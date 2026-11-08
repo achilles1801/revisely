@@ -192,6 +192,160 @@ appId: com.revisionbuddy.app
 - assertNotVisible:
     id: revo-chart-dailyPages-day
 
+# A newer chart kind, the juz map (sent as `visual`): a tap picks a juz, and its panel opens it in
+# the reader. As above, the first tap may only put the keyboard away.
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: reply
+      REPLY: '{"text": "Here is where each juz stands.", "chart": {"kind": "juzMap", "title": "Your juz · last revised"}, "remember": [], "title": "My juz", "chips": []}'
+- tapOn:
+    id: revo-input
+- inputText: "Which juz haven't I revised lately?"
+- tapOn:
+    id: revo-send
+- extendedWaitUntil:
+    visible:
+      id: revo-chart-juzMap
+    timeout: 15000
+- tapOn:
+    id: revo-chart-juzMap-plot
+- runFlow:
+    when:
+      notVisible:
+        id: revo-chart-juzMap-reader
+    commands:
+      - tapOn:
+          id: revo-chart-juzMap-plot
+- extendedWaitUntil:
+    visible:
+      id: revo-chart-juzMap-reader
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r5e-chart-juz
+- tapOn:
+    id: revo-chart-juzMap-plot
+- assertNotVisible:
+    id: revo-chart-juzMap-reader
+
+# The timeline (a `visual`): Al-Hashr, revised with Juz 28 every day the seed has. A tap picks a
+# revision, and its panel opens that day in Activity.
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: reply
+      REPLY: '{"text": "Most days this month.", "chart": {"kind": "timeline", "title": "Al-Hashr · last 30 days", "surah": 59, "days": 30}, "remember": [], "title": "Al-Hashr", "chips": []}'
+- tapOn:
+    id: revo-input
+- inputText: "How often do I revise Al-Hashr?"
+- tapOn:
+    id: revo-send
+- extendedWaitUntil:
+    visible:
+      id: revo-chart-timeline
+    timeout: 15000
+- tapOn:
+    id: revo-chart-timeline-plot
+- runFlow:
+    when:
+      notVisible:
+        id: revo-chart-timeline-day
+    commands:
+      - tapOn:
+          id: revo-chart-timeline-plot
+- extendedWaitUntil:
+    visible:
+      id: revo-chart-timeline-day
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r5f-chart-timeline
+- tapOn:
+    id: revo-chart-timeline-plot
+- assertNotVisible:
+    id: revo-chart-timeline-day
+
+# The weeks grid (a `visual`): six weeks of days. A tap in the grid picks a day (its middle is a
+# seeded day in October), and its panel opens it in Activity; a weekday's letter picks its column.
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: reply
+      REPLY: '{"text": "Saturdays, mostly.", "chart": {"kind": "weeks", "title": "The last six weeks", "weeks": 6}, "remember": [], "title": "Missed days", "chips": []}'
+- tapOn:
+    id: revo-input
+- inputText: "Which days do I usually miss?"
+- tapOn:
+    id: revo-send
+- extendedWaitUntil:
+    visible:
+      id: revo-chart-weeks
+    timeout: 15000
+- tapOn:
+    id: revo-chart-weeks-plot
+- runFlow:
+    when:
+      notVisible:
+        id: revo-chart-weeks-day
+    commands:
+      - tapOn:
+          id: revo-chart-weeks-plot
+- extendedWaitUntil:
+    visible:
+      id: revo-chart-weeks-day
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r5g-chart-weeks
+- tapOn:
+    id: revo-chart-weeks-plot
+- assertNotVisible:
+    id: revo-chart-weeks-day
+- tapOn:
+    id: revo-chart-weeks-col-6
+- assertVisible:
+    id: revo-chart-weeks-title
+    text: "Saturdays.*"
+- tapOn:
+    id: revo-chart-weeks-col-6
+
+# The table (a `visual`): Juz 27 and 28 side by side. A heading sorts; a row opens under itself
+# with Open in the reader.
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: reply
+      REPLY: '{"text": "Juz 28 needs the most care.", "chart": {"kind": "table", "title": "Juz 27–28", "juz": [27, 28], "columns": ["lastRevised", "weak"]}, "remember": [], "title": "Two juz", "chips": []}'
+- tapOn:
+    id: revo-input
+- inputText: "How are Juz 27 and 28 doing?"
+- tapOn:
+    id: revo-send
+- extendedWaitUntil:
+    visible:
+      id: revo-chart-table
+    timeout: 15000
+- tapOn:
+    id: revo-chart-table-sort-weak
+- tapOn:
+    id: revo-chart-table-row-28
+- extendedWaitUntil:
+    visible:
+      id: revo-chart-table-reader
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r5h-chart-table
+- tapOn:
+    id: revo-chart-table-row-28
+- assertNotVisible:
+    id: revo-chart-table-reader
+
 # Tonight's Day in review, written by the real function (as the app asks for it on a day with
 # something done). The memory holds what the conversation's answer asked to remember.
 - runScript:
@@ -333,6 +487,12 @@ appId: com.revisionbuddy.app
     file: ../subflows/shot.yaml
     env:
       NAME: r4-sheet-dark
+# The same answer as in light (the chart answers above set other replies, and a reply stays set).
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: reply
+      REPLY: '{"text": "The end of Al-Hashr and the start of Al-Mumtahanah slipped to weak twice this month, both coming late in a long session. Take them first tomorrow, while you are fresh.", "chart": {"kind": "pageRatings", "title": "End of Al-Hashr and start of Al-Mumtahanah", "pages": [548, 549]}, "textAfter": "Here is a plan:", "action": {"kind": "reviseFirst", "title": "The end of Al-Hashr first, tomorrow", "detail": "Then the start of Al-Mumtahanah, before the rest", "pages": [548, 549]}, "remember": ["You like short, practical plans.", "You usually revise after Fajr."], "title": "Pages that slip", "chips": ["How is my pace?"]}'
 - tapOn:
     id: revo-input
 - inputText: "Why do these two keep slipping?"

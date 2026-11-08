@@ -79,13 +79,13 @@ export function RatingCounts({ counts }: { counts: Record<RatingBand, number> })
 }
 
 /** Swatches under a plot ("■ Revised  ■ Planned"). */
-export function Legend({ items }: { items: { color: string; label: string; round?: boolean }[] }) {
+export function Legend({ items }: { items: { color: string; label: string; round?: boolean; outline?: boolean }[] }) {
   const { palette } = useTheme();
   return (
     <View style={styles.legend} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
       {items.map((it) => (
         <View key={it.label} style={styles.count}>
-          <View style={[it.round ? styles.dot : styles.swatch, { backgroundColor: it.color }]} />
+          <View style={[it.round ? styles.dot : styles.swatch, it.outline ? { borderWidth: 1.5, borderColor: it.color } : { backgroundColor: it.color }]} />
           <Text style={[styles.line, { color: palette.secondary }]} maxFontSizeMultiplier={CHART_TEXT_MAX}>
             {it.label}
           </Text>

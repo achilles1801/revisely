@@ -273,6 +273,7 @@ function revoMessage(id: string, uid: string, at: number, parts: Omit<RevoReplyP
   const m: StoredMessage = { id, uid, role: 'revo', text: parts.text, at };
   if (parts.textAfter) m.textAfter = parts.textAfter;
   if (parts.chart) m.chart = parts.chart;
+  if (parts.visual) m.visual = parts.visual;
   if (parts.action) m.action = parts.action;
   if (parts.chips && parts.chips.length > 0) m.chips = parts.chips;
   return m;

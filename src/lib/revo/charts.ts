@@ -8,10 +8,15 @@
 import type { RevisionLog, UserPage } from '../../types';
 import { reviewedOn } from '../aheadCredit';
 import { formatDayLong, formatMinutesLong } from '../activityFormat';
+import { weekStart } from '../activityHeatmap';
+import { lastRevisedByPage } from '../activityInsights';
+import { juzTiles, type JuzTile } from '../insightsView';
 import { shiftDay } from '../journal';
-import { describePassage, firstVerseOfPage, lastVerseOfPage, pagesNote, surahName } from '../passages';
+import { describePageRange, describePassage, firstVerseOfPage, lastVerseOfPage, NBSP, pagesNote, surahName } from '../passages';
+import { getJuzRange, getSurah } from '../quranData';
+import { revisedItems } from './context';
 import type { FactSources } from './facts';
-import type { RevoChart, RevoDayFacts } from './types';
+import type { RevoDayFacts, RevoPassageFacts, RevoTableColumn, RevoVisual } from './types';
 import { passageShort } from './words';
 
 export type RatingBand = 'weak' | 'moderate' | 'strong';
@@ -24,10 +29,25 @@ export const RATING_DAYS = 31;
  * A chart this app knows how to draw. A newer server's kind (or a malformed one) draws nothing:
  * the answer's words still show. Before this, an unknown kind fell through to an empty bar chart.
  */
-export function knownChart(c: RevoChart | null | undefined): c is RevoChart {
+export function knownChart(c: RevoVisual | null | undefined): c is RevoVisual {
   if (!c || typeof c.title !== 'string') return false;
   if (c.kind === 'pageRatings') return Array.isArray(c.pages) && c.pages.length > 0 && c.pages.every((p) => Number.isInteger(p) && p >= 1 && p <= 604);
   if (c.kind === 'dailyPages') return c.days === 7 || c.days === 30;
+  if (c.kind === 'juzMap') return true;
+  if (c.kind === 'timeline') {
+    const one = (c.surah == null) !== (c.juz == null);
+    const inRange = c.surah != null ? Number.isInteger(c.surah) && c.surah >= 1 && c.surah <= 114 : Number.isInteger(c.juz) && c.juz! >= 1 && c.juz! <= 30;
+    return one && inRange && (c.days === 30 || c.days === 90 || c.days === 365);
+  }
+  if (c.kind === 'weeks') return Number.isInteger(c.weeks) && c.weeks >= 4 && c.weeks <= 12;
+  if (c.kind === 'table') {
+    const rows = c.juz ?? c.surahs;
+    const max = c.juz ? 30 : 114;
+    const one = (c.juz == null) !== (c.surahs == null);
+    const rowsOk = Array.isArray(rows) && rows.length >= 2 && rows.length <= 8 && rows.every((n) => Number.isInteger(n) && n >= 1 && n <= max);
+    const colsOk = Array.isArray(c.columns) && c.columns.length >= 1 && c.columns.length <= 3 && c.columns.every((k) => k in TABLE_HEADS);
+    return one && rowsOk && colsOk;
+  }
   return false;
 }
 
@@ -43,9 +63,13 @@ const daysBetween = (from: string, to: string) => dayNumber(to) - dayNumber(from
 /** "once", "twice", "3 times". */
 export const timesWord = (n: number) => (n === 1 ? 'once' : n === 2 ? 'twice' : `${n} times`);
 
-/** "today", "yesterday", "4 days ago". */
+/**
+ * "today", "yesterday", "4 days ago". `day` may be a full timestamp: a page's lastRevisedDate is
+ * one in the app ("2026-11-02T09:00:00.000Z"); its first ten characters are the day, as AppContext
+ * reads it.
+ */
 export function agoWords(day: string, today: string): string {
-  const n = daysBetween(day, today);
+  const n = daysBetween(day.slice(0, 10), today);
   return n <= 0 ? 'today' : n === 1 ? 'yesterday' : `${n} days ago`;
 }
 
@@ -229,6 +253,335 @@ export function pageDetail(page: number, userPage: UserPage | undefined, dots: r
   if (weak > 0) parts.push(`rated weak ${timesWord(weak)} in ${RATING_DAYS} days`);
   parts.push(userPage?.lastRevisedDate ? `revised ${agoWords(userPage.lastRevisedDate, today)}` : 'not revised yet');
   return { title: describePassage([page], { juz: true }), note: pagesNote([page]), meta: parts.join(' · ') };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Juz map
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Insights' 30 tiles (lib/insightsView juzTiles), from the same reading of the sessions Revo's
+ * context makes (lastRevisedByPage over revisedItems), so the map and Revo's words agree.
+ */
+export function juzMapData(pages: readonly UserPage[], logs: readonly RevisionLog[], today: string): JuzTile[] {
+  const memorized = new Set(pages.filter((p) => p.status === 'memorized').map((p) => p.pageNumber));
+  const learning = new Set(pages.filter((p) => p.status === 'in_progress').map((p) => p.pageNumber));
+  return juzTiles(memorized, learning, lastRevisedByPage(revisedItems(logs), today), today);
+}
+
+/** A picked juz: "Juz 4 · last revised 41 days ago" over its surahs ("Ali 'Imran 92 to the end of Juz 4"). */
+export function juzReadout(tile: JuzTile): { title: string; line: string } {
+  const { start, end } = getJuzRange(tile.juz);
+  const when =
+    tile.state === 'none'
+      ? tile.learning
+        ? 'being learned'
+        : 'not memorized'
+      : tile.daysSince == null
+        ? 'not all revised yet'
+        : tile.daysSince === 0
+          ? 'revised today'
+          : tile.daysSince === 1
+            ? 'last revised yesterday'
+            : `last revised ${tile.daysSince} days ago`;
+  return { title: `Juz ${tile.juz} · ${when}`, line: describePageRange(start, end, { wholeJuz: false }) };
+}
+
+/** Pages for a strip: each memorized page that has been revised in its rating's band; the rest unrated. */
+export function pagesStrip(of: readonly number[], pages: readonly UserPage[]): { page: number; band: RatingBand | null; memorized: boolean }[] {
+  const byNumber = new Map(pages.map((p) => [p.pageNumber, p]));
+  return of.map((page) => {
+    const p = byNumber.get(page);
+    const memorized = p?.status === 'memorized';
+    return { page, memorized, band: memorized && p?.lastRevisedDate ? bandOf(p.weaknessRating) : null };
+  });
+}
+
+/** A juz's pages for its strip (pagesStrip). */
+export function juzStrip(juz: number, pages: readonly UserPage[]): { page: number; band: RatingBand | null; memorized: boolean }[] {
+  const { start, end } = getJuzRange(juz);
+  return pagesStrip(Array.from({ length: end - start + 1 }, (_, i) => start + i), pages);
+}
+
+const juzList = (js: number[]) => (js.length === 0 ? null : js.map((j) => `Juz ${j}`).join(', '));
+
+/** For VoiceOver: the tiles by state ("Revised this week: Juz 24, Juz 25. …"). */
+export function juzSummary(tiles: readonly JuzTile[]): string {
+  const of = (state: JuzTile['state']) => juzList(tiles.filter((t) => t.state === state).map((t) => t.juz));
+  return [
+    ['Revised this week', of('week')],
+    ['This month', of('month')],
+    ['Over 30 days ago', of('stale')],
+    ['Being learned', juzList(tiles.filter((t) => t.state === 'none' && t.learning).map((t) => t.juz))],
+  ]
+    .filter(([, v]) => v)
+    .map(([k, v]) => `${k}: ${v}`)
+    .join('. ');
+}
+
+// ---------------------------------------------------------------------------------------------
+// Timeline
+// ---------------------------------------------------------------------------------------------
+
+/** A surah's pages or a juz's, in the chosen print's page numbers. */
+export function passagePagesOf(c: { surah?: number; juz?: number }): number[] {
+  const range = c.surah != null ? getSurah(c.surah) : null;
+  const { start, end } = range ? { start: range.startPage, end: range.endPage } : c.juz != null ? getJuzRange(c.juz) : { start: 0, end: -1 };
+  return Array.from({ length: Math.max(0, end - start + 1) }, (_, i) => start + i);
+}
+
+export interface TimelineMark {
+  day: string;
+  /** Where on the line, 0 (the start) to 1 (today). */
+  at: number;
+  /** The weakest rating the passage's pages got that day (null: none rated). */
+  band: RatingBand | null;
+  /** Days since the revision before it in view (null for the first). */
+  gap: number | null;
+  /** The passage's pages revised that day. */
+  pages: number[];
+}
+
+/**
+ * Each day the passage was revised (any of its pages, in that day's sessions) over the last `days`,
+ * from the account's first session at the earliest.
+ */
+export function timelineData(logs: readonly RevisionLog[], passage: readonly number[], today: string, days: number): { start: string; end: string; marks: TimelineMark[] } {
+  const set = new Set(passage);
+  const first = logs.reduce<string | null>((m, l) => (m == null || l.date < m ? l.date : m), null);
+  const window = shiftDay(today, -(days - 1));
+  const start = first && first > window ? first : window;
+  const span = Math.max(0, daysBetween(start, today));
+  const daysIn = [...new Set(logs.map((l) => l.date))].filter((d) => d >= start && d <= today).sort();
+  const marks: TimelineMark[] = [];
+  for (const day of daysIn) {
+    const pages = [...reviewedOn(logs, day)].filter((p) => set.has(p)).sort((a, b) => a - b);
+    if (pages.length === 0) continue;
+    const rated = [...ratingsOn(logs, day)].filter(([p]) => set.has(p)).map(([, r]) => r);
+    const prev = marks[marks.length - 1];
+    marks.push({
+      day,
+      at: span > 0 ? daysBetween(start, day) / span : 1,
+      band: rated.length > 0 ? bandOf(Math.min(...rated)) : null,
+      gap: prev ? daysBetween(prev.day, day) : null,
+      pages,
+    });
+  }
+  return { start, end: today, marks };
+}
+
+/** "5 revisions · tap one to see it", or "Not revised in 30 days". */
+export function timelineHint(marks: readonly TimelineMark[], days: number): string {
+  if (marks.length > 0) return `${plural(marks.length, 'revision')} · tap one to see it`;
+  return days >= 365 ? 'Not revised in the last year' : `Not revised in ${days} days`;
+}
+
+/** A picked revision: "Friday 16 October · weak", "14 days after the time before". */
+export function timelineReadout(mark: TimelineMark): { title: string; line: string } {
+  return {
+    title: `${formatDayLong(mark.day)} · ${mark.band ?? 'not rated'}`,
+    line: mark.gap != null ? `${plural(mark.gap, 'day')} after the time before` : 'The first time in this view',
+  };
+}
+
+/**
+ * Its panel: the ratings the passage got that day, weakest first ("Al-Hashr 17–24 weak · Al-Hashr
+ * 4–16 moderate"), and the day's revision ("20 pages revised that day in 27 min").
+ */
+export function timelineDetail(mark: TimelineMark, logs: readonly RevisionLog[]): { ratings: string | null; line: string } {
+  const ratings = ratingsOn(logs, mark.day);
+  const byBand: Record<RatingBand, number[]> = { weak: [], moderate: [], strong: [] };
+  for (const p of mark.pages) {
+    const r = ratings.get(p);
+    if (r != null) byBand[bandOf(r)].push(p);
+  }
+  const parts = (['weak', 'moderate', 'strong'] as const).filter((b) => byBand[b].length > 0).map((b) => `${describePassage(byBand[b], { form: 'short' })} ${b}`);
+  const total = reviewedOn(logs, mark.day).size;
+  const minutes = logs.filter((l) => l.date === mark.day).reduce((n, l) => n + (l.durationMinutes ?? 0), 0);
+  return {
+    ratings: parts.length > 0 ? parts.join(' · ') : null,
+    line: `${plural(total, 'page')} revised that day${minutes > 0 ? ` in ${formatMinutesLong(minutes)}` : ''}`,
+  };
+}
+
+/**
+ * How big a timeline's dots can be: 14pt, smaller when revisions crowd the line (one a day for a
+ * month is 27 dots in 360pt), never under 6pt, so that neighbours keep 2pt between them.
+ */
+export function dotSizeFor(marks: readonly { at: number }[], width: number): number {
+  let closest = Infinity;
+  for (let i = 1; i < marks.length; i++) closest = Math.min(closest, (marks[i].at - marks[i - 1].at) * width);
+  return Math.max(6, Math.min(14, Math.floor(closest - 2)));
+}
+
+/** The mark nearest `x` (within `reach` points when given), or null. */
+export function nearestMark(marks: readonly { at: number }[], x: number, width: number, reach?: number): number | null {
+  let best: number | null = null;
+  let dist = reach ?? Infinity;
+  marks.forEach((m, i) => {
+    const d = Math.abs(m.at * width - x);
+    if (d <= dist) {
+      best = i;
+      dist = d;
+    }
+  });
+  return best;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Weeks grid
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * A day in the weeks grid: its plan done, done in part, missed, or a day without a plan (rest);
+ * today while it is under way; before the account's first session; or still to come.
+ */
+export type WeekCell = 'done' | 'part' | 'missed' | 'rest' | 'today' | 'before' | 'future';
+
+/**
+ * The last `weeks` weeks, Sunday to Saturday as Activity's calendar has them, a row a week, ending
+ * with this one. `planOf` says how a day's plan went (lib/revo/facts dayFacts).
+ */
+export function weeksData(
+  weeks: number,
+  today: string,
+  first: string | null,
+  planOf: (day: string) => RevoDayFacts['plan'],
+): { day: string; cell: WeekCell }[][] {
+  const top = weekStart(shiftDay(today, -7 * (weeks - 1)));
+  return Array.from({ length: weeks }, (_, w) =>
+    Array.from({ length: 7 }, (_, d) => {
+      const day = shiftDay(top, w * 7 + d);
+      if (day > today) return { day, cell: 'future' as const };
+      if (first == null || day < first) return { day, cell: 'before' as const };
+      const plan = planOf(day);
+      const cell: WeekCell = plan == null ? 'rest' : plan.done ? 'done' : day === today ? 'today' : plan.pages - plan.notDone > 0 ? 'part' : 'missed';
+      return { day, cell };
+    }),
+  );
+}
+
+const counted = (c: WeekCell) => c === 'done' || c === 'part' || c === 'missed';
+
+/** "45 of 50 days revised · tap a day or a weekday": days with a plan, before today. */
+export function weeksHint(rows: readonly { cell: WeekCell }[][]): string {
+  const cells = rows.flat().filter((c) => counted(c.cell));
+  const revised = cells.filter((c) => c.cell !== 'missed').length;
+  return cells.length > 0 ? `${revised} of ${plural(cells.length, 'day')} revised · tap a day or a weekday` : 'Tap a day to see it';
+}
+
+/** "26 Sep, 10, 17 and 24 Oct": days grouped by month, in order. */
+export function daysList(days: readonly string[]): string {
+  const groups: { month: string; dates: number[] }[] = [];
+  for (const day of [...days].sort()) {
+    const date = new Date(`${day}T00:00:00`);
+    const month = date.toLocaleDateString('en-US', { month: 'short' });
+    const last = groups[groups.length - 1];
+    if (last && last.month === month) last.dates.push(date.getDate());
+    else groups.push({ month, dates: [date.getDate()] });
+  }
+  const total = groups.reduce((n, g) => n + g.dates.length, 0);
+  let seen = 0;
+  return groups
+    .map((g) => {
+      const parts = g.dates.map((d) => {
+        seen++;
+        return seen === total && total > 1 ? `and ${d}` : String(d);
+      });
+      // "10, 17 and 24": the "and" joins with a space, the rest with commas.
+      const text = parts.reduce((out, p, i) => (i === 0 ? p : p.startsWith('and ') ? `${out} ${p}` : `${out}, ${p}`), '');
+      return `${text} ${g.month}`;
+    })
+    .reduce((out, g, i) => (i === 0 ? g : g.startsWith('and ') ? `${out} ${g}` : `${out}, ${g}`), '');
+}
+
+/** A picked weekday: "Saturdays · 4 missed of 8", "Missed 26 Sep, 10, 17 and 24 Oct · part of 31 Oct". */
+export function weekdayReadout(rows: readonly { day: string; cell: WeekCell }[][], column: number): { title: string; line: string } {
+  const cells = rows.map((r) => r[column]).filter((c) => counted(c.cell));
+  const name = `${new Date(`${rows[0][column].day}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long' })}s`;
+  const missed = cells.filter((c) => c.cell === 'missed').map((c) => c.day);
+  const part = cells.filter((c) => c.cell === 'part').map((c) => c.day);
+  const done = cells.filter((c) => c.cell === 'done').length;
+  const title = missed.length > 0 ? `${name} · ${missed.length} missed of ${cells.length}` : `${name} · ${done} of ${cells.length} done`;
+  const parts: string[] = [];
+  if (missed.length > 0) parts.push(`Missed ${daysList(missed)}`);
+  if (part.length > 0) parts.push(`${missed.length > 0 ? 'part' : 'Part'} of ${daysList(part)}`);
+  if (parts.length === 0) parts.push(cells.length > 0 ? 'None missed' : 'No plan on these days');
+  return { title, line: parts.join(' · ') };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Table
+// ---------------------------------------------------------------------------------------------
+
+export const TABLE_HEADS: Record<RevoTableColumn, string> = {
+  lastRevised: 'Last revised',
+  times30: '30 days',
+  weak: 'Weak',
+  strength: 'Strength',
+  memorized: 'Memorized',
+};
+
+/** Which way puts what needs care first, per column: the oldest, the fewest, the most weak, the weakest. */
+export const WORST_FIRST: Record<RevoTableColumn, 'asc' | 'desc'> = {
+  lastRevised: 'desc',
+  times30: 'asc',
+  weak: 'desc',
+  strength: 'asc',
+  memorized: 'asc',
+};
+
+export interface TableRow {
+  key: number;
+  name: string;
+  pages: number[];
+  facts: RevoPassageFacts;
+}
+
+/** A table's rows, in the order Revo gave them: each juz or surah with what the app shows for it. */
+export function tableRows(c: { juz?: number[]; surahs?: number[] }, factsOf: (pages: number[], name: string) => RevoPassageFacts): TableRow[] {
+  const juz = c.juz != null;
+  return (c.juz ?? c.surahs ?? []).map((n) => {
+    const pages = passagePagesOf(juz ? { juz: n } : { surah: n });
+    const name = juz ? `Juz${NBSP}${n}` : surahName(n);
+    return { key: n, name, pages, facts: factsOf(pages, name) };
+  });
+}
+
+/**
+ * A cell: its words, and the number it sorts by (null: nothing to say, as for a part not memorized,
+ * which always sorts last). `alert`: weak pages, in red.
+ */
+export function tableCell(col: RevoTableColumn, f: RevoPassageFacts): { text: string; key: number | null; alert?: boolean } {
+  if (col === 'memorized') return { text: `${f.memorized} of ${f.pages}`, key: f.pages > 0 ? f.memorized / f.pages : 0 };
+  if (f.memorized === 0) return { text: '—', key: null };
+  switch (col) {
+    case 'lastRevised': {
+      const d = f.lastRevisedDaysAgo;
+      return { text: d == null ? 'Never' : d === 0 ? 'Today' : d === 1 ? 'Yesterday' : `${d} days`, key: d ?? Number.MAX_SAFE_INTEGER };
+    }
+    case 'times30': {
+      // Revised in full (every memorized page) that many times, as Revo's attachments say it.
+      const n = f.memorized === 1 ? f.revised.last30.maxEach : f.revised.last30.minEach;
+      return { text: `${n}×`, key: n };
+    }
+    case 'weak':
+      return { text: String(f.strength.weak), key: f.strength.weak, alert: f.strength.weak > 0 };
+    case 'strength':
+      return f.strength.average == null ? { text: '—', key: null } : { text: f.strength.average.toFixed(1), key: f.strength.average };
+  }
+}
+
+/** The rows by a column: what needs care first, or the other way; rows with nothing to say last, the order kept on ties. */
+export function sortRows(rows: readonly TableRow[], col: RevoTableColumn, worstFirst: boolean): TableRow[] {
+  const dir = (WORST_FIRST[col] === 'desc') === worstFirst ? -1 : 1;
+  return rows
+    .map((r, i) => ({ r, i, k: tableCell(col, r.facts).key }))
+    .sort((a, b) => {
+      if (a.k == null || b.k == null) return a.k == null && b.k == null ? a.i - b.i : a.k == null ? 1 : -1;
+      return a.k === b.k ? a.i - b.i : (a.k - b.k) * dir;
+    })
+    .map((x) => x.r);
 }
 
 // ---------------------------------------------------------------------------------------------
