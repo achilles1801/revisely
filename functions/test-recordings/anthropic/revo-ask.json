@@ -1,6 +1,6 @@
 {
-  "recordedAt": "2026-11-08T05:17:16.606Z",
-  "how": "functions/scripts/record-anthropic.js. The request hash was then moved, without recording again, to the prompt after the guide's lines on translations changed (testers choose from QuranEnc's 76 translations, then star, download and read them offline; and Plan it on a custom plan, #434): record it again to match exactly.",
+  "recordedAt": "2026-11-08T08:56:26.419Z",
+  "how": "functions/scripts/record-anthropic.js",
   "request": {
     "model": "claude-sonnet-5-5",
     "max_tokens": 800,
@@ -13,13 +13,13 @@
   "status": 200,
   "body": {
     "model": "claude-sonnet-5-5",
-    "id": "msg_011Cgptp2usdG7gaAbh5cPFi",
+    "id": "msg_011CgqBXLY2BycUF8Ur64RoM",
     "type": "message",
     "role": "assistant",
     "content": [
       {
         "type": "text",
-        "text": "{\"text\":\"Most of your week held up: the whole plan was done on four of the last six days, and you're at 2 days in a row. Saturday was missed and Thursday fell one page short.\",\"chart\":{\"kind\":\"dailyPages\",\"title\":\"Pages revised, last 7 days\",\"days\":7},\"textAfter\":\"Today has 6 pages left, starting from Al-Infitar, and there's still time this evening.\",\"action\":{\"kind\":\"startRevision\",\"title\":\"Continue today's revision\",\"detail\":\"Pick up at Al-Infitar and finish today's pages\"},\"remember\":[],\"title\":\"How my week went\",\"chips\":[\"Which days do I miss?\",\"What are my weak spots?\",\"How is my pace?\"]}"
+        "text": "{\"text\":\"You finished the whole plan on four of the last six days, and one of those came on Thursday when you did 9 of 10. Saturday was the one missed day, and your 2-day streak is building again.\",\"chart\":{\"kind\":\"weeks\",\"title\":\"Your last few weeks, day by day\",\"weeks\":4},\"textAfter\":\"Six pages of Juz 30 are still waiting today, so finishing them tonight keeps this going.\",\"action\":{\"kind\":\"startRevision\",\"title\":\"Continue today's revision\",\"detail\":\"Six pages left, starting at Al-Infitar\"},\"remember\":[],\"title\":\"How my week went\",\"chips\":[\"Which days do I miss?\",\"What are my weak pages?\",\"How am I doing today?\"]}"
       }
     ],
     "container": null,
@@ -29,12 +29,12 @@
     "usage": {
       "input_tokens": 551,
       "cache_creation_input_tokens": 0,
-      "cache_read_input_tokens": 15232,
+      "cache_read_input_tokens": 15759,
       "cache_creation": {
         "ephemeral_5m_input_tokens": 0,
         "ephemeral_1h_input_tokens": 0
       },
-      "output_tokens": 227,
+      "output_tokens": 233,
       "output_tokens_details": {
         "thinking_tokens": 0
       },

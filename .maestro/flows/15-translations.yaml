@@ -2,7 +2,8 @@
 # International as everyone has it, the testers' picker and its search, then Al-Ikhlas 2 in one
 # translation per script the app shows (right to left: Urdu, Persian, Kurdish, Pashto, Uyghur,
 # N'Ko). E2E builds fetch nothing, so they write the recorded translations to the phone and open the
-# real verse sheet by a link (src/lib/e2e/demoTranslations.ts). The screenshots are the proof that
+# real verse sheet by a link (src/lib/e2e/demoTranslations.ts). Nobody signs in: the sheet opens over
+# the sign-in screen of a fresh install, which is what shows behind it in the screenshots. The screenshots are the proof that
 # every script renders with the system fonts and lays out the right way.
 # Rules (BEHAVIOUR.md): TRANS-1, TRANS-2, TRANS-3, TRANS-5, TRANS-8
 appId: com.revisionbuddy.app
