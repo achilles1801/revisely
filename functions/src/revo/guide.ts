@@ -35,7 +35,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
       '- Home’s Today post: where today starts (e.g. "Starts at Al-Mujadila ›", or "Starts at Al-Hadid, ayah 4 ›" mid-surah) and how much it is. Tapping that line (its ›) opens a menu with “Jump to…” and “Edit schedule”. Under it, one button: “Start revision”, “Continue revision” or “Review session”. Then "… of the Quran memorized ›" with a dot per juz; its › opens the memorized pages. Then “Recent sessions” (the last three) and “See all”.',
       '- Read tab: “Recent pages”, then every surah, grouped by juz. Tap one to open the reader.',
       '- The app names parts of the Qur’an by surah and juz, never by page numbers: "Starts at Al-Hadid, ayah 4", "Al-Baqarah 84–101", "Juz 28". Page numbers show only as a quiet detail after the words (the header of today’s › menu), inside the reader and the session (the printed page), and where pages are chosen by number (the Page tab of “Jump to…”).',
-      '- Revo (testers): the round button at the bottom right of Home, Activity and Read’s list. Never in the reader or a session.',
+      '- Revo: the round button at the bottom right of Home, Activity and Read’s list. Never in the reader or a session.',
     ),
   },
   {
@@ -234,7 +234,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
     text: lines(
       '- Account: display name. Activity: “Activity”, “Recordings”, “Back up recordings”, “Time in app”, “Memorized pages”. Home screen: “Next prayer”, “Friday Al-Kahf reminder”. Prayer: as above.',
       '- Revision: “Smart Tracking” (rate pages, Insights), “Keep daily amount”, and for testers on an iPhone “Speech model”.',
-      '- Revo AI (testers): Revo on or off, “Memory”, “Delete conversations”.',
+      '- Revo AI: Revo on or off, “Memory”, “Delete conversations”.',
       '- Mushaf: “Mushaf”, “Offline mushaf”, “Download over mobile data”. Notifications: “Enable notifications” (revision reminders: 8:00 AM, after Asr, and an hour before the day ends, while today isn’t done; there is no setting for their times). Appearance: “Theme” (Light or Dark) and “Accent” (Indigo, Crimson or Jade).',
       '- Support: “Share Revisely”, “Send feedback”, “Report a problem”, “Contact support”. About: “Privacy Policy”, “Terms of Service”, the version.',
       '- Testing (testers only): “Reset my data”, “Load test scenario”. Then “Sign out” and “Delete account”.',
@@ -246,7 +246,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['RESET-2', 'RESET-3'],
     routes: ['Settings'],
     text: lines(
-      '- Testers (TestFlight or Google Play testing, marked by the Revisely team) get Revo, Activity’s Overview, Insights and + menu, Settings → Testing, the hidden page in sessions (the eye button at the top, with the Madani 1405 mushaf: recite from memory; following the recitation word by word needs “Speech model” on an iPhone), and updates early.',
+      '- Testers (TestFlight or Google Play testing, marked by the Revisely team) get Activity’s Overview, Insights and + menu, Settings → Testing, the hidden page in sessions (the eye button at the top, with the Madani 1405 mushaf: recite from memory; following the recitation word by word needs “Speech model” on an iPhone), and updates early.',
       '- “Reset my data” (type RESET): a backup is kept, then the account starts again as new, still signed in; not again within 10 minutes. “Load test scenario” replaces the data with a ready-made situation the same way.',
       '- Updates come by themselves: “A new update is ready” → “Update now” or “Later”.',
     ),
@@ -256,7 +256,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['REVO-1', 'REVO-2', 'REVO-3', 'REVO-5', 'REVO-7', 'REVO-8', 'REVO-9', 'REVO-10', 'REVO-20', 'REVO-21', 'REVO-22', 'REVO-23', 'REVO-30', 'REVO-31', 'REVO-32', 'REVO-33', 'REVO-34', 'REVO-35', 'REVO-36', 'REVO-37'],
     routes: ['Settings'],
     text: lines(
-      '- For testers, off until turned on. Each question sends the numbers the app shows (today, the week, the streak, pages and ratings); 20 new questions a revision day, back after Fajr or at midnight. The same first question again that day is free.',
+      '- Off until turned on (its first open, or Settings → Revo AI). Each question sends the numbers the app shows (today, the week, the streak, pages and ratings); 20 new questions a revision day, back after Fajr or at midnight. The same first question again that day is free.',
       '- + opens “Add to chat”: search a surah, a juz, ayahs, a day or a page, or pick from Surahs, Juz, Days (a month: tap a day, then “Add day”) and Pages; up to six go with one question, and a day goes with its daily-log notes. Revo answers about them from their figures (how often revised, what was missed, weak spots, what’s next; a day’s plan, minutes and notes). History keeps the conversations; Memory keeps up to 30 short facts (delete one, clear them, or turn memory off). A Day in review comes once, from the evening, on a day something was done.',
       '- Revo can’t change anything itself: a suggestion happens only when tapped (“Add to my plan” puts pages first in tomorrow’s session; a card can also open a screen, such as Jump to… or a Settings section). It answers how-to questions from this guide. It needs the internet.',
       '- Its charts answer a touch: tap a bar, dot, tile or row (or slide along the bars) to see that day or passage, then “Open in Activity”, “Open in the reader” or “Revise first tomorrow” (only when tapped). A second tap or × puts it back; a table sorts by the heading tapped. The grey bar behind a day is its plan.',
@@ -336,7 +336,7 @@ export const GUIDE_PROMPT = [
   '- Which screen: “Edit schedule”, “Create new plan” or “Daily amount” → planEditor; “Jump to…” → jumpTo; Settings → a section → settings with that section; the reader, its player bar or “Audio Options” → reader; the compass: prayer times → prayerTimes, the Qibla → qibla; the memorized pages → memorized; the daily log → dailyLog; Activity → activity; Activity’s Insights → insights. Never write that you added a shortcut or will open something: the card shows it.',
   '- When the streak, missed days or missed pages come up, say how to catch up: tap “Add to today” on Home. A streak broken by two missed days can’t come back, but those days’ pages can still be added that way (the last three days): always say so.',
   '- Never invent a feature, a button, a setting or a path. When the guide says the app can’t do something (it is under “Not possible (yet)”, or the guide says no or not yet), say so plainly (“Not yet.” or “There’s no …”), then give the closest way the guide names. When that way changes more than they asked for (the whole plan, for one juz), say so in a few words. Say “I’m not sure that’s possible in Revisely” only for something the guide doesn’t mention at all, then offer the closest thing it has.',
-  '- What the guide marks as for testers is there for this person: Revo is only for testers.',
+  '- What the guide marks as for testers is in their app only when the question says "Tester: yes". For anyone else, never offer it as if it were there: say it isn’t in their app yet, then give the closest way that is.',
   '',
   '<guide>',
   REVO_GUIDE,

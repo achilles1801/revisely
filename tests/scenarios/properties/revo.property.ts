@@ -199,6 +199,20 @@ describe('who has Revo: the release switch (REVO-37)', () => {
     expect(m.requests).toHaveLength(2);
   });
 
+  it('[REVO-37] the model is told whether they are a tester, so it never offers a tester-only screen to anyone else', async () => {
+    const m = model();
+    const f = fakeStore({ tester: false, release: 'everyone' });
+    await handleRevoAsk(U, ask(), deps(f.store, m.call));
+    await handleDayInReview(U, { day: DAY, context: context() }, deps(f.store, m.call));
+    for (const r of m.requests) expect(r.messages.at(-1)!.content).toContain('Tester: no.');
+    const t = model();
+    await handleRevoAsk(U, ask(), deps(fakeStore({ release: 'everyone' }).store, t.call));
+    expect(t.requests[0].messages.at(-1)!.content).toContain('Tester: yes.');
+    expect(REVO_SYSTEM_PROMPT).toContain('only when the question says "Tester: yes"');
+    expect(REVO_SYSTEM_PROMPT).not.toContain('Revo is only for testers');
+    expect(REVO_GUIDE).not.toMatch(/Revo \(testers\)|Revo AI \(testers\)|get Revo,/);
+  });
+
   it('[REVO-37] off: testers too are refused as paused, the Day in review included, with no call', async () => {
     const f = fakeStore({ release: 'off' });
     const m = model();

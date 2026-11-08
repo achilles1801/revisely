@@ -86,6 +86,11 @@ export const REVO_SYSTEM_PROMPT = [
 export interface PromptOptions {
   /** Default true (as before the setting was read). */
   smartTracking?: boolean;
+  /**
+   * Whether the account is a tester (previewTester), so the guide's tester-only parts are in their
+   * app (REVO-37: once Revo is for everyone, most who ask aren't). Left out, nothing is said.
+   */
+  tester?: boolean;
 }
 
 /** An attachment as the model sees it: in sentences (attachText.ts); an older app's kinds as their label and fields. */
@@ -211,6 +216,8 @@ export function contextText(day: string, context: RevoContext, memory: readonly 
       (smart ? ` Weak pages revised in the last 7 days: ${T.weakRevisedLast7Days}.` : ''),
   );
   if (!smart) lines.push('Smart Tracking: off. They don’t rate pages, so say nothing about ratings or strength. Every chart but "pageRatings" still applies.');
+  if (opts.tester === true) lines.push('Tester: yes. What the guide marks as for testers is in their app.');
+  if (opts.tester === false) lines.push('Tester: no. What the guide marks as for testers isn’t in their app.');
   if (smart && context.weakPages.length > 0) {
     const weak = context.weakPages.map((p) => (named[String(p)] ? `${named[String(p)]} (page ${p})` : `page ${p}`));
     lines.push(`Weak pages, the longest since revised first: ${weak.join('; ')}.`);
@@ -282,11 +289,13 @@ export interface AskInput {
   chat?: { kind: 'chat' | 'review'; day: string } | null;
   /** The account's Smart Tracking (REVO-36); default true. */
   smartTracking?: boolean;
+  /** Whether the account is a tester (REVO-37); left out, nothing is said. */
+  tester?: boolean;
 }
 
 /** The Messages API body for a question: the chat so far, then the context and the question. */
 export function buildAskRequest(input: AskInput): MessagesRequest {
-  const opts: PromptOptions = { smartTracking: input.smartTracking };
+  const opts: PromptOptions = { smartTracking: input.smartTracking, tester: input.tester };
   const parts = [contextText(input.day, input.context, input.memory, opts)];
   if (input.attached.length > 0) parts.push(attachmentsText(input.attached, opts));
   parts.push(`Question: ${input.question}`);
@@ -296,7 +305,7 @@ export function buildAskRequest(input: AskInput): MessagesRequest {
 }
 
 /** The Messages API body for a day in review. */
-export function buildReviewRequest(input: { day: string; context: RevoContext; memory: readonly string[]; smartTracking?: boolean }): MessagesRequest {
-  const content = `${contextText(input.day, input.context, input.memory, { smartTracking: input.smartTracking })}\nWrite the day in review for this revision day.`;
+export function buildReviewRequest(input: { day: string; context: RevoContext; memory: readonly string[]; smartTracking?: boolean; tester?: boolean }): MessagesRequest {
+  const content = `${contextText(input.day, input.context, input.memory, { smartTracking: input.smartTracking, tester: input.tester })}\nWrite the day in review for this revision day.`;
   return request([{ role: 'user', content }]);
 }
