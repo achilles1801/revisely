@@ -2,6 +2,7 @@ import React from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import QuranReaderScreen from '../QuranReaderScreen';
+import { pageOfVerse } from '../../../lib/verses';
 
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
 jest.mock('react-native-reanimated', () => require('react-native-reanimated/mock'));
@@ -13,24 +14,41 @@ jest.mock('expo-haptics', () => ({
   NotificationFeedbackType: { Success: 's' },
 }));
 // The page: a tap toggles the controls, and the test can swipe it.
-const mockPager: { onUserSwipe?: () => void; onLongPressAyah?: unknown } = {};
+const mockPager: {
+  onUserSwipe?: () => void;
+  onLongPressAyah?: unknown;
+  onPageChange?: (page: number) => void;
+  highlightedAyah?: unknown;
+} = {};
 jest.mock('../../../components/MushafPager', () => {
   const { Pressable } = require('react-native');
   const React = require('react');
   return {
     MushafPager: React.forwardRef(
-      (props: { onTap?: () => void; onUserSwipe?: () => void; onLongPressAyah?: unknown }, _ref: unknown) => {
+      (
+        props: {
+          onTap?: () => void;
+          onUserSwipe?: () => void;
+          onLongPressAyah?: unknown;
+          onPageChange?: (page: number) => void;
+          highlightedAyah?: unknown;
+        },
+        _ref: unknown,
+      ) => {
         mockPager.onUserSwipe = props.onUserSwipe;
         mockPager.onLongPressAyah = props.onLongPressAyah;
+        mockPager.onPageChange = props.onPageChange;
+        mockPager.highlightedAyah = props.highlightedAyah;
         return <Pressable accessibilityLabel="The page" onPress={props.onTap} />;
       },
     ),
   };
 });
 const mockNavigation = { goBack: jest.fn(), navigate: jest.fn() };
+let mockParams: { pageNumber: number; highlight?: { sura: number; ayah: number } } = { pageNumber: 3 };
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => mockNavigation,
-  useRoute: () => ({ key: 'QuranReader-1', name: 'QuranReader', params: { pageNumber: 3 } }),
+  useRoute: () => ({ key: 'QuranReader-1', name: 'QuranReader', params: mockParams }),
   useIsFocused: () => true,
 }));
 jest.mock('../../../navigation/navigationRef', () => ({ navigateToActivityDay: jest.fn() }));
@@ -96,6 +114,7 @@ beforeEach(async () => {
   mockState.timer = null;
   mockState.phase = 'idle';
   mockState.calls = [];
+  mockParams = { pageNumber: 3 };
   await AsyncStorage.clear();
 });
 
@@ -170,6 +189,20 @@ describe('QuranReaderScreen: reading, and the controls on a tap', () => {
   it('holding a verse still works (the page passes it on)', async () => {
     await open();
     expect(typeof mockPager.onLongPressAyah).toBe('function');
+  });
+
+  it('opened from search, the verse found is highlighted until the page is turned', async () => {
+    const page = pageOfVerse({ sura: 10, ayah: 16 });
+    mockParams = { pageNumber: page, highlight: { sura: 10, ayah: 16 } };
+    await open();
+    expect(mockPager.highlightedAyah).toEqual({ page, sura: 10, ayah: 16 });
+    await act(async () => mockPager.onPageChange?.(page + 2));
+    expect(mockPager.highlightedAyah).toBeNull();
+  });
+
+  it('opened any other way, nothing is highlighted', async () => {
+    await open();
+    expect(mockPager.highlightedAyah).toBeNull();
   });
 });
 
