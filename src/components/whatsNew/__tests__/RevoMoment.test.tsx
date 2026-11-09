@@ -1,6 +1,6 @@
 import React from 'react';
 import { AccessibilityInfo, StyleSheet } from 'react-native';
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
 
@@ -69,14 +69,13 @@ describe('<RevoMoment />', () => {
   it('[NEW-2] Skip takes it to its end: Turn on Revo, or Later, which goes on and writes nothing', async () => {
     const { onNext } = await show();
     // Playing: nothing to choose yet, and the end's buttons take no touch.
-    expect(screen.queryByTestId('whats-new-moment-again')).toBeNull();
+    expect(screen.getByTestId('whats-new-moment-skip')).toBeTruthy();
     fireEvent.press(screen.getByTestId('whats-new-next'));
     expect(onNext).not.toHaveBeenCalled();
     await skip();
     expect(screen.getByTestId('whats-new-title').props.children).toBe('Meet Revo');
     expect(screen.getByTestId('whats-new-title').props.accessibilityLabel).toBe('Step 4 of 5. Meet Revo');
     expect(screen.getByTestId('whats-new-revo-turn-on')).toBeTruthy();
-    expect(screen.getByTestId('whats-new-moment-again')).toBeTruthy();
     fireEvent.press(screen.getByTestId('whats-new-next'));
     expect(onNext).toHaveBeenCalledTimes(1);
     expect(setOptions).not.toHaveBeenCalled();
@@ -134,7 +133,8 @@ describe('<RevoMoment />', () => {
   it('VoiceOver gets the end at once, read as one line', async () => {
     jest.spyOn(AccessibilityInfo, 'isScreenReaderEnabled').mockResolvedValue(true);
     await show();
-    expect(screen.getByTestId('whats-new-moment-again')).toBeTruthy();
+    expect(screen.getByTestId('whats-new-revo-turn-on')).toBeTruthy();
+    await waitFor(() => expect(screen.getByTestId('whats-new-moment-again')).toBeTruthy(), { timeout: 2000 });
     expect(screen.getByText('Ask about your revision, or how anything in the app works.').props.accessibilityLabel).toBe(MOMENT_WORDS.summary);
     // Nothing to skip.
     expect(screen.queryByTestId('whats-new-moment-skip')).toBeNull();
@@ -147,7 +147,8 @@ describe('<RevoMoment />', () => {
     fireEvent.press(screen.getByTestId('whats-new-revo-moment'));
     fireEvent.press(screen.getByTestId('whats-new-title'));
     await act(async () => {});
-    expect(screen.queryByTestId('whats-new-moment-again')).toBeNull();
+    // Still playing: Skip is still there.
+    expect(screen.getByTestId('whats-new-moment-skip')).toBeTruthy();
     expect(onNext).not.toHaveBeenCalled();
     // Skip: a visible button in the top corner, a 44pt target, read as "Skip".
     const button = screen.getByTestId('whats-new-moment-skip');
@@ -158,8 +159,31 @@ describe('<RevoMoment />', () => {
     expect(box.height).toBeGreaterThanOrEqual(44);
     expect(box.minWidth).toBeGreaterThanOrEqual(44);
     await skip();
-    expect(screen.getByTestId('whats-new-moment-again')).toBeTruthy();
     expect(screen.queryByTestId('whats-new-moment-skip')).toBeNull();
+  });
+
+  it('[NEW-2] a second tap where Skip was does nothing: Watch again takes its place a moment later', async () => {
+    await show();
+    await skip();
+    // Right after Skip, the corner is empty, so a double tap can't start it over.
+    expect(screen.queryByTestId('whats-new-moment-skip')).toBeNull();
+    expect(screen.queryByTestId('whats-new-moment-again')).toBeNull();
+    await waitFor(() => expect(screen.getByTestId('whats-new-moment-again')).toBeTruthy(), { timeout: 2000 });
+    // Watch again plays it from the start: Skip is back.
+    fireEvent.press(screen.getByTestId('whats-new-moment-again'));
+    await act(async () => {});
+    expect(screen.getByTestId('whats-new-moment-skip')).toBeTruthy();
+    expect(screen.queryByTestId('whats-new-moment-again')).toBeNull();
+  });
+
+  it('lands Revo where its button is on this screen, measured, not the window (Android’s is shorter)', async () => {
+    await show();
+    fireEvent(screen.getByTestId('whats-new-revo-moment'), 'layout', { nativeEvent: { layout: { x: 0, y: 0, width: 412, height: 915 } } });
+    await act(async () => {});
+    const docked = StyleSheet.flatten(screen.getByTestId('whats-new-moment-docked', { includeHiddenElements: true }).props.style) as { left: number; top: number };
+    // The tab bar (52 + 14 with no home indicator), the button's gap (14), its size (44); 16 from the right.
+    expect(docked.top).toBe(915 - 66 - 14 - 44);
+    expect(docked.left).toBe(412 - 16 - 44);
   });
 
   it('[NEW-3] the replay keeps its ✕', async () => {
