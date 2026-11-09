@@ -45,7 +45,9 @@ jest.mock('../../../components/MushafPager', () => {
   };
 });
 const mockNavigation = { goBack: jest.fn(), navigate: jest.fn() };
-let mockParams: { pageNumber: number; highlight?: { sura: number; ayah: number } } = { pageNumber: 3 };
+let mockParams: { pageNumber: number; highlight?: { sura: number; ayah: number; last?: { sura: number; ayah: number } } } = {
+  pageNumber: 3,
+};
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => mockNavigation,
   useRoute: () => ({ key: 'QuranReader-1', name: 'QuranReader', params: mockParams }),
@@ -195,7 +197,19 @@ describe('QuranReaderScreen: reading, and the controls on a tap', () => {
     const page = pageOfVerse({ sura: 10, ayah: 16 });
     mockParams = { pageNumber: page, highlight: { sura: 10, ayah: 16 } };
     await open();
-    expect(mockPager.highlightedAyah).toEqual({ page, sura: 10, ayah: 16 });
+    expect(mockPager.highlightedAyah).toEqual([{ page, sura: 10, ayah: 16 }]);
+    await act(async () => mockPager.onPageChange?.(page + 2));
+    expect(mockPager.highlightedAyah).toBeNull();
+  });
+
+  it('opened from search on a phrase across two ayat, both are highlighted until neither is on the page', async () => {
+    const page = pageOfVerse({ sura: 22, ayah: 49 });
+    mockParams = { pageNumber: page, highlight: { sura: 22, ayah: 49, last: { sura: 22, ayah: 50 } } };
+    await open();
+    expect(mockPager.highlightedAyah).toEqual([
+      { page, sura: 22, ayah: 49 },
+      { page: pageOfVerse({ sura: 22, ayah: 50 }), sura: 22, ayah: 50 },
+    ]);
     await act(async () => mockPager.onPageChange?.(page + 2));
     expect(mockPager.highlightedAyah).toBeNull();
   });

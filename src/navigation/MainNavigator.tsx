@@ -87,8 +87,13 @@ export type HomeStackParamList = {
 
 export type ReadStackParamList = {
   ReadIndex: undefined;
-  /** `highlight`: a verse found by search, highlighted on its page until the page is turned. */
-  QuranReader: { pageNumber: number; source?: 'index' | 'recent' | 'search'; highlight?: { sura: number; ayah: number } };
+  /** `highlight`: a verse found by search, highlighted on its page until the page is turned; with
+   *  `last`, the verses from it to `last` (a match that runs on into the next ayah). */
+  QuranReader: {
+    pageNumber: number;
+    source?: 'index' | 'recent' | 'search';
+    highlight?: { sura: number; ayah: number; last?: { sura: number; ayah: number } };
+  };
   /** Search the Qur'an (testers); `listen`: start listening at once (the Read tab's mic). */
   QuranSearch: { listen?: boolean } | undefined;
 };

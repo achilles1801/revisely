@@ -49,6 +49,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const JUMP_SETTLE_MS = 500;
 // The end card's item in the list (page numbers are 1–604).
 const END = -1;
+const NO_HIGHLIGHT: readonly AyahRef[] = [];
 
 interface MushafPagerProps {
   pages: number[];
@@ -66,8 +67,9 @@ interface MushafPagerProps {
    *  screen point pressed (to place a menu beside it). */
   /** A held verse: where the finger is, and the verse's lines on screen (both in window coordinates). */
   onLongPressAyah?: (ayah: AyahRef, point: { x: number; y: number }, verse?: Box | null) => void;
-  /** Verse to highlight (e.g. while its translation is open). */
-  highlightedAyah?: AyahRef | null;
+  /** Verse to highlight (e.g. while its translation is open), or several (a search match that
+   *  runs from one ayah into the next). */
+  highlightedAyah?: AyahRef | readonly AyahRef[] | null;
   /** Per-page extra data hashed into key — bumps trigger re-render of that
    *  page. Use for marking visual state (e.g. revised checkmark overlay). */
   extraData?: string;
@@ -99,9 +101,9 @@ interface PageItemProps {
   onTap?: () => void;
   /** A held verse: where the finger is, and the verse's lines on screen (both in window coordinates). */
   onLongPressAyah?: (ayah: AyahRef, point: { x: number; y: number }, verse?: Box | null) => void;
-  /** The highlighted verse, drawn on every page it has lines on (a verse can
-   *  run onto the next page). */
-  highlight: AyahRef | null;
+  /** The highlighted verses, each drawn on every page it has lines on (a verse
+   *  can run onto the next page). */
+  highlight: readonly AyahRef[];
   highlightColor: string;
   /** The highlight's opacity (it tints with a palette colour). */
   highlightOpacity?: number;
@@ -204,7 +206,7 @@ const PageItem = React.memo(function PageItem({
   };
 
   const highlightRects = useMemo(
-    () => (highlight ? ayahRects(pageNumber, highlight.sura, highlight.ayah) : []),
+    () => highlight.flatMap((h) => ayahRects(pageNumber, h.sura, h.ayah)),
     [highlight, pageNumber],
   );
 
@@ -459,6 +461,12 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
 
   // The verse a sheet is about is tinted: the accent's text colour at a quarter.
+  // One list, the same object while the highlight is the same (pages are memoised on it).
+  const highlights = useMemo<readonly AyahRef[]>(
+    () => (highlightedAyah == null ? NO_HIGHLIGHT : 'sura' in highlightedAyah ? [highlightedAyah] : highlightedAyah),
+    [highlightedAyah],
+  );
+
   const renderItem = useCallback(
     ({ item }: { item: number }) =>
       item === END ? (
@@ -471,7 +479,7 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
           edition={edition}
           onTap={onTap}
           onLongPressAyah={onLongPressAyah}
-          highlight={highlightedAyah ?? null}
+          highlight={highlights}
           highlightColor={v2.accentText}
           highlightOpacity={0.25}
           pageTint={palette.pageTint}
@@ -483,7 +491,7 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
           onTapVerse={onTapVerse}
         />
       ),
-    [onTap, onLongPressAyah, highlightedAyah, v2, palette, pageSize, endCard, pageOverlay, onTapVerse, edition],
+    [onTap, onLongPressAyah, highlights, v2, palette, pageSize, endCard, pageOverlay, onTapVerse, edition],
   );
 
   return (
@@ -510,7 +518,7 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
       initialNumToRender={3}
       maxToRenderPerBatch={3}
       windowSize={5}
-      extraData={`${extraData ?? ''}|${highlightedAyah ? `${highlightedAyah.page}:${highlightedAyah.sura}:${highlightedAyah.ayah}` : ''}|${pageSize.width}|${edition}`}
+      extraData={`${extraData ?? ''}|${highlights.map((h) => `${h.page}:${h.sura}:${h.ayah}`).join(',')}|${pageSize.width}|${edition}`}
       onLayout={(e) => {
         const { width, height } = e.nativeEvent.layout;
         setSpace((prev) => (prev.width === width && prev.height === height ? prev : { width, height }));
