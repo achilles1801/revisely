@@ -1,8 +1,31 @@
 // Clips: load and play only while on screen; each has a pause button.
 // With "reduce motion" on, nothing plays until the visitor presses play.
+// A clip whose sources have data-src and data-src-dark (and a poster in data-poster-dark) has a
+// light and a dark take: it plays the one that matches the visitor's appearance.
 (function () {
   var reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+  var dark = window.matchMedia('(prefers-color-scheme: dark)');
   var frames = Array.prototype.slice.call(document.querySelectorAll('[data-clip-frame]'));
+
+  // The light or dark take of an attribute (data-src, data-poster), if the element has both.
+  function pick(el, name) {
+    var d = el.getAttribute('data-' + name + '-dark');
+    return d && dark.matches ? d : el.getAttribute('data-' + name);
+  }
+
+  // Points a two-take clip at the take for the current appearance. False for a one-take clip.
+  // The sources are inserted afresh rather than given a src: a new source is what a waiting video
+  // picks up by itself, while load() would make Chrome download the clip despite preload="none".
+  function setSources(video) {
+    var sources = video.querySelectorAll('source[data-src]');
+    if (!sources.length) return false;
+    for (var i = 0; i < sources.length; i++) {
+      var s = sources[i].cloneNode(false);
+      s.src = pick(sources[i], 'src');
+      video.replaceChild(s, sources[i]);
+    }
+    return true;
+  }
 
   function setButton(btn, playing) {
     btn.setAttribute('aria-pressed', playing ? 'true' : 'false');
@@ -10,11 +33,13 @@
   }
 
   function loadPoster(video) {
-    var p = video.getAttribute('data-poster');
-    if (p) { video.poster = p; video.removeAttribute('data-poster'); }
+    var p = pick(video, 'poster');
+    if (p) { video.poster = p; video.setAttribute('data-poster-shown', ''); }
   }
 
   function play(state) {
+    // After a switch between light and dark, the video still holds the old take until reloaded.
+    if (state.reload) { state.reload = false; state.video.load(); }
     var p = state.video.play();
     if (p && p.catch) {
       // Autoplay refused (e.g. Low Power Mode): show the play button instead.
@@ -37,6 +62,7 @@
       userPaused: false,
       userPlayed: false,
     };
+    state.themed = setSources(state.video);
     setButton(state.btn, false);
     state.btn.addEventListener('click', function () {
       if (state.video.paused) {
@@ -91,6 +117,19 @@
   function onMotionChange() { states.forEach(update); }
   if (reduce.addEventListener) reduce.addEventListener('change', onMotionChange);
   else if (reduce.addListener) reduce.addListener(onMotionChange);
+
+  // Light to dark or back: switch two-take clips to the other take (from the start, when it plays).
+  function onSchemeChange() {
+    states.forEach(function (s) {
+      if (!s.themed) return;
+      setSources(s.video);
+      if (s.video.hasAttribute('data-poster-shown')) loadPoster(s.video);
+      s.reload = true;
+      if (!s.video.paused) play(s);
+    });
+  }
+  if (dark.addEventListener) dark.addEventListener('change', onSchemeChange);
+  else if (dark.addListener) dark.addListener(onSchemeChange);
 
   document.addEventListener('visibilitychange', function () {
     states.forEach(function (s) {

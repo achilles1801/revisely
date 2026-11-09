@@ -214,6 +214,42 @@
           </div>
         </div>
       </section>
+
+      <section class="feature flip" id="revo" aria-labelledby="f-revo">
+        <div class="wrap">
+          <div class="copy">
+            <span class="label">Revo</span>
+            <h2 id="f-revo" class="title">Ask Revo how your revision is going.</h2>
+            <p>Revo is an optional assistant in Revisely. Ask how your week went or what to revise first, and it answers from your own revision. Ask how something in the app works, and it explains.</p>
+            <ul class="points">
+              <li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.2 4.2L19 7"/></svg><span>Off until you turn it on. Turning it off in Settings deletes its conversations and what it remembers.</span></li>
+              <li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.2 4.2L19 7"/></svg><span>It only suggests: nothing in your plan changes unless you tap it.</span></li>
+              <li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.2 4.2L19 7"/></svg><span>Its answers are written by Claude, from Anthropic. Anthropic doesn’t train its models on what Revo sends.</span></li>
+            </ul>
+            <p class="note">Revo can make mistakes, so check anything that matters against the mushaf. <a href="/privacy/#revo">What Revo sends, and what’s kept</a></p>
+          </div>
+          <div class="phone" data-clip-frame>
+            <div class="screen" data-themed>
+              <video data-clip muted loop playsinline preload="none" disablepictureinpicture disableremoteplayback
+                data-poster="/assets/clips/revo-light.jpg" data-poster-dark="/assets/clips/revo-dark.jpg"
+                aria-label="Revo’s introduction in the app. Its R draws itself, then example questions appear: what to revise first, how the week went, with a chart of the pages revised each day, and how to log revision done at the masjid. It ends on “Meet Revo: Ask about your revision, or how anything in the app works,” with Turn on Revo and Later.">
+                <source data-src="/assets/clips/revo-light.webm" data-src-dark="/assets/clips/revo-dark.webm" type="video/webm; codecs=vp9">
+                <source data-src="/assets/clips/revo-light.mp4" data-src-dark="/assets/clips/revo-dark.mp4" type="video/mp4">
+              </video>
+              <noscript>
+                <picture>
+                  <source srcset="/assets/clips/revo-dark.jpg" media="(prefers-color-scheme: dark)">
+                  <img src="/assets/clips/revo-light.jpg" alt="" loading="lazy">
+                </picture>
+              </noscript>
+            </div>
+            <button class="clip-toggle" type="button" aria-pressed="true" aria-label="Pause clip">
+              <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6.5 4.5h4v15h-4zM13.5 4.5h4v15h-4z"/></svg>
+              <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 4.5v15l13-7.5z"/></svg>
+            </button>
+          </div>
+        </div>
+      </section>
     </div>
 
     <section class="more" aria-labelledby="more-title">
@@ -287,6 +323,10 @@
           <details>
             <summary>Does Revisely use my location?</summary>
             <p>Only if you use prayer times, the Qibla compass or Start day at fajr. Prayer times and the Qibla are worked out on your phone, and your location isn’t sent to us. Start day at fajr saves it to your account, to work out fajr where you are. The <a href="/privacy/">Privacy Policy</a> has the details.</p>
+          </details>
+          <details>
+            <summary>What does Revo send, and to whom?</summary>
+            <p>Nothing, until you turn Revo on. Then your questions, and the figures about your revision Revo needs to answer them, go to Anthropic, whose Claude models write the answers. On an evening after you’ve revised, Revo may also write a short Day in review from that day’s figures. Your name, email address, location and the audio of your recordings are never sent, and Anthropic doesn’t train its models on what is. What you type goes as you wrote it. The <a href="/privacy/#revo">Privacy Policy</a> has the details.</p>
           </details>
         </div>
       </div>

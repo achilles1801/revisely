@@ -28,6 +28,22 @@ signed in to the demo account `screenshots@revisely.app`. No real user's data ap
 5. `python3 encode.py <raw dir> ../../docs/assets/clips` cuts out the pauses and writes MP4, WebM and
    a poster for each. Keep the total under about 5 MB.
 
+## Revo
+
+The Revo section plays the app's What's new "Revo moment", in a light and a dark take: the page
+picks the one that matches the visitor's appearance (`site.js`, sources with `data-src` and
+`data-src-dark`). It comes from a recording of the moment in the app, made by the Revo session
+(`~/Documents/revisely-today-mocks/whats-new/revo-intro/video/`). To put a new recording on the page:
+
+```bash
+python3 scripts/site-clips/revo.py --light <light video> --dark <dark video> [--hold 2.5]
+```
+
+It writes `docs/assets/clips/revo-{light,dark}.{mp4,webm,jpg}` at the page's size. The poster is the
+last frame, the "Meet Revo" card, which is what a visitor with Reduce Motion sees until they press
+play. Update the video's `aria-label` in `docs/index.html` if the moment changes. The section stays
+off the live site until Revo is on for everyone.
+
 ## Stills
 
 The Home and revision screens on the page are the approved App Store screenshots
