@@ -26,9 +26,6 @@ export const STILL_HOLD = 2.6 / MOMENT_SPEED;
 export const STILL_FADE = 0.45 / MOMENT_SPEED;
 export const STILLS_DURATION = MOMENT_STILLS_P.length * STILL_HOLD;
 
-/** "Tap to skip" shows for the first seconds only (prototype seconds). */
-export const SKIP_HINT_P = [0.4, 3.6] as const;
-
 /** The questions, typed in big type, and when each is on screen (prototype seconds). */
 export const MOMENT_QUESTIONS = [
   'How was my week?',
@@ -78,7 +75,8 @@ export const MOMENT_WORDS = {
   dayLine: 'Every evening, a short look back',
   hereTitle: 'Always here',
   hereLine: 'on the main screens',
-  skip: 'Tap to skip',
+  /** The top corner's button while it plays: the one way to its end (a touch elsewhere does nothing). */
+  skip: 'Skip',
   turnOn: 'Turn on Revo',
   later: 'Later',
   next: 'Next',

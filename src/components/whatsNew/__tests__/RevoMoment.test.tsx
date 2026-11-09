@@ -1,5 +1,5 @@
 import React from 'react';
-import { AccessibilityInfo } from 'react-native';
+import { AccessibilityInfo, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
@@ -47,11 +47,13 @@ async function show({ closable = false } = {}) {
 }
 
 const skip = async () => {
-  fireEvent.press(screen.getByTestId('whats-new-moment'));
+  fireEvent.press(screen.getByTestId('whats-new-moment-skip'));
   await act(async () => {});
 };
 
 beforeEach(() => {
+  // VoiceOver off unless a test turns it on (its mock outlives restoreAllMocks).
+  jest.spyOn(AccessibilityInfo, 'isScreenReaderEnabled').mockResolvedValue(false);
   revoOn = false;
   setOptions.mockClear();
   __setRevoBackendForTests(backend);
@@ -64,7 +66,7 @@ afterEach(() => {
 });
 
 describe('<RevoMoment />', () => {
-  it('[NEW-2] a tap takes it to its end: Turn on Revo, or Later, which goes on and writes nothing', async () => {
+  it('[NEW-2] Skip takes it to its end: Turn on Revo, or Later, which goes on and writes nothing', async () => {
     const { onNext } = await show();
     // Playing: nothing to choose yet, and the end's buttons take no touch.
     expect(screen.queryByTestId('whats-new-moment-again')).toBeNull();
@@ -134,8 +136,30 @@ describe('<RevoMoment />', () => {
     await show();
     expect(screen.getByTestId('whats-new-moment-again')).toBeTruthy();
     expect(screen.getByText('Ask about your revision, or how anything in the app works.').props.accessibilityLabel).toBe(MOMENT_WORDS.summary);
-    // The skip control is gone from VoiceOver once there is nothing to skip.
-    expect(screen.getByTestId('whats-new-moment', { includeHiddenElements: true }).props.accessibilityElementsHidden).toBe(true);
+    // Nothing to skip.
+    expect(screen.queryByTestId('whats-new-moment-skip')).toBeNull();
+  });
+
+  it('[NEW-2] while it plays only Skip ends it: a touch anywhere else does nothing', async () => {
+    const { onNext } = await show();
+    // No tap-anywhere control: the screen itself takes no press.
+    expect(screen.queryByTestId('whats-new-moment')).toBeNull();
+    fireEvent.press(screen.getByTestId('whats-new-revo-moment'));
+    fireEvent.press(screen.getByTestId('whats-new-title'));
+    await act(async () => {});
+    expect(screen.queryByTestId('whats-new-moment-again')).toBeNull();
+    expect(onNext).not.toHaveBeenCalled();
+    // Skip: a visible button in the top corner, a 44pt target, read as "Skip".
+    const button = screen.getByTestId('whats-new-moment-skip');
+    expect(button.props.accessibilityLabel).toBe('Skip');
+    expect(button.props.accessibilityRole).toBe('button');
+    expect(screen.getByText('Skip')).toBeTruthy();
+    const box = StyleSheet.flatten(button.props.style) as { height?: number; minWidth?: number };
+    expect(box.height).toBeGreaterThanOrEqual(44);
+    expect(box.minWidth).toBeGreaterThanOrEqual(44);
+    await skip();
+    expect(screen.getByTestId('whats-new-moment-again')).toBeTruthy();
+    expect(screen.queryByTestId('whats-new-moment-skip')).toBeNull();
   });
 
   it('[NEW-3] the replay keeps its ✕', async () => {
