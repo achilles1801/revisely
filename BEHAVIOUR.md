@@ -676,6 +676,13 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   again from the same place with nothing changed, the line's second sentence changes, in turn; another place, day
   or juz starts afresh, and "done" is still said once a day.
 
+- **REVO-39.** The first time an account opens Revo while it's off (its button, Settings → Revo AI's switch, or a
+  screen's Ask Revo), Revo's moment plays first, then Revo's opt-in (REVO-21), which is never skipped or
+  shortened (Majd, Nov 9 2026: "whenever a new user clicks revo for the first time that way they know what revo
+  is"). Skip ends it as in What's new (NEW-2). It plays once per account on that phone: played or skipped there,
+  in What's new, on this first open or from Settings, it doesn't play on an open again. Settings → Revo AI →
+  "What Revo can do" plays it any time, ending on Turn on Revo and Later while Revo is off, or Done.
+
 ## Memorizing
 
 - **MEM-1.** What is memorized is kept by the ayah (most people memorize ayahs, not pages: Majd, Nov 7

@@ -44,6 +44,7 @@ import { logger } from '../../lib/logger';
 import { useNeedOpen } from './needs';
 import { pictureFor } from './pictures';
 import { RevoMoment } from './RevoMoment';
+import { markRevoMomentSeen } from '../../lib/revo/momentSeen';
 import { auth } from '../../lib/firebase';
 import { greetingName } from '../../lib/displayName';
 import { smartTrackingOn } from '../../lib/smartTracking';
@@ -260,6 +261,9 @@ export function WhatsNewScreen({ mode, onClose }: { mode: WhatsNewMode; onClose?
               closable={mode === 'replay'}
               onNext={advance}
               onClose={onClose}
+              onEnded={() => {
+                if (uid) markRevoMomentSeen(uid);
+              }}
             />
           </View>
         </GestureDetector>

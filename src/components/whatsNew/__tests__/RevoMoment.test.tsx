@@ -4,7 +4,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-
 
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
 
-import { RevoMoment } from '../RevoMoment';
+import { RevoMoment, type RevoMomentMode } from '../RevoMoment';
 import { ThemeProvider } from '../../../context/ThemeContext';
 import { DesignProvider } from '../../../design/DesignContext';
 import { auth } from '../../../lib/firebase';
@@ -22,13 +22,15 @@ const backend = {
   setOptions,
 } as unknown as RevoBackend;
 
-async function show({ closable = false } = {}) {
+async function show({ closable = false, mode }: { closable?: boolean; mode?: RevoMomentMode } = {}) {
   const onNext = jest.fn();
   const onClose = jest.fn();
+  const onEnded = jest.fn();
   render(
     <DesignProvider initial={{}}>
       <ThemeProvider>
         <RevoMoment
+          mode={mode}
           step={4}
           total={5}
           title="Meet Revo"
@@ -38,12 +40,13 @@ async function show({ closable = false } = {}) {
           closable={closable}
           onNext={onNext}
           onClose={onClose}
+          onEnded={onEnded}
         />
       </ThemeProvider>
     </DesignProvider>,
   );
   await act(async () => {});
-  return { onNext, onClose };
+  return { onNext, onClose, onEnded };
 }
 
 const skip = async () => {
@@ -184,6 +187,48 @@ describe('<RevoMoment />', () => {
     // The tab bar (52 + 14 with no home indicator), the button's gap (14), its size (44); 16 from the right.
     expect(docked.top).toBe(915 - 66 - 14 - 44);
     expect(docked.left).toBe(412 - 16 - 44);
+  });
+
+  it('[REVO-39] says when it has reached its end, played or skipped', async () => {
+    const { onEnded } = await show();
+    expect(onEnded).not.toHaveBeenCalled();
+    await skip();
+    expect(onEnded).toHaveBeenCalledTimes(1);
+  });
+
+  it('[REVO-39] on Revo’s first open it offers no choice at its end: Revo’s opt-in follows', async () => {
+    const { onEnded } = await show({ mode: 'intro' });
+    await skip();
+    expect(onEnded).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId('whats-new-revo-turn-on')).toBeNull();
+    expect(screen.queryByTestId('whats-new-next')).toBeNull();
+    expect(screen.queryByTestId('whats-new-title')).toBeNull();
+    // Nor Watch again: it goes on to the opt-in.
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 900));
+    });
+    expect(screen.queryByTestId('whats-new-moment-again')).toBeNull();
+  });
+
+  it('[REVO-39] from Settings: Turn on Revo and Later while Revo is off, no step', async () => {
+    const { onNext } = await show({ mode: 'settings', closable: true });
+    await skip();
+    expect(screen.getByTestId('whats-new-title').props.accessibilityLabel).toBe('Meet Revo');
+    expect(screen.queryByTestId('stepper')).toBeNull();
+    expect(screen.getByTestId('whats-new-revo-turn-on')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('revo-moment-later'));
+    expect(onNext).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('whats-new-close')).toBeTruthy();
+  });
+
+  it('[REVO-39] from Settings with Revo on: Done alone', async () => {
+    revoOn = true;
+    const { onNext } = await show({ mode: 'settings' });
+    await skip();
+    expect(screen.queryByTestId('whats-new-revo-turn-on')).toBeNull();
+    expect(screen.queryByTestId('revo-moment-later')).toBeNull();
+    fireEvent.press(screen.getByTestId('revo-moment-done'));
+    expect(onNext).toHaveBeenCalledTimes(1);
   });
 
   it('[NEW-3] the replay keeps its ✕', async () => {

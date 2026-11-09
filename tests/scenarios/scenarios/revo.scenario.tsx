@@ -12,7 +12,7 @@ import { markPreviewTester, watchFunction } from '../harness/admin';
 import { withAuthRetry } from '../harness/authRetry';
 import { getServerDoc, listServerDocs, setServerDoc } from '../harness/serverDocs';
 import { Home } from '../harness/screens';
-import { Phone, type Booted, type OpenApp } from '../harness/phone';
+import { Phone, type Booted, type OpenApp, revoMomentSeen } from '../harness/phone';
 import { plainText } from '../../../src/lib/passages';
 
 /** Home and the session in a stack, with Revo mounted as MainNavigator mounts it. */
@@ -81,6 +81,7 @@ it('[REVO-21] [REVO-20] [REVO-22] Revo from Home: the opt-in first, a greeting f
   await app.untilSynced();
   await app.close();
   await markPreviewTester(uid);
+  revoMomentSeen(phone, uid);
 
   app = await phone.open(revoStack);
   await app.until(() => app.app.user?.previewTester === true, 'the account to be a tester');
@@ -148,6 +149,7 @@ it('[REVO-23] [REVO-3] answers come through the real callables, a first question
   await app.untilSynced();
   await app.close();
   await markPreviewTester(uid);
+  revoMomentSeen(phone, uid);
 
   const setOptions = watchFunction('revoSetOptions');
   const asks = watchFunction('revoAsk');
@@ -232,6 +234,7 @@ it('[REVO-31] [REVO-30] an answer that offers a screen: its button opens it (Jum
   await app.untilSynced();
   await app.close();
   await markPreviewTester(uid);
+  revoMomentSeen(phone, uid);
 
   app = await phone.open(revoStack);
   await app.until(() => app.app.user?.previewTester === true, 'the account to be a tester');
@@ -335,6 +338,7 @@ it('[REVO-21] [REVO-1] [REVO-9] Revo’s own switch: with the Ask coach on, Revo
   await app.untilSynced();
   await app.close();
   await markPreviewTester(uid);
+  revoMomentSeen(phone, uid);
   // Before Nov 7 2026 Revo read the Ask coach's switch (as setCoachOptIn writes it): this account had
   // Revo "on" without ever seeing Revo's opt-in.
   await setServerDoc(`coachSettings/${uid}`, { optIn: true });
@@ -411,6 +415,7 @@ it('[REVO-34] [REVO-35] [REVO-9] [REVO-20] every open starts on a greeting writt
   await app.untilSynced();
   await app.close();
   await markPreviewTester(uid);
+  revoMomentSeen(phone, uid);
   await setServerDoc(`coachSettings/${uid}`, { revoOn: true });
 
   const reviews = watchFunction('revoDayInReview');

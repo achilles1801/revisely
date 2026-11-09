@@ -290,6 +290,7 @@ export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
   'NEW-2': 'the walkthrough itself; the guide gets it at the release\'s re-record',
   'NEW-3': 'the replay in Settings; the guide gets it at the release\'s re-record',
   'NEW-4': 'what waits for the walkthrough; nothing for Revo to explain',
+  'REVO-39': 'Revo\'s moment before its opt-in, and Settings → Revo AI → What Revo can do (testers); the guide gets them at the release\'s re-record',
   'ONBOARD-2': 'the server repairs a sign-up stopped half way; nothing to do',
   'SYNC-4': 'a new account loads with no relaunch; nothing to do',
   'ACCOUNT-2': 'the sign-in screen keeps what was typed after a failed attempt; Revo is for signed-in users',

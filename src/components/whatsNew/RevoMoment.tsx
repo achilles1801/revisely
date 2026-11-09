@@ -7,7 +7,7 @@
 // pictures are marked Example and hold no account's numbers. Reduce Motion: still frames that
 // cross-fade. VoiceOver: the end at once, read as one line.
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, Modal, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import Animated, {
   Easing,
@@ -66,6 +66,7 @@ import { PillButton } from '../v2/PillButton';
 import { Tap } from '../v2/Tap';
 import { Stepper } from '../Stepper';
 import { R_TRACE } from './rTrace';
+import { MOMENT_CAPTURE } from '../../lib/whatsNew/capture';
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
@@ -601,9 +602,18 @@ function Rise({ p, i, style, children }: { p: P; i: number; style?: object; chil
   return <Animated.View style={[styles.abs, style, rise]}>{children}</Animated.View>;
 }
 
+/**
+ * Where the moment plays (REVO-39):
+ * - `whatsNew`: What's new's card 4, ending on Next (Revo on) or Turn on Revo and Later, with its step;
+ * - `settings`: Settings → Revo AI → What Revo can do, ending on Done (Revo on) or Turn on Revo and Later;
+ * - `intro`: Revo's first open while it's off. No choice at its end: Revo's opt-in follows (onEnded).
+ */
+export type RevoMomentMode = 'whatsNew' | 'settings' | 'intro';
+
 export function RevoMoment({
-  step,
-  total,
+  mode = 'whatsNew',
+  step = 1,
+  total = 1,
   title,
   text,
   firstName,
@@ -611,19 +621,23 @@ export function RevoMoment({
   closable,
   onNext,
   onClose,
+  onEnded,
 }: {
-  step: number;
-  total: number;
+  mode?: RevoMomentMode;
+  step?: number;
+  total?: number;
   title: string;
   text: string;
   /** The account's first name, for Home's sketch: it stays on the phone. */
   firstName: string;
   smartTracking: boolean;
-  /** The replay's ✕ (NEW-3). */
+  /** A ✕ (What's new's replay, Settings). */
   closable: boolean;
-  /** Later, Next, or Revo turned on: on to the next card. */
+  /** Later, Next, Done, or Revo turned on: on (the next card) or closed. */
   onNext: () => void;
   onClose?: () => void;
+  /** It reached its end, played or skipped (each time: Watch again plays it again). */
+  onEnded?: () => void;
 }) {
   const { palette, isDark } = useTheme();
   const haptics = useHaptics();
@@ -673,6 +687,12 @@ export function RevoMoment({
     });
     return () => cancelAnimation(clock);
   }, [reduce, reader, run]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const endedRef = useRef(onEnded);
+  endedRef.current = onEnded;
+  useEffect(() => {
+    if (ended) endedRef.current?.();
+  }, [ended]);
 
   // Watch again only a moment after the end, where Skip was (AGAIN_AFTER_MS).
   useEffect(() => {
@@ -754,43 +774,54 @@ export function RevoMoment({
         </View>
 
         <View style={StyleSheet.absoluteFill} pointerEvents={ended ? 'box-none' : 'none'}>
-          <Rise p={p} i={0} style={{ top: 200 + L.oy, ...wide }}>
-            <Text
-              style={[styles.endTitle, { color: palette.text }]}
-              accessibilityRole="header"
-              accessibilityLabel={`Step ${step} of ${total}. ${title}`}
-              maxFontSizeMultiplier={TEXT_MAX}
-              testID="whats-new-title"
-            >
-              {title}
-            </Text>
-          </Rise>
-          <Rise p={p} i={1} style={{ top: 254 + L.oy, left: 36, width: L.width - 72 }}>
-            <Text style={[styles.endText, { color: palette.secondary }]} accessibilityLabel={MOMENT_WORDS.summary} maxFontSizeMultiplier={TEXT_MAX}>
-              {text}
-            </Text>
-          </Rise>
-          <Rise p={p} i={2} style={{ top: 384 + L.oy, ...wide }}>
-            {alreadyOn ? (
-              <PillButton title={MOMENT_WORDS.next} size="lg" onPress={onNext} testID="whats-new-next" />
-            ) : (
-              <PillButton title={MOMENT_WORDS.turnOn} size="lg" onPress={() => setOptIn(true)} testID="whats-new-revo-turn-on" />
-            )}
-          </Rise>
-          {alreadyOn ? null : (
-            <Rise p={p} i={3} style={{ top: 446 + L.oy, ...wide }}>
-              <Tap onPress={onNext} accessibilityRole="button" style={styles.later} testID="whats-new-next">
-                <Text style={[styles.laterText, { color: palette.text }]} maxFontSizeMultiplier={TEXT_MAX}>
-                  {MOMENT_WORDS.later}
+          {/* Revo's first open has no choice here: its opt-in follows. */}
+          {mode === 'intro' ? null : (
+            <>
+              <Rise p={p} i={0} style={{ top: 200 + L.oy, ...wide }}>
+                <Text
+                  style={[styles.endTitle, { color: palette.text }]}
+                  accessibilityRole="header"
+                  accessibilityLabel={mode === 'whatsNew' ? `Step ${step} of ${total}. ${title}` : title}
+                  maxFontSizeMultiplier={TEXT_MAX}
+                  testID="whats-new-title"
+                >
+                  {title}
                 </Text>
-              </Tap>
-            </Rise>
+              </Rise>
+              <Rise p={p} i={1} style={{ top: 254 + L.oy, left: 36, width: L.width - 72 }}>
+                <Text style={[styles.endText, { color: palette.secondary }]} accessibilityLabel={MOMENT_WORDS.summary} maxFontSizeMultiplier={TEXT_MAX}>
+                  {text}
+                </Text>
+              </Rise>
+              <Rise p={p} i={2} style={{ top: 384 + L.oy, ...wide }}>
+                {alreadyOn ? (
+                  mode === 'settings' ? (
+                    <PillButton title={MOMENT_WORDS.done} size="lg" onPress={onNext} testID="revo-moment-done" />
+                  ) : (
+                    <PillButton title={MOMENT_WORDS.next} size="lg" onPress={onNext} testID="whats-new-next" />
+                  )
+                ) : (
+                  <PillButton title={MOMENT_WORDS.turnOn} size="lg" onPress={() => setOptIn(true)} testID="whats-new-revo-turn-on" />
+                )}
+              </Rise>
+              {alreadyOn ? null : (
+                <Rise p={p} i={3} style={{ top: 446 + L.oy, ...wide }}>
+                  <Tap onPress={onNext} accessibilityRole="button" style={styles.later} testID={mode === 'settings' ? 'revo-moment-later' : 'whats-new-next'}>
+                    <Text style={[styles.laterText, { color: palette.text }]} maxFontSizeMultiplier={TEXT_MAX}>
+                      {MOMENT_WORDS.later}
+                    </Text>
+                  </Tap>
+                </Rise>
+              )}
+              {mode === 'whatsNew' ? (
+                <Rise p={p} i={4} style={{ top: 520 + L.oy, left: 0, width: L.width }}>
+                  <View style={styles.centered} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+                    <Stepper total={total} current={step} />
+                  </View>
+                </Rise>
+              ) : null}
+            </>
           )}
-          <Rise p={p} i={4} style={{ top: 520 + L.oy, left: 0, width: L.width }}>
-            <View style={styles.centered} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
-              <Stepper total={total} current={step} />
-            </View>
-          </Rise>
           <Rise p={p} i={5} style={{ top: L.button.y - 20, right: REVO_BUTTON_SIZE + 30 }}>
             <View importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
               <Text style={[styles.hereTitle, { color: palette.text }]} maxFontSizeMultiplier={TEXT_MAX}>
@@ -801,7 +832,7 @@ export function RevoMoment({
               </Text>
             </View>
           </Rise>
-          {againReady ? (
+          {againReady && mode !== 'intro' && !MOMENT_CAPTURE ? (
             <Tap
               onPress={() => setRun((r) => r + 1)}
               accessibilityRole="button"
@@ -818,7 +849,7 @@ export function RevoMoment({
       </Animated.View>
 
       {/* The one way to the end while it plays: holding the phone or brushing the screen never ends it. */}
-      {ended ? null : (
+      {ended || MOMENT_CAPTURE ? null : (
         <Tap
           onPress={skip}
           accessibilityRole="button"
@@ -833,7 +864,7 @@ export function RevoMoment({
           </View>
         </Tap>
       )}
-      {closable ? (
+      {closable && !MOMENT_CAPTURE ? (
         <Tap onPress={() => onClose?.()} accessibilityRole="button" accessibilityLabel="Close" hitSlop={12} style={[styles.close, { top: top + 6 }]} testID="whats-new-close">
           <Ionicons name="close" size={26} color={palette.text} />
         </Tap>

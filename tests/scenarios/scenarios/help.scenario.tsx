@@ -7,7 +7,7 @@ import { setNow, setZone, ZONES } from '../harness/clock';
 import { newAccount, pagesRange } from '../harness/account';
 import { markPreviewTester } from '../harness/admin';
 import { ActivityDayView, flatText, Home } from '../harness/screens';
-import { Phone, type Booted, type OpenApp } from '../harness/phone';
+import { Phone, type Booted, type OpenApp, revoMomentSeen } from '../harness/phone';
 
 /** Home, with the real Settings, session, Activity and day behind it (Home's stack holds them). */
 function homeAndSettings(mods: Booted): ReactElement {
@@ -67,6 +67,8 @@ async function account(tester: boolean, smartTracking = false): Promise<Phone> {
   await app.untilSynced();
   await app.close();
   if (tester) await markPreviewTester(uid);
+  // Ask Revo opens the opt-in here (REVO-39's moment has its own scenario).
+  revoMomentSeen(phone, uid);
   return phone;
 }
 

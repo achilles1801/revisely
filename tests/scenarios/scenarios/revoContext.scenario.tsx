@@ -14,7 +14,7 @@ import { setServerDoc } from '../harness/serverDocs';
 import { loadScenario } from '../harness/testScenario';
 import { DailyLog, Home, Manager, homeStack } from '../harness/screens';
 import { pageOfTitle } from '../harness/words';
-import { Phone, type Booted, type OpenApp } from '../harness/phone';
+import { Phone, type Booted, type OpenApp, revoMomentSeen } from '../harness/phone';
 import { SCENARIO_IDS, type ScenarioId, type SeedPlan } from '../../../functions/src/testScenarios';
 import type { RevoContext } from '../../../src/lib/revo/types';
 import type { HistoryItem } from '../../../src/lib/streakFromItems';
@@ -134,6 +134,7 @@ it('[REVO-26] Revo is told today, the week and the streak as Home shows them, in
   await app.untilSynced();
   await app.close();
   await markPreviewTester(uid);
+  revoMomentSeen(phone, uid);
   app = await phone.open(homeWithRevo);
   await app.until(() => app.app.user?.previewTester === true, 'the account to be a tester');
 
@@ -245,6 +246,7 @@ it('[REVO-26] Revo is asked with the state the phone shows now: after Jump to, a
   await app.close();
   setNow('2026-11-05 10:00');
   await markPreviewTester(uid);
+  revoMomentSeen(phone, uid);
   await setServerDoc(`emulator/anthropic/accounts/${uid}`, {
     reply: { text: JSON.stringify({ text: 'Here is where you are.', chart: null, textAfter: null, action: null, remember: [], title: 'Today', chips: [] }), stopReason: 'end_turn' },
   });
@@ -370,6 +372,7 @@ async function scenarioPhoneWithRevo(scenario: ScenarioId): Promise<{ app: OpenA
   await app.untilSynced();
   await app.close();
   await markPreviewTester(uid);
+  revoMomentSeen(phone, uid);
   app = await phone.open(revoAppStack);
   await app.until(() => app.app.user?.previewTester === true, 'the account to be a tester');
   const plan = await loadScenario(app, scenario);

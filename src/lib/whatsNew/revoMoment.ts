@@ -86,6 +86,7 @@ export const MOMENT_WORDS = {
   turnOn: 'Turn on Revo',
   later: 'Later',
   next: 'Next',
+  done: 'Done',
   again: 'Watch again',
   /** VoiceOver's one line, read for the end screen's words. */
   summary:
