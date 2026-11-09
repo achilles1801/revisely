@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="aw_today_name">Today</string>
+  <string name="aw_today_description">Today\'s revision, whether it\'s done, and your streak.</string>
+  <string name="aw_verse_name">Verse of the day</string>
+  <string name="aw_verse_description">A short verse each day, in Arabic.</string>
+  <string name="aw_qibla_name">Qibla</string>
+  <string name="aw_qibla_description">The Qibla\'s direction from true north, from where you last opened Revisely.</string>
+  <string name="aw_prayer_name">Prayer times</string>
+  <string name="aw_prayer_description">The next prayer and today\'s times.</string>
+
+  <string name="aw_today">Today</string>
+  <string name="aw_prayer">Prayer</string>
+  <string name="aw_verse_of_the_day">Verse of the day</string>
+  <string name="aw_open_revisely">Open Revisely</string>
+  <string name="aw_countdown_format">in %s</string>
+
+  <!-- The widget picker's previews: pages 582–586 as the app names them (no-break hyphens), an afternoon in New York. -->
+  <string name="aw_sample_title">An‑Naba to At‑Takwir</string>
+  <string name="aw_sample_place">Juz 30</string>
+  <string name="aw_sample_streak">7-day streak</string>
+  <string name="aw_sample_streak_dot">· 7-day streak</string>
+  <string name="aw_sample_left">5 pages left</string>
+  <string name="aw_sample_wide_line">5 pages left · Juz 30</string>
+  <string name="aw_sample_start">Start</string>
+  <string name="aw_sample_city">New York</string>
+  <string name="aw_sample_prayer">Asr</string>
+  <string name="aw_sample_time">2:21 PM</string>
+  <string name="aw_sample_countdown">in 1:12:05</string>
+  <string name="aw_sample_qibla">Qibla 58° NE</string>
+  <string name="aw_sample_qibla_short">58°</string>
+  <string name="aw_sample_qibla_city">New York</string>
+  <string name="aw_sample_distance">10,307 km to Makkah</string>
+  <string name="aw_sample_reference">Ash‑Sharh 94:5</string>
+  <string name="aw_sample_fajr">Fajr</string>
+  <string name="aw_sample_sunrise">Sunrise</string>
+  <string name="aw_sample_dhuhr">Dhuhr</string>
+  <string name="aw_sample_maghrib">Maghrib</string>
+  <string name="aw_sample_isha">Isha</string>
+  <string name="aw_sample_fajr_time">5:18 AM</string>
+  <string name="aw_sample_sunrise_time">6:36 AM</string>
+  <string name="aw_sample_dhuhr_time">11:41 AM</string>
+  <string name="aw_sample_maghrib_time">4:43 PM</string>
+  <string name="aw_sample_isha_time">6:01 PM</string>
+  <string name="aw_sample_fajr_short">5:18</string>
+  <string name="aw_sample_dhuhr_short">11:41</string>
+  <string name="aw_sample_asr_short">2:21</string>
+  <string name="aw_sample_maghrib_short">4:43</string>
+  <string name="aw_sample_isha_short">6:01</string>
+</resources>

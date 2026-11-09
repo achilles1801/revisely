@@ -1,5 +1,6 @@
 // What the Home and Lock Screen widgets show, worked out by the app and handed to
-// the widget extension (targets/widget) through the App Group's shared defaults.
+// the widget extension (targets/widget) through the App Group's shared defaults, and
+// on Android to the home-screen widgets (modules/android-widgets), which read the same JSON.
 //
 // The widget can't run the scheduler, so the app writes a week of days ahead:
 // today with what's done, then each following revision day as it would start.
@@ -56,6 +57,9 @@ export interface WidgetColors {
   /** The primary pill (Start revision), and the text on it. */
   primary: string;
   onPrimary: string;
+  /** The accent's tint (the next prayer's cell in Android's 4×1 prayer widget), and text on it. */
+  accentSubtle: string;
+  subtleText: string;
 }
 
 export interface WidgetSnapshot {
@@ -133,7 +137,15 @@ export interface WidgetInputs {
 function colorsFor(accent: AccentName): WidgetSnapshot['colors'] {
   const pick = (isDark: boolean): WidgetColors => {
     const p = paletteV2(isDark, accent);
-    return { accentText: p.accentText, done: p.done, onDone: p.onDone, primary: p.primary, onPrimary: p.onPrimary };
+    return {
+      accentText: p.accentText,
+      done: p.done,
+      onDone: p.onDone,
+      primary: p.primary,
+      onPrimary: p.onPrimary,
+      accentSubtle: p.accentSubtle,
+      subtleText: p.subtleText,
+    };
   };
   return { light: pick(false), dark: pick(true) };
 }

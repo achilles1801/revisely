@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <color name="aw_bg">#000000</color>
+  <color name="aw_text">#FFFFFF</color>
+  <color name="aw_secondary">#8A8A93</color>
+  <color name="aw_separator">#1F1F1F</color>
+  <color name="aw_fill">#181818</color>
+  <color name="aw_preview_accent">#9789DA</color>
+</resources>

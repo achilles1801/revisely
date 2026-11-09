@@ -59,7 +59,17 @@ The manifest declares `FOREGROUND_SERVICE_MEDIA_PLAYBACK` (expo-audio's media se
 - Video: an unlisted YouTube (or Google Drive) link, about 30 seconds: open a page, tap Play, press Home, show the
   notification and the lock screen with recitation going on, pause from the notification.
 
-## Exact alarms, all files access, photo and video permissions, background location
+## Exact alarms
+The manifest declares `SCHEDULE_EXACT_ALARM` (from 1.0.4, `modules/android-widgets`); the app never asks for
+it, and `USE_EXACT_ALARM` isn't used. If Play asks what it's for (App content → Exact alarms, or a review
+question):
+- *"Revisely's home-screen widgets show the next prayer time with a countdown and the day's Quran revision.
+  An exact alarm switches them at each prayer time, at Fajr (when the revision day starts) and at midnight, so
+  the widget never shows a prayer that has passed. Prayer-time reminders use it to arrive on time. The app
+  works without it: the widgets then switch within 10 minutes."*
+- It is core to the widgets and prayer times (a calendar-like, user-facing time), not for background work.
+
+## All files access, photo and video permissions, background location
 Not used: no declaration.
 
 ## Store settings

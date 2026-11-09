@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Today, 4×2. Its texts are the picker's preview; the widget sets every one. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:id="@android:id/background"
+  android:layout_width="match_parent"
+  android:layout_height="match_parent"
+  android:background="@drawable/aw_ground"
+  android:clipToOutline="true"
+  android:orientation="horizontal"
+  android:padding="16dp">
+
+  <FrameLayout
+    android:layout_width="40dp"
+    android:layout_height="40dp">
+    <ImageView
+      android:id="@+id/aw_mark_circle"
+      android:layout_width="match_parent"
+      android:layout_height="match_parent"
+      android:importantForAccessibility="no"
+      android:src="@drawable/aw_circle"
+      android:tint="@color/aw_fill" />
+    <ImageView
+      android:id="@+id/aw_mark_r"
+      android:layout_width="match_parent"
+      android:layout_height="match_parent"
+      android:importantForAccessibility="no"
+      android:padding="10dp"
+      android:scaleType="fitCenter"
+      android:src="@drawable/aw_r_mark" />
+    <ImageView
+      android:id="@+id/aw_mark_check"
+      android:layout_width="match_parent"
+      android:layout_height="match_parent"
+      android:importantForAccessibility="no"
+      android:padding="9dp"
+      android:scaleType="fitCenter"
+      android:src="@drawable/aw_check"
+      android:visibility="gone" />
+  </FrameLayout>
+
+  <LinearLayout
+    android:layout_width="0dp"
+    android:layout_height="match_parent"
+    android:layout_marginStart="12dp"
+    android:layout_weight="1"
+    android:orientation="vertical">
+
+    <LinearLayout
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:baselineAligned="true"
+      android:orientation="horizontal">
+      <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:fontFamily="sans-serif-medium"
+        android:maxLines="1"
+        android:text="@string/aw_today"
+        android:textColor="@color/aw_text"
+        android:textSize="15sp" />
+      <TextView
+        android:id="@+id/aw_streak"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="4dp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:text="@string/aw_sample_streak_dot"
+        android:textColor="@color/aw_secondary"
+        android:textSize="13sp" />
+    </LinearLayout>
+
+    <TextView
+      android:id="@+id/aw_title"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:layout_marginTop="2dp"
+      android:ellipsize="end"
+      android:fontFamily="sans-serif-medium"
+      android:includeFontPadding="false"
+      android:maxLines="1"
+      android:text="@string/aw_sample_title"
+      android:textColor="@color/aw_text"
+      android:textSize="17sp" />
+
+    <TextView
+      android:id="@+id/aw_place"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:layout_marginTop="2dp"
+      android:ellipsize="end"
+      android:maxLines="2"
+      android:text="@string/aw_sample_place"
+      android:textColor="@color/aw_secondary"
+      android:textSize="13sp" />
+
+    <TextView
+      android:id="@+id/aw_setup"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:layout_marginTop="2dp"
+      android:ellipsize="end"
+      android:maxLines="3"
+      android:textColor="@color/aw_secondary"
+      android:textSize="13sp"
+      android:visibility="gone" />
+
+    <FrameLayout
+      android:layout_width="match_parent"
+      android:layout_height="0dp"
+      android:layout_weight="1"
+      android:minHeight="6dp" />
+
+    <FrameLayout
+      android:id="@+id/aw_hairline"
+      android:layout_width="match_parent"
+      android:layout_height="0.5dp"
+      android:background="@color/aw_separator" />
+
+    <LinearLayout
+      android:id="@+id/aw_foot"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:gravity="center_vertical"
+      android:minHeight="36dp"
+      android:orientation="horizontal"
+      android:paddingTop="6dp">
+      <TextView
+        android:id="@+id/aw_status"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:ellipsize="end"
+        android:fontFamily="sans-serif-medium"
+        android:maxLines="1"
+        android:text="@string/aw_sample_left"
+        android:textColor="@color/aw_text"
+        android:textSize="13sp" />
+      <!-- The pill is the label's size: a RelativeLayout pins the tinted shape to it. -->
+      <RelativeLayout
+        android:id="@+id/aw_pill"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp">
+        <ImageView
+          android:id="@+id/aw_pill_bg"
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:layout_alignStart="@+id/aw_pill_text"
+          android:layout_alignTop="@+id/aw_pill_text"
+          android:layout_alignEnd="@+id/aw_pill_text"
+          android:layout_alignBottom="@+id/aw_pill_text"
+          android:importantForAccessibility="no"
+          android:scaleType="fitXY"
+          android:src="@drawable/aw_pill"
+          android:tint="@color/aw_preview_primary" />
+        <TextView
+          android:id="@+id/aw_pill_text"
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:fontFamily="sans-serif-medium"
+          android:maxLines="1"
+          android:paddingStart="14dp"
+          android:paddingTop="6dp"
+          android:paddingEnd="14dp"
+          android:paddingBottom="6dp"
+          android:text="@string/aw_sample_start"
+          android:textColor="@color/aw_preview_on_primary"
+          android:textSize="13sp" />
+      </RelativeLayout>
+    </LinearLayout>
+  </LinearLayout>
+</LinearLayout>

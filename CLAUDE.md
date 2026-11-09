@@ -1218,9 +1218,11 @@ before production can be applied for.
     have none.
   - expo-location sends a heading only after a ~2° turn, so a phone held still can show
     "Finding north…" until it moves.
-  - Widgets are iOS only (WidgetKit); Android home-screen widgets are a follow-up.
-- **Not on Android yet:** home-screen widgets, recite mode's speech recognition (whisper.rn's iOS
-  path only), Sign in with Apple. (Previous/next verse in the media notification came with 1.0.4.)
+  - Home-screen widgets are native RemoteViews (`modules/android-widgets`, from 1.0.4): see
+    "Widgets", Android.
+- **Not on Android yet:** recite mode's speech recognition (whisper.rn's iOS path only), Sign in
+  with Apple. (Previous/next verse in the media notification and home-screen widgets came with
+  1.0.4.)
 - **Testing on an emulator** without touching production: the Firebase emulators (Auth, Firestore,
   Storage) with a dev build pointed at them, and an account seeded there with
   `functions/scripts/seed-screenshots.js` (`FIRESTORE_EMULATOR_HOST`, `FIREBASE_AUTH_EMULATOR_HOST`).
@@ -1470,6 +1472,52 @@ app; `askCoach`/`setCoachOptIn` stay as they were until Insights links to Revo. 
   Prebuild over an existing `ios/` fails in the plugin (`removeFromProject`): use `--clean`.
 - **Simulator:** a reinstall doesn't make WidgetKit re-read; the app's own write does. An App Group
   plist edited by hand is seen only after a simulator reboot (cfprefsd keeps a copy).
+
+### Android (`modules/android-widgets`, 1.0.4; mocks `~/Documents/revisely-today-mocks/android-widgets/`)
+
+The same four widgets on the home screen, as Majd approved them (Nov 8 2026): the app's own colours
+(white or black ground, the account's accent; no Material You), resizable instead of Lock Screen
+families. Native RemoteViews (Kotlin and XML) in a local Expo module for Android only, so iOS's
+fingerprint doesn't move. No headless JavaScript: the widgets read the snapshot themselves.
+- **Sizes** (a layout per size, chosen from what the launcher reports, `Render.kt`'s `shapeOf`: 4
+  cells wide from 280dp, 2 tall from 140dp): Today and Prayer times 2×1, 2×2 (default), 4×1, 4×2;
+  Verse of the day 2×2, 4×2; Qibla 1×1, 2×2. 4×1, 2×1 and 1×1 stand in for iOS's rectangular, inline
+  and circular. The 4×1 prayer row tints the next prayer with `accentSubtle`/`subtleText`, which the
+  snapshot's colours carry for it (iOS ignores them).
+- **Data:** `lib/widgets/storage` hands the module the same JSON under the same key (`set`, then
+  `reload`); it keeps it in SharedPreferences (`revisely.widgets`) and redraws on a background thread.
+  `requireOptionalNativeModule`: binaries before 1.0.4 have none and nothing is written.
+- **Time:** one alarm for the next change of a placed widget (the day's end, each of the six times
+  and midnight, midnight for the verse), set again on every redraw, at boot, on a time, time-zone,
+  12/24-hour or locale change, after an update, and when "Alarms & reminders" is granted.
+  `SCHEDULE_EXACT_ALARM` is declared and never asked for (Majd, Nov 8 2026): with it the alarm is
+  exact (Android 12–13 grant it; 14+ only if the user allows it), else within 10 minutes. Not a wake-up
+  alarm. Prayer notifications become exact too where it's granted (expo-notifications uses it when
+  allowed). The countdown is a `Chronometer` ticked by the launcher ("in 1:12:05"; RemoteViews can't
+  say "1 hr, 12 min" without waking the app every minute).
+- **Light and dark:** base colours are resources with `values-night`; the accent goes through
+  `setColorInt(light, dark)` (Android 12+), so the launcher switches with the system's dark theme. On
+  8–11 the current appearance is written and the next redraw follows a change.
+- **Amiri and the dial** can't be RemoteViews: they're alpha masks (`Masks.kt`) tinted like any other
+  image, so one bitmap serves both appearances and stays small (a widget's update is one binder call).
+  `assets/widgets/` holds copies of `targets/widget/verses.json`, `Amiri-Regular.ttf` and its licence;
+  `androidWidgets.test.ts` fails when they differ, or when the base colours leave `src/theme/v2.ts`.
+- **Titles fit like iOS's** `minimumScaleFactor(0.8)` (`Render.fit`): `lib/passages` holds a surah and
+  its ayahs together with a no-break space, and Android won't break at the dash between numbers either,
+  so "Al‑Baqarah 142–252" broke inside "252" before it was made smaller.
+- **Taps** open MainActivity with the iOS links (`revisely://today` …), handled by `WidgetSync`.
+- **Previews:** `previewLayout` (Android 12+) is each widget's 2×2 layout with sample text; Verse and
+  Qibla use small white masks in `drawable-nodpi`. Android 8–11 pickers show the app icon.
+- **Tests:** the timeline rules and the snapshot parser are JVM tests
+  (`cd android && ./gradlew :android-widgets:testDebugUnitTest` after `npx expo prebuild -p android`; not in
+  CI); the bridge and the shared files in Jest (`widgetStorage`, `androidWidgets`).
+- **On an emulator** without signing in: a debug build has `DebugSnapshotReceiver` (`src/debug`, absent from
+  release builds): `adb shell am broadcast -n com.revisionbuddy.app/app.revisely.widgets.DebugSnapshotReceiver
+  -a app.revisely.widgets.DEBUG_SNAPSHOT -f 32 --es b64 "$(base64 < snapshot.json)"`. Widgets are added from
+  the launcher's picker (`adb shell input draganddrop` from a preview to the home screen works); `adb shell
+  cmd uimode night yes` switches the theme; `adb shell dumpsys alarm | grep revisely` shows the alarm.
+- **Revo's guide** still says Android has no widgets (`functions/src/revo/guide.ts`): change it, deploy
+  and re-record when 1.0.4 is out on Play.
 
 ## The design
 

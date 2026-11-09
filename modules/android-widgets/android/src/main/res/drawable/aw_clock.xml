@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A clock, white, tinted by the widget: the prayer widget's mark, as the app's next-prayer line. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+  android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+  <path
+    android:pathData="M12,3.25a8.75,8.75 0,1 1,0 17.5a8.75,8.75 0,1 1,0 -17.5z"
+    android:strokeColor="#FFFFFF"
+    android:strokeWidth="1.6" />
+  <path
+    android:pathData="M12,7.25L12,12.25L15.25,14.25"
+    android:strokeColor="#FFFFFF"
+    android:strokeWidth="1.6"
+    android:strokeLineCap="round"
+    android:strokeLineJoin="round" />
+</vector>
