@@ -1,7 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Keyboard, Platform } from 'react-native';
+import { Keyboard, Modal, Platform, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApp } from '../../context/AppContext';
+import { useTheme } from '../../context/ThemeContext';
+import { greetingName } from '../../lib/displayName';
+import { loadRevoMomentSeen, markRevoMomentSeen, revoMomentSeen } from '../../lib/revo/momentSeen';
+import { RevoMoment } from '../whatsNew/RevoMoment';
 import { auth } from '../../lib/firebase';
 import { logger } from '../../lib/logger';
 import { navigationRef } from '../../navigation/navigationRef';
@@ -79,7 +83,8 @@ function useKeyboardUp(): boolean {
 
 /**
  * Revo in the app (the accounts its release opens it to: config/app.revo, REVO-37): its button on
- * the main screens and its sheet. The first tap opens the opt-in; after that, every open is a new
+ * the main screens and its sheet. The first tap opens the opt-in, after Revo's moment the first time
+ * on this phone (REVO-39); after that, every open is a new
  * conversation on a greeting written then (REVO-34). An earlier one shows only when picked: in History, or today's Day in review from
  * its row under the greeting, which the button's dot points to until it is opened. Each evening
  * with something done, the day's review is written once (it never counts toward the day's questions).
@@ -119,6 +124,20 @@ function RevoHostInner({ available, onOpenChange }: { available: boolean; onOpen
   const fullBeforeAdd = useRef(false);
   const [optInBusy, setOptInBusy] = useState(false);
   const [optInError, setOptInError] = useState<string | null>(null);
+  // REVO-39: the first open while Revo is off plays its moment, then the opt-in. Seen on this phone,
+  // per account, once played or skipped anywhere (What's new, here, Settings).
+  const { palette } = useTheme();
+  const [momentSeen, setMomentSeen] = useState<boolean | undefined>(() => (uid ? revoMomentSeen(uid) : undefined));
+  const [intro, setIntro] = useState(false);
+  const optInAfterIntro = useRef(false);
+  useEffect(() => {
+    if (!uid) return;
+    let live = true;
+    void loadRevoMomentSeen(uid).then((v) => live && setMomentSeen(v));
+    return () => {
+      live = false;
+    };
+  }, [uid]);
 
   useEffect(() => (uid ? backend.watchSettings(uid, setSettings) : undefined), [backend, uid]);
   useEffect(() => (uid ? backend.watchUsage(uid, setUsage) : undefined), [backend, uid]);
@@ -286,6 +305,11 @@ function RevoHostInner({ available, onOpenChange }: { available: boolean; onOpen
       const at = request.place ?? (navigationRef.isReady() ? revoPlaceOf(navigationRef.getCurrentRoute()) : HOME);
       placeRef.current = at;
       if (!settings?.optIn) {
+        // Unread yet (just after launch): straight to the opt-in, as before.
+        if (uid && momentSeen === false) {
+          setIntro(true);
+          return;
+        }
         setView({ name: 'optin' });
         setFull(true);
       } else if (request.view === 'memory') {
@@ -302,7 +326,7 @@ function RevoHostInner({ available, onOpenChange }: { available: boolean; onOpen
       }
       setOpen(true);
     },
-    [settings, openChat, startFresh, attachDay],
+    [settings, openChat, startFresh, attachDay, uid, momentSeen],
   );
   const showRef = useRef(show);
   showRef.current = show;
@@ -320,6 +344,27 @@ function RevoHostInner({ available, onOpenChange }: { available: boolean; onOpen
     setOpen(false);
     Keyboard.dismiss();
   };
+
+  // The moment has played (or been skipped): the opt-in, once its modal has gone (iOS can't present
+  // the sheet's modal while another is leaving), never skipped or shortened.
+  const openOptInAfterIntro = useCallback(() => {
+    if (!optInAfterIntro.current) return;
+    optInAfterIntro.current = false;
+    setView({ name: 'optin' });
+    setFull(true);
+    setOpen(true);
+  }, []);
+  const finishIntro = useCallback(
+    (thenOptIn: boolean) => {
+      if (uid) markRevoMomentSeen(uid);
+      setMomentSeen(true);
+      optInAfterIntro.current = thenOptIn;
+      setIntro(false);
+      // Android has no onDismiss; iOS gets a fallback in case it never comes.
+      setTimeout(openOptInAfterIntro, Platform.OS === 'ios' ? 700 : 0);
+    },
+    [uid, openOptInAfterIntro],
+  );
   useEffect(() => onOpenChange(open), [open, onOpenChange]);
 
   const turnOn = async () => {
@@ -364,6 +409,27 @@ function RevoHostInner({ available, onOpenChange }: { available: boolean; onOpen
   return (
     <>
       {buttonShown ? <RevoButton bottom={bottom} dot={reviewWaiting} onPress={() => show()} /> : null}
+      <Modal
+        visible={intro}
+        animationType="fade"
+        presentationStyle="fullScreen"
+        onRequestClose={() => finishIntro(false)}
+        onDismiss={openOptInAfterIntro}
+        statusBarTranslucent
+      >
+        <View style={{ flex: 1, backgroundColor: palette.bg }} testID="revo-intro">
+          <RevoMoment
+            mode="intro"
+            title="Meet Revo"
+            text=""
+            firstName={greetingName(user?.name, auth.currentUser?.displayName ?? null).split(' ')[0]}
+            smartTracking={smartTrackingOn(user)}
+            closable={false}
+            onNext={() => finishIntro(true)}
+            onEnded={() => finishIntro(true)}
+          />
+        </View>
+      </Modal>
       <RevoSheetFrame visible={open} onClose={close} full={full} onFullChange={setFull}>
         <RevoBoundary resetKey={open}>
           {view.name === 'optin' ? (

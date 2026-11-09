@@ -32,6 +32,18 @@ appId: com.revisionbuddy.app
     timeout: 15000
 - tapOn:
     id: revo-button
+    waitToSettleTimeoutMs: 500
+    retryTapIfNoChange: false
+# REVO-39: the first open while Revo is off plays Revo's moment, then its opt-in. Skip ends it; while
+# it plays the screen never settles, so these taps don't wait for it (.maestro/README.md).
+- extendedWaitUntil:
+    visible:
+      id: whats-new-moment-skip
+    timeout: 10000
+- tapOn:
+    id: whats-new-moment-skip
+    waitToSettleTimeoutMs: 500
+    retryTapIfNoChange: false
 - extendedWaitUntil:
     visible: "Meet Revo"
     timeout: 10000

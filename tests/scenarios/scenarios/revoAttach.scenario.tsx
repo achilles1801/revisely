@@ -17,7 +17,7 @@ import { markPreviewTester, watchFunction } from '../harness/admin';
 import { setServerDoc } from '../harness/serverDocs';
 import { loadScenario } from '../harness/testScenario';
 import { Home } from '../harness/screens';
-import { Phone, type Booted, type OpenApp } from '../harness/phone';
+import { Phone, type Booted, type OpenApp, revoMomentSeen } from '../harness/phone';
 import type { ScenarioId, SeedPlan } from '../../../functions/src/testScenarios';
 import type { JournalEntry, ReadingSession, RevisionLog, UserPage } from '../../../src/types';
 import type { RevoDayFacts, RevoPassageFacts } from '../../../src/lib/revo/types';
@@ -86,6 +86,7 @@ async function scenarioWithRevo(scenario: ScenarioId): Promise<{ app: OpenApp; p
   await app.untilSynced();
   await app.close();
   await markPreviewTester(uid);
+  revoMomentSeen(phone, uid);
   app = await phone.open(stack);
   await app.until(() => app.app.user?.previewTester === true, 'the account to be a tester');
   const plan = await loadScenario(app, scenario);
