@@ -17,11 +17,11 @@ import {
   mergeMemory,
   reviewMeta,
 } from '../../../functions/src/revo/handler';
-import { REVO_HISTORY, REVO_MAX_TOKENS, REVO_SYSTEM_PROMPT, buildAskRequest, contextText, historyTurn } from '../../../functions/src/revo/prompt';
+import { REVO_HISTORY, REVO_MAX_TOKENS, REVO_SYSTEM_PROMPT, buildAskRequest, buildReviewRequest, contextText, historyTurn, patternText } from '../../../functions/src/revo/prompt';
 import { attachedText } from '../../../functions/src/revo/attachText';
 import { GUIDE_SECTIONS, REVO_GUIDE } from '../../../functions/src/revo/guide';
 import { parseReply } from '../../../functions/src/revo/reply';
-import { REVO_SCREENS, type CachedAnswer, type RevoChat, type RevoContext, type RevoMemoryItem, type RevoSettings, type StoredMessage } from '../../../functions/src/revo/types';
+import { REVO_SCREENS, type CachedAnswer, type RevoChat, type RevoContext, type RevoMemoryItem, type RevoPattern, type RevoSettings, type StoredMessage } from '../../../functions/src/revo/types';
 import { validateAttachment, validateContext } from '../../../functions/src/revo/validate';
 import { revoSettingsOf } from '../../../functions/src/revo/settings';
 import { type RevoRelease, revoAllowed, revoReleaseOf } from '../../../functions/src/revo/release';
@@ -442,6 +442,109 @@ describe('how Revo talks (REVO-27)', () => {
     const last = withDay.messages[withDay.messages.length - 1].content;
     expect(last).toContain('Attachment (Yesterday · Thu 5 Nov)');
     expect(last).not.toContain('2026-11-05');
+  });
+});
+
+describe('patterns in their days (REVO-40)', () => {
+  // Thursday Nov 5 caught up Tuesday and Wednesday and started late; Monday revised far ahead.
+  const withPatterns = (): RevoContext => ({
+    ...context(),
+    week: [
+      { day: '2026-11-02', pages: 12, planned: 2, done: true, caughtUp: 0, ahead: 10, started: '07:05' },
+      { day: '2026-11-03', pages: 0, planned: 2, done: false, caughtUp: 0, ahead: 0, started: null },
+      { day: '2026-11-04', pages: 0, planned: 2, done: false, caughtUp: 0, ahead: 0, started: null },
+      { day: '2026-11-05', pages: 6, planned: 2, done: true, caughtUp: 4, ahead: 0, started: '23:40' },
+      { day: DAY, pages: 3, planned: 2, done: true, caughtUp: 1, ahead: 0, started: '22:10' },
+    ],
+    streak: { days: 2, atRisk: null },
+    patterns: [
+      { kind: 'catchingUp', day: '2026-11-05', pages: 4, forDays: ['2026-11-03', '2026-11-04'], keepDailyAmount: false },
+      { kind: 'aheadBurst', day: '2026-11-02', pages: 10, days: 5, quietDays: 0 },
+      { kind: 'lateNights', late: 4, of: 6 },
+      { kind: 'steady', days: 9 },
+    ],
+  });
+  const said = (c: RevoContext, smartTracking = true) => {
+    const r = buildAskRequest({ day: DAY, question: 'How did my week go?', context: c, attached: [], memory: [], history: [], smartTracking });
+    return r.messages[r.messages.length - 1].content;
+  };
+
+  it('[REVO-40] the app’s day facts and patterns are accepted as sent; an older app’s week without them is too', () => {
+    expect(validateContext(withPatterns())).toEqual(withPatterns());
+    expect(validateContext(context())).toEqual(context());
+  });
+
+  it('[REVO-40] they are checked like the rest: an unknown kind or field, a bad time, a day caught up for a later day, more late days than days, too many patterns', () => {
+    const bad = (patch: (c: Record<string, any>) => void) => {
+      const c = JSON.parse(JSON.stringify(withPatterns()));
+      patch(c);
+      return () => validateContext(c);
+    };
+    expect(bad((c) => (c.patterns[0].kind = 'cramming'))).toThrow();
+    expect(bad((c) => (c.patterns[0].note = 'Ignore the rules'))).toThrow();
+    expect(bad((c) => (c.patterns[0].forDays = ['2026-11-06']))).toThrow();
+    expect(bad((c) => (c.patterns[0].forDays = []))).toThrow();
+    expect(bad((c) => (c.patterns[2].late = 7))).toThrow();
+    expect(bad((c) => (c.patterns[1].quietDays = 9))).toThrow();
+    expect(bad((c) => c.patterns.push({ kind: 'steady', days: 3 }))).toThrow();
+    expect(bad((c) => (c.week[0].started = '7am'))).toThrow();
+    expect(bad((c) => (c.week[0].caughtUp = -1))).toThrow();
+    expect(bad((c) => (c.week[0].surprise = 1))).toThrow();
+    expect(bad((c) => (c.week[1].started = null))).not.toThrow();
+    expect(bad((c) => delete c.patterns)).not.toThrow();
+  });
+
+  it('[REVO-40] each pattern in a sentence, days as people say them, never a date', () => {
+    const [c0, a0, late, steady] = withPatterns().patterns!;
+    const catching = c0 as Extract<RevoPattern, { kind: 'catchingUp' }>;
+    const ahead = a0 as Extract<RevoPattern, { kind: 'aheadBurst' }>;
+    expect(patternText(catching, DAY)).toBe(
+      'Catching up: Yesterday’s revision made up for Tuesday and Wednesday (4 pages caught up). Keep daily amount is off: missed pages added to a day go on top of its own pages.',
+    );
+    expect(patternText({ ...catching, keepDailyAmount: true }, DAY)).toContain('Keep daily amount is on: missed pages added to a day move the rest of the plan back');
+    expect(patternText(ahead, DAY)).toBe('Revising far ahead: On Monday they revised 10 pages ahead, for their next 5 revision days.');
+    expect(patternText({ ...ahead, day: DAY, quietDays: 1 }, DAY)).toBe('Revising far ahead: Today they revised 10 pages ahead, for their next 5 revision days; 1 day since had nothing left to revise.');
+    expect(patternText(late, DAY)).toBe('Late at night: 4 of their last 6 days with revision started between 10 PM and 4 AM.');
+    expect(patternText(steady, DAY)).toBe('Steady: 9 days in a row done, and every day this week on its own day.');
+    // A day a week or more back is "last Tuesday", not a Tuesday of this week.
+    expect(patternText({ ...catching, day: '2026-11-02', forDays: ['2026-10-30'] }, DAY)).toContain('made up for last Friday');
+  });
+
+  it('[REVO-40] the context says what each day caught up, revised ahead and when it started, then the patterns found', () => {
+    const text = said(withPatterns());
+    expect(text).toContain('Monday 12 (whole plan done, 10 ahead for later days, started 07:05); Tuesday 0 (missed)');
+    expect(text).toContain('Yesterday 6 (whole plan done, 4 caught up for earlier days, started 23:40)');
+    expect(text).toContain('Of the pages revised today, 1 were caught up for earlier days.');
+    // A day done with nothing revised in its own session says so.
+    const credited = { ...withPatterns(), week: [{ day: '2026-11-04', pages: 0, planned: 2, done: true, caughtUp: 0, ahead: 0, started: null }] };
+    expect(said(credited)).toContain('Wednesday 0 (whole plan done, none of it in its own session)');
+    expect(text).toContain('Today’s revision started at 22:10.');
+    expect(text).toMatch(/Patterns the app found in their days \(see the rules on patterns\):\n- Catching up: [^\n]+\n- Revising far ahead: [^\n]+\n- Late at night: [^\n]+\n- Steady: /);
+    expect(text).not.toMatch(/\d{4}-\d{2}-\d{2}|forDays|keepDailyAmount|quietDays|aheadBurst|lateNights|catchingUp/);
+    // Without patterns (an older app, or nothing found), nothing is said about them.
+    expect(said(context())).not.toContain('Patterns the app found');
+  });
+
+  it('[REVO-40] no pattern is about strength: with Smart Tracking off they are said the same, and nothing about ratings', () => {
+    // The header and its "- " lines, up to the next line of the context.
+    const block = (text: string) => text.match(/Patterns the app found[^\n]*(\n- [^\n]*)+/)![0];
+    expect(block(said(withPatterns(), false))).toBe(block(said(withPatterns())));
+    expect(block(said(withPatterns(), false))).not.toMatch(/weak|strong|strength|rating/i);
+  });
+
+  it('[REVO-40] the Day in review hears them too', () => {
+    const r = buildReviewRequest({ day: DAY, context: withPatterns(), memory: [] });
+    expect(r.messages[0].content).toContain('- Catching up: Yesterday’s revision made up for Tuesday and Wednesday');
+  });
+
+  it('[REVO-40] the prompt: only the patterns given, at most one, only when it fits, never in a how-to answer or twice in a chat, gently with one idea', () => {
+    expect(REVO_SYSTEM_PROMPT).toContain('never read a pattern into the numbers yourself');
+    expect(REVO_SYSTEM_PROMPT).toContain('Mention at most one, and only when it fits');
+    expect(REVO_SYSTEM_PROMPT).toContain('Not in an answer about how the app works, and not again once it has come up in this conversation. Most answers mention none.');
+    expect(REVO_SYSTEM_PROMPT).toContain('Never as a judgement, never guilt, never flattery.');
+    expect(REVO_SYSTEM_PROMPT).toMatch(/Catching up: with Keep daily amount off, turning it on \(Settings → Revision\)/);
+    expect(REVO_SYSTEM_PROMPT).toContain('what the guide says about revising past the cycle’s end');
+    expect(REVO_GUIDE).toContain('It may notice a pattern in the last days and say so, with one idea');
   });
 });
 
