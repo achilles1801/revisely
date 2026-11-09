@@ -58,9 +58,11 @@ interface Props {
   onOpenDay: (day: string, block?: PreviewBlock) => void;
   /** The tab on show changed (Overview or Insights): the top bar's help explains that one. */
   onViewChange?: (view: ViewKind) => void;
+  /** Filled with what reads the items again, for the screen's pull to refresh (ACT-27). */
+  refreshRef?: React.MutableRefObject<(() => Promise<unknown>) | null>;
 }
 
-export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorrow, onPlanIt, onAddToPlan, onOpenPage, onSeeAllPages, onTurnOnSmartTracking, firstTomorrow, onViewChange }: Props) {
+export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorrow, onPlanIt, onAddToPlan, onOpenPage, onSeeAllPages, onTurnOnSmartTracking, firstTomorrow, onViewChange, refreshRef }: Props) {
   const { pages, logs, user } = useApp();
   const revo = useRevoAvailable(user);
   const [view, setView] = useState<ViewKind>('calendar');
@@ -116,13 +118,17 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
   const accountStart = useMemo(() => journalFirstDay(user, []), [user]);
   const rangeFrom = [shiftDays(today, -daysToLoad(range, today, accountStart)), ...shown].sort()[0];
   const rangeTo = [today, ...shown].sort().reverse()[0];
-  const load = useCallback(() => {
-    firestoreService
-      .getActivityItemsBetween(rangeFrom, rangeTo)
-      .then(setData)
-      .catch((err) => logger.warn('Could not load the Activity items for the calendar', err));
-  }, [rangeFrom, rangeTo]);
-  useActivityReload(load);
+  const load = useCallback(
+    () =>
+      firestoreService
+        .getActivityItemsBetween(rangeFrom, rangeTo)
+        .then(setData)
+        .catch((err) => logger.warn('Could not load the Activity items for the calendar', err)),
+    [rangeFrom, rangeTo],
+  );
+  // Also when the outbox sends a change: a session saved before the screen opened shows once the server
+  // has it, without leaving the screen (ACT-27).
+  useActivityReload(load, undefined, true);
   useEffect(() => {
     load();
   }, [load]);
@@ -165,17 +171,25 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
 
   // Insights' twelve months of memorization (the calendar's window is 90 days).
   const [yearOfMemorizing, setYearOfMemorizing] = useState<{ day: string; pages: number[] }[]>([]);
-  const loadYear = useCallback(() => {
+  const loadYear = useCallback(async () => {
     if (view !== 'insights') return;
-    firestoreService
+    await firestoreService
       .getMemorizationsBetween(shiftDays(today, -400), today)
       .then(setYearOfMemorizing)
       .catch((err) => logger.warn('Could not load the year of memorization for Insights', err));
   }, [view, today]);
-  useActivityReload(loadYear);
+  useActivityReload(loadYear, undefined, true);
   useEffect(() => {
     loadYear();
   }, [loadYear]);
+  // The screen's pull to refresh reads the items again too (ACT-27): it read only the readings and notes.
+  useEffect(() => {
+    if (!refreshRef) return;
+    refreshRef.current = () => Promise.all([load(), loadYear()]);
+    return () => {
+      refreshRef.current = null;
+    };
+  }, [refreshRef, load, loadYear]);
 
   const memorizedSet = useMemo(() => new Set(pages.filter((p) => p.status === 'memorized').map((p) => p.pageNumber)), [pages]);
   // Pages being learned (`in_progress`): a juz with some, and none memorized, gets the tile's dot.

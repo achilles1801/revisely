@@ -39,7 +39,7 @@ jest.mock('../../../src/lib/revo/open', () => ({ openRevo: jest.fn() }));
 // Loads once on mount (the screen's focus and the outbox's changes aren't part of this).
 jest.mock('../../../src/components/activity/useActivityReload', () => {
   const mockReact = jest.requireActual('react');
-  return { useActivityReload: (load: () => void) => mockReact.useEffect(() => load(), []) };
+  return { useActivityReload: (load: () => void) => mockReact.useEffect(() => { load(); }, []) };
 });
 
 const METRICS = { frame: { x: 0, y: 0, width: 393, height: 852 }, insets: { top: 59, left: 0, right: 0, bottom: 34 } };

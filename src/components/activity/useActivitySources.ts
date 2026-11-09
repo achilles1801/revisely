@@ -17,7 +17,6 @@ export function useActivitySources() {
   const [journal, setJournal] = useState<JournalEntry[]>([]);
   const [recordings, setRecordings] = useState<RecordingMeta[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState(false);
 
   const load = useCallback(async () => {
@@ -38,11 +37,5 @@ export function useActivitySources() {
 
   useActivityReload(load);
 
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await load();
-    setRefreshing(false);
-  }, [load]);
-
-  return { readings, journal, recordings, loading, refreshing, loadError, load, onRefresh };
+  return { readings, journal, recordings, loading, loadError, load };
 }
