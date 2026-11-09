@@ -129,12 +129,16 @@ const both = { ...catchingUp, patterns: [...catchingUp.patterns, { kind: 'lateNi
 const SAID = {
   catchingUp: /making up|made up|catch(?:ing)? up|caught up|catch-up|missed (?:days|tuesday|wednesday)/i,
   aheadBurst: /\bahead\b|in one go|all at once|spread/i,
-  lateNights: /late at night|late-night|at night|\blate\b|night/i,
+  // Whole words: "tonight" and "later" aren't about late nights (samples at 0a7fba6b, #1).
+  lateNights: /late at night|late-night|\bat night\b|\blate\b|\bnights?\b/i,
   steady: /in a row|every day|steady|consistent|each day/i,
 };
 const FLATTERY = /amazing|keep it up|journey|incredible|fantastic|proud of you|superstar/i;
 const GUILT = /you should have|you failed|disappoint|lazy|no excuse/i;
 const STRENGTH = /weak|strong|strength|rating/i;
+// A week with days made up later wasn't done every day (samples at 0a7fba6b, #1: "you finished the whole plan every day,
+// and tonight you made up for Tuesday and yesterday").
+const EVERY_DAY = /(?:whole|full|entire) plan every day|every day (?:this|of the) week|done every day|finished (?:it )?every day|all (?:seven|7) days/i;
 
 const SAMPLES = [
   { q: 'How did my week go?', ctx: catchingUp, expect: 'catchingUp', note: 'Tuesday and Wednesday made up on Thursday, Keep daily amount off' },
@@ -180,6 +184,9 @@ function checks(s, r) {
   if (s.mustSay) out.push(s.mustSay.test(words) ? `✅ says ${s.mustSay.source}` : `❌ doesn’t say ${s.mustSay.source}`);
   if (FLATTERY.test(words)) out.push(`❌ flattery: ${words.match(FLATTERY)[0]}`);
   if (GUILT.test(words)) out.push(`❌ guilt: ${words.match(GUILT)[0]}`);
+  if ((s.ctx.patterns ?? []).some((p) => p.kind === 'catchingUp') && EVERY_DAY.test(words)) {
+    out.push(`❌ says every day was done, but days were made up later: ${words.match(EVERY_DAY)[0]}`);
+  }
   if (s.smartTracking === false && STRENGTH.test(words)) out.push(`❌ strength with Smart Tracking off: ${words.match(STRENGTH)[0]}`);
   const bare = barePageNumbers(words);
   if (bare.length) out.push(`❌ page numbers on their own: ${bare.join(', ')}`);
