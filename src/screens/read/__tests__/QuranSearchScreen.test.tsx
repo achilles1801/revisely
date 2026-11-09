@@ -48,6 +48,7 @@ import { ThemeProvider } from '../../../context/ThemeContext';
 import { setQuranWordsForTests } from '../../../lib/recite/quranWords';
 import { wordsData } from '../../../lib/recite/__fixtures__/quranWords';
 import { pageOfVerse } from '../../../lib/verses';
+import { plainText } from '../../../lib/passages';
 
 beforeAll(() => setQuranWordsForTests(wordsData()));
 afterAll(() => setQuranWordsForTests(null));
@@ -89,7 +90,23 @@ describe('searching the Quran', () => {
     expect(mockNavigation.push).toHaveBeenCalledWith('QuranReader', {
       pageNumber: pageOfVerse({ sura: 10, ayah: 16 }),
       source: 'search',
-      highlight: { sura: 10, ayah: 16 },
+      highlight: { sura: 10, ayah: 16, last: { sura: 10, ayah: 16 } },
+    });
+  });
+
+  it('a phrase that runs into the next ayah: named as the run, both ayat shown, both highlighted', async () => {
+    await open();
+    await search('الناس إنما أنا لكم نذير مبين فالذين');
+    expect(screen.getByTestId('search-count')).toHaveTextContent('1 result');
+    const row = screen.getByTestId('search-verse-22-49');
+    expect(within(row).getByText('Al-Hajj, ayahs 49–50', { normalizer: (t) => plainText(t).trim() })).toBeTruthy();
+    expect(within(row).getByText(/﴿ ٤٩ ﴾/)).toBeTruthy();
+    expect(within(row).getByText(/﴿ ٥٠ ﴾/)).toBeTruthy();
+    fireEvent.press(row);
+    expect(mockNavigation.push).toHaveBeenCalledWith('QuranReader', {
+      pageNumber: pageOfVerse({ sura: 22, ayah: 49 }),
+      source: 'search',
+      highlight: { sura: 22, ayah: 49, last: { sura: 22, ayah: 50 } },
     });
   });
 

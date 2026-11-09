@@ -4,7 +4,7 @@
 
 import fc from 'fast-check';
 import { quranWords, wordsData } from '../../../src/lib/recite/__fixtures__/quranWords';
-import { searchText } from '../../../src/lib/search/quranSearch';
+import { queryWords, searchText } from '../../../src/lib/search/quranSearch';
 import { parseReference } from '../../../src/lib/search/parseQuery';
 import { getAllSurahs, getSurahDisplay } from '../../../src/lib/quranData';
 import { runs } from './fixtures';
@@ -25,6 +25,48 @@ const findsRun = (text: string, start: number, length: number) =>
 
 const toArabicDigits = (n: number) => String(n).replace(/\d/g, (d) => String.fromCharCode(0x0660 + Number(d)));
 
+/** Where each ayah after the first starts (a word number), with the ayah before it and its own. */
+const boundaries: { at: number; before: number; after: number }[] = [];
+{
+  let at = 0;
+  for (let v = 0; v + 1 < data.counts.length; v++) {
+    at += data.counts[v];
+    boundaries.push({ at, before: data.counts[v], after: data.counts[v + 1] });
+  }
+}
+
+const letters = 'ابتثجحخدذرزسشصضطظعغفقكلمنهوي';
+
+/** A run with one word misheard by a letter (a word of four letters or more), maybe said twice. */
+const misheardRun = fc.property(
+  runArb(6, 9),
+  fc.nat(),
+  fc.nat(),
+  fc.constantFrom(...letters.split('')),
+  fc.boolean(),
+  ({ start, length }, which, at, letter, twice) => {
+    const run = plain.slice(start, start + length);
+    const k = which % run.length;
+    const word = run[k];
+    if (word.length >= 4 && !word.includes(' ')) {
+      const i = 1 + (at % (word.length - 1));
+      run[k] = word.slice(0, i) + letter + word.slice(i + 1);
+    }
+    const text = twice ? `${run.join(' ')} ${run.join(' ')}` : run.join(' ');
+    expect(findsRun(text, start, length)).toBe(true);
+  },
+);
+
+/** Develop's Scenarios failed on this (seed -935442960, Nov 9 2026): the last six words of 22:49 and
+ *  the first of 22:50 found nothing ("نذير مبين" read as 71:2's one word, "إنما أنا" as one word twice). */
+const AYAH_BOUNDARY: [{ start: number; length: number }, number, number, string, boolean] = [
+  { start: 43391, length: 7 },
+  0,
+  0,
+  'ا',
+  false,
+];
+
 describe('finding an ayah from its words (SEARCH-1)', () => {
   it('[SEARCH-1] any four to eight words in a row find the ayah they are in', () => {
     fc.assert(
@@ -36,27 +78,36 @@ describe('finding an ayah from its words (SEARCH-1)', () => {
   });
 
   it('[SEARCH-1] still found with one word misheard by a letter, or the phrase said twice', () => {
-    const letters = 'ابتثجحخدذرزسشصضطظعغفقكلمنهوي';
+    fc.assert(misheardRun, { numRuns: runs(80), examples: [AYAH_BOUNDARY] });
+  });
+
+  it('[SEARCH-1] the seed that once found nothing across an ayah boundary passes', () => {
+    expect(plain.slice(43391, 43398).join(' ')).toBe('الناس إنما أنا لكم نذير مبين فالذين');
+    fc.assert(misheardRun, { seed: -935442960, path: '51:17:15:2:2:2' });
+  });
+
+  it('[SEARCH-1] a phrase run from one ayah into the next is found at the first, ending in the next', () => {
     fc.assert(
       fc.property(
-        runArb(6, 9),
-        fc.nat(),
-        fc.nat(),
-        fc.constantFrom(...letters.split('')),
-        fc.boolean(),
-        ({ start, length }, which, at, letter, twice) => {
-          const run = plain.slice(start, start + length);
-          const k = which % run.length;
-          const word = run[k];
-          if (word.length >= 4 && !word.includes(' ')) {
-            const i = 1 + (at % (word.length - 1));
-            run[k] = word.slice(0, i) + letter + word.slice(i + 1);
-          }
-          const text = twice ? `${run.join(' ')} ${run.join(' ')}` : run.join(' ');
-          expect(findsRun(text, start, length)).toBe(true);
+        fc.integer({ min: 0, max: boundaries.length - 1 }),
+        fc.integer({ min: 1, max: 6 }),
+        fc.integer({ min: 1, max: 6 }),
+        (k, x, y) => {
+          const b = boundaries[k];
+          const start = b.at - Math.min(x, b.before);
+          const end = b.at + Math.min(y, b.after);
+          const text = plain.slice(start, end).join(' ');
+          // A basmala said first is set aside (1:1, the end of 27:30): the ayah after it is searched.
+          fc.pre(queryWords(text)[0].key === queryWords(plain[start])[0].key);
+          const first = words.ref(start);
+          const last = words.ref(end - 1);
+          const r = searchText(words, text, 2000);
+          // By ayah, not word: the word data's spellings are a word out at a few places (60:1's end).
+          const hit = r.hits.find((h) => h.from < end && start < h.to);
+          expect(hit).toMatchObject({ sura: first.sura, ayah: first.ayah, last: { sura: last.sura, ayah: last.ayah } });
         },
       ),
-      { numRuns: runs(80) },
+      { numRuns: runs(120) },
     );
   });
 

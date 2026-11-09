@@ -15,8 +15,11 @@ import { editDistance, splitWords } from '../recite/arabic';
 import type { QuranWords } from '../recite/quranWords';
 
 export interface VerseHit {
+  /** The ayah the match starts in. */
   sura: number;
   ayah: number;
+  /** The ayah it ends in: the same, or a later one when the phrase runs on. */
+  last: { sura: number; ayah: number };
   /** The words matched, [from, to) in QuranWords numbering (may run into the next ayah). */
   from: number;
   to: number;
@@ -34,6 +37,8 @@ export interface TextSearchResult {
 
 /** Words beyond this are not searched (a long recitation: its start says where it is). */
 const MAX_QUERY_WORDS = 24;
+/** A word printed as one is said as at most this many (يا ابن ام). */
+const MAX_PARTS = 3;
 /** A word heard with one letter wrong counts for this much of the word. */
 const NEAR_ONE = 0.7;
 /** Two letters wrong, in a long word. */
@@ -64,8 +69,10 @@ interface Index {
   freq: Int32Array;
   /** Distinct word of every word of the Qur'an. */
   wordVocab: Int32Array;
-  /** Words printed as one but said as two (يا أيها): "يا ايها" → their joined key. */
-  splitPairs: Map<string, { key: string; loose: string }>;
+  /** Words printed as one but said as two or three (يا أيها): "يا ايها" → those distinct words. */
+  joined: Map<string, number[]>;
+  /** How many words each distinct word is said as (1 for most). */
+  partCount: Int8Array;
   /** Verse of each word, as sura × 1000 + ayah. */
   verseOf: Int32Array;
   /** Which letters each distinct word has (one bit a letter), to rule out far words quickly. */
@@ -97,7 +104,8 @@ function buildIndex(words: QuranWords): Index {
   const counts: number[] = [];
   const wordVocab = new Int32Array(words.count);
   const verseOf = new Int32Array(words.count);
-  const splitPairs = new Map<string, { key: string; loose: string }>();
+  const joined = new Map<string, number[]>();
+  const partCount: number[] = [];
   for (let i = 0; i < words.count; i++) {
     const [k, a = null] = words.keys(i);
     const l = words.looseKey(i);
@@ -110,13 +118,20 @@ function buildIndex(words: QuranWords): Index {
       alt.push(a);
       loose.push(l);
       counts.push(0);
+      partCount.push(1);
     }
     counts[v]++;
     wordVocab[i] = v;
     const ref = words.ref(i);
     verseOf[i] = ref.sura * 1000 + ref.ayah;
     const parts = words.parts(i);
-    if (parts && parts.length === 2) splitPairs.set(parts.join(' '), { key: k, loose: l });
+    if (parts && parts.length > 1 && parts.length <= MAX_PARTS) {
+      const said = parts.join(' ');
+      const list = joined.get(said) ?? [];
+      if (!list.includes(v)) list.push(v);
+      joined.set(said, list);
+      partCount[v] = parts.length;
+    }
   }
   return {
     key,
@@ -124,7 +139,8 @@ function buildIndex(words: QuranWords): Index {
     loose,
     freq: Int32Array.from(counts),
     wordVocab,
-    splitPairs,
+    joined,
+    partCount: Int8Array.from(partCount),
     verseOf,
     keyMask: Int32Array.from(key, letterMask),
     altMask: Int32Array.from(alt, (a) => (a ? letterMask(a) : 0)),
@@ -156,20 +172,15 @@ function leading(list: QueryWord[], prefix: string[], least: number): number {
   return n >= least ? n : 0;
 }
 
-/** The query as words to look for: split words joined, a leading isti'adha or basmala set aside. */
-export function queryWords(words: QuranWords, text: string): QueryWord[] {
-  const index = indexFor(words);
+/**
+ * The query as words to look for, a leading isti'adha or basmala set aside. Words said
+ * apart that are printed as one (يا أيها) stay apart here: the line-up matches them with
+ * the printed word together. Joining them here would also join them where the text has
+ * them apart (نذير مبين is one word in 71:2 and two everywhere else).
+ */
+export function queryWords(text: string): QueryWord[] {
   const split = splitWords(text);
-  let list: QueryWord[] = [];
-  for (let j = 0; j < split.keys.length; j++) {
-    const pair = j + 1 < split.keys.length ? index.splitPairs.get(`${split.keys[j]} ${split.keys[j + 1]}`) : undefined;
-    if (pair) {
-      list.push({ key: pair.key, loose: pair.loose, alike: null });
-      j++;
-    } else {
-      list.push({ key: split.keys[j], loose: split.loose[j], alike: split.alike[j] });
-    }
-  }
+  let list: QueryWord[] = split.keys.map((key, j) => ({ key, loose: split.loose[j], alike: split.alike[j] }));
   // "A'udhu billahi min ash-shaytan ir-rajim" before reciting isn't in the Qur'an.
   const istiadha = leading(list, ISTIADHA, 3);
   if (istiadha && list.length - istiadha >= 1) list = list.slice(istiadha);
@@ -235,9 +246,10 @@ function minimumScore(n: number): number {
   return n <= 2 ? MIN_SHORT : MIN_LONG;
 }
 
-/** Two query words that are the same word (heard twice), or near enough. */
-function sameWord(a: QueryWord, b: QueryWord): boolean {
+/** Two query words that are the same word (heard twice), or near enough when `near`. */
+function sameWord(a: QueryWord, b: QueryWord, near: boolean): boolean {
   if (a.key === b.key || a.loose === b.loose) return true;
+  if (!near) return false;
   return conjunctionOnly(a.key, b.key) || nearness(a.key, letterMask(a.key), b.key, letterMask(b.key)) >= NEAR_ONE;
 }
 
@@ -254,7 +266,10 @@ export function withoutRepeats<T extends QueryWord>(list: T[]): T[] {
     for (let p = 1; p <= Math.floor(out.length / 2) && !changed; p++) {
       for (let s = 0; s + 2 * p <= out.length; s++) {
         let same = true;
-        for (let k = 0; k < p && same; k++) same = sameWord(out[s + k], out[s + p + k]);
+        // A phrase said again may be heard a little differently the second time. One word
+        // must be the very same word: neighbours a letter apart are common in the text
+        // (إنما أنا, 22:49).
+        for (let k = 0; k < p && same; k++) same = sameWord(out[s + k], out[s + p + k], p > 1);
         // One word said twice is kept twice when it is short (لا لا, a real repetition in the text).
         if (same && (p > 1 || out[s].key.length >= 4)) {
           out = [...out.slice(0, s + p), ...out.slice(s + 2 * p)];
@@ -274,8 +289,9 @@ interface Found {
   score: number;
 }
 
-/** The query lined up with the whole text: the matches good enough to show, best first. */
-function align(words: QuranWords, index: Index, query: QueryWord[]): { found: Found[]; sim: Float32Array; V: number } {
+/** The query lined up with the whole text: the matches good enough to show, best first, and
+ *  which distinct words match some query word (`matches`). */
+function align(words: QuranWords, index: Index, query: QueryWord[]): { found: Found[]; matches: Uint8Array } {
   const m = query.length;
   const V = index.key.length;
   const sim = new Float32Array(m * V);
@@ -300,6 +316,22 @@ function align(words: QuranWords, index: Index, query: QueryWord[]): { found: Fo
   // Distinct words that match some query word; the rest only cost.
   const matches = new Uint8Array(V);
   for (let j = 0; j < m; j++) for (let v = 0; v < V; v++) if (sim[j * V + v] > 0) matches[v] = 1;
+  // Words printed as one that the query says as two or three (يا أيها): bit j of
+  // joinedEnds[v] when query words j - partCount[v] … j - 1 together are word v.
+  const joinedEnds = new Int32Array(V);
+  for (let j = 2; j <= m; j++) {
+    for (let k = 2; k <= Math.min(MAX_PARTS, j); k++) {
+      const said = query.slice(j - k, j).map((w) => w.key).join(' ');
+      for (const v of index.joined.get(said) ?? []) {
+        if (index.partCount[v] !== k) continue;
+        joinedEnds[v] |= 1 << j;
+        matches[v] = 1;
+      }
+    }
+  }
+  // Weight of the first j query words.
+  const before = new Float32Array(m + 1);
+  for (let j = 1; j <= m; j++) before[j] = before[j - 1] + weight[j - 1];
   // The most the rest of the query can still add, after j words.
   const rest = new Float32Array(m + 1);
   for (let j = m - 1; j >= 0; j--) rest[j] = rest[j + 1] + weight[j];
@@ -327,11 +359,21 @@ function align(words: QuranWords, index: Index, query: QueryWord[]): { found: Fo
     cur[0] = 0;
     curStart[0] = i;
     let alive = false;
+    const ends = joinedEnds[v];
     for (let j = 1; j <= m; j++) {
       const w = weight[j - 1];
       const s = sim[(j - 1) * V + v];
       let best = prev[j - 1] + (s > 0 ? w * s : -SUBSTITUTE * w);
       let from = prevStart[j - 1];
+      // Two or three query words that are this one printed word, together.
+      if (ends & (1 << j)) {
+        const k = index.partCount[v];
+        const together = prev[j - k] + before[j] - before[j - k];
+        if (together > best) {
+          best = together;
+          from = prevStart[j - k];
+        }
+      }
       // A query word not in the text (added, or misheard beyond recognition).
       const unmatched = cur[j - 1] - UNMATCHED * w;
       if (unmatched > best) {
@@ -370,46 +412,67 @@ function align(words: QuranWords, index: Index, query: QueryWord[]): { found: Fo
     const exactB = b.score >= EXACT ? 1 : 0;
     return exactB - exactA || b.score - a.score || a.start - b.start;
   });
-  return { found: kept, sim, V };
+  return { found: kept, matches };
 }
 
 /**
  * Ayat that hold `text` (Arabic, as typed or as speech recognition wrote it), best first,
- * then in mushaf order. Each match is reported once, at the ayah it starts in.
+ * then in mushaf order. Each match is reported once, at the ayah it starts in; a phrase
+ * that runs on into the next ayah (or more) says where it ends (`last`).
  *
  * When nothing is found, the first or last word is left out and it looks again: speech
  * recognition often gets the word cut off at either end wrong.
  */
 export function searchText(words: QuranWords, text: string, limit = 50): TextSearchResult {
   const index = indexFor(words);
-  const query = withoutRepeats(queryWords(words, text));
-  const m = query.length;
-  if (m === 0) return { hits: [], total: 0, words: [] };
-  const tries: QueryWord[][] = [query];
-  if (m >= 3) tries.push(query.slice(0, -1), query.slice(1));
-  if (m >= 4) tries.push(query.slice(1, -1));
-  for (const q of tries) {
-    const { found, sim, V } = align(words, index, q);
-    if (found.length === 0) continue;
-    // A shorter query found the place; its score still counts the words left out.
-    const scale = q === query ? 1 : q.length / m;
-    const hits = found.slice(0, limit).map((t) => {
-      const first = firstMatched(index, sim, V, q.length, t.start, t.end);
-      const verse = index.verseOf[first];
-      return { sura: Math.floor(verse / 1000), ayah: verse % 1000, from: first, to: t.end, score: t.score * scale };
-    });
-    return { hits, total: found.length, words: q.map((w) => w.key) };
+  const said = queryWords(text);
+  if (said.length === 0) return { hits: [], total: 0, words: [] };
+  const once = withoutRepeats(said);
+  // Words said twice that the text itself has twice (ليلة القدر ليلة القدر, 97:2–3; لم يلد
+  // ولم يولد, 112:3) are found as said; a repeat that isn't in the text is searched once.
+  if (once.length < said.length) {
+    const asSaid = align(words, index, said);
+    if (asSaid.found.length > 0 && asSaid.found[0].score >= EXACT) return resultOf(index, said, asSaid, 1, limit);
   }
-  return { hits: [], total: 0, words: query.map((w) => w.key) };
+  const m = once.length;
+  const tries: QueryWord[][] = [once];
+  if (m >= 3) tries.push(once.slice(0, -1), once.slice(1));
+  if (m >= 4) tries.push(once.slice(1, -1));
+  for (const q of tries) {
+    const aligned = align(words, index, q);
+    if (aligned.found.length === 0) continue;
+    // A shorter query found the place; its score still counts the words left out.
+    return resultOf(index, q, aligned, q === once ? 1 : q.length / m, limit);
+  }
+  return { hits: [], total: 0, words: once.map((w) => w.key) };
 }
 
-/** The first word of [start, end) that matches any query word (the line-up may begin on a miss). */
-function firstMatched(index: Index, sim: Float32Array, V: number, m: number, start: number, end: number): number {
-  for (let i = start; i < end; i++) {
-    const v = index.wordVocab[i];
-    for (let j = 0; j < m; j++) if (sim[j * V + v] > 0) return i;
-  }
-  return start;
+/** The matches as ayat: where each starts and ends, from the first word matched to the last. */
+function resultOf(
+  index: Index,
+  query: QueryWord[],
+  { found, matches }: { found: Found[]; matches: Uint8Array },
+  scale: number,
+  limit: number,
+): TextSearchResult {
+  const hits = found.slice(0, limit).map((t): VerseHit => {
+    // The line-up may begin or end on a word that didn't match: the match is the words between.
+    let first = t.start;
+    while (first < t.end - 1 && !matches[index.wordVocab[first]]) first++;
+    let last = t.end - 1;
+    while (last > first && !matches[index.wordVocab[last]]) last--;
+    const verse = index.verseOf[first];
+    const end = index.verseOf[last];
+    return {
+      sura: Math.floor(verse / 1000),
+      ayah: verse % 1000,
+      last: { sura: Math.floor(end / 1000), ayah: end % 1000 },
+      from: first,
+      to: last + 1,
+      score: t.score * scale,
+    };
+  });
+  return { hits, total: found.length, words: query.map((w) => w.key) };
 }
 
 /** Which words of [from, to) were matched, for highlighting (by QuranWords number). */
@@ -417,11 +480,16 @@ export function matchedWords(words: QuranWords, hit: VerseHit, query: string[]):
   const index = indexFor(words);
   const set = new Set<number>();
   const keys = new Set(query);
+  // Words printed as one that the query said apart (يا أيها).
+  const joined = new Set<number>();
+  for (let k = 2; k <= MAX_PARTS; k++) {
+    for (let j = 0; j + k <= query.length; j++) for (const v of index.joined.get(query.slice(j, j + k).join(' ')) ?? []) joined.add(v);
+  }
   for (let i = hit.from; i < hit.to; i++) {
     const v = index.wordVocab[i];
     const k = index.key[v];
     const a = index.alt[v];
-    if (keys.has(k) || (a && keys.has(a))) {
+    if (keys.has(k) || (a && keys.has(a)) || joined.has(v)) {
       set.add(i);
       continue;
     }

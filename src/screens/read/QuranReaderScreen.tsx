@@ -34,6 +34,7 @@ import {
 } from '../../lib/quranData';
 import { appendReadingHistory } from '../../lib/readingHistory';
 import { firstSurahOnPage, toAyahRef } from '../../lib/verses';
+import { ayahKey, ayahOf, ayahsBetween, suraOf } from '../../lib/ayahKeys';
 import { AyahRef, ayahRects } from '../../lib/ayahBounds';
 import { useMushafEdition } from '../../lib/mushafEdition';
 import { sittingSavedText } from '../../lib/sitting';
@@ -47,6 +48,16 @@ const SETTLE_DEBOUNCE_MS = 1500;
 // Under the page, with the controls: the position track, then the capsule.
 const SCRUBBER_HEIGHT = 32;
 const FOOTER_HEIGHT = SCRUBBER_HEIGHT + spacing.xs + CAPSULE_HEIGHT + spacing.sm;
+/** A search match highlights at most this many verses (24 words said reach about ten short ones). */
+const MAX_SEARCH_HIGHLIGHT = 12;
+
+/** The verses a search highlight names ("first-last", as ayah keys; last may be empty). */
+function searchHighlightOf(key: string | null): AyahRef[] | null {
+  if (!key) return null;
+  const [from, to] = key.split('-').map((k) => (k ? Number(k) : NaN));
+  const keys = Number.isFinite(to) && to > from ? ayahsBetween(from, to).slice(0, MAX_SEARCH_HIGHLIGHT) : [from];
+  return keys.map((k) => toAyahRef({ sura: suraOf(k), ayah: ayahOf(k) }));
+}
 
 export default function QuranReaderScreen() {
   const navigation = useNavigation<NavigationProp>();
@@ -121,21 +132,20 @@ export default function QuranReaderScreen() {
     focused: isScreenFocused,
   });
 
-  // A verse found by search (testers): highlighted on its page, until the reader turns
-  // to a page it isn't on. A held or playing verse shows instead while there is one.
+  // A verse found by search (testers), or the verses a match runs across: highlighted,
+  // until the reader turns to a page none of them is on. A held or playing verse shows
+  // instead while there is one.
   const highlightParam = route.params.highlight;
-  const highlightKey = highlightParam ? `${highlightParam.sura}:${highlightParam.ayah}` : null;
-  const [searchHighlight, setSearchHighlight] = useState<AyahRef | null>(() =>
-    highlightParam ? toAyahRef(highlightParam) : null,
-  );
+  const highlightKey = highlightParam
+    ? `${ayahKey(highlightParam.sura, highlightParam.ayah)}-${highlightParam.last ? ayahKey(highlightParam.last.sura, highlightParam.last.ayah) : ''}`
+    : null;
+  const [searchHighlight, setSearchHighlight] = useState<AyahRef[] | null>(() => searchHighlightOf(highlightKey));
   useEffect(() => {
-    if (!highlightKey) return;
-    const [sura, ayah] = highlightKey.split(':').map(Number);
-    setSearchHighlight(toAyahRef({ sura, ayah }));
+    if (highlightKey) setSearchHighlight(searchHighlightOf(highlightKey));
   }, [highlightKey]);
   useEffect(() => {
-    if (!searchHighlight || currentPage === searchHighlight.page) return;
-    if (ayahRects(currentPage, searchHighlight.sura, searchHighlight.ayah).length === 0) setSearchHighlight(null);
+    if (!searchHighlight || searchHighlight.some((h) => h.page === currentPage)) return;
+    if (searchHighlight.every((h) => ayahRects(currentPage, h.sura, h.ayah).length === 0)) setSearchHighlight(null);
   }, [currentPage, searchHighlight]);
 
   // Reading: nothing but the page (its number, the juz and surah). A tap on

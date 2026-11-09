@@ -248,7 +248,9 @@ nothing said is recorded or sent.
 
 - **SEARCH-1.** A few words of an ayah, recited or typed in Arabic (with or without vowel marks, in
   Uthmani or standard spelling), find it: from its start or its middle, running on into the next
-  ayah, with a word misheard, left out or said twice, and after an isti'adha or a basmala said first.
+  ayah (found at the first, named as the run and highlighted across both), with a word misheard, left
+  out or said twice (words the text itself says twice are found as said), and after an isti'adha or a
+  basmala said first.
   A phrase in several ayat lists every one, in mushaf order, the phrase itself before ayat that only
   nearly hold it. Words that aren't in the Qur'an find nothing.
 - **SEARCH-2.** A place typed by name or number goes there: a surah by its name, Latin or Arabic,

@@ -14,7 +14,9 @@ import { useTheme } from '../../context/ThemeContext';
 import { arabicV2, layoutV2, typeV2 } from '../../theme/v2';
 import type { ReadStackParamList } from '../../navigation/MainNavigator';
 import { getJuzRange } from '../../lib/quranData';
-import { surahName } from '../../lib/passages';
+import { describeAyahs, spokenText, surahName } from '../../lib/passages';
+import { ayahKey, ayahOf, ayahsBetween, suraOf } from '../../lib/ayahKeys';
+import { verseEndMark } from '../../lib/verseShare';
 import { pageOfVerse } from '../../lib/verses';
 import { loadQuranWords, QuranWords } from '../../lib/recite/quranWords';
 import { matchedWords, searchText, VerseHit } from '../../lib/search/quranSearch';
@@ -166,7 +168,7 @@ export default function QuranSearchScreen() {
   }, []);
 
   const open = useCallback(
-    (pageNumber: number, highlight?: { sura: number; ayah: number }) => {
+    (pageNumber: number, highlight?: ReadStackParamList['QuranReader']['highlight']) => {
       Keyboard.dismiss();
       navigation.push('QuranReader', { pageNumber, source: 'search', highlight });
     },
@@ -306,7 +308,7 @@ export default function QuranSearchScreen() {
               hit={item.hit}
               matched={item.matched}
               words={words}
-              onPress={() => open(pageOfVerse(item.hit), { sura: item.hit.sura, ayah: item.hit.ayah })}
+              onPress={() => open(pageOfVerse(item.hit), { sura: item.hit.sura, ayah: item.hit.ayah, last: item.hit.last })}
             />
           ) : null
         }
@@ -409,33 +411,50 @@ function TargetRow({ target, onPress }: { target: SearchTarget; onPress: () => v
   );
 }
 
-/** A verse found in the text: where it is, then the ayah with the words found in full ink. */
+/** A search match runs over at most this many ayat in its row (as the reader highlights). */
+const MAX_ROW_AYAHS = 12;
+
+/**
+ * A verse found in the text: where it is, then the ayah with the words found in full ink.
+ * A match that runs on into the next ayah (or more) is named as the run ("Al-Hajj, ayahs
+ * 49–50") and shows each of its ayat, each ending in its number.
+ */
 function VerseRow({ hit, matched, words, onPress }: { hit: VerseHit; matched: Set<number>; words: QuranWords; onPress: () => void }) {
   const { palette } = useTheme();
-  const [from, to] = words.verseRange(hit.sura, hit.ayah);
-  const indexes = useMemo(() => Array.from({ length: to - from }, (_, k) => from + k), [from, to]);
+  const first = ayahKey(hit.sura, hit.ayah);
+  const last = ayahKey(hit.last.sura, hit.last.ayah);
+  const ayahs = useMemo(() => (last > first ? ayahsBetween(first, last).slice(0, MAX_ROW_AYAHS) : [first]), [first, last]);
+  const title = ayahs.length > 1 ? describeAyahs(ayahs, { wholeJuz: false }) : verseTitle(hit.sura, hit.ayah);
   const page = pageOfVerse(hit);
   return (
     <Tap
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${verseTitle(hit.sura, hit.ayah)}, page ${page}`}
+      accessibilityLabel={`${spokenText(title)}, page ${page}`}
       style={[styles.verse, { borderBottomColor: palette.separator }]}
       testID={`search-verse-${hit.sura}-${hit.ayah}`}
     >
       <View style={styles.verseHead}>
         <Text style={[typeV2.name, styles.main, { color: palette.text }]} numberOfLines={1}>
-          {verseTitle(hit.sura, hit.ayah)}
+          {title}
         </Text>
         <Text style={[typeV2.meta, { color: palette.secondary }]}>{`p.${NBSP}${page}`}</Text>
       </View>
       <Text style={[arabicV2(22), styles.arabic]} accessibilityLanguage="ar">
-        {indexes.map((i, k) => (
-          <Text key={i} style={{ color: matched.has(i) ? palette.text : palette.secondary }}>
-            {k > 0 ? ' ' : ''}
-            {words.uthmani(i)}
-          </Text>
-        ))}
+        {ayahs.map((key, n) => {
+          const [from, to] = words.verseRange(suraOf(key), ayahOf(key));
+          return (
+            <React.Fragment key={key}>
+              {Array.from({ length: to - from }, (_, k) => from + k).map((i, k) => (
+                <Text key={i} style={{ color: matched.has(i) ? palette.text : palette.secondary }}>
+                  {n > 0 || k > 0 ? ' ' : ''}
+                  {words.uthmani(i)}
+                </Text>
+              ))}
+              {ayahs.length > 1 ? <Text style={{ color: palette.secondary }}>{` ${verseEndMark(ayahOf(key))}`}</Text> : null}
+            </React.Fragment>
+          );
+        })}
       </Text>
     </Tap>
   );
