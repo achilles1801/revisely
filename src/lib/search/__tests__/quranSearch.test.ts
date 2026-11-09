@@ -69,6 +69,18 @@ describe('searchText', () => {
     expect(found(say('بسم الله الرحمن الرحيم', verse(67, 1).slice(0, 4)))).toEqual(['67:1']);
   });
 
+  it('finds the ayah when the basmala and the words after it are said twice', () => {
+    // The Fatihah from its start (the property's seed -378724082), and 27:30's basmala on into 27:31.
+    const fatihah = 'بسم الله الرحمن الرحيم الحمد لله رب العالمين الرحمن';
+    expect(found(`${fatihah} ${fatihah}`)[0]).toBe('1:2');
+    const naml = 'بسم الله الرحمن الرحيم ألا تعلوا علي وأتوني مسلمين';
+    expect(found(`${naml} ${naml}`)).toEqual(['27:31']);
+    const both = 'أعوذ بالله من الشيطان الرجيم بسم الله الرحمن الرحيم الحمد لله رب العالمين';
+    expect(found(`${both} ${both}`)[0]).toBe('1:2');
+    // A word said twice after the basmala is still the word, not the basmala.
+    expect(found('بسم الله الرحمن الرحيم فارجع البصر فارجع البصر')).toEqual(['67:3', '67:4']);
+  });
+
   it('reads يا أيها, printed as one word, said as two (or typed as one)', () => {
     const r = searchText(words, 'يا أيها الذين آمنوا');
     expect(r.total).toBeGreaterThan(80);
