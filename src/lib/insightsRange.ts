@@ -119,7 +119,8 @@ export type GridCell = { day: string; state: 'done' | 'missed' | 'before' | 'aft
 /**
  * Columns of Consistency's weeks grid (3 months: up to 13; All time: up to 26): one per week from the
  * account's first week to this one, so a short history is a short grid (one day: one column), drawn at a
- * fixed cell size from the left, never stretched to the width.
+ * fixed cell size from the left, never stretched to the width; the weekdays' initials before the rows and
+ * the days before the account or after today drawn faintly (InsightsView), so it reads as a week.
  */
 export function gridWeeks(range: InsightsRange, today: string, firstDay?: string | null): number {
   const max = range === 90 ? 13 : range === 'all' ? 26 : 0;

@@ -426,8 +426,9 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   and says so by its date at every range ("50 of 56 days since 9 September"). At 3 months Consistency shows a
   weeks grid by weekday and, when there is one, the missed days' pattern by weekday ("Every missed day was a
   Saturday"). The grid has a column per week since the account's first (up to 13 at 3 months, 26 All time),
-  its cells one fixed size whatever the history (at most 18 pt), drawn from the left: a day-old account is
-  one small column, never a cell stretched to the width. All time reads from the account's first day:
+  its cells one fixed size whatever the history (at most 18 pt), drawn from the left, with each row's
+  weekday initial before it and the days before the account or after today drawn faintly: a day-old account
+  is one small column that reads as a week, never a cell stretched to the width or a gap under one cell. All time reads from the account's first day:
   Coverage in cycles ("3.1 cycles of your 305 memorized pages since 9 September", since a long range covers
   nearly everything) once the pages have gone round once, and before that the share, as the other ranges
   show it ("4% · 1 of 23 memorized pages since 8 November", never "0 cycles"); the weeks grid from the start
