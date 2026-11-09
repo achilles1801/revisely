@@ -9,7 +9,27 @@ appId: com.revisionbuddy.app
     env:
       CLOCK: 2026-11-03T20:00
       BOUNDARY: midnight
-- runScript: ../scripts/server-account.js
+# The function once first, as an account of its own, so the flow's call finds its worker started: the
+# first call took 47 s on iOS (run 42594658944), past the app's 30 s (scripts/warm-delete.js).
+- runScript: ../scripts/warm-delete.js
+# The app sends the new account's pages from its outbox once onboarding is done: look again until
+# they are on the server (about 2 s a look; they went out 19 s after Home showed on iOS in run
+# 42573714262), then check.
+- repeat:
+    while:
+      true: ${!(output.serverPagesCount > 0)}
+    times: 20
+    commands:
+      - runScript: ../scripts/server-account.js
+      - runFlow:
+          when:
+            true: ${!(output.serverPagesCount > 0)}
+          commands:
+            - extendedWaitUntil:
+                visible:
+                  id: e2e-never-shown
+                timeout: 2000
+                optional: true
 - assertTrue:
     condition: ${output.accountExists && output.userDocExists && output.serverPagesCount > 0}
     label: The server has the new account, its user document and its pages
@@ -19,11 +39,19 @@ appId: com.revisionbuddy.app
 # The last row: on to the end of Settings, where it sits above the tab bar. Found at the screen's
 # foot, it sat under the tab bar, which took the tap (Android); and a last row can't be centred,
 # so centring it timed out on iOS, with the row in plain view (#328's run, Nov 7 2026).
+# Swipes first, counted, not timed, as settings-row.yaml does: a loaded iOS runner took 20 s a swipe.
+- repeat:
+    while:
+      notVisible:
+        id: settings-delete-account
+    times: 12
+    commands:
+      - scroll
 - scrollUntilVisible:
     element:
       id: settings-delete-account
     direction: DOWN
-    timeout: 20000
+    timeout: 60000
 - scroll
 - tapOn:
     id: settings-delete-account

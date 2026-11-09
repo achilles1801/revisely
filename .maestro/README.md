@@ -71,6 +71,16 @@ retry is a warning on the run, and the job keeps its results as for a failure.
 - **Time limits:** `run.sh` stops a flow's attempt after 15 minutes and the warm-up after 6
   (`E2E_FLOW_LIMIT`, `E2E_WARMUP_LIMIT`). Maestro can hang for good: once its iOS driver answered
   500, its JVM never exited, and a job waited 55 minutes for it.
+  - A `scrollUntilVisible` timeout is time, not swipes: on the iOS runner each swipe and look takes
+    4–6 s, so 20 s reaches only 3 or 4 swipes down. Rows deep in Settings (Theme, Help buttons,
+    What's new, Delete account) are 4–6 swipes down. In run 42531940953 the row came into view
+    with the last swipe, just after time ran out (flows 16 and 09-activity-dark). With 60 s it
+    happened again in run 42565390013 (09-revo-attach): for two minutes the runner was loaded
+    (the app answered every look in 0.1 s; Maestro took 5–7 s over each tree it got, and the
+    simulator's status bar took 1.8 s instead of 0.12), so a swipe and a look took 20 s.
+  - So a long screen is scrolled by counted swipes: `repeat` while the row isn't visible, `scroll`,
+    at most so many times, then `scrollUntilVisible` only to centre it. Every Settings row goes
+    through `subflows/settings-row.yaml` (by id) or `subflows/theme.yaml` (Theme has none).
 - **Caches:** this workflow holds no release secrets, so it keeps `node_modules`, Maestro and the
   Firestore emulator's jar, as it keeps the native builds.
 

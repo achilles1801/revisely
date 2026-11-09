@@ -681,7 +681,12 @@ export class ActivityDayView {
     await this.app.act(async () => {
       fireEvent(el, 'accessibilityAction', { nativeEvent: { actionName: action } });
     });
-    await this.app.idle(50);
+    // Delete reads the account's other entries from the server, saves the pages, and only then
+    // queues the delete (ActivityDayScreen.onDeleteMemorized). Until then the outbox can be empty
+    // (during the read, and again once the pages have gone), so a test's untilSynced could pass before
+    // the delete was even queued: [ACT-7] failed that way in CI (Nov 9 2026, today's entry still on
+    // the server). Done here once the entry has left the day, which it does when the delete is queued.
+    await this.app.until(() => header()?.props.accessibilityActions?.some((a: A11y) => a.name === action) !== true, 'the entry to leave the day');
   }
 }
 

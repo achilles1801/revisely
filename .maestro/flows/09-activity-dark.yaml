@@ -14,18 +14,10 @@ appId: com.revisionbuddy.app
     env:
       SET: activity
 - runFlow: ../subflows/backup-notice.yaml
-- tapOn:
-    id: open-settings
-# Appearance is down the page.
-- scrollUntilVisible:
-    element:
-      text: "Dark"
-    direction: DOWN
-    timeout: 20000
-- tapOn:
-    text: "Dark"
-- tapOn:
-    id: back
+- runFlow:
+    file: ../subflows/theme.yaml
+    env:
+      THEME: Dark
 - runFlow:
     file: ../subflows/activity-screens.yaml
     env:

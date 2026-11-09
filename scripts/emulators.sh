@@ -178,6 +178,11 @@ ROOT="$ROOT" FIRESTORE="$FIRESTORE" AUTH="$AUTH" STORAGE="$STORAGE" HUB="$HUB" L
 cp "$ROOT/.firebaserc" "$WORK/" 2>/dev/null || true
 echo "emulators: $ONLY on firestore $FIRESTORE, auth $AUTH, storage $STORAGE, functions $FUNCTIONS (hub $HUB)" >&2
 
+# The functions emulator gives our code 10 s to load, then serves no functions at all and still
+# says "All emulators ready": on a loaded macOS runner it took longer, and every function call in
+# that E2E job answered 404 (deleteUserAccount in 10-delete-account, run 42573714262). 60 s.
+export FUNCTIONS_DISCOVERY_TIMEOUT=${FUNCTIONS_DISCOVERY_TIMEOUT:-60}
+
 cd "$WORK"
 if [ "$MODE" = exec ]; then
   "$FIREBASE" emulators:exec --config "$CONFIG" --only "$ONLY" --project "$PROJECT" \

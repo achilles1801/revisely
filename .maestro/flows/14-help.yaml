@@ -56,7 +56,7 @@ appId: com.revisionbuddy.app
 - assertVisible:
     id: help-button-home
 
-# HELP-2: Hide help buttons. The ? goes, and Home says how to bring it back, with Undo.
+# HELP-2: Hide help buttons, with Undo; then hidden for good (until Settings).
 - tapOn:
     id: help-button-home
 - extendedWaitUntil:
@@ -64,6 +64,24 @@ appId: com.revisionbuddy.app
       id: help-hide
     timeout: 10000
 # The sheet slides up; a tap while it moves can miss (iOS).
+- waitForAnimationToEnd
+- tapOn:
+    id: help-hide
+# Undo at once: its toast lasts six seconds, and with the checks and the screenshot before it the
+# tap came after them on iOS (#328's run 42483723092). They are on the second hide, below.
+- tapOn:
+    id: undo-toast-action
+- extendedWaitUntil:
+    visible:
+      id: help-button-home
+    timeout: 10000
+# Hidden again: the ? goes, Home says how to bring it back, and it stays hidden after a relaunch.
+- tapOn:
+    id: help-button-home
+- extendedWaitUntil:
+    visible:
+      id: help-hide
+    timeout: 10000
 - waitForAnimationToEnd
 - tapOn:
     id: help-hide
@@ -76,26 +94,6 @@ appId: com.revisionbuddy.app
     file: ../subflows/shot.yaml
     env:
       NAME: h3-help-hidden
-# Undo brings it back; hidden again, it stays hidden after a relaunch.
-- tapOn:
-    id: undo-toast-action
-- extendedWaitUntil:
-    visible:
-      id: help-button-home
-    timeout: 10000
-- tapOn:
-    id: help-button-home
-- extendedWaitUntil:
-    visible:
-      id: help-hide
-    timeout: 10000
-- waitForAnimationToEnd
-- tapOn:
-    id: help-hide
-- extendedWaitUntil:
-    notVisible:
-      id: help-button-home
-    timeout: 10000
 - runFlow: ../subflows/relaunch.yaml
 - extendedWaitUntil:
     visible:
@@ -107,14 +105,10 @@ appId: com.revisionbuddy.app
 # Settings → Support → Help buttons: off; turned on, the ? is back on Home.
 - tapOn:
     id: open-settings
-# Centred: found at the screen's foot, a row can sit under the tab bar, which takes the tap (the
-# first run, Nov 8 2026, tapped Read instead).
-- scrollUntilVisible:
-    element:
-      id: settings-help-buttons
-    direction: DOWN
-    centerElement: true
-    timeout: 20000
+- runFlow:
+    file: ../subflows/settings-row.yaml
+    env:
+      ROW: settings-help-buttons
 - tapOn:
     id: settings-help-buttons
 - runFlow: ../subflows/back-home.yaml
