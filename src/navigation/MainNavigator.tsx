@@ -13,6 +13,7 @@ import PrayerNotificationsScreen from '../screens/prayer/PrayerNotificationsScre
 import ActiveRevisionScreen from '../screens/revision/ActiveRevisionScreen';
 import ReadIndexScreen from '../screens/read/ReadIndexScreen';
 import QuranReaderScreen from '../screens/read/QuranReaderScreen';
+import QuranSearchScreen from '../screens/read/QuranSearchScreen';
 import { RevoHost } from '../components/revo/RevoHost';
 import ListenBackScreen from '../screens/activity/ListenBackScreen';
 import JournalEntryScreen from '../screens/journal/JournalEntryScreen';
@@ -86,7 +87,10 @@ export type HomeStackParamList = {
 
 export type ReadStackParamList = {
   ReadIndex: undefined;
-  QuranReader: { pageNumber: number; source?: 'index' | 'recent' };
+  /** `highlight`: a verse found by search, highlighted on its page until the page is turned. */
+  QuranReader: { pageNumber: number; source?: 'index' | 'recent' | 'search'; highlight?: { sura: number; ayah: number } };
+  /** Search the Qur'an (testers); `listen`: start listening at once (the Read tab's mic). */
+  QuranSearch: { listen?: boolean } | undefined;
 };
 
 // The tabs are one pager: a sideways swipe on a tab's main screen moves to the
@@ -103,6 +107,7 @@ const HIDE_TAB_BAR_ON = new Set([
   'ActiveRevision',
   'Memorization',
   'QuranReader',
+  'QuranSearch',
   'JournalEntry',
   'ListenBack',
 ]);
@@ -146,6 +151,7 @@ function ReadStackNavigator() {
     >
       <ReadStack.Screen name="ReadIndex" component={ReadIndexScreen} />
       <ReadStack.Screen name="QuranReader" component={QuranReaderScreen} />
+      <ReadStack.Screen name="QuranSearch" component={QuranSearchScreen} />
     </ReadStack.Navigator>
   );
 }

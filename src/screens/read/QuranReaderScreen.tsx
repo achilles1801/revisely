@@ -33,7 +33,8 @@ import {
   getSurahsForPage,
 } from '../../lib/quranData';
 import { appendReadingHistory } from '../../lib/readingHistory';
-import { firstSurahOnPage } from '../../lib/verses';
+import { firstSurahOnPage, toAyahRef } from '../../lib/verses';
+import { AyahRef, ayahRects } from '../../lib/ayahBounds';
 import { useMushafEdition } from '../../lib/mushafEdition';
 import { sittingSavedText } from '../../lib/sitting';
 import type { ReadStackParamList } from '../../navigation/MainNavigator';
@@ -119,6 +120,23 @@ export default function QuranReaderScreen() {
     currentPage,
     focused: isScreenFocused,
   });
+
+  // A verse found by search (testers): highlighted on its page, until the reader turns
+  // to a page it isn't on. A held or playing verse shows instead while there is one.
+  const highlightParam = route.params.highlight;
+  const highlightKey = highlightParam ? `${highlightParam.sura}:${highlightParam.ayah}` : null;
+  const [searchHighlight, setSearchHighlight] = useState<AyahRef | null>(() =>
+    highlightParam ? toAyahRef(highlightParam) : null,
+  );
+  useEffect(() => {
+    if (!highlightKey) return;
+    const [sura, ayah] = highlightKey.split(':').map(Number);
+    setSearchHighlight(toAyahRef({ sura, ayah }));
+  }, [highlightKey]);
+  useEffect(() => {
+    if (!searchHighlight || currentPage === searchHighlight.page) return;
+    if (ayahRects(currentPage, searchHighlight.sura, searchHighlight.ayah).length === 0) setSearchHighlight(null);
+  }, [currentPage, searchHighlight]);
 
   // Reading: nothing but the page (its number, the juz and surah). A tap on
   // the page brings the controls (they sit beside the page, never over it);
@@ -258,7 +276,7 @@ export default function QuranReaderScreen() {
           initialPage={initialPage}
           onPageChange={handlePageChange}
           onLongPressAyah={verseActions.onLongPressAyah}
-          highlightedAyah={verseActions.highlightedAyah}
+          highlightedAyah={verseActions.highlightedAyah ?? searchHighlight}
           onTap={onTapPage}
           onUserSwipe={chrome.hide}
         />
