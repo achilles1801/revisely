@@ -176,6 +176,16 @@ describe('<RevoMoment />', () => {
     expect(screen.queryByTestId('whats-new-moment-again')).toBeNull();
   });
 
+  it('lands Revo where its button is on this screen, measured, not the window (Android’s is shorter)', async () => {
+    await show();
+    fireEvent(screen.getByTestId('whats-new-revo-moment'), 'layout', { nativeEvent: { layout: { x: 0, y: 0, width: 412, height: 915 } } });
+    await act(async () => {});
+    const docked = StyleSheet.flatten(screen.getByTestId('whats-new-moment-docked', { includeHiddenElements: true }).props.style) as { left: number; top: number };
+    // The tab bar (52 + 14 with no home indicator), the button's gap (14), its size (44); 16 from the right.
+    expect(docked.top).toBe(915 - 66 - 14 - 44);
+    expect(docked.left).toBe(412 - 16 - 44);
+  });
+
   it('[NEW-3] the replay keeps its ✕', async () => {
     const { onClose } = await show({ closable: true });
     fireEvent.press(screen.getByTestId('whats-new-close'));

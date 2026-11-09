@@ -254,6 +254,7 @@ function Docked({ p, L, ring }: { p: P; L: MomentLayout; ring: boolean }) {
     <Animated.View
       pointerEvents="none"
       style={[styles.abs, { left: L.button.x - REVO_BUTTON_SIZE / 2, top: L.button.y - REVO_BUTTON_SIZE / 2 }, style]}
+      testID="whats-new-moment-docked"
     >
       <RevoMark size={REVO_BUTTON_SIZE} ring={ring} />
     </Animated.View>
@@ -581,7 +582,8 @@ function Veil({ p, L }: { p: P; L: MomentLayout }) {
     <>
       <Animated.View style={[StyleSheet.absoluteFill, style]} pointerEvents="none">
         <Svg width={L.width} height={L.height}>
-          <Path d={d} fill={palette.bg} fillOpacity={isDark ? 0.94 : 0.95} fillRule="evenodd" />
+          {/* Firm enough that Home's sketch doesn't smudge the end's words (CI frames, Nov 9 2026). */}
+          <Path d={d} fill={palette.bg} fillOpacity={isDark ? 0.96 : 0.97} fillRule="evenodd" />
         </Svg>
       </Animated.View>
       <Animated.View style={[styles.abs, { borderWidth: 2, borderColor: palette.revo.ring }, pulse]} pointerEvents="none" />
@@ -625,7 +627,12 @@ export function RevoMoment({
 }) {
   const { palette, isDark } = useTheme();
   const haptics = useHaptics();
-  const { width, height } = useWindowDimensions();
+  // Laid out to its own box: on Android the window is shorter than an edge-to-edge screen, which left
+  // the sketch's tab bar under no veil and Revo docked above where its button is.
+  const win = useWindowDimensions();
+  const [box, setBox] = useState<{ width: number; height: number } | null>(null);
+  const width = box?.width ?? win.width;
+  const height = box?.height ?? win.height;
   const insets = useSafeAreaInsets();
   const tabBar = useTabBarHeight();
   const L = useMemo(
@@ -721,7 +728,14 @@ export function RevoMoment({
   const wide = { left: 16, width: L.width - 32 };
 
   return (
-    <View style={styles.fill} testID="whats-new-revo-moment">
+    <View
+      style={styles.fill}
+      testID="whats-new-revo-moment"
+      onLayout={(e) => {
+        const { width: w, height: h } = e.nativeEvent.layout;
+        if (w > 0 && h > 0 && (w !== box?.width || h !== box?.height)) setBox({ width: w, height: h });
+      }}
+    >
       <Animated.View style={[StyleSheet.absoluteFill, faded]} pointerEvents="box-none">
         <View style={StyleSheet.absoluteFill} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
           <HomeSketch p={p} firstName={firstName} topInset={top} tabBar={tabBar} />
