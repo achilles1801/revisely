@@ -32,17 +32,25 @@ signed in to the demo account `screenshots@revisely.app`. No real user's data ap
 
 The Revo section plays the app's What's new "Revo moment", in a light and a dark take: the page
 picks the one that matches the visitor's appearance (`site.js`, sources with `data-src` and
-`data-src-dark`). It comes from a recording of the moment in the app, made by the Revo session
-(`~/Documents/revisely-today-mocks/whats-new/revo-intro/video/`). To put a new recording on the page:
+`data-src-dark`). It comes from the Revo session's recordings of the moment in the app (iPhone 17 Pro
+Max simulator, 1320×2868, Indigo, an account named Maryam with Revo off; the README in
+`~/Documents/revisely-today-mocks/whats-new/revo-intro/video/` says how they were made). The page's
+take was made from the `revo-moment-preview-*-1320x2868.mp4` files, which end on the settled card
+with no loop fade:
 
 ```bash
-python3 scripts/site-clips/revo.py --light <light video> --dark <dark video> [--hold 2.5]
+V=~/Documents/revisely-today-mocks/whats-new/revo-intro/video
+python3 scripts/site-clips/revo.py --light $V/revo-moment-preview-light-1320x2868.mp4 \
+  --dark $V/revo-moment-preview-dark-1320x2868.mp4 --hold 1.5 --fade 0.6 --poster 4.8
 ```
 
-It writes `docs/assets/clips/revo-{light,dark}.{mp4,webm,jpg}` at the page's size. The poster is the
-last frame, the "Meet Revo" card, which is what a visitor with Reduce Motion sees until they press
-play. Update the video's `aria-label` in `docs/index.html` if the moment changes. The section stays
-off the live site until Revo is on for everyone.
+It writes `docs/assets/clips/revo-{light,dark}.{mp4,webm,jpg}` at the page's size, about 21 s:
+the "Meet Revo" card stays 1.5 s longer than in the recording, so it can be read, then fades into
+the first frame, so the loop has no seam. The poster is the "Revo" wordmark at 4.8 s (the Revo
+session's choice), which is what a visitor with Reduce Motion sees until they press play; the end
+card would show Turn on Revo and Later as buttons that do nothing on a web page. Update the video's
+`aria-label` in `docs/index.html` if the moment changes. The section stays off the live site until
+Revo is on for everyone.
 
 ## Stills
 
