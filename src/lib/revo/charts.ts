@@ -19,7 +19,7 @@ import { revisedItems } from './context';
 import type { FactSources } from './facts';
 import type { RevoDayFacts, RevoPassageFacts, RevoTableColumn, RevoVisual } from './types';
 import { passageShort } from './words';
-import { daysSince, lastRevisedWords, recencyLine as recencyWords, timesWord } from '../recency';
+import { coverageSince, daysSince, lastRevisedWords, recencyLine as recencyWords, timesWord } from '../recency';
 
 export { timesWord };
 
@@ -284,10 +284,13 @@ export function recencyLine(f: RevoPassageFacts): string {
  * Insights' 30 tiles (lib/insightsView juzTiles), from the same reading of the sessions Revo's
  * context makes (lastRevisedByPage over revisedItems), so the map and Revo's words agree.
  */
-export function juzMapData(pages: readonly UserPage[], logs: readonly RevisionLog[], today: string): JuzTile[] {
+export function juzMapData(pages: readonly UserPage[], logs: readonly RevisionLog[], today: string, firstDay?: string | null): JuzTile[] {
   const memorized = new Set(pages.filter((p) => p.status === 'memorized').map((p) => p.pageNumber));
   const learning = new Set(pages.filter((p) => p.status === 'in_progress').map((p) => p.pageNumber));
-  return juzTiles(memorized, learning, lastRevisedByPage(revisedItems(logs), today), today);
+  // A page never revised counts from when it was memorized, or the account's first day (ACT-25).
+  const memorizedOn = new Map(pages.map((p) => [p.pageNumber, p.dateMemorized]));
+  const sinceOf = (page: number) => coverageSince(memorizedOn.get(page), firstDay);
+  return juzTiles(memorized, learning, lastRevisedByPage(revisedItems(logs), today), today, sinceOf);
 }
 
 /** A picked juz: "Juz 4 · last revised 41 days ago" over its surahs ("Ali 'Imran 92 to the end of Juz 4"). */
@@ -298,8 +301,12 @@ export function juzReadout(tile: JuzTile): { title: string; line: string } {
       ? tile.learning
         ? 'being learned'
         : 'not memorized'
-      : tile.daysSince == null
-        ? 'not all revised yet'
+      : tile.state === 'new'
+        ? tile.counts.week + tile.counts.month === 0
+          ? 'not revised yet'
+          : 'not all revised yet'
+        : tile.daysSince == null
+          ? 'not all revised yet'
         : tile.daysSince === 0
           ? 'revised today'
           : tile.daysSince === 1
@@ -332,6 +339,7 @@ export function juzSummary(tiles: readonly JuzTile[]): string {
   return [
     ['Revised this week', of('week')],
     ['This month', of('month')],
+    ['Not revised yet', of('new')],
     ['Over 30 days ago', of('stale')],
     ['Being learned', juzList(tiles.filter((t) => t.state === 'none' && t.learning).map((t) => t.juz))],
   ]

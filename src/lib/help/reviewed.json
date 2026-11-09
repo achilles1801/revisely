@@ -74,12 +74,12 @@
     "ACT-17": "62b54494328e1e9d"
   },
   "insights.coverage": {
-    "ACT-4": "a304caca52f119a4",
+    "ACT-4": "9105a4f613b7539e",
     "ACT-21": "b309872a5b9f1cb8",
     "ACT-22": "c9c5d346459454a8"
   },
   "insights.consistency": {
-    "ACT-4": "a304caca52f119a4",
+    "ACT-4": "9105a4f613b7539e",
     "ACT-23": "bc761a4eb1d943b5"
   },
   "insights.weak": {
@@ -89,7 +89,7 @@
     "ACT-24": "84ed5272370beade"
   },
   "insights.pace": {
-    "ACT-4": "a304caca52f119a4",
+    "ACT-4": "9105a4f613b7539e",
     "ACT-23": "bc761a4eb1d943b5"
   },
   "day.change": {

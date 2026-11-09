@@ -39,3 +39,35 @@ export function daysSince(day: string, today: string): number {
   const n = (d: string) => Math.round(Date.parse(`${d.slice(0, 10)}T00:00:00Z`) / DAY_MS);
   return n(today) - n(day);
 }
+
+// ── Coverage ─────────────────────────────────────────────────────────────
+
+/**
+ * A memorized page in Coverage (ACT-4, ACT-25): revised this week (under 7 days), this month (under
+ * 30), not revised yet (never, but memorized or on record under 30 days ago), or 30+ days (revised 30
+ * or more days ago, or never in the 30 or more days since it was memorized or on record).
+ */
+export type CoverageRecency = 'week' | 'month' | 'new' | 'stale';
+
+/** Days without a revision before a memorized page counts as left too long. */
+export const COVERAGE_STALE_DAYS = 30;
+
+/**
+ * The day a never-revised memorized page counts from: when it was memorized, or the account's first
+ * day when that is later (nothing before it is on record). Null when neither is known.
+ */
+export function coverageSince(dateMemorized: string | null | undefined, firstDay: string | null | undefined): string | null {
+  const memorized = dateMemorized ? dateMemorized.slice(0, 10) : null;
+  const first = firstDay ? firstDay.slice(0, 10) : null;
+  if (memorized && first) return memorized > first ? memorized : first;
+  return memorized ?? first;
+}
+
+/** Where a memorized page stands (CoverageRecency); with no `since`, a page never revised is 30+ days. */
+export function coverageRecency(lastDay: string | null | undefined, since: string | null | undefined, today: string): CoverageRecency {
+  if (lastDay) {
+    const ago = daysSince(lastDay, today);
+    return ago < 7 ? 'week' : ago < COVERAGE_STALE_DAYS ? 'month' : 'stale';
+  }
+  return since != null && daysSince(since, today) < COVERAGE_STALE_DAYS ? 'new' : 'stale';
+}

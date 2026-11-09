@@ -55,6 +55,34 @@ describe('Coverage: juz tiles (gap audit §5)', () => {
     expect(juzTiles(memorized, new Set(), partly, TODAY)[27]).toMatchObject({ state: 'stale', daysSince: null });
   });
 
+  it('[ACT-25] a page never revised counts from when it was memorized: “not revised yet” for 30 days, then stale', () => {
+    // A new account (Majd, Nov 8 2026): Juz 28 memorized yesterday, five of its pages revised today.
+    const memorized = new Set(juz28);
+    const revised = lastOf(juz28.slice(0, 5), TODAY);
+    const sinceYesterday = () => ago(1);
+    const fresh = juzTiles(memorized, new Set(), revised, TODAY, sinceYesterday)[27];
+    expect(fresh).toMatchObject({ state: 'new', daysSince: 0, counts: { week: 5, month: 0, new: juz28.length - 5, stale: 0 } });
+    // Nothing is untouched the longest for a page not revised yet.
+    expect(untouchedJuz(juzTiles(memorized, new Set(), revised, TODAY, sinceYesterday))).toBeNull();
+    // None revised yet: still not 30+ days.
+    expect(juzTiles(memorized, new Set(), new Map(), TODAY, sinceYesterday)[27]).toMatchObject({ state: 'new', daysSince: null });
+    // 29 days on record and never revised: not yet; 30: stale ("Never revised").
+    expect(juzTiles(memorized, new Set(), new Map(), TODAY, () => ago(29))[27].state).toBe('new');
+    const old = juzTiles(memorized, new Set(), new Map(), TODAY, () => ago(30));
+    expect(old[27]).toMatchObject({ state: 'stale', daysSince: null });
+    expect(untouchedJuz(old)?.first.juz).toBe(28);
+    // A page revised 41 days ago beside fresh ones: stale for that page, and it says 41 days.
+    const mixed = new Map(revised);
+    mixed.set(juz28[6], ago(41));
+    expect(juzTiles(memorized, new Set(), mixed, TODAY, sinceYesterday)[27]).toMatchObject({ state: 'stale', daysSince: 41 });
+    // A juz not revised yet is never "the next one" ahead of one revised 20 days ago.
+    const both = new Set([...juz28, ...juz4]);
+    const lastBoth = new Map([...lastOf(juz4, ago(20))]);
+    lastBoth.set(juz4[0], ago(40));
+    const u = untouchedJuz(juzTiles(both, new Set(), lastBoth, TODAY, (p) => (juz28.includes(p) ? ago(1) : ago(90))));
+    expect(u).toMatchObject({ first: { juz: 4, daysSince: 40 }, next: { juz: 28, state: 'new' } });
+  });
+
   it('marks a juz being learned', () => {
     expect(juzTiles(new Set(), new Set([juz29[0]]), new Map(), TODAY)[28]).toMatchObject({ state: 'none', learning: true });
   });

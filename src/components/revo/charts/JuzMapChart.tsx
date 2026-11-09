@@ -7,6 +7,7 @@ import { juzMapData, juzReadout, juzStrip, juzSummary, slotAt, stepIndex, stripE
 import { spokenText } from '../../../lib/passages';
 import { getJuzRange } from '../../../lib/quranData';
 import { CHART_TEXT_MAX, ChartFrame, ChartPlot } from './ChartFrame';
+import { COVERAGE_LABELS, coverageLook } from '../../activity/coverageLook';
 import { ChartButtons, DetailLine, Legend, RatingCounts, RatingStrip } from './ChartParts';
 
 const COLS = 10;
@@ -26,6 +27,7 @@ export function JuzMapChart({
   onReviseFirst,
   onOpenPage,
   smart = true,
+  firstDay,
   testID = 'revo-chart-juzMap',
 }: {
   title: string;
@@ -38,10 +40,12 @@ export function JuzMapChart({
   onOpenPage?: (page: number) => void;
   /** The account's Smart Tracking: off, no strength strip (REVO-36); `preview` says when and how often. */
   smart?: boolean;
+  /** The account's first day: a page never revised counts from it, or from when it was memorized (ACT-25). */
+  firstDay?: string | null;
   testID?: string;
 }) {
   const { palette } = useTheme();
-  const tiles = useMemo(() => juzMapData(userPages, logs, today), [userPages, logs, today]);
+  const tiles = useMemo(() => juzMapData(userPages, logs, today, firstDay), [userPages, logs, today, firstDay]);
   const [picked, setPicked] = useState<number | null>(null);
   const tile = picked != null ? tiles[picked] : null;
   const readout = tile ? juzReadout(tile) : null;
@@ -52,14 +56,8 @@ export function JuzMapChart({
   const line = tile && tile.state !== 'none' && preview ? preview(memorizedPages) : null;
   const ends = tile ? stripEnds(strip.map((s) => s.page)) : { first: null, last: null };
 
-  const look = (t: JuzTile) =>
-    t.state === 'week'
-      ? { box: { backgroundColor: palette.heat[3] }, color: palette.heatInk[3] }
-      : t.state === 'month'
-        ? { box: { backgroundColor: palette.heat[1] }, color: palette.heatInk[1] }
-        : t.state === 'stale'
-          ? { box: { borderWidth: 1.5, borderColor: palette.red }, color: palette.red }
-          : { box: { backgroundColor: palette.heat[0] }, color: palette.secondary, dim: true };
+  // As Insights' Coverage tiles draw them (ACT-25: not revised yet is neutral).
+  const look = (t: JuzTile) => coverageLook(t.state, palette);
 
   return (
     <ChartFrame
@@ -109,7 +107,7 @@ export function JuzMapChart({
                 return (
                   <View key={t.juz} style={[styles.tile, l.box]} testID={`revo-chart-juz-${t.juz}`}>
                     {on ? <View style={[styles.ring, { borderColor: palette.text }]} /> : null}
-                    <Text style={[styles.tileText, { color: l.color, opacity: 'dim' in l ? 0.7 : 1 }]} maxFontSizeMultiplier={CHART_TEXT_MAX}>
+                    <Text style={[styles.tileText, { color: l.color, opacity: l.dim ? 0.7 : 1 }]} maxFontSizeMultiplier={CHART_TEXT_MAX}>
                       {t.juz}
                     </Text>
                     {t.learning ? <View style={[styles.learning, { backgroundColor: palette.primary }]} /> : null}
@@ -122,10 +120,11 @@ export function JuzMapChart({
       </ChartPlot>
       <Legend
         items={[
-          { color: palette.heat[3], label: 'This week' },
-          { color: palette.heat[1], label: 'This month' },
-          { color: palette.red, label: '30+ days', outline: true },
-          { color: palette.heat[0], label: 'Not memorized' },
+          { color: palette.heat[3], label: COVERAGE_LABELS.week },
+          { color: palette.heat[1], label: COVERAGE_LABELS.month },
+          ...(tiles.some((t) => t.state === 'new') ? [{ color: palette.secondary, label: COVERAGE_LABELS.new, outline: true }] : []),
+          { color: palette.red, label: COVERAGE_LABELS.stale, outline: true },
+          { color: palette.heat[0], label: COVERAGE_LABELS.none },
         ]}
       />
     </ChartFrame>
