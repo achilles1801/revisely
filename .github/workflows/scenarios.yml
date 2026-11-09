@@ -31,7 +31,8 @@ jobs:
   shard:
     name: Scenario tests (${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # A run of a quarter takes about 12 minutes; the harness's second run doubles it (as e2e.yml).
+    timeout-minutes: ${{ inputs.repeat == 2 && 60 || 30 }}
     outputs:
       tree: ${{ steps.tree.outputs.tree }}
     strategy:
