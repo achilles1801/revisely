@@ -6,7 +6,10 @@ import { TopSafeAreaView } from '../../components/SafeAreaView';
 import { FlatList } from 'react-native-gesture-handler';
 import { useNavigation, useFocusEffect, useScrollToTop } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
+import { useApp } from '../../context/AppContext';
+import { canSearchByVoice, quranSearchEnabled } from '../../lib/search/availability';
 import { arabicV2, layoutV2, typeV2 } from '../../theme/v2';
 import { Mark } from '../../components/v2/Mark';
 import { Tap } from '../../components/v2/Tap';
@@ -71,6 +74,10 @@ function fallbackDisplay(name: string, nameArabic: string): SurahDisplay {
 export default function ReadIndexScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { isDark, palette: v2Palette } = useTheme();
+  const { user } = useApp();
+  // Search the Qur'an, typed or recited (testers).
+  const searchOn = quranSearchEnabled(user);
+  const voiceSearch = searchOn && canSearchByVoice();
   // Room for the tab bar (and the mini player). Revo's button isn't on the Read tab (REVO-25).
   const tabFootprint = useTabBarFootprint();
 
@@ -130,6 +137,34 @@ export default function ReadIndexScreen() {
           Surahs
         </Text>
       </View>
+      {searchOn ? (
+        <View style={v2.searchRow}>
+          <Tap
+            onPress={() => navigation.navigate('QuranSearch')}
+            accessibilityRole="button"
+            accessibilityLabel="Search the Quran"
+            style={[v2.searchField, { backgroundColor: v2Palette.fill }]}
+            testID="read-search"
+          >
+            <Ionicons name="search" size={18} color={v2Palette.secondary} />
+            <Text style={[typeV2.body, { color: v2Palette.secondary }]} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+              Search the Quran
+            </Text>
+          </Tap>
+          {voiceSearch ? (
+            <Tap
+              onPress={() => navigation.navigate('QuranSearch', { listen: true })}
+              accessibilityRole="button"
+              accessibilityLabel="Search by voice"
+              hitSlop={6}
+              style={[v2.searchMic, { backgroundColor: v2Palette.primary }]}
+              testID="read-search-voice"
+            >
+              <Ionicons name="mic" size={20} color={v2Palette.onPrimary} />
+            </Tap>
+          ) : null}
+        </View>
+      ) : null}
       {recent.length > 0 && (
         <View testID="read-recent">
           <SectionTitleV2 title="Recent pages" />
@@ -248,6 +283,9 @@ function SurahRowV2({ row, onPress }: { row: SurahRow; onPress: () => void }) {
 
 const v2 = StyleSheet.create({
   titleBlock: { paddingHorizontal: layoutV2.gutter, paddingTop: 12, paddingBottom: 4 },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: layoutV2.gutter, paddingTop: 8, paddingBottom: 4 },
+  searchField: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 40, borderRadius: 999, paddingHorizontal: 12 },
+  searchMic: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   sectionTitle: { paddingHorizontal: layoutV2.gutter, paddingTop: layoutV2.rowPad + 8, paddingBottom: 4 },
   row: {
     flexDirection: 'row',

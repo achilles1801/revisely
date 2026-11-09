@@ -6,13 +6,13 @@
 import { getJuzForPage, getJuzRange, getSurahsForPage } from './quranData';
 import { ayahOf, ayahsOnPage, pageOfAyah, suraOf } from './ayahKeys';
 import { memorizedAyahsOnPage, pageShare } from './memorizedAyahs';
-import { daysSince, lastRevisedWords, recencyLine, timesWord } from './recency';
+import { coverageRecency, coverageSince, daysSince, lastRevisedWords, recencyLine, timesWord } from './recency';
 import { describeSurahs } from './pageRanges';
 import { describeAyahs, pageRunEnds, surahName } from './passages';
 import { strengthOf, type Strength } from './activityDayParts';
 
-/** How recently a memorized page was revised: the Coverage tiles' bands (ACT-4). */
-export type Recency = 'week' | 'month' | 'older';
+/** How recently a memorized page was revised: the Coverage tiles' bands (ACT-4); `new`: not revised yet (ACT-25). */
+export type Recency = 'week' | 'month' | 'new' | 'older';
 
 /** A page of the juz. `learning`: partly memorized (`in_progress`), drawn filled by its share (MEM-7). */
 export type JuzCellState = 'not-memorized' | 'learning' | Strength | Recency;
@@ -25,6 +25,8 @@ export interface JuzSheetPage {
   skipCount?: number;
   /** A page in part: its memorized ayahs (MEM-1). */
   verses?: number[] | null;
+  /** When it was memorized: a page never revised counts from then (ACT-25). */
+  dateMemorized?: string | null;
 }
 
 export interface JuzSheetInput {
@@ -41,6 +43,8 @@ export interface JuzSheetInput {
   /** "in the last 30 days", "since 9 September": what "not …" says when a part wasn't revised in it. */
   windowInTheLast?: string;
   smartTracking: boolean;
+  /** The account's first day: a page never revised counts from it when that is later (ACT-25). */
+  firstDay?: string | null;
 }
 
 export interface JuzSurahRow {
@@ -65,7 +69,7 @@ export interface JuzSheetModel {
   headline: string;
   /** "twice in 30 days", "not in the last 30 days"; empty when nothing of it is memorized or ever revised. */
   times: string;
-  /** Over 30 days since a memorized page of it was revised, or one never was (the untouched juz). */
+  /** Over 30 days since a memorized page of it was revised, or one never was in the 30+ days on record (the untouched juz). */
   stale: boolean;
   /** `share`: how much of a page being learned is memorized, 0–1 (MEM-7); absent for the rest. */
   cells: { page: number; state: JuzCellState; share?: number }[];
@@ -88,10 +92,10 @@ export interface JuzSheetModel {
 /** "3 times" for a count of skips (recency's "once", "twice" are for revisions: lib/recency). */
 const skipsWord = (n: number) => `${n} ${n === 1 ? 'time' : 'times'}`;
 
-export function recencyOf(lastDay: string | null | undefined, today: string): Recency {
-  if (!lastDay) return 'older';
-  const d = daysSince(lastDay, today);
-  return d < 7 ? 'week' : d < 30 ? 'month' : 'older';
+/** A memorized page's band; never revised, it is `new` for 30 days from `since` (lib/recency coverageRecency). */
+export function recencyOf(lastDay: string | null | undefined, today: string, since?: string | null): Recency {
+  const where = coverageRecency(lastDay, since, today);
+  return where === 'stale' ? 'older' : where;
 }
 
 /** Ayah numbers' first run: "17–24" ("5"), and ", …" when more follow. */
@@ -154,17 +158,11 @@ export function juzSheetModel(input: JuzSheetInput): JuzSheetModel {
     }
     return newest ? daysSince(newest, today) : null;
   };
+  // A page never revised counts from when it was memorized, or the account's first day (ACT-25).
+  const sinceOf = (p: number) => coverageSince(byNumber.get(p)?.dateMemorized, input.firstDay);
+  const bandOf = (p: number) => recencyOf(last.get(p), today, sinceOf(p));
   // The juz is as stale as its least recently revised memorized page (the untouched row, ACT-4).
-  let oldest: number | null = 0;
-  for (const p of memorized) {
-    const d = last.get(p);
-    if (!d) {
-      oldest = null;
-      break;
-    }
-    oldest = Math.max(oldest, daysSince(d, today));
-  }
-  const staleByDays = memorized.length > 0 && (oldest == null || oldest >= 30);
+  const staleByDays = memorized.some((p) => bandOf(p) === 'older');
 
   // Being learned (MEM-7): the surahs with ayahs memorized on a page in part, and what of them is
   // memorized on the juz's pages, whole or in part.
@@ -205,7 +203,7 @@ export function juzSheetModel(input: JuzSheetInput): JuzSheetModel {
         : 'not-memorized'
       : smartTracking
         ? strength(p)
-        : recencyOf(last.get(p), today);
+        : bandOf(p);
   const cells = juzPages.map((page) => {
     const state = cellState(page);
     if (state !== 'learning') return { page, state };
@@ -213,7 +211,7 @@ export function juzSheetModel(input: JuzSheetInput): JuzSheetModel {
     return { page, state, share: pageShare({ pageNumber: page, status: 'in_progress', verses: pg.verses }) };
   });
 
-  const kinds: (Strength | Recency)[] = smartTracking ? ['weak', 'moderate', 'strong'] : ['week', 'month', 'older'];
+  const kinds: (Strength | Recency)[] = smartTracking ? ['weak', 'moderate', 'strong'] : ['week', 'month', 'new', 'older'];
   const counts = kinds.map((state) => ({ state, n: cells.filter((c) => c.state === state).length })).filter((c) => c.n > 0);
 
   // One row per surah the juz holds, in order.
@@ -258,6 +256,8 @@ export function juzSheetModel(input: JuzSheetInput): JuzSheetModel {
     }
     const ago = lastOf(mine);
     const n = daysOf(mine);
+    // Never revised yet, and none of it 30+ days on record: not revised yet, not stale (ACT-25).
+    if (ago == null && !mine.some((p) => bandOf(p) === 'older')) return { ...base, text: 'Not revised yet', alert: false, state: 'new' as const };
     const state: Recency = ago == null || ago >= 30 ? 'older' : ago < 7 ? 'week' : 'month';
     return { ...base, text: recency(ago, n), alert: state === 'older', state };
   });
@@ -266,7 +266,13 @@ export function juzSheetModel(input: JuzSheetInput): JuzSheetModel {
     juz,
     title: `Juz ${juz}`,
     subtitle: describeSurahs({ first: start, last: end }),
-    headline: beingLearned ? 'Being learned' : memorized.length === 0 ? 'Not memorized yet' : lastRevisedWords(newest),
+    headline: beingLearned
+      ? 'Being learned'
+      : memorized.length === 0
+        ? 'Not memorized yet'
+        : newest == null && !stale
+          ? 'Not revised yet'
+          : lastRevisedWords(newest),
     times: memorized.length === 0 || newest == null || beingLearned ? '' : timesText(daysOf(memorized)),
     stale,
     cells,

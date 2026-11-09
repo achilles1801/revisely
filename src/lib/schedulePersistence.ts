@@ -9,6 +9,7 @@ export function customPlanToFirestore(
     days: plan.days.map((pages) => ({ pages })),
     cycleStartDate: plan.cycleStartDate,
     direction: plan.direction,
+    ...(plan.name ? { name: plan.name } : {}),
   };
 }
 
@@ -28,10 +29,12 @@ export function customPlanFromFirestore(
   plan: FirestoreCustomPlan | null | undefined,
 ): CustomPlan | null {
   if (!plan) return null;
+  const name = typeof plan.name === 'string' ? plan.name.trim() : '';
   return {
     days: plan.days.map((day) => day.pages ?? []),
     cycleStartDate: plan.cycleStartDate,
     direction: plan.direction,
+    ...(name ? { name } : {}),
   };
 }
 

@@ -150,9 +150,24 @@ describe('schedule editing lifecycle', () => {
       days: [[2, 4], [6], []],
       cycleStartDate: '2026-06-12',
       direction: 'reverse',
+      name: 'Ramadan rotation',
     });
+    // SCHED-7: the plan keeps the saved plan's name through Firestore.
+    expect(reloadedUser.customPlan).toEqual(customPlan);
     expect(getPagesScheduledForDate(reloadedUser, new Date('2026-06-12T12:00:00Z'), memorized)).toEqual([2, 4]);
     expect(getPagesScheduledForDate(reloadedUser, new Date('2026-06-14T12:00:00Z'), memorized)).toEqual([]);
+  });
+
+  it('a custom plan without a name has none in Firestore, and a blank name is no name (SCHED-7)', () => {
+    const plan = createCustomPlanFromDraft([[1], [2]], 'forward', new Date('2026-06-12T08:00:00Z'));
+    expect(plan).not.toHaveProperty('name');
+    expect(customPlanToFirestore(plan)).not.toHaveProperty('name');
+    expect(createCustomPlanFromDraft([[1]], 'forward', new Date('2026-06-12T08:00:00Z'), '  ')).not.toHaveProperty('name');
+    expect(createCustomPlanFromDraft([[1]], 'forward', new Date('2026-06-12T08:00:00Z'), ' Weekdays ')).toMatchObject({
+      name: 'Weekdays',
+    });
+    const fromServer = customPlanFromFirestore({ days: [{ pages: [1] }], cycleStartDate: '2026-06-12', direction: 'forward', name: '' });
+    expect(fromServer).not.toHaveProperty('name');
   });
 
   it('saved named plans round-trip through Firestore without losing rest days or direction', () => {

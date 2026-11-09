@@ -94,6 +94,60 @@ describe('the juz sheet', () => {
       expect(never.stale).toBe(true);
       expect(never.surahs[0].text).toBe('Never revised');
     });
+
+    it('[ACT-25] memorized under 30 days ago and never revised: “not revised yet”, neutral, not stale', () => {
+      // A new account: Juz 28 memorized yesterday, five pages revised today.
+      const fresh = juzSheetModel({
+        juz: 28,
+        today: TODAY,
+        pages: JUZ28.map((p) => page(p, { dateMemorized: '2026-11-02T20:00:00.000Z' })),
+        revised: [{ countsFor: TODAY, pages: JUZ28.slice(0, 5) }],
+        windowDays: 30,
+        smartTracking: false,
+        firstDay: '2026-11-02',
+      });
+      expect(fresh.stale).toBe(false);
+      expect(fresh.headline).toBe('Last revised today');
+      expect(fresh.counts).toEqual([
+        { state: 'week', n: 5 },
+        { state: 'new', n: 15 },
+      ]);
+      expect(fresh.cells.slice(4, 6).map((c) => c.state)).toEqual(['week', 'new']);
+      // Al-Mujadila holds revised pages; At-Tahrim's are all not revised yet.
+      expect(fresh.surahs.slice(-1)[0]).toMatchObject({ text: 'Not revised yet', alert: false, state: 'new' });
+      // None revised: the headline says so, without "Never".
+      const none = juzSheetModel({
+        juz: 28,
+        today: TODAY,
+        pages: JUZ28.map((p) => page(p, { dateMemorized: '2026-11-02T20:00:00.000Z' })),
+        revised: [],
+        windowDays: 30,
+        smartTracking: false,
+      });
+      expect(none).toMatchObject({ headline: 'Not revised yet', stale: false, times: '' });
+      // Memorized long ago, but the account is a day old: nothing before it is on record.
+      const imported = juzSheetModel({
+        juz: 28,
+        today: TODAY,
+        pages: JUZ28.map((p) => page(p, { dateMemorized: '2024-01-01T09:00:00.000Z' })),
+        revised: [],
+        windowDays: 30,
+        smartTracking: false,
+        firstDay: '2026-11-02',
+      });
+      expect(imported.stale).toBe(false);
+      // A month later, never revised: stale.
+      const later = juzSheetModel({
+        juz: 28,
+        today: '2026-12-03',
+        pages: JUZ28.map((p) => page(p, { dateMemorized: '2026-11-02T20:00:00.000Z' })),
+        revised: [],
+        windowDays: 30,
+        smartTracking: false,
+        firstDay: '2026-11-02',
+      });
+      expect(later).toMatchObject({ headline: 'Never revised', stale: true });
+    });
   });
 
   describe('with Smart Tracking: strength (ACT-8)', () => {

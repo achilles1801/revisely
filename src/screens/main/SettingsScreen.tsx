@@ -10,6 +10,7 @@ import {
   Share,
   TextInput,
   AccessibilityState,
+  Modal,
   useWindowDimensions,
 } from 'react-native';
 import { TopSafeAreaView } from '../../components/SafeAreaView';
@@ -80,6 +81,11 @@ import { useRevoAvailable } from '../../lib/revo/availability';
 import { revoBackend } from '../../lib/revo/backend';
 import { openRevo } from '../../lib/revo/open';
 import { useRevoSettings } from '../../lib/revo/useRevoSettings';
+import { markRevoMomentSeen } from '../../lib/revo/momentSeen';
+import { RevoMoment } from '../../components/whatsNew/RevoMoment';
+import { auth } from '../../lib/firebase';
+import { greetingName } from '../../lib/displayName';
+import { smartTrackingOn } from '../../lib/smartTracking';
 import { showsTestScenarios } from '../../lib/testScenarios';
 import { releaseSync } from '../../lib/offline/sync';
 
@@ -290,6 +296,8 @@ export default function SettingsScreen() {
   const revoOpen = useRevoAvailable(user);
   const revoSettings = useRevoSettings(!!user);
   const revoShown = revoOpen || revoSettings?.optIn === true;
+  // Settings → Revo AI → What Revo can do: Revo's moment again, any time (REVO-39).
+  const [revoMoment, setRevoMoment] = useState(false);
   const confirmRevoOff = () =>
     Alert.alert('Turn off Revo?', 'Your conversations with Revo and what it remembers are deleted.', [
       { text: 'Cancel', style: 'cancel' },
@@ -823,6 +831,9 @@ export default function SettingsScreen() {
                 testID="revo-settings-switch"
               />
             </View>
+            {revoOpen ? (
+              <Row icon="play-circle-outline" label="What Revo can do" onPress={() => setRevoMoment(true)} testID="settings-revo-moment" />
+            ) : null}
             {revoSettings?.optIn ? (
               <>
                 {revoOpen ? (
@@ -831,6 +842,23 @@ export default function SettingsScreen() {
                 <Row icon="trash-outline" label="Delete conversations" destructive onPress={confirmRevoHistoryDelete} />
               </>
             ) : null}
+            <Modal visible={revoMoment} animationType="fade" presentationStyle="fullScreen" onRequestClose={() => setRevoMoment(false)} statusBarTranslucent>
+              <View style={{ flex: 1, backgroundColor: palette.bg }} testID="settings-revo-moment-screen">
+                <RevoMoment
+                  mode="settings"
+                  title="Meet Revo"
+                  text="Ask about your revision, or how anything in the app works."
+                  firstName={greetingName(user?.name, auth.currentUser?.displayName ?? null).split(' ')[0]}
+                  smartTracking={smartTrackingOn(user)}
+                  closable
+                  onNext={() => setRevoMoment(false)}
+                  onClose={() => setRevoMoment(false)}
+                  onEnded={() => {
+                    if (user?.id) markRevoMomentSeen(user.id);
+                  }}
+                />
+              </View>
+            </Modal>
           </Section>
         )}
 

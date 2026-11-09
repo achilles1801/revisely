@@ -50,7 +50,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'Plans',
-    covers: ['SCHED-1', 'SCHED-2', 'SCHED-3', 'SCHED-4', 'SCHED-5', 'SCHED-6', 'CARRY-5'],
+    covers: ['SCHED-1', 'SCHED-2', 'SCHED-3', 'SCHED-4', 'SCHED-5', 'SCHED-6', 'SCHED-7', 'CARRY-5'],
     routes: ['PlanEdit', 'PlanDayEdit'],
     text: lines(
       '- The plan goes round the memorized pages in a cycle, a set amount each revision day, then starts again. Each memorized page comes round once a cycle. Only memorized pages are scheduled.',
@@ -195,6 +195,15 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
     ),
   },
   {
+    title: 'Searching the Qur’an (testers)',
+    covers: ['SEARCH-1', 'SEARCH-2'],
+    routes: ['ReadIndex', 'QuranSearch', 'QuranReader'],
+    text: lines(
+      '- Testers: the Read tab has “Search the Quran” under its title and, on an iPhone, a mic beside it. Recite a few words of an ayah, or type them in Arabic, and the ayat that hold them are listed: from the middle of an ayah too, even with a word misheard; a phrase in several ayat lists every one. Typing a surah (Yunus, or its Arabic name), an ayah (2:255, Yunus 16), a page (page 62) or a juz (juz 30) goes there. A result opens the reader at the ayah, highlighted.',
+      '- Searching by voice needs the speech model, offered the first time (a one-time download); it listens on the phone, and the voice isn’t recorded or sent. On Android, typing only. For anyone else it isn’t in the app yet: the closest is the Read tab’s list of surahs, or “Jump to…” to start today there.',
+    ),
+  },
+  {
     title: 'Recording, listening back and the timer',
     covers: ['AUDIO-4'],
     routes: ['ListenBack', 'ActivityDay'],
@@ -285,11 +294,13 @@ export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
   'HELP-1': 'the help buttons (testers); the guide gets them with its next re-record',
   'HELP-2': 'hiding the help buttons (testers); the guide gets it with its next re-record',
   'HELP-3': 'the help follows Smart Tracking (testers); the guide gets it with its next re-record',
+  'ACT-25': 'Coverage’s “Not revised yet” (a fresh page is never 30+ days); the guide gets it with its next re-record',
   'HELP-4': 'the help buttons are on by default (testers); the guide gets it with its next re-record',
   'NEW-1': 'the What\'s new walkthrough ships switched off; the guide gets it, with Settings → About → What\'s new, at the release\'s re-record',
   'NEW-2': 'the walkthrough itself; the guide gets it at the release\'s re-record',
   'NEW-3': 'the replay in Settings; the guide gets it at the release\'s re-record',
   'NEW-4': 'what waits for the walkthrough; nothing for Revo to explain',
+  'REVO-39': 'Revo\'s moment before its opt-in, and Settings → Revo AI → What Revo can do (testers); the guide gets them at the release\'s re-record',
   'ONBOARD-2': 'the server repairs a sign-up stopped half way; nothing to do',
   'SYNC-4': 'a new account loads with no relaunch; nothing to do',
   'ACCOUNT-2': 'the sign-in screen keeps what was typed after a failed attempt; Revo is for signed-in users',

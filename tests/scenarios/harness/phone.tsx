@@ -79,6 +79,14 @@ function storageOf(req: (path: string) => any): any {
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
+/**
+ * The account has seen Revo's moment on this phone (src/lib/revo/momentSeen, REVO-39), so its first open
+ * of Revo goes straight to the opt-in, as before the moment. Call between a close and the next open.
+ */
+export function revoMomentSeen(phone: Phone, uid: string): void {
+  phone.storage.set(`@revisely_revo_moment_seen:v1:${uid}`, '1');
+}
+
 export class Phone {
   /** What the app saved on this phone (AsyncStorage), kept across launches. */
   readonly storage = new Map<string, string>();

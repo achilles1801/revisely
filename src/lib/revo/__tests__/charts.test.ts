@@ -229,6 +229,8 @@ describe('page ratings', () => {
   });
 });
 
+const NO_COUNTS = { week: 0, month: 0, new: 0, stale: 0 };
+
 describe('juz map', () => {
   // Juz 30 (p. 582–604): ten of its 23 pages memorized here, so it is being learned, not memorized.
   it('draws Insights’ tiles from the sessions, as Revo’s context reads them', () => {
@@ -241,14 +243,29 @@ describe('juz map', () => {
     expect(juzMapData(recomputePagesFromLogs(all, logs), logs, TODAY)[29]).toMatchObject({ state: 'stale', daysSince: null });
   });
 
+  it('[ACT-25] a page never revised is "not revised yet" for 30 days from when it was memorized, or the account began', () => {
+    // Juz 30 memorized three days ago, nothing revised: not revised yet, never 30+ days.
+    const fresh = Array.from({ length: 23 }, (_, i) => ({ ...memorized[0], pageNumber: 582 + i, lastRevisedDate: null, dateMemorized: '2026-11-04T09:00:00' }));
+    const tile = juzMapData(fresh, [], TODAY)[29];
+    expect(tile).toMatchObject({ state: 'new', daysSince: null, counts: { week: 0, month: 0, new: 23, stale: 0 } });
+    expect(juzReadout(tile).title).toBe('Juz 30 · not revised yet');
+    // Memorized long ago, but the account began five days ago: nothing before is on record.
+    const old = fresh.map((p) => ({ ...p, dateMemorized: '2025-01-01T09:00:00' }));
+    expect(juzMapData(old, [], TODAY)[29].state).toBe('stale');
+    expect(juzMapData(old, [], TODAY, '2026-11-02')[29].state).toBe('new');
+    // 30 days on record and still never revised: 30+ days.
+    expect(juzMapData(old, [], TODAY, '2026-10-08')[29].state).toBe('stale');
+    expect(juzSummary([juzMapData(fresh, [], TODAY)[29]])).toBe('Not revised yet: Juz 30');
+  });
+
   it('a picked juz: when it was last revised, and its surahs', () => {
-    expect(juzReadout({ juz: 4, state: 'stale', learning: false, daysSince: 41 })).toEqual({ title: 'Juz 4 · last revised 41 days ago', line: expect.anything() });
-    expect(plainText(juzReadout({ juz: 4, state: 'stale', learning: false, daysSince: 41 }).line)).toBe("Ali 'Imran 92 to the end of Juz 4");
-    expect(juzReadout({ juz: 28, state: 'week', learning: false, daysSince: 0 }).title).toBe('Juz 28 · revised today');
-    expect(juzReadout({ juz: 27, state: 'week', learning: false, daysSince: 1 }).title).toBe('Juz 27 · last revised yesterday');
-    expect(juzReadout({ juz: 5, state: 'stale', learning: false, daysSince: null }).title).toBe('Juz 5 · not all revised yet');
-    expect(juzReadout({ juz: 29, state: 'none', learning: true, daysSince: null }).title).toBe('Juz 29 · being learned');
-    expect(plainText(juzReadout({ juz: 28, state: 'week', learning: false, daysSince: 0 }).line)).toBe('Al-Mujadila to At-Tahrim');
+    expect(juzReadout({ juz: 4, state: 'stale', learning: false, daysSince: 41, counts: NO_COUNTS })).toEqual({ title: 'Juz 4 · last revised 41 days ago', line: expect.anything() });
+    expect(plainText(juzReadout({ juz: 4, state: 'stale', learning: false, daysSince: 41, counts: NO_COUNTS }).line)).toBe("Ali 'Imran 92 to the end of Juz 4");
+    expect(juzReadout({ juz: 28, state: 'week', learning: false, daysSince: 0, counts: NO_COUNTS }).title).toBe('Juz 28 · revised today');
+    expect(juzReadout({ juz: 27, state: 'week', learning: false, daysSince: 1, counts: NO_COUNTS }).title).toBe('Juz 27 · last revised yesterday');
+    expect(juzReadout({ juz: 5, state: 'stale', learning: false, daysSince: null, counts: NO_COUNTS }).title).toBe('Juz 5 · not all revised yet');
+    expect(juzReadout({ juz: 29, state: 'none', learning: true, daysSince: null, counts: NO_COUNTS }).title).toBe('Juz 29 · being learned');
+    expect(plainText(juzReadout({ juz: 28, state: 'week', learning: false, daysSince: 0, counts: NO_COUNTS }).line)).toBe('Al-Mujadila to At-Tahrim');
   });
 
   it('its strip: each page, in its rating’s colour once memorized and revised', () => {
@@ -260,7 +277,7 @@ describe('juz map', () => {
   });
 
   it('for VoiceOver, the tiles by state', () => {
-    const t = (juz: number, state: 'week' | 'month' | 'stale' | 'none', learning = false) => ({ juz, state, learning, daysSince: null });
+    const t = (juz: number, state: 'week' | 'month' | 'new' | 'stale' | 'none', learning = false) => ({ juz, state, learning, daysSince: null, counts: NO_COUNTS });
     expect(juzSummary([t(1, 'month'), t(4, 'stale'), t(5, 'stale'), t(28, 'week'), t(29, 'none', true), t(10, 'none')])).toBe(
       'Revised this week: Juz 28. This month: Juz 1. Over 30 days ago: Juz 4, Juz 5. Being learned: Juz 29',
     );

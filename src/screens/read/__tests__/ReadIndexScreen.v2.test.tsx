@@ -24,6 +24,14 @@ jest.mock('@react-navigation/native', () => {
   };
 });
 
+let mockApp: { user: { previewTester?: boolean } | null } = { user: null };
+jest.mock('../../../context/AppContext', () => ({ useApp: () => mockApp }));
+let mockVoice = false;
+jest.mock('../../../lib/search/availability', () => ({
+  quranSearchEnabled: (user: { previewTester?: boolean } | null) => user?.previewTester === true,
+  canSearchByVoice: () => mockVoice,
+}));
+
 import ReadIndexScreen from '../ReadIndexScreen';
 import { DesignProvider } from '../../../design/DesignContext';
 import { ThemeProvider } from '../../../context/ThemeContext';
@@ -40,6 +48,8 @@ const v2 = (ui: React.ReactElement) => (
 
 beforeEach(async () => {
   jest.clearAllMocks();
+  mockApp = { user: null };
+  mockVoice = false;
   await AsyncStorage.clear();
   await AsyncStorage.setItem('@revisely_theme_v2', 'light');
 });
@@ -86,5 +96,32 @@ describe('the Read index in the new design', () => {
     expect(within(row).getByText(/^Ayahs.1–9 · p\. 50 · /)).toBeTruthy();
     fireEvent.press(row);
     expect(mockNavigation.navigate).toHaveBeenCalledWith('QuranReader', { pageNumber: 50, source: 'index' });
+  });
+});
+
+describe('searching the Quran from the Read tab (testers)', () => {
+  it('a tester gets a search field under the title, and the mic where the phone can listen', async () => {
+    mockApp = { user: { previewTester: true } };
+    mockVoice = true;
+    await renderIndex();
+    fireEvent.press(screen.getByTestId('read-search'));
+    expect(mockNavigation.navigate).toHaveBeenCalledWith('QuranSearch');
+    fireEvent.press(screen.getByTestId('read-search-voice'));
+    expect(mockNavigation.navigate).toHaveBeenCalledWith('QuranSearch', { listen: true });
+  });
+
+  it('no mic where the phone can’t listen (Android, older builds)', async () => {
+    mockApp = { user: { previewTester: true } };
+    await renderIndex();
+    expect(screen.getByTestId('read-search')).toBeTruthy();
+    expect(screen.queryByTestId('read-search-voice')).toBeNull();
+  });
+
+  it('everyone else sees the index as before', async () => {
+    mockApp = { user: { previewTester: false } };
+    mockVoice = true;
+    await renderIndex();
+    expect(screen.queryByTestId('read-search')).toBeNull();
+    expect(screen.queryByTestId('read-search-voice')).toBeNull();
   });
 });

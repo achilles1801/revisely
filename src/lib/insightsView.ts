@@ -7,6 +7,7 @@ import { getPagesForJuz, getSurahsForPage } from './quranData';
 import { describePassage, pagesNote } from './passages';
 import { PACE_MIN_ITEMS } from './activityInsights';
 import { memorizedByMonth, type MemorizationItemLike } from './memorizedAyahs';
+import { coverageRecency, type CoverageRecency } from './recency';
 
 const dayNumber = (day: string) => Math.round(Date.parse(`${day}T00:00:00Z`) / 86_400_000);
 const daysBetween = (from: string, to: string) => dayNumber(to) - dayNumber(from);
@@ -22,54 +23,74 @@ const within = (day: string, today: string, window: number) => {
 
 // ── Coverage ─────────────────────────────────────────────────────────────
 
-/** A juz tile: revised this week, this month, over 30 days ago (or never), or not memorized (yet). */
-export type JuzState = 'week' | 'month' | 'stale' | 'none';
+/**
+ * A juz tile: revised this week, this month, not revised yet (ACT-25), over 30 days ago (or never in
+ * the 30+ days on record), or not memorized (yet).
+ */
+export type JuzState = 'week' | 'month' | 'new' | 'stale' | 'none';
 export interface JuzTile {
   juz: number;
   state: JuzState;
   /** Not memorized yet, with pages memorized or being learned (the tile's dot). */
   learning: boolean;
-  /** Days since its least recently revised memorized page (null: one was never revised, or none memorized). */
+  /**
+   * Days since its least recently revised memorized page; null when a page of it 30+ days on record was
+   * never revised, when none was revised yet, or with none memorized.
+   */
   daysSince: number | null;
+  /** Its memorized pages by where each stands (none for a juz not memorized). */
+  counts: Record<CoverageRecency, number>;
 }
+
+const noCounts = (): Record<CoverageRecency, number> => ({ week: 0, month: 0, new: 0, stale: 0 });
 
 /**
  * The 30 juz. A juz is memorized once at least half its pages are; one with fewer is being learned (not
  * memorized, with the dot), so a page memorized today never makes its juz "untouched the longest". A
  * memorized juz is as recent as its least recently revised memorized page (ACT-4's "juz untouched
- * longest"): this week when that is within 7 days, this month within 30, otherwise (or never) stale.
+ * longest"): this week when that is within 7 days, this month within 30, otherwise stale. A page never
+ * revised counts from `sinceOf` (lib/recency coverageSince: when it was memorized, or the account's
+ * first day): under 30 days it is "not revised yet", never stale (ACT-25); without `sinceOf`, stale.
  */
-export function juzTiles(memorized: Set<number>, learning: Set<number>, last: Map<number, string>, today: string): JuzTile[] {
+export function juzTiles(
+  memorized: Set<number>,
+  learning: Set<number>,
+  last: Map<number, string>,
+  today: string,
+  sinceOf?: (page: number) => string | null | undefined,
+): JuzTile[] {
   const tiles: JuzTile[] = [];
   for (let juz = 1; juz <= 30; juz++) {
     const pages = getPagesForJuz(juz);
     const mine = pages.filter((p) => memorized.has(p));
     if (mine.length * 2 < pages.length) {
-      tiles.push({ juz, state: 'none', learning: mine.length > 0 || pages.some((p) => learning.has(p)), daysSince: null });
+      tiles.push({ juz, state: 'none', learning: mine.length > 0 || pages.some((p) => learning.has(p)), daysSince: null, counts: noCounts() });
       continue;
     }
-    let oldest: number | null = 0;
+    const counts = noCounts();
+    let oldest = -1;
+    let neverInTime = false;
     for (const p of mine) {
       const d = last.get(p);
-      if (d == null) {
-        oldest = null;
-        break;
-      }
-      oldest = Math.max(oldest, daysBetween(d, today));
+      const where = coverageRecency(d, sinceOf?.(p), today);
+      counts[where]++;
+      if (d != null) oldest = Math.max(oldest, daysBetween(d, today));
+      else if (where === 'stale') neverInTime = true;
     }
-    const state: JuzState = oldest == null || oldest >= 30 ? 'stale' : oldest < 7 ? 'week' : 'month';
-    tiles.push({ juz, state, learning: false, daysSince: oldest });
+    const state: JuzState = counts.stale > 0 ? 'stale' : counts.new > 0 ? 'new' : counts.month > 0 ? 'month' : 'week';
+    tiles.push({ juz, state, learning: false, daysSince: neverInTime || oldest < 0 ? null : oldest, counts });
   }
   return tiles;
 }
 
 /**
- * The juz untouched the longest and the next one, when the longest is stale (over 30 days, or never):
- * "Juz 4, untouched the longest · Last revised 41 days ago · Juz 5, 33 days".
+ * The juz untouched the longest and the next one, when the longest is stale (over 30 days, or never in
+ * the 30+ days on record): "Juz 4, untouched the longest · Last revised 41 days ago · Juz 5, 33 days".
+ * A juz with a page not revised yet (ACT-25) is never the longest for that page.
  */
 export function untouchedJuz(tiles: JuzTile[]): { first: JuzTile; next: JuzTile | null } | null {
   const memorized = tiles.filter((t) => t.state !== 'none');
-  const age = (t: JuzTile) => (t.daysSince == null ? Number.POSITIVE_INFINITY : t.daysSince);
+  const age = (t: JuzTile) => (t.daysSince != null ? t.daysSince : t.state === 'stale' ? Number.POSITIVE_INFINITY : -1);
   const sorted = [...memorized].sort((a, b) => age(b) - age(a) || a.juz - b.juz);
   if (sorted.length === 0 || sorted[0].state !== 'stale') return null;
   return { first: sorted[0], next: sorted[1] ?? null };

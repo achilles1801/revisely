@@ -38,6 +38,7 @@ import { spokenText } from '../../lib/passages';
 import { JuzSheet } from './JuzSheet';
 import { Sheet } from '../v2/Sheet';
 import { hourDetail, minutesWords, monthOfMemorizing, uncoveredRows, type UncoveredRow } from '../../lib/insightsTaps';
+import { COVERAGE_LABELS, coverageLook } from './coverageLook';
 import { PaceSheet } from './PaceSheet';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import {
@@ -75,6 +76,11 @@ export interface InsightsData {
   firstDay?: string | null;
   /** Each memorized page's last revision on record (all time), for how long ago a page was revised. */
   lastRevisedOn?: Map<number, string>;
+  /**
+   * The day each memorized page counts from when never revised (lib/recency coverageSince: when it was
+   * memorized, or the account's first day): under 30 days it is "not revised yet", never 30+ (ACT-25).
+   */
+  coverageSince?: Map<number, string>;
   /** Pages already first tomorrow (Insights' carry): their buttons show "First tomorrow ✓" (ACT-24). */
   firstTomorrow?: ReadonlySet<number>;
 }
@@ -271,7 +277,18 @@ function Coverage({
   const span = rangeSpan(data.range ?? 30, data.today, data.firstDay);
   const days = span.window;
   const last = useMemo(() => lastRevisedByPage(data.revised, data.today), [data.revised, data.today]);
-  const tiles = useMemo(() => juzTiles(data.memorized, data.learning, last, data.today), [data.memorized, data.learning, last, data.today]);
+  // Each page's last revision: the items read, or its own record when later (ACT-16: revised elsewhere,
+  // or before the items), as the juz sheet reads it. A page revised on record is never "not revised yet".
+  const lastAll = useMemo(() => {
+    const merged = new Map(data.lastRevisedOn ?? []);
+    for (const [p, d] of last) if (!merged.has(p) || d > merged.get(p)!) merged.set(p, d);
+    return merged;
+  }, [data.lastRevisedOn, last]);
+  const since = data.coverageSince;
+  const tiles = useMemo(
+    () => juzTiles(data.memorized, data.learning, lastAll, data.today, since ? (p) => since.get(p) : undefined),
+    [data.memorized, data.learning, lastAll, data.today, since],
+  );
   const count = coverageCount(data.memorized, last, data.today, days);
   // Never 100% while a page is left (at 3 months, 304 of 305 rounded up).
   const pct = coveragePercent(count.revised, count.of);
@@ -281,52 +298,46 @@ function Coverage({
   const thenJuz = React.useRef<number | null>(null);
   const uncovered = useMemo(() => {
     if (!uncoveredUsed) return [];
-    const merged = new Map(data.lastRevisedOn ?? []);
-    for (const [p, d] of last) if (!merged.has(p) || d > merged.get(p)!) merged.set(p, d);
     const memorizedOn = new Map<number, string>();
     for (const m of data.memorizations) for (const p of m.pages) if (!memorizedOn.has(p) || m.day > memorizedOn.get(p)!) memorizedOn.set(p, m.day);
-    return uncoveredRows({ memorized: data.memorized, last: merged, memorizedOn, today: data.today, window: days });
-  }, [uncoveredUsed, data.lastRevisedOn, data.memorizations, data.memorized, data.today, last, days]);
+    return uncoveredRows({ memorized: data.memorized, last: lastAll, memorizedOn, today: data.today, window: days });
+  }, [uncoveredUsed, data.memorizations, data.memorized, data.today, lastAll, days]);
   const untouched = untouchedJuz(tiles);
   const tile = (t: JuzTile) => {
-    const look =
-      t.state === 'week'
-        ? { backgroundColor: palette.heat[3], color: palette.heatInk[3] }
-        : t.state === 'month'
-          ? { backgroundColor: palette.heat[1], color: palette.heatInk[1] }
-          : t.state === 'stale'
-            ? { borderWidth: 1.5, borderColor: palette.red, color: palette.red }
-            : { backgroundColor: palette.heat[0], color: palette.secondary, dim: true };
+    const look = coverageLook(t.state, palette);
+    const revisedPages = t.counts.week + t.counts.month;
     const label =
       t.state === 'none'
         ? `Juz ${t.juz}, not memorized${t.learning ? ', learning' : ''}`
         : t.state === 'stale'
           ? `Juz ${t.juz}, ${t.daysSince == null ? 'never revised' : `revised ${t.daysSince} days ago`}`
-          : `Juz ${t.juz}, revised this ${t.state}`;
+          : t.state === 'new'
+            ? revisedPages > 0
+              ? `Juz ${t.juz}, ${revisedPages} of ${revisedPages + t.counts.new} pages revised, the rest not revised yet`
+              : `Juz ${t.juz}, not revised yet`
+            : `Juz ${t.juz}, revised this ${t.state}`;
     // Each tile opens its juz (ACT-21).
     return (
       <Tap
         key={t.juz}
         onPress={() => onOpenJuz(t.juz)}
-        style={[styles.tile, look.backgroundColor ? { backgroundColor: look.backgroundColor } : null, look.borderWidth ? { borderWidth: look.borderWidth, borderColor: look.borderColor } : null]}
+        style={[styles.tile, look.box]}
         accessibilityRole="button"
         accessibilityLabel={label}
         accessibilityHint={`Opens Juz ${t.juz}`}
         testID={`juz-tile-${t.juz}`}
       >
-        <ChromeText style={[styles.tileText, { color: look.color, opacity: 'dim' in look ? 0.7 : 1 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+        <ChromeText style={[styles.tileText, { color: look.color, opacity: look.dim ? 0.7 : 1 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
           {t.juz}
         </ChromeText>
         {t.learning ? <View style={[styles.learnDot, { backgroundColor: palette.primary }]} /> : null}
       </Tap>
     );
   };
-  const legend: { key: string; label: string; swatch: object }[] = [
-    { key: 'week', label: 'This week', swatch: { backgroundColor: palette.heat[3] } },
-    { key: 'month', label: 'This month', swatch: { backgroundColor: palette.heat[1] } },
-    { key: 'stale', label: '30+ days', swatch: { borderWidth: 1.5, borderColor: palette.red } },
-    { key: 'none', label: 'Not memorized', swatch: { backgroundColor: palette.heat[0] } },
-  ];
+  // "Not revised yet" only while a juz is (ACT-25): the legend stays as it was for everyone else.
+  const legend = (['week', 'month', 'new', 'stale', 'none'] as const)
+    .filter((key) => key !== 'new' || tiles.some((t) => t.state === 'new'))
+    .map((key) => ({ key, label: COVERAGE_LABELS[key], swatch: coverageLook(key, palette).box }));
 
   return (
     <Section
@@ -387,7 +398,11 @@ function Coverage({
             <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>
               {[
                 untouched.first.daysSince == null ? 'Never revised' : `Last revised ${untouched.first.daysSince} days ago`,
-                untouched.next ? `Juz ${untouched.next.juz}, ${untouched.next.daysSince == null ? 'never' : `${untouched.next.daysSince} days`}` : null,
+                untouched.next
+                  ? `Juz ${untouched.next.juz}, ${
+                      untouched.next.daysSince != null ? `${untouched.next.daysSince} days` : untouched.next.state === 'new' ? 'not revised yet' : 'never'
+                    }`
+                  : null,
               ]
                 .filter(Boolean)
                 .join(' · ')}

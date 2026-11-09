@@ -68,6 +68,12 @@ How the tests are made: `tests/scenarios/README.md`.
   opened after missed days shows that day's pages.
 - **SCHED-6.** A day never holds the same page twice. A plan with a page on two neighbouring days,
   shifted by a carry-over, takes that page once and the next page after it.
+- **SCHED-7.** The Schedule screen's header names the plan: "Automatic", or a custom plan by its
+  name, "Custom plan" only when it has none. A saved plan loaded and saved keeps its name (on every
+  phone), and so does an edit of it. "Save current plan…" on a custom plan names it too (at once
+  when it has no unsaved edits, with the next Save when it has). A plan made with "Create new plan"
+  has no name. On the automatic schedule, "Save current plan…" only keeps a copy. A saved plan is a
+  copy: editing the plan in use doesn't change it, and deleting it doesn't rename the plan in use.
 
 ## A revision session
 
@@ -233,6 +239,23 @@ How the tests are made: `tests/scenarios/README.md`.
   A sitting offers one thing: pages not memorized come first (MEM-5). Pages not scheduled that day,
   already revised, or on an older day were reading, and offer nothing.
 
+## Searching the Qur'an
+
+Testers, from the Read tab: "Search the Quran" under its title and, on an iPhone that can listen, a mic
+(`lib/search`, `screens/read/QuranSearchScreen`; Majd, Nov 8 2026). A result opens the reader at its
+ayah, highlighted until the page is turned. Listening uses recite mode's speech model on the phone:
+nothing said is recorded or sent.
+
+- **SEARCH-1.** A few words of an ayah, recited or typed in Arabic (with or without vowel marks, in
+  Uthmani or standard spelling), find it: from its start or its middle, running on into the next
+  ayah, with a word misheard, left out or said twice, and after an isti'adha or a basmala said first.
+  A phrase in several ayat lists every one, in mushaf order, the phrase itself before ayat that only
+  nearly hold it. Words that aren't in the Qur'an find nothing.
+- **SEARCH-2.** A place typed by name or number goes there: a surah by its name, Latin or Arabic,
+  with or without its "al-" ("Yunus", "Fatiha", "الكهف"), an ayah ("2:255", "Yunus 16", in Arabic
+  digits too), a page ("page 62") or a juz ("juz 30"). A bare number offers the surah and the page.
+  A number that isn't in the mushaf goes nowhere.
+
 ## Translations
 
 A held verse's translation (the verse sheet). The sources' terms are in CLAUDE.md ("Saheeh
@@ -286,8 +309,9 @@ International", "The Clear Quran®") and in `lib/quranenc`.
 - **ACT-4.** Insights use one definition each: coverage is the share of memorized pages revised within the range
   (ACT-22; a longer range never covers less, and it never shows 100% while a page is left); consistency is the days with a revision or a read; pace is shown
   only from at least ten timed items; juz untouched longest is the juz whose least recently revised page is
-  oldest, or never, among the juz at least half memorized (a juz under half is shown as being learned, so a
-  page memorized today never makes its juz the one untouched longest).
+  oldest, or never revised in the 30 or more days on record (ACT-25), among the juz at least half memorized
+  (a juz under half is shown as being learned, so a page memorized today never makes its juz the one
+  untouched longest).
 
 - **ACT-5.** The day's + offers, for today and yesterday, Revised elsewhere, Memorized and Note (Majd, Nov 7
   2026: "yes trim it"). There is no Read (the reader logs reading by itself) and no free choice of pages to
@@ -433,6 +457,15 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   missed (SESS-7). The pages from Insights stay labelled and stay extra, even when the leftovers fill the
   day, and Home names both ("2 from Insights, 5 from yesterday first"). (Before Nov 8 2026 they blocked it:
   no catch-up was offered that day.)
+- **ACT-25.** A memorized page never revised counts from when it was memorized, or from the account's first
+  day when that is later (nothing before it is on record). For 30 days it is "not revised yet", never "30+
+  days": its Coverage tile, a page of the juz sheet's strip and a surah row there are neutral (a grey outline,
+  "Not revised yet" in the legend while one shows), the juz sheet's headline says "Not revised yet" when none
+  of the juz was revised, and it is never untouched the longest. A juz is as recent as its least recently
+  revised page, so one with a page not revised yet (and none 30+ days) is "not revised yet": "Juz 30, 5 of
+  23 pages revised, the rest not revised yet" for VoiceOver. After 30 days on record it is 30+ days, as a page
+  revised 30 or more days ago is. Revo's juz map draws the same. (Majd, Nov 8 2026: a new account with Juz 30
+  memorized and five pages revised showed Juz 30 red a day after it began.)
 
 ## Ask coach
 
@@ -669,6 +702,13 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   question, attached as + would attach it, and × removes it. Each place counts its own opens (REVO-35): opened
   again from the same place with nothing changed, the line's second sentence changes, in turn; another place, day
   or juz starts afresh, and "done" is still said once a day.
+
+- **REVO-39.** The first time an account opens Revo while it's off (its button, Settings → Revo AI's switch, or a
+  screen's Ask Revo), Revo's moment plays first, then Revo's opt-in (REVO-21), which is never skipped or
+  shortened (Majd, Nov 9 2026: "whenever a new user clicks revo for the first time that way they know what revo
+  is"). Skip ends it as in What's new (NEW-2). It plays once per account on that phone: played or skipped there,
+  in What's new, on this first open or from Settings, it doesn't play on an open again. Settings → Revo AI →
+  "What Revo can do" plays it any time, ending on Turn on Revo and Later while Revo is off, or Done.
 
 ## Memorizing
 

@@ -26,6 +26,7 @@ import { CalendarMonth } from './CalendarMonth';
 import { InsightsView } from './InsightsView';
 import { useActivityReload } from './useActivityReload';
 import { listRecordings, onRecordingsChanged } from '../../lib/recordings';
+import { coverageSince } from '../../lib/recency';
 import type { PreviewBlock, RecordingCounts } from './CalendarMonth';
 
 const shiftDays = (day: string, n: number) => {
@@ -195,6 +196,16 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
   };
   // The account's first day: a range longer than the account counts from it ("50 of 56 days").
   const firstDay = useMemo(() => journalFirstDay(user, (data?.revisions ?? []).map((r) => ({ date: r.day }))), [user, data]);
+  // The day each memorized page counts from when never revised: under 30 days, "not revised yet" (ACT-25).
+  const coverageSinceByPage = useMemo(() => {
+    const out = new Map<number, string>();
+    for (const p of pages) {
+      if (p.status !== 'memorized') continue;
+      const since = coverageSince(p.dateMemorized, firstDay);
+      if (since) out.set(p.pageNumber, since);
+    }
+    return out;
+  }, [pages, firstDay]);
   const ratedWeak = useMemo(() => ratedWeakCounts(logs, today, rangeSpan(range, today, firstDay).window), [logs, today, range, firstDay]);
 
   const revised: Revised[] = useMemo(() => (data?.revisions ?? []).map((r) => ({ day: r.day, countsFor: r.countsFor, pages: r.pages, assigned: r.assigned, minutes: r.minutes })), [data]);
@@ -275,6 +286,7 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
             range,
             firstDay,
             lastRevisedOn,
+            coverageSince: coverageSinceByPage,
             firstTomorrow,
           }}
           onOpenDay={onOpenDay}

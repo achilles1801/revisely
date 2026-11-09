@@ -3,7 +3,7 @@
 # from a recording, with the text the flow gives it (scripts/server-revo.js). Takes a screenshot of
 # each screen the mocks show (~/Documents/revisely-today-mocks/revo), for the screenshot-vs-mock
 # boards, in light and then in dark (…-dark), and the sheet with the keyboard up (r5k-keyboard).
-# Rules (BEHAVIOUR.md): REVO-20, REVO-21, REVO-22, REVO-23, REVO-24, REVO-25
+# Rules (BEHAVIOUR.md): REVO-20, REVO-21, REVO-22, REVO-23, REVO-24, REVO-25, REVO-39
 appId: com.revisionbuddy.app
 ---
 - runFlow:
@@ -33,9 +33,14 @@ appId: com.revisionbuddy.app
     timeout: 15000
 - tapOn:
     id: revo-button
+    waitToSettleTimeoutMs: 500
+    retryTapIfNoChange: false
+# REVO-39: the first open while Revo is off plays Revo's moment, then its opt-in. Skip ends it; while
+# it plays the screen never settles, so these taps don't wait for it (.maestro/README.md).
+- runFlow: ../subflows/revo-moment-skip.yaml
 - extendedWaitUntil:
     visible: "Meet Revo"
-    timeout: 10000
+    timeout: 40000
 - assertVisible: "Your notes and recordings stay private"
 - assertVisible: "Answered by Claude, from Anthropic"
 - runFlow:
@@ -643,3 +648,34 @@ appId: com.revisionbuddy.app
     file: ../subflows/shot.yaml
     env:
       NAME: r1-fab-home-dark
+
+# REVO-39: Settings → Revo AI → What Revo can do plays the moment again; with Revo on, it ends on Done.
+- tapOn:
+    id: open-settings
+- scrollUntilVisible:
+    element:
+      id: settings-revo-moment
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: settings-revo-moment
+    waitToSettleTimeoutMs: 500
+    retryTapIfNoChange: false
+- runFlow: ../subflows/revo-moment-skip.yaml
+- extendedWaitUntil:
+    visible:
+      id: revo-moment-done
+    timeout: 40000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r11-what-revo-can-do-dark
+- tapOn:
+    id: revo-moment-done
+- extendedWaitUntil:
+    notVisible:
+      id: settings-revo-moment-screen
+    timeout: 10000
+- tapOn:
+    id: back
