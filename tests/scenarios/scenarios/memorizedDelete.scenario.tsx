@@ -62,7 +62,9 @@ describe('deleting a Memorized entry (ACT-7, MEM-3)', () => {
     expect(await page(app, 563)).toMatchObject({ status: 'not_memorized', verses: null });
     expect(await item(app, TODAY)).toBeNull();
     // On the phone too, and Home's % memorized is the sign-up pages' again (20 of 604).
-    expect(app.app.pages.find((p) => p.pageNumber === 563)).toMatchObject({ status: 'not_memorized', verses: null });
+    const onPhone = app.app.pages.find((p) => p.pageNumber === 563);
+    expect(onPhone?.status).toBe('not_memorized');
+    expect(onPhone?.verses ?? null).toBeNull();
     await goBack(app);
     const home = new Home(app);
     await app.until(() => home.memorized()?.startsWith('3.3%') ?? false, 'Home to say 3.3%');
@@ -106,8 +108,9 @@ describe('deleting a Memorized entry (ACT-7, MEM-3)', () => {
     expect(await page(app, 20)).toMatchObject({ status: 'memorized' });
     expect(await page(app, 21)).toMatchObject({ status: 'not_memorized' });
     expect(await page(app, 22)).toMatchObject({ status: 'not_memorized' });
-    const user = (await getServerDoc(`users/${app.uid}`)) as { customPlan: { days: number[][] } };
-    const planned = user.customPlan.days.flat();
+    // The server keeps each day of the plan as { pages }.
+    const user = (await getServerDoc(`users/${app.uid}`)) as { customPlan: { days: { pages: number[] }[] } };
+    const planned = user.customPlan.days.flatMap((d) => d.pages);
     expect(planned).toContain(20);
     expect(planned).not.toContain(21);
     expect(planned).not.toContain(22);

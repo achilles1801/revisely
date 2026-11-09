@@ -156,11 +156,12 @@ describe('deleting a Memorized entry (ACT-7)', () => {
   it('[ACT-7] it takes off the entry’s ayahs that no other entry holds, and nothing else', () => {
     fc.assert(
       fc.property(pageWithSubset, masks, masks, ({ n, ed, all, some }, mine, theirs) => {
+        // An entry by the ayah has some (one with none listed holds its pages whole).
         const entry = all.filter((_, i) => mine[i]);
+        if (entry.length === 0) return;
         const other = all.filter((_, i) => theirs[i]);
         // Memorized: some ayahs from before, and both entries' (dated today: none came before them).
         const held = all.filter((k) => some.includes(k) || entry.includes(k) || other.includes(k));
-        if (held.length === 0) return;
         const start = { ...page(n, held.length === all.length ? 'memorized' : 'in_progress', held.length === all.length ? undefined : held), dateMemorized: '2026-11-03T12:00:00.000Z' };
         const after = pagesAfterDeletingItem(
           [start],
