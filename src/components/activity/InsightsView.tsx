@@ -277,10 +277,17 @@ function Coverage({
   const span = rangeSpan(data.range ?? 30, data.today, data.firstDay);
   const days = span.window;
   const last = useMemo(() => lastRevisedByPage(data.revised, data.today), [data.revised, data.today]);
+  // Each page's last revision: the items read, or its own record when later (ACT-16: revised elsewhere,
+  // or before the items), as the juz sheet reads it. A page revised on record is never "not revised yet".
+  const lastAll = useMemo(() => {
+    const merged = new Map(data.lastRevisedOn ?? []);
+    for (const [p, d] of last) if (!merged.has(p) || d > merged.get(p)!) merged.set(p, d);
+    return merged;
+  }, [data.lastRevisedOn, last]);
   const since = data.coverageSince;
   const tiles = useMemo(
-    () => juzTiles(data.memorized, data.learning, last, data.today, since ? (p) => since.get(p) : undefined),
-    [data.memorized, data.learning, last, data.today, since],
+    () => juzTiles(data.memorized, data.learning, lastAll, data.today, since ? (p) => since.get(p) : undefined),
+    [data.memorized, data.learning, lastAll, data.today, since],
   );
   const count = coverageCount(data.memorized, last, data.today, days);
   // Never 100% while a page is left (at 3 months, 304 of 305 rounded up).
@@ -291,12 +298,10 @@ function Coverage({
   const thenJuz = React.useRef<number | null>(null);
   const uncovered = useMemo(() => {
     if (!uncoveredUsed) return [];
-    const merged = new Map(data.lastRevisedOn ?? []);
-    for (const [p, d] of last) if (!merged.has(p) || d > merged.get(p)!) merged.set(p, d);
     const memorizedOn = new Map<number, string>();
     for (const m of data.memorizations) for (const p of m.pages) if (!memorizedOn.has(p) || m.day > memorizedOn.get(p)!) memorizedOn.set(p, m.day);
-    return uncoveredRows({ memorized: data.memorized, last: merged, memorizedOn, today: data.today, window: days });
-  }, [uncoveredUsed, data.lastRevisedOn, data.memorizations, data.memorized, data.today, last, days]);
+    return uncoveredRows({ memorized: data.memorized, last: lastAll, memorizedOn, today: data.today, window: days });
+  }, [uncoveredUsed, data.memorizations, data.memorized, data.today, lastAll, days]);
   const untouched = untouchedJuz(tiles);
   const tile = (t: JuzTile) => {
     const look = coverageLook(t.state, palette);

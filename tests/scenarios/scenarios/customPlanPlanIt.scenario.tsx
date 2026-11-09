@@ -7,6 +7,7 @@
 import { pagesRange } from '../harness/account';
 import { addDays, scenarioPhone } from '../harness/testScenario';
 import { activityStack } from '../harness/screens';
+import { setServerDoc } from '../harness/serverDocs';
 import type { OpenApp } from '../harness/phone';
 
 async function tap(app: OpenApp, testID: string): Promise<void> {
@@ -24,9 +25,24 @@ it('[ACT-24] On a custom plan, Plan it puts the juz first tomorrow and leaves th
   await home.close();
   const app = await phone.open(activityStack);
   await app.until(() => app.app.user?.customPlan != null, 'the account');
-  // Juz 29 memorized and untouched for 40 days: Insights' untouched row.
+  // Juz 29 memorized and untouched for 40 days: Insights' untouched row. Its last revision is a session's
+  // item 40 days ago (a page never revised on an account this young is only "not revised yet", ACT-25).
   const juz29 = pagesRange(562, 581);
-  const old = `${addDays(D, -40)}T10:00:00.000Z`;
+  const oldDay = addDays(D, -40);
+  const old = `${oldDay}T10:00:00.000Z`;
+  await setServerDoc(`users/${app.uid}/revisions/${oldDay}`, {
+    id: oldDay,
+    uid: app.uid,
+    day: oldDay,
+    countsFor: oldDay,
+    occurredAt: Date.parse(old),
+    source: 'session',
+    pages: juz29,
+    skipped: [],
+    assigned: juz29,
+    minutes: 30,
+    recordings: [],
+  });
   await app.act(() =>
     app.app.updatePages(
       app.app.pages.map((p) => (juz29.includes(p.pageNumber) ? { ...p, status: 'memorized', dateMemorized: addDays(D, -60), lastRevisedDate: old } : p)),
