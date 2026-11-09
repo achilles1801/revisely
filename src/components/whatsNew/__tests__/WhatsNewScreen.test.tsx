@@ -1,5 +1,5 @@
 import React from 'react';
-import { BackHandler, Dimensions } from 'react-native';
+import { BackHandler, Dimensions, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -12,6 +12,7 @@ const mockApp: { user: { id: string; previewTester?: boolean } | null; markWhats
 };
 jest.mock('../../../context/AppContext', () => ({ useApp: () => mockApp }));
 
+import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import { WhatsNewScreen } from '../WhatsNewScreen';
 import { ThemeProvider } from '../../../context/ThemeContext';
 import { DesignProvider } from '../../../design/DesignContext';
@@ -154,6 +155,27 @@ describe('<WhatsNewScreen />', () => {
     expect(title()).toBe('Meet Revo');
     expect(screen.queryByTestId('whats-new-revo-moment')).toBeNull();
     expect(screen.getByTestId('whats-new-next')).toBeTruthy();
+  });
+
+  it('sits below the status bar from its first frame, in the replay’s modal as at launch', async () => {
+    // The insets come from the app's root provider: in the replay's native modal, a native safe-area
+    // view found no provider and padded nothing, so ✕ sat in the status bar (E2E flow 16, iOS).
+    const insets = { top: 62, bottom: 34, left: 0, right: 0 };
+    for (const mode of ['replay', 'forced'] as const) {
+      await loadWhatsNew('u1');
+      const view = render(
+        <SafeAreaInsetsContext.Provider value={insets}>
+          <DesignProvider initial={{}}>
+            <ThemeProvider>
+              <WhatsNewScreen mode={mode} onClose={jest.fn()} />
+            </ThemeProvider>
+          </DesignProvider>
+        </SafeAreaInsetsContext.Provider>,
+      );
+      await act(async () => {});
+      expect(StyleSheet.flatten(screen.getByTestId(`whats-new-${mode}`).props.style)).toMatchObject({ flex: 1, paddingTop: 62 });
+      view.unmount();
+    }
   });
 
   it('reads a row as its words, never a glyph', async () => {
