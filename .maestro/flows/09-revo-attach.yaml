@@ -65,16 +65,10 @@ appId: com.revisionbuddy.app
           direction: DOWN
       - waitForAnimationToEnd:
           timeout: 1500
-- tapOn:
-    id: open-settings
-- scrollUntilVisible:
-    element: "Theme"
-    direction: DOWN
-    centerElement: true
-    timeout: 20000
-- tapOn: "Dark(, selected)?"
-- tapOn:
-    id: back
+- runFlow:
+    file: ../subflows/theme.yaml
+    env:
+      THEME: Dark
 - extendedWaitUntil:
     visible:
       id: revo-button
