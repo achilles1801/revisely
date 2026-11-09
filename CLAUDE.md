@@ -1038,9 +1038,8 @@ opens `qibla/QiblaSheet`, a `v2/Sheet` (drag to close, Done).
   and the Kaaba stay upright, the Kaaba and its tick in `done`/`doneText`, a glow when facing it.
   `qiblaView` picks the state; `QiblaContent` renders one, which is how to show a state on the
   simulator (it has no compass).
-- **Native follow-up (the release session's build):** the iOS location purpose string still names
-  only fajr; it should name the Qibla too (Info.plist, so a build), and `expo-location` (^55, SDK 55's
-  line) should be aligned with SDK 54. The compass itself is JS on the existing binaries.
+- The location purpose string names prayer times, the Qibla and Fajr, and `expo-location` is SDK 54's
+  ~19.0.8, both in the 1.0.3 store builds (see "Widgets", Location). The compass itself is JS.
 - Privacy: the policy's Location item says the compass works on the device only. No App Privacy
   change (nothing is collected).
 
