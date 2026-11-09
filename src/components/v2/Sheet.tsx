@@ -31,6 +31,11 @@ import { Ionicons } from '@expo/vector-icons';
  */
 export const DISMISS_FALLBACK_MS = 1000;
 
+// E2E builds log when a sheet's native modal is presented and dismissed (lib/e2e/screens); every
+// other build drops this (the bundler inlines the variable).
+const e2eModal =
+  process.env.EXPO_PUBLIC_E2E === '1' ? (require('../../lib/e2e/screens') as typeof import('../../lib/e2e/screens')).sayModal : undefined;
+
 /** A button in a sheet's header: text ("Cancel", "Save") or an icon (✕, ▶). */
 export interface SheetHeaderAction {
   /** Its text, or for an icon its accessibility label. */
@@ -234,11 +239,12 @@ export function Sheet({
   useEffect(() => {
     if (!dismissing) return;
     const t = setTimeout(() => {
+      e2eModal?.(testID, 'replaced');
       setModalKey((k) => k + 1);
       finish();
     }, DISMISS_FALLBACK_MS);
     return () => clearTimeout(t);
-  }, [dismissing, finish]);
+  }, [dismissing, finish, testID]);
 
   const translateY = progress.interpolate({ inputRange: [0, 1], outputRange: [height * 0.6, 0] });
   const hasHeader = !!(title || left || right);
@@ -358,8 +364,18 @@ export function Sheet({
       transparent
       animationType="none"
       onRequestClose={onClose}
-      onShow={onShow}
-      onDismiss={finish}
+      onShow={
+        e2eModal
+          ? () => {
+              e2eModal(testID, 'shown');
+              onShow?.();
+            }
+          : onShow
+      }
+      onDismiss={() => {
+        e2eModal?.(testID, 'dismissed');
+        finish();
+      }}
     >
       {/* Gestures inside a native modal need their own root (iOS). */}
       <GestureHandlerRootView style={styles.fill}>
