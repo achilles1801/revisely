@@ -146,12 +146,6 @@ if [ "$WITH_FUNCTIONS" = true ]; then
   npm --prefix "$ROOT/functions" run --silent build >&2
   [ -f "$ROOT/functions/.secret.local" ] || echo 'ANTHROPIC_COACH_KEY=emulator-only-recorded-replies' >"$ROOT/functions/.secret.local"
   export REVISELY_FUNCTIONS_EMULATOR="127.0.0.1:$FUNCTIONS"
-  # Seconds a function's worker has to start. A request whose worker misses it is never answered:
-  # the emulator logs "Failed to load function" and drops it (firebase-tools 15.15 and 15.34,
-  # functionsEmulator.js), so the caller waits for good. 30 s by default, and a loaded CI macOS
-  # runner took longer (E2E run 42423019809: the app's deleteUserAccount got no answer). A deployed
-  # function's slow start is a late answer or an error, never silence; the callers' own limits judge.
-  export FUNCTIONS_DISCOVERY_TIMEOUT=${FUNCTIONS_DISCOVERY_TIMEOUT:-120}
 fi
 
 # ---- config --------------------------------------------------------------
@@ -184,10 +178,17 @@ ROOT="$ROOT" FIRESTORE="$FIRESTORE" AUTH="$AUTH" STORAGE="$STORAGE" HUB="$HUB" L
 cp "$ROOT/.firebaserc" "$WORK/" 2>/dev/null || true
 echo "emulators: $ONLY on firestore $FIRESTORE, auth $AUTH, storage $STORAGE, functions $FUNCTIONS (hub $HUB)" >&2
 
-# The functions emulator gives our code 10 s to load, then serves no functions at all and still
-# says "All emulators ready": on a loaded macOS runner it took longer, and every function call in
-# that E2E job answered 404 (deleteUserAccount in 10-delete-account, run 42573714262). 60 s.
-export FUNCTIONS_DISCOVERY_TIMEOUT=${FUNCTIONS_DISCOVERY_TIMEOUT:-60}
+# Seconds the functions emulator gives our code, twice over (firebase-tools 15.15 reads this one
+# variable for both, runtimes/discovery and functionsRuntimeWorker.js):
+# - to load at the start: 10 s by default, then it serves no functions at all and still says "All
+#   emulators ready". On a loaded macOS runner it took longer, and every function call in that E2E
+#   job answered 404 (deleteUserAccount in 10-delete-account, run 42573714262).
+# - for each function's worker to start: 30 s by default, then the request is dropped unanswered
+#   ("Failed to load function"), so the caller waits for good (run 42423019809: the app's
+#   deleteUserAccount got no answer).
+# A deployed function's slow start is a late answer or an error, never silence; the callers' own
+# limits judge.
+export FUNCTIONS_DISCOVERY_TIMEOUT=${FUNCTIONS_DISCOVERY_TIMEOUT:-120}
 
 cd "$WORK"
 if [ "$MODE" = exec ]; then

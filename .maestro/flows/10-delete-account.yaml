@@ -33,9 +33,6 @@ appId: com.revisionbuddy.app
 - assertTrue:
     condition: ${output.accountExists && output.userDocExists && output.serverPagesCount > 0}
     label: The server has the new account, its user document and its pages
-# deleteUserAccount runs once first, as a throwaway account: a function's first call in the
-# emulator is slow on a CI macOS runner, which the wait for "Account deleted" would count.
-- runScript: ../scripts/warm-delete-account.js
 
 - tapOn:
     id: open-settings
