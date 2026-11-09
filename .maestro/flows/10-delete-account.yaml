@@ -9,6 +9,9 @@ appId: com.revisionbuddy.app
     env:
       CLOCK: 2026-11-03T20:00
       BOUNDARY: midnight
+# The function once first, as an account of its own, so the flow's call finds its worker started: the
+# first call took 47 s on iOS (run 42594658944), past the app's 30 s (scripts/warm-delete.js).
+- runScript: ../scripts/warm-delete.js
 # The app sends the new account's pages from its outbox once onboarding is done: look again until
 # they are on the server (about 2 s a look; they went out 19 s after Home showed on iOS in run
 # 42573714262), then check.
