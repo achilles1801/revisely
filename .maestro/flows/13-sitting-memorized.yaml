@@ -153,11 +153,29 @@ appId: com.revisionbuddy.app
       - tapOn:
           text: "View"
           optional: true
+      - extendedWaitUntil:
+          visible:
+            id: activity-day-v2
+          timeout: 4000
+          optional: true
 - runFlow:
     when:
       notVisible:
         id: activity-day-v2
     commands:
+      # A View tap as the note fades (after the backup notice, say) goes through to the timer chip
+      # under it and opens the card, which hides Back: close it with a tap outside, as above.
+      - runFlow:
+          when:
+            visible:
+              id: "timer-(start|end)"
+          commands:
+            - tapOn:
+                point: 50%, 25%
+            - extendedWaitUntil:
+                notVisible:
+                  id: "timer-(start|end)"
+                timeout: 10000
       - tapOn: "Back"
       - tapOn:
           id: tab-Home
