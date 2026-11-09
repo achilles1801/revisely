@@ -31,11 +31,13 @@ export function historyOf(
 function itemsOfSession(log: RevisionLog, occurredAt: number): HistoryItem[] {
   const ahead = Object.entries(log.ahead ?? {}).filter(([, pages]) => pages.length > 0);
   const aheadPages = new Set(ahead.flatMap(([, pages]) => pages));
+  // A page of the day's own revised again for a day a cycle on stays the day's (AHEAD-3, lib/revisionItems).
+  const assignedHere = new Set(log.assignedPages ?? []);
   const own: HistoryItem = {
     id: revisionItemId(log.date),
     day: log.date,
     countsFor: log.date,
-    pages: log.pagesRevised.filter((p) => !aheadPages.has(p)),
+    pages: log.pagesRevised.filter((p) => !aheadPages.has(p) || assignedHere.has(p)),
     assigned: log.assignedPages ?? [],
     occurredAt,
   };

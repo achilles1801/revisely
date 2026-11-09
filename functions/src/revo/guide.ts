@@ -112,7 +112,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
     routes: ['ActiveRevision'],
     text: lines(
       '- Once today is done, Home shows a line like "Tomorrow starts at Al-Mulk"; tapping it opens the next day’s pages alone.',
-      '- On the end card, “Keep going” goes on to the next revision day’s pages not done yet, then the day after, up to the end of the cycle. A day already done ahead is passed over.',
+      '- On the end card, “Keep going” goes on to the next revision day’s pages not done yet, then the day after. It doesn’t stop at the end of the cycle: once the whole cycle is done, Keep going starts the next cycle from its first day (Home says "Next cycle starts at Al-Fatihah"), and goes on through it. Those pages count for the next cycle’s days, and show in Activity and Insights on the day they were revised. A day already done ahead is passed over.',
       '- A page revised ahead counts for the day it is planned on: that day then needs only the pages left, and is done when none are. Only pages actually revised (swiped or checked) count.',
     ),
   },

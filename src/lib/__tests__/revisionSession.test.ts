@@ -1,4 +1,4 @@
-import { pagesToUnrevise, removeRevisedPages } from '../revisionSession';
+import { pagesToUnrevise, removeRevisedPages, removeRoundPages } from '../revisionSession';
 import { recomputePagesFromLogs } from '../algorithm';
 import type { RevisionLog, UserPage } from '../../types';
 
@@ -59,5 +59,29 @@ describe('removeRevisedPages', () => {
     );
     expect(after.lastRevisedDate).toBe('2026-09-20');
     expect(after.totalRevisionCount).toBe(1);
+  });
+});
+
+// AHEAD-3: a new round past the cycle's end revises today's pages again, for a day a cycle on.
+describe('removeRoundPages', () => {
+  const NEXT = '2026-10-07';
+  const round = new Map([[331, NEXT], [332, NEXT], [345, '2026-10-08']]);
+
+  it('takes back only the round’s credit: today keeps its own revision of the page', () => {
+    const next = removeRoundPages(log({ ahead: { [NEXT]: [331, 332] } }), round, [331]);
+    expect(next.pagesRevised).toContain(331);
+    expect(next.ahead).toEqual({ [NEXT]: [332] });
+  });
+
+  it('a page revised only in the round leaves the day too', () => {
+    const next = removeRoundPages(log({ pagesRevised: [331, 345], ahead: { '2026-10-08': [345] } }), round, [345]);
+    expect(next.pagesRevised).toEqual([331]);
+    expect(next.ahead).toEqual({});
+  });
+
+  it('keeps the page’s credit to another day', () => {
+    const next = removeRoundPages(log({ pagesRevised: [345], ahead: { '2026-10-02': [345], '2026-10-08': [345] } }), round, [345]);
+    expect(next.pagesRevised).toEqual([345]);
+    expect(next.ahead).toEqual({ '2026-10-02': [345] });
   });
 });

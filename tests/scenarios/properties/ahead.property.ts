@@ -65,7 +65,7 @@ const worldArb: fc.Arbitrary<World> = fc
     return { zone: r.zone, user, pages: memorizedPages(range(1, r.n)), startDay };
   });
 
-type Plan = { day: string; pages: number[] };
+type Plan = { day: string; pages: number[]; round?: true };
 
 /** One session as ActiveRevisionScreen makes it: today, `keepGoing` more days, some pages revised. */
 function makeSession(w: World, day: string, keepGoing: number, pick: boolean[], logs: RevisionLog[]) {
@@ -241,12 +241,12 @@ function nextPlanByRule(w: World, after: string, taken: ReadonlySet<number>, log
     const day = addDays(after, delta);
     const pages = getPagesForDay(w.user, parseDay(day), w.pages);
     if (pages.length === 0) continue; // an off day
-    if (pages.some((p) => taken.has(p))) return null; // come round again
     // The pages not done yet (#198): a partly done day goes on from there; a day done ahead is passed over.
     const credited = creditedOnDay(logs, day);
     const left = pages.filter((p) => !credited.has(p));
     if (left.length === 0) continue;
-    return { day, pages: left };
+    // Come round again (AHEAD-3, Majd, Nov 9 2026): it doesn't stop; the day starts a new round.
+    return left.some((p) => taken.has(p)) ? { day, pages: left, round: true } : { day, pages: left };
   }
   return null;
 }
@@ -254,7 +254,7 @@ function nextPlanByRule(w: World, after: string, taken: ReadonlySet<number>, log
 const keepGoingArb = fc.tuple(historyArb, fc.integer({ min: -5, max: 45 }), fc.uniqueArray(fc.integer({ min: 1, max: 30 }), { maxLength: 10 }));
 
 describe('[AHEAD-3] [AHEAD-4] Keep going (nextRevisionDayPlan)', () => {
-  it('is a later day, with that day’s pages not done yet (revisionDayPlan), in order, none of them taken', () => {
+  it('is a later day, with that day’s pages not done yet (revisionDayPlan), in order; a new round exactly when they repeat what is taken', () => {
     fc.assert(
       fc.property(keepGoingArb, ([{ w, logs }, afterOffset, takenList]) => {
         useZone(w.zone);
@@ -265,7 +265,7 @@ describe('[AHEAD-3] [AHEAD-4] Keep going (nextRevisionDayPlan)', () => {
         expect(plan!.day > after).toBe(true);
         expect(plan!.pages).toEqual(revisionDayPlan(w.user, w.pages, plan!.day, logs).pages);
         expect(plan!.pages.length).toBeGreaterThan(0);
-        expect(plan!.pages.some((p) => taken.has(p))).toBe(false);
+        expect(plan!.round === true).toBe(plan!.pages.some((p) => taken.has(p)));
         const credited = creditIndex(logs).get(plan!.day) ?? new Set<number>();
         expect(plan!.pages.some((p) => credited.has(p))).toBe(false);
         // The rest of that day, in the day's order.
@@ -276,7 +276,7 @@ describe('[AHEAD-3] [AHEAD-4] Keep going (nextRevisionDayPlan)', () => {
     );
   });
 
-  it('passes over only off days and days done ahead, and is null exactly when the next such day overlaps what is taken', () => {
+  it('passes over only off days and days done ahead, never stops at the end of a cycle, and marks a new round when the day overlaps what is taken', () => {
     fc.assert(
       fc.property(keepGoingArb, ([{ w, logs }, afterOffset, takenList]) => {
         useZone(w.zone);
@@ -288,25 +288,36 @@ describe('[AHEAD-3] [AHEAD-4] Keep going (nextRevisionDayPlan)', () => {
     );
   });
 
-  it('followed from today to the end, never repeats a page, moves forward, and stops within one cycle', () => {
+  it('followed from today, moves forward, never repeats a page within a round, and comes round to a new round within one cycle', () => {
     fc.assert(
       fc.property(historyArb, fc.integer({ min: 0, max: 45 }), ({ w, logs }, todayOffset) => {
         useZone(w.zone);
         const today = addDays(w.startDay, todayOffset);
         const todays = getPagesForDay(w.user, parseDay(today), w.pages);
-        const taken = new Set(todays);
+        // The session's pages: today's, then each later day's, until the cycle comes round.
+        let held = new Set(todays);
         let last = today;
         let steps = 0;
-        for (;;) {
-          const plan = nextRevisionDayPlan(w.user, w.pages, last, taken, logs);
+        let rounds = 0;
+        // Two rounds past the first: each new round holds only its own day (the session starts over).
+        while (rounds < 2) {
+          const plan = nextRevisionDayPlan(w.user, w.pages, last, held, logs);
           if (!plan) break;
           expect(plan.day > last).toBe(true);
-          // None of its pages was on an earlier day of the session.
-          expect(plan.pages.some((p) => taken.has(p))).toBe(false);
-          for (const p of plan.pages) taken.add(p);
+          if (plan.round) {
+            // Come round: the day repeats a page the round holds.
+            expect(plan.pages.some((p) => held.has(p))).toBe(true);
+            held = new Set(plan.pages);
+            rounds++;
+            steps = 0;
+          } else {
+            // Within a round, no page is held twice.
+            expect(plan.pages.some((p) => held.has(p))).toBe(false);
+            for (const p of plan.pages) held.add(p);
+            steps++;
+          }
           last = plan.day;
-          steps++;
-          // Every day of the chain holds new pages, so it ends before the pages run out.
+          // Every day of a round holds new pages, so it comes round before the pages run out: at most one cycle.
           expect(steps).toBeLessThanOrEqual(w.pages.length);
         }
       }),

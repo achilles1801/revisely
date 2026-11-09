@@ -62,7 +62,7 @@ import { catchUpLine } from '../../lib/todayLines';
 import { applyCarryOver, leftoversFor, type Leftovers } from '../../lib/carryOver';
 import { reviewPagesInOrder } from '../../lib/aheadCredit';
 import { ownRevised } from '../../lib/activityItems';
-import { nextRevisionDayPlan, revisionDayAfter, weekdayLabel } from '../../lib/aheadPlan';
+import { aheadLead, nextRevisionDayPlan } from '../../lib/aheadPlan';
 import type { HistoryItem } from '../../lib/streakFromItems';
 import { handLogsOf, loadActivityHistory, shareActivityHistory, withPendingHandLogs } from '../../lib/activityHistory';
 import { pendingEntries } from '../../lib/offline/outbox';
@@ -217,13 +217,14 @@ export default function DashboardScreen() {
   );
   const todayStatus = { status: snapshot?.status ?? ('not_started' as const) };
 
-  // Done today: the next revision day, which Home's quiet line opens (#168).
+  // Done today: the next revision day, which Home's quiet line opens (#168). It goes on past the cycle's
+  // end (AHEAD-3): a day that repeats today's pages opens as a new round, and one that begins the plan
+  // again reads "Next cycle starts at …".
   const aheadNext = useMemo(() => {
     if (!user || !assignment || todayStatus.status !== 'completed' || assignment.pages.length === 0) return null;
     const plan = nextRevisionDayPlan(user, pages, revisionDay, new Set(assignment.pages), logs);
     if (!plan || plan.pages.length === 0) return null;
-    const lead = plan.day === revisionDayAfter(revisionDay) ? 'Tomorrow' : weekdayLabel(plan.day);
-    return { plan, lead };
+    return { plan, lead: aheadLead(user, pages, revisionDay, plan) };
   }, [user, pages, logs, assignment, revisionDay, todayStatus.status]);
 
   // Pages from the last few revision days that were never revised (a day with
@@ -562,7 +563,10 @@ export default function DashboardScreen() {
           onCarryOver={handleCarryOver}
           carrying={carrying}
           ahead={aheadNext ? { lead: aheadNext.lead, first: aheadNext.plan.pages[0] } : null}
-          onAhead={() => aheadNext && navigation.navigate('ActiveRevision', { aheadDay: aheadNext.plan.day })}
+          onAhead={() =>
+            aheadNext &&
+            navigation.navigate('ActiveRevision', { aheadDay: aheadNext.plan.day, ...(aheadNext.plan.round ? { round: true } : {}) })
+          }
           help={<HelpButton screen="home" size={20} color={palette.secondary} maxFontSizeMultiplier={HEADER_MAX_SCALE} />}
         />
 
