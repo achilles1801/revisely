@@ -212,6 +212,18 @@ How the tests are made: `tests/scenarios/README.md`.
 - **SYNC-5.** The same day revised on two phones while both were offline keeps every page either
   phone revised, in one session for the day.
 
+## Sheets and updates
+
+- **SHEET-1.** One sheet at a time: a sheet asked to open while another is open, or still closing,
+  opens once that one has gone (a sheet opened from inside another opens over it). So whatever opens
+  a sheet (the user, an update, Revo's "Open Jump to"), the screen under it takes taps again once the
+  sheets have gone. (Nov 9 2026: "A new update is ready" opened by itself over the Today menu; iOS
+  refused it, and Home took no taps, only the swipe to Read, until the app restarted.)
+- **UPD-1.** "A new update is ready" opens by itself once an update has downloaded, on a tab's main
+  screen, 1.2 s after nothing is going on: never during a session, a recording, a recitation or a
+  timer, nor while another sheet is open (it waits until that one has gone, then the delay again).
+  Later puts it off until the next cold start.
+
 ## Recitation
 
 - **AUDIO-1.** On Android, a recitation that stops leaves no notification behind: ■ or ✕ in the app,

@@ -104,6 +104,8 @@ describe('the Smart Tracking preview in the new design', () => {
     expect(screen.getByTestId('sandbox-rating-sheet')).toBeTruthy();
     fireEvent.press(screen.getByTestId('sandbox-rating-2'));
     expect(screen.getByText('Rated weak.')).toBeTruthy();
+    // The rating sheet goes (iOS: onDismiss) before another sheet can open (SHEET-1).
+    dismissSheets();
     // A demo, but no line saying nothing is saved next to a button that continues.
     expect(screen.queryByText(/nothing is saved/i)).toBeNull();
 

@@ -1580,6 +1580,17 @@ classic default), and a fresh install starts in light.
   (`src/components/Backdrop.tsx`), rendered as the sheet's sibling, before it. Layout tests can't
   see this; `touchHandlingAncestor()` (`jest/scrollable.ts`) can. The long-verse fix of PR #20
   bounded the height correctly and still didn't scroll on a phone for this reason.
+- **One modal at a time on iOS** (BEHAVIOUR.md SHEET-1, Nov 9 2026). A modal asked to present while another
+  is up, or still being dismissed, is refused, and React Native then keeps the refused one's host over the
+  screen, invisible, taking every touch (the swipe between tabs still works: it is native). Home froze that way
+  when "A new update is ready" opened by itself over the Today menu. So `v2/Sheet` takes a turn
+  (`v2/modalTurn`): it waits while another sheet holds one and holds it until iOS reports it gone, with a 1 s
+  fallback that replaces a modal whose dismissal never reports. A sheet inside another modal's content is
+  presented by it and goes at once (`ModalNest`). `RevoSheetFrame` and `v2/ContextMenu` take turns the same
+  way. A raw `<Modal>` that coexists with sheets calls `useModalHold(visible)` (and wraps its content in
+  `ModalNest` if sheets open inside it). The scenario harness's Modal refuses as iOS does, and a tap on the
+  screen under it then fails (`harness/modal.tsx`); a test that reports `onDismiss` itself lets the sheet's
+  closing animation end first, as iOS would.
 - Check sheets and menus at the largest Dynamic Type size (`xcrun simctl ui <udid> content_size
   accessibility-extra-extra-extra-large`) and on an SE-size simulator. Chrome text (headers, menu
   rows, credits) caps growth with `maxFontSizeMultiplier`; reading text doesn't.

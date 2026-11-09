@@ -34,6 +34,7 @@ import { RevoChat } from './RevoChat';
 import { RevoHistory, RevoMemory, RevoOptIn } from './RevoPages';
 import { RevoAddSheet } from './RevoAddSheet';
 import { RevoSheetFrame } from './RevoSheetFrame';
+import { useModalHold } from '../v2/modalTurn';
 
 type View_ = { name: 'chat' } | { name: 'history' } | { name: 'memory' } | { name: 'optin' } | { name: 'add' };
 
@@ -129,6 +130,8 @@ function RevoHostInner({ available, onOpenChange }: { available: boolean; onOpen
   const { palette } = useTheme();
   const [momentSeen, setMomentSeen] = useState<boolean | undefined>(() => (uid ? revoMomentSeen(uid) : undefined));
   const [intro, setIntro] = useState(false);
+  // Revo's moment is a modal too: sheets wait for it (v2/modalTurn).
+  useModalHold(intro);
   const optInAfterIntro = useRef(false);
   useEffect(() => {
     if (!uid) return;
