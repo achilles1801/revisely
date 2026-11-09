@@ -95,6 +95,23 @@ describe('the juz sheet', () => {
       expect(never.surahs[0].text).toBe('Never revised');
     });
 
+    it('[AHEAD-6] pages revised ahead today count today, not on the day they are credited to', () => {
+      const ahead = juzSheetModel({
+        juz: 28,
+        today: TODAY,
+        pages: JUZ28.map((p) => page(p)),
+        revised: [
+          { day: TODAY, countsFor: TODAY, pages: JUZ28.slice(0, 5) },
+          { day: TODAY, countsFor: '2026-11-04', pages: JUZ28.slice(5, 10) },
+        ],
+        windowDays: 30,
+        smartTracking: false,
+      });
+      expect(ahead.headline).toBe('Last revised today');
+      expect(ahead.times).toBe('once in 30 days');
+      expect(ahead.cells.slice(0, 10).every((c) => c.state === 'week')).toBe(true);
+    });
+
     it('[ACT-25] memorized under 30 days ago and never revised: “not revised yet”, neutral, not stale', () => {
       // A new account: Juz 28 memorized yesterday, five pages revised today.
       const fresh = juzSheetModel({

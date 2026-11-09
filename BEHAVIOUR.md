@@ -129,6 +129,11 @@ How the tests are made: `tests/scenarios/README.md`.
 - **AHEAD-4.** A day already done ahead is passed over: Keep going and Home's next line go to the day
   after it (the owner's rule, #198).
 - **AHEAD-5.** A page is credited ahead only when it was revised in that session (checked or swiped).
+- **AHEAD-6.** A page revised ahead (Keep going) or caught up is revised on the day it was revised, wherever
+  recency shows: Coverage's figure, its Juz, Surah and Page views and the untouched row, the juz sheet (its
+  strip, headline and days), Pages by strength and Revo. Only the schedule credits it to the day it is
+  planned on (AHEAD-2) or was missed on (SESS-7). (Majd, Nov 9 2026: "when i revise ahead, does that show up
+  in coverage because i don't see it?" Coverage read the credited day and skipped a credit for a later day.)
 
 ## Carrying pages over
 

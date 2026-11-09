@@ -52,7 +52,7 @@ const COUNT_WORDS: Record<string, string> = {
   older: 'over 30 days',
 };
 
-type Revised = { countsFor: string; pages: number[] }[];
+type Revised = { day?: string; countsFor: string; pages: number[] }[];
 
 export function JuzSheet({
   juz,

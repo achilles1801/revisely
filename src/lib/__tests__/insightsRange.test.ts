@@ -58,6 +58,8 @@ describe('Insights’ range', () => {
     expect(coverageCycleCount([{ countsFor: TODAY, pages: [1] }], TODAY, 23)).toBeCloseTo(1 / 23);
     expect(coverageCycleCount([], TODAY, 0)).toBe(0);
     expect(coverageCycleCount([{ countsFor: TODAY, pages: [1, 2] }], TODAY, 2)).toBe(1);
+    // AHEAD-6: pages revised today for tomorrow are revised today.
+    expect(coverageCycleCount([{ day: TODAY, countsFor: shift(TODAY, 1), pages: [1, 2] }], TODAY, 2)).toBe(1);
   });
 
   it('[ACT-22] the weeks grid has a column per week since the account’s first, up to 13 or 26', () => {
