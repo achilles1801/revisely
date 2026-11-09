@@ -25,7 +25,7 @@ export function UpdateReadySheet() {
   // Every reason counts, the screen too: only a tab's main screen, nothing going on.
   const busy = useBusyReasons().length > 0;
   // Another sheet open (the Today menu, Jump to, Revo…): it waits until that one has gone, then
-  // the delay again (UPD-3). It opened over Jump to once, iOS refused it, and Home froze.
+  // the delay again (UPD-1). It opened over Jump to once, iOS refused it, and Home froze.
   const sheetOpen = useModalShowing();
   const [shown, setShown] = useState(false);
 

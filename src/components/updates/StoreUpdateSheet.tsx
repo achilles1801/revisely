@@ -25,7 +25,7 @@ export function StoreUpdateSheet() {
   const busy = useBusyReasons().some((r) => r !== 'screen');
   // An update that only needs a restart goes first (UpdateReadySheet): one sheet at a time.
   const otaOffered = useUpdateOffer().visible;
-  // Another sheet open (Jump to, a menu, Revo…): it waits until that one has gone (UPD-3).
+  // Another sheet open (Jump to, a menu, Revo…): it waits until that one has gone (UPD-1).
   const sheetOpen = useModalShowing();
   const [shown, setShown] = useState<string | null>(null);
 
