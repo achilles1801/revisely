@@ -2,8 +2,8 @@
 // onShow when it appears, and onDismiss once it has gone. React Native's own jest mock never calls
 // onDismiss, and v2/Sheet runs a menu's action from it.
 //
-// One at a time, as on iOS: a modal asked to present while another is up, or still being
-// dismissed, is refused, unless it is presented from inside that one (rendered in its children).
+// One at a time, as on iOS: a modal asked to present while another is up is refused, unless it is
+// presented from inside that one (rendered in its children).
 // React Native then keeps the refused modal's host over the screen, invisible, taking every touch,
 // and never reports it dismissed (the dismissal of a modal that never showed doesn't complete).
 // That froze Home on Nov 9 2026 (SHEET-1). A refused modal here shows nothing and is listed by
@@ -22,7 +22,7 @@ interface Props {
 
 /** Inside a presented modal's children: a modal there is presented by it, over it. */
 const Inside = createContext(false);
-/** Top-level modals presented, or still being dismissed. */
+/** Top-level modals presented. */
 const presented = new Set<object>();
 /** Modals iOS refused, by what they are called, while they stay mounted. */
 const refused = new Map<object, string>();
@@ -30,6 +30,12 @@ const refused = new Map<object, string>();
 /** The modals iOS would have refused that are still mounted: each covers the screen, taking every touch. */
 export function refusedModals(): string[] {
   return [...refused.values()];
+}
+
+/** Between tests (harness/afterEnv): nothing presented or refused. */
+export function resetModalsForTests(): void {
+  presented.clear();
+  refused.clear();
 }
 
 type State = 'hidden' | 'shown' | 'refused';
@@ -64,13 +70,11 @@ function Modal({ visible = true, onShow, onDismiss, children, testID }: Props) {
       show.current?.();
       return;
     }
-    // Hidden: gone a moment later, then onDismiss. A refused one stays (no dismissal completes).
+    // Hidden: onDismiss a moment later. A refused one stays (no dismissal completes).
     if (now === 'shown') {
       set('hidden');
-      setTimeout(() => {
-        presented.delete(token);
-        dismiss.current?.();
-      }, 0);
+      presented.delete(token);
+      setTimeout(() => dismiss.current?.(), 0);
     }
   }, [visible, nested, token, testID]);
 
@@ -90,4 +94,4 @@ function Modal({ visible = true, onShow, onDismiss, children, testID }: Props) {
   );
 }
 
-module.exports = { __esModule: true, default: Modal, refusedModals };
+module.exports = { __esModule: true, default: Modal, refusedModals, resetModalsForTests };

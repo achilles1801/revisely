@@ -1586,10 +1586,11 @@ classic default), and a fresh install starts in light.
   when "A new update is ready" opened by itself over the Today menu. So `v2/Sheet` takes a turn
   (`v2/modalTurn`): it waits while another sheet holds one and holds it until iOS reports it gone, with a 1 s
   fallback that replaces a modal whose dismissal never reports. A sheet inside another modal's content is
-  presented by it and goes at once (`ModalNest`). A raw `<Modal>` that coexists with sheets calls
-  `useModalHold(visible)` (and wraps its content in `ModalNest` if sheets open inside it). Never open a sheet
-  from code without going through `v2/Sheet`. The scenario harness's Modal refuses as iOS does, and a tap on
-  the screen under it then fails (`harness/modal.tsx`).
+  presented by it and goes at once (`ModalNest`). `RevoSheetFrame` and `v2/ContextMenu` take turns the same
+  way. A raw `<Modal>` that coexists with sheets calls `useModalHold(visible)` (and wraps its content in
+  `ModalNest` if sheets open inside it). The scenario harness's Modal refuses as iOS does, and a tap on the
+  screen under it then fails (`harness/modal.tsx`); a test that reports `onDismiss` itself lets the sheet's
+  closing animation end first, as iOS would.
 - Check sheets and menus at the largest Dynamic Type size (`xcrun simctl ui <udid> content_size
   accessibility-extra-extra-extra-large`) and on an SE-size simulator. Chrome text (headers, menu
   rows, credits) caps growth with `maxFontSizeMultiplier`; reading text doesn't.
