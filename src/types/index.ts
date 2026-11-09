@@ -108,6 +108,9 @@ export interface CustomPlan {
   /** Which direction the user generated the plan from — useful for re-rendering
    *  the editor in the same orientation. */
   direction: 'forward' | 'reverse';
+  /** Its name (SCHED-7): the saved plan it was loaded from, or the name given with "Save current
+   *  plan…". Absent when it has none: the Schedule screen calls it "Custom plan". */
+  name?: string;
 }
 
 /** A reusable, named schedule the user saved to switch between later. Stores
