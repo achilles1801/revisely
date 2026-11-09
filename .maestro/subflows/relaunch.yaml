@@ -5,6 +5,10 @@ appId: com.revisionbuddy.app
 - stopApp
 - launchApp:
     stopApp: true
+    permissions:
+      all: allow
+      # Not location unless the flow has set a position (location.yaml).
+      location: "${output.location || 'deny'}"
 - extendedWaitUntil:
     visible:
       id: e2e-status

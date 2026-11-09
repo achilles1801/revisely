@@ -66,7 +66,7 @@ on:
         options: [both, ios, android]
         default: both
       flows:
-        description: Only these flows (a glob in .maestro/flows, e.g. 06-*); empty for all
+        description: Only these flows, in this order, in one job (globs in .maestro/flows, e.g. 06-* or '04-* 06-* 11-*'); empty for all
         type: string
         default: ''
       debug:
@@ -167,8 +167,10 @@ jobs:
           if [ -n "$IOS_SET" ] || [ -n "$ANDROID_SET" ]; then
             ios=$(set_of "${IOS_SET:-none}" ios); android=$(set_of "${ANDROID_SET:-none}" android)
           elif [ -n "$ONLY" ]; then
-            case "$ONLY" in *[!A-Za-z0-9*?._-]*) echo "::error::flows: a glob of flow names, like 06-*"; exit 1 ;; esac
-            ios=$(jq -cn --arg n "$ONLY" '[{name: $n, flows: (".maestro/flows/" + $n)}]'); android="$ios"
+            # Several globs run in one job in the order given, as a full job's do: '06-* 11-*' runs 11
+            # after 06 on the same device, which is how order between flows is tried by hand.
+            case "$ONLY" in *[!]A-Za-z0-9*?._[\ -]*) echo "::error::flows: globs of flow names, like 06-* or '06-* 11-*'"; exit 1 ;; esac
+            ios=$(jq -cn --arg n "$ONLY" '[{name: $n, flows: ($n | split(" ") | map(select(. != "") | ".maestro/flows/" + .) | join(" "))}]'); android="$ios"
           elif [ "$SMOKE" = true ]; then
             ios="$smoke_ios"; android="$smoke_android"
           else
