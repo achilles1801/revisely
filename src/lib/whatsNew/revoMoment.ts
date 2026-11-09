@@ -20,6 +20,12 @@ export const MOMENT_DURATION = MOMENT_END_P / MOMENT_SPEED;
 export const MOMENT_BEATS_P = [2.6, 4.8, 6.35, 7.9, 9.45, 12.4, 13.4] as const;
 export const MOMENT_HAPTICS = MOMENT_BEATS_P.map((p) => p / MOMENT_SPEED);
 
+/**
+ * Watch again takes Skip's place in the top corner only this long after the end: a quick second tap on
+ * Skip (or Maestro's retried tap) never starts the moment over.
+ */
+export const AGAIN_AFTER_MS = 800;
+
 /** Reduce Motion: these frames as stills, each held, cross-fading (the end screen last). */
 export const MOMENT_STILLS_P = [4.1, 6.2, 7.75, 9.3, 10.7, 11.9, MOMENT_END_P] as const;
 export const STILL_HOLD = 2.6 / MOMENT_SPEED;

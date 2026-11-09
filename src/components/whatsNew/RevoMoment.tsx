@@ -34,6 +34,7 @@ import { refreshRevoRelease } from '../../lib/revo/release';
 import { useRevoSettings } from '../../lib/revo/useRevoSettings';
 import { REVO_BUTTON_GAP, REVO_BUTTON_SIZE } from '../../lib/revo/presence';
 import {
+  AGAIN_AFTER_MS,
   FIRST_JUZ,
   JUZ_SHADE,
   MOMENT_CHOICE_P,
@@ -638,6 +639,7 @@ export function RevoMoment({
 
   const [run, setRun] = useState(0);
   const [ended, setEnded] = useState(false);
+  const [againReady, setAgainReady] = useState(false);
   const [typedKey, setTypedKey] = useState('0,0,0,0');
   const [optIn, setOptIn] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -664,6 +666,16 @@ export function RevoMoment({
     });
     return () => cancelAnimation(clock);
   }, [reduce, reader, run]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Watch again only a moment after the end, where Skip was (AGAIN_AFTER_MS).
+  useEffect(() => {
+    if (!ended) {
+      setAgainReady(false);
+      return;
+    }
+    const t = setTimeout(() => setAgainReady(true), AGAIN_AFTER_MS);
+    return () => clearTimeout(t);
+  }, [ended]);
 
   const buzz = useCallback(() => haptics.light(), [haptics]);
   useAnimatedReaction(
@@ -775,7 +787,7 @@ export function RevoMoment({
               </Text>
             </View>
           </Rise>
-          {ended ? (
+          {againReady ? (
             <Tap
               onPress={() => setRun((r) => r + 1)}
               accessibilityRole="button"
