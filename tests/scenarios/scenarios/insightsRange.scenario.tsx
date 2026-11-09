@@ -101,8 +101,8 @@ describe('Insights’ range', () => {
     await screen.findByTestId('insights-range');
     await choose('3 months');
     await waitFor(() => expect(screen.getByText(/memorized pages in 3 months( ›)?$/)).toBeTruthy());
-    // The account is 66 days old: the days count from its start.
-    expect(screen.getByText(/^of 66 days since you started( ›)?$/)).toBeTruthy();
+    // The account is 66 days old: the days count from its start, named by its date as under All time.
+    expect(screen.getByText(/^of 66 days since 1 September( ›)?$/)).toBeTruthy();
     expect(screen.getByTestId('insights-weeks-grid')).toBeTruthy();
     expect(screen.getByTestId('insights-pattern').props.children).toBe('Every missed day was a Saturday');
     expect(screen.getByText('Minutes by hour, last 3 months')).toBeTruthy();

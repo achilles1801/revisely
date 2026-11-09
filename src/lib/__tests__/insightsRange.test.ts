@@ -1,8 +1,11 @@
 import {
   activeDays,
   beforeWords,
+  coverageCycleCount,
   coverageCycles,
   coveragePercent,
+  gridWeeks,
+  unit,
   rangeLabel,
   rangeSpan,
   daysToLoad,
@@ -49,6 +52,32 @@ describe('Insights’ range', () => {
     ];
     expect(coverageCycles(revised, TODAY, 4)).toBe('1.5');
     expect(coverageCycles(revised.slice(0, 1), TODAY, 4)).toBe('1');
+  });
+
+  it('[ACT-22] cycles count from the first whole one; before it, All time shows the share', () => {
+    expect(coverageCycleCount([{ countsFor: TODAY, pages: [1] }], TODAY, 23)).toBeCloseTo(1 / 23);
+    expect(coverageCycleCount([], TODAY, 0)).toBe(0);
+    expect(coverageCycleCount([{ countsFor: TODAY, pages: [1, 2] }], TODAY, 2)).toBe(1);
+  });
+
+  it('[ACT-22] the weeks grid has a column per week since the account’s first, up to 13 or 26', () => {
+    // Tuesday 3 November: its week began on Sunday 1 November.
+    expect(gridWeeks(90, TODAY, TODAY)).toBe(1);
+    expect(gridWeeks('all', TODAY, TODAY)).toBe(1);
+    expect(gridWeeks(90, TODAY, '2026-11-01')).toBe(1);
+    expect(gridWeeks(90, TODAY, '2026-10-31')).toBe(2);
+    expect(gridWeeks(90, TODAY, '2025-01-01')).toBe(13);
+    expect(gridWeeks('all', TODAY, '2025-01-01')).toBe(26);
+    expect(gridWeeks('all', TODAY, null)).toBe(26);
+    expect(gridWeeks(30, TODAY, TODAY)).toBe(0);
+    expect(gridWeeks(7, TODAY, '2025-01-01')).toBe(0);
+  });
+
+  it('[ACT-22] a count agrees with its number', () => {
+    expect(unit(1, 'day')).toBe('day');
+    expect(unit(0, 'day')).toBe('days');
+    expect(unit(2, 'page')).toBe('pages');
+    expect(unit(1, 'person', 'people')).toBe('person');
   });
 
   it('words for the chip and the sections', () => {

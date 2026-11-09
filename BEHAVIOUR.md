@@ -416,13 +416,20 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   chip at the end of the Overview | Insights row ("30 days ⌄", on Insights only) that opens the four (All time
   names its start, "Since 9 September"); the choice is kept on the phone. Coverage's figure, Consistency's days and hours, Weak spots' counts, Memorization's
   "+N" and Pace (against the same length before it) follow it, and so does the juz sheet's "times"; the juz
-  tiles always show where each juz stands now. A range longer than the account counts from its first day
-  ("50 of 56 days since you started"). At 3 months Consistency shows a weeks grid by weekday and, when there
-  is one, the missed days' pattern by weekday ("Every missed day was a Saturday"). All time reads from the
-  account's first day: Coverage in cycles ("3.1 cycles of your 305 memorized pages since 9 September", since a
-  long range covers nearly everything), the weeks grid from the start (up to half a year), and Pace week by
+  tiles always show where each juz stands now. A range longer than the account counts from its first day,
+  and says so by its date at every range ("50 of 56 days since 9 September"). At 3 months Consistency shows a
+  weeks grid by weekday and, when there is one, the missed days' pattern by weekday ("Every missed day was a
+  Saturday"). The grid has a column per week since the account's first (up to 13 at 3 months, 26 All time),
+  its cells one fixed size whatever the history (at most 18 pt), drawn from the left: a day-old account is
+  one small column, never a cell stretched to the width. All time reads from the account's first day:
+  Coverage in cycles ("3.1 cycles of your 305 memorized pages since 9 September", since a long range covers
+  nearly everything) once the pages have gone round once, and before that the share, as the other ranges
+  show it ("4% · 1 of 23 memorized pages since 8 November", never "0 cycles"); the weeks grid from the start
+  (up to half a year), and Pace week by
   week ("Week by week: 2.1 → 1.8 min a page") in place of a comparison. (Majd, Nov 7 2026: "why is
-  insights restricted to just the last 30 days?"; mocks i1 and i2.)
+  insights restricted to just the last 30 days?"; mocks i1 and i2.) Every count agrees with its number ("1 of 1
+  day", "1 of 1 memorized page"). (Majd, Nov 8 2026, on a day-old account: "think i found a bug when u filter by
+  all time or 3 months".)
 - **ACT-23.** Insights answer a tap: a day's circle (or a day of the weeks grid) opens that day, a missed one
   too (empty, with its +); Consistency's figure opens Overview at its month; Coverage's figure ("264 of 305
   memorized pages in 30 days ›") lists what wasn't revised in the range, a memorized juz as one row ("Juz 4 …

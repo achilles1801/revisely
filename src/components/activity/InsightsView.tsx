@@ -64,15 +64,23 @@ import { PaceSheet } from './PaceSheet';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import {
   activeDays,
+  coverageCycleCount,
   coverageCycles,
   coveragePercent,
+  dayAndMonth,
+  gridWeeks,
   memorizedIn,
   missedPattern,
   rangeSpan,
+  unit,
   weeklyPace,
   weeksGrid,
   type InsightsRange,
 } from '../../lib/insightsRange';
+
+/** Consistency's weeks grid: the gap between cells, and the largest a cell gets (3 months on a wide phone). */
+const GRID_GAP = 3;
+const GRID_CELL_MAX = 18;
 
 export interface InsightsData {
   today: string;
@@ -332,6 +340,8 @@ function Coverage({
   const count = coverageCount(data.memorized, last, data.today, days);
   // Never 100% while a page is left (at 3 months, 304 of 305 rounded up).
   const pct = coveragePercent(count.revised, count.of);
+  const inCycles = span.all && coverageCycleCount(data.revised, data.today, count.of) >= 1;
+  const cyclesText = inCycles ? coverageCycles(data.revised, data.today, count.of) : '';
   // What isn't covered (i7): the figure opens it; each row opens its juz once this sheet has gone.
   const [uncoveredOpen, setUncoveredOpen] = useState(false);
   const [uncoveredUsed, setUncoveredUsed] = useState(false);
@@ -435,12 +445,13 @@ function Coverage({
       testID="insights-coverage"
     >
       <Figure
-        // All time in cycles: over a long range the share nears 100%, so how many times round says more.
-        value={span.all ? coverageCycles(data.revised, data.today, count.of) : `${pct}%`}
+        // All time in cycles: over a long range the share nears 100%, so how many times round says more. Only
+        // from the first whole cycle: before it, the share, as the other ranges show it (never "0 cycles").
+        value={inCycles ? cyclesText : `${pct}%`}
         text={
-          span.all
-            ? `${coverageCycles(data.revised, data.today, count.of) === '1' ? 'cycle' : 'cycles'} of your ${count.of} memorized pages ${span.inWords}`
-            : `${count.revised} of ${count.of} memorized pages ${span.inWords}`
+          inCycles
+            ? `${cyclesText === '1' ? 'cycle' : 'cycles'} of your ${count.of} memorized ${unit(count.of, 'page')} ${span.inWords}`
+            : `${count.revised} of ${count.of} memorized ${unit(count.of, 'page')} ${span.inWords}`
         }
         onPress={
           count.revised < count.of
@@ -572,7 +583,11 @@ function Coverage({
                 untouched.first.daysSince == null ? 'Never revised' : `Last revised ${untouched.first.daysSince} days ago`,
                 untouched.next
                   ? `Juz ${untouched.next.juz}, ${
-                      untouched.next.daysSince != null ? `${untouched.next.daysSince} days` : untouched.next.state === 'new' ? 'not revised yet' : 'never'
+                      untouched.next.daysSince != null
+                        ? `${untouched.next.daysSince} ${unit(untouched.next.daysSince, 'day')}`
+                        : untouched.next.state === 'new'
+                          ? 'not revised yet'
+                          : 'never'
                     }`
                   : null,
               ]
@@ -604,7 +619,7 @@ function Coverage({
           visible={uncoveredOpen}
           onClose={() => setUncoveredOpen(false)}
           title={`Not revised ${span.inWords}`}
-          message={`${count.of - count.revised} of ${count.of} memorized pages`}
+          message={`${count.of - count.revised} of ${count.of} memorized ${unit(count.of, 'page')}`}
           messageMaxScale={CHROME_MAX_SCALE}
           scroll
           onHidden={() => {
@@ -679,18 +694,22 @@ function Consistency({ data, onOpenDay, onOpenCalendar }: { data: InsightsData; 
   const m = monthCount(active, month, data.today);
   const inRange = activeDays(active, data.today, span.window, data.firstDay);
   // 3 months and All time: a weeks grid by weekday (up to half a year) and the missed days' pattern;
-  // 7 and 30 days: the week's circles.
-  const gridWeeks = range === 90 ? 13 : span.all ? Math.min(26, Math.ceil(span.window / 7) + 1) : 0;
-  const grid = gridWeeks > 0 ? weeksGrid(active, data.today, gridWeeks, data.firstDay) : null;
-  const pattern = gridWeeks > 0 ? missedPattern(active, data.today, span.window, data.firstDay) : null;
+  // 7 and 30 days: the week's circles. The grid has a column per week since the account's first (a short
+  // history is a short grid), its cells a fixed size whatever the history, from the left.
+  const weeks = gridWeeks(range, data.today, data.firstDay);
+  const grid = weeks > 0 ? weeksGrid(active, data.today, weeks, data.firstDay) : null;
+  const pattern = weeks > 0 ? missedPattern(active, data.today, span.window, data.firstDay) : null;
+  const { width } = useWindowDimensions();
+  const fullWeeks = range === 90 ? 13 : 26;
+  const cell = Math.max(8, Math.min(GRID_CELL_MAX, Math.floor((width - 32 - (fullWeeks - 1) * GRID_GAP) / fullWeeks)));
+  // A count from the account's first day names it, whatever the range ("since 8 November").
+  const sinceFirst = data.firstDay ? `since ${dayAndMonth(data.firstDay)}` : 'since you started';
   const figureText =
     range === 7
       ? `of the last 7 days · ${m.done} of ${m.of} in ${monthName(month)}`
-      : span.all
-        ? `of ${inRange.of} days ${span.inWords}`
-        : inRange.sinceStart
-          ? `of ${inRange.of} days since you started`
-          : `of the last ${inRange.of} days`;
+      : span.all || inRange.sinceStart
+        ? `of ${inRange.of} ${unit(inRange.of, 'day')} ${sinceFirst}`
+        : `of the last ${inRange.of} days`;
   const hours = useMemo(() => minutesByHour([...data.revised, ...data.read], data.today, span.window), [data.revised, data.read, data.today, span.window]);
   // The hours scrub (i8): a press that slides picks the hour under the finger; letting go puts it back.
   const [heldHour, setHeldHour] = useState<number | null>(null);
@@ -725,7 +744,7 @@ function Consistency({ data, onOpenDay, onOpenCalendar }: { data: InsightsData; 
       {grid ? (
         <View style={styles.grid} testID="insights-weeks-grid">
           {grid.map((col) => (
-            <View key={col[0].day} style={styles.gridCol}>
+            <View key={col[0].day} style={[styles.gridCol, { width: cell }]}>
               {col.map((c) => (
                 <Tap
                   key={c.day}
@@ -733,6 +752,7 @@ function Consistency({ data, onOpenDay, onOpenCalendar }: { data: InsightsData; 
                   disabled={!onOpenDay || (c.state !== 'done' && c.state !== 'missed')}
                   style={[
                     styles.gridCell,
+                    { width: cell, height: cell },
                     c.state === 'done'
                       ? { backgroundColor: palette.primary }
                       : c.state === 'missed'
@@ -985,7 +1005,7 @@ function Memorization({ data, onOpenDay }: { data: InsightsData; onOpenDay?: (da
               }}
               style={styles.monthCol}
               accessibilityRole="button"
-              accessibilityLabel={`${monthName(m.month)}, ${m.pages} pages`}
+              accessibilityLabel={`${monthName(m.month)}, ${m.pages} ${unit(m.pages, 'page')}`}
               accessibilityState={{ selected: picked === m.month }}
               testID={`insights-month-${m.month}`}
             >
@@ -1194,9 +1214,9 @@ const styles = StyleSheet.create({
   untouchedMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
   dot8: { width: 8, height: 8, borderRadius: 4 },
   circles: { flexDirection: 'row', marginTop: 12 },
-  grid: { flexDirection: 'row', gap: 4, marginTop: 12 },
-  gridCol: { flex: 1, gap: 4 },
-  gridCell: { aspectRatio: 1, borderRadius: 4 },
+  grid: { flexDirection: 'row', gap: GRID_GAP, marginTop: 12, alignSelf: 'flex-start' },
+  gridCol: { gap: GRID_GAP },
+  gridCell: { borderRadius: 3 },
   pattern: { marginTop: 10 },
   donePill: { flexDirection: 'row', gap: 6 },
   doneLink: { flexDirection: 'row', alignItems: 'center', gap: 4 },

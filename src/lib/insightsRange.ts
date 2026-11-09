@@ -70,11 +70,22 @@ export function daysToLoad(range: InsightsRange, today?: string, firstDay?: stri
   return Math.max(90, range * 2);
 }
 
-/** Coverage over All time, in cycles: page revisions on record, over the memorized pages ("3.1"). */
-export function coverageCycles(revised: { countsFor: string; pages: number[] }[], today: string, memorized: number): string {
-  if (memorized <= 0) return '0';
+/** "day" for 1, "days" for any other count: every count line agrees with its number ("1 of 1 day"). */
+export const unit = (n: number, one: string, many = `${one}s`): string => (n === 1 ? one : many);
+
+/** Page revisions on record over the memorized pages: how many times round them (All time's Coverage). */
+export function coverageCycleCount(revised: { countsFor: string; pages: number[] }[], today: string, memorized: number): number {
+  if (memorized <= 0) return 0;
   const pages = revised.filter((r) => daysBetween(r.countsFor, today) >= 0).reduce((n, r) => n + r.pages.length, 0);
-  return (pages / memorized).toFixed(1).replace(/\.0$/, '');
+  return pages / memorized;
+}
+
+/**
+ * Coverage over All time, in cycles ("3.1"). Shown only from the first whole cycle: before it, All time
+ * shows the share as the other ranges do ("4% · 1 of 23 memorized pages since 8 November"), never "0 cycles".
+ */
+export function coverageCycles(revised: { countsFor: string; pages: number[] }[], today: string, memorized: number): string {
+  return coverageCycleCount(revised, today, memorized).toFixed(1).replace(/\.0$/, '');
 }
 
 /**
@@ -105,6 +116,19 @@ export type GridCell = { day: string; state: 'done' | 'missed' | 'before' | 'aft
  * The weeks grid (3 months): a column per week, Sunday to Saturday, ending with this week. Days before
  * the account started, or after today, are blank.
  */
+/**
+ * Columns of Consistency's weeks grid (3 months: up to 13; All time: up to 26): one per week from the
+ * account's first week to this one, so a short history is a short grid (one day: one column), drawn at a
+ * fixed cell size from the left, never stretched to the width.
+ */
+export function gridWeeks(range: InsightsRange, today: string, firstDay?: string | null): number {
+  const max = range === 90 ? 13 : range === 'all' ? 26 : 0;
+  if (max === 0 || !firstDay) return max;
+  const sunday = (day: string) => shiftDay(day, -new Date(`${day}T00:00:00Z`).getUTCDay());
+  const weeks = Math.floor(daysBetween(sunday(firstDay), sunday(today)) / 7) + 1;
+  return Math.max(1, Math.min(max, weeks));
+}
+
 export function weeksGrid(active: Set<string>, today: string, weeks: number, firstDay?: string | null): GridCell[][] {
   const dow = new Date(`${today}T00:00:00Z`).getUTCDay();
   const lastSunday = shiftDay(today, -dow);
