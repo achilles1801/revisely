@@ -38,10 +38,30 @@ describe('searchText', () => {
     expect(r.hits.every((h) => h.score === 1)).toBe(true);
   });
 
-  it('follows a recitation into the next ayah', () => {
+  it('follows a recitation into the next ayah, and says where it ends', () => {
     const r = searchText(words, say(verse(2, 4).slice(-3), verse(2, 5).slice(0, 4)));
-    expect(r.hits[0]).toMatchObject({ sura: 2, ayah: 4 });
+    expect(r.hits[0]).toMatchObject({ sura: 2, ayah: 4, last: { sura: 2, ayah: 5 } });
     expect(r.hits[0].to - r.hits[0].from).toBe(7);
+    expect(searchText(words, 'قل لو شاء الله').hits[0].last).toEqual({ sura: 10, ayah: 16 });
+  });
+
+  // From the property test's seed -935442960 (Nov 9 2026): the end of 22:49 and the first
+  // word of 22:50 found nothing. "نذير مبين" was read as the one word 71:2 prints, and
+  // "إنما أنا" as one word said twice.
+  it('finds the end of an ayah run into the first word of the next', () => {
+    const r = searchText(words, 'الناس إنما أنا لكم نذير مبين فالذين');
+    const [from] = words.verseRange(22, 49);
+    expect(r.hits[0]).toMatchObject({ sura: 22, ayah: 49, last: { sura: 22, ayah: 50 }, from: from + 2, to: from + 9 });
+    expect(r.hits[0].score).toBeGreaterThan(0.999);
+    expect(r.hits).toHaveLength(1);
+  });
+
+  it('reads two words apart where the text has them apart, though one ayah prints them as one', () => {
+    // "نذير مبين" is one word in 71:2 only; "سواء السبيل" in 60:1 only.
+    expect(found('إنما أنا لكم نذير مبين')[0]).toBe('22:49');
+    expect(found('إني لكم نذير مبين')).toEqual(['11:25', '71:2']);
+    expect(found('فقد ضل سواء السبيل')).toEqual(expect.arrayContaining(['2:108', '5:12', '60:1']));
+    expect(found('ولا تتبعوا أهواء قوم قد ضلوا من قبل وأضلوا كثيرا وضلوا عن سواء السبيل')).toEqual(['5:77']);
   });
 
   it('sets aside the isti’adha and the basmala said before an ayah', () => {
@@ -49,11 +69,15 @@ describe('searchText', () => {
     expect(found(say('بسم الله الرحمن الرحيم', verse(67, 1).slice(0, 4)))).toEqual(['67:1']);
   });
 
-  it('reads يا أيها, printed as one word, said as two', () => {
-    expect(queryWords(words, 'يا أيها الذين آمنوا').map((w) => w.key)).toEqual(['ياايها', 'الذين', 'امنوا']);
+  it('reads يا أيها, printed as one word, said as two (or typed as one)', () => {
     const r = searchText(words, 'يا أيها الذين آمنوا');
     expect(r.total).toBeGreaterThan(80);
     expect(r.hits).toHaveLength(50);
+    expect(r.hits[0]).toMatchObject({ sura: 2, ayah: 104, from: words.verseRange(2, 104)[0] });
+    expect(r.hits[0].score).toBeGreaterThan(0.999);
+    expect(searchText(words, 'ياأيها الذين آمنوا').total).toBe(r.total);
+    // Said as three: يا ابن أم (20:94).
+    expect(found('قال يا ابن أم لا تأخذ بلحيتي')).toEqual(['20:94']);
   });
 
   it('finds a long recitation from its words, as recognition writes them', () => {
@@ -63,6 +87,14 @@ describe('searchText', () => {
 
   it('finds the ayah when recognition repeats itself', () => {
     expect(found('إياك نعبد وإياك نعبد وإياك نعبد وإياك نستعين')).toEqual(['1:5']);
+  });
+
+  it('finds words said twice as said when the text has them twice', () => {
+    const r = searchText(words, 'ليلة القدر ليلة القدر');
+    expect(r.hits[0]).toMatchObject({ sura: 97, ayah: 2, last: { sura: 97, ayah: 3 } });
+    expect(r.hits[0].to - r.hits[0].from).toBe(4);
+    const [from, to] = words.verseRange(112, 3);
+    expect(searchText(words, 'لم يلد ولم يولد').hits[0]).toMatchObject({ sura: 112, ayah: 3, from, to });
   });
 
   it('finds nothing in words that are not in the Quran', () => {
@@ -79,12 +111,16 @@ describe('searchText', () => {
 });
 
 describe('withoutRepeats', () => {
-  const ws = (text: string) => queryWords(words, text);
+  const ws = (text: string) => queryWords(text);
   it('keeps a phrase said twice in a row once', () => {
     expect(withoutRepeats(ws('فارجع البصر فارجع البصر هل ترى')).map((w) => w.key)).toEqual(['فارجع', 'البصر', 'هل', 'تري']);
   });
   it('keeps a short word said twice (it can be in the text twice)', () => {
     expect(withoutRepeats(ws('كلا كلا')).map((w) => w.key)).toEqual(['كلا', 'كلا']);
+  });
+  it('keeps neighbouring words a letter apart: one word counts as said twice only when it is the same', () => {
+    expect(withoutRepeats(ws('إنما أنا لكم')).map((w) => w.key)).toEqual(['انما', 'انا', 'لكم']);
+    expect(withoutRepeats(ws('الرحمن الرحمن الرحيم')).map((w) => w.key)).toEqual(['الرحمن', 'الرحيم']);
   });
 });
 
@@ -94,5 +130,12 @@ describe('matchedWords', () => {
     const set = matchedWords(words, r.hits[0], r.words);
     const [from] = words.verseRange(10, 16);
     expect([...set].sort((a, b) => a - b)).toEqual([from, from + 1, from + 2, from + 3]);
+  });
+  it('marks a word printed as one that was said as two, and words in the next ayah', () => {
+    const r = searchText(words, 'يا أيها الناس إنما أنا لكم نذير مبين فالذين آمنوا');
+    const set = matchedWords(words, r.hits[0], r.words);
+    const [from] = words.verseRange(22, 49);
+    const [next] = words.verseRange(22, 50);
+    expect([...set].sort((a, b) => a - b)).toEqual([from + 1, from + 2, from + 3, from + 4, from + 5, from + 6, from + 7, next, next + 1]);
   });
 });

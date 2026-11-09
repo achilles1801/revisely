@@ -55,7 +55,7 @@ function homeStackWith(mods: Booted, real: Record<string, unknown>): ReactElemen
       h(Stack.Screen, { name: 'JournalEntry', component: Journal }),
       h(Stack.Screen, { name: 'Memorization', component: Manager }),
       h(Stack.Screen, { name: 'ActivityDay', component: ActivityDayScreen }),
-      ...['Settings', 'PlanEdit', 'PlanDayEdit', 'Activity', 'ActivityAll', 'Insights'].map(
+      ...['Settings', 'PlanEdit', 'PlanDayEdit', 'Activity', 'ActivityAll', 'Insights', 'QuranReader'].map(
         (name) => h(Stack.Screen, { key: name, name, component: real[name] ?? Elsewhere }),
       ),
     ),

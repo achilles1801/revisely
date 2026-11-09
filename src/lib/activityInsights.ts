@@ -12,13 +12,20 @@ const dayNumber = (day: string) => Math.round(Date.parse(`${day}T00:00:00Z`) / 8
 const daysBetween = (from: string, to: string) => dayNumber(to) - dayNumber(from);
 
 /** The last day each page was revised (own or credited items, by the day it counts for). */
+/**
+ * Each page's last revision: the day it was revised, whatever day it was credited to (AHEAD-6). Pages
+ * revised ahead (Keep going) or caught up are revised that day; they count for their own day only in the
+ * schedule (lib/aheadCredit). Before Nov 9 2026 this read the credited day and skipped a credit for a later
+ * day, so pages revised ahead were missing from Coverage until their day came.
+ */
 export function lastRevisedByPage(revised: Revised[], today: string): Map<number, string> {
   const last = new Map<number, string>();
   for (const r of revised) {
-    if (daysBetween(r.countsFor, today) < 0) continue; // a credit for a later day is not a revision yet
+    const on = r.day ?? r.countsFor;
+    if (daysBetween(on, today) < 0) continue;
     for (const p of r.pages) {
       const prev = last.get(p);
-      if (prev == null || r.countsFor > prev) last.set(p, r.countsFor);
+      if (prev == null || on > prev) last.set(p, on);
     }
   }
   return last;

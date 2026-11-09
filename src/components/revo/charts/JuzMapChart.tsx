@@ -7,7 +7,8 @@ import { juzMapData, juzReadout, juzStrip, juzSummary, slotAt, stepIndex, stripE
 import { spokenText } from '../../../lib/passages';
 import { getJuzRange } from '../../../lib/quranData';
 import { CHART_TEXT_MAX, ChartFrame, ChartPlot } from './ChartFrame';
-import { COVERAGE_LABELS, coverageLook } from '../../activity/coverageLook';
+import { COVERAGE_LABELS, fillLook } from '../../activity/coverageLook';
+import { CoverageFill } from '../../activity/CoverageFill';
 import { ChartButtons, DetailLine, Legend, RatingCounts, RatingStrip } from './ChartParts';
 
 const COLS = 10;
@@ -56,8 +57,9 @@ export function JuzMapChart({
   const line = tile && tile.state !== 'none' && preview ? preview(memorizedPages) : null;
   const ends = tile ? stripEnds(strip.map((s) => s.page)) : { first: null, last: null };
 
-  // As Insights' Coverage tiles draw them (ACT-25: not revised yet is neutral).
-  const look = (t: JuzTile) => coverageLook(t.state, palette);
+  // As Insights' Coverage tiles draw them: filled by the share revised this week and this month (ACT-26),
+  // not revised yet neutral (ACT-25).
+  const look = (t: JuzTile) => fillLook(t.state, t.counts, palette);
 
   return (
     <ChartFrame
@@ -102,14 +104,19 @@ export function JuzMapChart({
           {Array.from({ length: ROWS }, (_, r) => (
             <View key={r} style={styles.row}>
               {tiles.slice(r * COLS, r * COLS + COLS).map((t, c) => {
-                const l = look(t);
                 const on = picked === r * COLS + c;
                 return (
-                  <View key={t.juz} style={[styles.tile, l.box]} testID={`revo-chart-juz-${t.juz}`}>
+                  <View key={t.juz} style={styles.tile} testID={`revo-chart-juz-${t.juz}`}>
+                    <CoverageFill
+                      look={look(t)}
+                      style={styles.fill}
+                      label={(color, dim) => (
+                        <Text style={[styles.tileText, { color, opacity: dim ? 0.7 : 1 }]} maxFontSizeMultiplier={CHART_TEXT_MAX}>
+                          {t.juz}
+                        </Text>
+                      )}
+                    />
                     {on ? <View style={[styles.ring, { borderColor: palette.text }]} /> : null}
-                    <Text style={[styles.tileText, { color: l.color, opacity: l.dim ? 0.7 : 1 }]} maxFontSizeMultiplier={CHART_TEXT_MAX}>
-                      {t.juz}
-                    </Text>
                     {t.learning ? <View style={[styles.learning, { backgroundColor: palette.primary }]} /> : null}
                   </View>
                 );
@@ -134,7 +141,8 @@ export function JuzMapChart({
 const styles = StyleSheet.create({
   grid: { gap: 4, marginTop: 14 },
   row: { flexDirection: 'row', gap: 4 },
-  tile: { flex: 1, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  tile: { flex: 1, height: 32 },
+  fill: { flex: 1 },
   tileText: { fontSize: 13, lineHeight: 18, fontWeight: '600', fontVariant: ['tabular-nums'] },
   ring: { position: 'absolute', top: -3, left: -3, right: -3, bottom: -3, borderRadius: 10, borderWidth: 2 },
   learning: { position: 'absolute', top: 4, right: 4, width: 6, height: 6, borderRadius: 3 },

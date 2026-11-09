@@ -2,7 +2,8 @@
 // each a section with a title, one detail line, a figure and its picture, and no captions. The figures
 // come from lib/insightsView (definitions: ACT-4).
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Polyline } from 'react-native-svg';
@@ -34,24 +35,55 @@ import {
 import { getPagesForJuz } from '../../lib/quranData';
 import { allFirstTomorrow } from '../../lib/weakSpotActions';
 import { openRevo } from '../../lib/revo/open';
-import { spokenText } from '../../lib/passages';
+import { describePassage, spokenText } from '../../lib/passages';
 import { JuzSheet } from './JuzSheet';
 import { Sheet } from '../v2/Sheet';
 import { hourDetail, minutesWords, monthOfMemorizing, uncoveredRows, type UncoveredRow } from '../../lib/insightsTaps';
-import { COVERAGE_LABELS, coverageLook } from './coverageLook';
+import { COVERAGE_LABELS, coverageLook, fillLook } from './coverageLook';
+import { CoverageFill } from './CoverageFill';
+import { PillTabs } from '../v2/PillTabs';
+import { coverageRecency } from '../../lib/recency';
+import {
+  COVERAGE_OPEN_KEY,
+  COVERAGE_VIEW_KEY,
+  coverageWords,
+  openJuz,
+  pageCoverage,
+  pageWords,
+  parseCoverageView,
+  parseOpenChoices,
+  stateOf,
+  surahCoverage,
+  toggleJuz,
+  type CoverageView,
+  type OpenChoices,
+  type PageCell,
+  type SurahCoverage,
+} from '../../lib/coverageViews';
 import { PaceSheet } from './PaceSheet';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import {
   activeDays,
+  coverageCycleCount,
   coverageCycles,
   coveragePercent,
+  dayAndMonth,
+  gridWeeks,
   memorizedIn,
   missedPattern,
   rangeSpan,
+  unit,
   weeklyPace,
   weeksGrid,
   type InsightsRange,
 } from '../../lib/insightsRange';
+
+/** Consistency's weeks grid: the gap between cells, and the largest a cell gets (3 months on a wide phone). */
+const GRID_GAP = 3;
+const GRID_CELL_MAX = 18;
+/** Its rows' weekday initials (Sunday first, as weeksGrid) and their column's width. */
+const WEEKDAY_INITIALS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+const GRID_LABEL_W = 12;
 
 export interface InsightsData {
   today: string;
@@ -148,7 +180,7 @@ export function InsightsView({
   };
   return (
     <View testID="activity-insights">
-      <Coverage data={data} onPlanIt={onPlanIt} onAddToPlan={onAddToPlan} onOpenJuz={openJuz} />
+      <Coverage data={data} onPlanIt={onPlanIt} onAddToPlan={onAddToPlan} onOpenJuz={openJuz} onOpenPage={onOpenPage} />
       <Consistency data={data} onOpenDay={onOpenDay} onOpenCalendar={onOpenCalendar} />
       {data.smartTracking !== false ? (
         <WeakSpots data={data} onReviseTomorrow={onReviseTomorrow} onOpenPage={onOpenPage} onSeeAllPages={onSeeAllPages} />
@@ -267,13 +299,32 @@ function Coverage({
   onPlanIt,
   onAddToPlan,
   onOpenJuz,
+  onOpenPage,
 }: {
   data: InsightsData;
   onPlanIt: (pages: number[]) => void;
   onAddToPlan?: (pages: number[]) => void;
   onOpenJuz: (juz: number) => void;
+  /** The Page view's cells open the reader there (ACT-26). */
+  onOpenPage?: (page: number) => void;
 }) {
   const { palette } = useTheme();
+  // Juz | Surah | Page (ACT-26), kept on the phone like Week | Month.
+  const [view, setViewState] = useState<CoverageView>('juz');
+  // The Surah view's juz the user opened or closed, over the default (those with something to act on).
+  const [choices, setChoices] = useState<OpenChoices>({ opened: [], closed: [] });
+  useEffect(() => {
+    AsyncStorage.getItem(COVERAGE_VIEW_KEY)
+      .then((v) => setViewState(parseCoverageView(v)))
+      .catch(() => undefined);
+    AsyncStorage.getItem(COVERAGE_OPEN_KEY)
+      .then((v) => setChoices(parseOpenChoices(v)))
+      .catch(() => undefined);
+  }, []);
+  const setView = (next: CoverageView) => {
+    setViewState(next);
+    AsyncStorage.setItem(COVERAGE_VIEW_KEY, next).catch(() => undefined);
+  };
   const span = rangeSpan(data.range ?? 30, data.today, data.firstDay);
   const days = span.window;
   const last = useMemo(() => lastRevisedByPage(data.revised, data.today), [data.revised, data.today]);
@@ -292,6 +343,8 @@ function Coverage({
   const count = coverageCount(data.memorized, last, data.today, days);
   // Never 100% while a page is left (at 3 months, 304 of 305 rounded up).
   const pct = coveragePercent(count.revised, count.of);
+  const inCycles = span.all && coverageCycleCount(data.revised, data.today, count.of) >= 1;
+  const cyclesText = inCycles ? coverageCycles(data.revised, data.today, count.of) : '';
   // What isn't covered (i7): the figure opens it; each row opens its juz once this sheet has gone.
   const [uncoveredOpen, setUncoveredOpen] = useState(false);
   const [uncoveredUsed, setUncoveredUsed] = useState(false);
@@ -303,56 +356,105 @@ function Coverage({
     return uncoveredRows({ memorized: data.memorized, last: lastAll, memorizedOn, today: data.today, window: days });
   }, [uncoveredUsed, data.memorizations, data.memorized, data.today, lastAll, days]);
   const untouched = untouchedJuz(tiles);
+  const tileText = (text: string | number) => (color: string, dim: boolean) => (
+    <ChromeText style={[styles.tileText, { color, opacity: dim ? 0.7 : 1 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+      {text}
+    </ChromeText>
+  );
   const tile = (t: JuzTile) => {
-    const look = coverageLook(t.state, palette);
-    const revisedPages = t.counts.week + t.counts.month;
     const label =
       t.state === 'none'
         ? `Juz ${t.juz}, not memorized${t.learning ? ', learning' : ''}`
         : t.state === 'stale'
           ? `Juz ${t.juz}, ${t.daysSince == null ? 'never revised' : `revised ${t.daysSince} days ago`}`
-          : t.state === 'new'
-            ? revisedPages > 0
-              ? `Juz ${t.juz}, ${revisedPages} of ${revisedPages + t.counts.new} pages revised, the rest not revised yet`
-              : `Juz ${t.juz}, not revised yet`
-            : `Juz ${t.juz}, revised this ${t.state}`;
-    // Each tile opens its juz (ACT-21).
+          : `Juz ${t.juz}, ${coverageWords(t.counts)}`;
+    // Each tile opens its juz (ACT-21), filled by the share revised this week and this month (ACT-26).
     return (
       <Tap
         key={t.juz}
         onPress={() => onOpenJuz(t.juz)}
-        style={[styles.tile, look.box]}
+        style={styles.tile}
         accessibilityRole="button"
         accessibilityLabel={label}
         accessibilityHint={`Opens Juz ${t.juz}`}
         testID={`juz-tile-${t.juz}`}
       >
-        <ChromeText style={[styles.tileText, { color: look.color, opacity: look.dim ? 0.7 : 1 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
-          {t.juz}
-        </ChromeText>
+        <CoverageFill look={fillLook(t.state, t.counts, palette)} label={tileText(t.juz)} style={styles.fill} contentStyle={styles.tileContent} />
         {t.learning ? <View style={[styles.learnDot, { backgroundColor: palette.primary }]} /> : null}
       </Tap>
     );
   };
-  // "Not revised yet" only while a juz is (ACT-25): the legend stays as it was for everyone else.
+
+  // The Surah and Page views read the same pages as the tiles (ACT-26).
+  const input = useMemo(
+    () => ({ memorized: data.memorized, last: lastAll, today: data.today, sinceOf: since ? (p: number) => since.get(p) : undefined }),
+    [data.memorized, lastAll, data.today, since],
+  );
+  const groups = useMemo(() => (view === 'surah' ? surahCoverage(input) : []), [view, input]);
+  const open = useMemo(() => openJuz(groups, choices), [groups, choices]);
+  const toggle = (juz: number, wasOpen: boolean) => {
+    const next = toggleJuz(choices, juz, wasOpen);
+    setChoices(next);
+    AsyncStorage.setItem(COVERAGE_OPEN_KEY, JSON.stringify(next)).catch(() => undefined);
+  };
+  const rows = useMemo(() => (view === 'page' ? pageCoverage(input) : []), [view, input]);
+  const chip = (juz: number) => (sc: SurahCoverage) => (
+    <Tap
+      key={`${juz}-${sc.sura}`}
+      onPress={() => onOpenJuz(juz)}
+      accessibilityRole="button"
+      accessibilityLabel={`${spokenText(sc.name)}, ${coverageWords(sc.counts)}`}
+      accessibilityHint={`Opens Juz ${juz}`}
+      testID={`coverage-surah-${juz}-${sc.sura}`}
+    >
+      <CoverageFill
+        look={fillLook(stateOf(sc.counts), sc.counts, palette)}
+        label={(color) => (
+          <ChromeText style={[typeV2.name, styles.chipText, { color }]} numberOfLines={1}>
+            {sc.name}
+          </ChromeText>
+        )}
+        style={styles.chip}
+        contentStyle={styles.chipContent}
+      />
+    </Tap>
+  );
+  const cellLook = (state: PageCell['state']) =>
+    state === 'week'
+      ? { backgroundColor: palette.heat[3] }
+      : state === 'month'
+        ? { backgroundColor: palette.heat[1] }
+        : state === 'new'
+          ? { borderWidth: 1.5, borderColor: palette.secondary }
+          : state === 'stale'
+            ? { borderWidth: 1.5, borderColor: palette.red }
+            : { backgroundColor: palette.heat[0], opacity: 0.6 };
+
+  // "Not revised yet" only while a page is (ACT-25); "Not memorized" where such parts show (not in Surah).
+  const anyNew = useMemo(
+    () => [...data.memorized].some((p) => coverageRecency(lastAll.get(p), since?.get(p), data.today) === 'new'),
+    [data.memorized, lastAll, since, data.today],
+  );
   const legend = (['week', 'month', 'new', 'stale', 'none'] as const)
-    .filter((key) => key !== 'new' || tiles.some((t) => t.state === 'new'))
+    .filter((key) => (key !== 'new' || anyNew) && (key !== 'none' || view !== 'surah'))
     .map((key) => ({ key, label: COVERAGE_LABELS[key], swatch: coverageLook(key, palette).box }));
+  const detail = view === 'surah' ? "Which surahs you've revised lately" : view === 'page' ? "Which pages you've revised lately" : "Which juz you've revised lately";
 
   return (
     <Section
       first
       title="Coverage"
-      detail="Which juz you've revised lately"
+      detail={detail}
       testID="insights-coverage"
     >
       <Figure
-        // All time in cycles: over a long range the share nears 100%, so how many times round says more.
-        value={span.all ? coverageCycles(data.revised, data.today, count.of) : `${pct}%`}
+        // All time in cycles: over a long range the share nears 100%, so how many times round says more. Only
+        // from the first whole cycle: before it, the share, as the other ranges show it (never "0 cycles").
+        value={inCycles ? cyclesText : `${pct}%`}
         text={
-          span.all
-            ? `${coverageCycles(data.revised, data.today, count.of) === '1' ? 'cycle' : 'cycles'} of your ${count.of} memorized pages ${span.inWords}`
-            : `${count.revised} of ${count.of} memorized pages ${span.inWords}`
+          inCycles
+            ? `${cyclesText === '1' ? 'cycle' : 'cycles'} of your ${count.of} memorized ${unit(count.of, 'page')} ${span.inWords}`
+            : `${count.revised} of ${count.of} memorized ${unit(count.of, 'page')} ${span.inWords}`
         }
         onPress={
           count.revised < count.of
@@ -365,13 +467,97 @@ function Coverage({
         hint="Shows what wasn't revised"
         testID="insights-coverage-figure"
       />
-      <View style={styles.tiles}>
-        {[0, 1, 2].map((row) => (
-          <View key={row} style={styles.tileRow}>
-            {tiles.slice(row * 10, row * 10 + 10).map(tile)}
-          </View>
-        ))}
+      <View style={styles.views}>
+        <PillTabs<CoverageView>
+          options={[
+            { value: 'juz', label: 'Juz' },
+            { value: 'surah', label: 'Surah' },
+            { value: 'page', label: 'Page' },
+          ]}
+          value={view}
+          onChange={setView}
+          tone="ink"
+          compact
+          hug
+          testID="coverage-views"
+        />
       </View>
+      {view === 'juz' ? (
+        <View style={styles.tiles} testID="coverage-juz">
+          {[0, 1, 2].map((row) => (
+            <View key={row} style={styles.tileRow}>
+              {tiles.slice(row * 10, row * 10 + 10).map(tile)}
+            </View>
+          ))}
+        </View>
+      ) : view === 'surah' ? (
+        // Each juz with memorized pages is a header (its tile, filled, and what it stands at); a tap shows or
+        // hides its surahs. Open at first: the juz with something to act on (ACT-26).
+        <View style={styles.surahs} testID="coverage-surahs">
+          {groups.map((g) => {
+            const isOpen = open.has(g.juz);
+            const words = coverageWords(g.counts);
+            return (
+              <View key={g.juz}>
+                <Tap
+                  onPress={() => toggle(g.juz, isOpen)}
+                  style={styles.juzHead}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Juz ${g.juz}, ${words}`}
+                  accessibilityState={{ expanded: isOpen }}
+                  accessibilityHint={isOpen ? 'Hides its surahs' : 'Shows its surahs'}
+                  testID={`coverage-juz-${g.juz}`}
+                >
+                  <CoverageFill look={fillLook(stateOf(g.counts), g.counts, palette)} label={tileText(g.juz)} style={styles.headTile} contentStyle={styles.tileContent} />
+                  <View style={styles.flex}>
+                    <ChromeText style={[typeV2.name, { color: palette.text }]}>{`Juz ${g.juz}`}</ChromeText>
+                    <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{words.charAt(0).toUpperCase() + words.slice(1)}</ChromeText>
+                  </View>
+                  <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={18} color={palette.secondary} />
+                </Tap>
+                {isOpen ? (
+                  <View style={styles.chips} testID={`coverage-juz-${g.juz}-surahs`}>
+                    {g.surahs.map(chip(g.juz))}
+                  </View>
+                ) : null}
+              </View>
+            );
+          })}
+        </View>
+      ) : (
+        // A row per juz with memorized pages, a cell per page: a cell opens the reader there, the juz its sheet.
+        <View style={styles.pageGrid} testID="coverage-pages">
+          {rows.map((r) => (
+            <View key={r.juz} style={styles.pageRow}>
+              <Tap
+                onPress={() => onOpenJuz(r.juz)}
+                style={styles.pageLabel}
+                accessibilityRole="button"
+                accessibilityLabel={`Juz ${r.juz}`}
+                accessibilityHint={`Opens Juz ${r.juz}`}
+                testID={`coverage-page-row-${r.juz}`}
+              >
+                <ChromeText style={[styles.pageLabelText, { color: palette.secondary }]}>{r.juz}</ChromeText>
+              </Tap>
+              <View style={styles.cells}>
+                {r.cells.map((c) => (
+                  <Tap
+                    key={c.page}
+                    onPress={() => onOpenPage?.(c.page)}
+                    style={styles.cellSlot}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${spokenText(describePassage([c.page], { form: 'compact' }))}, page ${c.page}, ${pageWords(c.state)}`}
+                    accessibilityHint="Opens it in the reader"
+                    testID={`coverage-page-${c.page}`}
+                  >
+                    <View style={[styles.cell, cellLook(c.state)]} />
+                  </Tap>
+                ))}
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
       <View style={styles.legend}>
         {legend.map((l) => (
           <View key={l.key} style={styles.legendItem}>
@@ -400,7 +586,11 @@ function Coverage({
                 untouched.first.daysSince == null ? 'Never revised' : `Last revised ${untouched.first.daysSince} days ago`,
                 untouched.next
                   ? `Juz ${untouched.next.juz}, ${
-                      untouched.next.daysSince != null ? `${untouched.next.daysSince} days` : untouched.next.state === 'new' ? 'not revised yet' : 'never'
+                      untouched.next.daysSince != null
+                        ? `${untouched.next.daysSince} ${unit(untouched.next.daysSince, 'day')}`
+                        : untouched.next.state === 'new'
+                          ? 'not revised yet'
+                          : 'never'
                     }`
                   : null,
               ]
@@ -432,7 +622,7 @@ function Coverage({
           visible={uncoveredOpen}
           onClose={() => setUncoveredOpen(false)}
           title={`Not revised ${span.inWords}`}
-          message={`${count.of - count.revised} of ${count.of} memorized pages`}
+          message={`${count.of - count.revised} of ${count.of} memorized ${unit(count.of, 'page')}`}
           messageMaxScale={CHROME_MAX_SCALE}
           scroll
           onHidden={() => {
@@ -507,18 +697,22 @@ function Consistency({ data, onOpenDay, onOpenCalendar }: { data: InsightsData; 
   const m = monthCount(active, month, data.today);
   const inRange = activeDays(active, data.today, span.window, data.firstDay);
   // 3 months and All time: a weeks grid by weekday (up to half a year) and the missed days' pattern;
-  // 7 and 30 days: the week's circles.
-  const gridWeeks = range === 90 ? 13 : span.all ? Math.min(26, Math.ceil(span.window / 7) + 1) : 0;
-  const grid = gridWeeks > 0 ? weeksGrid(active, data.today, gridWeeks, data.firstDay) : null;
-  const pattern = gridWeeks > 0 ? missedPattern(active, data.today, span.window, data.firstDay) : null;
+  // 7 and 30 days: the week's circles. The grid has a column per week since the account's first (a short
+  // history is a short grid), its cells a fixed size whatever the history, from the left.
+  const weeks = gridWeeks(range, data.today, data.firstDay);
+  const grid = weeks > 0 ? weeksGrid(active, data.today, weeks, data.firstDay) : null;
+  const pattern = weeks > 0 ? missedPattern(active, data.today, span.window, data.firstDay) : null;
+  const { width } = useWindowDimensions();
+  const fullWeeks = range === 90 ? 13 : 26;
+  const cell = Math.max(8, Math.min(GRID_CELL_MAX, Math.floor((width - 32 - GRID_LABEL_W - fullWeeks * GRID_GAP) / fullWeeks)));
+  // A count from the account's first day names it, whatever the range ("since 8 November").
+  const sinceFirst = data.firstDay ? `since ${dayAndMonth(data.firstDay)}` : 'since you started';
   const figureText =
     range === 7
       ? `of the last 7 days · ${m.done} of ${m.of} in ${monthName(month)}`
-      : span.all
-        ? `of ${inRange.of} days ${span.inWords}`
-        : inRange.sinceStart
-          ? `of ${inRange.of} days since you started`
-          : `of the last ${inRange.of} days`;
+      : span.all || inRange.sinceStart
+        ? `of ${inRange.of} ${unit(inRange.of, 'day')} ${sinceFirst}`
+        : `of the last ${inRange.of} days`;
   const hours = useMemo(() => minutesByHour([...data.revised, ...data.read], data.today, span.window), [data.revised, data.read, data.today, span.window]);
   // The hours scrub (i8): a press that slides picks the hour under the finger; letting go puts it back.
   const [heldHour, setHeldHour] = useState<number | null>(null);
@@ -552,8 +746,22 @@ function Consistency({ data, onOpenDay, onOpenCalendar }: { data: InsightsData; 
       />
       {grid ? (
         <View style={styles.grid} testID="insights-weeks-grid">
+          {/* The weekdays, and the days before the account or after today drawn faintly: even a day-old
+              account's one column reads as a week, not as an empty space under one cell. */}
+          <View
+            style={[styles.gridCol, { width: GRID_LABEL_W }]}
+            importantForAccessibility="no-hide-descendants"
+            accessibilityElementsHidden
+            testID="insights-grid-weekdays"
+          >
+            {WEEKDAY_INITIALS.map((letter, i) => (
+              <View key={i} style={[styles.gridLabel, { height: cell }]}>
+                <ChromeText style={[styles.gridLabelText, { color: palette.secondary, fontSize: cell >= 14 ? 11 : 9 }]}>{letter}</ChromeText>
+              </View>
+            ))}
+          </View>
           {grid.map((col) => (
-            <View key={col[0].day} style={styles.gridCol}>
+            <View key={col[0].day} style={[styles.gridCol, { width: cell }]} testID={`insights-grid-week-${col[0].day}`}>
               {col.map((c) => (
                 <Tap
                   key={c.day}
@@ -561,11 +769,12 @@ function Consistency({ data, onOpenDay, onOpenCalendar }: { data: InsightsData; 
                   disabled={!onOpenDay || (c.state !== 'done' && c.state !== 'missed')}
                   style={[
                     styles.gridCell,
+                    { width: cell, height: cell },
                     c.state === 'done'
                       ? { backgroundColor: palette.primary }
                       : c.state === 'missed'
                         ? { borderWidth: 1, borderColor: palette.outline }
-                        : null,
+                        : { backgroundColor: palette.track, opacity: 0.35 },
                   ]}
                   accessible={c.state === 'done' || c.state === 'missed'}
                   accessibilityRole="button"
@@ -813,7 +1022,7 @@ function Memorization({ data, onOpenDay }: { data: InsightsData; onOpenDay?: (da
               }}
               style={styles.monthCol}
               accessibilityRole="button"
-              accessibilityLabel={`${monthName(m.month)}, ${m.pages} pages`}
+              accessibilityLabel={`${monthName(m.month)}, ${m.pages} ${unit(m.pages, 'page')}`}
               accessibilityState={{ selected: picked === m.month }}
               testID={`insights-month-${m.month}`}
             >
@@ -991,7 +1200,25 @@ const styles = StyleSheet.create({
   big: { fontSize: 28, lineHeight: 32, fontWeight: '700', letterSpacing: -0.6, fontVariant: ['tabular-nums'] },
   tiles: { marginTop: 14, gap: 4 },
   tileRow: { flexDirection: 'row', gap: 4 },
-  tile: { flex: 1, minHeight: 32, paddingHorizontal: 2, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  tile: { flex: 1, minHeight: 32 },
+  fill: { flex: 1, minHeight: 32 },
+  tileContent: { paddingHorizontal: 2 },
+  views: { marginTop: 14 },
+  surahs: { marginTop: 10 },
+  juzHead: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 },
+  headTile: { width: 36, minHeight: 28 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingLeft: 48, paddingBottom: 8 },
+  chip: { minHeight: 30 },
+  chipContent: { paddingHorizontal: 10 },
+  chipText: { fontSize: 13, lineHeight: 18 },
+  pageGrid: { marginTop: 12, gap: 4 },
+  pageRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  pageLabel: { width: 22, alignItems: 'flex-end' },
+  pageLabelText: { fontSize: 11, lineHeight: 14, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  cells: { flex: 1, flexDirection: 'row' },
+  // Up to 23 pages a juz (Juz 30): every row on the same columns.
+  cellSlot: { width: `${100 / 23}%`, padding: 1 },
+  cell: { aspectRatio: 0.85, borderRadius: 3 },
   tileText: { fontSize: 13, lineHeight: 18, fontWeight: '600', fontVariant: ['tabular-nums'] },
   learnDot: { position: 'absolute', top: 4, right: 4, width: 5, height: 5, borderRadius: 2.5 },
   // One line across the tiles' width, as the mock (iOS draws 13pt a little wider than the mock did,
@@ -1004,9 +1231,11 @@ const styles = StyleSheet.create({
   untouchedMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
   dot8: { width: 8, height: 8, borderRadius: 4 },
   circles: { flexDirection: 'row', marginTop: 12 },
-  grid: { flexDirection: 'row', gap: 4, marginTop: 12 },
-  gridCol: { flex: 1, gap: 4 },
-  gridCell: { aspectRatio: 1, borderRadius: 4 },
+  grid: { flexDirection: 'row', gap: GRID_GAP, marginTop: 12, alignSelf: 'flex-start' },
+  gridCol: { gap: GRID_GAP },
+  gridCell: { borderRadius: 3 },
+  gridLabel: { justifyContent: 'center' },
+  gridLabelText: { fontWeight: '600', textAlign: 'center' },
   pattern: { marginTop: 10 },
   donePill: { flexDirection: 'row', gap: 6 },
   doneLink: { flexDirection: 'row', alignItems: 'center', gap: 4 },

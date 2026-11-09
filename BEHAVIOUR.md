@@ -129,6 +129,11 @@ How the tests are made: `tests/scenarios/README.md`.
 - **AHEAD-4.** A day already done ahead is passed over: Keep going and Home's next line go to the day
   after it (the owner's rule, #198).
 - **AHEAD-5.** A page is credited ahead only when it was revised in that session (checked or swiped).
+- **AHEAD-6.** A page revised ahead (Keep going) or caught up is revised on the day it was revised, wherever
+  recency shows: Coverage's figure, its Juz, Surah and Page views and the untouched row, the juz sheet (its
+  strip, headline and days), Pages by strength and Revo. Only the schedule credits it to the day it is
+  planned on (AHEAD-2) or was missed on (SESS-7). (Majd, Nov 9 2026: "when i revise ahead, does that show up
+  in coverage because i don't see it?" Coverage read the credited day and skipped a credit for a later day.)
 
 ## Carrying pages over
 
@@ -248,7 +253,9 @@ nothing said is recorded or sent.
 
 - **SEARCH-1.** A few words of an ayah, recited or typed in Arabic (with or without vowel marks, in
   Uthmani or standard spelling), find it: from its start or its middle, running on into the next
-  ayah, with a word misheard, left out or said twice, and after an isti'adha or a basmala said first.
+  ayah (found at the first, named as the run and highlighted across both), with a word misheard, left
+  out or said twice (words the text itself says twice are found as said), and after an isti'adha or a
+  basmala said first.
   A phrase in several ayat lists every one, in mushaf order, the phrase itself before ayat that only
   nearly hold it. Words that aren't in the Qur'an find nothing.
 - **SEARCH-2.** A place typed by name or number goes there: a surah by its name, Latin or Arabic,
@@ -339,9 +346,15 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   beneath it, over the dimmed screen. An action runs once the menu has closed; touching the backdrop runs nothing.
   The daily log's note menu is the same menu (Edit, and Copy when the note has text).
 
-- **ACT-7.** Deleting a Revised session or a Memorized entry asks first, and names what goes. A memorized
-  entry's pages go back to not memorized (only those still memorized) and its item is removed. A failed
-  removal is kept and retried, never dropped.
+- **ACT-7.** Deleting a Revised session or a Memorized entry asks first, and names what goes. A Memorized
+  entry takes off exactly the ayahs it added (MEM-3), and its item is removed: a page it memorized goes back
+  to not memorized, and a page it added part of keeps only its other ayahs (Nov 8 2026: before, a page it
+  added part of kept the entry's ayahs). Ayahs another day's entry also holds stay, and so does a page that
+  was memorized before any entry that holds it (marked in the memorized pages, or at sign-up). Home's %
+  memorized, the juz dots, the plan and Revo follow the pages; a custom plan drops the pages that are no
+  longer memorized, as editing the memorized pages does. Undo of an add takes its ayahs out of that day's
+  entry only, so Undo straight after an add and Delete leave the same pages. A failed removal is kept and
+  retried, never dropped.
 
 - **ACT-8.** A revised page's strength comes from its weakness rating (1–5): 1–2 is weak, 3 is moderate, 4–5
   is strong. The counts on a day's Revised block are these classes, over the day's revised pages (a page with
@@ -416,13 +429,21 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   chip at the end of the Overview | Insights row ("30 days ⌄", on Insights only) that opens the four (All time
   names its start, "Since 9 September"); the choice is kept on the phone. Coverage's figure, Consistency's days and hours, Weak spots' counts, Memorization's
   "+N" and Pace (against the same length before it) follow it, and so does the juz sheet's "times"; the juz
-  tiles always show where each juz stands now. A range longer than the account counts from its first day
-  ("50 of 56 days since you started"). At 3 months Consistency shows a weeks grid by weekday and, when there
-  is one, the missed days' pattern by weekday ("Every missed day was a Saturday"). All time reads from the
-  account's first day: Coverage in cycles ("3.1 cycles of your 305 memorized pages since 9 September", since a
-  long range covers nearly everything), the weeks grid from the start (up to half a year), and Pace week by
+  tiles always show where each juz stands now. A range longer than the account counts from its first day,
+  and says so by its date at every range ("50 of 56 days since 9 September"). At 3 months Consistency shows a
+  weeks grid by weekday and, when there is one, the missed days' pattern by weekday ("Every missed day was a
+  Saturday"). The grid has a column per week since the account's first (up to 13 at 3 months, 26 All time),
+  its cells one fixed size whatever the history (at most 18 pt), drawn from the left, with each row's
+  weekday initial before it and the days before the account or after today drawn faintly: a day-old account
+  is one small column that reads as a week, never a cell stretched to the width or a gap under one cell. All time reads from the account's first day:
+  Coverage in cycles ("3.1 cycles of your 305 memorized pages since 9 September", since a long range covers
+  nearly everything) once the pages have gone round once, and before that the share, as the other ranges
+  show it ("4% · 1 of 23 memorized pages since 8 November", never "0 cycles"); the weeks grid from the start
+  (up to half a year), and Pace week by
   week ("Week by week: 2.1 → 1.8 min a page") in place of a comparison. (Majd, Nov 7 2026: "why is
-  insights restricted to just the last 30 days?"; mocks i1 and i2.)
+  insights restricted to just the last 30 days?"; mocks i1 and i2.) Every count agrees with its number ("1 of 1
+  day", "1 of 1 memorized page"). (Majd, Nov 8 2026, on a day-old account: "think i found a bug when u filter by
+  all time or 3 months".)
 - **ACT-23.** Insights answer a tap: a day's circle (or a day of the weeks grid) opens that day, a missed one
   too (empty, with its +); Consistency's figure opens Overview at its month; Coverage's figure ("264 of 305
   memorized pages in 30 days ›") lists what wasn't revised in the range, a memorized juz as one row ("Juz 4 …
@@ -466,6 +487,22 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   23 pages revised, the rest not revised yet" for VoiceOver. After 30 days on record it is 30+ days, as a page
   revised 30 or more days ago is. Revo's juz map draws the same. (Majd, Nov 8 2026: a new account with Juz 30
   memorized and five pages revised showed Juz 30 red a day after it began.)
+- **ACT-26.** Coverage shows the memorized pages three ways, Juz | Surah | Page (small pills under the
+  figure; the choice is kept on the phone, like Week | Month), each coloured by ACT-25's recency, with the
+  same legend, figure and untouched row (always juz). A juz tile, a juz's header and a surah chip fill from
+  the left by the share of its memorized pages revised this week (dark) then this month (light), like
+  Home's juz dots; the outline says what the rest is (grey not revised yet, red 30+ days), and the label is
+  drawn in each part's own colour so it reads wherever the fill ends. A juz revised in full looks as before.
+  Surah: a header per juz with memorized pages (its tile, filled, and where it stands: "5 of 23 pages
+  revised, the rest not revised yet"); a tap shows or hides its surahs, by name, each with its pages in that
+  juz (a surah running on into the next juz is under both, as the juz sheet's rows are). Open at first: the
+  juz with something to act on (a page 30+ days or not revised yet), or with none the one revised least
+  recently; what the user opens or closes is kept on the phone over that. A chip opens its juz's sheet.
+  Page: a row per juz with memorized pages, a cell per page; a cell opens the reader there, a row's juz
+  number its sheet. VoiceOver reads each: "Juz 30, 5 of 23 pages revised, the rest not revised yet", "An-Naba,
+  revised this week", "At-Takwir, page 586, not revised yet". Revo's juz map fills the same way. (Majd, Nov 8
+  2026: "for coverage shouldn't we allow for different views, not just juz?"; on the mocks: "fill is nicer
+  than the bar", Surah filterable by juz, "having both surah and page is fine".)
 
 ## Ask coach
 

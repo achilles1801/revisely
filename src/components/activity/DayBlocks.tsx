@@ -42,7 +42,8 @@ import { REVISED_ICON } from './BlockMark';
 import { isManualRevisionId } from '../../lib/manualRevision';
 import { describeAyahs } from '../../lib/passages';
 import { ayahsOnPage, sortedAyahs } from '../../lib/ayahKeys';
-import { memorizedAyahsOnPage, memorizedPageShare, revisablePages } from '../../lib/memorizedAyahs';
+import { ayahsOfItem, memorizedAyahsOnPage, memorizedPageShare, revisablePages } from '../../lib/memorizedAyahs';
+import { customPlanAfterUnmemorizing } from '../../lib/memorizationChanges';
 import { scheduledDaysFrom } from '../../lib/algorithm';
 import { allFirstTomorrow, firstTomorrowPages } from '../../lib/weakSpotActions';
 import { shiftDay } from '../../lib/journal';
@@ -77,7 +78,7 @@ interface Props {
   revisedLog: RevisionLog | null;
   onDeleteRevised: (log: RevisionLog) => void;
   /** A memorization item of the day: deleting it un-marks its pages (the screen does that). */
-  onDeleteMemorized: (item: { id: string; day: string; pages: number[] }) => void;
+  onDeleteMemorized: (item: { id: string; day: string; pages: number[]; verses?: number[] }) => void;
   /** A memorization item's Edit: the memorized pages, opened at its pages (the screen navigates). */
   onEditMemorized?: (pages: number[]) => void;
   /** A page of the strip: the reader at it, over the day (ACT-20). */
@@ -165,7 +166,9 @@ export function DayBlocks({
   onAddToPlan,
   onUndoOffer,
 }: Props) {
-  const { pages, user, updatePages, refreshPageStates } = useApp();
+  const { pages, user, updatePages, saveUser, refreshPageStates } = useApp();
+  const userNow = useRef(user);
+  userNow.current = user;
   // Undo runs seconds after the add: it reads the pages as they are then.
   const pagesNow = useRef(pages);
   pagesNow.current = pages;
@@ -309,8 +312,9 @@ export function DayBlocks({
           onPress: () =>
             confirmDelete(
               'Delete this memorization?',
-              `${describePassage(i.pages)} goes back to not memorized.`,
-              () => onDeleteMemorized({ id: i.id, day, pages: i.pages }),
+              // Its own ayahs (ACT-7): an entry for part of a page names that part.
+              `${describeAyahs(ayahsOfItem(i), { form: 'compact' })} goes back to not memorized.`,
+              () => onDeleteMemorized({ id: i.id, day, pages: i.pages, ...(i.verses ? { verses: i.verses } : {}) }),
             ),
         },
       ];
@@ -742,13 +746,24 @@ export function DayBlocks({
         sitting={sittingToAdd}
         onAdded={(added) => {
           const itemPagesBefore = memorizedPages;
+          const itemAyahsBefore = new Set(memorized.items.flatMap((i) => ayahsOfItem(i)));
           onUndoOffer?.({
             text: `${describeAyahs(added.ayahs)} marked memorized`,
             undo: () => {
-              // Each page back as it was, and the ayahs out of the day's item (MEM-3).
+              // Each page back as it was, and the ayahs it brought out of this day's item alone (MEM-3,
+              // ACT-7: another day's item keeps the ayahs it holds).
               const before = new Map(added.previous.map((p) => [p.pageNumber, p] as const));
-              void updatePages((pagesNow.current ?? []).map((p) => before.get(p.pageNumber) ?? p), [...before.keys()]);
-              void queueChange({ kind: 'memorization.unmark', pages: added.pages.filter((p) => !itemPagesBefore.includes(p)), verses: added.ayahs });
+              const next = (pagesNow.current ?? []).map((p) => before.get(p.pageNumber) ?? p);
+              void updatePages(next, [...before.keys()]);
+              void queueChange({
+                kind: 'memorization.unmark',
+                day,
+                pages: added.pages.filter((p) => !itemPagesBefore.includes(p)),
+                verses: added.ayahs.filter((k) => !itemAyahsBefore.has(k)),
+              });
+              // The custom plan, as Delete leaves it.
+              const plan = customPlanAfterUnmemorizing(userNow.current?.customPlan, next);
+              if (plan && userNow.current) void saveUser({ ...userNow.current, customPlan: plan });
             },
           });
         }}

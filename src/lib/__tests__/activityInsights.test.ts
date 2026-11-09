@@ -10,9 +10,19 @@ describe('Activity Insights (C3)', () => {
     expect(coverage(memorized, last, TODAY, 30)).toBe(0.5);
   });
 
-  it('a credit for a later day does not count as a revision yet', () => {
-    const last = lastRevisedByPage([{ day: '2026-11-08', countsFor: '2026-11-12', pages: [9], minutes: null }], TODAY);
-    expect(last.has(9)).toBe(false);
+  it('[AHEAD-6] pages revised ahead (or caught up) are revised on the day they were revised, not the day credited', () => {
+    // Revised on the 8th for the 12th (Keep going), and on the 9th for the 3rd (a catch-up).
+    const last = lastRevisedByPage(
+      [
+        { day: '2026-11-08', countsFor: '2026-11-12', pages: [9], minutes: null },
+        { day: '2026-11-09', countsFor: '2026-11-03', pages: [4], minutes: null },
+      ],
+      TODAY,
+    );
+    expect(last.get(9)).toBe('2026-11-08');
+    expect(last.get(4)).toBe('2026-11-09');
+    // A revision after today (a clock set back) isn't one yet.
+    expect(lastRevisedByPage([{ day: '2026-11-30', countsFor: '2026-11-30', pages: [1], minutes: null }], TODAY).has(1)).toBe(false);
   });
 
   it('juz untouched longest: the juz with the oldest least-recent page, or never', () => {

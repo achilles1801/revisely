@@ -44,4 +44,10 @@ describe('removing a memorization (C4)', () => {
     await applyEntry('u1', { id: 'e4', at: 2, op: { kind: 'memorization.unmark', pages: [563], verses: ayahs } });
     expect(mocked.removeMemorizationPages).toHaveBeenCalledWith([563], 'u1', ayahs);
   });
+
+  it('[ACT-7] an Undo’s unmark names its day: only that day’s item changes', async () => {
+    const ayahs = [67013, 67014];
+    await applyEntry('u1', { id: 'e5', at: 3, op: { kind: 'memorization.unmark', day: '2026-11-03', pages: [563], verses: ayahs } });
+    expect(mocked.removeMemorizationPages).toHaveBeenCalledWith([563], 'u1', ayahs, '2026-11-03');
+  });
 });

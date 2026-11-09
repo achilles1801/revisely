@@ -52,8 +52,9 @@ export type OutboxOp =
   /** Pages memorized today (the manager's "Today"): merged into the day's memorization item, with
    *  the minutes the Memorized add sheet was given, if any (they add to the day's). */
   | { kind: 'memorization.mark'; day: string; pages: number[]; at: number; minutes?: number | null; verses?: number[] }
-  /** Pages un-memorized: removed from the items that hold them; `verses`, ayahs taken off (MEM-3), from theirs. */
-  | { kind: 'memorization.unmark'; pages: number[]; verses?: number[] }
+  /** Pages un-memorized: removed from the items that hold them; `verses`, ayahs taken off (MEM-3), from theirs.
+   *  With `day`, from that day's item alone (Undo of an add on the Day, ACT-7). */
+  | { kind: 'memorization.unmark'; pages: number[]; verses?: number[]; day?: string }
   /** A Revised item added by hand (Activity's add sheet): one write, never merged. */
   | { kind: 'revision.add'; item: import('../revisionItems').RevisionItem }
   /** A Revised item added by hand, deleted from the day's Revised block (ACT-7). */

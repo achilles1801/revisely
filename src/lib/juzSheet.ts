@@ -34,8 +34,8 @@ export interface JuzSheetInput {
   today: string;
   /** The account's pages (the juz's are read from them). */
   pages: JuzSheetPage[];
-  /** Revision items covering at least the window (each page counts for the day it counts for). */
-  revised: { countsFor: string; pages: number[] }[];
+  /** Revision items covering at least the window: each page on the day it was revised (`day`; AHEAD-6). */
+  revised: { day?: string; countsFor: string; pages: number[] }[];
   /** The window "times" are counted over (30: "4 times in 30 days"). */
   windowDays: number;
   /** Its words ("in 30 days", "since 9 September"); `in ${windowDays} days` when not given. */
@@ -136,15 +136,17 @@ export function juzSheetModel(input: JuzSheetInput): JuzSheetModel {
   // Days in the window each page was revised (a page counts once a day).
   const inWindow = new Map<number, Set<string>>();
   for (const r of input.revised) {
-    const age = daysSince(r.countsFor, today);
+    // The day it was revised: pages revised ahead or caught up count that day (AHEAD-6).
+    const on = r.day ?? r.countsFor;
+    const age = daysSince(on, today);
     if (age < 0) continue;
     for (const p of r.pages) {
       if (!memorizedSet.has(p)) continue;
       const prev = last.get(p);
-      if (prev == null || r.countsFor > prev) last.set(p, r.countsFor);
+      if (prev == null || on > prev) last.set(p, on);
       if (age < windowDays) {
         const days = inWindow.get(p) ?? new Set<string>();
-        days.add(r.countsFor);
+        days.add(on);
         inWindow.set(p, days);
       }
     }

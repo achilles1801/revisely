@@ -1,4 +1,4 @@
-import { UndoQueue, memorizeSuggestion, missedFromSession, pagesToUnmark, sittingToRevise } from '../activityAdd';
+import { UndoQueue, memorizeSuggestion, missedFromSession, sittingToRevise } from '../activityAdd';
 
 const M = new Set([549, 550, 551, 552, 553, 556, 557, 600]);
 
@@ -13,10 +13,6 @@ describe('the add menu’s rules (C4)', () => {
 
   it('the Memorized suggestion is the pages read that aren’t memorized yet', () => {
     expect(memorizeSuggestion([600, 601, 601, 602], M)).toEqual([601, 602]);
-  });
-
-  it('removing a memorization un-marks only the pages still memorized', () => {
-    expect(pagesToUnmark([549, 999, 549], M)).toEqual([549]);
   });
 });
 

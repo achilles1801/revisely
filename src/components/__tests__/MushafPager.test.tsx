@@ -324,6 +324,22 @@ describe('<MushafPager /> a verse’s highlight', () => {
     expect(frame).not.toBeNull();
     expect(boxes.every((box) => frameOf(box as unknown as Node) === frame)).toBe(true);
   });
+
+  it('highlights several verses at once (a search match across ayat): each verse’s lines', () => {
+    render(
+      <MushafPager
+        pages={[3]}
+        highlightedAyah={[
+          { page: 3, sura: 2, ayah: 13 },
+          { page: 3, sura: 2, ayah: 14 },
+        ]}
+      />,
+    );
+    const list = screen.UNSAFE_getByType(FlatList);
+    act(() => list.props.onLayout({ nativeEvent: { layout: { x: 0, y: 0, width: 393, height: 760 } } }));
+    expect(ayahRects(3, 2, 14).length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId('ayah-highlight')).toHaveLength(ayahRects(3, 2, 13).length + ayahRects(3, 2, 14).length);
+  });
 });
 
 describe('<MushafPager /> how the page image is decoded (#153)', () => {

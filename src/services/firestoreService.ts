@@ -936,22 +936,32 @@ export async function addMemorizationPages(
   });
 }
 
-/** Pages un-memorized: removed from every item that holds them; an item left empty is removed. */
-export async function removeMemorizationPages(pages: number[], userId: string, verses?: number[]): Promise<void> {
+/**
+ * Pages un-memorized: removed from every item that holds them; an item left empty is removed. With
+ * `day`, from that day's item alone (Undo of an add on the Day, ACT-7: another day's item keeps them).
+ */
+export async function removeMemorizationPages(pages: number[], userId: string, verses?: number[], day?: string): Promise<void> {
   const drop = new Set(pages);
   const dropAyahs = new Set(verses ?? []);
-  const snap = await getDocs(collection(db, 'users', userId, 'memorizations'));
+  const items = collection(db, 'users', userId, 'memorizations');
+  const docs = day ? [await getDoc(doc(items, day))].filter((d) => d.exists()) : (await getDocs(items)).docs;
   await Promise.all(
-    snap.docs.map(async (d) => {
-      const current: number[] = d.data().pages ?? [];
-      const ayahs: number[] | undefined = Array.isArray(d.data().verses) ? d.data().verses : undefined;
-      const rest = current.filter((p) => !drop.has(p));
-      // Ayahs taken off go from an item's ayahs (MEM-3), and with them those of pages un-memorized.
+    docs.map(async (d) => {
+      const data = d.data() ?? {};
+      const current: number[] = data.pages ?? [];
+      const ayahs: number[] | undefined = Array.isArray(data.verses) ? data.verses : undefined;
+      // Ayahs taken off go from an item's ayahs (MEM-3), and with them those of pages un-memorized;
+      // a page whose ayahs here all went leaves the item too (memorizedAyahs.ayahsOfItem).
       const restAyahs = ayahs?.filter((k) => !dropAyahs.has(k) && !drop.has(pageOfAyah(k)));
       const ayahsChanged = ayahs != null && restAyahs != null && restAyahs.length !== ayahs.length;
+      const hadAyahs = new Set((ayahs ?? []).map((k) => pageOfAyah(k)));
+      const keepsAyahs = new Set((restAyahs ?? []).map((k) => pageOfAyah(k)));
+      const rest = current.filter((p) => !drop.has(p) && (!hadAyahs.has(p) || keepsAyahs.has(p)));
       if (rest.length === current.length && !ayahsChanged) return;
-      if (rest.length === 0 || (ayahs != null && restAyahs != null && restAyahs.length === 0)) await deleteDoc(d.ref);
-      else await updateDoc(d.ref, { pages: rest, ...(ayahsChanged ? { verses: restAyahs } : {}) });
+      // An item left with no pages goes. One left with whole pages but no ayahs keeps the pages
+      // (added whole before any ayah that day), as a whole-pages item.
+      if (rest.length === 0) await deleteDoc(d.ref);
+      else await updateDoc(d.ref, { pages: rest, ...(ayahsChanged ? { verses: restAyahs!.length > 0 ? restAyahs : deleteField() } : {}) });
     }),
   );
 }
@@ -1006,6 +1016,15 @@ export async function getActivityItemsBetween(
       return { id: d.id, day: x.day, pages: x.pages ?? [], minutes: x.minutes ?? null, occurredAt: occurred };
     }),
   };
+}
+
+/** Every memorization item of the account, with its ayahs when added by the ayah (deleting one, ACT-7). */
+export async function getMemorizationItems(userId: string): Promise<{ id: string; day: string; pages: number[]; verses?: number[] }[]> {
+  const snap = await getDocs(collection(db, 'users', userId, 'memorizations'));
+  return snap.docs.map((d) => {
+    const data = d.data();
+    return { id: d.id, day: data.day, pages: data.pages ?? [], ...(Array.isArray(data.verses) ? { verses: data.verses as number[] } : {}) };
+  });
 }
 
 /** The memorization items between two revision days, inclusive (Insights' twelve months). */
