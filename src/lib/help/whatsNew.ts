@@ -70,7 +70,7 @@ export const SEEN_ALL = 'all';
 export const RELEASES: readonly WhatsNewRelease[] = [
   {
     id: '2026-11',
-    live: false,
+    live: true,
     cards: [
       {
         id: 'activity',

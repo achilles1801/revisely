@@ -1,5 +1,5 @@
-// Downloading a whole QuranEnc translation to the phone, from the translation picker (testers;
-// TRANS-6). A download is the translation's store fetching every sura not on the phone at the newest
+// Downloading a whole QuranEnc translation to the phone, from the translation picker
+// (TRANS-6). A download is the translation's store fetching every sura not on the phone at the newest
 // version (lib/quranenc), on whatever connection the phone has: it is a tap on one translation, a
 // few megabytes. It can be stopped, and carries on from where it stopped (the suras on the phone
 // stay). Saheeh International isn't downloaded or removed here: it comes and goes with the offline

@@ -1,5 +1,5 @@
-// Activity's Calendar and Insights, from items (C3, mocks d3 and d4), for preview
-// testers while the blocks are built. The calendar is a month of rings and dots; the
+// Activity's Calendar and Insights, from items (C3, mocks d3 and d4), with the Activity blocks
+// (every account since the November 2026 release). The calendar is a month of rings and dots; the
 // Insights are the spec's figures, each with its own definition (activityInsights).
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';

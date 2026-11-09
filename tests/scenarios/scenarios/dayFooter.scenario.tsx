@@ -4,7 +4,6 @@
 
 import { setNow, setZone, ZONES } from '../harness/clock';
 import { CITIES, newAccount, pagesRange } from '../harness/account';
-import { markPreviewTester } from '../harness/admin';
 import { ActivityDayView, flatText, Home, homeStack } from '../harness/screens';
 import { OpenApp, Phone } from '../harness/phone';
 import type { User } from '../../../src/types';
@@ -19,8 +18,7 @@ async function dayFooter(user: Partial<User>): Promise<{ app: OpenApp; text: str
   const uid = first.uid;
   await first.untilSynced();
   await first.close();
-  // The day's blocks (and their footer) are for preview testers.
-  await markPreviewTester(uid);
+  // An App Store account, not a tester: this is everyone's since the November 2026 release.
   setNow(`${TUESDAY} 21:00`);
   const app = await phone.open(homeStack);
   await new Home(app).ready();

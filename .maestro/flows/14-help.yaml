@@ -1,7 +1,8 @@
-# The help buttons, for a previewTester account (marked one through the emulator, as the owner's script
-# does): Home's ? on the Today post opens "How Home works"; the sheet closes; "Hide help buttons" takes the
-# ? away with a toast and Undo; hidden it stays hidden after a relaunch, until Settings → Support → Help
-# buttons brings it back. Screenshots of the button, the sheet and the toast (h1–h3).
+# The help buttons, for an account that isn't a tester (help is every account's since the November
+# 2026 release, HELP_FOR_EVERYONE): Home's ? on the Today post opens "How Home works"; the sheet
+# closes; "Hide help buttons" takes the ? away with a toast and Undo; hidden it stays hidden after a
+# relaunch, until Settings → Support → Help buttons brings it back. Screenshots of the button, the
+# sheet and the toast (h1–h3).
 # Rules (BEHAVIOUR.md): HELP-1, HELP-2
 appId: com.revisionbuddy.app
 ---
@@ -10,11 +11,6 @@ appId: com.revisionbuddy.app
     env:
       CLOCK: 2026-11-03T19:00
       BOUNDARY: midnight
-# A tester (help is theirs only, for now): the app sees it when its user document changes.
-- runScript:
-    file: ../scripts/server-revo.js
-    env:
-      MODE: tester
 
 # HELP-1: the ? at the right of the Today post's header, and its sheet.
 - extendedWaitUntil:
@@ -39,7 +35,9 @@ appId: com.revisionbuddy.app
 - assertVisible:
     id: help-topic-home.streak
     text: "Streak, .*"
-- assertVisible:
+# "Ask Revo ›" only while Revo is on for the account: Revo follows config/app.revo, unset here
+# (testers), so not for this one.
+- assertNotVisible:
     id: help-ask-revo
 - assertVisible:
     id: help-hide

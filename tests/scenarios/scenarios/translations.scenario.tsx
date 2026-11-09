@@ -24,6 +24,7 @@ import {
 import { setOnline } from '../harness/netinfo';
 import { Alert } from 'react-native';
 import { VerseSheet } from '../../../src/components/verse/VerseSheet';
+import { everyTranslationOffered } from '../../../src/lib/translationsOffered';
 import { ThemeProvider } from '../../../src/context/ThemeContext';
 import { DesignProvider } from '../../../src/design/DesignContext';
 import { __resetQuranEncForTests, quranEncStore } from '../../../src/lib/quranenc';
@@ -76,10 +77,16 @@ async function until(check: () => boolean, what: string): Promise<void> {
   throw new Error(`Timed out waiting for ${what}`);
 }
 
-/** The verse sheet on a verse (Al-Ikhlas 2), as the reader opens it, its translation chosen by the user. */
+/** An App Store account: not a tester (previewTester unset). Every translation is everyone's since Nov 2026. */
+const APP_STORE = {};
+
+/**
+ * The verse sheet on a verse (Al-Ikhlas 2), as the reader opens it (useVerseActions: the picker of every
+ * translation for the account, lib/translationsOffered), its translation chosen by the user.
+ */
 function openSheet(
   initial: string,
-  tester: boolean,
+  account: { previewTester?: boolean } | null,
   start: { page: number; sura: number; ayah: number } = VERSE,
   accountId = 'account-a',
 ) {
@@ -93,7 +100,7 @@ function openSheet(
           <VerseSheet
             verse={verse}
             translationId={id}
-            tester={tester}
+            everyTranslation={everyTranslationOffered(account)}
             accountId={accountId}
             onChangeTranslation={(next: string) => {
               chosen.push(next);
@@ -156,7 +163,7 @@ async function goOffline(): Promise<void> {
 
 describe('a held verse in a QuranEnc translation (TRANS)', () => {
   it('[TRANS-1] Urdu shows exactly as QuranEnc gives it: its footnote’s number raised, the footnote under the verse', async () => {
-    openSheet(URDU, true);
+    openSheet(URDU, APP_STORE);
     await until(() => shown() != null, 'the translation');
     expect(textOf(screen.getByTestId('verse-translation') as never)).toBe('اللہ تعالیٰ بے نیاز ہے.¹');
     expect(textOf(screen.getByTestId('verse-footnotes') as never)).toBe('¹ یعنی سب اس کے محتاج ہیں، وہ کسی کا محتاج نہیں۔');
@@ -168,7 +175,7 @@ describe('a held verse in a QuranEnc translation (TRANS)', () => {
 
   it('[TRANS-1] a translation that can’t load says so, and shows no other translation in its place', async () => {
     // Nothing recorded for this sura in Turkish: QuranEnc answers 404.
-    openSheet('qe.turkish_shaban', true);
+    openSheet('qe.turkish_shaban', APP_STORE);
     await until(() => screen.queryByTestId('verse-error') != null, 'the error');
     expect(shown()).toBeNull();
     expect(screen.queryByText(/Eternal Refuge|بے نیاز|Maître/)).toBeNull();
@@ -176,7 +183,7 @@ describe('a held verse in a QuranEnc translation (TRANS)', () => {
   });
 
   it('[TRANS-2] under it: QuranEnc’s own credit, the version shown and a link to its page on QuranEnc.com', async () => {
-    openSheet(URDU, true);
+    openSheet(URDU, APP_STORE);
     await until(() => shown() != null, 'the translation');
     const credit = screen.getByTestId('translation-credit');
     expect(textOf(credit as never)).toBe(`${URDU_CREDIT} · v1.1.3QuranEnc.com`);
@@ -187,7 +194,7 @@ describe('a held verse in a QuranEnc translation (TRANS)', () => {
   });
 
   it('[TRANS-2] the picker shows each translation with the same credit', async () => {
-    openSheet(URDU, true);
+    openSheet(URDU, APP_STORE);
     await until(() => shown() != null, 'the translation');
     fireEvent.press(screen.getByLabelText('More'));
     fireEvent.press(screen.getByLabelText(/^Select translation/));
@@ -199,7 +206,7 @@ describe('a held verse in a QuranEnc translation (TRANS)', () => {
   });
 
   it('[TRANS-3] Urdu reads right to left, its footnotes too; French left to right', async () => {
-    openSheet(URDU, true);
+    openSheet(URDU, APP_STORE);
     await until(() => shown() != null, 'the translation');
     const urdu = StyleSheet.flatten(screen.getByTestId('verse-translation').props.style);
     expect(urdu).toMatchObject({ writingDirection: 'rtl', textAlign: 'right' });
@@ -256,8 +263,8 @@ describe('a held verse in a QuranEnc translation (TRANS)', () => {
     expect(requestsTo('translations/list')).toHaveLength(1);
   });
 
-  it('[TRANS-5] testers pick from every language, by English or its own name, and the verse follows the choice', async () => {
-    const { chosen } = openSheet(URDU, true);
+  it('[TRANS-5] an account that isn’t a tester picks from every language, by English or its own name, and the verse follows the choice', async () => {
+    const { chosen } = openSheet(URDU, APP_STORE);
     await until(() => shown() != null, 'the translation');
     fireEvent.press(screen.getByLabelText('More'));
     fireEvent.press(screen.getByLabelText(/^Select translation/));
@@ -285,8 +292,8 @@ describe('a held verse in a QuranEnc translation (TRANS)', () => {
     expect(textOf(screen.getByTestId('translation-credit') as never)).toBe('Translated by Rashid Ma’ash · v1.0.3QuranEnc.com');
   });
 
-  it('[TRANS-5] everyone else chooses Saheeh International or The Clear Quran®, as before', async () => {
-    openSheet('en.sahih', false);
+  it('[TRANS-5] gated off again (lib/translationsOffered), the short list: Saheeh International or The Clear Quran®', async () => {
+    openSheet('en.sahih', null);
     await until(() => shown() != null, 'the translation');
     fireEvent.press(screen.getByLabelText('More'));
     fireEvent.press(screen.getByLabelText(/^Select translation/));
@@ -300,7 +307,7 @@ describe('a held verse in a QuranEnc translation (TRANS)', () => {
 describe('downloading a translation (TRANS-6)', () => {
   it('[TRANS-6] its size before, its progress while it comes, then on the phone, under Downloaded, and read offline', async () => {
     serveWhole('french_rashid');
-    openSheet(FRENCH, true);
+    openSheet(FRENCH, APP_STORE);
     await until(() => shown() != null, 'the translation');
     // From here the connection stalls at sura 57: the download stands midway until released.
     holdFrom('french_rashid', 57);
@@ -336,7 +343,7 @@ describe('downloading a translation (TRANS-6)', () => {
 
   it('[TRANS-6] stopped midway, it keeps what came and carries on from there', async () => {
     serveWhole('french_rashid');
-    openSheet(FRENCH, true);
+    openSheet(FRENCH, APP_STORE);
     await until(() => shown() != null, 'the translation');
     holdFrom('french_rashid', 57);
     openPicker('rashid');
@@ -359,7 +366,7 @@ describe('downloading a translation (TRANS-6)', () => {
   it('[TRANS-6] a download that fails says so and keeps what came; tried again, it finishes', async () => {
     serveWhole('french_rashid');
     failSura('french_rashid', 50);
-    openSheet(FRENCH, true);
+    openSheet(FRENCH, APP_STORE);
     await until(() => shown() != null, 'the translation');
     openPicker('rashid');
     fireEvent.press(screen.getByTestId(`translation-download-${FRENCH}`));
@@ -372,7 +379,7 @@ describe('downloading a translation (TRANS-6)', () => {
 
   it('[TRANS-6] Remove asks first, then deletes it from the phone', async () => {
     serveWhole('french_rashid');
-    openSheet('en.sahih', true);
+    openSheet('en.sahih', APP_STORE);
     await until(() => shown() != null, 'the translation');
     openPicker('rashid');
     fireEvent.press(screen.getByTestId(`translation-download-${FRENCH}`));
@@ -389,7 +396,7 @@ describe('downloading a translation (TRANS-6)', () => {
   });
 
   it('[TRANS-6] Saheeh International comes with the offline mushaf: no download button of its own', async () => {
-    openSheet('qe.french_rashid', true);
+    openSheet('qe.french_rashid', APP_STORE);
     await until(() => shown() != null, 'the translation');
     openPicker('saheeh');
     expect(status('en.sahih')).toBe('Downloads with the offline mushaf');
@@ -401,7 +408,7 @@ describe('offline, a translation not on the phone (TRANS-7)', () => {
   it('[TRANS-7] says so, and offers one that is: Show it, and the verse is there', async () => {
     serveWhole('french_rashid');
     // French downloaded while online; Urdu in use, read only in Al-Ikhlas.
-    openSheet(FRENCH, true);
+    openSheet(FRENCH, APP_STORE);
     await until(() => shown() != null, 'French');
     openPicker('rashid');
     fireEvent.press(screen.getByTestId(`translation-download-${FRENCH}`));
@@ -423,7 +430,7 @@ describe('offline, a translation not on the phone (TRANS-7)', () => {
   });
 
   it('[TRANS-7] nothing else on the phone: it says how to read it offline, and offers nothing', async () => {
-    openSheet(URDU, true);
+    openSheet(URDU, APP_STORE);
     await until(() => shown() != null, 'Urdu');
     await goOffline();
     for (let i = 0; i < 3; i++) fireEvent.press(screen.getByLabelText('Next verse'));
@@ -434,7 +441,7 @@ describe('offline, a translation not on the phone (TRANS-7)', () => {
 
   it('[TRANS-7] the Arabic isn’t on the phone either: it shows once back online, by itself', async () => {
     serveWhole('urdu_junagarhi');
-    openSheet(URDU, true, { page: 1, sura: 1, ayah: 2 });
+    openSheet(URDU, APP_STORE, { page: 1, sura: 1, ayah: 2 });
     await goOffline();
     await until(() => screen.queryByTestId('verse-error') != null, 'the error');
     expect(screen.getByText("This verse isn't downloaded yet. It shows when you're back online.")).toBeTruthy();
@@ -464,7 +471,7 @@ describe('favorite translations (TRANS-8)', () => {
   }
 
   it('[TRANS-8] starred, they are listed under Selected in the order starred, and kept for that account', async () => {
-    const first = openSheet(URDU, true);
+    const first = openSheet(URDU, APP_STORE);
     await until(() => shown() != null, 'the translation');
     openPicker('');
     await star('rashid', FRENCH);
@@ -476,13 +483,13 @@ describe('favorite translations (TRANS-8)', () => {
 
     // A later launch, the same account: still there. Another account on this phone: none.
     __resetFavoritesForTests();
-    const again = openSheet(URDU, true);
+    const again = openSheet(URDU, APP_STORE);
     await until(() => shown() != null, 'the translation');
     openPicker('');
     await until(() => screen.queryByTestId('translation-section-favorites') != null, 'the favorites');
     expect(rowsOf('favorites')).toEqual([FRENCH, 'qe.turkish_shaban']);
     again.unmount();
-    openSheet(URDU, true, VERSE, 'account-b');
+    openSheet(URDU, APP_STORE, VERSE, 'account-b');
     await until(() => shown() != null, 'the translation');
     openPicker('');
     await settle();
@@ -491,7 +498,7 @@ describe('favorite translations (TRANS-8)', () => {
 
   it('[TRANS-8] Edit moves a favorite up, takes a star away, and deletes a download after asking', async () => {
     serveWhole('hindi_omari');
-    openSheet(URDU, true);
+    openSheet(URDU, APP_STORE);
     await until(() => shown() != null, 'the translation');
     openPicker('omari');
     fireEvent.press(screen.getByTestId('translation-download-qe.hindi_omari'));

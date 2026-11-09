@@ -158,8 +158,33 @@ BEHAVIOUR.md NEW-1 to NEW-4.
   A release with `live: true` that needs a feature still for testers fails `whatsNew.test.ts`.
 - **Ships dark.** A release's entry has `live: false` until the PR that makes its features public flips it
   (one line). Production gets JavaScript only through Promote, so App Store users get the cards in the
-  same update as the features.
-- **Testers before that:** Settings → About → What's new (a replay with ✕, nothing kept) and Settings →
+  same update as the features. `2026-11` is live (the release PR below).
+
+## The November 2026 release: everyone's
+
+The release PR (Nov 2026) opened these to every account, not only `previewTester`. Each is a named gate
+that returns true for any signed-in account, so it can be closed again in one line (as
+`prayerTimesEnabled` was opened for 1.0.3). `src/lib/__tests__/releaseGates.test.ts` holds each open for an
+account with `previewTester` unset or false, and the scenarios of these features run as such accounts.
+Non-testers follow `production`, so nobody sees this on a phone before Promote; the tests are the proof.
+- `activityBlocksEnabled` (`lib/activityBlocks`): Activity's blocks (ACT-2, ACT-3), Insights in Activity and
+  the Home and Read tab bar (ACT-12), the day's + (ACT-5), the sittings' offers on a day (REC-3, MEM-5), the
+  juz sheet (MEM-7), and pages logged by hand counted by the self-heal (ACT-16: `getManualRevisionItems`, one
+  query on every self-heal, for every account now).
+- `sittingsEnabled` (`lib/sitting`): the reader's sittings (REC-1, REC-2) and the schedule editor's "Not in
+  your plan" (MEM-6).
+- `everyTranslationOffered` (`lib/translationsOffered`): every QuranEnc translation, its downloads and
+  favorites (TRANS-5 to TRANS-8); `VerseSheet`'s `everyTranslation`.
+- `HELP_FOR_EVERYONE` (`lib/help/availability`): the ? buttons (HELP-1, HELP-4).
+- What's new `2026-11` `live: true`; `components/whatsNew/needs` reads the gates above.
+- Revo is not one of them: it follows `config/app.revo` (REVO-37).
+- Still testers only: hidden recite mode (`reciteModeEnabled`), Reset my data, Load test scenario, the
+  update tools and the `preview` channel, the old Ask coach.
+- The old Activity (no blocks) and the Insights tab stay in the code as what the gate falls back to;
+  `ActivityScreens.test` and `ActivityScreens.v2.test` pin them by mocking the gate off.
+- A loaded test scenario writes `whatsNewSeen: 'all'` (`functions/src/testScenarios.ts`), so it opens on
+  Home; deploy `loadTestScenario` with it.
+- **Testers before a release is live:** Settings → About → What's new (a replay with ✕, nothing kept) and Settings →
   Testing → Show What's new at launch (from the next launch, as App Store users will see it; Done turns it
   off and writes nothing to the account).
 - **Kill switch:** `config/app.whatsNewOff`.
@@ -505,7 +530,7 @@ June 2025).
 - The Arabic's source is credited in the verse sheet too: "Arabic text: Tanzil Project · tanzil.net"
   (`ARABIC_CREDIT`, at the end of the verse), as Tanzil's terms ask.
 
-### QuranEnc's other translations (testers; `lib/quranenc`, Nov 2026)
+### QuranEnc's other translations (`lib/quranenc`, Nov 2026)
 
 Every translation in QuranEnc's list (76 in 56 languages, Nov 8 2026), on Saheeh's terms (all 163
 translation pages on QuranEnc carry the same seven). The licensing inventory, with Quran.com's 126
@@ -520,8 +545,8 @@ translations matched to a source, is `~/Documents/revisely-translations/inventor
   to 40 characters, so new ones need no rules change.
 - **Credits:** QuranEnc's own description of each (who translated and issued it), the version of the
   sura shown and QuranEnc.com (TRANS-2). Right-to-left languages read right to left (TRANS-3).
-- **Who:** testers get the picker of every translation (`offeredTranslations`, TRANS-5); everyone else
-  keeps Saheeh International and The Clear Quran®.
+- **Who:** every account gets the picker of every translation (`everyTranslationOffered`, TRANS-5), since
+  the November 2026 release; testers only before.
 - **The picker** (Majd's design, Nov 8 2026): Translations and Edit, a search over every group, then
   Selected, Favorites (starred, in that order; `lib/translationFavorites`, on the phone per account,
   TRANS-8), Downloaded, and every language. Edit moves or unstars favorites and deletes downloads.
@@ -1505,8 +1530,8 @@ classic default), and a fresh install starts in light.
   - **Help, kept small** (Majd, Nov 8 2026: "helper buttons are good". This replaced the "No help"
     rule). A label or a subtitle still says what a control does (e.g. Keep daily amount), and sheets
     hold no paragraphs of explanation (the Mushaf picker's was removed, Nov 3 2026). On top of that,
-    the few screens that can't explain themselves get one ? (`components/help/HelpButton`; testers
-    until the release sets `HELP_FOR_EVERYONE` in `lib/help/availability`). They are on by default, new
+    the few screens that can't explain themselves get one ? (`components/help/HelpButton`; every
+    account since the November 2026 release set `HELP_FOR_EVERYONE` in `lib/help/availability`). They are on by default, new
     account or not; only the user hides them (HELP-4: Majd, Nov 8 2026). Home's is in the Today post's header, the schedule editor's
     before Save, the reader's a round button at the right of its header, and a session's the last
     row of its ⋯ menu (its header is full), Activity's in its top bar before search (for the tab on

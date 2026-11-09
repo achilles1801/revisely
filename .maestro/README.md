@@ -92,16 +92,16 @@ rules it covers in its first lines; recordings have no rule there yet.
 | Flow | What a user does | Rules |
 | --- | --- | --- |
 | `01-onboarding` | Sign up, onboarding, Home's first day; a cold start; past midnight | SCHED-1, SYNC-4, DAY-1 |
-| `02-revision-session` | Leave with nothing marked; swipe; Back; the check; the end card | SESS-1, SESS-2, SESS-3 |
+| `02-revision-session` | Leave with nothing marked; swipe; Back; the check; the end card; the tab bar is Home and Read | SESS-1, SESS-2, SESS-3, ACT-12 |
 | `03-revise-ahead` | Keep going; "Tomorrow starts at"; a day partly done ahead | AHEAD-1, -2, -3, -5, DAY-3, SESS-4 |
-| `04-fajr-boundary` | Settings → Start day at fajr; Home at 03:00 and 08:00; revise ahead and a note before Fajr | DAY-1, -2, -3, -5, AHEAD-1, LOG-3 |
-| `05-daily-log` | Two notes; one edited, the other deleted; each kept across a cold start | LOG-1, LOG-2 |
+| `04-fajr-boundary` | Settings → Start day at fajr; Home at 03:00 and 08:00; revise ahead and a note before Fajr (Activity's day, then its log) | DAY-1, -2, -3, -5, AHEAD-1, LOG-3 |
+| `05-daily-log` | Two notes (the first from Activity's day, +, which opens its log; the second in the log); one edited, the other deleted; each kept across a cold start | LOG-1, LOG-2, ACT-5 |
 | `06-offline` | A session offline; a cold start offline; back online, the server has it | SYNC-1, SYNC-2, SESS-3 |
-| `07-recordings` | Record in a session, find it in Activity, play, delete | none yet |
+| `07-recordings` | Record in a session, find it under Revised on Activity's day, play, delete | none yet |
 | `08-time-zone` | Kathmandu (UTC+5:45): the day turns at its midnight | DAY-1, DAY-6 |
 | `10-delete-account` | Settings → Delete account, confirmed twice: the account and its data leave the server, back at sign-in | ACCOUNT-1 |
 | `11-surah-names` | Every screen that names the Qur'an (Home, its › menu, Jump to, All activity, the schedule, the memorized pages, a session, the end card, the daily log), in light and then dark (`…-dark`). In the first job: after 04 the Android emulator has a location, and Home a prayer line | NAME-1 |
-| `14-help` | A tester: Home's ? opens How Home works, closes; Hide help buttons, Undo, hidden again; still hidden after a cold start; Settings → Support → Help buttons brings it back. In the second job | HELP-1, HELP-2 |
+| `14-help` | An account that isn't a tester: Home's ? opens How Home works, with no Ask Revo (Revo is for testers here), closes; Hide help buttons, Undo, hidden again; still hidden after a cold start; Settings → Support → Help buttons brings it back. In the second job | HELP-1, HELP-2 |
 | `16-whats-new` | A tester: Settings → About → What's new replays the cards with a ✕; Testing → Show What's new at launch runs them after a cold start, no ✕, Android's back to the card before; a relaunch part way reopens the card it was on; after Done it doesn't come back. In the first job | NEW-2, NEW-3 |
 
 Every account is new: signed up in the flow (`subflows/signup.yaml`) with Al-Fatihah and Juz 30
@@ -158,7 +158,6 @@ node .maestro/visual/approve.mjs <run id>
 **No baselines on purpose** (`PENDING` in `screens.mjs`), being rebuilt by other sessions. Approve
 each once its boards match the approved mocks, then take it out of `PENDING`:
 - Activity (Overview, Day, Insights: `07-activity-recording`);
-- Insights' Smart Tracking intro (`02-smart-preview`);
 - Revo (`09-revo`'s `r1`…`r10`), **in all six variants**: Indigo, Crimson and Jade, each in light
   and dark (`r4-sheet`, `r4-sheet-dark`, `r4-sheet-crimson`, … `r4-sheet-jade-dark`), each
   against its own mock. Then unmask Revo's button on Home (`revoButton`).

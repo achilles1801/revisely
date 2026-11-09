@@ -7,7 +7,6 @@
 import { setNow, setZone, ZONES } from '../harness/clock';
 import { newAccount, pagesRange, saveCustomPlan } from '../harness/account';
 import { ActivityDayView, activityStack, flatText, Home, homeStack } from '../harness/screens';
-import { markPreviewTester } from '../harness/admin';
 import { aheadAt, plain } from '../harness/words';
 import { Phone, OpenApp } from '../harness/phone';
 import type { User } from '../../../src/types';
@@ -324,10 +323,10 @@ describe('Activity and Insights after revising into the next cycle', () => {
     setZone(ZONES.chicago);
     setNow(`${MON} 20:00`);
     const phone = new Phone();
+    // An account that isn't a tester: Activity's blocks and Insights are every account's (the November
+    // 2026 release, activityBlocksEnabled).
     const first = await newAccount(phone, { memorized: WEEK, user: { dailyPageCapacity: 5 } });
-    const uid = first.uid;
     await first.close();
-    await markPreviewTester(uid);
 
     const { app: h, home } = await openHome(phone, `${MON} 21:00`);
     const session = await home.startSession();
@@ -343,7 +342,6 @@ describe('Activity and Insights after revising into the next cycle', () => {
     await h.close();
 
     const app = await phone.open(activityStack);
-    await app.until(() => app.app.user?.previewTester === true, 'the account to be a tester');
     // Monday's day: its own five, done (not taken away because they were revised again for next Monday),
     // and a credit line for every later day, next Monday's named by its date.
     const dayView = new ActivityDayView(app);

@@ -5,7 +5,7 @@ import { hideHelpFrom, setHelpHidden, useHelpHidden } from '../../lib/help/state
 import type { HelpScreen } from '../../lib/help/topics';
 
 /**
- * The help buttons for this account: whether they show (testers, not hidden, and the setting read so
+ * The help buttons for this account: whether they show (lib/help/availability, not hidden, and the setting read so
  * they never flash on then off), and the switch.
  */
 export function useHelpButtons(): {

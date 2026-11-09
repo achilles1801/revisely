@@ -4,6 +4,14 @@
 import { formatMinutesLong } from './activityFormat';
 import { describePassage } from './passages';
 
+/**
+ * Whether the reader's sittings are on (REC-1, REC-2) and with them the schedule editor's "Not in your plan"
+ * (MEM-6): every account since the November 2026 release (Majd, Nov 8 2026); testers only before. One gate
+ * for all of them, as activityBlocksEnabled is for the day's blocks (the Day's Add to memorized, MEM-5, is
+ * one of those), so they can be gated again in one place.
+ */
+export const sittingsEnabled = (user: { previewTester?: boolean } | null | undefined) => user != null;
+
 /** The day as the note names it: "today", or its weekday ("Tuesday") for an earlier revision day. */
 export function sittingDayWord(day: string, today: string): string {
   if (day === today) return 'today';
