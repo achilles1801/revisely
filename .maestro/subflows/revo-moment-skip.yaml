@@ -1,10 +1,18 @@
-# Revo's moment (RevoMoment), once it has been opened: Skip if it is still playing. On Android Maestro
-# reads the screen slowly while the moment moves, so it may have played through by the time it looks
-# (run 42543047653). The step after this waits for what its end shows, up to 40 s (it lasts about 19).
-# Skip's tap doesn't wait for the screen to settle (it never does while the moment plays) and isn't
-# retried (a retried tap landed on what came next, run 42537579159).
+# Revo's moment (RevoMoment), once it has been opened: Skip if it is still playing.
+# - First, wait until something of it is on screen: the moment itself (its root, with Skip while it
+#   plays), or, on Revo's first open, the opt-in that follows it. Checking for Skip straight after the
+#   tap found nothing yet on iOS, and the moment arrived a moment later over the sheet (run 42662790506).
+# - On Android Maestro reads the screen slowly while the moment moves, so it may have played through by
+#   the time it looks (run 42543047653): then there is no Skip, and the step after this waits for what
+#   its end shows, up to 40 s (it lasts about 19).
+# - Skip's tap doesn't wait for the screen to settle (it never does while the moment plays) and isn't
+#   retried (a retried tap landed on what came next, run 42537579159).
 appId: com.revisionbuddy.app
 ---
+- extendedWaitUntil:
+    visible:
+      id: "whats-new-moment-skip|whats-new-revo-moment|revo-optin"
+    timeout: 40000
 - runFlow:
     when:
       visible:
