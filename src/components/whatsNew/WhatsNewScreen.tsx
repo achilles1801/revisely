@@ -21,7 +21,6 @@ import {
 } from 'react-native';
 import { Directions, Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
-import { TopSafeAreaView } from '../SafeAreaView';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
 import { useApp } from '../../context/AppContext';
@@ -268,7 +267,10 @@ export function WhatsNewScreen({ mode, onClose }: { mode: WhatsNewMode; onClose?
   }
 
   return (
-    <TopSafeAreaView style={[styles.screen, { backgroundColor: palette.bg }]} testID={`whats-new-${mode}`}>
+    // Padded by the root provider's inset, not a native safe-area view: in the replay's native modal that
+    // view finds no provider among its native ancestors and pads nothing, so the ✕ and the title sat in
+    // the status bar, where iOS takes a tap for itself (E2E flow 16, Nov 2026). Right from the first frame.
+    <View style={[styles.screen, { backgroundColor: palette.bg, paddingTop: insets.top }]} testID={`whats-new-${mode}`}>
       <HeroGlow />
       <View style={[styles.bar, { minHeight: 44 * chrome }]}>
         <View style={styles.barSide}>
@@ -305,7 +307,7 @@ export function WhatsNewScreen({ mode, onClose }: { mode: WhatsNewMode; onClose?
           testID={last ? 'whats-new-done' : 'whats-new-next'}
         />
       </View>
-    </TopSafeAreaView>
+    </View>
   );
 }
 
