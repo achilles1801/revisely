@@ -1,5 +1,6 @@
 import { CustomPlan, UserPage } from '../types';
 import { TOTAL_QURAN_PAGES } from '../types/firestore';
+import { revisablePages } from './memorizedAyahs';
 
 export type PageStatus = 'memorized' | 'not_memorized';
 
@@ -157,6 +158,17 @@ export function pruneCustomPlanForMemorized(
     removedPageCount,
     unscheduledMemorizedCount,
   };
+}
+
+/**
+ * The custom plan once some pages are no longer memorized: pruneCustomPlanForMemorized over the pages
+ * still revised (memorized or partly, MEM-4), or null when no page leaves it. The memorized pages'
+ * editor, and a Memorized entry deleted or undone on the Day (ACT-7), prune the same way.
+ */
+export function customPlanAfterUnmemorizing(customPlan: CustomPlan | null | undefined, pages: readonly UserPage[]): CustomPlan | null {
+  if (!customPlan) return null;
+  const { plan, removedPageCount } = pruneCustomPlanForMemorized(customPlan, revisablePages(pages).map((p) => p.pageNumber));
+  return removedPageCount > 0 ? plan : null;
 }
 
 /**

@@ -9,6 +9,7 @@ import {
   memorizedAyahsOnPage,
   memorizedPageShare,
   pageShare,
+  pagesAfterDeletingItem,
   removeAyahs,
 } from '../../../src/lib/memorizedAyahs';
 import type { MushafEditionId } from '../../../src/lib/mushafEdition';
@@ -143,6 +144,55 @@ describe('memorized ayahs (MEM-1 to MEM-3)', () => {
         expect(after.status).toBe(rest.length === 0 ? 'not_memorized' : rest.length === all.length ? 'memorized' : 'in_progress');
       }),
       { numRuns: runs(200) },
+    );
+  });
+});
+
+describe('deleting a Memorized entry (ACT-7)', () => {
+  // Dates as days, in UTC, so the check doesn't depend on the machine's zone.
+  const dayOf = (iso: string) => iso.slice(0, 10);
+  const masks = fc.array(fc.boolean(), { minLength: 300, maxLength: 300 });
+
+  it('[ACT-7] it takes off the entry’s ayahs that no other entry holds, and nothing else', () => {
+    fc.assert(
+      fc.property(pageWithSubset, masks, masks, ({ n, ed, all, some }, mine, theirs) => {
+        const entry = all.filter((_, i) => mine[i]);
+        const other = all.filter((_, i) => theirs[i]);
+        // Memorized: some ayahs from before, and both entries' (dated today: none came before them).
+        const held = all.filter((k) => some.includes(k) || entry.includes(k) || other.includes(k));
+        if (held.length === 0) return;
+        const start = { ...page(n, held.length === all.length ? 'memorized' : 'in_progress', held.length === all.length ? undefined : held), dateMemorized: '2026-11-03T12:00:00.000Z' };
+        const after = pagesAfterDeletingItem(
+          [start],
+          { day: '2026-11-03', pages: [n], verses: entry },
+          other.length > 0 ? [{ day: '2026-11-02', pages: [n], verses: other }] : [],
+          ed,
+          dayOf,
+        ).pages[0];
+        expect(memorizedAyahsOnPage(after, ed)).toEqual(held.filter((k) => !entry.includes(k) || other.includes(k)));
+      }),
+      { numRuns: runs(300) },
+    );
+  });
+
+  it('[ACT-7] [MEM-3] after an add, Delete gives every page back as it was, as Undo does', () => {
+    fc.assert(
+      fc.property(pageWithSubset, masks, fc.boolean(), ({ n, ed, all, some }, mask, listed) => {
+        // Before: none, the whole page (marked in the memorized pages, no entry needed), or part of it
+        // (an earlier entry holds that part).
+        const whole = some.length === all.length;
+        const start = some.length === 0 ? page(n) : { ...(whole ? page(n, 'memorized') : page(n, 'in_progress', some)), dateMemorized: '2026-11-01T12:00:00.000Z' };
+        const others = some.length > 0 && (!whole || listed) ? [{ day: '2026-11-01', pages: [n], verses: some }] : [];
+        const before = memorizedAyahsOnPage(start, ed);
+        // Today's entry: any of the page's ayahs, some again.
+        const entry = all.filter((_, i) => mask[i]);
+        if (entry.length === 0) return;
+        const added = addAyahs([start], entry, '2026-11-03T12:00:00.000Z', ed).pages;
+        const back = pagesAfterDeletingItem(added, { day: '2026-11-03', pages: [n], verses: entry }, others, ed, dayOf).pages[0];
+        expect(memorizedAyahsOnPage(back, ed)).toEqual(before);
+        expect(back.status).toBe(start.status);
+      }),
+      { numRuns: runs(300) },
     );
   });
 });
