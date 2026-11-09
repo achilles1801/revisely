@@ -104,6 +104,13 @@ const Tab = createPagerTabNavigator<MainTabParamList>();
 const HomeStack = createNativeStackNavigator<HomeStackParamList>();
 const ReadStack = createNativeStackNavigator<ReadStackParamList>();
 
+// E2E builds log each stack screen's focus and transitions (lib/e2e/screens); every other build
+// drops this (the bundler inlines the variable).
+const e2eScreenListeners =
+  process.env.EXPO_PUBLIC_E2E === '1'
+    ? (require('../lib/e2e/screens') as typeof import('../lib/e2e/screens')).screenListeners
+    : undefined;
+
 // Routes (within any tab's stack) where the tab bar is hidden. These screens
 // are full screen or render their own bottom-edge chrome.
 const HIDE_TAB_BAR_ON = new Set([
@@ -120,6 +127,7 @@ const HIDE_TAB_BAR_ON = new Set([
 function HomeStackNavigator() {
   return (
     <HomeStack.Navigator
+      screenListeners={e2eScreenListeners}
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: 'transparent' },
@@ -148,6 +156,7 @@ function HomeStackNavigator() {
 function ReadStackNavigator() {
   return (
     <ReadStack.Navigator
+      screenListeners={e2eScreenListeners}
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: 'transparent' },

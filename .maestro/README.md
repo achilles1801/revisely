@@ -418,7 +418,13 @@ in `.maestro/build/results/<platform>/<flow>/`:
   it landed on (the nearest testID) and how many touches JavaScript holds as down; a Modal's root
   isn't covered). Three times on iOS in
   #328's runs a tap reached the app's window, by `device.log`, and never pressed; the third had no
-  "in" at all.
+  "in" at all. Each stack screen's focus and native transition is there (`[e2e] screen <name>
+  opening|closing start|end`, `focus`, `blur`), and each `v2/Sheet`'s native modal (`[e2e] sheet <id>
+  shown|dismissed|replaced`; `src/lib/e2e/screens.ts`). Twice on iOS (12 and 11, #328's runs) a
+  screen just pushed was drawn but missing from the accessibility tree for 16–25 s; these say
+  whether its push had ended, or a modal (which hides what is under it from that tree) was still
+  up. Since #478 (SHEET-1) a sheet whose modal iOS never reports gone is replaced after 1 s
+  (`replaced`): such a modal stayed over the screen, invisible, and took every touch.
 - `device.log` (iOS): the unified log. Its `CFNetwork:Summary` lines give each request's length
   (`transaction_duration_ms`; the emulators' ports name the service).
 - `logcat.txt` (Android): logcat, which has the same lines under `ReactNativeJS`.
