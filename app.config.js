@@ -163,14 +163,14 @@ export default {
           backgroundColor: "#000000",
         },
       ],
-      // Verse recitation (and, later, recording yourself reciting). The pod
-      // ships recording APIs, so Apple's upload check requires a microphone
-      // purpose string even before the app records.
+      // Verse recitation, and the microphone: recordings, recite mode's following
+      // along and searching the Quran by voice (both on-device Whisper). Apple's
+      // upload check requires the purpose string, since the pod ships recording APIs.
       [
         "expo-audio",
         {
           microphonePermission:
-            "Revisely uses the microphone to record your recitation, and to follow along word by word as you recite from memory. Following along happens on this iPhone; that audio isn't recorded or sent.",
+            "Revisely uses the microphone to record your recitation, to follow along word by word as you recite from memory, and to find an ayah when you search the Quran by voice. Following along and voice search happen on this iPhone; that audio isn't recorded or sent.",
           recordAudioAndroid: false,
         },
       ],
