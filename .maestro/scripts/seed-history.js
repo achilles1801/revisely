@@ -96,8 +96,28 @@ for (var k = 0; k < HISTORY; k++) {
     recordings: [],
   });
 }
-for (var c = 0; c < writes.length; c += 400) {
-  var commit = http.post(ROOT + ':commit', { headers: admin, body: JSON.stringify({ writes: writes.slice(c, c + 400) }) });
-  if (commit.status >= 300) throw new Error('seed commit failed: HTTP ' + commit.status + ' ' + commit.body);
+// The app is running and signed in while this writes, and its own writes can hold the account's documents:
+// the emulator then answers 409 "Transaction lock timeout" (both attempts of the first run, Nov 9 2026). So
+// the account and its pages go first, the revisions after in small commits, and a 409 is tried again after
+// a pause (Maestro's scripts have no timers: the pause is a wait on the clock).
+function pause(ms) {
+  var until = Date.now() + ms;
+  while (Date.now() < until) {
+    /* waiting */
+  }
 }
+function commitAll(list, size) {
+  for (var c = 0; c < list.length; c += size) {
+    var body = JSON.stringify({ writes: list.slice(c, c + size) });
+    for (var attempt = 1; ; attempt++) {
+      var commit = http.post(ROOT + ':commit', { headers: admin, body: body });
+      if (commit.status < 300) break;
+      if (commit.status !== 409 || attempt >= 8) throw new Error('seed commit failed: HTTP ' + commit.status + ' ' + commit.body);
+      pause(1500 * attempt);
+    }
+  }
+}
+var ACCOUNT_WRITES = 25; // the user, Al-Fatihah and Juz 30's 23 pages, written first
+commitAll(writes.slice(0, ACCOUNT_WRITES), ACCOUNT_WRITES);
+commitAll(writes.slice(ACCOUNT_WRITES), 100);
 console.log('seeded ' + HISTORY + ' days of history (' + writes.length + ' documents) for ' + output.email + ' (' + uid + ')');
