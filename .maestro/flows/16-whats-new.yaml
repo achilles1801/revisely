@@ -119,18 +119,12 @@ appId: com.revisionbuddy.app
     id: whats-new-next
     waitToSettleTimeoutMs: 500
     retryTapIfNoChange: false
+- runFlow: ../subflows/revo-moment-skip.yaml
 - extendedWaitUntil:
     visible:
-      id: whats-new-moment-skip
-    timeout: 10000
-# Once only: a retried tap on a screen still moving went on to Later (run 42537579159).
-- tapOn:
-    id: whats-new-moment-skip
-    waitToSettleTimeoutMs: 500
-    retryTapIfNoChange: false
-- assertVisible:
-    id: whats-new-title
-    text: '.*Meet Revo'
+      id: whats-new-title
+      text: '.*Meet Revo'
+    timeout: 40000
 - runFlow:
     file: ../subflows/shot.yaml
     env:

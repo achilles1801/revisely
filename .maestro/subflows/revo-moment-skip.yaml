@@ -1,0 +1,16 @@
+# Revo's moment (RevoMoment), once it has been opened: Skip if it is still playing. On Android Maestro
+# reads the screen slowly while the moment moves, so it may have played through by the time it looks
+# (run 42543047653). The step after this waits for what its end shows, up to 40 s (it lasts about 19).
+# Skip's tap doesn't wait for the screen to settle (it never does while the moment plays) and isn't
+# retried (a retried tap landed on what came next, run 42537579159).
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    when:
+      visible:
+        id: whats-new-moment-skip
+    commands:
+      - tapOn:
+          id: whats-new-moment-skip
+          waitToSettleTimeoutMs: 500
+          retryTapIfNoChange: false
