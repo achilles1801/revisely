@@ -3,8 +3,9 @@
 # together; End stops both and one note says what was saved ("Saved to today: Al-Mulk, ayahs 1–12,
 # 1 min · View"), with no "Recording saved" of its own. View opens the Day: the sitting, named by its
 # ayahs, offers Add to memorized. The sheet opens on its ayahs; To moved back a few ayahs, Add shows
-# them at once ("Memorized, 8 ayahs", what finishes the page), and Undo takes them off again.
-# Rules (BEHAVIOUR.md): REC-1, REC-2, MEM-1, MEM-3, MEM-5
+# them at once ("Memorized, 8 ayahs", what finishes the page), and they come off again (Undo on
+# Android, the Memorized menu's Delete on iOS: see the end).
+# Rules (BEHAVIOUR.md): REC-1, REC-2, MEM-1, MEM-3, MEM-5, ACT-6
 # The account: onboarded (Juz 30 and Al-Fatihah memorized, so Al-Mulk's first page, 562, is not), and
 # not a tester: sittings and the Day's blocks are every account's since the November 2026 release
 # (sittingsEnabled, activityBlocksEnabled).
@@ -252,8 +253,7 @@ appId: com.revisionbuddy.app
     env:
       NAME: 13-add-memorized
 # Undo's toast is on a 6 s clock from here, and its animation keeps the screen from settling: no
-# waiting for it to settle until Undo (waiting cost 3 s on Add and 2–3 s more before the screenshot,
-# and Undo came as the toast went, iOS, Nov 8 2026).
+# waiting for it to settle after Add.
 - tapOn:
     id: add-memorized-add
     waitToSettleTimeoutMs: 500
@@ -262,21 +262,43 @@ appId: com.revisionbuddy.app
       id: add-memorized-sheet
     timeout: 10000
 
-# At once (MEM-1, MEM-5): the Day counts ayahs (part of a page), says what finishes the page, and
-# offers Undo.
+# At once (MEM-1, MEM-5): the Day counts ayahs (part of a page) and says what finishes the page.
 - extendedWaitUntil:
     visible: "Memorized, ([1-9]|1[01]) ayahs?"
     timeout: 10000
 - assertVisible:
     id: activity-finishes-page
     text: "Al.Mulk.*12 finishes the page"
-- assertVisible: ".*marked memorized"
 - takeScreenshot: 13-day-memorized
 
-# Undo (MEM-3): the ayahs come off; the Day has nothing memorized again and offers the page.
-- tapOn:
-    text: "Undo"
-    waitToSettleTimeoutMs: 500
+# Taken off again (MEM-3): the ayahs come off; the Day has nothing memorized and offers the page.
+# Android: Undo on the toast. iOS: the toast's 6 s start as the sheet closes, and on a CI simulator
+# the sheet's going and Maestro seeing it took 5 of them, so Undo came after the toast had gone in
+# three runs of four (Nov 8 2026). There the ayahs come off the way ACT-6 offers, with no clock: the
+# Memorized header's menu → Delete, confirmed. Undo itself is in the scenario too (sittingMemorized).
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - assertVisible: ".*marked memorized"
+      - tapOn:
+          id: undo-toast-action
+          waitToSettleTimeoutMs: 500
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - longPressOn:
+          id: activity-block-memorized-header
+      - extendedWaitUntil:
+          visible:
+            id: activity-row-menu
+          timeout: 10000
+      - tapOn: "Delete"
+      - extendedWaitUntil:
+          visible: "Delete this memorization\\?"
+          timeout: 10000
+      - tapOn: "Delete"
 - extendedWaitUntil:
     notVisible:
       id: activity-block-memorized
