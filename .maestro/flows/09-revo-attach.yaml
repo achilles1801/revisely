@@ -67,11 +67,12 @@ appId: com.revisionbuddy.app
           timeout: 1500
 - tapOn:
     id: open-settings
+# Settings is long: on the iOS runner a swipe and a look take 4–6 s (.maestro/README.md, Time limits).
 - scrollUntilVisible:
     element: "Theme"
     direction: DOWN
     centerElement: true
-    timeout: 20000
+    timeout: 60000
 - tapOn: "Dark(, selected)?"
 - tapOn:
     id: back

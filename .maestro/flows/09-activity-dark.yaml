@@ -17,11 +17,12 @@ appId: com.revisionbuddy.app
 - tapOn:
     id: open-settings
 # Appearance is down the page.
+# Settings is long: on the iOS runner a swipe and a look take 4–6 s (.maestro/README.md, Time limits).
 - scrollUntilVisible:
     element:
       text: "Dark"
     direction: DOWN
-    timeout: 20000
+    timeout: 60000
 - tapOn:
     text: "Dark"
 - tapOn:

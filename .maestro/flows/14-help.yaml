@@ -109,12 +109,13 @@ appId: com.revisionbuddy.app
     id: open-settings
 # Centred: found at the screen's foot, a row can sit under the tab bar, which takes the tap (the
 # first run, Nov 8 2026, tapped Read instead).
+# Settings is long: on the iOS runner a swipe and a look take 4–6 s (.maestro/README.md, Time limits).
 - scrollUntilVisible:
     element:
       id: settings-help-buttons
     direction: DOWN
     centerElement: true
-    timeout: 20000
+    timeout: 60000
 - tapOn:
     id: settings-help-buttons
 - runFlow: ../subflows/back-home.yaml

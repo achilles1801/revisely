@@ -79,12 +79,13 @@ appId: com.revisionbuddy.app
 - tapOn:
     id: open-settings
 # Centred: found at the screen's foot, a row can sit under the tab bar, which takes the tap.
+# Settings is long: on the iOS runner a swipe and a look take 4–6 s (.maestro/README.md, Time limits).
 - scrollUntilVisible:
     element:
       id: smart-tracking-switch
     direction: DOWN
     centerElement: true
-    timeout: 20000
+    timeout: 60000
 - tapOn:
     id: smart-tracking-switch
 - tapOn:
