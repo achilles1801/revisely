@@ -26,7 +26,7 @@ jest.mock('../../../hooks/useRecordingPlayback', () => ({ useRecordingPlayback: 
 jest.mock('../../v2/ActionSheet', () => ({ ActionSheet: () => null }));
 jest.mock('../useActivityReload', () => {
   const mockReact = jest.requireActual('react');
-  return { useActivityReload: (load: () => void) => mockReact.useEffect(() => load(), []) };
+  return { useActivityReload: (load: () => void) => mockReact.useEffect(() => { load(); }, []) };
 });
 
 const note = (id: string, text: string): JournalNote => ({ id, at: Date.UTC(2026, 10, 5, 13, 1), kind: 'note', text, minutes: null });

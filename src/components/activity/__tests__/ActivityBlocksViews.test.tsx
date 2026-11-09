@@ -34,7 +34,7 @@ jest.mock('../../../lib/recordings', () => ({
 }));
 jest.mock('../useActivityReload', () => {
   const mockReact = jest.requireActual('react');
-  return { useActivityReload: (load: () => void) => mockReact.useEffect(() => load(), []) };
+  return { useActivityReload: (load: () => void) => mockReact.useEffect(() => { load(); }, []) };
 });
 jest.mock('../DayParts', () => ({ ProgressRing: () => null }));
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -17,6 +17,7 @@ import { setRevoActivityView } from '../../lib/revo/place';
 import { useActivitySources } from '../../components/activity/useActivitySources';
 import { ActivityCalendar } from '../../components/activity/ActivityCalendar';
 import { ActivityBlocksViews, type ViewKind } from '../../components/activity/ActivityBlocksViews';
+import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { HelpButton } from '../../components/help/HelpButton';
 import { HelpToast } from '../../components/help/HelpToast';
 import type { PreviewBlock } from '../../components/activity/CalendarMonth';
@@ -85,7 +86,12 @@ export default function ActivityScreen() {
   };
   // Pages already first tomorrow: their buttons say so ("First tomorrow ✓") and can't be tapped again.
   const firstTomorrow = useMemo(() => firstTomorrowPages(user, shiftDay(today, 1)), [user, today]);
-  const { readings, journal, recordings, loading, refreshing, loadError, load, onRefresh } = useActivitySources();
+  const { readings, journal, recordings, loading, loadError, load } = useActivitySources();
+  // Pull to refresh reads everything again (ACT-27): the readings and notes, and Overview's and Insights'
+  // items (they were left out, so a pull never changed Coverage). The spinner always ends (usePullToRefresh).
+  const blocksRefresh = useRef<(() => Promise<unknown>) | null>(null);
+  const refreshAll = useCallback(() => Promise.all([load(), blocksRefresh.current?.()]), [load]);
+  const { refreshing, onRefresh } = usePullToRefresh(refreshAll);
   const recordingDays = useMemo(() => recordings.map((rec) => rec.day), [recordings]);
 
   const days = useMemo(
@@ -144,7 +150,10 @@ export default function ActivityScreen() {
         <ScrollView
           style={styles.scroll}
           contentInsetAdjustmentBehavior="never" contentContainerStyle={{ paddingBottom: tabFootprint + layoutV2.rowPad }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={palette.secondary} />}
+          refreshControl={
+            // Transparent, as Home's: iOS paints the pull area opaque otherwise.
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={palette.secondary} style={{ backgroundColor: 'transparent' }} />
+          }
           testID="activity-v2"
         >
           {loadError && (
@@ -165,6 +174,7 @@ export default function ActivityScreen() {
               onSeeAllPages={() => navigation.navigate('PagesByStrength')}
               onTurnOnSmartTracking={() => navigation.navigate('Settings', { section: 'revision' })}
               onViewChange={setView}
+              refreshRef={blocksRefresh}
               // First tomorrow on every plan, for that day only (Majd, Nov 8 2026: a custom plan's day
               // used to open, and saving it replaced that day in every cycle).
               onPlanIt={reviseTomorrow}

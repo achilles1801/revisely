@@ -503,6 +503,12 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   revised this week", "At-Takwir, page 586, not revised yet". Revo's juz map fills the same way. (Majd, Nov 8
   2026: "for coverage shouldn't we allow for different views, not just juz?"; on the mocks: "fill is nicer
   than the bar", Surah filterable by juz, "having both surah and page is fine".)
+- **ACT-27.** Activity's Overview and Insights show a change as soon as the server has it, without leaving the
+  screen: a session or a revise-ahead saved before or while it is open shows once the phone has sent it (the
+  screen reads its items again whenever a change leaves the outbox), as well as on coming back to it. Pull to
+  refresh reads everything again, the items Overview and Insights read included, and its spinner always ends
+  (after 10 s at most), on a transparent ground as Home's. (Majd, Nov 9 2026: "shouldnt this update whenever
+  a user scrolls down to refresh the page instead of having to close out the app?")
 
 ## Ask coach
 
