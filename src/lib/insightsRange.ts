@@ -74,9 +74,10 @@ export function daysToLoad(range: InsightsRange, today?: string, firstDay?: stri
 export const unit = (n: number, one: string, many = `${one}s`): string => (n === 1 ? one : many);
 
 /** Page revisions on record over the memorized pages: how many times round them (All time's Coverage). */
-export function coverageCycleCount(revised: { countsFor: string; pages: number[] }[], today: string, memorized: number): number {
+export function coverageCycleCount(revised: { day?: string; countsFor: string; pages: number[] }[], today: string, memorized: number): number {
   if (memorized <= 0) return 0;
-  const pages = revised.filter((r) => daysBetween(r.countsFor, today) >= 0).reduce((n, r) => n + r.pages.length, 0);
+  // Every page revised up to today, on the day it was revised: ahead and catch-up pages too (AHEAD-6).
+  const pages = revised.filter((r) => daysBetween(r.day ?? r.countsFor, today) >= 0).reduce((n, r) => n + r.pages.length, 0);
   return pages / memorized;
 }
 
@@ -84,7 +85,7 @@ export function coverageCycleCount(revised: { countsFor: string; pages: number[]
  * Coverage over All time, in cycles ("3.1"). Shown only from the first whole cycle: before it, All time
  * shows the share as the other ranges do ("4% · 1 of 23 memorized pages since 8 November"), never "0 cycles".
  */
-export function coverageCycles(revised: { countsFor: string; pages: number[] }[], today: string, memorized: number): string {
+export function coverageCycles(revised: { day?: string; countsFor: string; pages: number[] }[], today: string, memorized: number): string {
   return coverageCycleCount(revised, today, memorized).toFixed(1).replace(/\.0$/, '');
 }
 

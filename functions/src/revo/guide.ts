@@ -296,6 +296,7 @@ export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
   'HELP-3': 'the help follows Smart Tracking (testers); the guide gets it with its next re-record',
   'ACT-25': 'Coverage’s “Not revised yet” (a fresh page is never 30+ days); the guide gets it with its next re-record',
   'ACT-26': 'Coverage’s Juz, Surah and Page views and the fill by share; the guide gets them with its next re-record',
+  'AHEAD-6': 'pages revised ahead are revised that day for Coverage and recency (Revo’s facts already read them so); the guide gets it with its next re-record',
   'HELP-4': 'the help buttons are on by default (testers); the guide gets it with its next re-record',
   'NEW-1': 'the What\'s new walkthrough ships switched off; the guide gets it, with Settings → About → What\'s new, at the release\'s re-record',
   'NEW-2': 'the walkthrough itself; the guide gets it at the release\'s re-record',
