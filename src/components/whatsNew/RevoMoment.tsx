@@ -1,5 +1,6 @@
 // What's new, Revo's card as a moment (lib/whatsNew/revoMoment: the clock, words and layout). It plays
-// by itself in about 19 s and a tap takes it to its end: the R writes itself, four questions in big
+// by itself in about 19 s and Skip, in the top corner, takes it to its end; a touch anywhere else does
+// nothing (Majd, Nov 9 2026: a tap anywhere was too easy to set off). The R writes itself, four questions in big
 // type each answered by a picture that turns into the next, a ring of questions drawn into Revo, and
 // Revo flying to its place on Home. Then Turn on Revo (Revo's own opt-in, REVO-21) or Later (NEW-2).
 // Drawn with Reanimated on the UI thread and react-native-svg, in the account's theme and accent; the
@@ -7,7 +8,7 @@
 // cross-fade. VoiceOver: the end at once, read as one line.
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { AccessibilityInfo, Modal, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { AccessibilityInfo, Modal, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import Animated, {
   Easing,
   cancelAnimation,
@@ -43,7 +44,6 @@ import {
   MOMENT_WEEK_MAX,
   MOMENT_WORDS,
   QUESTION_TIMES_P,
-  SKIP_HINT_P,
   WEEK_LETTERS,
   back,
   eio,
@@ -705,22 +705,11 @@ export function RevoMoment({
   };
 
   const faded = useAnimatedStyle(() => ({ opacity: fade.value }));
-  const hint = useAnimatedStyle(() => ({ opacity: seg(p.value, SKIP_HINT_P[0], SKIP_HINT_P[0] + 0.3) * (1 - seg(p.value, SKIP_HINT_P[1], SKIP_HINT_P[1] + 0.3)) }));
   const top = insets.top;
   const wide = { left: 16, width: L.width - 32 };
 
   return (
     <View style={styles.fill} testID="whats-new-revo-moment">
-      {/* A tap anywhere takes it to its end. */}
-      <Pressable
-        style={StyleSheet.absoluteFill}
-        onPress={skip}
-        accessibilityRole="button"
-        accessibilityLabel="Skip to the end"
-        accessibilityElementsHidden={ended}
-        importantForAccessibility={ended ? 'no-hide-descendants' : 'auto'}
-        testID="whats-new-moment"
-      />
       <Animated.View style={[StyleSheet.absoluteFill, faded]} pointerEvents="box-none">
         <View style={StyleSheet.absoluteFill} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
           <HomeSketch p={p} firstName={firstName} topInset={top} tabBar={tabBar} />
@@ -790,8 +779,7 @@ export function RevoMoment({
             <Tap
               onPress={() => setRun((r) => r + 1)}
               accessibilityRole="button"
-              hitSlop={10}
-              style={[styles.again, { top: top + 8 }]}
+              style={[styles.corner, { top: top + 2 }]}
               testID="whats-new-moment-again"
             >
               <Ionicons name="refresh" size={15} color={palette.link} />
@@ -803,12 +791,21 @@ export function RevoMoment({
         </View>
       </Animated.View>
 
+      {/* The one way to the end while it plays: holding the phone or brushing the screen never ends it. */}
       {ended ? null : (
-        <Animated.View style={[styles.hint, { top: top + 8, backgroundColor: palette.fill }, hint]} pointerEvents="none">
-          <Text style={[styles.hintText, { color: palette.secondary }]} maxFontSizeMultiplier={TEXT_MAX}>
-            {MOMENT_WORDS.skip}
-          </Text>
-        </Animated.View>
+        <Tap
+          onPress={skip}
+          accessibilityRole="button"
+          accessibilityLabel={MOMENT_WORDS.skip}
+          style={[styles.corner, { top: top + 2 }]}
+          testID="whats-new-moment-skip"
+        >
+          <View style={[styles.skipPill, { backgroundColor: palette.fill }]}>
+            <Text style={[styles.skipText, { color: palette.text }]} maxFontSizeMultiplier={TEXT_MAX}>
+              {MOMENT_WORDS.skip}
+            </Text>
+          </View>
+        </Tap>
       )}
       {closable ? (
         <Tap onPress={() => onClose?.()} accessibilityRole="button" accessibilityLabel="Close" hitSlop={12} style={[styles.close, { top: top + 6 }]} testID="whats-new-close">
@@ -867,9 +864,10 @@ const styles = StyleSheet.create({
   laterText: { fontSize: 17, fontWeight: '600' },
   hereTitle: { fontSize: 15, lineHeight: 20, fontWeight: '600', textAlign: 'right' },
   hereLine: { fontSize: 13, lineHeight: 18, textAlign: 'right' },
-  again: { position: 'absolute', right: 16, flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 6 },
+  /** Skip, then Watch again, in the same top corner: a 44pt target. */
+  corner: { position: 'absolute', right: 8, minWidth: 44, height: 44, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
+  skipPill: { height: 32, borderRadius: 16, paddingHorizontal: 14, justifyContent: 'center' },
+  skipText: { fontSize: 15, fontWeight: '600' },
   againText: { fontSize: 14, fontWeight: '600' },
-  hint: { position: 'absolute', right: 16, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 7 },
-  hintText: { fontSize: 14, fontWeight: '600' },
   close: { position: 'absolute', left: 16 },
 });

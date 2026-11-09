@@ -34,11 +34,9 @@ class WhatsNew {
   }
 
   async next(): Promise<void> {
-    // Revo's card plays first (at ordinary text sizes): a tap takes it to its end, where Later goes on.
-    const moment = this.app.screen.queryByTestId('whats-new-moment');
-    if (moment && !this.app.screen.queryByTestId('whats-new-moment-again')) {
-      await this.app.act(async () => this.app.mods.rtl.fireEvent.press(moment));
-    }
+    // Revo's card plays first (at ordinary text sizes): Skip takes it to its end, where Later goes on.
+    const skip = this.app.screen.queryByTestId('whats-new-moment-skip');
+    if (skip) await this.app.act(async () => this.app.mods.rtl.fireEvent.press(skip));
     await this.app.act(async () => this.app.mods.rtl.fireEvent.press(this.app.screen.getByTestId('whats-new-next')));
   }
 

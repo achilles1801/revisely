@@ -130,7 +130,7 @@ describe('<WhatsNewScreen />', () => {
     expect(screen.getByTestId('whats-new-done')).toBeTruthy();
   });
 
-  it('[NEW-2] Revo’s card plays full screen: a tap takes it to its end, and Later goes on', async () => {
+  it('[NEW-2] Revo’s card plays full screen: Skip takes it to its end, and Later goes on', async () => {
     // Jest's screen has 2× text; at an ordinary size the card is the moment.
     jest.spyOn(Dimensions, 'get').mockReturnValue({ width: 402, height: 874, scale: 3, fontScale: 1 });
     await show('required');
@@ -139,7 +139,7 @@ describe('<WhatsNewScreen />', () => {
     expect(screen.getByTestId('whats-new-revo-moment')).toBeTruthy();
     expect(screen.getByTestId('whats-new-card-revo')).toBeTruthy();
     expect(screen.queryByTestId('stepper')).toBeNull();
-    fireEvent.press(screen.getByTestId('whats-new-moment'));
+    fireEvent.press(screen.getByTestId('whats-new-moment-skip'));
     await act(async () => {});
     expect(screen.getByTestId('whats-new-title').props.accessibilityLabel).toBe(`Step ${revo + 1} of ${titles.length}. Meet Revo`);
     await next();
