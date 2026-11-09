@@ -38,10 +38,13 @@ function fullJobs() {
   return JSON.parse(line.trim().slice("full='".length, -1));
 }
 
-const flowsOf = (job) => {
-  const globs = job.flows.split(/\s+/).filter(Boolean).map(globRegex);
-  return flows.filter((f) => globs.some((g) => g.test(f)));
-};
+// A job's flows in the order it runs them: each glob in turn, its matches sorted, as the shell
+// expands them for run.sh. A flow two globs match comes twice, which the one-job check reports.
+const flowsOf = (job) =>
+  job.flows
+    .split(/\s+/)
+    .filter(Boolean)
+    .flatMap((glob) => flows.filter((f) => globRegex(glob).test(f)));
 const base = (flow) => path.basename(flow, '.yaml');
 
 /** A flow in a job's name: its number, or its file's name where several share the number (09). */
@@ -69,7 +72,7 @@ it('puts every flow in exactly one job of a full run', () => {
   expect({ missing, twice }).toEqual({ missing: [], twice: [] });
 });
 
-it('names each job by the flows it runs', () => {
+it('names each job by the flows it runs, in the order it runs them', () => {
   for (const job of fullJobs()) expect(job.name).toBe(flowsOf(job).map(short).join(' '));
 });
 

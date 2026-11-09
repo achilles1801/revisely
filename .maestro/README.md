@@ -42,7 +42,8 @@ and each iOS job takes 21–39 minutes of flows.
   `firestore.rules`, `storage.rules`, `firebase.json`, `functions/` and `scripts/emulators.sh`.
 - **Never missing:** it runs after a failure or a cancellation too, so a PR never waits for a check
   that won't come.
-- **Partial runs:** a run by hand on one platform, or with `flows` (a glob such as `06-*`), reports
+- **Partial runs:** a run by hand on one platform, or with `flows` (a glob such as `06-*`, or several:
+  `04-* 06-* 11-*` runs them in that order in one job, on one device), reports
   as `E2E (partial run)` and can't stand in for the check. `debug` there adds Firestore's own log to
   the app's log.
 - **Claude's PRs:** `claude-fix` starts CI on its branch (which runs it), since a PR opened by the
@@ -102,13 +103,19 @@ rules it covers in its first lines; recordings have no rule there yet.
 | `07-recordings` | Record in a session, find it under Revised on Activity's day, play, delete | none yet |
 | `08-time-zone` | Kathmandu (UTC+5:45): the day turns at its midnight | DAY-1, DAY-6 |
 | `10-delete-account` | Settings → Delete account, confirmed twice: the account and its data leave the server, back at sign-in | ACCOUNT-1 |
-| `11-surah-names` | Every screen that names the Qur'an (Home, its › menu, Jump to, All activity, the schedule, the memorized pages, a session, the end card, the daily log), in light and then dark (`…-dark`). In the first job: after 04 the Android emulator has a location, and Home a prayer line | NAME-1 |
+| `11-surah-names` | Every screen that names the Qur'an (Home, its › menu, Jump to, All activity, the schedule, the memorized pages, a session, the end card, the daily log), in light and then dark (`…-dark`). No position, so Home has no prayer line | NAME-1 |
 | `14-help` | An account that isn't a tester: Home's ? opens How Home works, with no Ask Revo (Revo is for testers here), closes; Hide help buttons, Undo, hidden again; still hidden after a cold start; Settings → Support → Help buttons brings it back. In the second job | HELP-1, HELP-2 |
 | `16-whats-new` | A tester: Settings → About → What's new replays the cards with a ✕; Testing → Show What's new at launch runs them after a cold start, no ✕, Android's back to the card before; a relaunch part way reopens the card it was on; after Done it doesn't come back. In the first job | NEW-2, NEW-3 |
 
 Every account is new: signed up in the flow (`subflows/signup.yaml`) with Al-Fatihah and Juz 30
 memorized (24 pages) and 10 pages a day, so the days are 1, 582–590 | 591–600 | 601–604, 1, 582–586.
 The test clock starts on Tuesday, 3 November 2026.
+
+The phone has no position the app can see unless the flow sets one with `subflows/location.yaml`
+before its first launch: 04 (Chicago, for the Fajr times) and 06 on Android (as its screenshot was
+approved). Every other launch allows every permission but location, so a position an earlier flow
+left on the device never reaches a later flow's screens (#217's run 42687083053: 06's Chicago gave
+11's Home a prayer line). `scripts/e2e/__tests__/location.test.js` keeps every launch to it.
 
 ## Screenshots
 

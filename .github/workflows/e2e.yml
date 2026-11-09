@@ -66,7 +66,7 @@ on:
         options: [both, ios, android]
         default: both
       flows:
-        description: Only these flows (a glob in .maestro/flows, e.g. 06-*); empty for all
+        description: Only these flows, in this order, in one job (globs in .maestro/flows, e.g. 06-* or '04-* 06-* 11-*'); empty for all
         type: string
         default: ''
       debug:
@@ -133,7 +133,11 @@ jobs:
       # slowest each flow has passed in (scripts/e2e/flow-minutes.json). Two jobs stopped
       # fitting once 09 grew to five files: #217's iOS job with 09 hit its limit twice,
       # before 11 and 16 (run 42619006611). scripts/e2e/__tests__/shards.test.js checks the
-      # times and that every flow is in exactly one job. The smoke set: two Android jobs, one iOS.
+      # times and that every flow is in exactly one job. A job runs its globs in the order
+      # written. 10 goes first in its job, before the 09 seeds: after them, deleting its account
+      # took 30.0 and 32.2 s on iOS against 3.4 and 4.0 s for the warm-up's empty account, past the
+      # app's 30 s (#217's run 42687083053); the emulator is in its first state then.
+      # The smoke set: two Android jobs, one iOS.
       # Called from CI: what `ios` and `android` say. On its own: a run by hand
       # with `flows` is one job each with those, `smoke` the smoke set, and
       # otherwise (and nightly) every flow.
@@ -150,7 +154,7 @@ jobs:
           SHA: ${{ github.sha }}
           RUN_ID: ${{ github.run_id }}
         run: |
-          full='[{"name":"02 03 08 12 13 16 17","flows":".maestro/flows/0[238]-*.yaml .maestro/flows/1[2367]-*.yaml"},{"name":"01 04 07 09-revo-attach 14 15","flows":".maestro/flows/0[147]-*.yaml .maestro/flows/09-revo-attach.yaml .maestro/flows/1[45]-*.yaml"},{"name":"09-activity-dark 09-activity-light 09-insights-history 10","flows":".maestro/flows/09-activity-*.yaml .maestro/flows/09-insights-history.yaml .maestro/flows/10-*.yaml"},{"name":"05 06 09-revo 11","flows":".maestro/flows/0[56]-*.yaml .maestro/flows/09-revo.yaml .maestro/flows/11-*.yaml"}]'
+          full='[{"name":"02 03 08 12 13 16 17","flows":".maestro/flows/0[238]-*.yaml .maestro/flows/1[2367]-*.yaml"},{"name":"01 04 07 09-revo-attach 14 15","flows":".maestro/flows/0[147]-*.yaml .maestro/flows/09-revo-attach.yaml .maestro/flows/1[45]-*.yaml"},{"name":"10 09-activity-dark 09-activity-light 09-insights-history","flows":".maestro/flows/10-*.yaml .maestro/flows/09-activity-*.yaml .maestro/flows/09-insights-history.yaml"},{"name":"05 06 09-revo 11","flows":".maestro/flows/0[56]-*.yaml .maestro/flows/09-revo.yaml .maestro/flows/11-*.yaml"}]'
           # Android's smoke set is a single PR's long pole: two jobs side by side
           # (about 8 minutes of flows each: 02 + 05, 04 + 06) instead of one of 16.
           # iOS keeps one job: macOS runners are the scarce part (5 at a time).
@@ -167,8 +171,10 @@ jobs:
           if [ -n "$IOS_SET" ] || [ -n "$ANDROID_SET" ]; then
             ios=$(set_of "${IOS_SET:-none}" ios); android=$(set_of "${ANDROID_SET:-none}" android)
           elif [ -n "$ONLY" ]; then
-            case "$ONLY" in *[!A-Za-z0-9*?._-]*) echo "::error::flows: a glob of flow names, like 06-*"; exit 1 ;; esac
-            ios=$(jq -cn --arg n "$ONLY" '[{name: $n, flows: (".maestro/flows/" + $n)}]'); android="$ios"
+            # Several globs run in one job in the order given, as a full job's do: '06-* 11-*' runs 11
+            # after 06 on the same device, which is how order between flows is tried by hand.
+            case "$ONLY" in *[!]A-Za-z0-9*?._[\ -]*) echo "::error::flows: globs of flow names, like 06-* or '06-* 11-*'"; exit 1 ;; esac
+            ios=$(jq -cn --arg n "$ONLY" '[{name: $n, flows: ($n | split(" ") | map(select(. != "") | ".maestro/flows/" + .) | join(" "))}]'); android="$ios"
           elif [ "$SMOKE" = true ]; then
             ios="$smoke_ios"; android="$smoke_android"
           else

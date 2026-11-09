@@ -79,13 +79,14 @@ export const SCREEN_MASKS = {
     ],
   },
   '06-home-offline': merge(revoButton, sessionMinutes(1272, 1186), {
-    // The next prayer's countdown, under the offline note (Android shows the prayer line here).
+    // The next prayer's countdown, under the offline note: on Android the flow sets Chicago, so Home
+    // has the prayer line; on iOS it sets no position and has none.
     android: [{ x: 800, y: 348, w: 205, h: 53, why: 'prayer countdown' }],
   }),
   '08-home-kathmandu': merge(revoButton),
   // 11-surah-names: Home done after a session, alone and under today's menu and Jump to, in light
-  // and dark: 02-home-done's layout. It runs in the first job, where no flow before it has given the
-  // Android emulator a location (04 does, in the second), so Home has no prayer line.
+  // and dark: 02-home-done's layout. The flow sets no position (subflows/location.yaml), so Home has
+  // no prayer line, whatever ran before it in its job.
   ...Object.fromEntries(
     ['11-home', '11-today-menu', '11-jump-juz', '11-jump-surah']
       .flatMap((n) => [n, `${n}-dark`])

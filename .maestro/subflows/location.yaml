@@ -1,0 +1,18 @@
+# The phone's position, for a flow whose screens show what depends on it (Home's next-prayer line,
+# the Fajr times): set on the device, and the app allowed to read it at every launch for the rest of
+# this flow. Call it before the flow's first launch.
+#
+# Every launch (launch.yaml, relaunch.yaml, relaunch-recordings.yaml, 06's) allows every permission
+# but location, unless this has run: `output.location`, which lasts one flow (each attempt is its own
+# `maestro test`, run.sh). Maestro allows everything when a launch names no permissions, and a
+# device keeps a position from one flow to the next in a job: before Nov 9 2026, 06's Chicago gave
+# 11's Home a prayer line after it in the same job (#217's run 42687083053, Android). So a flow
+# either sets the position here or the app can't see one (lib/widgets/position never asks).
+# `scripts/e2e/__tests__/location.test.js` keeps every launch and setLocation to this.
+#   env LATITUDE, LONGITUDE
+appId: com.revisionbuddy.app
+---
+- evalScript: ${output.location = 'allow'}
+- setLocation:
+    latitude: ${LATITUDE}
+    longitude: ${LONGITUDE}
