@@ -224,7 +224,7 @@ appId: com.revisionbuddy.app
     visible: "Add to yesterday"
     timeout: 10000
 - waitForAnimationToEnd
-- tapOn: "Close"
+- runFlow: ../subflows/close-sheet.yaml
 
 # ACT-17: Sunday, before yesterday: the + opens a note at once, no menu.
 - tapOn:

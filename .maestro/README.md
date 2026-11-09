@@ -404,6 +404,10 @@ Things that bit:
   kept onboarding's three changes on the phone past `seed-activity.js`; they reached the server
   after the relaunch (onboarding's 10 pages a day over the seed's 20), and the day showed neither
   "Juz 28" nor "From your session".
+- Close a `v2/Sheet` with `subflows/close-sheet.yaml` (a tap on the backdrop near the top), never
+  `tapOn: "Close"`. Two elements are "Close": the handle, which a tap doesn't close (a drag or
+  VoiceOver's activate does), and the backdrop, which Maestro taps at the screen's middle. On a tall
+  sheet that middle is the sheet itself: a page or a surah row there opened the reader (09, Nov 8).
 - One-time dialogs come when the app gets there, not at a fixed step (the recording backup notice,
   `subflows/backup-notice.yaml`). Wait for them a little where they belong, and accept them.
 - **Notes:** a flow never taps a note's action ("Saved to today: … · View",
