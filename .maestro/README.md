@@ -312,10 +312,15 @@ The app's `Date` runs at an offset from the device's own clock (`src/lib/e2e/clo
   `simctl openurl` can give up after 10 s (SpringBoard was slow to open the app), and Maestro ends
   the flow on that error even with `optional: true`. Links later in a flow still go through it.
 
-## Time zones
+## Time zones and places
 
 A flow names its zone in a header line, `# e2e-zone: Asia/Kathmandu`; the rest run in
-`America/Chicago`. `run.sh` sets it before the flow.
+`America/Chicago`. `run.sh` sets it before the flow, and puts the phone in the zone's city
+(`place_of`: Chicago 41.88, -87.63; Kathmandu 27.71, 85.32) before every attempt
+(`xcrun simctl location set`, `adb emu geo fix`). Home's next-prayer line and the Fajr boundary read
+the phone's position. Before (Nov 2026) only flow 04 set one, and it stayed for the rest of its job:
+the flows after 04 showed a line the others didn't, so a screenshot depended on which flows shared
+its job. A flow in a new zone needs its city in `place_of` (`run.sh` stops the flow without one).
 - **iOS:** the app is launched with `TZ` in its environment. Maestro launches apps with
   `xcrun simctl launch`, which passes on `SIMCTL_CHILD_*` variables from its own environment, so
   `run.sh` runs Maestro with `SIMCTL_CHILD_TZ`. Hermes' `Date` and `Intl` both follow it (checked:

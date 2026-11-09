@@ -2,7 +2,7 @@
 # 582–604) beside Al-Fatihah (page 1, marked for you): 24 pages. 10 pages a
 # day (the default), the day resetting at BOUNDARY (midnight | fajr). The days
 # (SCHED-1): 1, 582–590 | 591–600 | 601–604, 1, 582–586 | 587–596 …
-# For fajr, set the location first (setLocation) and launch with location allowed.
+# For fajr, launch with location allowed (run.sh puts the phone in its zone's city).
 appId: com.revisionbuddy.app
 ---
 - tapOn:

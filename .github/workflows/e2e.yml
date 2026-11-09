@@ -140,9 +140,9 @@ jobs:
       run_ios: ${{ steps.shards.outputs.run_ios }}
       run_android: ${{ steps.shards.outputs.run_android }}
     steps:
-      # The jobs and their flows. Every flow: two jobs a platform of about the
-      # same length (03 and 04, the long ones, apart; every flow in one of them, which
-      # scripts/e2e/__tests__/shards.test.js checks). The smoke set: two Android jobs, one iOS.
+      # The jobs and their flows. Every flow: six Android jobs and two iOS jobs, each list balanced by
+      # time; every flow file is in exactly one job of each (scripts/e2e/__tests__/shards.test.js).
+      # The smoke set: two Android jobs, one iOS.
       # Called from CI: what `ios` and `android` say. On its own: a run by hand
       # with `flows` is one job each with those, `smoke` the smoke set, and
       # otherwise (and nightly) every flow.
@@ -160,7 +160,12 @@ jobs:
           RUN_ID: ${{ github.run_id }}
           INFRA_ONLY: ${{ inputs.only }}
         run: |
-          full='[{"name":"01 02 03 08 09 11 16","flows":".maestro/flows/0[12389]-*.yaml .maestro/flows/1[16]-*.yaml"},{"name":"04 05 06 07 10 12 13 14 15 17","flows":".maestro/flows/0[4567]-*.yaml .maestro/flows/1[023457]-*.yaml"}]'
+          # From each flow's time on run 42548149857 (Nov 9 2026), less what an account made at launch
+          # saves: two iOS jobs of about 50 minutes of flows (macOS runners are five at a time) and six
+          # Android jobs of about 14 (Linux runners are plentiful, so a full Android run takes about
+          # one job's time). A new flow file fails the fast checks until it is in one job of each.
+          full='[{"name":"01 02 03 08 09-activity-dark 10 11 12 13 15 17","flows":".maestro/flows/01-*.yaml .maestro/flows/02-*.yaml .maestro/flows/03-*.yaml .maestro/flows/08-*.yaml .maestro/flows/09-activity-dark.yaml .maestro/flows/10-*.yaml .maestro/flows/11-*.yaml .maestro/flows/12-*.yaml .maestro/flows/13-*.yaml .maestro/flows/15-*.yaml .maestro/flows/17-*.yaml"},{"name":"04 05 06 07 09-activity-light 09-insights-history 09-revo-attach 09-revo 14 16","flows":".maestro/flows/04-*.yaml .maestro/flows/05-*.yaml .maestro/flows/06-*.yaml .maestro/flows/07-*.yaml .maestro/flows/09-activity-light.yaml .maestro/flows/09-insights-history.yaml .maestro/flows/09-revo-attach.yaml .maestro/flows/09-revo.yaml .maestro/flows/14-*.yaml .maestro/flows/16-*.yaml"}]'
+          full_android='[{"name":"01 09-activity-dark 12 14","flows":".maestro/flows/01-*.yaml .maestro/flows/09-activity-dark.yaml .maestro/flows/12-*.yaml .maestro/flows/14-*.yaml"},{"name":"02 05 09-insights-history 10","flows":".maestro/flows/02-*.yaml .maestro/flows/05-*.yaml .maestro/flows/09-insights-history.yaml .maestro/flows/10-*.yaml"},{"name":"03 08 09-revo","flows":".maestro/flows/03-*.yaml .maestro/flows/08-*.yaml .maestro/flows/09-revo.yaml"},{"name":"04 09-revo-attach 16","flows":".maestro/flows/04-*.yaml .maestro/flows/09-revo-attach.yaml .maestro/flows/16-*.yaml"},{"name":"06 09-activity-light 15","flows":".maestro/flows/06-*.yaml .maestro/flows/09-activity-light.yaml .maestro/flows/15-*.yaml"},{"name":"07 11 13 17","flows":".maestro/flows/07-*.yaml .maestro/flows/11-*.yaml .maestro/flows/13-*.yaml .maestro/flows/17-*.yaml"}]'
           # Android's smoke set is a single PR's long pole: two jobs side by side
           # (about 8 minutes of flows each: 02 + 05, 04 + 06) instead of one of 16.
           # iOS keeps one job: macOS runners are the scarce part (5 at a time).
@@ -168,17 +173,24 @@ jobs:
           smoke_ios='[{"name":"smoke: 02 04 05 06","flows":".maestro/flows/0[2456]-*.yaml"}]'
           build='[{"name":"native build","flows":""}]'
           # A change to shared test code (CI's plan): the flows it touches, or every flow.
-          if [ "$INFRA_ONLY" = all ]; then infra="$full"
+          if [ "$INFRA_ONLY" = all ]; then infra="$full"; infra_android="$full_android"
           else
-            # More than three flows: two jobs, alternately (each flow runs twice).
+            # iOS: more than three flows, two jobs, alternately (each flow runs twice).
             infra=$(jq -cn --arg f "$INFRA_ONLY" '
               ($f | split(" ") | map(select(. != ""))) as $all
               | (if ($all | length) > 3 then [[$all | to_entries[] | select(.key % 2 == 0) | .value], [$all | to_entries[] | select(.key % 2 == 1) | .value]] else [$all] end)
               | map({name: ("changed: " + (map(split("/") | last | split("-") | first) | join(" "))), flows: join(" ")})')
+            # Android: two flows a job.
+            infra_android=$(jq -cn --arg f "$INFRA_ONLY" '
+              ($f | split(" ") | map(select(. != ""))) as $all
+              | [range(0; $all | length; 2) as $i | $all[$i:$i + 2]]
+              | map({name: ("changed: " + (map(split("/") | last | split("-") | first) | join(" "))), flows: join(" ")})')
           fi
           set_of() { # set platform
             case "$1" in
-              none) echo '[]' ;; build) echo "$build" ;; full) echo "$full" ;; infra) echo "$infra" ;;
+              none) echo '[]' ;; build) echo "$build" ;;
+              full) if [ "$2" = android ]; then echo "$full_android"; else echo "$full"; fi ;;
+              infra) if [ "$2" = android ]; then echo "$infra_android"; else echo "$infra"; fi ;;
               smoke) if [ "$2" = android ]; then echo "$smoke_android"; else echo "$smoke_ios"; fi ;;
               *) echo "::error::Unknown set '$1' (none, build, smoke, full, infra)" >&2; return 1 ;;
             esac
@@ -191,7 +203,7 @@ jobs:
           elif [ "$SMOKE" = true ]; then
             ios="$smoke_ios"; android="$smoke_android"
           else
-            ios="$full"; android="$full"
+            ios="$full"; android="$full_android"
           fi
           if [ "$EVENT" = workflow_dispatch ] && [ -z "$IOS_SET$ANDROID_SET" ]; then
             if [ "$PLATFORM" = android ]; then ios='[]'; fi

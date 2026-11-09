@@ -9,6 +9,7 @@
 # one it runs in America/Chicago (E2E_ZONE). iOS: the app is launched with TZ set
 # (Maestro launches it with `xcrun simctl launch`, which passes SIMCTL_CHILD_*
 # variables on). Android: the emulator's own zone is set before the flow.
+# The phone is in the zone's city too (place_of), set before every attempt.
 #
 # Environment:
 #   E2E_DEVICE         simulator UDID / adb serial (default: the one booted device)
@@ -111,6 +112,32 @@ set_android_zone() {
   fi
 }
 
+# Where the phone is: the zone's city, set before every attempt on both platforms. Home's
+# next-prayer line and the Fajr boundary read the phone's position. Before (Nov 2026) only flow 04
+# set one (Maestro's setLocation), and it stayed for the rest of its job: the flows after 04 showed
+# a line the others didn't, and the screenshots depended on which flows shared a job.
+place_of() {
+  case "$1" in
+    America/Chicago) echo "41.88 -87.63" ;;
+    Asia/Kathmandu) echo "27.71 85.32" ;;
+    *) echo "error: no place for the zone $1 (run.sh, place_of)" >&2; return 1 ;;
+  esac
+}
+
+set_place() {
+  local place lat lon
+  place=$(place_of "$1") || return 1
+  read -r lat lon <<<"$place"
+  if [ "$PLATFORM" = ios ]; then
+    xcrun simctl location "$DEVICE" set "$lat,$lon" >/dev/null 2>&1 ||
+      { echo "error: could not put the simulator at $lat,$lon" >&2; return 1; }
+  else
+    # The emulator's console takes longitude first.
+    adb -s "$DEVICE" emu geo fix "$lon" "$lat" >/dev/null 2>&1 ||
+      { echo "error: could not put the emulator at $lat,$lon" >&2; return 1; }
+  fi
+}
+
 # A flow's own screenshots of key screens (takeScreenshot: a name) go to
 # $out/run/takeScreenshot/<name>.png; the workflow keeps them from every run.
 
@@ -145,6 +172,7 @@ run_flow() {
     # its offline switch is the app's own, and each flow starts from a fresh install.
     adb -s "$DEVICE" shell cmd connectivity airplane-mode disable >/dev/null 2>&1 || true
   fi
+  set_place "$zone" || return 1
   if [ "$PLATFORM" = ios ]; then
     with_limit "$FLOW_LIMIT" env SIMCTL_CHILD_TZ="$zone" "$MAESTRO" --device "$DEVICE" test \
       -e E2E_AUTH_URL="$AUTH_URL" -e E2E_FIRESTORE_URL="$FIRESTORE_URL" -e E2E_FUNCTIONS_URL="$FUNCTIONS_URL" \

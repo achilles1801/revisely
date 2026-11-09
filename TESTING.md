@@ -256,6 +256,8 @@ job (20.4 minutes): about 2 minutes of setup, a minute to bundle the JavaScript,
 boot the emulator, then 02, 04, 05 and 06 one after another (16 minutes). Since Nov 7 (#295):
 
 - the smoke set runs in **two Android jobs side by side** (02 + 05, 04 + 06);
+- a full run is **six Android jobs** of about 14 minutes of flows each and two iOS jobs of about
+  50 (balanced from run 42548149857's times; macOS runners are five at a time);
 - the JavaScript is bundled **while** the emulator installs and boots;
 - disk space is freed only before a native build.
 
