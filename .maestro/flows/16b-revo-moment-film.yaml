@@ -1,0 +1,246 @@
+# TEMPORARY, never merged (branch claude/whats-new-revo-moment-film): a filmstrip of What's new's
+# Revo moment for review, about a frame a second. Light as App Store users will see it (Show What's new
+# at launch), then dark from the replay. waitForAnimationToEnd never settles while it plays, so each one
+# is a pause of its timeout.
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    file: ../subflows/new-account.yaml
+    env:
+      CLOCK: 2026-11-03T19:00
+      BOUNDARY: midnight
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: tester
+- extendedWaitUntil:
+    visible:
+      id: today-post
+    timeout: 20000
+- tapOn:
+    id: open-settings
+- scrollUntilVisible:
+    element:
+      id: settings-whats-new-launch
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- tapOn:
+    id: settings-whats-new-launch
+- runFlow: ../subflows/relaunch.yaml
+- extendedWaitUntil:
+    visible:
+      id: whats-new-forced
+    timeout: 20000
+- tapOn:
+    id: whats-new-next
+- tapOn:
+    id: whats-new-next
+- tapOn:
+    id: whats-new-next
+    waitToSettleTimeoutMs: 100
+    retryTapIfNoChange: false
+- takeScreenshot: rm-light-01
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-light-02
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-light-03
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-light-04
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-light-05
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-light-06
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-light-07
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-light-08
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-light-09
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-light-10
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-light-11
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-light-12
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-light-13
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-light-14
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-light-15
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-light-16
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-light-17
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-light-18
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-light-19
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-light-20
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-light-21
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-light-22
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-light-23
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-light-24
+- waitForAnimationToEnd:
+    timeout: 600
+- extendedWaitUntil:
+    visible:
+      id: whats-new-moment-again
+    timeout: 40000
+- takeScreenshot: rm-light-end
+- tapOn:
+    id: whats-new-revo-turn-on
+- extendedWaitUntil:
+    visible:
+      id: revo-optin
+    timeout: 10000
+- takeScreenshot: rm-light-optin
+- tapOn:
+    id: revo-not-now
+- extendedWaitUntil:
+    notVisible:
+      id: revo-optin
+    timeout: 10000
+- tapOn:
+    id: whats-new-next
+- tapOn:
+    id: whats-new-done
+- extendedWaitUntil:
+    visible:
+      id: today-post
+    timeout: 20000
+- tapOn:
+    id: open-settings
+- scrollUntilVisible:
+    element:
+      text: "Dark"
+    direction: DOWN
+    timeout: 20000
+- tapOn:
+    text: "Dark"
+- scrollUntilVisible:
+    element:
+      id: settings-whats-new
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- tapOn:
+    id: settings-whats-new
+- extendedWaitUntil:
+    visible:
+      id: whats-new-replay
+    timeout: 10000
+- tapOn:
+    id: whats-new-next
+- tapOn:
+    id: whats-new-next
+- tapOn:
+    id: whats-new-next
+    waitToSettleTimeoutMs: 100
+    retryTapIfNoChange: false
+- takeScreenshot: rm-dark-01
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-dark-02
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-dark-03
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-dark-04
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-dark-05
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-dark-06
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-dark-07
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-dark-08
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-dark-09
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-dark-10
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-dark-11
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-dark-12
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-dark-13
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-dark-14
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-dark-15
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-dark-16
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-dark-17
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-dark-18
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-dark-19
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-dark-20
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-dark-21
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-dark-22
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-dark-23
+- waitForAnimationToEnd:
+    timeout: 600
+- takeScreenshot: rm-dark-24
+- waitForAnimationToEnd:
+    timeout: 600
+- extendedWaitUntil:
+    visible:
+      id: whats-new-moment-again
+    timeout: 40000
+- takeScreenshot: rm-dark-end
