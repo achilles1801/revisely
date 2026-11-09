@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import QuranReaderScreen from '../QuranReaderScreen';
 import { pageOfVerse } from '../../../lib/verses';
+import { navigateToActivityDay } from '../../../navigation/navigationRef';
 
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
 jest.mock('react-native-reanimated', () => require('react-native-reanimated/mock'));
@@ -259,6 +260,25 @@ describe('QuranReaderScreen: a sitting, the timer and a recording (REC-1)', () =
     await endTheTimer();
     expect(mockState.calls).toEqual(['timer saved']);
     expect(screen.getByText(/^Saved to (today|Tuesday): /)).toBeTruthy();
+  });
+
+  // E2E flows don't press the notes' View (a note lasts 6 s; .maestro/README.md, Notes): these do.
+  it('[REC-1] the sitting’s note opens the day it was saved to', async () => {
+    mockState.user = { previewTester: true };
+    mockState.phase = 'recording';
+    mockState.timer = runningOn(3);
+    await endTheTimer();
+    fireEvent.press(screen.getByText('View'));
+    expect(navigateToActivityDay).toHaveBeenCalledWith('2026-11-03');
+    expect(screen.queryByText(/^Saved to /)).toBeNull();
+  });
+
+  it('a recording ended alone: "Recording saved · View" opens its day at the recording', async () => {
+    await open();
+    act(() => mockState.onFinished?.({ day: '2026-11-03', recordingId: 'r1' }));
+    expect(screen.getByText('Recording saved')).toBeTruthy();
+    fireEvent.press(screen.getByText('View'));
+    expect(navigateToActivityDay).toHaveBeenCalledWith('2026-11-03', 'r1');
   });
 
   it('[REC-1] not a tester: End leaves a running recording alone, as before', async () => {
