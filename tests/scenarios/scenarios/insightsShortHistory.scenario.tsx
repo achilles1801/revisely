@@ -66,9 +66,10 @@ const flat = (st: unknown) => StyleSheet.flatten(st as never) as Record<string, 
 function grid() {
   const g = screen.queryByTestId('insights-weeks-grid');
   if (!g) return null;
-  const cells = screen.getAllByTestId(/^insights-grid-/);
+  const cells = screen.getAllByTestId(/^insights-grid-\d{4}-/);
   const size = flat(cells[0].props.style);
-  return { columns: g.props.children.length as number, width: size.width, height: size.height };
+  const faint = cells.filter((c) => flat(c.props.style).opacity === 0.35).length;
+  return { columns: screen.getAllByTestId(/^insights-grid-week-/).length, width: size.width, height: size.height, faint };
 }
 
 describe('Insights for a short and a long history, at every range (ACT-22)', () => {
@@ -92,6 +93,9 @@ describe('Insights for a short and a long history, at every range (ACT-22)', () 
       expect(g.columns).toBe(1);
       expect(g.width).toBe(g.height);
       expect(g.width).toBeLessThanOrEqual(18);
+      // The week reads as one: its weekdays' initials, and Monday to Saturday (after today) faint.
+      expect(screen.getByTestId('insights-grid-weekdays', { includeHiddenElements: true })).toBeTruthy();
+      expect(g.faint).toBe(6);
       screen.unmount();
     }
     open(1, 30);
@@ -123,8 +127,8 @@ describe('Insights for a short and a long history, at every range (ACT-22)', () 
     expect(figure('insights-consistency-figure')).toBe('365 of 365 days since 9 November');
     const gAll = grid()!;
     expect(gAll.columns).toBe(26);
-    // 26 weeks across 440 pt, less the gutters and gaps.
-    expect(gAll.width).toBe(Math.floor((440 - 32 - 25 * 3) / 26));
+    // 26 weeks across 440 pt, less the gutters, the weekdays' column and the gaps.
+    expect(gAll.width).toBe(Math.floor((440 - 32 - 12 - 26 * 3) / 26));
     screen.unmount();
   });
 });

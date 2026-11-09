@@ -81,6 +81,9 @@ import {
 /** Consistency's weeks grid: the gap between cells, and the largest a cell gets (3 months on a wide phone). */
 const GRID_GAP = 3;
 const GRID_CELL_MAX = 18;
+/** Its rows' weekday initials (Sunday first, as weeksGrid) and their column's width. */
+const WEEKDAY_INITIALS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+const GRID_LABEL_W = 12;
 
 export interface InsightsData {
   today: string;
@@ -701,7 +704,7 @@ function Consistency({ data, onOpenDay, onOpenCalendar }: { data: InsightsData; 
   const pattern = weeks > 0 ? missedPattern(active, data.today, span.window, data.firstDay) : null;
   const { width } = useWindowDimensions();
   const fullWeeks = range === 90 ? 13 : 26;
-  const cell = Math.max(8, Math.min(GRID_CELL_MAX, Math.floor((width - 32 - (fullWeeks - 1) * GRID_GAP) / fullWeeks)));
+  const cell = Math.max(8, Math.min(GRID_CELL_MAX, Math.floor((width - 32 - GRID_LABEL_W - fullWeeks * GRID_GAP) / fullWeeks)));
   // A count from the account's first day names it, whatever the range ("since 8 November").
   const sinceFirst = data.firstDay ? `since ${dayAndMonth(data.firstDay)}` : 'since you started';
   const figureText =
@@ -743,8 +746,22 @@ function Consistency({ data, onOpenDay, onOpenCalendar }: { data: InsightsData; 
       />
       {grid ? (
         <View style={styles.grid} testID="insights-weeks-grid">
+          {/* The weekdays, and the days before the account or after today drawn faintly: even a day-old
+              account's one column reads as a week, not as an empty space under one cell. */}
+          <View
+            style={[styles.gridCol, { width: GRID_LABEL_W }]}
+            importantForAccessibility="no-hide-descendants"
+            accessibilityElementsHidden
+            testID="insights-grid-weekdays"
+          >
+            {WEEKDAY_INITIALS.map((letter, i) => (
+              <View key={i} style={[styles.gridLabel, { height: cell }]}>
+                <ChromeText style={[styles.gridLabelText, { color: palette.secondary, fontSize: cell >= 14 ? 11 : 9 }]}>{letter}</ChromeText>
+              </View>
+            ))}
+          </View>
           {grid.map((col) => (
-            <View key={col[0].day} style={[styles.gridCol, { width: cell }]}>
+            <View key={col[0].day} style={[styles.gridCol, { width: cell }]} testID={`insights-grid-week-${col[0].day}`}>
               {col.map((c) => (
                 <Tap
                   key={c.day}
@@ -757,7 +774,7 @@ function Consistency({ data, onOpenDay, onOpenCalendar }: { data: InsightsData; 
                       ? { backgroundColor: palette.primary }
                       : c.state === 'missed'
                         ? { borderWidth: 1, borderColor: palette.outline }
-                        : null,
+                        : { backgroundColor: palette.track, opacity: 0.35 },
                   ]}
                   accessible={c.state === 'done' || c.state === 'missed'}
                   accessibilityRole="button"
@@ -1217,6 +1234,8 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row', gap: GRID_GAP, marginTop: 12, alignSelf: 'flex-start' },
   gridCol: { gap: GRID_GAP },
   gridCell: { borderRadius: 3 },
+  gridLabel: { justifyContent: 'center' },
+  gridLabelText: { fontWeight: '600', textAlign: 'center' },
   pattern: { marginTop: 10 },
   donePill: { flexDirection: 'row', gap: 6 },
   doneLink: { flexDirection: 'row', alignItems: 'center', gap: 4 },
