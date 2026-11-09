@@ -68,9 +68,11 @@ retry is a warning on the run, and the job keeps its results as for a failure.
   - Runs of a fork's pull request are left out. A PR that changes the report prints it in its job
     summary instead of commenting; so does a run by hand with `dry_run`. Like every scheduled
     workflow it runs from `main`.
-- **Time limits:** `run.sh` stops a flow's attempt after 15 minutes and the warm-up after 6
-  (`E2E_FLOW_LIMIT`, `E2E_WARMUP_LIMIT`). Maestro can hang for good: once its iOS driver answered
-  500, its JVM never exited, and a job waited 55 minutes for it.
+- **Time limits:** `run.sh` stops a flow's attempt after 15 minutes (20 in e2e.yml's iOS job) and
+  the warm-up after 6 (`E2E_FLOW_LIMIT`, `E2E_WARMUP_LIMIT`). Maestro can hang for good: once its
+  iOS driver answered 500, its JVM never exited, and a job waited 55 minutes for it. iOS flows 09
+  and 11 pass in 12 to 14.5 minutes on a busy runner; 11's first attempt in run 42649421053 was
+  stopped at 15 while still going (560 of its ~586 steps), hence 20 there.
   - A `scrollUntilVisible` timeout is time, not swipes: on the iOS runner each swipe and look takes
     4–6 s, so 20 s reaches only 3 or 4 swipes down. Rows deep in Settings (Theme, Help buttons,
     What's new, Delete account) are 4–6 swipes down. In run 42531940953 the row came into view
