@@ -339,9 +339,15 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   beneath it, over the dimmed screen. An action runs once the menu has closed; touching the backdrop runs nothing.
   The daily log's note menu is the same menu (Edit, and Copy when the note has text).
 
-- **ACT-7.** Deleting a Revised session or a Memorized entry asks first, and names what goes. A memorized
-  entry's pages go back to not memorized (only those still memorized) and its item is removed. A failed
-  removal is kept and retried, never dropped.
+- **ACT-7.** Deleting a Revised session or a Memorized entry asks first, and names what goes. A Memorized
+  entry takes off exactly the ayahs it added (MEM-3), and its item is removed: a page it memorized goes back
+  to not memorized, and a page it added part of keeps only its other ayahs (Nov 8 2026: before, a page it
+  added part of kept the entry's ayahs). Ayahs another day's entry also holds stay, and so does a page that
+  was memorized before any entry that holds it (marked in the memorized pages, or at sign-up). Home's %
+  memorized, the juz dots, the plan and Revo follow the pages; a custom plan drops the pages that are no
+  longer memorized, as editing the memorized pages does. Undo of an add takes its ayahs out of that day's
+  entry only, so Undo straight after an add and Delete leave the same pages. A failed removal is kept and
+  retried, never dropped.
 
 - **ACT-8.** A revised page's strength comes from its weakness rating (1–5): 1–2 is weak, 3 is moderate, 4–5
   is strong. The counts on a day's Revised block are these classes, over the day's revised pages (a page with

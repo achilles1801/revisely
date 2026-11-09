@@ -40,11 +40,6 @@ export function memorizedMinutesAfter(
   };
 }
 
-/** Removing a memorization un-marks its pages (only those still marked memorized). */
-export function pagesToUnmark(entryPages: number[], memorized: Set<number>): number[] {
-  return [...new Set(entryPages)].filter((p) => memorized.has(p)).sort((a, b) => a - b);
-}
-
 /**
  * Deletes that can be undone: each is held for `ms`, then committed. Undo cancels
  * it; a second delete of the same key replaces the first. `flush` commits all now

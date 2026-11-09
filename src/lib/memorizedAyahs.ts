@@ -14,7 +14,7 @@
 
 import type { UserPage } from '../types';
 import { MushafEditionId, getMushafEdition } from './mushafEdition';
-import { AyahKey, ayahSharesOnPage, ayahsOnPage, ayahCount, pageOfAyah, sortedAyahs } from './ayahKeys';
+import { AyahKey, ayahSharesOnPage, ayahsOfPages, ayahsOnPage, ayahCount, pageOfAyah, sortedAyahs } from './ayahKeys';
 import { getAllSurahs, getPagesForJuz } from './quranData';
 
 /** What the ayah rules need of a page. */
@@ -202,6 +202,67 @@ export interface MemorizationItemLike {
   pages: readonly number[];
   /** Every ayah the item added (sura × 1000 + ayah), when it was added by the ayah; absent for whole pages. */
   verses?: readonly number[] | null;
+}
+
+/**
+ * Every ayah a memorization item holds: its ayahs, and every ayah of its pages that has none among
+ * them. A day's item keeps whole pages added before any ayah that day without their ayahs
+ * (firestoreService.addMemorizationPages), so those pages count whole.
+ */
+export function ayahsOfItem(item: Pick<MemorizationItemLike, 'pages' | 'verses'>, edition: MushafEditionId = getMushafEdition()): AyahKey[] {
+  const verses = sortedAyahs(item.verses ?? []);
+  const withAyahs = new Set(verses.map((k) => pageOfAyah(k, edition)));
+  const whole = [...new Set(item.pages)].filter((p) => !withAyahs.has(p));
+  return sortedAyahs([...verses, ...ayahsOfPages(whole, edition)]);
+}
+
+/** The local day ("2026-11-03") a date falls on. */
+const localDayOf = (iso: string): string => {
+  const d = new Date(iso);
+  const two = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}`;
+};
+
+/**
+ * What deleting a memorization item does to the pages (ACT-7, MEM-3): it takes off exactly the
+ * ayahs it added. An ayah another item also holds stays, and so does a page memorized before any
+ * item that holds it (marked in the memorized pages or at sign-up, which date it then, or from
+ * before pages had dates): those ayahs didn't come from the item. `others` are the account's other
+ * items; when they can't be read, the dates still keep what came before the item.
+ */
+export function pagesAfterDeletingItem<T extends UserPage>(
+  pages: readonly T[],
+  item: MemorizationItemLike,
+  others: readonly MemorizationItemLike[],
+  edition: MushafEditionId = getMushafEdition(),
+  dayOf: (iso: string) => string = localDayOf,
+): AyahChange<T> {
+  const held = new Set<AyahKey>();
+  // Each page's first day in an item: a page dated before it was memorized some other way.
+  const firstDay = new Map<number, string>();
+  const note = (day: string, keys: readonly AyahKey[]) => {
+    for (const k of keys) {
+      const p = pageOfAyah(k, edition);
+      const known = firstDay.get(p);
+      if (known == null || day < known) firstDay.set(p, day);
+    }
+  };
+  for (const other of others) {
+    const keys = ayahsOfItem(other, edition);
+    for (const k of keys) held.add(k);
+    note(other.day, keys);
+  }
+  const mine = ayahsOfItem(item, edition);
+  note(item.day, mine);
+  const byNumber = new Map(pages.map((p) => [p.pageNumber, p] as const));
+  const memorizedBefore = (n: number): boolean => {
+    const page = byNumber.get(n);
+    if (!page || memorizedAyahsOnPage(page, edition).length === 0) return false;
+    if (!page.dateMemorized) return true;
+    return dayOf(page.dateMemorized) < (firstDay.get(n) ?? item.day);
+  };
+  const drop = mine.filter((k) => !held.has(k) && !memorizedBefore(pageOfAyah(k, edition)));
+  return removeAyahs(pages, drop, edition);
 }
 
 /**

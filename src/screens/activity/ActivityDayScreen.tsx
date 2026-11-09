@@ -31,7 +31,6 @@ import { pendingEntries } from '../../lib/offline/outbox';
 import { joinedSince, keepTaken } from '../../lib/offline/dayItems';
 import { onApplied } from '../../lib/offline/sync';
 import type { OutboxEntry } from '../../lib/offline/ops';
-import { pagesToUnmark } from '../../lib/activityAdd';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
 import { isRevisionActivity, normalizeReadingSession } from '../../lib/activity';
 import {
@@ -64,7 +63,9 @@ import { describePageRuns, describeRevised, pageRuns } from '../../lib/pageRange
 import { ownRevised } from '../../lib/activityItems';
 import { layoutV2, typeV2 } from '../../theme/v2';
 import { addToPlanParams, putFirstTomorrow } from '../../lib/weakSpotActions';
-import { revisablePages } from '../../lib/memorizedAyahs';
+import { pagesAfterDeletingItem, revisablePages } from '../../lib/memorizedAyahs';
+import { customPlanAfterUnmemorizing } from '../../lib/memorizationChanges';
+import { MemorizationItem, memorizationItemsWithWaiting } from '../../lib/offline/memorizationItems';
 import { describePassage } from '../../lib/passages';
 import { shiftDay } from '../../lib/journal';
 
@@ -112,6 +113,26 @@ function sessionPagesOf(log: RevisionLog): number[] {
  * a thread: the day first, then each revision session, timed session and the
  * daily log as replies joined by the line; recordings below.
  */
+/** How long Delete waits for the other memorization items before going on without them (offline). */
+const OTHER_ITEMS_MS = 5000;
+
+/** `promise`, or a rejection after `ms`. */
+function withinMs<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`no answer in ${ms} ms`)), ms);
+    promise.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(timer);
+        reject(e);
+      },
+    );
+  });
+}
+
 export default function ActivityDayScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<ScreenRoute>();
@@ -363,17 +384,26 @@ export default function ActivityDayScreen() {
     readings.length > 0 ? `${readings.length} timed` : null,
     journal ? 'daily log' : null,
   ].filter(Boolean);
-  // Deleting a memorization (C4): its pages go back to not memorized (one change to the
-  // pages, which also updates this phone), then the item is removed.
-  const onDeleteMemorized = async (item: { id: string; day: string; pages: number[] }) => {
-    const memorized = new Set(pages.filter((p) => p.status === 'memorized').map((p) => p.pageNumber));
-    const unmark = pagesToUnmark(item.pages, memorized);
-    if (unmark.length > 0) {
-      const set = new Set(unmark);
-      await updatePages(
-        pages.map((p) => (set.has(p.pageNumber) ? { ...p, status: 'not_memorized' as const, dateMemorized: null } : p)),
-        unmark,
-      );
+  // Deleting a memorization (ACT-7): it takes off exactly the ayahs it added, keeping those another
+  // item holds and pages memorized before it (one change to the pages, which also updates this
+  // phone); the custom plan drops what is no longer memorized; then the item is removed.
+  const onDeleteMemorized = async (item: { id: string; day: string; pages: number[]; verses?: number[] }) => {
+    const uid = currentAccount();
+    let server: MemorizationItem[] = [];
+    if (uid) {
+      try {
+        server = await withinMs(firestoreService.getMemorizationItems(uid), OTHER_ITEMS_MS);
+      } catch (err) {
+        // Offline: the items waiting here, and the pages' dates, still keep what came before it.
+        logger.warn('Deleting a memorization: the other items could not be read', err);
+      }
+    }
+    const others = memorizationItemsWithWaiting(server, pendingEntries(uid)).filter((m) => m.id !== item.id);
+    const { pages: next, changed } = pagesAfterDeletingItem(pages, item, others);
+    if (changed.length > 0) {
+      await updatePages(next, changed);
+      const plan = customPlanAfterUnmemorizing(userRef.current?.customPlan, next);
+      if (plan && userRef.current) await saveUser({ ...userRef.current, customPlan: plan });
     }
     await queueChange({ kind: 'memorization.delete', day: item.day, id: item.id });
   };

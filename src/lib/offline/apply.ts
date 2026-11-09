@@ -97,6 +97,7 @@ export async function applyEntry(uid: string, entry: OutboxEntry): Promise<void>
         ? firestoreService.addMemorizationPages(op.day, op.pages, op.at, uid, op.minutes ?? null, op.verses)
         : firestoreService.addMemorizationPages(op.day, op.pages, op.at, uid, op.minutes ?? null);
     case 'memorization.unmark':
+      if (op.day) return firestoreService.removeMemorizationPages(op.pages, uid, op.verses ?? [], op.day);
       return op.verses
         ? firestoreService.removeMemorizationPages(op.pages, uid, op.verses)
         : firestoreService.removeMemorizationPages(op.pages, uid);

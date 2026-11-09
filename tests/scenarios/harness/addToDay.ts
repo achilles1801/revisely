@@ -73,6 +73,23 @@ export class AddToDay {
     await this.add('memorized');
   }
 
+  /** + → Memorized → Ayahs, From `from` to `to` (sura × 1000 + ayah) → Add. */
+  async memorizedAyahs(from: number, to: number): Promise<void> {
+    await this.open();
+    await this.choose('memorized');
+    await this.pickAyah('from', from);
+    await this.pickAyah('to', to);
+    await this.add('memorized');
+  }
+
+  /** The Memorized sheet's Ayahs: `which` row's wheels (opened if they aren't), then the surah and the ayah. */
+  async pickAyah(which: 'from' | 'to', key: number): Promise<void> {
+    const id = `add-memorized-${which}-ayah`;
+    if (this.app.screen.queryByTestId(`${id}-picker`) == null) await this.press(id);
+    await this.press(`${id}-picker-surah-${Math.floor(key / 1000)}`);
+    await this.press(`${id}-picker-ayah-${key % 1000}`);
+  }
+
   /** The Memorized sheet's Whole pages: `which` row's wheel (opened if it isn't), then `page`'s row. */
   async pickPage(which: 'from' | 'to', page: number): Promise<void> {
     if (this.app.screen.queryByTestId(`add-memorized-${which}-picker`) == null) await this.press(`add-memorized-${which}`);

@@ -28,6 +28,7 @@ export function touchesDay(op: OutboxOp, day: string): boolean {
     case 'memorization.delete':
       return op.day === day;
     case 'memorization.unmark':
+      return op.day == null || op.day === day;
     case 'reading.pages':
     case 'reading.delete':
       return true;
@@ -116,14 +117,21 @@ export function overlayDayItems(items: DayItems, entries: readonly OutboxEntry[]
     } else if (op.kind === 'memorization.delete' && op.day === day) {
       memorized = memorized.filter((m) => m.id !== op.id);
     } else if (op.kind === 'memorization.unmark') {
+      // As the server does it (firestoreService.removeMemorizationPages): from that day's item alone
+      // when the change names one (an Undo, ACT-7), else from every item.
       const drop = new Set(op.pages);
       const dropAyahs = new Set(op.verses ?? []);
       memorized = memorized
         .map((m) => {
+          if (op.day != null && m.day !== op.day) return m;
           const verses = m.verses?.filter((k) => !dropAyahs.has(k) && !drop.has(pageOfAyah(k)));
-          return { ...m, pages: m.pages.filter((p) => !drop.has(p)), ...(verses ? { verses } : {}) };
+          const hadAyahs = new Set((m.verses ?? []).map((k) => pageOfAyah(k)));
+          const keepsAyahs = new Set((verses ?? []).map((k) => pageOfAyah(k)));
+          const pages = m.pages.filter((p) => !drop.has(p) && (!hadAyahs.has(p) || keepsAyahs.has(p)));
+          const { verses: _old, ...rest } = m;
+          return { ...rest, pages, ...(verses && verses.length > 0 ? { verses } : {}) };
         })
-        .filter((m) => m.pages.length > 0 && (m.verses == null || m.verses.length > 0));
+        .filter((m) => m.pages.length > 0);
     } else if (op.kind === 'reading.add' && op.session.date === day) {
       const r = readItemFor(op.id, uid, op.session);
       reads = [...reads.filter((x) => x.id !== op.id), { id: r.id, day: r.day, pages: r.pages, minutes: r.minutes, occurredAt: r.occurredAt }];

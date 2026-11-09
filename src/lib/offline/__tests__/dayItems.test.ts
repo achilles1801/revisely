@@ -99,6 +99,17 @@ describe('ayahs memorized, before the server has them (MEM-1, MEM-3)', () => {
     expect(overlayDayItems(empty, [whole], DAY, UID).memorized[0].verses).toBeUndefined();
   });
 
+  it('[ACT-7] an Undo takes the ayahs out of its own day’s item; whole pages added beside them stay', () => {
+    // Page 4 whole, then Al-Mulk 1–20 by the ayah, undone.
+    const base: DayItems = { ...empty, memorized: [{ id: DAY, day: DAY, pages: [4, 562, 563], verses: alMulk1to20 }] };
+    const undo = entry('u', { kind: 'memorization.unmark', day: DAY, pages: [562, 563], verses: alMulk1to20 });
+    expect(overlayDayItems(base, [undo], DAY, UID).memorized).toEqual([{ id: DAY, day: DAY, pages: [4] }]);
+    // Another day's Undo neither touches this day nor reloads it.
+    const yesterdays = entry('y', { kind: 'memorization.unmark', day: '2026-11-02', pages: [562, 563], verses: alMulk1to20 });
+    expect(touchesDay(yesterdays.op, DAY)).toBe(false);
+    expect(overlayDayItems(base, [yesterdays], DAY, UID).memorized).toEqual(base.memorized);
+  });
+
   it('[MEM-3] taking off what was added leaves nothing; taking off part keeps the rest', () => {
     const mark = entry('m', { kind: 'memorization.mark', day: DAY, pages: [562, 563], at: 5, verses: alMulk1to20 });
     expect(overlayDayItems(empty, [mark, entry('u', { kind: 'memorization.unmark', pages: [562, 563], verses: alMulk1to20 })], DAY, UID).memorized).toEqual([]);

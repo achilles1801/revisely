@@ -2,6 +2,7 @@ import { ayahsBetween, ayahsOnPage } from '../ayahKeys';
 import { __setMushafEditionForTests } from '../mushafEdition';
 import {
   addAyahs,
+  ayahsOfItem,
   isPartlyMemorized,
   isRevisable,
   juzShares,
@@ -13,6 +14,7 @@ import {
   memorizedPageShare,
   memorizedSurahs,
   pageShare,
+  pagesAfterDeletingItem,
   removeAyahs,
   revisablePages,
 } from '../memorizedAyahs';
@@ -147,5 +149,44 @@ describe('memorized ayahs', () => {
     expect(months[11]).toEqual({ month: '2026-11', pages: 2.6, ayahs: 27 });
     expect(months[10]).toMatchObject({ month: '2026-10', pages: 2 });
     expect(months.slice(0, 10).every((m) => m.pages === 0 && m.ayahs === 0)).toBe(true);
+  });
+});
+
+describe('deleting a memorization item (ACT-7)', () => {
+  const dayOf = (iso: string) => iso.slice(0, 10);
+  const dated = (p: UserPage, iso: string): UserPage => ({ ...p, dateMemorized: iso });
+  const TODAY = '2026-11-03';
+
+  it('[ACT-7] an item holds its ayahs, and every ayah of a page added whole before any ayah that day', () => {
+    // Page 4 whole, then Al-Mulk 1–20 by the ayah: the item lists only the ayahs.
+    const keys = ayahsOfItem({ pages: [4, 562, 563], verses: AL_MULK_1_20 });
+    expect(keys).toEqual([...ayahsOnPage(4), ...AL_MULK_1_20]);
+    expect(ayahsOfItem({ pages: [562] })).toEqual(ayahsOnPage(562));
+  });
+
+  it('[ACT-7] a part-page item takes off its ayahs; the page left with none is not memorized', () => {
+    const added = addAyahs([page(562), page(563)], AL_MULK_1_20, `${TODAY}T09:00:00.000Z`).pages;
+    const { pages, changed } = pagesAfterDeletingItem(added, { day: TODAY, pages: [562, 563], verses: AL_MULK_1_20 }, [], undefined, dayOf);
+    expect(changed).toEqual([562, 563]);
+    expect(pages.map((p) => [p.status, p.verses ?? null, p.dateMemorized])).toEqual([
+      ['not_memorized', null, null],
+      ['not_memorized', null, null],
+    ]);
+  });
+
+  it('[ACT-7] a page memorized before any item that holds it stays, dated or not', () => {
+    const before = [dated(page(20, 'memorized'), '2026-11-01T06:00:00.000Z'), { ...page(21, 'memorized'), dateMemorized: null }];
+    const { changed } = pagesAfterDeletingItem(before, { day: TODAY, pages: [20, 21] }, [], undefined, dayOf);
+    expect(changed).toEqual([]);
+  });
+
+  it('[ACT-7] with the other items unknown (offline), a page started before the item keeps all it has', () => {
+    // Al-Mulk 13–15 yesterday, 16–20 today: without yesterday's item, the page's date keeps it whole.
+    const p563 = dated(page(563, 'in_progress', ayahsBetween(67013, 67020)), '2026-11-02T12:00:00.000Z');
+    const today = { day: TODAY, pages: [563], verses: ayahsBetween(67016, 67020) };
+    expect(pagesAfterDeletingItem([p563], today, [], undefined, dayOf).changed).toEqual([]);
+    // Known, only today's part goes.
+    const known = pagesAfterDeletingItem([p563], today, [{ day: '2026-11-02', pages: [563], verses: ayahsBetween(67013, 67015) }], undefined, dayOf);
+    expect(known.pages[0]).toMatchObject({ status: 'in_progress', verses: ayahsBetween(67013, 67015) });
   });
 });
