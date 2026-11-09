@@ -63,22 +63,15 @@ appId: com.revisionbuddy.app
     env:
       NAME: 03-home-tomorrow
 
-# AHEAD-6: the pages revised ahead are revised today wherever recency shows. Activity's Insights (testers):
+# AHEAD-6: the pages revised ahead are revised today wherever recency shows. Activity's Insights:
 # Coverage counts Tuesday's 10 and the 3 ahead, 13 of the 24 memorized pages, and the Page view shows them
 # this week. (It read the day credited, Wednesday, and showed 10.) The screenshots come before the check, so
 # a run without the fix shows what it got.
-- runScript:
-    file: ../scripts/set-tester.js
-    env:
-      ON: "true"
-- runFlow: ../subflows/relaunch.yaml
-# The app opens from its own copy, then the server's, which brings the tester flag: wait for it (a tester's
-# ? on Home), or Activity opened before it lands is dropped when the screens change for a tester (both
-# attempts of run 42567489197).
-- extendedWaitUntil:
-    visible:
-      id: help-button-home
-    timeout: 30000
+# Every account has Insights in Activity since the November 2026 release, so the account stays as it is,
+# with no relaunch. It was made a tester and relaunched here before, and Activity, opened just after
+# the relaunch, was dropped when the server's copy brought the tester flag: "What's new" reads the
+# phone for a new tester and puts Home back meanwhile (lib/whatsNew/due). Both attempts of #217's iOS
+# run 42619006611; Home's ? stopped meaning "tester" once help came to everyone.
 - tapOn:
     id: open-activity
 - extendedWaitUntil:
@@ -110,10 +103,6 @@ appId: com.revisionbuddy.app
 - tapOn:
     id: pill-juz
 - runFlow: ../subflows/back-home.yaml
-- runScript:
-    file: ../scripts/set-tester.js
-    env:
-      ON: "false"
 
 # AHEAD-2: on Wednesday, the three pages revised ahead count for it.
 - runFlow:
