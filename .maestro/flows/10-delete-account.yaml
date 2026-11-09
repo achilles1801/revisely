@@ -9,7 +9,24 @@ appId: com.revisionbuddy.app
     env:
       CLOCK: 2026-11-03T20:00
       BOUNDARY: midnight
-- runScript: ../scripts/server-account.js
+# The app sends the new account's pages from its outbox once onboarding is done: look again until
+# they are on the server (about 2 s a look; they went out 19 s after Home showed on iOS in run
+# 42573714262), then check.
+- repeat:
+    while:
+      true: ${!(output.serverPagesCount > 0)}
+    times: 20
+    commands:
+      - runScript: ../scripts/server-account.js
+      - runFlow:
+          when:
+            true: ${!(output.serverPagesCount > 0)}
+          commands:
+            - extendedWaitUntil:
+                visible:
+                  id: e2e-never-shown
+                timeout: 2000
+                optional: true
 - assertTrue:
     condition: ${output.accountExists && output.userDocExists && output.serverPagesCount > 0}
     label: The server has the new account, its user document and its pages
