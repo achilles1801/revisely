@@ -75,6 +75,11 @@ export function buildRevoContext(input: {
   snapshot: TodaySnapshot;
   /** The Activity items Home's streak read: when each day's revision started (REVO-40). Null until loaded. */
   history?: readonly HistoryItem[] | null;
+  /**
+   * Send the patterns and each day's facts (REVO-40): only once config/app.revoPatterns says the server
+   * takes them (lib/revo/release revoPatternsOn); otherwise the context is as before, which every server takes.
+   */
+  patterns?: boolean;
   now?: Date;
 }): RevoContext {
   const { user, pages, logs, snapshot } = input;
@@ -135,8 +140,9 @@ export function buildRevoContext(input: {
       done: snapshot.status === 'completed',
     },
     weakPages,
-    week: week.map(({ caughtUpFor: _caught, aheadFor: _ahead, ...w }) => w),
-    patterns,
+    ...(input.patterns
+      ? { week: week.map(({ caughtUpFor: _caught, aheadFor: _ahead, ...w }) => w), patterns }
+      : { week: week.map(({ day, pages, planned, done }) => ({ day, pages, planned, done })) }),
     streak: {
       days: reading.streak,
       atRisk: reading.grace

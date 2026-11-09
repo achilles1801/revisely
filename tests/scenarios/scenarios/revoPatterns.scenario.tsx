@@ -66,6 +66,8 @@ it('[REVO-40] [SESS-7] Tuesday and Wednesday missed and caught up on Thursday: R
   await app.close();
   await markPreviewTester(uid);
   await setServerDoc(`coachSettings/${uid}`, { revoOn: true });
+  // The deployed functions take the patterns (these are this checkout's), so the switch is on (REVO-40).
+  await setServerDoc('config/app', { revoPatterns: true });
 
   // Monday: its five pages, in the session.
   app = await phone.open(stack);

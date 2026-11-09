@@ -764,7 +764,9 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   It mentions at most one, only when it fits the question (how they're doing, the week, their routine, the streak,
   catching up, the plan) or the Day in review is about that day; never in a how-to answer, and not again in the
   same conversation. Most answers mention none. No pattern is about strength, so Smart Tracking changes none of
-  them.
+  them. The app sends the patterns and the day facts only once config/app's `revoPatterns` is on (set after the
+  functions that take them are deployed: older ones refuse fields they don't know); off, it sends what it sent
+  before, and turning it off stops them with no deploy.
 
 ## Memorizing
 

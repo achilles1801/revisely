@@ -159,14 +159,27 @@ describe('the patterns Revo is told about (REVO-40)', () => {
     const pages = recomputePagesFromLogs(memorized, logs);
     const history = [item('2026-11-01', '06:10'), item('2026-11-02', '06:20'), item('2026-11-05', '23:40')];
     const snapshot = todaySnapshot({ user, pages, logs, day: '2026-11-06', assignment: [582, 583], history: null, now: Date.parse('2026-11-06T10:00:00') });
-    const ctx = buildRevoContext({ user, pages, logs, snapshot, history });
+    const ctx = buildRevoContext({ user, pages, logs, snapshot, history, patterns: true });
     expect(ctx.week.find((w) => w.day === '2026-11-05')).toEqual(expect.objectContaining({ pages: 6, caughtUp: 4, ahead: 0, started: '23:40' }));
     expect(ctx.week.find((w) => w.day === '2026-11-03')).toEqual(expect.objectContaining({ pages: 0, caughtUp: 0, started: null }));
     expect(ctx.patterns).toEqual([{ kind: 'catchingUp', day: '2026-11-05', pages: 4, forDays: ['2026-11-03', '2026-11-04'], keepDailyAmount: true }]);
     // The week sends counts and a time, never the credited days themselves.
     expect(Object.keys(ctx.week[0]).sort()).toEqual(['ahead', 'caughtUp', 'day', 'done', 'pages', 'planned', 'started']);
     // Keep daily amount off ('add'): the pattern says so.
-    const off = buildRevoContext({ user: { ...user, carryOverMode: 'add' } as User, pages, logs, snapshot, history });
+    const off = buildRevoContext({ user: { ...user, carryOverMode: 'add' } as User, pages, logs, snapshot, history, patterns: true });
     expect(off.patterns).toEqual([expect.objectContaining({ kind: 'catchingUp', keepDailyAmount: false })]);
+  });
+
+  it('[REVO-40] until config/app.revoPatterns says the server takes them, the context is exactly as before: no patterns, no day facts', () => {
+    const user = { id: 'u1', createdAt: '2026-10-01T12:00:00', scheduleAnchorDate: '2026-11-01T12:00:00', dailyPageCapacity: 2, scheduleMode: 'pages', dailyJuzCount: 1, customPlan: null, fajrBoundaryEnabled: false, locationCoords: null } as unknown as User;
+    const logs = [log('2026-11-05', [590, 591, 586, 587, 588, 589], { ahead: { '2026-11-03': [586, 587], '2026-11-04': [588, 589] } })];
+    const pages = recomputePagesFromLogs(
+      Array.from({ length: 10 }, (_, i) => ({ pageNumber: 582 + i, status: 'memorized', dateMemorized: '2026-09-01T09:00:00', weaknessRating: 4, lastRevisedDate: null, totalRevisionCount: 0, skipCount: 0 }) as UserPage),
+      logs,
+    );
+    const snapshot = todaySnapshot({ user, pages, logs, day: '2026-11-06', assignment: [582, 583], history: null, now: Date.parse('2026-11-06T10:00:00') });
+    const ctx = buildRevoContext({ user, pages, logs, snapshot, history: [item('2026-11-05', '23:40')] });
+    expect('patterns' in ctx).toBe(false);
+    expect(ctx.week.map((w) => Object.keys(w).sort())).toEqual(Array(7).fill(['day', 'done', 'pages', 'planned']));
   });
 });
