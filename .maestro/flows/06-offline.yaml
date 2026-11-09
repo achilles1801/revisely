@@ -3,6 +3,13 @@
 # Rules (BEHAVIOUR.md): SYNC-1, SYNC-2, SESS-3
 appId: com.revisionbuddy.app
 ---
+# Chicago, as the phone's position: Home's next-prayer line (Asr 2:18 PM in 06-home-offline) is worked
+# out from it. The flow had it only from 04's setLocation when 04 ran before it in the same job; in a job
+# without 04 the emulator had no position, the line was missing, and the screenshot differed (develop's
+# run 42662769247 and #217's 42662790506, Android "05 06 09-revo 11"). A flow sets what it shows.
+- setLocation:
+    latitude: 41.88
+    longitude: -87.63
 - runFlow:
     file: ../subflows/new-account.yaml
     env:
