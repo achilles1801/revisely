@@ -7,8 +7,8 @@ appId: com.revisionbuddy.app
     stopApp: true
     permissions:
       all: allow
-      # Not location unless the flow has set a position (location.yaml).
-      location: "${output.location || 'deny'}"
+      # Not location unless the flow has set a position (location.yaml). iOS names it always | never.
+      location: "${maestro.platform == 'ios' ? (output.location == 'allow' ? 'always' : 'never') : (output.location == 'allow' ? 'allow' : 'deny')}"
 - extendedWaitUntil:
     visible:
       id: e2e-status

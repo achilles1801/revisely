@@ -12,7 +12,9 @@ const path = require('path');
 const root = path.join(__dirname, '..', '..', '..');
 const maestro = path.join(root, '.maestro');
 const SUBFLOW = path.join(maestro, 'subflows', 'location.yaml');
-const LOCATION = `location: "\${output.location || 'deny'}"`;
+// Android takes allow | deny for location; iOS always | inuse | never | unset (Maestro 2.11: "wrong argument
+// value 'allow' was provided for 'location' permission"). maestro.platform is "ios" or "android".
+const LOCATION = `location: "\${maestro.platform == 'ios' ? (output.location == 'allow' ? 'always' : 'never') : (output.location == 'allow' ? 'allow' : 'deny')}"`;
 
 function yamlFiles(dir) {
   const out = [];
@@ -77,7 +79,7 @@ it('allows location at every launch only when the flow has set a position', () =
       return !p || p.all !== 'all: allow' || p.location !== LOCATION;
     })
     .map(({ where }) => where);
-  // Each must name `permissions: { all: allow, location: "${output.location || 'deny'}" }`.
+  // Each must name `permissions: { all: allow, location: <LOCATION's expression> }`.
   expect(wrong).toEqual([]);
 });
 
