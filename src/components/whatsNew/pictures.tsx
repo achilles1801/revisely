@@ -15,7 +15,6 @@ import type { WhatsNewPicture } from '../../lib/help/whatsNew';
 import { weekStart } from '../../lib/activityHeatmap';
 import { BlockMark, RevisedMark } from '../activity/BlockMark';
 import { CalendarMonth, type CalendarData } from '../activity/CalendarMonth';
-import { RevoMark } from '../revo/RevoMark';
 
 /** The words the pictures show, as the screens they're drawn from show them (pictures.test.ts). */
 export const PICTURE_WORDS = {
@@ -25,9 +24,6 @@ export const PICTURE_WORDS = {
     ['Memorized', 'New pages you learned today'],
     ['Note', 'A thought, or a mistake to watch'],
   ],
-  revoQuestion: 'How was my week?',
-  revoChips: ['What should I revise next?', 'How is my pace?'],
-  revoPlaceholder: 'Ask Revo anything',
 } as const;
 
 const FADE = 56;
@@ -211,58 +207,6 @@ function AyahPicture() {
   return <Day />;
 }
 
-// ------------------------------------------------------------------ 4. Revo's sheet
-
-function RevoPicture() {
-  const { palette } = useTheme();
-  const text = (style: object, children: React.ReactNode, lines?: number) => (
-    <Text style={style} maxFontSizeMultiplier={1} numberOfLines={lines}>
-      {children}
-    </Text>
-  );
-  return (
-    <View style={[styles.revoSheet, { backgroundColor: palette.sheet }]}>
-      <View style={[styles.handle, { backgroundColor: palette.handle }]} />
-      <View style={styles.revoHead}>
-        <View style={[styles.revoPill, { backgroundColor: palette.bubble }]}>
-          <RevoMark size={28} />
-          {text([typeV2.name, { color: palette.text }], 'Revo')}
-        </View>
-        <View style={styles.flex} />
-        <Ionicons name="time-outline" size={22} color={palette.text} />
-      </View>
-      <View style={[styles.question, { backgroundColor: palette.primary }]}>
-        {text([typeV2.body, { color: palette.onPrimary }], PICTURE_WORDS.revoQuestion)}
-      </View>
-      {text(
-        [styles.answer, { color: palette.text }],
-        'A good week, Maryam: you revised on 5 of the last 7 days, Juz 27 to Juz 30. Today is Al-Mujadila to At-Tahrim. Start there while it’s quiet?',
-      )}
-      <View style={styles.feedback}>
-        {(['copy-outline', 'thumbs-up-outline', 'thumbs-down-outline'] as const).map((n) => (
-          <Ionicons key={n} name={n} size={19} color={palette.secondary} />
-        ))}
-      </View>
-      <View style={styles.chips}>
-        {PICTURE_WORDS.revoChips.map((c) => (
-          <View key={c} style={[styles.revoChip, { borderColor: palette.outline }]}>
-            {text([typeV2.button, { color: palette.text }], c, 1)}
-          </View>
-        ))}
-      </View>
-      <View style={styles.composer}>
-        <View style={[styles.plus, { backgroundColor: palette.bubble }]}>
-          <Ionicons name="add" size={24} color={palette.text} />
-        </View>
-        <View style={[styles.field, { backgroundColor: palette.bubble, borderColor: palette.outline }]}>
-          {text([typeV2.body, styles.flex, { color: palette.secondary }], PICTURE_WORDS.revoPlaceholder, 1)}
-          <Ionicons name="mic-outline" size={20} color={palette.text} />
-        </View>
-      </View>
-    </View>
-  );
-}
-
 export function pictureFor(picture: WhatsNewPicture): React.ReactNode {
   switch (picture) {
     case 'activity':
@@ -281,12 +225,6 @@ export function pictureFor(picture: WhatsNewPicture): React.ReactNode {
       return (
         <Window anchor="top" testID="whats-new-picture-ayah">
           <AyahPicture />
-        </Window>
-      );
-    case 'revo':
-      return (
-        <Window anchor="top" testID="whats-new-picture-revo">
-          <RevoPicture />
         </Window>
       );
   }
@@ -314,15 +252,4 @@ const styles = StyleSheet.create({
   play: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   bars: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 3, overflow: 'hidden' },
   bar: { width: 3, borderRadius: 1.5 },
-  revoSheet: { borderTopLeftRadius: 22, borderTopRightRadius: 22, paddingHorizontal: 16, paddingBottom: 12, marginTop: 12 },
-  revoHead: { flexDirection: 'row', alignItems: 'center', minHeight: 44 },
-  revoPill: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 36, borderRadius: 18, paddingLeft: 4, paddingRight: 14 },
-  question: { alignSelf: 'flex-end', maxWidth: 270, borderRadius: 18, borderBottomRightRadius: 4, paddingHorizontal: 14, paddingVertical: 9, marginTop: 14 },
-  answer: { fontSize: 19, lineHeight: 27, letterSpacing: -0.3, marginTop: 16 },
-  feedback: { flexDirection: 'row', gap: 22, marginTop: 14 },
-  chips: { flexDirection: 'row', gap: 8, marginTop: 18, overflow: 'hidden' },
-  revoChip: { height: 36, borderRadius: 18, borderWidth: 1, paddingHorizontal: 14, justifyContent: 'center' },
-  composer: { flexDirection: 'row', gap: 10, marginTop: 12 },
-  plus: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  field: { flex: 1, height: 44, borderRadius: 22, borderWidth: 1, paddingLeft: 16, paddingRight: 14, flexDirection: 'row', alignItems: 'center' },
 });

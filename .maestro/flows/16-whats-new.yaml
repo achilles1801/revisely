@@ -3,6 +3,7 @@
 # Settings → About → What's new replays the cards with a ✕; Settings → Testing → Show What's new at
 # launch runs it from the next launch as App Store users will see it. It resumes on the card it was
 # left on after a relaunch, Android's back goes to the card before, and after Done it doesn't come back.
+# Revo's card is a moment (RevoMoment): a tap takes it to its end, its screenshot is that end.
 # Screenshots: the replay, each card of the run, Home after (w1–w7).
 # Rules (BEHAVIOUR.md): NEW-2, NEW-3
 appId: com.revisionbuddy.app
@@ -110,9 +111,22 @@ appId: com.revisionbuddy.app
       id: whats-new-forced
     timeout: 20000
 - assertVisible: "Memorize by the ayah"
+# NEW-2: Revo's card plays by itself (about 19 s); a tap takes it to its end, where Later goes on.
+# While it plays the screen never settles: these taps don't wait for it (.maestro/README.md). The
+# title is matched by id: iOS reads it as "Step 4 of 5. Meet Revo".
 - tapOn:
     id: whats-new-next
-- assertVisible: "Meet Revo"
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: whats-new-moment
+    timeout: 10000
+- tapOn:
+    id: whats-new-moment
+    waitToSettleTimeoutMs: 500
+- assertVisible:
+    id: whats-new-title
+    text: '.*Meet Revo'
 - runFlow:
     file: ../subflows/shot.yaml
     env:

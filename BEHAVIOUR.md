@@ -752,8 +752,10 @@ shows up once and they must go through it and complete it … just the main stuf
   onboarding marks the release it ran on, so an account set up on it never sees its walkthrough. A card
   shows only when the account has what it describes (a feature still for testers is left out). The kill
   switch (`config/app.whatsNewOff`) stops it showing.
-- **NEW-2.** It is required: no skip and no close, one Next a card and Done on the last. A swipe right or
-  Android's back goes to the card before. Leaving the app part way (or a restart) reopens it on the card
+- **NEW-2.** It is required: no skip and no close, one Next a card and Done on the last. Revo's card plays
+  by itself (about 19 s; a tap takes it to its end, and past 1.6× text it is words and Next like any card)
+  and ends on Turn on Revo, which opens Revo's opt-in (REVO-21), or Later, which goes on and turns nothing
+  on. A swipe right or Android's back goes to the card before. Leaving the app part way (or a restart) reopens it on the card
   it was on, on that phone.
 - **NEW-3.** Settings → About → What's new shows the release's cards again, with a ✕, and changes nothing
   (testers see the row before the release is switched on). A tester's Settings → Testing → Show What's
