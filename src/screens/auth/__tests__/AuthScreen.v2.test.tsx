@@ -76,7 +76,7 @@ beforeEach(async () => {
     sendPasswordReset: jest.fn(async () => undefined),
     clearError: jest.fn(),
     error: null,
-    isLoading: false,
+    isSigningIn: false,
   });
 });
 
@@ -152,11 +152,28 @@ describe('<AuthScreen /> in the new design: sign in', () => {
     expect(styleOf('auth-error-text').color).toBe(light.red);
   });
 
-  it('busy: the pill shows it, and Google waits', async () => {
-    mockAuth.isLoading = true;
+  it('busy: the pill shows its own attempt, and Google waits', async () => {
+    let finish!: () => void;
+    mockAuth.signIn = jest.fn(() => new Promise<void>((resolve) => (finish = resolve)));
     await showV2();
+    fireEvent.changeText(screen.getByTestId('auth-email'), 'someone@example.com');
+    fireEvent.changeText(screen.getByTestId('auth-password'), 'test-password');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('auth-submit'));
+    });
     expect(screen.getByTestId('auth-submit').props.accessibilityState).toMatchObject({ busy: true, disabled: true });
     expect(screen.getByTestId('auth-google').props.accessibilityState).toMatchObject({ disabled: true });
+    await act(async () => finish());
+    expect(screen.getByTestId('auth-submit').props.accessibilityState).toMatchObject({ busy: false, disabled: false });
+  });
+
+  it('another sign-in in progress (Google, Apple): the pill waits, not busy itself', async () => {
+    mockAuth.isSigningIn = true;
+    await showV2();
+    expect(screen.getByTestId('auth-submit').props.accessibilityState).toMatchObject({ busy: false, disabled: true });
+    expect(screen.getByTestId('auth-google').props.accessibilityState).toMatchObject({ disabled: true });
+    fireEvent.press(screen.getByTestId('auth-submit'));
+    expect(mockAuth.signIn).not.toHaveBeenCalled();
   });
 
   it('Continue with Google signs in with its token', async () => {

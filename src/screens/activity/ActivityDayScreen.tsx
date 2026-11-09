@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import {
   ActivityIndicator,
@@ -9,20 +9,38 @@ import {
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from '../../components/SafeAreaView';
+import { TopSafeAreaView } from '../../components/SafeAreaView';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { EditSessionModal } from '../../components/EditSessionModal';
 import { useTabBarFootprint } from '../../navigation/TabBar';
+import { useRevoFootprint } from '../../lib/revo/presence';
+import { setRevoDayExtras } from '../../lib/revo/place';
 import { ReadingPagesSheet } from '../../components/activity/ReadingPagesSheet';
+import { DayBlocks, activityBlocksEnabled, type UndoOffer } from '../../components/activity/DayBlocks';
+import { UndoToast } from '../../components/revision/UndoToast';
+import { HelpButton } from '../../components/help/HelpButton';
+import { HelpToast } from '../../components/help/HelpToast';
 import { useActivityReload } from '../../components/activity/useActivityReload';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import * as firestoreService from '../../services/firestoreService';
+import { currentAccount, queueChange, withPendingJournalDay, withPendingReadings } from '../../lib/offline/queue';
+import { pendingEntries } from '../../lib/offline/outbox';
+import { joinedSince, keepTaken } from '../../lib/offline/dayItems';
+import { onApplied } from '../../lib/offline/sync';
+import type { OutboxEntry } from '../../lib/offline/ops';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
 import { isRevisionActivity, normalizeReadingSession } from '../../lib/activity';
-import { formatJournalDayRelative, formatMinutes, isJournalEntryEmpty, journalTotalMinutes } from '../../lib/journal';
+import {
+  formatEntryTime,
+  formatJournalDayRelative,
+  formatMinutes,
+  isJournalEntryEmpty,
+  JOURNAL_KIND_LABELS,
+} from '../../lib/journal';
+import { JOURNAL_KIND_ICONS } from '../journal/journalKinds';
 import { formatDuration, formatPageRanges } from '../../lib/readingTimer';
 import { getQuranData } from '../../lib/quranData';
 import { logger } from '../../lib/logger';
@@ -31,15 +49,25 @@ import type { HomeStackParamList } from '../../navigation/MainNavigator';
 import type { JournalEntry, ReadingSession, RevisionLog } from '../../types';
 import { RecordingsList } from '../../components/recordings/RecordingsList';
 import { deleteRecordings, isReadingRecordingDuring } from '../../lib/recordings';
-import { TopBar } from '../../components/v2/TopBar';
+import { IconButton, TopBar } from '../../components/v2/TopBar';
+import { AddToDaySheet } from '../../components/activity/AddToDaySheet';
+import { dayTitle } from '../../lib/activityFormat';
 import { Mark } from '../../components/v2/Mark';
 import { PillButton } from '../../components/v2/PillButton';
 import { RowText, ThreadRow } from '../../components/v2/ThreadRow';
 import { ActionSheet } from '../../components/v2/ActionSheet';
 import { Tap } from '../../components/v2/Tap';
 import { dayOfMonth } from '../../lib/dayAgo';
-import { describePageRuns, describeSurahRuns, pageRuns } from '../../lib/pageRanges';
+import { previousIsoDay } from '../../lib/streak';
+import { describePageRuns, describeRevised, pageRuns } from '../../lib/pageRanges';
+import { ownRevised } from '../../lib/activityItems';
 import { layoutV2, typeV2 } from '../../theme/v2';
+import { addToPlanParams, putFirstTomorrow } from '../../lib/weakSpotActions';
+import { pagesAfterDeletingItem, revisablePages } from '../../lib/memorizedAyahs';
+import { customPlanAfterUnmemorizing } from '../../lib/memorizationChanges';
+import { MemorizationItem, memorizationItemsWithWaiting } from '../../lib/offline/memorizationItems';
+import { describePassage } from '../../lib/passages';
+import { shiftDay } from '../../lib/journal';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'ActivityDay'>;
 type ScreenRoute = RouteProp<HomeStackParamList, 'ActivityDay'>;
@@ -50,6 +78,18 @@ function formatTimeOfDay(ms: number): string {
 
 // 'YYYY-MM-DD' as a local date; new Date('YYYY-MM-DD') is UTC midnight,
 // which shows the previous day west of Greenwich.
+/** "3 ahead for Tue": a session's pages revised ahead, by the day they count for. */
+function aheadSummary(log: RevisionLog): string | null {
+  const parts = Object.entries(log.ahead ?? {})
+    .filter(([day, pages]) => /^\d{4}-\d{2}-\d{2}$/.test(day) && pages.length > 0)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([day, pages]) => {
+      const [y, m, d] = day.split('-').map(Number);
+      return `${pages.length} ahead for ${new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'short' })}`;
+    });
+  return parts.length > 0 ? parts.join(', ') : null;
+}
+
 function formatLongDay(date: string): string {
   const [y, m, d] = date.split('-').map(Number);
   return new Date(y, m - 1, d).toLocaleDateString('en-US', {
@@ -73,17 +113,48 @@ function sessionPagesOf(log: RevisionLog): number[] {
  * a thread: the day first, then each revision session, timed session and the
  * daily log as replies joined by the line; recordings below.
  */
+/** How long Delete waits for the other memorization items before going on without them (offline). */
+const OTHER_ITEMS_MS = 5000;
+
+/** `promise`, or a rejection after `ms`. */
+function withinMs<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`no answer in ${ms} ms`)), ms);
+    promise.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(timer);
+        reject(e);
+      },
+    );
+  });
+}
+
 export default function ActivityDayScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<ScreenRoute>();
   const date = route.params.date;
   const focusRecordingId = route.params.focusRecordingId;
+  const focusBlock = route.params.focusBlock;
   const scrollRef = useRef<ScrollView>(null);
   const scrolledToRecordingRef = useRef(false);
-  const { user, logs, updateLog, deleteLog } = useApp();
+  const { user, logs, updateLog, deleteLog, pages, updatePages, saveUser } = useApp();
+  // The latest user, for an Undo that runs after other changes.
+  const userRef = useRef(user);
+  userRef.current = user;
   const { theme, palette } = useTheme();
-  const tabFootprint = useTabBarFootprint();
-  const { day: today } = useRevisionDay(user);
+  // Room for the tab bar (and the mini player) and for Revo's button.
+  const tabFootprint = useTabBarFootprint() + useRevoFootprint();
+  // An add the day's blocks offer to undo (MEM-3), shown on the screen, above the tab bar and Revo.
+  const [undoOffer, setUndoOffer] = useState<UndoOffer | null>(null);
+  const { day: today, date: revisionDate } = useRevisionDay(user);
+  // A session of whole juz on the juz plan reads "Juz 1" (lib/pageRanges describeRevised).
+  const juzPlan = user?.scheduleMode === 'juz';
+  // The Revised and Memorized blocks from items replace the session rows and the log's copies (C2).
+  const blocks = activityBlocksEnabled(user);
   const quranData = useMemo(() => getQuranData(), []);
 
   const [readings, setReadings] = useState<ReadingSession[]>([]);
@@ -95,12 +166,51 @@ export default function ActivityDayScreen() {
   const [editingLog, setEditingLog] = useState<RevisionLog | null>(null);
   // A timed session's ⋯ menu.
   const [timedMenu, setTimedMenu] = useState<ReadingSession | null>(null);
+  // The + (blocks): add to this day (mock d5).
+  const [addOpen, setAddOpen] = useState(false);
 
+  // Only the newest load's answer is shown: loads overlap when a note joins the outbox and then
+  // reaches the server, and an older read could land last without it.
+  const loads = useRef(0);
+  // The server's last copy of the day's log, under the notes still waiting.
+  const servedLog = useRef<{ date: string; entry: JournalEntry | null } | null>(null);
+  // Notes the server has taken while the day shows: laid under the waiting ones, so a read without
+  // one never hides it (withPendingJournalDay's `sent`).
+  const takenNotes = useRef<{ date: string; entries: OutboxEntry[] }>({ date, entries: [] });
+  useEffect(() => {
+    takenNotes.current = { date, entries: [] };
+    return onApplied((uid, entry) => {
+      if (uid === currentAccount()) keepTaken(takenNotes.current.entries, entry, date);
+    });
+  }, [date]);
+  const sentNotes = () => (takenNotes.current.date === date ? takenNotes.current.entries : []);
+  const waitingIds = useRef<Set<string>>(new Set());
   const load = useCallback(async () => {
+    const n = ++loads.current;
+    // At once, from the last copy, when a change has just joined the outbox: a note added from the +
+    // shows without waiting for the read. (One that left is in what's shown already.)
+    const since = joinedSince(waitingIds.current, pendingEntries(currentAccount()), date);
+    waitingIds.current = since.ids;
+    if (since.joined && servedLog.current?.date === date) {
+      const shown = withPendingJournalDay(date, servedLog.current.entry, currentAccount(), sentNotes());
+      setJournal(shown && !isJournalEntryEmpty(shown) ? shown : null);
+    }
     const [r, j] = await Promise.allSettled([
-      firestoreService.getReadingSessionsForDay(date),
-      firestoreService.getJournalEntry(date),
+      firestoreService.getReadingSessionsForDay(date).then((list) => withPendingReadings(list, { date })),
+      firestoreService.getJournalEntry(date).then(
+        (entry) => {
+          if (n === loads.current) servedLog.current = { date, entry };
+          return withPendingJournalDay(date, entry, currentAccount(), sentNotes());
+        },
+        // Offline and not in Firestore's memory: a change waiting here still shows.
+        (err) => {
+          const waiting = withPendingJournalDay(date, null, currentAccount(), sentNotes());
+          if (waiting) return waiting;
+          throw err;
+        },
+      ),
     ]);
+    if (n !== loads.current) return;
     if (r.status === 'fulfilled') {
       setReadings(
         r.value
@@ -116,7 +226,15 @@ export default function ActivityDayScreen() {
   }, [date]);
   const { refreshing, onRefresh } = usePullToRefresh(load);
 
-  useActivityReload(load);
+  // What Revo's first line and its attached day read beyond the logs, as shown here (REVO-38).
+  useEffect(() => {
+    if (loading) return;
+    setRevoDayExtras(date, { journal: loadError ? null : journal ? [journal] : [], readings: loadError ? null : readings, recordings: null });
+    return () => setRevoDayExtras(date, null);
+  }, [date, loading, loadError, journal, readings]);
+
+  // Also when a change to this day joins or leaves the outbox: a note added from the + (ACT-13).
+  useActivityReload(load, date);
 
   const revisions = useMemo(
     () => logs.filter((l) => l.date === date && isRevisionActivity(l)),
@@ -127,7 +245,7 @@ export default function ActivityDayScreen() {
     setReadings((prev) => prev.map((s) => (s.id === session.id ? { ...s, pages } : s)));
     setEditingReading(null);
     try {
-      await firestoreService.updateReadingSessionPages(session.id, pages);
+      await queueChange({ kind: 'reading.pages', id: session.id, pages });
     } catch (err) {
       logger.error('Failed to update session pages', err);
       Alert.alert("Couldn't save pages", 'Please try again.');
@@ -145,7 +263,7 @@ export default function ActivityDayScreen() {
           setEditingReading(null);
           setReadings((prev) => prev.filter((s) => s.id !== session.id));
           try {
-            await firestoreService.deleteReadingSession(session.id);
+            await queueChange({ kind: 'reading.delete', id: session.id });
             // Recordings made while it ran go with it (a failure here must not
             // bring the deleted session back).
             // Only sessions timed in the reader: "Mark as read" sessions (e.g.
@@ -165,7 +283,6 @@ export default function ActivityDayScreen() {
   };
 
   const openJournal = () => navigation.navigate('JournalEntry', { date });
-  const journalTotal = journal ? journalTotalMinutes(journal) : null;
 
   // Opened from "Recording saved · View": scroll to the recordings once laid out.
   const onRecordingsLayout = (e: { nativeEvent: { layout: { y: number; height: number } } }) => {
@@ -177,6 +294,7 @@ export default function ActivityDayScreen() {
   };
 
   const label = formatJournalDayRelative(date, today);
+  const heading = dayTitle(date, today);
   type Reply = {
     key: string;
     mark: React.ReactNode;
@@ -189,9 +307,12 @@ export default function ActivityDayScreen() {
     a11y: string;
   };
   const replies: Reply[] = [
-    ...revisions.map((log): Reply => {
+    ...(blocks ? [] : revisions.map((log): Reply => {
       const runs = pageRuns(log.pagesRevised);
       const n = log.pagesRevised.length;
+      // Pages revised ahead (lib/aheadCredit) were revised here, in this
+      // session: they show on this day, never on the day they count for (DAY-9).
+      const ahead = aheadSummary(log);
       return {
         key: log.id,
         mark: <Mark size="reply" done />,
@@ -199,16 +320,16 @@ export default function ActivityDayScreen() {
         meta: log.durationMinutes != null ? formatMinutes(log.durationMinutes) : undefined,
         body: (
           <RowText secondary numberOfLines={2}>
-            {`${describePageRuns(runs)} · ${describeSurahRuns(runs)}${
+            {`${describePageRuns(runs)} · ${describeRevised(ownRevised(log), { juzPlan })}${
               log.pagesSkipped.length > 0 ? ` · ${log.pagesSkipped.length} skipped` : ''
-            }`}
+            }${ahead ? ` · ${ahead}` : ''}`}
           </RowText>
         ),
         onPress: () => setEditingLog(log),
-        a11y: `Revision session, ${n} pages revised. Edit`,
+        a11y: `Revision session, ${n} pages revised${ahead ? `, ${ahead}` : ''}. Edit`,
       };
-    }),
-    ...readings.map((r): Reply => ({
+    })),
+    ...(blocks ? [] : readings.map((r): Reply => ({
       key: r.id,
       mark: <Mark size="reply" icon="stopwatch-outline" />,
       name: formatDuration(r.durationSeconds),
@@ -228,38 +349,98 @@ export default function ActivityDayScreen() {
       onPress: () => setEditingReading(r),
       onMenu: () => setTimedMenu(r),
       a11y: `Timed session, ${formatDuration(r.durationSeconds)}. Edit pages`,
-    })),
-    {
-      key: 'journal',
-      mark: <Mark size="reply" icon="create-outline" />,
-      name: 'Daily log',
-      meta: journalTotal != null ? formatMinutes(journalTotal) : journal ? undefined : 'Nothing written',
-      body: journal ? (
-        <>
-          {(journal.memorization.trim() !== '' || journal.memorizationMinutes != null) && (
-            <RowText numberOfLines={3}>{`Memorization: ${journal.memorization.trim() || '—'}`}</RowText>
-          )}
-          {(journal.revision.trim() !== '' || journal.revisionMinutes != null) && (
-            <RowText numberOfLines={3}>{`Revision: ${journal.revision.trim() || '—'}`}</RowText>
-          )}
-          {journal.notes.trim() !== '' && <RowText secondary numberOfLines={4}>{journal.notes.trim()}</RowText>}
-        </>
-      ) : undefined,
-      footer: journal ? undefined : (
-        <PillButton title="Write" size="sm" variant="outline" icon="create-outline" onPress={openJournal} />
-      ),
-      onPress: openJournal,
-      a11y: journal ? 'Daily log. Edit' : 'Daily log: nothing written. Write',
-    },
+    }))),
+    // One row per note, in the order they were written.
+    ...(blocks
+      ? []
+      : journal
+      ? journal.entries.map((n): Reply => {
+          const text = n.text.trim();
+          const time = formatEntryTime(n.at, date, user);
+          return {
+            key: `journal-${n.id}`,
+            mark: <Mark size="reply" icon={JOURNAL_KIND_ICONS[n.kind]} />,
+            name: JOURNAL_KIND_LABELS[n.kind],
+            meta: n.minutes != null ? `${time} · ${formatMinutes(n.minutes)}` : time,
+            body: text ? <RowText numberOfLines={4}>{text}</RowText> : undefined,
+            onPress: openJournal,
+            a11y: `Daily log, ${JOURNAL_KIND_LABELS[n.kind]} at ${time}. Open the log`,
+          };
+        })
+      : [
+          {
+            key: 'journal',
+            mark: <Mark size="reply" icon="create-outline" />,
+            name: 'Daily log',
+            meta: 'Nothing written',
+            footer: <PillButton title="Write" size="sm" variant="outline" icon="create-outline" onPress={openJournal} />,
+            onPress: openJournal,
+            a11y: 'Daily log: nothing written. Write',
+          } as Reply,
+        ]),
   ];
   const parts = [
     revisions.length > 0 ? `${revisions.length} revision ${revisions.length === 1 ? 'session' : 'sessions'}` : null,
     readings.length > 0 ? `${readings.length} timed` : null,
     journal ? 'daily log' : null,
   ].filter(Boolean);
+  // Deleting a memorization (ACT-7): it takes off exactly the ayahs it added, keeping those another
+  // item holds and pages memorized before it (one change to the pages, which also updates this
+  // phone); the custom plan drops what is no longer memorized; then the item is removed.
+  const onDeleteMemorized = async (item: { id: string; day: string; pages: number[]; verses?: number[] }) => {
+    const uid = currentAccount();
+    let server: MemorizationItem[] = [];
+    if (uid) {
+      try {
+        server = await withinMs(firestoreService.getMemorizationItems(uid), OTHER_ITEMS_MS);
+      } catch (err) {
+        // Offline: the items waiting here, and the pages' dates, still keep what came before it.
+        logger.warn('Deleting a memorization: the other items could not be read', err);
+      }
+    }
+    const others = memorizationItemsWithWaiting(server, pendingEntries(uid)).filter((m) => m.id !== item.id);
+    const { pages: next, changed } = pagesAfterDeletingItem(pages, item, others);
+    if (changed.length > 0) {
+      await updatePages(next, changed);
+      const plan = customPlanAfterUnmemorizing(userRef.current?.customPlan, next);
+      if (plan && userRef.current) await saveUser({ ...userRef.current, customPlan: plan });
+    }
+    await queueChange({ kind: 'memorization.delete', day: item.day, id: item.id });
+  };
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
-      <TopBar title={label} onBack={() => navigation.goBack()} separator />
+    <TopSafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
+      {blocks ? (
+        <TopBar
+          onBack={() => navigation.goBack()}
+          center={
+            <View style={styles.title} accessible accessibilityRole="header" accessibilityLabel={`${heading.title}, ${heading.subtitle}`}>
+              <Text style={[typeV2.barTitle, styles.titleText, { color: palette.text }]} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+                {heading.title}
+              </Text>
+              <Text style={[typeV2.meta, { color: palette.secondary }]} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+                {heading.subtitle}
+              </Text>
+            </View>
+          }
+          right={
+            <>
+              {/* Its help (HELP-1), before +. */}
+              <HelpButton screen="day" />
+              <IconButton
+                icon="add"
+                label={date === today || date === previousIsoDay(today) ? 'Add' : 'Add a note'}
+                onPress={() => setAddOpen(true)}
+                size={28}
+                testID="day-add"
+              />
+            </>
+          }
+          separator
+        />
+      ) : (
+        <TopBar title={label} onBack={() => navigation.goBack()} separator />
+      )}
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator color={palette.secondary} />
@@ -267,7 +448,7 @@ export default function ActivityDayScreen() {
       ) : (
         <ScrollView
           ref={scrollRef}
-          contentContainerStyle={{ paddingBottom: tabFootprint + layoutV2.rowPad }}
+          contentInsetAdjustmentBehavior="never" contentContainerStyle={{ paddingBottom: tabFootprint + layoutV2.rowPad }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -283,16 +464,55 @@ export default function ActivityDayScreen() {
               <Text style={[typeV2.body, { color: palette.text, flex: 1 }]}>Couldn't load all of this day. Tap to retry.</Text>
             </Tap>
           )}
-          <ThreadRow
-            mark={<Mark label={dayOfMonth(date)} />}
-            name={label}
-            meta={formatLongDay(date)}
-            lineBelow
-            separator={false}
-            testID="day-post"
-          >
-            <RowText secondary>{parts.length > 0 ? parts.join(' · ') : 'Nothing logged yet'}</RowText>
-          </ThreadRow>
+          {!blocks && (
+            <ThreadRow
+              mark={<Mark label={dayOfMonth(date)} />}
+              name={label}
+              meta={formatLongDay(date)}
+              lineBelow
+              separator={false}
+              testID="day-post"
+            >
+              <RowText secondary>{parts.length > 0 ? parts.join(' · ') : 'Nothing logged yet'}</RowText>
+            </ThreadRow>
+          )}
+          {blocks && (
+            <DayBlocks
+              day={date}
+              today={today}
+              revisionNotes={(journal?.entries ?? []).filter((n) => n.kind === 'revision')}
+              memorizationNotes={(journal?.entries ?? []).filter((n) => n.kind === 'memorization')}
+              readings={readings}
+              notes={(journal?.entries ?? []).filter((n) => n.kind === 'note')}
+              onEditReading={setEditingReading}
+              onOpenLog={openJournal}
+              revisedLog={logs.find((l) => l.date === date) ?? null}
+              onDeleteRevised={(log) => {
+                void deleteLog(log.id);
+              }}
+              onDeleteMemorized={onDeleteMemorized}
+              onEditMemorized={(focusPages) => navigation.navigate('Memorization', { edit: true, focusPages })}
+              // The reader over the day, so back returns here (ACT-20).
+              onOpenPage={(pageNumber) => navigation.navigate('QuranReader', { pageNumber })}
+              // Opened at a block (ACT-18): scrolled to it once it is laid out.
+              focusBlock={focusBlock}
+              onFocusBlockLayout={(y) => scrollRef.current?.scrollTo({ y: Math.max(0, y - spacing.md), animated: true })}
+              onOpenRecording={(id) => navigation.navigate('ListenBack', { recordingId: id })}
+              onDeleteReading={removeReading}
+              // Memorized today (MEM-4): first tomorrow on an automatic plan, or onto a custom plan's day.
+              // A toast says so, with Undo (ACT-24): the tap used to save with no sign of it.
+              onReviseTomorrow={(memorizedToday) => {
+                if (!user) return;
+                putFirstTomorrow({ user, saveUser, today, pages: memorizedToday, name: describePassage(memorizedToday, { form: 'short' }), latest: () => userRef.current })
+                  .then(({ text, undo }) => setUndoOffer({ text, undo: () => void undo().catch((err) => logger.warn('Could not undo "first tomorrow"', err)) }))
+                  .catch((err) => logger.warn('Could not put the pages first tomorrow', err));
+              }}
+              onEditSchedule={() => navigation.navigate('PlanEdit')}
+              // Added to tomorrow's day of the plan, beside its own pages (it opened with these alone).
+              onAddToPlan={(memorizedToday) => user && navigation.navigate('PlanDayEdit', addToPlanParams(user, revisablePages(pages), revisionDate, memorizedToday))}
+              onUndoOffer={setUndoOffer}
+            />
+          )}
           {replies.map((r, i) => {
             const last = i === replies.length - 1;
             return (
@@ -317,11 +537,13 @@ export default function ActivityDayScreen() {
             );
           })}
           {/* The rows keep the gutter themselves (hairlines run edge to edge). */}
+          {!blocks && (
           <View onLayout={onRecordingsLayout}>
             <RecordingsList
               day={date}
               reloadKey={recordingsKey}
               highlightId={focusRecordingId}
+              onOpen={(r) => navigation.navigate('ListenBack', { recordingId: r.id })}
               header={
                 <Text style={[typeV2.name, v2.section, { color: palette.text }]} accessibilityRole="header">
                   Recordings
@@ -329,8 +551,23 @@ export default function ActivityDayScreen() {
               }
             />
           </View>
+          )}
         </ScrollView>
       )}
+      <UndoToast
+        visible={undoOffer != null}
+        message={undoOffer?.text ?? ''}
+        actionLabel="Undo"
+        duration={6000}
+        onUndo={() => {
+          const offer = undoOffer;
+          setUndoOffer(null);
+          offer?.undo();
+        }}
+        onDismiss={() => setUndoOffer(null)}
+        bottomInset={tabFootprint}
+      />
+      <HelpToast screen="day" bottomInset={tabFootprint} />
       <ActionSheet
         visible={timedMenu != null}
         onClose={() => setTimedMenu(null)}
@@ -345,6 +582,18 @@ export default function ActivityDayScreen() {
             : []
         }
       />
+      {blocks && (
+        <AddToDaySheet
+          visible={addOpen}
+          onClose={() => setAddOpen(false)}
+          day={date}
+          dayName={date === today ? 'today' : date === previousIsoDay(today) ? 'yesterday' : heading.title}
+          logs={logs}
+          // Today and yesterday take Revised elsewhere, Memorized and a note; an older day only a
+          // note, so its history and the streak can't be rewritten (ACT-17).
+          noteOnly={date !== today && date !== previousIsoDay(today)}
+        />
+      )}
       <ReadingPagesSheet
         session={editingReading}
         onClose={() => setEditingReading(null)}
@@ -370,13 +619,15 @@ export default function ActivityDayScreen() {
           }}
         />
       )}
-    </SafeAreaView>
+    </TopSafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  title: { alignItems: 'center' },
+  titleText: { letterSpacing: -0.43 },
 });
 
 // The new design.

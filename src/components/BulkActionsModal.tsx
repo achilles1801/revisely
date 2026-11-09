@@ -8,6 +8,7 @@ import { PillButton } from './v2/PillButton';
 import { Mark } from './v2/Mark';
 import { Tap } from './v2/Tap';
 import { layoutV2, typeV2 } from '../theme/v2';
+import { describePageRange, spokenText } from '../lib/passages';
 
 interface PageData {
   pageNumber: number;
@@ -113,15 +114,16 @@ export function BulkActionsModal({
               );
             })
           : pages.map((page) => {
-              const surah = quranData.find((q) => q.pageNumber === page.pageNumber)?.surahName || 'Surah';
+              // What the page holds first, its number as the quiet detail (surahs and juz first, CLAUDE.md).
+              const what = describePageRange(page.pageNumber, page.pageNumber, { form: 'compact' });
               return row(
                 page.pageNumber,
                 <Mark size="reply" label={String(page.pageNumber)} done={page.isCompleted} />,
-                `Page ${page.pageNumber}`,
-                surah,
+                what,
+                `p. ${page.pageNumber}`,
                 page.isCompleted,
                 () => onTogglePage(page.pageNumber),
-                `Page ${page.pageNumber}, ${surah}${page.isCompleted ? ', revised' : ''}`,
+                `${spokenText(what)}, page ${page.pageNumber}${page.isCompleted ? ', revised' : ''}`,
               );
             })}
       </ScrollView>

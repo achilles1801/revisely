@@ -141,7 +141,9 @@ describe('an edit to the plan shown', () => {
     const edited: CustomPlan = { days: [[5, 6, 7], [8, 9, 1], [2, 3]], cycleStartDate: TODAY, direction: 'forward' };
     const after = save(carried, edited, [yesterday], false);
     expect(pagesOn(after, 17)).toEqual([5, 6, 7]);
-    expect(after.carryOver).toEqual({ day: TODAY, pages: [5, 6], skip: 0 });
+    // The carry-over as it was: today's day still starts with the two pages 5
+    // and 6 stand in for (CARRY-5).
+    expect(after.carryOver).toEqual({ day: TODAY, pages: [5, 6], skip: 2 });
   });
 });
 

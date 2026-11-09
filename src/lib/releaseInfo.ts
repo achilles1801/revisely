@@ -64,6 +64,9 @@ export const REPORTING_CHANNELS = ['production', 'preview'] as const;
  * release.
  */
 export function sentryReports(input: Pick<ReleaseInput, 'isDev' | 'isDevice' | 'channel'>): boolean {
+  // The Test Lab build (EXPO_PUBLIC_TESTLAB=1) never reports: its crashes would count against
+  // production's crash-free gate. Test Lab's own results report them (testlab.yml).
+  if (process.env.EXPO_PUBLIC_TESTLAB === '1') return false;
   return !input.isDev && input.isDevice && (REPORTING_CHANNELS as readonly string[]).includes(input.channel ?? '');
 }
 

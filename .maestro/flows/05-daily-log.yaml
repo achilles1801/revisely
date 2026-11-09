@@ -1,0 +1,120 @@
+# The daily log: two notes added, one edited and the other deleted, each change
+# kept across a cold start, and the other note left as it was. The first note
+# comes from Activity's day (the + → Note), which is how a day without notes
+# reaches its log; the second is written in the log itself.
+# Rules (BEHAVIOUR.md): LOG-1, LOG-2, ACT-5
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    file: ../subflows/new-account.yaml
+    env:
+      CLOCK: 2026-11-03T20:00
+      BOUNDARY: midnight
+- runFlow: ../subflows/open-day.yaml
+
+# LOG-1: two notes, each its own entry. The first from the day's +; its row
+# opens the log, which holds it.
+- runFlow:
+    file: ../subflows/add-day-note.yaml
+    env:
+      TEXT: Juz 30 felt steady today
+- runFlow: ../subflows/day-log.yaml
+- extendedWaitUntil:
+    visible:
+      id: journal-note-.*
+      text: "Note, Juz 30 felt steady today, .*"
+    timeout: 15000
+- runFlow:
+    file: ../subflows/add-note.yaml
+    env:
+      TEXT: Repeat Al-Mutaffifin twice
+# The first note is checked with a wait: the second note's send can still be
+# landing, and a note that truly vanished still fails after the timeout.
+- extendedWaitUntil:
+    visible:
+      id: journal-note-.*
+      text: "Note, Juz 30 felt steady today, .*"
+    timeout: 15000
+
+# Kept: a cold start, then back to the log.
+- runFlow: ../subflows/relaunch.yaml
+- runFlow: ../subflows/open-log.yaml
+- extendedWaitUntil:
+    visible:
+      id: journal-note-.*
+      text: "Note, Juz 30 felt steady today, .*"
+    timeout: 15000
+- assertVisible:
+    id: journal-note-.*
+    text: "Note, Repeat Al-Mutaffifin twice, .*"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 05-daily-log-notes
+
+# LOG-2: editing one changes only it. Hold the note, Edit, change the text, Save.
+- longPressOn:
+    id: journal-note-.*
+    text: "Note, Juz 30 felt steady today, .*"
+- tapOn: "Edit"
+- runFlow:
+    file: ../subflows/type-in-log.yaml
+    env:
+      TEXT: An-Naba needs another look
+- tapOn:
+    id: journal-send
+- extendedWaitUntil:
+    visible:
+      id: journal-note-.*
+      text: "Note, An-Naba needs another look, .*"
+    timeout: 10000
+# Still so once the edit has been sent and the day read again.
+- runFlow: ../subflows/wait-sync.yaml
+- assertVisible:
+    id: journal-note-.*
+    text: "Note, An-Naba needs another look, .*"
+- assertNotVisible:
+    text: "Note, Juz 30 felt steady today, .*"
+- assertVisible:
+    id: journal-note-.*
+    text: "Note, Repeat Al-Mutaffifin twice, .*"
+
+# LOG-2: deleting one removes only it. Swipe the note left, Delete: it goes at
+# once, with Undo for five seconds (ACT-6); then the delete is sent.
+- swipe:
+    from:
+      id: journal-note-.*
+      text: "Note, Repeat Al-Mutaffifin twice, .*"
+    direction: LEFT
+- tapOn:
+    id: journal-note-.*-delete
+- extendedWaitUntil:
+    notVisible:
+      text: "Note, Repeat Al-Mutaffifin twice, .*"
+    timeout: 10000
+- assertVisible:
+    id: undo-toast-action
+- extendedWaitUntil:
+    notVisible:
+      id: undo-toast-action
+    timeout: 15000
+# Still gone once the delete has been sent and the day read again.
+- runFlow: ../subflows/wait-sync.yaml
+- assertNotVisible:
+    text: "Note, Repeat Al-Mutaffifin twice, .*"
+- assertVisible:
+    id: journal-note-.*
+    text: "Note, An-Naba needs another look, .*"
+
+# Both changes kept across a cold start.
+- runFlow: ../subflows/relaunch.yaml
+- runFlow: ../subflows/open-log.yaml
+- extendedWaitUntil:
+    visible:
+      id: journal-note-.*
+      text: "Note, An-Naba needs another look, .*"
+    timeout: 15000
+- assertNotVisible:
+    text: "Note, Repeat Al-Mutaffifin twice, .*"
+- assertNotVisible:
+    text: "Note, Juz 30 felt steady today, .*"

@@ -24,6 +24,8 @@ let mockPermission = { granted: true, status: 'granted', canAskAgain: true };
 jest.mock('expo-notifications', () => ({
   getPermissionsAsync: jest.fn(async () => mockPermission),
   requestPermissionsAsync: jest.fn(async () => ({ granted: true, status: 'granted' })),
+  scheduleNotificationAsync: jest.fn(async () => 'id'),
+  dismissNotificationAsync: jest.fn(async () => undefined),
 }));
 jest.mock('expo-location', () => ({
   Accuracy: { Balanced: 3 },
@@ -99,6 +101,34 @@ describe('Prayer notifications', () => {
     fireEvent.press(within(sheet).getByTestId('prayer-sound-silent'));
     expect(getPrayerPrefs().alerts.maghrib).toEqual({ on: true, before: 15, sound: 'silent' });
     expect(within(sheet).getByText('A banner only')).toBeTruthy();
+  });
+
+  it('tapping a sound picks it and plays it (Silent plays nothing); again on each tap', async () => {
+    const Notifications = require('expo-notifications');
+    resetPrayerPrefsForTests({
+      ...DEFAULT_PRAYER_PREFS,
+      place: LONDON,
+      alerts: { ...DEFAULT_PRAYER_PREFS.alerts, maghrib: { on: true, before: 0, sound: 'silent' } },
+    });
+    render(<PrayerNotificationsScreen />);
+    fireEvent.press(screen.getByTestId('prayer-alert-maghrib-detail'));
+    const sheet = screen.getByTestId('prayer-alert-sheet');
+    expect(within(sheet).getByTestId('prayer-sound-standard').props.accessibilityHint).toBe('Plays the sound');
+    await act(async () => {
+      fireEvent.press(within(sheet).getByTestId('prayer-sound-standard'));
+    });
+    expect(getPrayerPrefs().alerts.maghrib.sound).toBe('standard');
+    expect(Notifications.scheduleNotificationAsync).toHaveBeenCalledTimes(1);
+    expect(Notifications.scheduleNotificationAsync.mock.calls[0][0].content.data).toEqual({ soundPreview: true });
+    await act(async () => {
+      fireEvent.press(within(sheet).getByTestId('prayer-sound-standard'));
+    });
+    expect(Notifications.scheduleNotificationAsync).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      fireEvent.press(within(sheet).getByTestId('prayer-sound-silent'));
+    });
+    expect(getPrayerPrefs().alerts.maghrib.sound).toBe('silent');
+    expect(Notifications.scheduleNotificationAsync).toHaveBeenCalledTimes(2);
   });
 });
 

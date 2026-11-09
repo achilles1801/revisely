@@ -1,4 +1,5 @@
 import React from 'react';
+import { Alert } from 'react-native';
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -15,7 +16,7 @@ jest.mock('expo-haptics', () => ({
 }));
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
 const mockNavigation = { navigate: jest.fn(), goBack: jest.fn() };
-const mockRoute: { params?: { edit?: boolean } } = {};
+const mockRoute: { params?: { edit?: boolean; focusPages?: number[] } } = {};
 jest.mock('@react-navigation/native', () => ({ useNavigation: () => mockNavigation, useRoute: () => mockRoute }));
 const mockApp: any = {};
 jest.mock('../../../context/AppContext', () => ({ useApp: () => mockApp }));
@@ -26,6 +27,17 @@ import { DesignProvider } from '../../../design/DesignContext';
 import { ThemeProvider } from '../../../context/ThemeContext';
 import { DEFAULT_ACCENT, paletteV2 } from '../../../theme/v2';
 import type { User, UserPage } from '../../../types';
+
+// Saving newly memorized pages asks "When did you memorize these?": the tests answer Before (no log).
+beforeEach(() => {
+  jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+    const before = buttons?.find((b) => b.text === "Before (don't log)");
+    before?.onPress?.();
+  });
+});
+afterEach(() => {
+  jest.restoreAllMocks();
+});
 
 const palette = paletteV2(false, DEFAULT_ACCENT);
 const flat = (style: unknown) => Object.assign({}, ...[style].flat(5).filter(Boolean));
@@ -111,6 +123,32 @@ describe('Memorization in the new design', () => {
       expect(screen.getByTestId('surah-1-check')).toBeTruthy();
       expect(screen.getByTestId('memorization-cancel')).toBeTruthy();
       expect(screen.queryByTestId('memorization-edit')).toBeNull();
+    } finally {
+      mockRoute.params = undefined;
+    }
+  });
+
+  // Activity's Memorized → Edit (Majd, Nov 8 2026): the editor at that entry, not at the top.
+  it('opened at a day’s entry: ready to edit, its surah open and scrolled to, its pages ringed', async () => {
+    mockRoute.params = { edit: true, focusPages: [2, 3] };
+    const { ScrollView } = jest.requireActual('react-native');
+    try {
+      await renderScreen();
+      expect(screen.getByTestId('memorization-cancel')).toBeTruthy();
+      // Al-Baqarah (pages 2–3 of it here) is open, with the entry's pages ringed in ink.
+      for (const p of [2, 3]) {
+        const chip = screen.getByTestId(`page-chip-${p}`);
+        expect(flat(chip.props.style)).toMatchObject({ borderWidth: 2, borderColor: palette.text });
+        expect(chip.props.accessibilityLabel).toBe(`Page ${p}, in the entry you opened`);
+      }
+      expect(flat(screen.getByTestId('page-chip-4').props.style).borderWidth).toBeUndefined();
+      // Scrolled to its row once the rows are laid out: the browser's place, then the row's in it.
+      const scroll = screen.UNSAFE_getByType(ScrollView).instance as { scrollTo: jest.Mock };
+      scroll.scrollTo = jest.fn();
+      fireEvent(screen.getByTestId('memorization-browser'), 'layout', { nativeEvent: { layout: { x: 0, y: 120, width: 393, height: 4000 } } });
+      fireEvent(screen.getByTestId('memorization-browser-list'), 'layout', { nativeEvent: { layout: { x: 0, y: 56, width: 393, height: 3900 } } });
+      fireEvent(screen.getByTestId('surah-2-row'), 'layout', { nativeEvent: { layout: { x: 0, y: 60, width: 393, height: 200 } } });
+      expect(scroll.scrollTo).toHaveBeenCalledWith({ y: 120 + 56 + 60 - 8, animated: true });
     } finally {
       mockRoute.params = undefined;
     }

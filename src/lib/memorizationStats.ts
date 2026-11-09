@@ -1,46 +1,34 @@
-import { getPagesForJuz, getSurahsInJuz } from './quranData';
 import { UserPage } from '../types';
+import { juzShares, memorizedPageShare, memorizedSurahs } from './memorizedAyahs';
 
 export interface MemorizationStats {
-  /** Memorized pages (0–604). */
+  /** Pages memorized whole (0–604). */
   pages: number;
+  /**
+   * Pages memorized, a partly memorized page counting by its share of the page (MEM-2): 305.6.
+   * Home's % memorized and the progress bars read this.
+   */
+  share: number;
   /** Fully memorized juz (0–30). */
   completeJuz: number;
   /** Juz including partial progress, e.g. 3.4. */
   fractionalJuz: number;
-  /** Fully memorized surahs (0–114). */
+  /** Surahs with every ayah memorized (0–114). */
   surahs: number;
   /** Each juz's memorized share (0–1), juz 1 first: 30 numbers. */
   juzFractions: number[];
 }
 
 export function computeMemorizationStats(pages: UserPage[]): MemorizationStats {
-  const memorized = new Set(
-    pages.filter((p) => p.status === 'memorized').map((p) => p.pageNumber),
-  );
-  let completeJuz = 0;
-  let fractionalJuz = 0;
-  const juzFractions: number[] = [];
-  const surahs = new Set<number>();
-  // A surah can span juz; it's complete only if every page in every juz is.
-  const incompleteSurahs = new Set<number>();
-
-  for (let juz = 1; juz <= 30; juz++) {
-    const juzPages = getPagesForJuz(juz);
-    const count = juzPages.filter((pn) => memorized.has(pn)).length;
-    const share = juzPages.length > 0 ? count / juzPages.length : 0;
-    juzFractions.push(share);
-    fractionalJuz += share;
-    if (juzPages.length > 0 && count === juzPages.length) completeJuz++;
-
-    for (const surah of getSurahsInJuz(juz)) {
-      if (surah.pagesInJuz.every((pn) => memorized.has(pn))) surahs.add(surah.number);
-      else incompleteSurahs.add(surah.number);
-    }
-  }
-  for (const n of incompleteSurahs) surahs.delete(n);
-
-  return { pages: memorized.size, completeJuz, fractionalJuz, surahs: surahs.size, juzFractions };
+  const juzFractions = juzShares(pages);
+  return {
+    pages: pages.filter((p) => p.status === 'memorized').length,
+    share: memorizedPageShare(pages),
+    completeJuz: juzFractions.filter((s) => s >= 1).length,
+    fractionalJuz: juzFractions.reduce((n, s) => n + s, 0),
+    surahs: memorizedSurahs(pages).length,
+    juzFractions,
+  };
 }
 
 export function formatFractional(value: number): string {

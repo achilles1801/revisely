@@ -1,0 +1,117 @@
+# Activity → Insights at each range (30 days, 3 months, All time; ACT-22), the top and then Consistency,
+# for the account seed-history.js made. From Home, back to Home. Screenshots 09-insights-<AGE>-<range>-<THEME>.
+#   env AGE (1-day, 7-days, 1-year), THEME (light, dark)
+appId: com.revisionbuddy.app
+---
+- tapOn:
+    id: open-activity
+- extendedWaitUntil:
+    visible:
+      id: activity-blocks-views
+    timeout: 20000
+- tapOn:
+    id: pill-insights
+- extendedWaitUntil:
+    visible:
+      id: insights-range
+    timeout: 15000
+# 30 days
+- tapOn:
+    id: insights-range
+- extendedWaitUntil:
+    visible:
+      id: sheet-action-range-30
+    timeout: 10000
+- tapOn:
+    id: sheet-action-range-30
+- extendedWaitUntil:
+    visible:
+      text: ".*memorized pages? in 30 days.*"
+    timeout: 10000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-insights-${AGE}-30-${THEME}
+- scrollUntilVisible:
+    element:
+      id: insights-hours
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+    optional: true
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-insights-${AGE}-30-consistency-${THEME}
+- scrollUntilVisible:
+    element:
+      id: insights-range
+    direction: UP
+    timeout: 15000
+# 3 months
+- tapOn:
+    id: insights-range
+- extendedWaitUntil:
+    visible:
+      id: sheet-action-range-90
+    timeout: 10000
+- tapOn:
+    id: sheet-action-range-90
+- extendedWaitUntil:
+    visible:
+      text: ".*memorized pages? in 3 months.*"
+    timeout: 10000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-insights-${AGE}-90-${THEME}
+- scrollUntilVisible:
+    element:
+      id: insights-hours
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+    optional: true
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-insights-${AGE}-90-consistency-${THEME}
+- scrollUntilVisible:
+    element:
+      id: insights-range
+    direction: UP
+    timeout: 15000
+# All time: the share until the pages have gone round once, then cycles
+- tapOn:
+    id: insights-range
+- extendedWaitUntil:
+    visible:
+      id: sheet-action-range-all
+    timeout: 10000
+- tapOn:
+    id: sheet-action-range-all
+- extendedWaitUntil:
+    visible:
+      text: ".*memorized pages? since .*"
+    timeout: 10000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-insights-${AGE}-all-${THEME}
+- scrollUntilVisible:
+    element:
+      id: insights-hours
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+    optional: true
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-insights-${AGE}-all-consistency-${THEME}
+- scrollUntilVisible:
+    element:
+      id: insights-range
+    direction: UP
+    timeout: 15000
+- runFlow: back-home.yaml

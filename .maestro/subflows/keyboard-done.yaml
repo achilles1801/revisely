@@ -1,0 +1,17 @@
+# Puts the keyboard away where it would cover the log's buttons: the Done bar
+# on iOS (when Maestro can see it; Add stays above the keyboard anyway), and
+# hideKeyboard on Android.
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: journal-keyboard-done
+          optional: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard

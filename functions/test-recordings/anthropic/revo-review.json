@@ -1,0 +1,47 @@
+{
+  "recordedAt": "2026-11-09T09:45:26.388Z",
+  "how": "functions/scripts/record-anthropic.js",
+  "request": {
+    "model": "claude-sonnet-5-5",
+    "max_tokens": 800,
+    "thinking": {
+      "type": "between_tools"
+    },
+    "systemSha256": "f9ba722e05d3ea21903212b09eb7cfdc4e4a894b5cc0a5c36e1b405c77d92927",
+    "outputSchemaSha256": "ca725b35345fa9d4316a6e08e45b7f3a3c7c7833def4ea0b669b4c4d39dfba1e"
+  },
+  "status": 200,
+  "body": {
+    "model": "claude-sonnet-5-5",
+    "id": "msg_011Cgs94yzZGexxPXPAhCVFv",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"text\":\"Today you've revised 4 of your 10 pages and spent 22 minutes on them, and your 2-day streak is still alive. With the evening left, finish the rest, starting from Al-Infitar and giving Al-Mutaffifin 35 to Al-Inshiqaq a little extra care.\",\"chart\":null,\"textAfter\":null,\"action\":{\"kind\":\"startRevision\",\"title\":\"Continue today's revision\",\"detail\":\"Pick up from Al-Infitar and finish today's pages\"},\"remember\":[],\"title\":\"Day in review\",\"chips\":[\"How is my week going?\",\"Why is Al-Mutaffifin weak?\"]}"
+      }
+    ],
+    "container": null,
+    "stop_reason": "end_turn",
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+      "input_tokens": 555,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 16850,
+      "cache_creation": {
+        "ephemeral_5m_input_tokens": 0,
+        "ephemeral_1h_input_tokens": 0
+      },
+      "output_tokens": 211,
+      "output_tokens_details": {
+        "thinking_tokens": 0
+      },
+      "service_tier": "standard",
+      "inference_geo": "global",
+      "speed": "standard"
+    },
+    "diagnostics": null
+  }
+}

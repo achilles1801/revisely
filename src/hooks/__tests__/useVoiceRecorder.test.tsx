@@ -710,6 +710,51 @@ describe('waveform levels', () => {
     }
   });
 
+  it('one reading feeds the live bars and level(): the recorder is read once per tick', async () => {
+    jest.useFakeTimers();
+    try {
+      const { result } = setup();
+      await act(() => result.current.start());
+      const seen: number[] = [];
+      const off = result.current.subscribeLevel((l) => seen.push(l));
+      let db = -25;
+      mockRecorder.getStatus.mockImplementation(() => ({ isRecording: true, metering: db }));
+      mockRecorder.getStatus.mockClear();
+      await act(async () => {
+        jest.advanceTimersByTime(LEVEL_SAMPLE_MS * 2);
+      });
+      db = 0;
+      await act(async () => {
+        jest.advanceTimersByTime(LEVEL_SAMPLE_MS);
+      });
+      expect(seen).toEqual([0.5, 0.5, 1]);
+      expect(result.current.recentLevels()).toEqual([0.5, 0.5, 1]);
+      // The hidden mode's listener gets the same reading, without reading again.
+      const reads = mockRecorder.getStatus.mock.calls.length;
+      expect(result.current.level()).toBe(0);
+      expect(result.current.level()).toBe(0);
+      expect(mockRecorder.getStatus.mock.calls.length).toBe(reads);
+      off();
+      await act(async () => {
+        jest.advanceTimersByTime(LEVEL_SAMPLE_MS);
+      });
+      expect(seen).toHaveLength(3);
+      // Paused: no level, and the bars hold what they had.
+      await act(() => result.current.pause());
+      expect(result.current.level()).toBeNull();
+      expect(result.current.recentLevels()).toHaveLength(4);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('before the first reading, level() still reads the recorder (the listener never opens its own)', async () => {
+    const { result } = setup();
+    await act(() => result.current.start());
+    mockRecorder.getStatus.mockImplementation(() => ({ isRecording: true, metering: -30 }));
+    expect(result.current.level()).toBe(-30);
+  });
+
   it('a recorder that throws when read (released) just stops adding levels', async () => {
     jest.useFakeTimers();
     try {

@@ -1,0 +1,58 @@
+# Insights at every range for an account a day old and a week old, in light then dark (ACT-22). Majd, Nov 8
+# 2026, on a day-old account: "think i found a bug when u filter by all time or 3 months" (a weeks-grid cell
+# stretched to the width, a gap under it, "0 cycles", "1 of 1 days"). Screenshots only: the rules, a year's
+# history included, are tested by tests/scenarios/scenarios/insightsShortHistory.scenario.tsx.
+appId: com.revisionbuddy.app
+---
+# An account 1 day old.
+- runFlow:
+    file: ../subflows/new-account.yaml
+    env:
+      CLOCK: 2026-11-08T21:20
+      BOUNDARY: midnight
+- runScript:
+    file: ../scripts/seed-history.js
+    env:
+      DAYS: "1"
+- runFlow: ../subflows/relaunch.yaml
+- runFlow: ../subflows/backup-notice.yaml
+- runFlow:
+    file: ../subflows/insights-ranges.yaml
+    env:
+      AGE: 1-day
+      THEME: light
+- runFlow:
+    file: ../subflows/theme.yaml
+    env:
+      THEME: Dark
+- runFlow:
+    file: ../subflows/insights-ranges.yaml
+    env:
+      AGE: 1-day
+      THEME: dark
+# An account 7 days old.
+- runFlow:
+    file: ../subflows/new-account.yaml
+    env:
+      CLOCK: 2026-11-08T21:20
+      BOUNDARY: midnight
+- runScript:
+    file: ../scripts/seed-history.js
+    env:
+      DAYS: "7"
+- runFlow: ../subflows/relaunch.yaml
+- runFlow: ../subflows/backup-notice.yaml
+- runFlow:
+    file: ../subflows/insights-ranges.yaml
+    env:
+      AGE: 7-days
+      THEME: light
+- runFlow:
+    file: ../subflows/theme.yaml
+    env:
+      THEME: Dark
+- runFlow:
+    file: ../subflows/insights-ranges.yaml
+    env:
+      AGE: 7-days
+      THEME: dark

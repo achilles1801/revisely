@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import * as firestoreService from '../../services/firestoreService';
+import { withPendingJournal, withPendingReadings } from '../../lib/offline/queue';
 import { listRecordings, RecordingMeta } from '../../lib/recordings';
 import { logger } from '../../lib/logger';
 import type { JournalEntry, ReadingSession } from '../../types';
@@ -16,13 +17,12 @@ export function useActivitySources() {
   const [journal, setJournal] = useState<JournalEntry[]>([]);
   const [recordings, setRecordings] = useState<RecordingMeta[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState(false);
 
   const load = useCallback(async () => {
     const [r, j] = await Promise.allSettled([
-      firestoreService.getReadingSessions(),
-      firestoreService.getJournalEntries(400),
+      firestoreService.getReadingSessions().then((list) => withPendingReadings(list)),
+      firestoreService.getJournalEntries(400).then((list) => withPendingJournal(list)),
     ]);
     listRecordings()
       .then(setRecordings)
@@ -37,11 +37,5 @@ export function useActivitySources() {
 
   useActivityReload(load);
 
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await load();
-    setRefreshing(false);
-  }, [load]);
-
-  return { readings, journal, recordings, loading, refreshing, loadError, load, onRefresh };
+  return { readings, journal, recordings, loading, loadError, load };
 }

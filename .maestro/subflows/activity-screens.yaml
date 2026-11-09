@@ -1,0 +1,535 @@
+# The Activity screens for the visual check (gap audit; activity-redesign/verify): Overview's month (with
+# Today, since October isn't today's month), its Week | Month menu and the week; a day, a page of its
+# strip in the reader, its juz (from the Revised header), the day's block menus (Revised, d10a;
+# Memorized, whose Edit opens the memorized pages), the + (d5), its Revised, Memorized and Note sheets
+# (d6–d8), the day's end, a light day (d2), and Insights (d4: top; a juz from its tile and the stale one
+# from the untouched row, i5 and i6; Coverage's Surah view (as it opens, Juz 1 open and hidden), Page and
+# Juz views, ACT-26; the range's menu, 3 months and All time, i1, i2 and i4; what wasn't
+# revised, i7; Weak spots; a month's bar, i10; the end; Pace's timed revisions, i11). Each is a
+# screenshot named 09-<screen>-${THEME}.
+# Run by 09-activity-light.yaml and 09-activity-dark.yaml, after seed-activity.yaml.
+appId: com.revisionbuddy.app
+---
+- tapOn:
+    id: open-activity
+- extendedWaitUntil:
+    visible:
+      id: activity-blocks-views
+    timeout: 20000
+# As the mock (d3): October, with the 28th picked.
+- tapOn: "Previous month"
+- tapOn:
+    id: calendar-day-2026-10-28
+# The day's recording (the app writes the demo ones after the relaunch): its mic and count.
+- extendedWaitUntil:
+    visible:
+      id: preview-recordings-revised
+    timeout: 30000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-overview-month-${THEME}
+# Week | Month is the chip beside the title (ACT-18): its menu, then the week holding the picked day.
+- tapOn:
+    id: calendar-span
+- extendedWaitUntil:
+    visible:
+      id: sheet-action-week
+    timeout: 10000
+- waitForAnimationToEnd
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-overview-span-menu-${THEME}
+- tapOn:
+    id: sheet-action-week
+- extendedWaitUntil:
+    visible:
+      id: calendar-week
+    timeout: 10000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-overview-week-${THEME}
+- tapOn:
+    id: calendar-span
+- extendedWaitUntil:
+    visible:
+      id: sheet-action-month
+    timeout: 10000
+- tapOn:
+    id: sheet-action-month
+- extendedWaitUntil:
+    visible:
+      id: calendar-totals
+    timeout: 10000
+# As the mock (d1): today, Tuesday 3 November. Today brings back today's month with today picked; the
+# picked day's rows open it (ACT-18).
+- tapOn:
+    id: calendar-today
+- extendedWaitUntil:
+    notVisible:
+      id: calendar-today
+    timeout: 10000
+- tapOn:
+    id: calendar-day-2026-11-03
+- tapOn:
+    id: preview-row-revised
+- extendedWaitUntil:
+    visible:
+      id: activity-day-v2
+    timeout: 15000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-day-${THEME}
+# A page of the strip opens the reader over the day; back returns to the day (ACT-20, Majd, Nov 8
+# 2026). E2E builds load no page images, so the reader shows "page-missing"; a tap high on the page
+# brings its controls.
+- tapOn:
+    id: strip-page-548
+- extendedWaitUntil:
+    visible:
+      id: "page-(image|missing)"
+    timeout: 20000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-strip-reader-${THEME}
+- retry:
+    maxRetries: 2
+    commands:
+      - runFlow:
+          when:
+            notVisible:
+              id: reader-back
+          commands:
+            - tapOn:
+                point: 50%, 30%
+      - extendedWaitUntil:
+          visible:
+            id: reader-back
+          timeout: 5000
+- tapOn:
+    id: reader-back
+- extendedWaitUntil:
+    visible:
+      id: activity-day-v2
+    timeout: 10000
+# The Revised block's header opens its juz (ACT-21): Juz 28. The seed has Smart Tracking on, so it shows
+# strength, as mock i5 does.
+- tapOn:
+    id: activity-block-revised-header
+- extendedWaitUntil:
+    visible:
+      id: juz-sheet-strip
+    timeout: 10000
+- waitForAnimationToEnd
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-juz-day-${THEME}
+- runFlow: close-sheet.yaml
+- extendedWaitUntil:
+    notVisible:
+      id: juz-sheet-strip
+    timeout: 10000
+# The Revised block's menu (d10a): a hold on its header.
+- longPressOn:
+    id: activity-block-revised-header
+    optional: true
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-menu-revised-${THEME}
+- tapOn:
+    text: "Close menu"
+    optional: true
+# The Memorized block's menu: exactly Edit and Delete (ACT-6, Majd, Nov 8 2026). Edit opens the
+# memorized pages at the entry: Al-Mulk open and scrolled to, p. 562 ringed. Back returns to the day.
+- scrollUntilVisible:
+    element:
+      id: activity-block-memorized-header
+    direction: DOWN
+    timeout: 10000
+- longPressOn:
+    id: activity-block-memorized-header
+- extendedWaitUntil:
+    visible:
+      id: activity-row-menu
+    timeout: 10000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-menu-memorized-${THEME}
+- tapOn: "Edit"
+- extendedWaitUntil:
+    visible:
+      id: memorization-v2
+    timeout: 10000
+- waitForAnimationToEnd
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-memorized-edit-${THEME}
+- tapOn:
+    id: back
+- extendedWaitUntil:
+    visible:
+      id: activity-day-v2
+    timeout: 10000
+# Back to the day's top, which the add sheets' mocks show behind them.
+- scrollUntilVisible:
+    element:
+      id: activity-block-revised-header
+    direction: UP
+    timeout: 10000
+# The + (d5): add to today.
+- tapOn:
+    id: day-add
+- extendedWaitUntil:
+    visible:
+      id: activity-add-menu
+    timeout: 10000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-add-menu-${THEME}
+# Revised elsewhere (the trimmed +, Nov 7 2026): today's two pages not revised (At-Taghabun), ticked.
+- tapOn:
+    id: sheet-action-revised
+- extendedWaitUntil:
+    visible:
+      id: add-revised-info
+    timeout: 10000
+- waitForAnimationToEnd
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-add-revised-${THEME}
+- tapOn: "Cancel"
+- extendedWaitUntil:
+    notVisible:
+      id: add-revised-sheet
+    timeout: 10000
+# Memorized (d7): "From your reading" (p. 563, read at 8:05), nothing typed yet.
+- tapOn:
+    id: day-add
+- extendedWaitUntil:
+    visible:
+      id: activity-add-menu
+    timeout: 10000
+- tapOn:
+    id: sheet-action-memorized
+- extendedWaitUntil:
+    visible:
+      id: add-memorized-from-reading
+    timeout: 10000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-add-memorized-${THEME}
+- tapOn: "Cancel"
+- extendedWaitUntil:
+    notVisible:
+      id: add-memorized-sheet
+    timeout: 10000
+# Note (d8): typed, and shown under Revised. (ASCII only: Android's input can't type an en dash.)
+- tapOn:
+    id: day-add
+- extendedWaitUntil:
+    visible:
+      id: activity-add-menu
+    timeout: 10000
+- tapOn:
+    id: sheet-action-note
+- extendedWaitUntil:
+    visible:
+      id: add-note-text
+    timeout: 10000
+- tapOn:
+    id: add-note-text
+- inputText: "548-549 keep slipping at the turn. Read them twice before Fajr."
+- tapOn:
+    id: add-note-tag-revised
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-add-note-${THEME}
+- tapOn: "Cancel"
+- extendedWaitUntil:
+    notVisible:
+      id: add-note-sheet
+    timeout: 10000
+# The rest of the day (d1 is taller than a screen): Read, Notes and the footer. (After the sheets,
+# whose mocks show the day's top behind them.)
+- scrollUntilVisible:
+    element:
+      id: activity-day-footer
+    direction: DOWN
+    timeout: 10000
+    optional: true
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-day-end-${THEME}
+- tapOn:
+    id: back
+- extendedWaitUntil:
+    visible:
+      id: activity-blocks-views
+    timeout: 10000
+# A light day (d2): Sunday 1 November, stopped after 6 pages.
+- tapOn:
+    id: calendar-day-2026-11-01
+- tapOn:
+    id: preview-open
+- extendedWaitUntil:
+    visible:
+      id: activity-day-v2
+    timeout: 15000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-day-sunday-${THEME}
+- tapOn:
+    id: back
+- extendedWaitUntil:
+    visible:
+      id: activity-blocks-views
+    timeout: 10000
+- tapOn:
+    id: pill-insights
+- extendedWaitUntil:
+    visible:
+      id: activity-insights
+    timeout: 15000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-insights-${THEME}
+# A Coverage tile opens its juz (mock i5), and the untouched row the stale one (i6), ACT-21.
+- tapOn:
+    id: juz-tile-28
+- extendedWaitUntil:
+    visible:
+      id: juz-sheet-strip
+    timeout: 10000
+- waitForAnimationToEnd
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-juz-sheet-${THEME}
+- runFlow: close-sheet.yaml
+- extendedWaitUntil:
+    notVisible:
+      id: juz-sheet-strip
+    timeout: 10000
+- tapOn:
+    id: insights-untouched
+- extendedWaitUntil:
+    visible:
+      id: juz-sheet-plan-it
+    timeout: 10000
+- waitForAnimationToEnd
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-juz-stale-${THEME}
+- runFlow: close-sheet.yaml
+- extendedWaitUntil:
+    notVisible:
+      id: juz-sheet-strip
+    timeout: 10000
+# Coverage's views (ACT-26): Surah as it opens (the juz with something to act on), Juz 1 open and then
+# hidden, then Page; back to Juz for the rest.
+- tapOn:
+    id: pill-surah
+- extendedWaitUntil:
+    visible:
+      id: coverage-surahs
+    timeout: 10000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-coverage-surah-${THEME}
+- runFlow:
+    when:
+      notVisible:
+        id: coverage-juz-1-surahs
+    commands:
+      - tapOn:
+          id: coverage-juz-1
+- extendedWaitUntil:
+    visible:
+      id: coverage-juz-1-surahs
+    timeout: 10000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-coverage-surah-open-${THEME}
+- tapOn:
+    id: coverage-juz-1
+- extendedWaitUntil:
+    notVisible:
+      id: coverage-juz-1-surahs
+    timeout: 10000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-coverage-surah-closed-${THEME}
+- tapOn:
+    id: pill-page
+- extendedWaitUntil:
+    visible:
+      id: coverage-pages
+    timeout: 10000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-coverage-page-${THEME}
+- tapOn:
+    id: pill-juz
+- extendedWaitUntil:
+    visible:
+      id: coverage-juz
+    timeout: 10000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-coverage-juz-${THEME}
+# The range (ACT-22; mocks i1, i2): the chip's menu, then 3 months, then back to 30 days for the rest.
+- tapOn:
+    id: insights-range
+- extendedWaitUntil:
+    visible:
+      id: sheet-action-range-90
+    timeout: 10000
+- waitForAnimationToEnd
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-insights-range-menu-${THEME}
+- tapOn:
+    id: sheet-action-range-90
+- extendedWaitUntil:
+    visible:
+      text: ".*memorized pages in 3 months.*"
+    timeout: 10000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-insights-3-months-${THEME}
+# All time (mock i4): Coverage in cycles since the account's first day.
+- tapOn:
+    id: insights-range
+- extendedWaitUntil:
+    visible:
+      id: sheet-action-range-all
+    timeout: 10000
+- tapOn:
+    id: sheet-action-range-all
+- extendedWaitUntil:
+    visible:
+      text: ".*cycles? of your .*"
+    timeout: 10000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-insights-all-time-${THEME}
+- tapOn:
+    id: insights-range
+- extendedWaitUntil:
+    visible:
+      id: sheet-action-range-30
+    timeout: 10000
+- tapOn:
+    id: sheet-action-range-30
+- extendedWaitUntil:
+    visible:
+      text: ".*memorized pages in 30 days.*"
+    timeout: 10000
+# Coverage's figure lists what wasn't revised (ACT-23, mock i7).
+- tapOn:
+    id: insights-coverage-figure
+- extendedWaitUntil:
+    visible:
+      id: insights-uncovered
+    timeout: 10000
+- waitForAnimationToEnd
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-insights-uncovered-${THEME}
+- runFlow: close-sheet.yaml
+- extendedWaitUntil:
+    notVisible:
+      id: insights-uncovered
+    timeout: 10000
+# Weak spots in the middle of the screen, with Revo's Ask beside its title (d4's middle).
+- scrollUntilVisible:
+    element:
+      id: insights-ask-revo
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-insights-weak-${THEME}
+# A month's bar under Memorization (ACT-23, mock i10): October and its memorizations.
+- scrollUntilVisible:
+    element:
+      id: insights-month-2026-10
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- tapOn:
+    id: insights-month-2026-10
+- extendedWaitUntil:
+    visible:
+      id: insights-month-list
+    timeout: 10000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-insights-month-${THEME}
+- tapOn:
+    id: insights-month-2026-10
+# The rest of Insights (d4 is taller than a screen): Weak spots to Pace.
+- scrollUntilVisible:
+    element:
+      id: insights-pace
+    direction: DOWN
+    visibilityPercentage: 100
+    timeout: 15000
+    optional: true
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-insights-end-${THEME}
+# Pace's timed revisions (ACT-23, mock i11). (The hours scrub is a press that slides: no Maestro step.)
+# To the middle first: left at the foot of the screen, the link sat partly under the tab bar, and a
+# tap on its centre landed on the bar's Read half (Android, #328's run 42462860603: the app went to
+# Read and tabs-merge-screens.yaml found no Insights).
+- scrollUntilVisible:
+    element:
+      id: insights-pace-revisions
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+    optional: true
+- tapOn:
+    id: insights-pace-revisions
+    optional: true
+- runFlow:
+    when:
+      visible:
+        id: pace-chart
+    commands:
+      - waitForAnimationToEnd
+      - runFlow:
+          file: shot.yaml
+          env:
+            NAME: 09-insights-pace-${THEME}
+      - runFlow: close-sheet.yaml

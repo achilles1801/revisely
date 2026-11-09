@@ -82,7 +82,7 @@ describe('App info in the new design', () => {
 
   it('is a Settings row (an ink glyph, no tinted tile); its details open with outline pills', async () => {
     jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
-    await renderV2(<AppInfo release={release} />);
+    await renderV2(<AppInfo tools release={release} />);
     expect(screen.getByTestId('app-info-v2')).toBeTruthy();
     expect(screen.getByTestId('icon-information-circle-outline').props.children).toBe(palette.text);
     expect(flat(screen.getByText('App info').props.style).color).toBe(palette.text);

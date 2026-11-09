@@ -32,6 +32,7 @@ import { Anchor, SpeedMenu } from '../reader/SpeedMenu';
 import { UndoToast } from '../revision/UndoToast';
 import { copyText } from '../../lib/clipboard';
 import { verseShareText } from '../../lib/verseShare';
+import { everyTranslationOffered } from '../../lib/translationsOffered';
 import { spacing } from '../../theme/spacing';
 
 // The last To chosen by hand (Custom), for the next Play while it still fits.
@@ -353,6 +354,8 @@ export function useVerseActions({ pages, onShowPage, currentPage, focused = true
       <VerseSheet
         verse={sheetVerse}
         translationId={user?.translationId}
+        everyTranslation={everyTranslationOffered(user)}
+        accountId={user?.id}
         onChangeTranslation={changeTranslation}
         reciter={user?.reciter}
         onChangeReciter={changeReciter}

@@ -22,9 +22,14 @@ export function ThreadRow({
   name,
   nameAfter,
   meta,
+  metaBelow = false,
+  figure,
   headerMaxScale,
   onMenu,
   menuLabel = 'More',
+  onLongPress,
+  a11yActions,
+  onA11yAction,
   lineAbove,
   lineBelow,
   separator = true,
@@ -40,10 +45,18 @@ export function ThreadRow({
   /** Beside the name, before the metadata (e.g. the Arabic name). */
   nameAfter?: React.ReactNode;
   meta?: string;
+  /** The metadata on its own line under the name (the Activity blocks). */
+  metaBelow?: boolean;
+  /** A figure on the right of the header ("18 of 20"). */
+  figure?: React.ReactNode;
   /** Caps how far the name and metadata grow with Dynamic Type. */
   headerMaxScale?: number;
   onMenu?: () => void;
   menuLabel?: string;
+  /** Holding the header opens the caller's menu; the same actions are VoiceOver custom actions. */
+  onLongPress?: () => void;
+  a11yActions?: { name: string; label: string }[];
+  onA11yAction?: (name: string) => void;
   lineAbove?: boolean;
   lineBelow?: boolean;
   separator?: boolean;
@@ -68,7 +81,15 @@ export function ThreadRow({
         {lineBelow ? <View style={[line, styles.lineBelow]} testID="thread-line" /> : null}
       </View>
       <View style={[styles.content, { paddingTop: pad, paddingBottom: pad }]}>
-        <View style={styles.header}>
+        {onLongPress || a11yActions ? (
+          <Tap
+            onLongPress={onLongPress}
+            accessibilityRole="button"
+            accessibilityLabel={name}
+            accessibilityActions={a11yActions}
+            onAccessibilityAction={(e) => onA11yAction?.(e.nativeEvent.actionName)}
+            style={styles.header}
+          >
           <Text
             style={[typeV2.name, styles.name, { color: palette.text }]}
             numberOfLines={1}
@@ -77,7 +98,7 @@ export function ThreadRow({
             {name}
           </Text>
           {nameAfter}
-          {meta ? (
+          {meta && !metaBelow ? (
             <Text
               style={[typeV2.meta, styles.meta, { color: palette.secondary }]}
               numberOfLines={1}
@@ -87,6 +108,41 @@ export function ThreadRow({
             </Text>
           ) : null}
           <View style={styles.spacer} />
+          {figure ? <View style={styles.figure}>{figure}</View> : null}
+          {onMenu ? (
+            <Tap
+              onPress={onMenu}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel={menuLabel}
+              style={styles.menu}
+              testID={testID ? `${testID}-menu` : undefined}
+            >
+              <Ionicons name="ellipsis-horizontal" size={18} color={palette.secondary} />
+            </Tap>
+          ) : null}
+          </Tap>
+        ) : (
+        <View style={styles.header}>
+          <Text
+            style={[typeV2.name, styles.name, { color: palette.text }]}
+            numberOfLines={1}
+            maxFontSizeMultiplier={headerMaxScale}
+          >
+            {name}
+          </Text>
+          {nameAfter}
+          {meta && !metaBelow ? (
+            <Text
+              style={[typeV2.meta, styles.meta, { color: palette.secondary }]}
+              numberOfLines={1}
+              maxFontSizeMultiplier={headerMaxScale}
+            >
+              {meta}
+            </Text>
+          ) : null}
+          <View style={styles.spacer} />
+          {figure ? <View style={styles.figure}>{figure}</View> : null}
           {onMenu ? (
             <Tap
               onPress={onMenu}
@@ -100,6 +156,12 @@ export function ThreadRow({
             </Tap>
           ) : null}
         </View>
+        )}
+        {meta && metaBelow ? (
+          <Text style={[typeV2.meta, styles.meta, { color: palette.secondary }]} numberOfLines={1} maxFontSizeMultiplier={headerMaxScale}>
+            {meta}
+          </Text>
+        ) : null}
         {children}
         {footer ? <View style={styles.footer}>{footer}</View> : null}
       </View>
@@ -155,6 +217,7 @@ export function RowText({
 }
 
 const styles = StyleSheet.create({
+  figure: { marginLeft: 8 },
   row: { flexDirection: 'row', paddingHorizontal: layoutV2.gutter },
   markCol: { width: markV2.top, alignItems: 'center' },
   lineAbove: { flex: 1, marginBottom: 4 },

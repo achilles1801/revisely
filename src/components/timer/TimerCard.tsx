@@ -19,6 +19,7 @@ import { useReduceMotion } from '../../design/motion';
 import { layoutV2 } from '../../theme/v2';
 import { Backdrop } from '../Backdrop';
 import { shouldDismiss } from '../v2/Sheet';
+import { useModalHold } from '../v2/modalTurn';
 import { alertSessionSaved } from './sessionSavedAlert';
 import { TimerControls } from './TimerControls';
 
@@ -79,6 +80,8 @@ export function TimerCard({
   onClose,
   onHidden,
   onOpenQuran,
+  onSaved,
+  beforeEnd,
 }: {
   visible: boolean;
   origin: Frame | null;
@@ -87,6 +90,10 @@ export function TimerCard({
   onHidden?: () => void;
   /** "Open the Quran" in the controls; omitted where the Quran is already open. */
   onOpenQuran?: () => void;
+  /** A session was saved (TimerControls); by default the "Session saved" alert. The reader says it its own way (REC-1). */
+  onSaved?: (date: string, seconds: number, ended: { pages: number[] }) => void;
+  /** Runs before End finishes the session (TimerControls): the reader stops its recording (REC-1). */
+  beforeEnd?: () => Promise<void>;
 }) {
   const { palette, isDark } = useTheme();
   const insets = useSafeAreaInsets();
@@ -95,6 +102,8 @@ export function TimerCard({
   const keyboard = useAnimatedKeyboard();
 
   const [shown, setShown] = useState(visible);
+  // Sheets wait for it (v2/modalTurn).
+  useModalHold(shown);
   const progress = useSharedValue(0);
   const drag = useSharedValue(0);
   const contentHeight = useSharedValue(0);
@@ -245,7 +254,8 @@ export function TimerCard({
               <TimerControls
                 visible={visible}
                 onClose={onClose}
-                onSaved={(date, seconds) => alertSessionSaved(date, seconds)}
+                onSaved={onSaved ?? ((date, seconds) => alertSessionSaved(date, seconds))}
+                beforeEnd={beforeEnd}
                 onOpenQuran={onOpenQuran}
               />
             </Reanimated.View>

@@ -1,0 +1,21 @@
+# Adds a note to the open daily log: TEXT (plain words; it is matched as a pattern).
+appId: com.revisionbuddy.app
+---
+- tapOn:
+    id: pill-note
+- runFlow:
+    file: type-in-log.yaml
+    env:
+      TEXT: ${TEXT}
+- tapOn:
+    id: journal-send
+- extendedWaitUntil:
+    visible:
+      id: journal-note-.*
+      text: "Note, ${TEXT}, .*"
+    timeout: 10000
+# Still there once it has been sent and the day read again (LOG-1).
+- runFlow: wait-sync.yaml
+- assertVisible:
+    id: journal-note-.*
+    text: "Note, ${TEXT}, .*"

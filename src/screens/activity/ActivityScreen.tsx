@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -7,20 +7,33 @@ import {
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from '../../components/SafeAreaView';
+import { TopSafeAreaView } from '../../components/SafeAreaView';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useTabBarFootprint } from '../../navigation/TabBar';
+import { useRevoFootprint } from '../../lib/revo/presence';
+import { setRevoActivityView } from '../../lib/revo/place';
 import { useActivitySources } from '../../components/activity/useActivitySources';
 import { ActivityCalendar } from '../../components/activity/ActivityCalendar';
+import { ActivityBlocksViews, type ViewKind } from '../../components/activity/ActivityBlocksViews';
+import { usePullToRefresh } from '../../hooks/usePullToRefresh';
+import { HelpButton } from '../../components/help/HelpButton';
+import { HelpToast } from '../../components/help/HelpToast';
+import type { PreviewBlock } from '../../components/activity/CalendarMonth';
+import { activityBlocksEnabled } from '../../components/activity/DayBlocks';
 import { ActivityItemRow, RecentSection } from '../../components/activity/ActivityItemRow';
 import { ActivityItem, buildActivityItems } from '../../lib/activityItems';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
 import { buildActivityDays } from '../../lib/activity';
-import { journalFirstDay } from '../../lib/journal';
+import { journalFirstDay, shiftDay } from '../../lib/journal';
+import { addToPlanParams, firstTomorrowPages, putFirstTomorrow } from '../../lib/weakSpotActions';
+import { revisablePages } from '../../lib/memorizedAyahs';
+import { describePassage } from '../../lib/passages';
+import { logger } from '../../lib/logger';
+import { UndoToast } from '../../components/revision/UndoToast';
 import type { HomeStackParamList } from '../../navigation/MainNavigator';
 import { IconButton, TopBar } from '../../components/v2/TopBar';
 import { Tap } from '../../components/v2/Tap';
@@ -40,15 +53,45 @@ const RECENT_ITEMS = 3;
  */
 export default function ActivityScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const { user, logs } = useApp();
+  const { user, logs, pages, saveUser } = useApp();
   const { palette } = useTheme();
-  const tabFootprint = useTabBarFootprint();
+  // Room for the tab bar (and the mini player) and for Revo's button.
+  const tabFootprint = useTabBarFootprint() + useRevoFootprint();
 
   // The day picked in the calendar (today until one is tapped).
   const [pickedDay, setPickedDay] = useState<string | null>(null);
+  // "Revise these first tomorrow" (Insights): the weak pages lead tomorrow's session, labelled From Insights,
+  // in front of its own pages (ACT-24). A toast says so, with Undo (it put the carry back as it was);
+  // before, the tap saved with no sign of it and read as a dead button (Majd, Nov 8 2026).
+  const [carryToast, setCarryToast] = useState<{ text: string; undo?: () => void } | null>(null);
+  const userRef = useRef(user);
+  userRef.current = user;
+  const reviseTomorrow = (weak: number[]) => {
+    if (!user || weak.length === 0) return;
+    putFirstTomorrow({ user, saveUser, today, pages: weak, name: describePassage(weak, { form: 'short' }), latest: () => userRef.current })
+      .then(({ text, undo }) =>
+        setCarryToast({ text, undo: () => void undo().catch((err) => logger.warn('Could not undo "first tomorrow"', err)) }),
+      )
+      .catch((err) => {
+        logger.warn('Could not put pages first tomorrow', err);
+        setCarryToast({ text: "Couldn't put them first tomorrow. Try again." });
+      });
+  };
 
-  const { day: today } = useRevisionDay(user);
-  const { readings, journal, recordings, loading, refreshing, loadError, load, onRefresh } = useActivitySources();
+  const { day: today, date: revisionDate } = useRevisionDay(user);
+  // "Add to plan" (a custom plan, under "First tomorrow"): tomorrow's day of the plan with the pages
+  // added; the plan changes only when it is saved (ACT-24).
+  const addToPlan = (added: number[]) => {
+    if (user?.customPlan) navigation.navigate('PlanDayEdit', addToPlanParams(user, revisablePages(pages), revisionDate, added));
+  };
+  // Pages already first tomorrow: their buttons say so ("First tomorrow ✓") and can't be tapped again.
+  const firstTomorrow = useMemo(() => firstTomorrowPages(user, shiftDay(today, 1)), [user, today]);
+  const { readings, journal, recordings, loading, loadError, load } = useActivitySources();
+  // Pull to refresh reads everything again (ACT-27): the readings and notes, and Overview's and Insights'
+  // items (they were left out, so a pull never changed Coverage). The spinner always ends (usePullToRefresh).
+  const blocksRefresh = useRef<(() => Promise<unknown>) | null>(null);
+  const refreshAll = useCallback(() => Promise.all([load(), blocksRefresh.current?.()]), [load]);
+  const { refreshing, onRefresh } = usePullToRefresh(refreshAll);
   const recordingDays = useMemo(() => recordings.map((rec) => rec.day), [recordings]);
 
   const days = useMemo(
@@ -62,19 +105,41 @@ export default function ActivityScreen() {
   // The calendar steps back no further than the account's first day.
   const firstDay = useMemo(() => journalFirstDay(user, days), [user, days]);
 
-  const openDay = (date: string) => navigation.navigate('ActivityDay', { date });
+  const openDay = (date: string, focusBlock?: PreviewBlock) => navigation.navigate('ActivityDay', { date, ...(focusBlock ? { focusBlock } : {}) });
   const logToday = () => navigation.navigate('JournalEntry', { date: today });
+  // Days with a note in the log (the flagged calendar's note dot).
+  const noteDays = useMemo(
+    () => new Set((journal ?? []).filter((d) => d.entries.some((n) => n.kind === 'note' && n.text.trim() !== '')).map((d) => d.date)),
+    [journal],
+  );
+  const blocks = activityBlocksEnabled(user);
+  const [view, setView] = useState<ViewKind>('calendar');
+  // Revo opened from here starts on the tab on show (REVO-38).
+  useEffect(() => {
+    setRevoActivityView(view);
+    return () => setRevoActivityView('calendar');
+  }, [view]);
 
   const recentItems = items.slice(0, RECENT_ITEMS);
   const openItem = (it: ActivityItem) =>
     navigation.navigate('ActivityDay', { date: it.day, ...(it.recordingId ? { focusRecordingId: it.recordingId } : {}) });
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
+    <TopSafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
       <TopBar
         title="Activity"
         onBack={() => navigation.goBack()}
-        right={<IconButton icon="add" label="Log today" onPress={logToday} size={28} />}
+        right={
+          blocks ? (
+            <>
+              {/* Its help (HELP-1) explains the tab on show. */}
+              <HelpButton screen={view === 'insights' ? 'insights' : 'activity'} />
+              <IconButton icon="search" label="Search" onPress={() => navigation.navigate('ActivityAll')} size={22} />
+            </>
+          ) : (
+            <IconButton icon="add" label="Log today" onPress={logToday} size={28} />
+          )
+        }
         separator
       />
       {loading ? (
@@ -84,8 +149,11 @@ export default function ActivityScreen() {
       ) : (
         <ScrollView
           style={styles.scroll}
-          contentContainerStyle={{ paddingBottom: tabFootprint + layoutV2.rowPad }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={palette.secondary} />}
+          contentInsetAdjustmentBehavior="never" contentContainerStyle={{ paddingBottom: tabFootprint + layoutV2.rowPad }}
+          refreshControl={
+            // Transparent, as Home's: iOS paints the pull area opaque otherwise.
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={palette.secondary} style={{ backgroundColor: 'transparent' }} />
+          }
           testID="activity-v2"
         >
           {loadError && (
@@ -94,16 +162,38 @@ export default function ActivityScreen() {
               <Text style={[typeV2.body, { color: palette.text, flex: 1 }]}>Couldn't load all of your activity. Tap to retry.</Text>
             </Tap>
           )}
-          <View style={v2.graph}>
-            <ActivityCalendar
-              days={days}
+          {blocks ? (
+            <ActivityBlocksViews
               today={today}
-              firstDay={firstDay}
-              selected={pickedDay ?? today}
-              onSelect={setPickedDay}
+              noteDays={noteDays}
               onOpenDay={openDay}
+              onReviseTomorrow={reviseTomorrow}
+              firstTomorrow={firstTomorrow}
+              // The reader over Activity, so back returns here (as a day's strip does, ACT-20).
+              onOpenPage={(pageNumber) => navigation.navigate('QuranReader', { pageNumber })}
+              onSeeAllPages={() => navigation.navigate('PagesByStrength')}
+              onTurnOnSmartTracking={() => navigation.navigate('Settings', { section: 'revision' })}
+              onViewChange={setView}
+              refreshRef={blocksRefresh}
+              // First tomorrow on every plan, for that day only (Majd, Nov 8 2026: a custom plan's day
+              // used to open, and saving it replaced that day in every cycle).
+              onPlanIt={reviseTomorrow}
+              onAddToPlan={user?.customPlan ? addToPlan : undefined}
             />
-          </View>
+          ) : (
+            <View style={v2.graph}>
+              <ActivityCalendar
+                days={days}
+                today={today}
+                firstDay={firstDay}
+                selected={pickedDay ?? today}
+                onSelect={setPickedDay}
+                onOpenDay={openDay}
+              />
+            </View>
+          )}
+          {!blocks ? (
+          <>
           <View style={{ height: layoutV2.hairline, backgroundColor: palette.separator }} />
           <RecentSection
             count={recentItems.length}
@@ -121,9 +211,26 @@ export default function ActivityScreen() {
               />
             ))}
           </RecentSection>
+          </>
+          ) : null}
         </ScrollView>
       )}
-    </SafeAreaView>
+      <UndoToast
+        visible={carryToast != null}
+        message={carryToast?.text ?? ''}
+        onUndo={carryToast?.undo ? () => {
+          const undo = carryToast.undo;
+          setCarryToast(null);
+          undo?.();
+        } : undefined}
+        actionLabel="Undo"
+        duration={6000}
+        onDismiss={() => setCarryToast(null)}
+        bottomInset={tabFootprint}
+      />
+      <HelpToast screen="activity" bottomInset={tabFootprint} />
+      <HelpToast screen="insights" bottomInset={tabFootprint} />
+    </TopSafeAreaView>
   );
 }
 

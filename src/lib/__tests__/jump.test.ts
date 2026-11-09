@@ -100,18 +100,34 @@ describe('today: what it already holds', () => {
     expect(getPagesForDay(r.user, TODAY, JUZ_1_AND_30)).toEqual([21, 582, ...range(1, 10)]);
   });
 
-  it('pages carried into today stay in it; the old carry-over shift is replaced', () => {
+  it('pages carried into today and not revised are dropped: they were the old start’s, and the new start is today', () => {
     const carried = { ...baseUser, scheduleShiftPages: 1, carryOver: { day: TODAY_KEY, pages: [600], skip: 1 } };
     const r = jumpTo(carried, { kind: 'juz', juz: 1 }, ctx(JUZ_1_AND_30))!;
+    expect(r.user.carryOver).toEqual({ day: TODAY_KEY, pages: [], skip: 0 });
+    expect(getPagesForDay(r.user, TODAY, JUZ_1_AND_30)).toEqual(range(1, 10));
+  });
+
+  it('pages carried into today and revised today stay in it, first', () => {
+    const carried = { ...baseUser, carryOver: { day: TODAY_KEY, pages: [600], skip: 0 } };
+    const logs = [log(TODAY_KEY, [600], [600])];
+    const r = jumpTo(carried, { kind: 'juz', juz: 1 }, ctx(JUZ_1_AND_30, logs))!;
     expect(r.user.carryOver).toEqual({ day: TODAY_KEY, pages: [600], skip: 0 });
     expect(getPagesForDay(r.user, TODAY, JUZ_1_AND_30)).toEqual([600, ...range(1, 10)]);
   });
 
-  it('nothing revised or carried today: carry-over is left alone, so yesterday’s leftovers are still offered', () => {
+  it('nothing revised today: yesterday’s carry-over is dropped, and today is marked carried so no leftovers come back in front of the start', () => {
     const stale = { ...baseUser, carryOver: { day: '2026-10-16', pages: [5], skip: 0 } };
     const r = jumpTo(stale, { kind: 'juz', juz: 30 }, ctx(JUZ_1_AND_30))!;
-    expect(r.user.carryOver).toEqual(stale.carryOver);
-    expect(hasCarriedOver(r.user, TODAY_KEY)).toBe(false);
+    expect(r.user.carryOver).toEqual({ day: TODAY_KEY, pages: [], skip: 0 });
+    expect(hasCarriedOver(r.user, TODAY_KEY)).toBe(true);
+    expect(getPagesForDay(r.user, TODAY, JUZ_1_AND_30)).not.toContain(5);
+  });
+
+  it('pages revised ahead for today from an earlier session are not kept in front of the new start', () => {
+    const logs = [{ ...log('2026-10-16', [], []), ahead: { [TODAY_KEY]: [600] } }];
+    const r = jumpTo(baseUser, { kind: 'juz', juz: 1 }, ctx(JUZ_1_AND_30, logs))!;
+    expect(r.user.carryOver).toEqual({ day: TODAY_KEY, pages: [], skip: 0 });
+    expect(getPagesForDay(r.user, TODAY, JUZ_1_AND_30)).not.toContain(600);
   });
 
   it('today is the revision (Fajr) day passed in, not the clock’s', () => {
@@ -208,9 +224,14 @@ describe('undo, and what the sheet shows', () => {
 
   it('where today starts, and the toast’s words', () => {
     expect(todayStartPage(baseUser, TODAY, JUZ_1_AND_30)).toBe(21);
-    expect(describeStart({ kind: 'juz', juz: 30 }, 582)).toBe('Juz 30 · p. 582');
-    expect(describeStart({ kind: 'page', page: 600 }, 600)).toBe('p. 600');
-    expect(describeStart({ kind: 'surah', surah: 78 }, 583)).toMatch(/^An-Naba.* · p\. 583$/);
+    // Surahs and juz first, never the page.
+    const plain = (t: string) => t.split('\u00A0').join(' ').split('\u2011').join('-');
+    expect(plain(describeStart({ kind: 'juz', juz: 30 }, 582))).toBe('Juz 30');
+    expect(plain(describeStart({ kind: 'juz', juz: 12 }, 225))).toBe('Juz 12 · Hud, ayah 29');
+    expect(plain(describeStart({ kind: 'page', page: 600 }, 600))).toBe("Al-'Adiyat, ayah 10");
+    expect(plain(describeStart({ kind: 'surah', surah: 78 }, 583))).toBe('An-Naba, ayah 31');
+    expect(plain(describeStart({ kind: 'surah', surah: 18 }, 293))).toBe('Al-Kahf');
+    expect(plain(describeStart({ kind: 'surah', surah: 18 }, 300))).toBe('Al-Kahf, ayah 54');
   });
 
   it('targetStart: where a cycle reads into a target, from a given place', () => {

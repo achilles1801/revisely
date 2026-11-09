@@ -1,0 +1,85 @@
+# Revo's Add to chat (+, REVO-32, REVO-33): one sheet for a surah, a juz, days or pages, several at
+# once, each row with a line of the account's own data. The account has the Revo mocks' history
+# (Juz 28, 548–549 weak, today 6 of 20: scripts/seed-revo.js), and every screen of the approved
+# mocks (~/Documents/revisely-today-mocks/revo/attach, a1–a7) is taken in light and then in dark,
+# for the screenshot-vs-mock boards (revo/attach/scripts/boards.py there).
+# Rules (BEHAVIOUR.md): REVO-32, REVO-33
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    file: ../subflows/new-account.yaml
+    env:
+      CLOCK: 2026-11-03T21:41
+      BOUNDARY: midnight
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: tester
+# Revo's functions run once each first, changing nothing (as in 09-revo): a function's first
+# signed-in call in the emulator is slow on a CI macOS runner (17–22 s).
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: warm
+- runFlow: ../subflows/seed-revo.yaml
+# Tue 27 October with ratings, a timed read and two notes: every row of the day preview (a4).
+- runScript: ../scripts/seed-revo-day.js
+
+# Revo on (its opt-in), then Add to chat in light.
+- extendedWaitUntil:
+    visible:
+      id: revo-button
+    timeout: 15000
+- tapOn:
+    id: revo-button
+    waitToSettleTimeoutMs: 500
+    retryTapIfNoChange: false
+# REVO-39: the first open while Revo is off plays Revo's moment, then its opt-in. Skip ends it; while
+# it plays the screen never settles, so these taps don't wait for it (.maestro/README.md).
+- runFlow: ../subflows/revo-moment-skip.yaml
+- extendedWaitUntil:
+    visible: "Meet Revo"
+    timeout: 40000
+- tapOn:
+    id: revo-turn-on
+# Once revoSetOptions has answered: 30 s, as in 09-revo.
+- extendedWaitUntil:
+    visible:
+      id: revo-greeting
+    timeout: 30000
+- runFlow:
+    file: ../subflows/revo-attach-screens.yaml
+    env:
+      SUFFIX: ""
+
+# The same in dark: Revo's sheet down, Settings → Theme → Dark, Revo again.
+- repeat:
+    while:
+      visible:
+        id: revo-sheet-handle
+    times: 3
+    commands:
+      - swipe:
+          from:
+            id: revo-sheet-handle
+          direction: DOWN
+      - waitForAnimationToEnd:
+          timeout: 1500
+- runFlow:
+    file: ../subflows/theme.yaml
+    env:
+      THEME: Dark
+- extendedWaitUntil:
+    visible:
+      id: revo-button
+    timeout: 10000
+- tapOn:
+    id: revo-button
+- extendedWaitUntil:
+    visible:
+      id: revo-input
+    timeout: 10000
+- runFlow:
+    file: ../subflows/revo-attach-screens.yaml
+    env:
+      SUFFIX: "-dark"

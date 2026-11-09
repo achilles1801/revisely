@@ -1,0 +1,668 @@
+# Revo, the assistant, for a previewTester account (marked one through the emulator, as the owner's
+# script does), against the real revo* functions in the functions emulator: only the model answers
+# from a recording, with the text the flow gives it (scripts/server-revo.js). Takes a screenshot of
+# each screen the mocks show (~/Documents/revisely-today-mocks/revo), for the screenshot-vs-mock
+# boards, in light and then in dark (…-dark), and the sheet with the keyboard up (r5k-keyboard).
+# Rules (BEHAVIOUR.md): REVO-20, REVO-21, REVO-22, REVO-23, REVO-24, REVO-25, REVO-39
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    file: ../subflows/new-account.yaml
+    env:
+      CLOCK: 2026-11-03T21:41
+      BOUNDARY: midnight
+# A tester (Revo is theirs only): the app sees it when its user document changes.
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: tester
+# Revo's functions run once each as this account first, changing nothing: a function's first
+# signed-in call in the emulator is slow on a CI macOS runner (17–22 s), which the steps below would
+# count against their waits.
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: warm
+# The mocks' history: Juz 28, 548–549 weak, today 6 of 20 (scripts/seed-revo.js).
+- runFlow: ../subflows/seed-revo.yaml
+
+# REVO-21: the button on Home; its first tap opens the opt-in.
+- extendedWaitUntil:
+    visible:
+      id: revo-button
+    timeout: 15000
+- tapOn:
+    id: revo-button
+    waitToSettleTimeoutMs: 500
+    retryTapIfNoChange: false
+# REVO-39: the first open while Revo is off plays Revo's moment, then its opt-in. Skip ends it; while
+# it plays the screen never settles, so these taps don't wait for it (.maestro/README.md).
+- runFlow: ../subflows/revo-moment-skip.yaml
+- extendedWaitUntil:
+    visible: "Meet Revo"
+    timeout: 40000
+- assertVisible: "Your notes and recordings stay private"
+- assertVisible: "Answered by Claude, from Anthropic"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r9-opt-in
+- tapOn:
+    id: revo-turn-on
+
+# REVO-20: the greeting, from today's plan, and suggestions, once revoSetOptions has answered. By
+# surah, never page numbers (lib/passages; no-break hyphens and spaces inside, so "." between words).
+# 30 s, as for answers: on an iOS runner revoSetOptions has taken 14 s and 20 s (#328's run
+# 42498597405; the greeting showed just after these waits ran out at 10 s).
+- extendedWaitUntil:
+    visible:
+      id: revo-greeting
+      text: "Assalamu alaikum.* 6 pages into today, and Al.Hashr.17.to.Al.Mumtahanah.5 is next\\. It.s rated weak.*"
+    timeout: 30000
+# The first suggestion is about them, by surah.
+- assertVisible:
+    id: "revo-chip-Plan Al-Hashr to Al-Mumtahanah"
+# By id: on iOS a chip's accessibility label ("Ask: How was my week?") stands for its text. The id
+# is a pattern (Maestro reads it as one), so not its "?".
+- assertVisible:
+    id: "revo-chip-How was my week.*"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r4-sheet
+
+# + : Add to chat (09-revo-attach takes each of its screens): today added from Days, as a chip.
+- tapOn:
+    id: revo-plus
+- tapOn:
+    id: pill-days
+- tapOn:
+    id: revo-add-day
+- tapOn:
+    id: revo-add-done
+- extendedWaitUntil:
+    visible:
+      id: revo-context-chip
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r6-context
+- tapOn:
+    id: revo-context-remove
+
+# A conversation: a chart and one plan that waits for a tap. What the model says (inside its
+# recorded reply): a chart and a plan on today's two weak pages, as the mock has them, and two
+# things to remember.
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: reply
+      REPLY: '{"text": "The end of Al-Hashr and the start of Al-Mumtahanah slipped to weak twice this month, both coming late in a long session. Take them first tomorrow, while you are fresh.", "chart": {"kind": "pageRatings", "title": "End of Al-Hashr and start of Al-Mumtahanah", "pages": [548, 549]}, "textAfter": "Here is a plan:", "action": {"kind": "reviseFirst", "title": "The end of Al-Hashr first, tomorrow", "detail": "Then the start of Al-Mumtahanah, before the rest", "pages": [548, 549]}, "remember": ["You like short, practical plans.", "You usually revise after Fajr."], "title": "Pages that slip", "chips": ["How is my pace?"]}'
+- tapOn:
+    id: revo-input
+- inputText: "Why do these two keep slipping?"
+# REVO-24: with the keyboard up the header and the greeting stay on screen; the composer rides up.
+# Waited for: on iOS the check ran while the sheet was still settling with the keyboard (#328's run,
+# Nov 7 2026; the greeting was there a moment later).
+- extendedWaitUntil:
+    visible:
+      id: revo-history
+    timeout: 5000
+- extendedWaitUntil:
+    visible:
+      id: revo-greeting
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r5k-keyboard
+- tapOn:
+    id: revo-send
+# The answer's plan card, once revoAsk has answered (a few seconds on a CI runner, after the warm-up).
+# Every answer waits up to 30 s: on a loaded macOS runner one took over 20 (run 42444458733).
+- extendedWaitUntil:
+    visible:
+      id: revo-plan
+    timeout: 30000
+- assertVisible:
+    id: revo-chart-pageRatings
+# The chart answers a touch (REVO-7): a tap on a row picks it, and its panel leads to the passage
+# (Revise first tomorrow, Open in the reader). The tap also puts the keyboard away; if that is all
+# it did, a second one picks the row.
+- runFlow:
+    file: ../subflows/revo-chart-tap.yaml
+    env:
+      ID: revo-chart-pageRatings-plot
+- runFlow:
+    when:
+      notVisible:
+        id: revo-chart-pageRatings-reader
+    commands:
+      - runFlow:
+          file: ../subflows/revo-chart-tap.yaml
+          env:
+            ID: revo-chart-pageRatings-plot
+- extendedWaitUntil:
+    visible:
+      id: revo-chart-pageRatings-reader
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r5c-chart-passage
+# Tapping the picked row again puts it back, as the mock shows the conversation.
+- runFlow:
+    file: ../subflows/revo-chart-tap.yaml
+    env:
+      ID: revo-chart-pageRatings-plot
+- assertNotVisible:
+    id: revo-chart-pageRatings-reader
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r5-conversation
+- tapOn:
+    id: revo-plan-do
+- extendedWaitUntil:
+    visible:
+      id: revo-plan-added
+    timeout: 10000
+
+# A second answer with the week's bars: a tap picks a day, and its panel leads to that day in
+# Activity (REVO-7). As above, the first tap may only put the keyboard away.
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: reply
+      REPLY: '{"text": "You revised on most days this week, and today is under way.", "chart": {"kind": "dailyPages", "title": "Pages revised this week", "days": 7}, "remember": [], "title": "My week", "chips": []}'
+- tapOn:
+    id: revo-input
+- inputText: "How was my week?"
+- tapOn:
+    id: revo-send
+- extendedWaitUntil:
+    visible:
+      id: revo-chart-dailyPages
+    timeout: 30000
+- runFlow:
+    file: ../subflows/revo-chart-tap.yaml
+    env:
+      ID: revo-chart-dailyPages-plot
+- runFlow:
+    when:
+      notVisible:
+        id: revo-chart-dailyPages-day
+    commands:
+      - runFlow:
+          file: ../subflows/revo-chart-tap.yaml
+          env:
+            ID: revo-chart-dailyPages-plot
+- extendedWaitUntil:
+    visible:
+      id: revo-chart-dailyPages-day
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r5d-chart-day
+- runFlow:
+    file: ../subflows/revo-chart-tap.yaml
+    env:
+      ID: revo-chart-dailyPages-plot
+- assertNotVisible:
+    id: revo-chart-dailyPages-day
+
+# A newer chart kind, the juz map (sent as `visual`): a tap picks a juz, and its panel opens it in
+# the reader. As above, the first tap may only put the keyboard away.
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: reply
+      REPLY: '{"text": "Here is where each juz stands.", "chart": {"kind": "juzMap", "title": "Your juz · last revised"}, "remember": [], "title": "My juz", "chips": []}'
+- tapOn:
+    id: revo-input
+- inputText: "Which juz haven't I revised lately?"
+- tapOn:
+    id: revo-send
+- extendedWaitUntil:
+    visible:
+      id: revo-chart-juzMap
+    timeout: 30000
+- runFlow:
+    file: ../subflows/revo-chart-tap.yaml
+    env:
+      ID: revo-chart-juzMap-plot
+- runFlow:
+    when:
+      notVisible:
+        id: revo-chart-juzMap-reader
+    commands:
+      - runFlow:
+          file: ../subflows/revo-chart-tap.yaml
+          env:
+            ID: revo-chart-juzMap-plot
+- extendedWaitUntil:
+    visible:
+      id: revo-chart-juzMap-reader
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r5e-chart-juz
+- runFlow:
+    file: ../subflows/revo-chart-tap.yaml
+    env:
+      ID: revo-chart-juzMap-plot
+- assertNotVisible:
+    id: revo-chart-juzMap-reader
+
+# The timeline (a `visual`): Al-Hashr, revised with Juz 28 every day the seed has. A tap picks a
+# revision, and its panel opens that day in Activity.
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: reply
+      REPLY: '{"text": "Most days this month.", "chart": {"kind": "timeline", "title": "Al-Hashr · last 30 days", "surah": 59, "days": 30}, "remember": [], "title": "Al-Hashr", "chips": []}'
+- tapOn:
+    id: revo-input
+- inputText: "How often do I revise Al-Hashr?"
+- tapOn:
+    id: revo-send
+- extendedWaitUntil:
+    visible:
+      id: revo-chart-timeline
+    timeout: 30000
+- runFlow:
+    file: ../subflows/revo-chart-tap.yaml
+    env:
+      ID: revo-chart-timeline-plot
+- runFlow:
+    when:
+      notVisible:
+        id: revo-chart-timeline-day
+    commands:
+      - runFlow:
+          file: ../subflows/revo-chart-tap.yaml
+          env:
+            ID: revo-chart-timeline-plot
+- extendedWaitUntil:
+    visible:
+      id: revo-chart-timeline-day
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r5f-chart-timeline
+- runFlow:
+    file: ../subflows/revo-chart-tap.yaml
+    env:
+      ID: revo-chart-timeline-plot
+- assertNotVisible:
+    id: revo-chart-timeline-day
+
+# The weeks grid (a `visual`): six weeks of days. A tap in the grid picks a day (its middle is a
+# seeded day in October), and its panel opens it in Activity; a weekday's letter picks its column.
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: reply
+      REPLY: '{"text": "Saturdays, mostly.", "chart": {"kind": "weeks", "title": "The last six weeks", "weeks": 6}, "remember": [], "title": "Missed days", "chips": []}'
+- tapOn:
+    id: revo-input
+- inputText: "Which days do I usually miss?"
+- tapOn:
+    id: revo-send
+- extendedWaitUntil:
+    visible:
+      id: revo-chart-weeks
+    timeout: 30000
+- runFlow:
+    file: ../subflows/revo-chart-tap.yaml
+    env:
+      ID: revo-chart-weeks-plot
+- runFlow:
+    when:
+      notVisible:
+        id: revo-chart-weeks-day
+    commands:
+      - runFlow:
+          file: ../subflows/revo-chart-tap.yaml
+          env:
+            ID: revo-chart-weeks-plot
+- extendedWaitUntil:
+    visible:
+      id: revo-chart-weeks-day
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r5g-chart-weeks
+- runFlow:
+    file: ../subflows/revo-chart-tap.yaml
+    env:
+      ID: revo-chart-weeks-plot
+- assertNotVisible:
+    id: revo-chart-weeks-day
+- runFlow:
+    file: ../subflows/revo-chart-tap.yaml
+    env:
+      ID: revo-chart-weeks-col-6
+- assertVisible:
+    id: revo-chart-weeks-title
+    text: "Saturdays.*"
+- runFlow:
+    file: ../subflows/revo-chart-tap.yaml
+    env:
+      ID: revo-chart-weeks-col-6
+
+# The table (a `visual`): Juz 27 and 28 side by side. A heading sorts; a row opens under itself
+# with Open in the reader.
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: reply
+      REPLY: '{"text": "Juz 28 needs the most care.", "chart": {"kind": "table", "title": "Juz 27–28", "juz": [27, 28], "columns": ["lastRevised", "weak"]}, "remember": [], "title": "Two juz", "chips": []}'
+- tapOn:
+    id: revo-input
+- inputText: "How are Juz 27 and 28 doing?"
+- tapOn:
+    id: revo-send
+- extendedWaitUntil:
+    visible:
+      id: revo-chart-table
+    timeout: 30000
+- runFlow:
+    file: ../subflows/revo-chart-tap.yaml
+    env:
+      ID: revo-chart-table-sort-weak
+- runFlow:
+    file: ../subflows/revo-chart-tap.yaml
+    env:
+      ID: revo-chart-table-row-28
+- extendedWaitUntil:
+    visible:
+      id: revo-chart-table-reader
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r5h-chart-table
+- runFlow:
+    file: ../subflows/revo-chart-tap.yaml
+    env:
+      ID: revo-chart-table-row-28
+- assertNotVisible:
+    id: revo-chart-table-reader
+
+# Memorized by month (a `visual`): twelve months of the account's memorization records. A tap picks a
+# month: its header says how many pages (× puts it back).
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: reply
+      REPLY: '{"text": "Here is your year of memorizing.", "chart": {"kind": "memorized", "title": "Pages memorized", "months": 12}, "remember": [], "title": "My year", "chips": []}'
+- tapOn:
+    id: revo-input
+- inputText: "How much have I memorized this year?"
+- tapOn:
+    id: revo-send
+- extendedWaitUntil:
+    visible:
+      id: revo-chart-memorized-plot
+    timeout: 30000
+- runFlow:
+    file: ../subflows/revo-chart-tap.yaml
+    env:
+      ID: revo-chart-memorized-plot
+- runFlow:
+    when:
+      notVisible:
+        id: revo-chart-memorized-close
+    commands:
+      - runFlow:
+          file: ../subflows/revo-chart-tap.yaml
+          env:
+            ID: revo-chart-memorized-plot
+- extendedWaitUntil:
+    visible:
+      id: revo-chart-memorized-close
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r5i-chart-memorized
+- runFlow:
+    file: ../subflows/revo-chart-tap.yaml
+    env:
+      ID: revo-chart-memorized-close
+- assertNotVisible:
+    id: revo-chart-memorized-close
+
+# Tonight's Day in review, written by the real function (as the app asks for it on a day with
+# something done). The memory holds what the conversation's answer asked to remember.
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: review
+      DAY: 2026-11-03
+
+# History: the conversation and the Day in review.
+- tapOn:
+    id: revo-history
+- extendedWaitUntil:
+    # The row's label on iOS is "Day in review, <its line>".
+    visible: "Day in review.*"
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r7-history
+- tapOn:
+    id: revo-back
+
+# Memory: the items, the switch, Clear.
+- tapOn:
+    id: revo-memory
+- extendedWaitUntil:
+    visible: "Let Revo remember"
+    timeout: 5000
+- assertVisible: "You like short, practical plans."
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r8-memory
+- tapOn:
+    id: revo-back
+
+# REVO-22: the day's questions used (revoUsage, which only the functions write; the app reads it).
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: limit
+      DAY: 2026-11-03
+- extendedWaitUntil:
+    visible:
+      id: revo-limit
+    timeout: 10000
+- assertVisible: "Revo is back at midnight. Your conversations stay in History."
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r10-limit
+
+# Closed (a drag down halves a full sheet, a second closes it): the button on Home, its dot
+# for the Day in review not opened yet.
+- repeat:
+    while:
+      visible:
+        id: revo-sheet-handle
+    times: 3
+    commands:
+      - swipe:
+          from:
+            id: revo-sheet-handle
+          direction: DOWN
+      - waitForAnimationToEnd:
+          timeout: 1500
+- extendedWaitUntil:
+    visible:
+      id: revo-button-dot
+    timeout: 10000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r1-fab-home
+
+# The button on Activity too.
+- tapOn:
+    id: open-activity
+- extendedWaitUntil:
+    visible:
+      id: revo-button
+    timeout: 10000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r2-fab-activity
+
+# The same screens in dark: Settings → Theme → Dark, then Revo off (as Settings → Revo AI would
+# turn it off) so its opt-in shows again, with the day's questions back.
+- runFlow:
+    file: ../subflows/back-home.yaml
+- runFlow:
+    file: ../subflows/theme.yaml
+    env:
+      THEME: Dark
+# Revo off through the real revoSetOptions (what Settings → Revo AI calls), and the day's
+# questions back.
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: off
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: limit
+      DAY: 2026-11-03
+      COUNT: "0"
+- extendedWaitUntil:
+    visible:
+      id: revo-button
+    timeout: 10000
+- tapOn:
+    id: revo-button
+- extendedWaitUntil:
+    visible: "Meet Revo"
+    timeout: 10000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r9-opt-in-dark
+- tapOn:
+    id: revo-turn-on
+- extendedWaitUntil:
+    visible:
+      id: revo-greeting
+    timeout: 30000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r4-sheet-dark
+# The same answer as in light (the chart answers above set other replies, and a reply stays set).
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: reply
+      REPLY: '{"text": "The end of Al-Hashr and the start of Al-Mumtahanah slipped to weak twice this month, both coming late in a long session. Take them first tomorrow, while you are fresh.", "chart": {"kind": "pageRatings", "title": "End of Al-Hashr and start of Al-Mumtahanah", "pages": [548, 549]}, "textAfter": "Here is a plan:", "action": {"kind": "reviseFirst", "title": "The end of Al-Hashr first, tomorrow", "detail": "Then the start of Al-Mumtahanah, before the rest", "pages": [548, 549]}, "remember": ["You like short, practical plans.", "You usually revise after Fajr."], "title": "Pages that slip", "chips": ["How is my pace?"]}'
+- tapOn:
+    id: revo-input
+- inputText: "Why do these two keep slipping?"
+- extendedWaitUntil:
+    visible:
+      id: revo-history
+    timeout: 5000
+- extendedWaitUntil:
+    visible:
+      id: revo-greeting
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r5k-keyboard-dark
+- tapOn:
+    id: revo-send
+- extendedWaitUntil:
+    visible:
+      id: revo-plan
+    timeout: 30000
+# The keyboard away: a tap on the chart picks a row (or only puts the keyboard away), and one more
+# leaves the conversation as the mock shows it.
+- runFlow:
+    file: ../subflows/revo-chart-tap.yaml
+    env:
+      ID: revo-chart-pageRatings-plot
+- runFlow:
+    when:
+      visible:
+        id: revo-chart-pageRatings-reader
+    commands:
+      - runFlow:
+          file: ../subflows/revo-chart-tap.yaml
+          env:
+            ID: revo-chart-pageRatings-plot
+- assertNotVisible:
+    id: revo-chart-pageRatings-reader
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r5-conversation-dark
+- repeat:
+    while:
+      visible:
+        id: revo-sheet-handle
+    times: 3
+    commands:
+      - swipe:
+          from:
+            id: revo-sheet-handle
+          direction: DOWN
+      - waitForAnimationToEnd:
+          timeout: 1500
+- extendedWaitUntil:
+    visible:
+      id: revo-button
+    timeout: 10000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r1-fab-home-dark
+
+# REVO-39: Settings → Revo AI → What Revo can do plays the moment again; with Revo on, it ends on Done.
+- tapOn:
+    id: open-settings
+- runFlow:
+    file: ../subflows/settings-row.yaml
+    env:
+      ROW: settings-revo-moment
+- tapOn:
+    id: settings-revo-moment
+    waitToSettleTimeoutMs: 500
+    retryTapIfNoChange: false
+- runFlow: ../subflows/revo-moment-skip.yaml
+- extendedWaitUntil:
+    visible:
+      id: revo-moment-done
+    timeout: 40000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r11-what-revo-can-do-dark
+- tapOn:
+    id: revo-moment-done
+- extendedWaitUntil:
+    notVisible:
+      id: settings-revo-moment-screen
+    timeout: 10000
+- tapOn:
+    id: back

@@ -7,11 +7,12 @@ import {
   displayMs,
   elapsedMs,
   formatClock,
-  formatPageRanges,
   formatStopwatch,
   MIN_SESSION_SECONDS,
+  pagesHeld,
 } from '../../lib/readingTimer';
 import type { ReadingTimerMode } from '../../types';
+import { describePassage } from '../../lib/passages';
 import { useHaptics } from '../../design/haptics';
 import { typeV2 } from '../../theme/v2';
 import { PillButton } from '../v2/PillButton';
@@ -47,8 +48,10 @@ export function lengthLabel(m: number): string {
 interface TimerControlsProps {
   /** Close the surrounding sheet. */
   onClose: () => void;
-  /** A session was saved: offer to open its day (to add pages). */
-  onSaved?: (date: string, seconds: number) => void;
+  /** A session was saved: offer to open its day (to add pages). `pages`: those it held (REC-1). */
+  onSaved?: (date: string, seconds: number, ended: { pages: number[] }) => void;
+  /** Runs before the session ends, and is waited for: the reader stops its recording with it (REC-1). */
+  beforeEnd?: () => Promise<void>;
   /** Shown while running, unless the reader is already open. */
   onOpenQuran?: () => void;
   /** True while the controls are on screen, so the clock only ticks then. */
@@ -59,7 +62,7 @@ interface TimerControlsProps {
  * The state and actions behind the timer controls: what is chosen before
  * starting, the clock, and Start, End and Discard.
  */
-function useTimerControls({ onClose, onSaved, visible = true }: TimerControlsProps) {
+function useTimerControls({ onClose, onSaved, beforeEnd, visible = true }: TimerControlsProps) {
   const haptics = useHaptics();
   const { timer, start, pause, resume, finish, discard } = useReadingTimer();
 
@@ -130,12 +133,16 @@ function useTimerControls({ onClose, onSaved, visible = true }: TimerControlsPro
   const handleEnd = async () => {
     if (!timer) return;
     const date = timer.date;
-    const seconds = Math.round(elapsedMs(timer, Date.now()) / 1000);
+    const now = Date.now();
+    const seconds = Math.round(elapsedMs(timer, now) / 1000);
+    const pages = pagesHeld(timer, now);
+    // A recording running in the reader ends with it, and is saved first (REC-1).
+    if (beforeEnd) await beforeEnd().catch(() => undefined);
     if (!(await finish())) return;
     // The outcome is marked (taps don't buzz).
     haptics.success();
     onClose();
-    if (seconds >= MIN_SESSION_SECONDS) onSaved?.(date, seconds);
+    if (seconds >= MIN_SESSION_SECONDS) onSaved?.(date, seconds, { pages });
   };
 
   const handleDiscard = () => {
@@ -228,9 +235,9 @@ export function TimerControls(props: TimerControlsProps) {
       : targetSeconds != null
         ? `${mode === 'countDown' ? 'remaining of ' : 'of '}${lengthLabel(Math.round(targetSeconds / 60))}`
         : (timer.pagesRevised?.length ?? 0) > 0
-          ? `Pages revised: ${formatPageRanges(timer.pagesRevised ?? [])}`
+          ? `Revised: ${describePassage(timer.pagesRevised ?? [], { form: 'short', max: 2 })}`
           : timer.pagesVisited.length > 0
-            ? `Pages opened: ${formatPageRanges(timer.pagesVisited)}`
+            ? `Opened: ${describePassage(timer.pagesVisited, { form: 'short', max: 2 })}`
             : 'Saved to Activity when you end it'
     : kind === 'stopwatch'
       ? 'Runs until you end it'

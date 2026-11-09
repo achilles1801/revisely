@@ -1,0 +1,94 @@
+name: Scenarios
+
+# The scenario and property tests (tests/scenarios, BEHAVIOUR.md): the app's own
+# code against the Firebase emulators (Auth, Firestore, Storage, and our Cloud
+# Functions, where only Anthropic answers from a recording: TESTING.md), with a
+# test clock and time zone. Called by
+# ci.yml (every push and PR) and by preview.yml, which publishes nothing unless
+# they pass. No caches: preview.yml holds release secrets (CLAUDE.md).
+#
+# Four jobs side by side, each with a quarter of the work (Jest's --shard, split
+# by each file's time in tests/scenarios/durations.json: harness/sequencer.js)
+# and its own emulators on its own runner: as one job it took 18 minutes. The check
+# ci.yml and preview.yml wait for is `Scenario tests`, which passes only when
+# every shard passed. It then keeps an artifact named after the tree it tested
+# (scenarios-passed-<tree>): preview.yml skips its own run of the suite for a
+# push whose tree is exactly one that passed (a PR merged with nothing else
+# landing meanwhile).
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  shard:
+    name: Scenario tests (${{ matrix.shard }}/4)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      tree: ${{ steps.tree.outputs.tree }}
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      # npm 10, which Node 20 comes with, can give two of its cache's temporary files the same
+      # name, and `npm ci` then fails with EEXIST (npm/cli#7308; a scenario shard in #422's CI).
+      # npm 11.12 fixed it (cacache 20.0.4).
+      - name: npm 11
+        run: npm install -g npm@11.21.1 --no-audit --no-fund
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      # The tree tested, whatever the commit (a PR's merge commit, a push): what the suite ran on.
+      - id: tree
+        run: echo "tree=$(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
+      - run: npm ci --legacy-peer-deps
+      - run: npm ci
+        working-directory: tests/scenarios
+      # Our Cloud Functions, which the functions emulator runs (emulators.sh builds them),
+      # and firebase-admin for the owner's scripts the scenarios run (harness/admin.ts).
+      - run: npm ci
+        working-directory: functions
+      - name: BEHAVIOUR.md and its tests
+        if: matrix.shard == 1
+        run: node tests/scenarios/check-spec.js
+      - name: Scenarios and properties (Firebase emulators and our functions), shard ${{ matrix.shard }} of 4
+        run: >-
+          scripts/emulators.sh exec auth,firestore,functions,storage demo-revisely
+          'cd tests/scenarios && npx jest --config jest.config.js --ci --maxWorkers=2 --forceExit --shard=${{ matrix.shard }}/4'
+
+  # The one check: every shard passed. It runs after a failure too, so it is
+  # never missing, and a shard that didn't run (cancelled, skipped) fails it.
+  scenarios:
+    name: Scenario tests
+    needs: shard
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - env:
+          RESULT: ${{ needs.shard.result }}
+        run: |
+          echo "Shards: $RESULT"
+          [ "$RESULT" = success ] || { echo "::error::A scenario shard didn't pass ($RESULT)."; exit 1; }
+      # Every shard passed on this tree: said so where preview.yml can find it.
+      - env:
+          TREE: ${{ needs.shard.outputs.tree }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/passed"
+          echo "$TREE $GITHUB_RUN_ID $GITHUB_SHA" > "$RUNNER_TEMP/passed/tree.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: scenarios-passed-${{ needs.shard.outputs.tree }}
+          path: ${{ runner.temp }}/passed/tree.txt
+          retention-days: 14
+          overwrite: true

@@ -26,6 +26,25 @@ name: Preview
 # published for both platforms. The two runtimes differ, so EAS makes one update group per platform,
 # both with the same [app <hash>]; promote.yml promotes them together. Android testers follow
 # `preview` by their account alone (updateChannel.ts).
+#
+# Two halves, one file. A push runs the testing half (gate, scenarios); once it passes, it starts
+# this workflow again by hand (workflow_dispatch) with `publish` = the commit it tested, which runs
+# the publishing half (fingerprint, builds, update). Testing runs go one at a time per branch and
+# are never cancelled once started: a push that comes meanwhile waits, and a newer push takes the
+# waiting one's place before it starts (GitHub keeps one waiting run per concurrency group). So in a
+# burst of merges each finished run publishes, and the newest push is always the next one tested:
+# its tree holds everything the skipped ones do. Until Nov 8 2026 a newer push cancelled the running
+# test instead, and a burst (7 merges in 30 minutes) cancelled every run: nothing reached testers
+# for hours. Publishing runs are one at a time (eas-preview) and never cancelled, so updates go out
+# in order and a native build is never started twice. Before (Nov 7 2026) the whole run held
+# eas-preview, and in a burst of merges each push waited for every older push's scenario run first:
+# 19–24 minutes from a merge to its update instead of 5–15. One file because GitHub dispatches only
+# workflows that are on the default branch (main) already.
+#
+# The publishing half checks for itself that the scenario suite passed on the commit's tree, and
+# that the commit is on the branch, so a run by hand can't skip the gate. `dry_run` (by hand) goes
+# through both halves without building or publishing anything.
+run-name: ${{ inputs.publish && format('Preview · publish {0}', inputs.publish) || '' }}
 on:
   push:
     branches: [develop]
@@ -44,17 +63,155 @@ on:
       - 'firebase.json'
       - '.github/**'
   workflow_dispatch:
+    inputs:
+      publish:
+        description: Publishing half only, for this tested commit (the testing half starts it; leave empty)
+        required: false
+        default: ''
+      message:
+        description: The update's message (with publish; the push's first line)
+        required: false
+        default: ''
+      dry_run:
+        description: Build and publish nothing (to try the workflow itself)
+        type: boolean
+        default: false
 
+# Testing: one at a time per branch, and a started run finishes (a newer push replaces only a run
+# still waiting). Publishing: one at a time, never cancelled.
 concurrency:
-  group: eas-preview
+  group: ${{ inputs.publish && (inputs.dry_run && 'eas-preview-dry-run' || 'eas-preview') || format('preview-tests-{0}{1}', github.ref, inputs.dry_run && '-dry-run' || '') }}
   cancel-in-progress: false
 
 permissions:
   contents: read
 
 jobs:
+  # Nothing is built or published unless the scenario tests pass (BEHAVIOUR.md): here, or on
+  # exactly this tree. A PR merged with nothing else landing meanwhile has a merge commit whose
+  # tree is the one its CI tested (refs/pull/N/merge); that run kept an artifact named after the
+  # tree (scenarios.yml). Same tree, same suite, same result: the suite isn't run again, and the
+  # update reaches TestFlight about ten minutes sooner. Only this repository's own runs count (a
+  # fork's PR runs its own workflow files).
+  gate:
+    name: Scenarios passed on this tree already?
+    if: ${{ !inputs.publish }}
+    runs-on: ubuntu-latest
+    # Seconds of work. Short, because a newer push's run waits for this one to stop: a job cancelled
+    # before its runner had started it sat until its timeout (two runs dispatched a second apart).
+    timeout-minutes: 2
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      tested: ${{ steps.find.outputs.tested }}
+    steps:
+      - id: find
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          TREE=$(gh api "repos/$REPO/git/commits/$SHA" --jq .tree.sha 2>/dev/null || true)
+          RUN=""
+          if [ -n "$TREE" ]; then
+            RUN=$(gh api "repos/$REPO/actions/artifacts?name=scenarios-passed-$TREE&per_page=30" \
+              --jq '[.artifacts[] | select(.expired | not) | select(.workflow_run.head_repository_id == .workflow_run.repository_id)] | first | .workflow_run.id // empty' 2>/dev/null || true)
+          fi
+          if [ -n "$RUN" ]; then
+            echo "tested=true" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Scenarios::This tree ($TREE) passed the scenario suite in run $RUN: not run again."
+          else
+            echo "tested=false" >> "$GITHUB_OUTPUT"
+            echo "No passing run of the scenario suite on tree ${TREE:-?}: running it."
+          fi
+
+  scenarios:
+    name: Scenarios
+    needs: gate
+    if: ${{ !cancelled() && needs.gate.result == 'success' && needs.gate.outputs.tested != 'true' }}
+    uses: ./.github/workflows/scenarios.yml
+
+  # Tested: the publishing half takes it from here, in its turn.
+  handover:
+    name: Hand over to publishing
+    needs: [gate, scenarios]
+    if: ${{ !cancelled() && needs.gate.result == 'success' && (needs.gate.outputs.tested == 'true' || needs.scenarios.result == 'success') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          REF: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+          MESSAGE: ${{ github.event.head_commit.message || format('Manual update from {0}', github.ref_name) }}
+          DRY_RUN: ${{ inputs.dry_run == true }}
+        run: |
+          # First line only, short enough that the hash survives: EAS caps an update's message at
+          # 1024 characters and lists them cut at 512.
+          SUBJECT=$(printf '%s\n' "$MESSAGE" | head -n 1 | cut -c 1-300)
+          gh workflow run preview.yml --repo "$REPO" --ref "$REF" \
+            -f publish="$SHA" -f message="$SUBJECT" -f dry_run="$DRY_RUN"
+          echo "::notice title=Preview::Tested. Publishing $SHA is queued (Preview · publish $SHA)."
+
+  # The publishing half (a run with `publish`): is that commit tested, and on this branch? Builds
+  # use the branch as it is now (ios-build.yml and android-build.yml check out this run's commit),
+  # so they run only if what goes into the app there is what was tested; otherwise a newer push
+  # changed the app, and its own run builds.
+  check:
+    name: Tested?
+    if: ${{ inputs.publish }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      sha: ${{ steps.check.outputs.sha }}
+      can_build: ${{ steps.check.outputs.can_build }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TESTED: ${{ inputs.publish }}
+          HEAD_SHA: ${{ github.sha }}
+          REF: ${{ github.ref_name }}
+        run: |
+          case "$TESTED" in *[!0-9a-f]*|'') echo "::error::publish: a full commit hash"; exit 1 ;; esac
+          [ ${#TESTED} -eq 40 ] || { echo "::error::publish: a full commit hash"; exit 1; }
+          if ! git merge-base --is-ancestor "$TESTED" "$HEAD_SHA" 2>/dev/null; then
+            echo "::error::$TESTED is not on $REF: nothing is published."
+            exit 1
+          fi
+          TREE=$(git rev-parse "$TESTED^{tree}")
+          RUN=$(gh api "repos/$REPO/actions/artifacts?name=scenarios-passed-$TREE&per_page=30" \
+            --jq '[.artifacts[] | select(.expired | not) | select(.workflow_run.head_repository_id == .workflow_run.repository_id)] | first | .workflow_run.id // empty')
+          if [ -z "$RUN" ]; then
+            echo "::error::The scenario suite hasn't passed on $TESTED (tree $TREE): nothing is published."
+            exit 1
+          fi
+          echo "The scenario suite passed on tree $TREE in run $RUN."
+          echo "sha=$TESTED" >> "$GITHUB_OUTPUT"
+          cp .github/scripts/app-hash.sh "$RUNNER_TEMP/app-hash.sh"
+          git checkout -q "$TESTED"; TESTED_APP=$(sh "$RUNNER_TEMP/app-hash.sh")
+          git checkout -q "$HEAD_SHA"; HEAD_APP=$(sh "$RUNNER_TEMP/app-hash.sh")
+          if [ "$TESTED_APP" = "$HEAD_APP" ]; then
+            echo "can_build=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "can_build=false" >> "$GITHUB_OUTPUT"
+            echo "$REF has moved on to $HEAD_SHA with other app changes: a native build, if one is needed, comes from that push's run."
+          fi
+
   fingerprint:
     name: Fingerprint
+    needs: check
     runs-on: ubuntu-latest
     outputs:
       hash: ${{ steps.fp.outputs.hash }}
@@ -72,6 +229,8 @@ jobs:
           fi
 
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.check.outputs.sha }}
 
       - uses: actions/setup-node@v4
         with:
@@ -143,8 +302,8 @@ jobs:
 
   build:
     name: Build
-    needs: fingerprint
-    if: ${{ needs.fingerprint.outputs.needs_build == 'true' }}
+    needs: [check, fingerprint]
+    if: ${{ !cancelled() && !inputs.dry_run && needs.check.outputs.can_build == 'true' && needs.fingerprint.outputs.needs_build == 'true' }}
     permissions:
       contents: write # pushes the ios-fp/<hash> tag
     uses: ./.github/workflows/ios-build.yml
@@ -158,10 +317,11 @@ jobs:
   # native change needs EAS Build (android) by hand and an upload in Play Console (the notice says so).
   android-build:
     name: Build (android)
-    needs: fingerprint
-    if: ${{ vars.ANDROID_RELEASES == 'true' && vars.ANDROID_SUBMIT == 'true' && needs.fingerprint.outputs.android_needs_build == 'true' }}
+    needs: [check, fingerprint]
+    if: ${{ !cancelled() && !inputs.dry_run && needs.check.outputs.can_build == 'true' && vars.ANDROID_RELEASES == 'true' && vars.ANDROID_SUBMIT == 'true' && needs.fingerprint.outputs.android_needs_build == 'true' }}
     permissions:
       contents: write # pushes the android-fp/<hash> tag
+      id-token: write # android-build.yml's available job proves itself to playBuildAvailable
     uses: ./.github/workflows/android-build.yml
     with:
       submit: true
@@ -172,15 +332,16 @@ jobs:
   # and does no harm.
   update:
     name: Publish update
-    needs: [fingerprint, build, android-build]
-    if: ${{ !cancelled() && needs.fingerprint.result == 'success' }}
+    needs: [check, fingerprint, build, android-build]
+    if: ${{ !cancelled() && needs.check.result == 'success' && needs.fingerprint.result == 'success' }}
     runs-on: ubuntu-latest
     env:
       SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-      # First line only: EAS caps an update's message at 1024 characters.
-      MESSAGE: ${{ github.event.head_commit.message || format('Manual update from {0}', github.ref_name) }}
+      MESSAGE: ${{ inputs.message }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.check.outputs.sha }}
 
       - uses: actions/setup-node@v4
         with:
@@ -203,17 +364,28 @@ jobs:
       - name: eas update (preview)
         env:
           PLATFORM: ${{ vars.ANDROID_RELEASES == 'true' && 'all' || 'ios' }}
+          DRY_RUN: ${{ inputs.dry_run == true }}
+          SKIPPED_BUILD: ${{ needs.check.outputs.can_build != 'true' && (needs.fingerprint.outputs.needs_build == 'true' || (vars.ANDROID_SUBMIT == 'true' && needs.fingerprint.outputs.android_needs_build == 'true')) }}
         run: |
-          # Short enough that the hash survives: EAS lists messages cut at 512 characters.
+          # Short enough that the hash survives: EAS lists messages cut at 512 characters. A run by
+          # hand with no message: the commit's own first line.
+          [ -n "$MESSAGE" ] || MESSAGE=$(git log -1 --format=%s HEAD)
           SUBJECT=$(echo "$MESSAGE" | head -n 1 | cut -c 1-300)
           APP=$(.github/scripts/app-hash.sh)
+          if [ "$SKIPPED_BUILD" = true ]; then
+            echo "::notice title=No build here::Native code changed, and ${{ github.ref_name }} has moved on with other app changes: the newer push's run builds. This update waits for that build."
+          fi
+          if [ "$DRY_RUN" = true ]; then
+            echo "Dry run: would publish $(git rev-parse HEAD) to preview ($PLATFORM) as: $SUBJECT [app $APP]"
+            exit 0
+          fi
           eas update --channel preview --environment production --platform "$PLATFORM" \
             --message "$SUBJECT [app $APP]" --non-interactive
 
       # Source maps for the bundle just published (left in dist/ by eas update), so Sentry shows
       # crashes from updates with file names and line numbers. Skipped without the secret.
       - name: Upload source maps to Sentry
-        if: ${{ env.SENTRY_AUTH_TOKEN != '' }}
+        if: ${{ env.SENTRY_AUTH_TOKEN != '' && !inputs.dry_run }}
         continue-on-error: true
         env:
           SENTRY_ORG: revisely

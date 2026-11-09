@@ -23,6 +23,7 @@ import { SessionMenuSheet } from '../../components/revision/SessionMenuSheet';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import { getHizbForPage, getSurahForPage, getQuranData } from '../../lib/quranData';
+import { describePageRange } from '../../lib/passages';
 import { RATINGS, getRatingLabel } from '../../lib/ratings';
 import { useHaptics } from '../../design/haptics';
 import { getReadPalette } from '../../theme/readPalette';
@@ -182,7 +183,7 @@ export function SmartTrackingPreviewScreen({ visible, onClose }: Props) {
                   <Text style={{ color: read.textSecondary, fontWeight: '400' }}>{`· ${demoMarked ? 1 : 0}/1`}</Text>
                 </Text>
                 <Text style={[typeV2.meta, { color: read.textSecondary }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>
-                  {`Page ${demoPage.pageNumber} · Juz ${demoJuz} · Hizb ${demoHizb}`}
+                  {`${describePageRange(demoPage.pageNumber, demoPage.pageNumber, { form: 'compact' })} · Juz ${demoJuz} · Hizb ${demoHizb}`}
                 </Text>
               </View>
               <RoundButton
@@ -481,7 +482,7 @@ function SandboxRatingSheetV2({
       visible={visible}
       onClose={onClose}
       title="Rate this page"
-      message={`Page ${pageNumber} · ${surahName}`}
+      message={`${describePageRange(pageNumber, pageNumber, { form: 'compact' })} · p. ${pageNumber}`}
       left={{ label: 'Cancel', onPress: onClose }}
       scroll
       testID="sandbox-rating-sheet"

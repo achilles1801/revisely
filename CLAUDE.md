@@ -3,6 +3,13 @@
 Guidance for Claude Code in **Revisely**. `README.md` covers setup, tests and the branch table; this
 file is the release mechanics and the traps behind them.
 
+## How a session works
+
+- **Do the work in your own session** (Majd, Nov 6 2026). Don't hand it to sub-agents, forks or
+  new sessions: no "E2E agent", no fork per bug, no follow-up chips for work you could do yourself.
+- If a narrow, mechanical task really needs a sub-agent, set its model to `opus` explicitly. Check
+  its output yourself before you rely on it or report it.
+
 ## Branches and releases
 
 - Work on `develop` (or a branch off it). CI (`.github/workflows/ci.yml`) runs on every push and PR.
@@ -11,6 +18,16 @@ file is the release mechanics and the traps behind them.
      channel, and builds and submits to TestFlight first if native code changed. Each update's message
      ends with `[app <hash>]`, a hash of every file that goes into the app (`.github/scripts/app-hash.sh`;
      docs, store, scripts, functions, tests, rules and workflows don't count).
+     - A run has two halves (Nov 7 2026). The push's run tests (the scenario gate); a newer push
+       cancels an older push's tests, since its tree holds the older change too.
+     - Once it passes, it starts `Preview · publish <sha>` (the same workflow, `publish` = the tested
+       commit), which builds and publishes. These runs go one at a time and are never cancelled,
+       so updates go out in order and a native build never starts twice.
+     - The publishing half checks the tree's scenario artifact and that the commit is on the branch
+       itself, so a run by hand can't skip the gate.
+     - `dry_run` (by hand) tries both halves without building or publishing.
+     - Before, every push waited for each older push's scenario run: 19–24 minutes from a merge to
+       its update in a burst of merges.
   2. A tester's TestFlight install follows `preview`. The binary's channel is `production`; once the
      account has loaded, `src/lib/updateChannel.ts` switches to `preview` with
      `Updates.setUpdateRequestHeadersOverride` only if the install is from TestFlight (sandbox receipt,
@@ -20,7 +37,19 @@ file is the release mechanics and the traps behind them.
      `production`. Mark or unmark a tester with
      `cd functions && GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-admin.json node scripts/set-preview-tester.js <email> [--off]`
      (`--list` shows them; clients can't write the field). Binaries before 1.0.2 lack the module and
-     stay on `production`, in TestFlight too.
+     stay on `production`, in TestFlight too. To start an account again as a new user (keeping its
+     sign-in and `previewTester`), `node scripts/reset-account.js <email>` from `functions/` (a dry
+     run; `--yes` backs up to `~/secrets/backups/<uid>-<date>/`, checks the backup, then resets;
+     `--check` says whether it still looks new). `restore-account.js <backup dir>` puts it back.
+     It refuses the App Review account. Testers can also do it themselves: Settings → Testing →
+     Reset my data (shown only when `previewTester` is true; type RESET) calls the callable
+     `resetMyData` (`functions/src/testerReset.ts`). It works on the caller's own uid only, needs
+     App Check and `previewTester` read on the server, refuses the App Review account, allows one
+     reset per 10 minutes and 10 tries a day (`adminResets/<uid>`, closed to clients), and backs up
+     to Storage `backups/tester-resets/<uid>/<time>/` (closed to clients) before changing anything.
+     Unlike the script, it also deletes that phone's local recordings (the user asked for it on that
+     phone). Deployed Nov 5 2026; deploy it again (`firebase deploy --only functions:resetMyData`)
+     when `testerReset.ts` changes, and keep its `freshUser` in step with `reset-account.js`.
   3. Try it in TestFlight, then merge `develop` into `main` (a PR, CI green). Changes made on `main`
      directly that go into the app block promotion until they come back through `develop`.
   4. `Promote to production` (`.github/workflows/promote.yml`) finds the preview update with main's
@@ -41,6 +70,137 @@ file is the release mechanics and the traps behind them.
 - Pushes that touch only docs, tests, `functions/`, `scripts/`, `worker/`, `wrangler.jsonc`, workflows,
   Firestore rules or `.md` files publish nothing (`paths-ignore` in both workflows). Firebase rules and functions still deploy by hand
   (`firebase deploy`, see README).
+
+## How updates reach phones
+
+- **OTA** (`src/lib/updates/ota.ts`, started in `App.tsx`). On its own, expo-updates downloads in
+  the background and runs the update from the next cold start, which on iOS can be days away.
+  - **At launch** the splash stays up while the app checks, for at most 2.5 s. An update downloaded
+    by then is applied before Home shows, behind a reload screen that matches the splash (#000000
+    and the icon). The splash always goes by 4 s.
+  - **Back in front**, it checks again if the last check was 10 minutes ago or more.
+  - **Applying later:** an update that has downloaded is applied when the user comes back after 15
+    minutes or more away, unless a restart would interrupt something.
+    - "Something" is `lib/updates/busy.ts`: a recording session, a recitation, a timer, or any
+      screen but a tab's own (Dashboard, ReadIndex, Insights). So no session, reader, editor,
+      onboarding or sign-in screen is ever restarted under the user.
+  - **Update sheet:** otherwise, as soon as an update has downloaded, "A new update is ready" opens
+    by itself (`components/updates/UpdateReadySheet`, mounted on Home; the tabs stay mounted, so
+    it opens over Read and Insights too). **Update now** restarts into it; **Later** puts it off
+    until the next cold start (it still applies at launch, or on return after 15 minutes away).
+    Nobody has to look for updates (owner, Nov 4 2026). It replaced the "Update ready · Restart" row.
+    - It opens only on a tab's main screen with nothing going on (every `busy.ts` reason, the
+      screen too), so never during a session, recording, recitation or timer: it waits for them to
+      end, then opens 1.2 s later.
+    - "Downloaded" includes expo-updates' own background download at launch: `ota.ts` follows the
+      native state (`addUpdatesStateChangeListener`, `latestContext.isUpdatePending`), not only its
+      own checks.
+    - The store's "New version available" waits while it is offered: one sheet at a time.
+  - **App info in Settings → About is for testers only** (`lib/updates/testerTools`: a `previewTester` account, a
+    TestFlight install, a development build). Testers get App info (build, channel, update, Share,
+    test crashes on preview) with **Check for updates** (or a long press on the row;
+    `checkForUpdateNow`), which downloads what it finds and always ends in "Update ready ·
+    Restart to update". While an update waits, the details show "Restart to update" in its place.
+    Everyone else sees only "Version 1.0.3 (5)".
+- **Store versions** (`lib/updates/storeUpdates.ts`, rules in `versions.ts`).
+  - **iOS:** once a day, Apple's public lookup (`itunes.apple.com/lookup?bundleId=…`, nothing about
+    the user). A newer version than the binary's opens "New version available · Update"
+    (`StoreUpdateSheet`) on Home: once per version, never while busy.
+  - **Android:** what Play has comes from `config/app` (Play has no public lookup; Play In-App
+    Updates needs a native module, planned for 1.0.4). Builds compare by version code
+    (`Application.nativeBuildVersion`), so a new build of the same version is offered too, named
+    "1.0.3 (6)".
+    - `testing.android` `{version, code}`: Play's internal testing track. Written by itself: once
+      `android-build.yml` has uploaded a build, its `available` job waits 10 minutes (internal
+      testing has no review), reads the track (`scripts/play.js latest internal --json`) and posts
+      it to the `playBuildAvailable` function with the job's GitHub OIDC token. The function
+      (`functions/src/playAvailable.ts`) accepts only this repository's `android-build.yml` on
+      develop or `release/*` (push or by hand) and only a higher version code. Nothing for
+      Firestore is stored in GitHub. Callers of `android-build.yml` must grant `id-token: write`.
+    - Only `previewTester` accounts compare against it (`setStoreTester`, from AppContext with the
+      update channel): they are the internal testers, as on iOS. A tester who isn't on Play's
+      internal testing list would be offered a build Play doesn't show them, and wouldn't get
+      `preview` updates for it either. Closed-testing-only testers aren't offered testing builds:
+      Play's API can't say when a closed-testing review has passed.
+    - `latest.android` + `latest.androidCode`: production, for everyone. Set by hand once a release
+      is out to everyone (`play.js rollout 1` prints the command): review state and staged
+      rollouts aren't in Play's API either.
+  - Development, TestFlight and App Review (a sandbox receipt) never see either, so a reviewer is
+    never blocked. Android is never exempt (only `__DEV__`): internal and closed testers see it.
+- **Forced updates:** Firestore `config/app` `minSupported.ios` / `.android`. Below the minimum the
+  whole app is "Update required" (`UpdateRequired`) with no way past it.
+  - It applies only once the store has a version that meets the minimum: on iOS the listing must
+    show it, on Android `latest.android` must be at least it.
+  - It waits for a recording or a recitation to stop.
+  - Phones read `config/app` at launch and every 6 h, and keep a copy for offline use.
+  - Set it with
+    `cd functions && GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-admin.json node scripts/set-app-config.js`
+    (`--show`, `--latest-android V [--latest-android-code N]`, `--min-ios V`, `--min-android V`,
+    `--clear-min`). It refuses a minimum the store doesn't have yet, unless `--force`.
+  - After a release reaches everyone on Play's production track, set `--latest-android` and
+    `--latest-android-code` to it.
+  - `playBuildAvailable` deploys by hand like the other functions
+    (`firebase deploy --only functions:playBuildAvailable`); it is public and checks the token
+    itself. Its URL is in `android-build.yml`.
+  - The rule (`match /config/app`: anyone reads, no client writes) went live on 2026-11-03.
+
+## What's new (after an update)
+
+A short walkthrough after the update (Majd, Nov 8 2026; mocks `~/Documents/revisely-today-mocks/whats-new/`).
+BEHAVIOUR.md NEW-1 to NEW-4.
+- **Who sees it:** an account set up before the release (no `whatsNewSeen` on its user document, or an
+  earlier release's) sees it once, before Home, when the release is switched on.
+  - Done writes `whatsNewSeen` = the release id. Onboarding writes it too, so new accounts never see it.
+  - Required: no skip or close. It resumes on the card left, kept on the phone (`lib/whatsNew/state`).
+  - Each card shows only to accounts that have its feature (`components/whatsNew/needs`: each feature's own gate).
+- **The cards** live in `src/lib/help/whatsNew.ts` (`RELEASES`; the last is current) and are help text: the
+  help's drift check covers them (`whatsNewReviewed.json`, `UPDATE_HELP_REVIEWED=1 npx jest src/lib/help`).
+  A release with `live: true` that needs a feature still for testers fails `whatsNew.test.ts`.
+- **Ships dark.** A release's entry has `live: false` until the PR that makes its features public flips it
+  (one line). Production gets JavaScript only through Promote, so App Store users get the cards in the
+  same update as the features. `2026-11` is live (the release PR below).
+
+## The November 2026 release: everyone's
+
+The release PR (Nov 2026) opened these to every account, not only `previewTester`. Each is a named gate
+that returns true for any signed-in account, so it can be closed again in one line (as
+`prayerTimesEnabled` was opened for 1.0.3). `src/lib/__tests__/releaseGates.test.ts` holds each open for an
+account with `previewTester` unset or false, and the scenarios of these features run as such accounts.
+Non-testers follow `production`, so nobody sees this on a phone before Promote; the tests are the proof.
+- `activityBlocksEnabled` (`lib/activityBlocks`): Activity's blocks (ACT-2, ACT-3), Insights in Activity and
+  the Home and Read tab bar (ACT-12), the day's + (ACT-5), the sittings' offers on a day (REC-3, MEM-5), the
+  juz sheet (MEM-7), and pages logged by hand counted by the self-heal (ACT-16: `getManualRevisionItems`, one
+  query on every self-heal, for every account now).
+- `sittingsEnabled` (`lib/sitting`): the reader's sittings (REC-1, REC-2) and the schedule editor's "Not in
+  your plan" (MEM-6).
+- `everyTranslationOffered` (`lib/translationsOffered`): every QuranEnc translation, its downloads and
+  favorites (TRANS-5 to TRANS-8); `VerseSheet`'s `everyTranslation`.
+- `HELP_FOR_EVERYONE` (`lib/help/availability`): the ? buttons (HELP-1, HELP-4).
+- What's new `2026-11` `live: true`; `components/whatsNew/needs` reads the gates above.
+- Revo is not one of them: it follows `config/app.revo` (REVO-37).
+- Still testers only: hidden recite mode (`reciteModeEnabled`), Reset my data, Load test scenario, the
+  update tools and the `preview` channel, the old Ask coach.
+- The old Activity (no blocks) and the Insights tab stay in the code as what the gate falls back to;
+  `ActivityScreens.test` and `ActivityScreens.v2.test` pin them by mocking the gate off.
+- A loaded test scenario writes `whatsNewSeen: 'all'` (`functions/src/testScenarios.ts`), so it opens on
+  Home; deploy `loadTestScenario` with it.
+- **Testers before a release is live:** Settings → About → What's new (a replay with ✕, nothing kept) and Settings →
+  Testing → Show What's new at launch (from the next launch, as App Store users will see it; Done turns it
+  off and writes nothing to the account).
+- **Kill switch:** `config/app.whatsNewOff`.
+  `cd functions && GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-admin.json node scripts/set-app-config.js --whats-new off`
+  (`on` to undo). Phones read it at launch and back in front after 10 minutes.
+- **Never shown:** `seed-reviewer.js` and `seed-screenshots.js` write `whatsNewSeen: 'all'` (`SEEN_ALL`),
+  so App Review and the screenshots skip it. A mark the app doesn't know counts as seen (a later release's).
+- **Nothing opens over it:** it replaces the main screens in RootNavigator.
+  - Home's update and store sheets and Revo wait for Home.
+  - WidgetSync holds a widget's link until Done.
+  - `lib/updates/busy` sees no main screen, so no update restarts the app under it.
+- **The next release:** add an entry to `RELEASES` (a new id, its own cards, `live: false`) and leave the
+  old one. Only the current release shows or replays.
+- `whatsNewSeen` is in the user document's allowlist (`firestore.rules`, #439). The rules must be live
+  before app code that writes it reaches develop: onboarding's write would be refused, and with it
+  `onboardingComplete`.
 
 ## Health (Sentry → GitHub → Claude)
 
@@ -127,7 +287,48 @@ file is the release mechanics and the traps behind them.
 
   Settings → Actions → General → "Allow GitHub Actions to create and approve pull requests" lets
   `pr` open the PR. Without it the branch is pushed and the issue gets a link to open the PR by
-  hand. `main` and `develop` are protected: PRs only, CI green.
+  hand.
+- `develop` requires one check to merge: **`Required`** (ci.yml's last job, since Nov 6 2026). It
+  runs after a failure too and fails unless every job the change needs passed: `Fast checks` (one
+  job since Nov 7 2026, a step each: secret scan, typecheck, unit + component tests, Cloud Functions
+  tests, Firestore rules tests; every step runs even after one fails), Scenarios (four shards split
+  by each file's time; `Scenarios / Scenario tests` passes only if all four did) and E2E when `plan`
+  asks for it.
+  A job skipped because another failed is not a pass; E2E is the one job that may be skipped, when
+  the plan leaves it out. Branches needn't be up to date with develop (`strict` off: the Preview
+  workflow's scenario gate still stops a broken develop from publishing). Admins can still bypass
+  (`enforce_admins` off). `main` has no branch protection. "Bug fixes add a scenario" (`spec.yml`)
+  runs on every PR on its own, so a label or a title edit re-runs it alone.
+- **Where the slow checks run** (`plan` in ci.yml; E2E is `e2e.yml`, called from CI):
+  - a draft PR: no E2E unless it has the `e2e` label; marking it ready runs everything;
+  - a lower layer of a GitHub stack: the fast checks only (the top layer tests the whole stack);
+  - the top of a stack into develop, a PR into `main`, a merge group: every E2E flow, iOS and Android;
+  - a single PR into develop (and claude-fix's runs): the Android E2E smoke set (Linux, KVM), no iOS;
+  - what lands on develop (each push): every Android flow, and the iOS native build alone (kept
+    where every PR can restore it); a newer push cancels the run of the one before, so a push's
+    E2E covers everything since the last push whose CI passed (a docs-only push after a cancelled
+    run still tests that run's change);
+  - nightly (develop) and by hand: every flow on both, from e2e.yml itself. Runs by hand never cancel
+    each other, and skip iOS jobs the same commit already has running.
+
+  So iOS flows run only for the top of a stack, PRs into `main`, nightly and by hand.
+- **Stacks** (GitHub's stacked PRs, GA Oct 6 2026; `gh extension install github/gh-stack`, which
+  needs gh 2.90 or later): a large change is a stack, one layer per PR, each based on the one below.
+  - **Linear history.** Rebase a branch onto develop (or onto the layer below) and force-push with
+    `--force-with-lease`; never merge develop into a stack branch. GitHub requires it for stacks,
+    and it ends the "merge commit cannot be cleanly created" refusals (several merge bases).
+  - **Merging.** Every layer's `Required` must pass. Merging the top merges the whole stack, one
+    merge commit per layer. Merge from the top, not a lower layer alone: a lower layer has passed
+    only the fast checks.
+  - **Retargeting.** When a lower layer lands, GitHub rebases the rest onto develop.
+- **Merging into develop: auto-merge, no polling** (Nov 6 2026). A single PR: `gh pr merge <n>
+  --auto --merge`, and GitHub merges it once `Required` passes. A stack: the same on its top PR, or
+  `gh stack merge` (auto-merge for stacks is still rolling out). To follow a PR, run
+  `gh pr checks <n> --watch --fail-fast` in the background (one command that returns when the checks
+  finish or the first one fails), never a loop. A PR whose checks fail stays open: fix it and push.
+  GitHub's merge queue needs an organization-owned repository (this one is a user's: the API refuses
+  the rule); `ci.yml` already runs on `merge_group`, so moving the repo to an organization and adding
+  the ruleset is all it would take.
 - No caches in jobs that hold release secrets (`preview.yml`, `promote.yml`, `ios-build.yml`: no
   `cache: npm`, `eas-cache: false`). The fix job runs code Claude writes on these runners, and a cache
   entry written by one run can be restored by another. Only CI, which holds no secrets, caches.
@@ -160,6 +361,207 @@ file is the release mechanics and the traps behind them.
 **Rolling back** a production update: Actions → Promote to production → Run workflow on `main` →
 `group` = the previous production update group (`eas update:list --branch production`), `rollback` =
 true → approve. It republishes that exact update, the same way promotion does.
+
+## Offline (src/lib/offline)
+
+Firestore's JavaScript SDK keeps nothing on disk in React Native (its persistence needs IndexedDB), so
+the app keeps its own copy and its own queue. Before Nov 2026 a cold start offline sat on the spinner
+for good: it waited for the server to answer for the user document.
+- **The copy** (`accountCache`): the user document, the 604 pages and the 100 latest sessions, as the
+  server last sent them, per account in AsyncStorage (`@revisely_account:v1:<uid>:…`). `AppProvider`
+  opens from it at once and replaces it with each server snapshot. Snapshots marked `fromCache` (the
+  SDK's memory: empty on a cold start) are never applied or saved: an empty one once wrote blank
+  pages over real progress (REACT-NATIVE-6), and missing data is still created only when the server
+  confirms it (`lib/userDoc`). Signing out deletes the copy.
+- **The outbox** (`outbox`, `ops`, `sync`, `apply`): every change (user fields, pages, sessions, the
+  timer's reading sessions, the daily log, usage seconds) is saved on the phone first and sent in
+  order, one at a time. The app shows the copy with pending changes laid over it (`overlayAccount`),
+  so nothing waits for the server.
+  - **Only what changed:** a save sends just the fields that differ from what the app shows
+    (`changedOnly`, `pageChange`). The copy can be older than the server (another phone); sending
+    every field would put its old values back.
+  - **Safe to send twice:** values are absolute, page lists merge as sets, and `createdAt`s are fixed.
+    A session is merged with the server's inside a transaction, since another phone may have added
+    to the day. Its minutes add `durationAdd`, unless the server already has `durationAtLeast`.
+    When the other phone added at least as many minutes, this phone's minutes don't count; the
+    server keeps no record of which changes it has.
+  - **Crossing off:** a change leaves the outbox only after it has been folded into what's shown
+    and into the copy (`onApplied` is awaited).
+  - **Offline or a timeout:** it is tried again (2 s … 1 min), and at once when NetInfo says the
+    connection is back or the app comes to the front. `connectivity` also restarts Firestore's
+    connection, which otherwise waits out its own backoff.
+  - **"Permission denied":** this is how the rules refuse, but also how App Check or a stale
+    sign-in fail. A change is dropped (reported, kind only) only after a server read works
+    (`probe`), on the third refusal. Other refusals are dropped at once. An error that isn't
+    Firestore's (a bug) is dropped after 5 tries, so it can't hold up the rest.
+  - **Accounts:** nothing is sent for an account that isn't the one signed in. Signing out keeps
+    its outbox for its next sign-in here; deleting the account clears it.
+  - **Reset by an admin** (`lib/offline/reset`): `functions/scripts/reset-account.js` sets
+    `dataResetAt` on the user document. A run sends nothing until it has compared that with the
+    mark of the copy (the user document's listener does it, or `beforeSend` reads the server once).
+    Reset since: every waiting change built on the copy is dropped (with no copy, the ones made
+    before the reset), and the copy's pages and sessions go, on screen and on the phone. Local
+    recordings stay (only the user deletes those); the script tombstones their records, so they
+    stay local-only.
+  - **Storage:** a stored queue that can't be read is never written over, and a damaged one is
+    kept aside (`@revisely_outbox_damaged:…`).
+  - **Usage seconds** aren't idempotent: a crash between the server's answer and crossing them off
+    counts them twice.
+- **Listeners:** one that ends in an error (e.g. refused before App Check had its token) is
+  subscribed again after a backoff; "Try again" does it at once. Pull to refresh doesn't read the
+  server: the listeners already do, and an older read could roll a newer snapshot back.
+- **First launch offline** (no copy): `connectionNeeded` → `ConnectToSetUp` ("Connect to the internet
+  to set up", Try again, Sign out) when NetInfo or Firestore says offline, or after `SERVER_WAIT_MS`
+  (6 s). It carries on by itself when the server answers. Onboarding never starts without the server.
+- **A slow network at launch:** Firebase Auth checks its saved sign-in with the server first (up to
+  30 s). After `AUTH_GRACE_MS` (1.5 s) the app opens with the account Auth saved
+  (`provisionalUid`, read from Auth's own AsyncStorage entry) and its copy; nothing is sent until Auth
+  confirms it. Offline, Auth keeps an expired sign-in (it can't check it) and refreshes it once online.
+- **Offline note:** Home's `OfflineNote` ("Offline", "Offline · changes saved on this phone").
+- The daily log can't be read offline unless Firestore already holds that day: the screen then says
+  so and can't be saved (a save would overwrite the server's entry).
+- The start-up self-heal (`syncPagesFromLogs`) runs only on the server's pages and sessions, never on
+  the copy, and compares last-revised dates by day (comparing a day with a timestamp rewrote every
+  revised page, unchanged, on every launch).
+- **Testing offline:** the Android emulator has airplane mode (`adb shell cmd connectivity
+  airplane-mode enable`; Metro still works through `adb reverse`). The iOS Simulator has none:
+  `src/dev/offlineSwitch.ts` (development builds only; absent from release bundles) sends every
+  JavaScript request except to Metro to a closed port. Turn it on in the app with
+  `xcrun simctl openurl <udid> "revisely://devoffline?on=1"` (`exp+revision-buddy://devoffline?on=1`
+  on dev clients without the revisely scheme; `on=0` turns it off); it is kept for the next launch.
+  `defaults write` from `simctl spawn` doesn't reach the app once it has saved its own value.
+  Native requests don't pass through it, except those whose URL goes through `lib/devNetwork`
+  (`nativeRequestUrl`: the mushaf's page downloads and page images).
+
+### Offline mushaf (`lib/pageCache`, `lib/mushafOffline`)
+
+Every page is downloaded to the phone, so the reader and revision sessions work offline (Nov 2026).
+- **Where:** `Documents/mushaf/<set>/001.png …` (`Paths.document`; Android's files directory), which
+  the system never empties. Before, pages were cached as read in the caches directory, which iOS and
+  Android may clear; `migrateLegacyPages` moves those over once (2 s after launch) and they are read
+  from there until then. The reader saves the pages it opens to the same folder.
+- **Backups:** on iOS the folder (and `Documents/quran-text`, `Documents/translations`) is kept out of iCloud backups with
+  `RecitationAudio.excludeFromBackup`, which every binary on runtime 2df7a2f0 has (builds 31/32);
+  `xattr -l` shows `com_apple_backup_excludeItem` on it. Android has no way to do that from
+  JavaScript (expo-file-system writes only to files/ and cache/), so the pages are in Auto Backup's
+  files/, and with them Android's 25 MB backup quota is passed (recordings already pass it for most
+  users). The fix is backup rules excluding `files/mushaf` (`android:fullBackupContent` /
+  `dataExtractionRules`): a native change for the next build.
+- **Sizes** (`src/data/mushafSizes.json`, from `node scripts/mushaf-sizes.js`; run it again if the
+  images in Storage change): iOS (the originals) 247 MB, Android w1080 135 MB, w1440 191 MB; the
+  Arabic text (1.8 MB) and Saheeh International (1.1 MB) come on top, so Settings says 250, 138 and
+  194 MB (`ARABIC_TEXT_BYTES`, `SAHEEH_BYTES`, measured Nov 2 2026).
+- **The download** (`mushafOffline`, started by `MushafOfflineController` 20 s after launch with
+  someone signed in): Wi-Fi only (metered Wi-Fi, a hotspot on Android, counts as mobile data),
+  unless "Download over mobile data" is on or "Download now" was confirmed over it once; only in the
+  foreground; only while there is room for the next page plus 100 MB. Three pages at a time; it
+  stops between pages when any of that changes and carries on from there. A page is downloaded to
+  `.part` and moved in, so a page there is whole. Failures are tried again on the connection coming
+  back, the app coming to the front, or after 1, 5, 15 minutes; a run stops after 6 failures in a
+  row. Progress reaches Settings at most every 400 ms.
+- **Android downloads** go through `expo-file-system/legacy`'s `downloadAsync` (one shared OkHttp
+  client), checked for the status, the `Content-Length` and a 2-minute timeout (it can hang when the
+  connection drops mid-file). `File.downloadFileAsync` makes a new client per file: re-downloading
+  300 pages on the emulator reached 1,092 open files, 325 sockets and 653 threads (older Android
+  allows 1,024 files); with the shared client, 195, 26 and 75. iOS keeps `File.downloadFileAsync`
+  (`URLSession.shared`).
+- **Sets:** another set already downloaded is kept (a foldable's two screens pick different sets;
+  deleting one would re-download 135–191 MB on every switch). Old cache folders of other sets go.
+- **A page that fails to show** (`evictCachedPage`) is deleted only if its size isn't the table's
+  (a decoding failure from memory can hit a whole file: "Couldn't load page N", Try again); the
+  download hears it (`onPageRemoved`) and fetches it again.
+- **Settings → Mushaf:** "Offline mushaf" (status and %, a menu with Download now and Remove from
+  this phone) and "Download over mobile data". "Downloaded" means every page, the Arabic and every
+  sura of Saheeh International; the text downloads first. Remove deletes all three and turns the
+  download off (kept on this phone, `@revisely_mushaf_offline:v1`) until Download now; pages and
+  suras the reader opens are still kept.
+- **A page not on the phone:** online, it downloads (or loads from Storage, as before); offline
+  (`networkState`, fed from NetInfo), the reader shows "Page N isn't downloaded yet" with Try again,
+  and loads it by itself when the connection is back.
+- **Text offline:** the whole Arabic (Tanzil's Uthmani via alquran.cloud) is downloaded with the
+  pages (`downloadArabicText`, one request), so Copy and Share and the verse sheet's Arabic work
+  offline; the file keeps Tanzil's notice (`TANZIL_NOTICE`, word for word from
+  tanzil.net/docs/text_license), as its terms ask of every copy (a file from before Nov 3 2026 holds
+  the pages alone; it is written again with the notice the first time it loads). Saheeh International, now QuranEnc's
+  licensed copy (#80, below), is downloaded whole too. The Clear Quran stays as the owner decided on
+  Oct 27 2026 (cached as read, 30 + 30 days, never the whole of it): its terms (attribution, no
+  changes, a revocable licence, rate limits; public page theclearquran.org/organizations/api) don't
+  allow more. Offline, a verse of it not read before shows "The Clear Quran® needs the internet",
+  "Saheeh International is available offline." and a Show Saheeh International button (which sets
+  the account's translation) when that sura is on the phone. Surah and juz data and the verse boxes
+  are bundled. Recitation streams from everyayah.com and needs a connection.
+
+### Saheeh International (QuranEnc.com, licensed; `lib/saheeh`)
+
+From Nov 2026 (#80) Saheeh International comes from QuranEnc.com's API
+(`https://quranenc.com/api/v1/translation/sura/english_saheeh/<n>`), not alquran.cloud, which has no
+licence for individual translations. QuranEnc lists it as `english_saheeh`, "English Translation -
+Noor International Center" (Noor International issues Saheeh International), v1.1.2 (last update
+June 2025).
+- **Terms** ("Terms and Policies" on every translation's page, quranenc.com/en/browse/english_saheeh;
+  read Nov 2 2026): translations can be downloaded and re-published if (1) nothing is modified, added
+  or deleted; (2) the publisher and the source (QuranEnc.com) are clearly named; (3) the version is
+  mentioned; (4) the transcript information stays inside the document; (5) notes on the translation
+  go to QuranEnc (`POST /api/v1/translations/note`, if the app ever takes notes); (6) it is updated to
+  the latest version; (7) no inappropriate advertisements are shown with it.
+- **What the app does for them:** each verse's translation and footnotes are kept exactly as given.
+  The verse sheet shows `[n]` markers that have a footnote as raised numbers (`saheehSegments`;
+  bracketed words like "[All] praise" stay) and the footnotes under the verse (`saheehFootnotes`).
+  The pinned credit is `creditLine`: "Saheeh International, issued by Noor International Center ·
+  v1.1.2" and the link QuranEnc.com (its page). `info.json` keeps QuranEnc's title, description,
+  version and last update with the files.
+- **Storage:** `Documents/translations/english_saheeh/NNN-<version>.json`, one file per sura (written
+  to `.part` and moved in), as soon as a sura is read, and all 114 with the offline mushaf. Out of
+  iCloud backups on iOS. The old alquran.cloud cache (`Caches/translation/en.sahih`) is deleted.
+- **Versions:** QuranEnc's list (`/api/v1/translations/list/en`) is read at most once a day (after a
+  failure, not again for 10 minutes; a clock set back doesn't stop it). A sura of an older version is
+  shown with its own version and fetched again as soon as it is read, on any connection
+  (`refreshIfOutdated`), whether or not the offline download runs; the download (every run of
+  `mushafOffline`, even when everything is here) replaces the rest. The sura endpoint has no version:
+  a sura read before the list is labelled with the last version known (`SAHEEH_KNOWN` on a fresh
+  install) and fetched again if the list says otherwise.
+- **Failures:** the download carries on past a failed sura and stops after 3 in a row; a sura that
+  can't be stored (a full phone) is a failure there (the reader still shows it). The text downloads
+  before the free-space check for pages, so it comes even when the pages don't fit. The verse sheet
+  offers Saheeh International offline only when that sura and that page's Arabic are both on the
+  phone (`hasArabicForPage`), and reloads by itself when the connection comes back.
+- **Requests:** the API sits behind Cloudflare and answers 403 to Python's urllib (its user agent);
+  the phones' (CFNetwork, okhttp) and curl get 200. 114 requests, about 1 MB gzipped, ~6 s.
+- The Arabic's source is credited in the verse sheet too: "Arabic text: Tanzil Project · tanzil.net"
+  (`ARABIC_CREDIT`, at the end of the verse), as Tanzil's terms ask.
+
+### QuranEnc's other translations (`lib/quranenc`, Nov 2026)
+
+Every translation in QuranEnc's list (76 in 56 languages, Nov 8 2026), on Saheeh's terms (all 163
+translation pages on QuranEnc carry the same seven). The licensing inventory, with Quran.com's 126
+translations matched to a source, is `~/Documents/revisely-translations/inventory.md`.
+- **The store:** `createQuranEncStore(key)` is Saheeh's code made general: suras kept as read in
+  `Documents/translations/<key>/NNN-<version>.json` with `info.json`, the version check, the download.
+  `lib/saheeh` is that store for `english_saheeh`. QuranEnc's list is read once a day and one request
+  answers for every translation (TRANS-4).
+- **The catalogue:** `src/data/quranencCatalogue.json`, from `node scripts/quranenc-catalogue.js`:
+  QuranEnc's list as shipped (key, language, direction, version, title, description, size). Ids in the
+  app are `qe.<key>`; Saheeh International keeps `en.sahih`. The rules allow any `translationId` of up
+  to 40 characters, so new ones need no rules change.
+- **Credits:** QuranEnc's own description of each (who translated and issued it), the version of the
+  sura shown and QuranEnc.com (TRANS-2). Right-to-left languages read right to left (TRANS-3).
+- **Who:** every account gets the picker of every translation (`everyTranslationOffered`, TRANS-5), since
+  the November 2026 release; testers only before.
+- **The picker** (Majd's design, Nov 8 2026): Translations and Edit, a search over every group, then
+  Selected, Favorites (starred, in that order; `lib/translationFavorites`, on the phone per account,
+  TRANS-8), Downloaded, and every language. Edit moves or unstars favorites and deletes downloads.
+- **Downloads** (`lib/translationDownloads`, TRANS-6): a picker row shows its size, downloads the whole
+  translation on any connection (one tap, a few MB; stoppable, carries on), and the bin removes it.
+  Saheeh International stays with the offline mushaf. Offline, a translation not on the phone offers
+  one that is: the same language, then Saheeh, then any (`fallbackTranslation`, TRANS-7).
+- **E2E:** builds fetch nothing, so `src/lib/e2e/demoTranslations.ts` writes Al-Ikhlas in 24
+  recorded translations (one per script) and page 604's Arabic, and `revisely://e2e/verse?ref=112:2&t=…`
+  opens the real verse sheet. Flow `15-translations` captures each script on both platforms.
+- **Not yet:** 87 entries on QuranEnc's website aren't in its list (41 are tafsirs). The 25 that
+  Quran.com also has, Russian, Bengali, Malay and Korean among them, publish no version, which the
+  terms require: they wait for QuranEnc's answer. Tanzil's translations are non-commercial only. The
+  Quran Foundation API (Diyanet, Kuliev, Abdel Haleem…) needs a registered app, a 7-day sync for
+  offline copies and a privacy-policy rewrite.
 
 ## Runtime version is a fingerprint
 
@@ -226,12 +628,46 @@ hard-coded token was deleted from the console on 2026-10-27.
 
 ## CI
 
+- **How we test: `TESTING.md`.** The layers and what each proves, what is real and what is stood in
+  (only outside services, at their outermost edge: everything of ours runs for real), adding a test,
+  flakes (fix the cause, never a retry or a skip), the `develop-red` issue, the daily live smoke check
+  against production and real devices (Test Lab).
+- **Behaviour first.** `BEHAVIOUR.md` lists every rule the app keeps for its users, each with an id.
+  The scenario and property tests in `tests/scenarios/` check them (how to run and write them:
+  `tests/scenarios/README.md`). Scenarios run the real providers, Home and the session screen against
+  the Auth, Firestore, Storage and Functions emulators (real rules, our real functions; only Anthropic
+  answers from a recording, `functions/src/emulator.ts`), with a test clock and time zone. Property tests
+  (fast-check) cover the schedule and day functions. `Scenarios` in CI (`scenarios.yml`) runs both,
+  and `preview.yml` builds and publishes nothing unless it passes: on that push, or on exactly its tree
+  in the PR's own CI (a PR merged with nothing else landing meanwhile; `scenarios-passed-<tree>`
+  artifacts, same-repository runs only), so a clean merge reaches TestFlight without a second run
+  (about 5 minutes from the merge to the update; 15 when the suite runs again). Its publishing half
+  checks that artifact again before it builds or publishes.
+  - **Every bug fix adds a scenario** that fails without the fix and names the rule it keeps
+    (`[DAY-2]` in its title). The "Behaviour spec" check (`spec.yml`) fails a fix PR (branch `fix/`,
+    `hotfix/`, `claude/issue-`, or a title starting "Fix") that changes `src/` without one. Only the
+    `no-scenario` label, with the reason in the PR, lets one through.
+  - A rule changed on purpose changes in `BEHAVIOUR.md` first, in the same PR as its tests.
+  - `KNOWN BUG` tests (`it.failing`) pin bugs that are still open; `BEHAVIOUR.md` lists them. A fix
+    turns its test red, and the PR makes it an ordinary test.
+  - `node tests/scenarios/check-spec.js` fails when a rule has no test, or a test names an unknown id.
+  - The suite has its own `package.json` (fast-check), so it changes neither the app's dependencies
+    nor the fingerprint.
 - "Secret scan" (`scripts/check-secrets.sh`): `git grep` over tracked files for high-signal secret
   patterns (private keys, Google/Anthropic/OpenAI/GitHub/Sentry/AWS/Slack/Stripe/Expo tokens, The
   Clear Quran keys, App Check debug-token assignments), printing paths and lines, never the match.
   `--self-test` checks every pattern still catches a sample. Coverage reports aren't committed
   (`coverage/` is ignored; CI uploads them as an artifact).
 
+- **Emulators: always through `scripts/emulators.sh`** (`exec <only> <project> '<command>'`, or
+  `start` for local E2E). It takes a lock per set of ports (a folder in `/tmp`; it waits for the
+  owner, takes over one whose owner has exited, and waits while the ports are held by something
+  started by hand, naming it). Several sessions and worktrees ran `firebase emulators:*` on the same
+  ports (8080, 9099, 4400) at once and broke each other's runs (Nov 5 2026). `npm test` in
+  `tests/scenarios` and `tests/firestore-rules`, `scenarios.yml`, and `.maestro/scripts/emulators.sh`
+  all use it. A worktree of its own: `REVISELY_EMU_PORT_BASE=auto` (ports from the worktree's path,
+  the same each time) or a number (Firestore at it, Auth +1, Storage +2, hub +3, logging +4). The
+  scenario harness and the rules suite read the ports from the environment the script sets.
 - The app typecheck excludes `functions/` and `tests/firestore-rules/`. Each has its own
   dependencies and its own job.
 - The rules tests need Java 21 (firebase-tools). When `firestore.rules` changes, update the tests in
@@ -241,7 +677,72 @@ hard-coded token was deleted from the console on 2026-10-27.
   a current SDK for uploads; move the pin when the image or Apple's minimum changes.
 - Secret EAS variables are unreadable on the runner: the plist comes from `GOOGLE_SERVICE_INFO_PLIST`,
   and Sentry source maps upload only if a `SENTRY_AUTH_TOKEN` repository secret exists.
-- There is no Maestro job. The flows run locally (`npm run test:e2e:ios`) against a dev client.
+- **E2E** (`e2e.yml`, `.maestro/README.md`): Maestro flows on the iOS Simulator and the Android
+  emulator against the Firebase emulators, at a time and in a zone each flow sets (sign-up, a
+  session, revise ahead, the Fajr boundary, the daily log, offline, recordings). CI calls it with
+  the sets `plan` picks (see "Where the slow checks run" above): the smoke set is 02 session, 04 Fajr
+  boundary, 05 daily log, 06 offline (two Android jobs side by side: 02 + 05, 04 + 06); every flow is
+  two jobs a platform. The top of a stack tests the
+  stack's whole change. One run per PR (a push cancels the older one); a push to develop cancels the
+  run of the push before it, and never a full run started by hand. A red run on develop doesn't stop
+  the preview (the scenario gate does that): fix it like any failure. iOS runners are the slow part
+  (5 macOS jobs at once on this plan): don't start iOS runs you don't need.
+  - **Screenshots:** the flows take one on key screens (`subflows/shot.yaml`: Home's states, a
+    session page, the end card, the daily log, offline, a recording, Kathmandu). Every run that ran
+    flows keeps them as the artifact `e2e-<platform>-screens-<job>-<run>` (14 days):
+    `gh run download <run> -p 'e2e-*-screens-*'`. Check a visual change there, not on Majd's
+    simulator.
+  - **Visual regression** (Nov 7 2026; `.maestro/README.md`, "Screenshots"): after the flows, each
+    job compares its screenshots with the approved baselines in `.maestro/baselines/<platform>/`
+    (`.maestro/visual/`: status bar cropped, what varies between runs masked, pixelmatch). A
+    screen that changed fails E2E, with a board (baseline | this run | differences) in the
+    artifact `e2e-<platform>-visual-…`; a screen with no baseline is only reported. **An intended
+    change is approved in the same PR:** `node .maestro/visual/approve.mjs <run id>` (after
+    `npm ci --prefix .maestro/visual`), look at the PNGs, commit `.maestro/baselines/`. A single PR
+    runs Android's smoke flows only: for a change iOS or other flows show, run E2E by hand on the
+    branch (both platforms) and approve from that run. Activity, Insights and Revo have no
+    baselines yet (being rebuilt): approve theirs once their boards match the mocks.
+  - **Activity boards** (the screens against their mocks, `~/Documents/revisely-today-mocks/activity-redesign/png`):
+    flows `09-activity-light` and `09-activity-dark` seed the mocks' account (`.maestro/scripts/seed-activity.js`:
+    305 pages, the Fajr boundary, October as d3, Insights' figures as d4) and capture Overview, a day
+    (top, end, its menu, a light day), the + menu, the Revised, Memorized and Note sheets, and Insights
+    (top, Weak spots, end). The E2E build writes the mocks' recordings itself
+    (`src/lib/e2e/demoRecordings.ts`, `subflows/relaunch-recordings.yaml`). Run them with
+    `gh workflow run e2e.yml --ref <branch> -f platform=ios -f flows='09-activity-*'`, then
+    `~/Documents/revisely-today-mocks/.venv/bin/python scripts/verify/activity-boards.py --run <id> --platform ios`
+    writes one board per screen (capture left, mock right) into `activity-redesign/verify/`. A UI
+    change to Activity is done when its boards match, light and dark, apart from Majd's decisions.
+    A change to the seed: keep each figure the boards show (a figure that moves is a data change,
+    not a design one).
+  - **Cached builds:** the native build is kept per fingerprint, so a JavaScript-only change only
+    re-bundles. A PR restores develop's (pushes keep it there) and the nightly run's (kept on
+    `main`); a stack's upper layers see only `main`'s, so after a native change they build once,
+    until the next nightly run.
+  - **Hangs and system alerts:** `run.sh` stops a flow attempt after 15 minutes and the warm-up
+    after 6 (a Maestro driver that answered 500 once hung a shard for 55 minutes). Flows confirm
+    iOS permission alerts (the simulator's microphone grant sometimes doesn't take), and the clock
+    and network links are re-sent until they take.
+  - **The daily log** (05) checks again 8 s after each change is sent: a note that drops out once
+    sent, or a deleted one that comes back, fails it (#220 fixed exactly that, Nov 5 2026).
+  - **Its check:** the job `E2E` (CI's `Required` waits for it). Its `changes` job reads the change's files; when nothing that
+    goes into the app or the flows changed (only what `.github/scripts/app-hash.sh` leaves out, other
+    than `.maestro/`, `e2e.yml`, `firestore.rules` and `firebase.json`), the platform jobs are
+    skipped and `E2E` passes. It also runs after a failure or a cancellation, so it is never
+    missing. A run by hand on one platform or some flows reports as `E2E (partial run)`.
+    `claude-fix` starts CI on its branch, which runs it.
+  - A flaky flow is fixed, not skipped (Nov 4 2026). A pass on a retry is a warning, and the job
+    keeps its results (screenshots, `app.log`: the E2E build's own log, `src/lib/e2e/log.ts`).
+  - **Flakes are counted** (Nov 7 2026): every job keeps each flow's attempts (`attempts.json`,
+    artifact `e2e-<platform>-attempts-…`), and `E2E flakes` (`e2e-flakes.yml`, Mondays 14:00 UTC
+    and by hand, from `main`) comments the week's first-attempt pass rate per flow and platform,
+    worst first, on the issue "E2E flakes (weekly report)" (label `e2e-flakes`). It mentions the
+    owner only when a flow is under 95%. A flow there is fixed like a failing one.
+  The app is an E2E build: `EXPO_PUBLIC_E2E=1` at bundle time loads `src/lib/e2e/` (the
+  emulators, a hermetic network, the test clock `revisely://e2e/clock?at=…`); every other build
+  drops it, since the bundler inlines the variable. Keep new E2E code behind that test, and check a
+  release export has none of it. Its native build is cached per fingerprint: the workflow has no
+  secrets (demo Firebase config files) and publishes nothing. Run them locally with
+  `.maestro/scripts/` and `.maestro/run.sh`, never with a release build or `eas`.
 
 ## TestFlight
 
@@ -375,8 +876,9 @@ mistake-detection branch had found the same fit). All 604 pages were measured ag
 images; the rest match within a few units. After regenerating, run `scripts/check-ayah-bounds.py`
 on the images (its header says how to fetch them): it fails on a page whose boxes miss its ink.
 `ayahBounds.test` holds measured ink for pages 3, 4, 50, 300 and 604, and `MushafPager.test` that
-a box is the bounds × the page's scale, drawn in the image's own frame, at any phone size. Translations: Saheeh International from api.alquran.cloud,
-and The Clear Quran® (Dr. Mustafa Khattab) through our worker (below). Both are in the privacy policy.
+a box is the bounds × the page's scale, drawn in the image's own frame, at any phone size. Translations: Saheeh International from QuranEnc.com
+(licensed, see Offline mushaf), and The Clear Quran® (Dr. Mustafa Khattab) through our worker (below).
+Both are in the privacy policy, with alquran.cloud for the Arabic.
 
 **Copy and Share** (the held-verse menu; `lib/verseShare.ts`): the verse's Arabic, the verse sheet's
 own (`getArabicVerse`, alquran.cloud `quran-uthmani`, basmala stripped as the sheet does), then
@@ -563,7 +1065,42 @@ new user field needs `firebase deploy --only firestore:rules` first, or those wr
 **Third-party content:** Qur'an page images are renderings of the Madani Mushaf made with the King
 Fahd Complex fonts (open-source quran.com-images). They are served from the Storage bucket at
 `mushaf/001.png` ... `mushaf/604.png` (public, immutable; `src/lib/quranImages.ts`). If App Review
-asks about rights to them, that is the answer; the Qur'an text itself is public domain.
+asks about rights to them, that is the answer; the Qur'an text itself is public domain. The 1441
+print's pages (below) are drawn from the King Fahd Complex's own vector files, which its rights page
+(dm.qurancomplex.gov.sa/rights/) lets anyone use free, in apps too.
+
+**Mushaf editions** (Settings → Mushaf, `lib/mushafEdition`, `components/mushaf/MushafPickerSheet`;
+Nov 3 2026): the 1405 pages (the default) or the King Fahd Complex's **Madani 1441** print. The
+choice is kept per phone (`@revisely_mushaf_edition:v1`), not on the account.
+- **Page numbers are shared.** 568 pages hold the same verses in both; the other 36 come in runs
+  (120–123, 144–145, 531–534, 564–565, 567–570, 575–576, 583–600) that begin and end on the same
+  verses, and every surah and juz starts on the same page (`ayahBounds1441.test` checks all of it).
+  So plans, sessions, memorized pages and Home stay on one numbering and nothing is mapped; only
+  what the reader draws and its verse lookups follow the edition: `ayahBounds` (`boundsFile`,
+  `versesOnPage`, `ayahRects`, `ayahAt`), `verses.pageOfVerse`, `firstSurahOnPage` (the reader's
+  header: 1441 page 586 begins in 'Abasa), the page aspect (`pageFit`). `quranData`'s tables stay
+  1405's.
+- **Images:** `scripts/build-mushaf-1441.py` renders `1441-AI-hafs.zip` (one Illustrator/PDF file a
+  page, with layers for the text, the verse numbers, the ornaments and the running heads) inside the
+  frame: a 254.4 × 410.4 pt window (aspect 0.620), without running heads or page numbers, as ink alpha
+  like the 1405 pages (the green discs and header boxes become a light 17%, so the dark tint works).
+  `mushaf/1441/w1080/` (111 MB) and `mushaf/1441/w1440/` (153 MB; iOS uses it, there are no
+  originals), 32-level palette PNGs. Uploaded with `upload-mushaf-variants.js --prefix 1441`, sizes
+  in `mushafSizes.json` (`1441/w1080`, `1441/w1440`). Immutable: changed pages need a new folder.
+- **Verse boxes:** `src/data/ayahBounds1441.json`, same format and 1024-wide space, measured from the
+  pages (15 rows 26.93 pt apart; pages 1–2 have 7; the green marker discs split each line; headers and
+  the basmala skipped). The verses come in order from `scripts/mushaf1441-page-starts.json`; the build
+  fails on any page whose discs and verses don't match one for one (all 604 match).
+- **On the phone:** `Documents/mushaf/1441/<set>/`; `pageCache` keys everything by edition, and the
+  offline download follows the edition chosen. The other print's pages stay (switching back is
+  instant) until removed in the picker. "Remove from this phone" under Offline mushaf removes both.
+- Hidden recite mode needs line and word data, which only the 1405 pages have: its button is hidden
+  for the 1441 print (`MushafEdition.reciteData`).
+- **The picker** is a row per print (thumbnail, name, "On this phone" / "n of 604 pages" / "153 MB to
+  download", a check) and one credit line per publisher (`mushafCredits`; both prints are the King
+  Fahd Complex's, so one line). No explanations: the owner had the page-numbers note removed (Nov 3
+  2026). A Tajweed (Dar al-Maʿrifah) print waits on permission from the publisher and Quran.com
+  (being asked, Nov 2026); it would be another edition with its own folder and credit.
 
 ## Android (Google Play)
 
@@ -732,6 +1269,106 @@ To rotate one (or after a leak: revoke the old key in the portal first):
    channel (App Store or TestFlight for live) and look for no `answered 401/403` lines.
 4. Revoke the old key in the portal.
 
+## Revo (the assistant)
+
+Revo is the in-app AI assistant (Nov 6 2026; mocks and notes `~/Documents/revisely-today-mocks/revo/`,
+privacy draft `~/Documents/revisely-stats/coach-privacy-draft.md` § R). It supersedes the Ask coach in the
+app; `askCoach`/`setCoachOptIn` stay as they were until Insights links to Revo. Rules: BEHAVIOUR.md REVO-*.
+- **Who:** previewTester accounts only (`revoAvailable`), off until the opt-in. Revo's switch is its own,
+  `coachSettings.revoOn` (the callables call it `optIn`); the Ask coach's `optIn` doesn't turn Revo on (it
+  did until Nov 7 2026, which skipped Revo's opt-in and sent a Day in review before it). For the changeover
+  the server still serves an account with `revoOn` unset and the coach's `optIn` on (apps from before #310
+  read that), and only `revoOn: false` turns it off (`functions/src/revo/settings.ts`); drop that fallback
+  once every tester has the new app. A tap before the switch is read waits for it (up to 2 s). E2E builds
+  run the real `revo*` functions in the functions emulator (only the model answers from a recording);
+  `09-revo` marks its account a tester, sets the model's text, the day's count and Revo off through the
+  emulators (`.maestro/scripts/server-revo.js`), and calls the `revo*` functions once as its account
+  before anything waits on them (a function's first signed-in call there takes 17–22 s on a CI runner).
+- **App:** `components/revo/RevoHost` is mounted once in `MainNavigator`: the button (a 44pt disc,
+  bottom-right, 14 above the tab bar and the mini player) on the routes in `REVO_BUTTON_ROUTES` (never the
+  reader, a session or an editor; hidden with the keyboard and while the sheet is up), and the sheet
+  (`RevoSheetFrame`: about 55%, a drag up or a conversation takes it to full height). The views: `RevoChat`,
+  `RevoPages` (History, Memory, the opt-in), `RevoPicker` (+), inside `RevoBoundary` (an error in Revo says so
+  in the sheet: on build 32 an uncaught JS error can end as a native crash, REACT-NATIVE-10).
+  - **Lists clear the button** with `useRevoFootprint()` (`lib/revo/presence`): its room on the screens it
+    shows on, 0 elsewhere, added to the scroll view's bottom padding beside `useTabBarFootprint()` (which no
+    longer includes it). Home, Read, Activity (and its Day and All views) and Insights use it.
+  - **The keyboard:** the sheet sits on it and gets shorter (`lib/revo/sheetFit`), so the header and the
+    conversation stay; there is no KeyboardAvoidingView (it pushed the whole sheet up and off the top).
+  - **Colours** follow the theme and the accent: `palette.revo` (`theme/v2`) for the R, its disc, the glows
+    and the shadow; everything else is the palette's (`revoColours.test` checks the contrast).
+  - **Answers:** `callFunction` returns the callable's `{ result }`; `lib/revo/backend` reads it, checks the
+    answer's shape (`askResultOf`) and names a failure (`refusalOf`: offline, the server's reason, the limits).
+  Another screen opens Revo with `openRevo({ attach })` (e.g.
+  `insightAttachment('weakSpots')` for an Insights section's "Ask Revo"); Settings → Revo AI turns it on and off.
+- **What it is told** (`lib/revo/context`): built when a question is sent, from `lib/todaySnapshot`, the same
+  snapshot Home's Today post is built from (today, the week, the streak with its grace), so it can't disagree
+  with Home (REVO-26). Parts of the Qur'an go worded surah and juz first (`lib/revo/words` over
+  `lib/passages`), with the page numbers. The server writes the context out in plain words for the model
+  (weekdays, never dates, field names or JSON). Attachments (`lib/revo/attachments`) go only with the question they were
+  picked for; a recording is its length and pages, never audio. The greeting and chips are written on the
+  phone (`lib/revo/greeting`), no call. Every open is a new conversation on a greeting written then (REVO-34;
+  an old chat only from History, today's Day in review from a row under the greeting, never opened on). It
+  doesn't repeat itself (REVO-35): `RevoHost` counts the day's opens per state (`@revo_greeting_opens:<uid>`),
+  so "Today's N pages are done" comes once, then tomorrow's start, a weak part, the week, the share memorized in
+  turn (Majd, Nov 7 2026: the same done line on every open was "irrelevant now"). Charts are named by the model and drawn from the phone's own data
+  (`lib/revo/charts`); an action ("Add to my plan": tomorrow's carry, `carryForTomorrow`) waits for a tap.
+- **Attachments** (+; REVO-32, REVO-33, Nov 7 2026): a surah, a juz, pages or a day go with their facts, worked out
+  on the phone by `lib/revo/facts` from the sources Insights, Activity and the streak read, the way they read them
+  (the credits: the Activity items with the phone's sessions over them, else the logs as the streak reads them; the
+  plan: `snapshot.streak.scheduled`; strength: Insights' rule; a day: Activity's minutes, the timer, the daily log,
+  this phone's recordings). `prepare(sources)` reads them once for many rows (the picker's previews). A day goes
+  with its notes, and the picker and the chip say so ("includes 2 notes"); there is no separate Notes option. The
+  server checks the facts strictly (`validate.ts`: they must add up, a surah's or juz's pages are its own,
+  `quranIndex.ts`; a day's place matches the question's day) and writes them out as sentences (`attachText.ts`).
+  A question takes one (`attach`, every app) or up to six (`attachments`, stored as `attachList`); the older kinds
+  (day, page, note) are still accepted from older apps.
+- **Tone** (REVO-27, Majd's choice, Nov 7 2026): a warm coach; the answer first, about 35 words; one next step
+  (today's while today isn't done); surahs and juz, a page number only when asked. Check a prompt change with
+  `functions/scripts/revo-tone-samples.js` (real replies, before and after, for the owner) before deploying it.
+- **Server** (`functions/src/revo/`): `revoAsk`, `revoDayInReview`, `revoSetOptions`, `revoClear`, with the
+  coach's key (`ANTHROPIC_COACH_KEY`), cached system prompt, retries and ledger, on `claude-sonnet-5-5`
+  (`REVO_MODEL`; the Ask coach stays on Haiku 5.5; prices per model in `coach/pricing.ts`, Sonnet 5.5's
+  caching minimum is 512 tokens). **Thinking is off** (`thinking: {type: "between_tools"}`; Sonnet 5.5 thinks
+  by default and its thinking counts against `max_tokens`: at 700, every reply was cut off, Nov 7 2026) with
+  `REVO_MAX_TOKENS` 800; the log says `stop: max_tokens` when a reply is cut off anyway. 20 new questions a revision day (`revoUsage/{uid}`; an earlier day than counted is refused), a first
+  question without an attachment kept for the day (free), the last 10 messages sent with a follow-up, up to
+  30 memory items (`users/{uid}/revoMemory`), conversations in `users/{uid}/revoChats/{id}/messages`. The
+  owner reads them and may only rate a reply, mark an action, mark a chat "plan added" and delete a memory
+  item (firestore.rules, tests in `tests/firestore-rules/revo.test.ts`). Off deletes conversations, memory and
+  kept answers; account deletion and Reset my data delete them too.
+- **The monthly cap** (shared with the Ask coach, one ledger) is `config/coach.monthlyCapUsd`: **$150** since
+  Nov 7 2026 (the plan's $200 a month of API credit, used only by Revisely, less a buffer); $10 when unset,
+  at most $1,000, read again within a minute: `cd functions && GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-admin.json node scripts/set-coach-cap.js 200`
+  (`--show` prints it and the month's spend). No code change or deploy.
+- **Day in review:** from 19:00 local on a day with something done, the app asks once (`revoDayInReview`,
+  idempotent per day, `review-{day}`); it never counts toward the 20 and is skipped when capped. The
+  button's dot shows until it is opened (AsyncStorage, per account).
+- **Deploy order:** `firestore.rules` and the functions (`revoAsk,revoDayInReview,revoSetOptions,revoClear`,
+  and `askCoach,deleteUserAccount,resetMyData`, which changed with it) must be live before the app reaches
+  `develop` (it publishes to preview at once).
+- **Dictation:** the mic opens the field with the keyboard up (the keyboard's own dictation). A mic that
+  dictates by itself needs a speech module: a native build.
+- **E2E:** `.maestro/flows/09-revo.yaml` takes a screenshot of each mocked screen (`r1`…`r10`), the sheet
+  with the keyboard up (`r5k-keyboard`, asserting the header stays), then the main ones again in dark
+  (`…-dark`); `~/Documents/revisely-today-mocks/revo/scripts/boards.py <screens folder>` puts them beside the
+  mocks (light or dark) in `revo/verify/`. On iOS a control's accessibility label stands for its text (a chip
+  is "Ask: …"): match by id, and an id is a regex (no bare `?`).
+- **Scenarios:** `harness/revoServer.js` serves the callables from the functions' own code against the
+  emulators (only the model is a stand-in), so `[REVO-23]` runs the app's real requests.
+- **The guide** (`functions/src/revo/guide.ts`, REVO-30): how Revisely works, for Revo, in the cached part of its
+  prompt: each rule in user words, where every screen and setting is, the steps for common tasks, what is for testers,
+  and what the app can't do with the closest way. **Change the guide in the same PR as a feature** (a rule, a screen, a
+  route, a label, a setting): `guide.test.ts` fails when BEHAVIOUR.md has a rule the guide doesn't cover (or list in
+  `GUIDE_INTERNAL` with why), or the guide names a route or a “label” the app no longer has (curly quotes mean the
+  app's exact text; plain quotes are examples). `functions/scripts/revo-guide-samples.js` asks the real model ~25
+  how-to questions and checks each answer's facts (`--dry` checks the requests; live needs the coach key). A changed
+  guide is a changed system prompt: deploy `revoAsk,revoDayInReview` and re-record (`scripts/record-anthropic.js`).
+- **Opening a screen** (`openScreen`, REVO-31): Revo's card can open Jump to…, Edit schedule, the memorized pages,
+  Activity, the daily log, Settings at a section, prayer times, the Qibla or the reader at a surah or juz
+  (`REVO_SCREENS`, the same list in `functions/src/revo/types.ts` and `src/lib/revo/types.ts`; `src/lib/revo/screens`
+  maps each to its route). A new screen goes in both lists, `screenTarget` and the guide's `SCREEN_HINTS`.
+
 ## Widgets (Home Screen, Lock Screen)
 
 `targets/widget/` (SwiftUI, WidgetKit), linked into the generated Xcode project on prebuild by
@@ -740,8 +1377,9 @@ To rotate one (or after a leak: revoke the old key in the portal first):
 - **Today** (small, medium; Lock Screen rectangular, circular, inline): today's pages, juz and
   surahs, pages left or done, the streak. Tap: `revisely://today` (the session), or `revisely://home`
   once done. **Verse of the day** (small, medium): a short verse from `verses.json`, the same for
-  everyone on a date, Arabic (Amiri, bundled in the extension) and the reference only (Saheeh
-  International isn't licensed, #80; The Clear Quran® is API-only). Tap: `revisely://read?page=N`.
+  everyone on a date, Arabic (Amiri, bundled in the extension) and the reference only (it predates
+  the licensed Saheeh International, #80, which could now be added with QuranEnc's credit and
+  version: a native change; The Clear Quran® is API-only). Tap: `revisely://read?page=N`.
   `scripts/widget-verses.ts` builds the list from api.alquran.cloud, as the verse sheet shows it.
   **Qibla** (small, Lock Screen circular): a fixed dial, north up, with the Kaaba at the bearing,
   "Qibla 58° NE" and the distance to Makkah. WidgetKit can't read the compass, so it doesn't turn
@@ -861,14 +1499,16 @@ classic default), and a fresh install starts in light.
     to `ActivityAll` (search, kind and date filters); none → one quiet line, no list, no
     "Earlier".
   - **Today's two lines** (`lib/todayLines`; the owner's option E, Nov 1 2026, mocks in
-    `~/Documents/revisely-today-mocks/`): "Starts at Al-Mujadila, p. 542 ›" over "20 pages · to
-    At-Tahrim · Juz 28"; in progress "Continue at <the first page not revised>, p. N ›" over a thin
-    bar and "6 of 20"; done "● Done · 20 pages" over "Adh-Dhariyat → Al-Hadid · Juz 27" (no ›, but
-    a tap still opens the menu); across the cycle's end "20 pages · then Al-Fatihah, p. 1"; carried
-    pages "20 pages · 4 from yesterday first". Pages are read in the session's order. The › sheet's
-    header holds the exact ranges. No-break spaces hold "p. 542 ›", "20 pages" and "Juz 28"
-    together and no-break hyphens hold surah names, so the › never stands alone and "Al-" never
-    ends a line. Each line is two lines at most (`maxFontSizeMultiplier` 1.6, then it shrinks to
+    `~/Documents/revisely-today-mocks/`; page numbers replaced by surahs and ayahs on Nov 7 2026,
+    below): "Starts at Al-Mujadila ›" (or "Starts at Al-Baqarah, ayah 142 ›" when the page begins
+    mid-surah; `placeOfPage`) over "20 pages · to At-Tahrim · Juz 28"; in progress "Continue at
+    <where the first page not revised begins> ›" over a thin bar and "6 of 20"; done "● Done · 20
+    pages" over "Adh-Dhariyat → Al-Hadid · Juz 27" (no ›, but a tap still opens the menu); across
+    the cycle's end "20 pages · then Al-Fatihah"; carried pages "20 pages · 4 from yesterday first".
+    Pages are read in the session's order. The › sheet's header holds the exact ranges, the surahs
+    first and the pages as a quiet detail ("Al-Mujadila to At-Tahrim · Juz 28 · pp. 542–561").
+    No-break spaces hold "ayah 142 ›", "20 pages" and "Juz 28" together and no-break hyphens hold
+    surah names, so the › never stands alone and "Al-" never ends a line. Each line is two lines at most (`maxFontSizeMultiplier` 1.6, then it shrinks to
     fit); the name and streak and the sheet's header stop at 1.4, and so does the greeting, which
     also keeps 12pt from the icons (about 1.05 on an iPhone SE).
   - Activity is a calendar (`activity/ActivityCalendar`): **a month by default**, ‹ › to step,
@@ -887,8 +1527,30 @@ classic default), and a fresh install starts in light.
     then 15, then 30) and Down / Up; running, a red bin (Discard), Pause and End. A timer's length
     can be typed: tap the clock or the length, a number pad, 1–480 minutes (`parseMinutes`); the
     card rises above the keyboard. "Open the Quran" is a small link where it applies.
-  - **No help.** No "?" or ⓘ buttons, guide sheets or first-run guides; a label or a subtitle says
-    what a control does (e.g. Keep daily amount).
+  - **Help, kept small** (Majd, Nov 8 2026: "helper buttons are good". This replaced the "No help"
+    rule). A label or a subtitle still says what a control does (e.g. Keep daily amount), and sheets
+    hold no paragraphs of explanation (the Mushaf picker's was removed, Nov 3 2026). On top of that,
+    the few screens that can't explain themselves get one ? (`components/help/HelpButton`; every
+    account since the November 2026 release set `HELP_FOR_EVERYONE` in `lib/help/availability`). They are on by default, new
+    account or not; only the user hides them (HELP-4: Majd, Nov 8 2026). Home's is in the Today post's header, the schedule editor's
+    before Save, the reader's a round button at the right of its header, and a session's the last
+    row of its ⋯ menu (its header is full), Activity's in its top bar before search (for the tab on
+    show: Overview or Insights), and a day's before +. It opens a `v2/Sheet` of at
+    most four topics, about two sentences each, then "Ask Revo ›" (only while Revo is on for the
+    account, `useRevoPresent`, so it follows Revo's release switch) and "Hide help buttons". Hiding
+    is one switch for every screen, kept on the phone per account; Settings → Support → Help buttons
+    turns it back on. BEHAVIOUR.md HELP-1 to HELP-3. No first-run guides,
+    tooltips, coach marks, or ⓘ beside single controls.
+    - **All help text is in `src/lib/help/topics.ts`.** Each topic lists the BEHAVIOUR.md rules it
+      explains (`covers`). `src/lib/help/__tests__/topics.test.ts` keeps a hash of each covered rule
+      in `reviewed.json` and fails when a rule changes until its topic is reviewed: read the topic
+      against the rule, fix the words, then `UPDATE_HELP_REVIEWED=1 npx jest src/lib/help`. A topic
+      no rule covers yet says why (`unruled`: the reader's gestures and player, the hidden page); the
+      check can't watch those, so a rule with a scenario for one turns it into `covers`.
+    - A change to something a topic describes (a label, a gesture, where a button is) updates the
+      topic in the same PR. `{{labels}}` must be text the app shows (the test checks `src/`).
+    - With Smart Tracking off, no topic mentions ratings or strength (`when`; HELP-3). The hidden
+      page's topic shows only where it's offered. Surahs and juz, never page numbers.
 - **Accents** (Settings → Appearance → Accent, a row like Theme: label on the left, the three pills
   on the right, swatches only on narrow screens or large text): **Indigo (the default)**, Crimson and Jade. The
   choice is the user doc's `accent` field (rules allow `indigo|crimson|jade`), so it follows the
@@ -907,6 +1569,27 @@ classic default), and a fresh install starts in light.
 - Fonts: SF Pro for Latin, Amiri for all Arabic. In a line that mixes them, put the Latin first
   and the Arabic last in a first-strong isolate (`⁨…⁩`): a line that starts with Arabic
   is laid out right to left (Insights' juz rows did).
+- **Surahs and juz first, page numbers almost never** (the owner, Nov 7 2026). People memorize by
+  surah and juz: "Your revision starts at page 288" means little, "Al-Baqarah" a lot. So the app
+  names any part of the Qur'an by its surahs and juz ("Al-Baqarah, ayahs 142–176", "Adh-Dhariyat 7
+  to Al-Hadid", "Juz 28"), never as "Pages 522–541", and every such name comes from `lib/passages`:
+  - `describePassage(pages, { form, juz, order, wholeJuz })`: long (rows, sentences) or short (chips,
+    chart labels: "Start of Al-Baqarah"); `juz: true` adds " · Juz 28" when it helps; `order:
+    'given'` keeps a session's order (the reverse plan, the cycle's end then its start).
+  - `form: 'compact'` drops the word "ayahs" ("Al-Mulk 1–12", sub-lines); `describePageRange`,
+    `describeSession` (SESS-5: whole juz only on the juz plan), `placeOfPage` ("Starts at
+    Al-Baqarah, ayah 142"), `ayahsInSurah` ("Ayahs 142–252", for a row already named by its surah),
+    `pagesNote` ("p. 542") and `plainText` / `spokenText` (notifications and tests / VoiceOver).
+    The text holds names together with no-break hyphens and spaces: in tests compare `plainText`.
+  - Where it shows (NAME-1 in BEHAVIOUR.md): Home's Today post, catch-up line, recent sessions and
+    See all (`lib/activityItems`), the session's header, toast, end card and Keep going, the daily
+    log, the plan editor and schedule, the memorization manager's juz and hizb rows, Jump to, the
+    Read tab's recent pages, the widget snapshot (`lib/widgets/snapshot`). Reminders already named
+    surahs (`lib/reminders/copy`).
+  - Page numbers stay only as a quiet detail after the words where they help ("Al-Mujadila ·
+    p. 542"), inside the reader (the printed page is the reference there) and where the user
+    chooses by page (Jump to's Page tab, the plan's start-point Page tab, page grids, From and To).
+    Amounts are fine ("20 pages"). Approved mocks that lead with page numbers are overridden by this.
 - `theme.onAccent` is the text colour on an `accent` fill. Use it instead of `'#fff'`.
 - Following the system appearance needs `userInterfaceStyle: "automatic"` in app.config (now "light"):
   a native change for a versioned release. Until then Settings offers Light and Dark only
@@ -922,6 +1605,17 @@ classic default), and a fresh install starts in light.
   (`src/components/Backdrop.tsx`), rendered as the sheet's sibling, before it. Layout tests can't
   see this; `touchHandlingAncestor()` (`jest/scrollable.ts`) can. The long-verse fix of PR #20
   bounded the height correctly and still didn't scroll on a phone for this reason.
+- **One modal at a time on iOS** (BEHAVIOUR.md SHEET-1, Nov 9 2026). A modal asked to present while another
+  is up, or still being dismissed, is refused, and React Native then keeps the refused one's host over the
+  screen, invisible, taking every touch (the swipe between tabs still works: it is native). Home froze that way
+  when "A new update is ready" opened by itself over the Today menu. So `v2/Sheet` takes a turn
+  (`v2/modalTurn`): it waits while another sheet holds one and holds it until iOS reports it gone, with a 1 s
+  fallback that replaces a modal whose dismissal never reports. A sheet inside another modal's content is
+  presented by it and goes at once (`ModalNest`). `RevoSheetFrame` and `v2/ContextMenu` take turns the same
+  way. A raw `<Modal>` that coexists with sheets calls `useModalHold(visible)` (and wraps its content in
+  `ModalNest` if sheets open inside it). The scenario harness's Modal refuses as iOS does, and a tap on the
+  screen under it then fails (`harness/modal.tsx`); a test that reports `onDismiss` itself lets the sheet's
+  closing animation end first, as iOS would.
 - Check sheets and menus at the largest Dynamic Type size (`xcrun simctl ui <udid> content_size
   accessibility-extra-extra-extra-large`) and on an SE-size simulator. Chrome text (headers, menu
   rows, credits) caps growth with `maxFontSizeMultiplier`; reading text doesn't.

@@ -1,0 +1,18 @@
+# Taps the log's text field. On iOS a multiline field's testID doesn't reach the
+# accessibility tree, so it is found by its label ("Note"), under the kind pills.
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          text: "Note.*"
+          below:
+            id: journal-kind
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - tapOn:
+          id: journal-text-input

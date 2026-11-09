@@ -74,10 +74,17 @@ export interface User {
   carryOverMode?: 'shift' | 'add';
   // The new design's accent (Settings → Appearance → Accent); unset = Indigo.
   accent?: 'indigo' | 'crimson' | 'jade';
+  /** The last "What's new" release this account finished, or set up on (lib/help/whatsNew, NEW-1). */
+  whatsNewSeen?: string;
   // Pages carried into one revision day. They go first that day and replace its
   // first `skip` scheduled pages (the ones the shift moved back). Only applies
   // while `day` is the revision day.
-  carryOver?: { day: string; pages: number[]; skip?: number } | null;
+  /**
+   * Who put the pages there: 'insights' for "Revise these first tomorrow" (absent: the schedule's own).
+   * `next`: the next day's pages put there that way while this day's carry still applies (read with
+   * carryOverOn, lib/algorithm), so saving tomorrow's never drops today's.
+   */
+  carryOver?: { day: string; pages: number[]; skip?: number; source?: 'insights' | null; from?: Record<string, string>; next?: { day: string; pages: number[]; source?: 'insights' | null } | null } | null;
   // Pages the whole schedule has been moved back by carry-overs; every day reads
   // its pages this many earlier in the cycle. Reset when a plan is saved.
   scheduleShiftPages?: number;
@@ -101,6 +108,9 @@ export interface CustomPlan {
   /** Which direction the user generated the plan from — useful for re-rendering
    *  the editor in the same orientation. */
   direction: 'forward' | 'reverse';
+  /** Its name (SCHED-7): the saved plan it was loaded from, or the name given with "Save current
+   *  plan…". Absent when it has none: the Schedule screen calls it "Custom plan". */
+  name?: string;
 }
 
 /** A reusable, named schedule the user saved to switch between later. Stores
@@ -128,6 +138,11 @@ export interface UserPage {
   lastRevisedDate: string | null;
   totalRevisionCount: number;
   skipCount: number;                // times scheduled but not revised
+  /**
+   * A partly memorized page (status 'in_progress', Firestore's 'learning'): its memorized ayahs,
+   * as sura × 1000 + ayah (lib/memorizedAyahs). Meaningless on any other status.
+   */
+  verses?: number[] | null;
 }
 
 // A revision session log
@@ -143,19 +158,43 @@ export interface RevisionLog {
   pagesSkipped: number[];
   weaknessUpdates: { page: number; rating: number }[];
   durationMinutes: number | null;
+  // Pages revised in this session but credited to a later day (lib/aheadCredit).
+  ahead?: Record<string, number[]>;
 }
 
 // One day in the user's personal memorization/revision journal. Free-form text
 // on purpose — huffaz already have their own shorthand ("1/2 p3", "4L p4",
 // "5p Maryam + Taha") and the journal should record it as written.
+export type JournalKind = 'memorization' | 'revision' | 'note';
+
+/**
+ * One timestamped line in a day's log: written at `at` (ms since epoch), made
+ * on the phone, kept as it was written (an edit changes its text, not its time).
+ */
+export interface JournalNote {
+  id: string;
+  at: number;
+  kind: JournalKind;
+  text: string;
+  minutes: number | null;
+  /** The item this note hangs off (Activity spec section 2): `revision:<day>`, `memorization:<day>`, `read:<id>`. */
+  tag?: string | null;
+}
+
+/**
+ * A revision day's log. `entries` are the day's notes, oldest first; the
+ * memorization / revision / notes fields and minutes are summaries of them
+ * (see journalDayFromEntries), so the day-level views read them as before.
+ */
 export interface JournalEntry {
-  date: string;                     // YYYY-MM-DD, also the document ID
+  date: string;                     // YYYY-MM-DD
+  entries: JournalNote[];
   memorization: string;
   memorizationMinutes: number | null;
   revision: string;
   revisionMinutes: number | null;
   notes: string;
-  /** Last save time (ms since epoch); undefined for unsaved drafts. */
+  /** Last entry time (ms since epoch); undefined when the day has none. */
   updatedAt?: number;
 }
 

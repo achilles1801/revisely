@@ -11,6 +11,7 @@ type IconName = keyof typeof Ionicons.glyphMap;
  * The new design's button, a pill:
  *   solid   → black (white in dark), the one primary action of a row or screen;
  *   outline → a hairline pill, a secondary action.
+ * `destructive` makes a solid pill red (redFill, onRedFill): an action that deletes.
  */
 export function PillButton({
   title,
@@ -20,6 +21,7 @@ export function PillButton({
   icon,
   disabled,
   busy,
+  destructive,
   accessibilityLabel,
   style,
   testID,
@@ -32,13 +34,15 @@ export function PillButton({
   icon?: IconName;
   disabled?: boolean;
   busy?: boolean;
+  destructive?: boolean;
   accessibilityLabel?: string;
   style?: StyleProp<ViewStyle>;
   testID?: string;
 }) {
   const { palette } = useTheme();
   const solid = variant === 'solid';
-  const fg = solid ? palette.onPrimary : palette.text;
+  const red = solid && destructive;
+  const fg = red ? palette.onRedFill : solid ? palette.onPrimary : palette.text;
   return (
     <Tap
       onPress={onPress}
@@ -50,7 +54,7 @@ export function PillButton({
         styles.base,
         styles[size],
         solid
-          ? { backgroundColor: palette.primary }
+          ? { backgroundColor: red ? palette.redFill : palette.primary }
           : { borderWidth: 1, borderColor: palette.outline },
         disabled && { opacity: 0.4 },
         style,

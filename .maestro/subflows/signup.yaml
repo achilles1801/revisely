@@ -1,0 +1,47 @@
+# Signs up with email and password (the Auth emulator), on to onboarding.
+# Leaves the address in output.email.
+appId: com.revisionbuddy.app
+---
+- evalScript: ${output.email = 'e2e' + Date.now() + '@example.com'}
+# Sign up (a tap made while the screen settles can be lost: check it took).
+- retry:
+    maxRetries: 2
+    commands:
+      - runFlow:
+          when:
+            notVisible:
+              id: auth-name
+          commands:
+            - tapOn:
+                id: auth-switch-mode
+      - extendedWaitUntil:
+          visible:
+            id: auth-name
+          timeout: 10000
+- tapOn:
+    id: auth-name
+- inputText: E2E
+- tapOn:
+    id: auth-email
+- inputText: ${output.email}
+- tapOn:
+    id: auth-password
+- inputText: e2e-password
+- tapOn:
+    id: auth-confirm-password
+- inputText: e2e-password
+# Maestro's hideKeyboard can't dismiss it here: a tap on the title does. The form moves as the
+# keyboard goes (a KeyboardAvoidingView): wait for it to stop, or the tap lands where Sign up was.
+# On iOS in run 42573714262 (04) the tap reached the window and no sign-up reached the Auth emulator.
+- tapOn:
+    id: auth-title
+- waitForAnimationToEnd
+- tapOn:
+    id: auth-submit
+# SYNC-4: the new account loads at once, with no relaunch. (Asserted by the
+# caller: 01-onboarding fails on it; other flows go on, see new-account.yaml.)
+- extendedWaitUntil:
+    visible:
+      id: welcome
+    timeout: 60000
+    optional: true

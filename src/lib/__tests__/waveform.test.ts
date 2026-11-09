@@ -9,6 +9,8 @@ import {
   hasLevels,
   LEVELS_PER_SEGMENT,
   normalizeBars,
+  barCountFor,
+  barHeight,
   playedBarCount,
   playedFraction,
   waveformBars,
@@ -94,7 +96,7 @@ describe('cleanLevels (read back from the index)', () => {
 describe('waveformBars (a recording across its segments)', () => {
   it('one segment with as many levels as bars: the levels, normalised to the loudest', () => {
     const bars = waveformBars([{ durationMs: 4000, levels: [20, 40, 80, 40] }], 4);
-    expect(bars).toEqual([0.25, 0.5, 1, 0.5]);
+    [0.25, 0.5, 1, 0.5].forEach((v, i) => expect(bars[i]).toBeCloseTo(v * 0.9));
   });
 
   it('segments take the share of bars their length gives them', () => {
@@ -106,18 +108,18 @@ describe('waveformBars (a recording across its segments)', () => {
       ],
       4,
     );
-    expect(bars.slice(0, 3)).toEqual([1, 1, 1]);
-    expect(bars[3]).toBeCloseTo(30 / 90);
+    expect(bars.slice(0, 3)).toEqual([0.9, 0.9, 0.9]);
+    expect(bars[3]).toBeCloseTo((30 / 90) * 0.9);
   });
 
   it('more levels than bars: the loudest under each bar', () => {
     const bars = waveformBars([{ durationMs: 1000, levels: [10, 60, 20, 40] }], 2);
-    expect(bars[0]).toBe(1);
-    expect(bars[1]).toBeCloseTo(40 / 60);
+    expect(bars[0]).toBeCloseTo(0.9);
+    expect(bars[1]).toBeCloseTo((40 / 60) * 0.9);
   });
 
   it('fewer levels than bars: each level spans its bars', () => {
-    expect(waveformBars([{ durationMs: 1000, levels: [50, 100] }], 4)).toEqual([0.5, 0.5, 1, 1]);
+    expect(waveformBars([{ durationMs: 1000, levels: [50, 100] }], 4)).toEqual([0.45, 0.45, 0.9, 0.9]);
   });
 
   it('a segment without levels (older, or restored from the backup) is null there, never made up', () => {
@@ -128,7 +130,7 @@ describe('waveformBars (a recording across its segments)', () => {
       ],
       4,
     );
-    expect(bars).toEqual([null, null, 0.5, 1]);
+    expect(bars).toEqual([null, null, 0.45, 0.9]);
   });
 
   it('no levels at all: every bar null (drawn flat)', () => {
@@ -141,13 +143,32 @@ describe('waveformBars (a recording across its segments)', () => {
 
   it('near-silence is not blown up to full height', () => {
     const bars = waveformBars([{ durationMs: 1000, levels: [3, 6] }], 2);
-    expect(bars[1]).toBeCloseTo(0.2);
+    expect(bars[1]).toBeCloseTo(0.18);
+  });
+});
+
+describe('voice bars', () => {
+  it('3 wide, 3 apart: one bar per 6pt of width', () => {
+    expect(barCountFor(318 - 6 - 14 - 36 - 10 - 38 - 10)).toBe(34);
+    expect(barCountFor(3)).toBe(1);
+    expect(barCountFor(0)).toBe(0);
+    expect(barCountFor(Number.NaN)).toBe(0);
+  });
+  it('height 3 + (max − 3) × level^1.1; under 0.1 (or no level) a dot', () => {
+    expect(barHeight(1, 26)).toBe(26);
+    expect(barHeight(0.5, 24)).toBeCloseTo(3 + 21 * 0.5 ** 1.1, 0);
+    expect(barHeight(0.09, 26)).toBe(3);
+    expect(barHeight(null, 26)).toBe(3);
+    expect(barHeight(Number.NaN, 26)).toBe(3);
+    // Louder is taller, never past the max.
+    expect(barHeight(0.6, 26)).toBeGreaterThan(barHeight(0.3, 26));
+    expect(barHeight(3, 26)).toBe(26);
   });
 });
 
 describe('normalizeBars', () => {
-  it('scales the loudest to 1, keeping nulls', () => {
-    expect(normalizeBars([0.2, null, 0.4])).toEqual([0.5, null, 1]);
+  it('scales the loudest to 0.9 (recitation is loud throughout: not a barcode of full bars), keeping nulls', () => {
+    expect(normalizeBars([0.2, null, 0.4])).toEqual([0.45, null, 0.9]);
   });
   it('all null or silent stays so', () => {
     expect(normalizeBars([null, null])).toEqual([null, null]);

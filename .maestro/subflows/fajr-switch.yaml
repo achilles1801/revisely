@@ -1,0 +1,25 @@
+# Settings → Start day at fajr, switched (with the location the simulator has),
+# then back to Home. RESETS: what the row then says ("Resets at 5:2… AM" or
+# "Resets at midnight"), as a regex.
+appId: com.revisionbuddy.app
+---
+- tapOn:
+    id: open-settings
+# Centred (on iOS Maestro counts a row cut off by the tab bar as visible).
+- runFlow:
+    file: settings-row.yaml
+    env:
+      ROW: fajr-boundary-switch
+- tapOn:
+    id: fajr-boundary-switch
+- extendedWaitUntil:
+    visible:
+      id: fajr-resets-at
+      text: ${RESETS}
+    timeout: 15000
+- tapOn:
+    id: back
+- extendedWaitUntil:
+    visible:
+      id: today-post
+    timeout: 10000

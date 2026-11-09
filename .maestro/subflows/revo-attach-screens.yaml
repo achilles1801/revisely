@@ -1,0 +1,202 @@
+# Revo's Add to chat, screen by screen as the approved mocks show them (a1–a7 in
+# ~/Documents/revisely-today-mocks/revo/attach), from Revo's sheet open on its greeting with
+# nothing attached; leaves it the same way. Each screenshot is named after its mock, with SUFFIX
+# ("" in light, "-dark" in dark).
+#   env SUFFIX: "" or "-dark"
+appId: com.revisionbuddy.app
+---
+# a1: at rest, Surahs in mushaf order, a line of the account's data on each row.
+- tapOn:
+    id: revo-plus
+- extendedWaitUntil:
+    visible:
+      id: revo-add-sheet
+    timeout: 10000
+- extendedWaitUntil:
+    visible:
+      id: revo-add-surah-1
+    timeout: 10000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: a1-sheet${SUFFIX}
+
+# a2: ayahs typed as people say them: those ayahs, the surah, its juz.
+- tapOn:
+    id: revo-add-search
+- inputText: "Al-Hashr 1-10"
+# By id, under its "Ayahs" header: on iOS a row is one checkbox, and Maestro matches its value
+# ("checkbox, unchecked"), not its label ("Al-Hashr, ayahs 1–10. …", what VoiceOver reads).
+- extendedWaitUntil:
+    visible:
+      id: revo-add-result-0
+    timeout: 5000
+- assertVisible: "Ayahs"
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: a2-search${SUFFIX}
+
+# a3: a weekday: the last four.
+- tapOn:
+    id: revo-add-search-clear
+- inputText: "Tuesday"
+- extendedWaitUntil:
+    visible:
+      id: revo-add-result-0
+    timeout: 5000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: a3-search-day${SUFFIX}
+- tapOn:
+    id: revo-add-search-clear
+# The keyboard away: hideKeyboard on Android; on iOS the keyboard's Search key (Maestro's
+# hideKeyboard there taps the list and ticked a surah).
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - pressKey: Enter
+
+# a4: Days, October: Tue 20 added, Tue 27 previewed.
+- tapOn:
+    id: pill-days
+- tapOn:
+    id: revo-add-month-prev
+- tapOn:
+    id: revo-add-day-2026-10-20
+- tapOn:
+    id: revo-add-day
+- extendedWaitUntil:
+    visible:
+      id: revo-add-day-added-2026-10-20
+    timeout: 5000
+- tapOn:
+    id: revo-add-day-2026-10-27
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: a4-days${SUFFIX}
+
+# a5: several: Tue 27 Oct, Al-Hashr and Juz 28 (Tue 20 Oct taken away again), on Juz.
+- tapOn:
+    id: revo-add-day
+- tapOn:
+    id: revo-context-remove
+    index: 0
+- tapOn:
+    id: revo-add-search
+- inputText: "Al-Hashr"
+- tapOn:
+    id: revo-add-surah-59
+- tapOn:
+    id: revo-add-search-clear
+# The keyboard away: hideKeyboard on Android; on iOS the keyboard's Search key (Maestro's
+# hideKeyboard there taps the list and ticked a surah).
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - pressKey: Enter
+# Juz opens on the account's own juz (28), a few rows above it in view.
+- tapOn:
+    id: pill-juz
+- extendedWaitUntil:
+    visible:
+      id: revo-add-juz-28
+    timeout: 10000
+- tapOn:
+    id: revo-add-juz-28
+- extendedWaitUntil:
+    visible:
+      id: revo-add-juz-28-on
+    timeout: 5000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: a5-multi${SUFFIX}
+
+# a6: Pages: Juz 28's grid, Al-Hashr 17–24 (548–551) picked.
+- tapOn:
+    id: pill-pages
+- tapOn:
+    id: revo-add-page-548
+- tapOn:
+    id: revo-add-page-551
+- extendedWaitUntil:
+    visible:
+      id: revo-add-pages-summary
+    timeout: 5000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: a6-pages${SUFFIX}
+
+# a7: back in Revo, the three as chips above the question.
+- tapOn:
+    id: revo-add-done
+- extendedWaitUntil:
+    visible:
+      id: revo-input
+    timeout: 5000
+- tapOn:
+    id: revo-input
+- inputText: "Should I revise Al-Hashr now or later?"
+# The keyboard away: hideKeyboard on Android; on iOS a tap on Revo's message, which is no control
+# (the composer's return key would send the question): the greeting, or in the evening the Day in
+# review that took its place (the dark pass).
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: "revo-greeting|revo-answer"
+          index: 0
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: a7-composer${SUFFIX}
+
+# As it was: nothing attached, nothing typed.
+- tapOn:
+    id: revo-input
+- eraseText: 60
+# The keyboard away: hideKeyboard on Android; on iOS a tap on Revo's message, which is no control
+# (the composer's return key would send the question): the greeting, or in the evening the Day in
+# review that took its place (the dark pass).
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: "revo-greeting|revo-answer"
+          index: 0
+- repeat:
+    while:
+      visible:
+        id: revo-context-remove
+    times: 4
+    commands:
+      - tapOn:
+          id: revo-context-remove

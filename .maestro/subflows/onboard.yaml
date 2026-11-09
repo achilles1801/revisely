@@ -1,0 +1,142 @@
+# Onboarding as a user does it: in progress, Juz 30 marked memorized (pages
+# 582–604) beside Al-Fatihah (page 1, marked for you): 24 pages. 10 pages a
+# day (the default), the day resetting at BOUNDARY (midnight | fajr). The days
+# (SCHED-1): 1, 582–590 | 591–600 | 601–604, 1, 582–586 | 587–596 …
+# For fajr, set the location first (setLocation) and launch with location allowed.
+appId: com.revisionbuddy.app
+---
+- tapOn:
+    id: welcome-begin
+- tapOn:
+    id: journey-in_progress
+- tapOn:
+    id: journey-continue
+- extendedWaitUntil:
+    visible:
+      id: juz-selection
+    timeout: 10000
+# The list by juz (a tap made while the screen is still settling can be lost: check it took).
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          id: pill-juz
+      - assertVisible:
+          id: pill-juz
+          text: "Juz, selected"
+- scrollUntilVisible:
+    element:
+      id: juz-30-check
+    direction: DOWN
+    timeout: 30000
+# Juz 30 is the last row: on to the end of the list, where it sits above the count and
+# Continue. On iOS Maestro reads an element's whole frame, so a row cut off by the list's foot
+# counts as visible, and every tap on it landed on the foot instead (09 on iOS, Nov 7 2026).
+- scroll
+# The check, once the screen has its starting count ("1 of 604": in progress
+# starts from page 1), which comes when the account's pages have loaded: a juz
+# marked before then was dropped when they arrived (fixed in #216).
+- extendedWaitUntil:
+    visible:
+      id: juz-selection-summary
+      text: "[1-9][0-9]* of 604 pages memorized"
+    timeout: 30000
+# Tapped while the check itself reads unchecked, and again only if a tap was
+# lost: a tap toggles it. The count is no guide here: it counts only the pages
+# the account has loaded, and once lagged behind a check that had taken, so
+# re-tapping on it turned Juz 30 off again (E2E, Nov 5 2026).
+# Its state reads as the value on iOS ("checkbox, checked") and as `checked` on
+# Android.
+- retry:
+    maxRetries: 2
+    commands:
+      - runFlow:
+          when:
+            platform: iOS
+            visible:
+              id: juz-30-check
+              text: "checkbox, unchecked"
+          commands:
+            - tapOn:
+                id: juz-30-check
+                retryTapIfNoChange: false
+      - runFlow:
+          when:
+            platform: Android
+            visible:
+              id: juz-30-check
+              checked: false
+          commands:
+            - tapOn:
+                id: juz-30-check
+                retryTapIfNoChange: false
+      - runFlow:
+          when:
+            platform: iOS
+          commands:
+            - extendedWaitUntil:
+                visible:
+                  id: juz-30-check
+                  text: "checkbox, checked"
+                timeout: 5000
+      - runFlow:
+          when:
+            platform: Android
+          commands:
+            - extendedWaitUntil:
+                visible:
+                  id: juz-30-check
+                  checked: true
+                timeout: 5000
+# Then the count: Juz 30's 23 pages and page 1.
+- extendedWaitUntil:
+    visible:
+      id: juz-selection-summary
+      text: "24 of 604 pages memorized"
+    timeout: 30000
+# Continue waits for the account's pages (a new account's arrive in two
+# batches): until then it reads "Loading your pages…" and is disabled, even
+# with the count at 24 (ONBOARD-1 counts a juz before its pages arrive). A tap
+# then did nothing (E2E run 42124077552, Nov 5 2026).
+- extendedWaitUntil:
+    visible:
+      id: juz-continue
+      text: "Continue"
+      enabled: true
+    timeout: 30000
+- tapOn:
+    id: juz-continue
+# As long as the other screens here get: the schedule had come up, but the CI
+# Simulator stalled for 20 s just after the tap (every process on it went
+# quiet), so the one look a 10 s wait had came back without it (run 42169518547).
+- extendedWaitUntil:
+    visible:
+      id: schedule
+    timeout: 30000
+- assertVisible:
+    id: schedule-amount
+    text: "10"
+# When the day resets. "At fajr" is the default, so a lost tap here left the
+# account on fajr and 04's first switch in Settings then turned it off (E2E,
+# Nov 5 2026): tapped until the pill reads selected (a selected pill ignores a tap).
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          id: pill-${BOUNDARY}
+      - extendedWaitUntil:
+          visible:
+            id: pill-${BOUNDARY}
+            text: ".*, selected"
+          timeout: 3000
+- tapOn:
+    id: schedule-start
+- extendedWaitUntil:
+    visible:
+      id: today-post
+    timeout: 30000
+# Juz 30 memorized (24 pages, 4.0%): what onboarding saved, on Home.
+- extendedWaitUntil:
+    visible:
+      text: ".*4.0% of the Quran memorized.*"
+    timeout: 15000

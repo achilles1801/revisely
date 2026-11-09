@@ -1,0 +1,101 @@
+# Offline: a session revised with no connection is kept on the phone, survives a
+# cold start offline, and reaches the server once the phone is back online.
+# Rules (BEHAVIOUR.md): SYNC-1, SYNC-2, SESS-3
+appId: com.revisionbuddy.app
+---
+# Chicago, as the phone's position: Home's next-prayer line (Asr 2:18 PM in 06-home-offline) is worked
+# out from it. The flow had it only from 04's setLocation when 04 ran before it in the same job; in a job
+# without 04 the emulator had no position, the line was missing, and the screenshot differed (develop's
+# run 42662769247 and #217's 42662790506, Android "05 06 09-revo 11"). A flow sets what it shows.
+- setLocation:
+    latitude: 41.88
+    longitude: -87.63
+- runFlow:
+    file: ../subflows/new-account.yaml
+    env:
+      CLOCK: 2026-11-03T12:00
+      BOUNDARY: midnight
+
+- runFlow:
+    file: ../subflows/network.yaml
+    env:
+      OFFLINE: 1
+- extendedWaitUntil:
+    visible:
+      id: offline-note
+    timeout: 30000
+
+# Three pages (1, 582, 583), offline.
+- runFlow:
+    file: ../subflows/open-session.yaml
+    env:
+      QUIET: "Juz 1 · 0/10"
+- runFlow:
+    file: ../subflows/swipe-pages.yaml
+    env:
+      UNTIL: 3/10
+- runFlow: ../subflows/show-controls.yaml
+- tapOn: "Back"
+# SYNC-1: the phone's copy shows it at once, and says it waits to sync.
+- extendedWaitUntil:
+    visible:
+      id: today-title
+      text: "Continue at An.Nazi.at, ayah.16[^0-9]*"
+    timeout: 10000
+- assertVisible:
+    id: offline-note
+    text: ".*changes are saved on this phone.*"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 06-home-offline
+- runFlow:
+    file: ../subflows/server-session-is.yaml
+    env:
+      DAY: 2026-11-03
+      PAGES: -1
+
+# SYNC-2: a cold start, still offline, shows the account with the change.
+- runFlow: ../subflows/relaunch.yaml
+- extendedWaitUntil:
+    visible:
+      id: today-title
+      text: "Continue at An.Nazi.at, ayah.16[^0-9]*"
+    timeout: 20000
+- assertVisible:
+    id: offline-note
+
+# SYNC-1: back online, the change reaches the server.
+- runFlow:
+    file: ../subflows/network.yaml
+    env:
+      OFFLINE: 0
+- extendedWaitUntil:
+    notVisible:
+      id: offline-note
+    timeout: 90000
+    optional: true
+# On a slow CI simulator, Firestore can take longer than that to reconnect. The
+# app restarts it when it comes back to the front (lib/offline/connectivity), as
+# a user would bring it: do that, and say so in the log.
+- runFlow:
+    when:
+      visible:
+        id: offline-note
+    commands:
+      - evalScript: "${console.log('WARNING SYNC-1 - still offline 90 s after the connection came back; bringing the app to the front again')}"
+      - pressKey: home
+      - launchApp:
+          stopApp: false
+      - extendedWaitUntil:
+          notVisible:
+            id: offline-note
+          timeout: 60000
+- runFlow:
+    file: ../subflows/server-session-is.yaml
+    env:
+      DAY: 2026-11-03
+      PAGES: 3
+- assertVisible:
+    id: today-title
+    text: "Continue at An.Nazi.at, ayah.16[^0-9]*"

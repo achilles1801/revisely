@@ -218,6 +218,8 @@ async function main() {
     totalPagesRevisedAllTime: totalPagesRevised,
 
     onboardingComplete: true,
+    // Never shown "What's new" (src/lib/help/whatsNew.ts SEEN_ALL).
+    whatsNewSeen: 'all',
     memorizedSurahs: [],
     fajrBoundaryEnabled: false,
     scheduleAnchorDate: SCHEDULE_ANCHOR.toISOString(),

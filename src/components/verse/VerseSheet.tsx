@@ -25,8 +25,16 @@ import { Tap } from '../v2/Tap';
 import { PillButton } from '../v2/PillButton';
 import { getSurahDisplay } from '../../lib/quranData';
 import {
+  ARABIC_CREDIT,
+  creditLine,
+  DEFAULT_TRANSLATION_ID,
   getVerseText,
+  fallbackTranslation,
+  hasArabicForPage,
+  hasTranslationSura,
   isTranslationAvailable,
+  nameWithLanguage,
+  offeredTranslations,
   pickerTitle,
   CLEAR_QURAN_ID,
   resolveTranslation,
@@ -36,9 +44,12 @@ import {
   VerseText,
 } from '../../lib/translation';
 import { clearQuranErrorHint, clearQuranSegments } from '../../lib/clearQuran';
+import { hasSaheehSura, saheehFootnotes, saheehSegments } from '../../lib/saheeh';
+import { knownOffline, onNetworkState } from '../../lib/networkState';
 import { nextVerse, previousVerse } from '../../lib/verses';
 import { resolveVoice, voiceLabel } from '../../lib/recitation';
 import { ReciterList } from './ReciterList';
+import { TranslationPicker } from './TranslationPicker';
 import { AyahRef } from '../../lib/ayahBounds';
 
 interface VerseSheetProps {
@@ -46,6 +57,10 @@ interface VerseSheetProps {
   verse: AyahRef | null;
   translationId: string | undefined;
   onChangeTranslation: (id: string) => void;
+  /** The picker offers every translation (lib/translationsOffered: any account), else the short list. */
+  everyTranslation?: boolean;
+  /** The account: the picker's favorites are kept on the phone for each. */
+  accountId?: string;
   /** Reciter and style for Play ('<reciter>:<style>'). */
   reciter: string | undefined;
   onChangeReciter: (choice: string) => void;
@@ -125,6 +140,8 @@ export function VerseSheet({
   verse,
   translationId,
   onChangeTranslation,
+  everyTranslation = false,
+  accountId,
   reciter,
   onChangeReciter,
   onNavigate,
@@ -134,7 +151,8 @@ export function VerseSheet({
   const styles = useMemo(() => makeStylesV2(palette), [palette]);
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [attempt, setAttempt] = useState(0);
-  const [menu, setMenu] = useState<'closed' | 'root' | 'translations' | 'reciters'>('closed');
+  // 'translations' is the short list; 'picker' the picker of every translation.
+  const [menu, setMenu] = useState<'closed' | 'root' | 'translations' | 'picker' | 'reciters'>('closed');
   const translation = resolveTranslation(translationId);
   const [expanded, setExpanded] = useState(false);
   // Where the "…" menu opens: under the header, however tall large text makes it.
@@ -154,6 +172,19 @@ export function VerseSheet({
   onCloseRef.current = onClose;
   const visibleRef = useRef(verse != null);
   visibleRef.current = verse != null;
+  // The connection: what an error says follows it, and a verse that couldn't
+  // load is tried again when it comes back.
+  const [, setNetworkChanges] = useState(0);
+  const failedRef = useRef(false);
+  useEffect(
+    () =>
+      onNetworkState((now, before) => {
+        if (!visibleRef.current) return;
+        setNetworkChanges((n) => n + 1);
+        if (now.connected && before?.connected !== true && failedRef.current) setAttempt((a) => a + 1);
+      }),
+    [],
+  );
   const reduceMotion = useReduceMotion();
 
   // The drag, on the UI thread: the sheet follows the finger down.
@@ -273,6 +304,20 @@ export function VerseSheet({
   }
   const prev = verse ? previousVerse(verse) : null;
   const next = verse ? nextVerse(verse) : null;
+  failedRef.current = view.status === 'error';
+  // Offline, with this page's Arabic here: the translation is what's missing, and another one on the
+  // phone can show the verse (TRANS-7): the same language first, then Saheeh International.
+  const offline = view.status === 'error' && knownOffline();
+  const arabicHere = offline && !!verse && hasArabicForPage(verse.page);
+  const alternative =
+    arabicHere && verse
+      ? fallbackTranslation(translation, verse.sura, offeredTranslations(everyTranslation), (t, sura) =>
+          t.id === DEFAULT_TRANSLATION_ID ? hasSaheehSura(sura) : hasTranslationSura(t, sura),
+        )
+      : null;
+  const notDownloaded = arabicHere && translation.source === 'quranenc' && translation.id !== DEFAULT_TRANSLATION_ID;
+  // Urdu, Persian, Kurdish, Pashto, Uyghur, N'Ko: the translation reads right to left.
+  const rtl = translation.direction === 'rtl';
 
   return (
     <Modal visible={verse != null} transparent animationType="slide" onRequestClose={onClose}>
@@ -282,7 +327,12 @@ export function VerseSheet({
         <Backdrop onPress={onClose} label="Close translation" />
         <Reanimated.View style={dragged}>
           <View
-            style={[styles.sheet, { maxHeight, paddingBottom: Math.max(insets.bottom, spacing.md) }]}
+            style={[
+              styles.sheet,
+              { maxHeight, paddingBottom: Math.max(insets.bottom, spacing.md) },
+              // The picker fills the expanded sheet, however short the verse is.
+              menu === 'picker' && { minHeight: maxHeight },
+            ]}
             onLayout={(e) => {
               setSheetHeight(e.nativeEvent.layout.height);
               sheetH.value = e.nativeEvent.layout.height;
@@ -373,6 +423,7 @@ export function VerseSheet({
                       accessibilityRole="button"
                       accessibilityLabel="More"
                       accessibilityState={{ expanded: menu !== 'closed' }}
+                      testID="verse-more"
                     >
                       <Ionicons name="ellipsis-horizontal" size={22} color={palette.text} />
                     </Tap>
@@ -380,7 +431,21 @@ export function VerseSheet({
                 </View>
               </GestureDetector>
 
-              {menu !== 'closed' && (
+              {menu === 'picker' && (
+                // Every translation, by language: over the verse, under the header.
+                <View style={[styles.pickerPanel, { top: headerBottom, bottom: Math.max(insets.bottom, spacing.md) }]}>
+                  <TranslationPicker
+                    translations={offeredTranslations(everyTranslation)}
+                    chosenId={translation.id}
+                    accountId={accountId}
+                    onChoose={(id) => {
+                      onChangeTranslation(id);
+                      setMenu('closed');
+                    }}
+                  />
+                </View>
+              )}
+              {menu !== 'closed' && menu !== 'picker' && (
                 // A flat panel in the sheet, not a second modal (iOS can't stack one
                 // over a sheet that is itself a modal).
                 <View style={[styles.dropdown, { top: headerBottom }]} testID="verse-menu-panel">
@@ -388,9 +453,17 @@ export function VerseSheet({
                     <>
                       <Tap
                         style={styles.dropRow}
-                        onPress={() => setMenu('translations')}
+                        onPress={() => {
+                          if (everyTranslation) {
+                            setMenu('picker');
+                            setExpanded(true);
+                          } else {
+                            setMenu('translations');
+                          }
+                        }}
                         accessibilityRole="button"
                         accessibilityLabel={`Select translation, ${pickerTitle(translation)}`}
+                        testID="verse-select-translation"
                       >
                         <Ionicons name="language-outline" size={22} color={palette.text} />
                         <View style={v2Only.flex}>
@@ -458,17 +531,11 @@ export function VerseSheet({
                             <Text style={[typeV2.menu, { color: palette.text }]} maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
                               {pickerTitle(t)}
                             </Text>
-                            {t.credit ? (
-                              // Credited as in the sheet: the publisher's site.
-                              <Text style={styles.creditText} maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
-                                {available ? `${t.language} · ` : 'Not available yet · '}
-                                <Text style={styles.creditLink}>{t.credit.linkLabel}</Text>
-                              </Text>
-                            ) : (
-                              <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
-                                {available ? `${t.language} · ${t.author}` : `${t.author} · not available yet`}
-                              </Text>
-                            )}
+                            {/* Credited as in the sheet: the source's site. */}
+                            <Text style={styles.creditText} maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
+                              {available ? `${t.language} · ` : 'Not available yet · '}
+                              <Text style={styles.creditLink}>{t.credit.linkLabel}</Text>
+                            </Text>
                           </View>
                           {chosen && <Ionicons name="checkmark" size={20} color={palette.text} />}
                         </Tap>
@@ -484,7 +551,36 @@ export function VerseSheet({
               )}
               {view.status === 'error' && (
                 <View style={styles.center} testID="verse-error">
-                  {translation.id === CLEAR_QURAN_ID ? (
+                  {translation.id === CLEAR_QURAN_ID && arabicHere ? (
+                    // Offline: kept only as read (its terms), so a verse not read before can't
+                    // show. Saheeh International can, once it's on the phone; only if chosen.
+                    <>
+                      <Text style={[typeV2.name, v2Only.centerText, { color: palette.text }]} testID="verse-offline">
+                        The Clear Quran® needs the internet
+                      </Text>
+                      <Text style={[typeV2.meta, v2Only.centerText, { color: palette.secondary }]}>
+                        {alternative
+                          ? `${nameWithLanguage(alternative)} is available offline.`
+                          : "Verses you've read before show offline. Try again once you're online."}
+                      </Text>
+                    </>
+                  ) : notDownloaded ? (
+                    // A QuranEnc translation with this sura not on the phone (TRANS-7).
+                    <>
+                      <Text style={[typeV2.name, v2Only.centerText, { color: palette.text }]} testID="verse-offline">
+                        This translation isn't downloaded
+                      </Text>
+                      <Text style={[typeV2.meta, v2Only.centerText, { color: palette.secondary }]}>
+                        {alternative
+                          ? `${nameWithLanguage(alternative)} is available offline.`
+                          : 'Download it from Select translation to read it offline.'}
+                      </Text>
+                    </>
+                  ) : offline ? (
+                    <Text style={[typeV2.body, v2Only.centerText, { color: palette.secondary }]}>
+                      This verse isn't downloaded yet. It shows when you're back online.
+                    </Text>
+                  ) : translation.id === CLEAR_QURAN_ID ? (
                     // Only ever this, or its own text: never another translation under its name.
                     <>
                       <Text style={[typeV2.name, { color: palette.text }]}>Couldn't load translation</Text>
@@ -497,7 +593,17 @@ export function VerseSheet({
                       Couldn't load this verse. Check your connection.
                     </Text>
                   )}
-                  <PillButton title="Try again" onPress={() => setAttempt((a) => a + 1)} testID="verse-retry" />
+                  <View style={styles.errorActions}>
+                    {alternative && (
+                      <PillButton
+                        title={`Show ${nameWithLanguage(alternative)}`}
+                        variant="outline"
+                        onPress={() => onChangeTranslation(alternative.id)}
+                        testID={alternative.id === DEFAULT_TRANSLATION_ID ? 'verse-use-saheeh' : 'verse-use-offline'}
+                      />
+                    )}
+                    <PillButton title="Try again" onPress={() => setAttempt((a) => a + 1)} testID="verse-retry" />
+                  </View>
                 </View>
               )}
               {view.status === 'ready' && (
@@ -526,35 +632,65 @@ export function VerseSheet({
                     <Text style={styles.arabic} maxFontSizeMultiplier={2}>
                       {view.text.arabic}
                     </Text>
-                    <Text style={styles.translation} testID="verse-translation">
-                      {translation.id === CLEAR_QURAN_ID
-                        ? // Exactly as given; its footnote markers shown as raised numbers.
-                          clearQuranSegments(view.text.translation).map((seg, i) =>
-                            'footnote' in seg ? (
-                              <Text key={i} style={styles.footnote}>
-                                {seg.footnote}
-                              </Text>
-                            ) : (
-                              seg.text
-                            ),
-                          )
-                        : view.text.translation}
+                    <Text
+                      style={[styles.translation, rtl && styles.rtlText]}
+                      accessibilityLanguage={translation.languageCode}
+                      testID="verse-translation"
+                    >
+                      {/* Exactly as given; footnote markers shown as raised numbers. */}
+                      {(translation.id === CLEAR_QURAN_ID
+                        ? clearQuranSegments(view.text.translation)
+                        : saheehSegments(view.text.translation, view.text.footnotes ?? '')
+                      ).map((seg, i) =>
+                        'footnote' in seg ? (
+                          <Text key={i} style={styles.footnote}>
+                            {seg.footnote}
+                          </Text>
+                        ) : (
+                          seg.text
+                        ),
+                      )}
                     </Text>
-                    {/* A credited translation has its credit pinned below instead. */}
-                    {!translation.credit && <Text style={styles.source}>{view.text.translationName}</Text>}
+                    {view.text.footnotes ? (
+                      // A QuranEnc translation's footnotes, as given (its terms: nothing cut).
+                      <View style={styles.footnotes} testID="verse-footnotes">
+                        {saheehFootnotes(view.text.footnotes).map((f, i) => (
+                          <Text key={i} style={[styles.footnoteText, rtl && styles.rtlFootnote]} accessibilityLanguage={translation.languageCode}>
+                            {f.mark ? <Text style={styles.footnote}>{`${f.mark} `}</Text> : null}
+                            {f.text}
+                          </Text>
+                        ))}
+                      </View>
+                    ) : null}
+                    {/* The Arabic's source, as Tanzil's terms ask; the translation's credit is pinned below. */}
+                    <View style={styles.arabicCredit} testID="arabic-credit">
+                      <Text style={styles.creditText} maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
+                        {`${ARABIC_CREDIT.text} · `}
+                      </Text>
+                      <Text
+                        style={styles.creditLink}
+                        maxFontSizeMultiplier={CHROME_TEXT_SCALE}
+                        onPress={() => Linking.openURL(ARABIC_CREDIT.url).catch(() => undefined)}
+                        accessibilityRole="link"
+                        accessibilityLabel={`${ARABIC_CREDIT.linkLabel}, opens the website`}
+                        suppressHighlighting={false}
+                      >
+                        {ARABIC_CREDIT.linkLabel}
+                      </Text>
+                    </View>
                   </ScrollView>
                 </GestureDetector>
               )}
-              {view.status === 'ready' && translation.credit && (
+              {view.status === 'ready' && (
                 // Pinned under the verse, however long it is: always in view.
                 <View style={styles.credit} testID="translation-credit">
                   <Text style={styles.creditText} maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
-                    {translation.credit.text}
+                    {creditLine(translation, view.text.version)}
                   </Text>
                   <Text
                     style={styles.creditLink}
                     maxFontSizeMultiplier={CHROME_TEXT_SCALE}
-                    onPress={() => Linking.openURL(translation.credit!.url).catch(() => undefined)}
+                    onPress={() => Linking.openURL(translation.credit.url).catch(() => undefined)}
                     accessibilityRole="link"
                     accessibilityLabel={`${translation.credit.linkLabel}, opens the website`}
                     suppressHighlighting={false}
@@ -654,8 +790,23 @@ const makeStylesV2 = (p: PaletteV2) =>
     },
     // Reading text: grows with Dynamic Type, uncapped.
     translation: { ...typeV2.body, fontSize: 18, lineHeight: 27, color: p.text },
-    source: { ...typeV2.meta, color: p.secondary, marginTop: layoutV2.gutter },
+    // A right-to-left translation: laid out from the right, with room for its script's marks.
+    rtlText: { writingDirection: 'rtl', textAlign: 'right', lineHeight: 34 },
+    rtlFootnote: { writingDirection: 'rtl', textAlign: 'right', lineHeight: 26 },
+    // The picker of every translation: fills the sheet under the header.
+    pickerPanel: {
+      position: 'absolute',
+      left: layoutV2.gutter,
+      right: layoutV2.gutter,
+      backgroundColor: p.sheet,
+      zIndex: 10,
+    },
     footnote: { color: p.accentText },
+    footnotes: { marginTop: 12, gap: 8 },
+    // Reading text too: grows with Dynamic Type, uncapped.
+    footnoteText: { ...typeV2.body, fontSize: 14, lineHeight: 20, color: p.secondary },
+    arabicCredit: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', marginTop: layoutV2.gutter },
+    errorActions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8 },
     credit: {
       borderTopWidth: layoutV2.hairline,
       borderTopColor: p.separator,

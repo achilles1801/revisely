@@ -1,0 +1,122 @@
+# The Fajr boundary: switched on in Settings, then Home's revision day before
+# and after Fajr, and revise ahead between midnight and Fajr (the bug that
+# started this suite: "Tomorrow" was the calendar day after, not the revision
+# day after). The phone is in Chicago, its zone and its location. Fajr on
+# Wednesday Nov 4 2026 is about 5:25 (North America method): 03:00 is before
+# it, 08:00 after. Days (subflows/onboard.yaml): Tuesday 1, 582–590; Wednesday
+# 591–600; Thursday 601–604, 1, 582–586.
+# Rules (BEHAVIOUR.md): DAY-1, DAY-2, DAY-3, DAY-5, AHEAD-1, LOG-3
+# e2e-zone: America/Chicago
+appId: com.revisionbuddy.app
+---
+- setLocation:
+    latitude: 41.88
+    longitude: -87.63
+- runFlow:
+    file: ../subflows/new-account.yaml
+    env:
+      CLOCK: 2026-11-03T12:00
+      BOUNDARY: midnight
+- runFlow:
+    file: ../subflows/fajr-switch.yaml
+    env:
+      RESETS: "Resets at 5:[0-5][0-9].AM"
+
+# Tuesday, done.
+- runFlow:
+    file: ../subflows/session-day.yaml
+    env:
+      FIRST: "Juz 1 · 0/10"
+- assertVisible:
+    id: today-title
+    text: "Done · 10.pages"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 04-home-done
+
+# DAY-2, DAY-5: 03:00 on Wednesday is before Fajr: still Tuesday, done.
+- runFlow:
+    file: ../subflows/set-clock-and-relaunch.yaml
+    env:
+      AT: 2026-11-04T03:00
+- extendedWaitUntil:
+    visible:
+      id: today-title
+      text: "Done · 10.pages"
+    timeout: 20000
+# DAY-3, AHEAD-1: "Tomorrow" is the revision day after (Wednesday), not the
+# calendar day after (Thursday, Al-'Asr, page 601), and opens on its first page.
+- assertVisible:
+    id: today-ahead
+    text: "Tomorrow starts at At.Tariq"
+- tapOn:
+    id: today-ahead
+- runFlow: ../subflows/show-controls.yaml
+- extendedWaitUntil:
+    visible:
+      id: session-title
+      text: "Revising ahead · Wed.*"
+    timeout: 10000
+- assertVisible:
+    id: session-page
+    text: "At.Tariq to Al.A'la.15 · .*"
+- tapOn: "Back"
+
+# LOG-3: a note written at 03:00 belongs to Tuesday, the revision day: Activity's
+# today is Tuesday, the note goes in its log, and the log is Tuesday's.
+- runFlow: ../subflows/open-day.yaml
+- assertVisible: "Today, Tuesday 3 November"
+- runFlow:
+    file: ../subflows/add-day-note.yaml
+    env:
+      TEXT: Written before Fajr
+- runFlow: ../subflows/day-log.yaml
+- assertVisible: "Tue 11/3"
+- extendedWaitUntil:
+    visible:
+      id: journal-note-.*
+      text: "Note, Written before Fajr, .*"
+    timeout: 15000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 04-daily-log
+- runFlow: ../subflows/back-home.yaml
+
+# DAY-1: with the boundary off, 03:00 Wednesday is Wednesday at once.
+- runFlow:
+    file: ../subflows/fajr-switch.yaml
+    env:
+      RESETS: "Resets at midnight"
+- extendedWaitUntil:
+    visible:
+      id: today-title
+      text: "Starts at At.Tariq[^,0-9]*"
+    timeout: 10000
+# And on again: back to Tuesday.
+- runFlow:
+    file: ../subflows/fajr-switch.yaml
+    env:
+      RESETS: "Resets at 5:[0-5][0-9].AM"
+- extendedWaitUntil:
+    visible:
+      id: today-title
+      text: "Done · 10.pages"
+    timeout: 10000
+
+# DAY-2: 08:00 is after Fajr: Wednesday.
+- runFlow:
+    file: ../subflows/set-clock-and-relaunch.yaml
+    env:
+      AT: 2026-11-04T08:00
+- extendedWaitUntil:
+    visible:
+      id: today-title
+      text: "Starts at At.Tariq[^,0-9]*"
+    timeout: 20000
+# LOG-3: Wednesday is a day of its own with nothing in it: no note, so no log to
+# open. The 03:00 note is Tuesday's.
+- runFlow: ../subflows/open-day.yaml
+- assertVisible: "Today, Wednesday 4 November"
+- assertNotVisible: "Daily log. Open the log"

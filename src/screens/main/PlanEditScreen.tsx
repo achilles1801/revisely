@@ -3,10 +3,11 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   Alert,
   ActivityIndicator,
 } from 'react-native';
+// Pads on Android too (React Native's own is a plain View there: the top bar sat under the clock).
+import { SafeAreaView } from '../../components/SafeAreaView';
 import Animated, { useAnimatedRef, useScrollOffset, useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,21 +21,22 @@ import { useTheme } from '../../context/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import {
   buildDefaultPlanDays,
-  scheduledDaysFrom,
   buildJuzCycleDays,
   buildWeakestFirstPlanDays,
 } from '../../lib/algorithm';
-import { createCustomPlanFromDraft, dateToLocalISODay } from '../../lib/schedulePlans';
+import { createCustomPlanFromDraft, customPlanTitle } from '../../lib/schedulePlans';
 import { userWithNewSchedule } from '../../lib/planChange';
 import {
   defaultStartPage,
   effectiveDailyPages,
+  addPagesToPlan,
   insertDay,
   moveDay,
+  pagesOutsidePlan,
   PlanDirection,
   planStats,
   removeDay,
-  rotateCustomPlanToToday,
+  liveCustomPlanDays,
 } from '../../lib/planBuilder';
 import { pageCountLabel, summarizeDay } from '../../lib/planDisplay';
 import { CustomPlan, SavedPlan, User } from '../../types';
@@ -44,6 +46,9 @@ import { InlineStepper } from '../../components/plan/InlineStepper';
 import { DAY_ROW_INSET } from '../../components/plan/DayRow';
 import { ReorderableDayList, ScrollLink } from '../../components/plan/ReorderableDayList';
 import { UndoToast } from '../../components/revision/UndoToast';
+import { HelpButton } from '../../components/help/HelpButton';
+import { HelpToast } from '../../components/help/HelpToast';
+import { useHelpButtons } from '../../components/help/useHelpButtons';
 import {
   PlanBuilderHandle,
   PlanBuilderSheet,
@@ -55,6 +60,9 @@ import { ActionSheet } from '../../components/v2/ActionSheet';
 import { useHaptics } from '../../design/haptics';
 import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
 import { getRevisionDateForUser } from '../../lib/fajrBoundary';
+import { partlyMemorizedAyahs, revisablePages } from '../../lib/memorizedAyahs';
+import { describePagesToRevise } from '../../lib/passages';
+import { sittingsEnabled } from '../../lib/sitting';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'PlanEdit'>;
 type RouteProps = RouteProp<HomeStackParamList, 'PlanEdit'>;
@@ -87,10 +95,18 @@ export default function PlanEditScreen() {
   // Outcomes only (a save, a load).
   const haptics = useHaptics();
   const { user, pages, logs, saveUser } = useApp();
+  const helpShown = useHelpButtons().shown;
   // "Today" in the editor is the revision day (it starts at fajr when that is
-  // on), fixed when the editor opens: the draft is rotated to that day, so it
-  // must not move while the editor is open.
-  const [revisionDate] = useState(() => getRevisionDateForUser(user));
+  // on). It is fixed once the account is loaded: the draft is rotated to that
+  // day, so it must not move while the editor is open. Read before the account
+  // loads, it would be the calendar day and stay so for the whole visit.
+  const [revisionDate, setRevisionDate] = useState(() => getRevisionDateForUser(user));
+  const [dateFixed, setDateFixed] = useState(() => user != null);
+  useEffect(() => {
+    if (dateFixed || !user) return;
+    setRevisionDate(getRevisionDateForUser(user));
+    setDateFixed(true);
+  }, [user, dateFixed]);
 
   const builderRef = useRef<PlanBuilderHandle>(null);
   const quotaSheetRef = useRef<BottomSheetModal>(null);
@@ -100,10 +116,8 @@ export default function PlanEditScreen() {
 
   const smartTrackingEnabled = user?.smartTrackingEnabled ?? false;
 
-  const memorizedPages = useMemo(
-    () => pages.filter((p) => p.status === 'memorized'),
-    [pages],
-  );
+  // Memorized and partly memorized pages: both are revised (MEM-4).
+  const memorizedPages = useMemo(() => revisablePages(pages), [pages]);
   const memorizedNumbers = useMemo(
     () => memorizedPages.map((p) => p.pageNumber).sort((a, b) => a - b),
     [memorizedPages],
@@ -115,16 +129,10 @@ export default function PlanEditScreen() {
   // the cycle to today on save).
   const initialState = useMemo(() => {
     if (user?.customPlan && user.customPlan.days.length > 0) {
-      const plan = user.customPlan;
-      // With a carry-over shift, show the days as they are now scheduled.
-      const shifted =
-        (user.scheduleShiftPages ?? 0) > 0 &&
-        plan.cycleStartDate <= dateToLocalISODay(revisionDate);
+      // With a carry-over shift, the days as they are now scheduled ("Add to plan" reads the same).
       return {
-        days: shifted
-          ? scheduledDaysFrom(user, memorizedPages, revisionDate, plan.days.length)
-          : rotateCustomPlanToToday(plan, revisionDate),
-        direction: plan.direction as PlanDirection,
+        days: liveCustomPlanDays(user, memorizedPages, revisionDate),
+        direction: user.customPlan.direction as PlanDirection,
       };
     }
     if (isJuzMode && user) {
@@ -138,6 +146,9 @@ export default function PlanEditScreen() {
 
   const [days, setDays] = useState<number[][]>(initialState.days);
   const [direction, setDirection] = useState<PlanDirection>(initialState.direction);
+  // The plan's name (SCHED-7): the live plan's, a loaded saved plan's or the one given with
+  // "Save current plan…"; none for a plan made with "Create new plan".
+  const [planName, setPlanName] = useState<string | undefined>(user?.customPlan?.name);
   const [saving, setSaving] = useState(false);
   const [expanded, setExpanded] = useState(false);
   // A day lifted for dragging: the page stops scrolling by touch (the list
@@ -163,6 +174,8 @@ export default function PlanEditScreen() {
   const [tempJuzCount, setTempJuzCount] = useState(user?.dailyJuzCount ?? 1);
   // Menus are v2/ActionSheet: a saved plan's Load / Delete.
   const [menuPlan, setMenuPlan] = useState<SavedPlan | null>(null);
+  // "Not in your plan" (MEM-6): its Add's choices.
+  const [notInPlanOpen, setNotInPlanOpen] = useState(false);
   const [planMenuOpen, setPlanMenuOpen] = useState(false);
 
   const savedPlans = useMemo(
@@ -189,10 +202,32 @@ export default function PlanEditScreen() {
     navigation.setParams({ editedDay: undefined });
   }, [route.params?.editedDay, navigation]);
 
+  const liveName = user?.customPlan?.name;
   const isDirty = useMemo(
-    () => direction !== initialState.direction || !sameDays(days, initialState.days),
-    [days, direction, initialState],
+    () =>
+      direction !== initialState.direction ||
+      !sameDays(days, initialState.days) ||
+      // A saved plan loaded over the same days still has a name to save.
+      (planName ?? '') !== (liveName ?? ''),
+    [days, direction, initialState, planName, liveName],
   );
+
+  // Memorized pages a custom plan doesn't hold (MEM-6): it never adds new pages by itself
+  // (pruneCustomPlanForMemorized), so they wait here, named by their ayahs, until added. Read from
+  // the days being edited, so a page added here leaves the list at once.
+  const outsidePlan = useMemo(() => {
+    if (!user?.customPlan || !sittingsEnabled(user)) return [];
+    return pagesOutsidePlan(days, memorizedNumbers);
+  }, [user, days, memorizedNumbers]);
+  const outsideName = useMemo(
+    () => (outsidePlan.length > 0 ? describePagesToRevise(outsidePlan, partlyMemorizedAyahs(pages), { max: 2 }) : ''),
+    [outsidePlan, pages],
+  );
+  // Tomorrow is the cycle's second day: the editor keeps today first.
+  const addOutsideTo = (how: 'tomorrow' | 'own') => {
+    const pagesToAdd = outsidePlan;
+    if (pagesToAdd.length > 0) setDays((prev) => addPagesToPlan(prev, pagesToAdd, how));
+  };
 
   // ---- Leaving with unsaved edits ------------------------------------------
   // Native swipe-back can't be intercepted, so it's disabled while dirty; the
@@ -249,7 +284,7 @@ export default function PlanEditScreen() {
 
   const handleSave = () => {
     if (!user || saving || !isDirty || days.length === 0) return;
-    const plan: CustomPlan = createCustomPlanFromDraft(days, direction, revisionDate);
+    const plan: CustomPlan = createCustomPlanFromDraft(days, direction, revisionDate, planName);
     // An older version's "push back a day" could leave the live anchor in the
     // future, and the draft wasn't rotated (see rotateCustomPlanToToday): keep
     // that anchor so saving an edit doesn't silently undo it.
@@ -295,13 +330,16 @@ export default function PlanEditScreen() {
     [user, memorizedPages, logs, revisionDate],
   );
 
-  const applyBuiltPlan = useCallback((next: number[][], dir: PlanDirection) => {
+  // A plan built or loaded here; only a loaded saved plan has a name.
+  const startPlan = useCallback((next: number[][], dir: PlanDirection, name?: string) => {
     setNewPlan(true);
     setDays(next);
     setDirection(dir);
+    setPlanName(name);
     setRemoved(null);
     setExpanded(false);
   }, []);
+  const applyBuiltPlan = useCallback((next: number[][], dir: PlanDirection) => startPlan(next, dir), [startPlan]);
 
   // ---- Saved plans ----------------------------------------------------------------
   const openSaveName = () => {
@@ -322,13 +360,21 @@ export default function PlanEditScreen() {
       createdAt: new Date().toISOString(),
     };
     saveNameSheetRef.current?.dismiss();
+    // A custom plan on screen takes the name (SCHED-7): the plan in use at once when nothing is
+    // unsaved, else the draft, with the next Save. The automatic schedule stays automatic.
+    const nameLive = !!user.customPlan && !isDirty;
     try {
-      await saveUser({ ...user, savedPlans: [...(user.savedPlans ?? []), plan] });
+      await saveUser({
+        ...user,
+        savedPlans: [...(user.savedPlans ?? []), plan],
+        ...(nameLive && user.customPlan ? { customPlan: { ...user.customPlan, name } } : {}),
+      });
+      if (nameLive || isDirty) setPlanName(name);
       haptics.success();
     } catch {
       Alert.alert("Couldn't save plan", 'Please try again.');
     }
-  }, [user, nameDraft, days, direction, saveUser, haptics]);
+  }, [user, nameDraft, days, direction, saveUser, haptics, isDirty]);
 
   const deleteSavedPlan = useCallback(
     (plan: SavedPlan) => {
@@ -356,7 +402,7 @@ export default function PlanEditScreen() {
 
   const loadSavedPlan = (plan: SavedPlan) => {
     haptics.selection();
-    applyBuiltPlan(plan.days.map((d) => [...d]), plan.direction);
+    startPlan(plan.days.map((d) => [...d]), plan.direction, plan.name);
   };
 
   const savedPlanMessage = (plan: SavedPlan) =>
@@ -463,7 +509,7 @@ export default function PlanEditScreen() {
     : days.length === 0
       ? 'No days in this cycle'
       : user.customPlan || isDirty
-        ? 'Custom plan'
+        ? customPlanTitle(planName)
         : 'Automatic';
   const repeats = `Repeats every ${days.length === 1 ? 'day' : `${days.length} days`}`;
 
@@ -480,16 +526,21 @@ export default function PlanEditScreen() {
         title="Schedule"
         onBack={() => navigation.goBack()}
         right={
-          <PillButton
-            title="Save"
-            size="sm"
-            onPress={handleSave}
-            disabled={!canSave}
-            busy={saving}
-            accessibilityLabel="Save schedule"
-            testID="plan-save"
-          />
+          <>
+            <HelpButton screen="schedule" />
+            <PillButton
+              title="Save"
+              size="sm"
+              onPress={handleSave}
+              disabled={!canSave}
+              busy={saving}
+              accessibilityLabel="Save schedule"
+              testID="plan-save"
+            />
+          </>
         }
+        // The ? beside Save needs a little more room than Save alone; both sides stay equal.
+        sideWidth={helpShown ? 112 : undefined}
         separator
       />
 
@@ -516,6 +567,23 @@ export default function PlanEditScreen() {
             </Text>
           ) : null}
         </View>
+
+        {outsidePlan.length > 0 ? (
+          <GroupedSection
+            header="Not in your plan"
+            footer="Your custom plan doesn’t add new pages by itself. Add them where they fit, then Save."
+          >
+            <GroupedRow
+              title={outsideName}
+              subtitle={pageCountLabel(outsidePlan.length)}
+              icon="leaf-outline"
+              value="Add"
+              accessory="chevron"
+              onPress={() => setNotInPlanOpen(true)}
+              testID="plan-not-in-plan"
+            />
+          </GroupedSection>
+        ) : null}
 
         {days.length > 0 ? (
           <GroupedSection
@@ -642,6 +710,7 @@ export default function PlanEditScreen() {
         </GroupedSection>
       </Animated.ScrollView>
 
+      <HelpToast screen="schedule" bottomInset={insets.bottom} />
       <UndoToast
         key={removed?.seq ?? 0}
         visible={removed != null}
@@ -664,6 +733,29 @@ export default function PlanEditScreen() {
         buildWeakest={buildWeakest}
         onApply={applyBuiltPlan}
         longCycleDays={LONG_CYCLE_DAYS}
+      />
+
+      <ActionSheet
+        visible={notInPlanOpen}
+        onClose={() => setNotInPlanOpen(false)}
+        title={`Add ${outsideName}`}
+        actions={[
+          {
+            key: 'tomorrow',
+            label: 'With tomorrow’s pages',
+            subtitle: days.length > 1 ? `${pageCountLabel(days[1].length)}, then ${pageCountLabel(days[1].length + outsidePlan.length)}` : undefined,
+            icon: 'add-circle-outline',
+            onPress: () => addOutsideTo('tomorrow'),
+          },
+          {
+            key: 'own',
+            label: 'As a day of its own, tomorrow',
+            subtitle: `The cycle becomes ${days.length + 1} days`,
+            icon: 'calendar-outline',
+            onPress: () => addOutsideTo('own'),
+          },
+        ]}
+        testID="plan-not-in-plan-menu"
       />
 
       <ActionSheet

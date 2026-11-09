@@ -7,7 +7,9 @@ import { MushafScrubber } from '../../components/MushafScrubber';
 import { useVerseActions } from '../../components/verse/useVerseActions';
 import { navigateToActivityDay } from '../../navigation/navigationRef';
 import { UndoToast } from '../../components/revision/UndoToast';
-import { RecordButton } from '../../components/recordings/RecordButton';
+import { HELP_ICON, HelpButton } from '../../components/help/HelpButton';
+import { HelpToast } from '../../components/help/HelpToast';
+import { RecordButton, recorderTakesCapsule } from '../../components/recordings/RecordButton';
 import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
 import { useKeepScreenOn } from '../../hooks/useKeepScreenOn';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
@@ -31,6 +33,11 @@ import {
   getSurahsForPage,
 } from '../../lib/quranData';
 import { appendReadingHistory } from '../../lib/readingHistory';
+import { firstSurahOnPage, toAyahRef } from '../../lib/verses';
+import { ayahKey, ayahOf, ayahsBetween, suraOf } from '../../lib/ayahKeys';
+import { AyahRef, ayahRects } from '../../lib/ayahBounds';
+import { useMushafEdition } from '../../lib/mushafEdition';
+import { sittingSavedText, sittingsEnabled } from '../../lib/sitting';
 import type { ReadStackParamList } from '../../navigation/MainNavigator';
 
 type NavigationProp = NativeStackNavigationProp<ReadStackParamList, 'QuranReader'>;
@@ -41,6 +48,16 @@ const SETTLE_DEBOUNCE_MS = 1500;
 // Under the page, with the controls: the position track, then the capsule.
 const SCRUBBER_HEIGHT = 32;
 const FOOTER_HEIGHT = SCRUBBER_HEIGHT + spacing.xs + CAPSULE_HEIGHT + spacing.sm;
+/** A search match highlights at most this many verses (24 words said reach about ten short ones). */
+const MAX_SEARCH_HIGHLIGHT = 12;
+
+/** The verses a search highlight names ("first-last", as ayah keys; last may be empty). */
+function searchHighlightOf(key: string | null): AyahRef[] | null {
+  if (!key) return null;
+  const [from, to] = key.split('-').map((k) => (k ? Number(k) : NaN));
+  const keys = Number.isFinite(to) && to > from ? ayahsBetween(from, to).slice(0, MAX_SEARCH_HIGHLIGHT) : [from];
+  return keys.map((k) => toAyahRef({ sura: suraOf(k), ayah: ayahOf(k) }));
+}
 
 export default function QuranReaderScreen() {
   const navigation = useNavigation<NavigationProp>();
@@ -63,12 +80,36 @@ export default function QuranReaderScreen() {
   const [savedRecording, setSavedRecording] = useState<{ day: string; recordingId: string } | null>(
     null,
   );
+  // A sitting (REC-1): ending the timer ends a recording running with it, and one note says what
+  // was saved ("Saved to today: Al-Mulk, ayahs 1–26, 41 min · View").
+  const sittings = sittingsEnabled(user);
+  const endingSitting = useRef(false);
+  const [sittingSaved, setSittingSaved] = useState<{ day: string; text: string } | null>(null);
   const recorder = useVoiceRecorder({
     kind: 'reading',
     day: today,
     currentPage,
-    onFinished: setSavedRecording,
+    // Ended with the timer, the recording is told about in the sitting's note, not its own.
+    onFinished: (info) => {
+      if (!endingSitting.current) setSavedRecording(info);
+    },
   });
+  const recordingOn = recorder.phase === 'recording' || recorder.phase === 'paused';
+  const endRecordingWithTimer = useCallback(async () => {
+    endingSitting.current = true;
+    try {
+      await recorder.finish();
+    } finally {
+      endingSitting.current = false;
+    }
+  }, [recorder]);
+  const onSittingSaved = useCallback(
+    (day: string, seconds: number, ended: { pages: number[] }) => {
+      setSavedRecording(null);
+      setSittingSaved({ day, text: sittingSavedText({ day, today: today ?? day, pages: ended.pages, seconds }) });
+    },
+    [today],
+  );
 
   // Opened again with another page while already open (e.g. the Friday
   // Al-Kahf card): the stack updates this screen's params instead of pushing.
@@ -90,6 +131,22 @@ export default function QuranReaderScreen() {
     currentPage,
     focused: isScreenFocused,
   });
+
+  // A verse found by search (testers), or the verses a match runs across: highlighted,
+  // until the reader turns to a page none of them is on. A held or playing verse shows
+  // instead while there is one.
+  const highlightParam = route.params.highlight;
+  const highlightKey = highlightParam
+    ? `${ayahKey(highlightParam.sura, highlightParam.ayah)}-${highlightParam.last ? ayahKey(highlightParam.last.sura, highlightParam.last.ayah) : ''}`
+    : null;
+  const [searchHighlight, setSearchHighlight] = useState<AyahRef[] | null>(() => searchHighlightOf(highlightKey));
+  useEffect(() => {
+    if (highlightKey) setSearchHighlight(searchHighlightOf(highlightKey));
+  }, [highlightKey]);
+  useEffect(() => {
+    if (!searchHighlight || searchHighlight.some((h) => h.page === currentPage)) return;
+    if (searchHighlight.every((h) => ayahRects(currentPage, h.sura, h.ayah).length === 0)) setSearchHighlight(null);
+  }, [currentPage, searchHighlight]);
 
   // Reading: nothing but the page (its number, the juz and surah). A tap on
   // the page brings the controls (they sit beside the page, never over it);
@@ -140,12 +197,16 @@ export default function QuranReaderScreen() {
 
   const juz = getJuzForPage(currentPage);
   const hizb = getHizbForPage(currentPage);
-  const firstSurah = getSurahsForPage(currentPage)[0];
+  // The surah at the top of the page drawn (the 1441 print's can differ; lib/mushafEdition).
+  const edition = useMushafEdition();
+  const firstSurah = useMemo(() => firstSurahOnPage(currentPage, edition), [currentPage, edition]);
 
   // Previous / next go when the capsule is crowded (a recording, a timer) on
   // anything narrower than the largest phones.
   const crowded = recorder.phase !== 'idle' || timer != null;
-  const compact = width < 430 && crowded;
+  // Recording: the recorder is the whole capsule, the timer beside it (compact).
+  const recordingLive = recorderTakesCapsule(recorder);
+  const compact = (width < 430 && crowded) || (recordingLive && timer != null);
 
   return (
     <View style={styles.container}>
@@ -165,15 +226,21 @@ export default function QuranReaderScreen() {
         }
         header={
           <View style={styles.header}>
-            <RoundButton icon="chevron-back" label="Back" onPress={() => navigation.goBack()} palette={palette} />
+            <RoundButton icon="chevron-back" label="Back" onPress={() => navigation.goBack()} palette={palette} testID="reader-back" />
             <View style={styles.titleCol}>
               <SurahName surah={firstSurah} palette={palette} />
               <Text style={styles.subtitle} numberOfLines={1} maxFontSizeMultiplier={1.3}>
                 Page {currentPage} · Juz {juz} · Hizb {hizb}
               </Text>
             </View>
-            {/* Keeps the title centred. */}
-            <View style={{ width: ROUND_BUTTON_SIZE }} />
+            {/* Its help (HELP-1), a round button like Back; hidden, the same room keeps the title centred. */}
+            <HelpButton
+              screen="reader"
+              render={(open, label) => (
+                <RoundButton icon={HELP_ICON} label={label} onPress={open} palette={palette} testID="help-button-reader" />
+              )}
+              placeholder={<View style={{ width: ROUND_BUTTON_SIZE }} />}
+            />
           </View>
         }
         footer={
@@ -184,8 +251,15 @@ export default function QuranReaderScreen() {
               page={currentPage}
               compact={compact}
               surface={{ background: palette.control, border: palette.divider }}
-              record={<RecordButton recorder={recorder} />}
-              timer={<TimerChip compact={compact} />}
+              recording={recordingLive}
+              record={<RecordButton recorder={recorder} crowded={timer != null} />}
+              timer={
+                <TimerChip
+                  compact={compact}
+                  onSaved={sittings ? onSittingSaved : undefined}
+                  beforeEnd={sittings && recordingOn ? endRecordingWithTimer : undefined}
+                />
+              }
             />
           </View>
         }
@@ -212,7 +286,7 @@ export default function QuranReaderScreen() {
           initialPage={initialPage}
           onPageChange={handlePageChange}
           onLongPressAyah={verseActions.onLongPressAyah}
-          highlightedAyah={verseActions.highlightedAyah}
+          highlightedAyah={verseActions.highlightedAyah ?? searchHighlight}
           onTap={onTapPage}
           onUserSwipe={chrome.hide}
         />
@@ -233,6 +307,21 @@ export default function QuranReaderScreen() {
         bottomInset={insets.bottom - spacing.sm}
       />
 
+      <UndoToast
+        visible={!!sittingSaved}
+        message={sittingSaved?.text ?? ''}
+        actionLabel="View"
+        duration={6000}
+        onUndo={() => {
+          const saved = sittingSaved;
+          setSittingSaved(null);
+          if (saved) navigateToActivityDay(saved.day);
+        }}
+        onDismiss={() => setSittingSaved(null)}
+        bottomInset={insets.bottom - spacing.sm}
+      />
+
+      <HelpToast screen="reader" bottomInset={insets.bottom - spacing.sm} />
       {verseActions.overlay}
     </View>
   );

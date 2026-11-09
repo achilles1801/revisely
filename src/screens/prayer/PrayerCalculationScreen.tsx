@@ -60,7 +60,7 @@ export default function PrayerCalculationScreen() {
       <View style={{ paddingTop: insets.top }}>
         <TopBar title="Calculation" onBack={() => navigation.goBack()} separator />
       </View>
-      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}>
+      <ScrollView contentInsetAdjustmentBehavior="never" contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}>
         <GroupedSection header="Location">
           <GroupedRow
             icon="location-outline"

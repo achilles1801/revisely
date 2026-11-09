@@ -25,7 +25,7 @@ import { fireGestureHandler, getByGestureTestId } from 'react-native-gesture-han
 import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createPagerTabNavigator, pagerRoutes, rubberBand, snapPage, swipeRange } from '../PagerTabs';
-import { swipeableTabCount } from '../tabPages';
+import { insightsTab, mainTabRoutes, swipeableTabCount } from '../tabPages';
 
 describe('the pager physics', () => {
   it('rubber band: nothing at the edge, growing ever slower, never a full page', () => {
@@ -82,6 +82,31 @@ describe('the pages in the pager, from the settings', () => {
   });
 });
 
+describe('the Insights tab, from the account', () => {
+  it('a new account: shown with its glow, not a page; a tap or a swipe past Read opens the preview', () => {
+    expect(insightsTab(false, false)).toEqual({ shown: true, opensPreview: true });
+    expect(swipeableTabCount(false)).toBe(2);
+  });
+
+  it('preview seen, Smart Tracking off: hidden; on: a page like the others', () => {
+    expect(insightsTab(false, true)).toEqual({ shown: false, opensPreview: false });
+    expect(insightsTab(true, true)).toEqual({ shown: true, opensPreview: false });
+    expect(insightsTab(true, false)).toEqual({ shown: true, opensPreview: false });
+    expect(swipeableTabCount(true)).toBe(3);
+  });
+
+  it('Insights in Activity (the new Activity): no Insights tab, Home and Read only, Smart Tracking or not', () => {
+    for (const on of [false, true]) {
+      for (const seen of [false, true]) {
+        expect(insightsTab(on, seen, true)).toEqual({ shown: false, opensPreview: false });
+      }
+      expect(swipeableTabCount(on, true)).toBe(2);
+    }
+    expect(mainTabRoutes(true)).toEqual(['Home', 'Read']);
+    expect(mainTabRoutes(false)).toEqual(['Home', 'Read', 'Insights']);
+  });
+});
+
 describe('the pager in a navigator', () => {
   const Tab = createPagerTabNavigator();
   const Stack = createNativeStackNavigator();
@@ -105,11 +130,11 @@ describe('the pager in a navigator', () => {
   const nav = createNavigationContainerRef<any>();
   const tab = () => nav.getRootState()?.routes[nav.getRootState()!.index].name;
 
-  async function mount(swipeableCount = 3) {
+  async function mount(swipeableCount = 3, onSwipePastEnd?: () => void) {
     for (const k of Object.keys(mounts)) delete mounts[k];
     render(
       <NavigationContainer ref={nav}>
-        <Tab.Navigator tabBar={() => null} swipeableCount={swipeableCount}>
+        <Tab.Navigator tabBar={() => null} swipeableCount={swipeableCount} onSwipePastEnd={onSwipePastEnd}>
           <Tab.Screen name="Home" component={Home} />
           <Tab.Screen name="Read" component={Read} />
           <Tab.Screen name="Insights" component={Insights} />
@@ -179,6 +204,38 @@ describe('the pager in a navigator', () => {
     expect(tab()).toBe('Read');
   });
 
+  it('Insights shown but not a page yet (Smart Tracking not set up): a swipe past Read does what its tap does', async () => {
+    // A new account: the tab bar shows Insights (with its glow; a tap opens the
+    // Smart Tracking preview), but the pager holds only Home and Read. A swipe
+    // toward it used to spring back as if it were too short.
+    const openPreview = jest.fn();
+    await mount(2, openPreview);
+    swipe(-600);
+    expect(tab()).toBe('Read');
+    mockTick.mockClear();
+    // Short and slow: springs back, nothing opens.
+    swipe(-60);
+    expect(openPreview).not.toHaveBeenCalled();
+    // A full swipe opens it, with the tick of a swipe that lands; the pager stays on Read.
+    swipe(-600);
+    expect(tab()).toBe('Read');
+    expect(openPreview).toHaveBeenCalledTimes(1);
+    expect(mockTick).toHaveBeenCalledTimes(1);
+    // A short fling counts, as between tabs.
+    swipe(-60, -900);
+    expect(openPreview).toHaveBeenCalledTimes(2);
+    // Only past the last page: back to Home, and past Home, open nothing.
+    swipe(600);
+    expect(tab()).toBe('Home');
+    swipe(600);
+    swipe(600, 1200);
+    expect(openPreview).toHaveBeenCalledTimes(2);
+    // From Home, a swipe goes to Read, not past it.
+    swipe(-600, -1200);
+    expect(tab()).toBe('Read');
+    expect(openPreview).toHaveBeenCalledTimes(2);
+  });
+
   it('Insights off: past Read is the rubber band and the ground, never a peek of Insights', async () => {
     await mount(2);
     swipe(-600);
@@ -227,6 +284,42 @@ describe('the pager in a navigator', () => {
     expect(mounts.Home).toBe(1);
     expect(mounts.Read).toBe(1);
     expect(tab()).toBe('Read');
+  });
+
+  it('Insights moved into Activity once the account loads: the route goes, Home and Read never remount', async () => {
+    let setInActivity: (v: boolean) => void = () => {};
+    function Harness() {
+      const [inActivity, set] = React.useState(false);
+      setInActivity = set;
+      return (
+        <NavigationContainer ref={nav}>
+          <Tab.Navigator tabBar={() => null} swipeableCount={swipeableTabCount(true, inActivity)}>
+            <Tab.Screen name="Home" component={Home} />
+            <Tab.Screen name="Read" component={Read} />
+            {mainTabRoutes(inActivity).includes('Insights') ? <Tab.Screen name="Insights" component={Insights} /> : null}
+          </Tab.Navigator>
+        </NavigationContainer>
+      );
+    }
+    for (const k of Object.keys(mounts)) delete mounts[k];
+    render(<Harness />);
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 10));
+    });
+    expect(nav.getRootState()!.routes.map((r) => r.name)).toEqual(['Home', 'Read', 'Insights']);
+    act(() => setInActivity(true));
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 10));
+    });
+    expect(nav.getRootState()!.routes.map((r) => r.name)).toEqual(['Home', 'Read']);
+    expect(StyleSheet.flatten(screen.getByTestId('tab-pager-row').props.style).width).toBe(2 * 750);
+    swipe(-600);
+    expect(tab()).toBe('Read');
+    swipe(-600);
+    expect(tab()).toBe('Read');
+    expect(screen.queryByText('Insights screen', { includeHiddenElements: true })).toBeNull();
+    expect(mounts.Home).toBe(1);
+    expect(mounts.Read).toBe(1);
   });
 
   it('only on a tab’s main screen: in the reader a sideways swipe leaves the tab alone', async () => {

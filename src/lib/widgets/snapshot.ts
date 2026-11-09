@@ -7,12 +7,17 @@
 // midnight) with the app closed. The app rewrites it whenever anything changes.
 
 import { generateDailyAssignment } from '../algorithm';
+import { catchUpIndex, caughtUpOnDay, creditedOnDay, creditIndex, needDone, needDoneCount } from '../aheadCredit';
+import { duePagesOf, planDuePages } from '../carryOver';
+import { aliveStreak, completedDays } from '../streak';
+import { streakReadingFromItems, type HistoryItem } from '../streakFromItems';
 import { CalcSettings, dayTimes } from '../prayer/times';
 import { getNextRevisionDayStart, getRevisionDayForUser } from '../fajrBoundary';
-import { describePageRuns, describeSurahRuns, pageRuns } from '../pageRanges';
+import { describePagesToRevise, placeOfPageToRevise, type PartialPages } from '../passages';
 import { paletteV2, type AccentName } from '../../theme/v2';
 import type { QuranPage, RevisionLog, User, UserPage } from '../../types';
 import { widgetQibla, type City, type Coords, type WidgetQibla } from './qibla';
+import { partlyMemorizedAyahs, revisablePages } from '../memorizedAyahs';
 
 /** Shared by the app and the extension (app.config.js, targets/widget). */
 export const WIDGET_APP_GROUP = 'group.com.revisionbuddy.app';
@@ -28,11 +33,11 @@ export interface WidgetDay {
   startsAt: number;
   /** When it ends: the next fajr, or midnight. */
   endsAt: number;
-  /** "Pages 41–50". */
+  /** What the day revises, by surah (never page numbers; lib/passages, short): "Al-Mujadila to At-Tahrim". */
   title: string;
-  /** "Juz 3 · Al-Baqarah to Aal-i-Imraan". */
+  /** Its juz: "Juz 28", "Juz 27–28". */
   where: string;
-  /** For the Lock Screen: "p. 41–50", or "12 pages" for several ranges. */
+  /** For the Lock Screen (one short line): the title when it fits, else where the day starts ("Al-Baqarah 142"). */
   short: string;
   total: number;
   /** Today's pages revised (only today can have any). */
@@ -121,6 +126,8 @@ export interface WidgetInputs {
   cities?: readonly City[];
   /** Prayer times to include (testers with a place); none otherwise. */
   prayer?: { from: Coords; settings: CalcSettings; place: string | null } | null;
+  /** The Activity items' history (C5): the streak is read from it once loaded; the logs until then. */
+  history?: HistoryItem[] | null;
 }
 
 function colorsFor(accent: AccentName): WidgetSnapshot['colors'] {
@@ -140,14 +147,12 @@ export function juzLabel(juzBreakdown: { juz: number }[]): string {
   return js.length <= 3 ? `Juz ${js.join(', ')}` : `${js.length} juz`;
 }
 
-function shortLabel(pages: number[]): string {
-  const runs = pageRuns(pages);
-  if (runs.length === 1) {
-    const r = runs[0];
-    return r.first === r.last ? `p. ${r.first}` : `p. ${r.first}–${r.last}`;
-  }
-  const n = runs.reduce((sum, r) => sum + r.last - r.first + 1, 0);
-  return `${n} page${n === 1 ? '' : 's'}`;
+/** The Lock Screen's rectangular widget fits about this many characters on its line. */
+const SHORT_FITS = 20;
+
+function shortLabel(pages: number[], title: string, partial: PartialPages): string {
+  if (pages.length === 0) return '';
+  return title.length <= SHORT_FITS ? title : placeOfPageToRevise(pages[0], partial, { form: 'short' });
 }
 
 function localDay(s: string): Date {
@@ -162,20 +167,7 @@ function previousDay(s: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-/**
- * Days in a row with a session, ending at `day` if it has one, or else at the day
- * before: a streak stays alive until the day is over. (Home counts the same days,
- * from the first session of the day.)
- */
-export function aliveStreak(logDays: ReadonlySet<string>, day: string): number {
-  let cursor = logDays.has(day) ? day : previousDay(day);
-  let streak = 0;
-  while (logDays.has(cursor)) {
-    streak++;
-    cursor = previousDay(cursor);
-  }
-  return streak;
-}
+export { aliveStreak };
 
 export function buildWidgetSnapshot(input: WidgetInputs): WidgetSnapshot {
   const base = {
@@ -189,36 +181,45 @@ export function buildWidgetSnapshot(input: WidgetInputs): WidgetSnapshot {
   };
   if (!input.signedIn || !input.user) return { ...base, state: 'signedOut', days: [] };
   const user = input.user;
-  const memorizedCount = input.pages.filter((p) => p.status === 'memorized').length;
+  const memorized = revisablePages(input.pages);
+  // A partly memorized page is named by its memorized ayahs (MEM-4).
+  const partial = partlyMemorizedAyahs(input.pages);
+  const memorizedCount = memorized.length;
   if (!input.onboardingComplete || memorizedCount === 0) return { ...base, state: 'noPlan', days: [] };
 
-  const logDays = new Set(input.logs.map((l) => l.date));
+  // A day with a session, or whose pages were all revised ahead, is a day done.
+  const logOf = new Map(input.logs.map((l) => [l.date, l]));
+  const done = completedDays(creditIndex(input.logs), (d) => logOf.get(d)?.assignedPages ?? planDuePages(user, d, memorized), catchUpIndex(input.logs));
   const days: WidgetDay[] = [];
   let startsAt = input.now;
   for (let i = 0; i < WIDGET_DAYS_AHEAD; i++) {
     const day = getRevisionDayForUser(user, startsAt);
     const endsAt = getNextRevisionDayStart(user, startsAt);
     const assignment = generateDailyAssignment(input.pages, input.quranData, user, localDay(day));
-    const runs = pageRuns(assignment.pages);
+    // The day's pages in the order it reads them, by surah (CLAUDE.md: surahs and juz first).
+    const title = describePagesToRevise(assignment.pages, partial, { form: 'short', order: 'given', wholeJuz: false, max: 2 });
 
-    // As Home: done once as many pages were revised today as were assigned.
-    const revised = new Set<number>();
-    for (const log of input.logs) if (log.date === day) log.pagesRevised.forEach((p) => revised.add(p));
-    const total = assignment.totalPages;
-    const completed = revised.size > 0 && revised.size >= total;
-    const doneHere = assignment.pages.filter((p) => revised.has(p)).length;
+    // As Home: done once every page of the day is revised, today or ahead.
+    const credited = creditedOnDay(input.logs, day);
+    const caughtUp = caughtUpOnDay(input.logs, day);
+    // The pages that finish the day (SESS-7): its own; or the carried pages, when Keep daily
+    // amount filled the day with them (they still count for the days they were missed).
+    const own = duePagesOf(assignment.pages, user, day, memorized);
+    const total = own.length;
+    const doneHere = needDoneCount(own, credited, caughtUp);
+    const completed = needDone(own, credited, caughtUp);
 
     days.push({
       day,
       startsAt: startsAt.getTime(),
       endsAt: endsAt.getTime(),
-      title: describePageRuns(runs),
-      where: [juzLabel(assignment.juzBreakdown), describeSurahRuns(runs)].filter(Boolean).join(' · '),
-      short: shortLabel(assignment.pages),
+      title,
+      where: juzLabel(assignment.juzBreakdown),
+      short: shortLabel(assignment.pages, title, partial),
       total,
       done: completed ? total : doneHere,
       completed,
-      streak: aliveStreak(logDays, day),
+      streak: input.history ? streakReadingFromItems({ user, pages: input.pages, items: input.history, today: day }).streak : aliveStreak(done, day),
     });
     // Never stall: a boundary that isn't later (an odd clock) moves on a day.
     startsAt = endsAt.getTime() > startsAt.getTime() ? endsAt : new Date(startsAt.getTime() + 86_400_000);

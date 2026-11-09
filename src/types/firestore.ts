@@ -33,6 +33,8 @@ export interface FirestoreCustomPlan {
   days: Array<{ pages: number[] }>;
   cycleStartDate: string;
   direction: 'forward' | 'reverse';
+  /** The plan's name (SCHED-7). Absent when it has none, and on plans saved before Nov 8 2026. */
+  name?: string;
 }
 
 /** A named, reusable schedule persisted on the user doc. Same array-of-objects
@@ -81,7 +83,10 @@ export const DEFAULT_WEAKNESS_RATING: WeaknessRating = 4;
 export interface NotificationSettings {
   /** Whether notifications are enabled */
   enabled: boolean;
-  /** Daily reminder time in HH:mm format */
+  /**
+   * The morning reminder's time, HH:mm. No longer set in the app (08:00 for new
+   * accounts); a time picked before is kept (lib/reminders morningTime).
+   */
   reminderTime: string;
 }
 
@@ -97,6 +102,10 @@ export interface FirestoreUser {
   /** Set by an admin only (functions/scripts/set-preview-tester.js; the rules
    *  refuse it from clients): TestFlight installs follow the preview channel. */
   previewTester?: boolean;
+  /** Set by an admin only (functions/scripts/reset-account.js): when the
+   *  account's data was reset. Phones drop what they held from before
+   *  (lib/offline/reset). */
+  dataResetAt?: Timestamp;
   // Identity
   /** User ID from Firebase Auth */
   uid: string;
@@ -122,7 +131,7 @@ export interface FirestoreUser {
   scheduleMode?: 'pages' | 'juz';
   /** How many juz to revise per day (only used when scheduleMode === 'juz') */
   dailyJuzCount?: number;
-  /** Whether Smart Tracking (page ratings + Insights tab) is enabled */
+  /** Whether Smart Tracking (page ratings, and Insights: the tab, or Activity's Weak spots) is enabled */
   smartTrackingEnabled: boolean;
   /** Whether the user has finished (or dismissed) the Smart Tracking preview tour */
   hasSeenSmartTrackingPreview: boolean;
@@ -183,8 +192,11 @@ export interface FirestoreUser {
   carryOverMode?: 'shift' | 'add';
   /** The new design's accent; unset = Indigo. */
   accent?: 'indigo' | 'crimson' | 'jade';
+  /** The last "What's new" release this account finished, or set up on (lib/help/whatsNew). */
+  whatsNewSeen?: string;
   /** Pages carried into one revision day (see User.carryOver). */
-  carryOver?: { day: string; pages: number[]; skip?: number } | null;
+  /** Who put the pages there: 'insights' for "Revise these first tomorrow" (absent: the schedule's own). */
+  carryOver?: { day: string; pages: number[]; skip?: number; source?: 'insights' | null; from?: Record<string, string>; next?: { day: string; pages: number[]; source?: 'insights' | null } | null } | null;
   /** Pages the schedule has been moved back by carry-overs. */
   scheduleShiftPages?: number;
   /** Translation shown when holding a verse. */
@@ -241,7 +253,10 @@ export interface UpdateUserInput {
   carryOverMode?: 'shift' | 'add';
   /** The new design's accent; unset = Indigo. */
   accent?: 'indigo' | 'crimson' | 'jade';
-  carryOver?: { day: string; pages: number[]; skip?: number } | null;
+  /** The last "What's new" release this account finished, or set up on (lib/help/whatsNew). */
+  whatsNewSeen?: string;
+  /** Who put the pages there: 'insights' for "Revise these first tomorrow" (absent: the schedule's own). */
+  carryOver?: { day: string; pages: number[]; skip?: number; source?: 'insights' | null; from?: Record<string, string>; next?: { day: string; pages: number[]; source?: 'insights' | null } | null } | null;
   scheduleShiftPages?: number;
   translationId?: string;
   reciter?: string;
@@ -254,10 +269,12 @@ export interface UpdateUserInput {
 // ============================================================================
 
 /**
- * One day of the user's personal memorization/revision journal
+ * One day of the user's personal memorization/revision journal.
  *
  * Collection: users/{userId}/journal/{date}
- * Document ID: The date (YYYY-MM-DD), so there is at most one entry per day.
+ * Document ID: The date (YYYY-MM-DD). Since timestamped entries (#167) the
+ * day's text lives in its entries subcollection; these fields hold a day's
+ * legacy single block until the day's first new entry moves it there.
  */
 export interface FirestoreJournalEntry {
   /** YYYY-MM-DD — also the document ID */
@@ -272,6 +289,27 @@ export interface FirestoreJournalEntry {
   notes: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+}
+
+/**
+ * One timestamped entry in a day's log.
+ *
+ * Collection: users/{userId}/journal/{date}/entries/{entryId}
+ * `uid` and `day` repeat the path so the entries of an account can be read
+ * with one collection-group query.
+ */
+export interface FirestoreJournalNote {
+  id: string;
+  uid: string;
+  /** YYYY-MM-DD: the revision day the entry belongs to. */
+  day: string;
+  /** Clock time it was written (ms since epoch). */
+  at: number;
+  kind: 'memorization' | 'revision' | 'note';
+  text: string;
+  /** The item this note is tagged to (see JournalNote.tag). */
+  tag?: string | null;
+  minutes: number | null;
 }
 
 // ============================================================================
@@ -336,6 +374,11 @@ export interface FirestorePage {
   totalRevisionCount: number;
   /** Number of times this page was assigned but skipped */
   skipCount: number;
+  /**
+   * A 'learning' page's memorized ayahs, sura × 1000 + ayah (lib/memorizedAyahs). Read only while
+   * the status is 'learning': a build before ayahs (1.0.3) re-marking the page leaves them behind.
+   */
+  verses?: number[];
   /** Last time any field was updated */
   updatedAt: Timestamp;
 }
@@ -420,6 +463,11 @@ export interface FirestoreSession {
   pagesSkipped: number[];
   /** Weakness ratings updated during this session */
   weaknessUpdates: WeaknessUpdate[];
+  /**
+   * Pages revised ahead (lib/aheadCredit), credited to a later revision day:
+   * day ('YYYY-MM-DD') → page numbers. Those pages are also in pagesRevised.
+   */
+  ahead?: Record<string, number[]>;
 
   // Computed on completion
   /** Percentage of assigned pages completed (0-100) */

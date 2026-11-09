@@ -18,11 +18,16 @@ export function SpeechModelSheet({
   visible,
   onClose,
   onReady,
+  title = 'Follow word by word',
+  intro = 'Revisely can listen as you recite and show each word as you say it.',
 }: {
   visible: boolean;
   onClose: () => void;
   /** The model is on the phone. */
   onReady: () => void;
+  /** What the model is wanted for (recite mode's words by default; search by voice has its own). */
+  title?: string;
+  intro?: string;
 }) {
   const { palette } = useTheme();
   const model = useSpeechModelState();
@@ -56,13 +61,13 @@ export function SpeechModelSheet({
     <Sheet
       visible={visible}
       onClose={onClose}
-      title="Follow word by word"
+      title={title}
       footer={{ label: downloading ? 'Close' : 'Not now', onPress: onClose, testID: 'speech-model-close' }}
       testID="speech-model-sheet"
     >
       <View style={styles.body}>
         <Text style={[typeV2.body, styles.centred, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
-          Revisely can listen as you recite and show each word as you say it.
+          {intro}
         </Text>
         <Text style={[typeV2.meta, styles.centred, { color: palette.secondary }]} maxFontSizeMultiplier={1.4} testID="speech-model-privacy">
           It works on this iPhone: your voice isn’t recorded or sent anywhere.

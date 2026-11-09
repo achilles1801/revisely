@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { useNow, useReadingTimer } from '../../context/ReadingTimerContext';
 import { displayMs, formatClock } from '../../lib/readingTimer';
-import { recordedMs } from '../recordings/RecordButton';
+import { levelsOf, recordedMs } from '../recordings/RecordButton';
+import { LiveWaveform } from '../recordings/LiveWaveform';
 import { formatRecordingTime } from '../../lib/recordingFormat';
 import type { RecitationState } from '../../lib/recitation';
 import type { RecorderPhase } from '../../hooks/useVoiceRecorder';
@@ -12,7 +13,14 @@ import { typeV2 } from '../../theme/v2';
 import { Tap } from '../v2/Tap';
 
 interface ReaderActivityProps {
-  recorder: { phase: RecorderPhase; baseMs: number; segmentStartedAt: number | null };
+  recorder: {
+    phase: RecorderPhase;
+    baseMs: number;
+    segmentStartedAt: number | null;
+    /** The recorder's own readings, for the five live bars. */
+    subscribeLevel?: (listener: (level: number) => void) => () => void;
+    recentLevels?: () => number[];
+  };
   /** This screen's recitation. */
   playback: RecitationState;
   /** Tap: show the controls. */
@@ -21,13 +29,15 @@ interface ReaderActivityProps {
 
 /**
  * While reading with the controls hidden: a small sign that something is
- * running, a recording (red dot and its time), a recitation (its verse) or the
- * timer (its clock), so it isn't forgotten. Tapping it brings the controls back.
- * Nothing otherwise.
+ * running, a recording (a red dot, five bars moving with the voice and the
+ * time; paused, a hollow dot and the time in grey), a recitation (its verse)
+ * or the timer (its clock), so it isn't forgotten. Tapping it brings the
+ * controls back. Nothing otherwise.
  */
 export function ReaderActivity({ recorder, playback, onPress }: ReaderActivityProps) {
   const { palette } = useTheme();
-  const { phase, baseMs, segmentStartedAt } = recorder;
+  const { phase, baseMs, segmentStartedAt, subscribeLevel, recentLevels } = recorder;
+  const levels = useMemo(() => levelsOf({ subscribeLevel, recentLevels }), [subscribeLevel, recentLevels]);
   const recordingShown = phase !== 'idle' && (phase !== 'starting' || baseMs > 0 || segmentStartedAt != null);
   const capturing = phase === 'recording';
   const reciting = playback.status !== 'idle' && playback.verse != null;
@@ -69,12 +79,25 @@ export function ReaderActivity({ recorder, playback, onPress }: ReaderActivityPr
       {recordingShown && (
         <View style={styles.item} testID="reader-activity-recording">
           <View
-            style={[
-              styles.dot,
-              capturing ? { backgroundColor: palette.red } : { borderWidth: 1.5, borderColor: palette.red },
-            ]}
+            style={
+              capturing
+                ? [styles.dot, { backgroundColor: palette.red }]
+                : [styles.hollow, { borderColor: palette.red }]
+            }
           />
-          <Text style={[text, { color: palette.red }]} maxFontSizeMultiplier={1.2}>
+          {capturing ? (
+            <LiveWaveform
+              levels={levels}
+              color={palette.text}
+              count={5}
+              barWidth={2.5}
+              gap={2}
+              maxHeight={14}
+              fade={false}
+              testID="reader-activity-bars"
+            />
+          ) : null}
+          <Text style={[text, { color: capturing ? palette.text : palette.secondary }]} maxFontSizeMultiplier={1.2}>
             {time}
           </Text>
         </View>
@@ -107,13 +130,14 @@ const styles = StyleSheet.create({
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    height: 22,
-    paddingHorizontal: 8,
-    borderRadius: 11,
+    gap: 6,
+    height: 24,
+    paddingHorizontal: 9,
+    borderRadius: 12,
     borderWidth: StyleSheet.hairlineWidth,
   },
-  item: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  dot: { width: 7, height: 7, borderRadius: 3.5 },
-  text: { fontSize: 11, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  item: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  dot: { width: 6, height: 6, borderRadius: 3 },
+  hollow: { width: 7, height: 7, borderRadius: 3.5, borderWidth: 1.5 },
+  text: { fontSize: 11.5, fontWeight: '600', fontVariant: ['tabular-nums'] },
 });

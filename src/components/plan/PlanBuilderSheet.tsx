@@ -33,7 +33,7 @@ import {
   memorizedSurahGroups,
   pageCountLabel,
 } from '../../lib/planDisplay';
-import { getJuzForPage, getSurahForPage } from '../../lib/quranData';
+import { describePageRange, describePassage, spokenText } from '../../lib/passages';
 import { useApp } from '../../context/AppContext';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
 
@@ -227,15 +227,16 @@ export const PlanBuilderSheet = forwardRef<PlanBuilderHandle, Props>(function Pl
       key: `juz:${g.juz}`,
       index: String(g.juz),
       title: `Juz ${g.juz}`,
-      subtitle: `${getSurahForPage(g.pages[0]).name} · ${pageCountLabel(g.pages.length)}`,
+      subtitle: `${describePassage(g.pages, { form: 'short', wholeJuz: false, max: 2 })} · ${pageCountLabel(g.pages.length)}`,
       trailing: g.name,
       search: `${g.juz}`,
       checked: startKey === `juz:${g.juz}`,
     }));
     const pageItems: PickerItem[] = memorizedNumbers.map((p) => ({
       key: `page:${p}`,
+      // Chosen by page (the Page tab): the number leads, the surah and juz follow.
       title: `Page ${p}`,
-      subtitle: `${getSurahForPage(p).name} · Juz ${getJuzForPage(p)}`,
+      subtitle: describePageRange(p, p, { juz: true }),
       checked: startKey === `page:${p}`,
     }));
     return [
@@ -317,7 +318,7 @@ export const PlanBuilderSheet = forwardRef<PlanBuilderHandle, Props>(function Pl
                 value={start.title}
                 accessory="chevron"
                 onPress={openStartPicker}
-                accessibilityLabel={`Today starts at ${start.title}, ${start.subtitle}`}
+                accessibilityLabel={spokenText(`Today starts at ${start.title}, ${start.subtitle}`)}
               />
             ) : null}
             {showOrder ? (

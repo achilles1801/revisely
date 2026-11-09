@@ -1,6 +1,6 @@
-import React, { useMemo, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from '../../components/SafeAreaView';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { TopSafeAreaView } from '../../components/SafeAreaView';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MemorizationBrowser } from '../../components/MemorizationBrowser';
@@ -16,11 +16,15 @@ import { IconButton, TopBar } from '../../components/v2/TopBar';
 import { PillButton } from '../../components/v2/PillButton';
 import { Sheet } from '../../components/v2/Sheet';
 import { computeMemorizationStats, formatFractional } from '../../lib/memorizationStats';
+import { defaultWhen, memorizationChangeSet, type WhenMemorized } from '../../lib/memorizationLog';
+import { queueChange } from '../../lib/offline/queue';
+import { getRevisionDayForUser } from '../../lib/fajrBoundary';
 import { layoutV2, typeV2 } from '../../theme/v2';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import type { HomeStackParamList } from '../../navigation/MainNavigator';
 import type { User } from '../../types';
+import { revisablePages } from '../../lib/memorizedAyahs';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'Memorization'>;
 
@@ -36,6 +40,17 @@ export default function MemorizationScreen() {
 
   // From Home's Memorized line (and its menu), straight to editing.
   const [markMode, setMarkMode] = useState(route.params?.edit === true);
+  // From Activity's Memorized → Edit: the entry's pages, scrolled to once the rows are laid out.
+  const focusPages = route.params?.focusPages;
+  const scrollRef = useRef<ScrollView>(null);
+  const [browserY, setBrowserY] = useState<number | null>(null);
+  const [focusY, setFocusY] = useState<number | null>(null);
+  const scrolledToFocus = useRef(false);
+  useEffect(() => {
+    if (scrolledToFocus.current || browserY == null || focusY == null) return;
+    scrolledToFocus.current = true;
+    scrollRef.current?.scrollTo({ y: Math.max(0, browserY + focusY - 8), animated: true });
+  }, [browserY, focusY]);
   const [pendingChanges, setPendingChanges] = useState<
     Map<number, PageStatus>
   >(new Map());
@@ -56,15 +71,24 @@ export default function MemorizationScreen() {
     setMarkMode(false);
   };
 
-  const handleSave = async () => {
+  // Saves the manager's changes. Pages newly marked are logged for Today (one dated memorization
+  // item for the day) or not logged (Before). Unmarked pages come out of the items that hold them.
+  const commit = async (when: WhenMemorized | null) => {
     setSaving(true);
     try {
       const { updatedPages, changedPageNumbers } = applyPendingChanges(
         pages,
         pendingChanges,
       );
+      const { marked, unmarked } = memorizationChangeSet(pages, pendingChanges);
       if (changedPageNumbers.length > 0) {
         await updatePages(updatedPages, changedPageNumbers);
+      }
+      if (when === 'today' && marked.length > 0 && user) {
+        await queueChange({ kind: 'memorization.mark', day: getRevisionDayForUser(user), pages: marked, at: Date.now() });
+      }
+      if (unmarked.length > 0) {
+        await queueChange({ kind: 'memorization.unmark', pages: unmarked });
       }
 
       if (user) {
@@ -79,9 +103,7 @@ export default function MemorizationScreen() {
         // doesn't surface pages the user no longer knows. We don't auto-add
         // newly-memorized pages — the user slots those in the plan editor.
         if (user.customPlan) {
-          const memorizedNumbers = updatedPages
-            .filter((p) => p.status === 'memorized')
-            .map((p) => p.pageNumber);
+          const memorizedNumbers = revisablePages(updatedPages).map((p) => p.pageNumber);
           const { plan } = pruneCustomPlanForMemorized(
             user.customPlan,
             memorizedNumbers,
@@ -107,6 +129,21 @@ export default function MemorizationScreen() {
     }
   };
 
+  const handleSave = () => {
+    const { marked } = memorizationChangeSet(pages, pendingChanges);
+    if (marked.length === 0) {
+      void commit('before');
+      return;
+    }
+    const today = { text: 'Today', onPress: () => void commit('today') };
+    const before = { text: "Before (don't log)", onPress: () => void commit('before') };
+    Alert.alert(
+      'When did you memorize these?',
+      `${marked.length} ${marked.length === 1 ? 'page' : 'pages'} marked memorized.`,
+      defaultWhen(marked) === 'today' ? [today, before, { text: 'Cancel', style: 'cancel' }] : [before, today, { text: 'Cancel', style: 'cancel' }],
+    );
+  };
+
   const handleReviewSchedule = () => {
     setReviewPromptOpen(false);
     navigation.navigate('PlanEdit');
@@ -125,7 +162,7 @@ export default function MemorizationScreen() {
     else navigation.goBack();
   };
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
+    <TopSafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
       <TopBar
         title="Memorization"
         onBack={backV2}
@@ -142,8 +179,9 @@ export default function MemorizationScreen() {
         separator
       />
       <ScrollView
+        ref={scrollRef}
         style={styles.scroll}
-        contentContainerStyle={{ paddingBottom: markMode ? barFootprint + layoutV2.rowPad : layoutV2.rowPad }}
+        contentInsetAdjustmentBehavior="never" contentContainerStyle={{ paddingBottom: markMode ? barFootprint + layoutV2.rowPad : layoutV2.rowPad }}
         testID="memorization-v2"
       >
         <View style={[v2.summary, { borderBottomColor: palette.separator }]} testID="memorization-summary">
@@ -154,9 +192,10 @@ export default function MemorizationScreen() {
             {`${formatFractional(stats.fractionalJuz)} of 30 juz · ${stats.surahs} of 114 surahs`}
           </Text>
           <View style={v2.bar}>
-            <ProgressBar progress={(stats.pages / 604) * 100} height={6} testID="memorization-progress" />
+            <ProgressBar progress={(stats.share / 604) * 100} height={6} testID="memorization-progress" />
           </View>
         </View>
+        <View onLayout={(e) => setBrowserY(e.nativeEvent.layout.y)} testID="memorization-browser">
         <MemorizationBrowser
           pages={pages}
           pendingChanges={pendingChanges}
@@ -167,7 +206,10 @@ export default function MemorizationScreen() {
           markMode={markMode}
           onMarkModeChange={setMarkMode}
           hideMarkToggle
+          focusPages={focusPages}
+          onFocusOffset={setFocusY}
         />
+        </View>
       </ScrollView>
 
       {markMode && (
@@ -223,7 +265,7 @@ export default function MemorizationScreen() {
           <PillButton size="lg" variant="outline" title="Later" onPress={() => setReviewPromptOpen(false)} testID="review-later" />
         </View>
       </Sheet>
-    </SafeAreaView>
+    </TopSafeAreaView>
   );
 }
 

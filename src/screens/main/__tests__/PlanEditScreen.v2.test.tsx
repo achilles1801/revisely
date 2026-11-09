@@ -167,6 +167,38 @@ beforeEach(async () => {
   });
 });
 
+describe('the schedule’s help (HELP-1, HELP-3)', () => {
+  it('a ? before Save; its sheet explains the cycle, and with Smart Tracking off a new plan has no weakest first', async () => {
+    Object.assign(mockApp, { user: { ...baseUser, smartTrackingEnabled: false } });
+    await mount(<PlanEditScreen />);
+    fireEvent.press(await screen.findByTestId('help-button-schedule'));
+    expect(await screen.findByTestId('help-sheet-schedule')).toBeTruthy();
+    expect(screen.getByText('How the schedule works')).toBeTruthy();
+    expect(screen.getByTestId('help-topic-schedule.cycle')).toBeTruthy();
+    expect(screen.getByTestId('help-topic-schedule.new.off')).toBeTruthy();
+    expect(screen.queryByTestId('help-topic-schedule.new')).toBeNull();
+    expect(screen.queryByText(/weakest/i)).toBeNull();
+  });
+
+  it('with Smart Tracking on, a new plan can put the weakest pages first', async () => {
+    Object.assign(mockApp, { user: { ...baseUser, smartTrackingEnabled: true } });
+    await mount(<PlanEditScreen />);
+    fireEvent.press(await screen.findByTestId('help-button-schedule'));
+    expect(await screen.findByTestId('help-topic-schedule.new')).toBeTruthy();
+    expect(screen.queryByTestId('help-topic-schedule.new.off')).toBeNull();
+  });
+
+  it('[HELP-4] an account that isn’t a tester has the ? too, and so does a tester', async () => {
+    for (const user of [baseUser, { ...baseUser, previewTester: false }, { ...baseUser, previewTester: true }]) {
+      Object.assign(mockApp, { user });
+      await mount(<PlanEditScreen />);
+      await act(async () => {});
+      expect(screen.getByTestId('help-button-schedule')).toBeTruthy();
+      screen.unmount();
+    }
+  });
+});
+
 describe('the schedule in the new design', () => {
   it('a v2 top bar: back, the title, Save as a solid pill (off until something changes)', async () => {
     await mount(<PlanEditScreen />);
@@ -335,6 +367,17 @@ describe('a day in the new design', () => {
     expect(mockNavigation.goBack).toHaveBeenCalled();
   });
 
+  it('[ACT-24] from “Add to plan”: the pages added to the day are an edit, saying it is every cycle; back hands them to the plan', async () => {
+    mockRoute.params = { dayIndex: 1, initialPages: [1, 2, 3, 4], basePages: [1, 2], note: 'Saving the plan adds Al-Baqarah 1–16 to this day in every cycle.' };
+    await mount(<PlanDayEditScreen />);
+    expect(screen.getByTestId('plan-day-note').props.children).toMatch(/every cycle\.$/);
+    expect(screen.getByText(/Edited$/)).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Back to schedule'));
+    // Into the plan's draft, which is saved from the plan (nothing is saved here).
+    expect(mockNavigation.popTo).toHaveBeenCalledWith('PlanEdit', { editedDay: { index: 1, pages: [1, 2, 3, 4] } }, { merge: true });
+    expect(mockNavigation.goBack).not.toHaveBeenCalled();
+  });
+
   it('the picker: search on the quiet fill, pill tabs, rows checked in ink', async () => {
     await mount(<PlanDayEditScreen />);
     fireEvent.press(screen.getByTestId('day-pick'));
@@ -469,5 +512,171 @@ describe('a new plan and today', () => {
     const automatic = { ...baseUser, customPlan: null };
     expect(todayOf(savedUser())).toEqual(todayOf(automatic));
     alert.mockRestore();
+  });
+});
+
+describe('the plan’s name in the header (SCHED-7)', () => {
+  const { dateToLocalISODay } = require('../../../lib/schedulePlans');
+  const day0 = new Date();
+  day0.setHours(0, 0, 0, 0);
+  const TODAY = dateToLocalISODay(day0);
+  const hero = () => screen.getByTestId('plan-hero');
+  const savedUser = (): User => (mockApp.saveUser as jest.Mock).mock.calls.at(-1)[0];
+  const live = (name?: string) => ({
+    days: [[1, 2, 3], [4, 5, 6], [7, 8, 9]],
+    cycleStartDate: TODAY,
+    direction: 'forward' as const,
+    ...(name ? { name } : {}),
+  });
+
+  async function loadSaved() {
+    fireEvent.press(screen.getByTestId('saved-plan-p1'));
+    await act(async () => {});
+    fireEvent.press(within(screen.getByTestId('saved-plan-menu')).getByTestId('sheet-action-load'));
+    await act(async () => {
+      screen.UNSAFE_getAllByType(Modal).find((m) => m.props.visible)?.props.onDismiss?.();
+    });
+  }
+  async function save() {
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('plan-save'));
+    });
+  }
+  async function saveCurrentAs(name: string) {
+    fireEvent.press(screen.getByTestId('plan-save-current'));
+    fireEvent.changeText(screen.getByTestId('plan-name'), name);
+    await act(async () => {
+      fireEvent.press(within(screen.getByTestId('gorhom-sheet')).getByText('Save'));
+    });
+  }
+
+  it('[SCHED-7] a loaded saved plan is named in the header, and saving it keeps the name', async () => {
+    await mount(<PlanEditScreen />);
+    expect(within(hero()).getByText('Automatic')).toBeTruthy();
+    await loadSaved();
+    expect(within(hero()).getByText('Ramadan rotation')).toBeTruthy();
+    expect(within(hero()).queryByText('Custom plan')).toBeNull();
+    await save();
+    expect(savedUser().customPlan).toMatchObject({ name: 'Ramadan rotation', days: [[1, 2], [3, 4]] });
+  });
+
+  it('[SCHED-7] a named live plan shows its name; an edit keeps it, with “Unsaved changes” until saved', async () => {
+    mockApp.user = { ...baseUser, savedPlans: [saved], customPlan: live('Weekdays') };
+    await mount(<PlanEditScreen />);
+    expect(within(hero()).getByText('Weekdays')).toBeTruthy();
+    expect(screen.queryByTestId('plan-dirty')).toBeNull();
+    fireEvent.press(screen.getByTestId('plan-add-day'));
+    expect(within(hero()).getByText('Weekdays')).toBeTruthy();
+    expect(screen.getByTestId('plan-dirty')).toBeTruthy();
+    await save();
+    expect(savedUser().customPlan).toMatchObject({ name: 'Weekdays' });
+    expect(savedUser().customPlan!.days).toHaveLength(4);
+  });
+
+  it('[SCHED-7] a custom plan without a name is “Custom plan”', async () => {
+    mockApp.user = { ...baseUser, savedPlans: [saved], customPlan: live() };
+    await mount(<PlanEditScreen />);
+    expect(within(hero()).getByText('Custom plan')).toBeTruthy();
+  });
+
+  it('[SCHED-7] “Create new plan” makes a plan with no name: “Custom plan”, saved without one', async () => {
+    mockApp.user = { ...baseUser, savedPlans: [saved], customPlan: live('Weekdays') };
+    await mount(<PlanEditScreen />);
+    fireEvent.press(screen.getByTestId('plan-create'));
+    await act(async () => {
+      fireEvent.press(within(screen.getByTestId('gorhom-sheet')).getByText('Apply'));
+    });
+    expect(within(hero()).getByText('Custom plan')).toBeTruthy();
+    await save();
+    expect(savedUser().customPlan).not.toHaveProperty('name');
+  });
+
+  it('[SCHED-7] saving the live custom plan under a name names it at once, without touching its days', async () => {
+    mockApp.user = { ...baseUser, savedPlans: [saved], customPlan: live() };
+    await mount(<PlanEditScreen />);
+    await saveCurrentAs('Weekdays');
+    const after = savedUser();
+    expect(after.customPlan).toEqual(live('Weekdays'));
+    expect(after.savedPlans.map((p) => p.name)).toEqual(['Ramadan rotation', 'Weekdays']);
+    expect(within(hero()).getByText('Weekdays')).toBeTruthy();
+  });
+
+  it('[SCHED-7] saving an edited draft under a name names the draft; Save then keeps the name', async () => {
+    mockApp.user = { ...baseUser, savedPlans: [saved], customPlan: live() };
+    await mount(<PlanEditScreen />);
+    fireEvent.press(screen.getByTestId('plan-add-day'));
+    await saveCurrentAs('Weekdays');
+    // The saved plan is stored; the live plan waits for Save, like the edit.
+    expect(savedUser().customPlan).toEqual(live());
+    expect(within(hero()).getByText('Weekdays')).toBeTruthy();
+    expect(screen.getByTestId('plan-dirty')).toBeTruthy();
+    await save();
+    expect(savedUser().customPlan).toMatchObject({ name: 'Weekdays' });
+    expect(savedUser().customPlan!.days).toHaveLength(4);
+  });
+
+  it('[SCHED-7] on the automatic schedule, saving it under a name keeps a copy and leaves it automatic', async () => {
+    await mount(<PlanEditScreen />);
+    await saveCurrentAs('Weekdays');
+    expect(savedUser().customPlan).toBeNull();
+    expect(within(hero()).getByText('Automatic')).toBeTruthy();
+    expect(screen.queryByTestId('plan-dirty')).toBeNull();
+  });
+});
+
+describe('memorized pages a custom plan doesn’t hold (MEM-6)', () => {
+  const today = new Date();
+  const day = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const range = (a: number, b: number) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
+  // Pages 1–30 memorized, the plan holding 1–28; and An-Nas alone memorized on the last page.
+  // An account that isn't a tester (previewTester unset): MEM-6 is everyone's since the November 2026 release.
+  const withPlan = (custom = true) => {
+    Object.assign(mockApp, {
+      user: { ...baseUser, customPlan: custom ? { days: [range(1, 10), range(11, 20), range(21, 28)], cycleStartDate: day, direction: 'forward' } : null },
+      pages: [
+        ...memorized,
+        { ...memorized[0], pageNumber: 604, status: 'in_progress', verses: [114001, 114002, 114003, 114004, 114005, 114006] },
+      ],
+    });
+  };
+
+  it('[MEM-6] an account that isn’t a tester sees them, named by their ayahs, and adds them to tomorrow’s pages', async () => {
+    withPlan();
+    await mount(<PlanEditScreen />);
+    expect(screen.getByText('Not in your plan')).toBeTruthy();
+    expect(screen.getByText(/Al.Baqarah .* and An.Nas/)).toBeTruthy();
+    expect(within(screen.getByTestId('plan-not-in-plan')).getByText('3 pages')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('plan-not-in-plan'));
+    await act(async () => {});
+    expect(screen.getByText('With tomorrow’s pages')).toBeTruthy();
+    expect(screen.getByText('10 pages, then 13 pages')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('sheet-action-tomorrow'));
+    // The action runs once the menu has gone (iOS: the modal's dismissal).
+    await act(async () => {
+      screen.UNSAFE_getAllByType(Modal).find((m) => m.props.visible)?.props.onDismiss?.();
+    });
+    // In the plan now (not saved yet): the section goes, and Save comes on.
+    expect(screen.queryByText('Not in your plan')).toBeNull();
+    expect(screen.getByTestId('plan-dirty')).toBeTruthy();
+  });
+
+  it('[MEM-6] as a day of its own, tomorrow: the cycle grows by a day', async () => {
+    withPlan();
+    await mount(<PlanEditScreen />);
+    fireEvent.press(screen.getByTestId('plan-not-in-plan'));
+    await act(async () => {});
+    expect(screen.getByText('The cycle becomes 4 days')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('sheet-action-own'));
+    // The action runs once the menu has gone (iOS: the modal's dismissal).
+    await act(async () => {
+      screen.UNSAFE_getAllByType(Modal).find((m) => m.props.visible)?.props.onDismiss?.();
+    });
+    expect(within(screen.getByTestId('plan-hero')).getByText('Repeats every 4 days')).toBeTruthy();
+  });
+
+  it('[MEM-6] not on the automatic schedule, which holds every memorized page', async () => {
+    withPlan(false);
+    await mount(<PlanEditScreen />);
+    expect(screen.queryByText('Not in your plan')).toBeNull();
   });
 });

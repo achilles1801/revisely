@@ -1,4 +1,6 @@
 import { CustomPlan, UserPage } from '../types';
+import { TOTAL_QURAN_PAGES } from '../types/firestore';
+import { revisablePages } from './memorizedAyahs';
 
 export type PageStatus = 'memorized' | 'not_memorized';
 
@@ -28,6 +30,38 @@ export function applyPendingChanges(
     };
   });
   return { updatedPages, changedPageNumbers };
+}
+
+/**
+ * Pages memorized once `pendingChanges` apply, over every page number (1–604):
+ * a page the phone hasn't loaded yet counts if it is marked. The selection's
+ * checks are drawn from page numbers too, so the count agrees with them.
+ */
+export function countMemorizedWithPending(
+  pages: UserPage[],
+  pendingChanges: Map<number, PageStatus>,
+  total: number = TOTAL_QURAN_PAGES,
+): number {
+  const loaded = new Map(pages.map((p) => [p.pageNumber, p.status] as const));
+  let n = 0;
+  for (let page = 1; page <= total; page++) {
+    const status = pendingChanges.get(page) ?? loaded.get(page);
+    if (status === 'memorized') n++;
+  }
+  return n;
+}
+
+/**
+ * Pages marked memorized that the phone hasn't loaded yet. Saving now would drop
+ * them (a page change is built from a loaded page), so the save waits for them.
+ */
+export function markedPagesNotLoaded(pages: UserPage[], pendingChanges: Map<number, PageStatus>): number[] {
+  const loaded = new Set(pages.map((p) => p.pageNumber));
+  const missing: number[] = [];
+  pendingChanges.forEach((status, page) => {
+    if (status === 'memorized' && !loaded.has(page)) missing.push(page);
+  });
+  return missing.sort((a, b) => a - b);
 }
 
 /**
@@ -124,6 +158,17 @@ export function pruneCustomPlanForMemorized(
     removedPageCount,
     unscheduledMemorizedCount,
   };
+}
+
+/**
+ * The custom plan once some pages are no longer memorized: pruneCustomPlanForMemorized over the pages
+ * still revised (memorized or partly, MEM-4), or null when no page leaves it. The memorized pages'
+ * editor, and a Memorized entry deleted or undone on the Day (ACT-7), prune the same way.
+ */
+export function customPlanAfterUnmemorizing(customPlan: CustomPlan | null | undefined, pages: readonly UserPage[]): CustomPlan | null {
+  if (!customPlan) return null;
+  const { plan, removedPageCount } = pruneCustomPlanForMemorized(customPlan, revisablePages(pages).map((p) => p.pageNumber));
+  return removedPageCount > 0 ? plan : null;
 }
 
 /**

@@ -28,6 +28,14 @@ export interface ActiveReadingTimer {
   purpose?: ReadingTimerPurpose;
   /** Pages marked revised on the revision screen while this timer ran. */
   pagesRevised?: number[];
+  /**
+   * How long each reader page was on screen while it ran (ms, by page number), banked when the page
+   * changes or the timer pauses. Kept on the phone only: it names a sitting by the pages it held
+   * (pagesHeld), and is never saved with the session.
+   */
+  pageTimes?: Record<string, number>;
+  /** The reader page on screen now, and since when (ms), while running. */
+  onPage?: { page: number; since: number } | null;
 }
 
 export const TIMER_PRESET_MINUTES = [10, 15, 20, 30, 45, 60, 90, 120];
@@ -65,12 +73,43 @@ export function elapsedMs(timer: ActiveReadingTimer, now: number): number {
 
 export function pauseTimer(timer: ActiveReadingTimer, now: number): ActiveReadingTimer {
   if (timer.runningSince == null) return timer;
-  return { ...timer, accumulatedMs: elapsedMs(timer, now), runningSince: null };
+  return { ...timer, accumulatedMs: elapsedMs(timer, now), runningSince: null, pageTimes: pageTimesAt(timer, now) };
 }
 
 export function resumeTimer(timer: ActiveReadingTimer, now: number): ActiveReadingTimer {
   if (timer.runningSince != null) return timer;
-  return { ...timer, runningSince: now };
+  return { ...timer, runningSince: now, onPage: timer.onPage ? { page: timer.onPage.page, since: now } : timer.onPage };
+}
+
+/** Each page's time on screen so far (ms, by page number): what is banked, and the page on screen while running. */
+export function pageTimesAt(timer: ActiveReadingTimer, now: number): Record<string, number> {
+  const times = { ...(timer.pageTimes ?? {}) };
+  const on = timer.onPage;
+  if (on && timer.runningSince != null) {
+    const key = String(on.page);
+    times[key] = (times[key] ?? 0) + Math.max(0, now - Math.max(on.since, timer.runningSince));
+  }
+  return times;
+}
+
+/** A reader page came on screen: the one before it banks its time (REC-1). Same object while paused. */
+export function notePageOnScreen(timer: ActiveReadingTimer, page: number, now: number): ActiveReadingTimer {
+  if (timer.runningSince == null) return timer;
+  if (timer.onPage?.page === page) return timer;
+  return { ...timer, pageTimes: pageTimesAt(timer, now), onPage: { page, since: now } };
+}
+
+/** On screen this long, a page was read, not glanced at (REC-1). */
+export const HELD_MS = 60_000;
+
+/**
+ * The pages a sitting held (REC-1): those on screen a minute or more, in the order first seen. A
+ * timer from before page times were kept (none recorded) holds every page it visited.
+ */
+export function pagesHeld(timer: ActiveReadingTimer, now: number, minMs: number = HELD_MS): number[] {
+  const times = pageTimesAt(timer, now);
+  if (Object.keys(times).length === 0) return [...timer.pagesVisited];
+  return timer.pagesVisited.filter((p) => (times[String(p)] ?? 0) >= minMs);
 }
 
 /** Remaining time for timed modes; null for the open-ended stopwatch. */
@@ -116,7 +155,9 @@ export function noteRevisedPages(timer: ActiveReadingTimer, pages: number[]): Ac
 export function readingSessionFromTimer(
   timer: ActiveReadingTimer,
   now: number,
+  opts: { pagesHeld?: boolean } = {},
 ): Omit<ReadingSession, 'id'> {
+  const revised = timer.pagesRevised ?? [];
   return {
     date: timer.date,
     startedAt: timer.startedAt,
@@ -124,9 +165,10 @@ export function readingSessionFromTimer(
     durationSeconds: Math.round(elapsedMs(timer, now) / 1000),
     mode: timer.mode,
     targetSeconds: timer.targetSeconds,
-    // Pages marked revised while it ran are known; reading pages are
-    // assigned afterwards from the day in Activity.
-    pages: timer.pagesRevised ?? [],
+    // Pages marked revised while it ran are known. A sitting in the reader is saved with the pages
+    // it held (REC-2, testers: `pagesHeld`); otherwise reading pages are assigned afterwards from
+    // the day in Activity.
+    pages: revised.length > 0 ? revised : opts.pagesHeld ? pagesHeld(timer, now) : [],
     pagesVisited: timer.pagesVisited,
   };
 }

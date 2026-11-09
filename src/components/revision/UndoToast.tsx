@@ -40,7 +40,10 @@ export function UndoToast({
   actionLabel = 'Undo',
 }: UndoToastProps) {
   const { palette } = useTheme();
-  const opacity = useSharedValue(0);
+  // It slides up into place, fully opaque from its first frame. It used to fade in from 0 as
+  // well, started from the effect below as it mounted; on Android that first animation was now
+  // and then lost, and the bar stayed fully transparent for its whole time (E2E flow 05). A lost
+  // slide leaves it 20pt low, still seen.
   const translateY = useSharedValue(20);
 
   // Through a ref: an inline onDismiss from the parent would otherwise restart
@@ -50,20 +53,18 @@ export function UndoToast({
 
   useEffect(() => {
     if (visible) {
-      opacity.value = withTiming(1, { duration: 180 });
       translateY.value = withTiming(0, { duration: 220 });
       const timer = setTimeout(() => {
         onDismissRef.current();
       }, duration);
       return () => clearTimeout(timer);
-    } else {
-      opacity.value = withTiming(0, { duration: 160 });
-      translateY.value = withTiming(20, { duration: 200 });
     }
-  }, [visible, duration, opacity, translateY]);
+    // Gone at once (nothing is drawn while not visible); the next one slides up again.
+    translateY.value = 20;
+    return undefined;
+  }, [visible, duration, translateY]);
 
   const animStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
     transform: [{ translateY: translateY.value }],
   }));
 

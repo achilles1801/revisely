@@ -1,0 +1,13 @@
+{
+  "recordedAt": null,
+  "how": "Not recorded: an overload can't be produced on demand. Anthropic's documented error body for HTTP 529 (docs.anthropic.com/en/api/errors), as the API sends errors.",
+  "request": null,
+  "status": 529,
+  "body": {
+    "type": "error",
+    "error": {
+      "type": "overloaded_error",
+      "message": "Overloaded"
+    }
+  }
+}

@@ -21,7 +21,15 @@ import { useReduceMotion } from '../../design/motion';
 import { Backdrop } from '../Backdrop';
 import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
 import { Tap } from './Tap';
+import { ModalNest, useInsideModal, useModalTurn } from './modalTurn';
 import { Ionicons } from '@expo/vector-icons';
+
+/**
+ * iOS: how long a closed sheet waits for its modal to report it has gone (onDismiss, normally a few
+ * ms) before it replaces the modal with a fresh one. A modal whose dismissal never completes would otherwise
+ * stay over the screen, invisible, taking every touch.
+ */
+export const DISMISS_FALLBACK_MS = 1000;
 
 /** A button in a sheet's header: text ("Cancel", "Save") or an icon (✕, ▶). */
 export interface SheetHeaderAction {
@@ -34,6 +42,8 @@ export interface SheetHeaderAction {
   onPress: () => void;
   /** The confirming action: semibold. */
   strong?: boolean;
+  /** In the accent's text colour (Activity's add sheets: Add); a disabled one is grey. */
+  accent?: boolean;
   disabled?: boolean;
   testID?: string;
 }
@@ -61,6 +71,11 @@ export function shouldDismiss(translationY: number, velocityY: number, sheetHeig
  * (CLAUDE.md, UI traps). `onHidden` runs once the sheet is fully gone (iOS:
  * when the modal has been dismissed), for whatever must wait for that.
  *
+ * One sheet at a time (modalTurn): asked to show while another sheet is up or
+ * still going, it waits until that one has gone. iOS refuses a second modal,
+ * and the refused one's host then took every touch on Home (Nov 9 2026). A
+ * sheet opened from inside another sheet's content shows over it at once.
+ *
  * It closes three ways: a tap on the backdrop, a drag of the handle or the
  * header down (it follows the finger and the backdrop fades with it; past
  * DISMISS_DISTANCE or a fling it goes, otherwise it springs back), and for
@@ -71,6 +86,8 @@ export function Sheet({
   visible,
   onClose,
   title,
+  titleMark,
+  headerRule = 'inset',
   message,
   messageMaxScale,
   left,
@@ -87,6 +104,10 @@ export function Sheet({
   visible: boolean;
   onClose: () => void;
   title?: string;
+  /** A small mark beside the title (Activity's add sheets: the block's mark). */
+  titleMark?: React.ReactNode;
+  /** The hairline under the header: inside the gutter (the default), edge to edge, or none. */
+  headerRule?: 'inset' | 'full' | 'none';
   message?: string;
   /** Caps how far the message grows with Dynamic Type (a header line, like the title). */
   messageMaxScale?: number;
@@ -107,13 +128,31 @@ export function Sheet({
   const { palette } = useTheme();
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
-  const [shown, setShown] = useState(visible);
+  // Shown only once it has its turn: no other sheet up or still going.
+  const nested = useInsideModal();
+  const { turn, release } = useModalTurn(visible, nested);
+  const [shown, setShown] = useState(false);
+  // iOS: closed, and waiting for the modal to report it has gone (onDismiss).
+  const [dismissing, setDismissing] = useState(false);
+  // A fresh modal in place of one whose dismissal never reported back (the fallback below).
+  const [modalKey, setModalKey] = useState(0);
   const progress = useRef(new Animated.Value(0)).current;
   const hiddenRef = useRef(onHidden);
   hiddenRef.current = onHidden;
-  const visibleRef = useRef(visible);
-  visibleRef.current = visible;
+  const visibleRef = useRef(turn);
+  visibleRef.current = turn;
   const reduceMotion = useReduceMotion();
+
+  // Gone: the turn passes on and onHidden runs, once per close. A dismissal reported while the
+  // sheet is wanted again is an old one (it was opened again before it had gone).
+  const finishedRef = useRef(true);
+  const finish = useCallback(() => {
+    if (finishedRef.current || visibleRef.current) return;
+    finishedRef.current = true;
+    setDismissing(false);
+    release();
+    hiddenRef.current?.();
+  }, [release]);
 
   // The drag of the handle or header, on the UI thread.
   const drag = useSharedValue(0);
@@ -152,7 +191,10 @@ export function Sheet({
   }));
 
   useEffect(() => {
-    if (visible) {
+    if (turn) {
+      // Reopened while going: this close is called off.
+      finishedRef.current = false;
+      setDismissing(false);
       drag.value = 0;
       setShown(true);
       Animated.timing(progress, {
@@ -173,12 +215,30 @@ export function Sheet({
         // holding the touches.
         if (!finished && visibleRef.current) return;
         setShown(false);
-        if (Platform.OS !== 'ios') hiddenRef.current?.();
+        // iOS: once the modal has been dismissed (its onDismiss, or the fallback).
+        if (Platform.OS !== 'ios') finish();
+        else if (!finishedRef.current) setDismissing(true);
       });
     }
-    // Only `visible` drives the animation.
+    // Only the turn drives the animation.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible]);
+  }, [turn]);
+
+  // Not wanted and fully gone (or never shown: closed while waiting for its turn): hold nothing.
+  useEffect(() => {
+    if (!visible && !shown && !dismissing) release();
+  }, [visible, shown, dismissing, release]);
+
+  // iOS: a modal whose dismissal never reports back is replaced by a fresh one (which shows
+  // nothing), so it can't stay over the screen; the turn passes on and onHidden runs as if it had.
+  useEffect(() => {
+    if (!dismissing) return;
+    const t = setTimeout(() => {
+      setModalKey((k) => k + 1);
+      finish();
+    }, DISMISS_FALLBACK_MS);
+    return () => clearTimeout(t);
+  }, [dismissing, finish]);
 
   const translateY = progress.interpolate({ inputRange: [0, 1], outputRange: [height * 0.6, 0] });
   const hasHeader = !!(title || left || right);
@@ -220,10 +280,29 @@ export function Sheet({
                 <View style={[styles.handle, { backgroundColor: palette.handle }]} />
               </View>
               {hasHeader ? (
-                <View style={[styles.header, { borderBottomColor: palette.separator }]}>
+                <View
+                  style={[
+                    styles.header,
+                    { borderBottomColor: palette.separator },
+                    headerRule === 'full' && styles.headerFull,
+                    headerRule === 'none' && styles.headerBare,
+                  ]}
+                >
                   <View style={[styles.side, styles.sideLeft]}>{left ? <HeaderButton action={left} /> : null}</View>
                   <View style={styles.titleWrap}>
-                    {title ? (
+                    {title && titleMark ? (
+                      <View style={styles.titleRow}>
+                        {titleMark}
+                        <Text
+                          style={[typeV2.sheetTitle, { color: palette.text }]}
+                          accessibilityRole="header"
+                          numberOfLines={1}
+                          maxFontSizeMultiplier={1.4}
+                        >
+                          {title}
+                        </Text>
+                      </View>
+                    ) : title ? (
                       <Text
                         style={[typeV2.sheetTitle, styles.center, { color: palette.text }]}
                         accessibilityRole="header"
@@ -249,10 +328,12 @@ export function Sheet({
           </GestureDetector>
           {scroll ? (
             <ScrollView bounces={false} style={styles.scroll} contentContainerStyle={contentStyle} keyboardShouldPersistTaps="handled">
-              {children}
+              <ModalNest>{children}</ModalNest>
             </ScrollView>
           ) : (
-            <View style={contentStyle}>{children}</View>
+            <View style={contentStyle}>
+              <ModalNest>{children}</ModalNest>
+            </View>
           )}
           {footer ? (
             <Tap
@@ -272,12 +353,13 @@ export function Sheet({
 
   return (
     <Modal
+      key={modalKey}
       visible={shown}
       transparent
       animationType="none"
       onRequestClose={onClose}
       onShow={onShow}
-      onDismiss={() => hiddenRef.current?.()}
+      onDismiss={finish}
     >
       {/* Gestures inside a native modal need their own root (iOS). */}
       <GestureHandlerRootView style={styles.fill}>
@@ -309,7 +391,10 @@ function HeaderButton({ action }: { action: SheetHeaderAction }) {
       hitSlop={10}
       accessibilityRole="button"
       accessibilityLabel={action.label}
-      style={[action.round && [styles.round, { backgroundColor: palette.primary }], action.disabled && { opacity: 0.4 }]}
+      style={[
+        action.round && [styles.round, { backgroundColor: palette.primary }],
+        action.disabled && { opacity: action.accent ? 0.7 : 0.4 },
+      ]}
       testID={action.testID}
     >
       {action.icon ? (
@@ -320,7 +405,14 @@ function HeaderButton({ action }: { action: SheetHeaderAction }) {
           style={action.round && action.icon === 'play' ? styles.playNudge : undefined}
         />
       ) : (
-        <Text style={[typeV2.menu, action.strong && styles.strong, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
+        <Text
+          style={[
+            typeV2.menu,
+            action.strong && styles.strong,
+            { color: action.accent ? (action.disabled ? palette.secondary : palette.accentText) : palette.text },
+          ]}
+          maxFontSizeMultiplier={1.4}
+        >
           {action.label}
         </Text>
       )}
@@ -353,6 +445,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: layoutV2.hairline,
     marginBottom: 6,
   },
+  // Edge to edge: out over the sheet's gutter, the buttons kept in it.
+  headerFull: { marginHorizontal: -layoutV2.gutter, paddingHorizontal: layoutV2.gutter },
+  headerBare: { borderBottomWidth: 0 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   side: { width: 72, flexDirection: 'row' },
   sideLeft: { justifyContent: 'flex-start' },
   sideRight: { justifyContent: 'flex-end' },

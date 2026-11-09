@@ -2,8 +2,9 @@
 // the global verse number recitation files are named by, and how far "Play"
 // continues (to the end of the juz).
 
-import { AyahRef } from './ayahBounds';
-import { getJuzForPage, getSurahDisplay } from './quranData';
+import { AyahRef, boundsFile, versesOnPage } from './ayahBounds';
+import { getMushafEdition, MushafEditionId } from './mushafEdition';
+import { getJuzForPage, getSurah, getSurahDisplay, getSurahsForPage, SurahOnPage } from './quranData';
 
 export interface VerseKey {
   sura: number;
@@ -37,14 +38,14 @@ export function globalVerseNumber(v: VerseKey): number {
   return n + v.ayah;
 }
 
-type BoundsFile = Record<string, number[]>;
-let firstPage: Map<string, number> | null = null;
+const firstPages = new Map<MushafEditionId, Map<string, number>>();
 
-/** The page where a verse starts (the page its first line is on). */
-export function pageOfVerse(v: VerseKey): number {
+/** The page where a verse starts (the page its first line is on), in the edition chosen unless named. */
+export function pageOfVerse(v: VerseKey, edition: MushafEditionId = getMushafEdition()): number {
+  let firstPage = firstPages.get(edition);
   if (!firstPage) {
     firstPage = new Map();
-    const bounds = require('../data/ayahBounds.json') as BoundsFile;
+    const bounds = boundsFile(edition);
     for (let page = 1; page <= 604; page++) {
       const d = bounds[String(page)] ?? [];
       for (let i = 0; i < d.length; i += 6) {
@@ -52,6 +53,7 @@ export function pageOfVerse(v: VerseKey): number {
         if (!firstPage.has(key)) firstPage.set(key, page);
       }
     }
+    firstPages.set(edition, firstPage);
   }
   return firstPage.get(verseKey(v)) ?? 1;
 }
@@ -68,4 +70,16 @@ export function nextVerseInJuz(v: VerseKey): VerseKey | null {
   const next = nextVerse(v);
   if (!next) return null;
   return getJuzForPage(pageOfVerse(next)) === getJuzForPage(pageOfVerse(v)) ? next : null;
+}
+
+/**
+ * The surah at the top of a page as the chosen print draws it (the reader's
+ * header). The 1405 pages use the page table, as before; the 1441 print's
+ * first verse can belong to the surah before (page 586 begins in 'Abasa).
+ */
+export function firstSurahOnPage(page: number, edition: MushafEditionId = getMushafEdition()): SurahOnPage | undefined {
+  if (edition === 'madani1405') return getSurahsForPage(page)[0];
+  const first = versesOnPage(page, edition)[0];
+  const surah = first ? getSurah(first.sura) : undefined;
+  return surah ? { number: surah.number, name: surah.name, nameArabic: surah.nameArabic } : getSurahsForPage(page)[0];
 }

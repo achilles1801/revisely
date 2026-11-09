@@ -1,0 +1,155 @@
+# Revising ahead: Keep going on the end card, Home's "Tomorrow starts at", and a
+# day revised partly ahead needing only what's left. Tuesday is pages 1, 582–590,
+# Wednesday 591–600, Thursday 601–604, 1, 582–586 (subflows/onboard.yaml).
+# Rules (BEHAVIOUR.md): AHEAD-1, AHEAD-2, AHEAD-3, AHEAD-5, AHEAD-6, DAY-3, SESS-4
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    file: ../subflows/new-account.yaml
+    env:
+      CLOCK: 2026-11-03T12:00
+      BOUNDARY: midnight
+
+# Tuesday, all ten pages, onto the end card.
+- runFlow:
+    file: ../subflows/open-session.yaml
+    env:
+      QUIET: "Juz 1 · 0/10"
+- runFlow:
+    file: ../subflows/swipe-pages.yaml
+    env:
+      UNTIL: end
+- runFlow:
+    file: ../subflows/end-card-is.yaml
+    env:
+      TEXT: Revision complete
+# AHEAD-3, DAY-3: Keep going offers the next revision day, Wednesday.
+- assertVisible: "Next: Wed · At.Tariq to At.Takathur · 10 pages"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 03-end-card
+- tapOn:
+    id: session-end-keep-going
+- runFlow: ../subflows/show-controls.yaml
+- extendedWaitUntil:
+    visible:
+      id: session-title
+      text: "Revising ahead · Wed.*"
+    timeout: 10000
+- assertVisible:
+    id: session-page
+    text: "At.Tariq to Al.A'la.15 · .*"
+# AHEAD-5: three of Wednesday's pages, swiped (591–593).
+- runFlow:
+    file: ../subflows/swipe-pages.yaml
+    env:
+      UNTIL: 3/10
+- runFlow: ../subflows/show-controls.yaml
+- tapOn: "Back"
+
+# AHEAD-1: Home says Tuesday is done, and Wednesday goes on from its first page
+# not done. SESS-4: Done counts Tuesday's 10 and the 3 revised ahead in its session.
+- extendedWaitUntil:
+    visible:
+      id: today-title
+      text: "Done · 13.pages"
+    timeout: 10000
+- assertVisible:
+    id: today-ahead
+    text: "Tomorrow starts at Al.Fajr, ayah.24"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 03-home-tomorrow
+
+# AHEAD-6: the pages revised ahead are revised today wherever recency shows. Activity's Insights:
+# Coverage counts Tuesday's 10 and the 3 ahead, 13 of the 24 memorized pages, and the Page view shows them
+# this week. (It read the day credited, Wednesday, and showed 10.) The screenshots come before the check, so
+# a run without the fix shows what it got.
+# Every account has Insights in Activity since the November 2026 release, so the account stays as it is,
+# with no relaunch. It was made a tester and relaunched here before, and Activity, opened just after
+# the relaunch, was dropped when the server's copy brought the tester flag: "What's new" reads the
+# phone for a new tester and puts Home back meanwhile (lib/whatsNew/due). Both attempts of #217's iOS
+# run 42619006611; Home's ? stopped meaning "tester" once help came to everyone.
+- tapOn:
+    id: open-activity
+- extendedWaitUntil:
+    visible:
+      id: activity-blocks-views
+    timeout: 20000
+- tapOn:
+    id: pill-insights
+- extendedWaitUntil:
+    visible:
+      id: insights-coverage-figure
+    timeout: 15000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 03-coverage-ahead
+- tapOn:
+    id: pill-page
+- extendedWaitUntil:
+    visible:
+      id: coverage-pages
+    timeout: 10000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 03-coverage-ahead-page
+- assertVisible:
+    text: ".*13 of 24 memorized pages in 30 days.*"
+- tapOn:
+    id: pill-juz
+- runFlow: ../subflows/back-home.yaml
+
+# AHEAD-2: on Wednesday, the three pages revised ahead count for it.
+- runFlow:
+    file: ../subflows/set-clock-and-relaunch.yaml
+    env:
+      AT: 2026-11-04T12:00
+- extendedWaitUntil:
+    visible:
+      id: today-title
+      text: "Continue at Al.Fajr, ayah.24[^0-9]*"
+    timeout: 20000
+- assertVisible:
+    id: today-summary
+    text: ".*3 of 10 pages done"
+- runFlow:
+    file: ../subflows/open-session.yaml
+    env:
+      QUIET: "Juz 30 · 3/10"
+- runFlow:
+    file: ../subflows/swipe-pages.yaml
+    env:
+      UNTIL: end
+- runFlow:
+    file: ../subflows/end-card-is.yaml
+    env:
+      TEXT: Revision complete
+- runFlow: ../subflows/show-controls.yaml
+- tapOn: "Back"
+- extendedWaitUntil:
+    visible:
+      id: today-title
+      text: "Done · 10.pages"
+    timeout: 10000
+
+# AHEAD-1, DAY-3: "Tomorrow" is Thursday, and it opens on Thursday's first page.
+# (The line's accessibility label spells out "page".)
+- assertVisible:
+    id: today-ahead
+    text: "Tomorrow starts at Al.'Asr"
+- tapOn:
+    id: today-ahead
+- runFlow: ../subflows/show-controls.yaml
+- extendedWaitUntil:
+    visible:
+      id: session-title
+      text: "Revising ahead · Thu.*"
+    timeout: 10000
+- assertVisible:
+    id: session-page
+    text: "Al.'Asr to Al.Fil · .*"

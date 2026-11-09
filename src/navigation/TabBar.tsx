@@ -39,6 +39,7 @@ export function useTabBarHeight() {
  */
 export function useTabBarFootprint() {
   const { visible } = useMiniPlayer();
+  // Revo's button is the screens' own to clear (lib/revo/presence useRevoFootprint).
   return useTabBarHeight() + (visible ? MINI_PLAYER_HEIGHT + MINI_PLAYER_GAP : 0);
 }
 

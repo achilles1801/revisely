@@ -1,0 +1,117 @@
+{
+  "home.today": {
+    "SCHED-1": "e34c5d66002488e4",
+    "SCHED-2": "9898aac73caf73d2",
+    "SCHED-3": "29523ed2e8b9d054",
+    "JUMP-1": "694fd82b135f59f3"
+  },
+  "home.missed": {
+    "SCHED-5": "1c59745b0f18a785",
+    "CARRY-1": "e82fd9775315574d",
+    "CARRY-4": "179a7d1058862b14"
+  },
+  "home.streak": {
+    "SESS-2": "ed190cc5b1bd8cc9",
+    "SESS-6": "f01af02cce55efc5"
+  },
+  "home.memorized": {
+    "MEM-1": "c433d43bc16e7ffb",
+    "MEM-2": "fa6bccea850e23b7"
+  },
+  "session.marking": {
+    "SESS-1": "09cd1f564f7eac99"
+  },
+  "session.stopping": {
+    "SESS-3": "4227fa695c15768c",
+    "SESS-2": "ed190cc5b1bd8cc9"
+  },
+  "session.rating": {
+    "ACT-8": "17530ba6416770ba",
+    "ACT-12": "4afb073e2a87d454"
+  },
+  "session.hidden": {},
+  "reader.hold": {},
+  "reader.turning": {},
+  "reader.recitation": {},
+  "reader.sitting": {
+    "REC-1": "971b7fa368411aaa",
+    "REC-2": "06be0811d7eedf49",
+    "MEM-5": "2b610dd93d4012d9",
+    "DAY-9": "d1f48e9dc60411f1"
+  },
+  "schedule.cycle": {
+    "SCHED-1": "e34c5d66002488e4",
+    "SCHED-3": "29523ed2e8b9d054",
+    "SCHED-5": "1c59745b0f18a785"
+  },
+  "schedule.rest": {
+    "SCHED-3": "29523ed2e8b9d054"
+  },
+  "schedule.days": {
+    "CARRY-5": "a16d57685246f888"
+  },
+  "schedule.new": {
+    "SCHED-1": "e34c5d66002488e4",
+    "SCHED-2": "9898aac73caf73d2",
+    "SCHED-4": "cd9b1e2c930dc819"
+  },
+  "schedule.new.off": {
+    "SCHED-1": "e34c5d66002488e4",
+    "SCHED-2": "9898aac73caf73d2",
+    "SCHED-4": "cd9b1e2c930dc819"
+  },
+  "activity.calendar": {
+    "ACT-3": "66440e5b3b9fbfc8",
+    "ACT-18": "bf9231cef3097199"
+  },
+  "activity.day": {
+    "DAY-9": "d1f48e9dc60411f1",
+    "DAY-2": "754b83b74bc2feda",
+    "ACT-1": "27b4c2094c950cdf"
+  },
+  "activity.adding": {
+    "ACT-5": "492efd0797908129",
+    "ACT-17": "62b54494328e1e9d"
+  },
+  "insights.coverage": {
+    "ACT-4": "9105a4f613b7539e",
+    "ACT-21": "b309872a5b9f1cb8",
+    "ACT-22": "fc6eb76cdbb3b866",
+    "ACT-26": "dc4513b928f78113"
+  },
+  "insights.consistency": {
+    "ACT-4": "9105a4f613b7539e",
+    "ACT-23": "bc761a4eb1d943b5"
+  },
+  "insights.weak": {
+    "ACT-12": "4afb073e2a87d454",
+    "ACT-8": "17530ba6416770ba",
+    "ACT-20": "e576925144fbc092",
+    "ACT-24": "84ed5272370beade"
+  },
+  "insights.pace": {
+    "ACT-4": "9105a4f613b7539e",
+    "ACT-23": "bc761a4eb1d943b5"
+  },
+  "day.change": {
+    "ACT-6": "68186ff52bb557fb",
+    "ACT-7": "a1a7e5301dc5560c"
+  },
+  "day.pages": {
+    "ACT-20": "e576925144fbc092",
+    "ACT-8": "17530ba6416770ba"
+  },
+  "day.pages.off": {
+    "ACT-20": "e576925144fbc092",
+    "ACT-19": "26b92511a47d4f09"
+  },
+  "day.adding": {
+    "ACT-5": "492efd0797908129",
+    "ACT-17": "62b54494328e1e9d"
+  },
+  "day.notes": {
+    "ACT-11": "d94a53dd57138182",
+    "ACT-6": "68186ff52bb557fb",
+    "LOG-2": "da9323046be62b09"
+  }
+}

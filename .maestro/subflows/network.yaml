@@ -1,0 +1,89 @@
+# The phone's connection off (OFFLINE=1) or back on (OFFLINE=0). Android: real
+# airplane mode. iOS: the Simulator has none, so the E2E build makes the
+# emulators unreachable (src/lib/e2e/network.ts) and NetInfo with them; the
+# status line says "offline" while it is.
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    when:
+      platform: Android
+      true: ${OFFLINE == '1'}
+    commands:
+      - setAirplaneMode: enabled
+- runFlow:
+    when:
+      platform: Android
+      true: ${OFFLINE == '0'}
+    commands:
+      - setAirplaneMode: disabled
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      # Optional and sent again below, as in clock.yaml: simctl openurl can time
+      # out on a slow CI Simulator though the link gets there.
+      - openLink:
+          link: revisely://e2e/network?offline=${OFFLINE}
+          optional: true
+      - runFlow:
+          when:
+            true: ${OFFLINE == '1'}
+          commands:
+            - repeat:
+                while:
+                  notVisible:
+                    id: e2e-status
+                    text: ".* offline.*"
+                times: 20
+                commands:
+                  - runFlow: open-link-prompt.yaml
+                  - extendedWaitUntil:
+                      visible:
+                        id: e2e-status
+                        text: ".* offline.*"
+                      timeout: 3000
+                      optional: true
+                  - runFlow:
+                      when:
+                        notVisible: "Open"
+                      commands:
+                        - runFlow:
+                            when:
+                              notVisible:
+                                id: e2e-status
+                                text: ".* offline.*"
+                            commands:
+                              - openLink:
+                                  link: revisely://e2e/network?offline=${OFFLINE}
+                                  optional: true
+      - runFlow:
+          when:
+            true: ${OFFLINE == '0'}
+          commands:
+            - repeat:
+                while:
+                  visible:
+                    id: e2e-status
+                    text: ".* offline.*"
+                times: 20
+                commands:
+                  - runFlow: open-link-prompt.yaml
+                  - extendedWaitUntil:
+                      notVisible:
+                        id: e2e-status
+                        text: ".* offline.*"
+                      timeout: 3000
+                      optional: true
+                  - runFlow:
+                      when:
+                        notVisible: "Open"
+                      commands:
+                        - runFlow:
+                            when:
+                              visible:
+                                id: e2e-status
+                                text: ".* offline.*"
+                            commands:
+                              - openLink:
+                                  link: revisely://e2e/network?offline=${OFFLINE}
+                                  optional: true

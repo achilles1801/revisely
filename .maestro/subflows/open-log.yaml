@@ -1,0 +1,6 @@
+# Home → Activity → today → its note → the daily log. Today needs a note: the log opens from one
+# (the old Activity's "Log today" went with it; add-day-note.yaml adds one).
+appId: com.revisionbuddy.app
+---
+- runFlow: open-day.yaml
+- runFlow: day-log.yaml

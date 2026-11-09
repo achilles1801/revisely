@@ -1,0 +1,9 @@
+# A screenshot of a key screen, once it has settled. run.sh points Maestro's test
+# output at the flow's results (run/takeScreenshot/<NAME>.png), and the workflow
+# keeps them from every run, so a change's look can be checked without a simulator.
+#   env NAME: the file's name, e.g. 02-session-page
+appId: com.revisionbuddy.app
+---
+- waitForAnimationToEnd:
+    timeout: 2000
+- takeScreenshot: ${NAME}

@@ -4,7 +4,9 @@ import React from 'react';
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import * as Haptics from 'expo-haptics';
 import ActiveRevisionScreen from '../ActiveRevisionScreen';
+import { BulkActionsModal } from '../../../components/BulkActionsModal';
 import { getCurrentRevisionDay } from '../../../lib/algorithm';
+import { dateToLocalISODay } from '../../../lib/schedulePlans';
 import type { RevisionLog, User, UserPage } from '../../../types';
 
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
@@ -22,21 +24,32 @@ const mockPager: {
   onUserSwipe?: () => void;
   onPageChange?: (p: number) => void;
   onReachEnd?: (lastPage: number, bySwipe: boolean) => void;
+  onAdvance?: (leftPage: number, currentPage: number) => void;
+  pages?: number[];
+  initialPage?: number;
   pageOverlay?: (page: number, scale: number) => React.ReactNode;
   onTapVerse?: (ayah: { page: number; sura: number; ayah: number }) => boolean;
 } = {};
+// The session's route params (Home's "starts at" line opens a later day).
+let mockRouteParams: { aheadDay?: string; round?: boolean } | undefined;
 jest.mock('../../../components/MushafPager', () => {
   const { Pressable, View } = require('react-native');
   return {
     MushafPager: (props: {
+      pages?: number[];
+      initialPage?: number;
       onTap?: () => void;
       onUserSwipe?: () => void;
       onPageChange?: (p: number) => void;
+      onAdvance?: (leftPage: number, currentPage: number) => void;
       onReachEnd?: (lastPage: number, bySwipe: boolean) => void;
       endCard?: React.ReactNode;
       pageOverlay?: (page: number, scale: number) => React.ReactNode;
       onTapVerse?: (ayah: { page: number; sura: number; ayah: number }) => boolean;
     }) => {
+      mockPager.pages = props.pages;
+      mockPager.initialPage = props.initialPage;
+      mockPager.onAdvance = props.onAdvance;
       mockPager.onUserSwipe = props.onUserSwipe;
       mockPager.onPageChange = props.onPageChange;
       mockPager.onReachEnd = props.onReachEnd;
@@ -93,10 +106,42 @@ jest.mock('../../../components/recite/usePauseListener', () => ({
   },
 }));
 
+// The recorder: the real hook, unless a test gives one (a recording in progress).
+let mockRecorder: Record<string, unknown> | null = null;
+jest.mock('../../../hooks/useVoiceRecorder', () => {
+  const actual = jest.requireActual('../../../hooks/useVoiceRecorder');
+  return {
+    ...actual,
+    useVoiceRecorder: (opts: unknown) => mockRecorder ?? actual.useVoiceRecorder(opts),
+  };
+});
+function recordingInProgress() {
+  mockRecorder = {
+    phase: 'recording',
+    recording: true,
+    paused: false,
+    level: 0,
+    elapsedMs: 0,
+    start: jest.fn(async () => undefined),
+    resume: jest.fn(async () => undefined),
+    pause: jest.fn(async () => undefined),
+    finish: jest.fn(async () => undefined),
+    leave: jest.fn(async () => undefined),
+  };
+  return mockRecorder as { finish: jest.Mock };
+}
+
+// The day's recordings (Listen back on the end card).
+let mockRecordings: unknown[] = [];
+jest.mock('../../../lib/recordings', () => {
+  const actual = jest.requireActual('../../../lib/recordings');
+  return { ...actual, listRecordings: jest.fn(async () => mockRecordings) };
+});
+
 const mockNavigation = { goBack: jest.fn(), navigate: jest.fn() };
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => mockNavigation,
-  useRoute: () => ({ key: 'ActiveRevision-1', name: 'ActiveRevision' }),
+  useRoute: () => ({ key: 'ActiveRevision-1', name: 'ActiveRevision', params: mockRouteParams }),
   useIsFocused: () => true,
 }));
 jest.mock('../../../navigation/navigationRef', () => ({ navigateToActivityDay: jest.fn() }));
@@ -196,6 +241,8 @@ beforeEach(() => {
   mockFollow.status = 'finding';
   mockFollow.active = false;
   mockModelState = { status: 'missing', error: null };
+  mockRecorder = null;
+  mockRecordings = [];
 });
 
 describe('ActiveRevisionScreen — unchecking saved pages', () => {
@@ -234,6 +281,63 @@ describe('ActiveRevisionScreen — unchecking saved pages', () => {
     expect(mockApp.addLog).toHaveBeenCalledWith(
       expect.objectContaining({ pagesRevised: [331] }),
     );
+    expect(mockApp.updateLog).not.toHaveBeenCalled();
+  });
+});
+
+// The iOS edge swipe and Android's back button close the screen without the
+// Back arrow; a page marked since the last 5-second save used to be lost.
+describe('ActiveRevisionScreen — every way out saves', () => {
+  it('closed without Back: what was marked is saved', async () => {
+    setup([332, 333]);
+    const { unmount } = render(<ActiveRevisionScreen />);
+    fireEvent.press(screen.getByLabelText('The page'));
+    fireEvent.press(screen.getByLabelText('Mark current page as revised'));
+    expect(mockApp.addLog).not.toHaveBeenCalled();
+    await act(async () => {
+      unmount();
+    });
+    expect(mockApp.addLog).toHaveBeenCalledTimes(1);
+    expect(mockApp.addLog).toHaveBeenCalledWith(expect.objectContaining({ pagesRevised: [331] }));
+    expect(mockApp.updatePages).toHaveBeenCalledWith(expect.any(Array), [331]);
+  });
+
+  it('closed without Back: a saved page unchecked comes out of the session', async () => {
+    const log = setup(DAY_PAGES);
+    const { unmount } = render(<ActiveRevisionScreen />);
+    fireEvent.press(screen.getByLabelText('Unmark current page'));
+    await act(async () => {
+      unmount();
+    });
+    expect(mockApp.updateLog).toHaveBeenCalledTimes(1);
+    expect(mockApp.updateLog).toHaveBeenCalledWith({
+      ...log,
+      pagesRevised: DAY_PAGES.filter((p) => p !== 331),
+    });
+  });
+
+  it('Back, then the screen goes: saved once', async () => {
+    setup([332, 333]);
+    const { unmount } = render(<ActiveRevisionScreen />);
+    fireEvent.press(screen.getByLabelText('The page'));
+    fireEvent.press(screen.getByLabelText('Mark current page as revised'));
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('Back'));
+    });
+    await act(async () => {
+      unmount();
+    });
+    expect(mockApp.addLog).toHaveBeenCalledTimes(1);
+  });
+
+  it('nothing marked: closing it writes nothing', async () => {
+    setup([332, 333]);
+    const { unmount } = render(<ActiveRevisionScreen />);
+    await act(async () => {
+      unmount();
+    });
+    expect(mockApp.addLog).not.toHaveBeenCalled();
+    expect(mockApp.updatePages).not.toHaveBeenCalled();
     expect(mockApp.updateLog).not.toHaveBeenCalled();
   });
 });
@@ -284,14 +388,26 @@ describe('ActiveRevisionScreen — reading and the controls', () => {
     expect(byTestId('reader-header').props.accessibilityElementsHidden).toBe(true);
   });
 
-  it('with every page revised, the controls stay up with Submit (a swipe or tap doesn’t hide them)', () => {
+  it('with every page revised, the controls stay up with Back (a swipe or tap doesn’t hide them); no Submit', () => {
     setup(DAY_PAGES);
     render(<ActiveRevisionScreen />);
     expect(byTestId('reader-header').props.accessibilityElementsHidden).toBe(false);
-    expect(within(byTestId('reader-footer')).getByLabelText('Submit session')).toBeTruthy();
     act(() => mockPager.onUserSwipe?.());
     fireEvent.press(screen.getByLabelText('The page'));
-    expect(within(byTestId('reader-footer')).getByLabelText('Submit session')).toBeTruthy();
+    expect(byTestId('reader-header').props.accessibilityElementsHidden).toBe(false);
+    expect(screen.getByLabelText('Back')).toBeTruthy();
+    expect(screen.queryByLabelText('Submit session')).toBeNull();
+    expect(screen.queryByText('Submit')).toBeNull();
+  });
+
+  it('the menu has no Save and exit or End session', () => {
+    setup([332, 333]);
+    render(<ActiveRevisionScreen />);
+    fireEvent.press(screen.getByLabelText('The page'));
+    fireEvent.press(screen.getByLabelText('Session menu'));
+    expect(screen.getByText('Jump or mark in bulk')).toBeTruthy();
+    expect(screen.queryByText('Save and exit')).toBeNull();
+    expect(screen.queryByText('End session')).toBeNull();
   });
 
   it('arriving on the last page marks nothing and leaves the controls as they were (the end card is next)', () => {
@@ -328,12 +444,14 @@ describe('ActiveRevisionScreen — swiping off the last page', () => {
     expect(screen.getAllByText(/10\/10/).length).toBeGreaterThan(0);
     expect(screen.getByText('Revision complete')).toBeTruthy();
     expect(screen.getByText('10 pages revised today')).toBeTruthy();
+    // What was revised, by surah (never page numbers).
+    expect(screen.getByTestId('session-end-what')).toHaveTextContent(/^Al.Anbiya.102 to Al.Hajj.72$/);
     expect(screen.getByTestId('confetti', { includeHiddenElements: true })).toBeTruthy();
     expect(Haptics.notificationAsync).toHaveBeenCalledTimes(1);
     expect(Haptics.selectionAsync).not.toHaveBeenCalled();
     expect(mockApp.addLog).toHaveBeenCalledWith(expect.objectContaining({ pagesRevised: [340] }));
     // No "marked as revised · Undo" for the page that finished it.
-    expect(screen.queryByText('Page 340 marked as revised')).toBeNull();
+    expect(screen.queryByText(/marked as revised$/)).toBeNull();
   });
 
   it('a one-page session finishes the same way', async () => {
@@ -347,13 +465,15 @@ describe('ActiveRevisionScreen — swiping off the last page', () => {
     expect(mockApp.addLog).toHaveBeenCalledWith(expect.objectContaining({ pagesRevised: [582] }));
   });
 
-  it('pages left: the last page is marked (with Undo), no confetti; the card counts and offers End session', async () => {
+  it('pages left: the last page is marked (with Undo), no confetti; the card counts, with no button', async () => {
     setup([331, 332, 333, 334, 335]);
     render(<ActiveRevisionScreen />);
     await finish();
-    expect(screen.getByText('Page 340 marked as revised')).toBeTruthy();
+    // The page by what it holds, never its number (surahs and juz first, CLAUDE.md).
+    expect(screen.getByText('Al\u2011Hajj\u00A065–72 marked as revised')).toBeTruthy();
     expect(screen.getByText('6 of 10 revised')).toBeTruthy();
-    expect(screen.getByTestId('session-end-end')).toBeTruthy();
+    expect(screen.getByText('Swipe back for the pages left.')).toBeTruthy();
+    expect(screen.queryByText('End session')).toBeNull();
     expect(screen.queryByTestId('confetti', { includeHiddenElements: true })).toBeNull();
     expect(Haptics.notificationAsync).not.toHaveBeenCalled();
   });
@@ -398,34 +518,305 @@ describe('ActiveRevisionScreen — swiping off the last page', () => {
     expect(Haptics.notificationAsync).toHaveBeenCalledTimes(1);
   });
 
-  it('finished: the header names the last page, Submit is in the controls (not twice), and ends the session', async () => {
+  it('finished: the header names the last page; Back leaves (saved once, nothing skipped)', async () => {
     setup([331, 332, 333, 334, 335, 336, 337, 338, 339]);
     render(<ActiveRevisionScreen />);
     await finish();
-    expect(screen.getByText(/^Page 340 ·/)).toBeTruthy();
-    expect(screen.queryByTestId('session-end-end')).toBeNull();
-    expect(screen.getAllByLabelText('Submit session')).toHaveLength(1);
+    expect(screen.getByText(/^Al.Hajj.65–72 · Juz 17 · Hizb \d+$/)).toBeTruthy();
+    expect(screen.queryByText('Submit')).toBeNull();
     await act(async () => {
-      fireEvent.press(within(byTestId('reader-footer')).getByLabelText('Submit session'));
+      fireEvent.press(screen.getByLabelText('Back'));
     });
     expect(mockNavigation.goBack).toHaveBeenCalled();
+    expect(mockApp.addLog).toHaveBeenCalledTimes(1);
+    expect(mockApp.addLog).toHaveBeenCalledWith(expect.objectContaining({ pagesRevised: [340], pagesSkipped: [] }));
   });
 
-  it('pages left: End session on the card ends it (the rest skipped)', async () => {
+  it('pages left: Back saves what was marked and skips nothing (reopening resumes at the first page left)', async () => {
     setup([331, 332, 333, 334, 335]);
     render(<ActiveRevisionScreen />);
     await finish();
+    fireEvent.press(screen.getByLabelText('The page'));
     await act(async () => {
-      fireEvent.press(screen.getByTestId('session-end-end'));
+      fireEvent.press(screen.getByLabelText('Back'));
     });
-    expect(mockApp.addLog).toHaveBeenCalledWith(expect.objectContaining({ pagesRevised: [340] }));
-    expect(mockApp.updatePages).toHaveBeenLastCalledWith(expect.any(Array), [336, 337, 338, 339]);
+    expect(mockApp.addLog).toHaveBeenCalledTimes(1);
+    expect(mockApp.addLog).toHaveBeenCalledWith(expect.objectContaining({ pagesRevised: [340], pagesSkipped: [] }));
+    expect(mockApp.updatePages).toHaveBeenCalledTimes(1);
+    expect(mockApp.updatePages).toHaveBeenCalledWith(expect.any(Array), [340]);
     expect(mockNavigation.goBack).toHaveBeenCalled();
+  });
+});
+
+// With Submit and End session gone, the last page marked completes the session.
+describe('ActiveRevisionScreen — the session completes on its last page', () => {
+  it('the check on the last page left saves at once (no waiting for the 5-second save)', async () => {
+    setup([331, 332, 333, 334, 335, 336, 337, 338, 339]);
+    render(<ActiveRevisionScreen />);
+    act(() => mockPager.onPageChange?.(340));
+    fireEvent.press(screen.getByLabelText('The page'));
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('Mark current page as revised'));
+    });
+    expect(mockApp.addLog).toHaveBeenCalledTimes(1);
+    expect(mockApp.addLog).toHaveBeenCalledWith(expect.objectContaining({ pagesRevised: [340] }));
+  });
+
+  it('a recording in progress is finished when the session completes, as Submit did', async () => {
+    const recorder = recordingInProgress();
+    setup([331, 332, 333, 334, 335, 336, 337, 338, 339]);
+    render(<ActiveRevisionScreen />);
+    await act(async () => {
+      mockPager.onReachEnd?.(340, true);
+    });
+    expect(recorder.finish).toHaveBeenCalledTimes(1);
+  });
+
+  it('pages left: the recording is not finished (Back leaves it paused for later)', async () => {
+    const recorder = recordingInProgress();
+    setup([331, 332, 333, 334, 335]);
+    render(<ActiveRevisionScreen />);
+    await act(async () => {
+      mockPager.onReachEnd?.(340, true);
+    });
+    fireEvent.press(screen.getByLabelText('The page'));
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('Back'));
+    });
+    expect(recorder.finish).not.toHaveBeenCalled();
+  });
+
+  it('a day already done when the screen opens finishes nothing and saves nothing', async () => {
+    const recorder = recordingInProgress();
+    setup(DAY_PAGES);
+    const { unmount } = render(<ActiveRevisionScreen />);
+    await act(async () => {
+      unmount();
+    });
+    expect(recorder.finish).not.toHaveBeenCalled();
+    expect(mockApp.addLog).not.toHaveBeenCalled();
+  });
+
+  it('unchecking a page and checking it again completes it again, but saves once', async () => {
+    const recorder = recordingInProgress();
+    setup([331, 332, 333, 334, 335, 336, 337, 338, 339]);
+    render(<ActiveRevisionScreen />);
+    await act(async () => {
+      mockPager.onReachEnd?.(340, true);
+    });
+    act(() => mockPager.onPageChange?.(340));
+    fireEvent.press(screen.getByLabelText('Unmark current page'));
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('Mark current page as revised'));
+    });
+    expect(mockApp.addLog).toHaveBeenCalledTimes(1);
+    expect(recorder.finish).toHaveBeenCalledTimes(2);
   });
 });
 
 // Hidden pages (the recite mode), for testers: the eye covers the page; a verse
 // shows when tapped, with Next verse, or after a pause in the reciter's voice.
+describe('ActiveRevisionScreen — keep going (revise ahead, #168)', () => {
+  const NEXT = [341, 342, 343];
+  const today = () => getCurrentRevisionDay(mockApp.user as User);
+  const tomorrow = () => {
+    const [y, m, d] = today().split('-').map(Number);
+    return dateToLocalISODay(new Date(y, m - 1, d + 1));
+  };
+
+  // Today's pages, then the next revision day's: a two-day cycle.
+  function setupTwoDays(revised: number[]) {
+    setup(revised);
+    const user = mockApp.user as User;
+    user.customPlan = { days: [DAY_PAGES, NEXT], cycleStartDate: today(), direction: 'forward' };
+    mockApp.pages = mockApp.pages.map((p: UserPage) =>
+      NEXT.includes(p.pageNumber) ? { ...p, status: 'memorized' } : p,
+    );
+  }
+
+  beforeEach(() => {
+    mockRouteParams = undefined;
+  });
+
+  it('after the last page, Keep going opens the next day alone; leaving saves its pages as credit for that day', async () => {
+    setupTwoDays([331, 332, 333, 334, 335, 336, 337, 338, 339]);
+    const { unmount } = render(<ActiveRevisionScreen />);
+    await act(async () => {
+      mockPager.onReachEnd?.(340, true);
+    });
+    expect(screen.getByText('Revision complete')).toBeTruthy();
+    expect(screen.getByText(/Next: .* · 3 pages/)).toBeTruthy();
+    fireEvent.press(screen.getByTestId('session-end-keep-going'));
+    // Only that day's pages: today's, done, are not behind them (Majd, Nov 5 2026).
+    expect(mockPager.pages).toEqual(NEXT);
+    expect(mockPager.initialPage).toBe(NEXT[0]);
+    expect(screen.getByText(/^Revising ahead/)).toBeTruthy();
+
+    // One page of the next day, checked, then leave.
+    fireEvent.press(screen.getByLabelText('Mark current page as revised'));
+    await act(async () => {
+      unmount();
+    });
+    expect(mockApp.addLog).toHaveBeenLastCalledWith(
+      expect.objectContaining({ pagesRevised: [341], ahead: { [tomorrow()]: [341] } }),
+    );
+  });
+
+  // AHEAD-3 (Majd, Nov 9 2026): "my next revise ahead would just be restarting the cycle". A one-day
+  // cycle: tomorrow repeats today's pages, so Keep going starts a new round.
+  it('at the end of the cycle, Keep going starts the next: its pages alone and unchecked, today’s left done', async () => {
+    setup(DAY_PAGES.slice(0, 9));
+    const { unmount } = render(<ActiveRevisionScreen />);
+    await act(async () => {
+      mockPager.onReachEnd?.(340, true);
+    });
+    expect(screen.getByText('Revision complete')).toBeTruthy();
+    // Tomorrow is the plan's first day again.
+    expect(screen.getByText(/^Next cycle · .+ · 10 pages$/)).toBeTruthy();
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('session-end-keep-going'));
+    });
+    expect(mockPager.pages).toEqual(DAY_PAGES);
+    expect(mockPager.initialPage).toBe(DAY_PAGES[0]);
+    expect(screen.getByText(/^Revising ahead/)).toBeTruthy();
+    // The same pages, to revise again: none is checked.
+    expect(screen.getByLabelText('Mark current page as revised')).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Mark current page as revised'));
+    await act(async () => {
+      unmount();
+    });
+    // Credited to tomorrow; nothing of today's is skipped or taken back.
+    expect(mockApp.addLog).toHaveBeenLastCalledWith(
+      expect.objectContaining({ pagesRevised: [331], pagesSkipped: [], ahead: { [tomorrow()]: [331] } }),
+    );
+    expect(mockApp.updateLog).not.toHaveBeenCalled();
+  });
+
+  it('Home’s new round opens that day alone, unchecked, though its pages are today’s', async () => {
+    setup(DAY_PAGES);
+    mockRouteParams = { aheadDay: tomorrow(), round: true };
+    const { unmount } = render(<ActiveRevisionScreen />);
+    expect(mockPager.pages).toEqual(DAY_PAGES);
+    expect(screen.getByLabelText('Mark current page as revised')).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Mark current page as revised'));
+    await act(async () => {
+      unmount();
+    });
+    expect(mockApp.addLog).toHaveBeenLastCalledWith(
+      expect.objectContaining({ pagesRevised: [331], pagesSkipped: [], ahead: { [tomorrow()]: [331] } }),
+    );
+  });
+
+  it('swiping off a later day’s page marks it, as a page of today', async () => {
+    setupTwoDays(DAY_PAGES);
+    mockRouteParams = { aheadDay: tomorrow() };
+    const { unmount } = render(<ActiveRevisionScreen />);
+    await act(async () => {
+      mockPager.onAdvance?.(NEXT[0], NEXT[1]);
+    });
+    await act(async () => {
+      unmount();
+    });
+    expect(mockApp.addLog).toHaveBeenLastCalledWith(
+      expect.objectContaining({ pagesRevised: [NEXT[0]], ahead: { [tomorrow()]: [NEXT[0]] } }),
+    );
+  });
+
+  it('a swipe off a page the screen is not showing credits nothing', async () => {
+    setupTwoDays(DAY_PAGES);
+    mockRouteParams = { aheadDay: tomorrow() };
+    const { unmount } = render(<ActiveRevisionScreen />);
+    // The screen shows NEXT[0]; a swipe that claims to leave NEXT[2] is a mismatch.
+    await act(async () => {
+      mockPager.onAdvance?.(NEXT[2], NEXT[0]);
+    });
+    await act(async () => {
+      unmount();
+    });
+    expect(mockApp.addLog).not.toHaveBeenCalled();
+  });
+
+  it('the end card after a later day’s last page marks it, as for today', async () => {
+    setupTwoDays(DAY_PAGES);
+    mockRouteParams = { aheadDay: tomorrow() };
+    const { unmount } = render(<ActiveRevisionScreen />);
+    await act(async () => {
+      mockPager.onReachEnd?.(NEXT[2], true);
+    });
+    await act(async () => {
+      unmount();
+    });
+    expect(mockApp.addLog).toHaveBeenLastCalledWith(
+      expect.objectContaining({ pagesRevised: [NEXT[2]], ahead: { [tomorrow()]: [NEXT[2]] } }),
+    );
+  });
+
+  it('Home’s “starts at” line opens on that day’s pages alone, on its first page', () => {
+    setupTwoDays(DAY_PAGES);
+    mockRouteParams = { aheadDay: tomorrow() };
+    render(<ActiveRevisionScreen />);
+    // As if it were that day's session: today's pages are not behind it.
+    expect(mockPager.pages).toEqual(NEXT);
+    // The pager starts there (not on today's first page), and the page on
+    // screen is tomorrow's: its check reflects tomorrow, not today.
+    expect(mockPager.initialPage).toBe(NEXT[0]);
+    expect(screen.getByText(/^Revising ahead/)).toBeTruthy();
+    expect(screen.getByLabelText('Mark current page as revised')).toBeTruthy();
+  });
+
+  it('in a later day’s session, mark in bulk works on that day’s pages and leaves today’s as they were', async () => {
+    setupTwoDays(DAY_PAGES);
+    mockRouteParams = { aheadDay: tomorrow() };
+    const { unmount } = render(<ActiveRevisionScreen />);
+    const bulk = () => screen.UNSAFE_getByType(BulkActionsModal);
+    expect(bulk().props.pages.map((p: { pageNumber: number }) => p.pageNumber)).toEqual(NEXT);
+    act(() => {
+      bulk().props.onMarkAllComplete();
+    });
+    await act(async () => {
+      unmount();
+    });
+    // That day's pages saved as its credit; today's, done before, untouched.
+    expect(mockApp.addLog).toHaveBeenLastCalledWith(
+      expect.objectContaining({ pagesRevised: NEXT, ahead: { [tomorrow()]: NEXT } }),
+    );
+    expect(mockApp.updateLog).not.toHaveBeenCalled();
+  });
+
+  it('a day partly revised ahead earlier opens on its first page not yet done', () => {
+    setupTwoDays(DAY_PAGES);
+    mockApp.logs = [
+      ...mockApp.logs,
+      {
+        id: 'earlier',
+        date: today(),
+        assignedPages: [],
+        pagesRevised: [NEXT[0]],
+        pagesSkipped: [],
+        weaknessUpdates: [],
+        durationMinutes: 5,
+        ahead: { [tomorrow()]: [NEXT[0]] },
+      },
+    ];
+    mockRouteParams = { aheadDay: tomorrow() };
+    render(<ActiveRevisionScreen />);
+    // The done page is not in the session: it opens on the next one, unchecked.
+    expect(mockPager.initialPage).toBe(NEXT[1]);
+    expect(screen.getByLabelText('Mark current page as revised')).toBeTruthy();
+  });
+
+  it('Keep going moves the page on screen to the next day’s first page', async () => {
+    setupTwoDays(DAY_PAGES);
+    render(<ActiveRevisionScreen />);
+    await act(async () => {
+      mockPager.onReachEnd?.(340, true);
+    });
+    fireEvent.press(screen.getByTestId('session-end-keep-going'));
+    expect(screen.getByLabelText('Mark current page as revised')).toBeTruthy();
+    expect(screen.getByText(/^Revising ahead/)).toBeTruthy();
+  });
+});
+
 describe('ActiveRevisionScreen — hidden pages (testers)', () => {
   const tester = () => {
     setup([]);
@@ -605,5 +996,84 @@ describe('ActiveRevisionScreen — hidden pages, word by word', () => {
     expect(mockFollow.active).toBe(false);
     expect(mockListener.active).toBe(true);
     expect(screen.queryByTestId('recite-word-by-word')).toBeNull();
+  });
+});
+
+// "They have to go find that recording in Activity": the end card offers it.
+describe('ActiveRevisionScreen — Listen back on the end card', () => {
+  const recording = (day: string, extra: Record<string, unknown> = {}) => ({
+    id: 'rec-1',
+    kind: 'revision',
+    day,
+    createdAt: 1,
+    durationMs: 60_000,
+    pageMarks: [{ atMs: 0, page: 339 }, { atMs: 30_000, page: 340 }],
+    uri: '',
+    segments: [],
+    sizeBytes: 0,
+    backedUp: false,
+    ...extra,
+  });
+
+  it('a recorded session: Listen back opens the recording over its pages', async () => {
+    const log = setup([331, 332, 333, 334, 335, 336, 337, 338, 339]);
+    mockRecordings = [recording(log.date)];
+    render(<ActiveRevisionScreen />);
+    await act(async () => {
+      mockPager.onReachEnd?.(340, true);
+    });
+    fireEvent.press(screen.getByTestId('session-end-listen-back'));
+    expect(mockNavigation.navigate).toHaveBeenCalledWith('ListenBack', { recordingId: 'rec-1' });
+  });
+
+  it('pages left: offered too', async () => {
+    const log = setup([331, 332]);
+    mockRecordings = [recording(log.date)];
+    render(<ActiveRevisionScreen />);
+    await act(async () => {
+      mockPager.onReachEnd?.(340, true);
+    });
+    expect(screen.getByText('3 of 10 revised')).toBeTruthy();
+    expect(screen.getByTestId('session-end-listen-back')).toBeTruthy();
+  });
+
+  it('not recorded (or only another day, or a reading): no button', async () => {
+    const log = setup([331, 332, 333, 334, 335, 336, 337, 338, 339]);
+    mockRecordings = [recording('2020-01-01'), recording(log.date, { id: 'r2', kind: 'reading' })];
+    render(<ActiveRevisionScreen />);
+    await act(async () => {
+      mockPager.onReachEnd?.(340, true);
+    });
+    expect(screen.getByText('Revision complete')).toBeTruthy();
+    expect(screen.queryByTestId('session-end-listen-back')).toBeNull();
+  });
+
+  it('while recording: not offered (it would play into the recording)', async () => {
+    const log = setup([331, 332]);
+    mockRecordings = [recording(log.date)];
+    recordingInProgress();
+    render(<ActiveRevisionScreen />);
+    await act(async () => {
+      mockPager.onReachEnd?.(340, true);
+    });
+    expect(screen.queryByTestId('session-end-listen-back')).toBeNull();
+  });
+});
+
+// Variant B: while recording the recorder is the whole capsule.
+describe('ActiveRevisionScreen — the recorder in the controls', () => {
+  it('recording: the recorder takes the capsule (the player steps aside); paused, the player is back', async () => {
+    setup([331, 332]);
+    const recorder = recordingInProgress() as unknown as Record<string, unknown>;
+    Object.assign(recorder, { baseMs: 5_000, segmentStartedAt: Date.now() });
+    const view = render(<ActiveRevisionScreen />);
+    fireEvent.press(screen.getByLabelText('The page'));
+    expect(screen.getByTestId('record-pill-recording')).toBeTruthy();
+    expect(screen.queryByLabelText('Play from this page')).toBeNull();
+
+    Object.assign(recorder, { phase: 'paused', recording: false, paused: true, segmentStartedAt: null });
+    view.rerender(<ActiveRevisionScreen />);
+    expect(screen.getByTestId('record-pill-paused')).toBeTruthy();
+    expect(screen.getByLabelText('Play from this page')).toBeTruthy();
   });
 });

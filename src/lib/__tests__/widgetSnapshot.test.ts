@@ -1,3 +1,4 @@
+import { plainText } from '../passages';
 import { aliveStreak, buildWidgetSnapshot, juzLabel, WIDGET_DAYS_AHEAD, type WidgetInputs } from '../widgets/snapshot';
 import { getQuranData } from '../quranData';
 import { generateDailyAssignment } from '../algorithm';
@@ -74,9 +75,11 @@ describe('buildWidgetSnapshot', () => {
     const today = snap.days[0];
     expect(today).toMatchObject({ day: '2026-10-27', startsAt: now.getTime(), total: 5, done: 0, completed: false, streak: 0 });
     expect(todaysPages).toHaveLength(5);
-    expect(today.title).toMatch(/^Pages \d+–\d+$/);
-    expect(today.short).toMatch(/^p\. \d+–\d+$/);
-    expect(today.where).toMatch(/^Juz 30 · /);
+    // By surah and juz, never page numbers (CLAUDE.md, lib/passages).
+    expect(plainText(today.title)).toBe('At-Tin to Al-Fil');
+    expect(plainText(today.short)).toBe('At-Tin to Al-Fil');
+    expect(today.where).toBe('Juz 30');
+    for (const t of [today.title, today.short, today.where]) expect(t).not.toMatch(/\bp{1,2}\.\s|\bPages? \d/);
   });
 
   it('a week ahead, each day starting at the last one’s end (midnight here)', () => {
@@ -100,6 +103,19 @@ describe('buildWidgetSnapshot', () => {
     // Tomorrow, before it's revised, the streak is still alive; the day after, not.
     expect(done.days[1]).toMatchObject({ done: 0, completed: false, streak: 2 });
     expect(done.days[2].streak).toBe(0);
+  });
+
+  // AHEAD-3: revising ahead goes on past the cycle's end; a day of the next cycle revised in a new round
+  // (its pages repeat today's) is done when it comes, as on Home (AHEAD-2, AHEAD-4).
+  it('a day of the next cycle done ahead in a new round is done; the days before it are not', () => {
+    const pagesOn = (d: number) => generateDailyAssignment(pages, quranData, user, new Date(2026, 9, 27 + d)).pages;
+    const later = pagesOn(5);
+    expect(later.some((p) => pagesOn(0).includes(p))).toBe(true);
+    const todays: RevisionLog = { ...log('2026-10-27', [...new Set([...pagesOn(0), ...later])]), assignedPages: pagesOn(0), ahead: { '2026-11-01': later } };
+    const snap = buildWidgetSnapshot(inputs({ logs: [todays] }));
+    expect(snap.days[0]).toMatchObject({ completed: true });
+    expect(snap.days[5]).toMatchObject({ day: '2026-11-01', completed: true });
+    expect(snap.days[4].completed).toBe(false);
   });
 
   it('a streak through yesterday stays alive today', () => {
@@ -143,14 +159,14 @@ describe('buildWidgetSnapshot', () => {
     expect(buildWidgetSnapshot(inputs({ signedIn: false, user: null, accent: 'crimson' })).colors.light.done).toBe('#DC1433');
   });
 
-  it('several ranges: the Lock Screen says how many pages', () => {
+  it('several ranges: the title names the first two and how many more; the Lock Screen, where the day starts', () => {
     const scattered: UserPage[] = pages.map((p) => ({
       ...p,
       status: [10, 11, 50, 90].includes(p.pageNumber) ? 'memorized' : 'not_memorized',
     })) as UserPage[];
     const snap = buildWidgetSnapshot(inputs({ pages: scattered, user: { ...user, dailyPageCapacity: 4 } }));
-    expect(snap.days[0].short).toBe('4 pages');
-    expect(snap.days[0].title).toBe('Pages 10–11, 50 and 90');
+    expect(plainText(snap.days[0].title)).toBe('Al-Baqarah 62–76, then 2 more');
+    expect(plainText(snap.days[0].short)).toBe('Al-Baqarah 62');
   });
 });
 
@@ -216,5 +232,24 @@ describe('widget snapshot: prayer times (for the prayer widgets)', () => {
   it('without (not a tester, no place): no prayer key at all, so nothing else changes', () => {
     expect('prayer' in buildWidgetSnapshot(inputs())).toBe(false);
     expect('prayer' in buildWidgetSnapshot(inputs({ prayer: null }))).toBe(false);
+  });
+});
+
+describe('a partly memorized page on the widget (MEM-4)', () => {
+  it('is in the day, named by its memorized ayahs', () => {
+    // Pages 1–4, and An-Nas alone on the last page: five pages at five a day.
+    const some: UserPage[] = pages.map((p) =>
+      p.pageNumber <= 4
+        ? { ...p, status: 'memorized' as const, dateMemorized: '2025-01-01' }
+        : p.pageNumber === 604
+          ? { ...p, status: 'in_progress' as const, dateMemorized: '2025-01-01', verses: [114001, 114002, 114003, 114004, 114005, 114006] }
+          : { ...p, status: 'not_memorized' as const, dateMemorized: null },
+    );
+    const snap = buildWidgetSnapshot(inputs({ pages: some }));
+    expect(snap.state).toBe('ready');
+    const day = snap.days[0];
+    expect(day.total).toBe(5);
+    expect(plainText(day.title)).toBe('Al-Fatihah to Al-Baqarah, then An-Nas');
+    expect(plainText(day.title)).not.toMatch(/Ikhlas/);
   });
 });
