@@ -765,6 +765,27 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   in What's new, on this first open or from Settings, it doesn't play on an open again. Settings → Revo AI →
   "What Revo can do" plays it any time, ending on Turn on Revo and Later while Revo is off, or Done.
 
+- **REVO-40.** Revo notices patterns in the account's own last days and may say so, gently, with one practical idea
+  (Majd, Nov 9 2026: "it should know such jargon like hey seems like you were making up blah blah blah how about we
+  try..."). The app finds them from what Activity and the streak read (catch-up pages credited to earlier days,
+  SESS-7; pages revised ahead credited to later ones, AHEAD-2; each day's session time) and sends them with the
+  question and the Day in review, beside each day's caught-up and ahead pages and start time. Revo never reads a
+  pattern into the numbers itself.
+  - Catching up: the latest day this week that revised, for earlier days, at least half a usual day's pages (3 at
+    least); it names those days and whether Keep daily amount is on.
+  - Revising far ahead: the latest day this week that revised pages for 3 or more later days, at least two days'
+    worth; with how many of those days have since come with nothing left to revise.
+  - Late at night: at least 3 of the last 14 days with revision, and at least half of them, started between 10 PM
+    and 4 AM.
+  - Steady: a streak of 7 days or more, with nothing caught up this week.
+
+  It mentions at most one, only when it fits the question (how they're doing, the week, their routine, the streak,
+  catching up, the plan) or the Day in review is about that day; never in a how-to answer, and not again in the
+  same conversation. Most answers mention none. No pattern is about strength, so Smart Tracking changes none of
+  them. The app sends the patterns and the day facts only once config/app's `revoPatterns` is on (set after the
+  functions that take them are deployed: older ones refuse fields they don't know); off, it sends what it sent
+  before, and turning it off stops them with no deploy.
+
 ## Memorizing
 
 - **MEM-1.** What is memorized is kept by the ayah (most people memorize ayahs, not pages: Majd, Nov 7

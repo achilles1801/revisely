@@ -9,12 +9,14 @@ import { juzPages, surahPages } from './quranIndex';
 import {
   REVO_INSIGHTS,
   REVO_PASSAGE_KEYS,
+  REVO_PATTERN_KINDS,
   REVO_TOTALS,
   RevoAttachment,
   RevoContext,
   RevoDayFacts,
   RevoInsight,
   RevoPassageFacts,
+  RevoPattern,
   RevoPlanTally,
   RevoTimes,
   RevoTotals,
@@ -125,11 +127,48 @@ export function validateChatId(v: unknown): string | null {
   return v;
 }
 
+/** One pattern the app read (REVO-40): its kind's fields only, each in range; days before the pattern's own. */
+function validatePattern(x: unknown, p: string): RevoPattern {
+  const o = obj(x, p);
+  const kind = o.kind;
+  if (typeof kind !== 'string' || !(REVO_PATTERN_KINDS as readonly string[]).includes(kind)) fail(`${p}.kind`);
+  if (kind === 'catchingUp') {
+    keys(o, ['kind', 'day', 'pages', 'forDays', 'keepDailyAmount'], p);
+    const on = day(o.day, `${p}.day`);
+    const forDays = list(o.forDays, 7, `${p}.forDays`, (d, q) => {
+      const v = day(d, q);
+      if (v >= on) fail(q);
+      return v;
+    });
+    if (forDays.length === 0) fail(`${p}.forDays`);
+    if (typeof o.keepDailyAmount !== 'boolean') fail(`${p}.keepDailyAmount`);
+    return { kind, day: on, pages: int(o.pages, 1, MAX_COUNT, `${p}.pages`), forDays, keepDailyAmount: o.keepDailyAmount };
+  }
+  if (kind === 'aheadBurst') {
+    keys(o, ['kind', 'day', 'pages', 'days', 'quietDays'], p);
+    return {
+      kind,
+      day: day(o.day, `${p}.day`),
+      pages: int(o.pages, 1, MAX_COUNT, `${p}.pages`),
+      days: int(o.days, 1, MAX_COUNT, `${p}.days`),
+      quietDays: int(o.quietDays, 0, 7, `${p}.quietDays`),
+    };
+  }
+  if (kind === 'lateNights') {
+    keys(o, ['kind', 'late', 'of'], p);
+    const of = int(o.of, 1, 31, `${p}.of`);
+    return { kind, late: int(o.late, 1, of, `${p}.late`), of };
+  }
+  keys(o, ['kind', 'days'], p);
+  return { kind: 'steady', days: int(o.days, 1, MAX_COUNT, `${p}.days`) };
+}
+
 export function validateContext(v: unknown): RevoContext {
   const c = obj(v, 'context');
   // `streak`, `today.carriedPages`, `today.doneEarlier`, `today.otherPages`, `week[].planned` and
   // `week[].done` come from apps after Nov 7 2026 (lib/todaySnapshot); older apps send without them.
-  keys(c, ['totals', 'today', 'weakPages', 'week', 'streak', 'passages', 'pageNames', 'localTime'], 'context', ['totals', 'today', 'weakPages', 'week']);
+  // `week[].caughtUp`, `week[].ahead`, `week[].started` and `patterns` come from apps after Nov 9 2026 (REVO-40).
+  keys(c, ['totals', 'today', 'weakPages', 'week', 'streak', 'patterns', 'passages', 'pageNames', 'localTime'], 'context', ['totals', 'today', 'weakPages', 'week']);
 
   const t = obj(c.totals, 'context.totals');
   keys(t, REVO_TOTALS, 'context.totals');
@@ -156,15 +195,21 @@ export function validateContext(v: unknown): RevoContext {
 
   const week = list(c.week, 7, 'context.week', (x, p) => {
     const w = obj(x, p);
-    keys(w, ['day', 'pages', 'planned', 'done'], p, ['day', 'pages']);
+    keys(w, ['day', 'pages', 'planned', 'done', 'caughtUp', 'ahead', 'started'], p, ['day', 'pages']);
     if (w.done !== undefined && typeof w.done !== 'boolean') fail(`${p}.done`);
+    if (w.started !== undefined && w.started !== null && (typeof w.started !== 'string' || !TIME_RE.test(w.started))) fail(`${p}.started`);
     return {
       day: day(w.day, `${p}.day`),
       pages: int(w.pages, 0, MAX_COUNT, `${p}.pages`),
       ...(w.planned === undefined ? {} : { planned: int(w.planned, 0, MAX_COUNT, `${p}.planned`) }),
       ...(w.done === undefined ? {} : { done: w.done as boolean }),
+      ...(w.caughtUp === undefined ? {} : { caughtUp: int(w.caughtUp, 0, MAX_COUNT, `${p}.caughtUp`) }),
+      ...(w.ahead === undefined ? {} : { ahead: int(w.ahead, 0, MAX_COUNT, `${p}.ahead`) }),
+      ...(w.started === undefined ? {} : { started: w.started as string | null }),
     };
   });
+
+  const patterns = c.patterns === undefined ? undefined : list(c.patterns, REVO_PATTERN_KINDS.length, 'context.patterns', validatePattern);
 
   let streak: RevoContext['streak'];
   if (c.streak !== undefined) {
@@ -214,6 +259,7 @@ export function validateContext(v: unknown): RevoContext {
     weakPages,
     week,
     ...(streak ? { streak } : {}),
+    ...(patterns ? { patterns } : {}),
     ...(passages ? { passages } : {}),
     ...(pageNames ? { pageNames } : {}),
     localTime: lt,

@@ -7,7 +7,9 @@ import { consistency, coverage, lastRevisedByPage, type Revised } from '../activ
 import { reviewedOn } from '../aheadCredit';
 import { revisionDayOf } from '../fajrBoundary';
 import { shiftDay } from '../journal';
+import type { HistoryItem } from '../streakFromItems';
 import type { TodaySnapshot } from '../todaySnapshot';
+import { daySignals, revoPatterns, sessionStarts } from './patterns';
 import type { RevoContext, RevoTotals } from './types';
 import { contextWords, memorizedWords } from './words';
 import { isRevisable, memorizedAyahs, memorizedPageShare, partlyMemorizedAyahs, revisablePages } from '../memorizedAyahs';
@@ -71,6 +73,13 @@ export function buildRevoContext(input: {
   logs: readonly RevisionLog[];
   /** Today as Home shows it (lib/todaySnapshot): today, the week and the streak come from it. */
   snapshot: TodaySnapshot;
+  /** The Activity items Home's streak read: when each day's revision started (REVO-40). Null until loaded. */
+  history?: readonly HistoryItem[] | null;
+  /**
+   * Send the patterns and each day's facts (REVO-40): only once config/app.revoPatterns says the server
+   * takes them (lib/revo/release revoPatternsOn); otherwise the context is as before, which every server takes.
+   */
+  patterns?: boolean;
   now?: Date;
 }): RevoContext {
   const { user, pages, logs, snapshot } = input;
@@ -102,6 +111,18 @@ export function buildRevoContext(input: {
       return page != null && isWeak(page);
     })
     .slice(0, MAX_PAGES);
+  const starts = sessionStarts(input.history);
+  const week = Array.from({ length: 7 }, (_, i) => {
+    const day = shiftDay(today, i - 6);
+    // Today as Home says it; earlier days as the streak counts them.
+    const base =
+      day === today
+        ? { day, pages: revisedHere.size, planned: snapshot.own.length, done: snapshot.status === 'completed' }
+        : { day, pages: pagesRevisedOn(logs, day), planned: scheduled(day).length, done: doneDays.has(day) };
+    return { ...base, ...daySignals(logs, day, starts) };
+  });
+  // REVO-40: what was caught up, revised ahead and when, read into at most a few patterns.
+  const patterns = revoPatterns({ today, week, starts, streakDays: reading.streak, keepDailyAmount: user.carryOverMode !== 'add' });
   // Surah and juz first (lib/passages): the model names parts of the Qur'an with these words.
   const words = contextWords({ today: snapshot.pages, next: nextPages, weakNext, weak: weakPages }, partlyMemorizedAyahs(pages));
   return {
@@ -119,13 +140,9 @@ export function buildRevoContext(input: {
       done: snapshot.status === 'completed',
     },
     weakPages,
-    week: Array.from({ length: 7 }, (_, i) => {
-      const day = shiftDay(today, i - 6);
-      // Today as Home says it; earlier days as the streak counts them.
-      return day === today
-        ? { day, pages: revisedHere.size, planned: snapshot.own.length, done: snapshot.status === 'completed' }
-        : { day, pages: pagesRevisedOn(logs, day), planned: scheduled(day).length, done: doneDays.has(day) };
-    }),
+    ...(input.patterns
+      ? { week: week.map(({ caughtUpFor: _caught, aheadFor: _ahead, ...w }) => w), patterns }
+      : { week: week.map(({ day, pages, planned, done }) => ({ day, pages, planned, done })) }),
     streak: {
       days: reading.streak,
       atRisk: reading.grace

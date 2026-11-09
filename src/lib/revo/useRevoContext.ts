@@ -7,6 +7,7 @@ import { generateDailyAssignment } from '../algorithm';
 import { getQuranData } from '../quranData';
 import { todaySnapshot } from '../todaySnapshot';
 import { buildRevoContext } from './context';
+import { revoPatternsOn } from './release';
 import type { FactSources } from './facts';
 import type { GreetingExtras } from './greeting';
 import type { RevoContext } from './types';
@@ -39,7 +40,7 @@ export function useRevoContext(): {
   }, [user, pages, logs, day, assignment, history]);
   const build = useCallback(() => {
     const src = sources();
-    return src ? buildRevoContext({ user: src.user, pages: src.pages, logs: src.logs, snapshot: src.snapshot }) : null;
+    return src ? buildRevoContext({ user: src.user, pages: src.pages, logs: src.logs, snapshot: src.snapshot, history: src.history, patterns: revoPatternsOn() }) : null;
   }, [sources]);
   const { context, extras } = useMemo(() => {
     const src = sources();
@@ -54,7 +55,7 @@ export function useRevoContext(): {
       }
     }
     return {
-      context: buildRevoContext({ user: src.user, pages: src.pages, logs: src.logs, snapshot }),
+      context: buildRevoContext({ user: src.user, pages: src.pages, logs: src.logs, snapshot, history: src.history, patterns: revoPatternsOn() }),
       // Smart Tracking unset is off, as Activity reads it.
       extras: { doneCount: snapshot.done.size, next, strength: src.user.smartTrackingEnabled === true },
     };
