@@ -27,14 +27,10 @@ appId: com.revisionbuddy.app
 # NEW-3: Settings → About → What's new, with a ✕.
 - tapOn:
     id: open-settings
-# Centred: at the screen's foot a row can sit under the tab bar, which takes the tap.
-# Settings is long: on the iOS runner a swipe and a look take 4–6 s (.maestro/README.md, Time limits).
-- scrollUntilVisible:
-    element:
-      id: settings-whats-new
-    direction: DOWN
-    centerElement: true
-    timeout: 60000
+- runFlow:
+    file: ../subflows/settings-row.yaml
+    env:
+      ROW: settings-whats-new
 - tapOn:
     id: settings-whats-new
 - extendedWaitUntil:
@@ -59,13 +55,10 @@ appId: com.revisionbuddy.app
     timeout: 10000
 
 # NEW-3: Testing → Show What's new at launch, from the next launch.
-# Settings is long: on the iOS runner a swipe and a look take 4–6 s (.maestro/README.md, Time limits).
-- scrollUntilVisible:
-    element:
-      id: settings-whats-new-launch
-    direction: DOWN
-    centerElement: true
-    timeout: 60000
+- runFlow:
+    file: ../subflows/settings-row.yaml
+    env:
+      ROW: settings-whats-new-launch
 - tapOn:
     id: settings-whats-new-launch
 - runFlow: ../subflows/relaunch.yaml

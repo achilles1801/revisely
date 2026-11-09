@@ -530,22 +530,10 @@ appId: com.revisionbuddy.app
 # turn it off) so its opt-in shows again, with the day's questions back.
 - runFlow:
     file: ../subflows/back-home.yaml
-- tapOn:
-    id: open-settings
-# Centred: stopped at its first sight, the row sat behind the tab bar and the tap opened Insights.
-# Settings is long: on the iOS runner a swipe and a look take 4–6 s (.maestro/README.md, Time limits).
-- scrollUntilVisible:
-    element: "Theme"
-    direction: DOWN
-    centerElement: true
-    timeout: 60000
-- tapOn: "Dark(, selected)?"
-- tapOn:
-    id: back
-- extendedWaitUntil:
-    visible:
-      id: today-post
-    timeout: 10000
+- runFlow:
+    file: ../subflows/theme.yaml
+    env:
+      THEME: Dark
 # Revo off through the real revoSetOptions (what Settings → Revo AI calls), and the day's
 # questions back.
 - runScript:
@@ -653,13 +641,10 @@ appId: com.revisionbuddy.app
 # REVO-39: Settings → Revo AI → What Revo can do plays the moment again; with Revo on, it ends on Done.
 - tapOn:
     id: open-settings
-# Settings is long: on the iOS runner a swipe and a look take 4–6 s (.maestro/README.md, Time limits).
-- scrollUntilVisible:
-    element:
-      id: settings-revo-moment
-    direction: DOWN
-    centerElement: true
-    timeout: 60000
+- runFlow:
+    file: ../subflows/settings-row.yaml
+    env:
+      ROW: settings-revo-moment
 - tapOn:
     id: settings-revo-moment
     waitToSettleTimeoutMs: 500

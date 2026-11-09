@@ -4,8 +4,15 @@ appId: com.revisionbuddy.app
 ---
 - tapOn:
     id: open-settings
-# Centred: stopped at its first sight, the row sat behind the tab bar and the tap opened Insights.
-# Settings is long: on the iOS runner a swipe and a look take 4–6 s (.maestro/README.md, Time limits).
+# Swipes first, counted, not timed, then centred, as settings-row.yaml does (the row has no id):
+# a loaded iOS runner took 20 s a swipe (#328's run 42565390013), and stopped at its first sight, the
+# row sat behind the tab bar and the tap opened Insights.
+- repeat:
+    while:
+      notVisible: "Theme"
+    times: 12
+    commands:
+      - scroll
 - scrollUntilVisible:
     element: "Theme"
     direction: DOWN

@@ -78,14 +78,10 @@ appId: com.revisionbuddy.app
 # Smart Tracking off (Settings → Revision): Insights shows the line that turns it on, in Weak spots' place.
 - tapOn:
     id: open-settings
-# Centred: found at the screen's foot, a row can sit under the tab bar, which takes the tap.
-# Settings is long: on the iOS runner a swipe and a look take 4–6 s (.maestro/README.md, Time limits).
-- scrollUntilVisible:
-    element:
-      id: smart-tracking-switch
-    direction: DOWN
-    centerElement: true
-    timeout: 60000
+- runFlow:
+    file: settings-row.yaml
+    env:
+      ROW: smart-tracking-switch
 - tapOn:
     id: smart-tracking-switch
 - tapOn:

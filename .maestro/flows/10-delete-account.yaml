@@ -19,7 +19,14 @@ appId: com.revisionbuddy.app
 # The last row: on to the end of Settings, where it sits above the tab bar. Found at the screen's
 # foot, it sat under the tab bar, which took the tap (Android); and a last row can't be centred,
 # so centring it timed out on iOS, with the row in plain view (#328's run, Nov 7 2026).
-# Settings is long: on the iOS runner a swipe and a look take 4–6 s (.maestro/README.md, Time limits).
+# Swipes first, counted, not timed, as settings-row.yaml does: a loaded iOS runner took 20 s a swipe.
+- repeat:
+    while:
+      notVisible:
+        id: settings-delete-account
+    times: 12
+    commands:
+      - scroll
 - scrollUntilVisible:
     element:
       id: settings-delete-account

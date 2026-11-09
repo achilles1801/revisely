@@ -14,19 +14,10 @@ appId: com.revisionbuddy.app
     env:
       SET: activity
 - runFlow: ../subflows/backup-notice.yaml
-- tapOn:
-    id: open-settings
-# Appearance is down the page.
-# Settings is long: on the iOS runner a swipe and a look take 4–6 s (.maestro/README.md, Time limits).
-- scrollUntilVisible:
-    element:
-      text: "Dark"
-    direction: DOWN
-    timeout: 60000
-- tapOn:
-    text: "Dark"
-- tapOn:
-    id: back
+- runFlow:
+    file: ../subflows/theme.yaml
+    env:
+      THEME: Dark
 - runFlow:
     file: ../subflows/activity-screens.yaml
     env:

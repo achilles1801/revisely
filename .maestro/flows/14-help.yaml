@@ -107,15 +107,10 @@ appId: com.revisionbuddy.app
 # Settings → Support → Help buttons: off; turned on, the ? is back on Home.
 - tapOn:
     id: open-settings
-# Centred: found at the screen's foot, a row can sit under the tab bar, which takes the tap (the
-# first run, Nov 8 2026, tapped Read instead).
-# Settings is long: on the iOS runner a swipe and a look take 4–6 s (.maestro/README.md, Time limits).
-- scrollUntilVisible:
-    element:
-      id: settings-help-buttons
-    direction: DOWN
-    centerElement: true
-    timeout: 60000
+- runFlow:
+    file: ../subflows/settings-row.yaml
+    env:
+      ROW: settings-help-buttons
 - tapOn:
     id: settings-help-buttons
 - runFlow: ../subflows/back-home.yaml
