@@ -42,8 +42,9 @@ exit 0
   delete env.GITHUB_ACTIONS;
   delete env.GITHUB_STEP_SUMMARY;
   delete env.E2E_REPEAT;
-  // A stand-in adb and xcrun, so nothing touches a real device.
-  for (const tool of ['adb', 'xcrun']) {
+  // A stand-in adb, xcrun and curl (which empties the emulators before each attempt), so nothing
+  // touches a real device or emulator.
+  for (const tool of ['adb', 'xcrun', 'curl']) {
     fs.writeFileSync(path.join(dir, tool), '#!/usr/bin/env bash\nexit 0\n', { mode: 0o755 });
   }
   env.PATH = `${dir}:${env.PATH}`;

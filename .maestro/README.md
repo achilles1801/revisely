@@ -70,6 +70,15 @@ retry is a warning on the run, and the job keeps its results as for a failure.
   - Runs of a fork's pull request are left out. A PR that changes the report prints it in its job
     summary instead of commenting; so does a run by hand with `dry_run`. Like every scheduled
     workflow it runs from `main`.
+- **A clean start:** every attempt starts from empty emulators (`run.sh` deletes the Firestore
+  emulator's documents and the Auth emulator's accounts first), with the app's data wiped
+  (`launch.yaml`), online, and on iOS with no position. A flow makes everything it reads: its account,
+  any config or seed. After three seeded accounts, 10-delete-account's deletion took 30 s on iOS
+  against 3–4 s on an empty emulator (#217's run 42687083053).
+- **Shuffled at night:** the nightly run takes each job's flows in an order seeded by its run id, and
+  prints it. A flow that leans on another having run before it fails there. To run a night's order
+  again: Run workflow with `shuffle` set to that seed (and the same `flows`), or `E2E_SHUFFLE=<seed>`
+  for `run.sh`.
 - **Time limits:** `run.sh` stops a flow's attempt after 20 minutes on iOS and 15 on Android, and
   the warm-up after 6 (`E2E_FLOW_LIMIT`, `E2E_WARMUP_LIMIT`). Maestro can hang for good: once its
   iOS driver answered 500, its JVM never exited, and a job waited 55 minutes for it. iOS flows 09

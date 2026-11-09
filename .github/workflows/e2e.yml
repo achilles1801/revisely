@@ -89,6 +89,10 @@ on:
         description: Runs of each flow, every one of which must pass, with no reruns
         type: string
         default: '1'
+      shuffle:
+        description: A seed to run each job's flows in its order (a nightly run's, to run that order again); empty to keep theirs
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -587,6 +591,9 @@ jobs:
           # run 42649421053 was stopped at 900 s while still going (560 of its ~586 steps).
           E2E_FLOW_LIMIT: '1200'
           E2E_REPEAT: ${{ inputs.repeat || '1' }}
+          # The nightly run shuffles each job's flows, its run id the seed (run.sh prints the order):
+          # a flow that leans on another having run before it fails there, not on a release day.
+          E2E_SHUFFLE: ${{ github.event_name == 'schedule' && github.run_id || inputs.shuffle || '' }}
         # $FLOWS is a glob, expanded here.
         run: bash .maestro/run.sh ios $FLOWS
 
@@ -875,6 +882,9 @@ jobs:
         env:
           E2E_FLOWS: ${{ matrix.shard.flows }}
           E2E_REPEAT: ${{ inputs.repeat || '1' }}
+          # The nightly run shuffles each job's flows, its run id the seed (run.sh prints the order):
+          # a flow that leans on another having run before it fails there, not on a release day.
+          E2E_SHUFFLE: ${{ github.event_name == 'schedule' && github.run_id || inputs.shuffle || '' }}
         with:
           api-level: 34
           target: google_apis
