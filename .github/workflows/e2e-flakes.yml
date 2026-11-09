@@ -69,5 +69,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           DAYS: ${{ inputs.days || '7' }}
-          COMMENT: ${{ (github.event_name == 'pull_request' || inputs.dry_run) && '' || '--comment' }}
+          # Not `cond && '' || '--comment'`: '' is false in an expression, so that always gave --comment
+          # and a PR's run would post on the weekly issue.
+          COMMENT: ${{ !(github.event_name == 'pull_request' || inputs.dry_run) && '--comment' || '' }}
         run: node scripts/ci/wait-times.js --days "$DAYS" $COMMENT
