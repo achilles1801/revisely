@@ -69,6 +69,31 @@ describe('searchText', () => {
     expect(found(say('بسم الله الرحمن الرحيم', verse(67, 1).slice(0, 4)))).toEqual(['67:1']);
   });
 
+  it('finds the ayah when the basmala and the words after it are said twice', () => {
+    // The Fatihah from its start (the property's seed -378724082), and 27:30's basmala on into 27:31.
+    const fatihah = 'بسم الله الرحمن الرحيم الحمد لله رب العالمين الرحمن';
+    expect(found(`${fatihah} ${fatihah}`)[0]).toBe('1:2');
+    const naml = 'بسم الله الرحمن الرحيم ألا تعلوا علي وأتوني مسلمين';
+    expect(found(`${naml} ${naml}`)).toEqual(['27:31']);
+    const both = 'أعوذ بالله من الشيطان الرجيم بسم الله الرحمن الرحيم الحمد لله رب العالمين';
+    expect(found(`${both} ${both}`)[0]).toBe('1:2');
+    // A word said twice after the basmala is still the word, not the basmala.
+    expect(found('بسم الله الرحمن الرحيم فارجع البصر فارجع البصر')).toEqual(['67:3', '67:4']);
+  });
+
+  it('searches two words after a basmala with it too, and lists both', () => {
+    // 27:30's basmala and 27:31's first two words, the second misheard (تعلوا as تكلوا): the two
+    // words alone are 6:119's (ألا تأكلوا without its hamza), the basmala with them 27:30–31.
+    expect(found('ألا تكلوا')).toEqual(['6:119']);
+    const r = searchText(words, 'بسم الله الرحمن الرحيم ألا تكلوا');
+    expect(r.hits.map((h) => `${h.sura}:${h.ayah}`)).toEqual(['6:119', '27:30']);
+    expect(r.hits[1].last).toEqual({ sura: 27, ayah: 31 });
+    // Two words that follow no basmala in the text: nothing is added for the basmala alone.
+    expect(found('بسم الله الرحمن الرحيم الم ذلك')).toEqual(['2:1']);
+    // The Fatihah's basmala and the start of its second ayah: still 1:2 first.
+    expect(found('بسم الله الرحمن الرحيم الحمد لله')[0]).toBe('1:2');
+  });
+
   it('reads يا أيها, printed as one word, said as two (or typed as one)', () => {
     const r = searchText(words, 'يا أيها الذين آمنوا');
     expect(r.total).toBeGreaterThan(80);

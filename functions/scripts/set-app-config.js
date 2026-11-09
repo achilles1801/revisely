@@ -25,6 +25,13 @@
  *                                after 10 minutes, or at once when the server
  *                                refuses Revo. Turning Revo off and deleting its
  *                                data stay open to every account.
+ *   revoPatterns                 Whether phones send Revo the patterns in their days
+ *                                and each day's facts (REVO-40, src/lib/revo/release
+ *                                revoPatternsOn). Turn it on only after revoAsk and
+ *                                revoDayInReview with REVO-40 are deployed: older
+ *                                functions refuse fields they don't know, so every
+ *                                question would fail. Off (unset) stops them, no
+ *                                deploy needed. Phones read it with `revo`.
  *   whatsNewOff                  The "What's new" kill switch (src/lib/whatsNew/
  *                                killSwitch.ts): true stops the walkthrough after
  *                                the update for everyone, without an update, in
@@ -40,6 +47,8 @@
  *   ... node scripts/set-app-config.js --revo everyone           # Revo for every account
  *   ... node scripts/set-app-config.js --revo off                # Revo paused for everyone
  *   ... node scripts/set-app-config.js --revo testers            # back to testers only
+ *   ... node scripts/set-app-config.js --revo-patterns on        # after deploying revoAsk,revoDayInReview with REVO-40
+ *   ... node scripts/set-app-config.js --revo-patterns off       # phones stop sending them
  *   ... node scripts/set-app-config.js --whats-new off           # stop the What's new walkthrough
  *   ... node scripts/set-app-config.js --whats-new on            # let it show again
  *
@@ -80,6 +89,11 @@ function parseArgs(argv) {
       if (!REVO.includes(v)) throw new Error(`--revo needs one of ${REVO.join(', ')} (got ${v ?? 'nothing'})`);
       opts.revo = v;
     }
+    else if (a === '--revo-patterns') {
+      const v = argv[++i];
+      if (!WHATS_NEW.includes(v)) throw new Error(`--revo-patterns needs on or off (got ${v ?? 'nothing'})`);
+      opts.revoPatterns = v;
+    }
     else if (a === '--whats-new') {
       const v = argv[++i];
       if (!WHATS_NEW.includes(v)) throw new Error(`--whats-new needs on or off (got ${v ?? 'nothing'})`);
@@ -110,7 +124,7 @@ async function main() {
   } catch (err) {
     console.error(err.message);
     console.error(
-      'Usage: node scripts/set-app-config.js --show | [--min-ios V] [--min-android V] [--latest-android V [--latest-android-code N]] [--clear-min] [--revo testers|everyone|off] [--whats-new on|off] [--force]',
+      'Usage: node scripts/set-app-config.js --show | [--min-ios V] [--min-android V] [--latest-android V [--latest-android-code N]] [--clear-min] [--revo testers|everyone|off] [--revo-patterns on|off] [--whats-new on|off] [--force]',
     );
     process.exit(1);
   }
@@ -135,6 +149,7 @@ async function main() {
           latest: data.latest || {},
           testing: testing ? { android: { version: testing.version, code: testing.code } } : {},
           revo: REVO.includes(data.revo) ? data.revo : 'testers (unset)',
+          revoPatterns: data.revoPatterns === true ? 'on' : 'off',
           whatsNew: data.whatsNewOff === true ? 'off' : 'on',
         },
         null,
@@ -143,7 +158,7 @@ async function main() {
     );
     console.log(`App Store has ${store ?? 'unknown'}.`);
   };
-  const changes = opts.minIos || opts.minAndroid || opts.latestAndroid || opts.clearMin || opts.revo || opts.whatsNew;
+  const changes = opts.minIos || opts.minAndroid || opts.latestAndroid || opts.clearMin || opts.revo || opts.revoPatterns || opts.whatsNew;
   if (opts.show || !changes) {
     show(current);
     return;
@@ -176,6 +191,7 @@ async function main() {
     update['latest.androidCode'] = opts.latestAndroidCode || FieldValue.delete();
   }
   if (opts.revo) update.revo = opts.revo;
+  if (opts.revoPatterns) update.revoPatterns = opts.revoPatterns === 'on' ? true : FieldValue.delete();
   if (opts.whatsNew) update.whatsNewOff = opts.whatsNew === 'off' ? true : FieldValue.delete();
   if (opts.clearMin && (opts.minIos || opts.minAndroid)) {
     console.error('--clear-min with a minimum: pick one.');
