@@ -156,7 +156,7 @@ describe('Keep going', () => {
     await app.close();
   });
 
-  it('[AHEAD-3] stops at the end of the cycle', async () => {
+  it('[AHEAD-3] doesn’t stop at the end of the cycle: Friday restarts it with Monday’s pages, unchecked', async () => {
     const { phone } = await account();
     const { app, home } = await openHome(phone, '2026-11-02 21:00');
     const session = await home.startSession();
@@ -165,8 +165,11 @@ describe('Keep going', () => {
       await session.keepGoing();
     }
     await session.swipeThrough(5);
-    // Mon–Thu is the whole cycle: Friday is Monday's pages again.
-    expect(session.hasKeepGoing()).toBe(false);
+    // Mon–Thu is the whole cycle: Friday is Monday's pages again (Majd, Nov 9 2026: it restarts the cycle).
+    expect(session.hasKeepGoing()).toBe(true);
+    await session.keepGoing();
+    expect(session.pages()).toEqual(MON);
+    expect(await session.isChecked()).toBe(false);
     await session.back();
     await app.close();
   });

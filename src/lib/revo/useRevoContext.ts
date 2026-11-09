@@ -2,7 +2,7 @@ import { useCallback, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
 import { useSharedActivityHistory } from '../activityHistory';
-import { nextRevisionDayPlan, revisionDayAfter } from '../aheadPlan';
+import { aheadLead, nextRevisionDayPlan } from '../aheadPlan';
 import { generateDailyAssignment } from '../algorithm';
 import { getQuranData } from '../quranData';
 import { todaySnapshot } from '../todaySnapshot';
@@ -13,7 +13,6 @@ import type { GreetingExtras } from './greeting';
 import type { RevoContext } from './types';
 
 /** "Wednesday": the next revision day with pages, when it isn't tomorrow. */
-const weekday = (day: string) => new Date(`${day}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long' });
 
 /**
  * The revision day, and Revo's context built from the account's data as Home sees it now: the same
@@ -51,7 +50,7 @@ export function useRevoContext(): {
     if (snapshot.status === 'completed' && assignment.length > 0) {
       const plan = nextRevisionDayPlan(src.user, src.pages, day, new Set(assignment), src.logs);
       if (plan && plan.pages.length > 0) {
-        next = { lead: plan.day === revisionDayAfter(day) ? 'Tomorrow' : weekday(plan.day), first: plan.pages[0], pages: plan.pages.length };
+        next = { lead: aheadLead(src.user, src.pages, day, plan, { long: true }), first: plan.pages[0], pages: plan.pages.length };
       }
     }
     return {

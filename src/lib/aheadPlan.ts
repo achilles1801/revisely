@@ -3,7 +3,7 @@
 // The credit rule itself is in lib/aheadCredit.
 
 import { RevisionLog, User, UserPage } from '../types';
-import { getPagesForDay } from './algorithm';
+import { calendarDaysBetween, getPagesForDay, juzModeCycle } from './algorithm';
 import { creditIndex } from './aheadCredit';
 import { dateToLocalISODay } from './schedulePlans';
 import { revisablePages } from './memorizedAyahs';
@@ -25,6 +25,17 @@ export function weekdayLabel(day: string): string {
   return parseDay(day).toLocaleDateString('en-US', { weekday: 'short' });
 }
 
+/**
+ * A later revision day named from `today`: its weekday within the week ("Thu"), else its weekday and
+ * date ("Mon 16 Nov"), so a day a cycle on (AHEAD-3) never reads as today's own weekday.
+ */
+export function aheadDayLabel(today: string, day: string, opts: { long?: boolean } = {}): string {
+  const d = parseDay(day);
+  const weekday = opts.long ? d.toLocaleDateString('en-US', { weekday: 'long' }) : weekdayLabel(day);
+  if (calendarDaysBetween(parseDay(today), d) < 7) return weekday;
+  return `${weekday} ${d.getDate()} ${d.toLocaleDateString('en-US', { month: 'short' })}`;
+}
+
 function addDays(day: string, delta: number): string {
   const d = parseDay(day);
   d.setDate(d.getDate() + delta);
@@ -34,6 +45,12 @@ function addDays(day: string, delta: number): string {
 export interface RevisionDayPlan {
   day: string;
   pages: number[];
+  /**
+   * The day repeats pages the session already holds: the schedule has come round (a whole cycle
+   * revised from where the session started). It starts a new round, revised apart from the pages
+   * before it (AHEAD-3: Majd, Nov 9 2026, the cycle restarts). Absent otherwise.
+   */
+  round?: true;
 }
 
 /**
@@ -41,9 +58,13 @@ export interface RevisionDayPlan {
  * "Keep going" and "Tomorrow starts at". The plan holds only the pages not yet
  * done on that day (a partly done day continues from its first page not done);
  * a day whose pages are all done ahead is passed over. Off days (an empty
- * custom-plan day) are skipped. Stops (null) at the end of one cycle: when the
- * next day's pages were already taken (`taken`: this session's pages so far),
- * the schedule has come round again.
+ * custom-plan day) are skipped.
+ *
+ * It never stops at the end of a cycle (AHEAD-3). When the day's pages include
+ * pages already taken (`taken`: this session's pages so far, or today's on
+ * Home), the schedule has come round: the plan is marked `round`, and the day
+ * is revised as a new round, apart from those pages. Null only when nothing is
+ * left to revise at all.
  */
 export function nextRevisionDayPlan(
   user: User,
@@ -58,13 +79,58 @@ export function nextRevisionDayPlan(
     const day = addDays(after, delta);
     const scheduled = getPagesForDay(user, parseDay(day), memorized);
     if (scheduled.length === 0) continue;
-    if (scheduled.some((p) => taken.has(p))) return null;
     const credited = index.get(day);
     const remaining = credited ? scheduled.filter((p) => !credited.has(p)) : scheduled;
     if (remaining.length === 0) continue;
-    return { day, pages: remaining };
+    return remaining.some((p) => taken.has(p)) ? { day, pages: remaining, round: true } : { day, pages: remaining };
   }
   return null;
+}
+
+/**
+ * Whether a revision day begins a pass through the plan from its first page, `first` being the page
+ * it would open on: day one of a custom plan or of the juz cycle, or, on the pages-a-day plan, a day
+ * that starts on the first memorized page. A day that ends one pass and begins the next (its pages
+ * run past the last page and on from the first) doesn't: it opens on the old pass's pages.
+ */
+export function startsCycle(user: User, pages: readonly UserPage[], day: string, first: number): boolean {
+  const memorized = revisablePages(pages);
+  if (memorized.length === 0) return false;
+  const custom = user.customPlan;
+  if (custom && custom.days.length > 0) {
+    const firstDay = custom.days.findIndex((d) => d.length > 0);
+    if (firstDay < 0) return false;
+    const since = calendarDaysBetween(parseDay(custom.cycleStartDate), parseDay(day));
+    if (since < 0) return false;
+    const n = custom.days.length;
+    return ((since % n) + n) % n === firstDay && first === custom.days[firstDay][0];
+  }
+  if (user.scheduleMode === 'juz' && (user.dailyJuzCount ?? 0) > 0) {
+    const juz = juzModeCycle(user, memorized);
+    if (!juz) return false;
+    const since = calendarDaysBetween(new Date(user.scheduleAnchorDate || user.createdAt), parseDay(day));
+    if (since < 0) return false;
+    return since % juz.cycle.length === 0 && first === juz.cycle[0][0];
+  }
+  return first === Math.min(...memorized.map((p) => p.pageNumber));
+}
+
+/**
+ * How Home names the next revision day (before "starts at …"), and Revo with it: "Tomorrow" for the day
+ * after `today`; "Next cycle" for a day that begins a pass through the plan (AHEAD-3: revising ahead goes
+ * on into the next cycle); else its weekday, "Thu" (with its date a week or more on, aheadDayLabel).
+ */
+export function aheadLead(
+  user: User,
+  pages: readonly UserPage[],
+  today: string,
+  plan: RevisionDayPlan,
+  /** The weekday in full ("Thursday"), as Revo words it. */
+  opts: { long?: boolean } = {},
+): string {
+  if (plan.day === revisionDayAfter(today)) return 'Tomorrow';
+  if (plan.pages.length > 0 && startsCycle(user, pages, plan.day, plan.pages[0])) return 'Next cycle';
+  return aheadDayLabel(today, plan.day, opts);
 }
 
 /**

@@ -421,7 +421,8 @@ export class Session {
     await this.app.act(async () => {
       fireEvent.press(el);
     });
-    await this.app.until(() => this.pages().join(',') !== before, 'Keep going to open the next day');
+    // A new round past the cycle's end (AHEAD-3) can hold the same pages again: the end card going is enough.
+    await this.app.until(() => this.pages().join(',') !== before || !this.hasKeepGoing(), 'Keep going to open the next day');
     // The pager opens on that day's first page.
     const state = pagerState();
     state.current = state.props!.initialPage ?? state.props!.pages[0];

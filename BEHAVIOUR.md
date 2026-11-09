@@ -123,9 +123,23 @@ How the tests are made: `tests/scenarios/README.md`.
   today's own pages.
 - **AHEAD-2.** A page revised ahead counts for the day it is scheduled on, not the day it was revised.
   That day then needs only the pages left, and is done when none are.
-- **AHEAD-3.** The end card's Keep going goes on to the next revision day's pages not done yet,
-  which the session then holds alone (the day before is not behind them). Done again, it goes on
-  to the day after. It stops at the end of a cycle. Mark in bulk works on the day on screen.
+- **AHEAD-3.** The end card's Keep going goes on to the next revision day's pages not done yet, which
+  the session then holds alone (the day before is not behind them). Done again, it goes on to the day
+  after. It never stops at the end of a cycle: once every day of the cycle is done (ahead or not), it
+  goes on into the next cycle and on through it, on every plan. Those pages count for the next cycle's
+  days (AHEAD-2) on their own dates; when the plan starts doesn't move, and recency still counts them
+  on the day they were revised (AHEAD-6). A day that repeats pages the session already holds (the
+  cycle has come round) starts a new round: the session holds that day alone, its pages unchecked, and
+  today keeps its own revision of them (unchecking one in the round takes back only its credit to that
+  day). One revision counts for one day. Activity and Insights show those pages on the day they were
+  revised (DAY-9, AHEAD-6): the day's own pages stay done there, each later day it counted for is
+  named ("Ahead for Monday 9 November: …"), and Coverage counts them. Home's line goes on the same
+  way, "Next cycle starts at Al-Fatihah ›" for a day that begins the plan again, and a day a week or
+  more away is named with its date ("Mon 16 Nov"). Mark in bulk works on the day on screen. (Majd, Nov
+  9 2026: "it should restart the cycle if they finish it before their cycle ends so for example if my
+  cycle is one week and i procrastinated all my revision for today and kept revising ahead until that
+  one week is done, my next revise ahead would just be restarting the cycle." It used to stop at the
+  end of the cycle.)
 - **AHEAD-4.** A day already done ahead is passed over: Keep going and Home's next line go to the day
   after it (the owner's rule, #198).
 - **AHEAD-5.** A page is credited ahead only when it was revised in that session (checked or swiped).
