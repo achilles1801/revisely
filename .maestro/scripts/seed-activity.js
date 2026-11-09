@@ -297,9 +297,47 @@ note('2026-11-03', 'hand-d1', 'Ya-Sin, p. 440–445', local('2026-11-03', 6, 10)
 note('2026-11-03', 'note-d1-mem', 'Two sittings. Ayah 10 needs work.', local('2026-11-03', 19, 10), 'memorization:2026-11-03');
 note('2026-11-03', 'note-d1-own', 'First half on the train, the rest after work.', local('2026-11-03', 13, 5), null);
 
+// The app is still making the account when this runs: sign-up writes its 604 pages in two batches. The seed
+// waits until all 604 are on the server. #217's iOS run 42662790506 met both sides of that race in
+// 09-activity-light: the seed's commit, while sign-up was still writing, got 409 "Transaction lock
+// timeout"; on the retry the seed went through, the relaunch then cut sign-up's second batch short, and the
+// app's repair of the 19 missing pages held the emulator's locks for 40 s while Activity waited on them.
+// A 409 is tried again after a pause, as seed-history.js does (Maestro's scripts have no timers: the pause
+// is a wait on the clock).
+function pause(ms) {
+  var until = Date.now() + ms;
+  while (Date.now() < until) {
+    /* waiting */
+  }
+}
+function pagesOnServer() {
+  var count = 0;
+  var token = '';
+  do {
+    var url = ROOT + '/users/' + uid + '/pages?pageSize=300&mask.fieldPaths=status' + (token ? '&pageToken=' + encodeURIComponent(token) : '');
+    var res = http.get(url, { headers: admin });
+    if (res.status >= 300) throw new Error('could not list the pages: HTTP ' + res.status + ' ' + res.body);
+    var body = json(res.body);
+    count += (body.documents || []).length;
+    token = body.nextPageToken || '';
+  } while (token);
+  return count;
+}
+var PAGES = 604;
+var have = pagesOnServer();
+for (var waited = 0; have < PAGES; waited += 2000) {
+  if (waited >= 90000) throw new Error('the account has ' + have + ' of its ' + PAGES + ' pages on the server after 90 s');
+  pause(2000);
+  have = pagesOnServer();
+}
 // Firestore takes at most 500 writes a commit.
 for (var c = 0; c < writes.length; c += 400) {
-  var commit = http.post(ROOT + ':commit', { headers: admin, body: JSON.stringify({ writes: writes.slice(c, c + 400) }) });
-  if (commit.status >= 300) throw new Error('seed commit failed: HTTP ' + commit.status + ' ' + commit.body);
+  var body = JSON.stringify({ writes: writes.slice(c, c + 400) });
+  for (var attempt = 1; ; attempt++) {
+    var commit = http.post(ROOT + ':commit', { headers: admin, body: body });
+    if (commit.status < 300) break;
+    if (commit.status !== 409 || attempt >= 8) throw new Error('seed commit failed: HTTP ' + commit.status + ' ' + commit.body);
+    pause(1500 * attempt);
+  }
 }
 console.log('seeded ' + writes.length + ' documents of Activity history for ' + output.email + ' (' + uid + ')');
