@@ -13,7 +13,10 @@ jest.mock('@react-navigation/native', () => ({
   useNavigation: () => mockNavigation,
   useRoute: () => ({ params: mockParams }),
 }));
-jest.mock('../../../context/AppContext', () => ({ useApp: () => ({ user: { id: 'u1', previewTester: true } }) }));
+let mockUser: { id: string; previewTester?: boolean } = { id: 'u1', previewTester: true };
+jest.mock('../../../context/AppContext', () => ({ useApp: () => ({ user: mockUser }) }));
+// Whether the binary can listen; who may is the real gate (lib/search/availability).
+jest.mock('../../../lib/recite/micSource', () => ({ isMicStreamAvailable: () => true }));
 // The model sheet: shown or not, and a way to finish its download.
 jest.mock('../../../components/recite/SpeechModelSheet', () => ({
   SpeechModelSheet: ({ visible, title, onReady }: { visible: boolean; title: string; onReady: () => void }) => {
@@ -36,9 +39,9 @@ const mockVoice = {
   heard: null as ((text: string) => void) | null,
 };
 jest.mock('../../../components/search/useVoiceSearch', () => ({
-  useVoiceSearch: (onHeard: (text: string) => void) => {
+  useVoiceSearch: (onHeard: (text: string) => void, enabled: boolean) => {
     mockVoice.heard = onHeard;
-    return mockVoice;
+    return { ...mockVoice, available: enabled && mockVoice.available };
   },
 }));
 
@@ -56,6 +59,7 @@ afterAll(() => setQuranWordsForTests(null));
 beforeEach(async () => {
   jest.clearAllMocks();
   mockParams = undefined;
+  mockUser = { id: 'u1', previewTester: true };
   Object.assign(mockVoice, { available: true, status: 'idle', partial: '', needsModel: false });
   await AsyncStorage.clear();
   await AsyncStorage.setItem('@revisely_theme_v2', 'light');
@@ -182,5 +186,16 @@ describe('searching the Quran', () => {
     mockVoice.available = false;
     await open();
     expect(screen.queryByTestId('search-mic')).toBeNull();
+  });
+
+  it('an account that isn’t a tester searches by typing, with no mic, and a link to listen only opens the field', async () => {
+    mockUser = { id: 'u2' };
+    mockParams = { listen: true };
+    await open();
+    expect(screen.queryByTestId('search-mic')).toBeNull();
+    expect(mockVoice.listen).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('model-sheet')).toBeNull();
+    await search('قل لو شاء الله');
+    expect(screen.getByTestId('search-verse-10-16')).toBeTruthy();
   });
 });

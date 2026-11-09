@@ -22,6 +22,7 @@ import { loadQuranWords, QuranWords } from '../../lib/recite/quranWords';
 import { matchedWords, searchText, VerseHit } from '../../lib/search/quranSearch';
 import { hasArabic, parseReference, SearchTarget } from '../../lib/search/parseQuery';
 import { addRecentSearch, clearRecentSearches, getRecentSearches } from '../../lib/search/recentSearches';
+import { voiceSearchEnabled } from '../../lib/search/availability';
 import { logger } from '../../lib/logger';
 
 type NavigationProp = NativeStackNavigationProp<ReadStackParamList, 'QuranSearch'>;
@@ -62,9 +63,9 @@ function targetText(t: SearchTarget): { title: string; meta: string; icon: 'book
 }
 
 /**
- * Search the Qur'an (testers): type a surah, an ayah ("2:255", "Yunus 16"), a page or
- * Arabic words, or tap the mic and recite a few words. Results open the reader at the
- * ayah, highlighted. Before anything is typed, the last searches.
+ * Search the Qur'an: type a surah, an ayah ("2:255", "Yunus 16"), a page or Arabic words,
+ * or (testers, on an iPhone that can listen) tap the mic and recite a few words. Results
+ * open the reader at the ayah, highlighted. Before anything is typed, the last searches.
  */
 export default function QuranSearchScreen() {
   const navigation = useNavigation<NavigationProp>();
@@ -147,9 +148,10 @@ export default function QuranSearchScreen() {
   const voice = useVoiceSearch((heard) => {
     setText(heard);
     run(heard, words);
-  });
+  }, voiceSearchEnabled(user));
 
   const startListening = useCallback(() => {
+    if (!voice.available) return;
     Keyboard.dismiss();
     if (voice.needsModel) {
       setModelSheet(true);
@@ -158,8 +160,8 @@ export default function QuranSearchScreen() {
     void voice.listen();
   }, [voice]);
 
-  // Opened from the mic on the Read tab: listen at once.
-  const listenOnOpen = route.params?.listen === true;
+  // Opened from the mic on the Read tab: listen at once (where voice search is on).
+  const listenOnOpen = route.params?.listen === true && voice.available;
   useEffect(() => {
     if (listenOnOpen) startListening();
     else inputRef.current?.focus();

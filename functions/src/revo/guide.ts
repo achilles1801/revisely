@@ -8,7 +8,8 @@
  * - every label in curly quotes (“Edit schedule”) is text the app shows, word for word (src/).
  * Change it in the same PR as the feature. Verified against the code on Nov 9 2026, as of the release
  * that opens Activity, memorizing by the ayah, help, What's new and every QuranEnc translation to
- * everyone (recite mode, Quran search and Settings → Testing stay testers').
+ * everyone (recite mode, searching the Qur'an by voice and Settings → Testing stay testers'; typed
+ * Quran search opened to everyone on Nov 9 2026).
  *
  * Name parts of the Qur'an by surah and juz here too (the owner's rule); page numbers only where
  * the app itself shows them. Mark what only testers (previewTester accounts) see.
@@ -35,7 +36,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
       '- The tab bar has Home and Read (swipe sideways between them). Insights is in Activity.',
       '- Home’s top bar, on the right: a compass (the Prayer sheet: prayer times and the Qibla), a pulse icon (Activity) and a gear (Settings). A running timer shows on the left.',
       '- Home’s Today post: where today starts (e.g. "Starts at Al-Mujadila ›", or "Starts at Al-Hadid, ayah 4 ›" mid-surah) and how much it is. Tapping that line (its ›) opens a menu with “Jump to…” and “Edit schedule”. Under it, one button: “Start revision”, “Continue revision” or “Review session”. Then "… of the Quran memorized ›" with a dot per juz; its › opens the memorized pages. Then “Recent sessions” (the last three) and “See all”.',
-      '- Read tab: “Recent pages”, then every surah, grouped by juz. Tap one to open the reader.',
+      '- Read tab: “Search the Quran” under its title, “Recent pages”, then every surah, grouped by juz. Tap one to open the reader.',
       '- The app names parts of the Qur’an by surah and juz, never by page numbers: "Starts at Al-Hadid, ayah 4", "Al-Baqarah 84–101", "Juz 28". Page numbers show only as a quiet detail after the words (the header of today’s › menu), inside the reader and the session (the printed page), and where pages are chosen by number (the Page tab of “Jump to…”).',
       '- Revo: the round button at the bottom right of Home and of Activity (Overview, Insights, a day, See all, Pages by strength). There is no Revo on the Read tab (its list or the reader) or in a revision session, and their help has no “Ask Revo”.',
     ),
@@ -199,12 +200,12 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
     ),
   },
   {
-    title: 'Searching the Qur’an (testers)',
+    title: 'Searching the Qur’an',
     covers: ['SEARCH-1', 'SEARCH-2'],
     routes: ['ReadIndex', 'QuranSearch', 'QuranReader'],
     text: lines(
-      '- Testers: the Read tab has “Search the Quran” under its title and, on an iPhone, a mic beside it. Recite a few words of an ayah, or type them in Arabic, and the ayat that hold them are listed: from the middle of an ayah too, even with a word misheard; a phrase in several ayat lists every one. Typing a surah (Yunus, or its Arabic name), an ayah (2:255, Yunus 16), a page (page 62) or a juz (juz 30) goes there. A result opens the reader at the ayah, highlighted.',
-      '- Searching by voice needs the speech model, offered the first time (a one-time download); it listens on the phone, and the voice isn’t recorded or sent. On Android, typing only. For anyone else it isn’t in the app yet: the closest is the Read tab’s list of surahs, or “Jump to…” to start today there.',
+      '- Everyone: the Read tab has “Search the Quran” under its title. Type a few words of an ayah in Arabic (with or without vowel marks) and the ayat that hold them are listed: from the middle of an ayah too, even with a word misspelled; a phrase in several ayat lists every one. Typing a surah (Yunus, or its Arabic name), an ayah (2:255, Yunus 16), a page (page 62) or a juz (juz 30) goes there. A result opens the reader at the ayah, highlighted.',
+      '- Testers on an iPhone also get a mic beside it: recite a few words and the ayah is found the same way. It needs the speech model, offered the first time (a one-time download); it listens on the phone, and the voice isn’t recorded or sent. For anyone else, searching by voice isn’t in the app yet (it comes with a later App Store version): type the words instead.',
     ),
   },
   {
@@ -270,7 +271,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['RESET-2', 'RESET-3'],
     routes: ['Settings'],
     text: lines(
-      '- Testers (TestFlight or Google Play testing, marked by the Revisely team) get Settings → Testing, the hidden page in sessions (the eye button at the top, with the Madani 1405 mushaf: recite from memory; following the recitation word by word needs “Speech model” on an iPhone), searching the Qur’an from the Read tab, and updates early.',
+      '- Testers (TestFlight or Google Play testing, marked by the Revisely team) get Settings → Testing, the hidden page in sessions (the eye button at the top, with the Madani 1405 mushaf: recite from memory; following the recitation word by word needs “Speech model” on an iPhone), searching the Qur’an by voice from the Read tab (on an iPhone), and updates early.',
       '- “Reset my data” (type RESET): a backup is kept, then the account starts again as new, still signed in; not again within 10 minutes. “Load test scenario” replaces the data with a ready-made situation the same way.',
     ),
   },

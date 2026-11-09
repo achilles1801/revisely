@@ -27,10 +27,8 @@ jest.mock('@react-navigation/native', () => {
 let mockApp: { user: { previewTester?: boolean } | null } = { user: null };
 jest.mock('../../../context/AppContext', () => ({ useApp: () => mockApp }));
 let mockVoice = false;
-jest.mock('../../../lib/search/availability', () => ({
-  quranSearchEnabled: (user: { previewTester?: boolean } | null) => user?.previewTester === true,
-  canSearchByVoice: () => mockVoice,
-}));
+// The real gates (lib/search/availability); only whether the binary can listen is set here.
+jest.mock('../../../lib/recite/micSource', () => ({ isMicStreamAvailable: () => mockVoice }));
 
 import ReadIndexScreen from '../ReadIndexScreen';
 import { DesignProvider } from '../../../design/DesignContext';
@@ -99,7 +97,7 @@ describe('the Read index in the new design', () => {
   });
 });
 
-describe('searching the Quran from the Read tab (testers)', () => {
+describe('searching the Quran from the Read tab', () => {
   it('a tester gets a search field under the title, and the mic where the phone can listen', async () => {
     mockApp = { user: { previewTester: true } };
     mockVoice = true;
@@ -117,8 +115,17 @@ describe('searching the Quran from the Read tab (testers)', () => {
     expect(screen.queryByTestId('read-search-voice')).toBeNull();
   });
 
-  it('everyone else sees the index as before', async () => {
-    mockApp = { user: { previewTester: false } };
+  it.each([{}, { previewTester: false }])('[SEARCH-1] [SEARCH-2] every account searches by typing; the mic stays testers’, for %o', async (user) => {
+    mockApp = { user };
+    mockVoice = true;
+    await renderIndex();
+    fireEvent.press(screen.getByTestId('read-search'));
+    expect(mockNavigation.navigate).toHaveBeenCalledWith('QuranSearch');
+    expect(screen.queryByTestId('read-search-voice')).toBeNull();
+  });
+
+  it('nobody signed in: no search', async () => {
+    mockApp = { user: null };
     mockVoice = true;
     await renderIndex();
     expect(screen.queryByTestId('read-search')).toBeNull();
