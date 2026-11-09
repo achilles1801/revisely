@@ -27,12 +27,18 @@ appId: com.revisionbuddy.app
 # Down until Al-Haqqah (69), two rows below, is in view, then Al-Mulk: a row found at the list's foot
 # can sit behind the tab bar, and the tap then lands on Read, which scrolls the list back to the top
 # (Android, Nov 8 2026). Two rows up it is clear of the bar. (Centring the row instead never settled
-# on iOS: Maestro gave up after a minute with Al-Mulk mid-screen.)
-- scrollUntilVisible:
-    element:
-      id: surah-69
-    direction: DOWN
-    timeout: 60000
+# on iOS: Maestro gave up after a minute with Al-Mulk mid-screen.) Swipes, counted, never a time
+# limit: on the iOS runner a scroll by time ran out with Al-Haqqah just brought into view by its
+# 19th swipe (#328's run 42586241564). A swipe moves less than a screen, so no row is skipped.
+- repeat:
+    while:
+      notVisible:
+        id: surah-69
+    times: 40
+    commands:
+      - scroll
+- assertVisible:
+    id: surah-69
 - tapOn:
     id: surah-67
 # The reader opens with its controls hidden; a tap high on the page shows them (E2E builds load no
