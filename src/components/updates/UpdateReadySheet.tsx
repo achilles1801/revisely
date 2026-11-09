@@ -6,6 +6,7 @@ import { Sheet } from '../v2/Sheet';
 import { PillButton } from '../v2/PillButton';
 import { applyUpdate, postponeUpdateOffer, useUpdateOffer } from '../../lib/updates/ota';
 import { useBusyReasons } from '../../lib/updates/busy';
+import { modalShowing, useModalShowing } from '../v2/modalTurn';
 
 /** The screen settles first (the splash going, a session's end). */
 export const UPDATE_OFFER_DELAY_MS = 1200;
@@ -13,22 +14,28 @@ export const UPDATE_OFFER_DELAY_MS = 1200;
 /**
  * "A new update is ready · Update now" (lib/updates/ota): opens by itself once
  * an update has downloaded that the launch didn't apply, over a tab's main
- * screen. Never during a session, a recording, a recitation or a timer: it
- * waits until they end. Later puts it off until the next cold start. Mounted on
- * Home; the tabs stay mounted, so it opens over Read and Insights too.
+ * screen. Never during a session, a recording, a recitation or a timer, nor
+ * while another sheet is open: it waits until they end. Later puts it off
+ * until the next cold start. Mounted on Home; the tabs stay mounted, so it
+ * opens over Read and Insights too.
  */
 export function UpdateReadySheet() {
   const { palette } = useTheme();
   const { visible } = useUpdateOffer();
   // Every reason counts, the screen too: only a tab's main screen, nothing going on.
   const busy = useBusyReasons().length > 0;
+  // Another sheet open (the Today menu, Jump to, Revo…): it waits until that one has gone, then
+  // the delay again (UPD-3). It opened over Jump to once, iOS refused it, and Home froze.
+  const sheetOpen = useModalShowing();
   const [shown, setShown] = useState(false);
 
   useEffect(() => {
-    if (!visible || busy || shown) return;
-    const t = setTimeout(() => setShown(true), UPDATE_OFFER_DELAY_MS);
+    if (!visible || busy || shown || sheetOpen) return;
+    const t = setTimeout(() => {
+      if (!modalShowing()) setShown(true);
+    }, UPDATE_OFFER_DELAY_MS);
     return () => clearTimeout(t);
-  }, [visible, busy, shown]);
+  }, [visible, busy, shown, sheetOpen]);
 
   const later = () => {
     setShown(false);

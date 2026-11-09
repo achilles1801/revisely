@@ -25,6 +25,7 @@ import {
   getSurahsForPage,
 } from '../lib/quranData';
 import { arabicLabelLines } from '../lib/platformUi';
+import { ModalNest, useModalHold } from './v2/modalTurn';
 
 interface EditSessionModalProps {
   visible: boolean;
@@ -49,6 +50,8 @@ export function EditSessionModal({
   const haptics = useHaptics();
   const { user, pages } = useApp();
   const smartTrackingEnabled = user?.smartTrackingEnabled ?? false;
+  // Sheets wait for it (v2/modalTurn); its own menu and rating sheets show over it.
+  useModalHold(visible);
 
   const [revisedPages, setRevisedPages] = useState<Set<number>>(
     new Set(log.pagesRevised),
@@ -145,101 +148,103 @@ export function EditSessionModal({
       presentationStyle="fullScreen"
       onRequestClose={handleCloseWithSave}
     >
-      <SafeAreaView style={[styles.container, { backgroundColor: read.pageBg }]} testID="edit-session">
-        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+      <ModalNest>
+        <SafeAreaView style={[styles.container, { backgroundColor: read.pageBg }]} testID="edit-session">
+          <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
-        <View style={[styles.topBar, { backgroundColor: read.pageBg }]}>
-          <RoundButton icon="close" label="Close and save" onPress={handleCloseWithSave} palette={read} />
-          <View style={styles.spacer} />
-          <RoundButton
-            icon={isCurrentRevised ? 'checkmark' : 'checkmark-outline'}
-            label={isCurrentRevised ? 'Unmark current page' : 'Mark current page as revised'}
-            onPress={toggleCurrent}
-            palette={read}
-            active={isCurrentRevised}
-          />
-          <RoundButton icon="ellipsis-horizontal" label="Session menu" onPress={() => setMenuOpen(true)} palette={read} />
-        </View>
+          <View style={[styles.topBar, { backgroundColor: read.pageBg }]}>
+            <RoundButton icon="close" label="Close and save" onPress={handleCloseWithSave} palette={read} />
+            <View style={styles.spacer} />
+            <RoundButton
+              icon={isCurrentRevised ? 'checkmark' : 'checkmark-outline'}
+              label={isCurrentRevised ? 'Unmark current page' : 'Mark current page as revised'}
+              onPress={toggleCurrent}
+              palette={read}
+              active={isCurrentRevised}
+            />
+            <RoundButton icon="ellipsis-horizontal" label="Session menu" onPress={() => setMenuOpen(true)} palette={read} />
+          </View>
 
-        <View style={styles.viewerWrap}>
-          <MushafPager
-            pages={sessionPages}
-            initialPage={sessionPages[0]}
-            onPageChange={setCurrentPageNumber}
-            extraData={extraData}
-          />
+          <View style={styles.viewerWrap}>
+            <MushafPager
+              pages={sessionPages}
+              initialPage={sessionPages[0]}
+              onPageChange={setCurrentPageNumber}
+              extraData={extraData}
+            />
 
-          <View style={styles.breadcrumb} pointerEvents="none">
-            <Text style={crumbText} maxFontSizeMultiplier={1.3}>
-              Juz {juz} · Hizb {hizb}
-            </Text>
-            <View style={styles.crumbRight}>
-              {firstSurah?.name ? (
-                <Text style={crumbText} maxFontSizeMultiplier={1.3}>
-                  {firstSurah.name}
-                </Text>
-              ) : null}
-              {firstSurah?.nameArabic ? (
-                <Text style={[arabicV2(13), { color: read.textSecondary }]} maxFontSizeMultiplier={1.3} numberOfLines={arabicLabelLines}>
-                  {firstSurah.nameArabic}
-                </Text>
-              ) : null}
+            <View style={styles.breadcrumb} pointerEvents="none">
+              <Text style={crumbText} maxFontSizeMultiplier={1.3}>
+                Juz {juz} · Hizb {hizb}
+              </Text>
+              <View style={styles.crumbRight}>
+                {firstSurah?.name ? (
+                  <Text style={crumbText} maxFontSizeMultiplier={1.3}>
+                    {firstSurah.name}
+                  </Text>
+                ) : null}
+                {firstSurah?.nameArabic ? (
+                  <Text style={[arabicV2(13), { color: read.textSecondary }]} maxFontSizeMultiplier={1.3} numberOfLines={arabicLabelLines}>
+                    {firstSurah.nameArabic}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+
+            <View style={styles.footer} pointerEvents="none">
+              <Text
+                style={[typeV2.meta, typeV2.numeral, { color: read.textPrimary }]}
+                maxFontSizeMultiplier={1.3}
+                testID="edit-session-page"
+              >
+                {currentPageNumber}
+              </Text>
             </View>
           </View>
 
-          <View style={styles.footer} pointerEvents="none">
-            <Text
-              style={[typeV2.meta, typeV2.numeral, { color: read.textPrimary }]}
-              maxFontSizeMultiplier={1.3}
-              testID="edit-session-page"
-            >
-              {currentPageNumber}
-            </Text>
-          </View>
-        </View>
-
-        <SessionMenuSheet
-          visible={menuOpen}
-          actions={menuActions}
-          onClose={() => setMenuOpen(false)}
-        />
-
-        {smartTrackingEnabled && selectedPageForRating && (
-          <WeaknessModal
-            pageNumber={selectedPageForRating}
-            surahName={
-              quranData.find((q) => q.pageNumber === selectedPageForRating)
-                ?.surahName || ''
-            }
-            currentRating={
-              localRatings.has(selectedPageForRating)
-                ? localRatings.get(selectedPageForRating)
-                : log.weaknessUpdates?.find((wu) => wu.page === selectedPageForRating)?.rating ??
-                  pages.find((p) => p.pageNumber === selectedPageForRating)?.weaknessRating
-            }
-            onSave={(rating, applyToJuz) => {
-              const next = new Map(localRatings);
-              if (applyToJuz) {
-                const pageJuz = quranData.find(
-                  (q) => q.pageNumber === selectedPageForRating,
-                )?.juzNumber;
-                if (pageJuz) {
-                  quranData
-                    .filter((q) => q.juzNumber === pageJuz)
-                    .forEach((q) => {
-                      if (sessionPages.includes(q.pageNumber))
-                        next.set(q.pageNumber, rating);
-                    });
-                }
-              } else {
-                next.set(selectedPageForRating, rating);
-              }
-              setLocalRatings(next);
-            }}
-            onClose={() => setSelectedPageForRating(null)}
+          <SessionMenuSheet
+            visible={menuOpen}
+            actions={menuActions}
+            onClose={() => setMenuOpen(false)}
           />
-        )}
-      </SafeAreaView>
+
+          {smartTrackingEnabled && selectedPageForRating && (
+            <WeaknessModal
+              pageNumber={selectedPageForRating}
+              surahName={
+                quranData.find((q) => q.pageNumber === selectedPageForRating)
+                  ?.surahName || ''
+              }
+              currentRating={
+                localRatings.has(selectedPageForRating)
+                  ? localRatings.get(selectedPageForRating)
+                  : log.weaknessUpdates?.find((wu) => wu.page === selectedPageForRating)?.rating ??
+                    pages.find((p) => p.pageNumber === selectedPageForRating)?.weaknessRating
+              }
+              onSave={(rating, applyToJuz) => {
+                const next = new Map(localRatings);
+                if (applyToJuz) {
+                  const pageJuz = quranData.find(
+                    (q) => q.pageNumber === selectedPageForRating,
+                  )?.juzNumber;
+                  if (pageJuz) {
+                    quranData
+                      .filter((q) => q.juzNumber === pageJuz)
+                      .forEach((q) => {
+                        if (sessionPages.includes(q.pageNumber))
+                          next.set(q.pageNumber, rating);
+                      });
+                  }
+                } else {
+                  next.set(selectedPageForRating, rating);
+                }
+                setLocalRatings(next);
+              }}
+              onClose={() => setSelectedPageForRating(null)}
+            />
+          )}
+        </SafeAreaView>
+      </ModalNest>
     </Modal>
   );
 }

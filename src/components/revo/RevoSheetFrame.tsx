@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Keyboard, type KeyboardEvent, Modal, Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Reanimated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
@@ -8,7 +8,8 @@ import { useTheme } from '../../context/ThemeContext';
 import { useReduceMotion } from '../../design/motion';
 import { layoutV2 } from '../../theme/v2';
 import { Backdrop } from '../Backdrop';
-import { shouldDismiss } from '../v2/Sheet';
+import { DISMISS_FALLBACK_MS, shouldDismiss } from '../v2/Sheet';
+import { ModalNest, useModalTurn } from '../v2/modalTurn';
 import { REVO_KEYBOARD_PAD, REVO_TOP_GAP, keyboardCover, keyboardOverSheet, revoHeights, revoSheetFit } from '../../lib/revo/sheetFit';
 
 /** Revo opens at about half the screen; a conversation, or a drag up, takes it to full height. */
@@ -67,7 +68,24 @@ export function RevoSheetFrame({
   const { cover, duration, rest } = useKeyboardCover(frameHeight, insets.bottom);
   // From the frame (keyboard down), not the window: Android's window leaves the system bars out.
   const { full: fullHeight, medium: mediumHeight, span } = revoHeights({ window: height, frame: rest, top: insets.top, medium: REVO_MEDIUM });
-  const [shown, setShown] = useState(visible);
+  // One sheet at a time (v2/modalTurn): it shows once no other sheet is up or still going, and
+  // holds its turn until it has gone, so a sheet opened from it (Open Jump to…) waits for it.
+  const { turn, release } = useModalTurn(visible);
+  const [shown, setShown] = useState(false);
+  const hidden = useCallback(() => {
+    setShown(false);
+    if (Platform.OS !== 'ios') release();
+  }, [release]);
+  // iOS: the turn passes on once the modal has been dismissed (onDismiss), or after the fallback.
+  useEffect(() => {
+    if (shown || turn) return;
+    if (Platform.OS !== 'ios') {
+      release();
+      return;
+    }
+    const t = setTimeout(release, DISMISS_FALLBACK_MS);
+    return () => clearTimeout(t);
+  }, [shown, turn, release]);
 
   // How far the sheet sits below its place: 0 shown, a sheet's height gone.
   const offset = useSharedValue(span);
@@ -92,7 +110,7 @@ export function RevoSheetFrame({
   }, [full, fullHeight, mediumHeight, reduceMotion, sheetH]);
 
   useEffect(() => {
-    if (visible) {
+    if (turn) {
       setShown(true);
       // It rises at the height it opens at (the opt-in and a conversation at full height), rather
       // than coming up at the medium height and growing.
@@ -102,12 +120,12 @@ export function RevoSheetFrame({
       offset.value = withTiming(0, { duration: 260 });
     } else if (shown) {
       offset.value = withTiming(span, { duration: 200 }, (done) => {
-        if (done) runOnJS(setShown)(false);
+        if (done) runOnJS(hidden)();
       });
     }
-    // Only `visible` drives it.
+    // Only the turn drives it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible]);
+  }, [turn]);
 
   const pan = useMemo(
     () =>
@@ -147,7 +165,15 @@ export function RevoSheetFrame({
     // On Android the modal's window is drawn under the status and navigation bars, as the app is
     // (edge to edge): otherwise the window starts below them while the heights here take the bars
     // off again, and a full sheet stopped about 90pt short of the mock's (Nov 7 2026).
-    <Modal visible={shown} transparent animationType="none" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
+    <Modal
+      visible={shown}
+      transparent
+      animationType="none"
+      onRequestClose={onClose}
+      onDismiss={release}
+      statusBarTranslucent
+      navigationBarTranslucent
+    >
       <GestureHandlerRootView style={styles.fill}>
         <Reanimated.View style={[StyleSheet.absoluteFill, { backgroundColor: palette.overlay }, dim]}>
           <Backdrop onPress={onClose} label="Close Revo" />
@@ -188,7 +214,9 @@ export function RevoSheetFrame({
                 <View style={[styles.handle, { backgroundColor: palette.handle }]} />
               </View>
             </GestureDetector>
-            <View style={styles.fill}>{children}</View>
+            <View style={styles.fill}>
+              <ModalNest>{children}</ModalNest>
+            </View>
           </Reanimated.View>
         </View>
       </GestureHandlerRootView>

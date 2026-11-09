@@ -10,6 +10,25 @@ import { pagerState } from './pager';
 /** The pages every scenario account holds (TOTAL_QURAN_PAGES). */
 const TOTAL_PAGES = 604;
 
+type ModalMock = { default: unknown; refusedModals: () => string[] };
+
+/**
+ * A tap on the screen under the sheets fails while a modal iOS refused is mounted (harness/modal):
+ * on a phone its invisible host covers the screen and every touch is lost (SHEET-1). Taps inside a
+ * sheet that is showing go to that sheet, as on a phone.
+ */
+export function assertTouchable(app: OpenApp, el: unknown, what: string): void {
+  const mock = app.mods.require<ModalMock>('react-native/Libraries/Modal/Modal');
+  const covered = mock.refusedModals();
+  if (covered.length === 0) return;
+  for (let node = el as { type?: unknown; parent?: unknown } | null; node; node = node.parent as typeof node) {
+    if (node.type === mock.default) return;
+  }
+  throw new Error(
+    `"${what}" got no tap: iOS refused to show ${covered.join(', ')} over another sheet, and its invisible host covers the screen, taking every touch (SHEET-1)`,
+  );
+}
+
 function resetPager() {
   const s = pagerState();
   s.props = null;
@@ -21,12 +40,21 @@ export function homeStack(mods: Booted): ReactElement {
   return homeStackWith(mods, {});
 }
 
+/**
+ * Home's stack with the app's own navigation ref too, as RootNavigator holds it: code that asks
+ * which screen shows (lib/updates/busy: the update sheets open only on a tab's main screen) sees
+ * Home. The other stacks leave it unset, so nothing there navigates the app's way.
+ */
+export function homeStackLive(mods: Booted): ReactElement {
+  return homeStackWith(mods, {}, true);
+}
+
 /** Home's stack with the Activity screen real (Overview and Insights), the rest of "elsewhere" empty. */
 export function activityStack(mods: Booted): ReactElement {
   return homeStackWith(mods, { Activity: mods.require<any>('src/screens/activity/ActivityScreen').default });
 }
 
-function homeStackWith(mods: Booted, real: Record<string, unknown>): ReactElement {
+function homeStackWith(mods: Booted, real: Record<string, unknown>, appRef = false): ReactElement {
   const { React, require: req } = mods;
   const { NavigationContainer } = req<any>('@react-navigation/native');
   const { createNativeStackNavigator } = req<any>('@react-navigation/native-stack');
@@ -36,6 +64,11 @@ function homeStackWith(mods: Booted, real: Record<string, unknown>): ReactElemen
   const Manager = req<any>('src/screens/main/MemorizationScreen').default;
   const ActivityDayScreen = req<any>('src/screens/activity/ActivityDayScreen').default;
   const nav = req<{ navigation: { current: unknown } }>('./navRef');
+  const app = appRef ? req<{ navigationRef: { current: unknown } }>('src/navigation/navigationRef').navigationRef : null;
+  const ref = (r: unknown) => {
+    nav.navigation.current = r;
+    if (app) app.current = r;
+  };
   const { ReadingTimerProvider } = req<any>('src/context/ReadingTimerContext');
   const Stack = createNativeStackNavigator();
   const h = React.createElement;
@@ -46,7 +79,7 @@ function homeStackWith(mods: Booted, real: Record<string, unknown>): ReactElemen
     null,
     h(
     NavigationContainer,
-    { ref: nav.navigation },
+    { ref },
     h(
       Stack.Navigator,
       { screenOptions: { headerShown: false, animation: 'none' } },
@@ -212,6 +245,7 @@ export class Home {
   async tap(testID: string): Promise<void> {
     const { fireEvent } = this.app.mods.rtl;
     const el = this.app.screen.getByTestId(testID);
+    assertTouchable(this.app, el, testID);
     await this.app.act(async () => {
       fireEvent.press(el);
     });

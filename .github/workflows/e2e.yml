@@ -147,7 +147,7 @@ jobs:
           SHA: ${{ github.sha }}
           RUN_ID: ${{ github.run_id }}
         run: |
-          full='[{"name":"01 02 03 08 09 11 16","flows":".maestro/flows/0[12389]-*.yaml .maestro/flows/1[16]-*.yaml"},{"name":"04 05 06 07 10 12 13 14 15","flows":".maestro/flows/0[4567]-*.yaml .maestro/flows/1[02345]-*.yaml"}]'
+          full='[{"name":"01 02 03 08 09 11 16","flows":".maestro/flows/0[12389]-*.yaml .maestro/flows/1[16]-*.yaml"},{"name":"04 05 06 07 10 12 13 14 15 17","flows":".maestro/flows/0[4567]-*.yaml .maestro/flows/1[023457]-*.yaml"}]'
           # Android's smoke set is a single PR's long pole: two jobs side by side
           # (about 8 minutes of flows each: 02 + 05, 04 + 06) instead of one of 16.
           # iOS keeps one job: macOS runners are the scarce part (5 at a time).

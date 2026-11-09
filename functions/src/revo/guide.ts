@@ -252,7 +252,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'For testers',
-    covers: ['RESET-2', 'RESET-3'],
+    covers: ['RESET-2', 'RESET-3', 'UPD-1'],
     routes: ['Settings'],
     text: lines(
       '- Testers (TestFlight or Google Play testing, marked by the Revisely team) get Activity’s Overview, Insights and + menu, Settings → Testing, the hidden page in sessions (the eye button at the top, with the Madani 1405 mushaf: recite from memory; following the recitation word by word needs “Speech model” on an iPhone), and updates early.',
@@ -303,6 +303,7 @@ export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
   'NEW-4': 'what waits for the walkthrough; nothing for Revo to explain',
   'REVO-39': 'Revo\'s moment before its opt-in, and Settings → Revo AI → What Revo can do (testers); the guide gets them at the release\'s re-record',
   'ONBOARD-2': 'the server repairs a sign-up stopped half way; nothing to do',
+  'SHEET-1': 'one sheet at a time, so the screen under them always takes taps again; nothing for Revo to explain',
   'SYNC-4': 'a new account loads with no relaunch; nothing to do',
   'ACCOUNT-2': 'the sign-in screen keeps what was typed after a failed attempt; Revo is for signed-in users',
   'ACCOUNT-3': 'how long Delete account waits for the server; the app says what happened itself',

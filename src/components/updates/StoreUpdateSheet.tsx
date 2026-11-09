@@ -8,13 +8,15 @@ import { PillButton } from '../v2/PillButton';
 import { markOffered, openStore, storeName, useStoreDecision } from '../../lib/updates/storeUpdates';
 import { useBusyReasons } from '../../lib/updates/busy';
 import { useUpdateOffer } from '../../lib/updates/ota';
+import { modalShowing, useModalShowing } from '../v2/modalTurn';
 
 /** Home settles first. */
 export const OFFER_DELAY_MS = 1200;
 
 /**
  * "New version available" (lib/updates/storeUpdates): once per version, on
- * Home, never while a recording or recitation goes on elsewhere or a timer runs.
+ * Home, never while a recording or recitation goes on elsewhere or a timer runs,
+ * nor while another sheet is open (it waits until that one has gone).
  */
 export function StoreUpdateSheet() {
   const { palette } = useTheme();
@@ -23,16 +25,19 @@ export function StoreUpdateSheet() {
   const busy = useBusyReasons().some((r) => r !== 'screen');
   // An update that only needs a restart goes first (UpdateReadySheet): one sheet at a time.
   const otaOffered = useUpdateOffer().visible;
+  // Another sheet open (Jump to, a menu, Revo…): it waits until that one has gone (UPD-3).
+  const sheetOpen = useModalShowing();
   const [shown, setShown] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!offer || !focused || busy || otaOffered || shown) return;
+    if (!offer || !focused || busy || otaOffered || shown || sheetOpen) return;
     const t = setTimeout(() => {
+      if (modalShowing()) return;
       setShown(offer);
       markOffered(offer);
     }, OFFER_DELAY_MS);
     return () => clearTimeout(t);
-  }, [offer, focused, busy, otaOffered, shown]);
+  }, [offer, focused, busy, otaOffered, shown, sheetOpen]);
 
   const close = () => setShown(null);
   return (

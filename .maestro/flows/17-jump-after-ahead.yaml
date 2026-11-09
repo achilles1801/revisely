@@ -1,0 +1,111 @@
+# Jump to… after today is done and pages were revised ahead, with an update ready meanwhile
+# (Majd's TestFlight report, Nov 9 2026: after the jump Home took no taps, only the swipe to Read).
+# A preview update had downloaded while the Today menu was up: "A new update is ready" opened by
+# itself over it, iOS refused it, and its invisible host stayed over Home. One sheet at a time now:
+# the offer waits until Jump to has gone. Tuesday is pages 1, 582–590, Wednesday 591–600
+# (subflows/onboard.yaml).
+# Rules (BEHAVIOUR.md): SHEET-1, UPD-1, JUMP-1
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    file: ../subflows/new-account.yaml
+    env:
+      CLOCK: 2026-11-03T12:00
+      BOUNDARY: midnight
+
+# Tuesday, all ten pages, then Keep going: three of Wednesday's.
+- runFlow:
+    file: ../subflows/open-session.yaml
+    env:
+      QUIET: "Juz 1 · 0/10"
+- runFlow:
+    file: ../subflows/swipe-pages.yaml
+    env:
+      UNTIL: end
+- runFlow:
+    file: ../subflows/end-card-is.yaml
+    env:
+      TEXT: Revision complete
+- tapOn:
+    id: session-end-keep-going
+- runFlow: ../subflows/show-controls.yaml
+- extendedWaitUntil:
+    visible:
+      id: session-title
+      text: "Revising ahead · Wed.*"
+    timeout: 10000
+- runFlow:
+    file: ../subflows/swipe-pages.yaml
+    env:
+      UNTIL: 3/10
+- runFlow: ../subflows/show-controls.yaml
+- tapOn: "Back"
+- extendedWaitUntil:
+    visible:
+      id: today-title
+      text: "Done · 13.pages"
+    timeout: 10000
+
+# The Today menu, and an update downloads while it is up (src/lib/e2e/updates.ts).
+- tapOn:
+    id: today-summary
+- extendedWaitUntil:
+    visible:
+      id: today-menu
+    timeout: 10000
+- openLink:
+    link: revisely://e2e/update-ready
+    optional: true
+- runFlow: ../subflows/open-link-prompt.yaml
+# SHEET-1, UPD-1: not over the menu (its own delay is 1.2 s).
+- extendedWaitUntil:
+    visible:
+      id: update-ready-sheet
+    timeout: 3000
+    optional: true
+- assertNotVisible:
+    id: update-ready-sheet
+- assertVisible:
+    id: today-menu
+
+# JUMP-1: Jump to Juz 1 (after Juz 30 in the cycle).
+- tapOn: "Jump to….*"
+- extendedWaitUntil:
+    visible:
+      id: jump-juz-list
+    timeout: 10000
+- tapOn:
+    id: jump-juz-1
+- tapOn:
+    id: jump-go
+- extendedWaitUntil:
+    notVisible:
+      id: jump-sheet
+    timeout: 10000
+
+# UPD-1: the update is offered once Jump to has gone, over Home alone; Later closes it.
+- extendedWaitUntil:
+    visible:
+      id: update-ready-sheet
+    timeout: 10000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 17-update-after-jump
+- tapOn:
+    id: update-ready-later
+- extendedWaitUntil:
+    notVisible:
+      id: update-ready-sheet
+    timeout: 10000
+
+# SHEET-1: Home takes taps.
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 17-home-after-jump
+- tapOn:
+    id: open-settings
+- extendedWaitUntil:
+    visible: "Settings"
+    timeout: 10000
