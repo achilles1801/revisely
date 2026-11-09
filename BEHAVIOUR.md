@@ -239,6 +239,23 @@ How the tests are made: `tests/scenarios/README.md`.
   A sitting offers one thing: pages not memorized come first (MEM-5). Pages not scheduled that day,
   already revised, or on an older day were reading, and offer nothing.
 
+## Searching the Qur'an
+
+Testers, from the Read tab: "Search the Quran" under its title and, on an iPhone that can listen, a mic
+(`lib/search`, `screens/read/QuranSearchScreen`; Majd, Nov 8 2026). A result opens the reader at its
+ayah, highlighted until the page is turned. Listening uses recite mode's speech model on the phone:
+nothing said is recorded or sent.
+
+- **SEARCH-1.** A few words of an ayah, recited or typed in Arabic (with or without vowel marks, in
+  Uthmani or standard spelling), find it: from its start or its middle, running on into the next
+  ayah, with a word misheard, left out or said twice, and after an isti'adha or a basmala said first.
+  A phrase in several ayat lists every one, in mushaf order, the phrase itself before ayat that only
+  nearly hold it. Words that aren't in the Qur'an find nothing.
+- **SEARCH-2.** A place typed by name or number goes there: a surah by its name, Latin or Arabic,
+  with or without its "al-" ("Yunus", "Fatiha", "الكهف"), an ayah ("2:255", "Yunus 16", in Arabic
+  digits too), a page ("page 62") or a juz ("juz 30"). A bare number offers the surah and the page.
+  A number that isn't in the mushaf goes nowhere.
+
 ## Translations
 
 A held verse's translation (the verse sheet). The sources' terms are in CLAUDE.md ("Saheeh

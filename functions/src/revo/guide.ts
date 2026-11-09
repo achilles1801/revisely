@@ -195,6 +195,15 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
     ),
   },
   {
+    title: 'Searching the Qur’an (testers)',
+    covers: ['SEARCH-1', 'SEARCH-2'],
+    routes: ['ReadIndex', 'QuranSearch', 'QuranReader'],
+    text: lines(
+      '- Testers: the Read tab has “Search the Quran” under its title and, on an iPhone, a mic beside it. Recite a few words of an ayah, or type them in Arabic, and the ayat that hold them are listed: from the middle of an ayah too, even with a word misheard; a phrase in several ayat lists every one. Typing a surah (Yunus, or its Arabic name), an ayah (2:255, Yunus 16), a page (page 62) or a juz (juz 30) goes there. A result opens the reader at the ayah, highlighted.',
+      '- Searching by voice needs the speech model, offered the first time (a one-time download); it listens on the phone, and the voice isn’t recorded or sent. On Android, typing only. For anyone else it isn’t in the app yet: the closest is the Read tab’s list of surahs, or “Jump to…” to start today there.',
+    ),
+  },
+  {
     title: 'Recording, listening back and the timer',
     covers: ['AUDIO-4'],
     routes: ['ListenBack', 'ActivityDay'],
