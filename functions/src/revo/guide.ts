@@ -285,6 +285,7 @@ export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
   'HELP-1': 'the help buttons (testers); the guide gets them with its next re-record',
   'HELP-2': 'hiding the help buttons (testers); the guide gets it with its next re-record',
   'HELP-3': 'the help follows Smart Tracking (testers); the guide gets it with its next re-record',
+  'ACT-25': 'Coverage’s “Not revised yet” (a fresh page is never 30+ days); the guide gets it with its next re-record',
   'HELP-4': 'the help buttons are on by default (testers); the guide gets it with its next re-record',
   'NEW-1': 'the What\'s new walkthrough ships switched off; the guide gets it, with Settings → About → What\'s new, at the release\'s re-record',
   'NEW-2': 'the walkthrough itself; the guide gets it at the release\'s re-record',

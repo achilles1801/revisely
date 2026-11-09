@@ -292,8 +292,9 @@ International", "The Clear Quran®") and in `lib/quranenc`.
 - **ACT-4.** Insights use one definition each: coverage is the share of memorized pages revised within the range
   (ACT-22; a longer range never covers less, and it never shows 100% while a page is left); consistency is the days with a revision or a read; pace is shown
   only from at least ten timed items; juz untouched longest is the juz whose least recently revised page is
-  oldest, or never, among the juz at least half memorized (a juz under half is shown as being learned, so a
-  page memorized today never makes its juz the one untouched longest).
+  oldest, or never revised in the 30 or more days on record (ACT-25), among the juz at least half memorized
+  (a juz under half is shown as being learned, so a page memorized today never makes its juz the one
+  untouched longest).
 
 - **ACT-5.** The day's + offers, for today and yesterday, Revised elsewhere, Memorized and Note (Majd, Nov 7
   2026: "yes trim it"). There is no Read (the reader logs reading by itself) and no free choice of pages to
@@ -439,6 +440,15 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   missed (SESS-7). The pages from Insights stay labelled and stay extra, even when the leftovers fill the
   day, and Home names both ("2 from Insights, 5 from yesterday first"). (Before Nov 8 2026 they blocked it:
   no catch-up was offered that day.)
+- **ACT-25.** A memorized page never revised counts from when it was memorized, or from the account's first
+  day when that is later (nothing before it is on record). For 30 days it is "not revised yet", never "30+
+  days": its Coverage tile, a page of the juz sheet's strip and a surah row there are neutral (a grey outline,
+  "Not revised yet" in the legend while one shows), the juz sheet's headline says "Not revised yet" when none
+  of the juz was revised, and it is never untouched the longest. A juz is as recent as its least recently
+  revised page, so one with a page not revised yet (and none 30+ days) is "not revised yet": "Juz 30, 5 of
+  23 pages revised, the rest not revised yet" for VoiceOver. After 30 days on record it is 30+ days, as a page
+  revised 30 or more days ago is. Revo's juz map draws the same. (Majd, Nov 8 2026: a new account with Juz 30
+  memorized and five pages revised showed Juz 30 red a day after it began.)
 
 ## Ask coach
 

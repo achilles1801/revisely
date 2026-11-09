@@ -7,6 +7,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
+import { journalFirstDay } from '../../lib/journal';
 import { useTheme } from '../../context/ThemeContext';
 import { ChromeText, STACK_AT_SCALE } from './ChromeText';
 import { AddToPlanLink } from './AddToPlanLink';
@@ -38,6 +39,7 @@ const STATE_WORDS: Record<JuzCellState, string> = {
   strong: 'strong',
   week: 'revised this week',
   month: 'revised this month',
+  new: 'not revised yet',
   older: 'not revised in 30 days',
 };
 const COUNT_WORDS: Record<string, string> = {
@@ -46,6 +48,7 @@ const COUNT_WORDS: Record<string, string> = {
   strong: 'strong',
   week: 'this week',
   month: 'this month',
+  new: 'not revised yet',
   older: 'over 30 days',
 };
 
@@ -107,12 +110,14 @@ export function JuzSheet({
     };
   }, [juz, revised, today, windowDays]);
   const smartTracking = smartTrackingOn(user);
+  // A page never revised counts from when it was memorized, or the account's first day (ACT-25).
+  const firstDay = useMemo(() => journalFirstDay(user), [user]);
   const model = useMemo(
     () =>
       shown == null
         ? null
-        : juzSheetModel({ juz: shown, today, pages, revised: revised ?? loaded ?? [], windowDays, windowWords, windowInTheLast, smartTracking }),
-    [shown, today, pages, revised, loaded, windowDays, windowWords, windowInTheLast, smartTracking],
+        : juzSheetModel({ juz: shown, today, pages, revised: revised ?? loaded ?? [], windowDays, windowWords, windowInTheLast, smartTracking, firstDay }),
+    [shown, today, pages, revised, loaded, windowDays, windowWords, windowInTheLast, smartTracking, firstDay],
   );
   // What a tap leads to runs once the sheet has gone (iOS can't present Revo, or move the stack
   // cleanly, while the sheet's modal is being dismissed).
@@ -150,6 +155,9 @@ export function JuzSheet({
         return { backgroundColor: palette.heat[3] };
       case 'month':
         return { backgroundColor: palette.heat[1] };
+      case 'new':
+        // Not revised yet (ACT-25): neutral, as the Coverage tile.
+        return { borderWidth: 1.5, borderColor: palette.secondary };
       case 'older':
         return { borderWidth: 1.5, borderColor: palette.red };
       default:

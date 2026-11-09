@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
+import { journalFirstDay } from '../../lib/journal';
 import { useTheme } from '../../context/ThemeContext';
 import { knownChart, passagePagesOf, plannedOf, recencyLine, tableRows } from '../../lib/revo/charts';
 import { dayFacts, passageFacts, passagePreview, prepare, type FactSources } from '../../lib/revo/facts';
@@ -34,6 +35,8 @@ export function ChartCard({ chart, day, sources, ...handlers }: { chart: RevoVis
   const { logs, pages, user } = useApp();
   // Ratings mean something only with Smart Tracking on; off, the charts show recency (REVO-36).
   const smart = smartTrackingOn(user);
+  // The juz map's pages never revised count from the account's first day at the earliest (ACT-25).
+  const firstDay = useMemo(() => journalFirstDay(user, logs), [user, logs]);
   // What the plan had for each day, and a day's facts, as Revo's attachments read them.
   const reads = useMemo(() => {
     const src = sources?.() ?? null;
@@ -66,6 +69,7 @@ export function ChartCard({ chart, day, sources, ...handlers }: { chart: RevoVis
         userPages={pages}
         preview={reads?.preview}
         smart={smart}
+        firstDay={firstDay}
         onReviseFirst={handlers.onReviseFirst}
         onOpenPage={handlers.onOpenPage}
       />
