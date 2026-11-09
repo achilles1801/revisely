@@ -301,10 +301,6 @@ Non-testers follow `production`, so nobody sees this on a phone before Promote; 
   runs on every PR on its own, so a label or a title edit re-runs it alone.
 - **Where the slow checks run** (`plan` in ci.yml; E2E is `e2e.yml`, called from CI):
   - a draft PR: no E2E unless it has the `e2e` label; marking it ready runs everything;
-  - a PR into develop that changes code the tests share (`.maestro` subflows and scripts, a flow,
-    `run.sh`, `e2e.yml`, `ci.yml`): the flows using it, with the smoke set, on both platforms, each
-    run twice with no reruns (all flows for `run.sh`, `e2e.yml`, `ci.yml`); a change to the scenario
-    harness runs that suite twice (TESTING.md);
   - a lower layer of a GitHub stack: the fast checks only (the top layer tests the whole stack);
   - the top of a stack into develop, a PR into `main`, a merge group: every E2E flow, iOS and Android;
   - a single PR into develop (and claude-fix's runs): the Android E2E smoke set (Linux, KVM), no iOS;
