@@ -68,6 +68,12 @@ How the tests are made: `tests/scenarios/README.md`.
   opened after missed days shows that day's pages.
 - **SCHED-6.** A day never holds the same page twice. A plan with a page on two neighbouring days,
   shifted by a carry-over, takes that page once and the next page after it.
+- **SCHED-7.** The Schedule screen's header names the plan: "Automatic", or a custom plan by its
+  name, "Custom plan" only when it has none. A saved plan loaded and saved keeps its name (on every
+  phone), and so does an edit of it. "Save current plan…" on a custom plan names it too (at once
+  when it has no unsaved edits, with the next Save when it has). A plan made with "Create new plan"
+  has no name. On the automatic schedule, "Save current plan…" only keeps a copy. A saved plan is a
+  copy: editing the plan in use doesn't change it, and deleting it doesn't rename the plan in use.
 
 ## A revision session
 

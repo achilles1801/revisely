@@ -33,6 +33,8 @@ export interface FirestoreCustomPlan {
   days: Array<{ pages: number[] }>;
   cycleStartDate: string;
   direction: 'forward' | 'reverse';
+  /** The plan's name (SCHED-7). Absent when it has none, and on plans saved before Nov 8 2026. */
+  name?: string;
 }
 
 /** A named, reusable schedule persisted on the user doc. Same array-of-objects

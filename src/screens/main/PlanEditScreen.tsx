@@ -24,7 +24,7 @@ import {
   buildJuzCycleDays,
   buildWeakestFirstPlanDays,
 } from '../../lib/algorithm';
-import { createCustomPlanFromDraft } from '../../lib/schedulePlans';
+import { createCustomPlanFromDraft, customPlanTitle } from '../../lib/schedulePlans';
 import { userWithNewSchedule } from '../../lib/planChange';
 import {
   defaultStartPage,
@@ -145,6 +145,9 @@ export default function PlanEditScreen() {
 
   const [days, setDays] = useState<number[][]>(initialState.days);
   const [direction, setDirection] = useState<PlanDirection>(initialState.direction);
+  // The plan's name (SCHED-7): the live plan's, a loaded saved plan's or the one given with
+  // "Save current plan…"; none for a plan made with "Create new plan".
+  const [planName, setPlanName] = useState<string | undefined>(user?.customPlan?.name);
   const [saving, setSaving] = useState(false);
   const [expanded, setExpanded] = useState(false);
   // A day lifted for dragging: the page stops scrolling by touch (the list
@@ -198,9 +201,14 @@ export default function PlanEditScreen() {
     navigation.setParams({ editedDay: undefined });
   }, [route.params?.editedDay, navigation]);
 
+  const liveName = user?.customPlan?.name;
   const isDirty = useMemo(
-    () => direction !== initialState.direction || !sameDays(days, initialState.days),
-    [days, direction, initialState],
+    () =>
+      direction !== initialState.direction ||
+      !sameDays(days, initialState.days) ||
+      // A saved plan loaded over the same days still has a name to save.
+      (planName ?? '') !== (liveName ?? ''),
+    [days, direction, initialState, planName, liveName],
   );
 
   // Memorized pages a custom plan doesn't hold (MEM-6, testers): it never adds new pages by itself
@@ -275,7 +283,7 @@ export default function PlanEditScreen() {
 
   const handleSave = () => {
     if (!user || saving || !isDirty || days.length === 0) return;
-    const plan: CustomPlan = createCustomPlanFromDraft(days, direction, revisionDate);
+    const plan: CustomPlan = createCustomPlanFromDraft(days, direction, revisionDate, planName);
     // An older version's "push back a day" could leave the live anchor in the
     // future, and the draft wasn't rotated (see rotateCustomPlanToToday): keep
     // that anchor so saving an edit doesn't silently undo it.
@@ -321,13 +329,16 @@ export default function PlanEditScreen() {
     [user, memorizedPages, logs, revisionDate],
   );
 
-  const applyBuiltPlan = useCallback((next: number[][], dir: PlanDirection) => {
+  // A plan built or loaded here; only a loaded saved plan has a name.
+  const startPlan = useCallback((next: number[][], dir: PlanDirection, name?: string) => {
     setNewPlan(true);
     setDays(next);
     setDirection(dir);
+    setPlanName(name);
     setRemoved(null);
     setExpanded(false);
   }, []);
+  const applyBuiltPlan = useCallback((next: number[][], dir: PlanDirection) => startPlan(next, dir), [startPlan]);
 
   // ---- Saved plans ----------------------------------------------------------------
   const openSaveName = () => {
@@ -348,13 +359,21 @@ export default function PlanEditScreen() {
       createdAt: new Date().toISOString(),
     };
     saveNameSheetRef.current?.dismiss();
+    // A custom plan on screen takes the name (SCHED-7): the plan in use at once when nothing is
+    // unsaved, else the draft, with the next Save. The automatic schedule stays automatic.
+    const nameLive = !!user.customPlan && !isDirty;
     try {
-      await saveUser({ ...user, savedPlans: [...(user.savedPlans ?? []), plan] });
+      await saveUser({
+        ...user,
+        savedPlans: [...(user.savedPlans ?? []), plan],
+        ...(nameLive && user.customPlan ? { customPlan: { ...user.customPlan, name } } : {}),
+      });
+      if (nameLive || isDirty) setPlanName(name);
       haptics.success();
     } catch {
       Alert.alert("Couldn't save plan", 'Please try again.');
     }
-  }, [user, nameDraft, days, direction, saveUser, haptics]);
+  }, [user, nameDraft, days, direction, saveUser, haptics, isDirty]);
 
   const deleteSavedPlan = useCallback(
     (plan: SavedPlan) => {
@@ -382,7 +401,7 @@ export default function PlanEditScreen() {
 
   const loadSavedPlan = (plan: SavedPlan) => {
     haptics.selection();
-    applyBuiltPlan(plan.days.map((d) => [...d]), plan.direction);
+    startPlan(plan.days.map((d) => [...d]), plan.direction, plan.name);
   };
 
   const savedPlanMessage = (plan: SavedPlan) =>
@@ -489,7 +508,7 @@ export default function PlanEditScreen() {
     : days.length === 0
       ? 'No days in this cycle'
       : user.customPlan || isDirty
-        ? 'Custom plan'
+        ? customPlanTitle(planName)
         : 'Automatic';
   const repeats = `Repeats every ${days.length === 1 ? 'day' : `${days.length} days`}`;
 

@@ -511,6 +511,115 @@ describe('a new plan and today', () => {
   });
 });
 
+describe('the plan’s name in the header (SCHED-7)', () => {
+  const { dateToLocalISODay } = require('../../../lib/schedulePlans');
+  const day0 = new Date();
+  day0.setHours(0, 0, 0, 0);
+  const TODAY = dateToLocalISODay(day0);
+  const hero = () => screen.getByTestId('plan-hero');
+  const savedUser = (): User => (mockApp.saveUser as jest.Mock).mock.calls.at(-1)[0];
+  const live = (name?: string) => ({
+    days: [[1, 2, 3], [4, 5, 6], [7, 8, 9]],
+    cycleStartDate: TODAY,
+    direction: 'forward' as const,
+    ...(name ? { name } : {}),
+  });
+
+  async function loadSaved() {
+    fireEvent.press(screen.getByTestId('saved-plan-p1'));
+    await act(async () => {});
+    fireEvent.press(within(screen.getByTestId('saved-plan-menu')).getByTestId('sheet-action-load'));
+    await act(async () => {
+      screen.UNSAFE_getAllByType(Modal).find((m) => m.props.visible)?.props.onDismiss?.();
+    });
+  }
+  async function save() {
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('plan-save'));
+    });
+  }
+  async function saveCurrentAs(name: string) {
+    fireEvent.press(screen.getByTestId('plan-save-current'));
+    fireEvent.changeText(screen.getByTestId('plan-name'), name);
+    await act(async () => {
+      fireEvent.press(within(screen.getByTestId('gorhom-sheet')).getByText('Save'));
+    });
+  }
+
+  it('[SCHED-7] a loaded saved plan is named in the header, and saving it keeps the name', async () => {
+    await mount(<PlanEditScreen />);
+    expect(within(hero()).getByText('Automatic')).toBeTruthy();
+    await loadSaved();
+    expect(within(hero()).getByText('Ramadan rotation')).toBeTruthy();
+    expect(within(hero()).queryByText('Custom plan')).toBeNull();
+    await save();
+    expect(savedUser().customPlan).toMatchObject({ name: 'Ramadan rotation', days: [[1, 2], [3, 4]] });
+  });
+
+  it('[SCHED-7] a named live plan shows its name; an edit keeps it, with “Unsaved changes” until saved', async () => {
+    mockApp.user = { ...baseUser, savedPlans: [saved], customPlan: live('Weekdays') };
+    await mount(<PlanEditScreen />);
+    expect(within(hero()).getByText('Weekdays')).toBeTruthy();
+    expect(screen.queryByTestId('plan-dirty')).toBeNull();
+    fireEvent.press(screen.getByTestId('plan-add-day'));
+    expect(within(hero()).getByText('Weekdays')).toBeTruthy();
+    expect(screen.getByTestId('plan-dirty')).toBeTruthy();
+    await save();
+    expect(savedUser().customPlan).toMatchObject({ name: 'Weekdays' });
+    expect(savedUser().customPlan!.days).toHaveLength(4);
+  });
+
+  it('[SCHED-7] a custom plan without a name is “Custom plan”', async () => {
+    mockApp.user = { ...baseUser, savedPlans: [saved], customPlan: live() };
+    await mount(<PlanEditScreen />);
+    expect(within(hero()).getByText('Custom plan')).toBeTruthy();
+  });
+
+  it('[SCHED-7] “Create new plan” makes a plan with no name: “Custom plan”, saved without one', async () => {
+    mockApp.user = { ...baseUser, savedPlans: [saved], customPlan: live('Weekdays') };
+    await mount(<PlanEditScreen />);
+    fireEvent.press(screen.getByTestId('plan-create'));
+    await act(async () => {
+      fireEvent.press(within(screen.getByTestId('gorhom-sheet')).getByText('Apply'));
+    });
+    expect(within(hero()).getByText('Custom plan')).toBeTruthy();
+    await save();
+    expect(savedUser().customPlan).not.toHaveProperty('name');
+  });
+
+  it('[SCHED-7] saving the live custom plan under a name names it at once, without touching its days', async () => {
+    mockApp.user = { ...baseUser, savedPlans: [saved], customPlan: live() };
+    await mount(<PlanEditScreen />);
+    await saveCurrentAs('Weekdays');
+    const after = savedUser();
+    expect(after.customPlan).toEqual(live('Weekdays'));
+    expect(after.savedPlans.map((p) => p.name)).toEqual(['Ramadan rotation', 'Weekdays']);
+    expect(within(hero()).getByText('Weekdays')).toBeTruthy();
+  });
+
+  it('[SCHED-7] saving an edited draft under a name names the draft; Save then keeps the name', async () => {
+    mockApp.user = { ...baseUser, savedPlans: [saved], customPlan: live() };
+    await mount(<PlanEditScreen />);
+    fireEvent.press(screen.getByTestId('plan-add-day'));
+    await saveCurrentAs('Weekdays');
+    // The saved plan is stored; the live plan waits for Save, like the edit.
+    expect(savedUser().customPlan).toEqual(live());
+    expect(within(hero()).getByText('Weekdays')).toBeTruthy();
+    expect(screen.getByTestId('plan-dirty')).toBeTruthy();
+    await save();
+    expect(savedUser().customPlan).toMatchObject({ name: 'Weekdays' });
+    expect(savedUser().customPlan!.days).toHaveLength(4);
+  });
+
+  it('[SCHED-7] on the automatic schedule, saving it under a name keeps a copy and leaves it automatic', async () => {
+    await mount(<PlanEditScreen />);
+    await saveCurrentAs('Weekdays');
+    expect(savedUser().customPlan).toBeNull();
+    expect(within(hero()).getByText('Automatic')).toBeTruthy();
+    expect(screen.queryByTestId('plan-dirty')).toBeNull();
+  });
+});
+
 describe('memorized pages a custom plan doesn’t hold (MEM-6)', () => {
   const today = new Date();
   const day = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;

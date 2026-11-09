@@ -92,14 +92,20 @@ export async function newAccount(phone: Phone, plan: Plan): Promise<OpenApp> {
  * A new custom plan saved from the plan editor (PlanEditScreen.handleSave with a
  * new plan): the days from today's revision day, through the same functions.
  */
-export async function saveCustomPlan(app: OpenApp, days: number[][], direction: 'forward' | 'reverse' = 'forward'): Promise<void> {
+export async function saveCustomPlan(
+  app: OpenApp,
+  days: number[][],
+  direction: 'forward' | 'reverse' = 'forward',
+  /** A saved plan loaded and saved keeps its name (SCHED-7). */
+  name?: string,
+): Promise<void> {
   const { createCustomPlanFromDraft } = app.mods.require<typeof import('../../../src/lib/schedulePlans')>('src/lib/schedulePlans');
   const { userWithNewSchedule } = app.mods.require<typeof import('../../../src/lib/planChange')>('src/lib/planChange');
   const { getRevisionDateForUser } = app.mods.require<typeof import('../../../src/lib/fajrBoundary')>('src/lib/fajrBoundary');
   const user = app.app.user!;
   const revisionDate = getRevisionDateForUser(user);
   const memorized = app.app.pages.filter((p) => p.status === 'memorized');
-  const plan = createCustomPlanFromDraft(days, direction, revisionDate);
+  const plan = createCustomPlanFromDraft(days, direction, revisionDate, name);
   const next = userWithNewSchedule(user, { customPlan: plan }, { revisionDate, memorized, logs: app.app.logs, newPlan: true });
   await app.act(() => app.app.saveUser(next));
   await app.untilSynced();
@@ -126,7 +132,8 @@ export async function saveEditedPlan(app: OpenApp, edit: (shown: number[][]) => 
   const shown = shifted
     ? algorithm.scheduledDaysFrom(user, memorized, revisionDate, plan.days.length)
     : builder.rotateCustomPlanToToday(plan, revisionDate);
-  const saved = plans.createCustomPlanFromDraft(edit(shown.map((d) => [...d])), plan.direction, revisionDate);
+  // The editor keeps the plan's name through an edit (SCHED-7).
+  const saved = plans.createCustomPlanFromDraft(edit(shown.map((d) => [...d])), plan.direction, revisionDate, plan.name);
   const next = userWithNewSchedule(user, { customPlan: saved }, { revisionDate, memorized, logs: app.app.logs, newPlan: false });
   await app.act(() => app.app.saveUser(next));
   await app.untilSynced();

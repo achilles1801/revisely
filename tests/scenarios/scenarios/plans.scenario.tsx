@@ -1,11 +1,13 @@
 // Plan types (BEHAVIOUR.md, SCHED-*): what each day holds, as the session opens it.
 
 import { setNow, setZone, ZONES } from '../harness/clock';
-import { newAccount, pagesRange, saveCustomPlan } from '../harness/account';
+import { changeUser, newAccount, pagesRange, saveCustomPlan, saveEditedPlan } from '../harness/account';
 import { Home, homeStack } from '../harness/screens';
 import { Phone } from '../harness/phone';
+import { getServerDoc } from '../harness/serverDocs';
 import { buildBalancedPlanFromStart } from '../../../src/lib/planBuilder';
-import type { User } from '../../../src/types';
+import { customPlanTitle } from '../../../src/lib/schedulePlans';
+import type { SavedPlan, User } from '../../../src/types';
 
 async function sessionPagesOn(phone: Phone, at: string): Promise<number[]> {
   setNow(at);
@@ -56,6 +58,47 @@ it('[SCHED-3] custom plan: its days in order from the day it was saved, looping'
   expect(await sessionPagesOn(phone, '2026-11-04 09:00')).toEqual([3, 4, 5]);
   expect(await sessionPagesOn(phone, '2026-11-05 09:00')).toEqual([6]);
   expect(await sessionPagesOn(phone, '2026-11-06 09:00')).toEqual([1, 2]);
+});
+
+it('[SCHED-7] a loaded saved plan keeps its name: on the server, on another phone and through an edit; a new plan has none', async () => {
+  const phone = await account(pagesRange(1, 6), { dailyPageCapacity: 5 });
+  setNow('2026-11-03 10:00');
+  const app = await phone.open();
+  await app.untilLoaded();
+  const uid = app.uid;
+  const saved: SavedPlan = {
+    id: 'ramadan',
+    name: 'Ramadan rotation',
+    days: [[1, 2], [3, 4, 5], [6]],
+    direction: 'forward',
+    createdAt: '2026-11-03T10:00:00.000Z',
+  };
+  // "Save current plan…" kept it under a name; Load plan, then Save.
+  await changeUser(app, { savedPlans: [saved] });
+  await saveCustomPlan(app, saved.days, saved.direction, saved.name);
+  await app.close();
+  const planOnServer = async () => (await getServerDoc(`users/${uid}`))?.customPlan as Record<string, unknown>;
+  expect(await planOnServer()).toMatchObject({ name: 'Ramadan rotation', cycleStartDate: '2026-11-03' });
+
+  // Another phone signed in to the account reads it with its name.
+  setNow('2026-11-04 09:00');
+  const b = await new Phone('phone B').open();
+  await b.signIn(phone.email!);
+  await b.untilLoaded();
+  expect(b.app.user!.customPlan).toMatchObject({ name: 'Ramadan rotation', days: saved.days, cycleStartDate: '2026-11-03' });
+  expect(customPlanTitle(b.app.user!.customPlan?.name)).toBe('Ramadan rotation');
+
+  // An edit (a rest day added) keeps the name.
+  await saveEditedPlan(b, (shown) => [...shown, []]);
+  expect(await planOnServer()).toMatchObject({ name: 'Ramadan rotation' });
+  expect(b.app.user!.customPlan!.days).toHaveLength(4);
+
+  // A plan made with "Create new plan" has none: "Custom plan".
+  await saveCustomPlan(b, [[1, 2, 3], [4, 5, 6]]);
+  expect(await planOnServer()).not.toHaveProperty('name');
+  expect(b.app.user!.customPlan).not.toHaveProperty('name');
+  expect(customPlanTitle(b.app.user!.customPlan?.name)).toBe('Custom plan');
+  await b.close();
 });
 
 it('[SCHED-4] reverse plan: from the end to the start, the same pages', async () => {
