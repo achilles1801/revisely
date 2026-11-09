@@ -1,0 +1,18 @@
+# TEXT typed into the field that has the focus, then a wait until the field shows all of it, so the
+# tap that follows (Add, Send) sends what was typed.
+#
+# Maestro's iOS driver sends the first character, waits 500 ms, then the rest. On a busy simulator the
+# keyboard can hold the rest back ("UIKeyboardTaskQueue … Keyboard queue task timeout detected") until
+# after the flow's next step: 05-daily-log tapped Add while the field held only "J", and the note was
+# saved as "J" (iOS, #217's run 42662790506; the rest arrived 0.2 s later). The app saves what the field
+# holds, as it should. The log's own field waits the same way (type-in-log.yaml); on iOS a multiline
+# field's text is its value, which `text:` matches.
+#   env TEXT: what to type. It is matched as a regex, so only letters, digits, spaces and . , ' -
+#   (scripts/e2e/__tests__/type.test.js).
+appId: com.revisionbuddy.app
+---
+- inputText: ${TEXT}
+- extendedWaitUntil:
+    visible:
+      text: ${TEXT}
+    timeout: 10000
