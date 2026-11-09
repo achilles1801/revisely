@@ -3,7 +3,8 @@
 # strip in the reader, its juz (from the Revised header), the day's block menus (Revised, d10a;
 # Memorized, whose Edit opens the memorized pages), the + (d5), its Revised, Memorized and Note sheets
 # (d6–d8), the day's end, a light day (d2), and Insights (d4: top; a juz from its tile and the stale one
-# from the untouched row, i5 and i6; the range's menu, 3 months and All time, i1, i2 and i4; what wasn't
+# from the untouched row, i5 and i6; Coverage's Surah view (as it opens, Juz 1 open and hidden), Page and
+# Juz views, ACT-26; the range's menu, 3 months and All time, i1, i2 and i4; what wasn't
 # revised, i7; Weak spots; a month's bar, i10; the end; Pace's timed revisions, i11). Each is a
 # screenshot named 09-<screen>-${THEME}.
 # Run by 09-activity-light.yaml and 09-activity-dark.yaml, after seed-activity.yaml.
@@ -340,6 +341,63 @@ appId: com.revisionbuddy.app
     notVisible:
       id: juz-sheet-strip
     timeout: 10000
+# Coverage's views (ACT-26): Surah as it opens (the juz with something to act on), Juz 1 open and then
+# hidden, then Page; back to Juz for the rest.
+- tapOn:
+    id: pill-surah
+- extendedWaitUntil:
+    visible:
+      id: coverage-surahs
+    timeout: 10000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-coverage-surah-${THEME}
+- runFlow:
+    when:
+      notVisible:
+        id: coverage-juz-1-surahs
+    commands:
+      - tapOn:
+          id: coverage-juz-1
+- extendedWaitUntil:
+    visible:
+      id: coverage-juz-1-surahs
+    timeout: 10000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-coverage-surah-open-${THEME}
+- tapOn:
+    id: coverage-juz-1
+- extendedWaitUntil:
+    notVisible:
+      id: coverage-juz-1-surahs
+    timeout: 10000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-coverage-surah-closed-${THEME}
+- tapOn:
+    id: pill-page
+- extendedWaitUntil:
+    visible:
+      id: coverage-pages
+    timeout: 10000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-coverage-page-${THEME}
+- tapOn:
+    id: pill-juz
+- extendedWaitUntil:
+    visible:
+      id: coverage-juz
+    timeout: 10000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-coverage-juz-${THEME}
 # The range (ACT-22; mocks i1, i2): the chip's menu, then 3 months, then back to 30 days for the rest.
 - tapOn:
     id: insights-range

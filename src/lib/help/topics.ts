@@ -259,9 +259,9 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         icon: 'grid-outline',
         title: 'Coverage',
         text:
-          "How much of what you've memorized you revised in the range at the top, juz by juz. " +
-          'Tap a juz to see its surahs.',
-        covers: ['ACT-4', 'ACT-21', 'ACT-22'],
+          "How much of what you've memorized you revised in the range at the top, by {{Juz}}, {{Surah}} or {{Page}}. " +
+          'Tap one to see it.',
+        covers: ['ACT-4', 'ACT-21', 'ACT-22', 'ACT-26'],
       },
       {
         id: 'insights.consistency',
