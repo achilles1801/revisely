@@ -455,11 +455,10 @@ jobs:
           xcrun simctl bootstatus "$UDID" -b
           # The simulator's push service (apsd) can't reach Apple from these runners and
           # tries again about 40 times a second for the whole job: 100–250k lines of log a
-          # minute, nine in ten of the simulator's, which Maestro also copies to a file. On a
-          # 3-core runner that starved the app: its JavaScript stood still for 3 to 30 s after
-          # the server answered (a long press arrived as a tap, 13 in run 42769434122), and
-          # deleteUserAccount ran past the app's 30 s in the Functions emulator (10). Nothing
-          # here uses push (the app asks for a push token on a real phone only), so it is off.
+          # minute, nine in ten of the simulator's, which Maestro also copies to a file, on a
+          # 3-core runner. Off, the log is a third of the size and flows ran about 15% faster
+          # (run 42783211424). Nothing here uses push (the app asks for a push token on a real
+          # phone only). The app's long stalls after a server answer remain without it.
           xcrun simctl spawn "$UDID" launchctl bootout system/com.apple.apsd 2>/dev/null ||
             echo "::warning::Couldn't switch off the simulator's push service (apsd)"
           xcrun simctl install "$UDID" .maestro/build/Revisely.app

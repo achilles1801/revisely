@@ -398,8 +398,9 @@ in `.maestro/build/results/<platform>/<flow>/`:
 - `device.log` (iOS): the unified log. Its `CFNetwork:Summary` lines give each request's length
   (`transaction_duration_ms`; the emulators' ports name the service). On CI the simulator's push
   service (apsd) is switched off before the flows (`e2e.yml`): it couldn't reach Apple from the
-  runners and looped, writing nine lines in ten of this log, and the app starved (stalls of 3 to
-  30 s). The job's step "The simulator's log, by process" names the log's writers on every run.
+  runners and looped, writing nine lines in ten of this log. The job's step "The simulator's log,
+  by process" names the log's writers on every run; with apsd off the top ones are SpringBoard and
+  `testmanagerd` (Maestro reading the screen) and the app.
 - `logcat.txt` (Android): logcat, which has the same lines under `ReactNativeJS`.
 - `run/<time>/<flow>/screen-hierarchy/` and `screenshots/`: what Maestro saw when the step failed,
   and the screen. The screenshot is taken after the hierarchy, so something that arrived in between
