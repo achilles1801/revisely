@@ -105,6 +105,19 @@ describe('buildWidgetSnapshot', () => {
     expect(done.days[2].streak).toBe(0);
   });
 
+  // AHEAD-3: revising ahead goes on past the cycle's end; a day of the next cycle revised in a new round
+  // (its pages repeat today's) is done when it comes, as on Home (AHEAD-2, AHEAD-4).
+  it('a day of the next cycle done ahead in a new round is done; the days before it are not', () => {
+    const pagesOn = (d: number) => generateDailyAssignment(pages, quranData, user, new Date(2026, 9, 27 + d)).pages;
+    const later = pagesOn(5);
+    expect(later.some((p) => pagesOn(0).includes(p))).toBe(true);
+    const todays: RevisionLog = { ...log('2026-10-27', [...new Set([...pagesOn(0), ...later])]), assignedPages: pagesOn(0), ahead: { '2026-11-01': later } };
+    const snap = buildWidgetSnapshot(inputs({ logs: [todays] }));
+    expect(snap.days[0]).toMatchObject({ completed: true });
+    expect(snap.days[5]).toMatchObject({ day: '2026-11-01', completed: true });
+    expect(snap.days[4].completed).toBe(false);
+  });
+
   it('a streak through yesterday stays alive today', () => {
     const logs = [log('2026-10-24', [1]), log('2026-10-25', [1]), log('2026-10-26', [1])];
     expect(buildWidgetSnapshot(inputs({ logs })).days[0].streak).toBe(3);

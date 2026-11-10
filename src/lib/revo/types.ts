@@ -1,3 +1,5 @@
+import type { RevoPattern } from './patterns';
+
 // Revo, the in-app assistant: what the app and the server exchange (the server's side is
 // functions/src/revo/; both follow the same contract) and what is stored per account.
 
@@ -53,9 +55,13 @@ export interface RevoContext {
   weakPages: number[];
   /**
    * The last 7 revision days, oldest first: the pages revised that day (in its sessions), the pages
-   * its plan had, and whether the day was done, as the streak counts it.
+   * its plan had, and whether the day was done, as the streak counts it. Then, from apps after Nov 9
+   * 2026 (lib/revo/patterns): the pages it caught up for earlier days and revised ahead for later
+   * ones, and when its revision started ("HH:MM", null when unknown).
    */
-  week: { day: string; pages: number; planned: number; done: boolean }[];
+  week: { day: string; pages: number; planned: number; done: boolean; caughtUp?: number; ahead?: number; started?: string | null }[];
+  /** Patterns in the last days (lib/revo/patterns, REVO-40); Revo mentions at most one, when it fits. Always sent by this app. */
+  patterns?: RevoPattern[];
   /**
    * The streak as Home shows it. `atRisk`: yesterday was missed but the run before it can still be
    * kept today by finishing yesterday's pages (SESS-6); Home shows `previous` dimmed.

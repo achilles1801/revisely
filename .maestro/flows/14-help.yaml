@@ -1,7 +1,8 @@
-# The help buttons, for a previewTester account (marked one through the emulator, as the owner's script
-# does): Home's ? on the Today post opens "How Home works"; the sheet closes; "Hide help buttons" takes the
-# ? away with a toast and Undo; hidden it stays hidden after a relaunch, until Settings → Support → Help
-# buttons brings it back. Screenshots of the button, the sheet and the toast (h1–h3).
+# The help buttons, for an account that isn't a tester (help is every account's since the November
+# 2026 release, HELP_FOR_EVERYONE): Home's ? on the Today post opens "How Home works"; the sheet
+# closes; "Hide help buttons" takes the ? away with a toast and Undo; hidden it stays hidden after a
+# relaunch, until Settings → Support → Help buttons brings it back. Screenshots of the button, the
+# sheet and the toast (h1–h3).
 # Rules (BEHAVIOUR.md): HELP-1, HELP-2
 appId: com.revisionbuddy.app
 ---
@@ -10,11 +11,6 @@ appId: com.revisionbuddy.app
     env:
       CLOCK: 2026-11-03T19:00
       BOUNDARY: midnight
-# A tester (help is theirs only, for now): the app sees it when its user document changes.
-- runScript:
-    file: ../scripts/server-revo.js
-    env:
-      MODE: tester
 
 # HELP-1: the ? at the right of the Today post's header, and its sheet.
 - extendedWaitUntil:
@@ -39,7 +35,9 @@ appId: com.revisionbuddy.app
 - assertVisible:
     id: help-topic-home.streak
     text: "Streak, .*"
-- assertVisible:
+# "Ask Revo ›" only while Revo is on for the account: Revo follows config/app.revo, unset here
+# (testers), so not for this one.
+- assertNotVisible:
     id: help-ask-revo
 - assertVisible:
     id: help-hide
@@ -56,7 +54,7 @@ appId: com.revisionbuddy.app
 - assertVisible:
     id: help-button-home
 
-# HELP-2: Hide help buttons. The ? goes, and Home says how to bring it back, with Undo.
+# HELP-2: Hide help buttons, with Undo; then hidden for good (until Settings).
 - tapOn:
     id: help-button-home
 - extendedWaitUntil:
@@ -64,6 +62,24 @@ appId: com.revisionbuddy.app
       id: help-hide
     timeout: 10000
 # The sheet slides up; a tap while it moves can miss (iOS).
+- waitForAnimationToEnd
+- tapOn:
+    id: help-hide
+# Undo at once: its toast lasts six seconds, and with the checks and the screenshot before it the
+# tap came after them on iOS (#328's run 42483723092). They are on the second hide, below.
+- tapOn:
+    id: undo-toast-action
+- extendedWaitUntil:
+    visible:
+      id: help-button-home
+    timeout: 10000
+# Hidden again: the ? goes, Home says how to bring it back, and it stays hidden after a relaunch.
+- tapOn:
+    id: help-button-home
+- extendedWaitUntil:
+    visible:
+      id: help-hide
+    timeout: 10000
 - waitForAnimationToEnd
 - tapOn:
     id: help-hide
@@ -76,26 +92,6 @@ appId: com.revisionbuddy.app
     file: ../subflows/shot.yaml
     env:
       NAME: h3-help-hidden
-# Undo brings it back; hidden again, it stays hidden after a relaunch.
-- tapOn:
-    id: undo-toast-action
-- extendedWaitUntil:
-    visible:
-      id: help-button-home
-    timeout: 10000
-- tapOn:
-    id: help-button-home
-- extendedWaitUntil:
-    visible:
-      id: help-hide
-    timeout: 10000
-- waitForAnimationToEnd
-- tapOn:
-    id: help-hide
-- extendedWaitUntil:
-    notVisible:
-      id: help-button-home
-    timeout: 10000
 - runFlow: ../subflows/relaunch.yaml
 - extendedWaitUntil:
     visible:
@@ -107,16 +103,19 @@ appId: com.revisionbuddy.app
 # Settings → Support → Help buttons: off; turned on, the ? is back on Home.
 - tapOn:
     id: open-settings
-# Centred: found at the screen's foot, a row can sit under the tab bar, which takes the tap (the
-# first run, Nov 8 2026, tapped Read instead).
-- scrollUntilVisible:
-    element:
-      id: settings-help-buttons
-    direction: DOWN
-    centerElement: true
-    timeout: 20000
+- runFlow:
+    file: ../subflows/settings-row.yaml
+    env:
+      ROW: settings-help-buttons
 - tapOn:
     id: settings-help-buttons
+# The switch reads on before Home is looked at: a tap that didn't take (the list still moving) fails here
+# as what it is, and a ? missing from Home with the switch on would be the app's.
+- extendedWaitUntil:
+    visible:
+      id: settings-help-buttons
+      checked: true
+    timeout: 5000
 - runFlow: ../subflows/back-home.yaml
 - extendedWaitUntil:
     visible:

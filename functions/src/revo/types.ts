@@ -36,8 +36,13 @@ export interface RevoContext {
     done: boolean;
   };
   weakPages: number[];
-  /** `planned` and `done` from apps after Nov 7 2026. */
-  week: { day: string; pages: number; planned?: number; done?: boolean }[];
+  /**
+   * `planned` and `done` from apps after Nov 7 2026; `caughtUp` (pages revised that day for earlier
+   * days), `ahead` (for later days) and `started` (local "HH:MM", null when unknown) after Nov 9 2026.
+   */
+  week: { day: string; pages: number; planned?: number; done?: boolean; caughtUp?: number; ahead?: number; started?: string | null }[];
+  /** Patterns the app read in the last days (REVO-40, the app's lib/revo/patterns), from apps after Nov 9 2026. */
+  patterns?: RevoPattern[];
   /** The streak as Home shows it, from apps after Nov 7 2026. */
   streak?: { days: number; atRisk: { previous: number; yesterdayPlanned: number; yesterdayDone: number } | null };
   /**
@@ -49,6 +54,22 @@ export interface RevoContext {
   pageNames?: Record<string, string>;
   localTime: string | null;
 }
+
+/**
+ * A pattern in the account's last days, found by the app from its own credits and session times
+ * (REVO-40). Revo mentions at most one, when it fits; it never infers one itself.
+ */
+export type RevoPattern =
+  /** `day`'s revision made up for `forDays` (`pages` caught up); whether Keep daily amount is on. */
+  | { kind: 'catchingUp'; day: string; pages: number; forDays: string[]; keepDailyAmount: boolean }
+  /** On `day`, `pages` revised ahead for the next `days` revision days; `quietDays` since had nothing left. */
+  | { kind: 'aheadBurst'; day: string; pages: number; days: number; quietDays: number }
+  /** `late` of the last `of` revision days with a known start began between 10 PM and 4 AM. */
+  | { kind: 'lateNights'; late: number; of: number }
+  /** A streak of `days`, each day this week done on its own day. */
+  | { kind: 'steady'; days: number };
+
+export const REVO_PATTERN_KINDS = ['catchingUp', 'aheadBurst', 'lateNights', 'steady'] as const;
 
 /** `memorizedToday`: what was added as memorized today, by surah and ayah ("Al-Mulk, ayahs 1–20"; MEM-1), from apps after Nov 8 2026. */
 export const REVO_PASSAGE_KEYS = ['today', 'startsAt', 'next', 'nextAt', 'weakNext', 'weak', 'memorizedToday'] as const;

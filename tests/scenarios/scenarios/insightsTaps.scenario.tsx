@@ -64,10 +64,15 @@ function open(shown: InsightsData = data) {
   return { onOpenDay, onOpenCalendar };
 }
 
-const sheetGone = () =>
+/** The sheet closes (its animation), then reports it has gone, as iOS does (onDismiss): only then can another open (SHEET-1). */
+const sheetGone = async () => {
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 250));
+  });
   act(() => {
     screen.UNSAFE_getAllByType(Modal).forEach((m: { props: { onDismiss?: () => void } }) => m.props.onDismiss?.());
   });
+};
 
 describe('Insights’ one-line taps', () => {
   afterEach(async () => {
@@ -94,7 +99,7 @@ describe('Insights’ one-line taps', () => {
     const row = screen.getByTestId('uncovered-600');
     expect(plainText(row.props.accessibilityLabel)).toMatch(/Memorized Thursday 29 October, not revised yet$/);
     fireEvent.press(row);
-    sheetGone();
+    await sheetGone();
     expect(await screen.findByText('Juz 30')).toBeTruthy();
   });
 
@@ -110,13 +115,13 @@ describe('Insights’ one-line taps', () => {
     expect(screen.queryByTestId('insights-month-list')).toBeNull();
   });
 
-  it('[ACT-23] Pace’s timed revisions: each as a dot and a row, the untimed one said; a row opens its day', () => {
+  it('[ACT-23] Pace’s timed revisions: each as a dot and a row, the untimed one said; a row opens its day', async () => {
     const { onOpenDay } = open(timedData);
     fireEvent.press(screen.getByTestId('insights-pace-revisions'));
     expect(screen.getByText('12 timed revisions')).toBeTruthy();
     expect(screen.getByTestId('pace-untimed').props.children).toBe('1 revision in 30 days had no time, so it isn’t counted.');
     fireEvent.press(screen.getByTestId(`pace-row-${dayBefore(1)}-1`));
-    sheetGone();
+    await sheetGone();
     expect(onOpenDay).toHaveBeenCalledWith(dayBefore(1));
   });
 

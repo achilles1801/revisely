@@ -1,0 +1,29 @@
+# On an open day (today or yesterday): the + → Note, TEXT, Add (ACT-5, ACT-13). The note is in the
+# day's Notes once the sheet has gone.
+appId: com.revisionbuddy.app
+---
+- tapOn:
+    id: day-add
+- extendedWaitUntil:
+    visible:
+      id: activity-add-menu
+    timeout: 10000
+- tapOn:
+    id: sheet-action-note
+- extendedWaitUntil:
+    visible:
+      id: add-note-sheet
+    timeout: 10000
+- waitForAnimationToEnd
+# The field takes focus as the sheet opens (a multiline field's testID doesn't reach iOS). Add once
+# the field holds all of TEXT (type.yaml).
+- runFlow:
+    file: type.yaml
+    env:
+      TEXT: ${TEXT}
+- tapOn:
+    id: add-note-add
+- extendedWaitUntil:
+    notVisible:
+      id: add-note-sheet
+    timeout: 10000

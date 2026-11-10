@@ -13,7 +13,10 @@ jest.mock('@react-navigation/native', () => ({
   useNavigation: () => mockNavigation,
   useRoute: () => ({ params: mockParams }),
 }));
-jest.mock('../../../context/AppContext', () => ({ useApp: () => ({ user: { id: 'u1', previewTester: true } }) }));
+let mockUser: { id: string; previewTester?: boolean } = { id: 'u1', previewTester: true };
+jest.mock('../../../context/AppContext', () => ({ useApp: () => ({ user: mockUser }) }));
+// Whether the binary can listen; who may is the real gate (lib/search/availability).
+jest.mock('../../../lib/recite/micSource', () => ({ isMicStreamAvailable: () => true }));
 // The model sheet: shown or not, and a way to finish its download.
 jest.mock('../../../components/recite/SpeechModelSheet', () => ({
   SpeechModelSheet: ({ visible, title, onReady }: { visible: boolean; title: string; onReady: () => void }) => {
@@ -36,9 +39,9 @@ const mockVoice = {
   heard: null as ((text: string) => void) | null,
 };
 jest.mock('../../../components/search/useVoiceSearch', () => ({
-  useVoiceSearch: (onHeard: (text: string) => void) => {
+  useVoiceSearch: (onHeard: (text: string) => void, enabled: boolean) => {
     mockVoice.heard = onHeard;
-    return mockVoice;
+    return { ...mockVoice, available: enabled && mockVoice.available };
   },
 }));
 
@@ -56,6 +59,7 @@ afterAll(() => setQuranWordsForTests(null));
 beforeEach(async () => {
   jest.clearAllMocks();
   mockParams = undefined;
+  mockUser = { id: 'u1', previewTester: true };
   Object.assign(mockVoice, { available: true, status: 'idle', partial: '', needsModel: false });
   await AsyncStorage.clear();
   await AsyncStorage.setItem('@revisely_theme_v2', 'light');
@@ -183,4 +187,20 @@ describe('searching the Quran', () => {
     await open();
     expect(screen.queryByTestId('search-mic')).toBeNull();
   });
+
+  it.each([{ id: 'u2' }, { id: 'u3', previewTester: false }])(
+    '[SEARCH-1] any account gets the mic: the first tap offers the speech model, then it listens, for %o',
+    async (user) => {
+      mockUser = user;
+      mockVoice.needsModel = true;
+      await open();
+      fireEvent.press(screen.getByTestId('search-mic'));
+      expect(mockVoice.listen).not.toHaveBeenCalled();
+      expect(screen.getByTestId('model-sheet')).toHaveTextContent('Search by voice');
+      await act(async () => fireEvent.press(screen.getByTestId('model-sheet')));
+      expect(mockVoice.listen).toHaveBeenCalledTimes(1);
+      await act(async () => mockVoice.heard?.('قل لو شاء الله'));
+      expect(screen.getByTestId('search-verse-10-16')).toBeTruthy();
+    },
+  );
 });

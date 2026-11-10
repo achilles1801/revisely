@@ -2,7 +2,7 @@
 // the day's revision items (one per day, with the credit to later days apart), and
 // the Memorized block from its memorization items. Notes that still live in the
 // daily log (revision and memorization kinds) appear under their block instead of
-// as a parallel row. Shown only with the Activity blocks flag (previewTester).
+// as a parallel row. Shown with the Activity blocks (lib/activityBlocks: every account since Nov 2026).
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
@@ -59,7 +59,7 @@ const EMPTY_DAY: DayItems = { revisions: [], memorized: [], reads: [], doneAhead
 /** The day's blocks, by the names Overview's preview rows use for them. */
 export type DayBlockKind = 'revised' | 'memorized' | 'read' | 'notes';
 
-/** Whether the Activity blocks show (the preview testers, while C2 is built): lib/activityBlocks. */
+/** Whether the Activity blocks show (every account since the November 2026 release): lib/activityBlocks. */
 export { activityBlocksEnabled } from '../../lib/activityBlocks';
 
 interface Props {

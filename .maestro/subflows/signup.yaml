@@ -30,9 +30,12 @@ appId: com.revisionbuddy.app
 - tapOn:
     id: auth-confirm-password
 - inputText: e2e-password
-# Maestro's hideKeyboard can't dismiss it here: a tap on the title does.
+# Maestro's hideKeyboard can't dismiss it here: a tap on the title does. The form moves as the
+# keyboard goes (a KeyboardAvoidingView): wait for it to stop, or the tap lands where Sign up was.
+# On iOS in run 42573714262 (04) the tap reached the window and no sign-up reached the Auth emulator.
 - tapOn:
     id: auth-title
+- waitForAnimationToEnd
 - tapOn:
     id: auth-submit
 # SYNC-4: the new account loads at once, with no relaunch. (Asserted by the

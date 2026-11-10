@@ -6,7 +6,6 @@
 
 import { setNow, setZone, ZONES } from '../harness/clock';
 import { newAccount, pagesRange } from '../harness/account';
-import { markPreviewTester } from '../harness/admin';
 import { getServerDoc } from '../harness/serverDocs';
 import { ActivityDayView, Home, homeStack } from '../harness/screens';
 import { Phone } from '../harness/phone';
@@ -27,7 +26,7 @@ describe('a sitting memorized from the Day (MEM-1, MEM-3, MEM-5)', () => {
     const uid = app.uid;
     await app.untilSynced();
     await app.close();
-    await markPreviewTester(uid);
+    // An App Store account, not a tester: this is everyone's since the November 2026 release.
 
     setNow(`${DAY} 08:23`);
     app = await phone.open(homeStack);

@@ -10,6 +10,7 @@ import { handleVerseLink, installDemoTranslations } from './demoTranslations';
 import { flushE2ELog, installLog } from './log';
 import { handleNetworkLink, installNetwork } from './network';
 import { pinFreshTheme } from './theme';
+import { handleUpdateLink } from './updates';
 
 let installed = false;
 let ready: Promise<void> = Promise.resolve();
@@ -19,6 +20,7 @@ function handle(url: string | null | undefined): void {
   if (handleClockLink(url)) return;
   if (handleRecordingsLink(url)) return;
   if (handleVerseLink(url)) return;
+  if (handleUpdateLink(url)) return;
   handleNetworkLink(url);
 }
 

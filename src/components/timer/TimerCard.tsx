@@ -19,6 +19,7 @@ import { useReduceMotion } from '../../design/motion';
 import { layoutV2 } from '../../theme/v2';
 import { Backdrop } from '../Backdrop';
 import { shouldDismiss } from '../v2/Sheet';
+import { useModalHold } from '../v2/modalTurn';
 import { alertSessionSaved } from './sessionSavedAlert';
 import { TimerControls } from './TimerControls';
 
@@ -101,6 +102,8 @@ export function TimerCard({
   const keyboard = useAnimatedKeyboard();
 
   const [shown, setShown] = useState(visible);
+  // Sheets wait for it (v2/modalTurn).
+  useModalHold(shown);
   const progress = useSharedValue(0);
   const drag = useSharedValue(0);
   const contentHeight = useSharedValue(0);

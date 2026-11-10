@@ -42,7 +42,8 @@ and each iOS job takes 21–39 minutes of flows.
   `firestore.rules`, `storage.rules`, `firebase.json`, `functions/` and `scripts/emulators.sh`.
 - **Never missing:** it runs after a failure or a cancellation too, so a PR never waits for a check
   that won't come.
-- **Partial runs:** a run by hand on one platform, or with `flows` (a glob such as `06-*`), reports
+- **Partial runs:** a run by hand on one platform, or with `flows` (a glob such as `06-*`, or several:
+  `04-* 06-* 11-*` runs them in that order in one job, on one device), reports
   as `E2E (partial run)` and can't stand in for the check. `debug` there adds Firestore's own log to
   the app's log.
 - **Claude's PRs:** `claude-fix` starts CI on its branch (which runs it), since a PR opened by the
@@ -68,9 +69,21 @@ retry is a warning on the run, and the job keeps its results as for a failure.
   - Runs of a fork's pull request are left out. A PR that changes the report prints it in its job
     summary instead of commenting; so does a run by hand with `dry_run`. Like every scheduled
     workflow it runs from `main`.
-- **Time limits:** `run.sh` stops a flow's attempt after 15 minutes and the warm-up after 6
-  (`E2E_FLOW_LIMIT`, `E2E_WARMUP_LIMIT`). Maestro can hang for good: once its iOS driver answered
-  500, its JVM never exited, and a job waited 55 minutes for it.
+- **Time limits:** `run.sh` stops a flow's attempt after 15 minutes (20 in e2e.yml's iOS job) and
+  the warm-up after 6 (`E2E_FLOW_LIMIT`, `E2E_WARMUP_LIMIT`). Maestro can hang for good: once its
+  iOS driver answered 500, its JVM never exited, and a job waited 55 minutes for it. iOS flows 09
+  and 11 pass in 12 to 14.5 minutes on a busy runner; 11's first attempt in run 42649421053 was
+  stopped at 15 while still going (560 of its ~586 steps), hence 20 there.
+  - A `scrollUntilVisible` timeout is time, not swipes: on the iOS runner each swipe and look takes
+    4–6 s, so 20 s reaches only 3 or 4 swipes down. Rows deep in Settings (Theme, Help buttons,
+    What's new, Delete account) are 4–6 swipes down. In run 42531940953 the row came into view
+    with the last swipe, just after time ran out (flows 16 and 09-activity-dark). With 60 s it
+    happened again in run 42565390013 (09-revo-attach): for two minutes the runner was loaded
+    (the app answered every look in 0.1 s; Maestro took 5–7 s over each tree it got, and the
+    simulator's status bar took 1.8 s instead of 0.12), so a swipe and a look took 20 s.
+  - So a long screen is scrolled by counted swipes: `repeat` while the row isn't visible, `scroll`,
+    at most so many times, then `scrollUntilVisible` only to centre it. Every Settings row goes
+    through `subflows/settings-row.yaml` (by id) or `subflows/theme.yaml` (Theme has none).
 - **Caches:** this workflow holds no release secrets, so it keeps `node_modules`, Maestro and the
   Firestore emulator's jar, as it keeps the native builds.
 
@@ -82,21 +95,27 @@ rules it covers in its first lines; recordings have no rule there yet.
 | Flow | What a user does | Rules |
 | --- | --- | --- |
 | `01-onboarding` | Sign up, onboarding, Home's first day; a cold start; past midnight | SCHED-1, SYNC-4, DAY-1 |
-| `02-revision-session` | Leave with nothing marked; swipe; Back; the check; the end card | SESS-1, SESS-2, SESS-3 |
+| `02-revision-session` | Leave with nothing marked; swipe; Back; the check; the end card; the tab bar is Home and Read | SESS-1, SESS-2, SESS-3, ACT-12 |
 | `03-revise-ahead` | Keep going; "Tomorrow starts at"; a day partly done ahead | AHEAD-1, -2, -3, -5, DAY-3, SESS-4 |
-| `04-fajr-boundary` | Settings → Start day at fajr; Home at 03:00 and 08:00; revise ahead and a note before Fajr | DAY-1, -2, -3, -5, AHEAD-1, LOG-3 |
-| `05-daily-log` | Two notes; one edited, the other deleted; each kept across a cold start | LOG-1, LOG-2 |
+| `04-fajr-boundary` | Settings → Start day at fajr; Home at 03:00 and 08:00; revise ahead and a note before Fajr (Activity's day, then its log) | DAY-1, -2, -3, -5, AHEAD-1, LOG-3 |
+| `05-daily-log` | Two notes (the first from Activity's day, +, which opens its log; the second in the log); one edited, the other deleted; each kept across a cold start | LOG-1, LOG-2, ACT-5 |
 | `06-offline` | A session offline; a cold start offline; back online, the server has it | SYNC-1, SYNC-2, SESS-3 |
-| `07-recordings` | Record in a session, find it in Activity, play, delete | none yet |
+| `07-recordings` | Record in a session, find it under Revised on Activity's day, play, delete | none yet |
 | `08-time-zone` | Kathmandu (UTC+5:45): the day turns at its midnight | DAY-1, DAY-6 |
 | `10-delete-account` | Settings → Delete account, confirmed twice: the account and its data leave the server, back at sign-in | ACCOUNT-1 |
-| `11-surah-names` | Every screen that names the Qur'an (Home, its › menu, Jump to, All activity, the schedule, the memorized pages, a session, the end card, the daily log), in light and then dark (`…-dark`). In the first job: after 04 the Android emulator has a location, and Home a prayer line | NAME-1 |
-| `14-help` | A tester: Home's ? opens How Home works, closes; Hide help buttons, Undo, hidden again; still hidden after a cold start; Settings → Support → Help buttons brings it back. In the second job | HELP-1, HELP-2 |
+| `11-surah-names` | Every screen that names the Qur'an (Home, its › menu, Jump to, All activity, the schedule, the memorized pages, a session, the end card, the daily log), in light and then dark (`…-dark`). No position, so Home has no prayer line | NAME-1 |
+| `14-help` | An account that isn't a tester: Home's ? opens How Home works, with no Ask Revo (Revo is for testers here), closes; Hide help buttons, Undo, hidden again; still hidden after a cold start; Settings → Support → Help buttons brings it back. In the second job | HELP-1, HELP-2 |
 | `16-whats-new` | A tester: Settings → About → What's new replays the cards with a ✕; Testing → Show What's new at launch runs them after a cold start, no ✕, Android's back to the card before; a relaunch part way reopens the card it was on; after Done it doesn't come back. In the first job | NEW-2, NEW-3 |
 
 Every account is new: signed up in the flow (`subflows/signup.yaml`) with Al-Fatihah and Juz 30
 memorized (24 pages) and 10 pages a day, so the days are 1, 582–590 | 591–600 | 601–604, 1, 582–586.
 The test clock starts on Tuesday, 3 November 2026.
+
+The phone has no position the app can see unless the flow sets one with `subflows/location.yaml`
+before its first launch: 04 (Chicago, for the Fajr times) and 06 on Android (as its screenshot was
+approved). Every other launch allows every permission but location, so a position an earlier flow
+left on the device never reaches a later flow's screens (#217's run 42687083053: 06's Chicago gave
+11's Home a prayer line). `scripts/e2e/__tests__/location.test.js` keeps every launch to it.
 
 ## Screenshots
 
@@ -148,7 +167,6 @@ node .maestro/visual/approve.mjs <run id>
 **No baselines on purpose** (`PENDING` in `screens.mjs`), being rebuilt by other sessions. Approve
 each once its boards match the approved mocks, then take it out of `PENDING`:
 - Activity (Overview, Day, Insights: `07-activity-recording`);
-- Insights' Smart Tracking intro (`02-smart-preview`);
 - Revo (`09-revo`'s `r1`…`r10`), **in all six variants**: Indigo, Crimson and Jade, each in light
   and dark (`r4-sheet`, `r4-sheet-dark`, `r4-sheet-crimson`, … `r4-sheet-jade-dark`), each
   against its own mock. Then unmask Revo's button on Home (`revoButton`).
@@ -262,6 +280,7 @@ The app's `Date` runs at an offset from the device's own clock (`src/lib/e2e/clo
 | `revisely://e2e/clock?at=2026-11-04T09:00Z` | that instant |
 | `revisely://e2e/clock?at=now` | the real clock again |
 | `revisely://e2e/network?offline=1` (`0`) | the E2E network off: the emulators unreachable (iOS) |
+| `revisely://e2e/update-ready` | as if an update had just downloaded: "A new update is ready" opens by itself, as on a tester's phone (`src/lib/e2e/updates.ts`; flow 17) |
 | `revisely://e2e/recordings?set=activity` | the Activity mocks' recordings, written into the signed-in account's folder (`src/lib/e2e/demoRecordings.ts`; iOS takes `e2eRecordings` at launch instead: `subflows/relaunch-recordings.yaml`) |
 
 - Time runs on from there, as on a phone; timers and animations use real time.

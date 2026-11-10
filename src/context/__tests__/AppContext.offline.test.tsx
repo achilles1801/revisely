@@ -71,6 +71,8 @@ jest.mock('../../services/firestoreService', () => {
     getUserFromServer: (...a: unknown[]) => mockService.getUserFromServer(...(a as [])),
     getAllPagesFromServer: (...a: unknown[]) => mockService.getAllPagesFromServer(...(a as [])),
     getRecentSessionsFromServer: (...a: unknown[]) => mockService.getRecentSessionsFromServer(...(a as [])),
+    // Pages logged by hand (ACT-16): every account has the Activity blocks, so the self-heal reads them.
+    getManualRevisionItems: async () => [],
   };
 });
 

@@ -168,8 +168,8 @@ beforeEach(async () => {
 });
 
 describe('the schedule’s help (HELP-1, HELP-3)', () => {
-  it('a tester gets a ? before Save; its sheet explains the cycle, and with Smart Tracking off a new plan has no weakest first', async () => {
-    Object.assign(mockApp, { user: { ...baseUser, previewTester: true, smartTrackingEnabled: false } });
+  it('a ? before Save; its sheet explains the cycle, and with Smart Tracking off a new plan has no weakest first', async () => {
+    Object.assign(mockApp, { user: { ...baseUser, smartTrackingEnabled: false } });
     await mount(<PlanEditScreen />);
     fireEvent.press(await screen.findByTestId('help-button-schedule'));
     expect(await screen.findByTestId('help-sheet-schedule')).toBeTruthy();
@@ -181,17 +181,21 @@ describe('the schedule’s help (HELP-1, HELP-3)', () => {
   });
 
   it('with Smart Tracking on, a new plan can put the weakest pages first', async () => {
-    Object.assign(mockApp, { user: { ...baseUser, previewTester: true, smartTrackingEnabled: true } });
+    Object.assign(mockApp, { user: { ...baseUser, smartTrackingEnabled: true } });
     await mount(<PlanEditScreen />);
     fireEvent.press(await screen.findByTestId('help-button-schedule'));
     expect(await screen.findByTestId('help-topic-schedule.new')).toBeTruthy();
     expect(screen.queryByTestId('help-topic-schedule.new.off')).toBeNull();
   });
 
-  it('no ? for an account that isn’t a tester', async () => {
-    await mount(<PlanEditScreen />);
-    await act(async () => {});
-    expect(screen.queryByTestId('help-button-schedule')).toBeNull();
+  it('[HELP-4] an account that isn’t a tester has the ? too, and so does a tester', async () => {
+    for (const user of [baseUser, { ...baseUser, previewTester: false }, { ...baseUser, previewTester: true }]) {
+      Object.assign(mockApp, { user });
+      await mount(<PlanEditScreen />);
+      await act(async () => {});
+      expect(screen.getByTestId('help-button-schedule')).toBeTruthy();
+      screen.unmount();
+    }
   });
 });
 
@@ -625,9 +629,10 @@ describe('memorized pages a custom plan doesn’t hold (MEM-6)', () => {
   const day = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   const range = (a: number, b: number) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
   // Pages 1–30 memorized, the plan holding 1–28; and An-Nas alone memorized on the last page.
-  const withPlan = (previewTester: boolean) => {
+  // An account that isn't a tester (previewTester unset): MEM-6 is everyone's since the November 2026 release.
+  const withPlan = (custom = true) => {
     Object.assign(mockApp, {
-      user: { ...baseUser, previewTester, customPlan: { days: [range(1, 10), range(11, 20), range(21, 28)], cycleStartDate: day, direction: 'forward' } },
+      user: { ...baseUser, customPlan: custom ? { days: [range(1, 10), range(11, 20), range(21, 28)], cycleStartDate: day, direction: 'forward' } : null },
       pages: [
         ...memorized,
         { ...memorized[0], pageNumber: 604, status: 'in_progress', verses: [114001, 114002, 114003, 114004, 114005, 114006] },
@@ -635,8 +640,8 @@ describe('memorized pages a custom plan doesn’t hold (MEM-6)', () => {
     });
   };
 
-  it('[MEM-6] a tester sees them, named by their ayahs, and adds them to tomorrow’s pages', async () => {
-    withPlan(true);
+  it('[MEM-6] an account that isn’t a tester sees them, named by their ayahs, and adds them to tomorrow’s pages', async () => {
+    withPlan();
     await mount(<PlanEditScreen />);
     expect(screen.getByText('Not in your plan')).toBeTruthy();
     expect(screen.getByText(/Al.Baqarah .* and An.Nas/)).toBeTruthy();
@@ -656,7 +661,7 @@ describe('memorized pages a custom plan doesn’t hold (MEM-6)', () => {
   });
 
   it('[MEM-6] as a day of its own, tomorrow: the cycle grows by a day', async () => {
-    withPlan(true);
+    withPlan();
     await mount(<PlanEditScreen />);
     fireEvent.press(screen.getByTestId('plan-not-in-plan'));
     await act(async () => {});
@@ -669,7 +674,7 @@ describe('memorized pages a custom plan doesn’t hold (MEM-6)', () => {
     expect(within(screen.getByTestId('plan-hero')).getByText('Repeats every 4 days')).toBeTruthy();
   });
 
-  it('[MEM-6] not for others, nor on the automatic schedule', async () => {
+  it('[MEM-6] not on the automatic schedule, which holds every memorized page', async () => {
     withPlan(false);
     await mount(<PlanEditScreen />);
     expect(screen.queryByText('Not in your plan')).toBeNull();

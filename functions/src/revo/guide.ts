@@ -6,7 +6,10 @@
  * - every rule id in BEHAVIOUR.md is in a section's `covers`, or in GUIDE_INTERNAL with a reason;
  * - every route in a section's `routes` is a screen in src/navigation/MainNavigator.tsx;
  * - every label in curly quotes (“Edit schedule”) is text the app shows, word for word (src/).
- * Change it in the same PR as the feature. Verified against the code on Nov 7 2026.
+ * Change it in the same PR as the feature. Verified against the code on Nov 9 2026, as of the release
+ * that opens Activity, memorizing by the ayah, help, What's new and every QuranEnc translation to
+ * everyone (recite mode and Settings → Testing stay testers'; searching the Qur'an, typed and by voice
+ * on an iPhone, opened to everyone on Nov 9 2026).
  *
  * Name parts of the Qur'an by surah and juz here too (the owner's rule); page numbers only where
  * the app itself shows them. Mark what only testers (previewTester accounts) see.
@@ -30,10 +33,10 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['NAME-1', 'REVO-25'],
     routes: ['Dashboard', 'ReadIndex', 'Activity', 'Settings'],
     text: lines(
-      '- The tab bar has Home and Read (swipe sideways between them). Testers have no Insights tab: Insights is in Activity.',
+      '- The tab bar has Home and Read (swipe sideways between them). Insights is in Activity.',
       '- Home’s top bar, on the right: a compass (the Prayer sheet: prayer times and the Qibla), a pulse icon (Activity) and a gear (Settings). A running timer shows on the left.',
       '- Home’s Today post: where today starts (e.g. "Starts at Al-Mujadila ›", or "Starts at Al-Hadid, ayah 4 ›" mid-surah) and how much it is. Tapping that line (its ›) opens a menu with “Jump to…” and “Edit schedule”. Under it, one button: “Start revision”, “Continue revision” or “Review session”. Then "… of the Quran memorized ›" with a dot per juz; its › opens the memorized pages. Then “Recent sessions” (the last three) and “See all”.',
-      '- Read tab: “Recent pages”, then every surah, grouped by juz. Tap one to open the reader.',
+      '- Read tab: “Search the Quran” under its title, “Recent pages”, then every surah, grouped by juz. Tap one to open the reader.',
       '- The app names parts of the Qur’an by surah and juz, never by page numbers: "Starts at Al-Hadid, ayah 4", "Al-Baqarah 84–101", "Juz 28". Page numbers show only as a quiet detail after the words (the header of today’s › menu), inside the reader and the session (the printed page), and where pages are chosen by number (the Page tab of “Jump to…”).',
       '- Revo: the round button at the bottom right of Home and of Activity (Overview, Insights, a day, See all, Pages by strength). There is no Revo on the Read tab (its list or the reader) or in a revision session, and their help has no “Ask Revo”.',
     ),
@@ -108,12 +111,12 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'Revising ahead',
-    covers: ['AHEAD-1', 'AHEAD-2', 'AHEAD-3', 'AHEAD-4', 'AHEAD-5'],
+    covers: ['AHEAD-1', 'AHEAD-2', 'AHEAD-3', 'AHEAD-4', 'AHEAD-5', 'AHEAD-6'],
     routes: ['ActiveRevision'],
     text: lines(
       '- Once today is done, Home shows a line like "Tomorrow starts at Al-Mulk"; tapping it opens the next day’s pages alone.',
-      '- On the end card, “Keep going” goes on to the next revision day’s pages not done yet, then the day after, up to the end of the cycle. A day already done ahead is passed over.',
-      '- A page revised ahead counts for the day it is planned on: that day then needs only the pages left, and is done when none are. Only pages actually revised (swiped or checked) count.',
+      '- On the end card, “Keep going” goes on to the next revision day’s pages not done yet, then the day after. It doesn’t stop at the end of the cycle: once the whole cycle is done, Keep going starts the next cycle from its first day (Home says "Next cycle starts at Al-Fatihah"), and goes on through it. Those pages count for the next cycle’s days, and show in Activity and Insights on the day they were revised. A day already done ahead is passed over.',
+      '- A page revised ahead counts for the day it is planned on: that day then needs only the pages left, and is done when none are. Only pages actually revised (swiped or checked) count. Coverage, the juz sheet and Pages by strength show it (and a page caught up) as revised on the day it was revised.',
     ),
   },
   {
@@ -138,8 +141,8 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
     ),
   },
   {
-    title: 'Memorizing by the ayah (testers)',
-    covers: ['MEM-1', 'MEM-2', 'MEM-3', 'MEM-4', 'MEM-5', 'MEM-6', 'REC-1', 'REC-2'],
+    title: 'Memorizing by the ayah',
+    covers: ['MEM-1', 'MEM-2', 'MEM-3', 'MEM-4', 'MEM-5', 'MEM-6', 'MEM-7', 'REC-1', 'REC-2', 'REC-3'],
     routes: ['ActivityDay', 'QuranReader', 'PlanEdit'],
     text: lines(
       '- What is memorized is kept by the ayah. A page is memorized when every ayah on it is; a page with some of them is partly memorized (a thin bar in the memorized pages). Adding a page’s last ayah makes it memorized.',
@@ -147,6 +150,8 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
       '- Add ayahs: Activity → + → “Memorized” → “Ayahs” (From and To), “Whole pages” or “Surah”; “From your reading” offers what was read today. Deleting a Memorized entry takes off only its ayahs.',
       '- A sitting in the reader: start the timer there (and the mic, to record), recite, then end the timer. Ending it also stops the recording; one note says what was saved, e.g. "Saved to today: Al-Mulk, ayahs 1–26, 41 min", with “View”. Stopping only the recording leaves the timer running.',
       '- On that day in Activity the sitting is under Read, named by the pages it held (e.g. "Al-Mulk, ayahs 1–26"; “Timed in Read” when none are known). If they aren’t all memorized it offers “Add to memorized”: the Memorized sheet opens on Ayahs, inside the sitting’s pages. Afterwards it stands under Memorized and says what finishes the page (e.g. "Al-Mulk 21–26 finishes the page"); Undo puts everything back.',
+      '- On today or yesterday, a sitting with nothing left to memorize on its pages, that held pages of that day’s revision not revised yet, offers “Add to revised” (e.g. "At-Taghabun is the 2 pages left of today’s revision"): it logs those pages for that day, as “Revised elsewhere” does.',
+      '- The juz sheet shows a juz being learned: a partly memorized page is filled by its memorized share, a surah reads what is memorized and what is to go ("Ayahs 1–20 · 21–30 to go"), the sheet says what is learned so far ("Al-Mulk 1–20 so far"), and its button continues at the first ayah not memorized ("Continue at Al-Mulk 21").',
       '- Memorized today, the block says when the pages first come up in the plan, with “Revise them tomorrow” and “Edit schedule”. A custom plan never adds new pages by itself: “Not in your custom plan yet” with “Add to your plan”, and in “Edit schedule” the list “Not in your plan” with “With tomorrow’s pages” or “As a day of its own, tomorrow” (then Save).',
     ),
   },
@@ -156,7 +161,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
     routes: ['Activity', 'ActivityDay', 'ActivityAll', 'JournalEntry', 'ListenBack', 'QuranReader'],
     text: lines(
       '- Activity (Home’s pulse icon, or Settings → Activity → “Activity”): everything done, day by day, on the revision day it was done: sessions, pages revised ahead (listed on the day they were revised), timed readings and sittings, recordings, memorized ayahs and notes.',
-      '- Testers: two tabs at the top, “Overview” and “Insights”. Overview is a calendar: the chip beside its title (“Month” or “Week”, with ⌄) switches between the two, and the choice is kept on the phone. ‹ › step back and on; “Today” appears when another month or week is showing and brings today back. Each day has a ring for how much of its pages was revised, and dots for memorized, read and a note.',
+      '- Two tabs at the top, “Overview” and “Insights”. Overview is a calendar: the chip beside its title (“Month” or “Week”, with ⌄) switches between the two, and the choice is kept on the phone. ‹ › step back and on; “Today” appears when another month or week is showing and brings today back. Each day has a ring for how much of its pages was revised, and dots for memorized, read and a note.',
       '- Tap a day: a preview under the calendar shows its date with “Open” and a row each for Revised, Memorized, Read and Notes. Tapping anywhere on the preview opens that day, at the block tapped.',
       '- A day: its Revised, Memorized, Read and Notes blocks and its recordings. The Revised block has a strip of the day’s pages (revised, skipped or not reached), its ends named by surah; tap a page to open it in the reader, and back returns to the day. Under the strip: the pages’ strength with Smart Tracking, or else what the strip shows (e.g. "18 revised · 2 skipped"). Tapping the Revised block’s header opens the juz most of its pages were in, in the juz sheet (see Insights).',
       '- The + adds, for today and yesterday: “Revised elsewhere” (that day’s pages not revised yet, all ticked; untick the ones not done; they count on Home and for the streak), “Memorized” and “Note”. An older day’s + adds a note only. Reading is logged by the reader itself.',
@@ -167,11 +172,11 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'Insights and page strength',
-    covers: ['ACT-4', 'ACT-8', 'ACT-12', 'ACT-16', 'ACT-19', 'ACT-21', 'ACT-22', 'ACT-23', 'ACT-24'],
+    covers: ['ACT-4', 'ACT-8', 'ACT-12', 'ACT-16', 'ACT-19', 'ACT-21', 'ACT-22', 'ACT-23', 'ACT-24', 'ACT-25', 'ACT-26'],
     routes: ['Activity', 'ActivityDay', 'PagesByStrength', 'QuranReader'],
     text: lines(
-      '- Testers: Activity → “Insights”. One range for the whole tab, from the chip at the end of the Overview | Insights row ("30 days ⌄" at first): “7 days”, “30 days”, “3 months” or “All time” (since the account’s first day). It is kept on the phone; a range longer than the account counts from its first day.',
-      '- “Coverage”: a tile per juz (“This week”, “This month”, “30+ days”, “Not memorized”) and the share of memorized pages revised in the range. Tap the figure for what wasn’t revised (e.g. "Not revised in 30 days"), a row per juz or run of pages. The "Juz 4, untouched the longest" row: tap it for that juz; “Plan it” puts it first tomorrow, for that day only, on every plan; on a custom plan, “Add to plan” under “First tomorrow” then opens tomorrow’s day of the plan with those pages added, kept every cycle once the plan is saved.',
+      '- Activity → “Insights”. One range for the whole tab, from the chip at the end of the Overview | Insights row ("30 days ⌄" at first): “7 days”, “30 days”, “3 months” or “All time” (since the account’s first day). It is kept on the phone; a range longer than the account counts from its first day.',
+      '- “Coverage”: the share of memorized pages revised in the range, and the memorized pages by “Juz”, “Surah” or “Page” (kept on the phone), each “This week”, “This month”, “30+ days” or “Not memorized”. A page memorized but not revised is “Not revised yet” for its first 30 days, never 30+ days. A juz or surah fills by the share of its pages revised. Surah: a header per juz, tapped for its surahs; a surah opens its juz’s sheet. Page: a cell per page, opening the reader. Tap the figure for what wasn’t revised (e.g. "Not revised in 30 days"), a row per juz or run of pages. The "Juz 4, untouched the longest" row: tap it for that juz; “Plan it” puts it first tomorrow, for that day only, on every plan; on a custom plan, “Add to plan” under “First tomorrow” then opens tomorrow’s day of the plan with those pages added, kept every cycle once the plan is saved.',
       '- The juz sheet (from a Coverage tile, the untouched row, or a day’s Revised block): the juz named by its surahs, when it was last revised and on how many days in the last 30, a strip of its pages and a row per surah. Tap a page, a row or “Open in the reader” to read it there; a juz left too long offers “Plan it for tomorrow first”.',
       '- “Consistency”: days with a revision or a read in the range, and the minutes by hour (press and slide along the hour bars to read each hour). A day’s circle opens that day; the figure opens Overview at its month. At 3 months: a weeks grid and, if there is one, the missed days’ pattern ("Every missed day was a Saturday").',
       '- “Memorization”: pages memorized each month; tap a month’s bar for that month’s memorizations, each opening its day. “Pace”: minutes per page, shown from ten timed items, against the same length before; tap its "From 24 timed revisions ›" line for each one.',
@@ -187,20 +192,30 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
     text: lines(
       '- Read tab → a surah, or “Recent pages” → the reader. Tap the page for the controls; swipe to turn pages; the bar at the bottom moves through the mushaf.',
       '- Hold a verse: “Play”, “Translation”, “Copy”, “Share”. “Translation” shows the verse in Arabic and in the chosen translation, exactly as its publisher gives it, with its footnotes and its credit (who translated it, the version and where it comes from) under it; ‹ › move between verses.',
-      '- Changing the translation: in the translation sheet, ⋯ at the top right → “Select translation”. Everyone has Saheeh International (offline once downloaded with the offline mushaf) and The Clear Quran (needs the internet, unless read before). Testers can choose from 76 translations in 56 languages, among them Urdu, Indonesian, Turkish, French, Spanish, German, Persian, Hindi, Chinese, Hausa, Swahili and Portuguese: the list shows “Selected”, “Favorites”, “Downloaded”, then every language; search a language, in English or its own name, or a translator. Urdu, Persian, Kurdish, Pashto and Uyghur read right to left. A translation is kept on the phone once read, and stays at its latest version.',
-      '- Testers, favorites and offline translations: the star on a translation adds it to “Favorites” (kept on this phone); “Edit” moves favorites up or down, takes a star away, and deletes downloads. Each translation shows its size; its download button downloads it whole (it can be stopped, and carries on later), the bin removes it, and downloaded ones are listed under “Downloaded” and read offline. Offline, a translation that isn’t downloaded says so and offers one of that surah that is on the phone (the same language first, then Saheeh International). Saheeh International downloads with the offline mushaf.',
+      '- Changing the translation: in the translation sheet, ⋯ at the top right → “Select translation”. There are 76 translations in 56 languages, among them Saheeh International (the default; offline once downloaded with the offline mushaf), Urdu, Indonesian, Turkish, French, Spanish, German, Persian, Hindi, Chinese, Hausa, Swahili and Portuguese, and The Clear Quran (needs the internet, unless read before). The list shows “Selected”, “Favorites”, “Downloaded”, then every language; search a language, in English or its own name, or a translator. Urdu, Persian, Kurdish, Pashto and Uyghur read right to left. A translation is kept on the phone once read, and stays at its latest version.',
+      '- Favorites and offline translations: the star on a translation adds it to “Favorites” (kept on this phone); “Edit” moves favorites up or down, takes a star away, and deletes downloads. Each translation shows its size; its download button downloads it whole (it can be stopped, and carries on later), the bin removes it, and downloaded ones are listed under “Downloaded” and read offline. Offline, a translation that isn’t downloaded says so and offers one of that surah that is on the phone (the same language first, then Saheeh International). Saheeh International downloads with the offline mushaf.',
       '- The player bar: ▶ plays from this page; the reciter’s name picks the reciter; the options icon opens “Audio Options”: “Reciter”, “Playback speed” (0.25× to 2×), “From” and “To” (surah and ayah), “Play up to” (Page, Surah, Juz’ or Custom), “Repeat” (loop, or 1 to 10 times) and “Pause after each verse”. While playing: stop, speed, previous and next verse, pause.',
       '- Reciters: Al-Husary, Al-Minshawi, Abdul Basit, Alafasy, As-Sudais, Ash-Shuraim, Al-Muaiqly, Al-Ghamdi, Al-Ajamy, Ash-Shatri, Al-Hudhaify, Muhammad Ayyub, Al-Tablawi, Ad-Dossari. The reciter follows the account; speed, repeat, pause and Play up to are kept on the phone.',
       '- Recitation goes on after leaving the reader (a mini player above the tab bar: pause, ✕ to stop, › back to the reader), in the background and with the phone locked. It streams, so it needs the internet.',
     ),
   },
   {
-    title: 'Searching the Qur’an (testers)',
+    title: 'Searching the Qur’an',
     covers: ['SEARCH-1', 'SEARCH-2'],
     routes: ['ReadIndex', 'QuranSearch', 'QuranReader'],
     text: lines(
-      '- Testers: the Read tab has “Search the Quran” under its title and, on an iPhone, a mic beside it. Recite a few words of an ayah, or type them in Arabic, and the ayat that hold them are listed: from the middle of an ayah too, even with a word misheard; a phrase in several ayat lists every one. Typing a surah (Yunus, or its Arabic name), an ayah (2:255, Yunus 16), a page (page 62) or a juz (juz 30) goes there. A result opens the reader at the ayah, highlighted.',
-      '- Searching by voice needs the speech model, offered the first time (a one-time download); it listens on the phone, and the voice isn’t recorded or sent. On Android, typing only. For anyone else it isn’t in the app yet: the closest is the Read tab’s list of surahs, or “Jump to…” to start today there.',
+      '- Everyone: the Read tab has “Search the Quran” under its title. Type a few words of an ayah in Arabic (with or without vowel marks) and the ayat that hold them are listed: from the middle of an ayah too, even with a word misspelled; a phrase in several ayat lists every one. Typing a surah (Yunus, or its Arabic name), an ayah (2:255, Yunus 16), a page (page 62) or a juz (juz 30) goes there. A result opens the reader at the ayah, highlighted.',
+      '- On an iPhone there is also a mic beside it: recite a few words and the ayah is found the same way. The first time, it offers the speech model (a one-time download of 57 MB, started by a tap; Settings → Revision → “Speech model” shows or deletes it), and the iPhone asks for the microphone. It listens on the phone: the voice isn’t recorded or sent. Microphone refused: turn it on in the iPhone’s Settings → Revisely. On Android, type the words.',
+    ),
+  },
+  {
+    title: 'Help and What’s new',
+    covers: ['HELP-1', 'HELP-2', 'HELP-3', 'HELP-4', 'NEW-1', 'NEW-2', 'NEW-3'],
+    routes: ['Settings'],
+    text: lines(
+      '- Screens that need explaining have a ?: Home (at the right of the Today post’s header), the schedule editor (before Save), the reader (a round button at the right of its header), a session (the last row of its ⋯ menu, “How a session works”), Activity (in its top bar before search, for the tab on show) and a day (before +). It opens up to four short topics, then “Ask Revo” (not in the reader’s or a session’s help), “Hide help buttons” and Done.',
+      '- The ? buttons are on unless hidden: “Hide help buttons” hides every one at once on this phone, and Settings → Support → “Help buttons” brings them back. With Smart Tracking off, help says nothing about ratings or strength.',
+      '- After an update with something new, a short walkthrough opens once before Home: Next on each card, Done on the last; it can’t be skipped, and another phone won’t show it again. Settings → About → “What’s new” shows it again any time.',
     ),
   },
   {
@@ -216,13 +231,14 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'Offline and other phones',
-    covers: ['SYNC-1', 'SYNC-2', 'SYNC-3', 'SYNC-5', 'ACCOUNT-1'],
+    covers: ['SYNC-1', 'SYNC-2', 'SYNC-3', 'SYNC-5', 'ACCOUNT-1', 'UPD-1'],
     routes: ['Settings'],
     text: lines(
       '- Everything works offline from the copy on the phone: changes are saved on the phone and sent in order once back online, and Home shows “Offline”. Pages not downloaded or opened before need the internet, so download the offline mushaf (below) to read and revise anywhere. Another phone signed in to the account sees changes once sent. The same day revised on two phones offline keeps every page.',
       '- The first setup on a phone needs the internet, and so do Revo, recitation, The Clear Quran (unless read before) and a day of the daily log not opened before.',
       '- Offline mushaf: Settings → Mushaf → “Offline mushaf” → “Download now”: every page, the Arabic text and Saheeh International (up to about 250 MB). Wi-Fi only unless “Download over mobile data”; it downloads while the app is open and carries on where it stopped. “Remove from this phone” deletes it.',
       '- “Delete account” (the end of Settings, confirmed twice) deletes the account and everything in it; it needs the internet.',
+      '- Updates come by themselves: “A new update is ready” → “Update now” or “Later”.',
     ),
   },
   {
@@ -238,14 +254,14 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'Settings, section by section',
-    covers: [],
+    covers: ['REVO-39'],
     routes: ['Settings'],
     text: lines(
       '- Account: display name. Activity: “Activity”, “Recordings”, “Back up recordings”, “Time in app”, “Memorized pages”. Home screen: “Next prayer”, “Friday Al-Kahf reminder”. Prayer: as above.',
-      '- Revision: “Smart Tracking” (rate pages, Insights), “Keep daily amount”, and for testers on an iPhone “Speech model”.',
-      '- Revo AI: Revo on or off, “Memory”, “Delete conversations”.',
+      '- Revision: “Smart Tracking” (rate pages, Insights), “Keep daily amount”, and on an iPhone “Speech model” (searching by voice; for testers, the hidden page too).',
+      '- Revo AI: Revo on or off, “What Revo can do” (Revo’s short introduction, which also plays before Revo is first turned on; Skip ends it), “Memory”, “Delete conversations”.',
       '- Mushaf: “Mushaf”, “Offline mushaf”, “Download over mobile data”. Notifications: “Enable notifications” (revision reminders: 8:00 AM, after Asr, and an hour before the day ends, while today isn’t done; there is no setting for their times). Appearance: “Theme” (Light or Dark) and “Accent” (Indigo, Crimson or Jade).',
-      '- Support: “Share Revisely”, “Send feedback”, “Report a problem”, “Contact support”. About: “Privacy Policy”, “Terms of Service”, the version.',
+      '- Support: “Share Revisely”, “Send feedback”, “Report a problem”, “Contact support”, “Help buttons”. About: “What’s new”, “Privacy Policy”, “Terms of Service”, the version.',
       '- Testing (testers only): “Reset my data”, “Load test scenario”. Then “Sign out” and “Delete account”.',
       '- iPhone widgets (Home Screen and Lock Screen): Today, Verse of the day, Qibla and Prayer times, added like any widget. Android has none yet.',
     ),
@@ -255,14 +271,13 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['RESET-2', 'RESET-3'],
     routes: ['Settings'],
     text: lines(
-      '- Testers (TestFlight or Google Play testing, marked by the Revisely team) get Activity’s Overview, Insights and + menu, Settings → Testing, the hidden page in sessions (the eye button at the top, with the Madani 1405 mushaf: recite from memory; following the recitation word by word needs “Speech model” on an iPhone), and updates early.',
+      '- Testers (TestFlight or Google Play testing, marked by the Revisely team) get Settings → Testing, the hidden page in sessions (the eye button at the top, with the Madani 1405 mushaf: recite from memory; following the recitation word by word needs “Speech model” on an iPhone), and updates early.',
       '- “Reset my data” (type RESET): a backup is kept, then the account starts again as new, still signed in; not again within 10 minutes. “Load test scenario” replaces the data with a ready-made situation the same way.',
-      '- Updates come by themselves: “A new update is ready” → “Update now” or “Later”.',
     ),
   },
   {
     title: 'Revo itself',
-    covers: ['REVO-1', 'REVO-2', 'REVO-3', 'REVO-5', 'REVO-7', 'REVO-8', 'REVO-9', 'REVO-10', 'REVO-20', 'REVO-21', 'REVO-22', 'REVO-23', 'REVO-30', 'REVO-31', 'REVO-32', 'REVO-33', 'REVO-34', 'REVO-35', 'REVO-36', 'REVO-37', 'REVO-38'],
+    covers: ['REVO-1', 'REVO-2', 'REVO-3', 'REVO-5', 'REVO-7', 'REVO-8', 'REVO-9', 'REVO-10', 'REVO-20', 'REVO-21', 'REVO-22', 'REVO-23', 'REVO-30', 'REVO-31', 'REVO-32', 'REVO-33', 'REVO-34', 'REVO-35', 'REVO-36', 'REVO-37', 'REVO-38', 'REVO-40'],
     routes: ['Settings', 'ActivityDay', 'PagesByStrength'],
     text: lines(
       '- Its first line is about where it was opened: from a day in Activity, that day (and the day goes with the question; × takes it off); from Overview, the month so far; from Insights, what stands out; from Weak spots or Pages by strength, the weak pages; from a juz’s “Ask”, that juz (it goes with the question too). From Home, today.',
@@ -270,6 +285,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
       '- + opens “Add to chat”: search a surah, a juz, ayahs, a day or a page, or pick from Surahs, Juz, Days (a month: tap a day, then “Add day”) and Pages; up to six go with one question, and a day goes with its daily-log notes. Revo answers about them from their figures (how often revised, what was missed, weak spots, what’s next; a day’s plan, minutes and notes). History keeps the conversations; Memory keeps up to 30 short facts (delete one, clear them, or turn memory off). A Day in review comes once, from the evening, on a day something was done.',
       '- Revo can’t change anything itself: a suggestion happens only when tapped (“Add to my plan” puts pages first in tomorrow’s session; a card can also open a screen, such as Jump to… or a Settings section). It answers how-to questions from this guide. It needs the internet.',
       '- Its charts answer a touch: tap a bar, dot, tile or row (or slide along the bars) to see that day or passage, then “Open in Activity”, “Open in the reader” or “Revise first tomorrow” (only when tapped). A second tap or × puts it back; a table sorts by the heading tapped. The grey bar behind a day is its plan.',
+      '- It may notice a pattern in the last days and say so, with one idea: catching up on missed days, revising far ahead, revising late at night, or a steady run. At most one, only when it fits the question, and most answers mention none.',
       '- With Smart Tracking off (Settings → Revision), Revo and its charts say nothing about ratings or strength: they show when each part was last revised and how often.',
       '- Settings → Revo AI → off deletes its conversations and memory.',
     ),
@@ -281,7 +297,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
     text: lines(
       '- Revising one juz backwards while the rest goes forward: there’s no such option, because “Reverse order” turns the whole plan backwards, not one juz. Closest: “Create new plan” → “Balanced” → “Reverse order” on → “Today starts at” → that juz → Apply → Save: today starts at the juz’s end and goes back page by page, and the days after carry on backwards into the juz before it. (“By Juz” with “Reverse order” puts the juz in reverse order, each juz’s pages in their usual order.)',
       '- A plan of whole surahs made for you: there is no surah mode (only pages, juz, or weakest). Closest: in “Edit schedule”, tap a day → “Add or remove content” → Surahs; or “Jump to…” → Surah.',
-      '- Revising a passage as a session without touching the plan: no. Closest: “Jump to…” (moves today’s start), or read it in the reader with the timer, and (testers) log it with Activity → + → “Revised”.',
+      '- Revising a passage as a session without touching the plan: no. Closest: “Jump to…” (moves today’s start), or read it in the reader with the timer, and log it with Activity → + → “Revised elsewhere”.',
       '- Pausing the plan for a holiday: there’s no pause, and missed days don’t pile up: the plan follows the calendar, and their pages are offered for three days. Back from the trip, “Jump to…” picks up where you stopped. (Rest days come round every cycle, so they aren’t a pause.)',
       '- Getting a streak back after two missed days, catching up days older than three, or moving a session to another day: no.',
       '- Following the phone’s light or dark setting, choosing reminder times, translations in Bengali, Russian, Malay, Korean or Italian, tafsir, a tajweed mushaf, recitation offline, sharing progress with a teacher, exporting data, several active plans at once (one is active; others can be saved), Android widgets: not yet.',
@@ -291,19 +307,10 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
 
 /** Rules with nothing for a user to ask Revo about, on purpose, and why. */
 export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
-  'HELP-1': 'the help buttons (testers); the guide gets them with its next re-record',
-  'HELP-2': 'hiding the help buttons (testers); the guide gets it with its next re-record',
-  'HELP-3': 'the help follows Smart Tracking (testers); the guide gets it with its next re-record',
-  'ACT-25': 'Coverage’s “Not revised yet” (a fresh page is never 30+ days); the guide gets it with its next re-record',
-  'ACT-26': 'Coverage’s Juz, Surah and Page views and the fill by share; the guide gets them with its next re-record',
-  'AHEAD-6': 'pages revised ahead are revised that day for Coverage and recency (Revo’s facts already read them so); the guide gets it with its next re-record',
-  'HELP-4': 'the help buttons are on by default (testers); the guide gets it with its next re-record',
-  'NEW-1': 'the What\'s new walkthrough ships switched off; the guide gets it, with Settings → About → What\'s new, at the release\'s re-record',
-  'NEW-2': 'the walkthrough itself; the guide gets it at the release\'s re-record',
-  'NEW-3': 'the replay in Settings; the guide gets it at the release\'s re-record',
+  'ACT-27': 'Activity refreshes by itself and with a pull; nothing to ask Revo about',
   'NEW-4': 'what waits for the walkthrough; nothing for Revo to explain',
-  'REVO-39': 'Revo\'s moment before its opt-in, and Settings → Revo AI → What Revo can do (testers); the guide gets them at the release\'s re-record',
   'ONBOARD-2': 'the server repairs a sign-up stopped half way; nothing to do',
+  'SHEET-1': 'one sheet at a time, so the screen under them always takes taps again; nothing for Revo to explain',
   'SYNC-4': 'a new account loads with no relaunch; nothing to do',
   'ACCOUNT-2': 'the sign-in screen keeps what was typed after a failed attempt; Revo is for signed-in users',
   'ACCOUNT-3': 'how long Delete account waits for the server; the app says what happened itself',
@@ -320,10 +327,6 @@ export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
   'REVO-24': 'the sheet’s layout with the keyboard',
   'REVO-26': 'how Revo’s context is built',
   'REVO-27': 'how Revo words its answers (its tone, in the prompt)',
-  // Not in the guide's sections yet: their words would change Revo's system prompt, so they come with the
-  // next recording of Revo's replies (functions/scripts/record-anthropic.js).
-  'REC-3': 'a sitting’s Add to revised on the Day (testers; Memorizing by the ayah’s section, next recording)',
-  'MEM-7': 'the juz sheet’s look for a juz being learned (testers; Memorizing by the ayah’s section, next recording)',
 };
 
 /** The guide as Revo reads it. */

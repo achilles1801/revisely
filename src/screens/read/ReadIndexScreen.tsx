@@ -9,7 +9,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { useApp } from '../../context/AppContext';
-import { canSearchByVoice, quranSearchEnabled } from '../../lib/search/availability';
+import { quranSearchEnabled, voiceSearchEnabled } from '../../lib/search/availability';
 import { arabicV2, layoutV2, typeV2 } from '../../theme/v2';
 import { Mark } from '../../components/v2/Mark';
 import { Tap } from '../../components/v2/Tap';
@@ -75,9 +75,9 @@ export default function ReadIndexScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { isDark, palette: v2Palette } = useTheme();
   const { user } = useApp();
-  // Search the Qur'an, typed or recited (testers).
+  // Search the Qur'an: typed for everyone, recited too on an iPhone that can listen.
   const searchOn = quranSearchEnabled(user);
-  const voiceSearch = searchOn && canSearchByVoice();
+  const voiceSearch = searchOn && voiceSearchEnabled(user);
   // Room for the tab bar (and the mini player). Revo's button isn't on the Read tab (REVO-25).
   const tabFootprint = useTabBarFootprint();
 

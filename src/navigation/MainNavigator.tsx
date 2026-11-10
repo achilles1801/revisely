@@ -49,7 +49,8 @@ export type MainTabParamList = {
 export type HomeStackParamList = {
   Dashboard: undefined;
   // aheadDay: open with that later revision day's pages after today's (Home's "starts at" line).
-  ActiveRevision: { aheadDay?: string } | undefined;
+  // round: that day repeats today's pages (the cycle has come round, AHEAD-3): it opens alone, a new round.
+  ActiveRevision: { aheadDay?: string; round?: boolean } | undefined;
   // section: scroll to that section (Revo's openScreen, REVO-31).
   Settings: { section?: RevoSettingsSection } | undefined;
   // edit: open with the pages ready to edit (Home's Memorized line). focusPages: open at those pages

@@ -8,7 +8,6 @@ import { startMicStream } from '../../lib/recite/micSource';
 import { closeSpeechEngine, openSpeechEngine } from '../../lib/recite/speechEngine';
 import { downloadedModelPath } from '../../lib/recite/speechModel';
 import { useSpeechModelState } from '../../lib/recite/speechModelStore';
-import { canSearchByVoice } from '../../lib/search/availability';
 import { VoiceQuery } from '../../lib/search/voiceQuery';
 
 /**
@@ -25,10 +24,10 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * time), and what is said goes to `onHeard` as text once the speaker pauses or
  * `stop()` is called. Words heard so far are in `partial`. Needs the speech model
  * (`needsModel`: show the download sheet first). Stops in the background and when the
- * screen goes.
+ * screen goes. `enabled` is `voiceSearchEnabled(user)`: when false, nothing listens.
  */
-export function useVoiceSearch(onHeard: (text: string) => void) {
-  const available = canSearchByVoice();
+export function useVoiceSearch(onHeard: (text: string) => void, enabled: boolean) {
+  const available = enabled;
   const model = useSpeechModelState();
   const [status, setStatus] = useState<VoiceSearchStatus>('idle');
   const [partial, setPartial] = useState('');

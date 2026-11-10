@@ -5,6 +5,9 @@ import ActivityDayScreen from '../ActivityDayScreen';
 import { getRevisionDayForUser } from '../../../lib/fajrBoundary';
 import type { ReadingSession, RevisionLog, User } from '../../../types';
 
+// Activity as it was before its blocks: what lib/activityBlocks falls back to if it is ever gated again.
+// Every account has the blocks since the November 2026 release; components/activity/__tests__ test them.
+jest.mock('../../../lib/activityBlocks', () => ({ activityBlocksEnabled: () => false }));
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
 jest.mock('react-native-reanimated', () => require('react-native-reanimated/mock'));
 jest.mock('expo-haptics', () => ({

@@ -1,8 +1,9 @@
 // "What's new" after the update (BEHAVIOUR.md NEW-1 to NEW-4): the real RootNavigator deciding what
 // opens, the real account (onboarding writes `whatsNewSeen`, Done marks it, the rules allow it), and
-// the phone's own storage across launches. The release ships switched off, so a launch here switches
-// it on for that launch (lib/whatsNew/due setWhatsNewLiveForTests), as the release PR's one line will.
+// the phone's own storage across launches. The November 2026 release is switched on; a launch here can
+// switch it off for that launch (lib/whatsNew/due setWhatsNewLiveForTests), as it was before it shipped.
 import type { ReactElement } from 'react';
+import { CURRENT_RELEASE } from '../../../src/lib/help/whatsNew';
 import { setNow, setZone, ZONES } from '../harness/clock';
 import { markPreviewTester } from '../harness/admin';
 import { newAccount, pagesRange } from '../harness/account';
@@ -11,10 +12,10 @@ import { Booted, OpenApp, Phone } from '../harness/phone';
 
 const RELEASE = '2026-11';
 
-/** The app as it starts, with the release switched on (or as it ships, off). */
+/** The app as it starts, with the release switched on (as it ships, since Nov 2026) or off (before). */
 function launch(live: boolean) {
   return (mods: Booted): ReactElement => {
-    mods.require<typeof import('../../../src/lib/whatsNew/due')>('src/lib/whatsNew/due').setWhatsNewLiveForTests(live ? true : undefined);
+    mods.require<typeof import('../../../src/lib/whatsNew/due')>('src/lib/whatsNew/due').setWhatsNewLiveForTests(live);
     const { RootNavigator } = mods.require<any>('src/navigation/RootNavigator');
     return mods.React.createElement(RootNavigator);
   };
@@ -48,11 +49,10 @@ class WhatsNew {
 }
 
 /**
- * An account set up on an app from before the release: no `whatsNewSeen` on its user document. A
- * tester unless said otherwise, so every card's feature is open to it, as it will be to everyone once
- * the release makes them public.
+ * An account set up on an app from before the release: no `whatsNewSeen` on its user document. An App
+ * Store account (not a tester) unless said otherwise: the release makes every card's feature everyone's.
  */
-async function accountFromBefore(phone: Phone, { tester = true } = {}): Promise<string> {
+async function accountFromBefore(phone: Phone, { tester = false } = {}): Promise<string> {
   const app = await newAccount(phone, { memorized: pagesRange(562, 604) });
   const uid = app.uid;
   expect((await getServerDoc(`users/${uid}`))?.whatsNewSeen).toBe(RELEASE);
@@ -103,17 +103,22 @@ it('[NEW-1] an account set up before the release sees it once after the update; 
   await app.close();
 });
 
-it('[NEW-1] a card shows only when the account has what it describes', async () => {
+it('[NEW-1] a card shows only when the account has what it describes: an App Store account has every one but Revo’s while Revo is for testers', async () => {
   const phone = new Phone('everyone');
-  await accountFromBefore(phone, { tester: false });
+  await accountFromBefore(phone);
   const app = await open(phone);
   const wn = new WhatsNew(app);
-  // Today the Activity blocks, sittings, Revo, help and the translations are testers': only the
-  // last card is left, with its offline row.
+  // The Activity blocks, sittings, help and every translation are everyone's; Revo follows its own
+  // switch (config/app.revo, unset here: testers).
+  const shown = CURRENT_RELEASE.cards.filter((c) => c.needs !== 'revo').map((c) => c.title);
   expect(wn.mode()).toBe('required');
-  expect(wn.title()).toBe('Also new');
-  expect(app.screen.getByTestId('whats-new-row-offline')).toBeTruthy();
-  expect(app.screen.queryByTestId('whats-new-row-help')).toBeNull();
+  const seen = [wn.title()];
+  while (app.screen.queryByTestId('whats-new-next')) {
+    await wn.next();
+    seen.push(wn.title());
+  }
+  expect(seen).toEqual(shown);
+  for (const row of ['help', 'translations', 'offline']) expect(app.screen.getByTestId(`whats-new-row-${row}`)).toBeTruthy();
   await wn.finish();
   await app.until(() => wn.mode() === null, 'the main screens');
   await app.close();
@@ -177,7 +182,7 @@ it('[NEW-3] Settings shows it again and changes nothing; a tester’s Show What�
   await app0.until(() => app0.app.user?.previewTester === true, 'the tester flag');
   await app0.close();
 
-  // As it ships (switched off): Home, and in Settings the testers' two rows.
+  // With the release switched off (as before it shipped): Home, and in Settings the testers' two rows.
   let app = await open(phone, false);
   expect(new WhatsNew(app).mode()).toBeNull();
   const { fireEvent } = app.mods.rtl;

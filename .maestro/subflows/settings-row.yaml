@@ -1,0 +1,36 @@
+# Settings (open), down to the row with id ROW, centred: found at the screen's foot, a row can sit
+# under the tab bar, which takes the tap (14's first run, Nov 8 2026, tapped Read instead).
+# Swipes first, counted, not timed: Settings is a few screens long, and a swipe and a look take 4–6 s
+# on the iOS runner, 20 s while the runner is loaded (09-revo-attach in #328's run 42565390013: a
+# 60 s scrollUntilVisible held three swipes, and the row came into view as it ran out). The rows a
+# flow wants are within 12. Then the centring, a swipe or two.
+#   env ROW
+appId: com.revisionbuddy.app
+---
+- repeat:
+    while:
+      notVisible:
+        id: ${ROW}
+    times: 12
+    commands:
+      - scroll
+- scrollUntilVisible:
+    element:
+      id: ${ROW}
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+# Still before the flow taps the row: the centring swipe's momentum can carry the list on after Maestro
+# has aimed. 14's tap on Help buttons came 0.5 s after it ("null settle after a scroll"), with the switch
+# drifting up under the header (y 90–118), and the switch stayed off (#217's run 42687083053 and #496's
+# 42727081470, the same step both times). Then centred again if it drifted, and still again.
+- waitForAnimationToEnd:
+    timeout: 5000
+- scrollUntilVisible:
+    element:
+      id: ${ROW}
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 5000

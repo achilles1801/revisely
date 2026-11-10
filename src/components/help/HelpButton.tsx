@@ -29,7 +29,7 @@ export function useHelpSheet(screen: HelpScreen, opts: { recite?: boolean } = {}
 }
 
 /**
- * A screen's ? (HELP-1): opens its help sheet. Shown to testers until they hide the buttons
+ * A screen's ? (HELP-1): opens its help sheet. Shown to every account until its user hides the buttons
  * (HELP-2). It sits where the screen has room: Home's Today post header, a top bar before its
  * action. Pair it with <HelpToast screen=…> at the screen's root, which says so when it's hidden.
  * `render` draws it another way (the reader's round button); `placeholder` holds its room when it's

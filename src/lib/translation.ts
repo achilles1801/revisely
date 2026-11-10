@@ -23,7 +23,7 @@
 //   says so (pointing to Saheeh International when that is on the phone).
 // - Every other translation in QuranEnc's list (src/data/quranencCatalogue.json, lib/quranenc), on
 //   the same terms as Saheeh International: kept as read, downloadable whole, credited with QuranEnc's
-//   own description, QuranEnc.com and the version shown. Offered to testers first (offeredTranslations).
+//   own description, QuranEnc.com and the version shown. Offered to every account (offeredTranslations).
 // One that is not `available` is shown in the picker as unavailable.
 
 import { Platform } from 'react-native';
@@ -60,8 +60,6 @@ export interface TranslationInfo {
   key?: string;
   /** About how many bytes the whole translation takes on the phone (QuranEnc's). */
   bytes?: number;
-  /** Offered in the picker to testers only, for now (offeredTranslations). */
-  testersOnly?: boolean;
   available: boolean;
   /** Required attribution, shown with the text and in the picker. */
   credit: Credit;
@@ -144,7 +142,6 @@ function fromCatalogue(e: QuranEncEntry): TranslationInfo {
     source: 'quranenc',
     key: e.key,
     bytes: e.bytes,
-    testersOnly: true,
     available: true,
     credit: { text: credit, linkLabel: 'QuranEnc.com', url: quranEncPageUrl(e.key) },
   };
@@ -158,9 +155,12 @@ export const QURANENC_TRANSLATIONS: TranslationInfo[] = QURANENC_CATALOGUE.filte
 /** Every translation the app knows. */
 export const ALL_TRANSLATIONS: TranslationInfo[] = [...TRANSLATIONS, ...QURANENC_TRANSLATIONS];
 
-/** What the picker offers: testers get every translation; everyone else Saheeh International and The Clear Quran®. */
-export function offeredTranslations(tester: boolean): TranslationInfo[] {
-  return tester ? ALL_TRANSLATIONS : ALL_TRANSLATIONS.filter((t) => !t.testersOnly);
+/**
+ * What the picker offers: every translation for an account (lib/translationsOffered: every account since
+ * the November 2026 release), else Saheeh International and The Clear Quran®.
+ */
+export function offeredTranslations(every: boolean): TranslationInfo[] {
+  return every ? ALL_TRANSLATIONS : TRANSLATIONS;
 }
 const ARABIC_EDITION = 'quran-uthmani';
 
@@ -567,7 +567,7 @@ export function fallbackTranslation(
 
 /** How a translation is named where its language isn't said around it: "Rachid Maach (French)". */
 export function nameWithLanguage(t: TranslationInfo): string {
-  return t.testersOnly ? `${t.name} (${t.language})` : t.name;
+  return TRANSLATIONS.includes(t) ? t.name : `${t.name} (${t.language})`;
 }
 
 /** A verse's Arabic (Uthmani), exactly as the verse sheet shows it. */

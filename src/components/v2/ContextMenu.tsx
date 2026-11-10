@@ -1,12 +1,16 @@
 // The iOS-style long-press menu (design d10a): a preview of the held item, a menu card of its
-// actions below it, over a dimmed backdrop. Touching the backdrop closes it. An action runs after
-// the menu has closed. No blur: the app has no blur module, so the backdrop is the overlay token.
+// actions below it, over a dimmed backdrop. Touching the backdrop closes it. An action runs as the
+// menu closes; a sheet it opens waits until the menu has gone (one at a time, v2/modalTurn: iOS
+// refuses a modal while another is still going). No blur: the app has no blur module, so the
+// backdrop is the overlay token.
 
-import React from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect } from 'react';
+import { Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { Tap } from './Tap';
+import { DISMISS_FALLBACK_MS } from './Sheet';
+import { useModalTurn } from './modalTurn';
 import { layoutV2, typeV2 } from '../../theme/v2';
 
 export interface ContextMenuAction {
@@ -39,13 +43,25 @@ export function ContextMenu({
   testID?: string;
 }) {
   const { palette } = useTheme();
+  // Its turn is held until iOS reports the menu gone (onDismiss, or the fallback), so a sheet opened
+  // by an action waits for it.
+  const { turn, release } = useModalTurn(visible);
+  useEffect(() => {
+    if (turn) return;
+    if (Platform.OS !== 'ios') {
+      release();
+      return;
+    }
+    const t = setTimeout(release, DISMISS_FALLBACK_MS);
+    return () => clearTimeout(t);
+  }, [turn, release]);
   const run = (action: ContextMenuAction) => {
     onClose();
     action.onPress();
   };
 
   return (
-    <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+    <Modal transparent visible={turn} animationType="fade" onRequestClose={onClose} onDismiss={release} statusBarTranslucent>
       <Pressable
         style={[StyleSheet.absoluteFill, { backgroundColor: palette.overlay }]}
         onPress={onClose}

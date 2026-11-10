@@ -418,6 +418,8 @@ export function revisionItemsFor(session: SeedSession, uid: string): RevisionIte
   const occurredAt = session.createdAt;
   const ahead = session.ahead ?? {};
   const aheadPages = new Set(Object.values(ahead).flat());
+  // A page of the day's own revised again for a day a cycle on stays the day's (AHEAD-3).
+  const assigned = new Set(session.assignedPages);
   const ratings: Record<string, number> = {};
   for (const w of session.weaknessUpdates) ratings[String(w.pageNumber)] = w.newRating;
   const own: RevisionItem = {
@@ -427,7 +429,7 @@ export function revisionItemsFor(session: SeedSession, uid: string): RevisionIte
     occurredAt,
     countsFor: day,
     source: 'session',
-    pages: session.pagesRevised.filter((p) => !aheadPages.has(p)),
+    pages: session.pagesRevised.filter((p) => !aheadPages.has(p) || assigned.has(p)),
     skipped: session.pagesSkipped,
     assigned: session.assignedPages,
     minutes: minutesOf(session.durationMinutes),
@@ -723,6 +725,9 @@ class Builder {
     }
     Object.assign(this.user, {
       onboardingComplete: true,
+      // Every "What's new" seen (the app's SEEN_ALL, src/lib/help/whatsNew): a loaded scenario opens on
+      // Home, not on a walkthrough. Testers replay it from Settings → About or Settings → Testing.
+      whatsNewSeen: 'all',
       totalMemorizedPages: pages.length,
       totalLearningPages: 0,
       totalSessionsCompleted: done.length,

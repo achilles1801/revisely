@@ -4,7 +4,6 @@
 
 import { setNow, setZone, ZONES } from '../harness/clock';
 import { newAccount, pagesRange } from '../harness/account';
-import { markPreviewTester } from '../harness/admin';
 import { ActivityDayView, DailyLog, Home, homeStack, Manager } from '../harness/screens';
 import { Phone } from '../harness/phone';
 import type { UserPage } from '../../../src/types';
@@ -19,8 +18,7 @@ async function account(): Promise<Phone> {
   const uid = app.uid;
   await app.untilSynced();
   await app.close();
-  // The owner marks the account a tester while the app is closed (the rules keep clients from it).
-  await markPreviewTester(uid);
+  // An App Store account, not a tester: this is everyone's since the November 2026 release.
   return phone;
 }
 
