@@ -98,29 +98,23 @@ describe('the Read index in the new design', () => {
 });
 
 describe('searching the Quran from the Read tab', () => {
-  it('a tester gets a search field under the title, and the mic where the phone can listen', async () => {
-    mockApp = { user: { previewTester: true } };
+  it.each([{}, { previewTester: false }, { previewTester: true }])(
+    '[SEARCH-1] [SEARCH-2] every account gets a search field under the title, and the mic where the phone can listen, for %o',
+    async (user) => {
+    mockApp = { user };
     mockVoice = true;
     await renderIndex();
     fireEvent.press(screen.getByTestId('read-search'));
     expect(mockNavigation.navigate).toHaveBeenCalledWith('QuranSearch');
     fireEvent.press(screen.getByTestId('read-search-voice'));
     expect(mockNavigation.navigate).toHaveBeenCalledWith('QuranSearch', { listen: true });
-  });
+    },
+  );
 
-  it('no mic where the phone can’t listen (Android, older builds)', async () => {
-    mockApp = { user: { previewTester: true } };
+  it.each([{}, { previewTester: true }])('no mic where the phone can’t listen (Android, older builds), for %o', async (user) => {
+    mockApp = { user };
     await renderIndex();
     expect(screen.getByTestId('read-search')).toBeTruthy();
-    expect(screen.queryByTestId('read-search-voice')).toBeNull();
-  });
-
-  it.each([{}, { previewTester: false }])('[SEARCH-1] [SEARCH-2] every account searches by typing; the mic stays testers’, for %o', async (user) => {
-    mockApp = { user };
-    mockVoice = true;
-    await renderIndex();
-    fireEvent.press(screen.getByTestId('read-search'));
-    expect(mockNavigation.navigate).toHaveBeenCalledWith('QuranSearch');
     expect(screen.queryByTestId('read-search-voice')).toBeNull();
   });
 

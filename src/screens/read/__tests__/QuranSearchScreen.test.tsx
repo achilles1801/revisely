@@ -188,14 +188,19 @@ describe('searching the Quran', () => {
     expect(screen.queryByTestId('search-mic')).toBeNull();
   });
 
-  it('an account that isn’t a tester searches by typing, with no mic, and a link to listen only opens the field', async () => {
-    mockUser = { id: 'u2' };
-    mockParams = { listen: true };
-    await open();
-    expect(screen.queryByTestId('search-mic')).toBeNull();
-    expect(mockVoice.listen).not.toHaveBeenCalled();
-    expect(screen.queryByTestId('model-sheet')).toBeNull();
-    await search('قل لو شاء الله');
-    expect(screen.getByTestId('search-verse-10-16')).toBeTruthy();
-  });
+  it.each([{ id: 'u2' }, { id: 'u3', previewTester: false }])(
+    '[SEARCH-1] any account gets the mic: the first tap offers the speech model, then it listens, for %o',
+    async (user) => {
+      mockUser = user;
+      mockVoice.needsModel = true;
+      await open();
+      fireEvent.press(screen.getByTestId('search-mic'));
+      expect(mockVoice.listen).not.toHaveBeenCalled();
+      expect(screen.getByTestId('model-sheet')).toHaveTextContent('Search by voice');
+      await act(async () => fireEvent.press(screen.getByTestId('model-sheet')));
+      expect(mockVoice.listen).toHaveBeenCalledTimes(1);
+      await act(async () => mockVoice.heard?.('قل لو شاء الله'));
+      expect(screen.getByTestId('search-verse-10-16')).toBeTruthy();
+    },
+  );
 });

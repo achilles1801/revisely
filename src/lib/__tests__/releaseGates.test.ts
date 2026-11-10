@@ -77,8 +77,21 @@ describe('everyone’s from the November 2026 release', () => {
     expect(quranSearchEnabled(user)).toBe(true);
   });
 
+  // On an iPhone binary with the microphone module (mocked here); Android types only (Majd, Nov 9 2026).
+  it.each(APP_STORE)('[SEARCH-1] searching the Qur’an by voice, on an iPhone that can listen, for %o', (user) => {
+    expect(voiceSearchEnabled(user)).toBe(true);
+  });
+
+  it('[SEARCH-1] Android searches by typing only', () => {
+    const { Platform } = require('react-native');
+    jest.replaceProperty(Platform, 'OS', 'android');
+    expect(voiceSearchEnabled(TESTER)).toBe(false);
+    expect(quranSearchEnabled(TESTER)).toBe(true);
+    jest.restoreAllMocks();
+  });
+
   it('nobody signed in has any of them', () => {
-    for (const gate of [activityBlocksEnabled, sittingsEnabled, everyTranslationOffered, helpAvailable, quranSearchEnabled]) {
+    for (const gate of [activityBlocksEnabled, sittingsEnabled, everyTranslationOffered, helpAvailable, quranSearchEnabled, voiceSearchEnabled]) {
       expect(gate(null)).toBe(false);
       expect(gate(undefined)).toBe(false);
     }
@@ -100,13 +113,6 @@ describe('still for testers', () => {
     expect(reciteModeEnabled(TESTER)).toBe(true);
     expect(showsResetMyData(TESTER)).toBe(true);
     expect(showsTestScenarios(TESTER)).toBe(true);
-  });
-
-  // Until 1.0.4: the microphone's purpose string (native) and the privacy policy don't name searching.
-  it.each(APP_STORE)('[SEARCH-1] searching by voice, for %o', (user) => {
-    expect(voiceSearchEnabled(user)).toBe(false);
-    expect(voiceSearchEnabled(TESTER)).toBe(true);
-    expect(voiceSearchEnabled(null)).toBe(false);
   });
 
   it('a What’s new run at launch by hand (Settings → Testing) is a tester’s only', () => {
