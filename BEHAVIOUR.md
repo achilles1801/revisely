@@ -245,7 +245,12 @@ How the tests are made: `tests/scenarios/README.md`.
   notification left by an earlier run goes when the app starts. Stopping never makes Android close
   the app.
 - **AUDIO-2.** On Android, Pause and ▶ on the recitation's notification work with the app away;
-  paused, the notification stays, and the app shows what was pressed.
+  paused, the notification stays, and the app shows what was pressed. From 1.0.4 it also has
+  previous and next, which move a verse back or on as the lock screen's do on iOS.
+- **AUDIO-3.** On Android (1.0.4 on), the notification of a paused recitation can be put away: "Hide"
+  on the system's media control, or a swipe a minute after the pause (Android 12 and earlier). The
+  recitation stays paused where it was, and ▶ in the app goes on from there and shows the
+  notification again.
 - **AUDIO-4.** When the day's recordings or Listen back go away (another day picked, the screen
   closed) while a recording plays, it stops and its player is freed: nothing plays on with nothing
   on screen to stop it.

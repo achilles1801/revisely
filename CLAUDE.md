@@ -442,11 +442,14 @@ Every page is downloaded to the phone, so the reader and revision sessions work 
   from there until then. The reader saves the pages it opens to the same folder.
 - **Backups:** on iOS the folder (and `Documents/quran-text`, `Documents/translations`) is kept out of iCloud backups with
   `RecitationAudio.excludeFromBackup`, which every binary on runtime 2df7a2f0 has (builds 31/32);
-  `xattr -l` shows `com_apple_backup_excludeItem` on it. Android has no way to do that from
-  JavaScript (expo-file-system writes only to files/ and cache/), so the pages are in Auto Backup's
-  files/, and with them Android's 25 MB backup quota is passed (recordings already pass it for most
-  users). The fix is backup rules excluding `files/mushaf` (`android:fullBackupContent` /
-  `dataExtractionRules`): a native change for the next build.
+  `xattr -l` shows `com_apple_backup_excludeItem` on it. Android can't do that from JavaScript, so
+  from 1.0.4 the build carries backup rules (`plugins/withAndroidBackupRules.js`):
+  `files/mushaf`, `files/quran-text` and `files/translations` are left out of cloud backups
+  (`android:fullBackupContent` for Android 6–11, `android:dataExtractionRules` for 12+; a
+  device-to-device transfer still takes them). Before, they pushed the app past Android's 25 MB
+  quota, and an app over it isn't backed up at all. Recordings stay in (they can't be downloaded
+  again unless backed up), though they alone pass the quota for many users. Add a folder there when
+  the app downloads something new into `Paths.document`.
 - **Sizes** (`src/data/mushafSizes.json`, from `node scripts/mushaf-sizes.js`; run it again if the
   images in Storage change): iOS (the originals) 247 MB, Android w1080 135 MB, w1440 191 MB; the
   Arabic text (1.8 MB) and Saheeh International (1.1 MB) come on top, so Settings says 250, 138 and
@@ -969,22 +972,48 @@ already in memory is shown in the first frame (`peekVerseText`), with no spinner
     recording itself is unchanged.
   - The simulator's dev client predates the key, so it can't show background play: check on a
     TestFlight build.
-  - **Android's notification can outlive its service** (expo-audio 1.1's `AudioControlsService`;
-    a closed tester's Samsung, Nov 3 2026; reproduced on an emulator Nov 4). Swiping the app away
-    from recents makes Media3's `onTaskRemoved` pause the player and stop the service. expo-audio's
-    paused post lands after the system has removed the service's notification, leaving a
-    notification that can't be swiped away (`NO_CLEAR`), for a dead session: no buttons, a still
-    progress bar, and it outlives the app. The screens then unmount and `MainNavigator` stops the
-    recitation; `setActiveForLockScreen(false)` started the dead service again with nothing to
-    show, and Android killed the app 30 s later (`ForegroundServiceDidNotStartInTimeException`).
-    Until expo-audio is patched (native, a build), `lib/recitation` on Android frees its player
-    (`remove()` + `release()`) instead of `setActiveForLockScreen(false)`, and dismisses any media
-    notification still on show once it has let go of the lock screen (`lib/mediaNotification`,
-    through expo-notifications): right after a stop, at launch and when the app comes back. With
-    the app away React Native's timers stand still on Android, so after a stop it reads again and
-    again for 2 s instead of waiting. Coming back, it also pauses a recitation whose notification
-    has lost its service, so ▶ starts a new player and notification. A paused notification still
-    can't be swiped away; that needs the native fix.
+  - **Android's notification could outlive its service** (expo-audio 1.1's
+    `AudioControlsService`; a closed tester's Samsung, Nov 3 2026; reproduced on an emulator Nov 4
+    and again Nov 6). Swiping the app away from recents makes Media3's `onTaskRemoved` pause the
+    player and stop the service. expo-audio's paused post landed after the system had removed the
+    service's notification, leaving a notification that can't be swiped away (`NO_CLEAR`), for a
+    dead session: no buttons, a still progress bar, and it outlives the app. The screens then
+    unmount and `MainNavigator` stops the recitation; `setActiveForLockScreen(false)` started the
+    dead service again with nothing to show, and Android killed the app 30 s later
+    (`ForegroundServiceDidNotStartInTimeException`).
+    - **Fixed natively from 1.0.4** (`patches/expo-audio+1.1.1.patch`, its header says how): the
+      service stops cleanly on `onTaskRemoved` and posts nothing once it is going, uses one
+      notification id, is never started only to be cleared, and posts only when what it shows
+      changes (expo-audio posted on every player event, often enough for Android to drop posts:
+      "Package enqueue rate … Shedding"). It honours Media3's foreground decision: a paused
+      notification leaves the foreground after `PAUSED_FOREGROUND_MS` (60 s), which ends the
+      foreground service and, on Android 12 and earlier, lets it be swiped away. On 13+ it lives in
+      the media control, which "Hide" puts away at any time (Android 15 marks every MediaStyle
+      notification `NO_CLEAR`, so Clear all skips it; that isn't ours to change). Put away, its
+      session stays, and playing again brings it back (AUDIO-3). Resuming from the media control
+      with the app away restarts the foreground service (Android allows it for media session
+      commands). Between verses (the
+      player ended, still set to play) and while a call holds it (up to 10 minutes) it stays in the
+      foreground, so the next verse can start from the background. Android's "Hide" on a media
+      control (13+) sends stop, which unloaded the verse (▶ in the app then played nothing, on
+      every binary before 1.0.4): the session's player takes stop as pause, and the app reloads a
+      verse whose player went idle from outside anyway. The patched module says so:
+      `AudioModule.reviselyMediaControls` (2: also previous and next, below) and each player's
+      `reviselyIsActiveForLockScreen`.
+    - **Binaries before 1.0.4** keep the JS workaround (`lib/recitation`, `lib/mediaNotification`):
+      on Android it frees its player (`remove()` + `release()`) instead of
+      `setActiveForLockScreen(false)`, and dismisses any media notification still on show once it
+      has let go of the lock screen: right after a stop, at launch and when the app comes back
+      (with the app away React Native's timers stand still on Android, so after a stop it reads
+      again and again for 2 s). Coming back, it pauses a recitation whose notification has lost its
+      service, so ▶ starts a new player and notification. On a patched binary
+      (`mediaControlsLevel() >= 1`) the sweeps after a stop are skipped, and coming back it asks the
+      player instead of guessing from what is on show (a swiped-away paused notification is not a
+      lost one); the launch check stays, for leftovers from an older binary.
+    - **The artwork** must be a URL: an Android release build's bundled icon is a drawable named
+      `assets_icon`, and expo-audio rejected every call carrying it, so the notification kept the
+      first verse's title and a recitation started after a stop had none at all (no foreground
+      service either). `lib/nowPlayingArtwork` passes only a URL with a scheme (Nov 6 2026).
 - `v2/WheelPicker`'s `contentOffset` is where it starts, set once. Changing it after mount moved
   the wheel a second row on a phone (a test covers it). Maestro can't tap a wheel's rows by id (the
   wheel is one adjustable element for VoiceOver): tap by point. Maestro takes whole-number
@@ -1009,9 +1038,8 @@ opens `qibla/QiblaSheet`, a `v2/Sheet` (drag to close, Done).
   and the Kaaba stay upright, the Kaaba and its tick in `done`/`doneText`, a glow when facing it.
   `qiblaView` picks the state; `QiblaContent` renders one, which is how to show a state on the
   simulator (it has no compass).
-- **Native follow-up (the release session's build):** the iOS location purpose string still names
-  only fajr; it should name the Qibla too (Info.plist, so a build), and `expo-location` (^55, SDK 55's
-  line) should be aligned with SDK 54. The compass itself is JS on the existing binaries.
+- The location purpose string names prayer times, the Qibla and Fajr, and `expo-location` is SDK 54's
+  ~19.0.8, both in the 1.0.3 store builds (see "Widgets", Location). The compass itself is JS.
 - Privacy: the policy's Location item says the compass works on the device only. No App Privacy
   change (nothing is collected).
 
@@ -1155,6 +1183,12 @@ before production can be applied for.
   that move nothing on iOS: Android-only local modules (`modules/*` with only `android`), `eas.json`,
   and google-services.json, ignored wherever it is (`**/google-services.json`: a file outside the
   project was hashed, so the runner's and a laptop's Android hashes differed).
+- **Patching an Expo module's Android code** (patch-package, `patches/`): SDK 54 links Expo modules
+  as prebuilt AARs (`node_modules/<module>/local-maven-repo`), so Gradle never compiles a patched
+  `android/src` and the patch silently does nothing. Name the module in `package.json`
+  `expo.autolinking.android.buildFromSource` (expo-audio is there) and check the build carries the
+  change (a string from it in the APK's `classes*.dex`). `patches/` counts in the fingerprint for
+  every platform, so an Android-only patch moves the iOS hash too.
 - **Gradle memory.** Lint (`lintVitalAnalyzeRelease`) ran out of memory with the default 2 GB; the
   workflow writes `org.gradle.jvmargs=-Xmx6g` to `~/.gradle/gradle.properties` (it wins over the
   project's, which prebuild writes). Locally: `-Dorg.gradle.jvmargs=-Xmx6g` and
@@ -1177,14 +1211,16 @@ before production can be applied for.
   - A notification's sound and importance are its channel's: schedule with a `channelId`
     (`lib/notificationChannels`: Reminders, Prayer times, Prayer times (silent); Recitation is
     expo-audio's channel, created first so it has a name). Without one it lands in "Miscellaneous".
-  - Recitation's media notification has play/pause and the scrubber, not previous/next verse
-    (expo-audio 1.1 removes track commands on Android; a patch or a later expo-audio).
+  - Recitation's media notification has play/pause and the scrubber, and from 1.0.4 previous and
+    next verse: the patched service's session offers them (expo-audio 1.1 removed them) and sends
+    them to the app (`reviselyRemoteCommand`, `onTrackCommand` in `lib/mediaNotification`), which
+    calls the engine's `skip`, as iOS's `modules/now-playing-commands` does. Binaries before 1.0.4
+    have none.
   - expo-location sends a heading only after a ~2° turn, so a phone held still can show
     "Finding north…" until it moves.
   - Widgets are iOS only (WidgetKit); Android home-screen widgets are a follow-up.
 - **Not on Android yet:** home-screen widgets, recite mode's speech recognition (whisper.rn's iOS
-  path only), Sign in with Apple, previous/next verse in the media notification and on the lock
-  screen.
+  path only), Sign in with Apple. (Previous/next verse in the media notification came with 1.0.4.)
 - **Testing on an emulator** without touching production: the Firebase emulators (Auth, Firestore,
   Storage) with a dev build pointed at them, and an account seeded there with
   `functions/scripts/seed-screenshots.js` (`FIRESTORE_EMULATOR_HOST`, `FIREBASE_AUTH_EMULATOR_HOST`).

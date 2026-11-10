@@ -9,8 +9,8 @@
 // not start within LOAD_TIMEOUT_MS (offline) gives up. The screens showing it
 // take it over in turn (`adopt`); elsewhere a mini player stands in
 // (components/player/MiniPlayer). On Android the lock screen's controls are a
-// media notification that can outlive its service; see lib/mediaNotification for
-// what that needs here.
+// media notification that, on binaries before 1.0.4, can outlive its service; see
+// lib/mediaNotification for what that needs here.
 //
 // Audio comes from EveryAyah (everyayah.com), one file per verse named
 // SSSAAA.mp3, in a folder per reciter and style. Every folder listed was checked
@@ -26,7 +26,13 @@ import type { VerseRange } from './playbackPlan';
 import { getSurahDisplay } from './quranData';
 import { lockScreenArtwork } from './nowPlayingArtwork';
 import { logger } from './logger';
-import { dismissNotifications, readMediaNotifications } from './mediaNotification';
+import {
+  dismissNotifications,
+  mediaControlsLevel,
+  onTrackCommand,
+  readMediaNotifications,
+  stillOnLockScreen,
+} from './mediaNotification';
 
 /**
  * How a reciter recites. Per-verse audio is organised by these styles, not by
@@ -262,10 +268,14 @@ export class Recitation {
   private appActive = true;
   private checking = false;
   private recheck = false;
+  /** Android: the binary carries expo-audio's notification fix (1.0.4 on; lib/mediaNotification). */
+  private readonly nativeFix = isAndroid() && mediaControlsLevel() >= 1;
 
   constructor() {
-    // Previous and next on the lock screen and in Control Center.
+    // Previous and next on the lock screen and in Control Center; on Android's
+    // notification from 1.0.4 (lib/mediaNotification).
     NowPlayingCommands?.addListener('onRemoteCommand', ({ command }) => this.skip(command === 'next' ? 1 : -1));
+    if (isAndroid()) onTrackCommand((direction) => this.skip(direction));
     // A recording starting or playing takes over the audio.
     onAudioClaimed((activity) => {
       if (activity !== 'recitation') this.stop();
@@ -434,7 +444,15 @@ export class Recitation {
       const { media, orphans } = await readMediaNotifications();
       const leftOver = this.onLockScreen ? orphans : [...media, ...orphans];
       if (leftOver.length) await dismissNotifications(leftOver);
-      if (!this.onLockScreen || media.length) return;
+      if (!this.onLockScreen) return;
+      if (this.nativeFix) {
+        // A notification put away while paused keeps its session (▶ brings it
+        // back), so nothing on show proves nothing: the player says whether its
+        // controls went (the app's task was removed).
+        if (this.player && !stillOnLockScreen(this.player)) this.lostNotification();
+        return;
+      }
+      if (media.length) return;
       const { status } = this.state;
       const settled = Date.now() - this.lockScreenSince >= NOTIFICATION_SETTLE_MS;
       // Playing with no notification may only mean Revisely's notifications are
@@ -452,6 +470,8 @@ export class Recitation {
    * Android, so it reads what is on show again and again for a moment instead.
    */
   private sweepLeftOvers() {
+    // The fixed service leaves nothing behind.
+    if (this.nativeFix) return;
     if (this.appActive) {
       setTimeout(() => void this.checkNotification(), NOTIFICATION_CHECK_MS);
       setTimeout(() => void this.checkNotification(), NOTIFICATION_CHECK_MS * 4);
@@ -657,6 +677,13 @@ export class Recitation {
     if (s.playbackState === 'failed') {
       this.clearLoadTimer();
       this.set({ status: 'error', verse });
+      return;
+    }
+    // Android: stopped from outside (before 1.0.4, "Hide" on the system's media
+    // control sends stop): the verse is no longer loaded, so ▶ loads it again.
+    if (isAndroid() && s.playbackState === 'idle' && this.started && status !== 'loading') {
+      this.started = false;
+      if (status === 'playing') this.set({ status: 'paused', verse });
       return;
     }
     if (s.playing && status === 'loading') {
