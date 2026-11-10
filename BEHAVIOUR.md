@@ -204,7 +204,8 @@ How the tests are made: `tests/scenarios/README.md`.
 - **RESET-2.** A tester (`previewTester`) can reset their own data from Settings (Reset my data, typed
   RESET): a backup only the owner can read is taken first, then the account is as new, onboarding
   next, still signed in, with nothing of before on the phone. No other account can, and not again
-  within 10 minutes.
+  within 10 minutes. While the server resets it, the phone doesn't listen to the account (its user
+  document, pages and sessions), and reads it afresh once the server has answered.
 - **RESET-3.** A tester can load a test scenario from Settings (Load test scenario, typed RESET): the
   account is reset as in RESET-2 (the same backup first) and filled with the scenario, on the revision
   days this phone shows (its zone, clock and Fajr). Every rule above that can be read off an account
@@ -938,3 +939,4 @@ Fixed in November 2026 (the tests that pinned them are ordinary tests now):
 | SYNC-4 | A new account could stay on "loading" until the app was relaunched. | Page and session listeners hear when the server confirms the cache (`onQuerySnapshot`, `src/services/firestoreService.ts`). |
 | ACCOUNT-3 | Delete account froze the phone (Nov 10 2026): the server's removals of the 604 pages and the sessions streamed into the app's listeners, and Firestore's JavaScript took about 20 s over them on a fast Mac before "Account deleted" could show; on a phone two or three times slower that passes the 30 s the app waits, and says the server didn't answer after a delete that worked. | The account's listeners stop before the server is asked and start again if the account is still there (`pauseAccountListeners`, `src/services/firestoreService.ts`), and Firestore's string comparator is made fast for Hermes when the bundle is built (`metro/firestoreCompare.js`). |
 | SYNC-4, ONBOARD-1 | Sign-up froze the phone for about 5 s on a fast Mac (Nov 10 2026): its 604 page writes went through the live pages listener, each page three times (written, confirmed, sent back). | The pages listener waits while sign-up writes the pages and reads them once after (`initializeAllPages`), with the faster comparator. |
+| RESET-2, RESET-3 | Reset my data and Load test scenario streamed the server's rewrite of the account into the listeners, one change at a time (Nov 10 2026): with Firestore's faster comparator (#509), a Hafiz scenario still froze the phone for 1.5–1.8 s on a fast Mac while the server worked, and a reset for 0.8–1.0 s. | The listeners pause while the server rewrites the account and read it afresh once it answers (`whileServerRewrites`, `src/services/firestoreService.ts`): no freeze while the server works; the account loaded afterwards is read once. |

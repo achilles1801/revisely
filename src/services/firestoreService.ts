@@ -1312,9 +1312,27 @@ export interface TesterResetResult {
 export async function resetMyDataOnServer(): Promise<TesterResetResult> {
   const user = auth.currentUser;
   if (!user) throw new Error('No signed-in user.');
-  const out = (await callFunction(user, 'resetMyData', { confirm: 'RESET' })) as { result?: TesterResetResult } | null;
+  const out = (await whileServerRewrites(user.uid, () =>
+    callFunction(user, 'resetMyData', { confirm: 'RESET' }),
+  )) as { result?: TesterResetResult } | null;
   if (!out?.result?.ok) throw new Error('The reset did not answer as expected.');
   return out.result;
+}
+
+/**
+ * `call`, a server function that rewrites the whole account (Reset my data, Load
+ * test scenario), with the account's listeners paused: its changes don't stream
+ * into the phone one by one, as account deletion's did (ACCOUNT-3). Once the
+ * server answers, refused or not, they start again and read the account afresh,
+ * which is how the phone sees the reset (lib/offline/reset).
+ */
+async function whileServerRewrites<T>(uid: string, call: () => Promise<T>): Promise<T> {
+  const resumeListeners = pauseAccountListeners(uid);
+  try {
+    return await call();
+  } finally {
+    resumeListeners();
+  }
 }
 
 /** What loadTestScenario answers (functions/src/testScenarios.ts). */
@@ -1339,7 +1357,9 @@ export async function loadTestScenarioOnServer(data: {
 }): Promise<TestScenarioResult> {
   const user = auth.currentUser;
   if (!user) throw new Error('No signed-in user.');
-  const out = (await callFunction(user, 'loadTestScenario', { confirm: 'RESET', ...data })) as {
+  const out = (await whileServerRewrites(user.uid, () =>
+    callFunction(user, 'loadTestScenario', { confirm: 'RESET', ...data }),
+  )) as {
     result?: TestScenarioResult;
   } | null;
   if (!out?.result?.ok) throw new Error('The scenario did not answer as expected.');
