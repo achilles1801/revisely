@@ -1,8 +1,11 @@
-// Hands the widget snapshot to the extension: the App Group's shared defaults,
-// then WidgetKit reloads the timelines. Written only when it changed, so the
-// foreground check and re-renders don't spend the widgets' reload budget.
+// Hands the widget snapshot to the widgets. iOS: the App Group's shared defaults,
+// then WidgetKit reloads the timelines. Android: the widgets module keeps it and
+// redraws the home-screen widgets (modules/android-widgets). Written only when it
+// changed, so the foreground check and re-renders don't spend the widgets' reload
+// budget (iOS) or redraw them for nothing (Android).
 
 import { Platform } from 'react-native';
+import AndroidWidgets from '../../../modules/android-widgets';
 import { logger } from '../logger';
 import { WIDGET_APP_GROUP, WIDGET_SNAPSHOT_KEY, type WidgetSnapshot } from './snapshot';
 
@@ -11,8 +14,19 @@ export interface WidgetStore {
   reload(): void;
 }
 
-/** @bacons/apple-targets' ExtensionStorage, or nothing where it isn't built in. */
+/** Android: the widgets module, or nothing on binaries without it (before 1.0.4). */
+function androidStore(): WidgetStore | null {
+  const widgets = AndroidWidgets;
+  if (!widgets) return null;
+  return {
+    set: (key, value) => widgets.set(key, value),
+    reload: () => widgets.reload(),
+  };
+}
+
+/** @bacons/apple-targets' ExtensionStorage (iOS), the widgets module (Android), or nothing where neither is built in. */
 function nativeStore(): WidgetStore | null {
+  if (Platform.OS === 'android') return androidStore();
   if (Platform.OS !== 'ios') return null;
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -31,8 +45,8 @@ function nativeStore(): WidgetStore | null {
 let store: WidgetStore | null | undefined;
 let lastWritten: string | null = null;
 
-/** Tests: a fake store, and forget what was written. */
-export function setWidgetStoreForTests(s: WidgetStore | null) {
+/** Tests: a fake store (undefined: look for the native one again), and forget what was written. */
+export function setWidgetStoreForTests(s: WidgetStore | null | undefined) {
   store = s;
   lastWritten = null;
 }

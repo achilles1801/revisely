@@ -1,0 +1,24 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'app.revisely.widgets'
+version = '1.0.0'
+
+android {
+  namespace "app.revisely.widgets"
+  defaultConfig {
+    versionCode 1
+    versionName '1.0.0'
+  }
+  testOptions {
+    unitTests.returnDefaultValues = true
+  }
+}
+
+dependencies {
+  testImplementation 'junit:junit:4.13.2'
+  // Android's org.json is a stub on the JVM.
+  testImplementation 'org.json:json:20240303'
+}

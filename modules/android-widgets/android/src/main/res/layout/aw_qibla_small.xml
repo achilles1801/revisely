@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Qibla, 2×2 (the default): a fixed dial, north up, with the Kaaba at the bearing. The dial is four
+  layers drawn to bitmaps (ring, the Kaaba, the accent's needle and band, ink), each tinted, so it
+  follows the system's dark theme.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:id="@android:id/background"
+  android:layout_width="match_parent"
+  android:layout_height="match_parent"
+  android:background="@drawable/aw_ground"
+  android:clipToOutline="true"
+  android:gravity="center"
+  android:orientation="vertical"
+  android:padding="16dp">
+
+  <FrameLayout
+    android:layout_width="72dp"
+    android:layout_height="72dp">
+    <ImageView
+      android:id="@+id/aw_dial_ring"
+      android:layout_width="match_parent"
+      android:layout_height="match_parent"
+      android:importantForAccessibility="no"
+      android:scaleType="fitCenter"
+      android:src="@drawable/aw_preview_dial_ring"
+      android:tint="@color/aw_secondary" />
+    <ImageView
+      android:id="@+id/aw_dial_body"
+      android:layout_width="match_parent"
+      android:layout_height="match_parent"
+      android:importantForAccessibility="no"
+      android:scaleType="fitCenter"
+      android:src="@drawable/aw_preview_dial_body"
+      android:tint="@color/aw_kaaba" />
+    <ImageView
+      android:id="@+id/aw_dial_accent"
+      android:layout_width="match_parent"
+      android:layout_height="match_parent"
+      android:importantForAccessibility="no"
+      android:scaleType="fitCenter"
+      android:src="@drawable/aw_preview_dial_accent"
+      android:tint="@color/aw_preview_accent" />
+    <ImageView
+      android:id="@+id/aw_dial_ink"
+      android:layout_width="match_parent"
+      android:layout_height="match_parent"
+      android:importantForAccessibility="no"
+      android:scaleType="fitCenter"
+      android:src="@drawable/aw_preview_dial_ink"
+      android:tint="@color/aw_text" />
+  </FrameLayout>
+
+  <LinearLayout
+    android:id="@+id/aw_qibla_text"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="8dp"
+    android:gravity="center_horizontal"
+    android:orientation="vertical">
+    <TextView
+      android:id="@+id/aw_qibla_label"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:ellipsize="end"
+      android:fontFamily="sans-serif-medium"
+      android:maxLines="1"
+      android:text="@string/aw_sample_qibla"
+      android:textColor="@color/aw_text"
+      android:textSize="15sp" />
+    <TextView
+      android:id="@+id/aw_qibla_place"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:ellipsize="end"
+      android:maxLines="1"
+      android:text="@string/aw_sample_qibla_city"
+      android:textColor="@color/aw_secondary"
+      android:textSize="12sp" />
+    <TextView
+      android:id="@+id/aw_qibla_distance"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:ellipsize="end"
+      android:maxLines="1"
+      android:text="@string/aw_sample_distance"
+      android:textColor="@color/aw_secondary"
+      android:textSize="12sp" />
+  </LinearLayout>
+
+  <TextView
+    android:id="@+id/aw_open"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="8dp"
+    android:ellipsize="end"
+    android:gravity="center_horizontal"
+    android:maxLines="2"
+    android:textColor="@color/aw_secondary"
+    android:textSize="12sp"
+    android:visibility="gone" />
+</LinearLayout>

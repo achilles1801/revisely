@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Today: 2×1 to 4×2, 2×2 by default. The 3 h update is only a backstop: alarms move it on. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+  android:description="@string/aw_today_description"
+  android:initialLayout="@layout/aw_initial"
+  android:minWidth="110dp"
+  android:minHeight="110dp"
+  android:minResizeWidth="110dp"
+  android:minResizeHeight="40dp"
+  android:previewLayout="@layout/aw_today_small"
+  android:resizeMode="horizontal|vertical"
+  android:targetCellWidth="2"
+  android:targetCellHeight="2"
+  android:updatePeriodMillis="10800000"
+  android:widgetCategory="home_screen" />

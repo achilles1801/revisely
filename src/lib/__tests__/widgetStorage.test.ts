@@ -1,14 +1,40 @@
+import { Platform } from 'react-native';
 import { setWidgetStoreForTests, writeWidgetSnapshot } from '../widgets/storage';
 import { WIDGET_SNAPSHOT_KEY, type WidgetSnapshot } from '../widgets/snapshot';
 import { parseWidgetLink } from '../widgets/links';
+
+// The Android widgets module (modules/android-widgets): null unless a test puts one in.
+const mockAndroidWidgets: { current: { set: jest.Mock; reload: jest.Mock } | null } = { current: null };
+jest.mock('../../../modules/android-widgets', () => ({
+  __esModule: true,
+  get default() {
+    return mockAndroidWidgets.current;
+  },
+}));
 
 const snapshot = (state: WidgetSnapshot['state'] = 'ready'): WidgetSnapshot => ({
   v: 1,
   state,
   accent: 'indigo',
   colors: {
-    light: { accentText: '#624BD5', done: '#624BD5', onDone: '#FFFFFF', primary: '#624BD5', onPrimary: '#FFFFFF' },
-    dark: { accentText: '#9789DA', done: '#624BD5', onDone: '#FFFFFF', primary: '#624BD5', onPrimary: '#FFFFFF' },
+    light: {
+      accentText: '#624BD5',
+      done: '#624BD5',
+      onDone: '#FFFFFF',
+      primary: '#624BD5',
+      onPrimary: '#FFFFFF',
+      accentSubtle: '#EFECFB',
+      subtleText: '#624BD5',
+    },
+    dark: {
+      accentText: '#9789DA',
+      done: '#624BD5',
+      onDone: '#FFFFFF',
+      primary: '#624BD5',
+      onPrimary: '#FFFFFF',
+      accentSubtle: '#16113A',
+      subtleText: '#9789DA',
+    },
   },
   days: [],
   qibla: null,
@@ -50,7 +76,7 @@ describe('writeWidgetSnapshot', () => {
     expect(f.reloads()).toBe(2);
   });
 
-  it('no native module (Android, tests, a build without widgets): nothing, quietly', () => {
+  it('no native module (tests, a build without widgets): nothing, quietly', () => {
     setWidgetStoreForTests(null);
     expect(writeWidgetSnapshot(snapshot())).toBe(false);
   });
@@ -69,6 +95,53 @@ describe('writeWidgetSnapshot', () => {
     fail = false;
     expect(writeWidgetSnapshot(snapshot())).toBe(true);
     expect(writes).toHaveLength(1);
+  });
+});
+
+describe('writeWidgetSnapshot on Android', () => {
+  const os = Platform.OS;
+  const setOS = (value: string) => Object.defineProperty(Platform, 'OS', { value, configurable: true });
+
+  beforeEach(() => {
+    setOS('android');
+    mockAndroidWidgets.current = { set: jest.fn(), reload: jest.fn() };
+    setWidgetStoreForTests(undefined);
+  });
+
+  afterEach(() => {
+    setOS(os);
+    mockAndroidWidgets.current = null;
+    setWidgetStoreForTests(undefined);
+  });
+
+  it('hands the widgets module the same JSON as iOS, under the same key, then redraws', () => {
+    expect(writeWidgetSnapshot(snapshot())).toBe(true);
+    const widgets = mockAndroidWidgets.current!;
+    expect(widgets.set).toHaveBeenCalledTimes(1);
+    expect(widgets.set).toHaveBeenCalledWith(WIDGET_SNAPSHOT_KEY, JSON.stringify(snapshot()));
+    expect(widgets.reload).toHaveBeenCalledTimes(1);
+    // Kept first, redrawn after: the widgets read what was just kept.
+    expect(widgets.set.mock.invocationCallOrder[0]).toBeLessThan(widgets.reload.mock.invocationCallOrder[0]);
+  });
+
+  it('the same snapshot again redraws nothing; a changed one does', () => {
+    writeWidgetSnapshot(snapshot());
+    expect(writeWidgetSnapshot(snapshot())).toBe(false);
+    expect(mockAndroidWidgets.current!.reload).toHaveBeenCalledTimes(1);
+    expect(writeWidgetSnapshot(snapshot('noPlan'))).toBe(true);
+    expect(mockAndroidWidgets.current!.reload).toHaveBeenCalledTimes(2);
+  });
+
+  it('a binary without the module (before 1.0.4): nothing, quietly', () => {
+    mockAndroidWidgets.current = null;
+    expect(writeWidgetSnapshot(snapshot())).toBe(false);
+  });
+
+  it('iOS never calls the Android module', () => {
+    setOS('ios');
+    writeWidgetSnapshot(snapshot());
+    expect(mockAndroidWidgets.current!.set).not.toHaveBeenCalled();
+    expect(mockAndroidWidgets.current!.reload).not.toHaveBeenCalled();
   });
 });
 

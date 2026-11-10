@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The widgets' ground, ink and hairlines: src/theme/v2.ts's tokens, as on iOS (targets/widget/Theme.swift).
+  values-night holds the dark ones, so the launcher swaps them with the system's dark theme.
+  The accent comes from the snapshot (theme/v2 via lib/widgets/snapshot); the aw_preview_* colours are
+  Indigo's, for the widget picker's previews only.
+-->
+<resources>
+  <color name="aw_bg">#FFFFFF</color>
+  <color name="aw_text">#1A1A1A</color>
+  <color name="aw_secondary">#616977</color>
+  <color name="aw_separator">#E5E7EB</color>
+  <color name="aw_fill">#F7F7F8</color>
+  <!-- The Kaaba on the Qibla dial, in both appearances. -->
+  <color name="aw_kaaba">#111111</color>
+  <color name="aw_preview_accent">#624BD5</color>
+  <color name="aw_preview_primary">#624BD5</color>
+  <color name="aw_preview_on_primary">#FFFFFF</color>
+</resources>
