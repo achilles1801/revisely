@@ -324,7 +324,9 @@ function revoDeps(caller: CallerRequest) {
     call: (request: Parameters<typeof callCoach>[0]) =>
       callCoach(request, { apiKey: ANTHROPIC_COACH_KEY.value(), fetch: anthropicFor(caller.auth?.uid) }),
     now: clockOf(caller.rawRequest),
-    log: (entry: Record<string, unknown>) => logger.info('revo', entry),
+    // Each line names the account (its pseudonymous uid), so the metrics collector can add up use and
+    // cost per account (scripts/metrics). Logs are kept 30 days; never the question, answer or notes.
+    log: (entry: Record<string, unknown>) => logger.info('revo', { ...entry, uid: caller.auth?.uid }),
   };
 }
 

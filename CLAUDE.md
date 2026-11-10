@@ -1331,7 +1331,9 @@ app; `askCoach`/`setCoachOptIn` stay as they were until Insights links to Revo. 
   (`REVO_MODEL`; the Ask coach stays on Haiku 5.5; prices per model in `coach/pricing.ts`, Sonnet 5.5's
   caching minimum is 512 tokens). **Thinking is off** (`thinking: {type: "between_tools"}`; Sonnet 5.5 thinks
   by default and its thinking counts against `max_tokens`: at 700, every reply was cut off, Nov 7 2026) with
-  `REVO_MAX_TOKENS` 800; the log says `stop: max_tokens` when a reply is cut off anyway. 20 new questions a revision day (`revoUsage/{uid}`; an earlier day than counted is refused), a first
+  `REVO_MAX_TOKENS` 800; the log says `stop: max_tokens` when a reply is cut off anyway. Every `revo` log
+  line carries the account's `uid` (Nov 2026, for the metrics dashboard's per-account use and cost; the
+  privacy policy's #revo says so); never the question, answer or notes. 20 new questions a revision day (`revoUsage/{uid}`; an earlier day than counted is refused), a first
   question without an attachment kept for the day (free), the last 10 messages sent with a follow-up, up to
   30 memory items (`users/{uid}/revoMemory`), conversations in `users/{uid}/revoChats/{id}/messages`. The
   owner reads them and may only rate a reply, mark an action, mark a chat "plan added" and delete a memory

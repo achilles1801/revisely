@@ -5,7 +5,7 @@
  * day; the monthly cap and ledger are the Ask coach's (shared), and one UTC day may spend only
  * part of the month (config/coach.dailyCapUsd). A first question with no attachment is cached for
  * the day. Storage and the model call are injected, so this runs in tests. Logs keep counts and
- * tokens, never content.
+ * tokens, and the account's uid (added in index.ts), never content.
  */
 import { createHash } from 'crypto';
 import { CoachCallError, CoachReply, MessagesRequest } from '../coach/call';
