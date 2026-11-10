@@ -6,7 +6,7 @@ permalink: /privacy/
 # Privacy Policy for Revisely
 
 **Effective date: 2026-05-11**
-**Last updated: 2026-11-08**
+**Last updated: 2026-11-09**
 
 This Privacy Policy describes how Revisely ("we", "us", or "the app") collects, uses, and protects information when you use the Revisely mobile application, and when you donate to Revisely on our website, revisely.app.
 
@@ -61,7 +61,7 @@ We never send Anthropic your name, email address, account ID, location, or the a
 - the answer to a first question, kept for that day, so asking the same question again doesn't send it to Anthropic again;
 - a count of the questions you ask each day, which sets the daily limit.
 
-Our logs record counts and costs, never your questions, Revo's answers or your notes.
+Our logs record counts and costs, linked to your account's internal ID and kept for 30 days, never your questions, Revo's answers or your notes.
 
 **Deleting it.** Settings → Revo AI → Delete conversations deletes all your conversations. Turning Revo off deletes your conversations, what it remembers and the kept answers. Deleting your account deletes all of it.
 
