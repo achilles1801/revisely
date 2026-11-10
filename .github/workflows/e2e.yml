@@ -89,6 +89,10 @@ on:
         description: Runs of each flow, every one of which must pass, with no reruns
         type: string
         default: '1'
+      shuffle:
+        description: A seed to run each job's flows in its order (a nightly run's, to run that order again); empty to keep theirs
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -290,10 +294,93 @@ jobs:
           done < "$files"
           [ "$app" = true ] || echo "Nothing here goes into the app or the flows: the flows are skipped."
           echo "app=$app" >> "$GITHUB_OUTPUT"
-  ios:
-    name: E2E (iOS Simulator, ${{ matrix.shard.name }})
+  # The iOS app's native build, once a run, before the iOS jobs: each then restores it. A PR's run can
+  # restore only its own caches and its base branch's, so a release PR's first run had none: each of
+  # the four iOS jobs built the app (26 minutes) inside its 90, and the two longest ran out with their
+  # flows still going (#496's run 42727081470). On a miss this builds it once and keeps it in the run's
+  # own scope; on a hit it only looks (lookup-only) and ends in about three minutes.
+  ios-build:
+    name: E2E (iOS Simulator, the native build)
     needs: changes
     if: ${{ needs.changes.outputs.app == 'true' && needs.changes.outputs.run_ios == 'true' }}
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'schedule' && 'develop' || '' }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # As the iOS job (npm/cli#7308).
+      - name: npm 11
+        run: npm install -g npm@11.21.1 --no-audit --no-fund
+
+      - name: Select Xcode
+        run: |
+          if [ -d /Applications/Xcode_26.6.app ]; then
+            sudo xcode-select -s /Applications/Xcode_26.6.app
+          else
+            echo "::warning::Xcode 26.6 is not on this image; using the default $(xcodebuild -version | head -1)."
+          fi
+          xcodebuild -version
+
+      - name: Restore node_modules
+        id: nm
+        uses: actions/cache/restore@v4
+        with:
+          path: node_modules
+          key: e2e-node-modules-${{ runner.os }}-${{ runner.arch }}-node22-${{ hashFiles('package-lock.json', 'patches/**') }}
+
+      - name: npm ci
+        if: steps.nm.outputs.cache-hit != 'true'
+        run: npm ci --legacy-peer-deps
+
+      - name: Keep node_modules
+        if: steps.nm.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: node_modules
+          key: ${{ steps.nm.outputs.cache-primary-key }}
+
+      - name: Fingerprint (the E2E build's native side)
+        id: fp
+        env:
+          GOOGLE_REVERSED_CLIENT_ID: com.googleusercontent.apps.123456789012-e2e
+        run: |
+          bash .maestro/scripts/firebase-demo-config.sh ios
+          HASH=$(npx expo-updates fingerprint:generate --platform ios | grep '^{' | jq -r .hash)
+          echo "hash=$HASH" >> "$GITHUB_OUTPUT"
+          echo "iOS fingerprint $HASH"
+
+      # The same key as the iOS job's (keep the two in step).
+      - name: Is the native build kept?
+        id: cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .maestro/build/Revisely.app
+          key: e2e-ios-${{ steps.fp.outputs.hash }}-${{ hashFiles('.maestro/scripts/build-ios.sh', '.maestro/scripts/firebase-demo-config.sh') }}
+          lookup-only: true
+
+      - name: Build the E2E app (native)
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: bash .maestro/scripts/build-ios.sh
+
+      - name: Keep the native build
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .maestro/build/Revisely.app
+          key: ${{ steps.cache.outputs.cache-primary-key }}
+
+  ios:
+    name: E2E (iOS Simulator, ${{ matrix.shard.name }})
+    # After the native build, which each job restores (its own build steps stay for a cache evicted
+    # in between).
+    needs: [changes, ios-build]
+    if: ${{ needs.changes.outputs.app == 'true' && needs.changes.outputs.run_ios == 'true' && needs.ios-build.result == 'success' }}
     runs-on: macos-26
     # Each flow run twice (a change to shared test code): twice the flows' time.
     timeout-minutes: ${{ inputs.repeat == '2' && 180 || 90 }}
@@ -504,6 +591,9 @@ jobs:
           # run 42649421053 was stopped at 900 s while still going (560 of its ~586 steps).
           E2E_FLOW_LIMIT: '1200'
           E2E_REPEAT: ${{ inputs.repeat || '1' }}
+          # The nightly run shuffles each job's flows, its run id the seed (run.sh prints the order):
+          # a flow that leans on another having run before it fails there, not on a release day.
+          E2E_SHUFFLE: ${{ github.event_name == 'schedule' && github.run_id || inputs.shuffle || '' }}
         # $FLOWS is a glob, expanded here.
         run: bash .maestro/run.sh ios $FLOWS
 
@@ -792,6 +882,9 @@ jobs:
         env:
           E2E_FLOWS: ${{ matrix.shard.flows }}
           E2E_REPEAT: ${{ inputs.repeat || '1' }}
+          # The nightly run shuffles each job's flows, its run id the seed (run.sh prints the order):
+          # a flow that leans on another having run before it fails there, not on a release day.
+          E2E_SHUFFLE: ${{ github.event_name == 'schedule' && github.run_id || inputs.shuffle || '' }}
         with:
           api-level: 34
           target: google_apis
@@ -857,7 +950,7 @@ jobs:
   # or when nothing in the change goes into the app (they were skipped).
   e2e:
     name: ${{ github.event_name == 'workflow_dispatch' && inputs.ios == '' && (inputs.platform != 'both' || inputs.flows != '') && 'E2E (partial run)' || 'E2E' }}
-    needs: [changes, ios, android]
+    needs: [changes, ios-build, ios, android]
     # Also after a failure or a cancellation, so the check is never missing.
     if: always()
     runs-on: ubuntu-latest
@@ -869,12 +962,13 @@ jobs:
           APP: ${{ needs.changes.outputs.app }}
           RUN_IOS: ${{ needs.changes.outputs.run_ios }}
           RUN_ANDROID: ${{ needs.changes.outputs.run_android }}
+          IOS_BUILD: ${{ needs.ios-build.result }}
           IOS: ${{ needs.ios.result }}
           ANDROID: ${{ needs.android.result }}
           EVENT: ${{ github.event_name }}
           PLATFORM: ${{ inputs.platform }}
         run: |
-          echo "changes: $CHANGES (app: $APP), iOS: $IOS, Android: $ANDROID"
+          echo "changes: $CHANGES (app: $APP), iOS build: $IOS_BUILD, iOS: $IOS, Android: $ANDROID"
           if [ "$CHANGES" != success ]; then echo "::error::Couldn't tell what changed ($CHANGES)."; exit 1; fi
           if [ "$APP" != true ]; then echo "Nothing that goes into the app changed: no flows to run."; exit 0; fi
           expect() { # platform planned result
@@ -882,6 +976,7 @@ jobs:
             if [ "$3" != success ]; then echo "::error::E2E on $1: $3"; return 1; fi
           }
           ok=0
+          expect "ios (the native build)" "$RUN_IOS" "$IOS_BUILD" || ok=1
           expect ios "$RUN_IOS" "$IOS" || ok=1
           expect android "$RUN_ANDROID" "$ANDROID" || ok=1
           exit $ok

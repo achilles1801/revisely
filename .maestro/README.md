@@ -70,6 +70,15 @@ retry is a warning on the run, and the job keeps its results as for a failure.
   - Runs of a fork's pull request are left out. A PR that changes the report prints it in its job
     summary instead of commenting; so does a run by hand with `dry_run`. Like every scheduled
     workflow it runs from `main`.
+- **A clean start:** every attempt starts from empty emulators (`run.sh` deletes the Firestore
+  emulator's documents and the Auth emulator's accounts first), with the app's data wiped
+  (`launch.yaml`), online, and on iOS with no position. A flow makes everything it reads: its account,
+  any config or seed. After three seeded accounts, 10-delete-account's deletion took 30 s on iOS
+  against 3–4 s on an empty emulator (#217's run 42687083053).
+- **Shuffled at night:** the nightly run takes each job's flows in an order seeded by its run id, and
+  prints it. A flow that leans on another having run before it fails there. To run a night's order
+  again: Run workflow with `shuffle` set to that seed (and the same `flows`), or `E2E_SHUFFLE=<seed>`
+  for `run.sh`.
 - **Time limits:** `run.sh` stops a flow's attempt after 20 minutes on iOS and 15 on Android, and
   the warm-up after 6 (`E2E_FLOW_LIMIT`, `E2E_WARMUP_LIMIT`). Maestro can hang for good: once its
   iOS driver answered 500, its JVM never exited, and a job waited 55 minutes for it. iOS flows 09
@@ -85,8 +94,19 @@ retry is a warning on the run, and the job keeps its results as for a failure.
   - So a long screen is scrolled by counted swipes: `repeat` while the row isn't visible, `scroll`,
     at most so many times, then `scrollUntilVisible` only to centre it. Every Settings row goes
     through `subflows/settings-row.yaml` (by id) or `subflows/theme.yaml` (Theme has none).
+- **Maestro's iOS driver is installed once:** the warm-up installs it, and each flow uses it
+  (`--no-reinstall-driver`); the attempt after a failure installs it afresh. Before, every flow
+  installed it again with xcodebuild, much of the 35–160 s an iOS flow spent before its first step,
+  and once the simulator refused to launch the fresh install ("Unknown application display
+  identifier"), failing 09-revo-attach before it began (run 42746203992). Maestro still installs it
+  when it isn't running. Android keeps the default (it installs its driver only when missing).
+  `scripts/e2e/__tests__/driver.test.js` runs `run.sh` against a stand-in Maestro.
 - **Caches:** this workflow holds no release secrets, so it keeps `node_modules`, Maestro and the
   Firestore emulator's jar, as it keeps the native builds.
+- **The iOS build, once a run:** the job "E2E (iOS Simulator, the native build)" builds the app (or
+  finds it kept) before the iOS jobs, which each restore it. A PR's run sees only its own caches and its
+  base branch's, so a release PR's first run had none, and each iOS job built its own: 26 of its 90
+  minutes, and two ran out (#496's run 42727081470).
 
 They sit on top of the scenario tests (`tests/scenarios`, `BEHAVIOUR.md`): those run the app's
 providers and screens in Jest; these run the built app, with its native modules, its navigation,

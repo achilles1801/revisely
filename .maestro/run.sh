@@ -15,6 +15,8 @@
 #   E2E_AUTH_URL       the Auth emulator as this computer sees it (http://127.0.0.1:9099)
 #   E2E_FIRESTORE_URL  the Firestore emulator (http://127.0.0.1:8080)
 #   E2E_FUNCTIONS_URL  the functions emulator (http://127.0.0.1:5001)
+#   E2E_PROJECT        the emulators' project (demo-revisely), whose data each attempt starts without
+#   E2E_SHUFFLE        a seed: the flows run in that seed's order (scripts/shuffle.js; the nightly run)
 #   E2E_OUTPUT         where reports, logs and screenshots go (.maestro/build/results)
 #   E2E_RETRIES        reruns of a failed flow (default 0); a pass on a rerun is reported
 #   E2E_REPEAT         runs of each flow, every one of which must pass, with no reruns (default 1;
@@ -31,6 +33,16 @@ FLOWS=("$@")
 if [ ${#FLOWS[@]} -eq 0 ]; then
   while IFS= read -r f; do FLOWS+=("$f"); done < <(ls "$ROOT"/.maestro/flows/*.yaml | sort)
 fi
+# E2E_SHUFFLE: the flows in the seed's order, the same each time for one seed. The nightly run's check
+# that no flow leans on another having run before it on the same device (06's prayer line came from
+# 04's location, and 11's from 06's: #217's runs 42662790506 and 42687083053).
+if [ -n "${E2E_SHUFFLE:-}" ]; then
+  shuffled=()
+  while IFS= read -r f; do shuffled+=("$f"); done < <(node "$ROOT/.maestro/scripts/shuffle.js" "$E2E_SHUFFLE" "${FLOWS[@]}")
+  FLOWS=("${shuffled[@]}")
+  echo "Flows in the order of seed $E2E_SHUFFLE (E2E_SHUFFLE=$E2E_SHUFFLE runs it again):"
+  for f in "${FLOWS[@]}"; do echo "  $(basename "$f" .yaml)"; done
+fi
 OUT=${E2E_OUTPUT:-$ROOT/.maestro/build/results}
 RETRIES=${E2E_RETRIES:-0}
 REPEAT=${E2E_REPEAT:-1}
@@ -40,6 +52,7 @@ DEFAULT_ZONE=${E2E_ZONE:-America/Chicago}
 AUTH_URL=${E2E_AUTH_URL:-http://127.0.0.1:9099}
 FIRESTORE_URL=${E2E_FIRESTORE_URL:-http://127.0.0.1:8080}
 FUNCTIONS_URL=${E2E_FUNCTIONS_URL:-http://127.0.0.1:5001}
+PROJECT=${E2E_PROJECT:-demo-revisely}
 MAESTRO=${MAESTRO:-$(command -v maestro || echo "$HOME/.maestro/bin/maestro")}
 mkdir -p "$OUT"
 
@@ -133,8 +146,41 @@ save_device_state() {
   fi
 }
 
+# iOS: Maestro's driver (an XCTest runner on the simulator) is installed by the warm-up and kept
+# running from flow to flow. By default every `maestro test` uninstalls it, installs it again with
+# xcodebuild and waits for it: much of the 35–160 s an iOS flow spent before its first step (#328's
+# run 42746203992), and once the simulator refused to launch the fresh install ("Unknown
+# application display identifier dev.mobile.maestro-driver-iosUITests.xctrunner") and the flow
+# failed before it began (09-revo-attach). With --no-reinstall-driver Maestro uses the running
+# driver, and installs it only when it isn't running (Maestro 2.11, LocalXCTestInstaller). After a
+# failed attempt the next one installs it afresh, in case the driver was the trouble.
+# The app is still launched per flow with `xcrun simctl launch`, so each flow's zone still applies.
+# Android installs its driver only when it is missing, and keeps the default.
+DRIVER=fresh
+
+# Every attempt starts from empty emulators: no account, document or sign-in that an earlier flow (or
+# attempt) left. A flow makes what it reads: its account, and config/app or a seed where it needs one.
+# After three seeded accounts, 10-delete-account's deletion took 30.0 and 32.2 s on iOS against 3.4 and
+# 4.0 s on an empty emulator, past the app's 30 s (#217's run 42687083053). Storage keeps its files:
+# they are under each account's own id, and nothing lists another's.
+clear_backend() {
+  curl -fsS -X DELETE "$FIRESTORE_URL/emulator/v1/projects/$PROJECT/databases/(default)/documents" >/dev/null &&
+    curl -fsS -X DELETE "$AUTH_URL/emulator/v1/projects/$PROJECT/accounts" >/dev/null
+}
+
 run_flow() {
-  local flow=$1 zone=$2 out=$3
+  local flow=$1 zone=$2 out=$3 reuse=""
+  [ "$DRIVER" = reuse ] && reuse=--no-reinstall-driver
+  if ! clear_backend; then
+    echo "    couldn't empty the emulators ($FIRESTORE_URL, $AUTH_URL) before $(basename "$flow" .yaml)" | tee "$out/maestro.log"
+    return 1
+  fi
+  if [ "$PLATFORM" = ios ]; then
+    # No position on the Simulator: a flow that wants one sets it (subflows/location.yaml), and the
+    # app is denied location otherwise. The emulator's position can't be cleared; its permission is.
+    xcrun simctl location "$DEVICE" clear >/dev/null 2>&1 ||
+      echo "    couldn't clear the Simulator's location (the app is still denied it)"
+  fi
   if [ "$PLATFORM" = android ]; then
     adb -s "$DEVICE" logcat -c >/dev/null 2>&1
     # A system dialog left up (a slow emulator's "isn't responding") would cover the app.
@@ -146,7 +192,9 @@ run_flow() {
     adb -s "$DEVICE" shell cmd connectivity airplane-mode disable >/dev/null 2>&1 || true
   fi
   if [ "$PLATFORM" = ios ]; then
-    with_limit "$FLOW_LIMIT" env SIMCTL_CHILD_TZ="$zone" "$MAESTRO" --device "$DEVICE" test \
+    # $reuse unquoted: nothing at all when the driver is installed afresh.
+    # shellcheck disable=SC2086
+    with_limit "$FLOW_LIMIT" env SIMCTL_CHILD_TZ="$zone" "$MAESTRO" --device "$DEVICE" test $reuse \
       -e E2E_AUTH_URL="$AUTH_URL" -e E2E_FIRESTORE_URL="$FIRESTORE_URL" -e E2E_FUNCTIONS_URL="$FUNCTIONS_URL" \
       --format junit --output "$out/report.xml" --debug-output "$out/debug" \
       --test-output-dir "$out/run" \
@@ -164,8 +212,12 @@ run_flow() {
 # The app's first launch, and iOS's one-time link prompt, before any flow.
 echo "▶ warm-up ($PLATFORM)"
 mkdir -p "$OUT/$PLATFORM"
-with_limit "$WARMUP_LIMIT" "$MAESTRO" --device "$DEVICE" test "$ROOT/.maestro/subflows/warm-up.yaml" > "$OUT/$PLATFORM/warm-up.log" 2>&1 ||
+# It installs Maestro's driver afresh; the flows then use it (DRIVER above).
+if with_limit "$WARMUP_LIMIT" "$MAESTRO" --device "$DEVICE" test "$ROOT/.maestro/subflows/warm-up.yaml" > "$OUT/$PLATFORM/warm-up.log" 2>&1; then
+  DRIVER=reuse
+else
   echo "  warm-up failed (see $OUT/$PLATFORM/warm-up.log); going on"
+fi
 
 failed=0
 summary="| Flow | Zone | Result | Time |\n| --- | --- | --- | --- |\n"
@@ -195,12 +247,14 @@ for flow in "${FLOWS[@]}"; do
     if [ "$attempt" -gt 0 ]; then echo "▶ $name ($PLATFORM, $zone), retry $attempt"; else echo "▶ $name ($PLATFORM, $zone)"; fi
     tried=$(date +%s)
     if run_flow "$flow" "$zone" "$out"; then
+      DRIVER=reuse
       printf '%s\t%s\t%s\tpassed\t%s\t%s\n' "$name" "$zone" "$attempt" $(( $(date +%s) - tried )) "$(basename "$out")" >> "$ATTEMPTS"
       result=$([ "$attempt" -eq 0 ] && echo passed || echo "passed on retry $attempt")
       break
     fi
     printf '%s\t%s\t%s\tfailed\t%s\t%s\n' "$name" "$zone" "$attempt" $(( $(date +%s) - tried )) "$(basename "$out")" >> "$ATTEMPTS"
     save_device_state "$out"
+    DRIVER=fresh
     # The workflow keeps the results of a job with a failed attempt (a pass on a retry too).
     touch "$out/attempt-failed"
     tail -25 "$out/maestro.log" | sed 's/^/    /'
