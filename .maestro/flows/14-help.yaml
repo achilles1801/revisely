@@ -109,6 +109,13 @@ appId: com.revisionbuddy.app
       ROW: settings-help-buttons
 - tapOn:
     id: settings-help-buttons
+# The switch reads on before Home is looked at: a tap that didn't take (the list still moving) fails here
+# as what it is, and a ? missing from Home with the switch on would be the app's.
+- extendedWaitUntil:
+    visible:
+      id: settings-help-buttons
+      checked: true
+    timeout: 5000
 - runFlow: ../subflows/back-home.yaml
 - extendedWaitUntil:
     visible:

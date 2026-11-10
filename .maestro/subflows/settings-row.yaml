@@ -20,3 +20,17 @@ appId: com.revisionbuddy.app
     direction: DOWN
     centerElement: true
     timeout: 60000
+# Still before the flow taps the row: the centring swipe's momentum can carry the list on after Maestro
+# has aimed. 14's tap on Help buttons came 0.5 s after it ("null settle after a scroll"), with the switch
+# drifting up under the header (y 90–118), and the switch stayed off (#217's run 42687083053 and #496's
+# 42727081470, the same step both times). Then centred again if it drifted, and still again.
+- waitForAnimationToEnd:
+    timeout: 5000
+- scrollUntilVisible:
+    element:
+      id: ${ROW}
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 5000

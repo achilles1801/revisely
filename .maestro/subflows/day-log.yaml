@@ -2,10 +2,22 @@
 # without a note has no way into its log; add one first (add-day-note.yaml).
 appId: com.revisionbuddy.app
 ---
-- scrollUntilVisible:
-    element: "Daily log. Open the log"
-    direction: DOWN
-    timeout: 10000
+# The note row is there once the day's notes have loaded: about 12 s after the day opened on a busy
+# iOS runner, where a 10 s scrollUntilVisible gave up just before it came (11's light pass, #496's run
+# 42727081470; the row was on screen in the hierarchy kept at the failure). So a wait for it where it
+# shows without scrolling (every day a flow writes is short), then counted swipes for a longer one (a
+# swipe and a look take 4–20 s on the iOS runner, settings-row.yaml), and the check.
+- extendedWaitUntil:
+    visible: "Daily log. Open the log"
+    timeout: 30000
+    optional: true
+- repeat:
+    while:
+      notVisible: "Daily log. Open the log"
+    times: 6
+    commands:
+      - scroll
+- assertVisible: "Daily log. Open the log"
 - tapOn: "Daily log. Open the log"
 - extendedWaitUntil:
     visible:
