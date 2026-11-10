@@ -85,6 +85,13 @@ retry is a warning on the run, and the job keeps its results as for a failure.
   - So a long screen is scrolled by counted swipes: `repeat` while the row isn't visible, `scroll`,
     at most so many times, then `scrollUntilVisible` only to centre it. Every Settings row goes
     through `subflows/settings-row.yaml` (by id) or `subflows/theme.yaml` (Theme has none).
+- **Maestro's iOS driver is installed once:** the warm-up installs it, and each flow uses it
+  (`--no-reinstall-driver`); the attempt after a failure installs it afresh. Before, every flow
+  installed it again with xcodebuild, much of the 35–160 s an iOS flow spent before its first step,
+  and once the simulator refused to launch the fresh install ("Unknown application display
+  identifier"), failing 09-revo-attach before it began (run 42746203992). Maestro still installs it
+  when it isn't running. Android keeps the default (it installs its driver only when missing).
+  `scripts/e2e/__tests__/driver.test.js` runs `run.sh` against a stand-in Maestro.
 - **Caches:** this workflow holds no release secrets, so it keeps `node_modules`, Maestro and the
   Firestore emulator's jar, as it keeps the native builds.
 - **The iOS build, once a run:** the job "E2E (iOS Simulator, the native build)" builds the app (or

@@ -133,8 +133,21 @@ save_device_state() {
   fi
 }
 
+# iOS: Maestro's driver (an XCTest runner on the simulator) is installed by the warm-up and kept
+# running from flow to flow. By default every `maestro test` uninstalls it, installs it again with
+# xcodebuild and waits for it: much of the 35–160 s an iOS flow spent before its first step (#328's
+# run 42746203992), and once the simulator refused to launch the fresh install ("Unknown
+# application display identifier dev.mobile.maestro-driver-iosUITests.xctrunner") and the flow
+# failed before it began (09-revo-attach). With --no-reinstall-driver Maestro uses the running
+# driver, and installs it only when it isn't running (Maestro 2.11, LocalXCTestInstaller). After a
+# failed attempt the next one installs it afresh, in case the driver was the trouble.
+# The app is still launched per flow with `xcrun simctl launch`, so each flow's zone still applies.
+# Android installs its driver only when it is missing, and keeps the default.
+DRIVER=fresh
+
 run_flow() {
-  local flow=$1 zone=$2 out=$3
+  local flow=$1 zone=$2 out=$3 reuse=""
+  [ "$DRIVER" = reuse ] && reuse=--no-reinstall-driver
   if [ "$PLATFORM" = android ]; then
     adb -s "$DEVICE" logcat -c >/dev/null 2>&1
     # A system dialog left up (a slow emulator's "isn't responding") would cover the app.
@@ -146,7 +159,9 @@ run_flow() {
     adb -s "$DEVICE" shell cmd connectivity airplane-mode disable >/dev/null 2>&1 || true
   fi
   if [ "$PLATFORM" = ios ]; then
-    with_limit "$FLOW_LIMIT" env SIMCTL_CHILD_TZ="$zone" "$MAESTRO" --device "$DEVICE" test \
+    # $reuse unquoted: nothing at all when the driver is installed afresh.
+    # shellcheck disable=SC2086
+    with_limit "$FLOW_LIMIT" env SIMCTL_CHILD_TZ="$zone" "$MAESTRO" --device "$DEVICE" test $reuse \
       -e E2E_AUTH_URL="$AUTH_URL" -e E2E_FIRESTORE_URL="$FIRESTORE_URL" -e E2E_FUNCTIONS_URL="$FUNCTIONS_URL" \
       --format junit --output "$out/report.xml" --debug-output "$out/debug" \
       --test-output-dir "$out/run" \
@@ -164,8 +179,12 @@ run_flow() {
 # The app's first launch, and iOS's one-time link prompt, before any flow.
 echo "▶ warm-up ($PLATFORM)"
 mkdir -p "$OUT/$PLATFORM"
-with_limit "$WARMUP_LIMIT" "$MAESTRO" --device "$DEVICE" test "$ROOT/.maestro/subflows/warm-up.yaml" > "$OUT/$PLATFORM/warm-up.log" 2>&1 ||
+# It installs Maestro's driver afresh; the flows then use it (DRIVER above).
+if with_limit "$WARMUP_LIMIT" "$MAESTRO" --device "$DEVICE" test "$ROOT/.maestro/subflows/warm-up.yaml" > "$OUT/$PLATFORM/warm-up.log" 2>&1; then
+  DRIVER=reuse
+else
   echo "  warm-up failed (see $OUT/$PLATFORM/warm-up.log); going on"
+fi
 
 failed=0
 summary="| Flow | Zone | Result | Time |\n| --- | --- | --- | --- |\n"
@@ -195,12 +214,14 @@ for flow in "${FLOWS[@]}"; do
     if [ "$attempt" -gt 0 ]; then echo "▶ $name ($PLATFORM, $zone), retry $attempt"; else echo "▶ $name ($PLATFORM, $zone)"; fi
     tried=$(date +%s)
     if run_flow "$flow" "$zone" "$out"; then
+      DRIVER=reuse
       printf '%s\t%s\t%s\tpassed\t%s\t%s\n' "$name" "$zone" "$attempt" $(( $(date +%s) - tried )) "$(basename "$out")" >> "$ATTEMPTS"
       result=$([ "$attempt" -eq 0 ] && echo passed || echo "passed on retry $attempt")
       break
     fi
     printf '%s\t%s\t%s\tfailed\t%s\t%s\n' "$name" "$zone" "$attempt" $(( $(date +%s) - tried )) "$(basename "$out")" >> "$ATTEMPTS"
     save_device_state "$out"
+    DRIVER=fresh
     # The workflow keeps the results of a job with a failed attempt (a pass on a retry too).
     touch "$out/attempt-failed"
     tail -25 "$out/maestro.log" | sed 's/^/    /'
