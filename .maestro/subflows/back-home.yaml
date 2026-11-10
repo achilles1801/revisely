@@ -1,4 +1,8 @@
 # Back (the top bar's) until Home shows.
+# After each Back it waits for Home (up to 5 s) before tapping again. The loop's own
+# check is immediate, so a Home still sliding in read as "not Home" and the next Back
+# found no button (09-insights-history, run 42783211424: Home showed a moment later).
+# A screen under this one has a Back of its own, and the wait just runs out there.
 appId: com.revisionbuddy.app
 ---
 - repeat:
@@ -9,5 +13,10 @@ appId: com.revisionbuddy.app
     commands:
       - tapOn:
           id: back
+      - extendedWaitUntil:
+          visible:
+            id: today-post
+          timeout: 5000
+          optional: true
 - assertVisible:
     id: today-post
