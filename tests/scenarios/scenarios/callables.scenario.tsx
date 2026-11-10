@@ -82,8 +82,10 @@ const tap = async (app: OpenApp, testID: string) => {
 
 it('[COACH-4] [COACH-5] [COACH-2] the Ask coach sheet against the real function: turned on, an answer with the questions left, kept for the day', async () => {
   setZone(ZONES.chicago);
-  // A month of its own: the ledger is shared by every account in a month.
+  // A month of its own: the ledger is shared by every account in a month. Empty to start with: a
+  // second run of the suite (TESTING.md) uses the same emulators, and found this run's call there.
   setNow('2031-03-04 10:00');
+  await deleteServerDoc('coachLedger/2031-03');
   const phone = new Phone('phone');
   const sheet = (mods: Booted) => {
     const { AskCoachSheet } = mods.require<typeof import('../../../src/components/coach/AskCoachSheet')>('src/components/coach/AskCoachSheet');
@@ -436,8 +438,11 @@ type RevoAvailabilityMod = typeof import('../../../src/lib/revo/availability');
 // app's handling of "off" is in properties/revo.property.ts and the app's tests.
 it('[REVO-37] the release switch: everyone opens Revo to an account that isn’t a tester, with no new build, and the phone reads it', async () => {
   setZone(ZONES.chicago);
-  setNow('2031-10-14 20:10');
-  const DAY = '2031-10-14';
+  // A month of its own, its ledger empty to start with: [REVO-9] caps October's, and the suite's
+  // second run (TESTING.md) found that cap here when this test shared the month.
+  setNow('2031-11-11 20:10');
+  await deleteServerDoc('coachLedger/2031-11');
+  const DAY = '2031-11-11';
   const phone = new Phone('phone');
   const app = await newAccount(phone, { memorized: pagesRange(582, 604), user: { dailyPageCapacity: 5 } });
   const revo = () => app.mods.require<RevoBackendMod>('src/lib/revo/backend').revoBackend();

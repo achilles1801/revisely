@@ -54,13 +54,20 @@ function short(flow) {
   return shared ? base(flow) : number;
 }
 
-/** The `timeout-minutes` of e2e.yml's job `ios` or `android`. */
-function limit(job) {
+/**
+ * The `timeout-minutes` of e2e.yml's job `ios` or `android`: a number, or
+ * `${{ inputs.repeat == '2' && <twice> || <once> }}` (each flow run twice, for a change to shared test code).
+ */
+function limit(job, repeat = 1) {
   const at = workflow.indexOf(`\n  ${job}:\n`);
   if (at < 0) throw new Error(`e2e.yml has no job ${job}`);
-  const match = /\n    timeout-minutes: (\d+)\n/.exec(workflow.slice(at));
-  if (!match) throw new Error(`e2e.yml's job ${job} has no timeout-minutes`);
-  return Number(match[1]);
+  const line = /\n    timeout-minutes: ([^\n]+)\n/.exec(workflow.slice(at));
+  if (!line) throw new Error(`e2e.yml's job ${job} has no timeout-minutes`);
+  const plain = /^(\d+)$/.exec(line[1]);
+  if (plain) return Number(plain[1]);
+  const either = /^\$\{\{ inputs\.repeat == '2' && (\d+) \|\| (\d+) \}\}$/.exec(line[1]);
+  if (!either) throw new Error(`e2e.yml's job ${job}: timeout-minutes '${line[1]}' isn't read here`);
+  return Number(repeat === 2 ? either[1] : either[2]);
 }
 
 it('puts every flow in exactly one job of a full run', () => {
@@ -96,6 +103,18 @@ it.each(['ios', 'android'])('%s: every full job fits its time limit with a retry
   expect(over).toEqual([]);
 });
 
+// Each flow run twice, with no reruns (a change to shared test code that every flow uses: run.sh,
+// e2e.yml, ci.yml), as slow as each has passed.
+it.each(['ios', 'android'])('%s: every full job fits its limit when each flow runs twice', (platform) => {
+  const over = [];
+  for (const job of fullJobs()) {
+    const each = flowsOf(job).map((f) => minutes[platform][base(f)]);
+    const total = OVERHEAD[platform] + 2 * each.reduce((a, b) => a + b, 0);
+    if (total > limit(platform, 2)) over.push(`${job.name}: ${total} of ${limit(platform, 2)} minutes`);
+  }
+  expect(over).toEqual([]);
+});
+
 it('reads globs the way the shell does', () => {
   expect(globRegex('.maestro/flows/1[02345]-*.yaml').test('.maestro/flows/13-sitting-memorized.yaml')).toBe(true);
   expect(globRegex('.maestro/flows/1[04]-*.yaml').test('.maestro/flows/12-add-to-day.yaml')).toBe(false);
@@ -105,6 +124,8 @@ it('reads globs the way the shell does', () => {
 });
 
 it('reads the time limits from e2e.yml', () => {
-  expect(limit('ios')).toBeGreaterThan(0);
-  expect(limit('android')).toBeGreaterThan(0);
+  for (const platform of ['ios', 'android']) {
+    expect(limit(platform)).toBeGreaterThanOrEqual(60);
+    expect(limit(platform, 2)).toBeGreaterThanOrEqual(limit(platform));
+  }
 });

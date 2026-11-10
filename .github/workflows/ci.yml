@@ -40,12 +40,45 @@ jobs:
     name: CI plan
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    permissions: {}
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
       e2e: ${{ steps.plan.outputs.e2e }}
       ios: ${{ steps.plan.outputs.ios }}
       android: ${{ steps.plan.outputs.android }}
+      only: ${{ steps.plan.outputs.only }}
+      repeat: ${{ steps.plan.outputs.repeat }}
+      scenario_repeat: ${{ steps.plan.outputs.scenario_repeat }}
     steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            .maestro
+            .github
+      # Test the tests: what a PR changes in the code flows and scenarios share
+      # (.github/scripts/affected-flows.js). Its flows run on both platforms,
+      # twice, with no reruns; a change to the scenario harness runs the suite
+      # twice. #286 changed swipe-page.yaml, passed 06 once in the smoke set and
+      # broke 06 on develop.
+      - id: infra
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          STACK_BASE_SHA: ${{ github.event.pull_request.stack.base.sha }}
+        run: |
+          if [ -n "$STACK_BASE_SHA" ]; then
+            files=$(gh api "repos/$REPO/compare/$STACK_BASE_SHA...$HEAD_SHA" --jq '.files[] | .filename, (.previous_filename // empty)')
+          else
+            files=$(gh api --paginate "repos/$REPO/pulls/$PR/files" --jq '.[] | .filename, (.previous_filename // empty)')
+          fi
+          out=$(printf '%s\n' "$files" | node .github/scripts/affected-flows.js)
+          echo "Shared test code: $out"
+          echo "flows=$(jq -c .flows <<<"$out")" >> "$GITHUB_OUTPUT"
+          echo "scenarios=$(jq -r .scenarios <<<"$out")" >> "$GITHUB_OUTPUT"
       # A stacked PR carries `stack` (position 1 is the bottom; the top has
       # position == size; base.ref is the branch the whole stack targets).
       - id: plan
@@ -58,8 +91,10 @@ jobs:
           STACK_BASE: ${{ github.event.pull_request.stack.base.ref }}
           DRAFT: ${{ github.event.pull_request.draft }}
           LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+          INFRA_FLOWS: ${{ steps.infra.outputs.flows }}
+          INFRA_SCENARIOS: ${{ steps.infra.outputs.scenarios }}
         run: |
-          ios=none; android=none
+          ios=none; android=none; only=""; repeat=1; scenario_repeat=1
           case "$EVENT" in
             pull_request)
               target=${STACK_BASE:-$BASE}
@@ -75,6 +110,21 @@ jobs:
                 android=smoke; what="a PR into develop: the Android smoke set"
               else
                 what="a PR into $target: fast checks (E2E runs once it targets develop)"
+              fi
+              # Test the tests (not for drafts, nor a stack's lower layers, nor PRs into main,
+              # which run every flow anyway): the flows using the shared code it changed, both
+              # platforms, twice.
+              if [ "$target" = develop ] && [ "$DRAFT" != true ] && { [ -z "$STACK_SIZE" ] || [ "$STACK_POSITION" = "$STACK_SIZE" ]; }; then
+                if [ -n "$INFRA_FLOWS" ] && [ "$INFRA_FLOWS" != '[]' ]; then
+                  ios=infra; android=infra; repeat=2
+                  # With the smoke set a single PR runs anyway (each flow once in the list).
+                  only=$(jq -r --arg smoke "$(ls .maestro/flows/0[2456]-*.yaml | tr '\n' ' ')" \
+                    'if . == "all" then "all" else (. + ($smoke | split(" ") | map(select(. != "")))) | unique | join(" ") end' <<<"$INFRA_FLOWS")
+                  what="$what; it changes code flows share: $only, on both platforms, twice"
+                fi
+                if [ "$INFRA_SCENARIOS" = true ]; then
+                  scenario_repeat=2; what="$what; it changes the scenario harness: the suite twice"
+                fi
               fi ;;
             merge_group) ios=full; android=full; what="a merge group: every flow" ;;
             push)
@@ -88,7 +138,7 @@ jobs:
           esac
           e2e=true; [ "$ios$android" = nonenone ] && e2e=false
           echo "$what (iOS: $ios, Android: $android)"
-          { echo "ios=$ios"; echo "android=$android"; echo "e2e=$e2e"; } >> "$GITHUB_OUTPUT"
+          { echo "ios=$ios"; echo "android=$android"; echo "e2e=$e2e"; echo "only=$only"; echo "repeat=$repeat"; echo "scenario_repeat=$scenario_repeat"; } >> "$GITHUB_OUTPUT"
 
   # -----------------------------------------------------------------------
   # The fast checks, one job: the secret scan, typechecks, the app's unit and
@@ -180,7 +230,10 @@ jobs:
   # -----------------------------------------------------------------------
   scenarios:
     name: Scenarios
+    needs: plan
     uses: ./.github/workflows/scenarios.yml
+    with:
+      repeat: ${{ fromJSON(needs.plan.outputs.scenario_repeat || '1') }}
 
   # -----------------------------------------------------------------------
   # The real app on the simulator and the emulator (e2e.yml), as `plan` says.
@@ -199,6 +252,8 @@ jobs:
     with:
       ios: ${{ needs.plan.outputs.ios }}
       android: ${{ needs.plan.outputs.android }}
+      only: ${{ needs.plan.outputs.only }}
+      repeat: ${{ needs.plan.outputs.repeat || '1' }}
 
   # -----------------------------------------------------------------------
   # The required check. It runs after a failure too (never missing), and fails
@@ -206,7 +261,13 @@ jobs:
   # pass. The one job that may be skipped is E2E, when `plan` didn't ask for it.
   # -----------------------------------------------------------------------
   required:
-    name: Required
+    # The check branch protection requires: "Required" on develop; on main, "Release gate", which only a
+    # PR into main whose run tested every flow on both platforms posts (a lower layer of a stack into
+    # main runs the fast checks, so it posts "Required"). GitHub matches a required check by name on the
+    # commit, from any run: #496 (develop into main) merged 8 s after it opened, on the green "Required"
+    # develop's own push run (Android flows, no iOS) had posted on the same commit, before its full run
+    # had started (Nov 10 2026).
+    name: ${{ (github.event.pull_request.stack.base.ref || github.base_ref) == 'main' && needs.plan.outputs.ios == 'full' && needs.plan.outputs.android == 'full' && 'Release gate' || 'Required' }}
     needs: [plan, fast, scenarios, e2e]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest

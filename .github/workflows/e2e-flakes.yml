@@ -57,7 +57,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           MENTION: '@${{ github.repository_owner }}'
-          DAYS: ${{ inputs.days || '7' }}
+          # A PR's run only shows the report works: one day. Seven days of runs read through the API
+          # took past the job's 15 minutes, or met a 502, on #492's and #495's runs (Nov 9 2026).
+          DAYS: ${{ github.event_name == 'pull_request' && '1' || inputs.days || '7' }}
           DRY: ${{ (github.event_name == 'pull_request' || inputs.dry_run) && '--dry-run' || '' }}
         run: node scripts/e2e/flakes.js $DRY
 
@@ -68,6 +70,8 @@ jobs:
         if: ${{ !cancelled() }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          DAYS: ${{ inputs.days || '7' }}
-          COMMENT: ${{ (github.event_name == 'pull_request' || inputs.dry_run) && '' || '--comment' }}
+          DAYS: ${{ github.event_name == 'pull_request' && '1' || inputs.days || '7' }}
+          # Not `cond && '' || '--comment'`: '' is false in an expression, so that always gave --comment
+          # and a PR's run would post on the weekly issue.
+          COMMENT: ${{ !(github.event_name == 'pull_request' || inputs.dry_run) && '--comment' || '' }}
         run: node scripts/ci/wait-times.js --days "$DAYS" $COMMENT

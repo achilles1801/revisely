@@ -282,9 +282,18 @@ describe('release health', () => {
     expect(gate(updateHealth(releases, 'e55e24c2'), { ...bar, minSessions: 3 })).toMatchObject({ ok: true });
   });
 
+  it('with the default bar (no minimum of sessions), still refuses an update whose sessions crashed', () => {
+    const bar = parseBar({});
+    expect(gate(updateHealth(releases, 'e55e24c2'), bar)).toMatchObject({ ok: true }); // 4 sessions, none crashed
+    expect(gate(updateHealth(releases, '84b0091f'), bar)).toMatchObject({ ok: false }); // 1 of 20 crashed: 95%
+    expect(gate(updateHealth(releases, 'nope'), bar)).toMatchObject({ ok: true, reason: expect.stringMatching(/no minimum/) });
+  });
+
   it('reads the bar from the environment and refuses anything that is not a number in range', () => {
-    expect(parseBar({})).toEqual({ minSessions: 5, minCrashFree: 0.99 });
-    expect(parseBar({ MIN_SESSIONS: '', MIN_CRASH_FREE: ' ' })).toEqual({ minSessions: 5, minCrashFree: 0.99 });
+    // No minimum of sessions unless one is set (the owner, Nov 10 2026).
+    expect(parseBar({})).toEqual({ minSessions: 0, minCrashFree: 0.99 });
+    expect(parseBar({ MIN_SESSIONS: '', MIN_CRASH_FREE: ' ' })).toEqual({ minSessions: 0, minCrashFree: 0.99 });
+    expect(parseBar({ MIN_SESSIONS: '5' })).toEqual({ minSessions: 5, minCrashFree: 0.99 });
     expect(parseBar({ MIN_SESSIONS: '0', MIN_CRASH_FREE: '0.95' })).toEqual({ minSessions: 0, minCrashFree: 0.95 });
     expect(() => parseBar({ MIN_SESSIONS: 'five' })).toThrow(/MIN_SESSIONS/);
     expect(() => parseBar({ MIN_CRASH_FREE: '99%' })).toThrow(/MIN_CRASH_FREE/);

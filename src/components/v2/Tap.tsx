@@ -15,8 +15,13 @@ export function Tap({
   children?: React.ReactNode;
   pressedOpacity?: number;
 }) {
+  // E2E builds trace each press's stages (lib/e2e/taps); every other build drops this line (the
+  // variable is inlined).
+  const props =
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    process.env.EXPO_PUBLIC_E2E === '1' ? (require('../../lib/e2e/taps') as typeof import('../../lib/e2e/taps')).traceTap(rest) : rest;
   return (
-    <Pressable style={({ pressed }) => [style, pressed && { opacity: pressedOpacity }]} {...rest}>
+    <Pressable style={({ pressed }) => [style, pressed && { opacity: pressedOpacity }]} {...props}>
       {children}
     </Pressable>
   );

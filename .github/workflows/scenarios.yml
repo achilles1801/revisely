@@ -18,6 +18,11 @@ name: Scenarios
 
 on:
   workflow_call:
+    inputs:
+      repeat:
+        description: Runs of the suite in each shard, every one of which must pass (2 for a PR that changes the scenario harness); each starts from empty emulators
+        type: number
+        default: 1
 
 permissions:
   contents: read
@@ -26,7 +31,8 @@ jobs:
   shard:
     name: Scenario tests (${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # A run of a quarter takes about 12 minutes; the harness's second run doubles it (as e2e.yml).
+    timeout-minutes: ${{ inputs.repeat == 2 && 60 || 30 }}
     outputs:
       tree: ${{ steps.tree.outputs.tree }}
     strategy:
@@ -63,7 +69,9 @@ jobs:
       - name: Scenarios and properties (Firebase emulators and our functions), shard ${{ matrix.shard }} of 4
         run: >-
           scripts/emulators.sh exec auth,firestore,functions,storage demo-revisely
-          'cd tests/scenarios && npx jest --config jest.config.js --ci --maxWorkers=2 --forceExit --shard=${{ matrix.shard }}/4'
+          'cd tests/scenarios && for run in $(seq 1 ${{ inputs.repeat }}); do echo "Run $run of ${{ inputs.repeat }}";
+          if [ "$run" -gt 1 ]; then node harness/clearEmulators.js || exit 1; fi;
+          npx jest --config jest.config.js --ci --maxWorkers=2 --forceExit --shard=${{ matrix.shard }}/4 || exit 1; done'
 
   # The one check: every shard passed. It runs after a failure too, so it is
   # never missing, and a shard that didn't run (cancelled, skipped) fails it.
