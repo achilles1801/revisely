@@ -18,13 +18,7 @@ function arg(name, fallback) {
   return i > 0 ? process.argv[i + 1] : fallback;
 }
 
-async function api(path) {
-  const res = await fetch(`https://api.github.com/repos/${process.env.GITHUB_REPOSITORY}${path}`, {
-    headers: { Authorization: `Bearer ${process.env.GITHUB_TOKEN}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' },
-  });
-  if (!res.ok) throw new Error(`GitHub GET ${path} -> ${res.status}`);
-  return res.json();
-}
+const { githubGet: api } = require('./githubGet');
 
 /** A job as counted here, or null when it held no runner. */
 function counted(job, workflow) {
