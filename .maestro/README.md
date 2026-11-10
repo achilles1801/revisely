@@ -87,6 +87,10 @@ retry is a warning on the run, and the job keeps its results as for a failure.
     through `subflows/settings-row.yaml` (by id) or `subflows/theme.yaml` (Theme has none).
 - **Caches:** this workflow holds no release secrets, so it keeps `node_modules`, Maestro and the
   Firestore emulator's jar, as it keeps the native builds.
+- **The iOS build, once a run:** the job "E2E (iOS Simulator, the native build)" builds the app (or
+  finds it kept) before the iOS jobs, which each restore it. A PR's run sees only its own caches and its
+  base branch's, so a release PR's first run had none, and each iOS job built its own: 26 of its 90
+  minutes, and two ran out (#496's run 42727081470).
 
 They sit on top of the scenario tests (`tests/scenarios`, `BEHAVIOUR.md`): those run the app's
 providers and screens in Jest; these run the built app, with its native modules, its navigation,
