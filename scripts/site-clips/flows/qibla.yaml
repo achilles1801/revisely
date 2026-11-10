@@ -1,0 +1,4 @@
+appId: com.revisionbuddy.app
+---
+- tapOn: "Qibla"
+- extendedWaitUntil: { visible: "__never__", timeout: 2500, optional: true }

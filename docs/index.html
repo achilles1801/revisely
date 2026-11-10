@@ -25,7 +25,8 @@
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="manifest" href="/site.webmanifest">
-  <link rel="preload" as="image" href="/assets/img/screens/home.webp" type="image/webp" fetchpriority="high">
+  <link rel="preload" as="image" type="image/webp" href="/assets/img/slides/fan-indigo-light.webp" media="(prefers-color-scheme: light)" fetchpriority="high">
+  <link rel="preload" as="image" type="image/webp" href="/assets/img/slides/fan-indigo-dark.webp" media="(prefers-color-scheme: dark)" fetchpriority="high">
   <link rel="stylesheet" href="/assets/site.css">
   <script>document.documentElement.classList.remove('no-js')</script>
   <script type="application/ld+json">
@@ -42,7 +43,7 @@
   }
   </script>
 </head>
-<body>
+<body class="home">
   <a class="skip" href="#main">Skip to content</a>
 
   <header class="site-header">
@@ -54,294 +55,221 @@
         </picture>
       </a>
       <nav class="site-nav" aria-label="Main">
-        <a class="hide-sm" href="#features">Features</a>
-        <a class="hide-sm" href="#faq">FAQ</a>
+        <a href="#revo">Revo</a>
+        <a class="hide-sm" href="/support/">Support</a>
         <a class="pill" href="https://apps.apple.com/app/revisely/id6767990248">Download</a>
       </nav>
     </div>
   </header>
 
   <main id="main">
-    <section class="hero" aria-labelledby="hero-title">
-      <div class="wrap">
-        <div>
-          <h1 id="hero-title" class="display">Keep the Qur’an you’ve memorized.</h1>
-          <p class="lede">Revisely gives you a little revision every day, rotating through everything you’ve memorized, on the pages of the mushaf you learned from.</p>
+    <!-- The slideshow: one idea a slide, all of its words here in the page. site.js adds the dots,
+         moves it on every 7 s until someone moves it themselves, and plays the current slide's loop. -->
+    <section class="show" id="features" aria-roledescription="carousel" aria-label="Revisely, in eight slides">
+      <div class="show-track" id="slides" tabindex="0" role="group" aria-label="Slides">
 
-          <div class="get">
-            <a class="badge-link" href="https://apps.apple.com/app/revisely/id6767990248">
-              <img class="badge-light" src="https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/black/en-us" width="156" height="52" alt="Download on the App Store">
-              <img class="badge-dark" src="https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/white/en-us" width="156" height="52" alt="Download on the App Store">
-            </a>
-            <p class="android"><strong>Android</strong> coming soon to Google Play</p>
-          </div>
-
-          <ul class="facts">
-            <li>Free, no ads</li>
-            <li>Syncs across devices</li>
-            <li>The 604-page Madani mushaf</li>
-          </ul>
-        </div>
-
-        <div class="phone">
-          <div class="screen">
-            <picture>
-              <source srcset="/assets/img/screens/home.webp" type="image/webp">
-              <img src="/assets/img/screens/home.jpg" width="660" height="1434" fetchpriority="high"
-                alt="Revisely’s Home: today’s revision starts at Al-Hadid, 20 pages to At-Tahrim, with a Start revision button and how much of the Qur’an is memorized. The next prayer, Fajr, is above it.">
-            </picture>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="verse" aria-label="A verse from Surah Al-Qamar">
-      <figure class="wrap">
-        <div class="arabic" aria-hidden="true"></div>
-        <p class="visually-hidden" lang="ar" dir="rtl">وَلَقَدْ يَسَّرْنَا ٱلْقُرْءَانَ لِلذِّكْرِ فَهَلْ مِن مُّدَّكِرٍۢ</p>
-        <figcaption>
-          “And We have certainly made the Qur’an easy for remembrance, so is there any who will remember?”
-          <cite>Al-Qamar 54:17</cite>
-        </figcaption>
-      </figure>
-    </section>
-
-    <section class="steps" aria-labelledby="steps-title">
-      <div class="wrap">
-        <div class="head">
-          <span class="label">How it works</span>
-          <h2 id="steps-title" class="title">Set it up once. Then just open the app.</h2>
-        </div>
-        <ol class="thread">
-          <li>
-            <span class="mark" aria-hidden="true">1</span>
-            <div>
-              <h3>Mark what you’ve memorized</h3>
-              <p>By surah, juz or page. Add more as you memorize it, and the cycle grows with you.</p>
-            </div>
-          </li>
-          <li>
-            <span class="mark" aria-hidden="true">2</span>
-            <div>
-              <h3>Choose how much to revise a day</h3>
-              <p>A number of pages, a juz or more, or a plan you build day by day, starting from any point.</p>
-            </div>
-          </li>
-          <li>
-            <span class="mark" aria-hidden="true">3</span>
-            <div>
-              <h3>Revise today’s pages</h3>
-              <p>Tap Start revision and go through them in the mushaf, checking off each page as you finish it.</p>
-            </div>
-          </li>
-        </ol>
-      </div>
-    </section>
-
-    <div id="features">
-      <section class="feature" aria-labelledby="f-reader">
-        <div class="wrap">
+        <section class="slide s-pitch is-active" role="group" aria-roledescription="slide" aria-label="1 of 8" data-name="Revisely">
           <div class="copy">
-            <span class="label">The mushaf</span>
-            <h2 id="f-reader" class="title">Revise on real pages, and hear them recited.</h2>
-            <p>Every page of the Madani mushaf, laid out as it is in print. Press and hold a verse to read its translation, play the recitation from there, or copy it to share.</p>
-            <ul class="points">
-              <li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.2 4.2L19 7"/></svg><span>Saheeh International, or <a href="https://theclearquran.org">The Clear Quran® by Dr. Mustafa Khattab</a>, verse by verse</span></li>
-              <li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.2 4.2L19 7"/></svg><span>Al-Husary, Al-Minshawi, Abdul Basit, Alafasy and more, including a teaching recitation</span></li>
-              <li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.2 4.2L19 7"/></svg><span>Change the speed, repeat each verse, or pause after it to recite it back</span></li>
-              <li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.2 4.2L19 7"/></svg><span>Keeps playing with the phone locked, with controls on the Lock Screen</span></li>
-            </ul>
-          </div>
-          <div class="phone" data-clip-frame>
-            <div class="screen">
-              <video data-clip muted loop playsinline preload="none" disablepictureinpicture disableremoteplayback
-                data-poster="/assets/clips/reader.jpg"
-                aria-label="Holding a verse on page 518 opens a menu; Translation shows Qaf 50:4 in Arabic with its English translation, then the next verse. Back on the page, recitation plays from the first verse.">
-                <source src="/assets/clips/reader.webm" type="video/webm; codecs=vp9">
-                <source src="/assets/clips/reader.mp4" type="video/mp4">
-              </video>
-              <noscript><img src="/assets/clips/reader.jpg" alt="" loading="lazy"></noscript>
+            <h1 class="display">Keep the Qur’an you’ve memorized.</h1>
+            <p class="line">Revisely gives you a little revision every day, rotating through everything you’ve memorized.</p>
+            <div class="stores">
+              <a class="badge-link" href="https://apps.apple.com/app/revisely/id6767990248">
+                <picture>
+                  <source srcset="https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/white/en-us" media="(prefers-color-scheme: dark)">
+                  <img src="https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/black/en-us" width="156" height="52" alt="Download on the App Store">
+                </picture>
+              </a>
+              <p class="soon"><small>Coming to</small> <b>Google Play</b></p>
             </div>
-            <button class="clip-toggle" type="button" aria-pressed="true" aria-label="Pause clip">
-              <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6.5 4.5h4v15h-4zM13.5 4.5h4v15h-4z"/></svg>
-              <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 4.5v15l13-7.5z"/></svg>
-            </button>
           </div>
-        </div>
-      </section>
-
-      <section class="feature flip" aria-labelledby="f-revision">
-        <div class="wrap">
-          <div class="copy">
-            <span class="label">Revision</span>
-            <h2 id="f-revision" class="title">One page at a time. Pick up where you left off.</h2>
-            <p>Today’s pages open in the mushaf, one after another. Swipe past a page to check it off. With Smart Tracking on, you can also rate how well you know it.</p>
-            <p>Stopped partway yesterday? Home offers to add the pages you missed to today. Today keeps its usual size, and the rest of your plan moves back to make room. Been away? Jump to any surah or juz and carry on from there. The schedule never piles up.</p>
-          </div>
-          <div class="phone">
-            <div class="screen">
+          <div class="visual fan" role="img" aria-label="Revisely’s Home three times, fanned like cards, in its three accents: Indigo, Crimson and Jade. Each shows today’s revision, starting at Al-Mujadila in Juz 28, with Start revision.">
+            <div class="screen c1">
               <picture>
-                <source srcset="/assets/img/screens/revision.webp" type="image/webp">
-                <img src="/assets/img/screens/revision.jpg" width="660" height="1434" loading="lazy"
-                  alt="A revision session: a page of Surah Al-Hadid fills the screen, with 0 of 20 pages done at the top, and play, the reciter, audio options, record and the timer at the bottom.">
+                <source srcset="/assets/img/slides/fan-crimson-dark.webp" media="(prefers-color-scheme: dark)">
+                <img src="/assets/img/slides/fan-crimson-light.webp" width="600" height="1304" decoding="async" alt="">
+              </picture>
+            </div>
+            <div class="screen c3">
+              <picture>
+                <source srcset="/assets/img/slides/fan-jade-dark.webp" media="(prefers-color-scheme: dark)">
+                <img src="/assets/img/slides/fan-jade-light.webp" width="600" height="1304" decoding="async" alt="">
+              </picture>
+            </div>
+            <div class="screen c2">
+              <picture>
+                <source srcset="/assets/img/slides/fan-indigo-dark.webp" media="(prefers-color-scheme: dark)">
+                <img src="/assets/img/slides/fan-indigo-light.webp" width="600" height="1304" fetchpriority="high" alt="">
               </picture>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section class="feature" aria-labelledby="f-activity">
-        <div class="wrap">
+        <section class="slide" role="group" aria-roledescription="slide" aria-label="2 of 8" data-name="Today">
           <div class="copy">
-            <span class="label">Activity</span>
-            <h2 id="f-activity" class="title">See your month at a glance.</h2>
-            <p>Each day you revise fills in on the calendar, darker the more you did. Tap a day to see what you covered and for how long, or switch to a week for the detail. Your recordings and daily log are kept there too.</p>
+            <span class="kicker">Today</span>
+            <h2 class="title">Know where today starts.</h2>
+            <p class="line">Each day has its portion: today, Al&#8209;Mujadila to At&#8209;Tahrim in Juz 28. Everything else you’ve memorized comes round in turn.</p>
           </div>
-          <div class="phone" data-clip-frame>
+          <div class="visual">
             <div class="screen">
-              <video data-clip muted loop playsinline preload="none" disablepictureinpicture disableremoteplayback
-                data-poster="/assets/clips/activity.jpg"
-                aria-label="The Activity calendar for October, most days shaded in indigo. Tapping October 22 shows 40 pages revised in 1 hour 4 minutes; then a week view, then September.">
-                <source src="/assets/clips/activity.webm" type="video/webm; codecs=vp9">
-                <source src="/assets/clips/activity.mp4" type="video/mp4">
-              </video>
-              <noscript><img src="/assets/clips/activity.jpg" alt="" loading="lazy"></noscript>
+              <picture>
+                <source srcset="/assets/img/slides/today-dark.webp" media="(prefers-color-scheme: dark)">
+                <img src="/assets/img/slides/today-light.webp" width="600" height="1304" decoding="async"
+                  alt="Home, with today’s revision: it starts at Al-Mujadila and runs 20 pages to At-Tahrim, in Juz 28, with Start revision. Below it, 20.5% of the Quran memorized, the 30 juz dots, and the last three sittings.">
+              </picture>
             </div>
-            <button class="clip-toggle" type="button" aria-pressed="true" aria-label="Pause clip">
-              <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6.5 4.5h4v15h-4zM13.5 4.5h4v15h-4z"/></svg>
-              <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 4.5v15l13-7.5z"/></svg>
-            </button>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section class="feature flip" id="revo" aria-labelledby="f-revo">
-        <div class="wrap">
+        <section class="slide" role="group" aria-roledescription="slide" aria-label="3 of 8" data-name="Time and record">
           <div class="copy">
-            <span class="label">Revo</span>
-            <h2 id="f-revo" class="title">Ask Revo how your revision is going.</h2>
-            <p>Revo is an optional assistant in Revisely. Ask how your week went or what to revise first, and it answers from your own revision. Ask how something in the app works, and it explains.</p>
-            <ul class="points">
-              <li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.2 4.2L19 7"/></svg><span>Off until you turn it on. Turning it off in Settings deletes its conversations and what it remembers.</span></li>
-              <li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.2 4.2L19 7"/></svg><span>It only suggests: nothing in your plan changes unless you tap it.</span></li>
-              <li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.2 4.2L19 7"/></svg><span>Its answers are written by Claude, from Anthropic. Anthropic doesn’t train its models on what Revo sends.</span></li>
-            </ul>
-            <p class="note">Revo can make mistakes, so check anything that matters against the mushaf. <a href="/privacy/#revo">What Revo sends, and what’s kept</a></p>
+            <span class="kicker">Time and record</span>
+            <h2 class="title">Time and record your recitation.</h2>
+            <p class="line">A stopwatch and a recorder on the page. Each sitting is saved to your day with its ayahs and minutes, to listen back later.</p>
           </div>
-          <div class="phone" data-clip-frame>
-            <div class="screen" data-themed>
-              <video data-clip muted loop playsinline preload="none" disablepictureinpicture disableremoteplayback
-                data-poster="/assets/clips/revo-light.jpg" data-poster-dark="/assets/clips/revo-dark.jpg"
-                aria-label="Revo’s introduction in the app. Its R draws itself and becomes Revo’s mark: “Revo. Your revision coach, inside Revisely.” Example questions follow, each with an example picture: how the week went, with a chart of the pages revised each day; what to revise first, “Start with Juz 29. It’s been 12 days.”; how to log revision done at the masjid, through Activity, Today and +; and how today went, with Your day in review. Revo’s R settles above Home’s tab bar, and it ends on “Meet Revo: Ask about your revision, or how anything in the app works,” with Turn on Revo and Later.">
-                <source data-src="/assets/clips/revo-light.webm" data-src-dark="/assets/clips/revo-dark.webm" type="video/webm; codecs=vp9">
-                <source data-src="/assets/clips/revo-light.mp4" data-src-dark="/assets/clips/revo-dark.mp4" type="video/mp4">
-              </video>
-              <noscript>
-                <picture>
-                  <source srcset="/assets/clips/revo-dark.jpg" media="(prefers-color-scheme: dark)">
-                  <img src="/assets/clips/revo-light.jpg" alt="" loading="lazy">
-                </picture>
-              </noscript>
+          <div class="visual">
+            <div class="screen" data-clip-light="/assets/clips/recite" data-t-light="13.5" data-clip-dark="/assets/clips/session-dark" data-t-dark="3.2">
+              <picture>
+                <source srcset="/assets/img/slides/recite-dark.webp" media="(prefers-color-scheme: dark)">
+                <img src="/assets/img/slides/recite-light.webp" width="600" height="1304" loading="lazy" decoding="async"
+                  alt="A sitting in the mushaf, timed: the stopwatch counts up over the page, with Pause and End, while the recitation is recorded.">
+              </picture>
+              <video muted loop playsinline preload="none" disablepictureinpicture disableremoteplayback aria-hidden="true" tabindex="-1"></video>
             </div>
-            <button class="clip-toggle" type="button" aria-pressed="true" aria-label="Pause clip">
-              <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6.5 4.5h4v15h-4zM13.5 4.5h4v15h-4z"/></svg>
-              <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 4.5v15l13-7.5z"/></svg>
-            </button>
           </div>
-        </div>
-      </section>
-    </div>
+        </section>
 
-    <section class="more" aria-labelledby="more-title">
-      <div class="wrap">
-        <span class="label">Also in Revisely</span>
-        <h2 id="more-title" class="title">The rest of your hifz, in one place.</h2>
-        <ul class="rows">
-          <li>
-            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>
-            <div><h3>Record your recitation</h3><p>Record yourself reciting a page, then listen back for what slipped. Recordings are backed up to your account.</p></div>
-          </li>
-          <li>
-            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M14.8 9.2l-1.6 4-4 1.6 1.6-4z"/></svg>
-            <div><h3>Prayer times and the Qibla</h3><p>Today’s prayer times and the next one on Home, a notification for the prayers you choose, and a Qibla compass, all worked out on your phone.</p></div>
-          </li>
-          <li>
-            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="17" height="7" rx="2"/></svg>
-            <div><h3>Widgets</h3><p>Today’s revision, a verse of the day, prayer times and the Qibla, on your Home Screen and Lock Screen.</p></div>
-          </li>
-          <li>
-            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18h18M7 18a5 5 0 0 1 10 0M12 6.5V4M6.3 10.3 4.6 8.6M17.7 10.3l1.7-1.7"/></svg>
-            <div><h3>Start your day at fajr</h3><p>A late-night session still counts for the day it belongs to.</p></div>
-          </li>
-          <li>
-            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-7M10 20V5M15 20v-9M20 20V8"/></svg>
-            <div><h3>Insights</h3><p>Rate a page’s strength as you revise and see which pages are slipping.</p></div>
-          </li>
-          <li>
-            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></svg>
-            <div><h3>A daily reminder</h3><p>One notification, at the time you choose.</p></div>
-          </li>
-          <li>
-            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h5"/></svg>
-            <div><h3>Daily log</h3><p>Note what you memorized and revised each day, in your own words.</p></div>
-          </li>
-          <li>
-            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13.5" r="7"/><path d="M12 13.5V10M10 2.5h4M18.5 6.5 20 5"/></svg>
-            <div><h3>Reading timer</h3><p>Time your reading outside revision and keep a history of it.</p></div>
-          </li>
-        </ul>
+        <section class="slide" role="group" aria-roledescription="slide" aria-label="4 of 8" data-name="Search">
+          <div class="copy">
+            <span class="kicker">Search</span>
+            <h2 class="title">Find any ayah in a few words.</h2>
+            <p class="line">Type a few words of an ayah, or say them on iPhone, and go straight to it: here, Ayat al&#8209;Kursi in Al&#8209;Baqarah.</p>
+          </div>
+          <div class="visual">
+            <div class="screen" data-clip-light="/assets/clips/search" data-t-light="7.6">
+              <picture>
+                <source srcset="/assets/img/slides/search-dark.webp" media="(prefers-color-scheme: dark)">
+                <img src="/assets/img/slides/search-light.webp" width="600" height="1304" loading="lazy" decoding="async"
+                  alt="Searching the Quran for the opening words of Ayat al-Kursi finds Al-Baqarah 255 and Ali ’Imran 2. Al-Baqarah 255 opens on its page, with the ayah highlighted.">
+              </picture>
+              <video muted loop playsinline preload="none" disablepictureinpicture disableremoteplayback aria-hidden="true" tabindex="-1"></video>
+            </div>
+          </div>
+        </section>
+
+        <section class="slide" role="group" aria-roledescription="slide" aria-label="5 of 8" data-name="Translations">
+          <div class="copy">
+            <span class="kicker">Translations</span>
+            <h2 class="title">Read the meaning in your language.</h2>
+            <p class="line">Hold an ayah for its translation. Choose from 76 translations in 56 languages, star the ones you use, and download them to read offline.</p>
+          </div>
+          <div class="visual">
+            <div class="screen" data-clip-light="/assets/clips/translations" data-t-light="6.0">
+              <picture>
+                <source srcset="/assets/img/slides/translations-dark.webp" media="(prefers-color-scheme: dark)">
+                <img src="/assets/img/slides/translations-light.webp" width="600" height="1304" loading="lazy" decoding="async"
+                  alt="Ayat al-Kursi with Saheeh International under it, and the translation picker: favourites starred, among them Urdu, French and Turkish, each ready to download.">
+              </picture>
+              <video muted loop playsinline preload="none" disablepictureinpicture disableremoteplayback aria-hidden="true" tabindex="-1"></video>
+            </div>
+          </div>
+        </section>
+
+        <section class="slide" role="group" aria-roledescription="slide" aria-label="6 of 8" data-name="Activity">
+          <div class="copy">
+            <span class="kicker">Activity</span>
+            <h2 class="title">Every day at a glance.</h2>
+            <p class="line">A calendar of what you revised, memorized and read, and the juz you haven’t revised in a while.</p>
+          </div>
+          <div class="visual">
+            <div class="screen" data-clip-light="/assets/clips/activity" data-t-light="3.0">
+              <picture>
+                <source srcset="/assets/img/slides/activity-dark.webp" media="(prefers-color-scheme: dark)">
+                <img src="/assets/img/slides/activity-light.webp" width="600" height="1304" loading="lazy" decoding="async"
+                  alt="Activity for October: a calendar with a ring for each day, filled on days with revision, and the day picked below it, with what was revised, memorized and read that day.">
+              </picture>
+              <video muted loop playsinline preload="none" disablepictureinpicture disableremoteplayback aria-hidden="true" tabindex="-1"></video>
+            </div>
+          </div>
+        </section>
+
+        <section class="slide" role="group" aria-roledescription="slide" aria-label="7 of 8" data-name="Prayer times">
+          <div class="copy">
+            <span class="kicker">Prayer times and the Qibla</span>
+            <h2 class="title">Prayer times, and which way to face.</h2>
+            <p class="line">The day’s times for where you are, worked out on your phone, and a Qibla compass beside them.</p>
+          </div>
+          <div class="visual">
+            <div class="screen duo">
+              <picture>
+                <source srcset="/assets/img/slides/prayer-dark.webp" media="(prefers-color-scheme: dark)">
+                <img src="/assets/img/slides/prayer-light.webp" width="600" height="1304" loading="lazy" decoding="async"
+                  alt="The Prayer sheet on Times: the next prayer, Fajr, with a countdown, the city, and the day’s six times from Fajr to Isha, each with a bell.">
+              </picture>
+              <picture>
+                <source srcset="/assets/img/slides/qibla-dark.webp" media="(prefers-color-scheme: dark)">
+                <img class="alt" src="/assets/img/slides/qibla-light.webp" width="600" height="1304" loading="lazy" decoding="async"
+                  alt="The same sheet on Qibla: a compass dial with the Kaaba marked at its bearing from north, and the distance to Makkah.">
+              </picture>
+            </div>
+          </div>
+        </section>
+
+        <section class="slide" role="group" aria-roledescription="slide" aria-label="8 of 8" data-name="Offline">
+          <div class="copy">
+            <span class="kicker">Offline</span>
+            <h2 class="title">Works without a connection.</h2>
+            <p class="line">Download the whole mushaf once and revise anywhere. What you log offline is kept on your phone and syncs when you’re back.</p>
+          </div>
+          <div class="visual">
+            <div class="screen">
+              <picture>
+                <source srcset="/assets/img/slides/offline-dark.webp" media="(prefers-color-scheme: dark)">
+                <img src="/assets/img/slides/offline-light.webp" width="600" height="1304" loading="lazy" decoding="async"
+                  alt="The mushaf open at the start of Al-Mulk, in Juz 29.">
+              </picture>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="controls">
+        <button class="ctl prev" type="button" aria-label="Previous slide"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <div class="dots" role="group" aria-label="Choose a slide"></div>
+        <button class="ctl next" type="button" aria-label="Next slide"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
+        <button class="ctl toggle" type="button" aria-label="Pause the slideshow"><svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg><svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5v14l11-7z"/></svg></button>
       </div>
     </section>
 
-    <section class="faq" id="faq" aria-labelledby="faq-title">
+    <section class="revo" id="revo" aria-labelledby="revo-title">
       <div class="wrap">
-        <div class="head">
-          <span class="label">FAQ</span>
-          <h2 id="faq-title" class="title">Questions</h2>
+        <div class="revo-copy">
+          <span class="revo-mark"><i aria-hidden="true"><svg viewBox="26 26 224 212"><path fill="#fff" d="M204.6 231.96C194.3 231.27 186.44 226.23 178.89 215.47C173.75 208.15 169.27 198.09 165.38 185.15C162.64 176.07 160.15 164.73 157.79 150.71C157.67 150.01 157.49 149.02 157.38 148.5C157.19 147.62 156.64 144.76 156.16 142.19C155.87 140.65 155.76 139.61 155.8 138.82C155.83 138.33 155.76 137.56 155.56 136.09C155.41 134.96 155.29 133.89 155.29 133.71C155.29 133.22 155.6 132.7 156.06 132.41C156.43 132.18 156.48 132.17 158.55 132.02C168.04 131.35 176.37 129.12 186.17 124.64C199.05 118.75 210.77 109.91 218.24 100.46C221.83 95.92 224.08 91.35 224.83 87.06C225.19 85.03 225.24 81.67 224.95 79.5C224.42 75.53 222.92 72.12 220.41 69.21C217.14 65.41 212.96 62.43 207.68 60.13C206.29 59.53 203.4 58.47 202.34 58.17C200.18 57.56 195.83 56.67 193.29 56.32C192.11 56.15 190.91 55.87 190.03 55.55C189.33 55.29 188.19 55.14 187.77 55.24C187.54 55.3 186.75 56.32 184.98 58.86C181.62 63.67 178.37 69.1 175.09 75.4C168.18 88.67 161.66 103.5 154.92 121.27C147.48 140.88 144.18 148.73 138.47 160.33C131.74 174.01 125.9 183.85 118.73 193.63C110.9 204.3 103.34 212.21 94.97 218.49C88.34 223.47 82.61 226.55 76.2 228.6C70.38 230.46 63.7 231.35 57.75 231.06C51.17 230.74 46.11 229.54 41.52 227.22C39.24 226.06 37.8 225.06 36.33 223.57C35.12 222.35 34.41 221.37 33.67 219.88C32.46 217.46 32 215.31 32 212.14C32 210.34 32.1 209.52 32.48 208.02C33.75 203.05 37.83 197.98 42.14 196C43.03 195.6 44.26 195.19 45.3 194.97C46.47 194.71 48.81 194.61 50.09 194.76C52.99 195.1 55.52 196.33 57.36 198.3C58.63 199.64 59.31 200.95 59.77 202.88C59.88 203.36 59.91 203.84 59.91 205.01C59.91 206.54 59.83 207.28 59.53 208.52C58.93 211.07 57.37 213.54 55.25 215.32C53.04 217.16 50.78 218.14 48.16 218.4C47.37 218.48 47.15 218.57 46.74 219.02C46.32 219.46 46.25 219.79 46.51 220.03C46.7 220.2 48.03 220.65 49.43 221.02C58.23 223.35 66.79 222.17 75.03 217.51C82.84 213.09 90.38 206.41 97.41 197.64C102.48 191.32 106.45 184.95 111.91 174.41C114.76 168.91 118.07 161.82 129.9 135.89C134.6 125.59 137.72 118.9 142.04 109.88C145.43 102.83 151.01 91.37 153.37 86.66C157.72 77.94 162.62 69.21 166.84 62.62C168.02 60.79 170.34 57.34 171.16 56.2C171.63 55.56 171.45 55.13 170.67 55.07C169.78 55 164.35 55.27 160.42 55.58C153.79 56.12 148.72 56.8 142.88 57.96C126.31 61.25 110.42 66.61 96.53 73.6C87.78 78 81.26 82.23 75.52 87.23C74.04 88.51 71.09 91.45 69.9 92.8C65.3 98.05 62.77 103.34 62.05 109.19C61.81 111.07 61.91 113.41 62.26 114.48C62.52 115.3 63.43 117.04 63.93 117.7C65.48 119.74 67.89 121.45 70.82 122.58C75.46 124.38 85.8 124.46 94.07 122.77C105.89 120.36 116.35 114.24 124.82 104.8C127.06 102.3 130.15 98.12 133.16 93.49C134.87 90.87 135.12 90.44 136.45 87.81C138.4 83.93 140.15 80.08 141.98 75.65C142.37 74.7 142.78 73.76 142.9 73.56C143.17 73.08 144.57 71.66 145.07 71.33C146.19 70.61 147.91 70.58 149.06 71.25C150.31 71.97 151.03 73.22 151.03 74.66C151.03 75.77 150.81 76.33 149.88 77.51C149.76 77.65 149.47 78.26 149.23 78.84C145.87 87.12 141.88 95.03 138.29 100.54C135.73 104.47 131.04 110.61 128.1 113.85C120.44 122.32 110.91 128.11 100.05 130.88C95.4 132.06 91.05 132.66 85.53 132.86C79.51 133.09 74.62 132.41 70.03 130.72C69.56 130.55 68.65 130.22 68.02 129.98C65.89 129.2 63.08 127.61 61.26 126.16C60.48 125.54 58.57 123.64 57.98 122.9C57.46 122.25 56.5 120.83 56.12 120.14C55.66 119.31 55.12 118.02 54.58 116.48C53.32 112.85 52.94 110.44 53.02 106.58C53.07 104.41 53.16 103.45 53.53 101.49C54.52 96.25 56.88 91.19 60.49 86.58C62.97 83.41 66.59 79.83 70.3 76.85C85.06 65.01 109.54 55.4 137.07 50.63C142.24 49.73 151.11 48.53 156.72 47.97C164.4 47.2 172.88 46.88 174.5 47.3C175.08 47.45 177.91 47.48 178.28 47.35C178.4 47.3 179.17 46.58 179.99 45.76C186.43 39.27 193.35 35.16 200.66 33.46C201.36 33.3 202.27 33.08 202.67 32.97C204.18 32.57 205.88 32.26 207.46 32.1C208.76 31.97 212.95 31.97 213.93 32.1C216.39 32.43 218.47 32.85 219.07 33.15C219.61 33.41 220.31 34.04 220.65 34.57C221.42 35.77 221.42 37.55 220.65 38.74C220.14 39.55 219.3 40.17 218.4 40.43C217.78 40.61 216.55 40.62 215.82 40.44C214.01 40.01 213.26 39.94 210.7 39.95C208.02 39.95 207.3 40.02 205.37 40.46C204.13 40.74 203.6 40.94 202.26 41.68C200.43 42.68 198.18 44.29 196.1 46.09C194.76 47.26 194.36 47.69 194.36 47.99C194.36 48.39 194.56 48.48 195.88 48.71C198.57 49.16 201.01 49.67 203.86 50.38C204.56 50.55 206.09 50.92 207.26 51.2C213.45 52.68 219.11 54.63 223.56 56.8C228.5 59.21 232.31 61.87 235.72 65.29C239.58 69.16 241.86 73.41 242.83 78.55C243.6 82.61 243.42 87.25 242.34 91.54C241.08 96.55 238.01 102.17 233.77 107.29C228.09 114.15 220.26 120.53 211.19 125.7C201.85 131.03 191.1 135.16 180.81 137.36C176 138.39 170.86 139.12 166.05 139.44C163.77 139.6 163.75 139.61 164.01 141.08C164.82 145.62 165.37 148.18 166.28 151.61C168.64 160.61 170.37 166.01 173.08 172.95C177.56 184.4 183.39 195.14 188.91 202.1C192.4 206.49 196.47 210.28 200.27 212.65C204.63 215.37 209.51 216.72 214.33 216.53C218.88 216.35 222.13 215.05 224.71 212.36C227.17 209.81 228.69 206.28 229.28 201.73C229.95 196.66 229.2 189.5 227.48 184.31C225.36 177.93 221.63 171.1 216.46 164.15C215.06 162.26 214.26 161.02 214.09 160.47C213.79 159.47 213.91 158.2 214.4 157.34C215.12 156.1 216.38 155.38 217.82 155.38C219.41 155.38 220.34 155.98 221.64 157.82C222.01 158.35 222.56 159.11 222.86 159.51C227.82 166.21 231.33 172.35 233.88 178.76C234.58 180.53 236 184.81 236.48 186.62C237.82 191.6 238.42 196.84 238.19 201.35C237.8 208.68 236.06 214.06 232.48 218.98C229.94 222.47 226.92 225.28 223.47 227.37C222.38 228.04 219.95 229.24 218.76 229.71C216 230.79 212.98 231.52 209.98 231.83C208.46 231.99 205.94 232.05 204.6 231.96Z"/></svg></i>Revo</span>
+          <h2 id="revo-title" class="title">Ask Revo how your revision is going.</h2>
+          <p>Revo is an optional assistant in Revisely. Ask how your week went or what to revise first, and it answers from your own revision. Ask how something in the app works, and it explains.</p>
+          <ul class="asks" aria-label="Things to ask Revo">
+            <li>How was my week?</li>
+            <li>What should I revise first?</li>
+            <li>How do I log revision from the masjid?</li>
+            <li>How did today go?</li>
+          </ul>
+          <ul class="points">
+            <li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.2 4.2L19 7"/></svg><span>Off until you turn it on. Turning it off in Settings deletes its conversations and what it remembers.</span></li>
+            <li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.2 4.2L19 7"/></svg><span>It only suggests: nothing in your plan changes unless you tap it.</span></li>
+            <li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.2 4.2L19 7"/></svg><span>Its answers are written by Claude, from Anthropic. Anthropic doesn’t train its models on what Revo sends.</span></li>
+          </ul>
+          <p class="note">Revo can make mistakes, so check anything that matters against the mushaf. <a href="/privacy/#revo">What Revo sends, and what’s kept</a></p>
         </div>
-        <div class="list">
-          <details>
-            <summary>Is Revisely free?</summary>
-            <p>Yes. It’s free to download and use, and there are no ads. If you’d like to help keep it that way, you can <a href="/donate/">donate</a>.</p>
-          </details>
-          <details>
-            <summary>Is there an Android version?</summary>
-            <p>It’s coming to Google Play. For now, Revisely is on iPhone.</p>
-          </details>
-          <details>
-            <summary>Which mushaf does it use?</summary>
-            <p>The 604-page Madani mushaf, set in the King Fahd Complex script, with the same page layout as the printed copy many people memorize from.</p>
-          </details>
-          <details>
-            <summary>What happens if I miss a day?</summary>
-            <p>Your plan keeps moving, so missed pages don’t pile up. If you started yesterday’s revision but didn’t finish, Home offers to add the pages you missed to today, and you can always jump to the juz, surah or page you want to start from.</p>
-          </details>
-          <details>
-            <summary>Do I need an account?</summary>
-            <p>Yes. Sign in with Apple, Google or email so your progress is saved and syncs between devices. You can delete your account and all of its data at any time in Settings.</p>
-          </details>
-          <details>
-            <summary>Does Revisely use my location?</summary>
-            <p>Only if you use prayer times, the Qibla compass or Start day at fajr. Prayer times and the Qibla are worked out on your phone, and your location isn’t sent to us. Start day at fajr saves it to your account, to work out fajr where you are. The <a href="/privacy/">Privacy Policy</a> has the details.</p>
-          </details>
-          <details>
-            <summary>What does Revo send, and to whom?</summary>
-            <p>Nothing, until you turn Revo on. Then your questions, and the figures about your revision Revo needs to answer them, go to Anthropic, whose Claude models write the answers. On an evening after you’ve revised, Revo may also write a short Day in review from that day’s figures. Your name, email address, location and the audio of your recordings are never sent, and Anthropic doesn’t train its models on what is. What you type goes as you wrote it. The <a href="/privacy/#revo">Privacy Policy</a> has the details.</p>
-          </details>
-        </div>
-      </div>
-    </section>
-
-    <section class="cta" aria-labelledby="cta-title">
-      <div class="wrap">
-        <img class="icon" src="/apple-touch-icon.png" width="72" height="72" alt="">
-        <h2 id="cta-title" class="title">Today’s pages are waiting.</h2>
-        <div class="get">
-          <a class="badge-link" href="https://apps.apple.com/app/revisely/id6767990248">
-            <img class="badge-light" src="https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/black/en-us" width="156" height="52" alt="Download on the App Store" loading="lazy">
-            <img class="badge-dark" src="https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/white/en-us" width="156" height="52" alt="Download on the App Store" loading="lazy">
-          </a>
-          <p class="android"><strong>Android</strong> coming soon to Google Play</p>
+        <div class="visual">
+          <div class="screen" id="revo-screen" data-clip-light="/assets/clips/revo-light" data-clip-dark="/assets/clips/revo-dark">
+            <picture>
+              <source srcset="/assets/clips/revo-dark.jpg" media="(prefers-color-scheme: dark)">
+              <img src="/assets/clips/revo-light.jpg" width="600" height="1304" loading="lazy" decoding="async"
+                alt="Revo’s introduction in the app. Its R draws itself and becomes Revo’s mark: “Revo. Your revision coach, inside Revisely.” Example questions follow, each with an example picture: how the week went, with a chart of the pages revised each day; what to revise first, “Start with Juz 29. It’s been 12 days.”; how to log revision done at the masjid, through Activity, Today and +; and how today went, with Your day in review. It ends on “Meet Revo: Ask about your revision, or how anything in the app works,” with Turn on Revo and Later.">
+            </picture>
+            <video muted loop playsinline preload="none" disablepictureinpicture disableremoteplayback aria-hidden="true" tabindex="-1"></video>
+          </div>
+          <button class="clip-toggle" type="button" data-playing="false" aria-label="Play Revo’s introduction"><svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6.5 4.5h4v15h-4zM13.5 4.5h4v15h-4z"/></svg><svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 4.5v15l13-7.5z"/></svg></button>
         </div>
       </div>
     </section>
