@@ -35,6 +35,20 @@ export interface TextSearchResult {
   words: string[];
 }
 
+/** What searches did, counted (for tests: their speed, without a clock). */
+export interface SearchWork {
+  /** Line-ups of a query with the whole text. */
+  alignments: number;
+  /** Query words lined up, over all the line-ups. */
+  queryWords: number;
+  /** Query words times the places in the text they were lined up at (stretches that match
+   *  nothing are passed over). */
+  cells: number;
+  /** Words of the Qur'an compared with a query word letter by letter (most are told apart by
+   *  their length or letters first). */
+  edits: number;
+}
+
 /** Words beyond this are not searched (a long recitation: its start says where it is). */
 const MAX_QUERY_WORDS = 24;
 /** A word printed as one is said as at most this many (يا ابن ام). */
@@ -216,9 +230,10 @@ function conjunctionOnly(a: string, b: string): boolean {
 }
 
 /** How near two words are, from how many letters differ (0 when too far). */
-function nearness(q: string, qMask: number, k: string, kMask: number): number {
+function nearness(q: string, qMask: number, k: string, kMask: number, work?: SearchWork): number {
   if (conjunctionOnly(q, k)) return CONJUNCTION;
   if (q.length < 3 || Math.abs(q.length - k.length) > 2 || bitCount(qMask ^ kMask) > 4) return 0;
+  if (work) work.edits++;
   const d = editDistance(q, k, 2);
   const len = Math.max(q.length, k.length);
   if (d === 1 && len >= 4) return NEAR_ONE;
@@ -227,7 +242,7 @@ function nearness(q: string, qMask: number, k: string, kMask: number): number {
 }
 
 /** How well a query word matches each distinct word of the Qur'an (0: not at all, 1: exactly). */
-function similarities(index: Index, q: QueryWord): Float32Array {
+function similarities(index: Index, q: QueryWord, work?: SearchWork): Float32Array {
   const n = index.key.length;
   const out = new Float32Array(n);
   const qMask = letterMask(q.key);
@@ -238,8 +253,8 @@ function similarities(index: Index, q: QueryWord): Float32Array {
       out[v] = 1;
       continue;
     }
-    let s = nearness(q.key, qMask, k, index.keyMask[v]);
-    if (a && s < NEAR_ONE) s = Math.max(s, nearness(q.key, qMask, a, index.altMask[v]));
+    let s = nearness(q.key, qMask, k, index.keyMask[v], work);
+    if (a && s < NEAR_ONE) s = Math.max(s, nearness(q.key, qMask, a, index.altMask[v], work));
     out[v] = s;
   }
   return out;
@@ -308,14 +323,19 @@ interface Found {
 
 /** The query lined up with the whole text: the matches good enough to show, best first, and
  *  which distinct words match some query word (`matches`). */
-function align(words: QuranWords, index: Index, query: QueryWord[]): { found: Found[]; matches: Uint8Array } {
+function align(
+  words: QuranWords,
+  index: Index,
+  query: QueryWord[],
+  work?: SearchWork,
+): { found: Found[]; matches: Uint8Array } {
   const m = query.length;
   const V = index.key.length;
   const sim = new Float32Array(m * V);
   const weight = new Float32Array(m);
   let total = 0;
   for (let j = 0; j < m; j++) {
-    const s = similarities(index, query[j]);
+    const s = similarities(index, query[j], work);
     sim.set(s, j * V);
     weight[j] = weightOf(index, s);
     total += weight[j];
@@ -363,6 +383,7 @@ function align(words: QuranWords, index: Index, query: QueryWord[]): { found: Fo
     prev[j] = prev[j - 1] - UNMATCHED * weight[j - 1];
     prevStart[j] = 0;
   }
+  let lined = 0;
   for (let i = 1; i <= N; i++) {
     const v = index.wordVocab[i - 1];
     if (isSettled) {
@@ -373,6 +394,7 @@ function align(words: QuranWords, index: Index, query: QueryWord[]): { found: Fo
       }
       isSettled = false;
     }
+    lined++;
     cur[0] = 0;
     curStart[0] = i;
     let alive = false;
@@ -412,6 +434,11 @@ function align(words: QuranWords, index: Index, query: QueryWord[]): { found: Fo
     [prevStart, curStart] = [curStart, prevStart];
     if (!alive && i >= m) isSettled = true;
   }
+  if (work) {
+    work.alignments++;
+    work.queryWords += m;
+    work.cells += lined * m;
+  }
 
   // The best end of each match (one phrase is found at several ends as words are
   // skipped after it); then the best overall, and those close to it.
@@ -438,9 +465,10 @@ function align(words: QuranWords, index: Index, query: QueryWord[]): { found: Fo
  * that runs on into the next ayah (or more) says where it ends (`last`).
  *
  * When nothing is found, the first or last word is left out and it looks again: speech
- * recognition often gets the word cut off at either end wrong.
+ * recognition often gets the word cut off at either end wrong. `work`, when given, counts
+ * what the search did.
  */
-export function searchText(words: QuranWords, text: string, limit = 50): TextSearchResult {
+export function searchText(words: QuranWords, text: string, limit = 50, work?: SearchWork): TextSearchResult {
   const index = indexFor(words);
   const heard = heardWords(text);
   const said = withoutOpening(heard);
@@ -455,7 +483,7 @@ export function searchText(words: QuranWords, text: string, limit = 50): TextSea
   // Words said twice that the text itself has twice (ليلة القدر ليلة القدر, 97:2–3; لم يلد
   // ولم يولد, 112:3) are found as said; a repeat that isn't in the text is searched once.
   if (once.length < said.length) {
-    const asSaid = align(words, index, said);
+    const asSaid = align(words, index, said, work);
     if (asSaid.found.length > 0 && asSaid.found[0].score >= EXACT) return resultOf(index, said, asSaid, 1, limit);
   }
   const m = once.length;
@@ -464,7 +492,7 @@ export function searchText(words: QuranWords, text: string, limit = 50): TextSea
   if (m >= 4) tries.push(once.slice(1, -1));
   let result: TextSearchResult | null = null;
   for (const q of tries) {
-    const aligned = align(words, index, q);
+    const aligned = align(words, index, q, work);
     if (aligned.found.length === 0) continue;
     // A shorter query found the place; its score still counts the words left out.
     result = resultOf(index, q, aligned, q === once ? 1 : q.length / m, limit);
@@ -476,7 +504,7 @@ export function searchText(words: QuranWords, text: string, limit = 50): TextSea
   // with it too, and its nearly exact matches that reach past it are listed as well.
   const whole = withoutIstiadha(withoutRepeats(heard)).slice(0, MAX_QUERY_WORDS);
   if (m <= 2 && whole.length > m) {
-    const aligned = align(words, index, whole);
+    const aligned = align(words, index, whole, work);
     const more = resultOf(index, whole, aligned, 1, limit).hits.filter(
       (h) =>
         h.score >= CLOSE_TO_EXACT &&
