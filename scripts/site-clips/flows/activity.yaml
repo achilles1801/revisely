@@ -1,18 +1,17 @@
 appId: com.revisionbuddy.app
 ---
-- pause: 1500
-- tapOn:
-    point: "364,86"
-- pause: 2000
-- tapOn:
-    point: "280,363"
-- pause: 1800
-- tapOn:
-    point: "385,141"
-- pause: 2400
-- tapOn:
-    point: "301,141"
-- pause: 1200
-- tapOn:
-    point: "30,141"
-- pause: 2000
+- extendedWaitUntil: { visible: "Start revision", timeout: 8000 }
+- extendedWaitUntil: { visible: "__never__", timeout: 1200, optional: true }
+- tapOn: { point: "364,86" }
+- extendedWaitUntil: { visible: { id: "pill-calendar" }, timeout: 6000 }
+- extendedWaitUntil: { visible: "__never__", timeout: 2000, optional: true }
+- tapOn: "Previous month"
+- extendedWaitUntil: { visible: "__never__", timeout: 2200, optional: true }
+- tapOn: { id: "pill-insights" }
+- extendedWaitUntil: { visible: "__never__", timeout: 2400, optional: true }
+- tapOn: "Surah.*"
+- extendedWaitUntil: { visible: "__never__", timeout: 2000, optional: true }
+- tapOn: "Page.*"
+- extendedWaitUntil: { visible: "__never__", timeout: 1800, optional: true }
+- swipe: { start: "50%,72%", end: "50%,44%", duration: 900 }
+- extendedWaitUntil: { visible: "__never__", timeout: 2000, optional: true }

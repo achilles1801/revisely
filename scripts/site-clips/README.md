@@ -1,42 +1,88 @@
-# Website clips
+# Website screens and clips
 
-The looping clips on revisely.app (`docs/assets/clips/`) are recordings of the dev client on an
-iPhone 17 Pro Max simulator, in the new design (Settings → Preview → New design) with the Indigo accent
-(the default; Settings → Appearance → Accent), light appearance,
-signed in to the demo account `screenshots@revisely.app`. No real user's data appears in them.
+revisely.app's home is one frame: a slideshow of eight slides, each a line or two and a phone, then
+a Revo section and a small footer (`docs/index.html`, `docs/assets/site.css`, `docs/assets/site.js`).
+Each phone shows a picture (`docs/assets/img/slides/`, light and dark), and four of them play a loop
+over it (`docs/assets/clips/`). Everything shown comes from the demo accounts, never a real user's data.
 
-## Recording
+| Slide | Light | Dark |
+| --- | --- | --- |
+| 1 Pitch | Home in Indigo, Crimson and Jade, fanned (store captures) | the same, dark |
+| 2 Today | Home (store capture) | Home (store capture) |
+| 3 Time and record | loop `recite` | loop `session-dark` (the stopwatch, no recording) |
+| 4 Search | loop `search` | still: the results |
+| 5 Translations | loop `translations` | still: the picker (store capture) |
+| 6 Activity | loop `activity` | still: the month (store capture) |
+| 7 Prayer times and the Qibla | stills: Times and Qibla, crossfading | the same, dark |
+| 8 Offline | still: Al-Mulk's opening page | the same, dark |
 
-1. Clone a simulator that already has the demo session, so nobody types a password
-   (`xcrun simctl clone <udid> "Revisely website clips"`), boot it and set the status bar:
-   `xcrun simctl status_bar <udid> override --time 9:41 --batteryState charged --batteryLevel 100 --wifiBars 3 --cellularBars 4`.
-2. Run Metro from a `develop` checkout with `--no-dev --minify` and open the dev client on it.
-   Sentry stays off on simulators (`sentryReports` in `src/lib/releaseInfo.ts`).
-3. Optional: `seed-demo-history.js` adds a month of revision sessions to the demo account (tagged
-   `seed: 'website-clips'`; `--remove` deletes exactly those) and a half-finished yesterday, which is
-   what makes Home offer "Add 6 from yesterday". Run it from `functions/` with the admin key, e.g.
-   `GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-admin.json ADMIN_PATH=$PWD/node_modules/firebase-admin node ../scripts/site-clips/seed-demo-history.js`.
-   The dates in it are for October 2026; move them before reusing it.
-4. For each flow, record while Maestro drives the app:
-   `xcrun simctl io <udid> recordVideo --codec=h264 raw-<name>.mp4` in one shell,
-   `maestro --device <udid> test flows/<name>.yaml` in another, then Ctrl-C the recording.
-   `- pause: N` in the flows is shorthand: expand it to an optional `extendedWaitUntil` with a
-   timeout of N ms before running (Maestro has no plain wait). Order: `carry` (once a day: carrying
-   over can't be repeated without undoing `carryOver` on the user doc), `plan` (from Home),
-   `reader` (inside the session on page 518), `activity` (from Home). Only `reader` and
-   `activity` are on the page now (see Stills).
-5. `python3 encode.py <raw dir> ../../docs/assets/clips` cuts out the pauses and writes MP4, WebM and
-   a poster for each. Keep the total under about 5 MB.
+A slide with no dark loop shows its dark picture: `data-clip-dark` is simply left out.
+
+## Pictures
+
+```bash
+python3 scripts/site-clips/slides.py --captures ~/Documents/revisely-today-mocks/store-104/captures \
+  --stills <dir of the site's stills> --posters <dir where cut.py wrote the loops>
+```
+
+writes `docs/assets/img/slides/<name>.webp` at 600×1304 (the loops' size; about 1 MB for all 22).
+The list of which picture comes from where is `SCREENS` in `slides.py`:
+
+- **Store captures**: the store previews session's 1320×2868 captures of the screenshots account
+  (`screenshots@revisely.app`, seeded by that session's `seed-screenshots.js`: today Juz 28,
+  "Starts at Al-Mujadila"), so the site and the App Store listing match.
+- **Stills**: `xcrun simctl io <udid> screenshot` of the same account, for screens the store set
+  doesn't have: the Prayer sheet on Times and on Qibla (`flows/prayer.yaml`, `flows/qibla.yaml`,
+  with the simulator's location set to Chicago), search results in dark, and Al-Mulk's first page
+  (`revisely://read?page=562`), light and dark.
+- **Posters**: for a slide with a loop, the frame the loop starts from, which `cut.py` writes as
+  `<name>.jpg`. The page starts the loop at that moment (`data-t-light` / `data-t-dark` in
+  `docs/index.html`, the same number as `--poster` below) and shows it only once it is there, so
+  nothing jumps.
+
+## Loops
+
+Recorded on an iPhone 17 Pro Max simulator (a clone of one that already has the screenshots
+account's session, so nobody types a password), with the status bar at 9:41
+(`xcrun simctl status_bar <udid> override --time 9:41 --batteryState charged --batteryLevel 100
+--wifiBars 3 --cellularBars 4`) and Metro from a `develop` checkout with `--no-dev --minify`.
+Sentry stays off on simulators.
+
+1. `scripts/site-clips/take.sh <udid> scripts/site-clips/flows/<flow>.yaml raw/<name>.mp4` records
+   the simulator while Maestro runs the flow. `search`, `translations` and `activity` start from
+   Home (translations from the reader on Ayat al-Kursi); `session` is recorded with the phone in
+   dark to make `session-dark`. A stopwatch started in a session is discarded afterwards, so nothing
+   is logged. `recite` (light) is cut from the store previews' iOS tour footage: the stopwatch
+   and a recording running over Al-Mulk.
+2. `cut.py` turns a take into a loop: simctl writes a frame only when the screen changes, so it
+   rebuilds a steady 30 fps copy, shortens every still stretch to `--hold`, keeps (`--keep`) or drops
+   (`--drop`) stretches, and cross-fades the end into the first frame. It writes `<name>.mp4`
+   (H.264), `<name>.webm` (VP9) and `<name>.jpg`, 600 px wide. The page's loops:
+
+   ```bash
+   cd scripts/site-clips
+   python3 cut.py raw/recite.mp4 out recite --start 7.6 --end 33 --hold 1.4 --keep 22.5-33 --fade 0.5 --poster 13.5
+   python3 cut.py raw/session-dark.mp4 out session-dark --start 7.4 --end 29.6 --hold 1.5 --fade 0.5 \
+     --keep 16.5-28.5 --drop 20.6-27.0 --poster 3.2
+   python3 cut.py raw/search.mp4 out search --start 13.0 --hold 1.9 --fade 0.5 --poster 7.6 --vp9-crf 43
+   python3 cut.py raw/translations.mp4 out translations --start 8.6 --hold 1.6 --fade 0.5 --drop 26.8-38.7 --poster 6.0
+   python3 cut.py raw/activity.mp4 out activity --start 11.62 --hold 1.6 --fade 0.5 --poster 3.0
+   ```
+
+   A ticking clock never looks still to the freeze detection, hence `--keep` around the stopwatch.
+   `--vp9-crf` is raised when the WebM comes out heavier than the MP4 (search's did at 38).
+3. Copy the `.mp4` and `.webm` into `docs/assets/clips/` and the `.jpg` into the posters folder for
+   `slides.py`. The loops are 0.4–1.2 MB each; a visitor downloads one only when its slide is
+   showing, and none with Reduce Motion on until they press play.
 
 ## Revo
 
-The Revo section plays the app's What's new "Revo moment", in a light and a dark take: the page
-picks the one that matches the visitor's appearance (`site.js`, sources with `data-src` and
-`data-src-dark`). It comes from the Revo session's recordings of the moment in the app (iPhone 17 Pro
-Max simulator, 1320×2868, Indigo, an account named Maryam with Revo off; the README in
-`~/Documents/revisely-today-mocks/whats-new/revo-intro/video/` says how they were made). The page's
-take was made from the `revo-moment-preview-*-1320x2868.mp4` files, which end on the settled card
-with no loop fade:
+The Revo section plays the app's What's new "Revo moment", in a light and a dark take
+(`data-clip-light` / `data-clip-dark` on `#revo-screen`). It comes from the Revo session's recordings
+of the moment in the app (iPhone 17 Pro Max simulator, 1320×2868, Indigo, an account named Maryam
+with Revo off; the README in `~/Documents/revisely-today-mocks/whats-new/revo-intro/video/` says how
+they were made). The page's take was made from the `revo-moment-preview-*-1320x2868.mp4` files,
+which end on the settled card with no loop fade:
 
 ```bash
 V=~/Documents/revisely-today-mocks/whats-new/revo-intro/video
@@ -46,22 +92,13 @@ python3 scripts/site-clips/revo.py --light $V/revo-moment-preview-light-1320x286
 
 It writes `docs/assets/clips/revo-{light,dark}.{mp4,webm,jpg}` at the page's size, about 21 s:
 the "Meet Revo" card stays 1.5 s longer than in the recording, so it can be read, then fades into
-the first frame, so the loop has no seam. The poster is the "Revo" wordmark at 4.8 s (the Revo
-session's choice), which is what a visitor with Reduce Motion sees until they press play; the end
-card would show Turn on Revo and Later as buttons that do nothing on a web page. Update the video's
-`aria-label` in `docs/index.html` if the moment changes. The section stays off the live site until
-Revo is on for everyone.
+the first frame, so the loop has no seam. The poster is the "Revo" wordmark at 4.8 s, which is what
+a visitor with Reduce Motion sees until they press play; the end card would show Turn on Revo and
+Later as buttons that do nothing on a web page. Update the picture's `alt` in `docs/index.html` if
+the moment changes.
 
-## Stills
+## Share image
 
-The Home and revision screens on the page are the approved App Store screenshots
-(`store/screenshots/01-home.png`, `03-revision.png`), not clips: the Home clips (`plan`, `carry`)
-showed Home from before 1.0.3 and were taken off the page on 2026-11-07. `python3
-scripts/site-clips/stills.py` writes them to `docs/assets/img/screens/` (half size, WebP and JPEG,
-with the Dynamic Island drawn in like the clips have it) and puts the Home screenshot into the
-phone in `docs/assets/img/og.png`, the link preview. Run it again whenever those screenshots are
-retaken.
-
-The Arabic verse on the page (`docs/assets/img/verse-54-17.webp`) is the Uthmani text of 54:17 set in
-Amiri (`assets/fonts/Amiri-Regular.ttf`) by headless Chrome and used as a CSS mask, so the page
-needs no web font; the real text is in the HTML for screen readers.
+`python3 scripts/site-clips/stills.py` puts the App Store Home screenshot
+(`store/screenshots/01-home.png`) into the phone in `docs/assets/img/og.png`, the link preview. Run
+it again whenever that screenshot is retaken.

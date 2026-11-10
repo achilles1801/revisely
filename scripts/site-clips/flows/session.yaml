@@ -1,0 +1,17 @@
+appId: com.revisionbuddy.app
+---
+- extendedWaitUntil: { visible: "Start revision", timeout: 8000 }
+- extendedWaitUntil: { visible: "__never__", timeout: 1400, optional: true }
+- tapOn: "Start revision"
+- extendedWaitUntil: { visible: { id: "session-quiet-count" }, timeout: 6000 }
+- extendedWaitUntil: { visible: "__never__", timeout: 2200, optional: true }
+- tapOn: { point: "220,500" }
+- extendedWaitUntil: { visible: { id: "timer-chip-idle" }, timeout: 4000 }
+- extendedWaitUntil: { visible: "__never__", timeout: 1100, optional: true }
+- tapOn: { id: "timer-chip-idle" }
+- extendedWaitUntil: { visible: { id: "timer-start" }, timeout: 4000 }
+- extendedWaitUntil: { visible: "__never__", timeout: 1000, optional: true }
+- tapOn: { id: "timer-start" }
+- extendedWaitUntil: { visible: "__never__", timeout: 3200, optional: true }
+- tapOn: { point: "220,250" }
+- extendedWaitUntil: { visible: "__never__", timeout: 2600, optional: true }

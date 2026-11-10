@@ -1,0 +1,6 @@
+appId: com.revisionbuddy.app
+---
+- extendedWaitUntil: { visible: "Start revision", timeout: 8000 }
+- tapOn: { id: "next-prayer-line" }
+- extendedWaitUntil: { visible: { id: "prayer-times" }, timeout: 6000 }
+- extendedWaitUntil: { visible: "__never__", timeout: 1500, optional: true }
