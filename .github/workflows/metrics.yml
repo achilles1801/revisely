@@ -1,0 +1,80 @@
+name: Metrics
+
+# The private metrics dashboard's app totals (scripts/metrics/README.md). Started by the collector on
+# the owner's Mac, every 6 hours and on the dashboard's Refresh button; it also runs once a day by
+# itself so a recent artifact always exists.
+# - Totals (default): Sentry sessions per release and channel, unresolved issues per platform, App
+#   Store downloads per day, as the artifact `metrics-totals` (2 days). Totals only, nothing per
+#   account: the same kind of numbers the public health and stats issues show. Read-only secrets
+#   already in the repository: SENTRY_API_TOKEN and the Sales-role App Store key.
+# - Alert (`alert` set): posts that text on the "Metrics alerts" issue, mentioning the owner, so GitHub
+#   emails it and the GitHub app pushes it. Alarms are totals too (failures, spend, crash-free).
+on:
+  workflow_dispatch:
+    inputs:
+      alert:
+        description: 'Alert text to post (leave empty to collect totals)'
+        required: false
+        default: ''
+  schedule:
+    - cron: '23 5 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: metrics-${{ inputs.alert != '' && 'alert' || 'totals' }}
+  cancel-in-progress: false
+
+jobs:
+  totals:
+    if: ${{ inputs.alert == '' || github.event_name == 'schedule' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # No dependencies: Node's own fetch, crypto and zlib. No cache.
+      - name: Collect the totals
+        env:
+          SENTRY_API_TOKEN: ${{ secrets.SENTRY_API_TOKEN }}
+          ASC_REPORTS_KEY_ID: ${{ secrets.ASC_REPORTS_KEY_ID }}
+          ASC_REPORTS_ISSUER_ID: ${{ secrets.ASC_REPORTS_ISSUER_ID }}
+          ASC_REPORTS_KEY: ${{ secrets.ASC_REPORTS_KEY }}
+          ASC_VENDOR_NUMBER: ${{ secrets.ASC_VENDOR_NUMBER }}
+        run: node scripts/metrics/totals.js metrics-totals.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: metrics-totals
+          path: metrics-totals.json
+          retention-days: 2
+
+  alert:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.alert != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Post the alert
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          OWNER: ${{ github.repository_owner }}
+          ALERT: ${{ inputs.alert }}
+        run: |
+          # The text goes through the environment, never into the script. Mentions, backticks and
+          # angle brackets are dropped, and it is cut to 400 characters.
+          text=$(printf '%s' "$ALERT" | tr -d '`<>@\r\n' | cut -c 1-400)
+          title="Metrics alerts"
+          gh label create metrics-alert -R "$REPO" --color d93f0b --description "Metrics dashboard alarms" 2>/dev/null || true
+          number=$(gh issue list -R "$REPO" --label metrics-alert --state open --json number,title --jq "map(select(.title == \"$title\")) | .[0].number // empty")
+          if [ -z "$number" ]; then
+            number=$(gh issue create -R "$REPO" --title "$title" --label metrics-alert \
+              --body "The metrics collector posts an alarm here when one starts (Revo failing, resting or capped, spend, function errors, crash-free). The dashboard has the detail. Subscribe to get them by email and in the GitHub app." \
+              | grep -oE '[0-9]+$')
+          fi
+          gh issue comment "$number" -R "$REPO" --body "@$OWNER ⚠️ $text"
