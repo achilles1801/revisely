@@ -453,6 +453,15 @@ jobs:
           UDID: ${{ steps.sim.outputs.udid }}
         run: |
           xcrun simctl bootstatus "$UDID" -b
+          # The simulator's push service (apsd) can't reach Apple from these runners and
+          # tries again about 40 times a second for the whole job: 100–250k lines of log a
+          # minute, nine in ten of the simulator's, which Maestro also copies to a file. On a
+          # 3-core runner that starved the app: its JavaScript stood still for 3 to 30 s after
+          # the server answered (a long press arrived as a tap, 13 in run 42769434122), and
+          # deleteUserAccount ran past the app's 30 s in the Functions emulator (10). Nothing
+          # here uses push (the app asks for a push token on a real phone only), so it is off.
+          xcrun simctl spawn "$UDID" launchctl bootout system/com.apple.apsd 2>/dev/null ||
+            echo "::warning::Couldn't switch off the simulator's push service (apsd)"
           xcrun simctl install "$UDID" .maestro/build/Revisely.app
 
       - name: Run the flows
@@ -469,6 +478,18 @@ jobs:
           E2E_FLOW_LIMIT: '1200'
         # $FLOWS is a glob, expanded here.
         run: bash .maestro/run.sh ios $FLOWS
+
+      # Which of the simulator's processes wrote its log in the last 10 minutes: a daemon
+      # looping as apsd did (above) shows here, on a passing run too.
+      - name: The simulator's log, by process
+        if: ${{ always() && matrix.shard.flows != '' && steps.sim.outputs.udid != '' }}
+        env:
+          UDID: ${{ steps.sim.outputs.udid }}
+        run: |
+          xcrun simctl spawn "$UDID" log show --last 10m --style compact 2>/dev/null |
+            awk '$1 ~ /^20[0-9][0-9]-/ { p = $4; sub(/\[.*/, "", p); n[p]++; all++ }
+                 END { printf "%d lines in 10 minutes\n", all; for (k in n) printf "%8d  %s\n", n[k], k }' |
+            sort -rn | head -12 | tee -a "$GITHUB_STEP_SUMMARY" || true
 
       # Each flow's attempts (run.sh's attempts.json: passed on the first attempt or
       # not, and why not), from every run, for the weekly flake report (e2e-flakes.yml).
