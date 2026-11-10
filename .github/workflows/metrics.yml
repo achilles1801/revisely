@@ -1,0 +1,46 @@
+name: Metrics
+
+# The owner's metrics console (scripts/metrics/README.md), every hour: Sentry sessions per release and
+# channel, unresolved issues per platform and App Store downloads per day (scripts/metrics/totals.js,
+# totals only, nothing per account), sent to the metricsTotals function with this job's GitHub OIDC
+# token (only this file on main may: functions/src/metrics/admin.ts). The function stores them for the
+# console and answers with any alarm that just started; push.js posts those on the "Metrics alerts"
+# issue, mentioning the owner. Read-only secrets already in the repository: SENTRY_API_TOKEN and the
+# Sales-role App Store key. Nothing is uploaded or kept here.
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  id-token: write # metricsTotals checks who is calling
+
+concurrency:
+  group: metrics
+  cancel-in-progress: false
+
+jobs:
+  totals:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # No dependencies: Node's own fetch, crypto and zlib. No cache.
+      - name: Collect the totals
+        env:
+          SENTRY_API_TOKEN: ${{ secrets.SENTRY_API_TOKEN }}
+          ASC_REPORTS_KEY_ID: ${{ secrets.ASC_REPORTS_KEY_ID }}
+          ASC_REPORTS_ISSUER_ID: ${{ secrets.ASC_REPORTS_ISSUER_ID }}
+          ASC_REPORTS_KEY: ${{ secrets.ASC_REPORTS_KEY }}
+          ASC_VENDOR_NUMBER: ${{ secrets.ASC_VENDOR_NUMBER }}
+        run: node scripts/metrics/totals.js metrics-totals.json
+      - name: Send them to the console, post new alarms
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          MENTION: '@${{ github.repository_owner }}'
+        run: node scripts/metrics/push.js metrics-totals.json
