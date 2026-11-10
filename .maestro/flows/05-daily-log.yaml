@@ -1,6 +1,8 @@
 # The daily log: two notes added, one edited and the other deleted, each change
-# kept across a cold start, and the other note left as it was.
-# Rules (BEHAVIOUR.md): LOG-1, LOG-2
+# kept across a cold start, and the other note left as it was. The first note
+# comes from Activity's day (the + → Note), which is how a day without notes
+# reaches its log; the second is written in the log itself.
+# Rules (BEHAVIOUR.md): LOG-1, LOG-2, ACT-5
 appId: com.revisionbuddy.app
 ---
 - runFlow:
@@ -8,13 +10,20 @@ appId: com.revisionbuddy.app
     env:
       CLOCK: 2026-11-03T20:00
       BOUNDARY: midnight
-- runFlow: ../subflows/open-log.yaml
+- runFlow: ../subflows/open-day.yaml
 
-# LOG-1: two notes, each its own entry.
+# LOG-1: two notes, each its own entry. The first from the day's +; its row
+# opens the log, which holds it.
 - runFlow:
-    file: ../subflows/add-note.yaml
+    file: ../subflows/add-day-note.yaml
     env:
       TEXT: Juz 30 felt steady today
+- runFlow: ../subflows/day-log.yaml
+- extendedWaitUntil:
+    visible:
+      id: journal-note-.*
+      text: "Note, Juz 30 felt steady today, .*"
+    timeout: 15000
 - runFlow:
     file: ../subflows/add-note.yaml
     env:

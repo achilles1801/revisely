@@ -62,6 +62,7 @@ import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
 import { getRevisionDateForUser } from '../../lib/fajrBoundary';
 import { partlyMemorizedAyahs, revisablePages } from '../../lib/memorizedAyahs';
 import { describePagesToRevise } from '../../lib/passages';
+import { sittingsEnabled } from '../../lib/sitting';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'PlanEdit'>;
 type RouteProps = RouteProp<HomeStackParamList, 'PlanEdit'>;
@@ -211,11 +212,11 @@ export default function PlanEditScreen() {
     [days, direction, initialState, planName, liveName],
   );
 
-  // Memorized pages a custom plan doesn't hold (MEM-6, testers): it never adds new pages by itself
+  // Memorized pages a custom plan doesn't hold (MEM-6): it never adds new pages by itself
   // (pruneCustomPlanForMemorized), so they wait here, named by their ayahs, until added. Read from
   // the days being edited, so a page added here leaves the list at once.
   const outsidePlan = useMemo(() => {
-    if (!user?.customPlan || user.previewTester !== true) return [];
+    if (!user?.customPlan || !sittingsEnabled(user)) return [];
     return pagesOutsidePlan(days, memorizedNumbers);
   }, [user, days, memorizedNumbers]);
   const outsideName = useMemo(

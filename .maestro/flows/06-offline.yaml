@@ -3,6 +3,19 @@
 # Rules (BEHAVIOUR.md): SYNC-1, SYNC-2, SESS-3
 appId: com.revisionbuddy.app
 ---
+# Where the phone is, as each platform's 06-home-offline was approved: on Android in Chicago, so Home
+# has its next-prayer line (Asr 2:18 PM; the screen's masks expect it), and on iOS nowhere the app can
+# see, so it has none. Both used to come from whatever ran before 06 in its job: Android's line from 04's
+# position, until 04 moved to another job (develop's run 42662769247); and once 06 set Chicago on both
+# (#490), iOS gained a line and 11 after it on Android inherited one (#217's run 42687083053). A flow
+# sets what it shows (subflows/location.yaml).
+- runFlow:
+    when:
+      platform: Android
+    file: ../subflows/location.yaml
+    env:
+      LATITUDE: 41.88
+      LONGITUDE: -87.63
 - runFlow:
     file: ../subflows/new-account.yaml
     env:
@@ -80,6 +93,10 @@ appId: com.revisionbuddy.app
       - pressKey: home
       - launchApp:
           stopApp: false
+          permissions:
+            all: allow
+            # Not location unless the flow has set a position (location.yaml). iOS names it always | never.
+            location: "${maestro.platform == 'ios' ? (output.location == 'allow' ? 'always' : 'never') : (output.location == 'allow' ? 'allow' : 'deny')}"
       - extendedWaitUntil:
           notVisible:
             id: offline-note

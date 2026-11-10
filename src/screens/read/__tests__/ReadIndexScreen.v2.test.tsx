@@ -27,10 +27,8 @@ jest.mock('@react-navigation/native', () => {
 let mockApp: { user: { previewTester?: boolean } | null } = { user: null };
 jest.mock('../../../context/AppContext', () => ({ useApp: () => mockApp }));
 let mockVoice = false;
-jest.mock('../../../lib/search/availability', () => ({
-  quranSearchEnabled: (user: { previewTester?: boolean } | null) => user?.previewTester === true,
-  canSearchByVoice: () => mockVoice,
-}));
+// The real gates (lib/search/availability); only whether the binary can listen is set here.
+jest.mock('../../../lib/recite/micSource', () => ({ isMicStreamAvailable: () => mockVoice }));
 
 import ReadIndexScreen from '../ReadIndexScreen';
 import { DesignProvider } from '../../../design/DesignContext';
@@ -99,26 +97,29 @@ describe('the Read index in the new design', () => {
   });
 });
 
-describe('searching the Quran from the Read tab (testers)', () => {
-  it('a tester gets a search field under the title, and the mic where the phone can listen', async () => {
-    mockApp = { user: { previewTester: true } };
+describe('searching the Quran from the Read tab', () => {
+  it.each([{}, { previewTester: false }, { previewTester: true }])(
+    '[SEARCH-1] [SEARCH-2] every account gets a search field under the title, and the mic where the phone can listen, for %o',
+    async (user) => {
+    mockApp = { user };
     mockVoice = true;
     await renderIndex();
     fireEvent.press(screen.getByTestId('read-search'));
     expect(mockNavigation.navigate).toHaveBeenCalledWith('QuranSearch');
     fireEvent.press(screen.getByTestId('read-search-voice'));
     expect(mockNavigation.navigate).toHaveBeenCalledWith('QuranSearch', { listen: true });
-  });
+    },
+  );
 
-  it('no mic where the phone can’t listen (Android, older builds)', async () => {
-    mockApp = { user: { previewTester: true } };
+  it.each([{}, { previewTester: true }])('no mic where the phone can’t listen (Android, older builds), for %o', async (user) => {
+    mockApp = { user };
     await renderIndex();
     expect(screen.getByTestId('read-search')).toBeTruthy();
     expect(screen.queryByTestId('read-search-voice')).toBeNull();
   });
 
-  it('everyone else sees the index as before', async () => {
-    mockApp = { user: { previewTester: false } };
+  it('nobody signed in: no search', async () => {
+    mockApp = { user: null };
     mockVoice = true;
     await renderIndex();
     expect(screen.queryByTestId('read-search')).toBeNull();

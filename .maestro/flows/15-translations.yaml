@@ -1,7 +1,7 @@
-# QuranEnc's translations in the verse sheet (testers; TRANS-*), on both platforms: Saheeh
-# International as everyone has it, the testers' picker and its search, then Al-Ikhlas 2 in one
-# translation per script the app shows (right to left: Urdu, Persian, Kurdish, Pashto, Uyghur,
-# N'Ko). E2E builds fetch nothing, so they write the recorded translations to the phone and open the
+# QuranEnc's translations in the verse sheet (every account's since the November 2026 release;
+# TRANS-*), on both platforms: Saheeh International, the picker of every translation and its search,
+# then Al-Ikhlas 2 in one translation per script the app shows (right to left: Urdu, Persian,
+# Kurdish, Pashto, Uyghur, N'Ko). E2E builds fetch nothing, so they write the recorded translations to the phone and open the
 # real verse sheet by a link (src/lib/e2e/demoTranslations.ts). Nobody signs in: the sheet opens over
 # the sign-in screen of a fresh install, which is what shows behind it in the screenshots. The screenshots are the proof that
 # every script renders with the system fonts and lays out the right way.
@@ -13,7 +13,7 @@ appId: com.revisionbuddy.app
     env:
       CLOCK: 2026-11-08T10:00
 
-# Saheeh International, as everyone has it: its footnote under the verse, its credit.
+# Saheeh International: its footnote under the verse, its credit.
 - runFlow:
     file: ../subflows/verse-link.yaml
     env:
@@ -27,7 +27,7 @@ appId: com.revisionbuddy.app
     env:
       NAME: t01-saheeh
 
-# The testers' picker: ⋯ → Select translation. Selected first, then every language.
+# The picker: ⋯ → Select translation. Selected first, then every language.
 - tapOn:
     id: verse-more
 - tapOn:

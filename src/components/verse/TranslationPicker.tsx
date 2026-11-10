@@ -33,7 +33,7 @@ interface Props {
 }
 
 /**
- * The verse sheet's translation picker (testers, for now; TRANS-5, TRANS-6, TRANS-8). Translations
+ * The verse sheet's translation picker (every account since Nov 2026; TRANS-5, TRANS-6, TRANS-8). Translations
  * and Edit, a search over every group, then Selected (the one in use), Favorites in the order starred,
  * Downloaded, and every language with its translations. Each row: the translator, the credit its
  * licence asks for, its source and what is on the phone; a download button (its size; stop while it

@@ -1,8 +1,11 @@
 import {
+  aheadDayLabel,
+  aheadLead,
   daysDoneAhead,
   nextRevisionDayPlan,
   revisionDayAfter,
   revisionDayPlan,
+  startsCycle,
   weekdayLabel,
 } from '../aheadPlan';
 import type { RevisionLog, User, UserPage } from '../../types';
@@ -63,9 +66,25 @@ describe('nextRevisionDayPlan', () => {
     });
   });
 
-  it('stops at the end of one cycle: the next day’s pages were taken already', () => {
+  // AHEAD-3 (Majd, Nov 9 2026): past the cycle's end the cycle restarts. The day repeats pages taken
+  // already, so it is a new round, revised apart from them.
+  it('goes on past the end of a cycle: the next day repeats pages taken already, a new round', () => {
     const taken = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9]);
-    expect(nextRevisionDayPlan(baseUser, pages, '2026-01-01', taken)).toBeNull();
+    expect(nextRevisionDayPlan(baseUser, pages, '2026-01-03', taken)).toEqual({ day: '2026-01-04', pages: [1, 2, 3], round: true });
+  });
+
+  it('a new round passes over the next cycle’s days already done ahead, and needs no round once nothing repeats', () => {
+    // Today (Jan 1) and the whole cycle done; the next cycle’s first day (Jan 4) done too, in a round.
+    const logs = [log('2026-01-01', [1, 2, 3, 4, 5, 6, 7, 8, 9], { '2026-01-02': [4, 5, 6], '2026-01-03': [7, 8, 9], '2026-01-04': [1, 2, 3] })];
+    // From Home: today’s pages are 1–3; Jan 5 repeats none of them.
+    expect(nextRevisionDayPlan(baseUser, pages, '2026-01-01', new Set([1, 2, 3]), logs)).toEqual({ day: '2026-01-05', pages: [4, 5, 6] });
+  });
+
+  it('is a new round only when the pages it still needs repeat taken ones (those already credited to it don’t)', () => {
+    const logs = [log('2026-01-01', [1, 2, 3], { '2026-01-04': [1] })];
+    expect(nextRevisionDayPlan(baseUser, pages, '2026-01-03', new Set([1, 2, 3]), logs)).toEqual({ day: '2026-01-04', pages: [2, 3], round: true });
+    const done = [log('2026-01-01', [1, 2, 3], { '2026-01-04': [1, 2] })];
+    expect(nextRevisionDayPlan(baseUser, pages, '2026-01-03', new Set([1, 2]), done)).toEqual({ day: '2026-01-04', pages: [3] });
   });
 
   it('passes over a day already done ahead', () => {
@@ -74,6 +93,31 @@ describe('nextRevisionDayPlan', () => {
       day: '2026-01-03',
       pages: [7, 8, 9],
     });
+  });
+});
+
+describe('naming the next day (AHEAD-3)', () => {
+  it('starts a cycle on its first page: pages a day, a custom plan, juz a day', () => {
+    // Pages a day: Jan 4 starts on page 1 again.
+    expect(startsCycle(baseUser, pages, '2026-01-04', 1)).toBe(true);
+    expect(startsCycle(baseUser, pages, '2026-01-05', 4)).toBe(false);
+    // Partly done (it would open on page 2): the cycle already began.
+    expect(startsCycle(baseUser, pages, '2026-01-04', 2)).toBe(false);
+    const custom: User = { ...baseUser, customPlan: { cycleStartDate: '2026-01-01', days: [[], [1, 2, 3], [4, 5, 6, 7, 8, 9]] } as User['customPlan'] };
+    // Day one is an off day: the cycle begins on its first day with pages.
+    expect(startsCycle(custom, pages, '2026-01-05', 1)).toBe(true);
+    expect(startsCycle(custom, pages, '2026-01-06', 4)).toBe(false);
+    const juz: User = { ...baseUser, scheduleMode: 'juz', dailyJuzCount: 1 };
+    expect(startsCycle(juz, pages, '2026-01-02', 1)).toBe(true);
+  });
+
+  it('Tomorrow, then Next cycle for a cycle’s first day, else the weekday (with the date a week on)', () => {
+    expect(aheadLead(baseUser, pages, '2026-01-03', { day: '2026-01-04', pages: [1, 2, 3] })).toBe('Tomorrow');
+    expect(aheadLead(baseUser, pages, '2026-01-01', { day: '2026-01-04', pages: [1, 2, 3] })).toBe('Next cycle');
+    expect(aheadLead(baseUser, pages, '2026-01-01', { day: '2026-01-05', pages: [4, 5, 6] })).toBe('Mon');
+    expect(aheadLead(baseUser, pages, '2026-01-01', { day: '2026-01-05', pages: [4, 5, 6] }, { long: true })).toBe('Monday');
+    expect(aheadDayLabel('2026-01-01', '2026-01-08')).toBe('Thu 8 Jan');
+    expect(aheadDayLabel('2026-01-01', '2026-01-07')).toBe('Wed');
   });
 });
 

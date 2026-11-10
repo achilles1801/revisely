@@ -52,7 +52,7 @@ describe('revisionItemsFor', () => {
 
   it('moves pages revised ahead out of the day and into an item counted for the later day', () => {
     const items = revisionItemsFor(
-      session({ pagesRevised: [549, 550, 551], ahead: { '2026-11-06': [551] } }),
+      session({ pagesRevised: [549, 550, 553], ahead: { '2026-11-06': [553] } }),
       UID,
     );
     expect(items).toHaveLength(2);
@@ -61,9 +61,19 @@ describe('revisionItemsFor', () => {
       id: `${DAY}-ahead-2026-11-06`,
       day: DAY,
       countsFor: '2026-11-06',
-      pages: [551],
+      pages: [553],
       minutes: null,
     });
+  });
+
+  // AHEAD-3: past the cycle's end, a new round revises the day's own pages again for a day a cycle on.
+  it('keeps the day’s own pages in its item when a new round revised them again for a later day', () => {
+    const items = revisionItemsFor(
+      session({ pagesRevised: [549, 550, 551, 552], ahead: { '2026-11-11': [549, 550] } }),
+      UID,
+    );
+    expect(items[0].pages).toEqual([549, 550, 551, 552]);
+    expect(items[1]).toMatchObject({ countsFor: '2026-11-11', pages: [549, 550] });
   });
 
   it('gives ratings from the session weakness changes', () => {

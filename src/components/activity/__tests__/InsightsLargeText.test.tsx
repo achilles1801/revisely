@@ -95,6 +95,9 @@ describe('Insights at the largest text', () => {
     expect(uncapped()).toEqual([]);
     fireEvent.press(screen.getByTestId('uncovered-62'));
     sheetGone();
+    // The row opened its juz's sheet: it goes first, as it must on a phone (one sheet at a time, SHEET-1).
+    fireEvent.press(screen.getByTestId('juz-sheet-open'));
+    sheetGone();
     fireEvent.press(screen.getByTestId('insights-pace-revisions'));
     expect(screen.getByTestId('pace-chart')).toBeTruthy();
     expect(uncapped()).toEqual([]);

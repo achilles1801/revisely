@@ -9,9 +9,11 @@
 # e2e-zone: America/Chicago
 appId: com.revisionbuddy.app
 ---
-- setLocation:
-    latitude: 41.88
-    longitude: -87.63
+- runFlow:
+    file: ../subflows/location.yaml
+    env:
+      LATITUDE: 41.88
+      LONGITUDE: -87.63
 - runFlow:
     file: ../subflows/new-account.yaml
     env:
@@ -63,17 +65,25 @@ appId: com.revisionbuddy.app
     text: "At.Tariq to Al.A'la.15 · .*"
 - tapOn: "Back"
 
-# LOG-3: a note written at 03:00 belongs to Tuesday, the revision day.
-- runFlow: ../subflows/open-log.yaml
+# LOG-3: a note written at 03:00 belongs to Tuesday, the revision day: Activity's
+# today is Tuesday, the note goes in its log, and the log is Tuesday's.
+- runFlow: ../subflows/open-day.yaml
+- assertVisible: "Today, Tuesday 3 November"
+- runFlow:
+    file: ../subflows/add-day-note.yaml
+    env:
+      TEXT: Written before Fajr
+- runFlow: ../subflows/day-log.yaml
 - assertVisible: "Tue 11/3"
+- extendedWaitUntil:
+    visible:
+      id: journal-note-.*
+      text: "Note, Written before Fajr, .*"
+    timeout: 15000
 - runFlow:
     file: ../subflows/shot.yaml
     env:
       NAME: 04-daily-log
-- runFlow:
-    file: ../subflows/add-note.yaml
-    env:
-      TEXT: Written before Fajr
 - runFlow: ../subflows/back-home.yaml
 
 # DAY-1: with the boundary off, 03:00 Wednesday is Wednesday at once.
@@ -107,8 +117,8 @@ appId: com.revisionbuddy.app
       id: today-title
       text: "Starts at At.Tariq[^,0-9]*"
     timeout: 20000
-# LOG-3: Wednesday's log is empty; the 03:00 note is Tuesday's.
-- runFlow: ../subflows/open-log.yaml
-- assertVisible: "Wed 11/4"
-- assertNotVisible:
-    text: "Note, Written before Fajr, .*"
+# LOG-3: Wednesday is a day of its own with nothing in it: no note, so no log to
+# open. The 03:00 note is Tuesday's.
+- runFlow: ../subflows/open-day.yaml
+- assertVisible: "Today, Wednesday 4 November"
+- assertNotVisible: "Daily log. Open the log"

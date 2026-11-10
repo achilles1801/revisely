@@ -102,9 +102,15 @@ appId: com.revisionbuddy.app
 - tapOn: "Back"
 
 # Last, as it marks pages memorized (and so changes the schedule): the daily log, where a
-# Memorized entry from its pages is named by its surahs. In dark, then in light.
+# Memorized entry from its pages is named by its surahs. In dark, then in light. The log
+# opens from a note on Activity's day, so today gets one first (the day's +).
 - runFlow: ../subflows/back-home.yaml
-- runFlow: ../subflows/open-log.yaml
+- runFlow: ../subflows/open-day.yaml
+- runFlow:
+    file: ../subflows/add-day-note.yaml
+    env:
+      TEXT: Al-Mulk again tomorrow
+- runFlow: ../subflows/day-log.yaml
 - tapOn:
     id: pill-memorization
 - tapOn:

@@ -43,13 +43,16 @@ function millisOf(ts: Timestamp | undefined): number {
 /**
  * The Revised items of a session as it stands after a change. Pages revised
  * ahead (`session.ahead`) leave the day's own item and go to their own item,
- * counted for the later day. Ratings are the weakness changes of the session.
+ * counted for the later day. A page of the day's own assignment stays in its item
+ * too: revising past the cycle's end revises it again for a day a cycle on
+ * (AHEAD-3). Ratings are the weakness changes of the session.
  */
 export function revisionItemsFor(session: FirestoreSession, uid: string): RevisionItem[] {
   const day = session.date;
   const occurredAt = millisOf(session.createdAt);
   const ahead = session.ahead ?? {};
   const aheadPages = new Set(Object.values(ahead).flat());
+  const assigned = new Set(session.assignedPages ?? []);
   const ratings: Record<string, number> = {};
   for (const w of session.weaknessUpdates ?? []) ratings[String(w.pageNumber)] = w.newRating;
 
@@ -60,7 +63,7 @@ export function revisionItemsFor(session: FirestoreSession, uid: string): Revisi
     occurredAt,
     countsFor: day,
     source: 'session',
-    pages: (session.pagesRevised ?? []).filter((p) => !aheadPages.has(p)),
+    pages: (session.pagesRevised ?? []).filter((p) => !aheadPages.has(p) || assigned.has(p)),
     skipped: session.pagesSkipped ?? [],
     assigned: session.assignedPages ?? [],
     minutes: minutesOf(session.durationMinutes),

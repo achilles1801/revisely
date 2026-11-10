@@ -31,8 +31,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { FajrBoundaryCard } from '../../components/FajrBoundaryCard';
 import { SpeechModelSheet } from '../../components/recite/SpeechModelSheet';
 import { ActionSheet } from '../../components/v2/ActionSheet';
-import { canFollowWords } from '../../components/recite/useReciteFollow';
 import { reciteModeEnabled } from '../../lib/recite/availability';
+import { voiceSearchEnabled } from '../../lib/search/availability';
 import { formatModelSize } from '../../lib/recite/speechModel';
 import { removeSpeechModel, useSpeechModelState } from '../../lib/recite/speechModelStore';
 import { PrayerSheet, PrayerTab } from '../../components/prayer/PrayerSheet';
@@ -325,6 +325,9 @@ export default function SettingsScreen() {
       },
     ]);
   const speechModel = useSpeechModelState();
+  // The speech model searches by voice (everyone, on an iPhone) and follows recitation (testers).
+  const speechModelShown = voiceSearchEnabled(user);
+  const followsRecitation = reciteModeEnabled(user);
   const [speechSheet, setSpeechSheet] = useState(false);
   const [deleteSpeechOpen, setDeleteSpeechOpen] = useState(false);
   const mushaf = useMushafOffline();
@@ -796,11 +799,15 @@ export default function SettingsScreen() {
             mode={localUser.carryOverMode}
             onChange={(carryOverMode) => updateUser({ carryOverMode })}
           />
-          {reciteModeEnabled(user) && canFollowWords() ? (
+          {speechModelShown ? (
             <Row
               icon="mic-outline"
               label="Speech model"
-              subtitle="Follows your recitation word by word, on this iPhone"
+              subtitle={
+                followsRecitation
+                  ? 'Searches by voice and follows your recitation, on this iPhone'
+                  : 'Searches the Quran by voice, on this iPhone'
+              }
               value={
                 speechModel.status === 'ready'
                   ? formatModelSize(speechModel.bytes)
@@ -1091,12 +1098,17 @@ export default function SettingsScreen() {
         )}
       </ScrollView>
       </SectionLayout.Provider>
-      <SpeechModelSheet visible={speechSheet} onClose={() => setSpeechSheet(false)} onReady={() => setSpeechSheet(false)} />
+      <SpeechModelSheet
+        visible={speechSheet}
+        onClose={() => setSpeechSheet(false)}
+        onReady={() => setSpeechSheet(false)}
+        {...(followsRecitation ? {} : { title: 'Search by voice', intro: 'Recite a few words and Revisely finds the ayah.' })}
+      />
       <ActionSheet
         visible={deleteSpeechOpen}
         onClose={() => setDeleteSpeechOpen(false)}
         title="Speech model"
-        message={`${formatModelSize()} on this iPhone. It downloads again the next time you follow word by word.`}
+        message={`${formatModelSize()} on this iPhone. It downloads again the next time you ${followsRecitation ? 'search by voice or follow word by word' : 'search by voice'}.`}
         actions={[{ key: 'delete', label: 'Delete speech model', icon: 'trash-outline', destructive: true, onPress: removeSpeechModel }]}
         testID="speech-model-delete-menu"
       />

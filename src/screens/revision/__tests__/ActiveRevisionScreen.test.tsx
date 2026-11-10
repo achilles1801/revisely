@@ -31,7 +31,7 @@ const mockPager: {
   onTapVerse?: (ayah: { page: number; sura: number; ayah: number }) => boolean;
 } = {};
 // The session's route params (Home's "starts at" line opens a later day).
-let mockRouteParams: { aheadDay?: string } | undefined;
+let mockRouteParams: { aheadDay?: string; round?: boolean } | undefined;
 jest.mock('../../../components/MushafPager', () => {
   const { Pressable, View } = require('react-native');
   return {
@@ -662,14 +662,49 @@ describe('ActiveRevisionScreen — keep going (revise ahead, #168)', () => {
     );
   });
 
-  it('at the end of the cycle there is no Keep going', async () => {
+  // AHEAD-3 (Majd, Nov 9 2026): "my next revise ahead would just be restarting the cycle". A one-day
+  // cycle: tomorrow repeats today's pages, so Keep going starts a new round.
+  it('at the end of the cycle, Keep going starts the next: its pages alone and unchecked, today’s left done', async () => {
     setup(DAY_PAGES.slice(0, 9));
-    render(<ActiveRevisionScreen />);
+    const { unmount } = render(<ActiveRevisionScreen />);
     await act(async () => {
       mockPager.onReachEnd?.(340, true);
     });
     expect(screen.getByText('Revision complete')).toBeTruthy();
-    expect(screen.queryByTestId('session-end-keep-going')).toBeNull();
+    // Tomorrow is the plan's first day again.
+    expect(screen.getByText(/^Next cycle · .+ · 10 pages$/)).toBeTruthy();
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('session-end-keep-going'));
+    });
+    expect(mockPager.pages).toEqual(DAY_PAGES);
+    expect(mockPager.initialPage).toBe(DAY_PAGES[0]);
+    expect(screen.getByText(/^Revising ahead/)).toBeTruthy();
+    // The same pages, to revise again: none is checked.
+    expect(screen.getByLabelText('Mark current page as revised')).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Mark current page as revised'));
+    await act(async () => {
+      unmount();
+    });
+    // Credited to tomorrow; nothing of today's is skipped or taken back.
+    expect(mockApp.addLog).toHaveBeenLastCalledWith(
+      expect.objectContaining({ pagesRevised: [331], pagesSkipped: [], ahead: { [tomorrow()]: [331] } }),
+    );
+    expect(mockApp.updateLog).not.toHaveBeenCalled();
+  });
+
+  it('Home’s new round opens that day alone, unchecked, though its pages are today’s', async () => {
+    setup(DAY_PAGES);
+    mockRouteParams = { aheadDay: tomorrow(), round: true };
+    const { unmount } = render(<ActiveRevisionScreen />);
+    expect(mockPager.pages).toEqual(DAY_PAGES);
+    expect(screen.getByLabelText('Mark current page as revised')).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Mark current page as revised'));
+    await act(async () => {
+      unmount();
+    });
+    expect(mockApp.addLog).toHaveBeenLastCalledWith(
+      expect.objectContaining({ pagesRevised: [331], pagesSkipped: [], ahead: { [tomorrow()]: [331] } }),
+    );
   });
 
   it('swiping off a later day’s page marks it, as a page of today', async () => {

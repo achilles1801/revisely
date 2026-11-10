@@ -22,7 +22,7 @@ name: E2E
 # smoke, full):
 #   - a lower layer of a GitHub stack: not called (the top layer tests the stack);
 #   - the top of a stack into develop, a PR into main, a merge group: every flow,
-#     two iOS jobs and two Android jobs;
+#     four iOS jobs and four Android jobs;
 #   - a single PR into develop: the smoke set, 02 04 05 06, on Android only, in
 #     two jobs side by side (.maestro/README.md says why these four);
 #   - a push to develop (what just landed): every Android flow, and the iOS native
@@ -66,7 +66,7 @@ on:
         options: [both, ios, android]
         default: both
       flows:
-        description: Only these flows (a glob in .maestro/flows, e.g. 06-*); empty for all
+        description: Only these flows, in this order, in one job (globs in .maestro/flows, e.g. 06-* or '04-* 06-* 11-*'); empty for all
         type: string
         default: ''
       debug:
@@ -128,9 +128,16 @@ jobs:
       run_ios: ${{ steps.shards.outputs.run_ios }}
       run_android: ${{ steps.shards.outputs.run_android }}
     steps:
-      # The jobs and their flows. Every flow: two jobs a platform of about the
-      # same length (03 and 04, the long ones, apart; every flow in one of them, which
-      # scripts/e2e/__tests__/shards.test.js checks). The smoke set: two Android jobs, one iOS.
+      # The jobs and their flows. Every flow: four jobs a platform, balanced by time so
+      # each ends inside its 90 minutes with a retry of its longest flow to spare, at the
+      # slowest each flow has passed in (scripts/e2e/flow-minutes.json). Two jobs stopped
+      # fitting once 09 grew to five files: #217's iOS job with 09 hit its limit twice,
+      # before 11 and 16 (run 42619006611). scripts/e2e/__tests__/shards.test.js checks the
+      # times and that every flow is in exactly one job. A job runs its globs in the order
+      # written. 10 goes first in its job, before the 09 seeds: after them, deleting its account
+      # took 30.0 and 32.2 s on iOS against 3.4 and 4.0 s for the warm-up's empty account, past the
+      # app's 30 s (#217's run 42687083053); the emulator is in its first state then.
+      # The smoke set: two Android jobs, one iOS.
       # Called from CI: what `ios` and `android` say. On its own: a run by hand
       # with `flows` is one job each with those, `smoke` the smoke set, and
       # otherwise (and nightly) every flow.
@@ -147,7 +154,7 @@ jobs:
           SHA: ${{ github.sha }}
           RUN_ID: ${{ github.run_id }}
         run: |
-          full='[{"name":"01 02 03 08 09 11 16","flows":".maestro/flows/0[12389]-*.yaml .maestro/flows/1[16]-*.yaml"},{"name":"04 05 06 07 10 12 13 14 15","flows":".maestro/flows/0[4567]-*.yaml .maestro/flows/1[02345]-*.yaml"}]'
+          full='[{"name":"02 03 08 12 13 16 17","flows":".maestro/flows/0[238]-*.yaml .maestro/flows/1[2367]-*.yaml"},{"name":"01 04 07 09-revo-attach 14 15","flows":".maestro/flows/0[147]-*.yaml .maestro/flows/09-revo-attach.yaml .maestro/flows/1[45]-*.yaml"},{"name":"10 09-activity-dark 09-activity-light 09-insights-history","flows":".maestro/flows/10-*.yaml .maestro/flows/09-activity-*.yaml .maestro/flows/09-insights-history.yaml"},{"name":"05 06 09-revo 11","flows":".maestro/flows/0[56]-*.yaml .maestro/flows/09-revo.yaml .maestro/flows/11-*.yaml"}]'
           # Android's smoke set is a single PR's long pole: two jobs side by side
           # (about 8 minutes of flows each: 02 + 05, 04 + 06) instead of one of 16.
           # iOS keeps one job: macOS runners are the scarce part (5 at a time).
@@ -164,8 +171,10 @@ jobs:
           if [ -n "$IOS_SET" ] || [ -n "$ANDROID_SET" ]; then
             ios=$(set_of "${IOS_SET:-none}" ios); android=$(set_of "${ANDROID_SET:-none}" android)
           elif [ -n "$ONLY" ]; then
-            case "$ONLY" in *[!A-Za-z0-9*?._-]*) echo "::error::flows: a glob of flow names, like 06-*"; exit 1 ;; esac
-            ios=$(jq -cn --arg n "$ONLY" '[{name: $n, flows: (".maestro/flows/" + $n)}]'); android="$ios"
+            # Several globs run in one job in the order given, as a full job's do: '06-* 11-*' runs 11
+            # after 06 on the same device, which is how order between flows is tried by hand.
+            case "$ONLY" in *[!]A-Za-z0-9*?._[\ -]*) echo "::error::flows: globs of flow names, like 06-* or '06-* 11-*'"; exit 1 ;; esac
+            ios=$(jq -cn --arg n "$ONLY" '[{name: $n, flows: ($n | split(" ") | map(select(. != "") | ".maestro/flows/" + .) | join(" "))}]'); android="$ios"
           elif [ "$SMOKE" = true ]; then
             ios="$smoke_ios"; android="$smoke_android"
           else
@@ -260,9 +269,10 @@ jobs:
     if: ${{ needs.changes.outputs.app == 'true' && needs.changes.outputs.run_ios == 'true' }}
     runs-on: macos-26
     timeout-minutes: 90
-    # The macOS runner takes 4–9 minutes a flow, and a native build 20 to 35
-    # (when the fingerprint has none kept: a native change). (A third job often
-    # waited for a macOS runner until GitHub gave up on it.)
+    # The macOS runner takes 4–14 minutes a flow, and a native build 20 to 35
+    # (when the fingerprint has none kept: a native change). (On Nov 4 a third job
+    # sometimes waited for a macOS runner until GitHub gave up on it; none has since,
+    # in 300 runs to Nov 9, and a full run now has four.)
     # (A run by hand with some flows: one job with those; `changes` picks.)
     strategy:
       fail-fast: false
@@ -420,9 +430,12 @@ jobs:
           for attempt in 1 2; do
             nohup bash .maestro/scripts/emulators.sh > "$RUNNER_TEMP/emulators.log" 2>&1 &
             for i in $(seq 1 90); do
-              # The functions emulator answers 404 at its root once it serves.
+              # Our functions are loaded: one answers 401 to a call without a sign-in. The emulator's
+              # root answers 404 even when none loaded (run 42573714262: "valid functions are:"
+              # followed by nothing, and every function call in the job failed).
               if curl -fs http://127.0.0.1:9099/ >/dev/null && curl -fs http://127.0.0.1:8080/ >/dev/null &&
-                [ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:5001/)" != 000 ]; then echo ready; exit 0; fi
+                [ "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"data":{}}' \
+                  http://127.0.0.1:5001/demo-revisely/us-central1/setCoachOptIn)" = 401 ]; then echo ready; exit 0; fi
               sleep 2
             done
             echo "::warning::The emulators didn't start (attempt $attempt)."
@@ -449,6 +462,11 @@ jobs:
           E2E_DEVICE: ${{ steps.sim.outputs.udid }}
           MAESTRO_DRIVER_STARTUP_TIMEOUT: '180000'
           FLOWS: ${{ matrix.shard.flows }}
+          # 20 minutes an attempt here (run.sh's own 15 stays for Android). The limit is
+          # there to stop a hung Maestro (one hung a shard for 55 minutes); iOS flows 09
+          # and 11 pass in 12 to 14.5 minutes on a busy runner, and 11's first attempt in
+          # run 42649421053 was stopped at 900 s while still going (560 of its ~586 steps).
+          E2E_FLOW_LIMIT: '1200'
         # $FLOWS is a glob, expanded here.
         run: bash .maestro/run.sh ios $FLOWS
 
@@ -691,9 +709,12 @@ jobs:
           for attempt in 1 2; do
             nohup bash .maestro/scripts/emulators.sh > "$RUNNER_TEMP/emulators.log" 2>&1 &
             for i in $(seq 1 90); do
-              # The functions emulator answers 404 at its root once it serves.
+              # Our functions are loaded: one answers 401 to a call without a sign-in. The emulator's
+              # root answers 404 even when none loaded (run 42573714262: "valid functions are:"
+              # followed by nothing, and every function call in the job failed).
               if curl -fs http://127.0.0.1:9099/ >/dev/null && curl -fs http://127.0.0.1:8080/ >/dev/null &&
-                [ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:5001/)" != 000 ]; then echo ready; exit 0; fi
+                [ "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"data":{}}' \
+                  http://127.0.0.1:5001/demo-revisely/us-central1/setCoachOptIn)" = 401 ]; then echo ready; exit 0; fi
               sleep 2
             done
             echo "::warning::The emulators didn't start (attempt $attempt)."

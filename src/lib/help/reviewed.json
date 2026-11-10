@@ -27,16 +27,16 @@
   },
   "session.rating": {
     "ACT-8": "17530ba6416770ba",
-    "ACT-12": "af7c5a40d965c592"
+    "ACT-12": "4afb073e2a87d454"
   },
   "session.hidden": {},
   "reader.hold": {},
   "reader.turning": {},
   "reader.recitation": {},
   "reader.sitting": {
-    "REC-1": "aa8d6fb7fcf6b756",
-    "REC-2": "103f684e88e23182",
-    "MEM-5": "5f710a835a3d12fe",
+    "REC-1": "971b7fa368411aaa",
+    "REC-2": "06be0811d7eedf49",
+    "MEM-5": "2b610dd93d4012d9",
     "DAY-9": "d1f48e9dc60411f1"
   },
   "schedule.cycle": {
@@ -61,7 +61,7 @@
     "SCHED-4": "cd9b1e2c930dc819"
   },
   "activity.calendar": {
-    "ACT-3": "9911173a493dc520",
+    "ACT-3": "66440e5b3b9fbfc8",
     "ACT-18": "bf9231cef3097199"
   },
   "activity.day": {
@@ -84,7 +84,7 @@
     "ACT-23": "bc761a4eb1d943b5"
   },
   "insights.weak": {
-    "ACT-12": "af7c5a40d965c592",
+    "ACT-12": "4afb073e2a87d454",
     "ACT-8": "17530ba6416770ba",
     "ACT-20": "e576925144fbc092",
     "ACT-24": "84ed5272370beade"

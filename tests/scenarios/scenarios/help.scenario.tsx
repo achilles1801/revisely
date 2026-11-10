@@ -1,6 +1,7 @@
 // The help buttons (BEHAVIOUR.md HELP-1, HELP-2): a ? on Home's Today post opens "How Home works"; hiding
 // the buttons takes them away for good on this phone, with Undo, until Settings → Support brings them back.
-// Testers only for now: the owner marks the account (set-preview-tester.js) while the app is closed.
+// Every account's since the November 2026 release: these run as App Store accounts (previewTester unset),
+// except where a tester's Revo is what Ask Revo needs (Revo follows its own switch, config/app.revo).
 
 import type { ReactElement } from 'react';
 import { setNow, setZone, ZONES } from '../harness/clock';
@@ -131,17 +132,20 @@ describe('the help on Home', () => {
     await app.close();
   });
 
-  it('[HELP-1] an account that isn’t a tester has no ?', async () => {
+  it('[HELP-1] [HELP-4] an account that isn’t a tester has the ? too: How Home works, without Ask Revo while Revo is for testers', async () => {
     const phone = await account(false);
     const { app } = await openHome(phone, false);
-    await app.idle(300);
-    expect(helpButton(app)).toBeNull();
+    await app.until(() => helpButton(app) != null, 'the ? on the Today post');
+    await press(app, 'help-button-home');
+    await app.until(() => app.screen.queryByTestId('help-sheet-home') != null, 'How Home works');
+    expect(app.screen.queryByTestId('help-ask-revo')).toBeNull();
+    expect(app.screen.queryByTestId('help-hide')).not.toBeNull();
     await app.close();
   });
 
   it('[HELP-4] the ? is on by default: a phone with nothing stored shows it, and hiding it on one phone leaves another’s on', async () => {
-    const phone = await account(true);
-    const { app } = await openHome(phone, true);
+    const phone = await account(false);
+    const { app } = await openHome(phone, false);
     // Nothing about help on this phone, and the ? shows.
     expect([...phone.storage.keys()].filter((k) => k.startsWith('@revisely_help'))).toEqual([]);
     await app.until(() => helpButton(app) != null, 'the ? on the Today post');
@@ -155,15 +159,14 @@ describe('the help on Home', () => {
     const other = new Phone('other');
     const app2 = await other.open(homeAndSettings);
     await app2.signIn(phone.email!);
-    await app2.until(() => app2.app.user?.previewTester === true, 'the account to be a tester');
     await new Home(app2).ready();
     await app2.until(() => helpButton(app2) != null, 'the ? on the other phone');
     await app2.close();
   });
 
   it('[HELP-2] Hide help buttons takes every ? away, with Undo; hidden they stay hidden at the next launch, until Settings → Support → Help buttons', async () => {
-    const phone = await account(true);
-    let { app } = await openHome(phone, true);
+    const phone = await account(false);
+    let { app } = await openHome(phone, false);
     await app.until(() => helpButton(app) != null, 'the ? on the Today post');
 
     // Hidden from Home's sheet: gone at once, and Home says how to bring them back, with Undo.
@@ -179,7 +182,7 @@ describe('the help on Home', () => {
     await press(app, 'help-hide');
     await app.until(() => helpButton(app) == null, 'the ? to go');
     await app.close();
-    ({ app } = await openHome(phone, true));
+    ({ app } = await openHome(phone, false));
     await app.idle(300);
     expect(helpButton(app)).toBeNull();
 
@@ -236,8 +239,8 @@ describe('the help follows Smart Tracking', () => {
   });
 
   it('[HELP-3] with Smart Tracking on, the session’s help says how to rate a page', async () => {
-    const phone = await account(true, true);
-    const { app, home } = await openHome(phone, true);
+    const phone = await account(false, true);
+    const { app, home } = await openHome(phone, false);
     await app.until(() => helpButton(app) != null, 'the ? on the Today post');
     await sessionHelp(app, home);
     expect(topicIds(app)).toContain('session.rating');
@@ -248,8 +251,8 @@ describe('the help follows Smart Tracking', () => {
 
 describe('the help in Activity', () => {
   it('[HELP-1] [HELP-3] Activity’s ? explains the tab on show: How Activity works on Overview, How Insights work on Insights (no Weak spots without Smart Tracking)', async () => {
-    const phone = await account(true, false);
-    const { app } = await openHome(phone, true);
+    const phone = await account(false, false);
+    const { app } = await openHome(phone, false);
     await app.until(() => helpButton(app) != null, 'the ? on the Today post');
     await press(app, 'open-activity');
     await app.until(() => app.screen.queryByTestId('help-button-activity') != null, 'Activity’s ?');
@@ -269,8 +272,8 @@ describe('the help in Activity', () => {
   });
 
   it('[HELP-1] [HELP-3] a day’s ? before +: with Smart Tracking on, the strip’s strength comes from ratings', async () => {
-    const phone = await account(true, true);
-    const { app } = await openHome(phone, true);
+    const phone = await account(false, true);
+    const { app } = await openHome(phone, false);
     await app.until(() => helpButton(app) != null, 'the ? on the Today post');
     await new ActivityDayView(app).open('2026-11-03');
     await app.until(() => app.screen.queryByTestId('help-button-day') != null, 'the day’s ?');

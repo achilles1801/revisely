@@ -68,7 +68,7 @@ import { generateDailyAssignment, getCurrentRevisionDay } from '../../lib/algori
 import { catchUpDayOf, duePagesOf, insightsPagesOn } from '../../lib/carryOver';
 import { revisablePages } from '../../lib/memorizedAyahs';
 import { aheadCreditFor, creditedOnDay, doneOnDay, sessionCredit } from '../../lib/aheadCredit';
-import { nextRevisionDayPlan, revisionDayPlan, weekdayLabel, type RevisionDayPlan } from '../../lib/aheadPlan';
+import { aheadDayLabel, nextRevisionDayPlan, revisionDayPlan, startsCycle, type RevisionDayPlan } from '../../lib/aheadPlan';
 import { describePageRange, describePassage } from '../../lib/passages';
 import {
   getHizbForPage,
@@ -76,7 +76,7 @@ import {
   getSurahsForPage,
 } from '../../lib/quranData';
 import { logger } from '../../lib/logger';
-import { pagesToUnrevise, removeRevisedPages } from '../../lib/revisionSession';
+import { pagesToUnrevise, removeRevisedPages, removeRoundPages } from '../../lib/revisionSession';
 import { dismissPresentedRevisionReminders } from '../../lib/reminders/sync';
 
 const NO_PAGES: number[] = [];
@@ -129,6 +129,11 @@ export default function ActiveRevisionScreen() {
   // starts on the day's first page with no jump (and no flash of today's).
   // Otherwise the effect below adds the day as soon as the user is there.
   const openAheadDay = route.params?.aheadDay;
+  // A new round (AHEAD-3, Majd, Nov 9 2026: revising ahead past the cycle's end restarts the cycle): the
+  // session holds only the later days it goes on to, not today's pages, which those days repeat. Home
+  // opens one (round: true) when the next day repeats today's pages; Keep going starts one when the next
+  // day repeats pages this session holds. Today was done to get here.
+  const [round, setRound] = useState(() => route.params?.round === true);
   const [openedAhead] = useState<RevisionDayPlan | null>(() => {
     if (!user || !sessionDay || !openAheadDay || openAheadDay <= sessionDay) return null;
     const plan = revisionDayPlan(user, pages, openAheadDay, logs);
@@ -140,22 +145,24 @@ export default function ActiveRevisionScreen() {
   // order. The session's pages are today's, then these.
   const [aheadDays, setAheadDays] = useState<RevisionDayPlan[]>(() => (openedAhead ? [openedAhead] : []));
   const sections = useMemo(
-    () => [{ day: sessionDay ?? '', pages: assignment?.pages ?? [] }, ...aheadDays],
-    [sessionDay, assignment, aheadDays],
+    () => (round && aheadDays.length > 0 ? aheadDays : [{ day: sessionDay ?? '', pages: assignment?.pages ?? [] }, ...aheadDays]),
+    [sessionDay, assignment, aheadDays, round],
   );
   const sessionPages = useMemo(() => sections.flatMap((s) => s.pages), [sections]);
   const pageDays = useMemo(() => {
     const days = new Map<number, string>();
     for (const s of sections) for (const p of s.pages) days.set(p, s.day);
-    // A catch-up page is credited to the day it was missed, not to today (SESS-7).
-    if (user && sessionDay) {
-      for (const p of sessionPages) {
+    // A catch-up page of today's is credited to the day it was missed, not to today (SESS-7). A later
+    // day's page is revised for that day, even one today carried in: a new round past the cycle's end
+    // revises it again for its day a cycle on (AHEAD-3), and holds none of today's.
+    if (user && sessionDay && !round) {
+      for (const p of sections[0]?.pages ?? []) {
         const d = catchUpDayOf(user, sessionDay, p);
         if (d) days.set(p, d);
       }
     }
     return days;
-  }, [sections, sessionPages, user, sessionDay]);
+  }, [sections, user, sessionDay, round]);
   const lastSectionDay = sections[sections.length - 1].day;
   const lastSectionPages = sections[sections.length - 1].pages;
   // The pager holds one revision day: today's, or once the session has gone
@@ -177,10 +184,11 @@ export default function ActiveRevisionScreen() {
   // day it was missed (SESS-7), and is still done here. (Counting today's credit alone reopened
   // the session on the catch-up pages, unchecked, while Home said to continue after them.)
   const alreadyRevisedToday = useMemo(() => {
-    if (!assignment || !sessionDay) return new Set<number>();
+    // A new round doesn't hold today's pages (its own may be the same pages, still to revise again).
+    if (!assignment || !sessionDay || round) return new Set<number>();
     const done = doneOnDay(logs, sessionDay);
     return new Set(assignment.pages.filter((p) => done.has(p)));
-  }, [logs, assignment, sessionDay]);
+  }, [logs, assignment, sessionDay, round]);
 
   const ratingsFromTodaysLogs = useMemo(() => {
     const map = new Map<number, number>();
@@ -375,7 +383,7 @@ export default function ActiveRevisionScreen() {
   // Every page revised: the session is complete, and the controls stay up
   // (Back is the way out; there is no Submit or End session).
   const allDone =
-    !!assignment && assignment.pages.length > 0 && assignment.pages.every((p) => completedPages.has(p));
+    round || (!!assignment && assignment.pages.length > 0 && assignment.pages.every((p) => completedPages.has(p)));
   const chrome = useReaderChrome({ locked: allDone });
   const tapHint = useTapHint();
   const dismissHint = tapHint.dismiss;
@@ -502,10 +510,11 @@ export default function ActiveRevisionScreen() {
           (l.pagesRevised.some((p) => unrevised.includes(p)) ||
             Object.values(l.ahead ?? {}).some((pages) => pages.some((p) => unrevised.includes(p)))),
       );
-      if (todaysLog) await updateLog(removeRevisedPages(todaysLog, unrevised));
+      // A new round takes back only its own credit: the day keeps its own revision of the page (AHEAD-3).
+      if (todaysLog) await updateLog(round ? removeRoundPages(todaysLog, pageDays, unrevised) : removeRevisedPages(todaysLog, unrevised));
       unrevised.forEach((p) => silentlySavedRef.current.delete(p));
     }
-  }, [user, assignment, sessionDay, completedPages, pages, localRatings, pageDays, updatePages, addLog, updateLog, heldAsRevised]);
+  }, [user, assignment, sessionDay, completedPages, pages, localRatings, pageDays, updatePages, addLog, updateLog, heldAsRevised, round]);
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -660,15 +669,16 @@ export default function ActiveRevisionScreen() {
   useEffect(() => {
     const prev = prevMarksRef.current;
     prevMarksRef.current = completedPages;
-    // Today's pages: a session revised on past them (Keep going) completes once.
-    const todays = assignment?.pages ?? [];
+    // Today's pages: a session revised on past them (Keep going) completes once. A new round doesn't
+    // hold them (today was done before it).
+    const todays = round ? [] : assignment?.pages ?? [];
     if (prev === completedPages || todays.length === 0) return;
     const doneWith = (marks: Set<number>) => todays.every((p) => marks.has(p));
     if (doneWith(prev) || !doneWith(completedPages)) return;
     void commitRef.current();
     // Only a recording in progress (idle, finish would wait for the next one).
     if (recorderRef.current.phase !== 'idle') void recorderRef.current.finish();
-  }, [completedPages, assignment]);
+  }, [completedPages, assignment, round]);
 
 
   // ===== Keep going (#168) =====
@@ -688,11 +698,23 @@ export default function ActiveRevisionScreen() {
     },
     [logs],
   );
-  const keepGoing = useCallback(() => {
+  const keepGoing = useCallback(async () => {
     if (!keepGoingPlan) return;
-    addSection(keepGoingPlan);
     haptics.selection();
-  }, [keepGoingPlan, addSection, haptics]);
+    if (!keepGoingPlan.round) {
+      addSection(keepGoingPlan);
+      return;
+    }
+    // The cycle has come round (AHEAD-3): the next day repeats pages this session holds. Everything so far
+    // is saved, then the session starts a new round holding that day alone, its pages unchecked.
+    await commitPendingPages();
+    const already = creditedPagesOf(logsRef.current, keepGoingPlan);
+    silentlySavedRef.current = new Set(already);
+    setCompletedPages(new Set(already));
+    setCurrentPageNumber(keepGoingPlan.pages[0]);
+    setRound(true);
+    setAheadDays([keepGoingPlan]);
+  }, [keepGoingPlan, addSection, haptics, commitPendingPages]);
 
   // Home's "Tomorrow starts at …" (#168) when the user wasn't loaded at mount:
   // the day is added once they are (planned at mount otherwise, above).
@@ -726,8 +748,9 @@ export default function ActiveRevisionScreen() {
       const pagesRevised = Array.from(completedPages).filter(
         (p) => !silentlySavedRef.current.has(p),
       );
-      // Only today's pages can be skipped; ahead pages not done are simply not revised.
-      const pagesSkipped = (assignment?.pages ?? []).filter(
+      // Only today's pages can be skipped; ahead pages not done are simply not revised. A new round
+      // holds none of today's.
+      const pagesSkipped = (round ? [] : assignment?.pages ?? []).filter(
         (p) => !completedPages.has(p) && !silentlySavedRef.current.has(p),
       );
       const changedPageNumbers = [...pagesRevised, ...pagesSkipped];
@@ -796,6 +819,7 @@ export default function ActiveRevisionScreen() {
     finishRecording,
     haptics,
     heldAsRevised,
+    round,
   ]);
 
   const viewerPages = shownPages;
@@ -1009,7 +1033,7 @@ export default function ActiveRevisionScreen() {
                 maxFontSizeMultiplier={1.3}
                 testID="session-title"
               >
-                {aheadView ? `Revising ahead · ${weekdayLabel(viewDay)}` : `Revising ${scopeLabel}`}{' '}
+                {aheadView ? `Revising ahead · ${aheadDayLabel(sessionDay ?? viewDay, viewDay)}` : `Revising ${scopeLabel}`}{' '}
                 <Text style={{ color: palette.textSecondary, fontWeight: '400' }}>
                   · {viewDone}/{totalPages}
                 </Text>
@@ -1132,14 +1156,16 @@ export default function ActiveRevisionScreen() {
               total={lastSectionPages.length}
               done={lastSectionPages.filter((p) => completedPages.has(p)).length}
               celebrate={celebrate}
-              dayLabel={lastSectionDay === sessionDay ? 'today' : `for ${weekdayLabel(lastSectionDay)}`}
+              dayLabel={lastSectionDay === sessionDay ? 'today' : `for ${aheadDayLabel(sessionDay ?? lastSectionDay, lastSectionDay)}`}
               what={describePassage(lastSectionPages, { order: 'given' })}
               next={
                 keepGoingPlan
                   ? {
-                      label: weekdayLabel(keepGoingPlan.day),
+                      label: aheadDayLabel(sessionDay ?? keepGoingPlan.day, keepGoingPlan.day),
                       what: describePassage(keepGoingPlan.pages, { form: 'short', order: 'given', max: 2 }),
                       pages: keepGoingPlan.pages.length,
+                      // Revising ahead goes on into the next cycle (AHEAD-3): "Next cycle · Al-Fatihah to …".
+                      cycle: user ? startsCycle(user, pages, keepGoingPlan.day, keepGoingPlan.pages[0]) : false,
                     }
                   : null
               }

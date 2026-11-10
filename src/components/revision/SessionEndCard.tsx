@@ -36,8 +36,11 @@ export function SessionEndCard({
   dayLabel?: string;
   /** What was revised, by surah or juz (lib/passages): "Al-Mujadila to At-Tahrim", "Juz 28". */
   what?: string;
-  /** The next revision day (Keep going): its weekday, its surahs and how many pages; none at the end of the cycle. */
-  next?: { label: string; what?: string; pages: number } | null;
+  /**
+   * The next revision day (Keep going): its weekday, its surahs and how many pages. `cycle`: it begins the
+   * next cycle (AHEAD-3: revising ahead goes on past the cycle's end), named "Next cycle" for its weekday.
+   */
+  next?: { label: string; what?: string; pages: number; cycle?: boolean } | null;
   onKeepGoing?: () => void;
   /** The session was recorded: play it back over its pages. */
   onListenBack?: () => void;
@@ -89,7 +92,9 @@ export function SessionEndCard({
       {complete && next && onKeepGoing ? (
         <View style={styles.keep}>
           <Text style={[typeV2.meta, styles.center, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
-            {[`Next: ${next.label}`, next.what, `${next.pages} ${next.pages === 1 ? 'page' : 'pages'}`].filter(Boolean).join(' · ')}
+            {[next.cycle ? 'Next cycle' : `Next: ${next.label}`, next.what, `${next.pages} ${next.pages === 1 ? 'page' : 'pages'}`]
+              .filter(Boolean)
+              .join(' · ')}
           </Text>
           <PillButton title="Keep going" onPress={onKeepGoing} testID="session-end-keep-going" />
         </View>

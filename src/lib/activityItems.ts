@@ -104,10 +104,15 @@ function catchUpAssigned(log: RevisionLog): number[] {
   return catchUpPagesOf(log).filter((p) => assigned.has(p));
 }
 
-/** The pages a session revised for its own day: revised, less those credited ahead to later days. */
+/**
+ * The pages a session revised for its own day: revised, less those credited ahead to later days. A page
+ * of the day's own that was revised again for a later day (a new round past the cycle's end, AHEAD-3) is
+ * still the day's.
+ */
 export function ownRevised(log: RevisionLog): number[] {
   const ahead = new Set(Object.values(log.ahead ?? {}).flat());
-  return [...log.pagesRevised.filter((p) => !ahead.has(p)), ...catchUpAssigned(log)];
+  const assigned = new Set(log.assignedPages ?? []);
+  return [...log.pagesRevised.filter((p) => !ahead.has(p) || assigned.has(p)), ...catchUpAssigned(log)];
 }
 
 /** How items name what was revised: `juzPlan` is the account's plan (scheduleMode 'juz'). */

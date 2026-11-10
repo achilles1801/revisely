@@ -1,4 +1,4 @@
-// Finding ayat from a few of their words, typed or heard (voice search, testers).
+// Finding ayat from a few of their words, typed or heard (voice search, on an iPhone).
 //
 // The words are compared the way recite mode compares what it hears with the mushaf
 // (lib/recite/arabic: bare letters, one alef, no hamza seats), against every word of the
@@ -173,21 +173,38 @@ function leading(list: QueryWord[], prefix: string[], least: number): number {
 }
 
 /**
- * The query as words to look for, a leading isti'adha or basmala set aside. Words said
- * apart that are printed as one (يا أيها) stay apart here: the line-up matches them with
- * the printed word together. Joining them here would also join them where the text has
- * them apart (نذير مبين is one word in 71:2 and two everywhere else).
+ * Every word heard, as words to look for. Words said apart that are printed as one (يا أيها)
+ * stay apart here: the line-up matches them with the printed word together. Joining them
+ * here would also join them where the text has them apart (نذير مبين is one word in 71:2
+ * and two everywhere else).
  */
-export function queryWords(text: string): QueryWord[] {
+function heardWords(text: string): QueryWord[] {
   const split = splitWords(text);
-  let list: QueryWord[] = split.keys.map((key, j) => ({ key, loose: split.loose[j], alike: split.alike[j] }));
-  // "A'udhu billahi min ash-shaytan ir-rajim" before reciting isn't in the Qur'an.
-  const istiadha = leading(list, ISTIADHA, 3);
-  if (istiadha && list.length - istiadha >= 1) list = list.slice(istiadha);
+  // Room for an opening and the query said twice; anything past that is never searched.
+  return split.keys
+    .slice(0, ISTIADHA.length + BASMALA.length + 2 * MAX_QUERY_WORDS)
+    .map((key, j) => ({ key, loose: split.loose[j], alike: split.alike[j] }));
+}
+
+/** The words with a leading isti'adha set aside: "A'udhu billahi min ash-shaytan ir-rajim"
+ *  before reciting isn't in the Qur'an. */
+function withoutIstiadha(heard: QueryWord[]): QueryWord[] {
+  const istiadha = leading(heard, ISTIADHA, 3);
+  return istiadha && heard.length - istiadha >= 1 ? heard.slice(istiadha) : heard;
+}
+
+/** The words with a leading isti'adha or basmala set aside, as many as are searched. */
+function withoutOpening(heard: QueryWord[]): QueryWord[] {
+  let list = withoutIstiadha(heard);
   // The basmala before an ayah: search for the ayah (the basmala alone is still found).
   const basmala = leading(list, BASMALA, 4);
   if (basmala && list.length - basmala >= 2) list = list.slice(basmala);
   return list.slice(0, MAX_QUERY_WORDS);
+}
+
+/** The query as words to look for, a leading isti'adha or basmala set aside. */
+export function queryWords(text: string): QueryWord[] {
+  return withoutOpening(heardWords(text));
 }
 
 /** One word is the other with a و or ف in front ("and", "so"): often dropped or added when
@@ -425,9 +442,16 @@ function align(words: QuranWords, index: Index, query: QueryWord[]): { found: Fo
  */
 export function searchText(words: QuranWords, text: string, limit = 50): TextSearchResult {
   const index = indexFor(words);
-  const said = queryWords(text);
+  const heard = heardWords(text);
+  const said = withoutOpening(heard);
   if (said.length === 0) return { hits: [], total: 0, words: [] };
-  const once = withoutRepeats(said);
+  // Repeats are folded after the opening is set aside, and before: a basmala and the ayah
+  // after it, said twice, leave the second basmala in the middle of what's left, which then
+  // no longer looks like a repeat (the Fatihah from its start, said twice). The fewer words
+  // left is searched.
+  const after = withoutRepeats(said);
+  const before = withoutOpening(withoutRepeats(heard));
+  const once = before.length < after.length ? before : after;
   // Words said twice that the text itself has twice (ليلة القدر ليلة القدر, 97:2–3; لم يلد
   // ولم يولد, 112:3) are found as said; a repeat that isn't in the text is searched once.
   if (once.length < said.length) {
@@ -438,13 +462,35 @@ export function searchText(words: QuranWords, text: string, limit = 50): TextSea
   const tries: QueryWord[][] = [once];
   if (m >= 3) tries.push(once.slice(0, -1), once.slice(1));
   if (m >= 4) tries.push(once.slice(1, -1));
+  let result: TextSearchResult | null = null;
   for (const q of tries) {
     const aligned = align(words, index, q);
     if (aligned.found.length === 0) continue;
     // A shorter query found the place; its score still counts the words left out.
-    return resultOf(index, q, aligned, q === once ? 1 : q.length / m, limit);
+    result = resultOf(index, q, aligned, q === once ? 1 : q.length / m, limit);
+    break;
   }
-  return { hits: [], total: 0, words: once.map((w) => w.key) };
+  // The basmala is in the text too (1:1, 27:30). Set aside with only two words after it,
+  // little is left to go on, and a misheard word can make those two another ayah's
+  // (27:30's basmala and ألا تعلوا heard as ألا تكلوا, 6:119's words): they are searched
+  // with it too, and its nearly exact matches that reach past it are listed as well.
+  const whole = withoutIstiadha(withoutRepeats(heard)).slice(0, MAX_QUERY_WORDS);
+  if (m <= 2 && whole.length > m) {
+    const aligned = align(words, index, whole);
+    const more = resultOf(index, whole, aligned, 1, limit).hits.filter(
+      (h) =>
+        h.score >= CLOSE_TO_EXACT &&
+        h.to - h.from > BASMALA.length &&
+        !result?.hits.some((x) => x.from < h.to && h.from < x.to),
+    );
+    if (more.length > 0) {
+      const hits = [...(result?.hits ?? []), ...more].sort(
+        (a, b) => Number(b.score >= EXACT) - Number(a.score >= EXACT) || b.score - a.score || a.from - b.from,
+      );
+      result = { hits: hits.slice(0, limit), total: (result?.total ?? 0) + more.length, words: whole.map((w) => w.key) };
+    }
+  }
+  return result ?? { hits: [], total: 0, words: once.map((w) => w.key) };
 }
 
 /** The matches as ayat: where each starts and ends, from the first word matched to the last. */
