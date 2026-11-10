@@ -535,7 +535,7 @@ ol.decide li { margin: 6px 0; }
     $('revoSub').textContent = 'Open to ' + (m.config.revo === 'everyone' ? 'everyone' : m.config.revo === 'off' ? 'nobody (switched off)' : 'testers') + ' · last ' + k;
     $('revoTiles').innerHTML = tiles([
       ['Questions', fmtN(T.questions), T.cached ? T.cached + ' kept answers (free)' : 'none were repeats'],
-      ['People who asked', String(T.people), 'of ' + R.funnel.on + ' with Revo on'],
+      ['People who asked', String(R.funnel.asked), 'of ' + R.funnel.on + ' with Revo on'],
       ['Cost', usd(T.costUsd), T.calls ? usd(T.costPerCall) + ' a call · ' + T.calls + ' calls' : 'no calls'],
       ['Failed answers', String(T.failed) + ' <small>' + pct(T.calls + T.failed ? T.failed / (T.calls + T.failed) : 0) + '</small>', T.failed ? Object.entries(T.failedByCode).map(([c, n]) => (CODE[c] || 'HTTP ' + c) + ' ' + n).join(', ') : 'none'],
     ]);
@@ -649,8 +649,8 @@ ol.decide li { margin: 6px 0; }
     const st = $('heroState');
     st.className = 'st' + (alarms.length || stale ? ' bad' : '');
     st.textContent = alarms.length ? alarms.length + (alarms.length === 1 ? ' alarm' : ' alarms') : stale ? 'Data is old' : 'All healthy';
-    const D = m.revo['24h'].totals;
-    $('heroLine').innerHTML = 'Revo answered <span class="num">' + esc(fmtN(D.questions)) + '</span> questions from <span class="num">' + D.people + '</span> ' + (D.people === 1 ? 'person' : 'people') + ' in the last 24 h, for <span class="num">' + esc(usd(D.costUsd)) + '</span>.';
+    const D = m.revo['24h'].totals, asked = m.revo['24h'].funnel.asked;
+    $('heroLine').innerHTML = 'Revo answered <span class="num">' + esc(fmtN(D.questions)) + '</span> questions from <span class="num">' + asked + '</span> ' + (asked === 1 ? 'person' : 'people') + ' in the last 24 h, for <span class="num">' + esc(usd(D.costUsd)) + '</span>.';
     $('heroSmall').textContent = 'Today ' + usd(m.month.todayUsd) + ' of the ' + usd(m.month.dailyCapUsd) + ' allowance · month ' + usd(m.month.monthUsd) + ' of ' + usd(m.month.capUsd);
     const items = [...m.look];
     if (stale) items.unshift({ level: 'alarm', text: 'No collection for ' + ago(Date.parse(m.generatedAt)).replace(' ago', '') + '. The Mac may be off, or the collector failed: ~/Library/Logs/revisely-metrics.log.' });

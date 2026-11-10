@@ -82,7 +82,7 @@ async function firestore(fs_) {
     // Never `text`, `textAfter` or `title`: only who, when, and the kinds of things.
     fs_.all('messages', ['uid', 'role', 'at', 'feedback', 'actionState', 'attach.kind', 'attachments', 'action.kind'], { group: true }),
     fs_.all('coachSettings', ['revoOn', 'optIn', 'memoryOn']),
-    fs_.all('users', ['previewTester', 'createdAt']),
+    fs_.all('users', ['previewTester']),
     fs_.all('coachLedgerDay', ['day', 'spendUsd', 'calls']),
     fs_.get('config/coach'),
     fs_.get('config/app'),
@@ -144,7 +144,7 @@ async function collect(cfg, { fresh = false, requestedAt = null } = {}) {
   const call = client(tokenSource(loadKey(cfg.keyFile)));
   const sources = {};
   const attempt = async (name, f) => {
-    try { const v = await f(); sources[name] = 'ok'; return v; } catch (err) { sources[name] = String(err.message || err).slice(0, 160); return null; }
+    try { const v = await f(); sources[name] = 'ok'; return v; } catch (err) { sources[name] = String(err.message || err).replace(/[A-Za-z0-9_-]{20,}/g, '…').slice(0, 160); return null; }
   };
   const [fsData, lines, mon, tot] = await Promise.all([
     attempt('Firestore', () => firestore(store(call, cfg.project))),
