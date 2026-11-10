@@ -100,3 +100,27 @@ $PY scripts/recite-eval/score.py --bench $LAB/data/bench-v0 --run $LAB/runs/v0 -
 - Settings were tuned on four reciters (Abdul Basit mujawwad, Shuraym, Alafasy, Husary) and checked on the
   other four. The model was trained on EveryAyah and RetaSy, which overlap both test sets, so every number
   here is optimistic until recordings it has never heard (revisely.app/record) are in.
+
+## The three modes (Nov 10)
+
+Write-up: `~/Documents/revisely-mistake-detection/three-modes-nov10.md`.
+
+- **Words** (`checker.py`): `alt_rule: "skeleton"` drops look-alikes with the same consonants as the word (ٱلدِّينِ
+  heard as دِينِ, مَـٰلِكِ as مَلِك differ only in shadda or madd: that is for the letters check). With `del_frac: 0.67`
+  this is the recommended words + wrong words setting: `{"sub_p": 1.01, "alt_rule": "skeleton", "del_frac": 0.67}`.
+- **Follow along**: `follow_madd.py` (part a: first-shown lag by the word's longest madd, from saved results; part b:
+  where the highlight is at every step vs the word being said) and `follow_live.py` (the highlight from final frames
+  vs one that also uses the newest window's provisional frames).
+- **Letters and harakat** (`letters.py`): each word against versions with one named slip (a confusable letter,
+  another haraka, a shadda or madd dropped, a vowel lengthened), scored by CTC on the word's frames; a slip is
+  flagged when it beats the correct word by a margin. `letters_eval.py` sets thresholds on professionals and reports
+  learners and qdat.
+- **Tajweed** (`tajweed.py`): slots from the phonetizer's own tags (every madd with its length, every qalqalah) and
+  its sounds (ikhfa ں/۾, a doubled ن or م held), each judged by scoring its versions on a window around it, plus the
+  held time against the reciter's count.
+- **qdat_bench** (obadx/qdat_bench, Apache-2.0: 159 learners reciting 5:109 from قَالُوا۟, experts' madd lengths,
+  ghunnah, ikhfa and qalqalah labels): put `train.parquet` in `$LAB/data/raw/qdat_bench/`, then
+  `qdat_eval.py --prepare`; `qdat_eval.py --ear hisn|muaalem` (the slots of that ayah written by hand, decided
+  together), `qdat_curves.py` (catch rate at fixed false flags), `qdat_tajweed.py hisn ecount 0` (the same through
+  `tajweed.py`; writes the thresholds `pros_tajweed.py` uses on the professionals).
+- `learner_flags.py NAME`: which rule flags the learners' recordings in a run.

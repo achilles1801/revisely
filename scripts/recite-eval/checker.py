@@ -61,6 +61,7 @@ DEFAULTS = {
     'mean_gop': -6.0,   # a word whose sounds fit this badly on average is wrong (None: off)
     'alts': 4,          # look-alike words listened for in place of each word (وما for ومن); 0: none
     'alt_pen': -5.0,    # the cost of hearing a look-alike instead of the word itself
+    'alt_rule': 'any',  # 'skeleton': only look-alikes with other consonants (not ones that differ in harakat, madd or shadda)
     'extra_min': 0.35,  # a filler shorter than this (seconds) is not reported as an extra word
     'delay': 1.0,       # (offline) seconds after a word ends that a live checker would decide it
     'look': 1.0,        # (live) seconds of audio after a frame before the model's frame is final
@@ -199,6 +200,22 @@ def core(norm):
     return norm.rstrip('َُِ')
 
 
+def skeleton(norm):
+    """The consonants alone: no harakat, no long vowels, a doubled consonant once, no hamza of a word's start.
+    Two words with the same skeleton differ only in harakat, madd or shadda (ٱلدِّينِ joined, ددِۦۦۦۦن, and دِينِ;
+    مَـٰلِكِ and مَلِك): that is for the letters check, not a different word."""
+    out = []
+    for ch in norm:
+        if ch in 'َُِ' or ch in FOLD:
+            continue
+        if out and out[-1] == ch:
+            continue
+        out.append(ch)
+    if out and out[0] == 'ء':
+        out = out[1:]
+    return ''.join(out)
+
+
 class Key:
     """Expected sounds for each word of a passage, from the phonetizer."""
 
@@ -303,21 +320,25 @@ class Key:
             self._alt_cache = {}
         return self._lex
 
-    def lookalikes(self, text, forms, k):
+    def lookalikes(self, text, forms, k, rule='any'):
         """Up to k other words that sound almost the same (one or two sounds apart), nearest first. A word
         that differs only by a final vowel (as when stopping on it) doesn't count."""
         import Levenshtein
-        if text in getattr(self, '_alt_cache', {}):
-            return self._alt_cache[text][:k]
+        ck = (text, rule)
+        if ck in getattr(self, '_alt_cache', {}):
+            return self._alt_cache[ck][:k]
         lex = self._lexicon()
         norms = {norm_sounds(f['sounds']) for f in forms}
         cores = {core(n) for n in norms}
+        skels = {skeleton(n) for n in norms} | {skeleton(core(n)) for n in norms}
         found = {}
         for n in norms:
             maxd = 2 if len(n) <= 10 else 3
             for ln in range(len(n) - maxd, len(n) + maxd + 1):
                 for e in lex.get(ln, ()):
                     if e['text'] == text or e['norm'] in norms or core(e['norm']) in cores:
+                        continue
+                    if rule == 'skeleton' and (skeleton(e['norm']) in skels or skeleton(core(e['norm'])) in skels):
                         continue
                     d = Levenshtein.distance(n, e['norm'], score_cutoff=maxd)
                     if d <= maxd and (e['text'] not in found or d < found[e['text']][0]):
@@ -328,10 +349,10 @@ class Key:
                 seen.add(e['norm'])
                 ranked.append(e)
         out = [dict(self._labels(e['sounds']), form='alt', text=e['text']) for e in ranked[:8]]
-        self._alt_cache[text] = out
+        self._alt_cache[ck] = out
         return out[:k]
 
-    def passage(self, lo, hi, alts=0):
+    def passage(self, lo, hi, alts=0, alt_rule='any'):
         """For app words lo..hi-1: [{'word', 'text', 'forms': [{labels, fold, counts, sounds, form}], 'alts'}]."""
         out = []
         for w in range(lo, hi):
@@ -343,7 +364,7 @@ class Key:
             fs = self.forms(ayah, p)
             if not fs:
                 raise ValueError(f'no sounds for {s}:{a} word {p}')
-            alt = self.lookalikes(ayah[p], fs, alts) if alts else []
+            alt = self.lookalikes(ayah[p], fs, alts, alt_rule) if alts else []
             out.append({'word': w, 'text': ayah[p], 'forms': fs, 'sounds': fs[0]['sounds'], 'alts': alt})
         return out
 
@@ -802,7 +823,7 @@ def run_item(item_path, run, name, P, ear_name='hisn'):
         lp = ear.logprobs(x)
         cache.parent.mkdir(parents=True, exist_ok=True)
         np.save(cache, lp.astype(np.float16))
-    kws = KEY.passage(start_at, stop_at, int(P['alts']))
+    kws = KEY.passage(start_at, stop_at, int(P['alts']), P['alt_rule'])
     g = Graph(kws)
     t0 = time.perf_counter()
     path, score = viterbi(lp, g, P)
@@ -848,7 +869,7 @@ def run_item_live(item_path, run, name, P, ear_name='hisn'):
         lp = EAR.stream(x, P['win'], P['hop'], P['look'])
         cache.parent.mkdir(parents=True, exist_ok=True)
         np.save(cache, lp.astype(np.float16))
-    kws = KEY.passage(start_at, stop_at, int(P['alts']))
+    kws = KEY.passage(start_at, stop_at, int(P['alts']), P['alt_rule'])
     g = Graph(kws)
     T = lp.shape[0]
     toks = heard_tokens(lp)  # a final frame never changes, so tokens behind the newest frame stand
