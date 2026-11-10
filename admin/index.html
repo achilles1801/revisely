@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Revisely Metrics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="console.css">
+<style>
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+html, body { margin: 0; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="top-in">
+    <div class="brand">
+      <span class="mark" aria-hidden="true">R</span>
+      <h1>Revisely Metrics</h1>
+      <span class="spacer"></span>
+      <span class="asof" id="asof">Loading…</span>
+      <button type="button" class="refresh" id="refreshBtn" disabled>Refresh</button>
+      <button type="button" class="btn" id="signOutBtn" hidden>Sign out</button>
+    </div>
+  </div>
+</header>
+
+<section class="gate" id="gate" hidden>
+  <span class="mark" aria-hidden="true">R</span>
+  <h2>Revisely Metrics</h2>
+  <p id="gateText">Sign in with the owner's Google account.</p>
+  <button type="button" class="btn primary" id="signInBtn">Sign in with Google</button>
+</section>
+
+<main id="console" hidden>
+  <div class="conn" id="conn" hidden></div>
+
+  <div class="hero" id="hero">
+    <div class="st" id="heroState">Loading</div>
+    <div class="line" id="heroLine">Reading the latest numbers from your Drive…</div>
+    <div class="small" id="heroSmall"></div>
+    <div class="look" id="look"></div>
+  </div>
+
+  <div class="toolbar">
+    <div class="seg" role="group" aria-label="Time range" id="range">
+      <button type="button" data-range="1h">1h</button>
+      <button type="button" data-range="24h">24h</button>
+      <button type="button" data-range="7d">7d</button>
+      <button type="button" data-range="30d">30d</button>
+    </div>
+    <span class="lbl" id="rangeNote"></span>
+  </div>
+
+  <div class="alarms" id="alarms" aria-label="Alarms"></div>
+
+  <div class="sec" id="sec-revo">
+    <div class="sec-h"><h2>Revo</h2><span class="sub" id="revoSub"></span></div>
+    <div class="tiles" id="revoTiles"></div>
+    <div class="grid">
+      <div class="w" id="w-questions">
+        <div class="w-h"><h3>Questions and Day in review</h3><span class="sub" id="qSub"></span></div>
+        <div class="legend"><span><i style="background:var(--s1)"></i>Questions</span><span><i style="background:var(--s2)"></i>Day in review</span></div>
+        <div class="chart" id="c-questions"></div>
+      </div>
+      <div class="w" id="w-spend">
+        <div class="w-h"><h3>Spend against the cap</h3><span class="sub">This month, from the spend ledger (Revo and the old Ask coach)</span></div>
+        <div class="legend"><span><i style="background:var(--rev)"></i>Spent so far</span><span><i class="dash"></i>On this pace</span></div>
+        <div class="chart" id="c-spend"></div>
+        <div class="meter">
+          <div class="row"><span>Today (UTC), against the daily allowance</span><span id="todaySpend"></span></div>
+          <div class="bar"><i id="todayBar"></i></div>
+        </div>
+      </div>
+      <div class="w" id="w-latency">
+        <div class="w-h"><h3>Answer time</h3><span class="sub">revoAsk, end to end (Cloud Run)</span></div>
+        <div class="legend"><span><i style="background:var(--s1)"></i>Typical (p50)</span><span><i style="background:var(--s2)"></i>Slow (p95)</span></div>
+        <div class="chart" id="c-latency"></div>
+      </div>
+      <div class="w" id="w-errors">
+        <div class="w-h"><h3>Errors and refusals</h3><span class="sub" id="errSub"></span></div>
+        <div class="chart" id="c-errors"></div>
+        <dl class="kv" id="errKv"></dl>
+      </div>
+      <div class="w" id="w-funnel">
+        <div class="w-h"><h3>Who uses it</h3><span class="sub" id="funSub"></span></div>
+        <div class="funnel" id="funnel"></div>
+        <dl class="kv" id="useKv" style="margin-top:12px"></dl>
+        <div style="margin-top:10px;font-size:12.5px;color:var(--ink-2)">What questions came with (+)</div>
+        <div class="split" id="attachSplit"></div>
+        <div class="split-l" id="attachLegend"></div>
+      </div>
+      <div class="w" id="w-tokens">
+        <div class="w-h"><h3>Tokens and the prompt cache</h3><span class="sub">Share of the prompt read from cache</span></div>
+        <div class="chart" id="c-cache"></div>
+        <dl class="kv" id="tokKv"></dl>
+      </div>
+      <div class="w full" id="w-accounts">
+        <div class="w-h"><h3>Accounts using Revo</h3><span class="sub" id="accSub"></span><span class="tag est" id="accTag"></span></div>
+        <div class="tbl-wrap">
+          <table id="accTable" aria-describedby="accFoot">
+            <thead><tr><th>Account</th><th class="n">Questions</th><th class="n">Days used</th><th class="n">Day in review</th><th class="n">Tokens</th><th class="n">Cost</th><th class="n">Days at limit</th><th class="n">Failed</th><th class="n">👍 / 👎</th><th>Last used</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <p class="foot" id="accFoot">Tap an account for its conversations and what Revo remembers. Accounts show by their internal id (first characters). Questions, days, reviews and ratings come from Revo's stored chats; cost, tokens and failures from Revo's log lines. A cost marked ≈ is partly estimated (calls from before the logs named the account, at the range's average).</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec" id="sec-app">
+    <div class="sec-h"><h2>App</h2><span class="sub">Active people, crashes, updates, downloads</span>
+      <div class="seg" role="group" aria-label="Channel" id="chan" style="margin-left:auto">
+        <button type="button" data-chan="prod">Store users</button>
+        <button type="button" data-chan="test">Testers</button>
+      </div>
+    </div>
+    <div class="tiles" id="appTiles"></div>
+    <div class="grid">
+      <div class="w" id="w-active">
+        <div class="w-h"><h3>Active people by platform</h3><span class="sub" id="actSub"></span></div>
+        <div class="legend"><span><i style="background:var(--s1)"></i>iOS</span><span><i style="background:var(--s2)"></i>Android</span></div>
+        <div class="chart" id="c-active"></div>
+      </div>
+      <div class="w" id="w-crash">
+        <div class="w-h"><h3>Crash-free by release</h3><span class="sub" id="crashSub"></span></div>
+        <div class="tbl-wrap"><table id="crashTable"><thead><tr><th>Release</th><th>Platform</th><th class="n">Sessions</th><th class="n">People</th><th class="n">Crash-free</th></tr></thead><tbody></tbody></table></div>
+      </div>
+      <div class="w" id="w-adopt">
+        <div class="w-h"><h3>Update adoption</h3><span class="sub">Store users on each JavaScript update, last 24 h</span></div>
+        <div id="adopt"></div>
+      </div>
+      <div class="w" id="w-downloads">
+        <div class="w-h"><h3>App Store downloads</h3><span class="sub" id="dlSub"></span></div>
+        <div class="chart" id="c-downloads"></div>
+        <p class="foot" id="dlFoot">Apple publishes a day 1–2 days late (Pacific days). Google Play joins once it's live.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec" id="sec-backend">
+    <div class="sec-h"><h2>Backend</h2><span class="sub">Cloud Functions, Firestore and The Clear Quran budget</span></div>
+    <div class="grid">
+      <div class="w full" id="w-functions">
+        <div class="w-h"><h3>Cloud Functions</h3><span class="sub" id="fnSub"></span></div>
+        <div class="tbl-wrap"><table id="fnTable"><thead><tr><th>Function</th><th class="n">Calls</th><th class="n">Refused (4xx)</th><th class="n">Errors (5xx)</th><th class="n">Typical</th><th class="n">Slow (p95)</th><th>State</th></tr></thead><tbody></tbody></table></div>
+        <p class="foot">Refused calls are mostly the app's own limits (the 20 questions a day answer 429). Errors are failures on our side or Anthropic's.</p>
+      </div>
+      <div class="w" id="w-firestore">
+        <div class="w-h"><h3>Firestore</h3><span class="sub">Today (UTC)</span></div>
+        <dl class="kv" id="fsKv"></dl>
+        <p class="foot">From Cloud Monitoring. Past the free tier (50k reads a day), reads cost about $0.03 per 100k.</p>
+      </div>
+      <div class="w" id="w-tcq">
+        <div class="w-h"><h3>The Clear Quran budget</h3><span class="tag">Later</span></div>
+        <p class="foot" style="margin-top:2px">The worker counts requests to The Clear Quran (300 a day, 150 per account), but nothing can read those counts yet.</p>
+      </div>
+    </div>
+  </div>
+
+  <p class="foot" id="sources" style="margin-top:22px"></p>
+</main>
+
+<div class="panel" id="panel" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="panelTitle">
+    <div class="sheet-h">
+      <button type="button" class="btn" id="panelBack" hidden>‹ Chats</button>
+      <h3 id="panelTitle">Account</h3>
+      <button type="button" class="btn" id="panelClose">Close</button>
+    </div>
+    <div class="sheet-b" id="panelBody"></div>
+  </div>
+</div>
+
+<script type="module" src="console.js"></script>
+</body>
+</html>

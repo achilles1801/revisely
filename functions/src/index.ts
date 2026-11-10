@@ -28,6 +28,8 @@ import { callCoach } from './coach/call';
 import { adminRevoStore, deleteRevoData } from './revo/admin';
 import { RevoError, handleClear, handleDayInReview, handleRevoAsk, handleSetOptions } from './revo/handler';
 import { inTestEmulator, recordedAnthropic, testNow } from './emulator';
+import { AdminError, TOTALS_AUDIENCE, handleAdminMetrics, handleAdminRevo, handleMetricsTotals } from './metrics/admin';
+import { adminRevoStore as adminConsoleRevoStore, adminTotalsStore, collector } from './metrics/adminStore';
 
 setGlobalOptions({ region: 'us-central1', maxInstances: 3 });
 
@@ -404,6 +406,66 @@ export const coachDigestDays = onRequest({ invoker: 'public', maxInstances: 1, t
       res.status(err.message.startsWith('start') || err.message.startsWith('end') || err.message.startsWith('at most') ? 400 : 403).json({ error: err.message });
     } else {
       logger.error('coachDigestDays failed', err);
+      res.status(500).json({ error: 'internal' });
+    }
+  }
+});
+
+/**
+ * The owner's metrics console (functions/src/metrics, scripts/metrics/README.md). The page is on Firebase
+ * Hosting (admin/); only an account whose ID token carries `admin: true` (functions/scripts/set-admin.js)
+ * gets anything back. No App Check: the page is a website, and the claim is the gate.
+ */
+const PROJECT = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || 'revision-buddy-3a398';
+const CONSOLE_ORIGINS = [`https://${PROJECT}.web.app`, `https://${PROJECT}.firebaseapp.com`];
+const metricsCollector = collector(adminDb, PROJECT, { emulator: process.env.FUNCTIONS_EMULATOR === 'true' });
+const adminLog = (entry: Record<string, unknown>) => logger.info('admin', entry);
+
+function adminFailure(name: string, err: unknown): HttpsError {
+  if (err instanceof AdminError) return new HttpsError(err.code, err.message);
+  logger.error(`${name} failed`, err);
+  return new HttpsError('internal', 'The console could not load that. Try again.');
+}
+
+export const adminMetrics = onCall({ cors: CONSOLE_ORIGINS, timeoutSeconds: 120, memory: '512MiB', maxInstances: 2 }, async (request) => {
+  try {
+    return await handleAdminMetrics(request.auth, request.data, { collect: metricsCollector, now: () => Date.now(), log: adminLog });
+  } catch (err) {
+    throw adminFailure('adminMetrics', err);
+  }
+});
+
+export const adminRevo = onCall({ cors: CONSOLE_ORIGINS, timeoutSeconds: 60, maxInstances: 2 }, async (request) => {
+  try {
+    return await handleAdminRevo(request.auth, request.data, { store: adminConsoleRevoStore(adminDb), log: adminLog });
+  } catch (err) {
+    throw adminFailure('adminRevo', err);
+  }
+});
+
+/** The Metrics workflow's Sentry and App Store totals, every hour, with its GitHub OIDC token. */
+export const metricsTotals = onRequest({ invoker: 'public', maxInstances: 1, timeoutSeconds: 120, memory: '512MiB' }, async (req, res) => {
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'POST only' });
+    return;
+  }
+  const header = req.get('authorization') ?? '';
+  const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
+  try {
+    let claims;
+    try {
+      claims = verifyGithubToken(token, await githubJwks(), TOTALS_AUDIENCE);
+    } catch (err) {
+      if (!(err instanceof UnknownKeyError)) throw err;
+      claims = verifyGithubToken(token, await githubJwks(true), TOTALS_AUDIENCE);
+    }
+    const raw = req.rawBody ? req.rawBody.toString('utf8') : JSON.stringify(req.body ?? {});
+    res.json(await handleMetricsTotals(claims, raw, { store: adminTotalsStore(adminDb), collect: metricsCollector, now: () => Date.now(), log: adminLog }));
+  } catch (err) {
+    if (err instanceof CallerError) {
+      res.status(/too large|JSON|object|missing/.test(err.message) ? 400 : 403).json({ error: err.message });
+    } else {
+      logger.error('metricsTotals failed', err);
       res.status(500).json({ error: 'internal' });
     }
   }

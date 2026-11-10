@@ -362,6 +362,15 @@ Non-testers follow `production`, so nobody sees this on a phone before Promote; 
 `group` = the previous production update group (`eas update:list --branch production`), `rollback` =
 true → approve. It republishes that exact update, the same way promotion does.
 
+## Metrics console (the owner's private page)
+
+https://revision-buddy-3a398.web.app (Firebase Hosting, `admin/`): Revo per account with its conversations,
+spend against the caps, app health, downloads and functions, read live. Only an account with the custom claim
+`admin: true` gets anything (`functions/scripts/set-admin.js <uid>`); the claim opens nothing else, since no
+rule reads it. Functions `adminMetrics`, `adminRevo` (conversations locked until `config/admin.conversations`)
+and `metricsTotals` (the hourly `metrics.yml` sends Sentry and App Store totals with its GitHub OIDC token, and
+posts new alarms on the "Metrics alerts" issue). Everything else: `scripts/metrics/README.md`.
+
 ## Offline (src/lib/offline)
 
 Firestore's JavaScript SDK keeps nothing on disk in React Native (its persistence needs IndexedDB), so
