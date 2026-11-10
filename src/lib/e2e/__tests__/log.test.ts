@@ -2,6 +2,16 @@
 // file in Documents, which run.sh keeps beside a failed flow's screenshot.
 
 const mockFiles = new Map<string, Uint8Array>();
+// The app coming to the front and going away (AppState's listener, as the log adds it).
+const mockAppState: { change?: (state: string) => void } = {};
+jest.mock('react-native', () => ({
+  AppState: {
+    addEventListener: (_event: string, fn: (state: string) => void) => {
+      mockAppState.change = fn;
+      return { remove() {} };
+    },
+  },
+}));
 jest.mock('expo-file-system', () => {
   const concat = (a: Uint8Array, b: Uint8Array) => {
     const out = new Uint8Array(a.length + b.length);
@@ -93,4 +103,33 @@ it('keeps each line to one line and a bounded length', () => {
   expect(lines).toHaveLength(1);
   expect(lines[0]).toContain('a ⏎ b');
   expect(lines[0].length).toBeLessThan(1700);
+});
+
+it('notes a stretch the JavaScript stopped answering: how long, and from when', () => {
+  const log = freshLog();
+  log.installLog();
+  // Ticks on time: nothing to note.
+  jest.advanceTimersByTime(1500);
+  expect(text()).not.toMatch(/stalled/);
+  const since = new Date(Date.now()).toISOString().slice(11, 23);
+  // The thread is held for 8 s: the next tick comes that much late.
+  jest.setSystemTime(Date.now() + 8000);
+  jest.advanceTimersByTime(500);
+  expect(text()).toContain(`warn [e2e] js stalled 8.5 s, since ${since}\n`);
+  // And it carries on from there.
+  jest.advanceTimersByTime(1500);
+  expect(text().match(/stalled/g)).toHaveLength(1);
+});
+
+it('does not count time away from the front as a stall', () => {
+  const log = freshLog();
+  log.installLog();
+  jest.advanceTimersByTime(500);
+  mockAppState.change?.('background');
+  // iOS holds the timers while the app is away.
+  jest.setSystemTime(Date.now() + 60_000);
+  jest.advanceTimersByTime(500);
+  mockAppState.change?.('active');
+  jest.advanceTimersByTime(1500);
+  expect(text()).not.toMatch(/stalled/);
 });

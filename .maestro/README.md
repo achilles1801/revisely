@@ -389,7 +389,12 @@ A failed attempt keeps Maestro's log and screenshots, a screenshot of the device
 in `.maestro/build/results/<platform>/<flow>/`:
 - `app.log` (iOS): the E2E build's own log (`src/lib/e2e/log.ts`). It has every console line the
   JavaScript wrote, including the app logger's, connectivity, the outbox and the root view's layout.
-  An iOS release build passes only `console.error` to the unified log.
+  An iOS release build passes only `console.error` to the unified log. Each line has the real time
+  it was written, so a gap is time the JavaScript didn't run: a gap over 2 s while the app is in
+  front is its own line, `[e2e] js stalled 8.5 s, since 03:42:07.812`. Native views (scrolling, a
+  sheet's animation) carry on meanwhile, and what the JavaScript missed arrives at once afterwards:
+  in #328's run 42746203992 two swipes reached it together after a 30 s stall, and 04 lost a page's
+  credit (MushafPager credits the page the JavaScript last saw).
 - `device.log` (iOS): the unified log. Its `CFNetwork:Summary` lines give each request's length
   (`transaction_duration_ms`; the emulators' ports name the service).
 - `logcat.txt` (Android): logcat, which has the same lines under `ReactNativeJS`.
