@@ -275,9 +275,10 @@ How the tests are made: `tests/scenarios/README.md`.
 Every account, from the Read tab: "Search the Quran" under its title (`lib/search`,
 `screens/read/QuranSearchScreen`; Majd, Nov 8 2026 for testers, Nov 9 for everyone). A result opens
 the reader at its ayah, highlighted until the page is turned. Searching by voice, a mic beside it, is
-for testers on an iPhone that can listen until 1.0.4: the microphone's purpose string (in the binary)
-and the privacy policy name recording and following a hidden page, not searching. Listening uses
-recite mode's speech model on the phone: nothing said is recorded or sent.
+for every account on an iPhone that can listen (1.0.3 on; Majd, Nov 9 2026); Android types only. Its
+first use downloads the speech model, once and on the user's tap (Settings → Revision → Speech model
+shows and deletes it). Listening uses that model on the phone: nothing said is recorded or sent. The
+microphone's purpose string (in the binary) names searching only from 1.0.4.
 
 - **SEARCH-1.** A few words of an ayah, recited or typed in Arabic (with or without vowel marks, in
   Uthmani or standard spelling), find it: from its start or its middle, running on into the next

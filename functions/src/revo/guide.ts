@@ -8,8 +8,8 @@
  * - every label in curly quotes (“Edit schedule”) is text the app shows, word for word (src/).
  * Change it in the same PR as the feature. Verified against the code on Nov 9 2026, as of the release
  * that opens Activity, memorizing by the ayah, help, What's new and every QuranEnc translation to
- * everyone (recite mode, searching the Qur'an by voice and Settings → Testing stay testers'; typed
- * Quran search opened to everyone on Nov 9 2026).
+ * everyone (recite mode and Settings → Testing stay testers'; searching the Qur'an, typed and by voice
+ * on an iPhone, opened to everyone on Nov 9 2026).
  *
  * Name parts of the Qur'an by surah and juz here too (the owner's rule); page numbers only where
  * the app itself shows them. Mark what only testers (previewTester accounts) see.
@@ -205,7 +205,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
     routes: ['ReadIndex', 'QuranSearch', 'QuranReader'],
     text: lines(
       '- Everyone: the Read tab has “Search the Quran” under its title. Type a few words of an ayah in Arabic (with or without vowel marks) and the ayat that hold them are listed: from the middle of an ayah too, even with a word misspelled; a phrase in several ayat lists every one. Typing a surah (Yunus, or its Arabic name), an ayah (2:255, Yunus 16), a page (page 62) or a juz (juz 30) goes there. A result opens the reader at the ayah, highlighted.',
-      '- Testers on an iPhone also get a mic beside it: recite a few words and the ayah is found the same way. It needs the speech model, offered the first time (a one-time download); it listens on the phone, and the voice isn’t recorded or sent. For anyone else, searching by voice isn’t in the app yet (it comes with a later App Store version): type the words instead.',
+      '- On an iPhone there is also a mic beside it: recite a few words and the ayah is found the same way. The first time, it offers the speech model (a one-time download of 57 MB, started by a tap; Settings → Revision → “Speech model” shows or deletes it), and the iPhone asks for the microphone. It listens on the phone: the voice isn’t recorded or sent. Microphone refused: turn it on in the iPhone’s Settings → Revisely. On Android, type the words.',
     ),
   },
   {
@@ -258,7 +258,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
     routes: ['Settings'],
     text: lines(
       '- Account: display name. Activity: “Activity”, “Recordings”, “Back up recordings”, “Time in app”, “Memorized pages”. Home screen: “Next prayer”, “Friday Al-Kahf reminder”. Prayer: as above.',
-      '- Revision: “Smart Tracking” (rate pages, Insights), “Keep daily amount”, and for testers on an iPhone “Speech model”.',
+      '- Revision: “Smart Tracking” (rate pages, Insights), “Keep daily amount”, and on an iPhone “Speech model” (searching by voice; for testers, the hidden page too).',
       '- Revo AI: Revo on or off, “What Revo can do” (Revo’s short introduction, which also plays before Revo is first turned on; Skip ends it), “Memory”, “Delete conversations”.',
       '- Mushaf: “Mushaf”, “Offline mushaf”, “Download over mobile data”. Notifications: “Enable notifications” (revision reminders: 8:00 AM, after Asr, and an hour before the day ends, while today isn’t done; there is no setting for their times). Appearance: “Theme” (Light or Dark) and “Accent” (Indigo, Crimson or Jade).',
       '- Support: “Share Revisely”, “Send feedback”, “Report a problem”, “Contact support”, “Help buttons”. About: “What’s new”, “Privacy Policy”, “Terms of Service”, the version.',
@@ -271,7 +271,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['RESET-2', 'RESET-3'],
     routes: ['Settings'],
     text: lines(
-      '- Testers (TestFlight or Google Play testing, marked by the Revisely team) get Settings → Testing, the hidden page in sessions (the eye button at the top, with the Madani 1405 mushaf: recite from memory; following the recitation word by word needs “Speech model” on an iPhone), searching the Qur’an by voice from the Read tab (on an iPhone), and updates early.',
+      '- Testers (TestFlight or Google Play testing, marked by the Revisely team) get Settings → Testing, the hidden page in sessions (the eye button at the top, with the Madani 1405 mushaf: recite from memory; following the recitation word by word needs “Speech model” on an iPhone), and updates early.',
       '- “Reset my data” (type RESET): a backup is kept, then the account starts again as new, still signed in; not again within 10 minutes. “Load test scenario” replaces the data with a ready-made situation the same way.',
     ),
   },

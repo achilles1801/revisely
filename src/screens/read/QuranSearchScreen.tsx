@@ -64,7 +64,7 @@ function targetText(t: SearchTarget): { title: string; meta: string; icon: 'book
 
 /**
  * Search the Qur'an: type a surah, an ayah ("2:255", "Yunus 16"), a page or Arabic words,
- * or (testers, on an iPhone that can listen) tap the mic and recite a few words. Results
+ * or (on an iPhone that can listen) tap the mic and recite a few words. Results
  * open the reader at the ayah, highlighted. Before anything is typed, the last searches.
  */
 export default function QuranSearchScreen() {

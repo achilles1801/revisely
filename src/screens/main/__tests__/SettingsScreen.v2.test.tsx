@@ -65,8 +65,9 @@ jest.mock('../../../lib/recordingBackupUi', () => ({
 }));
 jest.mock('../../../lib/sentry', () => ({ reportProblem: jest.fn() }));
 
+// Whether this binary has the microphone module the speech model needs.
 let mockFollowable = true;
-jest.mock('../../../components/recite/useReciteFollow', () => ({ canFollowWords: () => mockFollowable }));
+jest.mock('../../../lib/recite/micSource', () => ({ isMicStreamAvailable: () => mockFollowable }));
 let mockModelState: Record<string, unknown> = { status: 'missing', error: null };
 const mockRemoveModel = jest.fn();
 jest.mock('../../../lib/recite/speechModelStore', () => ({
@@ -216,7 +217,7 @@ describe('Settings: Prayer (every account from 1.0.3)', () => {
   });
 });
 
-describe('Settings: the speech model (testers)', () => {
+describe('Settings: the speech model', () => {
   beforeEach(() => {
     mockFollowable = true;
     mockModelState = { status: 'missing', error: null };
@@ -225,40 +226,45 @@ describe('Settings: the speech model (testers)', () => {
     delete mockUser.previewTester;
   });
 
-  it('not a tester, or a binary without the module: no row', async () => {
-    await renderV2();
-    expect(screen.queryByText('Speech model')).toBeNull();
-    mockUser.previewTester = true;
+  it('a binary without the module: no row, tester or not', async () => {
     mockFollowable = false;
     await renderV2();
     expect(screen.queryByText('Speech model')).toBeNull();
-  });
-
-  it('prayer times public, not a tester: still no row (recite mode has its own gate)', async () => {
-    const spy = jest.spyOn(require('../../../lib/prayer/status'), 'prayerTimesEnabled').mockReturnValue(true);
-    await renderV2();
-    expect(screen.queryByText('Speech model')).toBeNull();
-    spy.mockRestore();
-  });
-
-  it('not downloaded: says so, and opens the download', async () => {
     mockUser.previewTester = true;
     await renderV2();
+    expect(screen.queryByText('Speech model')).toBeNull();
+  });
+
+  it('[SEARCH-1] any account: the row is for searching by voice, and its download says so', async () => {
+    await renderV2();
     expect(screen.getByText('Speech model')).toBeTruthy();
-    expect(screen.getByText('Follows your recitation word by word, on this iPhone')).toBeTruthy();
+    expect(screen.getByText('Searches the Quran by voice, on this iPhone')).toBeTruthy();
     expect(screen.getByText('Not downloaded')).toBeTruthy();
     fireEvent.press(screen.getByText('Speech model'));
     await act(async () => {});
-    expect(screen.getByTestId('speech-model-sheet')).toBeTruthy();
+    expect(screen.getByTestId('speech-model-sheet')).toHaveTextContent('Search by voice', { exact: false });
+    expect(screen.getByTestId('speech-model-sheet')).toHaveTextContent('Recite a few words and Revisely finds the ayah.', { exact: false });
+  });
+
+  it('a tester: the row names following the recitation too', async () => {
+    mockUser.previewTester = true;
+    await renderV2();
+    expect(screen.getByText('Searches by voice and follows your recitation, on this iPhone')).toBeTruthy();
+    fireEvent.press(screen.getByText('Speech model'));
+    await act(async () => {});
+    expect(screen.getByTestId('speech-model-sheet')).toHaveTextContent('Follow word by word', { exact: false });
   });
 
   it('on the phone: its size, and Delete', async () => {
-    mockUser.previewTester = true;
     mockModelState = { status: 'ready', bytes: 59_707_625 };
     await renderV2();
     expect(screen.getByText('57 MB')).toBeTruthy();
     fireEvent.press(screen.getByText('Speech model'));
     await act(async () => {});
+    expect(screen.getByTestId('speech-model-delete-menu')).toHaveTextContent(
+      '57 MB on this iPhone. It downloads again the next time you search by voice.',
+      { exact: false },
+    );
     fireEvent.press(screen.getByTestId('sheet-action-delete'));
     await act(async () => {
       screen.UNSAFE_getAllByType(require('react-native').Modal).forEach((m: { props: { onDismiss?: () => void } }) => m.props.onDismiss?.());
