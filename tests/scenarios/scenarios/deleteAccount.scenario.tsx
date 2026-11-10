@@ -7,9 +7,10 @@
 import { withAuthRetry } from '../harness/authRetry';
 import { setNow, setZone, ZONES } from '../harness/clock';
 import { newAccount, pagesRange } from '../harness/account';
-import { watchFunction } from '../harness/admin';
+import { markOnServer, watchFunction } from '../harness/admin';
+import { trackingListeners, type ListenerTracker } from '../harness/listeners';
 import { getServerDoc, listServerDocs } from '../harness/serverDocs';
-import { Phone, PASSWORD } from '../harness/phone';
+import { Phone, PASSWORD, type OpenApp } from '../harness/phone';
 
 const DELETE_LIMIT_MS = 30_000;
 
@@ -75,5 +76,95 @@ it("[ACCOUNT-3] the server deletes the account but its answer is lost: after the
   await app.act(async () => {
     await expect(withAuthRetry(() => app.auth.signIn(email, PASSWORD))).rejects.toBeTruthy();
   });
+  await app.close();
+});
+
+// The server's removals of an account's documents streamed into the app's
+// listeners, and Firestore's JavaScript took about 20 s over them on a fast Mac
+// before "Account deleted" could show (Nov 10 2026): two or three times that on an
+// older phone passes the 30 s the app waits, after a delete that worked. The phone
+// stops listening first, and listens again when the account is still there.
+
+const urlOf = (input: RequestInfo | URL) => (typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
+
+/** An onboarded account, the app opened again with its listeners tracked. */
+async function accountWithListeners(): Promise<{ phone: Phone; app: OpenApp; uid: string; listeners: ListenerTracker }> {
+  setZone(ZONES.chicago);
+  setNow('2026-11-10 10:00');
+  const phone = new Phone('phone');
+  const first = await newAccount(phone, { memorized: pagesRange(1, 20), user: { dailyPageCapacity: 5 } });
+  const uid = first.uid;
+  await first.untilSynced();
+  await first.close();
+  let listeners!: ListenerTracker;
+  const app = await phone.open(trackingListeners((t) => (listeners = t)));
+  await app.untilLoaded();
+  // Listening as usual.
+  expect(listeners.onAccount(uid)).toEqual(
+    expect.arrayContaining([`users/${uid}`, `users/${uid}/pages`, `users/${uid}/sessions`]),
+  );
+  return { phone, app, uid, listeners };
+}
+
+it('[ACCOUNT-3] nothing on the phone listens to the account while the server deletes it', async () => {
+  const { app, uid, listeners } = await accountWithListeners();
+
+  // What listens to the account as the request to delete it leaves the phone.
+  const routed = global.fetch;
+  let listeningAtDelete: string[] | null = null;
+  global.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    if (urlOf(input).endsWith('/deleteUserAccount')) listeningAtDelete = listeners.onAccount(uid);
+    return routed(input, init);
+  }) as typeof fetch;
+  try {
+    await app.act(() => (app.auth.deleteAccount as () => Promise<void>)());
+  } finally {
+    global.fetch = routed;
+  }
+
+  expect(listeningAtDelete).toEqual([]);
+  await app.until(() => app.auth.firebaseUser == null, 'the phone to be signed out');
+  expect(await getServerDoc(`users/${uid}`)).toBeNull();
+  expect(await listServerDocs(`users/${uid}/pages`)).toHaveLength(0);
+  await app.close();
+});
+
+it('[ACCOUNT-1] [ACCOUNT-3] a delete the server refuses leaves the account, and the phone listens to it again', async () => {
+  const { phone, app, uid, listeners } = await accountWithListeners();
+
+  // The server refuses, as when App Check does: nothing is deleted.
+  const routed = global.fetch;
+  global.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    if (!urlOf(input).endsWith('/deleteUserAccount')) return routed(input, init);
+    return new Response(JSON.stringify({ error: { status: 'PERMISSION_DENIED', message: 'Refused' } }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }) as typeof fetch;
+  let outcome: 'pending' | 'deleted' | Error = 'pending';
+  try {
+    await app.act(async () => {
+      await (app.auth.deleteAccount as () => Promise<void>)().then(
+        () => (outcome = 'deleted'),
+        (err: Error) => (outcome = err),
+      );
+    });
+  } finally {
+    global.fetch = routed;
+  }
+
+  expect(outcome).toBeInstanceOf(Error);
+  expect(app.auth.firebaseUser?.uid).toBe(uid);
+  expect(await getServerDoc(`users/${uid}`)).not.toBeNull();
+  // Listening again: a change made elsewhere reaches the phone.
+  expect(listeners.onAccount(uid)).toEqual(
+    expect.arrayContaining([`users/${uid}`, `users/${uid}/pages`, `users/${uid}/sessions`]),
+  );
+  expect(app.app.pages.find((p) => p.pageNumber === 300)?.status).toBe('not_memorized');
+  markOnServer(phone.email!, 300);
+  await app.until(
+    () => app.app.pages.find((p) => p.pageNumber === 300)?.status === 'memorized',
+    'a change on the server to reach the phone',
+  );
   await app.close();
 });
