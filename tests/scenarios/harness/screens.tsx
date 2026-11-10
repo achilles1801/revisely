@@ -393,6 +393,37 @@ export class Session {
     await this.app.idle(30);
   }
 
+  /**
+   * `n` swipes that reach the app's JavaScript together, as on a phone whose JavaScript was held
+   * up meanwhile (a long job, a slow phone): the list turned `n` pages natively, and MushafPager
+   * credits each page they left, in order, then reports the one it landed on (or the end card),
+   * before the screen has heard of any page between. E2E 04 on iOS CI, run 42746203992.
+   */
+  async swipeTogether(n: number): Promise<void> {
+    const state = pagerState();
+    const props = state.props;
+    if (!props || state.current == null) throw new Error('no page on screen');
+    const i = props.pages.indexOf(state.current);
+    const last = props.pages.length - 1;
+    if (i + n > last + 1) throw new Error(`only ${last + 1 - i} swipes left`);
+    const left = props.pages.slice(i, i + n);
+    await this.app.act(async () => {
+      if (i + n === last + 1) {
+        // Onto the end card: the pages before the last are advances, the last is the end card's.
+        for (const page of left.slice(0, -1)) props.onAdvance?.(page, props.pages[last]);
+        props.onUserSwipe?.();
+        props.onReachEnd?.(props.pages[last], true);
+        return;
+      }
+      const next = props.pages[i + n];
+      for (const page of left) props.onAdvance?.(page, next);
+      props.onUserSwipe?.();
+      state.current = next;
+      props.onPageChange?.(next, i + n);
+    });
+    await this.app.idle(30);
+  }
+
   /** A swipe back to the page before (nothing is marked, as on the phone). */
   async swipeBack(): Promise<void> {
     const state = pagerState();

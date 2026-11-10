@@ -429,6 +429,48 @@ describe('ActiveRevisionScreen — reading and the controls', () => {
   });
 });
 
+// SESS-1: a held-up JavaScript thread gets two swipes at once. The pager credits each page they
+// left (MushafPager) before the screen hears of the page between them (E2E 04 on iOS CI, run
+// 42746203992: page 584 went uncounted and the session ended on 9 of 10).
+describe('ActiveRevisionScreen — swipes that arrive together (SESS-1)', () => {
+  it('marks every page they left', () => {
+    setup([331, 332]);
+    render(<ActiveRevisionScreen />);
+    act(() => mockPager.onPageChange?.(333));
+    act(() => {
+      mockPager.onAdvance?.(333, 335);
+      mockPager.onAdvance?.(334, 335);
+      mockPager.onPageChange?.(335);
+    });
+    expect(screen.getAllByText(/4\/10/).length).toBeGreaterThan(0);
+  });
+
+  it('marks nothing at or past the page the pager landed on', () => {
+    setup([331, 332]);
+    render(<ActiveRevisionScreen />);
+    act(() => mockPager.onPageChange?.(333));
+    act(() => {
+      mockPager.onAdvance?.(335, 335);
+      mockPager.onAdvance?.(336, 335);
+    });
+    expect(screen.getAllByText(/2\/10/).length).toBeGreaterThan(0);
+  });
+
+  it('onto the end card: the page before the last and the last, and the session is complete', async () => {
+    setup([331, 332, 333, 334, 335, 336, 337, 338]);
+    render(<ActiveRevisionScreen />);
+    act(() => mockPager.onPageChange?.(339));
+    await act(async () => {
+      mockPager.onAdvance?.(339, 340);
+      mockPager.onReachEnd?.(340, true);
+    });
+    expect(screen.getAllByText(/10\/10/).length).toBeGreaterThan(0);
+    expect(screen.getByText('Revision complete')).toBeTruthy();
+    expect(screen.getByTestId('confetti', { includeHiddenElements: true })).toBeTruthy();
+    expect(mockApp.addLog).toHaveBeenCalledWith(expect.objectContaining({ pagesRevised: [339, 340] }));
+  });
+});
+
 // "When I reach the last page I can't swipe anymore": the end card after it.
 describe('ActiveRevisionScreen — swiping off the last page', () => {
   const finish = () =>
