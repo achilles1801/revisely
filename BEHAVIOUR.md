@@ -47,8 +47,8 @@ How the tests are made: `tests/scenarios/README.md`.
 ## Onboarding
 
 - **ONBOARD-1.** In "Select memorized portions", a page the user marks counts at once, loaded or not: a
-  new account's 604 pages arrive in two batches (1–450, 451–604), and a juz from the second can be
-  marked before it lands. Continue never saves a selection without a marked page: while a marked page
+  new account's 604 pages reach the phone once the server holds them (sign-up writes them in two
+  batches, 1–450 and 451–604), and a juz can be marked before its pages land. Continue never saves a selection without a marked page: while a marked page
   hasn't loaded, it waits ("Loading your pages…"), and once the pages are there it saves them all.
 - **ONBOARD-2.** An account the server holds with some of its pages but not all 604 (a sign-up stopped
   between its two batches: the app closed, the second commit failed) gets the missing ones created, as
@@ -218,7 +218,9 @@ How the tests are made: `tests/scenarios/README.md`.
   endless spinner. The app waits for the server at most 30 seconds. With no answer (lost, or offline), it asks whether
   the account still exists: gone, it is deleted; there, or no way to tell, the error says the account may not be deleted
   and to try again. A Try again after the server had deleted it ends in "Account deleted". Once the server has deleted
-  it, nothing on the phone (its copy, signing out) keeps the spinner up more than a few seconds.
+  it, nothing on the phone (its copy, signing out) keeps the spinner up more than a few seconds. The deletion itself
+  doesn't hold the phone up either: the phone stops listening to the account (its user document, pages and sessions)
+  while the server deletes it, and listens again if the account is still there.
 - **ACCOUNT-2.** A sign-up or sign-in that fails (an address already registered, a wrong password, Google or Apple
   refused, no connection) leaves the sign-in screen as it was: the same mode, the name, the email and the password
   still typed, with the error under them. A password reset that fails keeps the email. While an attempt runs, it
@@ -934,3 +936,5 @@ Fixed in November 2026 (the tests that pinned them are ordinary tests now):
 | ACCOUNT-2 | A sign-up or sign-in that failed emptied the form: the attempt showed the launch spinner in place of the sign-in screen, so a failure mounted it again from scratch, back on "Sign in" with only the error left. | An attempt has its own flag (`isSigningIn`, `src/context/AuthContext.tsx`); the screen stays and shows it on its button. |
 | SESS-7 | A session's first save holding catch-up pages alone lost their credit: the empty session was written without it. | `mergeSessionAdd` keeps it (`src/lib/offline/ops.ts`). |
 | SYNC-4 | A new account could stay on "loading" until the app was relaunched. | Page and session listeners hear when the server confirms the cache (`onQuerySnapshot`, `src/services/firestoreService.ts`). |
+| ACCOUNT-3 | Delete account froze the phone (Nov 10 2026): the server's removals of the 604 pages and the sessions streamed into the app's listeners, and Firestore's JavaScript took about 20 s over them on a fast Mac before "Account deleted" could show; on a phone two or three times slower that passes the 30 s the app waits, and says the server didn't answer after a delete that worked. | The account's listeners stop before the server is asked and start again if the account is still there (`pauseAccountListeners`, `src/services/firestoreService.ts`), and Firestore's string comparator is made fast for Hermes when the bundle is built (`metro/firestoreCompare.js`). |
+| SYNC-4, ONBOARD-1 | Sign-up froze the phone for about 5 s on a fast Mac (Nov 10 2026): its 604 page writes went through the live pages listener, each page three times (written, confirmed, sent back). | The pages listener waits while sign-up writes the pages and reads them once after (`initializeAllPages`), with the faster comparator. |
