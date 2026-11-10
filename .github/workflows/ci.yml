@@ -267,7 +267,10 @@ jobs:
     # commit, from any run: #496 (develop into main) merged 8 s after it opened, on the green "Required"
     # develop's own push run (Android flows, no iOS) had posted on the same commit, before its full run
     # had started (Nov 10 2026).
-    name: ${{ (github.event.pull_request.stack.base.ref || github.base_ref) == 'main' && needs.plan.outputs.ios == 'full' && needs.plan.outputs.android == 'full' && 'Release gate' || 'Required' }}
+    # A draft's run is "Required (draft)": it runs no E2E, and its green check counted for the commit once
+    # the PR was marked ready, until the ready run posted its own; #499 merged on it the moment it was
+    # marked ready with auto-merge on (Nov 10 2026). Marked ready, the PR waits for that run's "Required".
+    name: ${{ github.event.pull_request.draft && 'Required (draft)' || ((github.event.pull_request.stack.base.ref || github.base_ref) == 'main' && needs.plan.outputs.ios == 'full' && needs.plan.outputs.android == 'full' && 'Release gate' || 'Required') }}
     needs: [plan, fast, scenarios, e2e]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
