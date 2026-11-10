@@ -10,6 +10,7 @@ FPS = 50
 PAD = 4
 import os
 LENGTHS = os.environ.get('LENGTHS', '1') == '1'
+EAR_NAME = os.environ.get('EAR_NAME', 'hisn')
 
 def words_judge(lp, word_sounds):
     """Align the passage's correct sounds, then judge each word with PAD symbols of context."""
@@ -38,7 +39,7 @@ def load(p):
 
 def pro_item(path):
     truth = load(path)
-    lp = np.load(LAB / 'runs/v0/logprobs/hisn' / f"{truth['sha1']}.npy").astype(np.float32)
+    lp = np.load(LAB / 'runs/v0/logprobs' / EAR_NAME / f"{truth['sha1']}.npy").astype(np.float32)
     tl = [e for e in truth['timeline'] if not e.get('extra')]
     by = collections.OrderedDict()
     for e in tl:
@@ -57,7 +58,7 @@ def pro_item(path):
 
 def learner_item(path):
     t = json.loads(path.read_text())
-    lp = np.load(LAB / 'runs/v0/logprobs/hisn' / f"{t.get('sha1') or t['id']}.npy").astype(np.float32)
+    lp = np.load(LAB / 'runs/v0/logprobs' / EAR_NAME / f"{t.get('sha1') or t['id']}.npy").astype(np.float32)
     lo, hi = t['range']
     s, a, p0 = KEY.where(t.get('start_at', lo))
     ay = KEY.uthmani(s, a)
@@ -67,7 +68,7 @@ def learner_item(path):
              max(rs, key=lambda r: r[0])[1] if rs else None)]
 
 def qdat_item(m):
-    lp = np.load(LAB / 'runs/qdat/logprobs/hisn' / f"{m['id']}.npy").astype(np.float32)
+    lp = np.load(LAB / 'runs/qdat/logprobs' / EAR_NAME / f"{m['id']}.npy").astype(np.float32)
     from quran_transcript import Aya
     ws = Aya(5, 109).get().uthmani.split(' ')
     st = next(i for i, w in enumerate(ws) if w.startswith('قَالُو'))
@@ -100,7 +101,7 @@ if __name__ == '__main__':
         rows += r
         if n % 100 == 0:
             print(n, len(work), file=sys.stderr, flush=True)
-    json.dump(rows, open(LAB / f'runs/v0/letters_eval{"" if LENGTHS else ".nolen"}.json', 'w'), ensure_ascii=False)
+    json.dump(rows, open(LAB / f'runs/v0/letters_eval{"" if LENGTHS else ".nolen"}{"" if EAR_NAME == "hisn" else "." + EAR_NAME}.json', 'w'), ensure_ascii=False)
     errs = [r for r in rows if r[0] == 'error']
     print('errors', len(errs), errs[:3])
     pro = np.array([r[2] for r in rows if r[0] == 'pro'])

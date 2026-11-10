@@ -123,7 +123,7 @@ def main():
     ap.add_argument('--device', default='cpu')
     a = ap.parse_args()
     meta = json.loads((D / 'index.json').read_text())
-    ear = Hisn() if a.ear == 'hisn' else Muaalem(a.device)
+    ear = Muaalem(a.device) if a.ear == 'muaalem' else Hisn()  # other names: a fine-tune's cached outputs
     cache = R / 'logprobs' / a.ear; cache.mkdir(parents=True, exist_ok=True)
     rows = []
     for n, m in enumerate(meta, 1):

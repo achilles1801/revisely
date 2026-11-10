@@ -804,6 +804,7 @@ def decide(key_words, g, lp, path, P, vocab=None, toks=None):
 # ---------------------------------------------------------------- running a bench
 
 def run_item(item_path, run, name, P, ear_name='hisn'):
+    ear_name = P.get('ear') or ear_name
     truth = json.loads(pathlib.Path(item_path).read_text())
     lo, hi = truth['range']
     if isinstance(lo, str):
@@ -851,6 +852,7 @@ def run_item_live(item_path, run, name, P, ear_name='hisn'):
     decided once it is commit seconds behind the newest final frame. Flags are timed when they would show;
     a flag later cleared (the reciter went back) still counts as shown. The final statuses come from the
     whole recording."""
+    ear_name = P.get('ear') or ear_name
     truth = json.loads(pathlib.Path(item_path).read_text())
     lo, hi = truth['range']
     if isinstance(lo, str):
@@ -958,9 +960,15 @@ def run_item_live(item_path, run, name, P, ear_name='hisn'):
     return truth['id'], res['stats']['decode_s']
 
 
-def _init(threads):
+def _init(threads, ckpt=None):
     global EAR, KEY
-    EAR = Hisn(threads=threads)
+    if ckpt:  # a fine-tuned copy of the small model (hisn_torch.py), on the CPU
+        import torch
+        import hisn_torch
+        torch.set_num_threads(threads)
+        EAR = hisn_torch.Ear(ckpt, device='cpu')
+    else:
+        EAR = Hisn(threads=threads)
     KEY = Key(EAR)
 
 
@@ -980,6 +988,8 @@ def main():
     ap.add_argument('--limit', type=int, default=0)
     ap.add_argument('--jobs', type=int, default=4)
     ap.add_argument('--threads', type=int, default=2)
+    ap.add_argument('--ear', default='hisn', help='name of the model: where its outputs are cached (logprobs/<ear>)')
+    ap.add_argument('--ckpt', default=None, help='a fine-tuned checkpoint (hisn_torch.py) to run when not cached')
     ap.add_argument('--params', default='{}', help='JSON overrides of DEFAULTS')
     ap.add_argument('--live', action='store_true', help='decide as the audio arrives (sliding-window model)')
     ap.add_argument('--lexicon', action='store_true', help='build cache/lexicon.json (every distinct word, alone)')
@@ -998,6 +1008,7 @@ def main():
         return
     P = dict(DEFAULTS, **json.loads(args.params))
     P['live'] = bool(args.live)
+    P['ear'] = args.ear
     run = pathlib.Path(args.run)
     items = sorted(pathlib.Path(args.bench, 'items').glob('*.json'))
     items = [f for f in items if args.only in f.name]
@@ -1009,11 +1020,11 @@ def main():
     t0 = time.time()
     errors = 0
     if args.jobs <= 1:
-        _init(args.threads)
+        _init(args.threads, args.ckpt)
         results = map(_work, work)
     else:
         import multiprocessing as mp
-        pool = mp.get_context('spawn').Pool(args.jobs, initializer=_init, initargs=(args.threads,))
+        pool = mp.get_context('spawn').Pool(args.jobs, initializer=_init, initargs=(args.threads, args.ckpt))
         results = pool.imap_unordered(_work, work)
     for k, (iid, info) in enumerate(results, 1):
         if isinstance(info, str):

@@ -9,7 +9,8 @@ LAB = pathlib.Path(os.environ.get('LAB', pathlib.Path.home() / 'revisely-mistake
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import checker, tajweed  # noqa
 FPS = 50
-TH = json.loads((LAB / 'runs/qdat/generic.hisn.json').read_text())['thresholds']
+EAR_NAME = os.environ.get('EAR_NAME', 'hisn')
+TH = json.loads((LAB / f'runs/qdat/generic.{EAR_NAME}.json').read_text())['thresholds']
 BIN = {'Qalqalah': TH['qalqalah'], 'Ikhfa': TH['noon_mokhfah_len'], 'Ikhfa meem': TH['noon_mokhfah_len'], 'Ghunnah': TH['noon_moshaddadah_len']}
 FIXED = {'Normal Madd': (2, TH['madd_qalo_alif_len_2']), 'Lazem Madd': (6, TH['madd_madd_aared_len_6'])}
 
@@ -22,7 +23,7 @@ def load(p):
 
 def item(path):
     truth = load(path)
-    lp = np.load(LAB / 'runs/v0/logprobs/hisn' / f"{truth['sha1']}.npy").astype(np.float32)
+    lp = np.load(LAB / 'runs/v0/logprobs' / EAR_NAME / f"{truth['sha1']}.npy").astype(np.float32)
     tl = [e for e in truth['timeline'] if not e.get('extra')]
     by = collections.OrderedDict()
     for e in tl:
@@ -60,7 +61,7 @@ if __name__ == '__main__':
         rows += r
         if n % 30 == 0:
             print(n, len(items), file=sys.stderr, flush=True)
-    json.dump(rows, open(LAB / 'runs/v0/pros_tajweed.json', 'w'))
+    json.dump(rows, open(LAB / f"runs/v0/pros_tajweed{'' if EAR_NAME == 'hisn' else '.' + EAR_NAME}.json", 'w'))
     print(f'{len(items)} recordings, {len(rows)} rule places')
     print('rule | condition | places | flagged (false) at the qdat threshold')
     agg = collections.defaultdict(lambda: [0, 0])

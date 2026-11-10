@@ -124,3 +124,19 @@ Write-up: `~/Documents/revisely-mistake-detection/three-modes-nov10.md`.
   together), `qdat_curves.py` (catch rate at fixed false flags), `qdat_tajweed.py hisn ecount 0` (the same through
   `tajweed.py`; writes the thresholds `pros_tajweed.py` uses on the professionals).
 - `learner_flags.py NAME`: which rule flags the learners' recordings in a run.
+
+## Fine-tuning the small model on planted mistakes (Nov 10, free, on the Mac)
+
+Write-up: `~/Documents/revisely-mistake-detection/free-finetune-v1.md`.
+
+- `hisn_torch.py`: HisnLabs tajweed-v2 in PyTorch (`model.safetensors`, Apache-2.0) with the same interface as
+  `checker.Hisn`; pads 0.4 s of silence either side as HisnLabs' own inference does.
+- `train_prep.py`: training clips from Muaalem's dataset (obadx/muaalem-annotated-v3, MIT). Download shards to
+  `$LAB/data/raw/muaalem/` (`fetch.sh` there takes one shard from each of 12 moshafs whose reciters are not in our
+  tests), then this lines each clip's labels up with the model's output.
+- `augment.py`: planted slips with labels changed to match (madd 0–6 counts by WSOLA stretch, ghunnah cut, ikhfa →
+  a clear ن from the same clip, qalqalah muted, confusable letter or haraka swapped, plus edits that change nothing).
+- `train.py --steps 5000 --out $LAB/models/ft-v1`: CTC on the phoneme head, on MPS, about 25 minutes.
+- `eval_ft.sh NAME [CHECKPOINT]`: every test for one model (`hisn` = the current one) into `$LAB/runs/eval.NAME.txt`;
+  `slip_check.py base CKPT`: planted slips on held-back clips (a sanity check, not a real test).
+- `checker.py --ear NAME [--ckpt PATH]` reads (or makes) that model's outputs.
