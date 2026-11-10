@@ -13,6 +13,8 @@ import {
   FlatList,
   GestureResponderEvent,
   Image,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Pressable,
   StyleSheet,
   Text,
@@ -57,7 +59,9 @@ interface MushafPagerProps {
   /** Fires whenever the visible page changes (any direction). */
   onPageChange?: (pageNumber: number, index: number) => void;
   /** Fires when the user advances forward (current index increases).
-   *  Receives the page being LEFT BEHIND, plus the page they're now on. */
+   *  Receives the page being LEFT BEHIND, plus the page they're now on: once
+   *  for each page a forward swipe left (two swipes the JavaScript gets
+   *  together are two calls, in order). */
   onAdvance?: (leftPage: number, currentPage: number) => void;
   /** Tap anywhere on the page area — consumers use this to toggle chrome. */
   onTap?: () => void;
@@ -355,9 +359,16 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
   // jump or a recitation turning pages can never mark a page revised.
   const draggedRef = useRef(false);
   // The page the list last reported on screen (never a programmatic jump's
-  // target), and the one a drag started on: a swipe credits the page it left.
+  // target).
   const shownIndexRef = useRef<number | null>(null);
-  const dragFromRef = useRef<number | null>(null);
+  // The page each drag began on since the list last changed page: a swipe
+  // credits the page it left (SESS-1). Read from the list's own offset when the
+  // drag began, not from the page the list last reported: a JavaScript thread
+  // that is held up (a long job, a slow phone) gets a swipe's events late, and
+  // two swipes can reach it before the page between them was ever reported.
+  // On iOS CI a 30 s stall did that, and the page between went uncounted (E2E
+  // 04, run 42746203992). Emptied by every page change and every jump.
+  const dragStartsRef = useRef<number[]>([]);
 
   // Download the pages around the starting one before they are swiped to (and
   // around the current one when another print is chosen).
@@ -395,6 +406,7 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
         const changed = idx !== from;
         currentIndexRef.current = idx;
         draggedRef.current = false;
+        dragStartsRef.current = [];
         if (changed) jumpRef.current = { from, to: idx, until: Date.now() + JUMP_SETTLE_MS };
         hasAutoScrolledRef.current = true;
         listRef.current?.scrollToIndex({ index: idx, animated: false });
@@ -411,6 +423,15 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
   const hasEnd = endCard != null;
   const data = useMemo(() => (hasEnd ? [...pages, END] : pages), [pages, hasEnd]);
 
+  // The pages swiped off going forward, now that the list shows `newIndex`:
+  // every drag since the last page change that began before it, in order.
+  const takeSwipedOff = useCallback((newIndex: number): number[] => {
+    const starts = dragStartsRef.current;
+    dragStartsRef.current = [];
+    if (!draggedRef.current) return [];
+    return [...new Set(starts)].filter((i) => i < newIndex).sort((a, b) => a - b);
+  }, []);
+
   const handleViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
       if (viewableItems.length === 0) return;
@@ -424,9 +445,18 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
         if (prevIndex === newIndex) return;
         jumpRef.current = null;
         currentIndexRef.current = newIndex;
-        const lastPage = pages[pages.length - 1];
+        const lastIndex = pages.length - 1;
+        const lastPage = pages[lastIndex];
+        const swipedOff = takeSwipedOff(newIndex);
+        // Pages before the last that the same swipes left (they reach a held-up
+        // JavaScript thread together).
+        if (onAdvance && lastPage != null) {
+          for (const i of swipedOff) if (i < lastIndex) onAdvance(pages[i], lastPage);
+        }
         if (draggedRef.current) onUserSwipe?.();
-        if (lastPage != null) onReachEnd?.(lastPage, draggedRef.current && prevIndex === pages.length - 1);
+        if (lastPage != null) {
+          onReachEnd?.(lastPage, draggedRef.current && (prevIndex === lastIndex || swipedOff.includes(lastIndex)));
+        }
         return;
       }
       // Right after a jump, ignore a stale report of the page we left. Any
@@ -440,13 +470,14 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
       const prevIndex = currentIndexRef.current;
       if (newIndex === prevIndex) return;
       const newPage = pages[newIndex];
-      // A swipe credits the page its drag started on, as the list showed it;
-      // a programmatic scroll never has a drag.
-      const from = dragFromRef.current;
-      if (draggedRef.current && from != null && newIndex > from && onAdvance) {
-        const leftPage = pages[from];
-        if (leftPage != null && newPage != null) {
-          onAdvance(leftPage, newPage);
+      // A swipe credits the page its drag began on (each of them, when the
+      // JavaScript gets several swipes at once); a programmatic scroll never
+      // has a drag.
+      const swipedOff = takeSwipedOff(newIndex);
+      if (onAdvance && newPage != null) {
+        for (const i of swipedOff) {
+          const leftPage = pages[i];
+          if (leftPage != null) onAdvance(leftPage, newPage);
         }
       }
       currentIndexRef.current = newIndex;
@@ -455,7 +486,7 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
       if (draggedRef.current) onUserSwipe?.();
       if (newPage != null) onPageChange?.(newPage, newIndex);
     },
-    [pages, hasEnd, onAdvance, onPageChange, onUserSwipe, onReachEnd],
+    [pages, hasEnd, onAdvance, onPageChange, onUserSwipe, onReachEnd, takeSwipedOff],
   );
 
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
@@ -505,8 +536,13 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
       inverted
       showsHorizontalScrollIndicator={false}
       onViewableItemsChanged={handleViewableItemsChanged}
-      onScrollBeginDrag={() => {
-        dragFromRef.current = shownIndexRef.current;
+      onScrollBeginDrag={(e?: NativeSyntheticEvent<NativeScrollEvent>) => {
+        // The page under the finger as the drag began, from the list's offset
+        // (each page is SCREEN_WIDTH wide, as getItemLayout says).
+        const x = e?.nativeEvent?.contentOffset?.x;
+        const at =
+          typeof x === 'number' ? Math.min(Math.max(Math.round(x / SCREEN_WIDTH), 0), data.length - 1) : shownIndexRef.current;
+        if (at != null) dragStartsRef.current.push(at);
         draggedRef.current = true;
       }}
       viewabilityConfig={viewabilityConfig}
