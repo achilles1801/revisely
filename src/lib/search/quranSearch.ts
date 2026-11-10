@@ -1,4 +1,4 @@
-// Finding ayat from a few of their words, typed (everyone) or heard (voice search, testers).
+// Finding ayat from a few of their words, typed or heard (voice search, on an iPhone).
 //
 // The words are compared the way recite mode compares what it hears with the mushaf
 // (lib/recite/arabic: bare letters, one alef, no hamza seats), against every word of the

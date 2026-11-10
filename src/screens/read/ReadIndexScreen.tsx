@@ -75,7 +75,7 @@ export default function ReadIndexScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { isDark, palette: v2Palette } = useTheme();
   const { user } = useApp();
-  // Search the Qur'an: typed for everyone, recited for testers on an iPhone that can listen.
+  // Search the Qur'an: typed for everyone, recited too on an iPhone that can listen.
   const searchOn = quranSearchEnabled(user);
   const voiceSearch = searchOn && voiceSearchEnabled(user);
   // Room for the tab bar (and the mini player). Revo's button isn't on the Read tab (REVO-25).
