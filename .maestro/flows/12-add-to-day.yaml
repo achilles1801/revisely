@@ -123,8 +123,12 @@ appId: com.revisionbuddy.app
       id: add-note-sheet
     timeout: 10000
 - waitForAnimationToEnd
-# The field takes focus as the sheet opens (a multiline field's testID doesn't reach iOS).
-- inputText: "Added from the plus"
+# The field takes focus as the sheet opens (a multiline field's testID doesn't reach iOS). Add once
+# the field holds all of it (type.yaml).
+- runFlow:
+    file: ../subflows/type.yaml
+    env:
+      TEXT: Added from the plus
 - tapOn:
     id: add-note-add
 - extendedWaitUntil:

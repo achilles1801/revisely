@@ -16,6 +16,10 @@ import { revoAvailable } from '../revo/availability';
 import { reciteModeEnabled } from '../recite/availability';
 import { showsResetMyData } from '../testerReset';
 import { showsTestScenarios } from '../testScenarios';
+import { quranSearchEnabled, voiceSearchEnabled } from '../search/availability';
+
+// A phone whose binary can listen (iPhone, 1.0.3 on): who may is what's tested.
+jest.mock('../recite/micSource', () => ({ isMicStreamAvailable: () => true }));
 
 const APP_STORE = [{}, { previewTester: false }] as const;
 const TESTER = { previewTester: true };
@@ -68,8 +72,13 @@ describe('everyone’s from the November 2026 release', () => {
     }
   });
 
+  // Opened on Nov 9 2026, after the release (Majd: "quran search should be open to everyone").
+  it.each(APP_STORE)('[SEARCH-1] [SEARCH-2] searching the Qur’an by typing, from the Read tab, for %o', (user) => {
+    expect(quranSearchEnabled(user)).toBe(true);
+  });
+
   it('nobody signed in has any of them', () => {
-    for (const gate of [activityBlocksEnabled, sittingsEnabled, everyTranslationOffered, helpAvailable]) {
+    for (const gate of [activityBlocksEnabled, sittingsEnabled, everyTranslationOffered, helpAvailable, quranSearchEnabled]) {
       expect(gate(null)).toBe(false);
       expect(gate(undefined)).toBe(false);
     }
@@ -91,6 +100,13 @@ describe('still for testers', () => {
     expect(reciteModeEnabled(TESTER)).toBe(true);
     expect(showsResetMyData(TESTER)).toBe(true);
     expect(showsTestScenarios(TESTER)).toBe(true);
+  });
+
+  // Until 1.0.4: the microphone's purpose string (native) and the privacy policy don't name searching.
+  it.each(APP_STORE)('[SEARCH-1] searching by voice, for %o', (user) => {
+    expect(voiceSearchEnabled(user)).toBe(false);
+    expect(voiceSearchEnabled(TESTER)).toBe(true);
+    expect(voiceSearchEnabled(null)).toBe(false);
   });
 
   it('a What’s new run at launch by hand (Settings → Testing) is a tester’s only', () => {

@@ -9,9 +9,11 @@
 # e2e-zone: America/Chicago
 appId: com.revisionbuddy.app
 ---
-- setLocation:
-    latitude: 41.88
-    longitude: -87.63
+- runFlow:
+    file: ../subflows/location.yaml
+    env:
+      LATITUDE: 41.88
+      LONGITUDE: -87.63
 - runFlow:
     file: ../subflows/new-account.yaml
     env:
