@@ -1,104 +1,104 @@
-# Revisely Metrics (the owner's private dashboard)
+# Revisely Metrics (the owner's console)
 
-A private claude.ai page, "Revisely Metrics", that answers two questions on the owner's phone: how Revo
-is used, by whom and at what cost, and whether the app is healthy. Built Nov 2026 (Majd's picks: layout
-A with the phone status line, refreshed every 6 hours, a Refresh button, push alerts).
+A private web page that answers two questions on the owner's phone: how Revo is used, by whom and at what
+cost (with each account's conversations), and whether the app is healthy. Built Nov 2026 to Majd's picks:
+layout A with the phone status line, a Refresh button, exact cost per account, alarms pushed to him, and
+everything in the cloud.
 
-## How it updates
+**Open it:** https://revision-buddy-3a398.web.app (sign in with the owner's Google account).
+
+## How it works
 
 ```
-GitHub workflow "Metrics" ──► Sentry + App Store totals (artifact, totals only)
-                                   │
-Mac: launchd job (every minute) ──► collect.js ──► metrics.json in Drive ──► the dashboard reads it
-       ▲   reads Firestore, Revo's logs and Cloud Monitoring                (Google Drive connector,
-       │   with the read-only service account                               as the owner)
-       └── the dashboard's Refresh button writes the time into Drive's "refresh" file
+Browser (Firebase Hosting, admin/) ── Google sign-in ──► adminMetrics ──► Firestore, Revo's logs, Cloud Monitoring,
+                                                                         the stored Sentry + App Store totals
+                                 └─ tap an account ──► adminRevo ──► that account's chats and memory (live)
+
+GitHub "Metrics" workflow, hourly ── Sentry + App Store totals ──► metricsTotals ──► adminMetrics/totals
+                                 ◄── alarms that just started ── (posted on the "Metrics alerts" issue)
 ```
 
-- **Every 6 hours**, `watch.js` (launchd, `app.revisely.metrics`) runs `collect.js`. That starts the
-  Metrics workflow, waits for its totals (up to 4 minutes, else it uses the last good run), reads
-  Firestore, Revo's log lines and Cloud Monitoring, works out the numbers (`metrics.js`) and overwrites
-  `metrics.json` in the owner's Drive folder "Revisely metrics". A copy stays on the Mac in
-  `~/.local/share/revisely-metrics/`.
-- **Refresh button:** the page sets the "refresh" file's description to the time of the tap, through the
-  owner's Google Drive connector (its only write). `watch.js` checks that file every minute. A newer time
-  starts a run, so new numbers arrive about 2–4 minutes after the tap. The page polls every 30 s until
-  they do. With the Mac asleep or off, the request waits, and the page says so after 10 minutes.
-- **Each run recomputes the last 30 days** from the sources (logs keep 30 days, Sentry 90, Monitoring
-  6 weeks, Firestore forever), so a missed run loses nothing.
-- **Alerts:** when an alarm turns on (Revo failing, resting or capped, spend over half the day's
-  allowance or 80% of the month's cap, a function over 1% errors, production crash-free under 99%),
-  `watch.js` starts the workflow in alert mode. That posts on the GitHub issue "Metrics alerts",
-  mentioning the owner, so GitHub emails it and the GitHub app pushes it. An alarm is posted once when it
-  starts, not again while it lasts.
-- **Stale data:** the page marks data older than 26 hours as an alarm.
+- **The page** (`admin/`: `index.html`, `console.js`, `console.css`) is served by Firebase Hosting. Its
+  Firebase config comes from Hosting itself (`/__/firebase/init.json`), so no key is in the repository,
+  and the project's own domain is already allowed for Google sign-in. It keeps nothing in the browser but
+  the range and channel picked.
+- **Who gets in:** only an account whose ID token carries `admin: true`, checked by the functions on
+  every call (`functions/src/metrics/admin.ts`). Set it with `functions/scripts/set-admin.js <uid>`.
+  No Firestore or Storage rule reads the claim, so it opens the console and nothing else.
+- **adminMetrics** (callable) reads everything live and works out every number
+  (`functions/src/metrics/aggregate.ts`), keeping the answer 2 minutes. Refresh asks for a new one. It
+  covers the 1h, 24h, 7d and 30d ranges. Firestore reads name their fields (`select`), so the numbers never
+  read conversation text. Logging and Monitoring are read with the function's own service account.
+- **adminRevo** (callable) returns one account's conversations (questions, answers, what was added,
+  ratings, actions) and what Revo remembers, read live when the owner opens that account. Nothing is
+  copied or kept. Each read is logged as `admin` `{event: 'read-revo', reader, account}`, never with
+  content. It shows counts only until `config/admin.conversations` is true
+  (`set-admin.js --conversations on`), which is turned on only once the privacy policy says the developer
+  may read conversations.
+- **metricsTotals** (HTTPS) takes the workflow's totals. Only `metrics.yml` in this repository on `main`
+  may call it, scheduled or by hand: it checks the job's GitHub OIDC token (audience `revisely-metrics`).
+  It stores them in `adminMetrics/totals`, works out the alarms, and answers with those that just started.
+  `scripts/metrics/push.js` posts them on the "Metrics alerts" issue, mentioning the owner, so GitHub
+  emails it and the GitHub app pushes it.
+- **Alarms:** Revo failing (3 in 15 minutes, or over 10% of an hour's calls), Revo resting or capped, today
+  over half the daily allowance, the month over 80% of the cap, a function over 1% errors in an hour,
+  production crash-free under 99% (50+ sessions). Each is posted once when it starts. They're checked
+  hourly, with the workflow.
+- **Server-only documents:** `adminMetrics/totals`, `adminMetrics/alarms` and `config/admin`. The rules'
+  catch-all keeps them closed to every client (`tests/firestore-rules/default-deny.test.ts`).
 
 ## What's on it
 
-- **Revo:** questions and Day in review over time, people who asked, cost (exact from the logs),
-  failures by cause, resting and capped, cut-off replies, retries, answer time (p50/p95), prompt cache
-  share and tokens, who uses it (Revo on, asked, came back), thumbs, actions taken, attachments by kind,
-  spend this month against the cap and today against the daily allowance, and a table of accounts.
-- **App:** active people by platform (store users or testers), crash-free by release, update adoption
-  per platform, App Store downloads.
+- **Revo:** questions and Day in review over time, people, cost, failures by cause, resting and capped,
+  cut-off replies, retries, answer time (p50/p95), the prompt cache, tokens, who uses it (Revo on, asked,
+  came back), thumbs, actions taken, attachments, spend against the month's cap and today's allowance,
+  and every account (questions, days, reviews, tokens, cost, days at the 20-question limit, failures,
+  thumbs, last used). Tap one for its conversations and memory.
+- **App** (Sentry and App Store totals, at most an hour old): active people by platform for store users
+  or testers, crash-free by release, update adoption, App Store downloads.
 - **Backend:** each Cloud Function's calls, refusals (4xx), errors (5xx) and latency; Firestore reads,
   writes and rule refusals today.
-- **Time ranges:** 1h (5-minute steps), 24h (hourly), 7d (6-hourly), 30d (daily). Sentry has no 5-minute
-  steps, so the app charts need 24h or longer. Numbers are as of the last run, never live.
 
 ## Privacy
 
-- Accounts show only as a keyed hash ("k7f2·a9"). The key and the hash → uid lookup stay on the Mac
-  (`~/.config/revisely-metrics/config.json`, `~/.local/share/revisely-metrics/lookup.json`). To find
-  an account: `node ~/.local/share/revisely-metrics/bin/collect.js --who k7f2a9`.
-- Never read or shown: question and answer text, chat titles, memory, emails, names, IP addresses,
-  locations. Firestore reads ask for named fields only (`select`), so content never leaves Firestore.
-- Revo's log lines carry the account's uid from #497. The privacy policy's #revo section says so: logs
-  hold counts and costs linked to the account's internal ID, for 30 days.
-- The per-account file lives in the owner's private Google Drive, and the page lives in his private
-  claude.ai account. Nothing per account passes through GitHub. The workflow's artifact holds totals
-  only, like the public health and stats issues.
-- Turning Revo off or deleting conversations deletes that account's chats, so its history here
-  shrinks. Spend totals stay exact.
+- The policy's Revo section says Revisely's developer may read Revo conversations and what it remembers to
+  improve Revo and keep it safe, and that logs carry the account's internal ID (#498). App Store
+  (Other User Content, Product Interaction) and Play (Other user-generated content) list Analytics as a
+  purpose, and Play also lists security.
+- Accounts are shown by their uid (pseudonymous), never by email or name.
+- Conversation text stays in Firestore. It is read live for the owner and is never copied to GitHub
+  (public), logs, or anywhere else. The workflow's totals hold nothing per account.
+- Revo's log lines carry the uid from #497, kept 30 days by Cloud Logging.
 
 ## What it costs
 
-- **Google Cloud:** reads inside the free tiers. A run reads the Revo chats and messages (non-content
-  fields), the users' tester flags and the ledger: a few thousand Firestore reads at today's size. It
-  also makes about 30 Monitoring calls and a few Logging pages.
-- **GitHub Actions:** free (public repository). One run takes about a minute.
-- **Sentry, App Store Connect, Drive:** none.
-- **Claude:** none. The page reads Drive directly; no Claude session runs on a schedule.
+About nothing at today's size. Each console load (or Refresh past the 2-minute cache) reads Revo's chats
+and messages (named fields) and the testers, about 30 Monitoring calls and a few Logging pages. The
+hourly totals run does the same once. Firestore reads are a few thousand a load and grow with Revo's use;
+add a collection-group index on `messages.at` and read only the range when that matters. GitHub Actions
+is free (public repository). Hosting serves a 60 KB page.
 
-## Setting it up (once)
+## Deploying (owner's word for each)
 
-1. **Service account** `revisely-metrics@revision-buddy-3a398.iam.gserviceaccount.com`. Roles
-   `roles/monitoring.viewer`, `roles/logging.viewer`, `roles/datastore.viewer` (read-only); the Google
-   Drive API enabled; a JSON key at `~/secrets/revisely-metrics.json` (chmod 600, never in the repo).
-2. **Drive:** a folder "Revisely metrics" in the owner's Drive with `metrics.json` (any JSON to start)
-   and an empty `refresh` file, shared with the service account as Editor.
-3. **Mac:** `bash scripts/metrics/install.sh`. Put the two Drive file ids in
-   `~/.config/revisely-metrics/config.json` (`drive.metricsFileId`, `drive.refreshFileId`), and your own
-   uid in `ownerUids` to mark your account "you". Then run
-   `node ~/.local/share/revisely-metrics/bin/watch.js --now`.
-4. **The page:** `scripts/metrics/dashboard.html` with the two file ids in its `CONFIG`, published as a
-   private artifact. It declares the `mcp` capability for Google Drive's `download_file_content` and
-   `update_file`; the first open asks the owner to allow it.
-5. **Workflow:** `.github/workflows/metrics.yml` runs from `main` (`gh workflow run` needs it there).
+1. Functions: `firebase deploy --only functions:adminMetrics,functions:adminRevo,functions:metricsTotals`
+2. Admin claim: `cd functions && GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-admin.json node scripts/set-admin.js <uid>`
+3. The page: `firebase deploy --only hosting` (from a checkout that has `admin/`).
+4. The workflow: `metrics.yml`, `scripts/metrics/totals.js` and `push.js` on `main`. Deploy step 1
+   first, or the hourly run fails until `metricsTotals` exists.
+5. Conversations: only after the policy (#498) is live and the store answers are updated,
+   `node scripts/set-admin.js --conversations on`.
+
+The functions' service account needs to read Logging and Monitoring (`roles/logging.viewer`,
+`roles/monitoring.viewer`). The default compute service account has them through Editor. The console shows
+"Revo logs: … 403" or "Cloud Monitoring: … 403" if not.
 
 ## Upkeep
 
-- After changing the scripts, run `bash scripts/metrics/install.sh` again. The job runs the copies in
-  `~/.local/share/revisely-metrics/bin`, never a checkout.
-- Log: `~/Library/Logs/revisely-metrics.log`. State (last run, last request, alarms on):
-  `~/.local/share/revisely-metrics/state.json`.
-- **Platform split:** Sentry's sessions carry no OS. `totals.js` takes a release's platform from its
-  Sentry events, then from another release of the same build, and only then from the build number:
-  below `METRICS_IOS_MIN_BUILD` (20) is Android. Builds that never sent an event fall back to that rule,
-  so raise it before Android version codes reach 20.
-- **Revo's limit (20) and prices** are read from the code's behaviour (`metrics.js` `DAILY_QUESTIONS`;
-  costs come from the log lines, priced by `functions/src/coach/pricing.ts`). Change them together.
-- **The Clear Quran budget** isn't on the page yet: the worker keeps its counts in a Durable Object with no
-  route to read them.
-- To stop it all: `bash scripts/metrics/install.sh --uninstall`, delete the key, and remove the service
-  account's roles.
+- **Platform split:** Sentry's sessions carry no OS. `totals.js` takes a release's platform from its Sentry
+  events, then from another release of the same build, then from the build number: below
+  `METRICS_IOS_MIN_BUILD` (20) is Android. Raise it before Android version codes reach 20.
+- **The daily limit (20) and prices:** `aggregate.ts` `DAILY_QUESTIONS` follows `REVO_DAILY_QUESTIONS`.
+  Costs come from the log lines, priced in `functions/src/coach/pricing.ts`.
+- **The Clear Quran budget** isn't on the console: the worker keeps its counts in a Durable Object with
+  no route to read them.
+- **To shut it:** `set-admin.js <uid> --off`, or delete the three functions. The page alone shows nothing.

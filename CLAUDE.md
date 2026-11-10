@@ -362,14 +362,14 @@ Non-testers follow `production`, so nobody sees this on a phone before Promote; 
 `group` = the previous production update group (`eas update:list --branch production`), `rollback` =
 true → approve. It republishes that exact update, the same way promotion does.
 
-## Metrics dashboard (the owner's private page)
+## Metrics console (the owner's private page)
 
-"Revisely Metrics", a private claude.ai artifact: Revo per account (keyed hashes only), spend against
-the caps, app health, downloads and functions, refreshed every 6 hours and by its Refresh button.
-The collector runs on the owner's Mac (launchd `app.revisely.metrics`, read-only service account
-`revisely-metrics@`), the workflow `metrics.yml` adds Sentry and App Store totals, and the page reads
-`metrics.json` from the owner's Drive. Alarms go to the "Metrics alerts" issue. Everything else:
-`scripts/metrics/README.md`.
+https://revision-buddy-3a398.web.app (Firebase Hosting, `admin/`): Revo per account with its conversations,
+spend against the caps, app health, downloads and functions, read live. Only an account with the custom claim
+`admin: true` gets anything (`functions/scripts/set-admin.js <uid>`); the claim opens nothing else, since no
+rule reads it. Functions `adminMetrics`, `adminRevo` (conversations locked until `config/admin.conversations`)
+and `metricsTotals` (the hourly `metrics.yml` sends Sentry and App Store totals with its GitHub OIDC token, and
+posts new alarms on the "Metrics alerts" issue). Everything else: `scripts/metrics/README.md`.
 
 ## Offline (src/lib/offline)
 

@@ -179,6 +179,8 @@ function revoRange(key: RangeKey, now: number, P: Prepared, input: Input) {
   const inR = (t: number) => B.index(t) >= 0;
   const lines = input.revoLines ?? null;
   const q = zeros(B.n), rev = zeros(B.n), failed = zeros(B.n), cr = zeros(B.n), cw = zeros(B.n);
+  // The same counts from the stored chats: used when they hold more (logs missing or not read).
+  const fsQ = zeros(B.n), fsRev = zeros(B.n);
   const T = { questions: 0, reviews: 0, calls: 0, costUsd: 0, failed: 0, failedByCode: {} as Record<string, number>, resting: 0, capped: 0, cutOff: 0, retried: 0, cached: 0, tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } };
   const acc = new Map<string, Acc>();
   const A = (uid: string): Acc => {
@@ -226,7 +228,7 @@ function revoRange(key: RangeKey, now: number, P: Prepared, input: Input) {
       const a = A(m.uid);
       a.q++;
       if (m.day) a.days.set(m.day, (a.days.get(m.day) ?? 0) + 1);
-      if (!lines) q[B.index(m.at)]++;
+      fsQ[B.index(m.at)]++;
       for (const k of m.kinds) attach[k] = (attach[k] ?? 0) + 1;
     } else if (m.role === 'revo') {
       if (m.feedback === 'up') { up++; A(m.uid).up++; }
@@ -235,8 +237,10 @@ function revoRange(key: RangeKey, now: number, P: Prepared, input: Input) {
       if (m.actionState === 'added') added++;
     }
   }
-  for (const c of P.chats) if (c.kind === 'review' && inR(c.createdAt)) { A(c.uid).reviews++; if (!lines) rev[B.index(c.createdAt)]++; }
-  if (!lines) { T.questions = q.reduce((x, y) => x + y, 0); T.reviews = rev.reduce((x, y) => x + y, 0); }
+  for (const c of P.chats) if (c.kind === 'review' && inR(c.createdAt)) { A(c.uid).reviews++; fsRev[B.index(c.createdAt)]++; }
+  const total = (a: number[]) => a.reduce((x, y) => x + y, 0);
+  if (total(fsQ) > T.questions) { fsQ.forEach((v, i) => (q[i] = v)); T.questions = total(fsQ); }
+  if (total(fsRev) > T.reviews) { fsRev.forEach((v, i) => (rev[i] = v)); T.reviews = total(fsRev); }
 
   const avg = T.calls ? T.costUsd / T.calls : 0;
   const avgTokens = T.calls ? (T.tokens.input + T.tokens.output + T.tokens.cacheRead + T.tokens.cacheWrite) / T.calls : 0;
