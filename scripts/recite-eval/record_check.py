@@ -170,16 +170,16 @@ def main():
     ap.add_argument('--words', default='rec.hisn.wp', help='checker.py results name for the words check')
     ap.add_argument('--v3', default=str(LAB / 'models/ft-v3/step8000.pt'))
     ap.add_argument('--items', default='', help='docs/record/items.json (default: the live copy)')
-    a = ap.parse_args()
-    bench_dir, run = pathlib.Path(a.bench), pathlib.Path(a.run)
+    args = ap.parse_args()
+    bench_dir, run = pathlib.Path(args.bench), pathlib.Path(args.run)
     import record_bench, bench, hisn_torch
-    items = {x['id']: x for x in record_bench.load_items(a.items)['items']}
+    items = {x['id']: x for x in record_bench.load_items(args.items)['items']}
     words_obj = bench.Words()
     checker._init(1)
     EAR, KEY = checker.EAR, checker.KEY
     letters_v2.EAR, letters_v2.KEY = EAR, KEY
     SL = tajweed.Slots(EAR)
-    v3 = hisn_torch.Ear(a.v3, device='cpu', name='v3') if a.v3 and pathlib.Path(a.v3).exists() else None
+    v3 = hisn_torch.Ear(args.v3, device='cpu', name='v3') if args.v3 and pathlib.Path(args.v3).exists() else None
     import soundfile as sf
 
     # bars set on professionals (bench-v0): letters (one bar, shadda checked by time) and tajweed margins
@@ -206,7 +206,7 @@ def main():
         x, _ = sf.read(bench_dir / 'items' / f'{iid}.wav', dtype='float32')
         lp = EAR.logprobs(x)
         lp3 = v3.logprobs(x) if v3 else None
-        resp = run / 'results' / a.words / f'{iid}.json'
+        resp = run / 'results' / args.words / f'{iid}.json'
         res = json.loads(resp.read_text()) if resp.exists() else None
         row = {'id': iid, 'item': item_id, 'kind': item['truth']['kind'], 'title': item['title'], 'secs': round(len(x) / 16000, 1)}
 
