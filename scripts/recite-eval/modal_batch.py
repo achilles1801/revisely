@@ -37,7 +37,8 @@ image = (modal.Image.debian_slim(python_version='3.12')
          .pip_install('torch==2.15.0', 'transformers==4.57.6', 'safetensors', 'onnxruntime==1.31.1', 'numpy', 'scipy',
                       'soundfile', 'pyarrow', 'Levenshtein==0.27.5', 'quran-transcript==0.6.4', 'pyworld',
                       'setuptools<81', 'huggingface_hub', 'psutil')
-         .env({'LAB': '/vol', 'PYTHONWARNINGS': 'ignore'})
+         .env({'LAB': '/vol', 'PYTHONWARNINGS': 'ignore', 'OMP_NUM_THREADS': '1', 'OPENBLAS_NUM_THREADS': '1',
+               'MKL_NUM_THREADS': '1'})  # one math thread a process: many data workers each spawning threads only fight
          .add_local_dir(HERE, '/root/recite-eval', ignore=['__pycache__', '*.pyc']))
 SCRIPTS = '/root/recite-eval'
 
@@ -48,7 +49,7 @@ def _setup():
     vol.reload()
 
 
-@app.function(image=image, volumes={'/vol': vol}, cpu=2.0, memory=8192, timeout=3600, max_containers=20)
+@app.function(image=image, volumes={'/vol': vol}, cpu=2.0, memory=4096, timeout=3600, max_containers=40)
 def prep_one(i: int):
     """One Tadabur file: download from Hugging Face, cut to 16 kHz, drop test reciters, model + madd timing (pass 1)."""
     _setup()
@@ -77,7 +78,7 @@ def label_all():
     return f'{len(st)} reciters with a style; {len(names)} files labelled'
 
 
-@app.function(image=image, volumes={'/vol': vol}, cpu=2.0, memory=8192, timeout=3600, max_containers=20)
+@app.function(image=image, volumes={'/vol': vol}, cpu=2.0, memory=4096, timeout=3600, max_containers=40)
 def revoice_one(name: str, d: str):
     """Women's and children's voices for one shard (voices.py)."""
     _setup()
@@ -87,12 +88,26 @@ def revoice_one(name: str, d: str):
     return r
 
 
-@app.function(image=image, volumes={'/vol': vol}, gpu='A10G', cpu=8.0, memory=32768, timeout=3600)
-def train_part(args: list):
-    """Up to about 50 minutes of training, then a save to <out>/last.pt; called again until it is done."""
+@app.function(image=image, volumes={'/vol': vol}, gpu='A10G', cpu=4.0, memory=16384, timeout=3600)
+def train_part(args: list, workers: int = 0, local: int = 0):
+    """Up to about 50 minutes of training, then a save to <out>/last.pt; called again until it is done.
+    local=1 copies the training data to this machine's own disk first: reading clips from the network volume one
+    by one starved the GPU (it waited for data 60% of the time)."""
     _setup()
-    sys.argv = ['train.py'] + args + ['--device', 'cuda', '--resume', '1', '--max_minutes', '50', '--workers', '7']
-    import train
+    import time
+    if local:
+        t = time.time()
+        data = args[args.index('--data') + 1].split(',')
+        os.makedirs('/tmp/lab/data', exist_ok=True)
+        for d in data:
+            subprocess.run(['cp', '-rL', f'/vol/{d}', f'/tmp/lab/{d}'], check=True)
+        if not os.path.exists('/tmp/lab/models'):
+            os.symlink('/vol/models', '/tmp/lab/models')
+        os.environ['LAB'] = '/tmp/lab'
+        print(f'copied {data} to local disk in {time.time() - t:.0f}s', flush=True)
+    sys.argv = ['train.py'] + args + ['--device', 'cuda', '--resume', '1', '--max_minutes', '45', '--workers', str(workers)]
+    import importlib, hisn_torch, train
+    importlib.reload(hisn_torch); importlib.reload(train)
     r = train.main()
     vol.commit()
     return r
@@ -137,18 +152,19 @@ def prep(first: int = 1, last: int = 2, voices: int = 1):
             names = listing.remote(d)
             have = {n[:-len('.voice.audio.npy')] for n in names if n.endswith('.voice.audio.npy')}
             jobs += [(n[:-len('.meta.pkl')], d) for n in names
-                     if n.endswith('.meta.pkl') and '.voice' not in n and n[:-len('.meta.pkl')] not in have]
+                     if n.endswith('.meta.pkl') and '.voice' not in n and n[:-len('.meta.pkl')] not in have
+                     and (d != 'data/train2' or int(n[1:6]) % 2 == 0)]  # half of Tadabur's files is enough
         for r in revoice_one.starmap(jobs, return_exceptions=True):
             print(r)
 
 
 @app.local_entrypoint()
 def train(out: str = 'ft-v4', init: str = 'ft-v3.pt', steps: int = 300, data: str = 'data/train,data/train2',
-          lr: float = 2e-5, batch_s: float = 60.0, parts: int = 40):
+          lr: float = 2e-5, batch_s: float = 60.0, parts: int = 40, workers: int = 0, local: int = 0):
     args = ['--init', f'/vol/models/{init}', '--out', f'/vol/models/{out}', '--steps', str(steps), '--data', data,
             '--lr', str(lr), '--batch_s', str(batch_s), '--voice_p', '0.4', '--chan_p', '0.35', '--fmask', '0.3']
     for k in range(parts):  # each call is under an hour; it carries on from last.pt
-        r = train_part.remote(args)
+        r = train_part.remote(args, workers, local)
         print(f'part {k + 1}: {r}', flush=True)
         if r == 'done':
             break

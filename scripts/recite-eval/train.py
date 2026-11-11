@@ -216,15 +216,24 @@ def main():
                     'base_vc': base_vc if hard else None}, out / 'last.pt.tmp')
         os.replace(out / 'last.pt.tmp', out / 'last.pt')
     ds = Batches(data, a, V, seed=first)
+    def _one_thread(_):  # each data worker on one core: several workers each spawning threads only fight
+        torch.set_num_threads(1)
+        os.environ['OMP_NUM_THREADS'] = '1'
     it = iter(torch.utils.data.DataLoader(ds, batch_size=None, num_workers=a.workers, prefetch_factor=4,
-                                          persistent_workers=False) if a.workers else ds)
-    t0, tot, cnt = time.time(), 0.0, 0
+                                          worker_init_fn=_one_thread, persistent_workers=False) if a.workers else ds)
+    t0, tot, cnt, t_wait = time.time(), 0.0, 0, 0.0
     for step in range(first, a.steps + 1):
+        tw = time.time()
         M, frames, labs, seen = next(it)
+        t_wait += time.time() - tw
         for k, v_ in seen.items():
             slips_seen[k] = slips_seen.get(k, 0) + v_
         mel, fr, tgt, tl = to_device(np.asarray(M), list(frames), labs, a.device)
-        out_ = model(mel, fr)
+        if a.device == 'cuda':  # bfloat16 on the GPU; the loss is computed in float32 below
+            with torch.autocast('cuda', dtype=torch.bfloat16):
+                out_ = model(mel, fr)
+        else:
+            out_ = model(mel, fr)
         lp = F.log_softmax(out_['phonemes'].float(), -1).transpose(0, 1)  # [T, B, V]
         il = ((fr + 1) // 2 - 1).clamp(max=lp.shape[0]).cpu()
         if a.device == 'cuda':
@@ -239,7 +248,7 @@ def main():
         if step % 50 == 0:
             if a.device == 'mps':
                 torch.mps.empty_cache()
-            msg = f'step {step} loss {tot/cnt:.4f} lr {sched.get_last_lr()[0]:.2e} {time.time()-t0:.0f}s'
+            msg = f'step {step} loss {tot/cnt:.4f} lr {sched.get_last_lr()[0]:.2e} {time.time()-t0:.0f}s (waiting for data {t_wait:.0f}s)'
             print(msg, flush=True); log.write(msg + '\n'); log.flush(); tot = cnt = 0
         if step % 500 == 0 or step == a.steps:
             v = per(model, data, val_items, a.device, rng)
