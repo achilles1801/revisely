@@ -64,6 +64,9 @@ DEFAULTS = {
     'alt_rule': 'any',  # 'skeleton': only look-alikes with other consonants (not ones that differ in harakat, madd or shadda)
     'extra_min': 0.35,  # a filler shorter than this (seconds) is not reported as an extra word
     'basmala_max': 8.0,  # a filler up to this long (seconds) before a surah's first word is its basmala
+    'basmala_fill': -0.1,  # per frame in that filler (other fillers: 'fill')
+    'lead_fill': -0.5,  # before a passage that opens a surah: as 'edge' (any cheaper and the lead ate the first
+                        # word of professionals reciting a long isti'adha: Abdul Basit, Sudais)
     'delay': 1.0,       # (offline) seconds after a word ends that a live checker would decide it
     'look': 1.0,        # (live) seconds of audio after a frame before the model's frame is final
     'hop': 0.5,         # (live) how often the model runs and the checker decides
@@ -378,6 +381,8 @@ class Graph:
 
     def __init__(self, key_words):
         self.W = W = len(key_words)
+        # gaps before a surah that starts inside the passage, where a basmala is said (Al-Falaq after Al-Ikhlas)
+        self.surah_gap = [g for g in range(0, W) if _starts_surah(key_words[g]['word'])]  # 0: the passage opens a surah
         lab, word_of, chain_of, kind, madd_back, alt_of = [], [], [], [], [], []
         entries = [[] for _ in range(W)]
         entry_alt = [[] for _ in range(W)]
@@ -443,6 +448,8 @@ class Decoder:
         self.skips = [k for k in range(1, int(P['skip_max']) + 1) if k < W]
         self.backs = min(int(P['back_max']), W - 1)
         self.pen = np.full(W + 1, P['fill']); self.pen[0] = self.pen[W] = P['edge']
+        for gg in getattr(g, 'surah_gap', []):  # a basmala there is cheap, so it isn't forced into the surah's first word
+            self.pen[gg] = P.get('lead_fill', -0.25) if gg == 0 else P.get('basmala_fill', -0.1)
         self.alt_pen = np.where(g.entry_alt, P['alt_pen'], 0.0)
         self.t = 0  # frames taken in
 
