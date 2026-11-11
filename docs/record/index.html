@@ -16,8 +16,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Amiri+Quran&display=swap">
   <style>
-    /* Volunteers recite into this page; each take goes to the developer's private Google Drive
-       through a Google Apps Script (scripts/record/apps-script.gs). Not linked from the site. */
+    /* Volunteers recite into this page; each take goes to Revisely's private Google Drive (the developer's
+       account) through a Google Apps Script (scripts/record/apps-script.gs). Not linked from the site. No person
+       listens to the takes: they are processed automatically (the page promises it). */
     /* A class's display (the banner's flex) must not override the hidden attribute. */
     [hidden] { display: none !important; }
     .rec { max-width: 640px; margin: 0 auto; padding: 24px var(--gutter) 120px; }
@@ -417,7 +418,7 @@
       <p>Revisely is building a checker that follows your recitation on the mushaf and points out mistakes. To make it accurate, it needs real people reciting, including some mistakes made on purpose. It takes about 20 minutes, or 35 with the extra part.</p>
       <label class="q" for="name">Your name</label>
       <input class="field" id="name" type="text" autocomplete="name" maxlength="60">
-      <p class="muted" style="margin-top:8px">Only Revisely’s developer can see your name. Your recordings are filed under a code, not your name.</p>
+      <p class="muted" style="margin-top:8px">No one listens to your recordings: they are processed automatically. They are filed under a code, not your name, and only Revisely’s developer can see your name.</p>
       <p class="err" id="err" hidden></p>
       <button class="btn wide" id="go" disabled>Continue</button>`;
     const name = document.getElementById('name'), go = document.getElementById('go'), err = document.getElementById('err');
@@ -471,7 +472,8 @@
       <ul class="plain" style="margin-top:10px">
         <li><strong>What’s recorded:</strong> only what you record on this page, your answers to a few questions, and your phone type.</li>
         <li><strong>No name on them:</strong> your recordings are filed under a code (${esc(S.pid)}), not your name. Only Revisely’s developer knows which code is yours.</li>
-        <li><strong>Who hears them:</strong> Revisely’s developer, and the software that builds the checker. They are never published or shared.</li>
+        <li><strong>Who listens:</strong> no one. No person listens to your recordings, Revisely’s developer included. They are processed automatically by software, only to build and test Revisely’s recitation checker, and they are never published or shared.</li>
+        <li><strong>Where they’re kept:</strong> privately, in Revisely’s own storage (a private Google Drive folder), under your code.</li>
         <li><strong>What they’re for:</strong> building and testing Revisely’s recitation checking, including training its models. This may become a paid feature of the app.</li>
         <li><strong>Stopping:</strong> you can stop at any time. To have your recordings deleted, tell Revisely’s developer, or email <a href="mailto:support@revisely.app">support@revisely.app</a> with your code (${esc(S.pid)}).</li>
       </ul>
