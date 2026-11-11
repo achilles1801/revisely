@@ -14,8 +14,8 @@ Each item's truth comes from the page's own script (docs/record/items.json, or t
   - tajweed changes: type 'tajweed' (mode 3), not a mode 2 mistake and not counted as a false alarm either;
   - the passage of the volunteer's choice (n8): ok, using the surah and ayat they picked.
 There are no word timings, so score.py's lag and latency don't apply to these items; false alarms and
-mistakes caught do. Whether a volunteer made the mistake asked for is not checked here: listen to the
-flagged and the missed ones before trusting a number.
+mistakes caught do. No person listens to the takes, ever (the page promises volunteers that, Nov 10 2026): whether
+a volunteer made the mistake asked for is checked automatically only (record_check.py).
 
   python record_bench.py --recordings DIR --out DIR [--items docs/record/items.json]
 """
