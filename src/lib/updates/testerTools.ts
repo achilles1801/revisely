@@ -6,9 +6,10 @@
 
 import { Platform } from 'react-native';
 import InstallSource from '../../../modules/install-source';
+import { isDevVariant } from '../variant';
 
 export function showsUpdateTools(user: { previewTester?: boolean } | null | undefined): boolean {
-  if (__DEV__) return true;
+  if (__DEV__ || isDevVariant()) return true;
   if (user?.previewTester === true) return true;
   if (Platform.OS !== 'ios') return false;
   try {

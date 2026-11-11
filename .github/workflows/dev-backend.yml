@@ -1,0 +1,77 @@
+name: Dev backend
+
+# Deploys the dev Firebase project (CLAUDE.md "Dev stack": Revisely Dev's backend) from develop: the
+# Firestore rules and indexes, the Storage rules and every Cloud Function, on each push to develop
+# that changes them, and by hand. Majd's standing OK for dev-only deploys (Nov 11 2026). Production
+# (revision-buddy-3a398) is never deployed from here: its deploys stay by hand, on his word.
+#
+# Keyless: the job's GitHub OIDC token is exchanged through Google Workload Identity Federation for a
+# deploy service account of the dev project. The pool accepts only this repository's develop branch,
+# and the account has roles on the dev project only (PLAN §3.C; ~/Documents/revisely-dev-stack).
+#
+# Off until the dev project exists: the repository variable DEV_BACKEND is 'true' once
+# DEV_FIREBASE_PROJECT (the project id), DEV_WIF_PROVIDER (projects/<number>/locations/global/
+# workloadIdentityPools/github/providers/github) and DEV_DEPLOY_SA (the service account's email) are
+# set. None of them is a secret. The functions' secret (ANTHROPIC_COACH_KEY) lives in the dev
+# project's Secret Manager; a deploy fails until it is set there.
+on:
+  push:
+    branches: [develop]
+    paths:
+      - 'functions/**'
+      - 'firestore.rules'
+      - 'firestore.indexes.json'
+      - 'storage.rules'
+      - 'firebase.json'
+      - '.github/workflows/dev-backend.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # Workload Identity Federation
+
+# One deploy at a time; a newer push waits rather than cancelling one halfway.
+concurrency:
+  group: dev-backend
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to the dev project
+    if: ${{ vars.DEV_BACKEND == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PROJECT: ${{ vars.DEV_FIREBASE_PROJECT }}
+    steps:
+      - name: Only ever the dev project, only from develop
+        run: |
+          if [ -z "$PROJECT" ] || [ "$PROJECT" = "revision-buddy-3a398" ]; then
+            echo "::error::DEV_FIREBASE_PROJECT must name the dev project, never production (it is '${PROJECT:-unset}')."
+            exit 1
+          fi
+          if [ "$GITHUB_REF" != "refs/heads/develop" ]; then
+            echo "::error::Deploys come from develop only (this is $GITHUB_REF)."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - run: npm ci --prefix functions
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.DEV_WIF_PROVIDER }}
+          service_account: ${{ vars.DEV_DEPLOY_SA }}
+
+      # The firebase-tools the scenario suite pins (tests/scenarios/package.json).
+      - name: firebase deploy
+        run: |
+          VERSION=$(node -p "require('./tests/scenarios/package.json').devDependencies['firebase-tools'] || require('./tests/scenarios/package.json').dependencies['firebase-tools']")
+          npx -y "firebase-tools@$VERSION" deploy --only firestore,storage,functions \
+            --project "$PROJECT" --non-interactive --force
+          echo "::notice title=Dev backend::Deployed $(git rev-parse --short HEAD) to $PROJECT."

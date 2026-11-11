@@ -4,7 +4,7 @@
 
 import { Platform } from 'react-native';
 import { logger } from '../logger';
-import { WIDGET_APP_GROUP, WIDGET_SNAPSHOT_KEY, type WidgetSnapshot } from './snapshot';
+import { WIDGET_SNAPSHOT_KEY, widgetAppGroup, type WidgetSnapshot } from './snapshot';
 
 export interface WidgetStore {
   set(key: string, value: string): void;
@@ -17,7 +17,7 @@ function nativeStore(): WidgetStore | null {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { ExtensionStorage } = require('@bacons/apple-targets') as typeof import('@bacons/apple-targets');
-    const storage = new ExtensionStorage(WIDGET_APP_GROUP);
+    const storage = new ExtensionStorage(widgetAppGroup());
     return {
       set: (key, value) => storage.set(key, value),
       reload: () => ExtensionStorage.reloadWidget(),

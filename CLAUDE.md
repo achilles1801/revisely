@@ -67,9 +67,78 @@ file is the release mechanics and the traps behind them.
   and `preview.yml` treats a fingerprint with that tag (or an EAS build, i.e. build 11 and earlier) as built.
 - Never run `eas update` or `eas build` from a laptop to ship. Everything on a phone should trace to a
   commit on `develop` (TestFlight) or `main` (App Store, promoted).
-- Pushes that touch only docs, tests, `functions/`, `scripts/`, `worker/`, `wrangler.jsonc`, workflows,
+- Pushes that touch only docs, tests, `functions/`, `scripts/`, `worker/`, `wrangler*.jsonc`, workflows,
   Firestore rules or `.md` files publish nothing (`paths-ignore` in both workflows). Firebase rules and functions still deploy by hand
   (`firebase deploy`, see README).
+
+## Dev stack (Revisely Dev, the dev backend, dev.revisely.app)
+
+Majd's plan of Nov 11 2026 (`~/Documents/revisely-dev-stack/PLAN.md`): testing runs on an app and a backend
+of its own, never on production data. What's below is in the repository; the clicks in PLAN §3 (App Store
+Connect, Play, the Firebase project, Cloudflare, Workload Identity) are Majd's, and each switch stays off
+until its part is set up.
+- **Revisely Dev** (`APP_VARIANT=dev` in app.config.js): bundle id and package
+  `com.revisionbuddy.app.dev`, name "Revisely Dev", the amber icon (`assets/dev/`), scheme
+  `revisely-dev`, App Group `group.com.revisionbuddy.app.dev`, widget `com.revisionbuddy.app.dev.widget`.
+  It installs beside the store app.
+  - **Production's fingerprints don't move.** Without APP_VARIANT every value resolves as the store
+    app's, and the fingerprint hashes the resolved config (and the plugins it loads), not the file.
+    Check both fingerprints before and after any change to app.config.js (Nov 11 2026: iOS
+    `2df7a2f0…`, Android `8876d062…`, unchanged by the variant). A dev-only value or plugin goes behind
+    `DEV`: a plugin required for every variant is loaded for the store app too and moves its hash.
+  - `plugins/withDevVariant` (dev only) points the widget's App Group and `revisely://` links at
+    Revisely Dev's, in the copy the build works on (changing the Swift in `targets/` would move
+    production's fingerprints). `APP_VARIANT=dev npx expo prebuild` on a laptop rewrites the tracked
+    files: `git checkout targets/`. The lasting fix (the widget works both out from its bundle id) rides
+    the next native release.
+  - In the app (`lib/variant`):
+    - it keeps its own `dev` channel, never preview or production, tester or not;
+    - it never shows the store sheets;
+    - it shows App info and Check for updates to everyone;
+    - it calls The Clear Quran through dev.revisely.app (`extra.apiBase`);
+    - it reports to Sentry as environment `dev`, under `com.revisionbuddy.app.dev@…`. The crash-free
+      gate, alerts, health issues, daily report and metrics console read production and preview only.
+  - EAS: build profile `dev` (channel `dev`, environment `development`, APP_VARIANT=dev); submit profile
+    `dev` (the Revisely Dev app in App Store Connect, whose id replaces the placeholder in eas.json, and
+    Play internal testing). The EAS `development` environment holds the dev project's config
+    (`FIREBASE_*`, Google client ids, `API_BASE=https://dev.revisely.app`, the Sentry DSN). `production`
+    is untouched.
+- **Updates and builds:** with the repository variable `DEV_APP` = `true`, Preview publishes each tested
+  develop commit to `preview` first, then the same commit to `dev` (`dev-update`).
+  - Revisely Dev's runtimes are its own (tags `ios-dev-fp/<hash>`, `android-dev-fp/<hash>`), and a
+    missing one builds (`ios-build.yml` / `android-build.yml` with `variant: dev`; EAS Build by hand has
+    a variant choice too).
+  - Android builds there only once `DEV_ANDROID_SUBMIT` is on. Before that, the first bundle goes to
+    Play Console by hand: EAS Build, variant dev, submit off, then upload the .aab.
+  - Nothing on the dev side stops preview: its fingerprint step can fail without failing the job, and
+    preview's update never waits for it. Promote reads only the preview branch.
+  - Each native change now builds twice (store and Dev).
+  - Secrets: `GOOGLE_SERVICE_INFO_PLIST_DEV` and `GOOGLE_SERVICES_JSON_DEV` (base64, as the store app's).
+- **The dev backend:** Firebase project `revisely-dev` (Blaze, a $10 budget alert), the same rules and
+  functions as production.
+  - **Deploys:** `dev-backend.yml` deploys rules, indexes, Storage rules and every function on each
+    develop push that changes them. Majd's standing OK covers dev only.
+    - It runs keyless: GitHub OIDC through Workload Identity, develop of this repository only.
+    - Its variables are `DEV_BACKEND`, `DEV_FIREBASE_PROJECT`, `DEV_WIF_PROVIDER` and `DEV_DEPLOY_SA`.
+    - It refuses the production project. Production deploys stay by hand.
+  - **Revo** has its own key there (a "revisely-dev" Anthropic workspace with a $10 monthly limit) and a
+    `config/coach` cap of $10.
+  - **Scripts** reach dev with `GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-dev-admin.json`.
+  - **Dev starts empty.** Sign in with any account; `set-preview-tester.js` makes it a tester, and Load
+    test scenario fills it.
+  - **Mushaf pages** come from production's public bucket (public, immutable files, nobody's data).
+- **dev.revisely.app:** the Worker `revisely-dev` (`wrangler.dev.jsonc`), the same code as revisely.app.
+  - Workers Builds deploys it from develop (non-production branch builds off), so its config is in both
+    main and develop. Worker changes go to main as always.
+  - `NOINDEX`: every answer carries `X-Robots-Tag: noindex, nofollow`, and `/robots.txt` disallows
+    everything.
+  - Its API accepts only the dev project's sign-ins.
+  - The Clear Quran uses its own live key, 30 requests a day: with revisely.app's 300, that stays under the
+    plan's 10,000 a month. Set it with
+    `npx wrangler@4.153.0 secret put TCQ_API_KEY_LIVE --config wrangler.dev.jsonc`.
+  - Its config is left out like `wrangler.jsonc` (app hash, paths-ignore, E2E, claude-fix).
+- **The laptop's `.env`** stays on production until the orchestrator says otherwise: the store previews are
+  filmed with it.
 
 ## How updates reach phones
 
@@ -209,7 +278,8 @@ Non-testers follow `production`, so nobody sees this on a phone before Promote; 
   `…+<build>.u<first 8 of the update group>` for an update; environment = the update channel
   (`production`, `preview`); tags `update_id`, `update_group`, `channel`, `runtime`, `build`. No IP
   addresses (`sendDefaultPii` off); events carry only the pseudonymous account id.
-- **Only installed builds report**: a real device on the `production` or `preview` channel, outside
+- **Only installed builds report**: a real device on the `production`, `preview` or `dev` (Revisely Dev,
+  environment `dev`, read by none of the scripts below) channel, outside
   `__DEV__` (`sentryReports()` in `src/lib/releaseInfo.ts`). Development, simulators (screenshots,
   Maestro) and dev clients start Sentry without a DSN, so the native crash reporter stays off too:
   `enabled: false` alone still starts it, and native crashes never pass through `beforeSend`. The
@@ -1201,6 +1271,8 @@ before production can be applied for.
   `r` typed twice outside a text field reloads a dev build.
 
 ## Worker (revisely.app/api)
+
+(dev.revisely.app is a second Worker with the same code, `wrangler.dev.jsonc`: see "Dev stack".)
 
 `wrangler.jsonc` + `worker/`: the Cloudflare Worker that serves `docs/` at revisely.app also runs
 `/api/*` (nothing else reaches the code). `GET /api/tcq/windows/<surah>:<verse>` answers the block

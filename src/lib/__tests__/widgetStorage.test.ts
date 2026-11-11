@@ -75,6 +75,9 @@ describe('writeWidgetSnapshot', () => {
 describe('parseWidgetLink', () => {
   it('the three links the widgets open', () => {
     expect(parseWidgetLink('revisely://today')).toEqual({ kind: 'today' });
+    // Revisely Dev's widgets (plugins/withDevVariant).
+    expect(parseWidgetLink('revisely-dev://read?page=12')).toEqual({ kind: 'read', page: 12 });
+    expect(parseWidgetLink('revisely-other://today')).toBeNull();
     expect(parseWidgetLink('revisely://home/')).toEqual({ kind: 'home' });
     expect(parseWidgetLink('revisely://read?page=574')).toEqual({ kind: 'read', page: 574 });
   });
