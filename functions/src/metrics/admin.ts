@@ -21,6 +21,14 @@ export class AdminError extends Error {
 
 export interface Caller { uid: string; token?: Record<string, unknown> }
 
+/** The console's own domain: a Firebase Hosting custom domain of the project (admin/). */
+export const CONSOLE_DOMAIN = 'metrics.revisely.app';
+
+/** The pages that may call adminMetrics and adminRevo: the project's two Hosting domains and its own. */
+export function consoleOrigins(project: string): string[] {
+  return [`https://${project}.web.app`, `https://${project}.firebaseapp.com`, `https://${CONSOLE_DOMAIN}`];
+}
+
 /** The caller, if their ID token carries the admin claim. */
 export function requireAdmin(auth: Caller | undefined): string {
   if (!auth?.uid) throw new AdminError('unauthenticated', 'Sign in first.');

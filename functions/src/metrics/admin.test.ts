@@ -7,6 +7,7 @@ import {
   TotalsStore,
   checkTotalsCaller,
   clearMetricsCache,
+  consoleOrigins,
   handleAdminMetrics,
   handleAdminRevo,
   handleMetricsTotals,
@@ -48,6 +49,14 @@ describe('who may use the console', () => {
     expect(() => requireAdmin({ uid: USER })).toThrow('This account is not an admin.');
     expect(() => requireAdmin({ uid: USER, token: { admin: 'true' } })).toThrow(AdminError);
     expect(requireAdmin(admin)).toBe(OWNER);
+  });
+
+  it('answers the console on its Hosting domains and on metrics.revisely.app, nowhere else', () => {
+    expect(consoleOrigins('revision-buddy-3a398')).toEqual([
+      'https://revision-buddy-3a398.web.app',
+      'https://revision-buddy-3a398.firebaseapp.com',
+      'https://metrics.revisely.app',
+    ]);
   });
 });
 
