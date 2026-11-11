@@ -256,7 +256,7 @@ jobs:
               # Our functions and the emulators' setup: the flows call the functions emulator.
               .maestro/*|.github/workflows/e2e.yml|firestore.rules|storage.rules|firebase.json|functions/*|scripts/emulators.sh) app=true ;;
               docs/*|tests/*|worker/*|store/*|scripts/*|.github/*) ;;
-              *.md|firestore.indexes.json|wrangler.jsonc) ;;
+              *.md|firestore.indexes.json|wrangler*.jsonc) ;;
               *) app=true ;;
             esac
             if [ "$app" = true ]; then echo "Goes into the app or the flows: $f"; break; fi
