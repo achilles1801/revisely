@@ -33,7 +33,17 @@ def fetch(i):
     if (OUT / f'{name}.rows.pkl').exists():
         return name, 'done before'
     tmp = OUT / f'{name}.parquet.part'
-    subprocess.run(['curl', '-sSL', '--retry', '5', '-C', '-', '-o', str(tmp), URL.format(i)], check=True)
+    # HTTP/1.1, resumed and retried: with 40 downloads at once Hugging Face reset HTTP/2 streams (curl 92) on 7 of
+    # the first 17 files (Nov 11 2026)
+    for k in range(4):
+        r = subprocess.run(['curl', '-sSL', '--http1.1', '--retry', '5', '--retry-all-errors', '-C', '-', '-o', str(tmp),
+                            URL.format(i)])
+        if r.returncode == 0:
+            break
+        import time
+        time.sleep(10 * (k + 1))
+    else:
+        raise RuntimeError(f'{name}: download failed (curl {r.returncode})')
     pf = pq.ParquetFile(tmp)
     chunks, rows, off = [], [], 0
     for b in pf.iter_batches(batch_size=50):

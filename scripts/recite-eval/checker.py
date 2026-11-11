@@ -65,6 +65,9 @@ DEFAULTS = {
     'extra_min': 0.35,  # a filler shorter than this (seconds) is not reported as an extra word
     'basmala_max': 8.0,  # a filler up to this long (seconds) before a surah's first word is its basmala
     'basmala_fill': -0.1,  # per frame in that filler (other fillers: 'fill')
+    'trail_extra': 0.35,  # speech this long (seconds) after the passage's last word is an extra word, unless it is
+                          # the next ayah carried on into or a closing (صَدَقَ ٱللَّهُ ٱلْعَظِيمُ); None: never reported
+    'trail_fit': 1.0,   # nats a frame within which the speech fits the next ayah or a closing
     'lead_fill': -0.5,  # before a passage that opens a surah: as 'edge' (any cheaper and the lead ate the first
                         # word of professionals reciting a long isti'adha: Abdul Basit, Sudais)
     'delay': 1.0,       # (offline) seconds after a word ends that a live checker would decide it
@@ -670,8 +673,44 @@ def _starts_surah(app_word):
     return a == 1 and p == 0
 
 
-def decide(key_words, g, lp, path, P, vocab=None, toks=None):
-    """Statuses, flags and extras from the best path."""
+CLOSINGS = ['صَدَقَ ٱللَّهُ ٱلْعَظِيمُ']
+
+
+def prefix_fit(lp, labels):
+    """How far below the free best the frames lp fit any start of labels (a CTC best path that may stop part way):
+    nats a frame, 0 for a perfect fit."""
+    T = lp.shape[0]
+    if T == 0 or not labels:
+        return 99.0
+    L = len(labels); S = 2 * L + 1
+    ext = np.zeros(S, np.int64); ext[1::2] = labels
+    skip = np.zeros(S, bool)
+    if L > 1:
+        skip[3::2] = np.array(labels[1:]) != np.array(labels[:-1])
+    d = np.full(S, -1e30); d[0] = lp[0, 0]; d[1] = lp[0, ext[1]]
+    for t in range(1, T):
+        n = d.copy()
+        n[1:] = np.maximum(n[1:], d[:-1])
+        n[2:] = np.where(skip[2:], np.maximum(n[2:], d[:-2]), n[2:])
+        d = n + lp[t, ext]
+    return float((lp.max(axis=1).sum() - d.max()) / T)
+
+
+def trail_refs(lo_next, n=4):
+    """Labels the speech after a passage may be without being an extra word: the next words, and each closing."""
+    refs = []
+    try:
+        nxt = KEY.passage(lo_next, lo_next + n)
+        refs.append([l for k in nxt for l in k['forms'][0]['labels']])
+    except Exception:
+        pass
+    for c in CLOSINGS:
+        refs.append(KEY._labels(''.join(KEY.phonetize(c.split(' '))))['labels'])
+    return refs
+
+
+def decide(key_words, g, lp, path, P, vocab=None, toks=None, refs=None):
+    """Statuses, flags and extras from the best path. refs: trail_refs() of the passage, for P['trail_extra']."""
     W = g.W
     nonblank_best = lp[:, 1:].max(axis=1)
     visits = [[] for _ in range(W)]  # per word: each visit's frames, whether it left normally, sound scores
@@ -758,6 +797,10 @@ def decide(key_words, g, lp, path, P, vocab=None, toks=None):
     replaced = set()
     extras = []
     for gi, a, b in fillers:
+        if gi == W and P.get('trail_extra') and (b - a) / FPS >= P['trail_extra'] and refs is not None:
+            if min((prefix_fit(lp[a:b], r) for r in refs), default=99.0) > P.get('trail_fit', 1.0):
+                extras.append({'after': key_words[W - 1]['word'], 't': b / FPS + P['delay'], 'trail': True})
+            continue
         if gi == 0 or gi == W:
             continue
         dur = (b - a) / FPS
@@ -847,7 +890,8 @@ def run_item(item_path, run, name, P, ear_name='hisn'):
     g = Graph(kws)
     t0 = time.perf_counter()
     path, score = viterbi(lp, g, P)
-    statuses, flagged, shown, decided, extras, visits, fillers = decide(kws, g, lp, path, P, EAR.vocab)
+    refs = trail_refs(stop_at) if P.get('trail_extra') else None
+    statuses, flagged, shown, decided, extras, visits, fillers = decide(kws, g, lp, path, P, EAR.vocab, refs=refs)
     for w in range(lo, hi):
         statuses.setdefault(w, 'pending')
     res = {
@@ -956,7 +1000,8 @@ def run_item_live(item_path, run, name, P, ear_name='hisn'):
     live_s = time.perf_counter() - t0
     path, score = dec.traceback(final=True)
     PF = dict(P, delay=look + P['commit'])
-    statuses, fl, _, _, extras, visits, fillers = decide(kws, g, lp, path, PF, EAR.vocab, toks)
+    refs = trail_refs(stop_at) if P.get('trail_extra') else None
+    statuses, fl, _, _, extras, visits, fillers = decide(kws, g, lp, path, PF, EAR.vocab, toks, refs=refs)
     late = 0
     for aw, x in fl.items():  # flags only the end of the recording showed
         if aw not in flag_t:
