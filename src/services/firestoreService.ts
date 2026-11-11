@@ -179,15 +179,20 @@ export function isInitializingPages(uid: string | undefined | null): boolean {
 /**
  * Initialize all 604 page documents with default values, in batches under
  * Firestore's 500-op limit. The batches are committed together, not one after
- * the other's acknowledgement: each commit puts its pages in the phone's view at
- * once, and a slow server ack (about 100 s on a CI simulator) kept pages
- * 451–604 off the phone that long, so onboarding couldn't count or save a juz
- * from them (ONBOARD-1). Firestore applies the batches in the order they were made.
+ * the other's acknowledgement (a slow server ack, about 100 s on a CI simulator,
+ * kept pages 451–604 back that long; ONBOARD-1). Firestore applies the batches in
+ * the order they were made.
+ *
+ * The account's pages listener waits meanwhile and reads the pages once they are
+ * all on the server: listening, each page went through it three times (written,
+ * confirmed, sent back), and sign-up froze the phone for about 5 s (Nov 10 2026).
+ * Onboarding counts a marked juz before its pages arrive (ONBOARD-1).
  */
 export async function initializeAllPages(userId: string): Promise<void> {
   const BATCH_SIZE = 450;
   const now = Timestamp.now();
   initializingPages.add(userId);
+  const resumePages = pauseAccountListeners(userId, ['pages']);
   try {
     const commits: Promise<void>[] = [];
     for (let batchStart = 1; batchStart <= TOTAL_QURAN_PAGES; batchStart += BATCH_SIZE) {
@@ -201,6 +206,7 @@ export async function initializeAllPages(userId: string): Promise<void> {
     await Promise.all(commits);
   } finally {
     initializingPages.delete(userId);
+    resumePages();
   }
 }
 
@@ -292,6 +298,78 @@ export async function updateUser(updates: UpdateUserInput, userId?: string): Pro
   await applyUserFields(userUpdateFields(updates), userId);
 }
 
+// ============================================================================
+// LISTENERS ON AN ACCOUNT
+// ============================================================================
+
+// The app's listeners on an account (its user document, pages and sessions) go
+// through here, so they can stand still while a lot of the account changes at
+// once. Every change a listener hears costs the phone's JavaScript, and Firestore
+// is slow at it on Hermes: deleting an account streamed its hundreds of removals
+// into the listeners and froze the app for about 20 s on a fast Mac before
+// "Account deleted" (two or three times that on an older phone, past the 30 s the
+// app waits for the server), and sign-up's 604 pages froze it for about 5 s
+// (Nov 10 2026). A paused listener is unsubscribed from Firestore, and subscribed
+// again on resume, which reads the documents afresh.
+
+export type AccountListenerKind = 'user' | 'pages' | 'sessions';
+const LISTENER_KINDS: AccountListenerKind[] = ['user', 'pages', 'sessions'];
+
+interface AccountListener {
+  uid: string;
+  kind: AccountListenerKind;
+  start: () => Unsubscribe;
+  /** Firestore's unsubscribe while listening; null while paused. */
+  stop: Unsubscribe | null;
+}
+
+const accountListeners = new Set<AccountListener>();
+// How many pauses hold each `uid/kind`: a listener runs only when none do.
+const listenerPauses = new Map<string, number>();
+const pauseKey = (uid: string, kind: AccountListenerKind) => `${uid}/${kind}`;
+const isListenerPaused = (uid: string, kind: AccountListenerKind) => (listenerPauses.get(pauseKey(uid, kind)) ?? 0) > 0;
+
+function listenToAccount(uid: string, kind: AccountListenerKind, start: () => Unsubscribe): Unsubscribe {
+  const entry: AccountListener = { uid, kind, start, stop: null };
+  if (!isListenerPaused(uid, kind)) entry.stop = start();
+  accountListeners.add(entry);
+  return () => {
+    accountListeners.delete(entry);
+    const stop = entry.stop;
+    entry.stop = null;
+    stop?.();
+  };
+}
+
+/**
+ * Stops `uid`'s listeners (all, or those of `kinds`) until the returned resume is
+ * called. Listeners subscribed meanwhile wait too. Pauses nest: a listener starts
+ * again once every pause that holds it has resumed. Resuming twice does nothing.
+ */
+export function pauseAccountListeners(uid: string, kinds: AccountListenerKind[] = LISTENER_KINDS): () => void {
+  for (const kind of kinds) listenerPauses.set(pauseKey(uid, kind), (listenerPauses.get(pauseKey(uid, kind)) ?? 0) + 1);
+  for (const entry of accountListeners) {
+    if (entry.uid !== uid || !kinds.includes(entry.kind) || !entry.stop) continue;
+    const stop = entry.stop;
+    entry.stop = null;
+    stop();
+  }
+  let resumed = false;
+  return () => {
+    if (resumed) return;
+    resumed = true;
+    for (const kind of kinds) {
+      const n = (listenerPauses.get(pauseKey(uid, kind)) ?? 1) - 1;
+      if (n > 0) listenerPauses.set(pauseKey(uid, kind), n);
+      else listenerPauses.delete(pauseKey(uid, kind));
+    }
+    for (const entry of accountListeners) {
+      if (entry.uid !== uid || entry.stop || isListenerPaused(uid, entry.kind)) continue;
+      entry.stop = entry.start();
+    }
+  };
+}
+
 /**
  * The user document as it changes. `fromCache` snapshots (the SDK's memory:
  * offline, or not yet heard from the server) come too, with metadata changes,
@@ -302,18 +380,21 @@ export function subscribeToUser(
   userId?: string,
   onError?: (error: unknown) => void,
 ): Unsubscribe {
-  return onSnapshot(
-    getUserRef(userId),
-    { includeMetadataChanges: true },
-    (snapshot) => {
-      callback(snapshot.exists() ? (snapshot.data() as FirestoreUser) : null, {
-        fromCache: snapshot.metadata.fromCache,
-      });
-    },
-    (error) => {
-      logger.error('subscribeToUser failed', error);
-      onError?.(error);
-    },
+  const ref = getUserRef(userId);
+  return listenToAccount(ref.id, 'user', () =>
+    onSnapshot(
+      ref,
+      { includeMetadataChanges: true },
+      (snapshot) => {
+        callback(snapshot.exists() ? (snapshot.data() as FirestoreUser) : null, {
+          fromCache: snapshot.metadata.fromCache,
+        });
+      },
+      (error) => {
+        logger.error('subscribeToUser failed', error);
+        onError?.(error);
+      },
+    ),
   );
 }
 
@@ -355,6 +436,13 @@ function onQuerySnapshot<T>(
     },
     onError,
   );
+}
+
+/** The uid of `users/<uid>/…`, from a collection under the user document. */
+function accountOf(collectionRef: { parent: DocumentReference | null }): string {
+  const parent = collectionRef.parent;
+  if (!parent) throw new Error('Not a collection of an account');
+  return parent.id;
 }
 
 // ============================================================================
@@ -445,11 +533,14 @@ export function subscribeToPages(
   userId?: string,
   onError?: (error: unknown) => void,
 ): Unsubscribe {
-  const q = query(getPagesCollectionRef(userId), orderBy('pageNumber', 'asc'));
-  return onQuerySnapshot<FirestorePage>(q, callback, (error) => {
-    logger.error('subscribeToPages failed', error);
-    onError?.(error);
-  });
+  const pages = getPagesCollectionRef(userId);
+  const q = query(pages, orderBy('pageNumber', 'asc'));
+  return listenToAccount(accountOf(pages), 'pages', () =>
+    onQuerySnapshot<FirestorePage>(q, callback, (error) => {
+      logger.error('subscribeToPages failed', error);
+      onError?.(error);
+    }),
+  );
 }
 
 /** Whether the user has any page documents, asked of the server (not the local cache). */
@@ -537,11 +628,14 @@ export function subscribeToSessions(
   limitCount = 100,
   onError?: (error: unknown) => void,
 ): Unsubscribe {
-  const q = query(getSessionsCollectionRef(userId), orderBy('date', 'desc'), limit(limitCount));
-  return onQuerySnapshot<FirestoreSession>(q, callback, (error) => {
-    logger.error('subscribeToSessions failed', error);
-    onError?.(error);
-  });
+  const sessions = getSessionsCollectionRef(userId);
+  const q = query(sessions, orderBy('date', 'desc'), limit(limitCount));
+  return listenToAccount(accountOf(sessions), 'sessions', () =>
+    onQuerySnapshot<FirestoreSession>(q, callback, (error) => {
+      logger.error('subscribeToSessions failed', error);
+      onError?.(error);
+    }),
+  );
 }
 
 /**
@@ -1152,6 +1246,10 @@ export async function deleteAccount(): Promise<void> {
   const user = auth.currentUser;
   if (!user) throw new Error('No signed-in user.');
   deletingUid = user.uid;
+  // Nothing listens to the account while the server deletes it: its removals
+  // streamed into the listeners froze the phone for longer than the server took
+  // (ACCOUNT-3). Deleted, the listeners go with the sign-out; not, they start again.
+  const resumeListeners = pauseAccountListeners(user.uid);
   try {
     await callFunction(user, 'deleteUserAccount', {}, { timeoutMs: DELETE_ACCOUNT_TIMEOUT_MS });
   } catch (err) {
@@ -1159,6 +1257,7 @@ export async function deleteAccount(): Promise<void> {
     // after it had. The account is gone when Auth no longer knows it.
     if (await accountGone(user)) return;
     deletingUid = null;
+    resumeListeners();
     if (isDeadlineError(err)) {
       throw Object.assign(
         new Error("The server didn't answer in time, so your account may not be deleted. Check your connection and try again."),
@@ -1213,9 +1312,27 @@ export interface TesterResetResult {
 export async function resetMyDataOnServer(): Promise<TesterResetResult> {
   const user = auth.currentUser;
   if (!user) throw new Error('No signed-in user.');
-  const out = (await callFunction(user, 'resetMyData', { confirm: 'RESET' })) as { result?: TesterResetResult } | null;
+  const out = (await whileServerRewrites(user.uid, () =>
+    callFunction(user, 'resetMyData', { confirm: 'RESET' }),
+  )) as { result?: TesterResetResult } | null;
   if (!out?.result?.ok) throw new Error('The reset did not answer as expected.');
   return out.result;
+}
+
+/**
+ * `call`, a server function that rewrites the whole account (Reset my data, Load
+ * test scenario), with the account's listeners paused: its changes don't stream
+ * into the phone one by one, as account deletion's did (ACCOUNT-3). Once the
+ * server answers, refused or not, they start again and read the account afresh,
+ * which is how the phone sees the reset (lib/offline/reset).
+ */
+async function whileServerRewrites<T>(uid: string, call: () => Promise<T>): Promise<T> {
+  const resumeListeners = pauseAccountListeners(uid);
+  try {
+    return await call();
+  } finally {
+    resumeListeners();
+  }
 }
 
 /** What loadTestScenario answers (functions/src/testScenarios.ts). */
@@ -1240,7 +1357,9 @@ export async function loadTestScenarioOnServer(data: {
 }): Promise<TestScenarioResult> {
   const user = auth.currentUser;
   if (!user) throw new Error('No signed-in user.');
-  const out = (await callFunction(user, 'loadTestScenario', { confirm: 'RESET', ...data })) as {
+  const out = (await whileServerRewrites(user.uid, () =>
+    callFunction(user, 'loadTestScenario', { confirm: 'RESET', ...data }),
+  )) as {
     result?: TestScenarioResult;
   } | null;
   if (!out?.result?.ok) throw new Error('The scenario did not answer as expected.');

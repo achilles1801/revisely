@@ -7,6 +7,7 @@ import { setNow, setZone, ZONES } from '../harness/clock';
 import { newAccount, onboard, pagesRange } from '../harness/account';
 import { markPreviewTester, watchFunction } from '../harness/admin';
 import { Home, homeStack } from '../harness/screens';
+import { trackingListeners, type ListenerTracker } from '../harness/listeners';
 import { Phone } from '../harness/phone';
 
 type TesterReset = typeof import('../../../src/lib/testerReset');
@@ -99,4 +100,48 @@ it('[RESET-2] an account that is not a tester is refused, and keeps everything',
   } finally {
     server.restore();
   }
+});
+
+// The server rewrites the whole account; the phone took in its changes one by one
+// through the listeners, as account deletion did (ACCOUNT-3). It now listens again
+// once the server has answered and reads the account afresh.
+it('[RESET-2] nothing on the phone listens to the account while the server resets it; then it listens again and shows the reset', async () => {
+  setZone(ZONES.amman);
+  setNow('2026-11-02 20:00');
+  const phone = new Phone('phone');
+  let app = await newAccount(phone, { memorized: pagesRange(1, 20), user: { dailyPageCapacity: 5 } });
+  const uid = app.uid;
+  await app.untilSynced();
+  await app.close();
+  await markPreviewTester(uid);
+  let listeners!: ListenerTracker;
+  app = await phone.open(trackingListeners((t) => (listeners = t)));
+  await app.until(() => app.app.user?.previewTester === true, 'the account to be a tester');
+  const listening = [`users/${uid}`, `users/${uid}/pages`, `users/${uid}/sessions`];
+  expect(listeners.onAccount(uid)).toEqual(expect.arrayContaining(listening));
+
+  // What listens to the account as the request to reset it leaves the phone.
+  const routed = global.fetch;
+  let listeningAtReset: string[] | null = null;
+  global.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+    if (url.endsWith('/resetMyData')) listeningAtReset = listeners.onAccount(uid);
+    return routed(input, init);
+  }) as typeof fetch;
+  try {
+    const { resetMyData } = app.mods.require<TesterReset>('src/lib/testerReset');
+    await app.act(async () => {
+      await withAuthRetry(() => resetMyData());
+    });
+  } finally {
+    global.fetch = routed;
+  }
+
+  expect(listeningAtReset).toEqual([]);
+  expect(listeners.onAccount(uid)).toEqual(expect.arrayContaining(listening));
+  await app.until(
+    () => !app.app.onboardingComplete && app.app.pages.length === 604 && app.app.pages.every((p) => p.status !== 'memorized'),
+    'the phone to show the reset account',
+  );
+  await app.close();
 });

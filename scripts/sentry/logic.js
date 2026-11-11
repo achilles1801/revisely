@@ -258,6 +258,8 @@ function updateHealth(releases, updateGroup) {
 
 /**
  * The promotion bar from the environment (MIN_SESSIONS, MIN_CRASH_FREE; empty = the default).
+ * No minimum of sessions by default (the owner, Nov 10 2026: "remove the … session thing from
+ * deploying to prod"); the sessions there are must still be crash-free enough.
  * Anything that isn't a number in range throws: a typo must not wave an update through.
  */
 function parseBar(env = {}) {
@@ -268,7 +270,7 @@ function parseBar(env = {}) {
     if (!Number.isFinite(n) || n < lo || n > hi) throw new Error(`${name}=${JSON.stringify(String(raw))} must be a number from ${lo} to ${hi}.`);
     return n;
   };
-  return { minSessions: num('MIN_SESSIONS', 5, 0, 1e6), minCrashFree: num('MIN_CRASH_FREE', 0.99, 0, 1) };
+  return { minSessions: num('MIN_SESSIONS', 0, 0, 1e6), minCrashFree: num('MIN_CRASH_FREE', 0.99, 0, 1) };
 }
 
 /** Whether an update may be promoted: enough sessions on preview, and crash-free at or above the bar. */
@@ -280,7 +282,7 @@ function gate(health, { minSessions, minCrashFree }) {
     return { ok: false, reason: `Only ${health.sessions} preview session(s) ran this update; ${minSessions} needed. Use it a little more on a tester's phone (TestFlight, or a Play testing install), or override.` };
   }
   if (health.crashFree == null) {
-    return { ok: true, reason: 'No preview sessions ran this update (the minimum was set to 0).' };
+    return { ok: true, reason: 'No preview sessions ran this update (no minimum is set).' };
   }
   if (health.crashFree < minCrashFree) {
     return { ok: false, reason: `Crash-free sessions ${pct(health.crashFree)} on preview (${health.crashed} crashed of ${health.sessions}); at least ${pct(minCrashFree)} needed.` };

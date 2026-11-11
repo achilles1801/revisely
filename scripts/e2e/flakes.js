@@ -11,6 +11,7 @@
 // --dry-run prints it (and writes it to the job summary) instead of commenting.
 
 const zlib = require('zlib');
+const { githubGet: api } = require('../ci/githubGet');
 
 const LABEL = 'e2e-flakes';
 const TITLE = 'E2E flakes (weekly report)';
@@ -140,20 +141,6 @@ function render({ rows, since, until, jobs, mention = '' }) {
     }
   }
   return out.join('\n') + '\n';
-}
-
-async function api(path, { raw = false } = {}) {
-  const res = await fetch(`https://api.github.com/repos/${process.env.GITHUB_REPOSITORY}${path}`, {
-    headers: {
-      Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
-      Accept: 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28',
-    },
-    redirect: raw ? 'manual' : 'follow',
-  });
-  if (raw) return res;
-  if (!res.ok) throw new Error(`GitHub GET ${path} -> ${res.status} ${(await res.text()).slice(0, 200)}`);
-  return res.json();
 }
 
 /** attempts.json of every E2E job since `since`, from this repository's own branches. */

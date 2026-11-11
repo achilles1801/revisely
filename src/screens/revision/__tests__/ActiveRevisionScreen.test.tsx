@@ -8,6 +8,7 @@ import { BulkActionsModal } from '../../../components/BulkActionsModal';
 import { getCurrentRevisionDay } from '../../../lib/algorithm';
 import { dateToLocalISODay } from '../../../lib/schedulePlans';
 import type { RevisionLog, User, UserPage } from '../../../types';
+import { navigateToActivityDay } from '../../../navigation/navigationRef';
 
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
 jest.mock('react-native-reanimated', () => require('react-native-reanimated/mock'));
@@ -108,11 +109,16 @@ jest.mock('../../../components/recite/usePauseListener', () => ({
 
 // The recorder: the real hook, unless a test gives one (a recording in progress).
 let mockRecorder: Record<string, unknown> | null = null;
+// What the screen gave the hook: how a test says a recording was saved, as the hook does.
+let mockRecorderOpts: { onFinished?: (info: { day: string; recordingId: string }) => void } | null = null;
 jest.mock('../../../hooks/useVoiceRecorder', () => {
   const actual = jest.requireActual('../../../hooks/useVoiceRecorder');
   return {
     ...actual,
-    useVoiceRecorder: (opts: unknown) => mockRecorder ?? actual.useVoiceRecorder(opts),
+    useVoiceRecorder: (opts: typeof mockRecorderOpts) => {
+      mockRecorderOpts = opts;
+      return mockRecorder ?? actual.useVoiceRecorder(opts);
+    },
   };
 });
 function recordingInProgress() {
@@ -426,6 +432,48 @@ describe('ActiveRevisionScreen — reading and the controls', () => {
     render(<ActiveRevisionScreen />);
     fireEvent.press(byTestId('reader-background'));
     expect(byTestId('reader-header').props.accessibilityElementsHidden).toBe(false);
+  });
+});
+
+// SESS-1: a held-up JavaScript thread gets two swipes at once. The pager credits each page they
+// left (MushafPager) before the screen hears of the page between them (E2E 04 on iOS CI, run
+// 42746203992: page 584 went uncounted and the session ended on 9 of 10).
+describe('ActiveRevisionScreen — swipes that arrive together (SESS-1)', () => {
+  it('marks every page they left', () => {
+    setup([331, 332]);
+    render(<ActiveRevisionScreen />);
+    act(() => mockPager.onPageChange?.(333));
+    act(() => {
+      mockPager.onAdvance?.(333, 335);
+      mockPager.onAdvance?.(334, 335);
+      mockPager.onPageChange?.(335);
+    });
+    expect(screen.getAllByText(/4\/10/).length).toBeGreaterThan(0);
+  });
+
+  it('marks nothing at or past the page the pager landed on', () => {
+    setup([331, 332]);
+    render(<ActiveRevisionScreen />);
+    act(() => mockPager.onPageChange?.(333));
+    act(() => {
+      mockPager.onAdvance?.(335, 335);
+      mockPager.onAdvance?.(336, 335);
+    });
+    expect(screen.getAllByText(/2\/10/).length).toBeGreaterThan(0);
+  });
+
+  it('onto the end card: the page before the last and the last, and the session is complete', async () => {
+    setup([331, 332, 333, 334, 335, 336, 337, 338]);
+    render(<ActiveRevisionScreen />);
+    act(() => mockPager.onPageChange?.(339));
+    await act(async () => {
+      mockPager.onAdvance?.(339, 340);
+      mockPager.onReachEnd?.(340, true);
+    });
+    expect(screen.getAllByText(/10\/10/).length).toBeGreaterThan(0);
+    expect(screen.getByText('Revision complete')).toBeTruthy();
+    expect(screen.getByTestId('confetti', { includeHiddenElements: true })).toBeTruthy();
+    expect(mockApp.addLog).toHaveBeenCalledWith(expect.objectContaining({ pagesRevised: [339, 340] }));
   });
 });
 
@@ -1075,5 +1123,16 @@ describe('ActiveRevisionScreen — the recorder in the controls', () => {
     view.rerender(<ActiveRevisionScreen />);
     expect(screen.getByTestId('record-pill-paused')).toBeTruthy();
     expect(screen.getByLabelText('Play from this page')).toBeTruthy();
+  });
+
+  // E2E flow 07 finds the recording through Activity (a note lasts 6 s; .maestro/README.md, Notes).
+  it('a recording ended: "Recording saved · View" opens its day at the recording', async () => {
+    setup([331, 332]);
+    recordingInProgress();
+    render(<ActiveRevisionScreen />);
+    act(() => mockRecorderOpts?.onFinished?.({ day: '2026-11-03', recordingId: 'r1' }));
+    expect(screen.getByText('Recording saved')).toBeTruthy();
+    fireEvent.press(screen.getByText('View'));
+    expect(navigateToActivityDay).toHaveBeenCalledWith('2026-11-03', 'r1');
   });
 });

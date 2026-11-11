@@ -1,5 +1,5 @@
 import React, { createRef } from 'react';
-import { FlatList, StyleSheet } from 'react-native';
+import { Dimensions, FlatList, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { MushafPager, MushafPagerHandle } from '../MushafPager';
 import { ayahRects } from '../../lib/ayahBounds';
@@ -30,6 +30,9 @@ jest.mock('../../lib/quranImages', () => ({
 }));
 
 const PAGES = Array.from({ length: 20 }, (_, i) => i + 1);
+// Each page is the window's width (getItemLayout): a drag's offset says which page it began on.
+const PAGE_WIDTH = Dimensions.get('window').width;
+const dragEvent = (index: number) => ({ nativeEvent: { contentOffset: { x: index * PAGE_WIDTH, y: 0 } } });
 
 function setup(initialPage?: number) {
   const ref = createRef<MushafPagerHandle>();
@@ -55,7 +58,9 @@ function setup(initialPage?: number) {
     });
   // The user starting to drag the pages.
   const drag = () => act(() => list.props.onScrollBeginDrag());
-  return { ref, onPageChange, onAdvance, report, drag };
+  // The same, with the list's offset as the drag began (as the native list sends it).
+  const dragAt = (index: number) => act(() => list.props.onScrollBeginDrag(dragEvent(index)));
+  return { ref, onPageChange, onAdvance, report, drag, dragAt };
 }
 
 describe('<MushafPager /> scrollToPage', () => {
@@ -151,6 +156,71 @@ describe('<MushafPager /> scrollToPage', () => {
     drag();
     report(11); // the user swiped on to page 12 before the jump settled
     expect(onPageChange).toHaveBeenLastCalledWith(12, 11);
+  });
+});
+
+// SESS-1: swiping off a page marks it revised. The JavaScript learns which page is on screen from
+// the list's reports; when its thread is held up, a swipe's events arrive late, and two swipes can
+// reach it before the page between them was ever reported (E2E 04 on iOS CI, run 42746203992: the
+// app wrote nothing for 30 s while the page scrolled, and page 584 went uncounted).
+describe('<MushafPager /> swipes the JavaScript gets late (SESS-1)', () => {
+  it('two swipes that arrive together credit both pages they left, in order', () => {
+    const { onAdvance, onPageChange, report, dragAt } = setup();
+    report(2); // page 3 on screen, as the JavaScript last heard
+    dragAt(2); // swiped off page 3 …
+    dragAt(3); // … and off page 4, before any report of page 4
+    report(4); // the list shows page 5
+    expect(onAdvance.mock.calls).toEqual([
+      [3, 5],
+      [4, 5],
+    ]);
+    expect(onPageChange).toHaveBeenLastCalledWith(5, 4);
+  });
+
+  it('a drag credits the page under the finger, even when the last report is out of date', () => {
+    const { onAdvance, report, dragAt } = setup();
+    report(2);
+    dragAt(3); // the list had moved on to page 4 without a report reaching the JavaScript
+    report(4);
+    expect(onAdvance.mock.calls).toEqual([[4, 5]]);
+  });
+
+  it('a drag that snapped back and the swipe after it credit the page once', () => {
+    const { onAdvance, report, dragAt } = setup();
+    report(2);
+    dragAt(2); // let go: back to page 3
+    dragAt(2);
+    report(3);
+    expect(onAdvance.mock.calls).toEqual([[3, 4]]);
+  });
+
+  it('a swipe back credits nothing, and leaves nothing behind for the next swipe', () => {
+    const { onAdvance, report, dragAt } = setup();
+    report(5);
+    dragAt(5);
+    report(4); // back to page 5
+    expect(onAdvance).not.toHaveBeenCalled();
+    dragAt(4);
+    report(5);
+    expect(onAdvance.mock.calls).toEqual([[5, 6]]);
+  });
+
+  it('a jump forgets the drags before it', () => {
+    jest.useFakeTimers();
+    try {
+      const { ref, onAdvance, report, dragAt } = setup();
+      report(2);
+      dragAt(2);
+      act(() => {
+        ref.current!.scrollToPage(10);
+      });
+      jest.advanceTimersByTime(600);
+      report(9);
+      report(12);
+      expect(onAdvance).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
 
@@ -385,7 +455,8 @@ describe('<MushafPager /> end card', () => {
         });
       });
     const drag = () => act(() => list.props.onScrollBeginDrag());
-    return { list, onPageChange, onAdvance, onReachEnd, onUserSwipe, report, drag };
+    const dragAt = (index: number) => act(() => list.props.onScrollBeginDrag(dragEvent(index)));
+    return { list, onPageChange, onAdvance, onReachEnd, onUserSwipe, report, drag, dragAt };
   }
 
   beforeEach(() => jest.useFakeTimers());
@@ -409,6 +480,17 @@ describe('<MushafPager /> end card', () => {
     report(19);
     expect(onPageChange).toHaveBeenCalledWith(20, 19);
     expect(onAdvance).not.toHaveBeenCalled();
+  });
+
+  it('two swipes that arrive together onto it credit the page before the last too (SESS-1)', () => {
+    const { onReachEnd, onAdvance, report, dragAt } = setupEnd(19);
+    act(() => jest.runAllTimers());
+    report(18); // page 19 on screen
+    dragAt(18); // off page 19 …
+    dragAt(19); // … and off page 20, the last, before any report of it
+    report(20);
+    expect(onAdvance.mock.calls).toEqual([[19, 20]]);
+    expect(onReachEnd).toHaveBeenCalledWith(20, true);
   });
 
   it('getting there without a swipe from the last page is not a swipe', () => {

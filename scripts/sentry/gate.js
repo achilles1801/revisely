@@ -3,7 +3,8 @@
 // at or above the bar. One update group per platform (iOS and Android have different runtimes, so a
 // push publishes two groups), and every one must pass.
 // Usage: node gate.js [<label>:]<update group> [...]   e.g. gate.js ios:ff76d17c-… android:51b39a90-…
-// Env: MIN_SESSIONS (default 5), MIN_CRASH_FREE (default 0.99), STATS_PERIOD (14d).
+// Env: MIN_SESSIONS (default 0: none needed; the sessions there are must still pass MIN_CRASH_FREE),
+// MIN_CRASH_FREE (default 0.99), STATS_PERIOD (14d).
 // Exit 0: may be promoted. 2: below the bar. 1: couldn't tell (a bad bar, Sentry unreachable).
 // Anything but 0 stops the promotion.
 

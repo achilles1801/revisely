@@ -51,3 +51,34 @@ it('[SESS-1] [SESS-3] two pages swiped, one checked then unchecked: the two are 
   expect(again.app.logs.map((l) => [l.date, l.pagesRevised])).toEqual([['2026-11-02', [1, 2]]]);
   await again.close();
 });
+
+// A phone whose JavaScript is held up (a long job, a slow phone) gets two swipes at once: the list
+// turned both pages natively, and the pager credits each page they left before the screen has heard
+// of the page between (harness/screens swipeTogether). E2E 04 on iOS CI, run 42746203992: page 584
+// went uncounted and the day ended on 9 of 10.
+it('[SESS-1] two swipes that reach the app together mark both pages they left', async () => {
+  const { app, home: h } = await home();
+  const session = await h.startSession();
+  await session.swipe();
+  await session.swipeTogether(2);
+  expect(await session.isChecked()).toBe(false); // page 4, not swiped off yet
+  await session.back();
+  await app.untilSynced();
+  expect(app.app.logs.map((l) => [l.date, l.pagesRevised])).toEqual([['2026-11-02', [1, 2, 3]]]);
+  await app.close();
+});
+
+it('[SESS-1] [SESS-2] the last two swipes reaching the app together onto the end card: the day is done', async () => {
+  const { app, home: h } = await home();
+  const session = await h.startSession();
+  await session.swipeThrough(3);
+  await session.swipeTogether(2);
+  expect(session.endCard()).toMatch(/Revision complete/);
+  // It celebrates, as when the swipes come one at a time: the page before the last counts as done.
+  expect(app.screen.queryByTestId('confetti', { includeHiddenElements: true })).not.toBeNull();
+  await session.back();
+  await app.untilSynced();
+  expect(app.app.logs.map((l) => [l.date, l.pagesRevised])).toEqual([['2026-11-02', [1, 2, 3, 4, 5]]]);
+  expect(h.today()).toMatch(/Done/);
+  await app.close();
+});

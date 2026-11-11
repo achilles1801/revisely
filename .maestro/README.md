@@ -7,6 +7,7 @@ emulators, at a time and in a time zone each flow sets. CI (`ci.yml`) runs them 
 | When | Flows | Jobs |
 | --- | --- | --- |
 | A single PR into `develop` (and claude-fix's runs) | the smoke set: 02, 04, 05, 06 | two Android (02 05, 04 06) |
+| A PR into `develop` that changes code flows share (subflows, scripts, `run.sh`, `e2e.yml`, `ci.yml`) | the flows that use it with the smoke set, or all, each run twice with no reruns | both platforms (TESTING.md, "Changing the tests themselves") |
 | A lower layer of a GitHub stack | none (the top layer tests the stack) | none |
 | The top of a stack into `develop`, a PR into `main`, a merge group | every flow | two iOS, two Android |
 | A push to `develop` (what just landed) | every flow on Android; iOS: the native build alone, kept for PRs | two Android, one iOS |
@@ -69,7 +70,16 @@ retry is a warning on the run, and the job keeps its results as for a failure.
   - Runs of a fork's pull request are left out. A PR that changes the report prints it in its job
     summary instead of commenting; so does a run by hand with `dry_run`. Like every scheduled
     workflow it runs from `main`.
-- **Time limits:** `run.sh` stops a flow's attempt after 15 minutes (20 in e2e.yml's iOS job) and
+- **A clean start:** every attempt starts from empty emulators (`run.sh` deletes the Firestore
+  emulator's documents and the Auth emulator's accounts first), with the app's data wiped
+  (`launch.yaml`), online, and on iOS with no position. A flow makes everything it reads: its account,
+  any config or seed. After three seeded accounts, 10-delete-account's deletion took 30 s on iOS
+  against 3–4 s on an empty emulator (#217's run 42687083053).
+- **Shuffled at night:** the nightly run takes each job's flows in an order seeded by its run id, and
+  prints it. A flow that leans on another having run before it fails there. To run a night's order
+  again: Run workflow with `shuffle` set to that seed (and the same `flows`), or `E2E_SHUFFLE=<seed>`
+  for `run.sh`.
+- **Time limits:** `run.sh` stops a flow's attempt after 20 minutes on iOS and 15 on Android, and
   the warm-up after 6 (`E2E_FLOW_LIMIT`, `E2E_WARMUP_LIMIT`). Maestro can hang for good: once its
   iOS driver answered 500, its JVM never exited, and a job waited 55 minutes for it. iOS flows 09
   and 11 pass in 12 to 14.5 minutes on a busy runner; 11's first attempt in run 42649421053 was
@@ -84,8 +94,19 @@ retry is a warning on the run, and the job keeps its results as for a failure.
   - So a long screen is scrolled by counted swipes: `repeat` while the row isn't visible, `scroll`,
     at most so many times, then `scrollUntilVisible` only to centre it. Every Settings row goes
     through `subflows/settings-row.yaml` (by id) or `subflows/theme.yaml` (Theme has none).
+- **Maestro's iOS driver is installed once:** the warm-up installs it, and each flow uses it
+  (`--no-reinstall-driver`); the attempt after a failure installs it afresh. Before, every flow
+  installed it again with xcodebuild, much of the 35–160 s an iOS flow spent before its first step,
+  and once the simulator refused to launch the fresh install ("Unknown application display
+  identifier"), failing 09-revo-attach before it began (run 42746203992). Maestro still installs it
+  when it isn't running. Android keeps the default (it installs its driver only when missing).
+  `scripts/e2e/__tests__/driver.test.js` runs `run.sh` against a stand-in Maestro.
 - **Caches:** this workflow holds no release secrets, so it keeps `node_modules`, Maestro and the
   Firestore emulator's jar, as it keeps the native builds.
+- **The iOS build, once a run:** the job "E2E (iOS Simulator, the native build)" builds the app (or
+  finds it kept) before the iOS jobs, which each restore it. A PR's run sees only its own caches and its
+  base branch's, so a release PR's first run had none, and each iOS job built its own: 26 of its 90
+  minutes, and two ran out (#496's run 42727081470).
 
 They sit on top of the scenario tests (`tests/scenarios`, `BEHAVIOUR.md`): those run the app's
 providers and screens in Jest; these run the built app, with its native modules, its navigation,
@@ -202,7 +223,9 @@ about a second a job.
   starts.
 - **A status line** at the foot of every screen (`e2e-status`): the app's time, the phone's zone,
   "offline" when the E2E network switch is off, and "net down" while NetInfo sees no connection.
-  Flows read it; failure screenshots show it.
+  Flows read it; failure screenshots show it. Its accessibility label adds "· 3 to send" while the
+  app holds changes it hasn't sent, "· nothing to send" otherwise (`src/lib/e2e/outboxStatus.ts`);
+  the line on screen doesn't show it, so screenshots don't change with it.
 - Every other build drops all of it. Each use is behind `process.env.EXPO_PUBLIC_E2E === '1'`, which
   the bundler inlines (as `undefined` when unset), so the test and the `require` behind it fold away
   in release bundles. Check: `npx expo export --platform ios --clear` without the variable, then
@@ -374,8 +397,26 @@ Things that bit:
 - On Android, text typed into a field as it gains focus can be lost; `subflows/type-in-log.yaml`
   checks the field and types again. Android also writes times as "12:23 pm" and may show dialog
   buttons in capitals: match with `(?i)`.
+- The iOS Simulator's keyboard can stall under load and drop what is typed meanwhile (run
+  42403217365: "Keyboard queue task timeout detected" in `device.log`, the keyboard connection
+  interrupted, 12 s before the first character; the sign-up email went out malformed). A sign-up
+  the app refuses fails in `subflows/signup.yaml` on its own error (`auth-error`), not later as
+  SYNC-4 after a relaunch that clears it.
+- A script that writes the server as its admin (a seed) runs once the app has sent its own changes
+  (`subflows/app-sent.yaml`). The app sends from its outbox, and a change it still held went out
+  after the script's writes and over them: on iOS, run 42414536111, a failed Firestore write stream
+  kept onboarding's three changes on the phone past `seed-activity.js`; they reached the server
+  after the relaunch (onboarding's 10 pages a day over the seed's 20), and the day showed neither
+  "Juz 28" nor "From your session".
 - One-time dialogs come when the app gets there, not at a fixed step (the recording backup notice,
   `subflows/backup-notice.yaml`). Wait for them a little where they belong, and accept them.
+- **Notes:** a flow never taps a note's action ("Saved to today: … · View",
+  "Recording saved · View"). A note lasts 6 s, and the backup notice comes 2 s into the first one.
+  On the iOS runner the steps between seeing it and the tap took 5.5 s (run 42548149857, 13 run 2):
+  Maestro found View as the note went, and the tap landed on the timer button under it, which opened
+  the timer card. 07's View tap never opened Activity on iOS in that run either. A flow takes the way
+  a user finds the thing later (Activity → the day). The action is pressed in a component test
+  (`QuranReaderScreen.test`, `ActiveRevisionScreen.test`).
 - A function's first signed-in call in the emulator is slow on a CI macOS runner: 17–22 s, against
   2–5 s for its later calls (run 42403200017: the app's first `revoSetOptions` 17.5 s, `revoAsk`
   21.9 s). The emulator runs each function in a worker of its own, so each pays it once. A step that
@@ -383,15 +424,47 @@ Things that bit:
   its account, in a way that changes nothing (09-revo: `scripts/server-revo.js`, `MODE=warm`, after
   the account exists). A call without an ID token isn't enough: refused before the token checks and
   Firestore, it starts the worker (1–3 s) and leaves the rest to the app's call. A worker stays up
-  until `functions/` changes.
+  until `functions/` changes. A function that can't run without changing the account runs as a
+  throwaway account (10-delete-account: `scripts/warm-delete.js`).
+- A worker that takes longer to start than the emulator allows gets its request dropped, never
+  answered: the emulator logs "Failed to load function" and the caller waits for good (iOS, run
+  42423019809: the app's `deleteUserAccount`, on a spinner). It allowed 30 s; `scripts/emulators.sh`
+  gives it 120 (`FUNCTIONS_DISCOVERY_TIMEOUT`, which also gives our code 120 s to load at the start,
+  against 10), so a slow start is a late answer, as deployed.
+- The app's internet check waits as long as in a release build (15 s). At 5 s, the Auth emulator's
+  slow answers at a launch read as offline for 3 s (run 42423019809): Home's "Offline" note came and
+  went between Maestro reading the screen and tapping, and the tap landed on the row below.
 
 A failed attempt keeps Maestro's log and screenshots, a screenshot of the device and the app's logs
 in `.maestro/build/results/<platform>/<flow>/`:
 - `app.log` (iOS): the E2E build's own log (`src/lib/e2e/log.ts`). It has every console line the
   JavaScript wrote, including the app logger's, connectivity, the outbox and the root view's layout.
-  An iOS release build passes only `console.error` to the unified log.
+  An iOS release build passes only `console.error` to the unified log. Each press of a `v2/Tap`
+  with a testID is there in stages (`[e2e] tap <id> in`, `out`, `press`; `src/lib/e2e/taps.ts`):
+  a tap the app ignored says whether JavaScript never had the touch or cancelled the press. Every
+  touch that reaches JavaScript on the app's root is there too (`[e2e] touch start|end|cancel`, what
+  it landed on (the nearest testID) and how many touches JavaScript holds as down; a Modal's root
+  isn't covered). Three times on iOS in
+  #328's runs a tap reached the app's window, by `device.log`, and never pressed; the third had no
+  "in" at all. Each stack screen's focus and native transition is there (`[e2e] screen <name>
+  opening|closing start|end`, `focus`, `blur`), and each `v2/Sheet`'s native modal (`[e2e] sheet <id>
+  shown|dismissed|replaced`; `src/lib/e2e/screens.ts`). Twice on iOS (12 and 11, #328's runs) a
+  screen just pushed was drawn but missing from the accessibility tree for 16–25 s; these say
+  whether its push had ended, or a modal (which hides what is under it from that tree) was still
+  up. Since #478 (SHEET-1) a sheet whose modal iOS never reports gone is replaced after 1 s
+  (`replaced`): such a modal stayed over the screen, invisible, and took every touch.
+  Each line has the real time it was written, so a gap is time the JavaScript didn't run: a gap
+  over 2 s while the app is in front is its own line, `[e2e] js stalled 8.5 s, since 03:42:07.812`.
+  Native views (scrolling, a sheet's animation) carry on meanwhile, and what the JavaScript missed
+  arrives at once afterwards: in #328's run 42746203992 two swipes reached it together after a
+  30 s stall, and 04 lost a page's credit (fixed in #505: MushafPager now reads each drag's page
+  from the list's offset).
 - `device.log` (iOS): the unified log. Its `CFNetwork:Summary` lines give each request's length
-  (`transaction_duration_ms`; the emulators' ports name the service).
+  (`transaction_duration_ms`; the emulators' ports name the service). On CI the simulator's push
+  service (apsd) is switched off before the flows (`e2e.yml`): it couldn't reach Apple from the
+  runners and looped, writing nine lines in ten of this log. The job's step "The simulator's log,
+  by process" names the log's writers on every run; with apsd off the top ones are SpringBoard and
+  `testmanagerd` (Maestro reading the screen) and the app.
 - `logcat.txt` (Android): logcat, which has the same lines under `ReactNativeJS`.
 - `run/<time>/<flow>/screen-hierarchy/` and `screenshots/`: what Maestro saw when the step failed,
   and the screen. The screenshot is taken after the hierarchy, so something that arrived in between

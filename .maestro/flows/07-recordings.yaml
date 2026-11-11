@@ -59,40 +59,22 @@ appId: com.revisionbuddy.app
     timeout: 10000
 # The backup notice comes about now; a tap on View under it would be lost.
 - runFlow: ../subflows/backup-notice.yaml
-# "Recording saved · View" opens it in Activity's day, while the toast is up (6 s);
-# otherwise the way a user finds it later: Home → Activity → the day. On a slow
-# simulator the toast can go between seeing it and the tap (CI): the tap is
-# then skipped and the way through Activity is taken. On the day the recording
-# hangs under Revised (the block layout: no header row; its time is under it).
-- runFlow:
-    when:
-      visible: "Recording saved"
-    commands:
-      - tapOn:
-          text: "View"
-          optional: true
-      - extendedWaitUntil:
-          visible:
-            id: recording-when-.*
-          timeout: 10000
-          optional: true
-- runFlow:
-    when:
-      notVisible:
-        id: recording-when-.*
-    commands:
-      - runFlow: ../subflows/show-controls.yaml
-      - tapOn: "Back"
-      - tapOn:
-          id: open-activity
-      - extendedWaitUntil:
-          visible:
-            id: activity-blocks-views
-          timeout: 15000
-      - tapOn:
-          id: calendar-day-2026-11-03
-      - tapOn:
-          id: preview-open
+# The way a user finds it later: Home → Activity → the day. "Recording saved · View" opens it too, but
+# a flow never taps it: the toast lasts 6 s, and a tap that comes as it goes lands on what is under it
+# (.maestro/README.md, Notes). ActiveRevisionScreen.test presses it. On the day the recording hangs
+# under Revised (the block layout: no header row; its time is under it).
+- runFlow: ../subflows/show-controls.yaml
+- tapOn: "Back"
+- tapOn:
+    id: open-activity
+- extendedWaitUntil:
+    visible:
+      id: activity-blocks-views
+    timeout: 15000
+- tapOn:
+    id: calendar-day-2026-11-03
+- tapOn:
+    id: preview-open
 # Activity's day: the recording, at the app's time (12:00 on the test clock;
 # Android writes "pm").
 - extendedWaitUntil:

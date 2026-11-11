@@ -40,8 +40,15 @@ appId: com.revisionbuddy.app
     id: auth-submit
 # SYNC-4: the new account loads at once, with no relaunch. (Asserted by the
 # caller: 01-onboarding fails on it; other flows go on, see new-account.yaml.)
+# The wait also ends on the app's error (an id is a regex), and a sign-up the
+# app refused fails here with its message on the screen, not as SYNC-4 after a
+# relaunch that clears it. On iOS the simulator's keyboard can stall and drop
+# typed characters (run 42403217365: the email went out malformed and the Auth
+# emulator answered "invalid email").
 - extendedWaitUntil:
     visible:
-      id: welcome
+      id: "welcome|auth-error"
     timeout: 60000
     optional: true
+- assertNotVisible:
+    id: auth-error
