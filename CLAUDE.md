@@ -91,6 +91,11 @@ until its part is set up.
     production's fingerprints). `APP_VARIANT=dev npx expo prebuild` on a laptop rewrites the tracked
     files: `git checkout targets/`. The lasting fix (the widget works both out from its bundle id) rides
     the next native release.
+  - EAS fingerprints the project again after prebuild, and `targets/` counts: with APP_VARIANT=dev,
+    `fingerprint.config.js` hashes the widget's Swift and `widget.entitlements` as committed
+    (`devWidgetAsCommitted`), or the build stops on a runtime mismatch (Nov 11 2026: 0bce2dd9 before,
+    282a2e42 inside). The store app's fingerprints never use it. `plugins/withDevVariant.js` itself
+    counts toward Revisely Dev's fingerprints: editing it means new Dev builds on both platforms.
   - In the app (`lib/variant`):
     - it keeps its own `dev` channel, never preview or production, tester or not;
     - it never shows the store sheets;
