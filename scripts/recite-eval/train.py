@@ -172,11 +172,17 @@ def main():
     ap.add_argument('--workers', type=int, default=0, help='processes building batches (0: in the training process)')
     ap.add_argument('--resume', type=int, default=0, help='carry on from <out>/last.pt if it is there')
     ap.add_argument('--max_minutes', type=float, default=0, help='save <out>/last.pt and stop after this long (0: run to the end)')
+    ap.add_argument('--max_clips', type=int, default=0, help='use only this many training clips (local tests: a few hundred)')
     a = ap.parse_args()
     out = pathlib.Path(a.out); out.mkdir(parents=True, exist_ok=True)
     torch.manual_seed(0)
     rng = np.random.default_rng(0)
     data = Data(dirs=a.data.split(','))
+    if a.max_clips:
+        data.train = random.Random(2).sample(data.train, min(a.max_clips, len(data.train)))
+        data.val = data.val[:min(len(data.val), 50)]
+    elif a.device in ('mps', 'cpu') and sys.platform == 'darwin' and a.workers > 1:
+        sys.exit('on the Mac: full-data runs go to Modal; a local test uses --max_clips (a few hundred) and --workers 0 or 1')
     V = json.loads((hisn_torch.MODEL / 'config.json').read_text())['phonemes']
     print(f'{len(data.train)} training clips, {len(data.val)} held back, {len(data.shards)} shards', flush=True)
     model = hisn_torch.load(a.init, device=a.device).train()
