@@ -1,0 +1,67 @@
+{
+  // Cloudflare Worker "revisely-dev" (dev.revisely.app): the site in /docs as it is on develop, and
+  // the same /api as revisely.app, for the Revisely Dev app on the dev Firebase project. The code is
+  // the production Worker's (worker/); only this file differs.
+  //
+  // Cloudflare Workers Builds deploys it on each push to develop (production branch develop,
+  // non-production branch builds off; deploy command
+  // `npx wrangler@4.153.0 deploy --config wrangler.dev.jsonc`). It is a Worker of its own, not a
+  // branch build of "revisely": branch builds upload versions that make `wrangler secret put` refuse
+  // on the production Worker (CLAUDE.md, Worker).
+  //
+  // NOINDEX: every answer carries X-Robots-Tag: noindex, nofollow, and /robots.txt disallows
+  // everything. That needs every path to pass through the worker (run_worker_first: true).
+  //
+  // Secret (never in this file): TCQ_API_KEY_LIVE, a live Clear Quran key of its own ("revisely-dev"
+  // in their portal), set with
+  //   npx wrangler@4.153.0 secret put TCQ_API_KEY_LIVE --config wrangler.dev.jsonc
+  // Without it /api/tcq answers 503 and the Dev app shows "Couldn't load translation".
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "revisely-dev",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-05-12",
+  // Cloudflare creates the DNS record for the custom domain on deploy. No workers.dev address and no
+  // preview URLs: dev.revisely.app is the only way in.
+  "routes": [{ "pattern": "dev.revisely.app", "custom_domain": true }],
+  "workers_dev": false,
+  "preview_urls": false,
+  "assets": {
+    "directory": "docs",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+  "vars": {
+    "NOINDEX": "1",
+    // The dev Firebase project (PLAN §3.C): only its sign-ins are accepted. Until it exists, every
+    // /api call answers 401 and the pages still serve.
+    "FIREBASE_PROJECT_ID": "revisely-dev",
+    "TCQ_API_BASE_LIVE": "https://api.theclearquran.org",
+    "TCQ_API_BASE_SANDBOX": "",
+    // Caches as on revisely.app, so dev spends few of the plan's requests.
+    "TCQ_EDGE_CACHE_SECONDS": "2592000",
+    "TCQ_EDGE_STALE_SECONDS": "2592000",
+    "TCQ_DEVICE_CACHE_SECONDS": "2592000",
+    "TCQ_DEVICE_STALE_SECONDS": "2592000",
+    "TCQ_CACHE_VERSION": "1",
+    // 30 a day for dev: with revisely.app's 300, (300 + 30) × 30 days stays under the plan's 10,000
+    // a month. The Dev app sends its channel ("dev"), which counts as development: live key, these
+    // budgets.
+    "TCQ_DAILY_LIMIT_LIVE": "30",
+    "TCQ_DAILY_LIMIT_SANDBOX": "30",
+    "TCQ_USER_DAILY_LIMIT": "20"
+  },
+  // No stored request logs, as on revisely.app.
+  "observability": { "enabled": false },
+  "durable_objects": {
+    "bindings": [{ "name": "TCQ_BUDGET", "class_name": "TcqBudget" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["TcqBudget"] }],
+  // Its own namespace: revisely.app uses 1001 (and 1002 for previews), so the two never share counts.
+  "ratelimits": [
+    {
+      "name": "TCQ_USER_LIMIT",
+      "namespace_id": "1003",
+      "simple": { "limit": 30, "period": 60 }
+    }
+  ]
+}

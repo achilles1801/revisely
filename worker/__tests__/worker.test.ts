@@ -586,6 +586,33 @@ describe('routing', () => {
     const { res } = await call('/api/tcq/verses/2:255', { method: 'POST' });
     expect(res.status).toBe(405);
   });
+
+  it('leaves revisely.app as it was: no noindex header, robots.txt from the site', async () => {
+    const assets = { fetch: jest.fn(async (r: Request) => new Response(new URL(r.url).pathname)) };
+    const c = ctx();
+    const page = await worker.fetch(new Request('https://revisely.app/privacy/'), { ...ENV, ASSETS: assets }, c);
+    expect(page.headers.get('X-Robots-Tag')).toBeNull();
+    const robots = await worker.fetch(new Request('https://revisely.app/robots.txt'), { ...ENV, ASSETS: assets }, c);
+    expect(await robots.text()).toBe('/robots.txt');
+    const api = await worker.fetch(new Request('https://revisely.app/api/other'), { ...ENV, ASSETS: assets }, c);
+    expect(api.headers.get('X-Robots-Tag')).toBeNull();
+  });
+
+  it('keeps dev.revisely.app out of search engines (NOINDEX)', async () => {
+    const assets = { fetch: jest.fn(async () => new Response('page', { headers: { 'Content-Type': 'text/html' } })) };
+    const dev = { ...ENV, ASSETS: assets, NOINDEX: '1' };
+    const c = ctx();
+    const page = await worker.fetch(new Request('https://dev.revisely.app/privacy/'), dev, c);
+    expect(await page.text()).toBe('page');
+    expect(page.headers.get('Content-Type')).toBe('text/html');
+    expect(page.headers.get('X-Robots-Tag')).toBe('noindex, nofollow');
+    const robots = await worker.fetch(new Request('https://dev.revisely.app/robots.txt'), dev, c);
+    expect(await robots.text()).toBe('User-agent: *\nDisallow: /\n');
+    expect(assets.fetch).toHaveBeenCalledTimes(1);
+    const api = await worker.fetch(new Request('https://dev.revisely.app/api/other'), dev, c);
+    expect(api.status).toBe(404);
+    expect(api.headers.get('X-Robots-Tag')).toBe('noindex, nofollow');
+  });
 });
 
 describe('sign-in: odd tokens are refused with 401, never a server error', () => {
