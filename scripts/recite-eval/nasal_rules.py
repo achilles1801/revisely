@@ -47,7 +47,7 @@ def stops_after(s, a, n_words):
         return set()
     words, after = 0, set()
     for t in text.split(' '):
-        if t and all(0x6D6 <= ord(ch) <= 0x6DC for ch in t):
+        if t and all(0x6D6 <= ord(ch) <= 0x6DC or ch in '۞۩' for ch in t):  # marks, the hizb sign, the sajda sign
             if any(ch in STOPS for ch in t):
                 after.add(words - 1)
         elif t:
