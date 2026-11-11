@@ -63,7 +63,8 @@ To release, try the change in TestFlight, open a PR from `develop` to `main`, me
 
 **Revisely Dev** is a second app (`com.revisionbuddy.app.dev`, `APP_VARIANT=dev`) that installs beside the
 store app. It runs on its own Firebase project, so testing never touches production data, and gets each
-develop commit on its own `dev` channel after `preview`. Its site and API are at dev.revisely.app. How it
+develop commit on its own `dev` channel after `preview`. Its site and API are at dev.revisely.app (without
+The Clear Quran: its portal gives one key per product, and revisely.app has it). How it
 fits together, and what stays off until it is set up: "Dev stack" in [CLAUDE.md](CLAUDE.md).
 
 The runtime version is a fingerprint of the native side, so an update only ever reaches a binary

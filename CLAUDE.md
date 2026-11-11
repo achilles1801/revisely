@@ -95,14 +95,17 @@ until its part is set up.
     - it keeps its own `dev` channel, never preview or production, tester or not;
     - it never shows the store sheets;
     - it shows App info and Check for updates to everyone;
-    - it calls The Clear Quran through dev.revisely.app (`extra.apiBase`);
+    - it calls The Clear Quran through dev.revisely.app (`extra.apiBase`), which has no key for it (below);
     - it reports to Sentry as environment `dev`, under `com.revisionbuddy.app.dev@…`. The crash-free
       gate, alerts, health issues, daily report and metrics console read production and preview only.
   - EAS: build profile `dev` (channel `dev`, environment `development`, APP_VARIANT=dev); submit profile
-    `dev` (the Revisely Dev app in App Store Connect, whose id replaces the placeholder in eas.json, and
-    Play internal testing). The EAS `development` environment holds the dev project's config
-    (`FIREBASE_*`, Google client ids, `API_BASE=https://dev.revisely.app`, the Sentry DSN). `production`
-    is untouched.
+    `dev`: App Store Connect app "Revisely Dev" (Apple ID `6833565026`, SKU `revisely-dev`; its TestFlight
+    internal group "Dev Team" gets every build) and Play internal testing of the Play app "Revisely Dev".
+    Signing: EAS holds Revisely Dev's own profiles (the app and `.dev.widget`) and Android keystore.
+  - The EAS `development` environment holds the dev project's config (`FIREBASE_*`, Google client ids,
+    `API_BASE=https://dev.revisely.app`, the Sentry DSN). The store app's `development` profile (a
+    simulator dev client, built by hand; last built May 2026) reads it too, so such a client talks to
+    revisely-dev, where Google sign-in won't work for the store bundle id. `production` is untouched.
 - **Updates and builds:** with the repository variable `DEV_APP` = `true`, Preview publishes each tested
   develop commit to `preview` first, then the same commit to `dev` (`dev-update`).
   - Revisely Dev's runtimes are its own (tags `ios-dev-fp/<hash>`, `android-dev-fp/<hash>`), and a
@@ -113,9 +116,15 @@ until its part is set up.
   - Nothing on the dev side stops preview: its fingerprint step can fail without failing the job, and
     preview's update never waits for it. Promote reads only the preview branch.
   - Each native change now builds twice (store and Dev).
-  - Secrets: `GOOGLE_SERVICE_INFO_PLIST_DEV` and `GOOGLE_SERVICES_JSON_DEV` (base64, as the store app's).
-- **The dev backend:** Firebase project `revisely-dev` (Blaze, a $10 budget alert), the same rules and
-  functions as production.
+  - Secrets: `GOOGLE_SERVICE_INFO_PLIST_DEV` and `GOOGLE_SERVICES_JSON_DEV` (base64, as the store app's),
+    from `firebase apps:sdkconfig` of the dev project's iOS and Android apps.
+- **The dev backend:** Firebase project `revisely-dev` (number 433792838929; Blaze, a $10 budget alert;
+  Firestore nam5; Storage `revisely-dev.firebasestorage.app`), the same rules and functions as production.
+  - **Apps:** "Revisely Dev iOS" (`1:433792838929:ios:854e01f457f27d29bbf0b0`), "Revisely Dev Android"
+    (`…:android:5c8c71d0893a4fe3bbf0b0`, with the EAS upload key's SHA-1; add Play App Signing's SHA-1
+    after the first upload, or Google sign-in fails on Play installs) and "Revisely Dev Web"
+    (`…:web:3d6ee9a1d16883d7bbf0b0`, the JavaScript SDK's `FIREBASE_APP_ID`, as production uses its web
+    app). Sign-in: email and password, Google, Apple.
   - **Deploys:** `dev-backend.yml` deploys rules, indexes, Storage rules and every function on each
     develop push that changes them. Majd's standing OK covers dev only.
     - It runs keyless: GitHub OIDC through Workload Identity, develop of this repository only.
@@ -133,9 +142,13 @@ until its part is set up.
   - `NOINDEX`: every answer carries `X-Robots-Tag: noindex, nofollow`, and `/robots.txt` disallows
     everything.
   - Its API accepts only the dev project's sign-ins.
-  - The Clear Quran uses its own live key, 30 requests a day: with revisely.app's 300, that stays under the
-    plan's 10,000 a month. Set it with
-    `npx wrangler@4.153.0 secret put TCQ_API_KEY_LIVE --config wrangler.dev.jsonc`.
+  - **No Clear Quran key.** The Clear Quran's portal allows one active Production key per product
+    ("duplicate key … api_keys_active_developer_account_id_product_environment"), and revisely.app holds
+    it. So the dev Worker answers 503 for The Clear Quran, and Revisely Dev shows "Couldn't load
+    translation" for it (every other translation works). Don't give it revisely.app's key. If The Clear
+    Quran allows a second key (or publishes a sandbox host), set it with
+    `npx wrangler@4.153.0 secret put TCQ_API_KEY_LIVE --config wrangler.dev.jsonc`: its budget is already
+    30 requests a day, which with revisely.app's 300 stays under the plan's 10,000 a month.
   - Its config is left out like `wrangler.jsonc` (app hash, paths-ignore, E2E, claude-fix).
 - **The laptop's `.env`** stays on production until the orchestrator says otherwise: the store previews are
   filmed with it.

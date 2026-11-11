@@ -51,7 +51,7 @@
     },
     "dev": {
       "ios": {
-        "ascAppId": "REPLACE_WITH_REVISELY_DEV_APPLE_ID",
+        "ascAppId": "6833565026",
         "appleTeamId": "CH8N5V9MA6"
       },
       "android": {
