@@ -62,7 +62,7 @@ def _init():
 if __name__ == '__main__':
     import multiprocessing as mp
     items = [f for f in sorted((LAB / 'data/bench-v0/items').glob('*.json')) if '.clean.' in f.name and f.name.split('.')[2] == 'clean']
-    pool = mp.get_context('spawn').Pool(10, initializer=_init)
+    pool = mp.get_context('spawn').Pool(int(os.environ.get('JOBS', 10)), initializer=_init)
     rows = []
     for n, r in enumerate(pool.imap_unordered(item, items), 1):
         rows += r
