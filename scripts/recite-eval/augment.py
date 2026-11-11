@@ -8,8 +8,13 @@ emission]). Each slip edits one place and returns the new audio and labels:
   qalqalah  the bounce (ڇ) muted
   letter    a letter replaced by a confusable one (ص/س, ض/د, ...) cut from the same clip
   haraka    a short vowel replaced by another one from the same clip
+  swap      any consonant replaced by any other one from the same clip (v5: فَمَا said as وَمَا, خَلَتْ as خَلَقَ; v4 had
+            learned to hear the expected word there, from hundreds of hours of always-correct recitation)
   null      the same kind of edit with nothing changed (so an edit's traces alone never mean a slip)
 Edits are applied from the end of the clip backwards, so earlier frame positions stay valid.
+
+mosaic() is the other v5 addition: a clip stitched from stretches of several ayat, so no sound can be guessed from
+the text around it.
 """
 import numpy as np
 
@@ -20,6 +25,15 @@ CONFUSE = {
     'ص': 'س', 'س': 'صش', 'ض': 'دظ', 'د': 'ض', 'ط': 'ت', 'ت': 'ط', 'ظ': 'زذض', 'ذ': 'زد', 'ز': 'ذ', 'ث': 'ست',
     'ح': 'هخ', 'ه': 'ح', 'خ': 'ح', 'ع': 'ء', 'ء': 'ع', 'ق': 'كغ', 'ك': 'ق', 'غ': 'خ', 'ش': 'س',
 }
+CONSONANTS = set('ءبتثجحخدذرزسشصضطظعغفقكلمنهوي')
+# Letter slips cut a consonant together with its vowel (v5): a consonant cut alone kept the original's release into
+# the vowel, and the released model heard the original letter in 30 of 49 such slips (aug_check.py)
+CV_UNITS = True
+
+
+def single(labels, i):
+    """labels[i] is one sound on its own (not half of a doubled, shadda letter)."""
+    return (i == 0 or labels[i - 1] != labels[i]) and (i + 1 == len(labels) or labels[i + 1] != labels[i])
 
 
 def wsola(x, out_len, win=640, tol=160):
@@ -90,8 +104,18 @@ def candidates(labels, vocab):
         c += [('ikhfa', i, j) for i, j in runs(labels, vocab, 'ں')]
     c += [('qalqalah', i, i + 1) for i, l in enumerate(labels) if vocab[l - 1] == 'ڇ']
     have = {vocab[l - 1] for l in labels}
-    c += [('letter', i, i + 1) for i, l in enumerate(labels) if vocab[l - 1] in CONFUSE and set(CONFUSE[vocab[l - 1]]) & have]
-    c += [('haraka', i, i + 1) for i, l in enumerate(labels) if vocab[l - 1] in HARAKAT]
+    w = 2 if CV_UNITS else 1
+    cv_ok = lambda i: not CV_UNITS or (i + 1 < len(labels) and vocab[labels[i + 1] - 1] in HARAKAT)
+    c += [('letter', i, i + w) for i, l in enumerate(labels)
+          if vocab[l - 1] in CONFUSE and set(CONFUSE[vocab[l - 1]]) & have and cv_ok(i)]
+    if CV_UNITS:  # the vowel with the consonant before it (the same consonant, cut from where another vowel follows it)
+        c += [('haraka', i - 1, i + 1) for i, l in enumerate(labels)
+              if i > 0 and vocab[l - 1] in HARAKAT and vocab[labels[i - 1] - 1] in CONSONANTS]
+    else:
+        c += [('haraka', i, i + 1) for i, l in enumerate(labels) if vocab[l - 1] in HARAKAT]
+    cons = have & CONSONANTS
+    c += [('swap', i, i + w) for i, l in enumerate(labels)
+          if vocab[l - 1] in CONSONANTS and single(labels, i) and len(cons - {vocab[l - 1]}) > 0 and cv_ok(i)]
     return c
 
 
@@ -148,12 +172,22 @@ def apply(x, labels, emit, vocab, slip, rng, x0=None, labels0=None):
         new_lab, what = [idx['ن']], 'ikhfa → clear ن'
     elif kind == 'letter':
         c = vocab[labels[i] - 1]
-        opts = [z for z in CONFUSE.get(c, '') if z in {vocab[l - 1] for l in labels0}]
+        ok = lambda p: j - i == 1 or (p + 1 < len(labels0) and labels0[p + 1] == labels[i + 1])
+        opts = [z for z in CONFUSE.get(c, '') if any(vocab[l - 1] == z and ok(p) for p, l in enumerate(labels0))]
         if not opts:
             return None
         d = rng.choice(opts)
-        src = [p for p, l in enumerate(labels0) if vocab[l - 1] == d]
-        new_lab, what = [idx[d]], f'{c}→{d}'
+        src = [p for p, l in enumerate(labels0) if vocab[l - 1] == d and ok(p)]
+        new_lab, what = [idx[d]] + labels[i + 1:j], f'{c}→{d}'
+    elif kind == 'haraka' and j - i == 2:
+        k, c = labels[i], vocab[labels[i + 1] - 1]
+        pairs = [(p, vocab[labels0[p + 1] - 1]) for p in range(len(labels0) - 1)
+                 if labels0[p] == k and vocab[labels0[p + 1] - 1] in HARAKAT and vocab[labels0[p + 1] - 1] != c]
+        if not pairs:
+            return None
+        d = pairs[int(rng.integers(len(pairs)))][1]
+        src = [p for p, z in pairs if z == d]
+        new_lab, what = [k, idx[d]], f'{c}→{d}'
     elif kind == 'haraka':
         c = vocab[labels[i] - 1]
         others = [z for z in HARAKAT if z != c and z in {vocab[l - 1] for l in labels0}]
@@ -162,13 +196,29 @@ def apply(x, labels, emit, vocab, slip, rng, x0=None, labels0=None):
         d = rng.choice(others)
         src = [p for p, l in enumerate(labels0) if vocab[l - 1] == d]
         new_lab, what = [idx[d]], f'{c}→{d}'
+    elif kind == 'swap':
+        c = vocab[labels[i] - 1]
+        ok = lambda p: j - i == 1 or (p + 1 < len(labels0) and labels0[p + 1] == labels[i + 1])
+        src = [p for p, l in enumerate(labels0)
+               if vocab[l - 1] in CONSONANTS and vocab[l - 1] != c and single(labels0, p) and ok(p)]
+        if not src:
+            return None
+        d = vocab[labels0[int(rng.choice(src))] - 1]
+        src = [p for p in src if vocab[labels0[p] - 1] == d]
+        new_lab, what = [idx[d]] + labels[i + 1:j], f'swap {c}→{d}'
     else:
         return None
     if not src:
         return None
     s = int(rng.choice(src))
-    sa, sb = max(0, emit[s][0] - 1) * FR, min(len(x0), (emit[s][1] + 1) * FR)
-    a, b = max(0, emit[i][0] - (0 if kind == 'ikhfa' else 1)) * FR, min(len(x), (emit[j - 1][1] + (0 if kind == 'ikhfa' else 1)) * FR)
+    if kind in ('letter', 'swap', 'haraka') and j - i == 2:
+        gap = lambda k, n: (emit[k - 1][1] + emit[k][0]) // 2 if 0 < k < n else (emit[k][0] - 1 if k == 0 else emit[-1][1] + 1)
+        n0 = len(emit)
+        sa, sb = max(0, gap(s, n0)) * FR, min(len(x0), (gap(s + 2, n0) if s + 2 < n0 else emit[-1][1] + 1) * FR)
+        a, b = max(0, gap(i, n0)) * FR, min(len(x), (gap(j, n0) if j < n0 else emit[-1][1] + 1) * FR)
+    else:
+        sa, sb = max(0, emit[s][0] - 1) * FR, min(len(x0), (emit[s][1] + 1) * FR)
+        a, b = max(0, emit[i][0] - (0 if kind == 'ikhfa' else 1)) * FR, min(len(x), (emit[j - 1][1] + (0 if kind == 'ikhfa' else 1)) * FR)
     if sb - sa < FR or b - a < FR:
         return None
     labels[i:j] = new_lab
@@ -177,7 +227,8 @@ def apply(x, labels, emit, vocab, slip, rng, x0=None, labels0=None):
 
 # v1 weighted madd most; madd length is now judged by timing (tajweed.madd_count), so v2 puts the weight on what
 # only the model can hear: ikhfa, ghunnah, letters
-WEIGHT = {'madd': 1.5, 'ghunnah': 2.5, 'ikhfa': 3.0, 'qalqalah': 1.5, 'letter': 2.5, 'haraka': 1.5}
+# v5 adds swap, as often as the confusable letters
+WEIGHT = {'madd': 1.5, 'ghunnah': 2.5, 'ikhfa': 3.0, 'qalqalah': 1.5, 'letter': 2.5, 'haraka': 1.5, 'swap': 2.5}
 
 
 def plant(x, labels, emit, vocab, rng, n_slips=1, null_p=0.3):
@@ -217,6 +268,49 @@ def plant(x, labels, emit, vocab, rng, n_slips=1, null_p=0.3):
             x, labels, w = r
             whats.append(w)
     return x, labels, whats
+
+
+def mosaic_pieces(pieces, vocab, rng, min_len=4, max_len=16):
+    """From each clip [(audio, labels, emit)], a stretch of min_len–max_len sounds that starts and ends on a
+    consonant's onset, cut midway through the gap before it. Returns [(audio float32, labels)]."""
+    out = []
+    for x, labels, emit in pieces:
+        x = x.astype(np.float32)
+        if np.abs(x).max() > 2:
+            x = x / 32768.0
+        labels = list(labels)
+        n = len(labels)
+        onsets = [k for k in range(1, n) if vocab[labels[k] - 1] in CONSONANTS and labels[k - 1] != labels[k]]
+        if len(onsets) < 2:
+            continue
+        s = int(rng.choice([0] + onsets[:-1]))
+        ends = [k for k in onsets + [n] if min_len <= k - s <= max_len]
+        if not ends:
+            continue
+        e = int(rng.choice(ends))
+        a = 0 if s == 0 else (emit[s - 1][1] + emit[s][0]) // 2 * FR
+        b = len(x) if e == n else min(len(x), (emit[e - 1][1] + emit[e][0]) // 2 * FR)
+        if b - a < 2 * FR:
+            continue
+        out.append((x[a:b], labels[s:e]))
+    return out
+
+
+def join(xs, fade=80):
+    y = xs[0]
+    for z in xs[1:]:
+        f = min(fade, len(y) // 2, len(z) // 2)
+        r = np.linspace(0, 1, f, dtype=np.float32)
+        y = np.concatenate([y[:-f], y[-f:] * (1 - r) + z[:f] * r, z[f:]])
+    return y.astype(np.float32)
+
+
+def mosaic(pieces, vocab, rng, **kw):
+    """A clip stitched from stretches of several ayat (mosaic_pieces, join). Returns (audio, labels) or None."""
+    ps = mosaic_pieces(pieces, vocab, rng, **kw)
+    if len(ps) < 2:
+        return None
+    return join([x for x, _ in ps]), [l for _, ls in ps for l in ls]
 
 
 def channel(x, rng, others=(), sr=16000):

@@ -10,6 +10,11 @@ heard as well as before.
 
 v3 adds --data data/train,data/train2: Tadabur's reciters (tadabur_fetch.py, tadabur_label.py) beside Muaalem's.
 
+v5 (Nov 11 2026): v4 heard the expected word where a learner swapped one consonant (وَمَا for فَمَا). Its data was
+about 85% Tadabur: always-correct recitation, labelled automatically. So --max_per keeps only Tadabur ayat the
+labels fit closely, --mix draws each folder's share of clips (Muaalem's hand-checked labels as often as Tadabur's),
+augment's new swap slip changes any consonant, and --mosaic_p stitches clips from stretches of several ayat.
+
 v2 adds (voices.py, augment.channel): women's and children's voices made from the same clips (--voice_p), a phone
 in a room (reverb, the microphone's band, babble or noise; --chan_p), masked mel bands (--fmask), and can start from
 an earlier fine-tune (--init).
@@ -25,8 +30,8 @@ import augment, hisn_torch, checker  # noqa: E402
 
 
 class Data:
-    def __init__(self, held=0.03, seed=0, dirs=('data/train',)):
-        self.shards = []
+    def __init__(self, held=0.03, seed=0, dirs=('data/train',), max_per=None):
+        self.shards, self.dir_of = [], []
         for d in dirs:
             for mp in sorted((LAB / d).glob('*.meta.pkl')):
                 name = mp.name[:-len('.meta.pkl')]
@@ -35,11 +40,14 @@ class Data:
                 metas = pickle.load(open(mp, 'rb'))
                 vp = LAB / d / f'{name}.voice.audio.npy'
                 self.shards.append((name, metas, LAB / d / f'{name}.audio.npy', vp if vp.exists() else None))
+                self.dir_of.append(dirs.index(d))
         rng = random.Random(seed)
         self.train, self.val = [], []
         for si, (_, metas, _, _) in enumerate(self.shards):
             for mi, m in enumerate(metas):
                 if m['fit'] < -1.5:  # the current model and the label disagree badly: likely a bad label
+                    continue
+                if max_per is not None and m.get('per', 0.0) > max_per:  # automatic labels only: too far from what was heard
                     continue
                 (self.val if rng.random() < held else self.train).append((si, mi))
 
@@ -107,14 +115,35 @@ class Batches(torch.utils.data.IterableDataset):
         wid = info.id if info else 0
         a, data, V = self.a, self.data, self.V
         rng = np.random.default_rng(self.seed * 1009 + wid)
-        order = list(range(len(data.train)))
-        random.Random(self.seed * 1009 + wid).shuffle(order)
-        pos, babble = 0, []
+        shuf = random.Random(self.seed * 1009 + wid)
+        ndir = max(data.dir_of) + 1 if data.dir_of else 1
+        orders = [[k for k, (si, _) in enumerate(data.train) if data.dir_of[si] == d] for d in range(ndir)]
+        for o in orders:
+            shuf.shuffle(o)
+        mix = [float(w) for w in a.mix.split(',')] if a.mix else [len(o) for o in orders]
+        mix = np.array([w if orders[d] else 0.0 for d, w in enumerate(mix[:ndir])], float)
+        mix /= mix.sum()
+        by_shard = {}
+        for k, (si, _) in enumerate(data.train):
+            by_shard.setdefault(si, []).append(k)
+        pos, babble = [0] * ndir, []
         while True:
             items, secs, seen = [], 0.0, {}
             while secs < a.batch_s:
-                si, mi = data.train[order[pos % len(order)]]; pos += 1
+                d = int(rng.choice(ndir, p=mix))
+                si, mi = data.train[orders[d][pos[d] % len(orders[d])]]; pos[d] += 1
                 use_voice = rng.random() < a.voice_p
+                if a.mosaic_p and rng.random() < a.mosaic_p:
+                    ks = rng.choice(by_shard[si], size=min(len(by_shard[si]), int(rng.integers(2, 5))), replace=False)
+                    r = augment.mosaic([data.clip(*data.train[k], voice=use_voice) for k in ks], V, rng)
+                    if r is not None:
+                        x, lab = r
+                        seen['mosaic'] = seen.get('mosaic', 0) + 1
+                        if rng.random() < a.chan_p:
+                            x = augment.channel(x, rng, babble)
+                        if len(x) >= 16000:
+                            items.append((x, lab)); secs += len(x) / 16000
+                        continue
                 x, lab, emit = data.clip(si, mi, voice=use_voice)
                 if not use_voice:
                     babble.append(x); babble[:] = babble[-24:]
@@ -173,11 +202,14 @@ def main():
     ap.add_argument('--resume', type=int, default=0, help='carry on from <out>/last.pt if it is there')
     ap.add_argument('--max_minutes', type=float, default=0, help='save <out>/last.pt and stop after this long (0: run to the end)')
     ap.add_argument('--max_clips', type=int, default=0, help='use only this many training clips (local tests: a few hundred)')
+    ap.add_argument('--max_per', type=float, default=None, help='drop automatically labelled clips whose labels differ from what was heard by more than this share')
+    ap.add_argument('--mix', default='', help="each --data folder's share of clips, e.g. 0.5,0.5 (default: by size)")
+    ap.add_argument('--mosaic_p', type=float, default=0.0, help='share of clips stitched from stretches of several ayat')
     a = ap.parse_args()
     out = pathlib.Path(a.out); out.mkdir(parents=True, exist_ok=True)
     torch.manual_seed(0)
     rng = np.random.default_rng(0)
-    data = Data(dirs=a.data.split(','))
+    data = Data(dirs=a.data.split(','), max_per=a.max_per)
     if a.max_clips:
         data.train = random.Random(2).sample(data.train, min(a.max_clips, len(data.train)))
         data.val = data.val[:min(len(data.val), 50)]
