@@ -63,6 +63,7 @@ DEFAULTS = {
     'alt_pen': -5.0,    # the cost of hearing a look-alike instead of the word itself
     'alt_rule': 'any',  # 'skeleton': only look-alikes with other consonants (not ones that differ in harakat, madd or shadda)
     'extra_min': 0.35,  # a filler shorter than this (seconds) is not reported as an extra word
+    'basmala_max': 8.0,  # a filler up to this long (seconds) before a surah's first word is its basmala
     'delay': 1.0,       # (offline) seconds after a word ends that a live checker would decide it
     'look': 1.0,        # (live) seconds of audio after a frame before the model's frame is final
     'hop': 0.5,         # (live) how often the model runs and the checker decides
@@ -653,6 +654,15 @@ def substitutions(expected, heard, vocab, edge_free=2, span=None, edge_frames=99
     return subs, dels, sum(1 for c in exp if c not in LONG)
 
 
+def _starts_surah(app_word):
+    """True for the first word of a surah (where a basmala is said before it)."""
+    try:
+        s, a, p = KEY.where(app_word)
+    except Exception:
+        return False
+    return a == 1 and p == 0
+
+
 def decide(key_words, g, lp, path, P, vocab=None, toks=None):
     """Statuses, flags and extras from the best path."""
     W = g.W
@@ -744,6 +754,8 @@ def decide(key_words, g, lp, path, P, vocab=None, toks=None):
         if gi == 0 or gi == W:
             continue
         dur = (b - a) / FPS
+        if dur <= P.get('basmala_max', 8.0) and _starts_surah(key_words[gi]['word']):
+            continue  # the basmala before a surah that starts inside the passage (Al-Falaq after Al-Ikhlas): not an extra
         nxt = None
         # what came after this filler: the word it sits before (an extra) or the one after (a replacement)
         for w in (gi, gi + 1):
