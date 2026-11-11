@@ -33,10 +33,8 @@ class Data:
                 if name.endswith('.voice'):
                     continue
                 metas = pickle.load(open(mp, 'rb'))
-                audio = np.load(LAB / d / f'{name}.audio.npy', mmap_mode='r')
                 vp = LAB / d / f'{name}.voice.audio.npy'
-                voice = np.load(vp, mmap_mode='r') if vp.exists() else None
-                self.shards.append((name, metas, audio, voice))
+                self.shards.append((name, metas, LAB / d / f'{name}.audio.npy', vp if vp.exists() else None))
         rng = random.Random(seed)
         self.train, self.val = [], []
         for si, (_, metas, _, _) in enumerate(self.shards):
@@ -45,14 +43,31 @@ class Data:
                     continue
                 (self.val if rng.random() < held else self.train).append((si, mi))
 
+    # The audio stays on disk: each process opens the files itself, memory-mapped, the first time it reads them.
+    # Never hand the arrays to another process: a Mac starts data workers fresh and would copy every array whole
+    # (35 GB on Nov 10, which filled the Mac's memory and restarted it).
+    def _open(self, path):
+        if path is None:
+            return None
+        cache = self.__dict__.setdefault('_mm', {})
+        if path not in cache:
+            cache[path] = np.load(path, mmap_mode='r')
+        return cache[path]
+
+    def __getstate__(self):
+        st = dict(self.__dict__)
+        st.pop('_mm', None)
+        return st
+
     def clip(self, si, mi, voice=False):
-        _, metas, audio, va = self.shards[si]
+        _, metas, apath, vpath = self.shards[si]
         m = metas[mi]
-        src = va if (voice and va is not None) else audio
+        src = self._open(vpath) if (voice and vpath is not None) else self._open(apath)
         return src[m['off']:m['off'] + m['n']].astype(np.float32) / 32768.0, list(m['labels']), m['emit']
 
 
-def batch_tensors(items, device, fmask=0.0, rng=None):
+def build_mels(items, fmask=0.0, rng=None):
+    """items [(audio, labels)] -> (mels [B, 80, T] float32, frames, labels): the CPU part of a batch."""
     mels, labs, frames = [], [], []
     for x, lab in items:
         mel = hisn_torch.mel_of(x)
@@ -66,10 +81,59 @@ def batch_tensors(items, device, fmask=0.0, rng=None):
     for k, m in enumerate(mels):
         M[k, :, :m.shape[1]] = m
         M[k, :, m.shape[1]:] = m.min()
+    return M, frames, labs
+
+
+def to_device(M, frames, labs, device):
     tgt = torch.tensor([l for lab in labs for l in lab], dtype=torch.long)
     tl = torch.tensor([len(l) for l in labs], dtype=torch.long)
     fr = torch.tensor(frames, dtype=torch.long)
-    return torch.from_numpy(M).to(device), fr.to(device), tgt, tl
+    return torch.as_tensor(M).to(device), fr.to(device), tgt, tl
+
+
+def batch_tensors(items, device, fmask=0.0, rng=None):
+    return to_device(*build_mels(items, fmask, rng), device)
+
+
+class Batches(torch.utils.data.IterableDataset):
+    """Training batches (about batch_s seconds of audio each): clips in a shuffled order, some in another voice,
+    half with planted slips, some through a phone in a room. Each data worker has its own order and random seed."""
+
+    def __init__(self, data, a, V, seed):
+        self.data, self.a, self.V, self.seed = data, a, V, seed
+
+    def __iter__(self):
+        info = torch.utils.data.get_worker_info()
+        wid = info.id if info else 0
+        a, data, V = self.a, self.data, self.V
+        rng = np.random.default_rng(self.seed * 1009 + wid)
+        order = list(range(len(data.train)))
+        random.Random(self.seed * 1009 + wid).shuffle(order)
+        pos, babble = 0, []
+        while True:
+            items, secs, seen = [], 0.0, {}
+            while secs < a.batch_s:
+                si, mi = data.train[order[pos % len(order)]]; pos += 1
+                use_voice = rng.random() < a.voice_p
+                x, lab, emit = data.clip(si, mi, voice=use_voice)
+                if not use_voice:
+                    babble.append(x); babble[:] = babble[-24:]
+                if rng.random() < a.slip_p:
+                    x, lab, whats = augment.plant(x, lab, emit, V, rng, n_slips=int(rng.integers(1, 4)), null_p=0.3)
+                    for w in whats:
+                        k = w.split(' ')[0] if w[0] not in 'ابتثجحخدذرزسشصضطظعغفقكلمنهويءَُِ' else 'letter/haraka'
+                        seen[k] = seen.get(k, 0) + 1
+                elif rng.random() < 0.3:
+                    x, lab, _ = augment.plant(x, lab, emit, V, rng, n_slips=0, null_p=1.0)
+                if not lab or len(x) < 16000:
+                    continue
+                if rng.random() < a.chan_p:
+                    x = augment.channel(x, rng, babble)
+                else:
+                    x = np.clip(x * rng.uniform(0.5, 1.5), -1, 1).astype(np.float32)
+                items.append((x, lab)); secs += len(x) / 16000
+            M, frames, labs = build_mels(items, a.fmask, rng)
+            yield M, frames, labs, seen
 
 
 def per(model, data, items, device, rng, voice=False, chan=False):
@@ -105,6 +169,9 @@ def main():
     ap.add_argument('--chan_p', type=float, default=0.0, help='share of clips through a phone in a room')
     ap.add_argument('--fmask', type=float, default=0.0)
     ap.add_argument('--data', default='data/train', help='comma-separated folders of shards (data/train: Muaalem, data/train2: Tadabur)')
+    ap.add_argument('--workers', type=int, default=0, help='processes building batches (0: in the training process)')
+    ap.add_argument('--resume', type=int, default=0, help='carry on from <out>/last.pt if it is there')
+    ap.add_argument('--max_minutes', type=float, default=0, help='save <out>/last.pt and stop after this long (0: run to the end)')
     a = ap.parse_args()
     out = pathlib.Path(a.out); out.mkdir(parents=True, exist_ok=True)
     torch.manual_seed(0)
@@ -125,41 +192,39 @@ def main():
     base_per = per(model, data, val_items, a.device, rng)
     print(f'held-back plain recitation, phoneme errors before: {100*base_per:.2f}%', flush=True)
     hard = a.voice_p > 0 or a.chan_p > 0
+    base_vc = None
     if hard:
         base_vc = (per(model, data, val_items, a.device, rng, voice=True), per(model, data, val_items, a.device, rng, voice=True, chan=True))
         print(f'  in other voices {100*base_vc[0]:.2f}%, other voices on a phone in a room {100*base_vc[1]:.2f}%', flush=True)
-    babble = []
     log = open(out / 'log.txt', 'a')
-    order = list(range(len(data.train)))
-    random.Random(1).shuffle(order)
-    pos, t0, tot, cnt, slips_seen = 0, time.time(), 0.0, 0, {}
-    for step in range(1, a.steps + 1):
-        items, secs = [], 0.0
-        while secs < a.batch_s:
-            si, mi = data.train[order[pos % len(order)]]; pos += 1
-            use_voice = rng.random() < a.voice_p
-            x, lab, emit = data.clip(si, mi, voice=use_voice)
-            if not use_voice:
-                babble.append(x); babble[:] = babble[-24:]
-            if rng.random() < a.slip_p:
-                x, lab, whats = augment.plant(x, lab, emit, V, rng, n_slips=int(rng.integers(1, 4)), null_p=0.3)
-                for w in whats:
-                    k = w.split(' ')[0] if w[0] not in 'ابتثجحخدذرزسشصضطظعغفقكلمنهويءَُِ' else 'letter/haraka'
-                    slips_seen[k] = slips_seen.get(k, 0) + 1
-            elif rng.random() < 0.3:
-                x, lab, _ = augment.plant(x, lab, emit, V, rng, n_slips=0, null_p=1.0)
-            if not lab or len(x) < 16000:
-                continue
-            if rng.random() < a.chan_p:
-                x = augment.channel(x, rng, babble)
-            else:
-                x = np.clip(x * rng.uniform(0.5, 1.5), -1, 1).astype(np.float32)
-            items.append((x, lab)); secs += len(x) / 16000
-        mel, fr, tgt, tl = batch_tensors(items, a.device, a.fmask, rng)
+    first, slips_seen, t_start = 1, {}, time.time()
+    if a.resume and (out / 'last.pt').exists():
+        ck = torch.load(out / 'last.pt', map_location='cpu')
+        model.load_state_dict(ck['model']); opt.load_state_dict(ck['opt']); sched.load_state_dict(ck['sched'])
+        first, slips_seen = ck['step'] + 1, ck.get('slips', {})
+        base_per, base_vc = ck.get('base_per', base_per), ck.get('base_vc', base_vc if hard else None)
+        print(f'carrying on from step {ck["step"]}', flush=True)
+    def save_last(step):
+        torch.save({'model': {k: v_.detach().cpu() for k, v_ in model.state_dict().items()}, 'opt': opt.state_dict(),
+                    'sched': sched.state_dict(), 'step': step, 'slips': slips_seen, 'base_per': base_per,
+                    'base_vc': base_vc if hard else None}, out / 'last.pt.tmp')
+        os.replace(out / 'last.pt.tmp', out / 'last.pt')
+    ds = Batches(data, a, V, seed=first)
+    it = iter(torch.utils.data.DataLoader(ds, batch_size=None, num_workers=a.workers, prefetch_factor=4,
+                                          persistent_workers=False) if a.workers else ds)
+    t0, tot, cnt = time.time(), 0.0, 0
+    for step in range(first, a.steps + 1):
+        M, frames, labs, seen = next(it)
+        for k, v_ in seen.items():
+            slips_seen[k] = slips_seen.get(k, 0) + v_
+        mel, fr, tgt, tl = to_device(np.asarray(M), list(frames), labs, a.device)
         out_ = model(mel, fr)
         lp = F.log_softmax(out_['phonemes'].float(), -1).transpose(0, 1)  # [T, B, V]
         il = ((fr + 1) // 2 - 1).clamp(max=lp.shape[0]).cpu()
-        loss = F.ctc_loss(lp.cpu(), tgt, il, tl, blank=0, reduction='mean', zero_infinity=True)
+        if a.device == 'cuda':
+            loss = F.ctc_loss(lp, tgt.cuda(), il.cuda(), tl.cuda(), blank=0, reduction='mean', zero_infinity=True)
+        else:
+            loss = F.ctc_loss(lp.cpu(), tgt, il, tl, blank=0, reduction='mean', zero_infinity=True)
         opt.zero_grad(); loss.backward()
         torch.nn.utils.clip_grad_norm_(params, 1.0)
         opt.step(); sched.step()
@@ -178,6 +243,14 @@ def main():
                 msg += f'; other voices {100*vv:.2f}% (before {100*base_vc[0]:.2f}%), on a phone in a room {100*vc:.2f}% (before {100*base_vc[1]:.2f}%)'
             print(msg, flush=True); log.write(msg + '\n'); log.flush()
             torch.save({k: v_.detach().cpu() for k, v_ in model.state_dict().items()}, out / f'step{step}.pt')
+            save_last(step)
+        if a.max_minutes and time.time() - t_start > a.max_minutes * 60:
+            save_last(step)
+            print(f'paused at step {step}', flush=True)
+            return 'paused'
+    save_last(a.steps)
+    (out / 'done').write_text(str(a.steps))
+    return 'done'
 
 
 if __name__ == '__main__':
