@@ -158,12 +158,14 @@ def versions(s):
 GAMMA = 0.6  # fitted on professionals: normal madds 2, lazim 6, each reciter's munfasil 2 or 4 (pros_tajweed.py)
 
 
-def madd_count(timing, ecount, gamma=GAMMA, mix=0.5):
+def madd_count(timing, ecount, gamma=GAMMA, mix=0.5, kind=None):
     """A madd's count. Timing (held to the next letter, in short syllables) on a curve: professionals hold a
     6-count madd about 6 times as long as a 2-count one, not 3; averaged with the model's own count, which is
     good at short madds and reads long ones short."""
     if timing is None:
         return ecount
+    if kind == 'Lazem Madd':  # always 6, and the question is only whether it was held long: time alone (v4's own
+        return 2 * (timing / 2) ** gamma  # count read 4 of 21 professionals' lazim madds as 2)
     return mix * 2 * (timing / 2) ** gamma + (1 - mix) * ecount
 
 
@@ -254,7 +256,7 @@ def judge(lp, ear, slots_out, pad=6, rule=None, pace=None):
         j['nasal_v'] = (j['held_nasal'] / vowel) if (vowel and j.get('held_nasal')) else None
         j['timing_v'] = (j['held_next'] / vowel) if (vowel and j['held_next'] and (j['symbol'] in LONG or j['kind'] == 'Leen Madd')) else None
         if j['symbol'] in LONG:
-            j['tcount'] = madd_count(j['timing_v'], j['ecount'], **(rule or {}))
+            j['tcount'] = madd_count(j['timing_v'], j['ecount'], kind=j['kind'], **(rule or {}))
         elif j['kind'] == 'Leen Madd':  # the phonetizer's leen isn't one symbol a count: timing alone
             j['tcount'] = madd_count(j['timing_v'], 0.0, mix=1.0) if j['timing_v'] is not None else None
     return out
