@@ -28,7 +28,7 @@ import { callCoach } from './coach/call';
 import { adminRevoStore, deleteRevoData } from './revo/admin';
 import { RevoError, handleClear, handleDayInReview, handleRevoAsk, handleSetOptions } from './revo/handler';
 import { inTestEmulator, recordedAnthropic, testNow } from './emulator';
-import { AdminError, TOTALS_AUDIENCE, handleAdminMetrics, handleAdminRevo, handleMetricsTotals } from './metrics/admin';
+import { AdminError, TOTALS_AUDIENCE, consoleOrigins, handleAdminMetrics, handleAdminRevo, handleMetricsTotals } from './metrics/admin';
 import { adminRevoStore as adminConsoleRevoStore, adminTotalsStore, collector } from './metrics/adminStore';
 
 setGlobalOptions({ region: 'us-central1', maxInstances: 3 });
@@ -417,7 +417,7 @@ export const coachDigestDays = onRequest({ invoker: 'public', maxInstances: 1, t
  * gets anything back. No App Check: the page is a website, and the claim is the gate.
  */
 const PROJECT = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || 'revision-buddy-3a398';
-const CONSOLE_ORIGINS = [`https://${PROJECT}.web.app`, `https://${PROJECT}.firebaseapp.com`];
+const CONSOLE_ORIGINS = consoleOrigins(PROJECT);
 const metricsCollector = collector(adminDb, PROJECT, { emulator: process.env.FUNCTIONS_EMULATOR === 'true' });
 const adminLog = (entry: Record<string, unknown>) => logger.info('admin', entry);
 

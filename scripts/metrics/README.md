@@ -5,7 +5,21 @@ cost (with each account's conversations), and whether the app is healthy. Built 
 layout A with the phone status line, a Refresh button, exact cost per account, alarms pushed to him, and
 everything in the cloud.
 
-**Open it:** https://revision-buddy-3a398.web.app (sign in with the owner's Google account).
+**Open it:** https://metrics.revisely.app once its domain is set up (below), or
+https://revision-buddy-3a398.web.app (sign in with the owner's Google account).
+
+**Sign-in in an app's built-in browser** works only on metrics.revisely.app. On web.app the page signs in
+through `revision-buddy-3a398.firebaseapp.com`, another site, and built-in browsers wall off its storage:
+Firebase stops halfway with "missing initial state" (Nov 10 2026; Safari is fine). On a host in
+`OWN_AUTH_DOMAIN_HOSTS` (`admin/console.js`), the page is its own auth domain, and a phone signs in with a
+full-page redirect. A host goes in that list only once both of these are done, or its sign-in breaks:
+- `https://<host>/__/auth/handler` is an authorized redirect URI of the project's "Web client (auto
+  created by Google Service)" (Google Cloud → APIs & Services → Credentials);
+- the host is an authorized domain in Firebase → Authentication → Settings.
+
+The domain itself is a Firebase Hosting custom domain (Hosting → Add custom domain), with its DNS records
+in Cloudflare as "DNS only" (a proxied record stops Firebase issuing the certificate). `adminMetrics` and
+`adminRevo` accept calls from it (`consoleOrigins` in `functions/src/metrics/admin.ts`).
 
 ## How it works
 
