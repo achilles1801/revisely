@@ -140,3 +140,24 @@ Write-up: `~/Documents/revisely-mistake-detection/free-finetune-v1.md`.
 - `eval_ft.sh NAME [CHECKPOINT]`: every test for one model (`hisn` = the current one) into `$LAB/runs/eval.NAME.txt`;
   `slip_check.py base CKPT`: planted slips on held-back clips (a sanity check, not a real test).
 - `checker.py --ear NAME [--ckpt PATH]` reads (or makes) that model's outputs.
+
+## Free v2 and v3 (Nov 10, evening)
+
+- **Madd by timing** (`madd_timing.py`, `tajweed.madd_count`): a madd's length is the time from its haraka to the
+  next letter, measured in the reciter's short syllables. It goes through a curve, `count = 2·(t/2)^0.6`, because
+  professionals hold a 6-count madd about 6 times as long as a 2-count one. The curve is fitted on professionals
+  (`pros_tajweed.py`) and averaged with the model's count. Nothing is fitted on qdat. An ayah too short to measure
+  the pace (يسٓ) takes the pace from the rest of the recording.
+- **Clear mistakes and consistency** (`tajweed.madd_dropped`, `tajweed.taswiyah`): a natural madd dropped (timing
+  and model agree), and a madd far from the reciter's own length for its kind.
+- **Voices** (`voices.py`): women's and children's voices made from the training clips with WORLD (pyworld). Pitch
+  moves to qdat learners' range and formants go up; timing is unchanged, so labels and slips stay valid.
+- **A phone in a room** (`augment.channel`): reverb, a phone microphone's band, babble or noise, gain.
+  `train.py --voice_p --chan_p --fmask --init --data`.
+- **Letters v2** (`letters_v2.py`): keeps every slip's margin. A shadda counts as missing only when it was held
+  short. Per-pair thresholds were tried and were worse; one bar stays.
+- **Tadabur** (`tadabur_fetch.py`, `tadabur_label.py`): a slice of FaisaI/tadabur (600+ reciters, one ayah per
+  file), with bench-v0's reciters dropped. Its `surah_id` counts from 0. Pass 1 measures each reciter's madd lengths;
+  pass 2 labels their ayat with them. Sources are listed in `$LAB/data/SOURCES.md`.
+- `eval_v2.sh NAME [CKPT]`: tajweed, madd timing, the professionals and letters for one model, into
+  `runs/eval2.NAME.txt`.

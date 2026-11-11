@@ -8,7 +8,7 @@ This differs from checker.py's sound rule (a different sound heard with confiden
 question asked is "is it this slip?" rather than "is anything off?", so accents that blur a sound without
 turning it into another letter cost less, and the flag can say which slip it heard.
 
-  judge_words(lp, ear, words_sounds, spans)  -> per word: [(margin, slip)] best first
+  judge_word(lp, ear, before, snd, after, f0, f1) -> [(margin, slip, new sounds, i, j)] best first (edit at snd[i:j])
 """
 import pathlib
 import sys
@@ -36,7 +36,7 @@ def slips(snd, lengths=True):
     def add(s, why):
         if s not in seen:
             seen.add(s)
-            out.append((s, why))
+            out.append((s, why, i, j))  # the edit is at snd[i:j]
 
     i = 0
     while i < n:
@@ -72,7 +72,7 @@ def judge_word(lp, ear, before, snd, after, f0, f1, lengths=True):
     lab = lambda s: [ear.index[ch] for ch in s if ch in ear.index]
     base = ctc_ll(win, lab(before + snd + after))
     res = []
-    for alt, why in slips(snd, lengths):
-        res.append((ctc_ll(win, lab(before + alt + after)) - base, why, alt))
+    for alt, why, i, j in slips(snd, lengths):
+        res.append((ctc_ll(win, lab(before + alt + after)) - base, why, alt, i, j))
     res.sort(key=lambda x: -x[0])
     return res

@@ -12,6 +12,7 @@ FPS = 50
 EAR_NAME = os.environ.get('EAR_NAME', 'hisn')
 TH = json.loads((LAB / f'runs/qdat/generic.{EAR_NAME}.json').read_text())['thresholds']
 BIN = {'Qalqalah': TH['qalqalah'], 'Ikhfa': TH['noon_mokhfah_len'], 'Ikhfa meem': TH['noon_mokhfah_len'], 'Ghunnah': TH['noon_moshaddadah_len']}
+RULE = None  # tajweed.madd_count's defaults
 FIXED = {'Normal Madd': (2, TH['madd_qalo_alif_len_2']), 'Lazem Madd': (6, TH['madd_madd_aared_len_6'])}
 
 def load(p):
@@ -30,6 +31,7 @@ def item(path):
         s, a, p = KEY.where(e['word'])
         by.setdefault((s, a), []).append((p, e))
     out = []
+    todo = []
     for (s, a), ws in by.items():
         n = len(KEY.uthmani(s, a))
         if [p for p, _ in ws] != list(range(n)):
@@ -37,13 +39,18 @@ def item(path):
         f0 = max(0, int((ws[0][1]['start'] - 0.3) * FPS)); f1 = min(lp.shape[0], int((ws[-1][1]['end'] + 0.3) * FPS))
         try:
             sl = SL.ayah(s, a)
-            js = tajweed.judge(lp[f0:f1], EAR, sl)
+            todo.append((sl, f0, f1, tajweed.judge(lp[f0:f1], EAR, sl, rule=RULE)))
         except Exception as ex:
             continue
+    # an ayah too short to measure the pace (يسٓ) takes the reciter's pace from the rest of the recording
+    paces = [js[0]['pace'] for _, _, _, js in todo if js and js[0].get('pace')]
+    for sl, f0, f1, js in todo:
+        if js and not js[0].get('pace') and paces:
+            js = tajweed.judge(lp[f0:f1], EAR, sl, rule=RULE, pace=float(np.median(paces)))
         for j in js:
             sc = np.array(j['scores']); pr = np.exp(sc - sc.max()); pr /= pr.sum()
             ec = float(sum(len(v) * q for (v, _), q in zip(j['versions'], pr)))
-            out.append((truth['reciter'], truth['condition'], j['kind'], j['margin'], ec, j['golden']))
+            out.append((truth['reciter'], truth['condition'], j['kind'], j['margin'], ec, j['golden'], j.get('tcount'), j.get('timing_v'), j.get('nasal_v')))
     return out
 
 def _init():
@@ -65,7 +72,7 @@ if __name__ == '__main__':
     print(f'{len(items)} recordings, {len(rows)} rule places')
     print('rule | condition | places | flagged (false) at the qdat threshold')
     agg = collections.defaultdict(lambda: [0, 0])
-    for rec, cond, kind, margin, ec, golden in rows:
+    for rec, cond, kind, margin, ec, golden, *_ in rows:
         if kind in BIN:
             a = agg[(kind, cond)]; a[0] += 1; a[1] += margin > BIN[kind]
         elif kind in FIXED:
@@ -76,10 +83,22 @@ if __name__ == '__main__':
         print(f'{k[0]} | {k[1]} | {a[0]} | {a[1]} ({100*a[1]/a[0]:.1f}%)')
     print('estimated counts (clean audio), median per reciter:')
     per = collections.defaultdict(list)
-    for rec, cond, kind, margin, ec, golden in rows:
+    tper = collections.defaultdict(list)
+    for rec, cond, kind, margin, ec, golden, tc, tv, *_ in rows:
         if cond == 'clean' and 'Madd' in kind:
             per[(rec, kind)].append(ec)
+            if tc is not None:
+                tper[(rec, kind)].append(tc)
     kinds = ['Normal Madd', 'Mottasel Madd', 'Monfasel Madd', 'Aared Madd', 'Lazem Madd']
     print('reciter | ' + ' | '.join(kinds))
     for rec in sorted({r for r, _ in per}):
         print(rec + ' | ' + ' | '.join(f"{np.median(per[(rec, k)]):.1f} (n={len(per[(rec, k)])})" if per[(rec, k)] else '-' for k in kinds))
+    if tper:
+        print('with timing (madd rule), median per reciter:')
+        print('reciter | ' + ' | '.join(kinds))
+        for rec in sorted({r for r, _ in tper}):
+            print(rec + ' | ' + ' | '.join(f"{np.median(tper[(rec, k)]):.1f} (n={len(tper[(rec, k)])})" if tper[(rec, k)] else '-' for k in kinds))
+        for cond in ('clean', 'babble20', 'babble10'):
+            nm = [r[6] for r in rows if r[1] == cond and r[2] == 'Normal Madd' and r[6] is not None]
+            lz = [r[6] for r in rows if r[1] == cond and r[2] == 'Lazem Madd' and r[6] is not None]
+            print(f'{cond}: normal madd judged 3.5+ counts {100*np.mean(np.array(nm) >= 3.5):.1f}% (n={len(nm)}); lazim judged under 4.5 {100*np.mean(np.array(lz) < 4.5):.1f}% (n={len(lz)})')

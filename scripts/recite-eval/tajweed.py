@@ -154,7 +154,44 @@ def versions(s):
     return [(c * k, k == n) for k in range(0, 9)]  # madd: 0 to 8 counts
 
 
-def judge(lp, ear, slots_out, pad=6):
+GAMMA = 0.6  # fitted on professionals: normal madds 2, lazim 6, each reciter's munfasil 2 or 4 (pros_tajweed.py)
+
+
+def madd_count(timing, ecount, gamma=GAMMA, mix=0.5):
+    """A madd's count. Timing (held to the next letter, in short syllables) on a curve: professionals hold a
+    6-count madd about 6 times as long as a 2-count one, not 3; averaged with the model's own count, which is
+    good at short madds and reads long ones short."""
+    if timing is None:
+        return ecount
+    return mix * 2 * (timing / 2) ** gamma + (1 - mix) * ecount
+
+
+def madd_dropped(j, timing_max=1.1, model_max=0.5):
+    """A natural madd (2 counts) not said at all, e.g. قَالَ as قَلَ: a clear mistake (lahn jali, mode 2). Both must agree:
+    held no longer than one short syllable, and the model hears no madd vowel. qdat: 6 of 9 real drops, 1.2% of
+    correct learners, 0.03% of professionals' natural madds."""
+    return j.get('timing_v') is not None and j['timing_v'] <= timing_max and j['ecount'] < model_max
+
+
+def taswiyah(judged, gap=2.0, kinds=('Monfasel Madd', 'Mottasel Madd', 'Aared Madd')):
+    """Consistency (taswiyah): within one recitation each kind of madd keeps one length. A madd whose count is
+    `gap` or more from the reciter's own median for its kind (3 or more of that kind heard) is flagged, whatever
+    length the reciter chose. Returns [(index in judged, own median)]."""
+    by = {}
+    for i, j in enumerate(judged):
+        if j['kind'] in kinds and j.get('tcount') is not None:
+            by.setdefault(j['kind'], []).append(i)
+    out = []
+    for k, idx in by.items():
+        if len(idx) < 3:
+            continue
+        med = float(np.median([judged[i]['tcount'] for i in idx]))
+        out += [(i, med) for i in idx if abs(judged[i]['tcount'] - med) >= gap]
+    return out
+
+
+def judge(lp, ear, slots_out, pad=6, rule=None, pace=None):
+    """pace: the reciter's short syllable in frames from earlier ayat, for an ayah too short to measure it."""
     """Judge each slot of an ayah on frames lp (the ayah's audio, a little silence either side)."""
     ph = slots_out['phonemes']
     index = ear.index
@@ -187,11 +224,34 @@ def judge(lp, ear, slots_out, pad=6):
         best = int(np.argmax(scores))
         good = max(sc for sc, (_, ok) in zip(scores, s['versions']) if ok)
         bad = max((sc for sc, (_, ok) in zip(scores, s['versions']) if not ok), default=-1e30)
-        out.append(dict(s, scores=scores, best=s['versions'][best][0], margin=bad - good, held=held,
-                        count=len(s['versions'][best][0]) if s['kind'] not in ('Qalqalah',) else None))
+        # held to the next letter's first sound (the madd's last sound comes early: CTC emits once and waits)
+        nxt = next((pos_of[i] for i in range(b, len(ph)) if i in pos_of), None)
+        held_next = 0
+        if inner and first[0] in emit:
+            end = emit[nxt][0] if (nxt is not None and nxt in emit) else spans[inner[-1]][1]
+            held_next = end - emit[first[0]][0]
+        held_nasal = 0  # a ghunnah or ikhfa: from the nasal's first sound to the next letter's
+        if s['kind'] in ('Ghunnah', 'Ikhfa', 'Ikhfa meem') and inner and inner[0] in emit and nxt is not None and nxt in emit:
+            held_nasal = emit[nxt][0] - emit[inner[0]][0]
+        pr = np.exp(np.array(scores) - max(scores)); pr /= pr.sum()
+        ecount = float(sum(len(v) * q for (v, _), q in zip(s['versions'], pr)))
+        out.append(dict(s, scores=scores, best=s['versions'][best][0], margin=bad - good, held=held, held_next=held_next, held_nasal=held_nasal,
+                        ecount=ecount, count=len(s['versions'][best][0]) if s['kind'] not in ('Qalqalah',) else None))
     # the reciter's count: half the median held time of the 2-count madds
     twos = [j['held'] for j in out if j['kind'] == 'Normal Madd' and j['held'] > 0]
     unit = (float(np.median(twos)) / 2) if len(twos) >= 2 else None
     for j in out:
         j['timing'] = (j['held'] / unit) if (unit and j['held'] and j['symbol'] in LONG) else None
+    # the reciter's pace: the median short syllable (a letter and its short haraka, to the next letter)
+    emit = ctc_align.emit
+    syl = [emit[pos_of[i + 1]][0] - emit[pos_of[i - 1]][0] for i, ch in enumerate(ph)
+           if ch in 'َُِ' and i + 1 < len(ph) and ph[i + 1] not in LONG and (i - 1) in pos_of and (i + 1) in pos_of
+           and pos_of[i - 1] in emit and pos_of[i + 1] in emit]
+    vowel = float(np.median(syl)) if len(syl) >= 3 else pace
+    for j in out:
+        j['pace'] = vowel
+        j['nasal_v'] = (j['held_nasal'] / vowel) if (vowel and j.get('held_nasal')) else None
+        j['timing_v'] = (j['held_next'] / vowel) if (vowel and j['held_next'] and j['symbol'] in LONG) else None
+        if j['symbol'] in LONG:
+            j['tcount'] = madd_count(j['timing_v'], j['ecount'], **(rule or {}))
     return out

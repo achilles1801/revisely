@@ -175,7 +175,9 @@ def apply(x, labels, emit, vocab, slip, rng, x0=None, labels0=None):
     return splice(x, a, b, x0[sa:sb].copy()), labels, what
 
 
-WEIGHT = {'madd': 3.0, 'ghunnah': 2.0, 'ikhfa': 2.0, 'qalqalah': 2.0, 'letter': 1.5, 'haraka': 1.0}
+# v1 weighted madd most; madd length is now judged by timing (tajweed.madd_count), so v2 puts the weight on what
+# only the model can hear: ikhfa, ghunnah, letters
+WEIGHT = {'madd': 1.5, 'ghunnah': 2.5, 'ikhfa': 3.0, 'qalqalah': 1.5, 'letter': 2.5, 'haraka': 1.5}
 
 
 def plant(x, labels, emit, vocab, rng, n_slips=1, null_p=0.3):
@@ -215,3 +217,54 @@ def plant(x, labels, emit, vocab, rng, n_slips=1, null_p=0.3):
             x, labels, w = r
             whats.append(w)
     return x, labels, whats
+
+
+def channel(x, rng, others=(), sr=16000):
+    """A phone in a room: some of reverb, a phone microphone's band, background speech or noise, gain.
+    others: a few other clips (float32) to make babble from. Length and timing unchanged."""
+    from scipy.signal import butter, fftconvolve, sosfilt
+    y = x.astype(np.float32)
+    n = len(y)
+    if rng.random() < 0.45:  # a room: exponentially decaying noise as the tail, the direct sound first
+        rt60 = rng.uniform(0.15, 0.7)
+        L = int(rt60 * sr)
+        t = np.arange(L) / sr
+        rir = rng.standard_normal(L).astype(np.float32) * np.exp(-6.9 * t / rt60).astype(np.float32)
+        rir[: int(0.003 * sr)] *= 0.2
+        rir[0] = 1.0
+        rir /= np.sqrt((rir ** 2).sum())
+        wet = fftconvolve(y, rir)[:n].astype(np.float32)
+        mix = rng.uniform(0.3, 0.9)
+        y = (1 - mix) * y + mix * wet * (np.abs(y).max() / (np.abs(wet).max() + 1e-6))
+    if rng.random() < 0.5:  # the phone's microphone and codec: no lows, no highs
+        hi = rng.uniform(3200, 7600)
+        lo = rng.uniform(60, 300)
+        y = sosfilt(butter(4, [lo, min(hi, sr / 2 - 100)], 'bandpass', fs=sr, output='sos'), y).astype(np.float32)
+    if rng.random() < 0.55:
+        snr = rng.uniform(5, 30)
+        kind = rng.random()
+        if kind < 0.5 and len(others) >= 2:  # people talking in the background
+            noise = np.zeros(n, np.float32)
+            for o in rng.choice(len(others), size=min(len(others), int(rng.integers(2, 6))), replace=False):
+                src = others[o]
+                if len(src) < 1600:
+                    continue
+                off = int(rng.integers(0, max(1, len(src) - n))) if len(src) > n else 0
+                seg = src[off:off + n]
+                start = int(rng.integers(0, max(1, n - len(seg) + 1)))
+                noise[start:start + len(seg)] += seg / (np.sqrt((seg ** 2).mean()) + 1e-6)
+        elif kind < 0.8:  # pink-ish noise (fans, traffic)
+            w = rng.standard_normal(n).astype(np.float32)
+            f = np.fft.rfft(w); f /= np.maximum(np.sqrt(np.arange(len(f)) + 1.0), 1.0)
+            noise = np.fft.irfft(f, n).astype(np.float32)
+        else:  # mains hum and its harmonics
+            t = np.arange(n) / sr; base = rng.choice([50.0, 60.0])
+            noise = sum(np.sin(2 * np.pi * base * k * t + rng.uniform(0, 6.3)) / k for k in range(1, 5)).astype(np.float32)
+        ps = float((y ** 2).mean()) + 1e-9; pn = float((noise ** 2).mean()) + 1e-9
+        y = y + noise * np.sqrt(ps / (pn * 10 ** (snr / 10)))
+    g = rng.uniform(0.3, 1.6)
+    y = y * g
+    if rng.random() < 0.05:  # a little clipping, as a cheap phone at full volume
+        c = rng.uniform(0.3, 0.8) * (np.abs(y).max() + 1e-6)
+        y = np.clip(y, -c, c)
+    return np.clip(y, -1, 1).astype(np.float32)

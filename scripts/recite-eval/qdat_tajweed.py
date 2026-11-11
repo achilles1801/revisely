@@ -25,7 +25,7 @@ for m in meta:
     for j in js:
         sc = np.array(j['scores']); pr = np.exp(sc - sc.max()); pr /= pr.sum()
         j['ecount'] = float(sum(len(v) * p_ for (v, _), p_ in zip(j['versions'], pr)))
-    rows.append({'id': m['id'], 'truth': {k: m[k] for k in names}, 'j': {k: {x: j[x] for x in ('margin', 'count', 'timing', 'held', 'ecount')} for k, j in zip(names, js)}})
+    rows.append({'id': m['id'], 'truth': {k: m[k] for k in names}, 'j': {k: {x: j[x] for x in ('margin', 'count', 'timing', 'held', 'ecount', 'tcount', 'timing_v', 'nasal_v') if x in j} for k, j in zip(names, js)}})
 GOOD = {'noon_moshaddadah_len': 1, 'noon_mokhfah_len': 2, 'qalqalah': 1}
 print(f'# {ear_name}, general module')
 th = {}
