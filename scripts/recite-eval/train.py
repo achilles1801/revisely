@@ -135,7 +135,8 @@ class Batches(torch.utils.data.IterableDataset):
                 use_voice = rng.random() < a.voice_p
                 if a.mosaic_p and rng.random() < a.mosaic_p:
                     ks = rng.choice(by_shard[si], size=min(len(by_shard[si]), int(rng.integers(2, 5))), replace=False)
-                    r = augment.mosaic([data.clip(*data.train[k], voice=use_voice) for k in ks], V, rng)
+                    # stretches of 12–40 sounds: in shorter ones even the released model loses its way (aug_check.py)
+                    r = augment.mosaic([data.clip(*data.train[k], voice=use_voice) for k in ks], V, rng, min_len=12, max_len=40)
                     if r is not None:
                         x, lab = r
                         seen['mosaic'] = seen.get('mosaic', 0) + 1
@@ -197,7 +198,7 @@ def main():
     ap.add_argument('--voice_p', type=float, default=0.0, help="share of clips in a woman's or child's voice")
     ap.add_argument('--chan_p', type=float, default=0.0, help='share of clips through a phone in a room')
     ap.add_argument('--fmask', type=float, default=0.0)
-    ap.add_argument('--data', default='data/train', help='comma-separated folders of shards (data/train: Muaalem, data/train2: Tadabur)')
+    ap.add_argument('--data', default='data/train', help='comma-separated folders of shards (data/train: Muaalem, data/train2: Tadabur, data/train3: Tarteel users)')
     ap.add_argument('--workers', type=int, default=0, help='processes building batches (0: in the training process)')
     ap.add_argument('--resume', type=int, default=0, help='carry on from <out>/last.pt if it is there')
     ap.add_argument('--max_minutes', type=float, default=0, help='save <out>/last.pt and stop after this long (0: run to the end)')

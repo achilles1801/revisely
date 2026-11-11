@@ -13,10 +13,12 @@ Volume `revisely-lab`, mounted at /vol, laid out like the lab (LAB=/vol):
 - models/hisnlabs-tajweed-v2 and models/<init>.pt: uploaded by `upload`;
 - data/train: Muaalem's shards, uploaded by `upload --muaalem 1`;
 - data/tadabur and data/train2: Tadabur, fetched and labelled here;
+- data/train3: Tarteel's user recordings (tarteel_users.py), fetched and labelled here;
 - models/<out>/: checkpoints, downloaded by `fetch_model`.
 
   modal run modal_batch.py::upload --init models/ft-v3/step8000.pt [--muaalem 1]
   modal run modal_batch.py::prep --first 1 --last 200          # fetch + label Tadabur files, re-voice them
+  modal run modal_batch.py::users                               # Tarteel's user recordings, one container a surah
   modal run modal_batch.py::train --out ft-v4 --init ft-v3.pt --steps 30000
   modal run modal_batch.py::fetch_model --out ft-v4
   modal volume delete revisely-lab                               # end of the batch
@@ -59,6 +61,16 @@ def prep_one(i: int):
     _, msg1 = tadabur_label.pass1(name)
     vol.commit()
     return f'{name}: {msg}; pass 1 {msg1}'
+
+
+@app.function(image=image, volumes={'/vol': vol}, cpu=2.0, memory=4096, timeout=3600, max_containers=40)
+def users_one(s: int):
+    """One surah of Tarteel's user recordings: download, label with the madd lengths that fit, keep the close ones."""
+    _setup()
+    import tarteel_users
+    r = tarteel_users.surah(s)
+    vol.commit()
+    return r
 
 
 @app.function(image=image, volumes={'/vol': vol}, cpu=8.0, memory=32768, timeout=3600)
@@ -159,10 +171,17 @@ def prep(first: int = 1, last: int = 2, voices: int = 1):
 
 
 @app.local_entrypoint()
+def users(first: int = 1, last: int = 114):
+    for r in users_one.map(range(first, last + 1), return_exceptions=True):
+        print(r, flush=True)
+
+
+@app.local_entrypoint()
 def train(out: str = 'ft-v4', init: str = 'ft-v3.pt', steps: int = 300, data: str = 'data/train,data/train2',
-          lr: float = 2e-5, batch_s: float = 60.0, parts: int = 40, workers: int = 0, local: int = 0):
+          lr: float = 2e-5, batch_s: float = 60.0, parts: int = 40, workers: int = 0, local: int = 0, extra: str = ''):
+    """extra: more train.py options, e.g. '--mix 0.4,0.4,0.2 --max_per 0.06 --mosaic_p 0.15' (v5)."""
     args = ['--init', f'/vol/models/{init}', '--out', f'/vol/models/{out}', '--steps', str(steps), '--data', data,
-            '--lr', str(lr), '--batch_s', str(batch_s), '--voice_p', '0.4', '--chan_p', '0.35', '--fmask', '0.3']
+            '--lr', str(lr), '--batch_s', str(batch_s), '--voice_p', '0.4', '--chan_p', '0.35', '--fmask', '0.3'] + extra.split()
     for k in range(parts):  # each call is under an hour; it carries on from last.pt
         r = train_part.remote(args, workers, local)
         print(f'part {k + 1}: {r}', flush=True)
