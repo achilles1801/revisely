@@ -16,9 +16,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Amiri+Quran&display=swap">
   <style>
-    /* Volunteers recite into this page; each take goes to Revisely's private Google Drive (the developer's
-       account) through a Google Apps Script (scripts/record/apps-script.gs). Not linked from the site. No person
-       listens to the takes: they are processed automatically (the page promises it). */
+    /* Volunteers recite into this page; each take goes to the developer's private Google Drive
+       through a Google Apps Script (scripts/record/apps-script.gs). Not linked from the site. */
     /* A class's display (the banner's flex) must not override the hidden attribute. */
     [hidden] { display: none !important; }
     .rec { max-width: 640px; margin: 0 auto; padding: 24px var(--gutter) 120px; }
@@ -473,7 +472,6 @@
         <li><strong>What’s recorded:</strong> only what you record on this page, your answers to a few questions, and your phone type.</li>
         <li><strong>No name on them:</strong> your recordings are filed under a code (${esc(S.pid)}), not your name. Only Revisely’s developer knows which code is yours.</li>
         <li><strong>Who listens:</strong> no one. No person listens to your recordings, Revisely’s developer included. They are processed automatically by software, only to build and test Revisely’s recitation checker, and they are never published or shared.</li>
-        <li><strong>Where they’re kept:</strong> privately, in Revisely’s own storage (a private Google Drive folder), under your code.</li>
         <li><strong>What they’re for:</strong> building and testing Revisely’s recitation checking, including training its models. This may become a paid feature of the app.</li>
         <li><strong>Stopping:</strong> you can stop at any time. To have your recordings deleted, tell Revisely’s developer, or email <a href="mailto:support@revisely.app">support@revisely.app</a> with your code (${esc(S.pid)}).</li>
       </ul>
