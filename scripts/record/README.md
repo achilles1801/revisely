@@ -37,6 +37,9 @@ Signed in to the Google account whose Drive should hold the recordings:
 - **Personal links:** give a person one link from the first tab and write their name next to it. `P00` is for
   testing.
 - **Closing a link:** delete its row. It stops working within 5 minutes.
+- **No one listens:** the page promises volunteers that no person listens to their recordings, the developer
+  included; they are processed automatically, only to build and test the checker. Don't open or play the takes;
+  check them only with the lab's scripts.
 - **Deleting someone's recordings:** delete their `P..` folder in "Revisely recordings (private)".
 - **What arrives:** in each person's folder, `consent.json` (which box they ticked, when), `profile.json` (their
   answers) and one file per take, `<item>_take<n>.m4a` (or `.webm` on some Android phones). Each take's Drive
