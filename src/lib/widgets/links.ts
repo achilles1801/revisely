@@ -4,6 +4,7 @@
 //   revisely://read?page=574  the reader at a page (the verse of the day's)
 //   revisely://qibla          the Prayer sheet on Qibla (or the Qibla sheet), over Home
 //   revisely://prayer         the Prayer sheet on Times, over Home
+// Revisely Dev's widgets open the same links on its own scheme, revisely-dev:// (plugins/withDevVariant).
 
 export type WidgetLink =
   | { kind: 'today' }
@@ -14,7 +15,7 @@ export type WidgetLink =
 
 export function parseWidgetLink(url: string | null | undefined): WidgetLink | null {
   if (!url) return null;
-  const m = /^revisely:\/\/([a-z]+)\/?(?:\?(.*))?$/i.exec(url.trim());
+  const m = /^revisely(?:-dev)?:\/\/([a-z]+)\/?(?:\?(.*))?$/i.exec(url.trim());
   if (!m) return null;
   const host = m[1].toLowerCase();
   if (host === 'today') return { kind: 'today' };

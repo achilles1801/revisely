@@ -1,7 +1,9 @@
 name: iOS build
 
 # Builds the production iOS app on a GitHub macOS runner (`eas build --local`) and
-# uploads it to TestFlight (`eas submit`). Local builds use no EAS build credits,
+# uploads it to TestFlight (`eas submit`), or, with variant `dev`, Revisely Dev (CLAUDE.md
+# "Dev stack": its own bundle id, App Store Connect app and TestFlight, the dev Firebase project's
+# plist from GOOGLE_SERVICE_INFO_PLIST_DEV, build and submit profile `dev`, tag ios-dev-fp/<hash>). Local builds use no EAS build credits,
 # and macOS runners cost nothing on a public repository. Called by Preview
 # (preview.yml, native code changed on develop) and by EAS Build (by hand).
 #
@@ -17,25 +19,42 @@ on:
         type: boolean
         default: true
       fingerprint:
-        description: iOS fingerprint of this commit; tagged ios-fp/<hash> once submitted
+        description: iOS fingerprint of this commit; tagged ios-fp/<hash> (ios-dev-fp/<hash>) once submitted
         type: string
         default: ''
+      variant:
+        description: store (Revisely) or dev (Revisely Dev)
+        type: string
+        default: store
     secrets:
       EXPO_TOKEN:
         required: true
       GOOGLE_SERVICE_INFO_PLIST:
         required: true
+      GOOGLE_SERVICE_INFO_PLIST_DEV:
+        required: false
       SENTRY_AUTH_TOKEN:
         required: false
 
 jobs:
   build:
-    name: Build and submit (ios)
+    name: Build and submit (ios${{ inputs.variant == 'dev' && ', Revisely Dev' || '' }})
     runs-on: macos-26
     timeout-minutes: 90
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      # Revisely Dev: app.config.js reads it wherever the config is resolved here (the dev build
+      # profile sets it for the build itself too). Empty: the store app.
+      APP_VARIANT: ${{ inputs.variant == 'dev' && 'dev' || '' }}
+      PROFILE: ${{ inputs.variant == 'dev' && 'dev' || 'production' }}
+      TAG_PREFIX: ${{ inputs.variant == 'dev' && 'ios-dev-fp' || 'ios-fp' }}
     steps:
+      - name: Check the variant
+        env:
+          VARIANT: ${{ inputs.variant }}
+        run: |
+          case "$VARIANT" in store|dev) ;; *) echo "::error::variant: store or dev, not '$VARIANT'"; exit 1 ;; esac
+
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
@@ -68,8 +87,12 @@ jobs:
       # plist from $GOOGLE_SERVICES_INFO_PLIST into it.
       - name: Write the Firebase plist
         env:
-          PLIST: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}
+          PLIST: ${{ inputs.variant == 'dev' && secrets.GOOGLE_SERVICE_INFO_PLIST_DEV || secrets.GOOGLE_SERVICE_INFO_PLIST }}
         run: |
+          if [ -z "$PLIST" ]; then
+            echo "::error::No Firebase plist for this variant: Revisely Dev's is the GOOGLE_SERVICE_INFO_PLIST_DEV repository secret."
+            exit 1
+          fi
           echo "$PLIST" | base64 -d > GoogleService-Info.plist
           cp GoogleService-Info.plist "$RUNNER_TEMP/GoogleService-Info.plist"
 
@@ -83,7 +106,7 @@ jobs:
           SENTRY_DISABLE_AUTO_UPLOAD: ${{ secrets.SENTRY_AUTH_TOKEN == '' && 'true' || 'false' }}
           # A failed upload costs readable stack traces, not the release.
           SENTRY_ALLOW_FAILURE: 'true'
-        run: eas build --local --profile production --platform ios --non-interactive --output "$RUNNER_TEMP/revisely.ipa"
+        run: eas build --local --profile "$PROFILE" --platform ios --non-interactive --output "$RUNNER_TEMP/revisely.ipa"
 
       # The Xcode build phase uploads dSYMs too, but its output is hidden and a
       # failure there is allowed. This makes the upload explicit and visible:
@@ -110,7 +133,7 @@ jobs:
 
       - name: eas submit (TestFlight)
         if: ${{ inputs.submit }}
-        run: eas submit --platform ios --profile production --path "$RUNNER_TEMP/revisely.ipa" --non-interactive
+        run: eas submit --platform ios --profile "$PROFILE" --path "$RUNNER_TEMP/revisely.ipa" --non-interactive
 
       # The marker preview.yml looks for: local builds are not listed by
       # `eas build:list`, so this tag is how it knows the fingerprint has a build.
@@ -119,8 +142,8 @@ jobs:
         env:
           FP: ${{ inputs.fingerprint }}
         run: |
-          if [ -z "$(git ls-remote --tags origin "refs/tags/ios-fp/$FP")" ]; then
-            git tag "ios-fp/$FP"
-            git push origin "refs/tags/ios-fp/$FP"
+          if [ -z "$(git ls-remote --tags origin "refs/tags/$TAG_PREFIX/$FP")" ]; then
+            git tag "$TAG_PREFIX/$FP"
+            git push origin "refs/tags/$TAG_PREFIX/$FP"
           fi
-          echo "::notice title=TestFlight::Build uploaded for fingerprint $FP. Add it to the Team (Expo) group in App Store Connect."
+          echo "::notice title=TestFlight::Build uploaded for fingerprint $FP ($PROFILE). Its internal group gets it once processed."

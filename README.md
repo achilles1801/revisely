@@ -61,6 +61,11 @@ CI runs all of the above except Maestro on every PR and on every push to `develo
 
 To release, try the change in TestFlight, open a PR from `develop` to `main`, merge it once CI is green, and approve the `Promote to production` run.
 
+**Revisely Dev** is a second app (`com.revisionbuddy.app.dev`, `APP_VARIANT=dev`) that installs beside the
+store app. It runs on its own Firebase project, so testing never touches production data, and gets each
+develop commit on its own `dev` channel after `preview`. Its site and API are at dev.revisely.app. How it
+fits together, and what stays off until it is set up: "Dev stack" in [CLAUDE.md](CLAUDE.md).
+
 The runtime version is a fingerprint of the native side, so an update only ever reaches a binary
 built from the same native code. A new library with native code, a plugin, a permission or the icon
 changes the fingerprint; the next push to `main` then builds and submits a new binary, and the update
@@ -83,6 +88,9 @@ firebase deploy --only firestore:rules
 firebase deploy --only functions
 firebase deploy --only firestore:rules,functions   # both at once
 ```
+
+These deploy production (`.firebaserc`'s default). The dev project deploys itself from develop
+([Dev backend](.github/workflows/dev-backend.yml)); by hand it is `--project revisely-dev`.
 
 ## Layout
 

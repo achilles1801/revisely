@@ -20,7 +20,7 @@ import { widgetQibla, type City, type Coords, type WidgetQibla } from './qibla';
 import { partlyMemorizedAyahs, revisablePages } from '../memorizedAyahs';
 
 /** Shared by the app and the extension (app.config.js, targets/widget). */
-export const WIDGET_APP_GROUP = 'group.com.revisionbuddy.app';
+export { widgetAppGroup } from '../variant';
 /** The one key the snapshot is kept under, as a JSON string. */
 export const WIDGET_SNAPSHOT_KEY = 'widget.snapshot';
 /** Days written ahead, so a week without opening the app still rolls over right. */

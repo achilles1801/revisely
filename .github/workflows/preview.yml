@@ -44,6 +44,14 @@ name: Preview
 # The publishing half checks for itself that the scenario suite passed on the commit's tree, and
 # that the commit is on the branch, so a run by hand can't skip the gate. `dry_run` (by hand) goes
 # through both halves without building or publishing anything.
+#
+# Revisely Dev (CLAUDE.md "Dev stack"), when the repository variable DEV_APP is 'true': the second
+# app, on the dev Firebase project, gets the same commit after preview's update, on its own `dev`
+# channel. Its runtimes are its own (APP_VARIANT=dev, the EAS development environment), so its
+# binaries are built here too when they're missing (tags ios-dev-fp/<hash>, android-dev-fp/<hash>;
+# Android only once DEV_ANDROID_SUBMIT is on, after its first bundle went to Play Console by hand).
+# Nothing on the dev side can stop or change preview's update: preview's jobs never wait for it, and
+# Promote reads only the preview branch.
 run-name: ${{ inputs.publish && format('Preview · publish {0}', inputs.publish) || '' }}
 on:
   push:
@@ -218,6 +226,10 @@ jobs:
       needs_build: ${{ steps.fp.outputs.needs_build }}
       android_hash: ${{ steps.android.outputs.hash }}
       android_needs_build: ${{ steps.android.outputs.needs_build }}
+      dev_ios_hash: ${{ steps.dev.outputs.ios_hash }}
+      dev_ios_needs_build: ${{ steps.dev.outputs.ios_needs_build }}
+      dev_android_hash: ${{ steps.dev.outputs.android_hash }}
+      dev_android_needs_build: ${{ steps.dev.outputs.android_needs_build }}
     steps:
       - name: Require an Expo token
         env:
@@ -300,6 +312,33 @@ jobs:
             echo "::notice title=Android build by hand::No Play build is tagged for fingerprint $HASH and ANDROID_SUBMIT is off. If native code changed since the build on Play, run EAS Build (android) and upload it in Play Console; the update reaches only binaries with this fingerprint."
           fi
 
+      # Revisely Dev (DEV_APP): its runtimes, from its own config. A failure here leaves the dev side
+      # out of this run (its jobs need these outputs) and never fails preview's.
+      - name: Look for Revisely Dev builds
+        id: dev
+        if: ${{ vars.DEV_APP == 'true' }}
+        continue-on-error: true
+        env:
+          APP_VARIANT: dev
+          ANDROID_RELEASES: ${{ vars.ANDROID_RELEASES }}
+        run: |
+          for P in ios android; do
+            if [ "$P" = android ] && [ "$ANDROID_RELEASES" != true ]; then continue; fi
+            HASH=$(eas env:exec development "npx expo-updates fingerprint:generate --platform $P" --non-interactive | grep '^{' | jq -r .hash)
+            if [ -z "$HASH" ] || [ "$HASH" = "null" ]; then
+              echo "::error::Could not compute Revisely Dev's $P fingerprint."
+              exit 1
+            fi
+            echo "${P}_hash=$HASH" >> "$GITHUB_OUTPUT"
+            if [ -n "$(git ls-remote --tags origin "refs/tags/$P-dev-fp/$HASH")" ]; then
+              echo "${P}_needs_build=false" >> "$GITHUB_OUTPUT"
+              echo "A Revisely Dev $P build exists for $HASH."
+            else
+              echo "${P}_needs_build=true" >> "$GITHUB_OUTPUT"
+              echo "::notice title=New Revisely Dev build ($P)::Fingerprint $HASH has no build yet."
+            fi
+          done
+
   build:
     name: Build
     needs: [check, fingerprint]
@@ -326,6 +365,34 @@ jobs:
     with:
       submit: true
       fingerprint: ${{ needs.fingerprint.outputs.android_hash }}
+    secrets: inherit
+
+  # Revisely Dev's binaries, when its runtime has none. Preview's update doesn't wait for these.
+  dev-build:
+    name: Build Revisely Dev
+    needs: [check, fingerprint]
+    if: ${{ !cancelled() && !inputs.dry_run && needs.check.outputs.can_build == 'true' && vars.DEV_APP == 'true' && needs.fingerprint.outputs.dev_ios_needs_build == 'true' }}
+    permissions:
+      contents: write # pushes the ios-dev-fp/<hash> tag
+    uses: ./.github/workflows/ios-build.yml
+    with:
+      submit: true
+      fingerprint: ${{ needs.fingerprint.outputs.dev_ios_hash }}
+      variant: dev
+    secrets: inherit
+
+  dev-android-build:
+    name: Build Revisely Dev (android)
+    needs: [check, fingerprint]
+    if: ${{ !cancelled() && !inputs.dry_run && needs.check.outputs.can_build == 'true' && vars.DEV_APP == 'true' && vars.ANDROID_RELEASES == 'true' && vars.DEV_ANDROID_SUBMIT == 'true' && needs.fingerprint.outputs.dev_android_needs_build == 'true' }}
+    permissions:
+      contents: write # pushes the android-dev-fp/<hash> tag
+      id-token: write # asked for by android-build.yml's available job, which never runs for dev
+    uses: ./.github/workflows/android-build.yml
+    with:
+      submit: true
+      fingerprint: ${{ needs.fingerprint.outputs.dev_android_hash }}
+      variant: dev
     secrets: inherit
 
   # Published even when the build failed: an update for a fingerprint with no build reaches nobody,
@@ -392,5 +459,69 @@ jobs:
           SENTRY_PROJECT: react-native
           # Required with org/project, or the script looks for the Sentry plugin's
           # config in app.config.js (deliberately not set there) and gives up.
+          SENTRY_URL: https://sentry.io/
+        run: npx sentry-expo-upload-sourcemaps dist
+
+  # Revisely Dev's update: the same commit, after preview's, on the `dev` channel, with the dev
+  # project's config (EAS development environment) and APP_VARIANT=dev, so it runs only on Revisely
+  # Dev's runtime. Published even when its build failed, as preview's is.
+  dev-update:
+    name: Publish Revisely Dev update
+    needs: [check, fingerprint, update, dev-build, dev-android-build]
+    if: ${{ !cancelled() && vars.DEV_APP == 'true' && needs.update.result == 'success' }}
+    runs-on: ubuntu-latest
+    env:
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      MESSAGE: ${{ inputs.message }}
+      APP_VARIANT: dev
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.check.outputs.sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - run: npm ci --legacy-peer-deps
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          # No caches where release secrets are (CLAUDE.md, Health).
+          eas-cache: false
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Write Revisely Dev's Firebase plist
+        env:
+          PLIST: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST_DEV }}
+        run: |
+          if [ -z "$PLIST" ]; then
+            echo "::error::Add the GOOGLE_SERVICE_INFO_PLIST_DEV repository secret (base64 of the dev project's plist), or turn DEV_APP off."
+            exit 1
+          fi
+          echo "$PLIST" | base64 -d > GoogleService-Info.plist
+
+      - name: eas update (dev)
+        env:
+          PLATFORM: ${{ vars.ANDROID_RELEASES == 'true' && 'all' || 'ios' }}
+          DRY_RUN: ${{ inputs.dry_run == true }}
+        run: |
+          [ -n "$MESSAGE" ] || MESSAGE=$(git log -1 --format=%s HEAD)
+          SUBJECT=$(echo "$MESSAGE" | head -n 1 | cut -c 1-300)
+          APP=$(.github/scripts/app-hash.sh)
+          if [ "$DRY_RUN" = true ]; then
+            echo "Dry run: would publish $(git rev-parse HEAD) to dev ($PLATFORM) as: $SUBJECT [app $APP]"
+            exit 0
+          fi
+          eas update --channel dev --environment development --platform "$PLATFORM" \
+            --message "$SUBJECT [app $APP]" --non-interactive
+
+      - name: Upload source maps to Sentry
+        if: ${{ env.SENTRY_AUTH_TOKEN != '' && !inputs.dry_run }}
+        continue-on-error: true
+        env:
+          SENTRY_ORG: revisely
+          SENTRY_PROJECT: react-native
           SENTRY_URL: https://sentry.io/
         run: npx sentry-expo-upload-sourcemaps dist

@@ -10,7 +10,10 @@ import * as Application from 'expo-application';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 
-export const BUNDLE_ID = 'com.revisionbuddy.app';
+import { appBundleId, STORE_BUNDLE_ID } from './variant';
+
+/** The store app's bundle id (the App Store lookup). Release names use the running app's own. */
+export const BUNDLE_ID = STORE_BUNDLE_ID;
 
 export interface ReleaseInput {
   version: string | null;
@@ -53,8 +56,13 @@ export function shortUpdate(group: string | null): string | null {
   return hex.length >= 8 ? hex.slice(0, 8) : null;
 }
 
-/** The channels of builds people install (App Store, TestFlight): the only ones that report. */
-export const REPORTING_CHANNELS = ['production', 'preview'] as const;
+/**
+ * The channels of builds people install: App Store, TestFlight and Play (production, preview), and
+ * Revisely Dev (dev). The only ones that report. Dev's events and sessions are environment `dev`,
+ * which the health scripts, the promote gate, the alert rule and the metrics console never read
+ * (SENTRY_ENVIRONMENTS in scripts/sentry/api.js: production and preview).
+ */
+export const REPORTING_CHANNELS = ['production', 'preview', 'dev'] as const;
 
 /**
  * Only installed builds report to Sentry: a store or TestFlight binary on a real
@@ -74,7 +82,7 @@ export function describeRelease(input: ReleaseInput): ReleaseInfo {
   const version = input.version ?? '0.0.0';
   const build = input.build ?? '0';
   const updateShort = input.isEmbeddedLaunch ? null : shortUpdate(input.updateGroup ?? input.updateId);
-  const sentryRelease = `${BUNDLE_ID}@${version}+${build}${updateShort ? `.u${updateShort}` : ''}`;
+  const sentryRelease = `${appBundleId()}@${version}+${build}${updateShort ? `.u${updateShort}` : ''}`;
   const sentryEnvironment = input.isDev ? 'development' : input.channel || 'production';
   return {
     ...input,

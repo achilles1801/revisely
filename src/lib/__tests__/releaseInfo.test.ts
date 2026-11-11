@@ -46,6 +46,8 @@ describe('releaseInfo', () => {
     expect(sentryReports({ isDev: false, isDevice: false, channel: 'preview' })).toBe(false);
     expect(sentryReports({ isDev: false, isDevice: true, channel: null })).toBe(false);
     expect(sentryReports({ isDev: false, isDevice: true, channel: 'development' })).toBe(false);
+    // Revisely Dev reports too, as environment dev, which no gate, alert or report reads.
+    expect(sentryReports({ isDev: false, isDevice: true, channel: 'dev' })).toBe(true);
   });
 
   it('never reports from the Test Lab build (its crashes would count against production)', () => {

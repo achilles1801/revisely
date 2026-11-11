@@ -2,7 +2,7 @@ jest.mock('firebase/auth', () => ({ getAuth: () => ({ currentUser: null }) }));
 jest.mock('../releaseInfo', () => ({ currentRelease: () => ({ channel: 'preview' }) }));
 
 import {
-  CLEAR_QURAN_API,
+  clearQuranApi,
   CLEAR_QURAN_DEVICE_CACHE,
   clearQuranBlock,
   ClearQuranDeps,
@@ -70,7 +70,7 @@ describe('getClearQuranVerse', () => {
     const { d, fetch } = deps([block(2, 241, 270, (k) => (k === '2:255' ? 'Allah! There is no god ˹worthy of worship˺ except Him' : 'x'))]);
     expect(await getClearQuranVerse(2, 255, d)).toBe('Allah! There is no god ˹worthy of worship˺ except Him');
     const [url, init] = fetch.mock.calls[0];
-    expect(url).toBe(`${CLEAR_QURAN_API}/windows/2:255`);
+    expect(url).toBe(`${clearQuranApi()}/windows/2:255`);
     expect(String(url)).not.toContain('theclearquran.org');
     expect(init?.headers).toMatchObject({ Authorization: 'Bearer id-token', 'X-Revisely-Channel': 'production' });
   });
@@ -95,7 +95,7 @@ describe('getClearQuranVerse', () => {
     const { d, urls } = worker();
     const [a, b] = await Promise.all([getClearQuranVerse(2, 33, d), getClearQuranVerse(2, 58, d)]);
     expect([a, b]).toEqual(['The text of 2:33', 'The text of 2:58']);
-    expect(urls).toEqual([`${CLEAR_QURAN_API}/windows/2:33`]);
+    expect(urls).toEqual([`${clearQuranApi()}/windows/2:33`]);
   });
 
   it('blocks are aligned 30-verse blocks of one surah (the worker tests check every verse)', () => {
@@ -108,7 +108,7 @@ describe('getClearQuranVerse', () => {
   it('a worker from before blocks (400): this verse alone', async () => {
     const { d, fetch } = deps([json(400, {}), json(200, { verse_key: '1:2', text: 'All praise' })]);
     expect(await getClearQuranVerse(1, 2, d)).toBe('All praise');
-    expect(fetch.mock.calls.map(([u]) => u)).toEqual([`${CLEAR_QURAN_API}/windows/1:2`, `${CLEAR_QURAN_API}/verses/1:2`]);
+    expect(fetch.mock.calls.map(([u]) => u)).toEqual([`${clearQuranApi()}/windows/1:2`, `${clearQuranApi()}/verses/1:2`]);
     expect(peekClearQuranVerse(1, 3)).toBeUndefined();
   });
 
@@ -340,7 +340,7 @@ describe('fetching ahead', () => {
     prefetchClearQuranAround({ sura: 2, ayah: 29 }, 2, d);
     prefetchClearQuranAround({ sura: 2, ayah: 30 }, 2, d);
     await settle();
-    expect(urls).toEqual([`${CLEAR_QURAN_API}/windows/2:15`, `${CLEAR_QURAN_API}/windows/2:31`]);
+    expect(urls).toEqual([`${clearQuranApi()}/windows/2:15`, `${clearQuranApi()}/windows/2:31`]);
     expect(peekClearQuranVerse(2, 31)).toBe('The text of 2:31');
   });
 
@@ -349,7 +349,7 @@ describe('fetching ahead', () => {
     await getClearQuranVerse(1, 7, d);
     prefetchClearQuranAround({ sura: 1, ayah: 7 }, 2, d);
     await settle();
-    expect(urls).toEqual([`${CLEAR_QURAN_API}/windows/1:7`, `${CLEAR_QURAN_API}/windows/2:1`]);
+    expect(urls).toEqual([`${clearQuranApi()}/windows/1:7`, `${clearQuranApi()}/windows/2:1`]);
     prefetchClearQuranAround({ sura: 2, ayah: 1 }, 2, d);
     await settle();
     expect(urls).toHaveLength(2); // 1:6–7 and 2:2–3 are here already

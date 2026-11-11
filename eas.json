@@ -27,12 +27,31 @@
       "autoIncrement": true,
       "channel": "production",
       "environment": "production"
+    },
+    "dev": {
+      "autoIncrement": true,
+      "channel": "dev",
+      "environment": "development",
+      "env": {
+        "APP_VARIANT": "dev"
+      }
     }
   },
   "submit": {
     "production": {
       "ios": {
         "ascAppId": "6767990248",
+        "appleTeamId": "CH8N5V9MA6"
+      },
+      "android": {
+        "serviceAccountKeyPath": "$PLAY_SERVICE_ACCOUNT_KEY_PATH",
+        "track": "internal",
+        "releaseStatus": "completed"
+      }
+    },
+    "dev": {
+      "ios": {
+        "ascAppId": "REPLACE_WITH_REVISELY_DEV_APPLE_ID",
         "appleTeamId": "CH8N5V9MA6"
       },
       "android": {

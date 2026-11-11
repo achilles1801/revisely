@@ -20,6 +20,8 @@ jest.mock('../../../modules/install-source', () => ({
   },
 }));
 jest.mock('../logger', () => ({ logger: { warn: jest.fn(), log: jest.fn(), error: jest.fn() } }));
+let mockDevVariant = false;
+jest.mock('../variant', () => ({ isDevVariant: () => mockDevVariant }));
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { applyUpdateChannel, channelOverride, resetUpdateChannelForTests } from '../updateChannel';
@@ -35,12 +37,22 @@ beforeEach(async () => {
   g.__DEV__ = false;
   mockEnabled = true;
   mockModule = { isTestFlight: () => true };
+  mockDevVariant = false;
 });
 afterAll(() => {
   g.__DEV__ = true;
 });
 
 describe('update channel', () => {
+  it('Revisely Dev keeps its own channel (dev), tester or not', async () => {
+    mockDevVariant = true;
+    expect(applyUpdateChannel(true)).toBeNull();
+    expect(applyUpdateChannel(false)).toBeNull();
+    await flush();
+    expect(mockSetOverride).not.toHaveBeenCalled();
+    expect(mockCheck).not.toHaveBeenCalled();
+  });
+
   it('a tester in TestFlight follows preview, and gets its update now', async () => {
     expect(applyUpdateChannel(true)).toBe('preview');
     expect(mockSetOverride).toHaveBeenCalledWith({ 'expo-channel-name': 'preview' });

@@ -1,6 +1,9 @@
 name: Android build
 
 # Builds the production Android app bundle (.aab) on a GitHub Linux runner (`eas build --local`)
+# (or, with variant `dev`, Revisely Dev's: CLAUDE.md "Dev stack"; its own Play app, google-services.json
+# from GOOGLE_SERVICES_JSON_DEV, profile `dev`, uploads only when DEV_ANDROID_SUBMIT is 'true', tag
+# android-dev-fp/<hash>, and never the "offer it to testers" job, which writes production's config/app)
 # and uploads it to Google Play's internal testing track (`eas submit`), released to its testers at
 # once, as TestFlight's Team (Expo) group gets every iOS build. Local builds use no EAS build credits,
 # and Linux runners cost nothing on a public repository. Called by Preview (preview.yml, native code
@@ -24,14 +27,20 @@ on:
         type: boolean
         default: true
       fingerprint:
-        description: Android fingerprint of this commit; tagged android-fp/<hash> once submitted
+        description: Android fingerprint of this commit; tagged android-fp/<hash> (android-dev-fp/<hash>) once submitted
         type: string
         default: ''
+      variant:
+        description: store (Revisely) or dev (Revisely Dev)
+        type: string
+        default: store
     secrets:
       EXPO_TOKEN:
         required: true
       GOOGLE_SERVICES_JSON:
         required: true
+      GOOGLE_SERVICES_JSON_DEV:
+        required: false
       SENTRY_AUTH_TOKEN:
         required: false
       PLAY_SERVICE_ACCOUNT_JSON:
@@ -39,18 +48,27 @@ on:
 
 jobs:
   build:
-    name: Build and submit (android)
+    name: Build and submit (android${{ inputs.variant == 'dev' && ', Revisely Dev' || '' }})
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      # Revisely Dev: app.config.js reads it wherever the config is resolved here. Empty: the store app.
+      APP_VARIANT: ${{ inputs.variant == 'dev' && 'dev' || '' }}
+      PROFILE: ${{ inputs.variant == 'dev' && 'dev' || 'production' }}
+      TAG_PREFIX: ${{ inputs.variant == 'dev' && 'android-dev-fp' || 'android-fp' }}
+      # Uploads to Google Play: the store app's when ANDROID_SUBMIT is on, Revisely Dev's when
+      # DEV_ANDROID_SUBMIT is (its first upload goes through Play Console by hand).
+      SUBMIT_ON: ${{ (inputs.variant == 'dev' && vars.DEV_ANDROID_SUBMIT == 'true') || (inputs.variant != 'dev' && vars.ANDROID_SUBMIT == 'true') }}
     steps:
       - name: Require the Firebase config
         env:
-          JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          VARIANT: ${{ inputs.variant }}
+          JSON: ${{ inputs.variant == 'dev' && secrets.GOOGLE_SERVICES_JSON_DEV || secrets.GOOGLE_SERVICES_JSON }}
         run: |
+          case "$VARIANT" in store|dev) ;; *) echo "::error::variant: store or dev, not '$VARIANT'"; exit 1 ;; esac
           if [ -z "$JSON" ]; then
-            echo "::error::Add a GOOGLE_SERVICES_JSON repository secret: base64 of google-services.json (Firebase Console > Project settings > the Android app)."
+            echo "::error::Add the repository secret with base64 of google-services.json (Firebase Console > Project settings > the Android app): GOOGLE_SERVICES_JSON, or GOOGLE_SERVICES_JSON_DEV for Revisely Dev."
             exit 1
           fi
 
@@ -88,7 +106,7 @@ jobs:
 
       - name: Write google-services.json
         env:
-          JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          JSON: ${{ inputs.variant == 'dev' && secrets.GOOGLE_SERVICES_JSON_DEV || secrets.GOOGLE_SERVICES_JSON }}
         run: echo "$JSON" | base64 -d > "$RUNNER_TEMP/google-services.json"
 
       - name: eas build --local
@@ -101,21 +119,21 @@ jobs:
           SENTRY_DISABLE_AUTO_UPLOAD: ${{ secrets.SENTRY_AUTH_TOKEN == '' && 'true' || 'false' }}
           # A failed upload costs readable stack traces, not the release.
           SENTRY_ALLOW_FAILURE: 'true'
-        run: eas build --local --profile production --platform android --non-interactive --output "$RUNNER_TEMP/revisely.aab"
+        run: eas build --local --profile "$PROFILE" --platform android --non-interactive --output "$RUNNER_TEMP/revisely.aab"
 
       # For the first upload, which Google Play takes only through Play Console, and for a look
       # without Play. The repository is public, so anyone signed in to GitHub can download it while
       # it is kept (an .aab holds nothing that the app on Play won't).
       - uses: actions/upload-artifact@v4
         with:
-          name: revisely-android-${{ github.sha }}
+          name: revisely-${{ inputs.variant == 'dev' && 'dev-' || '' }}android-${{ github.sha }}
           path: ${{ runner.temp }}/revisely.aab
           retention-days: 7
 
       # Released to internal testers at once (releaseStatus completed in eas.json). Closed testing and
       # production take the same bundle later, by hand: scripts/play.js promote (CLAUDE.md, Android).
       - name: eas submit (Google Play, internal testing)
-        if: ${{ inputs.submit && vars.ANDROID_SUBMIT == 'true' }}
+        if: ${{ inputs.submit && env.SUBMIT_ON == 'true' }}
         env:
           KEY: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
         run: |
@@ -126,24 +144,24 @@ jobs:
           export PLAY_SERVICE_ACCOUNT_KEY_PATH="$RUNNER_TEMP/play-service-account.json"
           trap 'rm -f "$PLAY_SERVICE_ACCOUNT_KEY_PATH"' EXIT
           (umask 077 && echo "$KEY" | base64 -d > "$PLAY_SERVICE_ACCOUNT_KEY_PATH")
-          eas submit --platform android --profile production --path "$RUNNER_TEMP/revisely.aab" --non-interactive
+          eas submit --platform android --profile "$PROFILE" --path "$RUNNER_TEMP/revisely.aab" --non-interactive
 
       # The marker preview.yml looks for: local builds are not listed by `eas build:list`, so this tag
       # is how it knows the fingerprint has a build on Play.
       - name: Tag the fingerprint
-        if: ${{ inputs.submit && vars.ANDROID_SUBMIT == 'true' && inputs.fingerprint != '' }}
+        if: ${{ inputs.submit && env.SUBMIT_ON == 'true' && inputs.fingerprint != '' }}
         env:
           FP: ${{ inputs.fingerprint }}
         run: |
-          if [ -z "$(git ls-remote --tags origin "refs/tags/android-fp/$FP")" ]; then
-            git tag "android-fp/$FP"
-            git push origin "refs/tags/android-fp/$FP"
+          if [ -z "$(git ls-remote --tags origin "refs/tags/$TAG_PREFIX/$FP")" ]; then
+            git tag "$TAG_PREFIX/$FP"
+            git push origin "refs/tags/$TAG_PREFIX/$FP"
           fi
           echo "::notice title=Google Play::Bundle uploaded to internal testing (released to its testers) for fingerprint $FP."
 
       - name: Not submitted
-        if: ${{ !(inputs.submit && vars.ANDROID_SUBMIT == 'true') }}
-        run: echo "::notice title=Not submitted::The .aab is attached to this run (Artifacts). Google Play submission is off (repository variable ANDROID_SUBMIT)."
+        if: ${{ !(inputs.submit && env.SUBMIT_ON == 'true') }}
+        run: echo "::notice title=Not submitted::The .aab is attached to this run (Artifacts). Google Play submission is off (repository variable ${{ inputs.variant == 'dev' && 'DEV_ANDROID_SUBMIT' || 'ANDROID_SUBMIT' }})."
 
   # Phones offer a new build ("New version available", src/lib/updates/storeUpdates.ts) once
   # Firestore config/app says Google Play has it. Internal testing has no review: a completed
@@ -156,7 +174,8 @@ jobs:
   available:
     name: Offer it to testers (config/app)
     needs: build
-    if: ${{ inputs.submit && vars.ANDROID_SUBMIT == 'true' }}
+    # The store app only: playBuildAvailable writes production's config/app.
+    if: ${{ inputs.submit && inputs.variant != 'dev' && vars.ANDROID_SUBMIT == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:

@@ -1,11 +1,24 @@
 import 'dotenv/config';
 
+// Revisely Dev (APP_VARIANT=dev; CLAUDE.md "Dev stack"): the second app that installs beside the
+// store app. Its own bundle id and package, name, icon, deep-link scheme, App Group and widget
+// extension; it runs on the dev Firebase project (EAS `development` environment) and follows develop
+// on the `dev` channel. Without APP_VARIANT every value below resolves exactly as the store app's: the
+// fingerprint hashes the resolved config, not this file, so production's runtime doesn't move. Keep
+// it that way: a dev-only plugin or value goes behind DEV, never into the store app's config.
+const DEV = process.env.APP_VARIANT === 'dev';
+const BUNDLE_ID = DEV ? "com.revisionbuddy.app.dev" : "com.revisionbuddy.app";
+const APP_GROUP = DEV ? "group.com.revisionbuddy.app.dev" : "group.com.revisionbuddy.app";
+const SCHEME = DEV ? "revisely-dev" : "revisely";
+// The Dev icon's ground (assets/dev/, assets/brand/dev/): amber, so it never passes for the store app.
+const DEV_ICON_GROUND = "#E8A33D";
+
 export default {
   expo: {
-    name: "Revisely",
+    name: DEV ? "Revisely Dev" : "Revisely",
     slug: "revision-buddy",
     owner: "achilles1802",
-    scheme: "revisely",
+    scheme: SCHEME,
     version: "1.0.3",
     // A hash of the native side (see fingerprint.config.js). An update reaches only
     // binaries with the same one, so JS that needs new native code never lands on a
@@ -18,12 +31,12 @@ export default {
     // The gradient cursive R on black (Oct 27 2026; sources in assets/brand/). Opaque
     // 1024 with no alpha, as the App Store requires. The splash is the
     // expo-splash-screen plugin below.
-    icon: "./assets/icon.png",
+    icon: DEV ? "./assets/dev/icon.png" : "./assets/icon.png",
     userInterfaceStyle: "light",
     newArchEnabled: true,
     ios: {
       supportsTablet: false,
-      bundleIdentifier: "com.revisionbuddy.app",
+      bundleIdentifier: BUNDLE_ID,
       // The team that signs the app and the widget extension (as in eas.json).
       appleTeamId: "CH8N5V9MA6",
       // A fixed path: EAS copies its GOOGLE_SERVICES_INFO_PLIST file here before
@@ -33,7 +46,7 @@ export default {
       // Shared with the widget extension (targets/widget): the app writes what the
       // widgets show here (src/lib/widgets).
       entitlements: {
-        "com.apple.security.application-groups": ["group.com.revisionbuddy.app"],
+        "com.apple.security.application-groups": [APP_GROUP],
         // Prayer notifications at a prayer's time break through Focus and the
         // notification summary (interruptionLevel in lib/prayer/sync). A capability
         // on the App ID: EAS signing needs `eas credentials:configure-build` once.
@@ -61,7 +74,7 @@ export default {
             ]
           },
           {
-            CFBundleURLSchemes: ["revisely"]
+            CFBundleURLSchemes: [SCHEME]
           }
         ]
       }
@@ -74,7 +87,7 @@ export default {
       color: "#624BD5"
     },
     android: {
-      package: "com.revisionbuddy.app",
+      package: BUNDLE_ID,
       // Expo adds these by default. The app never draws over other apps (only the dev menu
       // did) and stores files in its own folders (no storage permission since Android 10);
       // Play lists every permission on the store page.
@@ -85,9 +98,9 @@ export default {
       ],
       googleServicesFile: process.env.GOOGLE_SERVICES_JSON ?? "./google-services.json",
       adaptiveIcon: {
-        foregroundImage: "./assets/adaptive-icon.png",
+        foregroundImage: DEV ? "./assets/dev/adaptive-icon.png" : "./assets/adaptive-icon.png",
         monochromeImage: "./assets/adaptive-icon-monochrome.png",
-        backgroundColor: "#000000"
+        backgroundColor: DEV ? DEV_ICON_GROUND : "#000000"
       },
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false
@@ -192,7 +205,9 @@ export default {
           locationAlwaysAndWhenInUsePermission: "Revisely uses your location to work out prayer times, the Qibla direction and the Fajr time that starts your revision day. Only the Fajr setting saves it to your account; it is never shared or used for tracking.",
           locationWhenInUsePermission: "Revisely uses your location to work out prayer times, the Qibla direction and the Fajr time that starts your revision day. Only the Fajr setting saves it to your account; it is never shared or used for tracking."
         }
-      ]
+      ],
+      // Revisely Dev only: its widget reads its own App Group and opens revisely-dev:// links.
+      ...(DEV ? ["./plugins/withDevVariant"] : [])
     ],
     extra: {
       firebase: {
@@ -210,6 +225,10 @@ export default {
       // Sentry crash reporting. Empty DSN → Sentry stays off (fine for dev).
       // Set SENTRY_DSN in EAS env vars + .env when you're ready to capture errors.
       sentryDsn: process.env.SENTRY_DSN,
+      // lib/variant: "dev" in Revisely Dev. apiBase: the API (worker/) it calls, dev.revisely.app
+      // there (API_BASE in the EAS development environment); unset, revisely.app.
+      variant: DEV ? "dev" : "store",
+      apiBase: process.env.API_BASE,
       eas: {
         projectId: "32c71b6d-0a13-454c-916d-11d27f168fa8"
       }

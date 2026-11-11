@@ -6,6 +6,9 @@ name: EAS Build
 # GitHub macOS runner (ios-build.yml), Android on a Linux runner (android-build.yml): no EAS build
 # credits. By default both platforms build from the same commit, so the two stores stay on the same
 # version; each submitted build tags its fingerprint (ios-fp/<hash>, android-fp/<hash>) for Preview.
+# Variant `dev` builds Revisely Dev instead (CLAUDE.md "Dev stack"): fingerprints from the EAS
+# development environment with APP_VARIANT=dev, tags ios-dev-fp/<hash> and android-dev-fp/<hash>. Its
+# first Android bundle (submit off) is the one uploaded to Play Console by hand.
 on:
   workflow_dispatch:
     inputs:
@@ -18,6 +21,11 @@ on:
         description: Submit once built (TestFlight; Google Play internal testing when ANDROID_SUBMIT is on)
         type: boolean
         default: true
+      variant:
+        description: Which app (store = Revisely; dev = Revisely Dev)
+        type: choice
+        options: [store, dev]
+        default: store
 
 permissions:
   contents: read
@@ -48,14 +56,17 @@ jobs:
 
       - name: Write the Firebase plist
         env:
-          PLIST: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}
+          PLIST: ${{ inputs.variant == 'dev' && secrets.GOOGLE_SERVICE_INFO_PLIST_DEV || secrets.GOOGLE_SERVICE_INFO_PLIST }}
         run: echo "$PLIST" | base64 -d > GoogleService-Info.plist
 
       - name: Compute
         id: fp
+        env:
+          APP_VARIANT: ${{ inputs.variant == 'dev' && 'dev' || '' }}
+          EAS_ENV: ${{ inputs.variant == 'dev' && 'development' || 'production' }}
         run: |
           for P in ios android; do
-            HASH=$(eas env:exec production "npx expo-updates fingerprint:generate --platform $P" --non-interactive | grep '^{' | jq -r .hash)
+            HASH=$(eas env:exec "$EAS_ENV" "npx expo-updates fingerprint:generate --platform $P" --non-interactive | grep '^{' | jq -r .hash)
             if [ -z "$HASH" ] || [ "$HASH" = "null" ]; then
               echo "::error::Could not compute the $P fingerprint."
               exit 1
@@ -65,7 +76,7 @@ jobs:
           done
 
   build:
-    name: Build production (ios)
+    name: Build ${{ inputs.variant == 'dev' && 'Revisely Dev' || 'production' }} (ios)
     needs: fingerprint
     if: ${{ inputs.platform != 'android' }}
     permissions:
@@ -74,10 +85,11 @@ jobs:
     with:
       submit: ${{ inputs.submit }}
       fingerprint: ${{ needs.fingerprint.outputs.ios }}
+      variant: ${{ inputs.variant }}
     secrets: inherit
 
   build-android:
-    name: Build production (android)
+    name: Build ${{ inputs.variant == 'dev' && 'Revisely Dev' || 'production' }} (android)
     needs: fingerprint
     if: ${{ inputs.platform == 'android' || (inputs.platform == 'all' && vars.ANDROID_RELEASES == 'true') }}
     permissions:
@@ -87,4 +99,5 @@ jobs:
     with:
       submit: ${{ inputs.submit }}
       fingerprint: ${{ needs.fingerprint.outputs.android }}
+      variant: ${{ inputs.variant }}
     secrets: inherit

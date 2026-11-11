@@ -28,6 +28,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import InstallSource from '../../modules/install-source';
 import { logger } from './logger';
 import { notePendingUpdate } from './updates/ota';
+import { isDevVariant } from './variant';
 
 export const PREVIEW_CHANNEL = 'preview';
 type Channel = typeof PREVIEW_CHANNEL | 'production';
@@ -58,6 +59,9 @@ let applied: Channel | null = null;
  */
 export function applyUpdateChannel(isTester: boolean): Channel | null {
   if (__DEV__ || !Updates.isEnabled) return null;
+  // Revisely Dev follows the channel it was built with (dev), whatever the account: its runtime is
+  // its own, so preview's and production's updates could never run on it anyway.
+  if (isDevVariant()) return null;
   if (Platform.OS === 'ios' && !InstallSource) return null;
   const channel: Channel = isTester && installAllowsPreview() ? PREVIEW_CHANNEL : 'production';
   if (channel === applied) return channel;

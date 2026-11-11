@@ -25,6 +25,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import InstallSource from '../../../modules/install-source';
 import { BUNDLE_ID } from '../releaseInfo';
+import { isDevVariant } from '../variant';
 import { logger } from '../logger';
 import {
   AppConfig,
@@ -71,7 +72,7 @@ const listeners = new Set<() => void>();
 const notify = () => listeners.forEach((l) => l());
 
 function exempt(): boolean {
-  if (__DEV__) return true;
+  if (__DEV__ || isDevVariant()) return true;
   if (Platform.OS !== 'ios') return false;
   // Binaries before 1.0.2 can't tell; TestFlight and App Review have a sandbox receipt.
   try {

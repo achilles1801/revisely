@@ -28,10 +28,15 @@
 import { getAuth } from 'firebase/auth';
 import { logger } from './logger';
 import { currentRelease } from './releaseInfo';
+import { apiBase } from './variant';
 import { getSurahDisplay } from './quranData';
 import { nextVerse, previousVerse, VerseKey } from './verses';
 
-export const CLEAR_QURAN_API = 'https://revisely.app/api/tcq';
+/** The worker's Clear Quran routes: revisely.app's, or dev.revisely.app's in Revisely Dev (lib/variant). */
+export function clearQuranApi(): string {
+  return `${apiBase()}/api/tcq`;
+}
+
 const TIMEOUT_MS = 15_000;
 /** Verses kept in memory (30 blocks). */
 const KEEP = 900;
@@ -173,7 +178,7 @@ async function request(path: string, force: boolean, deps: ClearQuranDeps): Prom
   const abort = new AbortController();
   const timer = setTimeout(() => abort.abort(), TIMEOUT_MS);
   try {
-    return await deps.fetch(`${CLEAR_QURAN_API}/${path}`, {
+    return await deps.fetch(`${clearQuranApi()}/${path}`, {
       headers: {
         Authorization: `Bearer ${token}`,
         'X-Revisely-Channel': deps.channel() ?? 'development',
@@ -255,7 +260,7 @@ async function checkPolicy(store: ClearQuranStore, deps: ClearQuranDeps): Promis
   const abort = new AbortController();
   const timer = setTimeout(() => abort.abort(), TIMEOUT_MS);
   try {
-    const res = await deps.fetch(`${CLEAR_QURAN_API}/policy`, { headers: { Accept: 'application/json' }, signal: abort.signal });
+    const res = await deps.fetch(`${clearQuranApi()}/policy`, { headers: { Accept: 'application/json' }, signal: abort.signal });
     if (!res.ok) return; // a worker from before the policy: keep what we have
     const body = (await res.json()) as { version?: unknown; device?: { maxAgeSeconds?: unknown; staleSeconds?: unknown } };
     const max = body?.device?.maxAgeSeconds;
