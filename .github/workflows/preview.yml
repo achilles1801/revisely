@@ -61,7 +61,7 @@ on:
       - 'tests/**'
       - 'functions/**'
       - 'worker/**'
-      - 'wrangler.jsonc'
+      - 'wrangler*.jsonc'
       - '.maestro/**'
       - 'store/**'
       - 'scripts/**'

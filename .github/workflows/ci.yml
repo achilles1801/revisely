@@ -187,7 +187,7 @@ jobs:
           npm ci --prefix tests/firestore-rules
 
       # The app (tests/scenarios with it; fast-check is its own dependency), and
-      # the Cloudflare worker (worker/, wrangler.jsonc). functions/ and
+      # the Cloudflare worker (worker/, wrangler*.jsonc). functions/ and
       # tests/firestore-rules/ have their own and are checked below.
       - name: Typecheck (app, worker)
         id: typecheck
