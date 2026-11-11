@@ -618,14 +618,28 @@ export default function ActiveRevisionScreen() {
     },
     [assignedPages, completedPages, markRevised],
   );
-  // The pager's swipe: credited only for the page on screen, as the screen
-  // knows it (a page the screen doesn't show is never marked).
+  // The pager's swipe: credited only for a page between the one the screen
+  // shows and the one the pager has landed on (a page the screen never reached
+  // is never marked). Usually that is the page shown; when the JavaScript gets
+  // several swipes at once (a held-up thread), the pager credits each page they
+  // left in one go, before the screen hears of any page between (SESS-1).
+  // Those marks reach `completedPages` on the next render, so the end card,
+  // reached by the same swipes, reads them here (emptied once they have).
+  const swipedNowRef = useRef<Set<number>>(new Set());
+  useEffect(() => {
+    swipedNowRef.current.clear();
+  }, [completedPages]);
   const handleSwipeAdvance = useCallback(
     (leftPage: number, newPage: number) => {
-      if (currentPageNumber != null && leftPage !== currentPageNumber) return;
+      if (currentPageNumber != null) {
+        const from = shownPages.indexOf(currentPageNumber);
+        const left = shownPages.indexOf(leftPage);
+        if (from < 0 || left < from || left >= shownPages.indexOf(newPage)) return;
+      }
+      if (assignedPages.includes(leftPage)) swipedNowRef.current.add(leftPage);
       handleAdvance(leftPage, newPage);
     },
-    [currentPageNumber, handleAdvance],
+    [currentPageNumber, shownPages, assignedPages, handleAdvance],
   );
 
   // ===== The end card, after the last page =====
@@ -641,7 +655,9 @@ export default function ActiveRevisionScreen() {
       if (!bySwipe || !assignedPages.includes(lastPage) || completedPages.has(lastPage)) return;
       // The day the page belongs to: finishing it is what the card celebrates.
       const dayPages = sections.find((s) => s.pages.includes(lastPage))?.pages ?? [];
-      const finishes = dayPages.every((p) => p === lastPage || completedPages.has(p));
+      const finishes = dayPages.every(
+        (p) => p === lastPage || completedPages.has(p) || swipedNowRef.current.has(p),
+      );
       if (!finishes) {
         handleAdvance(lastPage, lastPage);
         return;

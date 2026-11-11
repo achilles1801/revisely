@@ -17,14 +17,20 @@ name: Promote to production
 # deployments): the testers' sign-off. An update promoted for a runtime that a store doesn't have yet
 # (a new version in review) reaches its users when that version is released.
 #
-# Release health: before the approval, each platform's update must have run at least `min_sessions`
-# sessions on preview at `min_crash_free` crash-free or better, read from Sentry (scripts/sentry/gate.js;
-# sessions are labelled per update group, src/lib/releaseInfo.ts). One platform below the bar stops
-# both. A run by hand can lower the bar or skip the check (`skip_health_check`).
+# Release health: before the approval, each platform's update must be `min_crash_free` crash-free or
+# better over the sessions it ran on preview, read from Sentry (scripts/sentry/gate.js; sessions are
+# labelled per update group, src/lib/releaseInfo.ts). No minimum of sessions by default (the owner,
+# Nov 10 2026); `min_sessions` sets one. One platform below the bar stops both. A run by hand can raise
+# or lower the bar, or skip the check (`skip_health_check`).
 #
 # workflow_dispatch can promote given update groups instead (e.g. a fix for an older binary, published
 # to preview from a branch cut before a native change): `group` takes one or more, separated by commas
 # or spaces (the iOS and the Android group of a push). It goes through the same approval.
+#
+# Release gate: main's commit must have come from a PR into main whose own run passed "Release gate"
+# (ci.yml: every flow, iOS and Android). Branch protection asks for it too; this holds even when a merge
+# got past it, as #496 did (Nov 10 2026). A rollback or a `group` given by hand isn't main's commit and
+# skips it; `skip_release_gate` is the owner's override, said so in the summary.
 #
 # Rolling back: run it by hand with `group` = the previous production update group(s) and `rollback`
 # = true. Those groups are looked up on production as well as preview, the health check is skipped (it
@@ -64,13 +70,17 @@ on:
         type: boolean
         default: false
       min_sessions:
-        description: Preview sessions the update must have run
+        description: Preview sessions the update must have run (0, the default, for none)
         type: string
-        default: '5'
+        default: '0'
       min_crash_free:
         description: Crash-free sessions needed (0-1)
         type: string
         default: '0.99'
+      skip_release_gate:
+        description: Promote though the release PR's run didn't pass "Release gate" (the owner's override)
+        type: boolean
+        default: false
 
 concurrency:
   group: eas-promote
@@ -178,7 +188,7 @@ jobs:
       - name: Crash-free sessions of the candidate update
         env:
           SENTRY_API_TOKEN: ${{ secrets.SENTRY_API_TOKEN }}
-          MIN_SESSIONS: ${{ inputs.min_sessions || '5' }}
+          MIN_SESSIONS: ${{ inputs.min_sessions || '0' }}
           MIN_CRASH_FREE: ${{ inputs.min_crash_free || '0.99' }}
           TARGETS: ${{ needs.find.outputs.targets }}
         run: |
@@ -189,14 +199,51 @@ jobs:
           # Every platform's update must pass: one below the bar stops both.
           node scripts/sentry/gate.js $TARGETS
 
+  gate:
+    name: Release gate passed for main
+    if: ${{ !inputs.rollback && !inputs.group && !inputs.skip_release_gate }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: read
+      pull-requests: read
+    steps:
+      - name: The release PR's run tested every flow on both platforms
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          # main's commit is a PR's merge commit; what was tested is that PR's head.
+          pr=$(gh api "repos/$REPO/commits/$SHA/pulls" --jq '[.[] | select(.base.ref == "main" and .merged_at != null)][0] // empty')
+          if [ -z "$pr" ]; then
+            echo "::error title=No release PR::main's $SHA didn't come from a merged PR into main. Nothing was promoted."
+            exit 1
+          fi
+          number=$(jq -r .number <<<"$pr"); head=$(jq -r .head.sha <<<"$pr")
+          gate=$(gh api "repos/$REPO/commits/$head/check-runs?check_name=Release%20gate&filter=latest" --jq '.check_runs[0].conclusion // "none"')
+          echo "#$number, head $head: Release gate $gate"
+          if [ "$gate" != success ]; then
+            echo "::error title=Release gate::#$number's run didn't pass Release gate ($gate) on $head. Nothing was promoted (skip_release_gate is the owner's override)."
+            exit 1
+          fi
+          echo "Release gate: #$number passed every flow on both platforms ($head)." >> "$GITHUB_STEP_SUMMARY"
+
   promote:
     name: Promote (after the testers' sign-off)
-    needs: [find, health]
-    # The health check passed, or was skipped on purpose (a rollback or a run by hand that skips it).
-    if: ${{ !cancelled() && needs.find.result == 'success' && (needs.health.result == 'success' || needs.health.result == 'skipped') }}
+    needs: [find, health, gate]
+    # The health check and the release gate passed, or were skipped on purpose (a rollback, a group
+    # given by hand, or a run by hand that skips one).
+    if: ${{ !cancelled() && needs.find.result == 'success' && (needs.health.result == 'success' || needs.health.result == 'skipped') && (needs.gate.result == 'success' || needs.gate.result == 'skipped') }}
     runs-on: ubuntu-latest
     environment: production
     steps:
+      - name: Without the release gate (the owner's override)
+        if: ${{ inputs.skip_release_gate }}
+        run: |
+          echo "::warning title=Release gate skipped::Promoted with skip_release_gate: the release PR's full run wasn't required to pass."
+          echo "**Release gate skipped** (skip_release_gate): the owner's override." >> "$GITHUB_STEP_SUMMARY"
+
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4

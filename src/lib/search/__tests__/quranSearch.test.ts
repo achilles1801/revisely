@@ -1,5 +1,5 @@
 import { quranWords, say, verse, verses } from '../../recite/__fixtures__/quranWords';
-import { matchedWords, queryWords, searchText, withoutRepeats } from '../quranSearch';
+import { matchedWords, queryWords, searchText, withoutRepeats, type SearchWork } from '../quranSearch';
 
 const words = quranWords();
 const found = (text: string) => searchText(words, text).hits.map((h) => `${h.sura}:${h.ayah}`);
@@ -127,11 +127,40 @@ describe('searchText', () => {
     expect(found('ترجمة نانسي قنقر')).toEqual([]);
     expect(found('')).toEqual([]);
   });
+});
 
-  it('answers quickly', () => {
-    const started = Date.now();
-    for (let i = 0; i < 5; i++) searchText(words, say(verse(2, 255).slice(0, 12)));
-    expect((Date.now() - started) / 5).toBeLessThan(500);
+describe('searchText: how much work a search does', () => {
+  // Counted, not timed: a time limit failed on a shared CI runner (507 ms against 500).
+  // Jest's own timeout still fails a search that hangs.
+  const places = words.count;
+  // Words compared letter by letter, per query word lined up: 2,400–3,500 today, and
+  // 6,100–9,400 with the letter check (letterMask) gone.
+  const EDITS_PER_WORD = 5000;
+  const counted = (text: string) => {
+    const work: SearchWork = { alignments: 0, queryWords: 0, cells: 0, edits: 0 };
+    searchText(words, text, 50, work);
+    return work;
+  };
+
+  it.each([
+    ['12 words of 2:255: lined up once', say(verse(2, 255).slice(0, 12)), 1, 12],
+    ['all of 2:255: its first 24 words, once', say(verse(2, 255)), 1, 24],
+    ['words not in the Quran: as said, then without the last, the first, both', 'كيف حالك اليوم يا صديقي', 4, 5 + 4 + 4 + 3],
+  ])('%s', (_, text, alignments, queryWords) => {
+    const work = counted(text);
+    expect(work.alignments).toBe(alignments);
+    expect(work.queryWords).toBe(queryWords);
+    // One pass over the text a line-up: each place at most once per query word.
+    expect(work.cells).toBeLessThanOrEqual(places * queryWords);
+    expect(work.edits).toBeLessThan(EDITS_PER_WORD * queryWords);
+  });
+
+  it('a short query passes over the stretches of text that match none of it', () => {
+    const work = counted('من الله');
+    expect(work.alignments).toBe(1);
+    // About 15% of the places today; every place without the shortcut.
+    expect(work.cells).toBeLessThan((places * 2) / 4);
+    expect(work.edits).toBeLessThan(EDITS_PER_WORD * 2);
   });
 });
 

@@ -8,6 +8,7 @@
 // the app's own (the test clock, src/lib/e2e/clock.ts) beside them.
 
 import { File, Paths } from 'expo-file-system';
+import { AppState } from 'react-native';
 
 // Taken when this module loads, before the test clock replaces Date.
 const RealDate = Date;
@@ -16,9 +17,18 @@ const LEVELS = ['log', 'info', 'warn', 'error', 'debug'] as const;
 const MAX_LINE = 1500;
 // One flow's worth: a fresh install (each flow's first step) starts the file again.
 const MAX_BYTES = 6_000_000;
+// Lines are written every FLUSH_MS. A JavaScript thread that stops answering (a long job on it, or
+// a starved simulator) shows as a gap between those ticks: in #328's run 42746203992 (04 on iOS)
+// the app wrote nothing for 30 s while the page still scrolled natively, then two swipes reached
+// the JavaScript together and a page went uncounted. Each gap over STALL_MS is one line, so a
+// failed flow says how long the app stopped, and from when.
+const FLUSH_MS = 500;
+const STALL_MS = 2000;
 
 let pending: string[] = [];
 let installed = false;
+// The last tick's time; 0 while the app is away from the front (iOS holds its timers then).
+let lastTick = 0;
 
 function logFile(): File {
   return new File(Paths.document, 'e2e-log.txt');
@@ -80,6 +90,16 @@ export function e2eLog(level: string, args: unknown[]): void {
   pending.push(`${real} [app ${app}Z] ${level} ${line.length > MAX_LINE ? `${line.slice(0, MAX_LINE)}…` : line}`);
 }
 
+function tick(): void {
+  const now = RealDate.now();
+  if (lastTick > 0 && now - lastTick > STALL_MS) {
+    const since = new RealDate(lastTick).toISOString().slice(11, 23);
+    e2eLog('warn', [`[e2e] js stalled ${((now - lastTick) / 1000).toFixed(1)} s, since ${since}`]);
+  }
+  if (lastTick > 0) lastTick = now;
+  flushE2ELog();
+}
+
 export function installLog(): void {
   if (installed) return;
   installed = true;
@@ -92,6 +112,11 @@ export function installLog(): void {
     };
   }
   e2eLog('info', ['[e2e] launch']);
+  // Away from the front iOS holds the timers: that gap isn't a stall.
+  AppState.addEventListener('change', (state) => {
+    lastTick = state === 'active' ? RealDate.now() : 0;
+  });
+  lastTick = RealDate.now();
   // Often enough that a flow failing right after a step has its lines.
-  setInterval(flushE2ELog, 500);
+  setInterval(tick, FLUSH_MS);
 }

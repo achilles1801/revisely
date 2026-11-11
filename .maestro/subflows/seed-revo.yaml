@@ -2,19 +2,16 @@
 # pages a day, 548–549 weak, a month of sessions, today 6 of 20. The account is the one signup.yaml
 # made. Waits for Home to show today from it ("Continue at Al-Hashr, ayah 17": page 548, NAME-1).
 #
-# Seeded again if Home doesn't show it: the app can still be sending sign-up's pages when the seed
-# lands, and a page write of its own arriving after it put Al-Fatihah and Juz 28 back as they were
-# (iOS, Nov 7 2026). The seed writes the same documents each time, and by the second pass the app's
-# writes have gone out.
+# Seeded once, after the app has sent its own changes (app-sent.yaml). A page write of sign-up's
+# still on the phone when the seed landed put Al-Fatihah and Juz 28 back as they were (iOS, Nov 7
+# 2026); seeding until Home showed it hid that instead of preventing it.
 appId: com.revisionbuddy.app
 ---
-- retry:
-    maxRetries: 3
-    commands:
-      - runScript:
-          file: ../scripts/seed-revo.js
-      - extendedWaitUntil:
-          visible:
-            id: today-title
-            text: "Continue at Al.Hashr, ayah.17[^0-9]*"
-          timeout: 20000
+- runFlow: app-sent.yaml
+- runScript:
+    file: ../scripts/seed-revo.js
+- extendedWaitUntil:
+    visible:
+      id: today-title
+      text: "Continue at Al.Hashr, ayah.17[^0-9]*"
+    timeout: 20000

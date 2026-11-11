@@ -1,6 +1,8 @@
 # Fills this flow's account with a fortnight of Activity history and makes it a tester
-# (scripts/seed-activity.js). The account is the one signup.yaml made.
+# (scripts/seed-activity.js). The account is the one signup.yaml made. Seeded once the app has
+# sent its own changes (app-sent.yaml): one sent after the seed would land over it.
 appId: com.revisionbuddy.app
 ---
+- runFlow: app-sent.yaml
 - runScript:
     file: ../scripts/seed-activity.js

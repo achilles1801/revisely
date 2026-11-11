@@ -1,8 +1,8 @@
 # A sitting in the reader, then part of it added as memorized from the Day, by the ayah, and
 # undone (the memorization flow approved Nov 7 2026). In the reader, the timer and a recording run
 # together; End stops both and one note says what was saved ("Saved to today: Al-Mulk, ayahs 1–12,
-# 1 min · View"), with no "Recording saved" of its own. View opens the Day: the sitting, named by its
-# ayahs, offers Add to memorized. The sheet opens on its ayahs; To moved back a few ayahs, Add shows
+# 1 min · View"), with no "Recording saved" of its own. The Day (through Activity): the sitting, named
+# by its ayahs, offers Add to memorized. The sheet opens on its ayahs; To moved back a few ayahs, Add shows
 # them at once ("Memorized, 8 ayahs", what finishes the page), and they come off again (Undo on
 # Android, the Memorized menu's Delete on iOS: see the end).
 # Rules (BEHAVIOUR.md): REC-1, REC-2, MEM-1, MEM-3, MEM-5, ACT-6, ACT-7
@@ -27,12 +27,18 @@ appId: com.revisionbuddy.app
 # Down until Al-Haqqah (69), two rows below, is in view, then Al-Mulk: a row found at the list's foot
 # can sit behind the tab bar, and the tap then lands on Read, which scrolls the list back to the top
 # (Android, Nov 8 2026). Two rows up it is clear of the bar. (Centring the row instead never settled
-# on iOS: Maestro gave up after a minute with Al-Mulk mid-screen.)
-- scrollUntilVisible:
-    element:
-      id: surah-69
-    direction: DOWN
-    timeout: 60000
+# on iOS: Maestro gave up after a minute with Al-Mulk mid-screen.) Swipes, counted, never a time
+# limit: on the iOS runner a scroll by time ran out with Al-Haqqah just brought into view by its
+# 19th swipe (#328's run 42586241564). A swipe moves less than a screen, so no row is skipped.
+- repeat:
+    while:
+      notVisible:
+        id: surah-69
+    times: 40
+    commands:
+      - scroll
+- assertVisible:
+    id: surah-69
 - tapOn:
     id: surah-67
 # The reader opens with its controls hidden; a tap high on the page shows them (E2E builds load no
@@ -142,51 +148,23 @@ appId: com.revisionbuddy.app
 # The backup notice can come up about now (the first recording); a tap on View under it would be lost.
 - runFlow: ../subflows/backup-notice.yaml
 
-# View opens the Day, while the note is up (6 s). On a slow simulator it can go before the tap: then
-# the way a user finds the day later, Activity → the day.
-- runFlow:
-    when:
-      visible: "Saved to today: .*"
-    commands:
-      - tapOn:
-          text: "View"
-          optional: true
-      - extendedWaitUntil:
-          visible:
-            id: activity-day-v2
-          timeout: 4000
-          optional: true
-- runFlow:
-    when:
-      notVisible:
-        id: activity-day-v2
-    commands:
-      # A View tap as the note fades (after the backup notice, say) goes through to the timer chip
-      # under it and opens the card, which hides Back: close it with a tap outside, as above.
-      - runFlow:
-          when:
-            visible:
-              id: "timer-(start|end)"
-          commands:
-            - tapOn:
-                point: 50%, 25%
-            - extendedWaitUntil:
-                notVisible:
-                  id: "timer-(start|end)"
-                timeout: 10000
-      - tapOn: "Back"
-      - tapOn:
-          id: tab-Home
-      - tapOn:
-          id: open-activity
-      - extendedWaitUntil:
-          visible:
-            id: activity-blocks-views
-          timeout: 20000
-      - tapOn:
-          id: calendar-day-2026-11-03
-      - tapOn:
-          id: preview-open
+# The way a user finds the day later: Activity → the day. "Saved to today · View" opens it too, but a
+# flow never taps it: the note lasts 6 s, and a tap that comes as it goes lands on the timer chip under
+# it, which opens the card (.maestro/README.md, Notes; iOS run 42548149857). QuranReaderScreen.test
+# presses it.
+- tapOn: "Back"
+- tapOn:
+    id: tab-Home
+- tapOn:
+    id: open-activity
+- extendedWaitUntil:
+    visible:
+      id: activity-blocks-views
+    timeout: 20000
+- tapOn:
+    id: calendar-day-2026-11-03
+- tapOn:
+    id: preview-open
 - extendedWaitUntil:
     visible:
       id: activity-day-v2

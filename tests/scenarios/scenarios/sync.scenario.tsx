@@ -4,6 +4,8 @@ import { setNow, setZone, ZONES } from '../harness/clock';
 import { newAccount, pagesRange } from '../harness/account';
 import { Home, homeStack } from '../harness/screens';
 import { newEmail, Phone, PASSWORD } from '../harness/phone';
+import { trackListeners, type ListenerTracker } from '../harness/listeners';
+import { createAccountPartWay } from '../harness/admin';
 
 const MEMORIZED = pagesRange(1, 20);
 
@@ -109,5 +111,46 @@ it('[SYNC-4] a new account loads after sign-up without a relaunch', async () => 
   const app = await phone.open();
   await app.act(() => app.auth.signUp(newEmail(), PASSWORD, 'New'));
   await app.until(() => !!app.app.user && app.app.pages.length === 604 && !app.app.loading, 'the new account to load', 30_000);
+  await app.close();
+});
+
+// A new account's 604 page writes went through the live pages listener, each page
+// three times (written, confirmed, sent back), and sign-up froze the phone for about
+// 5 s on a fast Mac (Nov 10 2026). The listener now waits while the pages are
+// written (firestoreService.initializeAllPages), then reads them once. Here the app
+// writes them itself, as for an account the server holds with no pages: its pages
+// listener is open, has heard there are none, and is what starts the writes.
+it('[SYNC-4] a new account\'s pages are written while nothing listens to them, then load once', async () => {
+  setZone(ZONES.chicago);
+  setNow('2026-11-10 20:00');
+  const email = newEmail();
+  createAccountPartWay(email, PASSWORD, 0);
+  const phone = new Phone();
+  let listeners!: ListenerTracker;
+  // The pages listeners open as each batch of writes is committed.
+  const atCommit: string[][] = [];
+  const app = await phone.open((mods) => {
+    listeners = trackListeners(mods);
+    const fs = mods.require<Record<string, (...args: unknown[]) => { commit: () => Promise<void> }>>('firebase/firestore');
+    const writeBatch = fs.writeBatch;
+    jest.spyOn(fs, 'writeBatch').mockImplementation((...args: unknown[]) => {
+      const batch = writeBatch(...args);
+      const commit = batch.commit.bind(batch);
+      batch.commit = () => {
+        atCommit.push(listeners.open().filter((p) => p.endsWith('/pages')));
+        return commit();
+      };
+      return batch;
+    });
+    return null;
+  });
+  await app.act(() => app.auth.signIn(email, PASSWORD));
+  await app.until(() => !!app.app.user && app.app.pages.length === 604 && !app.app.loading, 'the pages to load', 30_000);
+
+  // The pages went in two batches (1–450, 451–604), with no pages listener open.
+  expect(atCommit.length).toBeGreaterThanOrEqual(2);
+  expect(atCommit).toEqual(atCommit.map(() => []));
+  // Listening again afterwards.
+  expect(listeners.onAccount(app.uid)).toContain(`users/${app.uid}/pages`);
   await app.close();
 });
