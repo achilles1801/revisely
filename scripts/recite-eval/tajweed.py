@@ -84,7 +84,7 @@ class Slots:
         from quran_transcript import MoshafAttributes
         self.ear = ear
         self.moshaf = moshaf or MoshafAttributes(rewaya='hafs', madd_monfasel_len=4, madd_mottasel_len=4,
-                                                 madd_mottasel_waqf=4, madd_aared_len=4)
+                                                 madd_mottasel_waqf=4, madd_aared_len=4, madd_alleen_len=4)
 
     def phonetize(self, text):
         from quran_transcript import quran_phonetizer
@@ -108,8 +108,9 @@ class Slots:
                 a, b = mp.pos
                 kind = r.name.en
                 if r.correctness_type == 'count':
+                    held = LONG + ('وي' if kind == 'Leen Madd' else '')  # leen: a و or ي after a fatha, held at a stop
                     i = a
-                    while i < b and ph[i] not in LONG:
+                    while i < b and ph[i] not in held:
                         i += 1
                     j = i
                     while j < b and ph[j] == ph[i]:
@@ -241,7 +242,7 @@ def judge(lp, ear, slots_out, pad=6, rule=None, pace=None):
     twos = [j['held'] for j in out if j['kind'] == 'Normal Madd' and j['held'] > 0]
     unit = (float(np.median(twos)) / 2) if len(twos) >= 2 else None
     for j in out:
-        j['timing'] = (j['held'] / unit) if (unit and j['held'] and j['symbol'] in LONG) else None
+        j['timing'] = (j['held'] / unit) if (unit and j['held'] and (j['symbol'] in LONG or j['kind'] == 'Leen Madd')) else None
     # the reciter's pace: the median short syllable (a letter and its short haraka, to the next letter)
     emit = ctc_align.emit
     syl = [emit[pos_of[i + 1]][0] - emit[pos_of[i - 1]][0] for i, ch in enumerate(ph)
@@ -251,7 +252,9 @@ def judge(lp, ear, slots_out, pad=6, rule=None, pace=None):
     for j in out:
         j['pace'] = vowel
         j['nasal_v'] = (j['held_nasal'] / vowel) if (vowel and j.get('held_nasal')) else None
-        j['timing_v'] = (j['held_next'] / vowel) if (vowel and j['held_next'] and j['symbol'] in LONG) else None
+        j['timing_v'] = (j['held_next'] / vowel) if (vowel and j['held_next'] and (j['symbol'] in LONG or j['kind'] == 'Leen Madd')) else None
         if j['symbol'] in LONG:
             j['tcount'] = madd_count(j['timing_v'], j['ecount'], **(rule or {}))
+        elif j['kind'] == 'Leen Madd':  # the phonetizer's leen isn't one symbol a count: timing alone
+            j['tcount'] = madd_count(j['timing_v'], 0.0, mix=1.0) if j['timing_v'] is not None else None
     return out

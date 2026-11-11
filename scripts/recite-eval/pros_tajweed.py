@@ -89,7 +89,7 @@ if __name__ == '__main__':
             per[(rec, kind)].append(ec)
             if tc is not None:
                 tper[(rec, kind)].append(tc)
-    kinds = ['Normal Madd', 'Mottasel Madd', 'Monfasel Madd', 'Aared Madd', 'Lazem Madd']
+    kinds = ['Normal Madd', 'Mottasel Madd', 'Monfasel Madd', 'Aared Madd', 'Leen Madd', 'Lazem Madd']
     print('reciter | ' + ' | '.join(kinds))
     for rec in sorted({r for r, _ in per}):
         print(rec + ' | ' + ' | '.join(f"{np.median(per[(rec, k)]):.1f} (n={len(per[(rec, k)])})" if per[(rec, k)] else '-' for k in kinds))
