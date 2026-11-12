@@ -59,12 +59,23 @@ and the bars. None of those go into git.
 ```bash
 scripts/recite-check/stage.sh /tmp/recite-stage
 gcloud run deploy recite-check --project revisely-dev --region us-east1 --source /tmp/recite-stage \
-  --service-account recite-check@revisely-dev.iam.gserviceaccount.com --allow-unauthenticated \
+  --service-account recite-check@revisely-dev.iam.gserviceaccount.com --no-allow-unauthenticated \
   --cpu 2 --memory 2Gi --concurrency 1 --min-instances 0 --max-instances 2 --timeout 120 --cpu-boost \
   --set-env-vars PROJECT=revisely-dev,BUCKET=revisely-dev.firebasestorage.app,THREADS=2
 ```
 
-It is open to the internet (`--allow-unauthenticated`) because the app signs in with Firebase, not Google IAM; the
-service checks the ID token and `previewTester` itself. Its own account (`recite-check@`) may read Firestore and
-create objects in the dev bucket, nothing else. Free tier: it scales to zero, at most two instances, and a check of
-a minute's recitation takes a few seconds of CPU.
+A deploy keeps who may call the service. The app signs in with Firebase, not Google IAM, so the service is opened
+to the internet once, by Majd (the service checks the ID token and `previewTester` itself):
+
+```bash
+gcloud run services add-iam-policy-binding recite-check --project revisely-dev --region us-east1 \
+  --member allUsers --role roles/run.invoker
+```
+
+Before that (or to test a new revision), call it with a Google identity token in `X-Serverless-Authorization` and
+the Firebase ID token in `Authorization`: Cloud Run checks the first and passes the second on.
+
+Its own account (`recite-check@`) may read Firestore (`roles/datastore.viewer`) and create objects in the dev bucket
+(`roles/storage.objectCreator` on the bucket), nothing else. Free tier: it scales to zero, at most two instances,
+and a check of a minute's recitation takes a few seconds of CPU. The image is about 120 MB of Artifact Registry's
+free 0.5 GB; each deploy adds one, so delete old images in `cloud-run-source-deploy` after a few.
