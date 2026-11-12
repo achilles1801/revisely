@@ -157,6 +157,18 @@ until its part is set up.
   - Its config is left out like `wrangler.jsonc` (app hash, paths-ignore, E2E, claude-fix).
 - **The laptop's `.env`** stays on production until the orchestrator says otherwise: the store previews are
   filmed with it.
+- **Recitation check** (Majd, Nov 11 2026: "push the best version we have so far on dev"): the lab's mistake
+  detection in the Dev app only (`lib/reciteCheck`: `isDevVariant()`, `previewTester`, a binary with the
+  microphone stream). Hold a verse → Check my recitation: record, stop, and the passage comes back with the words
+  skipped, said wrong or added, and tajweed notes (madd lengths per the sheet's settings, qalqalah, ghunnah,
+  ikhfa, idgham, iqlab); letters behind an off-by-default switch.
+  - The checker runs on Cloud Run in revisely-dev (`scripts/recite-check`, its README): the app has no JS-only way
+    to run the model on the phone. It is deployed by hand, never to production, and the store app never calls it.
+  - The model's licence (Quran Muaalem License 1.0, 2.1) asks for its AI notice, English and Arabic, before the
+    first use and reachable afterwards: the sheet shows it first, and Settings → About has it.
+  - "Keep as test data" (on by default; in the sheet and Settings → Testing) keeps each recording and its result
+    in `recite-tests/<uid>/` in the dev bucket (closed to clients). The lab copies them with `fetch_takes.py`.
+    **Nobody listens to them**, Majd included; they are held out of training, like the /record takes.
 
 ## How updates reach phones
 
