@@ -101,6 +101,13 @@ class Slots:
     def text(self, text):
         o = self.phonetize(text)
         ph = o.phonemes
+        # the word (index in text's words) each sound comes from, for showing a slot on its word
+        word_of = [None] * len(ph)
+        for c, mp in enumerate(o.mappings):
+            a, b = mp.pos
+            for i in range(a, min(b, len(ph))):
+                if word_of[i] is None:
+                    word_of[i] = text[:c].count(' ')
         slots = []
         taken = set()
         for mp in o.mappings:
@@ -138,6 +145,7 @@ class Slots:
         slots.sort(key=lambda s: s['start'])
         for s in slots:
             s['versions'] = versions(s)
+            s['word'] = next((word_of[i] for i in range(s['start'], s['end']) if word_of[i] is not None), None)
         return {'phonemes': ph, 'slots': slots}
 
 

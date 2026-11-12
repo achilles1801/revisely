@@ -103,8 +103,13 @@ def places(uthmani, moshaf, stops=()):
 
 
 def nll(lp, labels):
-    import torch
-    import torch.nn.functional as F
+    try:
+        import torch
+        import torch.nn.functional as F
+    except ImportError:  # the recitation check service has no torch: the same CTC forward in numpy
+        import tajweed
+        v = tajweed.ctc_ll(np.asarray(lp, np.float64), list(labels))
+        return 0.0 if v < -1e29 else -v  # as zero_infinity
     t = torch.from_numpy(np.ascontiguousarray(lp, np.float32))[:, None]
     return float(F.ctc_loss(t, torch.tensor([labels]), torch.tensor([lp.shape[0]]), torch.tensor([len(labels)]),
                             blank=0, reduction='sum', zero_infinity=True))
