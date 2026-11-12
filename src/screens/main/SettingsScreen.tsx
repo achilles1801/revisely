@@ -88,6 +88,9 @@ import { greetingName } from '../../lib/displayName';
 import { smartTrackingOn } from '../../lib/smartTracking';
 import { showsTestScenarios } from '../../lib/testScenarios';
 import { releaseSync } from '../../lib/offline/sync';
+import { reciteCheckEnabled } from '../../lib/reciteCheck/availability';
+import { setReciteCheckSettings, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
+import { ReciteCheckNotice } from '../../components/reciteCheck/ReciteCheckNotice';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'Settings'>;
 
@@ -278,6 +281,10 @@ export default function SettingsScreen() {
   const [showNameModal, setShowNameModal] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [resetSheet, setResetSheet] = useState(false);
+  // The recitation check (Revisely Dev, testers): its AI notice stays reachable from About.
+  const reciteCheck = reciteCheckEnabled(user);
+  const reciteCheckSettings = useReciteCheckSettings(reciteCheck ? user?.id : null);
+  const [reciteNotice, setReciteNotice] = useState(false);
   const [scenarioSheet, setScenarioSheet] = useState(false);
   const [whatsNewOpen, setWhatsNewOpen] = useState(false);
   // Show What's new at launch (testers): kept on the phone, from the next launch.
@@ -1002,6 +1009,14 @@ export default function SettingsScreen() {
               testID="settings-whats-new"
             />
           ) : null}
+          {reciteCheck ? (
+            <Row
+              icon="information-circle-outline"
+              label="Recitation check notice"
+              onPress={() => setReciteNotice(true)}
+              testID="settings-recite-check-notice"
+            />
+          ) : null}
           <Row
             icon="document-text-outline"
             label="Privacy Policy"
@@ -1040,6 +1055,21 @@ export default function SettingsScreen() {
                 />
               }
             />
+            {reciteCheck ? (
+              <Row
+                icon="mic-outline"
+                label="Keep my recitations as test data"
+                subtitle="Recitation checks, for Revisely’s tests. Software checks them; nobody listens."
+                rightSlot={
+                  <SettingSwitch
+                    value={reciteCheckSettings.keep}
+                    onValueChange={(keep) => setReciteCheckSettings(user?.id, { keep })}
+                    accessibilityLabel="Keep my recitations as test data"
+                    testID="settings-recite-check-keep"
+                  />
+                }
+              />
+            ) : null}
             {showsTestScenarios(user) && (
               <View testID="test-scenario-row">
                 <Row
@@ -1115,6 +1145,11 @@ export default function SettingsScreen() {
       <MushafPickerSheet visible={mushafPicker} onClose={() => setMushafPicker(false)} />
       {replayOffered(user) ? <WhatsNewReplay visible={whatsNewOpen} onClose={() => setWhatsNewOpen(false)} /> : null}
       {showsResetMyData(user) ? <ResetDataSheet visible={resetSheet} onClose={() => setResetSheet(false)} /> : null}
+      {reciteCheck ? (
+        <Sheet visible={reciteNotice} onClose={() => setReciteNotice(false)} title="Recitation check" testID="settings-recite-notice-sheet">
+          <ReciteCheckNotice />
+        </Sheet>
+      ) : null}
       {showsTestScenarios(user) ? (
         <TestScenarioSheet visible={scenarioSheet} onClose={() => setScenarioSheet(false)} />
       ) : null}

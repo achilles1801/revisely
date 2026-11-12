@@ -1,0 +1,10 @@
+# The lab's versions (~/revisely-mistake-lab/.venv) for the checker; the rest for serving.
+numpy==2.5.4
+onnxruntime==1.31.1
+quran-transcript==0.6.4
+Levenshtein==0.27.5
+requests==2.34.2
+fastapi==0.115.12
+uvicorn==0.34.2
+google-auth==2.40.1
+cachecontrol==0.14.2
