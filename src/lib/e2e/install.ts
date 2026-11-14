@@ -11,6 +11,7 @@ import { flushE2ELog, installLog } from './log';
 import { handleNetworkLink, installNetwork } from './network';
 import { pinFreshTheme } from './theme';
 import { handleUpdateLink } from './updates';
+import { handleReciteLiveLink } from './reciteLive';
 
 let installed = false;
 let ready: Promise<void> = Promise.resolve();
@@ -21,6 +22,7 @@ function handle(url: string | null | undefined): void {
   if (handleRecordingsLink(url)) return;
   if (handleVerseLink(url)) return;
   if (handleUpdateLink(url)) return;
+  if (handleReciteLiveLink(url)) return;
   handleNetworkLink(url);
 }
 

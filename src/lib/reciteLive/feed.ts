@@ -14,7 +14,11 @@ export interface StartFrame {
   mot: number;
   aar: number;
   letters: boolean;
+  /** Check's Strict level: tajweed too (contract draft 4). */
+  tajweed?: boolean;
   keep: boolean;
+  /** Follow along only (Recite) or mark mistakes too (Check). */
+  mode?: 'recite' | 'check';
   /** Carry on a take after a dropped connection. */
   resume?: string;
 }
@@ -23,6 +27,8 @@ export type ClientFrame =
   | StartFrame
   | { type: 'seek'; w: number }
   | { type: 'dismiss'; id: string }
+  /** A word or an ayah shown by hand in the hidden view (information for the checker). */
+  | { type: 'hint'; w: number; what: 'word' | 'ayah' }
   | { type: 'end' };
 
 export interface LiveConnection {

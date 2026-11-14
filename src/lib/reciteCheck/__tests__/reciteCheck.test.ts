@@ -1,3 +1,4 @@
+import { renderHook } from '@testing-library/react-native';
 let mockVariant = 'dev';
 let mockMic = true;
 jest.mock('expo-constants', () => ({
@@ -156,5 +157,21 @@ describe('asking the service', () => {
     expect(await run(refusing(500, null))).toBe('server');
     expect(await run(jest.fn(async () => Promise.reject(new Error('offline'))))).toBe('offline');
     expect(await run(refusing(200, null), '')).toBe('sign_in');
+  });
+});
+
+describe('the check’s settings on the phone', () => {
+  it('a change made while the saved settings load wins over what loads, and is saved', async () => {
+    const storage = require('@react-native-async-storage/async-storage');
+    const AsyncStorage = storage.default ?? storage;
+    const { resetReciteCheckSettingsForTests, setReciteCheckSettings, useReciteCheckSettings, parseReciteCheckSettings } =
+      require('../settings') as typeof import('../settings');
+    resetReciteCheckSettingsForTests();
+    await AsyncStorage.setItem('@revisely_recite_check:v1:u9', JSON.stringify({ munfasil: 2, keep: false }));
+    setReciteCheckSettings('u9', { noticeSeen: true, mode: 'check' });
+    await new Promise((r) => setTimeout(r, 0));
+    const { result } = renderHook(() => useReciteCheckSettings('u9'));
+    expect(result.current).toMatchObject({ munfasil: 2, keep: false, noticeSeen: true, mode: 'check', level: 'words', saveRecording: true });
+    expect(parseReciteCheckSettings(await AsyncStorage.getItem('@revisely_recite_check:v1:u9'))).toMatchObject({ munfasil: 2, mode: 'check', noticeSeen: true });
   });
 });
