@@ -43,7 +43,8 @@ def kind_of(why):
 
 
 def words_judge(lp, word_sounds):
-    """Per word: [(margin, why, held/pace or None)] for every slip (lengths left out)."""
+    """Per word: [(margin, why, held/pace or None, heard sounds, i, j)] for every slip (lengths left out); the
+    slip is at word_sounds[k][i:j]."""
     ph = ''.join(word_sounds)
     keep = [i for i, ch in enumerate(ph) if ch in EAR.index]
     pos_of = {i: k for k, i in enumerate(keep)}
@@ -70,7 +71,8 @@ def words_judge(lp, word_sounds):
                 nxt = next((pos_of[q] for q in range(g1, len(ph)) if q in pos_of), None)
                 if g0 in pos_of and pos_of[g0] in emit and nxt is not None and nxt in emit:
                     held = (emit[nxt][0] - emit[pos_of[g0]][0]) / pace
-            rows.append((round(float(m), 3), why, None if held is None else round(held, 3)))
+            # (margin, why, held, the word's sounds with the slip, where in the word's sounds the slip is)
+            rows.append((round(float(m), 3), why, None if held is None else round(held, 3), alt, i, j))
         out.append(rows)
     return out
 
@@ -143,7 +145,7 @@ def _work(a):
 def word_score(word, th, shadda_max):
     """Largest margin over its threshold among the word's slips (> 0: flagged), and that slip."""
     best, why_ = -1e9, None
-    for m, why, held in word:
+    for m, why, held, *_ in word:
         k = kind_of(why)
         if k == 'length':
             continue
@@ -158,7 +160,7 @@ def word_score(word, th, shadda_max):
 def thresholds(pro_words, q):
     by = collections.defaultdict(list)
     for w in pro_words:
-        for m, why, held in w:
+        for m, why, held, *_ in w:
             by[kind_of(why)].append(m)
     letters_all = [m for k, v in by.items() if k not in ('haraka', 'shadda', 'length') for m in v]
     th = {'_letter': float(np.quantile(letters_all, 1 - q))}
@@ -171,7 +173,7 @@ def thresholds(pro_words, q):
 
 def report(rows):
     pro_words = [r[2][0] for r in rows if r[0] == 'pro']
-    shadda_held = [held for w in pro_words for m, why, held in w if why.startswith('no shadda') and held is not None]
+    shadda_held = [held for w in pro_words for m, why, held, *_ in w if why.startswith('no shadda') and held is not None]
     print(f'professional words: {len(pro_words)}; doubled consonants with a time: {len(shadda_held)}')
     print('doubled consonant held (to the next letter), in short syllables, professionals: '
           + ', '.join(f'{p}%: {np.percentile(shadda_held, p):.2f}' for p in (1, 5, 10, 50)))
@@ -202,11 +204,11 @@ def report_global(rows, shadda_pcts=(None, 5, 10)):
     """One bar for every slip (the slip must beat the correct sounds by a margin), with and without the time check
     on shadda. Length slips stay out (mode 3 / timing)."""
     pro_words = [r[2][0] for r in rows if r[0] == 'pro']
-    shadda_held = [held for w in pro_words for m, why, held in w if why.startswith('no shadda') and held is not None]
+    shadda_held = [held for w in pro_words for m, why, held, *_ in w if why.startswith('no shadda') and held is not None]
     groups = ('learner-ok', 'learner-bad', 'qdat-ok', 'qdat-slip')
     def best(w, smax):
         b, wy = -1e9, None
-        for m, why, held in w:
+        for m, why, held, *_ in w:
             k = kind_of(why)
             if k == 'length' or (k == 'shadda' and (held is None or held > smax)):
                 continue

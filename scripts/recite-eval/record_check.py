@@ -185,9 +185,9 @@ def main():
     # bars set on professionals (bench-v0): letters (one bar, shadda checked by time) and tajweed margins
     lrows = json.load(open(LAB / 'runs/v0/letters_v2.hisn.json'))
     pro_words = [r[2][0] for r in lrows if r[0] == 'pro']
-    held = [h for w in pro_words for m, why, h in w if why.startswith('no shadda') and h is not None]
+    held = [h for w in pro_words for m, why, h, *_ in w if why.startswith('no shadda') and h is not None]
     smax = float(np.percentile(held, 5))
-    best = lambda w: max([m for m, why, h in w if letters_v2.kind_of(why) != 'length'
+    best = lambda w: max([m for m, why, h, *_ in w if letters_v2.kind_of(why) != 'length'
                           and not (why.startswith('no shadda') and (h is None or h > smax))] or [-1e9])
     lbar = float(np.quantile([best(w) for w in pro_words], 1 - 0.003))
     pros = json.load(open(LAB / 'runs/v0/pros_tajweed.json'))
