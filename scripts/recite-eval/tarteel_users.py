@@ -152,6 +152,54 @@ def surah(s):
     return name, f'{len(rows)} clips, {len(metas)} kept ({off / 16000 / 3600:.2f} h), dropped {dropped}'
 
 
+TLOG_OUT = LAB / 'data/train4'
+
+
+def tlog_shard(i, skip=frozenset()):
+    """One shard of tarteel-ai/tlog's clean split (gated, CC-BY-4.0; HF_TOKEN from the Modal secret), labelled as the
+    public copy is (label(): the madd lengths that fit, kept only when the model and the text agree) into
+    data/train4/t<i>.audio.npy + .meta.pkl. skip: clip names already in the public copy (data/train3)."""
+    import pyarrow.parquet as pq
+    from huggingface_hub import HfFileSystem
+    import checker
+    TLOG_OUT.mkdir(parents=True, exist_ok=True)
+    name = f't{i:03d}'
+    if (TLOG_OUT / f'{name}.meta.pkl').exists():
+        return name, 'done before'
+    pf = pq.ParquetFile(HfFileSystem().open(f'datasets/tarteel-ai/tlog/data/clean-{i:05d}-of-00411.parquet', 'rb'))
+    ear = checker.Hisn(threads=1)
+    phon, chunks, metas, off, dropped, rows = {}, [], [], 0, {}, 0
+    drop = lambda why: dropped.__setitem__(why, dropped.get(why, 0) + 1)  # noqa: E731
+    for g in range(pf.metadata.num_row_groups):
+        for r in pf.read_row_group(g, columns=['audio']).to_pylist():
+            rows += 1
+            clip = os.path.splitext(os.path.basename(r['audio']['path'] or ''))[0]
+            if clip in skip:
+                drop('in the public copy'); continue
+            try:
+                s, ayah = map(int, clip.split('_')[:2])
+                x = audio(r['audio']['bytes'])
+            except Exception:
+                drop('decode'); continue
+            if len(x) < 24000 or len(x) > 16000 * 30:
+                drop('length'); continue
+            got = label(ear, phon, s, ayah, x)
+            if isinstance(got, str):
+                drop(got); continue
+            st, labels, emit, spans, fit, per = got
+            a = np.clip(x * 32768, -32768, 32767).astype(np.int16)
+            chunks.append(a)
+            metas.append({'off': off, 'n': len(a), 'labels': np.array(labels, np.int16),
+                          'emit': np.array([emit[k] for k in range(len(labels))], np.int32),
+                          'span': np.array([spans[k] for k in range(len(labels))], np.int32),
+                          'fit': fit, 'per': per, 'moshaf': 'tlog:%d/%d/%d' % st, 'reciter': 'tlog',
+                          'seg': f'{s}:{ayah}', 'uthmani': None, 'clip': clip})
+            off += len(a)
+    np.save(TLOG_OUT / f'{name}.audio.npy', np.concatenate(chunks) if chunks else np.zeros(0, np.int16))
+    pickle.dump(metas, open(TLOG_OUT / f'{name}.meta.pkl', 'wb'))
+    return name, f'{rows} clips, {len(metas)} kept ({off / 16000 / 3600:.2f} h), dropped {dropped}'
+
+
 def _try(f):
     try:
         return f()

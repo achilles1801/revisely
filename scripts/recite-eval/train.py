@@ -163,7 +163,59 @@ class Batches(torch.utils.data.IterableDataset):
                     x = np.clip(x * rng.uniform(0.5, 1.5), -1, 1).astype(np.float32)
                 items.append((x, lab)); secs += len(x) / 16000
             M, frames, labs = build_mels(items, a.fmask, rng)
-            yield M, frames, labs, seen
+            tf = teacher_features([x for x, _ in items]) if getattr(a, 'teacher', None) else None
+            yield M, frames, labs, seen, tf
+
+
+_TPROC = {}
+
+
+def teacher_features(xs):
+    """Muaalem's features for the same audio the student hears (the batch builder's workers make them)."""
+    if 'p' not in _TPROC:
+        from transformers import AutoFeatureExtractor
+        _TPROC['p'] = AutoFeatureExtractor.from_pretrained('obadx/muaalem-model-v3_2')
+    f = _TPROC['p'](xs, sampling_rate=16000, return_tensors='np', padding=True)
+    return {'input_features': f['input_features'].astype(np.float32), 'attention_mask': f['attention_mask']}
+
+
+def load_teacher(path, device):
+    """The teacher (teacher_train.py) for distillation, and the map from its phoneme ids to the student's order."""
+    from quran_muaalem.modeling.modeling_multi_level_ctc import Wav2Vec2BertForMultilevelCTC
+    from quran_muaalem.modeling.multi_level_tokenizer import MultiLevelTokenizer
+    m = Wav2Vec2BertForMultilevelCTC.from_pretrained('obadx/muaalem-model-v3_2')
+    sd = torch.load(path, map_location='cpu')
+    m.load_state_dict(sd.get('model', sd))
+    m = m.to(device).eval()
+    for q in m.parameters():
+        q.requires_grad = False
+    hv = json.loads((hisn_torch.MODEL / 'config.json').read_text())['phonemes']
+    v2i = {v: int(i) for i, v in MultiLevelTokenizer('obadx/muaalem-model-v3_2').id_to_vocab['phonemes'].items()}
+    cols = torch.tensor([0] + [v2i[s] for s in hv], device=device)  # student order: blank, then HisnLabs' sounds
+    return m, cols
+
+
+def kd_loss(student_lp, frames, teacher, cols, tf, device, temp=1.0):
+    """KL(teacher || student) per frame over the clip's own frames. The student hears 0.4 s of silence either side
+    (hisn_torch.mel_of), the teacher none: student frame k + 20 is teacher frame k."""
+    with torch.no_grad(), torch.autocast('cuda', dtype=torch.bfloat16, enabled=device == 'cuda'):
+        o = teacher(input_features=torch.as_tensor(tf['input_features']).to(device),
+                    attention_mask=torch.as_tensor(tf['attention_mask']).to(device), return_dict=True)
+    t_lp = F.log_softmax(o.logits['phonemes'].float()[..., cols] / temp, -1)  # [B, Tt, V]
+    s_lp = F.log_softmax(student_lp / temp, -1)  # [B, Ts, V]
+    pad = int(round(hisn_torch.LEAD * 50))
+    t_len = teacher._get_feat_extract_output_lengths(torch.as_tensor(tf['attention_mask']).sum(-1)).tolist()
+    tot, n = 0.0, 0
+    for b in range(s_lp.shape[0]):
+        s_len = (int(frames[b]) + 1) // 2 - 1 - 2 * pad
+        k = min(int(t_len[b]), s_len, t_lp.shape[1], s_lp.shape[1] - pad)
+        if k <= 0:
+            continue
+        tp = t_lp[b, :k]
+        sp = s_lp[b, pad:pad + k]
+        tot = tot + (tp.exp() * (tp - sp)).sum()
+        n += k
+    return (tot / max(n, 1)) * temp * temp
 
 
 def per(model, data, items, device, rng, voice=False, chan=False):
@@ -206,6 +258,9 @@ def main():
     ap.add_argument('--max_per', type=float, default=None, help='drop automatically labelled clips whose labels differ from what was heard by more than this share')
     ap.add_argument('--mix', default='', help="each --data folder's share of clips, e.g. 0.5,0.5 (default: by size)")
     ap.add_argument('--mosaic_p', type=float, default=0.0, help='share of clips stitched from stretches of several ayat')
+    ap.add_argument('--teacher', default=None, help="distil from this teacher (teacher_train.py's teacher.pt)")
+    ap.add_argument('--kd', type=float, default=1.0, help="weight of matching the teacher's frames, beside the CTC loss")
+    ap.add_argument('--kd_temp', type=float, default=1.0)
     a = ap.parse_args()
     out = pathlib.Path(a.out); out.mkdir(parents=True, exist_ok=True)
     torch.manual_seed(0)
@@ -224,6 +279,7 @@ def main():
         if a.freeze_conv and (name.startswith('enc.conv') or name.startswith('enc.embed_positions')):
             p.requires_grad = False
     params = [p for p in model.parameters() if p.requires_grad]
+    teacher, tcols = load_teacher(a.teacher, a.device) if a.teacher else (None, None)
     opt = torch.optim.AdamW(params, lr=a.lr, weight_decay=0.01)
     warm = 200
     sched = torch.optim.lr_scheduler.LambdaLR(opt, lambda s: min(1, (s + 1) / warm) * 0.5 * (1 + math.cos(math.pi * min(s, a.steps) / a.steps)))
@@ -257,7 +313,7 @@ def main():
     t0, tot, cnt, t_wait = time.time(), 0.0, 0, 0.0
     for step in range(first, a.steps + 1):
         tw = time.time()
-        M, frames, labs, seen = next(it)
+        M, frames, labs, seen, tf = next(it)
         t_wait += time.time() - tw
         for k, v_ in seen.items():
             slips_seen[k] = slips_seen.get(k, 0) + v_
@@ -273,6 +329,8 @@ def main():
             loss = F.ctc_loss(lp, tgt.cuda(), il.cuda(), tl.cuda(), blank=0, reduction='mean', zero_infinity=True)
         else:
             loss = F.ctc_loss(lp.cpu(), tgt, il, tl, blank=0, reduction='mean', zero_infinity=True)
+        if teacher is not None:
+            loss = loss + a.kd * kd_loss(out_['phonemes'].float(), frames, teacher, tcols, tf, a.device, a.kd_temp)
         opt.zero_grad(); loss.backward()
         torch.nn.utils.clip_grad_norm_(params, 1.0)
         opt.step(); sched.step()
