@@ -160,12 +160,14 @@ def main():
             print('  done score:', r['score'], 'ms:', r.get('ms'))
     if not args.fast and rounds == 1:
         lat_at, lat_said, lat_mark = [], [], []
+        slow_at = []  # (latency, word): the slowest cursor moves, to tell planted mistakes from a slow hop
         seen_at = set()
         prev = None
         for e in events:
             if e['type'] == 'at' and e['w'] in tl and e['w'] not in seen_at:
                 seen_at.add(e['w'])
                 lat_at.append(e['_at'] - when_sent(sent_at, tl[e['w']]['start']))
+                slow_at.append((round(lat_at[-1], 2), e['w']))
             elif e['type'] == 'said':
                 lo = (prev + 1) if prev is not None else min(tl)
                 for w in range(lo, e['upTo'] + 1):
@@ -178,6 +180,7 @@ def main():
                 if ref:
                     lat_mark.append(e['_at'] - when_sent(sent_at, ref['end']))
         print('  latency, word start -> its `at`:   ', quantiles(lat_at))
+        print('  slowest `at` (s, word):', sorted(slow_at, reverse=True)[:5])
         print('  latency, word end -> its `said`:   ', quantiles(lat_said))
         print('  latency, word end -> its mark:     ', quantiles(lat_mark))
     if args.transcript:
