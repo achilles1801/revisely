@@ -39,7 +39,8 @@ import { AyahRef, ayahRects } from '../../lib/ayahBounds';
 import { useMushafEdition } from '../../lib/mushafEdition';
 import { sittingSavedText, sittingsEnabled } from '../../lib/sitting';
 import type { ReadStackParamList } from '../../navigation/MainNavigator';
-import { checkOwned, reciteLiveEnabled } from '../../lib/reciteLive/availability';
+import { reciteLiveEnabled } from '../../lib/reciteLive/availability';
+import { premiumErrorText, setDevPremium, supportLinkUrl, usePremium } from '../../lib/premium';
 import { setReciteCheckSettings, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
 import { loadQuranWords, getQuranWords, QuranWords } from '../../lib/recite/quranWords';
 import { furthestWord, marksOnPage } from '../../lib/reciteLive/state';
@@ -249,7 +250,38 @@ export default function QuranReaderScreen() {
   // ===== The one mic: Record, Recite, Check (Revisely Dev, testers, the 1405 print) =====
   const liveOn = reciteLiveEnabled(user, edition);
   const reciteSettings = useReciteCheckSettings(user?.id);
-  const owned = checkOwned(user, reciteSettings);
+  // Marking mistakes needs Premium: the account's grant (lib/premium; apply-support's contract draft 2).
+  const premium = usePremium(user?.id, liveOn);
+  const owned = premium.has;
+  const [gettingPremium, setGettingPremium] = useState(false);
+  // Revisely Dev: Premium is free (nothing is charged); it says so before turning it on.
+  const getPremium = useCallback(() => {
+    Alert.alert('Premium in Revisely Dev', 'Free while testing: nothing is charged. Turn it off in Settings → Testing.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Turn on',
+        onPress: () => {
+          setGettingPremium(true);
+          setDevPremium(true)
+            .then((on) => {
+              if (on) setIntroOpen(false);
+            })
+            .catch((err) => Alert.alert('Couldn’t turn on Premium', premiumErrorText(err)))
+            .finally(() => setGettingPremium(false));
+        },
+      },
+    ]);
+  }, []);
+  // "Can't afford it? Apply for support": the program's page, opened with a one-time link for this account.
+  const applyForSupport = useCallback(() => {
+    supportLinkUrl()
+      .then((url) => {
+        // Required here, so screens and tests that never open it don't load it (expo-web-browser is in every binary).
+        const WebBrowser = require('expo-web-browser') as typeof import('expo-web-browser');
+        return WebBrowser.openBrowserAsync(url);
+      })
+      .catch((err) => Alert.alert('Apply for support', premiumErrorText(err)));
+  }, []);
   // A take kept as a recording (Save recordings, on by default) is told about once the take is closed (✕) and the
   // player is back: "Recording saved · View", over the player as after any recording, never over the recite bar.
   const [takeSaved, setTakeSaved] = useState<{ day: string; recordingId: string } | null>(null);
@@ -715,9 +747,9 @@ export default function QuranReaderScreen() {
           />
           <CheckIntroPage
             visible={introOpen}
-            onGet={() =>
-              Alert.alert('Not yet', 'Premium isn’t available yet. In Revisely Dev every tester can mark mistakes.')
-            }
+            getting={gettingPremium}
+            onGet={getPremium}
+            onSupport={applyForSupport}
             onClose={() => setIntroOpen(false)}
           />
           <ReciteNoticeSheet
