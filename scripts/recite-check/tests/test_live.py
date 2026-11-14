@@ -254,8 +254,10 @@ class Bench(unittest.TestCase):
         self.assertEqual(res['score']['mistakes'], 2)
         self.assertEqual([e for e in ev if e['type'] == 'score'][-1]['helped'], 8)
 
-    def test_strict_hands_the_take_to_the_second_model(self):
-        """With v5 loaded (#539), ayah_notes gets the take's samples, on the frames' grid; without it, nothing."""
+    def test_strict_hands_the_take_to_the_second_model_in_done_only(self):
+        """With v5 loaded (#539), live ayat are judged on the released model (no samples, so the cursor never waits on
+        v5) and v5's rules are held back; `done` gives ayah_notes the take's samples, on the frames' grid, and shows
+        them. Without v5 (tajweed off), never samples."""
         import live
         E = engine()
         seen = []
@@ -263,15 +265,26 @@ class Bench(unittest.TestCase):
 
         def notes(lp, s, a, statuses, spans, st, audio=None):
             seen.append(None if audio is None else len(audio))
-            return real(lp, s, a, statuses, spans, st)
+            tj, letters = real(lp, s, a, statuses, spans, st)
+            first = E.words.first[E.words.vindex[(s, a)]]
+            # one note of a rule v5 judges and one it doesn't, on the ayah's first word
+            return tj + [{'w': first, 'rule': 'qalqalah', '_sure': 'likely'},
+                         {'w': first, 'rule': 'ghunnah', '_sure': 'likely'}], letters
         pcm = bench_pcm()[: 16000 * 2 * 20]
         with unittest.mock.patch.object(E, 'ayah_notes', notes), unittest.mock.patch.object(E, 'ear2', object(),
                                                                                              create=True):
             sess = live.LiveSession(E, 1, 1, 1, 7, {})
-            run(sess, chunks(pcm, 3200) + [{'type': 'end'}])
-            self.assertTrue(sess.v5 and seen and all(n is not None for n in seen))
-            self.assertEqual(seen[-1], len(pcm) // 2)
+            ev = run(sess, chunks(pcm, 3200) + [{'type': 'end'}])
+            self.assertTrue(sess.v5)
+            live_seen, done_seen = seen[:seen.index(len(pcm) // 2)], seen[seen.index(len(pcm) // 2):]
+            self.assertTrue(live_seen and all(n is None for n in live_seen))  # live: never the second model
+            self.assertTrue(done_seen and all(n == len(pcm) // 2 for n in done_seen))
             np.testing.assert_allclose(sess.xf[:sess.n], np.frombuffer(pcm, '<i2') / 32768.0)
+            live_rules = {e['mark'].get('rule') for e in ev if e['type'] == 'mark'}
+            self.assertIn('ghunnah', live_rules)
+            self.assertFalse(live_rules & live.V5_DONE_ONLY)
+            done_rules = {m.get('rule') for m in ev[-1]['result']['marks']}
+            self.assertTrue({'qalqalah', 'ghunnah'} <= done_rules)
             seen.clear()
             sess = live.LiveSession(E, 1, 1, 1, 7, {'tajweed': '0'})  # words and harakat: no second model
             run(sess, chunks(pcm, 3200) + [{'type': 'end'}])

@@ -30,7 +30,7 @@ import time
 
 import numpy as np
 
-from engine import FPS, SAID, WORDS_P, BadRequest, heard_sounds, score, settings_of  # puts the harness on the path
+from engine import FPS, NASAL_RULES, SAID, WORDS_P, BadRequest, heard_sounds, score, settings_of  # puts the harness on the path
 import checker  # noqa: E402  (the harness's)
 
 SR = 16000
@@ -46,6 +46,11 @@ EXTRA_STABLE = 2    # hops in a row an extra word must be there before it is sho
 FIX_STABLE = 4      # hops in a row a marked word must be heard right again before it is unmarked
 LEAD_FRAMES = 10    # a filler starting this close to a segment's first frame is the pause it started in, not a word
 SETTLE = 3.0        # seconds a seam must be behind the newest final frame: the path there no longer moves
+# Strict's second model (v5) judges these rules (engine.V5_KINDS: qalqalah, lazim madd; and the nasal places), in `done`
+# only: ~1 s an ayah on 1 vCPU held the cursor up. Live, Strict sends no mark of them rather than the released model's,
+# which is the weaker one there (qalqalah: 7% of correct learners flagged against 1%; idgham without ghunnah caught 47%
+# against 85%): marks swapped at `done` would appear and vanish under the reciter (the model session, Nov 14 2026).
+V5_DONE_ONLY = frozenset({'qalqalah', 'madd_lazim', *NASAL_RULES.values()})
 NEG = checker.Decoder.NEG
 _pool = None
 
@@ -858,21 +863,25 @@ class LiveSession:
         ev += self._score_event(now)
         return ev
 
-    def _notes(self, s, a, statuses, spans):
-        """Engine.ayah_notes on the take's frames (and its samples, for the second model in Strict). It reads only the
-        ayah's word statuses, its first word's start, its last word's end and final frames there, so an ayah judged
-        live is not judged again in `done` when those are the same (the second model is ~1 s an ayah on Cloud Run)."""
+    def _notes(self, s, a, statuses, spans, final=False):
+        """Engine.ayah_notes on the take's frames. It reads only the ayah's word statuses, its first word's start, its
+        last word's end and final frames there, so an ayah judged live is not judged again in `done` when those are the
+        same. In Strict the second model (v5) runs in `done` only (final: the take's samples go with it); live, the
+        ayah is judged on the released model and the rules v5 judges are held back (V5_DONE_ONLY)."""
         first, n = self._ayah_bounds(s, a)
         ws = range(first, first + n)
+        strict = self.v5 and final
         key = (s, a, tuple(statuses.get(w) for w in ws), spans.get(first, (None,))[0],
-               spans.get(first + n - 1, (None, None))[1])
+               spans.get(first + n - 1, (None, None))[1], strict)
         if key not in self._notes_cache:
-            if self.v5:
+            if strict:
                 got = self.E.ayah_notes(self.lp[:self.T], s, a, statuses, spans, self.st, audio=self.xf[:self.n])
             else:
                 got = self.E.ayah_notes(self.lp[:self.T], s, a, statuses, spans, self.st)
             self._notes_cache[key] = got
         tj, letters = self._notes_cache[key]
+        if self.v5 and not final:
+            tj = [r for r in tj if r.get('rule') not in V5_DONE_ONLY]
         return [dict(r) for r in tj], [dict(r) for r in letters]
 
     def _keep_mark(self, m):
@@ -1026,7 +1035,7 @@ class LiveSession:
             first, n = self._ayah_bounds(s, a)
             if first < self.lo or first + n > self.end:
                 continue
-            o, l_ = self._notes(s, a, statuses, spans)
+            o, l_ = self._notes(s, a, statuses, spans, final=True)
             tj += o
             letters += l_
         self.ms['tajweed'] += (time.perf_counter() - t0) * 1000
