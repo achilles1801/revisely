@@ -521,7 +521,7 @@ export const supportApplication = onCall(
   (request) => supportCall('supportApplication', () => handleSupportApplication(request, supportStore(), SUPPORT_PAGES[PROJECT_ID])),
 );
 
-/** Get Check in the Revisely Dev app (no money): Premium from source "dev". revisely-dev only. */
+/** Get Premium in the Revisely Dev app (no money): Premium from source "dev". revisely-dev only. */
 export const devGrantPremium = onCall({ enforceAppCheck: true, maxInstances: 2, timeoutSeconds: 20 }, (request) =>
   supportCall('devGrantPremium', () => handleDevPremium(request, supportStore(), DEV_PROJECT || testing, true)),
 );

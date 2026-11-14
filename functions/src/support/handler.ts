@@ -106,7 +106,7 @@ export async function handleSupportApplication(
 }
 
 /**
- * devGrantPremium / devRevokePremium: "Get Check" in the Revisely Dev app, which takes no money. Only in a project
+ * devGrantPremium / devRevokePremium: "Get Premium" in the Revisely Dev app, which takes no money. Only in a project
  * that allows it (index.ts: revisely-dev); only the caller's own account; App Check is enforced by the callable.
  */
 export async function handleDevPremium(
