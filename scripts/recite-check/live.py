@@ -57,11 +57,15 @@ _pool = None
 # rules and letters (up to ~1 s on Cloud Run's vCPU) and, in Strict, the second model (v5, about 1 s more). Run inside
 # the hop, they held up the cursor on one vCPU (Strict: p90 1.9 s, worst 4 s, Nov 14 2026). With `defer` (the
 # server's setting) an ayah is judged on one background thread at the lowest priority (Linux), started only once the
-# chunk that finished it has been answered, and its marks and `ayah` event come out at the first hop AYAH_DUE seconds
-# of audio later (waiting for the thread only if it is late, as a fast replay is), or in `done`. The hop is left with
-# the model and the decoder; the events still depend only on the audio and where each control came, so any chunk size,
-# or a resume, gives the same.
+# chunk that finished it has been answered, and its marks and `ayah` event come out at the first hop a set time of
+# audio later (waiting for the thread only if it is late, as a fast replay is), or in `done`. The hop is left with the
+# model and the decoder; the events still depend only on the audio and where each control came, so any chunk size, or
+# a resume, gives the same.
+# The time: AYAH_DUE, or longer for a long ayah, as its judging grows with its length. On one vCPU the thread gets
+# what the hops leave: husary.p1.m1 (Strict, ayat of ~22 s, ~2.5 s of CPU each) took ~4.4 s an ayah, past a flat 3 s,
+# so the hop waited for it (recite-server, Nov 14 2026).
 AYAH_DUE = 3.0
+AYAH_DUE_SHARE = {'strict': 0.3, 'words': 0.1}  # seconds of wait per second of the ayah, by level
 _ayah_pool = None
 _ayah_pool_lock = threading.Lock()
 
@@ -447,7 +451,7 @@ class LiveSession:
         # Strict on the second model (v5, #539): ayah_notes takes the take's samples when the engine has it
         self.v5 = self.st.get('tajweed', True) and getattr(E, 'ear2', None) is not None \
             and 'audio' in inspect.signature(E.ayah_notes).parameters
-        # defer: each ayah's letters and tajweed off the hop (see _ayah_submit); nothing to judge per ayah, nothing to defer
+        # defer: each ayah's letters and tajweed off the hop (see _ayah_submit); with nothing to judge, nothing to defer
         self.defer = bool(defer) and not self.follow and (self.st['letters'] or self.st.get('tajweed', True))
         self._pending = []               # (notes key, s, a, future, due) of ayat judged in the background, in order
         self._idle = threading.Event()   # set while the session isn't working on a chunk (see _working)
@@ -485,7 +489,11 @@ class LiveSession:
         self.ayah_sent = []              # ayah events sent: for a resume's snapshot
         self.stopped = False
         self.result = None
-        self.ms = {'model': 0.0, 'words': 0.0, 'tajweed': 0.0, 'hops': 0, 'worst_hop': 0.0}
+        self.ms = {'model': 0.0, 'words': 0.0, 'tajweed': 0.0, 'hops': 0, 'worst_hop': 0.0,
+                   # defer: ayat handed to the thread, the hops' waits for it (total, worst), `done`'s wait, and the
+                   # ayat `done` judged again itself
+                   'ayah_jobs': 0, 'due_wait': 0.0, 'worst_due_wait': 0.0, 'done_wait': 0.0, 'done_notes': 0}
+        self._judged_here = 0
         self.seg = None                  # built on the first hop: a new session answers at once
 
     # ------------------------------------------------------------ input
@@ -926,6 +934,10 @@ class LiveSession:
         live is not judged again in `done` when those are the same (the second model is ~1 s an ayah on Cloud Run)."""
         key = self._notes_key(s, a, statuses, spans)
         if key not in self._notes_cache:
+            # in `done`: an ayah not judged live (not said in full then, or the last one), or one whose words or edges
+            # the final pass decided differently. Reusing the live notes when only its start had moved kept a false
+            # madd mark on husary's clean take that judging it again took away (Nov 14 2026), so it is judged again.
+            self._judged_here += 1
             if self.v5:
                 got = self.E.ayah_notes(self.lp[:self.T], s, a, statuses, spans, self.st, audio=self.xf[:self.n])
             else:
@@ -949,7 +961,11 @@ class LiveSession:
         kw = {'audio': self.xf[:self.n]} if self.v5 else {}
         fut = _ayah_submit(self._idle, self.E.ayah_notes, self.lp[:self.T], s, a, dict(self.status), dict(self.spans),
                            self.st, **kw)
-        self._pending.append((key, s, a, fut, now + AYAH_DUE))
+        first, n = self._ayah_bounds(s, a)
+        secs = (self.spans[first + n - 1][1] - self.spans[first][0]) / FPS  # both are there: said in full
+        share = AYAH_DUE_SHARE['strict' if self.v5 else 'words']
+        self._pending.append((key, s, a, fut, now + max(AYAH_DUE, share * secs)))
+        self.ms['ayah_jobs'] += 1
         return True
 
     def _due(self, now, every=False):
@@ -960,7 +976,12 @@ class LiveSession:
             key, s, a, fut, _ = self._pending.pop(0)
             if not fut.done():
                 self._idle.set()  # this thread waits for it anyway
+                t0 = time.perf_counter()
                 fut.result()
+                waited = (time.perf_counter() - t0) * 1000  # a hop held up (or `done`, at the end): `ms` says how long
+                self.ms['done_wait' if every else 'due_wait'] += waited
+                if not every:
+                    self.ms['worst_due_wait'] = max(self.ms['worst_due_wait'], waited)
                 if self._depth:
                     self._idle.clear()
             got, ms = fut.result()
@@ -1123,6 +1144,7 @@ class LiveSession:
         t0 = time.perf_counter()
         tj, letters = [], []
         done = set()
+        judged = self._judged_here
         for r in [] if self.follow else words:
             s, a = self.E.ayah_of(r['w'])
             if (s, a) in done:
@@ -1135,6 +1157,7 @@ class LiveSession:
             tj += o
             letters += l_
         self.ms['tajweed'] += (time.perf_counter() - t0) * 1000
+        self.ms['done_notes'] = self._judged_here - judged
         seen, ex = set(), []
         for e in extras:
             if e['after'] not in seen:

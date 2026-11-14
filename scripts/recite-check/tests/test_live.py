@@ -280,9 +280,9 @@ class Bench(unittest.TestCase):
 
     def test_with_defer_judging_an_ayah_never_holds_up_the_cursor(self):
         """The server's setting, at both levels: each ayah's letters and tajweed are worked out on their own thread and
-        come out AYAH_DUE seconds of audio after the ayah. The same events for any chunk size and however long the
-        thread takes (held back, the chunks are still answered); the same marks, ayat, cursor and `done` as in the
-        hop."""
+        come out at least AYAH_DUE seconds of audio after the ayah. The same events for any chunk size and however
+        long the thread takes (held back, the chunks are still answered); the same marks, ayat, cursor and `done` as
+        in the hop."""
         import live
         self.deferred({})  # Strict, with a second model
         self.deferred({'tajweed': '0', 'letters': '1'})  # words and harakat
@@ -340,7 +340,8 @@ class Bench(unittest.TestCase):
         self.assertEqual(want[-1], hop[-1])
         late = [x['t'] - y['t'] for x, y in zip([e for e in want if e['type'] == 'ayah'],
                                                 [e for e in hop if e['type'] == 'ayah'])]
-        self.assertTrue(late and all(0 <= d <= live.AYAH_DUE + live.LIVE['hop'] for d in late), late)
+        longest = max(live.AYAH_DUE, live.AYAH_DUE_SHARE['strict'] * 20)  # Al-Fatiha's ayat take under 20 s here
+        self.assertTrue(late and all(0 <= d <= longest + live.LIVE['hop'] for d in late), late)
 
     def test_same_events_for_any_chunk_size(self):
         pcm = bench_pcm()[: 16000 * 2 * 20]
