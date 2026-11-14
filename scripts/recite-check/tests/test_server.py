@@ -286,6 +286,7 @@ class LiveTests(Base):
             ws.send_text(json.dumps({'type': 'end'}))
             while ws.receive_json()['type'] != 'done':
                 pass
+            self.closed(ws)
         self.assertEqual((FakeSession.made[0].args[:4], FakeSession.made[0].open_end), ((78, 1, 114, 6), True))
         kept = json.loads(self.stored[f"recite-tests/tester1/{ready['take']}.json"])
         self.assertEqual((kept['request']['s2'], kept['request']['a2'], kept['request']['open']), (None, None, True))
@@ -314,10 +315,21 @@ class LiveTests(Base):
                 e = ws.receive_json()
                 if e['type'] in ('done', 'error'):
                     break
+            self.closed(ws)
         self.assertEqual(e['type'], 'done')
         self.assertTrue(e['result']['follow'])
         self.assertEqual((e['result']['marks'], e['result']['score']), ([], None))
         self.assertIn(f"recite-tests/tester1/{ready['take']}.json", self.stored)
+
+    def closed(self, ws):
+        """Read until the server closes the socket: with keep on, it closes only once the take is stored (`kept`),
+        since `done` goes before the upload. A test that checks the store after `done` waits for this first."""
+        got = []
+        try:
+            while True:
+                got.append(ws.receive_json())
+        except WebSocketDisconnect:
+            return got
 
     def end_a_take(self, ws, follow=False, keep=True):
         ws.send_text(start(follow=follow, keep=keep))
@@ -361,6 +373,7 @@ class LiveTests(Base):
             FakeSession.made, self.stored = [], {}
             with self.socket() as ws:
                 ready, done = self.end_a_take(ws, follow=follow)
+                self.closed(ws)
             with self.socket() as ws:
                 ws.send_text(start(follow=follow, keep=True, resume=ready['take']))
                 again = ws.receive_json()
@@ -376,6 +389,7 @@ class LiveTests(Base):
         the first copy stays, and the phone still hears `kept`."""
         with self.socket() as ws:
             ready, _ = self.end_a_take(ws)
+            self.closed(ws)
         first = dict(self.stored)
         server.FINISHED.clear()  # as on the other instance
         with self.socket() as ws:
@@ -421,6 +435,7 @@ class LiveTests(Base):
             ws.send_text(json.dumps({'type': 'end'}))
             while ws.receive_json()['type'] != 'done':
                 pass
+            self.closed(ws)
         self.assertEqual(FakeSession.made[0].hints, [{'type': 'hint', 'w': 3, 'what': 'word'}])
         kept = json.loads(self.stored[f"recite-tests/tester1/{ready['take']}.json"])
         self.assertEqual(kept['hints'], [{'type': 'hint', 'w': 3, 'what': 'word'}])
@@ -494,6 +509,7 @@ class LiveTests(Base):
             self.assertEqual(ws.receive_json()['w'], 104)
             ws.send_text(json.dumps({'type': 'stop'}))  # the old name still ends a take
             self.assertEqual(ws.receive_json()['result']['secs'], 4.0)
+            self.closed(ws)
         self.assertEqual(len(FakeSession.made), 1)
         self.assertIn(f'recite-tests/tester1/{sid}.wav', self.stored)
 
