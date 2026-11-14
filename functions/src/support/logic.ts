@@ -230,6 +230,10 @@ export interface StatusAnswer {
   applyAgainFrom?: number;
   /** none, after a support grant that has ended */
   endedAt?: number;
+  /** status only: the account's Premium (the account page says where it came from), null if none */
+  premium?: { source: Source; until: number | null } | null;
+  /** status on the website only: whether the account has a Revisely plan (a user document, made in the app) */
+  plan?: boolean;
 }
 
 export function stateOf(app: Application | null, ent: Entitlements | null, account: AccountLabel, now: number): StatusAnswer {

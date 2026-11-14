@@ -1315,6 +1315,29 @@ before production can be applied for.
   The Clear Quran needs a real ID token, so it can't be tried there. In `adb shell input text`, an
   `r` typed twice outside a text field reloads a dev build.
 
+## Account, Premium and Open Door (the website; dev only)
+
+Majd, Nov 14 2026: revisely.app becomes the account and Premium home, with **Open Door** (Premium free for anyone who
+can't pay) as one part. On **dev.revisely.app and revisely-dev only**; revisely.app, the production project and its auth
+settings only on Majd's word, after the privacy text for web sign-in. Contract with the app and the checker:
+side-session notes `apply-support.md`.
+- **Pages:** `docs/apply/` (Open Door: landing, steps, questions, the form), `docs/premium/` (Free vs Premium, nothing
+  for sale, no prices), `docs/account/` (plan and where it came from, the application, sign out). English and Arabic
+  (`docs/assets/strings.js`, `site-i18n.js`; Amiri, right to left, a switch defaulting to the browser's language).
+- **Kept off revisely.app:** the worker answers 404 for `/apply`, `/premium` and `/account` unless `ACCOUNT_PAGES` is
+  "1" (`wrangler.dev.jsonc` only); `wrangler.jsonc` sends those paths through the worker so the gate holds once develop
+  reaches main.
+- **Sign-in only** (Google pop-up, email and password), no sign-up: accounts are made in the app. The web config is
+  `/__/firebase/init.json`, which the worker serves from `FIREBASE_HOSTING` (revisely-dev's Hosting site, an empty
+  release made only for that), so no key is in the repository. dev.revisely.app is an authorized domain of revisely-dev.
+- **The page the app opens** (`/apply/#c=<code>`, from the callable `supportLink`) never signs in and is bare: no
+  Premium, account, Download, Donate or store links (App Store 3.1.1, Play's payments policy).
+- **Back end** (`functions/src/support`): `entitlements/{uid}` (`premium`, read by the app and the checker; `grants` per
+  source), `supportApplication`, `devGrantPremium` / `devRevokePremium`. Each refuses in a project with no program page
+  (`SUPPORT_PAGES`), so nothing is collected in production. Majd decides with
+  `functions/scripts/support-applications.js` (a decision deletes the answers). No Claude session reads a real
+  application.
+
 ## Worker (revisely.app/api)
 
 (dev.revisely.app is a second Worker with the same code, `wrangler.dev.jsonc`: see "Dev stack".)

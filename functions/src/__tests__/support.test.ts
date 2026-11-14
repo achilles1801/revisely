@@ -186,7 +186,7 @@ describe('applying and deciding', () => {
 });
 
 /** An in-memory store, transactions included. */
-function memoryStore(users: Record<string, { email: string | null; providers: string[] }>) {
+function memoryStore(users: Record<string, { email: string | null; providers: string[] }>, plans: string[] = []) {
   const codes = new Map<string, { uid: string; expiresAt: number }>();
   const apps = new Map<string, Application>();
   const ents = new Map<string, Entitlements>();
@@ -207,6 +207,9 @@ function memoryStore(users: Record<string, { email: string | null; providers: st
     },
     async read(uid) {
       return { app: apps.get(uid) ?? null, ent: ents.get(uid) ?? null };
+    },
+    async hasPlan(uid) {
+      return plans.includes(uid);
     },
     async apply(uid, run) {
       const out = run({ app: apps.get(uid) ?? null, ent: ents.get(uid) ?? null, limits: limits.get(uid) ?? null });
@@ -257,6 +260,19 @@ describe('supportApplication', () => {
     expect(answer).toMatchObject({ state: 'pending', account: { email: 'a•••e@example.com', via: 'google' } });
     expect(m.apps.get('alice')?.via).toBe('app');
     expect(m.apps.has('bob')).toBe(false);
+  });
+
+  it('status tells the website whether the account has a plan, and where its Premium came from', async () => {
+    const m = memoryStore(USERS, ['alice']);
+    m.ents.set('alice', { grants: { dev: grant('dev', null) }, premium: grant('dev', null) });
+    expect(await handleSupportApplication({ data: { action: 'status' }, auth: { uid: 'alice' } }, m.store, PAGE)).toMatchObject({
+      state: 'has',
+      plan: true,
+      premium: { source: 'dev', until: null },
+    });
+    expect(await handleSupportApplication({ data: { action: 'status' }, auth: { uid: 'bob' } }, m.store, PAGE)).toMatchObject({ plan: false, premium: null });
+    const code = codeOf((await handleSupportLink({ auth: { uid: 'bob' } }, m.store, PAGE)).url);
+    expect(await handleSupportApplication({ data: { action: 'status', code } }, m.store, PAGE)).not.toHaveProperty('plan');
   });
 
   it('signed in on the website, the caller applies for their own account', async () => {

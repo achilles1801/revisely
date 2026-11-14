@@ -1,6 +1,7 @@
 // The revisely worker: the public pages in /docs (privacy, terms) as static
-// assets, and a small API under /api/ for the app (wrangler.jsonc sends only
-// /api/* here; everything else is served from the assets without this code).
+// assets, and a small API under /api/ for the app (wrangler.jsonc sends /api/*,
+// the account, Premium and Open Door pages and /__/* here; everything else is
+// served from the assets without this code).
 // The same code runs as "revisely-dev" (dev.revisely.app, wrangler.dev.jsonc),
 // which sends every path here and sets NOINDEX.
 
@@ -13,6 +14,32 @@ interface Env extends TcqEnv {
   ASSETS: Fetcher;
   /** "1" on the dev Worker only: search engines are asked to leave every page alone. */
   NOINDEX?: string;
+  /**
+   * "1" where the account, Premium and Open Door pages are open (dev.revisely.app for now). Elsewhere they answer
+   * 404, so they reach revisely.app only when Majd sets it there (wrangler.jsonc sends their paths here).
+   */
+  ACCOUNT_PAGES?: string;
+  /**
+   * The Firebase Hosting site of the project the pages sign in to (revisely-dev.web.app on dev). Its
+   * /__/firebase/init.json is the web config, served here at the same path, so no key is kept in the repository.
+   */
+  FIREBASE_HOSTING?: string;
+}
+
+/** The pages behind ACCOUNT_PAGES. */
+const ACCOUNT_PAGE = /^\/(apply|premium|account)(\/|$)/;
+
+function notFound(): Response {
+  return new Response('Not found', { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+}
+
+/** The project's web config, from its Hosting site (an hour at the edge). */
+async function firebaseConfig(host: string): Promise<Response> {
+  const res = await fetch(`https://${host}/__/firebase/init.json`, { cf: { cacheTtl: 3600, cacheEverything: true } } as RequestInit);
+  if (!res.ok) return new Response('{}', { status: 502, headers: { 'Content-Type': 'application/json' } });
+  return new Response(await res.text(), {
+    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=3600' },
+  });
 }
 
 /** robots.txt where NOINDEX is set: nothing may be crawled. */
@@ -38,6 +65,10 @@ export default {
 /** The site from the assets, the API under /api/. */
 async function answer(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   const { pathname } = new URL(request.url);
+  if (ACCOUNT_PAGE.test(pathname) && env.ACCOUNT_PAGES !== '1') return notFound();
+  if (pathname === '/__/firebase/init.json') {
+    return env.FIREBASE_HOSTING ? firebaseConfig(env.FIREBASE_HOSTING) : notFound();
+  }
   if (pathname === '/api' || pathname.startsWith('/api/')) {
     try {
       if (pathname.startsWith('/api/tcq/')) return await handleTcq(request, env, ctx);
