@@ -9,6 +9,21 @@ file is the release mechanics and the traps behind them.
   new sessions: no "E2E agent", no fork per bug, no follow-up chips for work you could do yourself.
 - If a narrow, mechanical task really needs a sub-agent, set its model to `opus` explicitly. Check
   its output yourself before you rely on it or report it.
+- **Always be working on Revisely** (Majd, Nov 14 2026: "we should ALWAYS be working on revisely. if it's not
+  given a specific task then it should be looking to improve and writing down ideas for me to approve later on. we
+  need everyone to be curious and to dive deep and to not be scared to be wrong. revisely is a long term quran app
+  solution for the whole world and our scope is huge so there's always work to be done").
+  - When your task is done, or while you wait on CI, a review or Majd, look for what could be better, in your area
+    and beyond: bugs, UX, speed, tests, accessibility, languages, growth, cost, new features.
+  - Write each idea as its own file in `~/Documents/revisely-ideas/` (the template and rules are in its
+    `README.md`). Give the evidence, the proposal, the effort and risk, how sure you are, and the one decision Majd
+    makes. The orchestrator brings them to him in batches.
+  - Investigating is free to do: read the code, measure, reproduce, run cheap local checks. Building waits for his
+    yes. That means no product changes, spending, deploys, production changes or new sessions on an idea alone.
+  - Be curious, dig deep, and say how sure you are. A bold idea that turns out wrong costs nothing, but a quiet
+    session wastes the time.
+  - Everything else here still holds: privacy, free tiers, one simulator and no heavy jobs beside it, and the
+    branch rule below.
 
 ## Branches and releases
 
