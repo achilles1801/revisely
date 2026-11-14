@@ -81,13 +81,27 @@ interface MushafPagerProps {
    *  left (a revision session finishes there). */
   endCard?: React.ReactNode;
   /** Drawn over each page image, in its frame (bounds × `scale`), e.g. the
-   *  hidden recite mode's covers. */
-  pageOverlay?: (pageNumber: number, scale: number) => React.ReactNode;
+   *  hidden recite mode's covers. `image` is the page's image as shown (for
+   *  drawing a word again in another colour) and its size. */
+  pageOverlay?: (pageNumber: number, scale: number, image: PageImage | null) => React.ReactNode;
+  /** Drawn behind each page image's ink, in its frame (the live recitation
+   *  check's ayah band and word box). */
+  pageUnderlay?: (pageNumber: number, scale: number) => React.ReactNode;
+  /** A tap on the image, in bounds space (1024 wide): return true to take it
+   *  (before onTapVerse; the controls don't toggle). */
+  onTapPoint?: (pageNumber: number, x: number, y: number) => boolean;
   /** A tap on a verse: return true to take it (the controls don't toggle). */
   onTapVerse?: (ayah: AyahRef) => boolean;
   /** The end card came on screen. `bySwipe`: the user swiped there from the
    *  last page (a deliberate page turn, as for any page), not a jump. */
   onReachEnd?: (lastPage: number, bySwipe: boolean) => void;
+}
+
+/** A page's image as shown: where it comes from, its size, and the tint it's drawn with. */
+export interface PageImage {
+  uri: string;
+  width: number;
+  height: number;
 }
 
 export interface MushafPagerHandle {
@@ -119,7 +133,10 @@ interface PageItemProps {
   /** The page as drawn: fits the pager, so controls never cover it. */
   size: PageSize;
   /** Over the image (pageOverlay). */
-  overlay?: React.ReactNode;
+  overlay?: (image: PageImage | null) => React.ReactNode;
+  /** Behind the image's ink (pageUnderlay). */
+  underlay?: React.ReactNode;
+  onTapPoint?: (pageNumber: number, x: number, y: number) => boolean;
   onTapVerse?: (ayah: AyahRef) => boolean;
 }
 
@@ -137,6 +154,8 @@ const PageItem = React.memo(function PageItem({
   bg,
   size,
   overlay,
+  underlay,
+  onTapPoint,
   onTapVerse,
 }: PageItemProps) {
   const BOUNDS_SCALE = size.scale;
@@ -201,6 +220,10 @@ const PageItem = React.memo(function PageItem({
 
   // A tap on the image: the verse under it first, if a screen wants taps on verses.
   const handlePress = (e: GestureResponderEvent) => {
+    if (onTapPoint) {
+      const { locationX, locationY } = e.nativeEvent;
+      if (onTapPoint(pageNumber, locationX / BOUNDS_SCALE, locationY / BOUNDS_SCALE)) return;
+    }
     if (onTapVerse) {
       const { locationX, locationY } = e.nativeEvent;
       const ayah = ayahAt(pageNumber, locationX / BOUNDS_SCALE, locationY / BOUNDS_SCALE);
@@ -255,6 +278,7 @@ const PageItem = React.memo(function PageItem({
           delayLongPress={350}
           accessible={false}
         >
+          {underlay}
           {/* The verse's lines, in the image's own frame: bounds × the page's scale. */}
           {highlightRects.map((r, i) => (
             <View
@@ -308,7 +332,7 @@ const PageItem = React.memo(function PageItem({
               }
             }}
           />
-          {overlay}
+          {overlay ? overlay({ uri, width: size.width, height: size.height }) : null}
         </Pressable>
       ) : null}
     </Pressable>
@@ -335,6 +359,8 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
     endCard,
     onReachEnd,
     pageOverlay,
+    pageUnderlay,
+    onTapPoint,
     onTapVerse,
   },
   ref,
@@ -518,11 +544,13 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
           mutedColor={palette.textSecondary}
           bg={palette.pageBg}
           size={pageSize}
-          overlay={pageOverlay ? pageOverlay(item, pageSize.scale) : null}
+          overlay={pageOverlay ? (image: PageImage | null) => pageOverlay(item, pageSize.scale, image) : undefined}
+          underlay={pageUnderlay ? pageUnderlay(item, pageSize.scale) : null}
+          onTapPoint={onTapPoint}
           onTapVerse={onTapVerse}
         />
       ),
-    [onTap, onLongPressAyah, highlights, v2, palette, pageSize, endCard, pageOverlay, onTapVerse, edition],
+    [onTap, onLongPressAyah, highlights, v2, palette, pageSize, endCard, pageOverlay, pageUnderlay, onTapPoint, onTapVerse, edition],
   );
 
   return (

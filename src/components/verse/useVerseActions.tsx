@@ -34,8 +34,6 @@ import { copyText } from '../../lib/clipboard';
 import { verseShareText } from '../../lib/verseShare';
 import { everyTranslationOffered } from '../../lib/translationsOffered';
 import { spacing } from '../../theme/spacing';
-import { reciteCheckEnabled } from '../../lib/reciteCheck/availability';
-import { ReciteCheckSheet } from '../reciteCheck/ReciteCheckSheet';
 
 // The last To chosen by hand (Custom), for the next Play while it still fits.
 let lastCustomTo: VerseKey | null = null;
@@ -191,15 +189,6 @@ export function useVerseActions({ pages, onShowPage, currentPage, focused = true
     },
     [allowed, start, rangeFrom],
   );
-
-  // Check my recitation (Revisely Dev, testers): from the held verse.
-  const checkEnabled = reciteCheckEnabled(user);
-  const [checkFrom, setCheckFrom] = useState<AyahRef | null>(null);
-  const openCheck = useCallback(() => {
-    setCheckFrom(selected);
-    setMenuPoint(null);
-    setSelected(null);
-  }, [selected]);
 
   const openTranslation = useCallback(() => {
     setSheetVerse(selected);
@@ -360,17 +349,8 @@ export function useVerseActions({ pages, onShowPage, currentPage, focused = true
         onTranslation={openTranslation}
         onCopy={copyVerse}
         onShare={shareVerse}
-        onCheckRecitation={checkEnabled ? openCheck : undefined}
         onClose={closeMenu}
       />
-      {checkEnabled ? (
-        <ReciteCheckSheet
-          visible={checkFrom != null}
-          from={checkFrom}
-          accountId={user?.id}
-          onClose={() => setCheckFrom(null)}
-        />
-      ) : null}
       <VerseSheet
         verse={sheetVerse}
         translationId={user?.translationId}

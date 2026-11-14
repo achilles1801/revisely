@@ -39,6 +39,39 @@ import { AyahRef, ayahRects } from '../../lib/ayahBounds';
 import { useMushafEdition } from '../../lib/mushafEdition';
 import { sittingSavedText, sittingsEnabled } from '../../lib/sitting';
 import type { ReadStackParamList } from '../../navigation/MainNavigator';
+import { checkOwned, reciteLiveEnabled } from '../../lib/reciteLive/availability';
+import { setReciteCheckSettings, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
+import { loadQuranWords, getQuranWords, QuranWords } from '../../lib/recite/quranWords';
+import { furthestWord, marksOnPage } from '../../lib/reciteLive/state';
+import {
+  barWords,
+  hiddenFollow,
+  NOTHING_SHOWN,
+  revealAyah,
+  revealNextWord,
+  Revealed,
+  scorePill,
+} from '../../lib/reciteLive/view';
+import { LiveMode, useLiveRecitation } from '../../components/reciteLive/useLiveRecitation';
+import { ReciteMic, ReciteMicMode } from '../../components/reciteLive/ReciteMic';
+import { ReciteModeMenu } from '../../components/reciteLive/ReciteModeMenu';
+import { BarButton, ReciteBar } from '../../components/reciteLive/ReciteBar';
+import { LiveOverlay, LiveUnderlay } from '../../components/reciteLive/LivePageLayers';
+import { ReciteNoticeSheet } from '../../components/reciteLive/ReciteNoticeSheet';
+import type { LiveFailure } from '../../lib/reciteLive/contract';
+import { logger } from '../../lib/logger';
+
+/** What the recite bar says when a take ends without its answer. */
+const LIVE_FAILURE: Record<LiveFailure, string> = {
+  sign_in: 'Sign in again to recite',
+  testers_only: 'For testers only',
+  limit: 'That’s a lot for one hour',
+  too_long: '15 minutes reached',
+  idle: 'Stopped: nothing heard',
+  bad_request: 'Couldn’t start',
+  server: 'The checker stopped',
+  offline: 'Couldn’t reach the checker',
+};
 
 type NavigationProp = NativeStackNavigationProp<ReadStackParamList, 'QuranReader'>;
 type RouteProps = RouteProp<ReadStackParamList, 'QuranReader'>;
@@ -62,7 +95,7 @@ function searchHighlightOf(key: string | null): AyahRef[] | null {
 export default function QuranReaderScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProps>();
-  const { isDark } = useTheme();
+  const { isDark, palette: v2 } = useTheme();
   const palette = getReadPalette(isDark);
   const styles = useMemo(() => makeStyles(palette), [palette]);
 
@@ -201,6 +234,146 @@ export default function QuranReaderScreen() {
   const edition = useMushafEdition();
   const firstSurah = useMemo(() => firstSurahOnPage(currentPage, edition), [currentPage, edition]);
 
+  // ===== The one mic: Record, Recite, Check (Revisely Dev, testers, the 1405 print) =====
+  const liveOn = reciteLiveEnabled(user, edition);
+  const reciteSettings = useReciteCheckSettings(user?.id);
+  const owned = checkOwned(user, reciteSettings);
+  const live = useLiveRecitation({
+    settings: reciteSettings,
+    currentPage,
+    onShowPage: (page) => pagerRef.current?.scrollToPage(page),
+  });
+  const [words, setWords] = useState<QuranWords | null>(getQuranWords());
+  useEffect(() => {
+    if (!liveOn || words) return;
+    loadQuranWords()
+      .then(setWords)
+      .catch((err) => logger.warn('The word data did not load (the reader’s live check)', err));
+  }, [liveOn, words]);
+  const qw = live.words ?? words;
+  const [hidden, setHidden] = useState(false);
+  const [revealed, setRevealed] = useState<Revealed>(NOTHING_SHOWN);
+  const [modeMenu, setModeMenu] = useState(false);
+  const [noticeFor, setNoticeFor] = useState<LiveMode | null>(null);
+  const micMode: ReciteMicMode = reciteSettings.mode;
+  const liveInfo = useMemo(
+    () => ({ saidUpTo: furthestWord(live.state), startWord: live.startWord, cursor: live.state.cursor }),
+    [live.state, live.startWord],
+  );
+
+  const startMode = useCallback(
+    (mode: ReciteMicMode) => {
+      if (mode === 'record') {
+        void recorder.start();
+        return;
+      }
+      // Check that isn't the account's opens its page (next PR); until then it can't be picked locked.
+      if (mode === 'check' && !owned) return;
+      if (!reciteSettings.noticeSeen) {
+        setNoticeFor(mode);
+        return;
+      }
+      setRevealed(NOTHING_SHOWN);
+      void live.start(mode);
+    },
+    [recorder, owned, reciteSettings.noticeSeen, live],
+  );
+  const pickMode = useCallback(
+    (mode: ReciteMicMode) => {
+      setModeMenu(false);
+      if (mode !== 'check' || owned) setReciteCheckSettings(user?.id, { mode });
+      startMode(mode);
+    },
+    [owned, user?.id, startMode],
+  );
+  const toggleHidden = useCallback(() => {
+    setRevealed(NOTHING_SHOWN);
+    setHidden((h) => !h);
+  }, []);
+  const showNextWord = useCallback(() => {
+    if (!qw) return;
+    setRevealed((r) => {
+      const next = revealNextWord(qw, currentPage, r, liveInfo);
+      const added = [...next].find((w) => !r.has(w));
+      if (added != null) live.hint(added, 'word');
+      return next;
+    });
+  }, [qw, currentPage, liveInfo, live]);
+  const showWholeAyah = useCallback(() => {
+    if (!qw) return;
+    setRevealed((r) => {
+      const next = revealAyah(qw, currentPage, r, liveInfo);
+      const added = [...next].find((w) => !r.has(w));
+      if (added != null) live.hint(added, 'ayah');
+      return next;
+    });
+  }, [qw, currentPage, liveInfo, live]);
+
+  const checkTake = live.mode === 'check';
+  const pageMarks = useCallback(
+    (page: number) => (checkTake && qw ? marksOnPage(live.state, qw, page) : []),
+    [checkTake, qw, live.state],
+  );
+  const coverColors = useMemo(() => ({ cover: palette.pageBg, guide: palette.textSecondary, band: v2.accentText }), [palette, v2]);
+  const pageUnderlay = useMemo(
+    () =>
+      liveOn && qw && live.active
+        ? (page: number, scale: number) => (
+            <LiveUnderlay
+              page={page}
+              scale={scale}
+              words={qw}
+              cursor={live.state.status === 'listening' ? live.state.cursor : null}
+              selected={null}
+              colors={{ band: v2.followBand, word: v2.followWord, selectedMistake: v2.redSubtle, selectedSlip: v2.warnSubtle }}
+            />
+          )
+        : undefined,
+    [liveOn, qw, live.active, live.state, v2],
+  );
+  const pageOverlay = useMemo(
+    () =>
+      liveOn && qw && (live.active || hidden)
+        ? (page: number, scale: number, image: Parameters<NonNullable<React.ComponentProps<typeof MushafPager>['pageOverlay']>>[2]) => (
+            <LiveOverlay
+              page={page}
+              scale={scale}
+              image={image}
+              words={qw}
+              marks={pageMarks(page)}
+              hidden={hidden ? { follow: hiddenFollow(qw, revealed, liveInfo), ...coverColors } : null}
+              newest={live.state.cursor}
+              colors={{ mistake: v2.red, slip: v2.warn, accent: v2.accentText, onMistake: v2.bg, ground: palette.pageBg }}
+            />
+          )
+        : undefined,
+    [liveOn, qw, live.active, live.state.cursor, hidden, revealed, liveInfo, coverColors, pageMarks, v2],
+  );
+  const onTapVerse = useMemo(
+    () =>
+      liveOn && hidden && qw
+        ? (ayah: AyahRef) => {
+            setRevealed((r) => revealAyah(qw, ayah.page, r, liveInfo, ayah));
+            return true;
+          }
+        : undefined,
+    [liveOn, hidden, qw, liveInfo],
+  );
+
+  const liveStatus = live.state.status;
+  const barPhase: 'live' | 'checking' | 'done' =
+    liveStatus === 'checking' ? 'checking' : liveStatus === 'done' || liveStatus === 'failed' ? 'done' : 'live';
+  const barStatus =
+    liveStatus === 'connecting'
+      ? 'Starting…'
+      : liveStatus === 'checking'
+        ? 'Checking…'
+        : liveStatus === 'failed'
+          ? LIVE_FAILURE[live.state.failure ?? 'server']
+          : liveStatus === 'done'
+            ? 'Done'
+            : 'Listening…';
+
   // Previous / next go when the capsule is crowded (a recording, a timer) on
   // anything narrower than the largest phones.
   const crowded = recorder.phase !== 'idle' || timer != null;
@@ -211,7 +384,7 @@ export default function QuranReaderScreen() {
   return (
     <View style={styles.container}>
       <ReaderFrame
-        chromeVisible={chrome.visible}
+        chromeVisible={chrome.visible || live.active || modeMenu}
         active={isScreenFocused}
         onBackgroundPress={onTapPage}
         background={palette.pageBg}
@@ -245,6 +418,24 @@ export default function QuranReaderScreen() {
         }
         footer={
           <View style={styles.footer}>
+            {live.active && qw ? (
+              <ReciteBar
+                hidden={hidden}
+                onToggleHidden={toggleHidden}
+                onNextWord={showNextWord}
+                onWholeAyah={showWholeAyah}
+                score={checkTake ? scorePill(live.state, qw, live.startWord) : null}
+                seconds={live.seconds}
+                recording={false}
+                words={barWords(live.state, qw, { check: checkTake, startWord: live.startWord })}
+                status={barStatus}
+                phase={barPhase}
+                onStop={live.stop}
+                onClose={live.clear}
+                surface={{ background: palette.control, border: palette.divider }}
+              />
+            ) : (
+            <>
             <MushafScrubber page={currentPage} onJump={handleJump} palette={palette} />
             <PlayerCapsule
               player={verseActions.player}
@@ -252,7 +443,27 @@ export default function QuranReaderScreen() {
               compact={compact}
               surface={{ background: palette.control, border: palette.divider }}
               recording={recordingLive}
-              record={<RecordButton recorder={recorder} crowded={timer != null} />}
+              record={
+                liveOn && recorder.phase === 'idle' ? (
+                  <>
+                    <BarButton
+                      icon={hidden ? 'eye-outline' : 'eye-off-outline'}
+                      label={hidden ? 'Show the page' : 'Hide the page'}
+                      onPress={toggleHidden}
+                      active={hidden}
+                      testID="reader-eye"
+                    />
+                    <ReciteMic
+                      mode={micMode}
+                      starting={live.mic === 'starting'}
+                      onPress={() => startMode(micMode)}
+                      onLongPress={() => setModeMenu(true)}
+                    />
+                  </>
+                ) : (
+                  <RecordButton recorder={recorder} crowded={timer != null} />
+                )
+              }
               timer={
                 <TimerChip
                   compact={compact}
@@ -261,6 +472,8 @@ export default function QuranReaderScreen() {
                 />
               }
             />
+            </>
+            )}
           </View>
         }
         footerHeight={FOOTER_HEIGHT}
@@ -289,6 +502,10 @@ export default function QuranReaderScreen() {
           highlightedAyah={verseActions.highlightedAyah ?? searchHighlight}
           onTap={onTapPage}
           onUserSwipe={chrome.hide}
+          pageUnderlay={pageUnderlay}
+          pageOverlay={pageOverlay}
+          onTapVerse={onTapVerse}
+          extraData={liveOn ? `${live.state.cursor}|${live.state.saidUpTo}|${Object.keys(live.state.marks).length}|${hidden}|${revealed.size}` : undefined}
         />
       </ReaderFrame>
 
@@ -323,6 +540,32 @@ export default function QuranReaderScreen() {
 
       <HelpToast screen="reader" bottomInset={insets.bottom - spacing.sm} />
       {verseActions.overlay}
+      {liveOn ? (
+        <>
+          <ReciteModeMenu
+            visible={modeMenu}
+            mode={micMode}
+            checkOwned={owned}
+            bottom={insets.bottom + spacing.sm + CAPSULE_HEIGHT + spacing.sm}
+            right={spacing.sm + 2}
+            onPick={pickMode}
+            onClose={() => setModeMenu(false)}
+          />
+          <ReciteNoticeSheet
+            visible={noticeFor != null}
+            onAgree={() => {
+              const mode = noticeFor;
+              setReciteCheckSettings(user?.id, { noticeSeen: true });
+              setNoticeFor(null);
+              if (mode) {
+                setRevealed(NOTHING_SHOWN);
+                void live.start(mode);
+              }
+            }}
+            onClose={() => setNoticeFor(null)}
+          />
+        </>
+      ) : null}
     </View>
   );
 }
