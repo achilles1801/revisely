@@ -111,6 +111,9 @@ def settings_of(raw):
             v = DEFAULT[k]
         out[k] = v if v in allowed else DEFAULT[k]
     out['letters'] = str(raw.get('letters', '0')) == '1'
+    # tajweed (madd lengths, qalqalah, ghunnah, ikhfa, idgham, iqlab): on unless tajweed=0. The app offers two levels
+    # (Majd, Nov 14 2026): words and harakat (letters=1, tajweed=0), and strict (letters=1, tajweed=1)
+    out['tajweed'] = str(raw.get('tajweed', '1')) != '0'
     return out
 
 
@@ -297,7 +300,7 @@ class Engine:
             'extras': [{'after': e['after'], 't': round(e['t'], 2), 'trail': bool(e.get('trail'))} for e in extras],
             'tajweed': [{k: r[k] for k in r if not k.startswith('_')} for r in tj],
             'letters': [{k: r[k] for k in r if not k.startswith('_')} for r in letters] if st['letters'] else None,
-            'settings': {k: st[k] for k in ('mon', 'mot', 'aar', 'letters')},
+            'settings': {k: st[k] for k in ('mon', 'mot', 'aar', 'letters', 'tajweed')},
             'ms': {'model': int(t_model * 1000), 'words': int(t_words * 1000), 'tajweed': int(t_tajweed * 1000)},
         }
         if v == 2:
@@ -383,6 +386,8 @@ class Engine:
         n = self.words.counts[self.words.vindex[(s, a)]]
         ws = list(range(first, first + n))
         out, letters = [], []
+        if not st.get('tajweed', True) and not st['letters']:
+            return out, letters  # words only: nothing to judge per ayah
         sts = [statuses.get(x) for x in ws]
         if any(x not in SAID for x in sts) or ws[0] not in spans or ws[-1] not in spans:
             return out, letters  # not said in full: its sounds can't be lined up
@@ -406,7 +411,7 @@ class Engine:
             out.append(row)
 
         try:
-            judged = tajweed.judge(win, self.ear, SL.ayah(s, a))
+            judged = tajweed.judge(win, self.ear, SL.ayah(s, a)) if st.get('tajweed', True) else []
         except Exception:
             judged = []
         # tajweed and nasal places count quran_transcript's words; the app joins two pairs into one word (بَعْدَ مَا,
@@ -440,7 +445,7 @@ class Engine:
         text = ' '.join(self.key.uthmani(s, a))
         try:
             stops = nasal_rules.stops_after(s, a, n)
-            ph, pls = nasal_rules.places(text, ms, stops)
+            ph, pls = nasal_rules.places(text, ms, stops) if st.get('tajweed', True) else ('', [])
             margins = nasal_rules.judge(win, self.ear, ph, pls) if pls else []
         except Exception:
             pls, margins = [], []

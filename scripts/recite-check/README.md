@@ -17,6 +17,16 @@ every other account.
 > The app shows the same notice in English and Arabic before the first check, and from the check's sheet and
 > Settings → About afterwards.
 
+## Two levels (Majd, Nov 14 2026)
+
+- **Words and harakat:** `letters=1&tajweed=0`. Wrong, skipped and extra words, and letter and haraka slips:
+  what Tarteel checks.
+- **Strict:** `letters=1&tajweed=1`. The same, plus tajweed: madd lengths against the reciter's settings,
+  qalqalah, ghunnah, ikhfa, idgham, iqlab.
+
+`tajweed` is on unless `tajweed=0`, so the build that sends neither keeps today's answers. On Majd's head-to-head
+take (2:38–43): words and harakat gave his five slips and nothing else; strict added one idgham note.
+
 ## What it judges
 
 One recording against a passage (from an ayah to the end of its surah, or to a given ayah), with the lab's
