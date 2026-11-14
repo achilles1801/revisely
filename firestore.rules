@@ -18,6 +18,8 @@ rules_version = '2';
  * - users/{userId}/revisions|memorizations|reads/{id} - Activity items
  * - users/{userId}/stats/usage - Time spent in the app
  * - config/app - Supported and latest app versions (read by every install)
+ * - entitlements/{userId} - Revisely Premium (the owner reads; only the functions write)
+ * - supportApplications/{userId} - The support program (the owner reads; only the functions write)
  */
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -744,6 +746,30 @@ service cloud.firestore {
 
     match /revoUsage/{userId} {
       allow get: if isOwner(userId);
+    }
+
+    // Revisely Premium (functions/src/support): `premium`, the grant the app and the
+    // recitation checker read, and `grants`, one per source. The owner may get and
+    // listen to their own; only the admin SDK writes it, so Premium can't be given
+    // from a phone.
+    match /entitlements/{userId} {
+      allow get: if isOwner(userId);
+    }
+
+    // The support program's application (functions supportApplication): the owner
+    // may read its status; only the functions write it, after checking the answers.
+    match /supportApplications/{userId} {
+      allow get: if isOwner(userId);
+    }
+
+    // The program's one-time links (hashed) and daily limits: functions only, the
+    // account itself included (a client could otherwise lift its own limits).
+    match /supportCodes/{codeId} {
+      allow read, write: if false;
+    }
+
+    match /supportLimits/{userId} {
+      allow read, write: if false;
     }
 
     // Tester resets (functions resetMyData): how often each account reset.
