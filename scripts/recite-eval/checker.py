@@ -223,6 +223,28 @@ def skeleton(norm):
     return ''.join(out)
 
 
+# two words in quran_transcript that the mushaf (and the app) writes as one
+JOINED = {('بَعْدَ', 'مَا'), ('إِلْ', 'يَاسِينَ')}
+
+
+def join_to_app(ws, n):
+    """quran_transcript's words of an ayah grouped into the app's n words: a JOINED pair becomes one word (with its
+    space) while there are too many. Unchanged when the counts already agree, or when joining can't make them agree."""
+    if len(ws) <= n:
+        return ws
+    out, i = [], 0
+    extra = len(ws) - n
+    while i < len(ws):
+        if extra and i + 1 < len(ws) and (ws[i], ws[i + 1]) in JOINED:
+            out.append(ws[i] + ' ' + ws[i + 1])
+            i += 2
+            extra -= 1
+        else:
+            out.append(ws[i])
+            i += 1
+    return out if len(out) == n else ws
+
+
 class Key:
     """Expected sounds for each word of a passage, from the phonetizer."""
 
@@ -253,10 +275,21 @@ class Key:
         return self._aoi
 
     def uthmani(self, s, a):
+        """The ayah's words as the app counts them: quran_transcript's words, with the pairs the mushaf writes as one
+        word joined by a space (JOINED: بَعْدَ مَا in 2:181, 8:6, 13:37; إِلْ يَاسِينَ in 37:130)."""
         if (s, a) not in self._aya:
             from quran_transcript import Aya
-            self._aya[(s, a)] = Aya(s, a).get().uthmani.split(' ')
+            ws = Aya(s, a).get().uthmani.split(' ')
+            n = self.words.counts[self.words.vindex[(s, a)]] if (s, a) in self.words.vindex else len(ws)
+            self._aya[(s, a)] = join_to_app(ws, n)
         return self._aya[(s, a)]
+
+    def app_index(self, s, a):
+        """quran_transcript's word index -> the app's, for ayah s:a (the same but in the JOINED ayat)."""
+        out = []
+        for k, w in enumerate(self.uthmani(s, a)):
+            out += [k] * (w.count(' ') + 1)
+        return out
 
     def phonetize(self, words_text):
         """Sounds of each word: the phonetizer's output cut at each word's first sound."""
