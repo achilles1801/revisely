@@ -107,9 +107,11 @@ take (`<take>.dismiss-<time>.json`) as a label for the lab.
    words, if not yet decided, are `helped`, counted in `score.helped` and flagged in `done.result.words`; a helped word
    said wrong is still a mistake) and finally `{"type":"end"}`. Any other frame is ignored.
 4. The server sends `at` (the cursor), `said` (decided up to), `mark`, `unmark`, `ayah` (an ayah's tajweed has all
-   come), `score`, and after `end`, `done` with the whole take checked once more (the v2 answer, with `take`, `kept`
-   and `why`). Every event has `t`, the seconds of the take it was decided at. `error` (`sign_in`, `testers_only`,
-   `limit`, `idle`, `bad_request`, `server`) closes the socket.
+   come), `score`, and after `end`, `done` with the whole take checked once more (the v2 answer, with `take` and
+   `why`; Recite's has the words only, with `marks: []` and `score: null`). `done` goes at once; with keep on, the
+   take is then stored and `{"type":"kept","take":…,"ok":true|false}` follows before the server closes the socket
+   (the phone needn't wait for it). Every event has `t`, the seconds of the take it was decided at. `error`
+   (`sign_in`, `testers_only`, `limit`, `idle`, `bad_request`, `server`, `premium_required`) closes the socket.
 
 **Check is a Premium feature** (apply-support.md draft 2; Premium is free through "Apply for support"): with
 `CHECK_GATE=on`, `/check` and `/live` without `follow` need `entitlements/{uid}.premium` (present, and `until` null or
@@ -130,6 +132,8 @@ again. The phone applies events idempotently (marks by id; `at`, `said` and `sco
 changes nothing on screen. Right after `ready`, a resume on the same instance also sends what the phone should be
 showing (every mark shown, every `unmark`, the `ayah` events, `at`, `said`, `score`): the dropped socket may have
 swallowed events of the last audio it was checking, and that audio isn't sent again. The phone keeps the take's PCM for this (it needs it for "play this word" too).
+A resume of a take that already ended on this instance (the phone missed `done`) gets `ready` (`from` = every sample)
+and the same `done` again, for 2 minutes; on the other instance it runs again, and the copy already stored stays.
 
 **How it decides** (`live.py`): the lab's live checker (`checker.run_item_live`): every 0.5 s of audio the model runs
 on the last 4 s; frames with 1 s of audio after them are final and go to the Viterbi decoder; a word is decided once
