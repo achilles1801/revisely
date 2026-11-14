@@ -25,7 +25,9 @@ export function handleReciteLiveLink(url: string): boolean {
 /**
  * E2E builds fetch no page images, and the marks are drawn on the page's own ink: page 379 (the 1405 print, its
  * public image from the app's Storage) is put where the offline mushaf keeps it, for this device's set. Copied with
- * the legacy API, which may read the app bundle (lib/recite/quranWords' readText says why).
+ * the legacy API, which may read the app bundle (lib/recite/quranWords' readText says why). The PNG ships as `.dat`:
+ * an Android release build keeps a `.png` asset as a drawable, which the file API can't copy ("No resource found");
+ * a `.dat` is a raw file, as the word data is.
  */
 async function putPage379(): Promise<void> {
   try {
@@ -33,7 +35,7 @@ async function putPage379(): Promise<void> {
     const { Directory, File, Paths } = require('expo-file-system') as typeof import('expo-file-system');
     const legacy = require('expo-file-system/legacy') as typeof import('expo-file-system/legacy');
     const { pageImageSet } = require('../quranImages') as typeof import('../quranImages');
-    const asset = Asset.fromModule(require('./fixtures/page379.png'));
+    const asset = Asset.fromModule(require('./fixtures/page379.dat'));
     if (!asset.localUri) await asset.downloadAsync();
     const dir = new Directory(Paths.document, 'mushaf', pageImageSet());
     if (!dir.exists) dir.create({ intermediates: true, idempotent: true });
