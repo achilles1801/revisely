@@ -404,7 +404,8 @@ Things that bit:
   `subflows/type-in-field.yaml`, which checks what the field holds and types it again if keys were
   dropped (the passwords are shown first so their text can be read). A sign-up the app still
   refuses fails there on its own error (`auth-error`), not later as SYNC-4 after a relaunch that
-  clears it.
+  clears it. A swipe can stall the same way (27 s for one in run 43583371303): give a
+  `scrollUntilVisible` room for that, as onboarding's scroll to Juz 30 has (90 s).
 - A script that writes the server as its admin (a seed) runs once the app has sent its own changes
   (`subflows/app-sent.yaml`). The app sends from its outbox, and a change it still held went out
   after the script's writes and over them: on iOS, run 42414536111, a failed Firestore write stream
