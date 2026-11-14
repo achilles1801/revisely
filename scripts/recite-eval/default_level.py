@@ -61,7 +61,14 @@ def rates(marked):
     return 100 * np.mean(ok), 100 * np.mean(bad), len(ok), len(bad)
 
 
-def table(ears):
+def stamps(tags, mixed):
+    """Each learners run's stamp; runs from different checkers aren't put side by side (run_stamp.py)."""
+    import run_stamp
+    run_stamp.check([LAB / 'runs/v0/results' / t for t in tags], mixed=mixed)
+
+
+def table(ears, mixed=False):
+    stamps([f'learners.ft.{e}.wp' for e in ears], mixed)
     print('| letters bar (share of pro words) | ' + ' | '.join(ears) + ' |')
     print('| --- |' + ' --- |' * len(ears))
     cache = {e: (letter_scores(e), word_marked(f'learners.ft.{e}.wp')) for e in ears}
@@ -80,8 +87,9 @@ def table(ears):
     print(f'(correct clips / clips with mistakes; n = {words_only[0][2]} / {words_only[0][3]})')
 
 
-def frontier(ears):
+def frontier(ears, mixed=False):
     sweep = json.loads((LAB / 'runs/word_sweep.json').read_text())
+    stamps([t for t, v in sweep.items() if v['ear'] in ears] + [f'learners.ft.{e}.wp' for e in ears], mixed)
     qs = [0.0001, 0.0003, 0.001, 0.002, 0.003, 0.005, 0.01, 0.02]
     pts = collections.defaultdict(list)
     for e in ears:
@@ -110,7 +118,9 @@ def frontier(ears):
 
 
 if __name__ == '__main__':
-    if sys.argv[1] == '--frontier':
-        frontier(sys.argv[2:])
+    mixed = '--mixed' in sys.argv  # allow runs from different checkers side by side
+    argv = [a for a in sys.argv[1:] if a != '--mixed']
+    if argv[0] == '--frontier':
+        frontier(argv[1:], mixed)
     else:
-        table(sys.argv[1:])
+        table(argv, mixed)

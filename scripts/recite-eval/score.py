@@ -195,14 +195,19 @@ def main():
     ap.add_argument('--results', required=True, help='comma-separated result names')
     ap.add_argument('--by', default='condition,variant')
     ap.add_argument('--json')
+    ap.add_argument('--mixed', action='store_true', help='allow runs made by different checkers side by side')
     args = ap.parse_args()
     bench = pathlib.Path(args.bench)
     run = pathlib.Path(args.run)
+    import run_stamp  # which checker made each run; runs from different checkers aren't compared by mistake
+    run_stamp.check([run / 'results' / n for n in args.results.split(',')], mixed=args.mixed)
     keys = [k for k in args.by.split(',') if k]
     report = {}
     for name in args.results.split(','):
         rows = collections.defaultdict(list)
         for f in sorted((run / 'results' / name).glob('*.json')):
+            if f.name.startswith('_'):
+                continue  # _run.json, the run's stamp
             res = json.loads(f.read_text())
             truth = json.loads((bench / 'items' / f.name).read_text())
             group = tuple(truth[k] for k in keys)

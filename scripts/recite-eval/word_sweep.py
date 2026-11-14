@@ -28,7 +28,9 @@ def run(ear, alt_pen, mean_gop, bench='learners-v0'):
     if bench != 'learners-v0':
         tag += '.' + bench
     P = dict(BASE, alt_pen=alt_pen, mean_gop=mean_gop)
-    if not (LAB / 'runs/v0/results' / tag).exists():
+    import run_stamp
+    st = run_stamp.read(LAB / 'runs/v0/results' / tag)
+    if not st or st['code'] != run_stamp.code_hash():  # none yet, or made by another checker: run it
         subprocess.run([PY, str(LAB / 'tools/memguard.py'), '--limit-gb', '8', '--', PY, '-I', str(H / 'checker.py'),
                         '--bench', str(LAB / 'data' / bench), '--run', str(LAB / 'runs/v0'), '--name', tag,
                         '--ear', ear, '--jobs', '10', '--params', json.dumps(P)],

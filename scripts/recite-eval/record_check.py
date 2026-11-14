@@ -167,11 +167,16 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--bench', default=str(LAB / 'data/record-v1'))
     ap.add_argument('--run', default=str(LAB / 'runs/record-v1'))
-    ap.add_argument('--words', default='rec.hisn.wp', help='checker.py results name for the words check')
+    ap.add_argument('--words', required=True,
+                    help='checker.py results name for the words check, made with the current checker (no default: '
+                         'rec.hisn.wp silently stood for a run made before three checker fixes, Nov 14 2026)')
+    ap.add_argument('--stale-ok', action='store_true', help='score a run made by an older checker anyway')
     ap.add_argument('--v3', default=str(LAB / 'models/ft-v3/step8000.pt'))
     ap.add_argument('--items', default='', help='docs/record/items.json (default: the live copy)')
     args = ap.parse_args()
     bench_dir, run = pathlib.Path(args.bench), pathlib.Path(args.run)
+    import run_stamp
+    run_stamp.check([run / 'results' / args.words], current=not args.stale_ok)
     import record_bench, bench, hisn_torch
     items = {x['id']: x for x in record_bench.load_items(args.items)['items']}
     words_obj = bench.Words()

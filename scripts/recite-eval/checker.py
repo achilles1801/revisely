@@ -1113,6 +1113,8 @@ def main():
         items = items[: args.limit]
     (run / 'results' / args.name).mkdir(parents=True, exist_ok=True)
     (run / 'results' / args.name / 'params.txt').write_text(json.dumps(P, indent=1))
+    import run_stamp  # which checker made this run, for whoever compares it with another (run_stamp.py)
+    run_stamp.write(run / 'results' / args.name, P, args.ear)
     work = [(str(f), run, args.name, P) for f in items]
     t0 = time.time()
     errors = 0
