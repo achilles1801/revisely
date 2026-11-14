@@ -10,6 +10,7 @@ import os
 import pathlib
 import sys
 import unittest
+import unittest.mock
 import wave
 
 import numpy as np
@@ -81,6 +82,39 @@ class Model(unittest.TestCase):
             self.assertEqual((got, gs), (want, ws))
             self.assertEqual(mine.traceback(final, since=200)[0], [p for p in want if p[0] >= 200])
 
+    def test_the_fast_step_is_the_checkers_step_to_the_bit(self):
+        import checker
+        import live
+        E = engine()
+        sources = [np.frombuffer(noise(20, seed=3), '<i2')]
+        if ITEM.exists():
+            sources.append(np.frombuffer(bench_pcm()[: 16000 * 2 * 40], '<i2'))
+        P = dict(live.WORDS_P, **live.LIVE)
+        for x in sources:
+            lp = E.ear.logprobs(x.astype(np.float32) / 32768)
+            for lo, n in ((0, 29), (0, 96), (5000, 60)):  # short, a full segment, a passage mid-surah
+                g = checker.Graph(E.key.passage(lo, lo + n, 4, 'skeleton'))
+                ref = checker.Decoder(g, P, lp.shape[0])
+                mine = live.Decoder(g, P, cap=10)
+                for f in range(lp.shape[0]):
+                    ref.feed(lp[f:f + 1])
+                    mine.feed(lp[f:f + 1])
+                    self.assertTrue(np.array_equal(ref.d, mine.d) and np.array_equal(ref.gap, mine.gap), (lo, n, f))
+                T = lp.shape[0]
+                for name in ('bp', 'ent_src', 'gap_src', 'ex_state'):
+                    self.assertTrue(np.array_equal(getattr(ref, name)[:T], getattr(mine, name)[:T]), name)
+                self.assertEqual(ref.traceback(True), mine.traceback(True))
+                # the cursor's scores-only frames: the same scores, nothing else touched
+                probe = live.Decoder(g, P, cap=10)
+                probe.feed(lp[:T // 2])
+                saved, tables = probe.state(), probe.bp.copy()
+                probe.feed_scores(lp[T // 2:T // 2 + 50])
+                full = live.Decoder(g, P, cap=10)
+                full.feed(lp[:T // 2 + 50])
+                self.assertTrue(np.array_equal(probe.d, full.d) and np.array_equal(probe.gap, full.gap))
+                probe.restore(saved)
+                self.assertTrue(np.array_equal(probe.bp, tables))
+
     def test_a_session_on_noise_ends_with_a_v2_answer(self):
         import live
         sess = live.LiveSession(engine(), 1, 1, 1, 7, {'letters': '1'})
@@ -132,6 +166,21 @@ class Model(unittest.TestCase):
         finally:
             E.table = saved
 
+    def test_the_four_ayat_with_a_joined_word_check_and_stream(self):
+        """2:181, 8:6, 13:37 and 37:130 broke the checker (quran_transcript splits a word the mushaf writes as one;
+        fixed at c01f4ea0): a check or a live session near them failed with `server`."""
+        import live
+        E = engine()
+        x = np.frombuffer(noise(4, seed=7), '<i2')
+        for s, a in ((2, 181), (8, 6), (13, 37), (37, 130)):
+            first, n = E.words.first[E.words.vindex[(s, a)]], E.words.counts[E.words.vindex[(s, a)]]
+            self.assertEqual(len(E.passage_words(first, first + n)), n)
+            res = E.check(x.astype(np.float32) / 32768, s, a - 1 if a > 1 else a, s, a + 1, {}, v=2)
+            self.assertEqual(res['v'], 2)
+            sess = live.LiveSession(E, s, a - 1 if a > 1 else a, s, a + 1, {})
+            ev = run(sess, chunks(x.tobytes(), 3200) + [{'type': 'end'}])
+            self.assertEqual(ev[-1]['type'], 'done')
+
     def test_refuses_a_passage_that_does_not_exist(self):
         import live
         from engine import BadRequest
@@ -180,6 +229,55 @@ class Bench(unittest.TestCase):
         self.assertEqual(got['said']['upTo'], last['said']['upTo'])
         self.assertEqual({k: got['score'][k] for k in ('reached', 'mistakes')},
                          {k: last['score'][k] for k in ('reached', 'mistakes')})
+
+    def test_follow_mode_sends_the_cursor_and_said_but_no_marks_or_score(self):
+        import live
+        sess = live.LiveSession(engine(), 1, 1, 1, 7, {'letters': '1'}, follow=True)
+        ev = run(sess, chunks(bench_pcm(), 3200) + [{'type': 'end'}])
+        self.assertEqual({e['type'] for e in ev} - {'at', 'said', 'ayah', 'done'}, set())
+        res = ev[-1]['result']
+        self.assertNotIn('marks', res)
+        self.assertNotIn('score', res)
+        self.assertEqual(res['settings']['letters'], False)
+        self.assertEqual({w['w']: w['status'] for w in res['words']}[14], 'missed')  # words are still decided
+        self.assertEqual([e for e in ev if e['type'] == 'said'][-1]['upTo'] >= 27, True)
+
+    def test_hints_mark_words_helped_without_changing_mistakes(self):
+        pcm = bench_pcm()
+        log = chunks(pcm[:16000 * 2 * 20], 3200) + [{'type': 'hint', 'w': 20, 'what': 'word'},
+                                                    {'type': 'hint', 'w': 22, 'what': 'ayah'}] \
+            + chunks(pcm[16000 * 2 * 20:], 3200) + [{'type': 'end'}]
+        ev = run(self.session(), log)
+        res = ev[-1]['result']
+        helped = sorted(w['w'] for w in res['words'] if w.get('helped'))
+        self.assertEqual(helped, [20, 22, 23, 24, 25, 26, 27, 28])  # 1:7 runs to word 28
+        self.assertEqual(res['score']['helped'], 8)
+        self.assertEqual(res['score']['mistakes'], 2)
+        self.assertEqual([e for e in ev if e['type'] == 'score'][-1]['helped'], 8)
+
+    def test_strict_hands_the_take_to_the_second_model(self):
+        """With v5 loaded (#539), ayah_notes gets the take's samples, on the frames' grid; without it, nothing."""
+        import live
+        E = engine()
+        seen = []
+        real = E.ayah_notes
+
+        def notes(lp, s, a, statuses, spans, st, audio=None):
+            seen.append(None if audio is None else len(audio))
+            return real(lp, s, a, statuses, spans, st)
+        pcm = bench_pcm()[: 16000 * 2 * 20]
+        with unittest.mock.patch.object(E, 'ayah_notes', notes), unittest.mock.patch.object(E, 'ear2', object(),
+                                                                                             create=True):
+            sess = live.LiveSession(E, 1, 1, 1, 7, {})
+            run(sess, chunks(pcm, 3200) + [{'type': 'end'}])
+            self.assertTrue(sess.v5 and seen and all(n is not None for n in seen))
+            self.assertEqual(seen[-1], len(pcm) // 2)
+            np.testing.assert_allclose(sess.xf[:sess.n], np.frombuffer(pcm, '<i2') / 32768.0)
+            seen.clear()
+            sess = live.LiveSession(E, 1, 1, 1, 7, {'tajweed': '0'})  # words and harakat: no second model
+            run(sess, chunks(pcm, 3200) + [{'type': 'end'}])
+            self.assertFalse(sess.v5)
+            self.assertTrue(all(n is None for n in seen))
 
     def test_same_events_for_any_chunk_size(self):
         pcm = bench_pcm()[: 16000 * 2 * 20]

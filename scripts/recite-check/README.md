@@ -93,15 +93,26 @@ take (`<take>.dismiss-<time>.json`) as a label for the lab.
 
 1. The phone opens `wss://…/live` and sends a start frame first (within 10 s):
    `{"type":"start","token":"<ID token>","s":27,"a":23,"s2":null,"a2":null,"mon":4,"mot":4,"aar":0,"letters":false,"keep":true}`.
-   The token can be in the handshake's `Authorization: Bearer` header instead. Sign-in and `previewTester` are checked
+   The token can be in the handshake's `Authorization: Bearer` header instead. `"tajweed": false` turns tajweed off
+   (the app's "words and harakat" level; letters as asked). `"follow": true` (or `"mode": "recite"`) is Recite:
+   only `ready`, `at`, `said`, `ayah` and `done` come back, words are decided but no mark is made, and `done.result`
+   has the words and their statuses only. Sign-in and `previewTester` are checked
    on every socket. A session counts against the 40 an hour; resuming doesn't.
 2. The server answers `{"type":"ready","v":2,"engine":"…","take":"<take>","from":0}`.
 3. The phone sends PCM (16-bit little-endian, mono, 16 kHz) as binary frames of any size, and as text frames
-   `{"type":"seek","w":…}`, `{"type":"dismiss","id":"…"}` and finally `{"type":"end"}`.
+   `{"type":"seek","w":…}`, `{"type":"dismiss","id":"…"}`,
+   `{"type":"hint","w":…,"what":"word"|"ayah"}` (the hidden view showed a word, or the rest of its ayah: those
+   words, if not yet decided, are `helped`, counted in `score.helped` and flagged in `done.result.words`; a helped word
+   said wrong is still a mistake) and finally `{"type":"end"}`. Any other frame is ignored.
 4. The server sends `at` (the cursor), `said` (decided up to), `mark`, `unmark`, `ayah` (an ayah's tajweed has all
    come), `score`, and after `end`, `done` with the whole take checked once more (the v2 answer, with `take`, `kept`
    and `why`). Every event has `t`, the seconds of the take it was decided at. `error` (`sign_in`, `testers_only`,
    `limit`, `idle`, `bad_request`, `server`) closes the socket.
+
+**Check is paid** (apply-support.md, free through "Apply for support"): with `CHECK_GATE=on`, `/check` and `/live`
+without `follow` need `entitlements/{uid}.check` (present, and `until` null or later), read like `previewTester` and
+cached a minute; without it, 403 / `error` `check_locked`. Recite stays free. `previewTester` still gates everything.
+The gate is off until the entitlements exist on revisely-dev (`--update-env-vars CHECK_GATE=on` turns it on).
 
 **Limits.** A take is at most 15 minutes (then `done`, `why: "too_long"`). 30 s without a frame from the phone closes
 the socket (`idle`). uvicorn pings every 10 s, so a phone gone without closing is noticed within 20 s.
@@ -147,13 +158,16 @@ and the bars. None of those go into git.
 scripts/recite-check/stage.sh /tmp/recite-stage
 gcloud run deploy recite-check --project revisely-dev --region us-east1 --source /tmp/recite-stage \
   --service-account recite-check@revisely-dev.iam.gserviceaccount.com \
-  --cpu 2 --memory 2Gi --concurrency 1 --min-instances 0 --max-instances 2 --timeout 1200 --cpu-boost \
-  --session-affinity --set-env-vars PROJECT=revisely-dev,BUCKET=revisely-dev.firebasestorage.app,THREADS=2 \
+  --cpu 1 --memory 2Gi --concurrency 1 --min-instances 0 --max-instances 2 --timeout 1200 --cpu-boost \
+  --session-affinity --set-env-vars PROJECT=revisely-dev,BUCKET=revisely-dev.firebasestorage.app,THREADS=1,OMP_NUM_THREADS=1 \
   --no-traffic --tag live
 # test the tagged revision (https://live---recite-check-fljbshu7ma-ue.a.run.app), then:
 gcloud run services update-traffic recite-check --project revisely-dev --region us-east1 --to-latest
 ```
 
+`--cpu 1` (Nov 14 2026): measured on the e2e set against 2 vCPU, the cursor and the marks move by under 0.1 s
+(word start → `at` median 0.67–0.72 s; word end → mark 2.0–4.2 s) and a /check of 118 s takes the same 10–11 s; a live
+take uses 25–42% of the one vCPU. It doubles the free tier's hours of live use (about 50 a month).
 `--timeout 1200`: a WebSocket is one request to Cloud Run, so the timeout is a live session's longest (15 minutes of
 audio and pauses). With `--concurrency 1` an open socket holds an instance, so two live takes at once at most.
 Leave out `--[no-]allow-unauthenticated`: the service is already open (below), and the flag would change that.

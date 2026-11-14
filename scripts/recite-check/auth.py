@@ -1,5 +1,6 @@
 """Who is asking: a Firebase ID token for this project, and the account's previewTester flag (read from Firestore
 with the service's own identity; clients can't write that field)."""
+import datetime
 import os
 import threading
 import time
@@ -17,6 +18,8 @@ _creds = None
 _lock = threading.Lock()
 _testers = {}  # uid -> (is a tester, when read)
 TESTER_TTL = 600
+_checks = {}  # uid -> (has Check, when read)
+CHECK_TTL = 60  # a grant (or a revocation) takes effect within a minute
 
 
 class Refused(Exception):
@@ -65,6 +68,43 @@ def is_tester(uid):
         ok = r.json().get('fields', {}).get('previewTester', {}).get('booleanValue') is True
     _testers[uid] = (ok, time.time())
     return ok
+
+
+def has_check(uid, now=None):
+    """Whether the account may use Check (apply-support.md): entitlements/{uid}.check exists and its `until` is null
+    or later than now. Written only by the admin SDK (an approved application, a dev grant, later a purchase); any
+    source counts. Read with the service's own identity, as previewTester is."""
+    hit = _checks.get(uid)
+    t = time.time() if now is None else now
+    if hit and t - hit[1] < CHECK_TTL:
+        return hit[0]
+    url = (f'https://firestore.googleapis.com/v1/projects/{PROJECT}/databases/(default)/documents/entitlements/{uid}'
+           '?mask.fieldPaths=check')
+    r = requests.get(url, headers={'Authorization': f'Bearer {token()}'}, timeout=10)
+    if r.status_code == 404:
+        ok = False
+    else:
+        r.raise_for_status()
+        ok = check_open(r.json().get('fields', {}).get('check'), t)
+    _checks[uid] = (ok, t)
+    return ok
+
+
+def check_open(field, now):
+    """A Firestore REST `check` map: present, and `until` absent, null or after now."""
+    if not field or 'mapValue' not in field:
+        return False
+    until = field['mapValue'].get('fields', {}).get('until')
+    if until is None or 'nullValue' in until:
+        return True
+    ts = until.get('timestampValue')
+    if not ts:
+        return False
+    try:
+        when = datetime.datetime.fromisoformat(ts.replace('Z', '+00:00')).timestamp()
+    except ValueError:
+        return False
+    return when > now
 
 
 class Limiter:

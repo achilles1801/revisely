@@ -34,6 +34,9 @@ MAX_SECONDS = 240
 FIRST_FRAME = 10      # seconds a new socket has to send its start frame
 IDLE = 30             # seconds without a frame from the phone before a socket is closed
 RESUME_TTL = 120      # seconds a dropped session waits on this instance for its phone to come back
+# Check is paid, with a free path (apply-support.md): with CHECK_GATE=on, /check and /live without "follow" need
+# entitlements/{uid}.check; Recite (follow) stays free. Off until the entitlements exist on revisely-dev.
+CHECK_GATE = os.environ.get('CHECK_GATE', 'off') == 'on'
 MARK_ID = re.compile(r'^\d{1,6}:(word|letter|tajweed):[a-z_]{1,24}$')
 log = logging.getLogger('recite-check')
 logging.basicConfig(level=logging.INFO)
@@ -101,6 +104,12 @@ async def signed_in_tester(header):
     return uid
 
 
+async def may_check(uid):
+    """Check (marks) needs the entitlement when the gate is on; Recite doesn't."""
+    if CHECK_GATE and not await asyncio.to_thread(auth.has_check, uid):
+        raise auth.Refused(403, 'check_locked')
+
+
 def put_json(name, obj):
     store.put(name, json.dumps(obj, ensure_ascii=False).encode(), 'application/json')
 
@@ -114,6 +123,7 @@ def health():
 async def check(request: Request):
     try:
         uid = await signed_in_tester(request.headers.get('authorization'))
+        await may_check(uid)
         limiter.take(uid)
         body = await request.body()
         if len(body) > MAX_SECONDS * 32000 + 4096:
@@ -218,16 +228,23 @@ def keep_take(s, partial=False):
     sess = s.sess
     store.put(name + '.wav', wav_bytes(sess.pcm[:sess.n]), 'audio/wav')
     put_json(name + '.json', {'mode': 'live', 'request': s.request, 'app': s.app, 'engine': VERSION,
-                              'events': s.events, 'dismissed': sorted(sess.dismissed), 'result': sess.result,
+                              'events': s.events, 'dismissed': sorted(sess.dismissed), 'hints': sess.hints,
+                              'result': sess.result,
                               'secs': round(sess.seconds, 1)})
 
 
 def settings_from(msg):
-    """mon, mot, aar and letters from the start frame (flat, as the contract has them; or in 'settings')."""
+    """mon, mot, aar, letters and tajweed from the start frame (flat, as the contract has them; or in 'settings')."""
     raw = msg.get('settings') if isinstance(msg.get('settings'), dict) else msg
     out = {k: raw[k] for k in ('mon', 'mot', 'aar') if isinstance(raw.get(k), int) and not isinstance(raw[k], bool)}
     out['letters'] = '1' if raw.get('letters') is True else '0'
+    out['tajweed'] = '0' if raw.get('tajweed') is False else '1'
     return out
+
+
+def follow_of(msg):
+    """Recite (follow along only): "follow": true (contract draft 5), or the app's "mode": "recite"."""
+    return msg.get('follow') is True or msg.get('mode') == 'recite'
 
 
 def int_or_none(msg, k):
@@ -251,9 +268,10 @@ async def open_session(msg, uid):
         limiter.take(uid)
     passage = passage_of(*(int_or_none(msg, k) for k in ('s', 'a', 's2', 'a2')))
     settings = settings_from(msg)
-    sess = await asyncio.to_thread(live.LiveSession, ENGINE['e'], *passage, settings)
+    follow = follow_of(msg)
+    sess = await asyncio.to_thread(live.LiveSession, ENGINE['e'], *passage, settings, follow)
     sid = rid if isinstance(rid, str) and store.TAKE.match(rid) else store.new_take()
-    request = dict(zip(('s', 'a', 's2', 'a2'), passage), settings=settings)
+    request = dict(zip(('s', 'a', 's2', 'a2'), passage), settings=settings, follow=follow)
     s = Live(sid, uid, sess, msg.get('keep') is True, request, msg.get('app') if isinstance(msg.get('app'), str)
              else None)
     SESSIONS[sid] = s
@@ -279,8 +297,8 @@ async def read_into(ws, inbox):
                     c = json.loads(m['text'])
                 except ValueError:
                     continue
-                if isinstance(c, dict) and c.get('type') in ('seek', 'dismiss', 'end', 'stop'):
-                    await inbox.put(('control', c))
+                if isinstance(c, dict) and c.get('type') in ('seek', 'dismiss', 'hint', 'end', 'stop'):
+                    await inbox.put(('control', c))  # anything else is ignored
     except Exception:
         pass
     await inbox.put(('gone', None))
@@ -332,6 +350,8 @@ async def live_socket(ws: WebSocket):
             raise BadRequest('the first frame must be a start frame')
         token = msg.get('token')
         uid = await signed_in_tester('Bearer ' + token if isinstance(token, str) else ws.headers.get('authorization'))
+        if not follow_of(msg):
+            await may_check(uid)  # on every socket, a resume's too
         s, resumed = await open_session(msg, uid)
 
         def take_over():

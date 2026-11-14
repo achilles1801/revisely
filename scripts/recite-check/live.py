@@ -23,6 +23,7 @@ Everything here is a function of the audio and of where in it each seek and dism
 run again from its audio (a resumed socket on another instance) and gives the same events.
 """
 import concurrent.futures
+import inspect
 import json
 import multiprocessing
 import time
@@ -140,6 +141,13 @@ class Decoder(checker.Decoder):
     def __init__(self, g, P, entry=0, start='after', cap=1500):
         super().__init__(g, P, cap)
         self.entry, self.start = entry, start
+        # for the vectorized step: each word's skip and repeat sources as columns (see _fast_step)
+        ks = np.array(self.skips, np.int64)
+        self._K = int(ks.max()) if len(ks) else 0
+        self._kcol = self._K - ks
+        self._kpen = P['skip'] * ks
+        self._ks = ks
+        self._no1, self._no2, self._nomadd = ~g.prev1, ~g.prev2, ~g.madd
 
     def _grow(self, n):
         need = self.t + n
@@ -159,7 +167,10 @@ class Decoder(checker.Decoder):
 
     def _step(self, e):
         first = self.t == 0
-        super()._step(e)
+        if first:
+            super()._step(e)
+        else:
+            self._fast_step(e)
         if first and self.entry:
             g = self.g
             self.d = np.full(g.S + 1, NEG)
@@ -170,6 +181,122 @@ class Decoder(checker.Decoder):
                 self.d[ex] = e[0]
             else:
                 self.gap[self.entry] = float(e.max()) + self.pen[self.entry]
+
+    def _fast_step(self, e):
+        """checker.Decoder._step with its two loops (12 skips, 31 repeats, a numpy op each) done as one op each over
+        a window view: the same sums, the same maxima, ties to the same (first) source, so the same tables and
+        scores to the bit (tests/test_live.py checks it frame by frame against the checker's own Decoder)."""
+        g, P, NEG = self.g, self.P, self.NEG
+        S, W, t = g.S, g.W, self.t
+        best_any = float(e.max())
+        d, gap, widx, rows = self.d, self.gap, self.widx, self.widx
+        vals = d[g.exits]
+        am = vals.argmax(axis=1)
+        ex = vals[rows, am]
+        self.ex_state[t] = g.exits[rows, am]
+        cand = np.full(W, NEG)
+        src = np.zeros(W, np.int64)
+
+        def offer(c, code, idx):
+            better = c > cand
+            cand[better] = c[better]
+            src[better] = code * 1_000_000 + idx[better]
+
+        c = np.full(W, NEG); c[1:] = ex[:-1]
+        offer(c, 1, widx - 1)
+        c = np.full(W, NEG); c[0] = gap[0]
+        offer(c, 3, np.zeros(W, np.int64))
+        if self._K:  # skips: c_k[w] = ex[w - 1 - k] + skip * k, the first k with the best value
+            pad = np.concatenate([np.full(self._K + 1, NEG), ex])
+            view = np.lib.stride_tricks.sliding_window_view(pad, self._K + 1)[:W]
+            sk = view[:, self._kcol] + self._kpen
+            j = sk.argmax(axis=1)
+            offer(sk[rows, j], 2, widx - 1 - self._ks[j])
+        if self.backs > 0:  # repeats: the best exit of words w .. w + backs, the first o with it
+            pad = np.concatenate([ex, np.full(self.backs, NEG)])
+            view = np.lib.stride_tricks.sliding_window_view(pad, self.backs + 1)[:W]
+            warg = view.argmax(axis=1)
+            offer(view[rows, warg] + P['back'], 4, widx + warg)
+        c = gap[:W].copy(); c[0] = NEG
+        offer(c, 5, widx)
+        c = np.full(W, NEG); c[1:] = gap[1:W] + P['fill_sub']
+        offer(c, 6, widx - 1)
+        self.ent_src[t] = src
+
+        nd = d.copy()
+        code = self.bp[t]
+        code[:] = 0
+        c = np.empty(S + 1)
+        c[0] = NEG; c[1:] = d[:-1]; c[self._no1] = NEG
+        b = c > nd; nd[b] = c[b]; code[b] = 1
+        c[:2] = NEG; c[2:] = d[:-2]; c[self._no2] = NEG
+        b = c > nd; nd[b] = c[b]; code[b] = 2
+        c[:-1] = d[1:]; c[-1] = NEG; c[self._nomadd] = NEG
+        b = c > nd; nd[b] = c[b]; code[b] = 3
+        ce = cand[:, None] + self.alt_pen
+        cur = nd[g.entries]
+        b = ce > cur
+        nd[g.entries[b]] = ce[b]
+        code[g.entries[b]] = 4
+        nd += e[g.lab]
+        nd[S] = NEG
+
+        ng = gap.copy()
+        gs = self.gap_src[t]
+        gs[:] = 0
+        c = np.empty(W + 1); c[0] = NEG; c[1:W] = ex[:W - 1] + P['fill_in']; c[W] = ex[W - 1]
+        b = c > ng; ng[b] = c[b]; gs[b] = 1
+        ng += best_any + self.pen
+        self.d, self.gap = nd, ng
+        self.t = t + 1
+
+    def _score_step(self, e):
+        """The scores of the next frame alone (d and gap, the same values as _fast_step's), no tables: the cursor's
+        look at the provisional frames, which is put back after."""
+        g, P, NEG = self.g, self.P, self.NEG
+        S, W = g.S, g.W
+        best_any = float(e.max())
+        d, gap = self.d, self.gap
+        ex = d[g.exits].max(axis=1)
+        cand = np.empty(W); cand[0] = gap[0]; cand[1:] = ex[:-1]  # (no score is below NEG)
+        if self._K:
+            pad = np.concatenate([np.full(self._K + 1, NEG), ex])
+            sk = np.lib.stride_tricks.sliding_window_view(pad, self._K + 1)[:W][:, self._kcol] + self._kpen
+            np.maximum(cand, sk.max(axis=1), out=cand)
+        if self.backs > 0:
+            pad = np.concatenate([ex, np.full(self.backs, NEG)])
+            np.maximum(cand, np.lib.stride_tricks.sliding_window_view(pad, self.backs + 1)[:W].max(axis=1)
+                       + P['back'], out=cand)
+        c = gap[:W].copy(); c[0] = NEG
+        np.maximum(cand, c, out=cand)
+        c = np.empty(W); c[0] = NEG; c[1:] = gap[1:W] + P['fill_sub']
+        np.maximum(cand, c, out=cand)
+        nd = d.copy()
+        c = np.empty(S + 1)
+        c[0] = NEG; c[1:] = d[:-1]; c[self._no1] = NEG
+        np.maximum(nd, c, out=nd)
+        c[:2] = NEG; c[2:] = d[:-2]; c[self._no2] = NEG
+        np.maximum(nd, c, out=nd)
+        c[:-1] = d[1:]; c[-1] = NEG; c[self._nomadd] = NEG
+        np.maximum(nd, c, out=nd)
+        ent = g.entries
+        nd[ent] = np.maximum(nd[ent], cand[:, None] + self.alt_pen)
+        nd += e[g.lab]
+        nd[S] = NEG
+        ng = gap.copy()
+        c = np.empty(W + 1); c[0] = NEG; c[1:W] = ex[:W - 1] + P['fill_in']; c[W] = ex[W - 1]
+        np.maximum(ng, c, out=ng)
+        ng += best_any + self.pen
+        self.d, self.gap = nd, ng
+        self.t += 1
+
+    def feed_scores(self, lp):
+        """Frames for scores only (the provisional ones): no tables written. Put the decoder back after."""
+        if self.t == 0:
+            self.feed(lp)
+            return
+        for row in lp:
+            self._score_step(row)
 
     def state(self):
         return self.d.copy(), self.gap.copy(), self.t
@@ -264,14 +391,24 @@ class LiveSession:
     """One live check. feed() audio (PCM16 bytes), control() messages, finish() at the end; each returns the events
     to send, in order (dicts, recite-contract.md)."""
 
-    def __init__(self, engine, s, a, s2=None, a2=None, settings=None):
+    def __init__(self, engine, s, a, s2=None, a2=None, settings=None, follow=False):
         E = self.E = engine
-        self.st = settings_of(settings or {})
+        # follow (Recite, contract draft 5): the cursor and `said` only; words are decided (said needs them) but no
+        # mark is made, letters and tajweed aren't judged, and no mark, unmark or score is sent
+        self.follow = bool(follow)
+        raw = dict(settings or {})
+        if self.follow:
+            raw.update(letters='0', tajweed='0')
+        self.st = settings_of(raw)
         self.P = dict(WORDS_P, **LIVE)
         if (s2 is None) != (a2 is None):
             raise BadRequest('both or neither of s2, a2')
         self.lo, self.end = E.passage(s, a, s2, a2, max_words=10 ** 6)
         self.V = len(E.ear.vocab) + 1
+        # Strict on the second model (v5, #539): ayah_notes takes the take's samples when the engine has it
+        self.v5 = self.st.get('tajweed', True) and getattr(E, 'ear2', None) is not None \
+            and 'audio' in inspect.signature(E.ayah_notes).parameters
+        self.xf = np.zeros(SR * 30 if self.v5 else 0, np.float32)
         self.pcm = np.zeros(SR * 30, np.int16)
         self.n = 0                       # samples received
         self.lp = np.zeros((1500, self.V), np.float32)
@@ -297,6 +434,8 @@ class LiveSession:
         self._window = (None, [])        # the segment and path of the last decision (for a seam's state)
         self.sent = {'at': None, 'said': None, 'score': None}
         self.unmarked = set()            # ids taken back (and not marked again): for a resume's snapshot
+        self.helped = set()              # words the phone showed the reciter (hints) before they were decided
+        self.hints = []                  # (seconds, hint) as they came
         self.ayah_sent = []              # ayah events sent: for a resume's snapshot
         self.stopped = False
         self.result = None
@@ -317,6 +456,12 @@ class LiveSession:
             grown[:self.n] = self.pcm[:self.n]
             self.pcm = grown
         self.pcm[self.n:self.n + len(x)] = x
+        if self.v5:
+            if self.n + len(x) > len(self.xf):
+                grown = np.zeros(len(self.pcm), np.float32)
+                grown[:self.n] = self.xf[:self.n]
+                self.xf = grown
+            self.xf[self.n:self.n + len(x)] = x.astype(np.float32) / 32768.0
         self.n += len(x)
         ev = self._run()
         if self.n >= MAX_SECONDS * SR:
@@ -375,9 +520,31 @@ class LiveSession:
             self.origin = w
             self._start_segment(w, self.T, 'lead')
             return ev
+        if kind == 'hint':
+            return self._hint(msg)
         if kind in ('end', 'stop'):
             return self.finish()
         return []
+
+    def _hint(self, msg):
+        """The phone showed the reciter a word (or the rest of an ayah) in the hidden view. The model session's rule:
+        helped words are w (what 'word') or w's ayah from w to its end ('ayah'), each only if not yet decided. They
+        stay mistakes if said wrong; the score and `done` say how many were helped."""
+        w, what = msg.get('w'), msg.get('what')
+        if not isinstance(w, int) or isinstance(w, bool) or what not in ('word', 'ayah') \
+                or not self.lo <= w < self.end:
+            return []
+        self.hints.append((round(self.seconds, 2), {'w': w, 'what': what}))
+        ws = [w]
+        if what == 'ayah':
+            s_, a_, _ = self.E.key.where(w)
+            first, n = self._ayah_bounds(s_, a_)
+            ws = range(w, first + n)
+        new = {x for x in ws if x not in self.decided} - self.helped
+        if not new:
+            return []
+        self.helped |= new
+        return self._score_event(force=True)
 
     def _hop(self, last=False):
         """One hop: the model on the newest window, new final frames to the decoder, the cursor, decisions."""
@@ -522,7 +689,8 @@ class LiveSession:
                     continue
                 self.decided[w] = now
                 self.status[w] = row['status']
-                if row['status'] in ('wrong', 'missed') and (self.P['live_order'] or row.get('kind') != 'order'):
+                if not self.follow and row['status'] in ('wrong', 'missed') \
+                        and (self.P['live_order'] or row.get('kind') != 'order'):
                     m = self._word_mark(row, {'kind': row.get('kind')} if row['status'] == 'wrong' else None)
                     self.flagged[w] = now
                     self.bad_from[w] = res['spans'][w][0] if w in res['spans'] else seg.frames()
@@ -592,7 +760,7 @@ class LiveSession:
         if dec.t >= 1:
             if prov is not None and len(prov):
                 saved = dec.state()
-                dec.feed(prov)
+                dec.feed_scores(prov)
                 cw = dec.word_now()
                 dec.restore(saved)
             else:
@@ -654,6 +822,8 @@ class LiveSession:
                 self.bad_run[aw] = self.bad_run.get(aw, 0) + 1 if bad else 0
                 if bad:
                     self.good_run[aw] = 0
+                if self.follow:
+                    continue
                 if bad and self.bad_run[aw] >= P['stable'] and aw not in self.flagged:
                     self.flagged[aw] = now
                     self.bad_from[aw] = seg.f0 + (visits[w][-1]['start'] if visits[w] else end_f)
@@ -665,7 +835,7 @@ class LiveSession:
                     ev += self._unmark_if_corrected(aw, seg.f0 + visits[w][-1]['start'], now)
         # extra words: once their filler is behind the commit point, in EXTRA_STABLE hops in a row
         now_extra = set()
-        for e in extra_rows(extras, fillers, seg.kws, P['delay'], seg.f0):
+        for e in [] if self.follow else extra_rows(extras, fillers, seg.kws, P['delay'], seg.f0):
             if e['trail'] or not e['span'] or not seg.own_extra(e) or e['span'][1] - seg.f0 > dec.t - cf:
                 continue
             now_extra.add(e['after'])
@@ -687,6 +857,12 @@ class LiveSession:
         ev += self._score_event(now)
         return ev
 
+    def _notes(self, s, a, statuses, spans):
+        """Engine.ayah_notes on the take's frames (and its samples, for the second model in Strict)."""
+        if self.v5:
+            return self.E.ayah_notes(self.lp[:self.T], s, a, statuses, spans, self.st, audio=self.xf[:self.n])
+        return self.E.ayah_notes(self.lp[:self.T], s, a, statuses, spans, self.st)
+
     def _keep_mark(self, m):
         self.marks[m['id']] = m
         self.unmarked.discard(m['id'])
@@ -703,8 +879,8 @@ class LiveSession:
             ev.append({'type': 'at', 'w': self.sent['at'], 't': t})
         if self.sent['said'] is not None:
             ev.append({'type': 'said', 'upTo': self.sent['said'][0], 't': t})
-        if self.decided:
-            ev.append({'type': 'score', **score(self.status, list(self.marks.values()), self.dismissed), 't': t})
+        if self.decided and not self.follow:
+            ev.append({'type': 'score', **self._score(), 't': t})
         return ev
 
     def _word_mark(self, row, fl):
@@ -745,8 +921,11 @@ class LiveSession:
             self.ayat_done.add((s, a))
             if first < self.lo or first + n > self.end or not self._said_in_full(first, n, self.status, self.spans):
                 continue
-            tj, letters = self.E.ayah_notes(self.lp[:self.T], s, a, self.status, self.spans, self.st)
-            marks = self.E.marks([], {}, {}, [], tj, letters if self.st['letters'] else [])
+            if self.follow:
+                marks = []
+            else:
+                tj, letters = self._notes(s, a, self.status, self.spans)
+                marks = self.E.marks([], {}, {}, [], tj, letters if self.st['letters'] else [])
             for m in marks:
                 if m['id'] not in self.marks:
                     self._keep_mark(m)
@@ -781,10 +960,17 @@ class LiveSession:
         self.sent['said'] = said
         return [{'type': 'said', 'upTo': said[0], 't': round(now, 2)}]
 
-    def _score_event(self, now=None):
+    def _score(self):
         sc = score(self.status, list(self.marks.values()), self.dismissed)
-        key = (sc['reached'], sc['mistakes'], sc['tajweed'])
-        if key == self.sent['score'] or not sc['reached']:
+        sc['helped'] = len(self.helped)
+        return sc
+
+    def _score_event(self, now=None, force=False):
+        if self.follow:
+            return []
+        sc = self._score()
+        key = (sc['reached'], sc['mistakes'], sc['tajweed'], sc['helped'])
+        if key == self.sent['score'] or not sc['reached'] and not force:
             return []
         self.sent['score'] = key
         ev = {'type': 'score', **sc}
@@ -820,7 +1006,7 @@ class LiveSession:
         t0 = time.perf_counter()
         tj, letters = [], []
         done = set()
-        for r in words:
+        for r in [] if self.follow else words:
             s, a = self.E.ayah_of(r['w'])
             if (s, a) in done:
                 continue
@@ -828,7 +1014,7 @@ class LiveSession:
             first, n = self._ayah_bounds(s, a)
             if first < self.lo or first + n > self.end:
                 continue
-            o, l_ = self.E.ayah_notes(self.lp[:self.T], s, a, statuses, spans, self.st)
+            o, l_ = self._notes(s, a, statuses, spans)
             tj += o
             letters += l_
         self.ms['tajweed'] += (time.perf_counter() - t0) * 1000
@@ -841,11 +1027,17 @@ class LiveSession:
             'v': 1, 'from': self.lo, 'to': self.end, 'secs': round(self.seconds, 1), 'words': words, 'extras': ex,
             'tajweed': [{k: r[k] for k in r if not k.startswith('_')} for r in tj],
             'letters': [{k: r[k] for k in r if not k.startswith('_')} for r in letters] if self.st['letters'] else None,
-            'settings': {k: self.st[k] for k in ('mon', 'mot', 'aar', 'letters')},
+            'settings': {k: self.st[k] for k in ('mon', 'mot', 'aar', 'letters', 'tajweed')},
             'ms': {k: int(v) for k, v in self.ms.items()},
         }
+        for r in words:
+            if r['w'] in self.helped:
+                r['helped'] = True
+        if self.follow:  # Recite: the words and their statuses, nothing else
+            return {k: out[k] for k in ('v', 'from', 'to', 'secs', 'words', 'settings', 'ms')} | {'v': 2, 'follow': True}
         heard = heard_sounds(spans, self._tokens(0, self.T), self.E.ear.vocab)
         out['marks'] = self.E.marks(words, flagged, heard, ex, tj, letters if self.st['letters'] else [])
         out['score'] = score(statuses, out['marks'], self.dismissed)
+        out['score']['helped'] = len(self.helped)
         out['v'] = 2
         return out

@@ -58,8 +58,10 @@ class FakeSession:
 
     made = []
 
-    def __init__(self, engine, s, a, s2, a2, settings):
+    def __init__(self, engine, s, a, s2, a2, settings, follow=False):
         self.args = (s, a, s2, a2, settings)
+        self.follow = follow
+        self.hints = []
         self.n = 0
         self.stopped = False
         self.result = None
@@ -90,6 +92,9 @@ class FakeSession:
         if msg['type'] == 'dismiss':
             self.dismissed.add(msg['id'])
             return []
+        if msg['type'] == 'hint':
+            self.hints.append(msg)
+            return []
         if msg['type'] in ('end', 'stop'):
             self.stopped = True
             self.result = {'v': 2, 'marks': [], 'score': {'reached': 0, 'mistakes': 0, 'tajweed': 0,
@@ -114,6 +119,7 @@ class Base(unittest.TestCase):
             mock.patch.object(server, 'Engine', FakeEngine),
             mock.patch.object(auth, 'uid_of', uid_of),
             mock.patch.object(auth, 'is_tester', lambda uid: uid.startswith('tester')),
+            mock.patch.object(auth, 'has_check', lambda uid: uid == 'tester1'),
             mock.patch.object(store, 'put', lambda name, data, ct: self.stored.__setitem__(name, data)),
             mock.patch.object(live, 'LiveSession', FakeSession),
             mock.patch.object(server, 'limiter', auth.Limiter()),
@@ -232,7 +238,8 @@ class LiveTests(Base):
             self.assertEqual((ready['type'], ready['from'], ready['v']), ('ready', 0, 2))
             self.assertTrue(store.TAKE.match(ready['take']))
             self.assertEqual(FakeSession.made[0].args, (1, 1, None, None, {'mon': 5, 'mot': 4, 'aar': 2,
-                                                                           'letters': '1'}))
+                                                                           'letters': '1', 'tajweed': '1'}))
+            self.assertFalse(FakeSession.made[0].follow)
             for _ in range(10):
                 ws.send_bytes(b'\1\0' * 1600)  # 100 ms chunks, as micSource sends them
             self.assertEqual(ws.receive_json()['type'], 'at')
@@ -252,6 +259,30 @@ class LiveTests(Base):
         self.assertEqual(kept['dismissed'], ['101:skipped:'])
         self.assertEqual(kept['mode'], 'live')
         self.assertNotIn(ready['take'], server.SESSIONS)
+
+    def test_recite_mode_and_the_tajweed_switch_reach_the_session(self):
+        for extra, follow, tajweed in (({'mode': 'recite'}, True, '1'), ({'follow': True}, True, '1'),
+                                       ({'mode': 'check', 'tajweed': False}, False, '0')):
+            FakeSession.made = []
+            with self.socket() as ws:
+                ws.send_text(start(**extra))
+                ws.receive_json()
+            self.assertEqual((FakeSession.made[0].follow, FakeSession.made[0].args[4]['tajweed']), (follow, tajweed))
+
+    def test_hints_reach_the_session_and_unknown_frames_are_ignored(self):
+        with self.socket() as ws:
+            ws.send_text(start(keep=True))
+            ready = ws.receive_json()
+            ws.send_text(json.dumps({'type': 'hint', 'w': 3, 'what': 'word'}))
+            ws.send_text(json.dumps({'type': 'whatever', 'x': 1}))
+            ws.send_text('not json')
+            ws.send_bytes(second_of_audio())
+            ws.send_text(json.dumps({'type': 'end'}))
+            while ws.receive_json()['type'] != 'done':
+                pass
+        self.assertEqual(FakeSession.made[0].hints, [{'type': 'hint', 'w': 3, 'what': 'word'}])
+        kept = json.loads(self.stored[f"recite-tests/tester1/{ready['take']}.json"])
+        self.assertEqual(kept['hints'], [{'type': 'hint', 'w': 3, 'what': 'word'}])
 
     def test_nothing_kept_without_keep(self):
         with self.socket() as ws:
@@ -349,6 +380,85 @@ class LiveTests(Base):
                 with self.socket() as ws:
                     ws.send_text(start())
                     self.assertEqual(ws.receive_json()['type'], expect)
+
+
+
+class CheckGateTests(Base):
+    """Check is paid (apply-support.md): with the gate on, /check and /live without follow need the entitlement;
+    Recite (follow) doesn't. tester1 has Check, tester2 doesn't."""
+
+    def test_off_by_default(self):
+        self.assertFalse(server.CHECK_GATE)
+        r = self.client.post('/check?s=1&a=1', content=wav(), headers={'Authorization': 'Bearer other'})
+        self.assertEqual(r.status_code, 200)
+
+    def test_check_needs_the_entitlement(self):
+        with mock.patch.object(server, 'CHECK_GATE', True):
+            r = self.client.post('/check?s=1&a=1', content=wav(), headers={'Authorization': 'Bearer other'})
+            self.assertEqual((r.status_code, r.json()), (403, {'error': 'check_locked'}))
+            r = self.client.post('/check?s=1&a=1', content=wav(), headers={'Authorization': 'Bearer good'})
+            self.assertEqual(r.status_code, 200)
+
+    def test_live_check_needs_it_recite_does_not(self):
+        with mock.patch.object(server, 'CHECK_GATE', True):
+            with self.client.websocket_connect('/live') as ws:
+                ws.send_text(start(token='other'))
+                self.assertEqual(ws.receive_json(), {'type': 'error', 'reason': 'check_locked'})
+            for extra in ({'follow': True}, {'mode': 'recite'}):
+                with self.client.websocket_connect('/live') as ws:
+                    ws.send_text(start(token='other', **extra))
+                    self.assertEqual(ws.receive_json()['type'], 'ready')
+            with self.client.websocket_connect('/live') as ws:
+                ws.send_text(start(token='good'))
+                self.assertEqual(ws.receive_json()['type'], 'ready')
+
+
+class EntitlementTests(unittest.TestCase):
+    """auth.has_check reads entitlements/{uid}.check over Firestore REST."""
+
+    def ts(self, when):
+        import datetime
+        return {'timestampValue': datetime.datetime.fromtimestamp(when, datetime.timezone.utc)
+                .isoformat().replace('+00:00', 'Z')}
+
+    def test_until(self):
+        now = 1_800_000_000
+        self.assertFalse(auth.check_open(None, now))
+        self.assertTrue(auth.check_open({'mapValue': {'fields': {'source': {'stringValue': 'support'}}}}, now))
+        self.assertTrue(auth.check_open({'mapValue': {'fields': {'until': {'nullValue': None}}}}, now))
+        self.assertTrue(auth.check_open({'mapValue': {'fields': {'until': self.ts(now + 60)}}}, now))
+        self.assertFalse(auth.check_open({'mapValue': {'fields': {'until': self.ts(now - 60)}}}, now))
+        self.assertFalse(auth.check_open({'mapValue': {'fields': {'until': {'timestampValue': 'soon'}}}}, now))
+
+    def test_read_and_cache(self):
+        class R:
+            def __init__(self, code, body=None):
+                self.status_code, self.body = code, body or {}
+
+            def json(self):
+                return self.body
+
+            def raise_for_status(self):
+                if self.status_code >= 400:
+                    raise RuntimeError(self.status_code)
+        answers = {'nobody': R(404), 'granted': R(200, {'fields': {'check': {'mapValue': {'fields': {
+            'source': {'stringValue': 'dev'}, 'until': {'nullValue': None}}}}}}), 'empty': R(200, {})}
+        calls = []
+
+        def get(url, headers, timeout):
+            calls.append(url)
+            return answers[url.split('/entitlements/')[1].split('?')[0]]
+        auth._checks.clear()
+        with mock.patch.object(auth.requests, 'get', get), mock.patch.object(auth, 'token', lambda: 'x'):
+            self.assertFalse(auth.has_check('nobody', now=100))
+            self.assertTrue(auth.has_check('granted', now=100))
+            self.assertFalse(auth.has_check('empty', now=100))
+            self.assertTrue(auth.has_check('granted', now=150))  # cached
+            self.assertEqual(len(calls), 3)
+            self.assertTrue(auth.has_check('granted', now=100 + auth.CHECK_TTL + 1))  # read again
+            self.assertEqual(len(calls), 4)
+            self.assertIn('mask.fieldPaths=check', calls[0])
+        auth._checks.clear()
 
 
 if __name__ == '__main__':
