@@ -2,15 +2,18 @@
 
 import type { QuranWords } from '../recite/quranWords';
 import type { WordFollow } from '../recite/hiddenPage';
-import type { Mark } from './contract';
+import { severityOf, type Mark } from './contract';
 import { furthestWord, LiveState, mistakeCount } from './state';
 import { formatAccuracy, pageAccuracy, ScoreLevel, scoreLevel } from './score';
 
-/** A word in the bar: the one being said, one already said, or one said wrong (as heard). */
+/**
+ * A word in the bar: the one being said (blue), one already said, one said wrong (red, as heard), or one with a slip
+ * (amber: a haraka, a letter, a tajweed note). The colours never follow the accent.
+ */
 export interface BarWord {
   w: number;
   text: string;
-  tone: 'current' | 'said' | 'wrong';
+  tone: 'current' | 'said' | 'wrong' | 'slip';
 }
 
 /** The words heard, for the bar: the last two up to the cursor (newest last). Check shows a wrong word as heard. */
@@ -18,10 +21,12 @@ export function barWords(state: LiveState, words: QuranWords, opts: { check: boo
   if (state.cursor == null) return [];
   const wrong = new Map<number, Mark>();
   const skipped = new Set<number>();
+  const slipped = new Set<number>();
   if (opts.check) {
     for (const m of Object.values(state.marks)) {
       if (m.kind === 'word' && m.heard) wrong.set(m.w, m);
       if (m.kind === 'skipped') skipped.add(m.w);
+      if (severityOf(m) === 'slip') slipped.add(m.w);
     }
   }
   const out: BarWord[] = [];
@@ -32,7 +37,7 @@ export function barWords(state: LiveState, words: QuranWords, opts: { check: boo
     out.unshift(
       m
         ? { w, text: m.heard ?? words.uthmani(w), tone: 'wrong' }
-        : { w, text: words.uthmani(w), tone: w === state.cursor ? 'current' : 'said' },
+        : { w, text: words.uthmani(w), tone: slipped.has(w) ? 'slip' : w === state.cursor ? 'current' : 'said' },
     );
   }
   return out;

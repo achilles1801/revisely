@@ -431,7 +431,7 @@ export default function QuranReaderScreen() {
     (page: number) => (checkTake && qw ? marksOnPage(live.state, qw, page) : []),
     [checkTake, qw, live.state],
   );
-  const coverColors = useMemo(() => ({ cover: palette.pageBg, guide: palette.textSecondary, band: v2.accentText }), [palette, v2]);
+  const coverColors = useMemo(() => ({ cover: palette.pageBg, guide: palette.textSecondary, band: v2.followInk }), [palette, v2]);
   const pageUnderlay = useMemo(
     () =>
       liveOn && qw && live.active
@@ -460,7 +460,7 @@ export default function QuranReaderScreen() {
               marks={pageMarks(page)}
               hidden={hidden ? { follow: hiddenFollow(qw, revealed, liveInfo), ...coverColors } : null}
               newest={live.state.cursor}
-              colors={{ mistake: v2.red, slip: v2.warn, accent: v2.accentText, onMistake: v2.bg, ground: palette.pageBg }}
+              colors={{ mistake: v2.red, slip: v2.warn, follow: v2.followInk, onMistake: v2.bg, ground: palette.pageBg }}
             />
           )
         : undefined,

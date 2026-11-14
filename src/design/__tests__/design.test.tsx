@@ -265,13 +265,22 @@ describe('v2 palette (white and black grounds, no accent tint)', () => {
       return (h * 60 + 360) % 360;
     };
     expect(Math.abs(hue(p.warn) - hue(p.red))).toBeGreaterThanOrEqual(20);
-    // Following: the page's ink on the ayah band and the word box; a mark on them at 3:1 (large text).
+    // Following: the page's ink on the ayah band and the word box; a mark and the follow blue on them at 3:1 (large text).
     for (const ground of [p.followBand, p.followWord]) {
       expect(contrast(p.text, ground)).toBeGreaterThanOrEqual(4.5);
-      for (const mark of [p.red, p.warn, p.accentText]) expect(contrast(mark, ground)).toBeGreaterThanOrEqual(3);
+      for (const mark of [p.red, p.warn, p.followInk]) expect(contrast(mark, ground)).toBeGreaterThanOrEqual(3);
     }
+    // The follow blue as text (the word being said in the bar) on every ground, and as a word on the page.
+    for (const ground of [p.bg, p.fill, p.sheet, p.bubble]) expect(contrast(p.followInk, ground)).toBeGreaterThanOrEqual(4.5);
     // The box stands out from the band (non-text, a little).
     expect(contrast(p.followWord, p.followBand)).toBeGreaterThan(1.15);
+    // None of it follows the accent (Majd, Nov 14 2026): a mistake is red, a slip amber and the follow blue with every
+    // accent, so Crimson's follow never looks like a mistake.
+    const jade = paletteV2(isDark, 'jade');
+    for (const k of ['red', 'warn', 'followBand', 'followWord', 'followInk'] as const) expect(p[k]).toBe(jade[k]);
+    // Blue tells apart from red and amber by hue.
+    expect(Math.abs(hue(p.followInk) - hue(p.red))).toBeGreaterThanOrEqual(90);
+    expect(Math.abs(hue(p.followInk) - hue(p.warn))).toBeGreaterThanOrEqual(90);
     // Check, drawn special: each end as text on the sheet, and the glyph on each end.
     for (const end of p.premium) {
       expect(contrast(end, p.sheet)).toBeGreaterThanOrEqual(4.5);

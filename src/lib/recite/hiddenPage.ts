@@ -1,10 +1,10 @@
 // The hidden recite mode's state and what it covers (pure).
 //
 // While the page is hidden every line is covered except its verse markers
-// (lib/recite/pageLines); a verse is shown again when it is revealed: tapped,
-// reached by a pause in the reciter's voice (lib/recite/pauseDetector), or the
-// "Next verse" button. The line where the next hidden verse starts carries the
-// accent band.
+// (lib/recite/pageLines); a verse is shown again when it is revealed: reached
+// by a pause in the reciter's voice (lib/recite/pauseDetector), or the "Next
+// verse" button (never by a tap: Majd, Nov 14 2026). The line where the next hidden verse starts carries the
+// follow band (blue, never the accent).
 //
 // Reveals go through one place (revealVerse) whatever made them, so speech
 // recognition can drive them later (word by word: a verse's words up to the one
@@ -20,7 +20,7 @@ export interface WordFollow {
   words: QuranWords;
   /** Whether a word has been recited (it shows). */
   shown: (word: number) => boolean;
-  /** The next word to recite (the accent band's line), or null while finding the reciter. */
+  /** The next word to recite (the follow band's line), or null while finding the reciter. */
   next: number | null;
 }
 
@@ -70,13 +70,13 @@ export function nextHiddenVerse(state: RevealState, page: number): AyahRef | nul
 /** One line of a hidden page, in bounds space. */
 export interface CoverLine {
   line: number;
-  /** The band of its glyphs (the accent band, the guide line). */
+  /** The band of its glyphs (the follow band, the guide line). */
   y0: number;
   y1: number;
   /** The covers' top and bottom. */
   top: number;
   bottom: number;
-  /** The whole line's text, left to right (the accent band's width). */
+  /** The whole line's text, left to right (the follow band's width). */
   x0: number;
   x1: number;
   /** What is covered: the line less its markers and its revealed verses. */

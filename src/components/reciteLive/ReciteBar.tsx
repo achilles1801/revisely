@@ -154,8 +154,8 @@ export function ReciteBar({
               <Text
                 key={w.w}
                 style={{
-                  color: w.tone === 'wrong' ? palette.red : w.tone === 'current' ? palette.accentText : palette.text,
-                  textDecorationLine: w.tone === 'wrong' ? 'underline' : 'none',
+                  color: w.tone === 'wrong' ? palette.red : w.tone === 'slip' ? palette.warn : w.tone === 'current' ? palette.followInk : palette.text,
+                  textDecorationLine: w.tone === 'wrong' || w.tone === 'slip' ? 'underline' : 'none',
                   textDecorationStyle: 'dotted',
                 }}
               >

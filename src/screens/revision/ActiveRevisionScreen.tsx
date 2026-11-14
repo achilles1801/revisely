@@ -331,7 +331,7 @@ export default function ActiveRevisionScreen() {
   };
   const coverColors = useMemo(() => {
     const read = getReadPalette(isDark);
-    return { cover: read.pageBg, guide: read.textSecondary, band: v2Palette.accentText };
+    return { cover: read.pageBg, guide: read.textSecondary, band: v2Palette.followInk };
   }, [isDark, v2Palette]);
   const pageOverlay = useMemo(
     () =>
