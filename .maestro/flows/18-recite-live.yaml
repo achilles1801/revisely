@@ -2,8 +2,9 @@
 # previewTester account. E2E builds have no microphone or checker: `e2e/recite-live` turns the Dev
 # UI on and a take plays a recorded event log (src/lib/e2e/reciteLive.ts: An-Naml 23–24 on page
 # 379 with a wrong word and a haraka slip, the moment of Majd's Tarteel screenshots of Nov 14 2026).
-# Screenshots of each state for the mocks (~/Documents/revisely-recite-mocks/option-A-final-2.png):
-# the reader with the mic, the mic's menu, following, a mark and the score, the hidden view, done.
+# Screenshots of each state for the mocks (~/Documents/revisely-recite-mocks/option-A-final-2.png and
+# mistakes-toggle-after.png): the reader with the mic, the mic's menu (Mark mistakes off, then on),
+# following, a mark and the score, the hidden view, done, and the locked switch's Premium page.
 appId: com.revisionbuddy.app
 ---
 - runFlow:
@@ -58,19 +59,29 @@ appId: com.revisionbuddy.app
     env:
       NAME: rl01-reader
 
-# Hold the mic: Record, Recite, Check.
+# Hold the mic: Record and Recite, with Mark mistakes under Recite (off). Switch it on (the menu stays), then Recite.
 - longPressOn:
     id: recite-mic
 - extendedWaitUntil:
     visible:
       id: recite-mode-menu
     timeout: 5000
+- assertVisible:
+    id: recite-mistakes-off
 - runFlow:
     file: ../subflows/shot.yaml
     env:
       NAME: rl02-menu
 - tapOn:
-    id: recite-mode-check
+    id: recite-mistakes
+- assertVisible:
+    id: recite-mistakes-on
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl02b-menu-marks
+- tapOn:
+    id: recite-mode-recite
 
 # The AI notice, once; then the take.
 - extendedWaitUntil:
@@ -172,7 +183,7 @@ appId: com.revisionbuddy.app
     env:
       NAME: rl07b-recording-saved
 
-# In dark: a Check take again (the mic remembers Check). Back from the reader is the Read tab.
+# In dark: a take marking mistakes again (Mark mistakes stays on). Back from the reader is the Read tab.
 - tapOn:
     id: reader-back
 - tapOn:
@@ -224,7 +235,7 @@ appId: com.revisionbuddy.app
 - tapOn:
     id: recite-close
 
-# Check locked (Settings → Testing → Show Check locked): picking it opens Check's page.
+# Without Premium (Settings → Testing → Show Premium locked): Mark mistakes is locked, and a tap opens the Premium page.
 - tapOn:
     id: reader-back
 - tapOn:
@@ -252,13 +263,13 @@ appId: com.revisionbuddy.app
 - longPressOn:
     id: recite-mic
 - assertVisible:
-    id: check-locked
+    id: recite-mistakes-locked
 - runFlow:
     file: ../subflows/shot.yaml
     env:
       NAME: rl11-menu-locked-dark
 - tapOn:
-    id: recite-mode-check
+    id: recite-mistakes
 - extendedWaitUntil:
     visible:
       id: check-intro

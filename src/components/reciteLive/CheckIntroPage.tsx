@@ -9,7 +9,7 @@ import { useModalHold } from '../v2/modalTurn';
 import { BarButton } from './ReciteBar';
 import { CHECK_SUPPORT_URL } from '../../lib/reciteLive/availability';
 
-/** The real screen the page shows: a Check take on An-Naml 23 (E2E flow 18's screenshot), light and dark. */
+/** The real screen the page shows: a take marking mistakes on An-Naml 23 (E2E flow 18's screenshot), light and dark. */
 const PREVIEW: Record<'light' | 'dark', ImageSourcePropType> = {
   light: require('../../../assets/recite/check-preview-light.png'),
   dark: require('../../../assets/recite/check-preview-dark.png'),
@@ -18,11 +18,11 @@ const PREVIEW: Record<'light' | 'dark', ImageSourcePropType> = {
 const PREVIEW_ASPECT = 1206 / 1140;
 
 /**
- * Check, for an account without it (Majd, Nov 14 2026): a page of its own, the way Revisely introduces things (What's
- * new, Revo's opt-in): a framed real screen, a bold title, one sentence, one button, and under it "Can’t afford it?
- * Apply for support" (the Quran Muaalem License's free path, in plain view). Check is part of Revisely Premium (Majd,
- * Nov 14: the paid side is "Premium", and no prices: nothing is for sale yet), so the button is Get Premium, which is a
- * placeholder until Premium exists. One line says it's Premium, following along stays free, and Check is AI.
+ * Marking mistakes, for an account without Premium (Majd, Nov 14 2026): a page of its own, the way Revisely introduces
+ * things (What's new, Revo's opt-in): a framed real screen, "Mark my mistakes", one sentence, one button, and under it
+ * "Can’t afford it? Apply for support" (the Quran Muaalem License's free path, in plain view). It's part of Revisely
+ * Premium (the paid side is "Premium", with no feature name and no prices: nothing is for sale yet), so the button is
+ * Get Premium, a placeholder until Premium exists. One line says it's Premium, following along stays free, and it's AI.
  */
 export function CheckIntroPage({
   visible,
@@ -56,7 +56,7 @@ export function CheckIntroPage({
             />
           </View>
           <Text style={[styles.title, { color: palette.text }]} maxFontSizeMultiplier={1.4} accessibilityRole="header">
-            Check as you recite
+            Mark my mistakes
           </Text>
           <Text style={[styles.body, { color: palette.secondary }]} maxFontSizeMultiplier={1.6}>
             Revisely marks a wrong or missed word in red, and a haraka or tajweed slip in amber. Tap one to see what you
@@ -77,7 +77,7 @@ export function CheckIntroPage({
             </Text>
           </Tap>
           <Text style={[typeV2.meta, styles.note, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
-            Check is part of Premium. Following along stays free. Check is AI and can make mistakes.
+            Part of Premium. Following along stays free. It’s AI and can make mistakes.
           </Text>
         </View>
       </View>

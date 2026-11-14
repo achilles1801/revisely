@@ -54,7 +54,7 @@ import {
 } from '../../lib/reciteLive/view';
 import { LiveMode, useLiveRecitation } from '../../components/reciteLive/useLiveRecitation';
 import { ReciteMic, ReciteMicMode } from '../../components/reciteLive/ReciteMic';
-import { ReciteModeMenu } from '../../components/reciteLive/ReciteModeMenu';
+import { ReciteMenuMode, ReciteModeMenu } from '../../components/reciteLive/ReciteModeMenu';
 import { BarButton, ReciteBar } from '../../components/reciteLive/ReciteBar';
 import { LiveMarkTargets, LiveOverlay, LiveUnderlay } from '../../components/reciteLive/LivePageLayers';
 import { ReciteNoticeSheet } from '../../components/reciteLive/ReciteNoticeSheet';
@@ -80,7 +80,7 @@ const LIVE_FAILURE: Record<LiveFailure, string> = {
   idle: 'Stopped: nothing heard',
   bad_request: 'Couldn’t start',
   server: 'The checker stopped',
-  check_locked: 'Check isn’t on this account',
+  check_locked: 'Marking mistakes needs Premium',
   offline: 'Couldn’t reach the checker',
 };
 
@@ -280,7 +280,9 @@ export default function QuranReaderScreen() {
   useEffect(() => {
     if (liveOn) warmUpReciteCheck();
   }, [liveOn]);
-  const micMode: ReciteMicMode = reciteSettings.mode;
+  // What a tap on the mic starts: Record, or Recite, marking mistakes when the switch is on and the account has it.
+  const markMistakes = owned && reciteSettings.markMistakes;
+  const micMode: ReciteMicMode = reciteSettings.mode === 'record' ? 'record' : markMistakes ? 'check' : 'recite';
   const liveInfo = useMemo(
     () => ({ saidUpTo: furthestWord(live.state), startWord: live.startWord, cursor: live.state.cursor }),
     [live.state, live.startWord],
@@ -292,7 +294,7 @@ export default function QuranReaderScreen() {
         void recorder.start();
         return;
       }
-      // Check that isn't the account's opens its page.
+      // Marking mistakes without Premium opens the Premium page.
       if (mode === 'check' && !owned) {
         setIntroOpen(true);
         return;
@@ -307,12 +309,17 @@ export default function QuranReaderScreen() {
     [recorder, owned, reciteSettings.noticeSeen, live],
   );
   const pickMode = useCallback(
-    (mode: ReciteMicMode) => {
+    (mode: ReciteMenuMode) => {
       setModeMenu(false);
-      if (mode !== 'check' || owned) setReciteCheckSettings(user?.id, { mode });
-      startMode(mode);
+      setReciteCheckSettings(user?.id, { mode });
+      startMode(mode === 'record' ? 'record' : markMistakes ? 'check' : 'recite');
     },
-    [owned, user?.id, startMode],
+    [markMistakes, user?.id, startMode],
+  );
+  // The switch belongs to Recite: turning it on or off picks Recite too (the menu stays open).
+  const setMarkMistakes = useCallback(
+    (on: boolean) => setReciteCheckSettings(user?.id, { markMistakes: on, mode: 'recite' }),
+    [user?.id],
   );
   const toggleHidden = useCallback(() => {
     setRevealed(NOTHING_SHOWN);
@@ -636,11 +643,17 @@ export default function QuranReaderScreen() {
         <>
           <ReciteModeMenu
             visible={modeMenu}
-            mode={micMode}
-            checkOwned={owned}
+            mode={reciteSettings.mode}
+            markMistakes={markMistakes}
+            owned={owned}
             bottom={insets.bottom + spacing.sm + CAPSULE_HEIGHT + spacing.sm}
             right={spacing.sm + 2}
             onPick={pickMode}
+            onMarkMistakes={setMarkMistakes}
+            onLocked={() => {
+              setModeMenu(false);
+              setIntroOpen(true);
+            }}
             onClose={() => setModeMenu(false)}
           />
           {qw ? (
@@ -702,7 +715,7 @@ export default function QuranReaderScreen() {
           <CheckIntroPage
             visible={introOpen}
             onGet={() =>
-              Alert.alert('Not yet', 'Premium isn’t available yet. In Revisely Dev every tester has Check.')
+              Alert.alert('Not yet', 'Premium isn’t available yet. In Revisely Dev every tester can mark mistakes.')
             }
             onClose={() => setIntroOpen(false)}
           />

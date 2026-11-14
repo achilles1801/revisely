@@ -168,10 +168,19 @@ describe('the check’s settings on the phone', () => {
       require('../settings') as typeof import('../settings');
     resetReciteCheckSettingsForTests();
     await AsyncStorage.setItem('@revisely_recite_check:v1:u9', JSON.stringify({ munfasil: 2, keep: false }));
-    setReciteCheckSettings('u9', { noticeSeen: true, mode: 'check' });
+    setReciteCheckSettings('u9', { noticeSeen: true, markMistakes: true });
     await new Promise((r) => setTimeout(r, 0));
     const { result } = renderHook(() => useReciteCheckSettings('u9'));
-    expect(result.current).toMatchObject({ munfasil: 2, keep: false, noticeSeen: true, mode: 'check', level: 'words', saveRecording: true });
-    expect(parseReciteCheckSettings(await AsyncStorage.getItem('@revisely_recite_check:v1:u9'))).toMatchObject({ munfasil: 2, mode: 'check', noticeSeen: true });
+    expect(result.current).toMatchObject({ munfasil: 2, keep: false, noticeSeen: true, mode: 'recite', markMistakes: true, level: 'words', saveRecording: true });
+    expect(parseReciteCheckSettings(await AsyncStorage.getItem('@revisely_recite_check:v1:u9'))).toMatchObject({ munfasil: 2, markMistakes: true, noticeSeen: true });
+  });
+
+  it('Mark mistakes is off until turned on; a kept "check" (the three-way menu) is Recite with mistakes marked', () => {
+    const { parseReciteCheckSettings } = require('../settings') as typeof import('../settings');
+    expect(parseReciteCheckSettings(null)).toMatchObject({ mode: 'recite', markMistakes: false, level: 'words' });
+    expect(parseReciteCheckSettings(JSON.stringify({ mode: 'check' }))).toMatchObject({ mode: 'recite', markMistakes: true });
+    expect(parseReciteCheckSettings(JSON.stringify({ mode: 'check', markMistakes: false }))).toMatchObject({ mode: 'recite', markMistakes: false });
+    expect(parseReciteCheckSettings(JSON.stringify({ mode: 'record' }))).toMatchObject({ mode: 'record', markMistakes: false });
+    expect(parseReciteCheckSettings(JSON.stringify({ mode: 'shout' }))).toMatchObject({ mode: 'recite' });
   });
 });
