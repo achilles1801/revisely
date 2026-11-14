@@ -93,11 +93,17 @@ take (`<take>.dismiss-<time>.json`) as a label for the lab.
 
 1. The phone opens `wss://…/live` and sends a start frame first (within 10 s):
    `{"type":"start","token":"<ID token>","s":27,"a":23,"s2":null,"a2":null,"mon":4,"mot":4,"aar":0,"letters":false,"keep":true}`.
-   The token can be in the handshake's `Authorization: Bearer` header instead. Sign-in and `previewTester` are checked
+   The token can be in the handshake's `Authorization: Bearer` header instead. `"tajweed": false` turns tajweed off
+   (the app's "words and harakat" level; letters as asked). `"follow": true` (or `"mode": "recite"`) is Recite:
+   only `ready`, `at`, `said`, `ayah` and `done` come back, words are decided but no mark is made, and `done.result`
+   has the words and their statuses only. Sign-in and `previewTester` are checked
    on every socket. A session counts against the 40 an hour; resuming doesn't.
 2. The server answers `{"type":"ready","v":2,"engine":"…","take":"<take>","from":0}`.
 3. The phone sends PCM (16-bit little-endian, mono, 16 kHz) as binary frames of any size, and as text frames
-   `{"type":"seek","w":…}`, `{"type":"dismiss","id":"…"}` and finally `{"type":"end"}`.
+   `{"type":"seek","w":…}`, `{"type":"dismiss","id":"…"}`,
+   `{"type":"hint","w":…,"what":"word"|"ayah"}` (the hidden view showed a word, or the rest of its ayah: those
+   words, if not yet decided, are `helped`, counted in `score.helped` and flagged in `done.result.words`; a helped word
+   said wrong is still a mistake) and finally `{"type":"end"}`. Any other frame is ignored.
 4. The server sends `at` (the cursor), `said` (decided up to), `mark`, `unmark`, `ayah` (an ayah's tajweed has all
    come), `score`, and after `end`, `done` with the whole take checked once more (the v2 answer, with `take`, `kept`
    and `why`). Every event has `t`, the seconds of the take it was decided at. `error` (`sign_in`, `testers_only`,

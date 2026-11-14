@@ -58,8 +58,10 @@ class FakeSession:
 
     made = []
 
-    def __init__(self, engine, s, a, s2, a2, settings):
+    def __init__(self, engine, s, a, s2, a2, settings, follow=False):
         self.args = (s, a, s2, a2, settings)
+        self.follow = follow
+        self.hints = []
         self.n = 0
         self.stopped = False
         self.result = None
@@ -89,6 +91,9 @@ class FakeSession:
     def control(self, msg):
         if msg['type'] == 'dismiss':
             self.dismissed.add(msg['id'])
+            return []
+        if msg['type'] == 'hint':
+            self.hints.append(msg)
             return []
         if msg['type'] in ('end', 'stop'):
             self.stopped = True
@@ -232,7 +237,8 @@ class LiveTests(Base):
             self.assertEqual((ready['type'], ready['from'], ready['v']), ('ready', 0, 2))
             self.assertTrue(store.TAKE.match(ready['take']))
             self.assertEqual(FakeSession.made[0].args, (1, 1, None, None, {'mon': 5, 'mot': 4, 'aar': 2,
-                                                                           'letters': '1'}))
+                                                                           'letters': '1', 'tajweed': '1'}))
+            self.assertFalse(FakeSession.made[0].follow)
             for _ in range(10):
                 ws.send_bytes(b'\1\0' * 1600)  # 100 ms chunks, as micSource sends them
             self.assertEqual(ws.receive_json()['type'], 'at')
@@ -252,6 +258,30 @@ class LiveTests(Base):
         self.assertEqual(kept['dismissed'], ['101:skipped:'])
         self.assertEqual(kept['mode'], 'live')
         self.assertNotIn(ready['take'], server.SESSIONS)
+
+    def test_recite_mode_and_the_tajweed_switch_reach_the_session(self):
+        for extra, follow, tajweed in (({'mode': 'recite'}, True, '1'), ({'follow': True}, True, '1'),
+                                       ({'mode': 'check', 'tajweed': False}, False, '0')):
+            FakeSession.made = []
+            with self.socket() as ws:
+                ws.send_text(start(**extra))
+                ws.receive_json()
+            self.assertEqual((FakeSession.made[0].follow, FakeSession.made[0].args[4]['tajweed']), (follow, tajweed))
+
+    def test_hints_reach_the_session_and_unknown_frames_are_ignored(self):
+        with self.socket() as ws:
+            ws.send_text(start(keep=True))
+            ready = ws.receive_json()
+            ws.send_text(json.dumps({'type': 'hint', 'w': 3, 'what': 'word'}))
+            ws.send_text(json.dumps({'type': 'whatever', 'x': 1}))
+            ws.send_text('not json')
+            ws.send_bytes(second_of_audio())
+            ws.send_text(json.dumps({'type': 'end'}))
+            while ws.receive_json()['type'] != 'done':
+                pass
+        self.assertEqual(FakeSession.made[0].hints, [{'type': 'hint', 'w': 3, 'what': 'word'}])
+        kept = json.loads(self.stored[f"recite-tests/tester1/{ready['take']}.json"])
+        self.assertEqual(kept['hints'], [{'type': 'hint', 'w': 3, 'what': 'word'}])
 
     def test_nothing_kept_without_keep(self):
         with self.socket() as ws:
