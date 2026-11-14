@@ -167,6 +167,40 @@ def load_table(path):
     return t
 
 
+V5_KINDS = ('Qalqalah', 'Lazem Madd')  # tajweed.judge kinds judged on the strict ear (v5) when it is there; and the
+# nasal places (idgham, idgham without ghunnah, iqlab). Lab, Nov 11 2026: v5 caught idgham / idgham without ghunnah /
+# iqlab 97 / 85 / 98% (released 85 / 47 / 66), flagged 1% of correct learners' qalqalah (7%), and judged no lazim madd
+# of a professional short in loud babble (14%); it is worse at ghunnah, ikhfa, words and letters, which stay on the
+# released model.
+STRICT_EAR = 'models/tajweed-v5/model-int8.onnx'
+STRICT_BARS = 'bars.v5.json'
+
+
+class PaddedEar(checker.Hisn):
+    """A fine-tuned copy of the model, exported as the released one (export_onnx.py), run as the lab ran it
+    (hisn_torch: 0.4 s of silence either side, frames cropped back)."""
+    name = 'v5'
+
+    def __init__(self, path, threads=2):
+        import onnxruntime as ort
+        m = pathlib.Path(os.environ['LAB']) / 'models/hisnlabs-tajweed-v2'
+        self.vocab = json.loads((m / 'config.json').read_text())['phonemes']
+        self.index = {p: i + 1 for i, p in enumerate(self.vocab)}
+        o = ort.SessionOptions()
+        o.intra_op_num_threads = threads
+        o.inter_op_num_threads = 1
+        self.sess = ort.InferenceSession(str(path), o, providers=['CPUExecutionProvider'])
+        self.riwaya = 0
+
+    def _run(self, x):
+        z = np.zeros(int(16000 * 0.4), np.float32)
+        mel = checker.log_mel(np.concatenate([z, x.astype(np.float32), z]))
+        mel = mel[:, : mel.shape[1] // 2 * 2]
+        out = self.sess.run(None, {'mel': mel[None], 'riwaya': np.array([self.riwaya], np.int64)})[0][0]
+        k, n = 20, (1 + len(x) // 160) // 2
+        return out[k:k + n].astype(np.float32)
+
+
 class Engine:
     def __init__(self, threads=2):
         checker._init(threads)
@@ -178,6 +212,11 @@ class Engine:
         self._kw = {}  # app word -> its Key.passage entry, worked out on this instance (no table, or not in it)
         self._kw_lock = threading.Lock()
         self.table = load_table(pathlib.Path(os.environ['LAB']) / 'words.bin')
+        lab = pathlib.Path(os.environ['LAB'])
+        self.ear2, self.bars2 = None, None  # the strict level's second ear (v5), when the image carries it
+        if (lab / STRICT_EAR).exists() and (lab / STRICT_BARS).exists():
+            self.ear2 = PaddedEar(lab / STRICT_EAR, threads)
+            self.bars2 = json.loads((lab / STRICT_BARS).read_text())
 
     # ------------------------------------------------------------ words
 
@@ -263,9 +302,9 @@ class Engine:
         t_model = time.perf_counter() - t0
         # no one says more than about 4 words a second: a longer passage only slows the check
         lo, hi = self.passage(s, a, s2, a2, min(MAX_WORDS, int(4 * len(x) / 16000) + 20))
-        return self.judge(lp, lo, hi, st, v, t_model)
+        return self.judge(lp, lo, hi, st, v, t_model, x=x)
 
-    def judge(self, lp, lo, hi, st, v=1, t_model=0.0):
+    def judge(self, lp, lo, hi, st, v=1, t_model=0.0, x=None):
         """The check on the model's frames (50 a second) for app words [lo, hi): the words, then tajweed and letters
         per ayah said in full. check() runs the model first; a live session judges its streamed frames."""
         t0 = time.perf_counter() - t_model
@@ -298,7 +337,7 @@ class Engine:
                 row['t'] = [round(spans[w][0] / FPS, 2), round(spans[w][1] / FPS, 2)]
             words.append(row)
 
-        tj, letters = self.ayat(lp, lo, hi, statuses, spans, st)
+        tj, letters = self.ayat(lp, lo, hi, statuses, spans, st, audio=x)
         t_tajweed = time.perf_counter() - t0 - t_model - t_words
         out = {
             'v': 1,
@@ -400,7 +439,7 @@ class Engine:
                 heardExact=False if r.get('_heard') else None)
         return out
 
-    def ayat(self, lp, lo, hi, statuses, spans, st):
+    def ayat(self, lp, lo, hi, statuses, spans, st, audio=None):
         """Tajweed (and letters) for each ayah of the passage said in full, on its own frames."""
         out, letters = [], []
         w = lo
@@ -411,13 +450,14 @@ class Engine:
             w = first + n
             if first < lo or first + n > hi:
                 continue
-            o, l_ = self.ayah_notes(lp, s, a, statuses, spans, st)
+            o, l_ = self.ayah_notes(lp, s, a, statuses, spans, st, audio=audio)
             out += o
             letters += l_
         return out, letters
 
-    def ayah_notes(self, lp, s, a, statuses, spans, st):
-        """Tajweed (and letters) for ayah s:a, on its own frames; nothing unless it was said in full."""
+    def ayah_notes(self, lp, s, a, statuses, spans, st, audio=None):
+        """Tajweed (and letters) for ayah s:a, on its own frames; nothing unless it was said in full. audio: the take's
+        samples (16 kHz float32, lp's frame grid), for the strict ear (V5_KINDS and the nasal places) when there is one."""
         SL, ms = self.slots(st)
         B = self.bars
         S = B.get('strict', {})  # strict bars: past one, a mark is `clear` (bars.json from before them: all `likely`)
@@ -435,6 +475,15 @@ class Engine:
         if f1 - f0 < 10:
             return out, letters
         win = lp[f0:f1]
+        win2 = None  # the strict ear's frames for the same window
+        if st.get('tajweed', True) and self.ear2 is not None and audio is not None:
+            seg = np.asarray(audio[f0 * 320:f1 * 320], np.float32)
+            if len(seg) >= 3200:
+                w2 = self.ear2.logprobs(seg)
+                if w2.shape[0] >= f1 - f0 - 2:
+                    win2 = w2[:f1 - f0]
+        B2 = self.bars2 if win2 is not None else None
+        S2 = (B2 or {}).get('strict', {})
         bad = {i for i, x in enumerate(sts) if x == 'wrong'}
         near = bad | {i - 1 for i in bad} | {i + 1 for i in bad}
 
@@ -453,6 +502,14 @@ class Engine:
             judged = tajweed.judge(win, self.ear, SL.ayah(s, a)) if st.get('tajweed', True) else []
         except Exception:
             judged = []
+        if win2 is not None:  # qalqalah and lazim madd from the strict ear, the rest from the released one
+            try:
+                judged2 = tajweed.judge(win2, self.ear2, SL.ayah(s, a))
+            except Exception:
+                judged2 = None
+            if judged2 is not None:
+                judged = [j for j in judged if j['kind'] not in V5_KINDS] + \
+                    [dict(j, _v5=True) for j in judged2 if j['kind'] in V5_KINDS]
         # tajweed and nasal places count quran_transcript's words; the app joins two pairs into one word (بَعْدَ مَا,
         # إِلْ يَاسِينَ), so map them onto the app's
         qa = self.key.app_index(s, a)
@@ -467,6 +524,9 @@ class Engine:
             elif kind in MADD_RULES and tc is not None and abs(tc - j['golden']) >= 1.5 \
                     and not (kind == 'Aared Madd' and not st['aar']):
                 flag(i, MADD_RULES[kind], tc, j['golden'], clear=abs(tc - j['golden']) >= MADD_CLEAR_OFF)
+            elif kind == 'Qalqalah' and j.get('_v5'):
+                if j['margin'] > B2['margin']['Qalqalah']:
+                    flag(i, 'qalqalah', clear=j['margin'] > S2.get('margin', {}).get('Qalqalah', float('inf')))
             elif kind == 'Qalqalah' and j['margin'] > B['margin']['Qalqalah']:
                 flag(i, 'qalqalah', clear=j['margin'] > S.get('margin', {}).get('Qalqalah', float('inf')))
             elif kind in ('Ghunnah', 'Ikhfa'):
@@ -485,11 +545,15 @@ class Engine:
         try:
             stops = nasal_rules.stops_after(s, a, n)
             ph, pls = nasal_rules.places(text, ms, stops) if st.get('tajweed', True) else ('', [])
-            margins = nasal_rules.judge(win, self.ear, ph, pls) if pls else []
+            if pls and win2 is not None:
+                margins = nasal_rules.judge(win2, self.ear2, ph, pls)
+            else:
+                margins = nasal_rules.judge(win, self.ear, ph, pls) if pls else []
         except Exception:
             pls, margins = [], []
+        NB = (B2 or B)['nasal']
         for p, m in zip(pls, margins):
-            if m > B['nasal'][p['kind']]:
+            if m > NB[p['kind']]:
                 flag(to_app(text[:p['char']].count(' ')), NASAL_RULES[p['kind']])
 
         if st['letters']:
