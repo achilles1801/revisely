@@ -45,6 +45,7 @@ CLEAR_WORD_KINDS = ('skipped',)
 MADD_CLEAR_OFF = 2.5  # a madd this many counts from its setting is `clear` (flagged from 1.5)
 LAZIM_CLEAR_UNDER = 3.5  # a lazim madd held under this is `clear` (flagged under 4.5)
 HEARD_REACH = 20  # frames (0.4 s) either side of a word read for what was heard instead
+NAME_MAX = 0.1  # a word said instead is named only when at most this share of its sounds differs from what was heard
 # spelling the model's sounds in Arabic letters, for `heard` when what was said isn't a word
 SOUND_SIGNS = set('ڇۜـؙ۪۾')  # the model's own tajweed signs: not letters
 SOUND_LETTER = {'ں': 'ن', 'ٲ': 'ا'}
@@ -73,6 +74,13 @@ def spell(sounds):
             out.append(c + (SHADDA if j - i >= 2 else ''))
         i = j
     return ''.join(out)
+
+
+def plain_word(text):
+    """A word without harakat, marks or alef forms: for telling whether two spellings are the same word."""
+    import re
+    text = re.sub(r'[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]', '', text or '')
+    return text.translate(str.maketrans({'ٱ': 'ا', 'أ': 'ا', 'إ': 'ا', 'آ': 'ا', 'ى': 'ي', 'ة': 'ه'})).replace(' ', '')
 
 
 def slip_of(why):
@@ -305,6 +313,11 @@ class Engine:
         }
         if v == 2:
             heard = heard_sounds(spans, toks, self.ear.vocab)
+            for w_, sp in spans.items():  # a word judged wrong: its own span when it holds a word's worth of sounds
+                if statuses.get(w_) == 'wrong':
+                    own = ''.join(self.ear.vocab[k - 1] for k, pk, _ in toks if sp[0] <= pk < sp[1])
+                    if len(checker.norm_sounds(own)) >= 3:
+                        heard[w_] = own
             out['marks'] = self.marks(words, flagged, heard, out['extras'], tj, letters if st['letters'] else [])
             out['score'] = score(statuses, out['marks'])
             out['v'] = 2
@@ -315,6 +328,29 @@ class Engine:
     def ayah_of(self, w):
         s, a, _ = self.key.where(w)
         return [int(s), int(a)]
+
+    def name_heard(self, w, sounds):
+        """The Qur'an word that sounds like what was heard in place of word w, when one matches closely (NAME_MAX of
+        its sounds may differ); else None, and the caller spells the sounds. On bench-v0's planted substitutions the
+        look-alike the decoder picked was the word said 2 times in 23: a name is given only when the sounds say so."""
+        import Levenshtein
+        hn = checker.norm_sounds(sounds or '')
+        if len(hn) < 3:
+            return None
+        lex = self.key._lexicon()
+        best = None
+        for ln in range(max(2, len(hn) - 3), len(hn) + 4):
+            for x in lex.get(ln, ()):
+                d = Levenshtein.distance(hn, x['norm'])
+                key = (d / len(x['norm']), d, -x['n'])
+                if best is None or key < best[0]:
+                    best = (key, x)
+        if best is None or best[0][0] > NAME_MAX:
+            return None
+        s, a, p = self.key.where(w)
+        if plain_word(best[1]['text']) == plain_word(self.key.uthmani(s, a)[p]):
+            return None  # it sounds like the word itself: a sound said wrong, not another word
+        return best[1]['text']
 
     def marks(self, words, flagged, heard, extras, tajweed_rows, letter_rows):
         """Every mark of a check (recite-contract.md): words, extra words, tajweed, letters."""
@@ -342,10 +378,13 @@ class Engine:
             elif st == 'wrong':
                 detail = (flagged.get(w) or {}).get('kind') or 'sound'
                 h, exact = None, None
-                if detail == 'lookalike' and row.get('heard'):
-                    h, exact = row['heard'], True
-                elif detail == 'sound' and heard.get(w):
+                named = self.name_heard(w, heard.get(w)) if heard.get(w) else None
+                if named:
+                    h, exact = named, True
+                elif heard.get(w):
                     h, exact = spell(heard[w]), False
+                elif detail == 'lookalike' and row.get('heard'):
+                    h, exact = row['heard'], True
                 add(w, 'word', 'clear' if detail in CLEAR_WORD_KINDS else 'likely', detail=detail, heard=h,
                     heardExact=exact, t=t)
         for e in extras:
