@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, ImageSourcePropType, Linking, Modal, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Image, ImageSourcePropType, Modal, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
 import { layoutV2, typeV2 } from '../../theme/v2';
@@ -7,7 +7,6 @@ import { PillButton } from '../v2/PillButton';
 import { Tap } from '../v2/Tap';
 import { useModalHold } from '../v2/modalTurn';
 import { BarButton } from './ReciteBar';
-import { CHECK_SUPPORT_URL } from '../../lib/reciteLive/availability';
 
 /** The real screen the page shows: a take marking mistakes on An-Naml 23 (E2E flow 18's screenshot), light and dark. */
 const PREVIEW: Record<'light' | 'dark', ImageSourcePropType> = {
@@ -26,11 +25,17 @@ const PREVIEW_ASPECT = 1206 / 1140;
  */
 export function CheckIntroPage({
   visible,
+  getting = false,
   onGet,
+  onSupport,
   onClose,
 }: {
   visible: boolean;
+  /** Get Premium is under way. */
+  getting?: boolean;
   onGet: () => void;
+  /** "Can't afford it? Apply for support": the program's page for this account (lib/premium's supportLink). */
+  onSupport: () => void;
   onClose: () => void;
 }) {
   const { palette, isDark } = useTheme();
@@ -64,9 +69,9 @@ export function CheckIntroPage({
           </Text>
         </ScrollView>
         <View style={styles.bottom}>
-          <PillButton title="Get Premium" size="lg" onPress={onGet} testID="check-intro-get" />
+          <PillButton title="Get Premium" size="lg" onPress={onGet} busy={getting} testID="check-intro-get" />
           <Tap
-            onPress={() => Linking.openURL(CHECK_SUPPORT_URL).catch(() => undefined)}
+            onPress={onSupport}
             style={styles.support}
             accessibilityRole="link"
             accessibilityLabel="Can’t afford it? Apply for support"

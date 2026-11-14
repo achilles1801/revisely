@@ -1,5 +1,6 @@
 // The reader's one mic (Revisely Dev): Record, Recite, Check; the recite bar; marks and the hidden view.
 import React from 'react';
+import { Alert } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import QuranReaderScreen from '../QuranReaderScreen';
@@ -140,6 +141,19 @@ jest.mock('../../../lib/reciteLive/socket', () => ({
 
 // A take kept as a recording: the file side is lib/reciteLive/takeRecording's own test.
 const mockTake: { started: { day: string; page: number } | null; added: number; finished: number } = { started: null, added: 0, finished: 0 };
+// Premium: the account's grant (lib/premium, its own test). A tester here has it unless a test says not.
+const mockPremium = { has: true };
+jest.mock('../../../lib/premium', () => ({
+  usePremium: () => ({ has: mockPremium.has, known: true, grant: null }),
+  setDevPremium: jest.fn(async (on: boolean) => {
+    mockPremium.has = on;
+    return on;
+  }),
+  supportLinkUrl: jest.fn(async () => 'https://dev.revisely.app/apply/#c=one-time'),
+  premiumErrorText: () => 'Something went wrong. Try again.',
+}));
+jest.mock('expo-web-browser', () => ({ openBrowserAsync: jest.fn(async () => ({ type: 'opened' })) }));
+
 jest.mock('../../../lib/reciteLive/takeRecording', () => ({
   startTakeRecording: (opts: { day: string; page: number }) => {
     mockTake.started = opts;
@@ -169,6 +183,7 @@ beforeEach(async () => {
   mockLive.audio = 0;
   mockLive.start = undefined;
   mockMic = null;
+  mockPremium.has = true;
   mockTake.started = null;
   mockTake.added = 0;
   mockTake.finished = 0;
@@ -484,7 +499,8 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
   });
 
   it('without Premium: Mark mistakes is off with a lock, and a tap opens the Premium page, not a take', async () => {
-    setReciteCheckSettings('u1', { noticeSeen: true, previewLocked: true, markMistakes: true });
+    mockPremium.has = false;
+    setReciteCheckSettings('u1', { noticeSeen: true, markMistakes: true });
     await open();
     // Kept on, but the account doesn't have it: the mic starts a plain Recite.
     expect(screen.getByLabelText('Recite')).toBeTruthy();
@@ -502,5 +518,39 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
     expect(screen.queryByText(/[$€£]|\d+(\.\d+)? ?(USD|a month|\/mo)/)).toBeNull();
     expect(screen.getByText('Can’t afford it? Apply for support')).toBeTruthy();
     expect(mockLive.start).toBeUndefined();
+  });
+
+  it('Get Premium in Revisely Dev: it says it is free, then turns Premium on and the switch unlocks', async () => {
+    mockPremium.has = false;
+    const alert = jest.spyOn(Alert, 'alert');
+    setReciteCheckSettings('u1', { noticeSeen: true });
+    await open();
+    fireEvent(screen.getByTestId('recite-mic'), 'longPress');
+    fireEvent.press(screen.getByTestId('recite-mistakes'));
+    await flush();
+    fireEvent.press(screen.getByTestId('check-intro-get'));
+    const [title, message, buttons] = alert.mock.calls[alert.mock.calls.length - 1];
+    expect(title).toBe('Premium in Revisely Dev');
+    expect(message).toMatch(/Free while testing: nothing is charged/);
+    const { setDevPremium } = jest.requireMock('../../../lib/premium');
+    await act(async () => buttons!.find((b) => b.text === 'Turn on')!.onPress!());
+    expect(setDevPremium).toHaveBeenCalledWith(true);
+    expect(screen.queryByTestId('check-intro')).toBeNull();
+    fireEvent(screen.getByTestId('recite-mic'), 'longPress');
+    expect(screen.getByTestId('recite-mistakes-off')).toBeTruthy();
+    expect(screen.queryByTestId('recite-mistakes-locked')).toBeNull();
+    alert.mockRestore();
+  });
+
+  it('Apply for support opens the program’s page with the account’s one-time link', async () => {
+    mockPremium.has = false;
+    setReciteCheckSettings('u1', { noticeSeen: true });
+    await open();
+    fireEvent(screen.getByTestId('recite-mic'), 'longPress');
+    fireEvent.press(screen.getByTestId('recite-mistakes'));
+    await flush();
+    await act(async () => fireEvent.press(screen.getByTestId('check-intro-support')));
+    const { openBrowserAsync } = jest.requireMock('expo-web-browser');
+    expect(openBrowserAsync).toHaveBeenCalledWith('https://dev.revisely.app/apply/#c=one-time');
   });
 });

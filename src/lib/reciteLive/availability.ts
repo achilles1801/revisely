@@ -1,4 +1,3 @@
-import type { ReciteCheckSettings } from '../reciteCheck/settings';
 import { mushafEdition, MushafEditionId } from '../mushafEdition';
 import { isDevVariant } from '../variant';
 import { isMicStreamAvailable } from '../recite/micSource';
@@ -24,15 +23,3 @@ export function reciteLiveForAccount(user: { previewTester?: boolean } | null | 
   const e2e = e2eReciteLive();
   return (isDevVariant() || e2e) && user?.previewTester === true && (isMicStreamAvailable() || e2e);
 }
-
-/**
- * Whether marking mistakes (part of Revisely Premium) is this account's. In the Dev app every tester has it; "Show
- * Premium locked" (Settings → Testing) shows it as those without it see it. The grant (entitlements, being
- * agreed with apply-support: `.check` or `.premium`) replaces previewTester once it exists.
- */
-export function checkOwned(user: { previewTester?: boolean } | null | undefined, settings: Pick<ReciteCheckSettings, 'previewLocked'>): boolean {
-  return user?.previewTester === true && !settings.previewLocked;
-}
-
-/** "Can't afford it? Apply for support" (Quran Muaalem License's free path). The page is to come; until then, support. */
-export const CHECK_SUPPORT_URL = 'https://revisely.app/support/';

@@ -59,7 +59,8 @@ appId: com.revisionbuddy.app
     env:
       NAME: rl01-reader
 
-# Hold the mic: Record and Recite, with Mark mistakes under Recite (off). Switch it on (the menu stays), then Recite.
+# Hold the mic: Record and Recite. A new account has no Premium: Mark mistakes is locked, and a tap opens the
+# Premium page. Get Premium (Revisely Dev's free grant, devGrantPremium in the functions emulator) turns it on.
 - longPressOn:
     id: recite-mic
 - extendedWaitUntil:
@@ -67,11 +68,40 @@ appId: com.revisionbuddy.app
       id: recite-mode-menu
     timeout: 5000
 - assertVisible:
-    id: recite-mistakes-off
+    id: recite-mistakes-locked
 - runFlow:
     file: ../subflows/shot.yaml
     env:
       NAME: rl02-menu
+- tapOn:
+    id: recite-mistakes
+- extendedWaitUntil:
+    visible:
+      id: check-intro
+    timeout: 5000
+- tapOn:
+    id: check-intro-get
+- extendedWaitUntil:
+    visible: "Turn on"
+    timeout: 5000
+- assertVisible: "Premium in Revisely Dev"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl02a-premium-free
+- tapOn: "Turn on"
+- extendedWaitUntil:
+    notVisible:
+      id: check-intro
+    timeout: 30000
+
+# Premium on: Mark mistakes unlocks. Switch it on (the menu stays), then Recite.
+- longPressOn:
+    id: recite-mic
+- extendedWaitUntil:
+    visible:
+      id: recite-mistakes-off
+    timeout: 10000
 - tapOn:
     id: recite-mistakes
 - assertVisible:
@@ -235,7 +265,8 @@ appId: com.revisionbuddy.app
 - tapOn:
     id: recite-close
 
-# Without Premium (Settings → Testing → Show Premium locked): Mark mistakes is locked, and a tap opens the Premium page.
+# Premium off again (Settings → Testing → Premium: devRevokePremium): Mark mistakes is locked, and a tap opens the
+# Premium page.
 - tapOn:
     id: reader-back
 - tapOn:
@@ -245,9 +276,15 @@ appId: com.revisionbuddy.app
 - runFlow:
     file: ../subflows/settings-row.yaml
     env:
-      ROW: settings-check-locked
+      ROW: settings-premium
 - tapOn:
-    id: settings-check-locked
+    id: settings-premium
+- extendedWaitUntil:
+    visible:
+      id: settings-premium
+      checked: false
+      enabled: true
+    timeout: 30000
 - tapOn:
     id: back
 - openLink:
@@ -278,5 +315,17 @@ appId: com.revisionbuddy.app
     file: ../subflows/shot.yaml
     env:
       NAME: rl12-check-page-dark
+# Apply for support asks supportLink for the account's one-time link. The emulators' project has no program page
+# (only revisely-dev has one), so the app says so in one line instead of opening the browser.
+- tapOn:
+    id: check-intro-support
+- extendedWaitUntil:
+    visible: "Applying for support isn’t open yet."
+    timeout: 15000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl12b-support-dark
+- tapOn: "OK"
 - tapOn:
     id: check-intro-close
