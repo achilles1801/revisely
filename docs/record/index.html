@@ -155,7 +155,7 @@
   const S = {
     code: null, pid: null, endpoint: ENDPOINT, data: null,
     local: { consent: false, profile: null, done: {}, takes: {}, choices: {}, skipped: {} },
-    stream: null, ctx: null, analyser: null, view: 'loading', item: null, pending: 0,
+    stream: null, ctx: null, analyser: null, source: null, view: 'loading', item: null, pending: 0,
   };
 
   // ---------- small helpers ----------
@@ -299,13 +299,36 @@
   }
 
   // ---------- microphone ----------
+  // The microphone is open only while recording: each take opens it and hands it back when it ends
+  // (releaseMic). While a page holds it, an iPhone plays everything in call mode, so a take played
+  // back with the microphone still open was barely audible, as on a call (Nov 12 2026).
+  // Opening it again asks nothing: Safari keeps the page's permission until 10 minutes pass with
+  // nothing recording. getUserMedia must run inside the tap, before anything is awaited.
   async function getStream() {
     if (S.stream && S.stream.getAudioTracks().some((t) => t.readyState === 'live')) return S.stream;
-    S.stream = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 },
-    });
-    S.analyser = null;
+    audioSession('play-and-record');
+    dropMeterSource();
+    try {
+      S.stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 },
+      });
+    } catch (e) {
+      audioSession('playback');
+      throw e;
+    }
     return S.stream;
+  }
+
+  // Safari 16.4+ (the Audio Session API): recording, then playback on the speaker. Safari would
+  // otherwise keep call mode while a take plays if the microphone was on when it started.
+  function audioSession(type) {
+    try { if (navigator.audioSession) navigator.audioSession.type = type; } catch (e) {}
+  }
+
+  function dropMeterSource() {
+    if (S.source) { try { S.source.disconnect(); } catch (e) {} }
+    S.source = null;
+    S.analyser = null;
   }
 
   // Called at the start of a tap, before anything is awaited: iPhones only start audio inside the tap.
@@ -322,14 +345,16 @@
       if (!S.analyser) {
         S.analyser = S.ctx.createAnalyser();
         S.analyser.fftSize = 1024;
-        S.ctx.createMediaStreamSource(S.stream).connect(S.analyser);
+        S.source = S.ctx.createMediaStreamSource(S.stream);
+        S.source.connect(S.analyser);
       }
     } catch (e) { return () => {}; }
-    const buf = new Float32Array(S.analyser.fftSize);
+    const analyser = S.analyser; // this stream's: releaseMic drops S.analyser
+    const buf = new Float32Array(analyser.fftSize);
     let on = true;
     const tick = () => {
       if (!on) return;
-      S.analyser.getFloatTimeDomainData(buf);
+      analyser.getFloatTimeDomainData(buf);
       let sum = 0;
       for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
       const db = 20 * Math.log10(Math.sqrt(sum / buf.length) + 1e-9);
@@ -560,16 +585,18 @@
         err.hidden = false; err.textContent = 'This browser can’t record. Please open the link in Safari (iPhone) or Chrome (Android).';
         return;
       }
+      allow.disabled = true; // one microphone: a second tap would open another
       try {
         await getStream();
         err.hidden = true;
-        meter(document.getElementById('lvl'));
+        const stop = meter(document.getElementById('lvl'));
         allow.textContent = 'It works, continue';
-        allow.onclick = () => { S.view = 'list'; render(); };
+        allow.onclick = () => { stop(); releaseMic(); S.view = 'list'; render(); };
       } catch (e) {
         err.hidden = false;
         err.textContent = 'The microphone is blocked. Allow it for this site in your browser’s settings, then reload the page.';
       }
+      allow.disabled = false;
     };
   }
 
@@ -691,12 +718,23 @@
   }
 
   let current = null; // the take being recorded
+  let busy = false; // the microphone is opening, or a take is finishing (its last chunk isn't in yet)
   let stopMeter = () => {};
   let ticker = null;
   function stopAll() {
     clearInterval(ticker);
     stopMeter();
-    if (current) { current.stop(); current = null; }
+    if (current) { current.stop(); current = null; } // leaving the item drops an unsaved take
+    releaseMic();
+  }
+
+  // Hands the microphone back: the phone stops recording and plays takes on its speaker again.
+  function releaseMic() {
+    if (current) return; // a take is recording on it
+    dropMeterSource();
+    if (S.stream) S.stream.getTracks().forEach((t) => t.stop());
+    S.stream = null;
+    audioSession('playback');
   }
 
   function wireRecorder(it) {
@@ -705,14 +743,19 @@
     let last = null;
 
     const begin = async () => {
+      if (busy) return;
       wakeAudio();
+      play.pause(); // the last take mustn't play into this one
       err.hidden = true;
       after.hidden = true;
+      busy = true;
       try { await getStream(); } catch (e) {
         err.hidden = false; err.textContent = 'The microphone is blocked. Allow it for this site in your browser’s settings, then reload the page.';
         return;
-      }
+      } finally { busy = false; }
+      if (!rec.isConnected) { releaseMic(); return; } // the item was left while the microphone opened
       try { current = startTake(S.stream); } catch (e) {
+        releaseMic();
         err.hidden = false; err.textContent = 'Recording couldn’t start. Please reload the page and try again.';
         return;
       }
@@ -730,7 +773,9 @@
       clearInterval(ticker); stopMeter();
       const take = current; current = null;
       rec.classList.remove('on'); rec.setAttribute('aria-label', 'Record');
-      last = await take.stop();
+      busy = true;
+      try { last = await take.stop(); } finally { busy = false; }
+      releaseMic(); // only now, with the last chunk in
       clk.textContent = clock(last.ms);
       if (last.ms < 1500 || !last.blob.size) {
         err.hidden = false; err.textContent = 'That was too short. Tap the button and recite, then tap again to stop.';
@@ -739,7 +784,7 @@
       play.src = URL.createObjectURL(last.blob);
       after.hidden = false;
     };
-    rec.onclick = () => (current ? end() : begin());
+    rec.onclick = () => (busy ? null : current ? end() : begin());
     document.getElementById('redo').onclick = () => { last = null; after.hidden = true; begin(); };
     document.getElementById('save').onclick = async () => {
       if (!last) return;
