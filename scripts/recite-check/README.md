@@ -43,7 +43,7 @@ flagged (`make_bars.py`).
 
 ## Record, then check: `POST /check`
 
-`POST /check?s=2&a=6[&s2=2&a2=16][&mon=4&mot=4&aar=0][&letters=1][&keep=1][&v=2]`, body a WAV (16 kHz, mono, 16-bit,
+`POST /check?s=2&a=6[&s2=2&a2=16][&mon=4&mot=4&aar=0][&letters=1][&tajweed=0][&keep=1][&v=2]`, body a WAV (16 kHz, mono, 16-bit,
 at most 4 minutes), `Authorization: Bearer <Firebase ID token>` from revisely-dev. `keep=1` keeps the recording and
 the result as test data (below). Refusals: 401 `sign_in`, 403 `testers_only`, 429 `limit` (40 an hour, live sessions
 included), 400 `bad_request`.
