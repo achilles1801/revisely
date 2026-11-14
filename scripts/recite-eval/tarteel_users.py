@@ -74,10 +74,48 @@ def ctc_nll(lp, labels):
                             blank=0, reduction='sum', zero_infinity=True))
 
 
-def surah(s):
+def label(ear, phon, s, ayah, x):
+    """One clip of ayah s:ayah: the madd lengths that fit it best, and its alignment; or why it was dropped (a string).
+    `phon` caches each ayah's sounds per style across calls."""
     import Levenshtein
     import checker, tajweed
     from quran_transcript import Aya, MoshafAttributes, quran_phonetizer
+    lp = ear.logprobs(x)
+    best = None
+    for st in STYLES:
+        key = (s, ayah) + st
+        if key not in phon:
+            try:
+                m = MoshafAttributes(rewaya='hafs', madd_monfasel_len=st[0], madd_mottasel_len=st[1],
+                                     madd_mottasel_waqf=st[1], madd_aared_len=st[2])
+                ph = quran_phonetizer(Aya(s, ayah).get().uthmani, m, remove_spaces=True).phonemes
+                phon[key] = [ear.index[c] for c in ph if c in ear.index]
+            except Exception:
+                phon[key] = None
+        lab = phon[key]
+        if not lab or lp.shape[0] < 2 * len(lab) + 2:
+            continue
+        nll = ctc_nll(lp, lab)
+        if best is None or nll < best[0]:
+            best = (nll, st, lab)
+    if best is None:
+        return 'no label'
+    _, st, labels = best
+    heard = ''.join(ear.vocab[k - 1] for k, _, _ in checker.heard_tokens(lp))
+    ref = ''.join(ear.vocab[l - 1] for l in labels)
+    per = Levenshtein.distance(ref, heard) / max(len(ref), 1)
+    if per > 0.15:
+        return 'model and text disagree'
+    spans = tajweed.ctc_align(lp, labels)
+    emit = tajweed.ctc_align.emit
+    if len(emit) != len(labels):
+        return 'alignment'
+    fit = float(np.mean([lp[emit[i][0]:emit[i][1], labels[i]].max() for i in range(len(labels))]))
+    return st, labels, emit, spans, fit, per
+
+
+def surah(s):
+    import checker
     OUT.mkdir(parents=True, exist_ok=True)
     name = f'u{s:03d}'
     if (OUT / f'{name}.meta.pkl').exists():
@@ -97,37 +135,10 @@ def surah(s):
         if x is None or len(x) < 24000 or len(x) > 16000 * 30:
             drop('length'); continue
         ayah = int(r['quran_id']) % 1000
-        lp = ear.logprobs(x)
-        best = None
-        for st in STYLES:
-            key = (ayah,) + st
-            if key not in phon:
-                try:
-                    m = MoshafAttributes(rewaya='hafs', madd_monfasel_len=st[0], madd_mottasel_len=st[1],
-                                         madd_mottasel_waqf=st[1], madd_aared_len=st[2])
-                    ph = quran_phonetizer(Aya(s, ayah).get().uthmani, m, remove_spaces=True).phonemes
-                    phon[key] = [ear.index[c] for c in ph if c in ear.index]
-                except Exception:
-                    phon[key] = None
-            lab = phon[key]
-            if not lab or lp.shape[0] < 2 * len(lab) + 2:
-                continue
-            nll = ctc_nll(lp, lab)
-            if best is None or nll < best[0]:
-                best = (nll, st, lab)
-        if best is None:
-            drop('no label'); continue
-        _, st, labels = best
-        heard = ''.join(ear.vocab[k - 1] for k, _, _ in checker.heard_tokens(lp))
-        ref = ''.join(ear.vocab[l - 1] for l in labels)
-        per = Levenshtein.distance(ref, heard) / max(len(ref), 1)
-        if per > 0.15:
-            drop('model and text disagree'); continue
-        spans = tajweed.ctc_align(lp, labels)
-        emit = tajweed.ctc_align.emit
-        if len(emit) != len(labels):
-            drop('alignment'); continue
-        fit = float(np.mean([lp[emit[i][0]:emit[i][1], labels[i]].max() for i in range(len(labels))]))
+        got = label(ear, phon, s, ayah, x)
+        if isinstance(got, str):
+            drop(got); continue
+        st, labels, emit, spans, fit, per = got
         a = np.clip(x * 32768, -32768, 32767).astype(np.int16)
         chunks.append(a)
         metas.append({'off': off, 'n': len(a), 'labels': np.array(labels, np.int16),
