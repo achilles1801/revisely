@@ -1,0 +1,12 @@
+appId: com.revisionbuddy.app
+---
+- extendedWaitUntil: { visible: "Search the Quran", timeout: 8000 }
+- extendedWaitUntil: { visible: "__never__", timeout: 1200, optional: true }
+- tapOn: "Search the Quran"
+- extendedWaitUntil: { visible: "__never__", timeout: 1000, optional: true }
+- inputText: "الله لا إله إلا هو الحي القيوم"
+- extendedWaitUntil: { visible: "__never__", timeout: 700, optional: true }
+- pressKey: Enter
+- extendedWaitUntil: { visible: "__never__", timeout: 2600, optional: true }
+- tapOn: { point: "200,190" }
+- extendedWaitUntil: { visible: "__never__", timeout: 3500, optional: true }

@@ -6,7 +6,7 @@ permalink: /privacy/
 # Privacy Policy for Revisely
 
 **Effective date: 2026-05-11**
-**Last updated: 2026-11-08**
+**Last updated: 2026-11-09**
 
 This Privacy Policy describes how Revisely ("we", "us", or "the app") collects, uses, and protects information when you use the Revisely mobile application, and when you donate to Revisely on our website, revisely.app.
 
@@ -61,7 +61,9 @@ We never send Anthropic your name, email address, account ID, location, or the a
 - the answer to a first question, kept for that day, so asking the same question again doesn't send it to Anthropic again;
 - a count of the questions you ask each day, which sets the daily limit.
 
-Our logs record counts and costs, never your questions, Revo's answers or your notes.
+We may read your Revo conversations and what it remembers to improve Revo and keep it safe; only Revisely's developer can see them.
+
+Our logs record counts and costs, linked to your account's internal ID and kept for 30 days, never your questions, Revo's answers or your notes.
 
 **Deleting it.** Settings → Revo AI → Delete conversations deletes all your conversations. Turning Revo off deletes your conversations, what it remembers and the kept answers. Deleting your account deletes all of it.
 
@@ -76,7 +78,7 @@ We use the information described above to:
 
 - Operate the app — store your account, sync your revision data across devices, generate your daily revision schedule.
 - Send you the revision reminders you've enabled.
-- Answer your questions with Revo, and write its Day in review, if you turn Revo on.
+- Answer your questions with Revo, write its Day in review, and improve Revo, if you turn Revo on.
 - Respond to support requests you send us.
 - Process donations — send your receipt, thank you, and keep financial records.
 - Detect and fix bugs and crashes.
@@ -94,7 +96,7 @@ If you are in the European Economic Area, the United Kingdom, or Switzerland, we
 
 - **Performance of a contract** — to create and operate your account, sync your data, provide the core memorization-tracking service, and process a donation you make.
 - **Consent**: for push notifications, location (when you enable the fajr-aligned day boundary), Revo (you turn it on in the app and can turn it off at any time), and Apple/Google sign-in (you consent through the system permission prompts).
-- **Legitimate interests** — to detect crashes, prevent abuse, improve the app, and thank people who donate. We balance this against your right to privacy and have minimized what we collect.
+- **Legitimate interests** — to detect crashes, prevent abuse, improve the app (including reviewing Revo conversations), and thank people who donate. We balance this against your right to privacy and have minimized what we collect.
 - **Legal obligation** — to respond to lawful requests from authorities and retain records required by law.
 
 ## 5. Third-party services we use

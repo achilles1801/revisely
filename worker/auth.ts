@@ -109,6 +109,16 @@ export async function verifyIdToken(
   now: number = Math.floor(Date.now() / 1000),
   fetchImpl: typeof fetch = fetch,
 ): Promise<string> {
+  return (await verifyIdTokenClaims(token, projectId, now, fetchImpl)).sub;
+}
+
+/** As verifyIdToken, with the token's claims too (custom claims, email, exp). */
+export async function verifyIdTokenClaims(
+  token: string,
+  projectId: string,
+  now: number = Math.floor(Date.now() / 1000),
+  fetchImpl: typeof fetch = fetch,
+): Promise<{ sub: string; claims: Record<string, unknown> }> {
   const parts = token.split('.');
   if (parts.length !== 3 || parts.some((p) => p.length === 0)) throw new AuthError('Malformed token');
   const header = decodeObject(parts[0]);
@@ -133,5 +143,5 @@ export async function verifyIdToken(
   if (!(num('auth_time') <= now + SKEW)) throw new AuthError('Signed in in the future');
   const sub = claims.sub;
   if (typeof sub !== 'string' || sub.length === 0 || sub.length > 128) throw new AuthError('No user');
-  return sub;
+  return { sub, claims };
 }

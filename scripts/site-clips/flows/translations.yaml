@@ -1,0 +1,25 @@
+appId: com.revisionbuddy.app
+---
+- extendedWaitUntil: { visible: "__never__", timeout: 1200, optional: true }
+- longPressOn: { point: "220,560" }
+- extendedWaitUntil: { visible: { id: "verse-menu-translation" }, timeout: 4000 }
+- extendedWaitUntil: { visible: "__never__", timeout: 700, optional: true }
+- tapOn: { id: "verse-menu-translation" }
+- extendedWaitUntil: { visible: "__never__", timeout: 2800, optional: true }
+- tapOn: { id: "verse-more" }
+- extendedWaitUntil: { visible: "Select translation.*", timeout: 4000 }
+- extendedWaitUntil: { visible: "__never__", timeout: 500, optional: true }
+- tapOn: "Select translation.*"
+- extendedWaitUntil: { visible: "__never__", timeout: 1500, optional: true }
+- swipe: { start: "50%,85%", end: "50%,25%", duration: 500 }
+- extendedWaitUntil: { visible: "__never__", timeout: 400, optional: true }
+- swipe: { start: "50%,85%", end: "50%,25%", duration: 500 }
+- extendedWaitUntil: { visible: "__never__", timeout: 1000, optional: true }
+- swipe: { start: "50%,30%", end: "50%,95%", duration: 300 }
+- swipe: { start: "50%,30%", end: "50%,95%", duration: 300 }
+- extendedWaitUntil: { visible: "__never__", timeout: 500, optional: true }
+- tapOn: "Language or translator"
+- inputText: "Urdu"
+- extendedWaitUntil: { visible: "__never__", timeout: 1300, optional: true }
+- tapOn: { id: "translation-row-qe.urdu_junagarhi" }
+- extendedWaitUntil: { visible: "__never__", timeout: 4000, optional: true }

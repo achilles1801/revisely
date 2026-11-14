@@ -12,6 +12,15 @@ file is the release mechanics and the traps behind them.
 
 ## Branches and releases
 
+**Which branch is for what** (Majd, Nov 14 2026: "it should be well known that develop is for revisely dev only and
+main is strictly for production"):
+- **`develop` is pre-production**: Revisely Dev (the Dev app), the dev backend, dev.revisely.app, and the testers'
+  `preview` channel (TestFlight and Play testers of the store app, as below). Dev-only work goes there and only there,
+  dev-only Worker code included (behind a var that only `wrangler.dev.jsonc` sets).
+- **`main` is strictly production**: revisely.app and the store app. It gets work only through develop → main
+  release merges, or a fix meant for production itself. Never ask Majd to merge dev work into main.
+- **Bringing production's site to dev** is a main → develop merge, which never touches production.
+
 - Work on `develop` (or a branch off it). CI (`.github/workflows/ci.yml`) runs on every push and PR.
 - **Nothing reaches App Store users without passing TestFlight first.**
   1. A push to `develop` (`Preview`, `.github/workflows/preview.yml`) publishes the JS to the `preview`
@@ -143,9 +152,22 @@ until its part is set up.
   - **Mushaf pages** come from production's public bucket (public, immutable files, nobody's data).
 - **dev.revisely.app:** the Worker `revisely-dev` (`wrangler.dev.jsonc`), the same code as revisely.app.
   - Workers Builds deploys it from develop (non-production branch builds off), so its config is in both
-    main and develop. Worker changes go to main as always.
+    main and develop. A dev-only Worker change (behind a var only `wrangler.dev.jsonc` sets) goes through
+    develop and reaches main with the next release, switched off there. Only a change meant for revisely.app
+    goes to main first (Branches and releases).
   - `NOINDEX`: every answer carries `X-Robots-Tag: noindex, nofollow`, and `/robots.txt` disallows
     everything.
+  - **Sign-in gate** (`worker/gate.ts`, Majd, Nov 14 2026: only him for now): with `DEV_GATE` "1"
+    (`wrangler.dev.jsonc` only), every page needs a revisely-dev account with the custom claim `devSite`,
+    kept in a `__Host-` cookie for the hour its ID token lasts. `/api/*` stays open for the Dev app. Let
+    someone in with `functions/scripts/set-dev-site.js <email>` (`--off`, `--list`; revisely-dev only):
+    nobody's email is in the repository.
+  - **Keep it in step with revisely.app:** revisely.app is built from `main` and dev.revisely.app from
+    `develop`. After a site PR merges into `main`, merge `main` back into `develop` (or send site work
+    through `develop`); dev had drifted a whole redesign behind until Nov 14 2026.
+  - **Which branch a Worker change goes to:** a dev-only change (behind a var only `wrangler.dev.jsonc`
+    sets, like `DEV_GATE` or `ACCOUNT_PAGES`) goes through `develop` and reaches `main` with the next
+    release, switched off there. Only a change meant for revisely.app goes to `main` first.
   - Its API accepts only the dev project's sign-ins.
   - **No Clear Quran key.** The Clear Quran's portal allows one active Production key per product
     ("duplicate key … api_keys_active_developer_account_id_product_environment"), and revisely.app holds

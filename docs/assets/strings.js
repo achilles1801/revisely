@@ -4,7 +4,7 @@
 window.RV_STRINGS = {
   en: {
     'nav.premium': 'Premium', 'nav.program': 'Open Door', 'nav.signin': 'Sign in', 'nav.account': 'Account',
-    'nav.support': 'Support', 'nav.getApp': 'Get the app', 'nav.menu': 'Menu', 'nav.close': 'Close', lang: 'عربي',
+    'nav.support': 'Support', 'nav.getApp': 'Get the app', 'nav.download': 'Download', 'soon.small': 'Coming to', 'nav.menu': 'Menu', 'nav.close': 'Close', lang: 'عربي',
     'foot.privacy': 'Privacy', 'foot.terms': 'Terms', 'foot.support': 'Support',
 
     'p.title.doc': 'Premium · Revisely',
@@ -29,11 +29,12 @@ window.RV_STRINGS = {
     'g.revo': 'Revo', 'r.revoq': 'Questions a day', 'r.revoDay': 'Day in review',
     'g.more': 'Everything else', 'r.prayer': 'Prayer times and Qibla', 'r.widgets': 'Widgets',
     'p.laterT': 'Family plans and gifts', 'p.later': 'They come with Premium: one plan for the whole family, and Premium as a gift.',
-    'p.get': 'Get Revisely', 'p.getSub': 'Free on iPhone. Android is coming soon to Google Play.',
+    'p.get': 'Get Revisely', 'p.getSub': 'Free on iPhone. Android is coming to Google Play.',
 
     'a.title.doc': 'Your account · Revisely',
     'a.title': 'Your account', 'a.lede': 'Sign in with the account you use in the Revisely app to see your plan and your Open Door application.',
     'a.google': 'Continue with Google', 'a.email': 'Sign in with email',
+    'a.new2': 'New to Revisely? Accounts are made in the app.',
     'a.new': 'New to Revisely? Accounts are made in the app. <a href="https://apps.apple.com/app/revisely/id6767990248">Get it on the App Store</a>.',
     'a.plan': 'Your plan', 'a.free': 'Free', 'a.freeLine': 'Premium is coming. When it does, Open Door gives it free to anyone who can’t pay.',
     'a.premium': 'Premium', 'a.through': 'Open Door',
@@ -58,7 +59,7 @@ window.RV_STRINGS = {
     's.offline': 'Check your connection and try again.', 's.failed': 'Couldn’t sign in. Try again.', 's.blocked': 'Allow pop-ups for this site, then try again.',
 
     'o.title.doc': 'Open Door · Revisely',
-    'o.name': 'Open Door', 'o.sub': 'Premium, free for anyone who can’t pay for it',
+    'o.kicker': 'Revisely Premium, free', 'o.name': 'Open Door', 'o.sub': 'Premium, free for anyone who can’t pay for it',
     'o.pitch': 'Nobody should stop memorizing the Quran because of money. If Premium costs more than you can manage, or you have no way to pay for it where you live, apply and we’ll give it to you for free. It takes two minutes, and there’s nothing to prove.',
     'o.apply': 'Apply', 'o.status': 'Already applied? <a href="/account/">See your status</a>',
     'o.verse': '“And We have certainly made the Quran easy to remember. So is there anyone who will be mindful?”', 'o.verseRef': 'Al-Qamar 54:17',
@@ -105,7 +106,7 @@ window.RV_STRINGS = {
   },
   ar: {
     'nav.premium': 'بريميوم', 'nav.program': 'الباب المفتوح', 'nav.signin': 'تسجيل الدخول', 'nav.account': 'الحساب',
-    'nav.support': 'الدعم', 'nav.getApp': 'حمّل التطبيق', 'nav.menu': 'القائمة', 'nav.close': 'إغلاق', lang: 'English',
+    'nav.support': 'الدعم', 'nav.getApp': 'حمّل التطبيق', 'nav.download': 'حمّل', 'soon.small': 'قريبًا على', 'nav.menu': 'القائمة', 'nav.close': 'إغلاق', lang: 'English',
     'foot.privacy': 'الخصوصية', 'foot.terms': 'الشروط', 'foot.support': 'الدعم',
 
     'p.title.doc': 'بريميوم · ريفايزلي',
@@ -130,11 +131,12 @@ window.RV_STRINGS = {
     'g.revo': 'Revo', 'r.revoq': 'الأسئلة في اليوم', 'r.revoDay': 'ملخّص اليوم',
     'g.more': 'كل ما سوى ذلك', 'r.prayer': 'مواقيت الصلاة والقبلة', 'r.widgets': 'الأدوات على الشاشة الرئيسية',
     'p.laterT': 'خطط العائلة والهدايا', 'p.later': 'تأتي مع بريميوم: خطة واحدة للعائلة كلها، وبريميوم هديةً.',
-    'p.get': 'احصل على ريفايزلي', 'p.getSub': 'مجاني على iPhone. ويصل إلى Google Play قريبًا لأجهزة Android.',
+    'p.get': 'احصل على ريفايزلي', 'p.getSub': 'مجاني على iPhone، ويصل قريبًا إلى Google Play لأجهزة Android.',
 
     'a.title.doc': 'حسابك · ريفايزلي',
     'a.title': 'حسابك', 'a.lede': 'سجّل الدخول بالحساب الذي تستخدمه في تطبيق ريفايزلي لترى خطتك وطلبك في الباب المفتوح.',
     'a.google': 'المتابعة باستخدام Google', 'a.email': 'الدخول بالبريد الإلكتروني',
+    'a.new2': 'جديد على ريفايزلي؟ تُنشأ الحسابات في التطبيق.',
     'a.new': 'جديد على ريفايزلي؟ تُنشأ الحسابات في التطبيق. <a href="https://apps.apple.com/app/revisely/id6767990248">حمّله من App Store</a>.',
     'a.plan': 'خطتك', 'a.free': 'المجاني', 'a.freeLine': 'بريميوم قادم. وعند صدوره يمنحه الباب المفتوح مجانًا لكل من لا يستطيع الدفع.',
     'a.premium': 'بريميوم', 'a.through': 'الباب المفتوح',
@@ -159,7 +161,7 @@ window.RV_STRINGS = {
     's.offline': 'تحقّق من اتصالك وحاول مرة أخرى.', 's.failed': 'تعذّر تسجيل الدخول. حاول مرة أخرى.', 's.blocked': 'اسمح بالنوافذ المنبثقة لهذا الموقع، ثم حاول مرة أخرى.',
 
     'o.title.doc': 'الباب المفتوح · ريفايزلي',
-    'o.name': 'الباب المفتوح', 'o.sub': 'بريميوم مجانًا لكل من لا يستطيع دفع ثمنه',
+    'o.kicker': 'ريفايزلي بريميوم، مجانًا', 'o.name': 'الباب المفتوح', 'o.sub': 'بريميوم مجانًا لكل من لا يستطيع دفع ثمنه',
     'o.pitch': 'لا ينبغي أن يتوقف أحدٌ عن حفظ القرآن بسبب المال. إن كانت تكلفة بريميوم فوق طاقتك، أو لم تكن لديك وسيلة دفع تصلح له في بلدك، فقدِّم طلبك نمنحْك إياه مجانًا. لا يستغرق ذلك سوى دقيقتين، ولا شيء عليك إثباته.',
     'o.apply': 'قدِّم طلبك', 'o.status': 'قدّمت من قبل؟ <a href="/account/">اطّلع على حالة طلبك</a>',
     'o.verse': '', 'o.verseRef': 'القمر ٥٤:١٧',

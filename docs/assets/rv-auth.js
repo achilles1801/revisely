@@ -221,7 +221,7 @@ export function openSignIn({ focusEmail = false } = {}) {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-// The header: the account button and the menu (not on the page the app opens)
+// The header's account button: an icon signed out, the initial signed in (not on the page the app opens)
 
 function initial(user) {
   const s = (user.displayName || user.email || '?').trim();
@@ -232,36 +232,19 @@ export function wireHeader() {
   const html = document.documentElement;
   if (html.classList.contains('from-app')) return;
   const btn = document.querySelector('[data-account-btn]');
-  if (btn) {
-    onUser((user) => {
-      if (user) {
-        btn.removeAttribute('data-t');
-        btn.className = 'avatar latin';
-        btn.textContent = initial(user);
-        btn.setAttribute('aria-label', RV.t('nav.account'));
-        btn.href = '/account/';
-      } else {
-        btn.className = 'signin-link';
-        btn.setAttribute('data-t', 'nav.signin');
-        btn.textContent = RV.t('nav.signin');
-        btn.removeAttribute('aria-label');
-        btn.href = '/account/';
-      }
-    }).catch(() => {});
-  }
-  const menuBtn = document.querySelector('[data-menu]');
-  const menu = document.querySelector('[data-menu-panel]');
-  if (menuBtn && menu) {
-    menuBtn.addEventListener('click', () => {
-      const open = menu.hidden;
-      menu.hidden = !open;
-      menuBtn.setAttribute('aria-expanded', String(open));
-    });
-    document.addEventListener('click', (e) => {
-      if (!menu.hidden && !e.target.closest('[data-menu]') && !e.target.closest('[data-menu-panel]')) {
-        menu.hidden = true;
-        menuBtn.setAttribute('aria-expanded', 'false');
-      }
-    });
-  }
+  if (!btn) return;
+  const icon = btn.innerHTML;
+  onUser((user) => {
+    if (user) {
+      btn.removeAttribute('data-t-aria');
+      btn.classList.add('avatar', 'latin');
+      btn.textContent = initial(user);
+      btn.setAttribute('aria-label', RV.t('nav.account'));
+    } else {
+      btn.classList.remove('avatar', 'latin');
+      btn.innerHTML = icon;
+      btn.setAttribute('data-t-aria', 'nav.signin');
+      btn.setAttribute('aria-label', RV.t('nav.signin'));
+    }
+  }).catch(() => {});
 }
