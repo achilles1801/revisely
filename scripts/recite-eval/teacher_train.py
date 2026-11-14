@@ -106,6 +106,8 @@ def main():
     ap.add_argument('--max_minutes', type=float, default=0)
     ap.add_argument('--max_clips', type=int, default=0)
     ap.add_argument('--ckpt', type=int, default=1, help='gradient checkpointing (about 27% slower, a third of the memory)')
+    ap.add_argument('--pool', type=int, default=8, help='draw this many batches of clips at once and group them by length')
+    ap.add_argument('--max_secs', type=float, default=24.0, help='leave out clips longer than this (seconds)')
     a = ap.parse_args()
     out = pathlib.Path(a.out)
     out.mkdir(parents=True, exist_ok=True)

@@ -129,7 +129,8 @@ class Batches(torch.utils.data.IterableDataset):
         pos, babble = [0] * ndir, []
         while True:
             items, secs, seen = [], 0.0, {}
-            while secs < a.batch_s:
+            pool = max(1, getattr(a, 'pool', 0) or 1)
+            while secs < a.batch_s * pool:
                 d = int(rng.choice(ndir, p=mix))
                 si, mi = data.train[orders[d][pos[d] % len(orders[d])]]; pos[d] += 1
                 use_voice = rng.random() < a.voice_p
@@ -146,6 +147,8 @@ class Batches(torch.utils.data.IterableDataset):
                             items.append((x, lab)); secs += len(x) / 16000
                         continue
                 x, lab, emit = data.clip(si, mi, voice=use_voice)
+                if getattr(a, 'max_secs', 0) and len(x) > a.max_secs * 16000:
+                    continue  # (the teacher) attention grows with the square of a clip's length
                 if not use_voice:
                     babble.append(x); babble[:] = babble[-24:]
                 if rng.random() < a.slip_p:
@@ -162,9 +165,22 @@ class Batches(torch.utils.data.IterableDataset):
                 else:
                     x = np.clip(x * rng.uniform(0.5, 1.5), -1, 1).astype(np.float32)
                 items.append((x, lab)); secs += len(x) / 16000
-            M, frames, labs = build_mels(items, a.fmask, rng)
-            tf = teacher_features([x for x, _ in items]) if getattr(a, 'teacher', None) else None
-            yield M, frames, labs, seen, tf
+            if pool > 1:  # clips of like length together (less padding), the batches in a random order
+                items.sort(key=lambda it: len(it[0]))
+                groups, cur, cs = [], [], 0.0
+                for it in items:
+                    cur.append(it); cs += len(it[0]) / 16000
+                    if cs >= a.batch_s:
+                        groups.append(cur); cur, cs = [], 0.0
+                if cur:
+                    groups.append(cur)
+                shuf.shuffle(groups)
+            else:
+                groups = [items]
+            for gi, group in enumerate(groups):
+                M, frames, labs = build_mels(group, a.fmask, rng)
+                tf = teacher_features([x for x, _ in group]) if getattr(a, 'teacher', None) else None
+                yield M, frames, labs, (seen if gi == 0 else {}), tf
 
 
 _TPROC = {}
@@ -259,6 +275,7 @@ def main():
     ap.add_argument('--mix', default='', help="each --data folder's share of clips, e.g. 0.5,0.5 (default: by size)")
     ap.add_argument('--mosaic_p', type=float, default=0.0, help='share of clips stitched from stretches of several ayat')
     ap.add_argument('--teacher', default=None, help="distil from this teacher (teacher_train.py's teacher.pt)")
+    ap.add_argument('--pool', type=int, default=0, help='draw this many batches of clips at once and group them by length')
     ap.add_argument('--kd', type=float, default=1.0, help="weight of matching the teacher's frames, beside the CTC loss")
     ap.add_argument('--kd_temp', type=float, default=1.0)
     a = ap.parse_args()
