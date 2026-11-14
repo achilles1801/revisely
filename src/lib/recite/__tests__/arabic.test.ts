@@ -56,3 +56,37 @@ describe('soundAlike', () => {
     expect(soundAlike('لى')).toBeNull(); // too short to tell
   });
 });
+
+describe('reading the word data', () => {
+  it('falls back to the legacy file API when File refuses the app bundle (built-in JavaScript)', async () => {
+    jest.resetModules();
+    jest.doMock('expo-file-system', () => ({
+      File: class {
+        text() {
+          return Promise.reject(new Error('Missing permission for uri'));
+        }
+      },
+    }));
+    jest.doMock('expo-file-system/legacy', () => ({ readAsStringAsync: jest.fn(async () => '{"ok":1}') }));
+    const { readText } = require('../quranWords') as typeof import('../quranWords');
+    await expect(readText('file:///app.app/assets/src/data/quranWords.dat')).resolves.toBe('{"ok":1}');
+    jest.dontMock('expo-file-system');
+    jest.dontMock('expo-file-system/legacy');
+  });
+
+  it('a refusal from both is the first error', async () => {
+    jest.resetModules();
+    jest.doMock('expo-file-system', () => ({
+      File: class {
+        text() {
+          return Promise.reject(new Error('Missing permission for uri'));
+        }
+      },
+    }));
+    jest.doMock('expo-file-system/legacy', () => ({ readAsStringAsync: jest.fn(async () => Promise.reject(new Error('nope'))) }));
+    const { readText } = require('../quranWords') as typeof import('../quranWords');
+    await expect(readText('file:///x')).rejects.toThrow('Missing permission for uri');
+    jest.dontMock('expo-file-system');
+    jest.dontMock('expo-file-system/legacy');
+  });
+});

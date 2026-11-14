@@ -243,9 +243,28 @@ export function setQuranWordsForTests(data: QuranWordsData | null): void {
 async function readAsset(): Promise<QuranWordsData> {
   // Required here so tests and screens that never check recitation don't load it.
   const { Asset } = require('expo-asset') as typeof import('expo-asset');
-  const { File } = require('expo-file-system') as typeof import('expo-file-system');
   const asset = Asset.fromModule(require('../../data/quranWords.dat'));
   if (!asset.localUri) await asset.downloadAsync();
   const uri = asset.localUri ?? asset.uri;
-  return JSON.parse(await new File(uri).text()) as QuranWordsData;
+  return JSON.parse(await readText(uri)) as QuranWordsData;
+}
+
+/**
+ * A file's text. The JavaScript a binary was built with keeps its assets inside the app bundle, which
+ * expo-file-system's File refuses to read ("Missing permission for uri"); an update's assets are in the app's own
+ * folders, which it reads. The legacy API may read the bundle, so it is the fallback (seen in an E2E build, which only
+ * ever runs its built-in JavaScript, Nov 14 2026).
+ */
+export async function readText(uri: string): Promise<string> {
+  const { File } = require('expo-file-system') as typeof import('expo-file-system');
+  try {
+    return await new File(uri).text();
+  } catch (err) {
+    const legacy = require('expo-file-system/legacy') as typeof import('expo-file-system/legacy');
+    try {
+      return await legacy.readAsStringAsync(uri);
+    } catch {
+      throw err;
+    }
+  }
 }
