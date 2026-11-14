@@ -12,6 +12,14 @@ file is the release mechanics and the traps behind them.
 
 ## Branches and releases
 
+**Which branch is for what** (Majd, Nov 14 2026: "it should be well known that develop is for revisely dev only and
+main is strictly for production"):
+- **`develop` is for Revisely Dev**: the Dev app, the dev backend and dev.revisely.app. Dev-only work goes there and
+  only there, dev-only Worker code included (behind a var that only `wrangler.dev.jsonc` sets).
+- **`main` is strictly production**: revisely.app and the store app. It gets work only through develop → main
+  release merges, or a fix meant for production itself. Never ask Majd to merge dev work into main.
+- **Bringing production's site to dev** is a main → develop merge, which never touches production.
+
 - Work on `develop` (or a branch off it). CI (`.github/workflows/ci.yml`) runs on every push and PR.
 - **Nothing reaches App Store users without passing TestFlight first.**
   1. A push to `develop` (`Preview`, `.github/workflows/preview.yml`) publishes the JS to the `preview`
@@ -143,7 +151,9 @@ until its part is set up.
   - **Mushaf pages** come from production's public bucket (public, immutable files, nobody's data).
 - **dev.revisely.app:** the Worker `revisely-dev` (`wrangler.dev.jsonc`), the same code as revisely.app.
   - Workers Builds deploys it from develop (non-production branch builds off), so its config is in both
-    main and develop. Worker changes go to main as always.
+    main and develop. A dev-only Worker change (behind a var only `wrangler.dev.jsonc` sets) goes through
+    develop and reaches main with the next release, switched off there. Only a change meant for revisely.app
+    goes to main first (Branches and releases).
   - `NOINDEX`: every answer carries `X-Robots-Tag: noindex, nofollow`, and `/robots.txt` disallows
     everything.
   - **Sign-in gate** (`worker/gate.ts`, Majd, Nov 14 2026: only him for now): with `DEV_GATE` "1"
