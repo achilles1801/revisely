@@ -125,7 +125,7 @@ html[dir="rtl"] .select, html[dir="rtl"] .ta { font-family: "Amiri", var(--font)
 .select { appearance: none; -webkit-appearance: none; padding-inline-end: 38px;
   background-image: linear-gradient(45deg, transparent 50%, var(--secondary) 50%), linear-gradient(135deg, var(--secondary) 50%, transparent 50%);
   background-position: calc(100% - 20px) 52%, calc(100% - 14px) 52%; background-size: 6px 6px; background-repeat: no-repeat; }
-html[dir="rtl"] .select { background-position: 20px 52%, 14px 52%; }
+html[dir="rtl"] .select { background-position: 14px 52%, 20px 52%; } /* the two halves keep their order, or the arrow points up */
 .ta { min-height: 110px; resize: vertical; border-radius: 14px; }
 .select:focus, .ta:focus { outline: 2px solid var(--accent); outline-offset: 0; }
 .seg { display: flex; gap: 6px; margin-top: 8px; padding: 4px; border-radius: 999px; background: var(--fill); }
