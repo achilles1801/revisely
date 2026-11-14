@@ -248,6 +248,37 @@ describe('v2 palette (white and black grounds, no accent tint)', () => {
     expect(contrast(c.textInverse, c.accent)).toBeGreaterThanOrEqual(4.5);
   });
 
+  it.each(combos)('%s: the live recitation check’s colours (marks, the score, following, Check)', (_name, accent, isDark) => {
+    const p = paletteV2(isDark, accent);
+    // Slips in amber, like mistakes in red and good in green: text on every ground and on its own quiet fill.
+    for (const ground of [p.bg, p.fill, p.sheet]) expect(contrast(p.warn, ground)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(p.onRedSubtle, p.redSubtle)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(p.onRedSubtle, p.bg)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(p.warn, p.warnSubtle)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(p.good, p.goodSubtle)).toBeGreaterThanOrEqual(4.5);
+    // Red and amber tell apart by hue (a mistake from a slip; the card names the kind too).
+    const hue = (hex: string) => {
+      const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+      const max = Math.max(r, g, b);
+      const d = max - Math.min(r, g, b);
+      const h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+      return (h * 60 + 360) % 360;
+    };
+    expect(Math.abs(hue(p.warn) - hue(p.red))).toBeGreaterThanOrEqual(20);
+    // Following: the page's ink on the ayah band and the word box; a mark on them at 3:1 (large text).
+    for (const ground of [p.followBand, p.followWord]) {
+      expect(contrast(p.text, ground)).toBeGreaterThanOrEqual(4.5);
+      for (const mark of [p.red, p.warn, p.accentText]) expect(contrast(mark, ground)).toBeGreaterThanOrEqual(3);
+    }
+    // The box stands out from the band (non-text, a little).
+    expect(contrast(p.followWord, p.followBand)).toBeGreaterThan(1.15);
+    // Check, drawn special: each end as text on the sheet, and the glyph on each end.
+    for (const end of p.premium) {
+      expect(contrast(end, p.sheet)).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(p.onPremium, end)).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
   it('Jade is the design as agreed: ink buttons, grey links; a jade glow in light only', () => {
     expect([paletteLight.primary, paletteLight.link, paletteLight.done]).toEqual(['#1A1A1A', '#616977', '#0E6B5A']);
     expect(paletteLight.hero?.[0].color).toBe('#3FA084');

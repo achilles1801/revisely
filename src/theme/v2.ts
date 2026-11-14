@@ -68,6 +68,13 @@ interface AccentTokens {
   heatInk: readonly [string, string, string, string, string];
   /** Revo's mark and glows, in the accent (components/revo). */
   revo: RevoTokens;
+  /**
+   * Following a recitation (lib/reciteLive, Revisely Dev): the ayah being recited (a soft band behind the page's ink)
+   * and the word being recited (a firmer box). Ink reads at 4.5:1 on both; a mark's colour at 3:1 (the page's text is
+   * large).
+   */
+  followBand: string;
+  followWord: string;
 }
 
 /**
@@ -135,6 +142,25 @@ export interface PaletteV2 extends AccentTokens {
   /** A switch that is off: its track, and the thumb on it (on, the track is `primary`). */
   switchOff: string;
   switchThumb: string;
+  /**
+   * A slip, not a mistake (the live recitation check: a haraka, a letter, a tajweed note), and the amber score: text
+   * at 4.5:1 on every ground. Like `red` and `good`, it never follows the accent.
+   */
+  warn: string;
+  /**
+   * Quiet fills behind `red`, `warn` and `good` (the score pill, a picked mark): `warn` and `good` read at 4.5:1 on
+   * theirs; red on its fill is `onRedSubtle` (light's red is only 4.6:1 on white, too little for any tint).
+   */
+  redSubtle: string;
+  onRedSubtle: string;
+  warnSubtle: string;
+  goodSubtle: string;
+  /**
+   * The paid recitation check, drawn special: a gradient, start to end, the same for every accent, only for it (its
+   * row in the mic's menu, the mic's badge). Each end reads at 4.5:1 as text on the sheet; `onPremium` is the glyph on it.
+   */
+  premium: readonly [string, string];
+  onPremium: string;
 }
 
 type Base = Omit<PaletteV2, keyof AccentTokens | 'accent'>;
@@ -159,6 +185,13 @@ const BASE_LIGHT: Base = {
   shadow: '#000000',
   switchOff: '#E5E7EB',
   switchThumb: '#FFFFFF',
+  warn: '#B45309',
+  redSubtle: '#FDECEC',
+  onRedSubtle: '#B91C1C',
+  warnSubtle: '#FDF2E2',
+  goodSubtle: '#E6F2EF',
+  premium: ['#7C3AED', '#DB2777'],
+  onPremium: '#FFFFFF',
 };
 
 const BASE_DARK: Base = {
@@ -181,6 +214,13 @@ const BASE_DARK: Base = {
   shadow: '#000000',
   switchOff: '#39393D',
   switchThumb: '#FFFFFF',
+  warn: '#FBBF24',
+  redSubtle: '#2A1212',
+  onRedSubtle: '#F87171',
+  warnSubtle: '#2A2008',
+  goodSubtle: '#0D2721',
+  premium: ['#A78BFA', '#F472B6'],
+  onPremium: '#000000',
 };
 
 /**
@@ -233,6 +273,8 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
       heat: ['#EBEDF0', '#79C2AA', '#3FA084', '#1A7D66', '#0B5A4A'],
       heatInk: ['#1A1A1A', '#1A1A1A', '#1A1A1A', '#FFFFFF', '#FFFFFF'],
       revo: { r: ['#3FA084', '#79C2AA'], disc: '#0B3A30', ring: '#4DBA9F', glow: '#3FA084', shadow: '#06231D', sheetGlow: { color: '#3FA084', opacity: 0.12 } },
+      followBand: '#EEF7F4',
+      followWord: '#CDE9DF',
     },
     dark: {
       primary: '#FFFFFF',
@@ -251,6 +293,8 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
       heat: ['#1C1C1E', '#0F4A3B', '#18735C', '#2A9C7F', '#5CD1B2'],
       heatInk: ['#FFFFFF', '#FFFFFF', '#FFFFFF', '#000000', '#000000'],
       revo: { r: ['#3FA084', '#79C2AA'], disc: '#0B3A30', ring: '#4DBA9F', glow: '#3FA084', shadow: '#06231D', sheetGlow: null },
+      followBand: '#0B1F1A',
+      followWord: '#0B3A30',
     },
   },
   // RedotPay, from colours sampled off its screens: #DC1433 for the action,
@@ -275,6 +319,8 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
       heat: ['#EBEDF0', '#F29AA7', '#E9637A', '#DC1433', '#7A0B1D'],
       heatInk: ['#1A1A1A', '#1A1A1A', '#1A1A1A', '#FFFFFF', '#FFFFFF'],
       revo: { r: ['#DC1433', '#F5455E'], disc: '#3E0812', ring: '#F03C56', glow: '#DC1433', shadow: '#2A0509', sheetGlow: { color: '#DC1433', opacity: 0.08 } },
+      followBand: '#FDF1F3',
+      followWord: '#F8D3DA',
     },
     dark: {
       primary: '#DC1433',
@@ -299,6 +345,8 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
       heat: ['#2E0E15', '#8A0E26', '#B3112C', '#DC1433', '#F5455E'],
       heatInk: ['#FFFFFF', '#FFFFFF', '#FFFFFF', '#FFFFFF', '#000000'],
       revo: { r: ['#DC1433', '#F5455E'], disc: '#3E0812', ring: '#F03C56', glow: '#DC1433', shadow: '#2A0509', sheetGlow: { color: '#DC1433', opacity: 0.22 } },
+      followBand: '#1E0A0E',
+      followWord: '#5A0E1C',
     },
   },
   // The real-estate app, from sampled colours: #624BD5 for the action (white
@@ -322,6 +370,8 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
       heat: ['#EBEDF0', '#9789DA', '#624BD5', '#2E0EC6', '#1F1170'],
       heatInk: ['#1A1A1A', '#1A1A1A', '#FFFFFF', '#FFFFFF', '#FFFFFF'],
       revo: { r: ['#624BD5', '#9789DA'], disc: '#2B2352', ring: '#9789DA', glow: '#624BD5', shadow: '#14103C', sheetGlow: { color: '#624BD5', opacity: 0.1 } },
+      followBand: '#F3F1FC',
+      followWord: '#DCD6F7',
     },
     dark: {
       primary: '#624BD5',
@@ -346,6 +396,8 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
       heat: ['#1C1C1E', '#3F2AA2', '#624BD5', '#7E6CD8', '#9789DA'],
       heatInk: ['#FFFFFF', '#FFFFFF', '#FFFFFF', '#000000', '#000000'],
       revo: { r: ['#624BD5', '#9789DA'], disc: '#2B2352', ring: '#9789DA', glow: '#624BD5', shadow: '#14103C', sheetGlow: { color: '#624BD5', opacity: 0.22 } },
+      followBand: '#100C2A',
+      followWord: '#2B2352',
     },
   },
 };

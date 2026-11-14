@@ -130,6 +130,11 @@ const RULE_NAMES: Record<TajweedRule, string> = {
   iqlab: 'Iqlab',
 };
 
+/** "Madd munfasil", "Idgham without ghunnah". */
+export function tajweedName(rule: TajweedRule): string {
+  return RULE_NAMES[rule];
+}
+
 /** "Madd munfasil · about 2 counts, set to 4", "Qalqalah · not heard". */
 export function describeTajweed(note: TajweedNote): string {
   const name = RULE_NAMES[note.rule];
