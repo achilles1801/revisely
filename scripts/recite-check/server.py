@@ -35,7 +35,8 @@ PROTOCOL = 5  # the contract draft this server speaks (recite-contract.md): foll
 MAX_SECONDS = 240
 FIRST_FRAME = 10      # seconds a new socket has to send its start frame
 IDLE = 30             # seconds without a frame from the phone before a socket is closed
-RESUME_TTL = 120      # seconds a dropped session waits on this instance for its phone to come back
+RESUME_TTL = 120      # seconds a dropped session waits on this instance for its phone to come back (and a
+                      # finished take's `done` is kept for a resume that missed it)
 # Check is a Premium feature, with a free path (apply-support.md draft 2): with CHECK_GATE=on, /check and /live without
 # "follow" need entitlements/{uid}.premium (auth.has_check); Recite (follow) stays free. Off until a dev account has it.
 CHECK_GATE = os.environ.get('CHECK_GATE', 'off') == 'on'
@@ -217,6 +218,7 @@ class Live:
 
 
 SESSIONS = {}
+FINISHED = {}  # take -> (uid, samples held, its `done`, when): a resume after the end gets the same `done` again
 
 
 def forget_old():
@@ -224,18 +226,29 @@ def forget_old():
     for sid, s in list(SESSIONS.items()):
         if s.owner is None and s.left is not None and now - s.left > RESUME_TTL:
             del SESSIONS[sid]
+    for sid, f in list(FINISHED.items()):
+        if now - f[3] > RESUME_TTL:
+            del FINISHED[sid]
 
 
 def keep_take(s, partial=False):
     """The audio, the events and the dismissals (and the end result) under recite-tests/<uid>/<take>; a dropped
-    session's so far under <take>.part-<time> (names are written once, and another instance may finish it)."""
+    session's so far under <take>.part-<time> (names are written once, and another instance may finish it). A take
+    already kept under its name (finished before, then resumed and run again, maybe on the other instance) is left as
+    it is: the run is the same audio, so the same events."""
     name = store.name_for(s.uid, s.sid) + (f'.part-{store.new_take()}' if partial else '')
     sess = s.sess
-    store.put(name + '.wav', wav_bytes(sess.pcm[:sess.n]), 'audio/wav')
-    put_json(name + '.json', {'mode': 'live', 'request': s.request, 'app': s.app, 'engine': VERSION,
+    for suffix, write in (('.wav', lambda n: store.put(n, wav_bytes(sess.pcm[:sess.n]), 'audio/wav')),
+                          ('.json', lambda n: put_json(n, {
+                              'mode': 'live', 'request': s.request, 'app': s.app, 'engine': VERSION,
                               'events': s.events, 'dismissed': sorted(sess.dismissed), 'hints': sess.hints,
-                              'result': sess.result,
-                              'secs': round(sess.seconds, 1)})
+                              'result': sess.result, 'secs': round(sess.seconds, 1)}))):
+        try:
+            write(name + suffix)
+        except store.Exists:
+            if partial:
+                raise
+            log.info('live: take already kept (%s)', suffix)
 
 
 def settings_from(msg):
@@ -319,7 +332,10 @@ async def live_socket(ws: WebSocket):
         for e in events:
             if record and s is not None and e['type'] != 'ready':
                 s.events.append(e)
-            await ws.send_text(json.dumps(e, ensure_ascii=False))
+            try:
+                await ws.send_text(json.dumps(e, ensure_ascii=False))
+            except (RuntimeError, OSError) as x:  # the phone closed first (uvicorn: "websocket.send after close")
+                raise WebSocketDisconnect(1006) from x
 
     async def fail(reason, code=1008):
         with contextlib.suppress(Exception):
@@ -327,22 +343,34 @@ async def live_socket(ws: WebSocket):
             await ws.close(code)
 
     async def finish(events):
-        """The take is over: keep it (when asked), then send the rest with `done`, and close."""
+        """The take is over: send the rest with `done` at once, then keep the take (when asked) and say so with
+        `kept`, and close. The phone has its answer without waiting for the upload; the socket stays open for it."""
         SESSIONS.pop(s.sid, None)
         r = s.sess.result
         r.update(engine=VERSION, take=s.sid)
+        done = next((e for e in events if e['type'] == 'done'), None)
+        FINISHED[s.sid] = (s.uid, s.sess.n, done, time.time())
         log.info('live: %.1f s audio, %s words reached, %d marks, why %s, ms %s, sockets %d, keep %s',
-                 s.sess.seconds, (r.get('score') or {}).get('reached', len(r.get('words') or [])), len(r.get('marks') or []),
-                 r.get('why'), r.get('ms'), s.sockets, s.keep)
+                 s.sess.seconds, (r.get('score') or {}).get('reached', len(r.get('words') or [])),
+                 len(r.get('marks') or []), r.get('why'), r.get('ms'), s.sockets, s.keep)
         s.events += [e for e in events if e['type'] != 'done']  # the result is kept on its own
+        with contextlib.suppress(WebSocketDisconnect):
+            await send(events, record=False)
         if s.keep:
+            t0 = time.perf_counter()
+            job = asyncio.ensure_future(asyncio.to_thread(keep_take, s))  # shielded: it finishes if the phone goes
+            job.add_done_callback(lambda j: j.cancelled() or j.exception() is None
+                                  or log.error('keeping the live take failed: %r', j.exception()))
+            ok = True
             try:
-                await asyncio.to_thread(keep_take, s)
-                r['kept'] = True
+                await asyncio.shield(job)
+            except asyncio.CancelledError:
+                raise
             except Exception:
-                log.exception('keeping the live take failed')
-                r['kept'] = False
-        await send(events, record=False)
+                ok = False
+            log.info('live: kept in %d ms (%s)', (time.perf_counter() - t0) * 1000, 'ok' if ok else 'failed')
+            with contextlib.suppress(Exception):
+                await send([{'type': 'kept', 'take': s.sid, 'ok': ok, 't': round(s.sess.seconds, 2)}], record=False)
         with contextlib.suppress(Exception):
             await ws.close(1000)
 
@@ -358,6 +386,16 @@ async def live_socket(ws: WebSocket):
         uid = await signed_in_tester('Bearer ' + token if isinstance(token, str) else ws.headers.get('authorization'))
         if not follow_of(msg):
             await may_check(uid)  # on every socket, a resume's too
+        forget_old()
+        rid = msg.get('resume')
+        f = FINISHED.get(rid) if isinstance(rid, str) else None
+        if f and f[0] == uid and f[2] is not None:
+            # the take ended on this instance and the phone missed its `done`: the same answer again, not a re-run
+            await send([{'type': 'ready', 'v': 2, 'engine': VERSION, 'server': SERVER, 'protocol': PROTOCOL,
+                         'take': rid, 'from': f[1]}, f[2]], record=False)
+            with contextlib.suppress(Exception):
+                await ws.close(1000)
+            return
         s, resumed = await open_session(msg, uid)
 
         def take_over():

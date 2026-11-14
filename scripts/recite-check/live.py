@@ -1045,8 +1045,9 @@ class LiveSession:
         for r in words:
             if r['w'] in self.helped:
                 r['helped'] = True
-        if self.follow:  # Recite: the words and their statuses, nothing else
-            return {k: out[k] for k in ('v', 'from', 'to', 'secs', 'words', 'settings', 'ms')} | {'v': 2, 'follow': True}
+        if self.follow:  # Recite: the words and their statuses; no marks and no score (the contract's shape: [], null)
+            return {k: out[k] for k in ('v', 'from', 'to', 'secs', 'words', 'settings', 'ms')} | {
+                'v': 2, 'follow': True, 'marks': [], 'score': None}
         heard = heard_sounds(spans, self._tokens(0, self.T), self.E.ear.vocab)
         out['marks'] = self.E.marks(words, flagged, heard, ex, tj, letters if self.st['letters'] else [])
         out['score'] = score(statuses, out['marks'], self.dismissed)

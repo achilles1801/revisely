@@ -8,6 +8,7 @@ import json
 import logging
 import os
 import sys
+import threading
 import time
 import unittest
 import wave
@@ -101,7 +102,8 @@ class FakeSession:
                                                           'accuracy': None},
                            'secs': round(self.seconds, 1), 'why': 'end'}
             if self.follow:  # Recite's answer: words only, no marks or score
-                self.result = {'v': 2, 'follow': True, 'words': [], 'secs': round(self.seconds, 1), 'why': 'end'}
+                self.result = {'v': 2, 'follow': True, 'words': [], 'marks': [], 'score': None,
+                               'secs': round(self.seconds, 1), 'why': 'end'}
             return [{'type': 'done', 'result': self.result}]
         return []
 
@@ -114,6 +116,11 @@ def uid_of(header):
 
 
 class Base(unittest.TestCase):
+    def put(self, name, data, ct):  # create-only, as Storage is (ifGenerationMatch=0)
+        if name in self.stored:
+            raise store.Exists(name)
+        self.stored[name] = data
+
     def setUp(self):
         self.stored = {}
         FakeSession.made = []
@@ -122,7 +129,7 @@ class Base(unittest.TestCase):
             mock.patch.object(auth, 'uid_of', uid_of),
             mock.patch.object(auth, 'is_tester', lambda uid: uid.startswith('tester')),
             mock.patch.object(auth, 'has_check', lambda uid: uid == 'tester1'),
-            mock.patch.object(store, 'put', lambda name, data, ct: self.stored.__setitem__(name, data)),
+            mock.patch.object(store, 'put', self.put),
             mock.patch.object(live, 'LiveSession', FakeSession),
             mock.patch.object(server, 'limiter', auth.Limiter()),
         ]
@@ -130,6 +137,7 @@ class Base(unittest.TestCase):
             p.start()
             self.addCleanup(p.stop)
         server.SESSIONS.clear()
+        server.FINISHED.clear()
         self.client = TestClient(server.app)
         self.client.__enter__()
         self.addCleanup(self.client.__exit__, None, None, None)
@@ -252,8 +260,10 @@ class LiveTests(Base):
             ws.send_text(json.dumps({'type': 'dismiss', 'id': '101:skipped:'}))
             ws.send_text(json.dumps({'type': 'end'}))
             done = ws.receive_json()
-            self.assertEqual((done['type'], done['result']['secs'], done['result']['kept']), ('done', 1.0, True))
+            self.assertEqual((done['type'], done['result']['secs']), ('done', 1.0))
             self.assertEqual(done['result']['take'], ready['take'])
+            self.assertNotIn('kept', done['result'])  # `done` goes before the upload; `kept` follows it
+            self.assertEqual(ws.receive_json(), {'type': 'kept', 'take': ready['take'], 'ok': True, 't': 1.0})
             with self.assertRaises(WebSocketDisconnect):
                 ws.receive_json()
         base = f"recite-tests/tester1/{ready['take']}"
@@ -286,8 +296,99 @@ class LiveTests(Base):
                     break
         self.assertEqual(e['type'], 'done')
         self.assertTrue(e['result']['follow'])
-        self.assertNotIn('marks', e['result'])
+        self.assertEqual((e['result']['marks'], e['result']['score']), ([], None))
         self.assertIn(f"recite-tests/tester1/{ready['take']}.json", self.stored)
+
+    def end_a_take(self, ws, follow=False, keep=True):
+        ws.send_text(start(follow=follow, keep=keep))
+        ready = ws.receive_json()
+        ws.send_bytes(second_of_audio() * 3)
+        ws.send_text(json.dumps({'type': 'end'}))
+        while True:
+            e = ws.receive_json()
+            if e['type'] == 'done':
+                return ready, e
+
+    def test_done_goes_before_the_take_is_kept(self):
+        """Stop answers at once: `done` reaches the phone while the upload is still going; `kept` says when it's
+        stored."""
+        gate, put = threading.Event(), self.put
+
+        def slow_put(name, data, ct):
+            gate.wait(5)
+            put(name, data, ct)
+        with mock.patch.object(store, 'put', slow_put):
+            with self.socket() as ws:
+                ready, done = self.end_a_take(ws)
+                self.assertEqual(self.stored, {})  # nothing stored yet, and `done` is here
+                gate.set()
+                self.assertEqual(ws.receive_json(), {'type': 'kept', 'take': ready['take'], 'ok': True, 't': 3.0})
+        self.assertIn(f"recite-tests/tester1/{ready['take']}.wav", self.stored)
+
+    def test_a_failed_upload_still_answers(self):
+        def broken(name, data, ct):
+            raise RuntimeError('storage is down')
+        with mock.patch.object(store, 'put', broken):
+            with self.socket() as ws:
+                ready, done = self.end_a_take(ws)
+                self.assertEqual(done['result']['why'], 'end')
+                self.assertEqual(ws.receive_json()['ok'], False)
+
+    def test_a_resume_after_the_end_gets_the_same_done(self):
+        """The phone missed `done` (or couldn't read it) and came back with resume: the same answer, no second run
+        and no second upload."""
+        for follow in (False, True):
+            FakeSession.made, self.stored = [], {}
+            with self.socket() as ws:
+                ready, done = self.end_a_take(ws, follow=follow)
+            with self.socket() as ws:
+                ws.send_text(start(follow=follow, keep=True, resume=ready['take']))
+                again = ws.receive_json()
+                self.assertEqual((again['type'], again['take'], again['from']), ('ready', ready['take'], 3 * SR))
+                self.assertEqual(ws.receive_json(), done)
+                with self.assertRaises(WebSocketDisconnect):
+                    ws.receive_json()
+            self.assertEqual(len(FakeSession.made), 1)
+            self.assertEqual(len(self.stored), 2)
+
+    def test_a_take_run_again_elsewhere_keeps_the_first_copy(self):
+        """The other instance finishes a take this one already kept (its `done` was missed): the name is taken, so
+        the first copy stays, and the phone still hears `kept`."""
+        with self.socket() as ws:
+            ready, _ = self.end_a_take(ws)
+        first = dict(self.stored)
+        server.FINISHED.clear()  # as on the other instance
+        with self.socket() as ws:
+            ws.send_text(start(keep=True, resume=ready['take']))
+            self.assertEqual(ws.receive_json()['from'], 0)
+            ws.send_bytes(second_of_audio() * 3)
+            ws.send_text(json.dumps({'type': 'end'}))
+            while ws.receive_json()['type'] != 'done':
+                pass
+            self.assertEqual(ws.receive_json()['ok'], True)
+        self.assertEqual(self.stored, first)
+
+    def test_a_phone_gone_before_an_event_is_not_a_failure(self):
+        """uvicorn refuses a send after the phone closed ("Unexpected ASGI message 'websocket.send'"): the socket
+        ends as a drop (what came is kept), not as a server failure."""
+        real = server.WebSocket.send_text
+
+        async def send_text(ws_, data):
+            if '"type": "at"' in data:
+                raise RuntimeError("Unexpected ASGI message 'websocket.send', after sending 'websocket.close'")
+            return await real(ws_, data)
+        with mock.patch.object(server.WebSocket, 'send_text', send_text), \
+                mock.patch.object(server.log, 'exception') as failed:
+            with self.socket() as ws:
+                ws.send_text(start(keep=True))
+                ws.receive_json()
+                ws.send_bytes(second_of_audio() * 3)
+            for _ in range(100):
+                if any('.part-' in n for n in self.stored):
+                    break
+                time.sleep(0.02)
+        failed.assert_not_called()
+        self.assertTrue(any('.part-' in n for n in self.stored))
 
     def test_hints_reach_the_session_and_unknown_frames_are_ignored(self):
         with self.socket() as ws:
