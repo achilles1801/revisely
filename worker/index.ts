@@ -6,11 +6,12 @@
 // which sends every path here and sets NOINDEX.
 
 import { errorResponse, handleTcq, TcqEnv } from './tcq';
+import { gate, GateEnv } from './gate';
 
 // The Durable Object class behind TCQ_BUDGET (wrangler.jsonc).
 export { TcqBudget } from './budget';
 
-interface Env extends TcqEnv {
+interface Env extends TcqEnv, GateEnv {
   ASSETS: Fetcher;
   /** "1" on the dev Worker only: search engines are asked to leave every page alone. */
   NOINDEX?: string;
@@ -54,6 +55,11 @@ function noindex(res: Response): Response {
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    // dev.revisely.app only (gate.ts): accounts with the devSite claim, or the gate page.
+    if (env.DEV_GATE === '1') {
+      const stop = await gate(request, env);
+      if (stop) return env.NOINDEX === '1' ? noindex(stop) : stop;
+    }
     if (env.NOINDEX !== '1') return answer(request, env, ctx);
     if (new URL(request.url).pathname === '/robots.txt') {
       return noindex(new Response(ROBOTS_DISALLOW, { headers: { 'Content-Type': 'text/plain; charset=utf-8' } }));
