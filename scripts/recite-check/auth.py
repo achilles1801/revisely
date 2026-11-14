@@ -20,9 +20,9 @@ _testers = {}  # uid -> (is a tester, when read)
 TESTER_TTL = 600
 _checks = {}  # uid -> (has Check, when read)
 CHECK_TTL = 60  # a grant (or a revocation) takes effect within a minute
-# The entitlements/{uid} field that unlocks Check (apply-support.md draft 1: `check`; draft 2 may make it `premium`,
-# with Check one Premium feature). Same shape either way: present, and `until` null or later.
-ENTITLEMENT = os.environ.get('ENTITLEMENT', 'check')
+# The entitlements/{uid} field that unlocks Check (apply-support.md draft 2: `premium`, Check being a Premium feature;
+# draft 1 had `check`). Present, and `until` null or later; the `grants` map beside it is the writers' bookkeeping.
+ENTITLEMENT = os.environ.get('ENTITLEMENT', 'premium')
 
 
 class Refused(Exception):
@@ -74,9 +74,9 @@ def is_tester(uid):
 
 
 def has_check(uid, now=None):
-    """Whether the account may use Check (apply-support.md): entitlements/{uid}.<ENTITLEMENT> exists and its `until`
-    is null or later than now. Written only by the admin SDK (an approved application, a dev grant, later a purchase); any
-    source counts. Read with the service's own identity, as previewTester is."""
+    """Whether the account may use Check (apply-support.md: Has Premium): entitlements/{uid}.<ENTITLEMENT> exists and
+    its `until` is null or later than now. Written only by the admin SDK (an approved application, devGrantPremium, later
+    a purchase); any source counts. Read with the service's own identity, as previewTester is."""
     hit = _checks.get(uid)
     t = time.time() if now is None else now
     if hit and t - hit[1] < CHECK_TTL:
