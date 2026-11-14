@@ -456,12 +456,24 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
     const mark = { id: 'a', w: UTIYAT, ayah: [27, 23] as [number, number], kind: 'word' as const, sure: 'likely' as const, heard: 'وَأُوهِيَتْ', heardExact: false };
     await event({ type: 'mark', mark });
     fireEvent.press(screen.getByTestId('recite-stop'));
-    await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [mark], score: null, kept: true } });
+    // As the checker answers since Nov 14 2026: `done` at once, without `kept` (a `kept` event follows the hang-up).
+    await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [mark], score: null } });
     expect(screen.getByTestId('take-summary')).toBeTruthy();
     expect(screen.getByTestId('take-summary-finding-word')).toBeTruthy();
+    // Keep as test data is on by default: the take went to be kept, and the summary says so.
     expect(screen.getByText('Kept as test data. Software checks it; nobody listens.')).toBeTruthy();
     fireEvent.press(screen.getByTestId('take-summary-done'));
     expect(screen.getByTestId('recite-close')).toBeTruthy();
+  });
+
+  it('Keep as test data off: the summary doesn’t say the take was kept', async () => {
+    setReciteCheckSettings('u1', { keep: false });
+    await startTake('recite');
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await event({ type: 'done', result: { v: 2, follow: true, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [], score: null } });
+    expect(screen.getByTestId('take-summary')).toBeTruthy();
+    expect(screen.queryByText('Kept as test data. Software checks it; nobody listens.')).toBeNull();
+    expect(mockLive.start?.keep).toBe(false);
   });
 
   it.each(['check_locked', 'premium_required'] as const)(

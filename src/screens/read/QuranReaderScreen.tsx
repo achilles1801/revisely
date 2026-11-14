@@ -713,7 +713,7 @@ export default function QuranReaderScreen() {
             seconds={live.seconds}
             marks={Object.values(live.state.marks).sort((a, b) => a.w - b.w)}
             score={checkTake && qw ? scorePill(live.state, qw, live.startWord) : null}
-            kept={live.state.final?.kept === true}
+            kept={live.testData}
             checkOwned={owned}
             onFinding={(m) => {
               setSummaryShown(null);
