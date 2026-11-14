@@ -56,7 +56,7 @@ import { LiveMode, useLiveRecitation } from '../../components/reciteLive/useLive
 import { ReciteMic, ReciteMicMode } from '../../components/reciteLive/ReciteMic';
 import { ReciteModeMenu } from '../../components/reciteLive/ReciteModeMenu';
 import { BarButton, ReciteBar } from '../../components/reciteLive/ReciteBar';
-import { LiveOverlay, LiveUnderlay } from '../../components/reciteLive/LivePageLayers';
+import { LiveMarkTargets, LiveOverlay, LiveUnderlay } from '../../components/reciteLive/LivePageLayers';
 import { ReciteNoticeSheet } from '../../components/reciteLive/ReciteNoticeSheet';
 import { MarkCard } from '../../components/reciteLive/MarkCard';
 import { SimilarPhrasesSheet } from '../../components/reciteLive/SimilarPhrasesSheet';
@@ -404,6 +404,15 @@ export default function QuranReaderScreen() {
         : undefined,
     [liveOn, qw, live.active, live.state.cursor, hidden, revealed, liveInfo, coverColors, pageMarks, v2],
   );
+  // The marks as elements of their own (VoiceOver, the tests). Given whenever the live UI is on, so the pager's pages
+  // keep one shape through takes.
+  const pageAccessories = useMemo(
+    () =>
+      liveOn && qw
+        ? (page: number, scale: number) => <LiveMarkTargets page={page} scale={scale} words={qw} marks={pageMarks(page)} />
+        : undefined,
+    [liveOn, qw, pageMarks],
+  );
   const onTapVerse = useMemo(
     () =>
       liveOn && hidden && qw
@@ -563,6 +572,7 @@ export default function QuranReaderScreen() {
           onUserSwipe={chrome.hide}
           pageUnderlay={pageUnderlay}
           pageOverlay={pageOverlay}
+          pageAccessories={pageAccessories}
           onTapVerse={onTapVerse}
           onTapPoint={onTapPoint}
           extraData={liveOn ? `${live.state.cursor}|${live.state.saidUpTo}|${Object.keys(live.state.marks).length}|${hidden}|${revealed.size}` : undefined}

@@ -9,6 +9,7 @@ import type { QuranWords } from '../../lib/recite/quranWords';
 import type { WordFollow } from '../../lib/recite/hiddenPage';
 import type { Mark } from '../../lib/reciteLive/contract';
 import { severityOf } from '../../lib/reciteLive/contract';
+import { markTitle } from '../../lib/reciteLive/describe';
 import { ayahBand, cursorBox, grow, markShape, wordBox } from '../../lib/reciteLive/geometry';
 import { markStrength } from '../../lib/reciteLive/state';
 import { mixColors } from '../../theme/v2';
@@ -167,7 +168,7 @@ export function LiveOverlay({
           return (
             <View
               key={m.id}
-              testID="live-mark-gap"
+              testID="live-ink-gap"
               style={[styles.abs, styles.gap, { left: shape.x * scale - 9, top: shape.y * scale - 4, backgroundColor: color, opacity }]}
             >
               <Ionicons name="add" size={14} color={colors.onMistake} />
@@ -177,7 +178,7 @@ export function LiveOverlay({
         return (
           <View key={m.id} style={StyleSheet.absoluteFill} pointerEvents="none">
             {image && m.kind !== 'skipped' ? (
-              <Recoloured image={image} box={shape.box} scale={scale} color={color} opacity={opacity} testID={`live-mark-${m.kind}`} />
+              <Recoloured image={image} box={shape.box} scale={scale} color={color} opacity={opacity} testID={`live-ink-${m.kind}`} />
             ) : null}
             {image && m.kind === 'skipped' ? (
               // A word left out: the word in the mark's colour, fainter, as it wasn't said.
@@ -187,7 +188,7 @@ export function LiveOverlay({
                 scale={scale}
                 color={mixColors(color, colors.ground, 0.4)}
                 opacity={opacity}
-                testID="live-mark-skipped"
+                testID="live-ink-skipped"
               />
             ) : null}
             <Dots box={shape.box} scale={scale} color={color} opacity={opacity} />
@@ -195,6 +196,38 @@ export function LiveOverlay({
         );
       })}
     </View>
+  );
+}
+
+/**
+ * Each mark on the page as an element of its own, over its word: invisible, read by VoiceOver ("Wrong word,
+ * وَأُوتِيَتْ") and found by the tests. The pager draws these beside the page's one element (`pageAccessories`): inside
+ * it iOS hides them. A touch goes through to the page, which opens the mark's card, as a tap on the word does.
+ */
+export function LiveMarkTargets({ page, scale, words, marks }: { page: number; scale: number; words: QuranWords; marks: Mark[] }) {
+  return (
+    <>
+      {marks.map((m) => {
+        if (words.pageOf(m.w) !== page) return null;
+        const shape = markShape(words, m);
+        const box =
+          shape.type === 'gap'
+            ? { x0: shape.x - 9 / scale, y0: shape.y - 4 / scale, x1: shape.x + 9 / scale, y1: shape.y + 14 / scale }
+            : shape.box;
+        return (
+          <View
+            key={m.id}
+            pointerEvents="none"
+            accessible
+            accessibilityRole="button"
+            accessibilityLabel={`${markTitle(m)}, ${words.uthmani(m.w)}`}
+            accessibilityHint="Shows what you said"
+            testID={`live-mark-${m.kind}`}
+            style={[styles.abs, rectStyle(box, scale)]}
+          />
+        );
+      })}
+    </>
   );
 }
 

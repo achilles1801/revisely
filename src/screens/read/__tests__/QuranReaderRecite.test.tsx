@@ -36,6 +36,7 @@ jest.mock('../../../components/MushafPager', () => {
           onTapPoint?: (page: number, x: number, y: number, toWindow: (r: unknown) => unknown) => boolean;
           pageUnderlay?: (page: number, scale: number) => React.ReactNode;
           pageOverlay?: (page: number, scale: number, image: unknown) => React.ReactNode;
+          pageAccessories?: (page: number, scale: number) => React.ReactNode;
         },
         ref: React.Ref<{ scrollToPage: (p: number) => boolean }>,
       ) => {
@@ -48,6 +49,7 @@ jest.mock('../../../components/MushafPager', () => {
             <Pressable accessibilityLabel="The page" onPress={props.onTap} />
             {props.pageUnderlay?.(379, 0.38)}
             {props.pageOverlay?.(379, 0.38, { uri: 'file:///379.png', width: 389, height: 629 })}
+            {props.pageAccessories?.(379, 0.38)}
           </View>
         );
       },
@@ -257,7 +259,8 @@ describe('Check: marks as you recite', () => {
     await event({ type: 'said', upTo: UTIYAT });
     await event({ type: 'mark', mark: { id: 'a', w: UTIYAT, ayah: [27, 23], kind: 'word', sure: 'likely', heard: 'وَأُوهِيَتْ', heardExact: false } });
     await event({ type: 'at', w: UTIYAT + 1 });
-    expect(screen.getByTestId('live-mark-word')).toBeTruthy();
+    expect(screen.getByTestId('live-ink-word')).toBeTruthy();
+    expect(screen.getByTestId('live-mark-word').props.accessibilityLabel).toBe('Wrong word, وَأُوتِيَتْ');
     expect(screen.getByText('99.2%')).toBeTruthy();
     expect(screen.getByText('وَأُوهِيَتْ')).toBeTruthy();
     await event({ type: 'mark', mark: { id: 'b', w: A23 + 7, ayah: [27, 23], kind: 'harakat', sure: 'clear', slip: { expected: 'ٍ', heard: 'ٌّ' } } });

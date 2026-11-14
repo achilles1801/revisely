@@ -87,6 +87,11 @@ interface MushafPagerProps {
   /** Drawn behind each page image's ink, in its frame (the live recitation
    *  check's ayah band and word box). */
   pageUnderlay?: (pageNumber: number, scale: number) => React.ReactNode;
+  /** Over the image, in its frame, but beside the page's one VoiceOver element
+   *  rather than inside it (iOS hides an accessible element's insides from
+   *  VoiceOver and from the tests): elements of their own, e.g. the live
+   *  check's marks. Touches go through to the page. */
+  pageAccessories?: (pageNumber: number, scale: number) => React.ReactNode;
   /** A tap on the image, in bounds space (1024 wide): return true to take it
    *  (before onTapVerse; the controls don't toggle). `toWindow` turns a rect
    *  of the page (bounds space) into window coordinates (to place a card). */
@@ -137,6 +142,8 @@ interface PageItemProps {
   overlay?: (image: PageImage | null) => React.ReactNode;
   /** Behind the image's ink (pageUnderlay). */
   underlay?: React.ReactNode;
+  /** pageAccessories (undefined when the pager has none: the page alone). */
+  accessories?: React.ReactNode;
   onTapPoint?: (pageNumber: number, x: number, y: number, toWindow: (r: Rect) => Box) => boolean;
   onTapVerse?: (ayah: AyahRef) => boolean;
 }
@@ -156,6 +163,7 @@ const PageItem = React.memo(function PageItem({
   size,
   overlay,
   underlay,
+  accessories,
   onTapPoint,
   onTapVerse,
 }: PageItemProps) {
@@ -246,7 +254,7 @@ const PageItem = React.memo(function PageItem({
     [highlight, pageNumber],
   );
 
-  return (
+  const pageView = (
     // The page is one element for VoiceOver (the image's pressable inside isn't).
     <Pressable
       style={[styles.page, { backgroundColor: bg }]}
@@ -346,6 +354,20 @@ const PageItem = React.memo(function PageItem({
       ) : null}
     </Pressable>
   );
+  if (accessories === undefined) return pageView;
+  // Beside the page, in the image's frame (the page centres it), so they are elements of their own.
+  return (
+    <View style={styles.pageWrap}>
+      {pageView}
+      {uri != null && !missing ? (
+        <View pointerEvents="box-none" style={styles.accessories}>
+          <View pointerEvents="box-none" style={{ width: size.width, height: size.height }}>
+            {accessories}
+          </View>
+        </View>
+      ) : null}
+    </View>
+  );
 });
 
 /**
@@ -369,6 +391,7 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
     onReachEnd,
     pageOverlay,
     pageUnderlay,
+    pageAccessories,
     onTapPoint,
     onTapVerse,
   },
@@ -555,11 +578,12 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
           size={pageSize}
           overlay={pageOverlay ? (image: PageImage | null) => pageOverlay(item, pageSize.scale, image) : undefined}
           underlay={pageUnderlay ? pageUnderlay(item, pageSize.scale) : null}
+          accessories={pageAccessories ? pageAccessories(item, pageSize.scale) : undefined}
           onTapPoint={onTapPoint}
           onTapVerse={onTapVerse}
         />
       ),
-    [onTap, onLongPressAyah, highlights, v2, palette, pageSize, endCard, pageOverlay, pageUnderlay, onTapPoint, onTapVerse, edition],
+    [onTap, onLongPressAyah, highlights, v2, palette, pageSize, endCard, pageOverlay, pageUnderlay, pageAccessories, onTapPoint, onTapVerse, edition],
   );
 
   return (
@@ -608,6 +632,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  pageWrap: { width: SCREEN_WIDTH, flex: 1 },
+  accessories: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center' },
 
   highlight: {
     position: 'absolute',
