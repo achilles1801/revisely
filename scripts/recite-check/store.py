@@ -28,9 +28,15 @@ def name_for(uid, take=None):
     return f'{PREFIX}/{uid}/{take or new_take()}'
 
 
+class Exists(Exception):
+    """The name is taken: names are written once (ifGenerationMatch=0)."""
+
+
 def put(name, data, content_type):
     url = (f'https://storage.googleapis.com/upload/storage/v1/b/{BUCKET}/o?uploadType=media'
            f'&name={urllib.parse.quote(name, safe="")}&ifGenerationMatch=0')
     r = requests.post(url, data=data, timeout=60,
                       headers={'Authorization': f'Bearer {auth.token()}', 'Content-Type': content_type})
+    if r.status_code == 412:
+        raise Exists(name)
     r.raise_for_status()

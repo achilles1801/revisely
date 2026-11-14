@@ -236,8 +236,7 @@ class Bench(unittest.TestCase):
         ev = run(sess, chunks(bench_pcm(), 3200) + [{'type': 'end'}])
         self.assertEqual({e['type'] for e in ev} - {'at', 'said', 'ayah', 'done'}, set())
         res = ev[-1]['result']
-        self.assertNotIn('marks', res)
-        self.assertNotIn('score', res)
+        self.assertEqual((res['marks'], res['score']), ([], None))  # the contract's shape, empty
         self.assertEqual(res['settings']['letters'], False)
         self.assertEqual({w['w']: w['status'] for w in res['words']}[14], 'missed')  # words are still decided
         self.assertEqual([e for e in ev if e['type'] == 'said'][-1]['upTo'] >= 27, True)
