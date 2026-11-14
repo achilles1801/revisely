@@ -48,6 +48,9 @@ SEG_FRAMES = 3 * 60 * FPS  # ...or when a segment has taken this many frames (3 
 MAX_SECONDS = 15 * 60
 EXTRA_STABLE = 2    # hops in a row an extra word must be there before it is shown
 FIX_STABLE = 4      # hops in a row a marked word must be heard right again before it is unmarked
+JUMP_BACK = 3       # the cursor moving back more than this many words, or ahead more than JUMP_AHEAD, is shown only
+JUMP_AHEAD = 6      # once the next hop agrees (within a word): one hop's provisional frames once took it 13 words back
+                    # and forward again (Majd's Recite take, 3:1, Nov 14 2026)
 LEAD_FRAMES = 10    # a filler starting this close to a segment's first frame is the pause it started in, not a word
 SETTLE = 3.0        # seconds a seam must be behind the newest final frame: the path there no longer moves
 NEG = checker.Decoder.NEG
@@ -494,6 +497,8 @@ class LiveSession:
                    # ayat `done` judged again itself
                    'ayah_jobs': 0, 'due_wait': 0.0, 'worst_due_wait': 0.0, 'done_wait': 0.0, 'done_notes': 0}
         self._judged_here = 0
+        self._jump = None                # a big cursor move waiting for the next hop to agree (_cursor)
+        self._seeked = False
         self.seg = None                  # built on the first hop: a new session answers at once
 
     # ------------------------------------------------------------ input
@@ -588,6 +593,7 @@ class LiveSession:
                 return []
             _, ev = self._close_segment() if self.seg is not None else (None, [])
             self.origin = w
+            self._seeked = True  # the phone moved the reader: the cursor follows at once (_cursor)
             self._start_segment(w, self.T, 'lead')
             return ev
         if kind == 'hint':
@@ -836,10 +842,11 @@ class LiveSession:
                 dec.restore(saved)
             else:
                 cw = dec.word_now()
-            if cw is not None and seg.app[cw] != self.sent['at']:
-                w = seg.app[cw]
-                self.sent['at'] = w
-                ev.append({'type': 'at', 'w': w, 't': round(now, 2)})
+            if cw is not None:
+                w = self._cursor(seg.app[cw])
+                if w is not None:
+                    self.sent['at'] = w
+                    ev.append({'type': 'at', 'w': w, 't': round(now, 2)})
         else:
             cw = None
         if dec.t < 5:
@@ -927,6 +934,22 @@ class LiveSession:
         ev += self._said_event(now)
         ev += self._score_event(now)
         return ev
+
+    def _cursor(self, w):
+        """The `at` to send for this hop's cursor word w, or None. A move back more than JUMP_BACK words or ahead more
+        than JUMP_AHEAD waits for the next hop to land within a word of it: a repeat or a skip shows one hop (0.5 s)
+        later, and a single hop's slip of the provisional frames never shows. After a seek it moves at once."""
+        last, held = self.sent['at'], self._jump
+        self._jump = None
+        if w == last:
+            return None
+        if last is None or self._seeked or not (w < last - JUMP_BACK or w > last + JUMP_AHEAD):
+            self._seeked = False
+            return w
+        if held is not None and abs(held - w) <= 1:
+            return w
+        self._jump = w
+        return None
 
     def _notes(self, s, a, statuses, spans):
         """Engine.ayah_notes on the take's frames (and its samples, for the second model in Strict). It reads only the

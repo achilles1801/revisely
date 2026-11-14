@@ -181,6 +181,26 @@ class Model(unittest.TestCase):
             ev = run(sess, chunks(x.tobytes(), 3200) + [{'type': 'end'}])
             self.assertEqual(ev[-1]['type'], 'done')
 
+    def test_a_big_cursor_move_waits_for_the_next_hop(self):
+        """A one-hop slip back (Majd's Recite take: 13 words back for one hop) never shows; a repeat or a skip shows a
+        hop later; small moves and a seek show at once."""
+        import live
+        sess = live.LiveSession(engine(), 1, 1, 2, 10, {}, follow=True)
+
+        def hop(w):
+            got = sess._cursor(w)
+            if got is not None:
+                sess.sent['at'] = got
+            return got
+        self.assertEqual([hop(w) for w in (0, 1, 2, 2, 4)], [0, 1, 2, None, 4])  # moving on: at once
+        self.assertEqual([hop(w) for w in (20, 21)], [None, 21])  # 16 ahead: waits a hop, shown when the next agrees
+        self.assertEqual([hop(w) for w in (8, 22)], [None, 22])  # a slip 13 back for one hop: never shown
+        self.assertEqual([hop(w) for w in (10, 10, 11)], [None, 10, 11])  # a repeat from word 10: a hop later
+        self.assertEqual(hop(9), 9)  # one or two words back (the reciter going over a word): at once
+        sess._seeked = True
+        self.assertEqual(hop(40), 40)  # the phone moved the reader there: at once
+        self.assertEqual(hop(5), None)  # and the rule holds again after it
+
     def test_refuses_a_passage_that_does_not_exist(self):
         import live
         from engine import BadRequest
