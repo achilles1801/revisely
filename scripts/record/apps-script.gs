@@ -24,6 +24,11 @@ var MAX_ROWS = 400; // a group link can't add more people than this
 var CODES = 40; // P01–P40, plus P00 for testing
 var MAX_BYTES = 25 * 1024 * 1024;
 var TYPES = { 'audio/mp4': 'm4a', 'audio/x-m4a': 'm4a', 'audio/aac': 'aac', 'audio/webm': 'webm', 'audio/ogg': 'ogg' };
+// log.json, beside a participant's takes (consent text v2 on, which says so): the furthest step reached and what
+// went wrong, with the browser and OS family. Nothing else: no audio, no answers, no name.
+var STAGES = ['questions', 'mic_ok', 'item', 'recorded', 'saved', 'uploaded'];
+var ERRORS = ['mic_refused', 'mic_missing', 'mic_error', 'no_recorder', 'record_failed', 'upload_failed', 'script_error'];
+var LOG_MAX = 200; // entries kept per participant (the newest)
 
 /** Run from the editor (again after updating the script): makes what's missing and logs the links. */
 function setup() {
@@ -101,6 +106,26 @@ function doPost(e) {
       file.setDescription(JSON.stringify({ item: item, take: take, ms: Number(body.ms) || 0, choice: body.choice || null, at: now, ua: str_(body.ua, 300) }));
       return { ok: true, name: name };
     }
+    if (body.op === 'log') {
+      if (consentVersion_(folder) < 2) throw new Error('old_consent'); // v1's text didn't mention it
+      var stage = String(body.stage || ''), error = String(body.error || '');
+      if ((stage && STAGES.indexOf(stage) < 0) || (error && ERRORS.indexOf(error) < 0) || (!stage && !error)) throw new Error('bad_log');
+      var entry = { at: now, stage: stage, error: error,
+                    status: /^[A-Za-z0-9_.-]{0,24}$/.test(String(body.status || '')) ? String(body.status || '') : '',
+                    family: /^[A-Za-z0-9 ,.()-]{0,48}$/.test(String(body.family || '')) ? String(body.family || '') : '' };
+      var lock = LockService.getScriptLock();
+      lock.waitLock(10000);
+      try {
+        var it = folder.getFilesByName('log.json');
+        var log = [];
+        if (it.hasNext()) { try { log = JSON.parse(it.next().getBlob().getDataAsString()) || []; } catch (e) { log = []; } }
+        log.push(entry);
+        writeJson_(folder, 'log.json', log.slice(-LOG_MAX));
+      } finally {
+        lock.releaseLock();
+      }
+      return { ok: true };
+    }
     throw new Error('bad_op');
   });
 }
@@ -176,8 +201,9 @@ function status_(pid) {
   if (!it.hasNext()) return out;
   var files = it.next().getFiles();
   while (files.hasNext()) {
-    var name = files.next().getName();
-    if (name === 'consent.json') out.consent = true;
+    var file = files.next();
+    var name = file.getName();
+    if (name === 'consent.json') { out.consent = true; out.consentV = 'v' + consentVersionOf_(file); }
     else if (name === 'profile.json') out.profile = true;
     var m = /^([a-z][a-z0-9]*)_take(\d+)\./.exec(name);
     if (m) {
@@ -186,6 +212,21 @@ function status_(pid) {
     }
   }
   return out;
+}
+
+/** The consent text version a participant agreed to (consent.json's text: v1, v2 …); 0 if none. */
+function consentVersion_(folder) {
+  var it = folder.getFilesByName('consent.json');
+  return it.hasNext() ? consentVersionOf_(it.next()) : 0;
+}
+
+function consentVersionOf_(file) {
+  try {
+    var m = /^v(\d+)$/.exec(String(JSON.parse(file.getBlob().getDataAsString()).text || ''));
+    return m ? Number(m[1]) : 1;
+  } catch (e) {
+    return 1;
+  }
 }
 
 function writeJson_(folder, name, value) {

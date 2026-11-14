@@ -20,6 +20,17 @@ REPO = pathlib.Path(__file__).resolve().parents[2]
 CODES = {'P00-localtest01', 'P01-localtest02'}
 GROUP_KEY = 'localgroup01'
 TYPES = {'audio/mp4': 'm4a', 'audio/x-m4a': 'm4a', 'audio/aac': 'aac', 'audio/webm': 'webm', 'audio/ogg': 'ogg'}
+STAGES = ('questions', 'mic_ok', 'item', 'recorded', 'saved', 'uploaded')
+ERRORS = ('mic_refused', 'mic_missing', 'mic_error', 'no_recorder', 'record_failed', 'upload_failed', 'script_error')
+
+
+def consent_version(folder):
+    """As apps-script.gs: the consent text version agreed to (v1, v2 …), 0 with no consent."""
+    p = folder / 'consent.json'
+    if not p.exists():
+        return 0
+    m = re.match(r'^v(\d+)$', str(json.loads(p.read_text()).get('text') or ''))
+    return int(m[1]) if m else 1
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -54,6 +65,8 @@ class Handler(SimpleHTTPRequestHandler):
             folder = self.check(q.get('k'))
             out = {'ok': True, 'pid': folder.name, 'consent': (folder / 'consent.json').exists(),
                    'profile': (folder / 'profile.json').exists(), 'done': [], 'takes': {}}
+            if out['consent']:
+                out['consentV'] = f'v{consent_version(folder)}'
             for f in folder.iterdir():
                 m = re.match(r'^([a-z][a-z0-9]*)_take(\d+)\.', f.name)
                 if m:
@@ -107,6 +120,20 @@ class Handler(SimpleHTTPRequestHandler):
                 (folder / name).write_bytes(data)
                 (folder / (name + '.json')).write_text(json.dumps({k: body.get(k) for k in ('item', 'take', 'ms', 'choice')}))
                 return self.answer({'ok': True, 'name': name})
+            if op == 'log':
+                if consent_version(folder) < 2:
+                    raise ValueError('old_consent')
+                stage, error = str(body.get('stage') or ''), str(body.get('error') or '')
+                if (stage and stage not in STAGES) or (error and error not in ERRORS) or not (stage or error):
+                    raise ValueError('bad_log')
+                status, family = str(body.get('status') or ''), str(body.get('family') or '')
+                entry = {'stage': stage, 'error': error,
+                         'status': status if re.match(r'^[A-Za-z0-9_.-]{0,24}$', status) else '',
+                         'family': family if re.match(r'^[A-Za-z0-9 ,.()-]{0,48}$', family) else ''}
+                log = folder / 'log.json'
+                entries = json.loads(log.read_text()) if log.exists() else []
+                log.write_text(json.dumps((entries + [entry])[-200:], indent=1))
+                return self.answer({'ok': True})
             raise ValueError('bad_op')
         except ValueError as e:
             self.answer({'ok': False, 'error': str(e)})

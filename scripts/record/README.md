@@ -41,9 +41,17 @@ Signed in to the Google account whose Drive should hold the recordings:
   included; they are processed automatically, only to build and test the checker. Don't open or play the takes;
   check them only with the lab's scripts.
 - **Deleting someone's recordings:** delete their `P..` folder in "Revisely recordings (private)".
-- **What arrives:** in each person's folder, `consent.json` (which box they ticked, when), `profile.json` (their
-  answers) and one file per take, `<item>_take<n>.m4a` (or `.webm` on some Android phones). Each take's Drive
-  description holds its length, the chosen passage for `n8` and the phone. The latest take of an item counts.
+- **What arrives:** in each person's folder, `consent.json` (which box they ticked, when, and the consent text's
+  version), `profile.json` (their answers) and one file per take, `<item>_take<n>.m4a` (or `.webm` on some
+  Android phones). Each take's Drive description holds its length, the chosen passage for `n8` and the phone. The
+  latest take of an item counts.
+- **Where people get stuck (`log.json`, Nov 2026):** for people who agreed to consent text v2 (which says so),
+  the page notes the furthest step reached (`questions`, `mic_ok`, `item`, `recorded`, `saved`, `uploaded`) and
+  each error (`mic_refused`, `mic_missing`, `mic_error`, `no_recorder`, `record_failed`, `upload_failed` with the
+  HTTP status or the script's reason, `script_error`), with the browser and OS family ("iOS 18, Safari",
+  "iOS 17, Instagram") and the time. Nothing else: no audio, no answers. The newest 200 are kept. People who agreed
+  to v1 before it aren't noted. The page also tells anyone in an app's built-in browser (Instagram, WhatsApp, …)
+  to open it in Safari or Chrome, where the microphone works.
 - **More links:** add rows to the sheet with a new code (`P41-` and 12 random letters and digits) and the link
   `https://revisely.app/record/#k=<code>`.
 - **Changing the Apps Script later:** paste the new version, save, run `setup` (it only adds what's missing),

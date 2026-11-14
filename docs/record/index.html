@@ -203,15 +203,97 @@
   }
 
   // ---------- the server (Apps Script) ----------
+  // Throws Error('network'), Error('http_<status>') or Error('bad_reply'), so a failure can say what it was.
   async function api(op, body) {
-    if (body === undefined) {
-      const r = await fetch(`${S.endpoint}?op=${op}&k=${encodeURIComponent(S.code)}`);
-      return r.json();
-    }
-    // text/plain keeps it a simple request (no preflight), which Apps Script needs
-    const r = await fetch(S.endpoint, { method: 'POST', body: JSON.stringify({ op, k: S.code, ...body }) });
-    return r.json();
+    let r;
+    try {
+      r = body === undefined
+        ? await fetch(`${S.endpoint}?op=${op}&k=${encodeURIComponent(S.code)}`)
+        // text/plain keeps it a simple request (no preflight), which Apps Script needs
+        : await fetch(S.endpoint, { method: 'POST', body: JSON.stringify({ op, k: S.code, ...body }) });
+    } catch (e) { throw new Error('network'); }
+    if (!r.ok) throw new Error(`http_${r.status}`);
+    try { return await r.json(); } catch (e) { throw new Error('bad_reply'); }
   }
+
+  // ---------- the browser ----------
+  // "iOS 18, Safari", "Android 14, Chrome", "iOS 17, Instagram": the family only, for the log below.
+  function browserFamily() {
+    const ua = navigator.userAgent || '';
+    const ios = ua.match(/(?:iPhone|iPad|iPod).*? OS (\d+)/), android = ua.match(/Android (\d+)/);
+    const os = ios ? `iOS ${ios[1]}` : android ? `Android ${android[1]}` : /Macintosh/.test(ua) ? 'macOS' : /Windows/.test(ua) ? 'Windows' : 'other';
+    const app = inAppName();
+    const browser = app || (/CriOS/.test(ua) ? 'Chrome' : /FxiOS|Firefox\//.test(ua) ? 'Firefox' : /EdgiOS|Edg\//.test(ua) ? 'Edge'
+      : /SamsungBrowser/.test(ua) ? 'Samsung Internet' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : 'other');
+    return `${os}, ${browser}`;
+  }
+
+  // The browser built into another app (a link tapped in Instagram, WhatsApp …), which often can't use the
+  // microphone: its name, 'another app' for an unnamed one, or null in a real browser.
+  function inAppName() {
+    const ua = navigator.userAgent || '';
+    const known = [['Instagram', /Instagram/], ['Facebook', /FBAN|FBAV|FB_IAB|FBIOS/], ['Messenger', /Messenger/],
+      ['WhatsApp', /WhatsApp/], ['TikTok', /musical_ly|BytedanceWebview|TikTok/], ['Snapchat', /Snapchat/],
+      ['Telegram', /Telegram/], ['LinkedIn', /LinkedInApp/], ['X', /Twitter/], ['Google', /\bGSA\//], ['Gmail', /Gmail/],
+      ['Line', /\bLine\//], ['WeChat', /MicroMessenger/]];
+    for (const [name, re] of known) if (re.test(ua)) return name;
+    if (/iPhone|iPad|iPod/.test(ua) && !/Safari\//.test(ua)) return 'another app'; // a web view: no Safari in it
+    if (/Android/.test(ua) && /; wv\)/.test(ua)) return 'another app';
+    return null;
+  }
+
+  // What to do in an app's browser: open the page in Safari or Chrome, with the link to copy.
+  function openInBrowserHtml(app) {
+    const where = app === 'another app' ? 'an app’s built-in browser' : `${esc(app)}’s built-in browser`;
+    return `<p><strong>You’re in ${where}</strong>, which often can’t use the microphone. Please open this page in
+      <strong>Safari</strong> (iPhone) or <strong>Chrome</strong> (Android): tap the <strong>⋯</strong> or <strong>⋮</strong>
+      menu, then <strong>Open in browser</strong> (or <strong>Open in Safari</strong>). Or copy your link and paste it there.</p>
+      <div class="row-btns"><button class="btn quiet" id="copyInApp">Copy your link</button></div>`;
+  }
+  function wireCopyInApp() {
+    const b = document.getElementById('copyInApp');
+    if (!b) return;
+    b.onclick = async () => {
+      try { await navigator.clipboard.writeText(myLink()); b.textContent = 'Copied: now paste it in Safari or Chrome'; } catch (e) { prompt('Your link:', myLink()); }
+    };
+  }
+
+  // What the microphone's refusal was: [error, its name].
+  function micError(e) {
+    const n = (e && e.name) || 'unknown';
+    if (/NotAllowed|Security|PermissionDenied/.test(n)) return ['mic_refused', n];
+    if (/NotFound|DevicesNotFound|Overconstrained/.test(n)) return ['mic_missing', n];
+    return ['mic_error', n];
+  }
+  function micBlockedText(kind) {
+    if (kind === 'mic_missing') return 'No microphone was found. Please record on a phone, with its own microphone.';
+    return 'The microphone is blocked. Allow it for this site in your browser’s settings, then reload the page. If you opened this link from another app, open it in Safari (iPhone) or Chrome (Android) instead.';
+  }
+
+  // ---------- what went wrong, so the page can be fixed (consent text v2 says so) ----------
+  // The furthest step reached and each error, with the browser family: nothing else. Only for a participant who
+  // agreed to text v2, at most 20 a visit, each once.
+  const STAGES = ['questions', 'mic_ok', 'item', 'recorded', 'saved', 'uploaded'];
+  const logged = new Set();
+  let logsLeft = 20;
+  function note(stage, error, status) {
+    if (S.local.consentV !== 'v2' || !S.code || logsLeft <= 0) return;
+    status = /^[A-Za-z0-9_.-]{1,24}$/.test(String(status || '')) ? String(status) : (status ? 'other' : '');
+    const key = `${stage}|${error}|${status}`;
+    if (logged.has(key)) return;
+    logged.add(key);
+    logsLeft--;
+    api('log', { stage, error, status, family: browserFamily() }).catch(() => {});
+  }
+  function reached(stage) {
+    const i = STAGES.indexOf(stage);
+    if (i <= (S.local.stage == null ? -1 : S.local.stage)) return;
+    S.local.stage = i; store.save();
+    note(stage, '', '');
+  }
+  const failed = (error, status) => note('', error, status);
+  window.addEventListener('error', (e) => failed('script_error', (e.error && e.error.name) || 'Error'));
+  window.addEventListener('unhandledrejection', (e) => failed('script_error', (e.reason && e.reason.name) || 'promise'));
 
   // ---------- takes waiting to upload (IndexedDB, so a closed tab loses nothing) ----------
   const queue = {
@@ -275,7 +357,9 @@
           if (S.waiting) S.waiting.delete(t.item);
           S.local.done[t.item] = true;
           store.save();
+          reached('uploaded');
         } catch (e) {
+          failed('upload_failed', e && e.message); // network, http_<status>, bad_reply or the server's reason
           break; // try again later, in order
         }
       }
@@ -498,6 +582,7 @@
         <li><strong>No name on them:</strong> your recordings are filed under a code (${esc(S.pid)}), not your name. Only Revisely’s developer knows which code is yours.</li>
         <li><strong>Who listens:</strong> no one. No person listens to your recordings, Revisely’s developer included. They are processed automatically by software, only to build and test Revisely’s recitation checker, and they are never published or shared.</li>
         <li><strong>What they’re for:</strong> building and testing Revisely’s recitation checking, including training its models. This may become a paid feature of the app.</li>
+        <li><strong>If something goes wrong:</strong> the page notes which step you reached and any error, with your phone and browser type, so problems can be fixed. Nothing else.</li>
         <li><strong>Stopping:</strong> you can stop at any time. To have your recordings deleted, tell Revisely’s developer, or email <a href="mailto:support@revisely.app">support@revisely.app</a> with your code (${esc(S.pid)}).</li>
       </ul>
       <div class="agree" role="radiogroup" aria-label="Agreement">
@@ -513,9 +598,10 @@
       const who = app.querySelector('input[name="agree"]:checked').value;
       go.disabled = true;
       try {
-        const res = await api('consent', { who, ua: navigator.userAgent, tz: Intl.DateTimeFormat().resolvedOptions().timeZone, text: 'v1' });
+        // text v2 added "If something goes wrong" (the step-and-error notes); v1 participants aren't noted
+        const res = await api('consent', { who, ua: navigator.userAgent, tz: Intl.DateTimeFormat().resolvedOptions().timeZone, text: 'v2' });
         if (!res.ok) throw new Error(res.error);
-        S.local.consent = true; store.save();
+        S.local.consent = true; S.local.consentV = 'v2'; store.save();
         S.view = S.local.profile ? 'mic' : 'about'; render();
       } catch (e) {
         const err = document.getElementById('err');
@@ -553,7 +639,11 @@
         b.setAttribute('aria-pressed', String(on));
       };
     });
-    document.getElementById('go').onclick = async () => {
+    const go = document.getElementById('go');
+    go.onclick = async () => {
+      if (go.disabled) return;
+      go.disabled = true; // the save takes a few seconds: a second tap saved the answers twice
+      go.textContent = 'Saving…';
       const profile = {};
       app.querySelectorAll('.choice').forEach((g) => {
         const b = g.querySelector('button[aria-pressed="true"]');
@@ -564,6 +654,7 @@
         if (!res.ok) throw new Error(res.error);
       } catch (e) { /* answers are optional: keep going, they're kept on the phone */ }
       S.local.profile = profile; store.save();
+      reached('questions');
       S.view = 'mic'; render();
     };
   }
@@ -576,12 +667,15 @@
         <div class="meter" aria-hidden="true"><i id="lvl"></i></div>
         <p class="err" id="err" hidden></p>
       </div>
+      ${inAppName() ? `<div class="note" id="inapp">${openInBrowserHtml(inAppName())}</div>` : ''}
       <div class="row-btns"><button class="btn" id="allow">Turn on the microphone</button></div>`;
+    wireCopyInApp();
     const allow = document.getElementById('allow');
     allow.onclick = async () => {
       wakeAudio();
       const err = document.getElementById('err');
       if (!navigator.mediaDevices || recorderType() === null) {
+        failed(navigator.mediaDevices ? 'no_recorder' : 'mic_missing', navigator.mediaDevices ? 'no_mediarecorder' : 'no_mediadevices');
         err.hidden = false; err.textContent = 'This browser can’t record. Please open the link in Safari (iPhone) or Chrome (Android).';
         return;
       }
@@ -589,12 +683,15 @@
       try {
         await getStream();
         err.hidden = true;
+        reached('mic_ok');
         const stop = meter(document.getElementById('lvl'));
         allow.textContent = 'It works, continue';
         allow.onclick = () => { stop(); releaseMic(); S.view = 'list'; render(); };
       } catch (e) {
+        const [kind, name] = micError(e);
+        failed(kind, name);
         err.hidden = false;
-        err.textContent = 'The microphone is blocked. Allow it for this site in your browser’s settings, then reload the page.';
+        err.textContent = micBlockedText(kind);
       }
       allow.disabled = false;
     };
@@ -681,6 +778,7 @@
     if (show) show.onclick = () => { document.getElementById('text').hidden = false; document.getElementById('hiddenText').hidden = true; };
     if (it.choose) wirePicker(it);
     wireRecorder(it);
+    reached('item');
   }
 
   function pickerHtml(choice) {
@@ -750,11 +848,14 @@
       after.hidden = true;
       busy = true;
       try { await getStream(); } catch (e) {
-        err.hidden = false; err.textContent = 'The microphone is blocked. Allow it for this site in your browser’s settings, then reload the page.';
+        const [kind, name] = micError(e);
+        failed(kind, name);
+        err.hidden = false; err.textContent = inAppName() ? `You’re in an app’s built-in browser, which can’t use the microphone. Please open this page in Safari (iPhone) or Chrome (Android).` : micBlockedText(kind);
         return;
       } finally { busy = false; }
       if (!rec.isConnected) { releaseMic(); return; } // the item was left while the microphone opened
       try { current = startTake(S.stream); } catch (e) {
+        failed('record_failed', e && e.name);
         releaseMic();
         err.hidden = false; err.textContent = 'Recording couldn’t start. Please reload the page and try again.';
         return;
@@ -781,6 +882,7 @@
         err.hidden = false; err.textContent = 'That was too short. Tap the button and recite, then tap again to stop.';
         last = null; return;
       }
+      reached('recorded');
       play.src = URL.createObjectURL(last.blob);
       after.hidden = false;
     };
@@ -801,6 +903,7 @@
       try { saved = await queue.put(take); } catch (e) { saved = null; }
       if (saved === null) memoryQueue.set(take.key, take);
       S.waiting = S.waiting || new Set(); S.waiting.add(it.id);
+      reached('saved');
       updateBanner();
       flush();
       const next = nextItem(it.id);
@@ -843,6 +946,7 @@
       for (const id of status.done || []) S.local.done[id] = true;
       for (const [id, n] of Object.entries(status.takes || {})) S.local.takes[id] = Math.max(S.local.takes[id] || 0, n);
       if (status.consent) S.local.consent = true;
+      if (status.consentV) S.local.consentV = status.consentV; // an older script doesn't say: keep the phone's
       store.save();
       try { localStorage.setItem(MINE, S.code); } catch (e) {}
     } catch (e) {
