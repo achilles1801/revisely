@@ -45,7 +45,9 @@ limiter = auth.Limiter()
 async def lifespan(_app):
     # Loaded before the port opens: Cloud Run gives a starting instance its CPU until then.
     ENGINE['e'] = Engine(threads=int(os.environ.get('THREADS', '2')))
-    if os.environ.get('LIVE_HELPER', '1') == '1':
+    # The helper works out a live session's next words; with the word table in the image there is nothing for it to
+    # do, and starting it (a second Python importing the checker) costs seconds of a cold start on Cloud Run.
+    if ENGINE['e'].table is None and os.environ.get('LIVE_HELPER', '1') == '1':
         live.start_helper()
     yield
 
