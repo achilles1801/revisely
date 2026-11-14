@@ -21,7 +21,8 @@
     "14-help": 6.5,
     "15-translations": 10.5,
     "16-whats-new": 7,
-    "17-jump-after-ahead": 7.5
+    "17-jump-after-ahead": 7.5,
+    "18-recite-live": 9
   },
   "android": {
     "01-onboarding": 3,
@@ -44,6 +45,7 @@
     "14-help": 3.5,
     "15-translations": 6,
     "16-whats-new": 4,
-    "17-jump-after-ahead": 4
+    "17-jump-after-ahead": 4,
+    "18-recite-live": 6
   }
 }

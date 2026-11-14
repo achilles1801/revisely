@@ -149,7 +149,7 @@ export function ReciteBar({
           </Text>
         </View>
         {words.length ? (
-          <Text style={[arabicV2(20), styles.words]} numberOfLines={1} testID="recite-words">
+          <Text style={[arabicV2(20), styles.words]} numberOfLines={1} maxFontSizeMultiplier={1.3} testID="recite-words">
             {words.map((w, i) => (
               <Text
                 key={w.w}

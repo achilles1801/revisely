@@ -88,7 +88,7 @@ import { greetingName } from '../../lib/displayName';
 import { smartTrackingOn } from '../../lib/smartTracking';
 import { showsTestScenarios } from '../../lib/testScenarios';
 import { releaseSync } from '../../lib/offline/sync';
-import { reciteCheckEnabled } from '../../lib/reciteCheck/availability';
+import { reciteLiveForAccount } from '../../lib/reciteLive/availability';
 import { setReciteCheckSettings, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
 import { ReciteCheckNotice } from '../../components/reciteCheck/ReciteCheckNotice';
 
@@ -282,8 +282,9 @@ export default function SettingsScreen() {
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [resetSheet, setResetSheet] = useState(false);
   // The recitation check (Revisely Dev, testers): its AI notice stays reachable from About.
-  const reciteCheck = reciteCheckEnabled(user);
+  const reciteCheck = reciteLiveForAccount(user);
   const reciteCheckSettings = useReciteCheckSettings(reciteCheck ? user?.id : null);
+  const [checkLevelSheet, setCheckLevelSheet] = useState(false);
   const [reciteNotice, setReciteNotice] = useState(false);
   const [scenarioSheet, setScenarioSheet] = useState(false);
   const [whatsNewOpen, setWhatsNewOpen] = useState(false);
@@ -907,6 +908,62 @@ export default function SettingsScreen() {
           />
         </Section>
 
+        {reciteCheck ? (
+          <Section title="Recite" footer="Check is AI and can make mistakes. Recordings are checked by software; nobody listens.">
+            <Row
+              icon="checkmark-done-outline"
+              label="What Check marks"
+              value={reciteCheckSettings.level === 'strict' ? 'Strict' : 'Words and harakat'}
+              onPress={() => setCheckLevelSheet(true)}
+              testID="settings-check-level"
+            />
+            {reciteCheckSettings.level === 'strict' ? (
+              <>
+                <Row
+                  label="Madd munfasil"
+                  rightSlot={
+                    <PillTabs
+                      compact
+                      hug
+                      tone="ink"
+                      options={[2, 4, 5].map((n) => ({ value: String(n), label: String(n) }))}
+                      value={String(reciteCheckSettings.munfasil)}
+                      onChange={(v) => setReciteCheckSettings(user?.id, { munfasil: Number(v) as 2 | 4 | 5 })}
+                    />
+                  }
+                />
+                <Row
+                  label="Madd muttasil"
+                  rightSlot={
+                    <PillTabs
+                      compact
+                      hug
+                      tone="ink"
+                      options={[4, 5, 6].map((n) => ({ value: String(n), label: String(n) }))}
+                      value={String(reciteCheckSettings.muttasil)}
+                      onChange={(v) => setReciteCheckSettings(user?.id, { muttasil: Number(v) as 4 | 5 | 6 })}
+                    />
+                  }
+                />
+                <Row
+                  label="Madd ʿarid"
+                  subtitle="At a stop"
+                  rightSlot={
+                    <PillTabs
+                      compact
+                      hug
+                      tone="ink"
+                      options={[{ value: '0', label: 'Any' }, ...[2, 4, 6].map((n) => ({ value: String(n), label: String(n) }))]}
+                      value={String(reciteCheckSettings.aared)}
+                      onChange={(v) => setReciteCheckSettings(user?.id, { aared: Number(v) as 0 | 2 | 4 | 6 })}
+                    />
+                  }
+                />
+              </>
+            ) : null}
+          </Section>
+        ) : null}
+
         <Section title="Notifications">
           <Row
             icon="notifications-outline"
@@ -1070,6 +1127,21 @@ export default function SettingsScreen() {
                 }
               />
             ) : null}
+            {reciteCheck ? (
+              <Row
+                icon="lock-closed-outline"
+                label="Show Check locked"
+                subtitle="As it will look to those who haven’t got it"
+                rightSlot={
+                  <SettingSwitch
+                    value={reciteCheckSettings.previewLocked}
+                    onValueChange={(previewLocked) => setReciteCheckSettings(user?.id, { previewLocked })}
+                    accessibilityLabel="Show Check locked"
+                    testID="settings-check-locked"
+                  />
+                }
+              />
+            ) : null}
             {showsTestScenarios(user) && (
               <View testID="test-scenario-row">
                 <Row
@@ -1133,6 +1205,28 @@ export default function SettingsScreen() {
         onClose={() => setSpeechSheet(false)}
         onReady={() => setSpeechSheet(false)}
         {...(followsRecitation ? {} : { title: 'Search by voice', intro: 'Recite a few words and Revisely finds the ayah.' })}
+      />
+      <ActionSheet
+        visible={checkLevelSheet}
+        onClose={() => setCheckLevelSheet(false)}
+        title="What Check marks"
+        actions={[
+          {
+            key: 'words',
+            label: 'Words and harakat',
+            subtitle: 'Wrong, skipped and added words, and letter and haraka slips',
+            selected: reciteCheckSettings.level !== 'strict',
+            onPress: () => setReciteCheckSettings(user?.id, { level: 'words' }),
+          },
+          {
+            key: 'strict',
+            label: 'Strict',
+            subtitle: 'The same, and tajweed: madd lengths, qalqalah, ghunnah, ikhfa, idgham, iqlab',
+            selected: reciteCheckSettings.level === 'strict',
+            onPress: () => setReciteCheckSettings(user?.id, { level: 'strict' }),
+          },
+        ]}
+        testID="check-level-sheet"
       />
       <ActionSheet
         visible={deleteSpeechOpen}

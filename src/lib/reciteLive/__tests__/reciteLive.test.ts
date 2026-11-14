@@ -397,12 +397,14 @@ describe('the card’s words', () => {
     const approx = parseMark({ id: 'h', w: SHAY, ayah: [27, 23], kind: 'harakat', heard: 'شيون', heardExact: false, slip: { expected: 'ٍ', heard: 'ٌّ' }, sure: 'clear' })!;
     expect(recitedLabel(approx)).toBe('As heard');
     expect(approx.slip).toEqual({ expected: 'ٍ', heard: 'ٌّ' });
-    // A haraka alone sits on a tatweel; each side is an isolate after the Latin.
-    expect(slipLine(approx)).toBe('\u2068\u0640ٌّ\u2069 heard for \u2068\u0640ٍ\u2069');
+    // Harakat by name (a lone haraka is too small to read in a line); letters in Arabic, in isolates.
+    expect(slipLine(approx)).toBe('Dammatan and shadda heard for kasratan');
     const exact = mark({ kind: 'letter', heard: 'شَيٌّ', heardExact: true, slip: { expected: 'ء', heard: 'ي' } });
     expect(recitedLabel(exact)).toBe('Recited');
     expect(slipLine(exact)).toBe('\u2068ي\u2069 heard for \u2068ء\u2069');
     expect(slipLine(mark({ kind: 'letter', slip: { expected: 'ء', heard: '' } }))).toBe('\u2068ء\u2069 not heard');
+    expect(slipLine(mark({ kind: 'harakat', detail: 'shadda', slip: { expected: 'لّ', heard: 'ل' } }))).toBe('\u2068ل\u2069 heard for \u2068لّ\u2069');
+    expect(slipLine(mark({ kind: 'harakat', slip: { expected: 'ُ', heard: 'َ' } }))).toBe('Fatha heard for damma');
     expect(slipLine(mark({ kind: 'word', slip: { expected: 'ء', heard: 'ي' } }))).toBeNull();
     expect(parseMark({ id: 'x', w: 1, ayah: [1, 1], kind: 'letter', slip: { expected: 3 }, sure: 'clear' })!.slip).toBeUndefined();
   });

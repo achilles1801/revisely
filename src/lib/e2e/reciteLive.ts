@@ -18,7 +18,33 @@ export function handleReciteLiveLink(url: string): boolean {
   on = m[1] === '1';
   // eslint-disable-next-line no-console
   console.log(`[e2e] recite-live ${on ? 'on' : 'off'}`);
+  if (on) void putPage379();
   return true;
+}
+
+/**
+ * E2E builds fetch no page images, and the marks are drawn on the page's own ink: page 379 (the 1405 print, its
+ * public image) is put where the offline mushaf keeps it, for this device's set. It comes from the bundle itself as
+ * base64 (fixtures/page379.ts says why), written with the legacy API.
+ */
+async function putPage379(): Promise<void> {
+  try {
+    const { Directory, File, Paths } = require('expo-file-system') as typeof import('expo-file-system');
+    const legacy = require('expo-file-system/legacy') as typeof import('expo-file-system/legacy');
+    const { pageImageSet } = require('../quranImages') as typeof import('../quranImages');
+    const { PAGE_379_PNG_BASE64 } = require('./fixtures/page379') as typeof import('./fixtures/page379');
+    const dir = new Directory(Paths.document, 'mushaf', pageImageSet());
+    if (!dir.exists) dir.create({ intermediates: true, idempotent: true });
+    const target = new File(dir, '379.png');
+    if (!target.exists) {
+      await legacy.writeAsStringAsync(target.uri, PAGE_379_PNG_BASE64, { encoding: legacy.EncodingType.Base64 });
+    }
+    // eslint-disable-next-line no-console
+    console.log('[e2e] recite-live page 379 on the phone');
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.log(`[e2e] recite-live page 379 not written: ${String(err)}`);
+  }
 }
 
 export function e2eReciteLiveOn(): boolean {

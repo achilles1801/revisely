@@ -16,8 +16,13 @@ export function e2eReciteLive(): boolean {
  * else keeps today's record button; the store app never shows it (`isDevVariant()` is false there).
  */
 export function reciteLiveEnabled(user: { previewTester?: boolean } | null | undefined, edition: MushafEditionId): boolean {
+  return reciteLiveForAccount(user) && mushafEdition(edition).reciteData;
+}
+
+/** The account side of it, whatever print is chosen (Settings' rows for Recite and Check). */
+export function reciteLiveForAccount(user: { previewTester?: boolean } | null | undefined): boolean {
   const e2e = e2eReciteLive();
-  return (isDevVariant() || e2e) && user?.previewTester === true && (isMicStreamAvailable() || e2e) && mushafEdition(edition).reciteData;
+  return (isDevVariant() || e2e) && user?.previewTester === true && (isMicStreamAvailable() || e2e);
 }
 
 /**

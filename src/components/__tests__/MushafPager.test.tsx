@@ -1,5 +1,5 @@
 import React, { createRef } from 'react';
-import { Dimensions, FlatList, StyleSheet } from 'react-native';
+import { Dimensions, FlatList, StyleSheet, Text } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { MushafPager, MushafPagerHandle } from '../MushafPager';
 import { ayahRects } from '../../lib/ayahBounds';
@@ -352,6 +352,31 @@ describe('<MushafPager /> turning the page by swiping', () => {
     render(<MushafPager pages={[3]} onTap={jest.fn()} />);
     const page = screen.getByLabelText('Page 3');
     expect(page.props.accessibilityHint).toBe('Shows or hides the controls');
+  });
+
+  // iOS hides an accessible element's insides from VoiceOver and from the tests (Maestro saw the live check's marks
+  // only some of the time: flow 18, Nov 14 2026). pageAccessories are drawn beside the page, in the image's frame.
+  it('pageAccessories are elements of their own, beside the page, in the image’s frame', () => {
+    type Node = { type: unknown; props: Record<string, unknown>; parent: Node | null };
+    render(
+      <MushafPager
+        pages={[3]}
+        onTap={jest.fn()}
+        pageAccessories={(page, scale) => <Text testID={`acc-${page}-${scale.toFixed(2)}`}>mark</Text>}
+      />,
+    );
+    const list = screen.UNSAFE_getByType(FlatList);
+    act(() => list.props.onLayout({ nativeEvent: { layout: { x: 0, y: 0, width: 393, height: 760 } } }));
+    const size = fitPage(393, 760);
+    const acc = screen.getByTestId(`acc-3-${size.scale.toFixed(2)}`) as unknown as Node;
+    // No ancestor is the page's one element.
+    for (let p = acc.parent; p; p = p.parent) expect(p.props.accessibilityLabel).not.toBe('Page 3');
+    // The frame it sits in is the image's size (the page centres both).
+    const styleOf = (n: Node) => StyleSheet.flatten(n.props.style as never) as { width?: number } | undefined;
+    let frame = acc.parent;
+    while (frame && styleOf(frame)?.width !== size.width) frame = frame.parent;
+    expect(styleOf(frame!)).toMatchObject({ width: size.width, height: size.height });
+    expect(screen.getByLabelText('Page 3')).toBeTruthy();
   });
 });
 
