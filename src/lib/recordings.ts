@@ -81,6 +81,9 @@ export interface StoredRecording {
   inBackup?: boolean;
   /** Parts its record lists that the backup turned out not to have. */
   missingParts?: string[];
+  /** Kept on this phone only, never uploaded, whatever the backup setting: a live take's recording (Revisely Dev,
+   *  Settings → Recite). Uploading a take's audio stays opt-in until Majd decides otherwise. */
+  localOnly?: boolean;
 }
 
 export interface MetaSegment {
@@ -178,6 +181,8 @@ export interface SegmentInfo {
   open?: boolean;
   /** The segment's waveform (lib/waveform), when the recorder reported levels. */
   levels?: number[];
+  /** A new recording kept on this phone only (StoredRecording.localOnly). */
+  localOnly?: boolean;
 }
 
 export interface AppendResult {
@@ -252,6 +257,7 @@ export function appendSegment(
         ? rebaseMarks(normalizePageMarks(info.pageMarks), info.segmentStartMs ?? 0)
         : normalizePageMarks(info.pageMarks),
       ...(info.open ? { open: true } : {}),
+      ...((existing ? existing.localOnly : info.localOnly) ? { localOnly: true } : {}),
       storage: 'device',
     };
     try {
@@ -445,7 +451,7 @@ const hasBeenInBackup = (e: StoredRecording) =>
 const cloudDeleteFor = (e: StoredRecording): CloudDelete => ({ id: e.id, tombstone: hasBeenInBackup(e) });
 
 /** Whether this phone uploads the recording (its own, or adopted). */
-const uploadsHere = (e: StoredRecording) => !e.backupDeleted && (!e.restored || e.adopted === true);
+const uploadsHere = (e: StoredRecording) => !e.localOnly && !e.backupDeleted && (!e.restored || e.adopted === true);
 
 function syncDir(): Directory {
   const dir = new Directory(Paths.document, 'recordings-sync');

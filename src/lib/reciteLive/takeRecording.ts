@@ -1,7 +1,8 @@
 // A live take's audio kept as a recording (Revisely Dev; Settings → Recite → Save recordings when you recite, on by
 // default). The microphone's samples go to a WAV file in the caches folder as they come, about once a second, so a
 // long take never sits in memory; when the take ends the file becomes a reading recording of that day (lib/recordings),
-// with the pages it turned through and its waveform, as the reader's own recordings have.
+// with the pages it turned through and its waveform, as the reader's own recordings have. It stays on this phone
+// (localOnly): the backup never uploads it, since uploading a take's audio stays opt-in.
 
 import { File, Paths, type FileHandle } from 'expo-file-system';
 import { logger } from '../logger';
@@ -149,6 +150,7 @@ export function startTakeRecording({ day, page, now = Date.now() }: { day: strin
           segmentMs: Math.round((samples * 1000) / SAMPLE_RATE),
           pageMarks: marks,
           createdAt,
+          localOnly: true,
           ...(level.length > 0 ? { levels: level } : {}),
         });
         return result.kept && result.id ? { day, recordingId: result.id } : null;

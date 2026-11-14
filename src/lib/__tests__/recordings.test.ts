@@ -452,6 +452,22 @@ describe('backup bookkeeping', () => {
     expect(list.find((r) => r.id === b!.id)?.backedUp).toBe(false);
   });
 
+  it('a live take kept on this phone only is listed like any recording but never uploaded', async () => {
+    const a = await save('a', 100);
+    const { id: take } = await appendSegment(null, temp('take'), {
+      kind: 'reading',
+      day: '2026-10-20',
+      segmentMs: 5000,
+      pageMarks: [{ atMs: 0, page: 379 }],
+      createdAt: 300,
+      localOnly: true,
+    });
+    expect(take).not.toBeNull();
+    expect((await listRecordings()).map((r) => r.id).sort()).toEqual([a!.id, take!].sort());
+    expect((await pendingUploads(U)).map((p) => p.recordingId)).toEqual([a!.id]);
+    expect((await listRecordings()).find((r) => r.id === take)?.backedUp).toBe(false);
+  });
+
   it('keeps where an upload got to, until it is done', async () => {
     const a = await save('a', 100);
     const session = { url: 'https://upload/s1', offset: 4194304, sizeBytes: 11 };

@@ -964,7 +964,7 @@ export default function SettingsScreen() {
             <Row
               icon="mic-outline"
               label="Save recordings when you recite"
-              subtitle="With your other recordings, in Activity"
+              subtitle="On this phone only, with your recordings in Activity"
               rightSlot={
                 <SettingSwitch
                   value={reciteCheckSettings.saveRecording}

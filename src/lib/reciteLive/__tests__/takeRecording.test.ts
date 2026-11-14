@@ -85,6 +85,8 @@ describe('a take kept as a recording', () => {
       day: '2026-11-14',
       segmentMs: 2500,
       createdAt: 1000,
+      // On this phone only: the backup never uploads a take.
+      localOnly: true,
       pageMarks: [
         { atMs: 0, page: 379 },
         { atMs: 2000, page: 380 },
