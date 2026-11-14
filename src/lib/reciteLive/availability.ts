@@ -11,7 +11,7 @@ export function e2eReciteLive(): boolean {
 }
 
 /**
- * The reader's one mic (Record, Recite, Check) and following along on the page: Revisely Dev only, previewTester
+ * The reader's one mic (Record, Recite, Mark mistakes) and following along on the page: Revisely Dev only, previewTester
  * accounts, a binary that streams the microphone (iOS), and the print with word boxes (the 1405 pages). Everyone
  * else keeps today's record button; the store app never shows it (`isDevVariant()` is false there).
  */
@@ -19,15 +19,15 @@ export function reciteLiveEnabled(user: { previewTester?: boolean } | null | und
   return reciteLiveForAccount(user) && mushafEdition(edition).reciteData;
 }
 
-/** The account side of it, whatever print is chosen (Settings' rows for Recite and Check). */
+/** The account side of it, whatever print is chosen (Settings' Recite rows). */
 export function reciteLiveForAccount(user: { previewTester?: boolean } | null | undefined): boolean {
   const e2e = e2eReciteLive();
   return (isDevVariant() || e2e) && user?.previewTester === true && (isMicStreamAvailable() || e2e);
 }
 
 /**
- * Whether Check (mistake detection, part of Revisely Premium) is this account's. In the Dev app every tester has it;
- * "Show Check locked" (Settings → Testing) shows it as those without it will see it. The grant (entitlements, being
+ * Whether marking mistakes (part of Revisely Premium) is this account's. In the Dev app every tester has it; "Show
+ * Premium locked" (Settings → Testing) shows it as those without it see it. The grant (entitlements, being
  * agreed with apply-support: `.check` or `.premium`) replaces previewTester once it exists.
  */
 export function checkOwned(user: { previewTester?: boolean } | null | undefined, settings: Pick<ReciteCheckSettings, 'previewLocked'>): boolean {

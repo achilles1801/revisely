@@ -71,8 +71,12 @@ export type LiveFailure =
   | 'idle'
   | 'bad_request'
   | 'server'
-  /** Check without the account having it (the server's gate, CHECK_GATE). */
+  /**
+   * Marking mistakes without Premium (the server's gate, CHECK_GATE): `check_locked` as served, `premium_required` as
+   * proposed in apply-support's contract draft 2. Either opens the Premium page.
+   */
   | 'check_locked'
+  | 'premium_required'
   | 'offline';
 
 export type LiveEvent =
@@ -92,7 +96,22 @@ const RULES: TajweedRule[] = [
   'madd_munfasil', 'madd_muttasil', 'madd_aared', 'madd_lazim', 'madd_dropped', 'qalqalah', 'ghunnah', 'ikhfa',
   'idgham', 'idgham_no_ghunnah', 'iqlab',
 ];
-const FAILURES: LiveFailure[] = ['sign_in', 'testers_only', 'limit', 'too_long', 'idle', 'bad_request', 'server', 'check_locked'];
+const FAILURES: LiveFailure[] = [
+  'sign_in',
+  'testers_only',
+  'limit',
+  'too_long',
+  'idle',
+  'bad_request',
+  'server',
+  'check_locked',
+  'premium_required',
+];
+
+/** The server refused marking mistakes for want of Premium (either name). */
+export function needsPremium(reason: LiveFailure | null | undefined): boolean {
+  return reason === 'check_locked' || reason === 'premium_required';
+}
 
 const isNum = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x);
 const isWord = (x: unknown): x is number => isNum(x) && Number.isInteger(x) && x >= 0;

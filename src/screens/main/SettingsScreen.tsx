@@ -909,11 +909,11 @@ export default function SettingsScreen() {
         </Section>
 
         {reciteCheck ? (
-          <Section title="Recite" footer="Check is AI and can make mistakes. Recordings are checked by software; nobody listens.">
+          <Section title="Recite" footer="Marking mistakes is AI and can make mistakes. Recordings are checked by software; nobody listens.">
             <Row
               icon="checkmark-done-outline"
-              label="What Check marks"
-              value={reciteCheckSettings.level === 'strict' ? 'Strict' : 'Words and harakat'}
+              label="Mistakes to mark"
+              value={reciteCheckSettings.level === 'strict' ? 'Strict' : 'Words & harakat'}
               onPress={() => setCheckLevelSheet(true)}
               testID="settings-check-level"
             />
@@ -1143,13 +1143,13 @@ export default function SettingsScreen() {
             {reciteCheck ? (
               <Row
                 icon="lock-closed-outline"
-                label="Show Check locked"
-                subtitle="As it will look to those who haven’t got it"
+                label="Show Premium locked"
+                subtitle="Mark mistakes as those without Premium see it"
                 rightSlot={
                   <SettingSwitch
                     value={reciteCheckSettings.previewLocked}
                     onValueChange={(previewLocked) => setReciteCheckSettings(user?.id, { previewLocked })}
-                    accessibilityLabel="Show Check locked"
+                    accessibilityLabel="Show Premium locked"
                     testID="settings-check-locked"
                   />
                 }
@@ -1222,11 +1222,11 @@ export default function SettingsScreen() {
       <ActionSheet
         visible={checkLevelSheet}
         onClose={() => setCheckLevelSheet(false)}
-        title="What Check marks"
+        title="Mistakes to mark"
         actions={[
           {
             key: 'words',
-            label: 'Words and harakat',
+            label: 'Words & harakat',
             subtitle: 'Wrong, skipped and added words, and letter and haraka slips',
             selected: reciteCheckSettings.level !== 'strict',
             onPress: () => setReciteCheckSettings(user?.id, { level: 'words' }),

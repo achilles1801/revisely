@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../../context/ThemeContext';
 import { Tap } from '../v2/Tap';
 
+/** What a tap on the mic starts: Record, Recite, or Recite marking mistakes ("check", Premium). */
 export type ReciteMicMode = 'record' | 'recite' | 'check';
 
 const SIZE = 40;
@@ -12,10 +13,10 @@ const SIZE = 40;
 export const MIC_LABEL: Record<ReciteMicMode, string> = {
   record: 'Record',
   recite: 'Recite',
-  check: 'Check your recitation',
+  check: 'Recite and mark mistakes',
 };
 
-/** Check's mark: a tick on its own gradient (palette.premium), with a lock while it isn't the account's. */
+/** Marking mistakes' mark (Premium): a tick on its own gradient (palette.premium), with a lock without Premium. */
 export function CheckMark({ size = 24, locked = false }: { size?: number; locked?: boolean }) {
   const { palette } = useTheme();
   return (
@@ -38,8 +39,9 @@ export function CheckMark({ size = 24, locked = false }: { size?: number; locked
 }
 
 /**
- * The reader's one mic (Revisely Dev). A tap starts the mode it shows; held, it opens the choice of Record, Recite
- * and Check. A small badge says which: none for Recite, a red dot for Record, Check's mark for Check.
+ * The reader's one mic (Revisely Dev). A tap starts what it shows; held, it opens the choice of Record or Recite, with
+ * Mark mistakes under Recite. A small badge says which: none for Recite, a red dot for Record, the marking mark when
+ * Recite marks mistakes.
  */
 export function ReciteMic({
   mode,
@@ -62,8 +64,8 @@ export function ReciteMic({
       hitSlop={6}
       accessibilityRole="button"
       accessibilityLabel={MIC_LABEL[mode]}
-      accessibilityHint="Hold to choose Record, Recite or Check"
-      accessibilityActions={[{ name: 'longpress', label: 'Choose Record, Recite or Check' }]}
+      accessibilityHint="Hold to choose Record or Recite"
+      accessibilityActions={[{ name: 'longpress', label: 'Choose Record or Recite' }]}
       onAccessibilityAction={(e) => {
         if (e.nativeEvent.actionName === 'longpress') onLongPress();
       }}

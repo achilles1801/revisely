@@ -144,13 +144,13 @@ export function TakeSummarySheet({
           onPress={onCheck}
           style={[styles.row, styles.firstRow, { borderTopColor: palette.separator }]}
           accessibilityRole="button"
-          accessibilityLabel="See your mistakes with Check"
+          accessibilityLabel="See your mistakes, part of Premium"
           testID="take-summary-check"
         >
           <CheckMark size={36} locked />
           <View style={styles.rowText}>
             <Text style={[typeV2.name, { color: palette.premium[0] }]}>See your mistakes</Text>
-            <Text style={[typeV2.meta, { color: palette.secondary }]}>Check marks each one as you recite</Text>
+            <Text style={[typeV2.meta, { color: palette.secondary }]}>Mark mistakes shows each one as you recite</Text>
           </View>
           <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
         </Tap>
