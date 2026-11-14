@@ -166,14 +166,17 @@ export function parseScore(raw: unknown): LiveScore | null {
 export function parseFinal(raw: unknown): FinalResult | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
-  if (r.v !== 2 || !Array.isArray(r.marks)) return null;
+  if (r.v !== 2) return null;
+  // Recite's answer (`follow`) holds the words and nothing to mark: no marks list, no score. Check's always has marks.
+  // Reading Recite's as unreadable left the take on Checking… while the phone resumed it, again and again.
+  if (r.follow !== true && !Array.isArray(r.marks)) return null;
   return {
     v: 2,
     take: typeof r.take === 'string' ? r.take : null,
     from: isWord(r.from) ? r.from : 0,
     to: isWord(r.to) ? r.to : 0,
     secs: isNum(r.secs) ? r.secs : 0,
-    marks: (r.marks as unknown[]).map(parseMark).filter((m): m is Mark => m != null),
+    marks: Array.isArray(r.marks) ? r.marks.map(parseMark).filter((m): m is Mark => m != null) : [],
     score: parseScore(r.score),
     kept: typeof r.kept === 'boolean' ? r.kept : undefined,
     ...(r.why === 'end' || r.why === 'too_long' ? { why: r.why } : {}),

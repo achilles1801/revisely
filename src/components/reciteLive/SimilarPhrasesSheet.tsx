@@ -14,7 +14,7 @@ const NBSP = ' ';
 /**
  * Similar phrases (mutashabihat) for a marked word: the ayahs that read almost the same, worked out on the phone
  * (lib/reciteLive/similar). Each row: the ayah (surah first), its words with the shared ones in ink, the word at the
- * mark's place in the accent and the rest quieter. A tap opens the reader there.
+ * mark's place in the follow blue and the rest quieter. A tap opens the reader there.
  */
 export function SimilarPhrasesSheet({
   visible,
@@ -65,7 +65,7 @@ export function SimilarPhrasesSheet({
           </View>
           <Text style={[arabicV2(21), styles.ar]}>
             {Array.from({ length: to - from }, (_, i) => from + i).map((x, i) => (
-              <Text key={x} style={{ color: x === w ? palette.accentText : same.has(x) ? palette.text : palette.secondary }}>
+              <Text key={x} style={{ color: x === w ? palette.followInk : same.has(x) ? palette.text : palette.secondary }}>
                 {i > 0 ? ' ' : ''}
                 {words.uthmani(x)}
               </Text>

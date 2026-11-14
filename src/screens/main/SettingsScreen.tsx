@@ -89,6 +89,7 @@ import { smartTrackingOn } from '../../lib/smartTracking';
 import { showsTestScenarios } from '../../lib/testScenarios';
 import { releaseSync } from '../../lib/offline/sync';
 import { reciteLiveForAccount } from '../../lib/reciteLive/availability';
+import { premiumErrorText, setDevPremium, usePremium } from '../../lib/premium';
 import { setReciteCheckSettings, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
 import { ReciteCheckNotice } from '../../components/reciteCheck/ReciteCheckNotice';
 
@@ -285,6 +286,15 @@ export default function SettingsScreen() {
   const reciteCheck = reciteLiveForAccount(user);
   const reciteCheckSettings = useReciteCheckSettings(reciteCheck ? user?.id : null);
   const [checkLevelSheet, setCheckLevelSheet] = useState(false);
+  // Premium (lib/premium): in Revisely Dev a tester turns it on and off here, free, to see marking mistakes locked.
+  const premium = usePremium(user?.id, reciteCheck);
+  const [premiumBusy, setPremiumBusy] = useState(false);
+  const switchPremium = useCallback((on: boolean) => {
+    setPremiumBusy(true);
+    setDevPremium(on)
+      .catch((err) => Alert.alert(on ? 'Couldn’t turn on Premium' : 'Couldn’t turn off Premium', premiumErrorText(err)))
+      .finally(() => setPremiumBusy(false));
+  }, []);
   const [reciteNotice, setReciteNotice] = useState(false);
   const [scenarioSheet, setScenarioSheet] = useState(false);
   const [whatsNewOpen, setWhatsNewOpen] = useState(false);
@@ -1142,15 +1152,16 @@ export default function SettingsScreen() {
             ) : null}
             {reciteCheck ? (
               <Row
-                icon="lock-closed-outline"
-                label="Show Premium locked"
-                subtitle="Mark mistakes as those without Premium see it"
+                icon="sparkles-outline"
+                label="Premium"
+                subtitle="Free in Revisely Dev. Turn it off to see Mark mistakes locked"
                 rightSlot={
                   <SettingSwitch
-                    value={reciteCheckSettings.previewLocked}
-                    onValueChange={(previewLocked) => setReciteCheckSettings(user?.id, { previewLocked })}
-                    accessibilityLabel="Show Premium locked"
-                    testID="settings-check-locked"
+                    value={premium.has}
+                    disabled={premiumBusy || !premium.known}
+                    onValueChange={switchPremium}
+                    accessibilityLabel="Premium"
+                    testID="settings-premium"
                   />
                 }
               />

@@ -39,7 +39,8 @@ import { AyahRef, ayahRects } from '../../lib/ayahBounds';
 import { useMushafEdition } from '../../lib/mushafEdition';
 import { sittingSavedText, sittingsEnabled } from '../../lib/sitting';
 import type { ReadStackParamList } from '../../navigation/MainNavigator';
-import { checkOwned, reciteLiveEnabled } from '../../lib/reciteLive/availability';
+import { reciteLiveEnabled } from '../../lib/reciteLive/availability';
+import { premiumErrorText, setDevPremium, supportLinkUrl, usePremium } from '../../lib/premium';
 import { setReciteCheckSettings, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
 import { loadQuranWords, getQuranWords, QuranWords } from '../../lib/recite/quranWords';
 import { furthestWord, marksOnPage } from '../../lib/reciteLive/state';
@@ -249,7 +250,38 @@ export default function QuranReaderScreen() {
   // ===== The one mic: Record, Recite, Check (Revisely Dev, testers, the 1405 print) =====
   const liveOn = reciteLiveEnabled(user, edition);
   const reciteSettings = useReciteCheckSettings(user?.id);
-  const owned = checkOwned(user, reciteSettings);
+  // Marking mistakes needs Premium: the account's grant (lib/premium; apply-support's contract draft 2).
+  const premium = usePremium(user?.id, liveOn);
+  const owned = premium.has;
+  const [gettingPremium, setGettingPremium] = useState(false);
+  // Revisely Dev: Premium is free (nothing is charged); it says so before turning it on.
+  const getPremium = useCallback(() => {
+    Alert.alert('Premium in Revisely Dev', 'Free while testing: nothing is charged. Turn it off in Settings → Testing.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Turn on',
+        onPress: () => {
+          setGettingPremium(true);
+          setDevPremium(true)
+            .then((on) => {
+              if (on) setIntroOpen(false);
+            })
+            .catch((err) => Alert.alert('Couldn’t turn on Premium', premiumErrorText(err)))
+            .finally(() => setGettingPremium(false));
+        },
+      },
+    ]);
+  }, []);
+  // "Can't afford it? Apply for support": the program's page, opened with a one-time link for this account.
+  const applyForSupport = useCallback(() => {
+    supportLinkUrl()
+      .then((url) => {
+        // Required here, so screens and tests that never open it don't load it (expo-web-browser is in every binary).
+        const WebBrowser = require('expo-web-browser') as typeof import('expo-web-browser');
+        return WebBrowser.openBrowserAsync(url);
+      })
+      .catch((err) => Alert.alert('Apply for support', premiumErrorText(err)));
+  }, []);
   // A take kept as a recording (Save recordings, on by default) is told about once the take is closed (✕) and the
   // player is back: "Recording saved · View", over the player as after any recording, never over the recite bar.
   const [takeSaved, setTakeSaved] = useState<{ day: string; recordingId: string } | null>(null);
@@ -399,7 +431,7 @@ export default function QuranReaderScreen() {
     (page: number) => (checkTake && qw ? marksOnPage(live.state, qw, page) : []),
     [checkTake, qw, live.state],
   );
-  const coverColors = useMemo(() => ({ cover: palette.pageBg, guide: palette.textSecondary, band: v2.accentText }), [palette, v2]);
+  const coverColors = useMemo(() => ({ cover: palette.pageBg, guide: palette.textSecondary, band: v2.followInk }), [palette, v2]);
   const pageUnderlay = useMemo(
     () =>
       liveOn && qw && live.active
@@ -428,7 +460,7 @@ export default function QuranReaderScreen() {
               marks={pageMarks(page)}
               hidden={hidden ? { follow: hiddenFollow(qw, revealed, liveInfo), ...coverColors } : null}
               newest={live.state.cursor}
-              colors={{ mistake: v2.red, slip: v2.warn, accent: v2.accentText, onMistake: v2.bg, ground: palette.pageBg }}
+              colors={{ mistake: v2.red, slip: v2.warn, follow: v2.followInk, onMistake: v2.bg, ground: palette.pageBg }}
             />
           )
         : undefined,
@@ -442,16 +474,6 @@ export default function QuranReaderScreen() {
         ? (page: number, scale: number) => <LiveMarkTargets page={page} scale={scale} words={qw} marks={pageMarks(page)} />
         : undefined,
     [liveOn, qw, pageMarks],
-  );
-  const onTapVerse = useMemo(
-    () =>
-      liveOn && hidden && qw
-        ? (ayah: AyahRef) => {
-            setRevealed((r) => revealAyah(qw, ayah.page, r, liveInfo, ayah));
-            return true;
-          }
-        : undefined,
-    [liveOn, hidden, qw, liveInfo],
   );
 
   const liveStatus = live.state.status;
@@ -603,7 +625,6 @@ export default function QuranReaderScreen() {
           pageUnderlay={pageUnderlay}
           pageOverlay={pageOverlay}
           pageAccessories={pageAccessories}
-          onTapVerse={onTapVerse}
           onTapPoint={onTapPoint}
           extraData={liveOn ? `${live.state.cursor}|${live.state.saidUpTo}|${Object.keys(live.state.marks).length}|${hidden}|${revealed.size}` : undefined}
         />
@@ -692,7 +713,7 @@ export default function QuranReaderScreen() {
             seconds={live.seconds}
             marks={Object.values(live.state.marks).sort((a, b) => a.w - b.w)}
             score={checkTake && qw ? scorePill(live.state, qw, live.startWord) : null}
-            kept={live.state.final?.kept === true}
+            kept={live.testData}
             checkOwned={owned}
             onFinding={(m) => {
               setSummaryShown(null);
@@ -715,9 +736,9 @@ export default function QuranReaderScreen() {
           />
           <CheckIntroPage
             visible={introOpen}
-            onGet={() =>
-              Alert.alert('Not yet', 'Premium isn’t available yet. In Revisely Dev every tester can mark mistakes.')
-            }
+            getting={gettingPremium}
+            onGet={getPremium}
+            onSupport={applyForSupport}
             onClose={() => setIntroOpen(false)}
           />
           <ReciteNoticeSheet

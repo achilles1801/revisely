@@ -32,8 +32,6 @@ export interface ReciteCheckSettings {
   level: 'words' | 'strict';
   /** Reciting (Recite, Check) also saves the recitation as the session's recording; off in Settings. */
   saveRecording: boolean;
-  /** Tests and previews: show marking mistakes locked, as it is for those without Premium. */
-  previewLocked: boolean;
 }
 
 export const RECITE_CHECK_DEFAULTS: ReciteCheckSettings = {
@@ -47,7 +45,6 @@ export const RECITE_CHECK_DEFAULTS: ReciteCheckSettings = {
   markMistakes: false,
   level: 'words',
   saveRecording: true,
-  previewLocked: false,
 };
 
 const KEY = (uid: string) => `@revisely_recite_check:v1:${uid}`;
@@ -78,7 +75,6 @@ export function parseReciteCheckSettings(raw: string | null): ReciteCheckSetting
     markMistakes: typeof s.markMistakes === 'boolean' ? s.markMistakes : s.mode === 'check' ? true : d.markMistakes,
     level: pick(s.level, ['words', 'strict'] as const, d.level),
     saveRecording: typeof s.saveRecording === 'boolean' ? s.saveRecording : d.saveRecording,
-    previewLocked: s.previewLocked === true,
   };
 }
 

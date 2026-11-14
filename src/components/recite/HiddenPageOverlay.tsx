@@ -8,9 +8,10 @@ const GUIDE_AT = 0.74;
 /**
  * A hidden page (the recite mode), over the page image in its own frame: every
  * line covered in the page colour with a faint guide line across it, the verse
- * markers left open, revealed verses open in place, and an accent band across
+ * markers left open, revealed verses open in place, and a blue band (followInk) across
  * the line where the next hidden verse starts. Takes no touches: a tap reaches
- * the page underneath (MushafPager's onTapVerse).
+ * the page underneath, where it brings the controls and shows nothing (Majd,
+ * Nov 14 2026).
  */
 export function HiddenPageOverlay({
   page,

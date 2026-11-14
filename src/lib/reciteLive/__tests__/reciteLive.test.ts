@@ -84,6 +84,23 @@ describe('the contract', () => {
     expect(parseMark({ id: 'a', w: 1, ayah: [1, 1], kind: 'word', heard: 'وأوهيتت', heardExact: false })).toMatchObject({ heardExact: false, sure: 'clear' });
   });
 
+  it('reads Recite’s final answer: words only, no marks list or score (live.py’s follow result)', () => {
+    // As the service sends it at the end of a Recite take (scripts/recite-check/live.py, `self.follow`).
+    const recite = {
+      type: 'done',
+      result: {
+        v: 2, follow: true, from: A23, to: A23 + 10, secs: 3, take: '20261114-184317-15dbd6', engine: 'c01f4ea0', why: 'end', kept: true,
+        words: [{ w: A23, s: 'ok' }], settings: { mon: 4, mot: 4, aar: 0, letters: '0', tajweed: '1' }, ms: { model: 207, words: 190 },
+      },
+    };
+    expect(parseEvent(JSON.stringify(recite))).toEqual({
+      type: 'done',
+      result: { v: 2, take: '20261114-184317-15dbd6', from: A23, to: A23 + 10, secs: 3, marks: [], score: null, kept: true, why: 'end' },
+    });
+    // Check's answer still needs its marks.
+    expect(parseEvent({ type: 'done', result: { ...recite.result, follow: undefined } })).toBeNull();
+  });
+
   it('red for words, amber for harakat, letters and tajweed', () => {
     expect(['word', 'skipped', 'added'].map((kind) => severityOf({ kind } as Mark))).toEqual(['mistake', 'mistake', 'mistake']);
     expect(['harakat', 'letter', 'tajweed'].map((kind) => severityOf({ kind } as Mark))).toEqual(['slip', 'slip', 'slip']);

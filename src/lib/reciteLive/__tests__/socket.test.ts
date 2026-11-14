@@ -183,6 +183,48 @@ describe('the live socket', () => {
     expect(b.closed()).toBe(1);
   });
 
+  it('a final answer it can’t read still ends the take (as the checker’s failure), with no resume', async () => {
+    const t = setup();
+    await flush();
+    const s = t.sockets[0];
+    s.onopen!();
+    s.answer({ type: 'ready', v: 2, take: 'take1', from: 0 });
+    t.conn.send({ type: 'end' });
+    s.answer({ type: 'done', result: { v: 3 } });
+    // The checker closes after its answer; the socket was already let go.
+    expect(s.closed).toBe(true);
+    s.onclose?.({ code: 1000 });
+    expect(t.events.slice(-1)).toEqual([{ type: 'error', reason: 'server' }]);
+    expect(t.closed()).toBe(1);
+    expect(t.queue.length).toBe(0);
+    expect(t.sockets.length).toBe(1);
+  });
+
+  it('once the take has ended, resumes don’t renew the tries: a checker that closes without answering ends it as offline', async () => {
+    // Each socket opens, is ready, and closes with no answer (what the phone did on Nov 14 2026, 8 sockets in 10 s
+    // until the reader was left).
+    const t = setup(['tok1', 'tok2', 'tok3', 'tok4', 'tok5', 'tok6']);
+    await flush();
+    t.sockets[0].onopen!();
+    t.sockets[0].answer({ type: 'ready', v: 2, take: 'take1', from: 0 });
+    t.conn.sendAudio(pcm(1, 2, 3));
+    t.conn.send({ type: 'end' });
+    t.sockets[0].onclose!({ code: 1000 });
+    for (let i = 1; i <= 3; i++) {
+      t.runTimer();
+      await flush();
+      t.sockets[i].onopen!();
+      t.sockets[i].answer({ type: 'ready', v: 2, take: 'take1', from: 3 });
+      // The resume sends what the checker hasn't had: the end.
+      expect(t.sockets[i].out().slice(1)).toEqual([{ type: 'end' }]);
+      t.sockets[i].onclose!({ code: 1000 });
+    }
+    expect(t.events.slice(-1)).toEqual([{ type: 'error', reason: 'offline' }]);
+    expect(t.closed()).toBe(1);
+    expect(t.sockets.length).toBe(4);
+    expect(t.queue.length).toBe(0);
+  });
+
   it('closing it hangs up and stops any retry', async () => {
     const t = setup();
     await flush();

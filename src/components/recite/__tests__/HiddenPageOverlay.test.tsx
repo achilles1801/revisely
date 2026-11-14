@@ -27,7 +27,7 @@ describe('<HiddenPageOverlay />', () => {
     expect(flat(screen.getAllByTestId('hidden-guide')[0].props.style).backgroundColor).toBe('ink');
   });
 
-  it('one accent band, on the next verse’s line; takes no touches', () => {
+  it('one follow band, on the next verse’s line; takes no touches', () => {
     render(<HiddenPageOverlay page={1} scale={0.4} revealed={new Set(['1:1'])} colors={colors} />);
     const bands = screen.getAllByTestId('hidden-band');
     expect(bands).toHaveLength(1);

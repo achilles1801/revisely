@@ -113,6 +113,9 @@ export function useLiveRecitation({
   const [owner] = useState(() => `recite-live-${Math.random().toString(36).slice(2)}`);
   const recordingRef = useRef<TakeRecording | null>(null);
   const [recording, setRecording] = useState(false);
+  // The take went with Keep as test data on: the checker stores it (its `done` no longer says so; a `kept` event
+  // follows, after the phone has hung up).
+  const [testData, setTestData] = useState(false);
   const onSavedRef = useRef(onRecordingSaved);
   onSavedRef.current = onRecordingSaved;
 
@@ -177,6 +180,7 @@ export function useLiveRecitation({
         setWords(qw);
         const frame = startFrameFor(pageRef.current, take, settings);
         startWord.current = qw.verseFirstWord(frame.s, frame.a);
+        setTestData(frame.keep);
         setMode(take);
         setState(liveConnecting());
         const c = e2e.e2eLiveConnect()(frame, {
@@ -217,6 +221,7 @@ export function useLiveRecitation({
         setWords(qw);
         const frame = startFrameFor(pageRef.current, take, settings);
         startWord.current = qw.verseFirstWord(frame.s, frame.a);
+        setTestData(frame.keep);
         claimAudio('recorder', owner);
         getRecitation().stop();
         setMode(take);
@@ -338,6 +343,8 @@ export function useLiveRecitation({
     mic,
     /** The take is being kept as a recording (Save recordings on). */
     recording,
+    /** The take went to the checker with Keep as test data on (it is stored there). */
+    testData,
     seconds,
     words,
     /** The first word of the take (where the score's pages start). */

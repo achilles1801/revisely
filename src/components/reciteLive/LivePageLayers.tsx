@@ -121,7 +121,7 @@ function Dots({ box, scale, color, opacity }: { box: Rect; scale: number; color:
 
 /**
  * Over the page's ink: hidden-page covers (words show as recited, or shown by hand), the newest word shown in the
- * accent while hidden, and the marks (Check): the word itself in red or amber with a dotted line under it, or a small
+ * follow blue while hidden (never the accent), and the marks (Check): the word itself in red or amber with a dotted line under it, or a small
  * ⊕ in the gap where a word was added. A mark past the normal bar only (`likely`) is a little lighter.
  */
 export function LiveOverlay({
@@ -142,7 +142,7 @@ export function LiveOverlay({
   hidden: { follow: WordFollow; cover: string; guide: string; band: string } | null;
   newest: number | null;
   /** `ground`: the page's colour (a likely mark is its colour a little towards it). */
-  colors: { mistake: string; slip: string; accent: string; onMistake: string; ground: string };
+  colors: { mistake: string; slip: string; follow: string; onMistake: string; ground: string };
 }) {
   const showNewest = hidden && newest != null && words.pageOf(newest) === page && hidden.follow.shown(newest);
   return (
@@ -156,7 +156,7 @@ export function LiveOverlay({
           colors={{ cover: hidden.cover, guide: hidden.guide, band: hidden.band }}
         />
       ) : null}
-      {image && showNewest ? <Recoloured image={image} box={wordBox(words, newest)} scale={scale} color={colors.accent} opacity={1} /> : null}
+      {image && showNewest ? <Recoloured image={image} box={wordBox(words, newest)} scale={scale} color={colors.follow} opacity={1} /> : null}
       {marks.map((m) => {
         if (words.pageOf(m.w) !== page) return null;
         const shape = markShape(words, m);

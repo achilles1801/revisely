@@ -46,6 +46,17 @@ function bytes(chunk: Int16Array): ArrayBuffer {
   return chunk.buffer.slice(chunk.byteOffset, chunk.byteOffset + chunk.byteLength) as ArrayBuffer;
 }
 
+/** A text frame's `type`, read on its own (for a frame `parseEvent` couldn't read). */
+function typeOf(data: unknown): unknown {
+  if (typeof data !== 'string') return undefined;
+  try {
+    const x = JSON.parse(data) as unknown;
+    return x && typeof x === 'object' ? (x as { type?: unknown }).type : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function socketFeed(deps: SocketDeps): LiveConnect {
   const url = deps.url ?? RECITE_LIVE_URL;
   const open = deps.open ?? ((u: string) => new WebSocket(u) as unknown as SocketLike);
@@ -67,6 +78,8 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
     let finished = false;
     let tries = 0;
     let retry: unknown = null;
+    /** The take has ended (`end` went): only its answer is still to come. */
+    const ended = () => controls.some((c) => c.frame.type === 'end');
 
     const finish = (e?: LiveEvent) => {
       if (finished) return;
@@ -144,10 +157,17 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
       s.onmessage = (m) => {
         if (socket !== s || typeof m.data !== 'string') return;
         const e = parseEvent(m.data);
-        if (!e) return;
+        if (!e) {
+          // A final answer this app can't read still ends the take. Resuming instead had the checker finish it
+          // again, answer again and close again, round after round (a Recite take, Nov 14 2026).
+          if (typeOf(m.data) === 'done') finish({ type: 'error', reason: 'server' });
+          return;
+        }
         if (e.type === 'ready') {
           take = e.take ?? take;
-          tries = 0;
+          // Once the take has ended, a resume only waits for the answer: its tries aren't renewed, so a checker
+          // that keeps closing without one can't hold the take on Checking… for good.
+          if (!ended()) tries = 0;
           handlers.onEvent(e);
           catchUp(s, Math.min(samples, Math.max(0, e.from ?? 0)));
           return;
@@ -192,7 +212,7 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
     return {
       sendAudio: (pcm) => {
         if (finished || pcm.length === 0) return;
-        if (controls.some((c) => c.frame.type === 'end')) return;
+        if (ended()) return;
         const copy = new Int16Array(pcm);
         audio.push(copy);
         samples += copy.length;
