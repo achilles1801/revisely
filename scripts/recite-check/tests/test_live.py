@@ -10,6 +10,7 @@ import os
 import pathlib
 import sys
 import unittest
+import unittest.mock
 import wave
 
 import numpy as np
@@ -253,6 +254,30 @@ class Bench(unittest.TestCase):
         self.assertEqual(res['score']['helped'], 8)
         self.assertEqual(res['score']['mistakes'], 2)
         self.assertEqual([e for e in ev if e['type'] == 'score'][-1]['helped'], 8)
+
+    def test_strict_hands_the_take_to_the_second_model(self):
+        """With v5 loaded (#539), ayah_notes gets the take's samples, on the frames' grid; without it, nothing."""
+        import live
+        E = engine()
+        seen = []
+        real = E.ayah_notes
+
+        def notes(lp, s, a, statuses, spans, st, audio=None):
+            seen.append(None if audio is None else len(audio))
+            return real(lp, s, a, statuses, spans, st)
+        pcm = bench_pcm()[: 16000 * 2 * 20]
+        with unittest.mock.patch.object(E, 'ayah_notes', notes), unittest.mock.patch.object(E, 'ear2', object(),
+                                                                                             create=True):
+            sess = live.LiveSession(E, 1, 1, 1, 7, {})
+            run(sess, chunks(pcm, 3200) + [{'type': 'end'}])
+            self.assertTrue(sess.v5 and seen and all(n is not None for n in seen))
+            self.assertEqual(seen[-1], len(pcm) // 2)
+            np.testing.assert_allclose(sess.xf[:sess.n], np.frombuffer(pcm, '<i2') / 32768.0)
+            seen.clear()
+            sess = live.LiveSession(E, 1, 1, 1, 7, {'tajweed': '0'})  # words and harakat: no second model
+            run(sess, chunks(pcm, 3200) + [{'type': 'end'}])
+            self.assertFalse(sess.v5)
+            self.assertTrue(all(n is None for n in seen))
 
     def test_same_events_for_any_chunk_size(self):
         pcm = bench_pcm()[: 16000 * 2 * 20]

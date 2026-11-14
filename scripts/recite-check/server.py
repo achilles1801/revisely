@@ -34,6 +34,9 @@ MAX_SECONDS = 240
 FIRST_FRAME = 10      # seconds a new socket has to send its start frame
 IDLE = 30             # seconds without a frame from the phone before a socket is closed
 RESUME_TTL = 120      # seconds a dropped session waits on this instance for its phone to come back
+# Check is paid, with a free path (apply-support.md): with CHECK_GATE=on, /check and /live without "follow" need
+# entitlements/{uid}.check; Recite (follow) stays free. Off until the entitlements exist on revisely-dev.
+CHECK_GATE = os.environ.get('CHECK_GATE', 'off') == 'on'
 MARK_ID = re.compile(r'^\d{1,6}:(word|letter|tajweed):[a-z_]{1,24}$')
 log = logging.getLogger('recite-check')
 logging.basicConfig(level=logging.INFO)
@@ -101,6 +104,12 @@ async def signed_in_tester(header):
     return uid
 
 
+async def may_check(uid):
+    """Check (marks) needs the entitlement when the gate is on; Recite doesn't."""
+    if CHECK_GATE and not await asyncio.to_thread(auth.has_check, uid):
+        raise auth.Refused(403, 'check_locked')
+
+
 def put_json(name, obj):
     store.put(name, json.dumps(obj, ensure_ascii=False).encode(), 'application/json')
 
@@ -114,6 +123,7 @@ def health():
 async def check(request: Request):
     try:
         uid = await signed_in_tester(request.headers.get('authorization'))
+        await may_check(uid)
         limiter.take(uid)
         body = await request.body()
         if len(body) > MAX_SECONDS * 32000 + 4096:
@@ -340,6 +350,8 @@ async def live_socket(ws: WebSocket):
             raise BadRequest('the first frame must be a start frame')
         token = msg.get('token')
         uid = await signed_in_tester('Bearer ' + token if isinstance(token, str) else ws.headers.get('authorization'))
+        if not follow_of(msg):
+            await may_check(uid)  # on every socket, a resume's too
         s, resumed = await open_session(msg, uid)
 
         def take_over():

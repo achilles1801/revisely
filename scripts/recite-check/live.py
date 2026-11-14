@@ -23,6 +23,7 @@ Everything here is a function of the audio and of where in it each seek and dism
 run again from its audio (a resumed socket on another instance) and gives the same events.
 """
 import concurrent.futures
+import inspect
 import json
 import multiprocessing
 import time
@@ -404,6 +405,10 @@ class LiveSession:
             raise BadRequest('both or neither of s2, a2')
         self.lo, self.end = E.passage(s, a, s2, a2, max_words=10 ** 6)
         self.V = len(E.ear.vocab) + 1
+        # Strict on the second model (v5, #539): ayah_notes takes the take's samples when the engine has it
+        self.v5 = self.st.get('tajweed', True) and getattr(E, 'ear2', None) is not None \
+            and 'audio' in inspect.signature(E.ayah_notes).parameters
+        self.xf = np.zeros(SR * 30 if self.v5 else 0, np.float32)
         self.pcm = np.zeros(SR * 30, np.int16)
         self.n = 0                       # samples received
         self.lp = np.zeros((1500, self.V), np.float32)
@@ -451,6 +456,12 @@ class LiveSession:
             grown[:self.n] = self.pcm[:self.n]
             self.pcm = grown
         self.pcm[self.n:self.n + len(x)] = x
+        if self.v5:
+            if self.n + len(x) > len(self.xf):
+                grown = np.zeros(len(self.pcm), np.float32)
+                grown[:self.n] = self.xf[:self.n]
+                self.xf = grown
+            self.xf[self.n:self.n + len(x)] = x.astype(np.float32) / 32768.0
         self.n += len(x)
         ev = self._run()
         if self.n >= MAX_SECONDS * SR:
@@ -846,6 +857,12 @@ class LiveSession:
         ev += self._score_event(now)
         return ev
 
+    def _notes(self, s, a, statuses, spans):
+        """Engine.ayah_notes on the take's frames (and its samples, for the second model in Strict)."""
+        if self.v5:
+            return self.E.ayah_notes(self.lp[:self.T], s, a, statuses, spans, self.st, audio=self.xf[:self.n])
+        return self.E.ayah_notes(self.lp[:self.T], s, a, statuses, spans, self.st)
+
     def _keep_mark(self, m):
         self.marks[m['id']] = m
         self.unmarked.discard(m['id'])
@@ -907,7 +924,7 @@ class LiveSession:
             if self.follow:
                 marks = []
             else:
-                tj, letters = self.E.ayah_notes(self.lp[:self.T], s, a, self.status, self.spans, self.st)
+                tj, letters = self._notes(s, a, self.status, self.spans)
                 marks = self.E.marks([], {}, {}, [], tj, letters if self.st['letters'] else [])
             for m in marks:
                 if m['id'] not in self.marks:
@@ -997,7 +1014,7 @@ class LiveSession:
             first, n = self._ayah_bounds(s, a)
             if first < self.lo or first + n > self.end:
                 continue
-            o, l_ = self.E.ayah_notes(self.lp[:self.T], s, a, statuses, spans, self.st)
+            o, l_ = self._notes(s, a, statuses, spans)
             tj += o
             letters += l_
         self.ms['tajweed'] += (time.perf_counter() - t0) * 1000
