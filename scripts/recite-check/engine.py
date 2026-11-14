@@ -6,10 +6,13 @@ dropped, qalqalah, ghunnah and ikhfa (with their held time), idgham and iqlab. L
 off unless asked). Every bar was set on professional reciters so that about 2% of correct places are flagged
 (bars.json, from make_bars.py in the lab).
 """
+import hashlib
 import json
 import os
 import pathlib
+import pickle
 import sys
+import threading
 import time
 
 import numpy as np
@@ -111,6 +114,48 @@ def settings_of(raw):
     return out
 
 
+def heard_sounds(spans, toks, vocab):
+    """What was heard for each word: the sounds from the end of the word before to the start of the word after (the
+    path often gives a word said wrong only a sliver of its own time), at most HEARD_REACH frames either side of the
+    word. spans: word -> (first frame, last frame); toks: checker.heard_tokens on the same frames."""
+    order = sorted(spans)
+    heard = {}
+    for k_, w in enumerate(order):
+        w0, w1 = spans[w]
+        a_ = spans[order[k_ - 1]][1] if k_ > 0 else w0
+        b_ = spans[order[k_ + 1]][0] if k_ + 1 < len(order) else w1
+        a_ = min(w0, max(a_, w0 - HEARD_REACH))
+        b_ = max(w1, min(b_, w1 + HEARD_REACH))
+        heard[w] = ''.join(vocab[k - 1] for k, pk, _ in toks if a_ <= pk < b_)
+    return heard
+
+
+# ------------------------------------------------------------ the word table (make_words.py)
+
+def words_key():
+    """What a word's checker entry (Key.passage) depends on: the checker's and the word list's code and data, the
+    lexicon, the phonetizer's version and the service's look-alike settings. A table made under another key is not
+    used."""
+    import importlib.metadata
+    h = hashlib.sha256()
+    for p in (HARNESS / 'checker.py', HARNESS / 'bench.py', HARNESS.parent.parent / 'src/data/quranWords.dat',
+              pathlib.Path(os.environ['LAB']) / 'cache/lexicon.json'):
+        h.update(p.read_bytes() if p.exists() else b'-')
+    h.update(importlib.metadata.version('quran-transcript').encode())
+    h.update(json.dumps([int(WORDS_P['alts']), WORDS_P['alt_rule']]).encode())
+    return h.hexdigest()[:16]
+
+
+def load_table(path):
+    if not path.exists():
+        return None
+    t = pickle.loads(path.read_bytes())
+    if t.get('key') != words_key():
+        print(f"{path.name} was made for other words ({t.get('key')}, not {words_key()}): not used", file=sys.stderr)
+        return None
+    return t
+
+
 class Engine:
     def __init__(self, threads=2):
         checker._init(threads)
@@ -119,6 +164,41 @@ class Engine:
         self.words = self.key.words
         self.bars = json.loads((pathlib.Path(os.environ['LAB']) / 'bars.json').read_text())
         self._slots = {}
+        self._kw = {}  # app word -> its Key.passage entry, worked out on this instance (no table, or not in it)
+        self._kw_lock = threading.Lock()
+        self.table = load_table(pathlib.Path(os.environ['LAB']) / 'words.bin')
+
+    # ------------------------------------------------------------ words
+
+    @staticmethod
+    def word_count(key):
+        return key.words.first[-1] + key.words.counts[-1]
+
+    def passage_words(self, lo, hi):
+        """key.passage(lo, hi) with the service's look-alikes: from the word table when the image has one for these
+        words (make_words.py: Key.passage costs ~100 ms a word on Cloud Run), else worked out and kept here. Same
+        entries either way."""
+        P = WORDS_P
+        if self.table is not None:
+            off, blob = self.table['offsets'], self.table['blob']
+            out = [pickle.loads(blob[off[w]:off[w + 1]]) for w in range(lo, hi)]
+            for k in out:
+                if isinstance(k, tuple):  # ('refused', why): a word key.passage refuses, refused the same way
+                    raise ValueError(k[1])
+            return out
+        missing = [w for w in range(lo, hi) if w not in self._kw]
+        if missing:
+            self.remember(self.key.passage(missing[0], missing[-1] + 1, int(P['alts']), P['alt_rule']))
+        with self._kw_lock:
+            return [self._kw[w] for w in range(lo, hi)]
+
+    def remember(self, kws):
+        """Keep words worked out elsewhere (the live session's helper process)."""
+        with self._kw_lock:
+            if len(self._kw) > 30000:
+                self._kw.clear()
+            for k in kws:
+                self._kw[k['word']] = k
 
     # ------------------------------------------------------------ the passage
 
@@ -179,7 +259,7 @@ class Engine:
         per ayah said in full. check() runs the model first; a live session judges its streamed frames."""
         t0 = time.perf_counter() - t_model
         P = WORDS_P
-        kws = self.key.passage(lo, hi, int(P['alts']), P['alt_rule'])
+        kws = self.passage_words(lo, hi)
         g = checker.Graph(kws)
         path, _ = checker.viterbi(lp, g, P)
         refs = checker.trail_refs(hi) if P.get('trail_extra') else None
@@ -221,18 +301,7 @@ class Engine:
             'ms': {'model': int(t_model * 1000), 'words': int(t_words * 1000), 'tajweed': int(t_tajweed * 1000)},
         }
         if v == 2:
-            # what was heard for a word: the sounds from the end of the word before to the start of the word after
-            # (the path often gives a word said wrong only a sliver of its own time), at most HEARD_REACH frames
-            # either side of the word
-            order = sorted(spans)
-            heard = {}
-            for k_, w in enumerate(order):
-                w0, w1 = spans[w]
-                a_ = spans[order[k_ - 1]][1] if k_ > 0 else w0
-                b_ = spans[order[k_ + 1]][0] if k_ + 1 < len(order) else w1
-                a_ = min(w0, max(a_, w0 - HEARD_REACH))
-                b_ = max(w1, min(b_, w1 + HEARD_REACH))
-                heard[w] = ''.join(self.ear.vocab[k - 1] for k, pk, _ in toks if a_ <= pk < b_)
+            heard = heard_sounds(spans, toks, self.ear.vocab)
             out['marks'] = self.marks(words, flagged, heard, out['extras'], tj, letters if st['letters'] else [])
             out['score'] = score(statuses, out['marks'])
             out['v'] = 2

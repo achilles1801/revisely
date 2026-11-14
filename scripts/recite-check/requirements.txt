@@ -7,5 +7,7 @@ soundfile==0.14.0
 requests==2.34.2
 fastapi==0.115.12
 uvicorn==0.34.2
+websockets==15.0.1  # uvicorn serves /live with it
+httpx==0.28.1  # fastapi.testclient (the tests run in the build)
 google-auth==2.40.1
 cachecontrol==0.14.2
