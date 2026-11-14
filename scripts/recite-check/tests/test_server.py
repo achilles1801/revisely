@@ -42,6 +42,7 @@ def wav(seconds=2.0):
 class FakeEngine:
     def __init__(self, threads=2):
         self.calls = []
+        self.table = None
 
     def check(self, x, s, a, s2, a2, q, v=1):
         self.calls.append((v, s, a, s2, a2))
