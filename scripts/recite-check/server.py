@@ -260,6 +260,32 @@ async def open_session(msg, uid):
     return s
 
 
+async def read_into(ws, inbox):
+    """Every frame from the phone into the inbox as it comes: ('audio', bytes), ('control', msg), then ('gone', None),
+    or ('idle', None) after IDLE seconds without a frame."""
+    try:
+        while True:
+            try:
+                m = await asyncio.wait_for(ws.receive(), IDLE)
+            except asyncio.TimeoutError:
+                await inbox.put(('idle', None))
+                return
+            if m['type'] == 'websocket.disconnect':
+                break
+            if m.get('bytes') is not None:
+                await inbox.put(('audio', m['bytes']))
+            elif m.get('text') is not None:
+                try:
+                    c = json.loads(m['text'])
+                except ValueError:
+                    continue
+                if isinstance(c, dict) and c.get('type') in ('seek', 'dismiss', 'end', 'stop'):
+                    await inbox.put(('control', c))
+    except Exception:
+        pass
+    await inbox.put(('gone', None))
+
+
 @app.websocket('/live')
 async def live_socket(ws: WebSocket):
     await ws.accept()
@@ -310,33 +336,38 @@ async def live_socket(ws: WebSocket):
         s.owner, s.left = me, None
         s.sockets += 1
         await send([{'type': 'ready', 'v': 2, 'engine': VERSION, 'take': s.sid, 'from': s.sess.n}])
-        while True:
-            try:
-                m = await asyncio.wait_for(ws.receive(), IDLE)
-            except asyncio.TimeoutError:
-                await fail('idle', 1000)
-                break
-            if m['type'] == 'websocket.disconnect':
-                break
-            if s.owner is not me:  # the phone came back on another socket: this one is over
-                break
-            if m.get('bytes') is not None:
-                events = await asyncio.to_thread(s.run, s.sess.feed, m['bytes'])
-            elif m.get('text') is not None:
-                try:
-                    c = json.loads(m['text'])
-                except ValueError:
-                    c = None
-                if isinstance(c, dict) and c.get('type') in ('seek', 'dismiss', 'end', 'stop'):
-                    events = await asyncio.to_thread(s.run, s.sess.control, c)
+        # A reader drains the socket at once into a queue and the work runs from the queue, in order: a phone
+        # resending a take (a resume) sends faster than it is checked, and a socket left unread stops answering
+        # pings, which ends the connection.
+        inbox = asyncio.Queue()
+        reader = asyncio.create_task(read_into(ws, inbox))
+        held = None  # a frame taken while gathering audio, to handle next
+        try:
+            while True:
+                kind, item = held or await inbox.get()
+                held = None
+                if kind == 'idle':
+                    await fail('idle', 1000)
+                    break
+                if kind == 'gone' or s.owner is not me:  # gone, or the phone came back on another socket
+                    break
+                if kind == 'audio':  # this and any audio queued right behind it, in one go
+                    chunks = [item]
+                    while not inbox.empty():
+                        nxt = inbox.get_nowait()
+                        if nxt[0] != 'audio':
+                            held = nxt
+                            break
+                        chunks.append(nxt[1])
+                    events = await asyncio.to_thread(s.run, s.sess.feed, b''.join(chunks))
                 else:
-                    events = []
-            else:
-                events = []
-            if s.sess.stopped:
-                await finish(events)
-                break
-            await send(events)
+                    events = await asyncio.to_thread(s.run, s.sess.control, item)
+                if s.sess.stopped:
+                    await finish(events)
+                    break
+                await send(events)
+        finally:
+            reader.cancel()
     except auth.Refused as e:
         await fail(e.reason)
     except BadRequest as e:

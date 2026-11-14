@@ -260,6 +260,35 @@ class LiveTests(Base):
                 pass
         self.assertEqual(self.stored, {})
 
+    def test_audio_sent_faster_than_it_is_checked_is_read_at_once_and_merged_in_order(self):
+        """A resume resends the take as fast as the phone can: the socket is read at once (or it would stop
+        answering pings), and the queued audio reaches the checker in fewer, bigger pieces, in order."""
+        calls = []
+        slow = FakeSession.feed
+
+        def feed(sess, data):
+            calls.append(len(data))
+            time.sleep(0.05)
+            return slow(sess, data)
+        with mock.patch.object(FakeSession, 'feed', feed):
+            with self.socket() as ws:
+                ws.send_text(start())
+                ws.receive_json()
+                for _ in range(40):
+                    ws.send_bytes(b'\1\0' * 1600)  # 4 s of audio at once
+                ws.send_text(json.dumps({'type': 'dismiss', 'id': '101:skipped:'}))
+                ws.send_text(json.dumps({'type': 'end'}))
+                types = []
+                while True:
+                    e = ws.receive_json()
+                    types.append(e['type'])
+                    if e['type'] == 'done':
+                        break
+        self.assertEqual(sum(calls), 40 * 3200)
+        self.assertLess(len(calls), 40)
+        self.assertEqual(FakeSession.made[0].dismissed, {'101:skipped:'})
+        self.assertEqual(types.count('at'), 4)
+
     def test_idle_socket_is_closed(self):
         with mock.patch.object(server, 'IDLE', 0.3):
             with self.socket() as ws:
