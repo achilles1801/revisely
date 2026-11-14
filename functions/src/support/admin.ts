@@ -164,6 +164,10 @@ export async function decideApplication(
 ): Promise<Application> {
   const appRef = db.doc(`supportApplications/${uid}`);
   const entRef = db.doc(`entitlements/${uid}`);
+  // Refuse before any transaction: a transaction that only reads and then throws keeps its locks for about two
+  // minutes, and the next decision on the account fails with "Too much contention" meanwhile.
+  const [app0, ent0] = await Promise.all([appRef.get(), entRef.get()]);
+  decide(applicationFrom(app0.data()), entitlementsFrom(ent0.data()), decision, now);
   return db.runTransaction(async (tx) => {
     const [app, ent] = await Promise.all([tx.get(appRef), tx.get(entRef)]);
     const out = decide(applicationFrom(app.data()), entitlementsFrom(ent.data()), decision, now);
@@ -177,10 +181,22 @@ export async function decideApplication(
 /** Takes one source's grant away (the review script's revoke). */
 export async function revokeGrant(db: Firestore, uid: string, source: Source): Promise<Grant | null> {
   const ref = db.doc(`entitlements/${uid}`);
+  const none = () => new SupportError('failed-precondition', `No ${source} grant on this account.`);
+  if (!entitlementsFrom((await ref.get()).data())?.grants?.[source]) throw none(); // before any transaction: see above
   return db.runTransaction(async (tx) => {
     const current = entitlementsFrom((await tx.get(ref)).data());
-    if (!current?.grants?.[source]) throw new SupportError('failed-precondition', `No ${source} grant on this account.`);
+    if (!current?.grants?.[source]) throw none();
     const next = withGrant(current, source, null);
+    tx.set(ref, entitlementsTo(next));
+    return next.premium;
+  });
+}
+
+/** Premium from one source, or (null) none from it, keeping the other sources (testing on dev: the script's premium). */
+export async function setGrant(db: Firestore, uid: string, source: Source, grant: Grant | null): Promise<Grant | null> {
+  const ref = db.doc(`entitlements/${uid}`);
+  return db.runTransaction(async (tx) => {
+    const next = withGrant(entitlementsFrom((await tx.get(ref)).data()), source, grant);
     tx.set(ref, entitlementsTo(next));
     return next.premium;
   });
