@@ -22,7 +22,7 @@ import { plainText } from '../../passages';
 const FIXTURES = [
   'alafasy.p2.m1.clean', 'alafasy.p2.clean.clean', 'minshawi-murattal.p3.m1.clean', 'rifai.p8.m1.clean', 'abdulbaset-murattal.p2.m1.clean',
   // Real transcripts from the service on revisely-dev (Nov 14 2026).
-  'server-live-alafasy.p2.m1', 'server-live-husary.p1.m1.letters',
+  'server-live-alafasy.p2.m1', 'server-live-husary.p1.m1.letters', 'server-live-rifai.p8.m1',
 ];
 const fixture = (name: string): ReplayLog & { planted: unknown[] } => require(`../__fixtures__/${name}.json`);
 
