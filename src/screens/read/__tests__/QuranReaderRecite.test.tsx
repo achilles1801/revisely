@@ -235,7 +235,7 @@ describe('the one mic (Revisely Dev)', () => {
     fireEvent.press(screen.getByTestId('recite-notice-agree'));
     await flush();
     await flush();
-    expect(mockLive.start).toMatchObject({ type: 'start', s: 27, a: 23, mode: 'recite', letters: true, tajweed: false });
+    expect(mockLive.start).toMatchObject({ type: 'start', s: 27, a: 23, follow: true, letters: true, tajweed: false });
   });
 });
 
@@ -311,7 +311,7 @@ describe('a take kept as a recording (Save recordings, on by default)', () => {
 describe('Check: marks as you recite', () => {
   it('a wrong word is marked on the page and shows red, as heard, in the bar; the score by the page', async () => {
     await startTake('check');
-    expect(mockLive.start).toMatchObject({ mode: 'check' });
+    expect(mockLive.start).toMatchObject({ follow: false });
     expect(screen.getByTestId('recite-score')).toBeTruthy();
     await event({ type: 'said', upTo: UTIYAT });
     await event({ type: 'mark', mark: { id: 'a', w: UTIYAT, ayah: [27, 23], kind: 'word', sure: 'likely', heard: 'وَأُوهِيَتْ', heardExact: false } });
@@ -337,6 +337,12 @@ describe('the hidden view (the eye on the bar)', () => {
     fireEvent.press(screen.getByTestId('recite-whole-ayah'));
     expect(covered()).toBeLessThan(before);
     fireEvent.press(screen.getByTestId('recite-next-word'));
+    // The checker is told (contract draft 5): a shown word counts as helped, never as a mistake for being shown.
+    const [from, to] = words.verseRange(27, 23);
+    expect(mockLive.sent).toEqual([
+      { type: 'hint', w: from, what: 'ayah' },
+      { type: 'hint', w: to, what: 'word' },
+    ]);
     fireEvent.press(screen.getByTestId('recite-eye'));
     expect(screen.queryByTestId('hidden-page-379')).toBeNull();
   });
@@ -419,6 +425,15 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
     expect(screen.getByText('Kept as test data. Software checks it; nobody listens.')).toBeTruthy();
     fireEvent.press(screen.getByTestId('take-summary-done'));
     expect(screen.getByTestId('recite-close')).toBeTruthy();
+  });
+
+  it('the checker’s gate refuses Check (check_locked): Check’s page opens and the take goes', async () => {
+    await startTake('check');
+    await event({ type: 'error', reason: 'check_locked' });
+    await flush();
+    expect(screen.getByTestId('check-intro')).toBeTruthy();
+    expect(screen.queryByTestId('recite-bar')).toBeNull();
+    expect(screen.getByTestId('recite-mic')).toBeTruthy();
   });
 
   it('Check not the account’s: locked in the menu, and picking it opens Check’s page, not a take', async () => {

@@ -80,6 +80,7 @@ const LIVE_FAILURE: Record<LiveFailure, string> = {
   idle: 'Stopped: nothing heard',
   bad_request: 'Couldn’t start',
   server: 'The checker stopped',
+  check_locked: 'Check isn’t on this account',
   offline: 'Couldn’t reach the checker',
 };
 
@@ -317,24 +318,23 @@ export default function QuranReaderScreen() {
     setRevealed(NOTHING_SHOWN);
     setHidden((h) => !h);
   }, []);
+  // Each tells the checker which word was shown (the ayah's first word not shown before, for ‹‹).
   const showNextWord = useCallback(() => {
     if (!qw) return;
-    setRevealed((r) => {
-      const next = revealNextWord(qw, currentPage, r, liveInfo);
-      const added = [...next].find((w) => !r.has(w));
-      if (added != null) live.hint(added, 'word');
-      return next;
-    });
-  }, [qw, currentPage, liveInfo, live]);
+    const next = revealNextWord(qw, currentPage, revealed, liveInfo);
+    const added = [...next].find((w) => !revealed.has(w));
+    if (added == null) return;
+    live.hint(added, 'word');
+    setRevealed(next);
+  }, [qw, currentPage, revealed, liveInfo, live]);
   const showWholeAyah = useCallback(() => {
     if (!qw) return;
-    setRevealed((r) => {
-      const next = revealAyah(qw, currentPage, r, liveInfo);
-      const added = [...next].find((w) => !r.has(w));
-      if (added != null) live.hint(added, 'ayah');
-      return next;
-    });
-  }, [qw, currentPage, liveInfo, live]);
+    const next = revealAyah(qw, currentPage, revealed, liveInfo);
+    const added = [...next].find((w) => !revealed.has(w));
+    if (added == null) return;
+    live.hint(added, 'ayah');
+    setRevealed(next);
+  }, [qw, currentPage, revealed, liveInfo, live]);
 
   const checkTake = live.mode === 'check';
   const cardMarks = useMemo<Mark[]>(
@@ -371,6 +371,15 @@ export default function QuranReaderScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [live.state.status, takeId]);
   const takeStatus = live.state.status;
+  // The checker's gate refused Check (the account doesn't have it): Check's page, and the take goes.
+  const takeFailure = live.state.failure;
+  useEffect(() => {
+    if (takeStatus !== 'failed' || takeFailure !== 'check_locked') return;
+    live.clear();
+    setIntroOpen(true);
+    // Only when a take fails so.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [takeStatus, takeFailure]);
   useEffect(() => {
     if (!takeSaved) return;
     const takeGoing = takeStatus === 'connecting' || takeStatus === 'listening' || takeStatus === 'checking';

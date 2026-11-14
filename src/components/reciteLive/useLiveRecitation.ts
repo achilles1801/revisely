@@ -35,10 +35,10 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const e2e = process.env.EXPO_PUBLIC_E2E === '1' ? (require('../../lib/e2e/reciteLive') as typeof import('../../lib/e2e/reciteLive')) : null;
 
 /**
- * Whether to tell the checker about words shown by hand. Off until the server says an unknown frame is ignored
- * (asked Nov 14 2026).
+ * Whether to tell the checker about words shown by hand (contract draft 5: a hinted word counts as helped, never as a
+ * mistake for being hinted; the server ignores frames it doesn't know).
  */
-const SEND_HINTS = false;
+const SEND_HINTS = true;
 
 let realConnect: LiveConnect | null = null;
 /** The checker's live socket, made on first use. */
@@ -53,7 +53,7 @@ const defaultConnect: LiveConnect = (start, handlers) => {
   return realConnect(start, handlers);
 };
 
-/** The start frame for a take from `page`'s first ayah, with the account's settings (contract draft 4). */
+/** The start frame for a take from `page`'s first ayah, with the account's settings (contract draft 5). */
 export function startFrameFor(page: number, mode: LiveMode, settings: ReciteCheckSettings): StartFrame {
   const first = versesOnPage(page)[0] ?? { sura: 1, ayah: 1 };
   return {
@@ -68,7 +68,7 @@ export function startFrameFor(page: number, mode: LiveMode, settings: ReciteChec
     letters: true,
     tajweed: settings.level === 'strict',
     keep: settings.keep,
-    mode,
+    follow: mode === 'recite',
   };
 }
 
