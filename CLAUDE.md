@@ -146,6 +146,14 @@ until its part is set up.
     main and develop. Worker changes go to main as always.
   - `NOINDEX`: every answer carries `X-Robots-Tag: noindex, nofollow`, and `/robots.txt` disallows
     everything.
+  - **Sign-in gate** (`worker/gate.ts`, Majd, Nov 14 2026: only him for now): with `DEV_GATE` "1"
+    (`wrangler.dev.jsonc` only), every page needs a revisely-dev account with the custom claim `devSite`,
+    kept in a `__Host-` cookie for the hour its ID token lasts. `/api/*` stays open for the Dev app. Let
+    someone in with `functions/scripts/set-dev-site.js <email>` (`--off`, `--list`; revisely-dev only):
+    nobody's email is in the repository.
+  - **Keep it in step with revisely.app:** revisely.app is built from `main` and dev.revisely.app from
+    `develop`. After a site PR merges into `main`, merge `main` back into `develop` (or send site work
+    through `develop`); dev had drifted a whole redesign behind until Nov 14 2026.
   - Its API accepts only the dev project's sign-ins.
   - **No Clear Quran key.** The Clear Quran's portal allows one active Production key per product
     ("duplicate key … api_keys_active_developer_account_id_product_environment"), and revisely.app holds

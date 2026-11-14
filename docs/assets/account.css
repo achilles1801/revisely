@@ -8,8 +8,32 @@
   font-display: swap;
 }
 
-:root { --red: #dc2626; --amber: #d97706; }
-@media (prefers-color-scheme: dark) { :root { --red: #f87171; --amber: #f59e0b; } }
+:root { --red: #dc2626; --amber: #d97706; --outline: #d1d5db; }
+@media (prefers-color-scheme: dark) { :root { --red: #f87171; --amber: #f59e0b; --outline: #333333; } }
+
+/* The look of production's home (site.css, .home): its glow from the very top, the header on it (not sticky), its
+   grey (4.5:1 on the glow too). */
+body.acct {
+  --secondary: #616977;
+  --page-glow: radial-gradient(130% 620px at 50% 0, rgb(98 75 213 / 0.32) 0%, rgb(98 75 213 / 0.238) 10%, rgb(98 75 213 / 0.171) 20%, rgb(98 75 213 / 0.118) 30%, rgb(98 75 213 / 0.077) 40%, rgb(98 75 213 / 0.046) 50%, rgb(98 75 213 / 0.025) 60%, rgb(98 75 213 / 0.011) 70%, rgb(98 75 213 / 0) 100%);
+  position: relative; isolation: isolate;
+}
+@media (prefers-color-scheme: dark) {
+  body.acct {
+    --secondary: #8a8a93;
+    --page-glow: radial-gradient(85% 660px at 50% 0, rgb(46 14 198 / 0.45) 0%, rgb(58 38 148 / 0.3) 50%, rgb(58 38 148 / 0.135) 70%, rgb(58 38 148 / 0.035) 85%, rgb(58 38 148 / 0) 100%);
+  }
+}
+body.acct::before {
+  content: ""; position: absolute; z-index: -1; pointer-events: none;
+  left: 0; right: 0; top: 0; height: 760px; background: var(--page-glow);
+}
+body.acct .site-header {
+  position: relative; background: none; border-bottom: 0;
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+.kicker { display: block; margin-bottom: 10px; color: var(--accent); font-size: 14px; font-weight: 600; }
+html[dir="rtl"] .kicker { font-size: 16px; }
 
 /* Arabic text waits for its words (site-i18n.js), so English never flashes first. */
 html[lang="ar"]:not(.i18n) body { visibility: hidden; }
@@ -28,6 +52,13 @@ button.link:hover { text-decoration: underline; }
 html[dir="rtl"] .site-nav .lang { font-family: var(--font); }
 .site-nav .lang:hover { color: var(--text); }
 .site-nav .signin-link { color: var(--text); font-weight: 600; }
+.site-nav .acct-btn {
+  width: 32px; height: 32px; border-radius: 50%; flex: none; display: grid; place-items: center;
+  color: var(--text); box-shadow: inset 0 0 0 1px var(--outline); text-decoration: none;
+}
+.site-nav .acct-btn svg { width: 19px; height: 19px; }
+.site-nav .acct-btn.avatar { box-shadow: none; }
+@media (max-width: 380px) { .site-nav { gap: 14px; } .site-nav .pill { padding: 0 13px; } }
 .avatar {
   width: 32px; height: 32px; border-radius: 50%; flex: none;
   display: grid; place-items: center;
@@ -46,16 +77,13 @@ html[dir="rtl"] .site-nav .lang { font-family: var(--font); }
 .site-header .wrap { position: relative; }
 
 /* ---------- Sections ---------- */
-.page-hero { position: relative; isolation: isolate; padding: 40px 0 48px; }
-.page-hero::before {
-  content: ""; position: absolute; z-index: -1; pointer-events: none;
-  left: 0; right: 0; top: -61px; height: 520px; background: var(--glow);
-}
+.page-hero { position: relative; padding: 28px 0 48px; }
 .sec { border-top: 0.5px solid var(--separator); padding: 56px 0; }
 .sec .wrap, .page-hero .wrap { max-width: calc(40rem + 2 * var(--gutter)); }
 .sec-title { font-size: 1.6rem; letter-spacing: -0.02em; line-height: 1.15; }
 .sec-sub { color: var(--secondary); margin: 8px 0 0; }
-.page-hero h1 { font-size: clamp(2.3rem, 9vw, 3.2rem); line-height: 1.04; letter-spacing: -0.035em; margin-top: 10px; }
+.page-hero h1 { font-size: clamp(40px, 5.2vw, 66px); line-height: 1.02; letter-spacing: -0.035em; margin-top: 0; text-wrap: balance; }
+.page-hero .lede { font-size: clamp(16px, 1.45vw, 19px); line-height: 1.5; text-wrap: pretty; }
 html[dir="rtl"] .page-hero h1 { line-height: 1.4; }
 .page-hero .sub { color: var(--accent); font-weight: 600; margin: 8px 0 0; font-size: 17px; }
 .page-hero .lede { margin-top: 16px; }
@@ -67,7 +95,7 @@ html[dir="rtl"] .page-hero h1 { line-height: 1.4; }
 .quiet-link { font-size: 15px; color: var(--secondary); margin: 0; }
 .quiet-link a { color: var(--accent); text-decoration: none; font-weight: 600; }
 
-/* The verse (Al-Qamar 54:17), the calligraphy the home page uses. */
+/* The verse (Al-Qamar 54:17), the calligraphy the old home page used (kept in assets/img for this page). */
 .hero-verse { margin: 4px 0 30px; padding: 26px 18px 20px; border-radius: 22px; background: var(--accent-subtle); text-align: center; }
 .hero-verse .arabic {
   width: 100%; aspect-ratio: 1575 / 264; margin: 0 auto; background: var(--text);
@@ -80,7 +108,10 @@ html[dir="rtl"] .page-hero h1 { line-height: 1.4; }
 /* Steps */
 .step-cards { list-style: none; margin: 26px 0 0; padding: 0; display: grid; gap: 12px; }
 .step-cards li { display: grid; grid-template-columns: 40px 1fr; gap: 14px; padding: 18px 16px; border-radius: 18px; background: var(--fill); }
-.step-cards .mark { background: var(--bg); }
+.mark {
+  width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--bg); color: var(--accent); font-size: 15px; font-weight: 600;
+}
 .step-cards h3 { font-size: 17px; letter-spacing: -0.01em; margin-top: 8px; }
 .step-cards p { margin: 4px 0 0; color: var(--secondary); font-size: 15px; line-height: 1.45; }
 html[dir="rtl"] .step-cards h3 { margin-top: 2px; font-size: 20px; }
@@ -185,11 +216,20 @@ html[dir="rtl"] .plan li { font-size: 17px; }
 html[dir="rtl"] .compare { font-size: 17px; }
 .later { display: grid; grid-template-columns: 40px 1fr; gap: 12px; padding: 16px; margin-top: 18px; border-radius: 18px; background: var(--fill); font-size: 15px; color: var(--secondary); }
 .later strong { color: var(--text); display: block; }
-.later .mark { background: var(--bg); }
 .later svg { width: 20px; height: 20px; }
 .get-app { text-align: center; }
-.get-app .badge-link { margin-top: 20px; }
-.get-app .badge-link img { height: 48px; width: auto; }
+.stores { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 22px; }
+.get-app .stores, .signed-out .stores { justify-content: center; }
+.badge-link { display: inline-block; border-radius: 9px; line-height: 0; }
+.badge-link img { width: auto; height: 46px; }
+.soon {
+  display: inline-flex; flex-direction: column; justify-content: center; text-align: start;
+  min-height: 46px; margin: 0; padding: 0 16px; border-radius: 9px;
+  box-shadow: inset 0 0 0 1px var(--outline); line-height: 1.15;
+}
+.soon small { color: var(--secondary); font-size: 11px; }
+.soon b { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; font-family: var(--font); }
+html[dir="rtl"] .soon small { font-size: 13px; }
 
 /* ---------- Account ---------- */
 .acct-head { display: flex; align-items: center; gap: 14px; margin-top: 8px; }
