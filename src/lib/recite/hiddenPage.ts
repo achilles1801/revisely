@@ -25,7 +25,7 @@ export interface WordFollow {
 }
 
 /** What revealed a verse. 'speech' is for recognition (not in this version). */
-export type RevealSource = 'tap' | 'pause' | 'next' | 'speech';
+export type RevealSource = 'pause' | 'next' | 'speech';
 
 /** A verse as a key: "2:255". */
 export const verseKey = (a: { sura: number; ayah: number }) => `${a.sura}:${a.ayah}`;

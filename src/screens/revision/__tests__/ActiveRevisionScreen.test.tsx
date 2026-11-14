@@ -663,7 +663,7 @@ describe('ActiveRevisionScreen — the session completes on its last page', () =
 });
 
 // Hidden pages (the recite mode), for testers: the eye covers the page; a verse
-// shows when tapped, with Next verse, or after a pause in the reciter's voice.
+// shows with Next verse or after a pause in the reciter's voice, never on a tap.
 describe('ActiveRevisionScreen — keep going (revise ahead, #168)', () => {
   const NEXT = [341, 342, 343];
   const today = () => getCurrentRevisionDay(mockApp.user as User);
@@ -871,6 +871,11 @@ describe('ActiveRevisionScreen — hidden pages (testers)', () => {
     mockApp.user = { ...mockApp.user, previewTester: true };
   };
   const hide = () => fireEvent.press(screen.getByLabelText('Hide the page'));
+  /** The verses page 331's cover leaves open, as the screen hands them to it. */
+  const shownOn331 = (): string[] => {
+    const overlay = mockPager.pageOverlay?.(331, 0.5) as React.ReactElement<{ revealed: ReadonlySet<string> }>;
+    return [...overlay.props.revealed];
+  };
 
   it('not a tester: no eye, and nothing listens', () => {
     setup([]);
@@ -896,19 +901,13 @@ describe('ActiveRevisionScreen — hidden pages (testers)', () => {
     expect(screen.getAllByTestId('hidden-cover').length).toBeGreaterThan(5);
   });
 
-  it('a tap on a hidden verse shows it (and doesn’t toggle the controls); on shown text it does', () => {
+  it('a tap on a hidden page shows nothing: the pager gets no verse tap, so it brings the controls (Majd, Nov 14 2026)', () => {
     tester();
     render(<ActiveRevisionScreen />);
     fireEvent.press(screen.getByLabelText('The page'));
     hide();
-    const { versesOnPage } = require('../../../lib/ayahBounds');
-    const [first] = versesOnPage(331);
-    let taken = false;
-    act(() => {
-      taken = mockPager.onTapVerse!(first);
-    });
-    expect(taken).toBe(true);
-    expect(mockPager.onTapVerse!(first)).toBe(false);
+    expect(mockPager.onTapVerse).toBeUndefined();
+    expect(shownOn331()).toEqual([]);
   });
 
   it('a pause after a verse shows the next one, in order; Next verse too', () => {
@@ -917,13 +916,12 @@ describe('ActiveRevisionScreen — hidden pages (testers)', () => {
     fireEvent.press(screen.getByLabelText('The page'));
     hide();
     const { versesOnPage } = require('../../../lib/ayahBounds');
-    const [v1, v2, v3] = versesOnPage(331);
+    const [v1, v2] = versesOnPage(331);
+    const key = (v: { sura: number; ayah: number }) => `${v.sura}:${v.ayah}`;
     act(() => mockListener.onPause?.());
-    // Shown now: a tap on it isn't taken.
-    expect(mockPager.onTapVerse!(v1)).toBe(false);
-    expect(mockPager.onTapVerse!(v3)).toBe(true);
+    expect(shownOn331()).toEqual([key(v1)]);
     fireEvent.press(screen.getByLabelText('Show the next verse'));
-    expect(mockPager.onTapVerse!(v2)).toBe(false);
+    expect(shownOn331()).toEqual([key(v1), key(v2)]);
   });
 
   it('Record while hidden: the listener gives the microphone up first', async () => {
@@ -954,17 +952,14 @@ describe('ActiveRevisionScreen — hidden pages (testers)', () => {
     render(<ActiveRevisionScreen />);
     fireEvent.press(screen.getByLabelText('The page'));
     hide();
-    const { versesOnPage } = require('../../../lib/ayahBounds');
-    const [v1] = versesOnPage(331);
-    act(() => {
-      mockPager.onTapVerse!(v1);
-    });
+    fireEvent.press(screen.getByLabelText('Show the next verse'));
+    expect(shownOn331()).toHaveLength(1);
     fireEvent.press(screen.getByLabelText('Show the page'));
     expect(mockListener.active).toBe(false);
     expect(screen.getByTestId('player-capsule')).toBeTruthy();
     expect(mockPager.pageOverlay).toBeUndefined();
     hide();
-    expect(mockPager.onTapVerse!(v1)).toBe(true);
+    expect(shownOn331()).toEqual([]);
   });
 });
 

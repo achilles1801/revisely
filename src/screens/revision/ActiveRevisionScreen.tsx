@@ -39,9 +39,7 @@ import {
   RevealState,
   revealedOn,
   revealVerse,
-  verseKey,
 } from '../../lib/recite/hiddenPage';
-import type { AyahRef } from '../../lib/ayahBounds';
 import { useVerseActions } from '../../components/verse/useVerseActions';
 import { navigateToActivityDay, navigationRef } from '../../navigation/navigationRef';
 import { RecordButton, recorderTakesCapsule } from '../../components/recordings/RecordButton';
@@ -331,16 +329,6 @@ export default function ActiveRevisionScreen() {
       await recorder.resume();
     },
   };
-  const onTapVerse = useCallback(
-    (ayah: AyahRef) => {
-      if (!hidden) return false;
-      // A tap on shown text toggles the controls, as usual.
-      if (revealedOn(reveal, ayah.page).has(verseKey(ayah))) return false;
-      setReveal((s) => revealVerse(s, ayah.page, ayah));
-      return true;
-    },
-    [hidden, reveal],
-  );
   const coverColors = useMemo(() => {
     const read = getReadPalette(isDark);
     return { cover: read.pageBg, guide: read.textSecondary, band: v2Palette.accentText };
@@ -1166,7 +1154,6 @@ export default function ActiveRevisionScreen() {
           onUserSwipe={chrome.hide}
           extraData={extraData}
           pageOverlay={pageOverlay}
-          onTapVerse={hidden ? onTapVerse : undefined}
           endCard={
             <SessionEndCard
               total={lastSectionPages.length}
