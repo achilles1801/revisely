@@ -29,6 +29,17 @@ import checker  # noqa: E402
 
 MODEL = 'obadx/muaalem-model-v3_2'
 PROC = {}
+ON_SAVE = None  # modal_batch sets it to the volume's commit, so a save outlives a part that is stopped mid-run
+
+
+def save(obj, path):
+    """torch.save through a temporary file and a rename: a part stopped while writing (last.pt is ~7 GB with the
+    optimizer) leaves the previous file whole."""
+    tmp = path.with_name(path.name + '.tmp')
+    torch.save(obj, tmp)
+    os.replace(tmp, path)
+    if ON_SAVE:
+        ON_SAVE()
 
 
 def load(device, init=None):
@@ -108,6 +119,8 @@ def main():
     ap.add_argument('--ckpt', type=int, default=1, help='gradient checkpointing (about 27% slower, a third of the memory)')
     ap.add_argument('--pool', type=int, default=8, help='draw this many batches of clips at once and group them by length')
     ap.add_argument('--max_secs', type=float, default=24.0, help='leave out clips longer than this (seconds)')
+    ap.add_argument('--save_every', type=int, default=1000,
+                    help='steps between saves of last.pt (a part stopped mid-run loses at most this many)')
     a = ap.parse_args()
     out = pathlib.Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -178,12 +191,13 @@ def main():
             msg = f'step {step} held-out phoneme error {p:.4f}'
             print(msg, flush=True)
             log.write(msg + '\n'); log.flush()
-            torch.save({'model': model.state_dict(), 'opt': opt.state_dict(), 'step': step}, last)
+        if step % a.save_every == 0 or step >= a.steps:
+            save({'model': model.state_dict(), 'opt': opt.state_dict(), 'step': step}, last)
         if step >= a.steps:
-            torch.save(model.state_dict(), out / 'teacher.pt')
+            save(model.state_dict(), out / 'teacher.pt')
             return 'done'
         if a.max_minutes and time.time() - t_start > a.max_minutes * 60:
-            torch.save({'model': model.state_dict(), 'opt': opt.state_dict(), 'step': step}, last)
+            save({'model': model.state_dict(), 'opt': opt.state_dict(), 'step': step}, last)
             return f'paused at step {step}'
     return f'stopped at step {step}'
 

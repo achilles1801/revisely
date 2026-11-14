@@ -184,6 +184,7 @@ def teacher_part(args: list):
     sys.argv = ['teacher_train.py'] + args + ['--device', 'cuda', '--resume', '1', '--max_minutes', '45']
     import importlib, train, teacher_train
     importlib.reload(train); importlib.reload(teacher_train)
+    teacher_train.ON_SAVE = vol.commit  # each save of last.pt reaches the volume at once (a part can be stopped mid-run)
     r = teacher_train.main()
     vol.commit()
     return r
