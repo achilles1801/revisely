@@ -84,6 +84,11 @@ appId: com.revisionbuddy.app
 - extendedWaitUntil:
     visible: "Turn on"
     timeout: 5000
+- assertVisible: "Premium in Revisely Dev"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl02a-premium-free
 - tapOn: "Turn on"
 - extendedWaitUntil:
     notVisible:
@@ -310,5 +315,17 @@ appId: com.revisionbuddy.app
     file: ../subflows/shot.yaml
     env:
       NAME: rl12-check-page-dark
+# Apply for support asks supportLink for the account's one-time link. The emulators' project has no program page
+# (only revisely-dev has one), so the app says so in one line instead of opening the browser.
+- tapOn:
+    id: check-intro-support
+- extendedWaitUntil:
+    visible: "Applying for support isn’t open yet."
+    timeout: 15000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl12b-support-dark
+- tapOn: "OK"
 - tapOn:
     id: check-intro-close
