@@ -170,9 +170,14 @@ class Engine:
         t0 = time.perf_counter()
         lp = self.ear.logprobs(x)
         t_model = time.perf_counter() - t0
-
         # no one says more than about 4 words a second: a longer passage only slows the check
         lo, hi = self.passage(s, a, s2, a2, min(MAX_WORDS, int(4 * len(x) / 16000) + 20))
+        return self.judge(lp, lo, hi, st, v, t_model)
+
+    def judge(self, lp, lo, hi, st, v=1, t_model=0.0):
+        """The check on the model's frames (50 a second) for app words [lo, hi): the words, then tajweed and letters
+        per ayah said in full. check() runs the model first; a live session judges its streamed frames."""
+        t0 = time.perf_counter() - t_model
         P = WORDS_P
         kws = self.key.passage(lo, hi, int(P['alts']), P['alt_rule'])
         g = checker.Graph(kws)
@@ -207,7 +212,7 @@ class Engine:
         out = {
             'v': 1,
             'from': lo, 'to': hi,
-            'secs': round(len(x) / 16000, 1),
+            'secs': round(lp.shape[0] / FPS, 1),
             'words': words,
             'extras': [{'after': e['after'], 't': round(e['t'], 2), 'trail': bool(e.get('trail'))} for e in extras],
             'tajweed': [{k: r[k] for k in r if not k.startswith('_')} for r in tj],
@@ -393,6 +398,8 @@ class Engine:
 # ---------------------------------------------------------------- live (recite-contract.md, /live)
 
 LIVE_MAX_SECS = 15 * 60  # a live session is at most this long (the server closes it before)
+LIVE_WORDS = 80  # words a live segment reads against (300 words over 15 minutes would hold 1.2 GB in the decoder)
+REBASE_WORDS = 40  # once this many words of a segment are decided and an ayah has ended, the window moves on
 SR = 16000
 
 
@@ -406,11 +413,13 @@ def _grow(arr, rows):
 
 
 class _Segment:
-    """One stretch of a live take read against one passage: the start, or after the reader turned the page (seek)."""
+    """One stretch of a live take read against one window of the passage (LIVE_WORDS, whole ayat): the start, the
+    window moved on at the end of an ayah (rebase), or after the reader turned the page (seek). A new decoder per
+    segment keeps memory bounded: the decoder keeps a row per frame for every state of its window."""
 
     def __init__(self, e, s, a, s2, a2, f0, sample0):
         self.s, self.a, self.s2, self.a2 = s, a, s2, a2
-        self.lo, self.hi = e.passage(s, a, s2, a2)
+        self.lo, self.hi = e.passage(s, a, s2, a2, max_words=LIVE_WORDS)
         P = WORDS_P
         self.kws = e.key.passage(self.lo, self.hi, int(P['alts']), P['alt_rule'])
         self.g = checker.Graph(self.kws)
@@ -576,8 +585,9 @@ class LiveSession:
                 if bad and seg.bad_run[aw] >= P['stable'] and aw not in seg.flagged:
                     m = self._word_mark(seg, aw, st[aw], fl.get(aw) or {}, visits[w], toks)
                     seg.flagged[aw] = m['id']
-                    self.marks[m['id']] = m
-                    events.append({'type': 'mark', 'mark': m})
+                    if m['id'] not in self.marks:
+                        self.marks[m['id']] = m
+                        events.append({'type': 'mark', 'mark': m})
                 elif aw in seg.flagged and st[aw] == 'corrected' and prev != 'corrected':
                     mid = seg.flagged.pop(aw)
                     if self.marks.pop(mid, None):
@@ -586,7 +596,27 @@ class LiveSession:
         events += self._ayat(seg, path, lpl)
         if any(ev['type'] in ('mark', 'unmark', 'said') for ev in events):
             events.append(self._score_event())
+        if not last:
+            self._rebase(seg, path)
         return events
+
+    def _rebase(self, seg, path):
+        """Once REBASE_WORDS of the window are decided and the last decided word ends an ayah, read on against a new
+        window from the next ayah, from the frame that word ended on. Words behind stay decided."""
+        if seg.up_to is None or seg.up_to - min(seg.decided) + 1 < REBASE_WORDS:
+            return
+        e = self.e
+        s, a, p = e.key.where(seg.up_to)
+        if p != e.words.counts[e.words.vindex[(s, a)]] - 1:
+            return  # mid-ayah
+        nxt = (s, a + 1)
+        if nxt not in e.words.vindex or (seg.s2 is not None and nxt > (seg.s2, seg.a2)):
+            return  # the passage ends here
+        spans = self._spans(seg, path)
+        if seg.up_to not in spans:
+            return
+        f0 = seg.f0 + spans[seg.up_to][1]
+        self.segs.append(_Segment(e, nxt[0], nxt[1], seg.s2, seg.a2, f0, f0 * 320))
 
     def _cursor(self, seg):
         dec, g = seg.dec, seg.g
@@ -685,17 +715,18 @@ class LiveSession:
     # ------------------------------------------------------------ the end
 
     def _final(self):
-        """Each segment of the take checked whole, as POST /check v=2, put together."""
+        """Each segment judged once more on its streamed frames (Engine.judge: the final path, its words, tajweed and
+        letters per ayah said in full), put together. A word judged in two segments (after a seek back) keeps the
+        later answer."""
         e = self.e
-        out = None
-        statuses = {}
+        out, statuses, marks = None, {}, {}
         for i, seg in enumerate(self.segs):
-            b = self.segs[i + 1].sample0 if i + 1 < len(self.segs) else self.n
-            x = self.x[seg.sample0:b]
-            if len(x) < SR:
+            f1 = self.segs[i + 1].f0 if i + 1 < len(self.segs) else self.done
+            lp = self.lp[seg.f0:f1]
+            if lp.shape[0] < FPS:
                 continue
-            r = e.check(x, seg.s, seg.a, seg.s2, seg.a2, self.raw, v=2)
-            off = seg.sample0 / SR
+            r = e.judge(lp, seg.lo, seg.hi, self.st, v=2)
+            off = seg.f0 / FPS
             for w in r['words']:
                 if 't' in w:
                     w['t'] = [round(w['t'][0] + off, 2), round(w['t'][1] + off, 2)]
@@ -703,18 +734,24 @@ class LiveSession:
             for m in r['marks']:
                 if 't' in m:
                     m['t'] = [round(m['t'][0] + off, 2), round(m['t'][1] + off, 2)]
+                marks.pop(m['id'], None)
+                marks[m['id']] = m
             for x_ in r['extras']:
                 x_['t'] = round(x_['t'] + off, 2)
             if out is None:
                 out = r
             else:
-                for k in ('words', 'extras', 'tajweed', 'marks'):
+                seen = {w['w'] for w in r['words']}
+                out['words'] = [w for w in out['words'] if w['w'] not in seen] + r['words']
+                for k in ('extras', 'tajweed'):
                     out[k] += r[k]
                 if r['letters'] is not None:
                     out['letters'] = (out['letters'] or []) + r['letters']
-                out['to'] = r['to']
+                out['from'], out['to'] = min(out['from'], r['from']), max(out['to'], r['to'])
         if out is None:
             raise BadRequest('too short')
+        out['words'].sort(key=lambda w: w['w'])
+        out['marks'] = list(marks.values())
         out['secs'] = round(self.n / SR, 1)
         out['score'] = score(statuses, out['marks'], self.dismissed)
         return out

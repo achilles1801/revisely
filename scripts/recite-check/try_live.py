@@ -24,7 +24,9 @@ for i in range(0, len(x), 1600):
 live_s = time.perf_counter() - t0
 t1 = time.perf_counter()
 done = L.end()
-print(f'audio {len(x)/16000:.1f} s, live compute {live_s:.1f} s, worst chunk {worst*1000:.0f} ms, end {time.perf_counter()-t1:.1f} s')
+import resource
+print(f'audio {len(x)/16000:.1f} s, live compute {live_s:.1f} s, worst chunk {worst*1000:.0f} ms, end {time.perf_counter()-t1:.1f} s, '
+      f'segments {len(L.segs)}, peak memory {resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 2**20:.0f} MB')
 print('events', dict(collections.Counter(ev['type'] for ev in evs)))
 for ev in evs:
     if ev['type'] in ('mark', 'unmark'):

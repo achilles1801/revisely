@@ -83,13 +83,19 @@ How it runs: the lab's live checker (`checker.run_item_live`), fed as audio arri
   decided once it's 0.5 s behind the newest final frame.
 - The cursor also uses the newest window's provisional frames.
 - An ayah said in full gets its tajweed and letter marks when its last word is decided.
+- **The moving window.** It reads against 80 words at a time (`LIVE_WORDS`), and moves the window on to the next
+  ayah once 40 words are decided and an ayah has ended. Each window gets a new decoder, which stores a row per
+  frame for every state of its window: 300 words over 15 minutes would take 1.2 GB.
+- `end()` judges each window once more on the frames it streamed (`Engine.judge`), with no second model run.
 
 Measured on bench-v0 and the smoke take (Mac, 2 threads):
 - the cursor 0.6 s after a word starts (median);
 - word marks about 3.5 s after the word;
 - every planted mistake on three recordings caught;
 - compute about 6% of real time, with no 100 ms chunk over 0.1 s;
-- `end()` 0.5–1.7 s for 37–104 s of audio.
+- `end()` 0.5–1.7 s for 37–104 s of audio, 3.5 s for 6 minutes;
+- 6 minutes of Ya-Sin ran in three windows and peaked at 590 MB for the whole process. The step that moves the
+  window takes about 1 s, because it builds the next window's graph.
 
 A take is at most 15 minutes (`LIVE_MAX_SECS`; `feed` raises `BadRequest('too long')` past it). `try_live.py` streams
 a WAV through it.
