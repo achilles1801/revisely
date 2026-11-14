@@ -615,6 +615,37 @@ describe('routing', () => {
   });
 });
 
+describe('the account, Premium and Open Door pages', () => {
+  const assets = { fetch: jest.fn(async (r: Request) => new Response(new URL(r.url).pathname)) };
+
+  it('answer 404 on revisely.app until ACCOUNT_PAGES is set there', async () => {
+    const c = ctx();
+    for (const path of ['/apply/', '/apply', '/premium/', '/account/', '/account/x']) {
+      const res = await worker.fetch(new Request(`https://revisely.app${path}`), { ...ENV, ASSETS: assets }, c);
+      expect(res.status).toBe(404);
+    }
+    const other = await worker.fetch(new Request('https://revisely.app/applications-and-more/'), { ...ENV, ASSETS: assets }, c);
+    expect(await other.text()).toBe('/applications-and-more/');
+  });
+
+  it('are served where ACCOUNT_PAGES is "1" (dev.revisely.app)', async () => {
+    const dev = { ...ENV, ASSETS: assets, NOINDEX: '1', ACCOUNT_PAGES: '1' };
+    const res = await worker.fetch(new Request('https://dev.revisely.app/apply/'), dev, ctx());
+    expect(await res.text()).toBe('/apply/');
+    expect(res.headers.get('X-Robots-Tag')).toBe('noindex, nofollow');
+  });
+
+  it("serve the project's web config from its Hosting site, and nothing without one", async () => {
+    const fetchMock = jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"projectId":"revisely-dev"}'));
+    const dev = { ...ENV, ASSETS: assets, ACCOUNT_PAGES: '1', FIREBASE_HOSTING: 'revisely-dev.web.app' };
+    const res = await worker.fetch(new Request('https://dev.revisely.app/__/firebase/init.json'), dev, ctx());
+    expect(await res.json()).toEqual({ projectId: 'revisely-dev' });
+    expect(fetchMock.mock.calls[0][0]).toBe('https://revisely-dev.web.app/__/firebase/init.json');
+    const none = await worker.fetch(new Request('https://revisely.app/__/firebase/init.json'), { ...ENV, ASSETS: assets }, ctx());
+    expect(none.status).toBe(404);
+  });
+});
+
 describe('sign-in: odd tokens are refused with 401, never a server error', () => {
   const enc = (o: unknown) => b64url(JSON.stringify(o));
   it.each([

@@ -127,6 +127,9 @@ export function adminSupportStore(
       const [app, ent] = await Promise.all([db.doc(`supportApplications/${uid}`).get(), db.doc(`entitlements/${uid}`).get()]);
       return { app: applicationFrom(app.data()), ent: entitlementsFrom(ent.data()) };
     },
+    async hasPlan(uid) {
+      return (await db.doc(`users/${uid}`).get()).exists;
+    },
     async apply(uid, run) {
       const appRef = db.doc(`supportApplications/${uid}`);
       const entRef = db.doc(`entitlements/${uid}`);

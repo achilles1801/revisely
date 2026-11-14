@@ -19,7 +19,9 @@
   "assets": {
     "directory": "docs",
     "binding": "ASSETS",
-    "run_worker_first": ["/api/*"]
+    // The account, Premium and Open Door pages go through the worker too, which answers 404 until ACCOUNT_PAGES is
+    // set here (Majd's word, with the privacy text for web sign-in).
+    "run_worker_first": ["/api/*", "/apply*", "/premium*", "/account*", "/__/*"]
   },
   "vars": {
     // Firebase project whose sign-in tokens the API accepts.

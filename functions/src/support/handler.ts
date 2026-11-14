@@ -28,6 +28,8 @@ export interface SupportStore {
   /** The sign-in's email and providers; null if the account is gone. */
   authUser(uid: string): Promise<{ email: string | null; providers: string[] } | null>;
   read(uid: string): Promise<{ app: Application | null; ent: Entitlements | null }>;
+  /** Whether the account has a user document (a plan, made in the app). */
+  hasPlan(uid: string): Promise<boolean>;
   /** In one transaction: the account's application, entitlements and limits in, what `decide` returns out. */
   apply(
     uid: string,
@@ -99,8 +101,11 @@ export async function handleSupportApplication(
   if (!user) throw new SupportError('unauthenticated', via === 'app' ? 'This link has expired.' : 'Sign in first.');
   const account = accountLabel(user);
   if (action === 'status') {
-    const { app, ent } = await store.read(uid);
-    return stateOf(app, ent, account, now);
+    const [{ app, ent }, plan] = await Promise.all([store.read(uid), via === 'web' ? store.hasPlan(uid) : Promise.resolve(undefined)]);
+    const p = ent?.premium;
+    const answer: StatusAnswer = { ...stateOf(app, ent, account, now), premium: p ? { source: p.source, until: p.until } : null };
+    if (plan !== undefined) answer.plan = plan;
+    return answer;
   }
   return store.apply(uid, (current) => decideApply(current, data.answers, via, account, now));
 }
