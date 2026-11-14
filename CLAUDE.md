@@ -154,6 +154,9 @@ until its part is set up.
   - **Keep it in step with revisely.app:** revisely.app is built from `main` and dev.revisely.app from
     `develop`. After a site PR merges into `main`, merge `main` back into `develop` (or send site work
     through `develop`); dev had drifted a whole redesign behind until Nov 14 2026.
+  - **Which branch a Worker change goes to:** a dev-only change (behind a var only `wrangler.dev.jsonc`
+    sets, like `DEV_GATE` or `ACCOUNT_PAGES`) goes through `develop` and reaches `main` with the next
+    release, switched off there. Only a change meant for revisely.app goes to `main` first.
   - Its API accepts only the dev project's sign-ins.
   - **No Clear Quran key.** The Clear Quran's portal allows one active Production key per product
     ("duplicate key … api_keys_active_developer_account_id_product_environment"), and revisely.app holds
