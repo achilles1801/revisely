@@ -16,6 +16,7 @@
  *   node scripts/support-applications.js revoke <email|uid>   # takes the support grant back
  * For testing (revisely-dev only):
  *   node scripts/support-applications.js link <email|uid>     # a 30-minute link to the page, as the app gets
+ *   node scripts/support-applications.js premium <email|uid> on|off   # Premium from "dev", as Get Premium gives it
  *   node scripts/support-applications.js clear <email|uid> --yes   # application, Premium, links, limits: all gone
  */
 const fs = require('fs');
@@ -31,7 +32,7 @@ if (!fs.existsSync(path.join(LIB, 'admin.js'))) {
   console.error('ERROR: Build the functions first: npm run build');
   process.exit(1);
 }
-const { decideApplication, revokeGrant, deleteSupportData, adminSupportStore, applicationFrom, entitlementsFrom } = require(path.join(LIB, 'admin.js'));
+const { decideApplication, revokeGrant, setGrant, deleteSupportData, adminSupportStore, applicationFrom, entitlementsFrom } = require(path.join(LIB, 'admin.js'));
 const { handleSupportLink } = require(path.join(LIB, 'handler.js'));
 const { SUPPORT_PAGES, SupportError, hasPremium } = require(path.join(LIB, 'logic.js'));
 
@@ -138,6 +139,13 @@ async function main() {
     devOnly('link');
     const { url, expiresAt } = await handleSupportLink({ auth: { uid: user.uid } }, adminSupportStore(db, async () => null), SUPPORT_PAGES[PROJECT]);
     console.log(`Link for ${user.email} (until ${new Date(expiresAt).toISOString()}):\n${url}`);
+  } else if (cmd === 'premium') {
+    devOnly('premium');
+    const on = args[2];
+    if (on !== 'on' && on !== 'off') throw new Error('premium <email|uid> on|off');
+    const now = Date.now();
+    const p = await setGrant(db, user.uid, 'dev', on === 'on' ? { source: 'dev', grantedAt: now, until: null } : null);
+    console.log(`✓ ${user.email}: dev grant ${on}. Premium now: ${hasPremium(p, now) ? `yes, from ${p.source}` : 'no'}.`);
   } else if (cmd === 'clear') {
     devOnly('clear');
     if (!args.includes('--yes')) throw new Error(`This deletes ${user.email}'s application, Premium, links and limits. Add --yes.`);
@@ -148,10 +156,12 @@ async function main() {
   }
 }
 
+// Let the SDK finish (a refused decision rolls its transaction back) before exiting: exiting at once can leave the
+// documents locked, and the next command then fails with "Too much contention".
 main().then(
-  () => process.exit(0),
+  () => admin.app().delete().then(() => process.exit(0)),
   (err) => {
     console.error(err instanceof SupportError ? err.message : err.message || err);
-    process.exit(1);
+    admin.app().delete().then(() => process.exit(1), () => process.exit(1));
   },
 );
