@@ -138,8 +138,15 @@ def main():
     val = rng.sample(data.val, min(160, len(data.val)))
     model.train()
     log = open(out / 'log.txt', 'a')
-    t0, losses = time.time(), []
-    for feats, _, labs, seen, _tf in dl:
+    t0, losses, t_wait = time.time(), [], 0.0
+    it = iter(dl)
+    while True:
+        tw = time.time()
+        try:
+            feats, _, labs, seen, _tf = next(it)
+        except StopIteration:
+            break
+        t_wait += time.time() - tw
         for g in opt.param_groups:
             g['lr'] = a.lr * sched(step)
         x = torch.as_tensor(feats['input_features']).to(a.device)
@@ -158,7 +165,9 @@ def main():
         losses.append(float(loss))
         step += 1
         if step % 200 == 0:
-            msg = f'step {step} loss {np.mean(losses):.3f} lr {a.lr * sched(step):.2e} {(time.time() - t0) / 200:.2f}s/step'
+            msg = (f'step {step} loss {np.mean(losses):.3f} lr {a.lr * sched(step):.2e} {(time.time() - t0) / 200:.2f}s/step'
+                   f' (waiting for data {t_wait / 200:.2f}s)')
+            t_wait = 0.0
             print(msg, flush=True)
             log.write(msg + '\n'); log.flush()
             losses, t0 = [], time.time()

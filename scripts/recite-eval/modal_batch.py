@@ -117,11 +117,12 @@ def revoice_one(name: str, d: str):
 
 
 @app.function(image=image_m, volumes={'/vol': vol}, gpu='L40S', cpu=8.0,
-              memory=32768, timeout=3600)
+              memory=32768, timeout=3600, ephemeral_disk=100 * 1024)
 def distil_part(args: list, workers: int = 6):
     """The student's training with the teacher beside it (train.py --teacher), up to about 45 minutes a call."""
     _setup()
     os.environ['HF_HOME'] = '/vol/hf-cache'
+    _local_data(args)
     sys.argv = ['train.py'] + args + ['--device', 'cuda', '--resume', '1', '--max_minutes', '45', '--workers', str(workers)]
     import importlib, hisn_torch, train
     importlib.reload(hisn_torch); importlib.reload(train)
@@ -155,13 +156,31 @@ def train_part(args: list, workers: int = 0, local: int = 0):
     return r
 
 
+def _local_data(args):
+    """Copy the --data folders to this machine's own disk and point LAB there (models stay on the volume): read clip by
+    clip from the network volume, the teacher waited for data most of the time (1.9 s a step on Nov 14, against
+    0.65 s timed with data in memory)."""
+    import time
+    t = time.time()
+    data = args[args.index('--data') + 1].split(',')
+    os.makedirs('/tmp/lab/data', exist_ok=True)
+    for d in data:
+        if not os.path.exists(f'/tmp/lab/{d}'):
+            subprocess.run(['cp', '-rL', f'/vol/{d}', f'/tmp/lab/{d}'], check=True)
+    if not os.path.exists('/tmp/lab/models'):
+        os.symlink('/vol/models', '/tmp/lab/models')
+    os.environ['LAB'] = '/tmp/lab'
+    print(f'copied {data} to local disk in {time.time() - t:.0f}s', flush=True)
+
+
 @app.function(image=image_m, volumes={'/vol': vol}, gpu='L40S', cpu=8.0,
-              memory=32768, timeout=3600)
+              memory=32768, timeout=3600, ephemeral_disk=100 * 1024)
 def teacher_part(args: list):
     """Up to about 45 minutes of the teacher's training (teacher_train.py), then a save to <out>/last.pt."""
     _setup()
     os.environ['HF_HOME'] = '/vol/hf-cache'  # Muaalem's 2.4 GB downloaded once, kept on the volume
     os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
+    _local_data(args)
     sys.argv = ['teacher_train.py'] + args + ['--device', 'cuda', '--resume', '1', '--max_minutes', '45']
     import importlib, train, teacher_train
     importlib.reload(train); importlib.reload(teacher_train)
