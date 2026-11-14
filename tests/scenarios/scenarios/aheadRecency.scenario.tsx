@@ -19,6 +19,26 @@ async function tap(app: OpenApp, testID: string): Promise<void> {
   await app.idle(50);
 }
 const label = (app: OpenApp, testID: string) => app.screen.getByTestId(testID).props.accessibilityLabel as string;
+const text = (app: OpenApp, testID: string) => app.screen.getByTestId(testID).props.children as string;
+
+/**
+ * Waits until the element reads `expected` (its label, or what `read` gives). An element can be there before its
+ * figures: Coverage's once read "0% 0 of 23" the moment it appeared, before the account's items had come (#558's CI).
+ */
+async function untilReads(
+  app: OpenApp,
+  testID: string,
+  expected: string | RegExp,
+  read: (app: OpenApp, testID: string) => string = label,
+): Promise<void> {
+  const matches = (s: string) => (typeof expected === 'string' ? s === expected : expected.test(s));
+  let last: string | undefined;
+  try {
+    await app.until(() => matches((last = read(app, testID))), `${testID} to read ${expected}`);
+  } catch (e) {
+    throw new Error(`${(e as Error).message}\nlast read: ${JSON.stringify(last)}`);
+  }
+}
 
 it('[AHEAD-6] [ACT-26] today’s pages and the next day’s revised ahead: Coverage counts both, and the Page view shows them this week', async () => {
   setZone(ZONES.chicago);
@@ -53,17 +73,15 @@ it('[AHEAD-6] [ACT-26] today’s pages and the next day’s revised ahead: Cover
   });
   await app.until(() => app.screen.queryByTestId('activity-blocks-views') != null, 'Activity');
   await tap(app, 'pill-insights');
-  await app.until(() => app.screen.queryByTestId('insights-coverage-figure') != null, 'Coverage');
   // Ten pages revised today: the five of today and the five ahead.
-  expect(label(app, 'insights-coverage-figure')).toBe('43% 10 of 23 memorized pages in 30 days');
-  expect(label(app, 'juz-tile-30')).toBe('Juz 30, 10 of 23 pages revised, the rest not revised yet');
+  await untilReads(app, 'insights-coverage-figure', '43% 10 of 23 memorized pages in 30 days');
+  await untilReads(app, 'juz-tile-30', 'Juz 30, 10 of 23 pages revised, the rest not revised yet');
   await tap(app, 'pill-page');
-  expect(label(app, 'coverage-page-594')).toMatch(/, page 594, revised this week$/);
-  expect(label(app, 'coverage-page-589')).toMatch(/, page 589, revised this week$/);
-  expect(label(app, 'coverage-page-597')).toMatch(/, page 597, not revised yet$/);
+  await untilReads(app, 'coverage-page-594', /, page 594, revised this week$/);
+  await untilReads(app, 'coverage-page-589', /, page 589, revised this week$/);
+  await untilReads(app, 'coverage-page-597', /, page 597, not revised yet$/);
   // The juz sheet counts today once, for both.
   await tap(app, 'coverage-page-row-30');
-  await app.until(() => app.screen.queryByTestId('juz-sheet-headline') != null, 'the juz sheet');
-  expect(app.screen.getByTestId('juz-sheet-headline').props.children).toBe('Last revised today');
+  await untilReads(app, 'juz-sheet-headline', 'Last revised today', text);
   await app.close();
 });
