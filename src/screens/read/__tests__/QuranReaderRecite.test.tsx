@@ -466,6 +466,19 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
     expect(screen.getByTestId('recite-close')).toBeTruthy();
   });
 
+  it('the summary names what was recited, not the passage’s end (the checker’s `to` is the end of the surah)', async () => {
+    await startTake('recite');
+    await event({ type: 'at', w: A23 + 3 });
+    await event({ type: 'said', upTo: A23 + 12 });
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    // As the checker answers a take with no end ayah: from the start to the end of An-Naml, exclusive.
+    const [, end] = words.verseRange(27, 93);
+    await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: end, secs: 12, marks: [], score: null } });
+    const passage = String(screen.getByTestId('take-summary-passage').props.children);
+    expect(passage).toMatch(/^An.Naml,\sayahs\s23.24\s·\s/);
+    expect(passage).not.toMatch(/Qasas/);
+  });
+
   it('Keep as test data off: the summary doesn’t say the take was kept', async () => {
     setReciteCheckSettings('u1', { keep: false });
     await startTake('recite');
