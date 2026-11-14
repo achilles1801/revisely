@@ -709,7 +709,10 @@ export default function QuranReaderScreen() {
             check={checkTake}
             words={qw}
             from={live.startWord}
-            to={live.state.final?.to ?? furthestWord(live.state)}
+            // What was recited: the furthest word reached. The final answer's `to` is the passage's end (exclusive): the
+            // end of the starting surah when no end ayah is sent, so a take of two ayat read as the whole surah and the
+            // next one's first ayah ("An-Naml 23 to Al-Qasas 1").
+            to={furthestWord(live.state)}
             seconds={live.seconds}
             marks={Object.values(live.state.marks).sort((a, b) => a.w - b.w)}
             score={checkTake && qw ? scorePill(live.state, qw, live.startWord) : null}
