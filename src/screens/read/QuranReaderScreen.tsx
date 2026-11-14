@@ -80,6 +80,7 @@ const LIVE_FAILURE: Record<LiveFailure, string> = {
   idle: 'Stopped: nothing heard',
   bad_request: 'Couldn’t start',
   server: 'The checker stopped',
+  check_locked: 'Check isn’t on this account',
   offline: 'Couldn’t reach the checker',
 };
 
@@ -248,10 +249,15 @@ export default function QuranReaderScreen() {
   const liveOn = reciteLiveEnabled(user, edition);
   const reciteSettings = useReciteCheckSettings(user?.id);
   const owned = checkOwned(user, reciteSettings);
+  // A take kept as a recording (Save recordings, on by default) is told about once the take is closed (✕) and the
+  // player is back: "Recording saved · View", over the player as after any recording, never over the recite bar.
+  const [takeSaved, setTakeSaved] = useState<{ day: string; recordingId: string } | null>(null);
   const live = useLiveRecitation({
     settings: reciteSettings,
     currentPage,
     onShowPage: (page) => pagerRef.current?.scrollToPage(page),
+    recordingDay: today ?? null,
+    onRecordingSaved: setTakeSaved,
   });
   const [words, setWords] = useState<QuranWords | null>(getQuranWords());
   useEffect(() => {
@@ -312,24 +318,23 @@ export default function QuranReaderScreen() {
     setRevealed(NOTHING_SHOWN);
     setHidden((h) => !h);
   }, []);
+  // Each tells the checker which word was shown (the ayah's first word not shown before, for ‹‹).
   const showNextWord = useCallback(() => {
     if (!qw) return;
-    setRevealed((r) => {
-      const next = revealNextWord(qw, currentPage, r, liveInfo);
-      const added = [...next].find((w) => !r.has(w));
-      if (added != null) live.hint(added, 'word');
-      return next;
-    });
-  }, [qw, currentPage, liveInfo, live]);
+    const next = revealNextWord(qw, currentPage, revealed, liveInfo);
+    const added = [...next].find((w) => !revealed.has(w));
+    if (added == null) return;
+    live.hint(added, 'word');
+    setRevealed(next);
+  }, [qw, currentPage, revealed, liveInfo, live]);
   const showWholeAyah = useCallback(() => {
     if (!qw) return;
-    setRevealed((r) => {
-      const next = revealAyah(qw, currentPage, r, liveInfo);
-      const added = [...next].find((w) => !r.has(w));
-      if (added != null) live.hint(added, 'ayah');
-      return next;
-    });
-  }, [qw, currentPage, liveInfo, live]);
+    const next = revealAyah(qw, currentPage, revealed, liveInfo);
+    const added = [...next].find((w) => !revealed.has(w));
+    if (added == null) return;
+    live.hint(added, 'ayah');
+    setRevealed(next);
+  }, [qw, currentPage, revealed, liveInfo, live]);
 
   const checkTake = live.mode === 'check';
   const cardMarks = useMemo<Mark[]>(
@@ -356,15 +361,32 @@ export default function QuranReaderScreen() {
   const cardHasSimilar = useMemo(() => (qw && cardAt ? similarPhrases(qw, cardAt.w).length > 0 : false), [qw, cardAt]);
   // The summary, once a take has its final answer.
   const takeId = live.state.take;
+  const [summaryShown, setSummaryShown] = useState<string | null>(null);
   useEffect(() => {
-    if (live.state.status === 'done' && takeId && summaryFor !== takeId) setSummaryFor(takeId);
+    if (live.state.status === 'done' && takeId && summaryFor !== takeId) {
+      setSummaryFor(takeId);
+      setSummaryShown(takeId);
+    }
     // Only when a take finishes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [live.state.status, takeId]);
-  const [summaryShown, setSummaryShown] = useState<string | null>(null);
+  const takeStatus = live.state.status;
+  // The checker's gate refused Check (the account doesn't have it): Check's page, and the take goes.
+  const takeFailure = live.state.failure;
   useEffect(() => {
-    if (summaryFor) setSummaryShown(summaryFor);
-  }, [summaryFor]);
+    if (takeStatus !== 'failed' || takeFailure !== 'check_locked') return;
+    live.clear();
+    setIntroOpen(true);
+    // Only when a take fails so.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [takeStatus, takeFailure]);
+  const micStatus = live.mic;
+  useEffect(() => {
+    // Recite again starts the next take at once (the mic is starting): its own end tells the latest recording.
+    if (!takeSaved || takeStatus !== 'idle' || micStatus !== 'off') return;
+    setSavedRecording(takeSaved);
+    setTakeSaved(null);
+  }, [takeSaved, takeStatus, micStatus]);
   const pageMarks = useCallback(
     (page: number) => (checkTake && qw ? marksOnPage(live.state, qw, page) : []),
     [checkTake, qw, live.state],
@@ -490,7 +512,7 @@ export default function QuranReaderScreen() {
                 onWholeAyah={showWholeAyah}
                 score={checkTake ? scorePill(live.state, qw, live.startWord) : null}
                 seconds={live.seconds}
-                recording={false}
+                recording={live.recording && live.mic === 'on'}
                 words={barWords(live.state, qw, { check: checkTake, startWord: live.startWord })}
                 status={barStatus}
                 phase={barPhase}
@@ -680,7 +702,7 @@ export default function QuranReaderScreen() {
           <CheckIntroPage
             visible={introOpen}
             onGet={() =>
-              Alert.alert('Not yet', 'Payments aren’t set up yet. In Revisely Dev every tester has Check.')
+              Alert.alert('Not yet', 'Premium isn’t available yet. In Revisely Dev every tester has Check.')
             }
             onClose={() => setIntroOpen(false)}
           />

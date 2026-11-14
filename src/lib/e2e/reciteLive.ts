@@ -85,6 +85,17 @@ function take(): ReplayLog {
   return { events };
 }
 
+/**
+ * A second of the take's audio for its recording: a generated tone (220 Hz, louder and softer by the second), never a
+ * recitation. The take's events are the recorded ones; only the recording needs samples.
+ */
+export function e2eToneSecond(second: number): Int16Array {
+  const out = new Int16Array(16000);
+  const amplitude = 1500 + 1500 * Math.abs(Math.sin(second / 2));
+  for (let i = 0; i < out.length; i++) out[i] = Math.round(amplitude * Math.sin((2 * Math.PI * 220 * i) / 16000));
+  return out;
+}
+
 /** The recorded take, played as a checker would send it. */
 export function e2eLiveConnect(): LiveConnect {
   return replayFeed(take());

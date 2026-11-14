@@ -141,9 +141,9 @@ export function ReciteBar({
     >
       <EyeGroup hidden={hidden} onToggle={onToggleHidden} onNextWord={onNextWord} onWholeAyah={onWholeAyah} />
       {score ? <ScorePill text={score.text} level={score.level} /> : null}
-      <View style={styles.middle} accessibilityLiveRegion="polite" accessible accessibilityLabel={`${clock(seconds)}. ${spoken || status}`}>
+      <View style={styles.middle} accessibilityLiveRegion="polite" accessible accessibilityLabel={`${clock(seconds)}${recording && phase === 'live' ? ', recording' : ''}. ${spoken || status}`}>
         <View style={styles.time}>
-          {recording && phase === 'live' ? <View style={[styles.dot, { backgroundColor: palette.red }]} /> : null}
+          {recording && phase === 'live' ? <View style={[styles.dot, { backgroundColor: palette.red }]} testID="recite-recording" /> : null}
           <Text style={[styles.timeText, typeV2.numeral, { color: palette.secondary }]} maxFontSizeMultiplier={1.2} testID="recite-time">
             {clock(seconds)}
           </Text>

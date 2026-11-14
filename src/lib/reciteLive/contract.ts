@@ -63,7 +63,17 @@ export interface FinalResult {
 }
 
 /** Why a take ended without its answer. `offline` is the phone's own: the checker couldn't be reached again. */
-export type LiveFailure = 'sign_in' | 'testers_only' | 'limit' | 'too_long' | 'idle' | 'bad_request' | 'server' | 'offline';
+export type LiveFailure =
+  | 'sign_in'
+  | 'testers_only'
+  | 'limit'
+  | 'too_long'
+  | 'idle'
+  | 'bad_request'
+  | 'server'
+  /** Check without the account having it (the server's gate, CHECK_GATE). */
+  | 'check_locked'
+  | 'offline';
 
 export type LiveEvent =
   | { type: 'ready'; take: string | null; engine?: string; session?: string; from?: number }
@@ -82,7 +92,7 @@ const RULES: TajweedRule[] = [
   'madd_munfasil', 'madd_muttasil', 'madd_aared', 'madd_lazim', 'madd_dropped', 'qalqalah', 'ghunnah', 'ikhfa',
   'idgham', 'idgham_no_ghunnah', 'iqlab',
 ];
-const FAILURES: LiveFailure[] = ['sign_in', 'testers_only', 'limit', 'too_long', 'idle', 'bad_request', 'server'];
+const FAILURES: LiveFailure[] = ['sign_in', 'testers_only', 'limit', 'too_long', 'idle', 'bad_request', 'server', 'check_locked'];
 
 const isNum = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x);
 const isWord = (x: unknown): x is number => isNum(x) && Number.isInteger(x) && x >= 0;
