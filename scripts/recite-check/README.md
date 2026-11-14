@@ -93,6 +93,9 @@ take (`<take>.dismiss-<time>.json`) as a label for the lab.
 
 1. The phone opens `wss://…/live` and sends a start frame first (within 10 s):
    `{"type":"start","token":"<ID token>","s":27,"a":23,"s2":null,"a2":null,"mon":4,"mot":4,"aar":0,"letters":false,"keep":true}`.
+   With no `s2`/`a2` the take follows the reciter to the end of the Qur'an (into the next surah too) until `end`; an
+   end given is kept (`/check` without one stops at the end of the surah). `done.result.to` is then the Qur'an's end:
+   the words reached are in `words`.
    The token can be in the handshake's `Authorization: Bearer` header instead. `"tajweed": false` turns tajweed off
    (the app's "words and harakat" level; letters as asked). `"follow": true` (or `"mode": "recite"`) is Recite:
    only `ready`, `at`, `said`, `ayah` and `done` come back, words are decided but no mark is made, and `done.result`

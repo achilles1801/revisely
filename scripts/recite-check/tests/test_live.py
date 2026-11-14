@@ -217,6 +217,18 @@ class Bench(unittest.TestCase):
         t14 = next(e['t'] for e in ev if e['type'] == 'mark' and e['mark']['w'] == 14)
         self.assertLess(t14, 30.0)
 
+    def test_a_passage_with_no_end_gives_the_same_answer(self):
+        """The server runs a take with no end to 114:6 (server.LAST_AYAH): on a take that stops at the end of
+        Al-Fatiha, the same mistakes, nothing reached past it, and the cursor ends on its last word."""
+        import live
+        ev = run(live.LiveSession(engine(), 1, 1, 114, 6, {}), chunks(bench_pcm(), 3200) + [{'type': 'end'}])
+        end = ev[-1]['result']
+        self.assertEqual({(m['w'], m['kind']) for m in end['marks'] if m['kind'] != 'tajweed'},
+                         {(4, 'word'), (14, 'skipped')})
+        self.assertEqual(max(w['w'] for w in end['words']), 28)
+        self.assertEqual([e['w'] for e in ev if e['type'] == 'at'][-1], 28)
+        self.assertEqual(end['score']['reached'], 29)
+
     def test_a_snapshot_holds_what_the_phone_should_show(self):
         sess = self.session()
         ev = run(sess, chunks(bench_pcm()[: 16000 * 2 * 35], 3200))
