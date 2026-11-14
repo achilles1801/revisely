@@ -76,6 +76,7 @@ let mockAppCheck: string | null = 'app-check-token';
 jest.mock('../appCheck', () => ({ getAppCheckToken: async () => mockAppCheck }));
 
 import {
+  audioTypeOf,
   CloudError,
   cancelUploads,
   deleteSegment,
@@ -160,6 +161,24 @@ describe('recording backup over Firebase Storage', () => {
   describe('uploading', () => {
     const SESSION = 'https://upload/session-1';
     const started = () => res(200, {}, { 'X-Goog-Upload-URL': SESSION });
+
+    it('declares a file’s type by its extension: the recorder’s .m4a, a live take’s .wav', async () => {
+      expect(['a-0.m4a', 'a-0.wav', 'a-0.WAV', 'a-0.aac', 'a-0.caf', 'a-0'].map(audioTypeOf)).toEqual([
+        'audio/mp4',
+        'audio/wav',
+        'audio/wav',
+        'audio/aac',
+        'audio/x-caf',
+        'audio/mp4',
+      ]);
+      mockFiles.set('file:///t-0.wav', bytes(4));
+      fetchMock.mockResolvedValueOnce(started());
+      mockUploadAnswer = async () => ({ status: 200, body: JSON.stringify({ size: '4' }), headers: {} });
+      await uploadSegment('u1', 't-0.wav', 'file:///t-0.wav', 4, { chunkBytes: 4 });
+      const [, start] = fetchMock.mock.calls[0];
+      expect(start.headers['X-Goog-Upload-Header-Content-Type']).toBe('audio/wav');
+      expect(JSON.parse(start.body)).toEqual({ name: 'recordings/u1/t-0.wav', contentType: 'audio/wav' });
+    });
 
     it('declares the file (name, audio type, size), then sends it in chunks, saving where it got to', async () => {
       mockFiles.set('file:///a-0.m4a', bytes(10));

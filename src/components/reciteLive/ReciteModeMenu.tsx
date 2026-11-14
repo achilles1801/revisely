@@ -91,7 +91,7 @@ export function ReciteModeMenu({
                   ref={i === 0 ? first : undefined}
                   onPress={() => onPick(r.mode)}
                   accessibilityRole="button"
-                  accessibilityLabel={`${r.label}, ${r.subtitle}${check && !checkOwned ? ', locked' : ''}`}
+                  accessibilityLabel={`${r.label}, ${r.subtitle}${check && !checkOwned ? ', part of Premium, locked' : ''}`}
                   accessibilityState={{ selected: chosen }}
                   style={({ pressed }) => [
                     styles.row,

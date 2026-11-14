@@ -17,8 +17,8 @@ export interface StartFrame {
   /** Check's Strict level: tajweed too (contract draft 4). */
   tajweed?: boolean;
   keep: boolean;
-  /** Follow along only (Recite) or mark mistakes too (Check). */
-  mode?: 'recite' | 'check';
+  /** Recite: follow along only, no marks (contract draft 5). Absent or false: Check. */
+  follow?: boolean;
   /** Carry on a take after a dropped connection. */
   resume?: string;
 }
