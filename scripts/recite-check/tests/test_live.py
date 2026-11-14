@@ -165,6 +165,21 @@ class Model(unittest.TestCase):
         finally:
             E.table = saved
 
+    def test_the_four_ayat_with_a_joined_word_check_and_stream(self):
+        """2:181, 8:6, 13:37 and 37:130 broke the checker (quran_transcript splits a word the mushaf writes as one;
+        fixed at c01f4ea0): a check or a live session near them failed with `server`."""
+        import live
+        E = engine()
+        x = np.frombuffer(noise(4, seed=7), '<i2')
+        for s, a in ((2, 181), (8, 6), (13, 37), (37, 130)):
+            first, n = E.words.first[E.words.vindex[(s, a)]], E.words.counts[E.words.vindex[(s, a)]]
+            self.assertEqual(len(E.passage_words(first, first + n)), n)
+            res = E.check(x.astype(np.float32) / 32768, s, a - 1 if a > 1 else a, s, a + 1, {}, v=2)
+            self.assertEqual(res['v'], 2)
+            sess = live.LiveSession(E, s, a - 1 if a > 1 else a, s, a + 1, {})
+            ev = run(sess, chunks(x.tobytes(), 3200) + [{'type': 'end'}])
+            self.assertEqual(ev[-1]['type'], 'done')
+
     def test_refuses_a_passage_that_does_not_exist(self):
         import live
         from engine import BadRequest
@@ -213,6 +228,31 @@ class Bench(unittest.TestCase):
         self.assertEqual(got['said']['upTo'], last['said']['upTo'])
         self.assertEqual({k: got['score'][k] for k in ('reached', 'mistakes')},
                          {k: last['score'][k] for k in ('reached', 'mistakes')})
+
+    def test_follow_mode_sends_the_cursor_and_said_but_no_marks_or_score(self):
+        import live
+        sess = live.LiveSession(engine(), 1, 1, 1, 7, {'letters': '1'}, follow=True)
+        ev = run(sess, chunks(bench_pcm(), 3200) + [{'type': 'end'}])
+        self.assertEqual({e['type'] for e in ev} - {'at', 'said', 'ayah', 'done'}, set())
+        res = ev[-1]['result']
+        self.assertNotIn('marks', res)
+        self.assertNotIn('score', res)
+        self.assertEqual(res['settings']['letters'], False)
+        self.assertEqual({w['w']: w['status'] for w in res['words']}[14], 'missed')  # words are still decided
+        self.assertEqual([e for e in ev if e['type'] == 'said'][-1]['upTo'] >= 27, True)
+
+    def test_hints_mark_words_helped_without_changing_mistakes(self):
+        pcm = bench_pcm()
+        log = chunks(pcm[:16000 * 2 * 20], 3200) + [{'type': 'hint', 'w': 20, 'what': 'word'},
+                                                    {'type': 'hint', 'w': 22, 'what': 'ayah'}] \
+            + chunks(pcm[16000 * 2 * 20:], 3200) + [{'type': 'end'}]
+        ev = run(self.session(), log)
+        res = ev[-1]['result']
+        helped = sorted(w['w'] for w in res['words'] if w.get('helped'))
+        self.assertEqual(helped, [20, 22, 23, 24, 25, 26, 27, 28])  # 1:7 runs to word 28
+        self.assertEqual(res['score']['helped'], 8)
+        self.assertEqual(res['score']['mistakes'], 2)
+        self.assertEqual([e for e in ev if e['type'] == 'score'][-1]['helped'], 8)
 
     def test_same_events_for_any_chunk_size(self):
         pcm = bench_pcm()[: 16000 * 2 * 20]

@@ -390,9 +390,15 @@ class LiveSession:
     """One live check. feed() audio (PCM16 bytes), control() messages, finish() at the end; each returns the events
     to send, in order (dicts, recite-contract.md)."""
 
-    def __init__(self, engine, s, a, s2=None, a2=None, settings=None):
+    def __init__(self, engine, s, a, s2=None, a2=None, settings=None, follow=False):
         E = self.E = engine
-        self.st = settings_of(settings or {})
+        # follow (Recite, contract draft 5): the cursor and `said` only; words are decided (said needs them) but no
+        # mark is made, letters and tajweed aren't judged, and no mark, unmark or score is sent
+        self.follow = bool(follow)
+        raw = dict(settings or {})
+        if self.follow:
+            raw.update(letters='0', tajweed='0')
+        self.st = settings_of(raw)
         self.P = dict(WORDS_P, **LIVE)
         if (s2 is None) != (a2 is None):
             raise BadRequest('both or neither of s2, a2')
@@ -423,6 +429,8 @@ class LiveSession:
         self._window = (None, [])        # the segment and path of the last decision (for a seam's state)
         self.sent = {'at': None, 'said': None, 'score': None}
         self.unmarked = set()            # ids taken back (and not marked again): for a resume's snapshot
+        self.helped = set()              # words the phone showed the reciter (hints) before they were decided
+        self.hints = []                  # (seconds, hint) as they came
         self.ayah_sent = []              # ayah events sent: for a resume's snapshot
         self.stopped = False
         self.result = None
@@ -501,9 +509,31 @@ class LiveSession:
             self.origin = w
             self._start_segment(w, self.T, 'lead')
             return ev
+        if kind == 'hint':
+            return self._hint(msg)
         if kind in ('end', 'stop'):
             return self.finish()
         return []
+
+    def _hint(self, msg):
+        """The phone showed the reciter a word (or the rest of an ayah) in the hidden view. The model session's rule:
+        helped words are w (what 'word') or w's ayah from w to its end ('ayah'), each only if not yet decided. They
+        stay mistakes if said wrong; the score and `done` say how many were helped."""
+        w, what = msg.get('w'), msg.get('what')
+        if not isinstance(w, int) or isinstance(w, bool) or what not in ('word', 'ayah') \
+                or not self.lo <= w < self.end:
+            return []
+        self.hints.append((round(self.seconds, 2), {'w': w, 'what': what}))
+        ws = [w]
+        if what == 'ayah':
+            s_, a_, _ = self.E.key.where(w)
+            first, n = self._ayah_bounds(s_, a_)
+            ws = range(w, first + n)
+        new = {x for x in ws if x not in self.decided} - self.helped
+        if not new:
+            return []
+        self.helped |= new
+        return self._score_event(force=True)
 
     def _hop(self, last=False):
         """One hop: the model on the newest window, new final frames to the decoder, the cursor, decisions."""
@@ -648,7 +678,8 @@ class LiveSession:
                     continue
                 self.decided[w] = now
                 self.status[w] = row['status']
-                if row['status'] in ('wrong', 'missed') and (self.P['live_order'] or row.get('kind') != 'order'):
+                if not self.follow and row['status'] in ('wrong', 'missed') \
+                        and (self.P['live_order'] or row.get('kind') != 'order'):
                     m = self._word_mark(row, {'kind': row.get('kind')} if row['status'] == 'wrong' else None)
                     self.flagged[w] = now
                     self.bad_from[w] = res['spans'][w][0] if w in res['spans'] else seg.frames()
@@ -780,6 +811,8 @@ class LiveSession:
                 self.bad_run[aw] = self.bad_run.get(aw, 0) + 1 if bad else 0
                 if bad:
                     self.good_run[aw] = 0
+                if self.follow:
+                    continue
                 if bad and self.bad_run[aw] >= P['stable'] and aw not in self.flagged:
                     self.flagged[aw] = now
                     self.bad_from[aw] = seg.f0 + (visits[w][-1]['start'] if visits[w] else end_f)
@@ -791,7 +824,7 @@ class LiveSession:
                     ev += self._unmark_if_corrected(aw, seg.f0 + visits[w][-1]['start'], now)
         # extra words: once their filler is behind the commit point, in EXTRA_STABLE hops in a row
         now_extra = set()
-        for e in extra_rows(extras, fillers, seg.kws, P['delay'], seg.f0):
+        for e in [] if self.follow else extra_rows(extras, fillers, seg.kws, P['delay'], seg.f0):
             if e['trail'] or not e['span'] or not seg.own_extra(e) or e['span'][1] - seg.f0 > dec.t - cf:
                 continue
             now_extra.add(e['after'])
@@ -829,8 +862,8 @@ class LiveSession:
             ev.append({'type': 'at', 'w': self.sent['at'], 't': t})
         if self.sent['said'] is not None:
             ev.append({'type': 'said', 'upTo': self.sent['said'][0], 't': t})
-        if self.decided:
-            ev.append({'type': 'score', **score(self.status, list(self.marks.values()), self.dismissed), 't': t})
+        if self.decided and not self.follow:
+            ev.append({'type': 'score', **self._score(), 't': t})
         return ev
 
     def _word_mark(self, row, fl):
@@ -871,8 +904,11 @@ class LiveSession:
             self.ayat_done.add((s, a))
             if first < self.lo or first + n > self.end or not self._said_in_full(first, n, self.status, self.spans):
                 continue
-            tj, letters = self.E.ayah_notes(self.lp[:self.T], s, a, self.status, self.spans, self.st)
-            marks = self.E.marks([], {}, {}, [], tj, letters if self.st['letters'] else [])
+            if self.follow:
+                marks = []
+            else:
+                tj, letters = self.E.ayah_notes(self.lp[:self.T], s, a, self.status, self.spans, self.st)
+                marks = self.E.marks([], {}, {}, [], tj, letters if self.st['letters'] else [])
             for m in marks:
                 if m['id'] not in self.marks:
                     self._keep_mark(m)
@@ -907,10 +943,17 @@ class LiveSession:
         self.sent['said'] = said
         return [{'type': 'said', 'upTo': said[0], 't': round(now, 2)}]
 
-    def _score_event(self, now=None):
+    def _score(self):
         sc = score(self.status, list(self.marks.values()), self.dismissed)
-        key = (sc['reached'], sc['mistakes'], sc['tajweed'])
-        if key == self.sent['score'] or not sc['reached']:
+        sc['helped'] = len(self.helped)
+        return sc
+
+    def _score_event(self, now=None, force=False):
+        if self.follow:
+            return []
+        sc = self._score()
+        key = (sc['reached'], sc['mistakes'], sc['tajweed'], sc['helped'])
+        if key == self.sent['score'] or not sc['reached'] and not force:
             return []
         self.sent['score'] = key
         ev = {'type': 'score', **sc}
@@ -946,7 +989,7 @@ class LiveSession:
         t0 = time.perf_counter()
         tj, letters = [], []
         done = set()
-        for r in words:
+        for r in [] if self.follow else words:
             s, a = self.E.ayah_of(r['w'])
             if (s, a) in done:
                 continue
@@ -967,11 +1010,17 @@ class LiveSession:
             'v': 1, 'from': self.lo, 'to': self.end, 'secs': round(self.seconds, 1), 'words': words, 'extras': ex,
             'tajweed': [{k: r[k] for k in r if not k.startswith('_')} for r in tj],
             'letters': [{k: r[k] for k in r if not k.startswith('_')} for r in letters] if self.st['letters'] else None,
-            'settings': {k: self.st[k] for k in ('mon', 'mot', 'aar', 'letters')},
+            'settings': {k: self.st[k] for k in ('mon', 'mot', 'aar', 'letters', 'tajweed')},
             'ms': {k: int(v) for k, v in self.ms.items()},
         }
+        for r in words:
+            if r['w'] in self.helped:
+                r['helped'] = True
+        if self.follow:  # Recite: the words and their statuses, nothing else
+            return {k: out[k] for k in ('v', 'from', 'to', 'secs', 'words', 'settings', 'ms')} | {'v': 2, 'follow': True}
         heard = heard_sounds(spans, self._tokens(0, self.T), self.E.ear.vocab)
         out['marks'] = self.E.marks(words, flagged, heard, ex, tj, letters if self.st['letters'] else [])
         out['score'] = score(statuses, out['marks'], self.dismissed)
+        out['score']['helped'] = len(self.helped)
         out['v'] = 2
         return out
