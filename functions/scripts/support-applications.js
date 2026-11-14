@@ -1,8 +1,11 @@
 /**
- * The support program's applications ("Apply for support" in the app, /apply/ on the website): see them, approve
- * or decline. Approval gives the account Revisely Premium for free (entitlements/<uid>, source "support", no end date
- * unless --until). A decision deletes the person's answers; only the outcome stays. The rules are in
- * functions/src/support/logic.ts, which this script runs from lib/ (run `npm run build` first).
+ * Open Door's applications ("Apply for support" in the app, /apply/ on the website): see them, approve or decline.
+ * Revisely Console (admin/, Open Door) does the same from a browser; both decide through
+ * functions/src/support/review.ts, so a decision here is exactly the console's, audit entry included (by "the review
+ * script"). Approval gives the account Revisely Premium for free (entitlements/<uid>, source "support", no end date
+ * unless --until). A decision deletes the person's answers; only the outcome stays. Revoking takes the grant back and,
+ * like a decline, the account may apply again after 30 days. This script runs the functions' code from lib/
+ * (run `npm run build` first).
  *
  * Applications are people's own words about their circumstances. They are Majd's to read.
  *
@@ -11,9 +14,9 @@
  *   node scripts/support-applications.js                      # pending applications, oldest first
  *   node scripts/support-applications.js --all                # every application and its outcome
  *   node scripts/support-applications.js show <email|uid>     # one account: application and Premium
- *   node scripts/support-applications.js approve <email|uid> [--until 2027-11-14]
- *   node scripts/support-applications.js decline <email|uid>  # they may apply again after 30 days
- *   node scripts/support-applications.js revoke <email|uid>   # takes the support grant back
+ *   node scripts/support-applications.js approve <email|uid> [--until 2027-11-14] [--note "…"]
+ *   node scripts/support-applications.js decline <email|uid> [--note "…"]   # they may apply again after 30 days
+ *   node scripts/support-applications.js revoke <email|uid> --note "why"    # takes the support grant back (30 days)
  * For testing (revisely-dev only):
  *   node scripts/support-applications.js link <email|uid>     # a 30-minute link to the page, as the app gets
  *   node scripts/support-applications.js premium <email|uid> on|off   # Premium from "dev", as Get Premium gives it
@@ -32,13 +35,17 @@ if (!fs.existsSync(path.join(LIB, 'admin.js'))) {
   console.error('ERROR: Build the functions first: npm run build');
   process.exit(1);
 }
-const { decideApplication, revokeGrant, setGrant, deleteSupportData, adminSupportStore, applicationFrom, entitlementsFrom } = require(path.join(LIB, 'admin.js'));
+const { setGrant, deleteSupportData, adminSupportStore } = require(path.join(LIB, 'admin.js'));
+const { review, newRequestId, queuePage, accountReview } = require(path.join(LIB, 'review.js'));
 const { handleSupportLink } = require(path.join(LIB, 'handler.js'));
 const { SUPPORT_PAGES, SupportError, hasPremium } = require(path.join(LIB, 'logic.js'));
 
 admin.initializeApp();
 const db = admin.firestore();
-const PROJECT = JSON.parse(fs.readFileSync(process.env.GOOGLE_APPLICATION_CREDENTIALS, 'utf8')).project_id;
+const KEY = JSON.parse(fs.readFileSync(process.env.GOOGLE_APPLICATION_CREDENTIALS, 'utf8'));
+const PROJECT = KEY.project_id;
+// The audit log names the script and the key it ran with (a service account, never a person's password).
+const BY = { uid: null, email: KEY.client_email ?? null, role: null, via: 'script' };
 const PROTECTED_EMAILS = ['applereview@revisely.app'];
 
 const day = (ms) => (ms == null ? '—' : new Date(ms).toISOString().slice(0, 10));
@@ -68,17 +75,23 @@ function printAnswers(a) {
 }
 
 async function list(all) {
-  const snap = all ? await db.collection('supportApplications').get() : await db.collection('supportApplications').where('status', '==', 'pending').get();
-  const rows = snap.docs.map((d) => ({ uid: d.id, app: applicationFrom(d.data()) })).filter((r) => r.app);
-  rows.sort((a, b) => a.app.createdAt - b.app.createdAt);
+  const rows = [];
+  let cursor = null;
+  do {
+    const page = await queuePage(db, { filter: all ? 'all' : 'pending', limit: 100, cursor });
+    rows.push(...page.rows);
+    cursor = page.next;
+  } while (cursor);
   if (!rows.length) {
     console.log(all ? 'No applications.' : 'No pending applications.');
     return;
   }
-  for (const { uid, app } of rows) {
-    const user = await admin.auth().getUser(uid).catch(() => null);
+  for (const row of rows) {
+    const { app } = await accountReview(db, row.uid);
+    if (!app) continue;
+    const user = await admin.auth().getUser(row.uid).catch(() => null);
     const decided = app.status === 'pending' ? `reply by ${day(app.createdAt + 7 * 86400000)}` : `${app.status} ${day(app.decidedAt)}`;
-    console.log(`\n${day(app.createdAt)}  ${user?.email ?? '(no sign-in)'}  ${uid}`);
+    console.log(`\n${day(app.createdAt)}  ${user?.email ?? '(no sign-in)'}  ${row.uid}`);
     console.log(`    ${app.status} · ${decided} · application ${app.count} · from the ${app.via === 'web' ? 'website' : 'app'}`);
     printAnswers(app.answers);
   }
@@ -87,9 +100,7 @@ async function list(all) {
 
 async function show(who) {
   const user = await account(who);
-  const [app, ent] = await Promise.all([db.doc(`supportApplications/${user.uid}`).get(), db.doc(`entitlements/${user.uid}`).get()]);
-  const a = applicationFrom(app.data());
-  const e = entitlementsFrom(ent.data());
+  const { app: a, ent: e, history } = await accountReview(db, user.uid);
   console.log(`${user.email ?? '(no email)'}  ${user.uid}`);
   if (a) {
     console.log(`  application: ${a.status}, applied ${day(a.createdAt)}${a.decidedAt ? `, decided ${day(a.decidedAt)}` : ''}${a.applyAgainFrom ? `, may apply again ${day(a.applyAgainFrom)}` : ''} (#${a.count})`);
@@ -98,6 +109,7 @@ async function show(who) {
   const p = e?.premium;
   console.log(`  premium: ${hasPremium(p, Date.now()) ? `yes, from ${p.source}${p.until ? ` until ${day(p.until)}` : ', no end date'}` : 'no'}`);
   for (const [source, g] of Object.entries(e?.grants ?? {})) console.log(`    grant ${source}: since ${day(g.grantedAt)}, ${g.until ? `until ${day(g.until)}` : 'no end date'}`);
+  for (const d of history) console.log(`  ${day(d.at)} ${d.action} by ${d.by.via === 'script' ? 'the review script' : d.by.email}${d.note ? ` · note: ${d.note}` : ''}`);
 }
 
 function devOnly(what) {
@@ -127,14 +139,16 @@ async function main() {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(untilArg)) throw new Error('--until takes a date: 2027-11-14');
       until = Date.parse(`${untilArg}T23:59:59Z`);
     }
-    await decideApplication(db, user.uid, { approve: true, until });
+    await review(db, { uid: user.uid, action: 'approve', by: BY, requestId: newRequestId(), note: flag('--note'), until });
     console.log(`✓ Approved: ${user.email} has Premium ${until ? `until ${untilArg}` : 'with no end date'}. Their answers are deleted.`);
   } else if (cmd === 'decline') {
-    const app = await decideApplication(db, user.uid, { approve: false });
-    console.log(`✓ Declined: ${user.email} may apply again from ${day(app.applyAgainFrom)}. Their answers are deleted.`);
+    const out = await review(db, { uid: user.uid, action: 'decline', by: BY, requestId: newRequestId(), note: flag('--note') });
+    console.log(`✓ Declined: ${user.email} may apply again from ${day(out.decision.applyAgainFrom)}. Their answers are deleted.`);
   } else if (cmd === 'revoke') {
-    const left = await revokeGrant(db, user.uid, 'support');
-    console.log(`✓ Support grant taken back from ${user.email}. Premium now: ${left ? `from ${left.source}` : 'none'}.`);
+    const note = flag('--note');
+    if (!note) throw new Error('Say why: revoke <email|uid> --note "…"');
+    const out = await review(db, { uid: user.uid, action: 'revoke', by: BY, requestId: newRequestId(), note });
+    console.log(`✓ Support grant taken back from ${user.email} (may apply again from ${day(out.decision.applyAgainFrom)}). Premium now: ${out.premium ? `from ${out.premium.source}` : 'none'}.`);
   } else if (cmd === 'link') {
     devOnly('link');
     const { url, expiresAt } = await handleSupportLink({ auth: { uid: user.uid } }, adminSupportStore(db, async () => null), SUPPORT_PAGES[PROJECT]);

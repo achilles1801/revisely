@@ -44,11 +44,16 @@ const input = (extra: Partial<Input> = {}): Omit<Input, 'now'> => ({
 });
 
 describe('who may use the console', () => {
-  it('needs a signed-in account whose token carries admin: true', () => {
+  it('needs a signed-in account whose role allows it (the old admin: true counts as owner)', () => {
     expect(() => requireAdmin(undefined)).toThrow(AdminError);
-    expect(() => requireAdmin({ uid: USER })).toThrow('This account is not an admin.');
+    expect(() => requireAdmin({ uid: USER })).toThrow('This account has no access to Revisely Console.');
     expect(() => requireAdmin({ uid: USER, token: { admin: 'true' } })).toThrow(AdminError);
+    expect(() => requireAdmin({ uid: USER, token: { role: 'superuser' } })).toThrow(AdminError);
     expect(requireAdmin(admin)).toBe(OWNER);
+    expect(requireAdmin({ uid: USER, token: { role: 'dev' } })).toBe(USER);
+    expect(() => requireAdmin({ uid: USER, token: { role: 'reviewer' } })).toThrow('Your role doesn’t allow this.');
+    expect(() => requireAdmin({ uid: USER, token: { role: 'dev' } }, 'revo.conversations')).toThrow('Your role doesn’t allow this.');
+    expect(requireAdmin({ uid: USER, token: { role: 'admin' } }, 'revo.conversations')).toBe(USER);
   });
 
   it('answers the console on its Hosting domains and on metrics.revisely.app, nowhere else', () => {

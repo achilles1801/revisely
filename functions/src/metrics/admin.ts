@@ -1,8 +1,8 @@
 /**
  * The owner's metrics console (scripts/metrics/README.md): who may call it, and what each call returns.
- * - adminMetrics: every number (aggregate.ts), for an account whose ID token carries `admin: true`
- *   (set with functions/scripts/set-admin.js). Cached a couple of minutes unless asked to refresh.
- * - adminRevo: one account's Revo conversations and memory, read live for the owner. Locked until
+ * - adminMetrics: every number (aggregate.ts), for an account whose role allows metrics.read
+ *   (console/roles.ts; given with functions/scripts/set-role.js). Cached a couple of minutes unless asked to refresh.
+ * - adminRevo: one account's Revo conversations and memory, read live (revo.conversations: owner and admin). Locked until
  *   config/admin.conversations is true, which is flipped only once the privacy policy says the
  *   developer may read them. Each read is logged with who read whose account, never the content.
  * - metricsTotals: the GitHub workflow's Sentry and App Store totals (its OIDC token proves it is
@@ -11,6 +11,7 @@
  */
 import { CallerError, GithubClaims, REPOSITORY, REPOSITORY_ID } from '../playAvailable';
 import { Alert, Input, Metrics, Totals, build } from './aggregate';
+import { Permission, can, roleOf } from '../console/roles';
 
 export type AdminErrorCode = 'unauthenticated' | 'permission-denied' | 'invalid-argument' | 'not-found';
 export class AdminError extends Error {
@@ -29,10 +30,15 @@ export function consoleOrigins(project: string): string[] {
   return [`https://${project}.web.app`, `https://${project}.firebaseapp.com`, `https://${CONSOLE_DOMAIN}`];
 }
 
-/** The caller, if their ID token carries the admin claim. */
-export function requireAdmin(auth: Caller | undefined): string {
+/**
+ * The caller, if their role allows `permission` (console/roles.ts). `token` is the account's custom claims; index.ts
+ * passes them read live from Firebase Auth, so a role taken away stops working at once.
+ */
+export function requireAdmin(auth: Caller | undefined, permission: Permission = 'metrics.read'): string {
   if (!auth?.uid) throw new AdminError('unauthenticated', 'Sign in first.');
-  if (auth.token?.admin !== true) throw new AdminError('permission-denied', 'This account is not an admin.');
+  const role = roleOf(auth.token);
+  if (!role) throw new AdminError('permission-denied', 'This account has no access to Revisely Console.');
+  if (!can(role, permission)) throw new AdminError('permission-denied', 'Your role doesn’t allow this.');
   return auth.uid;
 }
 
@@ -105,7 +111,7 @@ const UID = /^[A-Za-z0-9]{20,128}$/;
 const CHAT = /^[A-Za-z0-9_-]{1,64}$/;
 
 export async function handleAdminRevo(auth: Caller | undefined, data: unknown, deps: RevoDeps): Promise<AdminRevoResult> {
-  const reader = requireAdmin(auth);
+  const reader = requireAdmin(auth, 'revo.conversations');
   if (typeof data !== 'object' || data === null) throw new AdminError('invalid-argument', 'Name an account.');
   const { uid, chatId } = data as { uid?: unknown; chatId?: unknown };
   if (typeof uid !== 'string' || !UID.test(uid)) throw new AdminError('invalid-argument', 'That is not an account id.');

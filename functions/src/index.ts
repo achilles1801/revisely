@@ -33,6 +33,8 @@ import { adminRevoStore as adminConsoleRevoStore, adminTotalsStore, collector } 
 import { SUPPORT_ORIGINS, SUPPORT_PAGES, SupportError } from './support/logic';
 import { handleDevPremium, handleSupportApplication, handleSupportLink } from './support/handler';
 import { adminSupportStore, deleteSupportData } from './support/admin';
+import { AccountInfo, consoleErrorOf, handleAdminConsole } from './console/handler';
+import { StaffCaller, roleOf } from './console/roles';
 
 setGlobalOptions({ region: 'us-central1', maxInstances: 3 });
 
@@ -423,7 +425,8 @@ export const coachDigestDays = onRequest({ invoker: 'public', maxInstances: 1, t
  * gets anything back. No App Check: the page is a website, and the claim is the gate.
  */
 const PROJECT = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || 'revision-buddy-3a398';
-const CONSOLE_ORIGINS = consoleOrigins(PROJECT);
+// The test emulator serves the console from localhost.
+const CONSOLE_ORIGINS: (string | RegExp)[] = testing ? [...consoleOrigins(PROJECT), /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/] : consoleOrigins(PROJECT);
 const metricsCollector = collector(adminDb, PROJECT, { emulator: process.env.FUNCTIONS_EMULATOR === 'true' });
 const adminLog = (entry: Record<string, unknown>) => logger.info('admin', entry);
 
@@ -433,9 +436,30 @@ function adminFailure(name: string, err: unknown): HttpsError {
   return new HttpsError('internal', 'The console could not load that. Try again.');
 }
 
+/**
+ * The caller's account as the console sees it: its custom claims read live from Firebase Auth (not the ID token's
+ * copy, which lasts an hour), so a role taken away with set-role.js stops working at the next call.
+ */
+async function staffClaims(auth: { uid: string } | undefined): Promise<{ uid: string; email: string | null; claims: Record<string, unknown> } | null> {
+  if (!auth?.uid) return null;
+  try {
+    const user = await getAuth().getUser(auth.uid);
+    if (user.disabled) return null;
+    return { uid: user.uid, email: user.email ?? null, claims: (user.customClaims ?? {}) as Record<string, unknown> };
+  } catch (err) {
+    if ((err as { code?: string }).code === 'auth/user-not-found') return null;
+    throw err;
+  }
+}
+
+async function liveCaller(auth: { uid: string } | undefined) {
+  const staff = await staffClaims(auth);
+  return staff ? { uid: staff.uid, token: staff.claims } : undefined;
+}
+
 export const adminMetrics = onCall({ cors: CONSOLE_ORIGINS, timeoutSeconds: 120, memory: '512MiB', maxInstances: 2 }, async (request) => {
   try {
-    return await handleAdminMetrics(request.auth, request.data, { collect: metricsCollector, now: () => Date.now(), log: adminLog });
+    return await handleAdminMetrics(await liveCaller(request.auth), request.data, { collect: metricsCollector, now: () => Date.now(), log: adminLog });
   } catch (err) {
     throw adminFailure('adminMetrics', err);
   }
@@ -443,7 +467,7 @@ export const adminMetrics = onCall({ cors: CONSOLE_ORIGINS, timeoutSeconds: 120,
 
 export const adminRevo = onCall({ cors: CONSOLE_ORIGINS, timeoutSeconds: 60, maxInstances: 2 }, async (request) => {
   try {
-    return await handleAdminRevo(request.auth, request.data, { store: adminConsoleRevoStore(adminDb), log: adminLog });
+    return await handleAdminRevo(await liveCaller(request.auth), request.data, { store: adminConsoleRevoStore(adminDb), log: adminLog });
   } catch (err) {
     throw adminFailure('adminRevo', err);
   }
@@ -530,3 +554,68 @@ export const devGrantPremium = onCall({ enforceAppCheck: true, maxInstances: 2, 
 export const devRevokePremium = onCall({ enforceAppCheck: true, maxInstances: 2, timeoutSeconds: 20 }, (request) =>
   supportCall('devRevokePremium', () => handleDevPremium(request, supportStore(), DEV_PROJECT || testing, false)),
 );
+
+// ---------------------------------------------------------------------------------------------------------------
+// Revisely Console beyond the metrics (console/handler.ts): the caller's role, Open Door's queue and decisions, the
+// audit log. Roles and permissions: console/roles.ts. App Check is checked per action (every action but `me`, which
+// only says what the caller may see), so the page can show its no-access screen before App Check has a token.
+
+function accountInfo(u: { uid: string; email?: string; providerData: { providerId: string }[]; metadata: { creationTime?: string; lastSignInTime?: string }; disabled: boolean }): AccountInfo {
+  const email = u.email ?? null;
+  return {
+    uid: u.uid,
+    exists: true,
+    email,
+    emailHidden: !!email && /@privaterelay\.appleid\.com$/i.test(email),
+    providers: u.providerData.map((p) => p.providerId),
+    createdAt: u.metadata.creationTime ? Date.parse(u.metadata.creationTime) : null,
+    lastSignInAt: u.metadata.lastSignInTime ? Date.parse(u.metadata.lastSignInTime) : null,
+    disabled: u.disabled,
+  };
+}
+
+const missingAccount = (uid: string): AccountInfo => ({ uid, exists: false, email: null, emailHidden: false, providers: [], createdAt: null, lastSignInAt: null, disabled: false });
+
+const consoleDeps = {
+  db: adminDb,
+  async accounts(uids: string[]) {
+    const out = new Map<string, AccountInfo>();
+    const unique = [...new Set(uids)];
+    for (let i = 0; i < unique.length; i += 100) {
+      const res = await getAuth().getUsers(unique.slice(i, i + 100).map((uid) => ({ uid })));
+      for (const u of res.users) out.set(u.uid, accountInfo(u));
+    }
+    for (const uid of unique) if (!out.has(uid)) out.set(uid, missingAccount(uid));
+    return out;
+  },
+  async accountByEmail(email: string) {
+    try {
+      return accountInfo(await getAuth().getUserByEmail(email));
+    } catch (err) {
+      if ((err as { code?: string }).code === 'auth/user-not-found' || (err as { code?: string }).code === 'auth/invalid-email') return null;
+      throw err;
+    }
+  },
+  async hasPlan(uid: string) {
+    return (await adminDb.doc(`users/${uid}`).get()).exists;
+  },
+  programOpen: !!SUPPORT_PAGES[PROJECT_ID] || testing,
+  project: PROJECT_ID,
+  now: () => Date.now(),
+  log: (entry: Record<string, unknown>) => logger.info('console', entry),
+};
+
+export const adminConsole = onCall({ cors: CONSOLE_ORIGINS, timeoutSeconds: 60, maxInstances: 3 }, async (request) => {
+  try {
+    const staff = await staffClaims(request.auth);
+    const caller: StaffCaller | null = staff ? { uid: staff.uid, email: staff.email, role: roleOf(staff.claims) } : null;
+    // The test emulator decodes App Check tokens without verifying them, and the console there has none.
+    return await handleAdminConsole(caller, request.data, !!request.app || testing, consoleDeps);
+  } catch (err) {
+    const known = consoleErrorOf(err);
+    if (known) throw new HttpsError(known.code, known.message);
+    // Never the request's data: it may hold a note.
+    logger.error('adminConsole failed', { message: (err as Error).message });
+    throw new HttpsError('internal', 'The console could not do that. Try again.');
+  }
+});
