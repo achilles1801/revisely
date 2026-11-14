@@ -66,10 +66,24 @@ export function LiveUnderlay({
 }
 
 /** The word's own ink in `color`: the page image again, tinted, clipped to the word's box. */
-function Recoloured({ image, box, scale, color, opacity }: { image: PageImage; box: Rect; scale: number; color: string; opacity: number }) {
+function Recoloured({
+  image,
+  box,
+  scale,
+  color,
+  opacity,
+  testID,
+}: {
+  image: PageImage;
+  box: Rect;
+  scale: number;
+  color: string;
+  opacity: number;
+  testID?: string;
+}) {
   const r = grow(box, 0, 4);
   return (
-    <View style={[styles.abs, styles.clip, rectStyle(r, scale)]} pointerEvents="none">
+    <View style={[styles.abs, styles.clip, rectStyle(r, scale)]} pointerEvents="none" testID={testID}>
       <Image
         source={{ uri: image.uri }}
         {...pageImageProps()}
@@ -161,13 +175,20 @@ export function LiveOverlay({
           );
         }
         return (
-          <View key={m.id} testID={`live-mark-${m.kind}`} style={StyleSheet.absoluteFill} pointerEvents="none">
+          <View key={m.id} style={StyleSheet.absoluteFill} pointerEvents="none">
             {image && m.kind !== 'skipped' ? (
-              <Recoloured image={image} box={shape.box} scale={scale} color={color} opacity={opacity} />
+              <Recoloured image={image} box={shape.box} scale={scale} color={color} opacity={opacity} testID={`live-mark-${m.kind}`} />
             ) : null}
             {image && m.kind === 'skipped' ? (
               // A word left out: the word in the mark's colour, fainter, as it wasn't said.
-              <Recoloured image={image} box={shape.box} scale={scale} color={mixColors(color, colors.ground, 0.4)} opacity={opacity} />
+              <Recoloured
+                image={image}
+                box={shape.box}
+                scale={scale}
+                color={mixColors(color, colors.ground, 0.4)}
+                opacity={opacity}
+                testID="live-mark-skipped"
+              />
             ) : null}
             <Dots box={shape.box} scale={scale} color={color} opacity={opacity} />
           </View>

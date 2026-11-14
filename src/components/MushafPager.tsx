@@ -36,7 +36,7 @@ import {
   pagesAround,
   prefetchPages,
 } from '../lib/pageCache';
-import { AyahRef, ayahAt, ayahRects } from '../lib/ayahBounds';
+import { AyahRef, ayahAt, ayahRects, Rect } from '../lib/ayahBounds';
 import { Box, unionBox } from './verse/menuPlacement';
 import { fitPage, PageSize } from '../lib/pageFit';
 import { MushafEditionId, mushafEdition, useMushafEdition } from '../lib/mushafEdition';
@@ -88,8 +88,9 @@ interface MushafPagerProps {
    *  check's ayah band and word box). */
   pageUnderlay?: (pageNumber: number, scale: number) => React.ReactNode;
   /** A tap on the image, in bounds space (1024 wide): return true to take it
-   *  (before onTapVerse; the controls don't toggle). */
-  onTapPoint?: (pageNumber: number, x: number, y: number) => boolean;
+   *  (before onTapVerse; the controls don't toggle). `toWindow` turns a rect
+   *  of the page (bounds space) into window coordinates (to place a card). */
+  onTapPoint?: (pageNumber: number, x: number, y: number, toWindow: (r: Rect) => Box) => boolean;
   /** A tap on a verse: return true to take it (the controls don't toggle). */
   onTapVerse?: (ayah: AyahRef) => boolean;
   /** The end card came on screen. `bySwipe`: the user swiped there from the
@@ -136,7 +137,7 @@ interface PageItemProps {
   overlay?: (image: PageImage | null) => React.ReactNode;
   /** Behind the image's ink (pageUnderlay). */
   underlay?: React.ReactNode;
-  onTapPoint?: (pageNumber: number, x: number, y: number) => boolean;
+  onTapPoint?: (pageNumber: number, x: number, y: number, toWindow: (r: Rect) => Box) => boolean;
   onTapVerse?: (ayah: AyahRef) => boolean;
 }
 
@@ -221,8 +222,16 @@ const PageItem = React.memo(function PageItem({
   // A tap on the image: the verse under it first, if a screen wants taps on verses.
   const handlePress = (e: GestureResponderEvent) => {
     if (onTapPoint) {
-      const { locationX, locationY } = e.nativeEvent;
-      if (onTapPoint(pageNumber, locationX / BOUNDS_SCALE, locationY / BOUNDS_SCALE)) return;
+      const { locationX, locationY, pageX, pageY } = e.nativeEvent;
+      const ox = pageX - locationX;
+      const oy = pageY - locationY;
+      const toWindow = (r: Rect): Box => ({
+        x: ox + r.x0 * BOUNDS_SCALE,
+        y: oy + r.y0 * BOUNDS_SCALE,
+        width: (r.x1 - r.x0) * BOUNDS_SCALE,
+        height: (r.y1 - r.y0) * BOUNDS_SCALE,
+      });
+      if (onTapPoint(pageNumber, locationX / BOUNDS_SCALE, locationY / BOUNDS_SCALE, toWindow)) return;
     }
     if (onTapVerse) {
       const { locationX, locationY } = e.nativeEvent;

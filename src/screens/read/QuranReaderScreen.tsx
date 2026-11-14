@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Alert, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useIsFocused, useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MushafPager, MushafPagerHandle } from '../../components/MushafPager';
@@ -58,6 +58,16 @@ import { ReciteModeMenu } from '../../components/reciteLive/ReciteModeMenu';
 import { BarButton, ReciteBar } from '../../components/reciteLive/ReciteBar';
 import { LiveOverlay, LiveUnderlay } from '../../components/reciteLive/LivePageLayers';
 import { ReciteNoticeSheet } from '../../components/reciteLive/ReciteNoticeSheet';
+import { MarkCard } from '../../components/reciteLive/MarkCard';
+import { SimilarPhrasesSheet } from '../../components/reciteLive/SimilarPhrasesSheet';
+import { TakeSummarySheet } from '../../components/reciteLive/TakeSummarySheet';
+import { CheckIntroPage } from '../../components/reciteLive/CheckIntroPage';
+import { markAt, wordBox } from '../../lib/reciteLive/geometry';
+import { similarPhrases } from '../../lib/reciteLive/similar';
+import type { Mark } from '../../lib/reciteLive/contract';
+import type { Box } from '../../components/verse/menuPlacement';
+import { getRecitation } from '../../lib/recitation';
+import { warmUpReciteCheck } from '../../lib/reciteCheck/service';
 import type { LiveFailure } from '../../lib/reciteLive/contract';
 import { logger } from '../../lib/logger';
 
@@ -255,6 +265,15 @@ export default function QuranReaderScreen() {
   const [revealed, setRevealed] = useState<Revealed>(NOTHING_SHOWN);
   const [modeMenu, setModeMenu] = useState(false);
   const [noticeFor, setNoticeFor] = useState<LiveMode | null>(null);
+  // Check: the word a card is open on (and where it is on screen), similar phrases, the summary, Check's page.
+  const [cardAt, setCardAt] = useState<{ w: number; anchor: Box } | null>(null);
+  const [similarFor, setSimilarFor] = useState<number | null>(null);
+  const [summaryFor, setSummaryFor] = useState<string | null>(null);
+  const [introOpen, setIntroOpen] = useState(false);
+  // Wake the checker while the reader opens (Cloud Run sleeps; waking takes a few seconds).
+  useEffect(() => {
+    if (liveOn) warmUpReciteCheck();
+  }, [liveOn]);
   const micMode: ReciteMicMode = reciteSettings.mode;
   const liveInfo = useMemo(
     () => ({ saidUpTo: furthestWord(live.state), startWord: live.startWord, cursor: live.state.cursor }),
@@ -267,8 +286,11 @@ export default function QuranReaderScreen() {
         void recorder.start();
         return;
       }
-      // Check that isn't the account's opens its page (next PR); until then it can't be picked locked.
-      if (mode === 'check' && !owned) return;
+      // Check that isn't the account's opens its page.
+      if (mode === 'check' && !owned) {
+        setIntroOpen(true);
+        return;
+      }
       if (!reciteSettings.noticeSeen) {
         setNoticeFor(mode);
         return;
@@ -310,6 +332,39 @@ export default function QuranReaderScreen() {
   }, [qw, currentPage, liveInfo, live]);
 
   const checkTake = live.mode === 'check';
+  const cardMarks = useMemo<Mark[]>(
+    () => (cardAt ? Object.values(live.state.marks).filter((m) => m.w === cardAt.w) : []),
+    [cardAt, live.state.marks],
+  );
+  // A card whose marks are all dismissed closes.
+  useEffect(() => {
+    if (cardAt && cardMarks.length === 0) setCardAt(null);
+  }, [cardAt, cardMarks.length]);
+  const onTapPoint = useMemo(
+    () =>
+      liveOn && qw && checkTake
+        ? (page: number, x: number, y: number, toWindow: (r: { x0: number; y0: number; x1: number; y1: number }) => Box) => {
+            const m = markAt(qw, marksOnPage(live.state, qw, page), x, y);
+            if (!m) return false;
+            setCardAt({ w: m.w, anchor: toWindow(wordBox(qw, m.w)) });
+            return true;
+          }
+        : undefined,
+    [liveOn, qw, checkTake, live.state],
+  );
+  const similar = useMemo(() => (qw && similarFor != null ? similarPhrases(qw, similarFor) : []), [qw, similarFor]);
+  const cardHasSimilar = useMemo(() => (qw && cardAt ? similarPhrases(qw, cardAt.w).length > 0 : false), [qw, cardAt]);
+  // The summary, once a take has its final answer.
+  const takeId = live.state.take;
+  useEffect(() => {
+    if (live.state.status === 'done' && takeId && summaryFor !== takeId) setSummaryFor(takeId);
+    // Only when a take finishes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [live.state.status, takeId]);
+  const [summaryShown, setSummaryShown] = useState<string | null>(null);
+  useEffect(() => {
+    if (summaryFor) setSummaryShown(summaryFor);
+  }, [summaryFor]);
   const pageMarks = useCallback(
     (page: number) => (checkTake && qw ? marksOnPage(live.state, qw, page) : []),
     [checkTake, qw, live.state],
@@ -324,12 +379,12 @@ export default function QuranReaderScreen() {
               scale={scale}
               words={qw}
               cursor={live.state.status === 'listening' ? live.state.cursor : null}
-              selected={null}
+              selected={cardMarks[0] ?? null}
               colors={{ band: v2.followBand, word: v2.followWord, selectedMistake: v2.redSubtle, selectedSlip: v2.warnSubtle }}
             />
           )
         : undefined,
-    [liveOn, qw, live.active, live.state, v2],
+    [liveOn, qw, live.active, live.state, v2, cardMarks],
   );
   const pageOverlay = useMemo(
     () =>
@@ -431,7 +486,11 @@ export default function QuranReaderScreen() {
                 status={barStatus}
                 phase={barPhase}
                 onStop={live.stop}
-                onClose={live.clear}
+                onClose={() => {
+                  setCardAt(null);
+                  setSummaryShown(null);
+                  live.clear();
+                }}
                 surface={{ background: palette.control, border: palette.divider }}
               />
             ) : (
@@ -505,6 +564,7 @@ export default function QuranReaderScreen() {
           pageUnderlay={pageUnderlay}
           pageOverlay={pageOverlay}
           onTapVerse={onTapVerse}
+          onTapPoint={onTapPoint}
           extraData={liveOn ? `${live.state.cursor}|${live.state.saidUpTo}|${Object.keys(live.state.marks).length}|${hidden}|${revealed.size}` : undefined}
         />
       </ReaderFrame>
@@ -550,6 +610,69 @@ export default function QuranReaderScreen() {
             right={spacing.sm + 2}
             onPick={pickMode}
             onClose={() => setModeMenu(false)}
+          />
+          {qw ? (
+            <MarkCard
+              marks={cardMarks}
+              words={qw}
+              anchor={cardAt?.anchor ?? null}
+              onDismiss={live.dismiss}
+              onHear={(m) => getRecitation().play({ sura: m.ayah[0], ayah: m.ayah[1] }, () => null)}
+              onSimilar={(m) => {
+                setCardAt(null);
+                setSimilarFor(m.w);
+              }}
+              hasSimilar={cardHasSimilar}
+              onClose={() => setCardAt(null)}
+            />
+          ) : null}
+          <SimilarPhrasesSheet
+            visible={similarFor != null}
+            words={qw}
+            here={similarFor}
+            places={similar}
+            onOpen={(p) => {
+              setSimilarFor(null);
+              pagerRef.current?.scrollToPage(p.page);
+            }}
+            onClose={() => setSimilarFor(null)}
+          />
+          <TakeSummarySheet
+            visible={summaryShown != null && live.state.status === 'done'}
+            check={checkTake}
+            words={qw}
+            from={live.startWord}
+            to={live.state.final?.to ?? furthestWord(live.state)}
+            seconds={live.seconds}
+            marks={Object.values(live.state.marks).sort((a, b) => a.w - b.w)}
+            score={checkTake && qw ? scorePill(live.state, qw, live.startWord) : null}
+            kept={live.state.final?.kept === true}
+            checkOwned={owned}
+            onFinding={(m) => {
+              setSummaryShown(null);
+              if (!qw) return;
+              pagerRef.current?.scrollToPage(qw.pageOf(m.w));
+              setCardAt({ w: m.w, anchor: { x: width / 2, y: insets.top + 120, width: 1, height: 1 } });
+            }}
+            onCheck={() => {
+              setSummaryShown(null);
+              setIntroOpen(true);
+            }}
+            onAgain={() => {
+              const mode = live.mode;
+              setSummaryShown(null);
+              setCardAt(null);
+              live.clear();
+              if (mode) startMode(mode);
+            }}
+            onDone={() => setSummaryShown(null)}
+          />
+          <CheckIntroPage
+            visible={introOpen}
+            onGet={() =>
+              Alert.alert('Not yet', 'Payments aren’t set up yet. In Revisely Dev every tester has Check.')
+            }
+            onClose={() => setIntroOpen(false)}
           />
           <ReciteNoticeSheet
             visible={noticeFor != null}
