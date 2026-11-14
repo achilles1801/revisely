@@ -33,6 +33,65 @@ MADD_RULES = {'Monfasel Madd': 'madd_munfasil', 'Mottasel Madd': 'madd_muttasil'
 NASAL_RULES = {'idgham': 'idgham', 'idgham, no ghunnah': 'idgham_no_ghunnah', 'iqlab': 'iqlab'}
 CHOICES = {'mon': (2, 4, 5), 'mot': (4, 5, 6), 'aar': (0, 2, 4, 6)}  # aar 0: any length (the reciter's choice)
 DEFAULT = {'mon': 4, 'mot': 4, 'aar': 0}
+# v2 marks (recite-contract.md): the kinds that count against accuracy; tajweed is counted apart
+MISTAKE_KINDS = ('word', 'skipped', 'added', 'harakat', 'letter')
+# `sure` until each kind has a measured strict bar: on bench-v0's professional reciters a skipped word flagged is
+# right 98% of the time; a look-alike, a sound said wrong or a word out of order 57–67% (planted mistakes vs correct
+# words flagged), so those stay `likely`
+CLEAR_WORD_KINDS = ('skipped',)
+MADD_CLEAR_OFF = 2.5  # a madd this many counts from its setting is `clear` (flagged from 1.5)
+LAZIM_CLEAR_UNDER = 3.5  # a lazim madd held under this is `clear` (flagged under 4.5)
+HEARD_REACH = 20  # frames (0.4 s) either side of a word read for what was heard instead
+# spelling the model's sounds in Arabic letters, for `heard` when what was said isn't a word
+SOUND_SIGNS = set('ڇۜـؙ۪۾')  # the model's own tajweed signs: not letters
+SOUND_LETTER = {'ں': 'ن', 'ٲ': 'ا'}
+LONG_VOWEL = {'ا': 'ا', 'ۥ': 'و', 'ۦ': 'ي'}
+HARAKAT = 'َُِ'
+SHADDA = 'ّ'
+
+
+def spell(sounds):
+    """The model's sounds written in Arabic letters, close to how they'd be spelt: a doubled consonant once with a
+    shadda, a long vowel as one letter, the model's own signs left out. Approximate (`heardExact: false`)."""
+    out, i, n = [], 0, len(sounds)
+    while i < n:
+        c = SOUND_LETTER.get(sounds[i], sounds[i])
+        if c in SOUND_SIGNS:
+            i += 1
+            continue
+        j = i + 1
+        while j < n and SOUND_LETTER.get(sounds[j], sounds[j]) == c:
+            j += 1
+        if c in LONG_VOWEL:
+            out.append(LONG_VOWEL[c])
+        elif c in HARAKAT:
+            out.append(c)
+        else:
+            out.append(c + (SHADDA if j - i >= 2 else ''))
+        i = j
+    return ''.join(out)
+
+
+def slip_of(why):
+    """'ص→س' -> {'expected': 'ص', 'heard': 'س'}; 'no shadda on ل' -> {'expected': 'لّ', 'heard': 'ل'}."""
+    if why.startswith('no shadda on '):
+        c = why[len('no shadda on '):]
+        return {'expected': c + SHADDA, 'heard': c}
+    if '→' in why:
+        a, b = why.split('→', 1)
+        return {'expected': a, 'heard': b}
+    return None
+
+
+def score(statuses, marks, dismissed=()):
+    """reached: from the first word recited to the furthest heard, skipped words included; mistakes: word, skipped,
+    added, harakat and letter marks not dismissed; tajweed counted apart; accuracy = 1 - mistakes / reached."""
+    said = [w for w, s in statuses.items() if s in ('correct', 'corrected', 'wrong', 'missed')]
+    reached = (max(said) - min(said) + 1) if said else 0
+    live = [m for m in marks if m['id'] not in dismissed]
+    mistakes = sum(1 for m in live if m['kind'] in MISTAKE_KINDS)
+    return {'reached': reached, 'mistakes': mistakes, 'tajweed': sum(1 for m in live if m['kind'] == 'tajweed'),
+            'accuracy': round(max(0.0, 1 - mistakes / reached), 4) if reached else 1.0}
 
 
 class BadRequest(ValueError):
@@ -102,8 +161,9 @@ class Engine:
 
     # ------------------------------------------------------------ the check
 
-    def check(self, x, s, a, s2=None, a2=None, raw_settings=None):
-        """x: 16 kHz mono float32 audio. Returns the result the app shows (see README.md)."""
+    def check(self, x, s, a, s2=None, a2=None, raw_settings=None, v=1):
+        """x: 16 kHz mono float32 audio. Returns the result the app shows (see README.md); v=2 adds `marks` and
+        `score` (recite-contract.md)."""
         st = settings_of(raw_settings or {})
         if len(x) < 16000:
             raise BadRequest('too short')
@@ -118,7 +178,9 @@ class Engine:
         g = checker.Graph(kws)
         path, _ = checker.viterbi(lp, g, P)
         refs = checker.trail_refs(hi) if P.get('trail_extra') else None
-        statuses, flagged, _, _, extras, visits, _ = checker.decide(kws, g, lp, path, P, self.ear.vocab, refs=refs)
+        toks = checker.heard_tokens(lp)
+        statuses, flagged, _, _, extras, visits, _ = checker.decide(kws, g, lp, path, P, self.ear.vocab, toks=toks,
+                                                                    refs=refs)
         t_words = time.perf_counter() - t0 - t_model
 
         spans = {}
@@ -142,22 +204,91 @@ class Engine:
 
         tj, letters = self.ayat(lp, lo, hi, statuses, spans, st)
         t_tajweed = time.perf_counter() - t0 - t_model - t_words
-        return {
+        out = {
             'v': 1,
             'from': lo, 'to': hi,
             'secs': round(len(x) / 16000, 1),
             'words': words,
             'extras': [{'after': e['after'], 't': round(e['t'], 2), 'trail': bool(e.get('trail'))} for e in extras],
-            'tajweed': tj,
-            'letters': letters if st['letters'] else None,
+            'tajweed': [{k: r[k] for k in r if not k.startswith('_')} for r in tj],
+            'letters': [{k: r[k] for k in r if not k.startswith('_')} for r in letters] if st['letters'] else None,
             'settings': {k: st[k] for k in ('mon', 'mot', 'aar', 'letters')},
             'ms': {'model': int(t_model * 1000), 'words': int(t_words * 1000), 'tajweed': int(t_tajweed * 1000)},
         }
+        if v == 2:
+            # what was heard for a word: the sounds from the end of the word before to the start of the word after
+            # (the path often gives a word said wrong only a sliver of its own time), at most HEARD_REACH frames
+            # either side of the word
+            order = sorted(spans)
+            heard = {}
+            for k_, w in enumerate(order):
+                w0, w1 = spans[w]
+                a_ = spans[order[k_ - 1]][1] if k_ > 0 else w0
+                b_ = spans[order[k_ + 1]][0] if k_ + 1 < len(order) else w1
+                a_ = min(w0, max(a_, w0 - HEARD_REACH))
+                b_ = max(w1, min(b_, w1 + HEARD_REACH))
+                heard[w] = ''.join(self.ear.vocab[k - 1] for k, pk, _ in toks if a_ <= pk < b_)
+            out['marks'] = self.marks(words, flagged, heard, out['extras'], tj, letters if st['letters'] else [])
+            out['score'] = score(statuses, out['marks'])
+            out['v'] = 2
+        return out
+
+    # ------------------------------------------------------------ v2: marks
+
+    def ayah_of(self, w):
+        s, a, _ = self.key.where(w)
+        return [int(s), int(a)]
+
+    def marks(self, words, flagged, heard, extras, tajweed_rows, letter_rows):
+        """Every mark of a check (recite-contract.md): words, extra words, tajweed, letters."""
+        out, ids = [], {}
+
+        def add(w, kind, sure, detail=None, rule=None, **more):
+            mid = f"{w}:{kind}:{detail or rule or ''}"
+            ids[mid] = ids.get(mid, 0) + 1
+            if ids[mid] > 1:  # two extra words after one word
+                mid += f'#{ids[mid]}'
+            m = {'id': mid, 'w': int(w), 'ayah': self.ayah_of(w), 'kind': kind}
+            if detail:
+                m['detail'] = detail
+            if rule:
+                m['rule'] = rule
+            m.update({k: v for k, v in more.items() if v is not None})
+            m['sure'] = sure
+            out.append(m)
+
+        for row in words:
+            w, st = row['w'], row['status']
+            t = row.get('t')
+            if st == 'missed':
+                add(w, 'skipped', 'clear', t=t)
+            elif st == 'wrong':
+                detail = (flagged.get(w) or {}).get('kind') or 'sound'
+                h, exact = None, None
+                if detail == 'lookalike' and row.get('heard'):
+                    h, exact = row['heard'], True
+                elif detail == 'sound' and heard.get(w):
+                    h, exact = spell(heard[w]), False
+                add(w, 'word', 'clear' if detail in CLEAR_WORD_KINDS else 'likely', detail=detail, heard=h,
+                    heardExact=exact, t=t)
+        for e in extras:
+            add(e['after'], 'added', 'likely', detail='trail' if e.get('trail') else None)
+        for r in tajweed_rows:
+            add(r['w'], 'tajweed', r.get('_sure', 'likely'), rule=r['rule'], got=r.get('got'),
+                expected=r.get('expected'))
+        for r in letter_rows:
+            kind = letters_v2.kind_of(r['slip'])
+            detail = 'shadda' if kind == 'shadda' else None
+            add(r['w'], 'harakat' if kind in ('haraka', 'shadda') else 'letter', r.get('_sure', 'likely'),
+                detail=detail, slip=slip_of(r['slip']), heard=spell(r['_heard']) if r.get('_heard') else None,
+                heardExact=False if r.get('_heard') else None)
+        return out
 
     def ayat(self, lp, lo, hi, statuses, spans, st):
         """Tajweed (and letters) for each ayah of the passage said in full, on its own frames."""
         SL, ms = self.slots(st)
         B = self.bars
+        S = B.get('strict', {})  # strict bars: past one, a mark is `clear` (bars.json from before them: all `likely`)
         out, letters = [], []
         w = lo
         while w < hi:
@@ -179,7 +310,7 @@ class Engine:
             bad = {i for i, x in enumerate(sts) if x == 'wrong'}
             near = bad | {i - 1 for i in bad} | {i + 1 for i in bad}
 
-            def flag(i, rule, got=None, expected=None):
+            def flag(i, rule, got=None, expected=None, clear=False):
                 if i is None or i in near or not 0 <= i < n:
                     return
                 row = {'w': first + i, 'rule': rule}
@@ -187,6 +318,7 @@ class Engine:
                     row['got'] = round(float(got), 1)
                 if expected is not None:
                     row['expected'] = int(expected)
+                row['_sure'] = 'clear' if clear else 'likely'
                 out.append(row)
 
             try:
@@ -199,21 +331,23 @@ class Engine:
                 if kind == 'Normal Madd' and tajweed.madd_dropped(j):
                     flag(i, 'madd_dropped', expected=2)
                 elif kind == 'Lazem Madd' and tc is not None and tc < 4.5:
-                    flag(i, 'madd_lazim', tc, 6)
+                    flag(i, 'madd_lazim', tc, 6, clear=tc < LAZIM_CLEAR_UNDER)
                 elif kind in MADD_RULES and tc is not None and abs(tc - j['golden']) >= 1.5 \
                         and not (kind == 'Aared Madd' and not st['aar']):
-                    flag(i, MADD_RULES[kind], tc, j['golden'])
+                    flag(i, MADD_RULES[kind], tc, j['golden'], clear=abs(tc - j['golden']) >= MADD_CLEAR_OFF)
                 elif kind == 'Qalqalah' and j['margin'] > B['margin']['Qalqalah']:
-                    flag(i, 'qalqalah')
+                    flag(i, 'qalqalah', clear=j['margin'] > S.get('margin', {}).get('Qalqalah', float('inf')))
                 elif kind in ('Ghunnah', 'Ikhfa'):
                     T = B['timing'][kind]
                     if j.get('nasal_v') is not None:
                         sc = (j['margin'] - T['m_mean']) / T['m_std'] + (T['t_mean'] - j['nasal_v']) / T['t_std']
                         hit = sc > T['bar']
+                        clear = sc > S.get('timing', {}).get(kind, float('inf'))
                     else:
                         hit = j['margin'] > B['margin'][kind]
+                        clear = j['margin'] > S.get('margin', {}).get(kind, float('inf'))
                     if hit:
-                        flag(i, kind.lower())
+                        flag(i, kind.lower(), clear=clear)
 
             text = ' '.join(self.key.uthmani(s, a))
             try:
@@ -240,5 +374,7 @@ class Engine:
                     if ok:
                         top = max(ok, key=lambda r: r[0])
                         if top[0] > L['bar']:
-                            letters.append({'w': first + i, 'slip': top[1]})
+                            letters.append({'w': first + i, 'slip': top[1],
+                                            '_heard': top[3] if len(top) > 3 else None,
+                                            '_sure': 'clear' if top[0] > S.get('letters', float('inf')) else 'likely'})
         return out, letters

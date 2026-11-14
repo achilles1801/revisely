@@ -43,6 +43,29 @@ skipped, replaced, lookalike with `heard`, sound, order), `extras` (`after` a wo
 end), `tajweed` (`w`, `rule`, `got` and `expected` counts for madds), `letters` (`w`, `slip`, or null when not
 asked), `ms` (time spent) and `engine` (the checker's commit).
 
+**v2** (`engine.check(…, v=2)`, the contract the model, server and UI sessions agreed, Nov 14 2026) keeps every v1
+field and adds:
+
+- `marks`: every mark in one list, each with:
+  - `id`, `w`, `ayah`;
+  - `kind`: word, skipped, added, harakat, letter or tajweed;
+  - `detail`: lookalike, sound, replaced, order, trail or shadda;
+  - `heard` and `heardExact`: a look-alike is a real word; otherwise the heard sounds spelt in Arabic letters;
+  - `slip`: the expected and heard letter or haraka;
+  - `rule`, `got`, `expected`: tajweed;
+  - `t`;
+  - `sure`: `clear` or `likely`.
+- `score`: `reached`, `mistakes` (word, skipped, added, harakat and letter marks), `tajweed`, and
+  `accuracy` = 1 − mistakes ÷ reached.
+
+How `sure` is decided:
+- **Tajweed and letters:** `clear` past a strict bar, set where about 0.5% of professional reciters' correct places
+  are flagged (1 in 1,000 words for letters; `strict` in bars.json, from `make_bars.py`). Past the 2% bar alone it's
+  `likely`.
+- **Madds:** `clear` when 2.5 counts or more off the setting, or a lazim held under 3.5.
+- **Words:** a skipped word is `clear` (98% right on bench-v0). The other word kinds stay `likely` until they have a
+  measured strict bar.
+
 ## Test data
 
 With the app's switch on ("Keep my recitations as test data", on by default for testers), the service writes the WAV
