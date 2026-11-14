@@ -160,6 +160,11 @@ and its result to `recite-tests/<uid>/` in revisely-dev Storage, which no client
 only the lab's scripts judge them. They never leave the Mac, never go into git and are held out of training. With
 the switch off, a recording is checked in memory and nothing is kept.
 
+The logs carry numbers only (seconds of audio, words reached, marks, timings), never a uid, audio or words said.
+Firestore's and Storage's URLs hold the uid and requests names the URL in its errors, so their failures are raised as
+`auth.Unreachable` (a status, or the kind of error) and `store.Exists` (nothing): until Nov 14 2026 a failed upload
+logged the object's name.
+
 ## Deploying (revisely-dev only)
 
 The image holds the checker (pinned in `stage.sh`), the app's word list and, from the lab, the model, the lexicon

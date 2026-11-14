@@ -29,14 +29,15 @@ def name_for(uid, take=None):
 
 
 class Exists(Exception):
-    """The name is taken: names are written once (ifGenerationMatch=0)."""
+    """The name is taken: names are written once (ifGenerationMatch=0). It doesn't carry the name, which holds the
+    uid: a dropped take's Exists is logged."""
 
 
 def put(name, data, content_type):
+    """Failures are auth.Unreachable or Exists, neither naming the object."""
     url = (f'https://storage.googleapis.com/upload/storage/v1/b/{BUCKET}/o?uploadType=media'
            f'&name={urllib.parse.quote(name, safe="")}&ifGenerationMatch=0')
-    r = requests.post(url, data=data, timeout=60,
-                      headers={'Authorization': f'Bearer {auth.token()}', 'Content-Type': content_type})
+    r = auth.call(requests.post, url, fine=(412,), data=data, timeout=60,
+                  headers={'Authorization': f'Bearer {auth.token()}', 'Content-Type': content_type})
     if r.status_code == 412:
-        raise Exists(name)
-    r.raise_for_status()
+        raise Exists()

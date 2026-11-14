@@ -32,6 +32,23 @@ class Refused(Exception):
         self.reason = reason
 
 
+class Unreachable(Exception):
+    """Firestore or Storage refused, or couldn't be reached. It says only how (a status, or the kind of error):
+    requests puts the URL in its own errors, and these URLs hold the account's uid, which never goes in a log."""
+
+
+def call(fn, url, fine=(), **kw):
+    """fn(url, **kw) (requests.get or requests.post): the response, when it is below 400 or its status is in `fine`;
+    otherwise Unreachable, which names no URL."""
+    try:
+        r = fn(url, **kw)
+    except requests.RequestException as e:
+        raise Unreachable(type(e).__name__) from None
+    if r.status_code >= 400 and r.status_code not in fine:
+        raise Unreachable(f'HTTP {r.status_code}')
+    return r
+
+
 def uid_of(header):
     """The signed-in account's uid, or Refused(401)."""
     if not header or not header.startswith('Bearer '):
@@ -63,12 +80,8 @@ def is_tester(uid):
         return hit[0]
     url = (f'https://firestore.googleapis.com/v1/projects/{PROJECT}/databases/(default)/documents/users/{uid}'
            '?mask.fieldPaths=previewTester')
-    r = requests.get(url, headers={'Authorization': f'Bearer {token()}'}, timeout=10)
-    if r.status_code == 404:
-        ok = False
-    else:
-        r.raise_for_status()
-        ok = r.json().get('fields', {}).get('previewTester', {}).get('booleanValue') is True
+    r = call(requests.get, url, fine=(404,), headers={'Authorization': f'Bearer {token()}'}, timeout=10)
+    ok = r.status_code != 404 and r.json().get('fields', {}).get('previewTester', {}).get('booleanValue') is True
     _testers[uid] = (ok, time.time())
     return ok
 
@@ -83,12 +96,8 @@ def has_check(uid, now=None):
         return hit[0]
     url = (f'https://firestore.googleapis.com/v1/projects/{PROJECT}/databases/(default)/documents/entitlements/{uid}'
            f'?mask.fieldPaths={ENTITLEMENT}')
-    r = requests.get(url, headers={'Authorization': f'Bearer {token()}'}, timeout=10)
-    if r.status_code == 404:
-        ok = False
-    else:
-        r.raise_for_status()
-        ok = check_open(r.json().get('fields', {}).get(ENTITLEMENT), t)
+    r = call(requests.get, url, fine=(404,), headers={'Authorization': f'Bearer {token()}'}, timeout=10)
+    ok = r.status_code != 404 and check_open(r.json().get('fields', {}).get(ENTITLEMENT), t)
     _checks[uid] = (ok, t)
     return ok
 

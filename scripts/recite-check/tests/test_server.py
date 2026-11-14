@@ -10,9 +10,12 @@ import os
 import sys
 import threading
 import time
+import traceback
 import unittest
 import wave
 from unittest import mock
+
+import requests
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, HERE)
@@ -118,7 +121,7 @@ def uid_of(header):
 class Base(unittest.TestCase):
     def put(self, name, data, ct):  # create-only, as Storage is (ifGenerationMatch=0)
         if name in self.stored:
-            raise store.Exists(name)
+            raise store.Exists()
         self.stored[name] = data
 
     def setUp(self):
@@ -644,6 +647,50 @@ class EntitlementTests(unittest.TestCase):
         self.assertIn('mask.fieldPaths=check', seen[0])
         auth._checks.clear()
 
+
+
+class NoUidInLogsTests(unittest.TestCase):
+    """requests names the URL in its errors, and Firestore's and Storage's URLs hold the uid: what the service raises
+    (and logs, with its traceback) names only the status or the kind of failure."""
+    UID = 'U1d0fAnAccount0000000000000'
+
+    def logged(self, fn):
+        try:
+            fn()
+        except Exception as e:  # noqa: BLE001
+            return e, ''.join(traceback.format_exception(e))
+        self.fail('no error')
+
+    def test_storage_failures(self):
+        name = store.name_for(self.UID, 'take')
+        down = requests.ConnectionError(f'Max retries exceeded with url: /upload?name=recite-tests%2F{self.UID}')
+
+        def unreachable(url, **kw):
+            raise down
+
+        class R:
+            def __init__(self, code):
+                self.status_code = code
+        with mock.patch.object(auth, 'token', lambda: 'x'):
+            for post in (unreachable, lambda url, **kw: R(500), lambda url, **kw: R(412)):
+                with mock.patch.object(store.requests, 'post', post):
+                    e, text = self.logged(lambda: store.put(name, b'x', 'audio/wav'))
+                self.assertIsInstance(e, (auth.Unreachable, store.Exists))
+                self.assertNotIn(self.UID, text + repr(e))
+        self.assertEqual(str(self.logged(lambda: auth.call(unreachable, name))[0]), 'ConnectionError')
+
+    def test_firestore_failures(self):
+        class R:
+            status_code = 503
+        auth._testers.clear()
+        auth._checks.clear()
+        with mock.patch.object(auth, 'token', lambda: 'x'), \
+                mock.patch.object(auth.requests, 'get', lambda url, **kw: R()):
+            for read in (auth.is_tester, auth.has_check):
+                e, text = self.logged(lambda: read(self.UID))
+                self.assertEqual(str(e), 'HTTP 503')
+                self.assertNotIn(self.UID, text)
+        self.assertEqual((auth._testers, auth._checks), ({}, {}))  # a failure isn't cached as a no
 
 if __name__ == '__main__':
     unittest.main()
