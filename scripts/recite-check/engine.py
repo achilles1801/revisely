@@ -181,7 +181,11 @@ class Engine:
         P = WORDS_P
         if self.table is not None:
             off, blob = self.table['offsets'], self.table['blob']
-            return [pickle.loads(blob[off[w]:off[w + 1]]) for w in range(lo, hi)]
+            out = [pickle.loads(blob[off[w]:off[w + 1]]) for w in range(lo, hi)]
+            for k in out:
+                if isinstance(k, tuple):  # ('refused', why): a word key.passage refuses, refused the same way
+                    raise ValueError(k[1])
+            return out
         missing = [w for w in range(lo, hi) if w not in self._kw]
         if missing:
             self.remember(self.key.passage(missing[0], missing[-1] + 1, int(P['alts']), P['alt_rule']))

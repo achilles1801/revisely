@@ -36,11 +36,18 @@ def part(i, n, gcs):
     words = Engine.word_count(key)
     lo, hi = words * i // n, words * (i + 1) // n
     t0 = time.time()
-    blobs = []
+    blobs, refused = [], set()
     for w in range(lo, hi):
-        blobs.append(pickle.dumps(key.passage(w, w + 1, int(WORDS_P['alts']), WORDS_P['alt_rule'])[0], protocol=5))
+        try:
+            entry = key.passage(w, w + 1, int(WORDS_P['alts']), WORDS_P['alt_rule'])[0]
+        except ValueError as e:  # the checker can't take this word (an ayah it splits differently): kept as such
+            entry = ('refused', str(e))
+            refused.add(str(e))
+        blobs.append(pickle.dumps(entry, protocol=5))
         if (w - lo) % 1000 == 999:
             print(f'part {i}/{n}: {w - lo + 1}/{hi - lo} words, {time.time() - t0:.0f} s', flush=True)
+    for r in sorted(refused):
+        print(f'part {i}/{n}: the checker refuses: {r}')
     out = {'key': wk, 'alts': int(WORDS_P['alts']), 'rule': WORDS_P['alt_rule'], 'lo': lo, 'hi': hi,
            'blobs': blobs}
     data = pickle.dumps(out, protocol=5)
@@ -74,12 +81,16 @@ def main():
     ap.add_argument('--part', default=f"{os.environ.get('CLOUD_RUN_TASK_INDEX', 0)}/"
                                       f"{os.environ.get('CLOUD_RUN_TASK_COUNT', 1)}")
     ap.add_argument('--gcs', action='store_true')
+    ap.add_argument('--only', default='', help='slices to make (I,J,...): the others stop at once (a rerun)')
     ap.add_argument('--merge', nargs='+', metavar=('OUT', 'PART'))
     a = ap.parse_args()
     if a.merge:
         merge(a.merge[0], a.merge[1:])
     else:
         i, n = (int(x) for x in a.part.split('/'))
+        if a.only and str(i) not in a.only.split(','):
+            print(f'part {i}/{n}: not asked for this time')
+            return
         part(i, n, a.gcs)
 
 

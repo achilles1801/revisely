@@ -118,6 +118,20 @@ class Model(unittest.TestCase):
             E.table = saved
         self.assertEqual(from_table, E.key.passage(0, 29, int(engine_mod.WORDS_P['alts']), engine_mod.WORDS_P['alt_rule']))
 
+    def test_a_word_the_checker_refuses_is_refused_from_the_table_too(self):
+        import pickle
+        E = engine()
+        blobs = [pickle.dumps(E.key.passage(0, 1, 4, 'skeleton')[0]), pickle.dumps(('refused', '1:1 is odd'))]
+        table = {'offsets': [0, len(blobs[0]), len(blobs[0]) + len(blobs[1])], 'blob': b''.join(blobs)}
+        saved = E.table
+        try:
+            E.table = table
+            self.assertEqual(len(E.passage_words(0, 1)), 1)
+            with self.assertRaisesRegex(ValueError, 'odd'):
+                E.passage_words(0, 2)
+        finally:
+            E.table = saved
+
     def test_refuses_a_passage_that_does_not_exist(self):
         import live
         from engine import BadRequest
