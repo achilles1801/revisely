@@ -72,6 +72,9 @@ gcloud run services add-iam-policy-binding recite-check --project revisely-dev -
   --member allUsers --role roles/run.invoker
 ```
 
+It was opened on Nov 13 2026, so later deploys need nothing more. gcloud needs Python 3.10 or later: on Python 3.9 it
+crashes loading `gcloud run` (set `CLOUDSDK_PYTHON` to a newer Python, or `gcloud components reinstall`).
+
 Before that (or to test a new revision), call it with a Google identity token in `X-Serverless-Authorization` and
 the Firebase ID token in `Authorization`: Cloud Run checks the first and passes the second on.
 
