@@ -470,7 +470,7 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
     setReciteCheckSettings('u1', { keep: false });
     await startTake('recite');
     fireEvent.press(screen.getByTestId('recite-stop'));
-    await event({ type: 'done', result: { v: 2, follow: true, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [], score: null } });
+    await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [], score: null } });
     expect(screen.getByTestId('take-summary')).toBeTruthy();
     expect(screen.queryByText('Kept as test data. Software checks it; nobody listens.')).toBeNull();
     expect(mockLive.start?.keep).toBe(false);
