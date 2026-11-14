@@ -175,12 +175,10 @@ describe('the live state', () => {
     expect([live.status, live.failure, Object.keys(live.marks)]).toEqual(['failed', 'limit', ['a']]);
   });
 
-  it('likely marks draw in full until the checker also sends clear ones', () => {
-    const { drawsSoft } = require('../state') as typeof import('../state');
-    let s = applyEvent(liveConnecting(), { type: 'mark', mark: mark({ id: 'a', sure: 'likely' }) });
-    expect(drawsSoft(s, s.marks.a)).toBe(false);
-    s = applyEvent(s, { type: 'mark', mark: mark({ id: 'b', w: SHAY, sure: 'clear' }) });
-    expect([drawsSoft(s, s.marks.a), drawsSoft(s, s.marks.b)]).toEqual([true, false]);
+  it('each mark draws by its own sure: clear in full, likely lighter, whatever else the take holds', () => {
+    const { markStrength } = require('../state') as typeof import('../state');
+    expect(markStrength(mark({ sure: 'clear' }))).toBe('full');
+    expect(markStrength(mark({ sure: 'likely' }))).toBe('light');
   });
 
   it('the real service’s 4-minute take with letters: a word can carry two marks', () => {
@@ -366,7 +364,7 @@ describe('the card’s words', () => {
 
   it('names the ayah by its surah, and says when a mark is only likely', () => {
     expect(plainText(markPlace(mark({})))).toBe('An-Naml, ayah 23');
-    expect(plainText(markPlace(mark({ sure: 'likely' }), true))).toBe('An-Naml, ayah 23 · likely');
+    expect(plainText(markPlace(mark({ sure: 'likely' })))).toBe('An-Naml, ayah 23 · likely');
   });
 
   it('Expected and Recited: two words either side, the word swapped for what was said', () => {

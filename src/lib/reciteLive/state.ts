@@ -143,12 +143,12 @@ export function mistakeCount(state: LiveState): number {
 }
 
 /**
- * Whether a mark draws softer (a dotted underline, the word's ink left as it is). Only `likely` marks, and only once the
- * checker uses both bars in the take: until it sends `clear` marks, every mark is `likely` (Nov 14 2026) and all draw
- * in full.
+ * How strongly a mark draws, by its own `sure`: clear in full; likely (past the normal bar only) a little lighter, still
+ * in its colour and underlined, and its card says so. Each mark by itself, so the same kind of mark looks the same in
+ * every take (substitutions stay likely while skips, tajweed and letters past the strict bars come clear: #531).
  */
-export function drawsSoft(state: LiveState, mark: Mark): boolean {
-  return mark.sure === 'likely' && Object.values(state.marks).some((m) => m.sure === 'clear');
+export function markStrength(mark: Pick<Mark, 'sure'>): 'full' | 'light' {
+  return mark.sure === 'clear' ? 'full' : 'light';
 }
 
 /** The furthest word reached (the cursor or what's decided). */

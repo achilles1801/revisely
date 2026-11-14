@@ -25,10 +25,10 @@ export function markTitle(mark: Mark): string {
   }
 }
 
-/** "An-Naml, ayah 23"; with `soft` (state.drawsSoft), "· likely": past the normal bar only. */
-export function markPlace(mark: Mark, soft = false): string {
+/** "An-Naml, ayah 23", and "· likely" for a mark past the normal bar only. */
+export function markPlace(mark: Mark): string {
   const place = `${surahName(mark.ayah[0])}, ayah${NBSP}${mark.ayah[1]}`;
-  return soft ? `${place} · likely` : place;
+  return mark.sure === 'likely' ? `${place} · likely` : place;
 }
 
 /** The label of the Recited row: what was heard spelt out isn't exact. */
