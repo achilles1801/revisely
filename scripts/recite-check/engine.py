@@ -519,7 +519,10 @@ class Engine:
             tc = j.get('tcount')
             if kind == 'Normal Madd' and tajweed.madd_dropped(j):
                 flag(i, 'madd_dropped', expected=2)
-            elif kind == 'Lazem Madd' and tc is not None and tc < 4.5:
+            elif kind == 'Lazem Madd' and tc is not None and tc < 4.5 and j.get('timing_v') is not None:
+                # judged on time only. An ayah too short to measure the reciter's pace in (الٓمٓ alone: under 3 short
+                # syllables) leaves its count to the model, which reads long madds short: Majd's الٓمٓ of 4.8-6.5 s
+                # read 2.2-2.9 counts in all three of his takes, so it isn't judged (Nov 14 2026)
                 flag(i, 'madd_lazim', tc, 6, clear=tc < LAZIM_CLEAR_UNDER)
             elif kind in MADD_RULES and tc is not None and abs(tc - j['golden']) >= 1.5 \
                     and not (kind == 'Aared Madd' and not st['aar']):

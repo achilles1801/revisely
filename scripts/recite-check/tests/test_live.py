@@ -201,6 +201,23 @@ class Model(unittest.TestCase):
         self.assertEqual(hop(40), 40)  # the phone moved the reader there: at once
         self.assertEqual(hop(5), None)  # and the rule holds again after it
 
+    def test_a_lazim_madd_is_judged_on_time_only(self):
+        """A lazim madd read short is marked only when the reciter's pace was measured in the ayah: alone, الٓمٓ has no
+        short syllables, and the model's own count reads long madds short (Majd's three takes, Nov 14 2026)."""
+        E = engine()
+        import engine as engine_mod  # (it puts the harness's tajweed on the path)
+        tajweed = engine_mod.tajweed
+        first = E.words.first[E.words.vindex[(2, 1)]]
+        statuses, spans = {first: 'correct'}, {first: (20, 300)}
+        lp = np.zeros((400, len(E.ear.vocab) + 1), np.float32)
+        row = {'kind': 'Lazem Madd', 'word': 0, 'tcount': 2.2, 'golden': 6, 'margin': 0.0}
+        for timing, marked in ((None, False), (3.0, True)):
+            judged = [dict(row, timing_v=timing)]
+            with unittest.mock.patch.object(tajweed, 'judge', lambda *a, **k: judged), \
+                    unittest.mock.patch.object(E, 'ear2', None):
+                tj, _ = E.ayah_notes(lp, 2, 1, statuses, spans, {'letters': True, 'tajweed': True, 'mon': 4, 'mot': 4, 'aar': 0})
+            self.assertEqual([r['rule'] for r in tj] == ['madd_lazim'], marked, (timing, tj))
+
     def test_refuses_a_passage_that_does_not_exist(self):
         import live
         from engine import BadRequest
