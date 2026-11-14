@@ -35,6 +35,9 @@ fi
 cp "$HERE"/{server.py,engine.py,live.py,auth.py,store.py,make_words.py,requirements.txt,Dockerfile} "$STAGE/"
 rm -rf "$STAGE/tests" && mkdir -p "$STAGE/tests" && cp "$HERE"/tests/*.py "$STAGE/tests/"
 git -C "$REPO" rev-parse "$HARNESS_COMMIT" > "$STAGE/CHECKER_COMMIT"
+# this service's own commit (+ "-dirty" when staged from uncommitted changes), for /health and ready
+( git -C "$REPO" rev-parse --short=12 HEAD; git -C "$REPO" diff --quiet HEAD -- "$HERE" || echo dirty ) \
+  | paste -sd- - > "$STAGE/SERVER_COMMIT"
 # The word table (make_words.py), when the job has made it for these words (README.md, "The word table").
 WK=$(cd "$STAGE" && LAB=$STAGE/lab RECITE_HARNESS=$H "$PY" -c 'import engine; print(engine.words_key())' 2>/dev/null)
 PARTS=$(mktemp -d)

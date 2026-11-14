@@ -100,6 +100,8 @@ class FakeSession:
             self.result = {'v': 2, 'marks': [], 'score': {'reached': 0, 'mistakes': 0, 'tajweed': 0,
                                                           'accuracy': None},
                            'secs': round(self.seconds, 1), 'why': 'end'}
+            if self.follow:  # Recite's answer: words only, no marks or score
+                self.result = {'v': 2, 'follow': True, 'words': [], 'secs': round(self.seconds, 1), 'why': 'end'}
             return [{'type': 'done', 'result': self.result}]
         return []
 
@@ -137,7 +139,10 @@ class CheckTests(Base):
     def test_health(self):
         r = self.client.get('/health')
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['ok'], True)
+        body = r.json()
+        self.assertEqual((body['ok'], body['protocol']), (True, 5))
+        self.assertIn('server', body)
+        self.assertIn('engine', body)
 
     def test_sign_in_and_testers_only(self):
         r = self.client.post('/check?s=1&a=1', content=wav())
@@ -235,7 +240,7 @@ class LiveTests(Base):
         with self.socket() as ws:
             ws.send_text(start(keep=True, mon=5, aar=2, letters=True))
             ready = ws.receive_json()
-            self.assertEqual((ready['type'], ready['from'], ready['v']), ('ready', 0, 2))
+            self.assertEqual((ready['type'], ready['from'], ready['v'], ready['protocol']), ('ready', 0, 2, 5))
             self.assertTrue(store.TAKE.match(ready['take']))
             self.assertEqual(FakeSession.made[0].args, (1, 1, None, None, {'mon': 5, 'mot': 4, 'aar': 2,
                                                                            'letters': '1', 'tajweed': '1'}))
@@ -268,6 +273,21 @@ class LiveTests(Base):
                 ws.send_text(start(**extra))
                 ws.receive_json()
             self.assertEqual((FakeSession.made[0].follow, FakeSession.made[0].args[4]['tajweed']), (follow, tajweed))
+
+    def test_a_recite_take_ends_with_done(self):
+        with self.socket() as ws:
+            ws.send_text(start(follow=True, keep=True))
+            ready = ws.receive_json()
+            ws.send_bytes(second_of_audio() * 3)
+            ws.send_text(json.dumps({'type': 'end'}))
+            while True:
+                e = ws.receive_json()
+                if e['type'] in ('done', 'error'):
+                    break
+        self.assertEqual(e['type'], 'done')
+        self.assertTrue(e['result']['follow'])
+        self.assertNotIn('marks', e['result'])
+        self.assertIn(f"recite-tests/tester1/{ready['take']}.json", self.stored)
 
     def test_hints_reach_the_session_and_unknown_frames_are_ignored(self):
         with self.socket() as ws:

@@ -98,7 +98,9 @@ take (`<take>.dismiss-<time>.json`) as a label for the lab.
    only `ready`, `at`, `said`, `ayah` and `done` come back, words are decided but no mark is made, and `done.result`
    has the words and their statuses only. Sign-in and `previewTester` are checked
    on every socket. A session counts against the 40 an hour; resuming doesn't.
-2. The server answers `{"type":"ready","v":2,"engine":"…","take":"<take>","from":0}`.
+2. The server answers `{"type":"ready","v":2,"engine":"…","server":"…","protocol":5,"take":"<take>","from":0}`.
+   `GET /health` says the same `engine` (the checker's commit), `server` (this service's commit) and `protocol` (the
+   contract draft it speaks: 5 = follow, hint, tajweed, check_locked).
 3. The phone sends PCM (16-bit little-endian, mono, 16 kHz) as binary frames of any size, and as text frames
    `{"type":"seek","w":…}`, `{"type":"dismiss","id":"…"}`,
    `{"type":"hint","w":…,"what":"word"|"ayah"}` (the hidden view showed a word, or the rest of its ayah: those

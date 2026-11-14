@@ -152,8 +152,12 @@ def main():
     print('  unmarks:', [e['id'] for e in events if e['type'] == 'unmark'])
     if done:
         r = done['result']
-        print('  done marks:', [m['id'] for m in r['marks']])
-        print('  done score:', r['score'], 'ms:', r.get('ms'))
+        if r.get('follow'):  # Recite: words and statuses only
+            print('  done (recite):', len(r['words']), 'words,', sum(1 for w in r['words'] if w['status'] != 'correct'),
+                  'not correct; ms:', r.get('ms'))
+        else:
+            print('  done marks:', [m['id'] for m in r['marks']])
+            print('  done score:', r['score'], 'ms:', r.get('ms'))
     if not args.fast and rounds == 1:
         lat_at, lat_said, lat_mark = [], [], []
         seen_at = set()
