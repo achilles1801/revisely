@@ -14,8 +14,9 @@ file is the release mechanics and the traps behind them.
 
 **Which branch is for what** (Majd, Nov 14 2026: "it should be well known that develop is for revisely dev only and
 main is strictly for production"):
-- **`develop` is for Revisely Dev**: the Dev app, the dev backend and dev.revisely.app. Dev-only work goes there and
-  only there, dev-only Worker code included (behind a var that only `wrangler.dev.jsonc` sets).
+- **`develop` is pre-production**: Revisely Dev (the Dev app), the dev backend, dev.revisely.app, and the testers'
+  `preview` channel (TestFlight and Play testers of the store app, as below). Dev-only work goes there and only there,
+  dev-only Worker code included (behind a var that only `wrangler.dev.jsonc` sets).
 - **`main` is strictly production**: revisely.app and the store app. It gets work only through develop → main
   release merges, or a fix meant for production itself. Never ask Majd to merge dev work into main.
 - **Bringing production's site to dev** is a main → develop merge, which never touches production.
