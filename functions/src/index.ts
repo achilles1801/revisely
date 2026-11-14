@@ -30,6 +30,9 @@ import { RevoError, handleClear, handleDayInReview, handleRevoAsk, handleSetOpti
 import { inTestEmulator, recordedAnthropic, testNow } from './emulator';
 import { AdminError, TOTALS_AUDIENCE, consoleOrigins, handleAdminMetrics, handleAdminRevo, handleMetricsTotals } from './metrics/admin';
 import { adminRevoStore as adminConsoleRevoStore, adminTotalsStore, collector } from './metrics/adminStore';
+import { SUPPORT_ORIGINS, SUPPORT_PAGES, SupportError } from './support/logic';
+import { handleDevPremium, handleSupportApplication, handleSupportLink } from './support/handler';
+import { adminSupportStore, deleteSupportData } from './support/admin';
 
 setGlobalOptions({ region: 'us-central1', maxInstances: 3 });
 
@@ -85,8 +88,10 @@ function resetStoreFor(raw: { headers?: Record<string, string | string[] | undef
  *  8. users/{uid}/recordings/* — the records of backed-up recordings
  *  9. The Ask coach's and Revo's documents (Revo's chats with their messages,
  *     memory, cached answers and daily count)
- * 10. users/{uid} — user profile doc
- * 11. Firebase Auth user
+ * 10. The support program's and Premium's documents (application, entitlements,
+ *     link codes, limits)
+ * 11. users/{uid} — user profile doc
+ * 12. Firebase Auth user
  *
  * Requires App Check to prevent abuse: an attacker with a stolen ID token
  * could otherwise use this to delete arbitrary accounts they happen to control.
@@ -144,6 +149,7 @@ export const deleteUserAccount = onCall(
     await adminDb.doc(`coachSettings/${uid}`).delete();
     // Revo's: chats (with every messages subcollection), memory, cached answers, the daily count.
     await deleteRevoData(adminDb, uid, { usage: true });
+    await deleteSupportData(adminDb, uid);
 
     await userRef.delete();
 
@@ -470,3 +476,57 @@ export const metricsTotals = onRequest({ invoker: 'public', maxInstances: 1, tim
     }
   }
 });
+
+// ---------------------------------------------------------------------------------------------------------------
+// The support program and Premium (support/logic.ts). The project id picks the program page: a project without one
+// (production, until Majd moves it there) refuses links, so applications stay in revisely-dev.
+
+const PROJECT_ID = process.env.GCLOUD_PROJECT ?? '';
+const DEV_PROJECT = PROJECT_ID === 'revisely-dev';
+
+function supportStore() {
+  return adminSupportStore(adminDb, async (uid) => {
+    try {
+      const u = await getAuth().getUser(uid);
+      return { email: u.email ?? null, providers: u.providerData.map((p) => p.providerId) };
+    } catch (err) {
+      if ((err as { code?: string }).code === 'auth/user-not-found') return null;
+      throw err;
+    }
+  });
+}
+
+async function supportCall<T>(name: string, run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (err) {
+    if (err instanceof SupportError) throw new HttpsError(err.code, err.message);
+    // Never the request's data: it may hold someone's answers.
+    logger.error(`${name} failed`, { message: (err as Error).message });
+    throw new HttpsError('internal', 'Something went wrong. Try again in a minute.');
+  }
+}
+
+/** "Can't afford it? Apply for support" in the app: a 30-minute link to the program page for this account. */
+export const supportLink = onCall({ enforceAppCheck: true, maxInstances: 2, timeoutSeconds: 20 }, (request) =>
+  supportCall('supportLink', () => handleSupportLink(request, supportStore(), SUPPORT_PAGES[PROJECT_ID])),
+);
+
+/**
+ * The program page's calls: the account's state, or the application. Called from a browser, so App Check isn't
+ * enforced here: a code from supportLink (made with App Check) or the caller's own sign-in names the account.
+ */
+export const supportApplication = onCall(
+  { cors: SUPPORT_ORIGINS, enforceAppCheck: false, maxInstances: 2, timeoutSeconds: 20 },
+  (request) => supportCall('supportApplication', () => handleSupportApplication(request, supportStore(), SUPPORT_PAGES[PROJECT_ID])),
+);
+
+/** Get Premium in the Revisely Dev app (no money): Premium from source "dev". revisely-dev only. */
+export const devGrantPremium = onCall({ enforceAppCheck: true, maxInstances: 2, timeoutSeconds: 20 }, (request) =>
+  supportCall('devGrantPremium', () => handleDevPremium(request, supportStore(), DEV_PROJECT || testing, true)),
+);
+
+/** Takes the "dev" grant back, so a tester can see Check locked again. revisely-dev only. */
+export const devRevokePremium = onCall({ enforceAppCheck: true, maxInstances: 2, timeoutSeconds: 20 }, (request) =>
+  supportCall('devRevokePremium', () => handleDevPremium(request, supportStore(), DEV_PROJECT || testing, false)),
+);
