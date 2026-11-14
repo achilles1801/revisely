@@ -140,6 +140,13 @@ class Decoder(checker.Decoder):
     def __init__(self, g, P, entry=0, start='after', cap=1500):
         super().__init__(g, P, cap)
         self.entry, self.start = entry, start
+        # for the vectorized step: each word's skip and repeat sources as columns (see _fast_step)
+        ks = np.array(self.skips, np.int64)
+        self._K = int(ks.max()) if len(ks) else 0
+        self._kcol = self._K - ks
+        self._kpen = P['skip'] * ks
+        self._ks = ks
+        self._no1, self._no2, self._nomadd = ~g.prev1, ~g.prev2, ~g.madd
 
     def _grow(self, n):
         need = self.t + n
@@ -159,7 +166,10 @@ class Decoder(checker.Decoder):
 
     def _step(self, e):
         first = self.t == 0
-        super()._step(e)
+        if first:
+            super()._step(e)
+        else:
+            self._fast_step(e)
         if first and self.entry:
             g = self.g
             self.d = np.full(g.S + 1, NEG)
@@ -170,6 +180,122 @@ class Decoder(checker.Decoder):
                 self.d[ex] = e[0]
             else:
                 self.gap[self.entry] = float(e.max()) + self.pen[self.entry]
+
+    def _fast_step(self, e):
+        """checker.Decoder._step with its two loops (12 skips, 31 repeats, a numpy op each) done as one op each over
+        a window view: the same sums, the same maxima, ties to the same (first) source, so the same tables and
+        scores to the bit (tests/test_live.py checks it frame by frame against the checker's own Decoder)."""
+        g, P, NEG = self.g, self.P, self.NEG
+        S, W, t = g.S, g.W, self.t
+        best_any = float(e.max())
+        d, gap, widx, rows = self.d, self.gap, self.widx, self.widx
+        vals = d[g.exits]
+        am = vals.argmax(axis=1)
+        ex = vals[rows, am]
+        self.ex_state[t] = g.exits[rows, am]
+        cand = np.full(W, NEG)
+        src = np.zeros(W, np.int64)
+
+        def offer(c, code, idx):
+            better = c > cand
+            cand[better] = c[better]
+            src[better] = code * 1_000_000 + idx[better]
+
+        c = np.full(W, NEG); c[1:] = ex[:-1]
+        offer(c, 1, widx - 1)
+        c = np.full(W, NEG); c[0] = gap[0]
+        offer(c, 3, np.zeros(W, np.int64))
+        if self._K:  # skips: c_k[w] = ex[w - 1 - k] + skip * k, the first k with the best value
+            pad = np.concatenate([np.full(self._K + 1, NEG), ex])
+            view = np.lib.stride_tricks.sliding_window_view(pad, self._K + 1)[:W]
+            sk = view[:, self._kcol] + self._kpen
+            j = sk.argmax(axis=1)
+            offer(sk[rows, j], 2, widx - 1 - self._ks[j])
+        if self.backs > 0:  # repeats: the best exit of words w .. w + backs, the first o with it
+            pad = np.concatenate([ex, np.full(self.backs, NEG)])
+            view = np.lib.stride_tricks.sliding_window_view(pad, self.backs + 1)[:W]
+            warg = view.argmax(axis=1)
+            offer(view[rows, warg] + P['back'], 4, widx + warg)
+        c = gap[:W].copy(); c[0] = NEG
+        offer(c, 5, widx)
+        c = np.full(W, NEG); c[1:] = gap[1:W] + P['fill_sub']
+        offer(c, 6, widx - 1)
+        self.ent_src[t] = src
+
+        nd = d.copy()
+        code = self.bp[t]
+        code[:] = 0
+        c = np.empty(S + 1)
+        c[0] = NEG; c[1:] = d[:-1]; c[self._no1] = NEG
+        b = c > nd; nd[b] = c[b]; code[b] = 1
+        c[:2] = NEG; c[2:] = d[:-2]; c[self._no2] = NEG
+        b = c > nd; nd[b] = c[b]; code[b] = 2
+        c[:-1] = d[1:]; c[-1] = NEG; c[self._nomadd] = NEG
+        b = c > nd; nd[b] = c[b]; code[b] = 3
+        ce = cand[:, None] + self.alt_pen
+        cur = nd[g.entries]
+        b = ce > cur
+        nd[g.entries[b]] = ce[b]
+        code[g.entries[b]] = 4
+        nd += e[g.lab]
+        nd[S] = NEG
+
+        ng = gap.copy()
+        gs = self.gap_src[t]
+        gs[:] = 0
+        c = np.empty(W + 1); c[0] = NEG; c[1:W] = ex[:W - 1] + P['fill_in']; c[W] = ex[W - 1]
+        b = c > ng; ng[b] = c[b]; gs[b] = 1
+        ng += best_any + self.pen
+        self.d, self.gap = nd, ng
+        self.t = t + 1
+
+    def _score_step(self, e):
+        """The scores of the next frame alone (d and gap, the same values as _fast_step's), no tables: the cursor's
+        look at the provisional frames, which is put back after."""
+        g, P, NEG = self.g, self.P, self.NEG
+        S, W = g.S, g.W
+        best_any = float(e.max())
+        d, gap = self.d, self.gap
+        ex = d[g.exits].max(axis=1)
+        cand = np.empty(W); cand[0] = gap[0]; cand[1:] = ex[:-1]  # (no score is below NEG)
+        if self._K:
+            pad = np.concatenate([np.full(self._K + 1, NEG), ex])
+            sk = np.lib.stride_tricks.sliding_window_view(pad, self._K + 1)[:W][:, self._kcol] + self._kpen
+            np.maximum(cand, sk.max(axis=1), out=cand)
+        if self.backs > 0:
+            pad = np.concatenate([ex, np.full(self.backs, NEG)])
+            np.maximum(cand, np.lib.stride_tricks.sliding_window_view(pad, self.backs + 1)[:W].max(axis=1)
+                       + P['back'], out=cand)
+        c = gap[:W].copy(); c[0] = NEG
+        np.maximum(cand, c, out=cand)
+        c = np.empty(W); c[0] = NEG; c[1:] = gap[1:W] + P['fill_sub']
+        np.maximum(cand, c, out=cand)
+        nd = d.copy()
+        c = np.empty(S + 1)
+        c[0] = NEG; c[1:] = d[:-1]; c[self._no1] = NEG
+        np.maximum(nd, c, out=nd)
+        c[:2] = NEG; c[2:] = d[:-2]; c[self._no2] = NEG
+        np.maximum(nd, c, out=nd)
+        c[:-1] = d[1:]; c[-1] = NEG; c[self._nomadd] = NEG
+        np.maximum(nd, c, out=nd)
+        ent = g.entries
+        nd[ent] = np.maximum(nd[ent], cand[:, None] + self.alt_pen)
+        nd += e[g.lab]
+        nd[S] = NEG
+        ng = gap.copy()
+        c = np.empty(W + 1); c[0] = NEG; c[1:W] = ex[:W - 1] + P['fill_in']; c[W] = ex[W - 1]
+        np.maximum(ng, c, out=ng)
+        ng += best_any + self.pen
+        self.d, self.gap = nd, ng
+        self.t += 1
+
+    def feed_scores(self, lp):
+        """Frames for scores only (the provisional ones): no tables written. Put the decoder back after."""
+        if self.t == 0:
+            self.feed(lp)
+            return
+        for row in lp:
+            self._score_step(row)
 
     def state(self):
         return self.d.copy(), self.gap.copy(), self.t
@@ -592,7 +718,7 @@ class LiveSession:
         if dec.t >= 1:
             if prov is not None and len(prov):
                 saved = dec.state()
-                dec.feed(prov)
+                dec.feed_scores(prov)
                 cw = dec.word_now()
                 dec.restore(saved)
             else:
