@@ -1,5 +1,5 @@
-import React, { useMemo, useRef } from 'react';
-import { StyleSheet, Text, View, type AccessibilityActionEvent, type LayoutChangeEvent } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { StyleSheet, Text, View, type AccessibilityActionEvent, type GestureResponderEvent, type LayoutChangeEvent } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useTheme } from '../../../context/ThemeContext';
@@ -73,6 +73,55 @@ export function ChartFrame({
   );
 }
 
+/** How long a pick waits for React Native to hear its touch end, if that end never comes. */
+export const TOUCH_END_WAIT_MS = 1000;
+
+/**
+ * Holds a tap's pick until React Native (JavaScript) has heard the touch end. A pick can change the
+ * chat's height (a panel opens or goes), and a change made while JS still has the touch down lets
+ * the scroll it causes give the chat's ScrollView the JS responder. On iOS that touch's end then
+ * never reached JS, so the ScrollView kept the responder and the next tap anywhere did nothing
+ * (flow 09, Nov 8 and Nov 14 2026). Gesture Handler's tap ends on its own channel, often before JS
+ * has the touch's end: waiting a frame was enough on Nov 8, and not on a busy simulator on Nov 14.
+ * A touch whose end never comes (another cause) holds the pick for TOUCH_END_WAIT_MS at most.
+ */
+function touchGate() {
+  let down = false;
+  let waiting: (() => void) | null = null;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const release = () => {
+    down = false;
+    if (timer) clearTimeout(timer);
+    timer = null;
+    const run = waiting;
+    waiting = null;
+    if (run) requestAnimationFrame(run);
+  };
+  return {
+    /** A touch reached JS inside the plot. */
+    start: () => {
+      down = true;
+    },
+    /** Every touch has ended (or was cancelled) for JS. */
+    end: release,
+    /** Runs `run` once JS has the touch's end, on the frame after it. */
+    pick: (run: () => void) => {
+      if (!down) {
+        requestAnimationFrame(run);
+        return;
+      }
+      waiting = run;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(release, TOUCH_END_WAIT_MS);
+    },
+    dispose: () => {
+      if (timer) clearTimeout(timer);
+      timer = null;
+      waiting = null;
+    },
+  };
+}
+
 /**
  * The plot: a tap picks the mark under the finger; with `onSlide`, a sideways drag runs along the
  * marks (a vertical one still scrolls the chat). For VoiceOver it is one adjustable element:
@@ -102,18 +151,17 @@ export function ChartPlot({
   const latest = useRef({ onTap, onSlide });
   latest.current = { onTap, onSlide };
   const slides = onSlide != null;
+  const [gate] = useState(touchGate);
+  useEffect(() => gate.dispose, [gate]);
   const gesture = useMemo(() => {
     const tap = Gesture.Tap()
       .maxDistance(10)
       .runOnJS(true)
       .onEnd((e, ok) => {
         if (!ok) return;
-        // The pick waits a frame, for the touch to end in React Native too. A pick that put a
-        // panel away shrank the chat while the touch was still down there: on iOS the scroll it
-        // caused gave the chat's ScrollView the touch, whose end never came, and it kept it, so
-        // the next tap anywhere did nothing (flow 09, Nov 8 2026).
+        // The pick waits for the touch to end in React Native too (touchGate).
         const { x, y } = e;
-        requestAnimationFrame(() => latest.current.onTap(x, y, size.current));
+        gate.pick(() => latest.current.onTap(x, y, size.current));
       })
       .withTestId(`${testID}-tap`);
     if (!slides) return tap;
@@ -126,7 +174,11 @@ export function ChartPlot({
       .onUpdate((e) => slide(e.x))
       .withTestId(`${testID}-pan`);
     return Gesture.Race(pan, tap);
-  }, [testID, slides]);
+  }, [testID, slides, gate]);
+  // Every touch inside the plot reaches these, whoever holds the JS responder.
+  const onTouchEnd = (e: GestureResponderEvent) => {
+    if ((e.nativeEvent.touches?.length ?? 0) === 0) gate.end();
+  };
 
   const onAction = (e: AccessibilityActionEvent) => {
     if (e.nativeEvent.actionName === 'increment') onStep(1);
@@ -146,6 +198,9 @@ export function ChartPlot({
         onLayout={(e: LayoutChangeEvent) => {
           size.current = { width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height };
         }}
+        onTouchStart={gate.start}
+        onTouchEnd={onTouchEnd}
+        onTouchCancel={gate.end}
         testID={testID}
       >
         {children}

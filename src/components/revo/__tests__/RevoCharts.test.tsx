@@ -14,6 +14,7 @@ import { MemorizedChart } from '../charts/MemorizedChart';
 import { PageRatingsChart } from '../charts/PageRatingsChart';
 import { TimelineChart } from '../charts/TimelineChart';
 import { WeeksChart } from '../charts/WeeksChart';
+import { TOUCH_END_WAIT_MS } from '../charts/ChartFrame';
 import { TableChart } from '../charts/TableChart';
 import type { RevoDayFacts, RevoPassageFacts } from '../../../lib/revo/types';
 import { ChartCard } from '../RevoCards';
@@ -400,6 +401,51 @@ describe('weeks grid', () => {
     fireEvent.press(screen.getByTestId('revo-chart-weeks-close'));
     await tap('revo-chart-weeks-plot-tap', 39 + 10, 10);
     expect(text('revo-chart-weeks-title')).toBe('Since 1 November');
+  });
+
+  // Gesture Handler's tap can end before JS has the touch's end (a busy iOS Simulator, flow 09 on Nov 14
+  // 2026): a day put away then shrank the chat under a touch JS still had down, and the next tap did nothing.
+  const touchStart = () => fireEvent(screen.getByTestId('revo-chart-weeks-plot'), 'touchStart', { nativeEvent: { touches: [{}], changedTouches: [{}] } });
+  const touchEnd = () => fireEvent(screen.getByTestId('revo-chart-weeks-plot'), 'touchEnd', { nativeEvent: { touches: [], changedTouches: [{}] } });
+
+  it('putting a day away waits until JS has the touch’s end, however late; then a weekday still picks', async () => {
+    await grid();
+    layout('revo-chart-weeks-plot', 370, 100);
+    await tap('revo-chart-weeks-plot-tap', 39 + 10, 90);
+    expect(text('revo-chart-weeks-title')).toBe('Sunday 1 November');
+    touchStart();
+    touch('revo-chart-weeks-plot-tap', 39 + 10, 90);
+    await nextFrame();
+    await nextFrame();
+    expect(text('revo-chart-weeks-title')).toBe('Sunday 1 November');
+    expect(screen.getByTestId('revo-chart-weeks-detail')).toBeTruthy();
+    touchEnd();
+    expect(text('revo-chart-weeks-title')).toBe('Sunday 1 November');
+    await nextFrame();
+    expect(text('revo-chart-weeks-title')).toBe('Since 1 November');
+    expect(screen.queryByTestId('revo-chart-weeks-detail')).toBeNull();
+    fireEvent.press(screen.getByTestId('revo-chart-weeks-col-6'));
+    expect(text('revo-chart-weeks-title')).toMatch(/^Saturdays · /);
+  });
+
+  it('a touch whose end never reaches JS holds the pick for a second at most', async () => {
+    await grid();
+    layout('revo-chart-weeks-plot', 370, 100);
+    jest.useFakeTimers();
+    try {
+      touchStart();
+      touch('revo-chart-weeks-plot-tap', 39 + 10, 90);
+      act(() => jest.advanceTimersByTime(TOUCH_END_WAIT_MS - 50));
+      expect(text('revo-chart-weeks-title')).toBe('Since 1 November');
+      act(() => jest.advanceTimersByTime(100));
+      expect(text('revo-chart-weeks-title')).toBe('Sunday 1 November');
+      // That touch is given up on: the next tap picks a frame later, as before.
+      touch('revo-chart-weeks-plot-tap', 39 + 10, 90);
+      act(() => jest.advanceTimersByTime(50));
+      expect(text('revo-chart-weeks-title')).toBe('Since 1 November');
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('VoiceOver steps through the days from the first session', async () => {
