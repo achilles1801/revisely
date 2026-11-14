@@ -39,6 +39,7 @@ RESUME_TTL = 120      # seconds a dropped session waits on this instance for its
 # Check is paid, with a free path (apply-support.md): with CHECK_GATE=on, /check and /live without "follow" need
 # entitlements/{uid}.check; Recite (follow) stays free. Off until the entitlements exist on revisely-dev.
 CHECK_GATE = os.environ.get('CHECK_GATE', 'off') == 'on'
+LOCKED = 'check_locked'  # the refusal without the entitlement (to agree with apply-support and recite-ui if it moves)
 MARK_ID = re.compile(r'^\d{1,6}:(word|letter|tajweed):[a-z_]{1,24}$')
 log = logging.getLogger('recite-check')
 logging.basicConfig(level=logging.INFO)
@@ -109,7 +110,7 @@ async def signed_in_tester(header):
 async def may_check(uid):
     """Check (marks) needs the entitlement when the gate is on; Recite doesn't."""
     if CHECK_GATE and not await asyncio.to_thread(auth.has_check, uid):
-        raise auth.Refused(403, 'check_locked')
+        raise auth.Refused(403, LOCKED)
 
 
 def put_json(name, obj):

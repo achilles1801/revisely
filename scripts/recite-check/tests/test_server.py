@@ -480,6 +480,29 @@ class EntitlementTests(unittest.TestCase):
             self.assertIn('mask.fieldPaths=check', calls[0])
         auth._checks.clear()
 
+    def test_the_field_is_one_setting(self):
+        """If the grant becomes entitlements/{uid}.premium (apply-support draft 2), ENTITLEMENT=premium is all."""
+        seen = []
+
+        class R:
+            status_code = 200
+
+            def json(self):
+                return {'fields': {'premium': {'mapValue': {'fields': {'until': {'nullValue': None}}}}}}
+
+            def raise_for_status(self):
+                pass
+
+        def get(url, headers, timeout):
+            seen.append(url)
+            return R()
+        auth._checks.clear()
+        with mock.patch.object(auth, 'ENTITLEMENT', 'premium'), mock.patch.object(auth.requests, 'get', get), \
+                mock.patch.object(auth, 'token', lambda: 'x'):
+            self.assertTrue(auth.has_check('someone', now=100))
+        self.assertIn('mask.fieldPaths=premium', seen[0])
+        auth._checks.clear()
+
 
 if __name__ == '__main__':
     unittest.main()
