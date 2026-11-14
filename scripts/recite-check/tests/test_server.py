@@ -59,9 +59,9 @@ class FakeSession:
 
     made = []
 
-    def __init__(self, engine, s, a, s2, a2, settings, follow=False, defer=False):
+    def __init__(self, engine, s, a, s2, a2, settings, follow=False, defer=False, open_end=False):
         self.args = (s, a, s2, a2, settings)
-        self.follow, self.defer = follow, defer
+        self.follow, self.defer, self.open_end = follow, defer, open_end
         self.hints = []
         self.n = 0
         self.stopped = False
@@ -286,14 +286,14 @@ class LiveTests(Base):
             ws.send_text(json.dumps({'type': 'end'}))
             while ws.receive_json()['type'] != 'done':
                 pass
-        self.assertEqual(FakeSession.made[0].args[:4], (78, 1, 114, 6))
+        self.assertEqual((FakeSession.made[0].args[:4], FakeSession.made[0].open_end), ((78, 1, 114, 6), True))
         kept = json.loads(self.stored[f"recite-tests/tester1/{ready['take']}.json"])
         self.assertEqual((kept['request']['s2'], kept['request']['a2'], kept['request']['open']), (None, None, True))
         FakeSession.made = []
         with self.socket() as ws:
             ws.send_text(start(s=78, a=1, s2=78, a2=40))
             ws.receive_json()
-        self.assertEqual(FakeSession.made[0].args[:4], (78, 1, 78, 40))
+        self.assertEqual((FakeSession.made[0].args[:4], FakeSession.made[0].open_end), ((78, 1, 78, 40), False))
 
     def test_recite_mode_and_the_tajweed_switch_reach_the_session(self):
         for extra, follow, tajweed in (({'mode': 'recite'}, True, '1'), ({'follow': True}, True, '1'),

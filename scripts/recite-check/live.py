@@ -434,7 +434,7 @@ class LiveSession:
     """One live check. feed() audio (PCM16 bytes), control() messages, finish() at the end; each returns the events
     to send, in order (dicts, recite-contract.md)."""
 
-    def __init__(self, engine, s, a, s2=None, a2=None, settings=None, follow=False, defer=False):
+    def __init__(self, engine, s, a, s2=None, a2=None, settings=None, follow=False, defer=False, open_end=False):
         E = self.E = engine
         # follow (Recite, contract draft 5): the cursor and `said` only; words are decided (said needs them) but no
         # mark is made, letters and tajweed aren't judged, and no mark, unmark or score is sent
@@ -447,6 +447,9 @@ class LiveSession:
         if (s2 is None) != (a2 is None):
             raise BadRequest('both or neither of s2, a2')
         self.lo, self.end = E.passage(s, a, s2, a2, max_words=10 ** 6)
+        # open_end: the phone gave no end and the server runs the take on to the end of the Qur'an (server.LAST_AYAH);
+        # `done.result.to` is then the end of the last ayah reached, not the Qur'an's
+        self.open_end = open_end
         self.V = len(E.ear.vocab) + 1
         # Strict on the second model (v5, #539): ayah_notes takes the take's samples when the engine has it
         self.v5 = self.st.get('tajweed', True) and getattr(E, 'ear2', None) is not None \
@@ -1072,6 +1075,13 @@ class LiveSession:
             self.ayah_sent.append(ev[-1])
         return ev
 
+    def _reached_to(self, words):
+        """The end of the last ayah reached (the passage's start when nothing was): an open take's `to`."""
+        if not words:
+            return self.lo
+        first, n = self._ayah_bounds(*self.E.ayah_of(max(r['w'] for r in words)))
+        return first + n
+
     def _ends_ayah(self, w):
         s, a, p = self.E.key.where(w)
         return p == self._ayah_bounds(s, a)[1] - 1
@@ -1164,7 +1174,8 @@ class LiveSession:
                 seen.add(e['after'])
                 ex.append(v1_extra(e))
         out = {
-            'v': 1, 'from': self.lo, 'to': self.end, 'secs': round(self.seconds, 1), 'words': words, 'extras': ex,
+            'v': 1, 'from': self.lo, 'to': self._reached_to(words) if self.open_end else self.end,
+            'secs': round(self.seconds, 1), 'words': words, 'extras': ex,
             'tajweed': [{k: r[k] for k in r if not k.startswith('_')} for r in tj],
             'letters': [{k: r[k] for k in r if not k.startswith('_')} for r in letters] if self.st['letters'] else None,
             'settings': {k: self.st[k] for k in ('mon', 'mot', 'aar', 'letters', 'tajweed')},

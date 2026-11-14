@@ -296,7 +296,8 @@ async def open_session(msg, uid):
     open_end = passage[2] is None
     run = passage[:2] + LAST_AYAH if open_end else passage
     # defer: each ayah's letters and tajweed are judged off the hop, so they never hold up the cursor (live.py)
-    sess = await asyncio.to_thread(live.LiveSession, ENGINE['e'], *run, settings, follow, defer=True)
+    sess = await asyncio.to_thread(live.LiveSession, ENGINE['e'], *run, settings, follow, defer=True,
+                                   open_end=open_end)
     sid = rid if isinstance(rid, str) and store.TAKE.match(rid) else store.new_take()
     request = dict(zip(('s', 'a', 's2', 'a2'), passage), settings=settings, follow=follow, open=open_end)
     s = Live(sid, uid, sess, msg.get('keep') is True, request, msg.get('app') if isinstance(msg.get('app'), str)

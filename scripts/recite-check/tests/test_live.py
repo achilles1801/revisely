@@ -221,8 +221,10 @@ class Bench(unittest.TestCase):
         """The server runs a take with no end to 114:6 (server.LAST_AYAH): on a take that stops at the end of
         Al-Fatiha, the same mistakes, nothing reached past it, and the cursor ends on its last word."""
         import live
-        ev = run(live.LiveSession(engine(), 1, 1, 114, 6, {}), chunks(bench_pcm(), 3200) + [{'type': 'end'}])
+        ev = run(live.LiveSession(engine(), 1, 1, 114, 6, {}, open_end=True), chunks(bench_pcm(), 3200)
+                 + [{'type': 'end'}])
         end = ev[-1]['result']
+        self.assertEqual((end['from'], end['to']), (0, 29))  # the ayat reached, not the Qur'an
         self.assertEqual({(m['w'], m['kind']) for m in end['marks'] if m['kind'] != 'tajweed'},
                          {(4, 'word'), (14, 'skipped')})
         self.assertEqual(max(w['w'] for w in end['words']), 28)
