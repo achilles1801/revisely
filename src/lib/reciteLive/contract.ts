@@ -58,9 +58,12 @@ export interface FinalResult {
   marks: Mark[];
   score: LiveScore | null;
   kept?: boolean;
+  /** "too_long": the take reached the checker's 15 minutes. */
+  why?: 'end' | 'too_long';
 }
 
-export type LiveFailure = 'sign_in' | 'testers_only' | 'limit' | 'too_long' | 'idle' | 'server';
+/** Why a take ended without its answer. `offline` is the phone's own: the checker couldn't be reached again. */
+export type LiveFailure = 'sign_in' | 'testers_only' | 'limit' | 'too_long' | 'idle' | 'bad_request' | 'server' | 'offline';
 
 export type LiveEvent =
   | { type: 'ready'; take: string | null; engine?: string; session?: string; from?: number }
@@ -79,7 +82,7 @@ const RULES: TajweedRule[] = [
   'madd_munfasil', 'madd_muttasil', 'madd_aared', 'madd_lazim', 'madd_dropped', 'qalqalah', 'ghunnah', 'ikhfa',
   'idgham', 'idgham_no_ghunnah', 'iqlab',
 ];
-const FAILURES: LiveFailure[] = ['sign_in', 'testers_only', 'limit', 'too_long', 'idle', 'server'];
+const FAILURES: LiveFailure[] = ['sign_in', 'testers_only', 'limit', 'too_long', 'idle', 'bad_request', 'server'];
 
 const isNum = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x);
 const isWord = (x: unknown): x is number => isNum(x) && Number.isInteger(x) && x >= 0;
@@ -144,6 +147,7 @@ export function parseFinal(raw: unknown): FinalResult | null {
     marks: (r.marks as unknown[]).map(parseMark).filter((m): m is Mark => m != null),
     score: parseScore(r.score),
     kept: typeof r.kept === 'boolean' ? r.kept : undefined,
+    ...(r.why === 'end' || r.why === 'too_long' ? { why: r.why } : {}),
   };
 }
 

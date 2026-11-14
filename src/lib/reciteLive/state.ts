@@ -142,6 +142,15 @@ export function mistakeCount(state: LiveState): number {
   return Object.values(state.marks).filter(countsAsMistake).length;
 }
 
+/**
+ * Whether a mark draws softer (a dotted underline, the word's ink left as it is). Only `likely` marks, and only once the
+ * checker uses both bars in the take: until it sends `clear` marks, every mark is `likely` (Nov 14 2026) and all draw
+ * in full.
+ */
+export function drawsSoft(state: LiveState, mark: Mark): boolean {
+  return mark.sure === 'likely' && Object.values(state.marks).some((m) => m.sure === 'clear');
+}
+
 /** The furthest word reached (the cursor or what's decided). */
 export function furthestWord(state: LiveState): number | null {
   const xs = [state.cursor, state.saidUpTo].filter((x): x is number => x != null);

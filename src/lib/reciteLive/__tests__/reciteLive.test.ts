@@ -19,7 +19,11 @@ import { similarPhrases } from '../similar';
 import { expectedPhrase, findingNote, markPlace, markTitle, recitedLabel, recitedPhrase, slipLine, tajweedLines } from '../describe';
 import { plainText } from '../../passages';
 
-const FIXTURES = ['alafasy.p2.m1.clean', 'alafasy.p2.clean.clean', 'minshawi-murattal.p3.m1.clean', 'rifai.p8.m1.clean', 'abdulbaset-murattal.p2.m1.clean'];
+const FIXTURES = [
+  'alafasy.p2.m1.clean', 'alafasy.p2.clean.clean', 'minshawi-murattal.p3.m1.clean', 'rifai.p8.m1.clean', 'abdulbaset-murattal.p2.m1.clean',
+  // Real transcripts from the service on revisely-dev (Nov 14 2026).
+  'server-live-alafasy.p2.m1', 'server-live-husary.p1.m1.letters',
+];
 const fixture = (name: string): ReplayLog & { planted: unknown[] } => require(`../__fixtures__/${name}.json`);
 
 /** Every event of a fixture, parsed, in time order. */
@@ -90,7 +94,10 @@ describe('the live state', () => {
       const done = events.find((e): e is Extract<LiveEvent, { type: 'done' }> => e.type === 'done')!;
       const s = run(events);
       expect(s.status).toBe('done');
-      expect(marksInOrder(s).map((m) => m.id)).toEqual(done.result.marks.map((m) => m.id).sort((a, b) => parseInt(a, 10) - parseInt(b, 10)));
+      expect(marksInOrder(s).map((m) => m.id).sort()).toEqual(done.result.marks.map((m) => m.id).sort());
+      // In mushaf order.
+      const ws = marksInOrder(s).map((m) => m.w);
+      expect(ws).toEqual([...ws].sort((a, b) => a - b));
       expect(mistakeCount(s)).toBe(done.result.score!.mistakes);
     }
   });
@@ -166,6 +173,22 @@ describe('the live state', () => {
     expect(applyEvent(done, { type: 'error', reason: 'idle' })).toBe(done);
     const live = applyEvent(applyEvent(liveConnecting(), { type: 'mark', mark: mark({ id: 'a' }) }), { type: 'error', reason: 'limit' });
     expect([live.status, live.failure, Object.keys(live.marks)]).toEqual(['failed', 'limit', ['a']]);
+  });
+
+  it('likely marks draw in full until the checker also sends clear ones', () => {
+    const { drawsSoft } = require('../state') as typeof import('../state');
+    let s = applyEvent(liveConnecting(), { type: 'mark', mark: mark({ id: 'a', sure: 'likely' }) });
+    expect(drawsSoft(s, s.marks.a)).toBe(false);
+    s = applyEvent(s, { type: 'mark', mark: mark({ id: 'b', w: SHAY, sure: 'clear' }) });
+    expect([drawsSoft(s, s.marks.a), drawsSoft(s, s.marks.b)]).toEqual([true, false]);
+  });
+
+  it('the real service’s 4-minute take with letters: a word can carry two marks', () => {
+    const s = run(eventsOf('server-live-husary.p1.m1.letters'));
+    const byWord = new Map<number, string[]>();
+    for (const m of marksInOrder(s)) byWord.set(m.w, [...(byWord.get(m.w) ?? []), m.kind]);
+    expect([...byWord.values()].some((kinds) => kinds.length > 1)).toBe(true);
+    expect(marksInOrder(s).find((m) => m.kind === 'harakat')?.slip).toEqual({ expected: 'ُ', heard: 'َ' });
   });
 
   it('Stop waits for the final answer with the live marks still up', () => {
@@ -343,7 +366,7 @@ describe('the card’s words', () => {
 
   it('names the ayah by its surah, and says when a mark is only likely', () => {
     expect(plainText(markPlace(mark({})))).toBe('An-Naml, ayah 23');
-    expect(plainText(markPlace(mark({ sure: 'likely' })))).toBe('An-Naml, ayah 23 · likely');
+    expect(plainText(markPlace(mark({ sure: 'likely' }), true))).toBe('An-Naml, ayah 23 · likely');
   });
 
   it('Expected and Recited: two words either side, the word swapped for what was said', () => {
