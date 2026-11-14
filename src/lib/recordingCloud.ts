@@ -33,6 +33,21 @@ import type { UploadSession } from './recordings';
 
 export const STORAGE_HOST = 'https://firebasestorage.googleapis.com/v0/b';
 export const AUDIO_TYPE = 'audio/mp4';
+
+/** A recording file's type by its extension: the recorder's are .m4a (audio/mp4); a live take's are .wav. */
+export function audioTypeOf(fileName: string): string {
+  const ext = fileName.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase();
+  switch (ext) {
+    case 'wav':
+      return 'audio/wav';
+    case 'aac':
+      return 'audio/aac';
+    case 'caf':
+      return 'audio/x-caf';
+    default:
+      return AUDIO_TYPE;
+  }
+}
 /** A multiple of 256 KB, as the protocol requires of every chunk but the last. */
 export const CHUNK_BYTES = 4 * 1024 * 1024;
 
@@ -241,10 +256,10 @@ export async function uploadSegment(
         'X-Goog-Upload-Protocol': 'resumable',
         'X-Goog-Upload-Command': 'start',
         'X-Goog-Upload-Header-Content-Length': String(sizeBytes),
-        'X-Goog-Upload-Header-Content-Type': AUDIO_TYPE,
+        'X-Goog-Upload-Header-Content-Type': audioTypeOf(fileName),
         'Content-Type': 'application/json; charset=utf-8',
       },
-      body: JSON.stringify({ name: path, contentType: AUDIO_TYPE }),
+      body: JSON.stringify({ name: path, contentType: audioTypeOf(fileName) }),
     });
     const url = header(start.headers, 'X-Goog-Upload-URL');
     if (!start.ok || !url) throw new CloudError(`Backup upload refused (${start.status})`, start.status || 500);

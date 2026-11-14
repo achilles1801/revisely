@@ -961,6 +961,19 @@ export default function SettingsScreen() {
                 />
               </>
             ) : null}
+            <Row
+              icon="mic-outline"
+              label="Save recordings when you recite"
+              subtitle="With your other recordings, in Activity"
+              rightSlot={
+                <SettingSwitch
+                  value={reciteCheckSettings.saveRecording}
+                  onValueChange={(saveRecording) => setReciteCheckSettings(user?.id, { saveRecording })}
+                  accessibilityLabel="Save recordings when you recite"
+                  testID="settings-recite-save"
+                />
+              }
+            />
           </Section>
         ) : null}
 

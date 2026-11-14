@@ -138,6 +138,22 @@ jest.mock('../../../lib/reciteLive/socket', () => ({
   },
 }));
 
+// A take kept as a recording: the file side is lib/reciteLive/takeRecording's own test.
+const mockTake: { started: { day: string; page: number } | null; added: number; finished: number } = { started: null, added: 0, finished: 0 };
+jest.mock('../../../lib/reciteLive/takeRecording', () => ({
+  startTakeRecording: (opts: { day: string; page: number }) => {
+    mockTake.started = opts;
+    return {
+      add: (pcm: Int16Array) => (mockTake.added += pcm.length),
+      pageAt: () => undefined,
+      finish: async () => {
+        mockTake.finished += 1;
+        return { day: opts.day, recordingId: 'rec-1' };
+      },
+    };
+  },
+}));
+
 const words = require('../../../lib/recite/__fixtures__/quranWords').quranWords();
 const A23 = words.verseFirstWord(27, 23);
 const UTIYAT = A23 + 4;
@@ -153,6 +169,9 @@ beforeEach(async () => {
   mockLive.audio = 0;
   mockLive.start = undefined;
   mockMic = null;
+  mockTake.started = null;
+  mockTake.added = 0;
+  mockTake.finished = 0;
   resetReciteCheckSettingsForTests();
   await AsyncStorage.clear();
   const audio = jest.requireMock('expo-audio');
@@ -248,6 +267,44 @@ describe('Recite: following along', () => {
     fireEvent.press(screen.getByTestId('recite-close'));
     expect(screen.queryByTestId('recite-bar')).toBeNull();
     expect(screen.getByTestId('recite-mic')).toBeTruthy();
+  });
+});
+
+describe('a take kept as a recording (Save recordings, on by default)', () => {
+  it('the red dot while it records; Stop keeps it, and once the summary closes: Recording saved · View', async () => {
+    await startTake('recite');
+    await act(async () => mockMic!.onAudio(new Int16Array(16000)));
+    expect(mockTake.started?.page).toBe(379);
+    expect(mockTake.started?.day).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(mockTake.added).toBe(16000);
+    expect(screen.getByTestId('recite-recording')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await flush();
+    expect(mockTake.finished).toBe(1);
+    // Not while the checker still answers, nor over the summary.
+    expect(screen.queryByText('Recording saved')).toBeNull();
+    await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [], score: null } });
+    expect(screen.getByTestId('take-summary')).toBeTruthy();
+    expect(screen.queryByText('Recording saved')).toBeNull();
+    fireEvent.press(screen.getByTestId('take-summary-done'));
+    await flush();
+    expect(screen.getByText('Recording saved')).toBeTruthy();
+    fireEvent.press(screen.getByText('View'));
+    const { navigateToActivityDay } = jest.requireMock('../../../navigation/navigationRef');
+    expect(navigateToActivityDay).toHaveBeenCalledWith(mockTake.started?.day, 'rec-1');
+  });
+
+  it('Save recordings off: nothing is kept and there is no dot', async () => {
+    setReciteCheckSettings('u1', { saveRecording: false });
+    await startTake('recite');
+    await act(async () => mockMic!.onAudio(new Int16Array(16000)));
+    expect(mockTake.started).toBeNull();
+    expect(screen.queryByTestId('recite-recording')).toBeNull();
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [], score: null } });
+    fireEvent.press(screen.getByTestId('take-summary-done'));
+    await flush();
+    expect(screen.queryByText('Recording saved')).toBeNull();
   });
 });
 

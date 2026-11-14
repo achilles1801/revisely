@@ -1,10 +1,8 @@
 import { SAMPLE_RATE } from '../recite/segmenter';
 
-/** A WAV file (16 kHz, mono, 16-bit PCM) of the microphone's chunks, in order. */
-export function encodeWav(chunks: Int16Array[], sampleRate = SAMPLE_RATE): Uint8Array {
-  const samples = chunks.reduce((n, c) => n + c.length, 0);
-  const dataBytes = samples * 2;
-  const out = new Uint8Array(44 + dataBytes);
+/** The 44-byte header of a 16-bit mono PCM WAV file holding `dataBytes` of samples. */
+export function wavHeader(dataBytes: number, sampleRate = SAMPLE_RATE): Uint8Array {
+  const out = new Uint8Array(44);
   const view = new DataView(out.buffer);
   const ascii = (at: number, s: string) => {
     for (let i = 0; i < s.length; i++) out[at + i] = s.charCodeAt(i);
@@ -22,13 +20,30 @@ export function encodeWav(chunks: Int16Array[], sampleRate = SAMPLE_RATE): Uint8
   view.setUint16(34, 16, true); // bits a sample
   ascii(36, 'data');
   view.setUint32(40, dataBytes, true);
-  let at = 44;
+  return out;
+}
+
+/** Samples as little-endian bytes, as a WAV file holds them. */
+export function pcmBytes(chunks: Int16Array[]): Uint8Array {
+  const samples = chunks.reduce((n, c) => n + c.length, 0);
+  const out = new Uint8Array(samples * 2);
+  const view = new DataView(out.buffer);
+  let at = 0;
   for (const c of chunks) {
     for (let i = 0; i < c.length; i++) {
       view.setInt16(at, c[i], true);
       at += 2;
     }
   }
+  return out;
+}
+
+/** A WAV file (16 kHz, mono, 16-bit PCM) of the microphone's chunks, in order. */
+export function encodeWav(chunks: Int16Array[], sampleRate = SAMPLE_RATE): Uint8Array {
+  const data = pcmBytes(chunks);
+  const out = new Uint8Array(44 + data.length);
+  out.set(wavHeader(data.length, sampleRate), 0);
+  out.set(data, 44);
   return out;
 }
 

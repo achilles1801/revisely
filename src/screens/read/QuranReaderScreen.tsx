@@ -248,10 +248,15 @@ export default function QuranReaderScreen() {
   const liveOn = reciteLiveEnabled(user, edition);
   const reciteSettings = useReciteCheckSettings(user?.id);
   const owned = checkOwned(user, reciteSettings);
+  // A take kept as a recording (Save recordings, on by default) is told about once the take is over and its summary
+  // has closed: "Recording saved · View", as after any recording.
+  const [takeSaved, setTakeSaved] = useState<{ day: string; recordingId: string } | null>(null);
   const live = useLiveRecitation({
     settings: reciteSettings,
     currentPage,
     onShowPage: (page) => pagerRef.current?.scrollToPage(page),
+    recordingDay: today ?? null,
+    onRecordingSaved: setTakeSaved,
   });
   const [words, setWords] = useState<QuranWords | null>(getQuranWords());
   useEffect(() => {
@@ -356,15 +361,24 @@ export default function QuranReaderScreen() {
   const cardHasSimilar = useMemo(() => (qw && cardAt ? similarPhrases(qw, cardAt.w).length > 0 : false), [qw, cardAt]);
   // The summary, once a take has its final answer.
   const takeId = live.state.take;
+  const [summaryShown, setSummaryShown] = useState<string | null>(null);
   useEffect(() => {
-    if (live.state.status === 'done' && takeId && summaryFor !== takeId) setSummaryFor(takeId);
+    if (live.state.status === 'done' && takeId && summaryFor !== takeId) {
+      setSummaryFor(takeId);
+      setSummaryShown(takeId);
+    }
     // Only when a take finishes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [live.state.status, takeId]);
-  const [summaryShown, setSummaryShown] = useState<string | null>(null);
+  const takeStatus = live.state.status;
   useEffect(() => {
-    if (summaryFor) setSummaryShown(summaryFor);
-  }, [summaryFor]);
+    if (!takeSaved) return;
+    const takeGoing = takeStatus === 'connecting' || takeStatus === 'listening' || takeStatus === 'checking';
+    const summaryToCome = takeStatus === 'done' && takeId != null && summaryFor !== takeId;
+    if (takeGoing || summaryToCome || summaryShown != null) return;
+    setSavedRecording(takeSaved);
+    setTakeSaved(null);
+  }, [takeSaved, takeStatus, takeId, summaryFor, summaryShown]);
   const pageMarks = useCallback(
     (page: number) => (checkTake && qw ? marksOnPage(live.state, qw, page) : []),
     [checkTake, qw, live.state],
@@ -490,7 +504,7 @@ export default function QuranReaderScreen() {
                 onWholeAyah={showWholeAyah}
                 score={checkTake ? scorePill(live.state, qw, live.startWord) : null}
                 seconds={live.seconds}
-                recording={false}
+                recording={live.recording && live.mic === 'on'}
                 words={barWords(live.state, qw, { check: checkTake, startWord: live.startWord })}
                 status={barStatus}
                 phase={barPhase}

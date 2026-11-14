@@ -13,6 +13,7 @@ import { getQuranWords, loadQuranWords, QuranWords } from '../../lib/recite/qura
 import type { ReciteCheckSettings } from '../../lib/reciteCheck/settings';
 import type { LiveConnect, LiveConnection, StartFrame } from '../../lib/reciteLive/feed';
 import { socketFeed } from '../../lib/reciteLive/socket';
+import { SavedTake, startTakeRecording, TakeRecording } from '../../lib/reciteLive/takeRecording';
 import {
   applyEvent,
   dismissMark,
@@ -75,17 +76,24 @@ export function startFrameFor(page: number, mode: LiveMode, settings: ReciteChec
  * A live take on the reader (Revisely Dev): the microphone streams to the checker's `/live`, and its events become
  * what the page and the bar show (lib/reciteLive/state). The reciter's place turns the page; a page turned by hand
  * tells the checker where to look (`seek`). Leaving the app ends the take. The take's audio stays on the phone for
- * resuming (lib/reciteLive/socket).
+ * resuming (lib/reciteLive/socket). With Save recordings on (the default) and a revision day, the take is also kept as
+ * a reading recording of that day (lib/reciteLive/takeRecording), whatever ends it.
  */
 export function useLiveRecitation({
   settings,
   currentPage,
   onShowPage,
+  recordingDay = null,
+  onRecordingSaved,
   connect = defaultConnect,
 }: {
   settings: ReciteCheckSettings;
   currentPage: number;
   onShowPage: (page: number) => void;
+  /** The revision day a saved recording belongs to (null: nothing is saved). */
+  recordingDay?: string | null;
+  /** A take's recording was saved. */
+  onRecordingSaved?: (saved: SavedTake) => void;
   connect?: LiveConnect;
 }) {
   const [state, setState] = useState<LiveState>(LIVE_IDLE);
@@ -103,15 +111,34 @@ export function useLiveRecitation({
   const onShowPageRef = useRef(onShowPage);
   onShowPageRef.current = onShowPage;
   const [owner] = useState(() => `recite-live-${Math.random().toString(36).slice(2)}`);
+  const recordingRef = useRef<TakeRecording | null>(null);
+  const [recording, setRecording] = useState(false);
+  const onSavedRef = useRef(onRecordingSaved);
+  onSavedRef.current = onRecordingSaved;
+
+  /** The take's recording, kept once the microphone has stopped (on the screen's way out too). */
+  const finishRecording = useCallback(() => {
+    const rec = recordingRef.current;
+    recordingRef.current = null;
+    setRecording(false);
+    if (!rec) return;
+    rec
+      .finish()
+      .then((saved) => {
+        if (saved) onSavedRef.current?.(saved);
+      })
+      .catch((err) => logger.warn('The take’s recording was not saved', err));
+  }, []);
 
   const stopMic = useCallback(async () => {
     const src = source.current;
     source.current = null;
     if (!src) return;
     await src.stop().catch(() => undefined);
+    finishRecording();
     await setAudioMode(false).catch(() => undefined);
     setMic('off');
-  }, []);
+  }, [finishRecording]);
 
   /** Stop: the audio ends, the checker sends its final answer, the live marks stay meanwhile. */
   const stop = useCallback(() => {
@@ -195,10 +222,14 @@ export function useLiveRecitation({
           },
         });
         conn.current = c;
+        recordingRef.current =
+          settings.saveRecording && recordingDay ? startTakeRecording({ day: recordingDay, page: pageRef.current }) : null;
+        setRecording(recordingRef.current != null);
         const handlers = {
           onAudio: (pcm: Int16Array) => {
             if (conn.current !== c) return;
             c.sendAudio(pcm);
+            recordingRef.current?.add(pcm);
             const before = Math.floor(samples.current / SAMPLE_RATE);
             samples.current += pcm.length;
             if (Math.floor(samples.current / SAMPLE_RATE) !== before) setSeconds(Math.floor(samples.current / SAMPLE_RATE));
@@ -225,11 +256,13 @@ export function useLiveRecitation({
         conn.current?.close();
         conn.current = null;
         await stopMic();
+        // The microphone never started: nothing was heard to keep.
+        finishRecording();
         setMic('error');
         setState((s) => (s.status === 'connecting' ? { ...s, status: 'failed', failure: 'server' } : s));
       }
     },
-    [connect, owner, settings, stop, stopMic],
+    [connect, owner, settings, stop, stopMic, recordingDay, finishRecording],
   );
 
   /** "Not a mistake": off the page at once, and told to the checker (a label for the lab). */
@@ -263,6 +296,11 @@ export function useLiveRecitation({
     }
   }, [live, state.cursor, words]);
 
+  // The recording keeps the pages it turned through, as the reader's own recordings do.
+  useEffect(() => {
+    recordingRef.current?.pageAt(currentPage);
+  }, [currentPage]);
+
   // A page turned by hand: tell the checker where to look.
   useEffect(() => {
     if (turningTo.current === currentPage) {
@@ -291,6 +329,8 @@ export function useLiveRecitation({
     /** The running (or last) take's mode; null when idle. */
     mode,
     mic,
+    /** The take is being kept as a recording (Save recordings on). */
+    recording,
     seconds,
     words,
     /** The first word of the take (where the score's pages start). */
