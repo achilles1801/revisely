@@ -117,7 +117,7 @@ def revoice_one(name: str, d: str):
 
 
 @app.function(image=image_m, volumes={'/vol': vol}, gpu='L40S', cpu=8.0,
-              memory=32768, timeout=3600, ephemeral_disk=100 * 1024)
+              memory=32768, timeout=3600)
 def distil_part(args: list, workers: int = 6):
     """The student's training with the teacher beside it (train.py --teacher), up to about 45 minutes a call."""
     _setup()
@@ -174,7 +174,7 @@ def _local_data(args):
 
 
 @app.function(image=image_m, volumes={'/vol': vol}, gpu='L40S', cpu=8.0,
-              memory=32768, timeout=3600, ephemeral_disk=100 * 1024)
+              memory=32768, timeout=3600)
 def teacher_part(args: list):
     """Up to about 45 minutes of the teacher's training (teacher_train.py), then a save to <out>/last.pt."""
     _setup()
