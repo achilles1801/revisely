@@ -15,11 +15,13 @@
   <link rel="stylesheet" href="/assets/site.css">
   <link rel="stylesheet" href="/assets/account.css">
   <script>
-    // The language before the first paint: the switch's choice, else the browser's.
+    // The language before the first paint: ?lang=ar|en, else the switch's choice, else the browser's.
     (function () {
       var d = document.documentElement, l;
       d.classList.remove('no-js');
       try { l = localStorage.getItem('rv.lang'); } catch (e) {}
+      var q = /[?&]lang=(ar|en)\b/.exec(location.search);
+      if (q) { l = q[1]; try { localStorage.setItem('rv.lang', l); } catch (e) {} }
       if (l !== 'ar' && l !== 'en') l = /^ar\b/i.test(navigator.language || '') ? 'ar' : 'en';
       d.lang = l; d.dir = l === 'ar' ? 'rtl' : 'ltr';
     })();

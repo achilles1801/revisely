@@ -16,12 +16,14 @@
   <link rel="stylesheet" href="/assets/site.css">
   <link rel="stylesheet" href="/assets/account.css">
   <script>
-    // Before the first paint: the language (the switch's choice, else the browser's), and whether the app opened
+    // Before the first paint: the language (?lang=ar|en, else the switch's choice, else the browser's), and whether the app opened
     // this page (#c=<code>): then it is bare, with nothing a purchase could follow (App Store 3.1.1).
     (function () {
       var d = document.documentElement, l, c;
       d.classList.remove('no-js');
       try { l = localStorage.getItem('rv.lang'); } catch (e) {}
+      var q = /[?&]lang=(ar|en)\b/.exec(location.search);
+      if (q) { l = q[1]; try { localStorage.setItem('rv.lang', l); } catch (e) {} }
       if (l !== 'ar' && l !== 'en') l = /^ar\b/i.test(navigator.language || '') ? 'ar' : 'en';
       d.lang = l; d.dir = l === 'ar' ? 'rtl' : 'ltr';
       try { c = sessionStorage.getItem('revisely.apply.code'); } catch (e) {}
