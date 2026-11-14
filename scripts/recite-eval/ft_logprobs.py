@@ -28,13 +28,14 @@ def main():
     if 'qdat' in a.sets:
         for m in json.loads((LAB / 'data/qdat/index.json').read_text()):
             jobs.append((LAB / 'data/qdat' / f"{m['id']}.wav", LAB / 'runs/qdat/logprobs' / a.name / f"{m['id']}.npy"))
-    for s, d in (('learners', 'learners-v0'), ('bench', 'bench-v0'), ('short', 'bench-v0-short')):
+    for s, d, run in (('learners', 'learners-v0', 'v0'), ('bench', 'bench-v0', 'v0'), ('short', 'bench-v0-short', 'v0'),
+                      ('record', 'record-v1', 'record-v1')):  # record: volunteers' /record takes (record_run.sh)
         if s in a.sets.split(','):
             for f in sorted((LAB / 'data' / d / 'items').glob('*.json')):
                 if a.only and a.only not in f.name:
                     continue
                 t = json.loads(f.read_text())
-                jobs.append((f.with_suffix('.wav'), LAB / 'runs/v0/logprobs' / a.name / f"{t.get('sha1') or t['id']}.npy"))
+                jobs.append((f.with_suffix('.wav'), LAB / 'runs' / run / 'logprobs' / a.name / f"{t.get('sha1') or t['id']}.npy"))
     done = 0
     for wav, out in jobs:
         if out.exists():
