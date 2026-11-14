@@ -32,6 +32,9 @@
   },
   "vars": {
     "NOINDEX": "1",
+    // Only accounts of the dev project with the custom claim devSite get past the gate (worker/gate.ts); set it
+    // with functions/scripts/set-dev-site.js. /api/* stays open for the Dev app.
+    "DEV_GATE": "1",
     // The dev Firebase project (PLAN §3.C): only its sign-ins are accepted. Until it exists, every
     // /api call answers 401 and the pages still serve.
     "FIREBASE_PROJECT_ID": "revisely-dev",
