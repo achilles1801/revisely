@@ -409,8 +409,12 @@ class Engine:
             judged = tajweed.judge(win, self.ear, SL.ayah(s, a))
         except Exception:
             judged = []
+        # tajweed and nasal places count quran_transcript's words; the app joins two pairs into one word (بَعْدَ مَا,
+        # إِلْ يَاسِينَ), so map them onto the app's
+        qa = self.key.app_index(s, a)
+        to_app = lambda i: qa[i] if i is not None and 0 <= i < len(qa) else i  # noqa: E731
         for j in judged:
-            kind, i = j['kind'], j.get('word')
+            kind, i = j['kind'], to_app(j.get('word'))
             tc = j.get('tcount')
             if kind == 'Normal Madd' and tajweed.madd_dropped(j):
                 flag(i, 'madd_dropped', expected=2)
@@ -442,7 +446,7 @@ class Engine:
             pls, margins = [], []
         for p, m in zip(pls, margins):
             if m > B['nasal'][p['kind']]:
-                flag(text[:p['char']].count(' '), NASAL_RULES[p['kind']])
+                flag(to_app(text[:p['char']].count(' ')), NASAL_RULES[p['kind']])
 
         if st['letters']:
             try:
