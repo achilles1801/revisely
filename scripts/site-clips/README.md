@@ -31,7 +31,7 @@ signed in to the demo account `screenshots@revisely.app`. No real user's data ap
 ## Stills
 
 The Home and revision screens on the page are the approved App Store screenshots
-(`store/screenshots/01-home.png`, `03-revision.png`), not clips: the Home clips (`plan`, `carry`)
+(`store/screenshots/raw/01-home.png`, `03-revision.png`: bare captures, since the 1.0.4 store set has headlines), not clips: the Home clips (`plan`, `carry`)
 showed Home from before 1.0.3 and were taken off the page on 2026-11-07. `python3
 scripts/site-clips/stills.py` writes them to `docs/assets/img/screens/` (half size, WebP and JPEG,
 with the Dynamic Island drawn in like the clips have it) and puts the Home screenshot into the

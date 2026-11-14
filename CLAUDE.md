@@ -963,6 +963,17 @@ app from the home screen to clear the back-link in the status bar.
   seed writes sessions through yesterday in UTC, so in the evening (US time) shift them back a
   day, or Home shows today done. A worktree needs the local `.env` copied in, or the app stops
   at auth/invalid-api-key. PNGs from `simctl io` carry alpha: save them as RGB.
+- 1.0.4 (Nov 13 2026, Majd approved): a headline over each screen (`scripts/store/compose.py`, the
+  accents fan `fan.py`, Play's feature graphic `feature_graphic.py`). App Store: ten slides (Home,
+  Revo, timer and recording, Activity, Insights, translations, memorize, accents, prayer times,
+  widgets), dark for 1, 2 and 4–7. Play: eight from the Android emulator (1080×1920).
+  - The seed now writes dates relative to the day it runs, in America/Chicago (`SCREENSHOT_TZ`;
+    today = Juz 28, `--dry` checks). Run it on the day of the capture, and set the status bar to the
+    real time so the prayer line ("Fajr in 10h 38m") agrees with the clock.
+  - `store/screenshots/raw/` keeps bare captures for the website (`scripts/site-clips/stills.py`).
+  - The app preview (886×1920, 30 s, 0:09.5 poster, silent) and Play's promo come from screen
+    recordings through `scripts/store/video.py` (full bleed, a caption pill, the Dynamic Island
+    painted out). They aren't in git (about 40 MB each) and go up by hand.
 - The recordings are demo audio (a synthesized tone), placed on the simulator: two `.m4a` files and
   an `index.json` entry each (`levels` drawn to look like recitation) in the app's
   `Documents/recordings/<uid>/`, with the app closed. The seed turns the account's recording backup
