@@ -20,6 +20,9 @@ _testers = {}  # uid -> (is a tester, when read)
 TESTER_TTL = 600
 _checks = {}  # uid -> (has Check, when read)
 CHECK_TTL = 60  # a grant (or a revocation) takes effect within a minute
+# The entitlements/{uid} field that unlocks Check (apply-support.md draft 1: `check`; draft 2 may make it `premium`,
+# with Check one Premium feature). Same shape either way: present, and `until` null or later.
+ENTITLEMENT = os.environ.get('ENTITLEMENT', 'check')
 
 
 class Refused(Exception):
@@ -71,27 +74,27 @@ def is_tester(uid):
 
 
 def has_check(uid, now=None):
-    """Whether the account may use Check (apply-support.md): entitlements/{uid}.check exists and its `until` is null
-    or later than now. Written only by the admin SDK (an approved application, a dev grant, later a purchase); any
+    """Whether the account may use Check (apply-support.md): entitlements/{uid}.<ENTITLEMENT> exists and its `until`
+    is null or later than now. Written only by the admin SDK (an approved application, a dev grant, later a purchase); any
     source counts. Read with the service's own identity, as previewTester is."""
     hit = _checks.get(uid)
     t = time.time() if now is None else now
     if hit and t - hit[1] < CHECK_TTL:
         return hit[0]
     url = (f'https://firestore.googleapis.com/v1/projects/{PROJECT}/databases/(default)/documents/entitlements/{uid}'
-           '?mask.fieldPaths=check')
+           f'?mask.fieldPaths={ENTITLEMENT}')
     r = requests.get(url, headers={'Authorization': f'Bearer {token()}'}, timeout=10)
     if r.status_code == 404:
         ok = False
     else:
         r.raise_for_status()
-        ok = check_open(r.json().get('fields', {}).get('check'), t)
+        ok = check_open(r.json().get('fields', {}).get(ENTITLEMENT), t)
     _checks[uid] = (ok, t)
     return ok
 
 
 def check_open(field, now):
-    """A Firestore REST `check` map: present, and `until` absent, null or after now."""
+    """A Firestore REST entitlement map: present, and `until` absent, null or after now."""
     if not field or 'mapValue' not in field:
         return False
     until = field['mapValue'].get('fields', {}).get('until')
