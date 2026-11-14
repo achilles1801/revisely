@@ -25,6 +25,8 @@ export interface Mark {
   heardExact?: boolean;
   /** The character range in the word's Uthmani text the slip or rule is on. */
   at?: [number, number];
+  /** Harakat and letter slips: the letter or haraka expected and the one heard. */
+  slip?: { expected: string; heard: string };
   rule?: TajweedRule;
   /** Madds: the counts heard and the counts set. */
   got?: number;
@@ -104,6 +106,10 @@ export function parseMark(raw: unknown): Mark | null {
   }
   const at = pair(m.at);
   if (at && at[0] >= 0 && at[1] > at[0]) mark.at = at;
+  const slip = m.slip as Record<string, unknown> | undefined;
+  if (slip && typeof slip === 'object' && typeof slip.expected === 'string' && typeof slip.heard === 'string') {
+    mark.slip = { expected: slip.expected, heard: slip.heard };
+  }
   if (RULES.includes(m.rule as TajweedRule)) mark.rule = m.rule as TajweedRule;
   if (mark.kind === 'tajweed' && !mark.rule) return null;
   if (isNum(m.got)) mark.got = m.got;

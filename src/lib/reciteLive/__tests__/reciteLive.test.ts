@@ -16,7 +16,7 @@ import { replayFeed, ReplayLog } from '../feed';
 import { formatAccuracy, mistakesLabel, pageAccuracy, scoreLevel, wordsOnPagesReached } from '../score';
 import { ayahBand, cursorBox, markAt, markShape, wordBox } from '../geometry';
 import { similarPhrases } from '../similar';
-import { expectedPhrase, findingNote, markPlace, markTitle, recitedLabel, recitedPhrase, tajweedLines } from '../describe';
+import { expectedPhrase, findingNote, markPlace, markTitle, recitedLabel, recitedPhrase, slipLine, tajweedLines } from '../describe';
 import { plainText } from '../../passages';
 
 const FIXTURES = ['alafasy.p2.m1.clean', 'alafasy.p2.clean.clean', 'minshawi-murattal.p3.m1.clean', 'rifai.p8.m1.clean', 'abdulbaset-murattal.p2.m1.clean'];
@@ -369,6 +369,21 @@ describe('the card’s words', () => {
   it('no Recited row without heard text, nor for tajweed', () => {
     expect(recitedPhrase(words, mark({}))).toBeNull();
     expect(recitedPhrase(words, mark({ kind: 'tajweed', rule: 'ghunnah' }))).toBeNull();
+  });
+
+  it('a harakat or letter slip: the exact word, or the sounds “as heard”, and which letter or haraka', () => {
+    // Until the letters judge maps its position back to the written word, the heard word is spelt from the sounds.
+    const approx = parseMark({ id: 'h', w: SHAY, ayah: [27, 23], kind: 'harakat', heard: 'شيون', heardExact: false, slip: { expected: 'ٍ', heard: 'ٌّ' }, sure: 'clear' })!;
+    expect(recitedLabel(approx)).toBe('As heard');
+    expect(approx.slip).toEqual({ expected: 'ٍ', heard: 'ٌّ' });
+    // A haraka alone sits on a tatweel; each side is an isolate after the Latin.
+    expect(slipLine(approx)).toBe('\u2068\u0640ٌّ\u2069 heard for \u2068\u0640ٍ\u2069');
+    const exact = mark({ kind: 'letter', heard: 'شَيٌّ', heardExact: true, slip: { expected: 'ء', heard: 'ي' } });
+    expect(recitedLabel(exact)).toBe('Recited');
+    expect(slipLine(exact)).toBe('\u2068ي\u2069 heard for \u2068ء\u2069');
+    expect(slipLine(mark({ kind: 'letter', slip: { expected: 'ء', heard: '' } }))).toBe('\u2068ء\u2069 not heard');
+    expect(slipLine(mark({ kind: 'word', slip: { expected: 'ء', heard: 'ي' } }))).toBeNull();
+    expect(parseMark({ id: 'x', w: 1, ayah: [1, 1], kind: 'letter', slip: { expected: 3 }, sure: 'clear' })!.slip).toBeUndefined();
   });
 
   it('tajweed lines and the summary’s notes', () => {

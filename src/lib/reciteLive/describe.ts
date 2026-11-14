@@ -34,6 +34,19 @@ export function markPlace(mark: Mark): string {
 /** The label of the Recited row: what was heard spelt out isn't exact. */
 export const recitedLabel = (mark: Mark) => (mark.heardExact === false ? 'As heard' : 'Recited');
 
+/**
+ * A harakat or letter slip in a line, Latin first and the Arabic in isolates: "ي heard for ء". A haraka alone is shown
+ * on a tatweel (ـَ) so it has something to sit on. Null when the checker didn't say which.
+ */
+export function slipLine(mark: Mark): string | null {
+  if (!mark.slip || (mark.kind !== 'harakat' && mark.kind !== 'letter')) return null;
+  const iso = (s: string) => `\u2068${/^[\u064B-\u0652\u0670]+$/.test(s) ? `\u0640${s}` : s}\u2069`;
+  const { expected, heard } = mark.slip;
+  if (!heard) return `${iso(expected)} not heard`;
+  if (!expected) return `${iso(heard)} added`;
+  return `${iso(heard)} heard for ${iso(expected)}`;
+}
+
 /** For a tajweed note: what was heard, and the setting. */
 export function tajweedLines(mark: Mark): { main: string; sub: string | null } {
   const counts = (n: number) => `${Math.round(n)} ${Math.round(n) === 1 ? 'count' : 'counts'}`;
