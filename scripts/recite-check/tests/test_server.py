@@ -253,7 +253,7 @@ class LiveTests(Base):
             self.assertEqual(FakeSession.made[0].args, (1, 1, None, None, {'mon': 5, 'mot': 4, 'aar': 2,
                                                                            'letters': '1', 'tajweed': '1'}))
             self.assertFalse(FakeSession.made[0].follow)
-            self.assertTrue(FakeSession.made[0].defer)  # Strict's second model never holds up the cursor
+            self.assertTrue(FakeSession.made[0].defer)  # each ayah judged off the hop: never holds up the cursor
             for _ in range(10):
                 ws.send_bytes(b'\1\0' * 1600)  # 100 ms chunks, as micSource sends them
             self.assertEqual(ws.receive_json()['type'], 'at')

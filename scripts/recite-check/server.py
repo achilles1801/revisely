@@ -287,7 +287,7 @@ async def open_session(msg, uid):
     passage = passage_of(*(int_or_none(msg, k) for k in ('s', 'a', 's2', 'a2')))
     settings = settings_from(msg)
     follow = follow_of(msg)
-    # defer: Strict's second model runs off the hop, so it never holds up the cursor (live.py, _v5_submit)
+    # defer: each ayah's letters and tajweed are judged off the hop, so they never hold up the cursor (live.py)
     sess = await asyncio.to_thread(live.LiveSession, ENGINE['e'], *passage, settings, follow, defer=True)
     sid = rid if isinstance(rid, str) and store.TAKE.match(rid) else store.new_take()
     request = dict(zip(('s', 'a', 's2', 'a2'), passage), settings=settings, follow=follow)

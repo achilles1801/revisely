@@ -278,10 +278,19 @@ class Bench(unittest.TestCase):
             self.assertFalse(sess.v5)
             self.assertTrue(all(n is None for n in seen))
 
-    def test_strict_with_defer_never_holds_up_the_cursor(self):
-        """The server's setting: the second model's ayat are worked out on their own thread and come out V5_DUE
-        seconds of audio after the ayah. The same events for any chunk size and however long the thread takes (held
-        back, the chunks are still answered); the same marks, ayat, cursor and `done` as in the hop."""
+    def test_with_defer_judging_an_ayah_never_holds_up_the_cursor(self):
+        """The server's setting, at both levels: each ayah's letters and tajweed are worked out on their own thread and
+        come out AYAH_DUE seconds of audio after the ayah. The same events for any chunk size and however long the
+        thread takes (held back, the chunks are still answered); the same marks, ayat, cursor and `done` as in the
+        hop."""
+        import live
+        self.deferred({})  # Strict, with a second model
+        self.deferred({'tajweed': '0', 'letters': '1'})  # words and harakat
+        E = engine()
+        self.assertFalse(live.LiveSession(E, 1, 1, 1, 7, {'tajweed': '0'}, defer=True).defer)  # words only: nothing
+        self.assertFalse(live.LiveSession(E, 1, 1, 1, 7, {}, follow=True, defer=True).defer)
+
+    def deferred(self, settings):
         import threading
         import time
         import live
@@ -295,21 +304,22 @@ class Bench(unittest.TestCase):
             return real(lp, s, a, statuses, spans, st)
         pcm, end = bench_pcm(), [{'type': 'end'}]
         msgs = chunks(pcm, 3200)
+        session = lambda **kw: live.LiveSession(E, 1, 1, 1, 7, settings, **kw)
         with unittest.mock.patch.object(E, 'ayah_notes', notes), unittest.mock.patch.object(E, 'ear2', object(),
                                                                                              create=True):
             go.set()
-            hop = run(live.LiveSession(E, 1, 1, 1, 7, {}), msgs + end)
-            threads.clear()
-            want = run(live.LiveSession(E, 1, 1, 1, 7, {}, defer=True), msgs + end)
-            self.assertEqual(run(live.LiveSession(E, 1, 1, 1, 7, {}, defer=True), chunks(pcm, 50000) + end), want)
+            hop = run(session(), msgs + end)
+            want = run(session(defer=True), msgs + end)
+            self.assertEqual(run(session(defer=True), chunks(pcm, 50000) + end), want)
             go.clear()
             threads.clear()
-            sess = live.LiveSession(E, 1, 1, 1, 7, {}, defer=True)
+            sess = session(defer=True)
+            self.assertTrue(sess.defer)
             ev, i = [], 0
             while not sess._pending:  # up to the first ayah handed over, which then can't finish
                 ev += run(sess, [msgs[i]])
                 i += 1
-            for _ in range(int(live.V5_DUE / 0.1) - 5):  # the chunks go on being answered until it is due
+            for _ in range(int(live.AYAH_DUE / 0.1) - 5):  # the chunks go on being answered until it is due
                 ev += run(sess, [msgs[i]])
                 i += 1
             self.assertTrue(sess._pending)
@@ -318,7 +328,7 @@ class Bench(unittest.TestCase):
                     break
                 time.sleep(0.01)
             # while reciting only the background thread judges ayat (`done` may judge again, on this one)
-            self.assertTrue(threads and all(t.startswith('v5') for t in threads), threads)
+            self.assertTrue(threads and all(t.startswith('ayah') for t in threads), threads)
             go.set()
             ev += run(sess, msgs[i:] + end)
             self.assertEqual(ev, want)
@@ -330,8 +340,7 @@ class Bench(unittest.TestCase):
         self.assertEqual(want[-1], hop[-1])
         late = [x['t'] - y['t'] for x, y in zip([e for e in want if e['type'] == 'ayah'],
                                                 [e for e in hop if e['type'] == 'ayah'])]
-        self.assertTrue(late and all(0 <= d <= live.V5_DUE + live.LIVE['hop'] for d in late), late)
-        self.assertEqual(live.LiveSession(E, 1, 1, 1, 7, {'tajweed': '0'}, defer=True).defer, False)
+        self.assertTrue(late and all(0 <= d <= live.AYAH_DUE + live.LIVE['hop'] for d in late), late)
 
     def test_same_events_for_any_chunk_size(self):
         pcm = bench_pcm()[: 16000 * 2 * 20]
@@ -362,11 +371,11 @@ class Bench(unittest.TestCase):
 
 
 class Background(unittest.TestCase):
-    def test_the_second_model_starts_only_once_the_chunk_is_answered(self):
+    def test_an_ayah_is_judged_only_once_the_chunk_is_answered(self):
         import threading
         import live
         idle, ran = threading.Event(), threading.Event()
-        fut = live._v5_submit(idle, lambda x: ran.set() or x * 2, 21)
+        fut = live._ayah_submit(idle, lambda x: ran.set() or x * 2, 21)
         self.assertFalse(ran.wait(0.2))  # the session is still working on its chunk
         idle.set()
         got, ms = fut.result(5)

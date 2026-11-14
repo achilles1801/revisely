@@ -53,18 +53,20 @@ SETTLE = 3.0        # seconds a seam must be behind the newest final frame: the 
 NEG = checker.Decoder.NEG
 _pool = None
 
-# Strict's second model (v5) takes about 1 s of CPU an ayah. Run inside the hop, it held up the cursor on one vCPU
-# (p90 1.9 s, worst 4 s, Nov 14 2026). With `defer` (the server's setting) its ayat are judged on one background
-# thread at the lowest priority (Linux), each started only once the chunk that finished its ayah has been answered,
-# and the ayah's marks and `ayah` event come out at the first hop V5_DUE seconds of audio later (waiting for the
-# thread only if it is late, as a fast replay is), or in `done`. So the cursor doesn't wait for it, and the events
-# still depend only on the audio and where each control came: any chunk size, or a resume, gives the same.
-V5_DUE = 3.0
-_v5_pool = None
-_v5_pool_lock = threading.Lock()
+# Each ayah's letters and tajweed (Engine.ayah_notes) are judged once all its words are decided: the released model's
+# rules and letters (up to ~1 s on Cloud Run's vCPU) and, in Strict, the second model (v5, about 1 s more). Run inside
+# the hop, they held up the cursor on one vCPU (Strict: p90 1.9 s, worst 4 s, Nov 14 2026). With `defer` (the
+# server's setting) an ayah is judged on one background thread at the lowest priority (Linux), started only once the
+# chunk that finished it has been answered, and its marks and `ayah` event come out at the first hop AYAH_DUE seconds
+# of audio later (waiting for the thread only if it is late, as a fast replay is), or in `done`. The hop is left with
+# the model and the decoder; the events still depend only on the audio and where each control came, so any chunk size,
+# or a resume, gives the same.
+AYAH_DUE = 3.0
+_ayah_pool = None
+_ayah_pool_lock = threading.Lock()
 
 
-def _v5_lowest_priority():
+def _ayah_lowest_priority():
     if sys.platform.startswith('linux'):  # elsewhere a thread id isn't a valid target for setpriority
         try:
             os.setpriority(os.PRIO_PROCESS, threading.get_native_id(), 19)
@@ -72,15 +74,15 @@ def _v5_lowest_priority():
             pass
 
 
-def _v5_submit(idle, fn, *args, **kw):
-    global _v5_pool
-    with _v5_pool_lock:
-        if _v5_pool is None:
-            _v5_pool = concurrent.futures.ThreadPoolExecutor(1, 'v5', initializer=_v5_lowest_priority)
-    return _v5_pool.submit(_v5_job, idle, fn, *args, **kw)
+def _ayah_submit(idle, fn, *args, **kw):
+    global _ayah_pool
+    with _ayah_pool_lock:
+        if _ayah_pool is None:
+            _ayah_pool = concurrent.futures.ThreadPoolExecutor(1, 'ayah', initializer=_ayah_lowest_priority)
+    return _ayah_pool.submit(_ayah_job, idle, fn, *args, **kw)
 
 
-def _v5_job(idle, fn, *args, **kw):
+def _ayah_job(idle, fn, *args, **kw):
     idle.wait(5.0)  # the chunk that finished the ayah sends its cursor first
     t0 = time.perf_counter()
     got = fn(*args, **kw)
@@ -445,7 +447,8 @@ class LiveSession:
         # Strict on the second model (v5, #539): ayah_notes takes the take's samples when the engine has it
         self.v5 = self.st.get('tajweed', True) and getattr(E, 'ear2', None) is not None \
             and 'audio' in inspect.signature(E.ayah_notes).parameters
-        self.defer = bool(defer) and self.v5 and not self.follow  # the second model off the hop (see _v5_submit)
+        # defer: each ayah's letters and tajweed off the hop (see _ayah_submit); nothing to judge per ayah, nothing to defer
+        self.defer = bool(defer) and not self.follow and (self.st['letters'] or self.st.get('tajweed', True))
         self._pending = []               # (notes key, s, a, future, due) of ayat judged in the background, in order
         self._idle = threading.Event()   # set while the session isn't working on a chunk (see _working)
         self._idle.set()
@@ -937,16 +940,16 @@ class LiveSession:
                 spans.get(first + n - 1, (None, None))[1])
 
     def _notes_later(self, s, a, now):
-        """Strict with `defer`: this ayah's notes on the background thread, unless already worked out. True when they
-        were handed over (its marks and `ayah` event then come from _due, V5_DUE later). The frames and samples
-        before T and n are never written again, so the thread reads them as they are; the statuses and spans go as
-        copies."""
+        """With `defer`: this ayah's notes on the background thread, unless already worked out. True when they were
+        handed over (its marks and `ayah` event then come from _due, AYAH_DUE later). The frames and samples before T
+        and n are never written again, so the thread reads them as they are; the statuses and spans go as copies."""
         key = self._notes_key(s, a, self.status, self.spans)
         if key in self._notes_cache:
             return False
-        fut = _v5_submit(self._idle, self.E.ayah_notes, self.lp[:self.T], s, a, dict(self.status), dict(self.spans),
-                         self.st, audio=self.xf[:self.n])
-        self._pending.append((key, s, a, fut, now + V5_DUE))
+        kw = {'audio': self.xf[:self.n]} if self.v5 else {}
+        fut = _ayah_submit(self._idle, self.E.ayah_notes, self.lp[:self.T], s, a, dict(self.status), dict(self.spans),
+                           self.st, **kw)
+        self._pending.append((key, s, a, fut, now + AYAH_DUE))
         return True
 
     def _due(self, now, every=False):
