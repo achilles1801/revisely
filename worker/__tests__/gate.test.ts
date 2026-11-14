@@ -96,6 +96,19 @@ describe('the dev site gate', () => {
     expect((await gate(page('/__gate/session'), ENV, deps))?.status).toBe(405);
   });
 
+  it('many requests at once on a new isolate all get in: they wait for the one fetch of Google’s keys', async () => {
+    let calls = 0;
+    const slowKeys = (async (input: RequestInfo | URL) => {
+      calls++;
+      await new Promise((r) => setTimeout(r, 30));
+      return keys(input);
+    }) as typeof fetch;
+    const t = await token({ [GATE_CLAIM]: true });
+    const results = await Promise.all(['/', '/assets/site.css', '/assets/site-i18n.js', '/assets/apply.js', '/premium/'].map((p) => gate(page(p, t), ENV, { now: NOW, fetch: slowKeys })));
+    expect(results).toEqual([null, null, null, null, null]);
+    expect(calls).toBe(1);
+  });
+
   it('signing out clears the cookie', async () => {
     const res = await gate(post('/__gate/signout', {}), ENV, deps);
     expect(res?.status).toBe(204);

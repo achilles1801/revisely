@@ -22,11 +22,14 @@ export class AuthError extends Error {}
 
 let keys: { byKid: Map<string, CryptoKey>; expires: number } | null = null;
 let lastFetch = -Infinity;
+/** The fetch of Google's keys under way, which every check that needs them waits for. */
+let inflight: Promise<void> | null = null;
 
 /** For tests: forget the cached keys. */
 export function resetKeyCache(): void {
   keys = null;
   lastFetch = -Infinity;
+  inflight = null;
 }
 
 async function fetchKeys(now: number, fetchImpl: typeof fetch): Promise<void> {
@@ -58,13 +61,22 @@ async function signingKey(kid: string, now: number, fetchImpl: typeof fetch): Pr
   // Google rotates keys: an unknown kid refetches too. Either way at most once a
   // minute, so tokens with made-up kids can't make every request fetch.
   const wanted = stale || !keys!.byKid.has(kid);
-  if (wanted && now - lastFetch >= REFETCH_AFTER) {
-    try {
-      await fetchKeys(now, fetchImpl);
-    } catch (err) {
-      // Keep using the keys we have (Google publishes them well ahead of use).
-      if (!keys) throw err;
-      console.warn('auth: could not refresh Google keys; using the previous ones', err);
+  if (wanted) {
+    // Many requests at once on a new isolate (a page's files, right after the dev site's gate lets someone in):
+    // one fetches the keys and the others wait for it. Before, they found no keys yet and failed with a 500.
+    if (!inflight && now - lastFetch >= REFETCH_AFTER) {
+      inflight = fetchKeys(now, fetchImpl).finally(() => {
+        inflight = null;
+      });
+    }
+    if (inflight) {
+      try {
+        await inflight;
+      } catch (err) {
+        // Keep using the keys we have (Google publishes them well ahead of use).
+        if (!keys) throw err;
+        console.warn('auth: could not refresh Google keys; using the previous ones', err);
+      }
     }
   }
   if (!keys) throw new Error('Google keys: unavailable');
