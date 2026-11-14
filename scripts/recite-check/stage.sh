@@ -24,6 +24,14 @@ cp "$M/onnx/model-int8.onnx" "$STAGE/lab/models/hisnlabs-tajweed-v2/onnx/"
 cp "$LAB/cache/lexicon.json" "$STAGE/lab/cache/"
 cp "$LAB/data/tanzil_uthmani.json" "$STAGE/lab/data/"
 LAB=$LAB RECITE_HARNESS=$H "$PY" -I "$HERE/make_bars.py" "$STAGE/lab/bars.json" > /dev/null
+# the strict level's second ear: v5 for qalqalah, lazim madd and the nasal places (export_onnx.py in the lab), with its
+# own bars. Without it the service judges every rule on the released model.
+V5=$LAB/models/ft-v5-onnx/model-int8.onnx
+if [ -f "$V5" ]; then
+  mkdir -p "$STAGE/lab/models/tajweed-v5"
+  cp "$V5" "$STAGE/lab/models/tajweed-v5/"
+  LAB=$LAB RECITE_HARNESS=$H "$PY" -I "$HERE/make_bars.py" "$STAGE/lab/bars.v5.json" v5 > /dev/null
+fi
 cp "$HERE"/{server.py,engine.py,live.py,auth.py,store.py,make_words.py,requirements.txt,Dockerfile} "$STAGE/"
 rm -rf "$STAGE/tests" && mkdir -p "$STAGE/tests" && cp "$HERE"/tests/*.py "$STAGE/tests/"
 git -C "$REPO" rev-parse "$HARNESS_COMMIT" > "$STAGE/CHECKER_COMMIT"

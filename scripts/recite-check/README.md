@@ -24,7 +24,15 @@ every other account.
 - **Strict:** `letters=1&tajweed=1`. The same, plus tajweed: madd lengths against the reciter's settings,
   qalqalah, ghunnah, ikhfa, idgham, iqlab.
 
-`tajweed` is on unless `tajweed=0`, so the build that sends neither keeps today's answers. On Majd's head-to-head
+`tajweed` is on unless `tajweed=0`, so the build that sends neither keeps today's answers.
+
+**Strict uses two models.** Words, letters, ghunnah, ikhfa and the madd lengths are judged on the released model.
+Qalqalah, a lazim madd and the nasal places (idgham, idgham without ghunnah, iqlab) are judged on v5, the lab's
+fine-tune, with its own bars (`bars.v5.json`). In the lab, v5 caught idgham, idgham without ghunnah and iqlab 97%,
+85% and 98% of the time (the released model 85%, 47% and 66%); it flagged 1% of correct learners' qalqalah (7%) and
+judged no lazim madd short in loud babble (14%). It's worse at words, letters, ghunnah and ikhfa, which stay on the
+released model. `stage.sh` adds v5 from the lab (`models/ft-v5-onnx`, written by `export_onnx.py`); without it, every
+rule is judged on the released model. v5 runs on each judged ayah's audio only: +0.6 s for 112 s of audio. On Majd's head-to-head
 take (2:38–43): words and harakat gave his five slips and nothing else; strict added one idgham note.
 
 ## What it judges
