@@ -41,6 +41,12 @@ RESUME_TTL = 120      # seconds a dropped session waits on this instance for its
 # "follow" need entitlements/{uid}.premium (auth.has_check); Recite (follow) stays free. Off until a dev account has it.
 CHECK_GATE = os.environ.get('CHECK_GATE', 'off') == 'on'
 LOCKED = 'premium_required'  # the refusal without Premium (agreed with apply-support and recite-ui; was check_locked)
+# A live take with no end (no s2/a2, as the app sends it) follows the reciter to the end of the Qur'an, and the reciter
+# decides where to stop (`end`): with the surah's end, the follow stopped there, so a take running on into the next
+# surah (An-Naba into An-Nazi'at) lost its cursor. A passage costs nothing until it is reached (live.py works 96 words
+# at a time), and the checker takes the basmala before a surah inside the passage as a filler. /check (record, then
+# check) keeps the surah as its default: it aligns the whole recording to the passage at once.
+LAST_AYAH = (114, 6)
 MARK_ID = re.compile(r'^\d{1,6}:(word|letter|tajweed):[a-z_]{1,24}$')
 log = logging.getLogger('recite-check')
 logging.basicConfig(level=logging.INFO)
@@ -287,10 +293,13 @@ async def open_session(msg, uid):
     passage = passage_of(*(int_or_none(msg, k) for k in ('s', 'a', 's2', 'a2')))
     settings = settings_from(msg)
     follow = follow_of(msg)
+    open_end = passage[2] is None
+    run = passage[:2] + LAST_AYAH if open_end else passage
     # defer: each ayah's letters and tajweed are judged off the hop, so they never hold up the cursor (live.py)
-    sess = await asyncio.to_thread(live.LiveSession, ENGINE['e'], *passage, settings, follow, defer=True)
+    sess = await asyncio.to_thread(live.LiveSession, ENGINE['e'], *run, settings, follow, defer=True,
+                                   open_end=open_end)
     sid = rid if isinstance(rid, str) and store.TAKE.match(rid) else store.new_take()
-    request = dict(zip(('s', 'a', 's2', 'a2'), passage), settings=settings, follow=follow)
+    request = dict(zip(('s', 'a', 's2', 'a2'), passage), settings=settings, follow=follow, open=open_end)
     s = Live(sid, uid, sess, msg.get('keep') is True, request, msg.get('app') if isinstance(msg.get('app'), str)
              else None)
     SESSIONS[sid] = s

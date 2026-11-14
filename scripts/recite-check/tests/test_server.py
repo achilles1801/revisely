@@ -59,9 +59,9 @@ class FakeSession:
 
     made = []
 
-    def __init__(self, engine, s, a, s2, a2, settings, follow=False, defer=False):
+    def __init__(self, engine, s, a, s2, a2, settings, follow=False, defer=False, open_end=False):
         self.args = (s, a, s2, a2, settings)
-        self.follow, self.defer = follow, defer
+        self.follow, self.defer, self.open_end = follow, defer, open_end
         self.hints = []
         self.n = 0
         self.stopped = False
@@ -250,8 +250,8 @@ class LiveTests(Base):
             ready = ws.receive_json()
             self.assertEqual((ready['type'], ready['from'], ready['v'], ready['protocol']), ('ready', 0, 2, 5))
             self.assertTrue(store.TAKE.match(ready['take']))
-            self.assertEqual(FakeSession.made[0].args, (1, 1, None, None, {'mon': 5, 'mot': 4, 'aar': 2,
-                                                                           'letters': '1', 'tajweed': '1'}))
+            self.assertEqual(FakeSession.made[0].args, (1, 1, 114, 6, {'mon': 5, 'mot': 4, 'aar': 2,
+                                                                       'letters': '1', 'tajweed': '1'}))
             self.assertFalse(FakeSession.made[0].follow)
             self.assertTrue(FakeSession.made[0].defer)  # each ayah judged off the hop: never holds up the cursor
             for _ in range(10):
@@ -275,6 +275,25 @@ class LiveTests(Base):
         self.assertEqual(kept['dismissed'], ['101:skipped:'])
         self.assertEqual(kept['mode'], 'live')
         self.assertNotIn(ready['take'], server.SESSIONS)
+
+    def test_a_take_with_no_end_follows_to_the_end_of_the_quran(self):
+        """No s2/a2 (as the app sends it): the session runs to 114:6, so the follow carries on into the next surah;
+        the kept request says what was asked. An end the phone gives is kept as given."""
+        with self.socket() as ws:
+            ws.send_text(start(s=78, a=1, keep=True))
+            ready = ws.receive_json()
+            ws.send_bytes(second_of_audio())
+            ws.send_text(json.dumps({'type': 'end'}))
+            while ws.receive_json()['type'] != 'done':
+                pass
+        self.assertEqual((FakeSession.made[0].args[:4], FakeSession.made[0].open_end), ((78, 1, 114, 6), True))
+        kept = json.loads(self.stored[f"recite-tests/tester1/{ready['take']}.json"])
+        self.assertEqual((kept['request']['s2'], kept['request']['a2'], kept['request']['open']), (None, None, True))
+        FakeSession.made = []
+        with self.socket() as ws:
+            ws.send_text(start(s=78, a=1, s2=78, a2=40))
+            ws.receive_json()
+        self.assertEqual((FakeSession.made[0].args[:4], FakeSession.made[0].open_end), ((78, 1, 78, 40), False))
 
     def test_recite_mode_and_the_tajweed_switch_reach_the_session(self):
         for extra, follow, tajweed in (({'mode': 'recite'}, True, '1'), ({'follow': True}, True, '1'),
