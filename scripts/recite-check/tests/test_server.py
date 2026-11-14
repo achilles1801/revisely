@@ -404,8 +404,8 @@ class LiveTests(Base):
 
 
 class CheckGateTests(Base):
-    """Check is paid (apply-support.md): with the gate on, /check and /live without follow need the entitlement;
-    Recite (follow) doesn't. tester1 has Check, tester2 doesn't."""
+    """Check is a Premium feature (apply-support.md): with the gate on, /check and /live without follow need Premium;
+    Recite (follow) doesn't. tester1 has Premium, tester2 doesn't."""
 
     def test_off_by_default(self):
         self.assertFalse(server.CHECK_GATE)
@@ -415,7 +415,7 @@ class CheckGateTests(Base):
     def test_check_needs_the_entitlement(self):
         with mock.patch.object(server, 'CHECK_GATE', True):
             r = self.client.post('/check?s=1&a=1', content=wav(), headers={'Authorization': 'Bearer other'})
-            self.assertEqual((r.status_code, r.json()), (403, {'error': 'check_locked'}))
+            self.assertEqual((r.status_code, r.json()), (403, {'error': 'premium_required'}))
             r = self.client.post('/check?s=1&a=1', content=wav(), headers={'Authorization': 'Bearer good'})
             self.assertEqual(r.status_code, 200)
 
@@ -423,7 +423,7 @@ class CheckGateTests(Base):
         with mock.patch.object(server, 'CHECK_GATE', True):
             with self.client.websocket_connect('/live') as ws:
                 ws.send_text(start(token='other'))
-                self.assertEqual(ws.receive_json(), {'type': 'error', 'reason': 'check_locked'})
+                self.assertEqual(ws.receive_json(), {'type': 'error', 'reason': 'premium_required'})
             for extra in ({'follow': True}, {'mode': 'recite'}):
                 with self.client.websocket_connect('/live') as ws:
                     ws.send_text(start(token='other', **extra))
@@ -434,7 +434,7 @@ class CheckGateTests(Base):
 
 
 class EntitlementTests(unittest.TestCase):
-    """auth.has_check reads entitlements/{uid}.check over Firestore REST."""
+    """auth.has_check reads entitlements/{uid}.premium over Firestore REST (only `premium`: `grants` is ignored)."""
 
     def ts(self, when):
         import datetime
@@ -461,8 +461,11 @@ class EntitlementTests(unittest.TestCase):
             def raise_for_status(self):
                 if self.status_code >= 400:
                     raise RuntimeError(self.status_code)
-        answers = {'nobody': R(404), 'granted': R(200, {'fields': {'check': {'mapValue': {'fields': {
-            'source': {'stringValue': 'dev'}, 'until': {'nullValue': None}}}}}}), 'empty': R(200, {})}
+        dev = {'mapValue': {'fields': {'source': {'stringValue': 'dev'}, 'until': {'nullValue': None}}}}
+        answers = {'nobody': R(404), 'granted': R(200, {'fields': {'premium': dev, 'grants': {'mapValue': {'fields': {
+            'dev': dev}}}}}), 'empty': R(200, {}),
+            # a grant left in `grants` without `premium` (revoked, or mid-write) doesn't count
+            'grants_only': R(200, {'fields': {'grants': {'mapValue': {'fields': {'dev': dev}}}}})}
         calls = []
 
         def get(url, headers, timeout):
@@ -473,22 +476,23 @@ class EntitlementTests(unittest.TestCase):
             self.assertFalse(auth.has_check('nobody', now=100))
             self.assertTrue(auth.has_check('granted', now=100))
             self.assertFalse(auth.has_check('empty', now=100))
+            self.assertFalse(auth.has_check('grants_only', now=100))
             self.assertTrue(auth.has_check('granted', now=150))  # cached
-            self.assertEqual(len(calls), 3)
-            self.assertTrue(auth.has_check('granted', now=100 + auth.CHECK_TTL + 1))  # read again
             self.assertEqual(len(calls), 4)
-            self.assertIn('mask.fieldPaths=check', calls[0])
+            self.assertTrue(auth.has_check('granted', now=100 + auth.CHECK_TTL + 1))  # read again
+            self.assertEqual(len(calls), 5)
+            self.assertIn('mask.fieldPaths=premium', calls[0])
         auth._checks.clear()
 
     def test_the_field_is_one_setting(self):
-        """If the grant becomes entitlements/{uid}.premium (apply-support draft 2), ENTITLEMENT=premium is all."""
+        """The field is the ENTITLEMENT setting: another name (draft 1's `check`) is a deploy-time change."""
         seen = []
 
         class R:
             status_code = 200
 
             def json(self):
-                return {'fields': {'premium': {'mapValue': {'fields': {'until': {'nullValue': None}}}}}}
+                return {'fields': {'check': {'mapValue': {'fields': {'until': {'nullValue': None}}}}}}
 
             def raise_for_status(self):
                 pass
@@ -497,10 +501,10 @@ class EntitlementTests(unittest.TestCase):
             seen.append(url)
             return R()
         auth._checks.clear()
-        with mock.patch.object(auth, 'ENTITLEMENT', 'premium'), mock.patch.object(auth.requests, 'get', get), \
+        with mock.patch.object(auth, 'ENTITLEMENT', 'check'), mock.patch.object(auth.requests, 'get', get), \
                 mock.patch.object(auth, 'token', lambda: 'x'):
             self.assertTrue(auth.has_check('someone', now=100))
-        self.assertIn('mask.fieldPaths=premium', seen[0])
+        self.assertIn('mask.fieldPaths=check', seen[0])
         auth._checks.clear()
 
 

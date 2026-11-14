@@ -100,7 +100,7 @@ take (`<take>.dismiss-<time>.json`) as a label for the lab.
    on every socket. A session counts against the 40 an hour; resuming doesn't.
 2. The server answers `{"type":"ready","v":2,"engine":"…","server":"…","protocol":5,"take":"<take>","from":0}`.
    `GET /health` says the same `engine` (the checker's commit), `server` (this service's commit) and `protocol` (the
-   contract draft it speaks: 5 = follow, hint, tajweed, check_locked).
+   contract draft it speaks: 5 = follow, hint, tajweed, premium_required).
 3. The phone sends PCM (16-bit little-endian, mono, 16 kHz) as binary frames of any size, and as text frames
    `{"type":"seek","w":…}`, `{"type":"dismiss","id":"…"}`,
    `{"type":"hint","w":…,"what":"word"|"ayah"}` (the hidden view showed a word, or the rest of its ayah: those
@@ -111,12 +111,12 @@ take (`<take>.dismiss-<time>.json`) as a label for the lab.
    and `why`). Every event has `t`, the seconds of the take it was decided at. `error` (`sign_in`, `testers_only`,
    `limit`, `idle`, `bad_request`, `server`) closes the socket.
 
-**Check is paid** (apply-support.md, free through "Apply for support"): with `CHECK_GATE=on`, `/check` and `/live`
-without `follow` need `entitlements/{uid}.check` (present, and `until` null or later), read like `previewTester` and
-cached a minute; without it, 403 / `error` `check_locked`. Recite stays free. `previewTester` still gates everything.
-The gate is off until the entitlements exist on revisely-dev (`--update-env-vars CHECK_GATE=on` turns it on). The field
-read is the `ENTITLEMENT` setting (default `check`; `ENTITLEMENT=premium` if the grant becomes Premium), the reason
-`LOCKED` in server.py.
+**Check is a Premium feature** (apply-support.md draft 2; Premium is free through "Apply for support"): with
+`CHECK_GATE=on`, `/check` and `/live` without `follow` need `entitlements/{uid}.premium` (present, and `until` null or
+later; any `source`; the `grants` map beside it is ignored), read like `previewTester` and cached a minute; without it,
+403 / `error` `premium_required`. Recite stays free. `previewTester` still gates everything. The gate is off until a
+dev account has Premium (`devGrantPremium`); `--update-env-vars CHECK_GATE=on` turns it on. The field read is the
+`ENTITLEMENT` setting (default `premium`), the reason `LOCKED` in server.py.
 
 **Limits.** A take is at most 15 minutes (then `done`, `why: "too_long"`). 30 s without a frame from the phone closes
 the socket (`idle`). uvicorn pings every 10 s, so a phone gone without closing is noticed within 20 s.

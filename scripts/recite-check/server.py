@@ -31,15 +31,15 @@ from engine import BadRequest, Engine
 HERE = pathlib.Path(__file__).resolve().parent
 VERSION = (HERE / 'CHECKER_COMMIT').read_text().strip()[:12] if (HERE / 'CHECKER_COMMIT').exists() else 'local'
 SERVER = (HERE / 'SERVER_COMMIT').read_text().strip()[:12] if (HERE / 'SERVER_COMMIT').exists() else 'local'
-PROTOCOL = 5  # the contract draft this server speaks (recite-contract.md): follow, hint, tajweed, check_locked
+PROTOCOL = 5  # the contract draft this server speaks (recite-contract.md): follow, hint, tajweed, premium_required
 MAX_SECONDS = 240
 FIRST_FRAME = 10      # seconds a new socket has to send its start frame
 IDLE = 30             # seconds without a frame from the phone before a socket is closed
 RESUME_TTL = 120      # seconds a dropped session waits on this instance for its phone to come back
-# Check is paid, with a free path (apply-support.md): with CHECK_GATE=on, /check and /live without "follow" need
-# entitlements/{uid}.check; Recite (follow) stays free. Off until the entitlements exist on revisely-dev.
+# Check is a Premium feature, with a free path (apply-support.md draft 2): with CHECK_GATE=on, /check and /live without
+# "follow" need entitlements/{uid}.premium (auth.has_check); Recite (follow) stays free. Off until a dev account has it.
 CHECK_GATE = os.environ.get('CHECK_GATE', 'off') == 'on'
-LOCKED = 'check_locked'  # the refusal without the entitlement (to agree with apply-support and recite-ui if it moves)
+LOCKED = 'premium_required'  # the refusal without Premium (agreed with apply-support and recite-ui; was check_locked)
 MARK_ID = re.compile(r'^\d{1,6}:(word|letter|tajweed):[a-z_]{1,24}$')
 log = logging.getLogger('recite-check')
 logging.basicConfig(level=logging.INFO)
