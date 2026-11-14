@@ -221,7 +221,8 @@ export function openSignIn({ focusEmail = false } = {}) {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-// The header's account button: an icon signed out, the initial signed in (not on the page the app opens)
+// The header: the account button (an icon signed out, the initial signed in) and the phone menu (its account line,
+// Sign out). Not on the page the app opens.
 
 function initial(user) {
   const s = (user.displayName || user.email || '?').trim();
@@ -232,19 +233,67 @@ export function wireHeader() {
   const html = document.documentElement;
   if (html.classList.contains('from-app')) return;
   const btn = document.querySelector('[data-account-btn]');
-  if (!btn) return;
-  const icon = btn.innerHTML;
-  onUser((user) => {
-    if (user) {
-      btn.removeAttribute('data-t-aria');
-      btn.classList.add('avatar', 'latin');
-      btn.textContent = initial(user);
-      btn.setAttribute('aria-label', RV.t('nav.account'));
-    } else {
-      btn.classList.remove('avatar', 'latin');
-      btn.innerHTML = icon;
-      btn.setAttribute('data-t-aria', 'nav.signin');
-      btn.setAttribute('aria-label', RV.t('nav.signin'));
+  const icon = btn ? btn.innerHTML : '';
+  const menuBtn = document.querySelector('[data-menu]');
+  const menu = document.querySelector('[data-menu-panel]');
+  const who = menu && menu.querySelector('[data-menu-who]');
+  const acctLink = menu && menu.querySelector('[data-menu-account]');
+  const signouts = menu ? menu.querySelectorAll('[data-menu-signout]') : [];
+  let signedIn = null;
+
+  function draw() {
+    const user = signedIn;
+    if (btn) {
+      if (user) {
+        btn.removeAttribute('data-t-aria');
+        btn.classList.add('avatar', 'latin');
+        btn.textContent = initial(user);
+        btn.setAttribute('aria-label', RV.t('nav.account'));
+      } else {
+        btn.classList.remove('avatar', 'latin');
+        btn.innerHTML = icon;
+        btn.setAttribute('data-t-aria', 'nav.signin');
+        btn.setAttribute('aria-label', RV.t('nav.signin'));
+      }
     }
+    if (acctLink) {
+      acctLink.setAttribute('data-t', user ? 'nav.account' : 'nav.signin');
+      acctLink.textContent = RV.t(user ? 'nav.account' : 'nav.signin');
+    }
+    if (who) {
+      who.hidden = !user;
+      who.textContent = user ? user.email || user.displayName || '' : '';
+    }
+    for (const el of signouts) el.hidden = !user;
+  }
+
+  if (menuBtn && menu) {
+    const close = () => {
+      menu.hidden = true;
+      menuBtn.setAttribute('aria-expanded', 'false');
+    };
+    menuBtn.addEventListener('click', () => {
+      const open = menu.hidden;
+      menu.hidden = !open;
+      menuBtn.setAttribute('aria-expanded', String(open));
+    });
+    document.addEventListener('click', (e) => {
+      if (!menu.hidden && !e.target.closest('[data-menu]') && !e.target.closest('[data-menu-panel]')) close();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !menu.hidden) close();
+    });
+    menu.addEventListener('click', (e) => {
+      if (e.target.closest('button[data-menu-signout]')) {
+        close();
+        signOut().catch(() => {});
+      }
+    });
+  }
+  if (!btn && !menu) return;
+  RV.onLang(draw);
+  onUser((user) => {
+    signedIn = user;
+    draw();
   }).catch(() => {});
 }

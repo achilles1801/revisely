@@ -7,6 +7,7 @@
 
 import { errorResponse, handleTcq, TcqEnv } from './tcq';
 import { gate, GateEnv } from './gate';
+import { withAccountNav } from './nav';
 
 // The Durable Object class behind TCQ_BUDGET (wrangler.jsonc).
 export { TcqBudget } from './budget';
@@ -85,5 +86,14 @@ async function answer(request: Request, env: Env, ctx: ExecutionContext): Promis
       return errorResponse(500, 'UPSTREAM_ERROR', 'Something went wrong; try again');
     }
   }
-  return env.ASSETS.fetch(request);
+  if (env.ACCOUNT_PAGES !== '1') return env.ASSETS.fetch(request);
+  // dev.revisely.app: the site's own pages link the account, Premium and Open Door pages (nav.ts). A page asks the
+  // assets without its validators, so a copy cached before the navigation was added (a 304) never stands in for it.
+  let ask = request;
+  if ((request.headers.get('Accept') ?? '').includes('text/html')) {
+    ask = new Request(request);
+    ask.headers.delete('If-None-Match');
+    ask.headers.delete('If-Modified-Since');
+  }
+  return withAccountNav(await env.ASSETS.fetch(ask));
 }

@@ -1349,6 +1349,10 @@ side-session notes `apply-support.md`.
 - **Kept off revisely.app:** the worker answers 404 for `/apply`, `/premium` and `/account` unless `ACCOUNT_PAGES` is
   "1" (`wrangler.dev.jsonc` only); `wrangler.jsonc` sends those paths through the worker so the gate holds once develop
   reaches main.
+- **Their links in the site's navigation** (header, phone menu, footer, the account button) on dev only: with
+  `ACCOUNT_PAGES` "1" the worker adds them to the site's own pages (`worker/nav.ts`, which also loads
+  `account-nav.css` / `account-nav.js`), so revisely.app's HTML never links a page that answers 404 there. The three
+  pages carry the navigation themselves (`data-acct-nav`).
 - **Sign-in only** (Google pop-up, email and password), no sign-up: accounts are made in the app. The web config is
   `/__/firebase/init.json`, which the worker serves from `FIREBASE_HOSTING` (revisely-dev's Hosting site, an empty
   release made only for that), so no key is in the repository. dev.revisely.app is an authorized domain of revisely-dev.
