@@ -68,7 +68,7 @@ import type { Mark } from '../../lib/reciteLive/contract';
 import type { Box } from '../../components/verse/menuPlacement';
 import { getRecitation } from '../../lib/recitation';
 import { warmUpReciteCheck } from '../../lib/reciteCheck/service';
-import type { LiveFailure } from '../../lib/reciteLive/contract';
+import { needsPremium, type LiveFailure } from '../../lib/reciteLive/contract';
 import { logger } from '../../lib/logger';
 
 /** What the recite bar says when a take ends without its answer. */
@@ -81,6 +81,7 @@ const LIVE_FAILURE: Record<LiveFailure, string> = {
   bad_request: 'Couldn’t start',
   server: 'The checker stopped',
   check_locked: 'Marking mistakes needs Premium',
+  premium_required: 'Marking mistakes needs Premium',
   offline: 'Couldn’t reach the checker',
 };
 
@@ -378,10 +379,10 @@ export default function QuranReaderScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [live.state.status, takeId]);
   const takeStatus = live.state.status;
-  // The checker's gate refused Check (the account doesn't have it): Check's page, and the take goes.
+  // The checker's gate refused marking mistakes (no Premium): the Premium page, and the take goes.
   const takeFailure = live.state.failure;
   useEffect(() => {
-    if (takeStatus !== 'failed' || takeFailure !== 'check_locked') return;
+    if (takeStatus !== 'failed' || !needsPremium(takeFailure)) return;
     live.clear();
     setIntroOpen(true);
     // Only when a take fails so.

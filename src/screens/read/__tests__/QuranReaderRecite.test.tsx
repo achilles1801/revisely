@@ -446,14 +446,17 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
     expect(screen.getByTestId('recite-close')).toBeTruthy();
   });
 
-  it('the checker’s gate refuses Check (check_locked): Check’s page opens and the take goes', async () => {
-    await startTake('check');
-    await event({ type: 'error', reason: 'check_locked' });
-    await flush();
-    expect(screen.getByTestId('check-intro')).toBeTruthy();
-    expect(screen.queryByTestId('recite-bar')).toBeNull();
-    expect(screen.getByTestId('recite-mic')).toBeTruthy();
-  });
+  it.each(['check_locked', 'premium_required'] as const)(
+    'the checker’s Premium gate refuses (%s): the Premium page opens and the take goes',
+    async (reason) => {
+      await startTake('check');
+      await event({ type: 'error', reason });
+      await flush();
+      expect(screen.getByTestId('check-intro')).toBeTruthy();
+      expect(screen.queryByTestId('recite-bar')).toBeNull();
+      expect(screen.getByTestId('recite-mic')).toBeTruthy();
+    },
+  );
 
   it('Mark mistakes: the switch stays on, the mic says so, and the next take marks mistakes', async () => {
     setReciteCheckSettings('u1', { noticeSeen: true });
