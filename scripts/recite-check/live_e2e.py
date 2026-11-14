@@ -123,12 +123,15 @@ def main():
     ap.add_argument('--fast', action='store_true')
     ap.add_argument('--drop-at', type=float, default=0)
     ap.add_argument('--letters', action='store_true')
+    ap.add_argument('--no-tajweed', action='store_true', help='the "words and harakat" level (tajweed off)')
+    ap.add_argument('--follow', action='store_true', help='Recite: the cursor and said only')
     ap.add_argument('--transcript')
     args = ap.parse_args()
     token = pathlib.Path(args.token_file).expanduser().read_text().strip()
     truth, pcm = load_item(args.item)
     start = {'type': 'start', 's': truth['sura'], 'a': truth['ayat'][0], 's2': truth['sura'], 'a2': truth['ayat'][1],
-             'mon': 4, 'mot': 4, 'aar': 0, 'letters': args.letters, 'keep': False, 'app': 'live_e2e'}
+             'mon': 4, 'mot': 4, 'aar': 0, 'letters': args.letters, 'tajweed': not args.no_tajweed,
+             'follow': args.follow, 'keep': False, 'app': 'live_e2e'}
     events, sent_at, stamps, rounds = asyncio.run(session(args.url, token, start, pcm, args.fast, args.drop_at))
 
     tl = {e['word']: e for e in truth['timeline'] if e.get('word') is not None and not e.get('extra')}

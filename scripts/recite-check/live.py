@@ -435,6 +435,7 @@ class LiveSession:
         self.sent = {'at': None, 'said': None, 'score': None}
         self.unmarked = set()            # ids taken back (and not marked again): for a resume's snapshot
         self.helped = set()              # words the phone showed the reciter (hints) before they were decided
+        self._notes_cache = {}           # an ayah's notes by what they read (see _notes)
         self.hints = []                  # (seconds, hint) as they came
         self.ayah_sent = []              # ayah events sent: for a resume's snapshot
         self.stopped = False
@@ -858,10 +859,21 @@ class LiveSession:
         return ev
 
     def _notes(self, s, a, statuses, spans):
-        """Engine.ayah_notes on the take's frames (and its samples, for the second model in Strict)."""
-        if self.v5:
-            return self.E.ayah_notes(self.lp[:self.T], s, a, statuses, spans, self.st, audio=self.xf[:self.n])
-        return self.E.ayah_notes(self.lp[:self.T], s, a, statuses, spans, self.st)
+        """Engine.ayah_notes on the take's frames (and its samples, for the second model in Strict). It reads only the
+        ayah's word statuses, its first word's start, its last word's end and final frames there, so an ayah judged
+        live is not judged again in `done` when those are the same (the second model is ~1 s an ayah on Cloud Run)."""
+        first, n = self._ayah_bounds(s, a)
+        ws = range(first, first + n)
+        key = (s, a, tuple(statuses.get(w) for w in ws), spans.get(first, (None,))[0],
+               spans.get(first + n - 1, (None, None))[1])
+        if key not in self._notes_cache:
+            if self.v5:
+                got = self.E.ayah_notes(self.lp[:self.T], s, a, statuses, spans, self.st, audio=self.xf[:self.n])
+            else:
+                got = self.E.ayah_notes(self.lp[:self.T], s, a, statuses, spans, self.st)
+            self._notes_cache[key] = got
+        tj, letters = self._notes_cache[key]
+        return [dict(r) for r in tj], [dict(r) for r in letters]
 
     def _keep_mark(self, m):
         self.marks[m['id']] = m
