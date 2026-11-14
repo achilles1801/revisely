@@ -64,8 +64,9 @@ describe('the contract', () => {
     expect(parseMark({ id: 'x', w: 3, ayah: [1, 2], kind: 'tajweed', sure: 'clear' })).toBeNull();
     // An unknown error is the server's.
     expect(parseEvent({ type: 'error', reason: 'gremlins' })).toEqual({ type: 'error', reason: 'server' });
-    // The server's Check gate (CHECK_GATE) is its own reason: the app opens Check's page.
+    // The server's Premium gate (CHECK_GATE) under either name: the app opens the Premium page.
     expect(parseEvent({ type: 'error', reason: 'check_locked' })).toEqual({ type: 'error', reason: 'check_locked' });
+    expect(parseEvent({ type: 'error', reason: 'premium_required' })).toEqual({ type: 'error', reason: 'premium_required' });
     expect(parseEvent({ type: 'error', error: 'idle' })).toEqual({ type: 'error', reason: 'idle' });
   });
 

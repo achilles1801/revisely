@@ -18,16 +18,21 @@ export interface ReciteCheckSettings {
   keep: boolean;
   /** The AI notice has been shown (it comes before the first check). */
   noticeSeen: boolean;
-  /** What a tap on the reader's mic starts (held, it picks): Record, Recite (follow along) or Check (mistakes). */
-  mode: 'record' | 'recite' | 'check';
+  /** What a tap on the reader's mic starts (held, it picks): Record, or Recite (the page follows you). */
+  mode: 'record' | 'recite';
   /**
-   * Check's level (contract draft 4, Majd): Words and harakat (wrong, skipped and added words, letter and haraka
+   * Recite marks mistakes too (Premium; Majd, Nov 14 2026: one "Mark mistakes" switch under Recite). Kept on until
+   * turned off. Without Premium it is shown off and locked, whatever is kept.
+   */
+  markMistakes: boolean;
+  /**
+   * Mistakes to mark (contract draft 4, Majd): Words and harakat (wrong, skipped and added words, letter and haraka
    * slips) or Strict (the same and tajweed, with the madd settings above).
    */
   level: 'words' | 'strict';
   /** Reciting (Recite, Check) also saves the recitation as the session's recording; off in Settings. */
   saveRecording: boolean;
-  /** Tests and previews: show Check locked, as it will be for those who haven't got it. */
+  /** Tests and previews: show marking mistakes locked, as it is for those without Premium. */
   previewLocked: boolean;
 }
 
@@ -39,6 +44,7 @@ export const RECITE_CHECK_DEFAULTS: ReciteCheckSettings = {
   keep: true,
   noticeSeen: false,
   mode: 'recite',
+  markMistakes: false,
   level: 'words',
   saveRecording: true,
   previewLocked: false,
@@ -67,7 +73,9 @@ export function parseReciteCheckSettings(raw: string | null): ReciteCheckSetting
     letters: typeof s.letters === 'boolean' ? s.letters : d.letters,
     keep: typeof s.keep === 'boolean' ? s.keep : d.keep,
     noticeSeen: s.noticeSeen === true,
-    mode: pick(s.mode, ['record', 'recite', 'check'] as const, d.mode),
+    // A kept "check" (the three-way menu before Nov 14 2026) is Recite with mistakes marked.
+    mode: s.mode === 'record' ? 'record' : s.mode === 'recite' || s.mode === 'check' ? 'recite' : d.mode,
+    markMistakes: typeof s.markMistakes === 'boolean' ? s.markMistakes : s.mode === 'check' ? true : d.markMistakes,
     level: pick(s.level, ['words', 'strict'] as const, d.level),
     saveRecording: typeof s.saveRecording === 'boolean' ? s.saveRecording : d.saveRecording,
     previewLocked: s.previewLocked === true,

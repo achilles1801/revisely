@@ -185,8 +185,9 @@ async function open() {
   fireEvent.press(screen.getByLabelText('The page'));
 }
 
+/** A take: 'check' is Recite with Mark mistakes on. */
 async function startTake(mode: 'recite' | 'check') {
-  setReciteCheckSettings('u1', { noticeSeen: true, mode });
+  setReciteCheckSettings('u1', { noticeSeen: true, mode: 'recite', markMistakes: mode === 'check' });
   await open();
   fireEvent.press(screen.getByTestId('recite-mic'));
   await flush();
@@ -211,14 +212,16 @@ describe('the one mic (Revisely Dev)', () => {
     expect(screen.queryByLabelText('Record your recitation')).toBeNull();
   });
 
-  it('holding the mic: Record, Recite and Check (its own colours, no lock for a tester); Record starts the recorder and stays', async () => {
+  it('holding the mic: Record and Recite, with Mark mistakes under Recite (off, no lock for a tester); Record starts the recorder and stays', async () => {
     await open();
     fireEvent(screen.getByTestId('recite-mic'), 'longPress');
     expect(screen.getByTestId('recite-mode-menu')).toBeTruthy();
     expect(screen.getByText('Just record your recitation')).toBeTruthy();
     expect(screen.getByText('The page follows you')).toBeTruthy();
-    expect(screen.getByText('Follows you and marks your mistakes')).toBeTruthy();
-    expect(screen.queryByTestId('check-locked')).toBeNull();
+    expect(screen.queryByTestId('recite-mode-check')).toBeNull();
+    expect(screen.getByText('Mark mistakes')).toBeTruthy();
+    expect(screen.getByTestId('recite-mistakes-off')).toBeTruthy();
+    expect(screen.queryByTestId('recite-mistakes-locked')).toBeNull();
     fireEvent.press(screen.getByTestId('recite-mode-record'));
     expect(mockState.recordStart).toHaveBeenCalled();
     expect(screen.queryByTestId('recite-mode-menu')).toBeNull();
@@ -443,27 +446,59 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
     expect(screen.getByTestId('recite-close')).toBeTruthy();
   });
 
-  it('the checker’s gate refuses Check (check_locked): Check’s page opens and the take goes', async () => {
-    await startTake('check');
-    await event({ type: 'error', reason: 'check_locked' });
-    await flush();
-    expect(screen.getByTestId('check-intro')).toBeTruthy();
-    expect(screen.queryByTestId('recite-bar')).toBeNull();
-    expect(screen.getByTestId('recite-mic')).toBeTruthy();
-  });
+  it.each(['check_locked', 'premium_required'] as const)(
+    'the checker’s Premium gate refuses (%s): the Premium page opens and the take goes',
+    async (reason) => {
+      await startTake('check');
+      await event({ type: 'error', reason });
+      await flush();
+      expect(screen.getByTestId('check-intro')).toBeTruthy();
+      expect(screen.queryByTestId('recite-bar')).toBeNull();
+      expect(screen.getByTestId('recite-mic')).toBeTruthy();
+    },
+  );
 
-  it('Check not the account’s: locked in the menu, and picking it opens Check’s page, not a take', async () => {
-    setReciteCheckSettings('u1', { noticeSeen: true, previewLocked: true });
+  it('Mark mistakes: the switch stays on, the mic says so, and the next take marks mistakes', async () => {
+    setReciteCheckSettings('u1', { noticeSeen: true });
     await open();
     fireEvent(screen.getByTestId('recite-mic'), 'longPress');
-    expect(screen.getByTestId('check-locked')).toBeTruthy();
-    expect(screen.getByLabelText('Check, Follows you and marks your mistakes, part of Premium, locked')).toBeTruthy();
-    fireEvent.press(screen.getByTestId('recite-mode-check'));
+    fireEvent.press(screen.getByTestId('recite-mistakes'));
+    // The menu stays open, the switch on; the mic now starts Recite marking mistakes.
+    expect(screen.getByTestId('recite-mistakes-on')).toBeTruthy();
+    expect(screen.getByTestId('recite-mic', { includeHiddenElements: true }).props.accessibilityLabel).toBe('Recite and mark mistakes');
+    expect(screen.getByTestId('recite-mic-badge-check', { includeHiddenElements: true })).toBeTruthy();
+    fireEvent.press(screen.getByTestId('recite-mode-recite'));
     await flush();
+    await flush();
+    expect(mockLive.start).toMatchObject({ follow: false });
+    // Off again: a plain Recite take.
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [], score: null } });
+    fireEvent.press(screen.getByTestId('take-summary-done'));
+    fireEvent.press(screen.getByTestId('recite-close'));
+    fireEvent(screen.getByTestId('recite-mic'), 'longPress');
+    expect(screen.getByTestId('recite-mistakes-on')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('recite-mistakes'));
+    expect(screen.getByTestId('recite-mistakes-off')).toBeTruthy();
+    expect(screen.getByTestId('recite-mic', { includeHiddenElements: true }).props.accessibilityLabel).toBe('Recite');
+  });
+
+  it('without Premium: Mark mistakes is off with a lock, and a tap opens the Premium page, not a take', async () => {
+    setReciteCheckSettings('u1', { noticeSeen: true, previewLocked: true, markMistakes: true });
+    await open();
+    // Kept on, but the account doesn't have it: the mic starts a plain Recite.
+    expect(screen.getByLabelText('Recite')).toBeTruthy();
+    fireEvent(screen.getByTestId('recite-mic'), 'longPress');
+    expect(screen.getByTestId('recite-mistakes-locked')).toBeTruthy();
+    expect(screen.getByLabelText('Mark mistakes, part of Premium, locked')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('recite-mistakes'));
+    await flush();
+    expect(screen.queryByTestId('recite-mode-menu')).toBeNull();
     expect(screen.getByTestId('check-intro')).toBeTruthy();
-    // The paid side is Premium, with no price (Majd, Nov 14 2026).
+    // The paid side is Premium, with no feature name and no price (Majd, Nov 14 2026).
+    expect(screen.getByText('Mark my mistakes')).toBeTruthy();
     expect(screen.getByText('Get Premium')).toBeTruthy();
-    expect(screen.getByText('Check is part of Premium. Following along stays free. Check is AI and can make mistakes.')).toBeTruthy();
+    expect(screen.getByText('Part of Premium. Following along stays free. It’s AI and can make mistakes.')).toBeTruthy();
     expect(screen.queryByText(/[$€£]|\d+(\.\d+)? ?(USD|a month|\/mo)/)).toBeNull();
     expect(screen.getByText('Can’t afford it? Apply for support')).toBeTruthy();
     expect(mockLive.start).toBeUndefined();
