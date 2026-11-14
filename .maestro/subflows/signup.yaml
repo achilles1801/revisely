@@ -18,18 +18,32 @@ appId: com.revisionbuddy.app
           visible:
             id: auth-name
           timeout: 10000
+# Each field is checked once typed and typed again if the keyboard dropped keys (type-in-field.yaml).
+# The passwords are shown first, so their text can be read like the others'.
 - tapOn:
-    id: auth-name
-- inputText: E2E
+    id: auth-password-reveal
 - tapOn:
-    id: auth-email
-- inputText: ${output.email}
-- tapOn:
-    id: auth-password
-- inputText: e2e-password
-- tapOn:
-    id: auth-confirm-password
-- inputText: e2e-password
+    id: auth-confirm-password-reveal
+- runFlow:
+    file: type-in-field.yaml
+    env:
+      ID: auth-name
+      TEXT: E2E
+- runFlow:
+    file: type-in-field.yaml
+    env:
+      ID: auth-email
+      TEXT: ${output.email}
+- runFlow:
+    file: type-in-field.yaml
+    env:
+      ID: auth-password
+      TEXT: e2e-password
+- runFlow:
+    file: type-in-field.yaml
+    env:
+      ID: auth-confirm-password
+      TEXT: e2e-password
 # Maestro's hideKeyboard can't dismiss it here: a tap on the title does. The form moves as the
 # keyboard goes (a KeyboardAvoidingView): wait for it to stop, or the tap lands where Sign up was.
 # On iOS in run 42573714262 (04) the tap reached the window and no sign-up reached the Auth emulator.
@@ -42,9 +56,9 @@ appId: com.revisionbuddy.app
 # caller: 01-onboarding fails on it; other flows go on, see new-account.yaml.)
 # The wait also ends on the app's error (an id is a regex), and a sign-up the
 # app refused fails here with its message on the screen, not as SYNC-4 after a
-# relaunch that clears it. On iOS the simulator's keyboard can stall and drop
-# typed characters (run 42403217365: the email went out malformed and the Auth
-# emulator answered "invalid email").
+# relaunch that clears it. (Keys the simulator's keyboard dropped are typed
+# again above; before that, runs 42403217365 and 43583371303 failed here on
+# "Invalid email address".)
 - extendedWaitUntil:
     visible:
       id: "welcome|auth-error"

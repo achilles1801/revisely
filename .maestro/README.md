@@ -399,9 +399,12 @@ Things that bit:
   buttons in capitals: match with `(?i)`.
 - The iOS Simulator's keyboard can stall under load and drop what is typed meanwhile (run
   42403217365: "Keyboard queue task timeout detected" in `device.log`, the keyboard connection
-  interrupted, 12 s before the first character; the sign-up email went out malformed). A sign-up
-  the app refuses fails in `subflows/signup.yaml` on its own error (`auth-error`), not later as
-  SYNC-4 after a relaunch that clears it.
+  interrupted, 12 s before the first character; the sign-up email went out malformed, and again in
+  run 43583371303 as ".com"). So `subflows/signup.yaml` types each field through
+  `subflows/type-in-field.yaml`, which checks what the field holds and types it again if keys were
+  dropped (the passwords are shown first so their text can be read). A sign-up the app still
+  refuses fails there on its own error (`auth-error`), not later as SYNC-4 after a relaunch that
+  clears it.
 - A script that writes the server as its admin (a seed) runs once the app has sent its own changes
   (`subflows/app-sent.yaml`). The app sends from its outbox, and a change it still held went out
   after the script's writes and over them: on iOS, run 42414536111, a failed Firestore write stream
