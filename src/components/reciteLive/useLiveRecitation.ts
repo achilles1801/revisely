@@ -188,7 +188,14 @@ export function useLiveRecitation({
           },
         });
         conn.current = c;
-        const tick = setInterval(() => setSeconds((n) => n + 1), 1000);
+        recordingRef.current =
+          settings.saveRecording && recordingDay ? startTakeRecording({ day: recordingDay, page: pageRef.current }) : null;
+        setRecording(recordingRef.current != null);
+        let second = 0;
+        const tick = setInterval(() => {
+          setSeconds((n) => n + 1);
+          recordingRef.current?.add(e2e.e2eToneSecond(second++));
+        }, 1000);
         source.current = {
           stop: async () => {
             clearInterval(tick);

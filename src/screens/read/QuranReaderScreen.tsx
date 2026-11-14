@@ -249,8 +249,8 @@ export default function QuranReaderScreen() {
   const liveOn = reciteLiveEnabled(user, edition);
   const reciteSettings = useReciteCheckSettings(user?.id);
   const owned = checkOwned(user, reciteSettings);
-  // A take kept as a recording (Save recordings, on by default) is told about once the take is over and its summary
-  // has closed: "Recording saved · View", as after any recording.
+  // A take kept as a recording (Save recordings, on by default) is told about once the take is closed (✕) and the
+  // player is back: "Recording saved · View", over the player as after any recording, never over the recite bar.
   const [takeSaved, setTakeSaved] = useState<{ day: string; recordingId: string } | null>(null);
   const live = useLiveRecitation({
     settings: reciteSettings,
@@ -380,14 +380,13 @@ export default function QuranReaderScreen() {
     // Only when a take fails so.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [takeStatus, takeFailure]);
+  const micStatus = live.mic;
   useEffect(() => {
-    if (!takeSaved) return;
-    const takeGoing = takeStatus === 'connecting' || takeStatus === 'listening' || takeStatus === 'checking';
-    const summaryToCome = takeStatus === 'done' && takeId != null && summaryFor !== takeId;
-    if (takeGoing || summaryToCome || summaryShown != null) return;
+    // Recite again starts the next take at once (the mic is starting): its own end tells the latest recording.
+    if (!takeSaved || takeStatus !== 'idle' || micStatus !== 'off') return;
     setSavedRecording(takeSaved);
     setTakeSaved(null);
-  }, [takeSaved, takeStatus, takeId, summaryFor, summaryShown]);
+  }, [takeSaved, takeStatus, micStatus]);
   const pageMarks = useCallback(
     (page: number) => (checkTake && qw ? marksOnPage(live.state, qw, page) : []),
     [checkTake, qw, live.state],

@@ -144,12 +144,16 @@ appId: com.revisionbuddy.app
     visible:
       id: take-summary
     timeout: 10000
+# The take was saved as the account's first recording: the one-time backup notice comes about 2 s later, over the
+# summary or just after it.
+- runFlow: ../subflows/backup-notice.yaml
 - runFlow:
     file: ../subflows/shot.yaml
     env:
       NAME: rl06-summary
 - tapOn:
     id: take-summary-done
+- runFlow: ../subflows/backup-notice.yaml
 - extendedWaitUntil:
     visible:
       id: recite-close
@@ -162,6 +166,14 @@ appId: com.revisionbuddy.app
     id: recite-close
 - assertVisible:
     id: recite-mic
+# The take was kept as a recording (Save recordings, on by default; the E2E take records a tone).
+- extendedWaitUntil:
+    visible: "Recording saved"
+    timeout: 8000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl07b-recording-saved
 
 # In dark: a Check take again (the mic remembers Check). Back from the reader is the Read tab.
 - tapOn:

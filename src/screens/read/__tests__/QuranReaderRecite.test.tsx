@@ -271,7 +271,7 @@ describe('Recite: following along', () => {
 });
 
 describe('a take kept as a recording (Save recordings, on by default)', () => {
-  it('the red dot while it records; Stop keeps it, and once the summary closes: Recording saved · View', async () => {
+  it('the red dot while it records; Stop keeps it, and once the take is closed: Recording saved · View', async () => {
     await startTake('recite');
     await act(async () => mockMic!.onAudio(new Int16Array(16000)));
     expect(mockTake.started?.page).toBe(379);
@@ -281,12 +281,15 @@ describe('a take kept as a recording (Save recordings, on by default)', () => {
     fireEvent.press(screen.getByTestId('recite-stop'));
     await flush();
     expect(mockTake.finished).toBe(1);
-    // Not while the checker still answers, nor over the summary.
+    // Not while the checker still answers, nor over the summary or the recite bar.
     expect(screen.queryByText('Recording saved')).toBeNull();
     await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [], score: null } });
     expect(screen.getByTestId('take-summary')).toBeTruthy();
     expect(screen.queryByText('Recording saved')).toBeNull();
     fireEvent.press(screen.getByTestId('take-summary-done'));
+    await flush();
+    expect(screen.queryByText('Recording saved')).toBeNull();
+    fireEvent.press(screen.getByTestId('recite-close'));
     await flush();
     expect(screen.getByText('Recording saved')).toBeTruthy();
     fireEvent.press(screen.getByText('View'));
@@ -303,7 +306,20 @@ describe('a take kept as a recording (Save recordings, on by default)', () => {
     fireEvent.press(screen.getByTestId('recite-stop'));
     await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [], score: null } });
     fireEvent.press(screen.getByTestId('take-summary-done'));
+    fireEvent.press(screen.getByTestId('recite-close'));
     await flush();
+    expect(screen.queryByText('Recording saved')).toBeNull();
+  });
+
+  it('Recite again: the next take starts at once, and the note waits for its end', async () => {
+    await startTake('recite');
+    await act(async () => mockMic!.onAudio(new Int16Array(16000)));
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [], score: null } });
+    fireEvent.press(screen.getByTestId('take-summary-again'));
+    await flush();
+    await flush();
+    expect(screen.getByTestId('recite-bar')).toBeTruthy();
     expect(screen.queryByText('Recording saved')).toBeNull();
   });
 });
