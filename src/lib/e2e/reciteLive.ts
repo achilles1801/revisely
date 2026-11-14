@@ -55,7 +55,11 @@ export function e2eReciteLiveOn(): boolean {
 const A23 = 48707;
 const A24 = 48718;
 
-function take(): ReplayLog {
+/**
+ * The take's events. Recite (`follow`) gets what the checker sends it: the cursor and the words said, never a mark or a
+ * score, and a final answer of words only (no marks list), as scripts/recite-check's live.py writes it.
+ */
+function take(follow: boolean): ReplayLog {
   const events: ReplayLog['events'] = [{ t: 0.3, type: 'ready', v: 2, take: 'e2e-379', engine: 'e2e' }];
   const marks = [
     { id: `${A23 + 4}:word:sound`, w: A23 + 4, ayah: [27, 23], kind: 'word', detail: 'sound', heard: 'وَأُوهِيَتْ', heardExact: false, sure: 'likely' },
@@ -69,6 +73,7 @@ function take(): ReplayLog {
     if (i >= 2) {
       const said = w - 2;
       events.push({ t: t + 0.1, type: 'said', upTo: said });
+      if (follow) continue;
       const m = marks.find((x) => x.w === said);
       if (m) {
         mistakes++;
@@ -80,7 +85,9 @@ function take(): ReplayLog {
   events.push({
     t: 600,
     type: 'done',
-    result: { v: 2, take: 'e2e-379', from: A23, to: A24 + 3, secs: 13, marks, score: { reached: 15, mistakes: 2, tajweed: 0, accuracy: 13 / 15 } },
+    result: follow
+      ? { v: 2, follow: true, take: 'e2e-379', from: A23, to: A24 + 3, secs: 13, words: [], why: 'end' }
+      : { v: 2, take: 'e2e-379', from: A23, to: A24 + 3, secs: 13, marks, score: { reached: 15, mistakes: 2, tajweed: 0, accuracy: 13 / 15 } },
   });
   return { events };
 }
@@ -98,5 +105,5 @@ export function e2eToneSecond(second: number): Int16Array {
 
 /** The recorded take, played as a checker would send it. */
 export function e2eLiveConnect(): LiveConnect {
-  return replayFeed(take());
+  return (start, handlers) => replayFeed(take(start.follow === true))(start, handlers);
 }

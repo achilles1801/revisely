@@ -381,15 +381,18 @@ describe('the hidden view (the eye on the bar)', () => {
     expect(screen.queryByTestId('hidden-page-379')).toBeNull();
   });
 
-  it('not reciting: the eye hides the page and a tap on a verse shows it', async () => {
+  it('a tap on a hidden page shows nothing: the pager gets no verse tap, so it brings the controls (Majd, Nov 14 2026)', async () => {
     await open();
     fireEvent.press(screen.getByTestId('reader-eye'));
     expect(screen.getByTestId('hidden-page-379')).toBeTruthy();
-    const before = screen.getAllByTestId('hidden-cover').length;
-    act(() => {
-      mockPager.onTapVerse?.({ page: 379, sura: 27, ayah: 23 });
-    });
-    expect(screen.getAllByTestId('hidden-cover').length).toBeLessThan(before);
+    expect(mockPager.onTapVerse).toBeUndefined();
+  });
+
+  it('nor during a take: only ‹, ‹‹ and the recitation itself show words', async () => {
+    await startTake('recite');
+    fireEvent.press(screen.getByTestId('recite-eye'));
+    expect(screen.getByTestId('hidden-page-379')).toBeTruthy();
+    expect(mockPager.onTapVerse).toBeUndefined();
   });
 });
 

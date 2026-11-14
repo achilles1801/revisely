@@ -475,16 +475,6 @@ export default function QuranReaderScreen() {
         : undefined,
     [liveOn, qw, pageMarks],
   );
-  const onTapVerse = useMemo(
-    () =>
-      liveOn && hidden && qw
-        ? (ayah: AyahRef) => {
-            setRevealed((r) => revealAyah(qw, ayah.page, r, liveInfo, ayah));
-            return true;
-          }
-        : undefined,
-    [liveOn, hidden, qw, liveInfo],
-  );
 
   const liveStatus = live.state.status;
   const barPhase: 'live' | 'checking' | 'done' =
@@ -635,7 +625,6 @@ export default function QuranReaderScreen() {
           pageUnderlay={pageUnderlay}
           pageOverlay={pageOverlay}
           pageAccessories={pageAccessories}
-          onTapVerse={onTapVerse}
           onTapPoint={onTapPoint}
           extraData={liveOn ? `${live.state.cursor}|${live.state.saidUpTo}|${Object.keys(live.state.marks).length}|${hidden}|${revealed.size}` : undefined}
         />
