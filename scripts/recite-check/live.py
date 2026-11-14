@@ -23,9 +23,13 @@ Everything here is a function of the audio and of where in it each seek and dism
 run again from its audio (a resumed socket on another instance) and gives the same events.
 """
 import concurrent.futures
+import contextlib
 import inspect
 import json
 import multiprocessing
+import os
+import sys
+import threading
 import time
 
 import numpy as np
@@ -48,6 +52,45 @@ LEAD_FRAMES = 10    # a filler starting this close to a segment's first frame is
 SETTLE = 3.0        # seconds a seam must be behind the newest final frame: the path there no longer moves
 NEG = checker.Decoder.NEG
 _pool = None
+
+# Each ayah's letters and tajweed (Engine.ayah_notes) are judged once all its words are decided: the released model's
+# rules and letters (up to ~1 s on Cloud Run's vCPU) and, in Strict, the second model (v5, about 1 s more). Run inside
+# the hop, they held up the cursor on one vCPU (Strict: p90 1.9 s, worst 4 s, Nov 14 2026). With `defer` (the
+# server's setting) an ayah is judged on one background thread at the lowest priority (Linux), started only once the
+# chunk that finished it has been answered, and its marks and `ayah` event come out at the first hop a set time of
+# audio later (waiting for the thread only if it is late, as a fast replay is), or in `done`. The hop is left with the
+# model and the decoder; the events still depend only on the audio and where each control came, so any chunk size, or
+# a resume, gives the same.
+# The time: AYAH_DUE, or longer for a long ayah, as its judging grows with its length. On one vCPU the thread gets
+# what the hops leave: husary.p1.m1 (Strict, ayat of ~22 s, ~2.5 s of CPU each) took ~4.4 s an ayah, past a flat 3 s,
+# so the hop waited for it (recite-server, Nov 14 2026).
+AYAH_DUE = 3.0
+AYAH_DUE_SHARE = {'strict': 0.3, 'words': 0.1}  # seconds of wait per second of the ayah, by level
+_ayah_pool = None
+_ayah_pool_lock = threading.Lock()
+
+
+def _ayah_lowest_priority():
+    if sys.platform.startswith('linux'):  # elsewhere a thread id isn't a valid target for setpriority
+        try:
+            os.setpriority(os.PRIO_PROCESS, threading.get_native_id(), 19)
+        except OSError:
+            pass
+
+
+def _ayah_submit(idle, fn, *args, **kw):
+    global _ayah_pool
+    with _ayah_pool_lock:
+        if _ayah_pool is None:
+            _ayah_pool = concurrent.futures.ThreadPoolExecutor(1, 'ayah', initializer=_ayah_lowest_priority)
+    return _ayah_pool.submit(_ayah_job, idle, fn, *args, **kw)
+
+
+def _ayah_job(idle, fn, *args, **kw):
+    idle.wait(5.0)  # the chunk that finished the ayah sends its cursor first
+    t0 = time.perf_counter()
+    got = fn(*args, **kw)
+    return got, (time.perf_counter() - t0) * 1000
 
 
 def secs(span):
@@ -391,7 +434,7 @@ class LiveSession:
     """One live check. feed() audio (PCM16 bytes), control() messages, finish() at the end; each returns the events
     to send, in order (dicts, recite-contract.md)."""
 
-    def __init__(self, engine, s, a, s2=None, a2=None, settings=None, follow=False):
+    def __init__(self, engine, s, a, s2=None, a2=None, settings=None, follow=False, defer=False):
         E = self.E = engine
         # follow (Recite, contract draft 5): the cursor and `said` only; words are decided (said needs them) but no
         # mark is made, letters and tajweed aren't judged, and no mark, unmark or score is sent
@@ -408,6 +451,12 @@ class LiveSession:
         # Strict on the second model (v5, #539): ayah_notes takes the take's samples when the engine has it
         self.v5 = self.st.get('tajweed', True) and getattr(E, 'ear2', None) is not None \
             and 'audio' in inspect.signature(E.ayah_notes).parameters
+        # defer: each ayah's letters and tajweed off the hop (see _ayah_submit); with nothing to judge, nothing to defer
+        self.defer = bool(defer) and not self.follow and (self.st['letters'] or self.st.get('tajweed', True))
+        self._pending = []               # (notes key, s, a, future, due) of ayat judged in the background, in order
+        self._idle = threading.Event()   # set while the session isn't working on a chunk (see _working)
+        self._idle.set()
+        self._depth = 0
         self.xf = np.zeros(SR * 30 if self.v5 else 0, np.float32)
         self.pcm = np.zeros(SR * 30, np.int16)
         self.n = 0                       # samples received
@@ -440,7 +489,11 @@ class LiveSession:
         self.ayah_sent = []              # ayah events sent: for a resume's snapshot
         self.stopped = False
         self.result = None
-        self.ms = {'model': 0.0, 'words': 0.0, 'tajweed': 0.0, 'hops': 0, 'worst_hop': 0.0}
+        self.ms = {'model': 0.0, 'words': 0.0, 'tajweed': 0.0, 'hops': 0, 'worst_hop': 0.0,
+                   # defer: ayat handed to the thread, the hops' waits for it (total, worst), `done`'s wait, and the
+                   # ayat `done` judged again itself
+                   'ayah_jobs': 0, 'due_wait': 0.0, 'worst_due_wait': 0.0, 'done_wait': 0.0, 'done_notes': 0}
+        self._judged_here = 0
         self.seg = None                  # built on the first hop: a new session answers at once
 
     # ------------------------------------------------------------ input
@@ -464,23 +517,27 @@ class LiveSession:
                 self.xf = grown
             self.xf[self.n:self.n + len(x)] = x.astype(np.float32) / 32768.0
         self.n += len(x)
-        ev = self._run()
-        if self.n >= MAX_SECONDS * SR:
-            ev += self.finish(why='too_long')
+        with self._working():
+            ev = self._run()
+            if self.n >= MAX_SECONDS * SR:
+                ev += self.finish(why='too_long')
         return ev
 
     def control(self, msg):
         """seek {w}, dismiss {id} or end: applied at this point of the audio."""
         self.ctrl.append((self.n, msg))
-        return self._run()
+        with self._working():
+            return self._run()
 
     def finish(self, why='end'):
         """The rest of the audio, then the whole take decided once more: [..., done]."""
         if self.stopped:
             return []
-        ev = self._run()
-        self.stopped = True
-        ev += self._hop(last=True)
+        with self._working():
+            ev = self._run()
+            self.stopped = True
+            ev += self._hop(last=True)
+            ev += self._due(self.seconds, every=True)
         self.result = self._final()
         self.result['why'] = why
         ev.append({'type': 'done', 'result': self.result})
@@ -489,6 +546,18 @@ class LiveSession:
     @property
     def seconds(self):
         return self.n / SR
+
+    @contextlib.contextmanager
+    def _working(self):
+        """A chunk, a control or the end being worked on: the second model starts an ayah only once it is over."""
+        self._depth += 1
+        self._idle.clear()
+        try:
+            yield
+        finally:
+            self._depth -= 1
+            if not self._depth:
+                self._idle.set()
 
     # ------------------------------------------------------------ hops
 
@@ -570,6 +639,7 @@ class LiveSession:
             prov = None if last else lp[self.T - f0:]
         t1 = time.perf_counter()
         ev = self._decide(t_end / SR, prov)
+        ev += self._due(t_end / SR)
         t2 = time.perf_counter()
         self.ms['model'] += (t1 - t0) * 1000
         self.ms['words'] += (t2 - t1) * 1000
@@ -862,11 +932,12 @@ class LiveSession:
         """Engine.ayah_notes on the take's frames (and its samples, for the second model in Strict). It reads only the
         ayah's word statuses, its first word's start, its last word's end and final frames there, so an ayah judged
         live is not judged again in `done` when those are the same (the second model is ~1 s an ayah on Cloud Run)."""
-        first, n = self._ayah_bounds(s, a)
-        ws = range(first, first + n)
-        key = (s, a, tuple(statuses.get(w) for w in ws), spans.get(first, (None,))[0],
-               spans.get(first + n - 1, (None, None))[1])
+        key = self._notes_key(s, a, statuses, spans)
         if key not in self._notes_cache:
+            # in `done`: an ayah not judged live (not said in full then, or the last one), or one whose words or edges
+            # the final pass decided differently. Reusing the live notes when only its start had moved kept a false
+            # madd mark on husary's clean take that judging it again took away (Nov 14 2026), so it is judged again.
+            self._judged_here += 1
             if self.v5:
                 got = self.E.ayah_notes(self.lp[:self.T], s, a, statuses, spans, self.st, audio=self.xf[:self.n])
             else:
@@ -874,6 +945,59 @@ class LiveSession:
             self._notes_cache[key] = got
         tj, letters = self._notes_cache[key]
         return [dict(r) for r in tj], [dict(r) for r in letters]
+
+    def _notes_key(self, s, a, statuses, spans):
+        first, n = self._ayah_bounds(s, a)
+        return (s, a, tuple(statuses.get(w) for w in range(first, first + n)), spans.get(first, (None,))[0],
+                spans.get(first + n - 1, (None, None))[1])
+
+    def _notes_later(self, s, a, now):
+        """With `defer`: this ayah's notes on the background thread, unless already worked out. True when they were
+        handed over (its marks and `ayah` event then come from _due, AYAH_DUE later). The frames and samples before T
+        and n are never written again, so the thread reads them as they are; the statuses and spans go as copies."""
+        key = self._notes_key(s, a, self.status, self.spans)
+        if key in self._notes_cache:
+            return False
+        kw = {'audio': self.xf[:self.n]} if self.v5 else {}
+        fut = _ayah_submit(self._idle, self.E.ayah_notes, self.lp[:self.T], s, a, dict(self.status), dict(self.spans),
+                           self.st, **kw)
+        first, n = self._ayah_bounds(s, a)
+        secs = (self.spans[first + n - 1][1] - self.spans[first][0]) / FPS  # both are there: said in full
+        share = AYAH_DUE_SHARE['strict' if self.v5 else 'words']
+        self._pending.append((key, s, a, fut, now + max(AYAH_DUE, share * secs)))
+        self.ms['ayah_jobs'] += 1
+        return True
+
+    def _due(self, now, every=False):
+        """The ayat handed to the background thread whose time has come (every one, at the end), in order: their
+        marks, the `ayah` event, then the score. A job not done yet is waited for, and may run meanwhile."""
+        ev = []
+        while self._pending and (every or self._pending[0][4] <= now):
+            key, s, a, fut, _ = self._pending.pop(0)
+            if not fut.done():
+                self._idle.set()  # this thread waits for it anyway
+                t0 = time.perf_counter()
+                fut.result()
+                waited = (time.perf_counter() - t0) * 1000  # a hop held up (or `done`, at the end): `ms` says how long
+                self.ms['done_wait' if every else 'due_wait'] += waited
+                if not every:
+                    self.ms['worst_due_wait'] = max(self.ms['worst_due_wait'], waited)
+                if self._depth:
+                    self._idle.clear()
+            got, ms = fut.result()
+            self._notes_cache[key] = got
+            self.ms['tajweed'] += ms
+            t = round(now, 2)
+            tj, letters = ([dict(r) for r in rows] for rows in got)
+            for m in self.E.marks([], {}, {}, [], tj, letters if self.st['letters'] else []):
+                if m['id'] not in self.marks:
+                    self._keep_mark(m)
+                    ev.append({'type': 'mark', 'mark': m, 't': t})
+            ev.append({'type': 'ayah', 's': s, 'a': a, 't': t})
+            self.ayah_sent.append(ev[-1])
+        if ev:
+            ev += self._score_event(now)
+        return ev
 
     def _keep_mark(self, m):
         self.marks[m['id']] = m
@@ -935,6 +1059,8 @@ class LiveSession:
                 continue
             if self.follow:
                 marks = []
+            elif self.defer and self._notes_later(s, a, now):
+                continue
             else:
                 tj, letters = self._notes(s, a, self.status, self.spans)
                 marks = self.E.marks([], {}, {}, [], tj, letters if self.st['letters'] else [])
@@ -1018,6 +1144,7 @@ class LiveSession:
         t0 = time.perf_counter()
         tj, letters = [], []
         done = set()
+        judged = self._judged_here
         for r in [] if self.follow else words:
             s, a = self.E.ayah_of(r['w'])
             if (s, a) in done:
@@ -1030,6 +1157,7 @@ class LiveSession:
             tj += o
             letters += l_
         self.ms['tajweed'] += (time.perf_counter() - t0) * 1000
+        self.ms['done_notes'] = self._judged_here - judged
         seen, ex = set(), []
         for e in extras:
             if e['after'] not in seen:
