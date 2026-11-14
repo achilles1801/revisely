@@ -3,6 +3,7 @@ under recite-tests/<uid>/, which no client can read or write (storage.rules). Th
 to the Mac. Nobody listens to them: they are checked by the lab's scripts only."""
 import datetime
 import os
+import re
 import secrets
 import urllib.parse
 
@@ -14,9 +15,17 @@ BUCKET = os.environ.get('BUCKET', 'revisely-dev.firebasestorage.app')
 PREFIX = 'recite-tests'
 
 
-def name_for(uid):
+TAKE = re.compile(r'^\d{8}-\d{6}-[0-9a-f]{6}$')  # a take's name, as the app sees it
+
+
+def new_take():
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d-%H%M%S')
-    return f'{PREFIX}/{uid}/{stamp}-{secrets.token_hex(3)}'
+    return f'{stamp}-{secrets.token_hex(3)}'
+
+
+def name_for(uid, take=None):
+    """recite-tests/<uid>/<take> (a new take when none is given): add .wav, .json, ..."""
+    return f'{PREFIX}/{uid}/{take or new_take()}'
 
 
 def put(name, data, content_type):
