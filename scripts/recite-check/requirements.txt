@@ -3,6 +3,7 @@ numpy==2.5.4
 onnxruntime==1.31.1
 quran-transcript==0.6.4
 Levenshtein==0.27.5
+soundfile==0.14.0
 requests==2.34.2
 fastapi==0.115.12
 uvicorn==0.34.2
