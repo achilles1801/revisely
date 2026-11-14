@@ -131,12 +131,26 @@ appId: com.revisionbuddy.app
             id: pill-${BOUNDARY}
             text: ".*, selected"
           timeout: 3000
-- tapOn:
-    id: schedule-start
-- extendedWaitUntil:
-    visible:
-      id: today-post
-    timeout: 30000
+# Start, again only while it still reads Start: a tap that took turns it to "Setting up…" (busy,
+# and it ignores taps), so a second tap never starts a second save. Under load the simulator held
+# one tap down for half a second and iOS cancelled the touch on release: no press, the screen
+# stayed (02 on iOS, run 43619892917).
+- retry:
+    maxRetries: 2
+    commands:
+      - runFlow:
+          when:
+            visible:
+              id: schedule-start
+              text: "Start"
+          commands:
+            - tapOn:
+                id: schedule-start
+                retryTapIfNoChange: false
+      - extendedWaitUntil:
+          visible:
+            id: today-post
+          timeout: 30000
 # Juz 30 memorized (24 pages, 4.0%): what onboarding saved, on Home.
 - extendedWaitUntil:
     visible:
