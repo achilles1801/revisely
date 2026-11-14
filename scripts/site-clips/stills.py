@@ -2,7 +2,7 @@
 
     python3 scripts/site-clips/stills.py
 
-Reads store/screenshots/ (the approved 6.9" set, 1320x2868) and writes:
+Reads store/screenshots/raw/ (bare 6.9" captures, 1320x2868, beside the store set) and writes:
 - docs/assets/img/screens/<name>.webp and .jpg, at half size, with the Dynamic Island drawn in
   where the clips have it, so a still sits in the page's phone frame like a clip does;
 - docs/assets/img/og.png: the 1200x630 link preview, with the Home screenshot put into the phone
@@ -13,7 +13,7 @@ import os
 from PIL import Image, ImageDraw
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-SHOTS = os.path.join(ROOT, 'store', 'screenshots')
+SHOTS = os.path.join(ROOT, 'store', 'screenshots', 'raw')  # bare captures: the store set has headlines
 OUT = os.path.join(ROOT, 'docs', 'assets', 'img', 'screens')
 OG = os.path.join(ROOT, 'docs', 'assets', 'img', 'og.png')
 
