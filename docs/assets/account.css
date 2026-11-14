@@ -16,7 +16,6 @@
 body.acct {
   --secondary: #616977;
   --page-glow: radial-gradient(130% 620px at 50% 0, rgb(98 75 213 / 0.32) 0%, rgb(98 75 213 / 0.238) 10%, rgb(98 75 213 / 0.171) 20%, rgb(98 75 213 / 0.118) 30%, rgb(98 75 213 / 0.077) 40%, rgb(98 75 213 / 0.046) 50%, rgb(98 75 213 / 0.025) 60%, rgb(98 75 213 / 0.011) 70%, rgb(98 75 213 / 0) 100%);
-  position: relative; isolation: isolate;
 }
 @media (prefers-color-scheme: dark) {
   body.acct {
