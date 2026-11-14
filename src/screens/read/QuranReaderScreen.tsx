@@ -702,7 +702,7 @@ export default function QuranReaderScreen() {
           <CheckIntroPage
             visible={introOpen}
             onGet={() =>
-              Alert.alert('Not yet', 'Payments aren’t set up yet. In Revisely Dev every tester has Check.')
+              Alert.alert('Not yet', 'Premium isn’t available yet. In Revisely Dev every tester has Check.')
             }
             onClose={() => setIntroOpen(false)}
           />

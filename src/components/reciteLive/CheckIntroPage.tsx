@@ -20,8 +20,9 @@ const PREVIEW_ASPECT = 1206 / 1140;
 /**
  * Check, for an account without it (Majd, Nov 14 2026): a page of its own, the way Revisely introduces things (What's
  * new, Revo's opt-in): a framed real screen, a bold title, one sentence, one button, and under it "Can’t afford it?
- * Apply for support" (the Quran Muaalem License's free path, in plain view before paying). Get Check pays (payments
- * are to come). One line says following along stays free and that Check is AI.
+ * Apply for support" (the Quran Muaalem License's free path, in plain view). Check is part of Revisely Premium (Majd,
+ * Nov 14: the paid side is "Premium", and no prices: nothing is for sale yet), so the button is Get Premium, which is a
+ * placeholder until Premium exists. One line says it's Premium, following along stays free, and Check is AI.
  */
 export function CheckIntroPage({
   visible,
@@ -63,7 +64,7 @@ export function CheckIntroPage({
           </Text>
         </ScrollView>
         <View style={styles.bottom}>
-          <PillButton title="Get Check" size="lg" onPress={onGet} testID="check-intro-get" />
+          <PillButton title="Get Premium" size="lg" onPress={onGet} testID="check-intro-get" />
           <Tap
             onPress={() => Linking.openURL(CHECK_SUPPORT_URL).catch(() => undefined)}
             style={styles.support}
@@ -76,7 +77,7 @@ export function CheckIntroPage({
             </Text>
           </Tap>
           <Text style={[typeV2.meta, styles.note, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
-            Following along stays free. Check is AI and can make mistakes.
+            Check is part of Premium. Following along stays free. Check is AI and can make mistakes.
           </Text>
         </View>
       </View>

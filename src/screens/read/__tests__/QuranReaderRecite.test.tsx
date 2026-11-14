@@ -457,9 +457,14 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
     await open();
     fireEvent(screen.getByTestId('recite-mic'), 'longPress');
     expect(screen.getByTestId('check-locked')).toBeTruthy();
+    expect(screen.getByLabelText('Check, Follows you and marks your mistakes, part of Premium, locked')).toBeTruthy();
     fireEvent.press(screen.getByTestId('recite-mode-check'));
     await flush();
     expect(screen.getByTestId('check-intro')).toBeTruthy();
+    // The paid side is Premium, with no price (Majd, Nov 14 2026).
+    expect(screen.getByText('Get Premium')).toBeTruthy();
+    expect(screen.getByText('Check is part of Premium. Following along stays free. Check is AI and can make mistakes.')).toBeTruthy();
+    expect(screen.queryByText(/[$€£]|\d+(\.\d+)? ?(USD|a month|\/mo)/)).toBeNull();
     expect(screen.getByText('Can’t afford it? Apply for support')).toBeTruthy();
     expect(mockLive.start).toBeUndefined();
   });

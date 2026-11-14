@@ -26,8 +26,9 @@ export function reciteLiveForAccount(user: { previewTester?: boolean } | null | 
 }
 
 /**
- * Whether Check (mistake detection, to be paid) is this account's. In the Dev app every tester has it; "Show Check
- * locked" (Settings → Testing) shows it as those without it will see it.
+ * Whether Check (mistake detection, part of Revisely Premium) is this account's. In the Dev app every tester has it;
+ * "Show Check locked" (Settings → Testing) shows it as those without it will see it. The grant (entitlements, being
+ * agreed with apply-support: `.check` or `.premium`) replaces previewTester once it exists.
  */
 export function checkOwned(user: { previewTester?: boolean } | null | undefined, settings: Pick<ReciteCheckSettings, 'previewLocked'>): boolean {
   return user?.previewTester === true && !settings.previewLocked;
