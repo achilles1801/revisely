@@ -168,6 +168,19 @@ class Bench(unittest.TestCase):
         t14 = next(e['t'] for e in ev if e['type'] == 'mark' and e['mark']['w'] == 14)
         self.assertLess(t14, 30.0)
 
+    def test_a_snapshot_holds_what_the_phone_should_show(self):
+        sess = self.session()
+        ev = run(sess, chunks(bench_pcm()[: 16000 * 2 * 35], 3200))
+        snap = sess.snapshot()
+        marks = {e['mark']['id'] for e in ev if e['type'] == 'mark'} - {e['id'] for e in ev if e['type'] == 'unmark'}
+        self.assertEqual({e['mark']['id'] for e in snap if e['type'] == 'mark'}, marks)
+        last = {k: [e for e in ev if e['type'] == k][-1] for k in ('at', 'said', 'score')}
+        got = {e['type']: e for e in snap if e['type'] in ('at', 'said', 'score')}
+        self.assertEqual(got['at']['w'], last['at']['w'])
+        self.assertEqual(got['said']['upTo'], last['said']['upTo'])
+        self.assertEqual({k: got['score'][k] for k in ('reached', 'mistakes')},
+                         {k: last['score'][k] for k in ('reached', 'mistakes')})
+
     def test_same_events_for_any_chunk_size(self):
         pcm = bench_pcm()[: 16000 * 2 * 20]
         a = run(self.session(), chunks(pcm, 3200) + [{'type': 'end'}])

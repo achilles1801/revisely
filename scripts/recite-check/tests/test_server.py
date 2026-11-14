@@ -42,6 +42,7 @@ def wav(seconds=2.0):
 class FakeEngine:
     def __init__(self, threads=2):
         self.calls = []
+        self.table = None
 
     def check(self, x, s, a, s2, a2, q, v=1):
         self.calls.append((v, s, a, s2, a2))
@@ -81,6 +82,9 @@ class FakeSession:
                 ev.append({'type': 'mark', 'mark': {'id': '101:skipped:', 'w': 101, 'kind': 'skipped',
                                                     'ayah': [1, 1], 'sure': 'likely'}, 't': 1.0})
         return ev
+
+    def snapshot(self):
+        return [{'type': 'at', 'w': 100 + self.n // SR, 't': float(self.n // SR)}] if self.n else []
 
     def control(self, msg):
         if msg['type'] == 'dismiss':
@@ -259,6 +263,35 @@ class LiveTests(Base):
                 pass
         self.assertEqual(self.stored, {})
 
+    def test_audio_sent_faster_than_it_is_checked_is_read_at_once_and_merged_in_order(self):
+        """A resume resends the take as fast as the phone can: the socket is read at once (or it would stop
+        answering pings), and the queued audio reaches the checker in fewer, bigger pieces, in order."""
+        calls = []
+        slow = FakeSession.feed
+
+        def feed(sess, data):
+            calls.append(len(data))
+            time.sleep(0.05)
+            return slow(sess, data)
+        with mock.patch.object(FakeSession, 'feed', feed):
+            with self.socket() as ws:
+                ws.send_text(start())
+                ws.receive_json()
+                for _ in range(40):
+                    ws.send_bytes(b'\1\0' * 1600)  # 4 s of audio at once
+                ws.send_text(json.dumps({'type': 'dismiss', 'id': '101:skipped:'}))
+                ws.send_text(json.dumps({'type': 'end'}))
+                types = []
+                while True:
+                    e = ws.receive_json()
+                    types.append(e['type'])
+                    if e['type'] == 'done':
+                        break
+        self.assertEqual(sum(calls), 40 * 3200)
+        self.assertLess(len(calls), 40)
+        self.assertEqual(FakeSession.made[0].dismissed, {'101:skipped:'})
+        self.assertEqual(types.count('at'), 4)
+
     def test_idle_socket_is_closed(self):
         with mock.patch.object(server, 'IDLE', 0.3):
             with self.socket() as ws:
@@ -284,6 +317,7 @@ class LiveTests(Base):
             ws.send_text(start(token='good', resume=sid))
             ready = ws.receive_json()
             self.assertEqual((ready['take'], ready['from']), (sid, 3 * SR))
+            self.assertEqual(ws.receive_json(), {'type': 'at', 'w': 103, 't': 3.0})  # the snapshot
             ws.send_bytes(second_of_audio())
             self.assertEqual(ws.receive_json()['w'], 104)
             ws.send_text(json.dumps({'type': 'stop'}))  # the old name still ends a take

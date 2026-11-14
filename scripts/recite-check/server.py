@@ -45,7 +45,9 @@ limiter = auth.Limiter()
 async def lifespan(_app):
     # Loaded before the port opens: Cloud Run gives a starting instance its CPU until then.
     ENGINE['e'] = Engine(threads=int(os.environ.get('THREADS', '2')))
-    if os.environ.get('LIVE_HELPER', '1') == '1':
+    # The helper works out a live session's next words; with the word table in the image there is nothing for it to
+    # do, and starting it (a second Python importing the checker) costs seconds of a cold start on Cloud Run.
+    if ENGINE['e'].table is None and os.environ.get('LIVE_HELPER', '1') == '1':
         live.start_helper()
     yield
 
@@ -244,7 +246,7 @@ async def open_session(msg, uid):
     rid = msg.get('resume')
     s = SESSIONS.get(rid) if isinstance(rid, str) else None
     if s and s.uid == uid and not s.sess.stopped:
-        return s
+        return s, True
     if not rid:
         limiter.take(uid)
     passage = passage_of(*(int_or_none(msg, k) for k in ('s', 'a', 's2', 'a2')))
@@ -255,7 +257,33 @@ async def open_session(msg, uid):
     s = Live(sid, uid, sess, msg.get('keep') is True, request, msg.get('app') if isinstance(msg.get('app'), str)
              else None)
     SESSIONS[sid] = s
-    return s
+    return s, False
+
+
+async def read_into(ws, inbox):
+    """Every frame from the phone into the inbox as it comes: ('audio', bytes), ('control', msg), then ('gone', None),
+    or ('idle', None) after IDLE seconds without a frame."""
+    try:
+        while True:
+            try:
+                m = await asyncio.wait_for(ws.receive(), IDLE)
+            except asyncio.TimeoutError:
+                await inbox.put(('idle', None))
+                return
+            if m['type'] == 'websocket.disconnect':
+                break
+            if m.get('bytes') is not None:
+                await inbox.put(('audio', m['bytes']))
+            elif m.get('text') is not None:
+                try:
+                    c = json.loads(m['text'])
+                except ValueError:
+                    continue
+                if isinstance(c, dict) and c.get('type') in ('seek', 'dismiss', 'end', 'stop'):
+                    await inbox.put(('control', c))
+    except Exception:
+        pass
+    await inbox.put(('gone', None))
 
 
 @app.websocket('/live')
@@ -304,37 +332,50 @@ async def live_socket(ws: WebSocket):
             raise BadRequest('the first frame must be a start frame')
         token = msg.get('token')
         uid = await signed_in_tester('Bearer ' + token if isinstance(token, str) else ws.headers.get('authorization'))
-        s = await open_session(msg, uid)
-        s.owner, s.left = me, None
+        s, resumed = await open_session(msg, uid)
+
+        def take_over():
+            # under the session's lock: a socket that dropped may still be checking its last piece of audio, and
+            # `from` must not move after it is sent
+            with s.lock:
+                s.owner, s.left = me, None
+                return s.sess.n, s.sess.snapshot() if resumed else []
+        held, snap = await asyncio.to_thread(take_over)
         s.sockets += 1
-        await send([{'type': 'ready', 'v': 2, 'engine': VERSION, 'take': s.sid, 'from': s.sess.n}])
-        while True:
-            try:
-                m = await asyncio.wait_for(ws.receive(), IDLE)
-            except asyncio.TimeoutError:
-                await fail('idle', 1000)
-                break
-            if m['type'] == 'websocket.disconnect':
-                break
-            if s.owner is not me:  # the phone came back on another socket: this one is over
-                break
-            if m.get('bytes') is not None:
-                events = await asyncio.to_thread(s.run, s.sess.feed, m['bytes'])
-            elif m.get('text') is not None:
-                try:
-                    c = json.loads(m['text'])
-                except ValueError:
-                    c = None
-                if isinstance(c, dict) and c.get('type') in ('seek', 'dismiss', 'end', 'stop'):
-                    events = await asyncio.to_thread(s.run, s.sess.control, c)
+        await send([{'type': 'ready', 'v': 2, 'engine': VERSION, 'take': s.sid, 'from': held}], record=False)
+        await send(snap, record=False)  # what the dropped socket may have swallowed
+        # A reader drains the socket at once into a queue and the work runs from the queue, in order: a phone
+        # resending a take (a resume) sends faster than it is checked, and a socket left unread stops answering
+        # pings, which ends the connection.
+        inbox = asyncio.Queue()
+        reader = asyncio.create_task(read_into(ws, inbox))
+        held = None  # a frame taken while gathering audio, to handle next
+        try:
+            while True:
+                kind, item = held or await inbox.get()
+                held = None
+                if kind == 'idle':
+                    await fail('idle', 1000)
+                    break
+                if kind == 'gone' or s.owner is not me:  # gone, or the phone came back on another socket
+                    break
+                if kind == 'audio':  # this and any audio queued right behind it, in one go
+                    chunks = [item]
+                    while not inbox.empty():
+                        nxt = inbox.get_nowait()
+                        if nxt[0] != 'audio':
+                            held = nxt
+                            break
+                        chunks.append(nxt[1])
+                    events = await asyncio.to_thread(s.run, s.sess.feed, b''.join(chunks))
                 else:
-                    events = []
-            else:
-                events = []
-            if s.sess.stopped:
-                await finish(events)
-                break
-            await send(events)
+                    events = await asyncio.to_thread(s.run, s.sess.control, item)
+                if s.sess.stopped:
+                    await finish(events)
+                    break
+                await send(events)
+        finally:
+            reader.cancel()
     except auth.Refused as e:
         await fail(e.reason)
     except BadRequest as e:

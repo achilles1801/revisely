@@ -36,13 +36,15 @@ SR = 16000
 LIVE = {'hop': 0.5, 'win': 4.0, 'look': 1.0, 'commit': 0.5, 'context': 30.0, 'stable': 1, 'skip_wait': 'start',
         'live_order': False}
 SEG_WORDS = 96      # words in a segment's graph
-SEG_FIRST = 40      # the first segment's (built on the first hop, before the helper can have worked any out)
+SEG_FIRST = 96      # the first segment's (the word table makes building it quick)
 SEG_BACK = 16       # words before a segment's first word, for repeats
 SEG_MARGIN = 24     # a new segment starts when the cursor is this close to the segment's last word
 SEG_FRAMES = 3 * 60 * FPS  # ...or when a segment has taken this many frames (3 minutes)
 MAX_SECONDS = 15 * 60
 EXTRA_STABLE = 2    # hops in a row an extra word must be there before it is shown
 FIX_STABLE = 4      # hops in a row a marked word must be heard right again before it is unmarked
+LEAD_FRAMES = 10    # a filler starting this close to a segment's first frame is the pause it started in, not a word
+SETTLE = 3.0        # seconds a seam must be behind the newest final frame: the path there no longer moves
 NEG = checker.Decoder.NEG
 _pool = None
 
@@ -202,8 +204,15 @@ class Decoder(checker.Decoder):
         else:
             s, gi = int(np.argmax(d)), int(np.argmax(gap))
             cur, score = (('state', s), float(d[s])) if d[s] >= gap[gi] else (('gap', gi), float(gap[gi]))
+        return self._walk(cur, self.t - 1, since), score
+
+    def traceback_from(self, t, state):
+        """The best path that is in word state `state` at frame t (a seam), from frame 0."""
+        return self._walk(('state', state), t, 0)
+
+    def _walk(self, cur, t, since):
+        g = self.g
         path = []
-        t = self.t - 1
         while t >= since:
             if cur[0] == 'gap':
                 gi = cur[1]
@@ -227,7 +236,7 @@ class Decoder(checker.Decoder):
                 cur = ('state', s + {0: 0, 1: -1, 2: -2, 3: 1}[int(c)])
             t -= 1
         path.reverse()
-        return path, score
+        return path
 
 
 class Segment:
@@ -241,11 +250,11 @@ class Segment:
         self.dec = Decoder(self.g, P, entry=first - a, start=start)
 
     def own_extra(self, e):
-        """An extra word this segment may report: after its first word's predecessor or later, and not the pause
-        a 'lead' start holds before the reciter begins."""
+        """An extra word this segment may report: after its first word's predecessor or later, and never filler
+        the segment started in (the pause it starts at, whatever the start)."""
         if e['after'] < self.first - 1:
             return False
-        return not (self.start == 'lead' and e['after'] == self.first - 1 and e['span'] and e['span'][0] == self.f0)
+        return not (e['after'] == self.first - 1 and e['span'] and e['span'][0] - self.f0 <= LEAD_FRAMES)
 
     def frames(self):
         return self.f0 + self.dec.t
@@ -284,7 +293,11 @@ class LiveSession:
         self.dismissed = set()
         self.ayat_done = set()
         self.ctrl = []                   # (samples received when it came, message)
+        self.seams = []                  # (seconds, cursor, first word, frame, start) of each segment after the first
+        self._window = (None, [])        # the segment and path of the last decision (for a seam's state)
         self.sent = {'at': None, 'said': None, 'score': None}
+        self.unmarked = set()            # ids taken back (and not marked again): for a resume's snapshot
+        self.ayah_sent = []              # ayah events sent: for a resume's snapshot
         self.stopped = False
         self.result = None
         self.ms = {'model': 0.0, 'words': 0.0, 'tajweed': 0.0, 'hops': 0, 'worst_hop': 0.0}
@@ -439,17 +452,68 @@ class LiveSession:
         fut = _pool.submit(_helper_words, b, hi, int(self.P['alts']), self.P['alt_rule'])
         fut.add_done_callback(lambda f: f.exception() is None and E.remember(f.result()))
 
-    def _close_segment(self):
-        """End the segment after its furthest decided word c - 1 (not after the cursor: a reciter who went back is
-        followed by the next segment's repeats). Its decisions for words [first, c), on its whole path, are kept for
-        `end`; words in there the live window never settled are decided now (and marked when wrong). -> (c, events)"""
+    def _seam(self):
+        """Where the next segment starts (c: its first word), or None to wait a hop. The seam is the last decided word
+        that ends an ayah, heard SETTLE seconds or more before the newest final frame (so the path there no longer
+        moves) and inside the 30 s window: the next segment starts in the pause between ayat and judges again every
+        word after it. Without one, the last such decided word. Either way within a skip (12 words) of the furthest
+        decided word: a word visited again late (a repeat, or a passage that sounds like an earlier one) must not
+        pull the seam back behind the reciter."""
         seg = self.seg
+        now_f, ctx = seg.frames(), int(self.P['context'] * FPS)
         mine = [w for w in self.decided if seg.first <= w < seg.b]
-        c = max(mine) + 1 if mine else seg.first
+        if not mine:
+            return None
+        head = max(mine)
+        ok = [w for w in mine if w >= head - int(self.P['skip_max']) and w in self.spans
+              and now_f - ctx <= self.spans[w][1] <= now_f - int(SETTLE * FPS) and self._clean(w)]
+        ends = [w for w in ok if self._ends_ayah(w)]
+        if ends:
+            return max(ends) + 1
+        if ok:
+            return max(ok) + 1
+        return None
+
+    def _clean(self, w, n=3):
+        """Words w - n .. w were all decided right, each heard once after the one before: a stretch the path is sure
+        of (not a repeat, a passage that sounds like another, or a stray visit in a mistake)."""
+        prev_end = None
+        for x in range(w - n, w + 1):
+            if self.status.get(x) != 'correct' or x not in self.spans:
+                return False
+            a, b = self.spans[x]
+            if prev_end is not None and not prev_end - 2 <= a <= prev_end + 3 * FPS:
+                return False
+            prev_end = b
+        return True
+
+    def _seam_state(self, c):
+        """(frame in the segment, state) of word c - 1's last frame on the last decision's path, if it is there."""
+        seg, path = self._window
+        if seg is not self.seg or c - 1 not in self.spans:
+            return None
+        t = self.spans[c - 1][1] - 1 - seg.f0
+        for f, st, _ in path:
+            if f == t:
+                return (t, st) if st >= 0 and seg.app[int(seg.g.word_of[st])] == c - 1 else None
+        return None
+
+    def _close_segment(self, c=None, seam=False):
+        """End the segment before word c (default: after its furthest decided word, as for a seek). Its decisions for
+        words [first, c), on its whole path, are kept for `end`; words in there the live window never settled are
+        decided now (and marked when wrong). seam: the next segment starts at c and owns an extra word after c - 1.
+        -> (c, events)"""
+        seg = self.seg
+        if c is None:
+            mine = [w for w in self.decided if seg.first <= w < seg.b]
+            c = max(mine) + 1 if mine else seg.first
         ev = []
         if seg.dec.t >= 5 and c > seg.first:
-            path, _ = seg.dec.traceback(final=False)
-            res = self._segment_result(seg, path, c, self.P)
+            at = self._seam_state(c) if seam else None
+            # at a seam, the best path ending in word c - 1's last state there (where the next segment starts), so
+            # the two segments' paths join into one; else the best path now
+            path = seg.dec.traceback_from(*at) if at else seg.dec.traceback(final=False)[0]
+            res = self._segment_result(seg, path, c, self.P, extras_to=c - 1 if seam else c)
             self.segs.append(res)
             now = round(self.seconds, 2)
             for row in res['words']:
@@ -463,11 +527,11 @@ class LiveSession:
                     self.flagged[w] = now
                     self.bad_from[w] = res['spans'][w][0] if w in res['spans'] else seg.frames()
                     if m['id'] not in self.marks:
-                        self.marks[m['id']] = m
+                        self._keep_mark(m)
                         ev.append({'type': 'mark', 'mark': m, 't': now})
         return c, ev
 
-    def _segment_result(self, seg, path, upto, P, refs=None):
+    def _segment_result(self, seg, path, upto, P, refs=None, extras_to=None):
         lp = self.lp[seg.f0:seg.frames()]
         st, fl, _, _, extras, visits, fillers = checker.decide(seg.kws, seg.g, lp, path, P, self.E.ear.vocab,
                                                                self._tokens(seg.f0, seg.frames()), refs=refs)
@@ -480,8 +544,9 @@ class LiveSession:
             'words': [r for r in words if r['w'] in keep],
             'spans': {w: s for w, s in spans.items() if w in keep},
             'extras': [e for e in extra_rows(extras, fillers, seg.kws, P['delay'], seg.f0)
-                       if e['trail'] or seg.own_extra(e) and e['after'] < upto],
+                       if e['trail'] or seg.own_extra(e) and e['after'] < (upto if extras_to is None else extras_to)],
             'back': back,
+            'words_from': seg.first, 'words_to': upto,
         }
 
     def _maybe_rebase(self, cur):
@@ -492,11 +557,20 @@ class LiveSession:
         if near_end and not any(seg.first <= w < seg.b for w in self.decided) and seg.dec.t < SEG_FRAMES:
             return []
         old_frames = seg.frames()
-        c, ev = self._close_segment()
-        # start where the last decided word ended (its frames are final), at most the 30 s window back
+        c = self._seam()
+        if c is None:
+            about_to_leave = cur is not None and cur >= seg.b - 8
+            if not about_to_leave and seg.dec.t < SEG_FRAMES:
+                return []  # nothing settled yet: try again next hop
+            mine = [w for w in self.decided if seg.first <= w < seg.b]
+            c = max(mine) + 1 if mine else seg.first
+        c, ev = self._close_segment(c, seam=True)
+        # start where word c - 1 ended (its frames are final), at most the 30 s window back
         f0 = self.spans[c - 1][1] if c - 1 in self.spans and c > seg.first else seg.f0
         f0 = min(self.T, max(f0, old_frames - int(self.P['context'] * FPS)))
-        self._start_segment(c, f0, 'after' if c - 1 in self.decided else 'lead')
+        start = 'after' if c - 1 in self.decided else 'lead'
+        self.seams.append((round(self.seconds, 1), cur, c, f0, start))
+        self._start_segment(c, f0, start)
         return ev
 
     # ------------------------------------------------------------ decisions
@@ -535,6 +609,7 @@ class LiveSession:
         cf, ctx = int(P['commit'] * FPS), int(P['context'] * FPS)
         lo_t = max(0, dec.t - ctx)
         path, _ = dec.traceback(final=False, since=lo_t)
+        self._window = (seg, path)
         st, fl, _, _, extras, visits, fillers = checker.decide(seg.kws, seg.g, self.lp[seg.f0:seg.frames()], path, P,
                                                                E.ear.vocab, self._tokens(seg.f0, seg.frames()))
         app, W, entry = seg.app, seg.g.W, seg.first - seg.a
@@ -602,7 +677,7 @@ class LiveSession:
                 self.extra_run[aw] = 0
         for m in new_marks:
             if m['id'] not in self.marks:
-                self.marks[m['id']] = m
+                self._keep_mark(m)
                 ev.append({'type': 'mark', 'mark': m, 't': round(now, 2)})
         t1 = time.perf_counter()
         ev += self._ayah_marks(now)
@@ -610,6 +685,26 @@ class LiveSession:
         ev += self._maybe_rebase(cw + seg.a if cw is not None else None)
         ev += self._said_event(now)
         ev += self._score_event(now)
+        return ev
+
+    def _keep_mark(self, m):
+        self.marks[m['id']] = m
+        self.unmarked.discard(m['id'])
+
+    def snapshot(self):
+        """Everything a phone should be showing now, as the events it already knows (all idempotent): every mark
+        shown, every mark taken back, the ayat judged, the cursor, `said` and the score. Sent after `ready` on a
+        resume, for events a dropped socket may have swallowed."""
+        t = round(self.seconds, 2)
+        ev = [{'type': 'mark', 'mark': m, 't': t} for m in self.marks.values()]
+        ev += [{'type': 'unmark', 'id': i, 'why': 'corrected', 't': t} for i in sorted(self.unmarked)]
+        ev += [dict(e, t=t) for e in self.ayah_sent]
+        if self.sent['at'] is not None:
+            ev.append({'type': 'at', 'w': self.sent['at'], 't': t})
+        if self.sent['said'] is not None:
+            ev.append({'type': 'said', 'upTo': self.sent['said'][0], 't': t})
+        if self.decided:
+            ev.append({'type': 'score', **score(self.status, list(self.marks.values()), self.dismissed), 't': t})
         return ev
 
     def _word_mark(self, row, fl):
@@ -632,6 +727,7 @@ class LiveSession:
         for mid in [m for m, mk in self.marks.items() if mk['w'] == aw and mk['kind'] in ('word', 'skipped')]:
             del self.marks[mid]
             ev.append({'type': 'unmark', 'id': mid, 'why': 'corrected', 't': round(now, 2)})
+            self.unmarked.add(mid)
         self.status[aw] = 'corrected'
         self.flagged.pop(aw, None)
         self.bad_from.pop(aw, None)
@@ -653,10 +749,15 @@ class LiveSession:
             marks = self.E.marks([], {}, {}, [], tj, letters if self.st['letters'] else [])
             for m in marks:
                 if m['id'] not in self.marks:
-                    self.marks[m['id']] = m
+                    self._keep_mark(m)
                     ev.append({'type': 'mark', 'mark': m, 't': round(now, 2)})
             ev.append({'type': 'ayah', 's': s, 'a': a, 't': round(now, 2)})
+            self.ayah_sent.append(ev[-1])
         return ev
+
+    def _ends_ayah(self, w):
+        s, a, p = self.E.key.where(w)
+        return p == self._ayah_bounds(s, a)[1] - 1
 
     def _ayah_bounds(self, s, a):
         v = self.E.words.vindex[(s, a)]
