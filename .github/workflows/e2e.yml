@@ -171,7 +171,7 @@ jobs:
           RUN_ID: ${{ github.run_id }}
           INFRA_ONLY: ${{ inputs.only }}
         run: |
-          full='[{"name":"02 03 08 12 13 16 17","flows":".maestro/flows/0[238]-*.yaml .maestro/flows/1[2367]-*.yaml"},{"name":"01 04 07 09-revo-attach 14 15","flows":".maestro/flows/0[147]-*.yaml .maestro/flows/09-revo-attach.yaml .maestro/flows/1[45]-*.yaml"},{"name":"10 09-activity-dark 09-activity-light 09-insights-history","flows":".maestro/flows/10-*.yaml .maestro/flows/09-activity-*.yaml .maestro/flows/09-insights-history.yaml"},{"name":"05 06 09-revo 11","flows":".maestro/flows/0[56]-*.yaml .maestro/flows/09-revo.yaml .maestro/flows/11-*.yaml"}]'
+          full='[{"name":"02 03 08 12 13 16 17","flows":".maestro/flows/0[238]-*.yaml .maestro/flows/1[2367]-*.yaml"},{"name":"01 04 07 09-revo-attach 14 15","flows":".maestro/flows/0[147]-*.yaml .maestro/flows/09-revo-attach.yaml .maestro/flows/1[45]-*.yaml"},{"name":"10 09-activity-dark 09-activity-light 09-insights-history","flows":".maestro/flows/10-*.yaml .maestro/flows/09-activity-*.yaml .maestro/flows/09-insights-history.yaml"},{"name":"05 06 09-revo 11 18","flows":".maestro/flows/0[56]-*.yaml .maestro/flows/09-revo.yaml .maestro/flows/11-*.yaml .maestro/flows/18-*.yaml"}]'
           # Android's smoke set is a single PR's long pole: two jobs side by side
           # (about 8 minutes of flows each: 02 + 05, 04 + 06) instead of one of 16.
           # iOS keeps one job: macOS runners are the scarce part (5 at a time).

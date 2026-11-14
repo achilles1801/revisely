@@ -34,17 +34,40 @@ export function markPlace(mark: Mark): string {
 /** The label of the Recited row: what was heard spelt out isn't exact. */
 export const recitedLabel = (mark: Mark) => (mark.heardExact === false ? 'As heard' : 'Recited');
 
+const HARAKA_NAMES: Record<string, string> = {
+  '\u064B': 'fathatan',
+  '\u064C': 'dammatan',
+  '\u064D': 'kasratan',
+  '\u064E': 'fatha',
+  '\u064F': 'damma',
+  '\u0650': 'kasra',
+  '\u0651': 'shadda',
+  '\u0652': 'sukun',
+  '\u0670': 'a dagger alif',
+};
+
+/** A slip's side in words: harakat by name ("dammatan and shadda"), letters as Arabic in an isolate. */
+function slipSide(text: string): string {
+  const chars = [...text];
+  if (chars.length && chars.every((c) => HARAKA_NAMES[c])) {
+    // A shadda first reads best: "shadda and damma".
+    const names = chars.map((c) => HARAKA_NAMES[c]);
+    return names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+  }
+  return `\u2068${text}\u2069`;
+}
+
 /**
- * A harakat or letter slip in a line, Latin first and the Arabic in isolates: "ي heard for ء". A haraka alone is shown
- * on a tatweel (ـَ) so it has something to sit on. Null when the checker didn't say which.
+ * A harakat or letter slip in a line, Latin first: "Dammatan and shadda heard for kasratan", "⁨س⁩ heard for ⁨ص⁩".
+ * A lone haraka is too small to read in a line of text, so harakat are named. Null when the checker didn't say which.
  */
 export function slipLine(mark: Mark): string | null {
   if (!mark.slip || (mark.kind !== 'harakat' && mark.kind !== 'letter')) return null;
-  const iso = (s: string) => `\u2068${/^[\u064B-\u0652\u0670]+$/.test(s) ? `\u0640${s}` : s}\u2069`;
+  const cap = (x: string) => (x.startsWith('\u2068') ? x : x.charAt(0).toUpperCase() + x.slice(1));
   const { expected, heard } = mark.slip;
-  if (!heard) return `${iso(expected)} not heard`;
-  if (!expected) return `${iso(heard)} added`;
-  return `${iso(heard)} heard for ${iso(expected)}`;
+  if (!heard) return `${cap(slipSide(expected))} not heard`;
+  if (!expected) return `${cap(slipSide(heard))} added`;
+  return `${cap(slipSide(heard))} heard for ${slipSide(expected)}`;
 }
 
 /** For a tajweed note: what was heard, and the setting. */
@@ -133,6 +156,7 @@ export function findingNote(mark: Mark): string {
     return sub ? `${main} · ${sub}` : main;
   }
   if (mark.kind === 'skipped') return 'Left out';
-  if (!mark.heard) return mark.kind === 'word' ? 'Said as another word' : '';
+  const slip = slipLine(mark);
+  if (!mark.heard) return mark.kind === 'word' ? 'Said as another word' : (slip ?? '');
   return `${recitedLabel(mark)} ${iso(mark.heard)}`;
 }

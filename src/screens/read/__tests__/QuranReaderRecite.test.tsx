@@ -18,7 +18,11 @@ jest.mock('expo-haptics', () => ({
 }));
 
 // The page: draws what the screen puts behind and over it, so the test can see the marks and covers.
-const mockPager: { onPageChange?: (page: number) => void; onTapVerse?: (a: unknown) => boolean } = {};
+const mockPager: {
+  onPageChange?: (page: number) => void;
+  onTapVerse?: (a: unknown) => boolean;
+  onTapPoint?: (page: number, x: number, y: number, toWindow: (r: { x0: number; y0: number; x1: number; y1: number }) => unknown) => boolean;
+} = {};
 jest.mock('../../../components/MushafPager', () => {
   const { Pressable, View } = require('react-native');
   const React = require('react');
@@ -29,19 +33,23 @@ jest.mock('../../../components/MushafPager', () => {
           onTap?: () => void;
           onPageChange?: (page: number) => void;
           onTapVerse?: (a: unknown) => boolean;
+          onTapPoint?: (page: number, x: number, y: number, toWindow: (r: unknown) => unknown) => boolean;
           pageUnderlay?: (page: number, scale: number) => React.ReactNode;
           pageOverlay?: (page: number, scale: number, image: unknown) => React.ReactNode;
+          pageAccessories?: (page: number, scale: number) => React.ReactNode;
         },
         ref: React.Ref<{ scrollToPage: (p: number) => boolean }>,
       ) => {
         mockPager.onPageChange = props.onPageChange;
         mockPager.onTapVerse = props.onTapVerse;
+        mockPager.onTapPoint = props.onTapPoint as never;
         React.useImperativeHandle(ref, () => ({ scrollToPage: (p: number) => (props.onPageChange?.(p), true) }));
         return (
           <View>
             <Pressable accessibilityLabel="The page" onPress={props.onTap} />
             {props.pageUnderlay?.(379, 0.38)}
             {props.pageOverlay?.(379, 0.38, { uri: 'file:///379.png', width: 389, height: 629 })}
+            {props.pageAccessories?.(379, 0.38)}
           </View>
         );
       },
@@ -116,6 +124,7 @@ const mockLive: { start?: Record<string, unknown>; onEvent?: (e: LiveEvent) => v
   sent: [],
   audio: 0,
 };
+jest.mock('../../../lib/reciteCheck/service', () => ({ ...jest.requireActual('../../../lib/reciteCheck/service'), warmUpReciteCheck: jest.fn() }));
 jest.mock('../../../lib/reciteLive/socket', () => ({
   socketFeed: () => (start: Record<string, unknown>, handlers: { onEvent: (e: LiveEvent) => void; onClose: () => void }) => {
     mockLive.start = start;
@@ -250,7 +259,8 @@ describe('Check: marks as you recite', () => {
     await event({ type: 'said', upTo: UTIYAT });
     await event({ type: 'mark', mark: { id: 'a', w: UTIYAT, ayah: [27, 23], kind: 'word', sure: 'likely', heard: 'وَأُوهِيَتْ', heardExact: false } });
     await event({ type: 'at', w: UTIYAT + 1 });
-    expect(screen.getByTestId('live-mark-word')).toBeTruthy();
+    expect(screen.getByTestId('live-ink-word')).toBeTruthy();
+    expect(screen.getByTestId('live-mark-word').props.accessibilityLabel).toBe('Wrong word, وَأُوتِيَتْ');
     expect(screen.getByText('99.2%')).toBeTruthy();
     expect(screen.getByText('وَأُوهِيَتْ')).toBeTruthy();
     await event({ type: 'mark', mark: { id: 'b', w: A23 + 7, ayah: [27, 23], kind: 'harakat', sure: 'clear', slip: { expected: 'ٍ', heard: 'ٌّ' } } });
@@ -283,5 +293,86 @@ describe('the hidden view (the eye on the bar)', () => {
       mockPager.onTapVerse?.({ page: 379, sura: 27, ayah: 23 });
     });
     expect(screen.getAllByTestId('hidden-cover').length).toBeLessThan(before);
+  });
+});
+
+describe('Check: a mark’s card, the summary, and Check’s page', () => {
+  const tapWord = (w: number) => {
+    const { wordBox } = require('../../../lib/reciteLive/geometry');
+    const b = wordBox(words, w);
+    return act(async () => {
+      mockPager.onTapPoint?.(379, (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, (r: { x0: number; y0: number; x1: number; y1: number }) => ({
+        x: r.x0,
+        y: r.y0 + 100,
+        width: r.x1 - r.x0,
+        height: r.y1 - r.y0,
+      }));
+    });
+  };
+
+  it('tapping a marked word opens its card: Expected and As heard; Not a mistake takes it off and tells the checker', async () => {
+    await startTake('check');
+    await event({ type: 'mark', mark: { id: 'a', w: UTIYAT, ayah: [27, 23], kind: 'word', sure: 'likely', heard: 'وَأُوهِيَتْ', heardExact: false } });
+    await event({ type: 'mark', mark: { id: 'n', w: UTIYAT, ayah: [27, 23], kind: 'tajweed', rule: 'qalqalah', sure: 'clear' } });
+    await tapWord(UTIYAT);
+    expect(screen.getByTestId('mark-card')).toBeTruthy();
+    expect(screen.getByText('Wrong word')).toBeTruthy();
+    expect(screen.getByText('As heard')).toBeTruthy();
+    // Both marks on the word, each with its own Not a mistake.
+    expect(screen.getByTestId('mark-card-tajweed')).toBeTruthy();
+    // Similar phrases: An-Naml 16 reads almost the same.
+    expect(screen.getByTestId('mark-card-similar')).toBeTruthy();
+    const play = jest.spyOn(require('../../../lib/recitation').getRecitation(), 'play').mockImplementation(() => undefined);
+    fireEvent.press(screen.getByTestId('mark-card-hear'));
+    expect(play).toHaveBeenCalledWith({ sura: 27, ayah: 23 }, expect.any(Function));
+    play.mockRestore();
+    fireEvent.press(screen.getAllByTestId('mark-card-dismiss')[0]);
+    expect(mockLive.sent).toContainEqual({ type: 'dismiss', id: 'a' });
+    expect(screen.queryByTestId('live-mark-word')).toBeNull();
+  });
+
+  it('tapping where there is no mark leaves the page to its own tap', async () => {
+    await startTake('check');
+    await event({ type: 'mark', mark: { id: 'a', w: UTIYAT, ayah: [27, 23], kind: 'word', sure: 'likely' } });
+    let taken = true;
+    await act(async () => {
+      taken = mockPager.onTapPoint?.(379, 1000, 1500, () => ({ x: 0, y: 0, width: 1, height: 1 })) ?? false;
+    });
+    expect(taken).toBe(false);
+    expect(screen.queryByTestId('mark-card')).toBeNull();
+  });
+
+  it('Similar phrases opens the sheet with An-Naml 16', async () => {
+    await startTake('check');
+    await event({ type: 'mark', mark: { id: 'a', w: UTIYAT, ayah: [27, 23], kind: 'word', sure: 'likely' } });
+    await tapWord(UTIYAT);
+    fireEvent.press(screen.getByTestId('mark-card-similar'));
+    expect(screen.getByTestId('similar-sheet')).toBeTruthy();
+    expect(screen.getByTestId('similar-27-16')).toBeTruthy();
+  });
+
+  it('the final answer brings the summary: the score, the passage, each finding', async () => {
+    await startTake('check');
+    const mark = { id: 'a', w: UTIYAT, ayah: [27, 23] as [number, number], kind: 'word' as const, sure: 'likely' as const, heard: 'وَأُوهِيَتْ', heardExact: false };
+    await event({ type: 'mark', mark });
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [mark], score: null, kept: true } });
+    expect(screen.getByTestId('take-summary')).toBeTruthy();
+    expect(screen.getByTestId('take-summary-finding-word')).toBeTruthy();
+    expect(screen.getByText('Kept as test data. Software checks it; nobody listens.')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('take-summary-done'));
+    expect(screen.getByTestId('recite-close')).toBeTruthy();
+  });
+
+  it('Check not the account’s: locked in the menu, and picking it opens Check’s page, not a take', async () => {
+    setReciteCheckSettings('u1', { noticeSeen: true, previewLocked: true });
+    await open();
+    fireEvent(screen.getByTestId('recite-mic'), 'longPress');
+    expect(screen.getByTestId('check-locked')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('recite-mode-check'));
+    await flush();
+    expect(screen.getByTestId('check-intro')).toBeTruthy();
+    expect(screen.getByText('Can’t afford it? Apply for support')).toBeTruthy();
+    expect(mockLive.start).toBeUndefined();
   });
 });

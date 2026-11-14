@@ -1,0 +1,262 @@
+# The Dev app's one mic and live check on the reader (Revisely Dev only; src/lib/reciteLive), for a
+# previewTester account. E2E builds have no microphone or checker: `e2e/recite-live` turns the Dev
+# UI on and a take plays a recorded event log (src/lib/e2e/reciteLive.ts: An-Naml 23–24 on page
+# 379 with a wrong word and a haraka slip, the moment of Majd's Tarteel screenshots of Nov 14 2026).
+# Screenshots of each state for the mocks (~/Documents/revisely-recite-mocks/option-A-final-2.png):
+# the reader with the mic, the mic's menu, following, a mark and the score, the hidden view, done.
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    file: ../subflows/new-account.yaml
+    env:
+      CLOCK: 2026-11-14T10:00
+      BOUNDARY: midnight
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: tester
+
+# The Dev UI, then the reader at An-Naml 23.
+- openLink:
+    link: revisely://e2e/recite-live?on=1
+    optional: true
+- runFlow: ../subflows/open-link-prompt.yaml
+- openLink:
+    link: revisely://read?page=379
+    optional: true
+- repeat:
+    while:
+      notVisible:
+        id: reader-background
+    times: 6
+    commands:
+      - runFlow: ../subflows/open-link-prompt.yaml
+      - extendedWaitUntil:
+          visible:
+            id: reader-background
+          timeout: 4000
+          optional: true
+      - runFlow:
+          when:
+            notVisible:
+              id: reader-background
+          commands:
+            - openLink:
+                link: revisely://read?page=379
+                optional: true
+
+# The controls: one mic (no record button) and the eye.
+- tapOn:
+    id: reader-background
+- extendedWaitUntil:
+    visible:
+      id: recite-mic
+    timeout: 10000
+- assertNotVisible: "Record your recitation"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl01-reader
+
+# Hold the mic: Record, Recite, Check.
+- longPressOn:
+    id: recite-mic
+- extendedWaitUntil:
+    visible:
+      id: recite-mode-menu
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl02-menu
+- tapOn:
+    id: recite-mode-check
+
+# The AI notice, once; then the take.
+- extendedWaitUntil:
+    visible:
+      id: recite-notice-agree
+    timeout: 5000
+- tapOn:
+    id: recite-notice-agree
+- extendedWaitUntil:
+    visible:
+      id: recite-words
+    timeout: 10000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl03-following
+
+# The wrong word marked, the score by the page.
+- extendedWaitUntil:
+    visible:
+      id: live-mark-word
+    timeout: 15000
+- assertVisible:
+    id: recite-score
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl04-marks
+
+# Tap the mark: its card (Expected and Recited), then Similar phrases (An-Naml 16 reads almost the same).
+- tapOn:
+    id: live-mark-word
+- extendedWaitUntil:
+    visible:
+      id: mark-card
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl04b-card
+- tapOn:
+    id: mark-card-similar
+- extendedWaitUntil:
+    visible:
+      id: similar-27-16
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl04c-similar
+- runFlow: ../subflows/close-sheet.yaml
+
+# The eye hides the page; ‹ shows the next word.
+- tapOn:
+    id: recite-eye
+- assertVisible:
+    id: recite-eye-group
+- tapOn:
+    id: recite-next-word
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl05-hidden
+- tapOn:
+    id: recite-eye
+
+# Stop: the final answer and its summary; then the page with its marks, and ✕.
+- tapOn:
+    id: recite-stop
+- extendedWaitUntil:
+    visible:
+      id: take-summary
+    timeout: 10000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl06-summary
+- tapOn:
+    id: take-summary-done
+- extendedWaitUntil:
+    visible:
+      id: recite-close
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl07-review
+- tapOn:
+    id: recite-close
+- assertVisible:
+    id: recite-mic
+
+# In dark: a Check take again (the mic remembers Check). Back from the reader is the Read tab.
+- tapOn:
+    id: reader-back
+- tapOn:
+    id: tab-Home
+- runFlow:
+    file: ../subflows/theme.yaml
+    env:
+      THEME: Dark
+- openLink:
+    link: revisely://read?page=379
+    optional: true
+- runFlow: ../subflows/open-link-prompt.yaml
+- extendedWaitUntil:
+    visible:
+      id: reader-background
+    timeout: 10000
+- tapOn:
+    id: reader-background
+- tapOn:
+    id: recite-mic
+- extendedWaitUntil:
+    visible:
+      id: live-mark-word
+    timeout: 20000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl08-marks-dark
+- tapOn:
+    id: recite-eye
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl09-hidden-dark
+- tapOn:
+    id: recite-eye
+- tapOn:
+    id: recite-stop
+- extendedWaitUntil:
+    visible:
+      id: take-summary
+    timeout: 10000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl10-summary-dark
+- tapOn:
+    id: take-summary-done
+- tapOn:
+    id: recite-close
+
+# Check locked (Settings → Testing → Show Check locked): picking it opens Check's page.
+- tapOn:
+    id: reader-back
+- tapOn:
+    id: tab-Home
+- tapOn:
+    id: open-settings
+- runFlow:
+    file: ../subflows/settings-row.yaml
+    env:
+      ROW: settings-check-locked
+- tapOn:
+    id: settings-check-locked
+- tapOn:
+    id: back
+- openLink:
+    link: revisely://read?page=379
+    optional: true
+- runFlow: ../subflows/open-link-prompt.yaml
+- extendedWaitUntil:
+    visible:
+      id: reader-background
+    timeout: 10000
+- tapOn:
+    id: reader-background
+- longPressOn:
+    id: recite-mic
+- assertVisible:
+    id: check-locked
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl11-menu-locked-dark
+- tapOn:
+    id: recite-mode-check
+- extendedWaitUntil:
+    visible:
+      id: check-intro
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl12-check-page-dark
+- tapOn:
+    id: check-intro-close
