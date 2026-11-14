@@ -30,6 +30,8 @@ from engine import BadRequest, Engine
 
 HERE = pathlib.Path(__file__).resolve().parent
 VERSION = (HERE / 'CHECKER_COMMIT').read_text().strip()[:12] if (HERE / 'CHECKER_COMMIT').exists() else 'local'
+SERVER = (HERE / 'SERVER_COMMIT').read_text().strip()[:12] if (HERE / 'SERVER_COMMIT').exists() else 'local'
+PROTOCOL = 5  # the contract draft this server speaks (recite-contract.md): follow, hint, tajweed, check_locked
 MAX_SECONDS = 240
 FIRST_FRAME = 10      # seconds a new socket has to send its start frame
 IDLE = 30             # seconds without a frame from the phone before a socket is closed
@@ -116,7 +118,9 @@ def put_json(name, obj):
 
 @app.get('/health')
 def health():
-    return {'ok': True, 'engine': VERSION}
+    """engine: the checker's commit; server: this service's (the repo's commit it was staged from); protocol: the
+    contract draft it speaks, so the app can tell which features it may use."""
+    return {'ok': True, 'engine': VERSION, 'server': SERVER, 'protocol': PROTOCOL}
 
 
 @app.post('/check')
@@ -362,7 +366,8 @@ async def live_socket(ws: WebSocket):
                 return s.sess.n, s.sess.snapshot() if resumed else []
         held, snap = await asyncio.to_thread(take_over)
         s.sockets += 1
-        await send([{'type': 'ready', 'v': 2, 'engine': VERSION, 'take': s.sid, 'from': held}], record=False)
+        await send([{'type': 'ready', 'v': 2, 'engine': VERSION, 'server': SERVER, 'protocol': PROTOCOL,
+                     'take': s.sid, 'from': held}], record=False)
         await send(snap, record=False)  # what the dropped socket may have swallowed
         # A reader drains the socket at once into a queue and the work runs from the queue, in order: a phone
         # resending a take (a resume) sends faster than it is checked, and a socket left unread stops answering

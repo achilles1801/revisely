@@ -137,7 +137,10 @@ class CheckTests(Base):
     def test_health(self):
         r = self.client.get('/health')
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['ok'], True)
+        body = r.json()
+        self.assertEqual((body['ok'], body['protocol']), (True, 5))
+        self.assertIn('server', body)
+        self.assertIn('engine', body)
 
     def test_sign_in_and_testers_only(self):
         r = self.client.post('/check?s=1&a=1', content=wav())
@@ -235,7 +238,7 @@ class LiveTests(Base):
         with self.socket() as ws:
             ws.send_text(start(keep=True, mon=5, aar=2, letters=True))
             ready = ws.receive_json()
-            self.assertEqual((ready['type'], ready['from'], ready['v']), ('ready', 0, 2))
+            self.assertEqual((ready['type'], ready['from'], ready['v'], ready['protocol']), ('ready', 0, 2, 5))
             self.assertTrue(store.TAKE.match(ready['take']))
             self.assertEqual(FakeSession.made[0].args, (1, 1, None, None, {'mon': 5, 'mot': 4, 'aar': 2,
                                                                            'letters': '1', 'tajweed': '1'}))
