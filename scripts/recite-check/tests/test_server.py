@@ -100,6 +100,8 @@ class FakeSession:
             self.result = {'v': 2, 'marks': [], 'score': {'reached': 0, 'mistakes': 0, 'tajweed': 0,
                                                           'accuracy': None},
                            'secs': round(self.seconds, 1), 'why': 'end'}
+            if self.follow:  # Recite's answer: words only, no marks or score
+                self.result = {'v': 2, 'follow': True, 'words': [], 'secs': round(self.seconds, 1), 'why': 'end'}
             return [{'type': 'done', 'result': self.result}]
         return []
 
@@ -271,6 +273,21 @@ class LiveTests(Base):
                 ws.send_text(start(**extra))
                 ws.receive_json()
             self.assertEqual((FakeSession.made[0].follow, FakeSession.made[0].args[4]['tajweed']), (follow, tajweed))
+
+    def test_a_recite_take_ends_with_done(self):
+        with self.socket() as ws:
+            ws.send_text(start(follow=True, keep=True))
+            ready = ws.receive_json()
+            ws.send_bytes(second_of_audio() * 3)
+            ws.send_text(json.dumps({'type': 'end'}))
+            while True:
+                e = ws.receive_json()
+                if e['type'] in ('done', 'error'):
+                    break
+        self.assertEqual(e['type'], 'done')
+        self.assertTrue(e['result']['follow'])
+        self.assertNotIn('marks', e['result'])
+        self.assertIn(f"recite-tests/tester1/{ready['take']}.json", self.stored)
 
     def test_hints_reach_the_session_and_unknown_frames_are_ignored(self):
         with self.socket() as ws:

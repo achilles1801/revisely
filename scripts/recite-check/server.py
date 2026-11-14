@@ -331,7 +331,8 @@ async def live_socket(ws: WebSocket):
         r = s.sess.result
         r.update(engine=VERSION, take=s.sid)
         log.info('live: %.1f s audio, %s words reached, %d marks, why %s, ms %s, sockets %d, keep %s',
-                 s.sess.seconds, r['score']['reached'], len(r['marks']), r.get('why'), r.get('ms'), s.sockets, s.keep)
+                 s.sess.seconds, (r.get('score') or {}).get('reached', len(r.get('words') or [])), len(r.get('marks') or []),
+                 r.get('why'), r.get('ms'), s.sockets, s.keep)
         s.events += [e for e in events if e['type'] != 'done']  # the result is kept on its own
         if s.keep:
             try:
