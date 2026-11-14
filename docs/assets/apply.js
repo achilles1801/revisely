@@ -45,7 +45,7 @@ function fill(name, value, asHtml) {
   }
 }
 
-const num = (n) => n.toLocaleString(RV.lang === 'ar' ? 'ar' : 'en-GB');
+const num = (n) => n.toLocaleString(RV.locale());
 
 // ---------------------------------------------------------------------------------------------------------------
 // States

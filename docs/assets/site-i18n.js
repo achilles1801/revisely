@@ -4,7 +4,7 @@
 //   data-t="key"         text
 //   data-t-html="key"    markup from strings.js (links), never from anyone's input
 //   data-t-ph="key"      placeholder;  data-t-aria="key"  aria-label
-// window.RV: { lang, t(key, vars), date(ms, weekday), apply(root), onLang(fn) }.
+// window.RV: { lang, t(key, vars), date(ms, weekday), locale(), apply(root), onLang(fn) }.
 (function () {
   'use strict';
   var KEY = 'rv.lang';
@@ -14,6 +14,11 @@
 
   function lang() {
     return html.lang === 'ar' ? 'ar' : 'en';
+  }
+
+  /** For dates and numbers: Arabic-Indic digits in Arabic, as the copy writes them (plain "ar" now gives 0–9). */
+  function locale() {
+    return lang() === 'ar' ? 'ar-u-nu-arab' : 'en-GB';
   }
 
   function t(key, vars) {
@@ -30,7 +35,7 @@
     var opts = { day: 'numeric', month: 'long' };
     if (weekday) opts.weekday = 'long';
     if (d.getFullYear() !== thisYear) opts.year = 'numeric';
-    return d.toLocaleDateString(lang() === 'ar' ? 'ar' : 'en-GB', opts);
+    return d.toLocaleDateString(locale(), opts);
   }
 
   function apply(root) {
@@ -60,6 +65,7 @@
     get lang() { return lang(); },
     t: t,
     date: date,
+    locale: locale,
     apply: apply,
     onLang: function (fn) { listeners.push(fn); },
   };
