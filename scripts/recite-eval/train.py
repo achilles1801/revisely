@@ -212,19 +212,21 @@ def load_teacher(path, device):
 
 
 def kd_loss(student_lp, frames, teacher, cols, tf, device, temp=1.0):
-    """KL(teacher || student) per frame over the clip's own frames. The student hears 0.4 s of silence either side
-    (hisn_torch.mel_of), the teacher none: student frame k + 20 is teacher frame k."""
+    """KL(teacher || student) per frame over the clip's own frames. The teacher has 25 frames a second (w2v-BERT's
+    adapter halves them), the student 50: teacher frame k spans the student's frames 2k and 2k + 1 (measured on qdat,
+    Nov 14: the best offset is 0). The student hears 0.4 s of silence either side (hisn_torch.mel_of), the teacher
+    none, so teacher frame k is student frames 2k + 20 and 2k + 21."""
     with torch.no_grad(), torch.autocast('cuda', dtype=torch.bfloat16, enabled=device == 'cuda'):
         o = teacher(input_features=torch.as_tensor(tf['input_features']).to(device),
                     attention_mask=torch.as_tensor(tf['attention_mask']).to(device), return_dict=True)
-    t_lp = F.log_softmax(o.logits['phonemes'].float()[..., cols] / temp, -1)  # [B, Tt, V]
+    t_lp = F.log_softmax(o.logits['phonemes'].float()[..., cols] / temp, -1).repeat_interleave(2, dim=1)  # [B, 2Tt, V]
     s_lp = F.log_softmax(student_lp / temp, -1)  # [B, Ts, V]
     pad = int(round(hisn_torch.LEAD * 50))
     t_len = teacher._get_feat_extract_output_lengths(torch.as_tensor(tf['attention_mask']).sum(-1)).tolist()
     tot, n = 0.0, 0
     for b in range(s_lp.shape[0]):
         s_len = (int(frames[b]) + 1) // 2 - 1 - 2 * pad
-        k = min(int(t_len[b]), s_len, t_lp.shape[1], s_lp.shape[1] - pad)
+        k = min(2 * int(t_len[b]), s_len, t_lp.shape[1], s_lp.shape[1] - pad)
         if k <= 0:
             continue
         tp = t_lp[b, :k]

@@ -17,8 +17,13 @@ def main():
     ap.add_argument('--sets', default='qdat,learners,bench')
     ap.add_argument('--device', default='mps')
     ap.add_argument('--only', default='')
+    ap.add_argument('--kind', default='student', help='student (hisn_torch) or teacher (teacher_ear: Muaalem)')
     a = ap.parse_args()
-    ear = hisn_torch.Ear(a.ckpt, device=a.device, name=a.name)
+    if a.kind == 'teacher':
+        from teacher_ear import TeacherEar
+        ear = TeacherEar(a.ckpt, device=a.device, name=a.name)
+    else:
+        ear = hisn_torch.Ear(a.ckpt, device=a.device, name=a.name)
     jobs = []
     if 'qdat' in a.sets:
         for m in json.loads((LAB / 'data/qdat/index.json').read_text()):
