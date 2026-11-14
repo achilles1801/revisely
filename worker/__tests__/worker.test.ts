@@ -646,6 +646,57 @@ describe('the account, Premium and Open Door pages', () => {
   });
 });
 
+describe("the site's navigation on dev: the account, Premium and Open Door pages", () => {
+  // The real pages: production's home, and the Open Door page (which has the navigation in its own markup).
+  const fs = jest.requireActual('fs') as typeof import('fs');
+  const path = jest.requireActual('path') as typeof import('path');
+  const page = (p: string) => fs.readFileSync(path.join(__dirname, '../../docs', p), 'utf8');
+  const html = (body: string) => ({ fetch: jest.fn(async () => new Response(body, { headers: { 'Content-Type': 'text/html; charset=utf-8', ETag: '"x"' } })) });
+
+  it('revisely.app: the pages come through untouched, with no link to a page that answers 404 there', async () => {
+    const home = page('index.html');
+    const res = await worker.fetch(new Request('https://revisely.app/'), { ...ENV, ASSETS: html(home) }, ctx());
+    const body = await res.text();
+    expect(body).toBe(home);
+    for (const link of ['/premium/', '/apply/', '/account/', 'account-nav']) expect(body).not.toContain(link);
+  });
+
+  it('dev: the home gets Premium, Open Door and the account in its header, menu and footer', async () => {
+    const res = await worker.fetch(new Request('https://dev.revisely.app/'), { ...ENV, ASSETS: html(page('index.html')), NOINDEX: '1', ACCOUNT_PAGES: '1' }, ctx());
+    const body = await res.text();
+    const header = body.slice(body.indexOf('<nav class="site-nav"'), body.indexOf('data-menu-panel'));
+    expect(header).toContain('href="/premium/"');
+    expect(header).toContain('href="/apply/"');
+    expect(header).toContain('data-account-btn');
+    expect(header.indexOf('data-account-btn')).toBeLessThan(header.indexOf('class="pill"'));
+    expect(body).toContain('data-menu-panel hidden');
+    const footer = body.slice(body.indexOf('<nav aria-label="Footer"'));
+    for (const link of ['/premium/', '/apply/', '/account/']) expect(footer).toContain(`href="${link}"`);
+    expect(body).toContain('/assets/account-nav.css');
+    expect(body).toContain('<script type="module" src="/assets/account-nav.js">');
+    expect(res.headers.get('ETag')).toBeNull();
+  });
+
+  it('dev: a page is always fetched whole, so a copy cached before the navigation never answers (no 304)', async () => {
+    const assets = html(page('index.html'));
+    const req = new Request('https://dev.revisely.app/', { headers: { Accept: 'text/html', 'If-None-Match': '"x"', 'If-Modified-Since': 'Sat, 14 Nov 2026 00:00:00 GMT' } });
+    await worker.fetch(req, { ...ENV, ASSETS: assets, ACCOUNT_PAGES: '1' }, ctx());
+    const asked = assets.fetch.mock.calls[0][0] as unknown as Request;
+    expect(asked.headers.get('If-None-Match')).toBeNull();
+    expect(asked.headers.get('If-Modified-Since')).toBeNull();
+  });
+
+  it('dev: the account, Premium and Open Door pages keep their own navigation; other files pass through', async () => {
+    const apply = page('apply/index.html');
+    const env = { ...ENV, ACCOUNT_PAGES: '1' };
+    const res = await worker.fetch(new Request('https://dev.revisely.app/apply/'), { ...env, ASSETS: html(apply) }, ctx());
+    expect(await res.text()).toBe(apply);
+    const css = { fetch: jest.fn(async () => new Response('a{}', { headers: { 'Content-Type': 'text/css' } })) };
+    const res2 = await worker.fetch(new Request('https://dev.revisely.app/assets/site.css'), { ...env, ASSETS: css }, ctx());
+    expect(await res2.text()).toBe('a{}');
+  });
+});
+
 describe('sign-in: odd tokens are refused with 401, never a server error', () => {
   const enc = (o: unknown) => b64url(JSON.stringify(o));
   it.each([

@@ -46,34 +46,13 @@ html[dir="rtl"] .lede { line-height: 1.9; }
 button.link { background: none; border: 0; padding: 0; font: inherit; color: var(--accent); cursor: pointer; font-weight: 600; }
 button.link:hover { text-decoration: underline; }
 
-/* ---------- Header ---------- */
-.site-nav .lang { background: none; border: 0; padding: 0; color: var(--secondary); font: inherit; font-size: 15px; cursor: pointer; }
-html[dir="rtl"] .site-nav .lang { font-family: var(--font); }
-.site-nav .lang:hover { color: var(--text); }
-.site-nav .signin-link { color: var(--text); font-weight: 600; }
-.site-nav .acct-btn {
-  width: 32px; height: 32px; border-radius: 50%; flex: none; display: grid; place-items: center;
-  color: var(--text); box-shadow: inset 0 0 0 1px var(--outline); text-decoration: none;
-}
-.site-nav .acct-btn svg { width: 19px; height: 19px; }
-.site-nav .acct-btn.avatar { box-shadow: none; }
-@media (max-width: 380px) { .site-nav { gap: 14px; } .site-nav .pill { padding: 0 13px; } }
+/* The header (the language, the account button, the phone menu): account-nav.css. */
+
 .avatar {
   width: 32px; height: 32px; border-radius: 50%; flex: none;
   display: grid; place-items: center;
   background: var(--accent-subtle); color: var(--accent) !important; font-weight: 700; font-size: 14px; text-decoration: none;
 }
-.menu-btn { width: 32px; height: 32px; display: grid; place-items: center; background: none; border: 0; padding: 0; color: var(--text); cursor: pointer; }
-.menu-btn svg { width: 22px; height: 22px; }
-@media (min-width: 640px) { .menu-btn { display: none; } }
-.menu-panel {
-  position: absolute; top: 60px; inset-inline-end: var(--gutter); z-index: 6; min-width: 210px;
-  padding: 8px; border-radius: 16px; background: var(--bg); border: 0.5px solid var(--separator);
-  box-shadow: 0 16px 40px -12px rgba(0, 0, 0, .25);
-}
-.menu-panel a { display: block; padding: 11px 12px; border-radius: 10px; color: var(--text); text-decoration: none; font-size: 16px; }
-.menu-panel a:hover { background: var(--fill); }
-.site-header .wrap { position: relative; }
 
 /* ---------- Sections ---------- */
 .page-hero { position: relative; padding: 28px 0 48px; }

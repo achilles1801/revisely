@@ -15,6 +15,7 @@
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="stylesheet" href="/assets/site.css">
   <link rel="stylesheet" href="/assets/account.css">
+  <link rel="stylesheet" href="/assets/account-nav.css">
   <script>
     // Before the first paint: the language (?lang=ar|en, else the switch's choice, else the browser's), and whether the app opened
     // this page (#c=<code>): then it is bare, with nothing a purchase could follow (App Store 3.1.1).
@@ -42,13 +43,23 @@
           <img src="/assets/img/logo-light.svg" width="108" height="32" alt="">
         </picture>
       </span>
-      <nav class="site-nav" aria-label="Main">
+      <nav class="site-nav" aria-label="Main" data-acct-nav>
         <a class="hide-sm public-only" href="/premium/" data-t="nav.premium">Premium</a>
         <a class="hide-sm public-only" href="/apply/" data-t="nav.program">Open Door</a>
         <button class="lang" type="button" data-lang-switch data-t="lang">عربي</button>
         <a class="acct-btn public-only" href="/account/" data-account-btn data-t-aria="nav.signin" aria-label="Sign in"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8.5" r="3.6"/><path d="M5 19.5c.9-3.3 3.6-5.1 7-5.1s6.1 1.8 7 5.1"/></svg></a>
         <a class="pill public-only" href="https://apps.apple.com/app/revisely/id6767990248" data-t="nav.download">Download</a>
+        <button class="menu-btn public-only" type="button" data-menu aria-expanded="false" data-t-aria="nav.menu" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
       </nav>
+      <div class="menu-panel public-only" data-menu-panel hidden>
+        <p class="menu-who latin" data-menu-who hidden></p>
+        <a href="/account/" data-menu-account data-t="nav.signin">Sign in</a>
+        <a href="/premium/" data-t="nav.premium">Premium</a>
+        <a href="/apply/" data-t="nav.program">Open Door</a>
+        <a href="/support/" data-t="nav.support">Support</a>
+        <hr data-menu-signout hidden>
+        <button type="button" data-menu-signout data-t="a.signout" hidden>Sign out</button>
+      </div>
     </div>
   </header>
 
@@ -211,8 +222,9 @@
   <footer class="site-footer">
     <div class="wrap">
       <p class="latin"><bdi>© 2026 Majd Khawaldeh</bdi></p>
-      <nav aria-label="Footer">
+      <nav aria-label="Footer" data-acct-nav>
         <a class="public-only" href="/premium/" data-t="nav.premium">Premium</a>
+        <a class="public-only" href="/account/" data-t="nav.account">Account</a>
         <a href="/privacy/" data-t="foot.privacy">Privacy</a>
         <a href="/terms/" data-t="foot.terms">Terms</a>
         <a class="public-only" href="/support/" data-t="foot.support">Support</a>
