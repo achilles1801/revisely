@@ -296,6 +296,8 @@ class LiveSession:
         self.seams = []                  # (seconds, cursor, first word, frame, start) of each segment after the first
         self._window = (None, [])        # the segment and path of the last decision (for a seam's state)
         self.sent = {'at': None, 'said': None, 'score': None}
+        self.unmarked = set()            # ids taken back (and not marked again): for a resume's snapshot
+        self.ayah_sent = []              # ayah events sent: for a resume's snapshot
         self.stopped = False
         self.result = None
         self.ms = {'model': 0.0, 'words': 0.0, 'tajweed': 0.0, 'hops': 0, 'worst_hop': 0.0}
@@ -525,7 +527,7 @@ class LiveSession:
                     self.flagged[w] = now
                     self.bad_from[w] = res['spans'][w][0] if w in res['spans'] else seg.frames()
                     if m['id'] not in self.marks:
-                        self.marks[m['id']] = m
+                        self._keep_mark(m)
                         ev.append({'type': 'mark', 'mark': m, 't': now})
         return c, ev
 
@@ -675,7 +677,7 @@ class LiveSession:
                 self.extra_run[aw] = 0
         for m in new_marks:
             if m['id'] not in self.marks:
-                self.marks[m['id']] = m
+                self._keep_mark(m)
                 ev.append({'type': 'mark', 'mark': m, 't': round(now, 2)})
         t1 = time.perf_counter()
         ev += self._ayah_marks(now)
@@ -683,6 +685,26 @@ class LiveSession:
         ev += self._maybe_rebase(cw + seg.a if cw is not None else None)
         ev += self._said_event(now)
         ev += self._score_event(now)
+        return ev
+
+    def _keep_mark(self, m):
+        self.marks[m['id']] = m
+        self.unmarked.discard(m['id'])
+
+    def snapshot(self):
+        """Everything a phone should be showing now, as the events it already knows (all idempotent): every mark
+        shown, every mark taken back, the ayat judged, the cursor, `said` and the score. Sent after `ready` on a
+        resume, for events a dropped socket may have swallowed."""
+        t = round(self.seconds, 2)
+        ev = [{'type': 'mark', 'mark': m, 't': t} for m in self.marks.values()]
+        ev += [{'type': 'unmark', 'id': i, 'why': 'corrected', 't': t} for i in sorted(self.unmarked)]
+        ev += [dict(e, t=t) for e in self.ayah_sent]
+        if self.sent['at'] is not None:
+            ev.append({'type': 'at', 'w': self.sent['at'], 't': t})
+        if self.sent['said'] is not None:
+            ev.append({'type': 'said', 'upTo': self.sent['said'][0], 't': t})
+        if self.decided:
+            ev.append({'type': 'score', **score(self.status, list(self.marks.values()), self.dismissed), 't': t})
         return ev
 
     def _word_mark(self, row, fl):
@@ -705,6 +727,7 @@ class LiveSession:
         for mid in [m for m, mk in self.marks.items() if mk['w'] == aw and mk['kind'] in ('word', 'skipped')]:
             del self.marks[mid]
             ev.append({'type': 'unmark', 'id': mid, 'why': 'corrected', 't': round(now, 2)})
+            self.unmarked.add(mid)
         self.status[aw] = 'corrected'
         self.flagged.pop(aw, None)
         self.bad_from.pop(aw, None)
@@ -726,9 +749,10 @@ class LiveSession:
             marks = self.E.marks([], {}, {}, [], tj, letters if self.st['letters'] else [])
             for m in marks:
                 if m['id'] not in self.marks:
-                    self.marks[m['id']] = m
+                    self._keep_mark(m)
                     ev.append({'type': 'mark', 'mark': m, 't': round(now, 2)})
             ev.append({'type': 'ayah', 's': s, 'a': a, 't': round(now, 2)})
+            self.ayah_sent.append(ev[-1])
         return ev
 
     def _ends_ayah(self, w):

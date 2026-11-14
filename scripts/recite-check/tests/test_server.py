@@ -83,6 +83,9 @@ class FakeSession:
                                                     'ayah': [1, 1], 'sure': 'likely'}, 't': 1.0})
         return ev
 
+    def snapshot(self):
+        return [{'type': 'at', 'w': 100 + self.n // SR, 't': float(self.n // SR)}] if self.n else []
+
     def control(self, msg):
         if msg['type'] == 'dismiss':
             self.dismissed.add(msg['id'])
@@ -314,6 +317,7 @@ class LiveTests(Base):
             ws.send_text(start(token='good', resume=sid))
             ready = ws.receive_json()
             self.assertEqual((ready['take'], ready['from']), (sid, 3 * SR))
+            self.assertEqual(ws.receive_json(), {'type': 'at', 'w': 103, 't': 3.0})  # the snapshot
             ws.send_bytes(second_of_audio())
             self.assertEqual(ws.receive_json()['w'], 104)
             ws.send_text(json.dumps({'type': 'stop'}))  # the old name still ends a take

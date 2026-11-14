@@ -246,7 +246,7 @@ async def open_session(msg, uid):
     rid = msg.get('resume')
     s = SESSIONS.get(rid) if isinstance(rid, str) else None
     if s and s.uid == uid and not s.sess.stopped:
-        return s
+        return s, True
     if not rid:
         limiter.take(uid)
     passage = passage_of(*(int_or_none(msg, k) for k in ('s', 'a', 's2', 'a2')))
@@ -257,7 +257,7 @@ async def open_session(msg, uid):
     s = Live(sid, uid, sess, msg.get('keep') is True, request, msg.get('app') if isinstance(msg.get('app'), str)
              else None)
     SESSIONS[sid] = s
-    return s
+    return s, False
 
 
 async def read_into(ws, inbox):
@@ -332,10 +332,18 @@ async def live_socket(ws: WebSocket):
             raise BadRequest('the first frame must be a start frame')
         token = msg.get('token')
         uid = await signed_in_tester('Bearer ' + token if isinstance(token, str) else ws.headers.get('authorization'))
-        s = await open_session(msg, uid)
-        s.owner, s.left = me, None
+        s, resumed = await open_session(msg, uid)
+
+        def take_over():
+            # under the session's lock: a socket that dropped may still be checking its last piece of audio, and
+            # `from` must not move after it is sent
+            with s.lock:
+                s.owner, s.left = me, None
+                return s.sess.n, s.sess.snapshot() if resumed else []
+        held, snap = await asyncio.to_thread(take_over)
         s.sockets += 1
-        await send([{'type': 'ready', 'v': 2, 'engine': VERSION, 'take': s.sid, 'from': s.sess.n}])
+        await send([{'type': 'ready', 'v': 2, 'engine': VERSION, 'take': s.sid, 'from': held}], record=False)
+        await send(snap, record=False)  # what the dropped socket may have swallowed
         # A reader drains the socket at once into a queue and the work runs from the queue, in order: a phone
         # resending a take (a resume) sends faster than it is checked, and a socket left unread stops answering
         # pings, which ends the connection.

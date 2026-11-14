@@ -94,7 +94,9 @@ at the point of the audio where it was first sent), then carry on. On the same i
 where the socket dropped. On the other instance it is 0: the server runs the take again, faster than real time, and
 since every event depends only on the audio and where each seek and dismissal came in it, it sends the same events
 again. The phone applies events idempotently (marks by id; `at`, `said` and `score` are snapshots), so a repeat
-changes nothing on screen. The phone keeps the take's PCM for this (it needs it for "play this word" too).
+changes nothing on screen. Right after `ready`, a resume on the same instance also sends what the phone should be
+showing (every mark shown, every `unmark`, the `ayah` events, `at`, `said`, `score`): the dropped socket may have
+swallowed events of the last audio it was checking, and that audio isn't sent again. The phone keeps the take's PCM for this (it needs it for "play this word" too).
 
 **How it decides** (`live.py`): the lab's live checker (`checker.run_item_live`): every 0.5 s of audio the model runs
 on the last 4 s; frames with 1 s of audio after them are final and go to the Viterbi decoder; a word is decided once
