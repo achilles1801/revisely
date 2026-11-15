@@ -119,14 +119,25 @@ def slip_of(why):
     return None
 
 
+UNCLEAR_KINDS = ('harakat', 'letter')  # a `likely` one is "Not clear: say it more clearly", not a mistake
+
+
+def unclear(m):
+    """A harakat or letter mark the ear isn't sure of (Majd, Nov 15 2026: unclear is not the same as wrong; someone
+    not reciting clearly can sound wrong without being wrong)."""
+    return m['kind'] in UNCLEAR_KINDS and m.get('sure') == 'likely'
+
+
 def score(statuses, marks, dismissed=()):
-    """reached: from the first word recited to the furthest heard, skipped words included; mistakes: word, skipped,
-    added, harakat and letter marks not dismissed; tajweed counted apart; accuracy = 1 - mistakes / reached."""
+    """reached: from the first word recited to the furthest heard, skipped words included; mistakes: word, skipped
+    and added marks, and harakat and letter marks the ear is sure of, not dismissed; unclear (harakat and letter marks
+    it isn't sure of) and tajweed counted apart; accuracy = 1 - mistakes / reached (recite-contract.md, The score)."""
     said = [w for w, s in statuses.items() if s in ('correct', 'corrected', 'wrong', 'missed')]
     reached = (max(said) - min(said) + 1) if said else 0
     live = [m for m in marks if m['id'] not in dismissed]
-    mistakes = sum(1 for m in live if m['kind'] in MISTAKE_KINDS)
+    mistakes = sum(1 for m in live if m['kind'] in MISTAKE_KINDS and not unclear(m))
     return {'reached': reached, 'mistakes': mistakes, 'tajweed': sum(1 for m in live if m['kind'] == 'tajweed'),
+            'unclear': sum(1 for m in live if unclear(m)),
             'accuracy': round(max(0.0, 1 - mistakes / reached), 4) if reached else 1.0}
 
 

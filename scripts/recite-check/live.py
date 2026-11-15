@@ -1316,7 +1316,7 @@ class LiveSession:
         if self.follow:
             return []
         sc = self._score()
-        key = (sc['reached'], sc['mistakes'], sc['tajweed'], sc['helped'])
+        key = (sc['reached'], sc['mistakes'], sc['tajweed'], sc['unclear'], sc['helped'])
         if key == self.sent['score'] or not sc['reached'] and not force:
             return []
         self.sent['score'] = key

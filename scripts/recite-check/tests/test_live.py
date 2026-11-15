@@ -547,5 +547,21 @@ class Background(unittest.TestCase):
         self.assertEqual(ayah_pieces(ws, spans, last, 290), [(200 - PAD, 290)])  # clipped to the frames there are
 
 
+class Score(unittest.TestCase):
+    def test_an_unsure_harakat_or_letter_mark_is_not_clear_and_not_a_mistake(self):
+        """Majd, Nov 15 2026 ("Not clear: say it more clearly"): unsure harakat and letter marks are counted apart, out
+        of accuracy; unsure word marks stay mistakes (recite-contract.md, The score)."""
+        from engine import score
+        statuses = {w: 'correct' for w in range(100, 120)}
+        marks = [{'id': 'a', 'w': 101, 'kind': 'harakat', 'sure': 'clear'},
+                 {'id': 'b', 'w': 102, 'kind': 'harakat', 'sure': 'likely'},
+                 {'id': 'c', 'w': 103, 'kind': 'letter', 'sure': 'likely'},
+                 {'id': 'd', 'w': 104, 'kind': 'word', 'sure': 'likely'},
+                 {'id': 'e', 'w': 105, 'kind': 'tajweed', 'sure': 'likely'},
+                 {'id': 'f', 'w': 106, 'kind': 'letter', 'sure': 'likely'}]
+        self.assertEqual(score(statuses, marks, dismissed={'f'}),
+                         {'reached': 20, 'mistakes': 2, 'tajweed': 1, 'unclear': 2, 'accuracy': 0.9})
+
+
 if __name__ == '__main__':
     unittest.main()
