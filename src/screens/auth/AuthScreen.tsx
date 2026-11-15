@@ -92,8 +92,17 @@ function FieldV2({
 }
 
 export default function AuthScreen() {
-  const { signIn, signUp, signInWithGoogle, signInWithApple, sendPasswordReset, error, isSigningIn, clearError } =
-    useAuth();
+  const {
+    signIn,
+    signUp,
+    signInWithGoogle,
+    signInWithApple,
+    sendPasswordReset,
+    error,
+    isSigningIn,
+    clearError,
+    signInDropped,
+  } = useAuth();
   const { isDark, palette } = useTheme();
   const haptics = useHaptics();
   const [mode, setMode] = useState<AuthMode>('login');
@@ -256,6 +265,16 @@ export default function AuthScreen() {
             {mode === 'reset' && !resetSent ? (
               <Text style={[typeV2.body, v2.centered, v2.subtitle, { color: palette.secondary }]}>
                 We'll email you a link to set a new password.
+              </Text>
+            ) : null}
+            {/* AUTH-2: a sign-in saved on this phone that Firebase dropped at launch. One quiet line. */}
+            {mode === 'login' && signInDropped ? (
+              <Text
+                style={[typeV2.body, v2.centered, v2.subtitle, { color: palette.secondary }]}
+                maxFontSizeMultiplier={1.6}
+                testID="auth-signed-out"
+              >
+                You were signed out. Sign in again to carry on.
               </Text>
             ) : null}
           </View>

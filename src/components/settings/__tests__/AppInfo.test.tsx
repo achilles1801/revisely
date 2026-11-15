@@ -1,6 +1,6 @@
 import React from 'react';
 import { Alert } from 'react-native';
-import { fireEvent, render, screen, act } from '@testing-library/react-native';
+import { fireEvent, render, screen, act, waitFor } from '@testing-library/react-native';
 import { ThemeProvider } from '../../../context/ThemeContext';
 import { describeRelease, ReleaseInput } from '../../../lib/releaseInfo';
 
@@ -99,7 +99,8 @@ describe('App info', () => {
     expect(message).toBe('Restart Revisely to use it.');
     expect(buttons.map((b: any) => b.text)).toEqual(['Later', 'Restart to update']);
     buttons.find((b: any) => b.text === 'Restart to update').onPress();
-    expect(mockReload).toHaveBeenCalled();
+    // After noting the restart for AUTH-2's report (lib/signInDropped).
+    await waitFor(() => expect(mockReload).toHaveBeenCalled());
   });
 
   it('with an update waiting, the details offer the restart instead of a check', async () => {
@@ -108,7 +109,7 @@ describe('App info', () => {
     fireEvent.press(await screen.findByLabelText(/App info/));
     expect(screen.queryByText('Check for updates')).toBeNull();
     fireEvent.press(screen.getByTestId('app-info-restart'));
-    expect(mockReload).toHaveBeenCalled();
+    await waitFor(() => expect(mockReload).toHaveBeenCalled());
   });
 });
 

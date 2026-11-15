@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import {
   FirebaseUser,
   registerUser,
@@ -13,6 +13,7 @@ import { getAuth } from 'firebase/auth';
 import * as firestoreService from '../services/firestoreService';
 import { signOutGoogle } from '../lib/googleAuth';
 import { identifyUser } from '../lib/sentry';
+import { reportSignInDropped } from '../lib/signInDropped';
 import { logger } from '../lib/logger';
 import { deleteAllRecordings, forgetCloudDeletes } from '../lib/recordings';
 import { discardStoppedBackup, resumeBackup, stopBackup } from '../lib/recordingBackupController';
@@ -55,6 +56,13 @@ export async function savedSignInUid(): Promise<string | null> {
   }
 }
 
+/**
+ * The sign-in saved on this phone as the app started (AUTH-2). Read as this module loads, before
+ * Firebase Auth has asked Google about it: Auth deletes the entry when Google says it is no longer
+ * good, and only then answers "nobody".
+ */
+const savedAtLaunch: Promise<string | null> = savedSignInUid();
+
 interface AuthContextType {
   firebaseUser: FirebaseUser | null;
   isAuthenticated: boolean;
@@ -75,6 +83,11 @@ interface AuthContextType {
    * connection), the uid it saved: the app shows that account's copy meanwhile.
    */
   provisionalUid: string | null;
+  /**
+   * A sign-in saved on this phone that Firebase Auth dropped at launch (AUTH-2): the sign-in screen
+   * says so until the next sign-in. Never after a sign-out or an account deletion from the app.
+   */
+  signInDropped: boolean;
   error: string | null;
   // Auth actions
   signUp: (email: string, password: string, name?: string) => Promise<void>;
@@ -98,12 +111,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [provisionalUid, setProvisionalUid] = useState<string | null>(null);
+  const [signInDropped, setSignInDropped] = useState(false);
+  // A sign-out or a deletion from the app: Firebase's "nobody" after it is the app's own doing.
+  const leaving = useRef(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let answered = false;
+    let live = true;
     const unsubscribe = subscribeToAuthChanges((user) => {
+      const first = !answered;
       answered = true;
+      if (user) {
+        leaving.current = false;
+        setSignInDropped(false);
+      } else if (first && !leaving.current) {
+        // AUTH-2: a sign-in was saved as the app started, and Auth's first answer is "nobody".
+        void savedAtLaunch.then((saved) => {
+          if (!saved || !live || leaving.current) return;
+          setSignInDropped(true);
+          void reportSignInDropped();
+        });
+      }
       setFirebaseUser(user);
       setProvisionalUid(null);
       identifyUser(user?.uid ?? null);
@@ -116,6 +145,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     }, AUTH_GRACE_MS);
     return () => {
+      live = false;
       clearTimeout(grace);
       unsubscribe();
     };
@@ -254,6 +284,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Every wait in here is limited, so the spinner always ends (ACCOUNT-3).
   const deleteAccount = async () => {
+    leaving.current = true;
     setIsLoading(true);
     setError(null);
     const uid = getAuth().currentUser?.uid;
@@ -297,6 +328,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOutUser = async () => {
+    leaving.current = true;
     setIsLoading(true);
     setError(null);
     // Recordings deleted on this phone are deleted from the backup first (a
@@ -343,6 +375,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         isSigningIn,
         provisionalUid,
+        signInDropped,
         error,
         signUp,
         signIn,
