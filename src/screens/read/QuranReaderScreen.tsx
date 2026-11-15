@@ -54,7 +54,9 @@ import {
   revealNextWord,
   Revealed,
   scorePill,
+  wordShown,
 } from '../../lib/reciteLive/view';
+import { NOTHING_PEEKED, Peeked, peekedByAyah, peekedLine } from '../../lib/reciteLive/peeked';
 import { LiveMode, useLiveRecitation } from '../../components/reciteLive/useLiveRecitation';
 import { ReciteMic, ReciteMicMode } from '../../components/reciteLive/ReciteMic';
 import { ReciteMenuMode, ReciteModeMenu } from '../../components/reciteLive/ReciteModeMenu';
@@ -364,6 +366,8 @@ export default function QuranReaderScreen() {
   });
   noteTakeRecording.current = remembering.noteRecording;
   const takeRecord = remembering.current;
+  // Words shown by hand during the take (‹, ‹‹): kept in quiet grey on the page, listed in the summary, drilled.
+  const [peeked, setPeeked] = useState<Peeked>(NOTHING_PEEKED);
   const [modeMenu, setModeMenu] = useState(false);
   // The AI notice comes before the first take: the take it was asked for starts once it's agreed.
   const [noticeFor, setNoticeFor] = useState<{ mode: LiveMode; span: TakeSpan | null; reveal: Revealed } | null>(null);
@@ -436,6 +440,7 @@ export default function QuranReaderScreen() {
         return;
       }
       setRevealed(reveal);
+      setPeeked(NOTHING_PEEKED);
       setDrillBefore(null);
       void live.start(mode, span);
     },
@@ -561,22 +566,33 @@ export default function QuranReaderScreen() {
     setHidden((h) => !h);
   }, []);
   // Each tells the checker which word was shown (the ayah's first word not shown before, for ‹‹).
+  /** During a take, the words that `next` shows that weren't showing: peeks. */
+  const notePeeks = useCallback(
+    (next: Revealed) => {
+      if (!live.active) return;
+      const newly = [...next].filter((w) => !wordShown(w, revealed, liveInfo));
+      if (newly.length) setPeeked((p) => new Set([...p, ...newly]));
+    },
+    [live.active, revealed, liveInfo],
+  );
   const showNextWord = useCallback(() => {
     if (!qw) return;
     const next = revealNextWord(qw, currentPage, revealed, liveInfo);
     const added = [...next].find((w) => !revealed.has(w));
     if (added == null) return;
     live.hint(added, 'word');
+    notePeeks(next);
     setRevealed(next);
-  }, [qw, currentPage, revealed, liveInfo, live]);
+  }, [qw, currentPage, revealed, liveInfo, live, notePeeks]);
   const showWholeAyah = useCallback(() => {
     if (!qw) return;
     const next = revealAyah(qw, currentPage, revealed, liveInfo);
     const added = [...next].find((w) => !revealed.has(w));
     if (added == null) return;
     live.hint(added, 'ayah');
+    notePeeks(next);
     setRevealed(next);
-  }, [qw, currentPage, revealed, liveInfo, live]);
+  }, [qw, currentPage, revealed, liveInfo, live, notePeeks]);
 
   const checkTake = live.mode === 'check';
   const cardMarks = useMemo<Mark[]>(
@@ -740,7 +756,7 @@ export default function QuranReaderScreen() {
     const run = testRef.current;
     if (run) {
       stopTrace.end();
-      const results = [...run.results.slice(0, run.at), testResult(run.places[run.at], live.state)];
+      const results = [...run.results.slice(0, run.at), testResult(run.places[run.at], live.state, peeked.size)];
       if (run.at + 1 >= run.places.length) endTest(results);
       else setTest({ ...run, results });
       return;
@@ -833,22 +849,33 @@ export default function QuranReaderScreen() {
   );
   // The next word's cover turns red while something else is being said in its slot (the checker's `off`, draft 7).
   const offWord = live.state.off?.w ?? null;
+  // Peeked words in quiet grey while the take lasts, but for one with a mistake (its highlight shows as it is).
+  const veiled = useMemo(() => {
+    if (!live.active || peeked.size === 0) return [];
+    const marked = new Set(Object.values(live.state.marks).map((m) => m.w));
+    return [...peeked].filter((w) => !marked.has(w));
+  }, [live.active, peeked, live.state.marks]);
   const pageOverlay = useMemo(
     () =>
-      liveOn && qw && hidden
+      liveOn && qw && (hidden || veiled.length > 0)
         ? (page: number, scale: number) => (
             <LiveOverlay
               page={page}
               scale={scale}
-              hidden={{
-                follow: hiddenFollow(qw, revealed, liveInfo),
-                ...coverColors,
-                off: offWord != null ? { w: offWord, words: qw, colour: v2.markWord } : null,
-              }}
+              hidden={
+                hidden
+                  ? {
+                      follow: hiddenFollow(qw, revealed, liveInfo),
+                      ...coverColors,
+                      off: offWord != null ? { w: offWord, words: qw, colour: v2.markWord } : null,
+                    }
+                  : null
+              }
+              peeked={veiled.length ? { words: qw, peeked: veiled, veil: palette.peekVeil } : null}
             />
           )
         : undefined,
-    [liveOn, qw, hidden, revealed, liveInfo, coverColors, offWord, v2],
+    [liveOn, qw, hidden, revealed, liveInfo, coverColors, offWord, v2, veiled, palette],
   );
   // The marks as elements of their own (VoiceOver, the tests). Given whenever the live UI is on, so the pager's pages
   // keep one shape through takes.
@@ -1065,7 +1092,7 @@ export default function QuranReaderScreen() {
           pageOverlay={pageOverlay}
           pageAccessories={pageAccessories}
           onTapPoint={onTapPoint}
-          extraData={liveOn ? `${live.state.cursor}|${live.state.saidUpTo}|${Object.keys(live.state.marks).length}|${hidden}|${revealed.size}|${offWord}|${showPast ? memoryRecords.length : -1}|${pastAt?.w ?? ''}|${showing ? `${shownTake?.id}:${shownTake?.marks.length}` : ''}|${shownCardAt?.w ?? ''}` : undefined}
+          extraData={liveOn ? `${live.state.cursor}|${live.state.saidUpTo}|${Object.keys(live.state.marks).length}|${hidden}|${revealed.size}|${offWord}|${veiled.length}|${showPast ? memoryRecords.length : -1}|${pastAt?.w ?? ''}|${showing ? `${shownTake?.id}:${shownTake?.marks.length}` : ''}|${shownCardAt?.w ?? ''}` : undefined}
         />
       </ReaderFrame>
 
@@ -1315,13 +1342,15 @@ export default function QuranReaderScreen() {
             }}
             onDrill={() => {
               const marks = Object.values(live.state.marks);
-              const range = drillRange(marks);
+              const peekedAyahs = qw ? peekedByAyah(qw, peeked).map((p) => p.ayah) : [];
+              const range = drillRange(marks, peekedAyahs);
               if (!range) return;
               setSummaryShown(null);
               setCardAt(null);
               live.clear();
               setRevealed(NOTHING_SHOWN);
-              setDrillBefore(findingsLine(drillMarks(marks)));
+              setDrillBefore([findingsLine(drillMarks(marks)), peeked.size ? peekedLine(peeked.size) : ''].filter(Boolean).join(', '));
+              setPeeked(NOTHING_PEEKED);
               void live.start('check', range);
             }}
             before={drillBefore}
@@ -1330,6 +1359,11 @@ export default function QuranReaderScreen() {
               if (!takeRecord) return;
               setSummaryShown(null);
               setProgressFor({ from: takeRecord.from, to: takeRecord.to, back: 'summary' });
+            }}
+            peeked={qw ? peekedByAyah(qw, peeked) : []}
+            onPeeked={(w) => {
+              setSummaryShown(null);
+              if (qw) pagerRef.current?.scrollToPage(qw.pageOf(w));
             }}
             onDone={() => setSummaryShown(null)}
             // The summary is on screen: the take's Stop trace ends (lib/reciteLive/stopTrace).
@@ -1350,6 +1384,7 @@ export default function QuranReaderScreen() {
               setNoticeFor(null);
               if (asked) {
                 setRevealed(asked.reveal);
+                setPeeked(NOTHING_PEEKED);
                 void live.start(asked.mode, asked.span);
               }
             }}

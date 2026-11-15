@@ -398,6 +398,14 @@ until its part is set up.
     (`TakeActivity`, red dot while recording; a tap on it brings the controls back). The status bar stays
     (`keepStatusBar` on `ReaderFrame`). A tap brings them back, and so do a mark's card and the take's end. With
     VoiceOver or TalkBack the bar never goes, so Stop is always there. Outside a take the page's tap is as before.
+  - **Peeked words** (Majd, Nov 15 2026; `lib/reciteLive/peeked`): words shown by hand during a take (‹, ‹‹; with ‹‹
+    only the words of the ayah not yet shown) stay in quiet grey ink on the page while the take lasts, shown or
+    hidden, recited or not: a veil of the page's colour over their ink (`peekVeil` in `theme/readPalette`), never over
+    a word with a mistake (its highlight shows as it is). Grey, not amber: amber is a slip. The summary says "3 words
+    peeked" and lists each ayah's peeked words in a row (a tap shows it on the page). Recite the mistakes again takes
+    in their ayahs (offered for peeks alone too; its summary's "Before:" counts them). Peeks never count in the score
+    (the checker counts them as `helped`). In Test me a place said to its end with a peek is "1 word peeked", not
+    clean. The words Test me shows to start a place aren't peeks.
 
 ## How updates reach phones
 

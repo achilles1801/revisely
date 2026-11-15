@@ -100,13 +100,19 @@ describe('Test me: how a place went', () => {
     expect(r.marks).toEqual([wrong]);
   });
 
+  it('to the end with no mistake but words peeked: helped, not clean (a peek is a word not recalled)', () => {
+    const r = testResult(place, take(ready, locked, { type: 'said', upTo: place.last }), 2);
+    expect(r.outcome).toBe('helped');
+    expect(r.peeked).toBe(2);
+  });
+
   it('stopped before the end, or never begun', () => {
     expect(testResult(place, take(ready, locked, { type: 'said', upTo: first + 6 })).outcome).toBe('unfinished');
     expect(testResult(place, take(ready)).outcome).toBe('missed');
   });
 
   it('the headline counts the clean ones', () => {
-    const r = (outcome: 'clean' | 'mistakes') => ({ place, outcome, marks: [] });
+    const r = (outcome: 'clean' | 'mistakes') => ({ place, outcome, marks: [], peeked: 0 });
     expect(testHeadline([r('clean'), r('mistakes'), r('clean')])).toBe('2 of 3 continued cleanly');
     expect(testHeadline([r('clean'), r('clean')])).toBe('All 2 continued cleanly');
   });

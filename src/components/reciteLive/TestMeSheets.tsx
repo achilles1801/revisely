@@ -9,6 +9,7 @@ import { Tap } from '../v2/Tap';
 import { spokenText } from '../../lib/passages';
 import { testHeadline, testPlaceName, type TestResult } from '../../lib/reciteLive/testMe';
 import { findingsLine } from './TakeSummarySheet';
+import { peekedLine } from '../../lib/reciteLive/peeked';
 
 /** Chrome text stops growing here (CLAUDE.md, UI traps). */
 const CHROME_MAX = 1.4;
@@ -19,7 +20,9 @@ export function outcomeText(r: TestResult): string {
     case 'clean':
       return 'Clean';
     case 'mistakes':
-      return findingsLine(r.marks) || 'Mistakes';
+      return [findingsLine(r.marks) || 'Mistakes', r.peeked ? peekedLine(r.peeked) : ''].filter(Boolean).join(', ');
+    case 'helped':
+      return peekedLine(r.peeked);
     case 'unfinished':
       return 'Stopped before the end';
     case 'missed':

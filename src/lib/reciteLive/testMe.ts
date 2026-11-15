@@ -103,6 +103,8 @@ export type TestOutcome =
   | 'clean'
   /** Mistakes on the way (its marks say which). */
   | 'mistakes'
+  /** To the end with no mistake, but with words peeked (not recalled). */
+  | 'helped'
   /** Stopped before the end, with no mistake. */
   | 'unfinished'
   /** No start was ever found: nothing recited from there. */
@@ -113,16 +115,18 @@ export interface TestResult {
   outcome: TestOutcome;
   /** The take's marks (tajweed notes and "not clear" included; they don't count against it). */
   marks: Mark[];
+  /** Words peeked (shown by hand) at the place. */
+  peeked: number;
 }
 
-/** A finished take's outcome at its place. */
-export function testResult(place: TestPlace, state: LiveState): TestResult {
+/** A finished take's outcome at its place, with the words peeked there. */
+export function testResult(place: TestPlace, state: LiveState, peeked = 0): TestResult {
   const marks = Object.values(state.marks).sort((a, b) => a.w - b.w);
-  if (state.start == null) return { place, outcome: 'missed', marks: [] };
+  if (state.start == null) return { place, outcome: 'missed', marks: [], peeked };
   const mistakes = mistakeCount(state);
-  if (mistakes > 0) return { place, outcome: 'mistakes', marks };
+  if (mistakes > 0) return { place, outcome: 'mistakes', marks, peeked };
   const reached = (furthestWord(state) ?? -1) >= place.last;
-  return { place, outcome: reached ? 'clean' : 'unfinished', marks };
+  return { place, outcome: !reached ? 'unfinished' : peeked > 0 ? 'helped' : 'clean', marks, peeked };
 }
 
 /** Where a place is: "Al-Baqarah, ayahs 142–144". */

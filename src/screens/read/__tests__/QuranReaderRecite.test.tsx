@@ -1835,3 +1835,118 @@ describe('an immersive page during a take (Majd, Nov 15 2026: a tap hides the he
     expect(statusBarHidden()).toBe(true);
   });
 });
+
+describe('peeked words (Majd, Nov 15 2026: on the page in quiet grey, in the summary, drilled)', () => {
+  const hide = () => fireEvent.press(screen.getByTestId('recite-eye'));
+  const peek = () => fireEvent.press(screen.getByTestId('recite-next-word'));
+  const finish = async (marks: object[] = [], start = A23) => {
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await flush();
+    await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 40, start, secs: 30, marks, score: null } } as LiveEvent);
+    await flush();
+  };
+
+  it('a word shown with ‹ stays in quiet grey on the page: shown again, and once recited', async () => {
+    await startTake('recite');
+    expect(screen.queryAllByTestId('live-peeked')).toHaveLength(0);
+    hide();
+    peek();
+    peek();
+    expect(screen.getAllByTestId('live-peeked')).toHaveLength(2);
+    hide();
+    expect(screen.getAllByTestId('live-peeked')).toHaveLength(2);
+    await event({ type: 'said', upTo: A23 + 5 } as LiveEvent);
+    expect(screen.getAllByTestId('live-peeked')).toHaveLength(2);
+  });
+
+  it('‹‹: every word of the ayah not yet shown is a peek; words already recited aren’t', async () => {
+    await startTake('recite');
+    await event({ type: 'said', upTo: A23 + 1 } as LiveEvent);
+    hide();
+    fireEvent.press(screen.getByTestId('recite-whole-ayah'));
+    const [from, to] = words.verseRange(27, 23);
+    expect(screen.getAllByTestId('live-peeked')).toHaveLength(to - from - 2);
+  });
+
+  it('a peeked word with a mistake keeps its highlight, unveiled', async () => {
+    await startTake('check');
+    hide();
+    peek();
+    expect(screen.getAllByTestId('live-peeked')).toHaveLength(1);
+    // The word after the reciter's (the cursor's word counts as shown).
+    await event({ type: 'mark', mark: { id: 'p', w: A23 + 1, ayah: [27, 23], kind: 'word', sure: 'clear', heard: 'x', heardExact: false } });
+    expect(screen.queryAllByTestId('live-peeked')).toHaveLength(0);
+  });
+
+  it('the summary: “2 words peeked” and a row per ayah, which shows it on the page', async () => {
+    await startTake('recite');
+    hide();
+    peek();
+    peek();
+    await finish();
+    expect(screen.getByTestId('take-summary-peeked')).toHaveTextContent('2 words peeked');
+    const rows = screen.getAllByTestId('take-summary-peeked-row');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toHaveTextContent(/Peeked · ayah 23/);
+    mockPager.scrolled = [];
+    fireEvent.press(rows[0]);
+    expect(mockPager.scrolled).toContain(379);
+  });
+
+  it('a Check take with only peeks offers Recite the mistakes again, over the peeked ayahs; its summary says so', async () => {
+    const a25 = words.verseFirstWord(27, 25);
+    await startTake('check', a25);
+    hide();
+    peek();
+    await finish([], a25);
+    fireEvent.press(screen.getByTestId('take-summary-drill'));
+    await flush();
+    await flush();
+    expect(mockLive.start).toMatchObject({ s: 27, a: 24, s2: 27, a2: 25, follow: false });
+    // The next take starts with nothing peeked.
+    await event({ type: 'ready', take: 't2', protocol: 6 });
+    expect(screen.queryAllByTestId('live-peeked')).toHaveLength(0);
+    const last = words.verseFirstWord(27, 26) - 1;
+    await event({ type: 'said', upTo: last } as LiveEvent);
+    await flush();
+    await event({ type: 'done', result: { v: 2, take: 't2', from: A23, to: last + 1, start: words.verseFirstWord(27, 24), secs: 9, marks: [], score: null } } as LiveEvent);
+    await flush();
+    expect(screen.getByTestId('take-summary-before').props.children).toBe('Before: 1 word peeked');
+  });
+
+  it('Test me: a place said to its end with a word peeked is “1 word peeked”, not clean', async () => {
+    mockState.pages = [562, 563, 564].map((pageNumber) => ({ pageNumber, status: 'memorized' }));
+    const random = jest.spyOn(Math, 'random').mockReturnValue(0);
+    try {
+      setReciteCheckSettings('u1', { noticeSeen: true });
+      await open();
+      fireEvent(screen.getByTestId('recite-mic'), 'longPress');
+      fireEvent.press(screen.getByTestId('recite-mode-test'));
+      await flush();
+      fireEvent.press(screen.getByTestId('test-me-all'));
+      await flush();
+      await flush();
+      const first = words.verseFirstWord(67, 1);
+      const last = words.verseRange(67, 3)[1] - 1;
+      await event({ type: 'ready', take: 't1', protocol: 6 });
+      peek();
+      await event({ type: 'locked', w: first, s: 67, a: 1 });
+      await event({ type: 'said', upTo: last } as LiveEvent);
+      await flush();
+      await event({ type: 'done', result: { v: 2, take: 't1', from: first, to: last + 1, start: first, secs: 12, marks: [], score: null } } as LiveEvent);
+      await flush();
+      expect(screen.getByTestId('recite-status').props.children).toBe('1 word peeked · 1 of 5');
+    } finally {
+      random.mockRestore();
+    }
+  });
+
+  it('peeks never count in the score', async () => {
+    await startTake('check');
+    hide();
+    peek();
+    peek();
+    await event({ type: 'said', upTo: A23 + 3 } as LiveEvent);
+    expect(screen.getByTestId('recite-score')).toHaveTextContent('100%');
+  });
+});
