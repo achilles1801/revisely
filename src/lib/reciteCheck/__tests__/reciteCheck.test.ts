@@ -16,7 +16,7 @@ jest.mock('../../releaseInfo', () => ({
 
 import { reciteCheckEnabled } from '../availability';
 import { CheckResult, describeTajweed, describeWord, parseCheckResult, summary } from '../result';
-import { checkQuery, checkRecitation, CheckError, RECITE_CHECK_URL } from '../service';
+import { checkQuery, checkRecitation, CheckError, RECITE_CHECK_URL, sendLabel } from '../service';
 import { parseReciteCheckSettings, RECITE_CHECK_DEFAULTS } from '../settings';
 import { chunkSeconds, encodeWav } from '../wav';
 
@@ -182,5 +182,33 @@ describe('the check’s settings on the phone', () => {
     expect(parseReciteCheckSettings(JSON.stringify({ mode: 'check', markMistakes: false }))).toMatchObject({ mode: 'recite', markMistakes: false });
     expect(parseReciteCheckSettings(JSON.stringify({ mode: 'record' }))).toMatchObject({ mode: 'record', markMistakes: false });
     expect(parseReciteCheckSettings(JSON.stringify({ mode: 'shout' }))).toMatchObject({ mode: 'recite' });
+  });
+});
+
+describe('labels after a take (Not a mistake, and taking it back)', () => {
+  it('POSTs the take and the mark to /dismiss or /undismiss, signed in; a checker without the route is no error', async () => {
+    const calls: { url: string; init: RequestInit }[] = [];
+    const fetch = jest.fn(async (url: string, init: RequestInit) => {
+      calls.push({ url, init });
+      return { ok: !url.endsWith('/undismiss') } as Response;
+    }) as unknown as typeof globalThis.fetch;
+    const deps = { token: async () => 'tok', fetch };
+    expect(await sendLabel('dismiss', '20261115-0101-ab', '12:word:', 1794718249162, deps)).toBe(true);
+    expect(calls[0].url).toBe(`${RECITE_CHECK_URL}/dismiss`);
+    expect(calls[0].init).toMatchObject({ method: 'POST', headers: { Authorization: 'Bearer tok' } });
+    // `when`: the tap's time, by which the lab orders a mark's labels (they can arrive out of order).
+    expect(JSON.parse(calls[0].init.body as string)).toEqual({ take: '20261115-0101-ab', id: '12:word:', when: 1794718249162 });
+    // An older checker answers 404 to /undismiss: nothing is stored, nothing is shown.
+    expect(await sendLabel('undismiss', '20261115-0101-ab', '12:word:', 1794718250000, deps)).toBe(false);
+    expect(calls[1].url).toBe(`${RECITE_CHECK_URL}/undismiss`);
+  });
+
+  it('signed out or offline: nothing is sent, nothing thrown', async () => {
+    const fetch = jest.fn(async () => {
+      throw new Error('offline');
+    }) as unknown as typeof globalThis.fetch;
+    expect(await sendLabel('dismiss', 't', 'id', 1, { token: async () => null, fetch })).toBe(false);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(await sendLabel('dismiss', 't', 'id', 1, { token: async () => 'tok', fetch })).toBe(false);
   });
 });

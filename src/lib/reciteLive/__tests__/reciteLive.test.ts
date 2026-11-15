@@ -4,6 +4,8 @@ import {
   applyEvent,
   dismissMark,
   findingStart,
+  removedMarks,
+  restoreMark,
   furthestWord,
   seekOnPage,
   startNotFound,
@@ -199,6 +201,49 @@ describe('the live state', () => {
     expect(dismissMark(t, 'n').score).toEqual({ reached: 10, mistakes: 1, tajweed: 0, accuracy: 0.9 });
   });
 
+  it('“Put back” (Undo, the Removed list) brings the mark and its count back as they were (Majd, Nov 15 2026)', () => {
+    let s = applyEvent(liveConnecting(), { type: 'mark', mark: mark({ id: 'a' }) });
+    s = applyEvent(s, { type: 'score', score: { reached: 10, mistakes: 1, tajweed: 0, accuracy: 0.9 } });
+    s = dismissMark(s, 'a');
+    expect(removedMarks(s).map((m) => m.id)).toEqual(['a']);
+    s = restoreMark(s, 'a');
+    expect(Object.keys(s.marks)).toEqual(['a']);
+    expect(s.score).toEqual({ reached: 10, mistakes: 1, tajweed: 0, accuracy: 0.9 });
+    expect(s.dismissed).toEqual([]);
+    expect(removedMarks(s)).toEqual([]);
+    // Nothing to put back: unchanged.
+    expect(restoreMark(s, 'a')).toBe(s);
+    // Put back, the server's updates to it apply again.
+    s = applyEvent(s, { type: 'mark', mark: mark({ id: 'a', sure: 'likely' }) });
+    expect(s.marks.a.sure).toBe('likely');
+  });
+
+  it('a mark taken off before any score comes back without changing a count it never took', () => {
+    let s = applyEvent(liveConnecting(), { type: 'mark', mark: mark({ id: 'a' }) });
+    s = dismissMark(s, 'a');
+    s = applyEvent(s, { type: 'score', score: { reached: 10, mistakes: 0, tajweed: 0, accuracy: 1 } });
+    expect(restoreMark(s, 'a').score).toEqual({ reached: 10, mistakes: 0, tajweed: 0, accuracy: 1 });
+  });
+
+  it('after the final answer: a mark taken off during the take can be put back, as the final answer has it, and counts again', () => {
+    let s = applyEvent(liveConnecting(), { type: 'mark', mark: mark({ id: 'a' }) });
+    s = dismissMark(s, 'a');
+    // The checker's final score leaves out what was dismissed; its marks still hold it.
+    s = applyEvent(s, {
+      type: 'done',
+      result: { v: 2, take: 't', from: 0, to: 9, secs: 3, marks: [mark({ id: 'a', heard: 'X' }), mark({ id: 'b', w: UTIYAT + 1 })], score: { reached: 10, mistakes: 1, tajweed: 0, accuracy: 0.9 } },
+    });
+    expect(Object.keys(s.marks)).toEqual(['b']);
+    s = restoreMark(s, 'a');
+    expect(s.marks.a.heard).toBe('X');
+    expect(s.score).toEqual({ reached: 10, mistakes: 2, tajweed: 0, accuracy: 0.8 });
+    // One the checker dropped in the end has nothing to put back.
+    let t = applyEvent(liveConnecting(), { type: 'mark', mark: mark({ id: 'gone' }) });
+    t = dismissMark(t, 'gone');
+    t = applyEvent(t, { type: 'done', result: { v: 2, take: 't', from: 0, to: 9, secs: 3, marks: [], score: null } });
+    expect(removedMarks(t)).toEqual([]);
+  });
+
   it('after the final answer, late live events change nothing; an error keeps what was shown', () => {
     const done = run(eventsOf('alafasy.p2.m1.clean'));
     expect(applyEvent(done, { type: 'mark', mark: mark({ id: 'late' }) })).toBe(done);
@@ -207,11 +252,6 @@ describe('the live state', () => {
     expect([live.status, live.failure, Object.keys(live.marks)]).toEqual(['failed', 'limit', ['a']]);
   });
 
-  it('each mark draws by its own sure: clear in full, likely lighter, whatever else the take holds', () => {
-    const { markStrength } = require('../state') as typeof import('../state');
-    expect(markStrength(mark({ sure: 'clear' }))).toBe('full');
-    expect(markStrength(mark({ sure: 'likely' }))).toBe('light');
-  });
 
   it('the real service’s 4-minute take with letters: a word can carry two marks', () => {
     const s = run(eventsOf('server-live-husary.p1.m1.letters'));

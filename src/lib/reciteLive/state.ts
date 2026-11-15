@@ -31,8 +31,10 @@ export interface LiveState {
   saidUpTo: number | null;
   /** Live marks by id (the final ones once done). */
   marks: Readonly<Record<string, Mark>>;
-  /** Marks the person said weren't mistakes: never shown again, whatever the server sends. */
+  /** Marks the person said weren't mistakes: not shown, whatever the server sends, unless put back. */
   dismissed: readonly string[];
+  /** Those marks as they were, so "Put back" can restore them (the summary's Removed list, the card's Undo). */
+  removed: Readonly<Record<string, Removed>>;
   score: LiveScore | null;
   final: FinalResult | null;
   failure: LiveFailure | null;
@@ -56,6 +58,12 @@ export interface LiveState {
   protocol: number | null;
 }
 
+/** A mark taken off with "Not a mistake": the mark, and what it had counted in the score (taken off with it). */
+export interface Removed {
+  mark: Mark;
+  counted: 'mistakes' | 'unclear' | 'tajweed' | null;
+}
+
 export const LIVE_IDLE: LiveState = {
   status: 'idle',
   take: null,
@@ -63,6 +71,7 @@ export const LIVE_IDLE: LiveState = {
   saidUpTo: null,
   marks: {},
   dismissed: [],
+  removed: {},
   score: null,
   final: null,
   failure: null,
@@ -172,14 +181,31 @@ export function applyEvent(state: LiveState, e: LiveEvent): LiveState {
       const start = state.start ?? e.result.start ?? null;
       const marks: Record<string, Mark> = {};
       for (const m of e.result.marks) if (!state.dismissed.includes(m.id) && !beforeStart(m, start)) marks[m.id] = m;
+      // A mark taken off keeps its final version (the final answer holds dismissed marks too), so Put back restores
+      // that; one the checker dropped in the end has nothing to put back.
+      // The checker's final score leaves out what was dismissed during the take, so putting one back counts it again.
+      const finalScore = e.result.score ?? state.score;
+      const removed: Record<string, Removed> = {};
+      for (const m of e.result.marks) {
+        if (!state.removed[m.id]) continue;
+        const counted: Removed['counted'] = !finalScore
+          ? null
+          : isUnclear(m)
+            ? finalScore.unclear != null ? 'unclear' : 'mistakes'
+            : countsAsMistake(m)
+              ? 'mistakes'
+              : 'tajweed';
+        removed[m.id] = { mark: m, counted };
+      }
       return {
         ...state,
+        removed,
         start,
         seeking: false,
         status: 'done',
         take: e.result.take ?? state.take,
         marks,
-        score: e.result.score ?? state.score,
+        score: finalScore,
         final: e.result,
       };
     }
@@ -189,22 +215,58 @@ export function applyEvent(state: LiveState, e: LiveEvent): LiveState {
   }
 }
 
-/** "Not a mistake": the mark goes at once (and the score with it, until the server's next score). */
+/** "Not a mistake": the mark goes at once (and the score with it, until the server's next score); it can be put back. */
 export function dismissMark(state: LiveState, id: string): LiveState {
   const mark = state.marks[id];
   if (!mark || state.dismissed.includes(id)) return state;
   const marks = { ...state.marks };
   delete marks[id];
   let score = state.score;
+  let counted: Removed['counted'] = null;
   if (score && score.unclear != null && isUnclear(mark)) {
+    if (score.unclear > 0) counted = 'unclear';
     score = { ...score, unclear: Math.max(0, score.unclear - 1) };
   } else if (score && countsAsMistake(mark) && score.mistakes > 0) {
+    counted = 'mistakes';
     const mistakes = score.mistakes - 1;
     score = { ...score, mistakes, accuracy: score.reached > 0 ? 1 - mistakes / score.reached : 1 };
   } else if (score && mark.kind === 'tajweed' && score.tajweed > 0) {
+    counted = 'tajweed';
     score = { ...score, tajweed: score.tajweed - 1 };
   }
-  return { ...state, marks, score, dismissed: [...state.dismissed, id] };
+  return { ...state, marks, score, dismissed: [...state.dismissed, id], removed: { ...state.removed, [id]: { mark, counted } } };
+}
+
+/**
+ * "Put back" (or Undo): a mark taken off by mistake comes back as it was, and so does what it counted in the score
+ * (Majd, Nov 15 2026; Tarteel keeps a Removed list the same way). The checker is told too (`undismiss`), so the lab
+ * doesn't keep a wrong label.
+ */
+export function restoreMark(state: LiveState, id: string): LiveState {
+  const r = state.removed[id];
+  if (!r) return state;
+  const removed = { ...state.removed };
+  delete removed[id];
+  let score = state.score;
+  if (score && r.counted === 'unclear' && score.unclear != null) score = { ...score, unclear: score.unclear + 1 };
+  else if (score && r.counted === 'mistakes') {
+    const mistakes = score.mistakes + 1;
+    score = { ...score, mistakes, accuracy: score.reached > 0 ? 1 - mistakes / score.reached : 1 };
+  } else if (score && r.counted === 'tajweed') score = { ...score, tajweed: score.tajweed + 1 };
+  return {
+    ...state,
+    marks: { ...state.marks, [id]: r.mark },
+    score,
+    dismissed: state.dismissed.filter((d) => d !== id),
+    removed,
+  };
+}
+
+/** The marks taken off, in mushaf order (the summary's Removed list). */
+export function removedMarks(state: LiveState): Mark[] {
+  return Object.values(state.removed)
+    .map((r) => r.mark)
+    .sort((a, b) => a.w - b.w);
 }
 
 const KIND_ORDER: Record<MarkKind, number> = { word: 0, skipped: 1, added: 2, harakat: 3, letter: 4, tajweed: 5 };
@@ -231,15 +293,6 @@ export function mistakeCount(state: LiveState): number {
     return Math.max(0, state.score.mistakes - marks.filter(isUnclear).length);
   }
   return marks.filter((m) => countsAsMistake(m) && !isUnclear(m)).length;
-}
-
-/**
- * How strongly a mark draws, by its own `sure`: clear in full; likely (past the normal bar only) a little lighter, still
- * in its colour and underlined, and its card says so. Each mark by itself, so the same kind of mark looks the same in
- * every take (substitutions stay likely while skips, tajweed and letters past the strict bars come clear: #531).
- */
-export function markStrength(mark: Pick<Mark, 'sure'>): 'full' | 'light' {
-  return mark.sure === 'clear' ? 'full' : 'light';
 }
 
 /** The furthest word reached (the cursor or what's decided). */
