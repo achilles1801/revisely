@@ -21,6 +21,13 @@ appId: com.revisionbuddy.app
 # as a throwaway account (scripts/warm-premium.js), or the app's first call can pass its 20 s on a CI runner.
 - runScript:
     file: ../scripts/warm-premium.js
+# Page 379 (An-Naml, juz 19) memorized beside the onboarding's Juz 30, for Test me below. Written by an admin, so a
+# relaunch reads it (as other flows' seeds do), before the Dev UI's link, which the app keeps in memory.
+- runScript:
+    file: ../scripts/server-memorized.js
+    env:
+      PAGES: '379'
+- runFlow: ../subflows/relaunch.yaml
 
 # The Dev UI, then the reader at An-Naml 23.
 - openLink:
@@ -290,15 +297,12 @@ appId: com.revisionbuddy.app
       id: past-mark-word
     timeout: 5000
 
-# Test me (Majd, Nov 15 2026): random places in what's memorized, or in one juz of it. Page 379 (An-Naml, juz 19) is
-# marked memorized beside the onboarding's Juz 30, and the test is given Juz 19, so its places are on the one page E2E
-# has. At each place the page is hidden but for its ayah's first two words; the E2E take (lib/e2e/reciteLive's
-# placeTake) carries on from there to the place's end, where it stops by itself: "Clean · 1 of N" and Next. ✕ after
-# the second place ends the test: its summary.
-- runScript:
-    file: ../scripts/server-memorized.js
-    env:
-      PAGES: '379'
+# Test me (Majd, Nov 15 2026): random places in what's memorized, or in one juz of it. Page 379 (An-Naml, juz 19) was
+# marked memorized at the start, beside the onboarding's Juz 30, and the test is given Juz 19, so its places are on the
+# one page E2E has. At each place the page is hidden but for its ayah's first two words; the E2E take (lib/e2e/
+# reciteLive's placeTake) carries on from there to the place's end, where it stops by itself: "Clean · 1 of N" and
+# Next. ✕ after the second place ends the test: its summary. (Recording saved's note has gone, above: it sat over the
+# mic, and a long press there was its View.)
 - runFlow: ../subflows/reader-controls.yaml
 - longPressOn:
     id: recite-mic
