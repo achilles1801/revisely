@@ -63,6 +63,8 @@ import { ReciteNoticeSheet } from '../../components/reciteLive/ReciteNoticeSheet
 import { MarkCard } from '../../components/reciteLive/MarkCard';
 import { SimilarPhrasesSheet } from '../../components/reciteLive/SimilarPhrasesSheet';
 import { findingsLine, TakeSummarySheet } from '../../components/reciteLive/TakeSummarySheet';
+import { say, undoMs, useScreenReaderOn } from '../../components/reciteLive/a11y';
+import { markTitle } from '../../lib/reciteLive/describe';
 import { drillMarks, drillRange } from '../../lib/reciteLive/drill';
 import { CheckIntroPage } from '../../components/reciteLive/CheckIntroPage';
 import { markAt, wordBox } from '../../lib/reciteLive/geometry';
@@ -317,6 +319,8 @@ export default function QuranReaderScreen() {
   const [similarFor, setSimilarFor] = useState<number | null>(null);
   // "Not a mistake" on the card can be undone for a few seconds (Majd, Nov 15 2026); the summary's Removed list after.
   const [undoFor, setUndoFor] = useState<string | null>(null);
+  // With VoiceOver or TalkBack: the Undo stays longer, and what happened is said (never while the microphone is on).
+  const screenReader = useScreenReaderOn();
   useEffect(() => {
     if (live.state.status === 'connecting' || live.state.status === 'idle') setUndoFor(null);
   }, [live.state.status]);
@@ -695,7 +699,7 @@ export default function QuranReaderScreen() {
         <UndoToast
           visible={undoFor != null}
           message="Marked not a mistake"
-          duration={5000}
+          duration={undoMs(screenReader)}
           onUndo={() => {
             const id = undoFor;
             setUndoFor(null);
@@ -734,6 +738,7 @@ export default function QuranReaderScreen() {
               onDismiss={(id) => {
                 live.dismiss(id);
                 setUndoFor(id);
+                if (live.mic !== 'on') say('Marked not a mistake. Undo is at the bottom of the screen.');
               }}
               // The reciter's ayah on the card's own player (lib/reciteLive/hearAudio): a take still listening pauses first,
               // so it isn't ended and its microphone doesn't hear the reciter (Majd, Nov 15 2026).
@@ -786,7 +791,10 @@ export default function QuranReaderScreen() {
             removed={removedMarks(live.state)}
             onPutBack={(id) => {
               if (undoFor === id) setUndoFor(null);
+              const m = live.state.removed[id]?.mark;
               live.restore(id);
+              // The row it was on goes: say where it went.
+              if (m) say(`${markTitle(m)} put back`);
             }}
             checkOwned={owned}
             onFinding={(m) => {

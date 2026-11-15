@@ -255,7 +255,9 @@ until its part is set up.
     wrong label: on the connection while live (`dismiss`, `undismiss`), and after the final answer over HTTP (`POST
     /dismiss`, `/undismiss` with `when`, the tap's time, by which the lab orders a mark's labels; `sendLabel` in
     `lib/reciteCheck/service`, kept takes only; live on the checker since rev 00047). Before, a Not a mistake tapped
-    after Stop never reached the checker: the connection drops every frame once it has the final answer.
+    after Stop never reached the checker: the connection drops every frame once it has the final answer. With VoiceOver
+    or TalkBack the Undo stays 15 s, and Not a mistake and Put back are said (`components/reciteLive/a11y`; never while
+    the microphone is on). The bar's words are read with their marks ("…, wrong word"): colour is never the only signal.
   - **Your recitation** on the mark card: the reciter's own voice at the mark, from the take's audio that the connection
     holds on the phone for resuming (`audioClip`), from the mark's `t` (0.6 s before to 0.4 s after). A mark without
     one (a skipped word) uses when the cursor first reached that word or the one before, ±1.2 s. It works until the take

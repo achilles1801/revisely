@@ -761,6 +761,37 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
       expect(screen.getByLabelText(/Score .*, 1 mistake$/)).toBeTruthy();
       expect(sendLabel()).toHaveBeenLastCalledWith('undismiss', 't1', 'a', expect.any(Number));
     });
+
+    it('with a screen reader: Not a mistake after the take is said, and so is Put back; nothing is said while the mic is on', async () => {
+      const spoken = jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions');
+      // During the take: the microphone would record it.
+      await startTake('check');
+      await event({ type: 'mark', mark: wrongMark as never });
+      await tapWord(UTIYAT);
+      fireEvent.press(screen.getByTestId('mark-card-dismiss'));
+      expect(spoken.mock.calls.map((c) => c[0])).not.toContain('Marked not a mistake. Undo is at the bottom of the screen.');
+      fireEvent.press(screen.getByTestId('recite-stop'));
+      await event({
+        type: 'done',
+        result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [wrongMark], score: { reached: 11, mistakes: 0, tajweed: 0, accuracy: 1 } } as never,
+      });
+      fireEvent.press(screen.getByTestId('take-summary-removed-toggle'));
+      fireEvent.press(screen.getByTestId('take-summary-put-back'));
+      expect(spoken).toHaveBeenCalledWith('Wrong word put back', { queue: true });
+      // After the take, from the summary to the card: said at once.
+      fireEvent.press(screen.getByTestId('take-summary-finding-word'));
+      await flush();
+      fireEvent.press(screen.getByTestId('mark-card-dismiss'));
+      expect(spoken).toHaveBeenCalledWith('Marked not a mistake. Undo is at the bottom of the screen.', { queue: true });
+    });
+  });
+
+  it('the bar says each word’s mark in words, not by colour alone', async () => {
+    await startTake('check');
+    await event({ type: 'said', upTo: UTIYAT });
+    await event({ type: 'mark', mark: { id: 'a', w: UTIYAT, ayah: [27, 23], kind: 'word', sure: 'clear', heard: 'وَأُوهِيَتْ', heardExact: false } });
+    await event({ type: 'at', w: UTIYAT + 1 });
+    expect(screen.getByTestId('recite-middle').props.accessibilityLabel).toContain('وَأُوهِيَتْ, wrong word,');
   });
 
   it('a “not clear” haraka’s card: Not clear, say it more clearly; what was expected, not a guess at what was heard', async () => {
