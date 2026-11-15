@@ -677,6 +677,31 @@ describe("the site's navigation on dev: the account, Premium and Open Door pages
     expect(res.headers.get('ETag')).toBeNull();
   });
 
+  it('dev: the home and Support get Arabic: the switch, the language before the first paint, its words and styles', async () => {
+    for (const p of ['index.html', 'support/index.html']) {
+      const res = await worker.fetch(new Request('https://dev.revisely.app/'), { ...ENV, ASSETS: html(page(p)), NOINDEX: '1', ACCOUNT_PAGES: '1' }, ctx());
+      const body = await res.text();
+      const head = body.slice(0, body.indexOf('</head>'));
+      expect(head).toContain("d.dir = l === 'ar' ? 'rtl' : 'ltr'");
+      expect(head).toContain('/assets/site-rtl.css');
+      const header = body.slice(body.indexOf('<nav class="site-nav"'), body.indexOf('data-menu-panel'));
+      expect(header).toContain('data-lang-switch');
+      expect(header.indexOf('data-lang-switch')).toBeLessThan(header.indexOf('data-account-btn'));
+      // strings-site.js after strings.js and before site-i18n.js, which reads both.
+      const order = ['/assets/strings.js', '/assets/strings-site.js', '/assets/site-i18n.js'].map((s) => body.indexOf(s));
+      expect(order.every((i) => i > 0)).toBe(true);
+      expect(order).toEqual([...order].sort((a, b) => a - b));
+    }
+  });
+
+  it('revisely.app: Support comes through untouched too, with no Arabic switch or script', async () => {
+    const support = page('support/index.html');
+    const res = await worker.fetch(new Request('https://revisely.app/support/'), { ...ENV, ASSETS: html(support) }, ctx());
+    const body = await res.text();
+    expect(body).toBe(support);
+    for (const s of ['data-lang-switch', 'strings-site.js', 'site-i18n.js', 'site-rtl.css']) expect(body).not.toContain(s);
+  });
+
   it('dev: a page is always fetched whole, so a copy cached before the navigation never answers (no 304)', async () => {
     const assets = html(page('index.html'));
     const req = new Request('https://dev.revisely.app/', { headers: { Accept: 'text/html', 'If-None-Match': '"x"', 'If-Modified-Since': 'Sat, 14 Nov 2026 00:00:00 GMT' } });

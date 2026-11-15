@@ -13,6 +13,16 @@
   var stage = document.querySelector('.show');
   if (!stage) return;
 
+  // Words this script writes: Arabic where site-i18n.js has switched the page to it (dev.revisely.app), else the
+  // English given here.
+  function tr(key, en, vars) {
+    var R = window.RV;
+    if (!R || R.lang !== 'ar') return en;
+    var s = R.t(key, vars);
+    return s === key ? en : s;
+  }
+  var digits = function (n) { return window.RV && window.RV.lang === 'ar' ? n.toLocaleString(window.RV.locale()) : String(n); };
+
   var mqDark = window.matchMedia('(prefers-color-scheme: dark)');
   var mqReduce = window.matchMedia('(prefers-reduced-motion: reduce)');
   var track = stage.querySelector('.show-track');
@@ -141,11 +151,16 @@
 
   // ---------- Dots ----------
 
+  function dotLabel(sl, i) {
+    var name = sl.getAttribute('data-name');
+    var nameKey = sl.getAttribute('data-name-t');
+    return tr('h.dot', 'Slide ' + (i + 1) + ': ' + name, { n: digits(i + 1), name: nameKey ? tr(nameKey, name) : name });
+  }
   slides.forEach(function (sl, i) {
     var b = document.createElement('button');
     b.type = 'button';
     b.className = 'dot';
-    b.setAttribute('aria-label', 'Slide ' + (i + 1) + ': ' + sl.getAttribute('data-name'));
+    b.setAttribute('aria-label', dotLabel(sl, i));
     b.appendChild(document.createElement('i'));
     b.addEventListener('click', function () { userMoved(); go(i); });
     dotsBox.appendChild(b);
@@ -225,7 +240,7 @@
     stage.classList.toggle('held', held || !inView);
     stage.classList.toggle('still', !motion);
     stage.classList.toggle('stopped', !motion && !advancing);
-    toggle.setAttribute('aria-label', motion || advancing ? 'Pause the slideshow' : 'Play the slideshow');
+    toggle.setAttribute('aria-label', motion || advancing ? tr('h.pause', 'Pause the slideshow') : tr('h.play', 'Play the slideshow'));
     if (!advancing || held || !inView || document.hidden) return;
     timer = setTimeout(advanceNow, SLIDE_MS);
   }
@@ -290,7 +305,7 @@
   function revoSync() {
     if (!revoScreen) return;
     revoBtn.setAttribute('data-playing', String(revoOn));
-    revoBtn.setAttribute('aria-label', revoOn ? 'Pause Revo’s introduction' : 'Play Revo’s introduction');
+    revoBtn.setAttribute('aria-label', revoOn ? tr('h.revo.pause', 'Pause Revo’s introduction') : tr('h.revo.play', 'Play Revo’s introduction'));
     if (revoOn && revoVisible && !document.hidden) playClip(revoScreen);
     else stopClip(revoScreen);
   }
@@ -340,6 +355,14 @@
   stage.classList.add('is-live');
   setCurrent(0);
   revoSync();
+  // The language switch (dev.revisely.app): the labels written here follow it.
+  if (window.RV && window.RV.onLang) {
+    window.RV.onLang(function () {
+      dots.forEach(function (b, i) { b.setAttribute('aria-label', dotLabel(slides[i], i)); });
+      schedule();
+      revoSync();
+    });
+  }
   var pitch = slides[0];
   if (mqReduce.matches) pitch.classList.add('fanned');
   else requestAnimationFrame(function () { setTimeout(function () { pitch.classList.add('fanned'); }, 250); });
