@@ -312,9 +312,9 @@ class Bench(unittest.TestCase):
         seen = []
         real = E.ayah_notes
 
-        def notes(lp, s, a, statuses, spans, st, audio=None):
+        def notes(lp, s, a, statuses, spans, st, audio=None, readings=None):
             seen.append(None if audio is None else len(audio))
-            return real(lp, s, a, statuses, spans, st)
+            return real(lp, s, a, statuses, spans, st, readings=readings)
         pcm = bench_pcm()[: 16000 * 2 * 20]
         with unittest.mock.patch.object(E, 'ayah_notes', notes), unittest.mock.patch.object(E, 'ear2', object(),
                                                                                              create=True):
@@ -349,10 +349,10 @@ class Bench(unittest.TestCase):
         real = E.ayah_notes
         go, threads = threading.Event(), []
 
-        def notes(lp, s, a, statuses, spans, st, audio=None):
+        def notes(lp, s, a, statuses, spans, st, audio=None, readings=None):
             threads.append(threading.current_thread().name)
             self.assertTrue(go.wait(30))
-            return real(lp, s, a, statuses, spans, st)
+            return real(lp, s, a, statuses, spans, st, readings=readings)
         pcm, end = bench_pcm(), [{'type': 'end'}]
         msgs = chunks(pcm, 3200)
         session = lambda **kw: live.LiveSession(E, 1, 1, 1, 7, settings, **kw)
@@ -433,6 +433,25 @@ class Background(unittest.TestCase):
         got, ms = fut.result(5)
         self.assertEqual((got, ran.is_set()), (42, True))
         self.assertGreaterEqual(ms, 0)
+
+    def test_an_ayah_said_again_is_judged_on_its_last_readings(self):
+        """Going back to restart is no mistake (Majd, Nov 14 2026): the ayah's frames follow each word's last reading,
+        the first go and its pause cut out; with nothing said again, the frames are what they always were."""
+        from engine import CUT_MARGIN, PAD, ayah_pieces
+        ws = [10, 11, 12, 13, 14]
+        once = {10: (100, 120), 11: (120, 140), 12: (140, 160), 13: (160, 180), 14: (180, 200)}
+        self.assertEqual(ayah_pieces(ws, once, None, 10 ** 6), [(100 - PAD, 200 + PAD)])
+        self.assertEqual(ayah_pieces(ws, once, once, 10 ** 6), [(100 - PAD, 200 + PAD)])
+        # 10..13, a pause, back to 12, then 12..14
+        spans = {10: (100, 120), 11: (120, 140), 12: (140, 220), 13: (160, 240), 14: (240, 260)}
+        last = {10: (100, 120), 11: (120, 140), 12: (200, 220), 13: (220, 240), 14: (240, 260)}
+        self.assertEqual(ayah_pieces(ws, spans, last, 10 ** 6),
+                         [(100 - PAD, 140 + CUT_MARGIN), (200 - CUT_MARGIN, 260 + PAD)])
+        # back to the ayah's start: only the last go counts
+        spans = {10: (100, 220), 11: (120, 240), 12: (140, 260), 13: (160, 280), 14: (280, 300)}
+        last = {10: (200, 220), 11: (220, 240), 12: (240, 260), 13: (260, 280), 14: (280, 300)}
+        self.assertEqual(ayah_pieces(ws, spans, last, 10 ** 6), [(200 - PAD, 300 + PAD)])
+        self.assertEqual(ayah_pieces(ws, spans, last, 290), [(200 - PAD, 290)])  # clipped to the frames there are
 
 
 if __name__ == '__main__':
