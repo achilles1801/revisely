@@ -3,9 +3,11 @@
 //   revisely://e2e/recite-live?on=1   the reader shows the one mic (for a tester), as in Revisely Dev
 //   revisely://e2e/recite-live?on=0   back to the store app's record button
 //
-// A take plays a recorded event log instead of listening: An-Naml 23–24 on page 379 (the 1405 print), with وَأُوتِيَتْ
-// said as وَأُوهِيَتْ (a wrong word) and شَىْءٍ's tanween said as a shadda (a haraka slip), as Majd's Tarteel
-// screenshots of Nov 14 2026. Stop brings the checker's final answer at once.
+// A take plays a recorded event log instead of listening. Marking mistakes: An-Naml 23–24 on page 379 (the 1405
+// print), from the page's top, with وَأُوتِيَتْ said as وَأُوهِيَتْ (a wrong word) and شَىْءٍ's tanween said as a shadda
+// (a haraka slip), as Majd's Tarteel screenshots of Nov 14 2026. Recite (following only): An-Naml 25–26, begun in the
+// middle of the page (Majd's start anywhere, Nov 14 2026). Either way the checker first finds where the take started
+// (`locked`). Stop brings the checker's final answer at once.
 
 import type { LiveConnect, ReplayLog } from '../reciteLive/feed';
 import { replayFeed } from '../reciteLive/feed';
@@ -51,16 +53,45 @@ export function e2eReciteLiveOn(): boolean {
   return on;
 }
 
-/** An-Naml 23's first word (QuranWords), and its next ayah's. */
+/** An-Naml 23's first word (QuranWords, the first on page 379), and its next ayahs'. */
 const A23 = 48707;
 const A24 = 48718;
+/** An-Naml 25 and 26: the page's third and fourth ayat, where the Recite take begins. */
+const A25 = 48735;
+const A26 = 48749;
 
 /**
- * The take's events. Recite (`follow`) gets what the checker sends it: the cursor and the words said, never a mark or a
- * score, and a final answer of words only (no marks list), as scripts/recite-check's live.py writes it.
+ * Recite's take (`follow`), begun at An-Naml 25, mid-page: what the checker sends it is where it found the start, the
+ * cursor and the words said, never a mark or a score, and a final answer of words only (no marks list), as
+ * scripts/recite-check's live.py writes it.
  */
+function followTake(): ReplayLog {
+  const events: ReplayLog['events'] = [
+    { t: 0.3, type: 'ready', v: 2, take: 'e2e-379', engine: 'e2e' },
+    // Listening… until the checker is sure where the reciter started.
+    { t: 2.5, type: 'locked', w: A25, s: 27, a: 25 },
+  ];
+  for (let i = 0; i <= 15; i++) {
+    const w = A25 + i;
+    const t = 2.6 + i * 0.8;
+    events.push({ t, type: 'at', w });
+    if (i >= 2) events.push({ t: t + 0.1, type: 'said', upTo: w - 2 });
+  }
+  events.push({
+    t: 600,
+    type: 'done',
+    result: { v: 2, follow: true, take: 'e2e-379', from: A23, to: A26 + 2, start: A25, secs: 15, words: [], why: 'end' },
+  });
+  return { events };
+}
+
+/** The take's events: marking mistakes from the page's top, or following from its middle (`followTake`). */
 function take(follow: boolean): ReplayLog {
-  const events: ReplayLog['events'] = [{ t: 0.3, type: 'ready', v: 2, take: 'e2e-379', engine: 'e2e' }];
+  if (follow) return followTake();
+  const events: ReplayLog['events'] = [
+    { t: 0.3, type: 'ready', v: 2, take: 'e2e-379', engine: 'e2e' },
+    { t: 0.8, type: 'locked', w: A23, s: 27, a: 23 },
+  ];
   const marks = [
     { id: `${A23 + 4}:word:sound`, w: A23 + 4, ayah: [27, 23], kind: 'word', detail: 'sound', heard: 'وَأُوهِيَتْ', heardExact: false, sure: 'likely' },
     { id: `${A23 + 7}:harakat:`, w: A23 + 7, ayah: [27, 23], kind: 'harakat', slip: { expected: 'ٍ', heard: 'ٌّ' }, sure: 'clear' },
@@ -73,7 +104,6 @@ function take(follow: boolean): ReplayLog {
     if (i >= 2) {
       const said = w - 2;
       events.push({ t: t + 0.1, type: 'said', upTo: said });
-      if (follow) continue;
       const m = marks.find((x) => x.w === said);
       if (m) {
         mistakes++;
@@ -85,9 +115,7 @@ function take(follow: boolean): ReplayLog {
   events.push({
     t: 600,
     type: 'done',
-    result: follow
-      ? { v: 2, follow: true, take: 'e2e-379', from: A23, to: A24 + 3, secs: 13, words: [], why: 'end' }
-      : { v: 2, take: 'e2e-379', from: A23, to: A24 + 3, secs: 13, marks, score: { reached: 15, mistakes: 2, tajweed: 0, accuracy: 13 / 15 } },
+    result: { v: 2, take: 'e2e-379', from: A23, to: A24 + 3, start: A23, secs: 13, marks, score: { reached: 15, mistakes: 2, tajweed: 0, accuracy: 13 / 15 } },
   });
   return { events };
 }

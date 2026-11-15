@@ -60,6 +60,11 @@ export interface FinalResult {
   kept?: boolean;
   /** "too_long": the take reached the checker's 15 minutes. */
   why?: 'end' | 'too_long';
+  /**
+   * A take started anywhere on the page (`startBy`): the word the checker found the reciter started at, or null when it
+   * never found it. Absent from a take that started at a known place.
+   */
+  start?: number | null;
 }
 
 /** Why a take ended without its answer. `offline` is the phone's own: the checker couldn't be reached again. */
@@ -81,6 +86,8 @@ export type LiveFailure =
 
 export type LiveEvent =
   | { type: 'ready'; take: string | null; engine?: string; session?: string; from?: number }
+  /** A take started anywhere on the page: the checker has found where (the first word recited), once. */
+  | { type: 'locked'; w: number; s: number; a: number; t?: number }
   | { type: 'at'; w: number; t?: number }
   | { type: 'said'; upTo: number }
   | { type: 'mark'; mark: Mark }
@@ -180,6 +187,7 @@ export function parseFinal(raw: unknown): FinalResult | null {
     score: parseScore(r.score),
     kept: typeof r.kept === 'boolean' ? r.kept : undefined,
     ...(r.why === 'end' || r.why === 'too_long' ? { why: r.why } : {}),
+    ...(isWord(r.start) ? { start: r.start } : r.start === null ? { start: null } : {}),
   };
 }
 
@@ -204,6 +212,10 @@ export function parseEvent(raw: unknown): LiveEvent | null {
         ...(typeof x.session === 'string' ? { session: x.session } : {}),
         ...(isNum(x.from) ? { from: x.from } : {}),
       };
+    case 'locked':
+      return isWord(x.w) && isNum(x.s) && isNum(x.a)
+        ? { type: 'locked', w: x.w, s: x.s, a: x.a, ...(isNum(x.t) ? { t: x.t } : {}) }
+        : null;
     case 'at':
       return isWord(x.w) ? { type: 'at', w: x.w, ...(isNum(x.t) ? { t: x.t } : {}) } : null;
     case 'said':

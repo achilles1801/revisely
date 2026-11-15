@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState } from 'react-native';
+import { AccessibilityInfo, AppState } from 'react-native';
 import { getAuth } from 'firebase/auth';
 import { getRecordingPermissionsAsync, requestRecordingPermissionsAsync } from 'expo-audio';
 import { claimAudio, enterRecordingMode, isAudioSessionError, setAudioMode } from '../../lib/audioFocus';
@@ -7,6 +7,8 @@ import { getRecitation } from '../../lib/recitation';
 import { logger } from '../../lib/logger';
 import { currentRelease } from '../../lib/releaseInfo';
 import { versesOnPage } from '../../lib/ayahBounds';
+import { ayahKey } from '../../lib/ayahKeys';
+import { placeOfAyah, spokenText } from '../../lib/passages';
 import { AudioSource, startMicStream } from '../../lib/recite/micSource';
 import { SAMPLE_RATE } from '../../lib/recite/segmenter';
 import { getQuranWords, loadQuranWords, QuranWords } from '../../lib/recite/quranWords';
@@ -17,10 +19,12 @@ import { SavedTake, startTakeRecording, TakeRecording } from '../../lib/reciteLi
 import {
   applyEvent,
   dismissMark,
+  findingStart,
   LIVE_IDLE,
   liveConnecting,
   LiveState,
   liveStopping,
+  lookOnPage,
 } from '../../lib/reciteLive/state';
 
 /** What the mic does while reciting: follow along (free), or follow and mark mistakes (Check). */
@@ -40,6 +44,20 @@ const e2e = process.env.EXPO_PUBLIC_E2E === '1' ? (require('../../lib/e2e/recite
  */
 const SEND_HINTS = true;
 
+/**
+ * A take started from the reader starts anywhere on the page (Majd, Nov 14 2026: "it should assume it's anywhere on
+ * that page"): the checker finds where (`locked`). A server that doesn't look starts at the page's first ayah, as
+ * before, and the phone sees that from its first cursor (lib/reciteLive/state).
+ */
+export const START_ANYWHERE = true;
+
+/** The page's last ayah: the start frame's `startBy`. */
+function lastAyahOf(page: number): [number, number] {
+  const verses = versesOnPage(page);
+  const last = verses[verses.length - 1] ?? { sura: 1, ayah: 1 };
+  return [last.sura, last.ayah];
+}
+
 let realConnect: LiveConnect | null = null;
 /** The checker's live socket, made on first use. */
 const defaultConnect: LiveConnect = (start, handlers) => {
@@ -53,8 +71,16 @@ const defaultConnect: LiveConnect = (start, handlers) => {
   return realConnect(start, handlers);
 };
 
-/** The start frame for a take from `page`'s first ayah, with the account's settings (contract draft 5). */
-export function startFrameFor(page: number, mode: LiveMode, settings: ReciteCheckSettings): StartFrame {
+/**
+ * The start frame for a take on `page`, with the account's settings (contract draft 5): anywhere on the page
+ * (`startBy`, the page's last ayah), or from its first ayah.
+ */
+export function startFrameFor(
+  page: number,
+  mode: LiveMode,
+  settings: ReciteCheckSettings,
+  anywhere: boolean = START_ANYWHERE,
+): StartFrame {
   const first = versesOnPage(page)[0] ?? { sura: 1, ayah: 1 };
   return {
     type: 'start',
@@ -69,7 +95,14 @@ export function startFrameFor(page: number, mode: LiveMode, settings: ReciteChec
     tajweed: settings.level === 'strict',
     keep: settings.keep,
     follow: mode === 'recite',
+    ...(anywhere ? { startBy: lastAyahOf(page) } : {}),
   };
+}
+
+/** The state a take begins in: looking for its start on the page, or at the frame's first ayah. */
+function connectingFor(frame: StartFrame, words: QuranWords): LiveState {
+  const first = words.verseFirstWord(frame.s, frame.a);
+  return liveConnecting(frame.startBy ? { anywhereFrom: first } : { start: first });
 }
 
 /**
@@ -104,7 +137,6 @@ export function useLiveRecitation({
   const conn = useRef<LiveConnection | null>(null);
   const source = useRef<AudioSource | null>(null);
   const samples = useRef(0);
-  const startWord = useRef<number | null>(null);
   const turningTo = useRef<number | null>(null);
   const pageRef = useRef(currentPage);
   pageRef.current = currentPage;
@@ -179,10 +211,9 @@ export function useLiveRecitation({
         }
         setWords(qw);
         const frame = startFrameFor(pageRef.current, take, settings);
-        startWord.current = qw.verseFirstWord(frame.s, frame.a);
         setTestData(frame.keep);
         setMode(take);
-        setState(liveConnecting());
+        setState(connectingFor(frame, qw));
         const c = e2e.e2eLiveConnect()(frame, {
           onEvent: (e) => setState((s) => applyEvent(s, e)),
           onClose: () => {
@@ -220,12 +251,11 @@ export function useLiveRecitation({
         const qw = await loadQuranWords();
         setWords(qw);
         const frame = startFrameFor(pageRef.current, take, settings);
-        startWord.current = qw.verseFirstWord(frame.s, frame.a);
         setTestData(frame.keep);
         claimAudio('recorder', owner);
         getRecitation().stop();
         setMode(take);
-        setState(liveConnecting());
+        setState(connectingFor(frame, qw));
         const c = connect(frame, {
           onEvent: (e) => setState((s) => applyEvent(s, e)),
           onClose: () => {
@@ -320,7 +350,14 @@ export function useLiveRecitation({
       return;
     }
     if (!conn.current || !words || state.status !== 'listening') return;
-    conn.current.send({ type: 'seek', w: words.pageRange(currentPage)[0] });
+    const w = words.pageRange(currentPage)[0];
+    if (findingStart(state)) {
+      // Still looking for where the reciter started: look on this page instead.
+      conn.current.send({ type: 'seek', w, startBy: lastAyahOf(currentPage) });
+      setState((s) => lookOnPage(s, w));
+      return;
+    }
+    conn.current.send({ type: 'seek', w });
     // Only a page change sends it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage]);
@@ -336,6 +373,21 @@ export function useLiveRecitation({
   // Leaving the screen throws the take away.
   useEffect(() => () => cancel(), [cancel]);
 
+  // VoiceOver hears where the take started, once the checker has found it while listening.
+  const looked = useRef(false);
+  const looking = findingStart(state);
+  useEffect(() => {
+    if (looking) {
+      looked.current = true;
+      return;
+    }
+    const found = looked.current && state.start != null && live;
+    looked.current = false;
+    if (!found || !words || state.start == null) return;
+    const r = words.ref(state.start);
+    AccessibilityInfo.announceForAccessibility(`Started at ${spokenText(placeOfAyah(ayahKey(r.sura, r.ayah)))}`);
+  }, [looking, state.start, live, words]);
+
   return {
     state,
     /** The running (or last) take's mode; null when idle. */
@@ -347,8 +399,8 @@ export function useLiveRecitation({
     testData,
     seconds,
     words,
-    /** The first word of the take (where the score's pages start). */
-    startWord: startWord.current,
+    /** The first word recited (where the score's pages and the summary start); null while the checker looks for it. */
+    startWord: state.start,
     active: state.status !== 'idle',
     start,
     stop,

@@ -37,6 +37,13 @@ export interface LiveState {
   failure: LiveFailure | null;
   /** The last ayah judged in full. */
   lastAyah: [number, number] | null;
+  /**
+   * Where the take started: its first word recited. Null while the checker looks for it (a take started anywhere on
+   * the page, Majd's Nov 14 2026 change): no cursor, nothing revealed, nothing scored until it's found.
+   */
+  start: number | null;
+  /** The page's first word, while looking: a server that doesn't look starts there (its first `at` comes unlocked). */
+  startUnlocked: number | null;
 }
 
 export const LIVE_IDLE: LiveState = {
@@ -50,12 +57,32 @@ export const LIVE_IDLE: LiveState = {
   final: null,
   failure: null,
   lastAyah: null,
+  start: null,
+  startUnlocked: null,
 };
 
-/** Starting afresh (a new take). */
-export function liveConnecting(): LiveState {
+/**
+ * Starting afresh (a new take): at a known word (`start`), or anywhere on a page (`anywhereFrom`, the page's first
+ * word: the checker finds the start, or a server that doesn't look starts there).
+ */
+export function liveConnecting(from: { start: number } | { anywhereFrom: number } | null = null): LiveState {
+  if (from && 'start' in from) return { ...LIVE_IDLE, status: 'connecting', start: from.start };
+  if (from) return { ...LIVE_IDLE, status: 'connecting', startUnlocked: from.anywhereFrom };
   return { ...LIVE_IDLE, status: 'connecting' };
 }
+
+/** Whether the take is still looking for where the reciter started. */
+export function findingStart(state: LiveState): boolean {
+  return state.start == null && state.startUnlocked != null;
+}
+
+/** A page turned by hand while looking for the start: it's looked for on that page (`w`, its first word) instead. */
+export function lookOnPage(state: LiveState, w: number): LiveState {
+  return findingStart(state) && state.startUnlocked !== w ? { ...state, startUnlocked: w } : state;
+}
+
+/** A word mark the take's start leaves out: nothing before where the reciter started is skipped. */
+const beforeStart = (m: Mark, start: number | null) => start != null && m.kind === 'skipped' && m.w < start;
 
 /** Stop was tapped: the live marks stay while the final answer comes. */
 export function liveStopping(state: LiveState): LiveState {
@@ -71,12 +98,25 @@ export function applyEvent(state: LiveState, e: LiveEvent): LiveState {
         take: e.take ?? state.take,
         failure: null,
       };
+    case 'locked':
+      // Found where the reciter started: the cursor shows there (and the page turns to it).
+      return {
+        ...state,
+        start: e.w,
+        startUnlocked: null,
+        cursor: state.cursor ?? e.w,
+        marks: Object.fromEntries(Object.entries(state.marks).filter(([, m]) => !beforeStart(m, e.w))),
+      };
     case 'at':
+      if (state.start == null && state.startUnlocked != null) {
+        // A cursor with no `locked` first: a server that doesn't look for the start began at the page's first word.
+        return { ...state, start: state.startUnlocked, startUnlocked: null, cursor: e.w };
+      }
       return state.cursor === e.w ? state : { ...state, cursor: e.w };
     case 'said':
       return state.saidUpTo === e.upTo ? state : { ...state, saidUpTo: e.upTo };
     case 'mark': {
-      if (state.status === 'done' || state.dismissed.includes(e.mark.id)) return state;
+      if (state.status === 'done' || state.dismissed.includes(e.mark.id) || beforeStart(e.mark, state.start)) return state;
       return { ...state, marks: { ...state.marks, [e.mark.id]: e.mark } };
     }
     case 'unmark': {
@@ -90,10 +130,13 @@ export function applyEvent(state: LiveState, e: LiveEvent): LiveState {
     case 'score':
       return { ...state, score: e.score };
     case 'done': {
+      const start = e.result.start !== undefined ? e.result.start : state.start;
       const marks: Record<string, Mark> = {};
-      for (const m of e.result.marks) if (!state.dismissed.includes(m.id)) marks[m.id] = m;
+      for (const m of e.result.marks) if (!state.dismissed.includes(m.id) && !beforeStart(m, start)) marks[m.id] = m;
       return {
         ...state,
+        start,
+        startUnlocked: start == null ? state.startUnlocked : null,
         status: 'done',
         take: e.result.take ?? state.take,
         marks,
