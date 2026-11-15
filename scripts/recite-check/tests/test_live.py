@@ -565,3 +565,48 @@ class Score(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class LookAlikes(unittest.TestCase):
+    def test_a_spelling_apart_only_in_shadda_or_madd_is_not_a_lookalike(self):
+        """يَـٰبَنِىَّ (baniyya, 12:87) and يَـٰبَنِىٓ (banī) are written alike; only the shadda and the madd differ, which is
+        the letters check's business. As a look-alike it marked Majd's correct start of page 246 (Nov 15 2026)."""
+        import unicodedata
+        nfc = lambda t: unicodedata.normalize('NFC', t)  # noqa: E731 (shadda and fatha come in either order)
+        kws = engine().passage_words(31413, 31415)
+        self.assertEqual(nfc(kws[0]['text']), nfc('يَـٰبَنِىَّ'))
+        self.assertNotIn(nfc('يَـٰبَنِىٓ'), [nfc(a['text']) for a in kws[0]['alts']])
+
+    def test_a_glide_into_a_hamza_is_not_a_lookalike(self):
+        """«قَالُوٓا۟ أَءِنَّكَ» (12:90) joined sounds as «qālū waʾinnaka»: the long ū glides into the hamza. وَإِنَّكَ is
+        that glide and the rest of the word, so it isn't a look-alike there (Majd's mic-on take, Nov 15 2026); the
+        word's other look-alikes stay."""
+        import unicodedata
+        nfc = lambda t: unicodedata.normalize('NFC', t)  # noqa: E731
+        kws = engine().passage_words(31464, 31466)
+        alts = [nfc(a['text']) for a in kws[1]['alts']]
+        self.assertNotIn(nfc('وَإِنَّكَ'), alts)
+        self.assertIn(nfc('فَإِنَّكَ'), alts)
+
+
+DEV_TAKE = sorted(pathlib.Path(os.environ.get('RECITE_DEV_TAKES', pathlib.Path.home() / 'revisely-mistake-lab/data/dev-takes'))
+                  .glob('*/20261115-015943-4cd655.wav'))
+
+
+@unittest.skipUnless(DEV_TAKE, "Majd's kept Dev take (test data on the lab's Mac only, never in git)")
+class DevTake(unittest.TestCase):
+    def test_page_246_from_the_top_marks_only_the_slip(self):
+        """Majd's Recite take of page 246 (12:87 on), live at Words & harakat. Its first words, يَـٰبَنِىَّ ٱذْهَبُوا۟, are
+        right and were marked as look-alikes (يَـٰبَنِىٓ, then يَذْهَبُوا۟ taking the ya). The one mark is the second
+        رَّوْحِ, heard رُوح (the ear: a long ū for 7 frames, no fatha). Up to his Stop at 42 s; the rest is the app's
+        recitation playing back into the microphone."""
+        import live
+        with wave.open(str(DEV_TAKE[0])) as w:
+            pcm = w.readframes(16000 * 42)
+        sess = live.LiveSession(engine(), 12, 87, None, None, {'letters': '1', 'tajweed': '0'}, defer=True,
+                                open_end=True)
+        ev = run(sess, chunks(pcm, 3200) + [{'type': 'end'}])
+        live_marks = [(e['mark']['w'], e['mark']['kind']) for e in ev if e['type'] == 'mark']
+        self.assertEqual(live_marks, [(31428, 'harakat')])
+        self.assertEqual([(m['w'], m['kind'], m['sure']) for m in ev[-1]['result']['marks']],
+                         [(31428, 'harakat', 'clear')])
