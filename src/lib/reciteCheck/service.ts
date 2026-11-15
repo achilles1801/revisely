@@ -117,9 +117,12 @@ export async function sendLabel(
   }
 }
 
-/** Wake the service while the user gets ready (it sleeps when unused; waking takes a few seconds). */
+/** recite-check-pair: Recite and Words & harakat without letters, two takes an instance (lib/reciteLive/socket). */
+export const RECITE_CHECK_PAIR_URL = 'https://recite-check-pair-433792838929.us-east1.run.app';
+
+/** Wake both services while the user gets ready (they sleep when unused; waking takes a few seconds). */
 export function warmUpReciteCheck(deps: Pick<CheckDeps, 'fetch'> = defaults): void {
-  deps.fetch(`${RECITE_CHECK_URL}/health`).catch(() => undefined);
+  for (const base of [RECITE_CHECK_URL, RECITE_CHECK_PAIR_URL]) deps.fetch(`${base}/health`).catch(() => undefined);
 }
 
 export const FAILURE_TEXT: Record<CheckFailure, string> = {

@@ -219,6 +219,15 @@ until its part is set up.
   ikhfa, idgham, iqlab); letters behind an off-by-default switch.
   - The checker runs on Cloud Run in revisely-dev (`scripts/recite-check`, its README): the app has no JS-only way
     to run the model on the phone. It is deployed by hand, never to production, and the store app never calls it.
+  - **Two services** (recite-server, Nov 15 2026; Majd approved halving the light levels' cost; recite-contract.md,
+    "Two services"):
+    - Recite (`follow`), and Words & harakat with letters off, go to `recite-check-pair` (two takes an instance);
+      everything else goes to `recite-check`.
+    - The app's Words & harakat sends `letters: true`, so today only Recite goes to the pair.
+    - `lib/reciteLive/socket` picks the address when a take starts. A take the pair refuses (`level_elsewhere`), or
+      can't start (unreachable, or its 403 while private), starts again on `recite-check` as a new take there.
+    - After a failed start the pair is passed over for 10 minutes. A resume goes to the service that said `ready`.
+    - `warmUpReciteCheck()` wakes both.
   - The model's licence (Quran Muaalem License 1.0, 2.1) asks for its AI notice, English and Arabic, before the
     first use and reachable afterwards: the sheet shows it first, and Settings → About has it.
   - "Keep as test data" (on by default; in the sheet and Settings → Testing) keeps each recording and its result

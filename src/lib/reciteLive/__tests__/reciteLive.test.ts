@@ -72,6 +72,8 @@ describe('the contract', () => {
     // The server's Premium gate (CHECK_GATE) under either name: the app opens the Premium page.
     expect(parseEvent({ type: 'error', reason: 'check_locked' })).toEqual({ type: 'error', reason: 'check_locked' });
     expect(parseEvent({ type: 'error', reason: 'premium_required' })).toEqual({ type: 'error', reason: 'premium_required' });
+    // recite-check-pair refusing a level it doesn't take (the socket starts the take on recite-check).
+    expect(parseEvent({ type: 'error', reason: 'level_elsewhere' })).toEqual({ type: 'error', reason: 'level_elsewhere' });
     expect(parseEvent({ type: 'error', error: 'idle' })).toEqual({ type: 'error', reason: 'idle' });
   });
 
