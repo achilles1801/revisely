@@ -225,6 +225,7 @@ def skeleton(norm):
 
 
 LONG_LETTER = {'ۦ': 'ي', 'ۥ': 'و'}
+GLIDE = {'ۥ': 'و', 'ۦ': 'ي'}  # the glide a long ū or ī makes into a hamza after it (_without_glides)
 
 
 def letter_skeleton(norm):
@@ -420,8 +421,22 @@ class Key:
             if not fs:
                 raise ValueError(f'no sounds for {s}:{a} word {p}')
             alt = self.lookalikes(ayah[p], fs, alts, alt_rule) if alts else []
+            if alt and p > 0:
+                alt = self._without_glides(alt, fs, self.forms(ayah, p - 1))
             out.append({'word': w, 'text': ayah[p], 'forms': fs, 'sounds': fs[0]['sounds'], 'alts': alt})
         return out
+
+    @staticmethod
+    def _without_glides(alt, fs, prev):
+        """A word that starts with a hamza, said joined after one that ends in a long ū or ī, is heard with a w or y
+        glide where the hamza is: «قَالُوٓا۟ أَءِنَّكَ» sounds as «qālū waʾinnaka» (Majd's take, Nov 15 2026). A look-alike
+        that is that glide and the rest of the word (وَإِنَّكَ) is the same sound, not another word: it is left out."""
+        joined = [f['sounds'] for f in prev if f.get('form') == 'joined'] or [prev[0]['sounds']]
+        glides = {GLIDE[j[-1]] for j in joined if j and j[-1] in GLIDE}
+        if not glides:
+            return alt
+        same = {core(g + n[1:]) for g in glides for n in (norm_sounds(f['sounds']) for f in fs) if n[:1] == 'ء'}
+        return [a for a in alt if core(norm_sounds(a['sounds'])) not in same]
 
 
 # ---------------------------------------------------------------- the checker
