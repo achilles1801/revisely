@@ -327,6 +327,12 @@ class LiveTests(Base):
         self.assertEqual(FakeSession.made[0].args[:4], (2, 6, 114, 6))
         kept = json.loads(self.stored[f"recite-tests/tester1/{ready['take']}.json"])
         self.assertEqual(kept['request']['startBy'], [2, 16])
+        self.assertEqual(server.start_note(server.Live('t', 'u', FakeSession.made[0], False, {'startBy': [2, 16]},
+                                                       None)), 'no lock in 1.0 s')
+        found = server.Live('t', 'u', FakeSession.made[0], False, {'startBy': [2, 16]}, None)
+        found.events = [{'type': 'locked', 'w': 6090, 's': 2, 'a': 9, 't': 2.5}]
+        self.assertEqual(server.start_note(found), 'locked at 2.5 s (1 locks)')  # numbers only: no word or ayah
+        self.assertEqual(server.start_note(server.Live('t', 'u', FakeSession.made[0], False, {}, None)), '-')
         FakeSession.made = []
         with self.socket() as ws:
             ws.send_text(start(s=2, a=6))

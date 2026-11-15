@@ -298,6 +298,16 @@ def protocol():
     return PROTOCOL if 'start_by' in ps or any(p.kind is p.VAR_KEYWORD for p in ps.values()) else 5
 
 
+def start_note(s):
+    """How a take started, for the log, in numbers only (never the word or ayah): '-' for a start at s:a; with startBy,
+    when the first `locked` came (seconds of audio) and how many came, or that none did (no lock means silence: the
+    phone is told nothing, Majd, Nov 14 2026)."""
+    if 'startBy' not in s.request:
+        return '-'
+    locks = [e.get('t') for e in s.events if e.get('type') == 'locked']
+    return f'locked at {locks[0]} s ({len(locks)} locks)' if locks else f'no lock in {s.sess.seconds:.1f} s'
+
+
 def ayah_pair(v):
     """[sura, ayah] (two whole numbers) as a tuple, or None."""
     if isinstance(v, (list, tuple)) and len(v) == 2 and all(isinstance(x, int) and not isinstance(x, bool) for x in v):
@@ -417,10 +427,10 @@ async def live_socket(ws: WebSocket):
         r.update(engine=VERSION, take=s.sid)
         done = next((e for e in events if e['type'] == 'done'), None)
         FINISHED[s.sid] = (s.uid, s.sess.n, done, time.time())
-        log.info('live: %.1f s audio, %s words reached, %d marks, why %s, ms %s, sockets %d, keep %s',
-                 s.sess.seconds, (r.get('score') or {}).get('reached', len(r.get('words') or [])),
-                 len(r.get('marks') or []), r.get('why'), r.get('ms'), s.sockets, s.keep)
         s.events += [e for e in events if e['type'] != 'done']  # the result is kept on its own
+        log.info('live: %.1f s audio, %s words reached, %d marks, why %s, ms %s, sockets %d, keep %s, start %s',
+                 s.sess.seconds, (r.get('score') or {}).get('reached', len(r.get('words') or [])),
+                 len(r.get('marks') or []), r.get('why'), r.get('ms'), s.sockets, s.keep, start_note(s))
         with contextlib.suppress(WebSocketDisconnect):
             await send(events, record=False)
         if s.keep:

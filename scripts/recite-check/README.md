@@ -123,8 +123,9 @@ from the first word of `s:a` through the end of `startBy`.
   - Once sure, it sends `{"type":"locked","w":…,"s":…,"a":…,"t":…}`, and nothing (`at`, `said`, marks, `score`) comes
     before it.
   - Words before `w` aren't part of the take: never skipped, not in `done.result.words` or the score.
-  - `{"type":"nolock"}` comes once after about 8 s of speech with no lock. The search goes on.
-  - `done.result.start` is the locked `w`, or null.
+  - No lock means silence (Majd): nothing is sent, the search goes on, and `done.result.start` is null. Otherwise
+    it's the locked `w`.
+  - The take's log line says when it locked and how many times, or that it didn't, in numbers only (`start_note`).
 - **A hand page-turn:** `{"type":"seek","w":<the page's first word>,"startBy":[sura,ayah]}` searches again, before
   the lock or after it (another `locked`). A `seek` with `w` alone is as before.
 - **What the server checks** (server.py): `startBy` must be an ayah from `s:a` to the passage's end, at most
