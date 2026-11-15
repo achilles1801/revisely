@@ -113,4 +113,14 @@ describe('the take summary with screen readers and the largest text', () => {
     const [said] = (AccessibilityInfo.announceForAccessibilityWithOptions as jest.Mock).mock.calls.at(-1)!;
     expect(said).toMatch(/^Your recitation\. An-Naml, ayahs 23 to 2\d\. 1 minute 42 seconds$/);
   });
+
+  it('“not clear” findings come last, each saying it isn’t counted, and the mistakes leave them out', () => {
+    const unclear: Mark = { id: 'u', w: A23 + 1, ayah: [27, 23], kind: 'harakat', sure: 'likely' };
+    show({ marks: [unclear, wrong(A23 + 3, [27, 23])] });
+    const titles = screen.getAllByTestId('take-summary-finding-title').map((t) => plainText(flat(t.props.children)));
+    expect(titles).toEqual(['Wrong word · ayah 23', 'Not clear · ayah 23']);
+    expect(screen.getByText('Say it more clearly. Not counted in the score.')).toBeTruthy();
+    expect(screen.getByText('1 wrong word, 1 not clear')).toBeTruthy();
+    expect(screen.getByLabelText('Score 96%, 1 mistake')).toBeTruthy();
+  });
 });

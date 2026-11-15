@@ -6,6 +6,7 @@
 
 import {
   countsAsMistake,
+  isUnclear,
   FinalResult,
   LiveEvent,
   LiveFailure,
@@ -195,7 +196,9 @@ export function dismissMark(state: LiveState, id: string): LiveState {
   const marks = { ...state.marks };
   delete marks[id];
   let score = state.score;
-  if (score && countsAsMistake(mark) && score.mistakes > 0) {
+  if (score && score.unclear != null && isUnclear(mark)) {
+    score = { ...score, unclear: Math.max(0, score.unclear - 1) };
+  } else if (score && countsAsMistake(mark) && score.mistakes > 0) {
     const mistakes = score.mistakes - 1;
     score = { ...score, mistakes, accuracy: score.reached > 0 ? 1 - mistakes / score.reached : 1 };
   } else if (score && mark.kind === 'tajweed' && score.tajweed > 0) {
@@ -217,10 +220,17 @@ export function marksOnPage(state: LiveState, words: QuranWords, page: number): 
   return marksInOrder(state).filter((m) => m.w >= from && m.w < to);
 }
 
-/** Mistakes so far: the server's count when it has sent one, else the marks shown. */
+/**
+ * Mistakes so far: the server's count when it has sent one, else the marks shown. "Not clear" marks never count: a
+ * checker that sends `unclear` has left them out already; from one that doesn't, the ones shown are taken out.
+ */
 export function mistakeCount(state: LiveState): number {
-  if (state.score) return state.score.mistakes;
-  return Object.values(state.marks).filter(countsAsMistake).length;
+  const marks = Object.values(state.marks);
+  if (state.score) {
+    if (state.score.unclear != null) return state.score.mistakes;
+    return Math.max(0, state.score.mistakes - marks.filter(isUnclear).length);
+  }
+  return marks.filter((m) => countsAsMistake(m) && !isUnclear(m)).length;
 }
 
 /**

@@ -1,5 +1,5 @@
 import { quranWords } from '../../recite/__fixtures__/quranWords';
-import { applyEvent, liveConnecting, LiveState } from '../state';
+import { applyEvent, dismissMark, liveConnecting, LiveState, mistakeCount } from '../state';
 import type { Mark } from '../contract';
 import { barWords, hiddenFollow, nextHiddenWord, NOTHING_SHOWN, revealAyah, revealNextWord, scorePill, wordShown } from '../view';
 
@@ -37,13 +37,22 @@ describe('the words heard in the bar', () => {
 
   it('Check: a word with a slip (a haraka, a letter, a tajweed note) is amber, the current one too; Recite marks none', () => {
     let s = at(liveConnecting(), A23 + 8);
-    s = applyEvent(s, { type: 'mark', mark: mark({ id: 'h', w: A23 + 7, kind: 'harakat', slip: { expected: 'ٍ', heard: 'ٌّ' } }) });
+    s = applyEvent(s, { type: 'mark', mark: mark({ id: 'h', w: A23 + 7, kind: 'harakat', sure: 'clear', slip: { expected: 'ٍ', heard: 'ٌّ' } }) });
     s = applyEvent(s, { type: 'mark', mark: mark({ id: 't', w: A23 + 8, kind: 'tajweed', rule: 'qalqalah' }) });
     expect(barWords(s, words, { check: true, startWord: A23 }).map((b) => [b.w - A23, b.tone])).toEqual([
       [7, 'slip'],
       [8, 'slip'],
     ]);
     expect(barWords(s, words, { check: false, startWord: A23 }).map((b) => b.tone)).toEqual(['said', 'current']);
+  });
+
+  it('a “not clear” haraka (past the normal bar only) isn’t shown as a slip: it wasn’t heard as wrong', () => {
+    let s = at(liveConnecting(), A23 + 8);
+    s = applyEvent(s, { type: 'mark', mark: mark({ id: 'h', w: A23 + 7, kind: 'harakat', sure: 'likely' }) });
+    expect(barWords(s, words, { check: true, startWord: A23 }).map((b) => [b.w - A23, b.tone])).toEqual([
+      [7, 'said'],
+      [8, 'current'],
+    ]);
   });
 });
 
@@ -53,12 +62,36 @@ describe('the score pill', () => {
     expect(scorePill(s, words, A23)).toEqual({ text: '100%', level: 'good' });
     s = applyEvent(s, { type: 'mark', mark: mark({ id: 'a' }) });
     expect(scorePill(s, words, A23)).toEqual({ text: '99.2%', level: 'good' });
-    s = applyEvent(s, { type: 'mark', mark: mark({ id: 'b', w: A23 + 7, kind: 'harakat' }) });
+    s = applyEvent(s, { type: 'mark', mark: mark({ id: 'b', w: A23 + 7, kind: 'harakat', sure: 'clear' }) });
     expect(scorePill(s, words, A23)).toEqual({ text: '98.5%', level: 'warn' });
     // Tajweed notes don't count.
     s = applyEvent(s, { type: 'mark', mark: mark({ id: 'c', w: A23 + 8, kind: 'tajweed', rule: 'qalqalah' }) });
     expect(scorePill(s, words, A23)?.text).toBe('98.5%');
     expect(scorePill(s, words, null)).toBeNull();
+  });
+
+  it('“not clear” marks never count (Majd, Nov 15 2026): a haraka or letter past the normal bar only', () => {
+    let s = applyEvent(at(liveConnecting(), A23 + 8), { type: 'said', upTo: A23 + 7 });
+    s = applyEvent(s, { type: 'mark', mark: mark({ id: 'a' }) });
+    s = applyEvent(s, { type: 'mark', mark: mark({ id: 'h', w: A23 + 6, kind: 'harakat', sure: 'likely' }) });
+    s = applyEvent(s, { type: 'mark', mark: mark({ id: 'l', w: A23 + 7, kind: 'letter', sure: 'likely' }) });
+    expect(scorePill(s, words, A23)).toEqual({ text: '99.2%', level: 'good' });
+    // A checker that still counts them in `mistakes`: the ones shown are taken out.
+    s = applyEvent(s, { type: 'score', score: { reached: 8, mistakes: 3, tajweed: 0, accuracy: 0.625 } });
+    expect(mistakeCount(s)).toBe(1);
+    // Dismissing one: the checker's count and the marks shown both lose it, so the count stays.
+    s = dismissMark(s, 'h');
+    expect(mistakeCount(s)).toBe(1);
+    // A checker that counts them apart (`unclear`): its `mistakes` already leaves them out.
+    s = applyEvent(s, { type: 'score', score: { reached: 8, mistakes: 1, tajweed: 0, unclear: 1, accuracy: 0.875 } });
+    expect(mistakeCount(s)).toBe(1);
+    s = dismissMark(s, 'l');
+    expect(mistakeCount(s)).toBe(1);
+    expect(s.score?.unclear).toBe(0);
+    // A likely wrong word still counts: only harakat and letters are "not clear".
+    s = applyEvent(s, { type: 'mark', mark: mark({ id: 'w2', w: A23 + 5, kind: 'word', sure: 'likely' }) });
+    s = applyEvent(s, { type: 'score', score: { reached: 8, mistakes: 2, tajweed: 0, unclear: 0, accuracy: 0.75 } });
+    expect(mistakeCount(s)).toBe(2);
   });
 });
 

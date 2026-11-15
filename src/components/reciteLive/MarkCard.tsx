@@ -8,7 +8,7 @@ import { Tap } from '../v2/Tap';
 import { Box, placeMenu } from '../verse/menuPlacement';
 import type { QuranWords } from '../../lib/recite/quranWords';
 import type { Mark } from '../../lib/reciteLive/contract';
-import { severityOf } from '../../lib/reciteLive/contract';
+import { isUnclear, severityOf } from '../../lib/reciteLive/contract';
 import {
   expectedPhrase,
   markPlace,
@@ -18,6 +18,7 @@ import {
   recitedPhrase,
   slipLine,
   tajweedLines,
+  UNCLEAR_NOTE,
 } from '../../lib/reciteLive/describe';
 
 const CARD_MARGIN = 12;
@@ -96,8 +97,10 @@ function MarkBlock({
 }) {
   const { palette } = useTheme();
   const color = severityOf(mark) === 'mistake' ? palette.red : palette.warn;
-  const recited = recitedPhrase(words, mark);
-  const slip = slipLine(mark);
+  // Not clear: what the checker thinks it heard is the unclear part, so only what was expected shows, and why.
+  const unclear = isUnclear(mark);
+  const recited = unclear ? null : recitedPhrase(words, mark);
+  const slip = unclear ? UNCLEAR_NOTE : slipLine(mark);
   return (
     <View style={[styles.block, !first && { borderTopColor: palette.separator, borderTopWidth: layoutV2.hairline }]} testID={`mark-card-${mark.kind}`}>
       <View style={styles.head}>

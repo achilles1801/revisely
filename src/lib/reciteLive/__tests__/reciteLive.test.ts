@@ -1,5 +1,5 @@
 import { quranWords } from '../../recite/__fixtures__/quranWords';
-import { LiveEvent, parseEvent, parseMark, severityOf, Mark } from '../contract';
+import { isUnclear, LiveEvent, parseEvent, parseMark, severityOf, Mark } from '../contract';
 import {
   applyEvent,
   dismissMark,
@@ -121,7 +121,8 @@ describe('the live state', () => {
       // In mushaf order.
       const ws = marksInOrder(s).map((m) => m.w);
       expect(ws).toEqual([...ws].sort((a, b) => a - b));
-      expect(mistakeCount(s)).toBe(done.result.score!.mistakes);
+      // These checkers counted "not clear" marks in `mistakes` (no `unclear`); the app takes them out.
+      expect(mistakeCount(s)).toBe(done.result.score!.mistakes - done.result.marks.filter(isUnclear).length);
     }
   });
 
@@ -467,6 +468,21 @@ describe('the card’s words', () => {
     expect(markTitle(mark({ kind: 'harakat', detail: 'shadda' }))).toBe('Shadda slip');
     expect(markTitle(mark({ kind: 'letter' }))).toBe('Letter slip');
     expect(markTitle(mark({ kind: 'tajweed', rule: 'madd_munfasil' }))).toBe('Madd munfasil');
+  });
+
+  it('a haraka or letter past the normal bar only is “Not clear”: say it more clearly, not counted (Majd, Nov 15 2026)', () => {
+    const unclear = mark({ kind: 'harakat', sure: 'likely', slip: { expected: 'َ', heard: 'ِ' }, heard: 'x', heardExact: true });
+    expect(isUnclear(unclear)).toBe(true);
+    expect(markTitle(unclear)).toBe('Not clear');
+    expect(findingNote(unclear)).toBe('Say it more clearly. Not counted in the score.');
+    // The title says it, so the place doesn't add "likely".
+    expect(plainText(markPlace(unclear))).toBe('An-Naml, ayah 23');
+    expect(markTitle(mark({ kind: 'letter', sure: 'likely' }))).toBe('Not clear');
+    // Clear harakat and letters, and every word mark, keep their names.
+    expect(markTitle(mark({ kind: 'harakat', sure: 'clear' }))).toBe('Harakat slip');
+    expect(isUnclear(mark({ kind: 'word', sure: 'likely' }))).toBe(false);
+    expect(isUnclear(mark({ kind: 'skipped', sure: 'likely' }))).toBe(false);
+    expect(isUnclear(mark({ kind: 'tajweed', rule: 'ghunnah', sure: 'likely' }))).toBe(false);
   });
 
   it('names the ayah by its surah, and says when a mark is only likely', () => {

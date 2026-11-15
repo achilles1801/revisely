@@ -10,7 +10,7 @@ import { describeAyahs, spokenText } from '../../lib/passages';
 import { ayahKey } from '../../lib/ayahKeys';
 import type { QuranWords } from '../../lib/recite/quranWords';
 import type { Mark } from '../../lib/reciteLive/contract';
-import { severityOf } from '../../lib/reciteLive/contract';
+import { isUnclear, severityOf } from '../../lib/reciteLive/contract';
 import { findingNote, markTitle } from '../../lib/reciteLive/describe';
 import type { ScoreLevel } from '../../lib/reciteLive/score';
 import { mistakesLabel } from '../../lib/reciteLive/score';
@@ -47,20 +47,22 @@ export function passageOf(words: QuranWords, from: number, to: number): string {
   return describeAyahs(keys);
 }
 
-/** "1 wrong word, 1 harakat slip, 1 tajweed note". */
+/** "1 wrong word, 1 harakat slip, 1 tajweed note, 2 not clear". */
 export function findingsLine(marks: Mark[]): string {
-  const n = (kinds: Mark['kind'][]) => marks.filter((m) => kinds.includes(m.kind)).length;
+  const n = (kinds: Mark['kind'][]) => marks.filter((m) => kinds.includes(m.kind) && !isUnclear(m)).length;
   const parts: string[] = [];
   const wrong = n(['word']);
   const skipped = n(['skipped']);
   const added = n(['added']);
   const slips = n(['harakat', 'letter']);
   const tajweed = n(['tajweed']);
+  const unclear = marks.filter(isUnclear).length;
   if (wrong) parts.push(`${wrong} wrong ${wrong === 1 ? 'word' : 'words'}`);
   if (skipped) parts.push(`${skipped} skipped`);
   if (added) parts.push(`${added} added`);
   if (slips) parts.push(`${slips} harakat ${slips === 1 ? 'slip' : 'slips'}`);
   if (tajweed) parts.push(`${tajweed} tajweed ${tajweed === 1 ? 'note' : 'notes'}`);
+  if (unclear) parts.push(`${unclear} not clear`);
   return parts.join(', ');
 }
 
@@ -107,7 +109,9 @@ export function TakeSummarySheet({
   const stacked = useWindowDimensions().fontScale >= STACK_FINDINGS_AT;
   const passage = words && from != null && to != null && to >= from ? passageOf(words, from, to) : '';
   const manySurahs = words != null && from != null && to != null && to >= from && words.ref(from).sura !== words.ref(to).sura;
-  const mistakes = marks.filter((m) => m.kind !== 'tajweed').length;
+  // "Not clear" marks never count (Majd, Nov 15 2026), so they come last.
+  const mistakes = marks.filter((m) => m.kind !== 'tajweed' && !isUnclear(m)).length;
+  const findings = [...marks.filter((m) => !isUnclear(m)), ...marks.filter(isUnclear)];
   const scoreColor = score?.level === 'good' ? palette.good : score?.level === 'warn' ? palette.warn : palette.onRedSubtle;
   // Once, when the summary is on screen: what was recited, how long, and (Check) the score. Nothing is spoken while
   // the microphone is on, where it would be recorded with the recitation.
@@ -152,7 +156,7 @@ export function TakeSummarySheet({
         ) : null}
       </View>
       {check && words
-        ? marks.map((m, i) => {
+        ? findings.map((m, i) => {
             const mistake = severityOf(m) === 'mistake';
             const color = mistake ? palette.red : palette.warn;
             const place = findingPlace(m, manySurahs);
@@ -176,7 +180,7 @@ export function TakeSummarySheet({
               >
                 <View style={[styles.mark, { backgroundColor: mistake ? palette.redSubtle : palette.warnSubtle }]}>
                   <Ionicons
-                    name={m.kind === 'tajweed' ? 'pulse-outline' : mistake ? 'close' : 'remove-outline'}
+                    name={m.kind === 'tajweed' ? 'pulse-outline' : mistake ? 'close' : isUnclear(m) ? 'ear-outline' : 'remove-outline'}
                     size={18}
                     color={mistake ? palette.onRedSubtle : palette.warn}
                   />
