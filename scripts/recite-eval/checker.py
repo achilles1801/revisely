@@ -223,6 +223,18 @@ def skeleton(norm):
     return ''.join(out)
 
 
+
+LONG_LETTER = {'ۦ': 'ي', 'ۥ': 'و'}
+
+
+def letter_skeleton(norm):
+    """skeleton() with a long ī or ū read as the letter it is written with (ي, و), as a doubled y or w is. Two words
+    the same here are spelled alike apart from shadda and madd: يَـٰبَنِىَّ (baniyya) and يَـٰبَنِىٓ (banī) differ in
+    skeleton() (the doubled y is a consonant, the long ī isn't). As a look-alike it marked Majd's correct
+    «يَا بُنَيَّ ٱذْهَبُوا» at the start of a take, يَذْهَبُوا taking the ya (Nov 15 2026). Used beside skeleton(), not
+    instead: skeleton() also keeps out pairs like يُؤْمِنُونَ / يُؤْمِنُوا, and letting those in made false marks."""
+    return skeleton(''.join(LONG_LETTER.get(ch, ch) for ch in norm))
+
 # two words in quran_transcript that the mushaf (and the app) writes as one
 JOINED = {('بَعْدَ', 'مَا'), ('إِلْ', 'يَاسِينَ')}
 
@@ -371,6 +383,7 @@ class Key:
         norms = {norm_sounds(f['sounds']) for f in forms}
         cores = {core(n) for n in norms}
         skels = {skeleton(n) for n in norms} | {skeleton(core(n)) for n in norms}
+        lskels = {letter_skeleton(n) for n in norms} | {letter_skeleton(core(n)) for n in norms}
         found = {}
         for n in norms:
             maxd = 2 if len(n) <= 10 else 3
@@ -378,7 +391,9 @@ class Key:
                 for e in lex.get(ln, ()):
                     if e['text'] == text or e['norm'] in norms or core(e['norm']) in cores:
                         continue
-                    if rule == 'skeleton' and (skeleton(e['norm']) in skels or skeleton(core(e['norm'])) in skels):
+                    if rule == 'skeleton' and (skeleton(e['norm']) in skels or skeleton(core(e['norm'])) in skels
+                                               or letter_skeleton(e['norm']) in lskels
+                                               or letter_skeleton(core(e['norm'])) in lskels):
                         continue
                     d = Levenshtein.distance(n, e['norm'], score_cutoff=maxd)
                     if d <= maxd and (e['text'] not in found or d < found[e['text']][0]):
