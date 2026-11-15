@@ -166,6 +166,11 @@ class CheckTests(Base):
         self.assertEqual((body['ok'], body['protocol']), (True, 6))
         self.assertIn('server', body)
         self.assertIn('engine', body)
+        self.assertIs(body['words'], False)  # FakeEngine has no word table
+
+    def test_health_says_when_the_word_table_is_there(self):
+        server.ENGINE['e'].table = {'offsets': [], 'blob': b''}
+        self.assertIs(self.client.get('/health').json()['words'], True)
 
     def test_sign_in_and_testers_only(self):
         r = self.client.post('/check?s=1&a=1', content=wav())

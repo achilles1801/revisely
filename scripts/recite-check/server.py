@@ -133,8 +133,12 @@ def put_json(name, obj):
 @app.get('/health')
 def health():
     """engine: the checker's commit; server: this service's (the repo's commit it was staged from); protocol: the
-    contract draft it speaks, so the app can tell which features it may use."""
-    return {'ok': True, 'engine': VERSION, 'server': SERVER, 'protocol': protocol()}
+    contract draft it speaks, so the app can tell which features it may use; words: whether the word table for this
+    checker is in the image. Without it a cold instance works out every word it needs (~100 ms each), and finding
+    where a take starts needs a whole page at once: 27–38 s hops on rev 00043. Traffic never moves to a revision that
+    says false (README, "The word table")."""
+    return {'ok': True, 'engine': VERSION, 'server': SERVER, 'protocol': protocol(),
+            'words': ENGINE['e'].table is not None}
 
 
 @app.post('/check')
