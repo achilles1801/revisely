@@ -17,7 +17,7 @@ import subprocess
 import sys
 
 PROJECT = 'revisely-dev'
-SERVICE = 'recite-check'
+SERVICES = ('recite-check', 'recite-check-pair')  # every level, one take an instance; Recite and Words & Harakat, two
 REPO = 'achilles1801/revisely'
 LABEL = 'recite-health'
 TITLE = 'Recitation checker health (weekly digest)'
@@ -29,7 +29,8 @@ FREE_VCPU_S, FREE_GIB_S = 180_000, 360_000  # a month, per billing account (shar
 
 def read_logs(days):
     since = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=days)).strftime('%Y-%m-%dT%H:%M:%SZ')
-    q = (f'resource.type="cloud_run_revision" AND resource.labels.service_name="{SERVICE}" '
+    names = ' OR '.join(f'"{s}"' for s in SERVICES)
+    q = (f'resource.type="cloud_run_revision" AND resource.labels.service_name=({names}) '
          f'AND jsonPayload.health:* AND timestamp>="{since}"')
     out = subprocess.run(['gcloud', 'logging', 'read', q, '--project', PROJECT, '--format', 'json', '--limit',
                           '100000'], check=True, capture_output=True, text=True).stdout
@@ -37,12 +38,44 @@ def read_logs(days):
 
 
 def lines(entries):
-    """(kind, fields, revision, instance) of each health line."""
+    """(kind, fields, revision, instance) of each health line. The fields carry `_pair` (the two-takes service),
+    `_inst` (the instance) and `_end` (when the line was written, as a Unix time) for the instance time held."""
     for e in entries:
         p = e.get('jsonPayload') or {}
         if 'health' in p:
-            yield (p['health'], p, (e.get('resource') or {}).get('labels', {}).get('revision_name'),
-                   (e.get('labels') or {}).get('instanceId'))
+            res = (e.get('resource') or {}).get('labels', {})
+            inst = (e.get('labels') or {}).get('instanceId')
+            end = None
+            if isinstance(e.get('timestamp'), str):
+                end = dt.datetime.fromisoformat(e['timestamp'].replace('Z', '+00:00')).timestamp()
+            yield (p['health'], dict(p, _pair=str(res.get('service_name', '')).endswith('-pair'), _inst=inst, _end=end),
+                   res.get('revision_name'), inst)
+
+
+def held_seconds(takes, drops):
+    """Instance time a request held: per instance, the union of the spans of its takes and dropped sessions (two
+    takes at once on the pair service count once). A line without a time or an instance counts its own length."""
+    spans, loose = {}, 0.0
+    # a drop's open_s runs on while it waits for its phone (RESUME_TTL) after the socket closed: its audio instead
+    for p in [dict(x, _n=x.get('open_s', x.get('wall_s', 0))) for x in takes] + [dict(x, _n=x.get('audio_s', 0))
+                                                                                for x in drops]:
+        n = p['_n'] or 0
+        if p.get('_inst') and p.get('_end'):
+            spans.setdefault(p['_inst'], []).append((p['_end'] - n, p['_end']))
+        else:
+            loose += n
+    total = loose
+    for iv in spans.values():
+        iv.sort()
+        a, b = iv[0]
+        for x, y in iv[1:]:
+            if x > b:
+                total += b - a
+                a, b = x, y
+            else:
+                b = max(b, y)
+        total += b - a
+    return total
 
 
 def q(xs, p):
@@ -78,7 +111,7 @@ def summarize(entries, days, now=None):
     audio_h = sum(p.get('audio_s', 0) for p in takes) / 3600
     by_level = {}
     for p in takes:
-        by_level.setdefault(f"{p.get('kind')} · {p.get('level')}", []).append(p)
+        by_level.setdefault(f"{p.get('kind')} · {p.get('level')}" + (' (pair)' if p.get('_pair') else ''), []).append(p)
     out += ['### Takes', '', '| | Takes | Audio | p50 length | Kept | Marks (median) |', '| --- | --- | --- | --- | --- | --- |']
     for name, ps in sorted(by_level.items()):
         kept = [p['kept'] for p in ps if 'kept' in p]
@@ -123,8 +156,7 @@ def summarize(entries, days, now=None):
             '']
 
     # what Cloud Run bills: an instance while it holds a request (a take's socket, a check) and while it starts
-    held = sum(p.get('open_s', 0) for p in live) + sum(p.get('wall_s', 0) for p in checks) \
-        + sum(p.get('ready_s', 0) for p in inst)
+    held = held_seconds(takes, drop) + sum(p.get('ready_s', 0) for p in inst)
     vcpu_s, gib_s = held * VCPU, held * GIB
     month = 30 / days
     over = max(0.0, vcpu_s * month - FREE_VCPU_S) * PRICE_VCPU_S + max(0.0, gib_s * month - FREE_GIB_S) * PRICE_GIB_S

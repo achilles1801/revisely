@@ -46,9 +46,21 @@ class Digest(unittest.TestCase):
         self.assertIn('Refused: live / limit 1.', md)
         self.assertIn('Dropped (the phone went and never came back here): 1 (timeout 1).', md)
         self.assertIn('"Not a mistake": dismiss 1, undismiss 1.', md)
-        # held: 610 + 302 (sockets) + 8 (check) + 6.2 (start) = 926.2 s
-        self.assertIn('Instance time held: 0.26 h (926 vCPU-s, 1,852 GiB-s)', md)
+        # held: 610 + 302 (sockets) + 8 (check) + 40 (the drop's audio) + 6.2 (start) = 966.2 s
+        self.assertIn('Instance time held: 0.27 h (966 vCPU-s, 1,932 GiB-s)', md)
         self.assertNotIn('None', md)
+
+    def test_two_takes_at_once_on_the_pair_service_hold_one_instance(self):
+        def take(end, open_s, inst):
+            e = entry({'health': 'take', 'kind': 'live', 'level': 'recite', 'audio_s': open_s, 'open_s': open_s},
+                      inst=inst)
+            e['resource']['labels']['service_name'] = 'recite-check-pair'
+            e['timestamp'] = f'2026-11-22T14:{end}Z'
+            return e
+        # i1: 14:00:00–14:05:00 and 14:02:00–14:06:00 overlap (6 min); i2: 14:00:00–14:01:00 (1 min)
+        md = digest.summarize([take('05:00', 300, 'i1'), take('06:00', 240, 'i1'), take('01:00', 60, 'i2')], 7, NOW)
+        self.assertIn('| live · recite (pair) | 3 |', md)
+        self.assertIn('Instance time held: 0.12 h (420 vCPU-s', md)
 
 
 if __name__ == '__main__':
