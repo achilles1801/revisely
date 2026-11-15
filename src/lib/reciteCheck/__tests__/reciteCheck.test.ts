@@ -212,3 +212,13 @@ describe('labels after a take (Not a mistake, and taking it back)', () => {
     expect(await sendLabel('dismiss', 't', 'id', 1, { token: async () => 'tok', fetch })).toBe(false);
   });
 });
+
+describe('waking the checker', () => {
+  it('wakes both services: recite-check and recite-check-pair (a GET of /health each, failures ignored)', async () => {
+    const { warmUpReciteCheck, RECITE_CHECK_URL, RECITE_CHECK_PAIR_URL } = require('../service');
+    const fetch = jest.fn(() => Promise.reject(new Error('offline')));
+    warmUpReciteCheck({ fetch });
+    await Promise.resolve();
+    expect(fetch.mock.calls.map((c: unknown[]) => c[0])).toEqual([`${RECITE_CHECK_URL}/health`, `${RECITE_CHECK_PAIR_URL}/health`]);
+  });
+});

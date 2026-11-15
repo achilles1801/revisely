@@ -89,6 +89,8 @@ const LIVE_FAILURE: Record<LiveFailure, string> = {
   server: 'The checker stopped',
   check_locked: 'Marking mistakes needs Premium',
   premium_required: 'Marking mistakes needs Premium',
+  // Never shown in practice: the socket moves such a take to recite-check (lib/reciteLive/socket).
+  level_elsewhere: 'Couldn’t start',
   offline: 'Couldn’t reach the checker',
 };
 

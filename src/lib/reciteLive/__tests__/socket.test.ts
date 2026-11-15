@@ -255,3 +255,119 @@ describe('Your recitation: a moment of the take, from the audio held on the phon
   });
 });
 
+
+describe('two services: the light levels on recite-check-pair (recite-contract.md, "Two services")', () => {
+  const MAIN = 'wss://main.test/live';
+  const PAIR = 'wss://pair.test/live';
+  const RECITE: StartFrame = { ...START, follow: true, letters: true, tajweed: false };
+  const HARAKAT: StartFrame = { ...START, letters: false, tajweed: false };
+  const WITH_LETTERS: StartFrame = { ...START, letters: true, tajweed: false };
+  const STRICT: StartFrame = { ...START, letters: true, tajweed: true };
+
+  function feed() {
+    const opened: { url: string; s: FakeSocket }[] = [];
+    const timers: { fn: () => void; ms: number }[] = [];
+    let clock = 1_000_000;
+    const connect = socketFeed({
+      url: MAIN,
+      pairUrl: PAIR,
+      now: () => clock,
+      token: async () => 'tok',
+      open: (url) => {
+        const s = new FakeSocket();
+        opened.push({ url, s });
+        return s;
+      },
+      timers: {
+        set: (fn, ms) => {
+          const t = { fn, ms };
+          timers.push(t);
+          return t;
+        },
+        clear: (h) => {
+          const i = timers.indexOf(h as { fn: () => void; ms: number });
+          if (i >= 0) timers.splice(i, 1);
+        },
+      },
+    });
+    const take = (start: StartFrame) => {
+      const events: LiveEvent[] = [];
+      const conn = connect(start, { onEvent: (e) => events.push(e), onClose: () => undefined });
+      return { conn, events };
+    };
+    return { take, opened, timers, later: (ms: number) => (clock += ms) };
+  }
+
+  it('Recite and Words & harakat without letters go to the pair service; letters or Strict to recite-check', async () => {
+    const f = feed();
+    for (const start of [RECITE, HARAKAT, WITH_LETTERS, STRICT]) f.take(start);
+    await flush();
+    expect(f.opened.map((o) => o.url)).toEqual([PAIR, PAIR, MAIN, MAIN]);
+  });
+
+  it('level_elsewhere: the take starts on recite-check, as a new take there, with everything held sent after its ready', async () => {
+    const f = feed();
+    const { conn, events } = f.take(RECITE);
+    await flush();
+    const pair = f.opened[0].s;
+    pair.onopen!();
+    conn.sendAudio(pcm(1, 2));
+    pair.answer({ type: 'error', reason: 'level_elsewhere' });
+    await flush();
+    expect(pair.closed).toBe(true);
+    expect(events).toEqual([]); // nothing reaches the screen
+    expect(f.opened.map((o) => o.url)).toEqual([PAIR, MAIN]);
+    const main = f.opened[1].s;
+    main.onopen!();
+    expect(main.out()[0]).not.toHaveProperty('resume');
+    main.answer({ type: 'ready', v: 2, take: 'm1', from: 0, t: 0 });
+    expect(main.out().slice(1)).toEqual([[1, 2]]);
+    expect(f.timers).toEqual([]); // at once, not after a retry's wait
+    // Not passed over for being down: the next Recite take tries the pair service again.
+    f.take(RECITE);
+    await flush();
+    expect(f.opened[2].url).toBe(PAIR);
+  });
+
+  it('the pair service unreachable or private (its 403 closes the socket before ready): recite-check at once, and for 10 minutes', async () => {
+    const f = feed();
+    f.take(RECITE);
+    await flush();
+    f.opened[0].s.onclose!(); // the upgrade refused
+    await flush();
+    expect(f.opened.map((o) => o.url)).toEqual([PAIR, MAIN]);
+    expect(f.timers).toEqual([]);
+    f.take(HARAKAT);
+    await flush();
+    expect(f.opened[2].url).toBe(MAIN); // passed over meanwhile: no failed upgrade before each take
+    f.later(10 * 60_000);
+    f.take(RECITE);
+    await flush();
+    expect(f.opened[3].url).toBe(PAIR);
+  });
+
+  it('once the pair service has said ready, a dropped socket resumes there, never on recite-check', async () => {
+    const f = feed();
+    const { conn } = f.take(RECITE);
+    await flush();
+    const s = f.opened[0].s;
+    s.onopen!();
+    s.answer({ type: 'ready', v: 2, take: 'p1', from: 0, t: 0 });
+    conn.sendAudio(pcm(5));
+    s.onclose!();
+    f.timers.shift()!.fn();
+    await flush();
+    expect(f.opened.map((o) => o.url)).toEqual([PAIR, PAIR]);
+    f.opened[1].s.onopen!();
+    expect(f.opened[1].s.out()[0]).toMatchObject({ resume: 'p1' });
+    expect(conn.status?.()).toMatch(/ pair$/);
+  });
+
+  it('without a pair service, every take on recite-check', async () => {
+    const opened: string[] = [];
+    const connect = socketFeed({ url: MAIN, pairUrl: null, token: async () => 'tok', open: (url) => (opened.push(url), new FakeSocket()) });
+    connect(RECITE, { onEvent: () => undefined, onClose: () => undefined });
+    await flush();
+    expect(opened).toEqual([MAIN]);
+  });
+});

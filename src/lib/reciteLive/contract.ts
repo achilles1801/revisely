@@ -87,6 +87,8 @@ export type LiveFailure =
    */
   | 'check_locked'
   | 'premium_required'
+  /** A service that doesn't take this level (recite-check-pair): the socket starts the take on recite-check instead. */
+  | 'level_elsewhere'
   | 'offline';
 
 export type LiveEvent =
@@ -122,6 +124,7 @@ const FAILURES: LiveFailure[] = [
   'server',
   'check_locked',
   'premium_required',
+  'level_elsewhere',
 ];
 
 /** The server refused marking mistakes for want of Premium (either name). */
