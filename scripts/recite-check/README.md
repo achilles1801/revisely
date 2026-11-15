@@ -216,6 +216,12 @@ gcloud run services update-traffic recite-check --project revisely-dev --region 
 `--cpu 1` (Nov 14 2026): measured on the e2e set against 2 vCPU, the cursor and the marks move by under 0.1 s
 (word start → `at` median 0.67–0.72 s; word end → mark 2.0–4.2 s) and a /check of 118 s takes the same 10–11 s; a live
 take uses 25–42% of the one vCPU. It doubles the free tier's hours of live use (about 50 a month).
+`THREADS=1` (the model's threads; also the image's and `server.py`'s default, Nov 15 2026): the same image at 2
+threads, 15 public takes side by side on Cloud Run, locked within 0.1 s, the cursor and `said` were no sooner, and end →
+done was slower on every take (up to 4.1 against 8.1 s): on one vCPU a second thread only competes. With one thread a
+replay of a kept take also gives what the phone saw; with two, a borderline take can lock in one run and not the next.
+A test revision with other env vars (`--update-env-vars`) changes the service's template too: the next deploy without
+`--set-env-vars` inherits it.
 `--timeout 1200`: a WebSocket is one request to Cloud Run, so the timeout is a live session's longest (15 minutes of
 audio and pauses). With `--concurrency 1` an open socket holds an instance, so two live takes at once at most.
 Leave out `--[no-]allow-unauthenticated`: the service is already open (below), and the flag would change that.
