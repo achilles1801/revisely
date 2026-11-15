@@ -4,9 +4,12 @@
  * project's numbers from its `consoleMetrics` endpoint, proving who it is with a Google-signed ID token for its own
  * service account (from the metadata server; no key anywhere).
  *
- * What crosses: the Overview's aggregate numbers only (crash rates, Revo usage and spend, downloads, functions), with
- * account ids cut to 8 characters. Never conversations, answers or anything a person wrote: Revo conversations of an
- * environment open only in that environment's own console.
+ * What crosses (Majd, Nov 14 2026: one console, metrics.revisely.app to be retired):
+ * - `metrics`: the Overview's numbers (crash rates, Revo usage and spend, downloads, functions).
+ * - `revo`: one account's Revo conversations and memory, as the old console showed them. This also needs the signed-in
+ *   staff member's own Firebase ID token from the caller's project, whose role must allow revo.conversations: the
+ *   caller's server alone can't read anyone's conversations. The target still applies its own conversations lock
+ *   (config/admin.conversations) and logs each read with the staff account (`<project>/<uid>`).
  *
  * Who may read whom is this file's METRICS_READERS: production answers revisely-dev's server and nobody else.
  */
@@ -80,6 +83,10 @@ export interface Jwks {
   keys: (JsonWebKey & { kid?: string })[];
 }
 
+export function projectOfServiceAccount(email: string): string | null {
+  return Object.entries(ENVIRONMENTS).find(([, e]) => e.runtimeServiceAccount === email)?.[0] ?? null;
+}
+
 function part(segment: string): Record<string, unknown> {
   try {
     const v = JSON.parse(Buffer.from(segment, 'base64url').toString('utf8'));
@@ -90,8 +97,9 @@ function part(segment: string): Record<string, unknown> {
   throw new PeerError(401, 'malformed token');
 }
 
-/** The caller's service account, once the token's signature, issuer, audience, time and account check out. */
-export function verifyPeerToken(token: string, jwks: Jwks, audience: string, allowed: string[], now = Date.now() / 1000): string {
+/** A token's claims once its RS256 signature checks out against the key set. */
+function signedClaims(token: unknown, jwks: Jwks): Record<string, unknown> {
+  if (typeof token !== 'string') throw new PeerError(401, 'malformed token');
   const parts = token.split('.');
   if (parts.length !== 3) throw new PeerError(401, 'malformed token');
   const [h, p, s] = parts;
@@ -101,31 +109,62 @@ export function verifyPeerToken(token: string, jwks: Jwks, audience: string, all
   if (!jwk) throw new UnknownKeyError();
   const key = createPublicKey({ key: jwk, format: 'jwk' });
   if (!verify('RSA-SHA256', Buffer.from(`${h}.${p}`), key, Buffer.from(s, 'base64url'))) throw new PeerError(401, 'bad signature');
-  const c = part(p);
+  return part(p);
+}
+
+function checkTimes(c: Record<string, unknown>, now: number): void {
+  if (typeof c.exp !== 'number' || c.exp < now - LEEWAY) throw new PeerError(401, 'expired');
+  if (typeof c.iat === 'number' && c.iat > now + LEEWAY) throw new PeerError(401, 'issued in the future');
+}
+
+/** The caller's service account, once the token's signature, issuer, audience, time and account check out. */
+export function verifyPeerToken(token: string, jwks: Jwks, audience: string, allowed: string[], now = Date.now() / 1000): string {
+  const c = signedClaims(token, jwks);
   if (!GOOGLE_ISSUERS.has(String(c.iss))) throw new PeerError(401, 'wrong issuer');
   const auds = Array.isArray(c.aud) ? c.aud : [c.aud];
   if (!auds.includes(audience)) throw new PeerError(401, 'wrong audience');
-  if (typeof c.exp !== 'number' || c.exp < now - LEEWAY) throw new PeerError(401, 'expired');
-  if (typeof c.iat === 'number' && c.iat > now + LEEWAY) throw new PeerError(401, 'issued in the future');
+  checkTimes(c, now);
   if (c.email_verified !== true || typeof c.email !== 'string') throw new PeerError(403, 'no verified account');
   if (!allowed.includes(c.email)) throw new PeerError(403, 'this account may not read these metrics');
   return c.email;
 }
 
-// ---------------------------------------------------------------------------------------------------------------
-// What crosses
+/** Firebase Auth's signing keys (ID tokens of every project). */
+export const STAFF_JWKS_URL = 'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com';
 
-/** The metrics as another project may see them: account ids cut to 8 characters (enough to tell rows apart). */
-export function forPeer<T>(metrics: T): T {
-  const cut = (uid: unknown) => (typeof uid === 'string' ? uid.slice(0, 8) : uid);
-  const walk = (v: unknown, key?: string): unknown => {
-    if (Array.isArray(v)) return v.map((x) => walk(x));
-    if (v && typeof v === 'object') {
-      const o: Record<string, unknown> = {};
-      for (const [k, x] of Object.entries(v)) o[k] = walk(x, k);
-      return o;
-    }
-    return key === 'uid' ? cut(v) : v;
-  };
-  return walk(metrics) as T;
+/** A Firebase ID token of `project` (the staff member signed in to the console there): its uid and claims. */
+export function verifyStaffToken(token: unknown, jwks: Jwks, project: string, now = Date.now() / 1000): { uid: string; claims: Record<string, unknown> } {
+  const c = signedClaims(token, jwks);
+  if (c.iss !== `https://securetoken.google.com/${project}`) throw new PeerError(401, 'staff sign-in from another project');
+  if (c.aud !== project) throw new PeerError(401, 'staff sign-in for another project');
+  checkTimes(c, now);
+  if (typeof c.auth_time === 'number' && c.auth_time > now + LEEWAY) throw new PeerError(401, 'signed in in the future');
+  if (typeof c.sub !== 'string' || !c.sub || c.sub.length > 128) throw new PeerError(401, 'no account in the staff sign-in');
+  return { uid: c.sub, claims: c };
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// The endpoint's body, once the caller's service account checked out
+
+export interface PeerDeps<M, R> {
+  metrics(refresh: boolean): Promise<M>;
+  /** adminRevo's handler, for the staff member named by their own token */
+  revo(staff: { uid: string; token: Record<string, unknown> }, data: { uid?: unknown; chatId?: unknown }): Promise<R>;
+  staffJwks(fresh?: boolean): Promise<Jwks>;
+  now(): number;
+}
+
+export async function handlePeer<M, R>(body: unknown, callerProject: string, deps: PeerDeps<M, R>): Promise<M | R> {
+  const b = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
+  const action = b.action ?? 'metrics';
+  if (action === 'metrics') return deps.metrics(b.refresh === true);
+  if (action !== 'revo') throw new PeerError(400, 'unknown action');
+  let staff: { uid: string; claims: Record<string, unknown> };
+  try {
+    staff = verifyStaffToken(b.staffToken, await deps.staffJwks(), callerProject, deps.now() / 1000);
+  } catch (err) {
+    if (!(err instanceof UnknownKeyError)) throw err;
+    staff = verifyStaffToken(b.staffToken, await deps.staffJwks(true), callerProject, deps.now() / 1000);
+  }
+  return deps.revo({ uid: `${callerProject}/${staff.uid}`, token: staff.claims }, { uid: b.uid, chatId: b.chatId });
 }

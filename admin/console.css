@@ -454,4 +454,3 @@ td.wrap { white-space: normal; min-width: 18ch; max-width: 48ch; overflow-wrap: 
 .seg-env button[data-env="dev"][aria-pressed="true"] { color: var(--warn-ink); }
 .envbar .lbl { font-size: 12.5px; color: var(--ink-3); }
 #view-overview.stale > :not(.envbar):not(.conn) { opacity: 0.35; pointer-events: none; transition: opacity 0.15s; }
-#accFoot[data-remote="1"]::after { content: " Conversations of this environment’s accounts open only in its own console."; }

@@ -1,7 +1,7 @@
 import { generateKeyPairSync, sign, JsonWebKey } from 'crypto';
 import { AdminError, clearMetricsCache, handleAdminMetrics, MetricsDeps } from '../metrics/admin';
 import type { Metrics } from '../metrics/aggregate';
-import { allowedCallers, endpointUrl, forPeer, Jwks, metricsEnvironments, PeerError, UnknownKeyError, verifyPeerToken } from '../console/peer';
+import { allowedCallers, endpointUrl, handlePeer, Jwks, metricsEnvironments, PeerError, projectOfServiceAccount, UnknownKeyError, verifyPeerToken, verifyStaffToken } from '../console/peer';
 
 const DEV_SA = '433792838929-compute@developer.gserviceaccount.com';
 const PROD_SA = '169239488140-compute@developer.gserviceaccount.com';
@@ -72,10 +72,55 @@ describe('the caller’s Google ID token', () => {
   });
 });
 
-describe('what crosses to the other project', () => {
-  it('account ids are cut to 8 characters wherever they are; numbers stay', () => {
-    const m = { revo: { '24h': { accounts: [{ uid: 'jeahMBUF18eV6uY8kVG1HSfddwg1', q: 3 }] } }, look: [{ uid: 'abcdefghijklmnop', text: 'x' }, { text: 'no uid' }], total: 5 };
-    expect(forPeer(m)).toEqual({ revo: { '24h': { accounts: [{ uid: 'jeahMBUF', q: 3 }] } }, look: [{ uid: 'abcdefgh', text: 'x' }, { text: 'no uid' }], total: 5 });
+describe('the staff member’s own sign-in (conversations)', () => {
+  const staff = { iss: 'https://securetoken.google.com/revisely-dev', aud: 'revisely-dev', sub: 'staffUid123', exp: NOW + 600, iat: NOW, auth_time: NOW - 60, role: 'owner' };
+
+  it('accepts a revisely-dev ID token and gives its uid and claims', () => {
+    expect(verifyStaffToken(token(staff), JWKS, 'revisely-dev', NOW)).toMatchObject({ uid: 'staffUid123', claims: { role: 'owner' } });
+  });
+
+  it('refuses another project’s sign-in, an expired one, one with no account, or none', () => {
+    expect(status(() => verifyStaffToken(token({ ...staff, iss: 'https://securetoken.google.com/revision-buddy-3a398' }), JWKS, 'revisely-dev', NOW))).toBe(401);
+    expect(status(() => verifyStaffToken(token({ ...staff, aud: 'revision-buddy-3a398' }), JWKS, 'revisely-dev', NOW))).toBe(401);
+    expect(status(() => verifyStaffToken(token({ ...staff, exp: NOW - 600 }), JWKS, 'revisely-dev', NOW))).toBe(401);
+    expect(status(() => verifyStaffToken(token({ ...staff, sub: '' }), JWKS, 'revisely-dev', NOW))).toBe(401);
+    expect(status(() => verifyStaffToken(undefined, JWKS, 'revisely-dev', NOW))).toBe(401);
+    // A Google service-account token is not a staff sign-in.
+    expect(status(() => verifyStaffToken(token(good), JWKS, 'revisely-dev', NOW))).toBe(401);
+  });
+
+  it('knows each project by its service account', () => {
+    expect(projectOfServiceAccount(DEV_SA)).toBe('revisely-dev');
+    expect(projectOfServiceAccount(PROD_SA)).toBe('revision-buddy-3a398');
+    expect(projectOfServiceAccount('x@example.com')).toBeNull();
+  });
+});
+
+describe('the endpoint’s body', () => {
+  const staff = { iss: 'https://securetoken.google.com/revisely-dev', aud: 'revisely-dev', sub: 'staffUid123', exp: NOW + 600, iat: NOW, role: 'admin' };
+  const deps = () => ({
+    metrics: jest.fn(async (refresh: boolean) => ({ m: true, refresh })),
+    revo: jest.fn(async (who: { uid: string; token: Record<string, unknown> }, data: unknown) => ({ who: who.uid, role: who.token.role, data })),
+    staffJwks: jest.fn(async () => JWKS),
+    now: () => NOW * 1000,
+  });
+
+  it('metrics by default; conversations only with a staff sign-in from the calling project, named in the log as project/uid', async () => {
+    const d = deps();
+    expect(await handlePeer({ refresh: true }, 'revisely-dev', d)).toEqual({ m: true, refresh: true });
+    expect(await handlePeer({ action: 'revo', uid: 'u'.repeat(28), staffToken: token(staff) }, 'revisely-dev', d)).toEqual({
+      who: 'revisely-dev/staffUid123',
+      role: 'admin',
+      data: { uid: 'u'.repeat(28), chatId: undefined },
+    });
+  });
+
+  it('refuses conversations without a staff sign-in, or with one from another project, before reading anything', async () => {
+    const d = deps();
+    await expect(handlePeer({ action: 'revo', uid: 'u'.repeat(28) }, 'revisely-dev', d)).rejects.toBeInstanceOf(PeerError);
+    await expect(handlePeer({ action: 'revo', uid: 'u'.repeat(28), staffToken: token(staff) }, 'revision-buddy-3a398', d)).rejects.toBeInstanceOf(PeerError);
+    await expect(handlePeer({ action: 'delete-everything' }, 'revisely-dev', d)).rejects.toBeInstanceOf(PeerError);
+    expect(d.revo).not.toHaveBeenCalled();
   });
 });
 

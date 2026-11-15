@@ -311,15 +311,12 @@ export function startMetrics(c) {
   load(false);
 }
 
-/** The Production / Dev switch, and what it means for the accounts table (conversations open only where they live). */
+/** The Production / Dev switch. Conversations open in either (the other project checks the staff sign-in itself). */
 function renderEnv() {
   document.querySelectorAll('#envSeg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.env === state.env)));
-  const remote = !!state.env && state.env !== state.here;
   const e = state.envs.find((x) => x.env === state.env);
-  $('envNote').textContent = !e ? '' : !state.byEnv[state.env] ? 'Loading ' + e.label + '…' : remote ? 'Read from ' + e.label.toLowerCase() + '’s own server. Its Revo conversations open only in its own console.' : '';
-  const open = state.canChats && !remote;
-  $('accTable').classList.toggle('no-open', !open);
-  $('accFoot').dataset.remote = remote ? '1' : '';
+  $('envNote').textContent = e && !state.byEnv[state.env] ? 'Loading ' + e.label + '…' : '';
+  $('accTable').classList.toggle('no-open', !state.canChats);
 }
 
 function setEnv(env) {
@@ -365,12 +362,14 @@ async function load(refresh) {
 }
 
 // ---------- one account: conversations and memory, read live ----------
-const panel = { uid: null, chats: null };
+const panel = { uid: null, chats: null, env: null };
 function openPanel(uid) {
   panel.uid = uid;
+  panel.env = state.env;
   panel.chats = null;
   $('panel').hidden = false;
-  $('panelTitle').textContent = 'Account ' + short(uid);
+  const envName = state.envs.length > 1 ? ' · ' + ((state.envs.find((e) => e.env === state.env) || {}).label || '') : '';
+  $('panelTitle').textContent = 'Account ' + short(uid) + envName;
   $('panelBack').hidden = true;
   $('panelBody').innerHTML = '<p class="foot">Loading…</p>';
   showAccount(uid);
@@ -402,7 +401,7 @@ function accountSummary(uid) {
 async function showAccount(uid) {
   const body = $('panelBody');
   try {
-    const d = await ctx.call('adminRevo', { uid });
+    const d = await ctx.call('adminRevo', withEnv({ uid }));
     if (panel.uid !== uid) return;
     body.textContent = '';
     body.appendChild(accountSummary(uid));
@@ -444,7 +443,7 @@ async function showChat(uid, chat) {
   $('panelBack').hidden = false;
   body.innerHTML = '<p class="foot">Loading…</p>';
   try {
-    const d = await ctx.call('adminRevo', { uid, chatId: chat.id });
+    const d = await ctx.call('adminRevo', withEnv({ uid, chatId: chat.id }));
     if (panel.uid !== uid) return;
     body.textContent = '';
     if (d.locked) { body.appendChild(el2('div', 'locked', 'Conversations are locked.')); return; }
@@ -467,7 +466,9 @@ async function showChat(uid, chat) {
 // ---------- wiring ----------
 $('range').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; state.range = b.dataset.range; save(); render(); });
 $('chan').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; state.chan = b.dataset.chan; save(); render(); });
-const canOpen = () => state.canChats && (!state.env || state.env === state.here);
+const canOpen = () => state.canChats;
+// Which environment an account panel reads (the one shown when it opened).
+const withEnv = (data) => (state.env ? { ...data, env: panel.env || state.env } : data);
 $('accTable').addEventListener('click', (e) => { const tr = e.target.closest('tr[data-uid]'); if (tr && canOpen()) openPanel(tr.dataset.uid); });
 $('accTable').addEventListener('keydown', (e) => { const tr = e.target.closest('tr[data-uid]'); if (tr && canOpen() && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openPanel(tr.dataset.uid); } });
 $('envSeg').addEventListener('click', (e) => { const b = e.target.closest('button[data-env]'); if (b) setEnv(b.dataset.env); });
