@@ -1,7 +1,7 @@
 // The reader's one mic (Revisely Dev): Record, Recite, Check; the recite bar; marks and the hidden view.
 import React from 'react';
 import { AccessibilityInfo, Alert, Modal } from 'react-native';
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import QuranReaderScreen from '../QuranReaderScreen';
 import { resetReciteCheckSettingsForTests, setReciteCheckSettings } from '../../../lib/reciteCheck/settings';
@@ -792,6 +792,23 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
     const passage = String(screen.getByTestId('take-summary-passage').props.children);
     expect(passage).toMatch(/^An.Naml,\sayahs\s23.24\s·\s/);
     expect(passage).not.toMatch(/Qasas/);
+  });
+
+  it('[SHEET-1] See your mistakes: the Premium page waits for the summary to go, so iOS never refuses it (Majd’s Dev freeze, Nov 15 2026)', async () => {
+    // Majd: "i ended the session then the pop up came up and i clicked see your mistakes and now the screen froze".
+    // The Premium page opened while the summary was still closing: iOS presents one modal at a time, refused it, and
+    // its invisible host took every touch. React Native's jest Modal never reports a dismissal, so the summary goes
+    // by the fallback (v2/Sheet), about a second after its closing.
+    mockPremium.has = false;
+    await startTake('recite');
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [], score: null } });
+    expect(screen.getByTestId('take-summary')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('take-summary-check'));
+    await flush();
+    expect(screen.queryByTestId('check-intro')).toBeNull();
+    await waitFor(() => expect(screen.getByTestId('check-intro')).toBeTruthy(), { timeout: 3000 });
+    expect(screen.queryByTestId('take-summary')).toBeNull();
   });
 
   it('Keep as test data off: the summary doesn’t say the take was kept', async () => {
