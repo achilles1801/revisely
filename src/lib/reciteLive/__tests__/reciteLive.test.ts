@@ -5,7 +5,8 @@ import {
   dismissMark,
   findingStart,
   furthestWord,
-  lookOnPage,
+  seekOnPage,
+  startNotFound,
   LIVE_IDLE,
   LiveState,
   liveConnecting,
@@ -232,10 +233,13 @@ describe('the live state', () => {
 describe('a take started anywhere on the page (Majd, Nov 14 2026)', () => {
   const A25 = words.verseFirstWord(27, 25);
   const looking = () => liveConnecting({ anywhereFrom: A23 });
+  const ready6: LiveEvent = { type: 'ready', take: 't', protocol: 6 };
 
-  it('reads the checker’s `locked` and a final answer’s `start` (a number, or null when never found)', () => {
+  it('reads `locked`, `nolock`, `ready.protocol` and a final answer’s `start` (a number, or null when never found)', () => {
     expect(parseEvent({ type: 'locked', w: A25, s: 27, a: 25, t: 2.1 })).toEqual({ type: 'locked', w: A25, s: 27, a: 25, t: 2.1 });
     expect(parseEvent({ type: 'locked', w: A25 })).toBeNull();
+    expect(parseEvent({ type: 'nolock' })).toEqual({ type: 'nolock' });
+    expect(parseEvent({ type: 'ready', take: 't', protocol: 6 })).toMatchObject({ protocol: 6 });
     const done = (start: unknown) =>
       parseEvent({ type: 'done', result: { v: 2, follow: true, take: 't', from: A23, to: A25 + 9, secs: 9, words: [], start } });
     expect(done(A25)).toMatchObject({ result: { start: A25 } });
@@ -243,8 +247,8 @@ describe('a take started anywhere on the page (Majd, Nov 14 2026)', () => {
     expect((done(undefined) as { result: object }).result).not.toHaveProperty('start');
   });
 
-  it('looks until `locked`: then the start and the cursor are its word', () => {
-    let s = applyEvent(looking(), { type: 'ready', take: 't' });
+  it('a checker that looks (protocol 6): no start or cursor until `locked`, then both are its word', () => {
+    let s = applyEvent(looking(), ready6);
     expect(findingStart(s)).toBe(true);
     expect(s.start).toBeNull();
     expect(s.cursor).toBeNull();
@@ -254,22 +258,39 @@ describe('a take started anywhere on the page (Majd, Nov 14 2026)', () => {
     expect(s.cursor).toBe(A25);
   });
 
-  it('a cursor before any `locked` (a checker that doesn’t look) starts the take at the page’s first word', () => {
-    const s = run([{ type: 'ready', take: 't' }, { type: 'at', w: A23 + 3 }], looking());
+  it('a checker that doesn’t look (protocol 5, or none said) starts at the page’s first word at once, as before', () => {
+    for (const ready of [{ type: 'ready', take: 't', protocol: 5 }, { type: 'ready', take: 't' }] as LiveEvent[]) {
+      const s = applyEvent(looking(), ready);
+      expect(findingStart(s)).toBe(false);
+      expect(s.start).toBe(A23);
+    }
+  });
+
+  it('a cursor before any `locked` means the checker didn’t look: the page’s first word is the start', () => {
+    const s = run([ready6, { type: 'at', w: A23 + 3 }], looking());
     expect(s.start).toBe(A23);
     expect(s.cursor).toBe(A23 + 3);
   });
 
   it('a take started at a known word never looks', () => {
-    const s = liveConnecting({ start: A23 });
+    const s = applyEvent(liveConnecting({ start: A23 }), ready6);
     expect(findingStart(s)).toBe(false);
     expect(s.start).toBe(A23);
+  });
+
+  it('`nolock`: still looking, and it says so once; a `locked` may still come', () => {
+    let s = run([ready6, { type: 'nolock' }], looking());
+    expect(s.notFoundYet).toBe(true);
+    expect(findingStart(s)).toBe(true);
+    s = applyEvent(s, { type: 'locked', w: A25, s: 27, a: 25 });
+    expect(s.notFoundYet).toBe(false);
+    expect(applyEvent(s, { type: 'nolock' }).notFoundYet).toBe(false);
   });
 
   it('nothing before the start is skipped: such marks are dropped live and from the final answer; other marks stay', () => {
     const skipped = mark({ id: 'k', w: A23 + 2, kind: 'skipped' });
     const wrong = mark({ id: 'w', w: A25 + 1, ayah: [27, 25] });
-    let s = run([{ type: 'ready', take: 't' }, { type: 'mark', mark: skipped }], looking());
+    let s = run([ready6, { type: 'mark', mark: skipped }], looking());
     expect(s.marks.k).toBeDefined();
     s = applyEvent(s, { type: 'locked', w: A25, s: 27, a: 25 });
     expect(s.marks.k).toBeUndefined();
@@ -281,20 +302,23 @@ describe('a take started anywhere on the page (Majd, Nov 14 2026)', () => {
     expect(s.start).toBe(A25);
   });
 
-  it('never found: the final answer’s null start leaves it looking (the summary says so)', () => {
-    const s = run(
-      [{ type: 'ready', take: 't' }, { type: 'done', result: { v: 2, take: 't', from: A23, to: A23, secs: 5, marks: [], score: null, start: null } }],
-      looking(),
-    );
+  it('never found: the final answer’s null start says so (the summary does too)', () => {
+    const s = run([ready6, { type: 'done', result: { v: 2, take: 't', from: A23, to: A23, secs: 5, marks: [], score: null, start: null } }], looking());
     expect(s.status).toBe('done');
-    expect(findingStart(s)).toBe(true);
+    expect(startNotFound(s)).toBe(true);
+    expect(startNotFound(applyEvent(liveConnecting({ start: A23 }), ready6))).toBe(false);
   });
 
-  it('a page turned by hand while looking: the page’s first word is where an older checker would start', () => {
+  it('a page turned by hand: looked for again on that page; the cursor goes until it’s found, and the start stays the first', () => {
     const p380 = words.pageRange(380)[0];
-    expect(lookOnPage(looking(), p380).startUnlocked).toBe(p380);
-    const found = applyEvent(looking(), { type: 'locked', w: A25, s: 27, a: 25 });
-    expect(lookOnPage(found, p380)).toBe(found);
+    let s = run([ready6, { type: 'locked', w: A25, s: 27, a: 25 }, { type: 'said', upTo: A25 + 4 }], looking());
+    s = seekOnPage(s, p380);
+    expect(findingStart(s)).toBe(true);
+    expect(s.cursor).toBeNull();
+    expect(s.saidUpTo).toBe(A25 + 4);
+    s = applyEvent(s, { type: 'locked', w: p380 + 30, s: 27, a: 40 });
+    expect(s.cursor).toBe(p380 + 30);
+    expect(s.start).toBe(A25);
   });
 });
 

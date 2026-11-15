@@ -67,7 +67,7 @@ const A26 = 48749;
  */
 function followTake(): ReplayLog {
   const events: ReplayLog['events'] = [
-    { t: 0.3, type: 'ready', v: 2, take: 'e2e-379', engine: 'e2e' },
+    { t: 0.3, type: 'ready', v: 2, take: 'e2e-379', engine: 'e2e', protocol: 6 },
     // Listening… until the checker is sure where the reciter started.
     { t: 2.5, type: 'locked', w: A25, s: 27, a: 25 },
   ];
@@ -89,7 +89,7 @@ function followTake(): ReplayLog {
 function take(follow: boolean): ReplayLog {
   if (follow) return followTake();
   const events: ReplayLog['events'] = [
-    { t: 0.3, type: 'ready', v: 2, take: 'e2e-379', engine: 'e2e' },
+    { t: 0.3, type: 'ready', v: 2, take: 'e2e-379', engine: 'e2e', protocol: 6 },
     { t: 0.8, type: 'locked', w: A23, s: 27, a: 23 },
   ];
   const marks = [

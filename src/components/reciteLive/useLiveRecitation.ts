@@ -18,13 +18,13 @@ import { socketFeed } from '../../lib/reciteLive/socket';
 import { SavedTake, startTakeRecording, TakeRecording } from '../../lib/reciteLive/takeRecording';
 import {
   applyEvent,
+  checkerLooks,
   dismissMark,
-  findingStart,
   LIVE_IDLE,
   liveConnecting,
   LiveState,
   liveStopping,
-  lookOnPage,
+  seekOnPage,
 } from '../../lib/reciteLive/state';
 
 /** What the mic does while reciting: follow along (free), or follow and mark mistakes (Check). */
@@ -351,10 +351,10 @@ export function useLiveRecitation({
     }
     if (!conn.current || !words || state.status !== 'listening') return;
     const w = words.pageRange(currentPage)[0];
-    if (findingStart(state)) {
-      // Still looking for where the reciter started: look on this page instead.
+    if (checkerLooks(state)) {
+      // The reciter is somewhere on this page: the checker looks for where, as at the take's start (protocol 6).
       conn.current.send({ type: 'seek', w, startBy: lastAyahOf(currentPage) });
-      setState((s) => lookOnPage(s, w));
+      setState((s) => seekOnPage(s, w));
       return;
     }
     conn.current.send({ type: 'seek', w });
@@ -373,20 +373,16 @@ export function useLiveRecitation({
   // Leaving the screen throws the take away.
   useEffect(() => () => cancel(), [cancel]);
 
-  // VoiceOver hears where the take started, once the checker has found it while listening.
-  const looked = useRef(false);
-  const looking = findingStart(state);
+  // VoiceOver hears where the take started, once the checker has found it (while listening, from a search).
+  const startBefore = useRef<number | null>(null);
+  const searched = state.anywhere && checkerLooks(state);
   useEffect(() => {
-    if (looking) {
-      looked.current = true;
-      return;
-    }
-    const found = looked.current && state.start != null && live;
-    looked.current = false;
-    if (!found || !words || state.start == null) return;
+    const before = startBefore.current;
+    startBefore.current = state.start;
+    if (before != null || state.start == null || !live || !searched || !words) return;
     const r = words.ref(state.start);
     AccessibilityInfo.announceForAccessibility(`Started at ${spokenText(placeOfAyah(ayahKey(r.sura, r.ayah)))}`);
-  }, [looking, state.start, live, words]);
+  }, [state.start, live, searched, words]);
 
   return {
     state,

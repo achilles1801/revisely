@@ -216,7 +216,7 @@ async function startTake(mode: 'recite' | 'check', lock: number | null = A23) {
   fireEvent.press(screen.getByTestId('recite-mic'));
   await flush();
   await flush();
-  await event({ type: 'ready', take: 't1' });
+  await event({ type: 'ready', take: 't1', protocol: 6 });
   if (lock != null) {
     const r = words.ref(lock);
     await event({ type: 'locked', w: lock, s: r.sura, a: r.ayah });
@@ -434,10 +434,15 @@ describe('a take starts anywhere on the page (Majd, Nov 14 2026)', () => {
     expect(screen.queryByTestId('take-summary-not-found')).toBeNull();
   });
 
-  it('a checker that doesn’t look for the start (an older server) began at the page’s first ayah: its first cursor says so', async () => {
-    await startTake('check', null);
-    await event({ type: 'at', w: A23 + 2 });
+  it('a checker that doesn’t look for the start (protocol 5) begins at the page’s first ayah at once, as before', async () => {
+    setReciteCheckSettings('u1', { noticeSeen: true, mode: 'recite', markMistakes: true });
+    await open();
+    fireEvent.press(screen.getByTestId('recite-mic'));
+    await flush();
+    await flush();
+    await event({ type: 'ready', take: 't1', protocol: 5 });
     expect(screen.getByTestId('recite-score')).toBeTruthy();
+    await event({ type: 'at', w: A23 + 2 });
     fireEvent.press(screen.getByTestId('recite-stop'));
     await done();
     expect(String(screen.getByTestId('take-summary-passage').props.children)).toMatch(/^An.Naml,\sayah\s23\s·\s/);
@@ -454,6 +459,33 @@ describe('a take starts anywhere on the page (Majd, Nov 14 2026)', () => {
     await startTake('recite', null);
     await act(async () => mockPager.onPageChange?.(380));
     expect(mockLive.sent).toContainEqual({ type: 'seek', w: words.pageRange(380)[0], startBy: lastAyah(380) });
+  });
+
+  it('a page turned by hand once reciting: Listening… while the checker looks on that page, then the cursor where it finds you', async () => {
+    await startTake('recite', A25);
+    await event({ type: 'at', w: A25 + 2 });
+    await act(async () => mockPager.onPageChange?.(380));
+    expect(mockLive.sent).toContainEqual({ type: 'seek', w: words.pageRange(380)[0], startBy: lastAyah(380) });
+    expect(screen.getByTestId('recite-status').props.children).toBe('Listening…');
+    await event({ type: 'locked', w: words.pageRange(380)[0] + 20, s: 27, a: 40 });
+    expect(screen.getByTestId('recite-words')).toBeTruthy();
+  });
+
+  it('a checker that doesn’t look: a page turned by hand only says where the page starts, as before', async () => {
+    setReciteCheckSettings('u1', { noticeSeen: true, mode: 'recite', markMistakes: false });
+    await open();
+    fireEvent.press(screen.getByTestId('recite-mic'));
+    await flush();
+    await flush();
+    await event({ type: 'ready', take: 't1', protocol: 5 });
+    await act(async () => mockPager.onPageChange?.(380));
+    expect(mockLive.sent).toContainEqual({ type: 'seek', w: words.pageRange(380)[0] });
+  });
+
+  it('not found after a while (`nolock`): the bar says it is still looking', async () => {
+    await startTake('recite', null);
+    await event({ type: 'nolock' });
+    expect(screen.getByTestId('recite-status').props.children).toBe('Still looking for your place…');
   });
 
   it('‹ on a hidden page after a start mid-page shows the word after the reciter’s, not the page’s first', async () => {

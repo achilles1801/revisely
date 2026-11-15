@@ -43,7 +43,7 @@ import { reciteLiveEnabled } from '../../lib/reciteLive/availability';
 import { premiumErrorText, setDevPremium, supportLinkUrl, usePremium } from '../../lib/premium';
 import { setReciteCheckSettings, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
 import { loadQuranWords, getQuranWords, QuranWords } from '../../lib/recite/quranWords';
-import { findingStart, furthestWord, marksOnPage } from '../../lib/reciteLive/state';
+import { furthestWord, marksOnPage, startNotFound } from '../../lib/reciteLive/state';
 import {
   barWords,
   hiddenFollow,
@@ -488,7 +488,9 @@ export default function QuranReaderScreen() {
           ? LIVE_FAILURE[live.state.failure ?? 'server']
           : liveStatus === 'done'
             ? 'Done'
-            : 'Listening…';
+            : live.state.notFoundYet
+              ? 'Still looking for your place…'
+              : 'Listening…';
 
   // Previous / next go when the capsule is crowded (a recording, a timer) on
   // anything narrower than the largest phones.
@@ -718,7 +720,7 @@ export default function QuranReaderScreen() {
             score={checkTake && qw ? scorePill(live.state, qw, live.startWord) : null}
             kept={live.testData}
             checkOwned={owned}
-            startNotFound={findingStart(live.state)}
+            startNotFound={startNotFound(live.state)}
             onFinding={(m) => {
               setSummaryShown(null);
               if (!qw) return;
