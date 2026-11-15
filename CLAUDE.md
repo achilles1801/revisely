@@ -280,6 +280,13 @@ until its part is set up.
     - Nothing before the start is skipped, and the summary counts from the start.
     - A checker below protocol 6 (`ready.protocol`) doesn't search: the take starts at the page's first ayah, as
       before. So does a cursor that comes with no `locked` (`lib/reciteLive/state`).
+  - **The hidden view leaves every verse marker whole** (Majd, Nov 15 2026: page 2's ۱ ۲ ۳ were cut, only ۴ whole). Its
+    covers stop at each marker's opening in `src/data/pageLines.json`. Those came from glyph data about 7 units right
+    of the page images' markers, so 6,210 of 6,235 were clipped (page 236's held part of its ring). The openings are now
+    fitted to the images by `scripts/check-page-markers.py` (`--write`): it finds each marker's ornament by template
+    (some pages and lines draw it smaller, page 3 wider; a sajdah sign stays with its marker) and checks that no marker
+    ink is under a cover and no word's ink shows beside a marker, on the originals and Android's w1080 and w1440. Run it
+    after any change to the page lines or the images; `hiddenPage.test` pins measured markers (page 2's among them).
 
 ## How updates reach phones
 
