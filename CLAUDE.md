@@ -206,6 +206,12 @@ until its part is set up.
   - "Keep as test data" (on by default; in the sheet and Settings → Testing) keeps each recording and its result
     in `recite-tests/<uid>/` in the dev bucket (closed to clients). The lab copies them with `fetch_takes.py`.
     **Nobody listens to them**, Majd included; they are held out of training, like the /record takes.
+  - **A take starts anywhere on the page** (Majd, Nov 14 2026). The start frame sends `startBy` (the page's last
+    ayah), and the checker says where the reciter started (`locked`; recite-contract.md in the shared notes).
+    - Until then the bar says Listening…, with no cursor and no score.
+    - Nothing before the start is skipped, and the summary counts from the start.
+    - An older checker's first `at` with no `locked` means it began at the page's first ayah
+      (`lib/reciteLive/state`).
 
 ## How updates reach phones
 
