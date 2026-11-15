@@ -3,7 +3,8 @@
 // before anything is drawn; this fills in the words by key and wires the switch (the button with data-lang-switch).
 //   data-t="key"         text
 //   data-t-html="key"    markup from strings.js (links), never from anyone's input
-//   data-t-ph="key"      placeholder;  data-t-aria="key"  aria-label
+//   data-t-ph="key"      placeholder;  data-t-aria="key"  aria-label;  data-t-alt="key"  an image's alt
+// A key with no English in strings.js takes the page's own words as its English (the home and Support).
 // window.RV: { lang, t(key, vars), date(ms, weekday), locale(), apply(root), onLang(fn) }.
 (function () {
   'use strict';
@@ -38,19 +39,36 @@
     return d.toLocaleDateString(locale(), opts);
   }
 
+  // Each kind of key: the attribute that names it, and how to read and write what it stands for.
+  var KINDS = [
+    ['data-t', function (el) { return el.textContent; }, function (el, s) { el.textContent = s; }],
+    ['data-t-html', function (el) { return el.innerHTML; }, function (el, s) { el.innerHTML = s; }],
+    ['data-t-ph', function (el) { return el.getAttribute('placeholder'); }, function (el, s) { el.setAttribute('placeholder', s); }],
+    ['data-t-aria', function (el) { return el.getAttribute('aria-label'); }, function (el, s) { el.setAttribute('aria-label', s); }],
+    ['data-t-alt', function (el) { return el.getAttribute('alt'); }, function (el, s) { el.setAttribute('alt', s); }],
+  ];
+
   function apply(root) {
     root = root || document;
-    var i, els;
-    els = root.querySelectorAll('[data-t]');
-    for (i = 0; i < els.length; i++) els[i].textContent = t(els[i].getAttribute('data-t'));
-    els = root.querySelectorAll('[data-t-html]');
-    for (i = 0; i < els.length; i++) els[i].innerHTML = t(els[i].getAttribute('data-t-html'));
-    els = root.querySelectorAll('[data-t-ph]');
-    for (i = 0; i < els.length; i++) els[i].setAttribute('placeholder', t(els[i].getAttribute('data-t-ph')));
-    els = root.querySelectorAll('[data-t-aria]');
-    for (i = 0; i < els.length; i++) els[i].setAttribute('aria-label', t(els[i].getAttribute('data-t-aria')));
+    for (var k = 0; k < KINDS.length; k++) {
+      var els = root.querySelectorAll('[' + KINDS[k][0] + ']');
+      for (var i = 0; i < els.length; i++) {
+        var key = els[i].getAttribute(KINDS[k][0]);
+        // A page that writes its own English (the home, Support: strings-site.js holds only their Arabic) is read
+        // the first time, before anything is replaced, so switching back to English puts its own words back.
+        if (S.en[key] == null) S.en[key] = KINDS[k][1](els[i]) || '';
+        KINDS[k][2](els[i], t(key));
+      }
+    }
+    // The switch names the other language in that language ("عربي", "English"): a screen reader reads it in its voice.
+    var sw = root.querySelectorAll('[data-lang-switch]');
+    for (var j = 0; j < sw.length; j++) sw[j].setAttribute('lang', lang() === 'ar' ? 'en' : 'ar');
     var title = document.querySelector('meta[name="rv-title"]');
-    if (title && root === document) document.title = t(title.getAttribute('content'));
+    if (title && root === document) {
+      var tk = title.getAttribute('content');
+      if (S.en[tk] == null) S.en[tk] = document.title;
+      document.title = t(tk);
+    }
   }
 
   function set(l) {
