@@ -945,6 +945,44 @@ class HealthTests(Base):
         self.assertTrue(self.lines('take')[0]['restarted'])
 
 
+class LevelTests(Base):
+    """A service that takes only some levels (LEVELS: the second service, two takes per instance) refuses the rest
+    with `level_elsewhere`, on every socket and every check."""
+
+    def setUp(self):
+        super().setUp()
+        p = mock.patch.object(server, 'LEVELS', frozenset({'recite', 'harakat'}))
+        p.start()
+        self.addCleanup(p.stop)
+
+    def first_event(self, **kw):
+        with self.client.websocket_connect('/live') as ws:
+            ws.send_text(start(**kw))
+            return ws.receive_json()
+
+    def test_live(self):
+        self.assertEqual(self.first_event(follow=True)['type'], 'ready')
+        self.assertEqual(self.first_event(tajweed=False)['type'], 'ready')
+        for kw in ({}, {'tajweed': True}, {'tajweed': False, 'letters': True}):
+            self.assertEqual(self.first_event(**kw), {'type': 'error', 'reason': 'level_elsewhere'}, kw)
+        self.assertEqual(len(FakeSession.made), 2)
+        self.assertEqual([f['reason'] for k, f in self.health if k == 'refused'], ['level_elsewhere'] * 3)
+
+    def test_check(self):
+        h = {'Authorization': 'Bearer good'}
+        self.assertEqual(self.client.post('/check?s=1&a=1&v=2&tajweed=0', content=wav(), headers=h).status_code, 200)
+        r = self.client.post('/check?s=1&a=1&v=2', content=wav(), headers=h)
+        self.assertEqual((r.status_code, r.json()), (409, {'error': 'level_elsewhere'}))
+
+    def test_health_says_which(self):
+        self.assertEqual(self.client.get('/health').json()['levels'], ['harakat', 'recite'])
+
+    def test_every_level_without_it(self):
+        with mock.patch.object(server, 'LEVELS', frozenset()):
+            self.assertEqual(self.first_event()['type'], 'ready')
+            self.assertNotIn('levels', self.client.get('/health').json())
+
+
 class HealthParts(unittest.TestCase):
     def test_the_line(self):
         out = io.StringIO()
