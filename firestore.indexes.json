@@ -62,7 +62,7 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "action", "order": "ASCENDING" },
-        { "fieldPath": "at", "order": "DESCENDING" }
+        { "fieldPath": "at", "order": "ASCENDING" }
       ]
     },
     {
