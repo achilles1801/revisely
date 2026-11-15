@@ -1,0 +1,24 @@
+# Types TEXT into the text field ID, replacing what is there, and checks the field holds it; types it
+# again if not. The iOS Simulator's keyboard can stall under load and drop what is typed meanwhile:
+# the sign-up email went out as ".com" (runs 42403217365 and 43583371303, a 17 s touch on the field)
+# and the Auth emulator answered "Invalid email address". A dropped digit would instead sign up a
+# valid address that isn't output.email, which every later script then looks for in vain.
+# A field's text is its value on iOS and its text on Android, which `text:` matches. TEXT is a regex
+# (an address's dots match themselves too). A password field must be shown first, or its text is dots.
+# On iOS the keyboard goes first (keyboard-away.yaml): the field may be under it, on an SE or after
+# the field before, and the tap would land on a key.
+#   env ID: the field's id
+#   env TEXT: what it should hold
+appId: com.revisionbuddy.app
+---
+- retry:
+    maxRetries: 3
+    commands:
+      - runFlow: keyboard-away.yaml
+      - tapOn:
+          id: ${ID}
+      - eraseText: 60
+      - inputText: ${TEXT}
+      - assertVisible:
+          id: ${ID}
+          text: ${TEXT}

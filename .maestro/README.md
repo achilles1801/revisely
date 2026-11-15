@@ -7,7 +7,7 @@ emulators, at a time and in a time zone each flow sets. CI (`ci.yml`) runs them 
 | When | Flows | Jobs |
 | --- | --- | --- |
 | A single PR into `develop` (and claude-fix's runs) | the smoke set: 02, 04, 05, 06 | two Android (02 05, 04 06) |
-| A PR into `develop` that changes code flows share (subflows, scripts, `run.sh`, `e2e.yml`, `ci.yml`) | the flows that use it with the smoke set, or all, each run twice with no reruns | both platforms (TESTING.md, "Changing the tests themselves") |
+| A PR into `develop` that changes code flows share (subflows, scripts, `run.sh`, `e2e.yml`, `ci.yml`) | the flows that use it with the smoke set, or all, each run twice with no reruns | both platforms: one job for three flows or fewer, else the full run's jobs with only those flows (TESTING.md, "Changing the tests themselves") |
 | A lower layer of a GitHub stack | none (the top layer tests the stack) | none |
 | The top of a stack into `develop`, a PR into `main`, a merge group | every flow | two iOS, two Android |
 | A push to `develop` (what just landed) | every flow on Android; iOS: the native build alone, kept for PRs | two Android, one iOS |
@@ -399,9 +399,27 @@ Things that bit:
   buttons in capitals: match with `(?i)`.
 - The iOS Simulator's keyboard can stall under load and drop what is typed meanwhile (run
   42403217365: "Keyboard queue task timeout detected" in `device.log`, the keyboard connection
-  interrupted, 12 s before the first character; the sign-up email went out malformed). A sign-up
-  the app refuses fails in `subflows/signup.yaml` on its own error (`auth-error`), not later as
-  SYNC-4 after a relaunch that clears it.
+  interrupted, 12 s before the first character; the sign-up email went out malformed, and again in
+  run 43583371303 as ".com"). So `subflows/signup.yaml` types each field through
+  `subflows/type-in-field.yaml`, which checks what the field holds and types it again if keys were
+  dropped (the passwords are shown first so their text can be read). A sign-up the app still
+  refuses fails there on its own error (`auth-error`), not later as SYNC-4 (no Welcome). A swipe can stall the same way (27 s for one in run 43583371303): give a
+  `scrollUntilVisible` room for that, as onboarding's scroll to Juz 30 has (90 s). A tap can
+  stall too: held down for half a second, iOS cancelled it on release and nothing was pressed
+  (run 43619892917). Tap again only while the control still shows it wasn't taken, as onboarding's
+  Start does (only while it reads Start: once taken it reads "Setting up…" and ignores taps).
+- A tap meant for something under the iOS keyboard lands on a key. In run 43665041191 the tap on
+  the sign-up title that should have put the keyboard away was cancelled. The tap on Create account
+  then typed the "t" under it, and Confirm Password read "e2e-passwordt". On an SE the keyboard also
+  covers the lower fields. So on iOS, `subflows/keyboard-away.yaml` puts the keyboard away with
+  Return and checks it has gone (its keys are in the hierarchy only while it is up) before each tap
+  on the sign-up form. `signup.yaml` checks all four fields together right before Create account,
+  and taps Create account again only while the form is still there with the button enabled.
+- A `visible` condition (`when`, `repeat while`) on something that isn't there waits for it, polling
+  the screen, for up to 7 s after the last tap or key; `notVisible` on something that isn't there
+  answers at once. So a loop that asks "still visible?" after it has gone pays those 7 s each time:
+  `keyboard-away.yaml` did, after every Return, and in run 43721829261 Maestro's iOS driver crashed
+  during that poll. Ask `visible` once, then wait with `extendedWaitUntil: notVisible`.
 - A script that writes the server as its admin (a seed) runs once the app has sent its own changes
   (`subflows/app-sent.yaml`). The app sends from its outbox, and a change it still held went out
   after the script's writes and over them: on iOS, run 42414536111, a failed Firestore write stream
