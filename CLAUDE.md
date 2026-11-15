@@ -228,6 +228,12 @@ until its part is set up.
     clearly. Not counted in the score."), shows only what was expected on its card, isn't amber in the bar, comes last
     in the summary and never counts in the score (`isUnclear` in `lib/reciteLive/contract`). A checker that sends
     `score.unclear` has left them out of `mistakes`; from one that doesn't, the app takes out the ones shown.
+  - **Hear it and Pause** (Majd's Dev take, Nov 15 2026: Hear it ended the take, and Husary played on past it into
+    Control Center): Hear it plays the reciter's ayah on the card's own player (`lib/reciteLive/hearAudio`), never the
+    app's recitation, so there's no reader highlight, mini player or lock screen. During a take it pauses first: the
+    microphone goes off and the take stays open on the same connection. The bar's Pause and Resume do the same, and
+    Resume carries on from where it was. What the card plays stops when the card closes, the take ends or is closed, a
+    new one starts, the reader goes, or anything else takes the audio.
   - **Stop leaves a trace** (`lib/reciteLive/stopTrace`, Nov 15 2026, after a freeze on Stop that told us nothing): Stop
     writes a marker on the phone, each step to the summary adds to it (mic off, the final answer, the summary asked
     for), and a heartbeat keeps the longest JavaScript stall. The summary on screen, a failure, ✕ or leaving the reader

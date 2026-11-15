@@ -180,6 +180,10 @@ const UTIYAT = A23 + 4;
 
 const flush = () => act(async () => {});
 const event = (e: LiveEvent) => act(async () => mockLive.onEvent?.(e));
+/** The card's player (lib/reciteLive/hearAudio): what it was given to play, and the last one made. */
+const createdPlayers = () => (jest.requireMock('expo-audio').createAudioPlayer as jest.Mock).mock;
+const playerUris = () => createdPlayers().calls.map((c: unknown[]) => (c[0] as { uri?: string } | null)?.uri).filter(Boolean);
+const lastPlayer = () => createdPlayers().results.at(-1)!.value as { remove: jest.Mock; pause: jest.Mock; play: jest.Mock };
 
 beforeEach(async () => {
   jest.clearAllMocks();
@@ -559,10 +563,8 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
     expect(screen.getByTestId('mark-card-tajweed')).toBeTruthy();
     // Similar phrases: An-Naml 16 reads almost the same.
     expect(screen.getByTestId('mark-card-similar')).toBeTruthy();
-    const play = jest.spyOn(require('../../../lib/recitation').getRecitation(), 'play').mockImplementation(() => undefined);
-    fireEvent.press(screen.getByTestId('mark-card-hear'));
-    expect(play).toHaveBeenCalledWith({ sura: 27, ayah: 23 }, expect.any(Function));
-    play.mockRestore();
+    await act(async () => fireEvent.press(screen.getByTestId('mark-card-hear')));
+    expect(playerUris()).toEqual([expect.stringMatching(/^https:\/\/everyayah\.com\/data\/.+\/027023\.mp3$/)]);
     fireEvent.press(screen.getAllByTestId('mark-card-dismiss')[0]);
     expect(mockLive.sent).toContainEqual({ type: 'dismiss', id: 'a' });
     expect(screen.queryByTestId('live-mark-word')).toBeNull();
@@ -581,6 +583,87 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
     expect(screen.getByTestId('mark-card-slip').props.children).toBe('Say it more clearly. Not counted in the score.');
     expect(screen.getByText('Expected')).toBeTruthy();
     expect(screen.queryByText('Recited')).toBeNull();
+  });
+
+  describe('Hear it during a take (Majd, Nov 15 2026: it ended the take, and Husary played on past it)', () => {
+    // Any touch outside the card closes it (the bar is hidden from VoiceOver while it's open: accessibilityViewIsModal).
+    const closeCard = () => act(async () => fireEvent(screen.getByTestId('mark-card-backdrop'), 'responderGrant'));
+    const openCard = async () => {
+      await startTake('check');
+      await event({ type: 'mark', mark: { id: 'a', w: UTIYAT, ayah: [27, 23], kind: 'word', sure: 'clear', heard: 'وَأُوهِيَتْ', heardExact: false } });
+      await tapWord(UTIYAT);
+    };
+
+    it('pauses the take, never ends it, and plays on the card’s own player, not the app’s recitation', async () => {
+      const recitation = jest.spyOn(require('../../../lib/recitation').getRecitation(), 'play');
+      await openCard();
+      await act(async () => fireEvent.press(screen.getByTestId('mark-card-hear')));
+      expect(recitation).not.toHaveBeenCalled();
+      expect(playerUris()).toEqual([expect.stringMatching(/\/027023\.mp3$/)]);
+      expect(mockLive.sent).not.toContainEqual({ type: 'end' });
+      await closeCard();
+      expect(screen.getByTestId('recite-status').props.children).toBe('Paused');
+      expect(screen.getByTestId('recite-resume')).toBeTruthy();
+      recitation.mockRestore();
+    });
+
+    it('Resume carries on the same take: the microphone again, its audio to the same connection, no new take', async () => {
+      const { startMicStream } = jest.requireMock('../../../lib/recite/micSource');
+      await openCard();
+      const start = mockLive.start;
+      await act(async () => fireEvent.press(screen.getByTestId('mark-card-hear')));
+      const before = mockLive.audio;
+      await closeCard();
+      await act(async () => fireEvent.press(screen.getByTestId('recite-resume')));
+      expect(startMicStream).toHaveBeenCalledTimes(2);
+      expect(mockLive.start).toBe(start);
+      await act(async () => mockMic!.onAudio(new Int16Array(16000)));
+      expect(mockLive.audio).toBe(before + 16000);
+      expect(screen.getByTestId('recite-pause')).toBeTruthy();
+    });
+
+    it('the ayah stops when the card closes', async () => {
+      await openCard();
+      await act(async () => fireEvent.press(screen.getByTestId('mark-card-hear')));
+      const player = lastPlayer();
+      expect(player.play).toHaveBeenCalled();
+      await closeCard();
+      expect(player.remove).toHaveBeenCalled();
+    });
+
+    it('and when the reader is left', async () => {
+      await openCard();
+      await act(async () => fireEvent.press(screen.getByTestId('mark-card-hear')));
+      const player = lastPlayer();
+      screen.unmount();
+      expect(player.remove).toHaveBeenCalled();
+    });
+
+  });
+
+  describe('Pause and Resume on the bar', () => {
+    it('Pause turns the microphone off and keeps the take; Stop while paused still ends it, and keeps its recording', async () => {
+      await startTake('recite');
+      const mic = (await jest.requireMock('../../../lib/recite/micSource').startMicStream.mock.results[0].value) as { stop: jest.Mock };
+      await act(async () => fireEvent.press(screen.getByTestId('recite-pause')));
+      expect(mic.stop).toHaveBeenCalled();
+      expect(mockLive.sent).not.toContainEqual({ type: 'end' });
+      expect(screen.getByTestId('recite-status').props.children).toBe('Paused');
+      expect(screen.queryByTestId('recite-recording')).toBeNull();
+      fireEvent.press(screen.getByTestId('recite-stop'));
+      await flush();
+      expect(mockLive.sent).toContainEqual({ type: 'end' });
+      expect(mockTake.finished).toBe(1);
+    });
+
+    it('leaving the app while paused ends the take, as it does while reciting', async () => {
+      await startTake('recite');
+      await act(async () => fireEvent.press(screen.getByTestId('recite-pause')));
+      const { AppState } = require('react-native');
+      const listener = (AppState.addEventListener as jest.Mock).mock.calls.map((c: unknown[]) => c[1] as (s: string) => void).at(-1)!;
+      await act(async () => listener('background'));
+      expect(mockLive.sent).toContainEqual({ type: 'end' });
+    });
   });
 
   it('tapping where there is no mark leaves the page to its own tap', async () => {
