@@ -1430,6 +1430,8 @@ class LiveSession:
                 ('start',) if 'start' in out else ())} | {'v': 2, 'follow': True, 'marks': [], 'score': None}
         heard = heard_sounds(spans, self._tokens(0, self.T), self.E.ear.vocab)
         out['marks'] = self.E.marks(words, flagged, heard, ex, tj, letters if self.st['letters'] else [])
+        out['ms']['similar'] = self.E.name_slips(out['marks'], self.lp[:self.T], [r['w'] for r in words], statuses,
+                                                 spans, ex)
         out['score'] = score(statuses, out['marks'], self.dismissed)
         out['score']['helped'] = len(self.helped)
         out['v'] = 2

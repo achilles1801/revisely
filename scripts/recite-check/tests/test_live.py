@@ -639,6 +639,45 @@ class Score(unittest.TestCase):
                          {'reached': 20, 'mistakes': 2, 'tajweed': 1, 'unclear': 2, 'accuracy': 0.9})
 
 
+@unittest.skipUnless(MODEL.exists() and ITEM.exists(), 'the model or the bench is not here')
+class SimilarPassage(unittest.TestCase):
+    """A slip into a similar passage is named (`into` on the run's first mark: recite-contract.md), in a check and at
+    a live take's end, from bench-v0's planted slips (the ayah starts right, then carries on as a similar one)."""
+
+    def setUp(self):
+        if engine().table is None:
+            self.skipTest('no word table for these words: nothing is named without it')
+
+    def named(self, name, s, a, s2, a2):
+        """{(w, kind): into} of the marks with `into`: (from a check, from a live take)."""
+        import live
+        with wave.open(str(BENCH / f'{name}.wav')) as f:
+            pcm = f.readframes(f.getnframes())
+        x = np.frombuffer(pcm, '<i2').astype(np.float32) / 32768
+        checked = engine().check(x, s, a, s2, a2, v=2)
+        ev = run(live.LiveSession(engine(), s, a, s2, a2, {}), chunks(pcm, 3200) + [{'type': 'end'}])
+        return [{(m['w'], m['kind']): m['into'] for m in r['marks'] if 'into' in m}
+                for r in (checked, ev[-1]['result'])]
+
+    def test_a_slip_into_a_similar_ayah_names_it(self):
+        """2:255 said «ٱللَّهُ لَآ إِلَـٰهَ إِلَّا هُوَ» and then 20:8's «لَهُ ٱلْأَسْمَآءُ ٱلْحُسْنَىٰ»: the skipped «ٱلْحَىُّ» carries where
+        the reciter went, 20:8 from its sixth word."""
+        first = engine().words.first_word(20, 8) + 5
+        for got in self.named('alafasy.p8.m1.clean', 2, 255, 2, 257):
+            self.assertEqual(got, {(5178, 'skipped'): {'w': first, 'ayah': [20, 8]}})
+
+    def test_ayat_with_the_same_words_come_along(self):
+        """2:8 into 22:8 («يُجَـٰدِلُ فِى ٱللَّهِ بِغَيْرِ عِلْمٍۢ…»), which 31:20 also says."""
+        checked, at_end = self.named('husary.p1.m1.clean', 2, 6, 2, 16)
+        for got in (checked, at_end):
+            self.assertEqual([(v['ayah'], v.get('also')) for v in got.values()], [([22, 8], [[31, 20]])])
+
+    def test_no_name_without_a_slip(self):
+        """Al-Fatiha with a word said as another and one skipped, and as recited: nothing named."""
+        for name in ('alafasy.p2.m1.clean', 'alafasy.p2.clean.clean'):
+            self.assertEqual(self.named(name, 1, 1, 1, 7), [{}, {}])
+
+
 if __name__ == '__main__':
     unittest.main()
 
