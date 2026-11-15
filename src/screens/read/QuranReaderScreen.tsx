@@ -68,7 +68,7 @@ import { markAt, wordBox } from '../../lib/reciteLive/geometry';
 import { similarPhrases } from '../../lib/reciteLive/similar';
 import type { Mark } from '../../lib/reciteLive/contract';
 import type { Box } from '../../components/verse/menuPlacement';
-import { getRecitation } from '../../lib/recitation';
+import { playReference, stopHearing } from '../../lib/reciteLive/hearAudio';
 import { warmUpReciteCheck } from '../../lib/reciteCheck/service';
 import { needsPremium, type LiveFailure } from '../../lib/reciteLive/contract';
 import { logger } from '../../lib/logger';
@@ -307,6 +307,12 @@ export default function QuranReaderScreen() {
   const [noticeFor, setNoticeFor] = useState<LiveMode | null>(null);
   // Check: the word a card is open on (and where it is on screen), similar phrases, the summary, Check's page.
   const [cardAt, setCardAt] = useState<{ w: number; anchor: Box } | null>(null);
+  // What the card plays stops when the card closes, and when the reader goes (Majd, Nov 15 2026: Husary played on past
+  // the take, into Control Center).
+  useEffect(() => {
+    if (!cardAt) stopHearing();
+  }, [cardAt]);
+  useEffect(() => () => stopHearing(), []);
   const [similarFor, setSimilarFor] = useState<number | null>(null);
   const [summaryFor, setSummaryFor] = useState<string | null>(null);
   const [introOpen, setIntroOpen] = useState(false);
@@ -553,6 +559,9 @@ export default function QuranReaderScreen() {
                 words={barWords(live.state, qw, { check: checkTake, startWord: live.startWord })}
                 status={barStatus}
                 phase={barPhase}
+                paused={live.paused}
+                onPause={() => void live.pause()}
+                onResume={() => void live.resume()}
                 onStop={live.stop}
                 onClose={() => {
                   setCardAt(null);
@@ -691,7 +700,12 @@ export default function QuranReaderScreen() {
               words={qw}
               anchor={cardAt?.anchor ?? null}
               onDismiss={live.dismiss}
-              onHear={(m) => getRecitation().play({ sura: m.ayah[0], ayah: m.ayah[1] }, () => null)}
+              // The reciter's ayah on the card's own player (lib/reciteLive/hearAudio): a take still listening pauses first,
+              // so it isn't ended and its microphone doesn't hear the reciter (Majd, Nov 15 2026).
+              onHear={async (m) => {
+                if (live.state.status === 'listening' && live.mic === 'on') await live.pause();
+                void playReference({ sura: m.ayah[0], ayah: m.ayah[1] });
+              }}
               onSimilar={(m) => {
                 setCardAt(null);
                 setSimilarFor(m.w);

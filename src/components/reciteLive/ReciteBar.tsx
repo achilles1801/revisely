@@ -111,6 +111,9 @@ export function ReciteBar({
   words,
   status,
   phase,
+  paused = false,
+  onPause,
+  onResume,
   onStop,
   onClose,
   surface,
@@ -128,12 +131,19 @@ export function ReciteBar({
   status: string;
   /** live: reciting; checking: stopped, the final answer coming; done: finished (✕). */
   phase: 'live' | 'checking' | 'done';
+  /** The take is paused (the microphone off, the take open). */
+  paused?: boolean;
+  /** Pause and resume the take (shown while it's live). */
+  onPause?: () => void;
+  onResume?: () => void;
   onStop: () => void;
   onClose: () => void;
   surface: { background: string; border: string };
 }) {
   const { palette } = useTheme();
   const spoken = words.map((w) => w.text).join(' ');
+  const shownWords = paused ? [] : words;
+  const shownStatus = paused ? 'Paused' : status;
   return (
     <View
       style={[styles.capsule, { backgroundColor: surface.background, borderColor: surface.border }]}
@@ -143,16 +153,18 @@ export function ReciteBar({
       {score ? <ScorePill text={score.text} level={score.level} /> : null}
       {/* Not a live region: its clock changes every second, and TalkBack would speak each one over the recitation, where
           the microphone hears it. VoiceOver reads it when focused; the summary is spoken once when it shows. */}
-      <View style={styles.middle} accessible accessibilityLabel={`${clock(seconds)}${recording && phase === 'live' ? ', recording' : ''}. ${spoken || status}`} testID="recite-middle">
+      <View style={styles.middle} accessible accessibilityLabel={`${clock(seconds)}${recording && phase === 'live' && !paused ? ', recording' : ''}. ${paused ? shownStatus : spoken || status}`} testID="recite-middle">
         <View style={styles.time}>
-          {recording && phase === 'live' ? <View style={[styles.dot, { backgroundColor: palette.red }]} testID="recite-recording" /> : null}
+          {recording && phase === 'live' && !paused ? (
+            <View style={[styles.dot, { backgroundColor: palette.red }]} testID="recite-recording" />
+          ) : null}
           <Text style={[styles.timeText, typeV2.numeral, { color: palette.secondary }]} maxFontSizeMultiplier={1.2} testID="recite-time">
             {clock(seconds)}
           </Text>
         </View>
-        {words.length ? (
+        {shownWords.length ? (
           <Text style={[arabicV2(20), styles.words]} numberOfLines={1} maxFontSizeMultiplier={1.3} testID="recite-words">
-            {words.map((w, i) => (
+            {shownWords.map((w, i) => (
               <Text
                 key={w.w}
                 style={{
@@ -168,10 +180,17 @@ export function ReciteBar({
           </Text>
         ) : (
           <Text style={[typeV2.meta, { color: palette.secondary }]} numberOfLines={1} maxFontSizeMultiplier={1.2} testID="recite-status">
-            {status}
+            {shownStatus}
           </Text>
         )}
       </View>
+      {phase === 'live' && onPause && onResume ? (
+        paused ? (
+          <BarButton icon="play" label="Resume" onPress={onResume} testID="recite-resume" />
+        ) : (
+          <BarButton icon="pause" label="Pause" onPress={onPause} testID="recite-pause" />
+        )
+      ) : null}
       {phase === 'done' ? (
         <BarButton icon="close" label="Close" onPress={onClose} testID="recite-close" />
       ) : (

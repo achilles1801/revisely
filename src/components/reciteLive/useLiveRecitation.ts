@@ -16,6 +16,7 @@ import type { ReciteCheckSettings } from '../../lib/reciteCheck/settings';
 import type { LiveEvent } from '../../lib/reciteLive/contract';
 import type { LiveConnect, LiveConnection, StartFrame } from '../../lib/reciteLive/feed';
 import { socketFeed } from '../../lib/reciteLive/socket';
+import { stopHearing } from '../../lib/reciteLive/hearAudio';
 import { stopTrace } from '../../lib/reciteLive/stopTrace';
 import { SavedTake, startTakeRecording, TakeRecording } from '../../lib/reciteLive/takeRecording';
 import {
@@ -32,8 +33,8 @@ import {
 /** What the mic does while reciting: follow along (free), or follow and mark mistakes (Check). */
 export type LiveMode = 'recite' | 'check';
 
-/** The microphone: off, asking for it, on, refused, or failed to start. */
-export type MicStatus = 'off' | 'starting' | 'on' | 'denied' | 'error';
+/** The microphone: off, asking for it, on, paused (the take goes on), refused, or failed to start. */
+export type MicStatus = 'off' | 'starting' | 'on' | 'paused' | 'denied' | 'error';
 
 /** What ended a take: Stop tapped, the app left, or iOS took the microphone. */
 type StopWhy = 'tap' | 'background' | 'mic-lost';
@@ -155,6 +156,11 @@ export function useLiveRecitation({
   const [testData, setTestData] = useState(false);
   const onSavedRef = useRef(onRecordingSaved);
   onSavedRef.current = onRecordingSaved;
+  // Paused (Majd, Nov 15 2026: listening mid-take ended it, with no way back): the microphone is off and the take goes
+  // on, on the same connection, from where it was. `reopen` starts this take's microphone (or E2E's tone) again.
+  const [paused, setPaused] = useState(false);
+  const pausedRef = useRef(false);
+  const reopen = useRef<(() => Promise<AudioSource>) | null>(null);
   // For the Stop trace (lib/reciteLive/stopTrace), read when Stop is tapped.
   const traceRef = useRef({ state, mode, seconds });
   traceRef.current = { state, mode, seconds };
@@ -185,8 +191,11 @@ export function useLiveRecitation({
   const stopMic = useCallback(async () => {
     const src = source.current;
     source.current = null;
-    if (!src) return;
-    await src.stop().catch(() => undefined);
+    const wasPaused = pausedRef.current;
+    pausedRef.current = false;
+    if (!src && !wasPaused) return;
+    setPaused(false);
+    if (src) await src.stop().catch(() => undefined);
     stopTrace.step('mic-off');
     finishRecording();
     await setAudioMode(false).catch(() => undefined);
@@ -205,6 +214,7 @@ export function useLiveRecitation({
         take: t.state.take,
         socket: conn.current?.status?.(),
       });
+      stopHearing();
       void stopMic();
       conn.current?.send({ type: 'end' });
       setState((s) => liveStopping(s));
@@ -216,6 +226,7 @@ export function useLiveRecitation({
   /** Throw the take away (the screen left): nothing more comes. */
   const cancel = useCallback(() => {
     stopTrace.end();
+    stopHearing();
     void stopMic();
     conn.current?.close();
     conn.current = null;
@@ -226,6 +237,9 @@ export function useLiveRecitation({
   const start = useCallback(
     async (take: LiveMode) => {
       if (conn.current || source.current) return;
+      stopHearing();
+      pausedRef.current = false;
+      setPaused(false);
       setMic('starting');
       setSeconds(0);
       samples.current = 0;
@@ -251,7 +265,9 @@ export function useLiveRecitation({
           onClose: () => {
             stopTrace.step('closed');
             if (conn.current === c) conn.current = null;
-            clearInterval(tick);
+            const tone = source.current;
+            source.current = null;
+            void tone?.stop();
             setMic('off');
           },
         });
@@ -260,15 +276,19 @@ export function useLiveRecitation({
           settings.saveRecording && recordingDay ? startTakeRecording({ day: recordingDay, page: pageRef.current }) : null;
         setRecording(recordingRef.current != null);
         let second = 0;
-        const tick = setInterval(() => {
-          setSeconds((n) => n + 1);
-          recordingRef.current?.add(e2e.e2eToneSecond(second++));
-        }, 1000);
-        source.current = {
-          stop: async () => {
-            clearInterval(tick);
-          },
+        const openTone = async (): Promise<AudioSource> => {
+          const tick = setInterval(() => {
+            setSeconds((n) => n + 1);
+            recordingRef.current?.add(e2e.e2eToneSecond(second++));
+          }, 1000);
+          return {
+            stop: async () => {
+              clearInterval(tick);
+            },
+          };
         };
+        reopen.current = openTone;
+        source.current = await openTone();
         setMic('on');
         // eslint-disable-next-line no-console
         console.log('[e2e] recite-live take started');
@@ -313,15 +333,19 @@ export function useLiveRecitation({
           // iOS took the microphone (a call, headphones out): the take ends there.
           onStop: () => stopFor('mic-lost'),
         };
-        await enterRecordingMode();
-        try {
-          source.current = await startMicStream(handlers);
-        } catch (err) {
-          if (!isAudioSessionError(err)) throw err;
-          await wait(400);
+        const openMic = async (): Promise<AudioSource> => {
           await enterRecordingMode();
-          source.current = await startMicStream(handlers);
-        }
+          try {
+            return await startMicStream(handlers);
+          } catch (err) {
+            if (!isAudioSessionError(err)) throw err;
+            await wait(400);
+            await enterRecordingMode();
+            return await startMicStream(handlers);
+          }
+        };
+        reopen.current = openMic;
+        source.current = await openMic();
         if (conn.current !== c) {
           await stopMic();
           return;
@@ -341,6 +365,44 @@ export function useLiveRecitation({
     [connect, owner, settings, stopFor, stopMic, recordingDay, finishRecording, onEvent],
   );
 
+  /**
+   * Pause: the microphone goes off and nothing is sent; the take stays open on the checker, its marks and place on the
+   * page. Playback mode, so what plays meanwhile (Hear it) comes from the speaker.
+   */
+  const pause = useCallback(async () => {
+    const src = source.current;
+    if (!src || !conn.current || pausedRef.current) return;
+    pausedRef.current = true;
+    source.current = null;
+    setPaused(true);
+    setMic('paused');
+    await src.stop().catch(() => undefined);
+    await setAudioMode(false).catch(() => undefined);
+  }, []);
+
+  /** Resume the same take: its microphone again, its audio on to the same connection, from where it was. */
+  const resume = useCallback(async () => {
+    const open = reopen.current;
+    if (!pausedRef.current || !conn.current || !open) return;
+    stopHearing();
+    setMic('starting');
+    try {
+      claimAudio('recorder', owner);
+      const src = await open();
+      if (!pausedRef.current || !conn.current) {
+        await src.stop().catch(() => undefined);
+        return;
+      }
+      source.current = src;
+      pausedRef.current = false;
+      setPaused(false);
+      setMic('on');
+    } catch (err) {
+      logger.warn('Could not resume the live recitation', err);
+      setMic('paused');
+    }
+  }, [owner]);
+
   /** "Not a mistake": off the page at once, and told to the checker (a label for the lab). */
   const dismiss = useCallback((id: string) => {
     conn.current?.send({ type: 'dismiss', id });
@@ -355,6 +417,7 @@ export function useLiveRecitation({
   /** Done with the take: back to idle (the summary closed). */
   const clear = useCallback(() => {
     stopTrace.end();
+    stopHearing();
     void stopMic();
     conn.current?.close();
     conn.current = null;
@@ -401,7 +464,7 @@ export function useLiveRecitation({
   useEffect(() => {
     const sub = AppState.addEventListener('change', (s) => {
       stopTrace.step(`app:${s}`);
-      if (s === 'background' && source.current) stopFor('background');
+      if (s === 'background' && (source.current || pausedRef.current)) stopFor('background');
     });
     return () => sub.remove();
   }, [stopFor]);
@@ -441,8 +504,12 @@ export function useLiveRecitation({
     /** The first word recited (where the score's pages and the summary start); null while the checker looks for it. */
     startWord: state.start,
     active: state.status !== 'idle',
+    /** The take is paused: the microphone off, the take open (Resume carries on). */
+    paused,
     start,
     stop,
+    pause,
+    resume,
     cancel,
     clear,
     dismiss,
