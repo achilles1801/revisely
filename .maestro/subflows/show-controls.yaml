@@ -2,8 +2,21 @@
 # are swiped; a tap on the page shows them. (High on the page: E2E builds load no
 # page images, and "Try again" sits in the middle.) Tapped again if a busy
 # device misses it.
+#
+# Only once the session is on screen: its quiet header (controls hidden), its
+# title (shown) or its end card. Flows call this right after the tap that opens
+# a session, and a tap on the page's point before it has opened lands on what is
+# still there.
+# In #603's run 43679248328 (attempt 2, 04) the app's JavaScript stalled 3.6 s
+# after the tap on "Tomorrow starts at …": Home was still up, the point (50%,
+# 30%) was Home's Review session, and it opened the editor over the ahead
+# session, which then never showed its title.
 appId: com.revisionbuddy.app
 ---
+- extendedWaitUntil:
+    visible:
+      id: "session-(quiet-count|title|end-summary)"
+    timeout: 20000
 - retry:
     maxRetries: 2
     commands:
