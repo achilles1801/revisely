@@ -60,6 +60,7 @@ window.RV_STRINGS = {
 
     'o.title.doc': 'Open Door · Revisely',
     'o.kicker': 'Revisely Premium, free', 'o.name': 'Open Door', 'o.sub': 'Premium, free for anyone who can’t pay for it',
+    'o.intro': 'Revisely is a free Quran revision app: a little review every day, across everything you’ve memorized. <a href="/">How it works</a>',
     'o.pitch': 'Nobody should stop memorizing the Quran because of money. If Premium costs more than you can manage, or you have no way to pay for it where you live, apply and we’ll give it to you for free. It takes two minutes, and there’s nothing to prove.',
     'o.apply': 'Apply', 'o.status': 'Already applied? <a href="/account/">See your status</a>',
     'o.verse': '“And We have certainly made the Quran easy to remember. So is there anyone who will be mindful?”', 'o.verseRef': 'Al-Qamar 54:17',
@@ -162,6 +163,7 @@ window.RV_STRINGS = {
 
     'o.title.doc': 'الباب المفتوح · ريفايزلي',
     'o.kicker': 'ريفايزلي بريميوم، مجانًا', 'o.name': 'الباب المفتوح', 'o.sub': 'بريميوم مجانًا لكل من لا يستطيع دفع ثمنه',
+    'o.intro': 'ريفايزلي تطبيق مجاني لمراجعة القرآن: مراجعة قليلة كل يوم، تشمل كل ما حفظته. <a href="/">كيف يعمل</a>',
     'o.pitch': 'لا ينبغي أن يتوقف أحدٌ عن حفظ القرآن بسبب المال. إن كانت تكلفة بريميوم فوق طاقتك، أو لم تكن لديك وسيلة دفع تصلح له في بلدك، فقدِّم طلبك نمنحْك إياه مجانًا. لا يستغرق ذلك سوى دقيقتين، ولا شيء عليك إثباته.',
     'o.apply': 'قدِّم طلبك', 'o.status': 'قدّمت من قبل؟ <a href="/account/">اطّلع على حالة طلبك</a>',
     'o.verse': '', 'o.verseRef': 'القمر ٥٤:١٧',
