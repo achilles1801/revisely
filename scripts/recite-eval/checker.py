@@ -377,11 +377,13 @@ class Key:
         """Up to k other words that sound almost the same (one or two sounds apart), nearest first. A word
         that differs only by a final vowel (as when stopping on it) doesn't count."""
         import Levenshtein
-        ck = (text, rule)
-        if ck in getattr(self, '_alt_cache', {}):
-            return self._alt_cache[ck][:k]
         lex = self._lexicon()
         norms = {norm_sounds(f['sounds']) for f in forms}
+        # keyed by how the word sounds here too: the same text joined or stopped on has other look-alikes, and a key of
+        # the text alone let the first place met decide for every later one (18:5's «لَهُم» marked alone, not in a run)
+        ck = (text, rule, tuple(sorted(norms)))
+        if ck in self._alt_cache:
+            return self._alt_cache[ck][:k]
         cores = {core(n) for n in norms}
         skels = {skeleton(n) for n in norms} | {skeleton(core(n)) for n in norms}
         lskels = {letter_skeleton(n) for n in norms} | {letter_skeleton(core(n)) for n in norms}
