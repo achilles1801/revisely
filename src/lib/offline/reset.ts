@@ -47,6 +47,19 @@ export function whenResetAdopted(uid: string, mark: number, timeoutMs = 30_000):
   });
 }
 
+/** The mark the phone's data for `uid` is built on, once AppProvider has checked it (undefined until then). */
+export function adoptedResetMark(uid: string): number | null | undefined {
+  return adopted.get(uid);
+}
+
+/** Hears each mark AppProvider adopts (Recite's memory drops what it held from before a reset). */
+export function onResetAdopted(listener: () => void): () => void {
+  adoptWaiters.add(listener);
+  return () => {
+    adoptWaiters.delete(listener);
+  };
+}
+
 /** Tests. */
 export function resetAdoptedForTests(): void {
   adopted.clear();

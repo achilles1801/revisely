@@ -494,6 +494,9 @@ export function useLiveRecitation({
     [label],
   );
 
+  /** When the cursor first reached `w`, in seconds of the take (Recite's memory keeps it for ▶ on a right try). */
+  const wordTime = useCallback((w: number): number | null => wordTimes.current.get(w) ?? null, []);
+
   /** A word or an ayah shown by hand (hidden view), told to the checker as information. */
   const hint = useCallback((w: number, what: 'word' | 'ayah') => {
     if (SEND_HINTS) conn.current?.send({ type: 'hint', w, what });
@@ -608,6 +611,7 @@ export function useLiveRecitation({
     resume,
     hasClip,
     clipFor,
+    wordTime,
     cancel,
     clear,
     dismiss,
