@@ -25,6 +25,7 @@ sys.path.insert(0, str(HARNESS))
 import checker  # noqa: E402
 import letters_v2  # noqa: E402
 import nasal_rules  # noqa: E402
+import similar  # noqa: E402
 import tajweed  # noqa: E402
 
 FPS = checker.FPS
@@ -247,6 +248,8 @@ class Engine:
         self._slots = {}
         self._kw = {}  # app word -> its Key.passage entry, worked out on this instance (no table, or not in it)
         self._kw_lock = threading.Lock()
+        self.slip_index = similar.Index(self.words)  # where a slip into a similar passage went (name_slips); 0.1 s
+        self._labels = {}
         self.table = load_table(pathlib.Path(os.environ['LAB']) / 'words.bin')
         lab = pathlib.Path(os.environ['LAB'])
         self.ear2, self.bars2 = None, None  # the strict level's second ear (v5), when the image carries it
@@ -394,6 +397,8 @@ class Engine:
                     if len(checker.norm_sounds(own)) >= 3:
                         heard[w_] = own
             out['marks'] = self.marks(words, flagged, heard, out['extras'], tj, letters if st['letters'] else [])
+            out['ms']['similar'] = self.name_slips(out['marks'], lp, [k['word'] for k in kws], statuses, spans,
+                                                   out['extras'])
             out['score'] = score(statuses, out['marks'])
             out['v'] = 2
         return out
@@ -474,6 +479,54 @@ class Engine:
                 detail=detail, slip=slip_of(r['slip']), heard=spell(r['_heard']) if r.get('_heard') else None,
                 heardExact=False if r.get('_heard') else None)
         return out
+
+    def name_slips(self, marks, lp, order, statuses, spans, extras):
+        """Where the reciter went, when a run of words skipped or said wrong is a similar passage's words: `into` on the
+        run's first word mark ({w, ayah, also?}: the place's first word said, its ayah, other ayat with the same words
+        as far as heard). The lab's similar.py (Nov 15 2026: of bench-v0's 111 planted slips into a similar ayah, 107
+        named with the right place and none with a wrong one; no name on any other run there, or on the learners',
+        /record's or Dev takes). Not shown by the app yet (Majd: "show nothing until the numbers are good").
+        Returns the milliseconds it took: 0–17 ms a take with the word table; without it, each place's sounds would be
+        worked out here (~100 ms a word), so nothing is named."""
+        if self.table is None:
+            return 0
+        t0 = time.perf_counter()
+        try:
+            names = similar.find(lp, order, statuses, spans, extras, self._labels_of, self.slip_index)
+        except Exception as e:  # naming is extra: it never costs the answer
+            print(f'similar: {type(e).__name__}: {e}', file=sys.stderr)
+            names = []
+        for n in names:
+            m = next((m for m in marks if m['w'] == n['mark'] and m['kind'] in ('skipped', 'word')), None)
+            if m is None:
+                continue
+            ayah = self.slip_index.ayah(n['w'])
+            also = []
+            for x in n['also']:
+                a = self.slip_index.ayah(x)
+                if a != ayah and a not in also:
+                    also.append(a)
+            m['into'] = {'w': int(n['w']), 'ayah': ayah} | ({'also': also[:5]} if also else {})
+        return int((time.perf_counter() - t0) * 1000)
+
+    def _labels_of(self, lo, hi):
+        """The sounds of app words [lo, hi) as the checker hears them joined, and where each word ends (similar.py)."""
+        got = self._labels.get((lo, hi))
+        if got is None:
+            try:
+                kws = self.passage_words(lo, hi)
+            except ValueError:  # a word the checker refuses: that place isn't tried
+                kws = []
+            lab, ends = [], []
+            for k in kws:
+                lab += k['forms'][0]['labels']
+                ends.append(len(lab))
+            got = (lab, ends)
+            with self._kw_lock:
+                if len(self._labels) > 20000:
+                    self._labels.clear()
+                self._labels[(lo, hi)] = got
+        return got
 
     def ayat(self, lp, lo, hi, statuses, spans, st, audio=None):
         """Tajweed (and letters) for each ayah of the passage said in full, on its own frames."""
