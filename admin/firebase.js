@@ -28,7 +28,7 @@ const OWN_AUTH_DOMAIN_HOSTS = ['metrics.revisely.app', 'revisely-dev.web.app'];
 // App Check (reCAPTCHA Enterprise) per project: the site key is public, it only names the key. adminConsole refuses
 // every action but `me` without a valid token. A project without a key here has no App Check on this page.
 const APP_CHECK_KEYS = {
-  'revisely-dev': '',
+  'revisely-dev': '6LeZxiAuAAAAACWwi_P_lI9bWb49pnwBZahSJVlB',
 };
 
 const LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
