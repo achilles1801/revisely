@@ -422,6 +422,37 @@ class Bench(unittest.TestCase):
                          sum(1 for m in first[-1]['result']['marks']
                              if m['kind'] in ('word', 'skipped', 'added') and m['id'] != '4:word:lookalike'))
 
+    def test_an_undismiss_puts_the_mark_back_and_replays_the_same(self):
+        """Undo of a "Not a mistake" (Majd, Nov 15 2026): `undismiss` at its point in the audio takes the id out of
+        the dismissed set, so the score counts the mark again; run again from its messages (a resume on the other
+        instance), the session sends the same events."""
+        pcm = bench_pcm()
+        whole = run(self.session(), chunks(pcm, 3200) + [{'type': 'end'}])
+        counted = [m for m in whole[-1]['result']['marks'] if m['kind'] in ('word', 'skipped', 'added')]
+        self.assertTrue(counted, 'the bench take needs a word mark for this test')
+        mid = counted[0]['id']
+        cut = 16000 * 2 * 12
+        log = chunks(pcm, 3200) + [{'type': 'dismiss', 'id': mid}, {'type': 'undismiss', 'id': mid},
+                                   {'type': 'end'}]
+        undone = run(self.session(), log)
+        self.assertEqual(undone[-1]['result']['score'], whole[-1]['result']['score'])
+        log = chunks(pcm, 3200) + [{'type': 'dismiss', 'id': mid}, {'type': 'end'}]
+        dismissed = run(self.session(), log)
+        self.assertEqual(dismissed[-1]['result']['score']['mistakes'], whole[-1]['result']['score']['mistakes'] - 1)
+        # mid-take, then run again in big chunks: the same events
+        log = chunks(pcm[:cut], 3200) + [{'type': 'dismiss', 'id': mid}] + chunks(pcm[cut:2 * cut], 3200) \
+            + [{'type': 'undismiss', 'id': mid}] + chunks(pcm[2 * cut:], 3200) + [{'type': 'end'}]
+        first = run(self.session(), log)
+        again, buf = [], b''
+        for m in log:
+            if isinstance(m, bytes):
+                buf += m
+                continue
+            again += [buf, m]
+            buf = b''
+        self.assertEqual(run(self.session(), again), first)
+        self.assertEqual(first[-1]['result']['score'], whole[-1]['result']['score'])
+
 
 @unittest.skipUnless(MODEL.exists() and CLEAN.exists(), 'the model or the bench recitation is not here')
 class StartAnywhere(unittest.TestCase):

@@ -86,8 +86,13 @@ How `sure` is decided:
 
 When kept, the v2 answer also has `take`, the take's name.
 
-`POST /dismiss {"take": "...", "id": "<mark id>"}` (same sign-in): the person's "Not a mistake", kept next to the
-take (`<take>.dismiss-<time>.json`) as a label for the lab.
+`POST /dismiss {"take": "...", "id": "<mark id>", "when": <ms>}` (same sign-in): the person's "Not a mistake", kept
+next to the take (`<take>.dismiss-<time>.json`) as a label for the lab. `POST /undismiss` (the same body) undoes it
+(Undo, or the summary's Removed list; `<take>.undismiss-<time>.json`, with `"undo": true`). `when` (optional) is the
+phone's time of the tap in ms: two labels sent close together, or a retry, can be stored out of order, and the lab
+orders them by it. Read a take's labels with `fetch_takes.dismissed_now`: the live `dismissed` list, then these files
+in the order they were tapped, the latest for a mark winning, so an undone "Not a mistake" never stays a label. Any id
+`engine.marks` makes is taken (before Nov 15 2026 skipped, added and harakat marks were refused).
 
 ## Live: `/live` (a WebSocket on the same service)
 
@@ -107,7 +112,8 @@ take (`<take>.dismiss-<time>.json`) as a label for the lab.
    whether the image has the word table for its checker. Never move traffic to a revision whose `words` is false (see
    "The word table").
 3. The phone sends PCM (16-bit little-endian, mono, 16 kHz) as binary frames of any size, and as text frames
-   `{"type":"seek","w":…}`, `{"type":"dismiss","id":"…"}`,
+   `{"type":"seek","w":…}`, `{"type":"dismiss","id":"…"}`, `{"type":"undismiss","id":"…"}` (that dismissal undone:
+   the score counts the mark again, and the kept take's `dismissed` leaves it out),
    `{"type":"hint","w":…,"what":"word"|"ayah"}` (the hidden view showed a word, or the rest of its ayah: those
    words, if not yet decided, are `helped`, counted in `score.helped` and flagged in `done.result.words`; a helped word
    said wrong is still a mistake) and finally `{"type":"end"}`. Any other frame is ignored.
@@ -153,11 +159,11 @@ dev account has Premium (`devGrantPremium`); `--update-env-vars CHECK_GATE=on` t
 the socket (`idle`). uvicorn pings every 10 s, so a phone gone without closing is noticed within 20 s.
 
 **Resume.** A dropped socket: open a new one and send the start frame again with `"resume":"<take>"` (and a fresh
-token). `ready.from` says how many samples the server holds: send the take's PCM from there (and any seek or dismiss
-at the point of the audio where it was first sent), then carry on. On the same instance (within 2 minutes) `from` is
-where the socket dropped. On the other instance it is 0: the server runs the take again, faster than real time, and
-since every event depends only on the audio and where each seek and dismissal came in it, it sends the same events
-again. The phone applies events idempotently (marks by id; `at`, `said` and `score` are snapshots), so a repeat
+token). `ready.from` says how many samples the server holds: send the take's PCM from there (and any seek, dismiss or
+undismiss at the point of the audio where it was first sent), then carry on. On the same instance (within 2 minutes)
+`from` is where the socket dropped. On the other instance it is 0: the server runs the take again, faster than real
+time, and since every event depends only on the audio and where each seek, dismissal and undismissal came in it, it
+sends the same events again. The phone applies events idempotently (marks by id; `at`, `said` and `score` are snapshots), so a repeat
 changes nothing on screen. Right after `ready`, a resume on the same instance also sends what the phone should be
 showing (every mark shown, every `unmark`, the `ayah` events, `at`, `said`, `score`): the dropped socket may have
 swallowed events of the last audio it was checking, and that audio isn't sent again. The phone keeps the take's PCM for this (it needs it for "play this word" too).

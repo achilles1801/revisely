@@ -590,7 +590,7 @@ class LiveSession:
         return ev
 
     def control(self, msg):
-        """seek {w}, dismiss {id} or end: applied at this point of the audio."""
+        """seek {w}, dismiss {id}, undismiss {id}, hint or end: applied at this point of the audio."""
         self.ctrl.append((self.n, msg))
         with self._working():
             return self._run()
@@ -642,10 +642,10 @@ class LiveSession:
 
     def _apply(self, msg):
         kind = msg.get('type')
-        if kind == 'dismiss':
+        if kind in ('dismiss', 'undismiss'):  # Not a mistake, or that undone (Undo, the summary's Removed list)
             mid = msg.get('id')
             if isinstance(mid, str) and len(mid) < 64:
-                self.dismissed.add(mid)
+                (self.dismissed.add if kind == 'dismiss' else self.dismissed.discard)(mid)
                 return self._score_event()
             return []
         if kind == 'seek':

@@ -3,6 +3,7 @@
 POST /check?s=&a=[&s2=&a2=][&mon=&mot=&aar=][&letters=1][&keep=1][&v=2]  body: WAV, 16 kHz mono 16-bit
   Authorization: Bearer <Firebase ID token of a previewTester account on revisely-dev>
 POST /dismiss  {"take": "...", "id": "..."}  (same sign-in): "Not a mistake", kept next to the take
+POST /undismiss  {"take": "...", "id": "..."}  (same sign-in): that "Not a mistake" undone
 WS   /live     the live check: a start frame (the token in it or in the Authorization header), then PCM; events
                back (README.md, "Live"; the notes folder's recite-contract.md)
 GET  /health
@@ -53,7 +54,10 @@ LAST_AYAH = (114, 6)
 # reciter begins at some word from s:a's first through its end. The follower (live.py) searches for the start, sends
 # `locked` (or `nolock`) and goes on from there. A start frame without it is protocol 5's: the take starts at s:a.
 START_BY_WORDS = 400  # the most words from s:a's first word to startBy's end: a foldable's two pages
-MARK_ID = re.compile(r'^\d{1,6}:(word|letter|tajweed):[a-z_]{1,24}$')
+# A mark's id as engine.marks makes it: `${w}:${kind}:${detail ?? rule ?? ''}`, `#n` on a repeat ("12:skipped:",
+# "12:added:trail", "12:harakat:shadda", "12:letter:#2"). Before Nov 15 2026 it took only word, letter and tajweed
+# with a detail, so /dismiss refused skipped, added and harakat marks.
+MARK_ID = re.compile(r'^\d{1,6}:(word|skipped|added|harakat|letter|tajweed):[a-z0-9_]{0,24}(#\d{1,3})?$')
 log = logging.getLogger('recite-check')
 logging.basicConfig(level=logging.INFO)
 ENGINE = {}
@@ -192,25 +196,46 @@ async def check(request: Request):
 @app.post('/dismiss')
 async def dismiss(request: Request):
     """The person said a mark was not a mistake: a label for the lab, kept next to the take (only kept takes)."""
+    return await label(request, 'dismiss')
+
+
+@app.post('/undismiss')
+async def undismiss(request: Request):
+    """The person put a dismissed mark back (Undo, or the summary's Removed list): the lab takes the latest of a mark's
+    dismiss and undismiss (fetch_takes.dismissed_now), so an undone "Not a mistake" never stays a label. A route of
+    its own rather than a flag on /dismiss: a checker without it answers 404 instead of storing a dismissal."""
+    return await label(request, 'undismiss')
+
+
+async def label(request, kind):
+    """<take>.<kind>-<time>.json next to the take: {take, id, at (when stored)}, `when` (the phone's time of the tap,
+    in ms, if it sent one: two labels sent close together can be stored out of order, or a retry after the other)
+    and, for an undismiss, "undo": true."""
     try:
         uid = await signed_in_tester(request.headers.get('authorization'))
         try:
             body = json.loads(await request.body())
         except ValueError:
             raise BadRequest('JSON body needed')
-        take, mid = body.get('take'), body.get('id')
+        if not isinstance(body, dict):
+            raise BadRequest('JSON object needed')
+        take, mid, when = body.get('take'), body.get('id'), body.get('when')
         if not isinstance(take, str) or not store.TAKE.match(take) or not isinstance(mid, str) \
                 or not MARK_ID.match(mid):
             raise BadRequest('take and id are needed')
-        name = f'{store.name_for(uid, take)}.dismiss-{store.new_take()}.json'
-        await asyncio.to_thread(put_json, name, {'take': take, 'id': mid, 'at': time.time()})
+        kept = {'take': take, 'id': mid, 'at': time.time()}
+        if isinstance(when, int) and not isinstance(when, bool) and 0 < when < 10 ** 14:
+            kept['when'] = when
+        if kind == 'undismiss':
+            kept['undo'] = True
+        await asyncio.to_thread(put_json, f'{store.name_for(uid, take)}.{kind}-{store.new_take()}.json', kept)
         return JSONResponse({'ok': True})
     except auth.Refused as e:
         return JSONResponse({'error': e.reason}, status_code=e.status)
     except BadRequest as e:
         return JSONResponse({'error': 'bad_request', 'detail': str(e)}, status_code=400)
     except Exception:
-        log.exception('dismiss failed')
+        log.exception('%s failed', kind)
         return JSONResponse({'error': 'server'}, status_code=500)
 
 
@@ -323,7 +348,7 @@ def control_of(c):
     """A text frame from the phone after the start, as the session takes it, or None to ignore it. A `seek` may
     carry `startBy` (protocol 6: the reciter is somewhere from w through that ayah, so the follower searches again);
     as a tuple, or the frame is dropped when it isn't [sura, ayah]. The session checks the range itself."""
-    if not isinstance(c, dict) or c.get('type') not in ('seek', 'dismiss', 'hint', 'end', 'stop'):
+    if not isinstance(c, dict) or c.get('type') not in ('seek', 'dismiss', 'undismiss', 'hint', 'end', 'stop'):
         return None
     if c['type'] == 'seek' and 'startBy' in c:
         sb = ayah_pair(c['startBy'])
