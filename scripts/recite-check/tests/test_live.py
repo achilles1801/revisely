@@ -577,6 +577,17 @@ class LookAlikes(unittest.TestCase):
         self.assertEqual(nfc(kws[0]['text']), nfc('يَـٰبَنِىَّ'))
         self.assertNotIn(nfc('يَـٰبَنِىٓ'), [nfc(a['text']) for a in kws[0]['alts']])
 
+    def test_a_glide_into_a_hamza_is_not_a_lookalike(self):
+        """«قَالُوٓا۟ أَءِنَّكَ» (12:90) joined sounds as «qālū waʾinnaka»: the long ū glides into the hamza. وَإِنَّكَ is
+        that glide and the rest of the word, so it isn't a look-alike there (Majd's mic-on take, Nov 15 2026); the
+        word's other look-alikes stay."""
+        import unicodedata
+        nfc = lambda t: unicodedata.normalize('NFC', t)  # noqa: E731
+        kws = engine().passage_words(31464, 31466)
+        alts = [nfc(a['text']) for a in kws[1]['alts']]
+        self.assertNotIn(nfc('وَإِنَّكَ'), alts)
+        self.assertIn(nfc('فَإِنَّكَ'), alts)
+
 
 DEV_TAKE = sorted(pathlib.Path(os.environ.get('RECITE_DEV_TAKES', pathlib.Path.home() / 'revisely-mistake-lab/data/dev-takes'))
                   .glob('*/20261115-015943-4cd655.wav'))
