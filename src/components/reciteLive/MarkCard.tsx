@@ -117,9 +117,9 @@ function MarkBlock({
       {mark.kind === 'tajweed' ? (
         <View style={styles.tajweed}>
           <View style={styles.rowBody}>
-            <Text style={[typeV2.body, { color: palette.text }]}>{tajweedLines(mark).main}</Text>
+            <Text style={[typeV2.body, { color: palette.text }]} maxFontSizeMultiplier={1.4}>{tajweedLines(mark).main}</Text>
             {tajweedLines(mark).sub ? (
-              <Text style={[typeV2.meta, { color: palette.secondary }]}>{tajweedLines(mark).sub}</Text>
+              <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>{tajweedLines(mark).sub}</Text>
             ) : null}
           </View>
           <Text style={[arabicV2(24), { color }]} maxFontSizeMultiplier={1.6}>
@@ -137,7 +137,7 @@ function MarkBlock({
             </Row>
           ) : null}
           {slip ? (
-            <Text style={[typeV2.meta, styles.slip, { color: palette.secondary }]} testID="mark-card-slip">
+            <Text style={[typeV2.meta, styles.slip, { color: palette.secondary }]} maxFontSizeMultiplier={1.4} testID="mark-card-slip">
               {slip}
             </Text>
           ) : null}

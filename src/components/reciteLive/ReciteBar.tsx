@@ -141,7 +141,9 @@ export function ReciteBar({
     >
       <EyeGroup hidden={hidden} onToggle={onToggleHidden} onNextWord={onNextWord} onWholeAyah={onWholeAyah} />
       {score ? <ScorePill text={score.text} level={score.level} /> : null}
-      <View style={styles.middle} accessibilityLiveRegion="polite" accessible accessibilityLabel={`${clock(seconds)}${recording && phase === 'live' ? ', recording' : ''}. ${spoken || status}`}>
+      {/* Not a live region: its clock changes every second, and TalkBack would speak each one over the recitation, where
+          the microphone hears it. VoiceOver reads it when focused; the summary is spoken once when it shows. */}
+      <View style={styles.middle} accessible accessibilityLabel={`${clock(seconds)}${recording && phase === 'live' ? ', recording' : ''}. ${spoken || status}`} testID="recite-middle">
         <View style={styles.time}>
           {recording && phase === 'live' ? <View style={[styles.dot, { backgroundColor: palette.red }]} testID="recite-recording" /> : null}
           <Text style={[styles.timeText, typeV2.numeral, { color: palette.secondary }]} maxFontSizeMultiplier={1.2} testID="recite-time">

@@ -770,3 +770,20 @@ describe('the Stop trace (Revisely Dev: a freeze after Stop leaves a trace for t
     expect(await trace()).toBeNull();
   });
 });
+
+describe('screen readers during a take', () => {
+  it('the bar is not a live region (its clock would be spoken every second over the recitation); only where the take started is said', async () => {
+    await startTake('check');
+    const announce = AccessibilityInfo.announceForAccessibility as jest.Mock;
+    const said = announce.mock.calls.map((c) => String(c[0]));
+    expect(said).toEqual([expect.stringMatching(/^Started at An.Naml, ayah 23$/)]);
+    expect(screen.getByTestId('recite-middle').props.accessibilityLiveRegion).toBeUndefined();
+    for (let i = 0; i < 3; i++) {
+      await act(async () => mockMic!.onAudio(new Int16Array(16000)));
+      await event({ type: 'at', w: A23 + i });
+    }
+    expect(screen.getByTestId('recite-time').props.children).toBe('0:03');
+    expect(announce.mock.calls).toHaveLength(1);
+    expect(AccessibilityInfo.announceForAccessibilityWithOptions).not.toHaveBeenCalled();
+  });
+});
