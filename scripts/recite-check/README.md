@@ -103,7 +103,9 @@ take (`<take>.dismiss-<time>.json`) as a label for the lab.
    on every socket. A session counts against the 40 an hour; resuming doesn't.
 2. The server answers `{"type":"ready","v":2,"engine":"…","server":"…","protocol":6,"take":"<take>","from":0}`.
    `GET /health` says the same `engine` (the checker's commit), `server` (this service's commit) and `protocol` (the
-   contract it speaks: 5 = follow, hint, tajweed, premium_required; 6 = start anywhere on the page).
+   contract it speaks: 5 = follow, hint, tajweed, premium_required; 6 = start anywhere on the page), and `words`:
+   whether the image has the word table for its checker. Never move traffic to a revision whose `words` is false (see
+   "The word table").
 3. The phone sends PCM (16-bit little-endian, mono, 16 kHz) as binary frames of any size, and as text frames
    `{"type":"seek","w":…}`, `{"type":"dismiss","id":"…"}`,
    `{"type":"hint","w":…,"what":"word"|"ayah"}` (the hidden view showed a word, or the rest of its ayah: those
@@ -254,3 +256,8 @@ gcloud run jobs execute recite-words --project revisely-dev --region us-east1 --
 About 15 minutes and 8,000 vCPU-seconds (under 5% of a month's free tier). It writes ten slices to
 `recite-cache/<key>/` in the dev bucket (no client can reach them); the next `stage.sh` merges them, and the next
 deploy carries the table.
+
+So a checker change that moves the words key takes two deploys, both with `--no-traffic`: one for the job's image, then
+one with the table. Move traffic only once the tag's `/health` says `"words": true`. Without the table, finding where
+a take starts (protocol 6) needs every word of the page at once: on rev 00043 (Nov 15 2026) the worst hops were
+27–38 s and the start was found 35 and 61 s after the first word.
