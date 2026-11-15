@@ -1,0 +1,174 @@
+// Revisely Console's shell: sign-in gate, the header, the tabs a role may see, and the routes. Signed out, every
+// address goes to /sign-in (which also says "No access" to an account without a role). The server refuses anything a
+// role doesn't allow (functions/src/console/roles.ts); this only hides it.
+import { boot, currentUser, onUserChange, signInUrl, signOutNow } from '/firebase.js';
+import { metricsShown, refreshMetrics, startMetrics } from '/console.js';
+import * as openDoor from '/opendoor.js';
+import * as auditLog from '/audit.js';
+
+const $ = (id) => document.getElementById(id);
+
+const VIEWS = {
+  overview: { path: '/', permission: 'metrics.read', section: 'view-overview', wide: false },
+  opendoor: { path: '/open-door', permission: 'openDoor.read', section: 'view-opendoor', wide: true },
+  audit: { path: '/audit', permission: 'audit.read', section: 'view-audit', wide: true },
+};
+
+let ctx = null;
+let current = null;
+const started = new Set();
+
+function allowed(view) {
+  if (view === 'opendoor') return ctx.me.openDoor;
+  return ctx.can(VIEWS[view].permission);
+}
+
+function viewOf(path) {
+  if (path === '/open-door' || path.startsWith('/open-door/')) return 'opendoor';
+  if (path === '/audit') return 'audit';
+  return 'overview';
+}
+
+function visibleViews() {
+  return Object.keys(VIEWS).filter(allowed);
+}
+
+/** Shows the view for this address (or the first the role allows). */
+function route() {
+  let view = viewOf(location.pathname);
+  if (!allowed(view)) {
+    view = visibleViews()[0];
+    history.replaceState(null, '', VIEWS[view].path);
+  }
+  if (current !== view) {
+    if (current === 'overview') metricsShown(false);
+    if (current === 'opendoor') openDoor.hidden();
+    for (const [name, v] of Object.entries(VIEWS)) $(v.section).hidden = name !== view;
+    for (const a of $('tabs').querySelectorAll('a')) {
+      if (a.dataset.view === view) a.setAttribute('aria-current', 'page');
+      else a.removeAttribute('aria-current');
+    }
+    document.querySelector('main').classList.toggle('wide', VIEWS[view].wide);
+    $('topIn').classList.toggle('wide', VIEWS[view].wide);
+    $('asof').hidden = view !== 'overview';
+    $('refreshBtn').hidden = view !== 'overview';
+    current = view;
+    document.title = { overview: 'Overview', opendoor: 'Open Door', audit: 'Audit log' }[view] + ' · Revisely Console';
+  }
+  if (view === 'overview') {
+    if (!started.has(view)) startMetrics(ctx);
+    metricsShown(true);
+  } else if (view === 'opendoor') {
+    if (!started.has(view)) openDoor.start(ctx);
+    openDoor.shown(location.pathname.startsWith('/open-door/') ? decodeURIComponent(location.pathname.slice('/open-door/'.length)) : null);
+  } else if (view === 'audit') {
+    if (!started.has(view)) auditLog.start(ctx);
+    auditLog.shown();
+  }
+  started.add(view);
+}
+
+/** Moves to an address inside the console without reloading. */
+export function go(path, replace = false) {
+  if (path === location.pathname) return route();
+  if (replace) history.replaceState(null, '', path);
+  else history.pushState(null, '', path);
+  route();
+}
+
+function fail(text) {
+  $('boot').hidden = false;
+  $('boot').textContent = text;
+}
+
+async function start() {
+  try {
+    ctx = await boot();
+  } catch (err) {
+    fail(err.message);
+    return;
+  }
+  const { user } = await currentUser(ctx);
+  if (!user) {
+    location.replace(signInUrl());
+    return;
+  }
+  let me;
+  try {
+    me = await ctx.call('adminConsole', { action: 'me' });
+  } catch (err) {
+    const code = String((err && err.code) || '').replace('functions/', '');
+    if (code === 'unauthenticated') {
+      location.replace(signInUrl());
+      return;
+    }
+    fail('The console didn’t answer (' + (code || 'no connection') + '). Reload in a minute.');
+    return;
+  }
+  // No role: the sign-in page says "No access" (with sign-out) and nothing here loads.
+  if (!me.role) {
+    location.replace(signInUrl());
+    return;
+  }
+  ctx.me = me;
+  ctx.can = (permission) => me.permissions.includes(permission);
+  ctx.go = go;
+
+  if (ctx.env.kind !== 'prod') {
+    $('env').hidden = false;
+    $('env').textContent = ctx.env.label;
+    $('env').dataset.kind = ctx.env.kind;
+  }
+  $('who').innerHTML = '';
+  const b = document.createElement('b');
+  b.textContent = me.email || 'Signed in';
+  $('who').append(b, document.createTextNode(' · ' + me.roleName));
+  $('signOutBtn').hidden = false;
+
+  const views = visibleViews();
+  for (const a of $('tabs').querySelectorAll('a')) {
+    const i = views.indexOf(a.dataset.view);
+    a.hidden = i === -1;
+    a.querySelector('.k').textContent = i === -1 ? '' : String(i + 1);
+  }
+  $('tabs').hidden = views.length < 2;
+  $('boot').hidden = true;
+  $('console').hidden = false;
+  route();
+
+  // Signed out in another tab, or the sign-in ended: back to the sign-in page.
+  onUserChange(ctx, (u) => {
+    if (!u) location.replace(signInUrl());
+  });
+}
+
+$('tabs').addEventListener('click', (e) => {
+  const a = e.target.closest('a[data-view]');
+  if (!a || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+  e.preventDefault();
+  go(VIEWS[a.dataset.view].path);
+});
+$('refreshBtn').addEventListener('click', () => refreshMetrics());
+$('signOutBtn').addEventListener('click', async () => {
+  await signOutNow(ctx).catch(() => {});
+  location.replace('/sign-in');
+});
+window.addEventListener('popstate', () => ctx && ctx.me && route());
+
+const typing = (el) => !!el && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName));
+document.addEventListener('keydown', (e) => {
+  if (!ctx || !ctx.me || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (!$('modal').hidden || !$('panel').hidden) return;
+  if (!typing(document.activeElement) && /^[1-9]$/.test(e.key)) {
+    const views = visibleViews();
+    const view = views[Number(e.key) - 1];
+    if (view) {
+      e.preventDefault();
+      go(VIEWS[view].path);
+    }
+    return;
+  }
+  if (current === 'opendoor') openDoor.key(e, typing(document.activeElement));
+});
+
+start();

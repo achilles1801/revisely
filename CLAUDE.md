@@ -525,18 +525,36 @@ Non-testers follow `production`, so nobody sees this on a phone before Promote; 
 `group` = the previous production update group (`eas update:list --branch production`), `rollback` =
 true → approve. It republishes that exact update, the same way promotion does.
 
-## Metrics console (the owner's private page)
+## Revisely Console (staff only: metrics, Open Door, audit log)
 
-https://metrics.revisely.app (a Hosting custom domain; also https://revision-buddy-3a398.web.app) (Firebase
-Hosting, `admin/`): Revo per account with its conversations,
-spend against the caps, app health, downloads and functions, read live. Only an account with the custom claim
-`admin: true` gets anything (`functions/scripts/set-admin.js <uid>`); the claim opens nothing else, since no
-rule reads it. Functions `adminMetrics`, `adminRevo` (conversations locked until `config/admin.conversations`)
-and `metricsTotals` (the hourly `metrics.yml` sends Sentry and App Store totals with its GitHub OIDC token, and
-posts new alarms on the "Metrics alerts" issue). Sign-in in an app's built-in browser works only on
-metrics.revisely.app: there the page is its own auth domain (`OWN_AUTH_DOMAIN_HOSTS` in `admin/console.js`); a
-host joins that list only once its `/__/auth/handler` is a redirect URI of the Web OAuth client and it is an
-authorized domain. Everything else: `scripts/metrics/README.md`.
+`admin/` on Firebase Hosting (Majd, Nov 14 2026: "a revisely dev dashboard like a real company"). Production:
+https://metrics.revisely.app (also https://revision-buddy-3a398.web.app), still the old page until the console is
+deployed there on Majd's word. Dev: https://revisely-dev.web.app (deployed by hand, `firebase deploy --only hosting
+--project revisely-dev`; nothing deploys Hosting by itself).
+- **Pages:** `/sign-in` (its own page: Google, or email and password; no sign-up; an account without a role sees "No
+  access" with Sign out, and nothing else), `/` Overview (the metrics), `/open-door` and `/open-door/<uid>`, `/audit`.
+  Signed out, every address goes to `/sign-in?next=…` (`shell.js`). Hosting's `cleanUrls` and rewrites serve them.
+- **Roles** (`functions/src/console/roles.ts`, the one permission list): `owner` (everything, roles too), `admin`
+  (everything but roles), `reviewer` (Open Door read and decide; no revoke, metrics, Revo conversations or audit),
+  `dev` (metrics only). A custom claim `role`, given with `cd functions && GOOGLE_APPLICATION_CREDENTIALS=… node
+  scripts/set-role.js <email|uid> <role|none>` (`--list`, `--show`, `--roles`; refuses to remove the last owner), each
+  change recorded in `consoleAudit` (closed). Who has a role is never in the repository. The old `admin: true` claim
+  counts as owner until set-role replaces it (`set-admin.js` now only takes it away). The callables read claims live
+  from Auth (`staffClaims` in index.ts), so a role taken away stops at the next call. Rules open nothing to any role.
+- **Functions:** `adminMetrics` (metrics.read), `adminRevo` (revo.conversations; conversations locked until
+  `config/admin.conversations`), `adminConsole` (`me`, Open Door `od.*`, `audit.*`; App Check on every action but
+  `me`; Open Door only where `SUPPORT_PAGES` has the project), `metricsTotals` (the hourly `metrics.yml` with its
+  GitHub OIDC token; alarms on the "Metrics alerts" issue).
+- **App Check on the page:** reCAPTCHA Enterprise, a key per project in `APP_CHECK_KEYS` (`admin/firebase.js`; site
+  keys are public). Production has none yet: add one before the console's Open Door or audit runs there.
+- **Sign-in in Safari and built-in browsers** works only where the page is its own auth domain
+  (`OWN_AUTH_DOMAIN_HOSTS` in `admin/firebase.js`: metrics.revisely.app, revisely-dev.web.app); a host joins only once
+  its `/__/auth/handler` is a redirect URI of the project's Web OAuth client and an authorized domain. Phones sign in
+  with a full-page redirect there.
+- **Testing locally:** the console runs against the emulators from any static server that serves `admin/` with the
+  rewrites and an `init.json` carrying `emulators` (`{auth, functionsHost, functionsPort}`; only a localhost page
+  reads it). `functions/src/__tests__/review.emulator.test.ts` runs in CI against the Auth and Firestore emulators.
+- Everything else about the metrics: `scripts/metrics/README.md`.
 
 ## Offline (src/lib/offline)
 
@@ -1401,9 +1419,15 @@ side-session notes `apply-support.md`.
   Premium, account, Download, Donate or store links (App Store 3.1.1, Play's payments policy).
 - **Back end** (`functions/src/support`): `entitlements/{uid}` (`premium`, read by the app and the checker; `grants` per
   source), `supportApplication`, `devGrantPremium` / `devRevokePremium`. Each refuses in a project with no program page
-  (`SUPPORT_PAGES`), so nothing is collected in production. Majd decides with
-  `functions/scripts/support-applications.js` (a decision deletes the answers). No Claude session reads a real
-  application.
+  (`SUPPORT_PAGES`), so nothing is collected in production.
+- **Deciding:** Revisely Console's Open Door (above), or `functions/scripts/support-applications.js`; both go through
+  `functions/src/support/review.ts`. Approve grants `grants.support` (no end date unless one is given) and deletes the
+  answers; decline waits 30 days; revoke takes the grant back and the application becomes `revoked`, also with the
+  30-day wait (the page shows it as declined). Each decision is one transaction with its audit entry
+  (`supportDecisions/<request id>`: who, when, the internal note; never answers; closed; deleted with the account),
+  idempotent by the page's request id. The console waits 5 seconds before sending a decision (Undo). A notifier
+  ("you've been approved") would hang off new `supportDecisions` documents; no email provider is chosen.
+  No Claude session reads a real application.
 
 ## Worker (revisely.app/api)
 

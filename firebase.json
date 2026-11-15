@@ -39,6 +39,21 @@
     "ignore": [
       "**/.*"
     ],
+    "cleanUrls": true,
+    "rewrites": [
+      {
+        "source": "/open-door",
+        "destination": "/index.html"
+      },
+      {
+        "source": "/open-door/**",
+        "destination": "/index.html"
+      },
+      {
+        "source": "/audit",
+        "destination": "/index.html"
+      }
+    ],
     "headers": [
       {
         "source": "**",
