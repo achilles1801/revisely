@@ -89,6 +89,31 @@ export async function checkRecitation(
   return parsed;
 }
 
+/**
+ * "Not a mistake", or taking it back, once a take has its final answer (the connection has gone): `POST /dismiss` or
+ * `POST /undismiss` with the take and the mark's id, kept next to the take as a label for the lab (kept takes only).
+ * A checker without `/undismiss` answers 404, and nothing wrong is stored. Best effort: a failure isn't shown.
+ */
+export async function sendLabel(
+  what: 'dismiss' | 'undismiss',
+  take: string,
+  id: string,
+  deps: CheckDeps = defaults,
+): Promise<boolean> {
+  try {
+    const token = await deps.token();
+    if (!token) return false;
+    const res = await deps.fetch(`${RECITE_CHECK_URL}/${what}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ take, id }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 /** Wake the service while the user gets ready (it sleeps when unused; waking takes a few seconds). */
 export function warmUpReciteCheck(deps: Pick<CheckDeps, 'fetch'> = defaults): void {
   deps.fetch(`${RECITE_CHECK_URL}/health`).catch(() => undefined);

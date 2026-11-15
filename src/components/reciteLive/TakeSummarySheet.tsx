@@ -49,6 +49,9 @@ export function passageOf(words: QuranWords, from: number, to: number): string {
   return describeAyahs(keys);
 }
 
+/** "1 marked not a mistake": the Removed list's line. */
+export const removedLine = (n: number) => `${n} marked not a mistake`;
+
 /** "1 wrong word, 1 harakat slip, 1 tajweed note, 2 not clear". */
 export function findingsLine(marks: Mark[]): string {
   const n = (kinds: Mark['kind'][]) => marks.filter((m) => kinds.includes(m.kind) && !isUnclear(m)).length;
@@ -83,6 +86,8 @@ export function TakeSummarySheet({
   marks,
   score,
   kept,
+  removed = [],
+  onPutBack,
   checkOwned,
   onFinding,
   onCheck,
@@ -101,6 +106,9 @@ export function TakeSummarySheet({
   marks: Mark[];
   score: { text: string; level: ScoreLevel } | null;
   kept: boolean;
+  /** Marks taken off with "Not a mistake" during or after the take: listed under Removed, each with Put back. */
+  removed?: Mark[];
+  onPutBack?: (id: string) => void;
   checkOwned: boolean;
   onFinding: (mark: Mark) => void;
   onCheck: () => void;
@@ -115,6 +123,8 @@ export function TakeSummarySheet({
 }) {
   const { palette } = useTheme();
   const stacked = useWindowDimensions().fontScale >= STACK_FINDINGS_AT;
+  // Removed (Majd, Nov 15 2026; Tarteel keeps one too): closed until tapped, so the findings stay first.
+  const [removedOpen, setRemovedOpen] = React.useState(false);
   const passage = words && from != null && to != null && to >= from ? passageOf(words, from, to) : '';
   const manySurahs = words != null && from != null && to != null && to >= from && words.ref(from).sura !== words.ref(to).sura;
   // "Not clear" marks never count (Majd, Nov 15 2026), so they come last.
@@ -209,6 +219,49 @@ export function TakeSummarySheet({
             );
           })
         : null}
+      {check && removed.length && onPutBack ? (
+        <View testID="take-summary-removed">
+          <Tap
+            onPress={() => setRemovedOpen((o) => !o)}
+            style={[styles.row, styles.removedHead, { borderTopColor: palette.separator }]}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: removedOpen }}
+            accessibilityLabel={`${removedLine(removed.length)}. ${removedOpen ? 'Hide' : 'Show'} them`}
+            testID="take-summary-removed-toggle"
+          >
+            <Text style={[typeV2.meta, styles.rowText, { color: palette.secondary }]} maxFontSizeMultiplier={CHROME_MAX}>
+              {removedLine(removed.length)}
+            </Text>
+            <Ionicons name={removedOpen ? 'chevron-up' : 'chevron-down'} size={16} color={palette.secondary} />
+          </Tap>
+          {removedOpen
+            ? removed.map((m) => (
+                <View key={m.id} style={[styles.row, styles.removedRow, { borderTopColor: palette.separator }]} testID={`take-summary-removed-${m.kind}`}>
+                  <View style={styles.rowText}>
+                    <View style={styles.titleRow}>
+                      <View style={[styles.swatch, { backgroundColor: markFill(palette, m) }]} />
+                      <Text style={[typeV2.name, styles.title, { color: palette.secondary }]} maxFontSizeMultiplier={CHROME_MAX}>
+                        {`${markTitle(m)} · ${findingPlace(m, manySurahs)}`}
+                      </Text>
+                    </View>
+                  </View>
+                  <Tap
+                    onPress={() => onPutBack(m.id)}
+                    hitSlop={6}
+                    style={[styles.putBack, { borderColor: palette.outline }]}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Put back: ${markTitle(m)}, ${spokenText(findingPlace(m, manySurahs))}`}
+                    testID="take-summary-put-back"
+                  >
+                    <Text style={[styles.putBackText, { color: palette.text }]} maxFontSizeMultiplier={CHROME_MAX}>
+                      Put back
+                    </Text>
+                  </Tap>
+                </View>
+              ))
+            : null}
+        </View>
+      ) : null}
       {!check && !checkOwned ? (
         <Tap
           onPress={onCheck}
@@ -271,6 +324,10 @@ const styles = StyleSheet.create({
   /** A flat swatch of the mark's colour, beside its name (never a round mark). */
   swatch: { width: 12, height: 12, borderRadius: 3 },
   arWrap: { borderRadius: 7, paddingHorizontal: 6 },
+  removedHead: { paddingVertical: 10 },
+  removedRow: { paddingVertical: 8 },
+  putBack: { height: 32, paddingHorizontal: 13, borderRadius: 16, borderWidth: 1, justifyContent: 'center' },
+  putBackText: { fontSize: 14, fontWeight: '600' },
   arStacked: { alignSelf: 'flex-end', marginTop: 4 },
   buttons: { paddingHorizontal: layoutV2.gutter, paddingTop: 16, gap: 10 },
   kept: { textAlign: 'center', paddingHorizontal: layoutV2.gutter, paddingTop: 10, paddingBottom: 6 },

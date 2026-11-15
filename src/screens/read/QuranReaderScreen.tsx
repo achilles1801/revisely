@@ -43,7 +43,7 @@ import { reciteLiveEnabled } from '../../lib/reciteLive/availability';
 import { premiumErrorText, setDevPremium, supportLinkUrl, usePremium } from '../../lib/premium';
 import { setReciteCheckSettings, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
 import { loadQuranWords, getQuranWords, QuranWords } from '../../lib/recite/quranWords';
-import { furthestWord, marksOnPage, startNotFound } from '../../lib/reciteLive/state';
+import { furthestWord, marksOnPage, removedMarks, startNotFound } from '../../lib/reciteLive/state';
 import { stopTrace } from '../../lib/reciteLive/stopTrace';
 import {
   barWords,
@@ -315,6 +315,11 @@ export default function QuranReaderScreen() {
   }, [cardAt]);
   useEffect(() => () => stopHearing(), []);
   const [similarFor, setSimilarFor] = useState<number | null>(null);
+  // "Not a mistake" on the card can be undone for a few seconds (Majd, Nov 15 2026); the summary's Removed list after.
+  const [undoFor, setUndoFor] = useState<string | null>(null);
+  useEffect(() => {
+    if (live.state.status === 'connecting' || live.state.status === 'idle') setUndoFor(null);
+  }, [live.state.status]);
   const [summaryFor, setSummaryFor] = useState<string | null>(null);
   const [introOpen, setIntroOpen] = useState(false);
   // Wake the checker while the reader opens (Cloud Run sleeps; waking takes a few seconds).
@@ -686,6 +691,22 @@ export default function QuranReaderScreen() {
         bottomInset={insets.bottom - spacing.sm}
       />
 
+      {liveOn ? (
+        <UndoToast
+          visible={undoFor != null}
+          message="Marked not a mistake"
+          duration={5000}
+          onUndo={() => {
+            const id = undoFor;
+            setUndoFor(null);
+            if (id) live.restore(id);
+          }}
+          onDismiss={() => setUndoFor(null)}
+          // Above the recite bar.
+          bottomInset={insets.bottom + spacing.sm + CAPSULE_HEIGHT + spacing.sm}
+        />
+      ) : null}
+
       <HelpToast screen="reader" bottomInset={insets.bottom - spacing.sm} />
       {verseActions.overlay}
       {liveOn ? (
@@ -710,7 +731,10 @@ export default function QuranReaderScreen() {
               marks={cardMarks}
               words={qw}
               anchor={cardAt?.anchor ?? null}
-              onDismiss={live.dismiss}
+              onDismiss={(id) => {
+                live.dismiss(id);
+                setUndoFor(id);
+              }}
               // The reciter's ayah on the card's own player (lib/reciteLive/hearAudio): a take still listening pauses first,
               // so it isn't ended and its microphone doesn't hear the reciter (Majd, Nov 15 2026).
               onHear={async (m) => {
@@ -759,6 +783,11 @@ export default function QuranReaderScreen() {
             marks={Object.values(live.state.marks).sort((a, b) => a.w - b.w)}
             score={checkTake && qw ? scorePill(live.state, qw, live.startWord) : null}
             kept={live.testData}
+            removed={removedMarks(live.state)}
+            onPutBack={(id) => {
+              if (undoFor === id) setUndoFor(null);
+              live.restore(id);
+            }}
             checkOwned={owned}
             onFinding={(m) => {
               setSummaryShown(null);

@@ -140,7 +140,11 @@ const mockLive: {
   audio: 0,
   clips: [],
 };
-jest.mock('../../../lib/reciteCheck/service', () => ({ ...jest.requireActual('../../../lib/reciteCheck/service'), warmUpReciteCheck: jest.fn() }));
+jest.mock('../../../lib/reciteCheck/service', () => ({
+  ...jest.requireActual('../../../lib/reciteCheck/service'),
+  warmUpReciteCheck: jest.fn(),
+  sendLabel: jest.fn(async () => true),
+}));
 jest.mock('../../../lib/reciteLive/socket', () => ({
   socketFeed: () => (start: Record<string, unknown>, handlers: { onEvent: (e: LiveEvent) => void; onClose: () => void }) => {
     mockLive.start = start;
@@ -699,6 +703,64 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
     fireEvent.press(screen.getAllByTestId('mark-card-dismiss')[0]);
     expect(mockLive.sent).toContainEqual({ type: 'dismiss', id: 'a' });
     expect(screen.queryByTestId('live-mark-word')).toBeNull();
+  });
+
+  describe('“Not a mistake” can be undone (Majd, Nov 15 2026)', () => {
+    const sendLabel = () => jest.requireMock('../../../lib/reciteCheck/service').sendLabel as jest.Mock;
+    const wrongMark = { id: 'a', w: UTIYAT, ayah: [27, 23], kind: 'word', sure: 'clear', heard: 'وَأُوهِيَتْ', heardExact: false };
+
+    it('during the take: Undo on the toast puts it back, and the checker is told both (dismiss, then undismiss)', async () => {
+      await startTake('check');
+      await event({ type: 'mark', mark: wrongMark as never });
+      await tapWord(UTIYAT);
+      fireEvent.press(screen.getByTestId('mark-card-dismiss'));
+      expect(screen.queryByTestId('live-mark-word')).toBeNull();
+      expect(screen.getByText('Marked not a mistake')).toBeTruthy();
+      fireEvent.press(screen.getByTestId('undo-toast-action'));
+      expect(screen.getByTestId('live-mark-word')).toBeTruthy();
+      expect(mockLive.sent).toEqual(expect.arrayContaining([{ type: 'dismiss', id: 'a' }, { type: 'undismiss', id: 'a' }]));
+      const types = (mockLive.sent as { type: string }[]).map((f) => f.type);
+      expect(types.indexOf('dismiss')).toBeLessThan(types.indexOf('undismiss'));
+      expect(sendLabel()).not.toHaveBeenCalled();
+    });
+
+    it('after the final answer: the label goes over HTTP (the connection has gone), Undo too', async () => {
+      await startTake('check');
+      fireEvent.press(screen.getByTestId('recite-stop'));
+      await event({
+        type: 'done',
+        result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [wrongMark], score: { reached: 11, mistakes: 1, tajweed: 0, accuracy: 0.9 } } as never,
+      });
+      // From the summary to the word's card: Not a mistake there.
+      fireEvent.press(screen.getByTestId('take-summary-finding-word'));
+      await flush();
+      fireEvent.press(screen.getByTestId('mark-card-dismiss'));
+      expect(sendLabel()).toHaveBeenCalledWith('dismiss', 't1', 'a');
+      expect(mockLive.sent).not.toContainEqual({ type: 'dismiss', id: 'a' });
+      fireEvent.press(screen.getByTestId('undo-toast-action'));
+      expect(sendLabel()).toHaveBeenLastCalledWith('undismiss', 't1', 'a');
+    });
+
+    it('taken off during the take: the summary lists it under “1 marked not a mistake”, with Put back', async () => {
+      await startTake('check');
+      await event({ type: 'mark', mark: wrongMark as never });
+      await tapWord(UTIYAT);
+      fireEvent.press(screen.getByTestId('mark-card-dismiss'));
+      fireEvent.press(screen.getByTestId('recite-stop'));
+      await event({
+        type: 'done',
+        result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [wrongMark], score: { reached: 11, mistakes: 0, tajweed: 0, accuracy: 1 } } as never,
+      });
+      expect(screen.queryByTestId('take-summary-finding-word')).toBeNull();
+      expect(screen.getByText('1 marked not a mistake')).toBeTruthy();
+      fireEvent.press(screen.getByTestId('take-summary-removed-toggle'));
+      fireEvent.press(screen.getByTestId('take-summary-put-back'));
+      // Back among the findings, counted again, and the checker takes the label back.
+      expect(screen.getByTestId('take-summary-finding-word')).toBeTruthy();
+      expect(screen.queryByTestId('take-summary-removed')).toBeNull();
+      expect(screen.getByLabelText(/Score .*, 1 mistake$/)).toBeTruthy();
+      expect(sendLabel()).toHaveBeenLastCalledWith('undismiss', 't1', 'a');
+    });
   });
 
   it('a “not clear” haraka’s card: Not clear, say it more clearly; what was expected, not a guess at what was heard', async () => {

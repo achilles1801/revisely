@@ -249,6 +249,12 @@ until its part is set up.
     for is a firmer shade of its own (`…Firm`), no outline. No red ink, dotted lines or + discs. The bar, the card and
     the summary use the same highlights, and a small flat swatch beside the kind's name (never a round mark): the kind
     is always in words.
+  - **"Not a mistake" can be undone** (Majd, Nov 15 2026; Tarteel's Removed list): for 5 s an Undo toast above the bar,
+    and after the take the summary's "1 marked not a mistake" (closed until tapped) lists each with Put back
+    (`restoreMark`: the mark and what it counted come back). The checker is told both ways, so the lab never keeps a
+    wrong label: on the connection while live (`dismiss`, `undismiss`), and after the final answer over HTTP (`POST
+    /dismiss`, `/undismiss`, `sendLabel` in `lib/reciteCheck/service`, kept takes only). Before, a Not a mistake tapped
+    after Stop never reached the checker: the connection drops every frame once it has the final answer.
   - **Your recitation** on the mark card: the reciter's own voice at the mark, from the take's audio that the connection
     holds on the phone for resuming (`audioClip`), from the mark's `t` (0.6 s before to 0.4 s after). A mark without
     one (a skipped word) uses when the cursor first reached that word or the one before, ±1.2 s. It works until the take

@@ -13,6 +13,7 @@ import { AudioSource, startMicStream } from '../../lib/recite/micSource';
 import { SAMPLE_RATE } from '../../lib/recite/segmenter';
 import { getQuranWords, loadQuranWords, QuranWords } from '../../lib/recite/quranWords';
 import type { ReciteCheckSettings } from '../../lib/reciteCheck/settings';
+import { sendLabel } from '../../lib/reciteCheck/service';
 import type { LiveEvent, Mark } from '../../lib/reciteLive/contract';
 import type { LiveConnect, LiveConnection, StartFrame } from '../../lib/reciteLive/feed';
 import { socketFeed } from '../../lib/reciteLive/socket';
@@ -24,6 +25,7 @@ import {
   applyEvent,
   checkerLooks,
   dismissMark,
+  restoreMark,
   LIVE_IDLE,
   liveConnecting,
   LiveState,
@@ -457,11 +459,40 @@ export function useLiveRecitation({
     return pcm && pcm.length > 0 ? pcm : null;
   }, []);
 
-  /** "Not a mistake": off the page at once, and told to the checker (a label for the lab). */
-  const dismiss = useCallback((id: string) => {
-    conn.current?.send({ type: 'dismiss', id });
-    setState((s) => dismissMark(s, id));
+  /**
+   * A label for the checker ("Not a mistake", or taking it back): on the take's connection while it's live; after its
+   * final answer the connection has gone, so over HTTP, and only for a kept take (only those are stored). Before, a
+   * "Not a mistake" tapped after Stop, on the card or the summary, never reached the checker.
+   */
+  const testDataRef = useRef(testData);
+  testDataRef.current = testData;
+  const label = useCallback((what: 'dismiss' | 'undismiss', id: string) => {
+    const s = traceRef.current.state;
+    if (s.status === 'done') {
+      if (s.take && testDataRef.current) void sendLabel(what, s.take, id);
+      return;
+    }
+    conn.current?.send({ type: what, id });
   }, []);
+
+  /** "Not a mistake": off the page at once, and told to the checker (a label for the lab). It can be put back. */
+  const dismiss = useCallback(
+    (id: string) => {
+      label('dismiss', id);
+      setState((s) => dismissMark(s, id));
+    },
+    [label],
+  );
+
+  /** Put back (Undo, or the summary's Removed list): the mark returns, and the checker takes the label back. */
+  const restore = useCallback(
+    (id: string) => {
+      if (!traceRef.current.state.removed[id]) return;
+      label('undismiss', id);
+      setState((s) => restoreMark(s, id));
+    },
+    [label],
+  );
 
   /** A word or an ayah shown by hand (hidden view), told to the checker as information. */
   const hint = useCallback((w: number, what: 'word' | 'ayah') => {
@@ -580,6 +611,7 @@ export function useLiveRecitation({
     cancel,
     clear,
     dismiss,
+    restore,
     hint,
   };
 }
