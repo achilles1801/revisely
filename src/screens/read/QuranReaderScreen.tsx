@@ -455,7 +455,7 @@ export default function QuranReaderScreen() {
               words={qw}
               cursor={live.state.status === 'listening' ? live.state.cursor : null}
               selected={cardMarks[0] ?? null}
-              colors={{ word: v2.followWord, selectedMistake: v2.redSubtle, selectedSlip: v2.warnSubtle }}
+              colors={{ band: v2.followBand, word: v2.followWord, selectedMistake: v2.redSubtle, selectedSlip: v2.warnSubtle }}
             />
           )
         : undefined,
@@ -473,12 +473,11 @@ export default function QuranReaderScreen() {
               marks={pageMarks(page)}
               hidden={hidden ? { follow: hiddenFollow(qw, revealed, liveInfo), ...coverColors } : null}
               newest={live.state.cursor}
-              current={live.state.status === 'listening' ? live.state.cursor : null}
               colors={{ mistake: v2.red, slip: v2.warn, follow: v2.followInk, onMistake: v2.bg, ground: palette.pageBg }}
             />
           )
         : undefined,
-    [liveOn, qw, live.active, live.state.cursor, live.state.status, hidden, revealed, liveInfo, coverColors, pageMarks, v2],
+    [liveOn, qw, live.active, live.state.cursor, hidden, revealed, liveInfo, coverColors, pageMarks, v2],
   );
   // The marks as elements of their own (VoiceOver, the tests). Given whenever the live UI is on, so the pager's pages
   // keep one shape through takes.

@@ -10,7 +10,7 @@ import type { WordFollow } from '../../lib/recite/hiddenPage';
 import type { Mark } from '../../lib/reciteLive/contract';
 import { severityOf } from '../../lib/reciteLive/contract';
 import { markTitle } from '../../lib/reciteLive/describe';
-import { cursorBox, grow, markShape, wordBox } from '../../lib/reciteLive/geometry';
+import { currentLineBand, cursorBox, grow, markShape, wordBox } from '../../lib/reciteLive/geometry';
 import { markStrength } from '../../lib/reciteLive/state';
 import { mixColors } from '../../theme/v2';
 
@@ -21,9 +21,9 @@ function rectStyle(r: Rect, scale: number) {
 }
 
 /**
- * Behind the page's ink, in its frame: the word being recited (a box) and the mark a card is open for. No band over the
- * whole ayah: it covered words not yet said and read as running ahead (Majd's Dev take, Nov 15 2026). The cursor is the
- * word, as Tarteel's is.
+ * Behind the page's ink, in its frame, in quiet greys: the line being recited (its part of the ayah) and the word being
+ * recited (a firmer box), and the mark a card is open for. Not a band over the whole ayah: in blue, over lines not yet
+ * said, it read as running ahead (Majd's Dev take, Nov 15 2026). Calm and exact, as Tarteel's grey line and box are.
  */
 export function LiveUnderlay({
   page,
@@ -38,11 +38,15 @@ export function LiveUnderlay({
   words: QuranWords;
   cursor: number | null;
   selected: Mark | null;
-  colors: { word: string; selectedMistake: string; selectedSlip: string };
+  colors: { band: string; word: string; selectedMistake: string; selectedSlip: string };
 }) {
   const here = cursor != null && words.pageOf(cursor) === page;
+  const line = here ? currentLineBand(words, page, cursor) : null;
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill} testID={`live-underlay-${page}`}>
+      {line ? (
+        <View testID="live-line-band" style={[styles.abs, styles.band, rectStyle(line, scale), { backgroundColor: colors.band }]} />
+      ) : null}
       {here ? (
         <View testID="live-word-box" style={[styles.abs, styles.box, rectStyle(cursorBox(words, cursor), scale), { backgroundColor: colors.word }]} />
       ) : null}
@@ -127,7 +131,6 @@ export function LiveOverlay({
   marks,
   hidden,
   newest,
-  current = null,
   colors,
 }: {
   page: number;
@@ -137,13 +140,10 @@ export function LiveOverlay({
   marks: Mark[];
   hidden: { follow: WordFollow; cover: string; guide: string; band: string } | null;
   newest: number | null;
-  /** The word being said while the page shows (the take listening): its own ink in the follow colour. */
-  current?: number | null;
   /** `ground`: the page's colour (a likely mark is its colour a little towards it). */
   colors: { mistake: string; slip: string; follow: string; onMistake: string; ground: string };
 }) {
   const showNewest = hidden && newest != null && words.pageOf(newest) === page && hidden.follow.shown(newest);
-  const showCurrent = !hidden && current != null && words.pageOf(current) === page;
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill} testID={`live-overlay-${page}`}>
       {hidden ? (
@@ -156,9 +156,6 @@ export function LiveOverlay({
         />
       ) : null}
       {image && showNewest ? <Recoloured image={image} box={wordBox(words, newest)} scale={scale} color={colors.follow} opacity={1} /> : null}
-      {image && showCurrent ? (
-        <Recoloured image={image} box={wordBox(words, current)} scale={scale} color={colors.follow} opacity={1} testID="live-ink-current" />
-      ) : null}
       {marks.map((m) => {
         if (words.pageOf(m.w) !== page) return null;
         const shape = markShape(words, m);

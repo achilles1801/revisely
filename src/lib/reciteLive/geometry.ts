@@ -30,6 +30,15 @@ export function ayahBand(page: number, sura: number, ayah: number): Rect[] {
   return ayahRects(page, sura, ayah).map((r) => grow(r, 6, 6));
 }
 
+/** The ayah's band on the line of word `w` only (null off its page): where the reciter is, never the lines to come. */
+export function currentLineBand(words: QuranWords, page: number, w: number): Rect | null {
+  if (words.pageOf(w) !== page) return null;
+  const r = words.ref(w);
+  const box = wordBox(words, w);
+  const mid = (box.y0 + box.y1) / 2;
+  return ayahBand(page, r.sura, r.ayah).find((b) => b.y0 <= mid && b.y1 >= mid) ?? null;
+}
+
 /** Where a mark is drawn. */
 export type MarkShape =
   | { mark: Mark; type: 'word'; box: Rect }
