@@ -551,9 +551,11 @@ class LiveTests(Base):
         """uvicorn refuses a send after the phone closed ("Unexpected ASGI message 'websocket.send'"): the socket
         ends as a drop (what came is kept), not as a server failure."""
         real = server.WebSocket.send_text
+        refused = threading.Event()
 
         async def send_text(ws_, data):
             if '"type": "at"' in data:
+                refused.set()
                 raise RuntimeError("Unexpected ASGI message 'websocket.send', after sending 'websocket.close'")
             return await real(ws_, data)
         with mock.patch.object(server.WebSocket, 'send_text', send_text), \
@@ -562,6 +564,9 @@ class LiveTests(Base):
                 ws.send_text(start(keep=True))
                 ws.receive_json()
                 ws.send_bytes(second_of_audio() * 3)
+                # leave only once the server has checked the audio and tried to answer: closing first could end the
+                # handler before the audio was read, with nothing to keep (Cloud Build, Nov 15 2026: 1 in ~40 runs)
+                self.assertTrue(refused.wait(10))
             for _ in range(100):
                 if any('.part-' in n for n in self.stored):
                     break
