@@ -1289,6 +1289,17 @@ How it works:
   - The session is saved in the index, so an upload carries on after the app closes.
   - The network is checked before every chunk.
   - The chunk in flight is cancelled on leaving Wi-Fi, sign-out or account deletion.
+- **"Recording saved · Undo · View"** (Majd, Nov 15 2026: "there should be an undo button for it not just view";
+  `components/recordings/RecordingSavedToast`, in the reader, a session and after a Recite take):
+  - **The hold:** a recording uploads nothing while the recorder runs, nor while its note offers Undo
+    (`holdUpload` in `lib/recordings`). Each segment is held as `appendSegment` writes it, so no run sees it unheld.
+    Stopping gives it `UPLOAD_HOLD_MS` (20 s). The note going, or View, releases it; so does leaving a session kept
+    open. The hold lives in memory only, so a restart lets everything upload.
+  - **Undo** is `undoRecording`. If that go at the recorder began the recording (a take always does), Undo deletes
+    the whole recording as a delete does, tombstone rules included. If it carried on a day's session recording, only
+    that go's segments and their page marks go, and the earlier recording stays. Those segments never uploaded; a
+    segment that did is refused ("Couldn't undo"), since a segment can't leave the backup on its own.
+  - With VoiceOver or TalkBack the note stays 15 s and is said aloud (never while the microphone is on).
 - **Listing:** the backup is listed on an account's first run, then at most every 15 minutes.
 - **Account deletion:** `deleteUserAccount` deletes the Storage prefix first.
 - **Known limits:**

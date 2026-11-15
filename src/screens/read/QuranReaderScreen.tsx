@@ -6,6 +6,8 @@ import { MushafPager, MushafPagerHandle } from '../../components/MushafPager';
 import { MushafScrubber } from '../../components/MushafScrubber';
 import { useVerseActions } from '../../components/verse/useVerseActions';
 import { navigateToActivityDay } from '../../navigation/navigationRef';
+import { RecordingSavedToast, SavedRecording } from '../../components/recordings/RecordingSavedToast';
+import { releaseUpload } from '../../lib/recordings';
 import { UndoToast } from '../../components/revision/UndoToast';
 import { HELP_ICON, HelpButton } from '../../components/help/HelpButton';
 import { HelpToast } from '../../components/help/HelpToast';
@@ -128,10 +130,8 @@ export default function QuranReaderScreen() {
   // Record yourself reading; saved under today's (revision day's) reading.
   const { user } = useApp();
   const { day: today } = useRevisionDay(user);
-  // After ending a recording: "Recording saved · View" (opens it in Activity).
-  const [savedRecording, setSavedRecording] = useState<{ day: string; recordingId: string } | null>(
-    null,
-  );
+  // After ending a recording: "Recording saved · Undo · View" (View opens it in Activity).
+  const [savedRecording, setSavedRecording] = useState<SavedRecording | null>(null);
   // A sitting (REC-1): ending the timer ends a recording running with it, and one note says what
   // was saved ("Saved to today: Al-Mulk, ayahs 1–26, 41 min · View").
   const sittings = sittingsEnabled(user);
@@ -144,6 +144,8 @@ export default function QuranReaderScreen() {
     // Ended with the timer, the recording is told about in the sitting's note, not its own.
     onFinished: (info) => {
       if (!endingSitting.current) setSavedRecording(info);
+      // Its note is the sitting's, with no Undo: it uploads now.
+      else releaseUpload(info.recordingId);
     },
   });
   const recordingOn = recorder.phase === 'recording' || recorder.phase === 'paused';
@@ -683,17 +685,10 @@ export default function QuranReaderScreen() {
         />
       </ReaderFrame>
 
-      <UndoToast
-        visible={!!savedRecording}
-        message="Recording saved"
-        actionLabel="View"
-        duration={6000}
-        onUndo={() => {
-          const saved = savedRecording;
-          setSavedRecording(null);
-          if (saved) navigateToActivityDay(saved.day, saved.recordingId);
-        }}
-        onDismiss={() => setSavedRecording(null)}
+      <RecordingSavedToast
+        saved={savedRecording}
+        onClose={() => setSavedRecording(null)}
+        quiet={live.mic === 'on'}
         // At the bottom of the room under the page, never over the text.
         bottomInset={insets.bottom - spacing.sm}
       />
