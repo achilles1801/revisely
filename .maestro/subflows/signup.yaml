@@ -116,10 +116,10 @@ appId: com.revisionbuddy.app
     id: auth-submit
     retryTapIfNoChange: false
 # SYNC-4: the new account loads at once, with no relaunch. (Asserted by the
-# caller: 01-onboarding fails on it; other flows go on, see new-account.yaml.)
+# callers, 01-onboarding and new-account.yaml, right after.)
 # The wait also ends on the app's error (an id is a regex), and a sign-up the
-# app refused fails here with its message on the screen, not as SYNC-4 after a
-# relaunch that clears it. (Keys the simulator's keyboard dropped are typed
+# app refused fails here with its message on the screen, not later as SYNC-4
+# (no Welcome). (Keys the simulator's keyboard dropped are typed
 # again above; before that, runs 42403217365 and 43583371303 failed here on
 # "Invalid email address".)
 - repeat:

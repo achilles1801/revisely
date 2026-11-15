@@ -403,8 +403,7 @@ Things that bit:
   run 43583371303 as ".com"). So `subflows/signup.yaml` types each field through
   `subflows/type-in-field.yaml`, which checks what the field holds and types it again if keys were
   dropped (the passwords are shown first so their text can be read). A sign-up the app still
-  refuses fails there on its own error (`auth-error`), not later as SYNC-4 after a relaunch that
-  clears it. A swipe can stall the same way (27 s for one in run 43583371303): give a
+  refuses fails there on its own error (`auth-error`), not later as SYNC-4 (no Welcome). A swipe can stall the same way (27 s for one in run 43583371303): give a
   `scrollUntilVisible` room for that, as onboarding's scroll to Juz 30 has (90 s). A tap can
   stall too: held down for half a second, iOS cancelled it on release and nothing was pressed
   (run 43619892917). Tap again only while the control still shows it wasn't taken, as onboarding's
