@@ -99,6 +99,9 @@ import { countsAsMistake, isUnclear } from '../../lib/reciteLive/contract';
 import { pageAccuracy } from '../../lib/reciteLive/score';
 import { sendLabel } from '../../lib/reciteCheck/service';
 
+/** Said to screen reader users only, after Stop, when a take's start was never found (everyone else: nothing). */
+const START_NOT_FOUND_SPOKEN = 'Couldn’t follow that take. Try starting at the top of the page.';
+
 /** What the recite bar says when a take ends without its answer. */
 const LIVE_FAILURE: Record<LiveFailure, string> = {
   sign_in: 'Sign in again to recite',
@@ -762,9 +765,11 @@ export default function QuranReaderScreen() {
       return;
     }
     // The checker never found where the reciter started: it fails silently (Majd, Nov 14 2026). No summary or
-    // message; Stop just ends the take.
+    // message; Stop just ends the take. With VoiceOver or TalkBack one line is said, the microphone already off (Majd,
+    // Nov 15 2026): they can't see the bar never leave "Listening…", and a take gone without a word reads as a crash.
     if (startNotFound(live.state)) {
       live.clear();
+      if (screenReader) say(START_NOT_FOUND_SPOKEN);
       return;
     }
     stopTrace.step('summary-asked');

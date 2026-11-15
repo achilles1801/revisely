@@ -642,6 +642,7 @@ describe('a take starts anywhere on the page (Majd, Nov 14 2026)', () => {
   });
 
   it('never found: it fails silently (Majd, Nov 14 2026): Stop just ends the take, with no summary or message', async () => {
+    const spoken = jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions');
     await startTake('recite', null);
     expect(screen.getByTestId('recite-status').props.children).toBe('Listening…');
     fireEvent.press(screen.getByTestId('recite-stop'));
@@ -650,6 +651,43 @@ describe('a take starts anywhere on the page (Majd, Nov 14 2026)', () => {
     expect(screen.queryByTestId('take-summary')).toBeNull();
     expect(screen.queryByTestId('recite-bar')).toBeNull();
     expect(screen.getByTestId('recite-mic')).toBeTruthy();
+    expect(spoken).not.toHaveBeenCalled();
+  });
+
+  it('never found, with VoiceOver or TalkBack: one line is said once the microphone is off; the screen is the same (Majd, Nov 15 2026)', async () => {
+    const enabled = AccessibilityInfo.isScreenReaderEnabled as jest.Mock;
+    enabled.mockImplementation(async () => true);
+    const spoken = jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions');
+    try {
+      await startTake('recite', null);
+      await act(async () => mockMic!.onAudio(new Int16Array(16000)));
+      expect(spoken).not.toHaveBeenCalled();
+      fireEvent.press(screen.getByTestId('recite-stop'));
+      await done({ start: null });
+      await flush();
+      // Once (the take's recording is announced after it, as after any take).
+      expect(spoken.mock.calls.map((c) => c[0]).filter((t) => t === 'Couldn’t follow that take. Try starting at the top of the page.')).toHaveLength(1);
+      expect(screen.queryByTestId('take-summary')).toBeNull();
+      expect(screen.queryByTestId('recite-bar')).toBeNull();
+      expect(screen.getByTestId('recite-mic')).toBeTruthy();
+    } finally {
+      enabled.mockImplementation(async () => false);
+    }
+  });
+
+  it('found, with VoiceOver: nothing of the kind is said', async () => {
+    const enabled = AccessibilityInfo.isScreenReaderEnabled as jest.Mock;
+    enabled.mockImplementation(async () => true);
+    const spoken = jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions');
+    try {
+      await startTake('recite');
+      fireEvent.press(screen.getByTestId('recite-stop'));
+      await done({ start: A23 });
+      await flush();
+      expect(spoken.mock.calls.map((c) => c[0])).not.toContain('Couldn’t follow that take. Try starting at the top of the page.');
+    } finally {
+      enabled.mockImplementation(async () => false);
+    }
   });
 
   it('a page turned by hand before the start is found: the checker looks on that page instead', async () => {

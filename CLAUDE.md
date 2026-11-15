@@ -344,7 +344,9 @@ until its part is set up.
   - **A take starts anywhere on the page** (Majd, Nov 14 2026; protocol 6). The start frame sends `startBy` (the page's
     last ayah), and the checker says where the reciter started (`locked`; recite-contract.md in the shared notes).
     - Until then the bar says Listening…, with no cursor and no score. If it is never found, the take fails silently
-      (Majd): no message (`nolock` isn't read), and Stop just ends it, with no summary.
+      (Majd): no message (`nolock` isn't read), and Stop just ends it, with no summary. The one exception (Majd, Nov
+      15 2026): with VoiceOver or TalkBack on, once Stop has turned the microphone off, one line is said ("Couldn't
+      follow that take. Try starting at the top of the page."); nothing on screen changes for anyone.
     - A page turned by hand searches that page again (`seek` with `startBy`).
     - Nothing before the start is skipped, and the summary counts from the start.
     - A checker below protocol 6 (`ready.protocol`) doesn't search: the take starts at the page's first ayah, as
