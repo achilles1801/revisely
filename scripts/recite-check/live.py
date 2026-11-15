@@ -60,8 +60,20 @@ SETTLE = 3.0        # seconds a seam must be behind the newest final frame: the 
 # repeats waits until the two places part). A take that never locks fails silently (Majd: no prompt, since a reciter
 # may have the page hidden; nonsense or a passage off the page shows nothing): no cursor, no marks, `done` with no
 # words and start null, and `ms.search_speech` (speech heard without a lock) for the server's log.
+# One word of the run may be missing (a skip right after the start: 1:5 said without نعبد never locked, recite-server
+# Nov 15 2026); it doesn't count toward LOCK_WORDS. Bench takes cut one word before a planted mistake (206): never
+# locked within 25 s 118 → 57.
 LOCK_WORDS = 3
 LOCK_HOPS = 2
+# Sooner on QUICK_WORDS: the path's first QUICK_WORDS words (one fewer than the rule above), all heard as correct, none
+# missing, each heard well (its sounds score QUICK_MEAN or better on average: 0 is the ear's own best guess), in the
+# first LONG_SEARCH seconds. Bench end to end (Nov 15 2026, 8 reciters × 8 passages): from an ayah start a third in
+# 7.7 → 6.7 s (median; p90 11.7 → 9.7 s), from mid-ayah 7.7 → 6.7 s (p90 12.2 → 8.2 s); the same places, and off the
+# page the same 10 of 120. Without the sound check, Al-Kahf 18:4–5 (ما لهم به … لآبائهم) locked on Ya-Sin 36:6's page
+# (ما أنذر آباؤهم): its words scored -1.5 to -2.1. Two words, whatever the sound check, locked 2–16 more takes off the
+# page (traces, rules tuned on passages 2, 5, 7).
+QUICK_WORDS = 3
+QUICK_MEAN = -1.0
 # A search that has run LONG_SEARCH seconds without a lock asks for LONG_EXTRA more words: the longer nothing on the
 # page fits, the likelier the reciter is elsewhere, and a long take off the page meets phrases the page shares. Off the
 # page in full (120 takes): 14 → 11 locks; every start on the page locks well before (bench: 18 s at most).
@@ -75,8 +87,10 @@ LONG_EXTRA = 2
 # start further in was taken for the top. The first word must also have covered TOP_SOUNDS of its sounds (all of a
 # shorter word's): unrelated speech held Al-Fatiha's 1:1 for 3 hops on blanks alone. Off the page (another passage's
 # audio, 120 takes) 7 locked, all Al-Fatiha on Al-Kahf's page: both open with a basmala and الحمد لله; the strict rule
-# locks 6 of those same 7, later.
-TOP_HOPS = 3
+# locks 6 of those same 7, later. 2 hops, not 3 (Nov 15 2026), for room under the 3 s bar once Cloud Run and the
+# network are added (one take took 3.03 s there): 2.7 → 2.2 s (median; p90 2.9 → 2.4 s), the same places, and no more
+# locks off the page.
+TOP_HOPS = 2
 TOP_SOUNDS = 3
 MAX_SEARCH = 480    # words searched at most (the server allows a page of 400, plus an ayah either side)
 NEG = checker.Decoder.NEG
@@ -940,16 +954,39 @@ class LiveSession:
                 return ev + self._lock(loc.app[top], f_start, now)
             return ev
         self._loc_hist.append(w0)
-        # the words from w0 on heard in order, each over before the commit point (no longer moving)
-        k, cf = w0, int(self.P['commit'] * FPS)
-        while k + 1 < loc.g.W and visits[k + 1] and visits[k + 1][-1]['end'] <= dec.t - cf:
-            k += 1
-        good = sum(1 for w in range(w0, k + 1) if st.get(loc.app[w]) == 'correct')
-        need = LOCK_WORDS + (LONG_EXTRA if (self.T - self._search_f0) / FPS > LONG_SEARCH else 0)
-        if k - w0 < need or good < LOCK_WORDS or len(self._loc_hist) < LOCK_HOPS \
-                or len(set(self._loc_hist[-LOCK_HOPS:])) > 1 or not self._only_once(w0, k):
+        if len(self._loc_hist) < LOCK_HOPS or len(set(self._loc_hist[-LOCK_HOPS:])) > 1:
             return ev
-        return ev + self._lock(loc.app[w0], f_start, now)
+        # the words from w0 on heard in order, each over before the commit point (no longer moving); one may be missing
+        cf, W = int(self.P['commit'] * FPS), loc.g.W
+
+        def settled(w):
+            return bool(visits[w]) and visits[w][-1]['end'] <= dec.t - cf
+
+        k, missing = w0, 0
+        while k + 1 < W:
+            if settled(k + 1):
+                k += 1
+            elif not missing and k + 2 < W and not visits[k + 1] and settled(k + 2):
+                k, missing = k + 2, 1
+            else:
+                break
+        if not self._only_once(w0, k):
+            return ev
+        correct = [st.get(loc.app[w]) == 'correct' for w in range(w0, k + 1) if visits[w]]
+        long_search = (self.T - self._search_f0) / FPS > LONG_SEARCH
+        need = LOCK_WORDS + (LONG_EXTRA if long_search else 0)
+        if len(correct) > need and sum(correct) >= LOCK_WORDS:
+            return ev + self._lock(loc.app[w0], f_start, now)
+        n = QUICK_WORDS
+        if not long_search and not missing and k - w0 + 1 >= n and all(correct[:n]) \
+                and all(self._heard_well(visits[w][-1]) for w in range(w0, w0 + n)):
+            return ev + self._lock(loc.app[w0], f_start, now)
+        return ev
+
+    @staticmethod
+    def _heard_well(v):
+        """A visit whose sounds score QUICK_MEAN or better on average (QUICK_WORDS)."""
+        return bool(v['scores']) and float(np.mean(v['scores'])) >= QUICK_MEAN
 
     def _sounds_heard(self, v, w):
         """The visit v of the locator's word w has covered TOP_SOUNDS of its sounds (all, for a shorter word)."""

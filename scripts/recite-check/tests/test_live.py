@@ -538,6 +538,51 @@ class StartAnywhere(unittest.TestCase):
         self.assertEqual([e['type'] for e in ev], ['done'])
         self.assertEqual((ev[-1]['result']['start'], ev[-1]['result']['words']), (None, []))
 
+    def cut(self, name, word, page=None, seconds=20):
+        """Bench take `name` from its word `word` (0.3 s before it), up to `seconds`, searched on its own page or on
+        take `page`'s; the session and the timeline from that word, in seconds of the cut audio."""
+        import ast
+        import live
+        f = BENCH / f'{name}.json'
+        if not f.exists():
+            self.skipTest(f'{name} is not here')
+        t = json.loads(f.read_text())
+        tl = ast.literal_eval(t['timeline']) if isinstance(t['timeline'], str) else t['timeline']
+        words = [e for e in tl if not e.get('extra')]
+        k = next(i for i, e in enumerate(words) if e['word'] == word)
+        c = max(0, words[k]['start'] - 0.3)
+        with wave.open(str(f.with_suffix('.wav'))) as w:
+            pcm = w.readframes(w.getnframes())[int(c * 16000) * 2:][:seconds * 32000]
+        pt = json.loads((BENCH / f'{page}.json').read_text()) if page else t
+        sess = live.LiveSession(engine(), pt['sura'], pt['ayat'][0], pt['sura'], pt['ayat'][1], {},
+                                start_by=(pt['sura'], pt['ayat'][1]))
+        locks = [e for e in run(sess, chunks(pcm, 3200)) if e['type'] == 'locked']
+        return locks, [dict(e, start=e['start'] - c, end=e['end'] - c) for e in words[k:]]
+
+    def test_three_words_heard_well_lock_sooner(self):
+        """QUICK_WORDS: 1:5 locks on إِيَّاكَ نَعْبُدُ وَإِيَّاكَ, while نَسْتَعِينُ is still being said (4 words
+        settled, the rule before, waited for it to end)."""
+        locks, words = self.cut('alafasy.p2.clean.clean', 13)
+        self.assertEqual([e['w'] for e in locks], [13])
+        self.assertLess(locks[0]['t'], words[3]['end'])
+
+    def test_a_skip_right_after_the_start_still_locks(self):
+        """1:5 said without نَعْبُدُ (the bench's planted skip) never locked: the run had to be heard in order
+        (recite-server, Nov 15 2026). One missing word is stepped over."""
+        locks, words = self.cut('alafasy.p2.m1.clean', 13)
+        self.assertEqual(words[1]['word'], 15)  # 14 is the planted skip
+        self.assertEqual([e['w'] for e in locks], [13])
+
+    def test_a_look_alike_heard_poorly_does_not_lock_sooner(self):
+        """Al-Kahf from 18:3 (… وَيُنذِرَ … مَّا لَهُم بِهِۦ … لِءَابَآئِهِمْ) searched on Ya-Sin 36:1–18: ما أنذر آباؤهم
+        (36:6) is heard as 3 correct words, but poorly (-1.7 and -2.0 on average), so QUICK_WORDS doesn't take it."""
+        import live
+        locks, _ = self.cut('sudais.p3.clean.clean', 37569, page='sudais.p4.clean.clean')
+        self.assertEqual(locks, [])
+        self.assertTrue(live.LiveSession._heard_well({'scores': [-0.2, -0.9, 0.0]}))
+        self.assertFalse(live.LiveSession._heard_well({'scores': [-0.4, -2.6]}))
+        self.assertFalse(live.LiveSession._heard_well({'scores': []}))
+
     def test_without_start_by_nothing_changes(self):
         import live
         sess = live.LiveSession(engine(), 1, 1, 1, 7, {})
