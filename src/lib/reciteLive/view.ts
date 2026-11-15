@@ -2,7 +2,7 @@
 
 import type { QuranWords } from '../recite/quranWords';
 import type { WordFollow } from '../recite/hiddenPage';
-import { severityOf, type Mark } from './contract';
+import { isUnclear, severityOf, type Mark } from './contract';
 import { furthestWord, LiveState, mistakeCount } from './state';
 import { formatAccuracy, pageAccuracy, ScoreLevel, scoreLevel } from './score';
 
@@ -26,7 +26,8 @@ export function barWords(state: LiveState, words: QuranWords, opts: { check: boo
     for (const m of Object.values(state.marks)) {
       if (m.kind === 'word' && m.heard) wrong.set(m.w, m);
       if (m.kind === 'skipped') skipped.add(m.w);
-      if (severityOf(m) === 'slip') slipped.add(m.w);
+      // A "not clear" haraka or letter isn't shown as a slip in the bar: it wasn't heard as wrong.
+      if (severityOf(m) === 'slip' && !isUnclear(m)) slipped.add(m.w);
     }
   }
   const out: BarWord[] = [];

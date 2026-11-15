@@ -224,6 +224,10 @@ until its part is set up.
   - "Keep as test data" (on by default; in the sheet and Settings → Testing) keeps each recording and its result
     in `recite-tests/<uid>/` in the dev bucket (closed to clients). The lab copies them with `fetch_takes.py`.
     **Nobody listens to them**, Majd included; they are held out of training, like the /record takes.
+  - **"Not clear"** (Majd, Nov 15 2026): a harakat or letter mark with `sure: "likely"` reads "Not clear" ("Say it more
+    clearly. Not counted in the score."), shows only what was expected on its card, isn't amber in the bar, comes last
+    in the summary and never counts in the score (`isUnclear` in `lib/reciteLive/contract`). A checker that sends
+    `score.unclear` has left them out of `mistakes`; from one that doesn't, the app takes out the ones shown.
   - **Stop leaves a trace** (`lib/reciteLive/stopTrace`, Nov 15 2026, after a freeze on Stop that told us nothing): Stop
     writes a marker on the phone, each step to the summary adds to it (mic off, the final answer, the summary asked
     for), and a heartbeat keeps the longest JavaScript stall. The summary on screen, a failure, ✕ or leaving the reader

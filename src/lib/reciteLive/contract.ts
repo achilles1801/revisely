@@ -44,6 +44,11 @@ export interface LiveScore {
   mistakes: number;
   /** Tajweed notes, counted apart. */
   tajweed: number;
+  /**
+   * "Not clear" marks (harakat and letter marks past the normal bar only), counted apart and not in `mistakes`, when
+   * the checker counts them so. Absent: a checker that still counts them in `mistakes` (the app takes them out).
+   */
+  unclear?: number;
   /** 1 − mistakes ÷ reached (the model session's rule). */
   accuracy: number;
 }
@@ -170,6 +175,7 @@ export function parseScore(raw: unknown): LiveScore | null {
     reached: s.reached,
     mistakes: s.mistakes,
     tajweed: isNum(s.tajweed) ? s.tajweed : 0,
+    ...(isNum(s.unclear) ? { unclear: s.unclear } : {}),
     accuracy: Math.min(1, Math.max(0, s.accuracy)),
   };
 }
@@ -260,5 +266,12 @@ export function severityOf(mark: Pick<Mark, 'kind'>): Severity {
   return mark.kind === 'word' || mark.kind === 'skipped' || mark.kind === 'added' ? 'mistake' : 'slip';
 }
 
-/** Marks that count against the score (everything but tajweed notes). */
+/** Marks the checker's `mistakes` has counted (everything but tajweed notes; "not clear" ones too, until `unclear`). */
 export const countsAsMistake = (mark: Pick<Mark, 'kind'>) => mark.kind !== 'tajweed';
+
+/**
+ * "Not clear: say it more clearly" (Majd, Nov 15 2026): a haraka or letter heard past the normal bar only. Hearing a
+ * haraka needs very clear recitation, and "there's a difference between someone saying 100% the wrong haraqa vs them
+ * not sounding clear". Shown, worded so, and never counted in the score.
+ */
+export const isUnclear = (mark: Pick<Mark, 'kind' | 'sure'>) => (mark.kind === 'harakat' || mark.kind === 'letter') && mark.sure === 'likely';

@@ -568,6 +568,21 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
     expect(screen.queryByTestId('live-mark-word')).toBeNull();
   });
 
+  it('a “not clear” haraka’s card: Not clear, say it more clearly; what was expected, not a guess at what was heard', async () => {
+    await startTake('check');
+    await event({
+      type: 'mark',
+      mark: { id: 'h', w: UTIYAT, ayah: [27, 23], kind: 'harakat', sure: 'likely', slip: { expected: 'ُ', heard: 'َ' }, heard: 'وَأَوتِيَتْ', heardExact: true },
+    });
+    // Not counted: the score stays at 100%.
+    expect(screen.getByTestId('recite-score')).toHaveTextContent('100%');
+    await tapWord(UTIYAT);
+    expect(screen.getByText('Not clear')).toBeTruthy();
+    expect(screen.getByTestId('mark-card-slip').props.children).toBe('Say it more clearly. Not counted in the score.');
+    expect(screen.getByText('Expected')).toBeTruthy();
+    expect(screen.queryByText('Recited')).toBeNull();
+  });
+
   it('tapping where there is no mark leaves the page to its own tap', async () => {
     await startTake('check');
     await event({ type: 'mark', mark: { id: 'a', w: UTIYAT, ayah: [27, 23], kind: 'word', sure: 'likely' } });

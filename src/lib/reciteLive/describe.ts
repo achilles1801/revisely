@@ -3,12 +3,16 @@
 import { surahName } from '../passages';
 import { tajweedName } from '../reciteCheck/result';
 import type { QuranWords } from '../recite/quranWords';
-import type { Mark } from './contract';
+import { isUnclear, type Mark } from './contract';
+
+/** A "not clear" mark's line, on its card and in the summary. */
+export const UNCLEAR_NOTE = 'Say it more clearly. Not counted in the score.';
 
 const NBSP = ' ';
 
 /** "Wrong word", "Harakat slip", "Madd munfasil". */
 export function markTitle(mark: Mark): string {
+  if (isUnclear(mark)) return 'Not clear';
   switch (mark.kind) {
     case 'word':
       return mark.detail === 'order' ? 'Out of order' : 'Wrong word';
@@ -28,7 +32,7 @@ export function markTitle(mark: Mark): string {
 /** "An-Naml, ayah 23", and "· likely" for a mark past the normal bar only. */
 export function markPlace(mark: Mark): string {
   const place = `${surahName(mark.ayah[0])}, ayah${NBSP}${mark.ayah[1]}`;
-  return mark.sure === 'likely' ? `${place} · likely` : place;
+  return mark.sure === 'likely' && !isUnclear(mark) ? `${place} · likely` : place;
 }
 
 /** The label of the Recited row: what was heard spelt out isn't exact. */
@@ -156,6 +160,7 @@ export function findingNote(mark: Mark): string {
     return sub ? `${main} · ${sub}` : main;
   }
   if (mark.kind === 'skipped') return 'Left out';
+  if (isUnclear(mark)) return UNCLEAR_NOTE;
   const slip = slipLine(mark);
   if (!mark.heard) return mark.kind === 'word' ? 'Said as another word' : (slip ?? '');
   return `${recitedLabel(mark)} ${iso(mark.heard)}`;
