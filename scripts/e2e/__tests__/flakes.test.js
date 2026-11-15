@@ -64,6 +64,27 @@ describe('the flake report', () => {
     expect(render({ rows: aggregate(steady), since, until, jobs: 21, mention: '@owner' })).not.toContain('@owner');
   });
 
+  it('lists the taps tap-to-open found lost and tapped again, most first', () => {
+    const tapped = (n) => ({ ...ok(), lostTaps: n });
+    const recs = [
+      job('ios', { '09-revo': [tapped(1)], '02-revision-session': [ok()] }),
+      job('ios', { '09-revo': [tapped(2)] }),
+      job('android', { '09-revo-attach': [miss('x'), tapped(1)] }),
+    ];
+    const rows = aggregate(recs);
+    expect(rows.find((r) => r.flow === '09-revo').lostTaps).toBe(3);
+    expect(rows.find((r) => r.flow === '02-revision-session').lostTaps).toBe(0);
+    const body = render({ rows, since: new Date('2026-11-09'), until: new Date('2026-11-16'), jobs: recs.length });
+    expect(body).toContain('### Lost taps, tapped again');
+    expect(body).toContain('- 09-revo (iOS): 3 in 2 runs\n- 09-revo-attach (Android): 1 in 1 run');
+    expect(body).not.toMatch(/02-revision-session \(iOS\): /);
+  });
+
+  it('has no lost-taps section when none were tapped again', () => {
+    const rows = aggregate([job('ios', { '09-revo': [ok()] })]);
+    expect(render({ rows, since: new Date('2026-11-09'), until: new Date('2026-11-16'), jobs: 1 })).not.toContain('Lost taps');
+  });
+
   it('says so when no job recorded its attempts', () => {
     const body = render({ rows: [], since: new Date('2026-10-31'), until: new Date('2026-11-07'), jobs: 0, mention: '@owner' });
     expect(body).toContain('No E2E jobs recorded their attempts in these 7 days.');
