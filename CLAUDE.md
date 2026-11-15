@@ -267,6 +267,11 @@ until its part is set up.
     tajweed offers one take over the stretch from the ayah before the first mistake (same surah) to the last mistake's
     ayah (`s2`/`a2`, no `startBy`). It stops by itself once `said` reaches the stretch's last word (reciting on would
     add "Extra word after the end" marks), and its summary says "Before: …" (what the take before found there).
+  - **The checker is kept warm** (recite-server, Nov 15 2026; Majd's yes): Cloud Run stops an idle instance after about
+    15 minutes and a new one takes 6–9 s. So while the reader is open, focused and in front with live checking on,
+    `useKeepCheckerWarm` GETs `/health` (no sign-in, no model) on opening, every 10 minutes, and on coming back once
+    10 minutes have passed. It skips this while a take is connecting, listening or checking, since its connection holds
+    the instance.
   - **Stop leaves a trace** (`lib/reciteLive/stopTrace`, Nov 15 2026, after a freeze on Stop that told us nothing): Stop
     writes a marker on the phone, each step to the summary adds to it (mic off, the final answer, the summary asked
     for), and a heartbeat keeps the longest JavaScript stall. The summary on screen, a failure, ✕ or leaving the reader

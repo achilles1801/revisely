@@ -72,7 +72,7 @@ import { similarPhrases } from '../../lib/reciteLive/similar';
 import type { Mark } from '../../lib/reciteLive/contract';
 import type { Box } from '../../components/verse/menuPlacement';
 import { playClip, playReference, stopHearing } from '../../lib/reciteLive/hearAudio';
-import { warmUpReciteCheck } from '../../lib/reciteCheck/service';
+import { useKeepCheckerWarm } from '../../components/reciteLive/useKeepCheckerWarm';
 import { needsPremium, type LiveFailure } from '../../lib/reciteLive/contract';
 import { logger } from '../../lib/logger';
 import { useRememberTake } from '../../components/reciteMemory/useRememberTake';
@@ -343,10 +343,10 @@ export default function QuranReaderScreen() {
   }, [live.state.status]);
   const [summaryFor, setSummaryFor] = useState<string | null>(null);
   const [introOpen, setIntroOpen] = useState(false);
-  // Wake the checker while the reader opens (Cloud Run sleeps; waking takes a few seconds).
-  useEffect(() => {
-    if (liveOn) warmUpReciteCheck();
-  }, [liveOn]);
+  // Keep the checker awake while the reader is open and in front (Cloud Run stops an idle one after about 15 minutes, and
+  // waking takes 6–9 s): on opening, then every 10 minutes, never while a take's connection already holds it.
+  const takeBusy = live.state.status === 'connecting' || live.state.status === 'listening' || live.state.status === 'checking';
+  useKeepCheckerWarm(liveOn && isScreenFocused, takeBusy);
   // What a tap on the mic starts: Record, or Recite, marking mistakes when the switch is on and the account has it.
   const markMistakes = owned && reciteSettings.markMistakes;
   const micMode: ReciteMicMode = reciteSettings.mode === 'record' ? 'record' : markMistakes ? 'check' : 'recite';
