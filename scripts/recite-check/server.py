@@ -9,6 +9,7 @@ GET  /health
 """
 import asyncio
 import contextlib
+import inspect
 import io
 import json
 import logging
@@ -31,7 +32,8 @@ from engine import BadRequest, Engine
 HERE = pathlib.Path(__file__).resolve().parent
 VERSION = (HERE / 'CHECKER_COMMIT').read_text().strip()[:12] if (HERE / 'CHECKER_COMMIT').exists() else 'local'
 SERVER = (HERE / 'SERVER_COMMIT').read_text().strip()[:12] if (HERE / 'SERVER_COMMIT').exists() else 'local'
-PROTOCOL = 5  # the contract draft this server speaks (recite-contract.md): follow, hint, tajweed, premium_required
+PROTOCOL = 6  # the contract this server speaks (recite-contract.md): 5 = follow, hint, tajweed, premium_required;
+              # 6 = start anywhere on the page (startBy, locked, nolock, done.result.start); see protocol()
 MAX_SECONDS = 240
 FIRST_FRAME = 10      # seconds a new socket has to send its start frame
 IDLE = 30             # seconds without a frame from the phone before a socket is closed
@@ -47,6 +49,10 @@ LOCKED = 'premium_required'  # the refusal without Premium (agreed with apply-su
 # at a time), and the checker takes the basmala before a surah inside the passage as a filler. /check (record, then
 # check) keeps the surah as its default: it aligns the whole recording to the passage at once.
 LAST_AYAH = (114, 6)
+# Start anywhere on the page (Majd, Nov 14 2026; protocol 6): `startBy` [sura, ayah] is the page's last ayah, and the
+# reciter begins at some word from s:a's first through its end. The follower (live.py) searches for the start, sends
+# `locked` (or `nolock`) and goes on from there. A start frame without it is protocol 5's: the take starts at s:a.
+START_BY_WORDS = 400  # the most words from s:a's first word to startBy's end: a foldable's two pages
 MARK_ID = re.compile(r'^\d{1,6}:(word|letter|tajweed):[a-z_]{1,24}$')
 log = logging.getLogger('recite-check')
 logging.basicConfig(level=logging.INFO)
@@ -128,7 +134,7 @@ def put_json(name, obj):
 def health():
     """engine: the checker's commit; server: this service's (the repo's commit it was staged from); protocol: the
     contract draft it speaks, so the app can tell which features it may use."""
-    return {'ok': True, 'engine': VERSION, 'server': SERVER, 'protocol': PROTOCOL}
+    return {'ok': True, 'engine': VERSION, 'server': SERVER, 'protocol': protocol()}
 
 
 @app.post('/check')
@@ -266,6 +272,53 @@ def settings_from(msg):
     return out
 
 
+def start_by_of(msg, s, a, end):
+    """The start frame's `startBy` as (sura, ayah), or None without it. Refused (bad_request) unless it is [sura,
+    ayah] of an ayah from s:a to the passage's end (s2:a2, or the Qur'an's) and at most START_BY_WORDS words from
+    s:a's first word."""
+    sb = msg.get('startBy')
+    if sb is None:
+        return None
+    sb = ayah_pair(sb)
+    if sb is None:
+        raise BadRequest('startBy must be [sura, ayah]')
+    if sb < (s, a) or sb > end:
+        raise BadRequest('startBy must be an ayah from s:a to the end of the passage')
+    lo, hi = ENGINE['e'].passage(s, a, *sb, max_words=10 ** 6)
+    if hi - lo > START_BY_WORDS:
+        raise BadRequest(f'from s:a to startBy is more than {START_BY_WORDS} words')
+    return sb
+
+
+def protocol():
+    """PROTOCOL once the follower can start anywhere on the page (live.LiveSession takes start_by), else 5, with
+    startBy ignored as a protocol 5 server ignores it: whichever of the server and the follower is deployed first, the
+    phone is never told to wait for a `locked` that can't come."""
+    ps = inspect.signature(live.LiveSession).parameters
+    return PROTOCOL if 'start_by' in ps or any(p.kind is p.VAR_KEYWORD for p in ps.values()) else 5
+
+
+def ayah_pair(v):
+    """[sura, ayah] (two whole numbers) as a tuple, or None."""
+    if isinstance(v, (list, tuple)) and len(v) == 2 and all(isinstance(x, int) and not isinstance(x, bool) for x in v):
+        return tuple(v)
+    return None
+
+
+def control_of(c):
+    """A text frame from the phone after the start, as the session takes it, or None to ignore it. A `seek` may
+    carry `startBy` (protocol 6: the reciter is somewhere from w through that ayah, so the follower searches again);
+    as a tuple, or the frame is dropped when it isn't [sura, ayah]. The session checks the range itself."""
+    if not isinstance(c, dict) or c.get('type') not in ('seek', 'dismiss', 'hint', 'end', 'stop'):
+        return None
+    if c['type'] == 'seek' and 'startBy' in c:
+        sb = ayah_pair(c['startBy'])
+        if sb is None:
+            return None
+        c = dict(c, startBy=sb) if protocol() >= 6 else {k: v for k, v in c.items() if k != 'startBy'}
+    return c
+
+
 def follow_of(msg):
     """Recite (follow along only): "follow": true (contract draft 5), or the app's "mode": "recite"."""
     return msg.get('follow') is True or msg.get('mode') == 'recite'
@@ -295,11 +348,14 @@ async def open_session(msg, uid):
     follow = follow_of(msg)
     open_end = passage[2] is None
     run = passage[:2] + LAST_AYAH if open_end else passage
+    start_by = start_by_of(msg, *passage[:2], run[2:]) if protocol() >= 6 else None
     # defer: each ayah's letters and tajweed are judged off the hop, so they never hold up the cursor (live.py)
     sess = await asyncio.to_thread(live.LiveSession, ENGINE['e'], *run, settings, follow, defer=True,
-                                   open_end=open_end)
+                                   open_end=open_end, **({'start_by': start_by} if start_by else {}))
     sid = rid if isinstance(rid, str) and store.TAKE.match(rid) else store.new_take()
     request = dict(zip(('s', 'a', 's2', 'a2'), passage), settings=settings, follow=follow, open=open_end)
+    if start_by:
+        request['startBy'] = list(start_by)
     s = Live(sid, uid, sess, msg.get('keep') is True, request, msg.get('app') if isinstance(msg.get('app'), str)
              else None)
     SESSIONS[sid] = s
@@ -325,7 +381,8 @@ async def read_into(ws, inbox):
                     c = json.loads(m['text'])
                 except ValueError:
                     continue
-                if isinstance(c, dict) and c.get('type') in ('seek', 'dismiss', 'hint', 'end', 'stop'):
+                c = control_of(c)
+                if c is not None:
                     await inbox.put(('control', c))  # anything else is ignored
     except Exception:
         pass
@@ -401,7 +458,7 @@ async def live_socket(ws: WebSocket):
         f = FINISHED.get(rid) if isinstance(rid, str) else None
         if f and f[0] == uid and f[2] is not None:
             # the take ended on this instance and the phone missed its `done`: the same answer again, not a re-run
-            await send([{'type': 'ready', 'v': 2, 'engine': VERSION, 'server': SERVER, 'protocol': PROTOCOL,
+            await send([{'type': 'ready', 'v': 2, 'engine': VERSION, 'server': SERVER, 'protocol': protocol(),
                          'take': rid, 'from': f[1]}, f[2]], record=False)
             with contextlib.suppress(Exception):
                 await ws.close(1000)
@@ -416,7 +473,7 @@ async def live_socket(ws: WebSocket):
                 return s.sess.n, s.sess.snapshot() if resumed else []
         held, snap = await asyncio.to_thread(take_over)
         s.sockets += 1
-        await send([{'type': 'ready', 'v': 2, 'engine': VERSION, 'server': SERVER, 'protocol': PROTOCOL,
+        await send([{'type': 'ready', 'v': 2, 'engine': VERSION, 'server': SERVER, 'protocol': protocol(),
                      'take': s.sid, 'from': held}], record=False)
         await send(snap, record=False)  # what the dropped socket may have swallowed
         # A reader drains the socket at once into a queue and the work runs from the queue, in order: a phone

@@ -125,6 +125,8 @@ def main():
     ap.add_argument('--letters', action='store_true')
     ap.add_argument('--no-tajweed', action='store_true', help='the "words and harakat" level (tajweed off)')
     ap.add_argument('--follow', action='store_true', help='Recite: the cursor and said only')
+    ap.add_argument('--page', help='S:A-S:A: start anywhere on this page (protocol 6): s/a its first ayah, startBy its '
+                                   'last, no end; the take may begin mid-page (cut_take.py)')
     ap.add_argument('--transcript')
     args = ap.parse_args()
     token = pathlib.Path(args.token_file).expanduser().read_text().strip()
@@ -132,6 +134,9 @@ def main():
     start = {'type': 'start', 's': truth['sura'], 'a': truth['ayat'][0], 's2': truth['sura'], 'a2': truth['ayat'][1],
              'mon': 4, 'mot': 4, 'aar': 0, 'letters': args.letters, 'tajweed': not args.no_tajweed,
              'follow': args.follow, 'keep': False, 'app': 'live_e2e'}
+    if args.page:
+        (s, a), (s2, a2) = (tuple(map(int, x.split(':'))) for x in args.page.split('-'))
+        start.update(s=s, a=a, s2=None, a2=None, startBy=[s2, a2])
     events, sent_at, stamps, rounds = asyncio.run(session(args.url, token, start, pcm, args.fast, args.drop_at))
 
     tl = {e['word']: e for e in truth['timeline'] if e.get('word') is not None and not e.get('extra')}
@@ -179,6 +184,19 @@ def main():
                 ref = tl.get(w) or tl.get(min((x for x in tl if x > w), default=w))
                 if ref:
                     lat_mark.append(e['_at'] - when_sent(sent_at, ref['end']))
+        if args.page:  # where the follower locked on, against the take's first word
+            first = min(tl)
+            for e in events:
+                if e['type'] == 'locked':
+                    print(f"  locked: w {e['w']} ({e['s']}:{e['a']}), t {e['t']} s, "
+                          f"{e['_at'] - when_sent(sent_at, tl[first]['start']):.2f} s after the first word started; "
+                          f"{'right' if e['w'] == first else f'WRONG (the take starts at w {first})'}")
+            print('  nolock:', sum(1 for e in events if e['type'] == 'nolock'),
+                  '| locked:', sum(1 for e in events if e['type'] == 'locked'),
+                  '| events before the first locked:',
+                  sorted({e['type'] for e in events[:next((i for i, e in enumerate(events) if e['type'] == 'locked'),
+                                                          len(events))]}),
+                  '| done.start:', (done or {}).get('result', {}).get('start'))
         print('  latency, word start -> its `at`:   ', quantiles(lat_at))
         print('  slowest `at` (s, word):', sorted(slow_at, reverse=True)[:5])
         print('  latency, word end -> its `said`:   ', quantiles(lat_said))

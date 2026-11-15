@@ -101,9 +101,9 @@ take (`<take>.dismiss-<time>.json`) as a label for the lab.
    only `ready`, `at`, `said`, `ayah` and `done` come back, words are decided but no mark is made, and `done.result`
    has the words and their statuses only. Sign-in and `previewTester` are checked
    on every socket. A session counts against the 40 an hour; resuming doesn't.
-2. The server answers `{"type":"ready","v":2,"engine":"…","server":"…","protocol":5,"take":"<take>","from":0}`.
+2. The server answers `{"type":"ready","v":2,"engine":"…","server":"…","protocol":6,"take":"<take>","from":0}`.
    `GET /health` says the same `engine` (the checker's commit), `server` (this service's commit) and `protocol` (the
-   contract draft it speaks: 5 = follow, hint, tajweed, premium_required).
+   contract it speaks: 5 = follow, hint, tajweed, premium_required; 6 = start anywhere on the page).
 3. The phone sends PCM (16-bit little-endian, mono, 16 kHz) as binary frames of any size, and as text frames
    `{"type":"seek","w":…}`, `{"type":"dismiss","id":"…"}`,
    `{"type":"hint","w":…,"what":"word"|"ayah"}` (the hidden view showed a word, or the rest of its ayah: those
@@ -115,6 +115,29 @@ take (`<take>.dismiss-<time>.json`) as a label for the lab.
    take is then stored and `{"type":"kept","take":…,"ok":true|false}` follows before the server closes the socket
    (the phone needn't wait for it). Every event has `t`, the seconds of the take it was decided at. `error`
    (`sign_in`, `testers_only`, `limit`, `idle`, `bad_request`, `server`, `premium_required`) closes the socket.
+
+**Start anywhere on the page** (Majd, Nov 14 2026; protocol 6; recite-contract.md has the agreed shape). The start
+frame's `s`/`a` stay the page's first ayah, and `"startBy":[sura,ayah]` is its last: the reciter begins at some word
+from the first word of `s:a` through the end of `startBy`.
+- **The search.** The follower searches that range, plus an ayah either side.
+  - Once sure, it sends `{"type":"locked","w":…,"s":…,"a":…,"t":…}`, and nothing (`at`, `said`, marks, `score`) comes
+    before it.
+  - Words before `w` aren't part of the take: never skipped, not in `done.result.words` or the score.
+  - `{"type":"nolock"}` comes once after about 8 s of speech with no lock. The search goes on.
+  - `done.result.start` is the locked `w`, or null.
+- **A hand page-turn:** `{"type":"seek","w":<the page's first word>,"startBy":[sura,ayah]}` searches again, before
+  the lock or after it (another `locked`). A `seek` with `w` alone is as before.
+- **What the server checks** (server.py): `startBy` must be an ayah from `s:a` to the passage's end, at most
+  `START_BY_WORDS` (400) words from `s:a`'s first word (a foldable's two pages), or the socket closes with
+  `bad_request`. A seek whose `startBy` isn't `[sura, ayah]` is ignored.
+- **Older versions.** A start frame without `startBy` is protocol 5's, unchanged. An older server ignores `startBy`
+  and starts at `s:a`, so the phone waits for `locked` only when `ready.protocol` is 6 or more.
+  - The server says 6 only when `live.LiveSession` takes `start_by` (`protocol()`). Until the follower has it, the
+    server says 5 and ignores `startBy`, whichever of the two is deployed first.
+- **Kept takes.** The kept take's request records `startBy`.
+- **The search is the model session's** (`live.py`, `start_by=(sura, ayah)`).
+- **Measuring it:** `cut_take.py` cuts a public bench take to begin at an ayah mid-page, and `live_e2e.py --page
+  S:A-S:A` sends it with the page's range and reports where and how soon it locked.
 
 **Check is a Premium feature** (apply-support.md draft 2; Premium is free through "Apply for support"): with
 `CHECK_GATE=on`, `/check` and `/live` without `follow` need `entitlements/{uid}.premium` (present, and `until` null or
