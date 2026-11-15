@@ -92,12 +92,15 @@ export async function checkRecitation(
 /**
  * "Not a mistake", or taking it back, once a take has its final answer (the connection has gone): `POST /dismiss` or
  * `POST /undismiss` with the take and the mark's id, kept next to the take as a label for the lab (kept takes only).
- * A checker without `/undismiss` answers 404, and nothing wrong is stored. Best effort: a failure isn't shown.
+ * A checker without `/undismiss` answers 404, and nothing wrong is stored. Best effort: a failure isn't shown. `when`
+ * is the tap's time (ms): the two can arrive out of order (Undo while the dismiss is on its way), and the lab orders
+ * a mark's labels by it, the latest winning (recite-server, Nov 15 2026).
  */
 export async function sendLabel(
   what: 'dismiss' | 'undismiss',
   take: string,
   id: string,
+  when: number,
   deps: CheckDeps = defaults,
 ): Promise<boolean> {
   try {
@@ -106,7 +109,7 @@ export async function sendLabel(
     const res = await deps.fetch(`${RECITE_CHECK_URL}/${what}`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ take, id }),
+      body: JSON.stringify({ take, id, when }),
     });
     return res.ok;
   } catch {

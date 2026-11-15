@@ -253,7 +253,8 @@ until its part is set up.
     and after the take the summary's "1 marked not a mistake" (closed until tapped) lists each with Put back
     (`restoreMark`: the mark and what it counted come back). The checker is told both ways, so the lab never keeps a
     wrong label: on the connection while live (`dismiss`, `undismiss`), and after the final answer over HTTP (`POST
-    /dismiss`, `/undismiss`, `sendLabel` in `lib/reciteCheck/service`, kept takes only). Before, a Not a mistake tapped
+    /dismiss`, `/undismiss` with `when`, the tap's time, by which the lab orders a mark's labels; `sendLabel` in
+    `lib/reciteCheck/service`, kept takes only; live on the checker since rev 00047). Before, a Not a mistake tapped
     after Stop never reached the checker: the connection drops every frame once it has the final answer.
   - **Your recitation** on the mark card: the reciter's own voice at the mark, from the take's audio that the connection
     holds on the phone for resuming (`audioClip`), from the mark's `t` (0.6 s before to 0.4 s after). A mark without

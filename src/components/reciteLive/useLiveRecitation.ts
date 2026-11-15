@@ -469,7 +469,7 @@ export function useLiveRecitation({
   const label = useCallback((what: 'dismiss' | 'undismiss', id: string) => {
     const s = traceRef.current.state;
     if (s.status === 'done') {
-      if (s.take && testDataRef.current) void sendLabel(what, s.take, id);
+      if (s.take && testDataRef.current) void sendLabel(what, s.take, id, Date.now());
       return;
     }
     conn.current?.send({ type: what, id });

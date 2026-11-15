@@ -735,10 +735,10 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
       fireEvent.press(screen.getByTestId('take-summary-finding-word'));
       await flush();
       fireEvent.press(screen.getByTestId('mark-card-dismiss'));
-      expect(sendLabel()).toHaveBeenCalledWith('dismiss', 't1', 'a');
+      expect(sendLabel()).toHaveBeenCalledWith('dismiss', 't1', 'a', expect.any(Number));
       expect(mockLive.sent).not.toContainEqual({ type: 'dismiss', id: 'a' });
       fireEvent.press(screen.getByTestId('undo-toast-action'));
-      expect(sendLabel()).toHaveBeenLastCalledWith('undismiss', 't1', 'a');
+      expect(sendLabel()).toHaveBeenLastCalledWith('undismiss', 't1', 'a', expect.any(Number));
     });
 
     it('taken off during the take: the summary lists it under “1 marked not a mistake”, with Put back', async () => {
@@ -759,7 +759,7 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
       expect(screen.getByTestId('take-summary-finding-word')).toBeTruthy();
       expect(screen.queryByTestId('take-summary-removed')).toBeNull();
       expect(screen.getByLabelText(/Score .*, 1 mistake$/)).toBeTruthy();
-      expect(sendLabel()).toHaveBeenLastCalledWith('undismiss', 't1', 'a');
+      expect(sendLabel()).toHaveBeenLastCalledWith('undismiss', 't1', 'a', expect.any(Number));
     });
   });
 
