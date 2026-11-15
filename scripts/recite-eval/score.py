@@ -199,6 +199,8 @@ def main():
     args = ap.parse_args()
     bench = pathlib.Path(args.bench)
     run = pathlib.Path(args.run)
+    import sys
+    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))  # run_stamp, under python -I
     import run_stamp  # which checker made each run; runs from different checkers aren't compared by mistake
     run_stamp.check([run / 'results' / n for n in args.results.split(',')], mixed=args.mixed)
     keys = [k for k in args.by.split(',') if k]

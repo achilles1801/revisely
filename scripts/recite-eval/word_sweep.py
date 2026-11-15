@@ -17,6 +17,7 @@ import sys
 
 LAB = pathlib.Path(os.environ.get('LAB', pathlib.Path.home() / 'revisely-mistake-lab'))
 H = pathlib.Path(__file__).resolve().parent
+sys.path.insert(0, str(H))  # run_stamp, under python -I
 PY = str(LAB / '.venv/bin/python')
 BASE = {'sub_p': 1.01, 'alt_rule': 'skeleton', 'del_frac': 0.67}
 ALT_PEN = [-3.0, -5.0, -7.0, -9.0, -12.0]
