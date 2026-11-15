@@ -545,6 +545,13 @@ deployed there on Majd's word. Dev: https://revisely-dev.web.app (deployed by ha
   `config/admin.conversations`), `adminConsole` (`me`, Open Door `od.*`, `audit.*`; App Check on every action but
   `me`; Open Door only where `SUPPORT_PAGES` has the project), `metricsTotals` (the hourly `metrics.yml` with its
   GitHub OIDC token; alarms on the "Metrics alerts" issue).
+- **Production and Dev in one console** (Majd, Nov 14 2026: one console, a switch on the Overview): the console's
+  project asks the other project's `consoleMetrics` (an HTTPS endpoint), proving who it is with a Google-signed ID
+  token for its own service account from the metadata server (no key). `functions/src/console/peer.ts` says who may
+  read whom: production answers revisely-dev's server only (`METRICS_READERS`). Aggregates only, account ids cut to 8
+  characters; Revo conversations open only in their own environment's console. `consoleMetrics` is deployed by hand in
+  production (Nov 14 2026, by Majd's choice); the dev one answers nobody. Dev's crash and App Store section stays
+  empty: the hourly Metrics workflow sends those totals to production only.
 - **App Check on the page:** reCAPTCHA Enterprise, a key per project in `APP_CHECK_KEYS` (`admin/firebase.js`; site
   keys are public). Production has none yet: add one before the console's Open Door or audit runs there.
 - **Sign-in in Safari and built-in browsers** works only where the page is its own auth domain
