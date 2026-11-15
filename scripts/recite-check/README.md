@@ -285,6 +285,34 @@ Its own account (`recite-check@`) may read Firestore (`roles/datastore.viewer`) 
 and a check of a minute's recitation takes a few seconds of CPU. The image is about 120 MB of Artifact Registry's
 free 0.5 GB; each deploy adds one, so delete old images in `cloud-run-source-deploy` after a few.
 
+## Two takes per instance: `recite-check-pair` (Majd approved Nov 15 2026)
+
+A take holds a whole instance for as long as its socket is open, while Recite and Words & Harakat use about 0.3 of its
+vCPU. A second service from the same image takes two of those at once, which halves what their hours cost
+(`recite-checker-cost.md` in the shared notes). Strict (about 0.55 of a vCPU, and 20–26 s to its summary when paired)
+stays on `recite-check`, one take per instance.
+- **The setting:** `LEVELS=recite,harakat`. The service refuses any other level with `level_elsewhere` (409 on /check, an
+  error frame on /live), on every socket and every check, and `/health` lists the levels it takes. Unset (as on
+  `recite-check`), it takes every level.
+- **The app** picks the address by level: Recite and Words & Harakat to the pair service, Strict and anything with
+  letters to `recite-check`. After `level_elsewhere`, or if the pair service can't be reached, it uses `recite-check`.
+- **Deploy** with `--concurrency 2 --max-instances 2`, the other flags as `recite-check`, and
+  `--set-env-vars "^@^PROJECT=revisely-dev@BUCKET=revisely-dev.firebasestorage.app@THREADS=1@OMP_NUM_THREADS=1@LEVELS=recite,harakat"`.
+  The `^@^` prefix makes `@` the separator, because `LEVELS` holds a comma. It takes the same image (`--image`, the one
+  `recite-check` runs), so it needs no build of its own.
+- **Measured on a slow instance** (Nov 15, rev pair-00002, max one instance, so both takes shared one vCPU; the model at
+  0.25 vCPU-s per second of audio, near the slowest seen). Two public takes, the second starting 7 s after the first,
+  at real time:
+
+  | Level | Cursor p90, alone → paired | `said` p90 | Summary after Stop |
+  | --- | --- | --- | --- |
+  | Words & Harakat | 1.03 → 1.08 / 1.04 s | 2.52 → 2.56 / 2.34 s | 0.46 → 0.38 / 0.36 s |
+  | Recite | 1.03 → 1.05 / 1.00 s | 2.51 → 2.52 / 2.32 s | 0.38 → 0.36 / 0.35 s |
+
+  The same take marked the same alone and paired. The worst hop went from 400 to about 580 ms. Before ayah judging
+  moved off the hop, a Words & Harakat pair took 3 s to its summary on a fast instance (Nov 15 morning); now 0.4 s.
+- `live_e2e.py --iam-token-file` (`gcloud auth print-identity-token`) reaches it while it isn't open to the internet.
+
 ## The word table
 
 The checker works out each word's sounds and look-alikes (`checker.Key.passage`) in pure Python: about 100 ms a word
