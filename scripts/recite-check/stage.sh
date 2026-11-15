@@ -32,7 +32,7 @@ if [ -f "$V5" ]; then
   cp "$V5" "$STAGE/lab/models/tajweed-v5/"
   LAB=$LAB RECITE_HARNESS=$H "$PY" -I "$HERE/make_bars.py" "$STAGE/lab/bars.v5.json" v5 > /dev/null
 fi
-cp "$HERE"/{server.py,engine.py,live.py,auth.py,store.py,make_words.py,requirements.txt,Dockerfile} "$STAGE/"
+cp "$HERE"/{server.py,engine.py,live.py,auth.py,store.py,make_words.py,fetch_takes.py,requirements.txt,Dockerfile} "$STAGE/"  # fetch_takes: for its test
 rm -rf "$STAGE/tests" && mkdir -p "$STAGE/tests" && cp "$HERE"/tests/*.py "$STAGE/tests/"
 git -C "$REPO" rev-parse "$HARNESS_COMMIT" > "$STAGE/CHECKER_COMMIT"
 # this service's own commit (+ "-dirty" when staged from uncommitted changes), for /health and ready

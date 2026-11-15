@@ -108,6 +108,9 @@ class FakeSession:
         if msg['type'] == 'dismiss':
             self.dismissed.add(msg['id'])
             return []
+        if msg['type'] == 'undismiss':
+            self.dismissed.discard(msg['id'])
+            return []
         if msg['type'] == 'hint':
             self.hints.append(msg)
             return []
@@ -217,13 +220,41 @@ class DismissTests(Base):
         self.assertEqual(json.loads(data)['id'], '12:word:skipped')
 
     def test_dismiss_refuses(self):
-        r = self.client.post('/dismiss', json={'take': '20261113-101010-abcdef', 'id': '12:word:skipped'})
-        self.assertEqual(r.status_code, 401)
-        h = {'Authorization': 'Bearer good'}
-        for body in ({'take': '../other/x', 'id': '12:word:skipped'}, {'take': '20261113-101010-abcdef', 'id': 'x'},
-                     {'take': '20261113-101010-abcdef'}):
-            self.assertEqual(self.client.post('/dismiss', json=body, headers=h).status_code, 400)
+        for route in ('/dismiss', '/undismiss'):
+            r = self.client.post(route, json={'take': '20261113-101010-abcdef', 'id': '12:word:skipped'})
+            self.assertEqual(r.status_code, 401)
+            h = {'Authorization': 'Bearer good'}
+            for body in ({'take': '../other/x', 'id': '12:word:skipped'}, {'take': '20261113-101010-abcdef', 'id': 'x'},
+                         {'take': '20261113-101010-abcdef'}, ['20261113-101010-abcdef'],
+                         {'take': '20261113-101010-abcdef', 'id': '12:wrong:x'}):
+                self.assertEqual(self.client.post(route, json=body, headers=h).status_code, 400, (route, body))
         self.assertEqual(self.stored, {})
+
+    def test_every_kind_of_mark_can_be_dismissed(self):
+        """The ids engine.marks makes: before Nov 15 2026 /dismiss refused skipped, added and harakat marks."""
+        h = {'Authorization': 'Bearer good'}
+        for mid in ('12:skipped:', '12:added:', '12:added:trail', '12:added:#2', '12:word:lookalike',
+                    '12:harakat:', '12:harakat:shadda', '12:letter:', '12:letter:#3', '12:tajweed:madd_munfasil'):
+            r = self.client.post('/dismiss', json={'take': '20261113-101010-abcdef', 'id': mid}, headers=h)
+            self.assertEqual(r.status_code, 200, mid)
+        self.assertEqual(len(self.stored), 10)
+
+    def test_undismiss(self):
+        """Undo of a "Not a mistake" after the fact: its own file, with the phone's time of the tap when it sent one,
+        so the lab can take the latest of the two (fetch_takes.dismissed_now)."""
+        h = {'Authorization': 'Bearer good'}
+        r = self.client.post('/undismiss', json={'take': '20261113-101010-abcdef', 'id': '12:skipped:',
+                                                 'when': 1763180000123}, headers=h)
+        self.assertEqual(r.json(), {'ok': True})
+        [(name, data)] = self.stored.items()
+        self.assertTrue(name.startswith('recite-tests/tester1/20261113-101010-abcdef.undismiss-'))
+        kept = json.loads(data)
+        self.assertEqual((kept['id'], kept['when'], kept['undo']), ('12:skipped:', 1763180000123, True))
+        self.assertIsInstance(kept['at'], float)
+        # a `when` that isn't a time in ms is left out, not refused
+        self.client.post('/undismiss', json={'take': '20261113-101010-abcdef', 'id': '12:skipped:', 'when': 'soon'},
+                         headers=h)
+        self.assertEqual(sum('when' in json.loads(d) for d in self.stored.values()), 1)
 
 
 def start(token='good', **kw):
@@ -295,6 +326,25 @@ class LiveTests(Base):
         self.assertEqual(kept['dismissed'], ['101:skipped:'])
         self.assertEqual(kept['mode'], 'live')
         self.assertNotIn(ready['take'], server.SESSIONS)
+
+    def test_an_undone_dismissal_is_left_out_of_the_kept_take(self):
+        """Undo on the card while the take is live: `undismiss` goes to the session at its point in the audio, as
+        `dismiss` does, so the score counts the mark again and the kept take's `dismissed` leaves it out."""
+        with self.socket() as ws:
+            ws.send_text(start(keep=True))
+            ready = ws.receive_json()
+            ws.send_bytes(second_of_audio())
+            self.assertEqual(ws.receive_json()['type'], 'at')
+            self.assertEqual(ws.receive_json()['type'], 'mark')
+            for frame in ({'type': 'dismiss', 'id': '101:skipped:'}, {'type': 'dismiss', 'id': '102:word:sound'},
+                          {'type': 'undismiss', 'id': '101:skipped:'}, {'type': 'end'}):
+                ws.send_text(json.dumps(frame))
+            self.assertEqual(ws.receive_json()['type'], 'done')
+            self.assertEqual(ws.receive_json()['type'], 'kept')
+        self.assertEqual([c['type'] for c in FakeSession.made[0].controls],
+                         ['dismiss', 'dismiss', 'undismiss', 'end'])
+        kept = json.loads(self.stored[f"recite-tests/tester1/{ready['take']}.json"])
+        self.assertEqual(kept['dismissed'], ['102:word:sound'])
 
     def test_a_take_with_no_end_follows_to_the_end_of_the_quran(self):
         """No s2/a2 (as the app sends it): the session runs to 114:6, so the follow carries on into the next surah;
