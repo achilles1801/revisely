@@ -129,10 +129,13 @@ export function onMemoryChange(listener: (uid: string) => void): () => void {
 export async function remember(uid: string, record: MemoryRecord): Promise<void> {
   await loadMemory(uid);
   const h = held.get(uid) ?? { ...EMPTY, records: {} };
-  held.set(uid, { ...h, records: mergeInto(h.records, [record]) });
+  // A change made here is the newest version, even within the same millisecond as the one before (Undo right after).
+  const before = h.records[record.id];
+  const r = before && before.rev >= record.rev ? { ...record, rev: before.rev + 1 } : record;
+  held.set(uid, { ...h, records: mergeInto(h.records, [r]) });
   notify(uid);
   await persist(uid);
-  await enqueue(uid, { kind: 'reciteMemory.put', record });
+  await enqueue(uid, { kind: 'reciteMemory.put', record: r });
   requestFlush(uid);
 }
 

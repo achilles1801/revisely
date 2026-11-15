@@ -45,6 +45,13 @@ describe('Recite memory on the phone', () => {
     expect(memoryRecords(UID).map((r) => r.id)).toEqual(['c1']);
   });
 
+  it('a change made on this phone is always the newest version, even in the same millisecond', async () => {
+    await remember(UID, clear('c1', 5));
+    await remember(UID, clear('c1', 5, { deleted: true }));
+    expect(memoryRecords(UID)[0]).toMatchObject({ deleted: true, rev: 6 });
+    expect(mockEnqueue).toHaveBeenLastCalledWith(UID, { kind: 'reciteMemory.put', record: clear('c1', 6, { deleted: true }) });
+  });
+
   it('what the account has is merged in by version, and the next read starts after it', async () => {
     await remember(UID, clear('c1', 5));
     mockPull.mockResolvedValueOnce({ records: [clear('c1', 4, { deleted: true }), clear('c2', 9)], newest: 777 });

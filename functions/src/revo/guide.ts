@@ -307,6 +307,8 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
 
 /** Rules with nothing for a user to ask Revo about, on purpose, and why. */
 export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
+  'RMEM-1': 'Recite’s memory is Revisely Dev only (Mark mistakes), not the store app Revo answers for',
+  'RMEM-2': 'Recite’s memory is Revisely Dev only (Mark mistakes), not the store app Revo answers for',
   'ACT-27': 'Activity refreshes by itself and with a pull; nothing to ask Revo about',
   'NEW-4': 'what waits for the walkthrough; nothing for Revo to explain',
   'ONBOARD-2': 'the server repairs a sign-up stopped half way; nothing to do',
