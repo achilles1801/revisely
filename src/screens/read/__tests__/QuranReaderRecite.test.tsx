@@ -1718,6 +1718,28 @@ describe('Test me (Majd, Nov 15 2026: random within what’s memorized, with an 
     expect(screen.getByTestId('recite-mic')).toBeTruthy();
   });
 
+  it('the notice closed without agreeing: the test ends, and the next take is an ordinary one', async () => {
+    await open();
+    fireEvent(screen.getByTestId('recite-mic'), 'longPress');
+    fireEvent.press(screen.getByTestId('recite-mode-test'));
+    await flush();
+    fireEvent.press(screen.getByTestId('test-me-all'));
+    // The notice takes its turn once the where-from sheet has gone (SHEET-1; in Jest, the fallback about a second on).
+    await waitFor(() => expect(screen.getByTestId('recite-notice-sheet')).toBeTruthy(), { timeout: 3000 });
+    expect(mockLive.start).toBeUndefined();
+    const { ReciteNoticeSheet } = require('../../../components/reciteLive/ReciteNoticeSheet');
+    await act(async () => screen.UNSAFE_getByType(ReciteNoticeSheet).props.onClose());
+    await flush();
+    // The page as it was, and a tap on the mic is a Recite take on the page.
+    expect(screen.queryByTestId('recite-eye-group')).toBeNull();
+    await act(async () => setReciteCheckSettings('u1', { noticeSeen: true }));
+    fireEvent.press(screen.getByTestId('recite-mic'));
+    await flush();
+    await flush();
+    expect(mockLive.start).toMatchObject({ s: 27, a: 23, startBy: expect.any(Array), follow: true });
+    expect(screen.getByTestId('recite-status').props.children).toBe('Starting…');
+  });
+
   it('a place whose start is never found: “Not continued”, and the test goes on', async () => {
     await openTest();
     const { first, last } = placeAt(1);

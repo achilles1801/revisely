@@ -511,6 +511,14 @@ export default function QuranReaderScreen() {
     },
     [live],
   );
+  // A test whose take never started (the notice closed, the microphone refused, Premium refused): it ends, so the next
+  // take isn't counted as one of its places. Between places the microphone is already starting.
+  const testStalled = test != null && live.state.status === 'idle' && live.mic !== 'starting' && noticeFor == null;
+  useEffect(() => {
+    if (testStalled && testRef.current) endTest(testRef.current.results);
+    // endTest is stable enough: only when the test stalls.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [testStalled]);
   // A voice search with one result (Majd, Nov 15 2026: "take them to that page as if they're about to recite it"): a
   // take starts as the reader opens, the checker looking for the start only in the ayahs found. Recite, marking
   // mistakes when the switch is on, whatever a tap on the mic would start. It waits for the account's settings (the
