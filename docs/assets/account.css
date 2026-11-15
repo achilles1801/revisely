@@ -42,6 +42,7 @@ html[dir="rtl"] .lede { line-height: 1.9; }
 .latin, html[dir="rtl"] input, html[dir="rtl"] .latin { font-family: var(--font); }
 [hidden] { display: none !important; }
 .from-app .public-only { display: none !important; }
+html:not(.from-app) .app-only { display: none !important; }
 
 button.link { background: none; border: 0; padding: 0; font: inherit; color: var(--accent); cursor: pointer; font-weight: 600; }
 button.link:hover { text-decoration: underline; }
@@ -65,6 +66,8 @@ button.link:hover { text-decoration: underline; }
 html[dir="rtl"] .page-hero h1 { line-height: 1.4; }
 .page-hero .sub { color: var(--accent); font-weight: 600; margin: 8px 0 0; font-size: 17px; }
 .page-hero .lede { margin-top: 16px; }
+.page-hero .intro { margin: 10px 0 0; font-size: 15px; color: var(--secondary); text-wrap: pretty; }
+.page-hero .intro a { color: var(--accent); font-weight: 600; text-decoration: none; white-space: nowrap; }
 .actions { display: flex; flex-direction: column; gap: 12px; margin-top: 26px; }
 .pill-lg { min-height: 50px; padding: 0 36px; font-size: 17px; border: 0; cursor: pointer; font-family: inherit; }
 .pill-lg:disabled { opacity: .55; cursor: default; }
@@ -163,6 +166,8 @@ html[dir="rtl"] .seg span { font-size: 16px; padding: 4px 6px; }
 .status-card .pill-lg { margin-top: 18px; }
 .signin-ask p { color: var(--secondary); }
 .signin-ask .pill-lg { margin-top: 16px; }
+.signin-ask .store-line { margin-top: 22px; }
+.signin-ask .stores { margin-top: 12px; }
 .spinner { width: 26px; height: 26px; margin: 30px auto; border-radius: 50%; border: 2.5px solid var(--separator); border-top-color: var(--accent); animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
