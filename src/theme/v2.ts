@@ -149,11 +149,11 @@ export interface PaletteV2 extends AccentTokens {
   warnSubtle: string;
   goodSubtle: string;
   /**
-   * Following a recitation (the reader's live take, the hidden pages): the ayah being recited (a soft band behind the
-   * page's ink), the word being recited (a firmer box), and `followInk`, where the recitation is as a colour of its own
-   * (the word being said in the bar, the newest word on a hidden page, the hidden page's guide band). Blue for every
-   * accent, so it never reads as a mistake's red or a slip's amber (Majd, Nov 14 2026: Crimson's follow looked like
-   * mistakes). Ink reads at 4.5:1 on the band and the box; a mark's colour and `followInk` at 3:1 (the page's text is
+   * Following a recitation (the reader's live take, the hidden pages): the line being recited (a soft band behind the
+   * page's ink) and the word being recited (a firmer box), both quiet greys like Tarteel's (Majd, Nov 15 2026: the blue
+   * ayah band read as running ahead); and `followInk`, where the recitation is as a colour of its own (the word being said
+   * in the bar, the newest word on a hidden page, the hidden page's guide band). None of it follows the accent, so it
+   * never reads as a mistake's red or a slip's amber (Majd, Nov 14 2026: Crimson's follow looked like mistakes). Ink reads at 4.5:1 on the band and the box; a mark's colour and `followInk` at 3:1 (the page's text is
    * large); `followInk` as text at 4.5:1 on the ground.
    */
   followBand: string;
@@ -194,8 +194,8 @@ const BASE_LIGHT: Base = {
   onRedSubtle: '#B91C1C',
   warnSubtle: '#FDF2E2',
   goodSubtle: '#E6F2EF',
-  followBand: '#F0F6FF',
-  followWord: '#CFE1FB',
+  followBand: '#F2F2F4',
+  followWord: '#DEDEE3',
   followInk: '#1D4ED8',
   premium: ['#7C3AED', '#DB2777'],
   onPremium: '#FFFFFF',
@@ -226,8 +226,8 @@ const BASE_DARK: Base = {
   onRedSubtle: '#F87171',
   warnSubtle: '#2A2008',
   goodSubtle: '#0D2721',
-  followBand: '#0A1626',
-  followWord: '#14325A',
+  followBand: '#121214',
+  followWord: '#26262B',
   followInk: '#7DB3F5',
   premium: ['#A78BFA', '#F472B6'],
   onPremium: '#000000',

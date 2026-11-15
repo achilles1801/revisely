@@ -10,7 +10,7 @@ import type { WordFollow } from '../../lib/recite/hiddenPage';
 import type { Mark } from '../../lib/reciteLive/contract';
 import { severityOf } from '../../lib/reciteLive/contract';
 import { markTitle } from '../../lib/reciteLive/describe';
-import { ayahBand, cursorBox, grow, markShape, wordBox } from '../../lib/reciteLive/geometry';
+import { currentLineBand, cursorBox, grow, markShape, wordBox } from '../../lib/reciteLive/geometry';
 import { markStrength } from '../../lib/reciteLive/state';
 import { mixColors } from '../../theme/v2';
 
@@ -21,8 +21,9 @@ function rectStyle(r: Rect, scale: number) {
 }
 
 /**
- * Behind the page's ink, in its frame: the ayah being recited (a soft band on each of its lines) and the word being
- * recited (a firmer box), and the mark a card is open for.
+ * Behind the page's ink, in its frame, in quiet greys: the line being recited (its part of the ayah) and the word being
+ * recited (a firmer box), and the mark a card is open for. Not a band over the whole ayah: in blue, over lines not yet
+ * said, it read as running ahead (Majd's Dev take, Nov 15 2026). Calm and exact, as Tarteel's grey line and box are.
  */
 export function LiveUnderlay({
   page,
@@ -40,14 +41,12 @@ export function LiveUnderlay({
   colors: { band: string; word: string; selectedMistake: string; selectedSlip: string };
 }) {
   const here = cursor != null && words.pageOf(cursor) === page;
-  const ref = here ? words.ref(cursor) : null;
+  const line = here ? currentLineBand(words, page, cursor) : null;
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill} testID={`live-underlay-${page}`}>
-      {ref
-        ? ayahBand(page, ref.sura, ref.ayah).map((r, i) => (
-            <View key={`b${i}`} testID="live-ayah-band" style={[styles.abs, styles.band, rectStyle(r, scale), { backgroundColor: colors.band }]} />
-          ))
-        : null}
+      {line ? (
+        <View testID="live-line-band" style={[styles.abs, styles.band, rectStyle(line, scale), { backgroundColor: colors.band }]} />
+      ) : null}
       {here ? (
         <View testID="live-word-box" style={[styles.abs, styles.box, rectStyle(cursorBox(words, cursor), scale), { backgroundColor: colors.word }]} />
       ) : null}

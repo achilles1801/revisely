@@ -234,6 +234,11 @@ until its part is set up.
     microphone goes off and the take stays open on the same connection. The bar's Pause and Resume do the same, and
     Resume carries on from where it was. What the card plays stops when the card closes, the take ends or is closed, a
     new one starts, the reader goes, or anything else takes the audio.
+  - **Calm, exact tracking** (Majd's Dev take, Nov 15 2026; Tarteel's mic take as the reference): a quiet grey band on
+    the line being recited (the ayah's part of it, `currentLineBand`) and a grey box on the word. It is not a blue band
+    over the whole ayah, which covered lines not yet said and read as running ahead (the checker's `at` was 1.0 s
+    behind, never ahead). Blue (`followInk`) is for the word being said in the bar and the newest word on a hidden page.
+    None of Recite's colours follow the accent (design.test).
   - **Your recitation** on the mark card: the reciter's own voice at the mark, from the take's audio that the connection
     holds on the phone for resuming (`audioClip`), from the mark's `t` (0.6 s before to 0.4 s after). A mark without
     one (a skipped word) uses when the cursor first reached that word or the one before, ±1.2 s. It works until the take

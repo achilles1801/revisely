@@ -196,6 +196,11 @@ const UTIYAT = A23 + 4;
 
 const flush = () => act(async () => {});
 const event = (e: LiveEvent) => act(async () => mockLive.onEvent?.(e));
+/** An element's style, flattened. */
+const flatStyle = (el: { props: { style?: unknown } }): Record<string, unknown> => {
+  const flat = (st: unknown): Record<string, unknown> => (Array.isArray(st) ? Object.assign({}, ...st.map(flat)) : ((st as Record<string, unknown>) ?? {}));
+  return flat(el.props.style);
+};
 /** The card's player (lib/reciteLive/hearAudio): what it was given to play, and the last one made. */
 const createdPlayers = () => (jest.requireMock('expo-audio').createAudioPlayer as jest.Mock).mock;
 const playerUris = () => createdPlayers().calls.map((c: unknown[]) => (c[0] as { uri?: string } | null)?.uri).filter(Boolean);
@@ -305,8 +310,14 @@ describe('Recite: following along', () => {
     await event({ type: 'mark', mark: { id: 'a', w: UTIYAT, ayah: [27, 23], kind: 'word', sure: 'likely', heard: 'وَأُوهِيَتْ', heardExact: false } });
     await event({ type: 'at', w: UTIYAT + 1 });
     expect(screen.getByTestId('recite-words')).toBeTruthy();
+    // Where the reciter is (Majd's Dev take, Nov 15 2026): the word's box and a quiet band on its line only. Not a band
+    // over the whole ayah, which covered lines not yet said and read as running ahead.
     expect(screen.getByTestId('live-word-box')).toBeTruthy();
-    expect(screen.getAllByTestId('live-ayah-band').length).toBe(2);
+    expect(screen.queryAllByTestId('live-ayah-band')).toHaveLength(0);
+    const band = flatStyle(screen.getByTestId('live-line-band'));
+    const box = flatStyle(screen.getByTestId('live-word-box'));
+    expect(band.top as number).toBeLessThanOrEqual(box.top as number);
+    expect((band.top as number) + (band.height as number)).toBeGreaterThanOrEqual((box.top as number) + (box.height as number));
     expect(screen.queryByTestId('recite-score')).toBeNull();
     expect(screen.queryByTestId('live-mark-word')).toBeNull();
   });
