@@ -64,6 +64,24 @@ appId: com.revisionbuddy.app
     env:
       NAME: rl01-reader
 
+# The reader's help, with Recite: its recording topic tells of holding the mic for Recite (lib/help/topics).
+- tapOn:
+    id: help-button-reader
+- extendedWaitUntil:
+    visible:
+      id: help-sheet-reader
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl01b-help-reader
+- tapOn:
+    id: help-done
+- extendedWaitUntil:
+    notVisible:
+      id: help-sheet
+    timeout: 5000
+
 # Hold the mic: Record and Recite. A new account has no Premium: Mark mistakes is locked, and a tap opens the
 # Premium page. Get Premium (Revisely Dev's free grant, devGrantPremium in the functions emulator) turns it on.
 - longPressOn:
@@ -184,6 +202,24 @@ appId: com.revisionbuddy.app
       NAME: rl05-hidden
 - tapOn:
     id: recite-eye
+
+# While a take is open, the reader's ? tells how Recite works (Majd, Nov 15 2026: the help in line with Dev's Recite).
+- tapOn:
+    id: help-button-reader
+- extendedWaitUntil:
+    visible:
+      id: help-sheet-recite
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl05b-help-recite
+- tapOn:
+    id: help-done
+- extendedWaitUntil:
+    notVisible:
+      id: help-sheet
+    timeout: 5000
 
 # Stop: the final answer and its summary; then the page with its marks, and ✕.
 - tapOn:

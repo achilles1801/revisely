@@ -596,7 +596,10 @@ export default function QuranReaderScreen() {
             </View>
             {/* Its help (HELP-1), a round button like Back; hidden, the same room keeps the title centred. */}
             <HelpButton
-              screen="reader"
+              // While a take is open: how Recite works (Revisely Dev); otherwise the reader's own help.
+              screen={live.active ? 'recite' : 'reader'}
+              liveRecite={liveOn}
+              hideAs="reader"
               render={(open, label) => (
                 <RoundButton icon={HELP_ICON} label={label} onPress={open} palette={palette} testID="help-button-reader" />
               )}
