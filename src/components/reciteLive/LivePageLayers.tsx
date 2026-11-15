@@ -119,8 +119,9 @@ function Dots({ box, scale, color, opacity }: { box: Rect; scale: number; color:
 }
 
 /**
- * Over the page's ink: hidden-page covers (words show as recited, or shown by hand), the newest word shown in the
- * follow blue while hidden (never the accent), and the marks (Check): the word itself in red or amber with a dotted line under it, or a small
+ * Over the page's ink: hidden-page covers (words show as recited, or shown by hand) with no band on any line (before
+ * the checker has found where the reciter is, nothing shows but the covers: Majd's Dev take, Nov 15 2026), the newest
+ * word shown in the follow blue while hidden (never the accent), and the marks (Check): the word itself in red or amber with a dotted line under it, or a small
  * ⊕ in the gap where a word was added. A mark past the normal bar only (`likely`) is a little lighter.
  */
 export function LiveOverlay({
@@ -138,7 +139,7 @@ export function LiveOverlay({
   image: PageImage | null;
   words: QuranWords;
   marks: Mark[];
-  hidden: { follow: WordFollow; cover: string; guide: string; band: string } | null;
+  hidden: { follow: WordFollow; cover: string; guide: string } | null;
   newest: number | null;
   /** `ground`: the page's colour (a likely mark is its colour a little towards it). */
   colors: { mistake: string; slip: string; follow: string; onMistake: string; ground: string };
@@ -152,7 +153,7 @@ export function LiveOverlay({
           scale={scale}
           revealed={NO_REVEALED}
           follow={hidden.follow}
-          colors={{ cover: hidden.cover, guide: hidden.guide, band: hidden.band }}
+          colors={{ cover: hidden.cover, guide: hidden.guide }}
         />
       ) : null}
       {image && showNewest ? <Recoloured image={image} box={wordBox(words, newest)} scale={scale} color={colors.follow} opacity={1} /> : null}

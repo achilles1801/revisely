@@ -429,7 +429,8 @@ describe('a take starts anywhere on the page (Majd, Nov 14 2026)', () => {
     expect(screen.getByTestId('recite-status').props.children).toBe('Listening…');
     expect(screen.queryByTestId('recite-words')).toBeNull();
     expect(screen.queryByTestId('live-word-box')).toBeNull();
-    expect(screen.queryAllByTestId('live-ayah-band')).toHaveLength(0);
+    // Never on the page's top line by default: the checker hasn't said where the reciter is.
+    expect(screen.queryByTestId('live-line-band')).toBeNull();
     expect(screen.queryByTestId('recite-score')).toBeNull();
   });
 
@@ -548,6 +549,29 @@ describe('the hidden view (the eye on the bar)', () => {
     ]);
     fireEvent.press(screen.getByTestId('recite-eye'));
     expect(screen.queryByTestId('hidden-page-379')).toBeNull();
+  });
+
+  it('no band on any line: nothing but the covers before the start is found, the words recited after (Majd, Nov 15 2026)', async () => {
+    // Majd: "there shouldn't be an always there highlight at the top when the verses are hidden".
+    await startTake('recite', null);
+    fireEvent.press(screen.getByTestId('recite-eye'));
+    expect(screen.getByTestId('hidden-page-379')).toBeTruthy();
+    const covered = screen.getAllByTestId('hidden-cover').length;
+    expect(screen.queryAllByTestId('hidden-band')).toHaveLength(0);
+    expect(screen.queryByTestId('live-line-band')).toBeNull();
+    expect(screen.queryByTestId('live-word-box')).toBeNull();
+    // Found: the words recited show in place, and still no band.
+    await event({ type: 'locked', w: A23, s: 27, a: 23 });
+    await event({ type: 'at', w: A23 + 3 });
+    expect(screen.getAllByTestId('hidden-cover').length).toBeLessThanOrEqual(covered);
+    expect(screen.queryAllByTestId('hidden-band')).toHaveLength(0);
+  });
+
+  it('nor with no take: the eye alone covers the page with no band', async () => {
+    await open();
+    fireEvent.press(screen.getByTestId('reader-eye'));
+    expect(screen.getByTestId('hidden-page-379')).toBeTruthy();
+    expect(screen.queryAllByTestId('hidden-band')).toHaveLength(0);
   });
 
   it('a tap on a hidden page shows nothing: the pager gets no verse tap, so it brings the controls (Majd, Nov 14 2026)', async () => {

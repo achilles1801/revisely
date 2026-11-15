@@ -444,7 +444,8 @@ export default function QuranReaderScreen() {
     (page: number) => (checkTake && qw ? marksOnPage(live.state, qw, page) : []),
     [checkTake, qw, live.state],
   );
-  const coverColors = useMemo(() => ({ cover: palette.pageBg, guide: palette.textSecondary, band: v2.followInk }), [palette, v2]);
+  // The hidden view: covers and guide lines only, no band on any line (lib/reciteLive's LiveOverlay).
+  const coverColors = useMemo(() => ({ cover: palette.pageBg, guide: palette.textSecondary }), [palette]);
   const pageUnderlay = useMemo(
     () =>
       liveOn && qw && live.active
