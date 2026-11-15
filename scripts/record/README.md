@@ -73,7 +73,9 @@ takes `?endpoint=` only on localhost.
 
 ## Privacy
 
-Recordings are of volunteers who agreed on the page (or whose parent or guardian did). They never go into
+Recordings are of volunteers who agreed on the page (or, at 13 to 17, whose parent or guardian did). Under 13, the
+page stops before the microphone with a thank-you note and sends nothing, not even the answers (Majd, Nov 15 2026):
+a child's voice is personal information under COPPA, which asks for a parent's verifiable consent. They never go into
 this repository, the app or Firebase. The page tells volunteers the recordings are used to build and test the
 checker, including training models, that it may become a paid feature, and how to have them deleted
 (support@revisely.app with their code). This is separate from the app, so the app's privacy policy and App
