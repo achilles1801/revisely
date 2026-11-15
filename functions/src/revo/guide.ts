@@ -314,6 +314,7 @@ export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
   'SYNC-4': 'a new account loads with no relaunch; nothing to do',
   'ACCOUNT-2': 'the sign-in screen keeps what was typed after a failed attempt; Revo is for signed-in users',
   'ACCOUNT-3': 'how long Delete account waits for the server; the app says what happened itself',
+  'AUTH-2': 'the sign-in screen says when the phone was signed out; Revo is for signed-in users',
   'RESET-1': 'the owner’s reset script',
   'ACT-9': 'when a day’s items load',
   'ACT-13': 'an add from the day’s + shows there at once, offline too; nothing to ask (the + itself is in Activity’s section)',

@@ -25,6 +25,7 @@ import * as Updates from 'expo-updates';
 import * as SplashScreen from 'expo-splash-screen';
 import { logger } from '../logger';
 import { busyReasons } from './busy';
+import { markUpdateRestart } from '../signInDropped';
 import { SPLASH_GROUND } from '../../theme/v2';
 
 /** How long the splash waits for an update at launch. */
@@ -157,6 +158,8 @@ export async function applyUpdate(): Promise<boolean> {
   if (!otaEnabled() || reloading) return false;
   reloading = true;
   try {
+    // AUTH-2's report says whether a dropped sign-in followed a restart into an update.
+    await markUpdateRestart();
     await Updates.reloadAsync({ reloadScreenOptions: reloadScreenOptions() });
     return true;
   } catch (err) {
