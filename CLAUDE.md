@@ -527,10 +527,11 @@ true → approve. It republishes that exact update, the same way promotion does.
 
 ## Revisely Console (staff only: metrics, Open Door, audit log)
 
-`admin/` on Firebase Hosting (Majd, Nov 14 2026: "a revisely dev dashboard like a real company"). Production:
-https://metrics.revisely.app (also https://revision-buddy-3a398.web.app), still the old page until the console is
-deployed there on Majd's word. Dev: https://revisely-dev.web.app (deployed by hand, `firebase deploy --only hosting
---project revisely-dev`; nothing deploys Hosting by itself).
+`admin/` on Firebase Hosting (Majd, Nov 14 2026: "a revisely dev dashboard like a real company"). **The one console
+is https://revisely-dev.web.app** (revisely-dev's Hosting, deployed by hand: `firebase deploy --only hosting --project
+revisely-dev`; nothing deploys Hosting by itself). It shows production and dev (below). https://metrics.revisely.app
+(and revision-buddy-3a398.web.app) only redirects there since Nov 14 2026 (`scripts/metrics/metrics-redirect/`, its
+README has the deploy and the undo); never deploy the root `firebase.json`'s hosting to production.
 - **Pages:** `/sign-in` (its own page: Google, or email and password; no sign-up; an account without a role sees "No
   access" with Sign out, and nothing else), `/` Overview (the metrics), `/open-door` and `/open-door/<uid>`, `/audit`.
   Signed out, every address goes to `/sign-in?next=…` (`shell.js`). Hosting's `cleanUrls` and rewrites serve them.

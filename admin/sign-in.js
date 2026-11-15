@@ -60,7 +60,7 @@ async function start() {
     show('broken');
     return;
   }
-  if (ctx.env.kind !== 'prod') {
+  if (ctx.env.kind === 'local' || ctx.env.kind === 'other') {
     $('env').hidden = false;
     $('env').textContent = ctx.env.label;
     $('env').dataset.kind = ctx.env.kind;

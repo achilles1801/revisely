@@ -94,6 +94,8 @@ const st = {
 
 export function start(c) {
   ctx = c;
+  // Open Door runs on Revisely Dev until it launches (its applications live in that project).
+  if (ctx.env.kind === 'dev') document.querySelector('#view-opendoor .od-head .sub').textContent = 'Open Door · Premium for anyone who can’t pay · on Revisely Dev until launch';
   $('odFilters').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-filter]');
     if (b) setFilter(b.dataset.filter);

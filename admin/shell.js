@@ -114,7 +114,9 @@ async function start() {
   ctx.can = (permission) => me.permissions.includes(permission);
   ctx.go = go;
 
-  if (ctx.env.kind !== 'prod') {
+  // The one console shows production and dev (Overview's switch), so its host project gets no badge; only a local
+  // test server or an unknown project does.
+  if (ctx.env.kind === 'local' || ctx.env.kind === 'other') {
     $('env').hidden = false;
     $('env').textContent = ctx.env.label;
     $('env').dataset.kind = ctx.env.kind;
