@@ -24,6 +24,24 @@ file is the release mechanics and the traps behind them.
     session wastes the time.
   - Everything else here still holds: privacy, free tiers, one simulator and no heavy jobs beside it, and the
     branch rule below.
+- **Hand off before your context fills, and name sessions by topic and number** (Majd, Nov 14 2026).
+  - Check your context with `mcp__ccd_session_mgmt__get_usage` (session "self") at milestones and before big
+    reads. Auto-compaction starts at about 97% and keeps you going, but it loses detail.
+  - At 80% or more, write a full hand-off doc in `~/Documents/revisely-handoffs/<topic>-<n>.md`:
+    - the goal and scope;
+    - where things stand;
+    - the decisions and why, with Majd's words quoted;
+    - branches, PRs and deploys;
+    - running jobs and watchers;
+    - who is waiting on what;
+    - the next steps;
+    - the traps you found.
+  - Then stop starting new work and tell the orchestrator, who starts your successor with the doc. With no
+    orchestrator, start it yourself.
+  - **Titles** (`set_session_title`, "self"): a few words for the work, then a number.
+    - The first session is "<topic> · MAIN".
+    - The first successor is "<topic> · WORKER", then "<topic> · WORKER 2", "<topic> · WORKER 3"…
+    - A successor renames itself when it starts.
 
 ## Branches and releases
 
