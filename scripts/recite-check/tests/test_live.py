@@ -22,6 +22,9 @@ MODEL = LAB / 'models/hisnlabs-tajweed-v2/onnx/model-int8.onnx'
 BENCH = pathlib.Path(os.environ.get('RECITE_BENCH', pathlib.Path.home() / 'revisely-mistake-lab/data/bench-v0/items'))
 ITEM = BENCH / 'alafasy.p2.m1.clean.json'  # Al-Fatiha; planted: word 4 said as another word, word 14 skipped
 CLEAN = BENCH / 'alafasy.p2.clean.clean.json'  # Al-Fatiha as recited, no mistakes
+# the lab's bench_endings.py: bench-v0's passages with ayah endings swapped for nearby ones, from the same recordings
+ENDINGS = pathlib.Path(os.environ.get('RECITE_BENCH_ENDINGS',
+                                      pathlib.Path.home() / 'revisely-mistake-lab/data/bench-endings/items'))
 
 E = None
 
@@ -648,10 +651,12 @@ class SimilarPassage(unittest.TestCase):
         if engine().table is None:
             self.skipTest('no word table for these words: nothing is named without it')
 
-    def named(self, name, s, a, s2, a2):
+    def named(self, name, s, a, s2, a2, where=BENCH):
         """{(w, kind): into} of the marks with `into`: (from a check, from a live take)."""
         import live
-        with wave.open(str(BENCH / f'{name}.wav')) as f:
+        if not (where / f'{name}.wav').exists():
+            self.skipTest(f'{name} is not here')
+        with wave.open(str(where / f'{name}.wav')) as f:
             pcm = f.readframes(f.getnframes())
         x = np.frombuffer(pcm, '<i2').astype(np.float32) / 32768
         checked = engine().check(x, s, a, s2, a2, v=2)
@@ -670,7 +675,28 @@ class SimilarPassage(unittest.TestCase):
         """2:8 into 22:8 («يُجَـٰدِلُ فِى ٱللَّهِ بِغَيْرِ عِلْمٍۢ…»), which 31:20 also says."""
         checked, at_end = self.named('husary.p1.m1.clean', 2, 6, 2, 16)
         for got in (checked, at_end):
-            self.assertEqual([(v['ayah'], v.get('also')) for v in got.values()], [([22, 8], [[31, 20]])])
+            self.assertEqual([(v['ayah'], v.get('also')) for v in got.values() if not v.get('ending')],
+                             [([22, 8], [[31, 20]])])
+            # the take's planted substitution put «بِمُؤْمِنِينَ» for 2:15's last word: that is 2:8's ending, so naming
+            # it is right (at the live take's end, where the word before was heard right)
+            self.assertIn({w: v['ayah'] for (w, _), v in got.items() if v.get('ending')}, ({}, {180: [2, 8]}))
+
+    def test_an_ayah_ending_said_as_a_nearby_one_names_it(self):
+        """1:4 ended with «ٱلرَّحِيمِ» (1:3's ending, and 1:1's) for «ٱلدِّينِ»: its mark says so, `ending: true`. The take's
+        other two swapped endings aren't named at the end of either: nothing is named on weak evidence."""
+        for got in self.named('shuraym.p2.end.clean', 1, 1, 1, 7, where=ENDINGS):
+            self.assertEqual(got, {(12, 'word'): {'w': 9, 'ayah': [1, 3], 'also': [[1, 1]], 'ending': True}})
+
+    def test_naming_starts_nothing_once_its_work_is_spent(self):
+        """A take full of mistakes can't hold up the answer: once similar.P['budget'] is spent no run or ending is
+        tried. The budget is work, not time, so the same take names the same on the Mac and on Cloud Run."""
+        import similar
+        with wave.open(str(BENCH / 'alafasy.p8.m1.clean.wav')) as f:
+            x = np.frombuffer(f.readframes(f.getnframes()), '<i2').astype(np.float32) / 32768
+        with unittest.mock.patch.dict(similar.P, {'budget': 0}):
+            got = engine().check(x, 2, 255, 2, 257, v=2)
+        self.assertFalse([m for m in got['marks'] if 'into' in m])
+        self.assertTrue([m for m in got['marks'] if m['kind'] == 'skipped'])  # the marks themselves are all there
 
     def test_no_name_without_a_slip(self):
         """Al-Fatiha with a word said as another and one skipped, and as recited: nothing named."""

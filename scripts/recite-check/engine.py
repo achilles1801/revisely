@@ -481,21 +481,31 @@ class Engine:
         return out
 
     def name_slips(self, marks, lp, order, statuses, spans, extras):
-        """Where the reciter went, when a run of words skipped or said wrong is a similar passage's words: `into` on the
-        run's first word mark ({w, ayah, also?}: the place's first word said, its ayah, other ayat with the same words
-        as far as heard). The lab's similar.py (Nov 15 2026: of bench-v0's 111 planted slips into a similar ayah, 107
-        named with the right place and none with a wrong one; no name on any other run there, or on the learners',
-        /record's or Dev takes). Not shown by the app yet (Majd: "show nothing until the numbers are good").
-        Returns the milliseconds it took: 0–17 ms a take with the word table; without it, each place's sounds would be
-        worked out here (~100 ms a word), so nothing is named."""
+        """Where the reciter went, on the mark of a slip (recite-contract.md, `into`): {w, ayah, also?, ending?}.
+        - A run of words skipped or said wrong that is a similar passage's words: `into` on the run's first word mark,
+          w being the place's first word said (lab, Nov 15 2026: of bench-v0's 111 planted slips into a similar ayah,
+          107 named with the right place, none with a wrong one).
+        - An ayah's last word said as another nearby ayah's last word (`ending: true`; 78 of 164 swapped endings named,
+          none wrongly; /record w4's «إذا وقب» for «إذا حسد»).
+        `also`: other ayat with the same words as far as heard. Nothing was named on any other run of the bench, the
+        learners', /record's or the Dev takes. The lab's similar.py. Not shown by the app yet (Majd: "show nothing
+        until the numbers are good").
+        Returns the milliseconds it took: 0–20 ms a take on the Mac, 74–104 on Cloud Run. Both passes share
+        similar.P['budget'], a measure of work, not time (about 0.5 s on Cloud Run), so a take full of mistakes can't
+        hold up the answer and a take names the same on any machine. Without the word table each place's sounds would
+        be worked out here (~100 ms a word), so nothing is named."""
         if self.table is None:
             return 0
         t0 = time.perf_counter()
+        work = {'left': similar.P['budget']}
+        names = []
         try:
-            names = similar.find(lp, order, statuses, spans, extras, self._labels_of, self.slip_index)
+            names = similar.find(lp, order, statuses, spans, extras, self._labels_of, self.slip_index, work=work)
+            marked = {n['mark'] for n in names}
+            names += [n for n in similar.endings(lp, order, statuses, spans, self._forms_of, self.slip_index,
+                                                 work=work) if n['mark'] not in marked]
         except Exception as e:  # naming is extra: it never costs the answer
             print(f'similar: {type(e).__name__}: {e}', file=sys.stderr)
-            names = []
         for n in names:
             m = next((m for m in marks if m['w'] == n['mark'] and m['kind'] in ('skipped', 'word')), None)
             if m is None:
@@ -506,8 +516,16 @@ class Engine:
                 a = self.slip_index.ayah(x)
                 if a != ayah and a not in also:
                     also.append(a)
-            m['into'] = {'w': int(n['w']), 'ayah': ayah} | ({'also': also[:5]} if also else {})
+            m['into'] = ({'w': int(n['w']), 'ayah': ayah} | ({'also': also[:5]} if also else {})
+                         | ({'ending': True} if n.get('kind') == 'ending' else {}))
         return int((time.perf_counter() - t0) * 1000)
+
+    def _forms_of(self, w):
+        """Word w's forms (joined, started on, stopped on), for similar.endings."""
+        try:
+            return self.passage_words(w, w + 1)[0]['forms']
+        except ValueError:
+            return []
 
     def _labels_of(self, lo, hi):
         """The sounds of app words [lo, hi) as the checker hears them joined, and where each word ends (similar.py)."""

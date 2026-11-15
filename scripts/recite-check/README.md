@@ -75,8 +75,9 @@ asked), `ms` (time spent) and `engine` (the checker's commit).
   - `sure`: `clear` or `likely`;
   - `into` (Nov 15 2026), on the first mark of a run of words skipped or said wrong when they were a similar
     passage's words: `w`, the place's first word said; its `ayah`; and `also`, other ayat with the same words as far
-    as heard. From the lab's `similar.py` (`Engine.name_slips`); only in the final answer, and the app doesn't show it
-    yet.
+    as heard. With `ending: true`, an ayah's last word said as the last word of an ayah near it in the same surah.
+    From the lab's `similar.py` (`Engine.name_slips`, within `similar.P['budget']`); only in the final answer, and the
+    app doesn't show it yet.
 - `score`: `reached`, `mistakes` (word, skipped, added, harakat and letter marks), `tajweed`, and
   `accuracy` = 1 − mistakes ÷ reached.
 
