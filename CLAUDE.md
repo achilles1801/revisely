@@ -1738,8 +1738,8 @@ classic default), and a fresh install starts in light.
   with a small accent dot under the current tab that follows a swipe (below); `ActionBar` takes
   its place for a screen's own actions. No Threads/Meta names, logos or icons, no likes or reposts.
 - Shared pieces live in `src/components/v2/`; Home's feed in `src/components/home/feed/`. Every sheet
-  is `v2/Sheet` (handle, centred title, optional Cancel/Save, optional foot bar; the backdrop is its
-  sibling) and every menu `v2/ActionSheet`; segmented controls are `v2/PillTabs`. Sheets with their
+  is `v2/Sheet` (handle, centred title, optional Cancel/Save, optional foot bar, and `pinned`: a sheet's own
+  main action kept on screen under its scrolling content; the backdrop is its sibling) and every menu `v2/ActionSheet`; segmented controls are `v2/PillTabs`. Sheets with their
   own frame (gorhom `PlanSheet`) take the same colours and corners.
 - A sheet closes by a tap on the backdrop, or by dragging its handle or header down (Oct 27 2026):
   it follows the finger on the UI thread and the backdrop fades with it; past 120pt (or 30% of a

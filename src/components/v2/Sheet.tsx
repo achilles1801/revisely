@@ -99,6 +99,7 @@ export function Sheet({
   right,
   children,
   footer,
+  pinned,
   scroll = false,
   keyboard = false,
   onShow,
@@ -121,6 +122,11 @@ export function Sheet({
   children?: React.ReactNode;
   /** A full-width bar at the bottom (e.g. "Cancel", "Done"). */
   footer?: { label: string; onPress: () => void; testID?: string };
+  /**
+   * Kept under the scrolling content, always on screen: a sheet's own main action (the recite notice's "I understand"
+   * at the largest text, where it sat at the end of a long scroll on an SE).
+   */
+  pinned?: React.ReactNode;
   /** Wrap the content in a scroll view (bounded by the sheet's max height). */
   scroll?: boolean;
   /** Lift the sheet above the keyboard (sheets with a text field). */
@@ -341,6 +347,7 @@ export function Sheet({
               <ModalNest>{children}</ModalNest>
             </View>
           )}
+          {pinned ? <ModalNest>{pinned}</ModalNest> : null}
           {footer ? (
             <Tap
               onPress={footer.onPress}

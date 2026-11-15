@@ -2,7 +2,7 @@
 // memory): an Arabic phrase with the mark's word highlighted, a labelled row, a small outlined pill.
 
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { arabicV2, layoutV2, typeV2 } from '../../theme/v2';
@@ -38,11 +38,18 @@ export function Phrase({ parts, fill }: { parts: PhrasePart[]; fill: string }) {
   );
 }
 
+/** From this text size a row's label goes above its phrase: beside it, "Expected" broke mid-word on an SE at the largest. */
+export const STACK_ROWS_AT = 1.3;
+
 export function Row({ label, children, first }: { label: string; children: React.ReactNode; first?: boolean }) {
   const { palette } = useTheme();
+  const stacked = useWindowDimensions().fontScale >= STACK_ROWS_AT;
   return (
-    <View style={[styles.row, !first && { borderTopColor: palette.separator, borderTopWidth: layoutV2.hairline }]}>
-      <Text style={[typeV2.meta, styles.label, { color: palette.secondary }]} maxFontSizeMultiplier={1.3}>
+    <View
+      style={[styles.row, stacked && styles.rowStacked, !first && { borderTopColor: palette.separator, borderTopWidth: layoutV2.hairline }]}
+      testID={stacked ? 'mark-card-row-stacked' : undefined}
+    >
+      <Text style={[typeV2.meta, stacked ? null : styles.label, { color: palette.secondary }]} maxFontSizeMultiplier={1.3}>
         {label}
       </Text>
       <View style={styles.rowBody}>{children}</View>
@@ -72,6 +79,7 @@ export function SmallPill({ icon, label, onPress, testID }: { icon?: keyof typeo
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 4, marginTop: 6 },
   label: { width: 66 },
+  rowStacked: { flexDirection: 'column', alignItems: 'stretch', gap: 2 },
   ar: { writingDirection: 'rtl', textAlign: 'right' },
   pill: {
     flexDirection: 'row',

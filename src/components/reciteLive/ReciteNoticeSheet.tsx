@@ -11,12 +11,21 @@ import { ReciteCheckNotice } from '../reciteCheck/ReciteCheckNotice';
  */
 export function ReciteNoticeSheet({ visible, onAgree, onClose }: { visible: boolean; onAgree: () => void; onClose: () => void }) {
   return (
-    <Sheet visible={visible} onClose={onClose} title="Before you recite" scroll testID="recite-notice-sheet">
-      <View style={styles.block}>
-        <ReciteCheckNotice />
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      title="Before you recite"
+      scroll
+      // Always on screen: at the largest text on an SE the notice runs several screens long, and the button sat at its end.
+      pinned={
         <View style={styles.pad}>
           <PillButton title="I understand" size="lg" onPress={onAgree} testID="recite-notice-agree" />
         </View>
+      }
+      testID="recite-notice-sheet"
+    >
+      <View style={styles.block}>
+        <ReciteCheckNotice />
       </View>
     </Sheet>
   );
@@ -24,5 +33,5 @@ export function ReciteNoticeSheet({ visible, onAgree, onClose }: { visible: bool
 
 const styles = StyleSheet.create({
   block: { gap: 12, paddingBottom: 16 },
-  pad: { paddingHorizontal: layoutV2.gutter },
+  pad: { paddingHorizontal: layoutV2.gutter, paddingTop: 12 },
 });
