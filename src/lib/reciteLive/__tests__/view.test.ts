@@ -72,6 +72,19 @@ describe('the hidden view', () => {
     expect(wordShown(A23 + 4, new Set([A23 + 4]), live(A23 + 3))).toBe(true);
   });
 
+  it('a take still looking for its start shows nothing it heard (start anywhere on the page)', () => {
+    expect(wordShown(A23 + 2, NOTHING_SHOWN, { saidUpTo: A23 + 3, startWord: null })).toBe(false);
+  });
+
+  it('after a start mid-page, ‹ looks from the start: the words before it aren’t what comes next', () => {
+    const a25 = words.verseFirstWord(27, 25);
+    const fromMid = { saidUpTo: null, startWord: a25 };
+    expect(nextHiddenWord(words, 379, NOTHING_SHOWN, fromMid)).toBe(a25);
+    // Before the start is found, and on a page the start isn't on: from the page's top.
+    expect(nextHiddenWord(words, 379, NOTHING_SHOWN, { saidUpTo: null, startWord: null })).toBe(A23);
+    expect(nextHiddenWord(words, 380, NOTHING_SHOWN, fromMid)).toBe(words.pageRange(380)[0]);
+  });
+
   it('‹ shows the next hidden word, again and again', () => {
     let r = revealNextWord(words, 379, NOTHING_SHOWN, live(A23 + 3));
     expect([...r]).toEqual([A23 + 4]);

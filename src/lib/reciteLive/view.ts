@@ -63,7 +63,10 @@ export function wordShown(w: number, revealed: Revealed, live: { saidUpTo: numbe
   return live.saidUpTo != null && live.startWord != null && w >= live.startWord && w <= live.saidUpTo;
 }
 
-/** The first word on a page still hidden, or null. */
+/**
+ * The first word on a page still hidden, or null: from where the take started when that is on the page (a take can
+ * start anywhere on it, and the words before its start aren't what comes next), else from the page's top.
+ */
 export function nextHiddenWord(
   words: QuranWords,
   page: number,
@@ -71,7 +74,8 @@ export function nextHiddenWord(
   live: { saidUpTo: number | null; startWord: number | null },
 ): number | null {
   const [from, to] = words.pageRange(page);
-  for (let w = from; w < to; w++) if (!wordShown(w, revealed, live)) return w;
+  const begin = live.startWord != null && live.startWord > from && live.startWord < to ? live.startWord : from;
+  for (let w = begin; w < to; w++) if (!wordShown(w, revealed, live)) return w;
   return null;
 }
 

@@ -21,11 +21,18 @@ export interface StartFrame {
   follow?: boolean;
   /** Carry on a take after a dropped connection. */
   resume?: string;
+  /**
+   * Start anywhere on the page (Majd, Nov 14 2026): the reciter starts at some word from s:a through the end of this
+   * ayah (the page's last), and the checker finds where (`locked`). Absent: the take starts at s:a. A server that
+   * doesn't read it starts at s:a, and its first `at` comes with no `locked` (lib/reciteLive/state).
+   */
+  startBy?: [number, number];
 }
 
 export type ClientFrame =
   | StartFrame
-  | { type: 'seek'; w: number }
+  /** A page turned by hand; with `startBy`, before the start is found: look for it on this page instead. */
+  | { type: 'seek'; w: number; startBy?: [number, number] }
   | { type: 'dismiss'; id: string }
   /** A word or an ayah shown by hand in the hidden view (information for the checker). */
   | { type: 'hint'; w: number; what: 'word' | 'ayah' }

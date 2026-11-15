@@ -43,7 +43,7 @@ import { reciteLiveEnabled } from '../../lib/reciteLive/availability';
 import { premiumErrorText, setDevPremium, supportLinkUrl, usePremium } from '../../lib/premium';
 import { setReciteCheckSettings, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
 import { loadQuranWords, getQuranWords, QuranWords } from '../../lib/recite/quranWords';
-import { furthestWord, marksOnPage } from '../../lib/reciteLive/state';
+import { furthestWord, marksOnPage, startNotFound } from '../../lib/reciteLive/state';
 import {
   barWords,
   hiddenFollow,
@@ -403,10 +403,15 @@ export default function QuranReaderScreen() {
   const takeId = live.state.take;
   const [summaryShown, setSummaryShown] = useState<string | null>(null);
   useEffect(() => {
-    if (live.state.status === 'done' && takeId && summaryFor !== takeId) {
-      setSummaryFor(takeId);
-      setSummaryShown(takeId);
+    if (live.state.status !== 'done' || !takeId || summaryFor === takeId) return;
+    setSummaryFor(takeId);
+    // The checker never found where the reciter started: it fails silently (Majd, Nov 14 2026). No summary or
+    // message; Stop just ends the take.
+    if (startNotFound(live.state)) {
+      live.clear();
+      return;
     }
+    setSummaryShown(takeId);
     // Only when a take finishes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [live.state.status, takeId]);

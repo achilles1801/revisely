@@ -4,7 +4,8 @@
 # 379 with a wrong word and a haraka slip, the moment of Majd's Tarteel screenshots of Nov 14 2026).
 # Screenshots of each state for the mocks (~/Documents/revisely-recite-mocks/option-A-final-2.png and
 # mistakes-toggle-after.png): the reader with the mic, the mic's menu (Mark mistakes off, then on),
-# following, a mark and the score, the hidden view, done, and the locked switch's Premium page.
+# following, a mark and the score, the hidden view, done, and the locked switch's Premium page. Last, a
+# Recite take begun in the middle of the page (An-Naml 25), as a take can start anywhere on it.
 appId: com.revisionbuddy.app
 ---
 - runFlow:
@@ -329,3 +330,42 @@ appId: com.revisionbuddy.app
 - tapOn: "OK"
 - tapOn:
     id: check-intro-close
+
+# Start anywhere on the page (Majd, Nov 14 2026): a take from page 379 begun at An-Naml 25, its third ayah. Mark
+# mistakes is locked now, so the mic starts Recite, whose recorded take begins there: "Listening…" until the checker
+# has found where (`locked`), then the cursor at An-Naml 25, and the summary names what was recited from there, not
+# from the page's top.
+- runFlow:
+    when:
+      notVisible:
+        id: recite-mic
+    commands:
+      - tapOn:
+          id: reader-background
+- tapOn:
+    id: recite-mic
+- extendedWaitUntil:
+    visible:
+      id: recite-words
+    timeout: 20000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl13-started-mid-page-dark
+- tapOn:
+    id: recite-stop
+- extendedWaitUntil:
+    visible:
+      id: take-summary-passage
+      text: "An.Naml,.ayahs.25.26.*"
+    timeout: 10000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl14-summary-mid-page-dark
+- tapOn:
+    id: take-summary-done
+- tapOn:
+    id: recite-close
+- assertVisible:
+    id: recite-mic

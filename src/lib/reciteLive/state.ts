@@ -37,6 +37,22 @@ export interface LiveState {
   failure: LiveFailure | null;
   /** The last ayah judged in full. */
   lastAyah: [number, number] | null;
+  /**
+   * Where the take started: its first word recited. Null while the checker looks for it (a take started anywhere on
+   * the page, Majd's Nov 14 2026 change): no cursor, nothing revealed, nothing scored until it's found.
+   */
+  start: number | null;
+  /** The take started anywhere on a page (`startBy`), not at a known word. */
+  anywhere: boolean;
+  /**
+   * The checker is looking for where the reciter is (contract protocol 6): from the take's start until `locked`, and
+   * again after a page turned by hand. No cursor meanwhile ("Listening…").
+   */
+  seeking: boolean;
+  /** The first word of the page being searched: where a checker that doesn't look (protocol 5) starts instead. */
+  seekFrom: number | null;
+  /** The checker's protocol (`ready`); null until it's ready. Below 6 it doesn't look: the take starts at s:a. */
+  protocol: number | null;
 }
 
 export const LIVE_IDLE: LiveState = {
@@ -50,12 +66,56 @@ export const LIVE_IDLE: LiveState = {
   final: null,
   failure: null,
   lastAyah: null,
+  start: null,
+  anywhere: false,
+  seeking: false,
+  seekFrom: null,
+  protocol: null,
 };
 
-/** Starting afresh (a new take). */
-export function liveConnecting(): LiveState {
+/**
+ * Starting afresh (a new take): at a known word (`start`), or anywhere on a page (`anywhereFrom`, the page's first
+ * word: the checker finds the start, or a server that doesn't look starts there).
+ */
+export function liveConnecting(from: { start: number } | { anywhereFrom: number } | null = null): LiveState {
+  if (from && 'start' in from) return { ...LIVE_IDLE, status: 'connecting', start: from.start };
+  if (from) return { ...LIVE_IDLE, status: 'connecting', anywhere: true, seeking: true, seekFrom: from.anywhereFrom };
   return { ...LIVE_IDLE, status: 'connecting' };
 }
+
+/** The first protocol whose checker looks for where the reciter started (contract: start anywhere on the page). */
+export const LOOKS_FOR_START = 6;
+
+/** Whether the checker is looking for where the reciter is: no cursor meanwhile. */
+export function findingStart(state: LiveState): boolean {
+  return state.seeking;
+}
+
+/** A take started anywhere on the page whose checker never found where: it ends with no summary (Majd: silently). */
+export function startNotFound(state: LiveState): boolean {
+  return state.anywhere && state.start == null;
+}
+
+/** Whether the checker looks for where the reciter is (protocol 6, or not ready yet: a page turn then asks it to). */
+export function checkerLooks(state: LiveState): boolean {
+  return state.protocol == null || state.protocol >= LOOKS_FOR_START;
+}
+
+/**
+ * A page turned by hand during a take: the checker looks for the reciter on that page (`w`, its first word), as at the
+ * take's start. The cursor goes until it's found; what was decided stays.
+ */
+export function seekOnPage(state: LiveState, w: number): LiveState {
+  return { ...state, seeking: true, seekFrom: w, cursor: null };
+}
+
+/** The checker's cursor came without `locked` (a checker that doesn't look): it began at the searched page's top. */
+function startedUnlocked(state: LiveState): LiveState {
+  return { ...state, seeking: false, start: state.start ?? state.seekFrom };
+}
+
+/** A word mark the take's start leaves out: nothing before where the reciter started is skipped. */
+const beforeStart = (m: Mark, start: number | null) => start != null && m.kind === 'skipped' && m.w < start;
 
 /** Stop was tapped: the live marks stay while the final answer comes. */
 export function liveStopping(state: LiveState): LiveState {
@@ -64,19 +124,37 @@ export function liveStopping(state: LiveState): LiveState {
 
 export function applyEvent(state: LiveState, e: LiveEvent): LiveState {
   switch (e.type) {
-    case 'ready':
-      return {
+    case 'ready': {
+      const protocol = e.protocol ?? 5;
+      const ready: LiveState = {
         ...state,
         status: state.status === 'checking' || state.status === 'done' ? state.status : 'listening',
         take: e.take ?? state.take,
         failure: null,
+        protocol,
       };
+      // A checker that doesn't look for the start begins at the page's first ayah, as before: no waiting.
+      return ready.seeking && protocol < LOOKS_FOR_START ? startedUnlocked(ready) : ready;
+    }
+    case 'locked': {
+      // Found where the reciter is: the cursor shows there (and the page turns to it). The first lock is the start.
+      const start = state.start ?? e.w;
+      return {
+        ...state,
+        start,
+        seeking: false,
+        cursor: e.w,
+        marks: Object.fromEntries(Object.entries(state.marks).filter(([, m]) => !beforeStart(m, start))),
+      };
+    }
     case 'at':
+      // A cursor with no `locked` first: a checker that doesn't look began at the searched page's first word.
+      if (state.seeking) return { ...startedUnlocked(state), cursor: e.w };
       return state.cursor === e.w ? state : { ...state, cursor: e.w };
     case 'said':
       return state.saidUpTo === e.upTo ? state : { ...state, saidUpTo: e.upTo };
     case 'mark': {
-      if (state.status === 'done' || state.dismissed.includes(e.mark.id)) return state;
+      if (state.status === 'done' || state.dismissed.includes(e.mark.id) || beforeStart(e.mark, state.start)) return state;
       return { ...state, marks: { ...state.marks, [e.mark.id]: e.mark } };
     }
     case 'unmark': {
@@ -90,10 +168,13 @@ export function applyEvent(state: LiveState, e: LiveEvent): LiveState {
     case 'score':
       return { ...state, score: e.score };
     case 'done': {
+      const start = state.start ?? e.result.start ?? null;
       const marks: Record<string, Mark> = {};
-      for (const m of e.result.marks) if (!state.dismissed.includes(m.id)) marks[m.id] = m;
+      for (const m of e.result.marks) if (!state.dismissed.includes(m.id) && !beforeStart(m, start)) marks[m.id] = m;
       return {
         ...state,
+        start,
+        seeking: false,
         status: 'done',
         take: e.result.take ?? state.take,
         marks,
