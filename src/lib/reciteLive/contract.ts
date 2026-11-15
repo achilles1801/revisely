@@ -5,7 +5,7 @@
 
 import type { TajweedRule } from '../reciteCheck/result';
 
-/** What a mark is about. Red: word, skipped, added. Amber: harakat, letter, tajweed (`severityOf`). */
+/** What a mark is about. Mistakes: word, skipped, added; slips: harakat, letter, tajweed (`severityOf`). Colours: `markGroup`. */
 export type MarkKind = 'word' | 'skipped' | 'added' | 'harakat' | 'letter' | 'tajweed';
 
 /** Finer than the kind, for the card's wording. */
@@ -265,6 +265,18 @@ export type Severity = 'mistake' | 'slip';
 export function severityOf(mark: Pick<Mark, 'kind'>): Severity {
   return mark.kind === 'word' || mark.kind === 'skipped' || mark.kind === 'added' ? 'mistake' : 'slip';
 }
+
+/**
+ * A mark's colour on the page, in the bar, the card and the summary: three groups at most (Majd, Nov 15 2026). Words
+ * (wrong, skipped, extra) red, slips (a haraka, a letter, "Not clear") amber, tajweed notes violet. The card and the
+ * summary always name the kind in words.
+ */
+export type MarkGroup = 'word' | 'slip' | 'tajweed';
+export function markGroup(mark: Pick<Mark, 'kind'>): MarkGroup {
+  return mark.kind === 'tajweed' ? 'tajweed' : severityOf(mark) === 'mistake' ? 'word' : 'slip';
+}
+/** Which of a word's marks shows when it has several: a word mistake over a slip over a tajweed note. */
+export const GROUP_RANK: Record<MarkGroup, number> = { tajweed: 0, slip: 1, word: 2 };
 
 /** Marks the checker's `mistakes` has counted (everything but tajweed notes; "not clear" ones too, until `unclear`). */
 export const countsAsMistake = (mark: Pick<Mark, 'kind'>) => mark.kind !== 'tajweed';

@@ -10,7 +10,8 @@ import { describeAyahs, spokenText } from '../../lib/passages';
 import { ayahKey } from '../../lib/ayahKeys';
 import type { QuranWords } from '../../lib/recite/quranWords';
 import type { Mark } from '../../lib/reciteLive/contract';
-import { isUnclear, severityOf } from '../../lib/reciteLive/contract';
+import { isUnclear, markGroup } from '../../lib/reciteLive/contract';
+import { markFill } from './markColours';
 import { findingNote, markTitle } from '../../lib/reciteLive/describe';
 import { drillMarks } from '../../lib/reciteLive/drill';
 import type { ScoreLevel } from '../../lib/reciteLive/score';
@@ -60,7 +61,7 @@ export function findingsLine(marks: Mark[]): string {
   const unclear = marks.filter(isUnclear).length;
   if (wrong) parts.push(`${wrong} wrong ${wrong === 1 ? 'word' : 'words'}`);
   if (skipped) parts.push(`${skipped} skipped`);
-  if (added) parts.push(`${added} added`);
+  if (added) parts.push(`${added} extra`);
   if (slips) parts.push(`${slips} harakat ${slips === 1 ? 'slip' : 'slips'}`);
   if (tajweed) parts.push(`${tajweed} tajweed ${tajweed === 1 ? 'note' : 'notes'}`);
   if (unclear) parts.push(`${unclear} not clear`);
@@ -169,17 +170,16 @@ export function TakeSummarySheet({
       </View>
       {check && words
         ? findings.map((m, i) => {
-            const mistake = severityOf(m) === 'mistake';
-            const color = mistake ? palette.red : palette.warn;
+            // The page's highlight (Majd, Nov 15 2026: no red text or round marks): a flat swatch by the kind's name, and
+            // the word in ink on its colour.
+            const fill = markFill(palette, m);
             const place = findingPlace(m, manySurahs);
             const arabic = (
-              <Text
-                style={[arabicV2(21), { color }, stacked && styles.arStacked]}
-                maxFontSizeMultiplier={ARABIC_MAX}
-                testID="take-summary-finding-arabic"
-              >
-                {words.uthmani(m.w)}
-              </Text>
+              <View style={[styles.arWrap, { backgroundColor: fill }, stacked && styles.arStacked]} testID="take-summary-finding-highlight">
+                <Text style={[arabicV2(21), { color: palette.text }]} maxFontSizeMultiplier={ARABIC_MAX} testID="take-summary-finding-arabic">
+                  {words.uthmani(m.w)}
+                </Text>
+              </View>
             );
             return (
               <Tap
@@ -190,17 +190,13 @@ export function TakeSummarySheet({
                 accessibilityLabel={`${markTitle(m)}, ${spokenText(place)}. Show it on the page`}
                 testID={`take-summary-finding-${m.kind}`}
               >
-                <View style={[styles.mark, { backgroundColor: mistake ? palette.redSubtle : palette.warnSubtle }]}>
-                  <Ionicons
-                    name={m.kind === 'tajweed' ? 'pulse-outline' : mistake ? 'close' : isUnclear(m) ? 'ear-outline' : 'remove-outline'}
-                    size={18}
-                    color={mistake ? palette.onRedSubtle : palette.warn}
-                  />
-                </View>
                 <View style={styles.rowText} testID="take-summary-finding-text">
-                  <Text style={[typeV2.name, { color: palette.text }]} maxFontSizeMultiplier={CHROME_MAX} testID="take-summary-finding-title">
-                    {`${markTitle(m)} · ${place}`}
-                  </Text>
+                  <View style={styles.titleRow}>
+                    <View style={[styles.swatch, { backgroundColor: fill }]} testID={`take-summary-swatch-${markGroup(m)}`} />
+                    <Text style={[typeV2.name, styles.title, { color: palette.text }]} maxFontSizeMultiplier={CHROME_MAX} testID="take-summary-finding-title">
+                      {`${markTitle(m)} · ${place}`}
+                    </Text>
+                  </View>
                   {findingNote(m) ? (
                     <Text style={[typeV2.meta, { color: palette.secondary }]} numberOfLines={stacked ? 4 : 2} maxFontSizeMultiplier={CHROME_MAX}>
                       {findingNote(m)}
@@ -269,8 +265,12 @@ const styles = StyleSheet.create({
     borderTopWidth: layoutV2.hairline,
   },
   firstRow: {},
-  mark: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   rowText: { flex: 1, minWidth: 0 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  title: { flexShrink: 1 },
+  /** A flat swatch of the mark's colour, beside its name (never a round mark). */
+  swatch: { width: 12, height: 12, borderRadius: 3 },
+  arWrap: { borderRadius: 7, paddingHorizontal: 6 },
   arStacked: { alignSelf: 'flex-end', marginTop: 4 },
   buttons: { paddingHorizontal: layoutV2.gutter, paddingTop: 16, gap: 10 },
   kept: { textAlign: 'center', paddingHorizontal: layoutV2.gutter, paddingTop: 10, paddingBottom: 6 },

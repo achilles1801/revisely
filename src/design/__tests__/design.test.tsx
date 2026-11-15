@@ -34,6 +34,7 @@ import { ActionSheet } from '../../components/v2/ActionSheet';
 import { AccentPicker } from '../../components/settings/AccentPicker';
 import { DesignGate as DesignGateForAccent } from '../DesignGate';
 import { dayAgo } from '../../lib/dayAgo';
+import { getReadPalette } from '../../theme/readPalette';
 import { ACCENTS, AccentName, DEFAULT_ACCENT, HERO_FIRST_TEXT_OFFSET, HERO_SHAPE, mixColors, paletteDark, paletteLight, paletteV2, v2ThemeColors } from '../../theme/v2';
 import { DOT } from '../../components/v2/JuzDots';
 import type { RevisionLog, UserPage } from '../../types';
@@ -265,22 +266,46 @@ describe('v2 palette (white and black grounds, no accent tint)', () => {
       return (h * 60 + 360) % 360;
     };
     expect(Math.abs(hue(p.warn) - hue(p.red))).toBeGreaterThanOrEqual(20);
-    // Following: the page's ink on the ayah band and the word box; a mark and the follow blue on them at 3:1 (large text).
-    for (const ground of [p.followBand, p.followWord]) {
-      expect(contrast(p.text, ground)).toBeGreaterThanOrEqual(4.5);
-      for (const mark of [p.red, p.warn, p.followInk]) expect(contrast(mark, ground)).toBeGreaterThanOrEqual(3);
+    // Following: the page's ink on the line band and the word box.
+    const page = getReadPalette(isDark);
+    const inks = [p.text, page.textPrimary, page.pageTint ?? '#000000'];
+    for (const ground of [p.followBand, p.followWord]) for (const ink of inks) expect(contrast(ink, ground)).toBeGreaterThanOrEqual(4.5);
+    // Mistakes are highlights behind the word, three colours (Majd, Nov 15 2026): the page's ink and the bar's text read
+    // at 4.5:1 on each, and on each firmer shade (a mark whose card is open), which stands out from its own.
+    const groups = [
+      [p.markWord, p.markWordFirm],
+      [p.markSlip, p.markSlipFirm],
+      [p.markTajweed, p.markTajweedFirm],
+    ] as const;
+    for (const [fill, firm] of groups) {
+      for (const ink of inks) {
+        expect(contrast(ink, fill)).toBeGreaterThanOrEqual(4.5);
+        expect(contrast(ink, firm)).toBeGreaterThanOrEqual(4.5);
+      }
+      expect(contrast(firm, fill)).toBeGreaterThan(1.15);
+      // Seen on the page (a tint, not text): a little apart from the ground, more than the grey word box.
+      expect(contrast(fill, page.pageBg)).toBeGreaterThan(1.3);
     }
-    // The follow blue as text (the word being said in the bar) on every ground, and as a word on the page.
+    // The three tell apart by hue, and words from slips by lightness too (red and amber are close for colour blindness).
+    const [word, slip, tajweed] = [p.markWord, p.markSlip, p.markTajweed];
+    const apart = (a: string, b: string) => Math.min(Math.abs(hue(a) - hue(b)), 360 - Math.abs(hue(a) - hue(b)));
+    expect(apart(word, slip)).toBeGreaterThanOrEqual(25);
+    expect(apart(word, tajweed)).toBeGreaterThanOrEqual(60);
+    expect(apart(slip, tajweed)).toBeGreaterThanOrEqual(60);
+    expect(contrast(word, slip)).toBeGreaterThanOrEqual(1.25);
+    // The follow blue as text (the word being said in the bar) on every ground.
     for (const ground of [p.bg, p.fill, p.sheet, p.bubble]) expect(contrast(p.followInk, ground)).toBeGreaterThanOrEqual(4.5);
     // The box stands out from the band (non-text, a little).
     expect(contrast(p.followWord, p.followBand)).toBeGreaterThan(1.15);
     // None of it follows the accent (Majd, Nov 14 2026): a mistake is red, a slip amber and the follow blue with every
     // accent, so Crimson's follow never looks like a mistake.
     const jade = paletteV2(isDark, 'jade');
-    for (const k of ['red', 'warn', 'followBand', 'followWord', 'followInk'] as const) expect(p[k]).toBe(jade[k]);
-    // Blue tells apart from red and amber by hue.
+    const fixed = ['red', 'warn', 'followBand', 'followWord', 'followInk', 'markWord', 'markWordFirm', 'markSlip', 'markSlipFirm', 'markTajweed', 'markTajweedFirm'] as const;
+    for (const k of fixed) expect(p[k]).toBe(jade[k]);
+    // Blue (the bar's word being said) tells apart from red and amber by hue, and from the tajweed violet.
     expect(Math.abs(hue(p.followInk) - hue(p.red))).toBeGreaterThanOrEqual(90);
     expect(Math.abs(hue(p.followInk) - hue(p.warn))).toBeGreaterThanOrEqual(90);
+    expect(apart(p.followInk, p.markTajweed)).toBeGreaterThanOrEqual(20);
     // Check, drawn special: each end as text on the sheet, and the glyph on each end.
     for (const end of p.premium) {
       expect(contrast(end, p.sheet)).toBeGreaterThanOrEqual(4.5);

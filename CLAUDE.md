@@ -237,11 +237,18 @@ until its part is set up.
   - **Calm, exact tracking** (Majd's Dev take, Nov 15 2026; Tarteel's mic take as the reference): a quiet grey band on
     the line being recited (the ayah's part of it, `currentLineBand`) and a grey box on the word. It is not a blue band
     over the whole ayah, which covered lines not yet said and read as running ahead (the checker's `at` was 1.0 s
-    behind, never ahead). Blue (`followInk`) is for the word being said in the bar and the newest word on a hidden page.
-    None of Recite's colours follow the accent (design.test). Nothing shows before the checker has found where the
-    reciter is (`locked`): no band or box, in either view. The hidden view has no band at all (Majd, Nov 15 2026:
-    "there shouldn't be an always there highlight at the top when the verses are hidden"): the words recited show in
-    place, the newest in blue.
+    behind, never ahead). Blue (`followInk`) is only for the word being said in the bar. None of Recite's colours follow
+    the accent (design.test). Nothing shows before the checker has found where the reciter is (`locked`): no band or
+    box, in either view. The hidden view has no band at all (Majd, Nov 15 2026: "there shouldn't be an always there
+    highlight at the top when the verses are hidden"): the words recited show in place, the newest in the grey box.
+  - **Mistakes are highlights** (Majd, Nov 15 2026: "i don't like the red + circles, only things we should show are
+    highlites for mistakes 3 colors max"; board `~/Documents/revisely-recite-mocks/marks-highlights/`): a highlight
+    behind the word, the page's ink unchanged, in three colours (`markGroup`, theme/v2 `markWord`…): red for a wrong,
+    skipped or extra word (an extra word on the word before it: "Extra word"), amber for a haraka or letter slip and
+    "Not clear", violet for a tajweed note (Strict). A word with several shows its strongest; the mark a card is open
+    for is a firmer shade of its own (`…Firm`), no outline. No red ink, dotted lines or + discs. The bar, the card and
+    the summary use the same highlights, and a small flat swatch beside the kind's name (never a round mark): the kind
+    is always in words.
   - **Your recitation** on the mark card: the reciter's own voice at the mark, from the take's audio that the connection
     holds on the phone for resuming (`audioClip`), from the mark's `t` (0.6 s before to 0.4 s after). A mark without
     one (a skipped word) uses when the cursor first reached that word or the one before, ±1.2 s. It works until the take

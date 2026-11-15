@@ -8,6 +8,7 @@ import { resetReciteCheckSettingsForTests, setReciteCheckSettings } from '../../
 import type { LiveEvent } from '../../../lib/reciteLive/contract';
 import { STOP_TRACE_KEY } from '../../../lib/reciteLive/stopTrace';
 import { versesOnPage } from '../../../lib/ayahBounds';
+import { paletteV2 } from '../../../theme/v2';
 
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
 jest.mock('expo-linear-gradient', () => ({ LinearGradient: ({ children }: { children?: React.ReactNode }) => children ?? null }));
@@ -390,20 +391,89 @@ describe('a take kept as a recording (Save recordings, on by default)', () => {
 });
 
 describe('Check: marks as you recite', () => {
-  it('a wrong word is marked on the page and shows red, as heard, in the bar; the score by the page', async () => {
+  it('a wrong word is highlighted on the page and, as heard, in the bar; the score by the page', async () => {
     await startTake('check');
     expect(mockLive.start).toMatchObject({ follow: false });
     expect(screen.getByTestId('recite-score')).toBeTruthy();
     await event({ type: 'said', upTo: UTIYAT });
     await event({ type: 'mark', mark: { id: 'a', w: UTIYAT, ayah: [27, 23], kind: 'word', sure: 'likely', heard: 'وَأُوهِيَتْ', heardExact: false } });
     await event({ type: 'at', w: UTIYAT + 1 });
-    expect(screen.getByTestId('live-ink-word')).toBeTruthy();
+    expect(screen.getByTestId('live-highlight-word')).toBeTruthy();
     expect(screen.getByTestId('live-mark-word').props.accessibilityLabel).toBe('Wrong word, وَأُوتِيَتْ');
     expect(screen.getByText('99.2%')).toBeTruthy();
     expect(screen.getByText('وَأُوهِيَتْ')).toBeTruthy();
     await event({ type: 'mark', mark: { id: 'b', w: A23 + 7, ayah: [27, 23], kind: 'harakat', sure: 'clear', slip: { expected: 'ٍ', heard: 'ٌّ' } } });
     expect(screen.getByText('98.5%')).toBeTruthy();
     expect(screen.getByTestId('live-mark-harakat')).toBeTruthy();
+  });
+});
+
+describe('mistakes are highlights (Majd, Nov 15 2026: “only things we should show are highlites for mistakes 3 colors max”)', () => {
+  const p = paletteV2(false, 'indigo');
+  // With a card open the page is hidden from queries (accessibilityViewIsModal): look at hidden elements too.
+  const bg = (testID: string) => flatStyle(screen.getByTestId(testID, { includeHiddenElements: true })).backgroundColor;
+
+  it('behind the word in three colours: red for words, amber for slips, violet for tajweed; no red ink, dots or + discs', async () => {
+    await startTake('check');
+    await event({ type: 'mark', mark: { id: 'w', w: UTIYAT, ayah: [27, 23], kind: 'word', sure: 'clear', heard: 'وَأُوهِيَتْ', heardExact: false } });
+    await event({ type: 'mark', mark: { id: 'h', w: A23 + 7, ayah: [27, 23], kind: 'harakat', sure: 'clear', slip: { expected: 'ٍ', heard: 'ٌّ' } } });
+    await event({ type: 'mark', mark: { id: 't', w: A23 + 1, ayah: [27, 23], kind: 'tajweed', rule: 'qalqalah', sure: 'clear' } });
+    expect(bg('live-highlight-word')).toBe(p.markWord);
+    expect(bg('live-highlight-slip')).toBe(p.markSlip);
+    expect(bg('live-highlight-tajweed')).toBe(p.markTajweed);
+    for (const kind of ['word', 'harakat', 'tajweed', 'skipped', 'letter']) expect(screen.queryByTestId(`live-ink-${kind}`)).toBeNull();
+    expect(screen.queryByTestId('live-ink-gap')).toBeNull();
+  });
+
+  it('a word with a slip and a tajweed note shows the slip; an extra word is highlighted on the word before it', async () => {
+    await startTake('check');
+    await event({ type: 'mark', mark: { id: 'h', w: A23 + 7, ayah: [27, 23], kind: 'harakat', sure: 'clear', slip: { expected: 'ٍ', heard: 'ٌّ' } } });
+    await event({ type: 'mark', mark: { id: 't', w: A23 + 7, ayah: [27, 23], kind: 'tajweed', rule: 'qalqalah', sure: 'clear' } });
+    expect(screen.getAllByTestId('live-highlight-slip')).toHaveLength(1);
+    expect(screen.queryByTestId('live-highlight-tajweed')).toBeNull();
+    await event({ type: 'mark', mark: { id: 'x', w: A23 + 2, ayah: [27, 23], kind: 'added', sure: 'clear', heard: 'وَ' } });
+    expect(bg('live-highlight-word')).toBe(p.markWord);
+    expect(screen.getByTestId('live-mark-added').props.accessibilityLabel).toBe(`Extra word, after ${words.uthmani(A23 + 2)}`);
+  });
+
+  it('the bar: a mistake is the page’s highlight behind the word in ink; blue is only the word being said', async () => {
+    await startTake('check');
+    await event({ type: 'said', upTo: UTIYAT });
+    await event({ type: 'mark', mark: { id: 'a', w: UTIYAT, ayah: [27, 23], kind: 'word', sure: 'clear', heard: 'وَأُوهِيَتْ', heardExact: false } });
+    await event({ type: 'at', w: UTIYAT + 1 });
+    const wrong = flatStyle(screen.getByTestId('recite-word-wrong'));
+    expect(wrong.backgroundColor).toBe(p.markWord);
+    expect(wrong.color).toBe(p.text);
+    expect(flatStyle(screen.getByTestId('recite-word-current')).color).toBe(p.followInk);
+  });
+
+  it('the mark a card is open for: a firmer shade of its own colour, back to its own when the card closes', async () => {
+    await startTake('check');
+    await event({ type: 'mark', mark: { id: 'h', w: A23 + 7, ayah: [27, 23], kind: 'harakat', sure: 'clear', slip: { expected: 'ٍ', heard: 'ٌّ' } } });
+    const { wordBox } = require('../../../lib/reciteLive/geometry');
+    const b = wordBox(words, A23 + 7);
+    await act(async () => {
+      mockPager.onTapPoint?.(379, (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, (r: { x0: number; y0: number; x1: number; y1: number }) => ({
+        x: r.x0,
+        y: r.y0 + 100,
+        width: r.x1 - r.x0,
+        height: r.y1 - r.y0,
+      }));
+    });
+    expect(screen.getByTestId('mark-card')).toBeTruthy();
+    expect(bg('live-highlight-slip-picked')).toBe(p.markSlipFirm);
+    await act(async () => fireEvent(screen.getByTestId('mark-card-backdrop'), 'responderGrant'));
+    expect(bg('live-highlight-slip')).toBe(p.markSlip);
+  });
+
+  it('the hidden view: the newest word in the grey box, no line band, no blue on the page', async () => {
+    await startTake('recite', null);
+    fireEvent.press(screen.getByTestId('recite-eye'));
+    await event({ type: 'locked', w: A23, s: 27, a: 23 });
+    await event({ type: 'at', w: A23 + 3 });
+    expect(bg('live-word-box')).toBe(p.followWord);
+    expect(screen.queryByTestId('live-line-band')).toBeNull();
+    expect(screen.queryAllByTestId('hidden-band')).toHaveLength(0);
   });
 });
 
@@ -611,6 +681,15 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
     expect(screen.getByTestId('mark-card')).toBeTruthy();
     expect(screen.getByText('Wrong word')).toBeTruthy();
     expect(screen.getByText('As heard')).toBeTruthy();
+    // Highlights, as on the page (Majd, Nov 15 2026): a flat swatch by each kind's name, what was recited on its colour,
+    // what was expected on quiet grey; no red or green text.
+    const p = paletteV2(false, 'indigo');
+    const style = (id: string) => flatStyle(screen.getAllByTestId(id)[0]);
+    expect(style('mark-card-swatch-word').backgroundColor).toBe(p.markWord);
+    expect(style('mark-card-swatch-tajweed').backgroundColor).toBe(p.markTajweed);
+    expect(style('mark-card-recited').backgroundColor).toBe(p.markWord);
+    expect(style('mark-card-expected').backgroundColor).toBe(p.followWord);
+    expect(style('mark-card-expected').color).toBeUndefined();
     // Both marks on the word, each with its own Not a mistake.
     expect(screen.getByTestId('mark-card-tajweed')).toBeTruthy();
     // Similar phrases: An-Naml 16 reads almost the same.
