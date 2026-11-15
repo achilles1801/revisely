@@ -234,6 +234,9 @@ until its part is set up.
     microphone goes off and the take stays open on the same connection. The bar's Pause and Resume do the same, and
     Resume carries on from where it was. What the card plays stops when the card closes, the take ends or is closed, a
     new one starts, the reader goes, or anything else takes the audio.
+  - **The cursor is the word** (Majd's Dev take, Nov 15 2026): its box behind it and its own ink in the follow blue. There
+    is no band over the whole ayah: it covered words not yet said and read as running ahead. Recite's colours never follow
+    the accent (`src/design/__tests__/reciteColours.test.ts`): follow blue, mistakes red, slips amber.
   - **Your recitation** on the mark card: the reciter's own voice at the mark, from the take's audio that the connection
     holds on the phone for resuming (`audioClip`), from the mark's `t` (0.6 s before to 0.4 s after). A mark without
     one (a skipped word) uses when the cursor first reached that word or the one before, ±1.2 s. It works until the take

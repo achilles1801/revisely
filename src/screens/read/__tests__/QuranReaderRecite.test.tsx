@@ -305,8 +305,11 @@ describe('Recite: following along', () => {
     await event({ type: 'mark', mark: { id: 'a', w: UTIYAT, ayah: [27, 23], kind: 'word', sure: 'likely', heard: 'وَأُوهِيَتْ', heardExact: false } });
     await event({ type: 'at', w: UTIYAT + 1 });
     expect(screen.getByTestId('recite-words')).toBeTruthy();
+    // The cursor is the word being said (Majd's Dev take, Nov 15 2026): its box and its own ink in blue, and no band over
+    // the whole ayah, which covered words not yet said and read as running ahead.
     expect(screen.getByTestId('live-word-box')).toBeTruthy();
-    expect(screen.getAllByTestId('live-ayah-band').length).toBe(2);
+    expect(screen.getByTestId('live-ink-current')).toBeTruthy();
+    expect(screen.queryAllByTestId('live-ayah-band')).toHaveLength(0);
     expect(screen.queryByTestId('recite-score')).toBeNull();
     expect(screen.queryByTestId('live-mark-word')).toBeNull();
   });
