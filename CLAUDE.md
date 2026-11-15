@@ -234,6 +234,11 @@ until its part is set up.
     microphone goes off and the take stays open on the same connection. The bar's Pause and Resume do the same, and
     Resume carries on from where it was. What the card plays stops when the card closes, the take ends or is closed, a
     new one starts, the reader goes, or anything else takes the audio.
+  - **The checker is kept warm** (recite-server, Nov 15 2026; Majd's yes): Cloud Run stops an idle instance after about
+    15 minutes and a new one takes 6–9 s. So while the reader is open, focused and in front with live checking on,
+    `useKeepCheckerWarm` GETs `/health` (no sign-in, no model) on opening, every 10 minutes, and on coming back once
+    10 minutes have passed. It skips this while a take is connecting, listening or checking, since its connection holds
+    the instance.
   - **Calm, exact tracking** (Majd's Dev take, Nov 15 2026; Tarteel's mic take as the reference): a quiet grey band on
     the line being recited (the ayah's part of it, `currentLineBand`) and a grey box on the word. It is not a blue band
     over the whole ayah, which covered lines not yet said and read as running ahead (the checker's `at` was 1.0 s

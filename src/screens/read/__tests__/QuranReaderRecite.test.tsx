@@ -293,6 +293,13 @@ describe('the one mic (Revisely Dev)', () => {
     expect(screen.getByTestId('recite-mic-badge-record')).toBeTruthy();
   });
 
+  it('opening the reader wakes the checker (and keeps it awake while it waits: useKeepCheckerWarm)', async () => {
+    const { warmUpReciteCheck } = jest.requireMock('../../../lib/reciteCheck/service');
+    (warmUpReciteCheck as jest.Mock).mockClear();
+    await open();
+    expect(warmUpReciteCheck).toHaveBeenCalledTimes(1);
+  });
+
   it('the first take shows the AI notice; after I understand, it listens', async () => {
     await open();
     fireEvent.press(screen.getByTestId('recite-mic'));
@@ -959,8 +966,9 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
       await startTake('recite');
       await act(async () => fireEvent.press(screen.getByTestId('recite-pause')));
       const { AppState } = require('react-native');
-      const listener = (AppState.addEventListener as jest.Mock).mock.calls.map((c: unknown[]) => c[1] as (s: string) => void).at(-1)!;
-      await act(async () => listener('background'));
+      // Every listener hears it, as in the app (the take's, and the checker's warm-up).
+      const listeners = (AppState.addEventListener as jest.Mock).mock.calls.map((c: unknown[]) => c[1] as (s: string) => void);
+      await act(async () => listeners.forEach((l) => l('background')));
       expect(mockLive.sent).toContainEqual({ type: 'end' });
     });
   });
