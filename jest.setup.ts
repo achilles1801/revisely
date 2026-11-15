@@ -53,6 +53,8 @@ jest.mock('firebase/auth', () => ({
   GoogleAuthProvider: { credential: jest.fn() },
   signInWithCredential: jest.fn(),
 }));
+// Auth's own fetch, which src/lib/firebase.ts wraps for the launch check (lib/authLaunchCheck, AUTH-1).
+jest.mock('@firebase/auth/internal', () => ({ FetchProvider: { initialize: jest.fn() } }));
 
 jest.mock('firebase/firestore', () => {
   // Enough of Timestamp for code that converts times (lib/offline/codec).
