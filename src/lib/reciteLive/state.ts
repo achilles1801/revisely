@@ -51,8 +51,6 @@ export interface LiveState {
   seeking: boolean;
   /** The first word of the page being searched: where a checker that doesn't look (protocol 5) starts instead. */
   seekFrom: number | null;
-  /** The checker said it hasn't found where yet (`nolock`); it goes on looking. */
-  notFoundYet: boolean;
   /** The checker's protocol (`ready`); null until it's ready. Below 6 it doesn't look: the take starts at s:a. */
   protocol: number | null;
 }
@@ -72,7 +70,6 @@ export const LIVE_IDLE: LiveState = {
   anywhere: false,
   seeking: false,
   seekFrom: null,
-  notFoundYet: false,
   protocol: null,
 };
 
@@ -94,7 +91,7 @@ export function findingStart(state: LiveState): boolean {
   return state.seeking;
 }
 
-/** A take started anywhere on the page whose checker never found where (the summary says so). */
+/** A take started anywhere on the page whose checker never found where: it ends with no summary (Majd: silently). */
 export function startNotFound(state: LiveState): boolean {
   return state.anywhere && state.start == null;
 }
@@ -109,12 +106,12 @@ export function checkerLooks(state: LiveState): boolean {
  * take's start. The cursor goes until it's found; what was decided stays.
  */
 export function seekOnPage(state: LiveState, w: number): LiveState {
-  return { ...state, seeking: true, seekFrom: w, cursor: null, notFoundYet: false };
+  return { ...state, seeking: true, seekFrom: w, cursor: null };
 }
 
 /** The checker's cursor came without `locked` (a checker that doesn't look): it began at the searched page's top. */
 function startedUnlocked(state: LiveState): LiveState {
-  return { ...state, seeking: false, notFoundYet: false, start: state.start ?? state.seekFrom };
+  return { ...state, seeking: false, start: state.start ?? state.seekFrom };
 }
 
 /** A word mark the take's start leaves out: nothing before where the reciter started is skipped. */
@@ -146,13 +143,10 @@ export function applyEvent(state: LiveState, e: LiveEvent): LiveState {
         ...state,
         start,
         seeking: false,
-        notFoundYet: false,
         cursor: e.w,
         marks: Object.fromEntries(Object.entries(state.marks).filter(([, m]) => !beforeStart(m, start))),
       };
     }
-    case 'nolock':
-      return state.seeking && !state.notFoundYet ? { ...state, notFoundYet: true } : state;
     case 'at':
       // A cursor with no `locked` first: a checker that doesn't look began at the searched page's first word.
       if (state.seeking) return { ...startedUnlocked(state), cursor: e.w };

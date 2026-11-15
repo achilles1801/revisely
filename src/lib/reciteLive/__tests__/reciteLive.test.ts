@@ -235,10 +235,11 @@ describe('a take started anywhere on the page (Majd, Nov 14 2026)', () => {
   const looking = () => liveConnecting({ anywhereFrom: A23 });
   const ready6: LiveEvent = { type: 'ready', take: 't', protocol: 6 };
 
-  it('reads `locked`, `nolock`, `ready.protocol` and a final answer’s `start` (a number, or null when never found)', () => {
+  it('reads `locked`, `ready.protocol` and a final answer’s `start` (a number, or null when never found); not `nolock`', () => {
     expect(parseEvent({ type: 'locked', w: A25, s: 27, a: 25, t: 2.1 })).toEqual({ type: 'locked', w: A25, s: 27, a: 25, t: 2.1 });
     expect(parseEvent({ type: 'locked', w: A25 })).toBeNull();
-    expect(parseEvent({ type: 'nolock' })).toEqual({ type: 'nolock' });
+    // A search that never finds the start fails silently (Majd, Nov 14 2026): nothing is shown for it.
+    expect(parseEvent({ type: 'nolock' })).toBeNull();
     expect(parseEvent({ type: 'ready', take: 't', protocol: 6 })).toMatchObject({ protocol: 6 });
     const done = (start: unknown) =>
       parseEvent({ type: 'done', result: { v: 2, follow: true, take: 't', from: A23, to: A25 + 9, secs: 9, words: [], start } });
@@ -278,15 +279,6 @@ describe('a take started anywhere on the page (Majd, Nov 14 2026)', () => {
     expect(s.start).toBe(A23);
   });
 
-  it('`nolock`: still looking, and it says so once; a `locked` may still come', () => {
-    let s = run([ready6, { type: 'nolock' }], looking());
-    expect(s.notFoundYet).toBe(true);
-    expect(findingStart(s)).toBe(true);
-    s = applyEvent(s, { type: 'locked', w: A25, s: 27, a: 25 });
-    expect(s.notFoundYet).toBe(false);
-    expect(applyEvent(s, { type: 'nolock' }).notFoundYet).toBe(false);
-  });
-
   it('nothing before the start is skipped: such marks are dropped live and from the final answer; other marks stay', () => {
     const skipped = mark({ id: 'k', w: A23 + 2, kind: 'skipped' });
     const wrong = mark({ id: 'w', w: A25 + 1, ayah: [27, 25] });
@@ -302,7 +294,7 @@ describe('a take started anywhere on the page (Majd, Nov 14 2026)', () => {
     expect(s.start).toBe(A25);
   });
 
-  it('never found: the final answer’s null start says so (the summary does too)', () => {
+  it('never found: the final answer’s null start says so (the take then ends with no summary)', () => {
     const s = run([ready6, { type: 'done', result: { v: 2, take: 't', from: A23, to: A23, secs: 5, marks: [], score: null, start: null } }], looking());
     expect(s.status).toBe('done');
     expect(startNotFound(s)).toBe(true);

@@ -62,7 +62,6 @@ export function TakeSummarySheet({
   score,
   kept,
   checkOwned,
-  startNotFound = false,
   onFinding,
   onCheck,
   onAgain,
@@ -78,8 +77,6 @@ export function TakeSummarySheet({
   score: { text: string; level: ScoreLevel } | null;
   kept: boolean;
   checkOwned: boolean;
-  /** The take started anywhere on the page and the checker never found where. */
-  startNotFound?: boolean;
   onFinding: (mark: Mark) => void;
   onCheck: () => void;
   onAgain: () => void;
@@ -105,11 +102,6 @@ export function TakeSummarySheet({
         <Text style={[check ? typeV2.body : typeV2.name, { color: palette.text }]} testID="take-summary-passage">
           {[passage, clock(seconds)].filter(Boolean).join(' · ')}
         </Text>
-        {startNotFound ? (
-          <Text style={[typeV2.meta, { color: palette.secondary }]} testID="take-summary-not-found">
-            Couldn’t find where you started on this page.
-          </Text>
-        ) : null}
         {check && marks.length ? (
           <Text style={[typeV2.meta, { color: palette.secondary }]}>{findingsLine(marks)}</Text>
         ) : null}

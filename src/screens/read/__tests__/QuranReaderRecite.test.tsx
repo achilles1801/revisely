@@ -431,7 +431,6 @@ describe('a take starts anywhere on the page (Majd, Nov 14 2026)', () => {
     const passage = String(screen.getByTestId('take-summary-passage').props.children);
     expect(passage).toMatch(/^An.Naml,\sayahs\s25.26\s·\s/);
     expect(screen.queryByTestId('take-summary-finding-skipped')).toBeNull();
-    expect(screen.queryByTestId('take-summary-not-found')).toBeNull();
   });
 
   it('a checker that doesn’t look for the start (protocol 5) begins at the page’s first ayah at once, as before', async () => {
@@ -448,11 +447,15 @@ describe('a take starts anywhere on the page (Majd, Nov 14 2026)', () => {
     expect(String(screen.getByTestId('take-summary-passage').props.children)).toMatch(/^An.Naml,\sayah\s23\s·\s/);
   });
 
-  it('never found: the summary says so', async () => {
+  it('never found: it fails silently (Majd, Nov 14 2026): Stop just ends the take, with no summary or message', async () => {
     await startTake('recite', null);
+    expect(screen.getByTestId('recite-status').props.children).toBe('Listening…');
     fireEvent.press(screen.getByTestId('recite-stop'));
     await done({ start: null });
-    expect(screen.getByTestId('take-summary-not-found').props.children).toBe('Couldn’t find where you started on this page.');
+    await flush();
+    expect(screen.queryByTestId('take-summary')).toBeNull();
+    expect(screen.queryByTestId('recite-bar')).toBeNull();
+    expect(screen.getByTestId('recite-mic')).toBeTruthy();
   });
 
   it('a page turned by hand before the start is found: the checker looks on that page instead', async () => {
@@ -482,11 +485,6 @@ describe('a take starts anywhere on the page (Majd, Nov 14 2026)', () => {
     expect(mockLive.sent).toContainEqual({ type: 'seek', w: words.pageRange(380)[0] });
   });
 
-  it('not found after a while (`nolock`): the bar says it is still looking', async () => {
-    await startTake('recite', null);
-    await event({ type: 'nolock' });
-    expect(screen.getByTestId('recite-status').props.children).toBe('Still looking for your place…');
-  });
 
   it('‹ on a hidden page after a start mid-page shows the word after the reciter’s, not the page’s first', async () => {
     await startTake('recite', null);
@@ -654,7 +652,7 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
     expect(mockLive.start).toMatchObject({ follow: false });
     // Off again: a plain Recite take.
     fireEvent.press(screen.getByTestId('recite-stop'));
-    await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [], score: null } });
+    await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [], score: null, start: A23 } });
     fireEvent.press(screen.getByTestId('take-summary-done'));
     fireEvent.press(screen.getByTestId('recite-close'));
     fireEvent(screen.getByTestId('recite-mic'), 'longPress');

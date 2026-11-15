@@ -403,10 +403,15 @@ export default function QuranReaderScreen() {
   const takeId = live.state.take;
   const [summaryShown, setSummaryShown] = useState<string | null>(null);
   useEffect(() => {
-    if (live.state.status === 'done' && takeId && summaryFor !== takeId) {
-      setSummaryFor(takeId);
-      setSummaryShown(takeId);
+    if (live.state.status !== 'done' || !takeId || summaryFor === takeId) return;
+    setSummaryFor(takeId);
+    // The checker never found where the reciter started: it fails silently (Majd, Nov 14 2026). No summary or
+    // message; Stop just ends the take.
+    if (startNotFound(live.state)) {
+      live.clear();
+      return;
     }
+    setSummaryShown(takeId);
     // Only when a take finishes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [live.state.status, takeId]);
@@ -488,9 +493,7 @@ export default function QuranReaderScreen() {
           ? LIVE_FAILURE[live.state.failure ?? 'server']
           : liveStatus === 'done'
             ? 'Done'
-            : live.state.notFoundYet
-              ? 'Still looking for your place…'
-              : 'Listening…';
+            : 'Listening…';
 
   // Previous / next go when the capsule is crowded (a recording, a timer) on
   // anything narrower than the largest phones.
@@ -720,7 +723,6 @@ export default function QuranReaderScreen() {
             score={checkTake && qw ? scorePill(live.state, qw, live.startWord) : null}
             kept={live.testData}
             checkOwned={owned}
-            startNotFound={startNotFound(live.state)}
             onFinding={(m) => {
               setSummaryShown(null);
               if (!qw) return;

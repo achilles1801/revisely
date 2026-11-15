@@ -86,10 +86,12 @@ export type LiveFailure =
 
 export type LiveEvent =
   | { type: 'ready'; take: string | null; engine?: string; session?: string; from?: number; protocol?: number }
-  /** A take started anywhere on the page: the checker has found where the reciter is (once per search). */
+  /**
+   * A take started anywhere on the page: the checker has found where the reciter is (once per search). Its `nolock`
+   * (still searching after about 8 s of speech) isn't read: a search that never finds the start fails silently
+   * (Majd, Nov 14 2026), so the phone shows nothing for it.
+   */
   | { type: 'locked'; w: number; s: number; a: number; t?: number }
-  /** Still looking after about 8 s of speech (once); the search goes on, and a `locked` may follow. */
-  | { type: 'nolock' }
   | { type: 'at'; w: number; t?: number }
   | { type: 'said'; upTo: number }
   | { type: 'mark'; mark: Mark }
@@ -219,8 +221,6 @@ export function parseEvent(raw: unknown): LiveEvent | null {
       return isWord(x.w) && isNum(x.s) && isNum(x.a)
         ? { type: 'locked', w: x.w, s: x.s, a: x.a, ...(isNum(x.t) ? { t: x.t } : {}) }
         : null;
-    case 'nolock':
-      return { type: 'nolock' };
     case 'at':
       return isWord(x.w) ? { type: 'at', w: x.w, ...(isNum(x.t) ? { t: x.t } : {}) } : null;
     case 'said':
