@@ -459,13 +459,16 @@ export default function QuranReaderScreen() {
     return () => clearTimeout(t);
   }, []);
   const premiumKnown = premium.known;
+  const showChrome = chrome.show;
   useEffect(() => {
     const found = reciteOnOpen.current;
     if (!found || !liveOn || !settingsLoaded) return;
     if (reciteSettings.markMistakes && !premiumKnown && !premiumWaited) return;
     reciteOnOpen.current = null;
+    // The controls up, as after a tap on the page: once the take is closed the player and its mic are there.
+    showChrome();
     startMode(markMistakes ? 'check' : 'recite', foundSpan(found));
-  }, [liveOn, settingsLoaded, premiumKnown, premiumWaited, reciteSettings.markMistakes, markMistakes, startMode]);
+  }, [liveOn, settingsLoaded, premiumKnown, premiumWaited, reciteSettings.markMistakes, markMistakes, startMode, showChrome]);
   const pickMode = useCallback(
     (mode: ReciteMenuMode) => {
       setModeMenu(false);

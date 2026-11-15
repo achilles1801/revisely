@@ -1547,6 +1547,8 @@ describe('a voice search with one result opens the reader reciting (Majd, Nov 15
     await flush();
     expect(mockLive.start).toBeUndefined();
     expect(screen.queryByTestId('recite-bar')).toBeNull();
+    // Back to the player, its mic there (the reader opened in reading mode, its controls put away).
+    expect(screen.getByTestId('recite-mic')).toBeTruthy();
   });
 
   it('a typed search (no `recite`) only highlights the ayah, as before', async () => {
