@@ -68,8 +68,11 @@ function TopicRow({ topic, marks }: { topic: HelpTopic; marks: boolean }) {
   );
 }
 
-/** Help sheets with no "Ask Revo": the reader (the Read tab) and a session (Majd, Nov 8 2026; REVO-25). */
-export const NO_REVO: ReadonlySet<HelpScreen> = new Set<HelpScreen>(['reader', 'session']);
+/**
+ * Help sheets with no "Ask Revo": the reader (the Read tab, and Recite's sheet there while a take is open) and a session
+ * (Majd, Nov 8 2026; REVO-25).
+ */
+export const NO_REVO: ReadonlySet<HelpScreen> = new Set<HelpScreen>(['reader', 'session', 'recite']);
 
 /**
  * A screen's help (HELP-1): its few topics, then "Ask Revo ›" (while Revo is on for the account, but never in

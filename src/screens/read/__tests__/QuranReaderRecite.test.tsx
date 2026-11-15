@@ -414,6 +414,9 @@ describe('a take kept as a recording (Save recordings, on by default)', () => {
     for (const id of ['recite.start', 'recite.marks', 'recite.card', 'recite.after']) {
       expect(screen.getByTestId(`help-topic-${id}`)).toBeTruthy();
     }
+    // It's the reader's help: no "Ask Revo" (REVO-25), as flow 18's first shot of it showed there was.
+    expect(jest.requireActual('../../../components/help/HelpSheet').NO_REVO.has('recite')).toBe(true);
+    expect(screen.queryByTestId('help-ask-revo')).toBeNull();
   });
 
   it('Save recordings off: nothing is kept and there is no dot', async () => {
