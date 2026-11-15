@@ -20,6 +20,7 @@ import { setupAppCheck } from './src/lib/appCheck';
 import * as Sentry from '@sentry/react-native';
 import { currentRelease, releaseTags } from './src/lib/releaseInfo';
 import { markUiReady, startOtaUpdates } from './src/lib/updates/ota';
+import { stopTrace } from './src/lib/reciteLive/stopTrace';
 import { startStoreChecks } from './src/lib/updates/storeUpdates';
 import { UpdateRequiredGate } from './src/components/updates/UpdateRequired';
 
@@ -86,6 +87,9 @@ Sentry.setTags(releaseTags(release));
 // New store versions are offered, or required below the minimum (storeUpdates.ts).
 startOtaUpdates();
 startStoreChecks();
+// Revisely Dev: a live take whose Stop never reached its summary last run (a freeze, or the app closed then) goes to
+// Sentry once (src/lib/reciteLive/stopTrace.ts).
+void stopTrace.reportLeftover();
 
 function App() {
   // Amiri (classical Naskh) for all Arabic UI text. If loading fails we still

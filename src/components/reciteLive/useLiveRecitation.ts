@@ -13,8 +13,10 @@ import { AudioSource, startMicStream } from '../../lib/recite/micSource';
 import { SAMPLE_RATE } from '../../lib/recite/segmenter';
 import { getQuranWords, loadQuranWords, QuranWords } from '../../lib/recite/quranWords';
 import type { ReciteCheckSettings } from '../../lib/reciteCheck/settings';
+import type { LiveEvent } from '../../lib/reciteLive/contract';
 import type { LiveConnect, LiveConnection, StartFrame } from '../../lib/reciteLive/feed';
 import { socketFeed } from '../../lib/reciteLive/socket';
+import { stopTrace } from '../../lib/reciteLive/stopTrace';
 import { SavedTake, startTakeRecording, TakeRecording } from '../../lib/reciteLive/takeRecording';
 import {
   applyEvent,
@@ -32,6 +34,9 @@ export type LiveMode = 'recite' | 'check';
 
 /** The microphone: off, asking for it, on, refused, or failed to start. */
 export type MicStatus = 'off' | 'starting' | 'on' | 'denied' | 'error';
+
+/** What ended a take: Stop tapped, the app left, or iOS took the microphone. */
+type StopWhy = 'tap' | 'background' | 'mic-lost';
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -150,6 +155,14 @@ export function useLiveRecitation({
   const [testData, setTestData] = useState(false);
   const onSavedRef = useRef(onRecordingSaved);
   onSavedRef.current = onRecordingSaved;
+  // For the Stop trace (lib/reciteLive/stopTrace), read when Stop is tapped.
+  const traceRef = useRef({ state, mode, seconds });
+  traceRef.current = { state, mode, seconds };
+  /** Each event the take receives: its type to the Stop trace, then the live state. */
+  const onEvent = useCallback((e: LiveEvent) => {
+    stopTrace.event(e.type);
+    setState((s) => applyEvent(s, e));
+  }, []);
 
   /** The take's recording, kept once the microphone has stopped (on the screen's way out too). */
   const finishRecording = useCallback(() => {
@@ -160,9 +173,13 @@ export function useLiveRecitation({
     rec
       .finish()
       .then((saved) => {
+        stopTrace.step(saved ? 'recording-saved' : 'recording-none');
         if (saved) onSavedRef.current?.(saved);
       })
-      .catch((err) => logger.warn('The take’s recording was not saved', err));
+      .catch((err) => {
+        stopTrace.step('recording-failed');
+        logger.warn('The take’s recording was not saved', err);
+      });
   }, []);
 
   const stopMic = useCallback(async () => {
@@ -170,20 +187,35 @@ export function useLiveRecitation({
     source.current = null;
     if (!src) return;
     await src.stop().catch(() => undefined);
+    stopTrace.step('mic-off');
     finishRecording();
     await setAudioMode(false).catch(() => undefined);
+    stopTrace.step('audio-mode');
     setMic('off');
   }, [finishRecording]);
 
   /** Stop: the audio ends, the checker sends its final answer, the live marks stay meanwhile. */
-  const stop = useCallback(() => {
-    void stopMic();
-    conn.current?.send({ type: 'end' });
-    setState((s) => liveStopping(s));
-  }, [stopMic]);
+  const stopFor = useCallback(
+    (why: StopWhy) => {
+      const t = traceRef.current;
+      stopTrace.stop({
+        mode: `${t.mode ?? '?'}${why === 'tap' ? '' : ` (${why})`}`,
+        status: t.state.status,
+        seconds: t.seconds,
+        take: t.state.take,
+        socket: conn.current?.status?.(),
+      });
+      void stopMic();
+      conn.current?.send({ type: 'end' });
+      setState((s) => liveStopping(s));
+    },
+    [stopMic],
+  );
+  const stop = useCallback(() => stopFor('tap'), [stopFor]);
 
   /** Throw the take away (the screen left): nothing more comes. */
   const cancel = useCallback(() => {
+    stopTrace.end();
     void stopMic();
     conn.current?.close();
     conn.current = null;
@@ -215,8 +247,9 @@ export function useLiveRecitation({
         setMode(take);
         setState(connectingFor(frame, qw));
         const c = e2e.e2eLiveConnect()(frame, {
-          onEvent: (e) => setState((s) => applyEvent(s, e)),
+          onEvent,
           onClose: () => {
+            stopTrace.step('closed');
             if (conn.current === c) conn.current = null;
             clearInterval(tick);
             setMic('off');
@@ -257,8 +290,9 @@ export function useLiveRecitation({
         setMode(take);
         setState(connectingFor(frame, qw));
         const c = connect(frame, {
-          onEvent: (e) => setState((s) => applyEvent(s, e)),
+          onEvent,
           onClose: () => {
+            stopTrace.step('closed');
             if (conn.current === c) conn.current = null;
             void stopMic();
           },
@@ -277,7 +311,7 @@ export function useLiveRecitation({
             if (Math.floor(samples.current / SAMPLE_RATE) !== before) setSeconds(Math.floor(samples.current / SAMPLE_RATE));
           },
           // iOS took the microphone (a call, headphones out): the take ends there.
-          onStop: () => stop(),
+          onStop: () => stopFor('mic-lost'),
         };
         await enterRecordingMode();
         try {
@@ -304,7 +338,7 @@ export function useLiveRecitation({
         setState((s) => (s.status === 'connecting' ? { ...s, status: 'failed', failure: 'server' } : s));
       }
     },
-    [connect, owner, settings, stop, stopMic, recordingDay, finishRecording],
+    [connect, owner, settings, stopFor, stopMic, recordingDay, finishRecording, onEvent],
   );
 
   /** "Not a mistake": off the page at once, and told to the checker (a label for the lab). */
@@ -320,6 +354,7 @@ export function useLiveRecitation({
 
   /** Done with the take: back to idle (the summary closed). */
   const clear = useCallback(() => {
+    stopTrace.end();
     void stopMic();
     conn.current?.close();
     conn.current = null;
@@ -365,10 +400,18 @@ export function useLiveRecitation({
   // Leaving the app ends the take (the final answer comes when it's back).
   useEffect(() => {
     const sub = AppState.addEventListener('change', (s) => {
-      if (s === 'background' && source.current) stop();
+      stopTrace.step(`app:${s}`);
+      if (s === 'background' && source.current) stopFor('background');
     });
     return () => sub.remove();
-  }, [stop]);
+  }, [stopFor]);
+
+  // The Stop trace: the final answer came, or the take failed (the bar says so, so the trace has ended).
+  const status = state.status;
+  useEffect(() => {
+    if (status === 'done') stopTrace.step('done', conn.current?.status?.());
+    else if (status === 'failed') stopTrace.end();
+  }, [status]);
 
   // Leaving the screen throws the take away.
   useEffect(() => () => cancel(), [cancel]);

@@ -44,6 +44,8 @@ export interface LiveConnection {
   send(frame: Exclude<ClientFrame, StartFrame>): void;
   /** Hang up (nothing more comes). */
   close(): void;
+  /** The connection's state in a word or two, for the Stop trace (lib/reciteLive/stopTrace): "live", "retry 2", … */
+  status?(): string;
 }
 
 export interface LiveHandlers {

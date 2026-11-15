@@ -44,6 +44,7 @@ import { premiumErrorText, setDevPremium, supportLinkUrl, usePremium } from '../
 import { setReciteCheckSettings, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
 import { loadQuranWords, getQuranWords, QuranWords } from '../../lib/recite/quranWords';
 import { furthestWord, marksOnPage, startNotFound } from '../../lib/reciteLive/state';
+import { stopTrace } from '../../lib/reciteLive/stopTrace';
 import {
   barWords,
   hiddenFollow,
@@ -411,6 +412,7 @@ export default function QuranReaderScreen() {
       live.clear();
       return;
     }
+    stopTrace.step('summary-asked');
     setSummaryShown(takeId);
     // Only when a take finishes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -741,6 +743,8 @@ export default function QuranReaderScreen() {
               if (mode) startMode(mode);
             }}
             onDone={() => setSummaryShown(null)}
+            // The summary is on screen: the take's Stop trace ends (lib/reciteLive/stopTrace).
+            onShown={() => stopTrace.end()}
           />
           <CheckIntroPage
             visible={introOpen}

@@ -1,11 +1,12 @@
 // The reader's one mic (Revisely Dev): Record, Recite, Check; the recite bar; marks and the hidden view.
 import React from 'react';
-import { AccessibilityInfo, Alert } from 'react-native';
+import { AccessibilityInfo, Alert, Modal } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import QuranReaderScreen from '../QuranReaderScreen';
 import { resetReciteCheckSettingsForTests, setReciteCheckSettings } from '../../../lib/reciteCheck/settings';
 import type { LiveEvent } from '../../../lib/reciteLive/contract';
+import { STOP_TRACE_KEY } from '../../../lib/reciteLive/stopTrace';
 import { versesOnPage } from '../../../lib/ayahBounds';
 
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
@@ -716,5 +717,56 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
     await act(async () => fireEvent.press(screen.getByTestId('check-intro-support')));
     const { openBrowserAsync } = jest.requireMock('expo-web-browser');
     expect(openBrowserAsync).toHaveBeenCalledWith('https://dev.revisely.app/apply/#c=one-time');
+  });
+});
+
+describe('the Stop trace (Revisely Dev: a freeze after Stop leaves a trace for the next launch)', () => {
+  const trace = async () => {
+    const raw = await AsyncStorage.getItem(STOP_TRACE_KEY);
+    return raw ? (JSON.parse(raw) as { mode: string; status: string; take: string; steps: { s: string }[] }) : null;
+  };
+  /** iOS presents the summary's modal (React Native's jest Modal never calls onShow). */
+  const presented = () =>
+    act(async () => {
+      for (const m of screen.UNSAFE_getAllByType(Modal)) if (m.props.visible !== false) m.props.onShow?.();
+    });
+
+  it('Stop writes it, each step to the summary adds to it, and the summary on screen removes it', async () => {
+    await startTake('check');
+    expect(await trace()).toBeNull();
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await flush();
+    const atStop = await trace();
+    expect(atStop).toMatchObject({ mode: 'check', status: 'listening', take: 't1' });
+    expect(atStop!.steps.map((s) => s.s)).toEqual(expect.arrayContaining(['stop', 'mic-off', 'audio-mode']));
+    await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, start: A23, secs: 12, marks: [], score: null } });
+    await flush();
+    expect(screen.getByTestId('take-summary')).toBeTruthy();
+    const steps = (await trace())!.steps.map((s) => s.s);
+    expect(steps).toEqual(expect.arrayContaining(['ev:done', 'done', 'summary-asked']));
+    await presented();
+    await flush();
+    expect(await trace()).toBeNull();
+  });
+
+  it('a take that ends without a summary (its start never found) removes it too', async () => {
+    await startTake('recite', null);
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await flush();
+    expect(await trace()).not.toBeNull();
+    await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, start: null, secs: 12, marks: [], score: null } });
+    await flush();
+    expect(screen.queryByTestId('take-summary')).toBeNull();
+    expect(await trace()).toBeNull();
+  });
+
+  it('leaving the reader before the answer removes it', async () => {
+    await startTake('recite');
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await flush();
+    expect(await trace()).not.toBeNull();
+    screen.unmount();
+    await flush();
+    expect(await trace()).toBeNull();
   });
 });
