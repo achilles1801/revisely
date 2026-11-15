@@ -9,6 +9,10 @@ The share of learners-v0 clips with at least one mark, word or letter/harakat, c
   python default_level.py hisn v5 teacher8k            -> the table at each letters bar
   python default_level.py --frontier hisn teacher8k    -> with every word setting of runs/word_sweep.json: the
                                                                best catch at each level of correct clips marked
+  python default_level.py --by-gender hisn teacher8k   -> men's and women's clips apart (intervals resample people),
+                                                               and the check every model passes before it reaches the
+                                                               Dev app (Majd, Nov 15 2026): women's correct clips
+                                                               aren't marked noticeably more often than men's
 """
 import collections
 import json
@@ -24,10 +28,18 @@ import letters_v2  # noqa: E402
 
 BARS = (0.0003, 0.001, 0.002, 0.003, 0.005, 0.01)
 ITEMS = sorted((LAB / 'data/learners-v0/items').glob('*.json'))
-TRUTH = {}
+TRUTH, GENDER, PERSON = {}, {}, {}
 for f in ITEMS:
     t = json.loads(f.read_text())
     TRUTH[t['id']] = t['variant'] == 'learner-correct'
+    GENDER[t['id']] = t.get('gender')  # RetaSy's reciter_gender; None for 318 clips
+    PERSON[t['id']] = t.get('reciter')
+# The check before a model reaches the Dev app: at any setting the app marks at (words alone, letters clear, letters
+# deployed), it fails when women's correct clips are marked more than GATE_POINTS more often than men's and the gap is
+# past GATE_Z standard errors (one-sided 95%). The teacher at letters clear, 4.8% of men's against 14.6% of women's
+# (review, Nov 14 2026), fails it; the released model passes.
+GATE_POINTS = 5.0
+GATE_Z = 1.64
 
 
 def letter_scores(ear):
@@ -117,10 +129,60 @@ def frontier(ears, mixed=False):
         print(f'| {cap:g}% | ' + ' | '.join(cells) + ' |')
 
 
+def person_rate(marked, clips, n_boot=2000, seed=0):
+    """Share of clips marked (%), and its standard error resampling people (all of a person's clips together)."""
+    people = collections.defaultdict(list)
+    for c in clips:
+        people[PERSON[c]].append(bool(marked[c]))
+    groups = list(people.values())
+    if not groups:
+        return float('nan'), float('nan'), [], 0
+    point = 100 * sum(map(sum, groups)) / sum(map(len, groups))
+    rng = np.random.default_rng(seed)
+    boots = []
+    for _ in range(n_boot):
+        pick = [groups[i] for i in rng.integers(0, len(groups), len(groups))]
+        boots.append(100 * sum(map(sum, pick)) / sum(map(len, pick)))
+    return point, float(np.std(boots)), boots, len(groups)
+
+
+def by_gender(ears, mixed=False):
+    stamps([f'learners.ft.{e}.wp' for e in ears], mixed)
+    settings = [('words alone', None), ('letters 0.1% (clear)', 0.001), ('letters 0.3% (deployed)', 0.003)]
+    gate = {}
+    for e in ears:
+        (pro, clip), words = letter_scores(e), word_marked(f'learners.ft.{e}.wp')
+        print(f'### {e}')
+        print('| setting | correct clips marked: men | women | clips with mistakes marked: men | women |')
+        print('| --- | --- | --- | --- | --- |')
+        for name, q in settings:
+            bar = float('inf') if q is None else float(np.quantile(pro, 1 - q))
+            marked = {c: words[c] or clip.get(c, -1e9) > bar for c in words}
+            cells, boots = [], {}
+            for want in (True, False):
+                for g in ('male', 'female'):
+                    clips = [c for c in marked if TRUTH[c] == want and GENDER[c] == g]
+                    pt, se, bs, n = person_rate(marked, clips, seed=hash((e, name, want, g)) % 2 ** 32)
+                    cells.append(f'{pt:.1f}% ± {se:.1f} ({len(clips)} clips, {n} people)')
+                    boots[(want, g)] = (pt, bs)
+            print(f'| {name} | ' + ' | '.join(cells) + ' |')
+            (m, mb), (w, wb) = boots[(True, 'male')], boots[(True, 'female')]
+            se = float(np.std(np.array(wb) - np.array(mb)))
+            gate.setdefault(e, []).append((name, w - m, se, w - m > GATE_POINTS and w - m > GATE_Z * se))
+        print()
+    print(f'Women vs men, correct clips marked (a setting fails above {GATE_POINTS:g} points and {GATE_Z:g} standard '
+          f'errors; the app shows marks at every one of them, so a model passes only if none fails):')
+    for e, rows in gate.items():
+        cells = '; '.join(f'{name} {gap:+.1f} ± {se:.1f}{" FAIL" if fail else ""}' for name, gap, se, fail in rows)
+        print(f'  {e}: {"FAIL" if any(r[3] for r in rows) else "pass"} ({cells})')
+
+
 if __name__ == '__main__':
     mixed = '--mixed' in sys.argv  # allow runs from different checkers side by side
     argv = [a for a in sys.argv[1:] if a != '--mixed']
     if argv[0] == '--frontier':
         frontier(argv[1:], mixed)
+    elif argv[0] == '--by-gender':
+        by_gender(argv[1:], mixed)
     else:
         table(argv, mixed)
