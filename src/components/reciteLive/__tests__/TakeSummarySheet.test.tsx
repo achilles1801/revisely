@@ -149,4 +149,15 @@ describe('the take summary with screen readers and the largest text', () => {
     expect(style(first).backgroundColor).toBe(p.markWord);
     expect(style(screen.getAllByTestId('take-summary-finding-arabic')[0]).color).toBe(p.text);
   });
+
+  it('Recite again and Done are pinned under the findings, never at the end of a long scroll (an SE at the largest text)', () => {
+    show({ fontScale: 3.1, marks: Array.from({ length: 8 }, (_, i) => wrong(A23 + i, [27, 23])) });
+    const { ScrollView } = require('react-native');
+    const scroll = screen.UNSAFE_getByType(ScrollView);
+    expect(screen.getByTestId('take-summary-done')).toBeTruthy();
+    expect(within(scroll).queryByTestId('take-summary-done')).toBeNull();
+    expect(within(scroll).queryByTestId('take-summary-again')).toBeNull();
+    // The findings scroll.
+    expect(within(scroll).getAllByTestId('take-summary-finding-word')).toHaveLength(8);
+  });
 });

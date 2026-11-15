@@ -146,8 +146,25 @@ export function TakeSummarySheet({
     else AccessibilityInfo.announceForAccessibility(spokenSummary);
     onShown?.();
   };
+  // Pinned under the findings, always on screen (at the largest text on an SE, or with many findings, they sat at the
+  // end of a long scroll).
+  const actions = (
+    <View style={styles.buttons}>
+      {check && onDrill && drillMarks(marks).length ? (
+        <PillButton title="Recite the mistakes again" size="lg" onPress={onDrill} testID="take-summary-drill" />
+      ) : null}
+      <PillButton
+        title="Recite again"
+        size="lg"
+        variant={check && onDrill && drillMarks(marks).length ? 'outline' : undefined}
+        onPress={onAgain}
+        testID="take-summary-again"
+      />
+      <PillButton title="Done" size="lg" variant="outline" onPress={onDone} testID="take-summary-done" />
+    </View>
+  );
   return (
-    <Sheet visible={visible} onClose={onDone} onShow={shown} title="Your recitation" scroll testID="take-summary">
+    <Sheet visible={visible} onClose={onDone} onShow={shown} title="Your recitation" scroll pinned={actions} testID="take-summary">
       <View style={styles.head}>
         {check && score ? (
           <View style={styles.scoreRow} accessible accessibilityLabel={`Score ${score.text}, ${mistakesLabel(mistakes)}`}>
@@ -282,19 +299,6 @@ export function TakeSummarySheet({
           <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
         </Tap>
       ) : null}
-      <View style={styles.buttons}>
-        {check && onDrill && drillMarks(marks).length ? (
-          <PillButton title="Recite the mistakes again" size="lg" onPress={onDrill} testID="take-summary-drill" />
-        ) : null}
-        <PillButton
-          title="Recite again"
-          size="lg"
-          variant={check && onDrill && drillMarks(marks).length ? 'outline' : undefined}
-          onPress={onAgain}
-          testID="take-summary-again"
-        />
-        <PillButton title="Done" size="lg" variant="outline" onPress={onDone} testID="take-summary-done" />
-      </View>
       {kept ? (
         <Text style={[typeV2.meta, styles.kept, { color: palette.secondary }]} maxFontSizeMultiplier={CHROME_MAX}>
           Kept as test data. Software checks it; nobody listens.
