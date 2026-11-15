@@ -35,6 +35,21 @@ export interface Mark {
   t?: [number, number];
   /** clear: past a strict bar; likely: past the normal one (shown softer). */
   sure: 'clear' | 'likely';
+  /** Final answer only (contract draft 6): the reciter went on with a similar ayah, or ended it as another ends. */
+  into?: MarkInto;
+}
+
+/**
+ * Where a slip into a similar ayah went (recite-contract.md, `into`; agreed by recite-ui Nov 15 2026): on the first
+ * skipped or wrong word of a run, in the final answer only. `ending`: the ayah's last word said as `ayah`'s last word.
+ */
+export interface MarkInto {
+  /** The first word said of that place (the app's word number); for `ending`, that ayah's last word. */
+  w: number;
+  ayah: [number, number];
+  /** Other ayat with the same words, as far as was heard. */
+  also?: [number, number][];
+  ending?: true;
 }
 
 export interface LiveScore {
@@ -134,6 +149,21 @@ const isWord = (x: unknown): x is number => isNum(x) && Number.isInteger(x) && x
 const pair = (x: unknown): [number, number] | null =>
   Array.isArray(x) && x.length === 2 && isNum(x[0]) && isNum(x[1]) ? [x[0], x[1]] : null;
 
+/** A mark's `into`, or null when it isn't one (the mark stays without it). */
+export function parseInto(raw: unknown): MarkInto | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const ayah = pair(r.ayah);
+  if (!isWord(r.w) || !ayah || !isWord(ayah[0]) || !isWord(ayah[1]) || ayah[0] < 1 || ayah[0] > 114 || ayah[1] < 1) return null;
+  const into: MarkInto = { w: r.w, ayah };
+  if (Array.isArray(r.also)) {
+    const also = r.also.map(pair).filter((a): a is [number, number] => a != null && a[0] >= 1 && a[0] <= 114 && a[1] >= 1);
+    if (also.length) into.also = also;
+  }
+  if (r.ending === true) into.ending = true;
+  return into;
+}
+
 /** A mark, or null when it isn't one. */
 export function parseMark(raw: unknown): Mark | null {
   if (!raw || typeof raw !== 'object') return null;
@@ -164,6 +194,8 @@ export function parseMark(raw: unknown): Mark | null {
   if (isNum(m.expected)) mark.expected = m.expected;
   const t = pair(m.t);
   if (t) mark.t = t;
+  const into = parseInto(m.into);
+  if (into) mark.into = into;
   return mark;
 }
 

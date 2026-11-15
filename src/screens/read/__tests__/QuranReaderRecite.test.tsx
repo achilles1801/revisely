@@ -25,6 +25,8 @@ jest.mock('expo-haptics', () => ({
 const mockPager: {
   /** Pages the screen turned to (scrollToPage). */
   scrolled: number[];
+  /** The verses it highlights (a search result, a held verse, an ayah a take slipped into). */
+  highlighted?: unknown;
   onPageChange?: (page: number) => void;
   onTapVerse?: (a: unknown) => boolean;
   onTapPoint?: (page: number, x: number, y: number, toWindow: (r: { x0: number; y0: number; x1: number; y1: number }) => unknown) => boolean;
@@ -43,10 +45,12 @@ jest.mock('../../../components/MushafPager', () => {
           pageUnderlay?: (page: number, scale: number) => React.ReactNode;
           pageOverlay?: (page: number, scale: number, image: unknown) => React.ReactNode;
           pageAccessories?: (page: number, scale: number) => React.ReactNode;
+          highlightedAyah?: unknown;
         },
         ref: React.Ref<{ scrollToPage: (p: number) => boolean }>,
       ) => {
         mockPager.onPageChange = props.onPageChange;
+        mockPager.highlighted = props.highlightedAyah;
         mockPager.onTapVerse = props.onTapVerse;
         mockPager.onTapPoint = props.onTapPoint as never;
         React.useImperativeHandle(ref, () => ({
@@ -994,6 +998,20 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
     expect(screen.getByText('Kept as test data. Software checks it; nobody listens.')).toBeTruthy();
     fireEvent.press(screen.getByTestId('take-summary-done'));
     expect(screen.getByTestId('recite-close')).toBeTruthy();
+  });
+
+  it('a slip into a similar ayah: the summary says where it went, and a tap opens that ayah, highlighted', async () => {
+    await startTake('check');
+    const into = { w: words.verseFirstWord(27, 16), ayah: [27, 16] as [number, number] };
+    const mark = { id: 'a', w: UTIYAT, ayah: [27, 23] as [number, number], kind: 'word' as const, sure: 'clear' as const, into };
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [mark], score: null } });
+    const row = screen.getByTestId('take-summary-into');
+    fireEvent.press(row);
+    await flush();
+    const page = words.pageOf(into.w);
+    expect(mockPager.scrolled).toContain(page);
+    expect(mockPager.highlighted).toEqual([expect.objectContaining({ sura: 27, ayah: 16, page })]);
   });
 
   it('the summary names what was recited, not the passage’s end (the checker’s `to` is the end of the surah)', async () => {

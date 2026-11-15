@@ -201,6 +201,14 @@ export default function QuranReaderScreen() {
     if (!searchHighlight || searchHighlight.some((h) => h.page === currentPage)) return;
     if (searchHighlight.every((h) => ayahRects(currentPage, h.sura, h.ayah).length === 0)) setSearchHighlight(null);
   }, [currentPage, searchHighlight]);
+  // An ayah a take slipped into (the summary's "You continued with …"): highlighted once its page is shown, since the
+  // highlight above goes as soon as the page shown has none of it.
+  const [intoTarget, setIntoTarget] = useState<AyahRef | null>(null);
+  useEffect(() => {
+    if (!intoTarget || intoTarget.page !== currentPage) return;
+    setSearchHighlight([intoTarget]);
+    setIntoTarget(null);
+  }, [intoTarget, currentPage]);
 
   // Reading: nothing but the page (its number, the juz and surah). A tap on
   // the page brings the controls (they sit beside the page, never over it);
@@ -814,6 +822,14 @@ export default function QuranReaderScreen() {
               if (!qw) return;
               pagerRef.current?.scrollToPage(qw.pageOf(m.w));
               setCardAt({ w: m.w, anchor: { x: width / 2, y: insets.top + 120, width: 1, height: 1 } });
+            }}
+            onInto={(into) => {
+              // That ayah, highlighted as a search result is, until the page is turned (once its page is the one shown).
+              setSummaryShown(null);
+              setCardAt(null);
+              const target = toAyahRef({ sura: into.ayah[0], ayah: into.ayah[1] });
+              setIntoTarget(target);
+              pagerRef.current?.scrollToPage(target.page);
             }}
             onCheck={() => {
               setSummaryShown(null);

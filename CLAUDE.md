@@ -267,6 +267,12 @@ until its part is set up.
     tajweed offers one take over the stretch from the ayah before the first mistake (same surah) to the last mistake's
     ayah (`s2`/`a2`, no `startBy`). It stops by itself once `said` reaches the stretch's last word (reciting on would
     add "Extra word after the end" marks), and its summary says "Before: …" (what the take before found there).
+  - **Where a slip went** (`into`, contract draft 6; Majd said yes, Nov 15 2026; live on the checker since #617/#618):
+    the final answer can name, on the first skipped or wrong word of a run, the similar ayah the reciter went on with,
+    or (`ending`) the ayah whose ending they used. The summary gives each a row under its head ("You continued with
+    Luqman 31:6, a similar ayah", "(and 2 others)" when `also` has more; "You ended ayah 5 as ayah 3 ends"), and a tap
+    opens that ayah in the reader, highlighted until the page is turned. `parseInto` drops a malformed one, never its
+    mark. A mark taken off takes its row with it (Put back restores it). It never counts in the score.
   - **Stop leaves a trace** (`lib/reciteLive/stopTrace`, Nov 15 2026, after a freeze on Stop that told us nothing): Stop
     writes a marker on the phone, each step to the summary adds to it (mic off, the final answer, the summary asked
     for), and a heartbeat keeps the longest JavaScript stall. The summary on screen, a failure, ✕ or leaving the reader

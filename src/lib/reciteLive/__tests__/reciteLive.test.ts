@@ -631,3 +631,43 @@ describe('the first answer (v1) as marks', () => {
     expect(f.marks.every((m) => m.ayah[0] === 27 && m.ayah[1] === 23)).toBe(true);
   });
 });
+
+describe('`into`: where a slip into a similar ayah went (contract draft 6, final answer only)', () => {
+  const { intoLine, intoMarks, spokenIntoLine } = require('../describe');
+  const { plainText, surahName } = require('../../passages');
+  const base = { id: 'a', w: 40, ayah: [2, 5] as [number, number], kind: 'skipped' as const, sure: 'clear' as const };
+
+  it('is kept on its mark, with the other ayat reading the same and a swapped ending', () => {
+    expect(parseMark({ ...base, into: { w: 3500, ayah: [31, 6], also: [[2, 7], 'x', [300, 1]] } })!.into).toEqual({ w: 3500, ayah: [31, 6], also: [[2, 7]] });
+    expect(parseMark({ ...base, into: { w: 9, ayah: [113, 3], ending: true } })!.into).toEqual({ w: 9, ayah: [113, 3], ending: true });
+  });
+
+  it('a malformed one is dropped, never its mark', () => {
+    for (const into of ['x', { w: -1, ayah: [31, 6] }, { w: 3, ayah: [200, 1] }, { w: 3, ayah: [31, 0] }, { w: 3 }]) {
+      const m = parseMark({ ...base, into });
+      expect(m).toMatchObject({ id: 'a', kind: 'skipped' });
+      expect(m!.into).toBeUndefined();
+    }
+  });
+
+  it('reads as a line on the card: the ayah gone on with, surah first; a swapped ending by its ayah', () => {
+    const luqman = plainText(surahName(31));
+    const m = { ...base, into: { w: 3500, ayah: [31, 6] as [number, number] } };
+    expect(plainText(intoLine(m, 'ayah 5'))).toBe(`You continued with ${luqman} 31:6, a similar ayah`);
+    expect(plainText(intoLine({ ...m, into: { ...m.into, also: [[2, 7]] } }, 'ayah 5'))).toBe(`You continued with ${luqman} 31:6, a similar ayah (and 1 other)`);
+    expect(plainText(intoLine({ ...m, into: { ...m.into, also: [[2, 7], [3, 9]] } }, 'ayah 5'))).toBe(`You continued with ${luqman} 31:6, a similar ayah (and 2 others)`);
+    const ending = { ...base, ayah: [113, 5] as [number, number], into: { w: 9, ayah: [113, 3] as [number, number], ending: true as const } };
+    expect(plainText(intoLine(ending, 'ayah 5'))).toBe('You ended ayah 5 as ayah 3 ends');
+    // VoiceOver hears the surah and ayah in words, not "31:6".
+    expect(spokenIntoLine(m, 'ayah 5')).toBe(`You continued with ${surahName(31)}, ayah 6, a similar ayah`);
+  });
+
+  it('only marks that carry one, in page order', () => {
+    const marks = [
+      { ...base, id: 'b', w: 50, into: { w: 1, ayah: [1, 1] as [number, number] } },
+      { ...base, id: 'c', w: 45 },
+      { ...base, id: 'd', w: 41, into: { w: 2, ayah: [1, 2] as [number, number] } },
+    ];
+    expect(intoMarks(marks).map((m: { id: string }) => m.id)).toEqual(['d', 'b']);
+  });
+});

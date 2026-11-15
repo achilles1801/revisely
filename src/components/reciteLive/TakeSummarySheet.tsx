@@ -9,10 +9,10 @@ import { Tap } from '../v2/Tap';
 import { describeAyahs, spokenText } from '../../lib/passages';
 import { ayahKey } from '../../lib/ayahKeys';
 import type { QuranWords } from '../../lib/recite/quranWords';
-import type { Mark } from '../../lib/reciteLive/contract';
+import type { Mark, MarkInto } from '../../lib/reciteLive/contract';
 import { isUnclear, markGroup } from '../../lib/reciteLive/contract';
 import { markFill } from './markColours';
-import { findingNote, markTitle } from '../../lib/reciteLive/describe';
+import { findingNote, intoLine, intoMarks, markTitle, spokenIntoLine } from '../../lib/reciteLive/describe';
 import { drillMarks } from '../../lib/reciteLive/drill';
 import type { ScoreLevel } from '../../lib/reciteLive/score';
 import { mistakesLabel } from '../../lib/reciteLive/score';
@@ -90,6 +90,7 @@ export function TakeSummarySheet({
   onPutBack,
   checkOwned,
   onFinding,
+  onInto,
   onCheck,
   onAgain,
   onDrill,
@@ -111,6 +112,8 @@ export function TakeSummarySheet({
   onPutBack?: (id: string) => void;
   checkOwned: boolean;
   onFinding: (mark: Mark) => void;
+  /** Where a slip went (`into`): that ayah in the reader. Without it, no such lines. */
+  onInto?: (into: MarkInto) => void;
   onCheck: () => void;
   onAgain: () => void;
   /** Recite the mistakes again (Check, with something to drill): one take from the first mistake to the last. */
@@ -195,6 +198,28 @@ export function TakeSummarySheet({
           </Text>
         ) : null}
       </View>
+      {check && onInto
+        ? intoMarks(marks).map((m, i) => {
+            // A slip into a similar ayah, or a swapped ending (the checker's `into`): where it went, a tap away.
+            const place = findingPlace(m, manySurahs);
+            return (
+              <Tap
+                key={`into-${m.id}`}
+                onPress={() => onInto(m.into)}
+                style={[styles.row, { borderTopColor: palette.separator }, i === 0 && styles.firstRow]}
+                accessibilityRole="button"
+                accessibilityLabel={`${spokenIntoLine(m, place)}. Show it in the reader`}
+                testID="take-summary-into"
+              >
+                <Ionicons name={m.into.ending ? 'return-down-back-outline' : 'git-compare-outline'} size={20} color={palette.secondary} />
+                <Text style={[typeV2.body, styles.rowText, { color: palette.text }]} maxFontSizeMultiplier={CHROME_MAX}>
+                  {intoLine(m, place)}
+                </Text>
+                <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
+              </Tap>
+            );
+          })
+        : null}
       {check && words
         ? findings.map((m, i) => {
             // The page's highlight (Majd, Nov 15 2026: no red text or round marks): a flat swatch by the kind's name, and
