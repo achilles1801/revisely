@@ -1392,6 +1392,13 @@ side-session notes `apply-support.md`.
 - **Pages:** `docs/apply/` (Open Door: landing, steps, questions, the form), `docs/premium/` (Free vs Premium, nothing
   for sale, no prices), `docs/account/` (plan and where it came from, the application, sign out). English and Arabic
   (`docs/assets/strings.js`, `site-i18n.js`; Amiri, right to left, a switch defaulting to the browser's language).
+- **The home and Support in Arabic, on dev only** (Majd, Nov 15 2026: "languages: Arabic only for now"):
+  - Their HTML carries the keys (`data-t…`) and its own English. `site-i18n.js` reads that English before it switches.
+  - The dev worker adds the switch, the language set before the first paint, `strings-site.js` (Arabic only) and
+    `site-rtl.css` (`worker/nav.ts`). revisely.app shows them unchanged.
+  - The app's screens are English, so labels stay English in isolates (⁨…⁩), with steps joined by ←.
+  - Arabic is Amiri cut to what the pages write (`scripts/site/amiri-subset.sh`, WOFF2, Regular and Bold).
+    `worker/__tests__/siteArabic.test.ts` fails on a character outside it, a key without Arabic, or an unused one.
 - **Kept off revisely.app:** the worker answers 404 for `/apply`, `/premium` and `/account` unless `ACCOUNT_PAGES` is
   "1" (`wrangler.dev.jsonc` only); `wrangler.jsonc` sends those paths through the worker so the gate holds once develop
   reaches main.
