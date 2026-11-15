@@ -19,7 +19,8 @@ export function markTitle(mark: Mark): string {
     case 'skipped':
       return 'Skipped word';
     case 'added':
-      return mark.detail === 'trail' ? 'Added after the end' : 'Added word';
+      // "Extra": the page highlights the word before it (an extra word has no text there).
+      return mark.detail === 'trail' ? 'Extra word after the end' : 'Extra word';
     case 'harakat':
       return mark.detail === 'shadda' ? 'Shadda slip' : 'Harakat slip';
     case 'letter':

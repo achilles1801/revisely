@@ -2,7 +2,7 @@
 //
 // Memorizers fix a weak spot by repeating it, starting a little before so it joins what comes first. So the take runs
 // from the ayah before the first mistake's (in the same surah) to the ayah of the last, and stops by itself once the
-// checker has decided its last word: reciting on would only add "Added after the end" marks.
+// checker has decided its last word: reciting on would only add "Extra word after the end" marks.
 
 import type { QuranWords } from '../recite/quranWords';
 import type { Mark } from './contract';

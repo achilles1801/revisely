@@ -70,15 +70,15 @@ export function CheckIntroPage({
               source={PREVIEW[isDark ? 'dark' : 'light']}
               style={{ width: frameWidth, height: frameHeight }}
               resizeMode="cover"
-              accessibilityLabel="A page of An-Naml with a wrong word marked in red and a haraka slip in amber"
+              accessibilityLabel="A page of An-Naml with its mistakes highlighted"
             />
           </View>
           <Text style={[styles.title, { color: palette.text }]} maxFontSizeMultiplier={1.4} accessibilityRole="header">
             Mark my mistakes
           </Text>
           <Text style={[styles.body, { color: palette.secondary }]} maxFontSizeMultiplier={1.6}>
-            Revisely marks a wrong or missed word in red, and a haraka or tajweed slip in amber. Tap one to see what you
-            said.
+            Revisely highlights a wrong, missed or extra word in red, and a haraka or letter slip in amber. Tap one to see
+            what you said.
           </Text>
         </ScrollView>
         <View style={styles.bottom}>

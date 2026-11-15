@@ -167,11 +167,13 @@ export function ReciteBar({
             {shownWords.map((w, i) => (
               <Text
                 key={w.w}
+                // A mistake is a highlight behind the word, as on the page; blue is only the word being said.
                 style={{
-                  color: w.tone === 'wrong' ? palette.red : w.tone === 'slip' ? palette.warn : w.tone === 'current' ? palette.followInk : palette.text,
-                  textDecorationLine: w.tone === 'wrong' || w.tone === 'slip' ? 'underline' : 'none',
-                  textDecorationStyle: 'dotted',
+                  color: w.tone === 'current' ? palette.followInk : palette.text,
+                  backgroundColor:
+                    w.tone === 'wrong' ? palette.markWord : w.tone === 'slip' ? palette.markSlip : w.tone === 'tajweed' ? palette.markTajweed : undefined,
                 }}
+                testID={`recite-word-${w.tone}`}
               >
                 {i > 0 ? ' ' : ''}
                 {w.text}

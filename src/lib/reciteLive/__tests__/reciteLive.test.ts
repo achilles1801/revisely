@@ -1,5 +1,5 @@
 import { quranWords } from '../../recite/__fixtures__/quranWords';
-import { isUnclear, LiveEvent, parseEvent, parseMark, severityOf, Mark } from '../contract';
+import { GROUP_RANK, isUnclear, LiveEvent, markGroup, parseEvent, parseMark, severityOf, Mark } from '../contract';
 import {
   applyEvent,
   dismissMark,
@@ -17,7 +17,7 @@ import {
 } from '../state';
 import { replayFeed, ReplayLog } from '../feed';
 import { formatAccuracy, mistakesLabel, pageAccuracy, scoreLevel, wordsOnPagesReached } from '../score';
-import { ayahBand, cursorBox, markAt, markShape, wordBox } from '../geometry';
+import { ayahBand, cursorBox, markAt, markBox, markHighlight, wordBox } from '../geometry';
 import { similarPhrases } from '../similar';
 import { expectedPhrase, findingNote, markPlace, markTitle, recitedLabel, recitedPhrase, slipLine, tajweedLines } from '../describe';
 import { plainText } from '../../passages';
@@ -104,9 +104,17 @@ describe('the contract', () => {
     expect(parseEvent({ type: 'done', result: { ...recite.result, follow: undefined } })).toBeNull();
   });
 
-  it('red for words, amber for harakat, letters and tajweed', () => {
+  it('mistakes are words; slips are harakat, letters and tajweed', () => {
     expect(['word', 'skipped', 'added'].map((kind) => severityOf({ kind } as Mark))).toEqual(['mistake', 'mistake', 'mistake']);
     expect(['harakat', 'letter', 'tajweed'].map((kind) => severityOf({ kind } as Mark))).toEqual(['slip', 'slip', 'slip']);
+  });
+
+  it('three colours (Majd, Nov 15 2026): red for words, amber for harakat and letters, violet for tajweed', () => {
+    const kinds = ['word', 'skipped', 'added', 'harakat', 'letter', 'tajweed'] as const;
+    expect(kinds.map((kind) => markGroup({ kind }))).toEqual(['word', 'word', 'word', 'slip', 'slip', 'tajweed']);
+    // A word with several marks shows its strongest.
+    expect(GROUP_RANK.word).toBeGreaterThan(GROUP_RANK.slip);
+    expect(GROUP_RANK.slip).toBeGreaterThan(GROUP_RANK.tajweed);
   });
 });
 
@@ -410,10 +418,23 @@ describe('where it draws', () => {
     ]);
   });
 
-  it('a mark is its word’s box; an added word is the gap after its word', () => {
-    expect(markShape(words, mark({}))).toMatchObject({ type: 'word', box: wordBox(words, UTIYAT) });
-    const g = markShape(words, mark({ kind: 'added', w: A23 + 6 }));
-    expect(g).toMatchObject({ type: 'gap', x: wordBox(words, A23 + 6).x0, y: 113 });
+  it('a mark is its word’s box; an extra word is the word it came after (Majd, Nov 15 2026: highlights only)', () => {
+    expect(markBox(words, mark({}))).toEqual(wordBox(words, UTIYAT));
+    expect(markBox(words, mark({ kind: 'added', w: A23 + 6 }))).toEqual(wordBox(words, A23 + 6));
+    // Its highlight: the word's box a little wider and taller, inside the cursor's box.
+    const h = markHighlight(words, mark({}));
+    const c = cursorBox(words, UTIYAT);
+    const b = wordBox(words, UTIYAT);
+    expect(h.x0).toBeLessThan(b.x0);
+    expect(h.x1).toBeGreaterThan(b.x1);
+    expect(h.x0).toBeGreaterThan(c.x0);
+    expect(h.y0).toBeGreaterThan(c.y0);
+  });
+
+  it('a tap on an extra word’s highlight finds it', () => {
+    const extra = mark({ id: 'x', kind: 'added', w: SHAY });
+    const b = wordBox(words, SHAY);
+    expect(markAt(words, [extra], (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2)?.id).toBe('x');
   });
 
   it('a tap finds the mark under it, or none', () => {
@@ -462,8 +483,8 @@ describe('the card’s words', () => {
     expect(markTitle(mark({}))).toBe('Wrong word');
     expect(markTitle(mark({ detail: 'order' }))).toBe('Out of order');
     expect(markTitle(mark({ kind: 'skipped' }))).toBe('Skipped word');
-    expect(markTitle(mark({ kind: 'added' }))).toBe('Added word');
-    expect(markTitle(mark({ kind: 'added', detail: 'trail' }))).toBe('Added after the end');
+    expect(markTitle(mark({ kind: 'added' }))).toBe('Extra word');
+    expect(markTitle(mark({ kind: 'added', detail: 'trail' }))).toBe('Extra word after the end');
     expect(markTitle(mark({ kind: 'harakat' }))).toBe('Harakat slip');
     expect(markTitle(mark({ kind: 'harakat', detail: 'shadda' }))).toBe('Shadda slip');
     expect(markTitle(mark({ kind: 'letter' }))).toBe('Letter slip');

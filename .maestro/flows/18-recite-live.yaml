@@ -137,6 +137,8 @@ appId: com.revisionbuddy.app
     timeout: 15000
 - assertVisible:
     id: recite-score
+# The marks are highlights behind their words, three colours at most (Majd, Nov 15 2026): red for words, amber for
+# harakat and letters, violet for tajweed. This shot is the Premium page's preview (assets/recite/check-preview-*.png).
 - runFlow:
     file: ../subflows/shot.yaml
     env:

@@ -8,7 +8,8 @@ import { Tap } from '../v2/Tap';
 import { Box, placeMenu } from '../verse/menuPlacement';
 import type { QuranWords } from '../../lib/recite/quranWords';
 import type { Mark } from '../../lib/reciteLive/contract';
-import { isUnclear, severityOf } from '../../lib/reciteLive/contract';
+import { isUnclear, markGroup } from '../../lib/reciteLive/contract';
+import { markFill } from './markColours';
 import {
   expectedPhrase,
   markPlace,
@@ -23,8 +24,11 @@ import {
 
 const CARD_MARGIN = 12;
 
-/** An Arabic phrase with the mark's word coloured (expected in green, recited in its mark's colour, a gap dotted). */
-function Phrase({ parts, color }: { parts: PhrasePart[]; color: string }) {
+/**
+ * An Arabic phrase with the mark's word highlighted, as on the page (Majd, Nov 15 2026: highlights, no coloured text):
+ * what was recited on the mark's colour, what was expected on a quiet grey, a skipped word's gap on the mark's colour.
+ */
+function Phrase({ parts, fill }: { parts: PhrasePart[]; fill: string }) {
   const { palette } = useTheme();
   return (
     <Text style={[arabicV2(21), styles.ar, { color: palette.text }]} maxFontSizeMultiplier={1.6}>
@@ -32,16 +36,13 @@ function Phrase({ parts, color }: { parts: PhrasePart[]; color: string }) {
         <Text key={i}>
           {i > 0 ? ' ' : ''}
           {p.role === 'gap' ? (
-            <Text style={{ color, textDecorationLine: 'underline', textDecorationStyle: 'dotted' }}>{'  '}</Text>
+            <Text style={{ backgroundColor: fill }} testID="mark-card-gap">
+              {'\u2003\u2003'}
+            </Text>
           ) : (
             <Text
-              style={
-                p.role === 'expected'
-                  ? { color: palette.good }
-                  : p.role === 'recited'
-                    ? { color, textDecorationLine: 'underline', textDecorationStyle: 'dotted' }
-                    : undefined
-              }
+              style={p.role === 'expected' ? { backgroundColor: palette.followWord } : p.role === 'recited' ? { backgroundColor: fill } : undefined}
+              testID={p.role === 'context' ? undefined : `mark-card-${p.role}`}
             >
               {p.text}
             </Text>
@@ -96,7 +97,7 @@ function MarkBlock({
   first: boolean;
 }) {
   const { palette } = useTheme();
-  const color = severityOf(mark) === 'mistake' ? palette.red : palette.warn;
+  const fill = markFill(palette, mark);
   // Not clear: what the checker thinks it heard is the unclear part, so only what was expected shows, and why.
   const unclear = isUnclear(mark);
   const recited = unclear ? null : recitedPhrase(words, mark);
@@ -106,7 +107,7 @@ function MarkBlock({
       <View style={styles.head}>
         <View style={styles.headText}>
           <View style={styles.titleRow}>
-            <View style={[styles.dot, { backgroundColor: color }]} />
+            <View style={[styles.swatch, { backgroundColor: fill }]} testID={`mark-card-swatch-${markGroup(mark)}`} />
             <Text style={[typeV2.name, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
               {markTitle(mark)}
             </Text>
@@ -125,18 +126,20 @@ function MarkBlock({
               <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>{tajweedLines(mark).sub}</Text>
             ) : null}
           </View>
-          <Text style={[arabicV2(24), { color }]} maxFontSizeMultiplier={1.6}>
-            {words.uthmani(mark.w)}
-          </Text>
+          <View style={[styles.arWrap, { backgroundColor: fill }]}>
+            <Text style={[arabicV2(24), { color: palette.text }]} maxFontSizeMultiplier={1.6}>
+              {words.uthmani(mark.w)}
+            </Text>
+          </View>
         </View>
       ) : (
         <View>
           <Row label="Expected" first>
-            <Phrase parts={expectedPhrase(words, mark)} color={color} />
+            <Phrase parts={expectedPhrase(words, mark)} fill={fill} />
           </Row>
           {recited ? (
             <Row label={recitedLabel(mark)}>
-              <Phrase parts={recited} color={color} />
+              <Phrase parts={recited} fill={fill} />
             </Row>
           ) : null}
           {slip ? (
@@ -264,7 +267,9 @@ const styles = StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   headText: { flex: 1, minWidth: 0 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  dot: { width: 8, height: 8, borderRadius: 4 },
+  /** A flat swatch of the mark's colour beside its name (never a round mark). */
+  swatch: { width: 12, height: 12, borderRadius: 3 },
+  arWrap: { borderRadius: 7, paddingHorizontal: 6 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 4, marginTop: 6 },
   label: { width: 66 },
   rowBody: { flex: 1, minWidth: 0 },

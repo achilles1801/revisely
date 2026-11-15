@@ -454,6 +454,15 @@ export default function QuranReaderScreen() {
   );
   // The hidden view: covers and guide lines only, no band on any line (lib/reciteLive's LiveOverlay).
   const coverColors = useMemo(() => ({ cover: palette.pageBg, guide: palette.textSecondary }), [palette]);
+  // Recite's three highlight colours (theme/v2: markWord…), each with its firmer shade for the mark a card is open for.
+  const markColours = useMemo(
+    () => ({
+      word: { fill: v2.markWord, firm: v2.markWordFirm },
+      slip: { fill: v2.markSlip, firm: v2.markSlipFirm },
+      tajweed: { fill: v2.markTajweed, firm: v2.markTajweedFirm },
+    }),
+    [v2],
+  );
   const pageUnderlay = useMemo(
     () =>
       liveOn && qw && live.active
@@ -463,30 +472,23 @@ export default function QuranReaderScreen() {
               scale={scale}
               words={qw}
               cursor={live.state.status === 'listening' ? live.state.cursor : null}
+              marks={pageMarks(page)}
               selected={cardMarks[0] ?? null}
-              colors={{ band: v2.followBand, word: v2.followWord, selectedMistake: v2.redSubtle, selectedSlip: v2.warnSubtle }}
+              hidden={hidden}
+              colors={{ band: v2.followBand, word: v2.followWord, marks: markColours }}
             />
           )
         : undefined,
-    [liveOn, qw, live.active, live.state, v2, cardMarks],
+    [liveOn, qw, live.active, live.state, v2, cardMarks, pageMarks, hidden, markColours],
   );
   const pageOverlay = useMemo(
     () =>
-      liveOn && qw && (live.active || hidden)
-        ? (page: number, scale: number, image: Parameters<NonNullable<React.ComponentProps<typeof MushafPager>['pageOverlay']>>[2]) => (
-            <LiveOverlay
-              page={page}
-              scale={scale}
-              image={image}
-              words={qw}
-              marks={pageMarks(page)}
-              hidden={hidden ? { follow: hiddenFollow(qw, revealed, liveInfo), ...coverColors } : null}
-              newest={live.state.cursor}
-              colors={{ mistake: v2.red, slip: v2.warn, follow: v2.followInk, onMistake: v2.bg, ground: palette.pageBg }}
-            />
+      liveOn && qw && hidden
+        ? (page: number, scale: number) => (
+            <LiveOverlay page={page} scale={scale} hidden={{ follow: hiddenFollow(qw, revealed, liveInfo), ...coverColors }} />
           )
         : undefined,
-    [liveOn, qw, live.active, live.state.cursor, hidden, revealed, liveInfo, coverColors, pageMarks, v2],
+    [liveOn, qw, hidden, revealed, liveInfo, coverColors],
   );
   // The marks as elements of their own (VoiceOver, the tests). Given whenever the live UI is on, so the pager's pages
   // keep one shape through takes.

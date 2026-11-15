@@ -9,7 +9,7 @@ import { TakeSummarySheet, findingPlace, STACK_FINDINGS_AT } from '../TakeSummar
 import { plainText } from '../../../lib/passages';
 import type { Mark } from '../../../lib/reciteLive/contract';
 
-const mockPalette = new Proxy({}, { get: (_t, k) => (k === 'premium' ? ['#000000', '#000000'] : '#000000') });
+const mockPalette = require('../../../theme/v2').paletteV2(false, 'indigo');
 jest.mock('../../../context/ThemeContext', () => ({ useTheme: () => ({ palette: mockPalette, theme: mockPalette, isDark: false }) }));
 
 const words = require('../../../lib/recite/__fixtures__/quranWords').quranWords();
@@ -122,5 +122,31 @@ describe('the take summary with screen readers and the largest text', () => {
     expect(screen.getByText('Say it more clearly. Not counted in the score.')).toBeTruthy();
     expect(screen.getByText('1 wrong word, 1 not clear')).toBeTruthy();
     expect(screen.getByLabelText('Score 96%, 1 mistake')).toBeTruthy();
+  });
+
+  it('each finding: a flat swatch of its colour by its name, and its word in ink on its highlight; no round marks (Majd, Nov 15 2026)', () => {
+    const p = mockPalette;
+    show({
+      marks: [
+        wrong(A23 + 3, [27, 23]),
+        { id: 'h', w: A23 + 5, ayah: [27, 23], kind: 'harakat', sure: 'clear', slip: { expected: 'ٍ', heard: 'ٌّ' } },
+        { id: 't', w: A23 + 6, ayah: [27, 23], kind: 'tajweed', rule: 'qalqalah', sure: 'clear' },
+        { id: 'x', w: A23 + 7, ayah: [27, 23], kind: 'added', sure: 'clear', heard: 'وَ' },
+      ],
+    });
+    const style = (el: { props: { style?: unknown } }) => Object.assign({}, ...[el.props.style].flat(3).filter(Boolean));
+    expect(screen.getAllByTestId('take-summary-swatch-word').map((e) => style(e).backgroundColor)).toEqual([p.markWord, p.markWord]);
+    expect(style(screen.getByTestId('take-summary-swatch-slip')).backgroundColor).toBe(p.markSlip);
+    expect(style(screen.getByTestId('take-summary-swatch-tajweed')).backgroundColor).toBe(p.markTajweed);
+    // Flat and small: never a disc.
+    const swatch = style(screen.getByTestId('take-summary-swatch-slip'));
+    expect(swatch.borderRadius).toBeLessThan((swatch.width as number) / 2);
+    // The kind is spelled out beside it.
+    expect(screen.getByText('Extra word · ayah 23')).toBeTruthy();
+    expect(screen.getByText('1 wrong word, 1 extra, 1 harakat slip, 1 tajweed note')).toBeTruthy();
+    // The word in ink on its colour, as on the page.
+    const [first] = screen.getAllByTestId('take-summary-finding-highlight');
+    expect(style(first).backgroundColor).toBe(p.markWord);
+    expect(style(screen.getAllByTestId('take-summary-finding-arabic')[0]).color).toBe(p.text);
   });
 });

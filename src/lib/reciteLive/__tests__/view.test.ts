@@ -35,13 +35,13 @@ describe('the words heard in the bar', () => {
     expect(barWords(s, words, { check: false, startWord: A23 }).map((b) => b.w - A23)).toEqual([5, 6]);
   });
 
-  it('Check: a word with a slip (a haraka, a letter, a tajweed note) is amber, the current one too; Recite marks none', () => {
+  it('Check: a word with a slip (a haraka, a letter) is amber, a tajweed note violet, the current one too; Recite marks none', () => {
     let s = at(liveConnecting(), A23 + 8);
     s = applyEvent(s, { type: 'mark', mark: mark({ id: 'h', w: A23 + 7, kind: 'harakat', sure: 'clear', slip: { expected: 'ٍ', heard: 'ٌّ' } }) });
     s = applyEvent(s, { type: 'mark', mark: mark({ id: 't', w: A23 + 8, kind: 'tajweed', rule: 'qalqalah' }) });
     expect(barWords(s, words, { check: true, startWord: A23 }).map((b) => [b.w - A23, b.tone])).toEqual([
       [7, 'slip'],
-      [8, 'slip'],
+      [8, 'tajweed'],
     ]);
     expect(barWords(s, words, { check: false, startWord: A23 }).map((b) => b.tone)).toEqual(['said', 'current']);
   });
