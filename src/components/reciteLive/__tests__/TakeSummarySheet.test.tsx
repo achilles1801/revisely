@@ -3,7 +3,7 @@
 // spoken once when it shows; a take that ran into another surah names the surah in each finding.
 import React from 'react';
 import { AccessibilityInfo, Dimensions, Modal, Text } from 'react-native';
-import { act, render, screen, within } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { TakeSummarySheet, findingPlace, STACK_FINDINGS_AT } from '../TakeSummarySheet';
 import { plainText } from '../../../lib/passages';
@@ -159,5 +159,60 @@ describe('the take summary with screen readers and the largest text', () => {
     expect(within(scroll).queryByTestId('take-summary-again')).toBeNull();
     // The findings scroll.
     expect(within(scroll).getAllByTestId('take-summary-finding-word')).toHaveLength(8);
+  });
+});
+
+describe('where a slip went (`into`, Majd said yes Nov 15 2026)', () => {
+  const into = { w: A23 + 40, ayah: [27, 16] as [number, number] };
+  const marks = [{ ...wrong(A23 + 3, [27, 23]), kind: 'skipped' as const, into }, wrong(A23 + 6, [27, 23])];
+  const render2 = (props: { onInto?: (i: unknown) => void; check?: boolean; marks?: Mark[] }) =>
+    render(
+      <SafeAreaProvider initialMetrics={METRICS}>
+        <TakeSummarySheet
+          visible
+          check={props.check ?? true}
+          words={words}
+          from={A23}
+          to={A23 + 20}
+          seconds={60}
+          marks={props.marks ?? marks}
+          score={{ text: '90%', level: 'good' }}
+          kept={false}
+          checkOwned
+          onFinding={() => undefined}
+          onInto={props.onInto}
+          onCheck={() => undefined}
+          onAgain={() => undefined}
+          onDone={() => undefined}
+        />
+      </SafeAreaProvider>,
+    );
+
+  it('a line for each, before the findings; a tap opens that ayah', () => {
+    const onInto = jest.fn();
+    render2({ onInto });
+    const rows = screen.getAllByTestId('take-summary-into');
+    expect(rows).toHaveLength(1);
+    expect(plainText(flat(within(rows[0]).UNSAFE_getAllByType(Text).map((t) => t.props.children)))).toMatch(/^You continued with An.Naml 27:16, a similar ayah$/);
+    expect(rows[0].props.accessibilityLabel).toMatch(/An.Naml, ayah 16, a similar ayah\. Show it in the reader$/);
+    fireEvent.press(rows[0]);
+    expect(onInto).toHaveBeenCalledWith(into);
+    // The findings are all still there.
+    expect(screen.getAllByTestId(/take-summary-finding-(word|skipped)/)).toHaveLength(2);
+  });
+
+  it('a mark taken off takes its line with it (it is in the Removed list, not the marks)', () => {
+    render2({ onInto: jest.fn(), marks: [wrong(A23 + 6, [27, 23])] });
+    expect(screen.queryByTestId('take-summary-into')).toBeNull();
+  });
+
+  it('none following along', () => {
+    render2({ onInto: jest.fn(), check: false });
+    expect(screen.queryByTestId('take-summary-into')).toBeNull();
+  });
+
+  it('none without a way to open it', () => {
+    render2({});
+    expect(screen.queryByTestId('take-summary-into')).toBeNull();
   });
 });
