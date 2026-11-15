@@ -17,6 +17,7 @@ import type { LiveEvent, Mark } from '../../lib/reciteLive/contract';
 import type { LiveConnect, LiveConnection, StartFrame } from '../../lib/reciteLive/feed';
 import { socketFeed } from '../../lib/reciteLive/socket';
 import { stopHearing } from '../../lib/reciteLive/hearAudio';
+import { AyahRange, lastWordOf } from '../../lib/reciteLive/drill';
 import { stopTrace } from '../../lib/reciteLive/stopTrace';
 import { SavedTake, startTakeRecording, TakeRecording } from '../../lib/reciteLive/takeRecording';
 import {
@@ -36,8 +37,8 @@ export type LiveMode = 'recite' | 'check';
 /** The microphone: off, asking for it, on, paused (the take goes on), refused, or failed to start. */
 export type MicStatus = 'off' | 'starting' | 'on' | 'paused' | 'denied' | 'error';
 
-/** What ended a take: Stop tapped, the app left, or iOS took the microphone. */
-type StopWhy = 'tap' | 'background' | 'mic-lost';
+/** What ended a take: Stop tapped, the app left, iOS took the microphone, or a drill reached its end. */
+type StopWhy = 'tap' | 'background' | 'mic-lost' | 'reached';
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -79,21 +80,23 @@ const defaultConnect: LiveConnect = (start, handlers) => {
 
 /**
  * The start frame for a take on `page`, with the account's settings (contract draft 5): anywhere on the page
- * (`startBy`, the page's last ayah), or from its first ayah.
+ * (`startBy`, the page's last ayah), or from its first ayah; or over a given stretch of ayahs ("Recite the mistakes
+ * again"), from its first ayah to its last.
  */
 export function startFrameFor(
   page: number,
   mode: LiveMode,
   settings: ReciteCheckSettings,
   anywhere: boolean = START_ANYWHERE,
+  range: AyahRange | null = null,
 ): StartFrame {
   const first = versesOnPage(page)[0] ?? { sura: 1, ayah: 1 };
   return {
     type: 'start',
-    s: first.sura,
-    a: first.ayah,
-    s2: null,
-    a2: null,
+    s: range ? range.from[0] : first.sura,
+    a: range ? range.from[1] : first.ayah,
+    s2: range ? range.to[0] : null,
+    a2: range ? range.to[1] : null,
     mon: settings.munfasil,
     mot: settings.muttasil,
     aar: settings.aared,
@@ -101,7 +104,7 @@ export function startFrameFor(
     tajweed: settings.level === 'strict',
     keep: settings.keep,
     follow: mode === 'recite',
-    ...(anywhere ? { startBy: lastAyahOf(page) } : {}),
+    ...(anywhere && !range ? { startBy: lastAyahOf(page) } : {}),
   };
 }
 
@@ -165,6 +168,8 @@ export function useLiveRecitation({
   // and when the cursor first reached each word, in seconds of the take (for a mark that carries no time of its own).
   const lastConn = useRef<LiveConnection | null>(null);
   const wordTimes = useRef(new Map<number, number>());
+  /** A drill take's last word: it stops by itself once the checker has decided it. */
+  const endWord = useRef<number | null>(null);
   // For the Stop trace (lib/reciteLive/stopTrace), read when Stop is tapped.
   const traceRef = useRef({ state, mode, seconds });
   traceRef.current = { state, mode, seconds };
@@ -241,7 +246,7 @@ export function useLiveRecitation({
   }, [stopMic]);
 
   const start = useCallback(
-    async (take: LiveMode) => {
+    async (take: LiveMode, range: AyahRange | null = null) => {
       if (conn.current || source.current) return;
       stopHearing();
       pausedRef.current = false;
@@ -251,6 +256,18 @@ export function useLiveRecitation({
       setMic('starting');
       setSeconds(0);
       samples.current = 0;
+      endWord.current = null;
+      /** The page the take starts on: the stretch's first ayah's (turned to), or the one on screen. */
+      const startPage = (qw: QuranWords) => {
+        if (!range) return pageRef.current;
+        const page = qw.pageOf(qw.verseFirstWord(range.from[0], range.from[1]));
+        if (page !== pageRef.current) {
+          turningTo.current = page;
+          onShowPageRef.current(page);
+        }
+        endWord.current = lastWordOf(qw, range);
+        return page;
+      };
       // The inlined variable folds this branch away in every other build.
       if (process.env.EXPO_PUBLIC_E2E === '1' && e2e?.e2eReciteLiveOn()) {
         // eslint-disable-next-line no-console
@@ -264,7 +281,8 @@ export function useLiveRecitation({
           return;
         }
         setWords(qw);
-        const frame = startFrameFor(pageRef.current, take, settings);
+        const page = startPage(qw);
+        const frame = startFrameFor(page, take, settings, START_ANYWHERE, range);
         setTestData(frame.keep);
         setMode(take);
         setState(connectingFor(frame, qw));
@@ -282,7 +300,7 @@ export function useLiveRecitation({
         conn.current = c;
         lastConn.current = c;
         recordingRef.current =
-          settings.saveRecording && recordingDay ? startTakeRecording({ day: recordingDay, page: pageRef.current }) : null;
+          settings.saveRecording && recordingDay ? startTakeRecording({ day: recordingDay, page }) : null;
         setRecording(recordingRef.current != null);
         let second = 0;
         const openTone = async (): Promise<AudioSource> => {
@@ -312,7 +330,8 @@ export function useLiveRecitation({
         }
         const qw = await loadQuranWords();
         setWords(qw);
-        const frame = startFrameFor(pageRef.current, take, settings);
+        const page = startPage(qw);
+        const frame = startFrameFor(page, take, settings, START_ANYWHERE, range);
         setTestData(frame.keep);
         claimAudio('recorder', owner);
         getRecitation().stop();
@@ -329,7 +348,7 @@ export function useLiveRecitation({
         conn.current = c;
         lastConn.current = c;
         recordingRef.current =
-          settings.saveRecording && recordingDay ? startTakeRecording({ day: recordingDay, page: pageRef.current }) : null;
+          settings.saveRecording && recordingDay ? startTakeRecording({ day: recordingDay, page }) : null;
         setRecording(recordingRef.current != null);
         const handlers = {
           onAudio: (pcm: Int16Array) => {
@@ -471,6 +490,16 @@ export function useLiveRecitation({
       onShowPageRef.current(page);
     }
   }, [live, state.cursor, words]);
+
+  // A drill take stops by itself once the checker has decided its last word (reciting on would add "Added after the
+  // end" marks).
+  const saidUpTo = state.saidUpTo;
+  useEffect(() => {
+    const end = endWord.current;
+    if (end == null || !live || saidUpTo == null || saidUpTo < end) return;
+    endWord.current = null;
+    stopFor('reached');
+  }, [live, saidUpTo, stopFor]);
 
   // The recording keeps the pages it turned through, as the reader's own recordings do.
   useEffect(() => {

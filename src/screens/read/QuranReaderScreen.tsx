@@ -62,7 +62,8 @@ import { LiveMarkTargets, LiveOverlay, LiveUnderlay } from '../../components/rec
 import { ReciteNoticeSheet } from '../../components/reciteLive/ReciteNoticeSheet';
 import { MarkCard } from '../../components/reciteLive/MarkCard';
 import { SimilarPhrasesSheet } from '../../components/reciteLive/SimilarPhrasesSheet';
-import { TakeSummarySheet } from '../../components/reciteLive/TakeSummarySheet';
+import { findingsLine, TakeSummarySheet } from '../../components/reciteLive/TakeSummarySheet';
+import { drillMarks, drillRange } from '../../lib/reciteLive/drill';
 import { CheckIntroPage } from '../../components/reciteLive/CheckIntroPage';
 import { markAt, wordBox } from '../../lib/reciteLive/geometry';
 import { similarPhrases } from '../../lib/reciteLive/similar';
@@ -328,6 +329,8 @@ export default function QuranReaderScreen() {
     [live.state, live.startWord],
   );
 
+  // Recite the mistakes again: what the take before found in the stretch, for its summary ("Before: …").
+  const [drillBefore, setDrillBefore] = useState<string | null>(null);
   const startMode = useCallback(
     (mode: ReciteMicMode) => {
       if (mode === 'record') {
@@ -344,6 +347,7 @@ export default function QuranReaderScreen() {
         return;
       }
       setRevealed(NOTHING_SHOWN);
+      setDrillBefore(null);
       void live.start(mode);
     },
     [recorder, owned, reciteSettings.noticeSeen, live],
@@ -409,6 +413,10 @@ export default function QuranReaderScreen() {
   // The summary, once a take has its final answer.
   const takeId = live.state.take;
   const [summaryShown, setSummaryShown] = useState<string | null>(null);
+  // A new take may get the id of the one before (E2E's recorded takes all do): its summary must still show.
+  useEffect(() => {
+    if (live.state.status === 'connecting') setSummaryFor(null);
+  }, [live.state.status]);
   useEffect(() => {
     if (live.state.status !== 'done' || !takeId || summaryFor === takeId) return;
     setSummaryFor(takeId);
@@ -766,6 +774,18 @@ export default function QuranReaderScreen() {
               live.clear();
               if (mode) startMode(mode);
             }}
+            onDrill={() => {
+              const marks = Object.values(live.state.marks);
+              const range = drillRange(marks);
+              if (!range) return;
+              setSummaryShown(null);
+              setCardAt(null);
+              live.clear();
+              setRevealed(NOTHING_SHOWN);
+              setDrillBefore(findingsLine(drillMarks(marks)));
+              void live.start('check', range);
+            }}
+            before={drillBefore}
             onDone={() => setSummaryShown(null)}
             // The summary is on screen: the take's Stop trace ends (lib/reciteLive/stopTrace).
             onShown={() => stopTrace.end()}

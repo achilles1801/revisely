@@ -12,6 +12,7 @@ import type { QuranWords } from '../../lib/recite/quranWords';
 import type { Mark } from '../../lib/reciteLive/contract';
 import { isUnclear, severityOf } from '../../lib/reciteLive/contract';
 import { findingNote, markTitle } from '../../lib/reciteLive/describe';
+import { drillMarks } from '../../lib/reciteLive/drill';
 import type { ScoreLevel } from '../../lib/reciteLive/score';
 import { mistakesLabel } from '../../lib/reciteLive/score';
 import { CheckMark } from './ReciteMic';
@@ -85,6 +86,8 @@ export function TakeSummarySheet({
   onFinding,
   onCheck,
   onAgain,
+  onDrill,
+  before = null,
   onDone,
   onShown,
 }: {
@@ -101,6 +104,10 @@ export function TakeSummarySheet({
   onFinding: (mark: Mark) => void;
   onCheck: () => void;
   onAgain: () => void;
+  /** Recite the mistakes again (Check, with something to drill): one take from the first mistake to the last. */
+  onDrill?: () => void;
+  /** This take recited the mistakes of the one before: what that one found there ("1 wrong word, 1 not clear"). */
+  before?: string | null;
   onDone: () => void;
   /** The sheet is on screen (its modal has been presented). */
   onShown?: () => void;
@@ -152,6 +159,11 @@ export function TakeSummarySheet({
         {check && marks.length ? (
           <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={CHROME_MAX}>
             {findingsLine(marks)}
+          </Text>
+        ) : null}
+        {check && before ? (
+          <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={CHROME_MAX} testID="take-summary-before">
+            {`Before: ${before}`}
           </Text>
         ) : null}
       </View>
@@ -222,7 +234,16 @@ export function TakeSummarySheet({
         </Tap>
       ) : null}
       <View style={styles.buttons}>
-        <PillButton title="Recite again" size="lg" onPress={onAgain} testID="take-summary-again" />
+        {check && onDrill && drillMarks(marks).length ? (
+          <PillButton title="Recite the mistakes again" size="lg" onPress={onDrill} testID="take-summary-drill" />
+        ) : null}
+        <PillButton
+          title="Recite again"
+          size="lg"
+          variant={check && onDrill && drillMarks(marks).length ? 'outline' : undefined}
+          onPress={onAgain}
+          testID="take-summary-again"
+        />
         <PillButton title="Done" size="lg" variant="outline" onPress={onDone} testID="take-summary-done" />
       </View>
       {kept ? (
