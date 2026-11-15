@@ -1,0 +1,56 @@
+# Taps Revo's button on a main screen and waits up to 8 s for what it opens. OPENS is an id regex for that:
+# the moment or the opt-in on Revo's first open, the opt-in, or the chat (revo-input).
+#
+# It taps again only if the tap was lost:
+# - What happened: on a loaded iOS runner Maestro's tap can reach the app and be cancelled before it becomes a
+#   press. In #574's run 43738520119 (09-revo, iOS run 1), the app logged a touch start on the button and a touch
+#   cancel 166 ms later. onPress never ran, and Home stayed as it was for 40 s. #608 met the same thing on the
+#   Fajr switch (fajr-switch.yaml).
+# - Why a second tap is safe: a tap that took hides the button. The sheet replaces it (RevoHost's `buttonShown`)
+#   and the moment covers it. So the button is tapped again only while it is still on screen and nothing of
+#   OPENS has come, at most twice.
+# - A second press while Revo is still reading its switch (up to 2 s, SETTINGS_WAIT_MS) only asks for the same
+#   thing again.
+# - Each check below is one Maestro answers at once: visible on what is there, or on what isn't once 7 s have
+#   passed since the tap. A visible check on something absent waits up to 7 s minus the time since the last tap
+#   (README, "Things that bit").
+# - The caller still waits for what it expects next (the moment-skip subflow, the opt-in, the greeting).
+appId: com.revisionbuddy.app
+---
+- tapOn:
+    id: revo-button
+    waitToSettleTimeoutMs: 500
+    retryTapIfNoChange: false
+- evalScript: ${output.revoOpened = false}
+- repeat:
+    times: 2
+    commands:
+      - runFlow:
+          when:
+            true: ${output.revoOpened !== true}
+          commands:
+            - extendedWaitUntil:
+                visible:
+                  id: ${OPENS}
+                timeout: 8000
+                optional: true
+            - runFlow:
+                when:
+                  visible:
+                    id: ${OPENS}
+                commands:
+                  - evalScript: ${output.revoOpened = true}
+            - runFlow:
+                when:
+                  true: ${output.revoOpened !== true}
+                commands:
+                  - runFlow:
+                      when:
+                        visible:
+                          id: revo-button
+                      commands:
+                        - evalScript: "${console.log('WARNING revo-open - nothing opened 8 s after the tap on the Revo button; tapping it again')}"
+                        - tapOn:
+                            id: revo-button
+                            waitToSettleTimeoutMs: 500
+                            retryTapIfNoChange: false

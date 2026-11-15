@@ -19,7 +19,10 @@ appId: com.revisionbuddy.app
       - scroll
 - assertVisible: "Daily log. Open the log"
 - tapOn: "Daily log. Open the log"
+# The log shows its composer once its own read of the day has answered. That's the same read as the day's notes
+# above (getJournalEntry), so it gets the same 30 s. 15 s ran out on a busy Android emulator: the log was still on
+# its spinner 15.6 s after it opened, about 10 s after the note was sent (11's run 1 in #574's run 43738520119).
 - extendedWaitUntil:
     visible:
       id: journal-composer
-    timeout: 15000
+    timeout: 30000

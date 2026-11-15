@@ -31,10 +31,10 @@ appId: com.revisionbuddy.app
     visible:
       id: revo-button
     timeout: 15000
-- tapOn:
-    id: revo-button
-    waitToSettleTimeoutMs: 500
-    retryTapIfNoChange: false
+- runFlow:
+    file: ../subflows/revo-open.yaml
+    env:
+      OPENS: "whats-new-moment-skip|whats-new-revo-moment|revo-optin"
 # REVO-39: the first open while Revo is off plays Revo's moment, then its opt-in. Skip ends it; while
 # it plays the screen never settles, so these taps don't wait for it (.maestro/README.md).
 - runFlow: ../subflows/revo-moment-skip.yaml
@@ -550,8 +550,10 @@ appId: com.revisionbuddy.app
     visible:
       id: revo-button
     timeout: 10000
-- tapOn:
-    id: revo-button
+- runFlow:
+    file: ../subflows/revo-open.yaml
+    env:
+      OPENS: revo-optin
 - extendedWaitUntil:
     visible: "Meet Revo"
     timeout: 10000
