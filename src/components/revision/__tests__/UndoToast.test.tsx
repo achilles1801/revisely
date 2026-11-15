@@ -44,3 +44,26 @@ it('shows nothing while not visible', () => {
   render(<UndoToast visible={false} message="Note deleted" onUndo={() => undefined} onDismiss={() => undefined} />);
   expect(screen.queryByTestId('undo-toast')).toBeNull();
 });
+
+it('a second action sits before the first, and runs on its own ("Recording saved · Undo · View")', () => {
+  const view = jest.fn();
+  const undo = jest.fn();
+  render(
+    <UndoToast
+      visible
+      message="Recording saved"
+      actionLabel="View"
+      onUndo={view}
+      secondAction={{ label: 'Undo', onPress: undo, testID: 'second' }}
+      onDismiss={() => undefined}
+    />,
+  );
+  expect(screen.getAllByRole('button')).toHaveLength(2);
+  fireEvent.press(screen.getByTestId('second'));
+  expect(undo).toHaveBeenCalledTimes(1);
+  expect(view).not.toHaveBeenCalled();
+  fireEvent.press(screen.getByTestId('undo-toast-action'));
+  expect(view).toHaveBeenCalledTimes(1);
+  expect(screen.getByText('Undo')).toBeTruthy();
+  expect(screen.getByText('View')).toBeTruthy();
+});

@@ -102,6 +102,11 @@ import {
   findRevisionRecording as findForDay,
   segmentFile,
   CloudRecording,
+  holdUpload,
+  releaseUpload,
+  uploadHeld,
+  undoRecording,
+  UPLOAD_HOLD_MS,
 } from '../recordings';
 import { formatBytes, formatRecordingTime } from '../recordingFormat';
 
@@ -542,6 +547,87 @@ describe('backup bookkeeping', () => {
       });
       expect(out.id).not.toBe('r1');
       expect(out.restarted).toBe(true);
+    });
+  });
+
+  describe('"Recording saved · Undo": the upload waits, and Undo takes back one go', () => {
+    const go = (id: string | null, name: string, segmentMs: number, pageMarks: any[] = [], hold = true) =>
+      appendSegment(id, temp(name), { kind: 'revision', day: 'd', segmentMs, pageMarks, createdAt: 9, holdUpload: hold });
+
+    it('a segment saved with holdUpload is held before anything lists it; released, it uploads (the backup runs)', async () => {
+      const changes = jest.fn();
+      const off = onRecordingsChanged(changes);
+      const { id } = await go(null, 'a', 4000);
+      expect(uploadHeld(id!)).toBe(true);
+      expect(await pendingUploads(U)).toEqual([]);
+      changes.mockClear();
+      releaseUpload(id!);
+      expect(changes).toHaveBeenCalledTimes(1); // the controller's cue to run the backup
+      expect((await pendingUploads(U)).map((p) => p.recordingId)).toEqual([id]);
+      releaseUpload(id!); // twice: nothing more
+      expect(changes).toHaveBeenCalledTimes(1);
+      off();
+    });
+
+    it('a timed hold lets go by itself (the note went without telling)', async () => {
+      const { id } = await go(null, 'a', 4000, [], false);
+      jest.useFakeTimers();
+      try {
+        holdUpload(id!);
+        expect(uploadHeld(id!)).toBe(true);
+        jest.advanceTimersByTime(UPLOAD_HOLD_MS - 1);
+        expect(uploadHeld(id!)).toBe(true);
+        jest.advanceTimersByTime(1);
+        expect(uploadHeld(id!)).toBe(false);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('Undo on a recording that began with this go deletes it, as a delete does', async () => {
+      const { id } = await go(null, 'a', 4000);
+      await go(id, 'b', 3000);
+      expect(await undoRecording(id!, { created: true, segments: [], fromMs: 0 })).toBe('deleted');
+      expect(await listRecordings()).toEqual([]);
+      expect(uploadHeld(id!)).toBe(false);
+      // Never in the backup: nothing there to tombstone.
+      expect(pendingCloudDeletes(U).items).toEqual([{ id, tombstone: false }]);
+      expect([...mockFs.keys()].some((k) => k.includes(`${id}-`))).toBe(false);
+    });
+
+    it('a take (no undo given) is the whole recording', async () => {
+      const { id } = await go(null, 'a', 4000);
+      expect(await undoRecording(id!)).toBe('deleted');
+      expect(await listRecordings()).toEqual([]);
+    });
+
+    it('Undo on a session’s recording carried on takes back only this go: what was recorded before stays', async () => {
+      const first = await go(null, 'a', 60_000, [{ atMs: 0, page: 3 }], false);
+      await markSegmentUploaded(U, first.id!, first.fileName!, 11);
+      const later = await go(first.id, 'b', 20_000, [{ atMs: 0, page: 3 }, { atMs: 60_000, page: 4 }]);
+      expect(later.fileName).not.toBe(first.fileName);
+      expect(await undoRecording(first.id!, { created: false, segments: [later.fileName!], fromMs: 60_000 })).toBe('dropped');
+      const [r] = await listRecordings();
+      expect(r).toMatchObject({ id: first.id, durationMs: 60_000, pageMarks: [{ atMs: 0, page: 3 }] });
+      expect(r.segments.map((s) => s.fileName)).toEqual([first.fileName]);
+      expect(mockFs.has(`doc/recordings/alice/${later.fileName}`)).toBe(false);
+      expect(uploadHeld(first.id!)).toBe(false);
+      expect(pendingCloudDeletes(U).items).toEqual([]); // the backup keeps what it has
+    });
+
+    it('a part of this go already backed up is never dropped on its own (it can’t leave the backup alone)', async () => {
+      const first = await go(null, 'a', 60_000, [], false);
+      const later = await go(first.id, 'b', 20_000, [], false);
+      await markSegmentUploaded(U, first.id!, later.fileName!, 11);
+      expect(await undoRecording(first.id!, { created: false, segments: [later.fileName!], fromMs: 60_000 })).toBe('backedUp');
+      expect((await listRecordings())[0].segments).toHaveLength(2);
+    });
+
+    it('a recording deleted since is gone; deleting a held recording forgets its hold', async () => {
+      const { id } = await go(null, 'a', 4000);
+      await deleteRecording(id!);
+      expect(uploadHeld(id!)).toBe(false);
+      expect(await undoRecording(id!, { created: true, segments: [], fromMs: 0 })).toBe('gone');
     });
   });
 

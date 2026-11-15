@@ -50,8 +50,12 @@ jest.mock('../../lib/recordings', () => {
     setCapturing: actual.setCapturing,
     isRecordingActive: actual.isRecordingActive,
     hasRecordingSession: actual.hasRecordingSession,
+    holdUpload: (...a: any[]) => mockHold(...a),
+    releaseUpload: (...a: any[]) => mockRelease(...a),
   };
 });
+const mockHold = jest.fn();
+const mockRelease = jest.fn();
 const mockClaim = jest.fn();
 jest.mock('../../lib/audioFocus', () => ({
   claimAudio: (...a: any[]) => mockClaim(...a),
@@ -85,9 +89,12 @@ beforeEach(() => {
   mockPerms.get.mockResolvedValue({ granted: true, canAskAgain: true });
   mockPerms.request.mockResolvedValue({ granted: true });
   mockRecorder.getStatus.mockImplementation(() => ({ isRecording: true }));
+  let segment = 0;
   mockAppend.mockImplementation((id: string | null) =>
-    Promise.resolve({ id: id ?? 'rec-1', kept: true, restarted: false }),
+    Promise.resolve({ id: id ?? 'rec-1', kept: true, restarted: false, fileName: `${id ?? 'rec-1'}-${segment++}.m4a` }),
   );
+  mockHold.mockReset();
+  mockRelease.mockReset();
   mockFind.mockResolvedValue(null);
 });
 
@@ -247,7 +254,33 @@ describe('useVoiceRecorder sessions', () => {
     const { result } = setup({ onFinished });
     await act(() => result.current.start());
     await act(() => result.current.finish());
-    expect(onFinished).toHaveBeenCalledWith({ day: '2026-10-20', recordingId: 'rec-1' });
+    expect(onFinished).toHaveBeenCalledWith({
+      day: '2026-10-20',
+      recordingId: 'rec-1',
+      undo: { created: true, segments: ['rec-1-0.m4a'], fromMs: 0 },
+    });
+  });
+
+  it('nothing it records uploads while it records, nor while "Recording saved · Undo" shows', async () => {
+    const onFinished = jest.fn();
+    const { result } = setup({ onFinished });
+    await act(() => result.current.start());
+    await act(() => result.current.pause());
+    await act(() => result.current.resume());
+    await act(() => result.current.finish());
+    // Each segment is held as it is saved (inside appendSegment, before any backup run can see it)...
+    expect(mockAppend.mock.calls.map((c) => c[2].holdUpload)).toEqual([true, true]);
+    // ...and the recording for the note's time once it stops (lib/recordings lets go by itself).
+    expect(mockHold).toHaveBeenCalledWith('rec-1');
+    expect(mockRelease).not.toHaveBeenCalled();
+    expect(onFinished.mock.calls[0][0].undo).toEqual({ created: true, segments: ['rec-1-0.m4a', 'rec-1-1.m4a'], fromMs: 0 });
+  });
+
+  it('with no note to show (the screen closed), it uploads at once', async () => {
+    const { result, unmount } = setup({ onFinished: jest.fn() });
+    await act(() => result.current.start());
+    await act(async () => unmount());
+    expect(mockRelease).toHaveBeenCalledWith('rec-1');
   });
 
   it('does not offer "View" when the screen closes (no one to show it)', async () => {
@@ -555,8 +588,32 @@ describe('a revision recording stays open until Stop', () => {
       { atMs: 42_000, page: 12 },
     ]);
     expect(mockClose).toHaveBeenCalledWith('open-1');
-    expect(onFinished).toHaveBeenCalledWith({ day: '2026-10-20', recordingId: 'open-1' });
+    // Undo takes back this go only: the 42 s recorded before stay.
+    expect(onFinished).toHaveBeenCalledWith({
+      day: '2026-10-20',
+      recordingId: 'open-1',
+      undo: { created: false, segments: ['open-1-0.m4a'], fromMs: 42_000 },
+    });
     expect(result.current.phase).toBe('idle');
+  });
+
+  it('a day’s session carried on with Record: Undo takes back only what this go added', async () => {
+    mockFind.mockResolvedValue({ id: 'old', durationMs: 60_000, pageMarks: [{ atMs: 0, page: 3 }] });
+    const onFinished = jest.fn();
+    const { result } = revision({ onFinished });
+    await settle();
+    await act(() => result.current.start());
+    await act(() => result.current.finish());
+    expect(onFinished.mock.calls[0][0].undo).toEqual({ created: false, segments: ['old-0.m4a'], fromMs: 60_000 });
+  });
+
+  it('a session left for later (kept open) uploads what it has: there is nothing to undo', async () => {
+    mockFind.mockResolvedValue(OPEN);
+    const { result, unmount } = revision({ onFinished: jest.fn() });
+    await settle();
+    await act(() => result.current.resume());
+    await act(async () => unmount());
+    expect(mockRelease).toHaveBeenCalledWith('open-1');
   });
 
   it('Stop on a reopened session closes it without recording', async () => {

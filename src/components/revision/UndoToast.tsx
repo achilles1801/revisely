@@ -22,11 +22,13 @@ interface UndoToastProps {
   bottomInset?: number;
   /** The action's label (default "Undo"); onUndo runs it. */
   actionLabel?: string;
+  /** A second action, before the first ("Recording saved · Undo · View"). */
+  secondAction?: { label: string; onPress: () => void; testID?: string };
 }
 
 /**
- * A short-lived bar, with an action ("Pages cleared · Undo") or without one
- * ("Copied"): a flat snackbar
+ * A short-lived bar, with an action ("Pages cleared · Undo"), two ("Recording
+ * saved · Undo · View") or none ("Copied"): a flat snackbar
  * in the inverse of the ground (ink on white, white on black), no shadow,
  * inside the gutters.
  */
@@ -38,6 +40,7 @@ export function UndoToast({
   duration = 3000,
   bottomInset = 0,
   actionLabel = 'Undo',
+  secondAction,
 }: UndoToastProps) {
   const { palette } = useTheme();
   // It slides up into place, fully opaque from its first frame. It used to fade in from 0 as
@@ -80,6 +83,19 @@ export function UndoToast({
         <Text style={[typeV2.body, v2.message, { color: palette.bg }]} numberOfLines={2} maxFontSizeMultiplier={1.4}>
           {message}
         </Text>
+        {secondAction ? (
+          <Tap
+            onPress={secondAction.onPress}
+            hitSlop={10}
+            style={v2.action}
+            accessibilityRole="button"
+            testID={secondAction.testID ?? 'undo-toast-second-action'}
+          >
+            <Text style={[typeV2.button, { color: palette.bg }]} maxFontSizeMultiplier={1.4}>
+              {secondAction.label}
+            </Text>
+          </Tap>
+        ) : null}
         {onUndo ? (
           <Tap onPress={onUndo} hitSlop={10} style={v2.action} accessibilityRole="button" testID="undo-toast-action">
             <Text style={[typeV2.button, { color: palette.bg }]} maxFontSizeMultiplier={1.4}>

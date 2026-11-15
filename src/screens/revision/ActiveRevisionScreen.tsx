@@ -20,6 +20,7 @@ import { getReadPalette } from '../../theme/readPalette';
 import { BulkActionsModal } from '../../components/BulkActionsModal';
 import { WeaknessModal } from '../../components/WeaknessRating';
 import { SessionMenuSheet, SessionMenuAction } from '../../components/revision/SessionMenuSheet';
+import { RecordingSavedToast, SavedRecording } from '../../components/recordings/RecordingSavedToast';
 import { UndoToast } from '../../components/revision/UndoToast';
 import { HELP_ICON, useHelpSheet } from '../../components/help/HelpButton';
 import { HelpToast } from '../../components/help/HelpToast';
@@ -219,10 +220,8 @@ export default function ActiveRevisionScreen() {
   // (scrollToPage never reports an advance).
   const pagerRef = useRef<MushafPagerHandle>(null);
   // Record yourself reciting; page marks follow the page on screen.
-  // After ending a recording: "Recording saved · View" (opens it in Activity).
-  const [savedRecording, setSavedRecording] = useState<{ day: string; recordingId: string } | null>(
-    null,
-  );
+  // After ending a recording: "Recording saved · Undo · View" (View opens it in Activity).
+  const [savedRecording, setSavedRecording] = useState<SavedRecording | null>(null);
   const recorder = useVoiceRecorder({
     kind: 'revision',
     day: sessionDay,
@@ -1183,17 +1182,9 @@ export default function ActiveRevisionScreen() {
       </ReaderFrame>
 
       <SpeechModelSheet visible={modelSheet} onClose={() => setModelSheet(false)} onReady={() => setModelSheet(false)} />
-      <UndoToast
-        visible={!!savedRecording}
-        message="Recording saved"
-        actionLabel="View"
-        duration={6000}
-        onUndo={() => {
-          const saved = savedRecording;
-          setSavedRecording(null);
-          if (saved) navigateToActivityDay(saved.day, saved.recordingId);
-        }}
-        onDismiss={() => setSavedRecording(null)}
+      <RecordingSavedToast
+        saved={savedRecording}
+        onClose={() => setSavedRecording(null)}
         bottomInset={insets.bottom - spacing.sm}
       />
 

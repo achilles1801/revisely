@@ -429,7 +429,7 @@ Things that bit:
 - One-time dialogs come when the app gets there, not at a fixed step (the recording backup notice,
   `subflows/backup-notice.yaml`). Wait for them a little where they belong, and accept them.
 - **Notes:** a flow never taps a note's action ("Saved to today: … · View",
-  "Recording saved · View"). A note lasts 6 s, and the backup notice comes 2 s into the first one.
+  "Recording saved · Undo · View"). A note lasts 6 s, and the backup notice comes 2 s into the first one.
   On the iOS runner the steps between seeing it and the tap took 5.5 s (run 42548149857, 13 run 2):
   Maestro found View as the note went, and the tap landed on the timer button under it, which opened
   the timer card. 07's View tap never opened Activity on iOS in that run either. A flow takes the way

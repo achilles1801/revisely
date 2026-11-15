@@ -367,6 +367,25 @@ describe('a take kept as a recording (Save recordings, on by default)', () => {
     expect(navigateToActivityDay).toHaveBeenCalledWith(mockTake.started?.day, 'rec-1');
   });
 
+  it('a take kept as a recording: Undo on its note deletes it (the whole take)', async () => {
+    const recordings = require('../../../lib/recordings');
+    const undo = jest.spyOn(recordings, 'undoRecording').mockResolvedValue('deleted');
+    await startTake('recite');
+    await act(async () => mockMic!.onAudio(new Int16Array(16000)));
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await flush();
+    await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [], score: null } });
+    fireEvent.press(screen.getByTestId('take-summary-done'));
+    await flush();
+    fireEvent.press(screen.getByTestId('recite-close'));
+    await flush();
+    fireEvent.press(screen.getByTestId('recording-saved-undo'));
+    await flush();
+    expect(undo).toHaveBeenCalledWith('rec-1', undefined);
+    expect(screen.queryByText('Recording saved')).toBeNull();
+    undo.mockRestore();
+  });
+
   it('Save recordings off: nothing is kept and there is no dot', async () => {
     setReciteCheckSettings('u1', { saveRecording: false });
     await startTake('recite');
