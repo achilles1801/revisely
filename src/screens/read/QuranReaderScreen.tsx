@@ -69,6 +69,9 @@ import { markTitle } from '../../lib/reciteLive/describe';
 import { drillMarks, drillRange, openDrill } from '../../lib/reciteLive/drill';
 import { describeAyahs } from '../../lib/passages';
 import { foundSpan, TakeSpan } from '../../lib/reciteLive/span';
+import { TestPlace, testJuz, testPlaces, TestResult, testResult } from '../../lib/reciteLive/testMe';
+import { memorizedAyahs } from '../../lib/memorizedAyahs';
+import { outcomeText, TestMeScopeSheet, TestSummarySheet } from '../../components/reciteLive/TestMeSheets';
 import { CheckIntroPage } from '../../components/reciteLive/CheckIntroPage';
 import { markAt, wordBox } from '../../lib/reciteLive/geometry';
 import { similarPhrases } from '../../lib/reciteLive/similar';
@@ -143,7 +146,7 @@ export default function QuranReaderScreen() {
   const { timer, notePage } = useReadingTimer();
   // Hold a verse: highlight, Play (Husary), Translation. Recitation turns pages.
   // Record yourself reading; saved under today's (revision day's) reading.
-  const { user } = useApp();
+  const { user, pages } = useApp();
   const { day: today } = useRevisionDay(user);
   // After ending a recording: "Recording saved · Undo · View" (View opens it in Activity).
   const [savedRecording, setSavedRecording] = useState<SavedRecording | null>(null);
@@ -362,7 +365,7 @@ export default function QuranReaderScreen() {
   const takeRecord = remembering.current;
   const [modeMenu, setModeMenu] = useState(false);
   // The AI notice comes before the first take: the take it was asked for starts once it's agreed.
-  const [noticeFor, setNoticeFor] = useState<{ mode: LiveMode; span: TakeSpan | null } | null>(null);
+  const [noticeFor, setNoticeFor] = useState<{ mode: LiveMode; span: TakeSpan | null; reveal: Revealed } | null>(null);
   // Check: the word a card is open on (and where it is on screen), similar phrases, the summary, Check's page.
   const [cardAt, setCardAt] = useState<{ w: number; anchor: Box } | null>(null);
   // What the card plays stops when the card closes, and when the reader goes (Majd, Nov 15 2026: Husary played on past
@@ -388,15 +391,36 @@ export default function QuranReaderScreen() {
   // What a tap on the mic starts: Record, or Recite, marking mistakes when the switch is on and the account has it.
   const markMistakes = owned && reciteSettings.markMistakes;
   const micMode: ReciteMicMode = reciteSettings.mode === 'record' ? 'record' : markMistakes ? 'check' : 'recite';
+  // Test me (Majd, Nov 15 2026; lib/reciteLive/testMe): five random places in what's memorized, or in one juz. Each is a
+  // Mark mistakes take with the page hidden but for its first two words; the bar says how it went, with Next and ✕.
+  const [testPick, setTestPick] = useState(false);
+  const [test, setTest] = useState<{
+    juz: number | null;
+    places: TestPlace[];
+    at: number;
+    results: TestResult[];
+    hiddenBefore: boolean;
+  } | null>(null);
+  const testRef = useRef(test);
+  testRef.current = test;
+  const [testSummary, setTestSummary] = useState<{ juz: number | null; results: TestResult[] } | null>(null);
+  const memorized = useMemo(() => (liveOn ? memorizedAyahs(pages ?? []) : []), [liveOn, pages]);
+  const testableJuz = useMemo(() => (liveOn && qw ? testJuz(memorized, qw) : []), [liveOn, qw, memorized]);
+  const testPlace = test ? test.places[test.at] : null;
   const liveInfo = useMemo(
-    () => ({ saidUpTo: furthestWord(live.state), startWord: live.startWord, cursor: live.state.cursor }),
-    [live.state, live.startWord],
+    () => ({
+      saidUpTo: furthestWord(live.state),
+      // Before the checker has found the start of a test's place: from the place (‹ shows its third word, not the page's first).
+      startWord: live.startWord ?? testPlace?.cue[0] ?? null,
+      cursor: live.state.cursor,
+    }),
+    [live.state, live.startWord, testPlace],
   );
 
   // Recite the mistakes again: what the take before found in the stretch, for its summary ("Before: …").
   const [drillBefore, setDrillBefore] = useState<string | null>(null);
   const startMode = useCallback(
-    (mode: ReciteMicMode, span: TakeSpan | null = null) => {
+    (mode: ReciteMicMode, span: TakeSpan | null = null, reveal: Revealed = NOTHING_SHOWN) => {
       if (mode === 'record') {
         void recorder.start();
         return;
@@ -407,10 +431,10 @@ export default function QuranReaderScreen() {
         return;
       }
       if (!reciteSettings.noticeSeen) {
-        setNoticeFor({ mode, span });
+        setNoticeFor({ mode, span, reveal });
         return;
       }
-      setRevealed(NOTHING_SHOWN);
+      setRevealed(reveal);
       setDrillBefore(null);
       void live.start(mode, span);
     },
@@ -441,11 +465,52 @@ export default function QuranReaderScreen() {
     // The summary's "Before: …": what those words were last time.
     setDrillBefore(findingsLine(pageDrill.marks));
     if (!reciteSettings.noticeSeen) {
-      setNoticeFor({ mode: 'check', span: pageDrill.range });
+      setNoticeFor({ mode: 'check', span: pageDrill.range, reveal: NOTHING_SHOWN });
       return;
     }
     void live.start('check', pageDrill.range);
   }, [pageDrill, reciteSettings.noticeSeen, live]);
+  // A test's place: the page hidden but for the place's first two words, and a take over its ayahs.
+  const beginPlace = useCallback(
+    (place: TestPlace) => {
+      setCardAt(null);
+      setHidden(true);
+      startMode('check', place.span, new Set(place.cue));
+    },
+    [startMode],
+  );
+  const startTest = useCallback(
+    (juz: number | null) => {
+      setTestPick(false);
+      setTestSummary(null);
+      if (!qw) return;
+      const places = testPlaces(memorized, qw, { juz });
+      if (places.length === 0) return;
+      setTest({ juz, places, at: 0, results: [], hiddenBefore: testRef.current?.hiddenBefore ?? hidden });
+      beginPlace(places[0]);
+    },
+    [qw, memorized, hidden, beginPlace],
+  );
+  const nextPlace = useCallback(() => {
+    const run = testRef.current;
+    if (!run || run.at + 1 >= run.places.length) return;
+    live.clear();
+    setTest({ ...run, at: run.at + 1 });
+    beginPlace(run.places[run.at + 1]);
+  }, [live, beginPlace]);
+  /** The test ends (its last place, or ✕): the take goes, the page as it was, and the summary if a place was done. */
+  const endTest = useCallback(
+    (results: TestResult[]) => {
+      const run = testRef.current;
+      live.clear();
+      setCardAt(null);
+      setRevealed(NOTHING_SHOWN);
+      setTest(null);
+      if (run) setHidden(run.hiddenBefore);
+      if (run && results.length > 0) setTestSummary({ juz: run.juz, results });
+    },
+    [live],
+  );
   // A voice search with one result (Majd, Nov 15 2026: "take them to that page as if they're about to recite it"): a
   // take starts as the reader opens, the checker looking for the start only in the ayahs found. Recite, marking
   // mistakes when the switch is on, whatever a tap on the mic would start. It waits for the account's settings (the
@@ -662,6 +727,15 @@ export default function QuranReaderScreen() {
   useEffect(() => {
     if (live.state.status !== 'done' || !takeId || summaryFor === takeId) return;
     setSummaryFor(takeId);
+    // A test's place: how it went is kept, and the bar says so with Next (or the test's summary after its last place).
+    const run = testRef.current;
+    if (run) {
+      stopTrace.end();
+      const results = [...run.results.slice(0, run.at), testResult(run.places[run.at], live.state)];
+      if (run.at + 1 >= run.places.length) endTest(results);
+      else setTest({ ...run, results });
+      return;
+    }
     // The checker never found where the reciter started: it fails silently (Majd, Nov 14 2026). No summary or
     // message; Stop just ends the take.
     if (startNotFound(live.state)) {
@@ -785,7 +859,7 @@ export default function QuranReaderScreen() {
   const liveStatus = live.state.status;
   const barPhase: 'live' | 'checking' | 'done' =
     liveStatus === 'checking' ? 'checking' : liveStatus === 'done' || liveStatus === 'failed' ? 'done' : 'live';
-  const barStatus =
+  const baseStatus =
     liveStatus === 'connecting'
       ? 'Starting…'
       : liveStatus === 'checking'
@@ -795,6 +869,11 @@ export default function QuranReaderScreen() {
           : liveStatus === 'done'
             ? 'Done'
             : 'Listening…';
+  // In a test: which place it is, and once it's done, how it went ("Clean · 2 of 5").
+  const placeResult = test && liveStatus === 'done' ? test.results[test.at] : undefined;
+  const barStatus = test
+    ? `${placeResult ? outcomeText(placeResult) : baseStatus} · ${test.at + 1} of ${test.places.length}`
+    : baseStatus;
 
   // Previous / next go when the capsule is crowded (a recording, a timer) on
   // anything narrower than the largest phones.
@@ -852,7 +931,8 @@ export default function QuranReaderScreen() {
                 score={checkTake ? scorePill(live.state, qw, live.startWord) : null}
                 seconds={live.seconds}
                 recording={live.recording && live.mic === 'on'}
-                words={barWords(live.state, qw, { check: checkTake, startWord: live.startWord })}
+                // A test's place, once done, says how it went in the words' place.
+                words={placeResult ? [] : barWords(live.state, qw, { check: checkTake, startWord: live.startWord })}
                 status={barStatus}
                 phase={barPhase}
                 paused={live.paused}
@@ -860,10 +940,19 @@ export default function QuranReaderScreen() {
                 onResume={() => void live.resume()}
                 onStop={live.stop}
                 onClose={() => {
+                  if (test) {
+                    endTest(test.results);
+                    return;
+                  }
                   setCardAt(null);
                   setSummaryShown(null);
                   live.clear();
                 }}
+                next={
+                  test && placeResult && test.at + 1 < test.places.length
+                    ? { label: `Next place, ${test.at + 2} of ${test.places.length}`, onPress: nextPlace }
+                    : undefined
+                }
                 surface={{ background: palette.control, border: palette.divider }}
               />
             ) : (
@@ -990,9 +1079,26 @@ export default function QuranReaderScreen() {
               setModeMenu(false);
               setIntroOpen(true);
             }}
+            onTest={() => {
+              setModeMenu(false);
+              setTestPick(true);
+            }}
+            testReady={testableJuz.length > 0}
             onClose={() => setModeMenu(false)}
             drill={menuDrill}
             onDrill={drillHere}
+          />
+          <TestMeScopeSheet visible={testPick} juz={testableJuz} onStart={startTest} onClose={() => setTestPick(false)} />
+          <TestSummarySheet
+            visible={testSummary != null}
+            results={testSummary?.results ?? []}
+            onPlace={(r) => {
+              setTestSummary(null);
+              setHidden(false);
+              if (qw) pagerRef.current?.scrollToPage(qw.pageOf(r.place.cue[0]));
+            }}
+            onAgain={() => startTest(testSummary?.juz ?? null)}
+            onDone={() => setTestSummary(null)}
           />
           {qw ? (
             <MarkCard
@@ -1210,7 +1316,7 @@ export default function QuranReaderScreen() {
               setReciteCheckSettings(user?.id, { noticeSeen: true });
               setNoticeFor(null);
               if (asked) {
-                setRevealed(NOTHING_SHOWN);
+                setRevealed(asked.reveal);
                 void live.start(asked.mode, asked.span);
               }
             }}

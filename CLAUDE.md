@@ -378,6 +378,21 @@ until its part is set up.
     `getVerseTranslation`, no Arabic fetched; fetched only once its card has been on screen, since each Clear Quran block
     spends the account's and everyone's daily budget), then Share, Copy (the ayat from the word data on the phone, so they
     work offline; "Copied") and Open in the reader.
+  - **Test me** (Majd, Nov 15 2026: approved, "random within all memorized pages, with an optional juz pick";
+    `lib/reciteLive/testMe`, `components/reciteLive/TestMeSheets`). The mic's menu has Test me under Recite (Premium,
+    locked like Mark mistakes; "Mark what you've memorized first" with nothing memorized). It asks where from:
+    everything memorized, or one juz of it (only the juz with somewhere to start). Five places at random, none sharing
+    an ayah, each starting in a memorized ayah of at least four words.
+    - At each place the page turns there and is hidden but for the ayah's first two words. A Mark mistakes take covers
+      that ayah and the next two (those memorized, in the same surah) and stops by itself at the end. The checker looks
+      for the start only in the first ayah (`startBy`), so starting the ayah again or carrying on both work.
+    - The bar then says how it went in the words' place ("Clean · 1 of 5", "1 wrong word · 2 of 5", "Stopped before
+      the end", "Not continued" when the start was never found), with Next and ✕. ✕ ends the test early.
+    - After the last place (or ✕): the summary, "4 of 5 continued cleanly" and each place with how it went (a tap shows
+      it on the page), Test me again (the same juz) and Done. The page goes back to shown or hidden as before.
+    - Each place's take is kept as a recording, as any take is.
+    - E2E: flow 18 marks page 379 memorized (`scripts/server-memorized.js`) and tests Juz 19; a place gets a take of
+      its own that says every word (`placeTake` in `lib/e2e/reciteLive`).
 
 ## How updates reach phones
 

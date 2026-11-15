@@ -79,10 +79,16 @@ jest.mock('@react-navigation/native', () => ({
 jest.mock('../../../navigation/navigationRef', () => ({ navigateToActivityDay: jest.fn() }));
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
 
-const mockState: { user: { previewTester?: boolean; id?: string } | null; dev: boolean; recordStart: jest.Mock } = {
+const mockState: {
+  user: { previewTester?: boolean; id?: string } | null;
+  dev: boolean;
+  recordStart: jest.Mock;
+  pages: { pageNumber: number; status: string }[];
+} = {
   user: null,
   dev: true,
   recordStart: jest.fn(),
+  pages: [],
 };
 jest.mock('../../../lib/variant', () => ({ ...jest.requireActual('../../../lib/variant'), isDevVariant: () => mockState.dev }));
 jest.mock('../../../context/ReadingTimerContext', () => ({
@@ -98,7 +104,7 @@ jest.mock('../../../context/ReadingTimerContext', () => ({
   }),
   useNow: () => Date.now(),
 }));
-jest.mock('../../../context/AppContext', () => ({ useApp: () => ({ user: mockState.user, saveUser: jest.fn() }) }));
+jest.mock('../../../context/AppContext', () => ({ useApp: () => ({ user: mockState.user, pages: mockState.pages, saveUser: jest.fn() }) }));
 jest.mock('../../../context/ThemeContext', () => {
   const { paletteV2, v2ThemeColors } = require('../../../theme/v2');
   return { useTheme: () => ({ theme: v2ThemeColors(false, 'indigo'), isDark: false, palette: paletteV2(false, 'indigo') }) };
@@ -221,6 +227,7 @@ beforeEach(async () => {
   jest.clearAllMocks();
   mockState.user = { previewTester: true, id: 'u1' };
   mockState.dev = true;
+  mockState.pages = [];
   mockLive.sent = [];
   mockLive.audio = 0;
   mockLive.clips = [];
@@ -1565,5 +1572,161 @@ describe('a voice search with one result opens the reader reciting (Majd, Nov 15
     await openFound();
     expect(mockLive.start).toBeUndefined();
     expect(mockMic).toBeNull();
+  });
+});
+
+describe('Test me (Majd, Nov 15 2026: random within what’s memorized, with an optional juz pick)', () => {
+  // Al-Mulk (pages 562–564, juz 29) and page 604 (juz 30) memorized. Math.random at 0 takes the first start left each
+  // time: Al-Mulk 1, 4, 7, 10 and 13.
+  beforeEach(() => {
+    mockState.pages = [562, 563, 564, 604].map((pageNumber) => ({ pageNumber, status: 'memorized' }));
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+  });
+  afterEach(() => jest.restoreAllMocks());
+
+  const placeAt = (a: number) => {
+    const first = words.verseFirstWord(67, a);
+    return { first, last: words.verseRange(67, a + 2)[1] - 1 };
+  };
+  async function openTest(pick: 'all' | 'juz-30' = 'all') {
+    setReciteCheckSettings('u1', { noticeSeen: true });
+    await open();
+    fireEvent(screen.getByTestId('recite-mic'), 'longPress');
+    fireEvent.press(screen.getByTestId('recite-mode-test'));
+    await flush();
+    expect(screen.getByTestId('test-me-sheet')).toBeTruthy();
+    fireEvent.press(screen.getByTestId(`test-me-${pick}`));
+    await flush();
+    await flush();
+  }
+  /** The place's take: found where the reciter carried on, said to its end (stopping by itself), the final answer. */
+  async function finishPlace(take: string, a: number, marks: object[] = []) {
+    const { first, last } = placeAt(a);
+    await event({ type: 'ready', take, protocol: 6 });
+    await event({ type: 'locked', w: first + 2, s: 67, a });
+    for (const mark of marks) await event({ type: 'mark', mark } as LiveEvent);
+    await event({ type: 'said', upTo: last } as LiveEvent);
+    await flush();
+    await event({ type: 'done', result: { v: 2, take, from: first, to: last + 1, start: first + 2, secs: 12, marks, score: null } } as LiveEvent);
+    await flush();
+  }
+
+  it('in the mic’s menu: locked without Premium (a tap opens the Premium page); with nothing memorized it says so', async () => {
+    mockPremium.has = false;
+    await open();
+    fireEvent(screen.getByTestId('recite-mic'), 'longPress');
+    expect(screen.getByLabelText('Test me, part of Premium, locked')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('recite-mode-test'));
+    await flush();
+    expect(screen.getByTestId('check-intro')).toBeTruthy();
+    expect(screen.queryByTestId('test-me-sheet')).toBeNull();
+    screen.unmount();
+    mockPremium.has = true;
+    mockState.pages = [];
+    await open();
+    fireEvent(screen.getByTestId('recite-mic'), 'longPress');
+    expect(screen.getByText('Mark what you’ve memorized first')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('recite-mode-test'));
+    expect(screen.queryByTestId('test-me-sheet')).toBeNull();
+  });
+
+  it('where from: everything memorized, or a juz of it', async () => {
+    setReciteCheckSettings('u1', { noticeSeen: true });
+    await open();
+    fireEvent(screen.getByTestId('recite-mic'), 'longPress');
+    fireEvent.press(screen.getByTestId('recite-mode-test'));
+    await flush();
+    expect(screen.getByText('Everything you’ve memorized')).toBeTruthy();
+    expect(screen.getByTestId('test-me-juz-29')).toBeTruthy();
+    expect(screen.getByTestId('test-me-juz-30')).toBeTruthy();
+    expect(screen.queryByTestId('test-me-juz-1')).toBeNull();
+  });
+
+  it('a place: the page turned to it and hidden but for its first two words, a Mark mistakes take over its three ayahs, looking only in the first', async () => {
+    await openTest();
+    expect(mockLive.start).toMatchObject({ type: 'start', s: 67, a: 1, startBy: [67, 1], s2: 67, a2: 3, follow: false });
+    expect(mockPager.scrolled).toContain(562);
+    expect(screen.getByTestId('recite-eye-group')).toBeTruthy();
+    expect(screen.getByTestId('recite-status').props.children).toBe('Starting… · 1 of 5');
+    await event({ type: 'ready', take: 't1', protocol: 6 });
+    expect(screen.getByTestId('recite-status').props.children).toBe('Listening… · 1 of 5');
+    // The two words are shown already: ‹ shows the third.
+    mockLive.sent = [];
+    fireEvent.press(screen.getByTestId('recite-next-word'));
+    expect(mockLive.sent).toContainEqual({ type: 'hint', w: placeAt(1).first + 2, what: 'word' });
+  });
+
+  it('a juz picked: its places only', async () => {
+    await openTest('juz-30');
+    expect(mockLive.start).toMatchObject({ s: 112, a: 1, startBy: [112, 1] });
+  });
+
+  it('it stops by itself at the place’s end; the bar says how it went, then Next goes to the next place', async () => {
+    await openTest();
+    const { first, last } = placeAt(1);
+    await event({ type: 'ready', take: 't1', protocol: 6 });
+    await event({ type: 'locked', w: first, s: 67, a: 1 });
+    mockLive.sent = [];
+    await event({ type: 'said', upTo: last } as LiveEvent);
+    await flush();
+    expect(mockLive.sent).toContainEqual({ type: 'end' });
+    await event({ type: 'done', result: { v: 2, take: 't1', from: first, to: last + 1, start: first, secs: 12, marks: [], score: null } } as LiveEvent);
+    await flush();
+    expect(screen.queryByTestId('take-summary')).toBeNull();
+    expect(screen.getByTestId('recite-status').props.children).toBe('Clean · 1 of 5');
+    expect(screen.getByLabelText('Next place, 2 of 5')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('recite-next'));
+    await flush();
+    await flush();
+    expect(mockLive.start).toMatchObject({ s: 67, a: 4, startBy: [67, 4], s2: 67, a2: 6 });
+    expect(screen.getByTestId('recite-eye-group')).toBeTruthy();
+  });
+
+  it('after the fifth place: the summary, how many were clean and how each went; Test me again starts a new test', async () => {
+    await openTest();
+    const wrong = { id: 'w', w: placeAt(4).first + 3, ayah: [67, 4], kind: 'word', sure: 'clear', heard: 'x', heardExact: false };
+    const places = [1, 4, 7, 10, 13];
+    for (let i = 0; i < places.length; i++) {
+      await finishPlace(`t${i + 1}`, places[i], places[i] === 4 ? [wrong] : []);
+      if (i < places.length - 1) {
+        fireEvent.press(screen.getByTestId('recite-next'));
+        await flush();
+        await flush();
+      }
+    }
+    expect(screen.getByTestId('test-summary')).toBeTruthy();
+    expect(screen.getByTestId('test-summary-headline')).toHaveTextContent('4 of 5 continued cleanly');
+    expect(screen.getAllByTestId('test-summary-place-clean')).toHaveLength(4);
+    expect(screen.getByTestId('test-summary-place-mistakes')).toHaveTextContent(/ayahs 4.6.*1 wrong word$/);
+    // The take is gone, and the page as it was (not hidden).
+    expect(screen.queryByTestId('recite-bar')).toBeNull();
+    fireEvent.press(screen.getByTestId('test-summary-again'));
+    await flush();
+    await flush();
+    expect(mockLive.start).toMatchObject({ s: 67, a: 1, s2: 67, a2: 3 });
+    expect(screen.getByTestId('recite-status').props.children).toBe('Starting… · 1 of 5');
+  });
+
+  it('✕ ends the test early: the summary of the places done', async () => {
+    await openTest();
+    await finishPlace('t1', 1);
+    fireEvent.press(screen.getByTestId('recite-close'));
+    await flush();
+    expect(screen.getByTestId('test-summary-headline')).toHaveTextContent('1 of 1 continued cleanly');
+    fireEvent.press(screen.getByTestId('test-summary-done'));
+    await flush();
+    expect(screen.getByTestId('recite-mic')).toBeTruthy();
+  });
+
+  it('a place whose start is never found: “Not continued”, and the test goes on', async () => {
+    await openTest();
+    const { first, last } = placeAt(1);
+    await event({ type: 'ready', take: 't1', protocol: 6 });
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await flush();
+    await event({ type: 'done', result: { v: 2, take: 't1', from: first, to: last + 1, start: null, secs: 6, marks: [], score: null } } as LiveEvent);
+    await flush();
+    expect(screen.getByTestId('recite-status').props.children).toBe('Not continued · 1 of 5');
+    expect(screen.getByTestId('recite-next')).toBeTruthy();
   });
 });
