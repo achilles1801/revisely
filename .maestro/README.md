@@ -151,6 +151,10 @@ Before Nov 7 2026 nothing did: Activity screens that didn't match the approved m
   (1080×2400). Every flow captures Indigo in light today. A capture in another accent or theme is
   its own screen, named with suffixes: `-crimson` or `-jade`, then `-dark` (`r4-sheet-jade-dark`;
   `VARIANTS` in `screens.mjs`).
+- **On an iPhone SE:** a run by hand can boot an iPhone SE (3rd generation) instead of the Pro, to check
+  small screens without the Mac's one simulator. Use `gh workflow run e2e.yml -f platform=ios -f device=se`
+  (add `-f flows='12-*'` for some flows). Its screenshots are kept in the screens artifact but not compared,
+  since the baselines are the Pro's size. CI and nightly runs always use the Pro.
 - **Normalised** before comparing or approving (`lib.mjs`): the status bar cropped, what still
   varies between runs masked (pink), and halved (each pixel the mean of 2×2), which keeps a
   baseline at 40–160 KB. The masks (`screens.mjs`, in the raw capture's pixels):
