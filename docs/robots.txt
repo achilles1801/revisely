@@ -1,0 +1,7 @@
+# revisely.app. Cloudflare adds its content-signals notice above these lines.
+# Nothing is disallowed: pages that shouldn't be indexed say so themselves (noindex), which crawlers can only read
+# if they may fetch them. dev.revisely.app answers its own robots.txt (the worker: everything disallowed).
+User-agent: *
+Disallow:
+
+Sitemap: https://revisely.app/sitemap.xml
