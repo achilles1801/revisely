@@ -21,6 +21,7 @@ LAB = pathlib.Path(os.environ.get('LAB', HERE / 'lab'))
 MODEL = LAB / 'models/hisnlabs-tajweed-v2/onnx/model-int8.onnx'
 BENCH = pathlib.Path(os.environ.get('RECITE_BENCH', pathlib.Path.home() / 'revisely-mistake-lab/data/bench-v0/items'))
 ITEM = BENCH / 'alafasy.p2.m1.clean.json'  # Al-Fatiha; planted: word 4 said as another word, word 14 skipped
+CLEAN = BENCH / 'alafasy.p2.clean.clean.json'  # Al-Fatiha as recited, no mistakes
 
 E = None
 
@@ -420,6 +421,98 @@ class Bench(unittest.TestCase):
         self.assertEqual(first[-1]['result']['score']['mistakes'],
                          sum(1 for m in first[-1]['result']['marks']
                              if m['kind'] in ('word', 'skipped', 'added') and m['id'] != '4:word:lookalike'))
+
+
+@unittest.skipUnless(MODEL.exists() and CLEAN.exists(), 'the model or the bench recitation is not here')
+class StartAnywhere(unittest.TestCase):
+    """Start anywhere on the page (Majd, Nov 14 2026): a take from the page (start_by) is locked to where the reciter
+    began; nothing is sent before `locked`, and nothing before the start is decided."""
+
+    def take_from(self, ayah):
+        import ast
+        t = json.loads(CLEAN.read_text())
+        tl = ast.literal_eval(t['timeline']) if isinstance(t['timeline'], str) else t['timeline']
+        E = engine()
+        first = next(e for e in tl if not e.get('extra') and E.key.where(e['word'])[:2] == (1, ayah))
+        with wave.open(str(CLEAN.with_suffix('.wav'))) as w:
+            pcm = w.readframes(w.getnframes())
+        cut = max(0, int((first['start'] - 0.3) * 16000)) * 2
+        return first['word'], pcm[cut:]
+
+    def check(self, ayah, follow=False):
+        import live
+        w, pcm = self.take_from(ayah)
+        sess = live.LiveSession(engine(), 1, 1, 1, 7, {}, follow=follow, start_by=(1, 7))
+        ev = run(sess, chunks(pcm, 3200) + [{'type': 'end'}])
+        lock = [e for e in ev if e['type'] == 'locked']
+        self.assertEqual([e['w'] for e in lock], [w], ev[:6])
+        self.assertEqual(ev[:ev.index(lock[0])], [])  # nothing at all before it
+        done = ev[-1]['result']
+        self.assertEqual((done['start'], done['from']), (w, sess.range_lo))  # from: the passage's first word (contract)
+        self.assertTrue(done['words'] and min(r['w'] for r in done['words']) == w)  # nothing before it decided
+        self.assertFalse([e for e in ev if e['type'] == 'mark' and e['mark']['w'] < w])
+        self.assertEqual(sess.snapshot()[0]['type'], 'locked')
+        return ev
+
+    def test_a_take_from_an_ayah_mid_page_is_locked_there(self):
+        self.check(5)
+        self.check(5, follow=True)
+
+    def test_a_phrase_the_page_repeats_waits_until_the_places_part(self):
+        """1:3 (ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ) is also the end of 1:1: it may not lock on 1:1."""
+        self.check(3)
+
+    def test_the_page_top_locks_within_3_s(self):
+        """Majd's bar (Nov 14 2026): a take from the page's first word gets its cursor within 3 s of speech."""
+        import ast
+        import live
+        t = json.loads(CLEAN.read_text())
+        tl = ast.literal_eval(t['timeline']) if isinstance(t['timeline'], str) else t['timeline']
+        first = next(e for e in tl if not e.get('extra'))
+        with wave.open(str(CLEAN.with_suffix('.wav'))) as w:
+            pcm = w.readframes(w.getnframes())
+        sess = live.LiveSession(engine(), 1, 1, 1, 7, {}, start_by=(1, 7))
+        ev = run(sess, chunks(pcm, 3200) + [{'type': 'end'}])
+        lock = next(e for e in ev if e['type'] == 'locked')
+        self.assertEqual(lock['w'], first['word'])
+        self.assertLess(lock['t'] - first['start'], 3.0)
+
+    def test_words_that_read_the_same_are_the_same_start(self):
+        """Harakat and marks aside: 17:111's ٱلَّذِى and 18:1's ٱلَّذِىٓ sound alike, so the page's top wins the tie."""
+        from live import _letters
+        self.assertEqual(_letters('ٱلَّذِى'), _letters('ٱلَّذِىٓ'))
+        self.assertEqual(_letters('ٱلْحَمْدُ'), 'الحمد')
+        self.assertNotEqual(_letters('مَٰلِكِ'), _letters('مَلِكِ'))
+
+    def test_a_seek_while_searching_starts_the_take_there(self):
+        """The phone placed the reader by hand before the lock (a seek without startBy): the take starts at its word,
+        with `locked` there; a seek with startBy searches again instead."""
+        import live
+        w, pcm = self.take_from(5)
+        sess = live.LiveSession(engine(), 1, 1, 1, 7, {}, start_by=(1, 7))
+        ev = run(sess, [{'type': 'seek', 'w': w}] + chunks(pcm, 3200) + [{'type': 'end'}])
+        lock = [e for e in ev if e['type'] == 'locked']
+        self.assertEqual(([e['w'] for e in lock], ev[0]['type']), ([w], 'locked'))
+        self.assertEqual(ev[-1]['result']['start'], w)
+        sess = live.LiveSession(engine(), 1, 1, 1, 7, {}, start_by=(1, 7))
+        first = sess.range_lo
+        ev = run(sess, [{'type': 'seek', 'w': first, 'startBy': [1, 7]}] + chunks(pcm, 3200) + [{'type': 'end'}])
+        self.assertEqual([e['w'] for e in ev if e['type'] == 'locked'], [w])
+
+    def test_nonsense_fails_silently(self):
+        """Nothing found on the page: no cursor, no marks, no message (Majd), and done has no words, start null."""
+        import live
+        sess = live.LiveSession(engine(), 1, 1, 1, 7, {}, start_by=(1, 7))
+        ev = run(sess, chunks(noise(12), 3200) + [{'type': 'end'}])
+        self.assertEqual([e['type'] for e in ev], ['done'])
+        self.assertEqual((ev[-1]['result']['start'], ev[-1]['result']['words']), (None, []))
+
+    def test_without_start_by_nothing_changes(self):
+        import live
+        sess = live.LiveSession(engine(), 1, 1, 1, 7, {})
+        ev = run(sess, chunks(bench_pcm()[:16000 * 2 * 10], 3200) + [{'type': 'end'}])
+        self.assertFalse([e for e in ev if e['type'] in ('locked', 'nolock')])
+        self.assertNotIn('start', ev[-1]['result'])
 
 
 class Background(unittest.TestCase):

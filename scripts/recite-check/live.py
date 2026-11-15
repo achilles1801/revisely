@@ -31,6 +31,7 @@ import os
 import sys
 import threading
 import time
+import unicodedata
 
 import numpy as np
 
@@ -53,6 +54,31 @@ JUMP_AHEAD = 6      # once the next hop agrees (within a word): one hop's provis
                     # and forward again (Majd's Recite take, 3:1, Nov 14 2026)
 LEAD_FRAMES = 10    # a filler starting this close to a segment's first frame is the pause it started in, not a word
 SETTLE = 3.0        # seconds a seam must be behind the newest final frame: the path there no longer moves
+# Start anywhere on the page (Majd, Nov 14 2026; contract protocol 6, `startBy`): the start is searched for over the
+# page and an ayah either side, and locked once the best path's first word has held LOCK_HOPS hops, LOCK_WORDS words
+# after it are heard and final, and the words heard so far occur only once in the range searched (a phrase the page
+# repeats waits until the two places part). A take that never locks fails silently (Majd: no prompt, since a reciter
+# may have the page hidden; nonsense or a passage off the page shows nothing): no cursor, no marks, `done` with no
+# words and start null, and `ms.search_speech` (speech heard without a lock) for the server's log.
+LOCK_WORDS = 3
+LOCK_HOPS = 2
+# A search that has run LONG_SEARCH seconds without a lock asks for LONG_EXTRA more words: the longer nothing on the
+# page fits, the likelier the reciter is elsewhere, and a long take off the page meets phrases the page shares. Off the
+# page in full (120 takes): 14 → 11 locks; every start on the page locks well before (bench: 18 s at most).
+LONG_SEARCH = 30.0
+LONG_EXTRA = 2
+# The page's top locks sooner: a reciter who opens a page nearly always starts there, and a slow reciter's first word
+# alone can last longer than Majd's 3 s bar (Abdulbaset, mujawwad: 4–10 s). So once the best path has begun at the
+# page's first word (or at words reading the same, letter for letter, as the page's first words: 17:111 before Al-Kahf
+# also says الحمد لله الذي) for TOP_HOPS hops, heard as correct, the take starts at the top. Bench (Nov 15 2026, 8
+# reciters, held-out passages): lock 2.6 s after the first word (p90 2.9 s), against 6.5 s without the tie; no
+# start further in was taken for the top. The first word must also have covered TOP_SOUNDS of its sounds (all of a
+# shorter word's): unrelated speech held Al-Fatiha's 1:1 for 3 hops on blanks alone. Off the page (another passage's
+# audio, 120 takes) 7 locked, all Al-Fatiha on Al-Kahf's page: both open with a basmala and الحمد لله; the strict rule
+# locks 6 of those same 7, later.
+TOP_HOPS = 3
+TOP_SOUNDS = 3
+MAX_SEARCH = 480    # words searched at most (the server allows a page of 400, plus an ayah either side)
 NEG = checker.Decoder.NEG
 _pool = None
 
@@ -178,16 +204,27 @@ def start_helper():
 
 
 
+def _letters(text):
+    """A word's letters, harakat and Quranic marks aside (two words that sound the same read the same); the dagger
+    alif is said, so it stays an alif (مَٰلِكِ is not مَلِكِ)."""
+    return ''.join(ch for ch in unicodedata.normalize('NFD', text.replace('\u0671', '\u0627').replace('\u0670', '\u0627'))
+                   if unicodedata.category(ch) != 'Mn' and ch != '\u0640')
+
+
 class Decoder(checker.Decoder):
     """checker.Decoder for a stream. Its tables grow as frames come; traceback() can stop at a frame (the live
     window); and it can start at a word inside its graph (`entry`; the words before are there for repeats):
       'after': as if the word before had just been said (its last blank holds the pause), so skipping the entry
                word costs what a skip costs from there;
-      'lead':  as if a free lead had held everything until now (a seek: the reciter may say anything first)."""
+      'lead':  as if a free lead had held everything until now (a seek: the reciter may say anything first);
+      'anywhere': a free lead before every word, all at the same cost, so the path may begin at any word (the
+               locator, while a take's start on its page is searched for: LiveSession(start_by=…))."""
 
     def __init__(self, g, P, entry=0, start='after', cap=1500):
         super().__init__(g, P, cap)
         self.entry, self.start = entry, start
+        if start == 'anywhere':  # no word's lead cheaper than another's (a surah's basmala gap is, normally)
+            self.pen[:g.W] = P['fill']
         # for the vectorized step: each word's skip and repeat sources as columns (see _fast_step)
         ks = np.array(self.skips, np.int64)
         self._K = int(ks.max()) if len(ks) else 0
@@ -218,7 +255,12 @@ class Decoder(checker.Decoder):
             super()._step(e)
         else:
             self._fast_step(e)
-        if first and self.entry:
+        if first and self.start == 'anywhere':
+            g = self.g
+            self.d = np.full(g.S + 1, NEG)
+            self.gap = np.full(g.W + 1, NEG)
+            self.gap[:g.W] = float(e.max()) + self.pen[:g.W]
+        elif first and self.entry:
             g = self.g
             self.d = np.full(g.S + 1, NEG)
             self.gap = np.full(g.W + 1, NEG)
@@ -438,7 +480,8 @@ class LiveSession:
     """One live check. feed() audio (PCM16 bytes), control() messages, finish() at the end; each returns the events
     to send, in order (dicts, recite-contract.md)."""
 
-    def __init__(self, engine, s, a, s2=None, a2=None, settings=None, follow=False, defer=False, open_end=False):
+    def __init__(self, engine, s, a, s2=None, a2=None, settings=None, follow=False, defer=False, open_end=False,
+                 start_by=None):
         E = self.E = engine
         # follow (Recite, contract draft 5): the cursor and `said` only; words are decided (said needs them) but no
         # mark is made, letters and tajweed aren't judged, and no mark, unmark or score is sent
@@ -451,6 +494,19 @@ class LiveSession:
         if (s2 is None) != (a2 is None):
             raise BadRequest('both or neither of s2, a2')
         self.lo, self.end = E.passage(s, a, s2, a2, max_words=10 ** 6)
+        self.range_lo = self.lo          # the passage's first word (`done.from`); lo moves to the start once locked
+        # start_by (sura, ayah): the take starts at some word from s:a through the end of start_by (a page); it is
+        # searched for, and nothing is sent or decided until it's locked (see LOCK_WORDS)
+        self.start_by = start_by
+        self.search = self._search_range(s, a, start_by) if start_by is not None else None
+        self._search_f0 = 0              # the frame the search began at
+        self.loc = None                  # the locator: a Segment over the search range ('anywhere')
+        self._loc_hist = []              # its best path's first word, hop by hop
+        self._top_hist = []              # whether that start was the page's top, hop by hop (TOP_HOPS)
+        self._search_top = self.lo       # the page's first word
+        self._search_speech = 0.0        # seconds of speech the current search has heard (for the log)
+        self.start_w = None              # the word the take was locked to start at
+        self.locked_ev = None            # the `locked` event, for a resume's snapshot
         # open_end: the phone gave no end and the server runs the take on to the end of the Qur'an (server.LAST_AYAH);
         # `done.result.to` is then the end of the last ayah reached, not the Qur'an's
         self.open_end = open_end
@@ -594,8 +650,21 @@ class LiveSession:
             return []
         if kind == 'seek':
             w = msg.get('w')
-            if not isinstance(w, int) or not self.lo - SEG_WORDS <= w < self.end:
+            if msg.get('startBy') is not None and isinstance(w, int) and not isinstance(w, bool):
+                # a page turned by hand: search for the start again, on that page (from w's ayah to startBy)
+                try:
+                    s_, a_, _ = self.E.key.where(w)
+                    rng = self._search_range(s_, a_, msg['startBy'])
+                except (BadRequest, IndexError, KeyError, TypeError):
+                    return []
+                _, ev = self._close_segment() if self.seg is not None else (None, [])
+                self.seg, self.search, self.loc, self._loc_hist, self._top_hist = None, rng, None, [], []
+                self._search_f0, self._search_speech, self._search_top = self.T, 0.0, w
+                return ev
+            if not isinstance(w, int) or isinstance(w, bool) or not min(self.lo, self.range_lo) - SEG_WORDS <= w < self.end:
                 return []
+            if self.search is not None:  # the reader moved by hand while searching: the take starts at w
+                return self._lock(w, self.T, self.seconds, seek=True)
             _, ev = self._close_segment() if self.seg is not None else (None, [])
             self.origin = w
             self._seeked = True  # the phone moved the reader: the cursor follows at once (_cursor)
@@ -824,6 +893,102 @@ class LiveSession:
         self._start_segment(c, f0, start)
         return ev
 
+    # ------------------------------------------------------------ the start, searched for (start_by)
+
+    def _search_range(self, s, a, start_by):
+        """App words [lo, hi) the start is searched in: from the ayah before s:a to the ayah after start_by."""
+        W = self.E.words
+        try:
+            v0, v1 = W.vindex[(int(s), int(a))], W.vindex[(int(start_by[0]), int(start_by[1]))]
+        except (KeyError, TypeError, ValueError, IndexError):
+            raise BadRequest('startBy is not an ayah')
+        if v1 < v0:
+            raise BadRequest('startBy is before the start')
+        v0, v1 = max(0, v0 - 1), min(len(W.counts) - 1, v1 + 1)
+        lo = W.first[v0]
+        return lo, min(W.first[v1] + W.counts[v1], lo + MAX_SEARCH, self.end)
+
+    def _locate(self, now):
+        """One hop of the search: the locator's best path, and the lock once its start is sure (LOCK_WORDS)."""
+        if self.loc is None:
+            lo, hi = self.search
+            self.loc = Segment(self.E, self.P, lo, hi, lo, self._search_f0, 'anywhere')
+        loc, ev = self.loc, []
+        if self.T > loc.frames():
+            loc.dec.feed(self.lp[loc.frames():self.T])
+        dec = loc.dec
+        if dec.t < 5:
+            return ev
+        path, _ = dec.traceback(final=False)
+        st, _, _, _, _, visits, _ = checker.decide(loc.kws, loc.g, self.lp[loc.f0:loc.frames()], path, self.P,
+                                                   self.E.ear.vocab, self._tokens(loc.f0, loc.frames()))
+        heard = [w for w in range(loc.g.W) if visits[w]]
+        if not heard:
+            return ev
+        w0 = min(heard, key=lambda w: visits[w][0]['start'])  # the path's first word
+        f_start = loc.f0 + visits[w0][0]['start']
+        self._search_speech = (self.T - f_start) / FPS
+        p = w0  # the words from w0 on heard in order so far, settled or not
+        while p + 1 < loc.g.W and visits[p + 1]:
+            p += 1
+        top = self._search_top - loc.a
+        at_top = 0 <= top < loc.g.W and loc.app[top] == self._search_top and st.get(loc.app[w0]) == 'correct' \
+            and (w0 == top or self._reads_as(w0, top, p + 1 - w0)) and self._sounds_heard(visits[w0][-1], w0)
+        self._top_hist.append(at_top)
+        if at_top:
+            if len(self._top_hist) >= TOP_HOPS and all(self._top_hist[-TOP_HOPS:]):
+                return ev + self._lock(loc.app[top], f_start, now)
+            return ev
+        self._loc_hist.append(w0)
+        # the words from w0 on heard in order, each over before the commit point (no longer moving)
+        k, cf = w0, int(self.P['commit'] * FPS)
+        while k + 1 < loc.g.W and visits[k + 1] and visits[k + 1][-1]['end'] <= dec.t - cf:
+            k += 1
+        good = sum(1 for w in range(w0, k + 1) if st.get(loc.app[w]) == 'correct')
+        need = LOCK_WORDS + (LONG_EXTRA if (self.T - self._search_f0) / FPS > LONG_SEARCH else 0)
+        if k - w0 < need or good < LOCK_WORDS or len(self._loc_hist) < LOCK_HOPS \
+                or len(set(self._loc_hist[-LOCK_HOPS:])) > 1 or not self._only_once(w0, k):
+            return ev
+        return ev + self._lock(loc.app[w0], f_start, now)
+
+    def _sounds_heard(self, v, w):
+        """The visit v of the locator's word w has covered TOP_SOUNDS of its sounds (all, for a shorter word)."""
+        g = self.loc.g
+        tot = int(np.count_nonzero((g.word_of == w) & (g.kind == 1) & (g.alt_of == v['alt'])))
+        return len(v['scores']) >= min(TOP_SOUNDS, tot)
+
+    def _reads_as(self, w0, top, n):
+        """The locator's n words from w0 read, letter for letter (harakat and marks aside), as the n from top."""
+        kws = self.loc.kws
+        if top + n > len(kws) or w0 + n > len(kws):
+            return False
+        return [_letters(kws[w0 + i]['text']) for i in range(n)] == [_letters(kws[top + i]['text']) for i in range(n)]
+
+    def _only_once(self, w0, k):
+        """The locator's words w0..k occur only once, as a run, in the range searched."""
+        texts = [kw['text'] for kw in self.loc.kws]
+        run, n = texts[w0:k + 1], k + 1 - w0
+        return not any(texts[j:j + n] == run for j in range(len(texts) - n + 1) if j != w0)
+
+    def _lock(self, w, f_start, now, seek=False):
+        """The take starts at app word w (heard from frame f_start): the follower takes over from there, as after a
+        seek. Words before w aren't part of the take: never decided, never skipped, not in `said` or the score. A
+        plain seek while searching locks at its word (the phone placed the reader; `locked` all the same)."""
+        self.search, self.loc, self._loc_hist, self._top_hist = None, None, [], []
+        # a search again after a page turn: the take's start stays the first lock (recite-ui), and what it covers
+        # widens to the new place if that is earlier; words decided since stay as they are
+        self.lo = w if self.start_w is None else min(self.lo, w)
+        self.start_w = w if self.start_w is None else self.start_w
+        self.origin = w
+        s, a, _ = self.E.key.where(w)
+        self.locked_ev = {'type': 'locked', 'w': w, 's': s, 'a': a, 't': round(now, 2)}
+        if seek:
+            self._seeked = True
+            self._start_segment(w, f_start, 'lead')
+            return [dict(self.locked_ev)]
+        self._start_segment(w, max(self._search_f0, f_start - LEAD_FRAMES), 'lead')
+        return [dict(self.locked_ev)] + self._decide(now, None)
+
     # ------------------------------------------------------------ decisions
 
     def _first_segment(self):
@@ -832,6 +997,8 @@ class LiveSession:
         self._prefetch()
 
     def _decide(self, now, prov):
+        if self.search is not None:
+            return self._locate(now)
         if self.seg is None:
             self._first_segment()
         seg, P, E = self.seg, self.P, self.E
@@ -1042,7 +1209,8 @@ class LiveSession:
         shown, every mark taken back, the ayat judged, the cursor, `said` and the score. Sent after `ready` on a
         resume, for events a dropped socket may have swallowed."""
         t = round(self.seconds, 2)
-        ev = [{'type': 'mark', 'mark': m, 't': t} for m in self.marks.values()]
+        ev = [dict(self.locked_ev, t=t)] if self.locked_ev else []  # where the take starts, first
+        ev += [{'type': 'mark', 'mark': m, 't': t} for m in self.marks.values()]
         ev += [{'type': 'unmark', 'id': i, 'why': 'corrected', 't': t} for i in sorted(self.unmarked)]
         ev += [dict(e, t=t) for e in self.ayah_sent]
         if self.sent['at'] is not None:
@@ -1206,7 +1374,7 @@ class LiveSession:
                 seen.add(e['after'])
                 ex.append(v1_extra(e))
         out = {
-            'v': 1, 'from': self.lo, 'to': self._reached_to(words) if self.open_end else self.end,
+            'v': 1, 'from': min(self.lo, self.range_lo), 'to': self._reached_to(words) if self.open_end else self.end,
             'secs': round(self.seconds, 1), 'words': words, 'extras': ex,
             'tajweed': [{k: r[k] for k in r if not k.startswith('_')} for r in tj],
             'letters': [{k: r[k] for k in r if not k.startswith('_')} for r in letters] if self.st['letters'] else None,
@@ -1216,9 +1384,13 @@ class LiveSession:
         for r in words:
             if r['w'] in self.helped:
                 r['helped'] = True
+        if self.start_by is not None:  # where the take was locked to start (null: never; then no words)
+            out['start'] = self.start_w
+            if self.start_w is None:
+                out['ms']['search_speech'] = int(self._search_speech * 1000)
         if self.follow:  # Recite: the words and their statuses; no marks and no score (the contract's shape: [], null)
-            return {k: out[k] for k in ('v', 'from', 'to', 'secs', 'words', 'settings', 'ms')} | {
-                'v': 2, 'follow': True, 'marks': [], 'score': None}
+            return {k: out[k] for k in ('v', 'from', 'to', 'secs', 'words', 'settings', 'ms') + (
+                ('start',) if 'start' in out else ())} | {'v': 2, 'follow': True, 'marks': [], 'score': None}
         heard = heard_sounds(spans, self._tokens(0, self.T), self.E.ear.vocab)
         out['marks'] = self.E.marks(words, flagged, heard, ex, tj, letters if self.st['letters'] else [])
         out['score'] = score(statuses, out['marks'], self.dismissed)
