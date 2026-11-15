@@ -501,7 +501,7 @@
 
   // ---------- screens ----------
   function render() {
-    const views = { nolink, badlink, closed, offline, join, back, welcome, about, mic, list, item, done };
+    const views = { nolink, badlink, closed, offline, join, back, welcome, about, young, mic, list, item, done };
     (views[S.view] || nolink)();
     window.scrollTo(0, 0);
   }
@@ -587,15 +587,19 @@
       </ul>
       <div class="agree" role="radiogroup" aria-label="Agreement">
         <label><input type="radio" name="agree" value="adult"><span>I’m 18 or over, and I agree.</span></label>
-        <label><input type="radio" name="agree" value="guardian"><span>I’m under 18, and my parent or guardian has read this and agrees.</span></label>
+        <label><input type="radio" name="agree" value="guardian"><span>I’m 13 to 17, and my parent or guardian has read this and agrees.</span></label>
+        <label><input type="radio" name="agree" value="young"><span>I’m under 13.</span></label>
       </div>
       <p class="err" id="err" hidden></p>
       <button class="btn wide" id="go" disabled>Agree and continue</button>`;
     wireLinkBox();
     const go = document.getElementById('go');
-    app.querySelectorAll('input[name="agree"]').forEach((r) => { r.onchange = () => { go.disabled = false; }; });
+    app.querySelectorAll('input[name="agree"]').forEach((r) => {
+      r.onchange = () => { go.disabled = false; go.textContent = r.value === 'young' ? 'Continue' : 'Agree and continue'; };
+    });
     go.onclick = async () => {
       const who = app.querySelector('input[name="agree"]:checked').value;
+      if (who === 'young') return tooYoung();
       go.disabled = true;
       try {
         // text v2 added "If something goes wrong" (the step-and-error notes); v1 participants aren't noted
@@ -649,6 +653,7 @@
         const b = g.querySelector('button[aria-pressed="true"]');
         if (b) profile[g.dataset.key] = b.dataset.v;
       });
+      if (profile.age === 'u13') return tooYoung();
       try {
         const res = await api('profile', { profile, ua: navigator.userAgent });
         if (!res.ok) throw new Error(res.error);
@@ -657,6 +662,20 @@
       reached('questions');
       S.view = 'mic'; render();
     };
+  }
+
+  // Under 13: the page stops here, sends nothing (not even the answers) and records nothing. A child's voice is
+  // personal information under COPPA, which asks for a parent's verifiable consent, not a box to tick (Majd, Nov 15
+  // 2026: closed to under-13s for now). Kept on this phone for this code, so the link opens on this note again.
+  function tooYoung() {
+    S.local.under13 = true; S.local.profile = null; store.save();
+    S.view = 'young'; render();
+  }
+  function young() {
+    app.innerHTML = `
+      <h1>Thank you</h1>
+      <p>For now this is for ages 13 and over. Thank you for wanting to help.</p>
+      <p class="muted">Nothing has been recorded. You can close this page.</p>`;
   }
 
   function mic() {
@@ -936,6 +955,7 @@
     document.getElementById('who').textContent = `Code ${S.pid}`;
     if (!S.endpoint) { S.view = 'closed'; return render(); }
     store.load();
+    if (S.local.under13) { S.view = 'young'; return render(); }
     try {
       const [data, status] = await Promise.all([
         fetch('/record/items.json', { cache: 'no-cache' }).then((r) => r.json()),
