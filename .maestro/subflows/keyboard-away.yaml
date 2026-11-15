@@ -1,0 +1,33 @@
+# iOS: puts the keyboard away with its Return key and checks it has gone. Android: nothing (the
+# caller puts it away its own way). For one-line fields, where Return ends the editing (a
+# multiline field would take a new line instead).
+#
+# Before any tap on a screen whose keyboard is up: a tap meant for something under the keyboard
+# lands on a key. In run 43665041191 (12 on iOS) a tap on the sign-up title to put the keyboard
+# away was cancelled by iOS (touch start, then cancel 220 ms later, in app.log). The keyboard
+# stayed, and the tap on Create account, at (201, 609), typed the "t" key there: Confirm Password
+# read "e2e-passwordt", and the app refused the sign-up. On an SE the keyboard covers the lower
+# fields as well.
+#
+# On iOS the keyboard's keys are in the screen's hierarchy only while it is up: its layout
+# ("UIKeyboardLayoutStar Preview"), Return and delete.
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - repeat:
+          while:
+            visible:
+              id: "UIKeyboardLayoutStar.*|Return|delete"
+          times: 3
+          commands:
+            - pressKey: Enter
+            - extendedWaitUntil:
+                notVisible:
+                  id: "UIKeyboardLayoutStar.*|Return|delete"
+                timeout: 5000
+                optional: true
+      - assertNotVisible:
+          id: "UIKeyboardLayoutStar.*|Return|delete"

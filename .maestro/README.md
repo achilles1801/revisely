@@ -409,6 +409,13 @@ Things that bit:
   stall too: held down for half a second, iOS cancelled it on release and nothing was pressed
   (run 43619892917). Tap again only while the control still shows it wasn't taken, as onboarding's
   Start does (only while it reads Start: once taken it reads "Setting up…" and ignores taps).
+- A tap meant for something under the iOS keyboard lands on a key. In run 43665041191 the tap on
+  the sign-up title that should have put the keyboard away was cancelled. The tap on Create account
+  then typed the "t" under it, and Confirm Password read "e2e-passwordt". On an SE the keyboard also
+  covers the lower fields. So on iOS, `subflows/keyboard-away.yaml` puts the keyboard away with
+  Return and checks it has gone (its keys are in the hierarchy only while it is up) before each tap
+  on the sign-up form. `signup.yaml` checks all four fields together right before Create account,
+  and taps Create account again only while the form is still there with the button enabled.
 - A script that writes the server as its admin (a seed) runs once the app has sent its own changes
   (`subflows/app-sent.yaml`). The app sends from its outbox, and a change it still held went out
   after the script's writes and over them: on iOS, run 42414536111, a failed Firestore write stream
