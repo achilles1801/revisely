@@ -551,9 +551,11 @@ class LiveTests(Base):
         """uvicorn refuses a send after the phone closed ("Unexpected ASGI message 'websocket.send'"): the socket
         ends as a drop (what came is kept), not as a server failure."""
         real = server.WebSocket.send_text
+        refused = threading.Event()
 
         async def send_text(ws_, data):
             if '"type": "at"' in data:
+                refused.set()
                 raise RuntimeError("Unexpected ASGI message 'websocket.send', after sending 'websocket.close'")
             return await real(ws_, data)
         with mock.patch.object(server.WebSocket, 'send_text', send_text), \
@@ -562,6 +564,9 @@ class LiveTests(Base):
                 ws.send_text(start(keep=True))
                 ws.receive_json()
                 ws.send_bytes(second_of_audio() * 3)
+                # leave only once the server has checked the audio and tried to answer: closing first could end the
+                # handler before the audio was read, with nothing to keep (Cloud Build, Nov 15 2026: 1 in ~40 runs)
+                self.assertTrue(refused.wait(10))
             for _ in range(100):
                 if any('.part-' in n for n in self.stored):
                     break
@@ -943,6 +948,44 @@ class HealthTests(Base):
             ws.send_text(json.dumps({'type': 'end'}))
             ws.receive_json()
         self.assertTrue(self.lines('take')[0]['restarted'])
+
+
+class LevelTests(Base):
+    """A service that takes only some levels (LEVELS: the second service, two takes per instance) refuses the rest
+    with `level_elsewhere`, on every socket and every check."""
+
+    def setUp(self):
+        super().setUp()
+        p = mock.patch.object(server, 'LEVELS', frozenset({'recite', 'harakat'}))
+        p.start()
+        self.addCleanup(p.stop)
+
+    def first_event(self, **kw):
+        with self.client.websocket_connect('/live') as ws:
+            ws.send_text(start(**kw))
+            return ws.receive_json()
+
+    def test_live(self):
+        self.assertEqual(self.first_event(follow=True)['type'], 'ready')
+        self.assertEqual(self.first_event(tajweed=False)['type'], 'ready')
+        for kw in ({}, {'tajweed': True}, {'tajweed': False, 'letters': True}):
+            self.assertEqual(self.first_event(**kw), {'type': 'error', 'reason': 'level_elsewhere'}, kw)
+        self.assertEqual(len(FakeSession.made), 2)
+        self.assertEqual([f['reason'] for k, f in self.health if k == 'refused'], ['level_elsewhere'] * 3)
+
+    def test_check(self):
+        h = {'Authorization': 'Bearer good'}
+        self.assertEqual(self.client.post('/check?s=1&a=1&v=2&tajweed=0', content=wav(), headers=h).status_code, 200)
+        r = self.client.post('/check?s=1&a=1&v=2', content=wav(), headers=h)
+        self.assertEqual((r.status_code, r.json()), (409, {'error': 'level_elsewhere'}))
+
+    def test_health_says_which(self):
+        self.assertEqual(self.client.get('/health').json()['levels'], ['harakat', 'recite'])
+
+    def test_every_level_without_it(self):
+        with mock.patch.object(server, 'LEVELS', frozenset()):
+            self.assertEqual(self.first_event()['type'], 'ready')
+            self.assertNotIn('levels', self.client.get('/health').json())
 
 
 class HealthParts(unittest.TestCase):

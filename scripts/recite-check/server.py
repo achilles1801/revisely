@@ -45,6 +45,12 @@ RESUME_TTL = 120      # seconds a dropped session waits on this instance for its
 # "follow" need entitlements/{uid}.premium (auth.has_check); Recite (follow) stays free. Off until a dev account has it.
 CHECK_GATE = os.environ.get('CHECK_GATE', 'off') == 'on'
 LOCKED = 'premium_required'  # the refusal without Premium (agreed with apply-support and recite-ui; was check_locked)
+# Two takes per instance for the light levels (Majd approved Nov 15 2026, the recite-checker-cost-per-user idea, item 2):
+# a second service from the same image, at concurrency 2, takes only the levels in LEVELS ("recite,harakat"; health.py
+# names them), and refuses the rest with `level_elsewhere`, so a Strict take never doubles up on one vCPU (Strict paired
+# fell behind by seconds, README, "Two takes per instance"). Unset: every level, as recite-check takes them.
+LEVELS = frozenset(x.strip() for x in os.environ.get('LEVELS', '').split(',') if x.strip())
+ELSEWHERE = 'level_elsewhere'
 # A live take with no end (no s2/a2, as the app sends it) follows the reciter to the end of the Qur'an, and the reciter
 # decides where to stop (`end`): with the surah's end, the follow stopped there, so a take running on into the next
 # surah (An-Naba into An-Nazi'at) lost its cursor. A passage costs nothing until it is reached (live.py works 96 words
@@ -135,6 +141,12 @@ async def signed_in_tester(header):
     return uid
 
 
+def may_run(level):
+    """Refused (409, level_elsewhere) when this service takes only some levels and not this one."""
+    if LEVELS and level not in LEVELS:
+        raise auth.Refused(409, ELSEWHERE)
+
+
 async def may_check(uid):
     """Check (marks) needs the entitlement when the gate is on; Recite doesn't."""
     if CHECK_GATE and not await asyncio.to_thread(auth.has_check, uid):
@@ -153,7 +165,7 @@ def health_route():
     where a take starts needs a whole page at once: 27–38 s hops on rev 00043. Traffic never moves to a revision that
     says false (README, "The word table")."""
     return {'ok': True, 'engine': VERSION, 'server': SERVER, 'protocol': protocol(),
-            'words': ENGINE['e'].table is not None}
+            'words': ENGINE['e'].table is not None} | ({'levels': sorted(LEVELS)} if LEVELS else {})
 
 
 @app.post('/check')
@@ -162,6 +174,7 @@ async def check(request: Request):
     try:
         uid = await signed_in_tester(request.headers.get('authorization'))
         await may_check(uid)
+        may_run(health.level(dict(request.query_params), False))
         limiter.take(uid)
         body = await request.body()
         if len(body) > MAX_SECONDS * 32000 + 4096:
@@ -553,6 +566,7 @@ async def live_socket(ws: WebSocket):
         uid = await signed_in_tester('Bearer ' + token if isinstance(token, str) else ws.headers.get('authorization'))
         if not follow_of(msg):
             await may_check(uid)  # on every socket, a resume's too
+        may_run(health.level(settings_from(msg), follow_of(msg)))
         forget_old()
         rid = msg.get('resume')
         f = FINISHED.get(rid) if isinstance(rid, str) else None
