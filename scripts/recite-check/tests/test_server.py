@@ -48,6 +48,15 @@ class FakeEngine:
         self.calls = []
         self.table = None
 
+    def passage(self, s, a, s2=None, a2=None, max_words=None):
+        """Ten words an ayah, numbered as sura * 3000 + ayah * 10; an ayah past 286 doesn't exist."""
+        if a > 286 or (a2 or 1) > 286:
+            raise server.BadRequest(f'no ayah {s2}:{a2}')
+        lo, hi = s * 3000 + a * 10, (s2 or s) * 3000 + (a2 or a) * 10 + 10
+        if hi <= lo:
+            raise server.BadRequest('the passage ends before it starts')
+        return lo, hi
+
     def check(self, x, s, a, s2, a2, q, v=1):
         self.calls.append((v, s, a, s2, a2))
         res = {'v': 1, 'secs': round(len(x) / SR, 1), 'words': [], 'extras': [], 'tajweed': [], 'letters': None,
@@ -62,8 +71,10 @@ class FakeSession:
 
     made = []
 
-    def __init__(self, engine, s, a, s2, a2, settings, follow=False, defer=False, open_end=False):
+    def __init__(self, engine, s, a, s2, a2, settings, follow=False, defer=False, open_end=False, **kw):
         self.args = (s, a, s2, a2, settings)
+        self.kw = kw  # start_by (protocol 6) only when the phone sent startBy
+        self.controls = []
         self.follow, self.defer, self.open_end = follow, defer, open_end
         self.hints = []
         self.n = 0
@@ -93,6 +104,7 @@ class FakeSession:
         return [{'type': 'at', 'w': 100 + self.n // SR, 't': float(self.n // SR)}] if self.n else []
 
     def control(self, msg):
+        self.controls.append(msg)
         if msg['type'] == 'dismiss':
             self.dismissed.add(msg['id'])
             return []
@@ -151,7 +163,7 @@ class CheckTests(Base):
         r = self.client.get('/health')
         self.assertEqual(r.status_code, 200)
         body = r.json()
-        self.assertEqual((body['ok'], body['protocol']), (True, 5))
+        self.assertEqual((body['ok'], body['protocol']), (True, 6))
         self.assertIn('server', body)
         self.assertIn('engine', body)
 
@@ -251,7 +263,7 @@ class LiveTests(Base):
         with self.socket() as ws:
             ws.send_text(start(keep=True, mon=5, aar=2, letters=True))
             ready = ws.receive_json()
-            self.assertEqual((ready['type'], ready['from'], ready['v'], ready['protocol']), ('ready', 0, 2, 5))
+            self.assertEqual((ready['type'], ready['from'], ready['v'], ready['protocol']), ('ready', 0, 2, 6))
             self.assertTrue(store.TAKE.match(ready['take']))
             self.assertEqual(FakeSession.made[0].args, (1, 1, 114, 6, {'mon': 5, 'mot': 4, 'aar': 2,
                                                                        'letters': '1', 'tajweed': '1'}))
@@ -298,6 +310,75 @@ class LiveTests(Base):
             ws.send_text(start(s=78, a=1, s2=78, a2=40))
             ws.receive_json()
         self.assertEqual((FakeSession.made[0].args[:4], FakeSession.made[0].open_end), ((78, 1, 78, 40), False))
+
+    def test_start_anywhere_on_the_page(self):
+        """startBy (protocol 6) reaches the session as (sura, ayah) and is kept with the take's request; a start frame
+        without it passes nothing new (protocol 5's session, unchanged)."""
+        with self.socket() as ws:
+            ws.send_text(start(s=2, a=6, startBy=[2, 16], keep=True))
+            ready = ws.receive_json()
+            ws.send_bytes(second_of_audio())
+            ws.send_text(json.dumps({'type': 'end'}))
+            while ws.receive_json()['type'] != 'done':
+                pass
+            self.closed(ws)
+        self.assertEqual(ready['protocol'], 6)
+        self.assertEqual(FakeSession.made[0].kw, {'start_by': (2, 16)})
+        self.assertEqual(FakeSession.made[0].args[:4], (2, 6, 114, 6))
+        kept = json.loads(self.stored[f"recite-tests/tester1/{ready['take']}.json"])
+        self.assertEqual(kept['request']['startBy'], [2, 16])
+        self.assertEqual(server.start_note(server.Live('t', 'u', FakeSession.made[0], False, {'startBy': [2, 16]},
+                                                       None)), 'no lock in 1.0 s')
+        found = server.Live('t', 'u', FakeSession.made[0], False, {'startBy': [2, 16]}, None)
+        found.events = [{'type': 'locked', 'w': 6090, 's': 2, 'a': 9, 't': 2.5}]
+        self.assertEqual(server.start_note(found), 'locked at 2.5 s (1 locks)')  # numbers only: no word or ayah
+        self.assertEqual(server.start_note(server.Live('t', 'u', FakeSession.made[0], False, {}, None)), '-')
+        FakeSession.made = []
+        with self.socket() as ws:
+            ws.send_text(start(s=2, a=6))
+            ws.receive_json()
+        self.assertEqual(FakeSession.made[0].kw, {})
+        self.assertEqual(self.client.get('/health').json()['protocol'], 6)
+
+    def test_a_follower_without_start_by_keeps_protocol_5(self):
+        """Deployed before the model session's follower: the server says 5 and ignores startBy (as a protocol 5
+        server does), so the phone never waits for a `locked` that can't come."""
+        class Old(FakeSession):
+            def __init__(self, engine, s, a, s2, a2, settings, follow=False, defer=False, open_end=False):
+                super().__init__(engine, s, a, s2, a2, settings, follow, defer, open_end)
+        with mock.patch.object(live, 'LiveSession', Old), self.socket() as ws:
+            ws.send_text(start(s=2, a=6, startBy=[2, 999]))  # not even checked
+            ready = ws.receive_json()
+            ws.send_text(json.dumps({'type': 'seek', 'w': 6170, 'startBy': [2, 24]}))
+            ws.send_text(json.dumps({'type': 'end'}))
+            while ws.receive_json()['type'] != 'done':
+                pass
+            self.assertEqual(self.client.get('/health').json()['protocol'], 5)
+        self.assertEqual(ready['protocol'], 5)
+        self.assertEqual(FakeSession.made[0].kw, {})
+        self.assertEqual(FakeSession.made[0].controls[0], {'type': 'seek', 'w': 6170})
+
+    def test_a_bad_start_by_is_refused(self):
+        for bad in ([2], ['2', '16'], [2, True], [2, 5], [2, 999], [3, 1], [2, 50]):
+            with self.subTest(startBy=bad), self.socket() as ws:
+                # [2, 5] is before s:a; [3, 1] past the passage's end; [2, 50] 450 words from s:a (at most 400)
+                ws.send_text(start(s=2, a=6, s2=2, a2=255, startBy=bad))
+                self.assertEqual(ws.receive_json(), {'type': 'error', 'reason': 'bad_request'})
+        self.assertEqual(FakeSession.made, [])
+
+    def test_a_seek_may_carry_start_by(self):
+        """A hand page-turn before (or after) the lock: seek with startBy, as a tuple; one that isn't [sura, ayah] is
+        dropped, as a bad frame is."""
+        with self.socket() as ws:
+            ws.send_text(start(s=2, a=6, startBy=[2, 16]))
+            ws.receive_json()
+            for c in ({'type': 'seek', 'w': 6170, 'startBy': [2, 24]}, {'type': 'seek', 'w': 6170, 'startBy': 'x'},
+                      {'type': 'seek', 'w': 6250}, {'type': 'end'}):
+                ws.send_text(json.dumps(c))
+            while ws.receive_json()['type'] != 'done':
+                pass
+        self.assertEqual(FakeSession.made[0].controls, [
+            {'type': 'seek', 'w': 6170, 'startBy': (2, 24)}, {'type': 'seek', 'w': 6250}, {'type': 'end'}])
 
     def test_recite_mode_and_the_tajweed_switch_reach_the_session(self):
         for extra, follow, tajweed in (({'mode': 'recite'}, True, '1'), ({'follow': True}, True, '1'),
