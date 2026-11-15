@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """similar.py on a checker run's results (cached ear outputs, no model run): planted slips into a similar ayah (bench
-`mut`) named right, named with a wrong place, or not named; and names given anywhere else (false).
+`mut`) and swapped ayah endings (bench_endings.py's `end`) named right, named with a wrong place, or not named; and
+names given anywhere else (false).
 
   python similar_eval.py --bench DIR --run DIR --results NAME [--slips ID:WORD,...] [--params JSON]
 
@@ -50,6 +51,10 @@ def main():
     known = {tuple(x.split(':')) for x in a.slips.split(',') if x}
 
     @functools.lru_cache(maxsize=None)
+    def forms_of(w):
+        return tuple({'labels': f['labels']} for f in key.passage(w, w + 1)[0]['forms'])
+
+    @functools.lru_cache(maxsize=None)
     def labels_of(lo, hi):
         lab, ends = [], []
         for k in key.passage(lo, hi):
@@ -86,10 +91,12 @@ def main():
             statuses = {int(k): v for k, v in res['statuses'].items()}
             t = time.perf_counter()
             names = similar.find(lp, order, statuses, spans, res.get('extras', []), labels_of, idx, p)
+            marked = {n['mark'] for n in names}
+            names += [n for n in similar.endings(lp, order, statuses, spans, forms_of, idx, p) if n['mark'] not in marked]
             if passno == 0:
                 continue
             times.append((time.perf_counter() - t) * 1000)
-            muts = [e for e in truth.get('events', []) if e['type'] == 'mut' and e.get('into')]
+            muts = [e for e in truth.get('events', []) if e['type'] in ('mut', 'end') and e.get('into')]
             tally['slips'] += len(muts)
             used = set()
             for e in muts:
@@ -97,7 +104,9 @@ def main():
                 for k, n in enumerate(names):
                     lo = n['mark'] - 2
                     hi = n['upto'] if n['upto'] is not None else 10 ** 9
-                    if lo <= e['words'][0] < hi:
+                    if e['type'] == 'end':
+                        lo, hi = n['mark'], n['mark'] + 1
+                    if k not in used and lo <= e['words'][0] < hi:
                         hit = k
                         break
                 if hit is None:
@@ -107,8 +116,12 @@ def main():
                     continue
                 used.add(hit)
                 n = names[hit]
-                ok = same_place(n['fork'], n['w'], e['words'][0], jtrue(e), n['words'])
+                if n.get('kind') == 'ending':  # the ending said; the ayat that end with it are all in w and also
+                    ok = idx.norm[n['w']] == idx.norm[jtrue(e)]
+                else:
+                    ok = same_place(n['fork'], n['w'], e['words'][0], jtrue(e), n['words'])
                 tally['right' if ok else 'wrong'] += 1
+                tally[e['type'] + '_right'] = tally.get(e['type'] + '_right', 0) + ok
                 if a.show and not ok:
                     print('wrong', truth['id'], e['into'], n)
             for k, n in enumerate(names):

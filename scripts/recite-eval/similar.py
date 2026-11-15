@@ -12,6 +12,8 @@ place, for the mark's card ("You continued with Luqmān 31:6").
    ear's own best, 0 = perfect), all places in one pass.
 3. A place is named when it fits well (FIT), covers most of two words or more (WORDS), and beats the expected words by
    ADV nats in all and GAIN a frame.
+4. endings(): an ayah's last word said as the last word of another ayah up to 10 away in the same surah, on that word
+   alone (bench_endings.py: 78 of 164 swapped endings named, none wrongly; /record w4's «إذا وقب» for «إذا حسد»).
 
 Lab, Nov 15 2026 (similar_eval.py, the released ear's bench results): of bench-v0's 111 planted slips into a similar
 ayah (8 professional reciters, clean and babble) 107 named with the right place, none with a wrong one, and no name
@@ -23,6 +25,8 @@ most, on the Mac.
     idx = similar.Index(bench.Words())
     names = similar.find(lp, order, statuses, spans, extras, labels_of, idx)
 """
+import time
+
 import numpy as np
 
 import bench
@@ -39,6 +43,13 @@ P = {
     'kmax': 40,        # shared words counted up to this
     'cont': 6,         # places whose next this-many words are the same are one place (the one sharing more words)
     'max_places': 64,  # places fitted per fork, those sharing the most words first
+    # an ayah's last word said as another ayah's last word (endings())
+    'end_near': 10,    # ayat either side, in the same surah, whose endings are tried
+    'end_fit': 1.0,    # bench_endings.py's 164 swapped endings: 78 named right, none wrongly; nothing named elsewhere
+    'end_words': 0.8,  # (the nearest: a Dev take's 2:42, 0.51 a frame better than the expected word, under end_gain)
+    'end_gain': 0.8,
+    'end_adv': 30.0,
+    'end_secs': 3.0,   # audio fitted after the word before, at most
 }
 FPS = 50
 
@@ -53,6 +64,8 @@ class Index:
         self.pairs = {}
         for w in range(2, len(self.norm)):
             self.pairs.setdefault((self.norm[w - 2], self.norm[w - 1]), []).append(w)
+        self.last_of = [words.first[v] + words.counts[v] - 1 for v in range(len(words.counts))]
+        self.is_last = set(self.last_of)
 
     def ayah(self, w):
         """[surah, ayah] of app word w."""
@@ -122,13 +135,13 @@ def fit_many(seg, chains):
     return out
 
 
-def find(lp, order, statuses, spans, extras, labels_of, idx, p=None):
+def find(lp, order, statuses, spans, extras, labels_of, idx, p=None, deadline=None):
     """Names for the runs of words not heard right. order: the passage's app words in order; statuses: word ->
     'correct', 'missed', 'wrong'… ; spans: word -> (first frame, last frame) said; extras: [{'after': w}] (speech
     between w and the next word); labels_of(lo, hi) -> (labels, word ends) for app words [lo, hi).
     Returns [{'mark': first word of the run, 'upto': the word heard right again (None: the end), 'fork': app word
     where the place's words began instead, 'w': the place's first word said, 'also': other places with the same words
-    as far as heard, 'words', 'fit', 'adv'}]."""
+    as far as heard, 'words', 'fit', 'adv'}]. deadline (time.perf_counter()): no run is started after it."""
     p = dict(P, **(p or {}))
     nm = idx.norm
     W = len(nm)
@@ -142,6 +155,8 @@ def find(lp, order, statuses, spans, extras, labels_of, idx, p=None):
         if st[i] == 'correct' or st[i - 1] != 'correct':
             i += 1
             continue
+        if deadline is not None and time.perf_counter() > deadline:
+            break
         r = i
         while r < len(order):
             if all(r + q < len(order) and st[r + q] == 'correct' for q in range(p['stable'])) and \
@@ -200,4 +215,70 @@ def find(lp, order, statuses, spans, extras, labels_of, idx, p=None):
             out.append({'mark': order[i], 'upto': order[r] if r < len(order) else None, 'fork': wf, 'w': j,
                         'also': same, 'words': words, 'fit': round(f, 3), 'adv': round(adv, 1)})
         i = r + 1
+    return out
+
+
+def endings(lp, order, statuses, spans, forms_of, idx, p=None, deadline=None):
+    """An ayah's last word said as the last word of another ayah near it in the same surah (Majd: memorizers most often
+    forget which word ends an ayah). For each last word heard wrong or not at all right after a word heard right, the
+    audio after that word is fitted against the word's own sounds and each nearby ending's, every form of each (a
+    stop drops the final vowel). forms_of(w) -> the word's forms ({'labels'}). Returns names as find()'s, with
+    'kind': 'ending'. A look-alike the checker heard that is a nearby ending (2:4's يوقنون heard يؤمنون, 2:6's) isn't
+    taken as one: it named endings on 3 bench and learners' takes with no slip."""
+    p = dict(P, **(p or {}))
+    nm = idx.norm
+    st = ['correct' if statuses.get(w) == 'corrected' else statuses.get(w) for w in order]
+    T = lp.shape[0]
+    out = []
+    for i, w in enumerate(order):
+        if i == 0 or st[i] in ('correct', 'pending', None) or w not in idx.is_last:
+            continue
+        if deadline is not None and time.perf_counter() > deadline:
+            break
+        b = order[i - 1]
+        if st[i - 1] != 'correct' or b not in spans:
+            continue
+        t0 = spans[b][1]
+        t1 = spans[order[i + 1]][0] if i + 1 < len(order) and st[i + 1] == 'correct' and order[i + 1] in spans else T
+        t1 = min(t1, t0 + int(p['end_secs'] * FPS), T)
+        if t1 - t0 < 0.25 * FPS:
+            continue
+        v = idx.verse[w]
+        sura = idx.ayah(w)[0]
+        near = {}  # ending -> the ayat that end with it, nearest first
+        for d in sorted(range(-p['end_near'], p['end_near'] + 1), key=abs):
+            if d == 0 or not 0 <= v + d < len(idx.last_of):
+                continue
+            j = idx.last_of[v + d]
+            if idx.ayah(j)[0] != sura or nm[j] == nm[w]:
+                continue
+            near.setdefault(nm[j], []).append(j)
+        if not near:
+            continue
+        words_ = [w] + [js[0] for js in near.values()]
+        chains, owner = [], []
+        for k, x in enumerate(words_):
+            for f in forms_of(x):
+                if f['labels']:
+                    chains.append((f['labels'], [len(f['labels'])]))
+                    owner.append(k)
+        fits = fit_many(lp[t0:t1], chains)
+        best = {}
+        for (f, wd), k in zip(fits, owner):
+            if k not in best or f < best[k][0]:
+                best[k] = (f, wd)
+        if 0 not in best:
+            continue
+        exp_fit = best[0][0]
+        ranked = sorted((best[k] + (k,) for k in best if k), key=lambda x: x[0])
+        if not ranked:
+            continue
+        f, wd, k = ranked[0]
+        gain = exp_fit - f
+        adv = gain * (t1 - t0)
+        if f > p['end_fit'] or wd < p['end_words'] or gain < p['end_gain'] or adv < p['end_adv']:
+            continue
+        out.append({'mark': w, 'upto': order[i + 1] if i + 1 < len(order) else None, 'fork': w, 'w': words_[k],
+                    'also': near[nm[words_[k]]][1:], 'words': wd, 'fit': round(f, 3), 'adv': round(adv, 1), 'kind': 'ending',
+                    'second': round(ranked[1][0], 3) if len(ranked) > 1 else None, 'exp': round(exp_fit, 3)})
     return out
