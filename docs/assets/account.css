@@ -1,10 +1,18 @@
 /*
  * The account, Premium and Open Door pages, on top of site.css: the same tokens, the app's design.
- * Arabic: Amiri (as the app), right to left (dir="rtl" on <html>, set before the first paint).
+ * Arabic: Amiri (as the app), right to left (dir="rtl" on <html>, set before the first paint). Regular and a real
+ * Bold, cut to what the pages write (scripts/site/amiri-subset.sh); 600 and 700 use the Bold.
  */
 @font-face {
   font-family: "Amiri";
-  src: url("/assets/fonts/Amiri-Regular.ttf") format("truetype");
+  src: url("/assets/fonts/Amiri-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Amiri";
+  src: url("/assets/fonts/Amiri-Bold.woff2") format("woff2");
+  font-weight: 700;
   font-display: swap;
 }
 
