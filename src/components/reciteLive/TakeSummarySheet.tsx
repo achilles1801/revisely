@@ -66,6 +66,7 @@ export function TakeSummarySheet({
   onCheck,
   onAgain,
   onDone,
+  onShown,
 }: {
   visible: boolean;
   check: boolean;
@@ -81,13 +82,15 @@ export function TakeSummarySheet({
   onCheck: () => void;
   onAgain: () => void;
   onDone: () => void;
+  /** The sheet is on screen (its modal has been presented). */
+  onShown?: () => void;
 }) {
   const { palette } = useTheme();
   const passage = words && from != null && to != null && to >= from ? passageOf(words, from, to) : '';
   const mistakes = marks.filter((m) => m.kind !== 'tajweed').length;
   const scoreColor = score?.level === 'good' ? palette.good : score?.level === 'warn' ? palette.warn : palette.onRedSubtle;
   return (
-    <Sheet visible={visible} onClose={onDone} title="Your recitation" scroll testID="take-summary">
+    <Sheet visible={visible} onClose={onDone} onShow={onShown} title="Your recitation" scroll testID="take-summary">
       <View style={styles.head}>
         {check && score ? (
           <View style={styles.scoreRow}>

@@ -224,6 +224,11 @@ until its part is set up.
   - "Keep as test data" (on by default; in the sheet and Settings → Testing) keeps each recording and its result
     in `recite-tests/<uid>/` in the dev bucket (closed to clients). The lab copies them with `fetch_takes.py`.
     **Nobody listens to them**, Majd included; they are held out of training, like the /record takes.
+  - **Stop leaves a trace** (`lib/reciteLive/stopTrace`, Nov 15 2026, after a freeze on Stop that told us nothing): Stop
+    writes a marker on the phone, each step to the summary adds to it (mic off, the final answer, the summary asked
+    for), and a heartbeat keeps the longest JavaScript stall. The summary on screen, a failure, ✕ or leaving the reader
+    removes it. One left at the next launch goes to Sentry once (environment `dev`, "Recite: a take's Stop never
+    reached the summary", tag `recite_stop_last`). It holds no audio or words, only event types.
   - **A take starts anywhere on the page** (Majd, Nov 14 2026; protocol 6). The start frame sends `startBy` (the page's
     last ayah), and the checker says where the reciter started (`locked`; recite-contract.md in the shared notes).
     - Until then the bar says Listening…, with no cursor and no score. If it is never found, the take fails silently

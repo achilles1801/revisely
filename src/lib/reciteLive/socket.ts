@@ -220,6 +220,8 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
       },
       send: control,
       close: () => finish(),
+      status: () =>
+        finished ? 'finished' : retry != null ? `retry ${tries}` : socket ? (live ? 'live' : 'opening') : 'none',
     };
   };
 }
