@@ -13,7 +13,7 @@ import { CallerError, GithubClaims, REPOSITORY, REPOSITORY_ID } from '../playAva
 import { Alert, Input, Metrics, Totals, build } from './aggregate';
 import { Permission, can, roleOf } from '../console/roles';
 
-export type AdminErrorCode = 'unauthenticated' | 'permission-denied' | 'invalid-argument' | 'not-found';
+export type AdminErrorCode = 'unauthenticated' | 'permission-denied' | 'invalid-argument' | 'not-found' | 'unavailable';
 export class AdminError extends Error {
   constructor(readonly code: AdminErrorCode, message: string) {
     super(message);
@@ -53,6 +53,10 @@ export interface MetricsDeps {
   collect: (now: number) => Promise<Omit<Input, 'now'>>;
   now: () => number;
   log: AdminLog;
+  /** This project's environment ('prod' or 'dev'; console/peer.ts). */
+  here?: string;
+  /** Another environment's metrics, from that project's consoleMetrics (console/peer.ts); absent: none. */
+  peer?: (env: string, refresh: boolean) => Promise<Metrics>;
 }
 
 const CACHE_MS = 2 * 60e3;
@@ -64,13 +68,25 @@ export function clearMetricsCache(): void {
 
 export async function handleAdminMetrics(auth: Caller | undefined, data: unknown, deps: MetricsDeps): Promise<Metrics> {
   const uid = requireAdmin(auth);
-  const refresh = typeof data === 'object' && data !== null && (data as { refresh?: unknown }).refresh === true;
+  const d = (typeof data === 'object' && data !== null ? data : {}) as { refresh?: unknown; env?: unknown };
+  const refresh = d.refresh === true;
+  // Another environment (Majd, Nov 14 2026: both in one console): its own server's numbers, never read from here.
+  if (d.env != null && d.env !== deps.here) {
+    if (typeof d.env !== 'string' || !deps.peer) throw new AdminError('invalid-argument', 'This console can’t show that environment.');
+    deps.log({ event: 'metrics.peer', reader: uid, env: d.env, refresh });
+    return deps.peer(d.env, refresh);
+  }
+  return metricsFor(uid, refresh, deps);
+}
+
+/** The numbers, from the cache unless asked to refresh. `reader` is tagged "you" in the accounts (none for a peer). */
+export async function metricsFor(reader: string | null, refresh: boolean, deps: MetricsDeps): Promise<Metrics> {
   const now = deps.now();
   if (!refresh && cached && now - cached.at < CACHE_MS) return cached.metrics;
   const input = await deps.collect(now);
-  const metrics = build({ ...input, now, ownerUids: new Set([...(input.ownerUids ?? []), uid]) });
+  const metrics = build({ ...input, now, ownerUids: new Set([...(input.ownerUids ?? []), ...(reader ? [reader] : [])]) });
   cached = { at: now, metrics };
-  deps.log({ event: 'metrics', reader: uid, refresh, sources: metrics.sources });
+  deps.log({ event: 'metrics', reader: reader ?? 'peer', refresh, sources: metrics.sources });
   return metrics;
 }
 

@@ -28,7 +28,20 @@ import { callCoach } from './coach/call';
 import { adminRevoStore, deleteRevoData } from './revo/admin';
 import { RevoError, handleClear, handleDayInReview, handleRevoAsk, handleSetOptions } from './revo/handler';
 import { inTestEmulator, recordedAnthropic, testNow } from './emulator';
-import { AdminError, TOTALS_AUDIENCE, consoleOrigins, handleAdminMetrics, handleAdminRevo, handleMetricsTotals } from './metrics/admin';
+import { AdminError, TOTALS_AUDIENCE, consoleOrigins, handleAdminMetrics, handleAdminRevo, handleMetricsTotals, metricsFor } from './metrics/admin';
+import type { Metrics } from './metrics/aggregate';
+import {
+  ENVIRONMENTS,
+  GOOGLE_JWKS_URL,
+  Jwks as PeerJwks,
+  PeerError,
+  UnknownKeyError as PeerKeyError,
+  allowedCallers,
+  endpointUrl,
+  forPeer,
+  metricsEnvironments,
+  verifyPeerToken,
+} from './console/peer';
 import { adminRevoStore as adminConsoleRevoStore, adminTotalsStore, collector } from './metrics/adminStore';
 import { SUPPORT_ORIGINS, SUPPORT_PAGES, SupportError } from './support/logic';
 import { handleDevPremium, handleSupportApplication, handleSupportLink } from './support/handler';
@@ -457,9 +470,51 @@ async function liveCaller(auth: { uid: string } | undefined) {
   return staff ? { uid: staff.uid, token: staff.claims } : undefined;
 }
 
+/**
+ * The other environment's numbers (console/peer.ts): asked of that project's consoleMetrics with a Google-signed ID
+ * token for this project's own service account, from the metadata server. Aggregates only.
+ */
+async function peerMetrics(env: string, refresh: boolean): Promise<Metrics> {
+  const target = metricsEnvironments(PROJECT).find((e) => !e.here && e.env === env);
+  if (!target) throw new AdminError('invalid-argument', 'This console can’t show that environment.');
+  const url = endpointUrl(target.project);
+  let token: string;
+  try {
+    const r = await fetch(
+      `http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=${encodeURIComponent(url)}&format=full`,
+      { headers: { 'Metadata-Flavor': 'Google' } },
+    );
+    if (!r.ok) throw new Error(`metadata server answered ${r.status}`);
+    token = await r.text();
+  } catch (err) {
+    logger.warn(`peer metrics: no identity token: ${(err as Error).message}`);
+    throw new AdminError('unavailable', `${target.label}’s numbers can’t be asked for from here.`);
+  }
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ refresh }),
+    signal: AbortSignal.timeout(110_000),
+  }).catch((err) => {
+    logger.warn(`peer metrics: ${(err as Error).message}`);
+    return null;
+  });
+  if (!res || !res.ok) {
+    if (res) logger.warn(`peer metrics: ${target.project} answered ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    throw new AdminError('unavailable', `${target.label}’s numbers didn’t load${res ? ` (${res.status})` : ''}. Try again.`);
+  }
+  return (await res.json()) as Metrics;
+}
+
 export const adminMetrics = onCall({ cors: CONSOLE_ORIGINS, timeoutSeconds: 120, memory: '512MiB', maxInstances: 2 }, async (request) => {
   try {
-    return await handleAdminMetrics(await liveCaller(request.auth), request.data, { collect: metricsCollector, now: () => Date.now(), log: adminLog });
+    return await handleAdminMetrics(await liveCaller(request.auth), request.data, {
+      collect: metricsCollector,
+      now: () => Date.now(),
+      log: adminLog,
+      here: ENVIRONMENTS[PROJECT]?.env,
+      peer: peerMetrics,
+    });
   } catch (err) {
     throw adminFailure('adminMetrics', err);
   }
@@ -496,6 +551,55 @@ export const metricsTotals = onRequest({ invoker: 'public', maxInstances: 1, tim
       res.status(/too large|JSON|object|missing/.test(err.message) ? 400 : 403).json({ error: err.message });
     } else {
       logger.error('metricsTotals failed', err);
+      res.status(500).json({ error: 'internal' });
+    }
+  }
+});
+
+let googleKeys: { value: PeerJwks; at: number } | null = null;
+
+/** Google's signing keys for ID tokens, kept for an hour (again at once for a key it doesn't have). */
+async function googleJwks(fresh = false): Promise<PeerJwks> {
+  if (!fresh && googleKeys && Date.now() - googleKeys.at < 3_600_000) return googleKeys.value;
+  const res = await fetch(GOOGLE_JWKS_URL);
+  if (!res.ok) throw new Error(`Google's keys answered ${res.status}`);
+  const value = (await res.json()) as PeerJwks;
+  if (!Array.isArray(value?.keys)) throw new Error("Google's keys are not a key set");
+  googleKeys = { value, at: Date.now() };
+  return value;
+}
+
+/**
+ * This project's Overview numbers for the other environment's console (console/peer.ts: production answers
+ * revisely-dev's server only). The caller proves it is that project's service account with a Google-signed ID token
+ * for this URL. Aggregates only, account ids cut to 8 characters; never conversations or anything a person wrote.
+ */
+export const consoleMetrics = onRequest({ invoker: 'public', maxInstances: 1, timeoutSeconds: 120, memory: '512MiB' }, async (req, res) => {
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'POST only' });
+    return;
+  }
+  const header = req.get('authorization') ?? '';
+  const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
+  try {
+    const allowed = allowedCallers(PROJECT);
+    if (!allowed.length) throw new PeerError(403, 'this project shares its metrics with nobody');
+    let caller: string;
+    try {
+      caller = verifyPeerToken(token, await googleJwks(), endpointUrl(PROJECT), allowed);
+    } catch (err) {
+      if (!(err instanceof PeerKeyError)) throw err;
+      caller = verifyPeerToken(token, await googleJwks(true), endpointUrl(PROJECT), allowed);
+    }
+    const refresh = (req.body as { refresh?: unknown } | undefined)?.refresh === true;
+    const metrics = await metricsFor(null, refresh, { collect: metricsCollector, now: () => Date.now(), log: adminLog });
+    adminLog({ event: 'metrics.shared', caller, refresh });
+    res.json(forPeer(metrics));
+  } catch (err) {
+    if (err instanceof PeerError) {
+      res.status(err.status).json({ error: err.message });
+    } else {
+      logger.error(`consoleMetrics failed: ${(err as Error).message}`);
       res.status(500).json({ error: 'internal' });
     }
   }
@@ -601,6 +705,7 @@ const consoleDeps = {
   },
   programOpen: !!SUPPORT_PAGES[PROJECT_ID] || testing,
   project: PROJECT_ID,
+  metricsEnvs: metricsEnvironments(PROJECT_ID).map(({ env, label, here }) => ({ env, label, here })),
   now: () => Date.now(),
   log: (entry: Record<string, unknown>) => logger.info('console', entry),
 };

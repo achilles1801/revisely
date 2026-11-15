@@ -57,6 +57,8 @@ export interface ConsoleDeps {
   /** Open Door runs in this project (SUPPORT_PAGES) */
   programOpen: boolean;
   project: string;
+  /** The environments the Overview can switch between (console/peer.ts), this project's marked `here`. */
+  metricsEnvs?: { env: string; label: string; here: boolean }[];
   now(): number;
   log(entry: Record<string, unknown>): void;
 }
@@ -86,6 +88,8 @@ export interface Me {
   permissions: Permission[];
   project: string;
   openDoor: boolean;
+  /** The Overview's environments (only for a role that sees metrics). */
+  metricsEnvs: { env: string; label: string; here: boolean }[];
 }
 
 export type QueueItem = QueueRow & {
@@ -125,6 +129,7 @@ export async function handleAdminConsole(
       permissions: permissionsOf(caller.role),
       project: deps.project,
       openDoor: deps.programOpen && permissionsOf(caller.role).includes('openDoor.read'),
+      metricsEnvs: permissionsOf(caller.role).includes('metrics.read') ? (deps.metricsEnvs ?? []) : [],
     };
     return me;
   }

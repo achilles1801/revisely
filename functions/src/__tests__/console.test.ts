@@ -82,9 +82,14 @@ describe('adminConsole: who gets what', () => {
       permissions: [],
       project: 'revisely-dev',
       openDoor: false,
+      metricsEnvs: [],
     });
     expect(await handleAdminConsole(as('reviewer'), { action: 'me' }, false, deps())).toMatchObject({ roleName: 'Reviewer', openDoor: true });
     expect(await handleAdminConsole(as('dev'), { action: 'me' }, false, deps())).toMatchObject({ permissions: ['metrics.read'], openDoor: false });
+    const envs = [{ env: 'prod', label: 'Production', here: false }, { env: 'dev', label: 'Dev', here: true }];
+    expect(await handleAdminConsole(as('dev'), { action: 'me' }, false, deps({ metricsEnvs: envs }))).toMatchObject({ metricsEnvs: envs });
+    // A reviewer sees no metrics, so no environments either.
+    expect(await handleAdminConsole(as('reviewer'), { action: 'me' }, false, deps({ metricsEnvs: envs }))).toMatchObject({ metricsEnvs: [] });
     expect(await handleAdminConsole(as('owner'), { action: 'me' }, false, deps({ programOpen: false }))).toMatchObject({ openDoor: false });
     expect(await code(handleAdminConsole(null, { action: 'me' }, true, deps()))).toBe('unauthenticated');
   });

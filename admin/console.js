@@ -9,9 +9,11 @@ const css = (name) => getComputedStyle(document.documentElement).getPropertyValu
 const short = (uid) => String(uid || '').slice(0, 8);
 let lastW = 0;
 
-const state = { range: '24h', chan: 'prod', m: null, user: null, loading: false, rendered: null };
-try { const s = JSON.parse(localStorage.getItem('rvc') || '{}'); if (['1h', '24h', '7d', '30d'].includes(s.range)) state.range = s.range; if (s.chan === 'test') state.chan = 'test'; } catch (e) {}
-const save = () => { try { localStorage.setItem('rvc', JSON.stringify({ range: state.range, chan: state.chan })); } catch (e) {} };
+// env: which environment's numbers (Production or Dev, from adminConsole `me`); byEnv keeps each one's last answer.
+const state = { range: '24h', chan: 'prod', env: null, envs: [], here: null, byEnv: {}, m: null, user: null, loading: false, rendered: null };
+let savedEnv = null;
+try { const s = JSON.parse(localStorage.getItem('rvc') || '{}'); if (['1h', '24h', '7d', '30d'].includes(s.range)) state.range = s.range; if (s.chan === 'test') state.chan = 'test'; if (typeof s.env === 'string') savedEnv = s.env; } catch (e) {}
+const save = () => { try { localStorage.setItem('rvc', JSON.stringify({ range: state.range, chan: state.chan, env: state.env })); } catch (e) {} };
 
 // ---------- format ----------
 const fmtN = (v) => (v == null ? '–' : v >= 100000 ? Math.round(v / 1000) + 'k' : v >= 10000 ? (v / 1000).toFixed(1) + 'k' : String(Math.round(v)));
@@ -138,8 +140,10 @@ function render() {
   document.querySelectorAll('#chan button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.chan === state.chan)));
   const m = state.m;
   renderStatus();
-  if (!m || state.rendered === m.generatedAt + state.range + state.chan + lastW) return;
-  state.rendered = m.generatedAt + state.range + state.chan + lastW;
+  $('view-overview').classList.toggle('stale', !!state.env && !state.byEnv[state.env]);
+  renderEnv();
+  if (!m || state.rendered === state.env + m.generatedAt + state.range + state.chan + lastW) return;
+  state.rendered = state.env + m.generatedAt + state.range + state.chan + lastW;
   const k = state.range, R = m.revo[k], T = R.totals;
   const times = Array.from({ length: R.n }, (_, i) => R.start + i * R.step);
   const labels = times.map((t) => label(k, t)), ticks = ticksFor(k, times);
@@ -258,7 +262,8 @@ function renderStatus() {
   btn.disabled = !state.user || state.loading;
   btn.textContent = state.loading ? 'Refreshing…' : 'Refresh';
   btn.classList.toggle('busy', state.loading);
-  $('asof').textContent = m ? 'Updated ' + clock(Date.parse(m.generatedAt)) + ' · ' + ago(Date.parse(m.generatedAt)) : state.loading ? 'Loading…' : '';
+  const envLabel = state.envs.length > 1 ? (state.envs.find((e) => e.env === state.env) || {}).label + ' · ' : '';
+  $('asof').textContent = m ? envLabel + 'Updated ' + clock(Date.parse(m.generatedAt)) + ' · ' + ago(Date.parse(m.generatedAt)) : state.loading ? 'Loading…' : '';
   if (!m) return;
   const alarms = m.alerts.filter((a) => a.level === 'alarm');
   const st = $('heroState');
@@ -297,7 +302,33 @@ export function startMetrics(c) {
   ctx = c;
   state.user = c.me;
   state.canChats = c.can('revo.conversations');
-  $('accTable').classList.toggle('no-open', !state.canChats);
+  state.envs = c.me.metricsEnvs || [];
+  const here = state.envs.find((e) => e.here);
+  state.here = here ? here.env : null;
+  state.env = state.envs.some((e) => e.env === savedEnv) ? savedEnv : state.envs.length ? state.envs[0].env : null;
+  $('envSeg').innerHTML = state.envs.map((e) => '<button type="button" data-env="' + esc(e.env) + '">' + esc(e.label) + '</button>').join('');
+  $('envBar').hidden = state.envs.length < 2;
+  load(false);
+}
+
+/** The Production / Dev switch, and what it means for the accounts table (conversations open only where they live). */
+function renderEnv() {
+  document.querySelectorAll('#envSeg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.env === state.env)));
+  const remote = !!state.env && state.env !== state.here;
+  const e = state.envs.find((x) => x.env === state.env);
+  $('envNote').textContent = !e ? '' : !state.byEnv[state.env] ? 'Loading ' + e.label + '…' : remote ? 'Read from ' + e.label.toLowerCase() + '’s own server. Its Revo conversations open only in its own console.' : '';
+  const open = state.canChats && !remote;
+  $('accTable').classList.toggle('no-open', !open);
+  $('accFoot').dataset.remote = remote ? '1' : '';
+}
+
+function setEnv(env) {
+  if (env === state.env || !state.envs.some((e) => e.env === env)) return;
+  state.env = env;
+  save();
+  closePanel();
+  if (state.byEnv[env]) { state.m = state.byEnv[env]; state.rendered = null; }
+  render();
   load(false);
 }
 
@@ -310,18 +341,25 @@ export function metricsShown(on) {
 
 export function refreshMetrics() { load(true); }
 
+let loadSeq = 0;
 async function load(refresh) {
-  if (!state.user || state.loading) return;
+  if (!state.user) return;
+  const env = state.env;
+  const seq = ++loadSeq;
   state.loading = true;
   renderStatus();
   try {
-    state.m = await ctx.call('adminMetrics', { refresh }, 130000);
-    state.rendered = null;
-    notice(null);
+    const m = await ctx.call('adminMetrics', env ? { refresh, env } : { refresh }, 130000);
+    if (env) state.byEnv[env] = m;
+    if (env === state.env) {
+      state.m = m;
+      state.rendered = null;
+      notice(null);
+    }
   } catch (err) {
-    notice(failureText(err), !!state.m);
+    if (env === state.env) notice(failureText(err), !!state.byEnv[env]);
   } finally {
-    state.loading = false;
+    if (seq === loadSeq) state.loading = false;
     render();
   }
 }
@@ -429,8 +467,10 @@ async function showChat(uid, chat) {
 // ---------- wiring ----------
 $('range').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; state.range = b.dataset.range; save(); render(); });
 $('chan').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; state.chan = b.dataset.chan; save(); render(); });
-$('accTable').addEventListener('click', (e) => { const tr = e.target.closest('tr[data-uid]'); if (tr && state.canChats) openPanel(tr.dataset.uid); });
-$('accTable').addEventListener('keydown', (e) => { const tr = e.target.closest('tr[data-uid]'); if (tr && state.canChats && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openPanel(tr.dataset.uid); } });
+const canOpen = () => state.canChats && (!state.env || state.env === state.here);
+$('accTable').addEventListener('click', (e) => { const tr = e.target.closest('tr[data-uid]'); if (tr && canOpen()) openPanel(tr.dataset.uid); });
+$('accTable').addEventListener('keydown', (e) => { const tr = e.target.closest('tr[data-uid]'); if (tr && canOpen() && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openPanel(tr.dataset.uid); } });
+$('envSeg').addEventListener('click', (e) => { const b = e.target.closest('button[data-env]'); if (b) setEnv(b.dataset.env); });
 $('panelClose').addEventListener('click', closePanel);
 $('panelBack').addEventListener('click', () => { if (panel.uid) { const uid = panel.uid; openPanel(uid); } });
 $('panel').addEventListener('click', (e) => { if (e.target === $('panel')) closePanel(); });
