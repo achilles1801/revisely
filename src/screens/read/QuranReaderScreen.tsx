@@ -86,6 +86,11 @@ import { memoryId, type ClearRecord } from '../../lib/reciteMemory/record';
 import { clipOfTake, useTakeRecordings } from '../../lib/reciteMemory/takeAudio';
 import { RememberedTargets, RememberedUnderlay } from '../../components/reciteMemory/RememberedLayers';
 import { WordHistoryCard } from '../../components/reciteMemory/WordHistoryCard';
+import { ShownTakeBar } from '../../components/reciteMemory/ShownTakeBar';
+import type { TakeRecord } from '../../lib/reciteMemory/record';
+import { countsAsMistake, isUnclear } from '../../lib/reciteLive/contract';
+import { pageAccuracy } from '../../lib/reciteLive/score';
+import { sendLabel } from '../../lib/reciteCheck/service';
 
 /** What the recite bar says when a take ends without its answer. */
 const LIVE_FAILURE: Record<LiveFailure, string> = {
@@ -446,7 +451,67 @@ export default function QuranReaderScreen() {
   // Recite's memory: words missed in past takes stay marked, lighter, outside takes (lib/reciteMemory), unless turned off
   // in Settings or the page is hidden. During a take they step aside: the page shows only that take's marks.
   const memories = useMemo(() => wordMemories(memoryRecords), [memoryRecords]);
-  const showPast = liveOn && !!qw && reciteSettings.showPast && !hidden && !live.active;
+  // Show on the page (Activity, Your progress; Tarteel's Load Session): a past take on its page with its marks, and
+  // nothing else, until Done.
+  const [showTakeId, setShowTakeId] = useState<string | null>(route.params.showTake ?? null);
+  const showTakeParam = route.params.showTake;
+  useEffect(() => {
+    if (showTakeParam) setShowTakeId(showTakeParam);
+  }, [showTakeParam]);
+  const shownTake = useMemo(
+    () => (showTakeId ? (memoryRecords.find((r): r is TakeRecord => r.id === showTakeId && r.kind === 'take' && !r.deleted) ?? null) : null),
+    [showTakeId, memoryRecords],
+  );
+  const showing = liveOn && !!qw && shownTake != null && !live.active;
+  const shownOnPage = useCallback(
+    (page: number) => {
+      if (!showing || !qw || !shownTake) return [];
+      const [from, to] = qw.pageRange(page);
+      return shownTake.marks.filter((m) => m.w >= from && m.w < to);
+    },
+    [showing, qw, shownTake],
+  );
+  const [shownCardAt, setShownCardAt] = useState<{ w: number; anchor: Box } | null>(null);
+  const shownCardMarks = useMemo(() => (shownCardAt && shownTake ? shownTake.marks.filter((m) => m.w === shownCardAt.w) : []), [shownCardAt, shownTake]);
+  useEffect(() => {
+    if (!shownCardAt) stopHearing();
+  }, [shownCardAt]);
+  useEffect(() => {
+    if (shownCardAt && shownCardMarks.length === 0) setShownCardAt(null);
+  }, [shownCardAt, shownCardMarks.length]);
+  const endShowing = useCallback(() => {
+    setShowTakeId(null);
+    setShownCardAt(null);
+    (navigation as { setParams?: (p: Record<string, unknown>) => void }).setParams?.({ showTake: undefined });
+  }, [navigation]);
+  // Not a mistake on a past take's mark: the take is kept again without it (and its score with it), and the checker
+  // hears it as a label.
+  const dismissShown = useCallback(
+    (id: string) => {
+      if (!shownTake || !user?.id || !qw) return;
+      const m = shownTake.marks.find((x) => x.id === id);
+      if (!m) return;
+      const unclear = isUnclear(m);
+      const mistakes = shownTake.mistakes - (countsAsMistake(m) && !unclear ? 1 : 0);
+      const next: TakeRecord = {
+        ...shownTake,
+        marks: shownTake.marks.filter((x) => x.id !== id),
+        mistakes: Math.max(0, mistakes),
+        tajweed: Math.max(0, shownTake.tajweed - (m.kind === 'tajweed' ? 1 : 0)),
+        unclear: Math.max(0, shownTake.unclear - (unclear ? 1 : 0)),
+        accuracy: pageAccuracy(qw, Math.max(0, mistakes), shownTake.from, shownTake.to),
+        rev: Date.now(),
+      };
+      remember(user.id, next).catch((err) => logger.warn('Recite memory: Not a mistake was not kept', err));
+      if (shownTake.take) void sendLabel('dismiss', shownTake.take, id, Date.now());
+    },
+    [shownTake, user?.id, qw],
+  );
+  // A take started over a shown one ends showing it.
+  useEffect(() => {
+    if (live.active && showTakeId) endShowing();
+  }, [live.active, showTakeId, endShowing]);
+  const showPast = liveOn && !!qw && reciteSettings.showPast && !hidden && !live.active && !showing;
   const pastOnPage = useCallback(
     (page: number): WordMemory[] => (showPast && qw ? openInRange(memories, ...qw.pageRange(page)) : []),
     [showPast, qw, memories],
@@ -459,7 +524,7 @@ export default function QuranReaderScreen() {
   useEffect(() => {
     if (!pastAt) stopHearing();
   }, [pastAt]);
-  const takeRecordings = useTakeRecordings(showPast);
+  const takeRecordings = useTakeRecordings(showPast || showing);
   const pastMemory = useMemo(() => (pastAt ? memoryOfWord(memories, pastAt.w) : null), [pastAt, memories]);
   const pastHasSimilar = useMemo(() => (qw && pastAt ? similarPhrases(qw, pastAt.w).length > 0 : false), [qw, pastAt]);
   // Clear now can be undone for a few seconds (the clear is a record of its own; Undo forgets it).
@@ -495,7 +560,14 @@ export default function QuranReaderScreen() {
   }, [progressFor, memoryRecords, takeRecord]);
   const onTapPoint = useMemo(
     () =>
-      liveOn && qw && checkTake
+      showing && qw
+        ? (page: number, x: number, y: number, toWindow: (r: { x0: number; y0: number; x1: number; y1: number }) => Box) => {
+            const m = markAt(qw, shownOnPage(page), x, y);
+            if (!m) return false;
+            setShownCardAt({ w: m.w, anchor: toWindow(wordBox(qw, m.w)) });
+            return true;
+          }
+        : liveOn && qw && checkTake
         ? (page: number, x: number, y: number, toWindow: (r: { x0: number; y0: number; x1: number; y1: number }) => Box) => {
             const m = markAt(qw, marksOnPage(live.state, qw, page), x, y);
             if (!m) return false;
@@ -511,7 +583,7 @@ export default function QuranReaderScreen() {
               return true;
             }
           : undefined,
-    [liveOn, qw, checkTake, live.state, showPast, pastOnPage],
+    [liveOn, qw, checkTake, live.state, showPast, pastOnPage, showing, shownOnPage],
   );
   const similar = useMemo(() => (qw && similarFor != null ? similarPhrases(qw, similarFor) : []), [qw, similarFor]);
   const cardHasSimilar = useMemo(() => (qw && cardAt ? similarPhrases(qw, cardAt.w).length > 0 : false), [qw, cardAt]);
@@ -570,7 +642,20 @@ export default function QuranReaderScreen() {
   );
   const pageUnderlay = useMemo(
     () =>
-      showPast && qw
+      showing && qw
+        ? (page: number, scale: number) => (
+            <LiveUnderlay
+              page={page}
+              scale={scale}
+              words={qw}
+              cursor={null}
+              marks={shownOnPage(page)}
+              selected={shownCardMarks[0] ?? null}
+              hidden={false}
+              colors={{ band: v2.followBand, word: v2.followWord, marks: markColours }}
+            />
+          )
+        : showPast && qw
         ? (page: number, scale: number) => (
             <RememberedUnderlay
               page={page}
@@ -596,7 +681,7 @@ export default function QuranReaderScreen() {
             />
           )
         : undefined,
-    [liveOn, qw, live.active, live.state, v2, cardMarks, pageMarks, hidden, markColours, showPast, pastOnPage, pastAt, isDark],
+    [liveOn, qw, live.active, live.state, v2, cardMarks, pageMarks, hidden, markColours, showPast, pastOnPage, pastAt, isDark, showing, shownOnPage, shownCardMarks],
   );
   // The next word's cover turns red while something else is being said in its slot (the checker's `off`, draft 7).
   const offWord = live.state.off?.w ?? null;
@@ -624,12 +709,12 @@ export default function QuranReaderScreen() {
       liveOn && qw
         ? (page: number, scale: number) => (
             <>
-              <LiveMarkTargets page={page} scale={scale} words={qw} marks={pageMarks(page)} />
+              <LiveMarkTargets page={page} scale={scale} words={qw} marks={showing ? shownOnPage(page) : pageMarks(page)} />
               <RememberedTargets page={page} scale={scale} words={qw} memories={pastOnPage(page)} />
             </>
           )
         : undefined,
-    [liveOn, qw, pageMarks, pastOnPage],
+    [liveOn, qw, pageMarks, pastOnPage, showing, shownOnPage],
   );
 
   const liveStatus = live.state.status;
@@ -785,7 +870,7 @@ export default function QuranReaderScreen() {
           pageOverlay={pageOverlay}
           pageAccessories={pageAccessories}
           onTapPoint={onTapPoint}
-          extraData={liveOn ? `${live.state.cursor}|${live.state.saidUpTo}|${Object.keys(live.state.marks).length}|${hidden}|${revealed.size}|${offWord}|${showPast ? memoryRecords.length : -1}|${pastAt?.w ?? ''}` : undefined}
+          extraData={liveOn ? `${live.state.cursor}|${live.state.saidUpTo}|${Object.keys(live.state.marks).length}|${hidden}|${revealed.size}|${offWord}|${showPast ? memoryRecords.length : -1}|${pastAt?.w ?? ''}|${showing ? `${shownTake?.id}:${shownTake?.marks.length}` : ''}|${shownCardAt?.w ?? ''}` : undefined}
         />
       </ReaderFrame>
 
@@ -909,6 +994,31 @@ export default function QuranReaderScreen() {
               onClose={() => setPastAt(null)}
             />
           ) : null}
+          {showing && shownTake ? (
+            <ShownTakeBar take={shownTake} now={Date.now()} bottom={insets.bottom + spacing.sm + CAPSULE_HEIGHT + spacing.sm} onDone={endShowing} />
+          ) : null}
+          {qw && showing ? (
+            <MarkCard
+              marks={shownCardMarks}
+              words={qw}
+              anchor={shownCardAt?.anchor ?? null}
+              onDismiss={dismissShown}
+              onHear={(m) => void playReference({ sura: m.ayah[0], ayah: m.ayah[1] })}
+              onYours={
+                shownCardMarks[0]?.t && shownTake?.recordingId && takeRecordings.has(shownTake.recordingId)
+                  ? (m) => {
+                      if (m.t && shownTake?.recordingId) void clipOfTake(shownTake.recordingId, m.t[0]).then((pcm) => (pcm ? playClip(pcm) : undefined));
+                    }
+                  : undefined
+              }
+              onSimilar={(m) => {
+                setShownCardAt(null);
+                setSimilarFor(m.w);
+              }}
+              hasSimilar={qw && shownCardAt ? similarPhrases(qw, shownCardAt.w).length > 0 : false}
+              onClose={() => setShownCardAt(null)}
+            />
+          ) : null}
           <PassageProgressSheet
             visible={progressFor != null}
             words={qw}
@@ -917,6 +1027,14 @@ export default function QuranReaderScreen() {
             takes={progressTakes}
             memories={memories}
             now={Date.now()}
+            onOpenTake={(t) => {
+              setProgressFor(null);
+              setSummaryShown(null);
+              setPastAt(null);
+              if (live.active) live.clear();
+              setShowTakeId(t.id);
+              if (qw) pagerRef.current?.scrollToPage(qw.pageOf(t.from));
+            }}
             onClose={() => {
               const back = progressFor?.back;
               setProgressFor(null);

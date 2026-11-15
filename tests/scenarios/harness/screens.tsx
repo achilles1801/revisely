@@ -54,9 +54,12 @@ export function activityStack(mods: Booted): ReactElement {
   return homeStackWith(mods, { Activity: mods.require<any>('src/screens/activity/ActivityScreen').default });
 }
 
-/** Home's stack with the reader real (its pager is harness/pager), the rest of "elsewhere" empty. */
+/** Home's stack with the reader and All activity real (the reader's pager is harness/pager), the rest of "elsewhere" empty. */
 export function readerStack(mods: Booted): ReactElement {
-  return homeStackWith(mods, { QuranReader: mods.require<any>('src/screens/read/QuranReaderScreen').default });
+  return homeStackWith(mods, {
+    QuranReader: mods.require<any>('src/screens/read/QuranReaderScreen').default,
+    ActivityAll: mods.require<any>('src/screens/activity/ActivityAllScreen').default,
+  });
 }
 
 function homeStackWith(mods: Booted, real: Record<string, unknown>, appRef = false): ReactElement {

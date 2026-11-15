@@ -18,6 +18,11 @@ import { BlockMark, RevisedMark } from './BlockMark';
 import { creditLine, formatMinutesLong, windowFooter } from '../../lib/activityFormat';
 import { describePassage } from '../../lib/passages';
 import { RecordingsList } from '../recordings/RecordingsList';
+import { RecitedMark, TakeDayItem, useQuranWordsWhen } from '../reciteMemory/TakeRows';
+import { useMemoryRecords } from '../../lib/reciteMemory/store';
+import { clearedBy } from '../../lib/reciteMemory/memory';
+import type { TakeRecord } from '../../lib/reciteMemory/record';
+import { reciteLiveForAccount } from '../../lib/reciteLive/availability';
 import { listRecordings, type RecordingMeta } from '../../lib/recordings';
 import { describeSurahRuns, describeSurahs, pageRuns } from '../../lib/pageRanges';
 import { logger } from '../../lib/logger';
@@ -89,6 +94,8 @@ interface Props {
   onFocusBlockLayout?: (y: number) => void;
   /** Opens a recording (Listen back). */
   onOpenRecording: (id: string) => void;
+  /** A recitation take on its page with its marks (Recite's memory, Revisely Dev). */
+  onShowTake?: (take: TakeRecord, page: number) => void;
   /** Deletes a timed session (the screen confirms first). */
   onDeleteReading: (session: ReadingSession) => void;
   /** Memorized today, on an automatic plan: put the pages first tomorrow (Insights' Plan it). */
@@ -161,6 +168,7 @@ export function DayBlocks({
   focusBlock,
   onFocusBlockLayout,
   onOpenRecording,
+  onShowTake,
   onDeleteReading,
   onReviseTomorrow,
   onEditSchedule,
@@ -264,8 +272,17 @@ export function DayBlocks({
       .then((all) => setRecs(all.filter((r) => r.day === day)))
       .catch((err) => logger.warn('Could not list the day’s recordings', err));
   }, [day]);
+  // Recite's memory (Revisely Dev): the day's recitation takes have a block of their own, with their recordings.
+  const memoryRecords = useMemoryRecords(user?.id, reciteLiveForAccount(user));
+  const dayTakes = useMemo(
+    () => memoryRecords.filter((r): r is TakeRecord => r.kind === 'take' && !r.deleted && r.day === day).sort((a, b) => a.createdAt - b.createdAt),
+    [memoryRecords, day],
+  );
+  const takeRecordings = useMemo(() => new Set(dayTakes.map((t) => t.recordingId).filter((id): id is string => id != null)), [dayTakes]);
+  const notTake = useCallback((r: RecordingMeta) => !takeRecordings.has(r.id), [takeRecordings]);
+  const takeWords = useQuranWordsWhen(dayTakes.length > 0);
   const revRecs = recs.filter((r) => r.kind === 'revision');
-  const readRecs = recs.filter((r) => r.kind === 'reading');
+  const readRecs = recs.filter((r) => r.kind === 'reading' && notTake(r));
   useActivityReload(load, day);
 
   const memorizedSet = useMemo(() => new Set(pages.filter((p) => p.status === 'memorized').map((p) => p.pageNumber)), [pages]);
@@ -488,7 +505,7 @@ export function DayBlocks({
   };
   const readRecordings = (
     <View style={styles.underItem}>
-      <RecordingsList day={day} kind="reading" emptyText={null} variant="block" onOpen={(r) => onOpenRecording(r.id)} />
+      <RecordingsList day={day} kind="reading" emptyText={null} variant="block" only={notTake} onOpen={(r) => onOpenRecording(r.id)} />
     </View>
   );
   const memorizedItems: React.ReactNode[] = [
@@ -588,7 +605,7 @@ export function DayBlocks({
       );
     }),
     ...(readItems.items.length === 0 && readRecs.length > 0
-      ? [<RecordingsList key="recordings" day={day} kind="reading" emptyText={null} variant="block" onOpen={(r) => onOpenRecording(r.id)} />]
+      ? [<RecordingsList key="recordings" day={day} kind="reading" emptyText={null} variant="block" only={notTake} onOpen={(r) => onOpenRecording(r.id)} />]
       : []),
     ...readItems.items.flatMap((i) => taggedTo('read', i.id).map(noteItem)),
   ];
@@ -724,6 +741,28 @@ export function DayBlocks({
           header={readMenu}
           onLayout={layoutFor('read')}
           testID="activity-block-read"
+        />
+      )}
+      {dayTakes.length > 0 && (
+        <DayBlock
+          mark={<RecitedMark />}
+          title="Recited"
+          figure={dayTakes.length === 1 ? '1 take' : `${dayTakes.length} takes`}
+          subline={subline([
+            takeWords ? surahsOf(dayTakes.map((t) => takeWords.pageOf(t.from))) : null,
+            formatMinutesLong(Math.max(1, Math.round(dayTakes.reduce((n, t) => n + t.secs, 0) / 60))),
+          ])}
+          items={dayTakes.map((t) => (
+            <TakeDayItem
+              key={t.id}
+              take={t}
+              words={takeWords}
+              cleared={clearedBy(memoryRecords, t).length}
+              onShow={(take) => takeWords && onShowTake?.(take, takeWords.pageOf(take.from))}
+              onOpenRecording={onOpenRecording}
+            />
+          ))}
+          testID="activity-block-recited"
         />
       )}
       {notesBlock.length > 0 && (

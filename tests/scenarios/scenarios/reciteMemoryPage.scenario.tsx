@@ -97,3 +97,45 @@ it('[RMEM-3] [RMEM-4] a word missed before stays marked on the page; its card sh
   expect(app.screen.getAllByTestId('progress-open-word')).toHaveLength(1);
   await app.close();
 });
+
+it('[RMEM-5] a day lists its takes in a Recited block; Show on the page opens the take with its marks until Done; All activity has Recitations', async () => {
+  setZone(ZONES.chicago);
+  setNow('2026-11-15 19:51');
+  const phone = new Phone('phone');
+  let app = await newAccount(phone, { memorized: pagesRange(240, 250), user: { dailyPageCapacity: 5 } });
+  await markPreviewTester(app.uid);
+  await app.until(() => app.app.user?.previewTester === true, 'the account to be a tester');
+  const { remember } = app.mods.require('src/lib/reciteMemory/store');
+  // The revision day (no Fajr boundary on this account): the date.
+  const today = '2026-11-15';
+  await app.act(() => remember(app.uid, { ...take('take1', Date.now(), today, [lookalike]), hidden: false }));
+  await app.untilSynced();
+  await app.close();
+
+  app = await phone.open(readerStack);
+  await app.untilLoaded();
+  const { setQuranWordsForTests } = app.mods.require('src/lib/recite/quranWords');
+  setQuranWordsForTests(app.mods.require('src/lib/recite/__fixtures__/quranWords').wordsData());
+  await app.act(() => nav(app).current.navigate('ActivityDay', { date: today }));
+  await app.until(() => app.screen.queryByTestId('activity-block-recited') != null, 'the Recited block');
+  expect(app.screen.getByTestId('activity-take-line').props.children).toBe('7:51 PM · 1 mistake');
+
+  // Show on the page: the reader at page 246 with the take's mark, and its bar.
+  await tap(app, 'activity-take-show');
+  await app.until(() => nav(app).current.getCurrentRoute()?.name === 'QuranReader', 'the reader');
+  expect(nav(app).current.getCurrentRoute()?.params).toMatchObject({ pageNumber: 246, showTake: 'take1' });
+  await app.until(() => app.screen.queryByTestId('shown-take-bar') != null && app.screen.queryByTestId('live-mark-word') != null, 'the take on its page');
+  expect(past(app)).toBeNull();
+  await tap(app, 'shown-take-done');
+  await app.until(() => app.screen.queryByTestId('shown-take-bar') == null && past(app) != null, 'the page as it is, with the word still to fix');
+
+  // All activity: Recitations, With mistakes.
+  await app.act(() => nav(app).current.navigate('ActivityAll'));
+  await tap(app, 'filter-recitation');
+  await app.until(() => app.screen.queryAllByTestId('activity-all-take').length === 1, 'the take in Recitations');
+  await tap(app, 'filter-takes-hidden');
+  await app.until(() => app.screen.queryAllByTestId('activity-all-take').length === 0, 'no take with the page hidden');
+  await tap(app, 'filter-takes-mistakes');
+  await app.until(() => app.screen.queryAllByTestId('activity-all-take').length === 1, 'the take with mistakes');
+  await app.close();
+});

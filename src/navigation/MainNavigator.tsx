@@ -70,7 +70,8 @@ export type HomeStackParamList = {
   ActivityDay: { date: string; focusRecordingId?: string; focusBlock?: 'revised' | 'memorized' | 'read' | 'notes' };
   // The reader over Activity (a page of a day's strip, a weak spot): back returns to where it was
   // opened (ACT-20), unlike the Read tab's reader.
-  QuranReader: { pageNumber: number };
+  // `showTake`: a past recitation take (Recite's memory, Revisely Dev) shown on its page with its marks.
+  QuranReader: { pageNumber: number; showTake?: string };
   // A recording played over the pages it was recorded on, from fromMs (ms
   // into it; default the start).
   ListenBack: { recordingId: string; fromMs?: number };
@@ -94,6 +95,8 @@ export type ReadStackParamList = {
     pageNumber: number;
     source?: 'index' | 'recent' | 'search';
     highlight?: { sura: number; ayah: number; last?: { sura: number; ayah: number } };
+    /** A past recitation take (Recite's memory, Revisely Dev) shown on its page with its marks. */
+    showTake?: string;
   };
   /** Search the Qur'an (testers); `listen`: start listening at once (the Read tab's mic). */
   QuranSearch: { listen?: boolean } | undefined;

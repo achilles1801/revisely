@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -51,6 +51,8 @@ interface RecordingsListProps {
    * right. `list` (the default): the day's own list, as before.
    */
   variant?: "list" | "block";
+  /** Only the recordings this keeps (a day's Read block leaves out recitation takes, which have a block of their own). */
+  only?: (recording: RecordingMeta) => boolean;
 }
 
 const KIND_LABEL: Record<RecordingKind, string> = {
@@ -79,8 +81,11 @@ export function RecordingsList({
   highlightId,
   onOpen,  emptyText,
   variant = "list",
+  only,
 }: RecordingsListProps) {
   const block = variant === "block";
+  const onlyRef = useRef(only);
+  onlyRef.current = only;
   const { palette } = useTheme();
   const haptics = useHaptics();
   const [items, setItems] = useState<RecordingMeta[]>([]);
@@ -105,7 +110,7 @@ export function RecordingsList({
     listRecordings()
       .then((all) => {
         setItems(
-          all.filter((r) => r.day === day && (!kind || r.kind === kind)),
+          all.filter((r) => r.day === day && (!kind || r.kind === kind) && (!onlyRef.current || onlyRef.current(r))),
         );
         setLoaded(true);
       })

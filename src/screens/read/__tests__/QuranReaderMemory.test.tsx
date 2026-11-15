@@ -66,9 +66,10 @@ jest.mock('../../../components/MushafPager', () => {
   };
 });
 const mockNavigation = { goBack: jest.fn(), navigate: jest.fn() };
+const mockRoute: { params: Record<string, unknown> } = { params: { pageNumber: 379 } };
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => mockNavigation,
-  useRoute: () => ({ key: 'QuranReader-1', name: 'QuranReader', params: { pageNumber: 379 } }),
+  useRoute: () => ({ key: 'QuranReader-1', name: 'QuranReader', params: mockRoute.params }),
   useIsFocused: () => true,
 }));
 jest.mock('../../../navigation/navigationRef', () => ({ navigateToActivityDay: jest.fn() }));
@@ -408,5 +409,33 @@ describe("Recite's memory in the take's summary", () => {
     await flush();
     await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: UTIYAT + 25, secs: 12, marks: [], score: { reached: 30, mistakes: 0, tajweed: 0, accuracy: 1 }, start: A23 } });
     expect(screen.getByText('1 cleared from the page')).toBeTruthy();
+  });
+});
+
+describe('Show on the page', () => {
+  beforeEach(() => {
+    mockMemory.records = [pastTake()];
+    mockMemory.remembered = [];
+    mockRoute.params = { pageNumber: 379, showTake: 'past1' };
+  });
+  afterEach(() => {
+    mockRoute.params = { pageNumber: 379 };
+  });
+
+  it('the take’s marks at full strength with its bar; Not a mistake keeps the take without that mark; Done ends it', async () => {
+    await open();
+    expect(screen.getByTestId('shown-take-bar')).toBeTruthy();
+    expect(screen.getByTestId('live-highlight-word')).toBeTruthy();
+    expect(screen.queryByTestId('past-highlight-word')).toBeNull();
+    await tapWord(UTIYAT);
+    fireEvent.press(screen.getByTestId('mark-card-dismiss'));
+    await flush();
+    expect(mockMemory.remembered[0]).toMatchObject({ id: 'past1', marks: [], mistakes: 0, accuracy: 1 });
+    expect(jest.requireMock('../../../lib/reciteCheck/service').sendLabel).not.toHaveBeenCalled();
+    // (The store here doesn't change, so the card stays open over the bar: modal for VoiceOver.)
+    fireEvent.press(screen.getByTestId('shown-take-done', { includeHiddenElements: true }));
+    await flush();
+    expect(screen.queryByTestId('shown-take-bar')).toBeNull();
+    expect(screen.getByTestId('past-highlight-word')).toBeTruthy();
   });
 });
