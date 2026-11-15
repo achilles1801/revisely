@@ -62,6 +62,11 @@ SETTLE = 3.0        # seconds a seam must be behind the newest final frame: the 
 # words and start null, and `ms.search_speech` (speech heard without a lock) for the server's log.
 LOCK_WORDS = 3
 LOCK_HOPS = 2
+# A search that has run LONG_SEARCH seconds without a lock asks for LONG_EXTRA more words: the longer nothing on the
+# page fits, the likelier the reciter is elsewhere, and a long take off the page meets phrases the page shares. Off the
+# page in full (120 takes): 14 → 11 locks; every start on the page locks well before (bench: 18 s at most).
+LONG_SEARCH = 30.0
+LONG_EXTRA = 2
 # The page's top locks sooner: a reciter who opens a page nearly always starts there, and a slow reciter's first word
 # alone can last longer than Majd's 3 s bar (Abdulbaset, mujawwad: 4–10 s). So once the best path has begun at the
 # page's first word (or at words reading the same, letter for letter, as the page's first words: 17:111 before Al-Kahf
@@ -940,7 +945,8 @@ class LiveSession:
         while k + 1 < loc.g.W and visits[k + 1] and visits[k + 1][-1]['end'] <= dec.t - cf:
             k += 1
         good = sum(1 for w in range(w0, k + 1) if st.get(loc.app[w]) == 'correct')
-        if k - w0 < LOCK_WORDS or good < LOCK_WORDS or len(self._loc_hist) < LOCK_HOPS \
+        need = LOCK_WORDS + (LONG_EXTRA if (self.T - self._search_f0) / FPS > LONG_SEARCH else 0)
+        if k - w0 < need or good < LOCK_WORDS or len(self._loc_hist) < LOCK_HOPS \
                 or len(set(self._loc_hist[-LOCK_HOPS:])) > 1 or not self._only_once(w0, k):
             return ev
         return ev + self._lock(loc.app[w0], f_start, now)
