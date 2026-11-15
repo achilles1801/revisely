@@ -220,6 +220,45 @@ appId: com.revisionbuddy.app
     env:
       NAME: rl07b-recording-saved
 
+# Recite's memory (RMEM-3): with the take closed, its word mistake stays on the page, lighter. A tap on it shows its
+# history: this take, wrong, and the clear rule. Clear now takes it off; Undo puts it back. (The "Recording saved" note
+# goes first: its View sits where Undo will.)
+- extendedWaitUntil:
+    notVisible: "Recording saved"
+    timeout: 12000
+- extendedWaitUntil:
+    visible:
+      id: past-mark-word
+    timeout: 10000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rm01-past-marks
+- tapOn:
+    id: past-mark-word
+- extendedWaitUntil:
+    visible:
+      id: past-card
+    timeout: 5000
+- assertVisible:
+    id: past-try-wrong
+- assertVisible: "Say it right on 2 different days to clear it."
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rm02-past-card
+- tapOn:
+    id: past-card-clear
+- extendedWaitUntil:
+    notVisible:
+      id: past-mark-word
+    timeout: 5000
+- tapOn: "Undo"
+- extendedWaitUntil:
+    visible:
+      id: past-mark-word
+    timeout: 5000
+
 # In dark: a take marking mistakes again (Mark mistakes stays on). Back from the reader is the Read tab.
 - tapOn:
     id: reader-back

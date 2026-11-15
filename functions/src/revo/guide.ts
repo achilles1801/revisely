@@ -309,6 +309,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
 export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
   'RMEM-1': 'Recite’s memory is Revisely Dev only (Mark mistakes), not the store app Revo answers for',
   'RMEM-2': 'Recite’s memory is Revisely Dev only (Mark mistakes), not the store app Revo answers for',
+  'RMEM-3': 'Recite’s memory is Revisely Dev only (Mark mistakes), not the store app Revo answers for',
   'ACT-27': 'Activity refreshes by itself and with a pull; nothing to ask Revo about',
   'NEW-4': 'what waits for the walkthrough; nothing for Revo to explain',
   'RINS-1': 'Revisely Dev only: Revo’s recitation rules travel with a recitation (recitation.ts RECITATION_SYSTEM), not in the guide every account gets',

@@ -984,6 +984,19 @@ export default function SettingsScreen() {
                 />
               }
             />
+            <Row
+              icon="bookmark-outline"
+              label="Show past mistakes"
+              subtitle="Lightly, until each is said right on 2 different days"
+              rightSlot={
+                <SettingSwitch
+                  value={reciteCheckSettings.showPast}
+                  onValueChange={(showPast) => setReciteCheckSettings(user?.id, { showPast })}
+                  accessibilityLabel="Show past mistakes"
+                  testID="settings-recite-past"
+                />
+              }
+            />
           </Section>
         ) : null}
 

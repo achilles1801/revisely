@@ -54,6 +54,11 @@ export function activityStack(mods: Booted): ReactElement {
   return homeStackWith(mods, { Activity: mods.require<any>('src/screens/activity/ActivityScreen').default });
 }
 
+/** Home's stack with the reader real (its pager is harness/pager), the rest of "elsewhere" empty. */
+export function readerStack(mods: Booted): ReactElement {
+  return homeStackWith(mods, { QuranReader: mods.require<any>('src/screens/read/QuranReaderScreen').default });
+}
+
 function homeStackWith(mods: Booted, real: Record<string, unknown>, appRef = false): ReactElement {
   const { React, require: req } = mods;
   const { NavigationContainer } = req<any>('@react-navigation/native');

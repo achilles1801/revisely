@@ -78,7 +78,12 @@ import { useKeepCheckerWarm } from '../../components/reciteLive/useKeepCheckerWa
 import { needsPremium, type LiveFailure } from '../../lib/reciteLive/contract';
 import { logger } from '../../lib/logger';
 import { useRememberTake } from '../../components/reciteMemory/useRememberTake';
-import { useMemoryRecords } from '../../lib/reciteMemory/store';
+import { remember, useMemoryRecords } from '../../lib/reciteMemory/store';
+import { memoryOfWord, openInRange, wordMemories, type WordMemory } from '../../lib/reciteMemory/memory';
+import { memoryId, type ClearRecord } from '../../lib/reciteMemory/record';
+import { clipOfTake, useTakeRecordings } from '../../lib/reciteMemory/takeAudio';
+import { RememberedTargets, RememberedUnderlay } from '../../components/reciteMemory/RememberedLayers';
+import { WordHistoryCard } from '../../components/reciteMemory/WordHistoryCard';
 
 /** What the recite bar says when a take ends without its answer. */
 const LIVE_FAILURE: Record<LiveFailure, string> = {
@@ -434,6 +439,38 @@ export default function QuranReaderScreen() {
   useEffect(() => {
     if (cardAt && cardMarks.length === 0) setCardAt(null);
   }, [cardAt, cardMarks.length]);
+  // Recite's memory: words missed in past takes stay marked, lighter, outside takes (lib/reciteMemory), unless turned off
+  // in Settings or the page is hidden. During a take they step aside: the page shows only that take's marks.
+  const memories = useMemo(() => wordMemories(memoryRecords), [memoryRecords]);
+  const showPast = liveOn && !!qw && reciteSettings.showPast && !hidden && !live.active;
+  const pastOnPage = useCallback(
+    (page: number): WordMemory[] => (showPast && qw ? openInRange(memories, ...qw.pageRange(page)) : []),
+    [showPast, qw, memories],
+  );
+  const [pastAt, setPastAt] = useState<{ w: number; anchor: Box } | null>(null);
+  useEffect(() => {
+    if (!showPast) setPastAt(null);
+  }, [showPast]);
+  // What its card plays stops when the card closes.
+  useEffect(() => {
+    if (!pastAt) stopHearing();
+  }, [pastAt]);
+  const takeRecordings = useTakeRecordings(showPast);
+  const pastMemory = useMemo(() => (pastAt ? memoryOfWord(memories, pastAt.w) : null), [pastAt, memories]);
+  const pastHasSimilar = useMemo(() => (qw && pastAt ? similarPhrases(qw, pastAt.w).length > 0 : false), [qw, pastAt]);
+  // Clear now can be undone for a few seconds (the clear is a record of its own; Undo forgets it).
+  const [clearedUndo, setClearedUndo] = useState<ClearRecord | null>(null);
+  const clearPast = useCallback(
+    (m: WordMemory) => {
+      if (!user?.id) return;
+      const now = Date.now();
+      const record: ClearRecord = { id: memoryId(), kind: 'clear', createdAt: now, rev: now, day: today ?? m.attempts[m.attempts.length - 1]?.take.day ?? '', w: m.w, group: m.group };
+      setPastAt(null);
+      setClearedUndo(record);
+      remember(user.id, record).catch((err) => logger.warn('Recite memory: Clear now was not kept', err));
+    },
+    [user?.id, today],
+  );
   const onTapPoint = useMemo(
     () =>
       liveOn && qw && checkTake
@@ -443,8 +480,16 @@ export default function QuranReaderScreen() {
             setCardAt({ w: m.w, anchor: toWindow(wordBox(qw, m.w)) });
             return true;
           }
-        : undefined,
-    [liveOn, qw, checkTake, live.state],
+        : showPast && qw
+          ? (page: number, x: number, y: number, toWindow: (r: { x0: number; y0: number; x1: number; y1: number }) => Box) => {
+              const past = pastOnPage(page);
+              const m = markAt(qw, past.map((p) => p.lastMark).filter((x): x is Mark => x != null), x, y);
+              if (!m) return false;
+              setPastAt({ w: m.w, anchor: toWindow(wordBox(qw, m.w)) });
+              return true;
+            }
+          : undefined,
+    [liveOn, qw, checkTake, live.state, showPast, pastOnPage],
   );
   const similar = useMemo(() => (qw && similarFor != null ? similarPhrases(qw, similarFor) : []), [qw, similarFor]);
   const cardHasSimilar = useMemo(() => (qw && cardAt ? similarPhrases(qw, cardAt.w).length > 0 : false), [qw, cardAt]);
@@ -503,7 +548,19 @@ export default function QuranReaderScreen() {
   );
   const pageUnderlay = useMemo(
     () =>
-      liveOn && qw && live.active
+      showPast && qw
+        ? (page: number, scale: number) => (
+            <RememberedUnderlay
+              page={page}
+              scale={scale}
+              words={qw}
+              memories={pastOnPage(page)}
+              selected={pastAt?.w ?? null}
+              colours={v2}
+              isDark={isDark}
+            />
+          )
+        : liveOn && qw && live.active
         ? (page: number, scale: number) => (
             <LiveUnderlay
               page={page}
@@ -517,7 +574,7 @@ export default function QuranReaderScreen() {
             />
           )
         : undefined,
-    [liveOn, qw, live.active, live.state, v2, cardMarks, pageMarks, hidden, markColours],
+    [liveOn, qw, live.active, live.state, v2, cardMarks, pageMarks, hidden, markColours, showPast, pastOnPage, pastAt, isDark],
   );
   // The next word's cover turns red while something else is being said in its slot (the checker's `off`, draft 7).
   const offWord = live.state.off?.w ?? null;
@@ -543,9 +600,14 @@ export default function QuranReaderScreen() {
   const pageAccessories = useMemo(
     () =>
       liveOn && qw
-        ? (page: number, scale: number) => <LiveMarkTargets page={page} scale={scale} words={qw} marks={pageMarks(page)} />
+        ? (page: number, scale: number) => (
+            <>
+              <LiveMarkTargets page={page} scale={scale} words={qw} marks={pageMarks(page)} />
+              <RememberedTargets page={page} scale={scale} words={qw} memories={pastOnPage(page)} />
+            </>
+          )
         : undefined,
-    [liveOn, qw, pageMarks],
+    [liveOn, qw, pageMarks, pastOnPage],
   );
 
   const liveStatus = live.state.status;
@@ -701,7 +763,7 @@ export default function QuranReaderScreen() {
           pageOverlay={pageOverlay}
           pageAccessories={pageAccessories}
           onTapPoint={onTapPoint}
-          extraData={liveOn ? `${live.state.cursor}|${live.state.saidUpTo}|${Object.keys(live.state.marks).length}|${hidden}|${revealed.size}|${offWord}` : undefined}
+          extraData={liveOn ? `${live.state.cursor}|${live.state.saidUpTo}|${Object.keys(live.state.marks).length}|${hidden}|${revealed.size}|${offWord}|${showPast ? memoryRecords.length : -1}|${pastAt?.w ?? ''}` : undefined}
         />
       </ReaderFrame>
 
@@ -796,6 +858,42 @@ export default function QuranReaderScreen() {
               onClose={() => setCardAt(null)}
             />
           ) : null}
+          {qw ? (
+            <WordHistoryCard
+              memory={pastMemory}
+              words={qw}
+              anchor={pastAt?.anchor ?? null}
+              now={Date.now()}
+              today={today ?? null}
+              canPlay={(a) => a.t != null && a.take.recordingId != null && takeRecordings.has(a.take.recordingId)}
+              onPlay={(a) => {
+                if (a.t == null || !a.take.recordingId) return;
+                void clipOfTake(a.take.recordingId, a.t).then((pcm) => (pcm ? playClip(pcm) : undefined));
+              }}
+              onClear={clearPast}
+              onHear={(m) => {
+                if (m.lastMark) void playReference({ sura: m.lastMark.ayah[0], ayah: m.lastMark.ayah[1] });
+              }}
+              onSimilar={(m) => {
+                setPastAt(null);
+                setSimilarFor(m.w);
+              }}
+              hasSimilar={pastHasSimilar}
+              onClose={() => setPastAt(null)}
+            />
+          ) : null}
+          <UndoToast
+            visible={clearedUndo != null}
+            message="Cleared from the page"
+            duration={undoMs(screenReader)}
+            onUndo={() => {
+              const r = clearedUndo;
+              setClearedUndo(null);
+              if (r && user?.id) remember(user.id, { ...r, rev: Date.now(), deleted: true }).catch(() => undefined);
+            }}
+            onDismiss={() => setClearedUndo(null)}
+            bottomInset={insets.bottom - spacing.sm}
+          />
           <SimilarPhrasesSheet
             visible={similarFor != null}
             words={qw}

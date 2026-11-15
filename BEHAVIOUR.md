@@ -306,6 +306,19 @@ Recite with Mark mistakes remembers each take (Majd, Nov 15 2026; Tarteel's bigg
   different revision days. Getting it wrong again starts the count over. A take counts only for what it
   checked: Words & harakat never clears a tajweed note. Not clear marks are never remembered, and a take
   that heard a word's harakat only as Not clear is not a try at them. Clear now clears a word at once.
+- **RMEM-3.** Outside a take, a word with a remembered mistake stays marked on the page, in its highlight
+  colour made lighter (red for a word, amber for harakat and letters, violet for tajweed). A word shows one
+  mark, its most severe. Marks don't show during a take, where only that take's marks do. They also don't
+  show on a hidden page, or with Settings → Recite → Show past mistakes off. Tapping one opens its history,
+  which shows:
+  - the kind in words, with its place and how often it went wrong;
+  - what was expected;
+  - its latest takes: the date, right or what was said, whether the page was hidden, and ▶ your own voice
+    when that take's recording is on the phone;
+  - where the clear rule stands;
+  - Hear it and Similar phrases.
+
+  Clear now takes the mark off at once, with Undo.
 
 ## Searching the Qur'an
 
