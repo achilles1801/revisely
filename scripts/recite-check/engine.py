@@ -52,6 +52,31 @@ SOUND_LETTER = {'ں': 'ن', 'ٲ': 'ا'}
 LONG_VOWEL = {'ا': 'ا', 'ۥ': 'و', 'ۦ': 'ي'}
 HARAKAT = 'َُِ'
 SHADDA = 'ّ'
+CUT_MARGIN = 5  # frames kept either side of a cut in an ayah's frames (ayah_pieces)
+
+
+def ayah_pieces(ws, spans, readings, n_frames):
+    """The frame ranges an ayah (its words ws, in order) is judged on, joined in order. Without readings, or with no
+    word said more than once, one range: the first word's start to the last word's end, PAD either side. With a word
+    said again (spans cover every reading of a word, readings only its last), the ranges follow each word's last
+    reading and cut out the gap before each word that had an earlier reading: the first go of a restart and its
+    pause, which lined up with sounds said once read as mistakes (12 professional takes with 24 restarts spliced in:
+    14 marks at words and harakat, 26 in Strict, Nov 14 2026)."""
+    one = [(max(0, spans[ws[0]][0] - PAD), min(n_frames, spans[ws[-1]][1] + PAD))]
+    if not readings or any(w not in readings for w in ws):
+        return one
+    again = [w for w in ws if spans[w][0] < readings[w][0]]  # said before its last reading
+    if not again or any(readings[b][0] < readings[a][1] - 2 for a, b in zip(ws, ws[1:])):
+        return one  # nothing said again, or last readings out of order (a jump the window can't follow)
+    pieces, start = [], readings[ws[0]][0] - PAD
+    for a, b in zip(ws, ws[1:]):
+        # the gap before b holds b's earlier reading (it began after a's last one ended): cut it. A word said again
+        # straight after the restart (its earlier reading is before a's) needs no cut of its own.
+        if b in again and spans[b][0] >= readings[a][1] - 2:
+            pieces.append((start, readings[a][1] + CUT_MARGIN))
+            start = readings[b][0] - CUT_MARGIN
+    pieces.append((start, readings[ws[-1]][1] + PAD))
+    return [(max(0, x), min(n_frames, y)) for x, y in pieces if min(n_frames, y) > max(0, x)]
 
 
 def spell(sounds):
@@ -455,9 +480,12 @@ class Engine:
             letters += l_
         return out, letters
 
-    def ayah_notes(self, lp, s, a, statuses, spans, st, audio=None):
+    def ayah_notes(self, lp, s, a, statuses, spans, st, audio=None, readings=None):
         """Tajweed (and letters) for ayah s:a, on its own frames; nothing unless it was said in full. audio: the take's
-        samples (16 kHz float32, lp's frame grid), for the strict ear (V5_KINDS and the nasal places) when there is one."""
+        samples (16 kHz float32, lp's frame grid), for the strict ear (V5_KINDS and the nasal places) when there is one.
+        readings: each word's last reading (start, end), when the caller knows them: an ayah with a word said again
+        (going back to restart, which is no mistake: Majd, Nov 14 2026) is judged on each word's last reading in
+        order, the earlier reading and the pause cut out (ayah_pieces)."""
         SL, ms = self.slots(st)
         B = self.bars
         S = B.get('strict', {})  # strict bars: past one, a mark is `clear` (bars.json from before them: all `likely`)
@@ -470,18 +498,18 @@ class Engine:
         sts = [statuses.get(x) for x in ws]
         if any(x not in SAID for x in sts) or ws[0] not in spans or ws[-1] not in spans:
             return out, letters  # not said in full: its sounds can't be lined up
-        f0 = max(0, spans[ws[0]][0] - PAD)
-        f1 = min(lp.shape[0], spans[ws[-1]][1] + PAD)
-        if f1 - f0 < 10:
+        pieces = ayah_pieces(ws, spans, readings, lp.shape[0])
+        nf = sum(b - a_ for a_, b in pieces)
+        if nf < 10:
             return out, letters
-        win = lp[f0:f1]
+        win = np.concatenate([lp[a_:b] for a_, b in pieces]) if len(pieces) > 1 else lp[pieces[0][0]:pieces[0][1]]
         win2 = None  # the strict ear's frames for the same window
         if st.get('tajweed', True) and self.ear2 is not None and audio is not None:
-            seg = np.asarray(audio[f0 * 320:f1 * 320], np.float32)
+            seg = np.concatenate([np.asarray(audio[a_ * 320:b * 320], np.float32) for a_, b in pieces])
             if len(seg) >= 3200:
                 w2 = self.ear2.logprobs(seg)
-                if w2.shape[0] >= f1 - f0 - 2:
-                    win2 = w2[:f1 - f0]
+                if w2.shape[0] >= nf - 2:
+                    win2 = w2[:nf]
         B2 = self.bars2 if win2 is not None else None
         S2 = (B2 or {}).get('strict', {})
         bad = {i for i, x in enumerate(sts) if x == 'wrong'}

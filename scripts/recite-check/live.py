@@ -34,7 +34,7 @@ import time
 
 import numpy as np
 
-from engine import FPS, SAID, WORDS_P, BadRequest, heard_sounds, score, settings_of  # puts the harness on the path
+from engine import FPS, SAID, WORDS_P, BadRequest, ayah_pieces, heard_sounds, score, settings_of  # puts the harness on the path
 import checker  # noqa: E402  (the harness's)
 
 SR = 16000
@@ -101,14 +101,15 @@ def secs(span):
 
 
 def word_rows(kws, statuses, flagged, visits, f0=0):
-    """Engine.judge's word rows (every word decided) and the frames each heard word spans, plus f0 (a segment's
-    first frame)."""
-    spans, words = {}, []
+    """Engine.judge's word rows (every word decided), the frames each heard word spans (every reading of it) and
+    its last reading's frames, plus f0 (a segment's first frame)."""
+    spans, readings, words = {}, {}, []
     for i, kw in enumerate(kws):
         w = kw['word']
         stt = statuses.get(w, 'pending')
         if visits[i]:
             spans[w] = (f0 + min(v['start'] for v in visits[i]), f0 + max(v['end'] for v in visits[i]))
+            readings[w] = (f0 + visits[i][-1]['start'], f0 + visits[i][-1]['end'])
         if stt == 'pending':
             continue
         row = {'w': w, 'status': stt}
@@ -120,7 +121,7 @@ def word_rows(kws, statuses, flagged, visits, f0=0):
         if w in spans:
             row['t'] = secs(spans[w])
         words.append(row)
-    return words, spans
+    return words, spans, readings
 
 
 def extra_rows(extras, fillers, kws, delay, f0=0):
@@ -479,6 +480,7 @@ class LiveSession:
         self.flagged = {}                # app word -> audio seconds when marked
         self.bad_from = {}               # app word -> frame its mistake was heard (a later good visit unmarks it)
         self.spans = {}                  # app word -> (first frame, last frame) heard, absolute
+        self.readings = {}               # app word -> its last reading's (first frame, last frame): ayah notes
         self.marks = {}                  # id -> Mark, shown now
         self.extra_run = {}
         self.good_run = {}
@@ -783,7 +785,7 @@ class LiveSession:
         lp = self.lp[seg.f0:seg.frames()]
         st, fl, _, _, extras, visits, fillers = checker.decide(seg.kws, seg.g, lp, path, P, self.E.ear.vocab,
                                                                self._tokens(seg.f0, seg.frames()), refs=refs)
-        words, spans = word_rows(seg.kws, st, fl, visits, seg.f0)
+        words, spans, readings = word_rows(seg.kws, st, fl, visits, seg.f0)
         keep = range(seg.first, upto)
         # words before the segment said again (not the start's own pause): a correction if said right
         back = {seg.app[w]: st[seg.app[w]] for w in range(seg.first - seg.a)
@@ -791,6 +793,7 @@ class LiveSession:
         return {
             'words': [r for r in words if r['w'] in keep],
             'spans': {w: s for w, s in spans.items() if w in keep},
+            'readings': {w: r for w, r in readings.items() if w in keep},
             'extras': [e for e in extra_rows(extras, fillers, seg.kws, P['delay'], seg.f0)
                        if e['trail'] or seg.own_extra(e) and e['after'] < (upto if extras_to is None else extras_to)],
             'back': back,
@@ -866,6 +869,7 @@ class LiveSession:
             if visits[w]:
                 self.spans[app[w]] = (seg.f0 + min(v['start'] for v in visits[w]),
                                       seg.f0 + max(v['end'] for v in visits[w]))
+                self.readings[app[w]] = (seg.f0 + visits[w][-1]['start'], seg.f0 + visits[w][-1]['end'])
         seen = [w for w in range(W) if visits[w]]
         order = [w for _, w in sorted((v['start'], w) for w in seen for v in visits[w])]
         jumped = set()
@@ -954,39 +958,43 @@ class LiveSession:
         self._jump = w
         return None
 
-    def _notes(self, s, a, statuses, spans):
+    def _notes(self, s, a, statuses, spans, readings=None):
         """Engine.ayah_notes on the take's frames (and its samples, for the second model in Strict). It reads only the
         ayah's word statuses, its first word's start, its last word's end and final frames there, so an ayah judged
         live is not judged again in `done` when those are the same (the second model is ~1 s an ayah on Cloud Run)."""
-        key = self._notes_key(s, a, statuses, spans)
+        key = self._notes_key(s, a, statuses, spans, readings)
         if key not in self._notes_cache:
             # in `done`: an ayah not judged live (not said in full then, or the last one), or one whose words or edges
             # the final pass decided differently. Reusing the live notes when only its start had moved kept a false
             # madd mark on husary's clean take that judging it again took away (Nov 14 2026), so it is judged again.
             self._judged_here += 1
             if self.v5:
-                got = self.E.ayah_notes(self.lp[:self.T], s, a, statuses, spans, self.st, audio=self.xf[:self.n])
+                got = self.E.ayah_notes(self.lp[:self.T], s, a, statuses, spans, self.st, audio=self.xf[:self.n],
+                                        readings=readings)
             else:
-                got = self.E.ayah_notes(self.lp[:self.T], s, a, statuses, spans, self.st)
+                got = self.E.ayah_notes(self.lp[:self.T], s, a, statuses, spans, self.st, readings=readings)
             self._notes_cache[key] = got
         tj, letters = self._notes_cache[key]
         return [dict(r) for r in tj], [dict(r) for r in letters]
 
-    def _notes_key(self, s, a, statuses, spans):
+    def _notes_key(self, s, a, statuses, spans, readings=None):
+        """What an ayah's notes read: its words' statuses and the frames it's judged on (ayah_pieces, unclipped:
+        a take that grows doesn't change them)."""
         first, n = self._ayah_bounds(s, a)
-        return (s, a, tuple(statuses.get(w) for w in range(first, first + n)), spans.get(first, (None,))[0],
-                spans.get(first + n - 1, (None, None))[1])
+        ws = list(range(first, first + n))
+        frames = tuple(ayah_pieces(ws, spans, readings, 10 ** 9)) if ws[0] in spans and ws[-1] in spans else None
+        return (s, a, tuple(statuses.get(w) for w in ws), frames)
 
     def _notes_later(self, s, a, now):
         """With `defer`: this ayah's notes on the background thread, unless already worked out. True when they were
         handed over (its marks and `ayah` event then come from _due, AYAH_DUE later). The frames and samples before T
         and n are never written again, so the thread reads them as they are; the statuses and spans go as copies."""
-        key = self._notes_key(s, a, self.status, self.spans)
+        key = self._notes_key(s, a, self.status, self.spans, self.readings)
         if key in self._notes_cache:
             return False
         kw = {'audio': self.xf[:self.n]} if self.v5 else {}
         fut = _ayah_submit(self._idle, self.E.ayah_notes, self.lp[:self.T], s, a, dict(self.status), dict(self.spans),
-                           self.st, **kw)
+                           self.st, readings=dict(self.readings), **kw)
         first, n = self._ayah_bounds(s, a)
         secs = (self.spans[first + n - 1][1] - self.spans[first][0]) / FPS  # both are there: said in full
         share = AYAH_DUE_SHARE['strict' if self.v5 else 'words']
@@ -1088,7 +1096,7 @@ class LiveSession:
             elif self.defer and self._notes_later(s, a, now):
                 continue
             else:
-                tj, letters = self._notes(s, a, self.status, self.spans)
+                tj, letters = self._notes(s, a, self.status, self.spans, self.readings)
                 marks = self.E.marks([], {}, {}, [], tj, letters if self.st['letters'] else [])
             for m in marks:
                 if m['id'] not in self.marks:
@@ -1160,11 +1168,12 @@ class LiveSession:
             path, _ = seg.dec.traceback(final=at_end)
             refs = checker.trail_refs(self.end) if at_end and P.get('trail_extra') else None
             results.append(self._segment_result(seg, path, seg.b, PF, refs))
-        rows, spans, extras = {}, {}, []
+        rows, spans, readings, extras = {}, {}, {}, []
         for r in results:
             for row in r['words']:
                 rows[row['w']] = row
             spans.update(r['spans'])
+            readings.update(r.get('readings', {}))
             extras += r['extras']
         for r in results:  # a word said again, right, in a later segment: corrected
             for w, stt in r['back'].items():
@@ -1186,7 +1195,7 @@ class LiveSession:
             first, n = self._ayah_bounds(s, a)
             if first < self.lo or first + n > self.end:
                 continue
-            o, l_ = self._notes(s, a, statuses, spans)
+            o, l_ = self._notes(s, a, statuses, spans, readings)
             tj += o
             letters += l_
         self.ms['tajweed'] += (time.perf_counter() - t0) * 1000
