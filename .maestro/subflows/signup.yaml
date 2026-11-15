@@ -18,37 +18,137 @@ appId: com.revisionbuddy.app
           visible:
             id: auth-name
           timeout: 10000
-- tapOn:
-    id: auth-name
-- inputText: E2E
-- tapOn:
-    id: auth-email
-- inputText: ${output.email}
-- tapOn:
-    id: auth-password
-- inputText: e2e-password
-- tapOn:
-    id: auth-confirm-password
-- inputText: e2e-password
-# Maestro's hideKeyboard can't dismiss it here: a tap on the title does. The form moves as the
-# keyboard goes (a KeyboardAvoidingView): wait for it to stop, or the tap lands where Sign up was.
-# On iOS in run 42573714262 (04) the tap reached the window and no sign-up reached the Auth emulator.
-- tapOn:
-    id: auth-title
-- waitForAnimationToEnd
+# The form, filled and then checked as a whole right before Create account: in run 43665041191
+# (12 on iOS) every field passed its own check, and a tap meant for Create account then typed a "t"
+# into Confirm Password (keyboard-away.yaml says how). Each pass fixes only what is wrong, so
+# nothing that holds its text is typed again.
+# - The passwords are shown, so their text can be read like the others'. Only while the eye still
+#   says "Show password": a tap toggles it, and a lost tap leaves it saying so.
+# - Each field is typed through type-in-field.yaml, which checks it and types it again if the
+#   keyboard dropped keys.
+# - The keyboard goes before Create account. On iOS, its Return key (keyboard-away.yaml, checked).
+#   On Android, a tap on the title: hideKeyboard can't put it away here. The form moves as the
+#   keyboard goes (a KeyboardAvoidingView): wait for it to stop, or the tap lands where Create
+#   account was. (On iOS in run 42573714262 (04), the tap reached the window and no sign-up
+#   reached the Auth emulator.)
+- retry:
+    maxRetries: 2
+    commands:
+      - runFlow: keyboard-away.yaml
+      - runFlow:
+          when:
+            visible:
+              id: auth-password-reveal
+              text: Show password
+          commands:
+            - tapOn:
+                id: auth-password-reveal
+                retryTapIfNoChange: false
+      - runFlow:
+          when:
+            visible:
+              id: auth-confirm-password-reveal
+              text: Show password
+          commands:
+            - tapOn:
+                id: auth-confirm-password-reveal
+                retryTapIfNoChange: false
+      - runFlow:
+          when:
+            notVisible:
+              id: auth-name
+              text: E2E
+          file: type-in-field.yaml
+          env:
+            ID: auth-name
+            TEXT: E2E
+      - runFlow:
+          when:
+            notVisible:
+              id: auth-email
+              text: ${output.email}
+          file: type-in-field.yaml
+          env:
+            ID: auth-email
+            TEXT: ${output.email}
+      - runFlow:
+          when:
+            notVisible:
+              id: auth-password
+              text: e2e-password
+          file: type-in-field.yaml
+          env:
+            ID: auth-password
+            TEXT: e2e-password
+      - runFlow:
+          when:
+            notVisible:
+              id: auth-confirm-password
+              text: e2e-password
+          file: type-in-field.yaml
+          env:
+            ID: auth-confirm-password
+            TEXT: e2e-password
+      - runFlow: keyboard-away.yaml
+      - runFlow:
+          when:
+            platform: Android
+          commands:
+            - tapOn:
+                id: auth-title
+      - waitForAnimationToEnd
+      - assertVisible:
+          id: auth-name
+          text: E2E
+      - assertVisible:
+          id: auth-email
+          text: ${output.email}
+      - assertVisible:
+          id: auth-password
+          text: e2e-password
+      - assertVisible:
+          id: auth-confirm-password
+          text: e2e-password
+# Create account, and again only if the tap was lost: then the form is still there, its button
+# enabled. While the app signs up the button is busy and disabled, and once it has, the screen goes;
+# so a second tap never starts a second sign-up.
 - tapOn:
     id: auth-submit
+    retryTapIfNoChange: false
 # SYNC-4: the new account loads at once, with no relaunch. (Asserted by the
-# caller: 01-onboarding fails on it; other flows go on, see new-account.yaml.)
+# callers, 01-onboarding and new-account.yaml, right after.)
 # The wait also ends on the app's error (an id is a regex), and a sign-up the
-# app refused fails here with its message on the screen, not as SYNC-4 after a
-# relaunch that clears it. On iOS the simulator's keyboard can stall and drop
-# typed characters (run 42403217365: the email went out malformed and the Auth
-# emulator answered "invalid email").
+# app refused fails here with its message on the screen, not later as SYNC-4
+# (no Welcome). (Keys the simulator's keyboard dropped are typed
+# again above; before that, runs 42403217365 and 43583371303 failed here on
+# "Invalid email address".)
+- repeat:
+    while:
+      notVisible:
+        id: "welcome|auth-error"
+    times: 2
+    commands:
+      - extendedWaitUntil:
+          visible:
+            id: "welcome|auth-error"
+          timeout: 30000
+          optional: true
+      - runFlow:
+          when:
+            visible:
+              id: auth-submit
+              enabled: true
+            notVisible:
+              id: auth-error
+          commands:
+            - evalScript: "${console.log('WARNING signup - the form is still there 30 s after Create account; tapping it again')}"
+            - tapOn:
+                id: auth-submit
+                retryTapIfNoChange: false
 - extendedWaitUntil:
     visible:
       id: "welcome|auth-error"
-    timeout: 60000
+    timeout: 30000
     optional: true
 - assertNotVisible:
     id: auth-error

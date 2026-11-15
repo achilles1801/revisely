@@ -183,6 +183,8 @@ export interface SegmentInfo {
   levels?: number[];
   /** A new recording kept on this phone only (StoredRecording.localOnly). */
   localOnly?: boolean;
+  /** Hold the recording's upload from this segment on (holdUpload), until released: the recorder is still going. */
+  holdUpload?: boolean;
 }
 
 export interface AppendResult {
@@ -193,6 +195,8 @@ export interface AppendResult {
   /** The recording to continue was gone, so a new one began with this segment:
    *  its timeline starts at segmentStartMs. */
   restarted: boolean;
+  /** The kept segment's file name. */
+  fileName?: string;
 }
 
 /** Marks rebased to a timeline that starts at `startMs`: the page on screen
@@ -260,6 +264,8 @@ export function appendSegment(
       ...((existing ? existing.localOnly : info.localOnly) ? { localOnly: true } : {}),
       storage: 'device',
     };
+    // Held before the index lists it, so no backup run sees it unheld.
+    if (info.holdUpload) holdUpload(id, null);
     try {
       writeIndex(dir, existing ? entries.map((e) => (e.id === id ? entry : e)) : [...entries, entry]);
     } catch (err) {
@@ -269,7 +275,7 @@ export function appendSegment(
       throw err;
     }
     notifyChanged();
-    return { id, kept: true, restarted };
+    return { id, kept: true, restarted, fileName: target.name };
   });
 }
 
@@ -357,33 +363,90 @@ export function listRecordings(): Promise<RecordingMeta[]> {
   });
 }
 
+function deleteFiles(dir: Directory, segments: StoredSegment[]) {
+  for (const sg of segments) {
+    try {
+      const file = new File(dir, sg.fileName);
+      if (file.exists) file.delete();
+    } catch (err) {
+      logger.warn('Could not delete recording file', err);
+    }
+  }
+}
+
+/** Inside serial: delete `gone` from the index, its files and its backup. */
+function deleteEntries(dir: Directory, entries: StoredRecording[], gone: StoredRecording[]) {
+  for (const e of gone) deleteFiles(dir, segmentsOf(e));
+  if (gone.length === 0) return;
+  const ids = new Set(gone.map((e) => e.id));
+  for (const id of ids) dropHold(id);
+  writeIndex(dir, entries.filter((e) => !ids.has(e.id)));
+  // Its backup goes too (also a copy uploading right now, or one restored).
+  queueCloudDeletes(gone.map(cloudDeleteFor));
+  notifyChanged();
+}
+
 /** Delete the recordings `match` selects; returns how many were deleted. */
 export function deleteRecordings(match: (r: StoredRecording) => boolean): Promise<number> {
   return serial(async () => {
     const dir = accountDir();
     const entries = await readIndex(dir);
     const gone = entries.filter(match);
-    for (const e of gone) {
-      for (const sg of segmentsOf(e)) {
-        try {
-          const file = new File(dir, sg.fileName);
-          if (file.exists) file.delete();
-        } catch (err) {
-          logger.warn('Could not delete recording file', err);
-        }
-      }
-    }
-    if (gone.length > 0) {
-      writeIndex(dir, entries.filter((e) => !match(e)));
-      // Its backup goes too (also a copy uploading right now, or one restored).
-      queueCloudDeletes(gone.map(cloudDeleteFor));
-      notifyChanged();
-    }
+    deleteEntries(dir, entries, gone);
     return gone.length;
   });
 }
 
 export const deleteRecording = (id: string) => deleteRecordings((r) => r.id === id);
+
+/** What "Recording saved · Undo" takes back: one go at the recorder. */
+export interface RecordingUndo {
+  /** The recording began with it: Undo deletes the whole recording. */
+  created: boolean;
+  /** Otherwise (a session's recording carried on), the segments it added... */
+  segments: string[];
+  /** ...from this point of the recording's timeline (its page marks from here go too). */
+  fromMs: number;
+}
+
+export type UndoResult = 'deleted' | 'dropped' | 'gone' | 'backedUp';
+
+/**
+ * Undo a recording just saved: the whole recording if it began then (or `undo` isn't known: a take), as a delete does;
+ * else only the segments that go at the recorder added, and their page marks, so what was recorded before stays. Those segments
+ * never uploaded (the hold keeps them back while Undo is offered); one that did is refused ('backedUp'), since a
+ * segment can't leave the backup on its own. A recording left with no segments is deleted.
+ */
+export function undoRecording(id: string, undo?: RecordingUndo): Promise<UndoResult> {
+  return serial(async () => {
+    const dir = accountDir();
+    const entries = await readIndex(dir);
+    const e = entries.find((x) => x.id === id);
+    if (!e) return 'gone';
+    const added = new Set(undo && !undo.created ? undo.segments : segmentsOf(e).map((sg) => sg.fileName));
+    const parts = segmentsOf(e).filter((sg) => added.has(sg.fileName));
+    const kept = segmentsOf(e).filter((sg) => !added.has(sg.fileName));
+    if (kept.length === 0) {
+      deleteEntries(dir, entries, [e]);
+      return 'deleted';
+    }
+    if (parts.length === 0) return 'gone';
+    if (parts.some((sg) => sg.uploaded || sg.upload)) return 'backedUp';
+    deleteFiles(dir, parts);
+    const fromMs = undo?.fromMs ?? 0;
+    const entry: StoredRecording = {
+      ...e,
+      segments: kept,
+      durationMs: kept.reduce((sum, sg) => sum + sg.durationMs, 0),
+      pageMarks: normalizePageMarks(e.pageMarks.filter((m) => m.atMs < fromMs)),
+    };
+    writeIndex(dir, entries.map((x) => (x.id === id ? entry : x)));
+    // What was recorded before uploads as it would have.
+    dropHold(id);
+    notifyChanged();
+    return 'dropped';
+  });
+}
 
 /** The recordings belonging to a revision session (one per revision day). */
 export const isRevisionRecordingOf = (day: string) => (r: StoredRecording) =>
@@ -452,6 +515,35 @@ const cloudDeleteFor = (e: StoredRecording): CloudDelete => ({ id: e.id, tombsto
 
 /** Whether this phone uploads the recording (its own, or adopted). */
 const uploadsHere = (e: StoredRecording) => !e.localOnly && !e.backupDeleted && (!e.restored || e.adopted === true);
+
+// A recording being made, and one just saved while "Recording saved" offers Undo, waits to upload: what Undo takes
+// back never leaves the phone. The recorder holds it from its first segment (appendSegment's holdUpload) and gives it
+// UPLOAD_HOLD_MS once it stops; the note releases it when it goes, and leaving the screen does at once. Held only in
+// memory: a restart lets everything upload.
+export const UPLOAD_HOLD_MS = 20_000;
+const heldUploads = new Map<string, ReturnType<typeof setTimeout> | null>();
+
+function dropHold(id: string) {
+  const timer = heldUploads.get(id);
+  if (timer) clearTimeout(timer);
+  heldUploads.delete(id);
+}
+
+/** Don't upload `id` until releaseUpload, or for `ms` (null: until released). */
+export function holdUpload(id: string, ms: number | null = UPLOAD_HOLD_MS): void {
+  dropHold(id);
+  heldUploads.set(id, ms == null ? null : setTimeout(() => releaseUpload(id), ms));
+}
+
+/** Let `id` upload (the backup runs, as after any change). */
+export function releaseUpload(id: string): void {
+  if (!heldUploads.has(id)) return;
+  dropHold(id);
+  notifyChanged();
+}
+
+/** Whether `id`'s upload is held (tests, and the backup's pending list). */
+export const uploadHeld = (id: string) => heldUploads.has(id);
 
 function syncDir(): Directory {
   const dir = new Directory(Paths.document, 'recordings-sync');
@@ -558,7 +650,7 @@ export function pendingUploads(uid: string): Promise<PendingUpload[]> {
     const dir = dirFor(uid);
     const out: PendingUpload[] = [];
     for (const e of await readIndex(dir)) {
-      if (!uploadsHere(e)) continue;
+      if (!uploadsHere(e) || heldUploads.has(e.id)) continue;
       for (const sg of segmentsOf(e)) {
         if (sg.uploaded) continue;
         const file = new File(dir, sg.fileName);

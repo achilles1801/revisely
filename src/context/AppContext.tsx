@@ -619,7 +619,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (!active || !fbUser || fbUser.uid !== uid) return;
       if (ensuring[what]) return;
       ensuring[what] = true;
-      ensureOnServer({
+      // A sign-in creating the account (AuthContext) is its one creator: look once it is done.
+      firestoreService.accountCreatorDone().then(() => ensureOnServer({
         fromCache,
         skip: () =>
           !active || firestoreService.isDeletingAccount(fbUser.uid) || firestoreService.isResettingAccount(fbUser.uid),
@@ -639,7 +640,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         onLostRace: (err) => logger.warn(`User ${what} appeared while creating them`, err),
         onError: (err) =>
           logger.error(what === 'user' ? 'Failed to recreate missing user doc:' : 'Failed to initialize pages:', err),
-      })
+      }))
         .then((outcome) => {
           ensuring[what] = false;
           if (!active) return;
@@ -729,6 +730,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
       onListenError,
     );
 
+    // The pages this app writes for the account (it had none: sign-up, or the
+    // listener above) are shown as written, at once. The pages listener waits
+    // while they are written and then reads the server's, which replace them; the
+    // app used to wait for that, and a new account stayed on "loading" for as long
+    // as the server took to acknowledge 604 pages, over a minute on a CI simulator
+    // (SYNC-4, Nov 2026). Never over pages already shown.
+    const takeWritten = (written: FirestorePage[]) =>
+      update((b) => (b.pages === undefined || b.pages.length === 0 ? { ...b, pages: written } : b));
+    const offPagesWritten = firestoreService.onPagesWritten((u, written) => {
+      if (active && u === uid) takeWritten(written);
+    });
+    const writing = firestoreService.pagesBeingWritten(uid);
+    if (writing) takeWritten(writing);
+
     const unsubscribeSessions = firestoreService.subscribeToSessions(
       (sessions, { fromCache }) => {
         if (!active || fromCache) return;
@@ -745,6 +760,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       timers.forEach(clearTimeout);
       unsubscribeUser();
       unsubscribePages();
+      offPagesWritten();
       unsubscribeSessions();
     };
   }, [uid, listenEpoch, saveCopy, mutateBase, noteServerUser]);

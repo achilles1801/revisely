@@ -123,6 +123,10 @@ passed 06 once in the smoke set, and broke 06 on develop for everyone.
   other subflows), together with the smoke set, on **both platforms, twice**, with no reruns
   (`E2E_REPEAT=2`: every run must pass).
 - **`run.sh`, `.maestro/config.yaml`, `e2e.yml` or `ci.yml`:** every flow, both platforms, twice.
+- **The jobs:** three flows or fewer run in one job a platform; more run in the full run's jobs, each
+  keeping only the flows touched, so each fits its 180 minutes with every flow run twice
+  (`scripts/e2e/__tests__/shards.test.js`). Two jobs didn't: #574 touched 21 flows through
+  `signup.yaml`, and its iOS job of 11 ran out of time with every flow passing (run 43706009559).
 - **The scenario harness, its Jest config or `scripts/emulators.sh`:** the scenario suite twice. The
   second run starts from empty Firestore and Auth emulators (`harness/clearEmulators.js`), as the
   first does: it had found the first run's data, and the day's Revo spend put Revo to rest halfway

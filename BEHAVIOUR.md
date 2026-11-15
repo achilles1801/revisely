@@ -226,8 +226,15 @@ How the tests are made: `tests/scenarios/README.md`.
   refused, no connection) leaves the sign-in screen as it was: the same mode, the name, the email and the password
   still typed, with the error under them. A password reset that fails keeps the email. While an attempt runs, it
   shows on its button; only the launch shows the spinner in place of the screen.
+- **AUTH-1.** A phone signed in stays signed in at launch when Google can't check the sign-in just then (an
+  outage, a rate limit: a 5xx, a 429, or a quota or internal error). It checks again at the next start. A sign-in
+  that was ended, a disabled or deleted account, or any other answer still signs it out, as before.
 - **SYNC-5.** The same day revised on two phones while both were offline keeps every page either
   phone revised, in one session for the day.
+- **AUTH-2.** When the app finds the phone signed out at launch, though a sign-in was saved on it (the
+  account's sign-ins were ended on the server, or it was disabled or deleted), the sign-in screen says "You were
+  signed out. Sign in again to carry on." until the next sign-in, and Sentry hears of it once, with no account
+  details. A sign-out or an account deletion from the app says nothing.
 
 ## Sheets and updates
 
@@ -272,6 +279,20 @@ How the tests are made: `tests/scenarios/README.md`.
   in the Revised block at once (ACT-13), carry no strength or minutes, and go from its menu (ACT-14).
   A sitting offers one thing: pages not memorized come first (MEM-5). Pages not scheduled that day,
   already revised, or on an older day were reading, and offer nothing.
+
+## Recite's memory (Revisely Dev)
+
+Recite with Mark mistakes remembers each take (Majd, Nov 15 2026; Tarteel's biggest lead over Revisely).
+
+- **RMEM-1.** A take with Mark mistakes is remembered on the account, so it follows the user to another
+  phone. It keeps its marks (less any called Not a mistake, after the take too, and again once put back),
+  where it ran, its score by the page, whether the page was hidden, and which recording on the phone is its
+  own. It keeps text only, never audio. A Recite take (following only), a failed take, and a take whose start
+  was never found leave nothing. Forgetting a take removes it from every phone.
+- **RMEM-2.** A remembered mistake on a word clears after 2 right takes of that word in a row, on 2
+  different revision days. Getting it wrong again starts the count over. A take counts only for what it
+  checked: Words & harakat never clears a tajweed note. Not clear marks are never remembered, and a take
+  that heard a word's harakat only as Not clear is not a try at them. Clear now clears a word at once.
 
 ## Searching the Qur'an
 
@@ -939,4 +960,6 @@ Fixed in November 2026 (the tests that pinned them are ordinary tests now):
 | SYNC-4 | A new account could stay on "loading" until the app was relaunched. | Page and session listeners hear when the server confirms the cache (`onQuerySnapshot`, `src/services/firestoreService.ts`). |
 | ACCOUNT-3 | Delete account froze the phone (Nov 10 2026): the server's removals of the 604 pages and the sessions streamed into the app's listeners, and Firestore's JavaScript took about 20 s over them on a fast Mac before "Account deleted" could show; on a phone two or three times slower that passes the 30 s the app waits, and says the server didn't answer after a delete that worked. | The account's listeners stop before the server is asked and start again if the account is still there (`pauseAccountListeners`, `src/services/firestoreService.ts`), and Firestore's string comparator is made fast for Hermes when the bundle is built (`metro/firestoreCompare.js`). |
 | SYNC-4, ONBOARD-1 | Sign-up froze the phone for about 5 s on a fast Mac (Nov 10 2026): its 604 page writes went through the live pages listener, each page three times (written, confirmed, sent back). | The pages listener waits while sign-up writes the pages and reads them once after (`initializeAllPages`), with the faster comparator. |
+| SYNC-4 | A new account stayed on "loading" for as long as the server took to acknowledge sign-up's 604 page writes and send them back (Nov 2026): over a minute on a CI simulator, where 01-onboarding failed on it about half the time. The pages listener waited while the pages were written (the row above), and the app showed pages only from the server. | The app shows the pages it has just written at once (`onPagesWritten`, `src/services/firestoreService.ts`; AppContext); the listener's server read replaces them. |
+| SYNC-4 | Two creators of a new account (Nov 2026): on a phone the account's listener heard "no user document" while sign-up was still setting the name, and created one too. The rules refused one ("appeared while creating them"), and when the listener's won, the account had no name (Apple's, sent on the first sign-in only, was lost for good). | A sign-in that may create the account is its one creator while it runs, and the listeners wait for it (`asAccountCreator`, `src/services/firestoreService.ts`; AuthContext).
 | RESET-2, RESET-3 | Reset my data and Load test scenario streamed the server's rewrite of the account into the listeners, one change at a time (Nov 10 2026): with Firestore's faster comparator (#509), a Hafiz scenario still froze the phone for 1.5–1.8 s on a fast Mac while the server worked, and a reset for 0.8–1.0 s. | The listeners pause while the server rewrites the account and read it afresh once it answers (`whileServerRewrites`, `src/services/firestoreService.ts`): no freeze while the server works; the account loaded afterwards is read once. |

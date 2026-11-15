@@ -6,6 +6,8 @@ import { MushafPager, MushafPagerHandle } from '../../components/MushafPager';
 import { MushafScrubber } from '../../components/MushafScrubber';
 import { useVerseActions } from '../../components/verse/useVerseActions';
 import { navigateToActivityDay } from '../../navigation/navigationRef';
+import { RecordingSavedToast, SavedRecording } from '../../components/recordings/RecordingSavedToast';
+import { releaseUpload } from '../../lib/recordings';
 import { UndoToast } from '../../components/revision/UndoToast';
 import { HELP_ICON, HelpButton } from '../../components/help/HelpButton';
 import { HelpToast } from '../../components/help/HelpToast';
@@ -43,7 +45,8 @@ import { reciteLiveEnabled } from '../../lib/reciteLive/availability';
 import { premiumErrorText, setDevPremium, supportLinkUrl, usePremium } from '../../lib/premium';
 import { setReciteCheckSettings, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
 import { loadQuranWords, getQuranWords, QuranWords } from '../../lib/recite/quranWords';
-import { furthestWord, marksOnPage, startNotFound } from '../../lib/reciteLive/state';
+import { furthestWord, marksOnPage, removedMarks, startNotFound } from '../../lib/reciteLive/state';
+import { stopTrace } from '../../lib/reciteLive/stopTrace';
 import {
   barWords,
   hiddenFollow,
@@ -61,16 +64,21 @@ import { LiveMarkTargets, LiveOverlay, LiveUnderlay } from '../../components/rec
 import { ReciteNoticeSheet } from '../../components/reciteLive/ReciteNoticeSheet';
 import { MarkCard } from '../../components/reciteLive/MarkCard';
 import { SimilarPhrasesSheet } from '../../components/reciteLive/SimilarPhrasesSheet';
-import { TakeSummarySheet } from '../../components/reciteLive/TakeSummarySheet';
+import { findingsLine, TakeSummarySheet } from '../../components/reciteLive/TakeSummarySheet';
+import { say, undoMs, useScreenReaderOn } from '../../components/reciteLive/a11y';
+import { markTitle } from '../../lib/reciteLive/describe';
+import { drillMarks, drillRange } from '../../lib/reciteLive/drill';
 import { CheckIntroPage } from '../../components/reciteLive/CheckIntroPage';
 import { markAt, wordBox } from '../../lib/reciteLive/geometry';
 import { similarPhrases } from '../../lib/reciteLive/similar';
 import type { Mark } from '../../lib/reciteLive/contract';
 import type { Box } from '../../components/verse/menuPlacement';
-import { getRecitation } from '../../lib/recitation';
-import { warmUpReciteCheck } from '../../lib/reciteCheck/service';
+import { playClip, playReference, stopHearing } from '../../lib/reciteLive/hearAudio';
+import { useKeepCheckerWarm } from '../../components/reciteLive/useKeepCheckerWarm';
 import { needsPremium, type LiveFailure } from '../../lib/reciteLive/contract';
 import { logger } from '../../lib/logger';
+import { useRememberTake } from '../../components/reciteMemory/useRememberTake';
+import { useMemoryRecords } from '../../lib/reciteMemory/store';
 
 /** What the recite bar says when a take ends without its answer. */
 const LIVE_FAILURE: Record<LiveFailure, string> = {
@@ -122,10 +130,8 @@ export default function QuranReaderScreen() {
   // Record yourself reading; saved under today's (revision day's) reading.
   const { user } = useApp();
   const { day: today } = useRevisionDay(user);
-  // After ending a recording: "Recording saved · View" (opens it in Activity).
-  const [savedRecording, setSavedRecording] = useState<{ day: string; recordingId: string } | null>(
-    null,
-  );
+  // After ending a recording: "Recording saved · Undo · View" (View opens it in Activity).
+  const [savedRecording, setSavedRecording] = useState<SavedRecording | null>(null);
   // A sitting (REC-1): ending the timer ends a recording running with it, and one note says what
   // was saved ("Saved to today: Al-Mulk, ayahs 1–26, 41 min · View").
   const sittings = sittingsEnabled(user);
@@ -138,6 +144,8 @@ export default function QuranReaderScreen() {
     // Ended with the timer, the recording is told about in the sitting's note, not its own.
     onFinished: (info) => {
       if (!endingSitting.current) setSavedRecording(info);
+      // Its note is the sitting's, with no Undo: it uploads now.
+      else releaseUpload(info.recordingId);
     },
   });
   const recordingOn = recorder.phase === 'recording' || recorder.phase === 'paused';
@@ -193,6 +201,14 @@ export default function QuranReaderScreen() {
     if (!searchHighlight || searchHighlight.some((h) => h.page === currentPage)) return;
     if (searchHighlight.every((h) => ayahRects(currentPage, h.sura, h.ayah).length === 0)) setSearchHighlight(null);
   }, [currentPage, searchHighlight]);
+  // An ayah a take slipped into (the summary's "You continued with …"): highlighted once its page is shown, since the
+  // highlight above goes as soon as the page shown has none of it.
+  const [intoTarget, setIntoTarget] = useState<AyahRef | null>(null);
+  useEffect(() => {
+    if (!intoTarget || intoTarget.page !== currentPage) return;
+    setSearchHighlight([intoTarget]);
+    setIntoTarget(null);
+  }, [intoTarget, currentPage]);
 
   // Reading: nothing but the page (its number, the juz and surah). A tap on
   // the page brings the controls (they sit beside the page, never over it);
@@ -290,8 +306,14 @@ export default function QuranReaderScreen() {
     currentPage,
     onShowPage: (page) => pagerRef.current?.scrollToPage(page),
     recordingDay: today ?? null,
-    onRecordingSaved: setTakeSaved,
+    onRecordingSaved: (saved) => {
+      setTakeSaved(saved);
+      noteTakeRecording.current(saved);
+    },
   });
+  // Recite's memory (lib/reciteMemory): every take with Mark mistakes, kept on the account.
+  const memoryRecords = useMemoryRecords(user?.id, liveOn);
+  const noteTakeRecording = useRef<(saved: { recordingId: string }) => void>(() => undefined);
   const [words, setWords] = useState<QuranWords | null>(getQuranWords());
   useEffect(() => {
     if (!liveOn || words) return;
@@ -302,17 +324,39 @@ export default function QuranReaderScreen() {
   const qw = live.words ?? words;
   const [hidden, setHidden] = useState(false);
   const [revealed, setRevealed] = useState<Revealed>(NOTHING_SHOWN);
+  noteTakeRecording.current = useRememberTake({
+    uid: user?.id,
+    enabled: liveOn,
+    live,
+    hidden,
+    day: today ?? null,
+    level: reciteSettings.level === 'strict' ? 'strict' : 'words',
+    records: memoryRecords,
+  }).noteRecording;
   const [modeMenu, setModeMenu] = useState(false);
   const [noticeFor, setNoticeFor] = useState<LiveMode | null>(null);
   // Check: the word a card is open on (and where it is on screen), similar phrases, the summary, Check's page.
   const [cardAt, setCardAt] = useState<{ w: number; anchor: Box } | null>(null);
+  // What the card plays stops when the card closes, and when the reader goes (Majd, Nov 15 2026: Husary played on past
+  // the take, into Control Center).
+  useEffect(() => {
+    if (!cardAt) stopHearing();
+  }, [cardAt]);
+  useEffect(() => () => stopHearing(), []);
   const [similarFor, setSimilarFor] = useState<number | null>(null);
+  // "Not a mistake" on the card can be undone for a few seconds (Majd, Nov 15 2026); the summary's Removed list after.
+  const [undoFor, setUndoFor] = useState<string | null>(null);
+  // With VoiceOver or TalkBack: the Undo stays longer, and what happened is said (never while the microphone is on).
+  const screenReader = useScreenReaderOn();
+  useEffect(() => {
+    if (live.state.status === 'connecting' || live.state.status === 'idle') setUndoFor(null);
+  }, [live.state.status]);
   const [summaryFor, setSummaryFor] = useState<string | null>(null);
   const [introOpen, setIntroOpen] = useState(false);
-  // Wake the checker while the reader opens (Cloud Run sleeps; waking takes a few seconds).
-  useEffect(() => {
-    if (liveOn) warmUpReciteCheck();
-  }, [liveOn]);
+  // Keep the checker awake while the reader is open and in front (Cloud Run stops an idle one after about 15 minutes, and
+  // waking takes 6–9 s): on opening, then every 10 minutes, never while a take's connection already holds it.
+  const takeBusy = live.state.status === 'connecting' || live.state.status === 'listening' || live.state.status === 'checking';
+  useKeepCheckerWarm(liveOn && isScreenFocused, takeBusy);
   // What a tap on the mic starts: Record, or Recite, marking mistakes when the switch is on and the account has it.
   const markMistakes = owned && reciteSettings.markMistakes;
   const micMode: ReciteMicMode = reciteSettings.mode === 'record' ? 'record' : markMistakes ? 'check' : 'recite';
@@ -321,6 +365,8 @@ export default function QuranReaderScreen() {
     [live.state, live.startWord],
   );
 
+  // Recite the mistakes again: what the take before found in the stretch, for its summary ("Before: …").
+  const [drillBefore, setDrillBefore] = useState<string | null>(null);
   const startMode = useCallback(
     (mode: ReciteMicMode) => {
       if (mode === 'record') {
@@ -337,6 +383,7 @@ export default function QuranReaderScreen() {
         return;
       }
       setRevealed(NOTHING_SHOWN);
+      setDrillBefore(null);
       void live.start(mode);
     },
     [recorder, owned, reciteSettings.noticeSeen, live],
@@ -402,6 +449,10 @@ export default function QuranReaderScreen() {
   // The summary, once a take has its final answer.
   const takeId = live.state.take;
   const [summaryShown, setSummaryShown] = useState<string | null>(null);
+  // A new take may get the id of the one before (E2E's recorded takes all do): its summary must still show.
+  useEffect(() => {
+    if (live.state.status === 'connecting') setSummaryFor(null);
+  }, [live.state.status]);
   useEffect(() => {
     if (live.state.status !== 'done' || !takeId || summaryFor === takeId) return;
     setSummaryFor(takeId);
@@ -411,6 +462,7 @@ export default function QuranReaderScreen() {
       live.clear();
       return;
     }
+    stopTrace.step('summary-asked');
     setSummaryShown(takeId);
     // Only when a take finishes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -436,7 +488,17 @@ export default function QuranReaderScreen() {
     (page: number) => (checkTake && qw ? marksOnPage(live.state, qw, page) : []),
     [checkTake, qw, live.state],
   );
-  const coverColors = useMemo(() => ({ cover: palette.pageBg, guide: palette.textSecondary, band: v2.followInk }), [palette, v2]);
+  // The hidden view: covers and guide lines only, no band on any line (lib/reciteLive's LiveOverlay).
+  const coverColors = useMemo(() => ({ cover: palette.pageBg, guide: palette.textSecondary }), [palette]);
+  // Recite's three highlight colours (theme/v2: markWord…), each with its firmer shade for the mark a card is open for.
+  const markColours = useMemo(
+    () => ({
+      word: { fill: v2.markWord, firm: v2.markWordFirm },
+      slip: { fill: v2.markSlip, firm: v2.markSlipFirm },
+      tajweed: { fill: v2.markTajweed, firm: v2.markTajweedFirm },
+    }),
+    [v2],
+  );
   const pageUnderlay = useMemo(
     () =>
       liveOn && qw && live.active
@@ -446,30 +508,23 @@ export default function QuranReaderScreen() {
               scale={scale}
               words={qw}
               cursor={live.state.status === 'listening' ? live.state.cursor : null}
+              marks={pageMarks(page)}
               selected={cardMarks[0] ?? null}
-              colors={{ band: v2.followBand, word: v2.followWord, selectedMistake: v2.redSubtle, selectedSlip: v2.warnSubtle }}
+              hidden={hidden}
+              colors={{ band: v2.followBand, word: v2.followWord, marks: markColours }}
             />
           )
         : undefined,
-    [liveOn, qw, live.active, live.state, v2, cardMarks],
+    [liveOn, qw, live.active, live.state, v2, cardMarks, pageMarks, hidden, markColours],
   );
   const pageOverlay = useMemo(
     () =>
-      liveOn && qw && (live.active || hidden)
-        ? (page: number, scale: number, image: Parameters<NonNullable<React.ComponentProps<typeof MushafPager>['pageOverlay']>>[2]) => (
-            <LiveOverlay
-              page={page}
-              scale={scale}
-              image={image}
-              words={qw}
-              marks={pageMarks(page)}
-              hidden={hidden ? { follow: hiddenFollow(qw, revealed, liveInfo), ...coverColors } : null}
-              newest={live.state.cursor}
-              colors={{ mistake: v2.red, slip: v2.warn, follow: v2.followInk, onMistake: v2.bg, ground: palette.pageBg }}
-            />
+      liveOn && qw && hidden
+        ? (page: number, scale: number) => (
+            <LiveOverlay page={page} scale={scale} hidden={{ follow: hiddenFollow(qw, revealed, liveInfo), ...coverColors }} />
           )
         : undefined,
-    [liveOn, qw, live.active, live.state.cursor, hidden, revealed, liveInfo, coverColors, pageMarks, v2],
+    [liveOn, qw, hidden, revealed, liveInfo, coverColors],
   );
   // The marks as elements of their own (VoiceOver, the tests). Given whenever the live UI is on, so the pager's pages
   // keep one shape through takes.
@@ -551,6 +606,9 @@ export default function QuranReaderScreen() {
                 words={barWords(live.state, qw, { check: checkTake, startWord: live.startWord })}
                 status={barStatus}
                 phase={barPhase}
+                paused={live.paused}
+                onPause={() => void live.pause()}
+                onResume={() => void live.resume()}
                 onStop={live.stop}
                 onClose={() => {
                   setCardAt(null);
@@ -635,17 +693,10 @@ export default function QuranReaderScreen() {
         />
       </ReaderFrame>
 
-      <UndoToast
-        visible={!!savedRecording}
-        message="Recording saved"
-        actionLabel="View"
-        duration={6000}
-        onUndo={() => {
-          const saved = savedRecording;
-          setSavedRecording(null);
-          if (saved) navigateToActivityDay(saved.day, saved.recordingId);
-        }}
-        onDismiss={() => setSavedRecording(null)}
+      <RecordingSavedToast
+        saved={savedRecording}
+        onClose={() => setSavedRecording(null)}
+        quiet={live.mic === 'on'}
         // At the bottom of the room under the page, never over the text.
         bottomInset={insets.bottom - spacing.sm}
       />
@@ -663,6 +714,22 @@ export default function QuranReaderScreen() {
         onDismiss={() => setSittingSaved(null)}
         bottomInset={insets.bottom - spacing.sm}
       />
+
+      {liveOn ? (
+        <UndoToast
+          visible={undoFor != null}
+          message="Marked not a mistake"
+          duration={undoMs(screenReader)}
+          onUndo={() => {
+            const id = undoFor;
+            setUndoFor(null);
+            if (id) live.restore(id);
+          }}
+          onDismiss={() => setUndoFor(null)}
+          // Above the recite bar.
+          bottomInset={insets.bottom + spacing.sm + CAPSULE_HEIGHT + spacing.sm}
+        />
+      ) : null}
 
       <HelpToast screen="reader" bottomInset={insets.bottom - spacing.sm} />
       {verseActions.overlay}
@@ -688,8 +755,27 @@ export default function QuranReaderScreen() {
               marks={cardMarks}
               words={qw}
               anchor={cardAt?.anchor ?? null}
-              onDismiss={live.dismiss}
-              onHear={(m) => getRecitation().play({ sura: m.ayah[0], ayah: m.ayah[1] }, () => null)}
+              onDismiss={(id) => {
+                live.dismiss(id);
+                setUndoFor(id);
+                if (live.mic !== 'on') say('Marked not a mistake. Undo is at the bottom of the screen.');
+              }}
+              // The reciter's ayah on the card's own player (lib/reciteLive/hearAudio): a take still listening pauses first,
+              // so it isn't ended and its microphone doesn't hear the reciter (Majd, Nov 15 2026).
+              onHear={async (m) => {
+                if (live.state.status === 'listening' && live.mic === 'on') await live.pause();
+                void playReference({ sura: m.ayah[0], ayah: m.ayah[1] });
+              }}
+              // The reciter's own voice at the mark, from the take kept on the phone (Majd: Tarteel plays both).
+              onYours={
+                cardMarks[0] && live.hasClip(cardMarks[0])
+                  ? async (m) => {
+                      if (live.state.status === 'listening' && live.mic === 'on') await live.pause();
+                      const pcm = live.clipFor(m);
+                      if (pcm) void playClip(pcm);
+                    }
+                  : undefined
+              }
               onSimilar={(m) => {
                 setCardAt(null);
                 setSimilarFor(m.w);
@@ -722,12 +808,28 @@ export default function QuranReaderScreen() {
             marks={Object.values(live.state.marks).sort((a, b) => a.w - b.w)}
             score={checkTake && qw ? scorePill(live.state, qw, live.startWord) : null}
             kept={live.testData}
+            removed={removedMarks(live.state)}
+            onPutBack={(id) => {
+              if (undoFor === id) setUndoFor(null);
+              const m = live.state.removed[id]?.mark;
+              live.restore(id);
+              // The row it was on goes: say where it went.
+              if (m) say(`${markTitle(m)} put back`);
+            }}
             checkOwned={owned}
             onFinding={(m) => {
               setSummaryShown(null);
               if (!qw) return;
               pagerRef.current?.scrollToPage(qw.pageOf(m.w));
               setCardAt({ w: m.w, anchor: { x: width / 2, y: insets.top + 120, width: 1, height: 1 } });
+            }}
+            onInto={(into) => {
+              // That ayah, highlighted as a search result is, until the page is turned (once its page is the one shown).
+              setSummaryShown(null);
+              setCardAt(null);
+              const target = toAyahRef({ sura: into.ayah[0], ayah: into.ayah[1] });
+              setIntoTarget(target);
+              pagerRef.current?.scrollToPage(target.page);
             }}
             onCheck={() => {
               setSummaryShown(null);
@@ -740,7 +842,21 @@ export default function QuranReaderScreen() {
               live.clear();
               if (mode) startMode(mode);
             }}
+            onDrill={() => {
+              const marks = Object.values(live.state.marks);
+              const range = drillRange(marks);
+              if (!range) return;
+              setSummaryShown(null);
+              setCardAt(null);
+              live.clear();
+              setRevealed(NOTHING_SHOWN);
+              setDrillBefore(findingsLine(drillMarks(marks)));
+              void live.start('check', range);
+            }}
+            before={drillBefore}
             onDone={() => setSummaryShown(null)}
+            // The summary is on screen: the take's Stop trace ends (lib/reciteLive/stopTrace).
+            onShown={() => stopTrace.end()}
           />
           <CheckIntroPage
             visible={introOpen}

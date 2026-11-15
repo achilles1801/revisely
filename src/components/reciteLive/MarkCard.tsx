@@ -8,79 +8,21 @@ import { Tap } from '../v2/Tap';
 import { Box, placeMenu } from '../verse/menuPlacement';
 import type { QuranWords } from '../../lib/recite/quranWords';
 import type { Mark } from '../../lib/reciteLive/contract';
-import { severityOf } from '../../lib/reciteLive/contract';
+import { isUnclear, markGroup } from '../../lib/reciteLive/contract';
+import { markFill } from './markColours';
+import { Phrase, Row, SmallPill } from './MarkParts';
 import {
   expectedPhrase,
   markPlace,
   markTitle,
-  PhrasePart,
   recitedLabel,
   recitedPhrase,
   slipLine,
   tajweedLines,
+  UNCLEAR_NOTE,
 } from '../../lib/reciteLive/describe';
 
 const CARD_MARGIN = 12;
-
-/** An Arabic phrase with the mark's word coloured (expected in green, recited in its mark's colour, a gap dotted). */
-function Phrase({ parts, color }: { parts: PhrasePart[]; color: string }) {
-  const { palette } = useTheme();
-  return (
-    <Text style={[arabicV2(21), styles.ar, { color: palette.text }]} maxFontSizeMultiplier={1.6}>
-      {parts.map((p, i) => (
-        <Text key={i}>
-          {i > 0 ? ' ' : ''}
-          {p.role === 'gap' ? (
-            <Text style={{ color, textDecorationLine: 'underline', textDecorationStyle: 'dotted' }}>{'  '}</Text>
-          ) : (
-            <Text
-              style={
-                p.role === 'expected'
-                  ? { color: palette.good }
-                  : p.role === 'recited'
-                    ? { color, textDecorationLine: 'underline', textDecorationStyle: 'dotted' }
-                    : undefined
-              }
-            >
-              {p.text}
-            </Text>
-          )}
-        </Text>
-      ))}
-    </Text>
-  );
-}
-
-function Row({ label, children, first }: { label: string; children: React.ReactNode; first?: boolean }) {
-  const { palette } = useTheme();
-  return (
-    <View style={[styles.row, !first && { borderTopColor: palette.separator, borderTopWidth: layoutV2.hairline }]}>
-      <Text style={[typeV2.meta, styles.label, { color: palette.secondary }]} maxFontSizeMultiplier={1.3}>
-        {label}
-      </Text>
-      <View style={styles.rowBody}>{children}</View>
-    </View>
-  );
-}
-
-function SmallPill({ icon, label, onPress, testID }: { icon?: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void; testID?: string }) {
-  const { palette } = useTheme();
-  return (
-    <Tap
-      onPress={onPress}
-      hitSlop={4}
-      style={[styles.pill, { borderColor: palette.outline }]}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      testID={testID}
-    >
-      {icon ? <Ionicons name={icon} size={15} color={palette.text} /> : null}
-      <Text style={[styles.pillText, { color: palette.text }]} maxFontSizeMultiplier={1.3}>
-        {label}
-      </Text>
-    </Tap>
-  );
-}
 
 /** One mark's part of the card: what it is, where, Expected and Recited (or the tajweed note), and its actions. */
 function MarkBlock({
@@ -95,15 +37,17 @@ function MarkBlock({
   first: boolean;
 }) {
   const { palette } = useTheme();
-  const color = severityOf(mark) === 'mistake' ? palette.red : palette.warn;
-  const recited = recitedPhrase(words, mark);
-  const slip = slipLine(mark);
+  const fill = markFill(palette, mark);
+  // Not clear: what the checker thinks it heard is the unclear part, so only what was expected shows, and why.
+  const unclear = isUnclear(mark);
+  const recited = unclear ? null : recitedPhrase(words, mark);
+  const slip = unclear ? UNCLEAR_NOTE : slipLine(mark);
   return (
     <View style={[styles.block, !first && { borderTopColor: palette.separator, borderTopWidth: layoutV2.hairline }]} testID={`mark-card-${mark.kind}`}>
       <View style={styles.head}>
         <View style={styles.headText}>
           <View style={styles.titleRow}>
-            <View style={[styles.dot, { backgroundColor: color }]} />
+            <View style={[styles.swatch, { backgroundColor: fill }]} testID={`mark-card-swatch-${markGroup(mark)}`} />
             <Text style={[typeV2.name, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
               {markTitle(mark)}
             </Text>
@@ -117,27 +61,29 @@ function MarkBlock({
       {mark.kind === 'tajweed' ? (
         <View style={styles.tajweed}>
           <View style={styles.rowBody}>
-            <Text style={[typeV2.body, { color: palette.text }]}>{tajweedLines(mark).main}</Text>
+            <Text style={[typeV2.body, { color: palette.text }]} maxFontSizeMultiplier={1.4}>{tajweedLines(mark).main}</Text>
             {tajweedLines(mark).sub ? (
-              <Text style={[typeV2.meta, { color: palette.secondary }]}>{tajweedLines(mark).sub}</Text>
+              <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>{tajweedLines(mark).sub}</Text>
             ) : null}
           </View>
-          <Text style={[arabicV2(24), { color }]} maxFontSizeMultiplier={1.6}>
-            {words.uthmani(mark.w)}
-          </Text>
+          <View style={[styles.arWrap, { backgroundColor: fill }]}>
+            <Text style={[arabicV2(24), { color: palette.text }]} maxFontSizeMultiplier={1.6}>
+              {words.uthmani(mark.w)}
+            </Text>
+          </View>
         </View>
       ) : (
         <View>
           <Row label="Expected" first>
-            <Phrase parts={expectedPhrase(words, mark)} color={color} />
+            <Phrase parts={expectedPhrase(words, mark)} fill={fill} />
           </Row>
           {recited ? (
             <Row label={recitedLabel(mark)}>
-              <Phrase parts={recited} color={color} />
+              <Phrase parts={recited} fill={fill} />
             </Row>
           ) : null}
           {slip ? (
-            <Text style={[typeV2.meta, styles.slip, { color: palette.secondary }]} testID="mark-card-slip">
+            <Text style={[typeV2.meta, styles.slip, { color: palette.secondary }]} maxFontSizeMultiplier={1.4} testID="mark-card-slip">
               {slip}
             </Text>
           ) : null}
@@ -158,6 +104,7 @@ export function MarkCard({
   anchor,
   onDismiss,
   onHear,
+  onYours,
   onSimilar,
   hasSimilar,
   onClose,
@@ -168,6 +115,8 @@ export function MarkCard({
   anchor: Box | null;
   onDismiss: (id: string) => void;
   onHear: (mark: Mark) => void;
+  /** Your recitation: the reciter's own voice at the mark; absent when the take's audio for it isn't on the phone. */
+  onYours?: (mark: Mark) => void;
   onSimilar: (mark: Mark) => void;
   hasSimilar: boolean;
   onClose: () => void;
@@ -229,6 +178,9 @@ export function MarkCard({
         ))}
         <View style={styles.actions}>
           <SmallPill icon="volume-high-outline" label="Hear it" onPress={() => onHear(main)} testID="mark-card-hear" />
+          {onYours ? (
+            <SmallPill icon="person-outline" label="Your recitation" onPress={() => onYours(main)} testID="mark-card-yours" />
+          ) : null}
           {hasSimilar ? (
             <SmallPill icon="git-compare-outline" label="Similar phrases" onPress={() => onSimilar(main)} testID="mark-card-similar" />
           ) : null}
@@ -255,22 +207,11 @@ const styles = StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   headText: { flex: 1, minWidth: 0 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  dot: { width: 8, height: 8, borderRadius: 4 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 4, marginTop: 6 },
-  label: { width: 66 },
+  /** A flat swatch of the mark's colour beside its name (never a round mark). */
+  swatch: { width: 12, height: 12, borderRadius: 3 },
+  arWrap: { borderRadius: 7, paddingHorizontal: 6 },
   rowBody: { flex: 1, minWidth: 0 },
-  ar: { writingDirection: 'rtl', textAlign: 'right' },
   slip: { marginTop: 4 },
   tajweed: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8 },
   actions: { flexDirection: 'row', gap: 8, marginTop: 8, flexWrap: 'wrap' },
-  pill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    height: 32,
-    paddingHorizontal: 13,
-    borderRadius: 16,
-    borderWidth: 1,
-  },
-  pillText: { fontSize: 14, fontWeight: '600' },
 });

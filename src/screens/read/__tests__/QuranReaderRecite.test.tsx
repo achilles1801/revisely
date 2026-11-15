@@ -1,12 +1,14 @@
 // The reader's one mic (Revisely Dev): Record, Recite, Check; the recite bar; marks and the hidden view.
 import React from 'react';
-import { AccessibilityInfo, Alert } from 'react-native';
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { AccessibilityInfo, Alert, Modal } from 'react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import QuranReaderScreen from '../QuranReaderScreen';
 import { resetReciteCheckSettingsForTests, setReciteCheckSettings } from '../../../lib/reciteCheck/settings';
 import type { LiveEvent } from '../../../lib/reciteLive/contract';
+import { STOP_TRACE_KEY } from '../../../lib/reciteLive/stopTrace';
 import { versesOnPage } from '../../../lib/ayahBounds';
+import { paletteV2 } from '../../../theme/v2';
 
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
 jest.mock('expo-linear-gradient', () => ({ LinearGradient: ({ children }: { children?: React.ReactNode }) => children ?? null }));
@@ -23,6 +25,8 @@ jest.mock('expo-haptics', () => ({
 const mockPager: {
   /** Pages the screen turned to (scrollToPage). */
   scrolled: number[];
+  /** The verses it highlights (a search result, a held verse, an ayah a take slipped into). */
+  highlighted?: unknown;
   onPageChange?: (page: number) => void;
   onTapVerse?: (a: unknown) => boolean;
   onTapPoint?: (page: number, x: number, y: number, toWindow: (r: { x0: number; y0: number; x1: number; y1: number }) => unknown) => boolean;
@@ -41,10 +45,12 @@ jest.mock('../../../components/MushafPager', () => {
           pageUnderlay?: (page: number, scale: number) => React.ReactNode;
           pageOverlay?: (page: number, scale: number, image: unknown) => React.ReactNode;
           pageAccessories?: (page: number, scale: number) => React.ReactNode;
+          highlightedAyah?: unknown;
         },
         ref: React.Ref<{ scrollToPage: (p: number) => boolean }>,
       ) => {
         mockPager.onPageChange = props.onPageChange;
+        mockPager.highlighted = props.highlightedAyah;
         mockPager.onTapVerse = props.onTapVerse;
         mockPager.onTapPoint = props.onTapPoint as never;
         React.useImperativeHandle(ref, () => ({
@@ -126,11 +132,23 @@ jest.mock('../../../lib/recite/quranWords', () => {
 });
 
 // The checker: the test sends its events.
-const mockLive: { start?: Record<string, unknown>; onEvent?: (e: LiveEvent) => void; onClose?: () => void; sent: unknown[]; audio: number } = {
+const mockLive: {
+  start?: Record<string, unknown>;
+  onEvent?: (e: LiveEvent) => void;
+  onClose?: () => void;
+  sent: unknown[];
+  audio: number;
+  clips: [number, number][];
+} = {
   sent: [],
   audio: 0,
+  clips: [],
 };
-jest.mock('../../../lib/reciteCheck/service', () => ({ ...jest.requireActual('../../../lib/reciteCheck/service'), warmUpReciteCheck: jest.fn() }));
+jest.mock('../../../lib/reciteCheck/service', () => ({
+  ...jest.requireActual('../../../lib/reciteCheck/service'),
+  warmUpReciteCheck: jest.fn(),
+  sendLabel: jest.fn(async () => true),
+}));
 jest.mock('../../../lib/reciteLive/socket', () => ({
   socketFeed: () => (start: Record<string, unknown>, handlers: { onEvent: (e: LiveEvent) => void; onClose: () => void }) => {
     mockLive.start = start;
@@ -140,9 +158,17 @@ jest.mock('../../../lib/reciteLive/socket', () => ({
       sendAudio: (pcm: Int16Array) => (mockLive.audio += pcm.length),
       send: (f: unknown) => mockLive.sent.push(f),
       close: jest.fn(),
+      // The take's audio held on the phone (lib/reciteLive/socket's own test cuts it): the seconds asked for, as samples.
+      audioClip: (from: number, to: number) => {
+        mockLive.clips.push([from, to]);
+        return new Int16Array(Math.round((to - from) * 16000));
+      },
     };
   },
 }));
+
+// Your recitation's clip as a file (lib/reciteLive/clipFile).
+jest.mock('../../../lib/reciteLive/clipFile', () => ({ writeClip: jest.fn(() => 'file:///cache/recite-your-recitation.wav') }));
 
 // A take kept as a recording: the file side is lib/reciteLive/takeRecording's own test.
 const mockTake: { started: { day: string; page: number } | null; added: number; finished: number } = { started: null, added: 0, finished: 0 };
@@ -179,6 +205,15 @@ const UTIYAT = A23 + 4;
 
 const flush = () => act(async () => {});
 const event = (e: LiveEvent) => act(async () => mockLive.onEvent?.(e));
+/** An element's style, flattened. */
+const flatStyle = (el: { props: { style?: unknown } }): Record<string, unknown> => {
+  const flat = (st: unknown): Record<string, unknown> => (Array.isArray(st) ? Object.assign({}, ...st.map(flat)) : ((st as Record<string, unknown>) ?? {}));
+  return flat(el.props.style);
+};
+/** The card's player (lib/reciteLive/hearAudio): what it was given to play, and the last one made. */
+const createdPlayers = () => (jest.requireMock('expo-audio').createAudioPlayer as jest.Mock).mock;
+const playerUris = () => createdPlayers().calls.map((c: unknown[]) => (c[0] as { uri?: string } | null)?.uri).filter(Boolean);
+const lastPlayer = () => createdPlayers().results.at(-1)!.value as { remove: jest.Mock; pause: jest.Mock; play: jest.Mock };
 
 beforeEach(async () => {
   jest.clearAllMocks();
@@ -186,6 +221,7 @@ beforeEach(async () => {
   mockState.dev = true;
   mockLive.sent = [];
   mockLive.audio = 0;
+  mockLive.clips = [];
   mockLive.start = undefined;
   mockPager.scrolled = [];
   mockMic = null;
@@ -257,6 +293,13 @@ describe('the one mic (Revisely Dev)', () => {
     expect(screen.getByTestId('recite-mic-badge-record')).toBeTruthy();
   });
 
+  it('opening the reader wakes the checker (and keeps it awake while it waits: useKeepCheckerWarm)', async () => {
+    const { warmUpReciteCheck } = jest.requireMock('../../../lib/reciteCheck/service');
+    (warmUpReciteCheck as jest.Mock).mockClear();
+    await open();
+    expect(warmUpReciteCheck).toHaveBeenCalledTimes(1);
+  });
+
   it('the first take shows the AI notice; after I understand, it listens', async () => {
     await open();
     fireEvent.press(screen.getByTestId('recite-mic'));
@@ -283,8 +326,14 @@ describe('Recite: following along', () => {
     await event({ type: 'mark', mark: { id: 'a', w: UTIYAT, ayah: [27, 23], kind: 'word', sure: 'likely', heard: 'وَأُوهِيَتْ', heardExact: false } });
     await event({ type: 'at', w: UTIYAT + 1 });
     expect(screen.getByTestId('recite-words')).toBeTruthy();
+    // Where the reciter is (Majd's Dev take, Nov 15 2026): the word's box and a quiet band on its line only. Not a band
+    // over the whole ayah, which covered lines not yet said and read as running ahead.
     expect(screen.getByTestId('live-word-box')).toBeTruthy();
-    expect(screen.getAllByTestId('live-ayah-band').length).toBe(2);
+    expect(screen.queryAllByTestId('live-ayah-band')).toHaveLength(0);
+    const band = flatStyle(screen.getByTestId('live-line-band'));
+    const box = flatStyle(screen.getByTestId('live-word-box'));
+    expect(band.top as number).toBeLessThanOrEqual(box.top as number);
+    expect((band.top as number) + (band.height as number)).toBeGreaterThanOrEqual((box.top as number) + (box.height as number));
     expect(screen.queryByTestId('recite-score')).toBeNull();
     expect(screen.queryByTestId('live-mark-word')).toBeNull();
   });
@@ -329,6 +378,25 @@ describe('a take kept as a recording (Save recordings, on by default)', () => {
     expect(navigateToActivityDay).toHaveBeenCalledWith(mockTake.started?.day, 'rec-1');
   });
 
+  it('a take kept as a recording: Undo on its note deletes it (the whole take)', async () => {
+    const recordings = require('../../../lib/recordings');
+    const undo = jest.spyOn(recordings, 'undoRecording').mockResolvedValue('deleted');
+    await startTake('recite');
+    await act(async () => mockMic!.onAudio(new Int16Array(16000)));
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await flush();
+    await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [], score: null } });
+    fireEvent.press(screen.getByTestId('take-summary-done'));
+    await flush();
+    fireEvent.press(screen.getByTestId('recite-close'));
+    await flush();
+    fireEvent.press(screen.getByTestId('recording-saved-undo'));
+    await flush();
+    expect(undo).toHaveBeenCalledWith('rec-1', undefined);
+    expect(screen.queryByText('Recording saved')).toBeNull();
+    undo.mockRestore();
+  });
+
   it('Save recordings off: nothing is kept and there is no dot', async () => {
     setReciteCheckSettings('u1', { saveRecording: false });
     await startTake('recite');
@@ -357,20 +425,89 @@ describe('a take kept as a recording (Save recordings, on by default)', () => {
 });
 
 describe('Check: marks as you recite', () => {
-  it('a wrong word is marked on the page and shows red, as heard, in the bar; the score by the page', async () => {
+  it('a wrong word is highlighted on the page and, as heard, in the bar; the score by the page', async () => {
     await startTake('check');
     expect(mockLive.start).toMatchObject({ follow: false });
     expect(screen.getByTestId('recite-score')).toBeTruthy();
     await event({ type: 'said', upTo: UTIYAT });
     await event({ type: 'mark', mark: { id: 'a', w: UTIYAT, ayah: [27, 23], kind: 'word', sure: 'likely', heard: 'وَأُوهِيَتْ', heardExact: false } });
     await event({ type: 'at', w: UTIYAT + 1 });
-    expect(screen.getByTestId('live-ink-word')).toBeTruthy();
+    expect(screen.getByTestId('live-highlight-word')).toBeTruthy();
     expect(screen.getByTestId('live-mark-word').props.accessibilityLabel).toBe('Wrong word, وَأُوتِيَتْ');
     expect(screen.getByText('99.2%')).toBeTruthy();
     expect(screen.getByText('وَأُوهِيَتْ')).toBeTruthy();
     await event({ type: 'mark', mark: { id: 'b', w: A23 + 7, ayah: [27, 23], kind: 'harakat', sure: 'clear', slip: { expected: 'ٍ', heard: 'ٌّ' } } });
     expect(screen.getByText('98.5%')).toBeTruthy();
     expect(screen.getByTestId('live-mark-harakat')).toBeTruthy();
+  });
+});
+
+describe('mistakes are highlights (Majd, Nov 15 2026: “only things we should show are highlites for mistakes 3 colors max”)', () => {
+  const p = paletteV2(false, 'indigo');
+  // With a card open the page is hidden from queries (accessibilityViewIsModal): look at hidden elements too.
+  const bg = (testID: string) => flatStyle(screen.getByTestId(testID, { includeHiddenElements: true })).backgroundColor;
+
+  it('behind the word in three colours: red for words, amber for slips, violet for tajweed; no red ink, dots or + discs', async () => {
+    await startTake('check');
+    await event({ type: 'mark', mark: { id: 'w', w: UTIYAT, ayah: [27, 23], kind: 'word', sure: 'clear', heard: 'وَأُوهِيَتْ', heardExact: false } });
+    await event({ type: 'mark', mark: { id: 'h', w: A23 + 7, ayah: [27, 23], kind: 'harakat', sure: 'clear', slip: { expected: 'ٍ', heard: 'ٌّ' } } });
+    await event({ type: 'mark', mark: { id: 't', w: A23 + 1, ayah: [27, 23], kind: 'tajweed', rule: 'qalqalah', sure: 'clear' } });
+    expect(bg('live-highlight-word')).toBe(p.markWord);
+    expect(bg('live-highlight-slip')).toBe(p.markSlip);
+    expect(bg('live-highlight-tajweed')).toBe(p.markTajweed);
+    for (const kind of ['word', 'harakat', 'tajweed', 'skipped', 'letter']) expect(screen.queryByTestId(`live-ink-${kind}`)).toBeNull();
+    expect(screen.queryByTestId('live-ink-gap')).toBeNull();
+  });
+
+  it('a word with a slip and a tajweed note shows the slip; an extra word is highlighted on the word before it', async () => {
+    await startTake('check');
+    await event({ type: 'mark', mark: { id: 'h', w: A23 + 7, ayah: [27, 23], kind: 'harakat', sure: 'clear', slip: { expected: 'ٍ', heard: 'ٌّ' } } });
+    await event({ type: 'mark', mark: { id: 't', w: A23 + 7, ayah: [27, 23], kind: 'tajweed', rule: 'qalqalah', sure: 'clear' } });
+    expect(screen.getAllByTestId('live-highlight-slip')).toHaveLength(1);
+    expect(screen.queryByTestId('live-highlight-tajweed')).toBeNull();
+    await event({ type: 'mark', mark: { id: 'x', w: A23 + 2, ayah: [27, 23], kind: 'added', sure: 'clear', heard: 'وَ' } });
+    expect(bg('live-highlight-word')).toBe(p.markWord);
+    expect(screen.getByTestId('live-mark-added').props.accessibilityLabel).toBe(`Extra word, after ${words.uthmani(A23 + 2)}`);
+  });
+
+  it('the bar: a mistake is the page’s highlight behind the word in ink; blue is only the word being said', async () => {
+    await startTake('check');
+    await event({ type: 'said', upTo: UTIYAT });
+    await event({ type: 'mark', mark: { id: 'a', w: UTIYAT, ayah: [27, 23], kind: 'word', sure: 'clear', heard: 'وَأُوهِيَتْ', heardExact: false } });
+    await event({ type: 'at', w: UTIYAT + 1 });
+    const wrong = flatStyle(screen.getByTestId('recite-word-wrong'));
+    expect(wrong.backgroundColor).toBe(p.markWord);
+    expect(wrong.color).toBe(p.text);
+    expect(flatStyle(screen.getByTestId('recite-word-current')).color).toBe(p.followInk);
+  });
+
+  it('the mark a card is open for: a firmer shade of its own colour, back to its own when the card closes', async () => {
+    await startTake('check');
+    await event({ type: 'mark', mark: { id: 'h', w: A23 + 7, ayah: [27, 23], kind: 'harakat', sure: 'clear', slip: { expected: 'ٍ', heard: 'ٌّ' } } });
+    const { wordBox } = require('../../../lib/reciteLive/geometry');
+    const b = wordBox(words, A23 + 7);
+    await act(async () => {
+      mockPager.onTapPoint?.(379, (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, (r: { x0: number; y0: number; x1: number; y1: number }) => ({
+        x: r.x0,
+        y: r.y0 + 100,
+        width: r.x1 - r.x0,
+        height: r.y1 - r.y0,
+      }));
+    });
+    expect(screen.getByTestId('mark-card')).toBeTruthy();
+    expect(bg('live-highlight-slip-picked')).toBe(p.markSlipFirm);
+    await act(async () => fireEvent(screen.getByTestId('mark-card-backdrop'), 'responderGrant'));
+    expect(bg('live-highlight-slip')).toBe(p.markSlip);
+  });
+
+  it('the hidden view: the newest word in the grey box, no line band, no blue on the page', async () => {
+    await startTake('recite', null);
+    fireEvent.press(screen.getByTestId('recite-eye'));
+    await event({ type: 'locked', w: A23, s: 27, a: 23 });
+    await event({ type: 'at', w: A23 + 3 });
+    expect(bg('live-word-box')).toBe(p.followWord);
+    expect(screen.queryByTestId('live-line-band')).toBeNull();
+    expect(screen.queryAllByTestId('hidden-band')).toHaveLength(0);
   });
 });
 
@@ -396,7 +533,8 @@ describe('a take starts anywhere on the page (Majd, Nov 14 2026)', () => {
     expect(screen.getByTestId('recite-status').props.children).toBe('Listening…');
     expect(screen.queryByTestId('recite-words')).toBeNull();
     expect(screen.queryByTestId('live-word-box')).toBeNull();
-    expect(screen.queryAllByTestId('live-ayah-band')).toHaveLength(0);
+    // Never on the page's top line by default: the checker hasn't said where the reciter is.
+    expect(screen.queryByTestId('live-line-band')).toBeNull();
     expect(screen.queryByTestId('recite-score')).toBeNull();
   });
 
@@ -517,6 +655,29 @@ describe('the hidden view (the eye on the bar)', () => {
     expect(screen.queryByTestId('hidden-page-379')).toBeNull();
   });
 
+  it('no band on any line: nothing but the covers before the start is found, the words recited after (Majd, Nov 15 2026)', async () => {
+    // Majd: "there shouldn't be an always there highlight at the top when the verses are hidden".
+    await startTake('recite', null);
+    fireEvent.press(screen.getByTestId('recite-eye'));
+    expect(screen.getByTestId('hidden-page-379')).toBeTruthy();
+    const covered = screen.getAllByTestId('hidden-cover').length;
+    expect(screen.queryAllByTestId('hidden-band')).toHaveLength(0);
+    expect(screen.queryByTestId('live-line-band')).toBeNull();
+    expect(screen.queryByTestId('live-word-box')).toBeNull();
+    // Found: the words recited show in place, and still no band.
+    await event({ type: 'locked', w: A23, s: 27, a: 23 });
+    await event({ type: 'at', w: A23 + 3 });
+    expect(screen.getAllByTestId('hidden-cover').length).toBeLessThanOrEqual(covered);
+    expect(screen.queryAllByTestId('hidden-band')).toHaveLength(0);
+  });
+
+  it('nor with no take: the eye alone covers the page with no band', async () => {
+    await open();
+    fireEvent.press(screen.getByTestId('reader-eye'));
+    expect(screen.getByTestId('hidden-page-379')).toBeTruthy();
+    expect(screen.queryAllByTestId('hidden-band')).toHaveLength(0);
+  });
+
   it('a tap on a hidden page shows nothing: the pager gets no verse tap, so it brings the controls (Majd, Nov 14 2026)', async () => {
     await open();
     fireEvent.press(screen.getByTestId('reader-eye'));
@@ -554,17 +715,262 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
     expect(screen.getByTestId('mark-card')).toBeTruthy();
     expect(screen.getByText('Wrong word')).toBeTruthy();
     expect(screen.getByText('As heard')).toBeTruthy();
+    // Highlights, as on the page (Majd, Nov 15 2026): a flat swatch by each kind's name, what was recited on its colour,
+    // what was expected on quiet grey; no red or green text.
+    const p = paletteV2(false, 'indigo');
+    const style = (id: string) => flatStyle(screen.getAllByTestId(id)[0]);
+    expect(style('mark-card-swatch-word').backgroundColor).toBe(p.markWord);
+    expect(style('mark-card-swatch-tajweed').backgroundColor).toBe(p.markTajweed);
+    expect(style('mark-card-recited').backgroundColor).toBe(p.markWord);
+    expect(style('mark-card-expected').backgroundColor).toBe(p.followWord);
+    expect(style('mark-card-expected').color).toBeUndefined();
     // Both marks on the word, each with its own Not a mistake.
     expect(screen.getByTestId('mark-card-tajweed')).toBeTruthy();
     // Similar phrases: An-Naml 16 reads almost the same.
     expect(screen.getByTestId('mark-card-similar')).toBeTruthy();
-    const play = jest.spyOn(require('../../../lib/recitation').getRecitation(), 'play').mockImplementation(() => undefined);
-    fireEvent.press(screen.getByTestId('mark-card-hear'));
-    expect(play).toHaveBeenCalledWith({ sura: 27, ayah: 23 }, expect.any(Function));
-    play.mockRestore();
+    await act(async () => fireEvent.press(screen.getByTestId('mark-card-hear')));
+    expect(playerUris()).toEqual([expect.stringMatching(/^https:\/\/everyayah\.com\/data\/.+\/027023\.mp3$/)]);
     fireEvent.press(screen.getAllByTestId('mark-card-dismiss')[0]);
     expect(mockLive.sent).toContainEqual({ type: 'dismiss', id: 'a' });
     expect(screen.queryByTestId('live-mark-word')).toBeNull();
+  });
+
+  describe('“Not a mistake” can be undone (Majd, Nov 15 2026)', () => {
+    const sendLabel = () => jest.requireMock('../../../lib/reciteCheck/service').sendLabel as jest.Mock;
+    const wrongMark = { id: 'a', w: UTIYAT, ayah: [27, 23], kind: 'word', sure: 'clear', heard: 'وَأُوهِيَتْ', heardExact: false };
+
+    it('during the take: Undo on the toast puts it back, and the checker is told both (dismiss, then undismiss)', async () => {
+      await startTake('check');
+      await event({ type: 'mark', mark: wrongMark as never });
+      await tapWord(UTIYAT);
+      fireEvent.press(screen.getByTestId('mark-card-dismiss'));
+      expect(screen.queryByTestId('live-mark-word')).toBeNull();
+      expect(screen.getByText('Marked not a mistake')).toBeTruthy();
+      fireEvent.press(screen.getByTestId('undo-toast-action'));
+      expect(screen.getByTestId('live-mark-word')).toBeTruthy();
+      expect(mockLive.sent).toEqual(expect.arrayContaining([{ type: 'dismiss', id: 'a' }, { type: 'undismiss', id: 'a' }]));
+      const types = (mockLive.sent as { type: string }[]).map((f) => f.type);
+      expect(types.indexOf('dismiss')).toBeLessThan(types.indexOf('undismiss'));
+      expect(sendLabel()).not.toHaveBeenCalled();
+    });
+
+    it('after the final answer: the label goes over HTTP (the connection has gone), Undo too', async () => {
+      await startTake('check');
+      fireEvent.press(screen.getByTestId('recite-stop'));
+      await event({
+        type: 'done',
+        result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [wrongMark], score: { reached: 11, mistakes: 1, tajweed: 0, accuracy: 0.9 } } as never,
+      });
+      // From the summary to the word's card: Not a mistake there.
+      fireEvent.press(screen.getByTestId('take-summary-finding-word'));
+      await flush();
+      fireEvent.press(screen.getByTestId('mark-card-dismiss'));
+      expect(sendLabel()).toHaveBeenCalledWith('dismiss', 't1', 'a', expect.any(Number));
+      expect(mockLive.sent).not.toContainEqual({ type: 'dismiss', id: 'a' });
+      fireEvent.press(screen.getByTestId('undo-toast-action'));
+      expect(sendLabel()).toHaveBeenLastCalledWith('undismiss', 't1', 'a', expect.any(Number));
+    });
+
+    it('taken off during the take: the summary lists it under “1 marked not a mistake”, with Put back', async () => {
+      await startTake('check');
+      await event({ type: 'mark', mark: wrongMark as never });
+      await tapWord(UTIYAT);
+      fireEvent.press(screen.getByTestId('mark-card-dismiss'));
+      fireEvent.press(screen.getByTestId('recite-stop'));
+      await event({
+        type: 'done',
+        result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [wrongMark], score: { reached: 11, mistakes: 0, tajweed: 0, accuracy: 1 } } as never,
+      });
+      expect(screen.queryByTestId('take-summary-finding-word')).toBeNull();
+      expect(screen.getByText('1 marked not a mistake')).toBeTruthy();
+      fireEvent.press(screen.getByTestId('take-summary-removed-toggle'));
+      fireEvent.press(screen.getByTestId('take-summary-put-back'));
+      // Back among the findings, counted again, and the checker takes the label back.
+      expect(screen.getByTestId('take-summary-finding-word')).toBeTruthy();
+      expect(screen.queryByTestId('take-summary-removed')).toBeNull();
+      expect(screen.getByLabelText(/Score .*, 1 mistake$/)).toBeTruthy();
+      expect(sendLabel()).toHaveBeenLastCalledWith('undismiss', 't1', 'a', expect.any(Number));
+    });
+
+    it('with a screen reader: Not a mistake after the take is said, and so is Put back; nothing is said while the mic is on', async () => {
+      const spoken = jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions');
+      // During the take: the microphone would record it.
+      await startTake('check');
+      await event({ type: 'mark', mark: wrongMark as never });
+      await tapWord(UTIYAT);
+      fireEvent.press(screen.getByTestId('mark-card-dismiss'));
+      expect(spoken.mock.calls.map((c) => c[0])).not.toContain('Marked not a mistake. Undo is at the bottom of the screen.');
+      fireEvent.press(screen.getByTestId('recite-stop'));
+      await event({
+        type: 'done',
+        result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [wrongMark], score: { reached: 11, mistakes: 0, tajweed: 0, accuracy: 1 } } as never,
+      });
+      fireEvent.press(screen.getByTestId('take-summary-removed-toggle'));
+      fireEvent.press(screen.getByTestId('take-summary-put-back'));
+      expect(spoken).toHaveBeenCalledWith('Wrong word put back', { queue: true });
+      // After the take, from the summary to the card: said at once.
+      fireEvent.press(screen.getByTestId('take-summary-finding-word'));
+      await flush();
+      fireEvent.press(screen.getByTestId('mark-card-dismiss'));
+      expect(spoken).toHaveBeenCalledWith('Marked not a mistake. Undo is at the bottom of the screen.', { queue: true });
+    });
+  });
+
+  it('the bar says each word’s mark in words, not by colour alone', async () => {
+    await startTake('check');
+    await event({ type: 'said', upTo: UTIYAT });
+    await event({ type: 'mark', mark: { id: 'a', w: UTIYAT, ayah: [27, 23], kind: 'word', sure: 'clear', heard: 'وَأُوهِيَتْ', heardExact: false } });
+    await event({ type: 'at', w: UTIYAT + 1 });
+    expect(screen.getByTestId('recite-middle').props.accessibilityLabel).toContain('وَأُوهِيَتْ, wrong word,');
+  });
+
+  it('a “not clear” haraka’s card: Not clear, say it more clearly; what was expected, not a guess at what was heard', async () => {
+    await startTake('check');
+    await event({
+      type: 'mark',
+      mark: { id: 'h', w: UTIYAT, ayah: [27, 23], kind: 'harakat', sure: 'likely', slip: { expected: 'ُ', heard: 'َ' }, heard: 'وَأَوتِيَتْ', heardExact: true },
+    });
+    // Not counted: the score stays at 100%.
+    expect(screen.getByTestId('recite-score')).toHaveTextContent('100%');
+    await tapWord(UTIYAT);
+    expect(screen.getByText('Not clear')).toBeTruthy();
+    expect(screen.getByTestId('mark-card-slip').props.children).toBe('Say it more clearly. Not counted in the score.');
+    expect(screen.getByText('Expected')).toBeTruthy();
+    expect(screen.queryByText('Recited')).toBeNull();
+  });
+
+  describe('Hear it during a take (Majd, Nov 15 2026: it ended the take, and Husary played on past it)', () => {
+    // Any touch outside the card closes it (the bar is hidden from VoiceOver while it's open: accessibilityViewIsModal).
+    const closeCard = () => act(async () => fireEvent(screen.getByTestId('mark-card-backdrop'), 'responderGrant'));
+    const openCard = async () => {
+      await startTake('check');
+      await event({ type: 'mark', mark: { id: 'a', w: UTIYAT, ayah: [27, 23], kind: 'word', sure: 'clear', heard: 'وَأُوهِيَتْ', heardExact: false } });
+      await tapWord(UTIYAT);
+    };
+
+    it('pauses the take, never ends it, and plays on the card’s own player, not the app’s recitation', async () => {
+      const recitation = jest.spyOn(require('../../../lib/recitation').getRecitation(), 'play');
+      await openCard();
+      await act(async () => fireEvent.press(screen.getByTestId('mark-card-hear')));
+      expect(recitation).not.toHaveBeenCalled();
+      expect(playerUris()).toEqual([expect.stringMatching(/\/027023\.mp3$/)]);
+      expect(mockLive.sent).not.toContainEqual({ type: 'end' });
+      await closeCard();
+      expect(screen.getByTestId('recite-status').props.children).toBe('Paused');
+      expect(screen.getByTestId('recite-resume')).toBeTruthy();
+      recitation.mockRestore();
+    });
+
+    it('Resume carries on the same take: the microphone again, its audio to the same connection, no new take', async () => {
+      const { startMicStream } = jest.requireMock('../../../lib/recite/micSource');
+      await openCard();
+      const start = mockLive.start;
+      await act(async () => fireEvent.press(screen.getByTestId('mark-card-hear')));
+      const before = mockLive.audio;
+      await closeCard();
+      await act(async () => fireEvent.press(screen.getByTestId('recite-resume')));
+      expect(startMicStream).toHaveBeenCalledTimes(2);
+      expect(mockLive.start).toBe(start);
+      await act(async () => mockMic!.onAudio(new Int16Array(16000)));
+      expect(mockLive.audio).toBe(before + 16000);
+      expect(screen.getByTestId('recite-pause')).toBeTruthy();
+    });
+
+    it('the ayah stops when the card closes', async () => {
+      await openCard();
+      await act(async () => fireEvent.press(screen.getByTestId('mark-card-hear')));
+      const player = lastPlayer();
+      expect(player.play).toHaveBeenCalled();
+      await closeCard();
+      expect(player.remove).toHaveBeenCalled();
+    });
+
+    it('and when the reader is left', async () => {
+      await openCard();
+      await act(async () => fireEvent.press(screen.getByTestId('mark-card-hear')));
+      const player = lastPlayer();
+      screen.unmount();
+      expect(player.remove).toHaveBeenCalled();
+    });
+
+  });
+
+  describe('Your recitation (Majd, Nov 15 2026: Tarteel plays what you said and the reference)', () => {
+    const closeCard = () => act(async () => fireEvent(screen.getByTestId('mark-card-backdrop'), 'responderGrant'));
+
+    it('the card plays your own voice at the mark, a little before and after; a take still listening pauses first', async () => {
+      await startTake('check');
+      await event({
+        type: 'mark',
+        mark: { id: 'a', w: UTIYAT, ayah: [27, 23], kind: 'word', sure: 'clear', heard: 'وَأُوهِيَتْ', heardExact: false, t: [8.1, 8.5] },
+      });
+      await tapWord(UTIYAT);
+      await act(async () => fireEvent.press(screen.getByTestId('mark-card-yours')));
+      expect(mockLive.clips).toEqual([[expect.closeTo(7.5, 5), expect.closeTo(8.9, 5)]]);
+      const { writeClip } = jest.requireMock('../../../lib/reciteLive/clipFile');
+      expect((writeClip as jest.Mock).mock.calls[0][0]).toHaveLength(Math.round(1.4 * 16000));
+      expect(playerUris().at(-1)).toBe('file:///cache/recite-your-recitation.wav');
+      expect(mockLive.sent).not.toContainEqual({ type: 'end' });
+      await closeCard();
+      expect(screen.getByTestId('recite-resume')).toBeTruthy();
+    });
+
+    it('after the take too, from its summary', async () => {
+      await startTake('check');
+      const mark = { id: 'a', w: UTIYAT, ayah: [27, 23] as [number, number], kind: 'word' as const, sure: 'clear' as const, t: [8.1, 8.5] as [number, number] };
+      await event({ type: 'mark', mark });
+      fireEvent.press(screen.getByTestId('recite-stop'));
+      await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, start: A23, secs: 12, marks: [mark], score: null } });
+      await act(async () => mockLive.onClose?.());
+      fireEvent.press(screen.getByTestId('take-summary-finding-word'));
+      await flush();
+      await act(async () => fireEvent.press(screen.getByTestId('mark-card-yours')));
+      expect(mockLive.clips).toHaveLength(1);
+      expect(playerUris().at(-1)).toBe('file:///cache/recite-your-recitation.wav');
+    });
+
+    it('a mark with no time of its own (a skipped word): around when the cursor reached the word before', async () => {
+      await startTake('check');
+      await event({ type: 'at', w: UTIYAT - 1, t: 6 } as LiveEvent);
+      await event({ type: 'mark', mark: { id: 's', w: UTIYAT, ayah: [27, 23], kind: 'skipped', sure: 'clear' } });
+      await tapWord(UTIYAT);
+      await act(async () => fireEvent.press(screen.getByTestId('mark-card-yours')));
+      expect(mockLive.clips).toEqual([[expect.closeTo(4.8, 5), expect.closeTo(7.2, 5)]]);
+    });
+
+    it('no button when the moment isn’t known', async () => {
+      await startTake('check');
+      await event({ type: 'mark', mark: { id: 's', w: UTIYAT + 3, ayah: [27, 23], kind: 'skipped', sure: 'clear' } });
+      await tapWord(UTIYAT + 3);
+      expect(screen.getByTestId('mark-card')).toBeTruthy();
+      expect(screen.queryByTestId('mark-card-yours')).toBeNull();
+    });
+  });
+
+  describe('Pause and Resume on the bar', () => {
+    it('Pause turns the microphone off and keeps the take; Stop while paused still ends it, and keeps its recording', async () => {
+      await startTake('recite');
+      const mic = (await jest.requireMock('../../../lib/recite/micSource').startMicStream.mock.results[0].value) as { stop: jest.Mock };
+      await act(async () => fireEvent.press(screen.getByTestId('recite-pause')));
+      expect(mic.stop).toHaveBeenCalled();
+      expect(mockLive.sent).not.toContainEqual({ type: 'end' });
+      expect(screen.getByTestId('recite-status').props.children).toBe('Paused');
+      expect(screen.queryByTestId('recite-recording')).toBeNull();
+      fireEvent.press(screen.getByTestId('recite-stop'));
+      await flush();
+      expect(mockLive.sent).toContainEqual({ type: 'end' });
+      expect(mockTake.finished).toBe(1);
+    });
+
+    it('leaving the app while paused ends the take, as it does while reciting', async () => {
+      await startTake('recite');
+      await act(async () => fireEvent.press(screen.getByTestId('recite-pause')));
+      const { AppState } = require('react-native');
+      // Every listener hears it, as in the app (the take's, and the checker's warm-up).
+      const listeners = (AppState.addEventListener as jest.Mock).mock.calls.map((c: unknown[]) => c[1] as (s: string) => void);
+      await act(async () => listeners.forEach((l) => l('background')));
+      expect(mockLive.sent).toContainEqual({ type: 'end' });
+    });
   });
 
   it('tapping where there is no mark leaves the page to its own tap', async () => {
@@ -602,6 +1008,20 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
     expect(screen.getByTestId('recite-close')).toBeTruthy();
   });
 
+  it('a slip into a similar ayah: the summary says where it went, and a tap opens that ayah, highlighted', async () => {
+    await startTake('check');
+    const into = { w: words.verseFirstWord(27, 16), ayah: [27, 16] as [number, number] };
+    const mark = { id: 'a', w: UTIYAT, ayah: [27, 23] as [number, number], kind: 'word' as const, sure: 'clear' as const, into };
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [mark], score: null } });
+    const row = screen.getByTestId('take-summary-into');
+    fireEvent.press(row);
+    await flush();
+    const page = words.pageOf(into.w);
+    expect(mockPager.scrolled).toContain(page);
+    expect(mockPager.highlighted).toEqual([expect.objectContaining({ sura: 27, ayah: 16, page })]);
+  });
+
   it('the summary names what was recited, not the passage’s end (the checker’s `to` is the end of the surah)', async () => {
     await startTake('recite');
     await event({ type: 'at', w: A23 + 3 });
@@ -613,6 +1033,23 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
     const passage = String(screen.getByTestId('take-summary-passage').props.children);
     expect(passage).toMatch(/^An.Naml,\sayahs\s23.24\s·\s/);
     expect(passage).not.toMatch(/Qasas/);
+  });
+
+  it('[SHEET-1] See your mistakes: the Premium page waits for the summary to go, so iOS never refuses it (Majd’s Dev freeze, Nov 15 2026)', async () => {
+    // Majd: "i ended the session then the pop up came up and i clicked see your mistakes and now the screen froze".
+    // The Premium page opened while the summary was still closing: iOS presents one modal at a time, refused it, and
+    // its invisible host took every touch. React Native's jest Modal never reports a dismissal, so the summary goes
+    // by the fallback (v2/Sheet), about a second after its closing.
+    mockPremium.has = false;
+    await startTake('recite');
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [], score: null } });
+    expect(screen.getByTestId('take-summary')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('take-summary-check'));
+    await flush();
+    expect(screen.queryByTestId('check-intro')).toBeNull();
+    await waitFor(() => expect(screen.getByTestId('check-intro')).toBeTruthy(), { timeout: 3000 });
+    expect(screen.queryByTestId('take-summary')).toBeNull();
   });
 
   it('Keep as test data off: the summary doesn’t say the take was kept', async () => {
@@ -716,5 +1153,169 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
     await act(async () => fireEvent.press(screen.getByTestId('check-intro-support')));
     const { openBrowserAsync } = jest.requireMock('expo-web-browser');
     expect(openBrowserAsync).toHaveBeenCalledWith('https://dev.revisely.app/apply/#c=one-time');
+  });
+});
+
+describe('the Stop trace (Revisely Dev: a freeze after Stop leaves a trace for the next launch)', () => {
+  const trace = async () => {
+    const raw = await AsyncStorage.getItem(STOP_TRACE_KEY);
+    return raw ? (JSON.parse(raw) as { mode: string; status: string; take: string; steps: { s: string }[] }) : null;
+  };
+  /** iOS presents the summary's modal (React Native's jest Modal never calls onShow). */
+  const presented = () =>
+    act(async () => {
+      for (const m of screen.UNSAFE_getAllByType(Modal)) if (m.props.visible !== false) m.props.onShow?.();
+    });
+
+  it('Stop writes it, each step to the summary adds to it, and the summary on screen removes it', async () => {
+    await startTake('check');
+    expect(await trace()).toBeNull();
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await flush();
+    const atStop = await trace();
+    expect(atStop).toMatchObject({ mode: 'check', status: 'listening', take: 't1' });
+    expect(atStop!.steps.map((s) => s.s)).toEqual(expect.arrayContaining(['stop', 'mic-off', 'audio-mode']));
+    await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, start: A23, secs: 12, marks: [], score: null } });
+    await flush();
+    expect(screen.getByTestId('take-summary')).toBeTruthy();
+    const steps = (await trace())!.steps.map((s) => s.s);
+    expect(steps).toEqual(expect.arrayContaining(['ev:done', 'done', 'summary-asked']));
+    await presented();
+    await flush();
+    expect(await trace()).toBeNull();
+  });
+
+  it('a take that ends without a summary (its start never found) removes it too', async () => {
+    await startTake('recite', null);
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await flush();
+    expect(await trace()).not.toBeNull();
+    await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, start: null, secs: 12, marks: [], score: null } });
+    await flush();
+    expect(screen.queryByTestId('take-summary')).toBeNull();
+    expect(await trace()).toBeNull();
+  });
+
+  it('leaving the reader before the answer removes it', async () => {
+    await startTake('recite');
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await flush();
+    expect(await trace()).not.toBeNull();
+    screen.unmount();
+    await flush();
+    expect(await trace()).toBeNull();
+  });
+});
+
+describe('screen readers during a take', () => {
+  it('the bar is not a live region (its clock would be spoken every second over the recitation); only where the take started is said', async () => {
+    await startTake('check');
+    const announce = AccessibilityInfo.announceForAccessibility as jest.Mock;
+    const said = announce.mock.calls.map((c) => String(c[0]));
+    expect(said).toEqual([expect.stringMatching(/^Started at An.Naml, ayah 23$/)]);
+    expect(screen.getByTestId('recite-middle').props.accessibilityLiveRegion).toBeUndefined();
+    for (let i = 0; i < 3; i++) {
+      await act(async () => mockMic!.onAudio(new Int16Array(16000)));
+      await event({ type: 'at', w: A23 + i });
+    }
+    expect(screen.getByTestId('recite-time').props.children).toBe('0:03');
+    expect(announce.mock.calls).toHaveLength(1);
+    expect(AccessibilityInfo.announceForAccessibilityWithOptions).not.toHaveBeenCalled();
+  });
+});
+
+describe('Recite the mistakes again (Majd, Nov 15 2026: one take from the first mistake to the last)', () => {
+  const finish = async (marks: object[], start = A23) => {
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await flush();
+    await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 40, start, secs: 30, marks, score: null } } as LiveEvent);
+    await flush();
+  };
+  const wrongAt = (s: number, a: number) => ({ id: `${s}:${a}`, w: words.verseFirstWord(s, a) + 1, ayah: [s, a], kind: 'word', sure: 'clear', heard: 'x', heardExact: false });
+
+  it('a Check take with mistakes offers it; it runs from the ayah before the first to the last, with no search for the start', async () => {
+    await startTake('check');
+    const marks = [wrongAt(27, 24), wrongAt(27, 26)];
+    for (const mark of marks) await event({ type: 'mark', mark } as LiveEvent);
+    await finish(marks);
+    fireEvent.press(screen.getByTestId('take-summary-drill'));
+    await flush();
+    await flush();
+    expect(mockLive.start).toMatchObject({ s: 27, a: 23, s2: 27, a2: 26, follow: false });
+    expect(mockLive.start?.startBy).toBeUndefined();
+    // The stretch is known: the take begins there at once, with no search for the start (the score shows from the
+    // first moment; a search shows none until it finds the reciter).
+    await event({ type: 'ready', take: 't2', protocol: 6 });
+    expect(screen.getByTestId('recite-score')).toHaveTextContent('100%');
+    await event({ type: 'at', w: A23 });
+    expect(screen.getByTestId('recite-words')).toBeTruthy();
+  });
+
+  it('it stops by itself once the checker has decided the stretch’s last word; its summary says what the take before found there', async () => {
+    await startTake('check');
+    const marks = [wrongAt(27, 24)];
+    await event({ type: 'mark', mark: marks[0] } as LiveEvent);
+    await finish(marks);
+    fireEvent.press(screen.getByTestId('take-summary-drill'));
+    await flush();
+    await flush();
+    await event({ type: 'ready', take: 't2', protocol: 6 });
+    mockLive.sent = [];
+    const last = words.verseFirstWord(27, 25) - 1;
+    await event({ type: 'at', w: last - 1 });
+    await event({ type: 'said', upTo: last - 2 } as LiveEvent);
+    expect(mockLive.sent).not.toContainEqual({ type: 'end' });
+    await event({ type: 'said', upTo: last } as LiveEvent);
+    await flush();
+    expect(mockLive.sent).toContainEqual({ type: 'end' });
+    await event({ type: 'done', result: { v: 2, take: 't2', from: A23, to: last + 1, start: words.verseFirstWord(27, 23), secs: 9, marks: [], score: null } } as LiveEvent);
+    await flush();
+    expect(screen.getByTestId('take-summary-before').props.children).toBe('Before: 1 wrong word');
+    expect(screen.queryByTestId('take-summary-drill')).toBeNull();
+  });
+
+  it('its summary shows even when the checker gives it the take id of the one before (E2E’s recorded takes do)', async () => {
+    await startTake('check');
+    const marks = [wrongAt(27, 24)];
+    await event({ type: 'mark', mark: marks[0] } as LiveEvent);
+    await finish(marks);
+    fireEvent.press(screen.getByTestId('take-summary-drill'));
+    await flush();
+    await flush();
+    await event({ type: 'ready', take: 't1', protocol: 6 });
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await flush();
+    await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 20, start: words.verseFirstWord(27, 23), secs: 9, marks: [], score: null } } as LiveEvent);
+    await flush();
+    expect(screen.getByTestId('take-summary-before')).toBeTruthy();
+  });
+
+  it('a stretch on another page turns the page to it', async () => {
+    await startTake('check');
+    const marks = [wrongAt(27, 14)];
+    await event({ type: 'mark', mark: marks[0] } as LiveEvent);
+    await finish(marks);
+    mockPager.scrolled = [];
+    fireEvent.press(screen.getByTestId('take-summary-drill'));
+    await flush();
+    await flush();
+    expect(mockLive.start).toMatchObject({ s: 27, a: 13, s2: 27, a2: 14 });
+    expect(mockPager.scrolled).toContain(words.pageOf(words.verseFirstWord(27, 13)));
+  });
+
+  it('not offered without mistakes, for tajweed notes alone, or when following along', async () => {
+    await startTake('check');
+    const note = { id: 'n', w: A23 + 2, ayah: [27, 23], kind: 'tajweed', rule: 'qalqalah', sure: 'clear' };
+    await event({ type: 'mark', mark: note } as LiveEvent);
+    await finish([note]);
+    expect(screen.getByTestId('take-summary')).toBeTruthy();
+    expect(screen.queryByTestId('take-summary-drill')).toBeNull();
+    fireEvent.press(screen.getByTestId('take-summary-done'));
+    fireEvent.press(screen.getByTestId('recite-close'));
+    await flush();
+    screen.unmount();
+    await startTake('recite');
+    await finish([]);
+    expect(screen.queryByTestId('take-summary-drill')).toBeNull();
   });
 });

@@ -1,11 +1,12 @@
-import React from 'react';
-import { Image, ImageSourcePropType, Modal, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import React, { useEffect } from 'react';
+import { Image, ImageSourcePropType, Modal, Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
 import { layoutV2, typeV2 } from '../../theme/v2';
 import { PillButton } from '../v2/PillButton';
 import { Tap } from '../v2/Tap';
-import { useModalHold } from '../v2/modalTurn';
+import { useModalTurn } from '../v2/modalTurn';
+import { DISMISS_FALLBACK_MS } from '../v2/Sheet';
 import { BarButton } from './ReciteBar';
 
 /** The real screen the page shows: a take marking mistakes on An-Naml 23 (E2E flow 18's screenshot), light and dark. */
@@ -41,12 +42,24 @@ export function CheckIntroPage({
   const { palette, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
-  useModalHold(visible);
+  // One modal at a time (SHEET-1): it opens only once no sheet is up or still going, and holds its turn until iOS
+  // reports it gone (onDismiss, or the fallback). "See your mistakes" opened it while the take's summary was still
+  // closing; iOS refused it and its invisible host took every touch: the reader froze (Majd's Dev take, Nov 15 2026).
+  const { turn, release } = useModalTurn(visible);
+  useEffect(() => {
+    if (turn) return;
+    if (Platform.OS !== 'ios') {
+      release();
+      return;
+    }
+    const t = setTimeout(release, DISMISS_FALLBACK_MS);
+    return () => clearTimeout(t);
+  }, [turn, release]);
   // The frame: the screen's width less the margins, and never more than 40% of its height.
   const frameWidth = Math.min(width - 48, (height * 0.4) * PREVIEW_ASPECT);
   const frameHeight = frameWidth / PREVIEW_ASPECT;
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
+    <Modal visible={turn} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose} onDismiss={release}>
       <View style={[styles.root, { backgroundColor: palette.bg, paddingTop: insets.top, paddingBottom: insets.bottom + 8 }]} testID="check-intro">
         <View style={styles.top}>
           <BarButton icon="close" label="Close" onPress={onClose} testID="check-intro-close" />
@@ -57,15 +70,15 @@ export function CheckIntroPage({
               source={PREVIEW[isDark ? 'dark' : 'light']}
               style={{ width: frameWidth, height: frameHeight }}
               resizeMode="cover"
-              accessibilityLabel="A page of An-Naml with a wrong word marked in red and a haraka slip in amber"
+              accessibilityLabel="A page of An-Naml with its mistakes highlighted"
             />
           </View>
           <Text style={[styles.title, { color: palette.text }]} maxFontSizeMultiplier={1.4} accessibilityRole="header">
             Mark my mistakes
           </Text>
           <Text style={[styles.body, { color: palette.secondary }]} maxFontSizeMultiplier={1.6}>
-            Revisely marks a wrong or missed word in red, and a haraka or tajweed slip in amber. Tap one to see what you
-            said.
+            Revisely highlights a wrong, missed or extra word in red, and a haraka or letter slip in amber. Tap one to see
+            what you said.
           </Text>
         </ScrollView>
         <View style={styles.bottom}>

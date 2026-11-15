@@ -6,7 +6,7 @@
 //   tab). The page then never signs in, and shows nothing a purchase could follow (the <head> marks it from-app).
 // - On the website: signed in with the account from the app (rv-auth.js).
 // supportApplication (functions/src/support) answers with the account's state, or takes the application.
-import { call, onUser, openSignIn, signOut, wireHeader } from './rv-auth.js';
+import { call, onUserIfAny, openSignIn, signOut, wireHeader } from './rv-auth.js';
 
 const RV = window.RV;
 const KEY = 'revisely.apply.code';
@@ -214,7 +214,8 @@ if (fromApp) {
   load();
 } else {
   wireHeader();
-  onUser((u) => {
+  // A visitor who has never signed in here sees the sign-in step at once, and Firebase loads only if they open it.
+  onUserIfAny((u) => {
     user = u;
     if (u) load();
     else {

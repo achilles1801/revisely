@@ -37,7 +37,14 @@
 
   <header class="site-header">
     <div class="wrap">
-      <span class="brand" aria-label="Revisely">
+      <!-- The logo links home on the website; the page the app opens links nowhere (App Store 3.1.1). -->
+      <a class="brand public-only" href="/" aria-label="Revisely, home">
+        <picture>
+          <source srcset="/assets/img/logo-dark.svg" media="(prefers-color-scheme: dark)">
+          <img src="/assets/img/logo-light.svg" width="108" height="32" alt="">
+        </picture>
+      </a>
+      <span class="brand app-only" aria-label="Revisely">
         <picture>
           <source srcset="/assets/img/logo-dark.svg" media="(prefers-color-scheme: dark)">
           <img src="/assets/img/logo-light.svg" width="108" height="32" alt="">
@@ -74,6 +81,7 @@
         <span class="kicker" data-t="o.kicker">Revisely Premium, free</span>
         <h1 data-t="o.name">Open Door</h1>
         <p class="sub" data-t="o.sub">Premium, free for anyone who can’t pay for it</p>
+        <p class="intro public-only" data-t-html="o.intro">Revisely is a free Quran revision app: a little review every day, across everything you’ve memorized. <a href="/">How it works</a></p>
         <p class="lede" data-t="o.pitch">Nobody should stop memorizing the Quran because of money.</p>
         <div class="actions">
           <a class="pill pill-lg" href="#apply" data-t="o.apply">Apply</a>
@@ -122,6 +130,17 @@
             <button class="pill pill-lg" type="button" data-signin data-t="o.signInBtn">Sign in</button>
           </div>
           <p class="form-foot" data-t="o.orApp"></p>
+          <!-- For someone who arrives without the app: accounts are made there. -->
+          <p class="store-line public-only" data-t="a.new2">New to Revisely? Accounts are made in the app.</p>
+          <div class="stores public-only">
+            <a class="badge-link" href="https://apps.apple.com/app/revisely/id6767990248">
+              <picture>
+                <source srcset="https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/white/en-us" media="(prefers-color-scheme: dark)">
+                <img src="https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/black/en-us" width="156" height="52" alt="Download on the App Store">
+              </picture>
+            </a>
+            <p class="soon"><small data-t="soon.small">Coming to</small> <b>Google Play</b></p>
+          </div>
         </div>
 
         <!-- The form. -->

@@ -1,0 +1,52 @@
+/*
+ * The site's own pages (the home, Support) in Arabic, on top of site.css. Only dev.revisely.app loads this for now
+ * (worker/nav.ts, with strings-site.js); revisely.app's pages stay English as they are.
+ * The same rules as account.css's Arabic: Amiri (the app's font, cut to what the pages write), right to left,
+ * no letter-spacing (it breaks the joins between Arabic letters), and a little more size and line height.
+ */
+@font-face {
+  font-family: "Amiri";
+  src: url("/assets/fonts/Amiri-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Amiri";
+  src: url("/assets/fonts/Amiri-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-display: swap;
+}
+
+/* Lines written for Arabic readers only (the app's screens are in English): hidden in English, by their own hidden. */
+html[lang="ar"] .ar-only[hidden] { display: block !important; }
+
+html[dir="rtl"] body { font-family: "Amiri", var(--font); font-size: 19px; line-height: 1.85; }
+html[dir="rtl"] * { letter-spacing: 0 !important; }
+html[dir="rtl"] h1, html[dir="rtl"] h2, html[dir="rtl"] h3 { line-height: 1.5; }
+html[dir="rtl"] .latin, html[dir="rtl"] .brand, html[dir="rtl"] .soon b { font-family: var(--font); }
+html[dir="rtl"] .site-nav .lang { font-family: var(--font); }
+
+/* The home's slideshow: the track keeps scrolling left to right (site.js counts scrollLeft from the left), and each
+   slide reads right to left inside it, its words on the right. The controls stay as they are. */
+html[dir="rtl"] .home .show-track { direction: ltr; }
+html[dir="rtl"] .home .slide { direction: rtl; }
+html[dir="rtl"] .home .controls { direction: ltr; }
+html[dir="rtl"] .home .kicker { font-size: 16px; }
+html[dir="rtl"] .home .display { line-height: 1.35; }
+html[dir="rtl"] .home .title { line-height: 1.4; }
+html[dir="rtl"] .home .line { font-size: clamp(18px, 1.6vw, 21px); line-height: 1.75; }
+html[dir="rtl"] .home .revo p { font-size: 19px; line-height: 1.8; }
+html[dir="rtl"] .home .asks li { font-size: 17px; }
+html[dir="rtl"] .home .points li { font-size: 17px; line-height: 1.7; }
+html[dir="rtl"] .home .revo .note { font-size: 16px; }
+html[dir="rtl"] .home .soon small { font-size: 13px; }
+@media (max-width: 760px) {
+  html[dir="rtl"] .home .line { margin-top: 6px; font-size: 17px; line-height: 1.65; }
+}
+
+/* Support and the other documents. */
+html[dir="rtl"] .doc ul, html[dir="rtl"] .doc ol { padding-left: 0; padding-right: 1.3rem; }
+html[dir="rtl"] .doc .card-list { padding-right: 0; }
+html[dir="rtl"] .doc h1 { line-height: 1.4; }
+html[dir="rtl"] .doc .card-list h2 { font-size: 20px; }
+html[dir="rtl"] .doc p, html[dir="rtl"] .doc li { line-height: 1.85; }

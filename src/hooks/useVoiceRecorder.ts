@@ -17,10 +17,13 @@ import {
   appendSegment,
   closeRecording,
   findRevisionRecording,
+  holdUpload,
   PageMark,
   RecordingKind,
+  RecordingUndo,
   rebaseMarks,
   releaseRecording,
+  releaseUpload,
   setCapturing,
 } from '../lib/recordings';
 import {
@@ -72,7 +75,8 @@ interface Options {
   onSaved?: () => void;
   /** Called when the user ends a recording that was saved (not when the
    *  screen closes), e.g. to offer "View". */
-  onFinished?: (info: { day: string; recordingId: string }) => void;
+  /** The recording was saved; `undo` is what "Recording saved · Undo" takes back (this go at the recorder). */
+  onFinished?: (info: { day: string; recordingId: string; undo: RecordingUndo }) => void;
 }
 
 /**
@@ -126,6 +130,8 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
   const recordingIdRef = useRef<string | null>(null);
   const createdAtRef = useRef(0);
   const savedAnyRef = useRef(false);
+  // This go at the recorder (from Record, or from a session restored on reopening): what Undo takes back.
+  const goRef = useRef<RecordingUndo>({ created: false, segments: [], fromMs: 0 });
   // Segment saves run in order, so the second never starts a new recording
   // before the first has created it.
   const saveChainRef = useRef<Promise<void>>(Promise.resolve());
@@ -196,6 +202,8 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
       createdAt: createdAtRef.current,
       open: keepsOpen,
       ...(levels.length > 0 ? { levels } : {}),
+      // Nothing of it uploads while the recorder is going, nor while Undo is offered (lib/recordings).
+      holdUpload: true,
     };
     uriRef.current = null;
     baseRef.current += segmentMs;
@@ -212,6 +220,11 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
       try {
         const result = await appendSegment(recordingIdRef.current, uri, info);
         if (result.id) recordingIdRef.current = result.id;
+        if (result.kept && result.fileName) {
+          goRef.current = result.restarted
+            ? { created: true, segments: [result.fileName], fromMs: 0 }
+            : { ...goRef.current, segments: [...goRef.current.segments, result.fileName] };
+        }
         if (!result.kept) {
           // Dropped (too short): take its time back off the timeline.
           baseRef.current -= segmentMs;
@@ -336,6 +349,7 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
       // A day's revision is one session: carry on its recording.
       const existing = kind === 'revision' ? await findRevisionRecording(day) : null;
       recordingIdRef.current = existing?.id ?? null;
+      goRef.current = { created: !existing, segments: [], fromMs: existing?.durationMs ?? 0 };
       baseRef.current = existing?.durationMs ?? 0;
       marksRef.current = existing ? [...existing.pageMarks] : [];
       recentRef.current = [];
@@ -409,6 +423,7 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
     if (p !== 'recording' && p !== 'paused') return;
     stopRequestedRef.current = false;
     setPhaseBoth('finishing');
+    let noted = false;
     try {
       if (p === 'recording') endSegment();
       await saveChainRef.current;
@@ -422,11 +437,20 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
         buzz();
         const id = recordingIdRef.current;
         const savedDay = dayRef.current;
-        if (id && savedDay && !unmountedRef.current) onFinishedRef.current?.({ day: savedDay, recordingId: id });
+        if (id && savedDay && !unmountedRef.current && onFinishedRef.current) {
+          noted = true;
+          onFinishedRef.current({ day: savedDay, recordingId: id, undo: { ...goRef.current } });
+        }
       }
     } catch (err) {
       logger.error('Could not finish recording', err);
     } finally {
+      // Its upload waits a little longer while "Recording saved · Undo" shows; with no note, not at all.
+      const id = recordingIdRef.current;
+      if (id) {
+        if (noted) holdUpload(id);
+        else releaseUpload(id);
+      }
       releaseRecording(owner);
       recordingIdRef.current = null;
       baseRef.current = 0;
@@ -453,6 +477,8 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
     try {
       await saveChainRef.current;
     } finally {
+      // Kept for later (open): nothing to undo now, so it uploads.
+      if (recordingIdRef.current) releaseUpload(recordingIdRef.current);
       setAudioMode(false);
       releaseRecording(owner);
     }
@@ -479,6 +505,7 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
         acquireRecording(owner);
         dayRef.current = day;
         recordingIdRef.current = existing.id;
+        goRef.current = { created: false, segments: [], fromMs: existing.durationMs };
         createdAtRef.current = existing.createdAt;
         baseRef.current = existing.durationMs;
         marksRef.current = [...existing.pageMarks];

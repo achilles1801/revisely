@@ -5,7 +5,7 @@
 
 import type { TajweedRule } from '../reciteCheck/result';
 
-/** What a mark is about. Red: word, skipped, added. Amber: harakat, letter, tajweed (`severityOf`). */
+/** What a mark is about. Mistakes: word, skipped, added; slips: harakat, letter, tajweed (`severityOf`). Colours: `markGroup`. */
 export type MarkKind = 'word' | 'skipped' | 'added' | 'harakat' | 'letter' | 'tajweed';
 
 /** Finer than the kind, for the card's wording. */
@@ -35,6 +35,21 @@ export interface Mark {
   t?: [number, number];
   /** clear: past a strict bar; likely: past the normal one (shown softer). */
   sure: 'clear' | 'likely';
+  /** Final answer only (contract draft 6): the reciter went on with a similar ayah, or ended it as another ends. */
+  into?: MarkInto;
+}
+
+/**
+ * Where a slip into a similar ayah went (recite-contract.md, `into`; agreed by recite-ui Nov 15 2026): on the first
+ * skipped or wrong word of a run, in the final answer only. `ending`: the ayah's last word said as `ayah`'s last word.
+ */
+export interface MarkInto {
+  /** The first word said of that place (the app's word number); for `ending`, that ayah's last word. */
+  w: number;
+  ayah: [number, number];
+  /** Other ayat with the same words, as far as was heard. */
+  also?: [number, number][];
+  ending?: true;
 }
 
 export interface LiveScore {
@@ -44,6 +59,11 @@ export interface LiveScore {
   mistakes: number;
   /** Tajweed notes, counted apart. */
   tajweed: number;
+  /**
+   * "Not clear" marks (harakat and letter marks past the normal bar only), counted apart and not in `mistakes`, when
+   * the checker counts them so. Absent: a checker that still counts them in `mistakes` (the app takes them out).
+   */
+  unclear?: number;
   /** 1 − mistakes ÷ reached (the model session's rule). */
   accuracy: number;
 }
@@ -129,6 +149,21 @@ const isWord = (x: unknown): x is number => isNum(x) && Number.isInteger(x) && x
 const pair = (x: unknown): [number, number] | null =>
   Array.isArray(x) && x.length === 2 && isNum(x[0]) && isNum(x[1]) ? [x[0], x[1]] : null;
 
+/** A mark's `into`, or null when it isn't one (the mark stays without it). */
+export function parseInto(raw: unknown): MarkInto | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const ayah = pair(r.ayah);
+  if (!isWord(r.w) || !ayah || !isWord(ayah[0]) || !isWord(ayah[1]) || ayah[0] < 1 || ayah[0] > 114 || ayah[1] < 1) return null;
+  const into: MarkInto = { w: r.w, ayah };
+  if (Array.isArray(r.also)) {
+    const also = r.also.map(pair).filter((a): a is [number, number] => a != null && a[0] >= 1 && a[0] <= 114 && a[1] >= 1);
+    if (also.length) into.also = also;
+  }
+  if (r.ending === true) into.ending = true;
+  return into;
+}
+
 /** A mark, or null when it isn't one. */
 export function parseMark(raw: unknown): Mark | null {
   if (!raw || typeof raw !== 'object') return null;
@@ -159,6 +194,8 @@ export function parseMark(raw: unknown): Mark | null {
   if (isNum(m.expected)) mark.expected = m.expected;
   const t = pair(m.t);
   if (t) mark.t = t;
+  const into = parseInto(m.into);
+  if (into) mark.into = into;
   return mark;
 }
 
@@ -170,6 +207,7 @@ export function parseScore(raw: unknown): LiveScore | null {
     reached: s.reached,
     mistakes: s.mistakes,
     tajweed: isNum(s.tajweed) ? s.tajweed : 0,
+    ...(isNum(s.unclear) ? { unclear: s.unclear } : {}),
     accuracy: Math.min(1, Math.max(0, s.accuracy)),
   };
 }
@@ -260,5 +298,24 @@ export function severityOf(mark: Pick<Mark, 'kind'>): Severity {
   return mark.kind === 'word' || mark.kind === 'skipped' || mark.kind === 'added' ? 'mistake' : 'slip';
 }
 
-/** Marks that count against the score (everything but tajweed notes). */
+/**
+ * A mark's colour on the page, in the bar, the card and the summary: three groups at most (Majd, Nov 15 2026). Words
+ * (wrong, skipped, extra) red, slips (a haraka, a letter, "Not clear") amber, tajweed notes violet. The card and the
+ * summary always name the kind in words.
+ */
+export type MarkGroup = 'word' | 'slip' | 'tajweed';
+export function markGroup(mark: Pick<Mark, 'kind'>): MarkGroup {
+  return mark.kind === 'tajweed' ? 'tajweed' : severityOf(mark) === 'mistake' ? 'word' : 'slip';
+}
+/** Which of a word's marks shows when it has several: a word mistake over a slip over a tajweed note. */
+export const GROUP_RANK: Record<MarkGroup, number> = { tajweed: 0, slip: 1, word: 2 };
+
+/** Marks the checker's `mistakes` has counted (everything but tajweed notes; "not clear" ones too, until `unclear`). */
 export const countsAsMistake = (mark: Pick<Mark, 'kind'>) => mark.kind !== 'tajweed';
+
+/**
+ * "Not clear: say it more clearly" (Majd, Nov 15 2026): a haraka or letter heard past the normal bar only. Hearing a
+ * haraka needs very clear recitation, and "there's a difference between someone saying 100% the wrong haraqa vs them
+ * not sounding clear". Shown, worded so, and never counted in the score.
+ */
+export const isUnclear = (mark: Pick<Mark, 'kind' | 'sure'>) => (mark.kind === 'harakat' || mark.kind === 'letter') && mark.sure === 'likely';

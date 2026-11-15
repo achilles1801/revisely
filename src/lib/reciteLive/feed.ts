@@ -34,6 +34,8 @@ export type ClientFrame =
   /** A page turned by hand; with `startBy`, before the start is found: look for it on this page instead. */
   | { type: 'seek'; w: number; startBy?: [number, number] }
   | { type: 'dismiss'; id: string }
+  /** A dismissed mark put back (Undo, the summary's Put back): the label is taken back. A checker without it ignores it. */
+  | { type: 'undismiss'; id: string }
   /** A word or an ayah shown by hand in the hidden view (information for the checker). */
   | { type: 'hint'; w: number; what: 'word' | 'ayah' }
   | { type: 'end' };
@@ -44,6 +46,10 @@ export interface LiveConnection {
   send(frame: Exclude<ClientFrame, StartFrame>): void;
   /** Hang up (nothing more comes). */
   close(): void;
+  /** The connection's state in a word or two, for the Stop trace (lib/reciteLive/stopTrace): "live", "retry 2", … */
+  status?(): string;
+  /** The take's audio from `from` to `to` seconds (16 kHz mono), as held on the phone; null outside what was heard. */
+  audioClip?(from: number, to: number): Int16Array | null;
 }
 
 export interface LiveHandlers {

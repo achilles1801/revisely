@@ -49,6 +49,9 @@ jest.mock('../../services/firestoreService', () => {
     isDeletingAccount: () => false,
     isResettingAccount: () => false,
     isInitializingPages: () => false,
+    pagesBeingWritten: () => null,
+    onPagesWritten: () => () => {},
+    accountCreatorDone: () => Promise.resolve(),
     createMissingPages: (...a: unknown[]) => mockService.createMissingPages(...(a as [])),
     subscribeToUser: (cb: never, _uid: string, onError: never) => {
       mockListeners.user = cb;

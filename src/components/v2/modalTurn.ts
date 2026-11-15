@@ -93,7 +93,11 @@ export function useModalTurn(wanted: boolean, nested = false): { turn: boolean; 
   return { turn: wanted && turn, release };
 }
 
-/** For a modal that shows at once (not a v2 Sheet): holds a turn while `visible`, so sheets wait for it. */
+/**
+ * For a modal that shows at once (not a v2 Sheet): holds a turn while `visible`, so sheets wait for it. It doesn't wait
+ * itself: a modal that can open while a sheet is still closing (from a sheet's button) takes a turn instead
+ * (useModalTurn, released on its onDismiss), or iOS refuses it (reciteLive/CheckIntroPage, Nov 15 2026).
+ */
 export function useModalHold(visible: boolean): void {
   const token = useRef<object>({}).current;
   useEffect(() => {

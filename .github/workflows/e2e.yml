@@ -178,15 +178,25 @@ jobs:
           smoke_android='[{"name":"smoke: 02 05","flows":".maestro/flows/0[25]-*.yaml"},{"name":"smoke: 04 06","flows":".maestro/flows/0[46]-*.yaml"}]'
           smoke_ios='[{"name":"smoke: 02 04 05 06","flows":".maestro/flows/0[2456]-*.yaml"}]'
           build='[{"name":"native build","flows":""}]'
-          # A change to shared test code (CI's plan): the flows it touches, or every flow.
+          # A change to shared test code (CI's plan): the flows it touches, or every flow, each run
+          # twice. Three flows or fewer: one job. More: the full run's jobs, each keeping only the
+          # flows touched, in its order (10 before the 09 seeds), so each fits its limit as the full
+          # job does (shards.test.js checks both, running this). Splitting them into two jobs didn't
+          # fit: #574 touched 21 flows through signup.yaml, and its iOS job of 11 needed about 200 of
+          # its 180 minutes (run 43706009559, stopped in the tenth flow). A flow in no full job (the
+          # shards test fails on one) gets a job of its own rather than none.
+          infra_jq='
+            ($f | split(" ") | map(select(. != ""))) as $all
+            | (if ($all | length) <= 3 then [$all]
+               else [$full[] | [.flows | split(" ") | .[] | select(. != "")
+                       | ("^" + (gsub("\\."; "\\.") | gsub("\\*"; "[^/]*") | gsub("\\?"; "[^/]")) + "$") as $re
+                       | $all[] | select(test($re))]
+                     | select(length > 0)]
+                 | . + ([$all - flatten] | map(select(length > 0)))
+               end)
+            | map({name: ("changed: " + (map(split("/") | last | split("-") | first) | join(" "))), flows: join(" ")})'
           if [ "$INFRA_ONLY" = all ]; then infra="$full"
-          else
-            # More than three flows: two jobs, alternately (each flow runs twice).
-            infra=$(jq -cn --arg f "$INFRA_ONLY" '
-              ($f | split(" ") | map(select(. != ""))) as $all
-              | (if ($all | length) > 3 then [[$all | to_entries[] | select(.key % 2 == 0) | .value], [$all | to_entries[] | select(.key % 2 == 1) | .value]] else [$all] end)
-              | map({name: ("changed: " + (map(split("/") | last | split("-") | first) | join(" "))), flows: join(" ")})')
-          fi
+          else infra=$(jq -cn --arg f "$INFRA_ONLY" --argjson full "$full" "$infra_jq"); fi
           set_of() { # set platform
             case "$1" in
               none) echo '[]' ;; build) echo "$build" ;; full) echo "$full" ;; infra) echo "$infra" ;;

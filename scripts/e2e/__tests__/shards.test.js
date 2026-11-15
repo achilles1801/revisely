@@ -129,3 +129,70 @@ it('reads the time limits from e2e.yml', () => {
     expect(limit(platform, 2)).toBeGreaterThanOrEqual(limit(platform));
   }
 });
+
+// A change to shared test code runs the flows it touches, each twice (ci.yml `plan`, `infra`). The
+// jobs come from e2e.yml's `infra_jq`, run here with jq as the workflow runs it. They used to be two
+// jobs whatever the flows: #574 touched 21 flows through signup.yaml, and its iOS job of 11 needed
+// about 200 of its 180 minutes (run 43706009559).
+describe('the jobs for a change to shared test code', () => {
+  const { execFileSync } = require('child_process');
+  const { affected } = require('../../../.github/scripts/affected-flows');
+
+  function infraProgram() {
+    const lines = workflow.split('\n');
+    const start = lines.findIndex((l) => /^\s*infra_jq='/.test(l));
+    if (start < 0) throw new Error("e2e.yml has no infra_jq='…'");
+    const end = lines.findIndex((l, i) => i > start && /'$/.test(l));
+    const body = lines.slice(start, end + 1).join('\n');
+    return body.slice(body.indexOf("'") + 1, body.lastIndexOf("'"));
+  }
+
+  const infraJobs = (touched) =>
+    JSON.parse(
+      execFileSync('jq', ['-cn', '--arg', 'f', touched.join(' '), '--argjson', 'full', JSON.stringify(fullJobs()), infraProgram()], {
+        encoding: 'utf8',
+      }),
+    ).map((job) => job.flows.split(' '));
+
+  // Each touched flow once, each job a full job's flows in its order with only the touched ones
+  // kept, and each job inside its limit with every flow run twice.
+  function check(touched) {
+    const jobs = infraJobs(touched);
+    expect(jobs.flat().sort()).toEqual([...touched].sort());
+    for (const job of jobs) {
+      const full = fullJobs().find((j) => flowsOf(j).includes(job[0]));
+      expect(job).toEqual(flowsOf(full).filter((f) => touched.includes(f)));
+    }
+    for (const platform of ['ios', 'android']) {
+      const over = jobs
+        .map((job) => ({ job, total: OVERHEAD[platform] + 2 * job.reduce((a, f) => a + minutes[platform][base(f)], 0) }))
+        .filter(({ total }) => total > limit(platform, 2))
+        .map(({ job, total }) => `${job.map(short).join(' ')}: ${total} of ${limit(platform, 2)} minutes`);
+      expect({ platform, over }).toEqual({ platform, over: [] });
+    }
+    return jobs;
+  }
+
+  it('runs three flows or fewer in one job', () => {
+    const three = flows.slice(0, 3);
+    expect(infraJobs(three)).toEqual([three]);
+    expect(infraJobs(flows.slice(5, 6))).toEqual([flows.slice(5, 6)]);
+  });
+
+  it('runs more in the full jobs, keeping only the flows touched, each job inside its limit', () => {
+    expect(check(flows)).toEqual(fullJobs().map(flowsOf));
+    check(flows.filter((_, i) => i % 3 !== 0));
+    check(flows.slice(0, 4));
+  });
+
+  it("fits the flows the sign-up's subflows touch (#574)", () => {
+    const touched = affected(['.maestro/subflows/signup.yaml', '.maestro/subflows/type-in-field.yaml']).flows;
+    expect(touched.length).toBeGreaterThan(3);
+    check(touched);
+  });
+
+  it('still runs a flow that is in no full job', () => {
+    const jobs = infraJobs([...flows.slice(0, 4), '.maestro/flows/99-new.yaml']);
+    expect(jobs.flat()).toContain('.maestro/flows/99-new.yaml');
+  });
+});

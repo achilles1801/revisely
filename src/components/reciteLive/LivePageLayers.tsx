@@ -1,18 +1,13 @@
 import React from 'react';
-import { Image, StyleSheet, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import type { PageImage } from '../MushafPager';
+import { StyleSheet, View } from 'react-native';
 import { HiddenPageOverlay } from '../recite/HiddenPageOverlay';
-import { pageImageProps } from '../../lib/quranImages';
 import type { Rect } from '../../lib/ayahBounds';
 import type { QuranWords } from '../../lib/recite/quranWords';
 import type { WordFollow } from '../../lib/recite/hiddenPage';
-import type { Mark } from '../../lib/reciteLive/contract';
-import { severityOf } from '../../lib/reciteLive/contract';
+import type { Mark, MarkGroup } from '../../lib/reciteLive/contract';
+import { GROUP_RANK, markGroup } from '../../lib/reciteLive/contract';
 import { markTitle } from '../../lib/reciteLive/describe';
-import { ayahBand, cursorBox, grow, markShape, wordBox } from '../../lib/reciteLive/geometry';
-import { markStrength } from '../../lib/reciteLive/state';
-import { mixColors } from '../../theme/v2';
+import { currentLineBand, cursorBox, markBox, markHighlight } from '../../lib/reciteLive/geometry';
 
 const NO_REVEALED: ReadonlySet<string> = new Set();
 
@@ -20,181 +15,92 @@ function rectStyle(r: Rect, scale: number) {
   return { left: r.x0 * scale, top: r.y0 * scale, width: (r.x1 - r.x0) * scale, height: (r.y1 - r.y0) * scale };
 }
 
+/** Each group's highlight, and its firmer shade for the mark a card is open for (theme/v2: markWord, markWordFirm…). */
+export type MarkColours = Record<MarkGroup, { fill: string; firm: string }>;
+
 /**
- * Behind the page's ink, in its frame: the ayah being recited (a soft band on each of its lines) and the word being
- * recited (a firmer box), and the mark a card is open for.
+ * Behind the page's ink, in its frame: the line being recited (a quiet grey band; none on a hidden page) and the word
+ * being recited, or the newest shown on a hidden page (a firmer grey box), as Tarteel's grey line and box are; and the
+ * marks (Check) as highlights behind their words, three colours at most: red for words, amber for slips and "Not clear",
+ * violet for tajweed (Majd, Nov 15 2026: "only things we should show are highlites for mistakes 3 colors max"). An extra
+ * word is highlighted on the word before it. A word with several marks shows its strongest. The mark a card is open
+ * for is a firmer shade of its own colour. No red ink, dotted lines or + discs on the page any more.
  */
 export function LiveUnderlay({
   page,
   scale,
   words,
   cursor,
+  marks,
   selected,
+  hidden,
   colors,
 }: {
   page: number;
   scale: number;
   words: QuranWords;
   cursor: number | null;
+  marks: Mark[];
   selected: Mark | null;
-  colors: { band: string; word: string; selectedMistake: string; selectedSlip: string };
+  /** The hidden view: no line band. */
+  hidden: boolean;
+  colors: { band: string; word: string; marks: MarkColours };
 }) {
   const here = cursor != null && words.pageOf(cursor) === page;
-  const ref = here ? words.ref(cursor) : null;
+  const line = here && !hidden ? currentLineBand(words, page, cursor) : null;
+  // One highlight per word: its strongest mark (a word mistake over a slip over a tajweed note).
+  const byWord = new Map<number, Mark>();
+  for (const m of marks) {
+    if (words.pageOf(m.w) !== page) continue;
+    const had = byWord.get(m.w);
+    if (!had || GROUP_RANK[markGroup(m)] > GROUP_RANK[markGroup(had)]) byWord.set(m.w, m);
+  }
+  const picked = selected && words.pageOf(selected.w) === page ? selected : null;
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill} testID={`live-underlay-${page}`}>
-      {ref
-        ? ayahBand(page, ref.sura, ref.ayah).map((r, i) => (
-            <View key={`b${i}`} testID="live-ayah-band" style={[styles.abs, styles.band, rectStyle(r, scale), { backgroundColor: colors.band }]} />
-          ))
-        : null}
+      {line ? (
+        <View testID="live-line-band" style={[styles.abs, styles.band, rectStyle(line, scale), { backgroundColor: colors.band }]} />
+      ) : null}
       {here ? (
         <View testID="live-word-box" style={[styles.abs, styles.box, rectStyle(cursorBox(words, cursor), scale), { backgroundColor: colors.word }]} />
       ) : null}
-      {selected && words.pageOf(selected.w) === page && selected.kind !== 'added' ? (
-        <View
-          testID="live-selected-mark"
-          style={[
-            styles.abs,
-            styles.box,
-            rectStyle(grow(wordBox(words, selected.w), 5, 3), scale),
-            { backgroundColor: severityOf(selected) === 'mistake' ? colors.selectedMistake : colors.selectedSlip },
-          ]}
-        />
-      ) : null}
-    </View>
-  );
-}
-
-/** The word's own ink in `color`: the page image again, tinted, clipped to the word's box. */
-function Recoloured({
-  image,
-  box,
-  scale,
-  color,
-  opacity,
-  testID,
-}: {
-  image: PageImage;
-  box: Rect;
-  scale: number;
-  color: string;
-  opacity: number;
-  testID?: string;
-}) {
-  const r = grow(box, 0, 4);
-  return (
-    <View style={[styles.abs, styles.clip, rectStyle(r, scale)]} pointerEvents="none" testID={testID}>
-      <Image
-        source={{ uri: image.uri }}
-        {...pageImageProps()}
-        fadeDuration={0}
-        style={{
-          position: 'absolute',
-          left: -r.x0 * scale,
-          top: -r.y0 * scale,
-          width: image.width,
-          height: image.height,
-          tintColor: color,
-          opacity,
-        }}
-      />
-    </View>
-  );
-}
-
-/** A dotted line under a word (a row of dots: iOS draws a dotted border only on all four sides). */
-function Dots({ box, scale, color, opacity }: { box: Rect; scale: number; color: string; opacity: number }) {
-  const width = (box.x1 - box.x0) * scale - 4;
-  const n = Math.max(2, Math.floor(width / 4.4));
-  return (
-    <View
-      pointerEvents="none"
-      style={[styles.abs, styles.dots, { left: box.x0 * scale + 2, top: box.y1 * scale + 1.5, width, opacity }]}
-    >
-      {Array.from({ length: n }, (_, i) => (
-        <View key={i} style={[styles.dot, { backgroundColor: color }]} />
-      ))}
+      {[...byWord.values()].map((m) => {
+        const group = markGroup(picked && picked.w === m.w ? picked : m);
+        const firm = picked != null && picked.w === m.w;
+        return (
+          <View
+            key={m.w}
+            testID={firm ? `live-highlight-${group}-picked` : `live-highlight-${group}`}
+            style={[
+              styles.abs,
+              styles.box,
+              rectStyle(markHighlight(words, m), scale),
+              { backgroundColor: firm ? colors.marks[group].firm : colors.marks[group].fill },
+            ]}
+          />
+        );
+      })}
     </View>
   );
 }
 
 /**
- * Over the page's ink: hidden-page covers (words show as recited, or shown by hand), the newest word shown in the
- * follow blue while hidden (never the accent), and the marks (Check): the word itself in red or amber with a dotted line under it, or a small
- * ⊕ in the gap where a word was added. A mark past the normal bar only (`likely`) is a little lighter.
+ * Over the page's ink, on a hidden page: the covers (words show as recited, or shown by hand), with no band on any line
+ * (Majd, Nov 15 2026). The newest word's grey box and the marks' highlights are behind the ink (LiveUnderlay).
  */
 export function LiveOverlay({
   page,
   scale,
-  image,
-  words,
-  marks,
   hidden,
-  newest,
-  colors,
 }: {
   page: number;
   scale: number;
-  image: PageImage | null;
-  words: QuranWords;
-  marks: Mark[];
-  hidden: { follow: WordFollow; cover: string; guide: string; band: string } | null;
-  newest: number | null;
-  /** `ground`: the page's colour (a likely mark is its colour a little towards it). */
-  colors: { mistake: string; slip: string; follow: string; onMistake: string; ground: string };
+  hidden: { follow: WordFollow; cover: string; guide: string } | null;
 }) {
-  const showNewest = hidden && newest != null && words.pageOf(newest) === page && hidden.follow.shown(newest);
+  if (!hidden) return null;
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill} testID={`live-overlay-${page}`}>
-      {hidden ? (
-        <HiddenPageOverlay
-          page={page}
-          scale={scale}
-          revealed={NO_REVEALED}
-          follow={hidden.follow}
-          colors={{ cover: hidden.cover, guide: hidden.guide, band: hidden.band }}
-        />
-      ) : null}
-      {image && showNewest ? <Recoloured image={image} box={wordBox(words, newest)} scale={scale} color={colors.follow} opacity={1} /> : null}
-      {marks.map((m) => {
-        if (words.pageOf(m.w) !== page) return null;
-        const shape = markShape(words, m);
-        const base = severityOf(m) === 'mistake' ? colors.mistake : colors.slip;
-        // A likely mark: lighter, drawn solid (a see-through red over black ink reads as maroon).
-        const color = markStrength(m) === 'full' ? base : mixColors(base, colors.ground, 0.3);
-        const opacity = 1;
-        if (shape.type === 'gap') {
-          return (
-            <View
-              key={m.id}
-              testID="live-ink-gap"
-              style={[styles.abs, styles.gap, { left: shape.x * scale - 9, top: shape.y * scale - 4, backgroundColor: color, opacity }]}
-            >
-              <Ionicons name="add" size={14} color={colors.onMistake} />
-            </View>
-          );
-        }
-        return (
-          <View key={m.id} style={StyleSheet.absoluteFill} pointerEvents="none">
-            {image && m.kind !== 'skipped' ? (
-              <Recoloured image={image} box={shape.box} scale={scale} color={color} opacity={opacity} testID={`live-ink-${m.kind}`} />
-            ) : null}
-            {image && m.kind === 'skipped' ? (
-              // A word left out: the word in the mark's colour, fainter, as it wasn't said.
-              <Recoloured
-                image={image}
-                box={shape.box}
-                scale={scale}
-                color={mixColors(color, colors.ground, 0.4)}
-                opacity={opacity}
-                testID="live-ink-skipped"
-              />
-            ) : null}
-            <Dots box={shape.box} scale={scale} color={color} opacity={opacity} />
-          </View>
-        );
-      })}
+      <HiddenPageOverlay page={page} scale={scale} revealed={NO_REVEALED} follow={hidden.follow} colors={{ cover: hidden.cover, guide: hidden.guide }} />
     </View>
   );
 }
@@ -209,18 +115,14 @@ export function LiveMarkTargets({ page, scale, words, marks }: { page: number; s
     <>
       {marks.map((m) => {
         if (words.pageOf(m.w) !== page) return null;
-        const shape = markShape(words, m);
-        const box =
-          shape.type === 'gap'
-            ? { x0: shape.x - 9 / scale, y0: shape.y - 4 / scale, x1: shape.x + 9 / scale, y1: shape.y + 14 / scale }
-            : shape.box;
+        const box = markBox(words, m);
         return (
           <View
             key={m.id}
             pointerEvents="none"
             accessible
             accessibilityRole="button"
-            accessibilityLabel={`${markTitle(m)}, ${words.uthmani(m.w)}`}
+            accessibilityLabel={`${markTitle(m)}, ${m.kind === 'added' ? 'after ' : ''}${words.uthmani(m.w)}`}
             accessibilityHint="Shows what you said"
             testID={`live-mark-${m.kind}`}
             style={[styles.abs, rectStyle(box, scale)]}
@@ -235,8 +137,4 @@ const styles = StyleSheet.create({
   abs: { position: 'absolute' },
   band: { borderRadius: 8 },
   box: { borderRadius: 7 },
-  clip: { overflow: 'hidden' },
-  dots: { flexDirection: 'row', justifyContent: 'space-between', height: 2.4 },
-  dot: { width: 2.2, height: 2.2, borderRadius: 1.1 },
-  gap: { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
 });

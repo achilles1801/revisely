@@ -25,6 +25,7 @@ sys.path.insert(0, str(HARNESS))
 import checker  # noqa: E402
 import letters_v2  # noqa: E402
 import nasal_rules  # noqa: E402
+import similar  # noqa: E402
 import tajweed  # noqa: E402
 
 FPS = checker.FPS
@@ -119,14 +120,25 @@ def slip_of(why):
     return None
 
 
+UNCLEAR_KINDS = ('harakat', 'letter')  # a `likely` one is "Not clear: say it more clearly", not a mistake
+
+
+def unclear(m):
+    """A harakat or letter mark the ear isn't sure of (Majd, Nov 15 2026: unclear is not the same as wrong; someone
+    not reciting clearly can sound wrong without being wrong)."""
+    return m['kind'] in UNCLEAR_KINDS and m.get('sure') == 'likely'
+
+
 def score(statuses, marks, dismissed=()):
-    """reached: from the first word recited to the furthest heard, skipped words included; mistakes: word, skipped,
-    added, harakat and letter marks not dismissed; tajweed counted apart; accuracy = 1 - mistakes / reached."""
+    """reached: from the first word recited to the furthest heard, skipped words included; mistakes: word, skipped
+    and added marks, and harakat and letter marks the ear is sure of, not dismissed; unclear (harakat and letter marks
+    it isn't sure of) and tajweed counted apart; accuracy = 1 - mistakes / reached (recite-contract.md, The score)."""
     said = [w for w, s in statuses.items() if s in ('correct', 'corrected', 'wrong', 'missed')]
     reached = (max(said) - min(said) + 1) if said else 0
     live = [m for m in marks if m['id'] not in dismissed]
-    mistakes = sum(1 for m in live if m['kind'] in MISTAKE_KINDS)
+    mistakes = sum(1 for m in live if m['kind'] in MISTAKE_KINDS and not unclear(m))
     return {'reached': reached, 'mistakes': mistakes, 'tajweed': sum(1 for m in live if m['kind'] == 'tajweed'),
+            'unclear': sum(1 for m in live if unclear(m)),
             'accuracy': round(max(0.0, 1 - mistakes / reached), 4) if reached else 1.0}
 
 
@@ -236,6 +248,8 @@ class Engine:
         self._slots = {}
         self._kw = {}  # app word -> its Key.passage entry, worked out on this instance (no table, or not in it)
         self._kw_lock = threading.Lock()
+        self.slip_index = similar.Index(self.words)  # where a slip into a similar passage went (name_slips); 0.1 s
+        self._labels = {}
         self.table = load_table(pathlib.Path(os.environ['LAB']) / 'words.bin')
         lab = pathlib.Path(os.environ['LAB'])
         self.ear2, self.bars2 = None, None  # the strict level's second ear (v5), when the image carries it
@@ -383,6 +397,8 @@ class Engine:
                     if len(checker.norm_sounds(own)) >= 3:
                         heard[w_] = own
             out['marks'] = self.marks(words, flagged, heard, out['extras'], tj, letters if st['letters'] else [])
+            out['ms']['similar'] = self.name_slips(out['marks'], lp, [k['word'] for k in kws], statuses, spans,
+                                                   out['extras'])
             out['score'] = score(statuses, out['marks'])
             out['v'] = 2
         return out
@@ -463,6 +479,72 @@ class Engine:
                 detail=detail, slip=slip_of(r['slip']), heard=spell(r['_heard']) if r.get('_heard') else None,
                 heardExact=False if r.get('_heard') else None)
         return out
+
+    def name_slips(self, marks, lp, order, statuses, spans, extras):
+        """Where the reciter went, on the mark of a slip (recite-contract.md, `into`): {w, ayah, also?, ending?}.
+        - A run of words skipped or said wrong that is a similar passage's words: `into` on the run's first word mark,
+          w being the place's first word said (lab, Nov 15 2026: of bench-v0's 111 planted slips into a similar ayah,
+          107 named with the right place, none with a wrong one).
+        - An ayah's last word said as another nearby ayah's last word (`ending: true`; 78 of 164 swapped endings named,
+          none wrongly; /record w4's «إذا وقب» for «إذا حسد»).
+        `also`: other ayat with the same words as far as heard. Nothing was named on any other run of the bench, the
+        learners', /record's or the Dev takes. The lab's similar.py. Not shown by the app yet (Majd: "show nothing
+        until the numbers are good").
+        Returns the milliseconds it took: 0–20 ms a take on the Mac, 74–104 on Cloud Run. Both passes share
+        similar.P['budget'], a measure of work, not time (about 0.5 s on Cloud Run), so a take full of mistakes can't
+        hold up the answer and a take names the same on any machine. Without the word table each place's sounds would
+        be worked out here (~100 ms a word), so nothing is named."""
+        if self.table is None:
+            return 0
+        t0 = time.perf_counter()
+        work = {'left': similar.P['budget']}
+        names = []
+        try:
+            names = similar.find(lp, order, statuses, spans, extras, self._labels_of, self.slip_index, work=work)
+            marked = {n['mark'] for n in names}
+            names += [n for n in similar.endings(lp, order, statuses, spans, self._forms_of, self.slip_index,
+                                                 work=work) if n['mark'] not in marked]
+        except Exception as e:  # naming is extra: it never costs the answer
+            print(f'similar: {type(e).__name__}: {e}', file=sys.stderr)
+        for n in names:
+            m = next((m for m in marks if m['w'] == n['mark'] and m['kind'] in ('skipped', 'word')), None)
+            if m is None:
+                continue
+            ayah = self.slip_index.ayah(n['w'])
+            also = []
+            for x in n['also']:
+                a = self.slip_index.ayah(x)
+                if a != ayah and a not in also:
+                    also.append(a)
+            m['into'] = ({'w': int(n['w']), 'ayah': ayah} | ({'also': also[:5]} if also else {})
+                         | ({'ending': True} if n.get('kind') == 'ending' else {}))
+        return int((time.perf_counter() - t0) * 1000)
+
+    def _forms_of(self, w):
+        """Word w's forms (joined, started on, stopped on), for similar.endings."""
+        try:
+            return self.passage_words(w, w + 1)[0]['forms']
+        except ValueError:
+            return []
+
+    def _labels_of(self, lo, hi):
+        """The sounds of app words [lo, hi) as the checker hears them joined, and where each word ends (similar.py)."""
+        got = self._labels.get((lo, hi))
+        if got is None:
+            try:
+                kws = self.passage_words(lo, hi)
+            except ValueError:  # a word the checker refuses: that place isn't tried
+                kws = []
+            lab, ends = [], []
+            for k in kws:
+                lab += k['forms'][0]['labels']
+                ends.append(len(lab))
+            got = (lab, ends)
+            with self._kw_lock:
+                if len(self._labels) > 20000:
+                    self._labels.clear()
+                self._labels[(lo, hi)] = got
+        return got
 
     def ayat(self, lp, lo, hi, statuses, spans, st, audio=None):
         """Tajweed (and letters) for each ayah of the passage said in full, on its own frames."""

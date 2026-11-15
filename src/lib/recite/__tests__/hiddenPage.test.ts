@@ -45,6 +45,15 @@ describe('pageLines', () => {
     expect(pageLines(1).reduce((n, l) => n + l.markers.length, 0)).toBe(7);
   });
 
+  it('every marker’s opening is at least as wide as the smallest marker (pages 1 and 2: 60 units)', () => {
+    // Before Nov 15 2026 page 236's held 43 units of an 80-unit ring.
+    for (let page = 1; page <= 604; page++) {
+      for (const l of pageLines(page)) {
+        for (const [a, b] of l.markers) expect({ page, line: l.line, wide: b - a >= 60 }).toEqual({ page, line: l.line, wide: true });
+      }
+    }
+  });
+
   it('subtractSpans', () => {
     expect(subtractSpans(0, 100, [[10, 20], [15, 30], [90, 120]])).toEqual([[0, 10], [30, 90]]);
     expect(subtractSpans(0, 100, [])).toEqual([[0, 100]]);
@@ -57,9 +66,16 @@ describe('hidden page', () => {
     expect(next && verseKey(next)).toBe('1:1');
     for (const l of lines) {
       expect(l.covers.length).toBeGreaterThanOrEqual(1);
-      // Covered: the whole line less its markers.
+      // Covered: the whole line less its markers (a sliver beside a marker with no verse in it needs no cover).
       const markers = pageLines(1).find((p) => p.line === l.line)!.markers;
-      expect(total(l.covers)).toBe(l.x1 - l.x0 - total(markers));
+      expect(total(l.covers)).toBeLessThanOrEqual(l.x1 - l.x0 - total(markers) + 1e-6);
+      for (const v of versesOnPage(1)) {
+        for (const r of ayahRects(1, v.sura, v.ayah).filter((r) => Math.abs(r.y0 - l.y0) <= 1)) {
+          for (const [a, b] of subtractSpans(r.x0, r.x1, markers)) {
+            expect(l.covers.some(([c0, c1]) => c0 <= a && c1 >= b)).toBe(true);
+          }
+        }
+      }
     }
     expect(lines.filter((l) => l.current)).toHaveLength(1);
     expect(lines[0].current).toBe(true);
@@ -84,10 +100,12 @@ describe('hidden page', () => {
     expect(Math.abs(r3.y0 - r4.y0)).toBeLessThanOrEqual(1);
     const { lines } = hiddenPageLayout(1, new Set(['1:1', '1:2', '1:3']));
     const line = lines.find((l) => Math.abs(l.y0 - r3.y0) <= 1)!;
-    // 1:4 (left of 1:3, the text runs right to left) is covered, up to 1:3
-    // (its marker, at its left end, stays open).
+    // 1:4 (left of 1:3, the text runs right to left) is covered, up to 1:3's marker (at 1:3's left end, open; its
+    // left ear reaches a little into 1:4's box).
     const covered = (x: number) => line.covers.some(([a, b]) => x >= a && x <= b);
-    expect(covered((r4.x0 + r4.x1) / 2) && covered(r4.x1 - 3)).toBe(true);
+    const marker3 = pageLines(1).find((p) => p.line === line.line)!.markers.find(([a, b]) => a < r3.x0 && b > r3.x0)!;
+    expect(covered((r4.x0 + r4.x1) / 2) && covered(marker3[0] - 0.5)).toBe(true);
+    expect(covered(marker3[0] + 0.5)).toBe(false);
     // Most of 1:3 is open.
     expect(covered((r3.x0 + r3.x1) / 2)).toBe(false);
   });
@@ -156,6 +174,39 @@ describe('hidden page, word by word (following the reciter)', () => {
     const { lines, next } = hiddenPageLayout(50, new Set(), { words, shown: () => true, next: null });
     expect(lines.every((l) => l.covers.length === 0 && !l.current)).toBe(true);
     expect(next).toBeNull();
+  });
+
+  // Each marker's ink across the rows a cover takes, measured on the page images by scripts/check-page-markers.py
+  // (which checks every marker on every page). Majd's screenshot (Nov 15 2026): page 2's ۱ ۲ ۳ were cut on the left,
+  // only ۴ (its line's end) was whole; the openings sat 7 units right of the markers on nearly every page.
+  const MEASURED: { why: string; page: number; line: number; ink: [number, number] }[] = [
+    { why: '۱, cut by 8.3', page: 2, line: 3, ink: [672.69, 732.95] },
+    { why: '۲, cut by 6.7', page: 2, line: 4, ink: [652.21, 712.47] },
+    { why: '۳, cut by 7.1', page: 2, line: 5, ink: [500.97, 561.23] },
+    { why: '۴, at its line’s end', page: 2, line: 6, ink: [211.1, 271.36] },
+    { why: 'page 3’s wider print', page: 3, line: 7, ink: [267.03, 353.28] },
+    { why: 'the opening held part of the ring', page: 236, line: 5, ink: [552.96, 633.3] },
+    { why: 'a sajdah sign beside the ring', page: 416, line: 8, ink: [359.19, 502.15] },
+    { why: 'a word touching the marker', page: 577, line: 2, ink: [906.24, 988.16] },
+    { why: 'smaller markers', page: 596, line: 14, ink: [98.07, 171.72] },
+    { why: 'smaller markers, touching on both sides', page: 596, line: 14, ink: [711.29, 784.54] },
+  ];
+  const cut = (lines: { covers: [number, number][]; line: number }[], line: number, [x0, x1]: [number, number]) =>
+    lines.find((l) => l.line === line)!.covers.filter(([a, b]) => Math.min(b, x1) > Math.max(a, x0));
+
+  it('no cover reaches into a verse marker, by verse or word by word, whatever is shown', () => {
+    const words = getQuranWords();
+    for (const m of MEASURED) {
+      const [from] = words.pageRange(m.page);
+      const layouts = {
+        verses: hiddenPageLayout(m.page, new Set()).lines,
+        nothingRecited: hiddenPageLayout(m.page, new Set(), { words, shown: () => false, next: from }).lines,
+        everyOtherWord: hiddenPageLayout(m.page, new Set(), { words, shown: (w: number) => w % 2 === 0, next: null }).lines,
+      };
+      for (const [name, lines] of Object.entries(layouts)) {
+        expect({ marker: m.why, name, cut: cut(lines, m.line, m.ink) }).toEqual({ marker: m.why, name, cut: [] });
+      }
+    }
   });
 
   it('a verse shown by a tap shows all its words, beside the ones recited', () => {

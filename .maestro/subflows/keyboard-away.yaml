@@ -1,0 +1,39 @@
+# iOS: puts the keyboard away with its Return key and checks it has gone. Android: nothing (the
+# caller puts it away its own way). For one-line fields, where Return ends the editing (a
+# multiline field would take a new line instead).
+#
+# Before any tap on a screen whose keyboard is up: a tap meant for something under the keyboard
+# lands on a key. In run 43665041191 (12 on iOS) a tap on the sign-up title to put the keyboard
+# away was cancelled by iOS (touch start, then cancel 220 ms later, in app.log). The keyboard
+# stayed, and the tap on Create account, at (201, 609), typed the "t" key there: Confirm Password
+# read "e2e-passwordt", and the app refused the sign-up. On an SE the keyboard covers the lower
+# fields as well.
+#
+# On iOS the keyboard's keys are in the screen's hierarchy only while it is up: its layout
+# ("UIKeyboardLayoutStar Preview"), Return and delete.
+#
+# Each pass asks "is it up?" once and then waits for it to go, which ends as soon as it has. It
+# never asks "is it up?" again once it has gone: Maestro's `visible` check waits for an element
+# that isn't there, polling the screen, for up to 7 s after the last tap or key. A `repeat while
+# visible` loop did that after every Return (about 7 s each, six times a sign-up), and in run
+# 43721829261 (01 on iOS) Maestro's iOS driver crashed during that poll, 3 s after the keyboard
+# had gone ("Failed to resolve remote element", reading the status bar).
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - retry:
+          maxRetries: 2
+          commands:
+            - runFlow:
+                when:
+                  visible:
+                    id: "UIKeyboardLayoutStar.*|Return|delete"
+                commands:
+                  - pressKey: Enter
+            - extendedWaitUntil:
+                notVisible:
+                  id: "UIKeyboardLayoutStar.*|Return|delete"
+                timeout: 5000

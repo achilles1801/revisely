@@ -1,6 +1,16 @@
 # Settings → Start day at fajr, switched (with the location the simulator has),
 # then back to Home. RESETS: what the row then says ("Resets at 5:2… AM" or
-# "Resets at midnight"), as a regex.
+# "Resets at midnight"), as a regex. ON: "true" when this turns it on, "false"
+# when it turns it off.
+#
+# Tapped again only if the tap was lost. On a loaded iOS runner a tap on the
+# switch can come and go in one frame and leave it as it was: in #603's run
+# 43679248328 (attempt 2) the touch reached the app 1 ms long, no handler ran,
+# and 15 s later the row still read "Resets at midnight". A tap that took shows
+# at once: iOS flips the switch before the app hears of it, and while the app
+# saves, the switch is disabled (FajrBoundaryCard's `busy`). So only a switch
+# that still reads as before, enabled, with the row unchanged, is tapped again.
+# A tap toggles: never again once the switch reads the new state.
 appId: com.revisionbuddy.app
 ---
 - tapOn:
@@ -12,6 +22,44 @@ appId: com.revisionbuddy.app
       ROW: fajr-boundary-switch
 - tapOn:
     id: fajr-boundary-switch
+    retryTapIfNoChange: false
+- repeat:
+    while:
+      notVisible:
+        id: fajr-resets-at
+        text: ${RESETS}
+    times: 2
+    commands:
+      - extendedWaitUntil:
+          visible:
+            id: fajr-resets-at
+            text: ${RESETS}
+          timeout: 8000
+          optional: true
+      - runFlow:
+          when:
+            true: ${ON == 'true'}
+            visible:
+              id: fajr-boundary-switch
+              checked: false
+              enabled: true
+          commands:
+            - evalScript: "${console.log('WARNING fajr-switch - the switch still reads off 8 s after the tap; tapping it again')}"
+            - tapOn:
+                id: fajr-boundary-switch
+                retryTapIfNoChange: false
+      - runFlow:
+          when:
+            true: ${ON != 'true'}
+            visible:
+              id: fajr-boundary-switch
+              checked: true
+              enabled: true
+          commands:
+            - evalScript: "${console.log('WARNING fajr-switch - the switch still reads on 8 s after the tap; tapping it again')}"
+            - tapOn:
+                id: fajr-boundary-switch
+                retryTapIfNoChange: false
 - extendedWaitUntil:
     visible:
       id: fajr-resets-at

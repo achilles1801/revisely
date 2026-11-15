@@ -21,6 +21,10 @@ LAB = pathlib.Path(os.environ.get('LAB', HERE / 'lab'))
 MODEL = LAB / 'models/hisnlabs-tajweed-v2/onnx/model-int8.onnx'
 BENCH = pathlib.Path(os.environ.get('RECITE_BENCH', pathlib.Path.home() / 'revisely-mistake-lab/data/bench-v0/items'))
 ITEM = BENCH / 'alafasy.p2.m1.clean.json'  # Al-Fatiha; planted: word 4 said as another word, word 14 skipped
+CLEAN = BENCH / 'alafasy.p2.clean.clean.json'  # Al-Fatiha as recited, no mistakes
+# the lab's bench_endings.py: bench-v0's passages with ayah endings swapped for nearby ones, from the same recordings
+ENDINGS = pathlib.Path(os.environ.get('RECITE_BENCH_ENDINGS',
+                                      pathlib.Path.home() / 'revisely-mistake-lab/data/bench-endings/items'))
 
 E = None
 
@@ -421,6 +425,174 @@ class Bench(unittest.TestCase):
                          sum(1 for m in first[-1]['result']['marks']
                              if m['kind'] in ('word', 'skipped', 'added') and m['id'] != '4:word:lookalike'))
 
+    def test_an_undismiss_puts_the_mark_back_and_replays_the_same(self):
+        """Undo of a "Not a mistake" (Majd, Nov 15 2026): `undismiss` at its point in the audio takes the id out of
+        the dismissed set, so the score counts the mark again; run again from its messages (a resume on the other
+        instance), the session sends the same events."""
+        pcm = bench_pcm()
+        whole = run(self.session(), chunks(pcm, 3200) + [{'type': 'end'}])
+        counted = [m for m in whole[-1]['result']['marks'] if m['kind'] in ('word', 'skipped', 'added')]
+        self.assertTrue(counted, 'the bench take needs a word mark for this test')
+        mid = counted[0]['id']
+        cut = 16000 * 2 * 12
+        log = chunks(pcm, 3200) + [{'type': 'dismiss', 'id': mid}, {'type': 'undismiss', 'id': mid},
+                                   {'type': 'end'}]
+        undone = run(self.session(), log)
+        self.assertEqual(undone[-1]['result']['score'], whole[-1]['result']['score'])
+        log = chunks(pcm, 3200) + [{'type': 'dismiss', 'id': mid}, {'type': 'end'}]
+        dismissed = run(self.session(), log)
+        self.assertEqual(dismissed[-1]['result']['score']['mistakes'], whole[-1]['result']['score']['mistakes'] - 1)
+        # mid-take, then run again in big chunks: the same events
+        log = chunks(pcm[:cut], 3200) + [{'type': 'dismiss', 'id': mid}] + chunks(pcm[cut:2 * cut], 3200) \
+            + [{'type': 'undismiss', 'id': mid}] + chunks(pcm[2 * cut:], 3200) + [{'type': 'end'}]
+        first = run(self.session(), log)
+        again, buf = [], b''
+        for m in log:
+            if isinstance(m, bytes):
+                buf += m
+                continue
+            again += [buf, m]
+            buf = b''
+        self.assertEqual(run(self.session(), again), first)
+        self.assertEqual(first[-1]['result']['score'], whole[-1]['result']['score'])
+
+
+@unittest.skipUnless(MODEL.exists() and CLEAN.exists(), 'the model or the bench recitation is not here')
+class StartAnywhere(unittest.TestCase):
+    """Start anywhere on the page (Majd, Nov 14 2026): a take from the page (start_by) is locked to where the reciter
+    began; nothing is sent before `locked`, and nothing before the start is decided."""
+
+    def take_from(self, ayah):
+        import ast
+        t = json.loads(CLEAN.read_text())
+        tl = ast.literal_eval(t['timeline']) if isinstance(t['timeline'], str) else t['timeline']
+        E = engine()
+        first = next(e for e in tl if not e.get('extra') and E.key.where(e['word'])[:2] == (1, ayah))
+        with wave.open(str(CLEAN.with_suffix('.wav'))) as w:
+            pcm = w.readframes(w.getnframes())
+        cut = max(0, int((first['start'] - 0.3) * 16000)) * 2
+        return first['word'], pcm[cut:]
+
+    def check(self, ayah, follow=False):
+        import live
+        w, pcm = self.take_from(ayah)
+        sess = live.LiveSession(engine(), 1, 1, 1, 7, {}, follow=follow, start_by=(1, 7))
+        ev = run(sess, chunks(pcm, 3200) + [{'type': 'end'}])
+        lock = [e for e in ev if e['type'] == 'locked']
+        self.assertEqual([e['w'] for e in lock], [w], ev[:6])
+        self.assertEqual(ev[:ev.index(lock[0])], [])  # nothing at all before it
+        done = ev[-1]['result']
+        self.assertEqual((done['start'], done['from']), (w, sess.range_lo))  # from: the passage's first word (contract)
+        self.assertTrue(done['words'] and min(r['w'] for r in done['words']) == w)  # nothing before it decided
+        self.assertFalse([e for e in ev if e['type'] == 'mark' and e['mark']['w'] < w])
+        self.assertEqual(sess.snapshot()[0]['type'], 'locked')
+        return ev
+
+    def test_a_take_from_an_ayah_mid_page_is_locked_there(self):
+        self.check(5)
+        self.check(5, follow=True)
+
+    def test_a_phrase_the_page_repeats_waits_until_the_places_part(self):
+        """1:3 (ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ) is also the end of 1:1: it may not lock on 1:1."""
+        self.check(3)
+
+    def test_the_page_top_locks_within_3_s(self):
+        """Majd's bar (Nov 14 2026): a take from the page's first word gets its cursor within 3 s of speech."""
+        import ast
+        import live
+        t = json.loads(CLEAN.read_text())
+        tl = ast.literal_eval(t['timeline']) if isinstance(t['timeline'], str) else t['timeline']
+        first = next(e for e in tl if not e.get('extra'))
+        with wave.open(str(CLEAN.with_suffix('.wav'))) as w:
+            pcm = w.readframes(w.getnframes())
+        sess = live.LiveSession(engine(), 1, 1, 1, 7, {}, start_by=(1, 7))
+        ev = run(sess, chunks(pcm, 3200) + [{'type': 'end'}])
+        lock = next(e for e in ev if e['type'] == 'locked')
+        self.assertEqual(lock['w'], first['word'])
+        self.assertLess(lock['t'] - first['start'], 3.0)
+
+    def test_words_that_read_the_same_are_the_same_start(self):
+        """Harakat and marks aside: 17:111's ٱلَّذِى and 18:1's ٱلَّذِىٓ sound alike, so the page's top wins the tie."""
+        from live import _letters
+        self.assertEqual(_letters('ٱلَّذِى'), _letters('ٱلَّذِىٓ'))
+        self.assertEqual(_letters('ٱلْحَمْدُ'), 'الحمد')
+        self.assertNotEqual(_letters('مَٰلِكِ'), _letters('مَلِكِ'))
+
+    def test_a_seek_while_searching_starts_the_take_there(self):
+        """The phone placed the reader by hand before the lock (a seek without startBy): the take starts at its word,
+        with `locked` there; a seek with startBy searches again instead."""
+        import live
+        w, pcm = self.take_from(5)
+        sess = live.LiveSession(engine(), 1, 1, 1, 7, {}, start_by=(1, 7))
+        ev = run(sess, [{'type': 'seek', 'w': w}] + chunks(pcm, 3200) + [{'type': 'end'}])
+        lock = [e for e in ev if e['type'] == 'locked']
+        self.assertEqual(([e['w'] for e in lock], ev[0]['type']), ([w], 'locked'))
+        self.assertEqual(ev[-1]['result']['start'], w)
+        sess = live.LiveSession(engine(), 1, 1, 1, 7, {}, start_by=(1, 7))
+        first = sess.range_lo
+        ev = run(sess, [{'type': 'seek', 'w': first, 'startBy': [1, 7]}] + chunks(pcm, 3200) + [{'type': 'end'}])
+        self.assertEqual([e['w'] for e in ev if e['type'] == 'locked'], [w])
+
+    def test_nonsense_fails_silently(self):
+        """Nothing found on the page: no cursor, no marks, no message (Majd), and done has no words, start null."""
+        import live
+        sess = live.LiveSession(engine(), 1, 1, 1, 7, {}, start_by=(1, 7))
+        ev = run(sess, chunks(noise(12), 3200) + [{'type': 'end'}])
+        self.assertEqual([e['type'] for e in ev], ['done'])
+        self.assertEqual((ev[-1]['result']['start'], ev[-1]['result']['words']), (None, []))
+
+    def cut(self, name, word, page=None, seconds=20):
+        """Bench take `name` from its word `word` (0.3 s before it), up to `seconds`, searched on its own page or on
+        take `page`'s; the session and the timeline from that word, in seconds of the cut audio."""
+        import ast
+        import live
+        f = BENCH / f'{name}.json'
+        if not f.exists():
+            self.skipTest(f'{name} is not here')
+        t = json.loads(f.read_text())
+        tl = ast.literal_eval(t['timeline']) if isinstance(t['timeline'], str) else t['timeline']
+        words = [e for e in tl if not e.get('extra')]
+        k = next(i for i, e in enumerate(words) if e['word'] == word)
+        c = max(0, words[k]['start'] - 0.3)
+        with wave.open(str(f.with_suffix('.wav'))) as w:
+            pcm = w.readframes(w.getnframes())[int(c * 16000) * 2:][:seconds * 32000]
+        pt = json.loads((BENCH / f'{page}.json').read_text()) if page else t
+        sess = live.LiveSession(engine(), pt['sura'], pt['ayat'][0], pt['sura'], pt['ayat'][1], {},
+                                start_by=(pt['sura'], pt['ayat'][1]))
+        locks = [e for e in run(sess, chunks(pcm, 3200)) if e['type'] == 'locked']
+        return locks, [dict(e, start=e['start'] - c, end=e['end'] - c) for e in words[k:]]
+
+    def test_three_words_heard_well_lock_sooner(self):
+        """QUICK_WORDS: 1:5 locks on إِيَّاكَ نَعْبُدُ وَإِيَّاكَ, while نَسْتَعِينُ is still being said (4 words
+        settled, the rule before, waited for it to end)."""
+        locks, words = self.cut('alafasy.p2.clean.clean', 13)
+        self.assertEqual([e['w'] for e in locks], [13])
+        self.assertLess(locks[0]['t'], words[3]['end'])
+
+    def test_a_skip_right_after_the_start_still_locks(self):
+        """1:5 said without نَعْبُدُ (the bench's planted skip) never locked: the run had to be heard in order
+        (recite-server, Nov 15 2026). One missing word is stepped over."""
+        locks, words = self.cut('alafasy.p2.m1.clean', 13)
+        self.assertEqual(words[1]['word'], 15)  # 14 is the planted skip
+        self.assertEqual([e['w'] for e in locks], [13])
+
+    def test_a_look_alike_heard_poorly_does_not_lock_sooner(self):
+        """Al-Kahf from 18:3 (… وَيُنذِرَ … مَّا لَهُم بِهِۦ … لِءَابَآئِهِمْ) searched on Ya-Sin 36:1–18: ما أنذر آباؤهم
+        (36:6) is heard as 3 correct words, but poorly (-1.7 and -2.0 on average), so QUICK_WORDS doesn't take it."""
+        import live
+        locks, _ = self.cut('sudais.p3.clean.clean', 37569, page='sudais.p4.clean.clean')
+        self.assertEqual(locks, [])
+        self.assertTrue(live.LiveSession._heard_well({'scores': [-0.2, -0.9, 0.0]}))
+        self.assertFalse(live.LiveSession._heard_well({'scores': [-0.4, -2.6]}))
+        self.assertFalse(live.LiveSession._heard_well({'scores': []}))
+
+    def test_without_start_by_nothing_changes(self):
+        import live
+        sess = live.LiveSession(engine(), 1, 1, 1, 7, {})
+        ev = run(sess, chunks(bench_pcm()[:16000 * 2 * 10], 3200) + [{'type': 'end'}])
+        self.assertFalse([e for e in ev if e['type'] in ('locked', 'nolock')])
+        self.assertNotIn('start', ev[-1]['result'])
+
 
 class Background(unittest.TestCase):
     def test_an_ayah_is_judged_only_once_the_chunk_is_answered(self):
@@ -454,5 +626,128 @@ class Background(unittest.TestCase):
         self.assertEqual(ayah_pieces(ws, spans, last, 290), [(200 - PAD, 290)])  # clipped to the frames there are
 
 
+class Score(unittest.TestCase):
+    def test_an_unsure_harakat_or_letter_mark_is_not_clear_and_not_a_mistake(self):
+        """Majd, Nov 15 2026 ("Not clear: say it more clearly"): unsure harakat and letter marks are counted apart, out
+        of accuracy; unsure word marks stay mistakes (recite-contract.md, The score)."""
+        from engine import score
+        statuses = {w: 'correct' for w in range(100, 120)}
+        marks = [{'id': 'a', 'w': 101, 'kind': 'harakat', 'sure': 'clear'},
+                 {'id': 'b', 'w': 102, 'kind': 'harakat', 'sure': 'likely'},
+                 {'id': 'c', 'w': 103, 'kind': 'letter', 'sure': 'likely'},
+                 {'id': 'd', 'w': 104, 'kind': 'word', 'sure': 'likely'},
+                 {'id': 'e', 'w': 105, 'kind': 'tajweed', 'sure': 'likely'},
+                 {'id': 'f', 'w': 106, 'kind': 'letter', 'sure': 'likely'}]
+        self.assertEqual(score(statuses, marks, dismissed={'f'}),
+                         {'reached': 20, 'mistakes': 2, 'tajweed': 1, 'unclear': 2, 'accuracy': 0.9})
+
+
+@unittest.skipUnless(MODEL.exists() and ITEM.exists(), 'the model or the bench is not here')
+class SimilarPassage(unittest.TestCase):
+    """A slip into a similar passage is named (`into` on the run's first mark: recite-contract.md), in a check and at
+    a live take's end, from bench-v0's planted slips (the ayah starts right, then carries on as a similar one)."""
+
+    def setUp(self):
+        if engine().table is None:
+            self.skipTest('no word table for these words: nothing is named without it')
+
+    def named(self, name, s, a, s2, a2, where=BENCH):
+        """{(w, kind): into} of the marks with `into`: (from a check, from a live take)."""
+        import live
+        if not (where / f'{name}.wav').exists():
+            self.skipTest(f'{name} is not here')
+        with wave.open(str(where / f'{name}.wav')) as f:
+            pcm = f.readframes(f.getnframes())
+        x = np.frombuffer(pcm, '<i2').astype(np.float32) / 32768
+        checked = engine().check(x, s, a, s2, a2, v=2)
+        ev = run(live.LiveSession(engine(), s, a, s2, a2, {}), chunks(pcm, 3200) + [{'type': 'end'}])
+        return [{(m['w'], m['kind']): m['into'] for m in r['marks'] if 'into' in m}
+                for r in (checked, ev[-1]['result'])]
+
+    def test_a_slip_into_a_similar_ayah_names_it(self):
+        """2:255 said «ٱللَّهُ لَآ إِلَـٰهَ إِلَّا هُوَ» and then 20:8's «لَهُ ٱلْأَسْمَآءُ ٱلْحُسْنَىٰ»: the skipped «ٱلْحَىُّ» carries where
+        the reciter went, 20:8 from its sixth word."""
+        first = engine().words.first_word(20, 8) + 5
+        for got in self.named('alafasy.p8.m1.clean', 2, 255, 2, 257):
+            self.assertEqual(got, {(5178, 'skipped'): {'w': first, 'ayah': [20, 8]}})
+
+    def test_ayat_with_the_same_words_come_along(self):
+        """2:8 into 22:8 («يُجَـٰدِلُ فِى ٱللَّهِ بِغَيْرِ عِلْمٍۢ…»), which 31:20 also says."""
+        checked, at_end = self.named('husary.p1.m1.clean', 2, 6, 2, 16)
+        for got in (checked, at_end):
+            self.assertEqual([(v['ayah'], v.get('also')) for v in got.values() if not v.get('ending')],
+                             [([22, 8], [[31, 20]])])
+            # the take's planted substitution put «بِمُؤْمِنِينَ» for 2:15's last word: that is 2:8's ending, so naming
+            # it is right (at the live take's end, where the word before was heard right)
+            self.assertIn({w: v['ayah'] for (w, _), v in got.items() if v.get('ending')}, ({}, {180: [2, 8]}))
+
+    def test_an_ayah_ending_said_as_a_nearby_one_names_it(self):
+        """1:4 ended with «ٱلرَّحِيمِ» (1:3's ending, and 1:1's) for «ٱلدِّينِ»: its mark says so, `ending: true`. The take's
+        other two swapped endings aren't named at the end of either: nothing is named on weak evidence."""
+        for got in self.named('shuraym.p2.end.clean', 1, 1, 1, 7, where=ENDINGS):
+            self.assertEqual(got, {(12, 'word'): {'w': 9, 'ayah': [1, 3], 'also': [[1, 1]], 'ending': True}})
+
+    def test_naming_starts_nothing_once_its_work_is_spent(self):
+        """A take full of mistakes can't hold up the answer: once similar.P['budget'] is spent no run or ending is
+        tried. The budget is work, not time, so the same take names the same on the Mac and on Cloud Run."""
+        import similar
+        with wave.open(str(BENCH / 'alafasy.p8.m1.clean.wav')) as f:
+            x = np.frombuffer(f.readframes(f.getnframes()), '<i2').astype(np.float32) / 32768
+        with unittest.mock.patch.dict(similar.P, {'budget': 0}):
+            got = engine().check(x, 2, 255, 2, 257, v=2)
+        self.assertFalse([m for m in got['marks'] if 'into' in m])
+        self.assertTrue([m for m in got['marks'] if m['kind'] == 'skipped'])  # the marks themselves are all there
+
+    def test_no_name_without_a_slip(self):
+        """Al-Fatiha with a word said as another and one skipped, and as recited: nothing named."""
+        for name in ('alafasy.p2.m1.clean', 'alafasy.p2.clean.clean'):
+            self.assertEqual(self.named(name, 1, 1, 1, 7), [{}, {}])
+
+
 if __name__ == '__main__':
     unittest.main()
+
+
+class LookAlikes(unittest.TestCase):
+    def test_a_spelling_apart_only_in_shadda_or_madd_is_not_a_lookalike(self):
+        """يَـٰبَنِىَّ (baniyya, 12:87) and يَـٰبَنِىٓ (banī) are written alike; only the shadda and the madd differ, which is
+        the letters check's business. As a look-alike it marked Majd's correct start of page 246 (Nov 15 2026)."""
+        import unicodedata
+        nfc = lambda t: unicodedata.normalize('NFC', t)  # noqa: E731 (shadda and fatha come in either order)
+        kws = engine().passage_words(31413, 31415)
+        self.assertEqual(nfc(kws[0]['text']), nfc('يَـٰبَنِىَّ'))
+        self.assertNotIn(nfc('يَـٰبَنِىٓ'), [nfc(a['text']) for a in kws[0]['alts']])
+
+    def test_a_glide_into_a_hamza_is_not_a_lookalike(self):
+        """«قَالُوٓا۟ أَءِنَّكَ» (12:90) joined sounds as «qālū waʾinnaka»: the long ū glides into the hamza. وَإِنَّكَ is
+        that glide and the rest of the word, so it isn't a look-alike there (Majd's mic-on take, Nov 15 2026); the
+        word's other look-alikes stay."""
+        import unicodedata
+        nfc = lambda t: unicodedata.normalize('NFC', t)  # noqa: E731
+        kws = engine().passage_words(31464, 31466)
+        alts = [nfc(a['text']) for a in kws[1]['alts']]
+        self.assertNotIn(nfc('وَإِنَّكَ'), alts)
+        self.assertIn(nfc('فَإِنَّكَ'), alts)
+
+
+DEV_TAKE = sorted(pathlib.Path(os.environ.get('RECITE_DEV_TAKES', pathlib.Path.home() / 'revisely-mistake-lab/data/dev-takes'))
+                  .glob('*/20261115-015943-4cd655.wav'))
+
+
+@unittest.skipUnless(DEV_TAKE, "Majd's kept Dev take (test data on the lab's Mac only, never in git)")
+class DevTake(unittest.TestCase):
+    def test_page_246_from_the_top_marks_only_the_slip(self):
+        """Majd's Recite take of page 246 (12:87 on), live at Words & harakat. Its first words, يَـٰبَنِىَّ ٱذْهَبُوا۟, are
+        right and were marked as look-alikes (يَـٰبَنِىٓ, then يَذْهَبُوا۟ taking the ya). The one mark is the second
+        رَّوْحِ, heard رُوح (the ear: a long ū for 7 frames, no fatha). Up to his Stop at 42 s; the rest is the app's
+        recitation playing back into the microphone."""
+        import live
+        with wave.open(str(DEV_TAKE[0])) as w:
+            pcm = w.readframes(16000 * 42)
+        sess = live.LiveSession(engine(), 12, 87, None, None, {'letters': '1', 'tajweed': '0'}, defer=True,
+                                open_end=True)
+        ev = run(sess, chunks(pcm, 3200) + [{'type': 'end'}])
+        live_marks = [(e['mark']['w'], e['mark']['kind']) for e in ev if e['type'] == 'mark']
+        self.assertEqual(live_marks, [(31428, 'harakat')])
+        self.assertEqual([(m['w'], m['kind'], m['sure']) for m in ev[-1]['result']['marks']],
+                         [(31428, 'harakat', 'clear')])

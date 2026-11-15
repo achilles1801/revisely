@@ -3,10 +3,12 @@
 POST /check?s=&a=[&s2=&a2=][&mon=&mot=&aar=][&letters=1][&keep=1][&v=2]  body: WAV, 16 kHz mono 16-bit
   Authorization: Bearer <Firebase ID token of a previewTester account on revisely-dev>
 POST /dismiss  {"take": "...", "id": "..."}  (same sign-in): "Not a mistake", kept next to the take
+POST /undismiss  {"take": "...", "id": "..."}  (same sign-in): that "Not a mistake" undone
 WS   /live     the live check: a start frame (the token in it or in the Authorization header), then PCM; events
                back (README.md, "Live"; the notes folder's recite-contract.md)
 GET  /health
 """
+import health  # noqa: I001  first: an instance's age counts from about here (health.py: the numbers-only log lines)
 import asyncio
 import contextlib
 import inspect
@@ -43,6 +45,12 @@ RESUME_TTL = 120      # seconds a dropped session waits on this instance for its
 # "follow" need entitlements/{uid}.premium (auth.has_check); Recite (follow) stays free. Off until a dev account has it.
 CHECK_GATE = os.environ.get('CHECK_GATE', 'off') == 'on'
 LOCKED = 'premium_required'  # the refusal without Premium (agreed with apply-support and recite-ui; was check_locked)
+# Two takes per instance for the light levels (Majd approved Nov 15 2026, the recite-checker-cost-per-user idea, item 2):
+# a second service from the same image, at concurrency 2, takes only the levels in LEVELS ("recite,harakat"; health.py
+# names them), and refuses the rest with `level_elsewhere`, so a Strict take never doubles up on one vCPU (Strict paired
+# fell behind by seconds, README, "Two takes per instance"). Unset: every level, as recite-check takes them.
+LEVELS = frozenset(x.strip() for x in os.environ.get('LEVELS', '').split(',') if x.strip())
+ELSEWHERE = 'level_elsewhere'
 # A live take with no end (no s2/a2, as the app sends it) follows the reciter to the end of the Qur'an, and the reciter
 # decides where to stop (`end`): with the surah's end, the follow stopped there, so a take running on into the next
 # surah (An-Naba into An-Nazi'at) lost its cursor. A passage costs nothing until it is reached (live.py works 96 words
@@ -53,22 +61,35 @@ LAST_AYAH = (114, 6)
 # reciter begins at some word from s:a's first through its end. The follower (live.py) searches for the start, sends
 # `locked` (or `nolock`) and goes on from there. A start frame without it is protocol 5's: the take starts at s:a.
 START_BY_WORDS = 400  # the most words from s:a's first word to startBy's end: a foldable's two pages
-MARK_ID = re.compile(r'^\d{1,6}:(word|letter|tajweed):[a-z_]{1,24}$')
+# A mark's id as engine.marks makes it: `${w}:${kind}:${detail ?? rule ?? ''}`, `#n` on a repeat ("12:skipped:",
+# "12:added:trail", "12:harakat:shadda", "12:letter:#2"). Before Nov 15 2026 it took only word, letter and tajweed
+# with a detail, so /dismiss refused skipped, added and harakat marks.
+MARK_ID = re.compile(r'^\d{1,6}:(word|skipped|added|harakat|letter|tajweed):[a-z0-9_]{0,24}(#\d{1,3})?$')
 log = logging.getLogger('recite-check')
 logging.basicConfig(level=logging.INFO)
 ENGINE = {}
 limiter = auth.Limiter()
+IMPORTED = health.age()  # seconds from the process's start to here: Python, numpy, onnxruntime, the checker's modules
 
 
 @contextlib.asynccontextmanager
 async def lifespan(_app):
     # Loaded before the port opens: Cloud Run gives a starting instance its CPU until then.
-    ENGINE['e'] = Engine(threads=int(os.environ.get('THREADS', '2')))
+    # One thread, as the image sets (README, Deploying): on one vCPU a second is no faster, and replays repeat exactly.
+    t0 = time.perf_counter()
+    ENGINE['e'] = Engine(threads=int(os.environ.get('THREADS', '1')))
+    engine_s = time.perf_counter() - t0
     # The helper works out a live session's next words; with the word table in the image there is nothing for it to
     # do, and starting it (a second Python importing the checker) costs seconds of a cold start on Cloud Run.
     if ENGINE['e'].table is None and os.environ.get('LIVE_HELPER', '1') == '1':
         live.start_helper()
+    # Where a cold start's seconds go (Cloud Run's own "Starting new instance" line is 6–9 s before the port opens)
+    health.emit('instance', imports_s=round(IMPORTED, 2), engine_s=round(engine_s, 2), ready_s=round(health.age(), 2),
+                words=ENGINE['e'].table is not None, bench_ms=health.bench_ms(), engine=VERSION, server=SERVER)
     yield
+    for s in list(SESSIONS.values()):  # the instance is going (Cloud Run stops idle ones): what never came back
+        if not s.sess.stopped:
+            health.emit('dropped', **dropped_fields(s), at='shutdown')
 
 
 app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
@@ -120,6 +141,12 @@ async def signed_in_tester(header):
     return uid
 
 
+def may_run(level):
+    """Refused (409, level_elsewhere) when this service takes only some levels and not this one."""
+    if LEVELS and level not in LEVELS:
+        raise auth.Refused(409, ELSEWHERE)
+
+
 async def may_check(uid):
     """Check (marks) needs the entitlement when the gate is on; Recite doesn't."""
     if CHECK_GATE and not await asyncio.to_thread(auth.has_check, uid):
@@ -131,17 +158,23 @@ def put_json(name, obj):
 
 
 @app.get('/health')
-def health():
+def health_route():
     """engine: the checker's commit; server: this service's (the repo's commit it was staged from); protocol: the
-    contract draft it speaks, so the app can tell which features it may use."""
-    return {'ok': True, 'engine': VERSION, 'server': SERVER, 'protocol': protocol()}
+    contract draft it speaks, so the app can tell which features it may use; words: whether the word table for this
+    checker is in the image. Without it a cold instance works out every word it needs (~100 ms each), and finding
+    where a take starts needs a whole page at once: 27–38 s hops on rev 00043. Traffic never moves to a revision that
+    says false (README, "The word table")."""
+    return {'ok': True, 'engine': VERSION, 'server': SERVER, 'protocol': protocol(),
+            'words': ENGINE['e'].table is not None} | ({'levels': sorted(LEVELS)} if LEVELS else {})
 
 
 @app.post('/check')
 async def check(request: Request):
+    t0, cpu0, age0 = time.monotonic(), health.cpu(), health.age()
     try:
         uid = await signed_in_tester(request.headers.get('authorization'))
         await may_check(uid)
+        may_run(health.level(dict(request.query_params), False))
         limiter.take(uid)
         body = await request.body()
         if len(body) > MAX_SECONDS * 32000 + 4096:
@@ -175,38 +208,73 @@ async def check(request: Request):
             flags = sum(1 for w in res['words'] if w['status'] in ('wrong', 'missed')) + len(res['extras'])
             log.info('check: %.1f s audio, %d words said, %d word flags, %d tajweed, ms %s, kept %s',
                      res['secs'], len(res['words']), flags, len(res['tajweed']), res['ms'], res.get('kept'))
+        cold = health.STATE['takes'] == 0
+        health.STATE['takes'] += 1
+        health.emit('take', kind='check', v=2 if v2 else 1, level=health.level(dict(q), False),
+                    app=health.app_tag(request.headers.get('x-revisely-app')), audio_s=res['secs'],
+                    wall_s=round(time.monotonic() - t0, 2), cpu_s=round(health.cpu() - cpu0, 2), cold=cold,
+                    age_s=round(age0, 1), marks=len(res['marks']) if v2 else None, kept=res.get('kept'),
+                    **health.per_second(res.get('ms'), res['secs']))
         return JSONResponse(res)
     except auth.Refused as e:
+        health.emit('refused', route='check', reason=e.reason)
         return JSONResponse({'error': e.reason}, status_code=e.status)
     except BadRequest as e:
+        health.emit('refused', route='check', reason='bad_request')
         return JSONResponse({'error': 'bad_request', 'detail': str(e)}, status_code=400)
     except Exception:
         log.exception('check failed')
+        health.emit('error', route='check')
         return JSONResponse({'error': 'server'}, status_code=500)
 
 
 @app.post('/dismiss')
 async def dismiss(request: Request):
     """The person said a mark was not a mistake: a label for the lab, kept next to the take (only kept takes)."""
+    return await label(request, 'dismiss')
+
+
+@app.post('/undismiss')
+async def undismiss(request: Request):
+    """The person put a dismissed mark back (Undo, or the summary's Removed list): the lab takes the latest of a mark's
+    dismiss and undismiss (fetch_takes.dismissed_now), so an undone "Not a mistake" never stays a label. A route of
+    its own rather than a flag on /dismiss: a checker without it answers 404 instead of storing a dismissal."""
+    return await label(request, 'undismiss')
+
+
+async def label(request, kind):
+    """<take>.<kind>-<time>.json next to the take: {take, id, at (when stored)}, `when` (the phone's time of the tap,
+    in ms, if it sent one: two labels sent close together can be stored out of order, or a retry after the other)
+    and, for an undismiss, "undo": true."""
     try:
         uid = await signed_in_tester(request.headers.get('authorization'))
         try:
             body = json.loads(await request.body())
         except ValueError:
             raise BadRequest('JSON body needed')
-        take, mid = body.get('take'), body.get('id')
+        if not isinstance(body, dict):
+            raise BadRequest('JSON object needed')
+        take, mid, when = body.get('take'), body.get('id'), body.get('when')
         if not isinstance(take, str) or not store.TAKE.match(take) or not isinstance(mid, str) \
                 or not MARK_ID.match(mid):
             raise BadRequest('take and id are needed')
-        name = f'{store.name_for(uid, take)}.dismiss-{store.new_take()}.json'
-        await asyncio.to_thread(put_json, name, {'take': take, 'id': mid, 'at': time.time()})
+        kept = {'take': take, 'id': mid, 'at': time.time()}
+        if isinstance(when, int) and not isinstance(when, bool) and 0 < when < 10 ** 14:
+            kept['when'] = when
+        if kind == 'undismiss':
+            kept['undo'] = True
+        await asyncio.to_thread(put_json, f'{store.name_for(uid, take)}.{kind}-{store.new_take()}.json', kept)
+        health.emit('label', kind=kind)
         return JSONResponse({'ok': True})
     except auth.Refused as e:
+        health.emit('refused', route=kind, reason=e.reason)
         return JSONResponse({'error': e.reason}, status_code=e.status)
     except BadRequest as e:
+        health.emit('refused', route=kind, reason='bad_request')
         return JSONResponse({'error': 'bad_request', 'detail': str(e)}, status_code=400)
     except Exception:
-        log.exception('dismiss failed')
+        log.exception('%s failed', kind)
+        health.emit('error', route=kind)
         return JSONResponse({'error': 'server'}, status_code=500)
 
 
@@ -223,6 +291,14 @@ class Live:
         self.left = None      # when its last socket went
         self.sockets = 0
         self.lock = threading.Lock()  # one socket's work at a time
+        # for its health line (health.py): numbers only
+        self.opened = time.monotonic()  # its first socket's connect
+        self.cpu0 = health.cpu()
+        self.age = health.age()         # the instance's age then
+        self.cold = False               # the instance's first take
+        self.ready_s = None             # connect → `ready`, its first socket
+        self.restarted = False          # a resume this instance didn't have: run again from the first sample
+        self.lag = []                   # seconds from audio arriving to its events going out, per piece of work
 
     def run(self, fn, *args):
         with self.lock:
@@ -233,11 +309,20 @@ SESSIONS = {}
 FINISHED = {}  # take -> (uid, samples held, its `done`, when): a resume after the end gets the same `done` again
 
 
+def dropped_fields(s):
+    """A session that never reached its end, for its health line."""
+    return {'level': health.level(s.request.get('settings') or {}, s.request.get('follow')),
+            'audio_s': round(s.sess.seconds, 1), 'open_s': round(time.monotonic() - s.opened, 1),
+            'sockets': s.sockets, 'restarted': s.restarted}
+
+
 def forget_old():
     now = time.time()
     for sid, s in list(SESSIONS.items()):
         if s.owner is None and s.left is not None and now - s.left > RESUME_TTL:
             del SESSIONS[sid]
+            if not s.sess.stopped:  # its phone went and never came back here (it may have finished elsewhere)
+                health.emit('dropped', **dropped_fields(s), at='timeout')
     for sid, f in list(FINISHED.items()):
         if now - f[3] > RESUME_TTL:
             del FINISHED[sid]
@@ -308,6 +393,22 @@ def start_note(s):
     return f'locked at {locks[0]} s ({len(locks)} locks)' if locks else f'no lock in {s.sess.seconds:.1f} s'
 
 
+def take_fields(s, r, kept=None):
+    """A finished live take's health line (health.py): numbers, levels and reasons only. `open_s` is from its first
+    socket's connect to now; `cpu_s` the process's CPU meanwhile (one take per instance: the take's own)."""
+    secs = s.sess.seconds
+    locks = [e.get('t') for e in s.events if e.get('type') == 'locked']
+    cpu_s = health.cpu() - s.cpu0
+    return {'kind': 'live', 'level': health.level(s.request.get('settings') or {}, s.request.get('follow')),
+            'protocol': protocol(), 'start': 'anywhere' if 'startBy' in s.request else 'fixed',
+            'locked_s': locks[0] if locks else None, 'locks': len(locks) if 'startBy' in s.request else None,
+            'app': health.app_tag(s.app), 'audio_s': round(secs, 1), 'open_s': round(time.monotonic() - s.opened, 1),
+            'ready_s': s.ready_s, 'cold': s.cold, 'age_s': round(s.age, 1), 'sockets': s.sockets,
+            'restarted': s.restarted, 'why': r.get('why'), 'marks': len(r.get('marks') or []), 'kept': kept,
+            'cpu_s': round(cpu_s, 2), 'cpu_per_s': round(cpu_s / secs, 3) if secs else None,
+            **health.lag(s.lag), **health.per_second(r.get('ms'), secs)}
+
+
 def ayah_pair(v):
     """[sura, ayah] (two whole numbers) as a tuple, or None."""
     if isinstance(v, (list, tuple)) and len(v) == 2 and all(isinstance(x, int) and not isinstance(x, bool) for x in v):
@@ -319,7 +420,7 @@ def control_of(c):
     """A text frame from the phone after the start, as the session takes it, or None to ignore it. A `seek` may
     carry `startBy` (protocol 6: the reciter is somewhere from w through that ayah, so the follower searches again);
     as a tuple, or the frame is dropped when it isn't [sura, ayah]. The session checks the range itself."""
-    if not isinstance(c, dict) or c.get('type') not in ('seek', 'dismiss', 'hint', 'end', 'stop'):
+    if not isinstance(c, dict) or c.get('type') not in ('seek', 'dismiss', 'undismiss', 'hint', 'end', 'stop'):
         return None
     if c['type'] == 'seek' and 'startBy' in c:
         sb = ayah_pair(c['startBy'])
@@ -373,19 +474,19 @@ async def open_session(msg, uid):
 
 
 async def read_into(ws, inbox):
-    """Every frame from the phone into the inbox as it comes: ('audio', bytes), ('control', msg), then ('gone', None),
-    or ('idle', None) after IDLE seconds without a frame."""
+    """Every frame from the phone into the inbox as it comes, with when it came: ('audio', bytes, t),
+    ('control', msg, t), then ('gone', None, t), or ('idle', None, t) after IDLE seconds without a frame."""
     try:
         while True:
             try:
                 m = await asyncio.wait_for(ws.receive(), IDLE)
             except asyncio.TimeoutError:
-                await inbox.put(('idle', None))
+                await inbox.put(('idle', None, time.monotonic()))
                 return
             if m['type'] == 'websocket.disconnect':
                 break
             if m.get('bytes') is not None:
-                await inbox.put(('audio', m['bytes']))
+                await inbox.put(('audio', m['bytes'], time.monotonic()))
             elif m.get('text') is not None:
                 try:
                     c = json.loads(m['text'])
@@ -393,15 +494,16 @@ async def read_into(ws, inbox):
                     continue
                 c = control_of(c)
                 if c is not None:
-                    await inbox.put(('control', c))  # anything else is ignored
+                    await inbox.put(('control', c, time.monotonic()))  # anything else is ignored
     except Exception:
         pass
-    await inbox.put(('gone', None))
+    await inbox.put(('gone', None, time.monotonic()))
 
 
 @app.websocket('/live')
 async def live_socket(ws: WebSocket):
     await ws.accept()
+    accepted, cpu0, age0 = time.monotonic(), health.cpu(), health.age()
     me = object()
     s = None
 
@@ -448,6 +550,7 @@ async def live_socket(ws: WebSocket):
             log.info('live: kept in %d ms (%s)', (time.perf_counter() - t0) * 1000, 'ok' if ok else 'failed')
             with contextlib.suppress(Exception):
                 await send([{'type': 'kept', 'take': s.sid, 'ok': ok, 't': round(s.sess.seconds, 2)}], record=False)
+        health.emit('take', **take_fields(s, r, kept=ok if s.keep else None))
         with contextlib.suppress(Exception):
             await ws.close(1000)
 
@@ -463,6 +566,7 @@ async def live_socket(ws: WebSocket):
         uid = await signed_in_tester('Bearer ' + token if isinstance(token, str) else ws.headers.get('authorization'))
         if not follow_of(msg):
             await may_check(uid)  # on every socket, a resume's too
+        may_run(health.level(settings_from(msg), follow_of(msg)))
         forget_old()
         rid = msg.get('resume')
         f = FINISHED.get(rid) if isinstance(rid, str) else None
@@ -474,6 +578,11 @@ async def live_socket(ws: WebSocket):
                 await ws.close(1000)
             return
         s, resumed = await open_session(msg, uid)
+        if not resumed:  # a new session on this instance (a take, or a resume started again here)
+            s.opened, s.cpu0, s.age = accepted, cpu0, age0
+            s.cold = health.STATE['takes'] == 0
+            s.restarted = isinstance(msg.get('resume'), str)
+            health.STATE['takes'] += 1
 
         def take_over():
             # under the session's lock: a socket that dropped may still be checking its last piece of audio, and
@@ -485,6 +594,8 @@ async def live_socket(ws: WebSocket):
         s.sockets += 1
         await send([{'type': 'ready', 'v': 2, 'engine': VERSION, 'server': SERVER, 'protocol': protocol(),
                      'take': s.sid, 'from': held}], record=False)
+        if s.ready_s is None:
+            s.ready_s = round(time.monotonic() - accepted, 3)
         await send(snap, record=False)  # what the dropped socket may have swallowed
         # A reader drains the socket at once into a queue and the work runs from the queue, in order: a phone
         # resending a take (a resume) sends faster than it is checked, and a socket left unread stops answering
@@ -494,7 +605,7 @@ async def live_socket(ws: WebSocket):
         held = None  # a frame taken while gathering audio, to handle next
         try:
             while True:
-                kind, item = held or await inbox.get()
+                kind, item, came = held or await inbox.get()
                 held = None
                 if kind == 'idle':
                     await fail('idle', 1000)
@@ -510,6 +621,8 @@ async def live_socket(ws: WebSocket):
                             break
                         chunks.append(nxt[1])
                     events = await asyncio.to_thread(s.run, s.sess.feed, b''.join(chunks))
+                    if len(s.lag) < 20000:  # 15 minutes of 100 ms pieces is 9,000
+                        s.lag.append(time.monotonic() - came)
                 else:
                     events = await asyncio.to_thread(s.run, s.sess.control, item)
                 if s.sess.stopped:
@@ -519,14 +632,17 @@ async def live_socket(ws: WebSocket):
         finally:
             reader.cancel()
     except auth.Refused as e:
+        health.emit('refused', route='live', reason=e.reason)
         await fail(e.reason)
     except BadRequest as e:
         log.info('live: bad request (%s)', e)
+        health.emit('refused', route='live', reason='bad_request')
         await fail('bad_request')
     except WebSocketDisconnect:
         pass
     except Exception:
         log.exception('live failed')
+        health.emit('error', route='live')
         await fail('server', 1011)
     finally:
         if s is not None and s.owner is me:

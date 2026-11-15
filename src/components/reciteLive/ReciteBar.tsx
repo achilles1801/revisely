@@ -100,6 +100,12 @@ export function ScorePill({ text, level }: { text: string; level: ScoreLevel }) 
  * score (Check), then the time with the last words heard to its right, then Stop. After Stop: a spinner until the
  * checker's final answer; then ✕ closes.
  */
+/** A word in the bar as a screen reader reads it: "وَأُوهِيَتْ, wrong word". */
+export function spokenBarWord(w: { text: string; tone: string }): string {
+  const mark = w.tone === 'wrong' ? 'wrong word' : w.tone === 'slip' ? 'slip' : w.tone === 'tajweed' ? 'tajweed note' : '';
+  return mark ? `${w.text}, ${mark},` : w.text;
+}
+
 export function ReciteBar({
   hidden,
   onToggleHidden,
@@ -111,6 +117,9 @@ export function ReciteBar({
   words,
   status,
   phase,
+  paused = false,
+  onPause,
+  onResume,
   onStop,
   onClose,
   surface,
@@ -128,12 +137,21 @@ export function ReciteBar({
   status: string;
   /** live: reciting; checking: stopped, the final answer coming; done: finished (✕). */
   phase: 'live' | 'checking' | 'done';
+  /** The take is paused (the microphone off, the take open). */
+  paused?: boolean;
+  /** Pause and resume the take (shown while it's live). */
+  onPause?: () => void;
+  onResume?: () => void;
   onStop: () => void;
   onClose: () => void;
   surface: { background: string; border: string };
 }) {
   const { palette } = useTheme();
-  const spoken = words.map((w) => w.text).join(' ');
+  // Each word as VoiceOver and TalkBack read it, its mark said in words: in the bar a mistake is a colour behind the
+  // word, and colour must never be the only signal.
+  const spoken = words.map(spokenBarWord).join(' ');
+  const shownWords = paused ? [] : words;
+  const shownStatus = paused ? 'Paused' : status;
   return (
     <View
       style={[styles.capsule, { backgroundColor: surface.background, borderColor: surface.border }]}
@@ -141,23 +159,29 @@ export function ReciteBar({
     >
       <EyeGroup hidden={hidden} onToggle={onToggleHidden} onNextWord={onNextWord} onWholeAyah={onWholeAyah} />
       {score ? <ScorePill text={score.text} level={score.level} /> : null}
-      <View style={styles.middle} accessibilityLiveRegion="polite" accessible accessibilityLabel={`${clock(seconds)}${recording && phase === 'live' ? ', recording' : ''}. ${spoken || status}`}>
+      {/* Not a live region: its clock changes every second, and TalkBack would speak each one over the recitation, where
+          the microphone hears it. VoiceOver reads it when focused; the summary is spoken once when it shows. */}
+      <View style={styles.middle} accessible accessibilityLabel={`${clock(seconds)}${recording && phase === 'live' && !paused ? ', recording' : ''}. ${paused ? shownStatus : spoken || status}`} testID="recite-middle">
         <View style={styles.time}>
-          {recording && phase === 'live' ? <View style={[styles.dot, { backgroundColor: palette.red }]} testID="recite-recording" /> : null}
+          {recording && phase === 'live' && !paused ? (
+            <View style={[styles.dot, { backgroundColor: palette.red }]} testID="recite-recording" />
+          ) : null}
           <Text style={[styles.timeText, typeV2.numeral, { color: palette.secondary }]} maxFontSizeMultiplier={1.2} testID="recite-time">
             {clock(seconds)}
           </Text>
         </View>
-        {words.length ? (
+        {shownWords.length ? (
           <Text style={[arabicV2(20), styles.words]} numberOfLines={1} maxFontSizeMultiplier={1.3} testID="recite-words">
-            {words.map((w, i) => (
+            {shownWords.map((w, i) => (
               <Text
                 key={w.w}
+                // A mistake is a highlight behind the word, as on the page; blue is only the word being said.
                 style={{
-                  color: w.tone === 'wrong' ? palette.red : w.tone === 'slip' ? palette.warn : w.tone === 'current' ? palette.followInk : palette.text,
-                  textDecorationLine: w.tone === 'wrong' || w.tone === 'slip' ? 'underline' : 'none',
-                  textDecorationStyle: 'dotted',
+                  color: w.tone === 'current' ? palette.followInk : palette.text,
+                  backgroundColor:
+                    w.tone === 'wrong' ? palette.markWord : w.tone === 'slip' ? palette.markSlip : w.tone === 'tajweed' ? palette.markTajweed : undefined,
                 }}
+                testID={`recite-word-${w.tone}`}
               >
                 {i > 0 ? ' ' : ''}
                 {w.text}
@@ -166,10 +190,17 @@ export function ReciteBar({
           </Text>
         ) : (
           <Text style={[typeV2.meta, { color: palette.secondary }]} numberOfLines={1} maxFontSizeMultiplier={1.2} testID="recite-status">
-            {status}
+            {shownStatus}
           </Text>
         )}
       </View>
+      {phase === 'live' && onPause && onResume ? (
+        paused ? (
+          <BarButton icon="play" label="Resume" onPress={onResume} testID="recite-resume" />
+        ) : (
+          <BarButton icon="pause" label="Pause" onPress={onPause} testID="recite-pause" />
+        )
+      ) : null}
       {phase === 'done' ? (
         <BarButton icon="close" label="Close" onPress={onClose} testID="recite-close" />
       ) : (

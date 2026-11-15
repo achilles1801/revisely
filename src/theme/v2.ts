@@ -149,16 +149,30 @@ export interface PaletteV2 extends AccentTokens {
   warnSubtle: string;
   goodSubtle: string;
   /**
-   * Following a recitation (the reader's live take, the hidden pages): the ayah being recited (a soft band behind the
-   * page's ink), the word being recited (a firmer box), and `followInk`, where the recitation is as a colour of its own
-   * (the word being said in the bar, the newest word on a hidden page, the hidden page's guide band). Blue for every
-   * accent, so it never reads as a mistake's red or a slip's amber (Majd, Nov 14 2026: Crimson's follow looked like
-   * mistakes). Ink reads at 4.5:1 on the band and the box; a mark's colour and `followInk` at 3:1 (the page's text is
-   * large); `followInk` as text at 4.5:1 on the ground.
+   * Following a recitation (the reader's live take, the hidden pages): the line being recited (a soft band behind the
+   * page's ink; none on a hidden page) and the word being recited, or the newest one shown on a hidden page (a firmer
+   * box), both quiet greys like Tarteel's (Majd, Nov 15 2026: the blue ayah band read as running ahead); and `followInk`,
+   * the word being said in the bar, the one place blue is used. None of it follows the accent, so it never reads as a
+   * mistake (Majd, Nov 14 2026: Crimson's follow looked like mistakes). Ink reads at 4.5:1 on the band and the box;
+   * `followInk` as text at 4.5:1 on the ground.
    */
   followBand: string;
   followWord: string;
   followInk: string;
+  /**
+   * Recite's mistakes as highlights behind the word, three colours at most (Majd, Nov 15 2026: "only things we should
+   * show are highlites for mistakes 3 colors max and each color can consists of diff types of mistake"): `markWord` a
+   * wrong, skipped or extra word (on the word before it), `markSlip` a haraka or letter slip and "Not clear",
+   * `markTajweed` a tajweed note (Strict). Each `…Firm` is the mark a card is open for. On the page, in the bar, the
+   * card's and the summary's swatches. The ink reads at 4.5:1 on each; the three tell apart by hue and by lightness
+   * (colour blindness); the card and the summary always name the kind in words. None follows the accent.
+   */
+  markWord: string;
+  markWordFirm: string;
+  markSlip: string;
+  markSlipFirm: string;
+  markTajweed: string;
+  markTajweedFirm: string;
   /**
    * The paid recitation check, drawn special: a gradient, start to end, the same for every accent, only for it (its
    * row in the mic's menu, the mic's badge). Each end reads at 4.5:1 as text on the sheet; `onPremium` is the glyph on it.
@@ -194,9 +208,15 @@ const BASE_LIGHT: Base = {
   onRedSubtle: '#B91C1C',
   warnSubtle: '#FDF2E2',
   goodSubtle: '#E6F2EF',
-  followBand: '#F0F6FF',
-  followWord: '#CFE1FB',
+  followBand: '#F2F2F4',
+  followWord: '#DEDEE3',
   followInk: '#1D4ED8',
+  markWord: '#F49A9A',
+  markWordFirm: '#EC7A7A',
+  markSlip: '#FBD38D',
+  markSlipFirm: '#F5B94D',
+  markTajweed: '#C9B6F2',
+  markTajweedFirm: '#A98EEB',
   premium: ['#7C3AED', '#DB2777'],
   onPremium: '#FFFFFF',
 };
@@ -226,9 +246,15 @@ const BASE_DARK: Base = {
   onRedSubtle: '#F87171',
   warnSubtle: '#2A2008',
   goodSubtle: '#0D2721',
-  followBand: '#0A1626',
-  followWord: '#14325A',
+  followBand: '#121214',
+  followWord: '#26262B',
   followInk: '#7DB3F5',
+  markWord: '#7A2424',
+  markWordFirm: '#A33434',
+  markSlip: '#6E4C0C',
+  markSlipFirm: '#94660E',
+  markTajweed: '#4B3A86',
+  markTajweedFirm: '#6450B5',
   premium: ['#A78BFA', '#F472B6'],
   onPremium: '#000000',
 };

@@ -549,6 +549,57 @@ service cloud.firestore {
       match /revoMemory/{itemId} {
         allow read, delete: if isOwner(userId);
       }
+
+      // ======================================================================
+      // RECITE'S MEMORY (lib/reciteMemory; Revisely Dev, deployed to revisely-dev)
+      // ======================================================================
+      // Each take with Mark mistakes, and each word cleared by hand: text only
+      // (marks, where the take ran, how it went), never audio. Written whole by
+      // the owner (the outbox may send a version twice); `updatedAt` is the
+      // server's time, which a phone reads from (incremental pulls).
+
+      match /reciteTakes/{recordId} {
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidReciteRecord();
+      }
+    }
+
+    function isValidReciteRecord() {
+      let d = incomingData();
+      return d.get('v', 0) == 1 &&
+             d.get('updatedAt', null) == request.time &&
+             d.get('createdAt', null) is int &&
+             d.get('rev', null) is int &&
+             d.get('day', null) is string && d.day.size() == 10 &&
+             d.get('deleted', null) is bool &&
+             ((d.get('kind', '') == 'take' && isValidReciteTake(d)) ||
+              (d.get('kind', '') == 'clear' && isValidReciteClear(d)));
+    }
+
+    function isValidReciteTake(d) {
+      return d.keys().hasOnly(['v', 'kind', 'take', 'createdAt', 'rev', 'day', 'level', 'hidden', 'from', 'to',
+                               'secs', 'mistakes', 'tajweed', 'unclear', 'accuracy', 'marks', 'passed',
+                               'recordingId', 'deleted', 'updatedAt']) &&
+             d.keys().hasAll(['take', 'level', 'hidden', 'from', 'to', 'secs', 'mistakes', 'tajweed', 'unclear',
+                              'accuracy', 'marks', 'passed', 'recordingId']) &&
+             (d.take == null || (d.take is string && d.take.size() <= 100)) &&
+             d.level in ['words', 'strict'] &&
+             d.hidden is bool &&
+             d.from is int && d.to is int && d.from >= 1 && d.to >= d.from && d.to <= 100000 &&
+             d.secs is int && d.secs >= 0 &&
+             d.mistakes is int && d.mistakes >= 0 &&
+             d.tajweed is int && d.tajweed >= 0 &&
+             d.unclear is int && d.unclear >= 0 &&
+             d.accuracy is number && d.accuracy >= 0 && d.accuracy <= 1 &&
+             d.marks is list && d.marks.size() <= 400 &&
+             d.passed is list && d.passed.size() <= 400 &&
+             (d.recordingId == null || (d.recordingId is string && d.recordingId.size() <= 100));
+    }
+
+    function isValidReciteClear(d) {
+      return d.keys().hasOnly(['v', 'kind', 'createdAt', 'rev', 'day', 'w', 'group', 'deleted', 'updatedAt']) &&
+             d.get('w', null) is int && d.w >= 1 && d.w <= 100000 &&
+             d.get('group', '') in ['word', 'slip', 'tajweed'];
     }
 
     function isValidRecordingDoc() {

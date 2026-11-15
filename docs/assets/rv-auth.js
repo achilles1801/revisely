@@ -4,8 +4,37 @@
 // third-party storage is blocked) and email with a password; Apple comes later. The project's web config is
 // /__/firebase/init.json, which the worker serves from the project's Hosting site, so no key is kept here.
 // The page the app opens (/apply/#c=…) never signs in: it calls with the app's one-time code instead.
+//
+// Firebase (about 260 KB of JavaScript) loads only when it's needed: on the account page, when someone opens the
+// sign-in sheet, or when this browser has signed in before (FLAG, kept by every page that loads Firebase, and by the
+// dev gate's page). Everyone else gets the plain Sign in button for nothing (onUserIfAny).
 const SDK = 'https://www.gstatic.com/firebasejs/12.7.0';
 const RV = window.RV;
+
+/** localStorage: "1" while this browser is signed in. Only a hint: Firebase stays the authority once loaded. */
+export const FLAG = 'rv.signedIn';
+
+function setFlag(on) {
+  try {
+    if (on) localStorage.setItem(FLAG, '1');
+    else localStorage.removeItem(FLAG);
+  } catch {
+    /* storage blocked: every page loads Firebase, as before */
+  }
+}
+
+/** Whether this browser may be signed in: the flag, or storage we can't read (then assume it may). */
+export function maybeSignedIn() {
+  try {
+    return localStorage.getItem(FLAG) === '1';
+  } catch {
+    return true;
+  }
+}
+
+let loaded;
+/** Resolves once Firebase Auth has loaded on this page, for whatever reason. */
+const authLoaded = new Promise((resolve) => (loaded = resolve));
 
 let configPromise = null;
 /** The project's web config. */
@@ -26,7 +55,14 @@ export function auth() {
   if (!authPromise) {
     authPromise = Promise.all([config(), import(`${SDK}/firebase-app.js`), import(`${SDK}/firebase-auth.js`)]).then(([cfg, app, a]) => {
       const instance = a.getAuth(app.initializeApp(cfg));
-      return { a, instance };
+      a.onAuthStateChanged(instance, (user) => {
+        setFlag(!!user);
+        // Signed in already (a browser from before the flag): a sheet opened to sign in has nothing left to do.
+        if (user && settle) close(user);
+      });
+      const out = { a, instance };
+      loaded(out);
+      return out;
     });
     authPromise.catch(() => (authPromise = null));
   }
@@ -37,6 +73,16 @@ export function auth() {
 export async function onUser(fn) {
   const { a, instance } = await auth();
   return a.onAuthStateChanged(instance, fn);
+}
+
+/**
+ * Like onUser, without loading Firebase for a browser that has never signed in: fn(null) at once, then fn(user) for
+ * real from the moment Firebase loads here (the sign-in sheet loads it). A browser with the flag loads it now.
+ */
+export function onUserIfAny(fn) {
+  if (maybeSignedIn()) return onUser(fn);
+  fn(null);
+  return authLoaded.then(() => onUser(fn));
 }
 
 export async function signOut() {
@@ -84,6 +130,24 @@ const GOOGLE_ICON =
 
 let sheet = null;
 let settle = null;
+/** What had focus before the sheet opened: it gets focus back when the sheet closes. */
+let opener = null;
+
+/** What can take focus in the open sheet, in order. */
+function focusables() {
+  return Array.from(sheet.querySelectorAll('.sheet button, .sheet input, .sheet a[href]')).filter(
+    (el) => !el.disabled && !el.hidden && el.offsetParent !== null,
+  );
+}
+
+/** While the sheet is open, the rest of the page can't be reached (inert where the browser has it). */
+function setInert(on) {
+  for (const el of document.body.children) {
+    if (el === sheet || el.tagName === 'SCRIPT') continue;
+    if (on) el.setAttribute('inert', '');
+    else el.removeAttribute('inert');
+  }
+}
 
 function sheetMarkup() {
   return `
@@ -96,9 +160,9 @@ function sheetMarkup() {
     <button class="btn-out" type="button" data-google>${GOOGLE_ICON}<span data-t="s.google"></span></button>
     <div class="or" data-t="s.or"></div>
     <form class="signin-form" novalidate>
-      <input class="field" type="email" name="email" autocomplete="username" inputmode="email" required data-t-ph="s.email" dir="ltr">
-      <input class="field" type="password" name="password" autocomplete="current-password" required data-t-ph="s.pass" dir="ltr">
-      <p class="sheet-msg" role="alert" hidden></p>
+      <input class="field" type="email" name="email" autocomplete="username" inputmode="email" required data-t-ph="s.email" data-t-aria="s.email" aria-describedby="signin-msg" dir="ltr">
+      <input class="field" type="password" name="password" autocomplete="current-password" required data-t-ph="s.pass" data-t-aria="s.pass" aria-describedby="signin-msg" dir="ltr">
+      <p class="sheet-msg" id="signin-msg" role="alert" hidden></p>
       <button class="pill pill-lg" type="submit" data-t="s.go"></button>
     </form>
     <p class="forgot"><button type="button" class="link" data-forgot data-t="s.forgot"></button></p>
@@ -129,6 +193,10 @@ function close(user) {
   if (!sheet) return;
   sheet.hidden = true;
   document.documentElement.classList.remove('sheet-open');
+  setInert(false);
+  const back = opener;
+  opener = null;
+  if (back && back.isConnected && typeof back.focus === 'function') back.focus();
   const done = settle;
   settle = null;
   if (done) done(user || null);
@@ -155,7 +223,21 @@ function build() {
     if (e.target.closest('[data-close]')) close(null);
   });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && sheet && !sheet.hidden) close(null);
+    if (!sheet || sheet.hidden) return;
+    if (e.key === 'Escape') return close(null);
+    // Tab stays inside the sheet: from the last control to the first, and back.
+    if (e.key !== 'Tab') return;
+    const list = focusables();
+    if (!list.length) return;
+    const first = list[0];
+    const last = list[list.length - 1];
+    if (e.shiftKey && (document.activeElement === first || !sheet.contains(document.activeElement))) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && (document.activeElement === last || !sheet.contains(document.activeElement))) {
+      e.preventDefault();
+      first.focus();
+    }
   });
 
   sheet.querySelector('[data-google]').addEventListener('click', async () => {
@@ -212,8 +294,10 @@ function build() {
 export function openSignIn({ focusEmail = false } = {}) {
   if (!sheet) build();
   if (settle) return new Promise((resolve) => resolve(null));
+  opener = document.activeElement;
   sheet.hidden = false;
   document.documentElement.classList.add('sheet-open');
+  setInert(true);
   auth().catch(() => {}); // start loading while the person chooses
   if (focusEmail) setTimeout(() => sheet.querySelector('input[name="email"]').focus(), 50);
   else setTimeout(() => sheet.querySelector('[data-google]').focus(), 50);
@@ -268,20 +352,28 @@ export function wireHeader() {
   }
 
   if (menuBtn && menu) {
-    const close = () => {
+    if (!menu.id) menu.id = 'site-menu';
+    menuBtn.setAttribute('aria-controls', menu.id);
+    const close = (focusButton = false) => {
       menu.hidden = true;
       menuBtn.setAttribute('aria-expanded', 'false');
+      if (focusButton) menuBtn.focus();
     };
     menuBtn.addEventListener('click', () => {
       const open = menu.hidden;
       menu.hidden = !open;
       menuBtn.setAttribute('aria-expanded', String(open));
+      // Opened: focus goes to its first item, so the keyboard and screen readers land in it.
+      if (open) {
+        const first = Array.from(menu.querySelectorAll('a[href], button')).find((el) => !el.hidden);
+        if (first) first.focus();
+      }
     });
     document.addEventListener('click', (e) => {
       if (!menu.hidden && !e.target.closest('[data-menu]') && !e.target.closest('[data-menu-panel]')) close();
     });
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && !menu.hidden) close();
+      if (e.key === 'Escape' && !menu.hidden) close(true);
     });
     menu.addEventListener('click', (e) => {
       if (e.target.closest('button[data-menu-signout]')) {
@@ -292,7 +384,7 @@ export function wireHeader() {
   }
   if (!btn && !menu) return;
   RV.onLang(draw);
-  onUser((user) => {
+  onUserIfAny((user) => {
     signedIn = user;
     draw();
   }).catch(() => {});

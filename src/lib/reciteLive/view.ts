@@ -2,18 +2,19 @@
 
 import type { QuranWords } from '../recite/quranWords';
 import type { WordFollow } from '../recite/hiddenPage';
-import { severityOf, type Mark } from './contract';
+import { isUnclear, severityOf, type Mark } from './contract';
 import { furthestWord, LiveState, mistakeCount } from './state';
 import { formatAccuracy, pageAccuracy, ScoreLevel, scoreLevel } from './score';
 
 /**
- * A word in the bar: the one being said (blue), one already said, one said wrong (red, as heard), or one with a slip
- * (amber: a haraka, a letter, a tajweed note). The colours never follow the accent.
+ * A word in the bar: the one being said (blue), one already said, one said wrong (as heard, on red), one with a slip (a
+ * haraka or a letter, on amber) or a tajweed note (on violet): the page's highlights (Majd, Nov 15 2026). The colours
+ * never follow the accent.
  */
 export interface BarWord {
   w: number;
   text: string;
-  tone: 'current' | 'said' | 'wrong' | 'slip';
+  tone: 'current' | 'said' | 'wrong' | 'slip' | 'tajweed';
 }
 
 /** The words heard, for the bar: the last two up to the cursor (newest last). Check shows a wrong word as heard. */
@@ -22,11 +23,14 @@ export function barWords(state: LiveState, words: QuranWords, opts: { check: boo
   const wrong = new Map<number, Mark>();
   const skipped = new Set<number>();
   const slipped = new Set<number>();
+  const tajweed = new Set<number>();
   if (opts.check) {
     for (const m of Object.values(state.marks)) {
       if (m.kind === 'word' && m.heard) wrong.set(m.w, m);
       if (m.kind === 'skipped') skipped.add(m.w);
-      if (severityOf(m) === 'slip') slipped.add(m.w);
+      if (m.kind === 'tajweed') tajweed.add(m.w);
+      // A "not clear" haraka or letter isn't shown as a slip in the bar: it wasn't heard as wrong.
+      else if (severityOf(m) === 'slip' && !isUnclear(m)) slipped.add(m.w);
     }
   }
   const out: BarWord[] = [];
@@ -37,7 +41,7 @@ export function barWords(state: LiveState, words: QuranWords, opts: { check: boo
     out.unshift(
       m
         ? { w, text: m.heard ?? words.uthmani(w), tone: 'wrong' }
-        : { w, text: words.uthmani(w), tone: slipped.has(w) ? 'slip' : w === state.cursor ? 'current' : 'said' },
+        : { w, text: words.uthmani(w), tone: slipped.has(w) ? 'slip' : tajweed.has(w) ? 'tajweed' : w === state.cursor ? 'current' : 'said' },
     );
   }
   return out;

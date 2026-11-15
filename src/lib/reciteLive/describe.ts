@@ -3,19 +3,24 @@
 import { surahName } from '../passages';
 import { tajweedName } from '../reciteCheck/result';
 import type { QuranWords } from '../recite/quranWords';
-import type { Mark } from './contract';
+import { isUnclear, type Mark, type MarkInto } from './contract';
+
+/** A "not clear" mark's line, on its card and in the summary. */
+export const UNCLEAR_NOTE = 'Say it more clearly. Not counted in the score.';
 
 const NBSP = ' ';
 
 /** "Wrong word", "Harakat slip", "Madd munfasil". */
 export function markTitle(mark: Mark): string {
+  if (isUnclear(mark)) return 'Not clear';
   switch (mark.kind) {
     case 'word':
       return mark.detail === 'order' ? 'Out of order' : 'Wrong word';
     case 'skipped':
       return 'Skipped word';
     case 'added':
-      return mark.detail === 'trail' ? 'Added after the end' : 'Added word';
+      // "Extra": the page highlights the word before it (an extra word has no text there).
+      return mark.detail === 'trail' ? 'Extra word after the end' : 'Extra word';
     case 'harakat':
       return mark.detail === 'shadda' ? 'Shadda slip' : 'Harakat slip';
     case 'letter':
@@ -28,8 +33,37 @@ export function markTitle(mark: Mark): string {
 /** "An-Naml, ayah 23", and "· likely" for a mark past the normal bar only. */
 export function markPlace(mark: Mark): string {
   const place = `${surahName(mark.ayah[0])}, ayah${NBSP}${mark.ayah[1]}`;
-  return mark.sure === 'likely' ? `${place} · likely` : place;
+  return mark.sure === 'likely' && !isUnclear(mark) ? `${place} · likely` : place;
 }
+
+/**
+ * Where a slip went, on the end-of-take card (`into`; Majd said yes, Nov 15 2026): "You continued with Luqman 31:6, a
+ * similar ayah", "(and 2 others)" with more ayat reading the same; for a swapped ending, "You ended ayah 5 as ayah 3
+ * ends" (the same surah, as the checker only names those). `place` is where the mark is, as the card names it.
+ */
+export function intoLine(mark: Mark & { into: MarkInto }, place: string): string {
+  const [s, a] = mark.into.ayah;
+  const there = `${surahName(s)}${NBSP}${s}:${a}`;
+  if (mark.into.ending) {
+    const as = s === mark.ayah[0] ? `ayah${NBSP}${a}` : there;
+    return `You ended ${place} as ${as} ends`;
+  }
+  const others = mark.into.also?.length ?? 0;
+  return `You continued with ${there}, a similar ayah${others ? ` (and ${others} ${others === 1 ? 'other' : 'others'})` : ''}`;
+}
+
+/** The same for VoiceOver: the surah and ayah in words. */
+export function spokenIntoLine(mark: Mark & { into: MarkInto }, place: string): string {
+  const [s, a] = mark.into.ayah;
+  const there = `${surahName(s)}, ayah ${a}`;
+  if (mark.into.ending) return `You ended ${place} as ${s === mark.ayah[0] ? `ayah ${a}` : there} ends`;
+  const others = mark.into.also?.length ?? 0;
+  return `You continued with ${there}, a similar ayah${others ? `, and ${others} ${others === 1 ? 'other' : 'others'}` : ''}`;
+}
+
+/** Marks that name where a slip went, in page order (none taken off: those are in the Removed list). */
+export const intoMarks = (marks: Mark[]): (Mark & { into: MarkInto })[] =>
+  marks.filter((m): m is Mark & { into: MarkInto } => m.into != null).sort((x, y) => x.w - y.w);
 
 /** The label of the Recited row: what was heard spelt out isn't exact. */
 export const recitedLabel = (mark: Mark) => (mark.heardExact === false ? 'As heard' : 'Recited');
@@ -156,6 +190,7 @@ export function findingNote(mark: Mark): string {
     return sub ? `${main} · ${sub}` : main;
   }
   if (mark.kind === 'skipped') return 'Left out';
+  if (isUnclear(mark)) return UNCLEAR_NOTE;
   const slip = slipLine(mark);
   if (!mark.heard) return mark.kind === 'word' ? 'Said as another word' : (slip ?? '');
   return `${recitedLabel(mark)} ${iso(mark.heard)}`;

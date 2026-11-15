@@ -224,6 +224,65 @@ until its part is set up.
   - "Keep as test data" (on by default; in the sheet and Settings → Testing) keeps each recording and its result
     in `recite-tests/<uid>/` in the dev bucket (closed to clients). The lab copies them with `fetch_takes.py`.
     **Nobody listens to them**, Majd included; they are held out of training, like the /record takes.
+  - **"Not clear"** (Majd, Nov 15 2026): a harakat or letter mark with `sure: "likely"` reads "Not clear" ("Say it more
+    clearly. Not counted in the score."), shows only what was expected on its card, isn't amber in the bar, comes last
+    in the summary and never counts in the score (`isUnclear` in `lib/reciteLive/contract`). A checker that sends
+    `score.unclear` has left them out of `mistakes`; from one that doesn't, the app takes out the ones shown.
+  - **Hear it and Pause** (Majd's Dev take, Nov 15 2026: Hear it ended the take, and Husary played on past it into
+    Control Center): Hear it plays the reciter's ayah on the card's own player (`lib/reciteLive/hearAudio`), never the
+    app's recitation, so there's no reader highlight, mini player or lock screen. During a take it pauses first: the
+    microphone goes off and the take stays open on the same connection. The bar's Pause and Resume do the same, and
+    Resume carries on from where it was. What the card plays stops when the card closes, the take ends or is closed, a
+    new one starts, the reader goes, or anything else takes the audio.
+  - **The checker is kept warm** (recite-server, Nov 15 2026; Majd's yes): Cloud Run stops an idle instance after about
+    15 minutes and a new one takes 6–9 s. So while the reader is open, focused and in front with live checking on,
+    `useKeepCheckerWarm` GETs `/health` (no sign-in, no model) on opening, every 10 minutes, and on coming back once
+    10 minutes have passed. It skips this while a take is connecting, listening or checking, since its connection holds
+    the instance.
+  - **Calm, exact tracking** (Majd's Dev take, Nov 15 2026; Tarteel's mic take as the reference): a quiet grey band on
+    the line being recited (the ayah's part of it, `currentLineBand`) and a grey box on the word. It is not a blue band
+    over the whole ayah, which covered lines not yet said and read as running ahead (the checker's `at` was 1.0 s
+    behind, never ahead). Blue (`followInk`) is only for the word being said in the bar. None of Recite's colours follow
+    the accent (design.test). Nothing shows before the checker has found where the reciter is (`locked`): no band or
+    box, in either view. The hidden view has no band at all (Majd, Nov 15 2026: "there shouldn't be an always there
+    highlight at the top when the verses are hidden"): the words recited show in place, the newest in the grey box.
+  - **Mistakes are highlights** (Majd, Nov 15 2026: "i don't like the red + circles, only things we should show are
+    highlites for mistakes 3 colors max"; board `~/Documents/revisely-recite-mocks/marks-highlights/`): a highlight
+    behind the word, the page's ink unchanged, in three colours (`markGroup`, theme/v2 `markWord`…): red for a wrong,
+    skipped or extra word (an extra word on the word before it: "Extra word"), amber for a haraka or letter slip and
+    "Not clear", violet for a tajweed note (Strict). A word with several shows its strongest; the mark a card is open
+    for is a firmer shade of its own (`…Firm`), no outline. No red ink, dotted lines or + discs. The bar, the card and
+    the summary use the same highlights, and a small flat swatch beside the kind's name (never a round mark): the kind
+    is always in words.
+  - **"Not a mistake" can be undone** (Majd, Nov 15 2026; Tarteel's Removed list): for 5 s an Undo toast above the bar,
+    and after the take the summary's "1 marked not a mistake" (closed until tapped) lists each with Put back
+    (`restoreMark`: the mark and what it counted come back). The checker is told both ways, so the lab never keeps a
+    wrong label: on the connection while live (`dismiss`, `undismiss`), and after the final answer over HTTP (`POST
+    /dismiss`, `/undismiss` with `when`, the tap's time, by which the lab orders a mark's labels; `sendLabel` in
+    `lib/reciteCheck/service`, kept takes only; live on the checker since rev 00047). Before, a Not a mistake tapped
+    after Stop never reached the checker: the connection drops every frame once it has the final answer. With VoiceOver
+    or TalkBack the Undo stays 15 s, and Not a mistake and Put back are said (`components/reciteLive/a11y`; never while
+    the microphone is on). The bar's words are read with their marks ("…, wrong word"): colour is never the only signal.
+  - **Your recitation** on the mark card: the reciter's own voice at the mark, from the take's audio that the connection
+    holds on the phone for resuming (`audioClip`), from the mark's `t` (0.6 s before to 0.4 s after). A mark without
+    one (a skipped word) uses when the cursor first reached that word or the one before, ±1.2 s. It works until the take
+    is closed, and has no button when the moment isn't known (E2E's recorded take has no audio). The clip is a WAV in the
+    caches folder (`lib/reciteLive/clipFile`), on this phone only.
+  - **Recite the mistakes again** (Majd, Nov 15 2026; `lib/reciteLive/drill`): a Check summary with a mark other than
+    tajweed offers one take over the stretch from the ayah before the first mistake (same surah) to the last mistake's
+    ayah (`s2`/`a2`, no `startBy`). It stops by itself once `said` reaches the stretch's last word (reciting on would
+    add "Extra word after the end" marks), and its summary says "Before: …" (what the take before found there).
+  - **Where a slip went** (`into`, contract draft 6; Majd said yes, Nov 15 2026; live on the checker since #617/#618):
+    the final answer can name, on the first skipped or wrong word of a run, the similar ayah the reciter went on with,
+    or (`ending`) the ayah whose ending they used. The summary gives each a row under its head ("You continued with
+    Luqman 31:6, a similar ayah", "(and 2 others)" when `also` has more; "You ended ayah 5 as ayah 3 ends"), and a tap
+    opens that ayah in the reader, highlighted until the page is turned. `parseInto` drops a malformed one, never its
+    mark. A mark taken off takes its row with it (Put back restores it). It never counts in the score.
+  - **Stop leaves a trace** (`lib/reciteLive/stopTrace`, Nov 15 2026, after a freeze on Stop that told us nothing): Stop
+    writes a marker on the phone, each step to the summary adds to it (mic off, the final answer, the summary asked
+    for), and a heartbeat keeps the longest JavaScript stall. The summary on screen, a failure, ✕ or leaving the reader
+    removes it. One left at the next launch goes to Sentry once (environment `dev`, "Recite: a take's Stop never
+    reached the summary", tag `recite_stop_last`). It holds no audio or words, only event types.
   - **A take starts anywhere on the page** (Majd, Nov 14 2026; protocol 6). The start frame sends `startBy` (the page's
     last ayah), and the checker says where the reciter started (`locked`; recite-contract.md in the shared notes).
     - Until then the bar says Listening…, with no cursor and no score. If it is never found, the take fails silently
@@ -232,6 +291,13 @@ until its part is set up.
     - Nothing before the start is skipped, and the summary counts from the start.
     - A checker below protocol 6 (`ready.protocol`) doesn't search: the take starts at the page's first ayah, as
       before. So does a cursor that comes with no `locked` (`lib/reciteLive/state`).
+  - **The hidden view leaves every verse marker whole** (Majd, Nov 15 2026: page 2's ۱ ۲ ۳ were cut, only ۴ whole). Its
+    covers stop at each marker's opening in `src/data/pageLines.json`. Those came from glyph data about 7 units right
+    of the page images' markers, so 6,210 of 6,235 were clipped (page 236's held part of its ring). The openings are now
+    fitted to the images by `scripts/check-page-markers.py` (`--write`): it finds each marker's ornament by template
+    (some pages and lines draw it smaller, page 3 wider; a sajdah sign stays with its marker) and checks that no marker
+    ink is under a cover and no word's ink shows beside a marker, on the originals and Android's w1080 and w1440. Run it
+    after any change to the page lines or the images; `hiddenPage.test` pins measured markers (page 2's among them).
 
 ## How updates reach phones
 
@@ -1266,6 +1332,17 @@ How it works:
   - The session is saved in the index, so an upload carries on after the app closes.
   - The network is checked before every chunk.
   - The chunk in flight is cancelled on leaving Wi-Fi, sign-out or account deletion.
+- **"Recording saved · Undo · View"** (Majd, Nov 15 2026: "there should be an undo button for it not just view";
+  `components/recordings/RecordingSavedToast`, in the reader, a session and after a Recite take):
+  - **The hold:** a recording uploads nothing while the recorder runs, nor while its note offers Undo
+    (`holdUpload` in `lib/recordings`). Each segment is held as `appendSegment` writes it, so no run sees it unheld.
+    Stopping gives it `UPLOAD_HOLD_MS` (20 s). The note going, or View, releases it; so does leaving a session kept
+    open. The hold lives in memory only, so a restart lets everything upload.
+  - **Undo** is `undoRecording`. If that go at the recorder began the recording (a take always does), Undo deletes
+    the whole recording as a delete does, tombstone rules included. If it carried on a day's session recording, only
+    that go's segments and their page marks go, and the earlier recording stays. Those segments never uploaded; a
+    segment that did is refused ("Couldn't undo"), since a segment can't leave the backup on its own.
+  - With VoiceOver or TalkBack the note stays 15 s and is said aloud (never while the microphone is on).
 - **Listing:** the backup is listed on an account's first run, then at most every 15 minutes.
 - **Account deletion:** `deleteUserAccount` deletes the Storage prefix first.
 - **Known limits:**
@@ -1419,6 +1496,13 @@ side-session notes `apply-support.md`.
 - **Pages:** `docs/apply/` (Open Door: landing, steps, questions, the form), `docs/premium/` (Free vs Premium, nothing
   for sale, no prices), `docs/account/` (plan and where it came from, the application, sign out). English and Arabic
   (`docs/assets/strings.js`, `site-i18n.js`; Amiri, right to left, a switch defaulting to the browser's language).
+- **The home and Support in Arabic, on dev only** (Majd, Nov 15 2026: "languages: Arabic only for now"):
+  - Their HTML carries the keys (`data-t…`) and its own English. `site-i18n.js` reads that English before it switches.
+  - The dev worker adds the switch, the language set before the first paint, `strings-site.js` (Arabic only) and
+    `site-rtl.css` (`worker/nav.ts`). revisely.app shows them unchanged.
+  - The app's screens are English, so labels stay English in isolates (⁨…⁩), with steps joined by ←.
+  - Arabic is Amiri cut to what the pages write (`scripts/site/amiri-subset.sh`, WOFF2, Regular and Bold).
+    `worker/__tests__/siteArabic.test.ts` fails on a character outside it, a key without Arabic, or an unused one.
 - **Kept off revisely.app:** the worker answers 404 for `/apply`, `/premium` and `/account` unless `ACCOUNT_PAGES` is
   "1" (`wrangler.dev.jsonc` only); `wrangler.jsonc` sends those paths through the worker so the gate holds once develop
   reaches main.
@@ -1721,8 +1805,8 @@ classic default), and a fresh install starts in light.
   with a small accent dot under the current tab that follows a swipe (below); `ActionBar` takes
   its place for a screen's own actions. No Threads/Meta names, logos or icons, no likes or reposts.
 - Shared pieces live in `src/components/v2/`; Home's feed in `src/components/home/feed/`. Every sheet
-  is `v2/Sheet` (handle, centred title, optional Cancel/Save, optional foot bar; the backdrop is its
-  sibling) and every menu `v2/ActionSheet`; segmented controls are `v2/PillTabs`. Sheets with their
+  is `v2/Sheet` (handle, centred title, optional Cancel/Save, optional foot bar, and `pinned`: a sheet's own
+  main action kept on screen under its scrolling content; the backdrop is its sibling) and every menu `v2/ActionSheet`; segmented controls are `v2/PillTabs`. Sheets with their
   own frame (gorhom `PlanSheet`) take the same colours and corners.
 - A sheet closes by a tap on the backdrop, or by dragging its handle or header down (Oct 27 2026):
   it follows the finger on the UI thread and the backdrop fades with it; past 120pt (or 30% of a
@@ -1869,7 +1953,10 @@ classic default), and a fresh install starts in light.
   fallback that replaces a modal whose dismissal never reports. A sheet inside another modal's content is
   presented by it and goes at once (`ModalNest`). `RevoSheetFrame` and `v2/ContextMenu` take turns the same
   way. A raw `<Modal>` that coexists with sheets calls `useModalHold(visible)` (and wraps its content in
-  `ModalNest` if sheets open inside it). The scenario harness's Modal refuses as iOS does, and a tap on the
+  `ModalNest` if sheets open inside it). `useModalHold` doesn't wait: a raw modal that can open as a sheet closes
+  (from a sheet's button) takes a turn instead (`useModalTurn`, `visible={turn}`, released on `onDismiss` or after
+  `DISMISS_FALLBACK_MS`), as `reciteLive/CheckIntroPage` does: opened from the take summary's "See your mistakes"
+  while the summary was still closing, it froze the reader (Majd's Dev take, Nov 15 2026). The scenario harness's Modal refuses as iOS does, and a tap on the
   screen under it then fails (`harness/modal.tsx`); a test that reports `onDismiss` itself lets the sheet's
   closing animation end first, as iOS would.
 - Check sheets and menus at the largest Dynamic Type size (`xcrun simctl ui <udid> content_size

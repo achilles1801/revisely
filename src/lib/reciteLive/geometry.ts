@@ -30,32 +30,34 @@ export function ayahBand(page: number, sura: number, ayah: number): Rect[] {
   return ayahRects(page, sura, ayah).map((r) => grow(r, 6, 6));
 }
 
-/** Where a mark is drawn. */
-export type MarkShape =
-  | { mark: Mark; type: 'word'; box: Rect }
-  /** An added word: a point in the gap after the word it came after (to its left, in the line's foot). */
-  | { mark: Mark; type: 'gap'; x: number; y: number };
-
-export function markShape(words: QuranWords, mark: Mark): MarkShape {
-  const box = wordBox(words, mark.w);
-  if (mark.kind === 'added') return { mark, type: 'gap', x: box.x0, y: box.y1 };
-  return { mark, type: 'word', box };
+/** The ayah's band on the line of word `w` only (null off its page): where the reciter is, never the lines to come. */
+export function currentLineBand(words: QuranWords, page: number, w: number): Rect | null {
+  if (words.pageOf(w) !== page) return null;
+  const r = words.ref(w);
+  const box = wordBox(words, w);
+  const mid = (box.y0 + box.y1) / 2;
+  return ayahBand(page, r.sura, r.ayah).find((b) => b.y0 <= mid && b.y1 >= mid) ?? null;
 }
 
-/** The mark under a point on a page (bounds space), if any: a word's box, or near an added word's gap. */
+/**
+ * Where a mark is drawn: its word's box. An added word has no text on the page, so it is the word it came after (its
+ * `w`), and the card says "Extra word" (Majd, Nov 15 2026: highlights only, no + in the gap).
+ */
+export function markBox(words: QuranWords, mark: Mark): Rect {
+  return wordBox(words, mark.w);
+}
+
+/** A mark's highlight behind the page's ink: its word's box, a little wider (the cursor's box is wider still). */
+export const markHighlight = (words: QuranWords, mark: Mark): Rect => grow(markBox(words, mark), 4, 1);
+
+/** The mark under a point on a page (bounds space), if any: the nearest whose word's box (with some slop) holds it. */
 export function markAt(words: QuranWords, marks: Mark[], x: number, y: number, slop = 14): Mark | null {
   let best: { mark: Mark; d: number } | null = null;
   for (const mark of marks) {
-    const s = markShape(words, mark);
-    let d: number;
-    if (s.type === 'word') {
-      const b = grow(s.box, slop, slop / 2);
-      if (x < b.x0 || x > b.x1 || y < b.y0 || y > b.y1) continue;
-      d = Math.abs(x - (s.box.x0 + s.box.x1) / 2);
-    } else {
-      d = Math.hypot(x - s.x, y - s.y);
-      if (d > slop * 2) continue;
-    }
+    const box = markBox(words, mark);
+    const b = grow(box, slop, slop / 2);
+    if (x < b.x0 || x > b.x1 || y < b.y0 || y > b.y1) continue;
+    const d = Math.abs(x - (box.x0 + box.x1) / 2);
     if (!best || d < best.d) best = { mark, d };
   }
   return best?.mark ?? null;

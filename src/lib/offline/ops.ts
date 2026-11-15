@@ -139,7 +139,9 @@ export type OutboxOp =
       isNew: boolean;
     }
   | { kind: 'journal.delete'; date: string }
-  | { kind: 'usage'; seconds: number };
+  | { kind: 'usage'; seconds: number }
+  /** Recite's memory (Revisely Dev): a take's record, or a word cleared by hand, written whole (lib/reciteMemory). */
+  | { kind: 'reciteMemory.put'; record: import('../reciteMemory/record').MemoryRecord };
 
 export interface OutboxEntry {
   id: string;

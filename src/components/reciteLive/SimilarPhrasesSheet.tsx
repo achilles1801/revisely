@@ -84,7 +84,9 @@ export function SimilarPhrasesSheet({
   }
   return (
     <Sheet visible={visible} onClose={onClose} title="Similar phrases" scroll testID="similar-sheet">
-      <Text style={[typeV2.meta, styles.intro, { color: palette.secondary }]}>Ayahs that read almost the same</Text>
+      <Text style={[typeV2.meta, styles.intro, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
+        Ayahs that read almost the same
+      </Text>
       {places.map((p) => row(p.sura, p.ayah, p.w, p.from, p.to, new Set(p.same)))}
       {mine}
     </Sheet>

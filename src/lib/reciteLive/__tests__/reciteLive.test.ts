@@ -1,9 +1,11 @@
 import { quranWords } from '../../recite/__fixtures__/quranWords';
-import { LiveEvent, parseEvent, parseMark, severityOf, Mark } from '../contract';
+import { GROUP_RANK, isUnclear, LiveEvent, markGroup, parseEvent, parseMark, severityOf, Mark } from '../contract';
 import {
   applyEvent,
   dismissMark,
   findingStart,
+  removedMarks,
+  restoreMark,
   furthestWord,
   seekOnPage,
   startNotFound,
@@ -17,7 +19,7 @@ import {
 } from '../state';
 import { replayFeed, ReplayLog } from '../feed';
 import { formatAccuracy, mistakesLabel, pageAccuracy, scoreLevel, wordsOnPagesReached } from '../score';
-import { ayahBand, cursorBox, markAt, markShape, wordBox } from '../geometry';
+import { ayahBand, cursorBox, markAt, markBox, markHighlight, wordBox } from '../geometry';
 import { similarPhrases } from '../similar';
 import { expectedPhrase, findingNote, markPlace, markTitle, recitedLabel, recitedPhrase, slipLine, tajweedLines } from '../describe';
 import { plainText } from '../../passages';
@@ -104,9 +106,17 @@ describe('the contract', () => {
     expect(parseEvent({ type: 'done', result: { ...recite.result, follow: undefined } })).toBeNull();
   });
 
-  it('red for words, amber for harakat, letters and tajweed', () => {
+  it('mistakes are words; slips are harakat, letters and tajweed', () => {
     expect(['word', 'skipped', 'added'].map((kind) => severityOf({ kind } as Mark))).toEqual(['mistake', 'mistake', 'mistake']);
     expect(['harakat', 'letter', 'tajweed'].map((kind) => severityOf({ kind } as Mark))).toEqual(['slip', 'slip', 'slip']);
+  });
+
+  it('three colours (Majd, Nov 15 2026): red for words, amber for harakat and letters, violet for tajweed', () => {
+    const kinds = ['word', 'skipped', 'added', 'harakat', 'letter', 'tajweed'] as const;
+    expect(kinds.map((kind) => markGroup({ kind }))).toEqual(['word', 'word', 'word', 'slip', 'slip', 'tajweed']);
+    // A word with several marks shows its strongest.
+    expect(GROUP_RANK.word).toBeGreaterThan(GROUP_RANK.slip);
+    expect(GROUP_RANK.slip).toBeGreaterThan(GROUP_RANK.tajweed);
   });
 });
 
@@ -121,7 +131,8 @@ describe('the live state', () => {
       // In mushaf order.
       const ws = marksInOrder(s).map((m) => m.w);
       expect(ws).toEqual([...ws].sort((a, b) => a - b));
-      expect(mistakeCount(s)).toBe(done.result.score!.mistakes);
+      // These checkers counted "not clear" marks in `mistakes` (no `unclear`); the app takes them out.
+      expect(mistakeCount(s)).toBe(done.result.score!.mistakes - done.result.marks.filter(isUnclear).length);
     }
   });
 
@@ -190,6 +201,49 @@ describe('the live state', () => {
     expect(dismissMark(t, 'n').score).toEqual({ reached: 10, mistakes: 1, tajweed: 0, accuracy: 0.9 });
   });
 
+  it('“Put back” (Undo, the Removed list) brings the mark and its count back as they were (Majd, Nov 15 2026)', () => {
+    let s = applyEvent(liveConnecting(), { type: 'mark', mark: mark({ id: 'a' }) });
+    s = applyEvent(s, { type: 'score', score: { reached: 10, mistakes: 1, tajweed: 0, accuracy: 0.9 } });
+    s = dismissMark(s, 'a');
+    expect(removedMarks(s).map((m) => m.id)).toEqual(['a']);
+    s = restoreMark(s, 'a');
+    expect(Object.keys(s.marks)).toEqual(['a']);
+    expect(s.score).toEqual({ reached: 10, mistakes: 1, tajweed: 0, accuracy: 0.9 });
+    expect(s.dismissed).toEqual([]);
+    expect(removedMarks(s)).toEqual([]);
+    // Nothing to put back: unchanged.
+    expect(restoreMark(s, 'a')).toBe(s);
+    // Put back, the server's updates to it apply again.
+    s = applyEvent(s, { type: 'mark', mark: mark({ id: 'a', sure: 'likely' }) });
+    expect(s.marks.a.sure).toBe('likely');
+  });
+
+  it('a mark taken off before any score comes back without changing a count it never took', () => {
+    let s = applyEvent(liveConnecting(), { type: 'mark', mark: mark({ id: 'a' }) });
+    s = dismissMark(s, 'a');
+    s = applyEvent(s, { type: 'score', score: { reached: 10, mistakes: 0, tajweed: 0, accuracy: 1 } });
+    expect(restoreMark(s, 'a').score).toEqual({ reached: 10, mistakes: 0, tajweed: 0, accuracy: 1 });
+  });
+
+  it('after the final answer: a mark taken off during the take can be put back, as the final answer has it, and counts again', () => {
+    let s = applyEvent(liveConnecting(), { type: 'mark', mark: mark({ id: 'a' }) });
+    s = dismissMark(s, 'a');
+    // The checker's final score leaves out what was dismissed; its marks still hold it.
+    s = applyEvent(s, {
+      type: 'done',
+      result: { v: 2, take: 't', from: 0, to: 9, secs: 3, marks: [mark({ id: 'a', heard: 'X' }), mark({ id: 'b', w: UTIYAT + 1 })], score: { reached: 10, mistakes: 1, tajweed: 0, accuracy: 0.9 } },
+    });
+    expect(Object.keys(s.marks)).toEqual(['b']);
+    s = restoreMark(s, 'a');
+    expect(s.marks.a.heard).toBe('X');
+    expect(s.score).toEqual({ reached: 10, mistakes: 2, tajweed: 0, accuracy: 0.8 });
+    // One the checker dropped in the end has nothing to put back.
+    let t = applyEvent(liveConnecting(), { type: 'mark', mark: mark({ id: 'gone' }) });
+    t = dismissMark(t, 'gone');
+    t = applyEvent(t, { type: 'done', result: { v: 2, take: 't', from: 0, to: 9, secs: 3, marks: [], score: null } });
+    expect(removedMarks(t)).toEqual([]);
+  });
+
   it('after the final answer, late live events change nothing; an error keeps what was shown', () => {
     const done = run(eventsOf('alafasy.p2.m1.clean'));
     expect(applyEvent(done, { type: 'mark', mark: mark({ id: 'late' }) })).toBe(done);
@@ -198,11 +252,6 @@ describe('the live state', () => {
     expect([live.status, live.failure, Object.keys(live.marks)]).toEqual(['failed', 'limit', ['a']]);
   });
 
-  it('each mark draws by its own sure: clear in full, likely lighter, whatever else the take holds', () => {
-    const { markStrength } = require('../state') as typeof import('../state');
-    expect(markStrength(mark({ sure: 'clear' }))).toBe('full');
-    expect(markStrength(mark({ sure: 'likely' }))).toBe('light');
-  });
 
   it('the real service’s 4-minute take with letters: a word can carry two marks', () => {
     const s = run(eventsOf('server-live-husary.p1.m1.letters'));
@@ -409,10 +458,23 @@ describe('where it draws', () => {
     ]);
   });
 
-  it('a mark is its word’s box; an added word is the gap after its word', () => {
-    expect(markShape(words, mark({}))).toMatchObject({ type: 'word', box: wordBox(words, UTIYAT) });
-    const g = markShape(words, mark({ kind: 'added', w: A23 + 6 }));
-    expect(g).toMatchObject({ type: 'gap', x: wordBox(words, A23 + 6).x0, y: 113 });
+  it('a mark is its word’s box; an extra word is the word it came after (Majd, Nov 15 2026: highlights only)', () => {
+    expect(markBox(words, mark({}))).toEqual(wordBox(words, UTIYAT));
+    expect(markBox(words, mark({ kind: 'added', w: A23 + 6 }))).toEqual(wordBox(words, A23 + 6));
+    // Its highlight: the word's box a little wider and taller, inside the cursor's box.
+    const h = markHighlight(words, mark({}));
+    const c = cursorBox(words, UTIYAT);
+    const b = wordBox(words, UTIYAT);
+    expect(h.x0).toBeLessThan(b.x0);
+    expect(h.x1).toBeGreaterThan(b.x1);
+    expect(h.x0).toBeGreaterThan(c.x0);
+    expect(h.y0).toBeGreaterThan(c.y0);
+  });
+
+  it('a tap on an extra word’s highlight finds it', () => {
+    const extra = mark({ id: 'x', kind: 'added', w: SHAY });
+    const b = wordBox(words, SHAY);
+    expect(markAt(words, [extra], (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2)?.id).toBe('x');
   });
 
   it('a tap finds the mark under it, or none', () => {
@@ -461,12 +523,27 @@ describe('the card’s words', () => {
     expect(markTitle(mark({}))).toBe('Wrong word');
     expect(markTitle(mark({ detail: 'order' }))).toBe('Out of order');
     expect(markTitle(mark({ kind: 'skipped' }))).toBe('Skipped word');
-    expect(markTitle(mark({ kind: 'added' }))).toBe('Added word');
-    expect(markTitle(mark({ kind: 'added', detail: 'trail' }))).toBe('Added after the end');
+    expect(markTitle(mark({ kind: 'added' }))).toBe('Extra word');
+    expect(markTitle(mark({ kind: 'added', detail: 'trail' }))).toBe('Extra word after the end');
     expect(markTitle(mark({ kind: 'harakat' }))).toBe('Harakat slip');
     expect(markTitle(mark({ kind: 'harakat', detail: 'shadda' }))).toBe('Shadda slip');
     expect(markTitle(mark({ kind: 'letter' }))).toBe('Letter slip');
     expect(markTitle(mark({ kind: 'tajweed', rule: 'madd_munfasil' }))).toBe('Madd munfasil');
+  });
+
+  it('a haraka or letter past the normal bar only is “Not clear”: say it more clearly, not counted (Majd, Nov 15 2026)', () => {
+    const unclear = mark({ kind: 'harakat', sure: 'likely', slip: { expected: 'َ', heard: 'ِ' }, heard: 'x', heardExact: true });
+    expect(isUnclear(unclear)).toBe(true);
+    expect(markTitle(unclear)).toBe('Not clear');
+    expect(findingNote(unclear)).toBe('Say it more clearly. Not counted in the score.');
+    // The title says it, so the place doesn't add "likely".
+    expect(plainText(markPlace(unclear))).toBe('An-Naml, ayah 23');
+    expect(markTitle(mark({ kind: 'letter', sure: 'likely' }))).toBe('Not clear');
+    // Clear harakat and letters, and every word mark, keep their names.
+    expect(markTitle(mark({ kind: 'harakat', sure: 'clear' }))).toBe('Harakat slip');
+    expect(isUnclear(mark({ kind: 'word', sure: 'likely' }))).toBe(false);
+    expect(isUnclear(mark({ kind: 'skipped', sure: 'likely' }))).toBe(false);
+    expect(isUnclear(mark({ kind: 'tajweed', rule: 'ghunnah', sure: 'likely' }))).toBe(false);
   });
 
   it('names the ayah by its surah, and says when a mark is only likely', () => {
@@ -552,5 +629,45 @@ describe('the first answer (v1) as marks', () => {
     const f = finalFromV1(v1, words);
     expect(f.score).toEqual({ reached: 11, mistakes: 4, tajweed: 1, accuracy: 1 - 4 / 11 });
     expect(f.marks.every((m) => m.ayah[0] === 27 && m.ayah[1] === 23)).toBe(true);
+  });
+});
+
+describe('`into`: where a slip into a similar ayah went (contract draft 6, final answer only)', () => {
+  const { intoLine, intoMarks, spokenIntoLine } = require('../describe');
+  const { plainText, surahName } = require('../../passages');
+  const base = { id: 'a', w: 40, ayah: [2, 5] as [number, number], kind: 'skipped' as const, sure: 'clear' as const };
+
+  it('is kept on its mark, with the other ayat reading the same and a swapped ending', () => {
+    expect(parseMark({ ...base, into: { w: 3500, ayah: [31, 6], also: [[2, 7], 'x', [300, 1]] } })!.into).toEqual({ w: 3500, ayah: [31, 6], also: [[2, 7]] });
+    expect(parseMark({ ...base, into: { w: 9, ayah: [113, 3], ending: true } })!.into).toEqual({ w: 9, ayah: [113, 3], ending: true });
+  });
+
+  it('a malformed one is dropped, never its mark', () => {
+    for (const into of ['x', { w: -1, ayah: [31, 6] }, { w: 3, ayah: [200, 1] }, { w: 3, ayah: [31, 0] }, { w: 3 }]) {
+      const m = parseMark({ ...base, into });
+      expect(m).toMatchObject({ id: 'a', kind: 'skipped' });
+      expect(m!.into).toBeUndefined();
+    }
+  });
+
+  it('reads as a line on the card: the ayah gone on with, surah first; a swapped ending by its ayah', () => {
+    const luqman = plainText(surahName(31));
+    const m = { ...base, into: { w: 3500, ayah: [31, 6] as [number, number] } };
+    expect(plainText(intoLine(m, 'ayah 5'))).toBe(`You continued with ${luqman} 31:6, a similar ayah`);
+    expect(plainText(intoLine({ ...m, into: { ...m.into, also: [[2, 7]] } }, 'ayah 5'))).toBe(`You continued with ${luqman} 31:6, a similar ayah (and 1 other)`);
+    expect(plainText(intoLine({ ...m, into: { ...m.into, also: [[2, 7], [3, 9]] } }, 'ayah 5'))).toBe(`You continued with ${luqman} 31:6, a similar ayah (and 2 others)`);
+    const ending = { ...base, ayah: [113, 5] as [number, number], into: { w: 9, ayah: [113, 3] as [number, number], ending: true as const } };
+    expect(plainText(intoLine(ending, 'ayah 5'))).toBe('You ended ayah 5 as ayah 3 ends');
+    // VoiceOver hears the surah and ayah in words, not "31:6".
+    expect(spokenIntoLine(m, 'ayah 5')).toBe(`You continued with ${surahName(31)}, ayah 6, a similar ayah`);
+  });
+
+  it('only marks that carry one, in page order', () => {
+    const marks = [
+      { ...base, id: 'b', w: 50, into: { w: 1, ayah: [1, 1] as [number, number] } },
+      { ...base, id: 'c', w: 45 },
+      { ...base, id: 'd', w: 41, into: { w: 2, ayah: [1, 2] as [number, number] } },
+    ];
+    expect(intoMarks(marks).map((m: { id: string }) => m.id)).toEqual(['d', 'b']);
   });
 });

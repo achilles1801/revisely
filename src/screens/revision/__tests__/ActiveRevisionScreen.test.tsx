@@ -110,7 +110,9 @@ jest.mock('../../../components/recite/usePauseListener', () => ({
 // The recorder: the real hook, unless a test gives one (a recording in progress).
 let mockRecorder: Record<string, unknown> | null = null;
 // What the screen gave the hook: how a test says a recording was saved, as the hook does.
-let mockRecorderOpts: { onFinished?: (info: { day: string; recordingId: string }) => void } | null = null;
+let mockRecorderOpts: {
+  onFinished?: (info: { day: string; recordingId: string; undo?: import('../../../lib/recordings').RecordingUndo }) => void;
+} | null = null;
 jest.mock('../../../hooks/useVoiceRecorder', () => {
   const actual = jest.requireActual('../../../hooks/useVoiceRecorder');
   return {
@@ -1129,5 +1131,21 @@ describe('ActiveRevisionScreen — the recorder in the controls', () => {
     expect(screen.getByText('Recording saved')).toBeTruthy();
     fireEvent.press(screen.getByText('View'));
     expect(navigateToActivityDay).toHaveBeenCalledWith('2026-11-03', 'r1');
+  });
+
+  it('"Recording saved · Undo" takes back what this go recorded, not the day’s whole recording', async () => {
+    const recordings = jest.requireMock('../../../lib/recordings');
+    const undo = jest.spyOn(recordings, 'undoRecording').mockResolvedValue('dropped');
+    setup([331, 332]);
+    recordingInProgress();
+    render(<ActiveRevisionScreen />);
+    const go = { created: false, segments: ['r1-2.m4a'], fromMs: 60_000 };
+    act(() => mockRecorderOpts?.onFinished?.({ day: '2026-11-03', recordingId: 'r1', undo: go }));
+    fireEvent.press(screen.getByTestId('recording-saved-undo'));
+    await act(async () => {});
+    expect(undo).toHaveBeenCalledWith('r1', go);
+    expect(screen.queryByText('Recording saved')).toBeNull();
+    expect(navigateToActivityDay).not.toHaveBeenCalled();
+    undo.mockRestore();
   });
 });

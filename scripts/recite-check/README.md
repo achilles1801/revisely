@@ -72,7 +72,12 @@ asked), `ms` (time spent) and `engine` (the checker's commit).
   - `slip`: the expected and heard letter or haraka;
   - `rule`, `got`, `expected`: tajweed;
   - `t`;
-  - `sure`: `clear` or `likely`.
+  - `sure`: `clear` or `likely`;
+  - `into` (Nov 15 2026), on the first mark of a run of words skipped or said wrong when they were a similar
+    passage's words: `w`, the place's first word said; its `ayah`; and `also`, other ayat with the same words as far
+    as heard. With `ending: true`, an ayah's last word said as the last word of an ayah near it in the same surah.
+    From the lab's `similar.py` (`Engine.name_slips`, within `similar.P['budget']`); only in the final answer, and the
+    app doesn't show it yet.
 - `score`: `reached`, `mistakes` (word, skipped, added, harakat and letter marks), `tajweed`, and
   `accuracy` = 1 − mistakes ÷ reached.
 
@@ -86,8 +91,13 @@ How `sure` is decided:
 
 When kept, the v2 answer also has `take`, the take's name.
 
-`POST /dismiss {"take": "...", "id": "<mark id>"}` (same sign-in): the person's "Not a mistake", kept next to the
-take (`<take>.dismiss-<time>.json`) as a label for the lab.
+`POST /dismiss {"take": "...", "id": "<mark id>", "when": <ms>}` (same sign-in): the person's "Not a mistake", kept
+next to the take (`<take>.dismiss-<time>.json`) as a label for the lab. `POST /undismiss` (the same body) undoes it
+(Undo, or the summary's Removed list; `<take>.undismiss-<time>.json`, with `"undo": true`). `when` (optional) is the
+phone's time of the tap in ms: two labels sent close together, or a retry, can be stored out of order, and the lab
+orders them by it. Read a take's labels with `fetch_takes.dismissed_now`: the live `dismissed` list, then these files
+in the order they were tapped, the latest for a mark winning, so an undone "Not a mistake" never stays a label. Any id
+`engine.marks` makes is taken (before Nov 15 2026 skipped, added and harakat marks were refused).
 
 ## Live: `/live` (a WebSocket on the same service)
 
@@ -103,9 +113,12 @@ take (`<take>.dismiss-<time>.json`) as a label for the lab.
    on every socket. A session counts against the 40 an hour; resuming doesn't.
 2. The server answers `{"type":"ready","v":2,"engine":"…","server":"…","protocol":6,"take":"<take>","from":0}`.
    `GET /health` says the same `engine` (the checker's commit), `server` (this service's commit) and `protocol` (the
-   contract it speaks: 5 = follow, hint, tajweed, premium_required; 6 = start anywhere on the page).
+   contract it speaks: 5 = follow, hint, tajweed, premium_required; 6 = start anywhere on the page), and `words`:
+   whether the image has the word table for its checker. Never move traffic to a revision whose `words` is false (see
+   "The word table").
 3. The phone sends PCM (16-bit little-endian, mono, 16 kHz) as binary frames of any size, and as text frames
-   `{"type":"seek","w":…}`, `{"type":"dismiss","id":"…"}`,
+   `{"type":"seek","w":…}`, `{"type":"dismiss","id":"…"}`, `{"type":"undismiss","id":"…"}` (that dismissal undone:
+   the score counts the mark again, and the kept take's `dismissed` leaves it out),
    `{"type":"hint","w":…,"what":"word"|"ayah"}` (the hidden view showed a word, or the rest of its ayah: those
    words, if not yet decided, are `helped`, counted in `score.helped` and flagged in `done.result.words`; a helped word
    said wrong is still a mistake) and finally `{"type":"end"}`. Any other frame is ignored.
@@ -151,11 +164,11 @@ dev account has Premium (`devGrantPremium`); `--update-env-vars CHECK_GATE=on` t
 the socket (`idle`). uvicorn pings every 10 s, so a phone gone without closing is noticed within 20 s.
 
 **Resume.** A dropped socket: open a new one and send the start frame again with `"resume":"<take>"` (and a fresh
-token). `ready.from` says how many samples the server holds: send the take's PCM from there (and any seek or dismiss
-at the point of the audio where it was first sent), then carry on. On the same instance (within 2 minutes) `from` is
-where the socket dropped. On the other instance it is 0: the server runs the take again, faster than real time, and
-since every event depends only on the audio and where each seek and dismissal came in it, it sends the same events
-again. The phone applies events idempotently (marks by id; `at`, `said` and `score` are snapshots), so a repeat
+token). `ready.from` says how many samples the server holds: send the take's PCM from there (and any seek, dismiss or
+undismiss at the point of the audio where it was first sent), then carry on. On the same instance (within 2 minutes)
+`from` is where the socket dropped. On the other instance it is 0: the server runs the take again, faster than real
+time, and since every event depends only on the audio and where each seek, dismissal and undismissal came in it, it
+sends the same events again. The phone applies events idempotently (marks by id; `at`, `said` and `score` are snapshots), so a repeat
 changes nothing on screen. Right after `ready`, a resume on the same instance also sends what the phone should be
 showing (every mark shown, every `unmark`, the `ayah` events, `at`, `said`, `score`): the dropped socket may have
 swallowed events of the last audio it was checking, and that audio isn't sent again. The phone keeps the take's PCM for this (it needs it for "play this word" too).
@@ -189,6 +202,42 @@ Firestore's and Storage's URLs hold the uid and requests names the URL in its er
 `auth.Unreachable` (a status, or the kind of error) and `store.Exists` (nothing): until Nov 14 2026 a failed upload
 logged the object's name.
 
+## Health (Majd approved Nov 15 2026)
+
+`health.py` prints one JSON line for each of these, which Cloud Run's logging keeps as `jsonPayload` (`health` names
+the kind). Cloud Run adds the revision and the instance itself. A line holds no uid, take name, passage, word or audio:
+only counts, seconds, levels and reasons (the server tests check it).
+- **`take`:** a finished live take or a /check. It holds:
+  - `kind`, `level` (`recite`, `harakat`, `strict`, `+letters`), `protocol`, `start` and `locked_s`;
+  - `app` (the app's own version tag, only in that shape);
+  - `audio_s`, `open_s` (first connect to the end), and `ready_s` (connect → `ready`);
+  - `cold` (the instance's first take) and `age_s`;
+  - `lag_p50`, `lag_p90`, `lag_max` (seconds from audio arriving to its events going out);
+  - `cpu_s` and `cpu_per_s` (the process's CPU, the take's own at one take per instance);
+  - `<part>_per_s` from the checker's `ms`. `model_per_s` is also the instance's speed, 0.12–0.27 on Cloud Run's CPUs;
+  - `sockets`, `restarted` (a resume this instance didn't have, run again from the first sample), `why`, `marks`, `kept`.
+- **`instance`:** where a cold start's seconds go. `imports_s` (process start → the server imported), `engine_s` (the
+  checker, the model and the word table), `ready_s` (process start → the port opens), `words`, and `bench_ms` (a
+  fixed bit of Python, timed: the CPU apart from any take).
+- **`refused`** (`route`, `reason`: `sign_in`, `testers_only`, `premium_required`, `limit`, `bad_request`), **`error`**
+  (`route`), **`label`** (a dismiss or an undismiss), and **`dropped`**: a session whose phone went and didn't come
+  back here (`at`: `timeout` after RESUME_TTL, or `shutdown`).
+
+**The digest** (`digest.py`): the last 7 days of those lines from both services (`recite-check` and
+`recite-check-pair`, its rows marked "(pair)"), as Markdown. It covers:
+- takes and hours by level;
+- cold starts and their wait;
+- the lag, and the instance speed;
+- resumes, drops, refusals, errors and labels;
+- the instance time held, against the free tier (Cloud Run bills an instance while it holds a request and while it
+  starts). Per instance, it is the union of the takes' spans, so two takes at once on the pair service count once.
+
+`python digest.py` prints it (gcloud signed in, logging.viewer on revisely-dev); `--post` adds it as a comment on the
+issue "Recitation checker health (weekly digest)" (label `recite-health`, made if missing). The workflow
+`recite-digest.yml` runs it on Mondays. Schedules run from `main`, and dev's deploy provider takes develop only, so it
+signs in with its own read-only provider and account (`RECITE_DIGEST_WIF_PROVIDER`, `RECITE_DIGEST_SA`). Until both
+variables exist, it skips with a notice.
+
 ## Deploying (revisely-dev only)
 
 The image holds the checker (pinned in `stage.sh`), the app's word list and, from the lab, the model, the lexicon
@@ -208,6 +257,12 @@ gcloud run services update-traffic recite-check --project revisely-dev --region 
 `--cpu 1` (Nov 14 2026): measured on the e2e set against 2 vCPU, the cursor and the marks move by under 0.1 s
 (word start → `at` median 0.67–0.72 s; word end → mark 2.0–4.2 s) and a /check of 118 s takes the same 10–11 s; a live
 take uses 25–42% of the one vCPU. It doubles the free tier's hours of live use (about 50 a month).
+`THREADS=1` (the model's threads; also the image's and `server.py`'s default, Nov 15 2026): the same image at 2
+threads, 15 public takes side by side on Cloud Run, locked within 0.1 s, the cursor and `said` were no sooner, and end →
+done was slower on every take (up to 4.1 against 8.1 s): on one vCPU a second thread only competes. With one thread a
+replay of a kept take also gives what the phone saw; with two, a borderline take can lock in one run and not the next.
+A test revision with other env vars (`--update-env-vars`) changes the service's template too: the next deploy without
+`--set-env-vars` inherits it.
 `--timeout 1200`: a WebSocket is one request to Cloud Run, so the timeout is a live session's longest (15 minutes of
 audio and pauses). With `--concurrency 1` an open socket holds an instance, so two live takes at once at most.
 Leave out `--[no-]allow-unauthenticated`: the service is already open (below), and the flag would change that.
@@ -230,6 +285,34 @@ Its own account (`recite-check@`) may read Firestore (`roles/datastore.viewer`) 
 (`roles/storage.objectCreator` on the bucket), nothing else. Free tier: it scales to zero, at most two instances,
 and a check of a minute's recitation takes a few seconds of CPU. The image is about 120 MB of Artifact Registry's
 free 0.5 GB; each deploy adds one, so delete old images in `cloud-run-source-deploy` after a few.
+
+## Two takes per instance: `recite-check-pair` (Majd approved Nov 15 2026)
+
+A take holds a whole instance for as long as its socket is open, while Recite and Words & Harakat use about 0.3 of its
+vCPU. A second service from the same image takes two of those at once, which halves what their hours cost
+(`recite-checker-cost.md` in the shared notes). Strict (about 0.55 of a vCPU, and 20–26 s to its summary when paired)
+stays on `recite-check`, one take per instance.
+- **The setting:** `LEVELS=recite,harakat`. The service refuses any other level with `level_elsewhere` (409 on /check, an
+  error frame on /live), on every socket and every check, and `/health` lists the levels it takes. Unset (as on
+  `recite-check`), it takes every level.
+- **The app** picks the address by level: Recite and Words & Harakat to the pair service, Strict and anything with
+  letters to `recite-check`. After `level_elsewhere`, or if the pair service can't be reached, it uses `recite-check`.
+- **Deploy** with `--concurrency 2 --max-instances 2`, the other flags as `recite-check`, and
+  `--set-env-vars "^@^PROJECT=revisely-dev@BUCKET=revisely-dev.firebasestorage.app@THREADS=1@OMP_NUM_THREADS=1@LEVELS=recite,harakat"`.
+  The `^@^` prefix makes `@` the separator, because `LEVELS` holds a comma. It takes the same image (`--image`, the one
+  `recite-check` runs), so it needs no build of its own.
+- **Measured on a slow instance** (Nov 15, rev pair-00002, max one instance, so both takes shared one vCPU; the model at
+  0.25 vCPU-s per second of audio, near the slowest seen). Two public takes, the second starting 7 s after the first,
+  at real time:
+
+  | Level | Cursor p90, alone → paired | `said` p90 | Summary after Stop |
+  | --- | --- | --- | --- |
+  | Words & Harakat | 1.03 → 1.08 / 1.04 s | 2.52 → 2.56 / 2.34 s | 0.46 → 0.38 / 0.36 s |
+  | Recite | 1.03 → 1.05 / 1.00 s | 2.51 → 2.52 / 2.32 s | 0.38 → 0.36 / 0.35 s |
+
+  The same take marked the same alone and paired. The worst hop went from 400 to about 580 ms. Before ayah judging
+  moved off the hop, a Words & Harakat pair took 3 s to its summary on a fast instance (Nov 15 morning); now 0.4 s.
+- `live_e2e.py --iam-token-file` (`gcloud auth print-identity-token`) reaches it while it isn't open to the internet.
 
 ## The word table
 
@@ -254,3 +337,8 @@ gcloud run jobs execute recite-words --project revisely-dev --region us-east1 --
 About 15 minutes and 8,000 vCPU-seconds (under 5% of a month's free tier). It writes ten slices to
 `recite-cache/<key>/` in the dev bucket (no client can reach them); the next `stage.sh` merges them, and the next
 deploy carries the table.
+
+So a checker change that moves the words key takes two deploys, both with `--no-traffic`: one for the job's image, then
+one with the table. Move traffic only once the tag's `/health` says `"words": true`. Without the table, finding where
+a take starts (protocol 6) needs every word of the page at once: on rev 00043 (Nov 15 2026) the worst hops were
+27–38 s and the start was found 35 and 61 s after the first word.

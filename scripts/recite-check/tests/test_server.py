@@ -26,6 +26,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 from starlette.websockets import WebSocketDisconnect  # noqa: E402
 
 import auth  # noqa: E402
+import health  # noqa: E402
 import live  # noqa: E402
 import server  # noqa: E402
 import store  # noqa: E402
@@ -108,6 +109,9 @@ class FakeSession:
         if msg['type'] == 'dismiss':
             self.dismissed.add(msg['id'])
             return []
+        if msg['type'] == 'undismiss':
+            self.dismissed.discard(msg['id'])
+            return []
         if msg['type'] == 'hint':
             self.hints.append(msg)
             return []
@@ -138,8 +142,13 @@ class Base(unittest.TestCase):
 
     def setUp(self):
         self.stored = {}
+        self.health = []  # (kind, fields) of every health line (health.py)
         FakeSession.made = []
+        health.STATE['takes'] = 0
         patches = [
+            mock.patch.object(health, 'emit',  # as emit prints it: a None field left out
+                              lambda line, /, **f: self.health.append((line, {k: v for k, v in f.items()
+                                                                              if v is not None}))),
             mock.patch.object(server, 'Engine', FakeEngine),
             mock.patch.object(auth, 'uid_of', uid_of),
             mock.patch.object(auth, 'is_tester', lambda uid: uid.startswith('tester')),
@@ -166,6 +175,11 @@ class CheckTests(Base):
         self.assertEqual((body['ok'], body['protocol']), (True, 6))
         self.assertIn('server', body)
         self.assertIn('engine', body)
+        self.assertIs(body['words'], False)  # FakeEngine has no word table
+
+    def test_health_says_when_the_word_table_is_there(self):
+        server.ENGINE['e'].table = {'offsets': [], 'blob': b''}
+        self.assertIs(self.client.get('/health').json()['words'], True)
 
     def test_sign_in_and_testers_only(self):
         r = self.client.post('/check?s=1&a=1', content=wav())
@@ -212,13 +226,41 @@ class DismissTests(Base):
         self.assertEqual(json.loads(data)['id'], '12:word:skipped')
 
     def test_dismiss_refuses(self):
-        r = self.client.post('/dismiss', json={'take': '20261113-101010-abcdef', 'id': '12:word:skipped'})
-        self.assertEqual(r.status_code, 401)
-        h = {'Authorization': 'Bearer good'}
-        for body in ({'take': '../other/x', 'id': '12:word:skipped'}, {'take': '20261113-101010-abcdef', 'id': 'x'},
-                     {'take': '20261113-101010-abcdef'}):
-            self.assertEqual(self.client.post('/dismiss', json=body, headers=h).status_code, 400)
+        for route in ('/dismiss', '/undismiss'):
+            r = self.client.post(route, json={'take': '20261113-101010-abcdef', 'id': '12:word:skipped'})
+            self.assertEqual(r.status_code, 401)
+            h = {'Authorization': 'Bearer good'}
+            for body in ({'take': '../other/x', 'id': '12:word:skipped'}, {'take': '20261113-101010-abcdef', 'id': 'x'},
+                         {'take': '20261113-101010-abcdef'}, ['20261113-101010-abcdef'],
+                         {'take': '20261113-101010-abcdef', 'id': '12:wrong:x'}):
+                self.assertEqual(self.client.post(route, json=body, headers=h).status_code, 400, (route, body))
         self.assertEqual(self.stored, {})
+
+    def test_every_kind_of_mark_can_be_dismissed(self):
+        """The ids engine.marks makes: before Nov 15 2026 /dismiss refused skipped, added and harakat marks."""
+        h = {'Authorization': 'Bearer good'}
+        for mid in ('12:skipped:', '12:added:', '12:added:trail', '12:added:#2', '12:word:lookalike',
+                    '12:harakat:', '12:harakat:shadda', '12:letter:', '12:letter:#3', '12:tajweed:madd_munfasil'):
+            r = self.client.post('/dismiss', json={'take': '20261113-101010-abcdef', 'id': mid}, headers=h)
+            self.assertEqual(r.status_code, 200, mid)
+        self.assertEqual(len(self.stored), 10)
+
+    def test_undismiss(self):
+        """Undo of a "Not a mistake" after the fact: its own file, with the phone's time of the tap when it sent one,
+        so the lab can take the latest of the two (fetch_takes.dismissed_now)."""
+        h = {'Authorization': 'Bearer good'}
+        r = self.client.post('/undismiss', json={'take': '20261113-101010-abcdef', 'id': '12:skipped:',
+                                                 'when': 1763180000123}, headers=h)
+        self.assertEqual(r.json(), {'ok': True})
+        [(name, data)] = self.stored.items()
+        self.assertTrue(name.startswith('recite-tests/tester1/20261113-101010-abcdef.undismiss-'))
+        kept = json.loads(data)
+        self.assertEqual((kept['id'], kept['when'], kept['undo']), ('12:skipped:', 1763180000123, True))
+        self.assertIsInstance(kept['at'], float)
+        # a `when` that isn't a time in ms is left out, not refused
+        self.client.post('/undismiss', json={'take': '20261113-101010-abcdef', 'id': '12:skipped:', 'when': 'soon'},
+                         headers=h)
+        self.assertEqual(sum('when' in json.loads(d) for d in self.stored.values()), 1)
 
 
 def start(token='good', **kw):
@@ -290,6 +332,25 @@ class LiveTests(Base):
         self.assertEqual(kept['dismissed'], ['101:skipped:'])
         self.assertEqual(kept['mode'], 'live')
         self.assertNotIn(ready['take'], server.SESSIONS)
+
+    def test_an_undone_dismissal_is_left_out_of_the_kept_take(self):
+        """Undo on the card while the take is live: `undismiss` goes to the session at its point in the audio, as
+        `dismiss` does, so the score counts the mark again and the kept take's `dismissed` leaves it out."""
+        with self.socket() as ws:
+            ws.send_text(start(keep=True))
+            ready = ws.receive_json()
+            ws.send_bytes(second_of_audio())
+            self.assertEqual(ws.receive_json()['type'], 'at')
+            self.assertEqual(ws.receive_json()['type'], 'mark')
+            for frame in ({'type': 'dismiss', 'id': '101:skipped:'}, {'type': 'dismiss', 'id': '102:word:sound'},
+                          {'type': 'undismiss', 'id': '101:skipped:'}, {'type': 'end'}):
+                ws.send_text(json.dumps(frame))
+            self.assertEqual(ws.receive_json()['type'], 'done')
+            self.assertEqual(ws.receive_json()['type'], 'kept')
+        self.assertEqual([c['type'] for c in FakeSession.made[0].controls],
+                         ['dismiss', 'dismiss', 'undismiss', 'end'])
+        kept = json.loads(self.stored[f"recite-tests/tester1/{ready['take']}.json"])
+        self.assertEqual(kept['dismissed'], ['102:word:sound'])
 
     def test_a_take_with_no_end_follows_to_the_end_of_the_quran(self):
         """No s2/a2 (as the app sends it): the session runs to 114:6, so the follow carries on into the next surah;
@@ -490,9 +551,11 @@ class LiveTests(Base):
         """uvicorn refuses a send after the phone closed ("Unexpected ASGI message 'websocket.send'"): the socket
         ends as a drop (what came is kept), not as a server failure."""
         real = server.WebSocket.send_text
+        refused = threading.Event()
 
         async def send_text(ws_, data):
             if '"type": "at"' in data:
+                refused.set()
                 raise RuntimeError("Unexpected ASGI message 'websocket.send', after sending 'websocket.close'")
             return await real(ws_, data)
         with mock.patch.object(server.WebSocket, 'send_text', send_text), \
@@ -501,6 +564,9 @@ class LiveTests(Base):
                 ws.send_text(start(keep=True))
                 ws.receive_json()
                 ws.send_bytes(second_of_audio() * 3)
+                # leave only once the server has checked the audio and tried to answer: closing first could end the
+                # handler before the audio was read, with nothing to keep (Cloud Build, Nov 15 2026: 1 in ~40 runs)
+                self.assertTrue(refused.wait(10))
             for _ in range(100):
                 if any('.part-' in n for n in self.stored):
                     break
@@ -772,6 +838,177 @@ class NoUidInLogsTests(unittest.TestCase):
                 self.assertEqual(str(e), 'HTTP 503')
                 self.assertNotIn(self.UID, text)
         self.assertEqual((auth._testers, auth._checks), ({}, {}))  # a failure isn't cached as a no
+
+
+class HealthTests(Base):
+    """One numbers-only line per take, refusal, label, dropped session and instance start (health.py): never a uid,
+    a take's name, a passage or a word."""
+
+    def lines(self, kind):
+        return [f for k, f in self.health if k == kind]
+
+    def assertNothingPersonal(self, fields, *secrets):
+        text = json.dumps(fields)
+        for secret in ('tester1', '"s"', '"a"', 'startBy', '"w"') + secrets:
+            self.assertNotIn(secret, text)
+        for k, v in fields.items():
+            self.assertTrue(isinstance(v, (int, float, bool)) or (isinstance(v, str) and len(v) <= 48), (k, v))
+
+    def test_an_instance_says_where_its_start_went(self):
+        (line,) = self.lines('instance')
+        self.assertEqual(set(line) - {'imports_s', 'engine_s', 'ready_s', 'words', 'bench_ms', 'engine', 'server'},
+                         set())
+        self.assertIs(line['words'], False)
+        self.assertGreater(line['bench_ms'], 0)
+
+    def test_a_live_take(self):
+        with self.client.websocket_connect('/live') as ws:
+            ws.send_text(start(keep=True, letters=True, app='1.0.4 (40) dev 3fa9c1d2'))
+            take = ws.receive_json()['take']
+            for _ in range(20):
+                ws.send_bytes(b'\1\0' * 1600)
+            ws.send_text(json.dumps({'type': 'end'}))
+            while ws.receive_json()['type'] != 'kept':
+                pass
+        (line,) = self.lines('take')
+        self.assertEqual({k: line[k] for k in ('kind', 'level', 'start', 'audio_s', 'sockets', 'cold', 'restarted',
+                                               'why', 'kept', 'app', 'protocol')},
+                         {'kind': 'live', 'level': 'strict+letters', 'start': 'fixed', 'audio_s': 2.0, 'sockets': 1,
+                          'cold': True, 'restarted': False, 'why': 'end', 'kept': True, 'app': '1.0.4 (40) dev 3fa9c1d2',
+                          'protocol': 6})
+        for k in ('open_s', 'ready_s', 'age_s', 'cpu_s', 'lag_p50', 'lag_p90', 'lag_max'):
+            self.assertGreaterEqual(line[k], 0, k)
+        self.assertLessEqual(line['lag_p50'], line['lag_max'])
+        self.assertNothingPersonal(line, take)
+
+    def test_the_second_take_on_an_instance_is_not_cold_and_recite_says_so(self):
+        for follow in (False, True):
+            with self.client.websocket_connect('/live') as ws:
+                ws.send_text(start(follow=follow, tajweed=False))
+                ws.receive_json()
+                ws.send_bytes(second_of_audio())
+                ws.send_text(json.dumps({'type': 'end'}))
+                while ws.receive_json()['type'] != 'done':
+                    pass
+        self.assertEqual([(f['cold'], f['level'], f.get('kept')) for f in self.lines('take')],
+                         [(True, 'harakat', None), (False, 'recite', None)])
+
+    def test_an_app_tag_of_another_shape_is_left_out(self):
+        with self.client.websocket_connect('/live') as ws:
+            ws.send_text(start(app='me@example.com'))
+            ws.receive_json()
+            ws.send_text(json.dumps({'type': 'end'}))
+            ws.receive_json()
+        self.assertNotIn('app', self.lines('take')[0])
+
+    def test_refusals_say_why(self):
+        for token in ('bad', 'plain'):
+            with self.client.websocket_connect('/live') as ws:
+                ws.send_text(start(token))
+                ws.receive_json()
+        with self.client.websocket_connect('/live') as ws:
+            ws.send_text(json.dumps({'type': 'start', 'token': 'good', 's': 1}))
+            ws.receive_json()
+        self.client.post('/check?s=1&a=1', content=wav())
+        self.assertEqual([(f['route'], f['reason']) for f in self.lines('refused')],
+                         [('live', 'sign_in'), ('live', 'testers_only'), ('live', 'bad_request'), ('check', 'sign_in')])
+
+    def test_a_check(self):
+        h = {'Authorization': 'Bearer good', 'X-Revisely-App': '1.0.4 (40) dev embedded'}
+        self.client.post('/check?s=1&a=1&v=2&tajweed=0', content=wav(3.0), headers=h)
+        (line,) = self.lines('take')
+        self.assertEqual({k: line[k] for k in ('kind', 'v', 'level', 'audio_s', 'cold', 'marks', 'app')},
+                         {'kind': 'check', 'v': 2, 'level': 'harakat', 'audio_s': 3.0, 'cold': True, 'marks': 0,
+                          'app': '1.0.4 (40) dev embedded'})
+        self.assertNothingPersonal(line)
+
+    def test_labels_are_counted(self):
+        h = {'Authorization': 'Bearer good'}
+        for route in ('/dismiss', '/undismiss'):
+            self.client.post(route, json={'take': '20261113-101010-abcdef', 'id': '12:skipped:'}, headers=h)
+        self.assertEqual(self.lines('label'), [{'kind': 'dismiss'}, {'kind': 'undismiss'}])
+
+    def test_a_take_whose_phone_never_came_back(self):
+        with self.client.websocket_connect('/live') as ws:
+            ws.send_text(start())
+            take = ws.receive_json()['take']
+            ws.send_bytes(second_of_audio())
+            ws.receive_json()
+        server.SESSIONS[take].left -= server.RESUME_TTL + 1
+        server.forget_old()
+        (line,) = self.lines('dropped')
+        self.assertEqual({k: line[k] for k in ('at', 'level', 'audio_s', 'sockets', 'restarted')},
+                         {'at': 'timeout', 'level': 'strict', 'audio_s': 1.0, 'sockets': 1, 'restarted': False})
+        self.assertNothingPersonal(line, take)
+
+    def test_a_resume_this_instance_never_had_is_a_restart(self):
+        with self.client.websocket_connect('/live') as ws:
+            ws.send_text(start(resume='20261113-101010-abcdef'))
+            ws.receive_json()
+            ws.send_text(json.dumps({'type': 'end'}))
+            ws.receive_json()
+        self.assertTrue(self.lines('take')[0]['restarted'])
+
+
+class LevelTests(Base):
+    """A service that takes only some levels (LEVELS: the second service, two takes per instance) refuses the rest
+    with `level_elsewhere`, on every socket and every check."""
+
+    def setUp(self):
+        super().setUp()
+        p = mock.patch.object(server, 'LEVELS', frozenset({'recite', 'harakat'}))
+        p.start()
+        self.addCleanup(p.stop)
+
+    def first_event(self, **kw):
+        with self.client.websocket_connect('/live') as ws:
+            ws.send_text(start(**kw))
+            return ws.receive_json()
+
+    def test_live(self):
+        self.assertEqual(self.first_event(follow=True)['type'], 'ready')
+        self.assertEqual(self.first_event(tajweed=False)['type'], 'ready')
+        for kw in ({}, {'tajweed': True}, {'tajweed': False, 'letters': True}):
+            self.assertEqual(self.first_event(**kw), {'type': 'error', 'reason': 'level_elsewhere'}, kw)
+        self.assertEqual(len(FakeSession.made), 2)
+        self.assertEqual([f['reason'] for k, f in self.health if k == 'refused'], ['level_elsewhere'] * 3)
+
+    def test_check(self):
+        h = {'Authorization': 'Bearer good'}
+        self.assertEqual(self.client.post('/check?s=1&a=1&v=2&tajweed=0', content=wav(), headers=h).status_code, 200)
+        r = self.client.post('/check?s=1&a=1&v=2', content=wav(), headers=h)
+        self.assertEqual((r.status_code, r.json()), (409, {'error': 'level_elsewhere'}))
+
+    def test_health_says_which(self):
+        self.assertEqual(self.client.get('/health').json()['levels'], ['harakat', 'recite'])
+
+    def test_every_level_without_it(self):
+        with mock.patch.object(server, 'LEVELS', frozenset()):
+            self.assertEqual(self.first_event()['type'], 'ready')
+            self.assertNotIn('levels', self.client.get('/health').json())
+
+
+class HealthParts(unittest.TestCase):
+    def test_the_line(self):
+        out = io.StringIO()
+        with mock.patch('sys.stdout', out):
+            health.emit('take', audio_s=1.5, kept=None)
+        self.assertEqual(json.loads(out.getvalue()),
+                         {'severity': 'INFO', 'message': 'health take', 'health': 'take', 'audio_s': 1.5})
+
+    def test_levels(self):
+        self.assertEqual([health.level(s, f) for s, f in (({}, True), ({'tajweed': '0'}, False), ({}, False),
+                                                           ({'tajweed': '1', 'letters': '1'}, False))],
+                         ['recite', 'harakat', 'strict', 'strict+letters'])
+
+    def test_lag_and_cost(self):
+        self.assertEqual(health.lag([0.5, 0.1, 0.2, 0.3, 0.4]), {'lag_p50': 0.3, 'lag_p90': 0.5, 'lag_max': 0.5})
+        self.assertEqual(health.lag([]), {})
+        self.assertEqual(health.per_second({'model': 2400, 'words': 1000, 'hops': 30}, 10.0),
+                         {'model_per_s': 0.24, 'words_per_s': 0.1})
+        self.assertEqual(health.per_second({'model': 1}, 0), {})
+        self.assertGreater(health.age(), 0)
+
 
 if __name__ == '__main__':
     unittest.main()

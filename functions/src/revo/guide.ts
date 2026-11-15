@@ -307,13 +307,17 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
 
 /** Rules with nothing for a user to ask Revo about, on purpose, and why. */
 export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
+  'RMEM-1': 'Recite’s memory is Revisely Dev only (Mark mistakes), not the store app Revo answers for',
+  'RMEM-2': 'Recite’s memory is Revisely Dev only (Mark mistakes), not the store app Revo answers for',
   'ACT-27': 'Activity refreshes by itself and with a pull; nothing to ask Revo about',
   'NEW-4': 'what waits for the walkthrough; nothing for Revo to explain',
   'ONBOARD-2': 'the server repairs a sign-up stopped half way; nothing to do',
   'SHEET-1': 'one sheet at a time, so the screen under them always takes taps again; nothing for Revo to explain',
   'SYNC-4': 'a new account loads with no relaunch; nothing to do',
   'ACCOUNT-2': 'the sign-in screen keeps what was typed after a failed attempt; Revo is for signed-in users',
+  'AUTH-1': 'a passing Google outage at launch keeps the sign-in; nothing to do',
   'ACCOUNT-3': 'how long Delete account waits for the server; the app says what happened itself',
+  'AUTH-2': 'the sign-in screen says when the phone was signed out; Revo is for signed-in users',
   'RESET-1': 'the owner’s reset script',
   'ACT-9': 'when a day’s items load',
   'ACT-13': 'an add from the day’s + shows there at once, offline too; nothing to ask (the + itself is in Activity’s section)',

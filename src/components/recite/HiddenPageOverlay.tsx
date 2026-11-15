@@ -8,8 +8,10 @@ const GUIDE_AT = 0.74;
 /**
  * A hidden page (the recite mode), over the page image in its own frame: every
  * line covered in the page colour with a faint guide line across it, the verse
- * markers left open, revealed verses open in place, and a blue band (followInk) across
- * the line where the next hidden verse starts. Takes no touches: a tap reaches
+ * markers left open, revealed verses open in place, and, given a band colour, a blue band
+ * (followInk) across the line where the next hidden verse starts. The live recitation's hidden
+ * view gives none: a band waiting on the top line before anything was said read as a highlight
+ * that was always there (Majd's Dev take, Nov 15 2026). Takes no touches: a tap reaches
  * the page underneath, where it brings the controls and shows nothing (Majd,
  * Nov 14 2026).
  */
@@ -26,7 +28,8 @@ export function HiddenPageOverlay({
   revealed: ReadonlySet<string>;
   /** Following the reciter word by word: the words recited show too. */
   follow?: WordFollow | null;
-  colors: { cover: string; guide: string; band: string };
+  /** `band`: the next hidden verse's line; none without it. */
+  colors: { cover: string; guide: string; band?: string };
 }) {
   const { lines } = useMemo(() => hiddenPageLayout(page, revealed, follow), [page, revealed, follow]);
   return (
@@ -58,7 +61,7 @@ export function HiddenPageOverlay({
         )),
       )}
       {lines
-        .filter((l) => l.current)
+        .filter((l) => l.current && colors.band)
         .map((l) => (
           <View
             key={`band-${l.line}`}

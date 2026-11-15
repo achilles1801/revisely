@@ -5,7 +5,7 @@
 # lexicon, Tanzil's text and the bars. The model and data never go into git; they go into the image only.
 set -euo pipefail
 STAGE=${1:?usage: stage.sh DIR}
-HARNESS_COMMIT=c01f4ea0  # scripts/recite-eval on claude/mistake-eval: the checker this service runs
+HARNESS_COMMIT=d6a59899  # scripts/recite-eval on claude/mistake-eval: the checker this service runs
 LAB=${LAB:-$HOME/revisely-mistake-lab}
 HERE=$(cd "$(dirname "$0")" && pwd)
 REPO=$(git -C "$HERE" rev-parse --show-toplevel)
@@ -14,7 +14,7 @@ PY=${PY:-$LAB/.venv/bin/python}
 H=$STAGE/harness/scripts/recite-eval
 mkdir -p "$H" "$STAGE/harness/src/data" "$STAGE/lab/models/hisnlabs-tajweed-v2/onnx" "$STAGE/lab/cache" "$STAGE/lab/data"
 git -C "$REPO" fetch -q origin claude/mistake-eval
-for f in checker.py tajweed.py nasal_rules.py letters.py letters_v2.py bench.py; do
+for f in checker.py tajweed.py nasal_rules.py letters.py letters_v2.py bench.py similar.py; do
   git -C "$REPO" show "$HARNESS_COMMIT:scripts/recite-eval/$f" > "$H/$f"
 done
 cp "$REPO/src/data/quranWords.dat" "$STAGE/harness/src/data/"
@@ -32,7 +32,7 @@ if [ -f "$V5" ]; then
   cp "$V5" "$STAGE/lab/models/tajweed-v5/"
   LAB=$LAB RECITE_HARNESS=$H "$PY" -I "$HERE/make_bars.py" "$STAGE/lab/bars.v5.json" v5 > /dev/null
 fi
-cp "$HERE"/{server.py,engine.py,live.py,auth.py,store.py,make_words.py,requirements.txt,Dockerfile} "$STAGE/"
+cp "$HERE"/{server.py,health.py,engine.py,live.py,auth.py,store.py,make_words.py,fetch_takes.py,digest.py,requirements.txt,Dockerfile} "$STAGE/"  # fetch_takes, digest: for their tests
 rm -rf "$STAGE/tests" && mkdir -p "$STAGE/tests" && cp "$HERE"/tests/*.py "$STAGE/tests/"
 git -C "$REPO" rev-parse "$HARNESS_COMMIT" > "$STAGE/CHECKER_COMMIT"
 # this service's own commit (+ "-dirty" when staged from uncommitted changes), for /health and ready
