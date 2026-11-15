@@ -57,7 +57,7 @@ export function CheckIntroPage({
               source={PREVIEW[isDark ? 'dark' : 'light']}
               style={{ width: frameWidth, height: frameHeight }}
               resizeMode="cover"
-              accessibilityLabel="A page of An-Naml with a wrong word highlighted in red and a haraka slip in amber"
+              accessibilityLabel="A page of An-Naml with its mistakes highlighted"
             />
           </View>
           <Text style={[styles.title, { color: palette.text }]} maxFontSizeMultiplier={1.4} accessibilityRole="header">
