@@ -247,6 +247,10 @@ until its part is set up.
     one (a skipped word) uses when the cursor first reached that word or the one before, ±1.2 s. It works until the take
     is closed, and has no button when the moment isn't known (E2E's recorded take has no audio). The clip is a WAV in the
     caches folder (`lib/reciteLive/clipFile`), on this phone only.
+  - **Recite the mistakes again** (Majd, Nov 15 2026; `lib/reciteLive/drill`): a Check summary with a mark other than
+    tajweed offers one take over the stretch from the ayah before the first mistake (same surah) to the last mistake's
+    ayah (`s2`/`a2`, no `startBy`). It stops by itself once `said` reaches the stretch's last word (reciting on would
+    add "Added after the end" marks), and its summary says "Before: …" (what the take before found there).
   - **Stop leaves a trace** (`lib/reciteLive/stopTrace`, Nov 15 2026, after a freeze on Stop that told us nothing): Stop
     writes a marker on the phone, each step to the summary adds to it (mic off, the final answer, the summary asked
     for), and a heartbeat keeps the longest JavaScript stall. The summary on screen, a failure, ✕ or leaving the reader

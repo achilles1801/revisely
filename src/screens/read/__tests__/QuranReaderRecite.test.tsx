@@ -989,3 +989,99 @@ describe('screen readers during a take', () => {
     expect(AccessibilityInfo.announceForAccessibilityWithOptions).not.toHaveBeenCalled();
   });
 });
+
+describe('Recite the mistakes again (Majd, Nov 15 2026: one take from the first mistake to the last)', () => {
+  const finish = async (marks: object[], start = A23) => {
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await flush();
+    await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 40, start, secs: 30, marks, score: null } } as LiveEvent);
+    await flush();
+  };
+  const wrongAt = (s: number, a: number) => ({ id: `${s}:${a}`, w: words.verseFirstWord(s, a) + 1, ayah: [s, a], kind: 'word', sure: 'clear', heard: 'x', heardExact: false });
+
+  it('a Check take with mistakes offers it; it runs from the ayah before the first to the last, with no search for the start', async () => {
+    await startTake('check');
+    const marks = [wrongAt(27, 24), wrongAt(27, 26)];
+    for (const mark of marks) await event({ type: 'mark', mark } as LiveEvent);
+    await finish(marks);
+    fireEvent.press(screen.getByTestId('take-summary-drill'));
+    await flush();
+    await flush();
+    expect(mockLive.start).toMatchObject({ s: 27, a: 23, s2: 27, a2: 26, follow: false });
+    expect(mockLive.start?.startBy).toBeUndefined();
+    // The stretch is known: the take begins there at once, with no search for the start (the score shows from the
+    // first moment; a search shows none until it finds the reciter).
+    await event({ type: 'ready', take: 't2', protocol: 6 });
+    expect(screen.getByTestId('recite-score')).toHaveTextContent('100%');
+    await event({ type: 'at', w: A23 });
+    expect(screen.getByTestId('recite-words')).toBeTruthy();
+  });
+
+  it('it stops by itself once the checker has decided the stretch’s last word; its summary says what the take before found there', async () => {
+    await startTake('check');
+    const marks = [wrongAt(27, 24)];
+    await event({ type: 'mark', mark: marks[0] } as LiveEvent);
+    await finish(marks);
+    fireEvent.press(screen.getByTestId('take-summary-drill'));
+    await flush();
+    await flush();
+    await event({ type: 'ready', take: 't2', protocol: 6 });
+    mockLive.sent = [];
+    const last = words.verseFirstWord(27, 25) - 1;
+    await event({ type: 'at', w: last - 1 });
+    await event({ type: 'said', upTo: last - 2 } as LiveEvent);
+    expect(mockLive.sent).not.toContainEqual({ type: 'end' });
+    await event({ type: 'said', upTo: last } as LiveEvent);
+    await flush();
+    expect(mockLive.sent).toContainEqual({ type: 'end' });
+    await event({ type: 'done', result: { v: 2, take: 't2', from: A23, to: last + 1, start: words.verseFirstWord(27, 23), secs: 9, marks: [], score: null } } as LiveEvent);
+    await flush();
+    expect(screen.getByTestId('take-summary-before').props.children).toBe('Before: 1 wrong word');
+    expect(screen.queryByTestId('take-summary-drill')).toBeNull();
+  });
+
+  it('its summary shows even when the checker gives it the take id of the one before (E2E’s recorded takes do)', async () => {
+    await startTake('check');
+    const marks = [wrongAt(27, 24)];
+    await event({ type: 'mark', mark: marks[0] } as LiveEvent);
+    await finish(marks);
+    fireEvent.press(screen.getByTestId('take-summary-drill'));
+    await flush();
+    await flush();
+    await event({ type: 'ready', take: 't1', protocol: 6 });
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await flush();
+    await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 20, start: words.verseFirstWord(27, 23), secs: 9, marks: [], score: null } } as LiveEvent);
+    await flush();
+    expect(screen.getByTestId('take-summary-before')).toBeTruthy();
+  });
+
+  it('a stretch on another page turns the page to it', async () => {
+    await startTake('check');
+    const marks = [wrongAt(27, 14)];
+    await event({ type: 'mark', mark: marks[0] } as LiveEvent);
+    await finish(marks);
+    mockPager.scrolled = [];
+    fireEvent.press(screen.getByTestId('take-summary-drill'));
+    await flush();
+    await flush();
+    expect(mockLive.start).toMatchObject({ s: 27, a: 13, s2: 27, a2: 14 });
+    expect(mockPager.scrolled).toContain(words.pageOf(words.verseFirstWord(27, 13)));
+  });
+
+  it('not offered without mistakes, for tajweed notes alone, or when following along', async () => {
+    await startTake('check');
+    const note = { id: 'n', w: A23 + 2, ayah: [27, 23], kind: 'tajweed', rule: 'qalqalah', sure: 'clear' };
+    await event({ type: 'mark', mark: note } as LiveEvent);
+    await finish([note]);
+    expect(screen.getByTestId('take-summary')).toBeTruthy();
+    expect(screen.queryByTestId('take-summary-drill')).toBeNull();
+    fireEvent.press(screen.getByTestId('take-summary-done'));
+    fireEvent.press(screen.getByTestId('recite-close'));
+    await flush();
+    screen.unmount();
+    await startTake('recite');
+    await finish([]);
+    expect(screen.queryByTestId('take-summary-drill')).toBeNull();
+  });
+});

@@ -4,8 +4,8 @@
 # 379 with a wrong word and a haraka slip, the moment of Majd's Tarteel screenshots of Nov 14 2026).
 # Screenshots of each state for the mocks (~/Documents/revisely-recite-mocks/option-A-final-2.png and
 # mistakes-toggle-after.png): the reader with the mic, the mic's menu (Mark mistakes off, then on),
-# following, a mark and the score, the hidden view, done, and the locked switch's Premium page. Last, a
-# Recite take begun in the middle of the page (An-Naml 25), as a take can start anywhere on it.
+# following, a mark and the score, the hidden view, done, reciting the mistakes again, and the locked switch's
+# Premium page. Last, a Recite take begun in the middle of the page (An-Naml 25), as a take can start anywhere on it.
 appId: com.revisionbuddy.app
 ---
 - runFlow:
@@ -261,6 +261,27 @@ appId: com.revisionbuddy.app
     file: ../subflows/shot.yaml
     env:
       NAME: rl10-summary-dark
+
+# Recite the mistakes again (Majd, Nov 15 2026): one take over the stretch from the first mistake to the last, from the
+# ayah before (An-Naml 22–23). It stops by itself once the checker has decided the stretch's last word, and its summary
+# says what the take before found there.
+- tapOn:
+    id: take-summary-drill
+- extendedWaitUntil:
+    visible:
+      id: recite-bar
+    timeout: 10000
+- extendedWaitUntil:
+    visible:
+      id: take-summary-before
+    timeout: 30000
+- assertVisible:
+    id: take-summary-before
+    text: "Before: 1 wrong word, 1 harakat slip"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl10b-drill-summary-dark
 - tapOn:
     id: take-summary-done
 - tapOn:
@@ -357,7 +378,8 @@ appId: com.revisionbuddy.app
 - extendedWaitUntil:
     visible:
       id: take-summary-passage
-      text: "An.Naml,.ayahs.25.26.*"
+      # iOS matches the spoken label ("ayahs 25 to 26, 7 seconds", #592), Android the text ("ayahs 25–26 · 0:07").
+      text: "An.Naml,.ayahs.25.{1,4}26.*"
     timeout: 10000
 - runFlow:
     file: ../subflows/shot.yaml
