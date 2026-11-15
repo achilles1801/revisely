@@ -79,7 +79,9 @@ import { needsPremium, type LiveFailure } from '../../lib/reciteLive/contract';
 import { logger } from '../../lib/logger';
 import { useRememberTake } from '../../components/reciteMemory/useRememberTake';
 import { remember, useMemoryRecords } from '../../lib/reciteMemory/store';
-import { memoryOfWord, openInRange, wordMemories, type WordMemory } from '../../lib/reciteMemory/memory';
+import { clearedBy, memoryOfWord, openInRange, wordMemories, type WordMemory } from '../../lib/reciteMemory/memory';
+import { passageTakes, progressLine } from '../../lib/reciteMemory/progress';
+import { PassageProgressSheet } from '../../components/reciteMemory/PassageProgressSheet';
 import { memoryId, type ClearRecord } from '../../lib/reciteMemory/record';
 import { clipOfTake, useTakeRecordings } from '../../lib/reciteMemory/takeAudio';
 import { RememberedTargets, RememberedUnderlay } from '../../components/reciteMemory/RememberedLayers';
@@ -331,7 +333,7 @@ export default function QuranReaderScreen() {
   const qw = live.words ?? words;
   const [hidden, setHidden] = useState(false);
   const [revealed, setRevealed] = useState<Revealed>(NOTHING_SHOWN);
-  noteTakeRecording.current = useRememberTake({
+  const remembering = useRememberTake({
     uid: user?.id,
     enabled: liveOn,
     live,
@@ -339,7 +341,9 @@ export default function QuranReaderScreen() {
     day: today ?? null,
     level: reciteSettings.level === 'strict' ? 'strict' : 'words',
     records: memoryRecords,
-  }).noteRecording;
+  });
+  noteTakeRecording.current = remembering.noteRecording;
+  const takeRecord = remembering.current;
   const [modeMenu, setModeMenu] = useState(false);
   const [noticeFor, setNoticeFor] = useState<LiveMode | null>(null);
   // Check: the word a card is open on (and where it is on screen), similar phrases, the summary, Check's page.
@@ -471,6 +475,24 @@ export default function QuranReaderScreen() {
     },
     [user?.id, today],
   );
+  // The take's summary: the words it cleared, and its passage's trend (with this take in, before it has synced).
+  const summaryMemory = useMemo(() => {
+    if (!takeRecord || !qw) return null;
+    const all = [...memoryRecords.filter((r) => r.id !== takeRecord.id), takeRecord];
+    const takes = passageTakes(all, takeRecord.from, takeRecord.to);
+    return {
+      cleared: clearedBy(all, takeRecord).map((m) => qw.uthmani(m.w)),
+      trend: takes.map((t) => t.accuracy),
+      line: progressLine(takes, Date.now()),
+    };
+  }, [takeRecord, memoryRecords, qw]);
+  // A passage's progress: from the summary (Done goes back to it) or a word's card.
+  const [progressFor, setProgressFor] = useState<{ from: number; to: number; back: 'summary' | null } | null>(null);
+  const progressTakes = useMemo(() => {
+    if (!progressFor) return [];
+    const all = takeRecord ? [...memoryRecords.filter((r) => r.id !== takeRecord.id), takeRecord] : memoryRecords;
+    return passageTakes(all, progressFor.from, progressFor.to);
+  }, [progressFor, memoryRecords, takeRecord]);
   const onTapPoint = useMemo(
     () =>
       liveOn && qw && checkTake
@@ -879,9 +901,28 @@ export default function QuranReaderScreen() {
                 setSimilarFor(m.w);
               }}
               hasSimilar={pastHasSimilar}
+              onSeeAll={(m) => {
+                const t = m.attempts[m.attempts.length - 1]?.take;
+                setPastAt(null);
+                if (t) setProgressFor({ from: t.from, to: t.to, back: null });
+              }}
               onClose={() => setPastAt(null)}
             />
           ) : null}
+          <PassageProgressSheet
+            visible={progressFor != null}
+            words={qw}
+            from={progressFor?.from ?? 0}
+            to={progressFor?.to ?? 0}
+            takes={progressTakes}
+            memories={memories}
+            now={Date.now()}
+            onClose={() => {
+              const back = progressFor?.back;
+              setProgressFor(null);
+              if (back === 'summary' && live.state.status === 'done' && takeId) setSummaryShown(takeId);
+            }}
+          />
           <UndoToast
             visible={clearedUndo != null}
             message="Cleared from the page"
@@ -964,6 +1005,12 @@ export default function QuranReaderScreen() {
               void live.start('check', range);
             }}
             before={drillBefore}
+            memory={checkTake ? summaryMemory : null}
+            onProgress={() => {
+              if (!takeRecord) return;
+              setSummaryShown(null);
+              setProgressFor({ from: takeRecord.from, to: takeRecord.to, back: 'summary' });
+            }}
             onDone={() => setSummaryShown(null)}
             // The summary is on screen: the take's Stop trace ends (lib/reciteLive/stopTrace).
             onShown={() => stopTrace.end()}

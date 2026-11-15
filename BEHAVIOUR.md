@@ -319,6 +319,15 @@ Recite with Mark mistakes remembers each take (Majd, Nov 15 2026; Tarteel's bigg
   - Hear it and Similar phrases.
 
   Clear now takes the mark off at once, with Undo.
+- **RMEM-4.** A take's summary names the words it cleared from the page (said right on a second day).
+  Once its passage has two takes or more, the summary also shows the passage's trend, with a small line:
+  "Up from 95.1% on Mon 2 Nov · 6 takes". The trend opens the passage's progress, which shows:
+  - the latest accuracy by the page;
+  - a chart of every take of the passage (a take counts when it covers at least half of it);
+  - the words still to fix there;
+  - the takes, newest first.
+
+  A word's card opens the same page (See all). From the summary, Done goes back to the summary.
 
 ## Searching the Qur'an
 

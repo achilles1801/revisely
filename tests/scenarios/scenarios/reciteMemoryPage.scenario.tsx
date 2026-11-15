@@ -47,7 +47,7 @@ async function tap(app: OpenApp, testID: string): Promise<void> {
   await app.idle(50);
 }
 
-it('[RMEM-3] a word missed before stays marked on the page; its card shows its takes and the clear rule; Clear now takes it off, with Undo', async () => {
+it('[RMEM-3] [RMEM-4] a word missed before stays marked on the page; its card shows its takes and the clear rule; Clear now takes it off, with Undo; See all shows the passage’s progress', async () => {
   setZone(ZONES.chicago);
   setNow('2026-11-13 20:12');
   const phone = new Phone('phone');
@@ -86,5 +86,14 @@ it('[RMEM-3] a word missed before stays marked on the page; its card shows its t
   await tap(app, 'undo-toast-action');
   await app.until(() => past(app) != null, 'Undo to put the mark back');
   await app.untilSynced();
+
+  // See all: the passage's progress, both takes, up since Friday.
+  await app.act(() => tapPoint((box.x0 + box.x1) / 2, (box.y0 + box.y1) / 2));
+  await tap(app, 'past-card-see-all');
+  await app.until(() => app.screen.queryByTestId('progress-sheet') != null, 'the passage’s progress');
+  expect(app.screen.getByTestId('progress-line').props.children).toBe('Up from 99.1% on Fri 13 Nov · 2 takes');
+  expect(app.screen.getByTestId('progress-latest').props.children).toBe('100%');
+  expect(app.screen.getAllByTestId('progress-take')).toHaveLength(2);
+  expect(app.screen.getAllByTestId('progress-open-word')).toHaveLength(1);
   await app.close();
 });

@@ -80,6 +80,7 @@ export function WordHistoryCard({
   onHear,
   onSimilar,
   hasSimilar,
+  onSeeAll,
   onClose,
 }: {
   memory: WordMemory | null;
@@ -94,6 +95,8 @@ export function WordHistoryCard({
   onHear: (memory: WordMemory) => void;
   onSimilar: (memory: WordMemory) => void;
   hasSimilar: boolean;
+  /** Every take of the passage: its progress sheet. */
+  onSeeAll?: (memory: WordMemory) => void;
   onClose: () => void;
 }) {
   const { palette, isDark } = useTheme();
@@ -167,9 +170,18 @@ export function WordHistoryCard({
             <Phrase parts={expectedPhrase(words, mark)} fill={fill} />
           </Row>
         )}
-        <Text style={[typeV2.meta, styles.triesLabel, { color: palette.secondary }]} maxFontSizeMultiplier={1.3}>
-          Your takes
-        </Text>
+        <View style={styles.triesHead}>
+          <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={1.3}>
+            Your takes
+          </Text>
+          {onSeeAll ? (
+            <Tap onPress={() => onSeeAll(memory)} hitSlop={8} accessibilityRole="button" accessibilityLabel="See all your takes here" testID="past-card-see-all">
+              <Text style={[typeV2.meta, styles.seeAll, { color: palette.text }]} maxFontSizeMultiplier={1.3}>
+                See all ›
+              </Text>
+            </Tap>
+          ) : null}
+        </View>
         {tries.map((a) => (
           <TryRow key={a.take.id} attempt={a} now={now} fill={fill} onPlay={canPlay(a) ? () => onPlay(a) : undefined} />
         ))}
@@ -210,7 +222,8 @@ const styles = StyleSheet.create({
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   swatch: { width: 12, height: 12, borderRadius: 3 },
   tajweed: { marginTop: 8 },
-  triesLabel: { marginTop: 8, marginBottom: 2 },
+  triesHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, marginBottom: 2 },
+  seeAll: { fontWeight: '600' },
   try: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 38, borderTopWidth: layoutV2.hairline },
   tryWhen: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 6 },
   heard: { borderRadius: 6, paddingHorizontal: 5 },

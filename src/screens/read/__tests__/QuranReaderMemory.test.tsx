@@ -374,3 +374,39 @@ describe("Recite's memory on the page", () => {
     expect(screen.queryByTestId('past-highlight-word')).toBeNull();
   });
 });
+
+describe("Recite's memory in the take's summary", () => {
+  beforeEach(() => {
+    mockMemory.records = [pastTake()];
+    mockMemory.remembered = [];
+  });
+
+  it('a take that said a past mistake right: its summary shows the trend; Your progress here opens the passage’s progress, and Done comes back', async () => {
+    await startTake('check');
+    await event({ type: 'at', w: UTIYAT + 25 });
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await flush();
+    await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: UTIYAT + 25, secs: 12, marks: [], score: { reached: 30, mistakes: 0, tajweed: 0, accuracy: 1 }, start: A23 } });
+    expect(screen.getByTestId('take-summary')).toBeTruthy();
+    // One right take so far: nothing cleared yet (it needs a second day).
+    expect(screen.queryByTestId('take-summary-cleared')).toBeNull();
+    expect(screen.getByTestId('take-summary-progress').props.accessibilityLabel).toMatch(/^Your progress here\. Up from 99\.\d% yesterday · 2 takes$/);
+    fireEvent.press(screen.getByTestId('take-summary-progress'));
+    // One sheet at a time (v2/modalTurn): the progress waits for the summary to go.
+    await waitFor(() => expect(screen.getByTestId('progress-sheet')).toBeTruthy(), { timeout: 3000 });
+    expect(screen.getAllByTestId('progress-take')).toHaveLength(2);
+    fireEvent.press(screen.getByText('Done'));
+    await waitFor(() => expect(screen.getByTestId('take-summary')).toBeTruthy(), { timeout: 3000 });
+    expect(screen.queryByTestId('progress-sheet')).toBeNull();
+  });
+
+  it('a second right day clears the word: the summary says so', async () => {
+    mockMemory.records = [pastTake({ createdAt: NOW - 2 * 86_400_000, day: '2026-11-13' }), pastTake({ id: 'right1', createdAt: NOW - 86_400_000, day: '2026-11-14', marks: [], mistakes: 0, accuracy: 1 })];
+    await startTake('check');
+    await event({ type: 'at', w: UTIYAT + 25 });
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await flush();
+    await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: UTIYAT + 25, secs: 12, marks: [], score: { reached: 30, mistakes: 0, tajweed: 0, accuracy: 1 }, start: A23 } });
+    expect(screen.getByText('1 cleared from the page')).toBeTruthy();
+  });
+});
