@@ -90,9 +90,11 @@ def main():
                      for w in res['words'] if w['visits']}
             statuses = {int(k): v for k, v in res['statuses'].items()}
             t = time.perf_counter()
-            names = similar.find(lp, order, statuses, spans, res.get('extras', []), labels_of, idx, p)
+            work = {'left': dict(similar.P, **p)['budget']}  # one budget for both, as the service runs them
+            names = similar.find(lp, order, statuses, spans, res.get('extras', []), labels_of, idx, p, work=work)
             marked = {n['mark'] for n in names}
-            names += [n for n in similar.endings(lp, order, statuses, spans, forms_of, idx, p) if n['mark'] not in marked]
+            names += [n for n in similar.endings(lp, order, statuses, spans, forms_of, idx, p, work=work)
+                      if n['mark'] not in marked]
             if passno == 0:
                 continue
             times.append((time.perf_counter() - t) * 1000)

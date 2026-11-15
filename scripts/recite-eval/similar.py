@@ -25,8 +25,6 @@ most, on the Mac.
     idx = similar.Index(bench.Words())
     names = similar.find(lp, order, statuses, spans, extras, labels_of, idx)
 """
-import time
-
 import numpy as np
 
 import bench
@@ -50,7 +48,12 @@ P = {
     'end_gain': 0.8,
     'end_adv': 30.0,
     'end_secs': 3.0,   # audio fitted after the word before, at most
+    # work for one take, in frames x (states + FRAME_COST) fitted: the same names on any machine (a clock would trip at
+    # a fifth of the work on Cloud Run's 1 vCPU, 4.7x slower than the Mac). 50 M is about 0.1 s on the Mac, 0.5 s on
+    # Cloud Run; recite-server's heaviest real case, 41 runs of skipped words in 180 s, took 94 ms on the Mac.
+    'budget': 50e6,
 }
+FRAME_COST = 1500  # a frame's own cost in states (the Python step: about 3 µs, where a state costs about 2 ns)
 FPS = 50
 
 
@@ -135,14 +138,21 @@ def fit_many(seg, chains):
     return out
 
 
-def find(lp, order, statuses, spans, extras, labels_of, idx, p=None, deadline=None):
+def cost(frames, chains):
+    """fit_many's work, in the units of P['budget']."""
+    return frames * (sum(2 * len(lab) + 1 for lab, _ in chains) + FRAME_COST)
+
+
+def find(lp, order, statuses, spans, extras, labels_of, idx, p=None, work=None):
     """Names for the runs of words not heard right. order: the passage's app words in order; statuses: word ->
     'correct', 'missed', 'wrong'… ; spans: word -> (first frame, last frame) said; extras: [{'after': w}] (speech
     between w and the next word); labels_of(lo, hi) -> (labels, word ends) for app words [lo, hi).
     Returns [{'mark': first word of the run, 'upto': the word heard right again (None: the end), 'fork': app word
     where the place's words began instead, 'w': the place's first word said, 'also': other places with the same words
-    as far as heard, 'words', 'fit', 'adv'}]. deadline (time.perf_counter()): no run is started after it."""
+    as far as heard, 'words', 'fit', 'adv'}]. work: {'left': units} shared with endings() (P['budget'] when not
+    given); no run is started once it is spent."""
     p = dict(P, **(p or {}))
+    work = work if work is not None else {'left': p['budget']}
     nm = idx.norm
     W = len(nm)
     after_extra = {e['after'] for e in extras}
@@ -155,7 +165,7 @@ def find(lp, order, statuses, spans, extras, labels_of, idx, p=None, deadline=No
         if st[i] == 'correct' or st[i - 1] != 'correct':
             i += 1
             continue
-        if deadline is not None and time.perf_counter() > deadline:
+        if work['left'] <= 0:
             break
         r = i
         while r < len(order):
@@ -197,6 +207,7 @@ def find(lp, order, statuses, spans, extras, labels_of, idx, p=None, deadline=No
                 if t_end - t0 < p['min_secs'] * FPS:
                     continue
                 fits = fit_many(lp[t0:t_end], chains)
+                work['left'] -= cost(t_end - t0, chains)
                 exp_fit = fits[0][0]
                 k_best = min(range(len(cands)), key=lambda c: fits[c + 1][0])
                 f, words = fits[k_best + 1]
@@ -218,14 +229,15 @@ def find(lp, order, statuses, spans, extras, labels_of, idx, p=None, deadline=No
     return out
 
 
-def endings(lp, order, statuses, spans, forms_of, idx, p=None, deadline=None):
+def endings(lp, order, statuses, spans, forms_of, idx, p=None, work=None):
     """An ayah's last word said as the last word of another ayah near it in the same surah (Majd: memorizers most often
     forget which word ends an ayah). For each last word heard wrong or not at all right after a word heard right, the
     audio after that word is fitted against the word's own sounds and each nearby ending's, every form of each (a
     stop drops the final vowel). forms_of(w) -> the word's forms ({'labels'}). Returns names as find()'s, with
     'kind': 'ending'. A look-alike the checker heard that is a nearby ending (2:4's يوقنون heard يؤمنون, 2:6's) isn't
-    taken as one: it named endings on 3 bench and learners' takes with no slip."""
+    taken as one: it named endings on 3 bench and learners' takes with no slip. work: as find()'s."""
     p = dict(P, **(p or {}))
+    work = work if work is not None else {'left': p['budget']}
     nm = idx.norm
     st = ['correct' if statuses.get(w) == 'corrected' else statuses.get(w) for w in order]
     T = lp.shape[0]
@@ -233,7 +245,7 @@ def endings(lp, order, statuses, spans, forms_of, idx, p=None, deadline=None):
     for i, w in enumerate(order):
         if i == 0 or st[i] in ('correct', 'pending', None) or w not in idx.is_last:
             continue
-        if deadline is not None and time.perf_counter() > deadline:
+        if work['left'] <= 0:
             break
         b = order[i - 1]
         if st[i - 1] != 'correct' or b not in spans:
@@ -263,6 +275,7 @@ def endings(lp, order, statuses, spans, forms_of, idx, p=None, deadline=None):
                     chains.append((f['labels'], [len(f['labels'])]))
                     owner.append(k)
         fits = fit_many(lp[t0:t1], chains)
+        work['left'] -= cost(t1 - t0, chains)
         best = {}
         for (f, wd), k in zip(fits, owner):
             if k not in best or f < best[k][0]:
