@@ -1,0 +1,59 @@
+name: Recitation checker digest
+
+# Mondays at 15:30 UTC: the dev recitation checker's last week from its numbers-only health lines (takes and hours,
+# cold starts, how far it fell behind the reciter, resumes, refusals, errors, the cost against the free tier), as a
+# comment on the "Recitation checker health (weekly digest)" issue (label recite-health). scripts/recite-check/digest.py;
+# README there, "Health". Read-only on revisely-dev's logs, through Workload Identity: dev's deploy provider takes
+# develop only, and a schedule runs from main, so this reads with its own provider and a logging.viewer account
+# (RECITE_DIGEST_WIF_PROVIDER, RECITE_DIGEST_SA). Until both variables exist the run skips with a notice.
+on:
+  schedule:
+    - cron: '30 15 * * 1'
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'Days to cover'
+        default: '7'
+
+permissions:
+  contents: read
+  issues: write
+  id-token: write
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check the variables
+        id: vars
+        env:
+          PROVIDER: ${{ vars.RECITE_DIGEST_WIF_PROVIDER }}
+          SA: ${{ vars.RECITE_DIGEST_SA }}
+        run: |
+          if [ -z "$PROVIDER" ] || [ -z "$SA" ]; then
+            echo "::notice title=Recitation checker digest skipped::Set RECITE_DIGEST_WIF_PROVIDER and RECITE_DIGEST_SA (scripts/recite-check/README.md, Health)."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.vars.outputs.ready == 'true'
+
+      - uses: google-github-actions/auth@v2
+        if: steps.vars.outputs.ready == 'true'
+        with:
+          workload_identity_provider: ${{ vars.RECITE_DIGEST_WIF_PROVIDER }}
+          service_account: ${{ vars.RECITE_DIGEST_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+        if: steps.vars.outputs.ready == 'true'
+
+      # Python's standard library only; gcloud reads the logs and gh posts the comment.
+      - name: Post the digest
+        if: steps.vars.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DAYS: ${{ inputs.days || '7' }}
+        run: python3 scripts/recite-check/digest.py --days "$DAYS" --post

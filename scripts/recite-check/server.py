@@ -8,6 +8,7 @@ WS   /live     the live check: a start frame (the token in it or in the Authoriz
                back (README.md, "Live"; the notes folder's recite-contract.md)
 GET  /health
 """
+import health  # noqa: I001  first: an instance's age counts from about here (health.py: the numbers-only log lines)
 import asyncio
 import contextlib
 import inspect
@@ -62,18 +63,27 @@ log = logging.getLogger('recite-check')
 logging.basicConfig(level=logging.INFO)
 ENGINE = {}
 limiter = auth.Limiter()
+IMPORTED = health.age()  # seconds from the process's start to here: Python, numpy, onnxruntime, the checker's modules
 
 
 @contextlib.asynccontextmanager
 async def lifespan(_app):
     # Loaded before the port opens: Cloud Run gives a starting instance its CPU until then.
     # One thread, as the image sets (README, Deploying): on one vCPU a second is no faster, and replays repeat exactly.
+    t0 = time.perf_counter()
     ENGINE['e'] = Engine(threads=int(os.environ.get('THREADS', '1')))
+    engine_s = time.perf_counter() - t0
     # The helper works out a live session's next words; with the word table in the image there is nothing for it to
     # do, and starting it (a second Python importing the checker) costs seconds of a cold start on Cloud Run.
     if ENGINE['e'].table is None and os.environ.get('LIVE_HELPER', '1') == '1':
         live.start_helper()
+    # Where a cold start's seconds go (Cloud Run's own "Starting new instance" line is 6–9 s before the port opens)
+    health.emit('instance', imports_s=round(IMPORTED, 2), engine_s=round(engine_s, 2), ready_s=round(health.age(), 2),
+                words=ENGINE['e'].table is not None, bench_ms=health.bench_ms(), engine=VERSION, server=SERVER)
     yield
+    for s in list(SESSIONS.values()):  # the instance is going (Cloud Run stops idle ones): what never came back
+        if not s.sess.stopped:
+            health.emit('dropped', **dropped_fields(s), at='shutdown')
 
 
 app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
@@ -136,7 +146,7 @@ def put_json(name, obj):
 
 
 @app.get('/health')
-def health():
+def health_route():
     """engine: the checker's commit; server: this service's (the repo's commit it was staged from); protocol: the
     contract draft it speaks, so the app can tell which features it may use; words: whether the word table for this
     checker is in the image. Without it a cold instance works out every word it needs (~100 ms each), and finding
@@ -148,6 +158,7 @@ def health():
 
 @app.post('/check')
 async def check(request: Request):
+    t0, cpu0, age0 = time.monotonic(), health.cpu(), health.age()
     try:
         uid = await signed_in_tester(request.headers.get('authorization'))
         await may_check(uid)
@@ -184,13 +195,23 @@ async def check(request: Request):
             flags = sum(1 for w in res['words'] if w['status'] in ('wrong', 'missed')) + len(res['extras'])
             log.info('check: %.1f s audio, %d words said, %d word flags, %d tajweed, ms %s, kept %s',
                      res['secs'], len(res['words']), flags, len(res['tajweed']), res['ms'], res.get('kept'))
+        cold = health.STATE['takes'] == 0
+        health.STATE['takes'] += 1
+        health.emit('take', kind='check', v=2 if v2 else 1, level=health.level(dict(q), False),
+                    app=health.app_tag(request.headers.get('x-revisely-app')), audio_s=res['secs'],
+                    wall_s=round(time.monotonic() - t0, 2), cpu_s=round(health.cpu() - cpu0, 2), cold=cold,
+                    age_s=round(age0, 1), marks=len(res['marks']) if v2 else None, kept=res.get('kept'),
+                    **health.per_second(res.get('ms'), res['secs']))
         return JSONResponse(res)
     except auth.Refused as e:
+        health.emit('refused', route='check', reason=e.reason)
         return JSONResponse({'error': e.reason}, status_code=e.status)
     except BadRequest as e:
+        health.emit('refused', route='check', reason='bad_request')
         return JSONResponse({'error': 'bad_request', 'detail': str(e)}, status_code=400)
     except Exception:
         log.exception('check failed')
+        health.emit('error', route='check')
         return JSONResponse({'error': 'server'}, status_code=500)
 
 
@@ -230,13 +251,17 @@ async def label(request, kind):
         if kind == 'undismiss':
             kept['undo'] = True
         await asyncio.to_thread(put_json, f'{store.name_for(uid, take)}.{kind}-{store.new_take()}.json', kept)
+        health.emit('label', kind=kind)
         return JSONResponse({'ok': True})
     except auth.Refused as e:
+        health.emit('refused', route=kind, reason=e.reason)
         return JSONResponse({'error': e.reason}, status_code=e.status)
     except BadRequest as e:
+        health.emit('refused', route=kind, reason='bad_request')
         return JSONResponse({'error': 'bad_request', 'detail': str(e)}, status_code=400)
     except Exception:
         log.exception('%s failed', kind)
+        health.emit('error', route=kind)
         return JSONResponse({'error': 'server'}, status_code=500)
 
 
@@ -253,6 +278,14 @@ class Live:
         self.left = None      # when its last socket went
         self.sockets = 0
         self.lock = threading.Lock()  # one socket's work at a time
+        # for its health line (health.py): numbers only
+        self.opened = time.monotonic()  # its first socket's connect
+        self.cpu0 = health.cpu()
+        self.age = health.age()         # the instance's age then
+        self.cold = False               # the instance's first take
+        self.ready_s = None             # connect → `ready`, its first socket
+        self.restarted = False          # a resume this instance didn't have: run again from the first sample
+        self.lag = []                   # seconds from audio arriving to its events going out, per piece of work
 
     def run(self, fn, *args):
         with self.lock:
@@ -263,11 +296,20 @@ SESSIONS = {}
 FINISHED = {}  # take -> (uid, samples held, its `done`, when): a resume after the end gets the same `done` again
 
 
+def dropped_fields(s):
+    """A session that never reached its end, for its health line."""
+    return {'level': health.level(s.request.get('settings') or {}, s.request.get('follow')),
+            'audio_s': round(s.sess.seconds, 1), 'open_s': round(time.monotonic() - s.opened, 1),
+            'sockets': s.sockets, 'restarted': s.restarted}
+
+
 def forget_old():
     now = time.time()
     for sid, s in list(SESSIONS.items()):
         if s.owner is None and s.left is not None and now - s.left > RESUME_TTL:
             del SESSIONS[sid]
+            if not s.sess.stopped:  # its phone went and never came back here (it may have finished elsewhere)
+                health.emit('dropped', **dropped_fields(s), at='timeout')
     for sid, f in list(FINISHED.items()):
         if now - f[3] > RESUME_TTL:
             del FINISHED[sid]
@@ -338,6 +380,22 @@ def start_note(s):
     return f'locked at {locks[0]} s ({len(locks)} locks)' if locks else f'no lock in {s.sess.seconds:.1f} s'
 
 
+def take_fields(s, r, kept=None):
+    """A finished live take's health line (health.py): numbers, levels and reasons only. `open_s` is from its first
+    socket's connect to now; `cpu_s` the process's CPU meanwhile (one take per instance: the take's own)."""
+    secs = s.sess.seconds
+    locks = [e.get('t') for e in s.events if e.get('type') == 'locked']
+    cpu_s = health.cpu() - s.cpu0
+    return {'kind': 'live', 'level': health.level(s.request.get('settings') or {}, s.request.get('follow')),
+            'protocol': protocol(), 'start': 'anywhere' if 'startBy' in s.request else 'fixed',
+            'locked_s': locks[0] if locks else None, 'locks': len(locks) if 'startBy' in s.request else None,
+            'app': health.app_tag(s.app), 'audio_s': round(secs, 1), 'open_s': round(time.monotonic() - s.opened, 1),
+            'ready_s': s.ready_s, 'cold': s.cold, 'age_s': round(s.age, 1), 'sockets': s.sockets,
+            'restarted': s.restarted, 'why': r.get('why'), 'marks': len(r.get('marks') or []), 'kept': kept,
+            'cpu_s': round(cpu_s, 2), 'cpu_per_s': round(cpu_s / secs, 3) if secs else None,
+            **health.lag(s.lag), **health.per_second(r.get('ms'), secs)}
+
+
 def ayah_pair(v):
     """[sura, ayah] (two whole numbers) as a tuple, or None."""
     if isinstance(v, (list, tuple)) and len(v) == 2 and all(isinstance(x, int) and not isinstance(x, bool) for x in v):
@@ -403,19 +461,19 @@ async def open_session(msg, uid):
 
 
 async def read_into(ws, inbox):
-    """Every frame from the phone into the inbox as it comes: ('audio', bytes), ('control', msg), then ('gone', None),
-    or ('idle', None) after IDLE seconds without a frame."""
+    """Every frame from the phone into the inbox as it comes, with when it came: ('audio', bytes, t),
+    ('control', msg, t), then ('gone', None, t), or ('idle', None, t) after IDLE seconds without a frame."""
     try:
         while True:
             try:
                 m = await asyncio.wait_for(ws.receive(), IDLE)
             except asyncio.TimeoutError:
-                await inbox.put(('idle', None))
+                await inbox.put(('idle', None, time.monotonic()))
                 return
             if m['type'] == 'websocket.disconnect':
                 break
             if m.get('bytes') is not None:
-                await inbox.put(('audio', m['bytes']))
+                await inbox.put(('audio', m['bytes'], time.monotonic()))
             elif m.get('text') is not None:
                 try:
                     c = json.loads(m['text'])
@@ -423,15 +481,16 @@ async def read_into(ws, inbox):
                     continue
                 c = control_of(c)
                 if c is not None:
-                    await inbox.put(('control', c))  # anything else is ignored
+                    await inbox.put(('control', c, time.monotonic()))  # anything else is ignored
     except Exception:
         pass
-    await inbox.put(('gone', None))
+    await inbox.put(('gone', None, time.monotonic()))
 
 
 @app.websocket('/live')
 async def live_socket(ws: WebSocket):
     await ws.accept()
+    accepted, cpu0, age0 = time.monotonic(), health.cpu(), health.age()
     me = object()
     s = None
 
@@ -478,6 +537,7 @@ async def live_socket(ws: WebSocket):
             log.info('live: kept in %d ms (%s)', (time.perf_counter() - t0) * 1000, 'ok' if ok else 'failed')
             with contextlib.suppress(Exception):
                 await send([{'type': 'kept', 'take': s.sid, 'ok': ok, 't': round(s.sess.seconds, 2)}], record=False)
+        health.emit('take', **take_fields(s, r, kept=ok if s.keep else None))
         with contextlib.suppress(Exception):
             await ws.close(1000)
 
@@ -504,6 +564,11 @@ async def live_socket(ws: WebSocket):
                 await ws.close(1000)
             return
         s, resumed = await open_session(msg, uid)
+        if not resumed:  # a new session on this instance (a take, or a resume started again here)
+            s.opened, s.cpu0, s.age = accepted, cpu0, age0
+            s.cold = health.STATE['takes'] == 0
+            s.restarted = isinstance(msg.get('resume'), str)
+            health.STATE['takes'] += 1
 
         def take_over():
             # under the session's lock: a socket that dropped may still be checking its last piece of audio, and
@@ -515,6 +580,8 @@ async def live_socket(ws: WebSocket):
         s.sockets += 1
         await send([{'type': 'ready', 'v': 2, 'engine': VERSION, 'server': SERVER, 'protocol': protocol(),
                      'take': s.sid, 'from': held}], record=False)
+        if s.ready_s is None:
+            s.ready_s = round(time.monotonic() - accepted, 3)
         await send(snap, record=False)  # what the dropped socket may have swallowed
         # A reader drains the socket at once into a queue and the work runs from the queue, in order: a phone
         # resending a take (a resume) sends faster than it is checked, and a socket left unread stops answering
@@ -524,7 +591,7 @@ async def live_socket(ws: WebSocket):
         held = None  # a frame taken while gathering audio, to handle next
         try:
             while True:
-                kind, item = held or await inbox.get()
+                kind, item, came = held or await inbox.get()
                 held = None
                 if kind == 'idle':
                     await fail('idle', 1000)
@@ -540,6 +607,8 @@ async def live_socket(ws: WebSocket):
                             break
                         chunks.append(nxt[1])
                     events = await asyncio.to_thread(s.run, s.sess.feed, b''.join(chunks))
+                    if len(s.lag) < 20000:  # 15 minutes of 100 ms pieces is 9,000
+                        s.lag.append(time.monotonic() - came)
                 else:
                     events = await asyncio.to_thread(s.run, s.sess.control, item)
                 if s.sess.stopped:
@@ -549,14 +618,17 @@ async def live_socket(ws: WebSocket):
         finally:
             reader.cancel()
     except auth.Refused as e:
+        health.emit('refused', route='live', reason=e.reason)
         await fail(e.reason)
     except BadRequest as e:
         log.info('live: bad request (%s)', e)
+        health.emit('refused', route='live', reason='bad_request')
         await fail('bad_request')
     except WebSocketDisconnect:
         pass
     except Exception:
         log.exception('live failed')
+        health.emit('error', route='live')
         await fail('server', 1011)
     finally:
         if s is not None and s.owner is me:

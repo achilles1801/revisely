@@ -202,6 +202,41 @@ Firestore's and Storage's URLs hold the uid and requests names the URL in its er
 `auth.Unreachable` (a status, or the kind of error) and `store.Exists` (nothing): until Nov 14 2026 a failed upload
 logged the object's name.
 
+## Health (Majd approved Nov 15 2026)
+
+`health.py` prints one JSON line for each of these, which Cloud Run's logging keeps as `jsonPayload` (`health` names
+the kind). Cloud Run adds the revision and the instance itself. A line holds no uid, take name, passage, word or audio:
+only counts, seconds, levels and reasons (the server tests check it).
+- **`take`:** a finished live take or a /check. It holds:
+  - `kind`, `level` (`recite`, `harakat`, `strict`, `+letters`), `protocol`, `start` and `locked_s`;
+  - `app` (the app's own version tag, only in that shape);
+  - `audio_s`, `open_s` (first connect to the end), and `ready_s` (connect → `ready`);
+  - `cold` (the instance's first take) and `age_s`;
+  - `lag_p50`, `lag_p90`, `lag_max` (seconds from audio arriving to its events going out);
+  - `cpu_s` and `cpu_per_s` (the process's CPU, the take's own at one take per instance);
+  - `<part>_per_s` from the checker's `ms`. `model_per_s` is also the instance's speed, 0.12–0.27 on Cloud Run's CPUs;
+  - `sockets`, `restarted` (a resume this instance didn't have, run again from the first sample), `why`, `marks`, `kept`.
+- **`instance`:** where a cold start's seconds go. `imports_s` (process start → the server imported), `engine_s` (the
+  checker, the model and the word table), `ready_s` (process start → the port opens), `words`, and `bench_ms` (a
+  fixed bit of Python, timed: the CPU apart from any take).
+- **`refused`** (`route`, `reason`: `sign_in`, `testers_only`, `premium_required`, `limit`, `bad_request`), **`error`**
+  (`route`), **`label`** (a dismiss or an undismiss), and **`dropped`**: a session whose phone went and didn't come
+  back here (`at`: `timeout` after RESUME_TTL, or `shutdown`).
+
+**The digest** (`digest.py`): the last 7 days of those lines, as Markdown. It covers:
+- takes and hours by level;
+- cold starts and their wait;
+- the lag, and the instance speed;
+- resumes, drops, refusals, errors and labels;
+- the instance time held, against the free tier (Cloud Run bills an instance while it holds a request and while it
+  starts).
+
+`python digest.py` prints it (gcloud signed in, logging.viewer on revisely-dev); `--post` adds it as a comment on the
+issue "Recitation checker health (weekly digest)" (label `recite-health`, made if missing). The workflow
+`recite-digest.yml` runs it on Mondays. Schedules run from `main`, and dev's deploy provider takes develop only, so it
+signs in with its own read-only provider and account (`RECITE_DIGEST_WIF_PROVIDER`, `RECITE_DIGEST_SA`). Until both
+variables exist, it skips with a notice.
+
 ## Deploying (revisely-dev only)
 
 The image holds the checker (pinned in `stage.sh`), the app's word list and, from the lab, the model, the lexicon
