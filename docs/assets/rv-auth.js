@@ -4,8 +4,37 @@
 // third-party storage is blocked) and email with a password; Apple comes later. The project's web config is
 // /__/firebase/init.json, which the worker serves from the project's Hosting site, so no key is kept here.
 // The page the app opens (/apply/#c=…) never signs in: it calls with the app's one-time code instead.
+//
+// Firebase (about 260 KB of JavaScript) loads only when it's needed: on the account page, when someone opens the
+// sign-in sheet, or when this browser has signed in before (FLAG, kept by every page that loads Firebase, and by the
+// dev gate's page). Everyone else gets the plain Sign in button for nothing (onUserIfAny).
 const SDK = 'https://www.gstatic.com/firebasejs/12.7.0';
 const RV = window.RV;
+
+/** localStorage: "1" while this browser is signed in. Only a hint: Firebase stays the authority once loaded. */
+export const FLAG = 'rv.signedIn';
+
+function setFlag(on) {
+  try {
+    if (on) localStorage.setItem(FLAG, '1');
+    else localStorage.removeItem(FLAG);
+  } catch {
+    /* storage blocked: every page loads Firebase, as before */
+  }
+}
+
+/** Whether this browser may be signed in: the flag, or storage we can't read (then assume it may). */
+export function maybeSignedIn() {
+  try {
+    return localStorage.getItem(FLAG) === '1';
+  } catch {
+    return true;
+  }
+}
+
+let loaded;
+/** Resolves once Firebase Auth has loaded on this page, for whatever reason. */
+const authLoaded = new Promise((resolve) => (loaded = resolve));
 
 let configPromise = null;
 /** The project's web config. */
@@ -26,7 +55,14 @@ export function auth() {
   if (!authPromise) {
     authPromise = Promise.all([config(), import(`${SDK}/firebase-app.js`), import(`${SDK}/firebase-auth.js`)]).then(([cfg, app, a]) => {
       const instance = a.getAuth(app.initializeApp(cfg));
-      return { a, instance };
+      a.onAuthStateChanged(instance, (user) => {
+        setFlag(!!user);
+        // Signed in already (a browser from before the flag): a sheet opened to sign in has nothing left to do.
+        if (user && settle) close(user);
+      });
+      const out = { a, instance };
+      loaded(out);
+      return out;
     });
     authPromise.catch(() => (authPromise = null));
   }
@@ -37,6 +73,16 @@ export function auth() {
 export async function onUser(fn) {
   const { a, instance } = await auth();
   return a.onAuthStateChanged(instance, fn);
+}
+
+/**
+ * Like onUser, without loading Firebase for a browser that has never signed in: fn(null) at once, then fn(user) for
+ * real from the moment Firebase loads here (the sign-in sheet loads it). A browser with the flag loads it now.
+ */
+export function onUserIfAny(fn) {
+  if (maybeSignedIn()) return onUser(fn);
+  fn(null);
+  return authLoaded.then(() => onUser(fn));
 }
 
 export async function signOut() {
@@ -292,7 +338,7 @@ export function wireHeader() {
   }
   if (!btn && !menu) return;
   RV.onLang(draw);
-  onUser((user) => {
+  onUserIfAny((user) => {
     signedIn = user;
     draw();
   }).catch(() => {});

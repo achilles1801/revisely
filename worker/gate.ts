@@ -194,6 +194,7 @@ try {
   const auth = a.getAuth(initializeApp(cfg));
   async function enter(user) {
     show('wait'); say('');
+    try { localStorage.setItem('rv.signedIn', '1'); } catch {} // the site's header then loads sign-in (rv-auth.js)
     const res = await fetch('/__gate/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: await user.getIdToken(true) }) });
     if (res.status === 204) return location.reload();
     if (res.status === 403) { $('who').textContent = (user.email || 'This account') + ' doesn’t have access to the dev site yet.'; return show('denied'); }
@@ -213,6 +214,7 @@ try {
   };
   $('out').onclick = async () => {
     await fetch('/__gate/signout', { method: 'POST' });
+    try { localStorage.removeItem('rv.signedIn'); } catch {}
     await a.signOut(auth);
   };
 } catch {
