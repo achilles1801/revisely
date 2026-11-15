@@ -100,6 +100,12 @@ export function ScorePill({ text, level }: { text: string; level: ScoreLevel }) 
  * score (Check), then the time with the last words heard to its right, then Stop. After Stop: a spinner until the
  * checker's final answer; then ✕ closes.
  */
+/** A word in the bar as a screen reader reads it: "وَأُوهِيَتْ, wrong word". */
+export function spokenBarWord(w: { text: string; tone: string }): string {
+  const mark = w.tone === 'wrong' ? 'wrong word' : w.tone === 'slip' ? 'slip' : w.tone === 'tajweed' ? 'tajweed note' : '';
+  return mark ? `${w.text}, ${mark},` : w.text;
+}
+
 export function ReciteBar({
   hidden,
   onToggleHidden,
@@ -141,7 +147,9 @@ export function ReciteBar({
   surface: { background: string; border: string };
 }) {
   const { palette } = useTheme();
-  const spoken = words.map((w) => w.text).join(' ');
+  // Each word as VoiceOver and TalkBack read it, its mark said in words: in the bar a mistake is a colour behind the
+  // word, and colour must never be the only signal.
+  const spoken = words.map(spokenBarWord).join(' ');
   const shownWords = paused ? [] : words;
   const shownStatus = paused ? 'Paused' : status;
   return (
