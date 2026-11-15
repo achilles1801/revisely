@@ -1870,7 +1870,10 @@ classic default), and a fresh install starts in light.
   fallback that replaces a modal whose dismissal never reports. A sheet inside another modal's content is
   presented by it and goes at once (`ModalNest`). `RevoSheetFrame` and `v2/ContextMenu` take turns the same
   way. A raw `<Modal>` that coexists with sheets calls `useModalHold(visible)` (and wraps its content in
-  `ModalNest` if sheets open inside it). The scenario harness's Modal refuses as iOS does, and a tap on the
+  `ModalNest` if sheets open inside it). `useModalHold` doesn't wait: a raw modal that can open as a sheet closes
+  (from a sheet's button) takes a turn instead (`useModalTurn`, `visible={turn}`, released on `onDismiss` or after
+  `DISMISS_FALLBACK_MS`), as `reciteLive/CheckIntroPage` does: opened from the take summary's "See your mistakes"
+  while the summary was still closing, it froze the reader (Majd's Dev take, Nov 15 2026). The scenario harness's Modal refuses as iOS does, and a tap on the
   screen under it then fails (`harness/modal.tsx`); a test that reports `onDismiss` itself lets the sheet's
   closing animation end first, as iOS would.
 - Check sheets and menus at the largest Dynamic Type size (`xcrun simctl ui <udid> content_size

@@ -385,9 +385,24 @@ appId: com.revisionbuddy.app
     file: ../subflows/shot.yaml
     env:
       NAME: rl14-summary-mid-page-dark
+# Without Premium the summary offers "See your mistakes": the Premium page opens once the summary has gone. Opened while
+# it was still closing, iOS refused it and its invisible host took every touch: the reader froze (Majd's Dev take,
+# Nov 15 2026; SHEET-1). The reader must still take taps after it.
 - tapOn:
-    id: take-summary-done
+    id: take-summary-check
+- extendedWaitUntil:
+    visible:
+      id: check-intro
+    timeout: 5000
+- tapOn:
+    id: check-intro-close
+- extendedWaitUntil:
+    notVisible:
+      id: check-intro
+    timeout: 5000
 - tapOn:
     id: recite-close
-- assertVisible:
-    id: recite-mic
+- extendedWaitUntil:
+    visible:
+      id: recite-mic
+    timeout: 5000
