@@ -11,23 +11,29 @@
 #
 # On iOS the keyboard's keys are in the screen's hierarchy only while it is up: its layout
 # ("UIKeyboardLayoutStar Preview"), Return and delete.
+#
+# Each pass asks "is it up?" once and then waits for it to go, which ends as soon as it has. It
+# never asks "is it up?" again once it has gone: Maestro's `visible` check waits for an element
+# that isn't there, polling the screen, for up to 7 s after the last tap or key. A `repeat while
+# visible` loop did that after every Return (about 7 s each, six times a sign-up), and in run
+# 43721829261 (01 on iOS) Maestro's iOS driver crashed during that poll, 3 s after the keyboard
+# had gone ("Failed to resolve remote element", reading the status bar).
 appId: com.revisionbuddy.app
 ---
 - runFlow:
     when:
       platform: iOS
     commands:
-      - repeat:
-          while:
-            visible:
-              id: "UIKeyboardLayoutStar.*|Return|delete"
-          times: 3
+      - retry:
+          maxRetries: 2
           commands:
-            - pressKey: Enter
+            - runFlow:
+                when:
+                  visible:
+                    id: "UIKeyboardLayoutStar.*|Return|delete"
+                commands:
+                  - pressKey: Enter
             - extendedWaitUntil:
                 notVisible:
                   id: "UIKeyboardLayoutStar.*|Return|delete"
                 timeout: 5000
-                optional: true
-      - assertNotVisible:
-          id: "UIKeyboardLayoutStar.*|Return|delete"

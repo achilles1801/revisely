@@ -416,6 +416,11 @@ Things that bit:
   Return and checks it has gone (its keys are in the hierarchy only while it is up) before each tap
   on the sign-up form. `signup.yaml` checks all four fields together right before Create account,
   and taps Create account again only while the form is still there with the button enabled.
+- A `visible` condition (`when`, `repeat while`) on something that isn't there waits for it, polling
+  the screen, for up to 7 s after the last tap or key; `notVisible` on something that isn't there
+  answers at once. So a loop that asks "still visible?" after it has gone pays those 7 s each time:
+  `keyboard-away.yaml` did, after every Return, and in run 43721829261 Maestro's iOS driver crashed
+  during that poll. Ask `visible` once, then wait with `extendedWaitUntil: notVisible`.
 - A script that writes the server as its admin (a seed) runs once the app has sent its own changes
   (`subflows/app-sent.yaml`). The app sends from its outbox, and a change it still held went out
   after the script's writes and over them: on iOS, run 42414536111, a failed Firestore write stream
