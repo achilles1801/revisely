@@ -238,7 +238,10 @@ until its part is set up.
     the line being recited (the ayah's part of it, `currentLineBand`) and a grey box on the word. It is not a blue band
     over the whole ayah, which covered lines not yet said and read as running ahead (the checker's `at` was 1.0 s
     behind, never ahead). Blue (`followInk`) is for the word being said in the bar and the newest word on a hidden page.
-    None of Recite's colours follow the accent (design.test).
+    None of Recite's colours follow the accent (design.test). Nothing shows before the checker has found where the
+    reciter is (`locked`): no band or box, in either view. The hidden view has no band at all (Majd, Nov 15 2026:
+    "there shouldn't be an always there highlight at the top when the verses are hidden"): the words recited show in
+    place, the newest in blue.
   - **Your recitation** on the mark card: the reciter's own voice at the mark, from the take's audio that the connection
     holds on the phone for resuming (`audioClip`), from the mark's `t` (0.6 s before to 0.4 s after). A mark without
     one (a skipped word) uses when the cursor first reached that word or the one before, ±1.2 s. It works until the take
