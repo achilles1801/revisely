@@ -18,6 +18,7 @@ import {
   signInWithCredential,
 } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { keepSignInWhenUnchecked } from './authLaunchCheck';
 import {
   getFirestore,
   doc,
@@ -58,6 +59,9 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0
 // app restarts. initializeAuth throws if called twice (e.g. on Fast Refresh),
 // so fall back to getAuth on the second call.
 let auth: Auth;
+// AUTH-1: a launch check that Google couldn't answer (an outage, a rate limit) keeps the saved
+// sign-in instead of signing the person out (lib/authLaunchCheck).
+keepSignInWhenUnchecked(() => auth.authStateReady());
 try {
   auth = initializeAuth(app, {
     persistence: getReactNativePersistence(AsyncStorage),

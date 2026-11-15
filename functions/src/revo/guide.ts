@@ -313,6 +313,7 @@ export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
   'SHEET-1': 'one sheet at a time, so the screen under them always takes taps again; nothing for Revo to explain',
   'SYNC-4': 'a new account loads with no relaunch; nothing to do',
   'ACCOUNT-2': 'the sign-in screen keeps what was typed after a failed attempt; Revo is for signed-in users',
+  'AUTH-1': 'a passing Google outage at launch keeps the sign-in; nothing to do',
   'ACCOUNT-3': 'how long Delete account waits for the server; the app says what happened itself',
   'RESET-1': 'the owner’s reset script',
   'ACT-9': 'when a day’s items load',

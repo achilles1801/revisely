@@ -3,6 +3,7 @@
 // mocked here is an edge of the phone (network state, native views), not app logic.
 jest.unmock('firebase/app');
 jest.unmock('firebase/auth');
+jest.unmock('@firebase/auth/internal');
 jest.unmock('firebase/firestore');
 
 jest.mock('@react-native-community/netinfo', () => require('./netinfo'));

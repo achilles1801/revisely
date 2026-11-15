@@ -226,6 +226,9 @@ How the tests are made: `tests/scenarios/README.md`.
   refused, no connection) leaves the sign-in screen as it was: the same mode, the name, the email and the password
   still typed, with the error under them. A password reset that fails keeps the email. While an attempt runs, it
   shows on its button; only the launch shows the spinner in place of the screen.
+- **AUTH-1.** A phone signed in stays signed in at launch when Google can't check the sign-in just then (an
+  outage, a rate limit: a 5xx, a 429, or a quota or internal error). It checks again at the next start. A sign-in
+  that was ended, a disabled or deleted account, or any other answer still signs it out, as before.
 - **SYNC-5.** The same day revised on two phones while both were offline keeps every page either
   phone revised, in one session for the day.
 
