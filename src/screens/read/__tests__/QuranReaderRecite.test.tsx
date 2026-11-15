@@ -69,9 +69,11 @@ jest.mock('../../../components/MushafPager', () => {
   };
 });
 const mockNavigation = { goBack: jest.fn(), navigate: jest.fn() };
+// The reader's params: page 379 unless a test opens it otherwise (a search's result).
+const mockRoute: { params: Record<string, unknown> } = { params: { pageNumber: 379 } };
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => mockNavigation,
-  useRoute: () => ({ key: 'QuranReader-1', name: 'QuranReader', params: { pageNumber: 379 } }),
+  useRoute: () => ({ key: 'QuranReader-1', name: 'QuranReader', params: mockRoute.params }),
   useIsFocused: () => true,
 }));
 jest.mock('../../../navigation/navigationRef', () => ({ navigateToActivityDay: jest.fn() }));
@@ -224,6 +226,7 @@ beforeEach(async () => {
   mockLive.clips = [];
   mockLive.start = undefined;
   mockPager.scrolled = [];
+  mockRoute.params = { pageNumber: 379 };
   mockMic = null;
   mockPremium.has = true;
   mockTake.started = null;
@@ -1464,5 +1467,101 @@ describe('Recite your mistakes here (the held mic: the page’s remembered mista
     await flush();
     await flush();
     expect(mockLive.start).toMatchObject({ s: 27, a: 23, s2: 27, a2: 24 });
+  });
+});
+
+describe('a voice search with one result opens the reader reciting (Majd, Nov 15 2026)', () => {
+  /** The reader as a voice search opens it: at An-Naml 25 on page 379, highlighted, `recite` when found by voice. */
+  async function openFound(found: Record<string, unknown> = { sura: 27, ayah: 25 }, recite = true) {
+    mockRoute.params = { pageNumber: 379, source: 'search', highlight: found, ...(recite ? { recite: true } : {}) };
+    render(<QuranReaderScreen />);
+    await flush();
+    await flush();
+    await flush();
+  }
+
+  it('a Recite take starts as it opens, the microphone on with no tap, the checker looking for the start only in the ayah found', async () => {
+    setReciteCheckSettings('u1', { noticeSeen: true });
+    await openFound();
+    expect(mockLive.start).toMatchObject({ type: 'start', s: 27, a: 25, startBy: [27, 25], s2: null, a2: null, follow: true });
+    expect(mockMic).not.toBeNull();
+    expect(screen.getByTestId('recite-bar')).toBeTruthy();
+    await event({ type: 'ready', take: 't1', protocol: 6 });
+    expect(screen.getByTestId('recite-status').props.children).toBe('Listening…');
+    expect(screen.getByTestId('recite-stop')).toBeTruthy();
+    // The reciter carries on from the words they searched with: the cursor goes where the checker finds them.
+    const a25 = words.verseFirstWord(27, 25);
+    await event({ type: 'locked', w: a25 + 4, s: 27, a: 25 });
+    await event({ type: 'at', w: a25 + 5 });
+    expect(screen.getByTestId('live-word-box')).toBeTruthy();
+  });
+
+  it('a match that runs on into the next ayah: the checker looks through to the last ayah found', async () => {
+    setReciteCheckSettings('u1', { noticeSeen: true });
+    await openFound({ sura: 27, ayah: 25, last: { sura: 27, ayah: 26 } });
+    expect(mockLive.start).toMatchObject({ s: 27, a: 25, startBy: [27, 26] });
+  });
+
+  it('with Mark mistakes on it marks mistakes, as the mic would; a mic set to Record still recites', async () => {
+    setReciteCheckSettings('u1', { noticeSeen: true, mode: 'record', markMistakes: true });
+    await openFound();
+    expect(mockLive.start).toMatchObject({ s: 27, a: 25, startBy: [27, 25], follow: false });
+    expect(mockState.recordStart).not.toHaveBeenCalled();
+  });
+
+  it('the AI notice first when it hasn’t been agreed; after I understand, the same take', async () => {
+    await openFound();
+    expect(screen.getByTestId('recite-notice-sheet')).toBeTruthy();
+    expect(mockLive.start).toBeUndefined();
+    expect(mockMic).toBeNull();
+    fireEvent.press(screen.getByTestId('recite-notice-agree'));
+    await flush();
+    await flush();
+    expect(mockLive.start).toMatchObject({ s: 27, a: 25, startBy: [27, 25], follow: true });
+  });
+
+  it('the search’s highlight stays off the page while the take runs, and comes back once it is done', async () => {
+    setReciteCheckSettings('u1', { noticeSeen: true });
+    await openFound();
+    expect(mockPager.highlighted).toBeNull();
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await flush();
+    await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 30, start: null, secs: 5, marks: [], score: null } } as LiveEvent);
+    await flush();
+    expect(mockPager.highlighted).toEqual([expect.objectContaining({ sura: 27, ayah: 25 })]);
+  });
+
+  it('only once: a take closed doesn’t start again', async () => {
+    setReciteCheckSettings('u1', { noticeSeen: true });
+    await openFound();
+    await event({ type: 'ready', take: 't1', protocol: 6 });
+    await event({ type: 'locked', w: words.verseFirstWord(27, 25), s: 27, a: 25 });
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await flush();
+    await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 30, start: words.verseFirstWord(27, 25), secs: 5, marks: [], score: null } } as LiveEvent);
+    await flush();
+    fireEvent.press(screen.getByTestId('take-summary-done'));
+    fireEvent.press(screen.getByTestId('recite-close'));
+    mockLive.start = undefined;
+    await flush();
+    await flush();
+    expect(mockLive.start).toBeUndefined();
+    expect(screen.queryByTestId('recite-bar')).toBeNull();
+  });
+
+  it('a typed search (no `recite`) only highlights the ayah, as before', async () => {
+    setReciteCheckSettings('u1', { noticeSeen: true });
+    await openFound({ sura: 27, ayah: 25 }, false);
+    expect(mockLive.start).toBeUndefined();
+    expect(screen.queryByTestId('recite-bar')).toBeNull();
+    expect(mockPager.highlighted).toEqual([expect.objectContaining({ sura: 27, ayah: 25 })]);
+  });
+
+  it('outside Revisely Dev’s live check, nothing starts', async () => {
+    mockState.dev = false;
+    setReciteCheckSettings('u1', { noticeSeen: true });
+    await openFound();
+    expect(mockLive.start).toBeUndefined();
+    expect(mockMic).toBeNull();
   });
 });

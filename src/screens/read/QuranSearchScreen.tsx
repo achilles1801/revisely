@@ -23,6 +23,8 @@ import { matchedWords, searchText, VerseHit } from '../../lib/search/quranSearch
 import { hasArabic, parseReference, SearchTarget } from '../../lib/search/parseQuery';
 import { addRecentSearch, clearRecentSearches, getRecentSearches } from '../../lib/search/recentSearches';
 import { voiceSearchEnabled } from '../../lib/search/availability';
+import { reciteLiveEnabled } from '../../lib/reciteLive/availability';
+import { useMushafEdition } from '../../lib/mushafEdition';
 import { logger } from '../../lib/logger';
 
 type NavigationProp = NativeStackNavigationProp<ReadStackParamList, 'QuranSearch'>;
@@ -43,6 +45,16 @@ interface Results {
   total: number;
   /** The best match in the text is only close. */
   closest: boolean;
+}
+
+/**
+ * The one place a search found, when it found exactly one and not just the closest there is (the list would say
+ * "1 result"): a voice search then opens the reader there ready to recite (Revisely Dev's live check). Null otherwise.
+ */
+export function onlyVerseFound(results: Pick<Results, 'rows' | 'total' | 'closest'>): VerseHit | null {
+  if (results.closest || results.total !== 1 || results.rows.length !== 1) return null;
+  const row = results.rows[0];
+  return row.kind === 'verse' ? row.hit : null;
 }
 
 function verseTitle(sura: number, ayah: number): string {
@@ -80,7 +92,9 @@ export default function QuranSearchScreen() {
   const [recent, setRecent] = useState<string[]>([]);
   const [modelSheet, setModelSheet] = useState(false);
   const inputRef = useRef<TextInput>(null);
-  const pending = useRef<string | null>(null);
+  const pending = useRef<{ query: string; voice: boolean } | null>(null);
+  // Revisely Dev's live check (testers, the 1405 print): a voice search with one result opens the reader reciting.
+  const reciteOn = reciteLiveEnabled(user, useMushafEdition());
 
   useEffect(() => {
     let live = true;
@@ -108,8 +122,16 @@ export default function QuranSearchScreen() {
     };
   }, [uid]);
 
+  const open = useCallback(
+    (pageNumber: number, highlight?: ReadStackParamList['QuranReader']['highlight'], recite = false) => {
+      Keyboard.dismiss();
+      navigation.push('QuranReader', { pageNumber, source: 'search', highlight, ...(recite ? { recite: true } : {}) });
+    },
+    [navigation],
+  );
+
   const run = useCallback(
-    (query: string, w: QuranWords | null) => {
+    (query: string, w: QuranWords | null, voice = false) => {
       const q = query.trim();
       if (!q) {
         setResults(null);
@@ -117,7 +139,7 @@ export default function QuranSearchScreen() {
       }
       if (!w && hasArabic(q)) {
         // Searched before the words have loaded: once they have.
-        pending.current = q;
+        pending.current = { query: q, voice };
         return;
       }
       const rows: Row[] = parseReference(q).map((target, i) => ({ kind: 'target', key: `t${i}`, target }));
@@ -133,21 +155,26 @@ export default function QuranSearchScreen() {
       }
       setResults({ query: q, rows, total, closest });
       if (uid) addRecentSearch(uid, q).then(setRecent);
+      // Searched by voice with one place found (Majd, Nov 15 2026: "take them to that page as if they're about to recite
+      // it"): the reader opens there and starts reciting, looking for where the reciter goes on. Only after a voice
+      // search (the person was already speaking to the app), never a typed one; several results stay a list.
+      const only = voice && reciteOn ? onlyVerseFound({ rows, total, closest }) : null;
+      if (only) open(pageOfVerse(only), { sura: only.sura, ayah: only.ayah, last: only.last }, true);
     },
-    [uid],
+    [uid, reciteOn, open],
   );
 
   useEffect(() => {
     if (words && pending.current) {
-      const q = pending.current;
+      const { query, voice } = pending.current;
       pending.current = null;
-      run(q, words);
+      run(query, words, voice);
     }
   }, [words, run]);
 
   const voice = useVoiceSearch((heard) => {
     setText(heard);
-    run(heard, words);
+    run(heard, words, true);
   }, voiceSearchEnabled(user));
 
   const startListening = useCallback(() => {
@@ -168,14 +195,6 @@ export default function QuranSearchScreen() {
     // Once, on opening.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const open = useCallback(
-    (pageNumber: number, highlight?: ReadStackParamList['QuranReader']['highlight']) => {
-      Keyboard.dismiss();
-      navigation.push('QuranReader', { pageNumber, source: 'search', highlight });
-    },
-    [navigation],
-  );
 
   const openTarget = useCallback(
     (t: SearchTarget) => {

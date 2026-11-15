@@ -17,6 +17,9 @@ let mockUser: { id: string; previewTester?: boolean } = { id: 'u1', previewTeste
 jest.mock('../../../context/AppContext', () => ({ useApp: () => ({ user: mockUser }) }));
 // Whether the binary can listen; who may is the real gate (lib/search/availability).
 jest.mock('../../../lib/recite/micSource', () => ({ isMicStreamAvailable: () => true }));
+// Revisely Dev or the store app (the live check is Dev's: lib/reciteLive/availability).
+let mockDev = false;
+jest.mock('../../../lib/variant', () => ({ ...jest.requireActual('../../../lib/variant'), isDevVariant: () => mockDev }));
 // The model sheet: shown or not, and a way to finish its download.
 jest.mock('../../../components/recite/SpeechModelSheet', () => ({
   SpeechModelSheet: ({ visible, title, onReady }: { visible: boolean; title: string; onReady: () => void }) => {
@@ -45,7 +48,7 @@ jest.mock('../../../components/search/useVoiceSearch', () => ({
   },
 }));
 
-import QuranSearchScreen from '../QuranSearchScreen';
+import QuranSearchScreen, { onlyVerseFound } from '../QuranSearchScreen';
 import { DesignProvider } from '../../../design/DesignContext';
 import { ThemeProvider } from '../../../context/ThemeContext';
 import { setQuranWordsForTests } from '../../../lib/recite/quranWords';
@@ -59,6 +62,7 @@ afterAll(() => setQuranWordsForTests(null));
 beforeEach(async () => {
   jest.clearAllMocks();
   mockParams = undefined;
+  mockDev = false;
   mockUser = { id: 'u1', previewTester: true };
   Object.assign(mockVoice, { available: true, status: 'idle', partial: '', needsModel: false });
   await AsyncStorage.clear();
@@ -203,4 +207,72 @@ describe('searching the Quran', () => {
       expect(screen.getByTestId('search-verse-10-16')).toBeTruthy();
     },
   );
+});
+
+describe('a voice search with one result opens the reader reciting (Revisely Dev, Majd, Nov 15 2026)', () => {
+  const YUNUS_16 = { pageNumber: pageOfVerse({ sura: 10, ayah: 16 }), source: 'search', highlight: { sura: 10, ayah: 16, last: { sura: 10, ayah: 16 } } };
+
+  it('one place found by voice: the reader opens there with a take starting (`recite`), and the result stays listed behind it', async () => {
+    mockDev = true;
+    await open();
+    await act(async () => mockVoice.heard?.('قل لو شاء الله ما تلوتو عليكم'));
+    expect(mockNavigation.push).toHaveBeenCalledTimes(1);
+    expect(mockNavigation.push).toHaveBeenCalledWith('QuranReader', { ...YUNUS_16, recite: true });
+    expect(screen.getByTestId('search-count')).toHaveTextContent('1 result');
+    // Its row opens the page as before, with no take.
+    fireEvent.press(screen.getByTestId('search-verse-10-16'));
+    expect(mockNavigation.push).toHaveBeenLastCalledWith('QuranReader', YUNUS_16);
+  });
+
+  it('E2E flow 18’s words (An-Naml 25’s opening) find its one place, on page 379', async () => {
+    mockDev = true;
+    await open();
+    await act(async () => mockVoice.heard?.('ألا يسجدوا لله الذي يخرج الخبء'));
+    expect(mockNavigation.push).toHaveBeenCalledWith('QuranReader', {
+      pageNumber: 379,
+      source: 'search',
+      highlight: { sura: 27, ayah: 25, last: { sura: 27, ayah: 25 } },
+      recite: true,
+    });
+  });
+
+  it('never after a typed search: the microphone starts on its own only after the person spoke to the app', async () => {
+    mockDev = true;
+    await open();
+    await search('قل لو شاء الله');
+    expect(screen.getByTestId('search-count')).toHaveTextContent('1 result');
+    expect(mockNavigation.push).not.toHaveBeenCalled();
+  });
+
+  it('several places stay a list', async () => {
+    mockDev = true;
+    await open();
+    await act(async () => mockVoice.heard?.('فبأي آلاء ربكما تكذبان'));
+    expect(screen.getAllByTestId(/^search-verse-55-/).length).toBeGreaterThan(1);
+    expect(mockNavigation.push).not.toHaveBeenCalled();
+  });
+
+  it('only for accounts with the live check: not in the store app, nor for an account that isn’t a tester', async () => {
+    await open();
+    await act(async () => mockVoice.heard?.('قل لو شاء الله ما تلوتو عليكم'));
+    expect(screen.getByTestId('search-verse-10-16')).toBeTruthy();
+    expect(mockNavigation.push).not.toHaveBeenCalled();
+    screen.unmount();
+    mockDev = true;
+    mockUser = { id: 'u2', previewTester: false };
+    await open();
+    await act(async () => mockVoice.heard?.('قل لو شاء الله ما تلوتو عليكم'));
+    expect(screen.getByTestId('search-verse-10-16')).toBeTruthy();
+    expect(mockNavigation.push).not.toHaveBeenCalled();
+  });
+
+  it('one place, exactly: not a place named by reference, not the closest there is, not one of several cut to one', () => {
+    const hit = { sura: 10, ayah: 16, last: { sura: 10, ayah: 16 }, from: 1, to: 5, score: 1 };
+    const verse = { kind: 'verse' as const, key: 'v1', hit, matched: new Set<number>() };
+    expect(onlyVerseFound({ rows: [verse], total: 1, closest: false })).toBe(hit);
+    expect(onlyVerseFound({ rows: [verse], total: 1, closest: true })).toBeNull();
+    expect(onlyVerseFound({ rows: [verse], total: 3, closest: false })).toBeNull();
+    expect(onlyVerseFound({ rows: [{ kind: 'target', key: 't0', target: { kind: 'page', page: 62 } }], total: 0, closest: false })).toBeNull();
+    expect(onlyVerseFound({ rows: [], total: 0, closest: false })).toBeNull();
+  });
 });

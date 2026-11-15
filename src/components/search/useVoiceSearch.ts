@@ -9,6 +9,7 @@ import { closeSpeechEngine, openSpeechEngine } from '../../lib/recite/speechEngi
 import { downloadedModelPath } from '../../lib/recite/speechModel';
 import { useSpeechModelState } from '../../lib/recite/speechModelStore';
 import { VoiceQuery } from '../../lib/search/voiceQuery';
+import { e2eVoiceHeard } from '../../lib/search/availability';
 
 /**
  * idle: not listening. starting: the microphone and the model are being readied.
@@ -45,6 +46,16 @@ export function useVoiceSearch(onHeard: (text: string) => void, enabled: boolean
   const listen = useCallback(async () => {
     if (!available || queryRef.current) return;
     setPartial('');
+    // E2E builds: no microphone or model; the words a link gave are heard after a moment (lib/e2e/voiceSearch).
+    const scripted = process.env.EXPO_PUBLIC_E2E === '1' ? e2eVoiceHeard() : null;
+    if (scripted) {
+      setStatus('listening');
+      await wait(3000);
+      if (!mounted.current) return;
+      setStatus('idle');
+      onHeardRef.current(scripted);
+      return;
+    }
     setStatus('starting');
     try {
       let perm = await getRecordingPermissionsAsync();
@@ -130,8 +141,8 @@ export function useVoiceSearch(onHeard: (text: string) => void, enabled: boolean
     available,
     status,
     partial,
-    /** The speech model isn't on the phone yet. */
-    needsModel: model.status !== 'ready',
+    /** The speech model isn't on the phone yet (E2E's scripted words need none). */
+    needsModel: model.status !== 'ready' && !(process.env.EXPO_PUBLIC_E2E === '1' && e2eVoiceHeard()),
     listen,
     stop,
   };

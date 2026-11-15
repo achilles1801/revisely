@@ -130,6 +130,11 @@ export function useReciteCheckSettings(uid: string | null | undefined): ReciteCh
   );
 }
 
+/** Whether `uid`'s saved settings have been read (or failed to read): until then they are the defaults. */
+export function reciteCheckSettingsLoaded(uid: string | null | undefined): boolean {
+  return !!uid && owner === uid && pending === null;
+}
+
 /** Tests only. */
 export function resetReciteCheckSettingsForTests(): void {
   owner = null;
