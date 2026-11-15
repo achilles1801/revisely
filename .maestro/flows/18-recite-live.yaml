@@ -306,6 +306,27 @@ appId: com.revisionbuddy.app
     file: ../subflows/shot.yaml
     env:
       NAME: rl10-summary-dark
+# Recite's memory (RMEM-4): the passage's second take, so its summary has Your progress here; it opens the passage's
+# progress, and Done comes back to the summary.
+- extendedWaitUntil:
+    visible:
+      id: take-summary-progress
+    timeout: 5000
+- tapOn:
+    id: take-summary-progress
+- extendedWaitUntil:
+    visible:
+      id: progress-sheet
+    timeout: 8000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rm03-progress-dark
+- tapOn: "Done"
+- extendedWaitUntil:
+    visible:
+      id: take-summary-drill
+    timeout: 8000
 
 # Recite the mistakes again (Majd, Nov 15 2026): one take over the stretch from the first mistake to the last, from the
 # ayah before (An-Naml 22–23). It stops by itself once the checker has decided the stretch's last word, and its summary
@@ -448,4 +469,50 @@ appId: com.revisionbuddy.app
 - extendedWaitUntil:
     visible:
       id: recite-mic
+    timeout: 5000
+
+# Recite's memory (RMEM-5): the day's takes in a Recited block, and Show on the page (a take on its page with its marks).
+- tapOn:
+    id: reader-back
+- tapOn:
+    id: tab-Home
+- tapOn:
+    id: open-activity
+- extendedWaitUntil:
+    visible:
+      id: activity-blocks-views
+    timeout: 15000
+- tapOn:
+    id: calendar-day-2026-11-14
+- tapOn:
+    id: preview-open
+- scrollUntilVisible:
+    element:
+      id: activity-block-recited
+    direction: DOWN
+    timeout: 15000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rm04-day-recited-dark
+- scrollUntilVisible:
+    element:
+      id: activity-take-show
+    direction: DOWN
+    timeout: 10000
+- tapOn:
+    id: activity-take-show
+- extendedWaitUntil:
+    visible:
+      id: shown-take-bar
+    timeout: 10000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rm05-shown-take-dark
+- tapOn:
+    id: shown-take-done
+- extendedWaitUntil:
+    notVisible:
+      id: shown-take-bar
     timeout: 5000
