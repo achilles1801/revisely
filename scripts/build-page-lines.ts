@@ -14,6 +14,12 @@
 // −61/−57); each page is moved onto develop's verse boxes, and the run fails
 // if a page differs by more than a plain vertical shift (page 3 matches to a
 // tenth).
+//
+// The markers it writes come from glyph data that sits about 7 units right of
+// the page images' markers (the covers cut their left ornaments). After a run,
+// refit them from the images and check every page:
+//
+//   python3 scripts/check-page-markers.py /tmp/mushaf --write && python3 scripts/check-page-markers.py /tmp/mushaf
 import * as fs from 'fs';
 const BR = process.env.HOME + '/revisely-mistakes';
 const DEV = process.env.HOME + '/revisely';
