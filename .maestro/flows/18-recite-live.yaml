@@ -531,6 +531,24 @@ appId: com.revisionbuddy.app
     file: ../subflows/shot.yaml
     env:
       NAME: rl13-started-mid-page-dark
+# An immersive page (Majd, Nov 15 2026): a tap during the take puts the header and the bar away (the status bar stays,
+# the take's time by the page number); another tap brings them back.
+- tapOn:
+    id: reader-background
+- extendedWaitUntil:
+    visible:
+      id: reader-take-activity
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl13b-immersive-dark
+- tapOn:
+    id: reader-take-activity
+- extendedWaitUntil:
+    visible:
+      id: recite-stop
+    timeout: 5000
 - tapOn:
     id: recite-stop
 - extendedWaitUntil:

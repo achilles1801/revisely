@@ -1,6 +1,6 @@
 // The reader's one mic (Revisely Dev): Record, Recite, Check; the recite bar; marks and the hidden view.
 import React from 'react';
-import { AccessibilityInfo, Alert, Modal } from 'react-native';
+import { AccessibilityInfo, Alert, Modal, StatusBar } from 'react-native';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import QuranReaderScreen from '../QuranReaderScreen';
@@ -1582,7 +1582,7 @@ describe('Test me (Majd, Nov 15 2026: random within what’s memorized, with an 
     mockState.pages = [562, 563, 564, 604].map((pageNumber) => ({ pageNumber, status: 'memorized' }));
     jest.spyOn(Math, 'random').mockReturnValue(0);
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => (Math.random as jest.Mock).mockRestore());
 
   const placeAt = (a: number) => {
     const first = words.verseFirstWord(67, a);
@@ -1750,5 +1750,88 @@ describe('Test me (Majd, Nov 15 2026: random within what’s memorized, with an 
     await flush();
     expect(screen.getByTestId('recite-status').props.children).toBe('Not continued · 1 of 5');
     expect(screen.getByTestId('recite-next')).toBeTruthy();
+  });
+});
+
+describe('an immersive page during a take (Majd, Nov 15 2026: a tap hides the header and the bar)', () => {
+  const statusBarHidden = () => screen.UNSAFE_getByType(StatusBar).props.hidden;
+  const tapPage = () => act(async () => fireEvent.press(screen.getByLabelText('The page', { includeHiddenElements: true })));
+
+  it('a tap on the page puts the header and the bar away, the status bar stays and the take’s time shows by the page number; a tap brings them back', async () => {
+    await startTake('recite');
+    expect(screen.getByTestId('recite-bar')).toBeTruthy();
+    await tapPage();
+    expect(screen.queryByTestId('recite-bar')).toBeNull();
+    expect(screen.getByTestId('recite-bar', { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.queryByTestId('reader-back')).toBeNull();
+    expect(statusBarHidden()).toBe(false);
+    expect(screen.getByTestId('reader-take-time')).toHaveTextContent('0:00');
+    // The take goes on underneath.
+    await act(async () => mockMic!.onAudio(new Int16Array(16000)));
+    expect(mockLive.audio).toBe(16000);
+    expect(screen.getByTestId('reader-take-time')).toHaveTextContent('0:01');
+    await tapPage();
+    expect(screen.getByTestId('recite-bar')).toBeTruthy();
+    expect(screen.getByTestId('reader-back')).toBeTruthy();
+  });
+
+  it('the take’s time brings them back too', async () => {
+    await startTake('recite');
+    await tapPage();
+    fireEvent.press(screen.getByTestId('reader-take-activity'));
+    expect(screen.getByTestId('recite-bar')).toBeTruthy();
+  });
+
+  it('a mark’s card brings them back', async () => {
+    await startTake('check');
+    await event({ type: 'mark', mark: { id: 'a', w: UTIYAT, ayah: [27, 23], kind: 'word', sure: 'likely', heard: 'وَأُوهِيَتْ', heardExact: false } });
+    await tapPage();
+    expect(screen.queryByTestId('recite-bar')).toBeNull();
+    const { wordBox } = require('../../../lib/reciteLive/geometry');
+    const b = wordBox(words, UTIYAT);
+    await act(async () => {
+      mockPager.onTapPoint?.(379, (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, (r: { x0: number; y0: number; x1: number; y1: number }) => ({
+        x: r.x0,
+        y: r.y0 + 100,
+        width: r.x1 - r.x0,
+        height: r.y1 - r.y0,
+      }));
+    });
+    expect(screen.getByTestId('mark-card', { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.getByTestId('recite-bar', { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.UNSAFE_getByProps({ testID: 'reader-quiet-header' }).props.accessibilityElementsHidden).toBe(true);
+  });
+
+  it('the take’s end brings them back (leaving the app ends it)', async () => {
+    await startTake('recite');
+    await tapPage();
+    const { AppState } = require('react-native');
+    const listener = (AppState.addEventListener as jest.Mock).mock.calls.map((c: unknown[]) => c[1] as (s: string) => void).at(-1)!;
+    await act(async () => listener('background'));
+    expect(mockLive.sent).toContainEqual({ type: 'end' });
+    expect(screen.getByTestId('recite-bar')).toBeTruthy();
+  });
+
+  it('with VoiceOver or TalkBack the bar never goes: Stop is always there', async () => {
+    // React Native's jest setup mocks it (false); on for this test only.
+    const enabled = AccessibilityInfo.isScreenReaderEnabled as jest.Mock;
+    enabled.mockImplementation(async () => true);
+    try {
+      await startTake('recite');
+      await tapPage();
+      expect(screen.getByTestId('recite-bar')).toBeTruthy();
+      expect(screen.getByTestId('recite-stop')).toBeTruthy();
+    } finally {
+      enabled.mockImplementation(async () => false);
+    }
+  });
+
+  it('outside a take the page’s tap is as before: the controls come and go, and the status bar with them', async () => {
+    await open();
+    expect(screen.getByTestId('recite-mic')).toBeTruthy();
+    expect(statusBarHidden()).toBe(false);
+    await tapPage();
+    expect(screen.queryByTestId('recite-mic')).toBeNull();
+    expect(statusBarHidden()).toBe(true);
   });
 });

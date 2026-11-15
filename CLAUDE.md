@@ -393,6 +393,11 @@ until its part is set up.
     - Each place's take is kept as a recording, as any take is.
     - E2E: flow 18 marks page 379 memorized (`scripts/server-memorized.js`) and tests Juz 19; a place gets a take of
       its own that says every word (`placeTake` in `lib/e2e/reciteLive`).
+  - **An immersive page** (Majd, Nov 15 2026; Tarteel's): during a take a tap on the page puts the header and the bar
+    away too, leaving the page, the juz and surah above it, and the take's time beside the page number
+    (`TakeActivity`, red dot while recording; a tap on it brings the controls back). The status bar stays
+    (`keepStatusBar` on `ReaderFrame`). A tap brings them back, and so do a mark's card and the take's end. With
+    VoiceOver or TalkBack the bar never goes, so Stop is always there. Outside a take the page's tap is as before.
 
 ## How updates reach phones
 

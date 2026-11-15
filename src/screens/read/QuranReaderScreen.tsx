@@ -73,6 +73,7 @@ import { TestPlace, testJuz, testPlaces, TestResult, testResult } from '../../li
 import { memorizedAyahs } from '../../lib/memorizedAyahs';
 import { outcomeText, TestMeScopeSheet, TestSummarySheet } from '../../components/reciteLive/TestMeSheets';
 import { CheckIntroPage } from '../../components/reciteLive/CheckIntroPage';
+import { TakeActivity } from '../../components/reciteLive/TakeActivity';
 import { markAt, wordBox } from '../../lib/reciteLive/geometry';
 import { similarPhrases } from '../../lib/reciteLive/similar';
 import type { Mark } from '../../lib/reciteLive/contract';
@@ -865,6 +866,25 @@ export default function QuranReaderScreen() {
   );
 
   const liveStatus = live.state.status;
+  // An immersive page (Majd, Nov 15 2026; Tarteel's): during a take a tap on the page puts the header and the bar away
+  // too, leaving the page, the juz and surah above it and the take's time beside its number. The status bar stays (the
+  // time and battery). A tap brings them back, and so do a mark's card and the take's end. With VoiceOver or TalkBack
+  // the bar never goes, so Stop is always there.
+  const [takeImmersive, setTakeImmersive] = useState(false);
+  const takeListening = liveStatus === 'connecting' || liveStatus === 'listening';
+  useEffect(() => {
+    if (!takeListening || cardAt) setTakeImmersive(false);
+  }, [takeListening, cardAt]);
+  const immersive = takeImmersive && takeListening && !screenReader && !cardAt;
+  const chromeShown = modeMenu || (live.active ? !immersive : chrome.visible);
+  const onTapReader = useCallback(() => {
+    if (takeListening && !screenReader) {
+      dismissHint();
+      setTakeImmersive((v) => !v);
+      return;
+    }
+    onTapPage();
+  }, [takeListening, screenReader, dismissHint, onTapPage]);
   const barPhase: 'live' | 'checking' | 'done' =
     liveStatus === 'checking' ? 'checking' : liveStatus === 'done' || liveStatus === 'failed' ? 'done' : 'live';
   const baseStatus =
@@ -893,9 +913,10 @@ export default function QuranReaderScreen() {
   return (
     <View style={styles.container}>
       <ReaderFrame
-        chromeVisible={chrome.visible || live.active || modeMenu}
+        chromeVisible={chromeShown}
+        keepStatusBar={live.active}
         active={isScreenFocused}
-        onBackgroundPress={onTapPage}
+        onBackgroundPress={onTapReader}
         background={palette.pageBg}
         isDark={isDark}
         quietHeader={
@@ -1019,7 +1040,11 @@ export default function QuranReaderScreen() {
           ) : null
         }
         activity={
-          <ReaderActivity recorder={recorder} playback={verseActions.player.state} onPress={chrome.show} />
+          live.active ? (
+            <TakeActivity seconds={live.seconds} recording={live.recording && live.mic === 'on'} onPress={() => setTakeImmersive(false)} />
+          ) : (
+            <ReaderActivity recorder={recorder} playback={verseActions.player.state} onPress={chrome.show} />
+          )
         }
       >
         <MushafPager
@@ -1034,7 +1059,7 @@ export default function QuranReaderScreen() {
             verseActions.highlightedAyah ??
             (live.state.status === 'connecting' || live.state.status === 'listening' || live.state.status === 'checking' ? null : searchHighlight)
           }
-          onTap={onTapPage}
+          onTap={onTapReader}
           onUserSwipe={chrome.hide}
           pageUnderlay={pageUnderlay}
           pageOverlay={pageOverlay}
