@@ -60,6 +60,9 @@
         KINDS[k][2](els[i], t(key));
       }
     }
+    // The switch names the other language in that language ("عربي", "English"): a screen reader reads it in its voice.
+    var sw = root.querySelectorAll('[data-lang-switch]');
+    for (var j = 0; j < sw.length; j++) sw[j].setAttribute('lang', lang() === 'ar' ? 'en' : 'ar');
     var title = document.querySelector('meta[name="rv-title"]');
     if (title && root === document) {
       var tk = title.getAttribute('content');
