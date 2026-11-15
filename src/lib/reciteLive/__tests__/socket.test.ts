@@ -237,3 +237,21 @@ describe('the live socket', () => {
     expect(t.closed()).toBe(1);
   });
 });
+
+describe('Your recitation: a moment of the take, from the audio held on the phone', () => {
+  it('cuts seconds of the take across the chunks it came in, and still has them after the take ends', async () => {
+    const { conn: c } = setup();
+    await flush();
+    // 1.5 s in three chunks of half a second, each chunk's samples its own number.
+    for (const v of [1, 2, 3]) c.sendAudio(new Int16Array(8000).fill(v));
+    const clip = c.audioClip!(0.25, 1.25)!;
+    expect(clip.length).toBe(16000);
+    expect([clip[0], clip[3999], clip[4000], clip[11999], clip[12000], clip[15999]]).toEqual([1, 1, 2, 2, 3, 3]);
+    // Past what was heard: cut at its end; wholly outside: nothing.
+    expect(c.audioClip!(1.25, 9)!.length).toBe(4000);
+    expect(c.audioClip!(2, 3)).toBeNull();
+    c.close();
+    expect(c.audioClip!(0, 0.5)!.length).toBe(8000);
+  });
+});
+

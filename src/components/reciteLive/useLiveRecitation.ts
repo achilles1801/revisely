@@ -13,7 +13,7 @@ import { AudioSource, startMicStream } from '../../lib/recite/micSource';
 import { SAMPLE_RATE } from '../../lib/recite/segmenter';
 import { getQuranWords, loadQuranWords, QuranWords } from '../../lib/recite/quranWords';
 import type { ReciteCheckSettings } from '../../lib/reciteCheck/settings';
-import type { LiveEvent } from '../../lib/reciteLive/contract';
+import type { LiveEvent, Mark } from '../../lib/reciteLive/contract';
 import type { LiveConnect, LiveConnection, StartFrame } from '../../lib/reciteLive/feed';
 import { socketFeed } from '../../lib/reciteLive/socket';
 import { stopHearing } from '../../lib/reciteLive/hearAudio';
@@ -161,12 +161,17 @@ export function useLiveRecitation({
   const [paused, setPaused] = useState(false);
   const pausedRef = useRef(false);
   const reopen = useRef<(() => Promise<AudioSource>) | null>(null);
+  // "Your recitation": the take's connection, kept until the take is closed (its audio stays on the phone for resuming),
+  // and when the cursor first reached each word, in seconds of the take (for a mark that carries no time of its own).
+  const lastConn = useRef<LiveConnection | null>(null);
+  const wordTimes = useRef(new Map<number, number>());
   // For the Stop trace (lib/reciteLive/stopTrace), read when Stop is tapped.
   const traceRef = useRef({ state, mode, seconds });
   traceRef.current = { state, mode, seconds };
   /** Each event the take receives: its type to the Stop trace, then the live state. */
   const onEvent = useCallback((e: LiveEvent) => {
     stopTrace.event(e.type);
+    if (e.type === 'at' && !wordTimes.current.has(e.w)) wordTimes.current.set(e.w, e.t ?? samples.current / SAMPLE_RATE);
     setState((s) => applyEvent(s, e));
   }, []);
 
@@ -227,6 +232,7 @@ export function useLiveRecitation({
   const cancel = useCallback(() => {
     stopTrace.end();
     stopHearing();
+    lastConn.current = null;
     void stopMic();
     conn.current?.close();
     conn.current = null;
@@ -240,6 +246,8 @@ export function useLiveRecitation({
       stopHearing();
       pausedRef.current = false;
       setPaused(false);
+      lastConn.current = null;
+      wordTimes.current = new Map();
       setMic('starting');
       setSeconds(0);
       samples.current = 0;
@@ -272,6 +280,7 @@ export function useLiveRecitation({
           },
         });
         conn.current = c;
+        lastConn.current = c;
         recordingRef.current =
           settings.saveRecording && recordingDay ? startTakeRecording({ day: recordingDay, page: pageRef.current }) : null;
         setRecording(recordingRef.current != null);
@@ -318,6 +327,7 @@ export function useLiveRecitation({
           },
         });
         conn.current = c;
+        lastConn.current = c;
         recordingRef.current =
           settings.saveRecording && recordingDay ? startTakeRecording({ day: recordingDay, page: pageRef.current }) : null;
         setRecording(recordingRef.current != null);
@@ -403,6 +413,31 @@ export function useLiveRecitation({
     }
   }, [owner]);
 
+  /**
+   * The reciter's own voice at a mark ("Your recitation"): the mark's time in the take (a little before and after), or
+   * for a mark without one (a skipped word), around when the cursor reached that word or the one before. Null when the
+   * take's audio isn't held (E2E's recorded take) or the moment isn't known.
+   */
+  /** Whether Your recitation has something to play for `m` (cheap: nothing is cut). */
+  const hasClip = useCallback(
+    (m: Mark): boolean =>
+      !!lastConn.current?.audioClip && (m.t != null || wordTimes.current.has(m.w) || wordTimes.current.has(m.w - 1)),
+    [],
+  );
+  const clipFor = useCallback((m: Mark): Int16Array | null => {
+    const c = lastConn.current;
+    if (!c?.audioClip) return null;
+    let range: [number, number] | null = null;
+    if (m.t) range = [m.t[0] - 0.6, m.t[1] + 0.4];
+    else {
+      const at = wordTimes.current.get(m.w) ?? wordTimes.current.get(m.w - 1);
+      if (at != null) range = [at - 1.2, at + 1.2];
+    }
+    if (!range) return null;
+    const pcm = c.audioClip(Math.max(0, range[0]), range[1]);
+    return pcm && pcm.length > 0 ? pcm : null;
+  }, []);
+
   /** "Not a mistake": off the page at once, and told to the checker (a label for the lab). */
   const dismiss = useCallback((id: string) => {
     conn.current?.send({ type: 'dismiss', id });
@@ -418,6 +453,7 @@ export function useLiveRecitation({
   const clear = useCallback(() => {
     stopTrace.end();
     stopHearing();
+    lastConn.current = null;
     void stopMic();
     conn.current?.close();
     conn.current = null;
@@ -510,6 +546,8 @@ export function useLiveRecitation({
     stop,
     pause,
     resume,
+    hasClip,
+    clipFor,
     cancel,
     clear,
     dismiss,

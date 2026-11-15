@@ -234,6 +234,11 @@ until its part is set up.
     microphone goes off and the take stays open on the same connection. The bar's Pause and Resume do the same, and
     Resume carries on from where it was. What the card plays stops when the card closes, the take ends or is closed, a
     new one starts, the reader goes, or anything else takes the audio.
+  - **Your recitation** on the mark card: the reciter's own voice at the mark, from the take's audio that the connection
+    holds on the phone for resuming (`audioClip`), from the mark's `t` (0.6 s before to 0.4 s after). A mark without
+    one (a skipped word) uses when the cursor first reached that word or the one before, ±1.2 s. It works until the take
+    is closed, and has no button when the moment isn't known (E2E's recorded take has no audio). The clip is a WAV in the
+    caches folder (`lib/reciteLive/clipFile`), on this phone only.
   - **Stop leaves a trace** (`lib/reciteLive/stopTrace`, Nov 15 2026, after a freeze on Stop that told us nothing): Stop
     writes a marker on the phone, each step to the summary adds to it (mic off, the final answer, the summary asked
     for), and a heartbeat keeps the longest JavaScript stall. The summary on screen, a failure, ✕ or leaving the reader

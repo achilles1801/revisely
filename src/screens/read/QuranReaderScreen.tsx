@@ -68,7 +68,7 @@ import { markAt, wordBox } from '../../lib/reciteLive/geometry';
 import { similarPhrases } from '../../lib/reciteLive/similar';
 import type { Mark } from '../../lib/reciteLive/contract';
 import type { Box } from '../../components/verse/menuPlacement';
-import { playReference, stopHearing } from '../../lib/reciteLive/hearAudio';
+import { playClip, playReference, stopHearing } from '../../lib/reciteLive/hearAudio';
 import { warmUpReciteCheck } from '../../lib/reciteCheck/service';
 import { needsPremium, type LiveFailure } from '../../lib/reciteLive/contract';
 import { logger } from '../../lib/logger';
@@ -706,6 +706,16 @@ export default function QuranReaderScreen() {
                 if (live.state.status === 'listening' && live.mic === 'on') await live.pause();
                 void playReference({ sura: m.ayah[0], ayah: m.ayah[1] });
               }}
+              // The reciter's own voice at the mark, from the take kept on the phone (Majd: Tarteel plays both).
+              onYours={
+                cardMarks[0] && live.hasClip(cardMarks[0])
+                  ? async (m) => {
+                      if (live.state.status === 'listening' && live.mic === 'on') await live.pause();
+                      const pcm = live.clipFor(m);
+                      if (pcm) void playClip(pcm);
+                    }
+                  : undefined
+              }
               onSimilar={(m) => {
                 setCardAt(null);
                 setSimilarFor(m.w);
