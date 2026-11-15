@@ -425,7 +425,8 @@ Things that bit:
   the account exists). A call without an ID token isn't enough: refused before the token checks and
   Firestore, it starts the worker (1–3 s) and leaves the rest to the app's call. A worker stays up
   until `functions/` changes. A function that can't run without changing the account runs as a
-  throwaway account (10-delete-account: `scripts/warm-delete.js`).
+  throwaway account (10-delete-account: `scripts/warm-delete.js`; 18-recite-live: `scripts/warm-premium.js`, before Get
+  Premium, whose first call passed the app's 20 s on iOS in run 43687556122).
 - A worker that takes longer to start than the emulator allows gets its request dropped, never
   answered: the emulator logs "Failed to load function" and the caller waits for good (iOS, run
   42423019809: the app's `deleteUserAccount`, on a spinner). It allowed 30 s; `scripts/emulators.sh`

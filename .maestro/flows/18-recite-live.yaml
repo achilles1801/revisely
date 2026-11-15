@@ -17,6 +17,10 @@ appId: com.revisionbuddy.app
     file: ../scripts/server-revo.js
     env:
       MODE: tester
+# Get Premium (and Settings' Premium switch later) call devGrantPremium and devRevokePremium: start their workers first,
+# as a throwaway account (scripts/warm-premium.js), or the app's first call can pass its 20 s on a CI runner.
+- runScript:
+    file: ../scripts/warm-premium.js
 
 # The Dev UI, then the reader at An-Naml 23.
 - openLink:
