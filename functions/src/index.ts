@@ -135,6 +135,8 @@ export const deleteUserAccount = onCall(
     await deleteSubcollection('stats');
     await deleteSubcollection('_quota');
     await deleteSubcollection('recordings');
+    // Recite's memory: each take's marks and the words cleared by hand (lib/reciteMemory).
+    await deleteSubcollection('reciteTakes');
 
     // The Ask coach's documents: top-level, keyed by uid (functions/src/coach/admin.ts).
     for (const col of ['coachAnswers', 'coachUsage'] as const) {

@@ -75,6 +75,8 @@ import { playClip, playReference, stopHearing } from '../../lib/reciteLive/hearA
 import { warmUpReciteCheck } from '../../lib/reciteCheck/service';
 import { needsPremium, type LiveFailure } from '../../lib/reciteLive/contract';
 import { logger } from '../../lib/logger';
+import { useRememberTake } from '../../components/reciteMemory/useRememberTake';
+import { useMemoryRecords } from '../../lib/reciteMemory/store';
 
 /** What the recite bar says when a take ends without its answer. */
 const LIVE_FAILURE: Record<LiveFailure, string> = {
@@ -294,8 +296,14 @@ export default function QuranReaderScreen() {
     currentPage,
     onShowPage: (page) => pagerRef.current?.scrollToPage(page),
     recordingDay: today ?? null,
-    onRecordingSaved: setTakeSaved,
+    onRecordingSaved: (saved) => {
+      setTakeSaved(saved);
+      noteTakeRecording.current(saved);
+    },
   });
+  // Recite's memory (lib/reciteMemory): every take with Mark mistakes, kept on the account.
+  const memoryRecords = useMemoryRecords(user?.id, liveOn);
+  const noteTakeRecording = useRef<(saved: { recordingId: string }) => void>(() => undefined);
   const [words, setWords] = useState<QuranWords | null>(getQuranWords());
   useEffect(() => {
     if (!liveOn || words) return;
@@ -306,6 +314,15 @@ export default function QuranReaderScreen() {
   const qw = live.words ?? words;
   const [hidden, setHidden] = useState(false);
   const [revealed, setRevealed] = useState<Revealed>(NOTHING_SHOWN);
+  noteTakeRecording.current = useRememberTake({
+    uid: user?.id,
+    enabled: liveOn,
+    live,
+    hidden,
+    day: today ?? null,
+    level: reciteSettings.level === 'strict' ? 'strict' : 'words',
+    records: memoryRecords,
+  }).noteRecording;
   const [modeMenu, setModeMenu] = useState(false);
   const [noticeFor, setNoticeFor] = useState<LiveMode | null>(null);
   // Check: the word a card is open on (and where it is on screen), similar phrases, the summary, Check's page.

@@ -7,6 +7,7 @@ import { revisionItemsFor } from '../revisionItems';
 import type { OutboxEntry } from './ops';
 import { applySessionAssigned, applySessionEdit, mergeSessionAdd, pageUpdateData, sessionUpdateData } from './ops';
 import { readItemFor } from '../readItems';
+import { putMemoryRecord } from '../reciteMemory/remote';
 
 /** A document id like Firestore's own (20 letters and digits), made on the phone. */
 export function autoId(): string {
@@ -125,5 +126,7 @@ export async function applyEntry(uid: string, entry: OutboxEntry): Promise<void>
       return firestoreService.deleteJournalEntry(op.date, uid);
     case 'usage':
       return firestoreService.addAppUsageSeconds(op.seconds, uid);
+    case 'reciteMemory.put':
+      return putMemoryRecord(uid, op.record);
   }
 }

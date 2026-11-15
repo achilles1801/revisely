@@ -280,6 +280,20 @@ How the tests are made: `tests/scenarios/README.md`.
   A sitting offers one thing: pages not memorized come first (MEM-5). Pages not scheduled that day,
   already revised, or on an older day were reading, and offer nothing.
 
+## Recite's memory (Revisely Dev)
+
+Recite with Mark mistakes remembers each take (Majd, Nov 15 2026; Tarteel's biggest lead over Revisely).
+
+- **RMEM-1.** A take with Mark mistakes is remembered on the account, so it follows the user to another
+  phone. It keeps its marks (less any called Not a mistake, after the take too, and again once put back),
+  where it ran, its score by the page, whether the page was hidden, and which recording on the phone is its
+  own. It keeps text only, never audio. A Recite take (following only), a failed take, and a take whose start
+  was never found leave nothing. Forgetting a take removes it from every phone.
+- **RMEM-2.** A remembered mistake on a word clears after 2 right takes of that word in a row, on 2
+  different revision days. Getting it wrong again starts the count over. A take counts only for what it
+  checked: Words & harakat never clears a tajweed note. Not clear marks are never remembered, and a take
+  that heard a word's harakat only as Not clear is not a try at them. Clear now clears a word at once.
+
 ## Searching the Qur'an
 
 Every account, from the Read tab: "Search the Quran" under its title (`lib/search`,
