@@ -10,11 +10,11 @@ import type { QuranWords } from '../../lib/recite/quranWords';
 import type { Mark } from '../../lib/reciteLive/contract';
 import { isUnclear, markGroup } from '../../lib/reciteLive/contract';
 import { markFill } from './markColours';
+import { Phrase, Row, SmallPill } from './MarkParts';
 import {
   expectedPhrase,
   markPlace,
   markTitle,
-  PhrasePart,
   recitedLabel,
   recitedPhrase,
   slipLine,
@@ -23,66 +23,6 @@ import {
 } from '../../lib/reciteLive/describe';
 
 const CARD_MARGIN = 12;
-
-/**
- * An Arabic phrase with the mark's word highlighted, as on the page (Majd, Nov 15 2026: highlights, no coloured text):
- * what was recited on the mark's colour, what was expected on a quiet grey, a skipped word's gap on the mark's colour.
- */
-function Phrase({ parts, fill }: { parts: PhrasePart[]; fill: string }) {
-  const { palette } = useTheme();
-  return (
-    <Text style={[arabicV2(21), styles.ar, { color: palette.text }]} maxFontSizeMultiplier={1.6}>
-      {parts.map((p, i) => (
-        <Text key={i}>
-          {i > 0 ? ' ' : ''}
-          {p.role === 'gap' ? (
-            <Text style={{ backgroundColor: fill }} testID="mark-card-gap">
-              {'\u2003\u2003'}
-            </Text>
-          ) : (
-            <Text
-              style={p.role === 'expected' ? { backgroundColor: palette.followWord } : p.role === 'recited' ? { backgroundColor: fill } : undefined}
-              testID={p.role === 'context' ? undefined : `mark-card-${p.role}`}
-            >
-              {p.text}
-            </Text>
-          )}
-        </Text>
-      ))}
-    </Text>
-  );
-}
-
-function Row({ label, children, first }: { label: string; children: React.ReactNode; first?: boolean }) {
-  const { palette } = useTheme();
-  return (
-    <View style={[styles.row, !first && { borderTopColor: palette.separator, borderTopWidth: layoutV2.hairline }]}>
-      <Text style={[typeV2.meta, styles.label, { color: palette.secondary }]} maxFontSizeMultiplier={1.3}>
-        {label}
-      </Text>
-      <View style={styles.rowBody}>{children}</View>
-    </View>
-  );
-}
-
-function SmallPill({ icon, label, onPress, testID }: { icon?: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void; testID?: string }) {
-  const { palette } = useTheme();
-  return (
-    <Tap
-      onPress={onPress}
-      hitSlop={4}
-      style={[styles.pill, { borderColor: palette.outline }]}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      testID={testID}
-    >
-      {icon ? <Ionicons name={icon} size={15} color={palette.text} /> : null}
-      <Text style={[styles.pillText, { color: palette.text }]} maxFontSizeMultiplier={1.3}>
-        {label}
-      </Text>
-    </Tap>
-  );
-}
 
 /** One mark's part of the card: what it is, where, Expected and Recited (or the tajweed note), and its actions. */
 function MarkBlock({
@@ -270,21 +210,8 @@ const styles = StyleSheet.create({
   /** A flat swatch of the mark's colour beside its name (never a round mark). */
   swatch: { width: 12, height: 12, borderRadius: 3 },
   arWrap: { borderRadius: 7, paddingHorizontal: 6 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 4, marginTop: 6 },
-  label: { width: 66 },
   rowBody: { flex: 1, minWidth: 0 },
-  ar: { writingDirection: 'rtl', textAlign: 'right' },
   slip: { marginTop: 4 },
   tajweed: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8 },
   actions: { flexDirection: 'row', gap: 8, marginTop: 8, flexWrap: 'wrap' },
-  pill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    height: 32,
-    paddingHorizontal: 13,
-    borderRadius: 16,
-    borderWidth: 1,
-  },
-  pillText: { fontSize: 14, fontWeight: '600' },
 });
