@@ -223,13 +223,14 @@ only counts, seconds, levels and reasons (the server tests check it).
   (`route`), **`label`** (a dismiss or an undismiss), and **`dropped`**: a session whose phone went and didn't come
   back here (`at`: `timeout` after RESUME_TTL, or `shutdown`).
 
-**The digest** (`digest.py`): the last 7 days of those lines, as Markdown. It covers:
+**The digest** (`digest.py`): the last 7 days of those lines from both services (`recite-check` and
+`recite-check-pair`, its rows marked "(pair)"), as Markdown. It covers:
 - takes and hours by level;
 - cold starts and their wait;
 - the lag, and the instance speed;
 - resumes, drops, refusals, errors and labels;
 - the instance time held, against the free tier (Cloud Run bills an instance while it holds a request and while it
-  starts).
+  starts). Per instance, it is the union of the takes' spans, so two takes at once on the pair service count once.
 
 `python digest.py` prints it (gcloud signed in, logging.viewer on revisely-dev); `--post` adds it as a comment on the
 issue "Recitation checker health (weekly digest)" (label `recite-health`, made if missing). The workflow
