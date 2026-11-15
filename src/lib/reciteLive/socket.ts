@@ -13,6 +13,8 @@ import type { ClientFrame, LiveConnect, LiveConnection, LiveHandlers, StartFrame
 /** The checker's live endpoint (the same Cloud Run service as lib/reciteCheck/service). */
 export const RECITE_LIVE_URL = 'wss://recite-check-433792838929.us-east1.run.app/live';
 
+/** The take's audio rate (16 kHz mono). */
+const SAMPLE_RATE_HZ = 16_000;
 /** Samples per frame when sending held audio again after a drop (1 s). */
 const RESEND_SAMPLES = 16_000;
 /** Tries to reconnect before giving up, and the waits between them. */
@@ -222,6 +224,24 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
       close: () => finish(),
       status: () =>
         finished ? 'finished' : retry != null ? `retry ${tries}` : socket ? (live ? 'live' : 'opening') : 'none',
+      // Still there after the take ends (the audio is held for resuming), for "Your recitation" on its marks.
+      audioClip: (from, to) => {
+        const a = Math.max(0, Math.floor(from * SAMPLE_RATE_HZ));
+        const b = Math.min(samples, Math.ceil(to * SAMPLE_RATE_HZ));
+        if (b <= a) return null;
+        const out = new Int16Array(b - a);
+        let pos = 0;
+        for (const chunk of audio) {
+          const end = pos + chunk.length;
+          if (end > a && pos < b) {
+            const s0 = Math.max(a, pos);
+            out.set(chunk.subarray(s0 - pos, Math.min(b, end) - pos), s0 - a);
+          }
+          pos = end;
+          if (pos >= b) break;
+        }
+        return out;
+      },
     };
   };
 }

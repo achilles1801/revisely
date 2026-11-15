@@ -46,6 +46,8 @@ export interface LiveConnection {
   close(): void;
   /** The connection's state in a word or two, for the Stop trace (lib/reciteLive/stopTrace): "live", "retry 2", … */
   status?(): string;
+  /** The take's audio from `from` to `to` seconds (16 kHz mono), as held on the phone; null outside what was heard. */
+  audioClip?(from: number, to: number): Int16Array | null;
 }
 
 export interface LiveHandlers {

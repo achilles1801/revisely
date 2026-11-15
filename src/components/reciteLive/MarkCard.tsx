@@ -161,6 +161,7 @@ export function MarkCard({
   anchor,
   onDismiss,
   onHear,
+  onYours,
   onSimilar,
   hasSimilar,
   onClose,
@@ -171,6 +172,8 @@ export function MarkCard({
   anchor: Box | null;
   onDismiss: (id: string) => void;
   onHear: (mark: Mark) => void;
+  /** Your recitation: the reciter's own voice at the mark; absent when the take's audio for it isn't on the phone. */
+  onYours?: (mark: Mark) => void;
   onSimilar: (mark: Mark) => void;
   hasSimilar: boolean;
   onClose: () => void;
@@ -232,6 +235,9 @@ export function MarkCard({
         ))}
         <View style={styles.actions}>
           <SmallPill icon="volume-high-outline" label="Hear it" onPress={() => onHear(main)} testID="mark-card-hear" />
+          {onYours ? (
+            <SmallPill icon="person-outline" label="Your recitation" onPress={() => onYours(main)} testID="mark-card-yours" />
+          ) : null}
           {hasSimilar ? (
             <SmallPill icon="git-compare-outline" label="Similar phrases" onPress={() => onSimilar(main)} testID="mark-card-similar" />
           ) : null}

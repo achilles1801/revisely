@@ -127,9 +127,17 @@ jest.mock('../../../lib/recite/quranWords', () => {
 });
 
 // The checker: the test sends its events.
-const mockLive: { start?: Record<string, unknown>; onEvent?: (e: LiveEvent) => void; onClose?: () => void; sent: unknown[]; audio: number } = {
+const mockLive: {
+  start?: Record<string, unknown>;
+  onEvent?: (e: LiveEvent) => void;
+  onClose?: () => void;
+  sent: unknown[];
+  audio: number;
+  clips: [number, number][];
+} = {
   sent: [],
   audio: 0,
+  clips: [],
 };
 jest.mock('../../../lib/reciteCheck/service', () => ({ ...jest.requireActual('../../../lib/reciteCheck/service'), warmUpReciteCheck: jest.fn() }));
 jest.mock('../../../lib/reciteLive/socket', () => ({
@@ -141,9 +149,17 @@ jest.mock('../../../lib/reciteLive/socket', () => ({
       sendAudio: (pcm: Int16Array) => (mockLive.audio += pcm.length),
       send: (f: unknown) => mockLive.sent.push(f),
       close: jest.fn(),
+      // The take's audio held on the phone (lib/reciteLive/socket's own test cuts it): the seconds asked for, as samples.
+      audioClip: (from: number, to: number) => {
+        mockLive.clips.push([from, to]);
+        return new Int16Array(Math.round((to - from) * 16000));
+      },
     };
   },
 }));
+
+// Your recitation's clip as a file (lib/reciteLive/clipFile).
+jest.mock('../../../lib/reciteLive/clipFile', () => ({ writeClip: jest.fn(() => 'file:///cache/recite-your-recitation.wav') }));
 
 // A take kept as a recording: the file side is lib/reciteLive/takeRecording's own test.
 const mockTake: { started: { day: string; page: number } | null; added: number; finished: number } = { started: null, added: 0, finished: 0 };
@@ -191,6 +207,7 @@ beforeEach(async () => {
   mockState.dev = true;
   mockLive.sent = [];
   mockLive.audio = 0;
+  mockLive.clips = [];
   mockLive.start = undefined;
   mockPager.scrolled = [];
   mockMic = null;
@@ -639,6 +656,58 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
       expect(player.remove).toHaveBeenCalled();
     });
 
+  });
+
+  describe('Your recitation (Majd, Nov 15 2026: Tarteel plays what you said and the reference)', () => {
+    const closeCard = () => act(async () => fireEvent(screen.getByTestId('mark-card-backdrop'), 'responderGrant'));
+
+    it('the card plays your own voice at the mark, a little before and after; a take still listening pauses first', async () => {
+      await startTake('check');
+      await event({
+        type: 'mark',
+        mark: { id: 'a', w: UTIYAT, ayah: [27, 23], kind: 'word', sure: 'clear', heard: 'وَأُوهِيَتْ', heardExact: false, t: [8.1, 8.5] },
+      });
+      await tapWord(UTIYAT);
+      await act(async () => fireEvent.press(screen.getByTestId('mark-card-yours')));
+      expect(mockLive.clips).toEqual([[expect.closeTo(7.5, 5), expect.closeTo(8.9, 5)]]);
+      const { writeClip } = jest.requireMock('../../../lib/reciteLive/clipFile');
+      expect((writeClip as jest.Mock).mock.calls[0][0]).toHaveLength(Math.round(1.4 * 16000));
+      expect(playerUris().at(-1)).toBe('file:///cache/recite-your-recitation.wav');
+      expect(mockLive.sent).not.toContainEqual({ type: 'end' });
+      await closeCard();
+      expect(screen.getByTestId('recite-resume')).toBeTruthy();
+    });
+
+    it('after the take too, from its summary', async () => {
+      await startTake('check');
+      const mark = { id: 'a', w: UTIYAT, ayah: [27, 23] as [number, number], kind: 'word' as const, sure: 'clear' as const, t: [8.1, 8.5] as [number, number] };
+      await event({ type: 'mark', mark });
+      fireEvent.press(screen.getByTestId('recite-stop'));
+      await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, start: A23, secs: 12, marks: [mark], score: null } });
+      await act(async () => mockLive.onClose?.());
+      fireEvent.press(screen.getByTestId('take-summary-finding-word'));
+      await flush();
+      await act(async () => fireEvent.press(screen.getByTestId('mark-card-yours')));
+      expect(mockLive.clips).toHaveLength(1);
+      expect(playerUris().at(-1)).toBe('file:///cache/recite-your-recitation.wav');
+    });
+
+    it('a mark with no time of its own (a skipped word): around when the cursor reached the word before', async () => {
+      await startTake('check');
+      await event({ type: 'at', w: UTIYAT - 1, t: 6 } as LiveEvent);
+      await event({ type: 'mark', mark: { id: 's', w: UTIYAT, ayah: [27, 23], kind: 'skipped', sure: 'clear' } });
+      await tapWord(UTIYAT);
+      await act(async () => fireEvent.press(screen.getByTestId('mark-card-yours')));
+      expect(mockLive.clips).toEqual([[expect.closeTo(4.8, 5), expect.closeTo(7.2, 5)]]);
+    });
+
+    it('no button when the moment isn’t known', async () => {
+      await startTake('check');
+      await event({ type: 'mark', mark: { id: 's', w: UTIYAT + 3, ayah: [27, 23], kind: 'skipped', sure: 'clear' } });
+      await tapWord(UTIYAT + 3);
+      expect(screen.getByTestId('mark-card')).toBeTruthy();
+      expect(screen.queryByTestId('mark-card-yours')).toBeNull();
+    });
   });
 
   describe('Pause and Resume on the bar', () => {
