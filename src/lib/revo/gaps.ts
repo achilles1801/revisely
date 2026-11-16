@@ -1,4 +1,4 @@
-// Revo's view of Insights' Gaps and Last revised (ACT-28, ACT-29; Majd, Nov 16 2026: "whatever app changes we make,
+// Revo's view of Insights' Gaps and Last revised (ACT-28, ACT-30; Majd, Nov 16 2026: "whatever app changes we make,
 // revo should get that update too"). The same figures the section and the screen show, over the last 30 days, as
 // numbers the server checks and writes out in words (functions/src/revo: gaps): how long since the last revision,
 // the longest gap, the usual rhythm, how far gaps pushed the full revision back, and when each memorized surah was
