@@ -79,6 +79,8 @@ export interface RevoContext {
    * an account that recites with Mark mistakes (lib/revo/recitation). The server adds its recitation rules with it.
    */
   recitation?: RevoRecitation;
+  /** 'dev' from Revisely Dev (lib/variant): the server then adds the Dev guide to the question. Never from the store app. */
+  app?: 'dev';
   localTime: string | null;
 }
 

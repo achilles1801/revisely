@@ -12,6 +12,7 @@ import type { TodaySnapshot } from '../todaySnapshot';
 import { daySignals, revoPatterns, sessionStarts } from './patterns';
 import type { RevoContext, RevoRecitation, RevoTotals } from './types';
 import { contextWords, memorizedWords } from './words';
+import { isDevVariant } from '../variant';
 import { isRevisable, memorizedAyahs, memorizedPageShare, partlyMemorizedAyahs, revisablePages } from '../memorizedAyahs';
 
 const MAX_PAGES = 20;
@@ -154,6 +155,9 @@ export function buildRevoContext(input: {
     passages: memorizedTodayWords ? { ...words.passages, memorizedToday: memorizedTodayWords } : words.passages,
     pageNames: words.pageNames,
     ...(input.recitation ? { recitation: input.recitation } : {}),
+    // Revisely Dev: the server adds the Dev guide, what only Revisely Dev has (functions/src/revo/guide.ts). The
+    // store app never sends it, so its questions are asked exactly as before.
+    ...(isDevVariant() ? { app: 'dev' as const } : {}),
     localTime: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
   };
 }
