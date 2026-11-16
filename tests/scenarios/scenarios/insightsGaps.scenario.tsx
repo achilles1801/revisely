@@ -66,7 +66,12 @@ it('[ACT-28] [DAY-2] Gaps counts by the revision day: a session after midnight, 
   // Monday 9 November, evening: two days since Saturday (one, had the session counted for Sunday).
   setNow('2026-11-09 20:00');
   const app = await openInsights(phone);
-  await app.until(() => label(app, 'insights-gaps-figure') === '2 days since your last revision', 'the days since Saturday’s revision');
+  // The figure can come from the pages' own last revised dates before Insights has read its items, so wait for the
+  // strip too (it counts the items' revision days).
+  await app.until(
+    () => label(app, 'insights-gaps-figure') === '2 days since your last revision' && label(app, 'insights-gaps-strip')?.includes('revised on 3 days') === true,
+    'the days since Saturday’s revision, and the items read',
+  );
   // 3 → 7 November is a gap of 4 days; 7 → today, open, two (not yet long).
   expect(label(app, 'insights-gaps-longest')).toBe('4 days Longest gap, 3 Nov – 7 Nov');
   // Steps of 1 and 4 days: usually every 2–3 days.
@@ -84,7 +89,10 @@ it('[ACT-28] [DAY-2] Gaps counts by the revision day: a session after midnight, 
   // Revising now ends the open gap: "Today, you revised", and a 2-day gap isn't named.
   await revise(phone, '2026-11-09 20:30');
   const after = await openInsights(phone);
-  await after.until(() => label(after, 'insights-gaps-figure') === 'Today you revised', 'today’s revision in Gaps');
+  await after.until(
+    () => label(after, 'insights-gaps-figure') === 'Today you revised' && label(after, 'insights-gaps-strip')?.includes('revised on 4 days') === true,
+    'today’s revision in Gaps, and the items read',
+  );
   expect(label(after, 'insights-gaps-strip')).toBe('Since 2 November: revised on 4 days. Gaps of 3 days or more: 4 days, from 3 November to 7 November.');
   // Today's five (594–598) are no longer late.
   expect(label(after, 'insights-gaps-revision')).toBe(
