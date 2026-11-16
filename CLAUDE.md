@@ -367,6 +367,16 @@ until its part is set up.
     - The AI notice comes first if it hasn't been agreed, then the same take. It waits for the account's settings and,
       with Mark mistakes on, for Premium to be known (3 s at most).
     - E2E: `revisely://e2e/voice-search?heard=…` (flow 18, An-Naml 25).
+  - **The search screen** (Majd, Nov 16 2026: "the mic button being top right is annoying to have to reach up there
+    just to end the check"; Tarteel's as inspiration, built in our own design; for everyone with search): the field
+    and a 56pt mic sit in one bar at the bottom (`search-bar`), in reach of a thumb, and the keyboard pushes them up
+    (`KeyboardAvoidingView` padding, Android too). Stopping is one tap on the same button. While listening: what is
+    heard so far, large, and the voice's level (`LiveWaveform` fed by `useVoiceSearch().levels`). A verse found is a
+    row of its own (`components/search/SearchVerseCard`): surah and ayah first (the page a quiet detail), the ayat
+    large with the words found in full ink, the account's translation exactly as given (raised footnote markers, its
+    footnotes and its credit with the version kept, as QuranEnc's and The Clear Quran's terms ask;
+    `getVerseTranslation`, no Arabic fetched), then Share, Copy (the ayat from the word data on the phone, so they
+    work offline; "Copied") and Open in the reader.
 
 ## How updates reach phones
 

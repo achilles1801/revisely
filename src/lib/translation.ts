@@ -528,6 +528,33 @@ export async function getVerseText(
   return compose(t, sura, ayah, arabic, verse.text, verse);
 }
 
+/** A verse in the chosen translation alone (no Arabic): its text exactly as given, its footnotes and version. */
+export interface VerseTranslation {
+  translation: TranslationInfo;
+  text: string;
+  footnotes?: string;
+  version?: string;
+}
+
+/** One verse's translation, without its Arabic (search results show the Arabic from the word data on the phone). */
+export async function getVerseTranslation(sura: number, ayah: number, translationId?: string | null): Promise<VerseTranslation> {
+  const t = resolveTranslation(translationId);
+  if (t.id === CLEAR_QURAN_ID) return { translation: t, text: await getClearQuranVerse(sura, ayah) };
+  const verse = await quranEncVerse(t, sura, ayah);
+  return { translation: t, text: verse.text, footnotes: verse.footnotes, version: verse.version };
+}
+
+/** What getVerseTranslation would give, if it is already in memory; else null. */
+export function peekVerseTranslation(sura: number, ayah: number, translationId?: string | null): VerseTranslation | null {
+  const t = resolveTranslation(translationId);
+  if (t.id === CLEAR_QURAN_ID) {
+    const text = peekClearQuranVerse(sura, ayah);
+    return text === undefined ? null : { translation: t, text };
+  }
+  const verse = peekQuranEncVerse(t, sura, ayah);
+  return verse ? { translation: t, text: verse.text, footnotes: verse.footnotes, version: verse.version } : null;
+}
+
 /** A QuranEnc translation's verse: Saheeh International through lib/saheeh, the others from their store. */
 function quranEncVerse(t: TranslationInfo, sura: number, ayah: number): Promise<QuranEncVerse> {
   if (t.id === DEFAULT_TRANSLATION_ID) return getSaheehVerse(sura, ayah);

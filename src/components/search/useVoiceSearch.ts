@@ -10,6 +10,14 @@ import { downloadedModelPath } from '../../lib/recite/speechModel';
 import { useSpeechModelState } from '../../lib/recite/speechModelStore';
 import { VoiceQuery } from '../../lib/search/voiceQuery';
 import { e2eVoiceHeard } from '../../lib/search/availability';
+import type { LiveLevels } from '../recordings/LiveWaveform';
+
+/** The microphone's level, read this often while listening (the waveform's bars). */
+const LEVEL_MS = 100;
+/** Readings kept for a waveform that mounts late. */
+const LEVELS_KEPT = 64;
+/** A level in dB as 0–1 for the bars: quiet room at the bottom, a full voice near the top. */
+export const levelOf = (db: number) => Math.max(0, Math.min(1, (db + 55) / 45));
 
 /**
  * idle: not listening. starting: the microphone and the model are being readied.
@@ -37,6 +45,35 @@ export function useVoiceSearch(onHeard: (text: string) => void, enabled: boolean
   onHeardRef.current = onHeard;
   const [owner] = useState(() => `voice-search-${Math.random().toString(36).slice(2)}`);
   const mounted = useRef(true);
+  // The microphone's level while listening, for the waveform (LiveWaveform's feed).
+  const levelReadings = useRef<number[]>([]);
+  const levelListeners = useRef(new Set<(level: number) => void>());
+  const levelTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pushLevel = useCallback((level: number) => {
+    const r = levelReadings.current;
+    r.push(level);
+    if (r.length > LEVELS_KEPT) r.splice(0, r.length - LEVELS_KEPT);
+    levelListeners.current.forEach((l) => l(level));
+  }, []);
+  const stopLevels = useCallback(() => {
+    if (levelTimer.current) clearInterval(levelTimer.current);
+    levelTimer.current = null;
+  }, []);
+  const startLevels = useCallback(
+    (read: () => number) => {
+      stopLevels();
+      levelReadings.current = [];
+      levelTimer.current = setInterval(() => pushLevel(read()), LEVEL_MS);
+    },
+    [stopLevels, pushLevel],
+  );
+  const [levels] = useState<LiveLevels>(() => ({
+    subscribe: (listener) => {
+      levelListeners.current.add(listener);
+      return () => levelListeners.current.delete(listener);
+    },
+    recent: () => [...levelReadings.current],
+  }));
 
   const release = useCallback(async () => {
     await setAudioMode(false).catch(() => undefined);
@@ -50,7 +87,11 @@ export function useVoiceSearch(onHeard: (text: string) => void, enabled: boolean
     const scripted = process.env.EXPO_PUBLIC_E2E === '1' ? e2eVoiceHeard() : null;
     if (scripted) {
       setStatus('listening');
+      // A voice's rise and fall, for the waveform.
+      let n = 0;
+      startLevels(() => 0.35 + 0.3 * Math.abs(Math.sin(n++ / 3)));
       await wait(3000);
+      stopLevels();
       if (!mounted.current) return;
       setStatus('idle');
       onHeardRef.current(scripted);
@@ -99,7 +140,9 @@ export function useVoiceSearch(onHeard: (text: string) => void, enabled: boolean
         return;
       }
       setStatus('listening');
+      startLevels(() => levelOf(query.levelDb));
       const { text, end } = await query.result;
+      stopLevels();
       queryRef.current = null;
       await release();
       if (!mounted.current) return;
@@ -108,11 +151,12 @@ export function useVoiceSearch(onHeard: (text: string) => void, enabled: boolean
       if (text) onHeardRef.current(text);
     } catch (err) {
       logger.warn('Could not listen for a search', err);
+      stopLevels();
       queryRef.current = null;
       await release();
       if (mounted.current) setStatus('error');
     }
-  }, [available, owner, release]);
+  }, [available, owner, release, startLevels, stopLevels]);
 
   /** Stop and search with what was said. */
   const stop = useCallback(() => {
@@ -133,9 +177,10 @@ export function useVoiceSearch(onHeard: (text: string) => void, enabled: boolean
     mounted.current = true;
     return () => {
       mounted.current = false;
+      stopLevels();
       void queryRef.current?.cancel();
     };
-  }, []);
+  }, [stopLevels]);
 
   return {
     available,
@@ -145,5 +190,7 @@ export function useVoiceSearch(onHeard: (text: string) => void, enabled: boolean
     needsModel: model.status !== 'ready' && !(process.env.EXPO_PUBLIC_E2E === '1' && e2eVoiceHeard()),
     listen,
     stop,
+    /** The microphone's level while listening (0–1, every 100 ms), for a waveform. */
+    levels,
   };
 }

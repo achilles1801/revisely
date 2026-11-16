@@ -605,6 +605,52 @@ appId: com.revisionbuddy.app
     visible:
       id: recite-mic
     timeout: 5000
+# The search's results (Majd, Nov 16 2026: the field and the mic at the bottom, clearer results). With the live check off a
+# voice search's one result stays on the results: Al-Ikhlas 1, whose Saheeh International E2E builds carry
+# (lib/e2e/demoTranslations), so its card shows the ayah, the translation and its credit, Share, Copy and Open.
+- openLink:
+    link: revisely://e2e/recite-live?on=0
+    optional: true
+- runFlow: ../subflows/open-link-prompt.yaml
+- openLink:
+    link: revisely://e2e/voice-search?heard=%D9%82%D9%84%20%D9%87%D9%88%20%D8%A7%D9%84%D9%84%D9%87%20%D8%A3%D8%AD%D8%AF
+    optional: true
+- runFlow: ../subflows/open-link-prompt.yaml
+- runFlow:
+    when:
+      notVisible:
+        id: reader-back
+    commands:
+      - tapOn:
+          id: reader-background
+- tapOn:
+    id: reader-back
+- tapOn:
+    id: read-search
+- extendedWaitUntil:
+    visible:
+      id: search-bar
+    timeout: 10000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl18-search-dark
+- tapOn:
+    id: search-mic
+- extendedWaitUntil:
+    visible:
+      id: search-verse-112-1
+    timeout: 15000
+- extendedWaitUntil:
+    visible:
+      id: search-verse-translation
+    timeout: 10000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl19-search-result-dark
+- tapOn:
+    id: search-back
 - openLink:
     link: revisely://e2e/voice-search?off=1
     optional: true

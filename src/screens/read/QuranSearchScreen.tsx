@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Keyboard, StyleSheet, Text, TextInput, View } from 'react-native';
+import { AccessibilityInfo, ActivityIndicator, Keyboard, KeyboardAvoidingView, Platform, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FlatList } from 'react-native-gesture-handler';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -9,14 +10,17 @@ import { Mark } from '../../components/v2/Mark';
 import { Tap } from '../../components/v2/Tap';
 import { SpeechModelSheet } from '../../components/recite/SpeechModelSheet';
 import { useVoiceSearch } from '../../components/search/useVoiceSearch';
+import { hitShareText, SearchVerseCard } from '../../components/search/SearchVerseCard';
+import { LiveWaveform } from '../../components/recordings/LiveWaveform';
+import { UndoToast } from '../../components/revision/UndoToast';
+import { useHaptics } from '../../design/haptics';
+import { copyText } from '../../lib/clipboard';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import { arabicV2, layoutV2, typeV2 } from '../../theme/v2';
 import type { ReadStackParamList } from '../../navigation/MainNavigator';
 import { getJuzRange } from '../../lib/quranData';
-import { describeAyahs, spokenText, surahName } from '../../lib/passages';
-import { ayahKey, ayahOf, ayahsBetween, suraOf } from '../../lib/ayahKeys';
-import { verseEndMark } from '../../lib/verseShare';
+import { surahName } from '../../lib/passages';
 import { pageOfVerse } from '../../lib/verses';
 import { loadQuranWords, QuranWords } from '../../lib/recite/quranWords';
 import { matchedWords, searchText, VerseHit } from '../../lib/search/quranSearch';
@@ -92,6 +96,17 @@ export default function QuranSearchScreen() {
   const [recent, setRecent] = useState<string[]>([]);
   const [modelSheet, setModelSheet] = useState(false);
   const inputRef = useRef<TextInput>(null);
+  const insets = useSafeAreaInsets();
+  // With the keyboard up the bar sits on it, so it needs no room for the home indicator.
+  const [keyboardUp, setKeyboardUp] = useState(false);
+  useEffect(() => {
+    const show = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', () => setKeyboardUp(true));
+    const hide = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide', () => setKeyboardUp(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
   const pending = useRef<{ query: string; voice: boolean } | null>(null);
   // Revisely Dev's live check (testers, the 1405 print): a voice search with one result opens the reader reciting.
   const reciteOn = reciteLiveEnabled(user, useMushafEdition());
@@ -216,11 +231,46 @@ export default function QuranSearchScreen() {
     return null;
   }, [voice.status, loadFailed]);
 
+  // Share and Copy on a result: the ayat as shown (the word data on the phone), "Copied" for a moment.
+  const haptics = useHaptics();
+  const [note, setNote] = useState<string | null>(null);
+  const copyHit = useCallback(
+    (hit: VerseHit) => {
+      if (!words) return;
+      copyText(hitShareText(words, hit));
+      haptics.light();
+      setNote('Copied');
+      AccessibilityInfo.announceForAccessibility('Copied');
+    },
+    [words, haptics],
+  );
+  const shareHit = useCallback(
+    (hit: VerseHit) => {
+      if (!words) return;
+      Share.share({ message: hitShareText(words, hit) }).catch((err) => logger.warn('Could not share the verse', err));
+    },
+    [words],
+  );
+
+  // The header: back and the title. The field and the mic are at the bottom, in reach of a thumb (Majd, Nov 16 2026:
+  // "the mic button being top right is annoying to have to reach up there just to end the check").
   const header = (
-    <View style={[styles.bar, { borderBottomColor: palette.separator }]}>
+    <View style={styles.header}>
       <Tap onPress={() => navigation.goBack()} hitSlop={10} accessibilityRole="button" accessibilityLabel="Back" testID="search-back">
         <Ionicons name="chevron-back" size={26} color={palette.text} />
       </Tap>
+      <Text style={[typeV2.name, styles.headerTitle, { color: palette.text }]} accessibilityRole="header" maxFontSizeMultiplier={1.4}>
+        Search
+      </Text>
+      <View style={styles.headerSide} />
+    </View>
+  );
+
+  const bar = (
+    <View
+      style={[styles.bar, { borderTopColor: palette.separator, backgroundColor: palette.bg, paddingBottom: keyboardUp ? 10 : Math.max(10, insets.bottom) }]}
+      testID="search-bar"
+    >
       <View style={[styles.field, { backgroundColor: palette.fill }]}>
         <Ionicons name="search" size={18} color={palette.secondary} />
         <TextInput
@@ -239,6 +289,7 @@ export default function QuranSearchScreen() {
           returnKeyType="search"
           clearButtonMode="never"
           accessibilityLabel="Search the Quran"
+          maxFontSizeMultiplier={1.6}
           testID="search-input"
         />
         {text !== '' ? (
@@ -262,13 +313,19 @@ export default function QuranSearchScreen() {
           onPress={listening ? voice.stop : startListening}
           // Not while it gets ready (the microphone prompt) or reads what was said.
           disabled={thinking || voice.status === 'starting'}
-          hitSlop={6}
+          hitSlop={8}
           accessibilityRole="button"
           accessibilityLabel={listening ? 'Stop listening' : 'Search by voice'}
           style={[styles.mic, { backgroundColor: listening ? palette.red : palette.primary }]}
           testID="search-mic"
         >
-          <Ionicons name={listening ? 'stop' : 'mic'} size={20} color={listening ? palette.onRedFill : palette.onPrimary} />
+          {listening ? (
+            <View style={[styles.stopSquare, { backgroundColor: palette.onRedFill }]} />
+          ) : thinking ? (
+            <ActivityIndicator color={palette.onPrimary} />
+          ) : (
+            <Ionicons name="mic" size={26} color={palette.onPrimary} />
+          )}
         </Tap>
       ) : null}
     </View>
@@ -278,15 +335,20 @@ export default function QuranSearchScreen() {
   if (listening || thinking) {
     body = (
       <View style={styles.listening} testID="search-listening">
-        <Text style={[typeV2.name, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
-          {thinking ? 'Searching…' : voice.status === 'starting' ? 'Getting ready…' : 'Listening…'}
+        <Text style={[typeV2.body, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
+          {thinking ? 'Searching…' : voice.status === 'starting' ? 'Getting ready…' : 'Listening… recite any words of an ayah'}
         </Text>
-        {voice.partial ? (
-          <Text style={[arabicV2(22), styles.arabic, { color: palette.secondary }]} accessibilityLanguage="ar" testID="search-partial">
-            {voice.partial}
-          </Text>
-        ) : thinking ? (
-          <ActivityIndicator color={palette.secondary} />
+        <View style={styles.transcriptBox}>
+          {voice.partial ? (
+            <Text style={[arabicV2(30), styles.arabic, { color: palette.text }]} accessibilityLanguage="ar" testID="search-partial">
+              {voice.partial}
+            </Text>
+          ) : null}
+        </View>
+        {listening ? (
+          <View style={styles.wave} testID="search-wave">
+            <LiveWaveform levels={voice.levels} color={palette.primary} maxHeight={44} />
+          </View>
         ) : null}
       </View>
     );
@@ -310,11 +372,18 @@ export default function QuranSearchScreen() {
         keyboardDismissMode="on-drag"
         contentContainerStyle={styles.list}
         ListHeaderComponent={
-          heading ? (
-            <Text style={[typeV2.meta, styles.heading, { color: palette.secondary }]} testID="search-count">
-              {heading}
-            </Text>
-          ) : null
+          <View style={styles.resultsHead}>
+            {hasArabic(results.query) ? (
+              <Text style={[arabicV2(20), styles.arabic, { color: palette.secondary }]} accessibilityLanguage="ar" numberOfLines={2}>
+                {results.query}
+              </Text>
+            ) : null}
+            {heading ? (
+              <Text style={[typeV2.meta, { color: palette.secondary }]} testID="search-count">
+                {heading}
+              </Text>
+            ) : null}
+          </View>
         }
         ListEmptyComponent={
           <Text style={[typeV2.body, styles.empty, { color: palette.secondary }]} testID="search-none">
@@ -325,11 +394,14 @@ export default function QuranSearchScreen() {
           item.kind === 'target' ? (
             <TargetRow target={item.target} onPress={() => openTarget(item.target)} />
           ) : words ? (
-            <VerseRow
+            <SearchVerseCard
               hit={item.hit}
               matched={item.matched}
               words={words}
-              onPress={() => open(pageOfVerse(item.hit), { sura: item.hit.sura, ayah: item.hit.ayah, last: item.hit.last })}
+              translationId={user?.translationId}
+              onOpen={() => open(pageOfVerse(item.hit), { sura: item.hit.sura, ayah: item.hit.ayah, last: item.hit.last })}
+              onShare={() => shareHit(item.hit)}
+              onCopy={() => copyHit(item.hit)}
             />
           ) : null
         }
@@ -389,12 +461,23 @@ export default function QuranSearchScreen() {
   return (
     <TopSafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
       {header}
-      {status ? (
-        <Text style={[typeV2.meta, styles.status, { color: palette.red }]} testID="search-status">
-          {status}
-        </Text>
-      ) : null}
-      {body}
+      {/* The keyboard pushes the field and the mic up with it, on Android too (edge to edge: the window isn't resized). */}
+      <KeyboardAvoidingView style={styles.fill} behavior="padding">
+        {status ? (
+          <Text style={[typeV2.meta, styles.status, { color: palette.red }]} testID="search-status">
+            {status}
+          </Text>
+        ) : null}
+        <View style={styles.fill}>{body}</View>
+        {bar}
+      </KeyboardAvoidingView>
+      <UndoToast
+        visible={note != null}
+        message={note ?? ''}
+        duration={1500}
+        onDismiss={() => setNote(null)}
+        bottomInset={insets.bottom + BAR_HEIGHT}
+      />
       <SpeechModelSheet
         visible={modelSheet}
         onClose={() => setModelSheet(false)}
@@ -432,65 +515,29 @@ function TargetRow({ target, onPress }: { target: SearchTarget; onPress: () => v
   );
 }
 
-/** A search match runs over at most this many ayat in its row (as the reader highlights). */
-const MAX_ROW_AYAHS = 12;
-
-/**
- * A verse found in the text: where it is, then the ayah with the words found in full ink.
- * A match that runs on into the next ayah (or more) is named as the run ("Al-Hajj, ayahs
- * 49–50") and shows each of its ayat, each ending in its number.
- */
-function VerseRow({ hit, matched, words, onPress }: { hit: VerseHit; matched: Set<number>; words: QuranWords; onPress: () => void }) {
-  const { palette } = useTheme();
-  const first = ayahKey(hit.sura, hit.ayah);
-  const last = ayahKey(hit.last.sura, hit.last.ayah);
-  const ayahs = useMemo(() => (last > first ? ayahsBetween(first, last).slice(0, MAX_ROW_AYAHS) : [first]), [first, last]);
-  const title = ayahs.length > 1 ? describeAyahs(ayahs, { wholeJuz: false }) : verseTitle(hit.sura, hit.ayah);
-  const page = pageOfVerse(hit);
-  return (
-    <Tap
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={`${spokenText(title)}, page ${page}`}
-      style={[styles.verse, { borderBottomColor: palette.separator }]}
-      testID={`search-verse-${hit.sura}-${hit.ayah}`}
-    >
-      <View style={styles.verseHead}>
-        <Text style={[typeV2.name, styles.main, { color: palette.text }]} numberOfLines={1}>
-          {title}
-        </Text>
-        <Text style={[typeV2.meta, { color: palette.secondary }]}>{`p.${NBSP}${page}`}</Text>
-      </View>
-      <Text style={[arabicV2(22), styles.arabic]} accessibilityLanguage="ar">
-        {ayahs.map((key, n) => {
-          const [from, to] = words.verseRange(suraOf(key), ayahOf(key));
-          return (
-            <React.Fragment key={key}>
-              {Array.from({ length: to - from }, (_, k) => from + k).map((i, k) => (
-                <Text key={i} style={{ color: matched.has(i) ? palette.text : palette.secondary }}>
-                  {n > 0 || k > 0 ? ' ' : ''}
-                  {words.uthmani(i)}
-                </Text>
-              ))}
-              {ayahs.length > 1 ? <Text style={{ color: palette.secondary }}>{` ${verseEndMark(ayahOf(key))}`}</Text> : null}
-            </React.Fragment>
-          );
-        })}
-      </Text>
-    </Tap>
-  );
-}
+/** The bottom bar's height above the safe area (the toast sits above it). */
+const BAR_HEIGHT = 76;
+const MIC = 56;
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  fill: { flex: 1 },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: layoutV2.gutter,
+    paddingTop: 6,
+    paddingBottom: 8,
+  },
+  headerTitle: { flex: 1, textAlign: 'center' },
+  headerSide: { width: 26 },
   bar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
     paddingHorizontal: layoutV2.gutter,
-    paddingTop: 8,
-    paddingBottom: 10,
-    borderBottomWidth: layoutV2.hairline,
+    paddingTop: 10,
+    borderTopWidth: layoutV2.hairline,
   },
   field: {
     flex: 1,
@@ -498,15 +545,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     borderRadius: 999,
-    paddingHorizontal: 12,
-    minHeight: 40,
+    paddingHorizontal: 14,
+    minHeight: 48,
   },
-  input: { flex: 1, paddingVertical: 8 },
-  mic: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  input: { flex: 1, paddingVertical: 10 },
+  mic: { width: MIC, height: MIC, borderRadius: MIC / 2, alignItems: 'center', justifyContent: 'center' },
+  stopSquare: { width: 18, height: 18, borderRadius: 4 },
   status: { paddingHorizontal: layoutV2.gutter, paddingTop: 10 },
-  listening: { paddingHorizontal: layoutV2.gutter, paddingTop: 28, gap: 14, alignItems: 'center' },
-  list: { paddingBottom: 40 },
-  heading: { paddingHorizontal: layoutV2.gutter, paddingTop: 14, paddingBottom: 4 },
+  listening: { flex: 1, paddingHorizontal: layoutV2.gutter, paddingTop: 20, gap: 18 },
+  transcriptBox: { flex: 1 },
+  wave: { height: 56, justifyContent: 'center', marginBottom: 8 },
+  list: { paddingBottom: 24 },
+  resultsHead: { paddingHorizontal: layoutV2.gutter, paddingTop: 12, paddingBottom: 4, gap: 6 },
   empty: { paddingHorizontal: layoutV2.gutter, paddingTop: 24 },
   recentHead: {
     flexDirection: 'row',
@@ -526,12 +576,5 @@ const styles = StyleSheet.create({
     borderBottomWidth: layoutV2.hairline,
   },
   main: { flex: 1, minWidth: 0 },
-  verse: {
-    paddingVertical: 12,
-    paddingHorizontal: layoutV2.gutter,
-    borderBottomWidth: layoutV2.hairline,
-    gap: 6,
-  },
-  verseHead: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
   arabic: { textAlign: 'right', writingDirection: 'rtl' },
 });
