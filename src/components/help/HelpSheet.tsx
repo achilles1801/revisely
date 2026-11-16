@@ -17,6 +17,7 @@ import {
   type HelpScreen,
   type HelpTopic,
 } from '../../lib/help/topics';
+import { t } from '../../i18n';
 
 /** Past this text size the topics' marks drop out, so the words get the width (beside 46pt text they were specks). */
 export const MARKS_UP_TO = 1.6;
@@ -120,19 +121,19 @@ export function HelpSheet({
       title={entry.title}
       scroll
       onHidden={runPending}
-      footer={{ label: 'Done', onPress: onClose, testID: 'help-done' }}
+      footer={{ label: t('common.done'), onPress: onClose, testID: 'help-done' }}
       testID="help-sheet"
     >
       <View testID={`help-sheet-${screen}`}>
-        {topics.map((t) => (
-          <TopicRow key={t.id} topic={t} marks={marks} />
+        {topics.map((topic) => (
+          <TopicRow key={topic.id} topic={topic} marks={marks} />
         ))}
         {revo ? (
           <Tap onPress={() => after('revo')} accessibilityRole="button" style={styles.revo} testID="help-ask-revo">
             {marks ? <RevoMark size={MARK} /> : null}
             <View style={styles.revoLabel}>
               <Text style={[typeV2.name, { color: palette.link }]} maxFontSizeMultiplier={CHROME_MAX_SCALE}>
-                Ask Revo
+                {t('help.askRevo')}
               </Text>
               <Ionicons name="chevron-forward" size={14} color={palette.link} />
             </View>
@@ -145,7 +146,7 @@ export function HelpSheet({
           testID="help-hide"
         >
           <Text style={[typeV2.body, { color: palette.secondary }]} maxFontSizeMultiplier={CHROME_MAX_SCALE}>
-            Hide help buttons
+            {t('help.hide')}
           </Text>
         </Tap>
       </View>
