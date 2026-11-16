@@ -63,9 +63,11 @@ describe('plurals', () => {
         },
       },
     });
-    expect([1, 2].map((count) => i18n.t('pages', { count }))).toEqual(['1 page', '2 pages']);
-    const ar = i18n.getFixedT('ar');
-    expect([0, 1, 2, 3].map((count) => ar('pages', { count }))).toEqual(['لا صفحات', 'صفحة واحدة', 'صفحتان', '3 صفحات']);
+    // This instance's keys aren't the app's, so its t() is called untyped.
+    const english = i18n.getFixedT('en') as unknown as (key: string, options: { count: number }) => string;
+    const arabic = i18n.getFixedT('ar') as unknown as (key: string, options: { count: number }) => string;
+    expect([1, 2].map((count) => english('pages', { count }))).toEqual(['1 page', '2 pages']);
+    expect([0, 1, 2, 3].map((count) => arabic('pages', { count }))).toEqual(['لا صفحات', 'صفحة واحدة', 'صفحتان', '3 صفحات']);
   });
 });
 
