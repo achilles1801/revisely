@@ -112,16 +112,21 @@ export function shareActivityHistory(uid: string, day: string, items: HistoryIte
   for (const l of listeners) l();
 }
 
+/** The history Home read last for this account and day, or null. */
+export function sharedActivityHistory(uid: string | null | undefined, day: string): HistoryItem[] | null {
+  return shared && uid && shared.uid === uid && shared.day === day ? shared.items : null;
+}
+
 /** The history Home read last for this account and day, or null (callers use the logs, as Home does). */
 export function useSharedActivityHistory(uid: string | null | undefined, day: string): HistoryItem[] | null {
-  const current = useSyncExternalStore(
+  useSyncExternalStore(
     (onChange) => {
       listeners.add(onChange);
       return () => void listeners.delete(onChange);
     },
     () => shared,
   );
-  return current && uid && current.uid === uid && current.day === day ? current.items : null;
+  return sharedActivityHistory(uid, day);
 }
 
 /** Whether a history item is pages logged by hand (Activity's + → Revised elsewhere). */

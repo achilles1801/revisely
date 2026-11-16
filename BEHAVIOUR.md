@@ -320,7 +320,10 @@ has them; Revisely Dev's Revo knows them from its Dev guide.
   latest due day of a late page to the latest day one comes round ("from your gaps" when every late page was due
   before today; a catch-up that slid the plan back says only "come round"); none late: "Full revision on
   schedule". A plan changed mid-cycle is judged by the new plan; pages it doesn't hold are left out. Nothing
-  revised on record: no section. Recency only, the same with Smart Tracking on or off (ACT-19).
+  revised on record: no section. Recency only, the same with Smart Tracking on or off (ACT-19). Revo is told the
+  same figures over the last 30 days with each question, and when each memorized surah was last revised (ACT-30),
+  from the items Home read and only once they have loaded; only Revisely Dev sends them, and the server refuses them
+  from any other app.
   (Majd, Nov 16 2026: "some metric in insights
   that give the user an idea on their 'gaps' between session"; mocks insights-gaps.)
 
