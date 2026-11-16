@@ -123,12 +123,19 @@ function inIdPlace(node: ts.Node, sf: ts.SourceFile): boolean {
   return false;
 }
 
-/** A line marked `// i18n-ignore` (on it, or alone on the line above). */
+/**
+ * A line marked `// i18n-ignore` (on it, or alone on the line above), and every line between
+ * `// i18n-ignore-start` and `// i18n-ignore-end` (a table of ids).
+ */
 function ignoredLines(text: string): Set<number> {
   const lines = text.split('\n');
   const out = new Set<number>();
+  let block = false;
   lines.forEach((l, i) => {
-    if (!/\/\/\s*i18n-ignore\b|\/\*\s*i18n-ignore\b/.test(l)) return;
+    if (/i18n-ignore-start\b/.test(l)) block = true;
+    if (block) out.add(i + 1);
+    if (/i18n-ignore-end\b/.test(l)) block = false;
+    if (!/\/\/\s*i18n-ignore\b(?!-)|\/\*\s*i18n-ignore\b(?!-)/.test(l)) return;
     out.add(i + 1);
     if (/^\s*(\/\/|\/\*|\{\s*\/\*)/.test(l)) out.add(i + 2);
   });

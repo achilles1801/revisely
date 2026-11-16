@@ -77,10 +77,10 @@ describe('the English strings', () => {
       v && typeof v === 'object' ? leaves(v, `${prefix}${k}.`) : [[`${prefix}${k}`, v] as [string, unknown]],
     );
 
-  it('are all text, under camelCase keys', () => {
+  it('are all text, under camelCase keys (an id from elsewhere, like adhan\'s method names, as it is)', () => {
     for (const [key, value] of leaves(en)) {
       expect([key, typeof value === 'string' && value.trim().length > 0]).toEqual([key, true]);
-      expect([key, /^[a-z][A-Za-z0-9]*(\.[a-z][A-Za-z0-9]*)*(_(zero|one|two|few|many|other))?$/.test(key)]).toEqual([
+      expect([key, /^[a-z][A-Za-z0-9]*(\.[A-Za-z][A-Za-z0-9]*)*(_(zero|one|two|few|many|other))?$/.test(key)]).toEqual([
         key,
         true,
       ]);
