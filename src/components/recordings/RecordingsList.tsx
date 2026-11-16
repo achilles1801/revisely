@@ -29,7 +29,7 @@ import { Tap } from "../v2/Tap";
 import { ActionSheet } from "../v2/ActionSheet";
 import { AudioWaveform } from "../v2/AudioWaveform";
 import { HoldRow } from "../v2/SwipeRow";
-import { formatTime } from '../../i18n';
+import { formatTime, t } from '../../i18n';
 
 interface RecordingsListProps {
   day: string;
@@ -54,8 +54,12 @@ interface RecordingsListProps {
 }
 
 const KIND_LABEL: Record<RecordingKind, string> = {
-  revision: "Revision",
-  reading: "Reading",
+  get revision() {
+    return t('recordings.kind.revision');
+  },
+  get reading() {
+    return t('recordings.kind.reading');
+  },
 };
 
 /**
@@ -121,14 +125,12 @@ export function RecordingsList({
 
   const confirmDelete = (r: RecordingMeta) => {
     Alert.alert(
-      "Delete this recording?",
-      r.backedUp
-        ? "It is deleted from this phone and from your backup, and cannot be recovered."
-        : "It cannot be recovered.",
+      t('recordings.list.deleteTitle'),
+      r.backedUp ? t('recordings.list.deleteBackedUp') : t('recordings.list.deleteLocal'),
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t('common.cancel'), style: "cancel" },
         {
-          text: "Delete",
+          text: t('common.delete'),
           style: "destructive",
           onPress: async () => {
             haptics.warning();
@@ -159,7 +161,7 @@ export function RecordingsList({
           ]}
           testID="recordings-none"
         >
-          {emptyText ?? 'No recordings on this day'}
+          {emptyText ?? t('recordings.list.none')}
         </Text>
       </>
     );
@@ -191,9 +193,12 @@ export function RecordingsList({
                 style={styles.head}
                 accessible
                 accessibilityRole="header"
-                accessibilityLabel={`${name} recording, ${time}${r.backedUp ? (allLocal ? ", backed up" : ", in your backup") : ""}`}
+                accessibilityLabel={t(
+                  r.backedUp ? (allLocal ? 'recordings.list.labelBackedUp' : 'recordings.list.labelInBackup') : 'recordings.list.label',
+                  { kind: name, time },
+                )}
                 accessibilityActions={[
-                  { name: "delete", label: "Delete recording" },
+                  { name: "delete", label: t('recordings.list.deleteRecording') },
                 ]}
                 onAccessibilityAction={(e) => {
                   if (e.nativeEvent.actionName === "delete") confirmDelete(r);
@@ -226,7 +231,7 @@ export function RecordingsList({
               <View style={block ? styles.blockLine : styles.line}>
                 <View
                   accessible={block ? false : undefined}
-                  accessibilityLabel={block ? `${name} recording, ${time}` : undefined}
+                  accessibilityLabel={block ? t('recordings.list.label', { kind: name, time }) : undefined}
                   style={[
                     styles.bubble,
                     block && styles.blockBubble,
@@ -248,13 +253,13 @@ export function RecordingsList({
                     accessibilityRole="button"
                     accessibilityLabel={
                       downloading
-                        ? "Downloading recording"
+                        ? t('recordings.list.downloading')
                         : playing
-                          ? "Pause recording"
-                          : "Play recording"
+                          ? t('recordings.list.pause')
+                          : t('recordings.list.play')
                     }
                     // In a block there is no header row: VoiceOver finds Delete on the play button.
-                    accessibilityActions={block ? [{ name: "delete", label: "Delete recording" }] : undefined}
+                    accessibilityActions={block ? [{ name: "delete", label: t('recordings.list.deleteRecording') }] : undefined}
                     onAccessibilityAction={
                       block
                         ? (e) => {
@@ -283,7 +288,7 @@ export function RecordingsList({
                       progress={playedFraction(at, r.durationMs)}
                       onSeek={(f) => play(r, Math.round(f * r.durationMs))}
                       height={24}
-                      valueText={`${formatRecordingTime(at)} of ${formatRecordingTime(r.durationMs)}`}
+                      valueText={t('recordings.list.position', { at: formatRecordingTime(at), total: formatRecordingTime(r.durationMs) })}
                       testID={`recording-waveform-${r.id}`}
                     />
                   </View>
@@ -310,7 +315,7 @@ export function RecordingsList({
                     hitSlop={{ top: 4, bottom: 4, left: 4, right: 8 }}
                     style={styles.open}
                     accessibilityRole="button"
-                    accessibilityLabel="Listen back with the pages"
+                    accessibilityLabel={t('recordings.list.listenBack')}
                     testID={`recording-open-${r.id}`}
                   >
                     <Ionicons
@@ -330,7 +335,7 @@ export function RecordingsList({
                   ]}
                   maxFontSizeMultiplier={1.4}
                 >
-                  In your backup · downloads when played
+                  {t('recordings.list.inBackup')}
                 </Text>
               ) : null}
               {block ? (
@@ -349,7 +354,7 @@ export function RecordingsList({
                               : { backgroundColor: palette.fill, borderColor: palette.separator },
                           ]}
                           accessibilityRole="button"
-                          accessibilityLabel={`Play from ${spokenText(placeOfPage(m.page, { form: 'long' }))}`}
+                          accessibilityLabel={t('recordings.list.playFrom', { place: spokenText(placeOfPage(m.page, { form: 'long' })) })}
                           accessibilityState={{ selected: current }}
                           testID={`recording-page-${r.id}-${m.page}`}
                         >
@@ -392,7 +397,7 @@ export function RecordingsList({
                               },
                         ]}
                         accessibilityRole="button"
-                        accessibilityLabel={`Play from ${spokenText(placeOfPage(m.page, { form: 'long' }))}`}
+                        accessibilityLabel={t('recordings.list.playFrom', { place: spokenText(placeOfPage(m.page, { form: 'long' })) })}
                         accessibilityState={{ selected: current }}
                         testID={`recording-page-${r.id}-${m.page}`}
                       >
@@ -418,7 +423,7 @@ export function RecordingsList({
       <ActionSheet
         visible={menuFor != null}
         onClose={() => setMenuFor(null)}
-        title="Recording"
+        title={t('recordings.list.menuTitle')}
         message={
           menuFor
             ? `${KIND_LABEL[menuFor.kind]} · ${formatRecordingTime(menuFor.durationMs)}`
@@ -431,7 +436,7 @@ export function RecordingsList({
                   ? [
                       {
                         key: "listen",
-                        label: "Listen back with the pages",
+                        label: t('recordings.list.listenBack'),
                         icon: "headset-outline" as const,
                         onPress: () => {
                           stopPlayback();
@@ -442,7 +447,7 @@ export function RecordingsList({
                   : []),
                 {
                   key: "delete",
-                  label: "Delete recording",
+                  label: t('recordings.list.deleteRecording'),
                   icon: "trash-outline",
                   destructive: true,
                   onPress: () => confirmDelete(menuFor),

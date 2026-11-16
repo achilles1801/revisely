@@ -7,6 +7,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { typeV2 } from '../../theme/v2';
 import { Tap } from '../v2/Tap';
 import { LiveWaveform, type LiveLevels } from './LiveWaveform';
+import { t } from '../../i18n';
 
 type Recorder = ReturnType<typeof useVoiceRecorder>;
 
@@ -83,7 +84,7 @@ export function RecordButton({ recorder, layout = 'capsule', crowded = false }: 
         hitSlop={8}
         style={[styles.round, { backgroundColor: palette.fill, borderColor: palette.separator }]}
         accessibilityRole="button"
-        accessibilityLabel="Record your recitation"
+        accessibilityLabel={t('recordings.button.record')}
         accessibilityState={{ disabled: phase === 'starting', busy: phase === 'starting' }}
         testID="record-start"
       >
@@ -118,7 +119,7 @@ export function RecordButton({ recorder, layout = 'capsule', crowded = false }: 
         )}
         {saving ? (
           <Text style={[styles.liveTime, { color: palette.secondary }]} maxFontSizeMultiplier={1.2}>
-            Saving…
+            {t('recordings.button.saving')}
           </Text>
         ) : (
           <Text
@@ -142,7 +143,7 @@ export function RecordButton({ recorder, layout = 'capsule', crowded = false }: 
             busy && styles.disabled,
           ]}
           accessibilityRole="button"
-          accessibilityLabel={`Pause recording, ${time} recorded`}
+          accessibilityLabel={t('recordings.button.pause', { time })}
           accessibilityState={{ disabled: busy, busy }}
           testID="record-toggle"
         >
@@ -154,7 +155,7 @@ export function RecordButton({ recorder, layout = 'capsule', crowded = false }: 
           hitSlop={4}
           style={[styles.circle, { backgroundColor: palette.redFill }, busy && styles.disabled]}
           accessibilityRole="button"
-          accessibilityLabel="Stop recording"
+          accessibilityLabel={t('recordings.button.stop')}
           accessibilityState={{ disabled: busy }}
           testID="record-stop"
         >
@@ -175,7 +176,7 @@ export function RecordButton({ recorder, layout = 'capsule', crowded = false }: 
           hitSlop={{ top: 6, bottom: 6, left: 6 }}
           style={styles.segment}
           accessibilityRole="button"
-          accessibilityLabel={`Pause recording, ${time} recorded`}
+          accessibilityLabel={t('recordings.button.pause', { time })}
           accessibilityState={{ disabled: busy, busy }}
           testID="record-toggle"
         >
@@ -196,7 +197,7 @@ export function RecordButton({ recorder, layout = 'capsule', crowded = false }: 
           hitSlop={{ top: 6, bottom: 6, right: 6 }}
           style={styles.stopBtn}
           accessibilityRole="button"
-          accessibilityLabel="Stop recording"
+          accessibilityLabel={t('recordings.button.stop')}
           accessibilityState={{ disabled: busy }}
           testID="record-stop"
         >
@@ -216,7 +217,7 @@ export function RecordButton({ recorder, layout = 'capsule', crowded = false }: 
         hitSlop={{ top: 6, bottom: 6, left: 6 }}
         style={styles.segment}
         accessibilityRole="button"
-        accessibilityLabel={`${interrupted ? 'Recording was paused by an interruption. ' : ''}Resume recording, ${time} recorded`}
+        accessibilityLabel={t(interrupted ? 'recordings.button.resumeInterrupted' : 'recordings.button.resume', { time })}
         testID="record-toggle"
       >
         <Ionicons name="mic" size={15} color={palette.red} />
@@ -230,7 +231,7 @@ export function RecordButton({ recorder, layout = 'capsule', crowded = false }: 
         hitSlop={{ top: 6, bottom: 6, right: 6 }}
         style={styles.stopBtn}
         accessibilityRole="button"
-        accessibilityLabel="Stop recording"
+        accessibilityLabel={t('recordings.button.stop')}
         testID="record-stop"
       >
         <View style={[styles.stopSquare, { backgroundColor: palette.red }]} />

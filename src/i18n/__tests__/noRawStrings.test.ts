@@ -21,6 +21,7 @@ const EXTRACTED: string[] = [
   'components/prayer',
   'components/qibla',
   'components/reader',
+  'components/recordings',
   'components/revision',
   'components/updates',
   'components/v2',
