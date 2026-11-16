@@ -6,6 +6,7 @@ import { common } from './common';
 import { help } from './help';
 import { home } from './home';
 import { insights } from './insights';
+import { journal } from './journal';
 import { memorization } from './memorization';
 import { mushaf } from './mushaf';
 import { offline } from './offline';
@@ -13,6 +14,7 @@ import { onboarding } from './onboarding';
 import { plan } from './plan';
 import { player } from './player';
 import { prayer } from './prayer';
+import { preview } from './preview';
 import { qibla } from './qibla';
 import { reader } from './reader';
 import { recite } from './recite';
@@ -23,6 +25,7 @@ import { settings } from './settings';
 import { timer } from './timer';
 import { updates } from './updates';
 import { v2 } from './v2';
+import { verse } from './verse';
 import { whatsNew } from './whatsNew';
 
 export const en = {
@@ -32,6 +35,7 @@ export const en = {
   help,
   home,
   insights,
+  journal,
   memorization,
   mushaf,
   offline,
@@ -39,6 +43,7 @@ export const en = {
   plan,
   player,
   prayer,
+  preview,
   qibla,
   reader,
   recite,
@@ -49,6 +54,7 @@ export const en = {
   timer,
   updates,
   v2,
+  verse,
   whatsNew,
 } as const;
 

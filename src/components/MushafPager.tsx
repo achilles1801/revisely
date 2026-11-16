@@ -41,6 +41,7 @@ import { Box, unionBox } from './verse/menuPlacement';
 import { fitPage, PageSize } from '../lib/pageFit';
 import { MushafEditionId, mushafEdition, useMushafEdition } from '../lib/mushafEdition';
 import { pagerStartIndex } from '../lib/pagerStart';
+import { t } from '../i18n';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -67,6 +68,7 @@ const e2eSay = (line: string) => {
 };
 const e2eX = (e?: NativeSyntheticEvent<NativeScrollEvent>): string => {
   const x = e?.nativeEvent?.contentOffset?.x;
+  // i18n-ignore (an E2E log line)
   return typeof x === 'number' ? `x ${Math.round(x)} (index ${(x / SCREEN_WIDTH).toFixed(2)})` : 'x ?';
 };
 
@@ -282,8 +284,8 @@ const PageItem = React.memo(function PageItem({
       // The placeholder's text and button are read on their own.
       accessible={!missing}
       accessibilityRole="button"
-      accessibilityLabel={`Page ${pageNumber}`}
-      accessibilityHint={onTap ? 'Shows or hides the controls' : undefined}
+      accessibilityLabel={t('mushaf.pager.page', { page: pageNumber })}
+      accessibilityHint={onTap ? t('mushaf.pager.hint') : undefined}
     >
       {(uri == null || (isRemote && loading)) && !missing && (
         <View style={styles.loadingOverlay}>
@@ -298,12 +300,12 @@ const PageItem = React.memo(function PageItem({
             color={mutedColor}
           />
           <Text style={[typeV2.name, styles.missingText, { color: tintColor }]}>
-            {missing === 'offline' ? `Page ${pageNumber} isn't downloaded yet` : `Couldn't load page ${pageNumber}`}
+            {missing === 'offline' ? t('mushaf.pager.notDownloaded', { page: pageNumber }) : t('mushaf.pager.couldNotLoad', { page: pageNumber })}
           </Text>
           <Text style={[typeV2.meta, styles.missingText, { color: mutedColor }]}>
-            {missing === 'offline' ? "It shows when you're back online." : 'Check your connection and try again.'}
+            {missing === 'offline' ? t('mushaf.pager.backOnline') : t('common.checkConnection')}
           </Text>
-          <PillButton title="Try again" variant="outline" size="sm" onPress={retry} testID="page-retry" />
+          <PillButton title={t('common.tryAgain')} variant="outline" size="sm" onPress={retry} testID="page-retry" />
         </View>
       ) : uri != null ? (
         // The pressable is exactly the image, so touch locations are page

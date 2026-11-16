@@ -78,7 +78,7 @@ export function planPrayerNotifications({
           id: prayerNotificationId(day.day, prayer),
           at,
           title: name,
-          body: `It’s time for ${name} · ${time}`,
+          body: t('prayer.notifications.atBody', { name, time }),
           sound: alert.sound,
           kind: 'at',
           prayer,
@@ -90,7 +90,7 @@ export function planPrayerNotifications({
           all.push({
             id: prayerNotificationId(day.day, prayer, true),
             at: early,
-            title: `${name} in ${alert.before} minutes`,
+            title: t('prayer.notifications.soonTitle', { name, count: alert.before }),
             body: place ? `${time} · ${place}` : time,
             sound: alert.sound,
             kind: 'before',

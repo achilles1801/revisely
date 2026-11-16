@@ -190,7 +190,7 @@ export function TodayPost({
     <View testID="today-thread">
       <ThreadRow
         mark={<Mark label={initial} />}
-        name={name || 'Today'}
+        name={name || t('common.today')}
         meta={name ? meta : undefined}
         figure={
           grace || help ? (

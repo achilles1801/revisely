@@ -42,4 +42,10 @@ export const common = {
   juzCount_other: '{{count}} juz',
   tryAgain: 'Try again',
   signOut: 'Sign out',
+  /** A progress bar of steps: "Step 2 of 4". */
+  stepNOfTotal: 'Step {{n}} of {{total}}',
+  error: 'Error',
+  save: 'Save',
+  ok: 'OK',
+  copy: 'Copy',
 } as const;

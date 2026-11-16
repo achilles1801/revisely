@@ -11,8 +11,12 @@ import { appSourceFiles, rawStringsIn, rawStringsUnder, readsAsText } from '../.
 
 const SRC = path.resolve(__dirname, '../..');
 
-/** Folders and files (relative to src/) whose UI text all comes from src/i18n. */
+/**
+ * Folders and files (relative to src/) whose UI text all comes from src/i18n. A folder is everything
+ * in it; `components/*` is only the files directly in components/.
+ */
 const EXTRACTED: string[] = [
+  'components/*',
   'components/coach',
   'components/help',
   'components/home',
@@ -32,6 +36,7 @@ const EXTRACTED: string[] = [
   'components/timer',
   'components/updates',
   'components/v2',
+  'components/verse',
   'context',
   'hooks',
   'lib/prayer',
@@ -41,8 +46,11 @@ const EXTRACTED: string[] = [
   'lib/widgets',
   'navigation',
   'screens/auth',
+  'screens/journal',
   'screens/onboarding',
   'screens/prayer',
+  'screens/preview',
+  'screens/revision',
   'services',
 ];
 
@@ -77,6 +85,9 @@ describe('UI text comes from src/i18n', () => {
       'const i = <Ionicons name="arrow-up-circle-outline" accessibilityLabel="Close" />;', // 14 a label
       "import { x } from 'Some Module';", // 15 an import
       "type K = 'Some Type';", // 16 a type
+      "actions.push({ key: 'rate', label: 'Rate this page' });", // 17 pushed onto a list
+      "navigation.push('Some Screen');", // 18 a route
+      'const j = <ThreadRow name="New entry" mark={<Ionicons name="add-outline" />} />;', // 19 a row's title
     ].join('\n');
     const lines = rawStringsIn('x.tsx', code).map((r) => `${r.line} ${r.text}`);
     expect(lines).toEqual([
@@ -88,6 +99,8 @@ describe('UI text comes from src/i18n', () => {
       '5 Delete this recording?',
       '5 It can’t be undone.',
       '14 Close',
+      '17 Rate this page',
+      '19 New entry',
     ]);
   });
 
@@ -104,7 +117,9 @@ describe('UI text comes from src/i18n', () => {
   });
 
   it('every extracted folder still exists', () => {
-    for (const scope of EXTRACTED) expect([scope, fs.existsSync(path.join(SRC, scope))]).toEqual([scope, true]);
+    for (const scope of EXTRACTED) {
+      expect([scope, fs.existsSync(path.join(SRC, scope.replace(/\/\*$/, '')))]).toEqual([scope, true]);
+    }
   });
 
   // I18N_PROGRESS=1 prints what is left: strings per folder, then per file for a folder named in

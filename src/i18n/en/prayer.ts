@@ -90,6 +90,11 @@ export const prayer = {
   },
   notifications: {
     title: 'Prayer notifications',
+    /** The notification at the time: "It’s time for Asr · 3:42 PM". */
+    atBody: 'It’s time for {{name}} · {{time}}',
+    /** The notification before it (5 minutes or more): "Asr in 10 minutes". */
+    soonTitle_one: '{{name}} in {{count}} minute',
+    soonTitle_other: '{{name}} in {{count}} minutes',
     prayers: 'Prayers',
     scheduled_one: 'Scheduled on this phone for the next {{count}} day. Opening Revisely keeps them going.',
     scheduled_other: 'Scheduled on this phone for the next {{count}} days. Opening Revisely keeps them going.',

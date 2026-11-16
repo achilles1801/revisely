@@ -53,4 +53,10 @@ export const plan = {
     searchStart: 'Search surahs, ajzaʼ or pages',
     startFooter: 'Revision starts here today and carries on in order, wrapping back around to the beginning.',
   },
+  /** components/CarryOverSetting. */
+  carryOver: {
+    label: 'Keep daily amount',
+    keep: 'When you add pages you missed yesterday, today stays its usual size and the rest of your plan moves back.',
+    add: 'When you add pages you missed yesterday, they go on top of today. Your plan stays as it is.',
+  },
 } as const;
