@@ -90,7 +90,7 @@ export function useVoiceSearch(onHeard: (text: string) => void, enabled: boolean
       // A voice's rise and fall, for the waveform.
       let n = 0;
       startLevels(() => 0.35 + 0.3 * Math.abs(Math.sin(n++ / 3)));
-      await wait(3000);
+      await wait(4500);
       stopLevels();
       if (!mounted.current) return;
       setStatus('idle');

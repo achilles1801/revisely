@@ -564,8 +564,11 @@ appId: com.revisionbuddy.app
     visible:
       id: search-mic
     timeout: 10000
+# The waveform moves for as long as it listens: a tap that waits for the screen to settle returned only once the
+# scripted listening had ended (Android, Nov 16 2026).
 - tapOn:
     id: search-mic
+    waitToSettleTimeoutMs: 300
 - extendedWaitUntil:
     visible:
       id: search-listening
@@ -651,6 +654,7 @@ appId: com.revisionbuddy.app
       NAME: rl18-search-dark
 - tapOn:
     id: search-mic
+    waitToSettleTimeoutMs: 300
 - extendedWaitUntil:
     visible:
       id: search-verse-112-1

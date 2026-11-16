@@ -3,7 +3,7 @@
 //   revisely://e2e/voice-search?heard=<words, URL-encoded>   voice search is on, and it hears these words
 //   revisely://e2e/voice-search?off=1                        back to the build's own (no voice search)
 //
-// A search by voice then shows Listening… for 3 s and searches with the words given, as if they were said.
+// A search by voice then shows Listening… for 4.5 s and searches with the words given, as if they were said.
 
 let heard: string | null = null;
 
