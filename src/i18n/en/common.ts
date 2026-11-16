@@ -7,6 +7,10 @@ export const common = {
   delete: 'Delete',
   done: 'Done',
   more: 'More',
+  notNow: 'Not now',
+  openSettings: 'Open Settings',
+  pleaseTryAgain: 'Please try again.',
+  checkConnection: 'Check your connection and try again.',
   remove: 'Remove',
   undo: 'Undo',
   /** A count of pages on its own: "1 page", "20 pages". */
@@ -16,6 +20,12 @@ export const common = {
   juz: 'Juz',
   surahN: 'Surah {{n}}',
   juzN: 'Juz {{n}}',
+  /** "Juz 26–27". */
+  juzRange: 'Juz {{from}}–{{to}}',
+  /** "Juz 3, 7": the numbers already joined. */
+  juzList: 'Juz {{list}}',
+  juzCount_one: '{{count}} juz',
+  juzCount_other: '{{count}} juz',
   tryAgain: 'Try again',
   signOut: 'Sign out',
 } as const;

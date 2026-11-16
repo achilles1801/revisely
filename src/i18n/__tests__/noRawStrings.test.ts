@@ -18,11 +18,16 @@ const EXTRACTED: string[] = [
   'components/mushaf',
   'components/offline',
   'components/player',
+  'components/qibla',
   'components/revision',
   'components/updates',
   'components/v2',
+  'context',
+  'hooks',
   'lib/updates',
+  'lib/widgets',
   'navigation',
+  'services',
 ];
 
 describe('UI text comes from src/i18n', () => {
