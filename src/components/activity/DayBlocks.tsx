@@ -53,6 +53,7 @@ import { smartTrackingOn } from '../../lib/smartTracking';
 import { juzOfPages } from '../../lib/juzSheet';
 import { PillButton } from '../v2/PillButton';
 import type { UserPage } from '../../types';
+import { formatDate, formatTime } from '../../i18n';
 
 const EMPTY_DAY: DayItems = { revisions: [], memorized: [], reads: [], doneAhead: [] };
 
@@ -112,7 +113,7 @@ export type UndoOffer = { text: string; undo: () => void };
  */
 export const timeRange = (start: number | null | undefined, minutes: number | null) => {
   if (start == null) return '';
-  const fmt = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const fmt = (ms: number) => formatTime(new Date(ms));
   if (minutes == null || minutes <= 0) return fmt(start);
   const from = fmt(start);
   const to = fmt(start + minutes * 60_000);
@@ -278,7 +279,7 @@ export function DayBlocks({
     return from && to ? { from, to } : null;
   }, [day, user]);
   const footerText = useMemo(() => {
-    const fmt = (x: Date) => x.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    const fmt = (x: Date) => formatTime(x);
     return windowFooter(day, dayWindow ? { from: fmt(dayWindow.from), to: fmt(dayWindow.to) } : null);
   }, [day, dayWindow]);
   const view: DayView | null = useMemo(
@@ -388,7 +389,7 @@ export function DayBlocks({
         }),
     })),
   ]);
-  const timeOf = (at: number) => new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const timeOf = (at: number) => formatTime(new Date(at));
   // A tagged note (ACT-11): "Note · 9:40 PM", then its text.
   const noteItem = (n: JournalNote) => (
     <ItemLine key={n.id} icon="document-text-outline">
@@ -464,7 +465,7 @@ export function DayBlocks({
         ? null
         : at === 0
           ? 'tomorrow'
-          : new Date(y, m - 1, d + 1 + at).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+          : formatDate(new Date(y, m - 1, d + 1 + at), { weekday: 'long', day: 'numeric', month: 'long' }, 'en-GB');
     // Already first tomorrow (its link was tapped, or Insights put them there): it says so, and the link
     // goes, so it can't be tapped twice (ACT-24).
     const first = allFirstTomorrow(mine, firstTomorrowPages(user, shiftDay(today, 1)));

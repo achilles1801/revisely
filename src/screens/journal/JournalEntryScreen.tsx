@@ -65,6 +65,7 @@ import { Tap } from '../../components/v2/Tap';
 import type { HomeStackParamList } from '../../navigation/MainNavigator';
 import type { JournalEntry, JournalKind, JournalNote } from '../../types';
 import { JOURNAL_KIND_ICONS } from './journalKinds';
+import { formatTime } from '../../i18n';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'JournalEntry'>;
 type ScreenRoute = RouteProp<HomeStackParamList, 'JournalEntry'>;
@@ -779,7 +780,7 @@ export default function JournalEntryScreen() {
         preview={
           menuNote
             ? {
-                label: `${JOURNAL_KIND_LABELS[menuNote.kind]} · ${new Date(menuNote.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`,
+                label: `${JOURNAL_KIND_LABELS[menuNote.kind]} · ${formatTime(new Date(menuNote.at))}`,
                 text: menuNote.text.trim() || undefined,
               }
             : undefined

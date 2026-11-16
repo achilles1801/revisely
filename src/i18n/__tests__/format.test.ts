@@ -6,8 +6,8 @@ import { dateLocale, dayMonth, formatDate, formatNumber, formatTime, monthName, 
 
 const SRC = path.resolve(__dirname, '../..');
 
-/** Folders (relative to src/) whose dates and numbers all go through src/i18n. */
-const FORMATTED = ['lib'];
+/** Folders (relative to src/) whose dates and numbers all go through src/i18n: all of it. */
+const FORMATTED = [''];
 
 /** Every day of 2026 and a few around it, at local midnight. */
 const days = Array.from({ length: 400 }, (_, i) => new Date(2025, 11, 1 + i));

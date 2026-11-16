@@ -5,6 +5,7 @@ import { Tap } from '../v2/Tap';
 import { useTheme } from '../../context/ThemeContext';
 import { summarizeDay } from '../../lib/planDisplay';
 import { layoutV2, typeV2 } from '../../theme/v2';
+import { formatDate } from '../../i18n';
 
 export function addDays(date: Date, days: number): Date {
   const next = new Date(date);
@@ -16,11 +17,11 @@ export function addDays(date: Date, days: number): Date {
 export function dayTitle(index: number, today: Date): string {
   if (index === 0) return 'Today';
   if (index === 1) return 'Tomorrow';
-  return addDays(today, index).toLocaleDateString(undefined, {
+  return formatDate(addDays(today, index), {
     weekday: 'long',
     day: 'numeric',
     month: 'short',
-  });
+  }, 'device');
 }
 
 /**
@@ -31,7 +32,7 @@ export function DateBadge({ index, today }: { index: number; today: Date }) {
   const { palette } = useTheme();
   const date = addDays(today, index);
   const isToday = index === 0;
-  const weekday = date.toLocaleDateString(undefined, { weekday: 'short' });
+  const weekday = formatDate(date, { weekday: 'short' }, 'device');
   return (
     <View style={styles.badge} testID={`date-badge-${index}`}>
       <Text

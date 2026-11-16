@@ -23,6 +23,7 @@ import { describePassage } from '../../lib/passages';
 import { typeV2 } from '../../theme/v2';
 import { BlockMark, RevisedMark } from './BlockMark';
 import type { Memorized, Read, Revised } from '../../lib/activityInsights';
+import { formatDate } from '../../i18n';
 
 /** Chrome text (the pills, the title, the totals, the grid, the preview) stops growing here, as headers and menu rows do. */
 const MAX_SCALE = 1.4;
@@ -355,7 +356,7 @@ function WeekSummary({ day, data, onOpen }: { day: string; data: CalendarData; o
   return (
     <Tap onPress={() => onOpen(day)} accessibilityRole="button" style={styles.summary}>
       <Text style={[typeV2.name, { color: palette.text, width: 84 }]} numberOfLines={1} maxFontSizeMultiplier={MAX_SCALE}>
-        {new Date(`${day}T00:00:00`).toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' })}
+        {formatDate(new Date(`${day}T00:00:00`), { weekday: 'short', day: 'numeric' })}
       </Text>
       <Text style={[typeV2.body, { color: palette.secondary, flex: 1 }]} numberOfLines={1} maxFontSizeMultiplier={MAX_SCALE}>
         {parts.length > 0 ? parts.join(' · ') : 'Nothing logged'}

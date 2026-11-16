@@ -41,8 +41,8 @@ From `src/i18n` too (`format.ts`), so another language writes them its own way:
 - In English each reads exactly as before: `formatDate` takes the locale the call always used
   (`'en-US'`, the default; `'en-GB'`; or `'device'`, the phone's own), and `formatTime` follows the
   phone (12 or 24 hours).
-- Never `toLocaleDateString('en-US', …)` or `toLocaleTimeString([], …)` in a folder listed in
-  `FORMATTED` (`src/i18n/__tests__/format.test.ts`).
+- Never `toLocaleDateString('en-US', …)` or `toLocaleTimeString([], …)` anywhere in `src/`:
+  `src/i18n/__tests__/format.test.ts` fails on a locale written in (or left to the phone).
 
 ## The check
 
