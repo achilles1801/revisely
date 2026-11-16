@@ -115,6 +115,10 @@ const LIVE_FAILURE: Record<LiveFailure, string> = {
   premium_required: 'Marking mistakes needs Premium',
   // Never shown in practice: the socket moves such a take to recite-check (lib/reciteLive/socket).
   level_elsewhere: 'Couldn’t start',
+  // Production's checker (recite-server-prod-plan.md): its switch, every instance busy, and App Check.
+  paused: 'Checking is paused for now',
+  busy: 'Busy right now, try again in a minute',
+  app_check: 'Couldn’t start: try again later',
   offline: 'Couldn’t reach the checker',
 };
 

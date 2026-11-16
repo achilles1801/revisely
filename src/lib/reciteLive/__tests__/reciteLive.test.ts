@@ -74,6 +74,10 @@ describe('the contract', () => {
     expect(parseEvent({ type: 'error', reason: 'premium_required' })).toEqual({ type: 'error', reason: 'premium_required' });
     // recite-check-pair refusing a level it doesn't take (the socket starts the take on recite-check).
     expect(parseEvent({ type: 'error', reason: 'level_elsewhere' })).toEqual({ type: 'error', reason: 'level_elsewhere' });
+    // Production's refusals (recite-server-prod-plan.md); `busy` is the phone's own, never the server's.
+    expect(parseEvent({ type: 'error', reason: 'paused' })).toEqual({ type: 'error', reason: 'paused' });
+    expect(parseEvent({ type: 'error', reason: 'app_check' })).toEqual({ type: 'error', reason: 'app_check' });
+    expect(parseEvent({ type: 'error', reason: 'busy' })).toEqual({ type: 'error', reason: 'server' });
     expect(parseEvent({ type: 'error', error: 'idle' })).toEqual({ type: 'error', reason: 'idle' });
   });
 

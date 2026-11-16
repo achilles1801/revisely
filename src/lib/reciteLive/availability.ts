@@ -2,6 +2,7 @@ import { mushafEdition, MushafEditionId } from '../mushafEdition';
 import { isDevVariant } from '../variant';
 import { isMicStreamAvailable } from '../recite/micSource';
 import { mistakeDetectionReleased } from '../release/mistakeDetection';
+import { reciteCheckOff } from './off';
 
 /** E2E builds: the live check without the Dev app, a microphone or the checker (lib/e2e/reciteLive). Others: never. */
 export function e2eReciteLive(): boolean {
@@ -17,6 +18,8 @@ export function e2eReciteLive(): boolean {
  * keeps today's record button; the store app never shows it before then (`isDevVariant()` is false there).
  */
 export function reciteLiveEnabled(user: { previewTester?: boolean } | null | undefined, edition: MushafEditionId): boolean {
+  // Recite's kill switch (config/app.reciteCheckOff): the mic records as before. Takes already kept stay shown.
+  if (reciteCheckOff()) return false;
   return reciteLiveForAccount(user) && mushafEdition(edition).reciteData;
 }
 

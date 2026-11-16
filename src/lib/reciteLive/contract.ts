@@ -104,6 +104,11 @@ export type LiveFailure =
   | 'premium_required'
   /** A service that doesn't take this level (recite-check-pair): the socket starts the take on recite-check instead. */
   | 'level_elsewhere'
+  /** Production's checker (recite-server-prod-plan.md): its kill switch (`PAUSED`), and App Check refused once it's on. */
+  | 'paused'
+  | 'app_check'
+  /** The phone's own, as `offline`: every instance was busy (Cloud Run's 429/503, or the socket never opened). */
+  | 'busy'
   | 'offline';
 
 export type LiveEvent =
@@ -142,6 +147,8 @@ const FAILURES: LiveFailure[] = [
   'check_locked',
   'premium_required',
   'level_elsewhere',
+  'paused',
+  'app_check',
 ];
 
 /** The server refused marking mistakes for want of Premium (either name). */
