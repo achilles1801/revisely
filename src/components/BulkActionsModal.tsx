@@ -9,6 +9,7 @@ import { Mark } from './v2/Mark';
 import { Tap } from './v2/Tap';
 import { layoutV2, typeV2 } from '../theme/v2';
 import { describePageRange, spokenText } from '../lib/passages';
+import { t } from '../i18n';
 
 interface PageData {
   pageNumber: number;
@@ -77,23 +78,23 @@ export function BulkActionsModal({
     <Sheet
       visible={visible}
       onClose={onClose}
-      title="Manage pages"
-      message={`${completedCount} of ${pages.length} complete`}
-      right={{ label: 'Done', onPress: onClose, strong: true }}
+      title={t('revision.bulk.title')}
+      message={t('revision.bulk.complete', { done: completedCount, total: pages.length })}
+      right={{ label: t('common.done'), onPress: onClose, strong: true }}
       contentStyle={v2.content}
       testID="bulk-sheet"
     >
       <View style={v2.controls}>
         <PillTabs<TabType>
           options={[
-            { value: 'juz', label: 'By juz' },
-            { value: 'pages', label: 'All pages' },
+            { value: 'juz', label: t('revision.bulk.byJuz') },
+            { value: 'pages', label: t('revision.bulk.allPages') },
           ]}
           value={activeTab}
           onChange={setActiveTab}
         />
         <PillButton
-          title={allCompleted ? 'Unmark all' : 'Mark all done'}
+          title={allCompleted ? t('revision.bulk.unmarkAll') : t('revision.bulk.markAllDone')}
           variant={allCompleted ? 'outline' : 'solid'}
           onPress={allCompleted ? onMarkAllIncomplete : onMarkAllComplete}
         />
@@ -106,11 +107,11 @@ export function BulkActionsModal({
               return row(
                 juzNum,
                 <Mark size="reply" label={juzNum} done={full} />,
-                `Juz ${juzNum}`,
-                `${completed} of ${juzPages.length} pages`,
+                t('common.juzN', { n: juzNum }),
+                t('revision.bulk.juzPages', { done: completed, total: juzPages.length }),
                 full,
                 () => onMarkJuzComplete(parseInt(juzNum, 10)),
-                `Juz ${juzNum}, ${completed} of ${juzPages.length} pages. Mark all done`,
+                t('revision.bulk.juzLabel', { juz: juzNum, done: completed, total: juzPages.length }),
               );
             })
           : pages.map((page) => {
@@ -120,10 +121,10 @@ export function BulkActionsModal({
                 page.pageNumber,
                 <Mark size="reply" label={String(page.pageNumber)} done={page.isCompleted} />,
                 what,
-                `p. ${page.pageNumber}`,
+                t('common.pageShort', { n: page.pageNumber }),
                 page.isCompleted,
                 () => onTogglePage(page.pageNumber),
-                `${spokenText(what)}, page ${page.pageNumber}${page.isCompleted ? ', revised' : ''}`,
+                t(page.isCompleted ? 'revision.bulk.pageLabelRevised' : 'revision.bulk.pageLabel', { what: spokenText(what), page: page.pageNumber }),
               );
             })}
       </ScrollView>

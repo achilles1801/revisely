@@ -48,7 +48,7 @@ const ID_CALLS = new RegExp(
   [
     '^(console|logger|log|Sentry|crashlytics|jest|expect|describe|it|test)\\b',
     '\\.(warn|error|debug|info|log|trace|addBreadcrumb|captureException|captureMessage|setTag|setTags|setExtra|setContext)$',
-    '^(t|i18n\\.t|require|navigate|push|replace|reset|reportError|report|warn|debug|trace)$',
+    '^(t|i18n\\.t|require|navigate|push|replace|reset|reportError|report|warn|debug|trace|e2eSay)$',
     '\\.(navigate|push|replace|reset|setParams|getItem|setItem|removeItem|multiGet|multiRemove|addEventListener|addListener|emit)$',
     '\\.(includes|has|indexOf|lastIndexOf|startsWith|endsWith)$',
     '^(doc|collection|query|where|orderBy|ref|httpsCallable|callFunction|getFunctions|storageRef|fetch)$',
@@ -113,6 +113,10 @@ function inIdPlace(node: ts.Node, sf: ts.SourceFile): boolean {
     if (ts.isCallExpression(p) || ts.isNewExpression(p)) {
       if (child === p.expression) continue;
       const callee = calleeText(p, sf);
+      // A list's push and a string's replace share their names with navigation's: only a string
+      // passed straight in is an id there (a route, a pattern). An object pushed onto a list of
+      // menu actions holds UI text.
+      if (/(^|\.)(push|replace)$/.test(callee) && child !== node) continue;
       if (ID_CALLS.test(callee) || isErrorName(callee.replace(/^new /, ''))) return true;
     }
     if (ts.isThrowStatement(p)) return true;
@@ -190,7 +194,13 @@ export function appSourceFiles(src: string): string[] {
 
 /** The raw UI text of every file under the given folders or files (relative to src/). */
 export function rawStringsUnder(src: string, scopes: string[]): RawString[] {
-  const inScope = (rel: string) => scopes.some((s) => rel === s || rel.startsWith(s.endsWith('/') ? s : `${s}/`));
+  // 'components' is the folder and everything in it; 'components/*' only the files directly in it.
+  const inScope = (rel: string) =>
+    scopes.some((s) =>
+      s.endsWith('/*')
+        ? path.posix.dirname(rel) === s.slice(0, -2)
+        : rel === s || rel.startsWith(s.endsWith('/') ? s : `${s}/`),
+    );
   return appSourceFiles(src)
     .filter(inScope)
     .flatMap((rel) => rawStringsIn(rel, fs.readFileSync(path.join(src, rel), 'utf8')));

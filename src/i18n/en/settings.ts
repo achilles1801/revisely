@@ -45,4 +45,20 @@ export const settings = {
     load: 'Load {{title}}',
     pick: 'Pick a scenario',
   },
+  /** components/FajrBoundaryCard: the day starting at fajr. */
+  fajr: {
+    locationNeeded: 'Location needed',
+    locationNeededBody: 'Fajr times depend on where you are. You can enable location later from Settings.',
+    noLocation: "Couldn't get your location",
+    tryLater: 'Try again later.',
+    label: 'Start day at fajr',
+    resetsAt: 'Resets at {{time}}',
+    resetsAtMidnight: 'Resets at midnight',
+    method: 'Method',
+    methodLabel: 'Method, {{method}}',
+    methodTitle: 'Calculation method',
+    updateLocation: 'Update location',
+    setLocation: 'Set location',
+    location: 'Location',
+  },
 } as const;
