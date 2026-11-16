@@ -592,7 +592,11 @@ class LiveSession:
         if self.follow:
             raw.update(letters='0', tajweed='0')
         self.st = settings_of(raw)
-        self.P = dict(WORDS_P, **LIVE)
+        # the model this take runs on, with its own word settings and bars: v6 for Recite and Words & harakat, the
+        # released model for Strict (Engine.level)
+        self.lv = E.level(self.st)
+        self.ear = self.lv.ear
+        self.P = dict(self.lv.words_p, **LIVE)
         if (s2 is None) != (a2 is None):
             raise BadRequest('both or neither of s2, a2')
         self.lo, self.end = E.passage(s, a, s2, a2, max_words=10 ** 6)
@@ -615,7 +619,7 @@ class LiveSession:
         # open_end: the phone gave no end and the server runs the take on to the end of the Qur'an (server.LAST_AYAH);
         # `done.result.to` is then the end of the last ayah reached, not the Qur'an's
         self.open_end = open_end
-        self.V = len(E.ear.vocab) + 1
+        self.V = len(self.ear.vocab) + 1
         # Strict on the second model (v5, #539): ayah_notes takes the take's samples when the engine has it
         self.v5 = self.st.get('tajweed', True) and getattr(E, 'ear2', None) is not None \
             and 'audio' in inspect.signature(E.ayah_notes).parameters
@@ -818,7 +822,7 @@ class LiveSession:
         hi = T_all if last else min(T_all, int((t_end / SR - P['look']) * FPS))
         prov = None
         if t_end - s0 >= 1600:
-            lp = self.E.ear._run(self.pcm[s0:t_end].astype(np.float32) / 32768.0)
+            lp = self.ear._run(self.pcm[s0:t_end].astype(np.float32) / 32768.0)
             f0 = s0 // 320
             if hi > self.T:
                 rows = lp[self.T - f0:hi - f0]
@@ -961,7 +965,7 @@ class LiveSession:
 
     def _segment_result(self, seg, path, upto, P, refs=None, extras_to=None):
         lp = self.lp[seg.f0:seg.frames()]
-        st, fl, _, _, extras, visits, fillers = checker.decide(seg.kws, seg.g, lp, path, P, self.E.ear.vocab,
+        st, fl, _, _, extras, visits, fillers = checker.decide(seg.kws, seg.g, lp, path, P, self.ear.vocab,
                                                                self._tokens(seg.f0, seg.frames()), refs=refs)
         words, spans, readings = word_rows(seg.kws, st, fl, visits, seg.f0)
         keep = range(seg.first, upto)
@@ -1070,7 +1074,7 @@ class LiveSession:
         dec = loc.dec
         path, _ = dec.traceback(final=False)
         st, _, _, _, _, visits, _ = checker.decide(loc.kws, loc.g, self.lp[loc.f0:loc.frames()], path, self.P,
-                                                   self.E.ear.vocab, self._tokens(loc.f0, loc.frames()))
+                                                   self.ear.vocab, self._tokens(loc.f0, loc.frames()))
         heard = [w for w in range(loc.g.W) if visits[w]]
         if not heard:
             return []
@@ -1107,7 +1111,7 @@ class LiveSession:
     def _quran_fits_now(self, idx, onset):
         W = self.E.words
         f1 = min(self.T, onset + int(QURAN_SECS * FPS))
-        sounds = ''.join(self.E.ear.vocab[c - 1] for c, _, _ in self._tokens(onset, f1))
+        sounds = ''.join(self.ear.vocab[c - 1] for c, _, _ in self._tokens(onset, f1))
         voted = idx.places(checker.skeleton(checker.norm_sounds(sounds)))
         # each place from a word either side too (the vote merges neighbours): the best start of the three stands
         starts = sorted({u for w in voted for u in (w - 1, w, w + 1) if 0 <= u < min(self.end, W.total)})
@@ -1192,7 +1196,7 @@ class LiveSession:
             return ev
         path, _ = dec.traceback(final=False)
         st, _, _, _, _, visits, _ = checker.decide(loc.kws, loc.g, self.lp[loc.f0:loc.frames()], path, self.P,
-                                                   self.E.ear.vocab, self._tokens(loc.f0, loc.frames()))
+                                                   self.ear.vocab, self._tokens(loc.f0, loc.frames()))
         heard = [w for w in range(loc.g.W) if visits[w]]
         if not heard:
             return ev
@@ -1330,7 +1334,7 @@ class LiveSession:
         path, _ = dec.traceback(final=False, since=lo_t)
         self._window = (seg, path)
         st, fl, _, _, extras, visits, fillers = checker.decide(seg.kws, seg.g, self.lp[seg.f0:seg.frames()], path, P,
-                                                               E.ear.vocab, self._tokens(seg.f0, seg.frames()))
+                                                               self.ear.vocab, self._tokens(seg.f0, seg.frames()))
         app, W, entry = seg.app, seg.g.W, seg.first - seg.a
         for w in range(W):
             if visits[w]:
@@ -1550,7 +1554,7 @@ class LiveSession:
         heard = {}
         if row['status'] == 'wrong' and (fl or {}).get('kind', 'sound') == 'sound' and aw in self.spans:
             near = {w: self.spans[w] for w in (aw - 1, aw, aw + 1) if w in self.spans}
-            heard = {aw: heard_sounds(near, self._tokens(0, self.T), self.E.ear.vocab).get(aw, '')}
+            heard = {aw: heard_sounds(near, self._tokens(0, self.T), self.ear.vocab).get(aw, '')}
         return self.E.marks([row], {aw: fl} if fl else {}, heard, [], [], [])[0]
 
     def _unmark_if_corrected(self, aw, visit_start, now):
@@ -1714,10 +1718,10 @@ class LiveSession:
         if self.follow:  # Recite: the words and their statuses; no marks and no score (the contract's shape: [], null)
             return {k: out[k] for k in ('v', 'from', 'to', 'secs', 'words', 'settings', 'ms') + (
                 ('start',) if 'start' in out else ())} | {'v': 2, 'follow': True, 'marks': [], 'score': None}
-        heard = heard_sounds(spans, self._tokens(0, self.T), self.E.ear.vocab)
+        heard = heard_sounds(spans, self._tokens(0, self.T), self.ear.vocab)
         out['marks'] = self.E.marks(words, flagged, heard, ex, tj, letters if self.st['letters'] else [])
         out['ms']['similar'] = self.E.name_slips(out['marks'], self.lp[:self.T], [r['w'] for r in words], statuses,
-                                                 spans, ex)
+                                                 spans, ex, self.lv.words_p)
         out['score'] = score(statuses, out['marks'], self.dismissed)
         out['score']['helped'] = len(self.helped)
         out['v'] = 2
