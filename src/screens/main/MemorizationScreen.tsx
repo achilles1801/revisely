@@ -25,6 +25,7 @@ import { useTheme } from '../../context/ThemeContext';
 import type { HomeStackParamList } from '../../navigation/MainNavigator';
 import type { User } from '../../types';
 import { revisablePages } from '../../lib/memorizedAyahs';
+import { t } from '../../i18n';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'Memorization'>;
 
@@ -135,12 +136,13 @@ export default function MemorizationScreen() {
       void commit('before');
       return;
     }
-    const today = { text: 'Today', onPress: () => void commit('today') };
-    const before = { text: "Before (don't log)", onPress: () => void commit('before') };
+    const today = { text: t('common.today'), onPress: () => void commit('today') };
+    const before = { text: t('memorization.screen.before'), onPress: () => void commit('before') };
+    const cancel = { text: t('common.cancel'), style: 'cancel' as const };
     Alert.alert(
-      'When did you memorize these?',
-      `${marked.length} ${marked.length === 1 ? 'page' : 'pages'} marked memorized.`,
-      defaultWhen(marked) === 'today' ? [today, before, { text: 'Cancel', style: 'cancel' }] : [before, today, { text: 'Cancel', style: 'cancel' }],
+      t('memorization.screen.whenTitle'),
+      t('memorization.screen.marked', { count: marked.length }),
+      defaultWhen(marked) === 'today' ? [today, before, cancel] : [before, today, cancel],
     );
   };
 
@@ -164,13 +166,13 @@ export default function MemorizationScreen() {
   return (
     <TopSafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
       <TopBar
-        title="Memorization"
+        title={t('memorization.screen.title')}
         onBack={backV2}
         right={
           markMode ? null : (
             <IconButton
               icon="create-outline"
-              label="Edit memorized pages"
+              label={t('memorization.screen.edit')}
               onPress={() => setMarkMode(true)}
               testID="memorization-edit"
             />
@@ -186,10 +188,10 @@ export default function MemorizationScreen() {
       >
         <View style={[v2.summary, { borderBottomColor: palette.separator }]} testID="memorization-summary">
           <Text style={[typeV2.title, typeV2.numeral, { color: palette.text }]}>
-            {`${stats.pages} of 604 pages`}
+            {t('memorization.screen.pagesOf', { n: stats.pages })}
           </Text>
           <Text style={[typeV2.meta, typeV2.numeral, { color: palette.secondary }]}>
-            {`${formatFractional(stats.fractionalJuz)} of 30 juz · ${stats.surahs} of 114 surahs`}
+            {t('memorization.screen.juzAndSurahs', { juz: formatFractional(stats.fractionalJuz), surahs: stats.surahs })}
           </Text>
           <View style={v2.bar}>
             <ProgressBar progress={(stats.share / 604) * 100} height={6} testID="memorization-progress" />
@@ -214,10 +216,10 @@ export default function MemorizationScreen() {
 
       {markMode && (
         <ActionBar>
-          <PillButton title="Cancel" variant="outline" onPress={handleCancel} testID="memorization-cancel" />
+          <PillButton title={t('common.cancel')} variant="outline" onPress={handleCancel} testID="memorization-cancel" />
           <View style={{ flex: 1 }} />
           <PillButton
-            title={changeCount === 0 ? 'No changes' : `Save (${changeCount})`}
+            title={changeCount === 0 ? t('memorization.screen.noChanges') : t('memorization.screen.saveCount', { n: changeCount })}
             onPress={() => setConfirmOpen(true)}
             disabled={changeCount === 0}
             testID="memorization-save"
@@ -228,8 +230,8 @@ export default function MemorizationScreen() {
       <Sheet
         visible={confirmOpen}
         onClose={saving ? () => undefined : () => setConfirmOpen(false)}
-        title={`Save ${confirmCount.current} change${confirmCount.current === 1 ? '' : 's'}?`}
-        message="Your revision schedule follows what's memorized."
+        title={t('memorization.screen.confirmTitle', { count: confirmCount.current })}
+        message={t('memorization.screen.confirmBody')}
         onHidden={() => {
           if (!reviewAfterSave.current) return;
           reviewAfterSave.current = false;
@@ -238,11 +240,11 @@ export default function MemorizationScreen() {
         testID="memorization-confirm"
       >
         <View style={v2.sheetActions}>
-          <PillButton size="lg" title="Save" onPress={handleSave} busy={saving} testID="confirm-save" />
+          <PillButton size="lg" title={t('common.save')} onPress={handleSave} busy={saving} testID="confirm-save" />
           <PillButton
             size="lg"
             variant="outline"
-            title="Discard changes"
+            title={t('memorization.screen.discard')}
             onPress={() => {
               setConfirmOpen(false);
               handleCancel();
@@ -256,13 +258,13 @@ export default function MemorizationScreen() {
       <Sheet
         visible={reviewPromptOpen}
         onClose={() => setReviewPromptOpen(false)}
-        title="Schedule needs review"
-        message="Your custom schedule doesn't adjust itself. Pages you un-memorized were taken out; new ones aren't scheduled until you add them."
+        title={t('memorization.screen.reviewTitle')}
+        message={t('memorization.screen.reviewBody')}
         testID="memorization-review"
       >
         <View style={v2.sheetActions}>
-          <PillButton size="lg" title="Review schedule" onPress={handleReviewSchedule} testID="review-now" />
-          <PillButton size="lg" variant="outline" title="Later" onPress={() => setReviewPromptOpen(false)} testID="review-later" />
+          <PillButton size="lg" title={t('memorization.screen.review')} onPress={handleReviewSchedule} testID="review-now" />
+          <PillButton size="lg" variant="outline" title={t('memorization.screen.later')} onPress={() => setReviewPromptOpen(false)} testID="review-later" />
         </View>
       </Sheet>
     </TopSafeAreaView>

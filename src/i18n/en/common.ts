@@ -48,4 +48,7 @@ export const common = {
   save: 'Save',
   ok: 'OK',
   copy: 'Copy',
+  loading: 'Loading…',
+  /** "Try again." as a sentence after an error. */
+  tryAgainSentence: 'Try again.',
 } as const;

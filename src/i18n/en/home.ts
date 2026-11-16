@@ -57,4 +57,22 @@ export const home = {
     edit: 'Edit session',
     delete: 'Delete session',
   },
+  /** screens/main/DashboardScreen: Home itself. */
+  screen: {
+    loadFailed: "Couldn't load your data",
+    saveFailed: "Couldn't save",
+    carryFailed: "Couldn't update today's session",
+    jumpRefused: "Couldn't start there",
+    jumpRefusedBody: "That part isn't in your schedule.",
+    /** After Jump to: "Today now starts at Al-Mulk". */
+    todayStartsAt: 'Today now starts at {{where}}',
+    nextStartsAt: 'Your next revision starts at {{where}}',
+    jumpFailed: "Couldn't update your schedule",
+    undoFailed: "Couldn't undo",
+    qibla: 'Find the Qibla',
+    activity: 'Open activity',
+    settings: 'Open settings',
+    recent: 'Recent sessions',
+    noSessions: 'No sessions yet. Start your first revision above.',
+  },
 } as const;
