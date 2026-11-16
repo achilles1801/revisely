@@ -10,6 +10,10 @@
  *   od.revoke        take Premium through Open Door back (review.ts)  openDoor.revoke
  *   audit.decisions  the decisions, newest first                      audit.read
  *   audit.roles      role changes, newest first                       audit.read
+ *   labels.next      the next recitation clip to label, with its audio  recite.label (labels.ts)
+ *   labels.get       one clip again (going back)                      recite.label
+ *   labels.save      a clip's label                                   recite.label
+ *   labels.stats     clips left and done, today's answers             recite.label
  *
  * Every action but `me` needs App Check, and Open Door's need a project with the program (SUPPORT_PAGES), so the
  * production project answers nothing about applications. Nothing here logs an applicant's answers or a note.
@@ -30,6 +34,7 @@ import {
 } from '../support/review';
 import { ConsoleError, Permission, ROLE_NAMES, StaffCaller, permissionsOf, requirePermission } from './roles';
 import { RoleChange, rolesPage } from './staff';
+import { LabelDeps, handleLabels } from './labels';
 
 /** Accounts nobody may decide on from the console (the script refuses them too). */
 export const PROTECTED_EMAILS = ['applereview@revisely.app'];
@@ -61,6 +66,8 @@ export interface ConsoleDeps {
   metricsEnvs?: { env: string; label: string; here: boolean }[];
   now(): number;
   log(entry: Record<string, unknown>): void;
+  /** the labelling page's clips and audio (labels.ts); absent where it isn't wired */
+  labels?: LabelDeps;
 }
 
 const UID = /^[A-Za-z0-9_-]{1,128}$/;
@@ -90,6 +97,8 @@ export interface Me {
   openDoor: boolean;
   /** The Overview's environments (only for a role that sees metrics). */
   metricsEnvs: { env: string; label: string; here: boolean }[];
+  /** the labelling page (/label) is here and the role may use it */
+  labels: boolean;
 }
 
 export type QueueItem = QueueRow & {
@@ -130,11 +139,17 @@ export async function handleAdminConsole(
       project: deps.project,
       openDoor: deps.programOpen && permissionsOf(caller.role).includes('openDoor.read'),
       metricsEnvs: permissionsOf(caller.role).includes('metrics.read') ? (deps.metricsEnvs ?? []) : [],
+      labels: !!deps.labels?.open && permissionsOf(caller.role).includes('recite.label'),
     };
     return me;
   }
 
   if (!appCheck) throw new ConsoleError('failed-precondition', 'This page couldn’t prove it is Revisely Console. Reload it.');
+
+  if (action?.startsWith('labels.')) {
+    if (!deps.labels) throw new ConsoleError('failed-precondition', 'Labelling isn’t in this project.');
+    return handleLabels(caller, action, data, deps.labels);
+  }
 
   switch (action) {
     case 'od.summary': {

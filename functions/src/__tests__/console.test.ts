@@ -1,5 +1,6 @@
 import type { Firestore } from 'firebase-admin/firestore';
 import { ConsoleDeps, handleAdminConsole } from '../console/handler';
+import { LabelDeps, checkLabel } from '../console/labels';
 import { ConsoleError, GRANTS, PERMISSIONS, ROLES, Role, StaffCaller, can, claimsWithRole, permissionsOf, requirePermission, roleOf } from '../console/roles';
 
 describe('console roles', () => {
@@ -83,6 +84,7 @@ describe('adminConsole: who gets what', () => {
       project: 'revisely-dev',
       openDoor: false,
       metricsEnvs: [],
+      labels: false,
     });
     expect(await handleAdminConsole(as('reviewer'), { action: 'me' }, false, deps())).toMatchObject({ roleName: 'Reviewer', openDoor: true });
     expect(await handleAdminConsole(as('dev'), { action: 'me' }, false, deps())).toMatchObject({ permissions: ['metrics.read'], openDoor: false });
@@ -136,5 +138,85 @@ describe('adminConsole: who gets what', () => {
     expect(await code(handleAdminConsole(as('owner'), { action: 'od.decide', uid: 'u1', decision: 'approve', requestId: 'r_0123456789abcdefXYZ' }, true, reviewer))).toBe(
       'permission-denied',
     );
+  });
+});
+
+describe('adminConsole: recitation labels', () => {
+  const untouchable = new Proxy({}, { get: () => { throw new Error('the database was read'); } }) as unknown as Firestore;
+  const labels = (over: Partial<LabelDeps> = {}): LabelDeps => ({
+    db: untouchable,
+    open: true,
+    audio: async () => { throw new Error('audio was read'); },
+    now: () => Date.parse('2026-11-15T12:00:00Z'),
+    ...over,
+  });
+  const deps = (over: Partial<ConsoleDeps> = {}): ConsoleDeps => ({
+    db: untouchable,
+    accounts: async () => { throw new Error('accounts were read'); },
+    accountByEmail: async () => { throw new Error('accounts were read'); },
+    hasPlan: async () => false,
+    programOpen: true,
+    project: 'revisely-dev',
+    now: () => Date.parse('2026-11-15T12:00:00Z'),
+    log: () => undefined,
+    labels: labels(),
+    ...over,
+  });
+  const as = (role: Role | null): StaffCaller => ({ uid: 'staff', email: 'staff@example.com', role });
+  async function code(p: Promise<unknown>): Promise<string> {
+    try {
+      await p;
+    } catch (err) {
+      if (err instanceof ConsoleError) return err.code;
+      throw err;
+    }
+    return 'ok';
+  }
+
+  it('is for owners and admins only, where the page is (revisely-dev), and needs App Check', async () => {
+    expect(can('owner', 'recite.label')).toBe(true);
+    expect(can('admin', 'recite.label')).toBe(true);
+    expect(can('reviewer', 'recite.label')).toBe(false);
+    expect(can('dev', 'recite.label')).toBe(false);
+    const actions = [{ action: 'labels.next' }, { action: 'labels.get', id: 'c1' }, { action: 'labels.save', id: 'c1', marks: {} }, { action: 'labels.stats' }];
+    for (const data of actions) {
+      for (const role of [null, 'dev', 'reviewer'] as const) {
+        expect(await code(handleAdminConsole(as(role), data, true, deps()))).toBe('permission-denied');
+      }
+      expect(await code(handleAdminConsole(as('owner'), data, false, deps()))).toBe('failed-precondition');
+      expect(await code(handleAdminConsole(as('owner'), data, true, deps({ labels: labels({ open: false }) })))).toBe('failed-precondition');
+      expect(await code(handleAdminConsole(as('owner'), data, true, deps({ labels: undefined })))).toBe('failed-precondition');
+    }
+    expect(await code(handleAdminConsole(as('admin'), { action: 'labels.get', id: '../users/x' }, true, deps()))).toBe('invalid-argument');
+    expect(await code(handleAdminConsole(as('admin'), { action: 'labels.nope' }, true, deps()))).toBe('invalid-argument');
+  });
+
+  it('me says whether the page is open to the caller', async () => {
+    expect(await handleAdminConsole(as('owner'), { action: 'me' }, false, deps())).toMatchObject({ labels: true });
+    expect(await handleAdminConsole(as('admin'), { action: 'me' }, false, deps())).toMatchObject({ labels: true });
+    expect(await handleAdminConsole(as('reviewer'), { action: 'me' }, false, deps())).toMatchObject({ labels: false });
+    expect(await handleAdminConsole(as('owner'), { action: 'me' }, false, deps({ labels: labels({ open: false }) }))).toMatchObject({ labels: false });
+    expect(await handleAdminConsole(as('owner'), { action: 'me' }, false, deps({ labels: undefined }))).toMatchObject({ labels: false });
+  });
+
+  it('a label answers every mark (unless the clip is skipped), with known answers, on the clip’s own marks and words', () => {
+    const clip = {
+      marks: [
+        { id: '10:word:', w: 10, kind: 'word' as const },
+        { id: '12:harakat:', w: 12, kind: 'harakat' as const },
+      ],
+      words: [10, 11, 12].map((w) => ({ w, t: 'كلمة', s: 1, a: 1 })),
+    };
+    const ok = { marks: { '10:word:': 'yes', '12:harakat:': 'no' }, words: { 11: 'skipped' } };
+    expect(checkLabel(clip, ok)).toEqual({ marks: { '10:word:': 'yes', '12:harakat:': 'no' }, words: { 11: 'skipped' } });
+    expect(() => checkLabel(clip, { marks: { '10:word:': 'yes' } })).toThrow('One mark has no answer yet.');
+    expect(() => checkLabel(clip, { marks: {} })).toThrow('2 marks have no answer yet.');
+    expect(() => checkLabel(clip, { ...ok, marks: { ...ok.marks, '99:word:': 'yes' } })).toThrow('A mark isn’t on this clip.');
+    expect(() => checkLabel(clip, { ...ok, marks: { '10:word:': 'maybe', '12:harakat:': 'no' } })).toThrow('one of yes, no or can’t tell');
+    expect(() => checkLabel(clip, { ...ok, words: { 13: 'word' } })).toThrow('A word isn’t in this clip.');
+    expect(() => checkLabel(clip, { ...ok, words: { 11: 'fine' } })).toThrow('A word’s label isn’t one the page offers.');
+    // A skipped clip may leave marks unanswered; the reason must be a known one.
+    expect(checkLabel(clip, { marks: {}, skip: 'audio' })).toEqual({ marks: {}, words: {}, skip: 'audio' });
+    expect(() => checkLabel(clip, { marks: {}, skip: 'bored' })).toThrow('That isn’t a reason to skip.');
   });
 });

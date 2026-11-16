@@ -50,6 +50,7 @@ import { handleDevPremium, handleSupportApplication, handleSupportLink } from '.
 import { adminSupportStore, deleteSupportData } from './support/admin';
 import { AccountInfo, consoleErrorOf, handleAdminConsole } from './console/handler';
 import { StaffCaller, roleOf } from './console/roles';
+import { AUDIO_PREFIX as LABEL_AUDIO_PREFIX, LABEL_PROJECTS } from './console/labels';
 
 setGlobalOptions({ region: 'us-central1', maxInstances: 3 });
 
@@ -748,6 +749,16 @@ const consoleDeps = {
   metricsEnvs: metricsEnvironments(PROJECT_ID).map(({ env, label, here }) => ({ env, label, here })),
   now: () => Date.now(),
   log: (entry: Record<string, unknown>) => logger.info('console', entry),
+  labels: {
+    db: adminDb,
+    open: LABEL_PROJECTS.includes(PROJECT_ID) || testing,
+    async audio(path: string) {
+      if (!path.startsWith(LABEL_AUDIO_PREFIX)) throw new Error('not a label clip');
+      const [bytes] = await getStorage().bucket().file(path).download();
+      return bytes;
+    },
+    now: () => Date.now(),
+  },
 };
 
 export const adminConsole = onCall({ cors: CONSOLE_ORIGINS, timeoutSeconds: 60, maxInstances: 3 }, async (request) => {

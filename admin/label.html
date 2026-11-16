@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#fdfcfe" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#18171f" media="(prefers-color-scheme: dark)">
+<title>Label recitations · Revisely Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Amiri+Quran&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/console.css">
+<link rel="stylesheet" href="/label.css">
+</head>
+<body class="lab">
+<div class="lab-app" id="app">
+  <header class="lab-top">
+    <a class="lab-home" href="/" aria-label="Revisely Console"><span class="mark" aria-hidden="true">R</span></a>
+    <div class="lab-title">
+      <b>Label recitations</b>
+      <span class="lab-stats" id="stats" aria-live="polite"></span>
+    </div>
+    <span class="env" id="env" hidden></span>
+    <button class="lab-icon" id="menuBtn" type="button" aria-label="More" aria-haspopup="menu" hidden>⋯</button>
+  </header>
+
+  <p class="lab-boot" id="boot" aria-live="polite">Loading…</p>
+
+  <section class="lab-clip" id="clipView" hidden>
+    <div class="lab-meta">
+      <span id="where"></span>
+      <span class="lab-src" id="source"></span>
+    </div>
+    <div class="lab-player">
+      <button class="lab-play" id="playBtn" type="button" aria-label="Play the clip">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path id="playIcon" d="M8 5v14l11-7z"/></svg>
+      </button>
+      <div class="lab-bar" id="bar" role="slider" aria-label="Position in the clip" aria-valuemin="0" tabindex="0">
+        <div class="lab-bar-fill" id="barFill"></div>
+        <div class="lab-ticks" id="ticks"></div>
+      </div>
+      <span class="lab-time mono" id="time">0:00</span>
+    </div>
+    <div class="lab-words" id="words" dir="rtl" lang="ar"></div>
+  </section>
+
+  <section class="lab-empty" id="emptyView" hidden>
+    <h2>Nothing left to label</h2>
+    <p id="emptyText">Every clip has a label. New ones show up here when the lab adds them.</p>
+    <button class="lab-btn" id="emptyReload" type="button">Check again</button>
+  </section>
+
+  <footer class="lab-foot" id="foot" hidden>
+    <div class="lab-card" id="card" aria-live="polite"></div>
+    <div class="lab-actions" id="actions"></div>
+  </footer>
+</div>
+
+<div class="lab-start" id="start" hidden>
+  <div class="lab-start-in">
+    <h2>Label recitations</h2>
+    <p>Each clip plays as it opens. For every mark, say whether it is a mistake. Tap any word the checker missed.</p>
+    <p class="lab-keys">Keys: <kbd>Space</kbd> play · <kbd>R</kbd> the mark again · <kbd>1</kbd> not a mistake · <kbd>2</kbd> can’t tell · <kbd>3</kbd> mistake · <kbd>Enter</kbd> next clip · <kbd>U</kbd> undo</p>
+    <button class="lab-btn primary" id="startBtn" type="button">Start</button>
+  </div>
+</div>
+
+<div class="lab-sheet-back" id="sheetBack" hidden></div>
+<div class="lab-sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" hidden>
+  <div class="lab-sheet-h">
+    <span class="lab-sheet-word" id="sheetWord" dir="rtl" lang="ar"></span>
+    <span class="lab-sheet-title" id="sheetTitle"></span>
+    <button class="lab-icon" id="sheetPlay" type="button" aria-label="Play this word">▶</button>
+  </div>
+  <div class="lab-sheet-opts" id="sheetOpts"></div>
+  <button class="lab-btn lab-sheet-cancel" id="sheetCancel" type="button">Cancel</button>
+</div>
+
+<div class="lab-menu" id="menu" role="menu" hidden>
+  <button type="button" role="menuitem" data-act="back">Back to the last clip</button>
+  <button type="button" role="menuitem" data-act="skip-audio">Skip: the audio is bad</button>
+  <button type="button" role="menuitem" data-act="skip-passage">Skip: not this passage</button>
+  <button type="button" role="menuitem" data-act="skip-other">Skip: another reason</button>
+  <button type="button" role="menuitem" data-act="keys">Keys</button>
+  <a role="menuitem" href="/">Revisely Console</a>
+</div>
+
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script type="module" src="/label.js"></script>
+</body>
+</html>

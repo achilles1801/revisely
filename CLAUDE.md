@@ -599,8 +599,9 @@ revisely-dev`; nothing deploys Hosting by itself). It shows production and dev (
 (and revision-buddy-3a398.web.app) only redirects there since Nov 14 2026 (`scripts/metrics/metrics-redirect/`, its
 README has the deploy and the undo); never deploy the root `firebase.json`'s hosting to production.
 - **Pages:** `/sign-in` (its own page: Google, or email and password; no sign-up; an account without a role sees "No
-  access" with Sign out, and nothing else), `/` Overview (the metrics), `/open-door` and `/open-door/<uid>`, `/audit`.
-  Signed out, every address goes to `/sign-in?next=…` (`shell.js`). Hosting's `cleanUrls` and rewrites serve them.
+  access" with Sign out, and nothing else), `/` Overview (the metrics), `/open-door` and `/open-door/<uid>`, `/audit`,
+  `/label` (below). Signed out, every address goes to `/sign-in?next=…` (`shell.js`). Hosting's `cleanUrls` and
+  rewrites serve them.
 - **Roles** (`functions/src/console/roles.ts`, the one permission list): `owner` (everything, roles too), `admin`
   (everything but roles), `reviewer` (Open Door read and decide; no revoke, metrics, Revo conversations or audit),
   `dev` (metrics only). A custom claim `role`, given with `cd functions && GOOGLE_APPLICATION_CREDENTIALS=… node
@@ -609,8 +610,8 @@ README has the deploy and the undo); never deploy the root `firebase.json`'s hos
   counts as owner until set-role replaces it (`set-admin.js` now only takes it away). The callables read claims live
   from Auth (`staffClaims` in index.ts), so a role taken away stops at the next call. Rules open nothing to any role.
 - **Functions:** `adminMetrics` (metrics.read), `adminRevo` (revo.conversations; conversations locked until
-  `config/admin.conversations`), `adminConsole` (`me`, Open Door `od.*`, `audit.*`; App Check on every action but
-  `me`; Open Door only where `SUPPORT_PAGES` has the project), `metricsTotals` (the hourly `metrics.yml` with its
+  `config/admin.conversations`), `adminConsole` (`me`, Open Door `od.*`, `audit.*`, `labels.*`; App Check on every
+  action but `me`; Open Door only where `SUPPORT_PAGES` has the project), `metricsTotals` (the hourly `metrics.yml` with its
   GitHub OIDC token; alarms on the "Metrics alerts" issue).
 - **Production and Dev in one console** (Majd, Nov 14 2026: one console with a switch; metrics.revisely.app to be
   retired, "why would we need two separate dashboards"): the console's project asks the other project's
@@ -631,6 +632,26 @@ README has the deploy and the undo); never deploy the root `firebase.json`'s hos
   (`OWN_AUTH_DOMAIN_HOSTS` in `admin/firebase.js`: metrics.revisely.app, revisely-dev.web.app); a host joins only once
   its `/__/auth/handler` is a redirect URI of the project's Web OAuth client and an authorized domain. Phones sign in
   with a full-page redirect there.
+- **Label recitations** (`/label`, `admin/label.*`; adminConsole `labels.*`, `functions/src/console/labels.ts`; permission
+  `recite.label`: owners and admins; revisely-dev only, `LABEL_PROJECTS`). Majd, Nov 15 2026: "if the issue is those
+  recitations don't say what is right or wrong then i can help with that". Its own page, made for a phone held in one
+  hand, and linked from the console's tabs.
+  - **The flow:** one clip at a time, played as it opens, with the passage's words and the checker's marks. Each mark
+    gets Mistake, Not a mistake or Can't tell; tapping a word the checker missed labels it (wrong word, skipped, extra
+    word after it, haraka or letter, not clear). The answers sit under the thumb; the next clip is fetched and decoded
+    while this one is labelled.
+  - **Audio** is Web Audio, with `navigator.audioSession.type = 'playback'` so the ringer switch doesn't mute it. The
+    callable sends the clip's audio (AAC, about 6 KB a second) with the clip: nothing in Storage is opened to clients.
+  - **Saving:** labels go in the background, one at a time, and wait on the phone (localStorage, per account) until the
+    server has them.
+  - **Data:** `reciteLabelClips/{id}` and Storage `recite-labels/<batch>/`, closed to clients (the catch-alls; the rules
+    suite checks both). Index (status, order).
+  - **Adding clips and exporting labels:** `cd functions && GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-dev-admin.json node
+    scripts/recite-labels.js add|status|export|remove` (its header has the clip format).
+  - **What may be added:** only clips a person may listen to: a licensed set whose licence allows it (`licensed`),
+    Majd's own recordings (`own`), recordings gathered with the reciter's permission (`permission`). Never the /record
+    takes or anyone's Dev takes (`recite-tests/`, the lab's `dev-takes`, `record-raw`, `record-v1`): their consent says
+    nobody listens. The script refuses a clip without one of those sources, and audio from those folders.
 - **Testing locally:** the console runs against the emulators from any static server that serves `admin/` with the
   rewrites and an `init.json` carrying `emulators` (`{auth, functionsHost, functionsPort}`; only a localhost page
   reads it). `functions/src/__tests__/review.emulator.test.ts` runs in CI against the Auth and Firestore emulators.

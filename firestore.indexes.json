@@ -66,6 +66,14 @@
       ]
     },
     {
+      "collectionGroup": "reciteLabelClips",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "order", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "consoleAudit",
       "queryScope": "COLLECTION",
       "fields": [

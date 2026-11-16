@@ -128,12 +128,14 @@ async function start() {
   $('signOutBtn').hidden = false;
 
   const views = visibleViews();
-  for (const a of $('tabs').querySelectorAll('a')) {
+  for (const a of $('tabs').querySelectorAll('a[data-view]')) {
     const i = views.indexOf(a.dataset.view);
     a.hidden = i === -1;
     a.querySelector('.k').textContent = i === -1 ? '' : String(i + 1);
   }
-  $('tabs').hidden = views.length < 2;
+  // Labelling recitations is its own page (/label, made for a phone), so its tab is a plain link.
+  $('labelsTab').hidden = !me.labels;
+  $('tabs').hidden = views.length + (me.labels ? 1 : 0) < 2;
   $('boot').hidden = true;
   $('console').hidden = false;
   route();

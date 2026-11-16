@@ -1,5 +1,6 @@
 import { assertFails, assertSucceeds, RulesTestEnvironment } from '@firebase/rules-unit-testing';
 import { collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
+import { getBytes, ref, uploadBytes } from 'firebase/storage';
 import { getTestEnv, cleanupTestEnv } from './setup';
 
 // Revisely Premium and the support program (functions/src/support): the owner may read
@@ -93,6 +94,24 @@ describe('Premium and the support program', () => {
       await assertFails(setDoc(doc(db, 'supportDecisions/d2'), { uid: 'alice', action: 'approve' }));
       await assertFails(getDoc(doc(db, 'consoleAudit/a1')));
       await assertFails(setDoc(doc(db, 'consoleAudit/a2'), { kind: 'role', uid: 'staff', to: 'owner' }));
+    }
+  });
+
+  it('recitation clips, their audio and their labels (the console’s /label page) are closed to everyone, staff included', async () => {
+    const audio = new Uint8Array([0, 1, 2, 3]);
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'reciteLabelClips/c1'), { batch: 'test', status: 'open', marks: '[]' });
+      await uploadBytes(ref(ctx.storage(), 'recite-labels/test/c1.m4a'), audio, { contentType: 'audio/mp4' });
+    });
+    const people = [env.authenticatedContext('alice'), env.authenticatedContext('staff', { role: 'owner', admin: true }), env.unauthenticatedContext()];
+    for (const who of people) {
+      const db = who.firestore();
+      await assertFails(getDoc(doc(db, 'reciteLabelClips/c1')));
+      await assertFails(getDocs(collection(db, 'reciteLabelClips')));
+      await assertFails(setDoc(doc(db, 'reciteLabelClips/c2'), { batch: 'test', status: 'open' }));
+      await assertFails(updateDoc(doc(db, 'reciteLabelClips/c1'), { status: 'done' }));
+      await assertFails(getBytes(ref(who.storage(), 'recite-labels/test/c1.m4a')));
+      await assertFails(uploadBytes(ref(who.storage(), 'recite-labels/test/c2.m4a'), audio, { contentType: 'audio/mp4' }));
     }
   });
 

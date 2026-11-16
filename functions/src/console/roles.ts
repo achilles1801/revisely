@@ -24,6 +24,7 @@ export const PERMISSIONS = {
   'openDoor.revoke': 'Take Premium through Open Door back',
   'audit.read': 'The audit log: every decision and role change',
   'roles.manage': 'Give and take roles',
+  'recite.label': 'Label recitation clips for the mistake checker (revisely-dev only)',
 } as const;
 export type Permission = keyof typeof PERMISSIONS;
 

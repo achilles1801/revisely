@@ -1,6 +1,7 @@
 /**
- * Open Door's review and the console's role changes against the Firebase emulators: the real transactions, queries,
- * cursors and counts (review.ts, console/staff.ts, console/handler.ts). Skipped unless the emulators run:
+ * Open Door's review, the console's role changes and its recitation labels against the Firebase emulators: the real
+ * transactions, queries, cursors and counts (review.ts, console/staff.ts, console/labels.ts, console/handler.ts).
+ * Skipped unless the emulators run:
  *   cd functions && bash ../scripts/emulators.sh exec auth,firestore demo-revisely 'npx jest review.emulator'
  * CI runs it that way (ci.yml, Fast checks).
  */
@@ -195,6 +196,81 @@ const BY: Reviewer = { uid: 'staff1', email: 'owner@example.com', role: 'owner',
     expect(out).toMatchObject({ status: 'approved', decision: { by: { email: 'rev@example.com', role: 'reviewer', via: 'console' } } });
     const after = (await handleAdminConsole(owner, { action: 'od.queue', filter: 'approved' }, true, deps)) as { rows: { uid: string; last?: { by: string } }[] };
     expect(after.rows[0]).toMatchObject({ uid: 'c1', last: { by: 'rev@example.com' } });
+  });
+
+  it('recitation labels end to end: the queue in order, held clips skipped, a label stored, the counts', async () => {
+    // As functions/scripts/recite-labels.js writes them (an invented test clip; no real recording).
+    const clip = (id: string, order: number, marks: { id: string; w: number; kind: string }[]) =>
+      db.doc(`reciteLabelClips/${id}`).set({
+        batch: 'test',
+        order,
+        source: { kind: 'own', name: 'Test voice' },
+        audio: { path: `recite-labels/test/${id}.m4a`, type: 'audio/mp4', seconds: 4 },
+        words: [100, 101, 102].map((w) => ({ w, t: 'كلمة', s: 2, a: 3 })),
+        marks: JSON.stringify(marks),
+        times: [{ w: 100, a: 0.2, b: 0.9 }],
+        status: 'open',
+        createdAt: NOW,
+      });
+    await clip('b', 2, []);
+    await clip('a', 1, [{ id: '101:word:', w: 101, kind: 'word' }]);
+    await clip('c', 3, []);
+    const read: string[] = [];
+    const deps: ConsoleDeps = {
+      db,
+      accounts: async () => new Map(),
+      accountByEmail: async () => null,
+      hasPlan: async () => false,
+      programOpen: true,
+      project: PROJECT,
+      now: () => NOW,
+      log: () => undefined,
+      labels: {
+        db,
+        open: true,
+        audio: async (path) => {
+          read.push(path);
+          return Buffer.from('audio');
+        },
+        now: () => NOW,
+      },
+    };
+    const owner = { uid: 'staff1', email: 'owner@example.com', role: 'owner' as const };
+    type Next = { clip: { id: string; marks: { id: string }[]; times: number[][] } | null; audio?: { type: string; data: string } };
+    const first = (await handleAdminConsole(owner, { action: 'labels.next' }, true, deps)) as Next;
+    expect(first.clip?.id).toBe('a');
+    expect(first.clip?.marks.map((m) => m.id)).toEqual(['101:word:']);
+    expect(first.clip?.times).toEqual([[100, 0.2, 0.9]]);
+    expect(first.audio).toEqual({ type: 'audio/mp4', data: Buffer.from('audio').toString('base64') });
+    expect(read).toEqual(['recite-labels/test/a.m4a']);
+    // The page holds `a` (on screen) while it fetches the next.
+    expect(((await handleAdminConsole(owner, { action: 'labels.next', held: ['a'] }, true, deps)) as Next).clip?.id).toBe('b');
+
+    await expect(handleAdminConsole(owner, { action: 'labels.save', id: 'a', marks: {} }, true, deps)).rejects.toThrow('One mark has no answer yet.');
+    expect(await handleAdminConsole(owner, { action: 'labels.save', id: 'a', marks: { '101:word:': 'yes' }, words: { 102: 'skipped' }, ms: 9000 }, true, deps)).toEqual({ saved: true, status: 'done' });
+    expect(await handleAdminConsole(owner, { action: 'labels.save', id: 'b', skip: 'audio', ms: 2000 }, true, deps)).toEqual({ saved: true, status: 'skipped' });
+    const stored = (await db.doc('reciteLabelClips/a').get()).data()!;
+    expect(stored).toMatchObject({
+      status: 'done',
+      labelledAt: NOW,
+      answers: 2,
+      label: { by: { uid: 'staff1', email: 'owner@example.com' }, at: NOW, ms: 9000, marks: { '101:word:': 'yes' }, words: { '102': 'skipped' }, n: 1 },
+    });
+    expect(((await handleAdminConsole(owner, { action: 'labels.next' }, true, deps)) as Next).clip?.id).toBe('c');
+    expect(await handleAdminConsole(owner, { action: 'labels.stats', since: NOW - DAY }, true, deps)).toEqual({
+      open: 1,
+      done: 1,
+      skipped: 1,
+      today: { clips: 2, answers: 2, ms: 11000 },
+    });
+    // Going back to a clip shows its label, and saving again replaces it.
+    const again = (await handleAdminConsole(owner, { action: 'labels.get', id: 'a' }, true, deps)) as { clip: { label: { marks: Record<string, string> } } };
+    expect(again.clip.label.marks).toEqual({ '101:word:': 'yes' });
+    await handleAdminConsole(owner, { action: 'labels.save', id: 'a', marks: { '101:word:': 'no' }, ms: 1000 }, true, deps);
+    expect((await db.doc('reciteLabelClips/a').get()).get('label')).toMatchObject({ marks: { '101:word:': 'no' }, words: {}, n: 2 });
+    await handleAdminConsole(owner, { action: 'labels.save', id: 'c', marks: {} }, true, deps);
+    expect(await handleAdminConsole(owner, { action: 'labels.next' }, true, deps)).toEqual({ clip: null });
+    await expect(handleAdminConsole(owner, { action: 'labels.get', id: 'gone' }, true, deps)).rejects.toThrow('That clip is gone.');
   });
 
   (process.env.FIREBASE_AUTH_EMULATOR_HOST ? it : it.skip)('role changes keep other claims and go to the audit log', async () => {
