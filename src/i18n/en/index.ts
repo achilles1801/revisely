@@ -23,6 +23,7 @@ import { settings } from './settings';
 import { timer } from './timer';
 import { updates } from './updates';
 import { v2 } from './v2';
+import { verse } from './verse';
 import { whatsNew } from './whatsNew';
 
 export const en = {
@@ -49,6 +50,7 @@ export const en = {
   timer,
   updates,
   v2,
+  verse,
   whatsNew,
 } as const;
 

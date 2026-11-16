@@ -36,6 +36,7 @@ const EXTRACTED: string[] = [
   'components/timer',
   'components/updates',
   'components/v2',
+  'components/verse',
   'context',
   'hooks',
   'lib/prayer',
