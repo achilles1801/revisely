@@ -17,6 +17,7 @@ import { PageRatingsChart } from './charts/PageRatingsChart';
 import { TableChart } from './charts/TableChart';
 import { TimelineChart } from './charts/TimelineChart';
 import { WeeksChart } from './charts/WeeksChart';
+import { t } from '../../i18n';
 
 /** Where a chart's panel can take the user (RevoChat wires them; RevoHost closes Revo first). */
 export interface ChartHandlers {
@@ -117,14 +118,8 @@ export function ChartCard({ chart, day, sources, ...handlers }: { chart: RevoVis
   );
 }
 
-const ACTION_BUTTON: Record<Exclude<RevoAction['kind'], 'openScreen'>, string> = {
-  reviseFirst: 'Add to my plan',
-  openPage: 'Open in the reader',
-  startRevision: 'Start revision',
-};
-
 /** The card's button: for a screen, what it opens (lib/revo/screens). */
-const actionButton = (a: RevoAction) => (a.kind === 'openScreen' ? SCREEN_BUTTON[a.screen] : ACTION_BUTTON[a.kind]);
+const actionButton = (a: RevoAction) => (a.kind === 'openScreen' ? SCREEN_BUTTON[a.screen] : t(`revo.card.${a.kind}`));
 
 const ACTION_ICON: Record<RevoAction['kind'], keyof typeof Ionicons.glyphMap> = {
   reviseFirst: 'calendar-outline',
@@ -163,13 +158,13 @@ export function PlanCard({
         <View style={styles.planDone} testID="revo-plan-added">
           <Ionicons name="checkmark-circle" size={18} color={palette.doneText} />
           <Text style={[styles.planDetail, { color: palette.text }]}>
-            {action.kind === 'reviseFirst' ? 'Added to tomorrow’s revision' : 'Done'}
+            {action.kind === 'reviseFirst' ? t('revo.card.added') : t('common.done')}
           </Text>
         </View>
       ) : state === 'dismissed' ? null : (
         <View style={styles.planButtons}>
           <PillButton title={actionButton(action)} onPress={onDo} size="sm" testID="revo-plan-do" style={styles.planPrimary} />
-          <PillButton title="Not now" onPress={onDismiss} size="sm" variant="outline" testID="revo-plan-not-now" />
+          <PillButton title={t('common.notNow')} onPress={onDismiss} size="sm" variant="outline" testID="revo-plan-not-now" />
         </View>
       )}
     </View>

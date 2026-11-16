@@ -6,26 +6,26 @@ import { useTheme } from '../../context/ThemeContext';
 import { useReduceMotion } from '../../design/motion';
 import { Tap } from '../v2/Tap';
 import { RevoMark } from './RevoMark';
-import { formatTime } from '../../i18n';
+import { t, formatTime } from '../../i18n';
 
 /** Revo's header: the "Revo" capsule, then History and Memory. */
 export function RevoHeader({ onHistory, onMemory }: { onHistory: () => void; onMemory: () => void }) {
   const { palette } = useTheme();
   return (
     <View style={styles.header}>
-      <View style={[styles.capsule, { backgroundColor: palette.bubble }]} accessibilityRole="header" accessibilityLabel="Revo">
+      <View style={[styles.capsule, { backgroundColor: palette.bubble }]} accessibilityRole="header" accessibilityLabel={t('revo.revo')}>
         <RevoMark size={28} />
         <Text style={[styles.capsuleText, { color: palette.text }]} maxFontSizeMultiplier={1.3}>
-          Revo
+          {t('revo.revo')}
         </Text>
       </View>
       <View style={styles.headerRight}>
-        <Tap onPress={onHistory} hitSlop={10} accessibilityRole="button" accessibilityLabel="History" testID="revo-history">
+        <Tap onPress={onHistory} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('revo.history')} testID="revo-history">
           <Ionicons name="time-outline" size={22} color={palette.text} />
         </Tap>
-        <Tap onPress={onMemory} hitSlop={10} style={styles.memory} accessibilityRole="button" accessibilityLabel="Memory" testID="revo-memory">
+        <Tap onPress={onMemory} hitSlop={10} style={styles.memory} accessibilityRole="button" accessibilityLabel={t('revo.memory')} testID="revo-memory">
           <Text style={[styles.memoryText, { color: palette.text }]} maxFontSizeMultiplier={1.3}>
-            Memory
+            {t('revo.memory')}
           </Text>
           <Ionicons name="bulb-outline" size={21} color={palette.text} />
         </Tap>
@@ -47,7 +47,7 @@ export function RevoSubHeader({
   const { palette } = useTheme();
   return (
     <View style={styles.subHeader}>
-      <Tap onPress={onBack} hitSlop={10} style={styles.side} accessibilityRole="button" accessibilityLabel="Back" testID="revo-back">
+      <Tap onPress={onBack} hitSlop={10} style={styles.side} accessibilityRole="button" accessibilityLabel={t('common.back')} testID="revo-back">
         <Ionicons name="chevron-back" size={26} color={palette.text} />
       </Tap>
       <Text style={[styles.subTitle, { color: palette.text }]} accessibilityRole="header" maxFontSizeMultiplier={1.3}>
@@ -94,7 +94,7 @@ export function FeedbackRow({
         onPress={() => onFeedback?.(on ? null : which)}
         hitSlop={8}
         accessibilityRole="button"
-        accessibilityLabel={which === 'up' ? 'Good answer' : 'Bad answer'}
+        accessibilityLabel={which === 'up' ? t('revo.parts.good') : t('revo.parts.bad')}
         accessibilityState={{ selected: on }}
         testID={testID ? `${testID}-${which}` : undefined}
       >
@@ -108,7 +108,7 @@ export function FeedbackRow({
   };
   return (
     <View style={styles.feedback}>
-      <Tap onPress={onCopy} hitSlop={8} accessibilityRole="button" accessibilityLabel="Copy" testID={testID ? `${testID}-copy` : undefined}>
+      <Tap onPress={onCopy} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('common.copy')} testID={testID ? `${testID}-copy` : undefined}>
         <Ionicons name="copy-outline" size={19} color={palette.secondary} />
       </Tap>
       {onFeedback ? thumb('up') : null}
@@ -159,7 +159,7 @@ export function ContextChip({ label, kind, onRemove }: { label: string; kind: st
         {label}
       </Text>
       {onRemove ? (
-        <Tap onPress={onRemove} hitSlop={10} accessibilityRole="button" accessibilityLabel={`Remove ${label}`} testID="revo-context-remove">
+        <Tap onPress={onRemove} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('revo.parts.remove', { label })} testID="revo-context-remove">
           <Ionicons name="close-circle" size={18} color={palette.accentText} />
         </Tap>
       ) : null}
@@ -180,7 +180,7 @@ export function Chips({ chips, onPick, disabled }: { chips: string[]; onPick: (c
           disabled={disabled}
           style={[styles.chip, { borderColor: palette.outline }, disabled && styles.dim]}
           accessibilityRole="button"
-          accessibilityLabel={`Ask: ${c}`}
+          accessibilityLabel={t('revo.parts.ask', { chip: c })}
           testID={`revo-chip-${plainText(c)}`}
         >
           <Text style={[styles.chipText, { color: palette.text }]} maxFontSizeMultiplier={1.3}>
@@ -222,13 +222,13 @@ export function ReviewRow({ at, onOpen }: { at: number; onOpen: () => void }) {
       onPress={onOpen}
       style={[styles.review, { backgroundColor: palette.bubble }]}
       accessibilityRole="button"
-      accessibilityLabel={`Day in review, ${time}`}
+      accessibilityLabel={t('revo.parts.reviewAt', { time })}
       testID="revo-review"
     >
       <Ionicons name="moon-outline" size={22} color={palette.text} />
       <View style={styles.reviewText}>
         <Text style={[styles.reviewTitle, { color: palette.text }]} maxFontSizeMultiplier={1.3}>
-          Day in review
+          {t('revo.parts.review')}
         </Text>
         <Text style={[styles.reviewLine, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
           {time}
@@ -251,7 +251,7 @@ export function Typing() {
     return () => loop.stop();
   }, [pulse, reduceMotion]);
   return (
-    <View style={styles.typing} accessibilityLabel="Revo is thinking" accessible testID="revo-typing">
+    <View style={styles.typing} accessibilityLabel={t('revo.parts.thinking')} accessible testID="revo-typing">
       {[0, 1, 2].map((i) => (
         <Animated.View
           key={i}

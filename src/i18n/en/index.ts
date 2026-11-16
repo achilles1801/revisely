@@ -21,6 +21,7 @@ import { recite } from './recite';
 import { recordings } from './recordings';
 import { reminders } from './reminders';
 import { revision } from './revision';
+import { revo } from './revo';
 import { settings } from './settings';
 import { timer } from './timer';
 import { updates } from './updates';
@@ -50,6 +51,7 @@ export const en = {
   recordings,
   reminders,
   revision,
+  revo,
   settings,
   timer,
   updates,

@@ -10,6 +10,7 @@ import { CHART_TEXT_MAX, ChartFrame, ChartPlot } from './ChartFrame';
 import { COVERAGE_LABELS, fillLook } from '../../activity/coverageLook';
 import { CoverageFill } from '../../activity/CoverageFill';
 import { ChartButtons, DetailLine, Legend, RatingCounts, RatingStrip } from './ChartParts';
+import { t } from '../../../i18n';
 
 const COLS = 10;
 const ROWS = 3;
@@ -59,12 +60,12 @@ export function JuzMapChart({
 
   // As Insights' Coverage tiles draw them: filled by the share revised this week and this month (ACT-26),
   // not revised yet neutral (ACT-25).
-  const look = (t: JuzTile) => fillLook(t.state, t.counts, palette);
+  const look = (tile: JuzTile) => fillLook(tile.state, tile.counts, palette);
 
   return (
     <ChartFrame
       title={title}
-      hint="Tap a juz to see it"
+      hint={t('revo.chart.juzHint')}
       readout={readout}
       onClear={() => setPicked(null)}
       testID={testID}
@@ -92,7 +93,7 @@ export function JuzMapChart({
       <ChartPlot
         testID={`${testID}-plot`}
         label={`${title}. ${juzSummary(tiles)}`}
-        value={readout ? spokenText(`${readout.title}, ${readout.line}`) : 'Swipe up or down to pick a juz'}
+        value={readout ? spokenText(`${readout.title}, ${readout.line}`) : t('revo.chart.pickJuz')}
         onStep={(by) => setPicked(stepIndex(picked, by, tiles.length))}
         onActivate={() => setPicked(picked == null ? 0 : null)}
         onTap={(x, y, size) => {

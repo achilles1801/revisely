@@ -2,16 +2,17 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { logger } from '../../lib/logger';
+import { t } from '../../i18n';
 
 function Broken() {
   const { palette } = useTheme();
   return (
     <View style={styles.wrap} testID="revo-broken" accessibilityLiveRegion="polite">
       <Text style={[styles.title, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
-        Revo ran into a problem
+        {t('revo.broken.title')}
       </Text>
       <Text style={[styles.body, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
-        Close it and open it again. Your conversations are kept.
+        {t('revo.broken.body')}
       </Text>
     </View>
   );
