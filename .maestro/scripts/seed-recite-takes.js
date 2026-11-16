@@ -1,5 +1,5 @@
 // Maestro runScript: takes with Mark mistakes on the flow's new account, for Insights' Recitation section (Revisely
-// Dev, RINS-2; flow 09-activity-recitation). Today is Monday 16 November 2026 (the flow's CLOCK). Writes through the
+// Dev, RINS-2; the end of flow 09-revo-attach). Today is Monday 16 November 2026 (the flow's CLOCK). Writes through the
 // emulators as their admin ("Bearer owner"), as seed-history.js does.
 //   env SMART: "on" (default) or "off": the account's Smart Tracking. With "off" only the account is written again.
 //
