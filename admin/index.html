@@ -33,6 +33,7 @@ html, body { margin: 0; }
       <a href="/" data-view="overview" hidden><span class="k"></span>Overview</a>
       <a href="/open-door" data-view="opendoor" hidden><span class="k"></span>Open Door <span class="badge" id="odBadge" hidden></span></a>
       <a href="/audit" data-view="audit" hidden><span class="k"></span>Audit log</a>
+      <a href="/premium" data-view="premium" hidden><span class="k"></span>Premium</a>
       <a href="/staff" data-view="staff" hidden><span class="k"></span>Staff</a>
     </nav>
   </div>
@@ -216,6 +217,20 @@ html, body { margin: 0; }
   <div class="conn" id="auditConn" hidden></div>
   <div class="w"><div class="tbl-wrap"><table id="auditTable"><thead></thead><tbody></tbody></table></div>
   <div class="queue-f" style="border:0;padding:10px 0 0"><span id="auditRange"></span><span class="sp"></span><button type="button" class="btn" id="auditNewer" disabled>‹ Newer</button><button type="button" class="btn" id="auditOlder" disabled>Older ›</button></div></div>
+</section>
+
+<section id="view-premium" hidden aria-labelledby="premiumTitle">
+  <div class="od-head">
+    <h2 id="premiumTitle">Premium</h2>
+    <span class="sub">Who has Premium, from where, and what ends soon. Counts only.</span>
+    <span class="sub" id="premiumAsOf" style="margin-left:auto"></span>
+    <button type="button" class="btn" id="premiumRefresh">Refresh</button>
+  </div>
+  <div class="conn" id="premiumConn" hidden></div>
+  <div class="tiles" id="premiumTop"></div>
+  <div class="sec-h" style="margin-top:18px"><h2>Premium now, by where it came from</h2><span class="sub">An account with two grants counts under the one that lasts longest</span></div>
+  <div class="tiles premium-sources" id="premiumSources"></div>
+  <p class="foot">From each account’s entitlements, as the app and the recitation checker read them. Subscriptions show here once a paid plan exists.</p>
 </section>
 
 <section id="view-staff" hidden aria-labelledby="staffTitle">

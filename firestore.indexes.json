@@ -72,6 +72,14 @@
         { "fieldPath": "kind", "order": "ASCENDING" },
         { "fieldPath": "at", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "entitlements",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "premium.source", "order": "ASCENDING" },
+        { "fieldPath": "premium.until", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [

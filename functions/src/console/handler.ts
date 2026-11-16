@@ -10,6 +10,7 @@
  *   od.revoke        take Premium through Open Door back (review.ts)  openDoor.revoke
  *   audit.decisions  the decisions, newest first                      audit.read
  *   audit.roles      role changes, newest first                       audit.read
+ *   premium.summary  Premium counts: by source, ending soon, ended    premium.read
  *   staff.list       who has which role, and what each role may do    roles.manage
  *   staff.set        give, change or take a role (by email or id)     roles.manage
  *
@@ -32,6 +33,10 @@ import {
 } from '../support/review';
 import { ConsoleError, GRANTS, PERMISSIONS, Permission, ROLES, ROLE_NAMES, Role, StaffCaller, isRole, permissionsOf, requirePermission } from './roles';
 import { RoleActor, RoleChange, StaffMember, roleChangeRefusal, rolesPage } from './staff';
+import { premiumSummary } from './premium';
+
+/** Projects whose accounts get dev grants (the Dev app's "Get Premium"), so the Premium overview counts them. */
+const DEV_PROJECTS = ['revisely-dev', 'demo-revisely'];
 
 /** Accounts nobody may decide on from the console (the script refuses them too). */
 export const PROTECTED_EMAILS = ['applereview@revisely.app'];
@@ -250,6 +255,11 @@ export async function handleAdminConsole(
       requirePermission(caller, 'audit.read');
       const page: { rows: RoleChange[]; next: string | null } = await rolesPage(deps.db, { cursor: data.cursor, limit: typeof data.limit === 'number' ? data.limit : undefined });
       return page;
+    }
+
+    case 'premium.summary': {
+      requirePermission(caller, 'premium.read');
+      return premiumSummary(deps.db, deps.now(), { devProject: DEV_PROJECTS.includes(deps.project) });
     }
 
     case 'staff.list': {

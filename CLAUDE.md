@@ -600,6 +600,8 @@ revisely-dev`; nothing deploys Hosting by itself). It shows production and dev (
 README has the deploy and the undo); never deploy the root `firebase.json`'s hosting to production.
 - **Pages:** `/sign-in` (its own page: Google, or email and password; no sign-up; an account without a role sees "No
   access" with Sign out, and nothing else), `/` Overview (the metrics), `/open-door` and `/open-door/<uid>`, `/audit`,
+  `/premium` (owners and admins, `premium.read`: Premium now by source, ending in 30 days, ended Open Door grants and,
+  on revisely-dev, dev grants; `count()` queries only, index (premium.source, premium.until)),
   `/staff` (owners only: give a role by exact email, change or take one; no changing your own, never the App Review
   account, never the last owner; each change in the audit log). Signed out, every address goes to `/sign-in?next=…` (`shell.js`). Hosting's `cleanUrls` and rewrites serve them.
 - **Roles** (`functions/src/console/roles.ts`, the one permission list): `owner` (everything, roles too), `admin`
@@ -610,7 +612,7 @@ README has the deploy and the undo); never deploy the root `firebase.json`'s hos
   counts as owner until set-role replaces it (`set-admin.js` now only takes it away). The callables read claims live
   from Auth (`staffClaims` in index.ts), so a role taken away stops at the next call. Rules open nothing to any role.
 - **Functions:** `adminMetrics` (metrics.read), `adminRevo` (revo.conversations; conversations locked until
-  `config/admin.conversations`), `adminConsole` (`me`, Open Door `od.*`, `audit.*`, `staff.*`; App Check on every action but
+  `config/admin.conversations`), `adminConsole` (`me`, Open Door `od.*`, `audit.*`, `premium.summary`, `staff.*`; App Check on every action but
   `me`; Open Door only where `SUPPORT_PAGES` has the project), `metricsTotals` (the hourly `metrics.yml` with its
   GitHub OIDC token; alarms on the "Metrics alerts" issue).
 - **Production and Dev in one console** (Majd, Nov 14 2026: one console with a switch; metrics.revisely.app to be

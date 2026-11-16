@@ -10,7 +10,8 @@ import { Firestore, Timestamp, getFirestore } from 'firebase-admin/firestore';
 import { AccountInfo, ConsoleDeps, handleAdminConsole } from '../console/handler';
 import { roleOf } from '../console/roles';
 import { rolesPage, setRole, staff } from '../console/staff';
-import { applicationFrom, deleteSupportData, entitlementsFrom } from '../support/admin';
+import { premiumSummary } from '../console/premium';
+import { applicationFrom, deleteSupportData, entitlementsFrom, entitlementsTo } from '../support/admin';
 import { REAPPLY_AFTER_DAYS, SupportError, stateOf } from '../support/logic';
 import {
   Reviewer,
@@ -217,5 +218,28 @@ const BY: Reviewer = { uid: 'staff1', email: 'owner@example.com', role: 'owner',
       ['owner', 'reviewer'],
     ]);
     await auth.deleteUser(user.uid);
+  });
+
+  it('the Premium overview counts Premium now by source, what ends within 30 days, ended Open Door grants and dev grants', async () => {
+    const g = (source: string, until: number | null) => ({ source, grantedAt: NOW - 40 * DAY, until });
+    const put = (uid: string, grants: Record<string, ReturnType<typeof g>>) => {
+      const list = Object.values(grants);
+      // The grant that lasts longest is `premium` (effectivePremium); written as support/admin.ts writes it.
+      const premium = list.reduce<ReturnType<typeof g> | null>((best, x) => (!best || (best.until != null && (x.until == null || x.until > best.until)) ? x : best), null);
+      return db.doc(`entitlements/${uid}`).set(entitlementsTo({ grants: grants as never, premium: premium as never }));
+    };
+    await put('a', { support: g('support', null) }); // Open Door, no end date
+    await put('b', { support: g('support', NOW + 10 * DAY) }); // Open Door, ends in 10 days
+    await put('c', { support: g('support', NOW - DAY) }); // Open Door, ended yesterday: no Premium now
+    await put('d', { dev: g('dev', null) }); // a tester's dev grant
+    await put('e', { gift: g('gift', NOW + 60 * DAY), support: g('support', NOW - 5 * DAY) }); // gift lasts; support ended
+    await db.doc('entitlements/f').set({ premium: null, grants: {} }); // everything taken back
+
+    const out = await premiumSummary(db, NOW, { devProject: true });
+    expect(out.now).toEqual({ total: 4, bySource: { support: 2, dev: 1, purchase: 0, gift: 1, family: 0 } });
+    expect(out.endingSoon).toBe(1); // b
+    expect(out.supportEnded).toBe(2); // c and e
+    expect(out.devGrants).toBe(1);
+    expect((await premiumSummary(db, NOW, { devProject: false })).devGrants).toBeNull();
   });
 });

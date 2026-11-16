@@ -106,6 +106,7 @@ describe('adminConsole: who gets what', () => {
       { action: 'od.revoke', uid: 'u1', note: 'x', requestId: 'r_0123456789abcdefXYZ' },
       { action: 'audit.decisions' },
       { action: 'audit.roles' },
+      { action: 'premium.summary' },
       { action: 'staff.list' },
       { action: 'staff.set', email: 'a@example.com', role: 'owner' },
     ];
@@ -118,7 +119,7 @@ describe('adminConsole: who gets what', () => {
       expect(await code(handleAdminConsole(as('admin'), data, true, deps()))).toBe('permission-denied');
       expect(await code(handleAdminConsole(as('reviewer'), data, true, deps()))).toBe('permission-denied');
     }
-    for (const data of [actions[5], actions[6], actions[7]]) {
+    for (const data of [actions[5], actions[6], actions[7], actions[8]]) {
       expect(await code(handleAdminConsole(as('reviewer'), data, true, deps()))).toBe('permission-denied');
     }
   });
