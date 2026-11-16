@@ -111,6 +111,7 @@ const INSIGHT_LABEL: Record<RevoInsight, string> = {
   consistency: 'Consistency',
   weakSpots: 'Weak spots',
   pace: 'Pace',
+  recitation: 'Recitation',
 };
 
 export function insightAttachment(insight: RevoInsight): RevoAttachment {

@@ -74,10 +74,84 @@ export interface RevoContext {
   passages: { today?: string; startsAt?: string; next?: string; nextAt?: string; weakNext?: string; weak?: string; memorizedToday?: string };
   /** Each page named above, in words ("Al-Hashr, ayahs 17–24 · Juz 28"), by page number. */
   pageNames: Record<string, string>;
+  /**
+   * Their recitation (Revisely Dev, RINS-1): what lib/reciteInsights finds in the takes kept on the account, only for
+   * an account that recites with Mark mistakes (lib/revo/recitation). The server adds its recitation rules with it.
+   */
+  recitation?: RevoRecitation;
   localTime: string | null;
 }
 
-export type RevoInsight = 'coverage' | 'consistency' | 'weakSpots' | 'pace';
+/** A passage of one surah by its ayahs, with its words ("Al-Kahf, ayahs 22–23"); a take across two surahs is named whole. */
+export interface RevoRecitedPassage {
+  sura: number;
+  from: number;
+  to: number;
+  name: string;
+}
+
+/** One ayah with its short words ("Al-Baqarah 48"). */
+export interface RevoRecitedAyah {
+  sura: number;
+  ayah: number;
+  name: string;
+}
+
+/** The server's shape (functions/src/revo/types.ts RevoRecitation), checked there to add up. */
+export interface RevoRecitation {
+  days: number;
+  takes: number;
+  daysRecited: number;
+  minutes: number;
+  words: number;
+  mistakes: number;
+  kinds: { wrong: number; skipped: number; added: number; harakat: number; letter: number };
+  unclear: number;
+  tajweed: number | null;
+  score: number | null;
+  earlierScore: number | null;
+  weeks: (number | null)[];
+  stillMarked: number;
+  cleared: number;
+  slipping: { passage: RevoRecitedPassage; words: number; wordMistakes: number; wrong: number; tries: number; daysAgo: number }[];
+  similar: { from: RevoRecitedAyah; into: RevoRecitedAyah; ending: boolean; times: number; also: number; daysAgo: number }[];
+  last: { daysAgo: number; passage: RevoRecitedPassage; score: number; mistakes: number; unclear: number; hidden: boolean; strict: boolean } | null;
+}
+
+export interface RevoTakeMark {
+  sura: number;
+  ayah: number;
+  name: string;
+  kind: 'word' | 'skipped' | 'added' | 'harakat' | 'letter' | 'tajweed';
+  unclear: boolean;
+  detail?: 'lookalike' | 'sound' | 'replaced' | 'order' | 'trail' | 'shadda';
+  expected?: string;
+  heard?: string;
+  rule?: string;
+  got?: number;
+  set?: number;
+  into?: { sura: number; ayah: number; name: string; ending: boolean; also: number };
+}
+
+/** One take, as attached (functions/src/revo/types.ts RevoTakeFacts). */
+export interface RevoTakeFacts {
+  daysAgo: number;
+  passage: RevoRecitedPassage;
+  level: 'words' | 'strict';
+  hidden: boolean;
+  secs: number;
+  words: number;
+  score: number;
+  mistakes: number;
+  unclear: number;
+  tajweed: number;
+  marks: RevoTakeMark[];
+  cleared: number;
+  before: number | null;
+}
+
+/** `recitation`: Insights' Recitation section (Revisely Dev). */
+export type RevoInsight = 'coverage' | 'consistency' | 'weakSpots' | 'pace' | 'recitation';
 
 /** How often a part of the Qur'an was revised in a window: on how many days, and each memorized page's least and most. */
 export interface RevoTimes {
@@ -165,7 +239,9 @@ export type RevoAttachment =
   | { kind: 'pages'; label: string; pages: number[]; facts: RevoPassageFacts }
   | { kind: 'revisionDay'; label: string; day: string; facts: RevoDayFacts }
   | { kind: 'recording'; label: string; day: string; of: 'revision' | 'reading'; seconds: number; pages: number[] }
-  | { kind: 'insight'; label: string; insight: RevoInsight };
+  | { kind: 'insight'; label: string; insight: RevoInsight }
+  /** A take with Mark mistakes (Revisely Dev, RINS-1). */
+  | { kind: 'reciteTake'; label: string; day: string; facts: RevoTakeFacts };
 
 /** At most this many things go with one question. */
 export const REVO_MAX_ATTACHMENTS = 6;
