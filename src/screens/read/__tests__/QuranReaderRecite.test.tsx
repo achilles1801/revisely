@@ -212,6 +212,17 @@ const A23 = words.verseFirstWord(27, 23);
 const UTIYAT = A23 + 4;
 
 const flush = () => act(async () => {});
+/**
+ * The app goes to the background: every AppState listener hears it, as on a phone. (Taking the last one registered was
+ * order-dependent: other hooks register theirs too, some after a promise.)
+ */
+const toBackground = () =>
+  act(async () => {
+    const { AppState } = require('react-native');
+    for (const [type, listener] of (AppState.addEventListener as jest.Mock).mock.calls as [string, (s: string) => void][]) {
+      if (type === 'change') listener('background');
+    }
+  });
 const event = (e: LiveEvent) => act(async () => mockLive.onEvent?.(e));
 /** An element's style, flattened. */
 const flatStyle = (el: { props: { style?: unknown } }): Record<string, unknown> => {
@@ -1059,10 +1070,7 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
     it('leaving the app while paused ends the take, as it does while reciting', async () => {
       await startTake('recite');
       await act(async () => fireEvent.press(screen.getByTestId('recite-pause')));
-      const { AppState } = require('react-native');
-      // Every listener hears it, as in the app (the take's, and the checker's warm-up).
-      const listeners = (AppState.addEventListener as jest.Mock).mock.calls.map((c: unknown[]) => c[1] as (s: string) => void);
-      await act(async () => listeners.forEach((l) => l('background')));
+      await toBackground();
       expect(mockLive.sent).toContainEqual({ type: 'end' });
     });
   });
@@ -1847,9 +1855,7 @@ describe('an immersive page during a take (Majd, Nov 15 2026: a tap hides the he
   it('the take’s end brings them back (leaving the app ends it)', async () => {
     await startTake('recite');
     await tapPage();
-    const { AppState } = require('react-native');
-    const listener = (AppState.addEventListener as jest.Mock).mock.calls.map((c: unknown[]) => c[1] as (s: string) => void).at(-1)!;
-    await act(async () => listener('background'));
+    await toBackground();
     expect(mockLive.sent).toContainEqual({ type: 'end' });
     expect(screen.getByTestId('recite-bar')).toBeTruthy();
   });
