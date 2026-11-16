@@ -509,6 +509,30 @@ describe('mistakes are highlights (Majd, Nov 15 2026: “only things we should s
     expect(screen.queryByTestId('live-line-band')).toBeNull();
     expect(screen.queryAllByTestId('hidden-band')).toHaveLength(0);
   });
+
+  it('something else said in the next word’s slot (`off`): its cover turns red, its text still hidden, until it’s said', async () => {
+    await startTake('recite', null);
+    fireEvent.press(screen.getByTestId('recite-eye'));
+    await event({ type: 'locked', w: A23, s: 27, a: 23 });
+    await event({ type: 'at', w: A23 + 3 });
+    await event({ type: 'said', upTo: A23 + 3 });
+    expect(screen.queryByTestId('live-off')).toBeNull();
+    await event({ type: 'off', w: A23 + 4 });
+    // Recite's red (the word-mistake highlight), over the cover: no new colour, never a mark.
+    expect(bg('live-off')).toBe(p.markWord);
+    expect(screen.queryAllByTestId(/^live-mark-/)).toHaveLength(0);
+    // Said right: it goes.
+    await event({ type: 'at', w: A23 + 4 });
+    expect(screen.queryByTestId('live-off')).toBeNull();
+  });
+
+  it('`off` with the page shown draws nothing (you see the words there)', async () => {
+    await startTake('recite', null);
+    await event({ type: 'locked', w: A23, s: 27, a: 23 });
+    await event({ type: 'at', w: A23 + 3 });
+    await event({ type: 'off', w: A23 + 4 });
+    expect(screen.queryByTestId('live-off')).toBeNull();
+  });
 });
 
 describe('a take starts anywhere on the page (Majd, Nov 14 2026)', () => {

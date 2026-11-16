@@ -267,6 +267,13 @@ until its part is set up.
     for is a firmer shade of its own (`…Firm`), no outline. No red ink, dotted lines or + discs. The bar, the card and
     the summary use the same highlights, and a small flat swatch beside the kind's name (never a round mark): the kind
     is always in words.
+  - **The next word's cover turns red while something else is said** (contract draft 7's `off`; Majd's yes, Nov 15 2026):
+    - What shows: in the hidden view only, red over the word's cover (the word-mistake highlight), its text still
+      hidden. It's never a mark and never counted.
+    - When it goes: once the word is said (`at` or `said` reach it), the reciter goes back, or a mark lands on it or an
+      Extra word just before it (`off` in `lib/reciteLive/state`).
+    - What the lab measured: right 86% of the times it fires, and never on hesitations or pauses.
+    - VoiceOver hears nothing: the mic is on throughout a take.
   - **"Not a mistake" can be undone** (Majd, Nov 15 2026; Tarteel's Removed list): for 5 s an Undo toast above the bar,
     and after the take the summary's "1 marked not a mistake" (closed until tapped) lists each with Put back
     (`restoreMark`: the mark and what it counted come back). The checker is told both ways, so the lab never keeps a

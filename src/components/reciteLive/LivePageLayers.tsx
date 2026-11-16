@@ -7,7 +7,7 @@ import type { WordFollow } from '../../lib/recite/hiddenPage';
 import type { Mark, MarkGroup } from '../../lib/reciteLive/contract';
 import { GROUP_RANK, markGroup } from '../../lib/reciteLive/contract';
 import { markTitle } from '../../lib/reciteLive/describe';
-import { currentLineBand, cursorBox, markBox, markHighlight } from '../../lib/reciteLive/geometry';
+import { currentLineBand, cursorBox, markBox, markHighlight, offBox } from '../../lib/reciteLive/geometry';
 
 const NO_REVEALED: ReadonlySet<string> = new Set();
 
@@ -87,6 +87,9 @@ export function LiveUnderlay({
 /**
  * Over the page's ink, on a hidden page: the covers (words show as recited, or shown by hand), with no band on any line
  * (Majd, Nov 15 2026). The newest word's grey box and the marks' highlights are behind the ink (LiveUnderlay).
+ * `off`: the next word, while something else is being said in its slot (the checker's `off`): its cover turns red, the
+ * word-mistake highlight over it, its text still hidden. Not a mark: it goes when the word is said, the reciter goes
+ * back, or a mark comes (lib/reciteLive/state).
  */
 export function LiveOverlay({
   page,
@@ -95,12 +98,16 @@ export function LiveOverlay({
 }: {
   page: number;
   scale: number;
-  hidden: { follow: WordFollow; cover: string; guide: string } | null;
+  hidden: { follow: WordFollow; cover: string; guide: string; off?: { w: number; words: QuranWords; colour: string } | null } | null;
 }) {
   if (!hidden) return null;
+  const off = hidden.off && hidden.off.words.pageOf(hidden.off.w) === page && !hidden.follow.shown(hidden.off.w) ? hidden.off : null;
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill} testID={`live-overlay-${page}`}>
       <HiddenPageOverlay page={page} scale={scale} revealed={NO_REVEALED} follow={hidden.follow} colors={{ cover: hidden.cover, guide: hidden.guide }} />
+      {off ? (
+        <View testID="live-off" style={[styles.abs, styles.box, rectStyle(offBox(off.words, off.w), scale), { backgroundColor: off.colour }]} />
+      ) : null}
     </View>
   );
 }

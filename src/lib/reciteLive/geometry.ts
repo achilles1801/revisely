@@ -47,6 +47,9 @@ export function markBox(words: QuranWords, mark: Mark): Rect {
   return wordBox(words, mark.w);
 }
 
+/** The hidden view's red cover on a word something else is being said in place of (`off`): as a mark's highlight. */
+export const offBox = (words: QuranWords, w: number): Rect => grow(wordBox(words, w), 4, 1);
+
 /** A mark's highlight behind the page's ink: its word's box, a little wider (the cursor's box is wider still). */
 export const markHighlight = (words: QuranWords, mark: Mark): Rect => grow(markBox(words, mark), 4, 1);
 
