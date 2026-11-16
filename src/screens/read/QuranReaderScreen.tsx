@@ -519,14 +519,24 @@ export default function QuranReaderScreen() {
         : undefined,
     [liveOn, qw, live.active, live.state, v2, cardMarks, pageMarks, hidden, markColours],
   );
+  // The next word's cover turns red while something else is being said in its slot (the checker's `off`, draft 7).
+  const offWord = live.state.off?.w ?? null;
   const pageOverlay = useMemo(
     () =>
       liveOn && qw && hidden
         ? (page: number, scale: number) => (
-            <LiveOverlay page={page} scale={scale} hidden={{ follow: hiddenFollow(qw, revealed, liveInfo), ...coverColors }} />
+            <LiveOverlay
+              page={page}
+              scale={scale}
+              hidden={{
+                follow: hiddenFollow(qw, revealed, liveInfo),
+                ...coverColors,
+                off: offWord != null ? { w: offWord, words: qw, colour: v2.markWord } : null,
+              }}
+            />
           )
         : undefined,
-    [liveOn, qw, hidden, revealed, liveInfo, coverColors],
+    [liveOn, qw, hidden, revealed, liveInfo, coverColors, offWord, v2],
   );
   // The marks as elements of their own (VoiceOver, the tests). Given whenever the live UI is on, so the pager's pages
   // keep one shape through takes.
@@ -691,7 +701,7 @@ export default function QuranReaderScreen() {
           pageOverlay={pageOverlay}
           pageAccessories={pageAccessories}
           onTapPoint={onTapPoint}
-          extraData={liveOn ? `${live.state.cursor}|${live.state.saidUpTo}|${Object.keys(live.state.marks).length}|${hidden}|${revealed.size}` : undefined}
+          extraData={liveOn ? `${live.state.cursor}|${live.state.saidUpTo}|${Object.keys(live.state.marks).length}|${hidden}|${revealed.size}|${offWord}` : undefined}
         />
       </ReaderFrame>
 
