@@ -49,6 +49,8 @@ const EXTRACTED: string[] = [
   'screens/journal',
   'screens/onboarding',
   'screens/prayer',
+  'screens/preview',
+  'screens/revision',
   'services',
 ];
 

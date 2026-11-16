@@ -1,4 +1,4 @@
-// components/revision and the session pieces in components/ (BulkActionsModal, EditSessionModal, WeaknessRating).
+// components/revision, screens/revision and the session pieces in components/ (BulkActionsModal, EditSessionModal, WeaknessRating).
 export const revision = {
   menuTitle: 'Session',
   end: {
@@ -47,5 +47,31 @@ export const revision = {
     /** "Al-Mulk 1–12 · p. 562". */
     message: '{{what}} · p. {{page}}',
     wholeJuz: 'Apply to the whole juz',
+  },
+  /** screens/revision: the session itself. */
+  session: {
+    markedRevised: '{{what}} marked as revised',
+    complete_one: 'Revision complete. {{count}} page revised.',
+    complete_other: 'Revision complete. {{count}} pages revised.',
+    loadFailed: "Couldn't load your session",
+    loading: 'Loading…',
+    ratePageStrength: 'Rate page strength',
+    bulk: 'Jump or mark in bulk',
+    help: 'How a session works',
+    hidden: 'Hidden',
+    /** "From Insights: Al-Mulk". */
+    fromInsights: 'From Insights: {{what}}',
+    reciteWords: 'Recite: each word shows as you say it',
+    pauseToSee: 'Pause after a verse to see it',
+    tapToSee: 'Tap a verse to see it',
+    /** The header: "Revising ahead · Tue", "Revising Juz 28". */
+    revisingAhead: 'Revising ahead · {{day}}',
+    revising: 'Revising {{scope}}',
+    /** "Al-Mulk 1–12 · Juz 29 · Hizb 57". */
+    where: '{{what}} · Juz {{juz}} · Hizb {{hizb}}',
+    showPage: 'Show the page',
+    hidePage: 'Hide the page',
+    micOff: 'Mic off',
+    tapHint: 'Tap the page for the controls',
   },
 } as const;

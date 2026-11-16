@@ -14,6 +14,7 @@ import { onboarding } from './onboarding';
 import { plan } from './plan';
 import { player } from './player';
 import { prayer } from './prayer';
+import { preview } from './preview';
 import { qibla } from './qibla';
 import { reader } from './reader';
 import { recite } from './recite';
@@ -42,6 +43,7 @@ export const en = {
   plan,
   player,
   prayer,
+  preview,
   qibla,
   reader,
   recite,
