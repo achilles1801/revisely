@@ -23,6 +23,9 @@ import { dayAndMonth, daysToLoad, INSIGHTS_RANGE_KEY, INSIGHTS_RANGES, parseRang
 import { journalFirstDay } from '../../lib/journal';
 import { smartTrackingOn } from '../../lib/smartTracking';
 import { gapsInsightsEnabled } from '../../lib/insightsGaps';
+import { pushBack } from '../../lib/gapsCycle';
+import { revisablePages } from '../../lib/memorizedAyahs';
+import { lastRevisedDay } from '../../lib/recency';
 import { CalendarMonth } from './CalendarMonth';
 import { InsightsView } from './InsightsView';
 import { useActivityReload } from './useActivityReload';
@@ -222,6 +225,14 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
     return out;
   }, [pages, firstDay]);
   const ratedWeak = useMemo(() => ratedWeakCounts(logs, today, rangeSpan(range, today, firstDay).window), [logs, today, range, firstDay]);
+  // Gaps' full revision against the plan (ACT-28): only while Insights shows it.
+  const gapsOn = gapsInsightsEnabled(user);
+  const fullRevision = useMemo(() => {
+    if (!gapsOn || view !== 'insights' || !user) return null;
+    const plan = revisablePages(pages);
+    const lastBy = new Map(plan.filter((p) => p.lastRevisedDate).map((p) => [p.pageNumber, lastRevisedDay(user, p.lastRevisedDate as string)]));
+    return pushBack({ user, memorized: plan, today, lastRevised: (p) => lastBy.get(p) ?? null, since: (p) => coverageSinceByPage.get(p) ?? null });
+  }, [gapsOn, view, user, pages, today, coverageSinceByPage]);
 
   const revised: Revised[] = useMemo(() => (data?.revisions ?? []).map((r) => ({ day: r.day, countsFor: r.countsFor, pages: r.pages, assigned: r.assigned, minutes: r.minutes })), [data]);
   const memorized: Memorized[] = useMemo(() => (data?.memorized ?? []).map((m) => ({ day: m.day, pages: m.pages })), [data]);
@@ -303,7 +314,8 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
             lastRevisedOn,
             coverageSince: coverageSinceByPage,
             firstTomorrow,
-            gaps: gapsInsightsEnabled(user),
+            gaps: gapsOn,
+            pushBack: fullRevision,
             itemsFrom: rangeFrom,
           }}
           onOpenDay={onOpenDay}

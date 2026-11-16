@@ -584,17 +584,32 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   revision day (DAY-2, DAY-9) with at least one page revised: a session, pages revised ahead (on the day they were
   done) or pages logged as revised elsewhere; reading and memorizing don't count. A gap is the days from one revision
   day to the next (Monday, then Thursday, is 3 days); revising every day leaves none, and one missed day is a 2-day
-  gap. Its figure is the days since the last revision ("6 days since your last revision", in red from 3 days; the
-  pages' own last revised dates when no item reaches that far back), or "Today, you revised" ("after 6 days" when
-  today ended a gap of 3 days or more); it opens the day of the last revision. Under it, a strip of the range (ACT-22;
+  gap. Lengths under 2 weeks are days; from 2 weeks they are said as a person says them, weeks ("over 3 weeks"),
+  from 6 weeks months ("about 2 months"), from a year years, and Days at the section's top right (shown only when
+  something reads differently) switches every length to exact days, kept on the phone. (Majd, Nov 16 2026: "saying
+  25 days gap is kinda pointless … but 'days' specifically should always be an option".) Its figure is how long
+  since the last revision: under 2 weeks a number ("6 days since your last revision", red from 3 days); from 2
+  weeks words and the date, never red ("Over 3 weeks since your last revision, on 24 Oct"); the pages' own last
+  revised dates when no item reaches that far back. Revised today: "Today, you revised", "after 6 days" when it
+  ended a gap of 3 days or more, "you're back, after over 3 weeks" after 2 weeks or more. It opens the day of the
+  last revision. Under it, a strip of the range (ACT-22;
   at most half a year, never before the account's first day): a dot per revision day, joined while they run on,
   each gap of 3 days or more in red with its length above it ("9 days"), and the gap still open dashed up to
-  today ("6 days so far"); a touch opens the day under the finger (longer than a month: Overview at that month).
+  today ("6 days so far"; grey from 2 weeks); a touch opens the day under the finger (longer than a month:
+  Overview at that month).
   Then two tiles: the longest gap with a missed day in the range, the open one included and counted in full when it
   began before the range ("9 days · Longest gap, 28 Oct – 6 Nov", opening Overview at its month; "60+ days" when it
   began before the days read; "None · No gaps in 30 days"), and the usual rhythm, the median step between revision
   days in the range, from two steps ("Every day", "Every 2 days", "Every 1–2 days", with how many gaps of 3 days or
-  more). Nothing revised on record: no section. Recency only, the same with Smart Tracking on or off (ACT-19).
+  more). Under them, the full revision against the plan as it is now, read forwards from today (nothing records
+  what an older plan scheduled): a page's spacing is the days between its next two slots (days off, custom plans,
+  juz mode and carried pages included), it is due its spacing after its last revision (never revised: after the
+  day it was memorized), and it is late when its next slot comes after that. "Full revision pushed back 5 days ·
+  18 pages from your gaps come round by 13 Nov instead of 8 Nov. Your plan goes round every 5 days." runs from the
+  latest due day of a late page to the latest day one comes round ("from your gaps" when every late page was due
+  before today; a catch-up that slid the plan back says only "come round"); none late: "Full revision on
+  schedule". A plan changed mid-cycle is judged by the new plan; pages it doesn't hold are left out. Nothing
+  revised on record: no section. Recency only, the same with Smart Tracking on or off (ACT-19).
   Revisely Dev and previewTester accounts until a release opens it. (Majd, Nov 16 2026: "some metric in insights
   that give the user an idea on their 'gaps' between session"; mocks insights-gaps.)
 

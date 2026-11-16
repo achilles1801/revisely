@@ -7,6 +7,8 @@
 //   recencyLine(41, 0)       "Last revised 41 days ago · not in the last 30 days"
 //   recencyLine(null, 0)     "Never revised"
 
+import { getRevisionDayForUser } from './fajrBoundary';
+
 /** "once", "twice", "3 times". */
 export const timesWord = (n: number): string => (n === 1 ? 'once' : n === 2 ? 'twice' : `${n} times`);
 
@@ -30,6 +32,17 @@ export function recencyLine(daysAgo: number | null, timesInWindow: number, windo
 }
 
 const DAY_MS = 86_400_000;
+
+/**
+ * The revision day a page was last revised on. A page holds either the moment of its last
+ * revision (a session sets it) or the revision day itself, stored as that day's midnight UTC (the
+ * self-heal from the logs, AppContext's syncPagesFromLogs). Read as a moment, the second fell on
+ * the evening before in the Americas.
+ */
+export function lastRevisedDay(user: Parameters<typeof getRevisionDayForUser>[0], iso: string): string {
+  if (/T00:00:00(\.000)?Z$/.test(iso)) return iso.slice(0, 10);
+  return getRevisionDayForUser(user, new Date(iso));
+}
 
 /**
  * Whole days from `day` to `today`. Either may be a timestamp ("2026-11-02T09:00:00.000Z", as a

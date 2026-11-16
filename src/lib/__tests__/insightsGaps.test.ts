@@ -1,4 +1,7 @@
 import {
+  durationWords,
+  gapsHaveNatural,
+  naturalDiffers,
   gapDate,
   gapsInsightsEnabled,
   gapLabel,
@@ -169,17 +172,44 @@ describe('gapsView', () => {
 });
 
 describe('words', () => {
-  it('the figure', () => {
-    expect(gapsFigure({ sinceLast: 6, closedToday: null })).toEqual({ value: '6 days', text: 'since your last revision' });
-    expect(gapsFigure({ sinceLast: 1, closedToday: null })).toEqual({ value: '1 day', text: 'since your last revision' });
-    expect(gapsFigure({ sinceLast: 0, closedToday: null })).toEqual({ value: 'Today', text: 'you revised' });
-    expect(gapsFigure({ sinceLast: 0, closedToday: 6 })).toEqual({ value: 'Today', text: 'you revised, after 6 days' });
+  it('the figure: a number under 2 weeks, red from 3 days', () => {
+    const at = (sinceLast: number, closedToday: number | null = null) => gapsFigure({ sinceLast, closedToday, lastDay: shift(TODAY, -sinceLast) });
+    expect(at(6)).toEqual({ value: '6 days', text: 'since your last revision', red: true });
+    expect(at(2)).toEqual({ value: '2 days', text: 'since your last revision', red: false });
+    expect(at(1)).toEqual({ value: '1 day', text: 'since your last revision', red: false });
+    expect(at(13)).toMatchObject({ value: '13 days', red: true });
+    expect(at(0)).toEqual({ value: 'Today', text: 'you revised', red: false });
+    expect(at(0, 6)).toEqual({ value: 'Today', text: 'you revised, after 6 days', red: false });
+  });
+
+  it('the figure from 2 weeks: words and the date, never red; back today, gently; days when asked', () => {
+    const at = (sinceLast: number, closedToday: number | null = null, inDays = false) =>
+      gapsFigure({ sinceLast, closedToday, lastDay: shift(TODAY, -sinceLast) }, inDays);
+    expect(at(22)).toEqual({ value: 'Over 3 weeks', text: 'since your last revision, on 24 Oct', red: false });
+    expect(at(14)).toEqual({ value: '2 weeks', text: 'since your last revision, on 1 Nov', red: false });
+    expect(at(22, null, true)).toEqual({ value: '22 days', text: 'since your last revision, on 24 Oct', red: false });
+    expect(at(0, 22)).toEqual({ value: 'Today', text: 'you’re back, after over 3 weeks', red: false });
+    expect(at(0, 22, true)).toEqual({ value: 'Today', text: 'you’re back, after 22 days', red: false });
+  });
+
+  it('lengths as a person says them, from 2 weeks', () => {
+    const words = (d: number) => durationWords(d);
+    expect([1, 13].map(words)).toEqual(['1 day', '13 days']);
+    expect([14, 15, 21, 25, 41].map(words)).toEqual(['2 weeks', 'over 2 weeks', '3 weeks', 'over 3 weeks', 'over 5 weeks']);
+    expect([42, 45, 61, 75, 200].map(words)).toEqual(['over a month', 'over a month', 'about 2 months', 'over 2 months', 'over 6 months']);
+    expect([365, 400, 800].map(words)).toEqual(['about a year', 'about a year', 'about 2 years']);
+    expect(durationWords(25, true)).toBe('25 days');
+    expect(naturalDiffers(13)).toBe(false);
+    expect(naturalDiffers(14)).toBe(true);
   });
 
   it('a gap on the strip', () => {
     expect(gapLabel({ days: 9 })).toBe('9 days');
     expect(gapLabel({ days: 60, atLeast: true })).toBe('60+ days');
     expect(gapLabel({ days: 6, open: true })).toBe('6 days so far');
+    expect(gapLabel({ days: 22, open: true })).toBe('over 3 weeks so far');
+    expect(gapLabel({ days: 22 })).toBe('over 3 weeks');
+    expect(gapLabel({ days: 22 }, true)).toBe('22 days');
   });
 
   it('dates', () => {
@@ -192,6 +222,12 @@ describe('words', () => {
     expect(longestTile(v.longest, 'in 30 days')).toEqual({ value: '9', unit: 'days', text: 'Longest gap, 28 Oct – 6 Nov' });
     expect(longestTile(null, 'in 30 days')).toEqual({ value: 'None', unit: null, text: 'No gaps in 30 days' });
     expect(longestTile({ from: '2026-11-09', to: null, days: 6, atLeast: false, open: true, long: true }, 'in 30 days').text).toBe('Longest gap, since 9 Nov');
+    expect(longestTile({ from: '2026-10-24', to: null, days: 22, atLeast: false, open: true, long: true }, 'in 30 days')).toEqual({
+      value: 'Over 3 weeks',
+      unit: null,
+      text: 'Longest gap, since 24 Oct',
+    });
+    expect(longestTile({ from: '2026-10-24', to: null, days: 22, atLeast: false, open: true, long: true }, 'in 30 days', true)).toMatchObject({ value: '22', unit: 'days' });
     expect(longestTile({ from: null, to: '2026-10-20', days: 20, atLeast: true, open: false, long: true }, 'in 30 days')).toEqual({
       value: '20+',
       unit: 'days',
@@ -204,6 +240,9 @@ describe('words', () => {
     expect(rhythmTile(2, 1)).toEqual({ value: 'Every 2 days', text: 'Your usual rhythm · 1 gap of 3+ days' });
     expect(rhythmTile(1.5, 0)).toEqual({ value: 'Every 1–2 days', text: 'Your usual rhythm · no gaps of 3+ days' });
     expect(usualSteps(3.5)).toEqual({ low: 3, high: 4 });
+    expect(rhythmTile(15, 0).value).toBe('About every 2 weeks');
+    expect(rhythmTile(50, 0).value).toBe('About every 2 months');
+    expect(rhythmTile(15, 0, true).value).toBe('Every 15 days');
   });
 
   it('the strip for VoiceOver', () => {
@@ -229,5 +268,13 @@ describe('who sees it', () => {
     mockDev = true;
     expect(gapsInsightsEnabled({})).toBe(true);
     expect(gapsInsightsEnabled(null)).toBe(false);
+  });
+});
+
+describe('the Days switch', () => {
+  it('shows only when something reads differently in days', () => {
+    expect(gapsHaveNatural(gapsView({ revised: items(BOARD), today: TODAY, window: 30 })!)).toBe(false);
+    expect(gapsHaveNatural(gapsView({ revised: items(['2026-10-20']), today: TODAY, window: 30 })!)).toBe(true);
+    expect(gapsHaveNatural(gapsView({ revised: items(['2026-10-20', TODAY]), today: TODAY, window: 30 })!)).toBe(true);
   });
 });

@@ -223,29 +223,85 @@ export function gapDate(day: string, month: 'short' | 'long' = 'short'): string 
   return dayMonth(new Date(`${day.slice(0, 10)}T12:00:00`), { month });
 }
 
-/** The figure: "6 days" "since your last revision", or "Today" "you revised, after 6 days". */
-export function gapsFigure(v: Pick<GapsView, 'sinceLast' | 'closedToday'>): { value: string; text: string } {
-  if (v.sinceLast <= 0) {
-    return {
-      value: t('insights.gaps.today'),
-      text: v.closedToday ? t('insights.gaps.revisedTodayAfter', { count: v.closedToday }) : t('insights.gaps.revisedToday'),
-    };
+/** From this many days a length is said in weeks, months or years, unless the user asked for days. */
+export const NATURAL_FROM_DAYS = 14;
+const WEEKS_UNTIL = 42;
+const MONTH_DAYS = 30.44;
+
+/** "Over 3 weeks" from "over 3 weeks": a figure starts with a capital. */
+const capital = (s: string) => s.charAt(0).toLocaleUpperCase() + s.slice(1);
+
+/**
+ * A length of days as a person says it (Majd, Nov 16 2026: "if someone last revised 25 days ago … saying 25
+ * days gap is kinda pointless"): days under 2 weeks; then weeks ("2 weeks", "over 3 weeks"); from 6 weeks,
+ * months ("over a month", "about 2 months"); from a year, years. `inDays` (the section's Days switch) says
+ * exact days whatever the length.
+ */
+export function durationWords(days: number, inDays = false): string {
+  if (inDays || days < NATURAL_FROM_DAYS) return t('insights.gaps.days', { count: days });
+  if (days < WEEKS_UNTIL) {
+    const weeks = Math.floor(days / 7);
+    return days % 7 === 0 ? t('insights.gaps.weeks', { count: weeks }) : t('insights.gaps.overWeeks', { count: weeks });
   }
-  return { value: t('insights.gaps.days', { count: v.sinceLast }), text: t('insights.gaps.sinceLast') };
+  const long = days >= 365;
+  const units = days / (long ? 365 : MONTH_DAYS);
+  const n = Math.max(1, Math.floor(units));
+  const about = units - n < 0.25;
+  if (long) return about ? t('insights.gaps.aboutYears', { count: n }) : t('insights.gaps.overYears', { count: n });
+  return about ? t('insights.gaps.aboutMonths', { count: n }) : t('insights.gaps.overMonths', { count: n });
 }
 
-/** A gap's label on the strip: "9 days", "60+ days", "6 days so far". */
-export function gapLabel(g: { days: number; open?: boolean; atLeast?: boolean }): string {
-  if (g.open) return t('insights.gaps.openLabel', { count: g.days });
+/** Whether a length reads differently in days: the Days switch shows only when one does. */
+export const naturalDiffers = (days: number) => days >= NATURAL_FROM_DAYS;
+
+/**
+ * The figure. Under 2 weeks a number ("6 days" "since your last revision"; red from 3 days, a nudge while it is
+ * still a short gap). From 2 weeks, words and the date, never red: someone who has been away is welcomed back,
+ * not alarmed ("Over 3 weeks" "since your last revision, on 24 Oct"). Revised today: "Today" "you revised", "you
+ * revised, after 6 days" when it ended a long gap, "you're back, after over 3 weeks" after an absence.
+ */
+export function gapsFigure(v: Pick<GapsView, 'sinceLast' | 'closedToday' | 'lastDay'>, inDays = false): { value: string; text: string; red: boolean } {
+  if (v.sinceLast <= 0) {
+    const after = v.closedToday;
+    const text = !after
+      ? t('insights.gaps.revisedToday')
+      : naturalDiffers(after)
+        ? t('insights.gaps.back', { duration: durationWords(after, inDays) })
+        : t('insights.gaps.revisedTodayAfter', { count: after });
+    return { value: t('insights.gaps.today'), text, red: false };
+  }
+  if (!naturalDiffers(v.sinceLast)) {
+    return { value: t('insights.gaps.days', { count: v.sinceLast }), text: t('insights.gaps.sinceLast'), red: v.sinceLast >= LONG_GAP_DAYS };
+  }
+  return {
+    value: capital(durationWords(v.sinceLast, inDays)),
+    text: t('insights.gaps.sinceLastOn', { date: gapDate(v.lastDay) }),
+    red: false,
+  };
+}
+
+/** A gap's label on the strip: "9 days", "60+ days", "6 days so far", "over 3 weeks so far". */
+export function gapLabel(g: { days: number; open?: boolean; atLeast?: boolean }, inDays = false): string {
+  const natural = naturalDiffers(g.days) && !inDays;
+  if (g.open) return natural ? t('insights.gaps.soFar', { duration: durationWords(g.days) }) : t('insights.gaps.openLabel', { count: g.days });
+  // A gap of unknown start stays in days ("60+ days"): "at least about 2 months" reads badly.
   if (g.atLeast) return t('insights.gaps.gapLabelAtLeast', { count: g.days });
-  return t('insights.gaps.gapLabel', { count: g.days });
+  return natural ? durationWords(g.days) : t('insights.gaps.gapLabel', { count: g.days });
 }
 
-/** The longest gap's tile: its length and "Longest gap, 28 Oct – 6 Nov" (or "No gaps in 30 days"). */
-export function longestTile(longest: Gap | null, inWords: string): { value: string; unit: string | null; text: string } {
+/**
+ * The longest gap's tile: its length ("9" "days", or "Over 3 weeks" with no unit) and "Longest gap, 28 Oct – 6
+ * Nov" (or "None" "No gaps in 30 days").
+ */
+export function longestTile(longest: Gap | null, inWords: string, inDays = false): { value: string; unit: string | null; text: string } {
   if (!longest) return { value: t('insights.gaps.noGaps'), unit: null, text: t('insights.gaps.noGapsText', { range: inWords }) };
-  const value = longest.atLeast ? `${longest.days}+` : String(longest.days);
-  const unit = t('insights.gaps.unit', { count: longest.days });
+  const natural = naturalDiffers(longest.days) && !inDays && !longest.atLeast;
+  const value = natural
+    ? capital(durationWords(longest.days))
+    : longest.atLeast
+      ? `${longest.days}+`
+      : String(longest.days);
+  const unit = natural ? null : t('insights.gaps.unit', { count: longest.days });
   const text = longest.open
     ? t('insights.gaps.longestOpen', { from: gapDate(longest.from!) })
     : !longest.from
@@ -254,12 +310,31 @@ export function longestTile(longest: Gap | null, inWords: string): { value: stri
   return { value, unit, text };
 }
 
-/** The usual rhythm's tile: "Every day", "Every 2 days", "Every 1–2 days", and how many long gaps. */
-export function rhythmTile(usual: number, longCount: number): { value: string; text: string } {
+/**
+ * The usual rhythm's tile: "Every day", "Every 2 days", "Every 1–2 days" (from 2 weeks, "About every 2 weeks",
+ * "About every month"), and how many long gaps.
+ */
+export function rhythmTile(usual: number, longCount: number, inDays = false): { value: string; text: string } {
   const { low, high } = usualSteps(usual);
-  const value = low === high ? t('insights.gaps.every', { count: low }) : t('insights.gaps.everyBetween', { low, high });
+  let value: string;
+  if (!inDays && usual >= NATURAL_FROM_DAYS) {
+    value =
+      usual < WEEKS_UNTIL
+        ? t('insights.gaps.aboutEveryWeeks', { count: Math.round(usual / 7) })
+        : t('insights.gaps.aboutEveryMonths', { count: Math.max(1, Math.round(usual / MONTH_DAYS)) });
+  } else value = low === high ? t('insights.gaps.every', { count: low }) : t('insights.gaps.everyBetween', { low, high });
   const text = longCount > 0 ? t('insights.gaps.rhythm', { count: longCount }) : t('insights.gaps.rhythmNone');
   return { value, text };
+}
+
+/** Whether anything the section shows reads differently in days (the Days switch shows only then). */
+export function gapsHaveNatural(v: GapsView): boolean {
+  return (
+    naturalDiffers(v.sinceLast) ||
+    (v.closedToday != null && naturalDiffers(v.closedToday)) ||
+    (v.usual != null && naturalDiffers(v.usual)) ||
+    v.gaps.some((g) => naturalDiffers(g.days))
+  );
 }
 
 /** The strip for VoiceOver: the range, the days revised, then each long gap with its dates. */
