@@ -712,7 +712,9 @@ README has the deploy and the undo); never deploy the root `firebase.json`'s hos
     in ⋯, kept per device) and the checker's marks. Each mark gets Mistake, Not a mistake or Can't tell (All fine sets
     the rest to Not a mistake); tapping a word the checker missed labels it (wrong word, skipped, extra word after it,
     haraka, letter, not clear). Undo, −2 s, 0.75× (lower pitch: Web Audio), Unusable (bad audio, not this passage,
-    another reason). The header says how many clips have a label of all ("124 of 486"), how many wait for this labeller
+    another reason). An optional note (Majd, Nov 16 2026: "a text box for listener to put feedback for each word") on
+    any word (Add a note, N) or on the clip (⋯ → Note on this clip): up to 300 characters, any language, saved with the
+    label (`wordNotes`, `note`), in the audit entry and in the export; a word with one shows ✎. The header says how many clips have a label of all ("124 of 486"), how many wait for this labeller
     and today's count. The next clip is fetched and decoded while this one is labelled.
   - **The `labeller` role** opens this page only: every other console call refuses it, and the shell sends it to
     `/label`. Majd gives it on the Staff page (by exact email, after the person has signed in once, with Google, on the

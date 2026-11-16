@@ -333,6 +333,15 @@ describe('adminConsole: recitation labels', () => {
     expect(() => checkLabel(clip, { ...ok, words: { 11: 'fine' } })).toThrow('A word’s label isn’t one the page offers.');
     // A skipped clip may leave marks unanswered; the reason must be a known one.
     expect(checkLabel(clip, { marks: {}, skip: 'audio' })).toEqual({ marks: {}, words: {}, skip: 'audio', clip: 'unusable', answers: 0, actions: [] });
+    // Notes: optional, on the clip's own words, trimmed to one line, at most 300 characters, any language.
+    expect(checkLabel(clip, { ...ok, wordNotes: { 10: '  sounded like\nqaala  ', 11: '' }, note: 'صوت في الخلفية' })).toMatchObject({
+      wordNotes: { 10: 'sounded like qaala' },
+      note: 'صوت في الخلفية',
+    });
+    expect(checkLabel(clip, ok)).not.toHaveProperty('wordNotes');
+    expect(() => checkLabel(clip, { ...ok, wordNotes: { 99: 'x' } })).toThrow('A note is on a word that isn’t in this clip.');
+    expect(() => checkLabel(clip, { ...ok, note: 'x'.repeat(301) })).toThrow('longer than 300');
+    expect(() => checkLabel(clip, { ...ok, note: { evil: true } })).toThrow('A note has to be text.');
     expect(() => checkLabel(clip, { marks: {}, skip: 'bored' })).toThrow('That isn’t a reason to skip.');
   });
 

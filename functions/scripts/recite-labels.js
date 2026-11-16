@@ -28,8 +28,9 @@
  *
  * `export` writes one line per label (two labellers on a clip are two lines, told apart by `by`, with `role`): the clip
  * (no audio), each mark with `verdict` (yes: a mistake; no: not one; unsure: can't tell), `missed` (words the checker
- * didn't mark, as the labeller heard them: word, skipped, added, harakat, letter, unclear), `clip` (fine, mistakes or
- * unusable), `skip` (why it is unusable), and when and how long.
+ * didn't mark, as the labeller heard them: word, skipped, added, harakat, letter, unclear), `notes` ([{w, note}]: the
+ * labeller's own words on a word, optional) and `note` (on the whole clip), `clip` (fine, mistakes or unusable), `skip`
+ * (why it is unusable), and when and how long.
  *
  * A clip is labelled once by default, by whoever reaches it first. `queue` sends a share of a batch to a labeller as well
  * (one clip in five by default, spread through the batch), so some clips get two labels to compare.
@@ -291,6 +292,9 @@ async function exportLabels(opts) {
         ...base,
         marks: JSON.parse(c.marks).map((m) => ({ ...m, verdict: l ? (l.marks[m.id] ?? null) : null })),
         missed: l ? Object.entries(l.words).map(([w, label]) => ({ w: +w, label })).sort((a, b) => a.w - b.w) : [],
+        // the labeller's own words, when the choices weren't enough: on a word, and on the whole clip
+        notes: l && l.wordNotes ? Object.entries(l.wordNotes).map(([w, note]) => ({ w: +w, note })).sort((a, b) => a.w - b.w) : [],
+        note: l?.note ?? null,
         clip: l?.clip ?? null,
         skip: l?.skip ?? null,
         labelledAt: l?.at ?? null,

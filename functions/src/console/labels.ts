@@ -48,18 +48,23 @@ export type SkipReason = (typeof SKIP_REASONS)[number];
 /** The clip as a whole, worked out from the answers. */
 export type ClipVerdict = 'fine' | 'mistakes' | 'unusable';
 
+/** A labeller's own words, when the choices aren't enough (Majd, Nov 16 2026: "a text box for listener to put feedback
+ * for each word (optional)"): on a word, or on the whole clip. Any language. */
+export const NOTE_MAX = 300;
+
 /** One tap, as the page records it, for the audit log. `t`: ms since the clip was shown. */
 export interface LabelAction {
   t: number;
-  /** a mark's answer, a word's label, a word's label taken back, every open mark set to "not a mistake", undo, skip */
-  a: 'mark' | 'word' | 'clear' | 'fine' | 'undo' | 'skip';
+  /** a mark's answer, a word's label, a word's label taken back, every open mark set to "not a mistake", undo, skip, a
+   * word's note (v: added, changed or cleared), the clip's note (same) */
+  a: 'mark' | 'word' | 'clear' | 'fine' | 'undo' | 'skip' | 'note' | 'clipnote';
   id?: string;
   w?: number;
   v?: string;
   /** what it was before (mark and word) */
   was?: string | null;
 }
-const ACTION_KINDS = ['mark', 'word', 'clear', 'fine', 'undo', 'skip'];
+const ACTION_KINDS = ['mark', 'word', 'clear', 'fine', 'undo', 'skip', 'note', 'clipnote'];
 const MAX_ACTIONS = 300;
 
 export interface ClipWord {
@@ -91,6 +96,10 @@ export interface Label {
   words: Record<string, WordLabel>;
   skip?: SkipReason;
   clip: ClipVerdict;
+  /** notes on words, keyed by word number (optional) */
+  wordNotes?: Record<string, string>;
+  /** a note on the whole clip (optional) */
+  note?: string;
   /** mark answers + word labels, for the hourly rate */
   answers: number;
   actions: LabelAction[];
@@ -164,7 +173,9 @@ async function forPage(deps: LabelDeps, id: string, c: Clip, mine: Partial<Label
       marks: marksOf(c),
       times: (c.times ?? []).map((t) => [t.w, t.a, t.b]),
       status: c.status,
-      label: mine ? { marks: mine.marks ?? {}, words: mine.words ?? {}, skip: mine.skip ?? null, at: ms(mine.at) ?? null } : null,
+      label: mine
+        ? { marks: mine.marks ?? {}, words: mine.words ?? {}, wordNotes: mine.wordNotes ?? {}, note: mine.note ?? '', skip: mine.skip ?? null, at: ms(mine.at) ?? null }
+        : null,
     },
     audio: { type: c.audio.type, data: audio.toString('base64') },
   };
@@ -174,7 +185,7 @@ async function forPage(deps: LabelDeps, id: string, c: Clip, mine: Partial<Label
 export function checkLabel(
   c: { marks: ClipMark[]; words: ClipWord[] },
   data: Record<string, unknown>,
-): Pick<Label, 'marks' | 'words' | 'clip' | 'answers' | 'actions'> & { skip?: SkipReason } {
+): Pick<Label, 'marks' | 'words' | 'clip' | 'answers' | 'actions'> & { skip?: SkipReason; wordNotes?: Record<string, string>; note?: string } {
   if (data.skip != null && !(SKIP_REASONS as readonly unknown[]).includes(data.skip)) throw new ConsoleError('invalid-argument', 'That isn’t a reason to skip.');
   const skip = data.skip == null ? undefined : (data.skip as SkipReason);
   const rawMarks = (data.marks && typeof data.marks === 'object' ? data.marks : {}) as Record<string, unknown>;
@@ -197,10 +208,37 @@ export function checkLabel(
     const left = c.marks.filter((m) => !(m.id in marks)).length;
     if (left) throw new ConsoleError('invalid-argument', left === 1 ? 'One mark has no answer yet.' : `${left} marks have no answer yet.`);
   }
+  const rawNotes = (data.wordNotes && typeof data.wordNotes === 'object' ? data.wordNotes : {}) as Record<string, unknown>;
+  const wordNotes: Record<string, string> = {};
+  for (const [w, v] of Object.entries(rawNotes)) {
+    if (!ws.has(w)) throw new ConsoleError('invalid-argument', 'A note is on a word that isn’t in this clip. Reload it.');
+    const text = noteText(v);
+    if (text) wordNotes[w] = text;
+  }
+  const note = noteText(data.note);
   const actions = checkActions(data.actions);
   const clip: ClipVerdict = skip ? 'unusable' : Object.values(marks).includes('yes') || Object.keys(words).length ? 'mistakes' : 'fine';
   const answers = Object.keys(marks).length + Object.keys(words).length;
-  return skip ? { marks, words, skip, clip, answers, actions } : { marks, words, clip, answers, actions };
+  return {
+    marks,
+    words,
+    ...(skip ? { skip } : {}),
+    ...(Object.keys(wordNotes).length ? { wordNotes } : {}),
+    ...(note ? { note } : {}),
+    clip,
+    answers,
+    actions,
+  };
+}
+
+/** A note as kept: trimmed, control characters out (newlines become spaces), at most NOTE_MAX characters. */
+export function noteText(v: unknown): string {
+  if (v == null || v === '') return '';
+  if (typeof v !== 'string') throw new ConsoleError('invalid-argument', 'A note has to be text.');
+  // eslint-disable-next-line no-control-regex
+  const text = v.replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if ([...text].length > NOTE_MAX) throw new ConsoleError('invalid-argument', `A note is longer than ${NOTE_MAX} characters.`);
+  return text;
 }
 
 /** The page's record of taps, kept to the fields the audit log shows (and at most MAX_ACTIONS of them). */
@@ -231,6 +269,9 @@ export interface LabelAudit {
   result: ClipVerdict;
   marks: { yes: number; no: number; unsure: number };
   missed: { w: number; label: WordLabel; text: string }[];
+  /** notes on words (with the word's text) and on the clip */
+  notes: { w: number; text: string; note: string }[];
+  note: string | null;
   skip: SkipReason | null;
   relabel: boolean;
   ms: number;
@@ -306,6 +347,8 @@ export async function handleLabels(caller: StaffCaller, action: string, data: Re
           result: checked.clip,
           marks: counts,
           missed: Object.entries(checked.words).map(([w, l]) => ({ w: +w, label: l, text: text.get(w) ?? '' })),
+          notes: Object.entries(checked.wordNotes ?? {}).map(([w, n]) => ({ w: +w, text: text.get(w) ?? '', note: n })),
+          note: checked.note ?? null,
           skip: checked.skip ?? null,
           relabel: prev.exists,
           ms: spent,

@@ -148,3 +148,13 @@ kbd { font-family: var(--mono); font-size: 11px; color: var(--ink-3); border: 1p
 .lab-menu button:active, .lab-menu a:active { background: var(--line-2); }
 
 .lab-toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom, 0px) + 170px); z-index: 60; max-width: calc(100% - 32px); }
+/* Notes: a small pen on a word that has one; the note box is a sheet like the word's. */
+.wd.noted::before { content: "✎"; font-family: var(--font); font-size: 12px; vertical-align: super; color: var(--accent); margin-left: 2px; }
+.lab-opt.note { grid-column: 1 / -1; background: var(--accent-soft); color: var(--accent); }
+.lab-note { width: 100%; box-sizing: border-box; min-height: 92px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font: 16px/1.5 var(--font); color: var(--ink); background: var(--surface); resize: vertical; }
+.lab-note:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.lab-note-count { color: var(--ink-3); font-size: 12px; font-variant-numeric: tabular-nums; }
+.lab-note-help { margin: 6px 2px 10px; font-size: 12.5px; color: var(--ink-3); }
+.lab-note-acts { display: flex; gap: 8px; }
+.lab-note-acts .lab-btn { flex: 1; padding: 0 10px; }
+.lab-note-acts .lab-btn.primary { flex: 1.5; }

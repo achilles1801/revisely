@@ -216,7 +216,12 @@ function show(item, answers) {
   cur = {
     clip,
     buffer: item.buffer,
-    answers: answers ?? { marks: { ...(clip.label?.marks ?? {}) }, words: { ...(clip.label?.words ?? {}) } },
+    answers: answers ?? {
+      marks: { ...(clip.label?.marks ?? {}) },
+      words: { ...(clip.label?.words ?? {}) },
+      notes: { ...(clip.label?.wordNotes ?? {}) },
+      clipNote: clip.label?.note ?? '',
+    },
     order: orderOf(clip),
     undo: [],
     // Every tap, for the audit log (sent with the label).
@@ -226,7 +231,7 @@ function show(item, answers) {
   const first = clip.words[0];
   const last = clip.words[clip.words.length - 1];
   $('where').textContent = (SURAHS[first.s] || 'Surah ' + first.s) + ' ' + first.s + ':' + first.a + (last.s !== first.s ? '–' + last.s + ':' + last.a : last.a !== first.a ? '–' + last.a : '');
-  $('source').textContent = clip.source.name + (clip.label ? ' · you labelled this' : clip.status !== 'open' ? ' · a second label' : '');
+  drawSource();
   $('clipView').hidden = false;
   $('emptyView').hidden = true;
   $('foot').hidden = false;
@@ -236,6 +241,11 @@ function show(item, answers) {
   render();
   $('words').scrollTop = 0;
   drawPlayer();
+}
+
+function drawSource() {
+  const clip = cur.clip;
+  $('source').textContent = clip.source.name + (clip.label ? ' · you labelled this' : clip.status !== 'open' ? ' · a second label' : '') + (cur.answers.clipNote ? ' · ✎ clip note' : '');
 }
 
 function showEmpty() {
@@ -321,6 +331,7 @@ function paintWords() {
     }
     const miss = cur.answers.words[w];
     if (miss) el.classList.add('miss', 'm-' + MISSED_GROUP[miss]);
+    if (cur.answers.notes[w]) el.classList.add('noted');
     if (focused && focused.w === w && focused.kind !== 'added') el.classList.add('focus');
   }
   for (const el of $('words').querySelectorAll('.ins')) {
@@ -397,10 +408,12 @@ function render() {
       '<div class="lab-card-row">' +
       (span ? '<button type="button" class="lab-again" id="againBtn">▶ Hear it again <kbd>R</kbd></button>' : '') +
       '<button type="button" class="lab-link" id="fineBtn">All fine <kbd>F</kbd></button>' +
+      '<button type="button" class="lab-link" id="noteBtn">' + (cur.answers.notes[m.w] ? '✎ Edit note' : 'Add a note') + ' <kbd>N</kbd></button>' +
       (cur.undo.length ? '<button type="button" class="lab-link" id="undoBtn">Undo <kbd>U</kbd></button>' : '') +
       '</div>';
     if (span) $('againBtn').onclick = () => playMark(m);
     $('fineBtn').onclick = allFine;
+    $('noteBtn').onclick = () => openNote(m.w);
     if (cur.undo.length) $('undoBtn').onclick = undo;
     const current = cur.answers.marks[m.id];
     bar.className = 'lab-actions three';
@@ -504,11 +517,63 @@ function openSheet(w) {
   const current = cur.answers.words[w];
   $('sheetOpts').innerHTML =
     MISSED.map(([v, label, key]) => '<button type="button" class="lab-opt m-' + MISSED_GROUP[v] + (current === v ? ' on' : '') + '" data-v="' + v + '">' + esc(label) + '<kbd>' + key.toUpperCase() + '</kbd></button>').join('') +
-    (current ? '<button type="button" class="lab-opt fine" data-v="">Fine: take it back<kbd>0</kbd></button>' : '');
+    (current ? '<button type="button" class="lab-opt fine" data-v="">Fine: take it back<kbd>0</kbd></button>' : '') +
+    '<button type="button" class="lab-opt note" data-note="1">' + (cur.answers.notes[w] ? '✎ Edit your note' : 'Add a note') + '<kbd>N</kbd></button>';
   $('sheetBack').hidden = false;
   $('sheet').hidden = false;
   if (span) play(span[0] - 0.5, span[1] + 0.5, 'word');
   $('sheetOpts').querySelector('button')?.focus({ preventScroll: true });
+}
+
+// ── Notes: a labeller's own words on a word or on the whole clip, when the choices aren't enough (optional) ──
+let noteFor = null; // a word number, or 'clip'
+
+function openNote(target) {
+  noteFor = target;
+  const isClip = target === 'clip';
+  const word = isClip ? null : cur.clip.words.find((x) => x.w === target);
+  $('noteTitle').textContent = isClip ? 'Note on this clip' : 'Note on this word';
+  $('noteWord').textContent = word ? word.t : '';
+  $('noteWord').hidden = !word;
+  $('noteText').placeholder = isClip ? 'Background noise, two reciters, cut off…' : 'What you heard, in any language';
+  $('noteText').value = isClip ? cur.answers.clipNote || '' : cur.answers.notes[target] || '';
+  $('noteClear').hidden = !$('noteText').value;
+  noteCount();
+  closeSheet();
+  $('noteBack').hidden = false;
+  $('noteSheet').hidden = false;
+  setTimeout(() => $('noteText').focus(), 50);
+}
+
+function noteCount() {
+  const n = [...$('noteText').value].length;
+  $('noteCount').textContent = n ? n + ' / 300' : '';
+}
+
+function closeNote() {
+  noteFor = null;
+  $('noteSheet').hidden = true;
+  $('noteBack').hidden = true;
+}
+
+function saveNote(clear) {
+  if (noteFor == null) return closeNote();
+  const text = clear ? '' : $('noteText').value.replace(/\s+/g, ' ').trim().slice(0, 300);
+  const before = noteFor === 'clip' ? cur.answers.clipNote || '' : cur.answers.notes[noteFor] || '';
+  if (text !== before) {
+    const v = !text ? 'cleared' : before ? 'changed' : 'added';
+    if (noteFor === 'clip') {
+      cur.answers.clipNote = text;
+      act({ a: 'clipnote', v });
+    } else {
+      if (text) cur.answers.notes[noteFor] = text;
+      else delete cur.answers.notes[noteFor];
+      act({ a: 'note', w: noteFor, v });
+    }
+  }
+  closeNote();
+  drawSource();
+  render();
 }
 
 function closeSheet() {
@@ -585,13 +650,19 @@ function save(skip) {
   const ms = Math.min(Date.now() - cur.shownAt, ACTIVE_CAP_MS);
   const marks = { ...cur.answers.marks };
   const words = { ...cur.answers.words };
+  const wordNotes = { ...cur.answers.notes };
+  const note = cur.answers.clipNote || '';
   pending = pending.filter((p) => p.id !== cur.clip.id);
-  pending.push({ id: cur.clip.id, marks, words, ms, actions: cur.actions.slice(0, 300), ...(skip ? { skip } : {}) });
+  pending.push({ id: cur.clip.id, marks, words, wordNotes, note, ms, actions: cur.actions.slice(0, 300), ...(skip ? { skip } : {}) });
   persist();
   sitting.answers += Object.keys(marks).length + Object.keys(words).length;
   sitting.ms += ms;
   sitting.clips += 1;
-  back.push({ clip: { ...cur.clip, status: skip ? 'skipped' : 'done', label: { marks, words, skip: skip ?? null } }, buffer: cur.buffer, answers: { marks, words } });
+  back.push({
+    clip: { ...cur.clip, status: skip ? 'skipped' : 'done', label: { marks, words, wordNotes, note, skip: skip ?? null } },
+    buffer: cur.buffer,
+    answers: { marks, words, notes: wordNotes, clipNote: note },
+  });
   if (back.length > 5) back.shift();
   flush();
 }
@@ -773,7 +844,22 @@ function wire() {
 
   $('sheetOpts').addEventListener('click', (e) => {
     const b = e.target.closest('button');
-    if (b) labelWord(b.dataset.v);
+    if (!b) return;
+    if (b.dataset.note) openNote(sheetW);
+    else labelWord(b.dataset.v);
+  });
+  $('noteSave').addEventListener('click', () => saveNote(false));
+  $('noteClear').addEventListener('click', () => saveNote(true));
+  $('noteCancel').addEventListener('click', closeNote);
+  $('noteBack').addEventListener('click', closeNote);
+  $('noteText').addEventListener('input', noteCount);
+  $('noteText').addEventListener('keydown', (e) => {
+    // Enter saves (a note is one line); Escape closes. Nothing here reaches the page's own keys.
+    e.stopPropagation();
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+      e.preventDefault();
+      saveNote(false);
+    } else if (e.key === 'Escape') closeNote();
   });
   $('sheetCancel').addEventListener('click', closeSheet);
   $('sheetBack').addEventListener('click', closeSheet);
@@ -802,7 +888,8 @@ function wire() {
     else if (act === 'skip-audio') skip('audio');
     else if (act === 'skip-passage') skip('not-this-passage');
     else if (act === 'skip-other') skip('other');
-    else if (act === 'keys') toast('Space play · R the mark again · 1 not a mistake · 2 can’t tell · 3 mistake · F all fine · ← → marks · W S A H L U a missed word · Enter next · U undo · B back');
+    else if (act === 'clipnote') openNote('clip');
+    else if (act === 'keys') toast('Space play · R the mark again · 1 not a mistake · 2 can’t tell · 3 mistake · F all fine · N a note · ← → marks · W S A H L U a missed word · Enter next · U undo · B back');
   });
   $('emptyReload').addEventListener('click', async () => {
     await loadStats();
@@ -812,6 +899,8 @@ function wire() {
 
   document.addEventListener('keydown', (e) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
+    // Typing (a note): the page's keys stay out of it.
+    if (!$('noteSheet').hidden || ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
     if (!$('start').hidden) {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
@@ -821,7 +910,10 @@ function wire() {
     }
     if (!$('sheet').hidden) {
       if (e.key === 'Escape') closeSheet();
-      else if (e.key === '0') {
+      else if (e.key.toLowerCase() === 'n') {
+        e.preventDefault();
+        openNote(sheetW);
+      } else if (e.key === '0') {
         if (cur.answers.words[sheetW]) labelWord('');
       } else {
         const hit = MISSED.find(([, , key], i) => key === e.key.toLowerCase() || String(i + 1) === e.key);
@@ -838,6 +930,12 @@ function wire() {
       const m = cur.order[focus];
       if (m) playMark(m);
     } else if (k === 'f') allFine();
+    else if (k === 'n') {
+      e.preventDefault();
+      const m = cur.order[focus];
+      if (m) openNote(m.w);
+      else openNote('clip');
+    }
     else if (k === '1' || k === 'j') answer('no');
     else if (k === '2' || k === 'k') answer('unsure');
     else if (k === '3' || k === 'l') answer('yes');

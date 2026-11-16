@@ -244,7 +244,10 @@ const BY: Reviewer = { uid: 'staff1', email: 'owner@example.com', role: 'owner',
     };
     const majd = { uid: 'staff1', email: 'owner@example.com', role: 'owner' as const };
     const teacher = { uid: 'teacher1', email: 'teacher@example.com', role: 'labeller' as const };
-    type Next = { clip: { id: string; marks: { id: string }[]; times: number[][]; label: { marks: Record<string, string> } | null } | null; audio?: { type: string; data: string } };
+    type Next = {
+      clip: { id: string; marks: { id: string }[]; times: number[][]; label: { marks: Record<string, string>; wordNotes?: Record<string, string>; note?: string } | null } | null;
+      audio?: { type: string; data: string };
+    };
     const next = async (who: typeof majd | typeof teacher, held: string[] = []) =>
       ((await handleAdminConsole(who, { action: 'labels.next', held }, true, deps)) as Next).clip?.id ?? null;
 
@@ -265,10 +268,18 @@ const BY: Reviewer = { uid: 'staff1', email: 'owner@example.com', role: 'owner',
       { t: 3400, a: 'mark', id: '101:word:', v: 'yes', was: null },
       { t: 5000, a: 'word', w: 102, v: 'skipped', was: null },
     ];
-    expect(await handleAdminConsole(majd, { action: 'labels.save', id: 'a', marks: { '101:word:': 'yes' }, words: { 102: 'skipped' }, ms: 9000, actions }, true, deps)).toEqual({ saved: true, result: 'mistakes' });
+    expect(
+      await handleAdminConsole(
+        majd,
+        { action: 'labels.save', id: 'a', marks: { '101:word:': 'yes' }, words: { 102: 'skipped' }, wordNotes: { 101: 'he said قال' }, note: 'two voices', ms: 9000, actions },
+        true,
+        deps,
+      ),
+    ).toEqual({ saved: true, result: 'mistakes' });
     expect(await handleAdminConsole(majd, { action: 'labels.save', id: 'b', skip: 'audio', ms: 2000 }, true, deps)).toEqual({ saved: true, result: 'unusable' });
     const label = (await db.doc('reciteLabelClips/a/labels/staff1').get()).data()!;
     expect(label).toMatchObject({ by: { uid: 'staff1', email: 'owner@example.com', role: 'owner' }, ms: 9000, marks: { '101:word:': 'yes' }, words: { '102': 'skipped' }, clip: 'mistakes', answers: 2, n: 1, actions });
+    expect(label).toMatchObject({ wordNotes: { '101': 'he said قال' }, note: 'two voices' });
     expect((await db.doc('reciteLabelClips/a').get()).data()).toMatchObject({ status: 'done', labelledBy: ['staff1'], labelledAt: NOW + 1000 });
 
     // Labelled clips leave the pool: the teacher gets the next unlabelled one. Then `a` is sent to the teacher as well.
@@ -287,6 +298,9 @@ const BY: Reviewer = { uid: 'staff1', email: 'owner@example.com', role: 'owner',
     // Going back shows the caller's own label, and saving again replaces it.
     const again = (await handleAdminConsole(majd, { action: 'labels.get', id: 'a' }, true, deps)) as Next;
     expect(again.clip?.label?.marks).toEqual({ '101:word:': 'yes' });
+    expect(again.clip?.label).toMatchObject({ wordNotes: { '101': 'he said قال' }, note: 'two voices' });
+    // The teacher's view of the same clip has none of Majd's notes.
+    expect(((await handleAdminConsole(teacher, { action: 'labels.get', id: 'a' }, true, deps)) as Next).clip?.label).toMatchObject({ wordNotes: {}, note: '' });
     await handleAdminConsole(majd, { action: 'labels.save', id: 'a', marks: { '101:word:': 'unsure' }, ms: 1000 }, true, deps);
     expect((await db.doc('reciteLabelClips/a/labels/staff1').get()).data()).toMatchObject({ marks: { '101:word:': 'unsure' }, words: {}, n: 2 });
 
@@ -300,6 +314,7 @@ const BY: Reviewer = { uid: 'staff1', email: 'owner@example.com', role: 'owner',
     ]);
     expect(audit.rows[3].actions).toEqual(actions);
     expect(audit.rows[3].missed).toEqual([{ w: 102, label: 'skipped', text: 'كلمة' }]);
+    expect(audit.rows[3]).toMatchObject({ notes: [{ w: 101, text: 'كلمة', note: 'he said قال' }], note: 'two voices' });
     await expect(handleAdminConsole(teacher, { action: 'audit.labels' }, true, deps)).rejects.toThrow('Your role doesn’t allow this.');
 
     await handleAdminConsole(teacher, { action: 'labels.save', id: 'c', marks: {} }, true, deps);

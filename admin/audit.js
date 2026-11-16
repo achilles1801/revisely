@@ -117,6 +117,8 @@ function labelResult(r) {
   const marks = (m.yes || 0) + (m.no || 0) + (m.unsure || 0);
   if (marks) parts.push(marks + (marks === 1 ? ' mark: ' : ' marks: ') + [m.yes ? m.yes + ' mistake' : '', m.no ? m.no + ' not' : '', m.unsure ? m.unsure + ' can’t tell' : ''].filter(Boolean).join(', '));
   for (const x of r.missed || []) parts.push('missed <span class="ar-inline" dir="rtl" lang="ar">' + esc(x.text) + '</span>: ' + esc(MISSED[x.label] || x.label));
+  for (const x of r.notes || []) parts.push('✎ <span class="ar-inline" dir="rtl" lang="ar">' + esc(x.text) + '</span>: “<bdi>' + esc(x.note) + '</bdi>”');
+  if (r.note) parts.push('✎ clip: “<bdi>' + esc(r.note) + '</bdi>”');
   if (r.skip) parts.push(esc(SKIP[r.skip] || r.skip));
   if (r.relabel) parts.push('changed an earlier label');
   return '<span class="state ' + cls + '">' + esc(name) + '</span> <span class="sub">' + parts.join(' · ') + ' · ' + Math.round((r.ms || 0) / 1000) + ' s</span>';
@@ -137,6 +139,8 @@ function labelTaps(r) {
     if (x.a === 'clear') return at + ' · word ' + esc(String(x.w)) + ': fine (was ' + esc(MISSED[x.was] || x.was || '') + ')';
     if (x.a === 'fine') return at + ' · every open mark: not a mistake';
     if (x.a === 'undo') return at + ' · undo';
+    if (x.a === 'note') return at + ' · note on word ' + esc(String(x.w)) + ' ' + esc(x.v || '');
+    if (x.a === 'clipnote') return at + ' · note on the clip ' + esc(x.v || '');
     if (x.a === 'skip') return at + ' · set aside: ' + esc(SKIP[x.v] || x.v || '');
     return at + ' · ' + esc(x.a);
   };

@@ -81,8 +81,25 @@
   <button class="lab-btn lab-sheet-cancel" id="sheetCancel" type="button">Cancel</button>
 </div>
 
+<div class="lab-sheet-back" id="noteBack" hidden></div>
+<div class="lab-sheet" id="noteSheet" role="dialog" aria-modal="true" aria-labelledby="noteTitle" hidden>
+  <div class="lab-sheet-h">
+    <span class="lab-sheet-word" id="noteWord" dir="rtl" lang="ar"></span>
+    <span class="lab-sheet-title" id="noteTitle">Note</span>
+    <span class="lab-note-count" id="noteCount"></span>
+  </div>
+  <textarea class="lab-note" id="noteText" dir="auto" maxlength="300" rows="3" aria-labelledby="noteTitle"></textarea>
+  <p class="lab-note-help">Optional, when the choices don’t say it. Only you and Majd see it.</p>
+  <div class="lab-note-acts">
+    <button class="lab-btn" id="noteCancel" type="button">Cancel</button>
+    <button class="lab-btn" id="noteClear" type="button">Clear</button>
+    <button class="lab-btn primary" id="noteSave" type="button">Save note</button>
+  </div>
+</div>
+
 <div class="lab-menu" id="menu" role="menu" hidden>
   <button type="button" role="menuitem" data-act="back">Back to the last clip</button>
+  <button type="button" role="menuitem" data-act="clipnote">Note on this clip</button>
   <button type="button" role="menuitem" data-act="skip-audio">Unusable: the audio is bad</button>
   <button type="button" role="menuitem" data-act="skip-passage">Unusable: not this passage</button>
   <button type="button" role="menuitem" data-act="skip-other">Unusable: another reason</button>
