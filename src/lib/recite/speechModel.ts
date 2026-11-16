@@ -13,6 +13,7 @@ import { Directory, File, Paths } from 'expo-file-system';
 import { createDownloadResumable, type DownloadResumable } from 'expo-file-system/legacy';
 import RecitationAudio from '../../../modules/recitation-audio';
 import { logger } from '../logger';
+import { t } from '../../i18n';
 
 export interface SpeechModelInfo {
   /** File name, also its name in Storage. */
@@ -56,12 +57,12 @@ export function downloadedModelPath(model = SPEECH_MODEL): string | null {
 }
 
 export function formatModelSize(bytes = SPEECH_MODEL.bytes): string {
-  return `${Math.round(bytes / (1024 * 1024))} MB`;
+  return t('common.megabytes', { n: Math.round(bytes / (1024 * 1024)) });
 }
 
 export class NotEnoughSpaceError extends Error {
   constructor() {
-    super('Not enough free space for the speech model.');
+    super('Not enough free space for the speech model.'); // i18n-ignore (an error for logs)
   }
 }
 

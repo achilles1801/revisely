@@ -13,6 +13,7 @@ const SRC = path.resolve(__dirname, '../..');
 
 /** Folders and files (relative to src/) whose UI text all comes from src/i18n. */
 const EXTRACTED: string[] = [
+  'components/coach',
   'components/help',
   'components/home',
   'components/memorization',
@@ -22,6 +23,7 @@ const EXTRACTED: string[] = [
   'components/prayer',
   'components/qibla',
   'components/reader',
+  'components/reciteCheck',
   'components/recordings',
   'components/revision',
   'components/timer',
@@ -30,6 +32,7 @@ const EXTRACTED: string[] = [
   'context',
   'hooks',
   'lib/prayer',
+  'lib/recite',
   'lib/updates',
   'lib/widgets',
   'navigation',

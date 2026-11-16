@@ -28,6 +28,8 @@ export const common = {
   /** "3 of 20". */
   nOfTotal: '{{n}} of {{total}}',
   saving: 'Saving…',
+  /** A size: "142 MB". */
+  megabytes: '{{n}} MB',
   /** "Juz 26–27". */
   juzRange: 'Juz {{from}}–{{to}}',
   /** "Juz 3, 7": the numbers already joined. */
