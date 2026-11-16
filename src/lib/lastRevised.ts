@@ -36,7 +36,8 @@ export interface LastRevisedRow {
   view: LastRevisedView;
   /** The surah's, juz's, hizb's or page's number. */
   number: number;
-  /** Its pages that are memorized, in the mushaf's order. */
+  /** Its pages that are memorized, longest waiting first (among equals, the mushaf's order): the first is the one
+   * that dates the row. */
   pages: PageRecency[];
   /** The one that has waited longest. */
   oldest: PageRecency;
@@ -62,6 +63,7 @@ export function pageRecency(page: number, input: Pick<LastRevisedInput, 'last' |
 
 /** Longest waiting first; among equals, the mushaf's order. */
 const byWait = (a: LastRevisedRow, b: LastRevisedRow) => b.oldest.wait - a.oldest.wait || a.number - b.number;
+const pageByWait = (a: PageRecency, b: PageRecency) => (b.wait === a.wait ? 0 : b.wait > a.wait ? 1 : -1) || a.page - b.page;
 
 /** The rows of a view, longest waiting first. */
 export function lastRevisedRows(view: LastRevisedView, input: LastRevisedInput): LastRevisedRow[] {
@@ -73,10 +75,11 @@ export function lastRevisedRows(view: LastRevisedView, input: LastRevisedInput):
     return r;
   };
   const row = (number: number, pages: number[]): LastRevisedRow | null => {
-    const mine = pages.filter((p) => memorized.has(p)).sort((a, b) => a - b).map(of);
+    // Longest waiting first inside too, so the page that dates the row comes first when it opens (a surah's oldest
+    // page could otherwise sit below a screenful of recent ones).
+    const mine = pages.filter((p) => memorized.has(p)).map(of).sort(pageByWait);
     if (mine.length === 0) return null;
-    const oldest = mine.reduce((a, b) => (b.wait > a.wait ? b : a));
-    return { view, number, pages: mine, oldest };
+    return { view, number, pages: mine, oldest: mine[0] };
   };
   const rows: (LastRevisedRow | null)[] =
     view === 'page'

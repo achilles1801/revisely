@@ -69,7 +69,7 @@ describe('Gaps (ACT-28)', () => {
 });
 
 describe('Last revised (ACT-30)', () => {
-  it('[ACT-30] longest waiting first; a row is as recent as its least recently revised page; every memorized page is listed', () => {
+  it('[ACT-30] longest waiting first, rows and the pages inside; a row is as recent as its least recently revised page; every memorized page is listed', () => {
     const lastArb = fc.dictionary(fc.integer({ min: 1, max: 604 }).map(String), fc.integer({ min: 0, max: 120 }));
     fc.assert(
       fc.property(fc.uniqueArray(fc.integer({ min: 1, max: 604 }), { maxLength: 60 }), lastArb, fc.constantFrom('surah', 'juz', 'hizb', 'page') as fc.Arbitrary<LastRevisedView>, (memorized, ago, view) => {
@@ -81,6 +81,11 @@ describe('Last revised (ACT-30)', () => {
         });
         for (let i = 1; i < rows.length; i++) expect(rows[i - 1].oldest.wait).toBeGreaterThanOrEqual(rows[i].oldest.wait);
         for (const r of rows) for (const p of r.pages) expect(r.oldest.wait).toBeGreaterThanOrEqual(p.wait);
+        // Inside a row too, longest waiting first: the page that dates it is the first one shown.
+        for (const r of rows) {
+          expect(r.pages[0]).toBe(r.oldest);
+          for (let i = 1; i < r.pages.length; i++) expect(r.pages[i - 1].wait).toBeGreaterThanOrEqual(r.pages[i].wait);
+        }
         const listed = new Set(rows.flatMap((r) => r.pages.map((p) => p.page)));
         expect(listed).toEqual(new Set(memorized));
         if (view === 'page') expect(rows.length).toBe(memorized.length);

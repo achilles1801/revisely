@@ -39,6 +39,18 @@ describe('lastRevisedRows', () => {
     ]);
   });
 
+  it('[ACT-30] a row’s pages go longest waiting first, so the page that dates it comes first; equals keep the mushaf’s order', () => {
+    // Page 4 is Al-Baqarah's oldest now: it comes before 2 and 3, which keep their order.
+    const rows = lastRevisedRows('surah', input({ last: (p) => (p === 4 ? '2026-10-01' : LAST[p] ?? null) }));
+    const baqarah = rows.find((r) => r.number === 2)!;
+    expect(baqarah.pages.map((p) => [p.page, p.wait])).toEqual([
+      [4, 45],
+      [2, 22],
+      [3, 22],
+    ]);
+    expect(baqarah.oldest).toBe(baqarah.pages[0]);
+  });
+
   it('by juz, hizb and page', () => {
     expect(lastRevisedRows('juz', input()).map((r) => [rowName(r), r.oldest.wait])).toEqual([
       ['Juz 1', 22],

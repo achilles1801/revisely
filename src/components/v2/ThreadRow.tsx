@@ -159,7 +159,8 @@ export function ThreadRow({
         </View>
         )}
         {meta && metaBelow ? (
-          <Text style={[typeV2.meta, styles.meta, { color: palette.secondary }]} numberOfLines={1} maxFontSizeMultiplier={headerMaxScale}>
+          // Under the name, flush with it: `styles.meta`'s margin is for the meta beside the name.
+          <Text style={[typeV2.meta, { color: palette.secondary }]} numberOfLines={1} maxFontSizeMultiplier={headerMaxScale}>
             {meta}
           </Text>
         ) : null}
