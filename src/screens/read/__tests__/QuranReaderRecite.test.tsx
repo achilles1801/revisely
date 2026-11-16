@@ -1365,3 +1365,104 @@ describe('Recite the mistakes again (Majd, Nov 15 2026: one take from the first 
     expect(screen.queryByTestId('take-summary-drill')).toBeNull();
   });
 });
+
+describe('Recite your mistakes here (the held mic: the page’s remembered mistakes as one take)', () => {
+  const { remember, resetMemoryForTests } = jest.requireActual('../../../lib/reciteMemory/store');
+  const wrongAt = (s: number, a: number) => ({ id: `${s}:${a}:word`, w: words.verseFirstWord(s, a) + 1, ayah: [s, a], kind: 'word', sure: 'clear', heard: 'x' });
+  const PAGE_FROM = words.pageRange(379)[0];
+  const PAGE_TO = words.pageRange(379)[1] - 1;
+  const takeWith = (marks: object[]) => ({
+    id: 'mem-1',
+    kind: 'take',
+    take: 'old',
+    createdAt: Date.UTC(2026, 10, 14, 18),
+    rev: Date.UTC(2026, 10, 14, 18),
+    day: '2026-11-14',
+    level: 'words',
+    hidden: false,
+    from: PAGE_FROM,
+    to: PAGE_TO,
+    secs: 60,
+    mistakes: marks.length,
+    tajweed: 0,
+    unclear: 0,
+    accuracy: 0.9,
+    marks,
+    passed: [],
+    recordingId: null,
+  });
+  const holdMic = async () => {
+    fireEvent(screen.getByTestId('recite-mic'), 'longPress');
+    await flush();
+  };
+
+  beforeEach(() => resetMemoryForTests());
+
+  it('offers the page’s words still to fix, named by their stretch, and recites it as one take that stops at its end', async () => {
+    await remember('u1', takeWith([wrongAt(27, 24), wrongAt(27, 26)]));
+    setReciteCheckSettings('u1', { noticeSeen: true, mode: 'recite', markMistakes: true });
+    await open();
+    await holdMic();
+    const row = screen.getByTestId('recite-mode-drill');
+    expect(row).toHaveTextContent(/Recite your 2 mistakes here/);
+    // VoiceOver hears the stretch as words ("23 to 26").
+    expect(row.props.accessibilityLabel).toBe('Recite your 2 mistakes here, An-Naml, ayahs 23 to 26');
+    fireEvent.press(row);
+    await flush();
+    await flush();
+    expect(screen.queryByTestId('recite-mode-menu')).toBeNull();
+    // From the ayah before the first word to the last word's ayah, as Recite the mistakes again (#594), checked.
+    expect(mockLive.start).toMatchObject({ s: 27, a: 23, s2: 27, a2: 26, follow: false });
+    await event({ type: 'ready', take: 't2', protocol: 6 });
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await flush();
+    await event({ type: 'done', result: { v: 2, take: 't2', from: A23, to: A23 + 40, start: A23, secs: 20, marks: [], score: null } } as LiveEvent);
+    await flush();
+    // Its summary says what those words were last time.
+    expect(screen.getByTestId('take-summary-before').props.children).toBe('Before: 2 wrong words');
+  });
+
+  it('one word: “Recite your 1 mistake here”', async () => {
+    await remember('u1', takeWith([wrongAt(27, 25)]));
+    setReciteCheckSettings('u1', { noticeSeen: true, mode: 'recite', markMistakes: true });
+    await open();
+    await holdMic();
+    expect(screen.getByTestId('recite-mode-drill')).toHaveTextContent(/Recite your 1 mistake here/);
+  });
+
+  it('not offered without Premium, when the page has nothing to fix, or for tajweed notes alone', async () => {
+    setReciteCheckSettings('u1', { noticeSeen: true, mode: 'recite', markMistakes: true });
+    await open();
+    await holdMic();
+    expect(screen.getByTestId('recite-mode-menu')).toBeTruthy();
+    expect(screen.queryByTestId('recite-mode-drill')).toBeNull();
+    screen.unmount();
+
+    await remember('u1', takeWith([{ id: 'n', w: A23 + 2, ayah: [27, 23], kind: 'tajweed', rule: 'qalqalah', sure: 'clear' }]));
+    await open();
+    await holdMic();
+    expect(screen.queryByTestId('recite-mode-drill')).toBeNull();
+    screen.unmount();
+
+    await remember('u1', { ...takeWith([wrongAt(27, 24)]), id: 'mem-2' });
+    mockPremium.has = false;
+    await open();
+    await holdMic();
+    expect(screen.getByTestId('recite-mode-menu')).toBeTruthy();
+    expect(screen.queryByTestId('recite-mode-drill')).toBeNull();
+  });
+
+  it('on a phone that hasn’t seen the notice: the notice first, then the same stretch', async () => {
+    await remember('u1', takeWith([wrongAt(27, 24)]));
+    setReciteCheckSettings('u1', { noticeSeen: false, mode: 'recite', markMistakes: true });
+    await open();
+    await holdMic();
+    fireEvent.press(screen.getByTestId('recite-mode-drill'));
+    await flush();
+    expect(mockLive.start).toBeUndefined();
+    fireEvent.press(screen.getByTestId('recite-notice-agree'));
+    await flush();
+    await flush();
+    expect(mockLive.start).toMatchObject({ s: 27, a: 23, s2: 27, a2: 24 });
+  });
+});

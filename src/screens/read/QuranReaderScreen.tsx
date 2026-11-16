@@ -66,7 +66,8 @@ import { SimilarPhrasesSheet } from '../../components/reciteLive/SimilarPhrasesS
 import { findingsLine, TakeSummarySheet } from '../../components/reciteLive/TakeSummarySheet';
 import { say, undoMs, useScreenReaderOn } from '../../components/reciteLive/a11y';
 import { markTitle } from '../../lib/reciteLive/describe';
-import { drillMarks, drillRange } from '../../lib/reciteLive/drill';
+import { AyahRange, drillMarks, drillRange, openDrill } from '../../lib/reciteLive/drill';
+import { describeAyahs } from '../../lib/passages';
 import { CheckIntroPage } from '../../components/reciteLive/CheckIntroPage';
 import { markAt, wordBox } from '../../lib/reciteLive/geometry';
 import { similarPhrases } from '../../lib/reciteLive/similar';
@@ -346,6 +347,8 @@ export default function QuranReaderScreen() {
   }).noteRecording;
   const [modeMenu, setModeMenu] = useState(false);
   const [noticeFor, setNoticeFor] = useState<LiveMode | null>(null);
+  // The stretch a take waits to start on while the notice is up (Recite your mistakes here on a phone that hasn't seen it).
+  const [noticeRange, setNoticeRange] = useState<AyahRange | null>(null);
   // Check: the word a card is open on (and where it is on screen), similar phrases, the summary, Check's page.
   const [cardAt, setCardAt] = useState<{ w: number; anchor: Box } | null>(null);
   // What the card plays stops when the card closes, and when the reader goes (Majd, Nov 15 2026: Husary played on past
@@ -399,6 +402,37 @@ export default function QuranReaderScreen() {
     },
     [recorder, owned, reciteSettings.noticeSeen, live],
   );
+  // Recite your N mistakes here (the held mic, with Premium): the page's words still to fix in Recite's memory, as one
+  // take over the stretch that holds them, stopping by itself at its end. Worked out only while the menu is open.
+  const pageDrill = useMemo(
+    () => (modeMenu && liveOn && owned && qw && memoryRecords.length > 0 ? openDrill(memoryRecords, qw, currentPage) : null),
+    [modeMenu, liveOn, owned, qw, memoryRecords, currentPage],
+  );
+  const menuDrill = useMemo(
+    () =>
+      pageDrill
+        ? {
+            count: pageDrill.count,
+            place: describeAyahs(
+              ayahsBetween(ayahKey(pageDrill.range.from[0], pageDrill.range.from[1]), ayahKey(pageDrill.range.to[0], pageDrill.range.to[1])),
+            ),
+          }
+        : null,
+    [pageDrill],
+  );
+  const drillHere = useCallback(() => {
+    if (!pageDrill) return;
+    setModeMenu(false);
+    setRevealed(NOTHING_SHOWN);
+    // The summary's "Before: …": what those words were last time.
+    setDrillBefore(findingsLine(pageDrill.marks));
+    if (!reciteSettings.noticeSeen) {
+      setNoticeRange(pageDrill.range);
+      setNoticeFor('check');
+      return;
+    }
+    void live.start('check', pageDrill.range);
+  }, [pageDrill, reciteSettings.noticeSeen, live]);
   const pickMode = useCallback(
     (mode: ReciteMenuMode) => {
       setModeMenu(false);
@@ -761,6 +795,8 @@ export default function QuranReaderScreen() {
               setIntroOpen(true);
             }}
             onClose={() => setModeMenu(false)}
+            drill={menuDrill}
+            onDrill={drillHere}
           />
           {qw ? (
             <MarkCard
@@ -881,14 +917,20 @@ export default function QuranReaderScreen() {
             visible={noticeFor != null}
             onAgree={() => {
               const mode = noticeFor;
+              const range = noticeRange;
               setReciteCheckSettings(user?.id, { noticeSeen: true });
               setNoticeFor(null);
+              setNoticeRange(null);
               if (mode) {
                 setRevealed(NOTHING_SHOWN);
-                void live.start(mode);
+                void (range ? live.start(mode, range) : live.start(mode));
               }
             }}
-            onClose={() => setNoticeFor(null)}
+            onClose={() => {
+              if (noticeRange) setDrillBefore(null);
+              setNoticeFor(null);
+              setNoticeRange(null);
+            }}
           />
         </>
       ) : null}
