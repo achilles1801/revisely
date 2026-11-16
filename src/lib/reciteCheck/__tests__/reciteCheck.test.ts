@@ -221,4 +221,23 @@ describe('waking the checker', () => {
     await Promise.resolve();
     expect(fetch.mock.calls.map((c: unknown[]) => c[0])).toEqual([`${RECITE_CHECK_URL}/health`, `${RECITE_CHECK_PAIR_URL}/health`]);
   });
+
+  it('the pair service’s answer says whether takes may go there: 403 closes it for an hour, an answer opens it, no answer changes nothing', async () => {
+    const { warmUpReciteCheck } = require('../service');
+    const { pairAnswered, pairOpen } = require('../../reciteLive/pairService');
+    const answers = (pair: unknown) => jest.fn((url: string) => (url.includes('pair') ? pair : Promise.resolve({ ok: true, status: 200 })));
+    const settle = async () => {
+      for (let i = 0; i < 5; i++) await Promise.resolve();
+    };
+    pairAnswered();
+    warmUpReciteCheck({ fetch: answers(Promise.resolve({ ok: false, status: 403 })) });
+    await settle();
+    expect(pairOpen()).toBe(false);
+    warmUpReciteCheck({ fetch: answers(Promise.reject(new Error('offline'))) });
+    await settle();
+    expect(pairOpen()).toBe(false);
+    warmUpReciteCheck({ fetch: answers(Promise.resolve({ ok: true, status: 200 })) });
+    await settle();
+    expect(pairOpen()).toBe(true);
+  });
 });
