@@ -11,6 +11,19 @@ import type { TakeRecord } from '../../lib/reciteMemory/record';
 import { takeWhen } from '../../lib/reciteMemory/describe';
 import { logger } from '../../lib/logger';
 import { passageOf } from '../reciteLive/TakeSummarySheet';
+import { similarSlips } from '../../lib/reciteInsights/insights';
+import { intoLine } from '../../lib/reciteInsights/describe';
+import { plainText } from '../../lib/passages';
+
+/** At most this many similar-ayah lines under a take; the rest are on the page (Show on the page). */
+const INTO_LINES = 2;
+
+/** A take's own menu (held, or VoiceOver's actions): Show on the page, Ask Revo about this take (RINS-3). */
+export interface TakeMenuAction {
+  key: string;
+  label: string;
+  onPress: () => void;
+}
 
 /** The word data, loaded once something needs a take's passage (Activity has it only for takes). */
 export function useQuranWordsWhen(enabled: boolean): QuranWords | null {
@@ -66,29 +79,54 @@ export function TakeDayItem({
   cleared,
   onShow,
   onOpenRecording,
+  onHold,
+  actions = [],
 }: {
   take: TakeRecord;
   words: QuranWords | null;
   cleared: number;
   onShow: (take: TakeRecord) => void;
   onOpenRecording: (id: string) => void;
+  /** Its menu (RINS-3): a hold on its passage and lines. */
+  onHold?: () => void;
+  /** The same actions for VoiceOver. */
+  actions?: TakeMenuAction[];
 }) {
   const { palette } = useTheme();
   const colour = useScoreColour();
   const passage = words ? passageOf(words, take.from, take.to) : 'Recited';
+  // A slip into a similar ayah says so under the take's line (RINS-3).
+  const into = similarSlips([take]).slice(0, INTO_LINES).map(intoLine);
+  const line = takeLine(take, cleared);
   return (
     <View testID={`activity-take-${take.id}`}>
-      <View style={styles.titleRow}>
-        <Text style={[typeV2.name, styles.flex, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
-          {passage}
+      <Tap
+        onLongPress={onHold}
+        delayLongPress={350}
+        pressedOpacity={onHold ? 0.55 : 1}
+        accessible
+        accessibilityLabel={[passage, formatAccuracy(take.accuracy), line, ...into.map(plainText)].join(', ')}
+        accessibilityActions={actions.map((a) => ({ name: a.key, label: a.label }))}
+        onAccessibilityAction={(e) => actions.find((a) => a.key === e.nativeEvent.actionName)?.onPress()}
+        testID="activity-take-head"
+      >
+        <View style={styles.titleRow}>
+          <Text style={[typeV2.name, styles.flex, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
+            {passage}
+          </Text>
+          <Text style={[typeV2.name, typeV2.numeral, { color: colour(take.accuracy) }]} maxFontSizeMultiplier={1.3}>
+            {formatAccuracy(take.accuracy)}
+          </Text>
+        </View>
+        <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={1.4} testID="activity-take-line">
+          {line}
         </Text>
-        <Text style={[typeV2.name, typeV2.numeral, { color: colour(take.accuracy) }]} maxFontSizeMultiplier={1.3}>
-          {formatAccuracy(take.accuracy)}
-        </Text>
-      </View>
-      <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={1.4} testID="activity-take-line">
-        {takeLine(take, cleared)}
-      </Text>
+        {into.map((text, i) => (
+          <Text key={i} style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={1.4} testID="activity-take-into">
+            {text}
+          </Text>
+        ))}
+      </Tap>
       {take.recordingId ? (
         <View style={styles.recording}>
           <RecordingsList

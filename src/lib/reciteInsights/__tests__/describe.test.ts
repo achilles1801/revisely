@@ -1,4 +1,4 @@
-import { clearedLine, dayWords, kindsLine, passageName, scoreLine, similarNote, similarTitle, slipNote, weekLabel, weeksSpoken, weeksTakeaway, weeksToDraw } from '../describe';
+import { clearedLine, dayWords, intoLine, kindsLine, passageName, scoreLine, similarNote, similarTitle, slipNote, weekLabel, weeksSpoken, weeksTakeaway, weeksToDraw } from '../describe';
 import { NO_KINDS, type SimilarSlip, type SlippingPassage } from '../insights';
 import { plainText } from '../../passages';
 
@@ -56,6 +56,13 @@ describe('Recite insights in words', () => {
     const ending = similar({ from: [113, 3], into: [113, 5], ending: true, times: 1, lastDay: '2026-11-15' });
     expect(plainText(similarTitle(ending))).toBe('Al-Falaq 3');
     expect(plainText(similarNote(ending, TODAY))).toBe('You ended it as ayah 5 ends · yesterday');
+  });
+
+  it('a take’s slip into a similar ayah, under its line in Activity (RINS-3), names both by surah', () => {
+    expect(plainText(intoLine(similar()))).toBe('You went on with Al-Baqarah 123, a similar ayah');
+    expect(plainText(intoLine(similar({ into: [3, 7] })))).toBe("You went on with Ali 'Imran 7, a similar ayah");
+    expect(plainText(intoLine(similar({ from: [113, 3], into: [113, 5], ending: true })))).toBe('You ended Al-Falaq 3 as ayah 5 ends');
+    expect(plainText(intoLine(similar({ from: [2, 48], into: [3, 7], ending: true })))).toBe("You ended Al-Baqarah 48 as Ali 'Imran 7 ends");
   });
 
   it('the kinds come words first, and Not clear and tajweed are never counted as mistakes', () => {

@@ -18,7 +18,11 @@ import { BlockMark, RevisedMark } from './BlockMark';
 import { creditLine, formatMinutesLong, windowFooter } from '../../lib/activityFormat';
 import { describePassage } from '../../lib/passages';
 import { RecordingsList } from '../recordings/RecordingsList';
-import { RecitedMark, TakeDayItem, useQuranWordsWhen } from '../reciteMemory/TakeRows';
+import { RecitedMark, TakeDayItem, takeLine, useQuranWordsWhen, type TakeMenuAction } from '../reciteMemory/TakeRows';
+import { passageOf } from '../reciteLive/TakeSummarySheet';
+import { takeAttachment } from '../../lib/revo/recitation';
+import { openRevo } from '../../lib/revo/open';
+import { useRevoPresent } from '../../lib/revo/presence';
 import { useMemoryRecords } from '../../lib/reciteMemory/store';
 import { clearedBy } from '../../lib/reciteMemory/memory';
 import type { TakeRecord } from '../../lib/reciteMemory/record';
@@ -281,6 +285,33 @@ export function DayBlocks({
   const takeRecordings = useMemo(() => new Set(dayTakes.map((t) => t.recordingId).filter((id): id is string => id != null)), [dayTakes]);
   const notTake = useCallback((r: RecordingMeta) => !takeRecordings.has(r.id), [takeRecordings]);
   const takeWords = useQuranWordsWhen(dayTakes.length > 0);
+  // A take's menu (RINS-3): Show on the page, and Ask Revo about this take while Revo is on (the take goes with
+  // the question, as Revo's + attaches it).
+  const revoOn = useRevoPresent();
+  const takeActions = (take: TakeRecord): TakeMenuAction[] => {
+    if (!takeWords) return [];
+    const out: TakeMenuAction[] = [{ key: 'show', label: 'Show on the page', onPress: () => onShowTake?.(take, takeWords.pageOf(take.from)) }];
+    if (revoOn) {
+      out.push({
+        key: 'ask-revo',
+        label: 'Ask Revo about this take',
+        onPress: () => {
+          const attach = takeAttachment(memoryRecords, take, takeWords, today);
+          openRevo(attach ? { attach } : {});
+        },
+      });
+    }
+    return out;
+  };
+  const takeMenu = (take: TakeRecord, cleared: number) => {
+    const actions = takeActions(take);
+    if (!takeWords || actions.length === 0) return;
+    setMenu({
+      title: passageOf(takeWords, take.from, take.to),
+      text: takeLine(take, cleared),
+      actions: actions.map((a) => ({ ...a, icon: a.key === 'ask-revo' ? 'sparkles-outline' : 'book-outline' })),
+    });
+  };
   const revRecs = recs.filter((r) => r.kind === 'revision');
   const readRecs = recs.filter((r) => r.kind === 'reading' && notTake(r));
   useActivityReload(load, day);
@@ -760,6 +791,8 @@ export function DayBlocks({
               cleared={clearedBy(memoryRecords, t).length}
               onShow={(take) => takeWords && onShowTake?.(take, takeWords.pageOf(take.from))}
               onOpenRecording={onOpenRecording}
+              onHold={() => takeMenu(t, clearedBy(memoryRecords, t).length)}
+              actions={takeActions(t)}
             />
           ))}
           testID="activity-block-recited"

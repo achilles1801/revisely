@@ -77,6 +77,18 @@ export function similarNote(s: SimilarSlip, today: string): string {
   return `You went on with the similar ayah · ${when}`;
 }
 
+/**
+ * A take's slip into a similar ayah, under its line in Activity (RINS-3): "You went on with Al-Baqarah 123, a similar
+ * ayah"; an ending, "You ended Al-Falaq 3 as ayah 5 ends".
+ */
+export function intoLine(s: Pick<SimilarSlip, 'from' | 'into' | 'ending'>): string {
+  if (s.ending) {
+    const as = s.into[0] === s.from[0] ? `ayah${NBSP}${s.into[1]}` : `${surahName(s.into[0])}${NBSP}${s.into[1]}`;
+    return `You ended ${surahName(s.from[0])}${NBSP}${s.from[1]} as ${as} ends`;
+  }
+  return `You went on with ${surahName(s.into[0])}${NBSP}${s.into[1]}, a similar ayah`;
+}
+
 /** "6 words cleared · said right on 2 different days"; null with none. */
 export function clearedLine(n: number): string | null {
   return n > 0 ? `${count(n, 'word')} cleared · said right on 2 different days` : null;
