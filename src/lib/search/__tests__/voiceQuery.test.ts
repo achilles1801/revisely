@@ -81,6 +81,32 @@ describe('VoiceQuery', () => {
     }
   });
 
+  it('shows nothing and hears nothing before the person speaks, though the model writes a word for any noise [SEARCH-3]', async () => {
+    // The speech model writes وَالْمُؤْمِنِينَ for silence and for any noise (measured with ggml-tarteel-whisper-base,
+    // Nov 16 2026), so the room must never reach it. A phone's microphone starts with digital silence, then the room.
+    let decodes = 0;
+    let handlers: AudioSourceHandlers | null = null;
+    const partials: string[] = [];
+    const query = new VoiceQuery({
+      engine: { transcribe: async () => (decodes++, 'وَالْمُؤْمِنِينَ') },
+      startSource: async (h) => {
+        handlers = h;
+        return { stop: async () => undefined };
+      },
+      onPartial: (t) => partials.push(t),
+    });
+    await query.start();
+    const room = () => new Int16Array(CHUNK).map(() => Math.round((Math.random() * 2 - 1) * 250)); // about -45 dBFS
+    for (const c of [new Int16Array(CHUNK), ...[...Array(60)].map(room)]) {
+      handlers!.onAudio(c);
+      await new Promise((r) => setImmediate(r));
+    }
+    expect(partials).toEqual([]);
+    expect(decodes).toBe(0);
+    await query.stop();
+    await expect(query.result).resolves.toEqual({ text: '', end: 'nothing' });
+  });
+
   it('gives nothing when cancelled', async () => {
     const { query, feed } = setup(['قل']);
     await query.start();

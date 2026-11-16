@@ -140,6 +140,31 @@ describe('UtteranceSegmenter', () => {
     expect(ms(finals[0].audio.length)).toBeGreaterThan(6000);
   });
 
+  /** The room at about `db` dBFS: noise() scaled (its RMS is a third of the square root of its amplitude squared). */
+  const room = (msLong: number, db: number) => noise(msLong, Math.round(32768 * 10 ** (db / 20) * Math.sqrt(3)));
+  /** A phone's microphone starting: 30 ms frames of digital silence, then a rise to the room (kept takes, Nov 2026). */
+  const warmUp = (silentFrames: number, rise: number[]) => concat(new Int16Array(480 * silentFrames), ...rise.map((db) => room(30, db)));
+
+  it('never takes the microphone’s warm-up for the room: the room after it is not speech [SEARCH-3]', () => {
+    // Measured starts: four frames of silence then -57, -53 and a room at -47; or -68, -56 and a room at -51. The floor
+    // used to start at the first frame and drop to the silence, so the room read as speech for 4–13 s.
+    for (const [start, roomDb] of [
+      [warmUp(4, [-57, -53]), -47],
+      [warmUp(0, [-68, -56, -53]), -51],
+      [warmUp(1, [-98]), -45],
+    ] as const) {
+      const events = feed(new UtteranceSegmenter(), concat(start, room(10_000, roomDb)));
+      expect(events).toEqual([]);
+    }
+  });
+
+  it('still hears speaking straight away, during the warm-up or just after it [SEARCH-3]', () => {
+    for (const before of [warmUp(1, []), warmUp(4, [-57, -53]), concat(warmUp(4, [-57, -53]), room(200, -47))]) {
+      const events = feed(new UtteranceSegmenter(), concat(before, mix(tone(1500), room(1500, -47)), room(1500, -47)));
+      expect(events.filter((e) => e.type === 'final')).toHaveLength(1);
+    }
+  });
+
   it('flushes the utterance in progress', () => {
     const seg = new UtteranceSegmenter();
     feed(seg, concat(noise(300), tone(1000)));

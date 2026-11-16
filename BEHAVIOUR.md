@@ -424,6 +424,10 @@ microphone's purpose string (in the binary) names searching only from 1.0.4.
   with or without its "al-" ("Yunus", "Fatiha", "الكهف"), an ayah ("2:255", "Yunus 16", in Arabic
   digits too), a page ("page 62") or a juz ("juz 30"). A bare number offers the surah and the page.
   A number that isn't in the mushaf goes nowhere.
+- **SEARCH-3.** Searching by voice hears only what is said. Under "Listening…" nothing shows until the person
+  speaks, and the room (silence, its steady noise, the microphone's first moments) is never taken for words: the
+  speech model writes a word for any of them. Words show as they are said, and someone who speaks at once is heard.
+  Listening that hears nothing ends after 8 seconds and searches nothing.
 
 ## Translations
 

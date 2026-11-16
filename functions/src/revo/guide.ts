@@ -210,7 +210,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'Searching the Qur’an',
-    covers: ['SEARCH-1', 'SEARCH-2'],
+    covers: ['SEARCH-1', 'SEARCH-2', 'SEARCH-3'],
     routes: ['ReadIndex', 'QuranSearch', 'QuranReader'],
     text: lines(
       '- Everyone: the Read tab has “Search the Quran” under its title; the search field is at the bottom of the screen, in reach of a thumb. Type a few words of an ayah in Arabic (with or without vowel marks) and the ayat that hold them are listed: from the middle of an ayah too, even with a word misspelled; a phrase in several ayat lists every one. Typing a surah (Yunus, or its Arabic name), an ayah (2:255, Yunus 16), a page (page 62) or a juz (juz 30) goes there.',
