@@ -74,8 +74,13 @@ function render(s) {
     fill('appLine', RV.t('a.approvedLine'));
   } else if (s.state === 'declined') {
     dot.classList.add('off');
-    fill('appTitle', RV.t('a.declined'));
-    fill('appLine', RV.t('a.declinedLine', { date: RV.date(s.applyAgainFrom, true) }));
+    if (s.revokedAt) {
+      fill('appTitle', RV.t('a.revoked'));
+      fill('appLine', RV.t('a.revokedLine', { ended: RV.date(s.revokedAt), date: RV.date(s.applyAgainFrom, true) }));
+    } else {
+      fill('appTitle', RV.t('a.declined'));
+      fill('appLine', RV.t('a.declinedLine', { date: RV.date(s.applyAgainFrom, true) }));
+    }
   } else {
     dot.classList.add('off');
     fill('appTitle', RV.t('a.none'));
