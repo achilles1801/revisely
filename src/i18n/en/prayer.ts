@@ -66,6 +66,45 @@ export const prayer = {
     noLocation: { title: "Couldn't find where you are", body: 'Check that Location Services is on, then try again.' },
     locating: 'Finding where you are…',
   },
+  calculation: {
+    title: 'Calculation',
+    location: 'Location',
+    yourLocation: 'Your location',
+    notSet: 'Not set',
+    onPhoneOnly: 'On this phone only',
+    update: 'Update',
+    method: 'Method',
+    methodFooter: 'Also used for “Start day at fajr”.',
+    highLatitudes: 'High latitudes',
+    highLatitudesHelp: 'How Fajr and Isha are found where twilight lasts all night in summer.',
+    asrTime: 'Asr time',
+    asrFooter: 'Standard is Shafiʿi, Mālikī and Ḥanbalī. Hanafi puts Asr later.',
+    /** With today's Hanafi Asr: "… Hanafi puts Asr later (4:12 PM today)." */
+    asrFooterToday: 'Standard is Shafiʿi, Mālikī and Ḥanbalī. Hanafi puts Asr later ({{time}} today).',
+    adjustments: 'Adjustments',
+    adjustmentsFooter: 'Minutes added to or taken from each time, to match your mosque.',
+    /** An adjustment: "0 min", "+5 min", "−3 min" (the sign is part of the value). */
+    adjustValue: '{{value}} min',
+    /** VoiceOver's name for an adjustment's stepper: "minutes for Fajr". */
+    adjustLabel: 'minutes for {{name}}',
+  },
+  notifications: {
+    title: 'Prayer notifications',
+    prayers: 'Prayers',
+    scheduled_one: 'Scheduled on this phone for the next {{count}} day. Opening Revisely keeps them going.',
+    scheduled_other: 'Scheduled on this phone for the next {{count}} days. Opening Revisely keeps them going.',
+    off: 'Off',
+    silent: 'Silent',
+    silentDetail: 'A banner only',
+    /** "Standard tone · 10 min before". */
+    summaryBefore: '{{sound}} · {{minutes}} min before',
+    minutes: '{{minutes}} min',
+    reminderBefore: 'Reminder before',
+    sound: 'Sound',
+    playsSound: 'Plays the sound',
+    /** VoiceOver's name for a prayer's row: "Fajr: Standard tone · 10 min before. Change". */
+    rowLabel: '{{name}}: {{summary}}. Change',
+  },
   notify: {
     ask: {
       title: 'Turn on prayer notifications?',

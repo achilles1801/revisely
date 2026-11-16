@@ -30,12 +30,13 @@ const EXTRACTED: string[] = [
   'lib/updates',
   'lib/widgets',
   'navigation',
+  'screens/prayer',
   'services',
 ];
 
 describe('UI text comes from src/i18n', () => {
   it('reads words as words and ids as ids', () => {
-    for (const s of ['Done', 'Update now', 'Starts at 0 ›', '0 pages', 'pp. 0–0', 'Fajr', 'Juz 0', "Couldn't load"]) {
+    for (const s of ['Done', 'Update now', 'Starts at 0 ›', '0 pages', 'pp. 0–0', 'Fajr', 'Juz 0', "Couldn't load", '0: 0. Change']) {
       expect([s, readsAsText(s)]).toEqual([s, true]);
     }
     for (const s of [
