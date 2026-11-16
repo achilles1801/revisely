@@ -262,6 +262,10 @@ How the tests are made: `tests/scenarios/README.md`.
 
 ## The reader
 
+- **READ-1.** The reader opens on the page it was opened for (a surah or juz from the Read tab, a search
+  result, Jump to, a day's or a session's page): its first frame is that page, never page 1 first. Before
+  Nov 15 2026 it began at Al-Fatihah and moved to the page a moment later (Majd, on Revisely Dev: "the first
+  thing that pops up is Surah Fatiha, and then after like a half second or so, it jumps to the surah").
 - **REC-1.** A sitting in the reader: ending the timer while a recording runs, or is paused,
   ends both. The recording is saved first, then the timed sitting. One note says what was saved, by
   surah and ayah, and opens its day: "Saved to today: Al-Mulk, ayahs 1–26, 41 min · View". It takes the

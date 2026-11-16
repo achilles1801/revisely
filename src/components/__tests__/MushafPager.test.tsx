@@ -304,6 +304,30 @@ describe('<MushafPager /> the start-up scroll', () => {
   });
 });
 
+describe('<MushafPager /> opening on a page (READ-1)', () => {
+  // Majd, Nov 15 2026 (Revisely Dev, first use after opening the app): a surah opened from the Read tab showed
+  // Al-Fatihah for about half a second, then jumped to the surah. The list began at page 1 and only a scroll 50 ms after
+  // mount (and the time to draw the target page) moved it.
+  it('[READ-1] its first frame is the page it opens on, not page 1', () => {
+    jest.useFakeTimers();
+    try {
+      render(<MushafPager pages={PAGES} initialPage={15} />);
+      const list = screen.UNSAFE_getByType(FlatList);
+      // Before any timer runs: the list starts there, and page 1 isn't drawn at all.
+      expect(list.props.initialScrollIndex).toBe(14);
+      expect(screen.getByLabelText('Page 15', { exact: false })).toBeTruthy();
+      expect(screen.queryByLabelText(/^Page 1(\D|$)/)).toBeNull();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('[READ-1] opened with no page, or one it doesn’t have, it starts at the first', () => {
+    render(<MushafPager pages={PAGES} />);
+    expect(screen.UNSAFE_getByType(FlatList).props.initialScrollIndex ?? 0).toBe(0);
+  });
+});
+
 describe('<MushafPager /> turning the page by swiping', () => {
   function setupSwipe() {
     const order: string[] = [];
