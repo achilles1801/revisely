@@ -326,6 +326,10 @@ until its part is set up.
     tajweed offers one take over the stretch from the ayah before the first mistake (same surah) to the last mistake's
     ayah (`s2`/`a2`, no `startBy`). It stops by itself once `said` reaches the stretch's last word (reciting on would
     add "Extra word after the end" marks), and its summary says "Before: …" (what the take before found there).
+    - **From the page** (Nov 16 2026; `openDrill`): with Premium, holding the mic on a page that still has words to fix
+      in Recite's memory (open until two right takes on two days; tajweed notes left out) adds "Recite your N mistakes
+      here" under the stretch's name. The same kind of take, over the stretch that holds those words; "Before: …" is
+      each word's latest wrong try. On a phone that hasn't seen the notice, the notice comes first, then that stretch.
   - **Where a slip went** (`into`, contract draft 6; Majd said yes, Nov 15 2026; live on the checker since #617/#618):
     the final answer can name, on the first skipped or wrong word of a run, the similar ayah the reciter went on with,
     or (`ending`) the ayah whose ending they used. The summary gives each a row under its head ("You continued with

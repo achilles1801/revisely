@@ -3,6 +3,7 @@ import { AccessibilityInfo, Pressable, StyleSheet, Text, View } from 'react-nati
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
+import { spokenText } from '../../lib/passages';
 
 export const MODE_MENU_WIDTH = 276;
 
@@ -35,10 +36,24 @@ function MiniSwitch({ on, locked }: { on: boolean; locked: boolean }) {
   );
 }
 
+/** The page's remembered mistakes, offered as one take (lib/reciteLive/drill openDrill). */
+export interface MenuDrill {
+  /** Words still to fix on the page. */
+  count: number;
+  /** The stretch the take runs over, in words ("An-Naml, ayahs 23–27"). */
+  place: string;
+}
+
+/** The drill row's label: "Recite your 3 mistakes here". */
+export const drillLabel = (count: number) => `Recite your ${count} ${count === 1 ? 'mistake' : 'mistakes'} here`;
+
 /**
  * Holding the mic: Record or Recite, above the bar at the right (like the held verse's menu: a card in the screen,
  * nothing dimmed, any touch outside closes it). Under Recite, one row: Mark mistakes, a switch (Premium; Majd, Nov 14
  * 2026). Without Premium it is off with a lock, and a tap opens the Premium page. Its level is in Settings.
+ *
+ * With Premium, a page that still has words to fix in Recite's memory adds one more row: "Recite your N mistakes
+ * here", one take over the stretch that holds them, which stops by itself at its end (the idea of Nov 15 2026).
  */
 export function ReciteModeMenu({
   visible,
@@ -51,6 +66,8 @@ export function ReciteModeMenu({
   onMarkMistakes,
   onLocked,
   onClose,
+  drill,
+  onDrill,
 }: {
   visible: boolean;
   mode: ReciteMenuMode;
@@ -66,6 +83,9 @@ export function ReciteModeMenu({
   /** The locked switch was tapped. */
   onLocked: () => void;
   onClose: () => void;
+  /** The page's remembered mistakes to recite again, when it has any (and the account has Premium). */
+  drill?: MenuDrill | null;
+  onDrill?: () => void;
 }) {
   const { palette, isDark } = useTheme();
   const first = useRef<View>(null);
@@ -156,6 +176,31 @@ export function ReciteModeMenu({
               <MiniSwitch on={on} locked={!owned} />
             </Pressable>
           </View>
+          {drill && onDrill ? (
+            <>
+              <View style={[styles.separator, { backgroundColor: palette.separator }]} />
+              <Pressable
+                onPress={onDrill}
+                accessibilityRole="button"
+                accessibilityLabel={`${drillLabel(drill.count)}, ${spokenText(drill.place)}`}
+                style={({ pressed }) => [styles.row, pressed && { backgroundColor: palette.fill }]}
+                testID="recite-mode-drill"
+              >
+                <View style={styles.icon}>
+                  <Ionicons name="refresh" size={21} color={palette.text} />
+                </View>
+                <View style={styles.label}>
+                  <Text style={[typeV2.menu, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
+                    {drillLabel(drill.count)}
+                  </Text>
+                  <Text style={[typeV2.meta, { color: palette.secondary }]} numberOfLines={2} maxFontSizeMultiplier={1.3}>
+                    {drill.place}
+                  </Text>
+                </View>
+                <View style={styles.tick} />
+              </Pressable>
+            </>
+          ) : null}
         </View>
       </View>
     </View>
