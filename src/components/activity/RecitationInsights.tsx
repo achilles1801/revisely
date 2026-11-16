@@ -5,12 +5,11 @@
 // passage was last recited). Board: ~/Documents/revisely-recite-mocks/insights/board-insights-v1.png.
 
 import React, { useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Svg, { Circle, Line, Polyline } from 'react-native-svg';
 import { useTheme } from '../../context/ThemeContext';
-import { arabicV2, typeV2 } from '../../theme/v2';
-import { ChromeText } from './ChromeText';
+import { typeV2 } from '../../theme/v2';
+import { ChromeText, STACK_AT_SCALE } from './ChromeText';
 import { Tap } from '../v2/Tap';
 import { openRevo } from '../../lib/revo/open';
 import { insightAttachment } from '../../lib/revo/attachments';
@@ -29,9 +28,13 @@ import {
   similarTitle,
   slipNote,
   strongNote,
+  weekLabel,
   weeksSpoken,
+  weeksTakeaway,
+  weeksToDraw,
 } from '../../lib/reciteInsights/describe';
 import { markFill } from '../reciteLive/markColours';
+import { WordChip } from '../reciteLive/WordChip';
 
 /** Rows shown before "See all". */
 const FIRST_ROWS = 3;
@@ -66,6 +69,8 @@ export function RecitationInsights({ records, words, today, window, inWords, sma
     [smartTracking, ins.slipping, rating],
   );
   const slipping = allSlipping ? ins.slipping : ins.slipping.slice(0, FIRST_ROWS);
+  // The weeks are drawn once two had takes; their line then says how the score moved, and the figure gives the takes.
+  const weeksDrawn = ins.weeks.filter((w) => w.score !== null).length >= 2;
   const quiet = [clearedLine(ins.cleared.length), ins.takes > 0 ? kindsLine(ins) : null].filter(Boolean) as string[];
   return (
     <View style={[styles.section, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.separator }]} testID="insights-recitation">
@@ -96,9 +101,9 @@ export function RecitationInsights({ records, words, today, window, inWords, sma
             {formatAccuracy(ins.score)}
           </ChromeText>
         ) : null}
-        <ChromeText style={[typeV2.body, styles.flex, { color: palette.secondary }]}>{scoreLine(ins, inWords)}</ChromeText>
+        <ChromeText style={[typeV2.body, styles.flex, { color: palette.secondary }]}>{scoreLine(ins, inWords, !weeksDrawn)}</ChromeText>
       </View>
-      {ins.weeks.filter((w) => w.score !== null).length >= 2 ? <WeekLine weeks={ins.weeks} /> : null}
+      {weeksDrawn ? <WeekBars weeks={ins.weeks} /> : null}
 
       {ins.slipping.length > 0 ? (
         <>
@@ -222,11 +227,7 @@ function Chips({ passage, words }: { passage: SlippingPassage; words: QuranWords
   return (
     <View style={styles.chips} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
       {shown.map((w) => (
-        <View key={w.w} style={[styles.chip, { backgroundColor: markFill(palette, w) }]}>
-          <Text style={[arabicV2(18), { color: palette.text }]} maxFontSizeMultiplier={1.4}>
-            {words.uthmani(w.w)}
-          </Text>
-        </View>
+        <WordChip key={w.w} text={words.uthmani(w.w)} fill={markFill(palette, w)} />
       ))}
       {passage.words.length > shown.length ? (
         <ChromeText style={[typeV2.meta, styles.more, { color: palette.secondary }]}>{`+${passage.words.length - shown.length}`}</ChromeText>
@@ -235,35 +236,75 @@ function Chips({ passage, words }: { passage: SlippingPassage; words: QuranWords
   );
 }
 
-/** The score week by week, on the take score's own scale, this week a firm dot. */
-function WeekLine({ weeks }: { weeks: readonly { score: number | null }[] }) {
+/** Bars' room: the tallest bar, and the shortest a week with takes gets. */
+const BAR_MAX = 52;
+const BAR_MIN = 6;
+
+/**
+ * The score week by week, as bars (Majd, Nov 16 2026: the bare line "isn't intuitive, it's hard to tell what it's
+ * telling me"): a line saying how it moved, then a bar a week with its score over it and the week under it, this week
+ * in full colour as Memorization's month is. From the first week with takes; four weeks at large text.
+ */
+function WeekBars({ weeks }: { weeks: readonly { to: string; score: number | null }[] }) {
   const { palette } = useTheme();
-  const [width, setWidth] = useState(0);
-  const h = 64;
-  const scores = weeks.map((w) => w.score).filter((s): s is number => s !== null);
-  const lo = Math.min(0.96, Math.floor(Math.min(...scores) * 100) / 100);
-  const y = (s: number) => 6 + (1 - (s - lo) / (1 - lo)) * (h - 12);
-  const x = (i: number) => 6 + (i * (width - 12)) / Math.max(1, weeks.length - 1);
-  const points = weeks.map((w, i) => (w.score === null ? null : { x: x(i), y: y(w.score) })).filter((p): p is { x: number; y: number } => p != null);
-  const last = points[points.length - 1];
+  const large = useWindowDimensions().fontScale >= STACK_AT_SCALE;
+  const shown = weeksToDraw(weeks, large ? 4 : 8);
+  const scores = shown.map((w) => w.score).filter((x): x is number => x !== null);
+  // Bars start a point under the lowest week (and at 95% at most), so a change of a point shows.
+  const lo = Math.max(0, Math.min(0.95, Math.floor((Math.min(...scores) - 0.01) * 100) / 100));
+  const height = (score: number) => BAR_MIN + Math.round(((BAR_MAX - BAR_MIN) * (score - lo)) / (1 - lo));
+  const takeaway = weeksTakeaway(shown);
   return (
     <View
       style={styles.weeks}
-      onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
       accessible
       accessibilityRole="image"
-      accessibilityLabel={weeksSpoken(weeks)}
+      accessibilityLabel={`${takeaway ? `${takeaway}. ` : ''}${weeksSpoken(shown)}`}
       testID="insights-recitation-weeks"
     >
-      {width > 0 ? (
-        <Svg width={width} height={h}>
-          <Line x1={0} x2={width} y1={y(1)} y2={y(1)} stroke={palette.separator} strokeWidth={1} />
-          <Polyline points={points.map((p) => `${p.x},${p.y}`).join(' ')} fill="none" stroke={palette.secondary} strokeWidth={1.6} strokeLinejoin="round" />
-          {points.map((p, i) => (
-            <Circle key={i} cx={p.x} cy={p.y} r={p === last ? 4.5 : 3} fill={p === last ? palette.text : palette.secondary} />
-          ))}
-        </Svg>
+      {takeaway ? (
+        <ChromeText style={[typeV2.name, { color: palette.text }]} testID="insights-recitation-weeks-takeaway">
+          {takeaway}
+        </ChromeText>
       ) : null}
+      <View style={styles.bars}>
+        {shown.map((w, i) => {
+          const last = i === shown.length - 1;
+          return (
+            <View key={w.to} style={styles.col}>
+              <ChromeText
+                style={[styles.small, styles.value, { color: last ? palette.text : palette.secondary }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.7}
+              >
+                {w.score === null ? '–' : formatAccuracy(w.score)}
+              </ChromeText>
+              <View
+                style={[
+                  styles.bar,
+                  w.score === null
+                    ? { height: 2, backgroundColor: palette.separator }
+                    : { height: height(w.score), backgroundColor: palette.primary, opacity: last ? 1 : 0.4 },
+                ]}
+              />
+            </View>
+          );
+        })}
+      </View>
+      <View style={styles.labels}>
+        {shown.map((w, i) => (
+          <ChromeText
+            key={w.to}
+            style={[styles.small, styles.label, { color: i === shown.length - 1 ? palette.text : palette.secondary }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.7}
+          >
+            {weekLabel(w.to, i === shown.length - 1)}
+          </ChromeText>
+        ))}
+      </View>
     </View>
   );
 }
@@ -277,12 +318,18 @@ const styles = StyleSheet.create({
   figure: { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginTop: 12, flexWrap: 'wrap', rowGap: 4 },
   big: { fontSize: 28, lineHeight: 32, fontWeight: '700', letterSpacing: -0.6, fontVariant: ['tabular-nums'] },
   ask: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 32, borderRadius: 16, borderWidth: 1, paddingHorizontal: 12 },
-  weeks: { marginTop: 10, height: 64 },
+  weeks: { marginTop: 14 },
+  bars: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, height: BAR_MAX + 22, marginTop: 10 },
+  col: { flex: 1, alignItems: 'stretch', justifyContent: 'flex-end' },
+  bar: { borderRadius: 5 },
+  small: { fontSize: 12, lineHeight: 16 },
+  value: { fontWeight: '600', textAlign: 'center', marginBottom: 4 },
+  labels: { flexDirection: 'row', gap: 6, marginTop: 6 },
+  label: { flex: 1, textAlign: 'center' },
   subHead: { flexDirection: 'row', alignItems: 'baseline', marginTop: 18, marginBottom: 2 },
   strong: { fontWeight: '600' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
   chips: { flexDirection: 'row-reverse', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 6, marginTop: 6 },
-  chip: { borderRadius: 8, paddingHorizontal: 8 },
   more: { alignSelf: 'center' },
   quiet: { marginTop: 16, borderRadius: 14, paddingVertical: 12, paddingHorizontal: 14, gap: 4 },
 });

@@ -1,4 +1,4 @@
-import { clearedLine, dayWords, kindsLine, passageName, scoreLine, similarNote, similarTitle, slipNote, weeksSpoken } from '../describe';
+import { clearedLine, dayWords, kindsLine, passageName, scoreLine, similarNote, similarTitle, slipNote, weekLabel, weeksSpoken, weeksTakeaway, weeksToDraw } from '../describe';
 import { NO_KINDS, type SimilarSlip, type SlippingPassage } from '../insights';
 import { plainText } from '../../passages';
 
@@ -75,6 +75,27 @@ describe('Recite insights in words', () => {
   it('cleared words and the weeks for a screen reader', () => {
     expect(clearedLine(6)).toBe('6 words cleared · said right on 2 different days');
     expect(clearedLine(0)).toBeNull();
-    expect(weeksSpoken([{ score: 0.969 }, { score: null }, { score: 0.989 }])).toBe('Score by week: 96.9%, no takes, this week 98.9%');
+    expect(weeksSpoken([{ to: '2026-11-02', score: 0.969 }, { to: '2026-11-09', score: null }, { to: TODAY, score: 0.989 }])).toBe(
+      'Score by week: 27 Oct 96.9%, 3 Nov no takes, this week 98.9%',
+    );
+  });
+
+  it('the weeks say in one line how the score moved, and are named by the day they began', () => {
+    expect(weekLabel(TODAY, true)).toBe('This week');
+    expect(weekLabel('2026-11-09', false)).toBe('3 Nov');
+    const w = (score: number | null) => ({ score });
+    expect(weeksTakeaway([w(null), w(0.969), w(null), w(0.98), w(0.989)])).toBe('Up from 96.9% 3 weeks ago');
+    expect(weeksTakeaway([w(0.991), w(0.98)])).toBe('Down from 99.1% last week');
+    expect(weeksTakeaway([w(0.98), w(null), w(0.9805)])).toBe('About the same as 2 weeks ago');
+    expect(weeksTakeaway([w(null), w(0.98)])).toBeNull();
+    // The last `max` weeks, from the first of them with takes, at least two.
+    expect(weeksToDraw([w(null), w(null), w(0.9), w(null), w(0.95)], 8)).toHaveLength(3);
+    expect(weeksToDraw([w(0.9), w(0.91), w(0.92), w(0.93), w(0.94)], 4)).toHaveLength(4);
+    expect(weeksToDraw([w(0.9), w(null), w(null), w(0.93), w(0.94)], 4)).toHaveLength(2);
+    expect(weeksToDraw([w(null), w(null), w(null), w(0.94)], 8)).toHaveLength(2);
+  });
+
+  it('the figure gives only the takes once the weeks say how it moved', () => {
+    expect(scoreLine({ takes: 14, score: 0.986, earlierScore: 0.972 }, 'in 30 days', false)).toBe('14 takes');
   });
 });

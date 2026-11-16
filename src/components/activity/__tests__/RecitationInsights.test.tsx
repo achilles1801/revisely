@@ -2,6 +2,7 @@
 // keep slipping with their words on their highlights, the similar ayahs, the quiet line, Smart Tracking on and off,
 // Weak spots naming words Recite still marks, and each row opening the reader at its ayahs.
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -97,8 +98,12 @@ describe('Insights: Recitation (RINS-2)', () => {
     expect(section).toContain('Recitation');
     expect(section).toContain('Your takes with Mark mistakes in 30 days');
     // Five takes in the range (the one 30 days ago is the window before).
-    expect(text('insights-recitation-figure')).toMatch(/^\d+\.\d% \| 5 takes · up from 97\.0%$/);
-    expect(screen.getByTestId('insights-recitation-weeks').props.accessibilityLabel).toBe('Score by week: no takes, no takes, no takes, 97.0%, no takes, no takes, 98.0%, this week 98.3%');
+    // The weeks are drawn, so the figure gives the takes and the weeks' line says how it moved.
+    expect(text('insights-recitation-figure')).toMatch(/^\d+\.\d% \| 5 takes$/);
+    // Jest renders at font scale 2: four weeks at most, from the first of them with takes. A bar a week, its score
+    // over it and the week under it, this week last.
+    expect(text('insights-recitation-weeks-takeaway')).toBe('Up from 98.0% last week');
+    expect(text('insights-recitation-weeks')).toBe('Up from 98.0% last week | 98.0% | 98.3% | 3 Nov | This week');
     // Al-Kahf 22–23: a wrong word and a harakat slip still marked; Not clear never.
     expect(text('insights-recitation-slip-18-22')).toContain('Al-Kahf, ayahs 22–23 | 2 words still marked · wrong in 3 of 4 takes');
     expect(text('insights-recitation-slip-2-48')).toContain('Al-Baqarah, ayah 48 | 1 word still marked · wrong in 2 of 2 takes');
@@ -135,8 +140,10 @@ describe('Insights: Recitation (RINS-2)', () => {
   it('[RINS-2] the words still marked show on their highlights, in the page’s colours', async () => {
     await open(data());
     const row = screen.getByTestId('insights-recitation-slip-18-22');
-    const chips = within(row).getAllByText(/[؀-ۿ]/, { includeHiddenElements: true });
+    const chips = within(row).getAllByText(/[\u0600-\u06FF]/, { includeHiddenElements: true });
     expect(chips.map((c) => c.props.children)).toEqual([words.uthmani(w22), words.uthmani(w23)]);
+    // No fixed line height (it cut the harakat off): the font's own ascent and descent.
+    for (const c of chips) expect(StyleSheet.flatten(c.props.style).lineHeight).toBeUndefined();
   });
 
   it('[RINS-2] nothing shows for an account that doesn’t recite', async () => {

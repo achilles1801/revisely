@@ -1,7 +1,8 @@
 // What Insights' Recitation section says (pure; Revisely Dev, RINS-2): kinds in words, surahs and ayahs first, days as
 // people say them. Words and similar ayahs come before harakat, and "Not clear" is never counted (Majd, Nov 14 2026).
 
-import { formatNumber, weekdayName } from '../../i18n';
+import { dayMonth, formatNumber, weekdayName } from '../../i18n';
+import { shiftDay } from '../journal';
 import { ayahKey } from '../ayahKeys';
 import { describeAyahs, NBSP, surahName } from '../passages';
 import { daysSince } from '../recency';
@@ -34,11 +35,14 @@ export function passageName(sura: number, from: number, to: number): string {
   return describeAyahs(keys, { juz: false });
 }
 
-/** The figure's words: "14 takes · up from 97.2%", "3 takes", or none in the range. */
-export function scoreLine(ins: Pick<RecitationInsights, 'takes' | 'score' | 'earlierScore'>, inWords: string): string {
+/**
+ * The figure's words: "14 takes · up from 97.2%", "3 takes", or none in the range. With the weeks drawn under it
+ * (`trend` false), only the takes: the weeks' own line says how it moved, so there's one comparison, not two.
+ */
+export function scoreLine(ins: Pick<RecitationInsights, 'takes' | 'score' | 'earlierScore'>, inWords: string, trend = true): string {
   if (ins.takes === 0) return `No takes ${inWords}`;
   const takes = count(ins.takes, 'take');
-  if (ins.earlierScore === null || ins.score === null) return takes;
+  if (!trend || ins.earlierScore === null || ins.score === null) return takes;
   const now = formatAccuracy(ins.score);
   const then = formatAccuracy(ins.earlierScore);
   if (now === then) return `${takes} · the same as before`;
@@ -109,11 +113,46 @@ export function strongNote(p: SlippingPassage): string {
   return `Rated strong · wrong in ${count(p.wrong, 'take')}`;
 }
 
-/** The weeks' scores for a screen reader: "Score by week: 96.9%, no takes, …, this week 98.9%". */
-export function weeksSpoken(weeks: readonly { score: number | null }[]): string {
+/** The weeks for a screen reader: "Score by week: 2 Nov 96.9%, 9 Nov no takes, this week 98.9%". */
+export function weeksSpoken(weeks: readonly { to: string; score: number | null }[]): string {
   const said = weeks.map((w, i) => {
     const v = w.score === null ? 'no takes' : formatAccuracy(w.score);
-    return i === weeks.length - 1 ? `this week ${v}` : v;
+    const last = i === weeks.length - 1;
+    return `${last ? 'this week' : weekLabel(w.to, false)} ${v}`;
   });
   return `Score by week: ${said.join(', ')}`;
+}
+
+/** A week under its bar: "This week", or the day it began ("2 Nov"). */
+export function weekLabel(to: string, last: boolean): string {
+  if (last) return 'This week';
+  return dayMonth(new Date(`${shiftDay(to, -6)}T12:00:00`), { month: 'short' });
+}
+
+/** "3 weeks ago", "last week". */
+const weeksAgo = (n: number) => (n === 1 ? 'last week' : `${n} weeks ago`);
+
+/**
+ * The weeks drawn, in one line above them (Majd, Nov 16 2026: the bare line "isn't intuitive"): the latest week with
+ * takes against the first, "Up from 96.9% 3 weeks ago", "Down from 99.1% last week", "About the same as 4 weeks ago".
+ * Null with fewer than two weeks that had takes.
+ */
+export function weeksTakeaway(weeks: readonly { score: number | null }[]): string | null {
+  const lit = weeks.map((w, i) => ({ s: w.score, i })).filter((w): w is { s: number; i: number } => w.s !== null);
+  if (lit.length < 2) return null;
+  const first = lit[0];
+  const last = lit[lit.length - 1];
+  const ago = weeksAgo(last.i - first.i);
+  const a = formatAccuracy(first.s);
+  const b = formatAccuracy(last.s);
+  // Within a tenth of a point: no direction worth naming.
+  if (Math.abs(last.s - first.s) < 0.001 || a === b) return `About the same as ${ago}`;
+  return `${last.s > first.s ? 'Up' : 'Down'} from ${a} ${ago}`;
+}
+
+/** The weeks to draw: the last `max`, from the first of them with takes to this week (at least the last two). */
+export function weeksToDraw<T extends { score: number | null }>(weeks: readonly T[], max: number): T[] {
+  let shown = weeks.slice(Math.max(0, weeks.length - max));
+  while (shown.length > 2 && shown[0].score === null) shown = shown.slice(1);
+  return shown;
 }
