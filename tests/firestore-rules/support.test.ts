@@ -97,19 +97,28 @@ describe('Premium and the support program', () => {
     }
   });
 
-  it('recitation clips, their audio and their labels (the console’s /label page) are closed to everyone, staff included', async () => {
+  it('recitation clips, their audio and their labels (the console’s /label page) are closed to everyone, staff and labellers included', async () => {
     const audio = new Uint8Array([0, 1, 2, 3]);
     await env.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(doc(ctx.firestore(), 'reciteLabelClips/c1'), { batch: 'test', status: 'open', marks: '[]' });
+      await setDoc(doc(ctx.firestore(), 'reciteLabelClips/c1/labels/staff'), { by: { uid: 'staff' }, marks: {} });
       await uploadBytes(ref(ctx.storage(), 'recite-labels/test/c1.m4a'), audio, { contentType: 'audio/mp4' });
     });
-    const people = [env.authenticatedContext('alice'), env.authenticatedContext('staff', { role: 'owner', admin: true }), env.unauthenticatedContext()];
+    const people = [
+      env.authenticatedContext('alice'),
+      env.authenticatedContext('staff', { role: 'owner', admin: true }),
+      env.authenticatedContext('teacher', { role: 'labeller' }),
+      env.unauthenticatedContext(),
+    ];
     for (const who of people) {
       const db = who.firestore();
       await assertFails(getDoc(doc(db, 'reciteLabelClips/c1')));
       await assertFails(getDocs(collection(db, 'reciteLabelClips')));
       await assertFails(setDoc(doc(db, 'reciteLabelClips/c2'), { batch: 'test', status: 'open' }));
       await assertFails(updateDoc(doc(db, 'reciteLabelClips/c1'), { status: 'done' }));
+      // A labeller's own label too: labels go through the console only, which checks and logs them.
+      await assertFails(getDoc(doc(db, 'reciteLabelClips/c1/labels/staff')));
+      await assertFails(setDoc(doc(db, 'reciteLabelClips/c1/labels/teacher'), { by: { uid: 'teacher' }, marks: {} }));
       await assertFails(getBytes(ref(who.storage(), 'recite-labels/test/c1.m4a')));
       await assertFails(uploadBytes(ref(who.storage(), 'recite-labels/test/c2.m4a'), audio, { contentType: 'audio/mp4' }));
     }

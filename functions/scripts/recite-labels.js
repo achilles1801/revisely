@@ -13,6 +13,7 @@
  *   node scripts/recite-labels.js add clips.jsonl --batch bench-v0-a [--dry] [--replace]
  *   node scripts/recite-labels.js status
  *   node scripts/recite-labels.js export [--out labels.jsonl] [--batch name] [--all]
+ *   node scripts/recite-labels.js queue --batch name --to teacher@example.com [--share 0.2] [--yes]
  *   node scripts/recite-labels.js remove --batch name [--yes] [--labelled-too]
  *
  * `add` reads one clip per line:
@@ -25,9 +26,13 @@
  *    "order": 12}                                  // optional: lower comes first (default: the line number)
  * Instead of "w", "from": [surah, ayah] and "to": [surah, ayah] take whole ayahs.
  *
- * `export` writes one labelled clip per line: the clip (no audio), each mark with `verdict` (yes: a mistake; no: not
- * one; unsure: can't tell), `missed` (words the checker didn't mark, as the labeller heard them: word, skipped, added,
- * harakat, unclear), `skip` (the whole clip skipped, and why), and when and how long.
+ * `export` writes one line per label (two labellers on a clip are two lines, told apart by `by`, with `role`): the clip
+ * (no audio), each mark with `verdict` (yes: a mistake; no: not one; unsure: can't tell), `missed` (words the checker
+ * didn't mark, as the labeller heard them: word, skipped, added, harakat, letter, unclear), `clip` (fine, mistakes or
+ * unusable), `skip` (why it is unusable), and when and how long.
+ *
+ * A clip is labelled once by default, by whoever reaches it first. `queue` sends a share of a batch to a labeller as well
+ * (one clip in five by default, spread through the batch), so some clips get two labels to compare.
  */
 const fs = require('fs');
 const os = require('os');
@@ -36,6 +41,7 @@ const { execFileSync } = require('child_process');
 const admin = require('firebase-admin');
 
 const CLIPS = 'reciteLabelClips';
+const LABELS = 'labels';
 const AUDIO_PREFIX = 'recite-labels/';
 const SOURCE_KINDS = ['licensed', 'own', 'permission'];
 const MARK_KINDS = ['word', 'skipped', 'added', 'harakat', 'letter', 'tajweed'];
@@ -215,21 +221,46 @@ async function add(file, opts) {
   console.log(`✓ Added ${added} clips to ${batch}.`);
 }
 
+/** Every label, grouped by clip id: [{ uid, ...label }]. */
+async function labelsByClip() {
+  const snap = await db.collectionGroup(LABELS).get();
+  const out = new Map();
+  for (const d of snap.docs) {
+    const clip = d.ref.parent.parent;
+    if (!clip || clip.parent.id !== CLIPS) continue;
+    const l = d.data();
+    const list = out.get(clip.id) || [];
+    list.push({ uid: d.id, ...l, at: l.at && l.at.toMillis ? l.at.toMillis() : l.at });
+    out.set(clip.id, list);
+  }
+  return out;
+}
+
 async function status() {
-  const snap = await db.collection(CLIPS).select('batch', 'status', 'answers', 'label.ms').get();
+  const snap = await db.collection(CLIPS).select('batch', 'status', 'queue', 'labelledBy').get();
+  const labels = await labelsByClip();
   const by = new Map();
   for (const d of snap.docs) {
     const b = d.get('batch');
-    const row = by.get(b) || { open: 0, done: 0, skipped: 0, answers: 0, ms: 0 };
+    const row = by.get(b) || { open: 0, done: 0, skipped: 0, labels: 0, twice: 0, queued: 0, answers: 0, ms: 0 };
     row[d.get('status')] = (row[d.get('status')] || 0) + 1;
-    row.answers += d.get('answers') || 0;
-    row.ms += d.get('label.ms') || 0;
+    const ls = labels.get(d.id) || [];
+    row.labels += ls.length;
+    if (ls.length > 1) row.twice += 1;
+    row.queued += (d.get('queue') || []).length;
+    for (const l of ls) {
+      row.answers += l.answers || 0;
+      row.ms += l.ms || 0;
+    }
     by.set(b, row);
   }
   if (!by.size) return console.log('No clips yet.');
   for (const [b, r] of by) {
     const rate = r.ms ? Math.round(r.answers / (r.ms / 3_600_000)) : 0;
-    console.log(`${b}: ${r.open} to label, ${r.done} labelled, ${r.skipped} skipped · ${r.answers} answers${rate ? `, ${rate} an hour` : ''}`);
+    console.log(
+      `${b}: ${r.open} to label, ${r.done} labelled, ${r.skipped} unusable · ${r.labels} labels (${r.twice} clips by two people, ` +
+        `${r.queued} waiting for a second) · ${r.answers} answers${rate ? `, ${rate} an hour` : ''}`,
+    );
   }
 }
 
@@ -237,13 +268,14 @@ async function exportLabels(opts) {
   let q = db.collection(CLIPS);
   if (opts.batch) q = q.where('batch', '==', opts.batch);
   const snap = await q.get();
+  const labels = await labelsByClip();
   const out = opts.out ? fs.createWriteStream(opts.out) : process.stdout;
   let n = 0;
   for (const d of snap.docs) {
     const c = d.data();
-    if (!c.label && !opts.all) continue;
-    const l = c.label || null;
-    const row = {
+    const ls = labels.get(d.id) || [];
+    if (!ls.length && !opts.all) continue;
+    const base = {
       id: d.id,
       batch: c.batch,
       source: c.source,
@@ -252,32 +284,56 @@ async function exportLabels(opts) {
       words: c.words,
       times: (c.times || []).map((t) => [t.w, t.a, t.b]),
       status: c.status,
-      marks: JSON.parse(c.marks).map((m) => ({ ...m, verdict: l ? (l.marks[m.id] ?? null) : null })),
-      missed: l ? Object.entries(l.words).map(([w, label]) => ({ w: +w, label })).sort((a, b) => a.w - b.w) : [],
-      skip: l?.skip ?? null,
-      labelledAt: l?.at ?? null,
-      ms: l?.ms ?? null,
-      by: l?.by.uid ?? null,
     };
-    out.write(JSON.stringify(row) + '\n');
-    n++;
+    // One line per label: two labellers on a clip are two lines, told apart by `by`.
+    for (const l of ls.length ? ls : [null]) {
+      const row = {
+        ...base,
+        marks: JSON.parse(c.marks).map((m) => ({ ...m, verdict: l ? (l.marks[m.id] ?? null) : null })),
+        missed: l ? Object.entries(l.words).map(([w, label]) => ({ w: +w, label })).sort((a, b) => a.w - b.w) : [],
+        clip: l?.clip ?? null,
+        skip: l?.skip ?? null,
+        labelledAt: l?.at ?? null,
+        ms: l?.ms ?? null,
+        by: l?.uid ?? null,
+        role: l?.by?.role ?? null,
+      };
+      out.write(JSON.stringify(row) + '\n');
+      n++;
+    }
   }
   if (opts.out) {
     out.end();
-    console.error(`✓ ${n} clips to ${opts.out}`);
+    console.error(`✓ ${n} lines to ${opts.out}`);
   }
+}
+
+/** Sends some of a batch's clips to a labeller as well (a second label on purpose), spread through the batch. */
+async function queue(opts) {
+  if (!opts.batch || !opts.to) throw new Error('queue --batch <name> --to <email|uid> [--share 0.2] [--yes]');
+  const user = opts.to.includes('@') ? await admin.auth().getUserByEmail(opts.to) : await admin.auth().getUser(opts.to);
+  const share = opts.share != null ? Number(opts.share) : 0.2;
+  if (!(share > 0 && share <= 1)) throw new Error('--share is a fraction: 0.2 sends one clip in five');
+  const snap = await db.collection(CLIPS).where('batch', '==', opts.batch).get();
+  const docs = snap.docs.sort((a, b) => a.get('order') - b.get('order'));
+  const every = Math.max(1, Math.round(1 / share));
+  const pick = docs.filter((d, i) => i % every === 0).filter((d) => !(d.get('labelledBy') || []).includes(user.uid) && !(d.get('queue') || []).includes(user.uid));
+  console.log(`${opts.batch}: ${pick.length} of ${docs.length} clips to send to ${user.email || user.uid} as well`);
+  if (!opts.yes) return console.log('Dry run: --yes sends them.');
+  for (const d of pick) await d.ref.update({ queue: admin.firestore.FieldValue.arrayUnion(user.uid) });
+  console.log(`✓ Sent ${pick.length}. They come first on that labeller's page.`);
 }
 
 async function remove(opts) {
   if (!opts.batch) throw new Error('--batch <name>: which batch to remove');
   const snap = await db.collection(CLIPS).where('batch', '==', opts.batch).get();
-  const docs = snap.docs.filter((d) => opts.labelledToo || !d.get('label'));
+  const docs = snap.docs.filter((d) => opts.labelledToo || !(d.get('labelledBy') || []).length);
   const kept = snap.size - docs.length;
-  console.log(`${opts.batch}: ${docs.length} clips to remove${kept ? ` (${kept} labelled ones kept; --labelled-too removes them too)` : ''}`);
+  console.log(`${opts.batch}: ${docs.length} clips to remove${kept ? ` (${kept} labelled ones kept; --labelled-too removes them and their labels too)` : ''}`);
   if (!opts.yes) return console.log('Dry run: --yes removes them and their audio.');
   for (const d of docs) {
     await bucket.file(d.get('audio.path')).delete({ ignoreNotFound: true });
-    await d.ref.delete();
+    await db.recursiveDelete(d.ref);
   }
   console.log(`✓ Removed ${docs.length}.`);
 }
@@ -288,7 +344,7 @@ function parse(argv) {
     const a = argv[i];
     if (a === '--dry' || a === '--replace' || a === '--all' || a === '--yes') opts[a.slice(2)] = true;
     else if (a === '--labelled-too') opts.labelledToo = true;
-    else if (a === '--batch' || a === '--out') opts[a.slice(2)] = argv[++i];
+    else if (a === '--batch' || a === '--out' || a === '--to' || a === '--share') opts[a.slice(2)] = argv[++i];
     else opts._.push(a);
   }
   return opts;
@@ -301,7 +357,8 @@ async function main() {
   if (cmd === 'status') return status();
   if (cmd === 'export') return exportLabels(opts);
   if (cmd === 'remove') return remove(opts);
-  console.error('Usage: node scripts/recite-labels.js add <clips.jsonl> --batch <name> [--dry] [--replace] | status | export [--out f] [--batch b] [--all] | remove --batch <name> [--yes] [--labelled-too]');
+  if (cmd === 'queue') return queue(opts);
+  console.error('Usage: node scripts/recite-labels.js add <clips.jsonl> --batch <name> [--dry] [--replace] | status | export [--out f] [--batch b] [--all] | queue --batch <name> --to <email|uid> [--share 0.2] [--yes] | remove --batch <name> [--yes] [--labelled-too]');
   process.exit(1);
 }
 

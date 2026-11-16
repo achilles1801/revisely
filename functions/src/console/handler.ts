@@ -14,8 +14,9 @@
  *   staff.set        give, change or take a role (by email or id)     roles.manage
  *   labels.next      the next recitation clip to label, with its audio  recite.label (labels.ts)
  *   labels.get       one clip again (going back)                      recite.label
- *   labels.save      a clip's label                                   recite.label
- *   labels.stats     clips left and done, today's answers             recite.label
+ *   labels.save      the caller's label on a clip (+ an audit entry)  recite.label
+ *   labels.stats     clips labelled of all, sent to me, today's answers  recite.label
+ *   audit.labels     every saved label, with each tap, newest first   audit.read
  *
  * Every action but `me` needs App Check, and Open Door's need a project with the program (SUPPORT_PAGES), so the
  * production project answers nothing about applications. Nothing here logs an applicant's answers or a note.
@@ -36,7 +37,7 @@ import {
 } from '../support/review';
 import { ConsoleError, GRANTS, PERMISSIONS, Permission, ROLES, ROLE_NAMES, Role, StaffCaller, isRole, permissionsOf, requirePermission } from './roles';
 import { RoleActor, RoleChange, StaffMember, roleChangeRefusal, rolesPage } from './staff';
-import { LabelDeps, handleLabels } from './labels';
+import { LabelDeps, handleLabels, labelAuditPage } from './labels';
 
 /** Accounts nobody may decide on from the console (the script refuses them too). */
 export const PROTECTED_EMAILS = ['applereview@revisely.app'];
@@ -259,6 +260,11 @@ export async function handleAdminConsole(
       const page = await decisionsPage(deps.db, { cursor: data.cursor, limit: typeof data.limit === 'number' ? data.limit : undefined });
       const accounts = await deps.accounts(page.rows.map((d) => d.uid));
       return { rows: page.rows.map((d) => ({ ...d, email: accounts.get(d.uid)?.email ?? null, exists: accounts.get(d.uid)?.exists ?? false })), next: page.next };
+    }
+
+    case 'audit.labels': {
+      requirePermission(caller, 'audit.read');
+      return labelAuditPage(deps.db, { cursor: data.cursor, limit: typeof data.limit === 'number' ? data.limit : undefined });
     }
 
     case 'audit.roles': {

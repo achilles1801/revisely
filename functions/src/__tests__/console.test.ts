@@ -1,6 +1,6 @@
 import type { Firestore } from 'firebase-admin/firestore';
 import { ConsoleDeps, handleAdminConsole } from '../console/handler';
-import { LabelDeps, checkLabel } from '../console/labels';
+import { LabelDeps, checkActions, checkLabel } from '../console/labels';
 import { ConsoleError, GRANTS, PERMISSIONS, ROLES, Role, StaffCaller, can, claimsWithRole, permissionsOf, requirePermission, roleOf } from '../console/roles';
 
 describe('console roles', () => {
@@ -280,11 +280,17 @@ describe('adminConsole: recitation labels', () => {
     return 'ok';
   }
 
-  it('is for owners and admins only, where the page is (revisely-dev), and needs App Check', async () => {
+  it('is for owners, admins and labellers, where the page is (revisely-dev), and needs App Check', async () => {
     expect(can('owner', 'recite.label')).toBe(true);
     expect(can('admin', 'recite.label')).toBe(true);
+    expect(can('labeller', 'recite.label')).toBe(true);
     expect(can('reviewer', 'recite.label')).toBe(false);
     expect(can('dev', 'recite.label')).toBe(false);
+    // A labeller may do nothing else in the console.
+    expect(GRANTS.labeller).toEqual(['recite.label']);
+    for (const data of [{ action: 'od.summary' }, { action: 'od.queue' }, { action: 'audit.labels' }, { action: 'audit.roles' }, { action: 'staff.list' }]) {
+      expect(await code(handleAdminConsole(as('labeller'), data, true, deps()))).toBe('permission-denied');
+    }
     const actions = [{ action: 'labels.next' }, { action: 'labels.get', id: 'c1' }, { action: 'labels.save', id: 'c1', marks: {} }, { action: 'labels.stats' }];
     for (const data of actions) {
       for (const role of [null, 'dev', 'reviewer'] as const) {
@@ -302,6 +308,7 @@ describe('adminConsole: recitation labels', () => {
     expect(await handleAdminConsole(as('owner'), { action: 'me' }, false, deps())).toMatchObject({ labels: true });
     expect(await handleAdminConsole(as('admin'), { action: 'me' }, false, deps())).toMatchObject({ labels: true });
     expect(await handleAdminConsole(as('reviewer'), { action: 'me' }, false, deps())).toMatchObject({ labels: false });
+    expect(await handleAdminConsole(as('labeller'), { action: 'me' }, false, deps())).toMatchObject({ labels: true, roleName: 'Labeller', permissions: ['recite.label'], openDoor: false, metricsEnvs: [] });
     expect(await handleAdminConsole(as('owner'), { action: 'me' }, false, deps({ labels: labels({ open: false }) }))).toMatchObject({ labels: false });
     expect(await handleAdminConsole(as('owner'), { action: 'me' }, false, deps({ labels: undefined }))).toMatchObject({ labels: false });
   });
@@ -314,8 +321,10 @@ describe('adminConsole: recitation labels', () => {
       ],
       words: [10, 11, 12].map((w) => ({ w, t: 'كلمة', s: 1, a: 1 })),
     };
-    const ok = { marks: { '10:word:': 'yes', '12:harakat:': 'no' }, words: { 11: 'skipped' } };
-    expect(checkLabel(clip, ok)).toEqual({ marks: { '10:word:': 'yes', '12:harakat:': 'no' }, words: { 11: 'skipped' } });
+    const ok = { marks: { '10:word:': 'yes', '12:harakat:': 'no' }, words: { 11: 'letter' } };
+    expect(checkLabel(clip, ok)).toEqual({ marks: { '10:word:': 'yes', '12:harakat:': 'no' }, words: { 11: 'letter' }, clip: 'mistakes', answers: 3, actions: [] });
+    // Every mark "not a mistake" and nothing missed: the clip is fine.
+    expect(checkLabel(clip, { marks: { '10:word:': 'no', '12:harakat:': 'unsure' } })).toMatchObject({ clip: 'fine', answers: 2 });
     expect(() => checkLabel(clip, { marks: { '10:word:': 'yes' } })).toThrow('One mark has no answer yet.');
     expect(() => checkLabel(clip, { marks: {} })).toThrow('2 marks have no answer yet.');
     expect(() => checkLabel(clip, { ...ok, marks: { ...ok.marks, '99:word:': 'yes' } })).toThrow('A mark isn’t on this clip.');
@@ -323,7 +332,27 @@ describe('adminConsole: recitation labels', () => {
     expect(() => checkLabel(clip, { ...ok, words: { 13: 'word' } })).toThrow('A word isn’t in this clip.');
     expect(() => checkLabel(clip, { ...ok, words: { 11: 'fine' } })).toThrow('A word’s label isn’t one the page offers.');
     // A skipped clip may leave marks unanswered; the reason must be a known one.
-    expect(checkLabel(clip, { marks: {}, skip: 'audio' })).toEqual({ marks: {}, words: {}, skip: 'audio' });
+    expect(checkLabel(clip, { marks: {}, skip: 'audio' })).toEqual({ marks: {}, words: {}, skip: 'audio', clip: 'unusable', answers: 0, actions: [] });
     expect(() => checkLabel(clip, { marks: {}, skip: 'bored' })).toThrow('That isn’t a reason to skip.');
+  });
+
+  it('keeps the taps the audit log shows, and only those', () => {
+    expect(
+      checkActions([
+        { t: 1200.4, a: 'mark', id: '10:word:', v: 'yes', was: null },
+        { t: 3000, a: 'word', w: 11, v: 'skipped', was: 'word' },
+        { t: 3500, a: 'undo' },
+        { t: 4000, a: 'delete-everything', id: 'x' },
+        { t: 'soon', a: 'fine', extra: { big: true } },
+        'nonsense',
+      ]),
+    ).toEqual([
+      { t: 1200, a: 'mark', id: '10:word:', v: 'yes', was: null },
+      { t: 3000, a: 'word', w: 11, v: 'skipped', was: 'word' },
+      { t: 3500, a: 'undo' },
+      { t: 0, a: 'fine' },
+    ]);
+    expect(checkActions(Array.from({ length: 500 }, () => ({ t: 1, a: 'undo' })))).toHaveLength(300);
+    expect(checkActions('x')).toEqual([]);
   });
 });

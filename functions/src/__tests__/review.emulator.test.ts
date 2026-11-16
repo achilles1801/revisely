@@ -200,9 +200,9 @@ const BY: Reviewer = { uid: 'staff1', email: 'owner@example.com', role: 'owner',
     expect(after.rows[0]).toMatchObject({ uid: 'c1', last: { by: 'rev@example.com' } });
   });
 
-  it('recitation labels end to end: the queue in order, held clips skipped, a label stored, the counts', async () => {
+  it('recitation labels end to end: the queue, a label per labeller, a second label on purpose, the audit trail, the counts', async () => {
     // As functions/scripts/recite-labels.js writes them (an invented test clip; no real recording).
-    const clip = (id: string, order: number, marks: { id: string; w: number; kind: string }[]) =>
+    const clip = (id: string, order: number, marks: { id: string; w: number; kind: string }[], extra: Record<string, unknown> = {}) =>
       db.doc(`reciteLabelClips/${id}`).set({
         batch: 'test',
         order,
@@ -213,16 +213,21 @@ const BY: Reviewer = { uid: 'staff1', email: 'owner@example.com', role: 'owner',
         times: [{ w: 100, a: 0.2, b: 0.9 }],
         status: 'open',
         createdAt: NOW,
+        ...extra,
       });
     await clip('b', 2, []);
     await clip('a', 1, [{ id: '101:word:', w: 101, kind: 'word' }]);
     await clip('c', 3, []);
     const read: string[] = [];
+    // A second apart per save, so the audit log's order is the order they happened.
+    let clock = NOW;
     const deps: ConsoleDeps = {
       db,
       accounts: async () => new Map(),
       accountByEmail: async () => null,
       hasPlan: async () => false,
+      staff: async () => [],
+      setRole: async () => null,
       programOpen: true,
       project: PROJECT,
       now: () => NOW,
@@ -234,45 +239,73 @@ const BY: Reviewer = { uid: 'staff1', email: 'owner@example.com', role: 'owner',
           read.push(path);
           return Buffer.from('audio');
         },
-        now: () => NOW,
+        now: () => (clock += 1000),
       },
     };
-    const owner = { uid: 'staff1', email: 'owner@example.com', role: 'owner' as const };
-    type Next = { clip: { id: string; marks: { id: string }[]; times: number[][] } | null; audio?: { type: string; data: string } };
-    const first = (await handleAdminConsole(owner, { action: 'labels.next' }, true, deps)) as Next;
+    const majd = { uid: 'staff1', email: 'owner@example.com', role: 'owner' as const };
+    const teacher = { uid: 'teacher1', email: 'teacher@example.com', role: 'labeller' as const };
+    type Next = { clip: { id: string; marks: { id: string }[]; times: number[][]; label: { marks: Record<string, string> } | null } | null; audio?: { type: string; data: string } };
+    const next = async (who: typeof majd | typeof teacher, held: string[] = []) =>
+      ((await handleAdminConsole(who, { action: 'labels.next', held }, true, deps)) as Next).clip?.id ?? null;
+
+    const first = (await handleAdminConsole(majd, { action: 'labels.next' }, true, deps)) as Next;
     expect(first.clip?.id).toBe('a');
     expect(first.clip?.marks.map((m) => m.id)).toEqual(['101:word:']);
     expect(first.clip?.times).toEqual([[100, 0.2, 0.9]]);
+    expect(first.clip?.label).toBeNull();
     expect(first.audio).toEqual({ type: 'audio/mp4', data: Buffer.from('audio').toString('base64') });
     expect(read).toEqual(['recite-labels/test/a.m4a']);
     // The page holds `a` (on screen) while it fetches the next.
-    expect(((await handleAdminConsole(owner, { action: 'labels.next', held: ['a'] }, true, deps)) as Next).clip?.id).toBe('b');
+    expect(await next(majd, ['a'])).toBe('b');
 
-    await expect(handleAdminConsole(owner, { action: 'labels.save', id: 'a', marks: {} }, true, deps)).rejects.toThrow('One mark has no answer yet.');
-    expect(await handleAdminConsole(owner, { action: 'labels.save', id: 'a', marks: { '101:word:': 'yes' }, words: { 102: 'skipped' }, ms: 9000 }, true, deps)).toEqual({ saved: true, status: 'done' });
-    expect(await handleAdminConsole(owner, { action: 'labels.save', id: 'b', skip: 'audio', ms: 2000 }, true, deps)).toEqual({ saved: true, status: 'skipped' });
-    const stored = (await db.doc('reciteLabelClips/a').get()).data()!;
-    expect(stored).toMatchObject({
-      status: 'done',
-      labelledAt: NOW,
-      answers: 2,
-      label: { by: { uid: 'staff1', email: 'owner@example.com' }, at: NOW, ms: 9000, marks: { '101:word:': 'yes' }, words: { '102': 'skipped' }, n: 1 },
-    });
-    expect(((await handleAdminConsole(owner, { action: 'labels.next' }, true, deps)) as Next).clip?.id).toBe('c');
-    expect(await handleAdminConsole(owner, { action: 'labels.stats', since: NOW - DAY }, true, deps)).toEqual({
-      open: 1,
-      done: 1,
-      skipped: 1,
-      today: { clips: 2, answers: 2, ms: 11000 },
-    });
-    // Going back to a clip shows its label, and saving again replaces it.
-    const again = (await handleAdminConsole(owner, { action: 'labels.get', id: 'a' }, true, deps)) as { clip: { label: { marks: Record<string, string> } } };
-    expect(again.clip.label.marks).toEqual({ '101:word:': 'yes' });
-    await handleAdminConsole(owner, { action: 'labels.save', id: 'a', marks: { '101:word:': 'no' }, ms: 1000 }, true, deps);
-    expect((await db.doc('reciteLabelClips/a').get()).get('label')).toMatchObject({ marks: { '101:word:': 'no' }, words: {}, n: 2 });
-    await handleAdminConsole(owner, { action: 'labels.save', id: 'c', marks: {} }, true, deps);
-    expect(await handleAdminConsole(owner, { action: 'labels.next' }, true, deps)).toEqual({ clip: null });
-    await expect(handleAdminConsole(owner, { action: 'labels.get', id: 'gone' }, true, deps)).rejects.toThrow('That clip is gone.');
+    await expect(handleAdminConsole(majd, { action: 'labels.save', id: 'a', marks: {} }, true, deps)).rejects.toThrow('One mark has no answer yet.');
+    const actions = [
+      { t: 2100, a: 'mark', id: '101:word:', v: 'no', was: null },
+      { t: 2900, a: 'undo' },
+      { t: 3400, a: 'mark', id: '101:word:', v: 'yes', was: null },
+      { t: 5000, a: 'word', w: 102, v: 'skipped', was: null },
+    ];
+    expect(await handleAdminConsole(majd, { action: 'labels.save', id: 'a', marks: { '101:word:': 'yes' }, words: { 102: 'skipped' }, ms: 9000, actions }, true, deps)).toEqual({ saved: true, result: 'mistakes' });
+    expect(await handleAdminConsole(majd, { action: 'labels.save', id: 'b', skip: 'audio', ms: 2000 }, true, deps)).toEqual({ saved: true, result: 'unusable' });
+    const label = (await db.doc('reciteLabelClips/a/labels/staff1').get()).data()!;
+    expect(label).toMatchObject({ by: { uid: 'staff1', email: 'owner@example.com', role: 'owner' }, ms: 9000, marks: { '101:word:': 'yes' }, words: { '102': 'skipped' }, clip: 'mistakes', answers: 2, n: 1, actions });
+    expect((await db.doc('reciteLabelClips/a').get()).data()).toMatchObject({ status: 'done', labelledBy: ['staff1'], labelledAt: NOW + 1000 });
+
+    // Labelled clips leave the pool: the teacher gets the next unlabelled one. Then `a` is sent to the teacher as well.
+    expect(await next(teacher)).toBe('c');
+    await db.doc('reciteLabelClips/a').update({ queue: ['teacher1'] });
+    expect(await next(teacher)).toBe('a');
+    expect(await next(majd)).toBe('c');
+    expect(await handleAdminConsole(teacher, { action: 'labels.stats', since: NOW - DAY }, true, deps)).toEqual({ total: 3, labelled: 2, open: 1, queued: 1, today: { clips: 0, answers: 0, ms: 0 } });
+    await handleAdminConsole(teacher, { action: 'labels.save', id: 'a', marks: { '101:word:': 'no' }, ms: 4000 }, true, deps);
+    expect((await db.doc('reciteLabelClips/a').get()).data()).toMatchObject({ status: 'done', labelledBy: ['staff1', 'teacher1'], queue: [] });
+    expect((await db.doc('reciteLabelClips/a/labels/teacher1').get()).data()).toMatchObject({ by: { role: 'labeller' }, marks: { '101:word:': 'no' }, clip: 'fine' });
+    // Majd's label is untouched by the teacher's.
+    expect((await db.doc('reciteLabelClips/a/labels/staff1').get()).get('marks')).toEqual({ '101:word:': 'yes' });
+
+    expect(await handleAdminConsole(majd, { action: 'labels.stats', since: NOW - DAY }, true, deps)).toEqual({ total: 3, labelled: 2, open: 1, queued: 0, today: { clips: 2, answers: 2, ms: 11000 } });
+    // Going back shows the caller's own label, and saving again replaces it.
+    const again = (await handleAdminConsole(majd, { action: 'labels.get', id: 'a' }, true, deps)) as Next;
+    expect(again.clip?.label?.marks).toEqual({ '101:word:': 'yes' });
+    await handleAdminConsole(majd, { action: 'labels.save', id: 'a', marks: { '101:word:': 'unsure' }, ms: 1000 }, true, deps);
+    expect((await db.doc('reciteLabelClips/a/labels/staff1').get()).data()).toMatchObject({ marks: { '101:word:': 'unsure' }, words: {}, n: 2 });
+
+    // The audit log: every save, newest first, with its taps; only for audit.read (not a labeller).
+    const audit = (await handleAdminConsole(majd, { action: 'audit.labels' }, true, deps)) as { rows: { clip: string; by: { uid: string }; result: string; relabel: boolean; actions: unknown[]; missed: unknown[] }[] };
+    expect(audit.rows.map((r) => [r.clip, r.by.uid, r.result, r.relabel])).toEqual([
+      ['a', 'staff1', 'fine', true],
+      ['a', 'teacher1', 'fine', false],
+      ['b', 'staff1', 'unusable', false],
+      ['a', 'staff1', 'mistakes', false],
+    ]);
+    expect(audit.rows[3].actions).toEqual(actions);
+    expect(audit.rows[3].missed).toEqual([{ w: 102, label: 'skipped', text: 'كلمة' }]);
+    await expect(handleAdminConsole(teacher, { action: 'audit.labels' }, true, deps)).rejects.toThrow('Your role doesn’t allow this.');
+
+    await handleAdminConsole(teacher, { action: 'labels.save', id: 'c', marks: {} }, true, deps);
+    expect(await next(majd)).toBeNull();
+    expect(await next(teacher)).toBeNull();
+    await expect(handleAdminConsole(majd, { action: 'labels.get', id: 'gone' }, true, deps)).rejects.toThrow('That clip is gone.');
   });
 
   (process.env.FIREBASE_AUTH_EMULATOR_HOST ? it : it.skip)('role changes keep other claims and go to the audit log', async () => {

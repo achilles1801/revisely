@@ -12,7 +12,7 @@
  * they read (supportDecisions, consoleAudit and the rest) is closed to clients.
  */
 
-export const ROLES = ['owner', 'admin', 'reviewer', 'dev'] as const;
+export const ROLES = ['owner', 'admin', 'reviewer', 'dev', 'labeller'] as const;
 export type Role = (typeof ROLES)[number];
 
 /** Every permission, with what it opens (the page and set-role.js show these words). */
@@ -22,9 +22,9 @@ export const PERMISSIONS = {
   'openDoor.read': 'Open Door: the queue, applicants’ emails and answers',
   'openDoor.decide': 'Approve or decline Open Door applications',
   'openDoor.revoke': 'Take Premium through Open Door back',
-  'audit.read': 'The audit log: every decision and role change',
+  'audit.read': 'The audit log: every decision, role change and recitation label',
   'roles.manage': 'Give and take roles',
-  'recite.label': 'Label recitation clips for the mistake checker (revisely-dev only)',
+  'recite.label': 'Label recitation clips for the mistake checker (revisely-dev only; each label is theirs and logged)',
 } as const;
 export type Permission = keyof typeof PERMISSIONS;
 
@@ -40,9 +40,14 @@ export const GRANTS: Record<Role, readonly Permission[]> = {
   reviewer: ['openDoor.read', 'openDoor.decide'],
   /** Metrics and app health; nobody's answers, conversations or decisions. */
   dev: ['metrics.read'],
+  /**
+   * The labelling page only (Majd, Nov 16 2026: his Quran teacher labels recitations too, "only have permission in that
+   * dashboard with audit trail"). Signs in with their own revisely-dev account; every label is theirs and logged.
+   */
+  labeller: ['recite.label'],
 };
 
-export const ROLE_NAMES: Record<Role, string> = { owner: 'Owner', admin: 'Admin', reviewer: 'Reviewer', dev: 'Developer' };
+export const ROLE_NAMES: Record<Role, string> = { owner: 'Owner', admin: 'Admin', reviewer: 'Reviewer', dev: 'Developer', labeller: 'Labeller' };
 
 export function isRole(value: unknown): value is Role {
   return typeof value === 'string' && (ROLES as readonly string[]).includes(value);

@@ -25,7 +25,7 @@ html, body.lab { margin: 0; height: 100%; overscroll-behavior: none; }
 body.lab { -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; }
 [hidden] { display: none !important; }
 kbd { font-family: var(--mono); font-size: 11px; color: var(--ink-3); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; margin-left: 6px; }
-@media (hover: none) { .lab-actions kbd, .lab-sheet kbd, .lab-again kbd { display: none; } }
+@media (hover: none) { .lab-actions kbd, .lab-sheet kbd, .lab-again kbd, .lab-link kbd { display: none; } }
 
 .lab-app { height: 100dvh; display: flex; flex-direction: column; max-width: 760px; margin: 0 auto; }
 
@@ -55,9 +55,11 @@ kbd { font-family: var(--mono); font-size: 11px; color: var(--ink-3); border: 1p
 .tick.g-red { background: var(--red-firm); }
 .tick.g-amber { background: var(--amber-firm); }
 .tick.g-violet { background: var(--violet-firm); }
-.lab-time { flex: none; font-size: 12px; color: var(--ink-3); min-width: 74px; text-align: right; }
+.lab-time { margin-left: auto; font-size: 12px; color: var(--ink-3); }
+.lab-small { flex: none; min-width: 48px; height: 40px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); font: 500 13px var(--mono); color: var(--ink-2); cursor: pointer; touch-action: manipulation; }
+.lab-small[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
 
-.lab-words { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 14px 14px 24px; font-family: var(--ar); font-size: 30px; line-height: 2.15; text-align: justify; text-align-last: right; word-spacing: 2px; }
+.lab-words { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 14px 14px 24px; font-family: var(--ar); font-size: var(--wsize, 32px); line-height: 2.15; text-align: justify; text-align-last: right; word-spacing: 2px; }
 .wd { font: inherit; line-height: 1.5; border: 0; background: transparent; color: var(--ink); padding: 0 5px; margin: 0 -1px; border-radius: 8px; cursor: pointer; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
 .wd:active { background: var(--line-2); }
 .wd.g-red { background: var(--red-bg); }
@@ -100,7 +102,9 @@ kbd { font-family: var(--mono); font-size: 11px; color: var(--ink-3); border: 1p
 .sw.g-violet { background: var(--violet-firm); }
 .sure { font-size: 11px; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; padding: 2px 7px; border-radius: 999px; background: var(--line-2); color: var(--ink-2); }
 .sure.likely { background: transparent; box-shadow: inset 0 0 0 1px var(--line); color: var(--ink-3); }
-.lab-again { margin-top: 8px; border: 0; background: var(--accent-soft); color: var(--accent); font-weight: 500; font-size: 14px; padding: 8px 12px; border-radius: 999px; cursor: pointer; }
+.lab-card-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 8px; }
+.lab-link { border: 0; background: transparent; color: var(--accent); font-weight: 500; font-size: 14px; padding: 8px 4px; cursor: pointer; }
+.lab-again { border: 0; background: var(--accent-soft); color: var(--accent); font-weight: 500; font-size: 14px; padding: 8px 12px; border-radius: 999px; cursor: pointer; }
 
 .lab-actions { display: grid; gap: 8px; }
 .lab-actions.three { grid-template-columns: 1fr 0.8fr 1fr; }

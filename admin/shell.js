@@ -134,6 +134,12 @@ async function start() {
   $('signOutBtn').hidden = false;
 
   const views = visibleViews();
+  // A labeller (or any role that may only label) has nothing here but the labelling page.
+  if (!views.length) {
+    if (me.labels) location.replace('/label');
+    else fail('Your role has nothing to show in this project.');
+    return;
+  }
   for (const a of $('tabs').querySelectorAll('a[data-view]')) {
     const i = views.indexOf(a.dataset.view);
     a.hidden = i === -1;

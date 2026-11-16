@@ -605,7 +605,7 @@ README has the deploy and the undo); never deploy the root `firebase.json`'s hos
   `/sign-in?next=…` (`shell.js`). Hosting's `cleanUrls` and rewrites serve them.
 - **Roles** (`functions/src/console/roles.ts`, the one permission list): `owner` (everything, roles too), `admin`
   (everything but roles), `reviewer` (Open Door read and decide; no revoke, metrics, Revo conversations or audit),
-  `dev` (metrics only). A custom claim `role`, given on the Staff page or with `cd functions && GOOGLE_APPLICATION_CREDENTIALS=… node
+  `dev` (metrics only), `labeller` (the labelling page only). A custom claim `role`, given on the Staff page or with `cd functions && GOOGLE_APPLICATION_CREDENTIALS=… node
   scripts/set-role.js <email|uid> <role|none>` (`--list`, `--show`, `--roles`; refuses to remove the last owner), each
   change recorded in `consoleAudit` (closed). Who has a role is never in the repository. The old `admin: true` claim
   counts as owner until set-role replaces it (`set-admin.js` now only takes it away). The callables read claims live
@@ -634,21 +634,33 @@ README has the deploy and the undo); never deploy the root `firebase.json`'s hos
   its `/__/auth/handler` is a redirect URI of the project's Web OAuth client and an authorized domain. Phones sign in
   with a full-page redirect there.
 - **Label recitations** (`/label`, `admin/label.*`; adminConsole `labels.*`, `functions/src/console/labels.ts`; permission
-  `recite.label`: owners and admins; revisely-dev only, `LABEL_PROJECTS`). Majd, Nov 15 2026: "if the issue is those
-  recitations don't say what is right or wrong then i can help with that". Its own page, made for a phone held in one
-  hand, and linked from the console's tabs.
-  - **The flow:** one clip at a time, played as it opens, with the passage's words and the checker's marks. Each mark
-    gets Mistake, Not a mistake or Can't tell; tapping a word the checker missed labels it (wrong word, skipped, extra
-    word after it, haraka or letter, not clear). The answers sit under the thumb; the next clip is fetched and decoded
-    while this one is labelled.
+  `recite.label`: owners, admins and **labellers**; revisely-dev only, `LABEL_PROJECTS`). Majd, Nov 15–16 2026: "if the
+  issue is those recitations don't say what is right or wrong then i can help with that … i can even get my quran
+  teacher to help with that". Its own page, made for a phone held in one hand, and linked from the console's tabs.
+  - **The flow:** one clip at a time, played as it opens, with the passage's words (Amiri Quran; Larger and Smaller text
+    in ⋯, kept per device) and the checker's marks. Each mark gets Mistake, Not a mistake or Can't tell (All fine sets
+    the rest to Not a mistake); tapping a word the checker missed labels it (wrong word, skipped, extra word after it,
+    haraka, letter, not clear). Undo, −2 s, 0.75× (lower pitch: Web Audio), Unusable (bad audio, not this passage,
+    another reason). The header says how many clips have a label of all ("124 of 486"), how many wait for this labeller
+    and today's count. The next clip is fetched and decoded while this one is labelled.
+  - **The `labeller` role** opens this page only: every other console call refuses it, and the shell sends it to
+    `/label`. Majd gives it on the Staff page (by exact email, after the person has signed in once, with Google, on the
+    console's sign-in page) and takes it away there; each change goes to the audit log.
+  - **Several labellers:** each label is `reciteLabelClips/{id}/labels/{uid}` (who, role, when, time spent, the answers,
+    the clip as fine, mistakes or unusable, and every tap). A clip is labelled once by default, by whoever reaches it
+    first; `recite-labels.js queue --batch <b> --to <email> [--share 0.2]` sends a share of a batch to someone as well
+    (those come first on their page), so some clips get two labels to compare. The export has one line per label.
+  - **Audit trail:** every save is a `consoleAudit` entry (kind `label`): who, the clip, the result, and each tap in order
+    with what it was before (Audit log → Labels, `audit.read`; never a labeller).
   - **Audio** is Web Audio, with `navigator.audioSession.type = 'playback'` so the ringer switch doesn't mute it. The
     callable sends the clip's audio (AAC, about 6 KB a second) with the clip: nothing in Storage is opened to clients.
   - **Saving:** labels go in the background, one at a time, and wait on the phone (localStorage, per account) until the
     server has them.
-  - **Data:** `reciteLabelClips/{id}` and Storage `recite-labels/<batch>/`, closed to clients (the catch-alls; the rules
-    suite checks both). Index (status, order).
+  - **Data:** `reciteLabelClips/{id}` (+ `labels/{uid}`) and Storage `recite-labels/<batch>/`, closed to clients and to
+    every role (the catch-alls; the rules suite checks them). Indexes (status, order), (queue, order), labels (by.uid, at).
   - **Adding clips and exporting labels:** `cd functions && GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-dev-admin.json node
-    scripts/recite-labels.js add|status|export|remove` (its header has the clip format).
+    scripts/recite-labels.js add|status|export|queue|remove` (its header has the clip format). The lab's format notes:
+    `recite-labels.md` in the shared notes.
   - **What may be added:** only clips a person may listen to: a licensed set whose licence allows it (`licensed`),
     Majd's own recordings (`own`), recordings gathered with the reciter's permission (`permission`). Never the /record
     takes or anyone's Dev takes (`recite-tests/`, the lab's `dev-takes`, `record-raw`, `record-v1`): their consent says

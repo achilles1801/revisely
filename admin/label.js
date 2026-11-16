@@ -19,19 +19,22 @@ const ANSWERS = [
 ];
 /** A word the checker didn't mark. */
 const MISSED = [
-  ['word', 'Wrong word'],
-  ['skipped', 'Skipped'],
-  ['added', 'Extra word after it'],
-  ['harakat', 'Haraka or letter'],
-  ['unclear', 'Not clear'],
+  ['word', 'Wrong word', 'w'],
+  ['skipped', 'Skipped', 's'],
+  ['added', 'Extra word after it', 'a'],
+  ['harakat', 'Haraka', 'h'],
+  ['letter', 'Letter', 'l'],
+  ['unclear', 'Not clear', 'u'],
 ];
-const MISSED_NAME = Object.fromEntries(MISSED);
+const MISSED_NAME = Object.fromEntries(MISSED.map(([v, label]) => [v, label]));
 const KIND_NAME = { word: 'Wrong word', skipped: 'Skipped', added: 'Extra word', harakat: 'Haraka', letter: 'Letter', tajweed: 'Tajweed' };
 const DETAIL_NAME = { lookalike: 'a similar word', sound: 'other sounds', replaced: 'replaced', order: 'out of order', trail: 'after the end', shadda: 'shadda' };
 /** The app's three highlight colours: words, harakat and letters, tajweed. */
 const GROUP = { word: 'red', skipped: 'red', added: 'red', harakat: 'amber', letter: 'amber', tajweed: 'violet' };
 const KIND_ORDER = { skipped: 0, word: 1, harakat: 2, letter: 3, tajweed: 4, added: 5 };
-const MISSED_GROUP = { word: 'red', skipped: 'red', added: 'red', harakat: 'amber', unclear: 'amber' };
+const MISSED_GROUP = { word: 'red', skipped: 'red', added: 'red', harakat: 'amber', letter: 'amber', unclear: 'amber' };
+const TEXT_SIZES = [24, 28, 32, 38, 44, 52];
+const TEXT_KEY = 'revisely.labels.textSize';
 const AR_DIGITS = '٠١٢٣٤٥٦٧٨٩';
 const arNum = (n) => String(n).replace(/\d/g, (d) => AR_DIGITS[d]);
 const SURAHS = ['', 'Al-Fātiḥah', 'Al-Baqarah', "Āli-'Imrān", 'An-Nisā', "Al-Mā'idah", "Al-An'ām", "Al-A'rāf", 'Al-Anfāl', 'At-Tawbah', 'Yūnus', 'Hūd', 'Yūsuf', "Ar-Ra'd", 'Ibrāhīm', 'Al-Ḥijr', 'An-Naḥl', "Al-Isrā'", 'Al-Kahf', 'Maryam', 'Ṭā-Hā', "Al-Anbiyā'", 'Al-Ḥajj', "Al-Mu'minūn", 'An-Nūr', 'Al-Furqān', "Ash-Shu'arā'", 'An-Naml', 'Al-Qaṣaṣ', "Al-'Ankabūt", 'Ar-Rūm', 'Luqmān', 'As-Sajdah', 'Al-Aḥzāb', "Saba'", 'Fāṭir', 'Yā-Sīn', 'Aṣ-Ṣāffāt', 'Ṣād', 'Az-Zumar', 'Ghāfir', 'Fuṣṣilat', 'Ash-Shūrā', 'Az-Zukhruf', 'Ad-Dukhān', 'Al-Jāthiyah', 'Al-Aḥqāf', 'Muḥammad', 'Al-Fatḥ', 'Al-Ḥujurāt', 'Qāf', 'Adh-Dhāriyāt', 'Aṭ-Ṭūr', 'An-Najm', 'Al-Qamar', 'Ar-Raḥmān', "Al-Wāqi'ah", 'Al-Ḥadīd', 'Al-Mujādilah', 'Al-Ḥashr', 'Al-Mumtaḥanah', 'Aṣ-Ṣaff', "Al-Jumu'ah", 'Al-Munāfiqūn', 'At-Taghābun', 'Aṭ-Ṭalāq', 'At-Taḥrīm', 'Al-Mulk', 'Al-Qalam', 'Al-Ḥāqqah', "Al-Ma'ārij", 'Nūḥ', 'Al-Jinn', 'Al-Muzzammil', 'Al-Muddaththir', 'Al-Qiyāmah', 'Al-Insān', 'Al-Mursalāt', "An-Naba'", "An-Nāzi'āt", "'Abasa", 'At-Takwīr', 'Al-Infiṭār', 'Al-Muṭaffifīn', 'Al-Inshiqāq', 'Al-Burūj', 'Aṭ-Ṭāriq', "Al-A'lā", 'Al-Ghāshiyah', 'Al-Fajr', 'Al-Balad', 'Ash-Shams', 'Al-Layl', 'Aḍ-Ḍuḥā', 'Ash-Sharḥ', 'At-Tīn', "Al-'Alaq", 'Al-Qadr', 'Al-Bayyinah', 'Az-Zalzalah', "Al-'Ādiyāt", "Al-Qāri'ah", 'At-Takāthur', "Al-'Aṣr", 'Al-Humazah', 'Al-Fīl', 'Quraysh', "Al-Mā'ūn", 'Al-Kawthar', 'Al-Kāfirūn', 'An-Naṣr', 'Al-Masad', 'Al-Ikhlāṣ', 'Al-Falaq', 'An-Nās'];
@@ -58,6 +61,7 @@ let focus = -1; // index in cur.order
 // ── Audio (Web Audio: exact snippets, and one unlock for the whole sitting) ──
 let actx = null;
 let source = null;
+let speed = 1;
 let playing = null; // { from, to, t0, what }
 let lastPos = 0;
 let raf = 0;
@@ -100,7 +104,7 @@ function stop() {
 
 function position() {
   if (!playing) return lastPos;
-  return Math.min(playing.to, playing.from + (actx.currentTime - playing.t0));
+  return Math.min(playing.to, playing.from + (actx.currentTime - playing.t0) * playing.rate);
 }
 
 function play(from, to, what) {
@@ -114,10 +118,12 @@ function play(from, to, what) {
   if (to - from < 0.05) return;
   const s = ac.createBufferSource();
   s.buffer = cur.buffer;
+  // Slower is lower too: Web Audio has no pitch correction.
+  s.playbackRate.value = speed;
   s.connect(ac.destination);
   s.start(0, from, to - from);
   source = s;
-  playing = { from, to, t0: ac.currentTime, what };
+  playing = { from, to, t0: ac.currentTime, what, rate: speed };
   s.onended = () => {
     if (source !== s) return;
     source = null;
@@ -213,12 +219,14 @@ function show(item, answers) {
     answers: answers ?? { marks: { ...(clip.label?.marks ?? {}) }, words: { ...(clip.label?.words ?? {}) } },
     order: orderOf(clip),
     undo: [],
+    // Every tap, for the audit log (sent with the label).
+    actions: [],
     shownAt: Date.now(),
   };
   const first = clip.words[0];
   const last = clip.words[clip.words.length - 1];
   $('where').textContent = (SURAHS[first.s] || 'Surah ' + first.s) + ' ' + first.s + ':' + first.a + (last.s !== first.s ? '–' + last.s + ':' + last.a : last.a !== first.a ? '–' + last.a : '');
-  $('source').textContent = clip.source.name + (clip.status !== 'open' ? ' · labelled' : '');
+  $('source').textContent = clip.source.name + (clip.label ? ' · you labelled this' : clip.status !== 'open' ? ' · a second label' : '');
   $('clipView').hidden = false;
   $('emptyView').hidden = true;
   $('foot').hidden = false;
@@ -386,8 +394,14 @@ function render() {
       (m.sure ? '<span class="sure ' + m.sure + '">' + (m.sure === 'clear' ? 'clear' : 'likely') + '</span>' : '') +
       '<span class="cnt">' + (focus + 1) + ' of ' + n + '</span></div>' +
       (t.lines.length ? '<div class="lab-card-b">' + t.lines.join(' · ') + '</div>' : '') +
-      (span ? '<button type="button" class="lab-again" id="againBtn">▶ Hear it again <kbd>R</kbd></button>' : '');
+      '<div class="lab-card-row">' +
+      (span ? '<button type="button" class="lab-again" id="againBtn">▶ Hear it again <kbd>R</kbd></button>' : '') +
+      '<button type="button" class="lab-link" id="fineBtn">All fine <kbd>F</kbd></button>' +
+      (cur.undo.length ? '<button type="button" class="lab-link" id="undoBtn">Undo <kbd>U</kbd></button>' : '') +
+      '</div>';
     if (span) $('againBtn').onclick = () => playMark(m);
+    $('fineBtn').onclick = allFine;
+    if (cur.undo.length) $('undoBtn').onclick = undo;
     const current = cur.answers.marks[m.id];
     bar.className = 'lab-actions three';
     bar.innerHTML = ANSWERS.map(
@@ -408,12 +422,17 @@ function render() {
   drawStats();
 }
 
+function act(a) {
+  cur.actions.push({ t: Date.now() - cur.shownAt, ...a });
+}
+
 function answer(v) {
   const m = cur.order[focus];
   if (!m) return;
   const before = cur.answers.marks[m.id];
   cur.answers.marks[m.id] = v;
   cur.undo.push({ type: 'mark', id: m.id, before });
+  act({ a: 'mark', id: m.id, v, was: before ?? null });
   const was = focus;
   focus = nextUnanswered(focus);
   if (focus === -1 && was !== -1) {
@@ -428,10 +447,26 @@ function answer(v) {
   }
 }
 
+/** Every mark not answered yet: not a mistake (the clip is fine as far as they go). On a clip with none: the next clip. */
+function allFine() {
+  if (!cur) return;
+  const open = cur.order.filter((m) => !(m.id in cur.answers.marks)).map((m) => m.id);
+  if (!open.length) return next();
+  for (const id of open) cur.answers.marks[id] = 'no';
+  cur.undo.push({ type: 'fine', ids: open });
+  act({ a: 'fine' });
+  focus = -1;
+  render();
+}
+
 function undo() {
   const u = cur.undo.pop();
   if (!u) return;
-  if (u.type === 'mark') {
+  act({ a: 'undo' });
+  if (u.type === 'fine') {
+    for (const id of u.ids) delete cur.answers.marks[id];
+    focus = nextUnanswered(-1);
+  } else if (u.type === 'mark') {
     if (u.before === undefined) delete cur.answers.marks[u.id];
     else cur.answers.marks[u.id] = u.before;
     focus = cur.order.findIndex((m) => m.id === u.id);
@@ -468,7 +503,7 @@ function openSheet(w) {
   $('sheetPlay').hidden = !span;
   const current = cur.answers.words[w];
   $('sheetOpts').innerHTML =
-    MISSED.map(([v, label], i) => '<button type="button" class="lab-opt m-' + MISSED_GROUP[v] + (current === v ? ' on' : '') + '" data-v="' + v + '">' + esc(label) + '<kbd>' + (i + 1) + '</kbd></button>').join('') +
+    MISSED.map(([v, label, key]) => '<button type="button" class="lab-opt m-' + MISSED_GROUP[v] + (current === v ? ' on' : '') + '" data-v="' + v + '">' + esc(label) + '<kbd>' + key.toUpperCase() + '</kbd></button>').join('') +
     (current ? '<button type="button" class="lab-opt fine" data-v="">Fine: take it back<kbd>0</kbd></button>' : '');
   $('sheetBack').hidden = false;
   $('sheet').hidden = false;
@@ -490,6 +525,7 @@ function labelWord(v) {
   if (v) cur.answers.words[w] = v;
   else delete cur.answers.words[w];
   cur.undo.push({ type: 'word', w, before });
+  act(v ? { a: 'word', w, v, was: before ?? null } : { a: 'clear', w, was: before ?? null });
   render();
 }
 
@@ -524,10 +560,7 @@ async function flush() {
         await ctx.call('adminConsole', { action: 'labels.save', ...p }, 30_000);
         pending.shift();
         persist();
-        if (stats) {
-          if (!p.relabel) stats.today.clips += 1;
-          stats.open = Math.max(0, stats.open - (p.relabel ? 0 : 1));
-        }
+        if (!pending.length) loadStats();
       } catch (err) {
         const code = String((err && err.code) || '').replace('functions/', '');
         if (code === 'invalid-argument' || code === 'not-found' || code === 'permission-denied') {
@@ -548,17 +581,17 @@ async function flush() {
 }
 
 function save(skip) {
+  if (skip) act({ a: 'skip', v: skip });
   const ms = Math.min(Date.now() - cur.shownAt, ACTIVE_CAP_MS);
   const marks = { ...cur.answers.marks };
   const words = { ...cur.answers.words };
-  const relabel = cur.clip.status !== 'open';
   pending = pending.filter((p) => p.id !== cur.clip.id);
-  pending.push({ id: cur.clip.id, marks, words, ms, ...(skip ? { skip } : {}), relabel });
+  pending.push({ id: cur.clip.id, marks, words, ms, actions: cur.actions.slice(0, 300), ...(skip ? { skip } : {}) });
   persist();
   sitting.answers += Object.keys(marks).length + Object.keys(words).length;
   sitting.ms += ms;
   sitting.clips += 1;
-  back.push({ clip: { ...cur.clip, status: skip ? 'skipped' : 'done' }, buffer: cur.buffer, answers: { marks, words } });
+  back.push({ clip: { ...cur.clip, status: skip ? 'skipped' : 'done', label: { marks, words, skip: skip ?? null } }, buffer: cur.buffer, answers: { marks, words } });
   if (back.length > 5) back.shift();
   flush();
 }
@@ -593,7 +626,11 @@ function goBack() {
 // ── Stats ──
 function drawStats() {
   const parts = [];
-  if (stats) parts.push(stats.today.clips + ' today', Math.max(0, stats.open) + ' left');
+  if (stats) {
+    parts.push(stats.labelled.toLocaleString() + ' of ' + stats.total.toLocaleString());
+    if (stats.queued) parts.push(stats.queued + ' for you');
+    parts.push(stats.today.clips + ' today');
+  }
   if (sitting.ms > 60_000) parts.push(Math.round(sitting.answers / (sitting.ms / 3_600_000)) + '/h');
   if (pending.length) parts.push('<span class="warn">' + pending.length + ' sending</span>');
   $('stats').innerHTML = parts.join(' · ');
@@ -608,6 +645,36 @@ async function loadStats() {
     stats = null;
   }
   drawStats();
+}
+
+// ── Text size (kept on this device: the teacher may want it larger) ──
+function textSize(step) {
+  let i = TEXT_SIZES.indexOf(currentSize());
+  if (i === -1) i = 2;
+  i = Math.max(0, Math.min(TEXT_SIZES.length - 1, i + step));
+  try {
+    localStorage.setItem(TEXT_KEY, String(TEXT_SIZES[i]));
+  } catch {
+    // private mode: for this visit only
+  }
+  applySize(TEXT_SIZES[i]);
+}
+
+function currentSize() {
+  return Number(document.documentElement.style.getPropertyValue('--wsize').replace('px', '')) || 32;
+}
+
+function applySize(px) {
+  document.documentElement.style.setProperty('--wsize', px + 'px');
+}
+
+function restoreSize() {
+  try {
+    const v = Number(localStorage.getItem(TEXT_KEY));
+    if (TEXT_SIZES.includes(v)) applySize(v);
+  } catch {
+    // the default size
+  }
 }
 
 // ── Small pieces ──
@@ -636,6 +703,17 @@ function closeMenu() {
 // ── Events ──
 function wire() {
   $('playBtn').addEventListener('click', playClip);
+  $('backBtn').addEventListener('click', () => {
+    if (!cur?.buffer) return;
+    const at = Math.max(0, position() - 2);
+    play(at, cur.buffer.duration, 'clip');
+  });
+  $('speedBtn').addEventListener('click', () => {
+    speed = speed === 1 ? 0.75 : 1;
+    $('speedBtn').textContent = speed === 1 ? '1×' : '0.75×';
+    $('speedBtn').setAttribute('aria-pressed', String(speed !== 1));
+    if (playing) play(position(), playing.what === 'clip' ? cur.buffer.duration : playing.to, playing.what);
+  });
   $('actions').addEventListener('click', (e) => {
     const b = e.target.closest('button');
     if (!b || b.disabled) return;
@@ -717,10 +795,11 @@ function wire() {
     closeMenu();
     const act = b.dataset.act;
     if (act === 'back') goBack();
+    else if (act === 'text+' || act === 'text-') textSize(act === 'text+' ? 1 : -1);
     else if (act === 'skip-audio') skip('audio');
     else if (act === 'skip-passage') skip('not-this-passage');
     else if (act === 'skip-other') skip('other');
-    else if (act === 'keys') toast('Space play · R the mark again · 1 not a mistake · 2 can’t tell · 3 mistake · ← → marks · Enter next · U undo · B back');
+    else if (act === 'keys') toast('Space play · R the mark again · 1 not a mistake · 2 can’t tell · 3 mistake · F all fine · ← → marks · W S A H L U a missed word · Enter next · U undo · B back');
   });
   $('emptyReload').addEventListener('click', async () => {
     await loadStats();
@@ -739,11 +818,11 @@ function wire() {
     }
     if (!$('sheet').hidden) {
       if (e.key === 'Escape') closeSheet();
-      else if (/^[0-5]$/.test(e.key)) {
-        const i = +e.key;
-        if (i === 0) {
-          if (cur.answers.words[sheetW]) labelWord('');
-        } else if (MISSED[i - 1]) labelWord(MISSED[i - 1][0]);
+      else if (e.key === '0') {
+        if (cur.answers.words[sheetW]) labelWord('');
+      } else {
+        const hit = MISSED.find(([, , key], i) => key === e.key.toLowerCase() || String(i + 1) === e.key);
+        if (hit) labelWord(hit[0]);
       }
       return;
     }
@@ -755,7 +834,8 @@ function wire() {
     } else if (k === 'r') {
       const m = cur.order[focus];
       if (m) playMark(m);
-    } else if (k === '1' || k === 'j') answer('no');
+    } else if (k === 'f') allFine();
+    else if (k === '1' || k === 'j') answer('no');
     else if (k === '2' || k === 'k') answer('unsure');
     else if (k === '3' || k === 'l') answer('yes');
     else if (k === 'enter') {
@@ -807,6 +887,12 @@ async function start() {
     return;
   }
   wire();
+  restoreSize();
+  // A labeller sees this page only: no way into the rest of the console.
+  if (!me.permissions.some((p) => p !== 'recite.label')) {
+    $('menuConsole').hidden = true;
+    $('homeLink').removeAttribute('href');
+  }
   restorePending();
   audioContext();
   prefetch();

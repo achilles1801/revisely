@@ -18,7 +18,7 @@
 <body class="lab">
 <div class="lab-app" id="app">
   <header class="lab-top">
-    <a class="lab-home" href="/" aria-label="Revisely Console"><span class="mark" aria-hidden="true">R</span></a>
+    <a class="lab-home" id="homeLink" href="/" aria-label="Revisely Console"><span class="mark" aria-hidden="true">R</span></a>
     <div class="lab-title">
       <b>Label recitations</b>
       <span class="lab-stats" id="stats" aria-live="polite"></span>
@@ -33,16 +33,18 @@
     <div class="lab-meta">
       <span id="where"></span>
       <span class="lab-src" id="source"></span>
+      <span class="lab-time mono" id="time">0:00</span>
     </div>
     <div class="lab-player">
       <button class="lab-play" id="playBtn" type="button" aria-label="Play the clip">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path id="playIcon" d="M8 5v14l11-7z"/></svg>
       </button>
+      <button class="lab-small" id="backBtn" type="button" aria-label="Back 2 seconds">−2s</button>
       <div class="lab-bar" id="bar" role="slider" aria-label="Position in the clip" aria-valuemin="0" tabindex="0">
         <div class="lab-bar-fill" id="barFill"></div>
         <div class="lab-ticks" id="ticks"></div>
       </div>
-      <span class="lab-time mono" id="time">0:00</span>
+      <button class="lab-small" id="speedBtn" type="button" aria-label="Speed" aria-pressed="false">1×</button>
     </div>
     <div class="lab-words" id="words" dir="rtl" lang="ar"></div>
   </section>
@@ -63,7 +65,7 @@
   <div class="lab-start-in">
     <h2>Label recitations</h2>
     <p>Each clip plays as it opens. For every mark, say whether it is a mistake. Tap any word the checker missed.</p>
-    <p class="lab-keys">Keys: <kbd>Space</kbd> play · <kbd>R</kbd> the mark again · <kbd>1</kbd> not a mistake · <kbd>2</kbd> can’t tell · <kbd>3</kbd> mistake · <kbd>Enter</kbd> next clip · <kbd>U</kbd> undo</p>
+    <p class="lab-keys">Keys: <kbd>Space</kbd> play · <kbd>R</kbd> the mark again · <kbd>1</kbd> not a mistake · <kbd>2</kbd> can’t tell · <kbd>3</kbd> mistake · <kbd>F</kbd> all fine · <kbd>Enter</kbd> next clip · <kbd>U</kbd> undo</p>
     <button class="lab-btn primary" id="startBtn" type="button">Start</button>
   </div>
 </div>
@@ -81,11 +83,13 @@
 
 <div class="lab-menu" id="menu" role="menu" hidden>
   <button type="button" role="menuitem" data-act="back">Back to the last clip</button>
-  <button type="button" role="menuitem" data-act="skip-audio">Skip: the audio is bad</button>
-  <button type="button" role="menuitem" data-act="skip-passage">Skip: not this passage</button>
-  <button type="button" role="menuitem" data-act="skip-other">Skip: another reason</button>
+  <button type="button" role="menuitem" data-act="skip-audio">Unusable: the audio is bad</button>
+  <button type="button" role="menuitem" data-act="skip-passage">Unusable: not this passage</button>
+  <button type="button" role="menuitem" data-act="skip-other">Unusable: another reason</button>
+  <button type="button" role="menuitem" data-act="text+">Larger text</button>
+  <button type="button" role="menuitem" data-act="text-">Smaller text</button>
   <button type="button" role="menuitem" data-act="keys">Keys</button>
-  <a role="menuitem" href="/">Revisely Console</a>
+  <a role="menuitem" id="menuConsole" href="/">Revisely Console</a>
 </div>
 
 <div class="toast" id="toast" role="status" hidden></div>
