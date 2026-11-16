@@ -86,9 +86,11 @@ per kind of request our functions send (`revo-ask`, `revo-review`, `coach`), plu
 The Cloud Functions tests fail when a request our code sends no longer matches the one its recording
 was made with (model, `max_tokens`, `thinking`, the system prompt): record it again.
 
-**Not recorded yet:** the files are written by hand in the Messages API's shape (`recordedAt: null`),
-because recording needs an Anthropic key. To record real ones (a few cents, from the repository
-root):
+**What they hold now** (each file's `how` says): `revo-ask` and `revo-review` are real replies, recorded
+on Nov 10 2026. Since then the guide changed the system prompt without the coach key at hand, so their
+request hash was moved by hand (`recordedAt: null`, the recording's time kept in `how`): the replies
+answer an older prompt. `coach` is still written by hand in the Messages API's shape. To record real
+ones (a few cents, with the coach key, from the repository root):
 
 ```bash
 cd functions && npm run build && ANTHROPIC_API_KEY=… node scripts/record-anthropic.js
