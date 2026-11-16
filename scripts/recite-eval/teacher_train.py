@@ -108,6 +108,8 @@ def main():
     ap.add_argument('--mosaic_p', type=float, default=0.15)
     ap.add_argument('--data', default='data/train,data/train2,data/train3,data/train4')
     ap.add_argument('--mix', default='')
+    ap.add_argument('--high_f0', type=float, default=0, help='train.py: clips over this pitch (Hz) drawn --high_w times as often')
+    ap.add_argument('--high_w', type=int, default=1)
     ap.add_argument('--max_per', type=float, default=0.06)
     ap.add_argument('--out', default=str(LAB / 'models/teacher'))
     ap.add_argument('--init', default=None)

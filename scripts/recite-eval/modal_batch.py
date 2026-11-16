@@ -116,6 +116,16 @@ def revoice_one(name: str, d: str):
     return r
 
 
+@app.function(image=image, volumes={'/vol': vol}, cpu=1.0, memory=2048, timeout=3600, max_containers=40)
+def pitch_one(d: str, name: str):
+    """Each clip's median pitch for one shard (pitch.py: <shard>.f0.npy), for --high_f0."""
+    _setup()
+    import pitch
+    pitch.add_f0_one(pathlib.Path('/vol') / d, name)
+    vol.commit()
+    return name
+
+
 @app.function(image=image_m, volumes={'/vol': vol}, gpu='L40S', cpu=8.0,
               memory=32768, timeout=3600)
 def distil_part(args: list, workers: int = 6):
@@ -293,6 +303,20 @@ def distil(out: str = 'ft-v6', init: str = '', teacher: str = 'teacher/teacher.p
         print(f'part {k + 1}: {r}', flush=True)
         if r == 'done':
             break
+
+
+@app.local_entrypoint()
+def pitch(data: str = 'data/train,data/train2,data/train3,data/train4'):
+    """pitch_one over every shard of the folders (CPU containers)."""
+    jobs = []
+    for d in data.split(','):
+        for f in listing.remote(d):
+            if f.endswith('.meta.pkl') and not f.endswith('.voice.meta.pkl'):
+                jobs.append((d, f[:-len('.meta.pkl')]))
+    n = 0
+    for _ in pitch_one.starmap(jobs):
+        n += 1
+    print(f'pitch: {n} shards', flush=True)
 
 
 @app.local_entrypoint()

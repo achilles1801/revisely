@@ -31,7 +31,7 @@ import augment, hisn_torch, checker  # noqa: E402
 
 class Data:
     def __init__(self, held=0.03, seed=0, dirs=('data/train',), max_per=None):
-        self.shards, self.dir_of = [], []
+        self.shards, self.dir_of, self.f0 = [], [], []
         for d in dirs:
             for mp in sorted((LAB / d).glob('*.meta.pkl')):
                 name = mp.name[:-len('.meta.pkl')]
@@ -40,6 +40,8 @@ class Data:
                 metas = pickle.load(open(mp, 'rb'))
                 vp = LAB / d / f'{name}.voice.audio.npy'
                 self.shards.append((name, metas, LAB / d / f'{name}.audio.npy', vp if vp.exists() else None))
+                fp = LAB / d / f'{name}.f0.npy'  # pitch.py: each clip's median pitch (Hz), for --high_f0
+                self.f0.append(np.load(fp) if fp.exists() else None)
                 self.dir_of.append(dirs.index(d))
         rng = random.Random(seed)
         self.train, self.val = [], []
@@ -118,6 +120,11 @@ class Batches(torch.utils.data.IterableDataset):
         shuf = random.Random(self.seed * 1009 + wid)
         ndir = max(data.dir_of) + 1 if data.dir_of else 1
         orders = [[k for k, (si, _) in enumerate(data.train) if data.dir_of[si] == d] for d in range(ndir)]
+        hf, hw = getattr(a, 'high_f0', 0), int(getattr(a, 'high_w', 1))
+        if hf and hw > 1:  # women's and children's voices (pitch.py) drawn hw times as often within their folder
+            orders = [o + [k for k in o for _ in range(hw - 1)
+                           if data.f0[data.train[k][0]] is not None and data.f0[data.train[k][0]][data.train[k][1]] > hf]
+                      for o in orders]
         for o in orders:
             shuf.shuffle(o)
         mix = [float(w) for w in a.mix.split(',')] if a.mix else [len(o) for o in orders]
@@ -275,6 +282,8 @@ def main():
     ap.add_argument('--max_clips', type=int, default=0, help='use only this many training clips (local tests: a few hundred)')
     ap.add_argument('--max_per', type=float, default=None, help='drop automatically labelled clips whose labels differ from what was heard by more than this share')
     ap.add_argument('--mix', default='', help="each --data folder's share of clips, e.g. 0.5,0.5 (default: by size)")
+    ap.add_argument('--high_f0', type=float, default=0, help='clips whose median pitch is over this (Hz; pitch.py) are...')
+    ap.add_argument('--high_w', type=int, default=1, help='...drawn this many times as often (women and children)')
     ap.add_argument('--mosaic_p', type=float, default=0.0, help='share of clips stitched from stretches of several ayat')
     ap.add_argument('--teacher', default=None, help="distil from this teacher (teacher_train.py's teacher.pt)")
     ap.add_argument('--pool', type=int, default=0, help='draw this many batches of clips at once and group them by length')
