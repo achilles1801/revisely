@@ -205,8 +205,25 @@ export default function QuranSearchScreen() {
   // Opened from the mic on the Read tab: listen at once (where voice search is on).
   const listenOnOpen = route.params?.listen === true && voice.available;
   useEffect(() => {
-    if (listenOnOpen) startListening();
-    else inputRef.current?.focus();
+    if (listenOnOpen) {
+      startListening();
+      return;
+    }
+    // The field is focused once the screen has slid in: a keyboard raised during the transition left the bar under it
+    // (iPhone SE, Nov 16 2026).
+    let done = false;
+    const focus = () => {
+      if (done) return;
+      done = true;
+      inputRef.current?.focus();
+    };
+    const unsubscribe = navigation.addListener?.('transitionEnd', focus);
+    const fallback = setTimeout(focus, 650);
+    return () => {
+      done = true;
+      unsubscribe?.();
+      clearTimeout(fallback);
+    };
     // Once, on opening.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -374,12 +391,12 @@ export default function QuranSearchScreen() {
         ListHeaderComponent={
           <View style={styles.resultsHead}>
             {hasArabic(results.query) ? (
-              <Text style={[arabicV2(20), styles.arabic, { color: palette.secondary }]} accessibilityLanguage="ar" numberOfLines={2}>
+              <Text style={[arabicV2(20), styles.arabic, { color: palette.secondary }]} accessibilityLanguage="ar" numberOfLines={1} maxFontSizeMultiplier={1.3}>
                 {results.query}
               </Text>
             ) : null}
             {heading ? (
-              <Text style={[typeV2.meta, { color: palette.secondary }]} testID="search-count">
+              <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={1.4} testID="search-count">
                 {heading}
               </Text>
             ) : null}
@@ -419,7 +436,7 @@ export default function QuranSearchScreen() {
         ListHeaderComponent={
           recent.length > 0 ? (
             <View style={styles.recentHead}>
-              <Text style={[typeV2.name, { color: palette.text }]} accessibilityRole="header">
+              <Text style={[typeV2.name, { color: palette.text }]} accessibilityRole="header" maxFontSizeMultiplier={1.4}>
                 Recent
               </Text>
               <Tap
@@ -431,7 +448,9 @@ export default function QuranSearchScreen() {
                 accessibilityRole="button"
                 testID="search-recent-clear"
               >
-                <Text style={[typeV2.meta, { color: palette.link }]}>Clear</Text>
+                <Text style={[typeV2.meta, { color: palette.link }]} maxFontSizeMultiplier={1.4}>
+                  Clear
+                </Text>
               </Tap>
             </View>
           ) : null
