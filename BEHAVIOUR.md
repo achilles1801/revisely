@@ -935,6 +935,14 @@ shows up once and they must go through it and complete it … just the main stuf
   the rest by surah and ayah ("Al-Mulk, ayahs 1–20", "Al-Mulk 27 to Al-Qalam 15"). Whole pages and
   the ayahs they hold read alike.
 
+## Language and layout
+
+- **LANG-1.** The app lays out the way its language reads, not the phone's: while it shows English it
+  is left to right on every phone, Arabic or Persian or Hebrew included, from the next launch after it
+  starts (React Native reads the direction at launch). (Until Nov 2026 an Android phone set to an
+  RTL language mirrored the English app: rows, the tab swipe, the verse highlights and the mushaf's
+  page order; `src/i18n/direction.ts`.)
+
 ## Known bugs
 
 Each has a `KNOWN BUG` test that fails on purpose. Fixing one turns its test red: change it to an

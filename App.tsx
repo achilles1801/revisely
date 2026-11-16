@@ -23,6 +23,8 @@ import { markUiReady, startOtaUpdates } from './src/lib/updates/ota';
 import { stopTrace } from './src/lib/reciteLive/stopTrace';
 import { startStoreChecks } from './src/lib/updates/storeUpdates';
 import { UpdateRequiredGate } from './src/components/updates/UpdateRequired';
+import { currentLanguage } from './src/i18n';
+import { syncLayoutDirection } from './src/i18n/direction';
 
 // Every launch is one Sentry session, labelled with the exact JavaScript it ran
 // (src/lib/releaseInfo.ts): release com.revisionbuddy.app@1.0.2+19.u<update>,
@@ -87,6 +89,9 @@ Sentry.setTags(releaseTags(release));
 // New store versions are offered, or required below the minimum (storeUpdates.ts).
 startOtaUpdates();
 startStoreChecks();
+// The layout reads the way the app's language does, not the phone's: Android mirrored the English
+// app on a phone set to Arabic (BEHAVIOUR.md LANG-1). Applies from the next launch.
+syncLayoutDirection(currentLanguage());
 // Revisely Dev: a live take whose Stop never reached its summary last run (a freeze, or the app closed then) goes to
 // Sentry once (src/lib/reciteLive/stopTrace.ts).
 void stopTrace.reportLeftover();
