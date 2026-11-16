@@ -1,5 +1,6 @@
 import { onCall, onRequest, HttpsError } from 'firebase-functions/v2/https';
 import { setGlobalOptions, logger } from 'firebase-functions/v2';
+import { failure } from './failure';
 import { initializeApp, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { FieldValue, Timestamp, getFirestore } from 'firebase-admin/firestore';
@@ -33,7 +34,6 @@ import { adminRevoStore as adminConsoleRevoStore, adminTotalsStore, collector } 
 import { SUPPORT_ORIGINS, SUPPORT_PAGES, SupportError } from './support/logic';
 import { handleDevPremium, handleSupportApplication, handleSupportLink } from './support/handler';
 import { adminSupportStore, deleteSupportData } from './support/admin';
-import { failure } from './failure';
 
 setGlobalOptions({ region: 'us-central1', maxInstances: 3 });
 
