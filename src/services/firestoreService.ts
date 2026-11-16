@@ -167,13 +167,71 @@ function newPageData(pageNumber: number, now: Timestamp): FirestorePage {
   };
 }
 
-// Accounts whose pages this app is writing now (initializeAllPages): their page
-// list is short on purpose until the last batch lands.
-const initializingPages = new Set<string>();
+// Accounts whose pages this app is writing now (initializeAllPages), with the
+// pages written: their page list on the server is short on purpose until the
+// last batch lands.
+const initializingPages = new Map<string, FirestorePage[]>();
 
 /** Whether this app is creating `uid`'s pages right now. */
 export function isInitializingPages(uid: string | undefined | null): boolean {
   return !!uid && initializingPages.has(uid);
+}
+
+/** The pages this app is writing for `uid` right now (initializeAllPages), or null. */
+export function pagesBeingWritten(uid: string | undefined | null): FirestorePage[] | null {
+  return (uid && initializingPages.get(uid)) || null;
+}
+
+type PagesWrittenListener = (uid: string, pages: FirestorePage[]) => void;
+const pagesWrittenListeners = new Set<PagesWrittenListener>();
+
+/**
+ * Hears the pages this app writes for an account that had none (initializeAllPages),
+ * as soon as they are written on the phone, before the server acknowledges them.
+ */
+export function onPagesWritten(listener: PagesWrittenListener): () => void {
+  pagesWrittenListeners.add(listener);
+  return () => {
+    pagesWrittenListeners.delete(listener);
+  };
+}
+
+// ============================================================================
+// WHO CREATES A NEW ACCOUNT'S DOCUMENTS
+// ============================================================================
+
+// Signing up or in (AuthContext) creates the user document and pages of an
+// account that has none, with what only it knows: the name typed at sign-up,
+// the name Apple sends on the first sign-in only. The account's listeners
+// (AppContext) create them too when the server says there are none, and on a
+// phone they heard that while sign-up was still setting the name: both wrote
+// the user document, the rules refused one ("appeared while creating them"),
+// and when the listener's write won, the account had no name (SYNC-4, Nov 2026).
+// So while a sign-in runs, the listeners leave the creating to it and look again
+// once it is done.
+let accountCreator: Promise<void> | null = null;
+/** How long the listeners wait for a sign-in that never ends (no connection) before looking again. */
+export const ACCOUNT_CREATOR_WAIT_MS = 30_000;
+
+/** Runs a sign-in that may create the account's documents, as their one creator. */
+export function asAccountCreator<T>(signIn: () => Promise<T>): Promise<T> {
+  const run = signIn();
+  const done: Promise<void> = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  accountCreator = done;
+  done.then(() => {
+    if (accountCreator === done) accountCreator = null;
+  });
+  return run;
+}
+
+/** Resolves once no sign-in is creating an account's documents (at once if none is). */
+export function accountCreatorDone(): Promise<void> {
+  const running = accountCreator;
+  if (!running) return Promise.resolve();
+  return Promise.race([running, new Promise<void>((resolve) => setTimeout(resolve, ACCOUNT_CREATOR_WAIT_MS))]);
 }
 
 /**
@@ -186,12 +244,17 @@ export function isInitializingPages(uid: string | undefined | null): boolean {
  * The account's pages listener waits meanwhile and reads the pages once they are
  * all on the server: listening, each page went through it three times (written,
  * confirmed, sent back), and sign-up froze the phone for about 5 s (Nov 10 2026).
+ * The app shows the pages written at once (`onPagesWritten`, AppContext): waiting
+ * for the server's acknowledgement and that read kept a new account on "loading"
+ * for as long as they took, over a minute on a CI simulator (SYNC-4, Nov 2026).
  * Onboarding counts a marked juz before its pages arrive (ONBOARD-1).
  */
 export async function initializeAllPages(userId: string): Promise<void> {
   const BATCH_SIZE = 450;
   const now = Timestamp.now();
-  initializingPages.add(userId);
+  const written: FirestorePage[] = [];
+  for (let pageNumber = 1; pageNumber <= TOTAL_QURAN_PAGES; pageNumber++) written.push(newPageData(pageNumber, now));
+  initializingPages.set(userId, written);
   const resumePages = pauseAccountListeners(userId, ['pages']);
   try {
     const commits: Promise<void>[] = [];
@@ -199,9 +262,16 @@ export async function initializeAllPages(userId: string): Promise<void> {
       const batch = writeBatch(db);
       const batchEnd = Math.min(batchStart + BATCH_SIZE - 1, TOTAL_QURAN_PAGES);
       for (let pageNumber = batchStart; pageNumber <= batchEnd; pageNumber++) {
-        batch.set(getPageRef(pageNumber, userId), newPageData(pageNumber, now));
+        batch.set(getPageRef(pageNumber, userId), written[pageNumber - 1]);
       }
       commits.push(batch.commit());
+    }
+    for (const listener of pagesWrittenListeners) {
+      try {
+        listener(userId, written);
+      } catch (err) {
+        logger.warn('A pages-written listener failed', err);
+      }
     }
     await Promise.all(commits);
   } finally {

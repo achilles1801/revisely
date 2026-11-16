@@ -52,7 +52,11 @@ jest.mock('../../lib/firebase', () => ({
 }));
 jest.mock('firebase/auth', () => ({ getAuth: () => ({ currentUser: null }) }));
 jest.mock('expo-constants', () => ({ expoConfig: { extra: { firebase: { apiKey: 'KEY' } } } }));
-jest.mock('../../services/firestoreService', () => ({ getUser: jest.fn(), createUser: jest.fn() }));
+jest.mock('../../services/firestoreService', () => ({
+  getUser: jest.fn(),
+  createUser: jest.fn(),
+  asAccountCreator: (signIn: () => Promise<unknown>) => signIn(),
+}));
 jest.mock('../../lib/sentry', () => ({ identifyUser: jest.fn() }));
 jest.mock('../../lib/recordings', () => ({ deleteAllRecordings: jest.fn(), forgetCloudDeletes: jest.fn() }));
 jest.mock('../../lib/recordingBackupController', () => ({
