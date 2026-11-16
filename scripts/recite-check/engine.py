@@ -233,24 +233,35 @@ STRICT_BARS = 'bars.v5.json'
 # model (no new image needed to go back).
 WORDS_EAR = 'models/words-v6/model-int8.onnx'
 WORDS_BARS = 'bars.v6.json'
-# v6's word settings (lab, Nov 16 2026, checker 7c12824d). v6 is surer of what it hears, and hears much of what doesn't
-# fit as blanks, which a word takes in for free. So a look-alike word costs less to hear (alt_pen -3, not -5): bench-v0's
-# professionals, substitutions caught 84 -> 89% (the released model 94%). Speech between words costs less (fill -0.4,
-# not -0.5) and an extra word may be 0.3 s long (not 0.35): a word added after one that ends the same was taken in by
-# the word before (inserted words 86 -> 93%, the released model 94%). False alarms 0.36 per 100 words (released 0.40),
-# 151 of 180 correct takes with none (140); /record 5 of 6 slips, no false alarm (6 of 6, 5 in 3 takes); planted
-# hesitations marked 1 of 120 (3), corrections 5 of 108 (6); learners' clips as at v6's defaults. Not taken: the sound
-# rule (sub_p 0.9–0.95): on learners' clips it catches more at the same false marks, but on professionals' correct pages
-# it nearly doubles the false alarms (0.58–0.77 per 100 words), and /record's (8 in 7 takes).
-WORDS_P_V6 = dict(WORDS_P, alt_pen=-3.0, extra_min=0.3, fill=-0.4)
+# v6's word settings (lab, Nov 16 2026, checker 7c12824d; the released model's results in brackets). v6 is surer of what
+# it hears, and hears much of what doesn't fit as blanks, which a word takes in for free. So a look-alike word costs
+# less to hear (alt_pen -2, not -5): bench-v0's professionals, substitutions caught 84 -> 93% (94%). Speech between
+# words costs less (fill -0.4, not -0.5) and an extra word may be 0.3 s long (not 0.35): a word added after one that
+# ends the same was taken in by the word before (inserted words 86 -> 93%, 94%). Planted slips caught 97.1% (97.4%);
+# false alarms 0.45 per 100 words (0.40), 0.19 in quiet (0.20); correct takes with none 145 of 180 (140). /record 5 of 6
+# slips, no false alarm (6 of 6, 5 in 3 takes); planted hesitations marked 1 of 120 (3), corrections 6 of 108 (6).
+# Learners' correct clips with a word mark 9.7% (14.5%), mistaken 32.4% (38.6%). The page scorecard, live: correct
+# quiet pages marked 20% (23%), mild babble 20% (37%), loud 57% (73%); planted slips caught 95% (99%). alt_pen -3 marked
+# fewer (0.36 per 100 words) and caught fewer (live 92%). Not taken: the sound rule (sub_p 0.9–0.95): on learners' clips
+# it catches more at the same false marks, but on professionals' correct pages it nearly doubles the false alarms
+# (0.58–0.77 per 100 words), and /record's (8 in 7 takes).
+WORDS_P_V6 = dict(WORDS_P, alt_pen=-2.0, extra_min=0.3, fill=-0.4)
+# v6's naming thresholds (`into`), over similar.P. v6 fits a passage's words with smaller margins than the released model:
+# at the released model's thresholds it named 100 of bench-v0's 275 planted slips and swapped endings (the released
+# model 188). With these, 134 (79 slips into a similar ayah of 111, 55 endings of 164), none wrong, none false. Not
+# taken: run each slip's audio through the released model and name it there (159 at 80 s of audio a take, 171 with
+# no cap): up to ~2 s more before `done` on Cloud Run for a take full of slips.
+SIMILAR_P_V6 = {'adv': 80.0, 'gain': 0.35, 'end_adv': 20.0, 'end_gain': 0.55}
 
 
 class Level:
-    """The model a take runs on (`ear`), with the settings set on it: its bars (bars.json's shape: letters, tajweed)
-    and its word settings (`words_p`, WORDS_P's shape). Engine.level picks one from a take's settings."""
+    """The model a take runs on (`ear`), with the settings set on it: its bars (bars.json's shape: letters, tajweed),
+    its word settings (`words_p`, WORDS_P's shape) and its naming thresholds (`similar_p`, over similar.P). Engine.level
+    picks one from a take's settings."""
 
-    def __init__(self, name, ear, bars, words_p):
+    def __init__(self, name, ear, bars, words_p, similar_p=None):
         self.name, self.ear, self.bars, self.words_p = name, ear, bars, words_p
+        self.similar_p = dict(similar_p or {})
 
 
 class PaddedEar(checker.Hisn):
@@ -303,7 +314,8 @@ class Engine:
         if (lab / WORDS_EAR).exists() and (lab / WORDS_BARS).exists() and os.environ.get('RECITE_WORDS_EAR') != '0':
             ear = PaddedEar(lab / WORDS_EAR, threads, name='v6')
             if ear.vocab == self.ear.vocab:  # the word table and the word graphs are in the released model's sounds
-                self.words_level = Level('v6', ear, json.loads((lab / WORDS_BARS).read_text()), WORDS_P_V6)
+                self.words_level = Level('v6', ear, json.loads((lab / WORDS_BARS).read_text()), WORDS_P_V6,
+                                         SIMILAR_P_V6)
 
     def level(self, st):
         """The model and settings for a take with settings st (settings_of): v6 when no tajweed is judged (Recite,
@@ -459,7 +471,7 @@ class Engine:
                         heard[w_] = own
             out['marks'] = self.marks(words, flagged, heard, out['extras'], tj, letters if st['letters'] else [])
             out['ms']['similar'] = self.name_slips(out['marks'], lp, [k['word'] for k in kws], statuses, spans,
-                                                   out['extras'], P)
+                                                   out['extras'], lv)
             out['score'] = score(statuses, out['marks'])
             out['v'] = 2
         return out
@@ -541,7 +553,7 @@ class Engine:
                 heardExact=False if r.get('_heard') else None)
         return out
 
-    def name_slips(self, marks, lp, order, statuses, spans, extras, P=None):
+    def name_slips(self, marks, lp, order, statuses, spans, extras, lv=None):
         """Where the reciter went, on the mark of a slip (recite-contract.md, `into`): {w, ayah, also?, ending?}.
         - A run of words skipped or said wrong that is a similar passage's words: `into` on the run's first word mark,
           w being the place's first word said (lab, Nov 15 2026: of bench-v0's 111 planted slips into a similar ayah,
@@ -554,16 +566,20 @@ class Engine:
         Returns the milliseconds it took: 0–20 ms a take on the Mac, 74–104 on Cloud Run. Both passes share
         similar.P['budget'], a measure of work, not time (about 0.5 s on Cloud Run), so a take full of mistakes can't
         hold up the answer and a take names the same on any machine. Without the word table each place's sounds would
-        be worked out here (~100 ms a word), so nothing is named. P: the take's word settings (its level's)."""
+        be worked out here (~100 ms a word), so nothing is named.
+        lv: the take's level (the released model's if not given): its word settings, and its naming thresholds over
+        similar.P (Level.similar_p), set on its own frames.
+        """
         if self.table is None:
             return 0
-        P = P or WORDS_P
+        lv = lv or self.released
+        P, sp = lv.words_p, lv.similar_p
         t0 = time.perf_counter()
         work = {'left': similar.P['budget'], 'frames': NAME_FRAMES}
         names = []
         try:
             if P.get('gap_back') is None:
-                names = self._slips_in(lp, order, statuses, spans, extras, work)
+                names = self._slips_in(lp, order, statuses, spans, extras, work, sp)
             else:
                 # each run of marks that could be a slip (a similar passage forks off near its start, or it ends an
                 # ayah) is decoded again without going back from a filler, and named from that alone: named from the
@@ -574,7 +590,7 @@ class Engine:
                     plain = self._decode_plain(lp, lo, hi, spans, work, ends_heard, P)
                     if plain is not None:
                         named = {n['mark'] for n in names}
-                        names += [n for n in self._slips_in(lp, *plain, work) if n['mark'] not in named]
+                        names += [n for n in self._slips_in(lp, *plain, work, sp) if n['mark'] not in named]
         except Exception as e:  # naming is extra: it never costs the answer
             print(f'similar: {type(e).__name__}: {e}', file=sys.stderr)
         word_marks = sorted((m for m in marks if m['kind'] in ('skipped', 'word')), key=lambda m: m['w'])
@@ -593,12 +609,12 @@ class Engine:
                          | ({'ending': True} if n.get('kind') == 'ending' else {}))
         return int((time.perf_counter() - t0) * 1000)
 
-    def _slips_in(self, lp, order, statuses, spans, extras, work):
-        """similar.find, then similar.endings on the runs it didn't name."""
-        names = similar.find(lp, order, statuses, spans, extras, self._labels_of, self.slip_index, work=work)
+    def _slips_in(self, lp, order, statuses, spans, extras, work, sp=None):
+        """similar.find, then similar.endings on the runs it didn't name; sp: thresholds over similar.P."""
+        names = similar.find(lp, order, statuses, spans, extras, self._labels_of, self.slip_index, p=sp, work=work)
         marked = {n['mark'] for n in names}
         return names + [n for n in similar.endings(lp, order, statuses, spans, self._forms_of, self.slip_index,
-                                                   work=work) if n['mark'] not in marked]
+                                                   p=sp, work=work) if n['mark'] not in marked]
 
     @staticmethod
     def _mark_runs(order, statuses, extras, spans):
