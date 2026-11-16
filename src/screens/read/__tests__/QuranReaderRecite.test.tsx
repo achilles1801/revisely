@@ -1697,9 +1697,9 @@ describe('Test me (Majd, Nov 15 2026: random within what’s memorized, with an 
     expect(mockLive.start?.startIn).toBeUndefined();
     expect(mockPager.scrolled).toContain(562);
     expect(screen.getByTestId('recite-eye-group')).toBeTruthy();
-    expect(screen.getByTestId('recite-status').props.children).toBe('Starting… · 1 of 5');
+    expect(screen.getByTestId('recite-status').props.children).toBe('1 of 5');
     await event({ type: 'ready', take: 't1', protocol: 6 });
-    expect(screen.getByTestId('recite-status').props.children).toBe('Listening… · 1 of 5');
+    expect(screen.getByTestId('recite-status').props.children).toBe('1 of 5');
     // The two words are shown already: ‹ shows the third.
     mockLive.sent = [];
     fireEvent.press(screen.getByTestId('recite-next-word'));
@@ -1723,7 +1723,9 @@ describe('Test me (Majd, Nov 15 2026: random within what’s memorized, with an 
     await event({ type: 'done', result: { v: 2, take: 't1', from: first, to: last + 1, start: first, secs: 12, marks: [], score: null } } as LiveEvent);
     await flush();
     expect(screen.queryByTestId('take-summary')).toBeNull();
-    expect(screen.getByTestId('recite-status').props.children).toBe('Clean · 1 of 5');
+    expect(screen.getByTestId('recite-status').props.children).toBe('Clean');
+    // The outcome in words, no score pill: an SE at the largest text had no room for both.
+    expect(screen.queryByTestId('recite-score')).toBeNull();
     expect(screen.getByLabelText('Next place, 2 of 5')).toBeTruthy();
     fireEvent.press(screen.getByTestId('recite-next'));
     await flush();
@@ -1754,7 +1756,7 @@ describe('Test me (Majd, Nov 15 2026: random within what’s memorized, with an 
     await flush();
     await flush();
     expect(mockLive.start).toMatchObject({ s: 67, a: 1, s2: 67, a2: 3 });
-    expect(screen.getByTestId('recite-status').props.children).toBe('Starting… · 1 of 5');
+    expect(screen.getByTestId('recite-status').props.children).toBe('1 of 5');
   });
 
   it('✕ ends the test early: the summary of the places done', async () => {
@@ -1798,7 +1800,7 @@ describe('Test me (Majd, Nov 15 2026: random within what’s memorized, with an 
     await flush();
     await event({ type: 'done', result: { v: 2, take: 't1', from: first, to: last + 1, start: null, secs: 6, marks: [], score: null } } as LiveEvent);
     await flush();
-    expect(screen.getByTestId('recite-status').props.children).toBe('Not continued · 1 of 5');
+    expect(screen.getByTestId('recite-status').props.children).toBe('Not continued');
     expect(screen.getByTestId('recite-next')).toBeTruthy();
   });
 });
@@ -1983,7 +1985,7 @@ describe('peeked words (Majd, Nov 15 2026: on the page in quiet grey, in the sum
       await flush();
       await event({ type: 'done', result: { v: 2, take: 't1', from: first, to: last + 1, start: first, secs: 12, marks: [], score: null } } as LiveEvent);
       await flush();
-      expect(screen.getByTestId('recite-status').props.children).toBe('1 word peeked · 1 of 5');
+      expect(screen.getByTestId('recite-status').props.children).toBe('1 word peeked');
     } finally {
       random.mockRestore();
     }

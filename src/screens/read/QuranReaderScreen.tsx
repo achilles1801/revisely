@@ -931,8 +931,14 @@ export default function QuranReaderScreen() {
             : 'Listening…';
   // In a test: which place it is, and once it's done, how it went ("Clean · 2 of 5").
   const placeResult = test && liveStatus === 'done' ? test.results[test.at] : undefined;
+  // Short, for a crowded bar (an SE at the largest text): while listening which place it is; once done, how it went
+  // (Next says which place comes).
   const barStatus = test
-    ? `${placeResult ? outcomeText(placeResult) : baseStatus} · ${test.at + 1} of ${test.places.length}`
+    ? placeResult
+      ? outcomeText(placeResult)
+      : liveStatus === 'listening' || liveStatus === 'connecting'
+        ? `${test.at + 1} of ${test.places.length}`
+        : baseStatus
     : baseStatus;
 
   // Previous / next go when the capsule is crowded (a recording, a timer) on
@@ -989,7 +995,8 @@ export default function QuranReaderScreen() {
                 onToggleHidden={toggleHidden}
                 onNextWord={showNextWord}
                 onWholeAyah={showWholeAyah}
-                score={checkTake ? scorePill(live.state, qw, live.startWord) : null}
+                // A test's place says how it went in words: no score pill (it crowded the bar out).
+                score={checkTake && !test ? scorePill(live.state, qw, live.startWord) : null}
                 seconds={live.seconds}
                 recording={live.recording && live.mic === 'on'}
                 // A test's place, once done, says how it went in the words' place.

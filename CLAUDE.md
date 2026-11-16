@@ -394,8 +394,9 @@ until its part is set up.
     - At each place the page turns there and is hidden but for the ayah's first two words. A Mark mistakes take covers
       that ayah and the next two (those memorized, in the same surah) and stops by itself at the end. The checker looks
       for the start only in the first ayah (`startBy`), so starting the ayah again or carrying on both work.
-    - The bar then says how it went in the words' place ("Clean · 1 of 5", "1 wrong word · 2 of 5", "Stopped before
-      the end", "Not continued" when the start was never found), with Next and ✕. ✕ ends the test early.
+    - While listening the bar says which place it is ("1 of 5"); then how it went in the words' place ("Clean", "1 wrong
+      word", "Stopped before the end", "Not continued" when the start was never found), with Next and ✕ and no score
+      pill (an SE at the largest text had no room). ✕ ends the test early.
     - After the last place (or ✕): the summary, "4 of 5 continued cleanly" and each place with how it went (a tap shows
       it on the page), Test me again (the same juz) and Done. The page goes back to shown or hidden as before.
     - Each place's take is kept as a recording, as any take is.
