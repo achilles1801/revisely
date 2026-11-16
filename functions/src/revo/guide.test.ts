@@ -6,16 +6,28 @@
 import { execFileSync } from 'child_process';
 import { existsSync, readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
-import { GUIDE_INTERNAL, GUIDE_SECTIONS, REVO_GUIDE } from './guide';
+import { DEV_GUIDE, DEV_GUIDE_SECTIONS, DEV_GUIDE_SYSTEM, GUIDE_INTERNAL, GUIDE_INTERNAL_KINDS, GUIDE_SECTIONS, REVO_GUIDE } from './guide';
 import { barePageNumbers, replyWords } from './pageWords';
+import { REVO_SYSTEM_PROMPT, buildAskRequest, buildReviewRequest } from './prompt';
+import { RECITATION_SYSTEM } from './recitation';
 import { parseReply } from './reply';
-import { REVO_SCREENS, REVO_SETTINGS_SECTIONS } from './types';
+import { REVO_SCREENS, REVO_SETTINGS_SECTIONS, RevoContext, RevoRecitation } from './types';
+import { validateContext } from './validate';
 
 const ROOT = join(__dirname, '..', '..', '..');
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
 
-const rules = [...read('BEHAVIOUR.md').matchAll(/^- \*\*([A-Z]+-\d+)\.\*\*/gm)].map((m) => m[1]);
-const covered = GUIDE_SECTIONS.flatMap((s) => [...s.covers]);
+const behaviour = read('BEHAVIOUR.md');
+const rules = [...behaviour.matchAll(/^- \*\*([A-Z]+-\d+)\.\*\*/gm)].map((m) => m[1]);
+/** Rules under a heading marked "(Revisely Dev)": what only Revisely Dev has. */
+const devRules = behaviour
+  .split(/^## /m)
+  .filter((part) => /^[^\n]*\(Revisely Dev\)/.test(part))
+  .flatMap((part) => [...part.matchAll(/^- \*\*([A-Z]+-\d+)\.\*\*/gm)].map((m) => m[1]));
+const mainCovered = GUIDE_SECTIONS.flatMap((s) => [...s.covers]);
+const devCovered = DEV_GUIDE_SECTIONS.flatMap((s) => [...s.covers]);
+const covered = [...mainCovered, ...devCovered];
+const allSections = [...GUIDE_SECTIONS, ...DEV_GUIDE_SECTIONS];
 
 /** The app's source, comments left out (a label must be text the app shows, not a note about it). */
 function appSource(): string {
@@ -48,18 +60,49 @@ describe('Revo’s guide covers BEHAVIOUR.md', () => {
   });
 });
 
+describe('nothing a user can see is left out of the guide (Majd, Nov 16 2026)', () => {
+  // "whatever app changes we make, revo should get that update too": a rule may stay out of the guide only for a
+  // reason a user never meets. Before this, Revisely Dev's features sat in GUIDE_INTERNAL as "Dev only", and Revo in
+  // Revisely Dev knew nothing of Recite.
+  it('every reason for leaving a rule out starts with a kind a user never sees', () => {
+    const kinds = new RegExp(`^(${GUIDE_INTERNAL_KINDS.join('|')}): \\S`);
+    const unkinded = Object.entries(GUIDE_INTERNAL).filter(([, why]) => !kinds.test(why));
+    // A rule a user can see and ask about: say how it works in guide.ts (GUIDE_SECTIONS, or DEV_GUIDE_SECTIONS when
+    // only Revisely Dev has it). Only timing, the server's own work, layout, the owner's tools, screens before sign-in,
+    // a superseded feature or Revo's own prompt may stay out, with that kind first.
+    expect(unkinded).toEqual([]);
+  });
+
+  it('no rule is left out for being Revisely Dev only: those go in the Dev guide', () => {
+    expect(Object.entries(GUIDE_INTERNAL).filter(([, why]) => /\bDev\b/.test(why))).toEqual([]);
+  });
+
+  it('reads the rules marked Revisely Dev', () => {
+    expect(devRules).toEqual(expect.arrayContaining(['RINS-1', 'RMEM-1', 'RMEM-2']));
+  });
+
+  it('a rule only Revisely Dev has is in the Dev guide, never in the guide every account gets', () => {
+    expect(devRules.filter((id) => !devCovered.includes(id))).toEqual([]);
+    expect(mainCovered.filter((id) => devRules.includes(id))).toEqual([]);
+  });
+
+  it('the Dev guide covers only rules marked Revisely Dev (a feature that reached the store moves to the main guide)', () => {
+    expect(devCovered.filter((id) => !devRules.includes(id))).toEqual([]);
+  });
+});
+
 describe('Revo’s guide names what the app has', () => {
   it('every screen a section sends the user to is in the navigation', () => {
     const nav = read('src/navigation/MainNavigator.tsx');
     const screens = new Set([...nav.matchAll(/\.Screen\s+name="([A-Za-z]+)"/g)].map((m) => m[1]));
     expect(screens.size).toBeGreaterThan(10);
-    const routes = [...new Set(GUIDE_SECTIONS.flatMap((s) => [...s.routes]))];
+    const routes = [...new Set(allSections.flatMap((s) => [...s.routes]))];
     expect(routes.filter((r) => !screens.has(r))).toEqual([]);
   });
 
   it('every label in curly quotes is text the app shows, word for word (“…” stands for a part left out)', () => {
     const source = appSource().replace(/’/g, "'");
-    const labels = [...new Set([...REVO_GUIDE.matchAll(/“([^”]+)”/g)].map((m) => m[1]))];
+    const labels = [...new Set([...`${REVO_GUIDE}\n${DEV_GUIDE}`.matchAll(/“([^”]+)”/g)].map((m) => m[1]))];
     expect(labels.length).toBeGreaterThan(50);
     const absent = labels.filter((l) =>
       l
@@ -78,6 +121,61 @@ describe('Revo’s guide names what the app has', () => {
     // system prompt: a cache miss costs about 0.3¢ more per 1,000 tokens. Trim before raising it again.
     expect(REVO_GUIDE.length).toBeLessThan(30_000);
     expect(REVO_GUIDE).not.toMatch(/\b[A-Z]+-\d+\b/);
+  });
+
+  it('the Dev guide stays compact too', () => {
+    // It rides on every question from Revisely Dev, cached as a block of its own.
+    expect(DEV_GUIDE.length).toBeLessThan(12_000);
+    expect(DEV_GUIDE).not.toMatch(/\b[A-Z]+-\d+\b/);
+  });
+});
+
+describe('the Dev guide goes only with questions from Revisely Dev', () => {
+  const DAY = '2026-11-16';
+  const context = (extra: Partial<RevoContext> = {}): RevoContext => ({
+    totals: {
+      memorizedPages: 20, revisedWithin7Days: 20, revisedWithin30Days: 20, daysWithSession30: 10, streakDays: 3, sessions30: 10,
+      weakPages: 0, moderatePages: 0, strongPages: 20, weakRevisedLast7Days: 0, pagesPerDay7: 5, pagesPerDay30: 5, plannedPerDay: 5,
+    },
+    today: { plannedPages: 5, revisedPages: 0, minutes: 0, memorizedPages: 0, nextPages: [582, 583, 584, 585, 586], weakNext: [], done: false },
+    weakPages: [],
+    week: [{ day: DAY, pages: 0 }],
+    localTime: '20:00',
+    ...extra,
+  });
+  const recitation: RevoRecitation = {
+    days: 28, takes: 1, daysRecited: 1, minutes: 3, words: 40, score: 1, earlierScore: null, weeks: [1], mistakes: 0,
+    kinds: { wrong: 0, skipped: 0, added: 0, harakat: 0, letter: 0 }, unclear: 0, tajweed: null, stillMarked: 0, cleared: 0,
+    slipping: [], similar: [], last: null,
+  };
+  const ask = (c: RevoContext) => buildAskRequest({ day: DAY, question: 'How do I recite with the page hidden?', context: c, attached: [], memory: [], history: [] });
+
+  it('the store app’s questions are exactly as before: one system block', () => {
+    expect(ask(context()).system).toEqual([{ type: 'text', text: REVO_SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }]);
+  });
+
+  it('Revisely Dev’s carry it after the main prompt, the main prompt unchanged', () => {
+    const dev = ask(context({ app: 'dev' }));
+    expect(dev.system.map((s) => s.text)).toEqual([REVO_SYSTEM_PROMPT, DEV_GUIDE_SYSTEM]);
+    expect(dev.system[0]).toEqual(ask(context()).system[0]);
+    expect(dev.system[1].cache_control).toEqual({ type: 'ephemeral' });
+    expect(DEV_GUIDE_SYSTEM).toContain(DEV_GUIDE);
+  });
+
+  it('with a recitation, the recitation rules come after it', () => {
+    expect(ask(context({ app: 'dev', recitation })).system.map((s) => s.text)).toEqual([REVO_SYSTEM_PROMPT, DEV_GUIDE_SYSTEM, RECITATION_SYSTEM]);
+  });
+
+  it('a day in review never carries it', () => {
+    expect(buildReviewRequest({ day: DAY, context: context({ app: 'dev' }), memory: [] }).system).toHaveLength(1);
+  });
+
+  it('the server takes app "dev" and nothing else there', () => {
+    const plain = JSON.parse(JSON.stringify(context())) as Record<string, unknown>;
+    expect(validateContext({ ...plain, app: 'dev' }).app).toBe('dev');
+    expect(validateContext(plain).app).toBeUndefined();
+    expect(() => validateContext({ ...plain, app: 'store' })).toThrow();
+    expect(() => validateContext({ ...plain, app: true })).toThrow();
   });
 });
 

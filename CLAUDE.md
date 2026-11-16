@@ -1708,12 +1708,28 @@ app; `askCoach`/`setCoachOptIn` stay as they were until Insights links to Revo. 
   emulators (only the model is a stand-in), so `[REVO-23]` runs the app's real requests.
 - **The guide** (`functions/src/revo/guide.ts`, REVO-30): how Revisely works, for Revo, in the cached part of its
   prompt: each rule in user words, where every screen and setting is, the steps for common tasks, what is for testers,
-  and what the app can't do with the closest way. **Change the guide in the same PR as a feature** (a rule, a screen, a
-  route, a label, a setting): `guide.test.ts` fails when BEHAVIOUR.md has a rule the guide doesn't cover (or list in
-  `GUIDE_INTERNAL` with why), or the guide names a route or a “label” the app no longer has (curly quotes mean the
-  app's exact text; plain quotes are examples). `functions/scripts/revo-guide-samples.js` asks the real model ~25
-  how-to questions and checks each answer's facts (`--dry` checks the requests; live needs the coach key). A changed
-  guide is a changed system prompt: deploy `revoAsk,revoDayInReview` and re-record (`scripts/record-anthropic.js`).
+  and what the app can't do with the closest way.
+  - **Every change a user can see updates the guide in the same PR** (Majd, Nov 16 2026: "whatever app changes we make,
+    revo should get that update too"): a rule, a screen, a route, a label, a setting, an Undo, a mode. Features in the
+    store app (and its testers') go in `GUIDE_SECTIONS`; features only Revisely Dev has go in `DEV_GUIDE_SECTIONS`.
+    When a Dev feature reaches the store app, move its lines to the main guide.
+  - **The Dev guide** is a system block of its own (`DEV_GUIDE_SYSTEM`), sent after the main prompt only when the
+    context says `app: 'dev'` (Revisely Dev, `isDevVariant()`). Store requests never carry it, so they, their prompt
+    cache and the recorded replies stay byte-identical; a change to the Dev guide needs no re-record. A day in review
+    doesn't carry it.
+  - **`guide.test.ts` fails** when:
+    - BEHAVIOUR.md has a rule no section covers and `GUIDE_INTERNAL` doesn't list;
+    - a `GUIDE_INTERNAL` reason doesn't start with one of `GUIDE_INTERNAL_KINDS` (`timing:`, `server:`, `layout:`,
+      `owner tool:`, `signed out:`, `superseded:`, `prompt:`), or mentions Dev. Nothing a user sees may sit there;
+    - a rule under a BEHAVIOUR.md heading marked "(Revisely Dev)" isn't in the Dev guide, or is in the main one (so a
+      Dev-only rule goes under such a heading);
+    - the guide names a route or a “label” the app no longer has (curly quotes mean the app's exact text; plain quotes
+      are examples).
+  - `functions/scripts/revo-guide-samples.js` asks the real model ~40 how-to questions (Revisely Dev's marked `dev`)
+    and checks each answer's facts (`--dry` checks the requests; live needs the coach key).
+  - A changed main guide is a changed system prompt: deploy `revoAsk,revoDayInReview` and re-record
+    (`scripts/record-anthropic.js`, needs the coach key). On develop, `dev-backend.yml` deploys them to revisely-dev
+    on merge; production's are deployed by hand with a release.
 - **Recitation** (Revisely Dev, RINS-1; Majd, Nov 16 2026; plan `recite-insights-revo.md` in the orchestrator's notes):
   for an account that recites with Mark mistakes (`reciteLiveForAccount`), each question carries `context.recitation`.
   `lib/revo/recitation` builds it from `lib/reciteInsights` over Recite memory's takes: the last 4 weeks' takes and score,

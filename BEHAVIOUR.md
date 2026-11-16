@@ -747,7 +747,9 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   when the guide doesn't mention it at all, Revo says it isn't sure that's possible in Revisely rather than guess. The guide
   covers every rule in this file (or says why one isn't for users to ask about) and names only screens the navigation
   has and labels the app shows, word for word; a test fails when that stops being true, so a feature's PR changes the
-  guide with it.
+  guide with it. In Revisely Dev, Revo also knows what only Revisely Dev has (Recite and its marks, the hidden page,
+  the takes kept): that part of the guide goes only with Revisely Dev's questions, so the store app's are asked exactly
+  as before.
 
 - **REVO-31.** An answer can offer to open a screen (`openScreen`): Jump to…, the schedule editor, the memorized
   pages, Activity (Insights are a tab at its top), the daily log, Settings at one of its sections, the prayer

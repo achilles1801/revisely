@@ -58,6 +58,11 @@ export interface RevoContext {
    * recitation rules (recitation.ts) as a second system block.
    */
   recitation?: RevoRecitation;
+  /**
+   * 'dev' from Revisely Dev (lib/variant's isDevVariant), from Nov 16 2026: the request then carries the Dev guide
+   * (guide.ts DEV_GUIDE_SECTIONS) as a system block of its own. The store app never sends it.
+   */
+  app?: 'dev';
   localTime: string | null;
 }
 
