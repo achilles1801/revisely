@@ -1,7 +1,9 @@
-// Insights' Gaps (ACT-28), from lib/insightsGaps: what holds for any history of revision days.
+// Insights' Gaps (ACT-28), from lib/insightsGaps, and Last revised (ACT-30), from lib/lastRevised: what holds for
+// any history.
 
 import fc from 'fast-check';
 import { gapsView, LONG_GAP_DAYS, STRIP_MAX_DAYS } from '../../../src/lib/insightsGaps';
+import { lastRevisedRows, type LastRevisedView } from '../../../src/lib/lastRevised';
 import { runs } from './fixtures';
 
 const TODAY = '2026-11-15';
@@ -62,6 +64,28 @@ describe('Gaps (ACT-28)', () => {
         }
       }),
       { numRuns: runs(300) },
+    );
+  });
+});
+
+describe('Last revised (ACT-30)', () => {
+  it('[ACT-30] longest waiting first; a row is as recent as its least recently revised page; every memorized page is listed', () => {
+    const lastArb = fc.dictionary(fc.integer({ min: 1, max: 604 }).map(String), fc.integer({ min: 0, max: 120 }));
+    fc.assert(
+      fc.property(fc.uniqueArray(fc.integer({ min: 1, max: 604 }), { maxLength: 60 }), lastArb, fc.constantFrom('surah', 'juz', 'hizb', 'page') as fc.Arbitrary<LastRevisedView>, (memorized, ago, view) => {
+        const rows = lastRevisedRows(view, {
+          memorized,
+          last: (p) => (ago[p] != null ? dayOf(T - ago[p]) : null),
+          since: () => dayOf(T - 50),
+          today: TODAY,
+        });
+        for (let i = 1; i < rows.length; i++) expect(rows[i - 1].oldest.wait).toBeGreaterThanOrEqual(rows[i].oldest.wait);
+        for (const r of rows) for (const p of r.pages) expect(r.oldest.wait).toBeGreaterThanOrEqual(p.wait);
+        const listed = new Set(rows.flatMap((r) => r.pages.map((p) => p.page)));
+        expect(listed).toEqual(new Set(memorized));
+        if (view === 'page') expect(rows.length).toBe(memorized.length);
+      }),
+      { numRuns: runs(200) },
     );
   });
 });
