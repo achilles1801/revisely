@@ -6,7 +6,7 @@
 //
 // Labels are sent in the background, one at a time, and kept on this device until the server has them, so a dropped
 // connection loses nothing and never holds the labeller up.
-import { boot, currentUser, signInUrl } from '/firebase.js';
+import { boot, currentUser, signInUrl, signOutNow } from '/firebase.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -795,7 +795,10 @@ function wire() {
     closeMenu();
     const act = b.dataset.act;
     if (act === 'back') goBack();
-    else if (act === 'text+' || act === 'text-') textSize(act === 'text+' ? 1 : -1);
+    else if (act === 'signout') {
+      stop();
+      signOutNow(ctx).catch(() => {}).finally(() => location.replace('/sign-in'));
+    } else if (act === 'text+' || act === 'text-') textSize(act === 'text+' ? 1 : -1);
     else if (act === 'skip-audio') skip('audio');
     else if (act === 'skip-passage') skip('not-this-passage');
     else if (act === 'skip-other') skip('other');

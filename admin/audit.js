@@ -57,6 +57,7 @@ async function load() {
 
 function by(b) {
   if (b.via === 'script') return '<span class="tag">script</span> ' + esc(b.email || '');
+  if (b.via === 'invite') return esc(b.email || 'an owner');
   return esc(b.email || 'a reviewer') + (b.role ? ' <span class="tag">' + esc(ROLE[b.role] || b.role) + '</span>' : '');
 }
 
@@ -84,7 +85,14 @@ function render() {
   } else {
     thead.innerHTML = '<tr><th>When</th><th>Account</th><th>Role</th><th>By</th></tr>';
     tbody.innerHTML = st.rows.length
-      ? st.rows.map((r) => '<tr><td>' + esc(when(r.at)) + '</td><td>' + esc(r.email || r.uid) + '</td><td>' + esc(r.from ? ROLE[r.from] : 'No role') + ' → <b>' + esc(r.to ? ROLE[r.to] : 'No role') + '</b></td><td>' + by(r.by) + '</td></tr>').join('')
+      ? st.rows.map((r) => {
+          if (r.kind === 'invite') {
+            const what = r.action === 'cancelled' ? 'Invite cancelled' : 'Invited';
+            return '<tr><td>' + esc(when(r.at)) + '</td><td>' + esc(r.email) + '</td><td>' + what + (r.role ? ' as <b>' + esc(ROLE[r.role] || r.role) + '</b>' : '') + '</td><td>' + by(r.by) + '</td></tr>';
+          }
+          const via = r.by && r.by.via === 'invite' ? ' <span class="tag">from an invite, on first sign-in</span>' : '';
+          return '<tr><td>' + esc(when(r.at)) + '</td><td>' + esc(r.email || r.uid) + '</td><td>' + esc(r.from ? ROLE[r.from] : 'No role') + ' → <b>' + esc(r.to ? ROLE[r.to] : 'No role') + '</b>' + via + '</td><td>' + by(r.by) + '</td></tr>';
+        }).join('')
       : '<tr><td colspan="4" class="none">No role changes yet.</td></tr>';
   }
   const first = (st.cursors.length - 1) * PAGE;

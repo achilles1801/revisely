@@ -8,8 +8,11 @@ import {
   getAuth,
   getRedirectResult,
   GoogleAuthProvider,
+  isSignInWithEmailLink,
   onAuthStateChanged,
+  sendSignInLinkToEmail,
   signInWithEmailAndPassword,
+  signInWithEmailLink,
   signInWithPopup,
   signInWithRedirect,
   signOut,
@@ -124,6 +127,48 @@ export function signInEmail(ctx, email, password) {
   return signInWithEmailAndPassword(ctx.auth, email, password);
 }
 
+// ── Email link (passwordless): for people without Google. The link signs them in, making the account the first time;
+// an email link is a verified email, so it claims an invite (functions/src/console/invites.ts). ──
+const LINK_EMAIL_KEY = 'revisely.console.linkEmail';
+
+/** Sends the sign-in link; it brings them back to the sign-in page, then on to `next`. */
+export async function sendEmailLink(ctx, email, next) {
+  const url = location.origin + '/sign-in' + (next && next !== '/' ? '?next=' + encodeURIComponent(next) : '');
+  await sendSignInLinkToEmail(ctx.auth, email, { url, handleCodeInApp: true });
+  try {
+    localStorage.setItem(LINK_EMAIL_KEY, email);
+  } catch {
+    // private mode: they confirm the email when the link opens
+  }
+}
+
+/** This page was opened from a sign-in link. */
+export function isEmailLink(ctx) {
+  return isSignInWithEmailLink(ctx.auth, location.href);
+}
+
+/** The email the link was sent to from this browser, if it remembers. */
+export function linkEmail() {
+  try {
+    return localStorage.getItem(LINK_EMAIL_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+/** Finishes signing in from the link, then takes the link's code out of the address bar. */
+export async function finishEmailLink(ctx, email) {
+  const res = await signInWithEmailLink(ctx.auth, email, location.href);
+  try {
+    localStorage.removeItem(LINK_EMAIL_KEY);
+  } catch {
+    // nothing kept
+  }
+  const next = new URLSearchParams(location.search).get('next');
+  history.replaceState(null, '', '/sign-in' + (next ? '?next=' + encodeURIComponent(next) : ''));
+  return res;
+}
+
 export function signOutNow(ctx) {
   return signOut(ctx.auth);
 }
@@ -139,6 +184,9 @@ export function signInMessage(err) {
   if (code === 'auth/user-disabled') return 'This account is turned off.';
   if (code === 'auth/network-request-failed') return 'No connection. Check it and try again.';
   if (code === 'auth/popup-blocked') return 'The browser blocked the sign-in window. Allow pop-ups for this site, or try again.';
+  if (code === 'auth/invalid-action-code' || code === 'auth/expired-action-code') return 'That sign-in link has expired or was used already. Send a new one.';
+  if (code === 'auth/operation-not-allowed') return 'Email links aren’t switched on for this console yet. Use Google for now.';
+  if (code === 'auth/missing-email' || code === 'auth/invalid-email') return 'Type your email address.';
   return 'Sign-in didn’t finish (' + (code.replace('auth/', '') || 'unknown') + '). Try again.';
 }
 

@@ -308,6 +308,86 @@ const BY: Reviewer = { uid: 'staff1', email: 'owner@example.com', role: 'owner',
     await expect(handleAdminConsole(majd, { action: 'labels.get', id: 'gone' }, true, deps)).rejects.toThrow('That clip is gone.');
   });
 
+  it('invites: an email with no account is invited; its first verified sign-in claims the role once; waiting and cancelling', async () => {
+    const roles = new Map<string, string | null>();
+    const set: { uid: string; role: string | null; via: string }[] = [];
+    const accounts = new Map<string, AccountInfo>();
+    const account = (uid: string, email: string): AccountInfo => ({ uid, exists: true, email, emailHidden: false, providers: ['google.com'], createdAt: NOW, lastSignInAt: NOW, disabled: false });
+    accounts.set('old1', account('old1', 'known@example.com'));
+    let clock = NOW;
+    const deps: ConsoleDeps = {
+      db,
+      accounts: async (uids) => new Map(uids.map((uid) => [uid, accounts.get(uid) ?? { uid, exists: false, email: null, emailHidden: false, providers: [], createdAt: null, lastSignInAt: null, disabled: false }])),
+      accountByEmail: async (email) => [...accounts.values()].find((a) => a.email === email.toLowerCase()) ?? null,
+      hasPlan: async () => false,
+      staff: async () => [{ uid: 'staff1', email: 'owner@example.com', role: 'owner' as const }],
+      setRole: async (uid, role, by) => {
+        const from = (roles.get(uid) ?? null) as never;
+        roles.set(uid, role);
+        set.push({ uid, role, via: by.via });
+        return { id: 'r', uid, email: null, from, to: role, at: clock, by };
+      },
+      programOpen: true,
+      project: PROJECT,
+      now: () => (clock += 1000),
+      log: () => undefined,
+      invites: true,
+    };
+    const owner = { uid: 'staff1', email: 'owner@example.com', role: 'owner' as const };
+    type Me = { role: string | null; permissions: string[]; labels: boolean };
+    const me = async (uid: string, email: string, emailVerified: boolean) =>
+      (await handleAdminConsole({ uid, email, role: (roles.get(uid) ?? null) as never, emailVerified }, { action: 'me' }, false, deps)) as Me;
+
+    // An account that already exists gets the role at once, as before.
+    expect(await handleAdminConsole(owner, { action: 'staff.set', email: 'known@example.com', role: 'labeller' }, true, deps)).toMatchObject({ changed: true });
+    // No account yet: an invite.
+    const out = (await handleAdminConsole(owner, { action: 'staff.set', email: ' New.Person@Example.com ', role: 'labeller' }, true, deps)) as { invited: boolean; invite: { email: string; role: string } };
+    expect(out).toMatchObject({ changed: false, invited: true, invite: { email: 'new.person@example.com', role: 'labeller' } });
+    await expect(handleAdminConsole(owner, { action: 'staff.set', email: 'nobody@example.com', role: 'none' }, true, deps)).rejects.toThrow('Pick a role to invite them with.');
+    await expect(handleAdminConsole(owner, { action: 'staff.set', email: 'not-an-email', role: 'labeller' }, true, deps)).rejects.toThrow();
+    await expect(handleAdminConsole(owner, { action: 'staff.set', email: 'applereview@revisely.app', role: 'labeller' }, true, deps)).rejects.toThrow('Leave the App Review account alone.');
+    // Only an owner invites or sees invites.
+    const labeller = { uid: 'old1', email: 'known@example.com', role: 'labeller' as const };
+    await expect(handleAdminConsole(labeller, { action: 'staff.set', email: 'x@example.com', role: 'owner' }, true, deps)).rejects.toThrow('Your role doesn’t allow this.');
+
+    // A sign-in with that email, not verified: no role, and they wait.
+    expect(await me('u-new', 'new.person@example.com', false)).toMatchObject({ role: null, permissions: [] });
+    let list = (await handleAdminConsole(owner, { action: 'staff.list' }, true, deps)) as { invites: { email: string }[]; waiting: { uid: string; verified: boolean }[] };
+    expect(list.invites.map((i) => i.email)).toEqual(['new.person@example.com']);
+    expect(list.waiting).toEqual([expect.objectContaining({ uid: 'u-new', verified: false })]);
+    // Verified (Google, an email link): the invite's role, once, recorded as from an invite by the owner.
+    expect(await me('u-new', 'New.Person@example.com', true)).toMatchObject({ role: 'labeller', permissions: ['recite.label'], labels: false });
+    expect(set.at(-1)).toEqual({ uid: 'u-new', role: 'labeller', via: 'invite' });
+    expect((await db.doc('consoleInvites/new.person@example.com').get()).data()).toMatchObject({ status: 'used', usedBy: 'u-new' });
+    list = (await handleAdminConsole(owner, { action: 'staff.list' }, true, deps)) as typeof list;
+    expect(list.invites).toEqual([]);
+    expect(list.waiting).toEqual([]);
+    // Someone else with the same email later claims nothing.
+    expect(await me('u-other', 'new.person@example.com', true)).toMatchObject({ role: null });
+
+    // Someone with no invite waits; one tap gives the role and takes them off the list.
+    list = (await handleAdminConsole(owner, { action: 'staff.list' }, true, deps)) as typeof list;
+    expect(list.waiting.map((w) => w.uid)).toEqual(['u-other']);
+    accounts.set('u-other', account('u-other', 'new.person@example.com'));
+    await handleAdminConsole(owner, { action: 'staff.set', uid: 'u-other', role: 'labeller' }, true, deps);
+    list = (await handleAdminConsole(owner, { action: 'staff.list' }, true, deps)) as typeof list;
+    expect(list.waiting).toEqual([]);
+
+    // Cancelling: the invite no longer gives anything.
+    await handleAdminConsole(owner, { action: 'staff.set', email: 'later@example.com', role: 'admin' }, true, deps);
+    expect(await handleAdminConsole(owner, { action: 'staff.cancelInvite', email: 'later@example.com' }, true, deps)).toEqual({ cancelled: true });
+    expect(await handleAdminConsole(owner, { action: 'staff.cancelInvite', email: 'later@example.com' }, true, deps)).toEqual({ cancelled: false });
+    expect(await me('u-later', 'later@example.com', true)).toMatchObject({ role: null });
+
+    // The audit log's role view shows invites made and cancelled (setRole's own entries are faked here).
+    const page = (await handleAdminConsole(owner, { action: 'audit.roles' }, true, deps)) as { rows: { kind?: string; action?: string; email: string; role?: string }[] };
+    expect(page.rows.filter((r) => r.kind === 'invite').map((r) => [r.action, r.email, r.role])).toEqual([
+      ['cancelled', 'later@example.com', 'admin'],
+      ['created', 'later@example.com', 'admin'],
+      ['created', 'new.person@example.com', 'labeller'],
+    ]);
+  });
+
   (process.env.FIREBASE_AUTH_EMULATOR_HOST ? it : it.skip)('role changes keep other claims and go to the audit log', async () => {
     const auth = getAuth(app);
     const email = `staff-${Date.now()}@example.com`;
@@ -321,7 +401,7 @@ const BY: Reviewer = { uid: 'staff1', email: 'owner@example.com', role: 'owner',
     await setRole(auth, db, user.uid, null, by, NOW + 2);
     expect(roleOf((await auth.getUser(user.uid)).customClaims)).toBeNull();
     const log = await rolesPage(db, {});
-    expect(log.rows.map((r) => [r.from, r.to])).toEqual([
+    expect(log.rows.map((r) => ('from' in r ? [r.from, r.to] : [r.action, r.email]))).toEqual([
       ['reviewer', null],
       ['owner', 'reviewer'],
     ]);

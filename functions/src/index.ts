@@ -459,12 +459,14 @@ function adminFailure(name: string, err: unknown): HttpsError {
  * The caller's account as the console sees it: its custom claims read live from Firebase Auth (not the ID token's
  * copy, which lasts an hour), so a role taken away with set-role.js stops working at the next call.
  */
-async function staffClaims(auth: { uid: string } | undefined): Promise<{ uid: string; email: string | null; claims: Record<string, unknown> } | null> {
+async function staffClaims(
+  auth: { uid: string } | undefined,
+): Promise<{ uid: string; email: string | null; emailVerified: boolean; claims: Record<string, unknown> } | null> {
   if (!auth?.uid) return null;
   try {
     const user = await getAuth().getUser(auth.uid);
     if (user.disabled) return null;
-    return { uid: user.uid, email: user.email ?? null, claims: (user.customClaims ?? {}) as Record<string, unknown> };
+    return { uid: user.uid, email: user.email ?? null, emailVerified: user.emailVerified, claims: (user.customClaims ?? {}) as Record<string, unknown> };
   } catch (err) {
     if ((err as { code?: string }).code === 'auth/user-not-found') return null;
     throw err;
@@ -752,6 +754,8 @@ const consoleDeps = {
   metricsEnvs: metricsEnvironments(PROJECT_ID).map(({ env, label, here }) => ({ env, label, here })),
   now: () => Date.now(),
   log: (entry: Record<string, unknown>) => logger.info('console', entry),
+  // Invites and the waiting list: the dev console only for now (Majd, Nov 16 2026), where people outside the team sign in.
+  invites: LABEL_PROJECTS.includes(PROJECT_ID) || testing,
   labels: {
     db: adminDb,
     open: LABEL_PROJECTS.includes(PROJECT_ID) || testing,
@@ -767,7 +771,7 @@ const consoleDeps = {
 export const adminConsole = onCall({ cors: CONSOLE_ORIGINS, timeoutSeconds: 60, maxInstances: 3 }, async (request) => {
   try {
     const staff = await staffClaims(request.auth);
-    const caller: StaffCaller | null = staff ? { uid: staff.uid, email: staff.email, role: roleOf(staff.claims) } : null;
+    const caller: StaffCaller | null = staff ? { uid: staff.uid, email: staff.email, role: roleOf(staff.claims), emailVerified: staff.emailVerified } : null;
     // The test emulator decodes App Check tokens without verifying them, and the console there has none.
     return await handleAdminConsole(caller, request.data, !!request.app || testing, consoleDeps);
   } catch (err) {

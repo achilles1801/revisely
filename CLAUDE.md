@@ -598,14 +598,14 @@ is https://revisely-dev.web.app** (revisely-dev's Hosting, deployed by hand: `fi
 revisely-dev`; nothing deploys Hosting by itself). It shows production and dev (below). https://metrics.revisely.app
 (and revision-buddy-3a398.web.app) only redirects there since Nov 14 2026 (`scripts/metrics/metrics-redirect/`, its
 README has the deploy and the undo); never deploy the root `firebase.json`'s hosting to production.
-- **Pages:** `/sign-in` (its own page: Google, or email and password; no sign-up; an account without a role sees "No
-  access" with Sign out, and nothing else), `/` Overview (the metrics), `/open-door` and `/open-door/<uid>`, `/audit`,
+- **Pages:** `/sign-in` (its own page, phone-first: Google, an email link for people without Google, or email and
+  password; an account with no role and no invite sees "Waiting for access" with its email and nothing else), `/` Overview (the metrics), `/open-door` and `/open-door/<uid>`, `/audit`,
   `/staff` (owners only: give a role by exact email, change or take one; no changing your own, never the App Review
   account, never the last owner; each change in the audit log), `/label` (below). Signed out, every address goes to
   `/sign-in?next=…` (`shell.js`). Hosting's `cleanUrls` and rewrites serve them.
 - **Roles** (`functions/src/console/roles.ts`, the one permission list): `owner` (everything, roles too), `admin`
   (everything but roles), `reviewer` (Open Door read and decide; no revoke, metrics, Revo conversations or audit),
-  `dev` (metrics only), `labeller` (the labelling page only). A custom claim `role`, given on the Staff page or with `cd functions && GOOGLE_APPLICATION_CREDENTIALS=… node
+  `dev` (metrics only), `labeller` (the labelling page only; any number of accounts). A custom claim `role`, given on the Staff page or with `cd functions && GOOGLE_APPLICATION_CREDENTIALS=… node
   scripts/set-role.js <email|uid> <role|none>` (`--list`, `--show`, `--roles`; refuses to remove the last owner), each
   change recorded in `consoleAudit` (closed). Who has a role is never in the repository. The old `admin: true` claim
   counts as owner until set-role replaces it (`set-admin.js` now only takes it away). The callables read claims live
@@ -633,6 +633,18 @@ README has the deploy and the undo); never deploy the root `firebase.json`'s hos
   (`OWN_AUTH_DOMAIN_HOSTS` in `admin/firebase.js`: metrics.revisely.app, revisely-dev.web.app); a host joins only once
   its `/__/auth/handler` is a redirect URI of the project's Web OAuth client and an authorized domain. Phones sign in
   with a full-page redirect there.
+- **Invites and the waiting list** (`functions/src/console/invites.ts`; Majd, Nov 16 2026: "that should be its own role
+  i can attach to a approved user … how would signing up work for them?"; the dev console only, `invites` in index.ts).
+  - **Adding someone:** on the Staff page, an owner adds an email with a role. If the account has signed in before, it gets
+    the role now. If not, a pending invite (`consoleInvites/{email}`).
+  - **The first sign-in:** when that person signs in with that email, verified (Google or the email link; a password
+    sign-up's email is not), adminConsole `me` gives the role through setRole (`via: 'invite'`) and marks the invite used.
+  - **No role and no invite:** they see "Waiting for access" and are listed on the Staff page (`consoleWaiting/{uid}`,
+    30 days) with a one-tap Give role.
+  - **Cancelling and the audit log:** invites can be cancelled. Invites made and cancelled are in the audit log's Role
+    changes, beside the role changes themselves.
+  - **Sign-in methods:** the email link needs "Email link (passwordless sign-in)" on in Firebase Auth's Email/Password
+    provider (revisely-dev). It makes the account the first time.
 - **Label recitations** (`/label`, `admin/label.*`; adminConsole `labels.*`, `functions/src/console/labels.ts`; permission
   `recite.label`: owners, admins and **labellers**; revisely-dev only, `LABEL_PROJECTS`). Majd, Nov 15–16 2026: "if the
   issue is those recitations don't say what is right or wrong then i can help with that … i can even get my quran
