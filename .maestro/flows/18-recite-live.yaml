@@ -307,11 +307,10 @@ appId: com.revisionbuddy.app
 # Recite the mistakes again (Majd, Nov 15 2026): one take over the stretch from the first mistake to the last, from the
 # ayah before (An-Naml 22–23). It stops by itself once the checker has decided the stretch's last word, and its summary
 # says what the take before found there.
-# No wait for the bar first: here the checker answers from a recording at once, so the take can end before Maestro
-# first looks, and the bar is gone (#676's run 43816591729, Android, both attempts: only the drill's summary showed).
-# "Before: …" is shown only in this take's summary, so it is the proof the take ran.
 - tapOn:
     id: take-summary-drill
+# No wait for the bar between: the drill is short and stops by itself, so on Android its summary can be up before
+# Maestro has seen the bar (#632's run 43770950205). Only the drill's summary has "Before:".
 - extendedWaitUntil:
     visible:
       id: take-summary-before
