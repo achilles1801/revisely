@@ -6,6 +6,7 @@ import { common } from './common';
 import { help } from './help';
 import { home } from './home';
 import { insights } from './insights';
+import { insightsTab } from './insightsTab';
 import { journal } from './journal';
 import { memorization } from './memorization';
 import { mushaf } from './mushaf';
@@ -36,6 +37,7 @@ export const en = {
   help,
   home,
   insights,
+  insightsTab,
   journal,
   memorization,
   mushaf,

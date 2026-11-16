@@ -91,18 +91,18 @@ export default function AlgorithmScreen() {
       >
         <View style={v2.titleBlock}>
           <Text style={[typeV2.largeTitle, { color: palette.text }]} accessibilityRole="header" maxFontSizeMultiplier={1.4}>
-            {t('insights.tab.title')}
+            {t('insightsTab.title')}
           </Text>
-          <Text style={[typeV2.meta, { color: palette.secondary }]}>{t('insights.tab.subtitle')}</Text>
+          <Text style={[typeV2.meta, { color: palette.secondary }]}>{t('insightsTab.subtitle')}</Text>
         </View>
         <Hairline />
 
         {!hasEnoughSessions ? (
           <View testID="insights-warming">
-            <SectionHeader title={t('insights.tab.warmingUp')} />
+            <SectionHeader title={t('insightsTab.warmingUp')} />
             <View style={v2.block}>
               <Text style={[typeV2.body, { color: palette.secondary }]}>
-                {t('insights.tab.startsAfter', { n: INSIGHTS_MIN_SESSIONS })}
+                {t('insightsTab.startsAfter', { n: INSIGHTS_MIN_SESSIONS })}
               </Text>
               <View style={v2.progress}>
                 <ProgressBar
@@ -112,7 +112,7 @@ export default function AlgorithmScreen() {
                 />
               </View>
               <Text style={[typeV2.meta, typeV2.numeral, { color: palette.secondary }]}>
-                {t('insights.tab.soFar', { n: completedSessionCount, total: INSIGHTS_MIN_SESSIONS })}
+                {t('insightsTab.soFar', { n: completedSessionCount, total: INSIGHTS_MIN_SESSIONS })}
               </Text>
             </View>
             <Hairline />
@@ -122,17 +122,17 @@ export default function AlgorithmScreen() {
             {allPageRows.length > 0 && (
               <>
                 <SectionHeader
-                  title={t('insights.tab.strength')}
-                  detail={t('insights.tab.revisedPages', { count: allPageRows.length })}
+                  title={t('insightsTab.strength')}
+                  detail={t('insightsTab.revisedPages', { count: allPageRows.length })}
                 />
                 <StrengthBar ratings={allPageRows.map((r) => r.strength)} />
                 <Hairline />
               </>
             )}
 
-            <SectionHeader title={t('insights.tab.focus')} detail={t('insights.tab.focusDetail')} />
+            <SectionHeader title={t('insightsTab.focus')} detail={t('insightsTab.focusDetail')} />
             {topPages.length === 0 ? (
-              <QuietLine testID="focus-empty">{t('insights.tab.focusEmpty')}</QuietLine>
+              <QuietLine testID="focus-empty">{t('insightsTab.focusEmpty')}</QuietLine>
             ) : (
               topPages.map((row, i) => {
                 const text = pageRowText(row.pageNumber, (page) => `${getRatingLabel(row.strength)} · ${page} · ${row.reason}`);
@@ -153,7 +153,7 @@ export default function AlgorithmScreen() {
             )}
             <Hairline />
 
-            <SectionHeader title={t('insights.tab.browse')} detail={t('insights.tab.weakestFirst')} />
+            <SectionHeader title={t('insightsTab.browse')} detail={t('insightsTab.weakestFirst')} />
             <BrowseByStrength rows={allPageRows} onOpenPage={openPagePreview} />
           </>
         )}
