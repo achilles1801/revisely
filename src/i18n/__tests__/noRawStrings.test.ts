@@ -20,6 +20,7 @@ const EXTRACTED: string[] = [
   'components/memorization',
   'components/mushaf',
   'components/offline',
+  'components/plan',
   'components/player',
   'components/prayer',
   'components/qibla',

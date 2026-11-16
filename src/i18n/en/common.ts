@@ -25,6 +25,10 @@ export const common = {
   pageShort: 'p. {{n}}',
   page: 'Page',
   today: 'Today',
+  tomorrow: 'Tomorrow',
+  edit: 'Edit',
+  search: 'Search',
+  apply: 'Apply',
   /** "3 of 20". */
   nOfTotal: '{{n}} of {{total}}',
   saving: 'Saving…',

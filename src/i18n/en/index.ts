@@ -10,6 +10,7 @@ import { memorization } from './memorization';
 import { mushaf } from './mushaf';
 import { offline } from './offline';
 import { onboarding } from './onboarding';
+import { plan } from './plan';
 import { player } from './player';
 import { prayer } from './prayer';
 import { qibla } from './qibla';
@@ -35,6 +36,7 @@ export const en = {
   mushaf,
   offline,
   onboarding,
+  plan,
   player,
   prayer,
   qibla,

@@ -14,6 +14,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useHaptics } from '../../design/haptics';
 import { spacing } from '../../theme/spacing';
 import { arabicV2, layoutV2, radiusV2, typeV2 } from '../../theme/v2';
+import { t } from '../../i18n';
 
 /**
  * Searchable picker sheet: header (Cancel / Title / Done), a search field,
@@ -82,12 +83,12 @@ export const ListPickerSheet = forwardRef<BottomSheetModal, ListPickerSheetProps
       activeTab,
       onTabChange,
       onSelect,
-      leftLabel = 'Cancel',
+      leftLabel = t('common.cancel'),
       onLeft,
       rightLabel,
       onRight,
       rightDisabled,
-      searchPlaceholder = 'Search',
+      searchPlaceholder = t('common.search'),
       stackBehavior,
       onDismiss,
       footer,
@@ -206,7 +207,7 @@ export const ListPickerSheet = forwardRef<BottomSheetModal, ListPickerSheetProps
               testID="picker-search"
             />
             {query.length > 0 ? (
-              <Tap onPress={() => setQuery('')} hitSlop={10} accessibilityRole="button" accessibilityLabel="Clear search">
+              <Tap onPress={() => setQuery('')} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('plan.picker.clear')}>
                 <Ionicons name="close-circle" size={18} color={palette.secondary} />
               </Tap>
             ) : null}
@@ -231,7 +232,7 @@ export const ListPickerSheet = forwardRef<BottomSheetModal, ListPickerSheetProps
           contentContainerStyle={[v2.listContent, { paddingBottom: insets.bottom + spacing.xl }]}
           ListEmptyComponent={
             <Text style={[typeV2.body, v2.empty, { color: palette.secondary }]}>
-              {query ? `No results for “${query}”` : tab?.emptyText ?? 'Nothing here yet.'}
+              {query ? t('plan.picker.noResults', { query }) : tab?.emptyText ?? t('plan.picker.empty')}
             </Text>
           }
           ListFooterComponent={
