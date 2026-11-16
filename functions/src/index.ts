@@ -49,7 +49,8 @@ import { SUPPORT_ORIGINS, SUPPORT_PAGES, SupportError } from './support/logic';
 import { handleDevPremium, handleSupportApplication, handleSupportLink } from './support/handler';
 import { adminSupportStore, deleteSupportData } from './support/admin';
 import { AccountInfo, consoleErrorOf, handleAdminConsole } from './console/handler';
-import { StaffCaller, roleOf } from './console/roles';
+import { Role, StaffCaller, roleOf } from './console/roles';
+import { RoleActor, setRole, staff as consoleStaff } from './console/staff';
 import { AUDIO_PREFIX as LABEL_AUDIO_PREFIX, LABEL_PROJECTS } from './console/labels';
 
 setGlobalOptions({ region: 'us-central1', maxInstances: 3 });
@@ -744,6 +745,8 @@ const consoleDeps = {
   async hasPlan(uid: string) {
     return (await adminDb.doc(`users/${uid}`).get()).exists;
   },
+  staff: () => consoleStaff(getAuth()),
+  setRole: (uid: string, role: Role | null, by: RoleActor) => setRole(getAuth(), adminDb, uid, role, by),
   programOpen: !!SUPPORT_PAGES[PROJECT_ID] || testing,
   project: PROJECT_ID,
   metricsEnvs: metricsEnvironments(PROJECT_ID).map(({ env, label, here }) => ({ env, label, here })),

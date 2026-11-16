@@ -10,6 +10,8 @@
  *   od.revoke        take Premium through Open Door back (review.ts)  openDoor.revoke
  *   audit.decisions  the decisions, newest first                      audit.read
  *   audit.roles      role changes, newest first                       audit.read
+ *   staff.list       who has which role, and what each role may do    roles.manage
+ *   staff.set        give, change or take a role (by email or id)     roles.manage
  *   labels.next      the next recitation clip to label, with its audio  recite.label (labels.ts)
  *   labels.get       one clip again (going back)                      recite.label
  *   labels.save      a clip's label                                   recite.label
@@ -32,8 +34,8 @@ import {
   review,
   summary,
 } from '../support/review';
-import { ConsoleError, Permission, ROLE_NAMES, StaffCaller, permissionsOf, requirePermission } from './roles';
-import { RoleChange, rolesPage } from './staff';
+import { ConsoleError, GRANTS, PERMISSIONS, Permission, ROLES, ROLE_NAMES, Role, StaffCaller, isRole, permissionsOf, requirePermission } from './roles';
+import { RoleActor, RoleChange, StaffMember, roleChangeRefusal, rolesPage } from './staff';
 import { LabelDeps, handleLabels } from './labels';
 
 /** Accounts nobody may decide on from the console (the script refuses them too). */
@@ -59,6 +61,10 @@ export interface ConsoleDeps {
   accountByEmail(email: string): Promise<AccountInfo | null>;
   /** whether the account has a Revisely plan (a user document, made in the app) */
   hasPlan(uid: string): Promise<boolean>;
+  /** every account with a console role (staff.ts staff(): a scan of Firebase Auth) */
+  staff(): Promise<StaffMember[]>;
+  /** gives (null: takes) a role, keeping other claims, and records it in consoleAudit (staff.ts setRole) */
+  setRole(uid: string, role: Role | null, by: RoleActor): Promise<RoleChange | null>;
   /** Open Door runs in this project (SUPPORT_PAGES) */
   programOpen: boolean;
   project: string;
@@ -259,6 +265,52 @@ export async function handleAdminConsole(
       requirePermission(caller, 'audit.read');
       const page: { rows: RoleChange[]; next: string | null } = await rolesPage(deps.db, { cursor: data.cursor, limit: typeof data.limit === 'number' ? data.limit : undefined });
       return page;
+    }
+
+    case 'staff.list': {
+      requirePermission(caller, 'roles.manage');
+      const members = await deps.staff();
+      const accounts = await deps.accounts(members.map((m) => m.uid));
+      const order = (r: Role) => ROLES.indexOf(r);
+      const rows = members
+        .map((m) => {
+          const a = accounts.get(m.uid);
+          return { uid: m.uid, email: m.email, role: m.role, lastSignInAt: a?.lastSignInAt ?? null, disabled: a?.disabled ?? false, you: m.uid === caller.uid };
+        })
+        .sort((a, b) => order(a.role) - order(b.role) || String(a.email).localeCompare(String(b.email)));
+      const roles = ROLES.map((role) => ({ role, name: ROLE_NAMES[role], permissions: GRANTS[role].map((p) => PERMISSIONS[p]) }));
+      return { rows, roles };
+    }
+
+    case 'staff.set': {
+      const who = requirePermission(caller, 'roles.manage');
+      const raw = data.role;
+      if (!(raw === null || raw === 'none' || isRole(raw))) throw new ConsoleError('invalid-argument', 'Pick a role.');
+      const to: Role | null = raw === null || raw === 'none' ? null : raw;
+      let account: AccountInfo | null = null;
+      if (data.uid != null) account = (await deps.accounts([uidArg(data)])).get(str(data, 'uid')!) ?? null;
+      else {
+        const email = (str(data, 'email') ?? '').trim();
+        if (!email.includes('@')) throw new ConsoleError('invalid-argument', 'Type the account’s email.');
+        account = await deps.accountByEmail(email);
+      }
+      if (!account || !account.exists) {
+        throw new ConsoleError('not-found', 'No account has this email yet. They sign in once on the console’s sign-in page, then you can give them a role.');
+      }
+      const members = await deps.staff();
+      const refusal = roleChangeRefusal({
+        callerUid: caller.uid,
+        targetUid: account.uid,
+        targetEmail: account.email,
+        from: members.find((m) => m.uid === account!.uid)?.role ?? null,
+        to,
+        owners: members.filter((m) => m.role === 'owner').length,
+        protectedEmails: PROTECTED_EMAILS,
+      });
+      if (refusal) throw new ConsoleError(refusal.code, refusal.message);
+      const change = await deps.setRole(account.uid, to, { uid: who.uid, email: who.email, via: 'console' });
+      deps.log({ event: 'roles.set', by: caller.uid, uid: account.uid, from: change?.from ?? null, to, changed: !!change });
+      return { changed: !!change, change };
     }
 
     default:

@@ -56,6 +56,8 @@ describe('adminConsole: who gets what', () => {
     accounts: async () => { throw new Error('accounts were read'); },
     accountByEmail: async () => { throw new Error('accounts were read'); },
     hasPlan: async () => false,
+    staff: async () => { throw new Error('staff were read'); },
+    setRole: async () => { throw new Error('a role was set'); },
     programOpen: true,
     project: 'revisely-dev',
     now: () => Date.parse('2026-11-14T12:00:00Z'),
@@ -106,10 +108,17 @@ describe('adminConsole: who gets what', () => {
       { action: 'od.revoke', uid: 'u1', note: 'x', requestId: 'r_0123456789abcdefXYZ' },
       { action: 'audit.decisions' },
       { action: 'audit.roles' },
+      { action: 'staff.list' },
+      { action: 'staff.set', email: 'a@example.com', role: 'owner' },
     ];
     for (const data of actions) {
       expect(await code(handleAdminConsole(as(null), data, true, deps()))).toBe('permission-denied');
       expect(await code(handleAdminConsole(as('dev'), data, true, deps()))).toBe('permission-denied');
+    }
+    // Managing roles is the owner's alone: an admin or a reviewer can't list staff or give anyone a role.
+    for (const data of actions.slice(-2)) {
+      expect(await code(handleAdminConsole(as('admin'), data, true, deps()))).toBe('permission-denied');
+      expect(await code(handleAdminConsole(as('reviewer'), data, true, deps()))).toBe('permission-denied');
     }
     for (const data of [actions[5], actions[6], actions[7]]) {
       expect(await code(handleAdminConsole(as('reviewer'), data, true, deps()))).toBe('permission-denied');
@@ -141,6 +150,102 @@ describe('adminConsole: who gets what', () => {
   });
 });
 
+describe('adminConsole: the Staff page (owner only)', () => {
+  type Member = { uid: string; email: string | null; role: Role };
+  const account = (uid: string, email: string | null) => ({ uid, exists: true, email, emailHidden: false, providers: ['google.com'], createdAt: 0, lastSignInAt: 5, disabled: false });
+  const owner: StaffCaller = { uid: 'me', email: 'me@example.com', role: 'owner' };
+
+  function world(members: Member[], emails: Record<string, string>) {
+    const set: { uid: string; role: Role | null; by: unknown }[] = [];
+    const logs: Record<string, unknown>[] = [];
+    const byUid = new Map(Object.entries(emails).map(([email, uid]) => [uid, email]));
+    const d: ConsoleDeps = {
+      db: new Proxy({}, { get: () => { throw new Error('the database was read'); } }) as unknown as Firestore,
+      accounts: async (uids) => new Map(uids.map((uid) => [uid, byUid.has(uid) ? account(uid, byUid.get(uid)!) : { ...account(uid, null), exists: false }])),
+      accountByEmail: async (email) => (emails[email.toLowerCase()] ? account(emails[email.toLowerCase()], email) : null),
+      hasPlan: async () => false,
+      staff: async () => members,
+      setRole: async (uid, role, by) => {
+        set.push({ uid, role, by });
+        const from = members.find((m) => m.uid === uid)?.role ?? null;
+        return from === role ? null : { id: 'c1', uid, email: byUid.get(uid) ?? null, from, to: role, at: 1, by: by as never };
+      },
+      programOpen: true,
+      project: 'revisely-dev',
+      now: () => 0,
+      log: (e) => logs.push(e),
+    };
+    return { d, set, logs };
+  }
+
+  async function refusal(p: Promise<unknown>): Promise<string> {
+    try {
+      await p;
+    } catch (err) {
+      if (err instanceof ConsoleError) return `${err.code}: ${err.message}`;
+      throw err;
+    }
+    return 'ok';
+  }
+
+  const team: Member[] = [
+    { uid: 'me', email: 'me@example.com', role: 'owner' },
+    { uid: 'r1', email: 'reviewer@example.com', role: 'reviewer' },
+  ];
+  const emails = { 'me@example.com': 'me', 'reviewer@example.com': 'r1', 'new@example.com': 'n1', 'applereview@revisely.app': 'ar' };
+
+  it('lists staff (owners first, you marked) and what each role opens', async () => {
+    const { d } = world(team, emails);
+    const out = (await handleAdminConsole(owner, { action: 'staff.list' }, true, d)) as { rows: Record<string, unknown>[]; roles: { role: string; permissions: string[] }[] };
+    expect(out.rows).toEqual([
+      { uid: 'me', email: 'me@example.com', role: 'owner', lastSignInAt: 5, disabled: false, you: true },
+      { uid: 'r1', email: 'reviewer@example.com', role: 'reviewer', lastSignInAt: 5, disabled: false, you: false },
+    ]);
+    expect(out.roles.map((r) => r.role)).toEqual([...ROLES]);
+    expect(out.roles.find((r) => r.role === 'reviewer')!.permissions).toEqual(GRANTS.reviewer.map((p) => PERMISSIONS[p]));
+  });
+
+  it('gives a role by exact email, recorded as the console and the owner who did it', async () => {
+    const { d, set, logs } = world(team, emails);
+    const out = await handleAdminConsole(owner, { action: 'staff.set', email: ' new@example.com ', role: 'dev' }, true, d);
+    expect(out).toMatchObject({ changed: true, change: { uid: 'n1', from: null, to: 'dev' } });
+    expect(set).toEqual([{ uid: 'n1', role: 'dev', by: { uid: 'me', email: 'me@example.com', via: 'console' } }]);
+    expect(logs).toEqual([{ event: 'roles.set', by: 'me', uid: 'n1', from: null, to: 'dev', changed: true }]);
+  });
+
+  it('changes and takes roles by account id; the same role again changes nothing', async () => {
+    const { d, set } = world(team, emails);
+    expect(await handleAdminConsole(owner, { action: 'staff.set', uid: 'r1', role: 'admin' }, true, d)).toMatchObject({ changed: true });
+    expect(await handleAdminConsole(owner, { action: 'staff.set', uid: 'r1', role: 'none' }, true, d)).toMatchObject({ changed: true, change: { to: null } });
+    expect(await handleAdminConsole(owner, { action: 'staff.set', uid: 'r1', role: 'reviewer' }, true, d)).toEqual({ changed: false, change: null });
+    expect(set.map((x) => x.role)).toEqual(['admin', null, 'reviewer']);
+  });
+
+  it('refuses your own role, the App Review account, the last owner, unknown accounts and bad roles, before setting anything', async () => {
+    const { d, set } = world(team, emails);
+    expect(await refusal(handleAdminConsole(owner, { action: 'staff.set', uid: 'me', role: 'admin' }, true, d))).toMatch(/^failed-precondition: You can’t change your own role/);
+    expect(await refusal(handleAdminConsole(owner, { action: 'staff.set', email: 'AppleReview@revisely.app', role: 'dev' }, true, d))).toMatch(/^permission-denied/);
+    expect(await refusal(handleAdminConsole(owner, { action: 'staff.set', email: 'nobody@example.com', role: 'dev' }, true, d))).toMatch(/^not-found/);
+    expect(await refusal(handleAdminConsole(owner, { action: 'staff.set', email: 'new@example.com', role: 'root' }, true, d))).toMatch(/^invalid-argument/);
+    expect(await refusal(handleAdminConsole(owner, { action: 'staff.set', email: 'not-an-email', role: 'dev' }, true, d))).toMatch(/^invalid-argument/);
+    expect(await refusal(handleAdminConsole(owner, { action: 'staff.set', uid: '../x', role: 'dev' }, true, d))).toMatch(/^invalid-argument/);
+    expect(set).toEqual([]);
+  });
+
+  it('the last owner stays; with two, one may demote the other', async () => {
+    // The caller's own owner role already gone (taken a moment ago): the target is the last owner.
+    const lone = world([{ uid: 'o2', email: 'o2@example.com', role: 'owner' }], { 'o2@example.com': 'o2' });
+    expect(await refusal(handleAdminConsole(owner, { action: 'staff.set', uid: 'o2', role: 'admin' }, true, lone.d))).toMatch(/^failed-precondition: This is the last owner/);
+    const two = world([...team, { uid: 'o2', email: 'o2@example.com', role: 'owner' }], { ...emails, 'o2@example.com': 'o2' });
+    expect(await handleAdminConsole(owner, { action: 'staff.set', uid: 'o2', role: 'admin' }, true, two.d)).toMatchObject({ changed: true });
+  });
+
+  it('needs App Check like every action but me', async () => {
+    const { d } = world(team, emails);
+    expect(await refusal(handleAdminConsole(owner, { action: 'staff.list' }, false, d))).toMatch(/^failed-precondition/);
+  });
+});
+
 describe('adminConsole: recitation labels', () => {
   const untouchable = new Proxy({}, { get: () => { throw new Error('the database was read'); } }) as unknown as Firestore;
   const labels = (over: Partial<LabelDeps> = {}): LabelDeps => ({
@@ -159,6 +264,8 @@ describe('adminConsole: recitation labels', () => {
     project: 'revisely-dev',
     now: () => Date.parse('2026-11-15T12:00:00Z'),
     log: () => undefined,
+    staff: async () => { throw new Error('staff were read'); },
+    setRole: async () => { throw new Error('a role was set'); },
     labels: labels(),
     ...over,
   });
