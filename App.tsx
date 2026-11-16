@@ -22,6 +22,7 @@ import { currentRelease, releaseTags } from './src/lib/releaseInfo';
 import { markUiReady, startOtaUpdates } from './src/lib/updates/ota';
 import { startStoreChecks } from './src/lib/updates/storeUpdates';
 import { UpdateRequiredGate } from './src/components/updates/UpdateRequired';
+import { syncLayoutDirection } from './src/i18n/direction';
 
 // Every launch is one Sentry session, labelled with the exact JavaScript it ran
 // (src/lib/releaseInfo.ts): release com.revisionbuddy.app@1.0.2+19.u<update>,
@@ -86,6 +87,10 @@ Sentry.setTags(releaseTags(release));
 // New store versions are offered, or required below the minimum (storeUpdates.ts).
 startOtaUpdates();
 startStoreChecks();
+// The layout reads the way the app's language does, not the phone's: Android mirrored the English
+// app on a phone set to Arabic (BEHAVIOUR.md LANG-1). Applies from the next launch.
+// 1.0.4 is English only, so its direction is left to right.
+syncLayoutDirection('en');
 
 function App() {
   // Amiri (classical Naskh) for all Arabic UI text. If loading fails we still
