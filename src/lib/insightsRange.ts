@@ -3,6 +3,8 @@
 // on the phone. 7 days, 30 days (the default), 3 months and All time (since the account's first day:
 // Coverage in cycles, a weeks grid from the start).
 
+import { formatDate } from '../i18n';
+
 const dayNumber = (day: string) => Math.round(Date.parse(`${day}T00:00:00Z`) / 86_400_000);
 const daysBetween = (from: string, to: string) => dayNumber(to) - dayNumber(from);
 const shiftDay = (day: string, n: number) => new Date((dayNumber(day) + n) * 86_400_000).toISOString().slice(0, 10);
@@ -35,7 +37,7 @@ export function beforeWords(range: Exclude<InsightsRange, 'all'>): string {
 
 /** "9 September" (a day, as "since …" says it). */
 export function dayAndMonth(day: string): string {
-  return new Date(`${day}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', timeZone: 'UTC' });
+  return formatDate(new Date(`${day}T00:00:00Z`), { day: 'numeric', month: 'long', timeZone: 'UTC' }, 'en-GB');
 }
 
 /** A range as each section reads it: how many days, and the words for them. */

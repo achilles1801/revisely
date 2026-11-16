@@ -5,6 +5,7 @@ import { getJuzForPage, getPagesForJuz } from './quranData';
 import { describePassage } from './passages';
 import { formatDayLong } from './activityFormat';
 import { lastRevisedWords } from './recency';
+import { weekdayName } from '../i18n';
 
 // A day, or a timestamp whose first ten characters are its day (a page's record).
 const dayNumber = (day: string) => Math.round(Date.parse(`${day.slice(0, 10)}T00:00:00Z`) / 86_400_000);
@@ -176,7 +177,7 @@ export function hourDetail(
       : ago === 1
         ? 'yesterday'
         : ago < 7
-          ? `on ${new Date(`${last}T00:00:00Z`).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' })}`
+          ? `on ${weekdayName(new Date(`${last}T00:00:00Z`), 'long', 'UTC')}`
           : `on ${formatDayLong(last)}`;
   return {
     title: `${range} · ${minutesWords(minutes)}`,
@@ -214,7 +215,7 @@ export function timedRevisions(
     const ago = daysBetween(day, today);
     if (ago === 0) return 'Today';
     if (ago === 1) return 'Yesterday';
-    if (ago < 7) return new Date(`${day}T00:00:00Z`).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
+    if (ago < 7) return weekdayName(new Date(`${day}T00:00:00Z`), 'long', 'UTC');
     return formatDayLong(day);
   };
   return {

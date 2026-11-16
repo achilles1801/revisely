@@ -14,6 +14,7 @@ import {
 } from 'adhan';
 import type { Place, PrayerName, PrayerPrefs, TimeName } from './prefs';
 import { PRAYERS } from './prefs';
+import { dayMonth, formatTime as localeTime } from '../../i18n';
 
 /** The methods offered (adhan's factory names). */
 export const CALCULATION_METHODS = [
@@ -231,7 +232,7 @@ export function countdown(ms: number): string {
 }
 
 export function formatTime(date: Date): string {
-  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  return localeTime(date);
 }
 
 export const TIME_LABELS: Record<TimeName, { en: string; ar: string }> = {
@@ -261,6 +262,7 @@ const HIJRI_MONTHS = [
 /** "17 Jumada al-Ula 1448" (Umm al-Qura), or null where the phone's Intl lacks that calendar. */
 export function hijriDate(date: Date): string | null {
   try {
+    // i18n-ignore (numbers only: the month's name comes from HIJRI_MONTHS)
     const f = new Intl.DateTimeFormat('en-u-ca-islamic-umalqura', { day: 'numeric', month: 'numeric', year: 'numeric' });
     if (f.resolvedOptions().calendar !== 'islamic-umalqura') return null;
     const parts = f.formatToParts(date);
@@ -277,7 +279,5 @@ export function hijriDate(date: Date): string | null {
 
 /** "Wednesday 28 October". */
 export function gregorianDate(date: Date): string {
-  const weekday = date.toLocaleDateString('en-GB', { weekday: 'long' });
-  const dayMonth = date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
-  return `${weekday} ${dayMonth}`;
+  return dayMonth(date, { weekday: 'long' });
 }

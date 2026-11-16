@@ -1,5 +1,6 @@
 import { ActivityDay, isActivityDayEmpty, summarizeActivityDay } from './activity';
 import { shiftDay } from './journal';
+import { formatDate, monthName } from '../i18n';
 
 // Activity's calendar (new design): a month (or a week) of revision days, each
 // in jade by how much it held.
@@ -85,7 +86,7 @@ export function monthGrid(month: string): (string | null)[][] {
 
 /** "October 2026". */
 export function monthTitle(month: string): string {
-  return localDay(`${month}-01`).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  return formatDate(localDay(`${month}-01`), { month: 'long', year: 'numeric' });
 }
 
 /** "Oct 25 – 31", "Sep 27 – Oct 3", with the year when it isn't this year's. */
@@ -93,7 +94,7 @@ export function weekTitle(sunday: string, today: string): string {
   const saturday = shiftDay(sunday, 6);
   const a = localDay(sunday);
   const b = localDay(saturday);
-  const mon = (d: Date) => d.toLocaleDateString('en-US', { month: 'short' });
+  const mon = (d: Date) => monthName(d, 'short');
   const end = a.getMonth() === b.getMonth() ? `${b.getDate()}` : `${mon(b)} ${b.getDate()}`;
   const year = saturday.slice(0, 4) !== today.slice(0, 4) ? `, ${b.getFullYear()}` : '';
   return `${mon(a)} ${a.getDate()} – ${end}${year}`;
@@ -129,7 +130,7 @@ export function dayFacts(day: ActivityDay | undefined): string[] {
 export function heatDayLabel(date: string, today: string): string {
   const d = localDay(date);
   const sameYear = date.slice(0, 4) === today.slice(0, 4);
-  return d.toLocaleDateString('en-US', {
+  return formatDate(d, {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
@@ -139,7 +140,7 @@ export function heatDayLabel(date: string, today: string): string {
 
 /** VoiceOver's name for a cell: "Saturday, October 24: 12 pages revised, 34 min". */
 export function heatCellLabel(date: string, day: ActivityDay | undefined): string {
-  const name = localDay(date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  const name = formatDate(localDay(date), { weekday: 'long', month: 'long', day: 'numeric' });
   const facts = dayFacts(day);
   return `${name}: ${facts.length > 0 ? facts.join(', ') : 'no activity'}`;
 }
