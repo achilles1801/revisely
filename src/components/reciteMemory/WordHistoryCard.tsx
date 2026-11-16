@@ -3,7 +3,7 @@ import { LayoutChangeEvent, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
-import { arabicV2, layoutV2, typeV2 } from '../../theme/v2';
+import { layoutV2, typeV2 } from '../../theme/v2';
 import { Tap } from '../v2/Tap';
 import { Box, placeMenu } from '../verse/menuPlacement';
 import type { QuranWords } from '../../lib/recite/quranWords';
@@ -14,6 +14,7 @@ import { CLEAR_AFTER } from '../../lib/reciteMemory/memory';
 import { attemptWhat, clearLine, takeWhen, wrongCount } from '../../lib/reciteMemory/describe';
 import { markFill } from '../reciteLive/markColours';
 import { Phrase, Row, SmallPill } from '../reciteLive/MarkParts';
+import { WordChip } from '../reciteLive/WordChip';
 
 const CARD_MARGIN = 12;
 /** The latest tries the card lists (newest first). */
@@ -37,13 +38,7 @@ function TryRow({ attempt, now, fill, onPlay }: { attempt: Attempt; now: number;
       <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={1.3}>
         {what.text}
       </Text>
-      {what.heard ? (
-        <View style={[styles.heard, { backgroundColor: fill }]}>
-          <Text style={[arabicV2(18), { color: palette.text }]} maxFontSizeMultiplier={1.5}>
-            {what.heard}
-          </Text>
-        </View>
-      ) : null}
+      {what.heard ? <WordChip text={what.heard} fill={fill} maxScale={1.5} testID="past-try-heard" /> : null}
       {onPlay ? (
         <Tap
           onPress={onPlay}
@@ -226,7 +221,6 @@ const styles = StyleSheet.create({
   seeAll: { fontWeight: '600' },
   try: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 38, borderTopWidth: layoutV2.hairline },
   tryWhen: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  heard: { borderRadius: 6, paddingHorizontal: 5 },
   play: { width: 30, height: 30, borderRadius: 15, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginLeft: 4 },
   playIcon: { marginLeft: 2 },
   playSpace: { width: 34 },

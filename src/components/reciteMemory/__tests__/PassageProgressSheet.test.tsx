@@ -1,10 +1,12 @@
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { quranWords } from '../../../lib/recite/__fixtures__/quranWords';
 import { wordMemories } from '../../../lib/reciteMemory/memory';
 import type { TakeRecord } from '../../../lib/reciteMemory/record';
 import { PassageProgressSheet, takeRange } from '../PassageProgressSheet';
 import { plainText } from '../../../lib/passages';
+import { mixColors, paletteV2 } from '../../../theme/v2';
 
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
 jest.mock('react-native-reanimated', () => require('react-native-reanimated/mock'));
@@ -55,6 +57,12 @@ describe("a passage's progress sheet", () => {
     expect(screen.getByTestId('progress-line').props.children).toBe('Up from 95.1% on Mon 2 Nov · 3 takes');
     expect(screen.getByTestId('progress-chart')).toBeTruthy();
     expect(screen.getAllByTestId('progress-open-word')).toHaveLength(1);
+    // The page's past shade as one solid colour, and the word whole: no fixed lineHeight to cut its harakat off (WordChip).
+    const p = paletteV2(false, 'indigo');
+    const chip = StyleSheet.flatten(screen.getByTestId('progress-open-word').props.style);
+    expect(chip.backgroundColor).toBe(mixColors(p.sheet, p.markWord, 0.48));
+    expect(chip.opacity).toBeUndefined();
+    expect(StyleSheet.flatten(screen.getByText(words.uthmani(W)).props.style).lineHeight).toBeUndefined();
     const rows = screen.getAllByTestId('progress-take');
     expect(rows).toHaveLength(3);
     expect(rows[0].props.accessibilityLabel).toMatch(/^Today, 8:12 PM, 99\.1%, 1 mistake/);

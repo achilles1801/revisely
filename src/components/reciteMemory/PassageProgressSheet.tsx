@@ -2,11 +2,13 @@ import React from 'react';
 import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
-import { arabicV2, layoutV2, typeV2 } from '../../theme/v2';
+import { layoutV2, mixColors, typeV2 } from '../../theme/v2';
+import type { PaletteV2 } from '../../theme/v2';
 import { Sheet } from '../v2/Sheet';
 import { Tap } from '../v2/Tap';
 import type { QuranWords } from '../../lib/recite/quranWords';
 import { formatAccuracy, mistakesLabel, scoreLevel } from '../../lib/reciteLive/score';
+import type { Mark } from '../../lib/reciteLive/contract';
 import type { WordMemory } from '../../lib/reciteMemory/memory';
 import { openInRange } from '../../lib/reciteMemory/memory';
 import { progressLine } from '../../lib/reciteMemory/progress';
@@ -16,6 +18,12 @@ import { passageOf } from '../reciteLive/TakeSummarySheet';
 import { markFill } from '../reciteLive/markColours';
 import { PAST_OPACITY } from './RememberedLayers';
 import { AccuracyChart } from './AccuracyChart';
+import { WordChip } from '../reciteLive/WordChip';
+
+/** A word's remembered highlight on the sheet: the page's past shade (PAST_OPACITY) as one solid colour, WordChip's fill. */
+function pastFill(palette: PaletteV2, mark: Pick<Mark, 'kind'>, isDark: boolean): string {
+  return mixColors(palette.sheet, markFill(palette, mark), isDark ? PAST_OPACITY.dark : PAST_OPACITY.light);
+}
 
 /** "Ayahs 87–90" for a take within the passage's surah, else its own surah-first name. */
 export function takeRange(words: QuranWords, take: TakeRecord, sura: number): string {
@@ -88,14 +96,14 @@ export function PassageProgressSheet({
           <View style={styles.chips}>
             {open.map((m) =>
               m.lastMark ? (
-                <View key={m.w} style={styles.chip} testID={`progress-open-${m.group}`}>
-                  <View
-                    style={[StyleSheet.absoluteFill, styles.chipFill, { backgroundColor: markFill(palette, m.lastMark), opacity: isDark ? PAST_OPACITY.dark : PAST_OPACITY.light }]}
-                  />
-                  <Text style={[arabicV2(19), { color: palette.text }]} maxFontSizeMultiplier={1.5}>
-                    {words.uthmani(m.w)}
-                  </Text>
-                </View>
+                <WordChip
+                  key={m.w}
+                  text={words.uthmani(m.w)}
+                  fill={pastFill(palette, m.lastMark, isDark)}
+                  size={19}
+                  maxScale={1.5}
+                  testID={`progress-open-${m.group}`}
+                />
               ) : null,
             )}
           </View>
@@ -157,8 +165,6 @@ const styles = StyleSheet.create({
   chart: { paddingHorizontal: layoutV2.gutter, paddingTop: 6 },
   section: { paddingHorizontal: layoutV2.gutter, paddingTop: 8, paddingBottom: 12 },
   chips: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 6, marginTop: 6 },
-  chip: { borderRadius: 9, paddingHorizontal: 10, minHeight: 34, justifyContent: 'center', overflow: 'hidden' },
-  chipFill: { borderRadius: 9 },
   listTitle: { paddingHorizontal: layoutV2.gutter, paddingTop: 12, paddingBottom: 4, borderTopWidth: layoutV2.hairline },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: layoutV2.gutter, paddingVertical: 11 },
   rowText: { flex: 1, minWidth: 0 },
