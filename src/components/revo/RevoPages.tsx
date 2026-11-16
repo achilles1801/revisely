@@ -10,6 +10,7 @@ import { PillButton } from '../v2/PillButton';
 import { Tap } from '../v2/Tap';
 import { RevoMark } from './RevoMark';
 import { RevoSubHeader } from './RevoParts';
+import { formatDate } from '../../i18n';
 
 export const REVO_PRIVACY_URL = 'https://revisely.app/privacy/#revo';
 
@@ -89,7 +90,7 @@ export function RevoHistory({
 const sourceLine = (m: RevoMemoryItem, today: string) => {
   if (m.source === 'review') return 'From your Activity';
   if (m.day === today) return 'From a chat today';
-  return `From a chat on ${new Date(`${m.day}T12:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}`;
+  return `From a chat on ${formatDate(new Date(`${m.day}T12:00:00`), { day: 'numeric', month: 'short' }, 'device')}`;
 };
 
 /** What Revo remembers: each item can be deleted; a switch turns memory off; Clear deletes all. */

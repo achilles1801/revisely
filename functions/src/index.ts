@@ -1,5 +1,6 @@
 import { onCall, onRequest, HttpsError } from 'firebase-functions/v2/https';
 import { setGlobalOptions, logger } from 'firebase-functions/v2';
+import { failure } from './failure';
 import { initializeApp, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { FieldValue, Timestamp, getFirestore } from 'firebase-admin/firestore';
@@ -205,7 +206,7 @@ export const resetMyData = onCall(RESET_CALL_OPTIONS, async (request): Promise<R
     return result;
   } catch (err) {
     if (err instanceof ResetError) throw new HttpsError(err.code, err.message);
-    logger.error('resetMyData failed', err);
+    logger.error(failure('resetMyData', err));
     throw new HttpsError('internal', 'The reset did not finish. Try again; anything already reset stays reset.');
   }
 });
@@ -230,7 +231,7 @@ export const loadTestScenario = onCall(RESET_CALL_OPTIONS, async (request): Prom
     return result;
   } catch (err) {
     if (err instanceof ResetError) throw new HttpsError(err.code, err.message);
-    logger.error('loadTestScenario failed', err);
+    logger.error(failure('loadTestScenario', err));
     throw new HttpsError('internal', 'The scenario did not finish loading. Try again (the account was backed up first).');
   }
 });
@@ -293,7 +294,7 @@ export const playBuildAvailable = onRequest(
       } else if (err instanceof BuildError) {
         res.status(400).json({ error: err.message });
       } else {
-        logger.error('playBuildAvailable failed', err);
+        logger.error(failure('playBuildAvailable', err));
         res.status(500).json({ error: 'internal' });
       }
     }
@@ -326,7 +327,7 @@ export const askCoach = onCall(
       return await handleAskCoach(request.auth, request.data, coachDeps(request));
     } catch (err) {
       if (err instanceof CoachError) throw new HttpsError(err.code, err.message);
-      logger.error('askCoach failed', err);
+      logger.error(failure('askCoach', err));
       throw new HttpsError('internal', 'The coach is unavailable. Try again.');
     }
   },
@@ -337,7 +338,7 @@ export const setCoachOptIn = onCall({ enforceAppCheck: true, maxInstances: 2 }, 
     return await handleSetOptIn(request.auth, request.data, coachDeps(request));
   } catch (err) {
     if (err instanceof CoachError) throw new HttpsError(err.code, err.message);
-    logger.error('setCoachOptIn failed', err);
+    logger.error(failure('setCoachOptIn', err));
     throw new HttpsError('internal', 'The setting did not save. Try again.');
   }
 });
@@ -367,7 +368,7 @@ const REVO_CALL_OPTIONS = { enforceAppCheck: true, secrets: [ANTHROPIC_COACH_KEY
 /** A RevoError as the app sees it; anything else is logged (no content) and answered as internal. */
 function revoFailure(name: string, err: unknown, message: string): HttpsError {
   if (err instanceof RevoError) return new HttpsError(err.code, err.message, err.details);
-  logger.error(`${name} failed`, err);
+  logger.error(failure(name, err));
   return new HttpsError('internal', message);
 }
 
@@ -432,7 +433,7 @@ export const coachDigestDays = onRequest({ invoker: 'public', maxInstances: 1, t
     if (err instanceof CallerError) {
       res.status(err.message.startsWith('start') || err.message.startsWith('end') || err.message.startsWith('at most') ? 400 : 403).json({ error: err.message });
     } else {
-      logger.error('coachDigestDays failed', err);
+      logger.error(failure('coachDigestDays', err));
       res.status(500).json({ error: 'internal' });
     }
   }
@@ -451,7 +452,7 @@ const adminLog = (entry: Record<string, unknown>) => logger.info('admin', entry)
 
 function adminFailure(name: string, err: unknown): HttpsError {
   if (err instanceof AdminError) return new HttpsError(err.code, err.message);
-  logger.error(`${name} failed`, err);
+  logger.error(failure(name, err));
   return new HttpsError('internal', 'The console could not load that. Try again.');
 }
 
@@ -582,7 +583,7 @@ export const metricsTotals = onRequest({ invoker: 'public', maxInstances: 1, tim
     if (err instanceof CallerError) {
       res.status(/too large|JSON|object|missing/.test(err.message) ? 400 : 403).json({ error: err.message });
     } else {
-      logger.error('metricsTotals failed', err);
+      logger.error(failure('metricsTotals', err));
       res.status(500).json({ error: 'internal' });
     }
   }
@@ -673,8 +674,8 @@ async function supportCall<T>(name: string, run: () => Promise<T>): Promise<T> {
     return await run();
   } catch (err) {
     if (err instanceof SupportError) throw new HttpsError(err.code, err.message);
-    // Never the request's data: it may hold someone's answers.
-    logger.error(`${name} failed`, { message: (err as Error).message });
+    // The reason and the frames, never the request's data: it may hold someone's answers.
+    logger.error(failure(name, err));
     throw new HttpsError('internal', 'Something went wrong. Try again in a minute.');
   }
 }

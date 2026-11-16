@@ -8,11 +8,12 @@ import { spokenText } from '../../../lib/passages';
 import type { RevoDayFacts } from '../../../lib/revo/types';
 import { CHART_TEXT_MAX, ChartFrame, ChartPlot } from './ChartFrame';
 import { ChartButtons, DetailLine, DetailTitle, Legend, RatingCounts, RatingStrip } from './ChartParts';
+import { formatDate } from '../../../i18n';
 
 const BAR_AREA = 104;
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-const weekdayLetter = (day: string) => new Date(`${day}T12:00:00`).toLocaleDateString('en-US', { weekday: 'narrow' });
+const weekdayLetter = (day: string) => formatDate(new Date(`${day}T12:00:00`), { weekday: 'narrow' });
 
 /**
  * Pages revised per day over 7 or 30 days, the plan as a grey bar behind each. A tap (or a slide

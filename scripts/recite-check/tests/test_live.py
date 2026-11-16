@@ -238,14 +238,16 @@ class Bench(unittest.TestCase):
         return live.LiveSession(engine(), 1, 1, 1, 7, {})
 
     def test_planted_mistakes_are_marked_live_and_at_the_end(self):
+        """Word 4 (ٱلْحَمْدُ) said as «إِيَّاكَ» is marked skipped: since the decoder can go back from a filler (gap_back,
+        Nov 16 2026), «إِيَّاكَ» is heard as a dropped try at the next word, «لِلَّهِ», which is then said right. Before,
+        it was marked as a word said wrong."""
         ev = run(self.session(), chunks(bench_pcm(), 3200) + [{'type': 'end'}])
         live_marks = {e['mark']['w']: e['mark'] for e in ev if e['type'] == 'mark'}
         self.assertEqual(live_marks[14]['kind'], 'skipped')
-        self.assertEqual(live_marks[4]['kind'], 'word')
-        self.assertIn(live_marks[4]['detail'], ('lookalike', 'replaced', 'sound'))
+        self.assertEqual(live_marks[4]['kind'], 'skipped')
         end = ev[-1]['result']
         self.assertEqual({(m['w'], m['kind']) for m in end['marks'] if m['kind'] != 'tajweed'},
-                         {(4, 'word'), (14, 'skipped')})
+                         {(4, 'skipped'), (14, 'skipped')})
         self.assertEqual((end['words'][0]['w'], end['words'][-1]['w']), (0, 28))
         self.assertEqual({k: end['score'][k] for k in ('reached', 'mistakes', 'accuracy')},
                          {'reached': 29, 'mistakes': 2, 'accuracy': round(1 - 2 / 29, 4)})
@@ -267,7 +269,7 @@ class Bench(unittest.TestCase):
         end = ev[-1]['result']
         self.assertEqual((end['from'], end['to']), (0, 29))  # the ayat reached, not the Qur'an
         self.assertEqual({(m['w'], m['kind']) for m in end['marks'] if m['kind'] != 'tajweed'},
-                         {(4, 'word'), (14, 'skipped')})
+                         {(4, 'skipped'), (14, 'skipped')})
         self.assertEqual(max(w['w'] for w in end['words']), 28)
         self.assertEqual([e['w'] for e in ev if e['type'] == 'at'][-1], 28)
         self.assertEqual(end['score']['reached'], 29)
@@ -286,10 +288,11 @@ class Bench(unittest.TestCase):
                          {k: last['score'][k] for k in ('reached', 'mistakes')})
 
     def test_follow_mode_sends_the_cursor_and_said_but_no_marks_or_score(self):
+        """…and `off` (the hidden view's next word, when something else is said there: word 4 here)."""
         import live
         sess = live.LiveSession(engine(), 1, 1, 1, 7, {'letters': '1'}, follow=True)
         ev = run(sess, chunks(bench_pcm(), 3200) + [{'type': 'end'}])
-        self.assertEqual({e['type'] for e in ev} - {'at', 'said', 'ayah', 'done'}, set())
+        self.assertEqual({e['type'] for e in ev} - {'at', 'said', 'ayah', 'done', 'off'}, set())
         res = ev[-1]['result']
         self.assertEqual((res['marks'], res['score']), ([], None))  # the contract's shape, empty
         self.assertEqual(res['settings']['letters'], False)
@@ -704,8 +707,118 @@ class SimilarPassage(unittest.TestCase):
             self.assertEqual(self.named(name, 1, 1, 1, 7), [{}, {}])
 
 
-if __name__ == '__main__':
-    unittest.main()
+
+@unittest.skipUnless(MODEL.exists() and ITEM.exists() and CLEAN.exists(),
+                     'the model or the bench recitations are not here (the image has the model, not the bench)')
+class OffHere(unittest.TestCase):
+    """`off`: something else said in the next word's slot, for the hidden view (2026-11-15 idea, approved)."""
+
+    def events(self, item):
+        import live
+        with wave.open(str(item.with_suffix('.wav'))) as f:
+            pcm = f.readframes(f.getnframes())
+        return run(live.LiveSession(engine(), 1, 1, 1, 7, {}, follow=True), chunks(pcm, 3200) + [{'type': 'end'}])
+
+    def test_a_word_said_as_another_is_off_before_it_is_decided(self):
+        """Al-Fatiha with word 4 said as another word: `off` for 4, while the word in its place is still being said,
+        before `said` passes it."""
+        ev = self.events(ITEM)
+        off = [e for e in ev if e['type'] == 'off']
+        self.assertEqual([e['w'] for e in off][:1], [4])
+        passed = next(e['t'] for e in ev if e['type'] == 'said' and e['upTo'] >= 4)
+        self.assertLess(off[0]['t'], passed)
+
+    def test_nothing_is_off_in_a_correct_take(self):
+        self.assertEqual([e for e in self.events(CLEAN) if e['type'] == 'off'], [])
+
+
+@unittest.skipUnless(MODEL.exists() and CLEAN.exists(),
+                     'the model or the bench recitations are not here (the image has the model, not the bench)')
+class QuranStart(unittest.TestCase):
+    """Anywhere in the Qur'an (recite-anywhere step 2, protocol 7, `startIn: "quran"`): a take whose start isn't on the
+    reader's page is found Qur'an-wide, and locked only once its place is unique; a wrong jump is worse than none."""
+
+    def setUp(self):
+        if engine().table is None:
+            self.skipTest('no word table: the Qur\'an-wide search needs it')
+
+    def cut(self, name, w, secs=30):
+        """The take `name` of bench-v0 from app word w on, as PCM bytes."""
+        t = json.loads((BENCH / f'{name}.json').read_text())
+        x = next(e for e in t['timeline'] if e.get('word') == w and not e.get('extra'))
+        with wave.open(str(BENCH / f'{name}.wav')) as f:
+            pcm = f.readframes(f.getnframes())
+        i = int(x['start'] * 16000) * 2
+        return pcm[i:i + secs * 32000]
+
+    def lock(self, pcm, s, a, sb, start_in='quran'):
+        import live
+        sess = live.LiveSession(engine(), s, a, 114, 6, {'letters': '0', 'tajweed': '0'}, open_end=True, start_by=sb,
+                                start_in=start_in)
+        ev = run(sess, chunks(pcm, 16000) + [{'type': 'end'}])
+        return [{k: e.get(k) for k in ('w', 's', 'a', 'where')} for e in ev if e['type'] == 'locked'], ev
+
+    def test_a_start_off_the_page_is_found_when_it_parts_from_the_page(self):
+        """An-Naba' 78:29 «وَكُلَّ شَىْءٍ أَحْصَيْنَـٰهُ كِتَـٰبًۭا» with Ya-Sin's first page open: 36:12 there also says
+        «وَكُلَّ شَىْءٍ أَحْصَيْنَـٰهُ». The page doesn't lock while 78:29 fits clearly better (QURAN_DOUBT), and the take
+        locks to 78:29 once its words are its own."""
+        w = engine().words.first_word(78, 29)
+        if not (BENCH / 'husary.p7.clean.clean.wav').exists():
+            self.skipTest('bench-v0 is not here')
+        locks, ev = self.lock(self.cut('husary.p7.clean.clean', w), 36, 1, (36, 11))
+        self.assertEqual(locks, [{'w': w, 's': 78, 'a': 29, 'where': 'quran'}])
+        self.assertEqual(ev[-1]['result']['start'], w)
+
+    def test_audio_that_is_not_the_quran_never_locks(self):
+        """The same take reversed (speech-like, not the Qur'an) and noise: no lock, so the take fails silently."""
+        if not (BENCH / 'husary.p7.clean.clean.wav').exists():
+            self.skipTest('bench-v0 is not here')
+        pcm = self.cut('husary.p7.clean.clean', engine().words.first_word(78, 29))
+        rev = np.frombuffer(pcm, '<i2')[::-1].astype('<i2').tobytes()
+        for x in (rev, noise(20, seed=5)):
+            self.assertEqual(self.lock(x, 36, 1, (36, 11))[0], [])
+
+    def test_a_start_on_the_page_locks_as_without_it(self):
+        """Al-Fatiha from 1:5 with Al-Fatiha open: the same lock with startIn as without, `where` "page"."""
+        w = engine().words.first_word(1, 5)
+        pcm = self.cut('alafasy.p2.clean.clean', w)
+        with_q, _ = self.lock(pcm, 1, 1, (1, 7))
+        without, _ = self.lock(pcm, 1, 1, (1, 7), start_in=None)
+        self.assertEqual(with_q, [{'w': w, 's': 1, 'a': 5, 'where': 'page'}])
+        self.assertEqual(without, [{'w': w, 's': 1, 'a': 5, 'where': None}])
+
+    def test_a_doubt_from_off_the_page_lets_go_when_that_place_is_heard_wrong(self):
+        """An-Naba' 78:25 «إِلَّا حَمِيمًۭا وَغَسَّاقًۭا» with its own page open: Sad 38:57 («حَمِيمٌۭ وَغَسَّاقٌۭ») fits
+        better at first and holds the page's lock back, until its own locator hears a word wrong; then the page
+        locks. (With the doubt held for good, this take never locked.)"""
+        if not (BENCH / 'alafasy.p7.clean.clean.wav').exists():
+            self.skipTest('bench-v0 is not here')
+        w = engine().words.first_word(78, 25)
+        locks, _ = self.lock(self.cut('alafasy.p7.clean.clean', w), 78, 1, (78, 30))
+        self.assertEqual(locks, [{'w': w, 's': 78, 'a': 25, 'where': 'page'}])
+
+
+# the lab's bench_slips.py: bench-v0's passages with hesitations, pauses and corrections planted (none a mistake)
+SLIPS = pathlib.Path(os.environ.get('RECITE_BENCH_SLIPS',
+                                    pathlib.Path.home() / 'revisely-mistake-lab/data/bench-slips/items'))
+
+
+@unittest.skipUnless((SLIPS / 'alafasy.p2.slips.clean.wav').exists(), "the lab's planted-slips bench is not here")
+class Corrections(unittest.TestCase):
+    def test_a_word_tried_dropped_and_said_again_is_not_marked(self):
+        """Al-Fatiha with «نَعْبُدُ» said in place of «ٱلْمَغْضُوبِ» (25), a pause, then back to «أَنْعَمْتَ» (22) and on, right.
+        Before the decoder could go back from a filler, it took the first «أَنْعَمْتَ عَلَيْهِمْ غَيْرِ» and the dropped
+        word in as one extra word after «ٱلَّذِينَ» (21); a correction is not a mistake (recite-contract.md). The
+        hesitations and the pause planted in the same take aren't marked either."""
+        import live
+        with wave.open(str(SLIPS / 'alafasy.p2.slips.clean.wav')) as f:
+            pcm = f.readframes(f.getnframes())
+        x = np.frombuffer(pcm, '<i2').astype(np.float32) / 32768
+        checked = engine().check(x, 1, 1, 1, 7, v=2)
+        ev = run(live.LiveSession(engine(), 1, 1, 1, 7, {}), chunks(pcm, 3200) + [{'type': 'end'}])
+        for res in (checked, ev[-1]['result']):
+            self.assertEqual([(m['w'], m['kind']) for m in res['marks'] if m['kind'] != 'tajweed'], [])
+        self.assertEqual([e['mark']['w'] for e in ev if e['type'] == 'mark' and e['mark']['kind'] != 'tajweed'], [])
 
 
 class LookAlikes(unittest.TestCase):
@@ -751,3 +864,7 @@ class DevTake(unittest.TestCase):
         self.assertEqual(live_marks, [(31428, 'harakat')])
         self.assertEqual([(m['w'], m['kind'], m['sure']) for m in ev[-1]['result']['marks']],
                          [(31428, 'harakat', 'clear')])
+
+
+if __name__ == '__main__':
+    unittest.main()

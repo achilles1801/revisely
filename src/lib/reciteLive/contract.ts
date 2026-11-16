@@ -102,6 +102,8 @@ export type LiveFailure =
    */
   | 'check_locked'
   | 'premium_required'
+  /** A service that doesn't take this level (recite-check-pair): the socket starts the take on recite-check instead. */
+  | 'level_elsewhere'
   | 'offline';
 
 export type LiveEvent =
@@ -113,6 +115,8 @@ export type LiveEvent =
    */
   | { type: 'locked'; w: number; s: number; a: number; t?: number }
   | { type: 'at'; w: number; t?: number }
+  /** Something other than word `w` (the next to say) is being said in its slot: the hidden view's red cover (draft 7). */
+  | { type: 'off'; w: number; t?: number }
   | { type: 'said'; upTo: number }
   | { type: 'mark'; mark: Mark }
   | { type: 'unmark'; id: string; why: 'corrected' | 'retracted' }
@@ -137,6 +141,7 @@ const FAILURES: LiveFailure[] = [
   'server',
   'check_locked',
   'premium_required',
+  'level_elsewhere',
 ];
 
 /** The server refused marking mistakes for want of Premium (either name). */
@@ -261,6 +266,8 @@ export function parseEvent(raw: unknown): LiveEvent | null {
         : null;
     case 'at':
       return isWord(x.w) ? { type: 'at', w: x.w, ...(isNum(x.t) ? { t: x.t } : {}) } : null;
+    case 'off':
+      return isWord(x.w) ? { type: 'off', w: x.w, ...(isNum(x.t) ? { t: x.t } : {}) } : null;
     case 'said':
       return isWord(x.upTo) ? { type: 'said', upTo: x.upTo } : null;
     case 'mark': {

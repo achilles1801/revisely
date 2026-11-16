@@ -3,6 +3,7 @@
 
 import { shiftDay } from './journal';
 import { weekOf, weekStart } from './activityHeatmap';
+import { formatDate } from '../i18n';
 
 /** The name of the calendar screen (Majd chose "Overview"). */
 export const CALENDAR_SCREEN_LABEL = 'Overview';
@@ -29,7 +30,7 @@ export function weekTitle(start: string): string {
   const days = weekDays(start);
   const fmt = (d: string, opts: Intl.DateTimeFormatOptions) => {
     const [y, m, day] = d.split('-').map(Number);
-    return new Date(y, m - 1, day).toLocaleDateString('en-US', opts);
+    return formatDate(new Date(y, m - 1, day), opts);
   };
   const first = fmt(days[0], { month: 'short', day: 'numeric' });
   const last = days[6].slice(5, 7) === days[0].slice(5, 7)

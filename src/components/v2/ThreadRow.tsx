@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { layoutV2, markV2, typeV2 } from '../../theme/v2';
 import { Tap } from './Tap';
+import { t } from '../../i18n';
 
 /**
  * One row of a feed, the way a post sits in a thread: a mark on the left, a
@@ -26,7 +27,7 @@ export function ThreadRow({
   figure,
   headerMaxScale,
   onMenu,
-  menuLabel = 'More',
+  menuLabel = t('common.more'),
   onLongPress,
   a11yActions,
   onA11yAction,

@@ -172,7 +172,7 @@ class CheckTests(Base):
         r = self.client.get('/health')
         self.assertEqual(r.status_code, 200)
         body = r.json()
-        self.assertEqual((body['ok'], body['protocol']), (True, 6))
+        self.assertEqual((body['ok'], body['protocol']), (True, 7))
         self.assertIn('server', body)
         self.assertIn('engine', body)
         self.assertIs(body['words'], False)  # FakeEngine has no word table
@@ -305,7 +305,7 @@ class LiveTests(Base):
         with self.socket() as ws:
             ws.send_text(start(keep=True, mon=5, aar=2, letters=True))
             ready = ws.receive_json()
-            self.assertEqual((ready['type'], ready['from'], ready['v'], ready['protocol']), ('ready', 0, 2, 6))
+            self.assertEqual((ready['type'], ready['from'], ready['v'], ready['protocol']), ('ready', 0, 2, 7))
             self.assertTrue(store.TAKE.match(ready['take']))
             self.assertEqual(FakeSession.made[0].args, (1, 1, 114, 6, {'mon': 5, 'mot': 4, 'aar': 2,
                                                                        'letters': '1', 'tajweed': '1'}))
@@ -383,7 +383,7 @@ class LiveTests(Base):
             while ws.receive_json()['type'] != 'done':
                 pass
             self.closed(ws)
-        self.assertEqual(ready['protocol'], 6)
+        self.assertEqual(ready['protocol'], 7)
         self.assertEqual(FakeSession.made[0].kw, {'start_by': (2, 16)})
         self.assertEqual(FakeSession.made[0].args[:4], (2, 6, 114, 6))
         kept = json.loads(self.stored[f"recite-tests/tester1/{ready['take']}.json"])
@@ -399,7 +399,44 @@ class LiveTests(Base):
             ws.send_text(start(s=2, a=6))
             ws.receive_json()
         self.assertEqual(FakeSession.made[0].kw, {})
-        self.assertEqual(self.client.get('/health').json()['protocol'], 6)
+        self.assertEqual(self.client.get('/health').json()['protocol'], 7)
+
+    def test_anywhere_in_the_quran(self):
+        """startIn "quran" (protocol 7) reaches the session as start_in, only with startBy (the page is searched
+        first), and is kept with the take's request; the page's 400-word check stays."""
+        with self.socket() as ws:
+            ws.send_text(start(s=2, a=6, startBy=[2, 16], startIn='quran', keep=True))
+            ready = ws.receive_json()
+            ws.send_text(json.dumps({'type': 'end'}))
+            while ws.receive_json()['type'] != 'done':
+                pass
+            self.closed(ws)
+        self.assertEqual(FakeSession.made[0].kw, {'start_by': (2, 16), 'start_in': 'quran'})
+        kept = json.loads(self.stored[f"recite-tests/tester1/{ready['take']}.json"])
+        self.assertEqual(kept['request']['startIn'], 'quran')
+        for kw in ({'startIn': 'quran'}, {'startBy': [2, 16], 'startIn': 'everywhere'}):
+            FakeSession.made = []
+            with self.socket() as ws:
+                ws.send_text(start(s=2, a=6, **kw))
+                ws.receive_json()
+            self.assertNotIn('start_in', FakeSession.made[0].kw, kw)
+        with self.socket() as ws:  # a page of more than 400 words is still refused
+            ws.send_text(start(s=2, a=6, startBy=[2, 60], startIn='quran'))
+            self.assertEqual(ws.receive_json(), {'type': 'error', 'reason': 'bad_request'})
+
+    def test_a_follower_without_start_in_keeps_protocol_6(self):
+        """Deployed before the Qur'an-wide follower: the server says 6 and ignores startIn, so the phone never waits
+        for a lock off the page that can't come."""
+        class Page(FakeSession):
+            def __init__(self, engine, s, a, s2, a2, settings, follow=False, defer=False, open_end=False,
+                         start_by=None):
+                super().__init__(engine, s, a, s2, a2, settings, follow, defer, open_end, start_by=start_by)
+        with mock.patch.object(live, 'LiveSession', Page), self.socket() as ws:
+            ws.send_text(start(s=2, a=6, startBy=[2, 16], startIn='quran'))
+            ready = ws.receive_json()
+            self.assertEqual(self.client.get('/health').json()['protocol'], 6)
+        self.assertEqual(ready['protocol'], 6)
+        self.assertEqual(FakeSession.made[0].kw, {'start_by': (2, 16)})
 
     def test_a_follower_without_start_by_keeps_protocol_5(self):
         """Deployed before the model session's follower: the server says 5 and ignores startBy (as a protocol 5
@@ -875,7 +912,7 @@ class HealthTests(Base):
                                                'why', 'kept', 'app', 'protocol')},
                          {'kind': 'live', 'level': 'strict+letters', 'start': 'fixed', 'audio_s': 2.0, 'sockets': 1,
                           'cold': True, 'restarted': False, 'why': 'end', 'kept': True, 'app': '1.0.4 (40) dev 3fa9c1d2',
-                          'protocol': 6})
+                          'protocol': 7})
         for k in ('open_s', 'ready_s', 'age_s', 'cpu_s', 'lag_p50', 'lag_p90', 'lag_max'):
             self.assertGreaterEqual(line[k], 0, k)
         self.assertLessEqual(line['lag_p50'], line['lag_max'])
@@ -912,6 +949,14 @@ class HealthTests(Base):
         self.client.post('/check?s=1&a=1', content=wav())
         self.assertEqual([(f['route'], f['reason']) for f in self.lines('refused')],
                          [('live', 'sign_in'), ('live', 'testers_only'), ('live', 'bad_request'), ('check', 'sign_in')])
+
+    def test_where_a_take_locked(self):
+        s = server.Live('t', 'u', FakeSession(None, 2, 6, None, None, {}), False,
+                        {'startBy': [2, 16], 'startIn': 'quran', 'settings': {}, 'follow': True}, None)
+        s.events = [{'type': 'locked', 'w': 6090, 's': 2, 'a': 9, 't': 2.5, 'where': 'quran'}]
+        f = server.take_fields(s, {'why': 'end', 'ms': {'model': 900, 'search_quran': 30}})
+        self.assertEqual((f['start'], f['where'], f['level']), ('quran', 'quran', 'recite'))
+        self.assertNothingPersonal({k: v for k, v in f.items() if v is not None})
 
     def test_a_check(self):
         h = {'Authorization': 'Bearer good', 'X-Revisely-App': '1.0.4 (40) dev embedded'}

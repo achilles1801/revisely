@@ -6,6 +6,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useReduceMotion } from '../../design/motion';
 import { Tap } from '../v2/Tap';
 import { RevoMark } from './RevoMark';
+import { formatTime } from '../../i18n';
 
 /** Revo's header: the "Revo" capsule, then History and Memory. */
 export function RevoHeader({ onHistory, onMemory }: { onHistory: () => void; onMemory: () => void }) {
@@ -215,7 +216,7 @@ export function LimitCard({ title, body }: { title: string; body: string }) {
  */
 export function ReviewRow({ at, onOpen }: { at: number; onOpen: () => void }) {
   const { palette } = useTheme();
-  const time = new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const time = formatTime(new Date(at));
   return (
     <Tap
       onPress={onOpen}

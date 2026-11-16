@@ -9,6 +9,7 @@ import type { RevoDayFacts } from '../../../lib/revo/types';
 import { Tap } from '../../v2/Tap';
 import { CHART_TEXT_MAX, ChartFrame, ChartPlot } from './ChartFrame';
 import { ChartButtons, DetailTitle, Legend } from './ChartParts';
+import { formatDate } from '../../../i18n';
 
 /** The month column on the left. */
 const LABEL_W = 34;
@@ -16,9 +17,9 @@ const GAP = 5;
 
 type Pick = { kind: 'day'; w: number; d: number } | { kind: 'col'; d: number } | null;
 
-const letter = (day: string) => new Date(`${day}T12:00:00`).toLocaleDateString('en-US', { weekday: 'narrow' });
-const weekdayName = (day: string) => new Date(`${day}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long' });
-const monthShort = (day: string) => new Date(`${day}T12:00:00`).toLocaleDateString('en-US', { month: 'short' });
+const letter = (day: string) => formatDate(new Date(`${day}T12:00:00`), { weekday: 'narrow' });
+const weekdayName = (day: string) => formatDate(new Date(`${day}T12:00:00`), { weekday: 'long' });
+const monthShort = (day: string) => formatDate(new Date(`${day}T12:00:00`), { month: 'short' });
 
 /**
  * The last few weeks a day a cell, Sunday to Saturday as Activity's calendar: the plan done, done

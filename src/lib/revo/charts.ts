@@ -20,6 +20,7 @@ import type { FactSources } from './facts';
 import type { RevoDayFacts, RevoPassageFacts, RevoTableColumn, RevoVisual } from './types';
 import { passageShort } from './words';
 import { coverageSince, daysSince, lastRevisedWords, recencyLine as recencyWords, timesWord } from '../recency';
+import { dayMonth as dayMonthOf, formatDate, monthName as monthNameOf, weekdayName } from '../../i18n';
 
 export { timesWord };
 
@@ -78,13 +79,12 @@ export function agoWords(day: string, today: string): string {
 
 /** "30 October". */
 export function dayMonth(day: string): string {
-  const date = new Date(`${day}T00:00:00`);
-  return `${date.getDate()} ${date.toLocaleDateString('en-US', { month: 'long' })}`;
+  return dayMonthOf(new Date(`${day}T00:00:00`));
 }
 
 /** "1 Oct". */
 export function shortDate(day: string): string {
-  return new Date(`${day}T12:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  return formatDate(new Date(`${day}T12:00:00`), { day: 'numeric', month: 'short' }, 'device');
 }
 
 /** The surah a run of pages starts in, and the one it ends in: a strip's two end labels. */
@@ -505,7 +505,7 @@ export function daysList(days: readonly string[]): string {
   const groups: { month: string; dates: number[] }[] = [];
   for (const day of [...days].sort()) {
     const date = new Date(`${day}T00:00:00`);
-    const month = date.toLocaleDateString('en-US', { month: 'short' });
+    const month = monthNameOf(date, 'short');
     const last = groups[groups.length - 1];
     if (last && last.month === month) last.dates.push(date.getDate());
     else groups.push({ month, dates: [date.getDate()] });
@@ -528,7 +528,7 @@ export function daysList(days: readonly string[]): string {
 /** A picked weekday: "Saturdays · 4 missed of 8", "Missed 26 Sep, 10, 17 and 24 Oct · part of 31 Oct". */
 export function weekdayReadout(rows: readonly { day: string; cell: WeekCell }[][], column: number): { title: string; line: string } {
   const cells = rows.map((r) => r[column]).filter((c) => counted(c.cell));
-  const name = `${new Date(`${rows[0][column].day}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long' })}s`;
+  const name = `${weekdayName(new Date(`${rows[0][column].day}T12:00:00`))}s`;
   const missed = cells.filter((c) => c.cell === 'missed').map((c) => c.day);
   const part = cells.filter((c) => c.cell === 'part').map((c) => c.day);
   const done = cells.filter((c) => c.cell === 'done').length;

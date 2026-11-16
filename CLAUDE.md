@@ -24,10 +24,39 @@ file is the release mechanics and the traps behind them.
     session wastes the time.
   - Everything else here still holds: privacy, free tiers, one simulator and no heavy jobs beside it, and the
     branch rule below.
+- **Build new features straight into Revisely Dev** (Majd, Nov 16 2026: "the whole point of the dev app is so that
+  we can test new features super quickly ... we don't necessarily need to approve a mock before it's built into the
+  dev app. Just let me know when these things are built so I can go test them out myself in the app ... unless I
+  explicitly ask for a mock before building something").
+  - Draw a mock board if it helps you think, and save it in the area's mocks folder (for example
+    `~/Documents/revisely-recite-mocks/`), but don't wait on an approval. Build it, then tell the orchestrator what is
+    in Revisely Dev and where to find it.
+  - Ask for his look first only when he asks for a mock, or for anything outside Dev: production, store listings, the
+    public site.
+- **Yes to everything that doesn't touch production** (Majd, Nov 15 2026: "yes to everything that doesn't impact
+  production rn"). Approved ideas and choices that stay on develop, Revisely Dev, the dev backend (revisely-dev), the
+  dev checker and tests go ahead. Production, the stores, his accounts and billing, public posts and spending still
+  wait for him.
+- **PRs into develop merge themselves** (Majd, Nov 16 2026: "the only time i should have to manually merge
+  something myself is if it's going to production, all pr's aimed at dev can be automerged by claude"). Turn on
+  auto-merge for every PR into develop once it's ready. PRs into `main` or a `release/*` branch are his to merge.
+- **Google Drive is organized by area, then by item** (Majd, Nov 16 2026). Everything goes in his Drive's
+  `Revisely/` folder:
+  - `Product and design/`: design docs, specs;
+  - `Marketing/`: one folder per piece, for example `Halaqa kit/English (drafts)`, `Influencers`;
+  - `Mistake detection/`: for example `Volunteer recordings (revisely.app-record)`;
+  - `Bug reports/`: one folder per bug, `<date> · <what happens>`.
+
+  Each new idea or feature gets its own folder under the right area; add an area only when none fits. Never leave
+  files loose at the top of his Drive.
+- **One GitHub API limit for every session.** All sessions share one account's 5,000 requests an hour, and they ran
+  out on Nov 15. Check CI once when you need it (`gh pr checks`, or `gh run watch --interval 120`), never in a tight
+  loop.
 - **Hand off before your context fills, and name sessions by topic and number** (Majd, Nov 14 2026).
   - Check your context with `mcp__ccd_session_mgmt__get_usage` (session "self") at milestones and before big
     reads. Auto-compaction starts at about 97% and keeps you going, but it loses detail.
-  - At 80% or more, write a full hand-off doc in `~/Documents/revisely-handoffs/<topic>-<n>.md`:
+  - At about 93–95% (Majd, Nov 16 2026: "80% is too short to swap sessions, i was thinking closer to 95%"), write a
+    full hand-off doc in `~/Documents/revisely-handoffs/<topic>-<n>.md`, before auto-compaction at about 97%:
     - the goal and scope;
     - where things stand;
     - the decisions and why, with Majd's words quoted;
@@ -109,8 +138,8 @@ main is strictly for production"):
   and `preview.yml` treats a fingerprint with that tag (or an EAS build, i.e. build 11 and earlier) as built.
 - Never run `eas update` or `eas build` from a laptop to ship. Everything on a phone should trace to a
   commit on `develop` (TestFlight) or `main` (App Store, promoted).
-- Pushes that touch only docs, tests, `functions/`, `scripts/`, `worker/`, `wrangler*.jsonc`, workflows,
-  Firestore rules or `.md` files publish nothing (`paths-ignore` in both workflows). Firebase rules and functions still deploy by hand
+- Pushes that touch only docs, tests, `functions/`, `scripts/`, `worker/`, `admin/` (the staff console), `wrangler*.jsonc`,
+  workflows, Firestore rules or `.md` files publish nothing (`paths-ignore` in both workflows). Firebase rules and functions still deploy by hand
   (`firebase deploy`, see README).
 
 ## Dev stack (Revisely Dev, the dev backend, dev.revisely.app)
@@ -177,6 +206,11 @@ until its part is set up.
     - It runs keyless: GitHub OIDC through Workload Identity, develop of this repository only.
     - Its variables are `DEV_BACKEND`, `DEV_FIREBASE_PROJECT`, `DEV_WIF_PROVIDER` and `DEV_DEPLOY_SA`.
     - It refuses the production project. Production deploys stay by hand.
+    - It never deletes anything on dev (Nov 16 2026): functions go by name, with no `--force`. Its `--force` deleted
+      Revisely Console's functions and indexes on every develop deploy while they lived on a branch. A function or
+      index taken out of the source stays on dev until it is deleted by hand.
+    - Its `HOLD` lists functions a branch not yet in develop owns on dev, deployed by hand from it, so develop's older
+      copies don't overwrite them. The change that brings them to develop empties it.
   - **Revo** has its own key there (a "revisely-dev" Anthropic workspace with a $10 monthly limit) and a
     `config/coach` cap of $10.
   - **Scripts** reach dev with `GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-dev-admin.json`.
@@ -214,11 +248,24 @@ until its part is set up.
   filmed with it.
 - **Recitation check** (Majd, Nov 11 2026: "push the best version we have so far on dev"): the lab's mistake
   detection in the Dev app only (`lib/reciteCheck`: `isDevVariant()`, `previewTester`, a binary with the
-  microphone stream). Hold a verse → Check my recitation: record, stop, and the passage comes back with the words
-  skipped, said wrong or added, and tajweed notes (madd lengths per the sheet's settings, qalqalah, ghunnah,
-  ikhfa, idgham, iqlab); letters behind an off-by-default switch.
+  microphone stream). The reader's one mic: Recite follows the reciter on the page, and with Mark mistakes (Premium) it
+  marks the words skipped, said wrong or added, harakat and letter slips and, with Strict, tajweed notes (madd lengths
+  per Settings → Recite, qalqalah, ghunnah, ikhfa, idgham, iqlab). The verse menu's old "Check my recitation" row
+  (record, then check) is gone (Nov 15 2026; nothing showed it any more).
   - The checker runs on Cloud Run in revisely-dev (`scripts/recite-check`, its README): the app has no JS-only way
     to run the model on the phone. It is deployed by hand, never to production, and the store app never calls it.
+  - **Two services** (recite-server, Nov 15 2026; Majd approved halving the light levels' cost; recite-contract.md,
+    "Two services"):
+    - Recite (`follow`), and Words & harakat with letters off, go to `recite-check-pair` (two takes an instance);
+      everything else goes to `recite-check`.
+    - The app's Words & harakat sends `letters: true`, so today only Recite goes to the pair.
+    - `lib/reciteLive/socket` picks the address when a take starts. A take the pair refuses (`level_elsewhere`), or
+      can't start (unreachable, or its 403 while private), starts again on `recite-check` as a new take there.
+    - A resume goes to the service that said `ready`.
+    - `warmUpReciteCheck()` wakes both. Its pair `/health` answer also says whether the pair takes this phone's takes:
+      a 403 (still private), or a take it couldn't start, sends takes straight to `recite-check` for an hour
+      (`lib/reciteLive/pairService`, in memory). So even the first take after the reader opens pays no refused upgrade.
+      An answer from `/health` lets takes back.
   - The model's licence (Quran Muaalem License 1.0, 2.1) asks for its AI notice, English and Arabic, before the
     first use and reachable afterwards: the sheet shows it first, and Settings → About has it.
   - "Keep as test data" (on by default; in the sheet and Settings → Testing) keeps each recording and its result
@@ -254,6 +301,13 @@ until its part is set up.
     for is a firmer shade of its own (`…Firm`), no outline. No red ink, dotted lines or + discs. The bar, the card and
     the summary use the same highlights, and a small flat swatch beside the kind's name (never a round mark): the kind
     is always in words.
+  - **The next word's cover turns red while something else is said** (contract draft 7's `off`; Majd's yes, Nov 15 2026):
+    - What shows: in the hidden view only, red over the word's cover (the word-mistake highlight), its text still
+      hidden. It's never a mark and never counted.
+    - When it goes: once the word is said (`at` or `said` reach it), the reciter goes back, or a mark lands on it or an
+      Extra word just before it (`off` in `lib/reciteLive/state`).
+    - What the lab measured: right 86% of the times it fires, and never on hesitations or pauses.
+    - VoiceOver hears nothing: the mic is on throughout a take.
   - **"Not a mistake" can be undone** (Majd, Nov 15 2026; Tarteel's Removed list): for 5 s an Undo toast above the bar,
     and after the take the summary's "1 marked not a mistake" (closed until tapped) lists each with Put back
     (`restoreMark`: the mark and what it counted come back). The checker is told both ways, so the lab never keeps a
@@ -1750,6 +1804,17 @@ app; `askCoach`/`setCoachOptIn` stay as they were until Insights links to Revo. 
   app's exact text; plain quotes are examples). `functions/scripts/revo-guide-samples.js` asks the real model ~25
   how-to questions and checks each answer's facts (`--dry` checks the requests; live needs the coach key). A changed
   guide is a changed system prompt: deploy `revoAsk,revoDayInReview` and re-record (`scripts/record-anthropic.js`).
+- **Recitation** (Revisely Dev, RINS-1; Majd, Nov 16 2026; plan `recite-insights-revo.md` in the orchestrator's notes):
+  for an account that recites with Mark mistakes (`reciteLiveForAccount`), each question carries `context.recitation`.
+  `lib/revo/recitation` builds it from `lib/reciteInsights` over Recite memory's takes: the last 4 weeks' takes and score,
+  mistakes by kind, Not clear and tajweed apart, words still marked and cleared, passages that keep slipping, similar
+  ayahs gone on with, and the latest take. A take attached (`reciteTake`, `takeAttachment`) adds its marks: the expected
+  word, and the heard word only for a real word or a harakat/letter slip, never a `sound`. Text only, no audio or ids.
+  The server (`functions/src/revo/recitation.ts`) checks it adds up and writes it out. Its rules (only marks that exist;
+  Not clear is never wrong; words and similar ayahs before harakat; restarts aren't mistakes; surahs, never pages) are a
+  second system block sent only with a recitation, so every other request, its cache and the recorded replies are
+  unchanged. Before this could reach production, the privacy policy's Revo part and the store answers need the Recite
+  results (Majd's call).
 - **Opening a screen** (`openScreen`, REVO-31): Revo's card can open Jump to…, Edit schedule, the memorized pages,
   Activity, the daily log, Settings at a section, prayer times, the Qibla or the reader at a surah or juz
   (`REVO_SCREENS`, the same list in `functions/src/revo/types.ts` and `src/lib/revo/types.ts`; `src/lib/revo/screens`
@@ -1982,6 +2047,19 @@ classic default), and a fresh install starts in light.
   (`systemAppearanceAvailable()`; `resolveThemeMode` in `context/ThemeContext`).
 - `expo-blur` and `expo-glass-effect` were removed from `package.json` (and the tests' mocks) with
   the background-audio build (Oct 28 2026).
+
+## Strings (src/i18n; the app in Arabic)
+
+The app is getting Arabic (Majd approved the groundwork Nov 15 2026; study
+`~/Documents/revisely-ideas/approved/2026-11-15-growth-app-in-arabic-study.md`). UI text moves out of the
+code into `src/i18n/en/<folder>.ts`, folder by folder, with the English unchanged and nothing visible.
+- Use `t('folder.key', { values })` from `src/i18n` (i18next, typed keys). Whole sentences with
+  `{{values}}`, plurals as `_one`/`_other` keys, never `n === 1 ? …` or text glued from pieces.
+- **An extracted folder must stay extracted:** `src/i18n/__tests__/noRawStrings.test.ts` (its `EXTRACTED`
+  list) fails on UI text written into its files. Put new text in its `en/` file, or mark a line that isn't
+  UI text `// i18n-ignore (why)`. How-to and the progress command: `src/i18n/README.md`.
+- Tests, scenarios and E2E builds always run in English (`src/i18n/language.ts`).
+- JavaScript only so far; Arabic, the picker and right-to-left wait for the rest and a native release.
 
 ## UI traps
 

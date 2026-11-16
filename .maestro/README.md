@@ -366,6 +366,11 @@ A flow names its zone in a header line, `# e2e-zone: Asia/Kathmandu`; the rest r
 3. Select by `id:` (a `testID`). Add a `testID` to the app where one is missing.
 4. Work out what the user should see by hand from the plan, as the scenarios do, not with the app's
    code.
+5. A tap that opens something (a sheet, a modal, a screen) goes through `subflows/tap-to-open.yaml`
+   (`ID`, and `OPENS` as an id regex). On a loaded runner a tap can reach the app and be cancelled
+   before it's a press. This taps again only while `ID` is still there and nothing of `OPENS` has
+   come, at most twice. Each tap again saves a `lost-tap-<n>-<ID>` screenshot, which the weekly flake
+   report counts. Never use it for a switch, Next, or a button that stays on screen once it has worked.
 
 Things that bit:
 - Text with no-break spaces or hyphens (`p. 582`, `10 pages`, `Al‑Fatihah` on Home; the narrow

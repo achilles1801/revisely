@@ -2,6 +2,7 @@
 
 import { describePageRuns, pageRuns } from './pageRanges';
 import { describePassage } from './passages';
+import { dayMonth, weekdayName } from '../i18n';
 
 /** "p. 562", "p. 548–549": page numbers, only where the user works by page (From and To). */
 export function formatPagesShort(pages: Iterable<number>): string {
@@ -18,10 +19,7 @@ export function formatMinutesLong(minutes: number): string {
 
 /** "Wednesday 28 October": the weekday, the day, the month (the mocks' order, no comma). */
 export function formatDayLong(day: string): string {
-  const date = new Date(`${day}T00:00:00`);
-  const weekday = date.toLocaleDateString('en-US', { weekday: 'long' });
-  const month = date.toLocaleDateString('en-US', { month: 'long' });
-  return `${weekday} ${date.getDate()} ${month}`;
+  return dayMonth(new Date(`${day}T00:00:00`), { weekday: 'long' });
 }
 
 /**
@@ -36,9 +34,7 @@ export function dayTitle(day: string, today: string): { title: string; subtitle:
     date.getFullYear() === yesterday.getFullYear() && date.getMonth() === yesterday.getMonth() && date.getDate() === yesterday.getDate();
   if (day === today) return { title: 'Today', subtitle: formatDayLong(day) };
   if (isYesterday) return { title: 'Yesterday', subtitle: formatDayLong(day) };
-  const month = date.toLocaleDateString('en-US', { month: 'long' });
-  const year = date.getFullYear() !== t.getFullYear() ? ` ${date.getFullYear()}` : '';
-  return { title: date.toLocaleDateString('en-US', { weekday: 'long' }), subtitle: `${date.getDate()} ${month}${year}` };
+  return { title: weekdayName(date), subtitle: dayMonth(date, { year: date.getFullYear() !== t.getFullYear() }) };
 }
 
 /**
@@ -49,7 +45,7 @@ export function dayTitle(day: string, today: string): { title: string; subtitle:
  */
 export function windowFooter(day: string, window: { from: string; to: string } | null): string {
   const [y, m, d] = day.split('-').map(Number);
-  const weekday = (offset: number) => new Date(y, m - 1, d + offset).toLocaleDateString('en-US', { weekday: 'long' });
+  const weekday = (offset: number) => weekdayName(new Date(y, m - 1, d + offset));
   return window ? `${weekday(0)}: Fajr ${window.from} to ${weekday(1)}’s Fajr ${window.to}` : `${weekday(0)}: midnight to midnight`;
 }
 

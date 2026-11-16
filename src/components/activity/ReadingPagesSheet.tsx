@@ -10,6 +10,7 @@ import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
 import type { ReadingSession } from '../../types';
 import { Sheet } from '../v2/Sheet';
+import { formatDate } from '../../i18n';
 
 /** Assign pages to a session: free-form ranges plus a one-tap suggestion. */
 export function ReadingPagesSheet({
@@ -44,11 +45,11 @@ export function ReadingPagesSheet({
     <>
       <Text style={styles.meta}>
         {formatDuration(session.durationSeconds)} ·{' '}
-        {new Date(session.startedAt).toLocaleDateString([], {
+        {formatDate(new Date(session.startedAt), {
           weekday: 'short',
           month: 'short',
           day: 'numeric',
-        })}
+        }, 'device')}
       </Text>
 
       <View style={styles.inputWrap}>

@@ -24,11 +24,12 @@ import { usePrayerTimes } from '../../components/prayer/usePrayerTimes';
 import { usePrayerNotifyPermission } from '../../components/prayer/usePrayerNotifyPermission';
 import { useScheduledPrayerDays } from '../../lib/prayer/status';
 import { previewPrayerSound } from '../../lib/prayer/soundPreview';
+import { t } from '../../i18n';
 
 /** "Standard tone · 10 min before", "Silent". */
 export function alertSummary(a: PrayerAlert): string {
-  const sound = a.sound === 'silent' ? 'Silent' : 'Standard tone';
-  return a.before > 0 ? `${sound} · ${a.before} min before` : sound;
+  const sound = a.sound === 'silent' ? t('prayer.notifications.silent') : t('prayer.standardTone');
+  return a.before > 0 ? t('prayer.notifications.summaryBefore', { sound, minutes: a.before }) : sound;
 }
 
 /**
@@ -56,14 +57,14 @@ export default function PrayerNotificationsScreen() {
   return (
     <View style={[styles.container, { backgroundColor: palette.bg }]} testID="prayer-notifications-screen">
       <View style={{ paddingTop: insets.top }}>
-        <TopBar title="Prayer notifications" onBack={() => navigation.goBack()} separator />
+        <TopBar title={t('prayer.notifications.title')} onBack={() => navigation.goBack()} separator />
       </View>
       <ScrollView contentInsetAdjustmentBehavior="never" contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}>
         <GroupedSection
-          header="Prayers"
+          header={t('prayer.notifications.prayers')}
           footer={
             anyOn && days > 0
-              ? `Scheduled on this phone for the next ${days} ${days === 1 ? 'day' : 'days'}. Opening Revisely keeps them going.`
+              ? t('prayer.notifications.scheduled', { count: days })
               : undefined
           }
         >
@@ -85,7 +86,7 @@ export default function PrayerNotificationsScreen() {
                       hitSlop={6}
                       style={styles.detail}
                       accessibilityRole="button"
-                      accessibilityLabel={`${TIME_LABELS[p].en}: ${alertSummary(a)}. Change`}
+                      accessibilityLabel={t('prayer.notifications.rowLabel', { name: TIME_LABELS[p].en, summary: alertSummary(a) })}
                       testID={`prayer-alert-${p}-detail`}
                     >
                       <Text style={[typeV2.meta, { color: palette.accentText }]} maxFontSizeMultiplier={1.4}>
@@ -95,7 +96,7 @@ export default function PrayerNotificationsScreen() {
                     </Tap>
                   ) : (
                     <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
-                      Off
+                      {t('prayer.notifications.off')}
                     </Text>
                   )}
                 </View>
@@ -124,12 +125,12 @@ function AlertSheet({ prayer, onClose }: { prayer: PrayerName | null; onClose: (
       visible={prayer != null}
       onClose={onClose}
       title={TIME_LABELS[shown].en}
-      footer={{ label: 'Done', onPress: onClose, testID: 'prayer-alert-done' }}
+      footer={{ label: t('common.done'), onPress: onClose, testID: 'prayer-alert-done' }}
       testID="prayer-alert-sheet"
     >
       <View style={styles.sheet}>
         <Text style={[typeV2.name, styles.sheetHeader, { color: palette.text }]} accessibilityRole="header">
-          Reminder before
+          {t('prayer.notifications.reminderBefore')}
         </Text>
         <View style={styles.chips}>
           {REMINDER_OPTIONS.map((m) => {
@@ -149,19 +150,19 @@ function AlertSheet({ prayer, onClose }: { prayer: PrayerName | null; onClose: (
                 testID={`prayer-before-${m}`}
               >
                 <Text style={[typeV2.button, { color: selected ? palette.onPrimary : palette.text }]} maxFontSizeMultiplier={1.3}>
-                  {m === 0 ? 'Off' : `${m} min`}
+                  {m === 0 ? t('prayer.notifications.off') : t('prayer.notifications.minutes', { minutes: m })}
                 </Text>
               </Tap>
             );
           })}
         </View>
         <Text style={[typeV2.name, styles.sheetHeader, { color: palette.text }]} accessibilityRole="header">
-          Sound
+          {t('prayer.notifications.sound')}
         </Text>
         {(
           [
-            { id: 'standard', label: 'Standard tone', detail: undefined },
-            { id: 'silent', label: 'Silent', detail: 'A banner only' },
+            { id: 'standard', label: t('prayer.standardTone'), detail: undefined },
+            { id: 'silent', label: t('prayer.notifications.silent'), detail: t('prayer.notifications.silentDetail') },
           ] as const
         ).map((o) => {
           const selected = a.sound === o.id;
@@ -177,7 +178,7 @@ function AlertSheet({ prayer, onClose }: { prayer: PrayerName | null; onClose: (
               style={styles.option}
               accessibilityRole="radio"
               accessibilityState={{ checked: selected }}
-              accessibilityHint={o.id === 'silent' ? undefined : 'Plays the sound'}
+              accessibilityHint={o.id === 'silent' ? undefined : t('prayer.notifications.playsSound')}
               testID={`prayer-sound-${o.id}`}
             >
               <View style={styles.rowText}>

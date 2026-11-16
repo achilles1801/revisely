@@ -22,6 +22,7 @@ import { shouldDismiss } from '../v2/Sheet';
 import { useModalHold } from '../v2/modalTurn';
 import { alertSessionSaved } from './sessionSavedAlert';
 import { TimerControls } from './TimerControls';
+import { t } from '../../i18n';
 
 /** Where the card grows from and shrinks back to: the chip that opened it, on screen. */
 export interface Frame {
@@ -218,7 +219,7 @@ export function TimerCard({
   return (
     <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={onClose}>
       <GestureHandlerRootView style={StyleSheet.absoluteFill}>
-        <Backdrop onPress={onClose} label="Close timer" />
+        <Backdrop onPress={onClose} label={t('timer.card.close')} />
         <GestureDetector gesture={pan}>
           <Reanimated.View
             style={[
@@ -243,8 +244,8 @@ export function TimerCard({
                 style={styles.grabber}
                 accessible
                 accessibilityRole="button"
-                accessibilityLabel="Close"
-                accessibilityHint="Closes the timer"
+                accessibilityLabel={t('common.close')}
+                accessibilityHint={t('timer.card.closeHint')}
                 accessibilityActions={[{ name: 'activate' }]}
                 onAccessibilityAction={onClose}
                 testID="timer-card-handle"

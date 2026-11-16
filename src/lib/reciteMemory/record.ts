@@ -3,7 +3,8 @@
 // the words missed stay marked on the page, a passage shows its progress, and Activity lists the takes.
 //
 // Text only, about 1 KB a take: never audio (the take's recording stays on this phone, lib/reciteLive/takeRecording),
-// and never the words heard beyond what a mark says was said instead.
+// and never the words heard beyond what a mark says was said instead. A mark keeps its `into` (the similar ayah a slip
+// went on with) for Insights and Revo (Recite insights, RINS-1).
 //
 // A record is one document with a fixed id, written again whole when it changes ("Not a mistake" and Put back after
 // the take's end), so sending it twice changes nothing; two phones' copies of one record meet by `rev`, the newer
@@ -11,7 +12,7 @@
 // (`deleted`) so another phone's next pull drops it too.
 
 import type { TajweedRule } from '../reciteCheck/result';
-import type { Mark, MarkDetail, MarkGroup, MarkKind } from '../reciteLive/contract';
+import type { Mark, MarkDetail, MarkGroup, MarkInto, MarkKind } from '../reciteLive/contract';
 
 export type TakeLevel = 'words' | 'strict';
 
@@ -99,7 +100,16 @@ type StoredMark = {
   expected?: number;
   t0?: number;
   t1?: number;
+  /** Where a slip into a similar ayah went (`into`): its first word, its ayah, an ending, and the other ayat as s, a, s, a… */
+  intoW?: number;
+  intoSura?: number;
+  intoAyah?: number;
+  intoEnding?: boolean;
+  intoAlso?: number[];
 };
+
+/** At most this many other ayat of a slip into a similar ayah are kept. */
+const MAX_INTO_ALSO = 20;
 
 function storedMark(m: Mark): StoredMark {
   const out: StoredMark = { id: m.id, w: m.w, sura: m.ayah[0], ayah: m.ayah[1], kind: m.kind, sure: m.sure };
@@ -121,7 +131,30 @@ function storedMark(m: Mark): StoredMark {
     out.t0 = m.t[0];
     out.t1 = m.t[1];
   }
+  if (m.into) {
+    out.intoW = m.into.w;
+    out.intoSura = m.into.ayah[0];
+    out.intoAyah = m.into.ayah[1];
+    if (m.into.ending) out.intoEnding = true;
+    if (m.into.also?.length) out.intoAlso = m.into.also.slice(0, MAX_INTO_ALSO).flat();
+  }
   return out;
+}
+
+function intoFromStored(r: Record<string, unknown>): MarkInto | null {
+  const w = num(r.intoW);
+  const sura = num(r.intoSura);
+  const ayah = num(r.intoAyah);
+  if (w == null || sura == null || ayah == null) return null;
+  const into: MarkInto = { w, ayah: [sura, ayah] };
+  if (Array.isArray(r.intoAlso)) {
+    const flat = r.intoAlso.filter((x): x is number => num(x) != null);
+    const also: [number, number][] = [];
+    for (let i = 0; i + 1 < flat.length; i += 2) also.push([flat[i], flat[i + 1]]);
+    if (also.length) into.also = also;
+  }
+  if (r.intoEnding === true) into.ending = true;
+  return into;
 }
 
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
@@ -148,6 +181,8 @@ function markFromStored(raw: unknown): Mark | null {
   if (num(r.got) != null) m.got = r.got as number;
   if (num(r.expected) != null) m.expected = r.expected as number;
   if (num(r.t0) != null && num(r.t1) != null) m.t = [r.t0 as number, r.t1 as number];
+  const into = intoFromStored(r);
+  if (into) m.into = into;
   return m;
 }
 

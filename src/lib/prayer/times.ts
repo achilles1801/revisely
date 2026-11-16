@@ -14,30 +14,139 @@ import {
 } from 'adhan';
 import type { Place, PrayerName, PrayerPrefs, TimeName } from './prefs';
 import { PRAYERS } from './prefs';
+import { dayMonth, formatTime as localeTime, t } from '../../i18n';
 
 /** The methods offered (adhan's factory names). */
 export const CALCULATION_METHODS = [
-  { id: 'MuslimWorldLeague', label: 'Muslim World League', short: 'MWL' },
-  { id: 'Egyptian', label: 'Egyptian', short: 'Egyptian' },
-  { id: 'Karachi', label: 'Karachi', short: 'Karachi' },
-  { id: 'UmmAlQura', label: 'Umm al-Qura (Makkah)', short: 'Umm al-Qura' },
-  { id: 'Dubai', label: 'Dubai', short: 'Dubai' },
-  { id: 'MoonsightingCommittee', label: 'Moonsighting Committee', short: 'Moonsighting' },
-  { id: 'NorthAmerica', label: 'ISNA (North America)', short: 'ISNA' },
-  { id: 'Kuwait', label: 'Kuwait', short: 'Kuwait' },
-  { id: 'Qatar', label: 'Qatar', short: 'Qatar' },
-  { id: 'Singapore', label: 'Singapore', short: 'Singapore' },
-  { id: 'Turkey', label: 'Turkey', short: 'Turkey' },
-  { id: 'Tehran', label: 'Tehran', short: 'Tehran' },
+  {
+    id: 'MuslimWorldLeague',
+    get label() {
+      return t('prayer.methods.MuslimWorldLeague.label');
+    },
+    get short() {
+      return t('prayer.methods.MuslimWorldLeague.short');
+    },
+  },
+  {
+    id: 'Egyptian',
+    get label() {
+      return t('prayer.methods.Egyptian.label');
+    },
+    get short() {
+      return t('prayer.methods.Egyptian.short');
+    },
+  },
+  {
+    id: 'Karachi',
+    get label() {
+      return t('prayer.methods.Karachi.label');
+    },
+    get short() {
+      return t('prayer.methods.Karachi.short');
+    },
+  },
+  {
+    id: 'UmmAlQura',
+    get label() {
+      return t('prayer.methods.UmmAlQura.label');
+    },
+    get short() {
+      return t('prayer.methods.UmmAlQura.short');
+    },
+  },
+  {
+    id: 'Dubai',
+    get label() {
+      return t('prayer.methods.Dubai.label');
+    },
+    get short() {
+      return t('prayer.methods.Dubai.short');
+    },
+  },
+  {
+    id: 'MoonsightingCommittee',
+    get label() {
+      return t('prayer.methods.MoonsightingCommittee.label');
+    },
+    get short() {
+      return t('prayer.methods.MoonsightingCommittee.short');
+    },
+  },
+  {
+    id: 'NorthAmerica',
+    get label() {
+      return t('prayer.methods.NorthAmerica.label');
+    },
+    get short() {
+      return t('prayer.methods.NorthAmerica.short');
+    },
+  },
+  {
+    id: 'Kuwait',
+    get label() {
+      return t('prayer.methods.Kuwait.label');
+    },
+    get short() {
+      return t('prayer.methods.Kuwait.short');
+    },
+  },
+  {
+    id: 'Qatar',
+    get label() {
+      return t('prayer.methods.Qatar.label');
+    },
+    get short() {
+      return t('prayer.methods.Qatar.short');
+    },
+  },
+  {
+    id: 'Singapore',
+    get label() {
+      return t('prayer.methods.Singapore.label');
+    },
+    get short() {
+      return t('prayer.methods.Singapore.short');
+    },
+  },
+  {
+    id: 'Turkey',
+    get label() {
+      return t('prayer.methods.Turkey.label');
+    },
+    get short() {
+      return t('prayer.methods.Turkey.short');
+    },
+  },
+  {
+    id: 'Tehran',
+    get label() {
+      return t('prayer.methods.Tehran.label');
+    },
+    get short() {
+      return t('prayer.methods.Tehran.short');
+    },
+  },
 ] as const;
 
 export const DEFAULT_METHOD = 'NorthAmerica';
 
 export const HIGH_LATITUDE_OPTIONS = [
-  { id: 'recommended', label: 'Recommended', detail: 'Middle of the night below 48°, a seventh of it above' },
-  { id: 'middleofthenight', label: 'Middle of the night', detail: undefined },
-  { id: 'seventhofthenight', label: 'Seventh of the night', detail: undefined },
-  { id: 'twilightangle', label: 'Twilight angle', detail: undefined },
+  {
+    id: 'recommended',
+    get label() {
+      return t('prayer.highLatitude.recommended');
+    },
+    get detail(): string | undefined {
+      return t('prayer.highLatitude.recommendedDetail');
+    },
+  },
+  ...(['middleofthenight', 'seventhofthenight', 'twilightangle'] as const).map((id) => ({
+    id,
+    get label() {
+      return t(`prayer.highLatitude.${id}`);
+    },
+    detail: undefined as string | undefined,
+  })),
 ] as const;
 
 export function methodLabel(id: string, short = false): string {
@@ -47,6 +156,7 @@ export function methodLabel(id: string, short = false): string {
 
 /** The usual method where the phone is, by the bundled city list's country. */
 export function defaultMethodFor(country: string | null | undefined): string {
+  // i18n-ignore-start (country names from the city list, method ids)
   switch (country) {
     case 'United Kingdom':
     case 'Ireland':
@@ -88,6 +198,7 @@ export function defaultMethodFor(country: string | null | undefined): string {
       return 'Tehran';
     default:
       return 'MuslimWorldLeague';
+    // i18n-ignore-end
   }
 }
 
@@ -223,44 +334,58 @@ export function currentPrayer(times: DayTimes, now: Date): PrayerName | null {
 /** "in 1h 12m", "in 12m", "in 2h", "now". Whole minutes, rounded up. */
 export function countdown(ms: number): string {
   const minutes = Math.ceil(ms / 60_000);
-  if (minutes <= 0) return 'now';
+  if (minutes <= 0) return t('prayer.countdown.now');
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
-  if (h === 0) return `in ${m}m`;
-  return m === 0 ? `in ${h}h` : `in ${h}h ${m}m`;
+  if (h === 0) return t('prayer.countdown.minutes', { m });
+  return m === 0 ? t('prayer.countdown.hours', { h }) : t('prayer.countdown.hoursMinutes', { h, m });
 }
 
 export function formatTime(date: Date): string {
-  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  return localeTime(date);
 }
 
-export const TIME_LABELS: Record<TimeName, { en: string; ar: string }> = {
-  fajr: { en: 'Fajr', ar: 'الفجر' },
-  sunrise: { en: 'Sunrise', ar: 'الشروق' },
-  dhuhr: { en: 'Dhuhr', ar: 'الظهر' },
-  asr: { en: 'Asr', ar: 'العصر' },
-  maghrib: { en: 'Maghrib', ar: 'المغرب' },
-  isha: { en: 'Isha', ar: 'العشاء' },
+/** A time's name in the app's language (`en`, named before there was another) and in Arabic. */
+export const TIME_LABELS: Record<TimeName, { readonly en: string; readonly ar: string }> = {
+  fajr: {
+    get en() {
+      return t('prayer.names.fajr');
+    },
+    ar: 'الفجر' },
+  sunrise: {
+    get en() {
+      return t('prayer.names.sunrise');
+    },
+    ar: 'الشروق' },
+  dhuhr: {
+    get en() {
+      return t('prayer.names.dhuhr');
+    },
+    ar: 'الظهر' },
+  asr: {
+    get en() {
+      return t('prayer.names.asr');
+    },
+    ar: 'العصر' },
+  maghrib: {
+    get en() {
+      return t('prayer.names.maghrib');
+    },
+    ar: 'المغرب' },
+  isha: {
+    get en() {
+      return t('prayer.names.isha');
+    },
+    ar: 'العشاء' },
 };
 
-const HIJRI_MONTHS = [
-  'Muharram',
-  'Safar',
-  'Rabi al-Awwal',
-  'Rabi al-Thani',
-  'Jumada al-Ula',
-  'Jumada al-Akhirah',
-  'Rajab',
-  "Sha'ban",
-  'Ramadan',
-  'Shawwal',
-  "Dhu al-Qa'dah",
-  'Dhu al-Hijjah',
-];
+/** The months' keys, 1 to 12. */
+const HIJRI_MONTHS = ['m1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7', 'm8', 'm9', 'm10', 'm11', 'm12'] as const;
 
 /** "17 Jumada al-Ula 1448" (Umm al-Qura), or null where the phone's Intl lacks that calendar. */
 export function hijriDate(date: Date): string | null {
   try {
+    // i18n-ignore (numbers only: the month's name comes from HIJRI_MONTHS)
     const f = new Intl.DateTimeFormat('en-u-ca-islamic-umalqura', { day: 'numeric', month: 'numeric', year: 'numeric' });
     if (f.resolvedOptions().calendar !== 'islamic-umalqura') return null;
     const parts = f.formatToParts(date);
@@ -269,7 +394,7 @@ export function hijriDate(date: Date): string | null {
     const month = get('month');
     const year = parseInt(parts.find((p) => (p.type as string) === 'year' || (p.type as string) === 'relatedYear')?.value ?? '', 10);
     if (!day || !month || !year || month < 1 || month > 12) return null;
-    return `${day} ${HIJRI_MONTHS[month - 1]} ${year}`;
+    return `${day} ${t(`prayer.hijri.${HIJRI_MONTHS[month - 1]}`)} ${year}`;
   } catch {
     return null;
   }
@@ -277,7 +402,5 @@ export function hijriDate(date: Date): string | null {
 
 /** "Wednesday 28 October". */
 export function gregorianDate(date: Date): string {
-  const weekday = date.toLocaleDateString('en-GB', { weekday: 'long' });
-  const dayMonth = date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
-  return `${weekday} ${dayMonth}`;
+  return dayMonth(date, { weekday: 'long' });
 }

@@ -68,12 +68,13 @@ import { customPlanAfterUnmemorizing } from '../../lib/memorizationChanges';
 import { MemorizationItem, memorizationItemsWithWaiting } from '../../lib/offline/memorizationItems';
 import { describePassage } from '../../lib/passages';
 import { shiftDay } from '../../lib/journal';
+import { formatDate, formatTime, weekdayName } from '../../i18n';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'ActivityDay'>;
 type ScreenRoute = RouteProp<HomeStackParamList, 'ActivityDay'>;
 
 function formatTimeOfDay(ms: number): string {
-  return new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  return formatTime(new Date(ms));
 }
 
 // 'YYYY-MM-DD' as a local date; new Date('YYYY-MM-DD') is UTC midnight,
@@ -85,14 +86,14 @@ function aheadSummary(log: RevisionLog): string | null {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([day, pages]) => {
       const [y, m, d] = day.split('-').map(Number);
-      return `${pages.length} ahead for ${new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'short' })}`;
+      return `${pages.length} ahead for ${weekdayName(new Date(y, m - 1, d), 'short')}`;
     });
   return parts.length > 0 ? parts.join(', ') : null;
 }
 
 function formatLongDay(date: string): string {
   const [y, m, d] = date.split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString('en-US', {
+  return formatDate(new Date(y, m - 1, d), {
     weekday: 'long',
     month: 'long',
     day: 'numeric',

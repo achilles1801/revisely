@@ -1,0 +1,48 @@
+// components/settings: pieces of Settings (the accent, App info and the testers' tools).
+export const settings = {
+  accent: 'Accent',
+  appInfo: {
+    updateReady: 'Update ready',
+    restartToUse: 'Restart Revisely to use it.',
+    later: 'Later',
+    restartToUpdate: 'Restart to update',
+    builtIn: 'built-in',
+    /** "update 84b0091f". */
+    update: 'update {{id}}',
+    version: 'Version',
+    versionLabel: 'Version {{version}}',
+    upToDate: 'Up to date',
+    latest: 'This is the latest version for this build.',
+    notAvailable: 'Not available',
+    updatesOff: 'Updates are off in this build.',
+    checkFailed: 'Couldn’t check for updates',
+    sendTestError: 'Send test error',
+    sent: 'Sent',
+    sentBody: 'A test error went to Sentry.',
+    testCrash: 'Test native crash',
+    crashTitle: 'Crash the app?',
+    crashBody: 'Revisely closes at once; reopen it to send the crash report.',
+    crash: 'Crash',
+    label: 'App info: {{summary}}',
+    hint: 'Double tap for details. Long press to check for an update.',
+    title: 'App info',
+    emergency: 'The last update couldn’t start, so the built-in version is running.',
+    checkForUpdates: 'Check for updates',
+    share: 'Share',
+  },
+  /** Typing a word to confirm: "Type RESET to confirm." */
+  typeToConfirm: 'Type {{word}} to confirm.',
+  typeToConfirmLabel: 'Type {{word}} to confirm',
+  reset: {
+    title: 'Reset my data',
+    body: 'Your progress, plan, sessions, daily log, reading times and recordings are deleted, here and in your backup, and onboarding starts again. You stay signed in. A copy is kept that only the developer can read.',
+    resetting: 'Resetting…',
+  },
+  scenario: {
+    title: 'Load test scenario',
+    body: 'Your data is replaced by the scenario, here and in your backup, as Reset my data does it. A copy is kept that only the developer can read. TESTING-CHECKLIST.md says what to look at in each.',
+    loading: 'Loading…',
+    load: 'Load {{title}}',
+    pick: 'Pick a scenario',
+  },
+} as const;

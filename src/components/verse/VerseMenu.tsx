@@ -39,8 +39,6 @@ interface VerseMenuProps {
   onCopy: () => void;
   /** The same text, to the share sheet. */
   onShare: () => void;
-  /** Check my recitation from this verse (Revisely Dev, testers: lib/reciteCheck). Absent: no row. */
-  onCheckRecitation?: () => void;
   onClose: () => void;
   /** The held verse ("Al-Baqarah 2:255"), for VoiceOver. */
   verseLabel?: string;
@@ -75,7 +73,6 @@ export function VerseMenu({
   onTranslation,
   onCopy,
   onShare,
-  onCheckRecitation,
   onClose,
   verseLabel,
 }: VerseMenuProps) {
@@ -168,9 +165,6 @@ export function VerseMenu({
       { key: 'copy', label: 'Copy', icon: 'copy-outline', onPress: onCopy },
       { key: 'share', label: 'Share', icon: shareIcon, onPress: onShare },
     ],
-    ...(onCheckRecitation
-      ? [[{ key: 'check', label: 'Check my recitation', icon: 'mic-outline' as IconName, subtitle: 'From this ayah', onPress: onCheckRecitation }]]
-      : []),
   ];
   // VoiceOver hears which verse: there is no title.
   const spoken: Record<string, string> = {
@@ -178,7 +172,6 @@ export function VerseMenu({
     translation: of ? `Translation of${of}` : 'Translation',
     copy: `Copy${of}`,
     share: `Share${of}`,
-    check: `Check my recitation from${of || ' this ayah'}`,
   };
 
   return (

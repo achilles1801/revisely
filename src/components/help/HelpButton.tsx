@@ -5,6 +5,7 @@ import { Tap } from '../v2/Tap';
 import { HELP, type HelpScreen } from '../../lib/help/topics';
 import { HelpSheet } from './HelpSheet';
 import { useHelpButtons } from './useHelpButtons';
+import { t } from '../../i18n';
 
 export const HELP_ICON = 'help-circle-outline' as const;
 
@@ -25,7 +26,7 @@ export function useHelpSheet(screen: HelpScreen, opts: { recite?: boolean } = {}
         onHide={() => help.hideFrom(screen)}
       />
     ) : null;
-  return { shown: help.shown, open: () => setOpen(true), sheet, label: `Help: ${HELP[screen].title}` };
+  return { shown: help.shown, open: () => setOpen(true), sheet, label: t('help.button', { title: HELP[screen].title }) };
 }
 
 /**

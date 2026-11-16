@@ -13,6 +13,7 @@ import type { RevoDayFacts } from '../../lib/revo/types';
 import { typeV2 } from '../../theme/v2';
 import { BlockMark, RevisedMark } from '../activity/BlockMark';
 import { Tap } from '../v2/Tap';
+import { dayMonth } from '../../i18n';
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const DISC = 34;
@@ -26,8 +27,7 @@ export function ringOf(f: RevoDayFacts): number | null {
 
 /** "Tuesday 27 October": the mock's order, no comma. */
 function longDay(day: string): string {
-  const d = new Date(`${day}T00:00:00`);
-  return `${d.toLocaleDateString('en-US', { weekday: 'long' })} ${d.getDate()} ${d.toLocaleDateString('en-US', { month: 'long' })}`;
+  return dayMonth(new Date(`${day}T00:00:00`), { weekday: 'long' });
 }
 
 export function RevoMonth({

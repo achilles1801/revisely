@@ -18,6 +18,7 @@ import { useAuth } from '../../context/AuthContext';
 import { ensureNotificationsPermission } from '../../lib/notifications';
 import { DEFAULT_FAJR_METHOD } from '../../lib/fajrBoundary';
 import { getJuzForPage } from '../../lib/quranData';
+import { t } from '../../i18n';
 
 type DayBoundary = 'midnight' | 'fajr';
 type ScheduleMode = 'pages' | 'juz';
@@ -122,8 +123,8 @@ export default function ScheduleScreen() {
         locationCoords = coords;
       } else {
         Alert.alert(
-          'Location not available',
-          'Without location we can\'t compute fajr. Defaulting to midnight — switch in Settings once you grant location.',
+          t('onboarding.schedule.noLocationTitle'),
+          t('onboarding.schedule.noLocationBody'),
         );
       }
     }
@@ -157,16 +158,16 @@ export default function ScheduleScreen() {
   };
 
   const headlineText =
-    journeyStage === 'complete' ? 'Set your maintenance schedule' : 'Set your rhythm';
+    journeyStage === 'complete' ? t('onboarding.schedule.titleMaintain') : t('onboarding.schedule.title');
 
   const cycleText =
     derivedCycleDays > 0
-      ? `Full revision cycle: ~${derivedCycleDays} day${derivedCycleDays === 1 ? '' : 's'}`
+      ? t('onboarding.schedule.cycle', { count: derivedCycleDays })
       : null;
 
   const pagesMode = scheduleMode === 'pages';
   const amount = pagesMode ? dailyCapacity : dailyJuzCount;
-  const unit = pagesMode ? 'pages' : dailyJuzCount === 1 ? 'juz' : 'ajzaʼ';
+  const unit = pagesMode ? t('onboarding.schedule.unitPages') : t('onboarding.schedule.unitJuz', { count: dailyJuzCount });
   // Flat sections on hairlines, as in Settings: the amount (Pages or Juz,
   // then a slider), when the day resets, and reminders. "Start" stays at the foot.
   return (
@@ -182,22 +183,22 @@ export default function ScheduleScreen() {
             {headlineText}
           </Text>
           <Text style={[typeV2.body, v2.subtext, { color: palette.secondary }]}>
-            You can change any of these later in Settings.
+            {t('onboarding.schedule.changeLater')}
           </Text>
         </View>
 
-        <SectionV2 title="How much per day?">
+        <SectionV2 title={t('onboarding.schedule.howMuch')}>
           <View style={v2.block}>
             <PillTabs<ScheduleMode>
               options={[
-                { value: 'pages', label: 'Pages' },
-                { value: 'juz', label: 'Juz' },
+                { value: 'pages', label: t('onboarding.schedule.pages') },
+                { value: 'juz', label: t('common.juz') },
               ]}
               value={scheduleMode}
               onChange={setScheduleMode}
               testID="schedule-mode"
             />
-            <View style={v2.amountRow} accessible accessibilityLabel={`${amount} ${unit} a day`}>
+            <View style={v2.amountRow} accessible accessibilityLabel={t('onboarding.schedule.perDay', { amount, unit })}>
               <Text
                 style={[typeV2.largeTitle, typeV2.numeral, { color: palette.text }]}
                 maxFontSizeMultiplier={1.6}
@@ -220,7 +221,7 @@ export default function ScheduleScreen() {
               minimumTrackTintColor={palette.primary}
               maximumTrackTintColor={palette.separator}
               thumbTintColor={palette.primary}
-              accessibilityLabel={pagesMode ? 'Pages a day' : 'Juz a day'}
+              accessibilityLabel={pagesMode ? t('onboarding.schedule.pagesADay') : t('onboarding.schedule.juzADay')}
               testID="schedule-slider"
             />
             <View style={v2.sliderLabels}>
@@ -239,12 +240,12 @@ export default function ScheduleScreen() {
           </View>
         </SectionV2>
 
-        <SectionV2 title="When does your day reset?">
+        <SectionV2 title={t('onboarding.schedule.reset')}>
           <View style={v2.block}>
             <PillTabs<DayBoundary>
               options={[
-                { value: 'fajr', label: 'At fajr', icon: 'moon-outline' },
-                { value: 'midnight', label: 'At midnight', icon: 'time-outline' },
+                { value: 'fajr', label: t('onboarding.schedule.atFajr'), icon: 'moon-outline' },
+                { value: 'midnight', label: t('onboarding.schedule.atMidnight'), icon: 'time-outline' },
               ]}
               value={dayBoundary}
               onChange={setDayBoundary}
@@ -252,7 +253,7 @@ export default function ScheduleScreen() {
             />
             {dayBoundary === 'fajr' && (
               <Text style={[typeV2.meta, v2.helper, { color: palette.secondary }]}>
-                We'll ask for your location to compute fajr accurately.
+                {t('onboarding.schedule.locationNote')}
               </Text>
             )}
           </View>
@@ -261,15 +262,15 @@ export default function ScheduleScreen() {
         <SectionV2>
           <View style={v2.row}>
             <View style={v2.rowText}>
-              <Text style={[typeV2.body, { color: palette.text }]}>Daily reminders</Text>
+              <Text style={[typeV2.body, { color: palette.text }]}>{t('onboarding.schedule.reminders')}</Text>
               <Text style={[typeV2.meta, { color: palette.secondary }]}>
-                Get a nudge each day so revision stays consistent.
+                {t('onboarding.schedule.remindersDetail')}
               </Text>
             </View>
             <Toggle
               value={notificationsEnabled}
               onValueChange={setNotificationsEnabled}
-              accessibilityLabel="Daily reminders"
+              accessibilityLabel={t('onboarding.schedule.reminders')}
               testID="schedule-reminders"
             />
           </View>
@@ -278,7 +279,7 @@ export default function ScheduleScreen() {
 
       <View style={v2.footer}>
         <PillButton
-          title={starting ? 'Setting up…' : 'Start'}
+          title={starting ? t('onboarding.schedule.settingUp') : t('onboarding.schedule.start')}
           size="lg"
           onPress={handleStart}
           busy={starting}

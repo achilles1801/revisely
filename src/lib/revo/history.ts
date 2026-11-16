@@ -1,6 +1,7 @@
 // Revo's History: conversations grouped by the day they were last active, newest first.
 
 import type { RevoChat } from './types';
+import { formatDate, formatTime } from '../../i18n';
 
 export interface HistorySection {
   title: string;
@@ -16,7 +17,7 @@ const localDay = (ms: number) => {
 export function historyDayTitle(day: string, today: string, yesterday: string): string {
   if (day === today) return 'Today';
   if (day === yesterday) return 'Yesterday';
-  return new Date(`${day}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+  return formatDate(new Date(`${day}T12:00:00`), { weekday: 'long', day: 'numeric', month: 'long' }, 'device');
 }
 
 /** Sections by day; `query` keeps the conversations whose title or line has it. */
@@ -39,6 +40,6 @@ export function historySections(chats: readonly RevoChat[], now: Date, query = '
 
 /** "9:52 PM · plan added". */
 export function historyLine(chat: RevoChat): string {
-  const time = new Date(chat.updatedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const time = formatTime(new Date(chat.updatedAt));
   return chat.meta ? `${time} · ${chat.meta}` : time;
 }

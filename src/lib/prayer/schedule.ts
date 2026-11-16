@@ -7,6 +7,7 @@
 import type { PrayerAlert, PrayerName, PrayerSound } from './prefs';
 import { PRAYERS } from './prefs';
 import { DayTimes, formatTime, TIME_LABELS } from './times';
+import { t } from '../../i18n';
 
 /** Every prayer notification's identifier starts with this; nothing else's does. */
 export const PRAYER_ID_PREFIX = 'prayer-';
@@ -108,8 +109,8 @@ export function planPrayerNotifications({
     {
       id: KEEP_GOING_ID,
       at: new Date(last.getTime() + 60_000),
-      title: 'Prayer notifications',
-      body: 'Open Revisely to keep your prayer notifications going.',
+      title: t('prayer.keepGoing.title'),
+      body: t('prayer.keepGoing.body'),
       sound: 'silent',
       kind: 'keep-going',
     },

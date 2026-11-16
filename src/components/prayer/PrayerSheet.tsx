@@ -14,6 +14,7 @@ import { countdown, formatTime, gregorianDate, hijriDate, methodLabel, TIME_LABE
 import { usePrayerTimes, PrayerTimesNow } from './usePrayerTimes';
 import { usePrayerLocation } from './usePrayerLocation';
 import { usePrayerNotifyPermission } from './usePrayerNotifyPermission';
+import { t } from '../../i18n';
 
 export type PrayerTab = 'times' | 'qibla';
 
@@ -48,15 +49,15 @@ export function PrayerSheet({
     <Sheet
       visible={visible}
       onClose={onClose}
-      title="Prayer"
-      footer={{ label: asking ? 'Not now' : 'Done', onPress: onClose, testID: 'prayer-done' }}
+      title={t('prayer.sheet.title')}
+      footer={{ label: asking ? t('common.notNow') : t('common.done'), onPress: onClose, testID: 'prayer-done' }}
       testID="prayer-sheet"
     >
       <View style={styles.tabs}>
         <PillTabs<PrayerTab>
           options={[
-            { value: 'times', label: 'Times' },
-            { value: 'qibla', label: 'Qibla' },
+            { value: 'times', label: t('prayer.sheet.times') },
+            { value: 'qibla', label: t('prayer.sheet.qibla') },
           ]}
           value={tab}
           onChange={onTab}
@@ -126,7 +127,7 @@ export function TimesBody({
           const at = today[name];
           const isNext = isNextToday && next!.name === name;
           const past = at != null && at.getTime() <= now.getTime() && name !== current;
-          const sub = isNext ? nextIn : name === current ? 'Now' : null;
+          const sub = isNext ? nextIn : name === current ? t('prayer.sheet.now') : null;
           return (
             <TimeRow
               key={name}
@@ -144,9 +145,9 @@ export function TimesBody({
       </View>
       <Tap onPress={onOpenCalculation} style={[styles.calc, { borderTopColor: palette.separator }]} accessibilityRole="button" testID="prayer-calculation">
         <Ionicons name="options-outline" size={24} color={palette.text} />
-        <Text style={[typeV2.body, styles.calcLabel, { color: palette.text }]}>Calculation</Text>
+        <Text style={[typeV2.body, styles.calcLabel, { color: palette.text }]}>{t('prayer.sheet.calculation')}</Text>
         <Text style={[typeV2.body, styles.calcValue, { color: palette.secondary }]} numberOfLines={1}>
-          {methodLabel(settings.method, true)} · {settings.madhab === 'hanafi' ? 'Hanafi' : 'Standard'}
+          {methodLabel(settings.method, true)} · {settings.madhab === 'hanafi' ? t('prayer.sheet.hanafi') : t('prayer.sheet.standard')}
         </Text>
         <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
       </Tap>
@@ -206,7 +207,7 @@ function TimeRow({
           hitSlop={8}
           style={styles.bell}
           accessibilityRole="switch"
-          accessibilityLabel={`${label.en} notification`}
+          accessibilityLabel={t('prayer.sheet.bell', { name: label.en })}
           accessibilityState={{ checked: !!bell }}
           testID={`prayer-bell-${name}`}
         >
@@ -253,32 +254,32 @@ function TimesLocation({
     case 'needs-permission':
       content = (
         <>
-          {title('Allow location for prayer times')}
-          {body('Revisely works out the times for where you are. Your location stays on this phone.')}
+          {title(t('prayer.sheet.permission.title'))}
+          {body(t('prayer.sheet.permission.body'))}
         </>
       );
-      action = <PillButton title="Allow location" size="lg" onPress={onAllow} testID="prayer-allow-location" />;
+      action = <PillButton title={t('prayer.sheet.permission.allow')} size="lg" onPress={onAllow} testID="prayer-allow-location" />;
       break;
     case 'denied':
       content = (
         <>
-          {title('Location is off for Revisely')}
-          {body('Turn it on in Settings to see prayer times.')}
+          {title(t('prayer.sheet.denied.title'))}
+          {body(t('prayer.sheet.denied.body'))}
         </>
       );
-      action = <PillButton title="Open Settings" size="lg" onPress={onOpenSettings} />;
+      action = <PillButton title={t('common.openSettings')} size="lg" onPress={onOpenSettings} />;
       break;
     case 'no-location':
       content = (
         <>
-          {title("Couldn't find where you are")}
-          {body('Check that Location Services is on, then try again.')}
+          {title(t('prayer.sheet.noLocation.title'))}
+          {body(t('prayer.sheet.noLocation.body'))}
         </>
       );
-      action = <PillButton title="Try again" variant="outline" size="lg" onPress={onRetry} />;
+      action = <PillButton title={t('common.tryAgain')} variant="outline" size="lg" onPress={onRetry} />;
       break;
     default:
-      content = title('Finding where you are…');
+      content = title(t('prayer.sheet.locating'));
   }
   return (
     <View style={styles.locate} testID={`prayer-location-${status}`}>

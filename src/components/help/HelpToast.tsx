@@ -3,8 +3,7 @@ import { UndoToast } from '../revision/UndoToast';
 import { clearHelpToast, useHelpToast } from '../../lib/help/state';
 import type { HelpScreen } from '../../lib/help/topics';
 import { useHelpButtons } from './useHelpButtons';
-
-export const HIDDEN_MESSAGE = 'Help buttons hidden. Settings → Support brings them back.';
+import { t } from '../../i18n';
 
 /**
  * "Help buttons hidden", with Undo, on the screen they were hidden from (HELP-2). Put it at the
@@ -17,7 +16,7 @@ export function HelpToast({ screen, bottomInset = 0 }: { screen: HelpScreen; bot
     <UndoToast
       key={toast?.id}
       visible={!!toast}
-      message={HIDDEN_MESSAGE}
+      message={t('help.hidden')}
       onUndo={() => {
         clearHelpToast();
         help.setShown(true);

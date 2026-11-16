@@ -14,6 +14,7 @@ import {
   getFajrTimeFor,
   DEFAULT_FAJR_METHOD,
 } from '../lib/fajrBoundary';
+import { formatTime } from '../i18n';
 
 /**
  * Settings card for the fajr-based day boundary (`compact`: the toggle alone,
@@ -33,7 +34,7 @@ export function FajrBoundaryCard({ compact = false }: { compact?: boolean } = {}
   }, [user]);
 
   const resetsAt = todaysFajr
-    ? todaysFajr.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+    ? formatTime(todaysFajr)
     : 'midnight';
 
   if (!user) return null;

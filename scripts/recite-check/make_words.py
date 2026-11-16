@@ -13,7 +13,8 @@ checker that changes none of those keeps its table.
   python make_words.py --merge OUT PART...     the slices into one table
 
 The job (README.md, "The word table") runs it on the service's own image and writes the slices to the dev bucket
-under recite-cache/<key>/, where no client can reach them; stage.sh merges them into the image.
+under recite-cache/<key>/, where no client can reach them; stage.sh merges them into the image. The merge also keeps
+the Qur'an-wide start search's index in the table (live.QuranIndex, ~4 MB), so no instance works it out.
 """
 import argparse
 import os
@@ -72,6 +73,8 @@ def merge(out, parts):
     offsets = np.zeros(len(blobs) + 1, np.int64)
     offsets[1:] = np.cumsum([len(b) for b in blobs])
     table = dict(meta, words=len(blobs), offsets=offsets, blob=b''.join(blobs))
+    import live  # noqa: E402  (the harness)
+    table['quran'] = live.QuranIndex.data(table)  # the Qur'an-wide start search's index, made once here (startIn)
     pathlib.Path(out).write_bytes(pickle.dumps(table, protocol=5))
     print(f'{len(blobs)} words, {offsets[-1] / 1e6:.0f} MB -> {out} (words key {meta["key"]})')
 

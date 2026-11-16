@@ -2,6 +2,8 @@
 // "Yesterday", "3d", "2w", then the date ("Sep 14", or "Sep 14, 2025" in an
 // earlier year). Days are local 'YYYY-MM-DD' strings (revision days).
 
+import { formatDate, weekdayName } from '../i18n';
+
 function localDay(day: string): Date {
   const [y, m, d] = day.split('-').map(Number);
   return new Date(y, (m ?? 1) - 1, d ?? 1);
@@ -16,7 +18,7 @@ export function dayAgo(day: string, today: string): string {
   if (days < 7) return `${days}d`;
   if (days < 35) return `${Math.floor(days / 7)}w`;
   const sameYear = then.getFullYear() === now.getFullYear();
-  return then.toLocaleDateString('en-US', {
+  return formatDate(then, {
     month: 'short',
     day: 'numeric',
     ...(sameYear ? {} : { year: 'numeric' }),
@@ -25,7 +27,7 @@ export function dayAgo(day: string, today: string): string {
 
 /** "Saturday" for a revision day. */
 export function weekday(day: string): string {
-  return localDay(day).toLocaleDateString('en-US', { weekday: 'long' });
+  return weekdayName(localDay(day));
 }
 
 /** The day of the month, for a mark: "24". */

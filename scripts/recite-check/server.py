@@ -34,8 +34,9 @@ from engine import BadRequest, Engine
 HERE = pathlib.Path(__file__).resolve().parent
 VERSION = (HERE / 'CHECKER_COMMIT').read_text().strip()[:12] if (HERE / 'CHECKER_COMMIT').exists() else 'local'
 SERVER = (HERE / 'SERVER_COMMIT').read_text().strip()[:12] if (HERE / 'SERVER_COMMIT').exists() else 'local'
-PROTOCOL = 6  # the contract this server speaks (recite-contract.md): 5 = follow, hint, tajweed, premium_required;
-              # 6 = start anywhere on the page (startBy, locked, nolock, done.result.start); see protocol()
+PROTOCOL = 7  # the contract this server speaks (recite-contract.md): 5 = follow, hint, tajweed, premium_required;
+              # 6 = start anywhere on the page (startBy, locked, nolock, done.result.start);
+              # 7 = anywhere in the Qur'an (startIn "quran", locked.where); see protocol()
 MAX_SECONDS = 240
 FIRST_FRAME = 10      # seconds a new socket has to send its start frame
 IDLE = 30             # seconds without a frame from the phone before a socket is closed
@@ -376,11 +377,13 @@ def start_by_of(msg, s, a, end):
 
 
 def protocol():
-    """PROTOCOL once the follower can start anywhere on the page (live.LiveSession takes start_by), else 5, with
-    startBy ignored as a protocol 5 server ignores it: whichever of the server and the follower is deployed first, the
-    phone is never told to wait for a `locked` that can't come."""
+    """What the follower deployed can do: 7 once live.LiveSession takes start_in (anywhere in the Qur'an), 6 with
+    start_by only (anywhere on the page), else 5. What it can't do is ignored as an older server ignores it, so
+    whichever of the server and the follower is deployed first, the phone is never told to wait for what can't come."""
     ps = inspect.signature(live.LiveSession).parameters
-    return PROTOCOL if 'start_by' in ps or any(p.kind is p.VAR_KEYWORD for p in ps.values()) else 5
+    if any(p.kind is p.VAR_KEYWORD for p in ps.values()) or 'start_in' in ps:
+        return PROTOCOL
+    return 6 if 'start_by' in ps else 5
 
 
 def start_note(s):
@@ -398,10 +401,12 @@ def take_fields(s, r, kept=None):
     socket's connect to now; `cpu_s` the process's CPU meanwhile (one take per instance: the take's own)."""
     secs = s.sess.seconds
     locks = [e.get('t') for e in s.events if e.get('type') == 'locked']
+    where = next((e.get('where') for e in s.events if e.get('type') == 'locked'), None)  # 'page' or 'quran' (7)
     cpu_s = health.cpu() - s.cpu0
     return {'kind': 'live', 'level': health.level(s.request.get('settings') or {}, s.request.get('follow')),
-            'protocol': protocol(), 'start': 'anywhere' if 'startBy' in s.request else 'fixed',
-            'locked_s': locks[0] if locks else None, 'locks': len(locks) if 'startBy' in s.request else None,
+            'protocol': protocol(), 'start': ('quran' if s.request.get('startIn') else 'anywhere') if 'startBy' in
+            s.request else 'fixed', 'locked_s': locks[0] if locks else None,
+            'locks': len(locks) if 'startBy' in s.request else None, 'where': where,
             'app': health.app_tag(s.app), 'audio_s': round(secs, 1), 'open_s': round(time.monotonic() - s.opened, 1),
             'ready_s': s.ready_s, 'cold': s.cold, 'age_s': round(s.age, 1), 'sockets': s.sockets,
             'restarted': s.restarted, 'why': r.get('why'), 'marks': len(r.get('marks') or []), 'kept': kept,
@@ -460,13 +465,19 @@ async def open_session(msg, uid):
     open_end = passage[2] is None
     run = passage[:2] + LAST_AYAH if open_end else passage
     start_by = start_by_of(msg, *passage[:2], run[2:]) if protocol() >= 6 else None
+    # Anywhere in the Qur'an (protocol 7): with startBy only, as the page is searched first. startBy keeps its 400-word
+    # check, which limits the page, never the Qur'an-wide search.
+    start_in = 'quran' if start_by and msg.get('startIn') == 'quran' and protocol() >= 7 else None
     # defer: each ayah's letters and tajweed are judged off the hop, so they never hold up the cursor (live.py)
     sess = await asyncio.to_thread(live.LiveSession, ENGINE['e'], *run, settings, follow, defer=True,
-                                   open_end=open_end, **({'start_by': start_by} if start_by else {}))
+                                   open_end=open_end, **({'start_by': start_by} if start_by else {}),
+                                   **({'start_in': start_in} if start_in else {}))
     sid = rid if isinstance(rid, str) and store.TAKE.match(rid) else store.new_take()
     request = dict(zip(('s', 'a', 's2', 'a2'), passage), settings=settings, follow=follow, open=open_end)
     if start_by:
         request['startBy'] = list(start_by)
+    if start_in:
+        request['startIn'] = start_in
     s = Live(sid, uid, sess, msg.get('keep') is True, request, msg.get('app') if isinstance(msg.get('app'), str)
              else None)
     SESSIONS[sid] = s

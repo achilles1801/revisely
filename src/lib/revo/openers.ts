@@ -16,6 +16,7 @@ import { asides, revoChips, revoGreeting, revoHello, todayDone, type Aside, type
 import type { RevoPlace } from './place';
 import type { RevoContext, RevoDayFacts, RevoPassageFacts } from './types';
 import { passageLong, passageShort } from './words';
+import { formatDate, weekdayName } from '../../i18n';
 
 const NBSP = ' ';
 const juzName = (juz: number) => `Juz${NBSP}${juz}`;
@@ -156,8 +157,8 @@ interface Built {
   chips: (string | null | undefined)[];
 }
 
-const weekdayOf = (day: string) => new Date(`${day}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long' });
-const dateOf = (day: string) => new Date(`${day}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+const weekdayOf = (day: string) => weekdayName(new Date(`${day}T12:00:00`));
+const dateOf = (day: string) => formatDate(new Date(`${day}T12:00:00`), { weekday: 'long', day: 'numeric', month: 'long' }, 'device');
 
 /** How a day is named from today: "Yesterday", "Tuesday" (within a week), else its date. */
 function dayWords(day: string, today: string): { name: string; on: string; bare: string; near: boolean } {

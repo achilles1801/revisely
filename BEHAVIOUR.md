@@ -262,6 +262,10 @@ How the tests are made: `tests/scenarios/README.md`.
 
 ## The reader
 
+- **READ-1.** The reader opens on the page it was opened for (a surah or juz from the Read tab, a search
+  result, Jump to, a day's or a session's page): its first frame is that page, never page 1 first. Before
+  Nov 15 2026 it began at Al-Fatihah and moved to the page a moment later (Majd, on Revisely Dev: "the first
+  thing that pops up is Surah Fatiha, and then after like a half second or so, it jumps to the surah").
 - **REC-1.** A sitting in the reader: ending the timer while a recording runs, or is paused,
   ends both. The recording is saved first, then the timed sitting. One note says what was saved, by
   surah and ayah, and opens its day: "Saved to today: Al-Mulk, ayahs 1–26, 41 min · View". It takes the
@@ -279,6 +283,19 @@ How the tests are made: `tests/scenarios/README.md`.
   in the Revised block at once (ACT-13), carry no strength or minutes, and go from its menu (ACT-14).
   A sitting offers one thing: pages not memorized come first (MEM-5). Pages not scheduled that day,
   already revised, or on an older day were reading, and offer nothing.
+
+## Recite insights (Revisely Dev)
+
+What a user's takes with Mark mistakes show over time, and Revo knowing it (Majd, Nov 16 2026).
+
+- **RINS-1.** Revo knows what Recite found in the account's takes, worked out on the phone: the last 4
+  weeks' takes and score, mistakes by kind, Not clear and tajweed notes apart, words still marked and
+  cleared, the passages that keep slipping and the similar ayahs gone on with, and the latest take. A take's
+  own marks go only when the user attaches it. It is told text only: never audio, recordings or ids, and
+  never a sound spelt out. Its rules for this come only with a recitation, so every other question is asked
+  exactly as before. It speaks only of marks that exist, says Not clear wasn't clear enough to check (never
+  wrong), puts words and similar ayahs before harakat, never calls going back to restart a mistake, and
+  names surahs and ayahs, never pages.
 
 ## Recite's memory (Revisely Dev)
 
@@ -934,6 +951,14 @@ shows up once and they must go through it and complete it … just the main stuf
   and To). Any ayahs, not only whole pages, are named the same way: whole surahs and juz by name,
   the rest by surah and ayah ("Al-Mulk, ayahs 1–20", "Al-Mulk 27 to Al-Qalam 15"). Whole pages and
   the ayahs they hold read alike.
+
+## Language and layout
+
+- **LANG-1.** The app lays out the way its language reads, not the phone's: while it shows English it
+  is left to right on every phone, Arabic or Persian or Hebrew included, from the next launch after it
+  starts (React Native reads the direction at launch). (Until Nov 2026 an Android phone set to an
+  RTL language mirrored the English app: rows, the tab swipe, the verse highlights and the mushaf's
+  page order; `src/i18n/direction.ts`.)
 
 ## Known bugs
 

@@ -9,6 +9,7 @@ import { isActive } from '../nowPlaying';
 import { hasRecordingSession, onRecordingSessionChange } from '../recordings';
 
 /** The tabs' own screens: Home, Read's index, Insights. */
+// i18n-ignore (route names)
 export const MAIN_SCREENS: ReadonlySet<string> = new Set(['Dashboard', 'ReadIndex', 'Insights']);
 
 export type BusyReason = 'recording' | 'recitation' | 'timer' | 'screen';

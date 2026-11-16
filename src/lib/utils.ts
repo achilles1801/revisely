@@ -1,3 +1,5 @@
+import { formatDate as formatLocaleDate } from '../i18n';
+
 /**
  * Format date to YYYY-MM-DD in the user's local timezone.
  * Must use local components — `toISOString()` returns UTC and silently
@@ -15,7 +17,7 @@ export function formatDate(date: Date): string {
  */
 export function formatDateReadable(date: Date | string): string {
   const d = typeof date === 'string' ? new Date(date) : date;
-  return d.toLocaleDateString('en-US', { 
+  return formatLocaleDate(d, { 
     month: 'short', 
     day: 'numeric', 
     year: 'numeric' 

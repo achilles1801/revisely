@@ -47,6 +47,7 @@ import { markRevoMomentSeen } from '../../lib/revo/momentSeen';
 import { auth } from '../../lib/firebase';
 import { greetingName } from '../../lib/displayName';
 import { smartTrackingOn } from '../../lib/smartTracking';
+import { t } from '../../i18n';
 
 export type WhatsNewMode = 'required' | 'forced' | 'replay';
 
@@ -111,7 +112,7 @@ function Page({ card, step, total }: { card: WhatsNewCard; step: number; total: 
     <Text
       style={[typeV2.largeTitle, styles.center, { color: palette.text }]}
       accessibilityRole="header"
-      accessibilityLabel={`Step ${step} of ${total}. ${card.title}`}
+      accessibilityLabel={t('whatsNew.step', { step, total, title: card.title })}
       maxFontSizeMultiplier={TITLE_MAX_SCALE}
       testID="whats-new-title"
     >
@@ -193,9 +194,9 @@ export function WhatsNewScreen({ mode, onClose }: { mode: WhatsNewMode; onClose?
   // Each card starts at its top, and shows it can scroll when it can.
   useEffect(() => {
     scroll.current?.scrollTo({ y: 0, animated: false });
-    const t = setTimeout(() => scroll.current?.flashScrollIndicators(), 350);
-    if (card) AccessibilityInfo.announceForAccessibility(`Step ${index + 1} of ${cards.length}. ${card.title}`);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => scroll.current?.flashScrollIndicators(), 350);
+    if (card) AccessibilityInfo.announceForAccessibility(t('whatsNew.step', { step: index + 1, total: cards.length, title: card.title }));
+    return () => clearTimeout(timer);
   }, [index]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const done = useCallback(() => {
@@ -279,13 +280,13 @@ export function WhatsNewScreen({ mode, onClose }: { mode: WhatsNewMode; onClose?
       <View style={[styles.bar, { minHeight: 44 * chrome }]}>
         <View style={styles.barSide}>
           {mode === 'replay' ? (
-            <Tap onPress={() => onClose?.()} accessibilityRole="button" accessibilityLabel="Close" hitSlop={12} testID="whats-new-close">
+            <Tap onPress={() => onClose?.()} accessibilityRole="button" accessibilityLabel={t('common.close')} hitSlop={12} testID="whats-new-close">
               <Ionicons name="close" size={26} color={palette.text} />
             </Tap>
           ) : null}
         </View>
         <Text style={[typeV2.barTitle, styles.barTitle, { color: palette.text }]} maxFontSizeMultiplier={CHROME_MAX_SCALE} numberOfLines={1}>
-          What’s new
+          {t('whatsNew.title')}
         </Text>
         <View style={styles.barSide} />
       </View>
@@ -305,7 +306,7 @@ export function WhatsNewScreen({ mode, onClose }: { mode: WhatsNewMode; onClose?
           <Stepper total={cards.length} current={index + 1} />
         </View>
         <PillButton
-          title={last ? 'Done' : 'Next'}
+          title={last ? t('common.done') : t('whatsNew.next')}
           size="lg"
           onPress={advance}
           testID={last ? 'whats-new-done' : 'whats-new-next'}

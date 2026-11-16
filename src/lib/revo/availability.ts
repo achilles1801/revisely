@@ -6,6 +6,7 @@
 import type { User } from '../../types';
 import { getNextRevisionDayStart } from '../fajrBoundary';
 import { type RevoRelease, useRevoRelease } from './release';
+import { formatTime } from '../../i18n';
 
 export function revoAvailable(user: Pick<User, 'previewTester'> | null | undefined, release: RevoRelease): boolean {
   if (!user || release === 'off') return false;
@@ -31,6 +32,6 @@ export function revoBackAt(user: User | null | undefined, now: Date): { short: s
   const at = getNextRevisionDayStart(user, now);
   const fajr = !!(user?.fajrBoundaryEnabled && user.locationCoords);
   if (!fajr) return { short: 'Back at midnight', long: 'Revo is back at midnight.' };
-  const time = at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const time = formatTime(at);
   return { short: 'Back after Fajr', long: `Revo is back after Fajr, at ${time}.` };
 }

@@ -18,6 +18,7 @@ import { paletteV2, type AccentName } from '../../theme/v2';
 import type { QuranPage, RevisionLog, User, UserPage } from '../../types';
 import { widgetQibla, type City, type Coords, type WidgetQibla } from './qibla';
 import { partlyMemorizedAyahs, revisablePages } from '../memorizedAyahs';
+import { t } from '../../i18n';
 
 /** Shared by the app and the extension (app.config.js, targets/widget). */
 export { widgetAppGroup } from '../variant';
@@ -142,9 +143,9 @@ function colorsFor(accent: AccentName): WidgetSnapshot['colors'] {
 export function juzLabel(juzBreakdown: { juz: number }[]): string {
   const js = [...new Set(juzBreakdown.map((j) => j.juz))].sort((a, b) => a - b);
   if (js.length === 0) return '';
-  if (js.length === 1) return `Juz ${js[0]}`;
-  if (js.every((j, i) => i === 0 || j === js[i - 1] + 1)) return `Juz ${js[0]}–${js[js.length - 1]}`;
-  return js.length <= 3 ? `Juz ${js.join(', ')}` : `${js.length} juz`;
+  if (js.length === 1) return t('common.juzN', { n: js[0] });
+  if (js.every((j, i) => i === 0 || j === js[i - 1] + 1)) return t('common.juzRange', { from: js[0], to: js[js.length - 1] });
+  return js.length <= 3 ? t('common.juzList', { list: js.join(', ') }) : t('common.juzCount', { count: js.length });
 }
 
 /** The Lock Screen's rectangular widget fits about this many characters on its line. */
