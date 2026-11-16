@@ -169,6 +169,8 @@ interface PageItemProps {
   onTapVerse?: (ayah: AyahRef) => boolean;
 }
 
+const NO_RECTS: readonly Rect[] = [];
+
 const PageItem = React.memo(function PageItem({
   pageNumber,
   edition,
@@ -197,6 +199,11 @@ const PageItem = React.memo(function PageItem({
   const [uri, setUri] = useState<string | null>(() => getCachedPageUri(pageNumber, edition));
   const [attempt, setAttempt] = useState(0);
   const [loading, setLoading] = useState(false);
+  // The image that has been drawn (its onLoad). A verse's highlight waits for it, so the boxes and the page appear
+  // together: drawn before it, they showed on a blank page while the reader slid in, since the image waits for the
+  // pager's size and then decodes (Majd, Nov 16 2026: "it should show up at the same time").
+  const [drawnUri, setDrawnUri] = useState<string | null>(null);
+  const pageDrawn = sized && uri != null && drawnUri === uri;
   // Couldn't be shown: 'offline' (not on the phone, no connection) or 'failed'.
   const [missing, setMissing] = useState<'offline' | 'failed' | null>(null);
   const isRemote = uri != null && uri.startsWith('http');
@@ -318,8 +325,8 @@ const PageItem = React.memo(function PageItem({
           accessible={false}
         >
           {underlay}
-          {/* The verse's lines, in the image's own frame: bounds × the page's scale. */}
-          {highlightRects.map((r, i) => (
+          {/* The verse's lines, in the image's own frame: bounds × the page's scale; once the page is drawn. */}
+          {(pageDrawn ? highlightRects : NO_RECTS).map((r, i) => (
             <View
               key={i}
               testID="ayah-highlight"
@@ -353,6 +360,7 @@ const PageItem = React.memo(function PageItem({
               ]}
               fadeDuration={0}
               onLoadStart={() => setLoading(true)}
+              onLoad={() => setDrawnUri(uri)}
               onLoadEnd={() => setLoading(false)}
               onError={() => {
                 setLoading(false);
