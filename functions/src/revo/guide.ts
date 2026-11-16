@@ -358,7 +358,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'Takes kept, and past mistakes on the page',
-    covers: ['RMEM-1', 'RMEM-2', 'RMEM-3', 'RMEM-4', 'RMEM-5'],
+    covers: ['RMEM-1', 'RMEM-2', 'RMEM-3', 'RMEM-4', 'RMEM-5', 'RINS-3'],
     routes: ['QuranReader', 'ActivityDay', 'ActivityAll'],
     text: lines(
       '- Every take with Mark mistakes is kept on the account as text (its marks, less those taken off with “Not a mistake”, where it ran, its score and whether the page was hidden), so it follows them to another phone. Never audio: a recording stays on the phone. A take with Recite alone (following, no marks), a failed take, or one whose start was never found keeps nothing.',
@@ -368,6 +368,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
       '- A take’s summary says what it cleared ("2 cleared from the page") and, once the passage has two takes or more, “Your progress here” with its trend ("Up from 95.1% on Mon 2 Nov · 6 takes"). That opens “Your progress”: the latest score, a chart of every take of the passage (one that covers at least half of it), “Still to fix here” (a tap shows the word on the page) and “Your takes here”, newest first (a tap opens one on the page).',
       '- Activity: a day lists its takes in a “Recited” block: the passage, the score, a line (time, mistakes, words cleared, page hidden), the take’s recording and “Show on the page”. “See all” has “Recitations”, with “All takes”, “With mistakes” and “Page hidden”.',
       '- “Show on the page” opens the reader at the take’s page with only that take’s marks, and a bar: ▶ its recording (while it is on the phone), its time, score and mistakes, and Done. Tap a mark for its card; “Not a mistake” there updates the kept take.',
+      '- A take that went on into a similar ayah says so under it in Activity ("You went on with Yusuf 90, a similar ayah"; "You ended Al-Falaq 3 as ayah 5 ends"). Holding the take opens its menu: “Show on the page”, and, while Revo is on, “Ask Revo about this take”, which opens Revo with the take attached.',
     ),
   },
   {

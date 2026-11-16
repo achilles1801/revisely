@@ -343,6 +343,11 @@ What a user's takes with Mark mistakes show over time, and Revo knowing it (Majd
   first, Not clear never counted. With Smart Tracking on, a passage rated strong that still slips is named,
   and Weak spots say how many words Recite still marks there. Off, nothing about strength: a passage's
   row says when it was last recited instead of how often it went wrong.
+- **RINS-3.** A take in a day's Recited block that slipped into a similar ayah says so under its line ("You
+  went on with Yusuf 90, a similar ayah"; an ending, "You ended Al-Falaq 3 as ayah 5 ends"), two at most.
+  Holding the take's passage and lines opens its menu: Show on the page, and Ask Revo about this take while
+  Revo is on for the account, which opens Revo with that take attached (as Revo's + attaches one). VoiceOver
+  has the same two as actions on the take.
 
 ## Recite's memory (Revisely Dev)
 
