@@ -52,6 +52,9 @@ jest.mock('../../../src/components/activity/useActivityReload', () => {
   const mockReact = jest.requireActual('react');
   return { useActivityReload: (load: () => void) => mockReact.useEffect(() => { load(); }, [load]) };
 });
+/** What the tree search needs of a node. */
+type Node = { type: unknown; props: { testID?: string } };
+
 const METRICS = { frame: { x: 0, y: 0, width: 393, height: 852 }, insets: { top: 59, left: 0, right: 0, bottom: 34 } };
 
 const TESTER = { id: 'tester-1', previewTester: true, smartTrackingEnabled: true, createdAt: '2026-09-01T12:00:00.000Z' };
@@ -74,7 +77,7 @@ const OVERVIEW_IDS: Record<string, string> = {
 
 /** The sections on screen, top to bottom (host views only: a component and its view share a testID). */
 function order(ids: Record<string, string>): string[] {
-  return screen.UNSAFE_root.findAll((n) => typeof n.type === 'string' && ids[n.props.testID] != null).map((n) => ids[n.props.testID]);
+  return screen.UNSAFE_root.findAll((n: Node) => typeof n.type === 'string' && ids[n.props.testID ?? ''] != null).map((n: Node) => ids[n.props.testID ?? '']);
 }
 
 function open(user: Record<string, unknown> = TESTER) {
@@ -226,8 +229,8 @@ describe('Activity’s sections', () => {
     await done();
     expect(order(OVERVIEW_IDS)).toEqual(['day', 'totals', 'calendar']);
     expect(screen.getByTestId('calendar-head')).toBeTruthy();
-    const all = screen.UNSAFE_root.findAll((n) => typeof n.type === 'string' && ['calendar-head', 'calendar-preview'].includes(n.props.testID));
-    expect(all.map((n) => n.props.testID)).toEqual(['calendar-head', 'calendar-preview']);
+    const all = screen.UNSAFE_root.findAll((n: Node) => typeof n.type === 'string' && ['calendar-head', 'calendar-preview'].includes(n.props.testID ?? ''));
+    expect(all.map((n: Node) => n.props.testID)).toEqual(['calendar-head', 'calendar-preview']);
     expect((await stored()).overview).toEqual({ order: ['day', 'totals', 'calendar', 'key'], hidden: ['key'] });
   });
 
