@@ -1912,6 +1912,19 @@ classic default), and a fresh install starts in light.
 - `expo-blur` and `expo-glass-effect` were removed from `package.json` (and the tests' mocks) with
   the background-audio build (Oct 28 2026).
 
+## Strings (src/i18n; the app in Arabic)
+
+The app is getting Arabic (Majd approved the groundwork Nov 15 2026; study
+`~/Documents/revisely-ideas/approved/2026-11-15-growth-app-in-arabic-study.md`). UI text moves out of the
+code into `src/i18n/en/<folder>.ts`, folder by folder, with the English unchanged and nothing visible.
+- Use `t('folder.key', { values })` from `src/i18n` (i18next, typed keys). Whole sentences with
+  `{{values}}`, plurals as `_one`/`_other` keys, never `n === 1 ? …` or text glued from pieces.
+- **An extracted folder must stay extracted:** `src/i18n/__tests__/noRawStrings.test.ts` (its `EXTRACTED`
+  list) fails on UI text written into its files. Put new text in its `en/` file, or mark a line that isn't
+  UI text `// i18n-ignore (why)`. How-to and the progress command: `src/i18n/README.md`.
+- Tests, scenarios and E2E builds always run in English (`src/i18n/language.ts`).
+- JavaScript only so far; Arabic, the picker and right-to-left wait for the rest and a native release.
+
 ## UI traps
 
 - **Never wrap a scroll view in a Pressable.** On the new architecture (iOS), a ScrollView doesn't

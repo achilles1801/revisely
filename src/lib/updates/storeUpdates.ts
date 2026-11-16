@@ -27,6 +27,7 @@ import InstallSource from '../../../modules/install-source';
 import { BUNDLE_ID } from '../releaseInfo';
 import { isDevVariant } from '../variant';
 import { logger } from '../logger';
+import { t } from '../../i18n';
 import {
   AppConfig,
   EMPTY_CONFIG,
@@ -226,8 +227,9 @@ export async function openStore(): Promise<void> {
   }
 }
 
+/** Where the new version is, inside a sentence: "… is on the App Store." */
 export function storeName(): string {
-  return Platform.OS === 'ios' ? 'the App Store' : 'Google Play';
+  return Platform.OS === 'ios' ? t('updates.storeName.ios') : t('updates.storeName.android');
 }
 
 export function subscribeStore(listener: () => void): () => void {
