@@ -16,7 +16,6 @@ import { weekStart } from '../../lib/activityHeatmap';
 import { BlockMark, RevisedMark } from '../activity/BlockMark';
 import { CalendarMonth, type CalendarData } from '../activity/CalendarMonth';
 import { GapsSection } from '../activity/GapsSection';
-import { ReciteBar } from '../reciteLive/ReciteBar';
 import { MarkBlock } from '../reciteLive/MarkCard';
 import { SmallPill } from '../reciteLive/MarkParts';
 import { markFill } from '../reciteLive/markColours';
@@ -24,7 +23,6 @@ import { PAST_OPACITY } from '../reciteMemory/RememberedLayers';
 import { useQuranWordsWhen } from '../reciteMemory/TakeRows';
 import { PillButton } from '../v2/PillButton';
 import { arabicV2 } from '../../theme/v2';
-import { getReadPalette } from '../../theme/readPalette';
 import type { QuranWords } from '../../lib/recite/quranWords';
 import type { Mark, MarkKind } from '../../lib/reciteLive/contract';
 import DEMO_TAKE from '../../data/whatsNewTake.json';
@@ -265,18 +263,30 @@ export function demoTakeOf(words: QuranWords): DemoTake {
   return { lines, marks, cursor: end - 2 };
 }
 
-const TAKE = DEMO_TAKE as DemoTake;
-const textOf = (w: number) => TAKE.lines.flat().find((x) => x.w === w)?.text ?? '';
+export const TAKE = DEMO_TAKE as DemoTake;
+export const textOf = (w: number) => TAKE.lines.flat().find((x) => x.w === w)?.text ?? '';
 
 /**
  * The ayahs' lines, right to left, each mark on its word; `live`: the line being recited and the word being said. Each
  * mushaf line stays one line, made smaller to fit when the picture is narrower than it (a word never wraps alone).
  */
-function TakeLines({ live, past }: { live: boolean; past: boolean }) {
+export function TakeLines({
+  live,
+  past,
+  cursor = TAKE.cursor,
+  marks = TAKE.marks,
+}: {
+  live: boolean;
+  past: boolean;
+  /** The word being said (the take's own by default; the moment moves it; null: none yet). */
+  cursor?: number | null;
+  /** The marks shown (the take's three by default; the moment lands them one by one). */
+  marks?: Mark[];
+}) {
   const { palette, isDark } = useTheme();
   const [room, setRoom] = useState(0);
   const [wide, setWide] = useState(0);
-  const { marks, cursor, lines } = TAKE;
+  const { lines } = TAKE;
   const markOf = new Map(marks.map((m) => [m.w, m]));
   const fill = (w: number) => {
     const m = markOf.get(w);
@@ -291,7 +301,7 @@ function TakeLines({ live, past }: { live: boolean; past: boolean }) {
         onLayout={(e) => setWide(e.nativeEvent.layout.width)}
       >
         {lines.map((line) => {
-          const here = live && line.some((x) => x.w === cursor);
+          const here = live && cursor != null && line.some((x) => x.w === cursor);
           return (
             <View key={line[0].w} style={[styles.takeLine, here && { backgroundColor: palette.followBand }]}>
               {line.map(({ w, text }) => (
@@ -310,38 +320,6 @@ function TakeLines({ live, past }: { live: boolean; past: boolean }) {
 }
 
 const noop = () => undefined;
-
-/** The reader during a take: the page following the reciter, three marks, and the bar with its score. */
-function RecitePicture() {
-  const { isDark } = useTheme();
-  const read = getReadPalette(isDark);
-  const { cursor } = TAKE;
-  return (
-    <View style={styles.reciteScreen}>
-      <TakeLines live past={false} />
-      <View style={styles.reciteBar}>
-        <ReciteBar
-          hidden={false}
-          onToggleHidden={noop}
-          onNextWord={noop}
-          onWholeAyah={noop}
-          score={{ text: '94%', level: 'good' }}
-          seconds={47}
-          recording={false}
-          words={[
-            { w: cursor - 1, text: textOf(cursor - 1), tone: 'said' },
-            { w: cursor, text: textOf(cursor), tone: 'current' },
-          ]}
-          status=""
-          phase="live"
-          onStop={noop}
-          onClose={noop}
-          surface={{ background: read.control, border: read.divider }}
-        />
-      </View>
-    </View>
-  );
-}
 
 /** A mark's card, as a tap on a highlight opens it: what it is, what was expected, and its buttons. */
 function MarksPicture() {
@@ -411,12 +389,6 @@ export function pictureFor(picture: WhatsNewPicture): React.ReactNode {
       return (
         <Window anchor="top" testID="whats-new-picture-ayah">
           <AyahPicture />
-        </Window>
-      );
-    case 'recite':
-      return (
-        <Window anchor="bottom" testID="whats-new-picture-recite">
-          <RecitePicture />
         </Window>
       );
     case 'marks':

@@ -21,13 +21,13 @@ import { helpPlainText, helpTextParts, type HelpIcon, type HelpTextPart } from '
 export type WhatsNewNeed = 'activity' | 'sittings' | 'revo' | 'help' | 'translations' | 'recite' | 'insights' | 'reciteRevo';
 
 /** The pictures (components/whatsNew/pictures): a part of the screen the card is about. */
-export type WhatsNewPicture = 'activity' | 'elsewhere' | 'ayah' | 'recite' | 'marks' | 'again' | 'gaps';
+export type WhatsNewPicture = 'activity' | 'elsewhere' | 'ayah' | 'marks' | 'again' | 'gaps';
 
 /**
  * A card that plays as a full-screen moment instead of a picture over words (components/whatsNew):
  * 'revo' is RevoMoment (lib/whatsNew/revoMoment), ending on Turn on Revo or Later.
  */
-export type WhatsNewMoment = 'revo';
+export type WhatsNewMoment = 'revo' | 'recite';
 
 export interface WhatsNewRow {
   id: string;
@@ -162,7 +162,8 @@ export const NEXT_RELEASE: WhatsNewRelease | null = {
       text:
         'Tap [[mic]] in the reader and recite from memory. The page follows you, and with {{Mark mistakes}} on, ' +
         'each mistake is highlighted as you go.',
-      picture: 'recite',
+      // A take plays by itself (components/whatsNew/ReciteMoment), the card's words at its end.
+      moment: 'recite',
       covers: ['RECITE-1', 'RECITE-2'],
       needs: 'recite',
     },

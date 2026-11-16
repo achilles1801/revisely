@@ -2,6 +2,7 @@
 // Settings → About → What's new and the run at launch; the walkthrough an account must go through stays the current one.
 
 import React from 'react';
+import { Dimensions } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -44,8 +45,14 @@ beforeEach(async () => {
 describe('<WhatsNewScreen /> the next release in Revisely Dev', () => {
   it("a tester's replay walks the next release's cards: mistake detection first, then Insights, then the rest", async () => {
     expect(NEXT_RELEASE).not.toBeNull();
+    // An iPhone at the usual text size: the moment plays (past 1.6× text, card 1 is its words, as any card).
+    jest.spyOn(Dimensions, 'get').mockReturnValue({ width: 402, height: 874, scale: 3, fontScale: 1 });
     await show('replay');
     const titles = NEXT_RELEASE!.cards.map((c) => c.title);
+    // Card 1 is a moment: a take plays, Skip goes to its end, where its words and Next are.
+    expect(screen.getByTestId('recite-moment')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('recite-moment-skip'));
+    await act(async () => {});
     expect(title()).toBe(titles[0]);
     for (let i = 1; i < titles.length; i++) {
       fireEvent.press(screen.getByTestId('whats-new-next'));

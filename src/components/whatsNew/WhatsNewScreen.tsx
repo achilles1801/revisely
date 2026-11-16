@@ -44,6 +44,7 @@ import { logger } from '../../lib/logger';
 import { useNeedOpen } from './needs';
 import { pictureFor } from './pictures';
 import { RevoMoment } from './RevoMoment';
+import { ReciteMoment } from './ReciteMoment';
 import { markRevoMomentSeen } from '../../lib/revo/momentSeen';
 import { isDevVariant } from '../../lib/variant';
 import { loadQuranWords } from '../../lib/recite/quranWords';
@@ -259,6 +260,29 @@ export function WhatsNewScreen({
   if (!card) return null;
   const chrome = Math.min(fontScale, CHROME_MAX_SCALE);
   const advance = () => (last ? done() : go(index + 1));
+
+  // Card 1 of the mistake detection release: a take plays by itself, then its words and Next (past 1.6× text, its words
+  // as any card's).
+  if (card.moment === 'recite' && fontScale <= PICTURE_UP_TO) {
+    return (
+      <View style={[styles.screen, { backgroundColor: palette.bg }]} testID={`whats-new-${mode}`}>
+        <GestureDetector gesture={Gesture.Race(back, forward)}>
+          <View style={styles.flex} testID={`whats-new-card-${card.id}`}>
+            <ReciteMoment
+              key={card.id}
+              step={index + 1}
+              total={cards.length}
+              title={card.title}
+              words={<CardText text={card.text ?? ''} style={[typeV2.body, styles.center, styles.text, { color: palette.secondary }]} />}
+              closable={mode === 'replay'}
+              onNext={advance}
+              onClose={onClose}
+            />
+          </View>
+        </GestureDetector>
+      </View>
+    );
+  }
 
   // A moment plays full screen and ends on its own buttons (past 1.6× text, its words as any card's).
   if (card.moment === 'revo' && fontScale <= PICTURE_UP_TO) {
