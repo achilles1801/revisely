@@ -1,5 +1,6 @@
 """The service's protocol, with the checker stood in (no model needed): sign-in and testers on every request and
-socket, /check v1 and v2, /dismiss, and /live (start, events, stop, idle, resume, limits, keeping a take).
+socket, /check v1 and v2, /dismiss, and /live (start, events, stop, idle, resume, limits, keeping a take); production's
+switches (testers, App Check, paused, nothing kept).
 
   python -m unittest discover -s tests      (from the staged folder, or the image: the Dockerfile runs it)
 """
@@ -15,7 +16,10 @@ import unittest
 import wave
 from unittest import mock
 
+import google.auth.crypt
+import google.auth.jwt
 import requests
+import rsa
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, HERE)
@@ -157,6 +161,7 @@ class Base(unittest.TestCase):
             mock.patch.object(auth, 'is_tester', lambda uid: uid.startswith('tester')),
             mock.patch.object(auth, 'has_check', lambda uid: uid == 'tester1'),
             mock.patch.object(store, 'put', self.put),
+            mock.patch.object(store, 'BUCKET', 'test-bucket'),  # dev's services name one; production names none
             mock.patch.object(live, 'LiveSession', FakeSession),
             mock.patch.object(server, 'limiter', auth.Limiter()),
         ]
@@ -766,6 +771,218 @@ class CheckGateTests(Base):
                 self.assertEqual(ws.receive_json()['type'], 'ready')
 
 
+class ProductionSwitchTests(Base):
+    """The switches production sets (checker-prod.md): each one's default is what dev's services have always done."""
+
+    def take_lines(self):
+        return [f for k, f in self.health if k == 'take']
+
+    def test_testers_only_unless_turned_off(self):
+        self.assertTrue(server.TESTERS_ONLY)
+        h = {'Authorization': 'Bearer plain'}  # signed in, not a previewTester
+        self.assertEqual(self.client.post('/check?s=1&a=1', content=wav(), headers=h).status_code, 403)
+        with mock.patch.object(server, 'TESTERS_ONLY', False):
+            self.assertEqual(self.client.post('/check?s=1&a=1', content=wav(), headers=h).status_code, 200)
+            with self.client.websocket_connect('/live') as ws:
+                ws.send_text(start(token='plain'))
+                self.assertEqual(ws.receive_json()['type'], 'ready')
+            # still a sign-in
+            self.assertEqual(self.client.post('/check?s=1&a=1', content=wav()).status_code, 401)
+
+    def test_app_check_off_by_default(self):
+        self.assertEqual(server.APP_CHECK, 'off')
+        self.client.post('/check?s=1&a=1', content=wav(), headers={'Authorization': 'Bearer good'})
+        self.assertNotIn('appcheck', self.take_lines()[-1])
+
+    def judge(self, token, number):
+        self.assertEqual(number, '123456')
+        return {None: 'missing', 'good-ac': 'ok'}.get(token, 'bad')
+
+    def test_app_check_log_counts_and_refuses_nothing(self):
+        with mock.patch.object(server, 'APP_CHECK', 'log'), mock.patch.object(server, 'PROJECT_NUMBER', '123456'), \
+                mock.patch.object(auth, 'app_check', self.judge):
+            h = {'Authorization': 'Bearer good'}
+            for ac, want in ((None, 'missing'), ('good-ac', 'ok'), ('forged', 'bad')):
+                r = self.client.post('/check?s=1&a=1', content=wav(),
+                                     headers=h | ({'X-Firebase-AppCheck': ac} if ac else {}))
+                self.assertEqual(r.status_code, 200)
+                self.assertEqual(self.take_lines()[-1]['appcheck'], want)
+            with self.client.websocket_connect('/live') as ws:
+                ws.send_text(start(appCheck='good-ac'))
+                ready = ws.receive_json()
+                self.assertEqual(server.SESSIONS[ready['take']].appcheck, 'ok')
+
+    def test_app_check_on_refuses_without_a_good_token(self):
+        with mock.patch.object(server, 'APP_CHECK', 'on'), mock.patch.object(server, 'PROJECT_NUMBER', '123456'), \
+                mock.patch.object(auth, 'app_check', self.judge):
+            h = {'Authorization': 'Bearer good'}
+            for ac in (None, 'forged'):
+                r = self.client.post('/check?s=1&a=1', content=wav(),
+                                     headers=h | ({'X-Firebase-AppCheck': ac} if ac else {}))
+                self.assertEqual((r.status_code, r.json()), (401, {'error': 'app_check'}))
+                r = self.client.post('/dismiss', json={'take': '20261113-101010-abcdef', 'id': '12:skipped:'},
+                                     headers=h | ({'X-Firebase-AppCheck': ac} if ac else {}))
+                self.assertEqual(r.status_code, 401)
+            r = self.client.post('/check?s=1&a=1', content=wav(), headers=h | {'X-Firebase-AppCheck': 'good-ac'})
+            self.assertEqual(r.status_code, 200)
+            with self.client.websocket_connect('/live') as ws:
+                ws.send_text(start())
+                self.assertEqual(ws.receive_json(), {'type': 'error', 'reason': 'app_check'})
+            with self.client.websocket_connect('/live') as ws:
+                ws.send_text(start(appCheck='good-ac'))
+                self.assertEqual(ws.receive_json()['type'], 'ready')
+            with self.client.websocket_connect('/live', headers={'X-Firebase-AppCheck': 'good-ac'}) as ws:
+                ws.send_text(start())  # or in the header
+                self.assertEqual(ws.receive_json()['type'], 'ready')
+        self.assertIn(('refused', {'route': 'check', 'reason': 'app_check'}), self.health)
+
+    def test_app_check_keys_unreachable(self):
+        def gone(token, number):
+            raise auth.Unreachable('App Check keys')
+        h = {'Authorization': 'Bearer good', 'X-Firebase-AppCheck': 'good-ac'}
+        with mock.patch.object(server, 'PROJECT_NUMBER', '123456'), mock.patch.object(auth, 'app_check', gone):
+            with mock.patch.object(server, 'APP_CHECK', 'log'):  # counted, not refused
+                self.assertEqual(self.client.post('/check?s=1&a=1', content=wav(), headers=h).status_code, 200)
+                self.assertEqual(self.take_lines()[-1]['appcheck'], 'unreachable')
+            with mock.patch.object(server, 'APP_CHECK', 'on'):  # the server's failure, as Firestore's is
+                self.assertEqual(self.client.post('/check?s=1&a=1', content=wav(), headers=h).status_code, 500)
+
+    def test_switches_are_checked_at_start(self):
+        for mode, number in (('maybe', ''), ('on', ''), ('log', 'revision-buddy-3a398'), ('ON', '1')):
+            self.assertTrue(server.switches_wrong(mode, number), (mode, number))
+        for mode, number in (('off', ''), ('log', '123456789012'), ('on', '123456789012')):
+            self.assertIsNone(server.switches_wrong(mode, number), (mode, number))
+
+    def test_paused(self):
+        h = {'Authorization': 'Bearer good'}
+        with self.client.websocket_connect('/live') as ws:  # a take under way before the switch
+            ws.send_text(start())
+            ready = ws.receive_json()
+            ws.send_bytes(second_of_audio())
+        with mock.patch.object(server, 'PAUSED', True):
+            self.assertIs(self.client.get('/health').json()['paused'], True)
+            r = self.client.post('/check?s=1&a=1', content=wav(), headers=h)
+            self.assertEqual((r.status_code, r.json()), (503, {'error': 'paused'}))
+            with self.client.websocket_connect('/live') as ws:
+                ws.send_text(start())
+                self.assertEqual(ws.receive_json(), {'type': 'error', 'reason': 'paused'})
+            with self.client.websocket_connect('/live') as ws:  # its resume goes on
+                ws.send_text(start(resume=ready['take']))
+                self.assertEqual(ws.receive_json()['type'], 'ready')
+        self.assertNotIn('paused', self.client.get('/health').json())
+        self.assertIn(('refused', {'route': 'live', 'reason': 'paused'}), self.health)
+
+    def test_nothing_kept_without_a_bucket(self):
+        h = {'Authorization': 'Bearer good'}
+        with mock.patch.object(store, 'BUCKET', ''):
+            r = self.client.post('/check?s=1&a=1&s2=1&a2=7&v=2&keep=1', content=wav(), headers=h)
+            self.assertEqual(r.status_code, 200)
+            self.assertNotIn('kept', r.json())
+            with self.client.websocket_connect('/live') as ws:
+                ws.send_text(start(keep=True))
+                ready = ws.receive_json()
+                self.assertIs(server.SESSIONS[ready['take']].keep, False)
+            r = self.client.post('/dismiss', json={'take': '20261113-101010-abcdef', 'id': '12:skipped:'}, headers=h)
+            self.assertEqual(r.json(), {'ok': True, 'kept': False})
+        self.assertEqual(self.stored, {})
+        self.assertIn(('label', {'kind': 'dismiss', 'kept': False}), self.health)
+
+
+class AppCheckTests(unittest.TestCase):
+    """auth.app_check against tokens signed here, as App Check signs them (RS256, a key from its JWKS)."""
+    NUMBER = '123456789012'
+
+    @classmethod
+    def setUpClass(cls):
+        cls.pub, cls.priv = rsa.newkeys(1024)
+        cls.other_pub, cls.other_priv = rsa.newkeys(1024)
+
+    def setUp(self):
+        auth._jwks.update(keys={}, at=None, tried=None)
+        self.addCleanup(auth._jwks.update, keys={}, at=None, tried=None)
+        self.fetches = 0
+        self.jwks_up = True
+
+    def jwk(self, kid, pub):
+        b = lambda n: auth.base64.urlsafe_b64encode(n.to_bytes((n.bit_length() + 7) // 8, 'big')).rstrip(b'=').decode()  # noqa: E731
+        return {'kty': 'RSA', 'use': 'sig', 'alg': 'RS256', 'kid': kid, 'n': b(pub.n), 'e': b(pub.e)}
+
+    def get(self, url, timeout):
+        self.assertEqual(url, auth.APP_CHECK_JWKS)
+        self.fetches += 1
+        if not self.jwks_up:
+            raise requests.ConnectionError('down')
+        body = {'keys': [self.jwk('k1', self.pub)]}
+
+        class R:
+            status_code = 200
+
+            def json(self):
+                return body
+        return R()
+
+    def token(self, priv=None, kid='k1', **claims):
+        now = int(time.time())
+        payload = {'iss': f'https://firebaseappcheck.googleapis.com/{self.NUMBER}', 'sub': '1:1:ios:abc',
+                   'aud': [f'projects/{self.NUMBER}', 'projects/revision-buddy-3a398'], 'iat': now, 'exp': now + 3600}
+        payload.update(claims)
+        signer = google.auth.crypt.RSASigner.from_string((priv or self.priv).save_pkcs1())
+        return google.auth.jwt.encode(signer, {k: v for k, v in payload.items() if v is not None},
+                                      key_id=kid).decode()
+
+    def judge(self, token):
+        with mock.patch.object(auth.requests, 'get', self.get):
+            return auth.app_check(token, self.NUMBER)
+
+    def test_a_good_token(self):
+        self.assertEqual(self.judge(self.token()), 'ok')
+        self.assertEqual(self.judge(self.token(aud=f'projects/{self.NUMBER}')), 'ok')  # one audience, not a list
+        self.assertEqual(self.fetches, 1)  # the keys are kept
+
+    def test_missing_and_malformed(self):
+        for t in (None, ''):
+            self.assertEqual(self.judge(t), 'missing')
+        for t in ('x', 'a.b.c', 'a.b', 12, 'x' * 9000):
+            self.assertEqual(self.judge(t), 'bad', t)
+        self.assertEqual(self.fetches, 0)
+
+    def test_bad_tokens(self):
+        now = int(time.time())
+        for t in (self.token(priv=self.other_priv),  # not App Check's signature
+                  self.token(iss='https://firebaseappcheck.googleapis.com/999'),  # another project
+                  self.token(aud=['projects/999']),
+                  self.token(aud=None),
+                  self.token(iat=now - 7200, exp=now - 3600),  # expired
+                  self.token(iss='https://securetoken.google.com/revision-buddy-3a398')):  # an ID token's issuer
+            self.assertEqual(self.judge(t), 'bad')
+
+    def test_an_unknown_key_fetches_again_at_most_once_a_minute(self):
+        self.assertEqual(self.judge(self.token()), 'ok')
+        self.assertEqual(self.judge(self.token(kid='k9')), 'bad')  # within the minute: no second fetch
+        self.assertEqual(self.fetches, 1)
+        auth._jwks['tried'] -= auth.APP_CHECK_REFETCH + 1
+        self.assertEqual(self.judge(self.token(kid='k9')), 'bad')  # fetched again (App Check may have rotated)
+        self.assertEqual(self.judge(self.token(kid='k9')), 'bad')
+        self.assertEqual(self.fetches, 2)
+
+    def test_keys_that_cant_be_fetched(self):
+        self.jwks_up = False
+        with self.assertRaises(auth.Unreachable):
+            self.judge(self.token())
+        self.jwks_up = True
+        auth._jwks['tried'] = None
+        self.assertEqual(self.judge(self.token()), 'ok')
+        # later, Google down: the keys held still work
+        self.jwks_up = False
+        auth._jwks.update(at=0, tried=None)  # stale
+        self.assertEqual(self.judge(self.token()), 'ok')
+
+    def test_no_algorithm_switching(self):
+        head = auth.base64.urlsafe_b64encode(json.dumps({'alg': 'none', 'typ': 'JWT', 'kid': 'k1'}).encode())
+        body = self.token().split('.')[1]
+        self.assertEqual(self.judge(f"{head.rstrip(b'=').decode()}.{body}."), 'bad')
+
+
 class EntitlementTests(unittest.TestCase):
     """auth.has_check reads entitlements/{uid}.premium over Firestore REST (only `premium`: `grants` is ignored)."""
 
@@ -815,6 +1032,12 @@ class EntitlementTests(unittest.TestCase):
             self.assertTrue(auth.has_check('granted', now=100 + auth.CHECK_TTL + 1))  # read again
             self.assertEqual(len(calls), 5)
             self.assertIn('mask.fieldPaths=premium', calls[0])
+            # a no is trusted for less (CHECK_TTL_NO): a grant written just after sign-up unlocks within seconds
+            self.assertFalse(auth.has_check('nobody', now=105))
+            self.assertEqual(len(calls), 5)
+            answers['nobody'] = answers['granted']
+            self.assertTrue(auth.has_check('nobody', now=100 + auth.CHECK_TTL_NO + 1))
+            self.assertEqual(len(calls), 6)
         auth._checks.clear()
 
     def test_the_field_is_one_setting(self):

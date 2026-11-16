@@ -1,6 +1,9 @@
 """Keeping a recitation as test data: only when the app asks (the account's switch is on), in revisely-dev Storage
 under recite-tests/<uid>/, which no client can read or write (storage.rules). The lab's fetch_takes.py copies them
-to the Mac. Nobody listens to them: they are checked by the lab's scripts only."""
+to the Mac. Nobody listens to them: they are checked by the lab's scripts only.
+
+Only where BUCKET names a bucket (dev's services set it). Without one nothing is kept, whatever the app asks:
+production keeps no recordings (the release plan, checker-prod.md)."""
 import datetime
 import os
 import re
@@ -11,8 +14,13 @@ import requests
 
 import auth
 
-BUCKET = os.environ.get('BUCKET', 'revisely-dev.firebasestorage.app')
+BUCKET = os.environ.get('BUCKET', '')
 PREFIX = 'recite-tests'
+
+
+def enabled():
+    """Whether takes can be kept here at all (a bucket is named)."""
+    return bool(BUCKET)
 
 
 TAKE = re.compile(r'^\d{8}-\d{6}-[0-9a-f]{6}$')  # a take's name, as the app sees it
