@@ -22,6 +22,7 @@ import { ChoiceChip } from './ChoiceChip';
 import { dayAndMonth, daysToLoad, INSIGHTS_RANGE_KEY, INSIGHTS_RANGES, parseRange, rangeLabel, rangeSpan, type InsightsRange } from '../../lib/insightsRange';
 import { journalFirstDay } from '../../lib/journal';
 import { smartTrackingOn } from '../../lib/smartTracking';
+import { gapsInsightsEnabled } from '../../lib/insightsGaps';
 import { CalendarMonth } from './CalendarMonth';
 import { InsightsView } from './InsightsView';
 import { useActivityReload } from './useActivityReload';
@@ -302,6 +303,8 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
             lastRevisedOn,
             coverageSince: coverageSinceByPage,
             firstTomorrow,
+            gaps: gapsInsightsEnabled(user),
+            itemsFrom: rangeFrom,
           }}
           onOpenDay={onOpenDay}
           onOpenCalendar={openCalendar}

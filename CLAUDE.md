@@ -464,7 +464,8 @@ Non-testers follow `production`, so nobody sees this on a phone before Promote; 
 - `HELP_FOR_EVERYONE` (`lib/help/availability`): the ? buttons (HELP-1, HELP-4).
 - What's new `2026-11` `live: true`; `components/whatsNew/needs` reads the gates above.
 - Revo is not one of them: it follows `config/app.revo` (REVO-37).
-- Still testers only: hidden recite mode (`reciteModeEnabled`), Reset my data, Load test scenario, the
+- Still testers only: hidden recite mode (`reciteModeEnabled`), Insights' Gaps (`gapsInsightsEnabled` in
+  `lib/insightsGaps`, ACT-28; Revisely Dev too), Reset my data, Load test scenario, the
   update tools and the `preview` channel, the old Ask coach.
 - The old Activity (no blocks) and the Insights tab stay in the code as what the gate falls back to;
   `ActivityScreens.test` and `ActivityScreens.v2.test` pin them by mocking the gate off.
