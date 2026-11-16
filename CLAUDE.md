@@ -348,6 +348,12 @@ until its part is set up.
       15 2026): with VoiceOver or TalkBack on, once Stop has turned the microphone off, one line is said ("Couldn't
       follow that take. Try starting at the top of the page."); nothing on screen changes for anyone.
     - A page turned by hand searches that page again (`seek` with `startBy`).
+    - **Anywhere in the Qur'an** (Majd, Nov 15 2026, step 2; protocol 7, shape A in recite-contract.md): a take from
+      the mic also sends `startIn: "quran"`. When the page doesn't match, the checker looks in the whole Qur'an and locks
+      only on a place it is sure is the one (`locked.where: "quran"`); the reader turns there (the cursor's page turn),
+      VoiceOver hears "Started at …", and a Sentry breadcrumb notes it (numbers only; the checker keeps where every kept
+      take locked). Drills, Test me places and a voice search's ayahs never send it. Older checkers ignore it. Never
+      found anywhere: still silent.
     - Nothing before the start is skipped, and the summary counts from the start.
     - A checker below protocol 6 (`ready.protocol`) doesn't search: the take starts at the page's first ayah, as
       before. So does a cursor that comes with no `locked` (`lib/reciteLive/state`).

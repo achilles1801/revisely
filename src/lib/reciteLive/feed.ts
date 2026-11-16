@@ -27,6 +27,12 @@ export interface StartFrame {
    * doesn't read it starts at s:a, and its first `at` comes with no `locked` (lib/reciteLive/state).
    */
   startBy?: [number, number];
+  /**
+   * Recite anywhere in the Qur'an (protocol 7, Majd's step 2): beside `startBy`, the checker also looks in the whole
+   * Qur'an when the page doesn't match, and locks there only on a place it is sure is the one (`locked.where`). Sent
+   * for takes from the reader's mic only. A server before 7 ignores it.
+   */
+  startIn?: 'quran';
 }
 
 export type ClientFrame =

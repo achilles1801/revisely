@@ -1337,6 +1337,7 @@ describe('Recite the mistakes again (Majd, Nov 15 2026: one take from the first 
     await flush();
     expect(mockLive.start).toMatchObject({ s: 27, a: 23, s2: 27, a2: 26, follow: false });
     expect(mockLive.start?.startBy).toBeUndefined();
+    expect(mockLive.start?.startIn).toBeUndefined();
     // The stretch is known: the take begins there at once, with no search for the start (the score shows from the
     // first moment; a search shows none until it finds the reciter).
     await event({ type: 'ready', take: 't2', protocol: 6 });
@@ -1529,6 +1530,8 @@ describe('a voice search with one result opens the reader reciting (Majd, Nov 15
     setReciteCheckSettings('u1', { noticeSeen: true });
     await openFound();
     expect(mockLive.start).toMatchObject({ type: 'start', s: 27, a: 25, startBy: [27, 25], s2: null, a2: null, follow: true });
+    // The ayahs found are where it is: no search of the whole Qur'an.
+    expect(mockLive.start?.startIn).toBeUndefined();
     expect(mockMic).not.toBeNull();
     expect(screen.getByTestId('recite-bar')).toBeTruthy();
     await event({ type: 'ready', take: 't1', protocol: 6 });
@@ -1683,6 +1686,7 @@ describe('Test me (Majd, Nov 15 2026: random within what’s memorized, with an 
   it('a place: the page turned to it and hidden but for its first two words, a Mark mistakes take over its three ayahs, looking only in the first', async () => {
     await openTest();
     expect(mockLive.start).toMatchObject({ type: 'start', s: 67, a: 1, startBy: [67, 1], s2: 67, a2: 3, follow: false });
+    expect(mockLive.start?.startIn).toBeUndefined();
     expect(mockPager.scrolled).toContain(562);
     expect(screen.getByTestId('recite-eye-group')).toBeTruthy();
     expect(screen.getByTestId('recite-status').props.children).toBe('Starting… · 1 of 5');
@@ -1986,5 +1990,35 @@ describe('peeked words (Majd, Nov 15 2026: on the page in quiet grey, in the sum
     peek();
     await event({ type: 'said', upTo: A23 + 3 } as LiveEvent);
     expect(screen.getByTestId('recite-score')).toHaveTextContent('100%');
+  });
+});
+
+describe('recite anywhere in the Qur’an (Majd, Nov 15 2026: step 2; protocol 7)', () => {
+  it('a take from the mic lets the checker look in the whole Qur’an too, beside the page', async () => {
+    await startTake('recite', null);
+    expect(mockLive.start).toMatchObject({ startBy: expect.any(Array), startIn: 'quran' });
+  });
+
+  it('found elsewhere in the Qur’an: the reader turns there, the cursor shows, VoiceOver hears where', async () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
+    await startTake('recite', null);
+    const a1 = words.verseFirstWord(67, 1);
+    mockPager.scrolled = [];
+    await event({ type: 'locked', w: a1 + 2, s: 67, a: 1, where: 'quran' } as LiveEvent);
+    expect(mockPager.scrolled).toEqual([words.pageOf(a1)]);
+    expect(announce).toHaveBeenCalledWith('Started at Al-Mulk');
+    await event({ type: 'at', w: a1 + 3 });
+    expect(screen.getByTestId('recite-words')).toBeTruthy();
+    // The page turned by the take sends no `seek` (only a hand turn does).
+    expect(mockLive.sent.filter((f) => (f as { type: string }).type === 'seek')).toEqual([]);
+  });
+
+  it('never found anywhere: still silent', async () => {
+    await startTake('recite', null);
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, start: null, secs: 6, marks: [], score: null } } as LiveEvent);
+    await flush();
+    expect(screen.queryByTestId('take-summary')).toBeNull();
+    expect(screen.getByTestId('recite-mic')).toBeTruthy();
   });
 });

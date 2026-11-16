@@ -113,7 +113,7 @@ export type LiveEvent =
    * (still searching after about 8 s of speech) isn't read: a search that never finds the start fails silently
    * (Majd, Nov 14 2026), so the phone shows nothing for it.
    */
-  | { type: 'locked'; w: number; s: number; a: number; t?: number }
+  | { type: 'locked'; w: number; s: number; a: number; t?: number; where?: 'page' | 'quran' }
   | { type: 'at'; w: number; t?: number }
   /** Something other than word `w` (the next to say) is being said in its slot: the hidden view's red cover (draft 7). */
   | { type: 'off'; w: number; t?: number }
@@ -262,7 +262,15 @@ export function parseEvent(raw: unknown): LiveEvent | null {
       };
     case 'locked':
       return isWord(x.w) && isNum(x.s) && isNum(x.a)
-        ? { type: 'locked', w: x.w, s: x.s, a: x.a, ...(isNum(x.t) ? { t: x.t } : {}) }
+        ? {
+            type: 'locked',
+            w: x.w,
+            s: x.s,
+            a: x.a,
+            ...(isNum(x.t) ? { t: x.t } : {}),
+            // Protocol 7: found on the open page, or elsewhere in the Qur'an.
+            ...(x.where === 'page' || x.where === 'quran' ? { where: x.where } : {}),
+          }
         : null;
     case 'at':
       return isWord(x.w) ? { type: 'at', w: x.w, ...(isNum(x.t) ? { t: x.t } : {}) } : null;
