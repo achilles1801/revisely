@@ -61,6 +61,21 @@ appId: com.revisionbuddy.app
     file: ../subflows/type-in-log.yaml
     env:
       TEXT: An-Naba needs another look
+# The keyboard away first if it is still up (iOS shows Maestro no Done bar): on an iPhone SE an edited note's
+# Save sits under the keyboard, and the tap on it went to the keyboard (SE run 43873599186, both attempts).
+# A tap on the composer's own title, which no control takes, puts it away (keyboardShouldPersistTaps
+# "handled"). The flow takes no screenshot after this, so the Pro's baselines don't move.
+- runFlow:
+    when:
+      platform: iOS
+      visible:
+        id: shift
+    commands:
+      - tapOn: "Editing note"
+      - extendedWaitUntil:
+          notVisible:
+            id: shift
+          timeout: 5000
 - tapOn:
     id: journal-send
 - extendedWaitUntil:

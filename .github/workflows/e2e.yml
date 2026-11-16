@@ -631,6 +631,8 @@ jobs:
         if: matrix.shard.flows != ''
         env:
           E2E_DEVICE: ${{ steps.sim.outputs.udid }}
+          # Which iPhone it is (pro or se), for the few steps an SE needs done another way.
+          E2E_IPHONE: ${{ github.event_name == 'workflow_dispatch' && inputs.device || 'pro' }}
           MAESTRO_DRIVER_STARTUP_TIMEOUT: '180000'
           FLOWS: ${{ matrix.shard.flows }}
           # 20 minutes an attempt here (run.sh's own 15 stays for Android). The limit is

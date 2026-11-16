@@ -73,8 +73,12 @@ appId: com.revisionbuddy.app
     timeout: 10000
 - tapOn:
     id: calendar-day-2026-11-03
+# Near its top: on an iPhone SE the row (y 585–621) runs under the tab bar (from 600), and the tap at its
+# middle opened Read (SE run 43873599186, 09-activity-light and -dark, both attempts). Not a scroll: the
+# overview's place would carry on to its later screenshots (Insights is the same list).
 - tapOn:
     id: preview-row-revised
+    point: 50%,10%
 - extendedWaitUntil:
     visible:
       id: activity-day-v2
