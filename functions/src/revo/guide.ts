@@ -213,8 +213,9 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['SEARCH-1', 'SEARCH-2'],
     routes: ['ReadIndex', 'QuranSearch', 'QuranReader'],
     text: lines(
-      '- Everyone: the Read tab has “Search the Quran” under its title. Type a few words of an ayah in Arabic (with or without vowel marks) and the ayat that hold them are listed: from the middle of an ayah too, even with a word misspelled; a phrase in several ayat lists every one. Typing a surah (Yunus, or its Arabic name), an ayah (2:255, Yunus 16), a page (page 62) or a juz (juz 30) goes there. A result opens the reader at the ayah, highlighted.',
-      '- On an iPhone there is also a mic beside it: recite a few words and the ayah is found the same way. The first time, it offers the speech model (a one-time download of 57 MB, started by a tap; Settings → Revision → “Speech model” shows or deletes it), and the iPhone asks for the microphone. It listens on the phone: the voice isn’t recorded or sent. Microphone refused: turn it on in the iPhone’s Settings → Revisely. On Android, type the words.',
+      '- Everyone: the Read tab has “Search the Quran” under its title; the search field is at the bottom of the screen, in reach of a thumb. Type a few words of an ayah in Arabic (with or without vowel marks) and the ayat that hold them are listed: from the middle of an ayah too, even with a word misspelled; a phrase in several ayat lists every one. Typing a surah (Yunus, or its Arabic name), an ayah (2:255, Yunus 16), a page (page 62) or a juz (juz 30) goes there.',
+      '- Each ayah found shows its surah and ayah, the Arabic with the words found in darker ink, and their translation with its credit. Under it: Share, Copy (works offline) and “Open in the reader”, which opens the reader at the ayah, highlighted.',
+      '- On an iPhone there is also a mic beside the field: recite a few words and the ayah is found the same way; tap it again to stop. The first time, it offers the speech model (a one-time download of 57 MB, started by a tap; Settings → Revision → “Speech model” shows or deletes it), and the iPhone asks for the microphone. It listens on the phone: the voice isn’t recorded or sent. Microphone refused: turn it on in the iPhone’s Settings → Revisely. On Android, type the words.',
     ),
   },
   {
@@ -328,8 +329,9 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     text: lines(
       '- Who has it: Revisely Dev, a tester account ("Tester: yes"), an iPhone and the Madani 1405 mushaf (Settings → Mushaf → “Mushaf”). The reader’s bar then has an eye and a mic in place of the record button. On Android or with the 1441 print it is the usual record button. It needs the internet: the checking runs on Revisely’s server.',
       '- The mic: tap it to start a take. Hold it to choose: “Record” (“Just record your recitation”) or “Recite” (“The page follows you”), and under Recite the “Mark mistakes” switch. Recite follows them on the page; with Mark mistakes on it also marks mistakes as they recite. Mark mistakes is part of Premium, free in Revisely Dev (Settings → Testing → “Premium”: off shows it locked).',
-      '- A take starts anywhere on the page: the bar says “Listening…” until it finds where they are, and nothing shows before that. Then a grey band on the line and a grey box on the word follow them, and the page turns with them. Turning the page by hand makes it look on that page. If it never finds the place, nothing is marked and Stop just ends it.',
-      '- The bar during a take: the words being said and the time, “Pause” and “Resume” (the mic goes off and the take stays open), Stop (then “Checking…”), and ✕ to close it.',
+      '- A take starts anywhere: the bar says “Listening…” until it finds where they are, and nothing shows before that. It looks on the page, then in the whole Qur’an, and turns there once sure (VoiceOver says "Started at …"). Then a grey band on the line and a grey box on the word follow them, and the page turns with them. Turning the page by hand makes it look on that page. If it never finds the place, nothing is marked and Stop just ends it; with VoiceOver, one line says so ("Couldn’t follow that take. Try starting at the top of the page.").',
+      '- The bar during a take: the words being said and the time, “Pause” and “Resume” (the mic goes off and the take stays open), Stop (then “Checking…”), and ✕ to close it. A tap on the page puts the header and the bar away, leaving the page and the take’s time by the page number; a tap brings them back. With VoiceOver the bar stays.',
+      '- A voice search (“Search the Quran”, the mic) that finds just one place opens the reader there and starts a take, as a tap on the mic would: carry on from the words searched, or start the ayah again. A typed search, or several results, only lists them.',
       '- Settings → Recite: “Mistakes to mark”: “Words & harakat” (wrong, skipped and added words, letter and haraka slips) or “Strict” (the same, and tajweed: madd lengths, qalqalah, ghunnah, ikhfa, idgham, iqlab), where “Madd munfasil”, “Madd muttasil” and “Madd ʿarid” set the lengths. “Save recordings when you recite” keeps a take’s audio on this phone, with the recordings in Activity.',
       '- Since mid-November 2026, “Words & harakat” and Recite listen with a newer model: it marks recitation that was right less often, especially with noise in the background, and catches word slips (a skipped, changed or added word) about as before. Small haraka or letter slips are marked a little less often, and "You continued with …" shows for fewer slips. “Strict” is unchanged.',
       '- It is AI and can make mistakes (Settings → About → “Recitation check notice”). Software checks the recitation; nobody listens. Settings → Testing → “Keep my recitations as test data” keeps takes for Revisely’s tests.',
@@ -353,8 +355,19 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     routes: ['QuranReader'],
     text: lines(
       '- The eye beside the mic (“Hide the page”) covers the words, to recite from memory; the verse markers stay whole. During a take the words appear in place as they are recited.',
-      '- In the bar during a take: “Show the next word” (‹) uncovers one word, “Show the whole ayah” uncovers the ayah, and “Show the page” uncovers everything.',
+      '- In the bar during a take: “Show the next word” (‹) uncovers one word, “Show the whole ayah” (‹‹) uncovers the ayah, and “Show the page” uncovers everything.',
+      '- Words uncovered with ‹ or ‹‹ are peeked: they stay in quiet grey on the page during the take (a word with a mistake keeps its highlight) and never count in the score. The summary says "3 words peeked" and lists them by ayah (a tap shows one on the page); “Recite the mistakes again” takes in their ayahs, offered for peeks alone too.',
       '- When they say something other than the next word, its cover turns red, the word still hidden. It is a hint, never a mark, and never counts; it goes once the word is said or they go back.',
+    ),
+  },
+  {
+    title: 'Test me',
+    covers: [],
+    routes: ['QuranReader'],
+    text: lines(
+      '- Hold the mic → “Test me” (“A random place in what you’ve memorized”), part of Premium like Mark mistakes; with nothing memorized it says “Mark what you’ve memorized first”. Then: “Everything you’ve memorized”, or one juz of it.',
+      '- Five places at random. At each the page turns there, hidden but for an ayah’s first two words: go on from there (or start that ayah again) through it and up to two more ayahs; it stops by itself. The bar says "1 of 5", then how it went ("Clean", "1 wrong word", "1 word peeked", "Stopped before the end", "Not continued"), with Next. ✕ ends the test.',
+      '- At the end: "4 of 5 continued cleanly", each place with how it went (a tap shows it on the page), “Test me again” (new places, the same juz) and “Done”.',
     ),
   },
   {
