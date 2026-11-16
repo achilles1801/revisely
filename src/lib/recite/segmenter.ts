@@ -46,10 +46,11 @@ export interface SegmenterOptions {
   /** The noise floor is never above the quietest moment of this much recent audio. */
   floorWindowMs: number;
   /**
-   * The microphone's first moments, which never set the noise floor. A phone's microphone
-   * starts with digital silence or a rise to the room's level (30–120 ms in kept takes);
-   * a floor learned from that sat 10–50 dB under the room, and the room itself was then
-   * heard as speech for seconds (Whisper wrote وَالْمُؤْمِنِينَ for it: SEARCH-3).
+   * The microphone's first moments, counted from its first sound, which never set the noise
+   * floor. A phone's microphone starts with digital silence (up to 120 ms in kept takes),
+   * then rises to the room's level (within about 120 ms); a floor learned from that sat
+   * 10–50 dB under the room, and the room itself was then heard as speech for seconds
+   * (Whisper wrote وَالْمُؤْمِنِينَ for it: SEARCH-3).
    */
   warmUpMs: number;
 }
@@ -77,6 +78,9 @@ export type SegmenterEvent =
   | { type: 'final'; id: number; audio: Int16Array; cut?: boolean }
   /** An utterance too short to decode (it never produces a final). */
   | { type: 'discard'; id: number };
+
+/** Quieter than this is the microphone not yet sending sound (digital silence), never a room. */
+const SILENT_DB = -90;
 
 /** Loudness of a frame in dBFS (-100 for digital silence). */
 export function frameDb(samples: Int16Array, from = 0, to = samples.length): number {
@@ -132,7 +136,8 @@ export class UtteranceSegmenter {
   private silentFrames = 0;
   private sinceDecode = 0;
   private noiseDb = -70;
-  private framesSeen = 0;
+  /** Frames of the warm-up since the microphone's first sound. */
+  private warmUpFrames = 0;
   /** The loudest frame of the warm-up (warmUpMs). */
   private warmUpLoudest = -100;
   /** Quietest frame of each recent half second, newest last (the floor's cap). */
@@ -184,18 +189,19 @@ export class UtteranceSegmenter {
   private onFrame(frame: Int16Array, events: SegmenterEvent[]) {
     const db = frameDb(frame);
     this.levelDb = db;
-    this.framesSeen++;
     // While the microphone warms up (digital silence, then a rise to the room's
-    // level), the floor is the loudest of it so far, kept within a usual room's
-    // range: the room is never louder than its own floor, and speaking straight
-    // away (above -38 dBFS) still counts as speech. None of it is the floor's
+    // level: warmUpMs from its first sound, so a long silence can't use it up),
+    // the floor is the loudest of it so far, kept within a usual room's range:
+    // the room is never louder than its own floor, and speaking straight away
+    // (above -38 dBFS) still counts as speech. None of it is the floor's
     // history, so its silence can't hold the floor down afterwards.
     // After that, the floor drops at once to anything quieter and creeps up
     // slowly (3 dB a second), so a noisier room becomes the floor. It never
     // rises above the quietest moment of the last few seconds: recitation in a
     // room that echoes has no truly quiet gaps for a long while, and without the
     // cap the floor crept up to the voice itself, so whole phrases went unheard.
-    if (this.framesSeen * this.o.frameMs <= Math.max(this.o.warmUpMs, this.o.frameMs)) {
+    if (this.warmUpFrames * this.o.frameMs < Math.max(this.o.warmUpMs, this.o.frameMs)) {
+      if (this.warmUpFrames > 0 || db > SILENT_DB) this.warmUpFrames++;
       this.warmUpLoudest = Math.max(this.warmUpLoudest, db);
       this.noiseDb = Math.min(-50, Math.max(-75, this.warmUpLoudest));
     } else {

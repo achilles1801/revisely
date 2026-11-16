@@ -47,10 +47,10 @@ const concat = (...parts: Int16Array[]) => {
   return out;
 };
 
-/** The microphone's start: 0–6 frames of digital silence, then a rise of 0–4 frames from below the room up to it. */
+/** The microphone's start: 0–10 frames of digital silence (kept takes had up to 4), then a rise of 0–4 frames from below the room up to it. */
 const startArb = (roomDb: number) =>
   fc.record({
-    silent: fc.integer({ min: 0, max: 6 }),
+    silent: fc.integer({ min: 0, max: 10 }),
     rise: fc.array(fc.double({ min: -75, max: roomDb, noNaN: true }), { maxLength: 4 }).map((r) => [...r].sort((a, b) => a - b)),
     seed: fc.integer({ min: 1, max: 2 ** 30 }),
   });

@@ -152,6 +152,9 @@ describe('UtteranceSegmenter', () => {
       [warmUp(4, [-57, -53]), -47],
       [warmUp(0, [-68, -56, -53]), -51],
       [warmUp(1, [-98]), -45],
+      // A long silence, then a slow rise still 12 dB under a loud room (the property test's counterexample): the
+      // warm-up counts from the first sound, so it still reaches the room.
+      [warmUp(6, [-54.7, -54.7, -54.6, -54.5]), -42],
     ] as const) {
       const events = feed(new UtteranceSegmenter(), concat(start, room(10_000, roomDb)));
       expect(events).toEqual([]);
