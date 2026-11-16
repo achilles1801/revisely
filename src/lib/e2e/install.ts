@@ -13,6 +13,7 @@ import { pinFreshTheme } from './theme';
 import { handleUpdateLink } from './updates';
 import { handleReciteLiveLink } from './reciteLive';
 import { handleVoiceSearchLink } from './voiceSearch';
+import { handleWhatsNewLink } from './whatsNew';
 
 let installed = false;
 let ready: Promise<void> = Promise.resolve();
@@ -25,6 +26,7 @@ function handle(url: string | null | undefined): void {
   if (handleUpdateLink(url)) return;
   if (handleReciteLiveLink(url)) return;
   if (handleVoiceSearchLink(url)) return;
+  if (handleWhatsNewLink(url)) return;
   handleNetworkLink(url);
 }
 
