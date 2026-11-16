@@ -173,16 +173,28 @@ describe('the jobs for a change to shared test code', () => {
     return jobs;
   }
 
-  it('runs three flows or fewer in one job', () => {
-    const three = flows.slice(0, 3);
-    expect(infraJobs(three)).toEqual([three]);
+  it('runs four flows or fewer in one job, inside its limit even for the four slowest', () => {
+    const four = flows.slice(0, 4);
+    expect(infraJobs(four)).toEqual([four]);
     expect(infraJobs(flows.slice(5, 6))).toEqual([flows.slice(5, 6)]);
+    for (const platform of ['ios', 'android']) {
+      const slowest = [...flows].sort((a, b) => minutes[platform][base(b)] - minutes[platform][base(a)]).slice(0, 4);
+      const total = OVERHEAD[platform] + 2 * slowest.reduce((a, f) => a + minutes[platform][base(f)], 0);
+      expect({ platform, total, fits: total <= limit(platform, 2) }).toEqual({ platform, total, fits: true });
+    }
+  });
+
+  // A change to the workflows runs the smoke set on iOS (affected-flows.js): one macOS job, not three.
+  it('runs the smoke set in one job', () => {
+    const smoke = affected(['.github/workflows/e2e.yml']).ios;
+    expect(smoke.map(short)).toEqual(['02', '04', '05', '06']);
+    expect(infraJobs(smoke)).toEqual([smoke]);
   });
 
   it('runs more in the full jobs, keeping only the flows touched, each job inside its limit', () => {
     expect(check(flows)).toEqual(fullJobs().map(flowsOf));
     check(flows.filter((_, i) => i % 3 !== 0));
-    check(flows.slice(0, 4));
+    check(flows.slice(0, 5));
   });
 
   it("fits the flows the sign-up's subflows touch (#574)", () => {
