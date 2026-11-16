@@ -104,6 +104,11 @@ export type LiveFailure =
   | 'premium_required'
   /** A service that doesn't take this level (recite-check-pair): the socket starts the take on recite-check instead. */
   | 'level_elsewhere'
+  /** Production's checker (recite-server-prod-plan.md): its kill switch (`PAUSED`), and App Check refused once it's on. */
+  | 'paused'
+  | 'app_check'
+  /** The phone's own, as `offline`: every instance was busy (Cloud Run's 429/503, or the socket never opened). */
+  | 'busy'
   | 'offline';
 
 export type LiveEvent =
@@ -142,6 +147,8 @@ const FAILURES: LiveFailure[] = [
   'check_locked',
   'premium_required',
   'level_elsewhere',
+  'paused',
+  'app_check',
 ];
 
 /** The server refused marking mistakes for want of Premium (either name). */
@@ -324,6 +331,16 @@ export function markGroup(mark: Pick<Mark, 'kind'>): MarkGroup {
 }
 /** Which of a word's marks shows when it has several: a word mistake over a slip over a tajweed note. */
 export const GROUP_RANK: Record<MarkGroup, number> = { tajweed: 0, slip: 1, word: 2 };
+
+/** One highlight per word: its strongest mark, a word mistake over a slip over a tajweed note (RECITE-2). */
+export function strongestByWord(marks: readonly Mark[]): Map<number, Mark> {
+  const byWord = new Map<number, Mark>();
+  for (const m of marks) {
+    const had = byWord.get(m.w);
+    if (!had || GROUP_RANK[markGroup(m)] > GROUP_RANK[markGroup(had)]) byWord.set(m.w, m);
+  }
+  return byWord;
+}
 
 /** Marks the checker's `mistakes` has counted (everything but tajweed notes; "not clear" ones too, until `unclear`). */
 export const countsAsMistake = (mark: Pick<Mark, 'kind'>) => mark.kind !== 'tajweed';

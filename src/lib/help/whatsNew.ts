@@ -18,10 +18,10 @@ import { helpPlainText, helpTextParts, type HelpIcon, type HelpTextPart } from '
  * whose feature isn't open to the account is left out (components/whatsNew/needs decides, with each
  * feature's own gate), and a live release may not need a feature that is still testers only.
  */
-export type WhatsNewNeed = 'activity' | 'sittings' | 'revo' | 'help' | 'translations';
+export type WhatsNewNeed = 'activity' | 'sittings' | 'revo' | 'help' | 'translations' | 'recite' | 'insights' | 'reciteRevo';
 
 /** The pictures (components/whatsNew/pictures): a part of the screen the card is about. */
-export type WhatsNewPicture = 'activity' | 'elsewhere' | 'ayah';
+export type WhatsNewPicture = 'activity' | 'elsewhere' | 'ayah' | 'recite' | 'marks' | 'again' | 'gaps';
 
 /**
  * A card that plays as a full-screen moment instead of a picture over words (components/whatsNew):
@@ -143,6 +143,105 @@ export const RELEASES: readonly WhatsNewRelease[] = [
 ];
 
 export const CURRENT_RELEASE: WhatsNewRelease = RELEASES[RELEASES.length - 1];
+
+/**
+ * The next release, still dark: not in RELEASES yet, so the current release stays what store users, TestFlight testers,
+ * E2E and the scenarios see and what onboarding marks. Revisely Dev's testers see it in Settings → About → What's new
+ * and in the run at launch (releaseFor). The release PR appends it to RELEASES with `live: true`, opening its
+ * features' gates in the same change, and sets this back to null.
+ */
+export const NEXT_RELEASE: WhatsNewRelease | null = {
+  // The mistake detection release (Majd, Nov 16 2026: "it should mainly mention mistake detection and probably the new
+  // stuff in insights and whatever else i might've forgotten"). Switched on with the release PR, with its gates.
+  id: '1.0.5',
+  live: false,
+  cards: [
+    {
+      id: 'recite',
+      title: 'Recite, and see your mistakes',
+      text:
+        'Tap [[mic]] in the reader and recite from memory. The page follows you, and with {{Mark mistakes}} on, ' +
+        'each mistake is highlighted as you go.',
+      picture: 'recite',
+      covers: ['RECITE-1', 'RECITE-2'],
+      needs: 'recite',
+    },
+    {
+      id: 'marks',
+      title: 'Every mistake, explained',
+      text:
+        'Tap a highlight to see what was expected, hear the ayah, and hear yourself there. ' +
+        '{{Not clear}} never counts, and {{Not a mistake}} takes one off.',
+      picture: 'marks',
+      covers: ['RECITE-3', 'RECITE-4'],
+      needs: 'recite',
+    },
+    {
+      id: 'again',
+      title: 'Until it sticks',
+      text:
+        '{{Recite the mistakes again}} goes over just those ayat. A mistake stays marked on the page until you say ' +
+        'it right on two different days.',
+      picture: 'again',
+      covers: ['RECITE-7', 'RMEM-2', 'RMEM-3'],
+      needs: 'recite',
+    },
+    {
+      id: 'gaps',
+      title: 'Gaps, in Insights',
+      text: 'See the days between your revisions, and with {{Last revised}}, when you last revised each surah and juz.',
+      picture: 'gaps',
+      covers: ['ACT-28', 'ACT-30'],
+      needs: 'insights',
+    },
+    {
+      id: 'more',
+      title: 'Also new',
+      covers: [],
+      rows: [
+        {
+          id: 'test',
+          icon: 'shuffle-outline',
+          title: 'Test me',
+          text: 'Hold [[mic]] and pick {{Test me}}: five places at random in what you’ve memorized.',
+          covers: ['RECITE-8'],
+          needs: 'recite',
+        },
+        {
+          id: 'recitation',
+          icon: 'trending-up-outline',
+          title: 'Your recitation in Insights',
+          text: 'Your score over time, and the passages that keep slipping.',
+          covers: ['RINS-2'],
+          needs: 'recite',
+        },
+        {
+          id: 'revo',
+          icon: 'chatbubble-ellipses-outline',
+          title: 'Revo knows your recitation',
+          text: 'Ask what keeps slipping, or about one take.',
+          covers: ['RINS-1', 'RINS-3'],
+          needs: 'reciteRevo',
+        },
+        {
+          id: 'search',
+          icon: 'search-outline',
+          title: 'A new search',
+          text: 'The field and the mic sit at the bottom, and each ayah found comes with its meaning.',
+          covers: ['SEARCH-1'],
+        },
+      ],
+    },
+  ],
+};
+
+/** Every release with cards, the next one included (the drift check reads them all). */
+export const ALL_RELEASES: readonly WhatsNewRelease[] = NEXT_RELEASE ? [...RELEASES, NEXT_RELEASE] : RELEASES;
+
+/** The release a screen in `mode` shows: the next one for a tester's replay or run in Revisely Dev, else the current. */
+export function releaseFor(mode: 'required' | 'forced' | 'replay', dev: boolean): WhatsNewRelease {
+  return mode !== 'required' && dev && NEXT_RELEASE ? NEXT_RELEASE : CURRENT_RELEASE;
+}
 
 /**
  * Whether an account has seen `release` (NEW-1): it finished it, or a later one, or set up after it

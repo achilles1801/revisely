@@ -541,8 +541,12 @@ Non-testers follow `production`, so nobody sees this on a phone before Promote; 
   - Home's update and store sheets and Revo wait for Home.
   - WidgetSync holds a widget's link until Done.
   - `lib/updates/busy` sees no main screen, so no update restarts the app under it.
-- **The next release:** add an entry to `RELEASES` (a new id, its own cards, `live: false`) and leave the
-  old one. Only the current release shows or replays.
+- **The next release:** write it as `NEXT_RELEASE` in `src/lib/help/whatsNew.ts` (a new id, its own cards, `live:
+  false`), outside `RELEASES`. So the current release stays what store users, TestFlight testers, E2E and the scenarios
+  see, and what onboarding marks, while Revisely Dev's testers see the next one in Settings → About → What's new and the
+  run at launch (`releaseFor`). The release PR appends it to `RELEASES` with `live: true` (and sets `NEXT_RELEASE` back
+  to null), opening its features' gates in the same change. Only the current release shows or replays for everyone
+  else. The mistake detection release's is `1.0.5` (Nov 16 2026).
 - `whatsNewSeen` is in the user document's allowlist (`firestore.rules`, #439). The rules must be live
   before app code that writes it reaches develop: onboarding's write would be refused, and with it
   `onboardingComplete`.

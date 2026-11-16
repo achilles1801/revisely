@@ -16,6 +16,7 @@
 
 import { dayMonth, t } from '../i18n';
 import { isDevVariant } from './variant';
+import { mistakeDetectionReleased } from './release/mistakeDetection';
 
 /**
  * Who sees Gaps and Last revised: Revisely Dev (Majd, Nov 16 2026: build straight into Revisely Dev). Only Revisely
@@ -25,7 +26,7 @@ import { isDevVariant } from './variant';
  * line, once the main guide has them.
  */
 export function gapsInsightsEnabled(user: { previewTester?: boolean } | null | undefined): boolean {
-  return user != null && (isDevVariant() || process.env.EXPO_PUBLIC_E2E === '1');
+  return user != null && (mistakeDetectionReleased() || isDevVariant() || process.env.EXPO_PUBLIC_E2E === '1');
 }
 
 const DAY_MS = 86_400_000;

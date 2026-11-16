@@ -93,6 +93,7 @@ import { premiumErrorText, setDevPremium, usePremium } from '../../lib/premium';
 import { setReciteCheckSettings, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
 import { ReciteCheckNotice } from '../../components/reciteCheck/ReciteCheckNotice';
 import { t } from '../../i18n';
+import { isDevVariant } from '../../lib/variant';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'Settings'>;
 
@@ -1148,7 +1149,8 @@ export default function SettingsScreen() {
                 />
               }
             />
-            {reciteCheck ? (
+            {/* Revisely Dev's checker only: production's keeps nothing (recite-server-prod-plan.md). */}
+            {reciteCheck && isDevVariant() ? (
               <Row
                 icon="mic-outline"
                 label={t('settings.testing.keep')}

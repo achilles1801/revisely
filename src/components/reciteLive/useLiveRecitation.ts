@@ -33,6 +33,7 @@ import {
   liveStopping,
   seekOnPage,
 } from '../../lib/reciteLive/state';
+import { isDevVariant } from '../../lib/variant';
 
 /** What the mic does while reciting: follow along (free), or follow and mark mistakes (Check). */
 export type LiveMode = 'recite' | 'check';
@@ -114,7 +115,9 @@ export function startFrameFor(
     aar: settings.aared,
     letters: true,
     tajweed: settings.level === 'strict',
-    keep: settings.keep,
+    // Kept as test data only on Revisely Dev's checker: production's keeps nothing (recite-server-prod-plan.md), so the
+    // store app never asks, and never says a take was kept.
+    keep: settings.keep && isDevVariant(),
     follow: mode === 'recite',
     ...(startBy ? { startBy } : {}),
     ...(startBy && !span && START_IN_QURAN ? { startIn: 'quran' as const } : {}),

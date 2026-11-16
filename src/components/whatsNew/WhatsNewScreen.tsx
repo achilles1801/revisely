@@ -31,11 +31,12 @@ import { Tap } from '../v2/Tap';
 import { Stepper } from '../Stepper';
 import { RevoMark } from '../revo/RevoMark';
 import {
-  CURRENT_RELEASE,
+  releaseFor,
   cardsFor,
   whatsNewParts,
   whatsNewPlainText,
   type WhatsNewCard,
+  type WhatsNewRelease,
   type WhatsNewRow,
 } from '../../lib/help/whatsNew';
 import { finishWhatsNew, saveCard, savedCard, setWhatsNewShowing } from '../../lib/whatsNew/state';
@@ -44,6 +45,7 @@ import { useNeedOpen } from './needs';
 import { pictureFor } from './pictures';
 import { RevoMoment } from './RevoMoment';
 import { markRevoMomentSeen } from '../../lib/revo/momentSeen';
+import { isDevVariant } from '../../lib/variant';
 import { auth } from '../../lib/firebase';
 import { greetingName } from '../../lib/displayName';
 import { smartTrackingOn } from '../../lib/smartTracking';
@@ -152,13 +154,22 @@ function Page({ card, step, total }: { card: WhatsNewCard; step: number; total: 
   );
 }
 
-export function WhatsNewScreen({ mode, onClose }: { mode: WhatsNewMode; onClose?: () => void }) {
+export function WhatsNewScreen({
+  mode,
+  onClose,
+  release: given,
+}: {
+  mode: WhatsNewMode;
+  onClose?: () => void;
+  /** Tests pass a release to run its cards; otherwise the current one, or the next for a tester in Revisely Dev. */
+  release?: WhatsNewRelease;
+}) {
+  const release = given ?? releaseFor(mode, isDevVariant());
   const { palette } = useTheme();
   const { fontScale } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { user, markWhatsNewSeen } = useApp();
   const open = useNeedOpen(user);
-  const release = CURRENT_RELEASE;
   const uid = user?.id;
   // Kept current: Revo's switch is read after launch, and its card joins the list when it says
   // everyone. The card on screen is kept by its id, so the list changing never moves it.

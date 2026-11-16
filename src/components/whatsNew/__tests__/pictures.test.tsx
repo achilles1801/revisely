@@ -8,6 +8,11 @@ import { readRepo } from '../../../../jest/behaviourRules';
 import { PICTURE_WORDS, pictureFor } from '../pictures';
 import { ThemeProvider } from '../../../context/ThemeContext';
 import { DesignProvider } from '../../../design/DesignContext';
+import { setQuranWordsForTests } from '../../../lib/recite/quranWords';
+import { wordsData } from '../../../lib/recite/__fixtures__/quranWords';
+
+beforeAll(() => setQuranWordsForTests(wordsData()));
+afterAll(() => setQuranWordsForTests(null));
 
 const source = (p: string) => readRepo(p).replace(/’/g, "'");
 const plain = (s: string) => s.replace(/’/g, "'");
@@ -24,8 +29,12 @@ describe('the pictures', () => {
     }
   });
 
+  it("the drill's button is the take summary's", () => {
+    expect(source('src/components/reciteLive/TakeSummarySheet.tsx')).toContain(`title="${PICTURE_WORDS.drill}"`);
+  });
+
   it('each draws, hidden from VoiceOver and never touched', async () => {
-    for (const p of ['activity', 'elsewhere', 'ayah'] as const) {
+    for (const p of ['activity', 'elsewhere', 'ayah', 'recite', 'marks', 'again', 'gaps'] as const) {
       render(
         <DesignProvider initial={{}}>
           <ThemeProvider>{pictureFor(p)}</ThemeProvider>
