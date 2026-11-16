@@ -46,6 +46,7 @@ import { pictureFor } from './pictures';
 import { RevoMoment } from './RevoMoment';
 import { markRevoMomentSeen } from '../../lib/revo/momentSeen';
 import { isDevVariant } from '../../lib/variant';
+import { loadQuranWords } from '../../lib/recite/quranWords';
 import { auth } from '../../lib/firebase';
 import { greetingName } from '../../lib/displayName';
 import { smartTrackingOn } from '../../lib/smartTracking';
@@ -174,6 +175,10 @@ export function WhatsNewScreen({
   // Kept current: Revo's switch is read after launch, and its card joins the list when it says
   // everyone. The card on screen is kept by its id, so the list changing never moves it.
   const cards = useMemo(() => cardsFor(release, open), [release, open]);
+  // A mark's card in a picture reads the word data (3 MB, loaded in the background): start now, cards before it.
+  useEffect(() => {
+    if (cards.some((c) => c.picture === 'marks')) loadQuranWords().catch(() => undefined);
+  }, [cards]);
   const keeps = mode !== 'replay';
   const [at, setAt] = useState<{ id: string | undefined; index: number }>(() => ({
     id: keeps && uid ? savedCard(uid, release.id) : undefined,

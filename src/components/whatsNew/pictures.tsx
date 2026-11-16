@@ -5,7 +5,7 @@
 // VoiceOver (the card's words say it all), never touched, and gone past 1.6× text (WhatsNewScreen).
 // The words in them are the app's own, which pictures.test.ts checks against the screens they show.
 
-import React, { useId } from 'react';
+import React, { useId, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
@@ -27,6 +27,7 @@ import { arabicV2 } from '../../theme/v2';
 import { getReadPalette } from '../../theme/readPalette';
 import type { QuranWords } from '../../lib/recite/quranWords';
 import type { Mark, MarkKind } from '../../lib/reciteLive/contract';
+import DEMO_TAKE from '../../data/whatsNewTake.json';
 
 /** The words the pictures show, as the screens they're drawn from show them (pictures.test.ts). */
 export const PICTURE_WORDS = {
@@ -233,7 +234,19 @@ const DEMO_MARKS: { ayah: number; position: number; kind: MarkKind }[] = [
   { ayah: 2, position: 6, kind: 'tajweed' },
 ];
 
-function demoTake(words: QuranWords) {
+/** A take's demo: Al-Mulk 1–2 in the mushaf's own lines, its three marks and the word being said. */
+export interface DemoTake {
+  lines: { w: number; text: string }[][];
+  marks: Mark[];
+  cursor: number;
+}
+
+/**
+ * The demo take from the word data. The pictures read its copy, src/data/whatsNewTake.json, so the first card draws at
+ * once (the word data loads in the background, 3 MB); pictures.test keeps the copy equal to this
+ * (`UPDATE_WHATS_NEW_TAKE=1` writes it).
+ */
+export function demoTakeOf(words: QuranWords): DemoTake {
   const [first] = words.verseRange(RECITE_AT.sura, RECITE_AT.from);
   const [, end] = words.verseRange(RECITE_AT.sura, RECITE_AT.to);
   const marks: Mark[] = DEMO_MARKS.map(({ ayah, position, kind }) => {
@@ -241,43 +254,57 @@ function demoTake(words: QuranWords) {
     const w = Math.min(b - 1, a + position - 1);
     return { id: `${w}:${kind}:demo`, w, ayah: [RECITE_AT.sura, ayah], kind, sure: 'clear', ...(kind === 'tajweed' ? { rule: 'ghunnah' as const } : {}) };
   });
-  const cursor = end - 2;
   // The mushaf's own lines (the 1405 print), in order.
-  const lines: number[][] = [];
+  const lines: { w: number; text: string }[][] = [];
   for (let w = first; w < end; w++) {
     const last = lines[lines.length - 1];
-    if (last && words.lineOf(last[0]) === words.lineOf(w)) last.push(w);
-    else lines.push([w]);
+    const word = { w, text: words.uthmani(w) };
+    if (last && words.lineOf(last[0].w) === words.lineOf(w)) last.push(word);
+    else lines.push([word]);
   }
-  return { marks, cursor, lines };
+  return { lines, marks, cursor: end - 2 };
 }
 
-/** The ayahs' lines, right to left, each mark on its word; `live`: the line being recited and the word being said. */
-function TakeLines({ words, live, past }: { words: QuranWords; live: boolean; past: boolean }) {
+const TAKE = DEMO_TAKE as DemoTake;
+const textOf = (w: number) => TAKE.lines.flat().find((x) => x.w === w)?.text ?? '';
+
+/**
+ * The ayahs' lines, right to left, each mark on its word; `live`: the line being recited and the word being said. Each
+ * mushaf line stays one line, made smaller to fit when the picture is narrower than it (a word never wraps alone).
+ */
+function TakeLines({ live, past }: { live: boolean; past: boolean }) {
   const { palette, isDark } = useTheme();
-  const { marks, cursor, lines } = demoTake(words);
+  const [room, setRoom] = useState(0);
+  const [wide, setWide] = useState(0);
+  const { marks, cursor, lines } = TAKE;
   const markOf = new Map(marks.map((m) => [m.w, m]));
   const fill = (w: number) => {
     const m = markOf.get(w);
     if (m) return past ? { backgroundColor: markFill(palette, m), opacity: isDark ? PAST_OPACITY.dark : PAST_OPACITY.light } : { backgroundColor: markFill(palette, m) };
     return live && w === cursor ? { backgroundColor: palette.followWord } : null;
   };
+  const scale = room > 0 && wide > room ? room / wide : 1;
   return (
-    <View style={styles.takeLines}>
-      {lines.map((line) => {
-        const here = live && line.includes(cursor);
-        return (
-          <View key={line[0]} style={[styles.takeLine, here && { backgroundColor: palette.followBand }]}>
-            {line.map((w) => (
-              <View key={w} style={[styles.takeWord, fill(w)]}>
-                <Text style={[arabicV2(19), { color: palette.text }]} maxFontSizeMultiplier={1}>
-                  {words.uthmani(w)}
-                </Text>
-              </View>
-            ))}
-          </View>
-        );
-      })}
+    <View style={styles.takeRoom} onLayout={(e) => setRoom(e.nativeEvent.layout.width)}>
+      <View
+        style={[styles.takeLines, scale < 1 && { transform: [{ scale }] }]}
+        onLayout={(e) => setWide(e.nativeEvent.layout.width)}
+      >
+        {lines.map((line) => {
+          const here = live && line.some((x) => x.w === cursor);
+          return (
+            <View key={line[0].w} style={[styles.takeLine, here && { backgroundColor: palette.followBand }]}>
+              {line.map(({ w, text }) => (
+                <View key={w} style={[styles.takeWord, fill(w)]}>
+                  <Text style={[arabicV2(19), { color: palette.text }]} maxFontSizeMultiplier={1}>
+                    {text}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          );
+        })}
+      </View>
     </View>
   );
 }
@@ -287,13 +314,11 @@ const noop = () => undefined;
 /** The reader during a take: the page following the reciter, three marks, and the bar with its score. */
 function RecitePicture() {
   const { isDark } = useTheme();
-  const words = useQuranWordsWhen(true);
   const read = getReadPalette(isDark);
-  if (!words) return null;
-  const { cursor } = demoTake(words);
+  const { cursor } = TAKE;
   return (
     <View style={styles.reciteScreen}>
-      <TakeLines words={words} live past={false} />
+      <TakeLines live past={false} />
       <View style={styles.reciteBar}>
         <ReciteBar
           hidden={false}
@@ -304,8 +329,8 @@ function RecitePicture() {
           seconds={47}
           recording={false}
           words={[
-            { w: cursor - 1, text: words.uthmani(cursor - 1), tone: 'said' },
-            { w: cursor, text: words.uthmani(cursor), tone: 'current' },
+            { w: cursor - 1, text: textOf(cursor - 1), tone: 'said' },
+            { w: cursor, text: textOf(cursor), tone: 'current' },
           ]}
           status=""
           phase="live"
@@ -340,11 +365,9 @@ function MarksPicture() {
 
 /** The page after the take: the mistakes kept on it, lighter, and the way over them again. */
 function AgainPicture() {
-  const words = useQuranWordsWhen(true);
-  if (!words) return null;
   return (
     <View style={styles.reciteScreen}>
-      <TakeLines words={words} live={false} past />
+      <TakeLines live={false} past />
       <View style={styles.againButton}>
         <PillButton title={PICTURE_WORDS.drill} size="lg" onPress={noop} />
       </View>
@@ -440,8 +463,9 @@ const styles = StyleSheet.create({
   bars: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 3, overflow: 'hidden' },
   bar: { width: 3, borderRadius: 1.5 },
   reciteScreen: { paddingHorizontal: 12, paddingTop: 14, paddingBottom: 12 },
+  takeRoom: { alignItems: 'center' },
   takeLines: { gap: 4 },
-  takeLine: { flexDirection: 'row-reverse', justifyContent: 'center', flexWrap: 'wrap', borderRadius: 8, paddingVertical: 2 },
+  takeLine: { flexDirection: 'row-reverse', justifyContent: 'center', flexWrap: 'nowrap', borderRadius: 8, paddingVertical: 2 },
   takeWord: { borderRadius: 6, paddingHorizontal: 3 },
   reciteBar: { marginTop: 14 },
   markCard: { borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 16, paddingVertical: 14 },
