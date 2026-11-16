@@ -1,13 +1,17 @@
 #!/usr/bin/env node
 // Which E2E flows and suites a change to shared test code touches (ci.yml `plan`, "test the tests",
 // TESTING.md). A PR that changes what flows share must run every flow that uses it, on both
-// platforms, twice, before it merges: #286 changed swipe-page.yaml, passed 06 once in the smoke set,
-// and broke 06 on develop.
+// platforms, before it merges: #286 changed swipe-page.yaml, passed 06 once in the smoke set, and
+// broke 06 on develop. (Once with a retry since Nov 16 2026; twice with no reruns before.)
 //
 //   git diff --name-only … | node .github/scripts/affected-flows.js
-//   → {"flows":"all"} | {"flows":[".maestro/flows/06-offline.yaml", …]} | {"flows":[]}, plus "scenarios": true|false
+//   → {"flows":"all"} | {"flows":[".maestro/flows/06-offline.yaml", …]} | {"flows":[]},
+//     plus "ios": [the flows for iOS] and "scenarios": true|false
 //
-// - run.sh, .maestro/config.yaml, e2e.yml, ci.yml: every flow.
+// - run.sh, .maestro/config.yaml, e2e.yml, ci.yml: every flow on Android. On iOS, the smoke set (02 04
+//   05 06) and the flows the change's other test files touch: macOS runners are five at a time, and
+//   every iOS flow, twice, took four of them for up to three hours (#627, Nov 16 2026). Every iOS flow
+//   still runs on develop's nightly run and on PRs into main.
 // - a subflow or a script under .maestro: every flow that uses it, through other subflows too
 //   (runFlow / runScript / file: references, followed from each flow).
 // - a flow itself: that flow.
@@ -19,6 +23,8 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const FLOWS = '.maestro/flows';
 const EVERY_FLOW = ['.maestro/run.sh', '.maestro/config.yaml', '.github/workflows/e2e.yml', '.github/workflows/ci.yml'];
 const SCENARIO_CODE = [/^tests\/scenarios\/harness\//, /^tests\/scenarios\/jest\.config\.js$/, /^scripts\/emulators\.sh$/];
+// The smoke set (ci.yml, e2e.yml): what a workflow change runs on iOS.
+const SMOKE = /^\.maestro\/flows\/0[2456]-[^/]*\.yaml$/;
 const REF = /(?:\bfile:\s*|\brunFlow:\s*|\brunScript:\s*)["']?([^\s"'#{}]+\.(?:ya?ml|js))/g;
 
 /** Every file a flow uses, itself included, following references (paths relative to the repo). */
@@ -45,18 +51,20 @@ function closure(flow, root = ROOT) {
 function affected(changed, root = ROOT) {
   const files = changed.map((f) => f.trim()).filter(Boolean);
   const scenarios = files.some((f) => SCENARIO_CODE.some((re) => re.test(f)));
-  if (files.some((f) => EVERY_FLOW.includes(f))) return { flows: 'all', scenarios };
   const flows = fs
     .readdirSync(path.join(root, FLOWS))
     .filter((f) => f.endsWith('.yaml'))
     .sort()
     .map((f) => `${FLOWS}/${f}`);
-  const shared = files.filter((f) => f.startsWith('.maestro/'));
+  const shared = files.filter((f) => f.startsWith('.maestro/') && !EVERY_FLOW.includes(f));
   const hit = flows.filter((flow) => {
     const uses = closure(flow, root);
     return shared.some((f) => uses.has(f));
   });
-  return { flows: hit, scenarios };
+  if (files.some((f) => EVERY_FLOW.includes(f))) {
+    return { flows: 'all', ios: flows.filter((f) => SMOKE.test(f) || hit.includes(f)), scenarios };
+  }
+  return { flows: hit, ios: hit, scenarios };
 }
 
 if (require.main === module) {

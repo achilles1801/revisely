@@ -59,6 +59,10 @@ on:
         description: For infra, the flows a change to shared test code touches (paths, or all)
         type: string
         default: ''
+      only_ios:
+        description: For infra on iOS, its own flows (paths; the flows touched, or the smoke set for a workflow change); empty for the same as only
+        type: string
+        default: ''
       repeat:
         description: Runs of each flow, every one of which must pass, with no reruns
         type: string
@@ -142,6 +146,7 @@ jobs:
       ios_shards: ${{ steps.shards.outputs.ios }}
       android_shards: ${{ steps.shards.outputs.android }}
       run_ios: ${{ steps.shards.outputs.run_ios }}
+      ios_one: ${{ steps.shards.outputs.ios_one }}
       run_android: ${{ steps.shards.outputs.run_android }}
     steps:
       # The jobs and their flows. Every flow: four jobs a platform, balanced by time so
@@ -170,6 +175,7 @@ jobs:
           SHA: ${{ github.sha }}
           RUN_ID: ${{ github.run_id }}
           INFRA_ONLY: ${{ inputs.only }}
+          INFRA_ONLY_IOS: ${{ inputs.only_ios }}
         run: |
           full='[{"name":"02 03 08 12 13 16 17","flows":".maestro/flows/0[238]-*.yaml .maestro/flows/1[2367]-*.yaml"},{"name":"01 04 07 09-revo-attach 14 15","flows":".maestro/flows/0[147]-*.yaml .maestro/flows/09-revo-attach.yaml .maestro/flows/1[45]-*.yaml"},{"name":"10 09-activity-dark 09-activity-light 09-insights-history","flows":".maestro/flows/10-*.yaml .maestro/flows/09-activity-*.yaml .maestro/flows/09-insights-history.yaml"},{"name":"05 06 09-revo 11 18","flows":".maestro/flows/0[56]-*.yaml .maestro/flows/09-revo.yaml .maestro/flows/11-*.yaml .maestro/flows/18-*.yaml"}]'
           # Android's smoke set is a single PR's long pole: two jobs side by side
@@ -178,8 +184,10 @@ jobs:
           smoke_android='[{"name":"smoke: 02 05","flows":".maestro/flows/0[25]-*.yaml"},{"name":"smoke: 04 06","flows":".maestro/flows/0[46]-*.yaml"}]'
           smoke_ios='[{"name":"smoke: 02 04 05 06","flows":".maestro/flows/0[2456]-*.yaml"}]'
           build='[{"name":"native build","flows":""}]'
-          # A change to shared test code (CI's plan): the flows it touches, or every flow, each run
-          # twice. Three flows or fewer: one job. More: the full run's jobs, each keeping only the
+          # A change to shared test code (CI's plan): the flows it touches, or every flow, once with a
+          # retry. Five flows or fewer: one job, in the full run's order with 10 first (the five slowest
+          # with a retry fit its limit on either platform; the smoke set, and the smoke set with the flow
+          # a PR edits, are one macOS job). More: the full run's jobs, each keeping only the
           # flows touched, in its order (10 before the 09 seeds), so each fits its limit as the full
           # job does (shards.test.js checks both, running this). Splitting them into two jobs didn't
           # fit: #574 touched 21 flows through signup.yaml, and its iOS job of 11 needed about 200 of
@@ -187,19 +195,23 @@ jobs:
           # shards test fails on one) gets a job of its own rather than none.
           infra_jq='
             ($f | split(" ") | map(select(. != ""))) as $all
-            | (if ($all | length) <= 3 then [$all]
-               else [$full[] | [.flows | split(" ") | .[] | select(. != "")
-                       | ("^" + (gsub("\\."; "\\.") | gsub("\\*"; "[^/]*") | gsub("\\?"; "[^/]")) + "$") as $re
-                       | $all[] | select(test($re))]
-                     | select(length > 0)]
-                 | . + ([$all - flatten] | map(select(length > 0)))
-               end)
+            | [$full[] | [.flows | split(" ") | .[] | select(. != "")
+                 | ("^" + (gsub("\\."; "\\.") | gsub("\\*"; "[^/]*") | gsub("\\?"; "[^/]")) + "$") as $re
+                 | $all[] | select(test($re))]
+               | select(length > 0)]
+            | . + ([$all - flatten] | map(select(length > 0)))
+            | (if ($all | length) <= 5 then [flatten | map(select(test("/10-"))) + map(select(test("/10-") | not))] else . end)
             | map({name: ("changed: " + (map(split("/") | last | split("-") | first) | join(" "))), flows: join(" ")})'
           if [ "$INFRA_ONLY" = all ]; then infra="$full"
           else infra=$(jq -cn --arg f "$INFRA_ONLY" --argjson full "$full" "$infra_jq"); fi
+          # iOS has its own list (ci.yml's plan): the flows touched without Android's smoke set, or the
+          # smoke set for a workflow change, never every flow (macOS runners are five at a time).
+          if [ -n "$INFRA_ONLY_IOS" ]; then infra_ios=$(jq -cn --arg f "$INFRA_ONLY_IOS" --argjson full "$full" "$infra_jq")
+          else infra_ios="$infra"; fi
           set_of() { # set platform
             case "$1" in
-              none) echo '[]' ;; build) echo "$build" ;; full) echo "$full" ;; infra) echo "$infra" ;;
+              none) echo '[]' ;; build) echo "$build" ;; full) echo "$full" ;;
+              infra) if [ "$2" = ios ]; then echo "$infra_ios"; else echo "$infra"; fi ;;
               smoke) if [ "$2" = android ]; then echo "$smoke_android"; else echo "$smoke_ios"; fi ;;
               *) echo "::error::Unknown set '$1' (none, build, smoke, full, infra)" >&2; return 1 ;;
             esac
@@ -238,7 +250,10 @@ jobs:
           fi
           run_ios=true; if [ "$ios" = '[]' ]; then run_ios=false; fi
           run_android=true; if [ "$android" = '[]' ]; then run_android=false; fi
-          { echo "ios=$ios"; echo "android=$android"; echo "run_ios=$run_ios"; echo "run_android=$run_android"; } >> "$GITHUB_OUTPUT"
+          # One iOS job (a PR's flows, the smoke set, develop's native build): it restores or builds
+          # the app itself, with no ios-build job before it to wait in the macOS queue for.
+          ios_one=false; if [ "$(jq length <<<"$ios")" = 1 ]; then ios_one=true; fi
+          { echo "ios=$ios"; echo "android=$android"; echo "run_ios=$run_ios"; echo "ios_one=$ios_one"; echo "run_android=$run_android"; } >> "$GITHUB_OUTPUT"
           echo "iOS: $ios"; echo "Android: $android"
 
       # What the change holds. A PR: its files; the top of a stack: the whole
@@ -309,10 +324,13 @@ jobs:
   # the four iOS jobs built the app (26 minutes) inside its 90, and the two longest ran out with their
   # flows still going (#496's run 42727081470). On a miss this builds it once and keeps it in the run's
   # own scope; on a hit it only looks (lookup-only) and ends in about three minutes.
+  # Only for two iOS jobs or more: with one, it was a second wait in the macOS queue for a minute's
+  # lookup (57 minutes before #659's flows could even queue, Nov 16 2026), and the one job builds the
+  # app itself if it isn't kept.
   ios-build:
     name: E2E (iOS Simulator, the native build)
     needs: changes
-    if: ${{ needs.changes.outputs.app == 'true' && needs.changes.outputs.run_ios == 'true' }}
+    if: ${{ needs.changes.outputs.app == 'true' && needs.changes.outputs.run_ios == 'true' && needs.changes.outputs.ios_one != 'true' }}
     runs-on: macos-26
     timeout-minutes: 60
     steps:
@@ -390,17 +408,22 @@ jobs:
     # After the native build, which each job restores (its own build steps stay for a cache evicted
     # in between).
     needs: [changes, ios-build]
-    if: ${{ needs.changes.outputs.app == 'true' && needs.changes.outputs.run_ios == 'true' && needs.ios-build.result == 'success' }}
+    if: ${{ !cancelled() && needs.changes.outputs.app == 'true' && needs.changes.outputs.run_ios == 'true' && (needs.ios-build.result == 'success' || (needs.ios-build.result == 'skipped' && needs.changes.outputs.ios_one == 'true')) }}
     runs-on: macos-26
-    # Each flow run twice (a change to shared test code): twice the flows' time.
-    timeout-minutes: ${{ inputs.repeat == '2' && 180 || 90 }}
+    # Each flow run twice (a run by hand with repeat 2): twice the flows' time. 120, not 90: a run's one
+    # iOS job builds the app itself when it isn't kept (26–35 minutes, a native change).
+    timeout-minutes: ${{ inputs.repeat == '2' && 180 || 120 }}
     # The macOS runner takes 4–14 minutes a flow, and a native build 20 to 35
     # (when the fingerprint has none kept: a native change). (On Nov 4 a third job
     # sometimes waited for a macOS runner until GitHub gave up on it; none has since,
     # in 300 runs to Nov 9, and a full run now has four.)
     # (A run by hand with some flows: one job with those; `changes` picks.)
+    # A run by hand takes two macOS runners at a time at most, leaving three for PRs: GitHub starts
+    # queued jobs in the order they came, with no priority (Nov 16 2026, 24 iOS jobs queued for up to
+    # 2.5 hours behind four).
     strategy:
       fail-fast: false
+      max-parallel: ${{ github.event_name == 'workflow_dispatch' && 2 || 4 }}
       matrix:
         shard: ${{ fromJSON(needs.changes.outputs.ios_shards) }}
     steps:
@@ -676,7 +699,7 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.app == 'true' && needs.changes.outputs.run_android == 'true' }}
     runs-on: ubuntu-latest
-    # Each flow run twice (a change to shared test code): twice the flows' time.
+    # Each flow run twice (a run by hand with repeat 2): twice the flows' time.
     timeout-minutes: ${{ inputs.repeat == '2' && 180 || 90 }}
     strategy:
       fail-fast: false
@@ -971,6 +994,7 @@ jobs:
           CHANGES: ${{ needs.changes.result }}
           APP: ${{ needs.changes.outputs.app }}
           RUN_IOS: ${{ needs.changes.outputs.run_ios }}
+          IOS_ONE: ${{ needs.changes.outputs.ios_one }}
           RUN_ANDROID: ${{ needs.changes.outputs.run_android }}
           IOS_BUILD: ${{ needs.ios-build.result }}
           IOS: ${{ needs.ios.result }}
@@ -986,7 +1010,8 @@ jobs:
             if [ "$3" != success ]; then echo "::error::E2E on $1: $3"; return 1; fi
           }
           ok=0
-          expect "ios (the native build)" "$RUN_IOS" "$IOS_BUILD" || ok=1
+          build_planned=$RUN_IOS; [ "$IOS_ONE" = true ] && build_planned=false
+          expect "ios (the native build)" "$build_planned" "$IOS_BUILD" || ok=1
           expect ios "$RUN_IOS" "$IOS" || ok=1
           expect android "$RUN_ANDROID" "$ANDROID" || ok=1
           exit $ok
