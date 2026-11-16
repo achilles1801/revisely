@@ -5,6 +5,10 @@
 // emails it and the GitHub app pushes it). Run by .github/workflows/metrics.yml.
 //
 //   node scripts/metrics/push.js metrics-totals.json
+//
+// With METRICS_ENV=Dev (and METRICS_TOTALS_URL at revisely-dev's metricsTotals) it asks the dev project for its own
+// alarms (Open Door replies past 7 days, its functions, Revo there) and labels them "Dev" on the issue. The dev project
+// gets no production totals: Sentry and App Store go as null, so its console never shows production's numbers as dev's.
 
 const fs = require('fs');
 const { githubApi } = require('../sentry/api');
@@ -12,6 +16,7 @@ const { githubApi } = require('../sentry/api');
 const URL = process.env.METRICS_TOTALS_URL || 'https://us-central1-revision-buddy-3a398.cloudfunctions.net/metricsTotals';
 const TITLE = 'Metrics alerts';
 const LABEL = 'metrics-alert';
+const ENV = (process.env.METRICS_ENV || '').replace(/[^A-Za-z ]/g, '').slice(0, 20);
 
 async function oidcToken() {
   const url = process.env.ACTIONS_ID_TOKEN_REQUEST_URL;
@@ -23,19 +28,26 @@ async function oidcToken() {
 }
 
 /** The alarm lines as posted: plain text, no mentions or markup from the values. */
-function alertBody(alarms, mention) {
+function alertBody(alarms, mention, env = '') {
   const clean = (s) => String(s).replace(/[`<>@\r\n]/g, '').slice(0, 200);
-  return [`${mention} ⚠️ ${alarms.length === 1 ? 'An alarm started' : `${alarms.length} alarms started`}:`, '', ...alarms.map((a) => `- **${clean(a.title)}**: ${clean(a.value)}`), '', '_Details on the metrics console._'].join('\n');
+  const where = env ? `${env}: ` : '';
+  return [`${mention} ⚠️ ${alarms.length === 1 ? 'An alarm started' : `${alarms.length} alarms started`}:`, '', ...alarms.map((a) => `- **${where}${clean(a.title)}**: ${clean(a.value)}`), '', '_Details on the metrics console._'].join('\n');
+}
+
+/** What the dev project is sent: the hour, and no production numbers. */
+function devTotals(totals) {
+  return { generatedAt: totals.generatedAt, sentry: null, appStore: null, errors: { sentry: 'production only', appStore: 'production only' } };
 }
 
 async function main() {
   const file = process.argv[2] || 'metrics-totals.json';
-  const body = fs.readFileSync(file, 'utf8');
+  const read = fs.readFileSync(file, 'utf8');
+  const body = ENV ? JSON.stringify(devTotals(JSON.parse(read))) : read;
   const res = await fetch(URL, { method: 'POST', headers: { Authorization: `Bearer ${await oidcToken()}`, 'Content-Type': 'application/json' }, body });
   const text = await res.text();
   if (!res.ok) throw new Error(`metricsTotals answered ${res.status}: ${text.slice(0, 200)}`);
   const { newAlarms = [] } = JSON.parse(text);
-  console.log(`Totals stored. New alarms: ${newAlarms.map((a) => a.id).join(', ') || 'none'}`);
+  console.log(`${ENV ? ENV + ': t' : 'T'}otals stored. New alarms: ${newAlarms.map((a) => a.id).join(', ') || 'none'}`);
   if (!newAlarms.length) return;
   const open = await githubApi.issuesWithLabel(LABEL, 'open');
   let issue = open.find((i) => i.title === TITLE);
@@ -43,10 +55,10 @@ async function main() {
     await githubApi.ensureLabel(LABEL, 'd93f0b', 'Metrics console alarms');
     issue = await githubApi.createIssue(TITLE, 'The Metrics workflow posts here when an alarm starts (Revo failing, resting or capped, spend, function errors, crash-free). The metrics console has the detail. Subscribe to get them by email and in the GitHub app.', [LABEL]);
   }
-  await githubApi.comment(issue.number, alertBody(newAlarms, process.env.MENTION || ''));
+  await githubApi.comment(issue.number, alertBody(newAlarms, process.env.MENTION || '', ENV));
   console.log(`Posted on #${issue.number}`);
 }
 
 if (require.main === module) main().catch((err) => { console.error(`::error title=Metrics push::${err.message}`); process.exit(1); });
 
-module.exports = { alertBody };
+module.exports = { alertBody, devTotals };

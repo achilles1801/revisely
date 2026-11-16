@@ -617,7 +617,9 @@ README has the deploy and the undo); never deploy the root `firebase.json`'s hos
 - **Functions:** `adminMetrics` (metrics.read), `adminRevo` (revo.conversations; conversations locked until
   `config/admin.conversations`), `adminConsole` (`me`, Open Door `od.*`, `audit.*`, `accounts.get`, `premium.summary`, `staff.*`; App Check on every action but
   `me`; Open Door only where `SUPPORT_PAGES` has the project), `metricsTotals` (the hourly `metrics.yml` with its
-  GitHub OIDC token; alarms on the "Metrics alerts" issue).
+  GitHub OIDC token; alarms on the "Metrics alerts" issue). metrics.yml asks revisely-dev's `metricsTotals` too,
+  sending it no production totals, and posts its alarms labelled "Dev"; a project with Open Door adds the alarm
+  "Open Door replies" (an application waiting past the 7-day promise; counts only).
 - **Production and Dev in one console** (Majd, Nov 14 2026: one console with a switch; metrics.revisely.app to be
   retired, "why would we need two separate dashboards"): the console's project asks the other project's
   `consoleMetrics` (an HTTPS endpoint), proving who it is with a Google-signed ID token for its own service account from

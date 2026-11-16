@@ -445,7 +445,8 @@ export const coachDigestDays = onRequest({ invoker: 'public', maxInstances: 1, t
 const PROJECT = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || 'revision-buddy-3a398';
 // The test emulator serves the console from localhost.
 const CONSOLE_ORIGINS: (string | RegExp)[] = testing ? [...consoleOrigins(PROJECT), /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/] : consoleOrigins(PROJECT);
-const metricsCollector = collector(adminDb, PROJECT, { emulator: process.env.FUNCTIONS_EMULATOR === 'true' });
+// Open Door's overdue count joins the alarms where the program runs (revisely-dev today; SUPPORT_PAGES).
+const metricsCollector = collector(adminDb, PROJECT, { emulator: process.env.FUNCTIONS_EMULATOR === 'true', openDoor: !!SUPPORT_PAGES[PROJECT] });
 const adminLog = (entry: Record<string, unknown>) => logger.info('admin', entry);
 
 function adminFailure(name: string, err: unknown): HttpsError {

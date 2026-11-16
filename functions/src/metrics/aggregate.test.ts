@@ -138,4 +138,14 @@ describe('alerts', () => {
     expect(levels['revo-resting']).toBe('alarm');
     expect(levels['spend-today']).toBe('alarm');
   });
+  it('Open Door: an alarm only past the 7-day promise, nothing where the program doesn\'t run, no data when unread', () => {
+    const od = (openDoor: Parameters<typeof build>[0]['openDoor']) => build(input({ openDoor })).alerts.find((a) => a.id === 'open-door-overdue');
+    expect(build(input()).alerts.some((a) => a.id === 'open-door-overdue')).toBe(false);
+    expect(od({ pending: 0, overdue: 0, oldestPending: null })).toEqual({ id: 'open-door-overdue', level: 'ok', title: 'Open Door replies', value: 'nothing waiting' });
+    expect(od({ pending: 3, overdue: 0, oldestPending: NOW - 2 * 86_400_000 })).toMatchObject({ level: 'ok', value: '3 waiting, none past 7 days' });
+    expect(od({ pending: 5, overdue: 2, oldestPending: NOW - 9.5 * 86_400_000 })).toMatchObject({ level: 'alarm', value: '2 past the 7-day promise (oldest 9 days)' });
+    expect(od(null)).toMatchObject({ level: 'nodata', value: 'no data' });
+    // It reaches the console's "look at" list like every alarm.
+    expect(build(input({ openDoor: { pending: 1, overdue: 1, oldestPending: NOW - 8 * 86_400_000 } })).look.some((l) => /Open Door replies: 1 past/.test(l.text))).toBe(true);
+  });
 });

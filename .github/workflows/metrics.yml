@@ -44,3 +44,14 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           MENTION: '@${{ github.repository_owner }}'
         run: node scripts/metrics/push.js metrics-totals.json
+      # revisely-dev's own alarms (Open Door replies past 7 days, its functions, Revo there), labelled "Dev" on the same
+      # issue. It is sent no production totals (push.js). After production's step, and a failure here only warns: it
+      # never hides production's alarms. Its metricsTotals accepts this file on main only, like production's.
+      - name: Ask the dev console for its alarms, post new ones
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          MENTION: '@${{ github.repository_owner }}'
+          METRICS_TOTALS_URL: https://us-central1-revisely-dev.cloudfunctions.net/metricsTotals
+          METRICS_ENV: Dev
+        run: node scripts/metrics/push.js metrics-totals.json
