@@ -227,8 +227,11 @@ until its part is set up.
     - The app's Words & harakat sends `letters: true`, so today only Recite goes to the pair.
     - `lib/reciteLive/socket` picks the address when a take starts. A take the pair refuses (`level_elsewhere`), or
       can't start (unreachable, or its 403 while private), starts again on `recite-check` as a new take there.
-    - After a failed start the pair is passed over for 10 minutes. A resume goes to the service that said `ready`.
-    - `warmUpReciteCheck()` wakes both.
+    - A resume goes to the service that said `ready`.
+    - `warmUpReciteCheck()` wakes both. Its pair `/health` answer also says whether the pair takes this phone's takes:
+      a 403 (still private), or a take it couldn't start, sends takes straight to `recite-check` for an hour
+      (`lib/reciteLive/pairService`, in memory). So even the first take after the reader opens pays no refused upgrade.
+      An answer from `/health` lets takes back.
   - The model's licence (Quran Muaalem License 1.0, 2.1) asks for its AI notice, English and Arabic, before the
     first use and reachable afterwards: the sheet shows it first, and Settings → About has it.
   - "Keep as test data" (on by default; in the sheet and Settings → Testing) keeps each recording and its result

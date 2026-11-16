@@ -3,6 +3,7 @@ import { currentRelease } from '../releaseInfo';
 import type { VerseKey } from '../verses';
 import { CheckResult, parseCheckResult } from './result';
 import type { ReciteCheckSettings } from './settings';
+import { pairAnswered, pairClosed } from '../reciteLive/pairService';
 
 /** The recitation check service on revisely-dev (Cloud Run, us-east1; scripts/recite-check). */
 export const RECITE_CHECK_URL = 'https://recite-check-433792838929.us-east1.run.app';
@@ -120,9 +121,20 @@ export async function sendLabel(
 /** recite-check-pair: Recite and Words & harakat without letters, two takes an instance (lib/reciteLive/socket). */
 export const RECITE_CHECK_PAIR_URL = 'https://recite-check-pair-433792838929.us-east1.run.app';
 
-/** Wake both services while the user gets ready (they sleep when unused; waking takes a few seconds). */
+/**
+ * Wake both services while the user gets ready (they sleep when unused; waking takes a few seconds). The pair service's
+ * answer also says whether it takes this phone's takes yet: a 403 (still private) sends them to recite-check for an
+ * hour without a refused upgrade each; an answer lets them back (lib/reciteLive/pairService).
+ */
 export function warmUpReciteCheck(deps: Pick<CheckDeps, 'fetch'> = defaults): void {
-  for (const base of [RECITE_CHECK_URL, RECITE_CHECK_PAIR_URL]) deps.fetch(`${base}/health`).catch(() => undefined);
+  deps.fetch(`${RECITE_CHECK_URL}/health`).catch(() => undefined);
+  deps
+    .fetch(`${RECITE_CHECK_PAIR_URL}/health`)
+    .then((res) => {
+      if (res.status === 403) pairClosed();
+      else if (res.ok) pairAnswered();
+    })
+    .catch(() => undefined);
 }
 
 export const FAILURE_TEXT: Record<CheckFailure, string> = {

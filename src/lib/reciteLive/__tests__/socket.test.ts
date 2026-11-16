@@ -1,4 +1,5 @@
 import { socketFeed, SocketLike } from '../socket';
+import { pairAnswered, pairClosed, pairOpen, PAIR_CLOSED_MS } from '../pairService';
 import type { LiveEvent } from '../contract';
 import type { StartFrame } from '../feed';
 
@@ -263,6 +264,8 @@ describe('two services: the light levels on recite-check-pair (recite-contract.m
   const HARAKAT: StartFrame = { ...START, letters: false, tajweed: false };
   const WITH_LETTERS: StartFrame = { ...START, letters: true, tajweed: false };
   const STRICT: StartFrame = { ...START, letters: true, tajweed: true };
+  // What the phone knows of the pair service is shared by every take: each test starts with it open.
+  beforeEach(() => pairAnswered());
 
   function feed() {
     const opened: { url: string; s: FakeSocket }[] = [];
@@ -329,7 +332,7 @@ describe('two services: the light levels on recite-check-pair (recite-contract.m
     expect(f.opened[2].url).toBe(PAIR);
   });
 
-  it('the pair service unreachable or private (its 403 closes the socket before ready): recite-check at once, and for 10 minutes', async () => {
+  it('the pair service unreachable or private (its 403 closes the socket before ready): recite-check at once, and for an hour', async () => {
     const f = feed();
     f.take(RECITE);
     await flush();
@@ -340,10 +343,27 @@ describe('two services: the light levels on recite-check-pair (recite-contract.m
     f.take(HARAKAT);
     await flush();
     expect(f.opened[2].url).toBe(MAIN); // passed over meanwhile: no failed upgrade before each take
-    f.later(10 * 60_000);
+    f.later(PAIR_CLOSED_MS - 1);
     f.take(RECITE);
     await flush();
-    expect(f.opened[3].url).toBe(PAIR);
+    expect(f.opened[3].url).toBe(MAIN);
+    f.later(1);
+    f.take(RECITE);
+    await flush();
+    expect(f.opened[4].url).toBe(PAIR);
+  });
+
+  it('closed before any take (the warm-up’s /health said 403): even the first take goes straight to recite-check', async () => {
+    const f = feed();
+    pairClosed(1_000_000);
+    expect(pairOpen(1_000_000)).toBe(false);
+    f.take(RECITE);
+    await flush();
+    expect(f.opened.map((o) => o.url)).toEqual([MAIN]);
+    pairAnswered(); // its /health answered: open again
+    f.take(RECITE);
+    await flush();
+    expect(f.opened[1].url).toBe(PAIR);
   });
 
   it('once the pair service has said ready, a dropped socket resumes there, never on recite-check', async () => {

@@ -10,17 +10,17 @@
 // Two services (recite-contract.md, "Two services"; Majd approved Nov 15 2026): the light levels (Recite, and Words &
 // harakat with letters off) go to recite-check-pair, two takes an instance; everything else to recite-check. A take the
 // pair service refuses (`level_elsewhere`) or can't start (unreachable, or its 403 while it is private) starts again on
-// recite-check, with no resume; once a service has said `ready`, a resume goes back to it.
+// recite-check, with no resume; once a service has said `ready`, a resume goes back to it. A pair service that couldn't
+// start a take, or whose /health refused (lib/reciteLive/pairService), is passed over for an hour.
 
 import { LiveEvent, parseEvent } from './contract';
+import { pairClosed, pairOpen } from './pairService';
 import type { ClientFrame, LiveConnect, LiveConnection, LiveHandlers, StartFrame } from './feed';
 
 /** The checker's live endpoint (the same Cloud Run service as lib/reciteCheck/service). */
 export const RECITE_LIVE_URL = 'wss://recite-check-433792838929.us-east1.run.app/live';
 /** recite-check-pair's (the same image and protocol): Recite and Words & harakat without letters only. */
 export const RECITE_PAIR_LIVE_URL = 'wss://recite-check-pair-433792838929.us-east1.run.app/live';
-/** After the pair service couldn't start a take, takes go straight to recite-check for this long. */
-export const PAIR_DOWN_MS = 10 * 60_000;
 
 /** Whether recite-check-pair takes this take: what the server calls `recite` or `harakat` (health.level). */
 export function pairTakes(start: StartFrame): boolean {
@@ -80,8 +80,6 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
   const mainUrl = deps.url ?? RECITE_LIVE_URL;
   const pairUrl = deps.pairUrl === undefined ? RECITE_PAIR_LIVE_URL : deps.pairUrl;
   const now = deps.now ?? Date.now;
-  /** Until when the pair service is passed over (it couldn't start a take). */
-  let pairDownUntil = 0;
   const open = deps.open ?? ((u: string) => new WebSocket(u) as unknown as SocketLike);
   const timers = deps.timers ?? {
     set: (fn: () => void, ms: number) => setTimeout(fn, ms),
@@ -102,12 +100,12 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
     let tries = 0;
     let retry: unknown = null;
     /** Where the take goes: the pair service for the light levels while it's up, else recite-check. */
-    let url = pairUrl && pairTakes(start) && now() >= pairDownUntil ? pairUrl : mainUrl;
+    let url = pairUrl && pairTakes(start) && pairOpen(now()) ? pairUrl : mainUrl;
     /** On the pair service, which hasn't said `ready` yet: a refusal or a drop sends the take to recite-check. */
     let unproven = url !== mainUrl;
     /** Start again on recite-check, as a new take there. `down`: the pair service couldn't be reached. */
     const toMain = (down: boolean) => {
-      if (down) pairDownUntil = now() + PAIR_DOWN_MS;
+      if (down) pairClosed(now());
       url = mainUrl;
       unproven = false;
       take = null;
