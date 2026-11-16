@@ -1,13 +1,13 @@
 {
   "recordedAt": null,
-  "how": "functions/scripts/record-anthropic.js on 2026-11-10T02:34:05.365Z; request moved by hand to the system prompt of guide.ts trimmed for room under the 30,000-character cap (Nov 16 2026) (the reply is that recording, not re-recorded: record again with the coach key)",
+  "how": "functions/scripts/record-anthropic.js on 2026-11-10T02:34:05.365Z; request moved by hand to the system prompt of guide.ts with Activity sections for testers (Nov 16 2026) (the reply is that recording, not re-recorded: record again with the coach key)",
   "request": {
     "model": "claude-sonnet-5-5",
     "max_tokens": 800,
     "thinking": {
       "type": "between_tools"
     },
-    "systemSha256": "848e5b5adcb16bfac72c8beb6a01c5d633a7ac2f3aefe9cd6c2643726d684cd4",
+    "systemSha256": "d4d53201173d614b602ad2afff8f5cecae531e78dd6bb8e21dbd404250599781",
     "outputSchemaSha256": "ca725b35345fa9d4316a6e08e45b7f3a3c7c7833def4ea0b669b4c4d39dfba1e"
   },
   "status": 200,
