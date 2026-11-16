@@ -10,6 +10,7 @@ import { radius } from '../../theme/radius';
 import { layoutV2, typeV2 } from '../../theme/v2';
 import { Tap } from '../v2/Tap';
 import { t } from '../../i18n';
+import type { SittingEnded } from '../../lib/sitting';
 
 /** Height of the chip (it sits in the reader's control capsule). */
 export const TIMER_CHIP_SIZE = 36;
@@ -20,7 +21,7 @@ interface TimerChipProps {
   /** Crowded: the clock without its icon. */
   compact?: boolean;
   /** Passed to the card's controls: how a saved session is told, and what runs before End (REC-1). */
-  onSaved?: (date: string, seconds: number, ended: { pages: number[] }) => void;
+  onSaved?: (date: string, seconds: number, ended: SittingEnded) => void;
   beforeEnd?: () => Promise<void>;
 }
 

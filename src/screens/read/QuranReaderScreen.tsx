@@ -5,9 +5,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MushafPager, MushafPagerHandle } from '../../components/MushafPager';
 import { MushafScrubber } from '../../components/MushafScrubber';
 import { useVerseActions } from '../../components/verse/useVerseActions';
-import { navigateToActivityDay } from '../../navigation/navigationRef';
 import { RecordingSavedToast, SavedRecording } from '../../components/recordings/RecordingSavedToast';
-import { releaseUpload } from '../../lib/recordings';
 import { UndoToast } from '../../components/revision/UndoToast';
 import { HELP_ICON, HelpButton } from '../../components/help/HelpButton';
 import { HelpToast } from '../../components/help/HelpToast';
@@ -39,7 +37,8 @@ import { firstSurahOnPage, toAyahRef } from '../../lib/verses';
 import { ayahKey, ayahOf, ayahsBetween, suraOf } from '../../lib/ayahKeys';
 import { AyahRef, ayahRects } from '../../lib/ayahBounds';
 import { useMushafEdition } from '../../lib/mushafEdition';
-import { sittingSavedText, sittingsEnabled } from '../../lib/sitting';
+import { SavedSitting, SittingEnded, sittingSavedText, sittingsEnabled } from '../../lib/sitting';
+import { SittingSavedToast } from '../../components/timer/SittingSavedToast';
 import type { ReadStackParamList } from '../../navigation/MainNavigator';
 import { reciteLiveEnabled } from '../../lib/reciteLive/availability';
 import { premiumErrorText, setDevPremium, supportLinkUrl, usePremium } from '../../lib/premium';
@@ -135,10 +134,12 @@ export default function QuranReaderScreen() {
   // After ending a recording: "Recording saved · Undo · View" (View opens it in Activity).
   const [savedRecording, setSavedRecording] = useState<SavedRecording | null>(null);
   // A sitting (REC-1): ending the timer ends a recording running with it, and one note says what
-  // was saved ("Saved to today: Al-Mulk, ayahs 1–26, 41 min · View").
+  // was saved ("Saved to today: Al-Mulk, ayahs 1–26, 41 min · Undo · View").
   const sittings = sittingsEnabled(user);
   const endingSitting = useRef(false);
-  const [sittingSaved, setSittingSaved] = useState<{ day: string; text: string } | null>(null);
+  const [sittingSaved, setSittingSaved] = useState<SavedSitting | null>(null);
+  // The recording that ended with the sitting, for its note's Undo (its upload waits meanwhile).
+  const sittingRecording = useRef<SavedSitting['recording']>(null);
   const recorder = useVoiceRecorder({
     kind: 'reading',
     day: today,
@@ -146,13 +147,14 @@ export default function QuranReaderScreen() {
     // Ended with the timer, the recording is told about in the sitting's note, not its own.
     onFinished: (info) => {
       if (!endingSitting.current) setSavedRecording(info);
-      // Its note is the sitting's, with no Undo: it uploads now.
-      else releaseUpload(info.recordingId);
+      // Its note is the sitting's, whose Undo takes it back too.
+      else sittingRecording.current = { recordingId: info.recordingId, undo: info.undo };
     },
   });
   const recordingOn = recorder.phase === 'recording' || recorder.phase === 'paused';
   const endRecordingWithTimer = useCallback(async () => {
     endingSitting.current = true;
+    sittingRecording.current = null;
     try {
       await recorder.finish();
     } finally {
@@ -160,9 +162,16 @@ export default function QuranReaderScreen() {
     }
   }, [recorder]);
   const onSittingSaved = useCallback(
-    (day: string, seconds: number, ended: { pages: number[] }) => {
+    (day: string, seconds: number, ended: SittingEnded) => {
       setSavedRecording(null);
-      setSittingSaved({ day, text: sittingSavedText({ day, today: today ?? day, pages: ended.pages, seconds }) });
+      const recording = sittingRecording.current;
+      sittingRecording.current = null;
+      setSittingSaved({
+        day,
+        text: sittingSavedText({ day, today: today ?? day, pages: ended.pages, seconds }),
+        sessionId: ended.sessionId ?? null,
+        recording,
+      });
     },
     [today],
   );
@@ -716,19 +725,7 @@ export default function QuranReaderScreen() {
         bottomInset={insets.bottom - spacing.sm}
       />
 
-      <UndoToast
-        visible={!!sittingSaved}
-        message={sittingSaved?.text ?? ''}
-        actionLabel="View"
-        duration={6000}
-        onUndo={() => {
-          const saved = sittingSaved;
-          setSittingSaved(null);
-          if (saved) navigateToActivityDay(saved.day);
-        }}
-        onDismiss={() => setSittingSaved(null)}
-        bottomInset={insets.bottom - spacing.sm}
-      />
+      <SittingSavedToast saved={sittingSaved} onClose={() => setSittingSaved(null)} bottomInset={insets.bottom - spacing.sm} />
 
       {liveOn ? (
         <UndoToast
