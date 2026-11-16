@@ -5,10 +5,10 @@
 import { placeOfPage } from '../passages';
 import type { RevoContext } from './types';
 import { passageLong, passageShort } from './words';
+import { t } from '../../i18n';
 
-/** "p. 548", "p. 548–549", "p. 12, 40". */
-export function pagesLabel(pages: readonly number[]): string {
-  if (pages.length === 0) return '';
+/** The page numbers in runs: "548–549", "12, 40". */
+function pageRuns(pages: readonly number[]): string {
   const sorted = [...pages].sort((a, b) => a - b);
   const runs: string[] = [];
   let start = sorted[0];
@@ -22,16 +22,21 @@ export function pagesLabel(pages: readonly number[]): string {
     start = p;
     prev = p;
   }
-  return `p. ${runs.join(', ')}`;
+  return runs.join(', ');
+}
+
+/** "p. 548", "p. 548–549", "p. 12, 40". */
+export function pagesLabel(pages: readonly number[]): string {
+  return pages.length === 0 ? '' : t('common.pageShort', { n: pageRuns(pages) });
 }
 
 /** The same at the start of a sentence: "Page 302", "Pages 548–549". */
 export function pagesLabelStart(pages: readonly number[]): string {
-  const label = pagesLabel(pages);
-  return label.replace(/^p\. /, pages.length > 1 ? 'Pages ' : 'Page ');
+  if (pages.length === 0) return '';
+  return t(pages.length > 1 ? 'revo.greeting.pagesStart' : 'revo.greeting.pageStart', { runs: pageRuns(pages) });
 }
 
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+const pageCount = (n: number) => t('common.pages', { count: n });
 
 /** The two (or one) pages coming up next. */
 function upNext(ctx: RevoContext): number[] {
@@ -139,21 +144,41 @@ function weakToLookAt(ctx: RevoContext): number[] {
 export function asides(ctx: RevoContext, extras: GreetingExtras): Aside[] {
   const out: Aside[] = [];
   const next = extras.next;
-  if (next) out.push({ kind: 'next', text: `${next.lead} starts at ${placeOfPage(next.first)}, ${plural(next.pages, 'page')}.`, chip: 'How do I revise ahead?' });
+  if (next) {
+    out.push({
+      kind: 'next',
+      text: t('revo.greeting.nextStarts', { lead: next.lead, place: placeOfPage(next.first), pages: pageCount(next.pages) }),
+      chip: t('revo.greeting.reviseAhead'),
+    });
+  }
   const weak = extras.strength === false ? [] : weakToLookAt(ctx);
-  if (weak.length > 0) out.push({ kind: 'weak', text: `${passageLong(weak)} is rated weak. Want a short plan for it?`, chip: `Plan ${passageShort(weak)}` });
+  if (weak.length > 0) {
+    out.push({
+      kind: 'weak',
+      text: t('revo.greeting.weakAside', { passage: passageLong(weak) }),
+      chip: t('revo.greeting.planChip', { passage: passageShort(weak) }),
+    });
+  }
   const weekPages = ctx.week.reduce((n, d) => n + d.pages, 0);
   const weekDays = ctx.week.filter((d) => d.pages > 0).length;
-  if (weekPages > 0) out.push({ kind: 'week', text: `This week you’ve revised ${plural(weekPages, 'page')} on ${plural(weekDays, 'day')}.`, chip: 'How was my week?' });
+  if (weekPages > 0) {
+    out.push({
+      kind: 'week',
+      text: t('revo.greeting.weekAside', { pages: pageCount(weekPages), days: t('common.days', { count: weekDays }) }),
+      chip: t('revo.greeting.howWasWeek'),
+    });
+  }
   const memorized = ctx.totals.memorizedPages;
   if (memorized > 0) {
     out.push({
       kind: 'memorized',
-      text: `You’ve memorized ${percentOfQuran(memorized)} of the Quran.`,
-      chip: extras.strength !== false && ctx.weakPages.length > 0 ? 'Which parts are weakest?' : 'How is my pace?',
+      text: t('revo.greeting.memorizedAside', { percent: percentOfQuran(memorized) }),
+      chip: extras.strength !== false && ctx.weakPages.length > 0 ? t('revo.greeting.weakest') : t('revo.greeting.pace'),
     });
   }
-  if (ctx.totals.streakDays > 1) out.push({ kind: 'streak', text: `You’re on a ${ctx.totals.streakDays}-day streak.`, chip: 'How is my pace?' });
+  if (ctx.totals.streakDays > 1) {
+    out.push({ kind: 'streak', text: t('revo.greeting.streakAside', { n: ctx.totals.streakDays }), chip: t('revo.greeting.pace') });
+  }
   return out;
 }
 
@@ -168,7 +193,7 @@ interface Opening {
  * name (Majd, Nov 8 2026: "revos greeting should be Assalamu alaikum not just salam").
  */
 export function revoHello(name: string | null): string {
-  return name ? `Assalamu alaikum, ${name}.` : 'Assalamu alaikum.';
+  return name ? t('revo.greeting.hello', { name }) : t('revo.greeting.helloNoName');
 }
 
 /** `open` counts the opens before this one, today, in the same state (0: the first; nextOpens). */
@@ -182,44 +207,53 @@ function opening(name: string | null, ctx: RevoContext, open: number, extras: Gr
   if (plannedPages === 0) {
     const a = open > 0 ? turn(extra.filter((x) => x.kind !== 'streak')) : null;
     if (a) return { text: `${hello} ${a.text}`, chip: a.chip };
-    return { text: `${hello} Nothing is planned for today. Ask me about your progress, your weak spots or your plan.`, chip: null };
+    return { text: `${hello} ${t('revo.greeting.nothingPlanned')}`, chip: null };
   }
   if (done) {
     // "Done" once, on the first open after today is done; then what's ahead, in turn.
     if (open > 0) {
       const a = turn(extra.filter((x) => x.kind !== 'streak'));
-      return a ? { text: `${hello} ${a.text}`, chip: a.chip } : { text: `${hello} Ask me anything about your revision.`, chip: null };
+      return a ? { text: `${hello} ${a.text}`, chip: a.chip } : { text: `${hello} ${t('revo.greeting.askAnything')}`, chip: null };
     }
     const count = extras.doneCount ?? plannedPages;
-    const streak = ctx.totals.streakDays > 1 ? ` That’s a ${ctx.totals.streakDays}-day streak.` : '';
-    const doneLine = count === plannedPages ? `Today’s ${plural(plannedPages, 'page')} are done.` : `Today is done, with ${plural(count, 'page')} revised.`;
-    return { text: `${hello} ${doneLine}${streak} Ask me anything about your revision.`, chip: 'What should I revise next?' };
+    const streak = ctx.totals.streakDays > 1 ? t('revo.greeting.streakDone', { n: ctx.totals.streakDays }) : '';
+    const doneLine =
+      count === plannedPages
+        ? t('revo.greeting.doneAll', { pages: pageCount(plannedPages) })
+        : t('revo.greeting.doneWith', { pages: pageCount(count) });
+    return {
+      text: [hello, doneLine, streak, t('revo.greeting.askAnything')].filter(Boolean).join(' '),
+      chip: t('revo.greeting.whatNext'),
+    };
   }
   const next = upNext(ctx);
   const weakNext = extras.strength === false ? [] : next.filter((p) => ctx.today.weakNext.includes(p));
   const nextLine =
     revisedPages > 0
-      ? `You’re ${plural(revisedPages, 'page')} into today, and ${passageLong(next, { sentence: true })} is next.`
-      : `Today is ${plural(plannedPages, 'page')}, starting at ${placeOfPage(next[0])}.`;
+      ? t('revo.greeting.intoToday', { pages: pageCount(revisedPages), next: passageLong(next, { sentence: true }) })
+      : t('revo.greeting.todayIs', { pages: pageCount(plannedPages), place: placeOfPage(next[0]) });
   // Today's line always: where today stands is the moment. What follows it changes on a second open.
   const weakOffer: Aside | null =
     weakNext.length > 0
       ? {
           kind: 'weak',
           // All of what's next is weak: "It's"; some of it: name that part.
-          text: `${revisedPages > 0 && weakNext.length === next.length ? 'It’s' : `${passageLong(weakNext)} is`} rated weak. Want a short plan for it?`,
-          chip: `Plan ${passageShort(weakNext)}`,
+          text:
+            revisedPages > 0 && weakNext.length === next.length
+              ? t('revo.greeting.itsWeak')
+              : t('revo.greeting.weakAside', { passage: passageLong(weakNext) }),
+          chip: t('revo.greeting.planChip', { passage: passageShort(weakNext) }),
         }
       : null;
   if (open === 0) {
     if (weakOffer) return { text: `${hello} ${nextLine} ${weakOffer.text}`, chip: weakOffer.chip };
-    return { text: `${hello} ${nextLine} Ask me anything about your revision.`, chip: null };
+    return { text: `${hello} ${nextLine} ${t('revo.greeting.askAnything')}`, chip: null };
   }
   // While today isn't done, tomorrow and other weak parts would pull away from it: the week, the
   // memorized share and the streak take turns.
   const a = turn(extra.filter((x) => x.kind !== 'weak' && x.kind !== 'next'));
   if (a) return { text: `${hello} ${nextLine} ${a.text}`, chip: a.chip };
-  return { text: `${hello} ${nextLine} Ask me anything about your revision.`, chip: weakOffer?.chip ?? null };
+  return { text: `${hello} ${nextLine} ${t('revo.greeting.askAnything')}`, chip: weakOffer?.chip ?? null };
 }
 
 // Parts of the Qur'an by surah and juz, never page numbers (lib/revo/words over lib/passages).
@@ -233,10 +267,10 @@ export function revoChips(ctx: RevoContext, open = 0, extras: GreetingExtras = {
   const lead = opening(null, ctx, open, extras).chip;
   const strength = extras.strength !== false;
   const weakNext = strength ? upNext(ctx).filter((p) => ctx.today.weakNext.includes(p)) : [];
-  if (lead && lead !== 'What should I revise next?') out.push(lead);
-  if (weakNext.length > 0) out.push(`Plan ${passageShort(weakNext)}`);
-  else if (strength && ctx.weakPages.length > 0) out.push('Which parts are weakest?');
-  out.push('How was my week?');
-  out.push(todayDone(ctx) ? 'What should I revise next?' : 'How is my pace?');
+  if (lead && lead !== t('revo.greeting.whatNext')) out.push(lead);
+  if (weakNext.length > 0) out.push(t('revo.greeting.planChip', { passage: passageShort(weakNext) }));
+  else if (strength && ctx.weakPages.length > 0) out.push(t('revo.greeting.weakest'));
+  out.push(t('revo.greeting.howWasWeek'));
+  out.push(todayDone(ctx) ? t('revo.greeting.whatNext') : t('revo.greeting.pace'));
   return [...new Set(out)].slice(0, 3);
 }

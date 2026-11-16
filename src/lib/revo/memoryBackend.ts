@@ -8,6 +8,7 @@ import { RevoError } from './backend';
 import { pagesLabel } from './greeting';
 import { REVO_DAILY_QUESTIONS, type RevoChat, type RevoContext, type RevoMemoryItem, type RevoMessage, type RevoSettings } from './types';
 
+// i18n-ignore-start (a stand-in for the server in component tests: its fixed answers aren't the app's text)
 type Listener<T> = (v: T) => void;
 
 export function createMemoryRevoBackend(opts: { now?: () => number; optIn?: boolean } = {}): RevoBackend & {
@@ -170,3 +171,4 @@ export function createMemoryRevoBackend(opts: { now?: () => number; optIn?: bool
   };
   return backend;
 }
+// i18n-ignore-end

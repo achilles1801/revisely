@@ -6,7 +6,7 @@ import { journalFirstDay } from '../../lib/journal';
 import { useTheme } from '../../context/ThemeContext';
 import { knownChart, passagePagesOf, plannedOf, recencyLine, tableRows } from '../../lib/revo/charts';
 import { dayFacts, passageFacts, passagePreview, prepare, type FactSources } from '../../lib/revo/facts';
-import { SCREEN_BUTTON } from '../../lib/revo/screens';
+import { screenButton } from '../../lib/revo/screens';
 import { smartTrackingOn } from '../../lib/smartTracking';
 import type { RevoAction, RevoVisual } from '../../lib/revo/types';
 import { PillButton } from '../v2/PillButton';
@@ -119,7 +119,7 @@ export function ChartCard({ chart, day, sources, ...handlers }: { chart: RevoVis
 }
 
 /** The card's button: for a screen, what it opens (lib/revo/screens). */
-const actionButton = (a: RevoAction) => (a.kind === 'openScreen' ? SCREEN_BUTTON[a.screen] : t(`revo.card.${a.kind}`));
+const actionButton = (a: RevoAction) => (a.kind === 'openScreen' ? screenButton(a.screen) : t(`revo.card.${a.kind}`));
 
 const ACTION_ICON: Record<RevoAction['kind'], keyof typeof Ionicons.glyphMap> = {
   reviseFirst: 'calendar-outline',

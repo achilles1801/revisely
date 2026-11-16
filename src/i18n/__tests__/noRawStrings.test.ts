@@ -44,6 +44,7 @@ const EXTRACTED: string[] = [
   'lib/prayer',
   'lib/recite',
   'lib/reminders',
+  'lib/revo',
   'lib/updates',
   'lib/widgets',
   'navigation',
@@ -56,6 +57,17 @@ const EXTRACTED: string[] = [
   'screens/revision',
   'services',
 ];
+
+/**
+ * Files inside an extracted folder that wait for a design of their own, and why. Their text still
+ * counts in the progress report.
+ */
+const WAITING: Record<string, string> = {
+  'lib/revo/openers.ts':
+    'Revo’s first lines are built from English sentence parts (a day’s “on”/bare forms, “both pages”, “you” added or not): Arabic needs a module of its own with the same signature, as lib/help will.',
+  'lib/revo/charts.ts':
+    'Its readouts lean on lib/recency’s words (timesWord, recencyWords) and English grammar: it goes with lib’s own files.',
+};
 
 describe('UI text comes from src/i18n', () => {
   it('reads words as words and ids as ids', () => {
@@ -108,7 +120,9 @@ describe('UI text comes from src/i18n', () => {
   });
 
   it('every extracted folder has no UI text of its own', () => {
-    const found = rawStringsUnder(SRC, EXTRACTED).map((r) => `src/${r.file}:${r.line}  ${r.text}`);
+    const found = rawStringsUnder(SRC, EXTRACTED)
+      .filter((r) => !WAITING[r.file])
+      .map((r) => `src/${r.file}:${r.line}  ${r.text}`);
     if (found.length) {
       // eslint-disable-next-line no-console
       console.error(
@@ -123,6 +137,7 @@ describe('UI text comes from src/i18n', () => {
     for (const scope of EXTRACTED) {
       expect([scope, fs.existsSync(path.join(SRC, scope.replace(/\/\*$/, '')))]).toEqual([scope, true]);
     }
+    for (const file of Object.keys(WAITING)) expect([file, fs.existsSync(path.join(SRC, file))]).toEqual([file, true]);
   });
 
   // I18N_PROGRESS=1 prints what is left: strings per folder, then per file for a folder named in

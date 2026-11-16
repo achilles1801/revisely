@@ -25,6 +25,7 @@ export const common = {
   pageShort: 'p. {{n}}',
   page: 'Page',
   today: 'Today',
+  yesterday: 'Yesterday',
   tomorrow: 'Tomorrow',
   edit: 'Edit',
   search: 'Search',
@@ -38,6 +39,9 @@ export const common = {
   juzRange: 'Juz {{from}}–{{to}}',
   /** "Juz 3, 7": the numbers already joined. */
   juzList: 'Juz {{list}}',
+  /** A count of days: "1 day", "14 days". */
+  days_one: '{{count}} day',
+  days_other: '{{count}} days',
   juzCount_one: '{{count}} juz',
   juzCount_other: '{{count}} juz',
   tryAgain: 'Try again',

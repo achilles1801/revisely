@@ -4,6 +4,7 @@
 
 import { getJuzForPage } from '../quranData';
 import { describeAyahs, describePassage, describePagesToRevise, placeOfPageToRevise, plainText, type PartialPages, type PassageOptions } from '../passages';
+import { t } from '../../i18n';
 
 /** For labels (a chip, a chart's row, a picker row): "Al-Hashr 17–24", "Juz 28", "Al-Hashr to Al-Mumtahanah". */
 export function passageShort(pages: readonly number[]): string {
@@ -21,7 +22,7 @@ export function juzOf(pages: readonly number[]): string {
   const juz = pages.map(getJuzForPage);
   const lo = Math.min(...juz);
   const hi = Math.max(...juz);
-  return lo === hi ? `Juz ${lo}` : `Juz ${lo}–${hi}`;
+  return lo === hi ? t('common.juzN', { n: lo }) : t('common.juzRange', { from: lo, to: hi });
 }
 
 // What the server takes for a worded part (functions/src/revo/validate.ts passageText): one short

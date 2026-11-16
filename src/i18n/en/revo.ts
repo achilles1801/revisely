@@ -181,4 +181,103 @@ export const revo = {
     missed: 'Missed',
     noPlan: 'No plan',
   },
+  /** lib/revo/screens: the card's button for each screen Revo can open (REVO-31). */
+  screens: {
+    jumpTo: 'Open Jump to',
+    planEditor: 'Edit schedule',
+    memorized: 'Open memorized pages',
+    activity: 'Open Activity',
+    // Testers' Insights are a tab at the top of Activity.
+    insights: 'Open Activity',
+    dailyLog: 'Open the daily log',
+    settings: 'Open Settings',
+    prayerTimes: 'Show prayer times',
+    qibla: 'Find the Qibla',
+    reader: 'Open in the reader',
+  },
+  /** When Revo is back after the day's questions. */
+  back: {
+    midnight: 'Back at midnight',
+    midnightLong: 'Revo is back at midnight.',
+    fajr: 'Back after Fajr',
+    fajrLong: 'Revo is back after Fajr, at {{time}}.',
+  },
+  /** Revo's answer failed. */
+  errors: {
+    unavailable: 'Revo couldn’t answer. Try again.',
+    offline: 'You’re offline. Revo needs the internet.',
+    signIn: 'Revo couldn’t check your sign-in. Try again.',
+    busy: 'Revo is busy. Try again in a moment.',
+  },
+  /** A chat in History whose plan was added: "9:52 PM · plan added". */
+  planAdded: 'plan added',
+  /** What goes with a question: its chip's label. */
+  attach: {
+    /** "Today · Tue 3 Nov". */
+    today: 'Today · {{day}}',
+    yesterday: 'Yesterday · {{day}}',
+    withNotes_one: '{{label}} · {{count}} note',
+    withNotes_other: '{{label}} · {{count}} notes',
+    /** "Recording · Tue 3 Nov, 9:52 PM". */
+    recording: 'Recording · {{day}}, {{time}}',
+    coverage: 'Coverage',
+    consistency: 'Consistency',
+    weakSpots: 'Weak spots',
+    pace: 'Pace',
+    recitation: 'Recitation',
+    /** A search for ayahs: "Al-Mulk, ayah 5", "Al-Mulk, ayahs 1–12". */
+    ayah: '{{name}}, ayah {{a}}',
+    ayahs: '{{name}}, ayahs {{a}}–{{b}}',
+    /** A recitation take whose ayahs can't be named. */
+    take: 'A take',
+  },
+  /** A row's line in the + sheet: what the data says before it is added. */
+  preview: {
+    notMemorized: 'Not memorized',
+    notRevised: 'Not revised in 30 days',
+    revisedTimes: 'Revised {{n}}× in 30 days',
+    partly: 'Partly revised in 30 days',
+    weakSpots_one: '{{count}} weak spot',
+    weakSpots_other: '{{count}} weak spots',
+    memorizedOf: '{{n}} of {{total}} pages memorized',
+    /** A day: "12 of 20 pages · 25 min · includes 2 notes". */
+    ofPages: '{{done}} of {{pages}}',
+    pagesRevised: '{{pages}} revised',
+    recordings_one: '{{count}} recording',
+    recordings_other: '{{count}} recordings',
+    includesNotes_one: 'includes {{count}} note',
+    includesNotes_other: 'includes {{count}} notes',
+  },
+  /**
+   * lib/revo/greeting: Revo's first line and suggestions (REVO-20, REVO-35), whole sentences joined
+   * with a space after the hello. A suggestion is asked as written when tapped.
+   */
+  greeting: {
+    hello: 'Assalamu alaikum, {{name}}.',
+    helloNoName: 'Assalamu alaikum.',
+    /** "Pages 548–549", "Page 302": the pages at the start of a sentence. */
+    pagesStart: 'Pages {{runs}}',
+    pageStart: 'Page {{runs}}',
+    /** "Tomorrow starts at Al-Mulk, 20 pages." */
+    nextStarts: '{{lead}} starts at {{place}}, {{pages}}.',
+    weakAside: '{{passage}} is rated weak. Want a short plan for it?',
+    itsWeak: 'It’s rated weak. Want a short plan for it?',
+    weekAside: 'This week you’ve revised {{pages}} on {{days}}.',
+    memorizedAside: 'You’ve memorized {{percent}} of the Quran.',
+    streakAside: 'You’re on a {{n}}-day streak.',
+    nothingPlanned: 'Nothing is planned for today. Ask me about your progress, your weak spots or your plan.',
+    askAnything: 'Ask me anything about your revision.',
+    streakDone: 'That’s a {{n}}-day streak.',
+    doneAll: 'Today’s {{pages}} are done.',
+    doneWith: 'Today is done, with {{pages}} revised.',
+    intoToday: 'You’re {{pages}} into today, and {{next}} is next.',
+    todayIs: 'Today is {{pages}}, starting at {{place}}.',
+    /** Suggestions. */
+    reviseAhead: 'How do I revise ahead?',
+    planChip: 'Plan {{passage}}',
+    howWasWeek: 'How was my week?',
+    weakest: 'Which parts are weakest?',
+    pace: 'How is my pace?',
+    whatNext: 'What should I revise next?',
+  },
 } as const;

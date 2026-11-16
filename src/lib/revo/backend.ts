@@ -26,6 +26,7 @@ import type {
   RevoRefusal,
   RevoSettings,
 } from './types';
+import { t } from '../../i18n';
 
 export interface RevoBackend {
   watchSettings(uid: string, cb: (s: RevoSettings) => void): () => void;
@@ -55,11 +56,19 @@ export class RevoError extends Error {
 }
 
 export const REVO_MESSAGES = {
-  unavailable: 'Revo couldn’t answer. Try again.',
-  offline: 'You’re offline. Revo needs the internet.',
-  signIn: 'Revo couldn’t check your sign-in. Try again.',
-  busy: 'Revo is busy. Try again in a moment.',
-} as const;
+  get unavailable() {
+    return t('revo.errors.unavailable');
+  },
+  get offline() {
+    return t('revo.errors.offline');
+  },
+  get signIn() {
+    return t('revo.errors.signIn');
+  },
+  get busy() {
+    return t('revo.errors.busy');
+  },
+};
 
 /** A failure of the connection itself (fetch, or Auth refreshing the token), not an answer. */
 function isNetworkFailure(err: unknown): boolean {
@@ -219,7 +228,7 @@ const firebaseRevo: RevoBackend = {
   },
   async setActionState(uid, chatId, messageId, state) {
     await updateDoc(doc(db, 'users', uid, 'revoChats', chatId, 'messages', messageId), { actionState: state });
-    if (state === 'added') await updateDoc(doc(db, 'users', uid, 'revoChats', chatId), { meta: 'plan added' });
+    if (state === 'added') await updateDoc(doc(db, 'users', uid, 'revoChats', chatId), { meta: 'plan added' }); // i18n-ignore (the stored mark: firestore.rules allow only it; History shows it in words)
   },
   async deleteMemory(uid, id) {
     await deleteDoc(doc(db, 'users', uid, 'revoMemory', id));
