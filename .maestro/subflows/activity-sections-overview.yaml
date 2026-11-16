@@ -1,0 +1,41 @@
+# Edit sections on Overview (ACT-29; the account is a tester), from anywhere on Activity: the editor (the calendar
+# always shown), then Overview without its key. Last in a flow: the layout stays on the phone.
+#   env THEME  light or dark (in the screenshots' names)
+# Screenshots 09-activity-sections-overview-<THEME> and 09-activity-sections-overview-edited-<THEME>.
+appId: com.revisionbuddy.app
+---
+- scrollUntilVisible:
+    element:
+      id: activity-edit-sections
+    direction: UP
+    timeout: 20000
+- tapOn:
+    id: pill-calendar
+- extendedWaitUntil:
+    visible:
+      id: calendar-legend
+    timeout: 10000
+- tapOn:
+    id: activity-edit-sections
+- extendedWaitUntil:
+    visible:
+      id: sections-item-key
+    timeout: 10000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-activity-sections-overview-${THEME}
+- tapOn:
+    id: sections-item-key
+- tapOn:
+    id: sections-done
+- extendedWaitUntil:
+    notVisible:
+      id: sections-done
+    timeout: 10000
+- assertNotVisible:
+    id: calendar-legend
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-activity-sections-overview-edited-${THEME}

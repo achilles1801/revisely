@@ -34,6 +34,7 @@ import { pushBackLine, type PushBack } from '../../lib/gapsCycle';
 
 /** The Days switch, kept on the phone: '1' shows every length in exact days. */
 export const GAPS_IN_DAYS_KEY = 'insights.gapsInDays';
+import { useFirstSection } from './sectionPlace';
 
 /** The strip's height, where its line runs, and the gap labels' size. */
 const STRIP_H = 48;
@@ -93,6 +94,8 @@ function Gaps({ view, all, firstDay, onOpenDay, onOpenCalendar, pushBack, ...pro
     AsyncStorage.setItem(GAPS_IN_DAYS_KEY, next ? '1' : '0').catch(() => undefined);
   };
   const switchable = gapsHaveNatural(view) || (pushBack != null && naturalDiffers(pushBack.days));
+  // The first section shown has no hairline above it (ACT-29).
+  const first = useFirstSection();
   // A range longer than the account counts from its first day, and says so (ACT-22): "since 2 November".
   const since = !all && firstDay && view.strip.days[0] === firstDay.slice(0, 10) ? t('insights.gaps.since', { date: gapDate(firstDay, 'long') }) : null;
   const inWords = since ?? props.inWords;
@@ -117,7 +120,7 @@ function Gaps({ view, all, firstDay, onOpenDay, onOpenCalendar, pushBack, ...pro
   );
 
   return (
-    <View style={[styles.section, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.separator }]} testID="insights-gaps">
+    <View style={[styles.section, !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.separator }]} testID="insights-gaps">
       <View style={styles.head}>
         <View style={styles.flex}>
           <ChromeText style={[styles.title, { color: palette.text }]} accessibilityRole="header">

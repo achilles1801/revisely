@@ -277,11 +277,12 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'For testers',
-    covers: ['RESET-2', 'RESET-3'],
-    routes: ['Settings'],
+    covers: ['RESET-2', 'RESET-3', 'ACT-29'],
+    routes: ['Settings', 'Activity'],
     text: lines(
       '- Testers (TestFlight or Google Play testing, marked by the Revisely team) get Settings → Testing, the hidden page in sessions (the eye button at the top, with the Madani 1405 mushaf: recite from memory; following the recitation word by word needs “Speech model” on an iPhone), and updates early.',
       '- “Reset my data” (type RESET): a backup is kept, then the account starts again as new, still signed in; not again within 10 minutes. “Load test scenario” replaces the data with a ready-made situation the same way.',
+      '- Testers can arrange Activity: “Edit sections” (the icon at the end of the Overview and Insights tabs) shows, hides and reorders the tab’s sections (hold one, then drag); “Show all, in the usual order” puts it back. Kept on this phone.',
     ),
   },
   {
