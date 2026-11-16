@@ -33,6 +33,8 @@ const EXTRACTED: string[] = [
   'lib/updates',
   'lib/widgets',
   'navigation',
+  'screens/auth',
+  'screens/onboarding',
   'screens/prayer',
   'services',
 ];

@@ -15,6 +15,7 @@ import { HeroGlow } from '../../components/v2/HeroGlow';
 import { PillButton } from '../../components/v2/PillButton';
 import { useTheme } from '../../context/ThemeContext';
 import { arabicV2, layoutV2, typeV2 } from '../../theme/v2';
+import { t } from '../../i18n';
 
 type NavigationProp = NativeStackNavigationProp<OnboardingStackParamList, 'Welcome'>;
 
@@ -74,21 +75,22 @@ export default function WelcomeScreen() {
             accessibilityRole="header"
             maxFontSizeMultiplier={1.6}
           >
-            Your Quran,{'\n'}
+            {t('onboarding.welcome.title')}
+            {'\n'}
             <Text style={{ color: palette.accentText }} testID="welcome-accent">
-              remembered
+              {t('onboarding.welcome.accent')}
             </Text>
             .
           </Animated.Text>
           <Animated.Text style={[typeV2.body, v2.center, v2.subtext, { color: palette.secondary }, subtextAnim]}>
-            A personal revision companion. Track what you've memorized, review at the right moment, and never lose a page.
+            {t('onboarding.welcome.body')}
           </Animated.Text>
         </View>
       </ScrollView>
 
       <Animated.View style={[v2.footer, buttonAnim]}>
         <PillButton
-          title="Begin"
+          title={t('onboarding.welcome.begin')}
           size="lg"
           onPress={() => navigation.navigate('JourneySelect')}
           testID="welcome-begin"
