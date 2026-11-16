@@ -61,18 +61,7 @@ appId: com.revisionbuddy.app
       SUFFIX: ""
 
 # The same in dark: Revo's sheet down, Settings → Theme → Dark, Revo again.
-- repeat:
-    while:
-      visible:
-        id: revo-sheet-handle
-    times: 3
-    commands:
-      - swipe:
-          from:
-            id: revo-sheet-handle
-          direction: DOWN
-      - waitForAnimationToEnd:
-          timeout: 1500
+- runFlow: ../subflows/revo-close.yaml
 - runFlow:
     file: ../subflows/theme.yaml
     env:

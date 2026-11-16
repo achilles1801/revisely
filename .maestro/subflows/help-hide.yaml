@@ -1,0 +1,19 @@
+# Taps "Hide help buttons", the last row of an open help sheet, once the sheet's list is scrolled to its end.
+#   env SCREEN: the help's screen (home), as in its id help-sheet-<screen>
+# On an iPhone SE Home's sheet is taller than the screen: the row (y 569–613) is under the list's bottom edge
+# (about 589, above the Done bar), and the tap at its middle landed below the list, where nothing takes it
+# (SE run 43873599186, 14-help, both attempts). The accessibility tree doesn't clip it, so Maestro counts it
+# as wholly visible.
+# A drag up on the list brings it into view; where the sheet fits (the Pro), nothing moves.
+appId: com.revisionbuddy.app
+---
+# The sheet slides up; a tap or a drag while it moves can miss (iOS).
+- waitForAnimationToEnd
+- swipe:
+    from:
+      id: help-sheet-${SCREEN}
+    direction: UP
+- waitForAnimationToEnd:
+    timeout: 2000
+- tapOn:
+    id: help-hide
