@@ -1,4 +1,4 @@
-// Revo and Insights' Gaps (ACT-28, ACT-29; REVO-30): what the app sends from Revisely Dev (lib/revo/gaps) is always
+// Revo and Insights' Gaps (ACT-28, ACT-30; REVO-30): what the app sends from Revisely Dev (lib/revo/gaps) is always
 // what the server takes (validateGaps), only beside `app: 'dev'`, and the context says it in words.
 
 import fc from 'fast-check';
@@ -24,7 +24,7 @@ const user = {
 } as unknown as User;
 
 describe('Revo and Gaps', () => {
-  it('[ACT-28] [ACT-29] what Revisely Dev sends, the server takes; it names when each memorized surah was last revised', () => {
+  it('[ACT-28] [ACT-30] what Revisely Dev sends, the server takes; it names when each memorized surah was last revised', () => {
     fc.assert(
       fc.property(
         fc.uniqueArray(fc.integer({ min: 1, max: 604 }), { minLength: 1, maxLength: 40 }),

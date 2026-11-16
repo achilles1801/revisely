@@ -331,7 +331,7 @@ const MAX_GAP_DAYS = 10_000;
 const SURAH_COUNT = 114;
 const MAX_SURAH_NAME = 40;
 
-/** Insights' Gaps (ACT-28, ACT-29), checked: bounded counts, a full revision late only with pages late, every surah named. */
+/** Insights' Gaps (ACT-28, ACT-30), checked: bounded counts, a full revision late only with pages late, every surah named. */
 export function validateGaps(v: unknown, path: string): RevoGaps {
   const g = obj(v, path);
   keys(g, ['lastRevisedDaysAgo', 'longestGap', 'usualStepDays', 'longGaps', 'fullRevision', 'surahs'], path);

@@ -59,7 +59,7 @@ export interface RevoContext {
    */
   recitation?: RevoRecitation;
   /**
-   * Insights' Gaps and Last revised (BEHAVIOUR.md ACT-28, ACT-29), from Revisely Dev only (with `app: 'dev'`), from
+   * Insights' Gaps and Last revised (BEHAVIOUR.md ACT-28, ACT-30), from Revisely Dev only (with `app: 'dev'`), from
    * Nov 16 2026: the app's lib/revo/gaps, checked in validate.ts and written out by gaps.ts.
    */
   gaps?: RevoGaps;

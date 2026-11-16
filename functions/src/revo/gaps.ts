@@ -1,4 +1,4 @@
-// Insights' Gaps and Last revised in Revo's context (BEHAVIOUR.md ACT-28, ACT-29), from Revisely Dev only: the
+// Insights' Gaps and Last revised in Revo's context (BEHAVIOUR.md ACT-28, ACT-30), from Revisely Dev only: the
 // figures the section and the screen show, in plain words for the model (days here; the Dev guide tells Revo to say
 // long lengths as the app does, in weeks or months, and exact days when asked).
 

@@ -366,7 +366,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'Gaps and Last revised',
-    covers: ['ACT-28', 'ACT-29'],
+    covers: ['ACT-28', 'ACT-30'],
     routes: ['Activity', 'LastRevised', 'QuranReader'],
     text: lines(
       '- Activity → Insights → “Gaps”, after Consistency: how long they go between revisions, over the Insights range. A revision day is a day with a page revised (a session, pages revised ahead, pages logged as revised elsewhere), on the revision day Activity files it under; reading and memorizing don’t count. A gap is the days from one revision day to the next: Monday then Thursday is 3 days, and revising every day leaves none.',
