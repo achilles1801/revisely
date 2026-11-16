@@ -727,6 +727,8 @@ describe('`off`: something else said where the next word goes (contract draft 7;
     expect(seek(on, 200).off).toBeNull();
     expect(apply(on, { type: 'done', result: { v: 2, take: 't', from: 100, to: 110, secs: 9, marks: [], score: null } }).off).toBeNull();
     expect(apply(on, { type: 'error', reason: 'server' }).off).toBeNull();
+  });
+});
 
 describe('protocol 7: where the start was found', () => {
   it('locked carries where (page or quran); anything else is left out', () => {
