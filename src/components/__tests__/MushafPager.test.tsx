@@ -461,6 +461,12 @@ describe('<MushafPager /> a verse’s highlight', () => {
   });
 });
 
+// The list lays itself out (the size the phone gives the pager).
+function layOut(width: number, height: number) {
+  const list = screen.UNSAFE_getByType(FlatList);
+  act(() => list.props.onLayout({ nativeEvent: { layout: { x: 0, y: 0, width, height } } }));
+}
+
 describe('<MushafPager /> how the page image is decoded (#153)', () => {
   afterEach(() => {
     mockPageImageProps = {};
@@ -469,12 +475,49 @@ describe('<MushafPager /> how the page image is decoded (#153)', () => {
   it('on Android, draws the width-sized copy as decoded (no Fresco downsampling)', () => {
     mockPageImageProps = { resizeMethod: 'none' };
     render(<MushafPager pages={[50]} />);
+    layOut(393, 760);
     expect(screen.getByTestId('page-image').props.resizeMethod).toBe('none');
   });
 
   it('on iOS, leaves the image as it was', () => {
     render(<MushafPager pages={[50]} />);
+    layOut(393, 760);
     expect(screen.getByTestId('page-image').props.resizeMethod).toBeUndefined();
+  });
+
+  // iOS decodes an image at the size it is laid out at. The page used to be drawn at a guess (the screen's width) until
+  // the pager had measured itself, then at its real size: on an iPhone 17 Pro the three pages on screen were decoded at
+  // 402×650, then again at 386×624, blank in between (seen frame by frame on the simulator, Nov 16 2026).
+  it('draws the image only once the pager has measured itself, at the page’s real size', () => {
+    render(<MushafPager pages={PAGES} initialPage={15} />);
+    // Not measured yet: the page is there (one element for VoiceOver), its image isn't.
+    expect(screen.getByLabelText('Page 15')).toBeTruthy();
+    expect(screen.queryByTestId('page-image')).toBeNull();
+    layOut(402, 626);
+    const size = fitPage(402, 626);
+    const images = screen.getAllByTestId('page-image');
+    expect(images.length).toBeGreaterThan(0);
+    for (const image of images) {
+      expect(StyleSheet.flatten(image.props.style)).toMatchObject({ width: size.width, height: size.height });
+    }
+  });
+});
+
+describe('<MushafPager /> the page stays mounted while the screen changes around it', () => {
+  // The reader passes pageAccessories only once its word data has loaded, which on the first open after launch is
+  // after the pages are on screen. The page used to be wrapped only when there were accessories, so their arrival
+  // remounted every page and each image loaded again, blank meanwhile (seen on the simulator, Nov 16 2026).
+  it('accessories arriving later keep the same image (no second load)', () => {
+    render(<MushafPager pages={PAGES} initialPage={15} />);
+    layOut(402, 626);
+    const before = screen.getAllByTestId('page-image');
+    screen.rerender(
+      <MushafPager pages={PAGES} initialPage={15} pageAccessories={(page) => <Text testID={`acc-${page}`}>mark</Text>} />,
+    );
+    expect(screen.getByTestId('acc-15')).toBeTruthy();
+    const after = screen.getAllByTestId('page-image');
+    expect(after).toHaveLength(before.length);
+    after.forEach((image, i) => expect(image).toBe(before[i]));
   });
 });
 
@@ -587,6 +630,7 @@ describe('<MushafPager /> page overlay and taps on verses', () => {
         }}
       />,
     );
+    layOut(393, 760);
     // The middle of 1:1 on page 1, in the image's frame.
     const [x0, y0, x1, y1] = [336, 163, 691, 226];
     fireEvent.press(screen.getByTestId('page-image'), {
@@ -622,6 +666,7 @@ describe('<MushafPager /> pages not on the phone', () => {
     mockCachedUri = 'file:///300.png';
     mockEvictKeeps = true;
     render(<MushafPager pages={[300]} />);
+    layOut(393, 760);
     const image = await screen.findByTestId('page-image');
     act(() => {
       image.props.onError();
@@ -636,6 +681,7 @@ describe('<MushafPager /> pages not on the phone', () => {
   it('a page moved while shown (first launch) is shown from where it went', async () => {
     mockCachedUri = 'cache/mushaf/300.png';
     render(<MushafPager pages={[300]} />);
+    layOut(393, 760);
     const image = await screen.findByTestId('page-image');
     mockCachedUri = 'documents/mushaf/full/300.png';
     act(() => {
@@ -647,6 +693,7 @@ describe('<MushafPager /> pages not on the phone', () => {
   it('says a page isn\'t downloaded yet when offline, and shows it once back online', async () => {
     setNetworkState({ connected: false, type: 'none' });
     render(<MushafPager pages={[300]} />);
+    layOut(393, 760);
     expect(await screen.findByTestId('page-missing')).toBeTruthy();
     expect(screen.getByText("Page 300 isn't downloaded yet")).toBeTruthy();
     expect(screen.queryByTestId('page-image')).toBeNull();
@@ -662,6 +709,7 @@ describe('<MushafPager /> pages not on the phone', () => {
   it('tries again from its button', async () => {
     setNetworkState({ connected: false, type: 'none' });
     render(<MushafPager pages={[300]} />);
+    layOut(393, 760);
     await screen.findByTestId('page-missing');
     mockCachedUri = 'file:///300.png';
     await act(async () => {
@@ -673,6 +721,7 @@ describe('<MushafPager /> pages not on the phone', () => {
   it('online, loads it from Storage; if that fails too, says so', async () => {
     setNetworkState({ connected: true, type: 'wifi' });
     render(<MushafPager pages={[300]} />);
+    layOut(393, 760);
     const image = await screen.findByTestId('page-image');
     expect(image.props.source).toEqual({ uri: 'https://x/p.png' });
     act(() => {
