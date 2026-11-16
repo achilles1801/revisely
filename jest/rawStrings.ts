@@ -86,6 +86,15 @@ function calleeText(call: ts.CallExpression | ts.NewExpression, sf: ts.SourceFil
   return ts.isNewExpression(call) ? `new ${text}` : text;
 }
 
+/** A prop that holds an id, a style or a name (an icon's, a screen's), never text. */
+function isIdProp(attr: ts.JsxAttribute, sf: ts.SourceFile): boolean {
+  const prop = attr.name.getText(sf);
+  // A thread row's name is the title it shows.
+  const element = attr.parent.parent;
+  if (prop === 'name' && element.tagName.getText(sf) === 'ThreadRow') return false;
+  return ID_PROPS.has(prop);
+}
+
 /** True when this string sits somewhere that only ever holds identifiers or developer text. */
 function inIdPlace(node: ts.Node, sf: ts.SourceFile): boolean {
   let child: ts.Node = node;
@@ -109,7 +118,7 @@ function inIdPlace(node: ts.Node, sf: ts.SourceFile): boolean {
     }
     if ((ts.isPropertyAssignment(p) || ts.isPropertyDeclaration(p)) && child === p.name) return true;
     if (ts.isPropertyAssignment(p) && ID_KEYS.has(p.name.getText(sf).replace(/['"]/g, ''))) return true;
-    if (ts.isJsxAttribute(p)) return ID_PROPS.has(p.name.getText(sf));
+    if (ts.isJsxAttribute(p)) return isIdProp(p, sf);
     if (ts.isCallExpression(p) || ts.isNewExpression(p)) {
       if (child === p.expression) continue;
       const callee = calleeText(p, sf);
@@ -165,7 +174,7 @@ export function rawStringsIn(file: string, text: string): RawString[] {
       if (/[A-Za-z]{2,}/.test(node.text)) add(node, node.text);
       return;
     }
-    if (ts.isJsxAttribute(node) && ID_PROPS.has(node.name.getText(sf))) return;
+    if (ts.isJsxAttribute(node) && isIdProp(node, sf)) return;
     const value = stringText(node);
     if (value != null) {
       if (readsAsText(value) && !inIdPlace(node, sf)) add(node, value);

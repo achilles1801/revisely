@@ -46,6 +46,7 @@ const EXTRACTED: string[] = [
   'lib/widgets',
   'navigation',
   'screens/auth',
+  'screens/journal',
   'screens/onboarding',
   'screens/prayer',
   'services',
@@ -84,6 +85,7 @@ describe('UI text comes from src/i18n', () => {
       "type K = 'Some Type';", // 16 a type
       "actions.push({ key: 'rate', label: 'Rate this page' });", // 17 pushed onto a list
       "navigation.push('Some Screen');", // 18 a route
+      'const j = <ThreadRow name="New entry" mark={<Ionicons name="add-outline" />} />;', // 19 a row's title
     ].join('\n');
     const lines = rawStringsIn('x.tsx', code).map((r) => `${r.line} ${r.text}`);
     expect(lines).toEqual([
@@ -96,6 +98,7 @@ describe('UI text comes from src/i18n', () => {
       '5 It can’t be undone.',
       '14 Close',
       '17 Rate this page',
+      '19 New entry',
     ]);
   });
 

@@ -65,15 +65,15 @@ import { Tap } from '../../components/v2/Tap';
 import type { HomeStackParamList } from '../../navigation/MainNavigator';
 import type { JournalEntry, JournalKind, JournalNote } from '../../types';
 import { JOURNAL_KIND_ICONS } from './journalKinds';
-import { formatTime } from '../../i18n';
+import { t, formatTime } from '../../i18n';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'JournalEntry'>;
 type ScreenRoute = RouteProp<HomeStackParamList, 'JournalEntry'>;
 
-const KIND_OPTIONS: { value: JournalKind; label: string }[] = [
-  { value: 'memorization', label: 'Memorized' },
-  { value: 'revision', label: 'Revised' },
-  { value: 'note', label: 'Note' },
+const kindOptions = (): { value: JournalKind; label: string }[] => [
+  { value: 'memorization', label: t('journal.kinds.memorization') },
+  { value: 'revision', label: t('journal.kinds.revision') },
+  { value: 'note', label: t('journal.kinds.note') },
 ];
 
 type Draft = { text: string; minutes: string; tag?: string | null; from?: string; to?: string };
@@ -84,11 +84,7 @@ const EMPTY_DRAFTS: Record<JournalKind, Draft> = {
   note: EMPTY_DRAFT,
 };
 
-const PLACEHOLDER: Record<JournalKind, string> = {
-  memorization: 'e.g. Al-Mulk, or pages 562–564',
-  revision: 'e.g. Maryam and Taha, or pages 305–321',
-  note: 'How did it go? Mistakes to watch, ayat to repeat…',
-};
+const placeholder = (kind: JournalKind): string => t(`journal.placeholder.${kind}`);
 
 /**
  * A day's log as a thread: each note is a row with its time and its ⋯ menu
@@ -280,10 +276,10 @@ export default function JournalEntryScreen() {
 
   // Guards the back button and (on native-stack) the swipe-back gesture.
   usePreventRemove(unsavedDraft && !saving, ({ data }) => {
-    Alert.alert('Discard changes?', "You haven't saved this note.", [
-      { text: 'Keep editing', style: 'cancel' },
+    Alert.alert(t('journal.discard.title'), t('journal.discard.body'), [
+      { text: t('journal.discard.keepEditing'), style: 'cancel' },
       {
-        text: 'Discard',
+        text: t('journal.discard.discard'),
         style: 'destructive',
         onPress: () => navigation.dispatch(data.action),
       },
@@ -314,9 +310,9 @@ export default function JournalEntryScreen() {
       .then((items) => {
         if (cancelled) return;
         setTagOptions([
-          ...(items.revisions.some((r) => r.countsFor === date) ? [{ tag: tagFor('revision', date), label: 'Revised' }] : []),
-          ...items.memorized.map((m) => ({ tag: tagFor('memorization', m.id), label: 'Memorized' })),
-          ...items.reads.map((r) => ({ tag: tagFor('read', r.id), label: 'Read' })),
+          ...(items.revisions.some((r) => r.countsFor === date) ? [{ tag: tagFor('revision', date), label: t('journal.tags.revised') }] : []),
+          ...items.memorized.map((m) => ({ tag: tagFor('memorization', m.id), label: t('journal.tags.memorized') })),
+          ...items.reads.map((r) => ({ tag: tagFor('read', r.id), label: t('journal.tags.read') })),
         ]);
       })
       .catch(() => undefined);
@@ -368,7 +364,7 @@ export default function JournalEntryScreen() {
     // A Memorized entry names pages (From and To): those pages are marked memorized today.
     const range = sendKind === 'memorization' && !editing ? parsePageRange(draft.from, draft.to) : null;
     if (sendKind === 'memorization' && !editing && (draft.from || draft.to) && !range) {
-      Alert.alert('Check the pages', 'Type the first and last page, as numbers from 1 to 604.');
+      Alert.alert(t('journal.checkPages.title'), t('journal.checkPages.body'));
       return;
     }
     // Named by surah and juz, not page numbers (lib/passages); stored as plain text.
@@ -393,7 +389,7 @@ export default function JournalEntryScreen() {
       } else {
         if (trimmed === '' && minutes == null && !range) return;
         if ((day?.entries.length ?? 0) >= JOURNAL_ENTRIES_PER_DAY) {
-          Alert.alert('This day is full', `A day holds up to ${JOURNAL_ENTRIES_PER_DAY} entries.`);
+          Alert.alert(t('journal.full.title'), t('journal.full.body', { count: JOURNAL_ENTRIES_PER_DAY }));
           setSaving(false);
           return;
         }
@@ -429,7 +425,7 @@ export default function JournalEntryScreen() {
       refreshDay();
     } catch (err) {
       logger.error('Failed to save journal note', err);
-      Alert.alert("Couldn't save", 'Please try again.');
+      Alert.alert(t('journal.saveFailed'), t('common.pleaseTryAgain'));
     } finally {
       setSaving(false);
     }
@@ -459,10 +455,10 @@ export default function JournalEntryScreen() {
   };
 
   const deleteDay = () => {
-    Alert.alert(`Delete ${formatJournalDay(date)}?`, 'This removes every entry for this day.', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('journal.deleteDay.title', { day: formatJournalDay(date) }), t('journal.deleteDay.body'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Delete',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
           setSaving(true);
@@ -472,7 +468,7 @@ export default function JournalEntryScreen() {
             refreshDay();
           } catch (err) {
             logger.error('Failed to delete journal day', err);
-            Alert.alert("Couldn't delete", 'Please try again.');
+            Alert.alert(t('journal.deleteFailed'), t('common.pleaseTryAgain'));
           } finally {
             setSaving(false);
           }
@@ -501,12 +497,12 @@ export default function JournalEntryScreen() {
   };
   const menuActions = menuNote
     ? [
-        { key: 'edit', label: 'Edit', icon: 'create-outline' as const, onPress: () => startEdit(menuNote) },
+        { key: 'edit', label: t('common.edit'), icon: 'create-outline' as const, onPress: () => startEdit(menuNote) },
         ...(menuNote.text.trim() !== ''
           ? [
               {
                 key: 'copy',
-                label: 'Copy',
+                label: t('common.copy'),
                 icon: 'copy-outline' as const,
                 onPress: () => {
                   copyText(menuNote.text.trim());
@@ -533,7 +529,7 @@ export default function JournalEntryScreen() {
               {formatJournalDayRelative(date, today)}
             </Text>
             <Text style={[typeV2.meta, { color: palette.secondary }]} numberOfLines={1} maxFontSizeMultiplier={1.4}>
-              {total != null ? `Total ${formatMinutes(total)}` : formatJournalDay(date)}
+              {total != null ? t('journal.total', { minutes: formatMinutes(total) }) : formatJournalDay(date)}
             </Text>
           </View>
         }
@@ -547,13 +543,13 @@ export default function JournalEntryScreen() {
       ) : loadFailed ? (
         <View style={[styles.center, styles.failed]} testID="journal-offline">
           <Text style={[typeV2.name, { color: palette.text, textAlign: 'center' }]}>
-            {"Couldn't load this day's log"}
+            {t('journal.offline.title')}
           </Text>
           <Text style={[typeV2.body, { color: palette.secondary, textAlign: 'center' }]}>
-            Connect to the internet to see and add to it.
+            {t('journal.offline.body')}
           </Text>
           <PillButton
-            title="Try again"
+            title={t('common.tryAgain')}
             variant="outline"
             onPress={() => {
               setLoading(true);
@@ -582,7 +578,7 @@ export default function JournalEntryScreen() {
                 key={n.id}
                 testID={`journal-note-${n.id}`}
                 accessibilityLabel={`${label}${body ? `, ${body}` : ''}, ${time}`}
-                actions={[{ name: 'options', label: 'Options', onPress: () => openMenu(n) }]}
+                actions={[{ name: 'options', label: t('journal.options'), onPress: () => openMenu(n) }]}
                 onHold={() => openMenu(n)}
                 onDelete={() => deleteNote(n)}
               >
@@ -602,7 +598,7 @@ export default function JournalEntryScreen() {
 
           <ThreadRow
             mark={<Mark icon={editing ? 'create-outline' : 'add-outline'} />}
-            name={editing ? `Editing ${JOURNAL_KIND_LABELS[composingKind].toLowerCase()}` : 'New entry'}
+            name={editing ? t(`journal.editing.${composingKind}`) : t('journal.newEntry')}
             meta={editing ? formatEntryTime(editing.note.at, date, user) : undefined}
             lineAbove
             separator={false}
@@ -613,12 +609,12 @@ export default function JournalEntryScreen() {
                   onPress={fillFromSession}
                   style={[v2.suggestion, { borderColor: palette.outline }]}
                   accessibilityRole="button"
-                  accessibilityLabel="Fill from your session"
+                  accessibilityLabel={t('journal.fillFromSession')}
                   testID="journal-suggestion"
                 >
                   <Ionicons name="sparkles-outline" size={14} color={palette.text} />
                   <Text style={[typeV2.meta, v2.suggestionText, { color: palette.text }]} numberOfLines={1}>
-                    From your session: {sessionSuggestion.text}
+                    {t('journal.fromSession', { text: sessionSuggestion.text })}
                     {sessionSuggestion.minutes != null ? ` · ${formatMinutes(sessionSuggestion.minutes)}` : ''}
                   </Text>
                 </Tap>
@@ -627,17 +623,17 @@ export default function JournalEntryScreen() {
                   onPress={() => setDraft({ text: plainText(describePassage(memorizeSugg)) })}
                   style={[v2.suggestion, { borderColor: palette.outline }]}
                   accessibilityRole="button"
-                  accessibilityLabel="Fill with the pages you read today"
+                  accessibilityLabel={t('journal.fillRead')}
                   testID="journal-memorize-suggestion"
                 >
                   <Ionicons name="sparkles-outline" size={14} color={palette.text} />
                   <Text style={[typeV2.meta, v2.suggestionText, { color: palette.text }]} numberOfLines={1}>
-                    Read today, not memorized: {describePassage(memorizeSugg, { form: 'short' })}
+                    {t('journal.readNotMemorized', { what: describePassage(memorizeSugg, { form: 'short' }) })}
                   </Text>
                 </Tap>
               ) : composingKind === 'note' && tagOptions.length > 0 && !editing ? (
                 <View style={v2.tagRow} testID="journal-tag-picker">
-                  {[{ tag: null as string | null, label: 'Untagged' }, ...tagOptions].map((o) => {
+                  {[{ tag: null as string | null, label: t('journal.tags.untagged') }, ...tagOptions].map((o) => {
                     const chosen = noteTag === o.tag;
                     return (
                       <Tap
@@ -646,7 +642,7 @@ export default function JournalEntryScreen() {
                         style={[v2.suggestion, { borderColor: chosen ? palette.primary : palette.outline }]}
                         accessibilityRole="button"
                         accessibilityState={{ selected: chosen }}
-                        accessibilityLabel={`Tag: ${o.label}`}
+                        accessibilityLabel={t('journal.tags.label', { tag: o.label })}
                       >
                         <Text style={[typeV2.meta, { color: palette.text }]}>{o.label}</Text>
                       </Tap>
@@ -658,7 +654,7 @@ export default function JournalEntryScreen() {
           >
             <RangePickerSheet visible={pickerOpen} onClose={() => setPickerOpen(false)} onUse={(r) => setDraft({ from: String(r.from), to: String(r.to) })} />
             <PillTabs
-              options={KIND_OPTIONS}
+              options={kindOptions()}
               value={composingKind}
               onChange={setKind}
               disabled={editing != null}
@@ -669,28 +665,28 @@ export default function JournalEntryScreen() {
                 <PillButton
                   size="sm"
                   variant="outline"
-                  title="Surah or juz"
+                  title={t('journal.surahOrJuz')}
                   onPress={() => setPickerOpen(true)}
                   testID="memorize-pick"
                 />
                 <TextInput
                   value={draft.from ?? ''}
                   onChangeText={(v) => setDraft({ from: v.replace(/[^0-9]/g, '') })}
-                  placeholder="From page"
+                  placeholder={t('journal.fromPage')}
                   placeholderTextColor={palette.secondary}
                   keyboardType="number-pad"
                   style={[field, { flex: 1 }]}
-                  accessibilityLabel="From page"
+                  accessibilityLabel={t('journal.fromPage')}
                   testID="memorize-from"
                 />
                 <TextInput
                   value={draft.to ?? ''}
                   onChangeText={(v) => setDraft({ to: v.replace(/[^0-9]/g, '') })}
-                  placeholder="To page"
+                  placeholder={t('journal.toPage')}
                   placeholderTextColor={palette.secondary}
                   keyboardType="number-pad"
                   style={[field, { flex: 1 }]}
-                  accessibilityLabel="To page"
+                  accessibilityLabel={t('journal.toPage')}
                   testID="memorize-to"
                 />
               </View>
@@ -699,7 +695,7 @@ export default function JournalEntryScreen() {
               <TextInput
                 value={text}
                 onChangeText={setText}
-                placeholder={PLACEHOLDER[composingKind]}
+                placeholder={placeholder(composingKind)}
                 placeholderTextColor={palette.secondary}
                 selectionColor={palette.accentText}
                 multiline={composingKind === 'note'}
@@ -709,19 +705,21 @@ export default function JournalEntryScreen() {
                 style={[field, composingKind === 'note' && v2.notes]}
                 accessibilityLabel={
                   composingKind === 'note'
-                    ? 'Note'
-                    : `What you ${composingKind === 'memorization' ? 'memorized' : 'revised'}`
+                    ? t('journal.noteLabel')
+                    : composingKind === 'memorization'
+                      ? t('journal.whatMemorized')
+                      : t('journal.whatRevised')
                 }
                 testID="journal-text-input"
               />
               {composingKind !== 'note' && (
-                <MinutesFieldV2 value={minutesText} onChange={setMinutesText} label="Minutes" />
+                <MinutesFieldV2 value={minutesText} onChange={setMinutesText} label={t('journal.minutes')} />
               )}
             </View>
             <View style={v2.actions}>
               {editing && (
                 <PillButton
-                  title="Cancel"
+                  title={t('common.cancel')}
                   size="sm"
                   variant="outline"
                   onPress={() => setEditing(null)}
@@ -729,12 +727,12 @@ export default function JournalEntryScreen() {
                 />
               )}
               <PillButton
-                title={editing ? 'Save' : 'Add'}
+                title={editing ? t('common.save') : t('journal.add')}
                 size="sm"
                 onPress={handleSend}
                 disabled={!canSend}
                 busy={saving}
-                accessibilityLabel={editing ? 'Save entry' : 'Add entry'}
+                accessibilityLabel={editing ? t('journal.saveEntry') : t('journal.addEntry')}
                 testID="journal-send"
               />
             </View>
@@ -746,11 +744,11 @@ export default function JournalEntryScreen() {
               disabled={saving}
               style={[v2.deleteRow, { borderTopColor: palette.separator }]}
               accessibilityRole="button"
-              accessibilityLabel="Delete this day's log"
+              accessibilityLabel={t('journal.deleteLog')}
               testID="journal-delete"
             >
               <Ionicons name="trash-outline" size={24} color={palette.red} />
-              <Text style={[typeV2.body, { color: palette.red }]}>Delete this day's log</Text>
+              <Text style={[typeV2.body, { color: palette.red }]}>{t('journal.deleteLog')}</Text>
             </Tap>
           )}
         </ScrollView>
@@ -764,11 +762,11 @@ export default function JournalEntryScreen() {
             <Pressable
               onPress={() => Keyboard.dismiss()}
               accessibilityRole="button"
-              accessibilityLabel="Done"
+              accessibilityLabel={t('common.done')}
               testID="journal-keyboard-done"
               hitSlop={8}
             >
-              <Text style={[typeV2.body, { color: palette.accentText, fontWeight: '600' }]}>Done</Text>
+              <Text style={[typeV2.body, { color: palette.accentText, fontWeight: '600' }]}>{t('common.done')}</Text>
             </Pressable>
           </View>
         </InputAccessoryView>
@@ -791,8 +789,8 @@ export default function JournalEntryScreen() {
     <RangePickerSheet visible={pickerOpen} onClose={() => setPickerOpen(false)} onUse={(r) => setDraft({ from: String(r.from), to: String(r.to) })} />
       <UndoToast
         visible={undoNote != null}
-        message="Note deleted"
-        actionLabel="Undo"
+        message={t('journal.noteDeleted')}
+        actionLabel={t('common.undo')}
         onUndo={undoDelete}
         onDismiss={() => setUndoNote(null)}
         duration={5000}
@@ -809,7 +807,7 @@ function MinutesFieldV2({ value, onChange, label }: { value: string; onChange: (
     <View style={[v2.minutes, { backgroundColor: palette.fill }]}>
       <TextInput
         value={value}
-        onChangeText={(t) => onChange(t.replace(/[^0-9]/g, ''))}
+        onChangeText={(v) => onChange(v.replace(/[^0-9]/g, ''))}
         placeholder="0"
         placeholderTextColor={palette.secondary}
         selectionColor={palette.accentText}
@@ -819,7 +817,7 @@ function MinutesFieldV2({ value, onChange, label }: { value: string; onChange: (
         style={[typeV2.body, typeV2.numeral, v2.minutesInput, { color: palette.text }]}
         accessibilityLabel={label}
       />
-      <Text style={[typeV2.meta, { color: palette.secondary }]}>min</Text>
+      <Text style={[typeV2.meta, { color: palette.secondary }]}>{t('journal.min')}</Text>
     </View>
   );
 }

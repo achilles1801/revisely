@@ -47,4 +47,5 @@ export const common = {
   error: 'Error',
   save: 'Save',
   ok: 'OK',
+  copy: 'Copy',
 } as const;
