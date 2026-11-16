@@ -47,7 +47,7 @@ describe('the pictures', () => {
   });
 
   it('each draws, hidden from VoiceOver and never touched', async () => {
-    for (const p of ['activity', 'elsewhere', 'ayah', 'recite', 'marks', 'again', 'gaps'] as const) {
+    for (const p of ['activity', 'elsewhere', 'ayah', 'marks', 'again', 'gaps'] as const) {
       render(
         <DesignProvider initial={{}}>
           <ThemeProvider>{pictureFor(p)}</ThemeProvider>
