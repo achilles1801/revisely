@@ -122,3 +122,46 @@ describe('still for testers', () => {
     expect(due(true)).toBe('forced');
   });
 });
+
+describe('the mistake detection release (1.0.5): one switch, off until the release PR', () => {
+  // Outside Revisely Dev, as the store app is.
+  const { reciteLiveForAccount } = require('../reciteLive/availability') as typeof import('../reciteLive/availability');
+  const { gapsInsightsEnabled } = require('../insightsGaps') as typeof import('../insightsGaps');
+  const { MISTAKE_DETECTION_RELEASED, setMistakeDetectionReleasedForTests } = require('../release/mistakeDetection') as typeof import('../release/mistakeDetection');
+  afterEach(() => setMistakeDetectionReleasedForTests(undefined));
+
+  it('off: Recite, Recite’s memory and Insights’ Recitation, Gaps and Last revised stay Revisely Dev’s', () => {
+    setMistakeDetectionReleasedForTests(false);
+    for (const user of [...APP_STORE, TESTER]) {
+      expect(reciteLiveForAccount(user)).toBe(false);
+      expect(gapsInsightsEnabled(user)).toBe(false);
+    }
+  });
+
+  it.each(APP_STORE)('on: every account has them, for %o', (user) => {
+    setMistakeDetectionReleasedForTests(true);
+    expect(reciteLiveForAccount(user)).toBe(true);
+    expect(gapsInsightsEnabled(user)).toBe(true);
+    expect(reciteLiveForAccount(null)).toBe(false);
+  });
+
+  it('on: Recite still needs a phone that streams the microphone', () => {
+    setMistakeDetectionReleasedForTests(true);
+    const mic = require('../recite/micSource') as { isMicStreamAvailable: () => boolean };
+    const spy = jest.spyOn(mic, 'isMicStreamAvailable').mockReturnValue(false);
+    expect(reciteLiveForAccount({})).toBe(false);
+    spy.mockRestore();
+  });
+
+  it.each(APP_STORE)('on: every card of its What’s new is open, for %o (none drops out at the release)', (user) => {
+    setMistakeDetectionReleasedForTests(true);
+    const { NEXT_RELEASE } = require('../help/whatsNew') as typeof import('../help/whatsNew');
+    expect(NEXT_RELEASE).not.toBeNull();
+    expect(needsOf(NEXT_RELEASE!).filter((n) => !needOpen(n, user, 'everyone'))).toEqual([]);
+  });
+
+  it('develop ships it off: store users get it only with the release PR’s Promote', () => {
+    expect(MISTAKE_DETECTION_RELEASED).toBe(false);
+  });
+});
+
