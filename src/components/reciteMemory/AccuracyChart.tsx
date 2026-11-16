@@ -1,5 +1,5 @@
 import React from 'react';
-import { View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Line, Path, Text as SvgText } from 'react-native-svg';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -12,9 +12,23 @@ export function chartFloor(values: number[]): number {
   return Math.max(0, Math.min(98, Math.floor((low - 1) / 2) * 2));
 }
 
+/** The x axis's two dates: the first take's and the last's, or one when they are the same day ("Today" once). */
+export function axisDates(firstAt: number, lastAt: number, now: number): [string, string | null] {
+  const label = (at: number) => {
+    const d = new Date(at);
+    return Math.round((now - at) / DAY_MS) < 1 && new Date(now).getDate() === d.getDate() ? 'Today' : `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+  };
+  const a = label(firstAt);
+  const b = label(lastAt);
+  return [a, b === a ? null : b];
+}
+
 /**
  * A passage's accuracy over its takes: one line in ink and a dot a take, by date, the newest larger (Majd's style rule,
  * Nov 15 2026: no coloured circles; the figures beside it carry the score's colours). Gridlines every 2%.
+ *
+ * The dates under it are text beside the plot, not SVG text: react-native-svg measured "Today" short on iOS, and the
+ * right one, anchored at the plot's end, lost its last letter past the drawing's edge ("Toda", flow 18's rm03).
  */
 export function AccuracyChart({ points, width, height = 146, now }: { points: Array<{ at: number; accuracy: number }>; width: number; height?: number; now: number }) {
   const { palette } = useTheme();
@@ -31,14 +45,10 @@ export function AccuracyChart({ points, width, height = 146, now }: { points: Ar
   const grid: number[] = [];
   for (let g = 100; g >= floor; g -= Math.max(2, Math.ceil((100 - floor) / 4 / 2) * 2)) grid.push(g);
   const path = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(p.at).toFixed(1)},${y(p.accuracy).toFixed(1)}`).join(' ');
-  const label = (at: number) => {
-    const d = new Date(at);
-    return Math.round((now - at) / DAY_MS) < 1 && new Date(now).getDate() === d.getDate() ? 'Today' : `${d.getDate()} ${MONTHS[d.getMonth()]}`;
-  };
-  const lastPoint = points[points.length - 1];
+  const [fromDate, toDate] = axisDates(points[0].at, points[points.length - 1].at, now);
   return (
     <View testID="progress-chart" accessible accessibilityLabel={`Accuracy over ${points.length} takes`}>
-      <Svg width={width} height={height}>
+      <Svg width={width} height={by + 8}>
         {grid.map((g) => (
           <React.Fragment key={g}>
             <Line x1={lx} x2={rx} y1={y(g / 100)} y2={y(g / 100)} stroke={palette.separator} strokeWidth={1} />
@@ -51,18 +61,25 @@ export function AccuracyChart({ points, width, height = 146, now }: { points: Ar
         {points.map((p, i) => (
           <Circle key={i} cx={x(p.at)} cy={y(p.accuracy)} r={i === points.length - 1 ? 5 : 4} fill={palette.text} stroke={palette.sheet} strokeWidth={1.5} />
         ))}
-        <SvgText x={lx} y={height - 6} fontSize={11} fill={palette.secondary}>
-          {label(points[0].at)}
-        </SvgText>
-        {points.length > 1 ? (
-          <SvgText x={rx} y={height - 6} fontSize={11} textAnchor="end" fill={palette.secondary}>
-            {label(lastPoint.at)}
-          </SvgText>
-        ) : null}
       </Svg>
+      <View style={[styles.dates, { paddingLeft: lx, paddingRight: width - rx, minHeight: height - by - 8 }]}>
+        <Text style={[styles.date, { color: palette.secondary }]} maxFontSizeMultiplier={1.4} numberOfLines={1} testID="progress-chart-from">
+          {fromDate}
+        </Text>
+        {toDate ? (
+          <Text style={[styles.date, { color: palette.secondary }]} maxFontSizeMultiplier={1.4} numberOfLines={1} testID="progress-chart-to">
+            {toDate}
+          </Text>
+        ) : null}
+      </View>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  dates: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
+  date: { fontSize: 11 },
+});
 
 /** The summary row's small trend: the same line, no axes. */
 export function Sparkline({ values, width = 44, height = 24 }: { values: number[]; width?: number; height?: number }) {

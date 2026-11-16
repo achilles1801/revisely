@@ -506,6 +506,11 @@ appId: com.revisionbuddy.app
     visible:
       id: shown-take-bar
     timeout: 10000
+# ▶ for the take's recording, which is on the phone (the day lists it).
+- extendedWaitUntil:
+    visible:
+      id: shown-take-play
+    timeout: 5000
 - runFlow:
     file: ../subflows/shot.yaml
     env:

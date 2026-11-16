@@ -332,8 +332,9 @@ Recite with Mark mistakes remembers each take (Majd, Nov 15 2026; Tarteel's bigg
   passage, its score by the page, its line (time, mistakes, words cleared, page hidden), its recording and
   Show on the page. A take's recording shows there and not in Read. All activity has Recitations, with All
   takes, With mistakes and Page hidden. Show on the page opens the reader at the take's page with that
-  take's marks at full strength and nothing else, until Done. Each mark has its card, and Not a mistake
-  there updates the take. The progress page's takes open it too.
+  take's marks at full strength and nothing else, until Done. Its bar has ▶ for the take's recording while
+  that recording is on the phone. Each mark has its card, and Not a mistake there updates the take. The
+  progress page's takes open it too.
 
 ## Searching the Qur'an
 

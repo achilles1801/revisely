@@ -1,24 +1,57 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { layoutV2, typeV2 } from '../../theme/v2';
 import { PillButton } from '../v2/PillButton';
+import { Tap } from '../v2/Tap';
 import { formatAccuracy, mistakesLabel } from '../../lib/reciteLive/score';
 import type { TakeRecord } from '../../lib/reciteMemory/record';
 import { takeWhen } from '../../lib/reciteMemory/describe';
+import { useTakeRecording } from '../../lib/reciteMemory/takeAudio';
+import { useRecordingPlayback } from '../../hooks/useRecordingPlayback';
+import type { RecordingMeta } from '../../lib/recordings';
+
+const PLAY = 36;
+
+/** ▶ / ❚❚ for the take's recording, as the day's recordings draw it. Mounted only when the recording is on the phone,
+ *  so its player (which pauses when the app or the screen goes) exists only then; Done unmounts it and stops it. */
+function TakePlay({ recording }: { recording: RecordingMeta }) {
+  const { palette } = useTheme();
+  const { playingId, paused, downloadingId, togglePause } = useRecordingPlayback();
+  const playing = playingId === recording.id && !paused;
+  return (
+    <Tap
+      onPress={() => void togglePause(recording)}
+      style={[styles.play, { backgroundColor: palette.text }]}
+      accessibilityRole="button"
+      accessibilityLabel={playing ? 'Pause your take' : 'Play your take'}
+      testID="shown-take-play"
+    >
+      {downloadingId === recording.id ? (
+        <ActivityIndicator size="small" color={palette.bg} />
+      ) : (
+        <Ionicons name={playing ? 'pause' : 'play'} size={16} color={palette.bg} style={playing ? undefined : styles.playGlyph} testID="shown-take-play-icon" />
+      )}
+    </Tap>
+  );
+}
 
 /**
- * Over the reader while a past take shows on its page ("Show on the page", Tarteel's Load Session): whose take it is,
- * how it went, and Done. Its marks are on the page at full strength, each with its card.
+ * Over the reader while a past take shows on its page ("Show on the page", Tarteel's Load Session): ▶ the take (when
+ * its recording is on this phone), whose take it is, how it went, and Done. Its marks are on the page at full
+ * strength, each with its card.
  */
 export function ShownTakeBar({ take, now, bottom, onDone }: { take: TakeRecord; now: number; bottom: number; onDone: () => void }) {
   const { palette, isDark } = useTheme();
+  const recording = useTakeRecording(take.recordingId);
   return (
     <View
       style={[styles.bar, { bottom, backgroundColor: palette.sheet, borderColor: palette.outline, shadowColor: palette.shadow, shadowOpacity: isDark ? 0 : 0.12 }]}
       accessibilityLabel={`Your take, ${takeWhen(take.createdAt, now, true)}`}
       testID="shown-take-bar"
     >
+      {recording ? <TakePlay recording={recording} /> : null}
       <View style={styles.text}>
         <Text style={[typeV2.name, { color: palette.text }]} maxFontSizeMultiplier={1.4} numberOfLines={1}>
           {`Your take · ${takeWhen(take.createdAt, now, true)}`}
@@ -49,4 +82,7 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   text: { flex: 1, minWidth: 0 },
+  play: { width: PLAY, height: PLAY, borderRadius: PLAY / 2, alignItems: 'center', justifyContent: 'center' },
+  // The play triangle looks centred a point to the right.
+  playGlyph: { marginLeft: 2 },
 });

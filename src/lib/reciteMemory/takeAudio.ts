@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react';
 import { File } from 'expo-file-system';
 import { logger } from '../logger';
-import { listRecordings, onRecordingsChanged } from '../recordings';
+import { listRecordings, onRecordingsChanged, type RecordingMeta } from '../recordings';
 import { SAMPLE_RATE } from '../recite/segmenter';
 
 const HEADER = 44;
@@ -75,3 +75,29 @@ export function useTakeRecordings(enabled: boolean): ReadonlySet<string> {
 }
 
 const NONE: ReadonlySet<string> = new Set();
+
+/** A take's recording on this phone, for ▶ on Show on the page (null while unknown, deleted, or never kept). */
+export function useTakeRecording(recordingId: string | null | undefined): RecordingMeta | null {
+  const [rec, setRec] = useState<RecordingMeta | null>(null);
+  useEffect(() => {
+    setRec(null);
+    if (!recordingId) return;
+    let alive = true;
+    const read = () => {
+      listRecordings()
+        .then((all) => {
+          const r = all.find((x) => x.id === recordingId);
+          const seg = r?.segments[0];
+          if (alive) setRec(r && seg?.local && /\.wav$/i.test(seg.fileName) ? r : null);
+        })
+        .catch(() => undefined);
+    };
+    read();
+    const off = onRecordingsChanged(read);
+    return () => {
+      alive = false;
+      off();
+    };
+  }, [recordingId]);
+  return rec;
+}

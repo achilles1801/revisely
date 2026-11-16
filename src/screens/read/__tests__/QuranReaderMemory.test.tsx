@@ -71,6 +71,8 @@ jest.mock('@react-navigation/native', () => ({
   useNavigation: () => mockNavigation,
   useRoute: () => ({ key: 'QuranReader-1', name: 'QuranReader', params: mockRoute.params }),
   useIsFocused: () => true,
+  // The shown take's ▶ (useRecordingPlayback) pauses when the screen loses focus; the reader keeps it here.
+  useFocusEffect: () => {},
 }));
 jest.mock('../../../navigation/navigationRef', () => ({ navigateToActivityDay: jest.fn() }));
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
@@ -266,8 +268,19 @@ jest.mock('../../../lib/reciteMemory/store', () => ({
     mockMemory.remembered.push(r);
   }),
 }));
+const mockTakeRecording = {
+  id: 'rec-old',
+  day: '2026-11-14',
+  kind: 'revision',
+  createdAt: 0,
+  durationMs: 60_000,
+  uri: 'file:///recordings/rec-old.wav',
+  segments: [{ uri: 'file:///recordings/rec-old.wav', durationMs: 60_000, fileName: 'rec-old.wav', local: true }],
+};
+const mockTakeAudio = { recordingOnPhone: true };
 jest.mock('../../../lib/reciteMemory/takeAudio', () => ({
   useTakeRecordings: () => new Set(['rec-old']),
+  useTakeRecording: (id?: string) => (id === 'rec-old' && mockTakeAudio.recordingOnPhone ? mockTakeRecording : null),
   clipOfTake: jest.fn(async () => new Int16Array(16000)),
 }));
 
@@ -437,5 +450,31 @@ describe('Show on the page', () => {
     await flush();
     expect(screen.queryByTestId('shown-take-bar')).toBeNull();
     expect(screen.getByTestId('past-highlight-word')).toBeTruthy();
+  });
+
+  it('▶ plays the take’s recording from its start, ❚❚ pauses it; Done stops it', async () => {
+    await open();
+    fireEvent.press(screen.getByTestId('shown-take-play'));
+    await flush();
+    const player = lastPlayer() as ReturnType<typeof lastPlayer> & { replace: jest.Mock };
+    expect(player.replace).toHaveBeenCalledWith({ uri: 'file:///recordings/rec-old.wav' });
+    expect(screen.getByLabelText('Pause your take')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('shown-take-play'));
+    expect(player.pause).toHaveBeenCalled();
+    expect(screen.getByLabelText('Play your take')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('shown-take-done'));
+    await flush();
+    expect(player.remove).toHaveBeenCalled();
+  });
+
+  it('no ▶ when the take’s recording isn’t on this phone (deleted, or never kept)', async () => {
+    mockTakeAudio.recordingOnPhone = false;
+    try {
+      await open();
+      expect(screen.getByTestId('shown-take-bar')).toBeTruthy();
+      expect(screen.queryByTestId('shown-take-play')).toBeNull();
+    } finally {
+      mockTakeAudio.recordingOnPhone = true;
+    }
   });
 });
