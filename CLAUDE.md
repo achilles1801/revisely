@@ -24,6 +24,22 @@ file is the release mechanics and the traps behind them.
     session wastes the time.
   - Everything else here still holds: privacy, free tiers, one simulator and no heavy jobs beside it, and the
     branch rule below.
+- **Build new features straight into Revisely Dev** (Majd, Nov 16 2026: "the whole point of the dev app is so that
+  we can test new features super quickly ... we don't necessarily need to approve a mock before it's built into the
+  dev app. Just let me know when these things are built so I can go test them out myself in the app ... unless I
+  explicitly ask for a mock before building something").
+  - Draw a mock board if it helps you think, and save it in the area's mocks folder (for example
+    `~/Documents/revisely-recite-mocks/`), but don't wait on an approval. Build it, then tell the orchestrator what is
+    in Revisely Dev and where to find it.
+  - Ask for his look first only when he asks for a mock, or for anything outside Dev: production, store listings, the
+    public site.
+- **Yes to everything that doesn't touch production** (Majd, Nov 15 2026: "yes to everything that doesn't impact
+  production rn"). Approved ideas and choices that stay on develop, Revisely Dev, the dev backend (revisely-dev), the
+  dev checker and tests go ahead. Production, the stores, his accounts and billing, public posts and spending still
+  wait for him.
+- **One GitHub API limit for every session.** All sessions share one account's 5,000 requests an hour, and they ran
+  out on Nov 15. Check CI once when you need it (`gh pr checks`, or `gh run watch --interval 120`), never in a tight
+  loop.
 - **Hand off before your context fills, and name sessions by topic and number** (Majd, Nov 14 2026).
   - Check your context with `mcp__ccd_session_mgmt__get_usage` (session "self") at milestones and before big
     reads. Auto-compaction starts at about 97% and keeps you going, but it loses detail.
