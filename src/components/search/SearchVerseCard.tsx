@@ -51,8 +51,12 @@ export function hitShareText(words: QuranWords, hit: VerseHit): string {
 
 type Loaded = VerseTranslation | 'failed';
 
-/** The chosen translation of each ayah, from memory at once, else loaded (only for the cards on screen). */
-function useTranslations(ayahs: number[], translationId: string | null | undefined): Record<number, Loaded | undefined> {
+/**
+ * The chosen translation of each ayah, from memory at once, else loaded once `load` is true: the screen sets it when the card
+ * has been on screen. A list mounts cards well past the screen, and each Clear Quran block is a request against the account's
+ * and everyone's daily budget (and 30 a minute per account): 50 results would spend them on cards nobody scrolled to.
+ */
+function useTranslations(ayahs: number[], translationId: string | null | undefined, load: boolean): Record<number, Loaded | undefined> {
   const key = `${translationId ?? ''}|${ayahs.join(',')}`;
   const [loaded, setLoaded] = useState<Record<number, Loaded | undefined>>(() => {
     const out: Record<number, Loaded | undefined> = {};
@@ -60,6 +64,7 @@ function useTranslations(ayahs: number[], translationId: string | null | undefin
     return out;
   });
   useEffect(() => {
+    if (!load) return;
     let live = true;
     for (const k of ayahs) {
       if (loaded[k]) continue;
@@ -70,9 +75,9 @@ function useTranslations(ayahs: number[], translationId: string | null | undefin
     return () => {
       live = false;
     };
-    // Once per card and translation.
+    // Once per card and translation, once it has been on screen.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
+  }, [key, load]);
   return loaded;
 }
 
@@ -86,6 +91,7 @@ export function SearchVerseCard({
   matched,
   words,
   translationId,
+  load,
   onOpen,
   onShare,
   onCopy,
@@ -94,6 +100,8 @@ export function SearchVerseCard({
   matched: Set<number>;
   words: QuranWords;
   translationId?: string | null;
+  /** The card has been on screen: its translation may be fetched (from memory it shows at once either way). */
+  load: boolean;
   onOpen: () => void;
   onShare: () => void;
   onCopy: () => void;
@@ -102,7 +110,7 @@ export function SearchVerseCard({
   const ayahs = useMemo(() => hitAyahs(hit), [hit]);
   const title = hitTitle(hit);
   const page = pageOfVerse(hit);
-  const translations = useTranslations(ayahs, translationId);
+  const translations = useTranslations(ayahs, translationId, load);
   const shown = ayahs.map((k) => translations[k]).filter((t): t is VerseTranslation => t != null && t !== 'failed');
   const failed = ayahs.some((k) => translations[k] === 'failed');
   const t = shown[0]?.translation;

@@ -106,6 +106,16 @@ async function search(text: string) {
   });
 }
 
+/** The results list reports every row as on screen, as it does once laid out (Jest lays nothing out). */
+async function rowsOnScreen() {
+  const list = screen.UNSAFE_getAllByProps({ testID: 'search-results' }).find((n) => typeof n.props.onViewableItemsChanged === 'function');
+  if (!list) throw new Error('No results list');
+  const items = (list.props.data as { key: string }[]).map((item, index) => ({ item, key: item.key, index, isViewable: true }));
+  await act(async () => {
+    list.props.onViewableItemsChanged({ viewableItems: items, changed: items });
+  });
+}
+
 describe('searching the Quran', () => {
   it('finds the ayah for words typed in Arabic and opens it highlighted', async () => {
     await open();
@@ -331,6 +341,7 @@ describe('the redesign (Majd, Nov 16 2026: the mic in reach of a thumb, clearer 
     mockUser = { id: 'u1', previewTester: true, translationId: 'en.sahih' };
     await open();
     await search('قل لو شاء الله');
+    await rowsOnScreen();
     await act(async () => {});
     const card = screen.getByTestId('search-verse-10-16');
     expect(within(card).getByText('Yunus, ayah 16', { normalizer: (t) => plainText(t).trim() })).toBeTruthy();
@@ -339,6 +350,22 @@ describe('the redesign (Majd, Nov 16 2026: the mic in reach of a thumb, clearer 
     expect(within(card).getByText('A note on it.', { exact: false })).toBeTruthy();
     expect(within(card).getByTestId('search-verse-credit')).toHaveTextContent(/Saheeh International.*v1\.1\.2.*QuranEnc\.com/);
     expect(mockTranslation.calls).toEqual([[10, 16, 'en.sahih']]);
+  });
+
+  it('a card fetches its translation only once it has been on screen, and only once (each Clear Quran block spends a budget)', async () => {
+    mockUser = { id: 'u1', previewTester: true, translationId: 'en.sahih' };
+    await open();
+    await search('قل لو شاء الله');
+    await act(async () => {});
+    expect(mockTranslation.calls).toEqual([]);
+    expect(within(screen.getByTestId('search-verse-10-16')).queryByTestId('search-verse-translation')).toBeNull();
+    await rowsOnScreen();
+    await act(async () => {});
+    expect(mockTranslation.calls).toEqual([[10, 16, 'en.sahih']]);
+    expect(within(screen.getByTestId('search-verse-10-16')).getByTestId('search-verse-translation')).toBeTruthy();
+    await rowsOnScreen();
+    await act(async () => {});
+    expect(mockTranslation.calls).toHaveLength(1);
   });
 
   it('Copy puts the ayah and where it is on the clipboard, and says “Copied”; Share hands the same to the share sheet', async () => {

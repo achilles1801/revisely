@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, ActivityIndicator, Keyboard, KeyboardAvoidingView, Platform, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { AccessibilityInfo, ActivityIndicator, Keyboard, KeyboardAvoidingView, Platform, Share, StyleSheet, Text, TextInput, View, ViewToken } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FlatList } from 'react-native-gesture-handler';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
@@ -36,6 +36,8 @@ type RouteProps = RouteProp<ReadStackParamList, 'QuranSearch'>;
 const NBSP = ' ';
 /** Below this share of the query, results are the closest there is, not the words said. */
 const CLOSEST = 0.75;
+/** A result row counts as seen (its card may fetch a translation) once a tenth of it has been on screen for 150 ms. */
+const VIEWED = { itemVisiblePercentThreshold: 10, minimumViewTime: 150 };
 
 type Row =
   | { kind: 'target'; key: string; target: SearchTarget }
@@ -107,6 +109,18 @@ export default function QuranSearchScreen() {
     };
   }, []);
   const pending = useRef<{ query: string; voice: boolean } | null>(null);
+  // The result rows that have been on screen: only their cards fetch a translation (SearchVerseCard's `load`). The list
+  // mounts rows well past the screen, and a quick fling past them (under VIEWED.minimumViewTime) fetches nothing.
+  const [seen, setSeen] = useState<ReadonlySet<string>>(() => new Set());
+  const onViewable = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
+    setSeen((had) => {
+      const fresh = viewableItems.filter((v) => v.isViewable && v.key != null && !had.has(v.key));
+      if (fresh.length === 0) return had;
+      const next = new Set(had);
+      for (const v of fresh) next.add(v.key);
+      return next;
+    });
+  }).current;
   // Revisely Dev's live check (testers, the 1405 print): a voice search with one result opens the reader reciting.
   const reciteOn = reciteLiveEnabled(user, useMushafEdition());
 
@@ -382,8 +396,12 @@ export default function QuranSearchScreen() {
               : `${count} results`;
     body = (
       <FlatList
+        // Its own list, not Recent's reused: a FlatList can't gain onViewableItemsChanged once mounted.
+        key="results"
         data={results.rows}
         keyExtractor={(r) => r.key}
+        onViewableItemsChanged={onViewable}
+        viewabilityConfig={VIEWED}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         contentContainerStyle={styles.list}
@@ -415,6 +433,7 @@ export default function QuranSearchScreen() {
               matched={item.matched}
               words={words}
               translationId={user?.translationId}
+              load={seen.has(item.key)}
               onOpen={() => open(pageOfVerse(item.hit), { sura: item.hit.sura, ayah: item.hit.ayah, last: item.hit.last })}
               onShare={() => shareHit(item.hit)}
               onCopy={() => copyHit(item.hit)}
@@ -427,6 +446,7 @@ export default function QuranSearchScreen() {
   } else {
     body = (
       <FlatList
+        key="recent"
         data={recent}
         keyExtractor={(q) => q}
         keyboardShouldPersistTaps="handled"

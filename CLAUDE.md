@@ -375,7 +375,8 @@ until its part is set up.
     row of its own (`components/search/SearchVerseCard`): surah and ayah first (the page a quiet detail), the ayat
     large with the words found in full ink, the account's translation exactly as given (raised footnote markers, its
     footnotes and its credit with the version kept, as QuranEnc's and The Clear Quran's terms ask;
-    `getVerseTranslation`, no Arabic fetched), then Share, Copy (the ayat from the word data on the phone, so they
+    `getVerseTranslation`, no Arabic fetched; fetched only once its card has been on screen, since each Clear Quran block
+    spends the account's and everyone's daily budget), then Share, Copy (the ayat from the word data on the phone, so they
     work offline; "Copied") and Open in the reader.
 
 ## How updates reach phones
