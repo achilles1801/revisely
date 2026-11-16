@@ -471,6 +471,7 @@ export default function QuranReaderScreen() {
     if (!pageDrill) return;
     setModeMenu(false);
     setRevealed(NOTHING_SHOWN);
+    setPeeked(NOTHING_PEEKED);
     // The summary's "Before: …": what those words were last time.
     setDrillBefore(findingsLine(pageDrill.marks));
     if (!reciteSettings.noticeSeen) {
