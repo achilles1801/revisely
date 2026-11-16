@@ -4,6 +4,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useHaptics } from '../../design/haptics';
 import { ACCENT_LABELS, ACCENTS, AccentName, paletteV2, radiusV2, typeV2 } from '../../theme/v2';
 import { Tap } from '../v2/Tap';
+import { t } from '../../i18n';
 
 /**
  * Without a measured row (AccentSetting measures): below this width (an SE is
@@ -34,7 +35,7 @@ export function AccentPicker({
   const { width, fontScale } = useWindowDimensions();
   const labels = labelsWanted ?? (width >= LABELS_FROM_WIDTH && fontScale <= 1.15);
   return (
-    <View style={styles.row} accessibilityRole="radiogroup" accessibilityLabel="Accent" testID="accent-picker">
+    <View style={styles.row} accessibilityRole="radiogroup" accessibilityLabel={t('settings.accent')} testID="accent-picker">
       {ACCENTS.map((a) => {
         const selected = a === value;
         return (
@@ -90,13 +91,13 @@ export function AccentSetting({ value, onChange }: { value: AccentName; onChange
   return (
     <View style={styles.setting} onLayout={width(setRoom)} testID="accent-setting">
       <Text style={[typeV2.body, styles.settingLabel, { color: palette.text }]} numberOfLines={1}>
-        Accent
+        {t('settings.accent')}
       </Text>
       <AccentPicker value={value} onChange={onChange} labels={labels} />
       {/* The label and the named chips at their natural widths, unseen. */}
       <View style={styles.measure} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
         <Text style={[typeV2.body, styles.natural]} onLayout={width(setLabelWidth)} testID="accent-measure-label">
-          Accent
+          {t('settings.accent')}
         </Text>
         <View style={[styles.row, styles.natural]} onLayout={width(setChipsWidth)} testID="accent-measure-chips">
           {ACCENTS.map((a) => (

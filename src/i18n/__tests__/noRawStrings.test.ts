@@ -27,6 +27,7 @@ const EXTRACTED: string[] = [
   'components/reciteCheck',
   'components/recordings',
   'components/revision',
+  'components/settings',
   'components/timer',
   'components/updates',
   'components/v2',
