@@ -37,6 +37,18 @@ file is the release mechanics and the traps behind them.
   production rn"). Approved ideas and choices that stay on develop, Revisely Dev, the dev backend (revisely-dev), the
   dev checker and tests go ahead. Production, the stores, his accounts and billing, public posts and spending still
   wait for him.
+- **PRs into develop merge themselves** (Majd, Nov 16 2026: "the only time i should have to manually merge
+  something myself is if it's going to production, all pr's aimed at dev can be automerged by claude"). Turn on
+  auto-merge for every PR into develop once it's ready. PRs into `main` or a `release/*` branch are his to merge.
+- **Google Drive is organized by area, then by item** (Majd, Nov 16 2026). Everything goes in his Drive's
+  `Revisely/` folder:
+  - `Product and design/`: design docs, specs;
+  - `Marketing/`: one folder per piece, for example `Halaqa kit/English (drafts)`, `Influencers`;
+  - `Mistake detection/`: for example `Volunteer recordings (revisely.app-record)`;
+  - `Bug reports/`: one folder per bug, `<date> · <what happens>`.
+
+  Each new idea or feature gets its own folder under the right area; add an area only when none fits. Never leave
+  files loose at the top of his Drive.
 - **One GitHub API limit for every session.** All sessions share one account's 5,000 requests an hour, and they ran
   out on Nov 15. Check CI once when you need it (`gh pr checks`, or `gh run watch --interval 120`), never in a tight
   loop.
