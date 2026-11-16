@@ -18,6 +18,8 @@
 #   6. both services open to the internet (the app signs in with Firebase; the server checks it, App Check, Premium)
 #   7. a budget on the checker's spend (label app=recite-check), emailing at 50, 90 and 100%
 #   8. a log metric for the health lines' errors, an email channel, and the three alerts in alerts/
+#   9. Cloud Run's own request logs for the checker dropped: they hold each caller's IP address, user agent and URL
+#      (a /check URL names the passage) for 30 days, and nothing reads them (the alerts read Cloud Run's metrics)
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=/dev/null
@@ -127,6 +129,10 @@ step 8 "alerts" && {
     api POST "$M/alertPolicies" "$body" >/dev/null
     echo "  alert: $f"
   done
+}
+
+step 9 "drop Cloud Run's request logs for the checker (IP, user agent, URL)" && {
+  run "${G[@]}" logging sinks update _Default --add-exclusion "name=recite-check-requests,description=The recitation checker's request logs (IP addresses and passages; checker-prod.md),filter=resource.type=\"cloud_run_revision\" AND resource.labels.service_name=~\"^recite-check\" AND log_id(\"run.googleapis.com/requests\")"
 }
 
 [ "$YES" = 1 ] || printf '\n(dry run: nothing was called. With Majd'\''s word: --yes)\n'
