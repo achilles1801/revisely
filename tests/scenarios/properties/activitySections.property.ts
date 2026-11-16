@@ -1,4 +1,4 @@
-// Activity's sections (ACT-28): whatever this phone holds for the layout, and whatever moves and switches the user
+// Activity's sections (ACT-29): whatever this phone holds for the layout, and whatever moves and switches the user
 // makes, each tab still has every one of its sections exactly once, the calendar is never hidden, and what was
 // stored comes back as it was saved.
 import fc from 'fast-check';
@@ -33,7 +33,7 @@ function wellFormed(tab: ActivityTab, l: TabLayout) {
 }
 
 describe('Activity’s sections, any layout', () => {
-  it('[ACT-28] whatever is stored, each tab has every section once, and the calendar is never hidden', () => {
+  it('[ACT-29] whatever is stored, each tab has every section once, and the calendar is never hidden', () => {
     fc.assert(
       fc.property(fc.constantFrom(...TABS), STORED, (tab, raw) => {
         const l = cleanTab(tab, raw);
@@ -45,7 +45,7 @@ describe('Activity’s sections, any layout', () => {
     );
   });
 
-  it('[ACT-28] moves and switches keep the layout whole; a moved section lands where it was put', () => {
+  it('[ACT-29] moves and switches keep the layout whole; a moved section lands where it was put', () => {
     const step = fc.oneof(
       fc.record({ kind: fc.constant('move' as const), from: fc.integer({ min: -2, max: 8 }), to: fc.integer({ min: -2, max: 8 }) }),
       fc.record({ kind: fc.constant('show' as const), at: fc.nat(7), shown: fc.boolean() }),
@@ -76,7 +76,7 @@ describe('Activity’s sections, any layout', () => {
     );
   });
 
-  it('[ACT-28] a section the stored order lacks (one added since) comes back after the one it follows in the usual order', () => {
+  it('[ACT-29] a section the stored order lacks (one added since) comes back after the one it follows in the usual order', () => {
     fc.assert(
       fc.property(fc.constantFrom(...TABS), fc.nat(5), (tab, k) => {
         const all = [...TAB_SECTIONS[tab]];

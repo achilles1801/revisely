@@ -1,4 +1,4 @@
-// Edit sections (ACT-28): Overview's or Insights' sections, each with a switch to show or hide it; hold one and drag
+// Edit sections (ACT-29): Overview's or Insights' sections, each with a switch to show or hide it; hold one and drag
 // it to move it (VoiceOver: Move up, Move down). Every change applies at once and is kept for the account on this
 // phone (lib/activitySections); Done closes.
 

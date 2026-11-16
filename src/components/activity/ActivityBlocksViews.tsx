@@ -76,7 +76,7 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
   const { pages, logs, user } = useApp();
   const revo = useRevoAvailable(user);
   const recitation = useRecitation(user);
-  // The sections each tab shows, and in what order (ACT-28): the user's, kept on this phone for the account.
+  // The sections each tab shows, and in what order (ACT-29): the user's, kept on this phone for the account.
   const editable = activitySectionsEnabled(user);
   const sections = useActivitySections(user?.id, editable);
   const [editing, setEditing] = useState<ViewKind | null>(null);
@@ -275,7 +275,7 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
               testID="insights-range"
             />
           ) : null}
-          {/* Edit sections (ACT-28): what the tab on show shows, and in what order. */}
+          {/* Edit sections (ACT-29): what the tab on show shows, and in what order. */}
           {editable ? (
             <IconButton icon="options-outline" label="Edit sections" onPress={() => setEditing(view)} size={22} testID="activity-edit-sections" />
           ) : null}

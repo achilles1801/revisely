@@ -1,4 +1,4 @@
-# Edit sections on Overview (ACT-28; the account is a tester), from anywhere on Activity: the editor (the calendar
+# Edit sections on Overview (ACT-29; the account is a tester), from anywhere on Activity: the editor (the calendar
 # always shown), then Overview without its key. Last in a flow: the layout stays on the phone.
 #   env THEME  light or dark (in the screenshots' names)
 # Screenshots 09-activity-sections-overview-<THEME> and 09-activity-sections-overview-edited-<THEME>.

@@ -86,7 +86,7 @@ export function CalendarMonth({
   onOpen: (day: string, block?: PreviewBlock) => void;
   /** Recordings by day: the preview's mic and count beside the block they belong to. */
   recordings?: Map<string, RecordingCounts>;
-  /** The user's order of the sections under the header, and those hidden (ACT-28); the usual layout without it. */
+  /** The user's order of the sections under the header, and those hidden (ACT-29); the usual layout without it. */
   sections?: TabLayout<'overview'>;
 }) {
   const { palette } = useTheme();
@@ -123,7 +123,7 @@ export function CalendarMonth({
   }
   if (preview.notes) previewRows.push({ key: 'notes', kind: 'notes', label: 'Notes', value: '1' });
 
-  // The sections under the header, in the user's order, those hidden left out (ACT-28): the header (the month or
+  // The sections under the header, in the user's order, those hidden left out (ACT-29): the header (the month or
   // week, Week | Month, Today and the arrows) stays on top, since everything below follows it.
   // Totals (the month): four equal columns (icon and label, then the value); two by two at large text.
   const totals =
@@ -485,7 +485,7 @@ const styles = StyleSheet.create({
   legendMark: { width: 12, height: 12, alignItems: 'center', justifyContent: 'center' },
   legendDot: { width: 6, height: 6, borderRadius: 3 },
   legendRule: { height: StyleSheet.hairlineWidth, marginTop: 10 },
-  // Under the picked day when a section follows it (ACT-28).
+  // Under the picked day when a section follows it (ACT-29).
   ruleAfter: { marginTop: 6 },
   tabular: { fontVariant: ['tabular-nums'] },
   preview: { paddingTop: 10 },

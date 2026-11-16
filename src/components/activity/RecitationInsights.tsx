@@ -63,7 +63,7 @@ export interface RecitationInsightsProps {
 
 export function RecitationInsights({ records, words, today, window, inWords, smartTracking, rating, revo, onOpenAyahs }: RecitationInsightsProps) {
   const { palette } = useTheme();
-  // First on Insights (ACT-28): no hairline above it.
+  // First on Insights (ACT-29): no hairline above it.
   const first = useFirstSection();
   const [allSlipping, setAllSlipping] = useState(false);
   const ins = useMemo(() => recitationInsights(records, today, window), [records, today, window]);

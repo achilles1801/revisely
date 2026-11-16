@@ -1,4 +1,4 @@
-// Activity's sections, arranged by the user (ACT-28; Majd, Nov 16 2026: "all these 'sections' on activity should be
+// Activity's sections, arranged by the user (ACT-29; Majd, Nov 16 2026: "all these 'sections' on activity should be
 // configurable so users can pick what they want to see and should be able to drag and move them around").
 //
 // Overview and Insights each keep an order and the sections hidden, per account on this phone

@@ -190,9 +190,9 @@ export function InsightsView({
   onOpenCalendar?: (month: string) => void;
   /** The reader at some ayahs, highlighted (the Recitation section's rows, RINS-2). */
   onOpenAyahs?: (sura: number, from: number, to: number) => void;
-  /** The user's order and the sections hidden (ACT-28); the usual layout without it. */
+  /** The user's order and the sections hidden (ACT-29); the usual layout without it. */
   sections?: TabLayout<'insights'>;
-  /** Edit sections (ACT-28): from the line shown when every section is hidden. */
+  /** Edit sections (ACT-29): from the line shown when every section is hidden. */
   onEditSections?: () => void;
 }) {
   // The juz sheet (ACT-21): mounted from its first opening on, so it can slide away after.
@@ -202,7 +202,7 @@ export function InsightsView({
     setJuzUsed(true);
     setJuz(n);
   };
-  // The sections in the user's order, those hidden left out (ACT-28). A section the account can't have keeps its slot.
+  // The sections in the user's order, those hidden left out (ACT-29). A section the account can't have keeps its slot.
   const span = rangeSpan(data.range ?? 30, data.today, data.firstDay);
   const hasPace =
     paceView({ revised: data.revised.filter((r) => r.day === r.countsFor), read: data.read, today: data.today, capacity: data.capacity, window: span.window }) != null;
@@ -290,7 +290,7 @@ function Section({
   testID?: string;
 }) {
   const { palette } = useTheme();
-  // The first section shown has no hairline above it, whichever it is (ACT-28).
+  // The first section shown has no hairline above it, whichever it is (ACT-29).
   const isFirst = useFirstSection() || first;
   return (
     <View style={[styles.section, !isFirst && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.separator }]} testID={testID}>
@@ -930,7 +930,7 @@ const INVITE = 'Turn on Smart Tracking to see your weak spots';
  * Smart Tracking off: no page is rated, so Weak spots gives way to one line that turns it on
  * (Settings → Revision, at its switch). A label, not a guide (ACT-12).
  */
-/** Every section hidden (ACT-28): one quiet line, and the way back. */
+/** Every section hidden (ACT-29): one quiet line, and the way back. */
 function NothingShown({ onEdit }: { onEdit?: () => void }) {
   const { palette } = useTheme();
   return (

@@ -1,4 +1,4 @@
-// Activity's sections, arranged by the user (ACT-28). Majd, Nov 16 2026: "all these 'sections' on activity should be
+// Activity's sections, arranged by the user (ACT-29). Majd, Nov 16 2026: "all these 'sections' on activity should be
 // configurable so users can pick what they want to see and should be able to drag and move them around".
 import React from 'react';
 import { Modal } from 'react-native';
@@ -139,7 +139,7 @@ describe('Activity’s sections', () => {
     });
   });
 
-  it('[ACT-28] at first both tabs are as they were: Insights in its usual order, Overview totals, calendar, key, day', async () => {
+  it('[ACT-29] at first both tabs are as they were: Insights in its usual order, Overview totals, calendar, key, day', async () => {
     open();
     await screen.findByText('November 2026');
     expect(order(OVERVIEW_IDS)).toEqual(['totals', 'calendar', 'key', 'day']);
@@ -148,7 +148,7 @@ describe('Activity’s sections', () => {
     expect(screen.getByLabelText('Edit sections')).toBeTruthy();
   });
 
-  it('[ACT-28] a switch hides a section at once, and it stays hidden for the account on this phone', async () => {
+  it('[ACT-29] a switch hides a section at once, and it stays hidden for the account on this phone', async () => {
     const first = open();
     await toInsights();
     await edit();
@@ -169,7 +169,7 @@ describe('Activity’s sections', () => {
     expect(order(INSIGHTS_IDS)).toEqual(['coverage', 'consistency', 'weak', 'memorization', 'pace']);
   });
 
-  it('[ACT-28] holding a section and dragging it moves it; the first one shown has no hairline above it', async () => {
+  it('[ACT-29] holding a section and dragging it moves it; the first one shown has no hairline above it', async () => {
     open();
     await toInsights();
     await edit();
@@ -191,7 +191,7 @@ describe('Activity’s sections', () => {
     expect(border('insights-coverage')).toBeGreaterThan(0);
   });
 
-  it('[ACT-28] VoiceOver moves a section with Move up and Move down', async () => {
+  it('[ACT-29] VoiceOver moves a section with Move up and Move down', async () => {
     open();
     await toInsights();
     await edit();
@@ -213,7 +213,7 @@ describe('Activity’s sections', () => {
     expect(order(INSIGHTS_IDS)).toEqual(['coverage', 'weak', 'pace', 'memorization']);
   });
 
-  it('[ACT-28] Overview: the calendar is always shown, the rest can go or move; the header stays on top', async () => {
+  it('[ACT-29] Overview: the calendar is always shown, the rest can go or move; the header stays on top', async () => {
     open();
     await screen.findByText('November 2026');
     await edit();
@@ -234,7 +234,7 @@ describe('Activity’s sections', () => {
     expect((await stored()).overview).toEqual({ order: ['day', 'totals', 'calendar', 'key'], hidden: ['key'] });
   });
 
-  it('[ACT-28] every Insights section hidden: one line, and the way back', async () => {
+  it('[ACT-29] every Insights section hidden: one line, and the way back', async () => {
     open();
     await toInsights();
     await edit();
@@ -249,7 +249,7 @@ describe('Activity’s sections', () => {
     expect(order(INSIGHTS_IDS)).toEqual(['coverage', 'consistency', 'weak', 'memorization', 'pace']);
   });
 
-  it('[ACT-28] per account: another account on this phone has the usual layout', async () => {
+  it('[ACT-29] per account: another account on this phone has the usual layout', async () => {
     await AsyncStorage.setItem(
       `@revisely_activity_sections:v1:${TESTER.id}`,
       JSON.stringify({ insights: { order: ['pace', 'coverage'], hidden: ['consistency'] } }),
@@ -263,7 +263,7 @@ describe('Activity’s sections', () => {
     expect(order(INSIGHTS_IDS)).toEqual(['coverage', 'consistency', 'weak', 'memorization', 'pace']);
   });
 
-  it('[ACT-28] with Smart Tracking off Weak spots’ slot is its invite, and the editor says why', async () => {
+  it('[ACT-29] with Smart Tracking off Weak spots’ slot is its invite, and the editor says why', async () => {
     open({ ...TESTER, smartTrackingEnabled: false });
     await toInsights();
     expect(order(INSIGHTS_IDS)).toEqual(['coverage', 'consistency', 'weak', 'memorization', 'pace']);
@@ -274,7 +274,7 @@ describe('Activity’s sections', () => {
     await done();
   });
 
-  it('[ACT-28] testers only for now: anyone else has no Edit sections and the usual layout, whatever this phone holds', async () => {
+  it('[ACT-29] testers only for now: anyone else has no Edit sections and the usual layout, whatever this phone holds', async () => {
     const plain = { ...TESTER, id: 'plain-1', previewTester: false };
     await AsyncStorage.setItem('@revisely_activity_sections:v1:plain-1', JSON.stringify({ insights: { order: ['pace'], hidden: ['coverage'] } }));
     open(plain);
