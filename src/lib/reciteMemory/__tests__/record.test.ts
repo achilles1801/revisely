@@ -118,6 +118,19 @@ describe('a record on the account', () => {
     expect(fromStored(r.id, JSON.parse(JSON.stringify(stored)))).toEqual({ ...r, deleted: undefined });
   });
 
+  it('a slip into a similar ayah keeps where it went, its ending and the other ayat (Recite insights)', () => {
+    const into: Mark = { ...lookalike, id: '480:word:', w: 480, ayah: [2, 48], into: { w: 1900, ayah: [2, 123], also: [[3, 1], [4, 2]] } };
+    const ending: Mark = { ...lookalike, id: '9000:word:', w: 9000, ayah: [113, 3], into: { w: 9020, ayah: [113, 5], ending: true } };
+    const r = { ...(recordFromTake(doneState([lookalike]), words, ctx()) as TakeRecord), marks: [into, ending] };
+    const stored = toStored(r);
+    // Flat fields only: Firestore keeps no arrays in arrays.
+    expect(JSON.stringify(stored)).not.toMatch(/\[\[/);
+    const back = fromStored(r.id, JSON.parse(JSON.stringify(stored))) as TakeRecord;
+    expect(back.marks).toEqual([into, ending]);
+    // A record from before keeps its marks without one.
+    expect((fromStored(r.id, toStored({ ...r, marks: [lookalike] })) as TakeRecord).marks[0].into).toBeUndefined();
+  });
+
   it('a word cleared by hand, and a forgotten take, read back', () => {
     const c: ClearRecord = { id: 'c1', kind: 'clear', createdAt: 5, rev: 6, day: '2026-11-15', w: 31453, group: 'word' };
     expect(fromStored('c1', toStored(c))).toEqual(c);
