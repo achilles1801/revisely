@@ -51,8 +51,8 @@ export interface HelpOpts {
   sections?: boolean;
 }
 
-/** Why Recite's topics have no rules to cover: it isn't in BEHAVIOUR.md (Revisely Dev only, its checker on Cloud Run). */
-const RECITE_UNRULED = 'Recite is in Revisely Dev only and has no BEHAVIOUR.md rules yet (its checker runs on Cloud Run)';
+/** Why a Recite topic has no rule to cover: RECITE-1 to RECITE-8 (BEHAVIOUR.md) don't describe that part of it yet. */
+const RECITE_UNRULED = 'no RECITE rule in BEHAVIOUR.md describes this part of Recite yet (Revisely Dev only)';
 
 export interface HelpTopic {
   id: string;
@@ -247,8 +247,7 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         text:
           'Hold [[mic]] → {{Recite}} and start anywhere: it finds you on the page, or elsewhere in the Qur’an. ' +
           'With {{Mark mistakes}} on, it marks your mistakes.',
-        covers: [],
-        unruled: RECITE_UNRULED,
+        covers: ['RECITE-1'],
         when: 'liveRecite',
       },
       {
@@ -258,8 +257,7 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         text:
           'Red: a word skipped, wrong or extra. Amber: a haraka or letter, or {{Not clear}} (not counted). ' +
           'Violet: tajweed, with {{Strict}}. Tap one to see what it is.',
-        covers: [],
-        unruled: RECITE_UNRULED,
+        covers: ['RECITE-2', 'RECITE-3'],
         when: 'liveRecite',
       },
       {
@@ -269,8 +267,7 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         text:
           '{{Hear it}} plays the ayah and pauses your take; {{Your recitation}} plays you there. ' +
           '{{Not a mistake}} takes it off, and {{Undo}} or {{Put back}} brings it back.',
-        covers: [],
-        unruled: RECITE_UNRULED,
+        covers: ['RECITE-4'],
         when: 'liveRecite',
       },
       {
@@ -280,8 +277,7 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         text:
           '{{Recite the mistakes again}} goes over them once more; a slip into a similar ayah gets its own line. ' +
           '{{Undo}} on {{Recording saved}} deletes the recording.',
-        covers: [],
-        unruled: RECITE_UNRULED,
+        covers: ['RECITE-7'],
         when: 'liveRecite',
       },
     ],
@@ -306,9 +302,8 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         id: 'reciteTake.hidden',
         icon: 'eye-off-outline',
         title: 'From memory',
-        text: '[[eye]] hides the words, and they appear as you say them. [[back]] shows the next word, and ‹‹ the whole ayah.',
-        covers: [],
-        unruled: RECITE_UNRULED,
+        text: '[[eye]] hides the words, and they appear as you say them. [[back]] shows the next word, and ‹‹ the rest of its ayah.',
+        covers: ['RECITE-6'],
         when: 'liveRecite',
       },
       {
@@ -318,8 +313,7 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         text:
           'Words you uncover stay grey for the take and never count in your score. ' +
           'The summary lists them, and {{Recite the mistakes again}} takes them in.',
-        covers: [],
-        unruled: RECITE_UNRULED,
+        covers: ['RECITE-6'],
         when: 'liveRecite',
       },
       {
@@ -353,8 +347,7 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         icon: 'refresh',
         title: 'Recite them again',
         text: 'On a page with words still to fix, hold [[mic]] for "Recite your 3 mistakes here": one take over just that stretch.',
-        covers: [],
-        unruled: RECITE_UNRULED,
+        covers: ['RECITE-7'],
         when: 'liveRecite',
       },
       {
@@ -389,10 +382,9 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         icon: 'shuffle',
         title: 'Test me',
         text:
-          'Hold [[mic]] → {{Test me}}: five random places in what you’ve memorized, or in one juz. ' +
+          'Hold [[mic]] → {{Test me}}: up to five random places in what you’ve memorized, or in one juz. ' +
           'Each shows an ayah’s first two words; carry on from there.',
-        covers: [],
-        unruled: RECITE_UNRULED,
+        covers: ['RECITE-8'],
         when: 'liveRecite',
       },
       {
@@ -400,8 +392,7 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         icon: 'list-outline',
         title: 'How it went',
         text: 'The bar says how each place went, and [[next]] moves on. At the end: how many you continued cleanly, and {{Test me again}}.',
-        covers: [],
-        unruled: RECITE_UNRULED,
+        covers: ['RECITE-8'],
         when: 'liveRecite',
       },
       {
