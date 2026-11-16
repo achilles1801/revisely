@@ -5,10 +5,9 @@
 // real metric for tracking that consistency".
 
 import { CITIES, newAccount, pagesRange } from '../harness/account';
-import { markPreviewTester } from '../harness/admin';
 import { MINUTE, setNow, setZone, ZONES } from '../harness/clock';
 import { Home, activityStack, homeStack } from '../harness/screens';
-import { Phone, type OpenApp } from '../harness/phone';
+import { Phone, type Booted, type OpenApp } from '../harness/phone';
 import { fajrOn } from './dayWeeks';
 
 const label = (app: OpenApp, testID: string) => app.screen.queryByTestId(testID)?.props.accessibilityLabel as string | undefined;
@@ -26,9 +25,15 @@ async function revise(phone: Phone, at: string | Date): Promise<void> {
   await app.close();
 }
 
+/** Activity in Revisely Dev, where Gaps is (gapsInsightsEnabled). */
+function devActivity(mods: Booted) {
+  mods.require<{ default: { expoConfig: { extra: Record<string, unknown> } } }>('expo-constants').default.expoConfig.extra.variant = 'dev';
+  return activityStack(mods);
+}
+
 async function openInsights(phone: Phone): Promise<OpenApp> {
-  const app = await phone.open(activityStack);
-  await app.until(() => app.app.user?.previewTester === true, 'the account to be a tester');
+  const app = await phone.open(devActivity);
+  await app.until(() => app.app.user != null, 'the account');
   const nav = app.mods.require<{ navigation: { current: any } }>('./navRef').navigation;
   await app.act(async () => {
     nav.current.navigate('Activity');
@@ -49,9 +54,7 @@ it('[ACT-28] [DAY-2] Gaps counts by the revision day: a session after midnight, 
     memorized: pagesRange(582, 604),
     user: { dailyPageCapacity: 5, fajrBoundaryEnabled: true, locationCoords: CITIES.chicago },
   });
-  const uid = first.uid;
   await first.close();
-  await markPreviewTester(uid);
 
   // Monday 2 and Tuesday 3 November, then nothing until Saturday 7's revision day, revised at 4 a.m. on
   // Sunday 8, an hour before Fajr.

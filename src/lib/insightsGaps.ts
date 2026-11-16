@@ -18,11 +18,14 @@ import { dayMonth, t } from '../i18n';
 import { isDevVariant } from './variant';
 
 /**
- * Who sees Gaps: Revisely Dev and previewTester accounts (testers first; Majd, Nov 7 2026). A release
- * opens it to every account in one line, as the November 2026 release did its gates (lib/activityBlocks).
+ * Who sees Gaps and Last revised: Revisely Dev (Majd, Nov 16 2026: build straight into Revisely Dev). Only Revisely
+ * Dev's Revo carries their guide and figures (the Dev guide, context.app 'dev'), and "whatever app changes we make,
+ * revo should get that update too": a TestFlight tester's Revo, on the store's prompt, wouldn't know them. E2E builds
+ * show them for the screenshots (the variable is inlined; every other build drops it). A release opens them in one
+ * line, once the main guide has them.
  */
 export function gapsInsightsEnabled(user: { previewTester?: boolean } | null | undefined): boolean {
-  return user != null && (user.previewTester === true || isDevVariant());
+  return user != null && (isDevVariant() || process.env.EXPO_PUBLIC_E2E === '1');
 }
 
 const DAY_MS = 86_400_000;

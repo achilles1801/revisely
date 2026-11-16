@@ -248,25 +248,32 @@ function Strip({
     else onOpenCalendar?.(days[i].slice(0, 7));
   };
 
-  // A label sits over its gap's middle, kept inside the strip; one with too little room is left out
-  // (the tiles and VoiceOver carry every number).
-  const label = (p: Extract<StripPart, { kind: 'gap' | 'open' }>, key: string) => {
-    if (!p.long) return null;
-    // An absence of 2 weeks or more still open is grey, not red: someone coming back is welcomed, not alarmed.
-    const quiet = p.kind === 'open' && naturalDiffers(p.days);
-    const text = gapLabel({ days: p.days, open: p.kind === 'open', atLeast: p.kind === 'gap' && p.atLeast }, inDays);
-    const textW = text.length * LABEL_SIZE * 0.55;
-    const span = x(p.to) - x(p.from);
-    if (span < Math.min(textW, 44)) return null;
-    const mid = (x(p.from) + x(p.to)) / 2;
-    const anchor = mid - textW / 2 < 0 ? 'start' : mid + textW / 2 > width ? 'end' : 'middle';
-    const at = anchor === 'start' ? 0 : anchor === 'end' ? width : mid;
-    return (
-      <SvgText key={key} x={at} y={LINE_Y - 12} fontSize={LABEL_SIZE} fontWeight="600" fill={quiet ? palette.secondary : palette.red} textAnchor={anchor}>
-        {text}
-      </SvgText>
-    );
-  };
+  // A label sits over its gap's middle, kept inside the strip, and may reach past its gap's ends; one that would
+  // run into the label before it is left out (the tiles and VoiceOver carry every number).
+  const labels = (() => {
+    const out: React.ReactNode[] = [];
+    let right = -Infinity;
+    const long = parts
+      .map((p, i) => ({ p, i }))
+      .filter((e): e is { p: Extract<StripPart, { kind: 'gap' | 'open' }>; i: number } => e.p.kind !== 'run' && e.p.long)
+      .sort((a, b) => a.p.from - b.p.from);
+    for (const { p, i } of long) {
+      // An absence of 2 weeks or more still open is grey, not red: someone coming back is welcomed, not alarmed.
+      const quiet = p.kind === 'open' && naturalDiffers(p.days);
+      const text = gapLabel({ days: p.days, open: p.kind === 'open', atLeast: p.kind === 'gap' && p.atLeast }, inDays);
+      const textW = text.length * LABEL_SIZE * 0.55;
+      const mid = (x(p.from) + x(p.to)) / 2;
+      const left = Math.max(0, Math.min(width - textW, mid - textW / 2));
+      if (left < right + 6) continue;
+      right = left + textW;
+      out.push(
+        <SvgText key={`l${i}`} x={left} y={LINE_Y - 12} fontSize={LABEL_SIZE} fontWeight="600" fill={quiet ? palette.secondary : palette.red} textAnchor="start">
+          {text}
+        </SvgText>,
+      );
+    }
+    return out;
+  })();
 
   return (
     <View style={styles.strip}>
@@ -302,7 +309,7 @@ function Strip({
                 />
               ),
             )}
-            {parts.map((p, i) => (p.kind === 'run' ? null : label(p, `l${i}`)))}
+            {labels}
             {revised[n - 1] ? null : <Circle cx={x(n - 1)} cy={LINE_Y} r={4.5} fill={palette.bg} stroke={palette.secondary} strokeWidth={1.5} />}
             {revised.map((r, i) => (r ? <Circle key={days[i]} cx={x(i)} cy={LINE_Y} r={dot} fill={palette.primary} /> : null))}
           </Svg>

@@ -117,7 +117,7 @@ export interface InsightsData {
   coverageSince?: Map<number, string>;
   /** Pages already first tomorrow (Insights' carry): their buttons show "First tomorrow ✓" (ACT-24). */
   firstTomorrow?: ReadonlySet<number>;
-  /** Gaps (ACT-28): Revisely Dev and testers until a release opens it (lib/insightsGaps gapsInsightsEnabled). */
+  /** Gaps (ACT-28): Revisely Dev until a release opens it (lib/insightsGaps gapsInsightsEnabled). */
   gaps?: boolean;
   /** The first day the items were read from (Gaps: a gap before it began on a day not read, ACT-28). */
   itemsFrom?: string | null;

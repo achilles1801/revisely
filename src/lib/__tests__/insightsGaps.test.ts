@@ -260,13 +260,12 @@ describe('who sees it', () => {
     mockDev = false;
   });
 
-  it('testers, and every account in Revisely Dev; nobody signed out', () => {
-    expect(gapsInsightsEnabled({ previewTester: true })).toBe(true);
-    expect(gapsInsightsEnabled({ previewTester: false })).toBe(false);
+  it('every account in Revisely Dev, nobody signed out; not the store app, testers included', () => {
+    expect(gapsInsightsEnabled({ previewTester: true })).toBe(false);
     expect(gapsInsightsEnabled({})).toBe(false);
-    expect(gapsInsightsEnabled(null)).toBe(false);
     mockDev = true;
     expect(gapsInsightsEnabled({})).toBe(true);
+    expect(gapsInsightsEnabled({ previewTester: true })).toBe(true);
     expect(gapsInsightsEnabled(null)).toBe(false);
   });
 });
