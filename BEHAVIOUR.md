@@ -654,6 +654,18 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   refresh reads everything again, the items Overview and Insights read included, and its spinner always ends
   (after 10 s at most), on a transparent ground as Home's. (Majd, Nov 9 2026: "shouldnt this update whenever
   a user scrolls down to refresh the page instead of having to close out the app?")
+- **ACT-29.** Activity's sections are the user's to arrange (testers for now): Edit sections (an icon at the end
+  of the tabs row) opens the tab's sections, each with a switch to show or hide it; holding a section (350 ms,
+  still) lifts it to drag to another place, and VoiceOver has Move up and Move down. Every change shows at once.
+  Overview's month header stays on top; under it the month's totals, the calendar (always shown), its key and the
+  picked day's summary. Insights: Coverage, Consistency, Weak spots (its Smart Tracking invite when that is off),
+  Recitation (for an account that recites), Memorization, Pace. A section the account can't have keeps its place;
+  the first one shown has no hairline above it; with every Insights section hidden, one line says so with Edit
+  sections. The layout is kept per account on the phone, never on the account; another account, or a new one,
+  starts with the usual layout, which "Show all, in the usual order" brings back. Everyone else keeps the usual
+  layout and no Edit sections. (Majd, Nov 16 2026: "all these 'sections' on activity should be configurable so
+  users can pick what they want to see and should be able to drag and move them around".)
+
 ## Ask coach
 
 - **COACH-1.** The coach answers only a previewTester account that has opted in. One answer is kept per insight and

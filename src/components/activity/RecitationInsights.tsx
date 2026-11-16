@@ -35,6 +35,7 @@ import {
 } from '../../lib/reciteInsights/describe';
 import { markFill } from '../reciteLive/markColours';
 import { WordChip } from '../reciteLive/WordChip';
+import { useFirstSection } from './sectionPlace';
 
 /** Rows shown before "See all". */
 const FIRST_ROWS = 3;
@@ -62,6 +63,8 @@ export interface RecitationInsightsProps {
 
 export function RecitationInsights({ records, words, today, window, inWords, smartTracking, rating, revo, onOpenAyahs }: RecitationInsightsProps) {
   const { palette } = useTheme();
+  // First on Insights (ACT-28): no hairline above it.
+  const first = useFirstSection();
   const [allSlipping, setAllSlipping] = useState(false);
   const ins = useMemo(() => recitationInsights(records, today, window), [records, today, window]);
   const strong = useMemo(
@@ -73,7 +76,7 @@ export function RecitationInsights({ records, words, today, window, inWords, sma
   const weeksDrawn = ins.weeks.filter((w) => w.score !== null).length >= 2;
   const quiet = [clearedLine(ins.cleared.length), ins.takes > 0 ? kindsLine(ins) : null].filter(Boolean) as string[];
   return (
-    <View style={[styles.section, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.separator }]} testID="insights-recitation">
+    <View style={[styles.section, !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.separator }]} testID="insights-recitation">
       <View style={styles.head}>
         <View style={styles.flex}>
           <ChromeText style={[styles.title, { color: palette.text }]} accessibilityRole="header">

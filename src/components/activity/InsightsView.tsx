@@ -64,6 +64,8 @@ import { PaceSheet } from './PaceSheet';
 import { GapsSection } from './GapsSection';
 import type { PushBack } from '../../lib/gapsCycle';
 import { RecitationInsights } from './RecitationInsights';
+import { FirstSection, useFirstSection } from './sectionPlace';
+import { DEFAULT_SECTIONS, sectionsToShow, type InsightsSection, type TabLayout } from '../../lib/activitySections';
 import { stillMarkedWords } from '../../lib/reciteInsights/insights';
 import type { Recitation } from '../../lib/reciteInsights/useRecitation';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -169,6 +171,8 @@ export function InsightsView({
   onOpenDay,
   onOpenCalendar,
   onOpenAyahs,
+  sections = DEFAULT_SECTIONS.insights,
+  onEditSections,
 }: {
   data: InsightsData;
   onReviseTomorrow: (pages: number[]) => void;
@@ -186,6 +190,10 @@ export function InsightsView({
   onOpenCalendar?: (month: string) => void;
   /** The reader at some ayahs, highlighted (the Recitation section's rows, RINS-2). */
   onOpenAyahs?: (sura: number, from: number, to: number) => void;
+  /** The user's order and the sections hidden (ACT-28); the usual layout without it. */
+  sections?: TabLayout<'insights'>;
+  /** Edit sections (ACT-28): from the line shown when every section is hidden. */
+  onEditSections?: () => void;
 }) {
   // The juz sheet (ACT-21): mounted from its first opening on, so it can slide away after.
   const [juz, setJuz] = useState<number | null>(null);
@@ -194,46 +202,59 @@ export function InsightsView({
     setJuzUsed(true);
     setJuz(n);
   };
+  // The sections in the user's order, those hidden left out (ACT-28). A section the account can't have keeps its slot.
+  const span = rangeSpan(data.range ?? 30, data.today, data.firstDay);
+  const hasPace =
+    paceView({ revised: data.revised.filter((r) => r.day === r.countsFor), read: data.read, today: data.today, capacity: data.capacity, window: span.window }) != null;
+  const has = (id: InsightsSection) =>
+    id === 'weak'
+      ? data.smartTracking !== false || onTurnOnSmartTracking != null
+      : id === 'recitation'
+        ? data.recitation != null && onOpenAyahs != null
+        : id === 'pace'
+          ? hasPace
+          : true;
+  const shown = sectionsToShow(sections, has);
+  const part = (id: InsightsSection): React.ReactNode => {
+    switch (id) {
+      case 'coverage':
+        return <Coverage data={data} onPlanIt={onPlanIt} onAddToPlan={onAddToPlan} onOpenJuz={openJuz} onOpenPage={onOpenPage} />;
+      case 'consistency':
+        return <Consistency data={data} onOpenDay={onOpenDay} onOpenCalendar={onOpenCalendar} />;
+      case 'weak':
+        return data.smartTracking !== false ? (
+          <WeakSpots data={data} onReviseTomorrow={onReviseTomorrow} onOpenPage={onOpenPage} onSeeAllPages={onSeeAllPages} />
+        ) : onTurnOnSmartTracking ? (
+          <SmartTrackingInvite onPress={onTurnOnSmartTracking} />
+        ) : null;
+      case 'recitation':
+        return data.recitation && onOpenAyahs ? (
+          <RecitationInsights
+            records={data.recitation.records}
+            words={data.recitation.words}
+            today={data.today}
+            window={span.window}
+            inWords={span.inWords}
+            smartTracking={data.smartTracking !== false}
+            rating={data.rating}
+            revo={data.revo}
+            onOpenAyahs={onOpenAyahs}
+          />
+        ) : null;
+      case 'memorization':
+        return <Memorization data={data} onOpenDay={onOpenDay} />;
+      case 'pace':
+        return <Pace data={data} onOpenDay={onOpenDay} />;
+    }
+  };
   return (
     <View testID="activity-insights">
-      <Coverage data={data} onPlanIt={onPlanIt} onAddToPlan={onAddToPlan} onOpenJuz={openJuz} onOpenPage={onOpenPage} />
-      <Consistency data={data} onOpenDay={onOpenDay} onOpenCalendar={onOpenCalendar} />
-      {data.gaps ? (
-        <GapsSection
-          revised={data.revised}
-          today={data.today}
-          window={rangeSpan(data.range ?? 30, data.today, data.firstDay).window}
-          inWords={rangeSpan(data.range ?? 30, data.today, data.firstDay).inWords}
-          lastWords={rangeSpan(data.range ?? 30, data.today, data.firstDay).lastWords}
-          all={rangeSpan(data.range ?? 30, data.today, data.firstDay).all}
-          firstDay={data.firstDay}
-          knownSince={data.itemsFrom}
-          lastRevisedOn={data.lastRevisedOn}
-          onOpenDay={onOpenDay}
-          onOpenCalendar={onOpenCalendar}
-          pushBack={data.pushBack}
-        />
-      ) : null}
-      {data.smartTracking !== false ? (
-        <WeakSpots data={data} onReviseTomorrow={onReviseTomorrow} onOpenPage={onOpenPage} onSeeAllPages={onSeeAllPages} />
-      ) : onTurnOnSmartTracking ? (
-        <SmartTrackingInvite onPress={onTurnOnSmartTracking} />
-      ) : null}
-      {data.recitation && onOpenAyahs ? (
-        <RecitationInsights
-          records={data.recitation.records}
-          words={data.recitation.words}
-          today={data.today}
-          window={rangeSpan(data.range ?? 30, data.today, data.firstDay).window}
-          inWords={rangeSpan(data.range ?? 30, data.today, data.firstDay).inWords}
-          smartTracking={data.smartTracking !== false}
-          rating={data.rating}
-          revo={data.revo}
-          onOpenAyahs={onOpenAyahs}
-        />
-      ) : null}
-      <Memorization data={data} onOpenDay={onOpenDay} />
-      <Pace data={data} onOpenDay={onOpenDay} />
+      {shown.map((id, i) => (
+        <FirstSection.Provider key={id} value={i === 0}>
+          {part(id)}
+        </FirstSection.Provider>
+      ))}
+      {shown.length === 0 ? <NothingShown onEdit={onEditSections} /> : null}
       {juzUsed ? (
         <JuzSheet
           juz={juz}
@@ -269,8 +290,10 @@ function Section({
   testID?: string;
 }) {
   const { palette } = useTheme();
+  // The first section shown has no hairline above it, whichever it is (ACT-28).
+  const isFirst = useFirstSection() || first;
   return (
-    <View style={[styles.section, !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.separator }]} testID={testID}>
+    <View style={[styles.section, !isFirst && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.separator }]} testID={testID}>
       <View style={styles.sectionHead}>
         <View style={styles.flex}>
           <ChromeText style={[styles.sectionTitle, { color: palette.text }]} accessibilityRole="header">
@@ -487,7 +510,6 @@ function Coverage({
 
   return (
     <Section
-      first
       title="Coverage"
       detail={detail}
       testID="insights-coverage"
@@ -908,10 +930,29 @@ const INVITE = 'Turn on Smart Tracking to see your weak spots';
  * Smart Tracking off: no page is rated, so Weak spots gives way to one line that turns it on
  * (Settings → Revision, at its switch). A label, not a guide (ACT-12).
  */
-function SmartTrackingInvite({ onPress }: { onPress: () => void }) {
+/** Every section hidden (ACT-28): one quiet line, and the way back. */
+function NothingShown({ onEdit }: { onEdit?: () => void }) {
   const { palette } = useTheme();
   return (
-    <View style={[styles.section, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.separator }]}>
+    <View style={styles.section} testID="insights-nothing-shown">
+      <ChromeText style={[typeV2.body, { color: palette.secondary }]}>Every section is hidden.</ChromeText>
+      {onEdit ? (
+        <Tap onPress={onEdit} accessibilityRole="button" hitSlop={8} style={styles.invite} testID="insights-edit-sections">
+          <ChromeText style={[typeV2.name, styles.linkText, { color: palette.link }]} maxFontSizeMultiplier={LINK_MAX_SCALE}>
+            Edit sections
+          </ChromeText>
+          <Ionicons name="chevron-forward" size={16} color={palette.link} />
+        </Tap>
+      ) : null}
+    </View>
+  );
+}
+
+function SmartTrackingInvite({ onPress }: { onPress: () => void }) {
+  const { palette } = useTheme();
+  const first = useFirstSection();
+  return (
+    <View style={[styles.section, !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.separator }]}>
       <Tap onPress={onPress} accessibilityRole="link" accessibilityLabel={INVITE} hitSlop={8} style={styles.invite} testID="insights-smart-tracking">
         <ChromeText style={[typeV2.name, styles.linkText, { color: palette.link }]} maxFontSizeMultiplier={LINK_MAX_SCALE}>
           {INVITE}

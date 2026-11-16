@@ -24,6 +24,7 @@ import { typeV2 } from '../../theme/v2';
 import { BlockMark, RevisedMark } from './BlockMark';
 import type { Memorized, Read, Revised } from '../../lib/activityInsights';
 import { formatDate } from '../../i18n';
+import { DEFAULT_SECTIONS, sectionsToShow, type OverviewSection, type TabLayout } from '../../lib/activitySections';
 
 /** Chrome text (the pills, the title, the totals, the grid, the preview) stops growing here, as headers and menu rows do. */
 const MAX_SCALE = 1.4;
@@ -66,6 +67,7 @@ export function CalendarMonth({
   onPick,
   onOpen,
   recordings,
+  sections = DEFAULT_SECTIONS.overview,
 }: {
   /** 'YYYY-MM' (the month shown, and the grid's days). */
   month: string;
@@ -84,6 +86,8 @@ export function CalendarMonth({
   onOpen: (day: string, block?: PreviewBlock) => void;
   /** Recordings by day: the preview's mic and count beside the block they belong to. */
   recordings?: Map<string, RecordingCounts>;
+  /** The user's order of the sections under the header, and those hidden (ACT-28); the usual layout without it. */
+  sections?: TabLayout<'overview'>;
 }) {
   const { palette } = useTheme();
   const { fontScale } = useWindowDimensions();
@@ -118,6 +122,135 @@ export function CalendarMonth({
     previewRows.push({ key: 'read', kind: 'read', label: 'Read', value: `${describePassage(pagesOf(data.read), { form: 'short' })}${minutes}`, mics: recs?.reading });
   }
   if (preview.notes) previewRows.push({ key: 'notes', kind: 'notes', label: 'Notes', value: '1' });
+
+  // The sections under the header, in the user's order, those hidden left out (ACT-28): the header (the month or
+  // week, Week | Month, Today and the arrows) stays on top, since everything below follows it.
+  // Totals (the month): four equal columns (icon and label, then the value); two by two at large text.
+  const totals =
+    span === 'month' ? (
+      <View style={styles.totals} testID="calendar-totals">
+        {[
+          { icon: 'repeat' as const, label: 'Revised', value: `${revisedDays} ${revisedDays === 1 ? 'day' : 'days'}` },
+          { icon: 'leaf-outline' as const, label: 'Memorized', value: `+${memorizedPages} pages` },
+          { icon: 'book-outline' as const, label: 'Read', value: readMinutes > 0 ? formatMinutesLong(readMinutes) : '0 min' },
+          { icon: 'document-text-outline' as const, label: 'Notes', value: String(noteDays) },
+        ].map((t) => (
+          <Total key={t.label} {...t} twoByTwo={fontScale >= TOTALS_TWO_BY_TWO} />
+        ))}
+      </View>
+    ) : null;
+  const calendar =
+    span === 'week' ? (
+      <View style={styles.grid} testID="calendar-week">
+        <View style={styles.weekRow}>
+          {weekShown.map((d) => (
+            <DayCell key={d} day={d} today={today} picked={picked} data={data} onPick={onPick} onOpen={onOpen} />
+          ))}
+        </View>
+        {weekShown.map((d) => (
+          <WeekSummary key={`sum-${d}`} day={d} data={data} onOpen={onOpen} />
+        ))}
+      </View>
+    ) : (
+      // Grid: letters (18 tall), then the weeks, each day 50 tall.
+      <View style={styles.grid} testID="calendar-grid">
+        <View style={styles.weekRow}>
+          {WEEKDAYS.map((w, i) => (
+            <Text key={i} style={[styles.letter, { color: palette.secondary }]} maxFontSizeMultiplier={MAX_SCALE}>
+              {w}
+            </Text>
+          ))}
+        </View>
+        {grid.map((row, r) => (
+          <View key={r} style={styles.weekRow}>
+            {row.map((d, c) => (d ? <DayCell key={c} day={d} today={today} picked={picked} data={data} onPick={onPick} onOpen={onOpen} /> : <View key={c} style={styles.cell} />))}
+          </View>
+        ))}
+      </View>
+    );
+  const key = (
+    <View style={styles.legend} testID="calendar-legend">
+      <LegendItem label="Revised">
+        <Svg width={12} height={12}>
+          <Circle cx={6} cy={6} r={4.5} stroke={palette.track} strokeWidth={2} fill="none" />
+          <Circle cx={6} cy={6} r={4.5} stroke={palette.primary} strokeWidth={2} fill="none" strokeDasharray={`${2 * Math.PI * 4.5 * 0.7} ${2 * Math.PI * 4.5}`} transform="rotate(-90 6 6)" />
+        </Svg>
+      </LegendItem>
+      <LegendItem label="Memorized">
+        <View style={[styles.legendDot, { backgroundColor: palette.primary }]} />
+      </LegendItem>
+      <LegendItem label="Read">
+        <View style={[styles.legendDot, { backgroundColor: palette.text }]} />
+      </LegendItem>
+      <LegendItem label="Note">
+        <View style={[styles.legendDot, styles.noteRing, { borderColor: palette.secondary }]} />
+      </LegendItem>
+    </View>
+  );
+  // The picked day: its date and Open, then one row per block that has something. The whole of it
+  // opens the day (ACT-18; Majd, Nov 8 2026: Open alone was easy to miss): the date and
+  // Open are one button, each row another, edge to edge with no gap between them. Chrome, so it
+  // stops growing at 1.4×, and the date gives way: at the largest text it pushed Open off the
+  // screen and the rows clipped into each other (Nov 2026).
+  const dayPart = (
+    <View style={styles.preview} testID="calendar-preview">
+      <Tap
+        onPress={() => onOpen(shownDay)}
+        accessibilityRole="button"
+        accessibilityLabel="Open the day"
+        accessibilityValue={{ text: formatDayLong(shownDay) }}
+        style={styles.previewHead}
+        testID="preview-open"
+      >
+        <Text style={[styles.previewDate, { color: palette.text }]} numberOfLines={2} maxFontSizeMultiplier={MAX_SCALE} testID="preview-date">
+          {formatDayLong(shownDay)}
+        </Text>
+        <View style={styles.openRow}>
+          <Text style={[typeV2.name, { color: palette.link }]} maxFontSizeMultiplier={MAX_SCALE}>
+            Open
+          </Text>
+          <Ionicons name="chevron-forward" size={16} color={palette.link} />
+        </View>
+      </Tap>
+      {previewRows.map((r) => (
+        <Tap
+          key={r.key}
+          onPress={() => onOpen(shownDay, r.kind)}
+          accessibilityRole="button"
+          accessibilityLabel={`${r.label}, ${r.value}${r.mics ? `, ${r.mics} ${r.mics === 1 ? 'recording' : 'recordings'}` : ''}`}
+          accessibilityHint={`Opens the day at ${r.label}`}
+          style={styles.previewRow}
+          testID={`preview-row-${r.key}`}
+        >
+          {r.kind === 'revised' ? <RevisedMark fraction={dayMarks(shownDay, data).ring ?? 0} done={(dayMarks(shownDay, data).ring ?? 0) >= 1} size={26} /> : <BlockMark kind={r.kind} size={26} />}
+          <Text style={[typeV2.body, { color: palette.text, minWidth: 84 }]} numberOfLines={1} maxFontSizeMultiplier={MAX_SCALE}>
+            {r.label}
+          </Text>
+          <Text
+            style={[typeV2.body, styles.tabular, { color: palette.text, flex: 1, textAlign: 'right' }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
+            maxFontSizeMultiplier={MAX_SCALE}
+            testID={`preview-value-${r.key}`}
+          >
+            {r.value}
+          </Text>
+          {r.mics ? (
+            <View style={styles.mics} accessible accessibilityLabel={`${r.mics} ${r.mics === 1 ? 'recording' : 'recordings'}`} testID={`preview-recordings-${r.key}`}>
+              <Ionicons name="mic-outline" size={13} color={palette.secondary} />
+              <Text style={[typeV2.meta, styles.tabular, { color: palette.secondary }]} maxFontSizeMultiplier={MAX_SCALE}>
+                {r.mics}
+              </Text>
+            </View>
+          ) : null}
+        </Tap>
+      ))}
+    </View>
+  );
+  const parts: Record<OverviewSection, React.ReactNode> = { totals, calendar, key, day: dayPart };
+  // The totals are the month's: none in a week.
+  const shown = sectionsToShow(sections, (id) => id !== 'totals' || span === 'month');
 
   return (
     <View testID="calendar-month">
@@ -181,127 +314,14 @@ export function CalendarMonth({
         testID="calendar-span-menu"
       />
 
-      {/* Totals (the month): four equal columns (icon and label, then the value); two by two at large text. */}
-      {span === 'month' ? <View style={styles.totals} testID="calendar-totals">
-        {[
-          { icon: 'repeat' as const, label: 'Revised', value: `${revisedDays} ${revisedDays === 1 ? 'day' : 'days'}` },
-          { icon: 'leaf-outline' as const, label: 'Memorized', value: `+${memorizedPages} pages` },
-          { icon: 'book-outline' as const, label: 'Read', value: readMinutes > 0 ? formatMinutesLong(readMinutes) : '0 min' },
-          { icon: 'document-text-outline' as const, label: 'Notes', value: String(noteDays) },
-        ].map((t) => (
-          <Total key={t.label} {...t} twoByTwo={fontScale >= TOTALS_TWO_BY_TWO} />
-        ))}
-      </View> : null}
-
-      {span === 'week' ? (
-        <View style={styles.grid} testID="calendar-week">
-          <View style={styles.weekRow}>
-            {weekShown.map((d) => (
-              <DayCell key={d} day={d} today={today} picked={picked} data={data} onPick={onPick} onOpen={onOpen} />
-            ))}
-          </View>
-          {weekShown.map((d) => (
-            <WeekSummary key={`sum-${d}`} day={d} data={data} onOpen={onOpen} />
-          ))}
-        </View>
-      ) : (
-      /* Grid: letters (18 tall), then the weeks, each day 50 tall. */
-      <View style={styles.grid}>
-        <View style={styles.weekRow}>
-          {WEEKDAYS.map((w, i) => (
-            <Text key={i} style={[styles.letter, { color: palette.secondary }]} maxFontSizeMultiplier={MAX_SCALE}>
-              {w}
-            </Text>
-          ))}
-        </View>
-        {grid.map((row, r) => (
-          <View key={r} style={styles.weekRow}>
-            {row.map((d, c) => (d ? <DayCell key={c} day={d} today={today} picked={picked} data={data} onPick={onPick} onOpen={onOpen} /> : <View key={c} style={styles.cell} />))}
-          </View>
-        ))}
-      </View>
-      )}
-
-      {/* Legend. */}
-      <View style={styles.legend}>
-        <LegendItem label="Revised">
-          <Svg width={12} height={12}>
-            <Circle cx={6} cy={6} r={4.5} stroke={palette.track} strokeWidth={2} fill="none" />
-            <Circle cx={6} cy={6} r={4.5} stroke={palette.primary} strokeWidth={2} fill="none" strokeDasharray={`${2 * Math.PI * 4.5 * 0.7} ${2 * Math.PI * 4.5}`} transform="rotate(-90 6 6)" />
-          </Svg>
-        </LegendItem>
-        <LegendItem label="Memorized">
-          <View style={[styles.legendDot, { backgroundColor: palette.primary }]} />
-        </LegendItem>
-        <LegendItem label="Read">
-          <View style={[styles.legendDot, { backgroundColor: palette.text }]} />
-        </LegendItem>
-        <LegendItem label="Note">
-          <View style={[styles.legendDot, styles.noteRing, { borderColor: palette.secondary }]} />
-        </LegendItem>
-      </View>
-
-      <View style={[styles.legendRule, { backgroundColor: palette.separator }]} />
-
-      {/* The picked day: its date and Open, then one row per block that has something. The whole of it
-          opens the day (ACT-18; Majd, Nov 8 2026: Open alone was easy to miss): the date and
-          Open are one button, each row another, edge to edge with no gap between them. Chrome, so it
-          stops growing at 1.4×, and the date gives way: at the largest text it pushed Open off the
-          screen and the rows clipped into each other (Nov 2026). */}
-      <View style={styles.preview} testID="calendar-preview">
-        <Tap
-          onPress={() => onOpen(shownDay)}
-          accessibilityRole="button"
-          accessibilityLabel="Open the day"
-          accessibilityValue={{ text: formatDayLong(shownDay) }}
-          style={styles.previewHead}
-          testID="preview-open"
-        >
-          <Text style={[styles.previewDate, { color: palette.text }]} numberOfLines={2} maxFontSizeMultiplier={MAX_SCALE} testID="preview-date">
-            {formatDayLong(shownDay)}
-          </Text>
-          <View style={styles.openRow}>
-            <Text style={[typeV2.name, { color: palette.link }]} maxFontSizeMultiplier={MAX_SCALE}>
-              Open
-            </Text>
-            <Ionicons name="chevron-forward" size={16} color={palette.link} />
-          </View>
-        </Tap>
-        {previewRows.map((r) => (
-          <Tap
-            key={r.key}
-            onPress={() => onOpen(shownDay, r.kind)}
-            accessibilityRole="button"
-            accessibilityLabel={`${r.label}, ${r.value}${r.mics ? `, ${r.mics} ${r.mics === 1 ? 'recording' : 'recordings'}` : ''}`}
-            accessibilityHint={`Opens the day at ${r.label}`}
-            style={styles.previewRow}
-            testID={`preview-row-${r.key}`}
-          >
-            {r.kind === 'revised' ? <RevisedMark fraction={dayMarks(shownDay, data).ring ?? 0} done={(dayMarks(shownDay, data).ring ?? 0) >= 1} size={26} /> : <BlockMark kind={r.kind} size={26} />}
-            <Text style={[typeV2.body, { color: palette.text, minWidth: 84 }]} numberOfLines={1} maxFontSizeMultiplier={MAX_SCALE}>
-              {r.label}
-            </Text>
-            <Text
-              style={[typeV2.body, styles.tabular, { color: palette.text, flex: 1, textAlign: 'right' }]}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.75}
-              maxFontSizeMultiplier={MAX_SCALE}
-              testID={`preview-value-${r.key}`}
-            >
-              {r.value}
-            </Text>
-            {r.mics ? (
-              <View style={styles.mics} accessible accessibilityLabel={`${r.mics} ${r.mics === 1 ? 'recording' : 'recordings'}`} testID={`preview-recordings-${r.key}`}>
-                <Ionicons name="mic-outline" size={13} color={palette.secondary} />
-                <Text style={[typeV2.meta, styles.tabular, { color: palette.secondary }]} maxFontSizeMultiplier={MAX_SCALE}>
-                  {r.mics}
-                </Text>
-              </View>
-            ) : null}
-          </Tap>
-        ))}
-      </View>
+      {shown.map((id, i) => (
+        <React.Fragment key={id}>
+          {/* The picked day is set off by a hairline from what comes before it and after it. */}
+          {id === 'day' && i > 0 ? <View style={[styles.legendRule, { backgroundColor: palette.separator }]} /> : null}
+          {parts[id]}
+          {id === 'day' && i < shown.length - 1 ? <View style={[styles.legendRule, styles.ruleAfter, { backgroundColor: palette.separator }]} /> : null}
+        </React.Fragment>
+      ))}
     </View>
   );
 }
@@ -465,6 +485,8 @@ const styles = StyleSheet.create({
   legendMark: { width: 12, height: 12, alignItems: 'center', justifyContent: 'center' },
   legendDot: { width: 6, height: 6, borderRadius: 3 },
   legendRule: { height: StyleSheet.hairlineWidth, marginTop: 10 },
+  // Under the picked day when a section follows it (ACT-28).
+  ruleAfter: { marginTop: 6 },
   tabular: { fontVariant: ['tabular-nums'] },
   preview: { paddingTop: 10 },
   previewHead: { minHeight: 32, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },

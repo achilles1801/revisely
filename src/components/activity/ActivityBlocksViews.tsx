@@ -33,6 +33,9 @@ import { useActivityReload } from './useActivityReload';
 import { listRecordings, onRecordingsChanged } from '../../lib/recordings';
 import { coverageSince } from '../../lib/recency';
 import type { PreviewBlock, RecordingCounts } from './CalendarMonth';
+import { activitySectionsEnabled, useActivitySections, type InsightsSection } from '../../lib/activitySections';
+import { IconButton } from '../v2/TopBar';
+import { SectionsSheet } from './SectionsSheet';
 
 const shiftDays = (day: string, n: number) => {
   const d = new Date(`${day}T00:00:00Z`);
@@ -73,6 +76,10 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
   const { pages, logs, user } = useApp();
   const revo = useRevoAvailable(user);
   const recitation = useRecitation(user);
+  // The sections each tab shows, and in what order (ACT-28): the user's, kept on this phone for the account.
+  const editable = activitySectionsEnabled(user);
+  const sections = useActivitySections(user?.id, editable);
+  const [editing, setEditing] = useState<ViewKind | null>(null);
   const [view, setView] = useState<ViewKind>('calendar');
   const viewChange = useRef(onViewChange);
   viewChange.current = onViewChange;
@@ -256,17 +263,23 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
           tone="ink"
           hug
         />
-        {/* Insights' range (ACT-22; mock i1): at the end of the tabs row, on Insights only. */}
-        {view === 'insights' ? (
-          <ChoiceChip
-            label={rangeLabel(range)}
-            onPress={() => setRangeMenu(true)}
-            accessibilityLabel={`Insights for ${rangeLabel(range)}`}
-            accessibilityHint="Choose how far back Insights look"
-            size="md"
-            testID="insights-range"
-          />
-        ) : null}
+        <RNView style={styles.ends}>
+          {/* Insights' range (ACT-22; mock i1): at the end of the tabs row, on Insights only. */}
+          {view === 'insights' ? (
+            <ChoiceChip
+              label={rangeLabel(range)}
+              onPress={() => setRangeMenu(true)}
+              accessibilityLabel={`Insights for ${rangeLabel(range)}`}
+              accessibilityHint="Choose how far back Insights look"
+              size="md"
+              testID="insights-range"
+            />
+          ) : null}
+          {/* Edit sections (ACT-28): what the tab on show shows, and in what order. */}
+          {editable ? (
+            <IconButton icon="options-outline" label="Edit sections" onPress={() => setEditing(view)} size={22} testID="activity-edit-sections" />
+          ) : null}
+        </RNView>
       </RNView>
       <ActionSheet
         visible={rangeMenu}
@@ -297,6 +310,7 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
             onPick={setPicked}
             onOpen={onOpenDay}
             recordings={recordings}
+            sections={sections.overview}
           />
         </RNView>
       ) : (
@@ -332,8 +346,24 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
           onOpenAyahs={onOpenAyahs}
           onSeeAllPages={onSeeAllPages}
           onTurnOnSmartTracking={onTurnOnSmartTracking}
+          sections={sections.insights}
+          onEditSections={editable ? () => setEditing('insights') : undefined}
         />
       )}
+      {editable ? (
+        <>
+          <SectionsSheet tab="overview" visible={editing === 'calendar'} onClose={() => setEditing(null)} layout={sections.overview} />
+          <SectionsSheet
+            tab="insights"
+            visible={editing === 'insights'}
+            onClose={() => setEditing(null)}
+            layout={sections.insights}
+            // Recitation only for an account that recites; Weak spots with Smart Tracking off is its invite.
+            has={(id: InsightsSection) => id !== 'recitation' || (recitation != null && onOpenAyahs != null)}
+            notes={smartTrackingOn(user) ? {} : { weak: 'Smart Tracking is off' }}
+          />
+        </>
+      ) : null}
     </RNView>
   );
 }
@@ -341,4 +371,6 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
 const styles = StyleSheet.create({
   // The range chip wraps under the tabs when the row can't hold all three (large text, an SE).
   switch: { paddingHorizontal: layoutV2.gutter, paddingTop: layoutV2.rowPad, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', columnGap: 8, rowGap: 8 },
+  // The range chip and Edit sections, together at the end of the row.
+  ends: { flexDirection: 'row', alignItems: 'center', gap: 14, marginLeft: 'auto' },
 });
