@@ -128,6 +128,8 @@ def main():
     ap.add_argument('--page', help='S:A-S:A: start anywhere on this page (protocol 6): s/a its first ayah, startBy its '
                                    'last, no end; the take may begin mid-page (cut_take.py)')
     ap.add_argument('--transcript')
+    ap.add_argument('--start-in', choices=['quran'], help='with --page: search the whole Qur\'an too if the start '
+                                                         'isn\'t on that page (protocol 7)')
     ap.add_argument('--iam-token-file', help='a Google identity token (gcloud auth print-identity-token), sent as '
                                              'X-Serverless-Authorization: for a service not open to the internet')
     args = ap.parse_args()
@@ -139,6 +141,8 @@ def main():
     if args.page:
         (s, a), (s2, a2) = (tuple(map(int, x.split(':'))) for x in args.page.split('-'))
         start.update(s=s, a=a, s2=None, a2=None, startBy=[s2, a2])
+        if args.start_in:
+            start['startIn'] = args.start_in
     headers = None
     if args.iam_token_file:
         iam = pathlib.Path(args.iam_token_file).expanduser().read_text().strip()
@@ -195,7 +199,7 @@ def main():
             first = min(tl)
             for e in events:
                 if e['type'] == 'locked':
-                    print(f"  locked: w {e['w']} ({e['s']}:{e['a']}), t {e['t']} s, "
+                    print(f"  locked: w {e['w']} ({e['s']}:{e['a']}), where {e.get('where', '-')}, t {e['t']} s, "
                           f"{e['_at'] - when_sent(sent_at, tl[first]['start']):.2f} s after the first word started; "
                           f"{'right' if e['w'] == first else f'WRONG (the take starts at w {first})'}")
             print('  nolock:', sum(1 for e in events if e['type'] == 'nolock'),
