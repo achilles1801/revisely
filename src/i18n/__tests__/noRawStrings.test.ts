@@ -16,6 +16,7 @@ const EXTRACTED: string[] = [
   'components/coach',
   'components/help',
   'components/home',
+  'components/insights',
   'components/memorization',
   'components/mushaf',
   'components/offline',

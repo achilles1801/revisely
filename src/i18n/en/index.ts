@@ -5,6 +5,7 @@ import { coach } from './coach';
 import { common } from './common';
 import { help } from './help';
 import { home } from './home';
+import { insights } from './insights';
 import { memorization } from './memorization';
 import { mushaf } from './mushaf';
 import { offline } from './offline';
@@ -26,6 +27,7 @@ export const en = {
   common,
   help,
   home,
+  insights,
   memorization,
   mushaf,
   offline,
