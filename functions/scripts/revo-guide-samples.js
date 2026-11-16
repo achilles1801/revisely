@@ -421,6 +421,12 @@ const SAMPLES = [
     screen: 'settings',
   },
   {
+    q: 'It marks fewer of my mistakes than it used to. Did something change?',
+    ctx: devSteady,
+    dev: true,
+    facts: [F('yes: a newer model for Words & harakat and Recite', /newer|new model|updated/i, true), F('fewer marks on right recitation; word slips caught as before', /word|skipped|changed|added/i, true), F('Strict unchanged', /strict/i)],
+  },
+  {
     q: 'Can I use Recite during my revision session?',
     ctx: devSteady,
     dev: true,

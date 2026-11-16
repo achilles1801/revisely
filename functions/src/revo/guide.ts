@@ -10,7 +10,8 @@
  * Keep it true (guide.test.ts):
  * - every rule id in BEHAVIOUR.md is in a section's `covers`, or in GUIDE_INTERNAL with a reason that starts
  *   with one of GUIDE_INTERNAL_KINDS (nothing a user sees: timing, server, layout, an owner's tool…);
- * - a rule under a BEHAVIOUR.md heading marked "(Revisely Dev)" is in the Dev guide, never in the main one;
+ * - a rule under a BEHAVIOUR.md heading marked "(Revisely Dev)", or marked so right after its id
+ *   ("- **ACT-28.** (Revisely Dev) …"), is in the Dev guide, never in the main one; the Dev guide covers only those;
  * - every route in a section's `routes` is a screen in src/navigation/MainNavigator.tsx;
  * - every label in curly quotes (“Edit schedule”) is text the app shows, word for word (src/).
  * Change it in the same PR as the feature: every change a user can see updates the guide (main or Dev).
@@ -329,6 +330,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
       '- A take starts anywhere on the page: the bar says “Listening…” until it finds where they are, and nothing shows before that. Then a grey band on the line and a grey box on the word follow them, and the page turns with them. Turning the page by hand makes it look on that page. If it never finds the place, nothing is marked and Stop just ends it.',
       '- The bar during a take: the words being said and the time, “Pause” and “Resume” (the mic goes off and the take stays open), Stop (then “Checking…”), and ✕ to close it.',
       '- Settings → Recite: “Mistakes to mark”: “Words & harakat” (wrong, skipped and added words, letter and haraka slips) or “Strict” (the same, and tajweed: madd lengths, qalqalah, ghunnah, ikhfa, idgham, iqlab), where “Madd munfasil”, “Madd muttasil” and “Madd ʿarid” set the lengths. “Save recordings when you recite” keeps a take’s audio on this phone, with the recordings in Activity.',
+      '- Since mid-November 2026, “Words & harakat” and Recite listen with a newer model: it marks recitation that was right less often, especially with noise in the background, and catches word slips (a skipped, changed or added word) about as before. Small haraka or letter slips are marked a little less often, and "You continued with …" shows for fewer slips. “Strict” is unchanged.',
       '- It is AI and can make mistakes (Settings → About → “Recitation check notice”). Software checks the recitation; nobody listens. Settings → Testing → “Keep my recitations as test data” keeps takes for Revisely’s tests.',
     ),
   },
@@ -355,13 +357,37 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     ),
   },
   {
-    title: 'Takes kept, and Revo',
-    covers: ['RMEM-1', 'RMEM-2', 'RINS-1'],
-    routes: [],
+    title: 'Takes kept, and past mistakes on the page',
+    covers: ['RMEM-1', 'RMEM-2', 'RMEM-3', 'RMEM-4', 'RMEM-5'],
+    routes: ['QuranReader', 'ActivityDay', 'ActivityAll'],
     text: lines(
       '- Every take with Mark mistakes is kept on the account as text (its marks, less those taken off with “Not a mistake”, where it ran, its score and whether the page was hidden), so it follows them to another phone. Never audio: a recording stays on the phone. A take with Recite alone (following, no marks), a failed take, or one whose start was never found keeps nothing.',
-      '- A word missed stays remembered until it is said right in 2 takes in a row, on 2 different revision days; wrong again starts the count over. “Words & harakat” never clears a tajweed note, and “Not clear” is never remembered.',
+      '- A word missed stays marked until it is said right in 2 takes in a row, on 2 different revision days; wrong again starts the count over. “Words & harakat” never clears a tajweed note, and “Not clear” is never remembered.',
+      '- Outside a take, those words stay marked on the page in a lighter red, amber or violet (one mark a word, its strongest). Not during a take (only that take’s marks show), not on a hidden page, and not with Settings → Recite → “Show past mistakes” off. Tap one for its card: the kind, its place, how often it went wrong, what was expected, its latest takes (“Right” or what was said, page hidden, ▶ their own voice while that take’s recording is on the phone), "Say it right on 2 different days to clear it.", “Hear it” and “Similar phrases”; “See all” lists every take. “Clear now” clears the word at once, with Undo; its history stays, and a later mistake marks it again.',
+      '- With Premium, holding the mic on a page that still has such words adds "Recite your 3 mistakes here" ("Recite your 1 mistake here" for one), under the stretch it covers (e.g. An-Naml, ayahs 23–26): one take from the ayah before the first such word to the last one’s ayah, tajweed notes left out. It stops by itself at the end, and its summary says what those words were last time ("Before: …").',
+      '- A take’s summary says what it cleared ("2 cleared from the page") and, once the passage has two takes or more, “Your progress here” with its trend ("Up from 95.1% on Mon 2 Nov · 6 takes"). That opens “Your progress”: the latest score, a chart of every take of the passage (one that covers at least half of it), “Still to fix here” (a tap shows the word on the page) and “Your takes here”, newest first (a tap opens one on the page).',
+      '- Activity: a day lists its takes in a “Recited” block: the passage, the score, a line (time, mistakes, words cleared, page hidden), the take’s recording and “Show on the page”. “See all” has “Recitations”, with “All takes”, “With mistakes” and “Page hidden”.',
+      '- “Show on the page” opens the reader at the take’s page with only that take’s marks, and a bar: ▶ its recording (while it is on the phone), its time, score and mistakes, and Done. Tap a mark for its card; “Not a mistake” there updates the kept take.',
+    ),
+  },
+  {
+    title: 'Recite and Revo',
+    covers: ['RINS-1'],
+    routes: [],
+    text: lines(
       '- Revo knows what their takes show: the last 4 weeks’ takes and score, mistakes by kind, words still marked and cleared, the passages that keep slipping, the similar ayahs they went on with, and the latest take. It never hears the audio, and knows only what the checker marked.',
+    ),
+  },
+  {
+    title: 'Gaps (Insights)',
+    covers: ['ACT-28'],
+    routes: ['Activity', 'ActivityDay'],
+    text: lines(
+      '- Activity → “Insights” → “Gaps”, after Consistency: how long they go between revisions, over the Insights range. A revision day has a page revised (a session, pages revised ahead, pages logged as revised elsewhere), on the revision day Activity files it under; reading and memorizing don’t count. Monday then Thursday is a 3-day gap; revising every day leaves none, and one missed day is a 2-day gap.',
+      '- The figure is how long since the last revision (a tap opens that day): a number under 2 weeks, red from 3 days; from 2 weeks words and the date, never red ("Over 3 weeks since your last revision, on 24 Oct"); “Today” once they revised today ("you’re back, after over 3 weeks" after a long gap). Under it a strip of the range: a dot per revision day, each gap of 3 days or more in red with its length (a tap opens the day touched). Then the longest gap (a tap opens the calendar at that month) and how often they usually revise ("Every 2 days").',
+      '- “Days”, at the section’s top right when something is said in weeks or months, shows exact days; it is kept on the phone.',
+      '- "Full revision pushed back 5 days": pages their plan, as it is now, brings round later than it would have, missed in a gap or slid back by a catch-up; the dates say when they would have come round and when they will. "Full revision on schedule" when none are late.',
+      '- Say long lengths as the app does, in weeks or months, and exact days when asked; welcome someone back after a long gap, never scold. Recency only, the same with Smart Tracking on or off.',
     ),
   },
   {

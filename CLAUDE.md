@@ -1735,8 +1735,10 @@ app; `askCoach`/`setCoachOptIn` stay as they were until Insights links to Revo. 
     - BEHAVIOUR.md has a rule no section covers and `GUIDE_INTERNAL` doesn't list;
     - a `GUIDE_INTERNAL` reason doesn't start with one of `GUIDE_INTERNAL_KINDS` (`timing:`, `server:`, `layout:`,
       `owner tool:`, `signed out:`, `superseded:`, `prompt:`), or mentions Dev. Nothing a user sees may sit there;
-    - a rule under a BEHAVIOUR.md heading marked "(Revisely Dev)" isn't in the Dev guide, or is in the main one (so a
-      Dev-only rule goes under such a heading);
+    - a Dev-only rule isn't in the Dev guide, or is in the main one. A rule is Dev-only when it sits under a
+      BEHAVIOUR.md heading marked "(Revisely Dev)", or carries "(Revisely Dev)" right after its id
+      (`- **ACT-28.** (Revisely Dev) …`). The Dev guide covers only such rules: when a feature reaches the store app,
+      drop the mark and move its lines to the main guide;
     - the guide names a route or a “label” the app no longer has (curly quotes mean the app's exact text; plain quotes
       are examples).
   - `functions/scripts/revo-guide-samples.js` asks the real model ~40 how-to questions (Revisely Dev's marked `dev`)

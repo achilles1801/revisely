@@ -19,11 +19,18 @@ const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
 
 const behaviour = read('BEHAVIOUR.md');
 const rules = [...behaviour.matchAll(/^- \*\*([A-Z]+-\d+)\.\*\*/gm)].map((m) => m[1]);
-/** Rules under a heading marked "(Revisely Dev)": what only Revisely Dev has. */
-const devRules = behaviour
-  .split(/^## /m)
-  .filter((part) => /^[^\n]*\(Revisely Dev\)/.test(part))
-  .flatMap((part) => [...part.matchAll(/^- \*\*([A-Z]+-\d+)\.\*\*/gm)].map((m) => m[1]));
+/**
+ * What only Revisely Dev has: the rules under a heading marked "(Revisely Dev)", and a rule elsewhere marked so right
+ * after its id ("- **ACT-28.** (Revisely Dev) …"). When the feature reaches the store app, the mark goes, and the
+ * rule moves to the main guide.
+ */
+const devRules = [
+  ...behaviour
+    .split(/^## /m)
+    .filter((part) => /^[^\n]*\(Revisely Dev\)/.test(part))
+    .flatMap((part) => [...part.matchAll(/^- \*\*([A-Z]+-\d+)\.\*\*/gm)].map((m) => m[1])),
+  ...[...behaviour.matchAll(/^- \*\*([A-Z]+-\d+)\.\*\* \(Revisely Dev\b/gm)].map((m) => m[1]),
+].filter((id, i, all) => all.indexOf(id) === i);
 const mainCovered = GUIDE_SECTIONS.flatMap((s) => [...s.covers]);
 const devCovered = DEV_GUIDE_SECTIONS.flatMap((s) => [...s.covers]);
 const covered = [...mainCovered, ...devCovered];
