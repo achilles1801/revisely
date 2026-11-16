@@ -10,7 +10,7 @@ import { shiftDay } from '../journal';
 import type { HistoryItem } from '../streakFromItems';
 import type { TodaySnapshot } from '../todaySnapshot';
 import { daySignals, revoPatterns, sessionStarts } from './patterns';
-import type { RevoContext, RevoTotals } from './types';
+import type { RevoContext, RevoRecitation, RevoTotals } from './types';
 import { contextWords, memorizedWords } from './words';
 import { isRevisable, memorizedAyahs, memorizedPageShare, partlyMemorizedAyahs, revisablePages } from '../memorizedAyahs';
 
@@ -80,6 +80,8 @@ export function buildRevoContext(input: {
    * takes them (lib/revo/release revoPatternsOn); otherwise the context is as before, which every server takes.
    */
   patterns?: boolean;
+  /** Their recitation (Revisely Dev, RINS-1; lib/revo/recitation), only for an account that recites. */
+  recitation?: RevoRecitation | null;
   now?: Date;
 }): RevoContext {
   const { user, pages, logs, snapshot } = input;
@@ -151,6 +153,7 @@ export function buildRevoContext(input: {
     },
     passages: memorizedTodayWords ? { ...words.passages, memorizedToday: memorizedTodayWords } : words.passages,
     pageNames: words.pageNames,
+    ...(input.recitation ? { recitation: input.recitation } : {}),
     localTime: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
   };
 }

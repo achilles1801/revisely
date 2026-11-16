@@ -1714,6 +1714,17 @@ app; `askCoach`/`setCoachOptIn` stay as they were until Insights links to Revo. 
   app's exact text; plain quotes are examples). `functions/scripts/revo-guide-samples.js` asks the real model ~25
   how-to questions and checks each answer's facts (`--dry` checks the requests; live needs the coach key). A changed
   guide is a changed system prompt: deploy `revoAsk,revoDayInReview` and re-record (`scripts/record-anthropic.js`).
+- **Recitation** (Revisely Dev, RINS-1; Majd, Nov 16 2026; plan `recite-insights-revo.md` in the orchestrator's notes):
+  for an account that recites with Mark mistakes (`reciteLiveForAccount`), each question carries `context.recitation`.
+  `lib/revo/recitation` builds it from `lib/reciteInsights` over Recite memory's takes: the last 4 weeks' takes and score,
+  mistakes by kind, Not clear and tajweed apart, words still marked and cleared, passages that keep slipping, similar
+  ayahs gone on with, and the latest take. A take attached (`reciteTake`, `takeAttachment`) adds its marks: the expected
+  word, and the heard word only for a real word or a harakat/letter slip, never a `sound`. Text only, no audio or ids.
+  The server (`functions/src/revo/recitation.ts`) checks it adds up and writes it out. Its rules (only marks that exist;
+  Not clear is never wrong; words and similar ayahs before harakat; restarts aren't mistakes; surahs, never pages) are a
+  second system block sent only with a recitation, so every other request, its cache and the recorded replies are
+  unchanged. Before this could reach production, the privacy policy's Revo part and the store answers need the Recite
+  results (Majd's call).
 - **Opening a screen** (`openScreen`, REVO-31): Revo's card can open Jump to…, Edit schedule, the memorized pages,
   Activity, the daily log, Settings at a section, prayer times, the Qibla or the reader at a surah or juz
   (`REVO_SCREENS`, the same list in `functions/src/revo/types.ts` and `src/lib/revo/types.ts`; `src/lib/revo/screens`

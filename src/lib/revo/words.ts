@@ -35,6 +35,11 @@ function fit(text: string, max: number): string | null {
   return t.length > 0 && t.length <= max && PASSAGE_RE.test(t) ? t : null;
 }
 
+/** A worded part for a sentence, as the server takes it (plain text, at most 160), or null. */
+export const passageWords = (text: string): string | null => fit(text, MAX_PASSAGE);
+/** A short worded part (an ayah, a page), as the server takes it (at most 100), or null. */
+export const shortWords = (text: string): string | null => fit(text, MAX_PAGE_NAME);
+
 export interface ContextWords {
   passages: { today?: string; startsAt?: string; next?: string; nextAt?: string; weakNext?: string; weak?: string };
   pageNames: Record<string, string>;
