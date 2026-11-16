@@ -36,6 +36,7 @@ import { sittingsEnabled } from '../lib/sitting';
 import { setBusy } from '../lib/updates/busy';
 import { REMINDER_CHANNEL_ID } from '../lib/notificationChannels';
 import { ReadingTimerMode } from '../types';
+import { t } from '../i18n';
 
 const STORAGE_KEY = '@revisely_reading_timer';
 const NOTIFICATION_ID = 'reading-timer-complete';
@@ -69,8 +70,8 @@ async function scheduleCompletionNotification(timer: ActiveReadingTimer) {
     await Notifications.scheduleNotificationAsync({
       identifier: NOTIFICATION_ID,
       content: {
-        title: 'Reading session complete',
-        body: `${formatDuration((timer.targetSeconds ?? 0))} logged. Nice work.`,
+        title: t('timer.readingComplete'),
+        body: t('timer.logged', { duration: formatDuration(timer.targetSeconds ?? 0) }),
       },
       trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: new Date(at), channelId: REMINDER_CHANNEL_ID },
     });
@@ -104,20 +105,20 @@ export function ReadingTimerProvider({ children }: { children: ReactNode }) {
   }, [holdPages]);
 
   const finish = useCallback(async () => {
-    const t = timerRef.current;
-    if (!t || finishingRef.current) return false;
+    const running = timerRef.current;
+    if (!running || finishingRef.current) return false;
     finishingRef.current = true;
     const now = Date.now();
     try {
       setTimer(null);
       Notifications.cancelScheduledNotificationAsync(NOTIFICATION_ID).catch(() => {});
-      await save(t, now);
+      await save(running, now);
       return true;
     } catch (err) {
       logger.error('Failed to save reading session', err);
-      Alert.alert("Couldn't save session", 'Please try again.');
+      Alert.alert(t('timer.saveFailed'), t('common.pleaseTryAgain'));
       // Keep the recorded time, but paused so it doesn't keep growing.
-      setTimer(pauseTimer(t, now));
+      setTimer(pauseTimer(running, now));
       return false;
     } finally {
       finishingRef.current = false;
@@ -126,11 +127,11 @@ export function ReadingTimerProvider({ children }: { children: ReactNode }) {
 
   // A timed session reached its target: save it and offer its day in Activity.
   const complete = useCallback(async () => {
-    const t = timerRef.current;
-    if (!t || finishingRef.current) return;
+    const running = timerRef.current;
+    if (!running || finishingRef.current) return;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     if (!(await finish())) return;
-    alertSessionSaved(t.date, t.targetSeconds ?? 0, 'Session complete');
+    alertSessionSaved(running.date, running.targetSeconds ?? 0, t('timer.sessionComplete'));
   }, [finish]);
 
   // A restart for an update waits while a timer is on (lib/updates/busy).

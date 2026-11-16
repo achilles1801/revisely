@@ -37,6 +37,7 @@ import {
 export const SESSION_RETRY_DELAY_MS = 400;
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 import { logger } from '../lib/logger';
+import { t } from '../i18n';
 
 // Close to Voice Memos: AAC at 48 kHz, mono (the phone's main microphone),
 // 96 kbps at the encoder's highest quality. About 43 MB an hour. (The first
@@ -245,7 +246,7 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
         }
       } catch (err) {
         logger.error('Could not save recording', err);
-        Alert.alert("Couldn't save the recording", 'Your device may be out of storage.');
+        Alert.alert(t('recordings.saveFailed.title'), t('recordings.saveFailed.body'));
       }
     });
     saveChainRef.current = run;
@@ -316,7 +317,7 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
     stopRequestedRef.current = false;
     // One recording session at a time across screens (tabs stay mounted).
     if (!acquireRecording(owner)) {
-      Alert.alert('Already recording', 'Finish the other recording first.');
+      Alert.alert(t('recordings.already.title'), t('recordings.already.body'));
       return;
     }
     setPhaseBoth('starting');
@@ -334,11 +335,11 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
         releaseRecording(owner);
         setPhaseBoth('idle');
         Alert.alert(
-          'Microphone access is off',
-          'Allow Revisely to use the microphone in Settings to record your recitation.',
+          t('recordings.micOff.title'),
+          t('recordings.micOff.body'),
           [
-            { text: 'Not now', style: 'cancel' },
-            { text: 'Open Settings', onPress: () => Linking.openSettings() },
+            { text: t('common.notNow'), style: 'cancel' },
+            { text: t('common.openSettings'), onPress: () => Linking.openSettings() },
           ],
         );
         return;
@@ -362,10 +363,8 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
       setPhaseBoth('idle');
       if (!unmountedRef.current) {
         Alert.alert(
-          "Couldn't start recording",
-          isAudioSessionError(err)
-            ? 'The microphone is busy, maybe with a call or another app. Close it and try again.'
-            : 'Please try again.',
+          t('recordings.startFailed'),
+          isAudioSessionError(err) ? t('recordings.micBusy') : t('common.pleaseTryAgain'),
         );
       }
     }
@@ -395,7 +394,7 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
     if (phaseRef.current !== 'paused') return;
     // A session restored on reopening: take the microphone again.
     if (!acquireRecording(owner)) {
-      Alert.alert('Already recording', 'Finish the other recording first.');
+      Alert.alert(t('recordings.already.title'), t('recordings.already.body'));
       return;
     }
     setPhaseBoth('starting');
@@ -411,7 +410,7 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
         return;
       }
       setPhaseBoth('paused');
-      Alert.alert("Couldn't resume recording", 'Please try again.');
+      Alert.alert(t('recordings.resumeFailed'), t('common.pleaseTryAgain'));
     }
   }, [startSegment, abandonStart, owner]);
 

@@ -10,6 +10,7 @@ import { radiusV2, typeV2 } from '../../theme/v2';
 import { useHaptics } from '../../design/haptics';
 import { TEST_SCENARIOS, loadTestScenario } from '../../lib/testScenarios';
 import { isSyncHeld, onSyncState } from '../../lib/offline/sync';
+import { t } from '../../i18n';
 
 const CONFIRM = 'RESET';
 
@@ -80,14 +81,13 @@ export function TestScenarioSheet({
       onClose={close}
       keyboard
       scroll
-      title="Load test scenario"
-      left={{ label: 'Cancel', onPress: close, testID: 'test-scenario-cancel' }}
+      title={t('settings.scenario.title')}
+      left={{ label: t('common.cancel'), onPress: close, testID: 'test-scenario-cancel' }}
       testID="test-scenario-sheet"
     >
       <View style={styles.body}>
         <Text style={[typeV2.meta, { color: palette.secondary }]}>
-          Your data is replaced by the scenario, here and in your backup, as Reset my data does it. A copy is kept that
-          only the developer can read. TESTING-CHECKLIST.md says what to look at in each.
+          {t('settings.scenario.body')}
         </Text>
         <View accessibilityRole="radiogroup">
           {TEST_SCENARIOS.map((s) => {
@@ -119,11 +119,11 @@ export function TestScenarioSheet({
             );
           })}
         </View>
-        <Text style={[typeV2.meta, { color: palette.text }]}>Type {CONFIRM} to confirm.</Text>
+        <Text style={[typeV2.meta, { color: palette.text }]}>{t('settings.typeToConfirm', { word: CONFIRM })}</Text>
         <TextInput
           value={text}
-          onChangeText={(t) => {
-            setText(t);
+          onChangeText={(next) => {
+            setText(next);
             if (error) setError(null);
           }}
           placeholder={CONFIRM}
@@ -136,7 +136,7 @@ export function TestScenarioSheet({
           onSubmitEditing={confirm}
           selectionColor={palette.accentText}
           style={[typeV2.body, styles.input, { color: palette.text, backgroundColor: palette.fill }]}
-          accessibilityLabel={`Type ${CONFIRM} to confirm`}
+          accessibilityLabel={t('settings.typeToConfirmLabel', { word: CONFIRM })}
           testID="test-scenario-input"
         />
         {error ? (
@@ -145,7 +145,7 @@ export function TestScenarioSheet({
           </Text>
         ) : null}
         <PillButton
-          title={busy ? 'Loading…' : chosen ? `Load ${chosen.title}` : 'Pick a scenario'}
+          title={busy ? t('settings.scenario.loading') : chosen ? t('settings.scenario.load', { title: chosen.title }) : t('settings.scenario.pick')}
           onPress={confirm}
           size="lg"
           destructive

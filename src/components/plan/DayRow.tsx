@@ -6,6 +6,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { summarizeDay } from '../../lib/planDisplay';
 import { layoutV2, typeV2 } from '../../theme/v2';
 import { formatDate } from '../../i18n';
+import { t } from '../../i18n';
 
 export function addDays(date: Date, days: number): Date {
   const next = new Date(date);
@@ -15,8 +16,8 @@ export function addDays(date: Date, days: number): Date {
 
 /** "Today", "Tomorrow", "Thursday, 3 Oct" */
 export function dayTitle(index: number, today: Date): string {
-  if (index === 0) return 'Today';
-  if (index === 1) return 'Tomorrow';
+  if (index === 0) return t('common.today');
+  if (index === 1) return t('common.tomorrow');
   return formatDate(addDays(today, index), {
     weekday: 'long',
     day: 'numeric',
@@ -41,7 +42,7 @@ export function DateBadge({ index, today }: { index: number; today: Date }) {
         adjustsFontSizeToFit
         maxFontSizeMultiplier={1.3}
       >
-        {isToday ? 'Today' : weekday}
+        {isToday ? t('common.today') : weekday}
       </Text>
       {/* A 40pt column: the date grows only so far, like other chrome text. */}
       <Text

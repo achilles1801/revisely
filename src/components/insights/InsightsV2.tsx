@@ -21,6 +21,7 @@ import { Sheet } from '../v2/Sheet';
 import { RowText, ThreadRow } from '../v2/ThreadRow';
 import { Tap } from '../v2/Tap';
 import { countStrengths, StrengthBucket, strengthTone } from './strength';
+import { t } from '../../i18n';
 
 export { countStrengths, strengthBucket, strengthTone } from './strength';
 export type { StrengthBucket } from './strength';
@@ -77,7 +78,7 @@ export function StrengthBar({ ratings, testID = 'strength-bar' }: { ratings: num
   const shown = BUCKETS.filter((b) => counts[b.key] > 0);
   const summary = BUCKETS.map((b) => `${counts[b.key]} ${b.label}`).join(', ');
   return (
-    <View style={styles.barBlock} accessible accessibilityLabel={`Strength: ${summary}`} testID={testID}>
+    <View style={styles.barBlock} accessible accessibilityLabel={t('insights.strengthLabel', { value: summary })} testID={testID}>
       <View style={styles.bar}>
         {shown.length === 0 ? (
           <View style={[styles.segment, { flex: 1, backgroundColor: palette.separator }]} />
@@ -169,7 +170,7 @@ export function ShowMore({
   testID?: string;
 }) {
   const { palette } = useTheme();
-  const label = expanded ? 'Show less' : `Show all (${hidden})`;
+  const label = expanded ? t('insights.showLess') : t('insights.showAll', { hidden });
   return (
     <Tap onPress={onToggle} accessibilityRole="button" accessibilityLabel={label} style={styles.showMore} testID={testID}>
       <Text style={[typeV2.body, { color: palette.link }]} maxFontSizeMultiplier={1.6}>
@@ -214,9 +215,9 @@ export function PagePreviewSheet({ pageNumber, onClose }: { pageNumber: number |
     <Sheet
       visible={pageNumber != null}
       onClose={onClose}
-      title={shown != null ? `Page ${shown}` : undefined}
+      title={shown != null ? t('common.pageN', { n: shown }) : undefined}
       message={surah ? `${surah.name} · ${surah.nameArabic}` : undefined}
-      right={{ label: 'Done', onPress: onClose, strong: true, testID: 'preview-done' }}
+      right={{ label: t('common.done'), onPress: onClose, strong: true, testID: 'preview-done' }}
       scroll
       onShow={() => setLoading(true)}
       testID="page-preview"
@@ -224,7 +225,7 @@ export function PagePreviewSheet({ pageNumber, onClose }: { pageNumber: number |
       {shown != null ? (
         <View
           style={[styles.pageBox, { width: size.width, height: size.height, backgroundColor: read.pageBg }]}
-          accessibilityLabel={`Page ${shown}`}
+          accessibilityLabel={t('common.pageN', { n: shown })}
         >
           {loading ? <ActivityIndicator style={styles.loader} color={read.textSecondary} /> : null}
           <Image

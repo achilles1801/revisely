@@ -30,6 +30,8 @@ const ID_PROPS = new Set([
   'textContentType', 'autoComplete', 'autoCapitalize', 'keyboardType', 'returnKeyType', 'initialRouteName',
   'fontFamily', 'icon', 'iconName', 'mode', 'variant', 'kind', 'tone', 'size', 'type', 'route', 'screen',
   'resizeMode', 'ellipsizeMode', 'textBreakStrategy', 'lineBreakStrategyIOS', 'dataDetectorType',
+  // SVG geometry.
+  'transform', 'd', 'points', 'viewBox', 'origin',
 ]);
 
 /** Object properties whose values are identifiers, never UI text. */
@@ -38,6 +40,7 @@ const ID_KEYS = new Set([
   'channelId', 'categoryIdentifier', 'sound', 'icon', 'iconName', 'accessibilityRole', 'kind', 'type',
   'mode', 'variant', 'tone', 'event', 'eventName', 'path', 'url', 'uri', 'href', 'storageKey', 'tag',
   'fontWeight', 'textAlign', 'resizeMode', 'pointerEvents', 'source', 'mimeType', 'UTI', 'Authorization',
+  'transform', 'd', 'points', 'viewBox',
 ]);
 
 /** Calls whose arguments are never UI text: logs, errors, navigation, storage, tests, t() itself. */
@@ -66,7 +69,7 @@ export function readsAsText(s: string): boolean {
   if (/^[\w./-]+\.(png|jpe?g|svg|json|m4a|mp3|wav|txt|ts|tsx|js)$/.test(v)) return false;
   // Words: two of them with a space between, or one capitalised word ("Done", "Fajr").
   // (\s includes the no-break space.)
-  return /[A-Za-z0-9]\s+[A-Za-z]{2,}|[A-Za-z]{2,}[.,:;!?]?\s+[A-Za-z0-9]/.test(v) || /^[A-Z][a-z]/.test(v);
+  return /[A-Za-z0-9][.,:;!?)]?\s+[A-Za-z]{2,}|[A-Za-z]{2,}[.,:;!?]?\s+[A-Za-z0-9]/.test(v) || /^[A-Z][a-z]/.test(v);
 }
 
 /** The text of a string-like node, with each template value as `0`. */
@@ -123,12 +126,19 @@ function inIdPlace(node: ts.Node, sf: ts.SourceFile): boolean {
   return false;
 }
 
-/** A line marked `// i18n-ignore` (on it, or alone on the line above). */
+/**
+ * A line marked `// i18n-ignore` (on it, or alone on the line above), and every line between
+ * `// i18n-ignore-start` and `// i18n-ignore-end` (a table of ids).
+ */
 function ignoredLines(text: string): Set<number> {
   const lines = text.split('\n');
   const out = new Set<number>();
+  let block = false;
   lines.forEach((l, i) => {
-    if (!/\/\/\s*i18n-ignore\b|\/\*\s*i18n-ignore\b/.test(l)) return;
+    if (/i18n-ignore-start\b/.test(l)) block = true;
+    if (block) out.add(i + 1);
+    if (/i18n-ignore-end\b/.test(l)) block = false;
+    if (!/\/\/\s*i18n-ignore\b(?!-)|\/\*\s*i18n-ignore\b(?!-)/.test(l)) return;
     out.add(i + 1);
     if (/^\s*(\/\/|\/\*|\{\s*\/\*)/.test(l)) out.add(i + 2);
   });

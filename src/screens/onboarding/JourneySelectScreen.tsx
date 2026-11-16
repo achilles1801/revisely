@@ -13,12 +13,31 @@ import { TopBar } from '../../components/v2/TopBar';
 import { useTheme } from '../../context/ThemeContext';
 import { useHaptics } from '../../design/haptics';
 import { layoutV2, typeV2 } from '../../theme/v2';
+import { t } from '../../i18n';
 
 type NavigationProp = NativeStackNavigationProp<OnboardingStackParamList, 'JourneySelect'>;
 
 const OPTIONS: Array<{ value: JourneyStage; title: string; description: string; icon: keyof typeof Ionicons.glyphMap }> = [
-  { value: 'in_progress', title: 'In Progress', description: 'I’ve memorized part of the Quran', icon: 'flame-outline' },
-  { value: 'complete', title: 'Complete', description: 'I’ve memorized the whole Quran', icon: 'star-outline' },
+  {
+    value: 'in_progress',
+    get title() {
+      return t('onboarding.journey.inProgress');
+    },
+    get description() {
+      return t('onboarding.journey.inProgressDetail');
+    },
+    icon: 'flame-outline',
+  },
+  {
+    value: 'complete',
+    get title() {
+      return t('onboarding.journey.complete');
+    },
+    get description() {
+      return t('onboarding.journey.completeDetail');
+    },
+    icon: 'star-outline',
+  },
 ];
 
 export default function JourneySelectScreen() {
@@ -47,7 +66,7 @@ export default function JourneySelectScreen() {
           accessibilityRole="header"
           maxFontSizeMultiplier={1.6}
         >
-          Where are you in your journey?
+          {t('onboarding.journey.title')}
         </Text>
         <View
           style={[v2.list, { borderTopColor: palette.separator }]}
@@ -86,7 +105,7 @@ export default function JourneySelectScreen() {
         </View>
       </ScrollView>
       <View style={v2.footer}>
-        <PillButton title="Continue" size="lg" onPress={handleContinue} testID="journey-continue" />
+        <PillButton title={t('onboarding.continue')} size="lg" onPress={handleContinue} testID="journey-continue" />
       </View>
     </ScreenSafeAreaView>
   );

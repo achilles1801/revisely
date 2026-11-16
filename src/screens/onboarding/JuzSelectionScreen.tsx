@@ -25,6 +25,7 @@ import {
 import { useTheme } from '../../context/ThemeContext';
 import { layoutV2, typeV2 } from '../../theme/v2';
 import { useApp } from '../../context/AppContext';
+import { t } from '../../i18n';
 
 type NavigationProp = NativeStackNavigationProp<OnboardingStackParamList, 'JuzSelection'>;
 type RouteProps = RouteProp<OnboardingStackParamList, 'JuzSelection'>;
@@ -114,8 +115,8 @@ export default function JuzSelectionScreen() {
 
   const subtext =
     journeyStage === 'complete'
-      ? 'All marked as memorized — adjust if needed.'
-      : 'Mark your completed surahs and juz.';
+      ? t('onboarding.juz.allMarked')
+      : t('onboarding.juz.mark');
 
   // The title scrolls with the list, so the largest text sizes still leave
   // room for it; the count and the action stay at the foot, over a hairline.
@@ -134,7 +135,7 @@ export default function JuzSelectionScreen() {
             accessibilityRole="header"
             maxFontSizeMultiplier={1.6}
           >
-            Select memorized portions
+            {t('onboarding.juz.title')}
           </Text>
           <Text style={[typeV2.body, v2.subtext, { color: palette.secondary }]}>{subtext}</Text>
         </View>
@@ -158,10 +159,10 @@ export default function JuzSelectionScreen() {
           testID="juz-selection-summary"
         >
           <Text style={[typeV2.name, typeV2.numeral, { color: palette.accentText }]}>{effectiveMemorizedCount}</Text>
-          {' of 604 pages memorized'}
+          {t('onboarding.juz.ofPages')}
         </Text>
         <PillButton
-          title={notLoaded.length > 0 ? 'Loading your pages…' : 'Continue'}
+          title={notLoaded.length > 0 ? t('onboarding.juz.loading') : t('onboarding.continue')}
           size="lg"
           onPress={continueV2}
           disabled={!canContinue}

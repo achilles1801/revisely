@@ -1,0 +1,43 @@
+// Signing in and up (context/AuthContext): what a failed attempt says.
+export const auth = {
+  errors: {
+    emailInUse: 'This email is already registered',
+    invalidEmail: 'Invalid email address',
+    notAllowed: 'Email/password accounts are not enabled',
+    weakPassword: 'Password is too weak',
+    disabled: 'This account has been disabled',
+    noAccount: 'No account found with this email',
+    wrongPassword: 'Incorrect password',
+    invalidCredential: 'Invalid email or password',
+    tooManyRequests: 'Too many attempts. Please try again later',
+    network: 'Network error. Please check your connection',
+    other: 'An error occurred. Please try again',
+  },
+  screen: {
+    welcomeBack: 'Welcome back',
+    createAccount: 'Create account',
+    resetPassword: 'Reset password',
+    resetIntro: "We'll email you a link to set a new password.",
+    signedOut: 'You were signed out. Sign in again to carry on.',
+    resetSent: 'Password reset email sent. Check your inbox.',
+    backToSignIn: 'Back to sign in',
+    name: 'Name',
+    namePlaceholder: 'Your name',
+    email: 'Email',
+    password: 'Password',
+    confirmPassword: 'Confirm Password',
+    showPassword: 'Show password',
+    hidePassword: 'Hide password',
+    /** VoiceOver's name for the error line. */
+    error: 'Error: {{message}}',
+    signIn: 'Sign in',
+    sendResetLink: 'Send reset link',
+    forgotPassword: 'Forgot password?',
+    /** Before the link that switches mode; the trailing space joins them. */
+    noAccount: "Don't have an account? ",
+    haveAccount: 'Already have an account? ',
+    signUp: 'Sign up',
+    or: 'or',
+    google: 'Continue with Google',
+  },
+} as const;

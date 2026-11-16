@@ -13,21 +13,42 @@ const SRC = path.resolve(__dirname, '../..');
 
 /** Folders and files (relative to src/) whose UI text all comes from src/i18n. */
 const EXTRACTED: string[] = [
+  'components/coach',
   'components/help',
+  'components/home',
+  'components/insights',
   'components/memorization',
   'components/mushaf',
   'components/offline',
+  'components/plan',
   'components/player',
+  'components/prayer',
+  'components/qibla',
+  'components/reader',
+  'components/reciteCheck',
+  'components/recordings',
   'components/revision',
+  'components/settings',
+  'components/timer',
   'components/updates',
   'components/v2',
+  'context',
+  'hooks',
+  'lib/prayer',
+  'lib/recite',
+  'lib/reminders',
   'lib/updates',
+  'lib/widgets',
   'navigation',
+  'screens/auth',
+  'screens/onboarding',
+  'screens/prayer',
+  'services',
 ];
 
 describe('UI text comes from src/i18n', () => {
   it('reads words as words and ids as ids', () => {
-    for (const s of ['Done', 'Update now', 'Starts at 0 ›', '0 pages', 'pp. 0–0', 'Fajr', 'Juz 0', "Couldn't load"]) {
+    for (const s of ['Done', 'Update now', 'Starts at 0 ›', '0 pages', 'pp. 0–0', 'Fajr', 'Juz 0', "Couldn't load", '0: 0. Change']) {
       expect([s, readsAsText(s)]).toEqual([s, true]);
     }
     for (const s of [

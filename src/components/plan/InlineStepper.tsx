@@ -5,6 +5,7 @@ import { Tap } from '../v2/Tap';
 import { useTheme } from '../../context/ThemeContext';
 import { useHaptics } from '../../design/haptics';
 import { radiusV2, typeV2 } from '../../theme/v2';
+import { t } from '../../i18n';
 
 /**
  * Compact iOS-style [ − | + ] stepper with the value shown to its left: a
@@ -50,7 +51,7 @@ export function InlineStepper({
           style={styles.btn}
           hitSlop={{ top: 8, bottom: 8 }}
           accessibilityRole="button"
-          accessibilityLabel={`Decrease ${label}`}
+          accessibilityLabel={t('plan.stepper.decrease', { label })}
           accessibilityState={{ disabled: !canDec }}
         >
           <Ionicons name="remove" size={20} color={canDec ? palette.text : palette.secondary} />
@@ -62,7 +63,7 @@ export function InlineStepper({
           style={styles.btn}
           hitSlop={{ top: 8, bottom: 8 }}
           accessibilityRole="button"
-          accessibilityLabel={`Increase ${label}`}
+          accessibilityLabel={t('plan.stepper.increase', { label })}
           accessibilityState={{ disabled: !canInc }}
         >
           <Ionicons name="add" size={20} color={canInc ? palette.text : palette.secondary} />

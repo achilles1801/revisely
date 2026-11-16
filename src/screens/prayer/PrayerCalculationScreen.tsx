@@ -29,8 +29,10 @@ import {
 } from '../../lib/prayer/times';
 import { usePrayerTimes } from '../../components/prayer/usePrayerTimes';
 import { usePrayerLocation } from '../../components/prayer/usePrayerLocation';
+import { t } from '../../i18n';
 
-export const adjustLabel = (v: number) => (v === 0 ? '0 min' : `${v > 0 ? '+' : '−'}${Math.abs(v)} min`);
+export const adjustLabel = (v: number) =>
+  t('prayer.calculation.adjustValue', { value: v === 0 ? '0' : `${v > 0 ? '+' : '−'}${Math.abs(v)}` });
 
 /**
  * Settings → Prayer → Calculation: where times are worked out for, the method
@@ -53,31 +55,31 @@ export default function PrayerCalculationScreen() {
     times.place && times.today
       ? dayTimes(times.place, times.now, { ...times.settings, madhab: 'hanafi' }).asr
       : null;
-  const highLabel = HIGH_LATITUDE_OPTIONS.find((o) => o.id === prefs.highLatitude)?.label ?? 'Recommended';
+  const highLabel = HIGH_LATITUDE_OPTIONS.find((o) => o.id === prefs.highLatitude)?.label ?? t('prayer.highLatitude.recommended');
 
   return (
     <View style={[styles.container, { backgroundColor: palette.bg }]} testID="prayer-calculation-screen">
       <View style={{ paddingTop: insets.top }}>
-        <TopBar title="Calculation" onBack={() => navigation.goBack()} separator />
+        <TopBar title={t('prayer.calculation.title')} onBack={() => navigation.goBack()} separator />
       </View>
       <ScrollView contentInsetAdjustmentBehavior="never" contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}>
-        <GroupedSection header="Location">
+        <GroupedSection header={t('prayer.calculation.location')}>
           <GroupedRow
             icon="location-outline"
-            title={times.placeLabel ?? (times.place ? 'Your location' : 'Not set')}
-            subtitle="On this phone only"
+            title={times.placeLabel ?? (times.place ? t('prayer.calculation.yourLocation') : t('prayer.calculation.notSet'))}
+            subtitle={t('prayer.calculation.onPhoneOnly')}
             trailing={
               <Tap onPress={location.allow} hitSlop={8} accessibilityRole="button" testID="prayer-location-update">
-                <Text style={[typeV2.body, { color: palette.link }]}>Update</Text>
+                <Text style={[typeV2.body, { color: palette.link }]}>{t('prayer.calculation.update')}</Text>
               </Tap>
             }
           />
         </GroupedSection>
 
-        <GroupedSection header="Method" footer="Also used for “Start day at fajr”.">
+        <GroupedSection header={t('prayer.calculation.method')} footer={t('prayer.calculation.methodFooter')}>
           <GroupedRow
             icon="calculator-outline"
-            title="Method"
+            title={t('prayer.calculation.method')}
             value={methodLabel(method)}
             accessory="chevron"
             onPress={() => setPicker('method')}
@@ -85,7 +87,7 @@ export default function PrayerCalculationScreen() {
           />
           <GroupedRow
             icon="globe-outline"
-            title="High latitudes"
+            title={t('prayer.calculation.highLatitudes')}
             value={highLabel}
             accessory="chevron"
             onPress={() => setPicker('high')}
@@ -94,14 +96,18 @@ export default function PrayerCalculationScreen() {
         </GroupedSection>
 
         <GroupedSection
-          header="Asr time"
-          footer={`Standard is Shafiʿi, Mālikī and Ḥanbalī. Hanafi puts Asr later${hanafiAsr ? ` (${formatTime(hanafiAsr)} today)` : ''}.`}
+          header={t('prayer.calculation.asrTime')}
+          footer={
+            hanafiAsr
+              ? t('prayer.calculation.asrFooterToday', { time: formatTime(hanafiAsr) })
+              : t('prayer.calculation.asrFooter')
+          }
         >
           <View style={styles.tabs}>
             <PillTabs<AsrMadhab>
               options={[
-                { value: 'standard', label: 'Standard' },
-                { value: 'hanafi', label: 'Hanafi' },
+                { value: 'standard', label: t('prayer.sheet.standard') },
+                { value: 'hanafi', label: t('prayer.sheet.hanafi') },
               ]}
               value={prefs.madhab}
               onChange={(madhab) => setPrayerPrefs({ madhab })}
@@ -110,7 +116,7 @@ export default function PrayerCalculationScreen() {
           </View>
         </GroupedSection>
 
-        <GroupedSection header="Adjustments" footer="Minutes added to or taken from each time, to match your mosque.">
+        <GroupedSection header={t('prayer.calculation.adjustments')} footer={t('prayer.calculation.adjustmentsFooter')}>
           {PRAYERS.map((p) => (
             <GroupedRow
               key={p}
@@ -121,7 +127,7 @@ export default function PrayerCalculationScreen() {
                   min={-ADJUST_LIMIT}
                   max={ADJUST_LIMIT}
                   onChange={(v) => setPrayerPrefs({ adjustments: { ...prefs.adjustments, [p]: v } })}
-                  label={`minutes for ${TIME_LABELS[p].en}`}
+                  label={t('prayer.calculation.adjustLabel', { name: TIME_LABELS[p].en })}
                   formatValue={adjustLabel}
                 />
               }
@@ -134,7 +140,7 @@ export default function PrayerCalculationScreen() {
       <ActionSheet
         visible={picker === 'method'}
         onClose={() => setPicker(null)}
-        title="Method"
+        title={t('prayer.calculation.method')}
         actions={CALCULATION_METHODS.map((m) => ({
           key: m.id,
           label: m.label,
@@ -149,8 +155,8 @@ export default function PrayerCalculationScreen() {
       <ActionSheet
         visible={picker === 'high'}
         onClose={() => setPicker(null)}
-        title="High latitudes"
-        message="How Fajr and Isha are found where twilight lasts all night in summer."
+        title={t('prayer.calculation.highLatitudes')}
+        message={t('prayer.calculation.highLatitudesHelp')}
         actions={HIGH_LATITUDE_OPTIONS.map((o) => ({
           key: o.id,
           label: o.label,

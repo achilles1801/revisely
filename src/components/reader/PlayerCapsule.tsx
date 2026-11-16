@@ -8,6 +8,7 @@ import { radius } from '../../theme/radius';
 import { speedLabel } from '../../lib/playbackPlan';
 import type { RecitationState } from '../../lib/recitation';
 import type { Anchor } from './SpeedMenu';
+import { t } from '../../i18n';
 
 /** Height of the capsule; the reader keeps this much free under the page. */
 export const CAPSULE_HEIGHT = 52;
@@ -117,7 +118,7 @@ export function PlayerCapsule({ player, page, record, timer, trailing, compact, 
       hitSlop={6}
       style={[styles.playBtn, { backgroundColor: theme.accent }]}
       accessibilityRole="button"
-      accessibilityLabel={playing ? 'Pause' : failed ? 'Retry' : 'Play'}
+      accessibilityLabel={playing ? t('reader.player.pause') : failed ? t('reader.player.retry') : t('reader.player.play')}
       testID="player-play-pause"
     >
       {state.status === 'loading' ? (
@@ -133,7 +134,7 @@ export function PlayerCapsule({ player, page, record, timer, trailing, compact, 
     </Pressable>
   );
 
-  const options = iconBtn('options-outline', 'Audio options', player.onOptions, 20, 'player-options');
+  const options = iconBtn('options-outline', t('reader.player.options'), player.onOptions, 20, 'player-options');
 
   return (
     <View
@@ -145,7 +146,7 @@ export function PlayerCapsule({ player, page, record, timer, trailing, compact, 
     >
       {active ? (
         <>
-          {iconBtn('stop', 'Stop', player.onStop, 15, 'player-stop')}
+          {iconBtn('stop', t('reader.player.stop'), player.onStop, 15, 'player-stop')}
           {failed ? (
             <Text
               style={[typography.caption, styles.text, { color: theme.error }]}
@@ -153,7 +154,7 @@ export function PlayerCapsule({ player, page, record, timer, trailing, compact, 
               maxFontSizeMultiplier={1.2}
               accessibilityLiveRegion="polite"
             >
-              Couldn’t play. Check your connection.
+              {t('reader.player.failed')}
             </Text>
           ) : (
             <>
@@ -163,7 +164,7 @@ export function PlayerCapsule({ player, page, record, timer, trailing, compact, 
                 hitSlop={6}
                 style={[styles.speed, { borderColor: theme.border }]}
                 accessibilityRole="button"
-                accessibilityLabel={`Speed ${speedLabel(player.speed)}. Change speed`}
+                accessibilityLabel={t('reader.player.speed', { speed: speedLabel(player.speed) })}
                 testID="player-speed"
               >
                 <Text style={[typography.caption, styles.speedText, { color: theme.textPrimary }]} maxFontSizeMultiplier={1.2}>
@@ -171,11 +172,11 @@ export function PlayerCapsule({ player, page, record, timer, trailing, compact, 
                 </Text>
               </Pressable>
               <View style={styles.spacer} />
-              {!compact && iconBtn('play-back', 'Previous verse', player.onPrevious, 20, 'player-previous')}
+              {!compact && iconBtn('play-back', t('reader.player.previous'), player.onPrevious, 20, 'player-previous')}
             </>
           )}
           {playPause}
-          {!failed && !compact && iconBtn('play-forward', 'Next verse', player.onNext, 20, 'player-next')}
+          {!failed && !compact && iconBtn('play-forward', t('reader.player.next'), player.onNext, 20, 'player-next')}
           {!failed && <View style={styles.spacer} />}
           {options}
         </>
@@ -186,7 +187,7 @@ export function PlayerCapsule({ player, page, record, timer, trailing, compact, 
             hitSlop={6}
             style={[styles.playBtn, { backgroundColor: theme.accent }]}
             accessibilityRole="button"
-            accessibilityLabel="Play from this page"
+            accessibilityLabel={t('reader.player.playFromPage')}
             testID="player-play-page"
           >
             <Ionicons name="play" size={18} color={theme.onAccent} style={styles.playIcon} />
@@ -195,7 +196,7 @@ export function PlayerCapsule({ player, page, record, timer, trailing, compact, 
             style={styles.text}
             onPress={player.onPickReciter}
             accessibilityRole="button"
-            accessibilityLabel={`${player.voiceName}. Choose reciter`}
+            accessibilityLabel={t('reader.player.chooseReciter', { reciter: player.voiceName })}
           >
             <View style={styles.voiceRow}>
               <Text style={[typography.bodySmall, { color: theme.textPrimary, flexShrink: 1 }]} numberOfLines={1} maxFontSizeMultiplier={1.2}>

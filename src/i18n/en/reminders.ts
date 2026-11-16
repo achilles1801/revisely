@@ -1,0 +1,42 @@
+// lib/reminders: the revision reminders' words. {{place}} is a surah ("Al-Mulk") or a juz ("Juz 12").
+// They're scheduled on the phone with their text, so a language change reaches them when they're
+// scheduled again.
+export const reminders = {
+  todaysRevision: "Today's revision",
+  goodMorning: 'Good morning',
+  goodMorningName: 'Good morning, {{name}}',
+  /** Pages from the surahs: "Today's revision: Al-Mulk to Al-Qalam." */
+  todayIs: "Today's revision: {{range}}.",
+  rangeOnly: '{{range}}.',
+  startsWith: 'Today starts with {{place}}.',
+  juzWhenReady: "Today's revision is Juz {{juz}}, whenever you're ready.",
+  pickUpWith: "You've made a good start. Pick up with {{place}}.",
+  pickUpNearEnd: "You've made a good start. Pick up near the end of {{place}}.",
+  pickUpIn: "You've made a good start. Pick up in {{place}}.",
+  startingWith: 'Starting with {{place}}',
+  calmMinutes: "A few calm minutes for today's revision?",
+  isNext: '{{place}} is next',
+  mostDone: 'Most of today is done. A few calm minutes before your next task?',
+  goodStart: 'A good start already. Perfect time for a little more.',
+  backTo: 'Back to {{place}}',
+  nearEnd: "You're near the end of it. Perfect time for a page or two.",
+  hourUntilFajr: 'An hour until Fajr',
+  overnight: "If you're up, {{place}} is where you left off. What's left can be added to tomorrow.",
+  hourLeft: 'An hour left today',
+  justLeft: "Just {{place}} left. You're nearly there.",
+  evenAPage: 'Even a page or two of {{place}} counts.',
+  stillOpen: '{{place}} is still open. A few calm minutes would do it.',
+  almostDone: 'Almost done with {{place}}. A few calm minutes would do it.',
+  done: {
+    juz: '{{today}} is done',
+    tomorrowJuz: "That's today's revision. Tomorrow is {{tomorrow}}.",
+    thatsToday: "That's today's revision.",
+    title: "Today's revision is done",
+    allRevised: '{{range}}, all revised. MashaAllah.',
+    forToday: 'Done for today',
+    tomorrowStarts: 'Tomorrow starts with {{place}}. Rest well.',
+    restWell: 'Rest well.',
+    streak: '{{days}} days in a row',
+    alhamdulillah: "Today's revision is done. Alhamdulillah.",
+  },
+} as const;
