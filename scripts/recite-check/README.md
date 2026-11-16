@@ -243,11 +243,13 @@ only counts, seconds, levels and reasons (the server tests check it).
   - `lag_p50`, `lag_p90`, `lag_max` (seconds from audio arriving to its events going out);
   - `cpu_s` and `cpu_per_s` (the process's CPU, the take's own at one take per instance);
   - `<part>_per_s` from the checker's `ms`. `model_per_s` is also the instance's speed, 0.12–0.27 on Cloud Run's CPUs;
-  - `sockets`, `restarted` (a resume this instance didn't have, run again from the first sample), `why`, `marks`, `kept`.
+  - `sockets`, `restarted` (a resume this instance didn't have, run again from the first sample), `why`, `marks`, `kept`;
+  - `appcheck` (`ok`, `missing`, `bad`, `unreachable`) when `APP_CHECK` is log or on.
 - **`instance`:** where a cold start's seconds go. `imports_s` (process start → the server imported), `engine_s` (the
   checker, the model and the word table), `ready_s` (process start → the port opens), `words`, and `bench_ms` (a
   fixed bit of Python, timed: the CPU apart from any take).
-- **`refused`** (`route`, `reason`: `sign_in`, `testers_only`, `premium_required`, `limit`, `bad_request`), **`error`**
+- **`refused`** (`route`, `reason`: `sign_in`, `testers_only`, `premium_required`, `app_check`, `paused`, `limit`,
+  `bad_request`), **`error`**
   (`route`), **`label`** (a dismiss or an undismiss), and **`dropped`**: a session whose phone went and didn't come
   back here (`at`: `timeout` after RESUME_TTL, or `shutdown`).
 
@@ -267,6 +269,10 @@ signs in with its own read-only provider and account (`RECITE_DIGEST_WIF_PROVIDE
 variables exist, it skips with a notice.
 
 ## Deploying (revisely-dev only)
+
+`deploy/deploy.sh dev --source DIR` does what follows for both services, with their settings in `deploy/dev.env`
+(`--migrate` then moves the traffic and tags the image `serving`). Without `--yes` it prints the commands and calls
+nothing. The commands by hand:
 
 The image holds the checker (pinned in `stage.sh`), the app's word list and, from the lab, the model, the lexicon
 and the bars. None of those go into git.
@@ -313,6 +319,40 @@ Its own account (`recite-check@`) may read Firestore (`roles/datastore.viewer`) 
 (`roles/storage.objectCreator` on the bucket), nothing else. Free tier: it scales to zero, at most two instances,
 and a check of a minute's recitation takes a few seconds of CPU. The image is about 120 MB of Artifact Registry's
 free 0.5 GB; each deploy adds one, so delete old images in `cloud-run-source-deploy` after a few.
+
+## Production (built dark: nothing exists there yet)
+
+The plan is `~/Documents/revisely-release/checker-prod.md`, outside the repository. It covers where the checker runs,
+cost, alerts, the kill switches and older app versions. Nothing in it is created or deployed without Majd's word.
+What's here for it:
+- **Switches on the same image** (`server.py`). Each defaults to what dev's services have always done:
+
+  | Variable | Dev | Production | What it does |
+  | --- | --- | --- | --- |
+  | `PROJECT` | `revisely-dev` | `revision-buddy-3a398` | whose ID tokens and `entitlements` |
+  | `TESTERS_ONLY` | on (unset) | `0` | `previewTester` accounts only |
+  | `CHECK_GATE` | off | `on` | Mark mistakes needs `entitlements/{uid}.premium`; Recite needs only a sign-in |
+  | `APP_CHECK` | `log` | `log`, then `on` | the app's App Check token (`appCheck` in the start frame, `X-Firebase-AppCheck` on HTTP): counted, then refused without (`app_check`). Needs `PROJECT_NUMBER`. |
+  | `BUCKET` | dev's bucket | empty | where kept takes go. Empty: nothing is kept and labels do nothing (`{"ok": true, "kept": false}`). |
+  | `PAUSED` | `0` | `0` | `1` refuses new takes with `paused` (503); a take under way finishes, and `/health` says `paused` |
+
+  A wrong `APP_CHECK` (or log or on without a numeric `PROJECT_NUMBER`) stops the service at start, so the deploy
+  fails instead of checking nothing. `auth.app_check` verifies the token against App Check's published keys
+  (RS256), its issuer and its audience (the project's number). It keeps the keys 6 hours, fetches them again for an
+  unknown key at most once a minute, and keeps using them through a short outage at Google.
+- **`deploy/`:**
+  - `dev.env` and `prod.env`: everything that differs.
+  - `deploy.sh`: production takes only an image dev has run, by digest. It is copied into production's repository by
+    a Cloud Build in production (`copy-image.yaml`, `gcloud container images add-tag`, which keeps the digest; tried
+    between two dev repositories on Nov 16: 16 s, same digest).
+  - `setup-prod.sh`: the one-time setup, steps 1–8. It covers the service accounts, the repository and its cleanup,
+    the first deploy, opening the services, the budget on label `app=recite-check`, and the error metric with three
+    alerts (`alerts/`).
+  - All of them only print without `--yes`.
+- **The phones' switch:** `config/app.reciteCheckOff` (`functions/scripts/set-app-config.js --recite-check off|on`).
+  The app reads it once the release has the code (the release owner's).
+- **The digest:** `digest.py --project revision-buddy-3a398` reads production's lines and posts on its own issue (label
+  `recite-health-prod`).
 
 ## Two takes per instance: `recite-check-pair` (Majd approved Nov 15 2026)
 

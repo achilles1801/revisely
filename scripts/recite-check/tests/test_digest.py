@@ -50,6 +50,20 @@ class Digest(unittest.TestCase):
         self.assertIn('Instance time held: 0.27 h (966 vCPU-s, 1,932 GiB-s)', md)
         self.assertNotIn('None', md)
 
+    def test_production_and_app_check(self):
+        """--project names production in the heading; the take lines' App Check results (APP_CHECK log) are counted."""
+        lines = [entry({'health': 'take', 'kind': 'live', 'level': 'harakat+letters', 'audio_s': 60, 'open_s': 61,
+                        'appcheck': a}) for a in ('ok', 'ok', 'missing')]
+        lines.append(entry({'health': 'refused', 'route': 'live', 'reason': 'app_check'}))
+        md = digest.summarize(lines, 7, NOW, project=digest.PROD)
+        self.assertIn('## Recitation checker in production, the last 7 days', md)
+        self.assertIn('App Check (APP_CHECK log or on), takes: missing 1, ok 2.', md)
+        self.assertIn('Refused: live / app_check 1.', md)
+        dev = digest.summarize(lines[:1], 7, NOW)
+        self.assertIn('## Recitation checker, the last 7 days', dev)
+        self.assertNotIn('App Check', digest.summarize([entry({'health': 'take', 'kind': 'live', 'level': 'recite',
+                                                              'audio_s': 5, 'open_s': 6})], 7, NOW))
+
     def test_two_takes_at_once_on_the_pair_service_hold_one_instance(self):
         def take(end, open_s, inst):
             e = entry({'health': 'take', 'kind': 'live', 'level': 'recite', 'audio_s': open_s, 'open_s': open_s},

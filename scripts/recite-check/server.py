@@ -1,7 +1,8 @@
-"""The recitation check service (Cloud Run, revisely-dev only). See README.md.
+"""The recitation check service (Cloud Run: revisely-dev today; production's switches are below). See README.md.
 
 POST /check?s=&a=[&s2=&a2=][&mon=&mot=&aar=][&letters=1][&keep=1][&v=2]  body: WAV, 16 kHz mono 16-bit
   Authorization: Bearer <Firebase ID token of a previewTester account on revisely-dev>
+  X-Firebase-AppCheck: <App Check token> (checked when APP_CHECK is log or on)
 POST /dismiss  {"take": "...", "id": "..."}  (same sign-in): "Not a mistake", kept next to the take
 POST /undismiss  {"take": "...", "id": "..."}  (same sign-in): that "Not a mistake" undone
 WS   /live     the live check: a start frame (the token in it or in the Authorization header), then PCM; events
@@ -46,6 +47,31 @@ RESUME_TTL = 120      # seconds a dropped session waits on this instance for its
 # "follow" need entitlements/{uid}.premium (auth.has_check); Recite (follow) stays free. Off until a dev account has it.
 CHECK_GATE = os.environ.get('CHECK_GATE', 'off') == 'on'
 LOCKED = 'premium_required'  # the refusal without Premium (agreed with apply-support and recite-ui; was check_locked)
+# Production (the release plan, checker-prod.md): the same image with other switches. Each defaults to what dev's
+# services have always done, so a service without them behaves as before.
+TESTERS_ONLY = os.environ.get('TESTERS_ONLY', '1') != '0'  # previewTester accounts only (dev); '0' in production
+# App Check (the app's token: `appCheck` in the start frame, X-Firebase-AppCheck on HTTP): off; log (counted in the
+# health lines as `appcheck`, nothing refused); on (refused with `app_check` unless good). Tokens name the project by
+# its number, so log and on need PROJECT_NUMBER.
+APP_CHECK = os.environ.get('APP_CHECK', 'off')
+PROJECT_NUMBER = os.environ.get('PROJECT_NUMBER', '')
+
+
+def switches_wrong(app_check, number):
+    """Why APP_CHECK and PROJECT_NUMBER can't run as set, or None. Checked as the service starts: a typo fails the
+    deploy instead of quietly checking nothing."""
+    if app_check not in ('off', 'log', 'on'):
+        return 'APP_CHECK must be off, log or on'
+    if app_check != 'off' and not number.isdigit():
+        return 'APP_CHECK must be off with no PROJECT_NUMBER: log and on need the project\'s number'
+    return None
+
+
+if (wrong := switches_wrong(APP_CHECK, PROJECT_NUMBER)):
+    raise RuntimeError(wrong)
+# The kill switch on the server (checker-prod.md, "Switching it off"): no new take starts ('paused', 503); a take under
+# way on this instance finishes, and /health says so, so the app's warm-up learns it when the reader opens.
+PAUSED = os.environ.get('PAUSED', '0') == '1'
 # Two takes per instance for the light levels (Majd approved Nov 15 2026, the recite-checker-cost-per-user idea, item 2):
 # a second service from the same image, at concurrency 2, takes only the levels in LEVELS ("recite,harakat"; health.py
 # names them), and refuses the rest with `level_elsewhere`, so a Strict take never doubles up on one vCPU (Strict paired
@@ -135,11 +161,35 @@ def passage_of(s, a, s2, a2):
     return s, a, s2, a2
 
 
-async def signed_in_tester(header):
+async def signed_in(header):
+    """The account's uid: a Firebase ID token of this project, and (TESTERS_ONLY, dev) a previewTester account."""
     uid = await asyncio.to_thread(auth.uid_of, header)
-    if not await asyncio.to_thread(auth.is_tester, uid):
+    if TESTERS_ONLY and not await asyncio.to_thread(auth.is_tester, uid):
         raise auth.Refused(403, 'testers_only')
     return uid
+
+
+async def app_checked(token):
+    """The App Check result for the health line: 'ok', 'missing', 'bad', 'unreachable' (App Check's keys couldn't be
+    fetched, and none are held), or None with APP_CHECK off. With it on, anything but 'ok' is refused (`app_check`),
+    except keys that can't be fetched, which are the server's failure, as Firestore's are."""
+    if APP_CHECK == 'off':
+        return None
+    try:
+        r = await asyncio.to_thread(auth.app_check, token, PROJECT_NUMBER)
+    except auth.Unreachable:
+        if APP_CHECK == 'on':
+            raise
+        return 'unreachable'
+    if APP_CHECK == 'on' and r != 'ok':
+        raise auth.Refused(401, 'app_check')
+    return r
+
+
+def not_paused():
+    """Refused (503, paused) while the server's kill switch is on."""
+    if PAUSED:
+        raise auth.Refused(503, 'paused')
 
 
 def may_run(level):
@@ -167,7 +217,7 @@ def health_route():
     says false (README, "The word table")."""
     return {'ok': True, 'engine': VERSION, 'server': SERVER, 'protocol': protocol(),
             'words': ENGINE['e'].table is not None} | ({'levels': sorted(LEVELS)} if LEVELS else {}) \
-        | ({'ears': e} if (e := ears()) else {})
+        | ({'ears': e} if (e := ears()) else {}) | ({'paused': True} if PAUSED else {})
 
 
 def ears():
@@ -188,7 +238,9 @@ def ear_of(level):
 async def check(request: Request):
     t0, cpu0, age0 = time.monotonic(), health.cpu(), health.age()
     try:
-        uid = await signed_in_tester(request.headers.get('authorization'))
+        not_paused()
+        uid = await signed_in(request.headers.get('authorization'))
+        appcheck = await app_checked(request.headers.get('x-firebase-appcheck'))
         await may_check(uid)
         may_run(health.level(dict(request.query_params), False))
         limiter.take(uid)
@@ -199,7 +251,7 @@ async def check(request: Request):
         q = request.query_params
         s, a, s2, a2 = passage_of(num(q, 's'), num(q, 'a'), num(q, 's2'), num(q, 'a2'))
         v2 = q.get('v') == '2'
-        keep = q.get('keep') == '1'
+        keep = q.get('keep') == '1' and store.enabled()  # nothing is kept where no bucket is named (production)
         take = store.new_take() if keep else None
         name = store.name_for(uid, take) if keep else None
         upload = asyncio.create_task(asyncio.to_thread(store.put, name + '.wav', body, 'audio/wav')) if keep else None
@@ -231,7 +283,7 @@ async def check(request: Request):
                     app=health.app_tag(request.headers.get('x-revisely-app')), audio_s=res['secs'],
                     wall_s=round(time.monotonic() - t0, 2), cpu_s=round(health.cpu() - cpu0, 2), cold=cold,
                     age_s=round(age0, 1), marks=len(res['marks']) if v2 else None, kept=res.get('kept'),
-                    **health.per_second(res.get('ms'), res['secs']))
+                    appcheck=appcheck, **health.per_second(res.get('ms'), res['secs']))
         return JSONResponse(res)
     except auth.Refused as e:
         health.emit('refused', route='check', reason=e.reason)
@@ -264,7 +316,8 @@ async def label(request, kind):
     in ms, if it sent one: two labels sent close together can be stored out of order, or a retry after the other)
     and, for an undismiss, "undo": true."""
     try:
-        uid = await signed_in_tester(request.headers.get('authorization'))
+        uid = await signed_in(request.headers.get('authorization'))
+        await app_checked(request.headers.get('x-firebase-appcheck'))
         try:
             body = json.loads(await request.body())
         except ValueError:
@@ -280,6 +333,9 @@ async def label(request, kind):
             kept['when'] = when
         if kind == 'undismiss':
             kept['undo'] = True
+        if not store.enabled():  # no takes are kept here (production), so there's nothing to label
+            health.emit('label', kind=kind, kept=False)
+            return JSONResponse({'ok': True, 'kept': False})
         await asyncio.to_thread(put_json, f'{store.name_for(uid, take)}.{kind}-{store.new_take()}.json', kept)
         health.emit('label', kind=kind)
         return JSONResponse({'ok': True})
@@ -316,6 +372,7 @@ class Live:
         self.ready_s = None             # connect → `ready`, its first socket
         self.restarted = False          # a resume this instance didn't have: run again from the first sample
         self.lag = []                   # seconds from audio arriving to its events going out, per piece of work
+        self.appcheck = None            # its latest socket's App Check result (APP_CHECK log or on)
 
     def run(self, fn, *args):
         with self.lock:
@@ -428,7 +485,7 @@ def take_fields(s, r, kept=None):
             'ready_s': s.ready_s, 'cold': s.cold, 'age_s': round(s.age, 1), 'sockets': s.sockets,
             'restarted': s.restarted, 'why': r.get('why'), 'marks': len(r.get('marks') or []), 'kept': kept,
             'cpu_s': round(cpu_s, 2), 'cpu_per_s': round(cpu_s / secs, 3) if secs else None,
-            **health.lag(s.lag), **health.per_second(r.get('ms'), secs)}
+            'appcheck': s.appcheck, **health.lag(s.lag), **health.per_second(r.get('ms'), secs)}
 
 
 def ayah_pair(v):
@@ -474,6 +531,7 @@ async def open_session(msg, uid):
     s = SESSIONS.get(rid) if isinstance(rid, str) else None
     if s and s.uid == uid and not s.sess.stopped:
         return s, True
+    not_paused()  # a take under way here goes on; nothing new starts
     if not rid:
         limiter.take(uid)
     passage = passage_of(*(int_or_none(msg, k) for k in ('s', 'a', 's2', 'a2')))
@@ -495,7 +553,7 @@ async def open_session(msg, uid):
         request['startBy'] = list(start_by)
     if start_in:
         request['startIn'] = start_in
-    s = Live(sid, uid, sess, msg.get('keep') is True, request, msg.get('app') if isinstance(msg.get('app'), str)
+    s = Live(sid, uid, sess, msg.get('keep') is True and store.enabled(), request, msg.get('app') if isinstance(msg.get('app'), str)
              else None)
     SESSIONS[sid] = s
     return s, False
@@ -591,7 +649,9 @@ async def live_socket(ws: WebSocket):
         if not isinstance(msg, dict) or msg.get('type') != 'start':
             raise BadRequest('the first frame must be a start frame')
         token = msg.get('token')
-        uid = await signed_in_tester('Bearer ' + token if isinstance(token, str) else ws.headers.get('authorization'))
+        uid = await signed_in('Bearer ' + token if isinstance(token, str) else ws.headers.get('authorization'))
+        ac = msg.get('appCheck')
+        appcheck = await app_checked(ac if isinstance(ac, str) else ws.headers.get('x-firebase-appcheck'))
         if not follow_of(msg):
             await may_check(uid)  # on every socket, a resume's too
         may_run(health.level(settings_from(msg), follow_of(msg)))
@@ -606,6 +666,7 @@ async def live_socket(ws: WebSocket):
                 await ws.close(1000)
             return
         s, resumed = await open_session(msg, uid)
+        s.appcheck = appcheck
         if not resumed:  # a new session on this instance (a take, or a resume started again here)
             s.opened, s.cpu0, s.age = accepted, cpu0, age0
             s.cold = health.STATE['takes'] == 0
