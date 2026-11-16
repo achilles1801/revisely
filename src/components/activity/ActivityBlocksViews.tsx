@@ -54,6 +54,8 @@ interface Props {
   firstTomorrow?: ReadonlySet<number>;
   /** Weak spots' "See all pages by strength" (ACT-12). */
   onSeeAllPages?: () => void;
+  /** Gaps' "When did I last revise…?" (ACT-30). */
+  onOpenLastRevised?: () => void;
   /** Smart Tracking off: Insights' line that opens Settings at its switch (ACT-12). */
   onTurnOnSmartTracking?: () => void;
   /** Days with a note in the log (the calendar's note dot). */
@@ -66,7 +68,7 @@ interface Props {
   refreshRef?: React.MutableRefObject<(() => Promise<unknown>) | null>;
 }
 
-export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorrow, onPlanIt, onAddToPlan, onOpenPage, onSeeAllPages, onTurnOnSmartTracking, firstTomorrow, onViewChange, refreshRef }: Props) {
+export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorrow, onPlanIt, onAddToPlan, onOpenPage, onSeeAllPages, onOpenLastRevised, onTurnOnSmartTracking, firstTomorrow, onViewChange, refreshRef }: Props) {
   const { pages, logs, user } = useApp();
   const revo = useRevoAvailable(user);
   const [view, setView] = useState<ViewKind>('calendar');
@@ -325,6 +327,7 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
           onAddToPlan={onAddToPlan}
           onOpenPage={onOpenPage}
           onSeeAllPages={onSeeAllPages}
+          onOpenLastRevised={onOpenLastRevised}
           onTurnOnSmartTracking={onTurnOnSmartTracking}
         />
       )}

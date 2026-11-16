@@ -61,6 +61,8 @@ export interface GapsSectionProps {
   onOpenCalendar?: (month: string) => void;
   /** The full revision against the plan (lib/gapsCycle pushBack); none: no line. */
   pushBack?: PushBack | null;
+  /** Last revised (ACT-30): the link at the section's end, and the full revision line. */
+  onOpenLastRevised?: () => void;
 }
 
 export function GapsSection(props: GapsSectionProps) {
@@ -74,7 +76,7 @@ export function GapsSection(props: GapsSectionProps) {
   return <Gaps view={view} {...props} />;
 }
 
-function Gaps({ view, all, firstDay, onOpenDay, onOpenCalendar, pushBack, ...props }: GapsSectionProps & { view: GapsView }) {
+function Gaps({ view, all, firstDay, onOpenDay, onOpenCalendar, pushBack, onOpenLastRevised, ...props }: GapsSectionProps & { view: GapsView }) {
   const { palette } = useTheme();
   // Every length in exact days (Majd, Nov 16 2026: "'days' specifically should always be an option"), kept.
   const [inDays, setInDaysState] = useState(false);
@@ -194,10 +196,13 @@ function Gaps({ view, all, firstDay, onOpenDay, onOpenCalendar, pushBack, ...pro
       </View>
 
       {revision ? (
-        <View
+        <Tap
+          onPress={onOpenLastRevised}
+          disabled={!onOpenLastRevised}
           style={[styles.revision, { borderTopColor: palette.separator }]}
-          accessible
+          accessibilityRole={onOpenLastRevised ? 'button' : 'text'}
           accessibilityLabel={`${revision.title}. ${revision.detail}`}
+          accessibilityHint={onOpenLastRevised ? t('insights.lastRevised.linkHint') : undefined}
           testID="insights-gaps-revision"
         >
           <View style={[styles.mark, { backgroundColor: palette.bubble }]}>
@@ -207,7 +212,24 @@ function Gaps({ view, all, firstDay, onOpenDay, onOpenCalendar, pushBack, ...pro
             <ChromeText style={[typeV2.name, { color: palette.text }]}>{revision.title}</ChromeText>
             <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{revision.detail}</ChromeText>
           </View>
-        </View>
+          {onOpenLastRevised ? <Ionicons name="chevron-forward" size={16} color={palette.secondary} style={styles.revisionChevron} /> : null}
+        </Tap>
+      ) : null}
+
+      {onOpenLastRevised ? (
+        <Tap
+          onPress={onOpenLastRevised}
+          accessibilityRole="button"
+          accessibilityHint={t('insights.lastRevised.linkHint')}
+          hitSlop={8}
+          style={styles.link}
+          testID="insights-gaps-last-revised"
+        >
+          <ChromeText style={[typeV2.name, styles.linkText, { color: palette.link }]} maxFontSizeMultiplier={1.4}>
+            {t('insights.lastRevised.link')}
+          </ChromeText>
+          <Ionicons name="chevron-forward" size={16} color={palette.link} />
+        </Tap>
       ) : null}
     </View>
   );
@@ -332,6 +354,9 @@ const styles = StyleSheet.create({
   daysText: { fontWeight: '600' },
   revision: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginTop: 14, paddingTop: 14, borderTopWidth: StyleSheet.hairlineWidth },
   mark: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  revisionChevron: { alignSelf: 'center' },
+  link: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start', marginTop: 14 },
+  linkText: { flexShrink: 1 },
   figure: { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginTop: 12 },
   figureWrap: { flexWrap: 'wrap', rowGap: 4 },
   big: { fontSize: 28, lineHeight: 32, fontWeight: '700', letterSpacing: -0.6, fontVariant: ['tabular-nums'] },

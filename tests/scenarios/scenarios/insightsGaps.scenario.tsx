@@ -9,6 +9,7 @@ import { MINUTE, setNow, setZone, ZONES } from '../harness/clock';
 import { Home, activityStack, homeStack } from '../harness/screens';
 import { Phone, type Booted, type OpenApp } from '../harness/phone';
 import { fajrOn } from './dayWeeks';
+import { plain } from '../harness/words';
 
 const label = (app: OpenApp, testID: string) => app.screen.queryByTestId(testID)?.props.accessibilityLabel as string | undefined;
 
@@ -46,7 +47,7 @@ async function openInsights(phone: Phone): Promise<OpenApp> {
   return app;
 }
 
-it('[ACT-28] [DAY-2] Gaps counts by the revision day: a session after midnight, before Fajr, is the day before', async () => {
+it('[ACT-28] [ACT-30] [DAY-2] Gaps counts by the revision day: a session after midnight, before Fajr, is the day before', async () => {
   setZone(ZONES.chicago);
   setNow('2026-11-02 20:00');
   const phone = new Phone();
@@ -79,6 +80,27 @@ it('[ACT-28] [DAY-2] Gaps counts by the revision day: a session after midnight, 
   expect(label(app, 'insights-gaps-revision')).toBe(
     'Full revision pushed back 5 days. 18 pages from your gaps come round by 13 Nov instead of 8 Nov. Your plan goes round every 5 days.',
   );
+
+  // When did I last revise…? (ACT-30): by surah, longest waiting first. An-Naba's 582 was last revised on the 2nd
+  // (7 days), as long as Juz 30's end has waited since it was memorized; An-Naba comes first among them.
+  const { fireEvent } = app.mods.rtl;
+  await app.act(async () => {
+    fireEvent.press(app.screen.getByTestId('insights-gaps-last-revised'));
+  });
+  await app.until(() => app.screen.queryAllByTestId(/^last-revised-row-surah-/).length > 0, 'Last revised');
+  const rows = app.screen.getAllByTestId(/^last-revised-row-surah-/);
+  expect(rows[0].props.testID).toBe('last-revised-row-surah-78');
+  expect(plain(label(app, 'last-revised-row-surah-78')!)).toBe('An-Naba. 2 Nov · 7 days ago. Shows its pages');
+  await app.act(async () => {
+    fireEvent.press(app.screen.getByTestId('last-revised-row-surah-78'));
+  });
+  await app.until(() => app.screen.queryByTestId('last-revised-page-surah-78-582') != null, 'An-Naba’s pages');
+  await app.act(async () => {
+    fireEvent.press(app.screen.getByTestId('last-revised-page-surah-78-582'));
+  });
+  const nav = app.mods.require<{ navigation: { current: any } }>('./navRef').navigation;
+  await app.until(() => nav.current.getCurrentRoute()?.name === 'QuranReader', 'the reader');
+  expect(nav.current.getCurrentRoute().params).toMatchObject({ pageNumber: 582 });
   await app.close();
 
   // Revising now ends the open gap: "Today, you revised", and a 2-day gap isn't named.

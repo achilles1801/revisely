@@ -172,6 +172,7 @@ export default function ActivityScreen() {
               // The reader over Activity, so back returns here (as a day's strip does, ACT-20).
               onOpenPage={(pageNumber) => navigation.navigate('QuranReader', { pageNumber })}
               onSeeAllPages={() => navigation.navigate('PagesByStrength')}
+              onOpenLastRevised={() => navigation.navigate('LastRevised')}
               onTurnOnSmartTracking={() => navigation.navigate('Settings', { section: 'revision' })}
               onViewChange={setView}
               refreshRef={blocksRefresh}

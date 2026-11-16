@@ -380,13 +380,14 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'Gaps (Insights)',
-    covers: ['ACT-28'],
-    routes: ['Activity', 'ActivityDay'],
+    covers: ['ACT-28', 'ACT-30'],
+    routes: ['Activity', 'ActivityDay', 'LastRevised', 'QuranReader'],
     text: lines(
       '- Activity → “Insights” → “Gaps”, after Consistency: how long they go between revisions, over the Insights range. A revision day has a page revised (a session, pages revised ahead, pages logged as revised elsewhere), on the revision day Activity files it under; reading and memorizing don’t count. Monday then Thursday is a 3-day gap; revising every day leaves none, and one missed day is a 2-day gap.',
       '- The figure is how long since the last revision (a tap opens that day): a number under 2 weeks, red from 3 days; from 2 weeks words and the date, never red ("Over 3 weeks since your last revision, on 24 Oct"); “Today” once they revised today ("you’re back, after over 3 weeks" after a long gap). Under it a strip of the range: a dot per revision day, each gap of 3 days or more in red with its length (a tap opens the day touched). Then the longest gap (a tap opens the calendar at that month) and how often they usually revise ("Every 2 days").',
       '- “Days”, at the section’s top right when something is said in weeks or months, shows exact days; it is kept on the phone.',
       '- "Full revision pushed back 5 days": pages their plan, as it is now, brings round later than it would have, missed in a gap or slid back by a catch-up; the dates say when they would have come round and when they will. "Full revision on schedule" when none are late.',
+      '- “When did I last revise…?”, at the end of Gaps (or a tap on the full revision line), opens “Last revised”: every memorized surah, juz, hizb or page by when it was last revised, longest waiting first, by “Surah”, “Juz”, “Hizb” or “Page” (kept). A surah, juz or hizb opens to its pages, longest waiting first too; a page opens the reader. “Not revised yet” is a page memorized under 30 days ago, “Never revised” older.',
       '- Say long lengths as the app does, in weeks or months, and exact days when asked; welcome someone back after a long gap, never scold. Recency only, the same with Smart Tracking on or off.',
     ),
   },

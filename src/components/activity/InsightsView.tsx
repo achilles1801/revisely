@@ -163,6 +163,7 @@ export function InsightsView({
   onTurnOnSmartTracking,
   onOpenDay,
   onOpenCalendar,
+  onOpenLastRevised,
 }: {
   data: InsightsData;
   onReviseTomorrow: (pages: number[]) => void;
@@ -178,6 +179,8 @@ export function InsightsView({
   onOpenDay?: (day: string) => void;
   /** Overview at a month (Consistency's figure: ACT-23). */
   onOpenCalendar?: (month: string) => void;
+  /** When each surah, juz, hizb or page was last revised (Gaps' link: ACT-30). */
+  onOpenLastRevised?: () => void;
 }) {
   // The juz sheet (ACT-21): mounted from its first opening on, so it can slide away after.
   const [juz, setJuz] = useState<number | null>(null);
@@ -204,6 +207,7 @@ export function InsightsView({
           onOpenDay={onOpenDay}
           onOpenCalendar={onOpenCalendar}
           pushBack={data.pushBack}
+          onOpenLastRevised={onOpenLastRevised}
         />
       ) : null}
       {data.smartTracking !== false ? (
