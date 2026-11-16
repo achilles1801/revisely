@@ -334,7 +334,9 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
             lastRevisedOn,
             coverageSince: coverageSinceByPage,
             firstTomorrow,
-            gaps: gapsOn,
+            // Gaps waits for the items: drawn from none, it fell back on the pages' last revisions and read "Today you
+            // revised" over a strip of "revised on 0 days" while they loaded (ACT-28).
+            gaps: gapsOn && data != null,
             pushBack: fullRevision,
             itemsFrom: rangeFrom,
             recitation,

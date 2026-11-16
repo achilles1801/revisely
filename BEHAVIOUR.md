@@ -335,7 +335,6 @@ has them; Revisely Dev's Revo knows them from its Dev guide.
   the same with Smart Tracking on or off (ACT-19). (Majd, Nov 16
   2026: "being able to click on a page or surah or juz or hizb and seeing the last time u revised it".)
 
-
 ## Recite insights (Revisely Dev)
 
 What a user's takes with Mark mistakes show over time, and Revo knowing it (Majd, Nov 16 2026).
