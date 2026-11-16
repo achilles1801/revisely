@@ -166,7 +166,22 @@ def health_route():
     where a take starts needs a whole page at once: 27–38 s hops on rev 00043. Traffic never moves to a revision that
     says false (README, "The word table")."""
     return {'ok': True, 'engine': VERSION, 'server': SERVER, 'protocol': protocol(),
-            'words': ENGINE['e'].table is not None} | ({'levels': sorted(LEVELS)} if LEVELS else {})
+            'words': ENGINE['e'].table is not None} | ({'levels': sorted(LEVELS)} if LEVELS else {}) \
+        | ({'ears': e} if (e := ears()) else {})
+
+
+def ears():
+    """Each level's model (Engine.ears: {'recite': 'v6', 'harakat': 'v6', 'strict': 'released+v5'}), or None from an
+    engine that doesn't say."""
+    f = getattr(ENGINE.get('e'), 'ears', None)
+    return f() if callable(f) else None
+
+
+def ear_of(level):
+    """The model a take at `level` (health.level's name, '+letters' or not) ran on, for its health line: v6 costs about
+    20% more model time a second of audio than the released model (its 0.4 s of padding a window), so `model_per_s` is
+    compared within one ear."""
+    return (ears() or {}).get(level.split('+')[0])
 
 
 @app.post('/check')
@@ -211,7 +226,8 @@ async def check(request: Request):
                      res['secs'], len(res['words']), flags, len(res['tajweed']), res['ms'], res.get('kept'))
         cold = health.STATE['takes'] == 0
         health.STATE['takes'] += 1
-        health.emit('take', kind='check', v=2 if v2 else 1, level=health.level(dict(q), False),
+        level = health.level(dict(q), False)
+        health.emit('take', kind='check', v=2 if v2 else 1, level=level, ear=ear_of(level),
                     app=health.app_tag(request.headers.get('x-revisely-app')), audio_s=res['secs'],
                     wall_s=round(time.monotonic() - t0, 2), cpu_s=round(health.cpu() - cpu0, 2), cold=cold,
                     age_s=round(age0, 1), marks=len(res['marks']) if v2 else None, kept=res.get('kept'),
@@ -403,7 +419,8 @@ def take_fields(s, r, kept=None):
     locks = [e.get('t') for e in s.events if e.get('type') == 'locked']
     where = next((e.get('where') for e in s.events if e.get('type') == 'locked'), None)  # 'page' or 'quran' (7)
     cpu_s = health.cpu() - s.cpu0
-    return {'kind': 'live', 'level': health.level(s.request.get('settings') or {}, s.request.get('follow')),
+    level = health.level(s.request.get('settings') or {}, s.request.get('follow'))
+    return {'kind': 'live', 'level': level, 'ear': ear_of(level),
             'protocol': protocol(), 'start': ('quran' if s.request.get('startIn') else 'anywhere') if 'startBy' in
             s.request else 'fixed', 'locked_s': locks[0] if locks else None,
             'locks': len(locks) if 'startBy' in s.request else None, 'where': where,
