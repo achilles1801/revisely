@@ -730,6 +730,62 @@ class OffHere(unittest.TestCase):
         self.assertEqual([e for e in self.events(CLEAN) if e['type'] == 'off'], [])
 
 
+@unittest.skipUnless(MODEL.exists() and CLEAN.exists(),
+                     'the model or the bench recitations are not here (the image has the model, not the bench)')
+class QuranStart(unittest.TestCase):
+    """Anywhere in the Qur'an (recite-anywhere step 2, protocol 7, `startIn: "quran"`): a take whose start isn't on the
+    reader's page is found Qur'an-wide, and locked only once its place is unique; a wrong jump is worse than none."""
+
+    def setUp(self):
+        if engine().table is None:
+            self.skipTest('no word table: the Qur\'an-wide search needs it')
+
+    def cut(self, name, w, secs=30):
+        """The take `name` of bench-v0 from app word w on, as PCM bytes."""
+        t = json.loads((BENCH / f'{name}.json').read_text())
+        x = next(e for e in t['timeline'] if e.get('word') == w and not e.get('extra'))
+        with wave.open(str(BENCH / f'{name}.wav')) as f:
+            pcm = f.readframes(f.getnframes())
+        i = int(x['start'] * 16000) * 2
+        return pcm[i:i + secs * 32000]
+
+    def lock(self, pcm, s, a, sb, start_in='quran'):
+        import live
+        sess = live.LiveSession(engine(), s, a, 114, 6, {'letters': '0', 'tajweed': '0'}, open_end=True, start_by=sb,
+                                start_in=start_in)
+        ev = run(sess, chunks(pcm, 16000) + [{'type': 'end'}])
+        return [{k: e.get(k) for k in ('w', 's', 'a', 'where')} for e in ev if e['type'] == 'locked'], ev
+
+    def test_a_start_off_the_page_is_found_when_it_parts_from_the_page(self):
+        """An-Naba' 78:29 «وَكُلَّ شَىْءٍ أَحْصَيْنَـٰهُ كِتَـٰبًۭا» with Ya-Sin's first page open: 36:12 there also says
+        «وَكُلَّ شَىْءٍ أَحْصَيْنَـٰهُ». The page doesn't lock while 78:29 fits clearly better (QURAN_DOUBT), and the take
+        locks to 78:29 once its words are its own."""
+        w = engine().words.first_word(78, 29)
+        if not (BENCH / 'husary.p7.clean.clean.wav').exists():
+            self.skipTest('bench-v0 is not here')
+        locks, ev = self.lock(self.cut('husary.p7.clean.clean', w), 36, 1, (36, 11))
+        self.assertEqual(locks, [{'w': w, 's': 78, 'a': 29, 'where': 'quran'}])
+        self.assertEqual(ev[-1]['result']['start'], w)
+
+    def test_audio_that_is_not_the_quran_never_locks(self):
+        """The same take reversed (speech-like, not the Qur'an) and noise: no lock, so the take fails silently."""
+        if not (BENCH / 'husary.p7.clean.clean.wav').exists():
+            self.skipTest('bench-v0 is not here')
+        pcm = self.cut('husary.p7.clean.clean', engine().words.first_word(78, 29))
+        rev = np.frombuffer(pcm, '<i2')[::-1].astype('<i2').tobytes()
+        for x in (rev, noise(20, seed=5)):
+            self.assertEqual(self.lock(x, 36, 1, (36, 11))[0], [])
+
+    def test_a_start_on_the_page_locks_as_without_it(self):
+        """Al-Fatiha from 1:5 with Al-Fatiha open: the same lock with startIn as without, `where` "page"."""
+        w = engine().words.first_word(1, 5)
+        pcm = self.cut('alafasy.p2.clean.clean', w)
+        with_q, _ = self.lock(pcm, 1, 1, (1, 7))
+        without, _ = self.lock(pcm, 1, 1, (1, 7), start_in=None)
+        self.assertEqual(with_q, [{'w': w, 's': 1, 'a': 5, 'where': 'page'}])
+        self.assertEqual(without, [{'w': w, 's': 1, 'a': 5, 'where': None}])
+
+
 class LookAlikes(unittest.TestCase):
     def test_a_spelling_apart_only_in_shadda_or_madd_is_not_a_lookalike(self):
         """يَـٰبَنِىَّ (baniyya, 12:87) and يَـٰبَنِىٓ (banī) are written alike; only the shadda and the madd differ, which is
