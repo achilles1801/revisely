@@ -69,9 +69,32 @@ jobs:
           service_account: ${{ vars.DEV_DEPLOY_SA }}
 
       # The firebase-tools the scenario suite pins (tests/scenarios/package.json).
+      #
+      # Nothing on the dev project is ever deleted from here: the functions in this source are deployed by name, and
+      # without --force (which deleted every function and index the source lacked). Until Nov 16 2026 each deploy
+      # deleted Revisely Console's functions and indexes, which live on a branch (#583) and were deployed by hand, so
+      # the console went down with every develop merge that touched functions. A function or index taken out of the
+      # source now stays on dev until it is deleted by hand (`firebase functions:delete <name> --project revisely-dev`).
+      #
+      # HOLD: functions a branch not yet in develop owns on dev (deployed by hand from it), which develop's older copies
+      # must not overwrite. Empty it in the change that brings them to develop.
       - name: firebase deploy
+        env:
+          HOLD: adminConsole consoleMetrics adminMetrics adminRevo supportApplication deleteUserAccount
         run: |
           VERSION=$(node -p "require('./tests/scenarios/package.json').devDependencies['firebase-tools'] || require('./tests/scenarios/package.json').dependencies['firebase-tools']")
-          npx -y "firebase-tools@$VERSION" deploy --only firestore,storage,functions \
-            --project "$PROJECT" --non-interactive --force
-          echo "::notice title=Dev backend::Deployed $(git rev-parse --short HEAD) to $PROJECT."
+          npm --prefix functions run build
+          FUNCTIONS=$(cd functions && node -e "
+            const hold = new Set((process.env.HOLD || '').split(/\s+/).filter(Boolean));
+            const m = require('./lib/index.js');
+            const names = Object.keys(m).filter((k) => m[k] && m[k].__endpoint && !hold.has(k));
+            process.stdout.write(names.map((k) => 'functions:' + k).join(','));
+          ")
+          if [ -z "$FUNCTIONS" ]; then
+            echo "::error::No functions found in functions/lib."
+            exit 1
+          fi
+          echo "Deploying ${FUNCTIONS//functions:/}; held back: ${HOLD:-none}"
+          npx -y "firebase-tools@$VERSION" deploy --only "firestore,storage,$FUNCTIONS" \
+            --project "$PROJECT" --non-interactive
+          echo "::notice title=Dev backend::Deployed $(git rev-parse --short HEAD) to $PROJECT (held back: ${HOLD:-none})."

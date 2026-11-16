@@ -205,6 +205,11 @@ until its part is set up.
     - It runs keyless: GitHub OIDC through Workload Identity, develop of this repository only.
     - Its variables are `DEV_BACKEND`, `DEV_FIREBASE_PROJECT`, `DEV_WIF_PROVIDER` and `DEV_DEPLOY_SA`.
     - It refuses the production project. Production deploys stay by hand.
+    - It never deletes anything on dev (Nov 16 2026): functions go by name, with no `--force`. Its `--force` deleted
+      Revisely Console's functions and indexes on every develop deploy while they lived on a branch. A function or
+      index taken out of the source stays on dev until it is deleted by hand.
+    - Its `HOLD` lists functions a branch not yet in develop owns on dev, deployed by hand from it, so develop's older
+      copies don't overwrite them. The change that brings them to develop empties it.
   - **Revo** has its own key there (a "revisely-dev" Anthropic workspace with a $10 monthly limit) and a
     `config/coach` cap of $10.
   - **Scripts** reach dev with `GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-dev-admin.json`.
