@@ -20,6 +20,14 @@ export const common = {
   juz: 'Juz',
   surahN: 'Surah {{n}}',
   juzN: 'Juz {{n}}',
+  pageN: 'Page {{n}}',
+  /** A page as a quiet detail: "p. 222". */
+  pageShort: 'p. {{n}}',
+  page: 'Page',
+  today: 'Today',
+  /** "3 of 20". */
+  nOfTotal: '{{n}} of {{total}}',
+  saving: 'Saving…',
   /** "Juz 26–27". */
   juzRange: 'Juz {{from}}–{{to}}',
   /** "Juz 3, 7": the numbers already joined. */

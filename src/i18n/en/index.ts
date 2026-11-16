@@ -3,6 +3,7 @@
 import { auth } from './auth';
 import { common } from './common';
 import { help } from './help';
+import { home } from './home';
 import { memorization } from './memorization';
 import { mushaf } from './mushaf';
 import { offline } from './offline';
@@ -20,6 +21,7 @@ export const en = {
   auth,
   common,
   help,
+  home,
   memorization,
   mushaf,
   offline,

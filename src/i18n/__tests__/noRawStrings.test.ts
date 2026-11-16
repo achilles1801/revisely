@@ -14,6 +14,7 @@ const SRC = path.resolve(__dirname, '../..');
 /** Folders and files (relative to src/) whose UI text all comes from src/i18n. */
 const EXTRACTED: string[] = [
   'components/help',
+  'components/home',
   'components/memorization',
   'components/mushaf',
   'components/offline',

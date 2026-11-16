@@ -12,6 +12,7 @@ import { getAllSurahs, getJuzForPage, getPagesForJuz, getSurahDisplay, getSurahF
 import { isJuzMode, jumpablePages, type JumpTarget, todayStartPage } from '../../lib/jump';
 import { describePageRange, describePassage, NBSP, spokenText } from '../../lib/passages';
 import type { User, UserPage } from '../../types';
+import { t } from '../../i18n';
 
 type Tab = 'juz' | 'surah' | 'page';
 
@@ -19,15 +20,15 @@ const surahName = (n: number, fallback: string) => getSurahDisplay(n)?.nameDispl
 const juzOf = (pages: number[]) => {
   const a = getJuzForPage(pages[0]);
   const b = getJuzForPage(pages[pages.length - 1]);
-  return a === b ? `Juz${NBSP}${a}` : `Juz${NBSP}${a}–${b}`;
+  return a === b ? t('home.jump.juz', { n: a }) : t('home.jump.juzRange', { from: a, to: b });
 };
-const partOf = (have: number, size: number) => (have === size ? '' : ` · ${have} of ${size} pages`);
+const partOf = (have: number, size: number) => (have === size ? '' : t('home.jump.part', { have, size }));
 
 /** "Juz 12", "Al-Kahf", "p. 222" (the Page tab chooses by page): what the button calls a target. */
 export function targetLabel(target: JumpTarget): string {
-  if (target.kind === 'juz') return `Juz ${target.juz}`;
-  if (target.kind === 'surah') return surahName(target.surah, `Surah ${target.surah}`);
-  return `p. ${target.page}`;
+  if (target.kind === 'juz') return t('common.juzN', { n: target.juz });
+  if (target.kind === 'surah') return surahName(target.surah, t('common.surahN', { n: target.surah }));
+  return t('common.pageShort', { n: target.page });
 }
 
 /**
@@ -90,28 +91,28 @@ export function JumpSheet({
   const pageIndex = Math.max(0, current != null ? pages.indexOf(current) : 0);
   const pageChosen = chosen?.kind === 'page' ? chosen.page : (pages[pageIndex] ?? null);
 
-  const choose = (t: JumpTarget) => setChosen(t);
-  const isChosen = (t: JumpTarget) =>
+  const choose = (option: JumpTarget) => setChosen(option);
+  const isChosen = (option: JumpTarget) =>
     chosen != null &&
-    chosen.kind === t.kind &&
-    (t.kind === 'juz'
-      ? chosen.kind === 'juz' && chosen.juz === t.juz
-      : t.kind === 'surah'
-        ? chosen.kind === 'surah' && chosen.surah === t.surah
-        : chosen.kind === 'page' && chosen.page === t.page);
+    chosen.kind === option.kind &&
+    (option.kind === 'juz'
+      ? chosen.kind === 'juz' && chosen.juz === option.juz
+      : option.kind === 'surah'
+        ? chosen.kind === 'surah' && chosen.surah === option.surah
+        : chosen.kind === 'page' && chosen.page === option.page);
   const target: JumpTarget | null = tab === 'page' && pageChosen != null ? { kind: 'page', page: pageChosen } : chosen;
   const ready = target != null && target.kind === tab;
 
-  const row = (t: JumpTarget, label: string, meta: string, today: boolean, testID: string) => {
-    const selected = isChosen(t);
+  const row = (option: JumpTarget, label: string, meta: string, today: boolean, testID: string) => {
+    const selected = isChosen(option);
     return (
       <Tap
         key={testID}
-        onPress={() => choose(t)}
+        onPress={() => choose(option)}
         style={[styles.row, { borderBottomColor: palette.separator }]}
         accessibilityRole="radio"
         accessibilityState={{ checked: selected }}
-        accessibilityLabel={`${label}. ${spokenText(meta)}${today ? '. Today starts here' : ''}`}
+        accessibilityLabel={t(today ? 'home.jump.rowLabelToday' : 'home.jump.rowLabel', { label, meta: spokenText(meta) })}
         testID={testID}
       >
         <View style={styles.rowText}>
@@ -124,7 +125,7 @@ export function JumpSheet({
         </View>
         {today ? (
           <Text style={[typeV2.meta, styles.today, { color: palette.accentText }]} maxFontSizeMultiplier={1.3}>
-            Today
+            {t('common.today')}
           </Text>
         ) : null}
         <View style={styles.check}>
@@ -138,8 +139,8 @@ export function JumpSheet({
     <Sheet
       visible={visible}
       onClose={onClose}
-      title="Jump to"
-      message="Today starts here and the days after follow on. Your plan stays the same."
+      title={t('home.jump.title')}
+      message={t('home.jump.body')}
       testID="jump-sheet"
     >
       <View style={styles.body}>
@@ -147,13 +148,13 @@ export function JumpSheet({
           <View style={styles.tabs}>
             <PillTabs<Tab>
               options={[
-                { value: 'juz', label: 'Juz' },
-                { value: 'surah', label: 'Surah' },
-                { value: 'page', label: 'Page' },
+                { value: 'juz', label: t('common.juz') },
+                { value: 'surah', label: t('common.surah') },
+                { value: 'page', label: t('common.page') },
               ]}
               value={tab}
-              onChange={(t) => {
-                setTab(t);
+              onChange={(next) => {
+                setTab(next);
                 setChosen(null);
               }}
               testID="jump-tabs"
@@ -166,16 +167,18 @@ export function JumpSheet({
             <View style={styles.wheelRow}>
               <WheelPicker
                 key={wheelKey}
-                items={pages.map((p) => ({ key: String(p), label: `Page ${p}` }))}
+                items={pages.map((p) => ({ key: String(p), label: t('common.pageN', { n: p }) }))}
                 index={pageIndex}
                 onChange={(i) => setChosen({ kind: 'page', page: pages[i] })}
-                label="Page"
+                label={t('common.page')}
                 testID="jump-page-wheel"
               />
             </View>
             {pageChosen != null ? (
               <Text style={[typeV2.meta, styles.centred, { color: palette.secondary }]} testID="jump-page-where">
-                {`${describePageRange(pageChosen, pageChosen, { juz: true })}${pageChosen === current ? ' · today starts here' : ''}`}
+                {pageChosen === current
+                  ? t('home.jump.pageToday', { where: describePageRange(pageChosen, pageChosen, { juz: true }) })
+                  : describePageRange(pageChosen, pageChosen, { juz: true })}
               </Text>
             ) : null}
           </View>
@@ -185,7 +188,7 @@ export function JumpSheet({
               ? juzRows.map((r) =>
                   row(
                     { kind: 'juz', juz: r.juz },
-                    `Juz ${r.juz}`,
+                    t('common.juzN', { n: r.juz }),
                     // What of it is in the schedule, by surah (surahs and juz first, CLAUDE.md).
                     `${describePassage(r.pages, { form: 'short', wholeJuz: false, max: 2 })}${partOf(r.pages.length, r.size)}`,
                     r.juz === currentJuz,
@@ -205,7 +208,7 @@ export function JumpSheet({
         )}
         <View style={styles.tabs}>
           <PillButton
-            title={ready ? `Start today at ${targetLabel(target!)}` : 'Choose where to start'}
+            title={ready ? t('home.jump.start', { target: targetLabel(target!) }) : t('home.jump.choose')}
             size="lg"
             disabled={!ready}
             onPress={() => target && onJump(target)}
