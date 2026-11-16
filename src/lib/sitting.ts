@@ -3,6 +3,7 @@
 
 import { formatMinutesLong } from './activityFormat';
 import { describePassage } from './passages';
+import { weekdayName } from '../i18n';
 
 /**
  * Whether the reader's sittings are on (REC-1, REC-2) and with them the schedule editor's "Not in your plan"
@@ -16,7 +17,7 @@ export const sittingsEnabled = (user: { previewTester?: boolean } | null | undef
 export function sittingDayWord(day: string, today: string): string {
   if (day === today) return 'today';
   const [y, m, d] = day.split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'long' });
+  return weekdayName(new Date(y, m - 1, d));
 }
 
 /** "Saved to today: Al-Mulk, ayahs 1–26, 41 min"; without pages, "Saved to today: 41 min". */

@@ -1,6 +1,7 @@
 import { JournalEntry, JournalKind, JournalNote, User } from '../types';
 import { getSurahsForPage } from './quranData';
 import { getRevisionDayForUser, revisionDayOf } from './fajrBoundary';
+import { formatDate, formatTime, weekdayName } from '../i18n';
 
 // Limits mirrored in firestore.rules — keep them in sync.
 export const JOURNAL_TEXT_MAX = 200;
@@ -141,10 +142,10 @@ export function journalTotalMinutes(entry: JournalEntry): number | null {
  */
 export function formatEntryTime(at: number, day: string, user?: User | null): string {
   const d = new Date(at);
-  const clock = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).toLowerCase();
+  const clock = formatTime(d, undefined, 'en-US').toLowerCase();
   const writtenOn = user !== undefined ? revisionDayOf(at, user) : toDay(d);
   if (writtenOn === day) return clock;
-  return `${clock} ${d.toLocaleDateString('en-US', { weekday: 'short' })}`;
+  return `${clock} ${weekdayName(d, 'short')}`;
 }
 
 /** "45m", "1h", "1h 5m". */
@@ -187,7 +188,7 @@ export function shiftDay(date: string, deltaDays: number): string {
 /** "Wed 9/23" — the same compact label people use in a notes-app table. */
 export function formatJournalDay(date: string): string {
   const d = parseDay(date);
-  const weekday = d.toLocaleDateString('en-US', { weekday: 'short' });
+  const weekday = weekdayName(d, 'short');
   return `${weekday} ${d.getMonth() + 1}/${d.getDate()}`;
 }
 
@@ -319,7 +320,7 @@ export function journalFilterLabel(filter: JournalFilter): string {
 /** '2026-09' → 'September 2026'. */
 export function formatJournalMonth(month: string): string {
   const [y, m] = month.split('-').map(Number);
-  return new Date(y, m - 1, 1).toLocaleDateString('en-US', {
+  return formatDate(new Date(y, m - 1, 1), {
     month: 'long',
     year: 'numeric',
   });

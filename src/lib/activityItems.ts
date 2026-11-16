@@ -7,6 +7,7 @@ import { describePageRuns, pageRuns } from './pageRanges';
 import { describePassage, describeSession, plainText } from './passages';
 import { getSurahsForPage } from './quranData';
 import { formatClock } from './readingTimer';
+import { formatDate } from '../i18n';
 
 // Activity as single things done (a revision session, a timed reading, a
 // recording, a day's log), newest first: Recent on Activity and Home, and the
@@ -69,9 +70,9 @@ function dateWords(day: string): string {
   const [y, m, d] = day.split('-').map(Number);
   const date = new Date(y, m - 1, d);
   return [
-    date.toLocaleDateString('en-US', { weekday: 'long' }),
-    date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' }),
-    date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    formatDate(date, { weekday: 'long' }),
+    formatDate(date, { month: 'long', day: 'numeric' }),
+    formatDate(date, { month: 'short', day: 'numeric' }),
     day,
   ].join(' ');
 }
@@ -191,7 +192,7 @@ function logItem(day: JournalEntry, note: JournalNote, user?: User | null): Acti
 
 function weekdayName(day: string): string {
   const [y, m, d] = day.split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'short' });
+  return formatDate(new Date(y, m - 1, d), { weekday: 'short' });
 }
 
 /**

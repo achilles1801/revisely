@@ -13,6 +13,7 @@ import { typeV2 } from '../../theme/v2';
 import type { JournalNote } from '../../types';
 import { BlockMark, type BlockKind } from './BlockMark';
 import { TagChip } from './AddSheetParts';
+import { formatTime } from '../../i18n';
 
 type TagOption = { tag: string; label: string; kind: BlockKind };
 
@@ -85,7 +86,7 @@ export function AddNoteSheet({
     }
   };
 
-  const stamp = `${capitalized(dayName)} · ${now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+  const stamp = `${capitalized(dayName)} · ${formatTime(now)}`;
 
   return (
     <Sheet

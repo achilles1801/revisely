@@ -29,6 +29,7 @@ import { Tap } from "../v2/Tap";
 import { ActionSheet } from "../v2/ActionSheet";
 import { AudioWaveform } from "../v2/AudioWaveform";
 import { HoldRow } from "../v2/SwipeRow";
+import { formatTime } from '../../i18n';
 
 interface RecordingsListProps {
   day: string;
@@ -172,10 +173,7 @@ export function RecordingsList({
         const downloading = downloadingId === r.id;
         const at = active ? position : 0;
         const currentPage = active ? pageAt(r.pageMarks, position) : null;
-        const time = new Date(r.createdAt).toLocaleTimeString([], {
-          hour: "numeric",
-          minute: "2-digit",
-        });
+        const time = formatTime(new Date(r.createdAt));
         const allLocal = r.segments.every((sg) => sg.local);
         const highlighted = r.id === highlightId;
         const name = KIND_LABEL[r.kind];

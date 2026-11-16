@@ -32,6 +32,18 @@ t('updates.store.body', { version, store });      // "Revisely 1.0.4 is on the A
 - **The English stays exactly as it was** when a string moves. Values are text only: no colours, no
   markup.
 
+## Dates and numbers
+
+From `src/i18n` too (`format.ts`), so another language writes them its own way:
+
+- `weekdayName(d)` "Wednesday", `monthName(d, 'short')` "Oct", `dayMonth(d, { weekday: 'long' })`
+  "Wednesday 28 October", `formatDate(d, options)`, `formatTime(d)` "5:07 PM", `formatNumber(n)` "4,794".
+- In English each reads exactly as before: `formatDate` takes the locale the call always used
+  (`'en-US'`, the default; `'en-GB'`; or `'device'`, the phone's own), and `formatTime` follows the
+  phone (12 or 24 hours).
+- Never `toLocaleDateString('en-US', …)` or `toLocaleTimeString([], …)` anywhere in `src/`:
+  `src/i18n/__tests__/format.test.ts` fails on a locale written in (or left to the phone).
+
 ## The check
 
 `src/i18n/__tests__/noRawStrings.test.ts` fails when an extracted folder (its `EXTRACTED` list) gets
@@ -60,7 +72,6 @@ I18N_PROGRESS=1 I18N_FOLDER=components/home npx jest src/i18n/__tests__/noRawStr
 
 ## Not yet
 
-- Dates, numbers and plurals through helpers (step 4); the `›` and `‹` in text from one helper that
-  knows the direction (step 5).
+- The `›` and `‹` in text from one helper that knows the direction (step 5).
 - The language picker, Arabic itself and right-to-left layout: they wait for the rest, and the native
   part (declaring Arabic, iOS's RTL flag) for the next native release.

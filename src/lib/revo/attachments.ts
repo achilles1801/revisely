@@ -10,12 +10,13 @@ import type { RecordingMeta } from '../recordings';
 import { dayFacts, type DayExtras, passageFacts, type Prepared } from './facts';
 import { juzOf, passageShort } from './words';
 import type { RevoAttachment, RevoInsight } from './types';
+import { formatDate, formatTime } from '../../i18n';
 
 /** At most this many pages in a pick of pages (Al-Baqarah has 48). */
 export const MAX_PICK_PAGES = 60;
 
 const shortDay = (day: string) =>
-  new Date(`${day}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+  formatDate(new Date(`${day}T12:00:00`), { weekday: 'short', day: 'numeric', month: 'short' }, 'device');
 
 /** "Today · Tue 3 Nov", "Yesterday · Mon 2 Nov", or "Sun 1 Nov". */
 export function dayLabel(day: string, today: string, yesterday: string): string {
@@ -94,7 +95,7 @@ export function attachmentFor(found: Found, prepared: Prepared): RevoAttachment 
 }
 
 export function recordingAttachment(rec: Pick<RecordingMeta, 'day' | 'kind' | 'durationMs' | 'pageMarks' | 'createdAt'>): RevoAttachment {
-  const time = new Date(rec.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const time = formatTime(new Date(rec.createdAt));
   return {
     kind: 'recording',
     label: `Recording · ${shortDay(rec.day)}, ${time}`.slice(0, 40),

@@ -8,6 +8,7 @@ import { describePassage, pagesNote } from './passages';
 import { PACE_MIN_ITEMS } from './activityInsights';
 import { memorizedByMonth, type MemorizationItemLike } from './memorizedAyahs';
 import { coverageRecency, type CoverageRecency } from './recency';
+import { formatDate } from '../i18n';
 
 const dayNumber = (day: string) => Math.round(Date.parse(`${day}T00:00:00Z`) / 86_400_000);
 const daysBetween = (from: string, to: string) => dayNumber(to) - dayNumber(from);
@@ -132,7 +133,7 @@ export function reportMonth(today: string): string {
 
 /** "October". */
 export function monthName(month: string): string {
-  return new Date(`${month}-01T00:00:00Z`).toLocaleDateString('en-US', { month: 'long', timeZone: 'UTC' });
+  return formatDate(new Date(`${month}-01T00:00:00Z`), { month: 'long', timeZone: 'UTC' });
 }
 
 /** Active days in the month, out of its days so far (all of them once it is over). */
@@ -298,7 +299,7 @@ export function memorizationMonths(items: MemorizationItemLike[], last: string):
 
 /** A month's label under its bar: its initial, or "Nov" at either end. */
 export function monthLabel(month: string, first: boolean): string {
-  const short = new Date(`${month}-01T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' });
+  const short = formatDate(new Date(`${month}-01T00:00:00Z`), { month: 'short', timeZone: 'UTC' });
   return first ? short : short.charAt(0);
 }
 
