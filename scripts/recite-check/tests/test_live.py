@@ -238,14 +238,16 @@ class Bench(unittest.TestCase):
         return live.LiveSession(engine(), 1, 1, 1, 7, {})
 
     def test_planted_mistakes_are_marked_live_and_at_the_end(self):
+        """Word 4 (ٱلْحَمْدُ) said as «إِيَّاكَ» is marked skipped: since the decoder can go back from a filler (gap_back,
+        Nov 16 2026), «إِيَّاكَ» is heard as a dropped try at the next word, «لِلَّهِ», which is then said right. Before,
+        it was marked as a word said wrong."""
         ev = run(self.session(), chunks(bench_pcm(), 3200) + [{'type': 'end'}])
         live_marks = {e['mark']['w']: e['mark'] for e in ev if e['type'] == 'mark'}
         self.assertEqual(live_marks[14]['kind'], 'skipped')
-        self.assertEqual(live_marks[4]['kind'], 'word')
-        self.assertIn(live_marks[4]['detail'], ('lookalike', 'replaced', 'sound'))
+        self.assertEqual(live_marks[4]['kind'], 'skipped')
         end = ev[-1]['result']
         self.assertEqual({(m['w'], m['kind']) for m in end['marks'] if m['kind'] != 'tajweed'},
-                         {(4, 'word'), (14, 'skipped')})
+                         {(4, 'skipped'), (14, 'skipped')})
         self.assertEqual((end['words'][0]['w'], end['words'][-1]['w']), (0, 28))
         self.assertEqual({k: end['score'][k] for k in ('reached', 'mistakes', 'accuracy')},
                          {'reached': 29, 'mistakes': 2, 'accuracy': round(1 - 2 / 29, 4)})
@@ -267,7 +269,7 @@ class Bench(unittest.TestCase):
         end = ev[-1]['result']
         self.assertEqual((end['from'], end['to']), (0, 29))  # the ayat reached, not the Qur'an
         self.assertEqual({(m['w'], m['kind']) for m in end['marks'] if m['kind'] != 'tajweed'},
-                         {(4, 'word'), (14, 'skipped')})
+                         {(4, 'skipped'), (14, 'skipped')})
         self.assertEqual(max(w['w'] for w in end['words']), 28)
         self.assertEqual([e['w'] for e in ev if e['type'] == 'at'][-1], 28)
         self.assertEqual(end['score']['reached'], 29)
