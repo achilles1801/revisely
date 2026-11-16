@@ -131,8 +131,12 @@ describe('Revo’s guide names what the app has', () => {
   });
 
   it('the Dev guide stays compact too', () => {
-    // It rides on every question from Revisely Dev, cached as a block of its own.
-    expect(DEV_GUIDE.length).toBeLessThan(12_000);
+    // It rides on every question from Revisely Dev (never the store app's), cached as a block of its own. Raised from
+    // 12,000 characters on Nov 16 2026, at 11,766 (about 3.6 characters a token), to hold about 5 more Dev features
+    // (a feature has taken 400 to 900 characters). At 16,000 (about 4,450 tokens) on Sonnet 5.5 the block costs about
+    // $0.00045 a question when cached (cache read $0.10 per million tokens) and $0.011 on a cache miss (write $2.50 per
+    // million); the 4,000 characters added are about $0.0001 and $0.003 of that. Trim repeats before raising it again.
+    expect(DEV_GUIDE.length).toBeLessThan(16_000);
     expect(DEV_GUIDE).not.toMatch(/\b[A-Z]+-\d+\b/);
   });
 });
