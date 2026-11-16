@@ -32,8 +32,8 @@ describe('revoGaps', () => {
     expect(g.fullRevision).toMatchObject({ cycleDays: 4 });
     expect(g.fullRevision!.latePages).toBeGreaterThan(0);
     expect(g.surahs).toEqual([
-      { sura: 2, daysAgo: 9 },
-      { sura: 1, daysAgo: 2 },
+      { name: 'Al-Baqarah', daysAgo: 9 },
+      { name: 'Al-Fatihah', daysAgo: 2 },
     ]);
   });
 
@@ -46,7 +46,7 @@ describe('revoGaps', () => {
   it('a surah never revised: null, and "not yet" in its first 30 days', () => {
     const fresh = { ...page(582, null), dateMemorized: '2026-01-10T00:00:00.000Z' } as UserPage;
     const g = revoGaps({ user, pages: [page(1, '2026-01-14T00:00:00.000Z'), fresh, page(600, null)], history: [{ day: '2026-01-14', pages: [1] }], today: TODAY, firstDay: '2025-12-01' })!;
-    expect(g.surahs).toContainEqual({ sura: 78, daysAgo: null, notYet: true });
+    expect(g.surahs).toContainEqual({ name: 'An-Naba', daysAgo: null, notYet: true });
     expect(g.surahs[0]).toMatchObject({ daysAgo: null });
     expect(g.surahs[0].notYet).toBeUndefined();
   });

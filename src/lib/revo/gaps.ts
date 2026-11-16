@@ -2,7 +2,8 @@
 // revo should get that update too"). The same figures the section and the screen show, over the last 30 days, as
 // numbers the server checks and writes out in words (functions/src/revo: gaps): how long since the last revision,
 // the longest gap, the usual rhythm, how far gaps pushed the full revision back, and when each memorized surah was
-// last revised. Days only (never dates); surahs by number (the server names them). Revisely Dev only, as the section.
+// last revised. Days only (never dates); surahs in words, as every part of the Qur'an the app sends (lib/revo/words).
+// Revisely Dev only, as the section.
 
 import type { User, UserPage } from '../../types';
 import { gapsView } from '../insightsGaps';
@@ -10,6 +11,7 @@ import { pushBack } from '../gapsCycle';
 import { lastRevisedRows } from '../lastRevised';
 import { revisablePages } from '../memorizedAyahs';
 import { coverageSince, daysSince, lastRevisedDay } from '../recency';
+import { plainText, surahName } from '../passages';
 
 /** Revo's window for the gaps, whatever range Insights shows. */
 export const REVO_GAPS_WINDOW = 30;
@@ -27,7 +29,7 @@ export interface RevoGaps {
   /** The full revision against the plan (lib/gapsCycle). */
   fullRevision: { latePages: number; pushedBackDays: number; cycleDays: number } | null;
   /** Memorized surahs, longest waiting first: days since revised (null: never; `notYet`: memorized under 30 days ago). */
-  surahs: { sura: number; daysAgo: number | null; notYet?: true }[];
+  surahs: { name: string; daysAgo: number | null; notYet?: true }[];
 }
 
 export function revoGaps(input: {
@@ -56,13 +58,14 @@ export function revoGaps(input: {
     last: (p) => last.get(p) ?? null,
     since: (p) => since.get(p) ?? null,
     today,
-  }).map((r) =>
-    r.oldest.state === 'dated'
-      ? { sura: r.number, daysAgo: r.oldest.wait }
+  }).map((r) => {
+    const name = plainText(surahName(r.number));
+    return r.oldest.state === 'dated'
+      ? { name, daysAgo: r.oldest.wait }
       : r.oldest.state === 'notYet'
-        ? { sura: r.number, daysAgo: null, notYet: true as const }
-        : { sura: r.number, daysAgo: null },
-  );
+        ? { name, daysAgo: null, notYet: true as const }
+        : { name, daysAgo: null };
+  });
   return {
     lastRevisedDaysAgo: view.sinceLast,
     longestGap: view.longest
