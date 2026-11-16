@@ -111,7 +111,14 @@ def summarize(entries, days, now=None):
     audio_h = sum(p.get('audio_s', 0) for p in takes) / 3600
     by_level = {}
     for p in takes:
-        by_level.setdefault(f"{p.get('kind')} · {p.get('level')}" + (' (pair)' if p.get('_pair') else ''), []).append(p)
+        by_level.setdefault(f"{p.get('kind')} · {p.get('level')}" + (f" · {p['ear']}" if p.get('ear') else '')
+                            + (' (pair)' if p.get('_pair') else ''), []).append(p)
+    # the model's CPU per second of audio, per model: v6 pads each window (about 20% more than the released model), so
+    # instance speed is read within one model. A line from before `ear` was on the released model.
+    by_ear = {}
+    for p in takes:
+        if p.get('model_per_s') is not None:
+            by_ear.setdefault((p.get('ear') or 'released').split('+')[0], []).append(p['model_per_s'])
     out += ['### Takes', '', '| | Takes | Audio | p50 length | Kept | Marks (median) |', '| --- | --- | --- | --- | --- | --- |']
     for name, ps in sorted(by_level.items()):
         kept = [p['kept'] for p in ps if 'kept' in p]
@@ -135,9 +142,9 @@ def summarize(entries, days, now=None):
     out += ['### Keeping up with the reciter (live)', '',
             f"- Audio waiting before its events went out: median of takes' p50 {f(q([p.get('lag_p50') for p in live], .5), ' s')}, "
             f"median p90 {f(q([p.get('lag_p90') for p in live], .5), ' s')}, worst {f(q([p.get('lag_max') for p in live], 1), ' s')}.",
-            f"- Instance speed (the model's CPU per second of audio; Cloud Run's CPUs differ): "
-            f"{f(q([p.get('model_per_s') for p in takes], 0), '', 3)}–{f(q([p.get('model_per_s') for p in takes], 1), '', 3)}"
-            f", median {f(q([p.get('model_per_s') for p in takes], .5), '', 3)}. Pure-Python bench at start: "
+            f"- Instance speed (the model's CPU per second of audio; Cloud Run's CPUs differ): " + ('; '.join(
+                f"{ear} {f(q(xs, 0), '', 3)}–{f(q(xs, 1), '', 3)}, median {f(q(xs, .5), '', 3)}"
+                for ear, xs in sorted(by_ear.items())) or '–') + ". Pure-Python bench at start: "
             f"{f(q([p.get('bench_ms') for p in inst], 0), ' ms', 0)}–{f(q([p.get('bench_ms') for p in inst], 1), ' ms', 0)}.",
             '- CPU per second of audio, median by level: ' + (', '.join(
                 f"{name} {f(q([p.get('cpu_per_s') for p in ps], .5), '', 2)}" for name, ps in sorted(by_level.items()))

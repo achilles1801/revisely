@@ -62,6 +62,18 @@ class Digest(unittest.TestCase):
         self.assertIn('| live · recite (pair) | 3 |', md)
         self.assertIn('Instance time held: 0.12 h (420 vCPU-s', md)
 
+    def test_takes_and_instance_speed_by_model(self):
+        md = digest.summarize([
+            entry({'health': 'take', 'kind': 'live', 'level': 'recite', 'ear': 'v6', 'audio_s': 60, 'model_per_s': 0.3}),
+            entry({'health': 'take', 'kind': 'live', 'level': 'strict', 'ear': 'released+v5', 'audio_s': 60,
+                   'model_per_s': 0.25}),
+            entry({'health': 'take', 'kind': 'live', 'level': 'strict', 'audio_s': 60, 'model_per_s': 0.2}),  # before `ear`
+        ], 7, NOW)
+        self.assertIn('| live · recite · v6 | 1 |', md)
+        self.assertIn('| live · strict · released+v5 | 1 |', md)
+        self.assertIn('| live · strict | 1 |', md)
+        self.assertIn('released 0.200–0.250, median 0.250; v6 0.300–0.300, median 0.300.', md)
+
 
 if __name__ == '__main__':
     unittest.main()

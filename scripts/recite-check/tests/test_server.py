@@ -58,6 +58,9 @@ class FakeEngine:
             raise server.BadRequest('the passage ends before it starts')
         return lo, hi
 
+    def ears(self):
+        return {'recite': 'v6', 'harakat': 'v6', 'strict': 'released+v5'}
+
     def check(self, x, s, a, s2, a2, q, v=1):
         self.calls.append((v, s, a, s2, a2))
         res = {'v': 1, 'secs': round(len(x) / SR, 1), 'words': [], 'extras': [], 'tajweed': [], 'letters': None,
@@ -176,6 +179,12 @@ class CheckTests(Base):
         self.assertIn('server', body)
         self.assertIn('engine', body)
         self.assertIs(body['words'], False)  # FakeEngine has no word table
+
+    def test_health_says_which_model_each_level_runs(self):
+        self.assertEqual(self.client.get('/health').json()['ears'],
+                         {'recite': 'v6', 'harakat': 'v6', 'strict': 'released+v5'})
+        with mock.patch.object(FakeEngine, 'ears', None):  # an engine from before levels had their own models
+            self.assertNotIn('ears', self.client.get('/health').json())
 
     def test_health_says_when_the_word_table_is_there(self):
         server.ENGINE['e'].table = {'offsets': [], 'blob': b''}
@@ -909,8 +918,9 @@ class HealthTests(Base):
                 pass
         (line,) = self.lines('take')
         self.assertEqual({k: line[k] for k in ('kind', 'level', 'start', 'audio_s', 'sockets', 'cold', 'restarted',
-                                               'why', 'kept', 'app', 'protocol')},
-                         {'kind': 'live', 'level': 'strict+letters', 'start': 'fixed', 'audio_s': 2.0, 'sockets': 1,
+                                               'why', 'kept', 'app', 'protocol', 'ear')},
+                         {'kind': 'live', 'level': 'strict+letters', 'ear': 'released+v5', 'start': 'fixed',
+                          'audio_s': 2.0, 'sockets': 1,
                           'cold': True, 'restarted': False, 'why': 'end', 'kept': True, 'app': '1.0.4 (40) dev 3fa9c1d2',
                           'protocol': 7})
         for k in ('open_s', 'ready_s', 'age_s', 'cpu_s', 'lag_p50', 'lag_p90', 'lag_max'):
@@ -955,16 +965,16 @@ class HealthTests(Base):
                         {'startBy': [2, 16], 'startIn': 'quran', 'settings': {}, 'follow': True}, None)
         s.events = [{'type': 'locked', 'w': 6090, 's': 2, 'a': 9, 't': 2.5, 'where': 'quran'}]
         f = server.take_fields(s, {'why': 'end', 'ms': {'model': 900, 'search_quran': 30}})
-        self.assertEqual((f['start'], f['where'], f['level']), ('quran', 'quran', 'recite'))
+        self.assertEqual((f['start'], f['where'], f['level'], f['ear']), ('quran', 'quran', 'recite', 'v6'))
         self.assertNothingPersonal({k: v for k, v in f.items() if v is not None})
 
     def test_a_check(self):
         h = {'Authorization': 'Bearer good', 'X-Revisely-App': '1.0.4 (40) dev embedded'}
         self.client.post('/check?s=1&a=1&v=2&tajweed=0', content=wav(3.0), headers=h)
         (line,) = self.lines('take')
-        self.assertEqual({k: line[k] for k in ('kind', 'v', 'level', 'audio_s', 'cold', 'marks', 'app')},
-                         {'kind': 'check', 'v': 2, 'level': 'harakat', 'audio_s': 3.0, 'cold': True, 'marks': 0,
-                          'app': '1.0.4 (40) dev embedded'})
+        self.assertEqual({k: line[k] for k in ('kind', 'v', 'level', 'ear', 'audio_s', 'cold', 'marks', 'app')},
+                         {'kind': 'check', 'v': 2, 'level': 'harakat', 'ear': 'v6', 'audio_s': 3.0, 'cold': True,
+                          'marks': 0, 'app': '1.0.4 (40) dev embedded'})
         self.assertNothingPersonal(line)
 
     def test_labels_are_counted(self):
