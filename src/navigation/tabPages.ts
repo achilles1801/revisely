@@ -36,6 +36,6 @@ export function insightsTab(
 
 /** The tab routes, in order: Insights only for an account whose Insights aren't in Activity. */
 export function mainTabRoutes(insightsInActivity: boolean): ('Home' | 'Read' | 'Insights')[] {
-  return insightsInActivity ? ['Home', 'Read'] : ['Home', 'Read', 'Insights'];
+  return insightsInActivity ? ['Home', 'Read'] : ['Home', 'Read', 'Insights']; // i18n-ignore (route names)
 }
 

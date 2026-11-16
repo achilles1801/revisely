@@ -17,7 +17,9 @@ const EXTRACTED: string[] = [
   'components/offline',
   'components/player',
   'components/updates',
+  'components/v2',
   'lib/updates',
+  'navigation',
 ];
 
 describe('UI text comes from src/i18n', () => {

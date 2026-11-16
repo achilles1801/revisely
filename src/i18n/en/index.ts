@@ -5,6 +5,7 @@ import { help } from './help';
 import { offline } from './offline';
 import { player } from './player';
 import { updates } from './updates';
+import { v2 } from './v2';
 
 export const en = {
   common,
@@ -12,6 +13,7 @@ export const en = {
   offline,
   player,
   updates,
+  v2,
 } as const;
 
 export type Strings = typeof en;

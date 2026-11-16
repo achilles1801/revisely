@@ -47,6 +47,7 @@ const ID_CALLS = new RegExp(
     '\\.(warn|error|debug|info|log|trace|addBreadcrumb|captureException|captureMessage|setTag|setTags|setExtra|setContext)$',
     '^(t|i18n\\.t|require|navigate|push|replace|reset|reportError|report|warn|debug|trace)$',
     '\\.(navigate|push|replace|reset|setParams|getItem|setItem|removeItem|multiGet|multiRemove|addEventListener|addListener|emit)$',
+    '\\.(includes|has|indexOf|lastIndexOf|startsWith|endsWith)$',
     '^(doc|collection|query|where|orderBy|ref|httpsCallable|callFunction|getFunctions|storageRef|fetch)$',
     '^(StyleSheet\\.create|Platform\\.select|Symbol|RegExp|parseInt|Number|Date|new Date)$',
   ].join('|'),
