@@ -23,6 +23,7 @@ const EXTRACTED: string[] = [
   'components/reader',
   'components/recordings',
   'components/revision',
+  'components/timer',
   'components/updates',
   'components/v2',
   'context',
