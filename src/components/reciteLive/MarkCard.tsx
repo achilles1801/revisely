@@ -25,7 +25,7 @@ import {
 const CARD_MARGIN = 12;
 
 /** One mark's part of the card: what it is, where, Expected and Recited (or the tajweed note), and its actions. */
-function MarkBlock({
+export function MarkBlock({
   mark,
   words,
   onDismiss,

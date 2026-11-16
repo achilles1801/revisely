@@ -15,9 +15,22 @@ import type { WhatsNewPicture } from '../../lib/help/whatsNew';
 import { weekStart } from '../../lib/activityHeatmap';
 import { BlockMark, RevisedMark } from '../activity/BlockMark';
 import { CalendarMonth, type CalendarData } from '../activity/CalendarMonth';
+import { GapsSection } from '../activity/GapsSection';
+import { ReciteBar } from '../reciteLive/ReciteBar';
+import { MarkBlock } from '../reciteLive/MarkCard';
+import { SmallPill } from '../reciteLive/MarkParts';
+import { markFill } from '../reciteLive/markColours';
+import { PAST_OPACITY } from '../reciteMemory/RememberedLayers';
+import { useQuranWordsWhen } from '../reciteMemory/TakeRows';
+import { PillButton } from '../v2/PillButton';
+import { arabicV2 } from '../../theme/v2';
+import { getReadPalette } from '../../theme/readPalette';
+import type { QuranWords } from '../../lib/recite/quranWords';
+import type { Mark, MarkKind } from '../../lib/reciteLive/contract';
 
 /** The words the pictures show, as the screens they're drawn from show them (pictures.test.ts). */
 export const PICTURE_WORDS = {
+  drill: 'Recite the mistakes again',
   addTitle: 'Add to today',
   rows: [
     ['Revised elsewhere', 'Today’s pages, revised away from a session'],
@@ -207,6 +220,156 @@ function AyahPicture() {
   return <Day />;
 }
 
+// ------------------------------------------------------------------ 4–6. Recite (the mistake detection release)
+
+/**
+ * Al-Mulk 1–2 as a take sees it, from the app's own word data (never Arabic typed here): three marks, one of each
+ * colour, the line being recited and the word being said. Each mark is placed by its word's position in its ayah.
+ */
+const RECITE_AT = { sura: 67, from: 1, to: 2 };
+const DEMO_MARKS: { ayah: number; position: number; kind: MarkKind }[] = [
+  { ayah: 1, position: 3, kind: 'word' },
+  { ayah: 2, position: 2, kind: 'harakat' },
+  { ayah: 2, position: 6, kind: 'tajweed' },
+];
+
+function demoTake(words: QuranWords) {
+  const [first] = words.verseRange(RECITE_AT.sura, RECITE_AT.from);
+  const [, end] = words.verseRange(RECITE_AT.sura, RECITE_AT.to);
+  const marks: Mark[] = DEMO_MARKS.map(({ ayah, position, kind }) => {
+    const [a, b] = words.verseRange(RECITE_AT.sura, ayah);
+    const w = Math.min(b - 1, a + position - 1);
+    return { id: `${w}:${kind}:demo`, w, ayah: [RECITE_AT.sura, ayah], kind, sure: 'clear', ...(kind === 'tajweed' ? { rule: 'ghunnah' as const } : {}) };
+  });
+  const cursor = end - 2;
+  // The mushaf's own lines (the 1405 print), in order.
+  const lines: number[][] = [];
+  for (let w = first; w < end; w++) {
+    const last = lines[lines.length - 1];
+    if (last && words.lineOf(last[0]) === words.lineOf(w)) last.push(w);
+    else lines.push([w]);
+  }
+  return { marks, cursor, lines };
+}
+
+/** The ayahs' lines, right to left, each mark on its word; `live`: the line being recited and the word being said. */
+function TakeLines({ words, live, past }: { words: QuranWords; live: boolean; past: boolean }) {
+  const { palette, isDark } = useTheme();
+  const { marks, cursor, lines } = demoTake(words);
+  const markOf = new Map(marks.map((m) => [m.w, m]));
+  const fill = (w: number) => {
+    const m = markOf.get(w);
+    if (m) return past ? { backgroundColor: markFill(palette, m), opacity: isDark ? PAST_OPACITY.dark : PAST_OPACITY.light } : { backgroundColor: markFill(palette, m) };
+    return live && w === cursor ? { backgroundColor: palette.followWord } : null;
+  };
+  return (
+    <View style={styles.takeLines}>
+      {lines.map((line) => {
+        const here = live && line.includes(cursor);
+        return (
+          <View key={line[0]} style={[styles.takeLine, here && { backgroundColor: palette.followBand }]}>
+            {line.map((w) => (
+              <View key={w} style={[styles.takeWord, fill(w)]}>
+                <Text style={[arabicV2(19), { color: palette.text }]} maxFontSizeMultiplier={1}>
+                  {words.uthmani(w)}
+                </Text>
+              </View>
+            ))}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+const noop = () => undefined;
+
+/** The reader during a take: the page following the reciter, three marks, and the bar with its score. */
+function RecitePicture() {
+  const { isDark } = useTheme();
+  const words = useQuranWordsWhen(true);
+  const read = getReadPalette(isDark);
+  if (!words) return null;
+  const { cursor } = demoTake(words);
+  return (
+    <View style={styles.reciteScreen}>
+      <TakeLines words={words} live past={false} />
+      <View style={styles.reciteBar}>
+        <ReciteBar
+          hidden={false}
+          onToggleHidden={noop}
+          onNextWord={noop}
+          onWholeAyah={noop}
+          score={{ text: '94%', level: 'good' }}
+          seconds={47}
+          recording={false}
+          words={[
+            { w: cursor - 1, text: words.uthmani(cursor - 1), tone: 'said' },
+            { w: cursor, text: words.uthmani(cursor), tone: 'current' },
+          ]}
+          status=""
+          phase="live"
+          onStop={noop}
+          onClose={noop}
+          surface={{ background: read.control, border: read.divider }}
+        />
+      </View>
+    </View>
+  );
+}
+
+/** A mark's card, as a tap on a highlight opens it: what it is, what was expected, and its buttons. */
+function MarksPicture() {
+  const { palette } = useTheme();
+  const words = useQuranWordsWhen(true);
+  if (!words) return null;
+  const [a] = words.verseRange(RECITE_AT.sura, 2);
+  const mark: Mark = { id: `${a + 1}:skipped:demo`, w: a + 1, ayah: [RECITE_AT.sura, 2], kind: 'skipped', sure: 'clear' };
+  return (
+    <View style={styles.screen}>
+      <View style={[styles.markCard, { backgroundColor: palette.sheet, borderColor: palette.outline }]}>
+        <MarkBlock mark={mark} words={words} onDismiss={noop} first />
+        <View style={styles.markActions}>
+          <SmallPill icon="volume-high-outline" label="Hear it" onPress={noop} />
+          <SmallPill icon="person-outline" label="Your recitation" onPress={noop} />
+        </View>
+      </View>
+    </View>
+  );
+}
+
+/** The page after the take: the mistakes kept on it, lighter, and the way over them again. */
+function AgainPicture() {
+  const words = useQuranWordsWhen(true);
+  if (!words) return null;
+  return (
+    <View style={styles.reciteScreen}>
+      <TakeLines words={words} live={false} past />
+      <View style={styles.againButton}>
+        <PillButton title={PICTURE_WORDS.drill} size="lg" onPress={noop} />
+      </View>
+    </View>
+  );
+}
+
+/** Insights' Gaps over the same demo month as Activity's picture. */
+function GapsPicture() {
+  const month = demoMonth();
+  return (
+    <View style={styles.screen}>
+      <GapsSection
+        revised={month.revised.map((r) => ({ day: r.day, pages: r.pages }))}
+        today={TODAY}
+        window={30}
+        inWords="in 30 days"
+        lastWords="last 30 days"
+        firstDay={day(1)}
+        knownSince={day(1)}
+      />
+    </View>
+  );
+}
+
 export function pictureFor(picture: WhatsNewPicture): React.ReactNode {
   switch (picture) {
     case 'activity':
@@ -225,6 +388,30 @@ export function pictureFor(picture: WhatsNewPicture): React.ReactNode {
       return (
         <Window anchor="top" testID="whats-new-picture-ayah">
           <AyahPicture />
+        </Window>
+      );
+    case 'recite':
+      return (
+        <Window anchor="bottom" testID="whats-new-picture-recite">
+          <RecitePicture />
+        </Window>
+      );
+    case 'marks':
+      return (
+        <Window anchor="top" testID="whats-new-picture-marks">
+          <MarksPicture />
+        </Window>
+      );
+    case 'again':
+      return (
+        <Window anchor="bottom" testID="whats-new-picture-again">
+          <AgainPicture />
+        </Window>
+      );
+    case 'gaps':
+      return (
+        <Window anchor="top" testID="whats-new-picture-gaps">
+          <GapsPicture />
         </Window>
       );
   }
@@ -252,4 +439,12 @@ const styles = StyleSheet.create({
   play: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   bars: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 3, overflow: 'hidden' },
   bar: { width: 3, borderRadius: 1.5 },
+  reciteScreen: { paddingHorizontal: 12, paddingTop: 14, paddingBottom: 12 },
+  takeLines: { gap: 4 },
+  takeLine: { flexDirection: 'row-reverse', justifyContent: 'center', flexWrap: 'wrap', borderRadius: 8, paddingVertical: 2 },
+  takeWord: { borderRadius: 6, paddingHorizontal: 3 },
+  reciteBar: { marginTop: 14 },
+  markCard: { borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 16, paddingVertical: 14 },
+  markActions: { flexDirection: 'row', gap: 8, marginTop: 8, flexWrap: 'wrap' },
+  againButton: { marginTop: 18, alignItems: 'center' },
 });
