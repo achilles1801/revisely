@@ -560,6 +560,7 @@ class LiveSession:
         self.seams = []                  # (seconds, cursor, first word, frame, start) of each segment after the first
         self._window = (None, [])        # the segment and path of the last decision (for a seam's state)
         self.sent = {'at': None, 'said': None, 'score': None}
+        self.off_w = None                # the word an `off` was sent for, until the cursor reaches it (_off_event)
         self.unmarked = set()            # ids taken back (and not marked again): for a resume's snapshot
         self.helped = set()              # words the phone showed the reciter (hints) before they were decided
         self._notes_cache = {}           # an ayah's notes by what they read (see _notes)
@@ -1143,8 +1144,26 @@ class LiveSession:
         self.ms['tajweed'] += (time.perf_counter() - t1) * 1000
         ev += self._maybe_rebase(cw + seg.a if cw is not None else None)
         ev += self._said_event(now)
+        ev += self._off_event(seg, path, now)
         ev += self._score_event(now)
         return ev
+
+    def _off_event(self, seg, path, now):
+        """`off`: the newest final frames are free speech in the next word's slot (the word the hidden view shows next):
+        the reciter is saying something else there. Lab (Nov 15 2026, live, 0.5 s chunks): on bench-v0 right 86% of
+        the times it is sent, for 27% of planted mistakes, 0.09 wrong per 100 words; 0 of 120 planted hesitations and 0
+        of 60 long pauses; 33 of 108 planted corrections, while the wrong word is said. Sent once per word, again only
+        after the cursor has reached it; the phone clears it when `at` reaches the word or the word is marked."""
+        nxt = self.sent['said'][0] + 1 if self.sent['said'] is not None else self.origin
+        if self.off_w is not None and (self.off_w < nxt or (self.sent['at'] or -1) >= self.off_w):
+            self.off_w = None
+        if not path or path[-1][1] >= 0 or self.off_w is not None:
+            return []
+        gi = -path[-1][1] - 1
+        if gi >= seg.g.W or seg.app[gi] != nxt or any(m['w'] == nxt for m in self.marks.values()):
+            return []
+        self.off_w = nxt
+        return [{'type': 'off', 'w': nxt, 't': round(now, 2)}]
 
     def _cursor(self, w):
         """The `at` to send for this hop's cursor word w, or None. A move back more than JUMP_BACK words or ahead more
@@ -1254,6 +1273,8 @@ class LiveSession:
             ev.append({'type': 'at', 'w': self.sent['at'], 't': t})
         if self.sent['said'] is not None:
             ev.append({'type': 'said', 'upTo': self.sent['said'][0], 't': t})
+        if self.off_w is not None:
+            ev.append({'type': 'off', 'w': self.off_w, 't': t})
         if self.decided and not self.follow:
             ev.append({'type': 'score', **self._score(), 't': t})
         return ev
