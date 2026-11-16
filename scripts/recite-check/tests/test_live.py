@@ -785,6 +785,16 @@ class QuranStart(unittest.TestCase):
         self.assertEqual(with_q, [{'w': w, 's': 1, 'a': 5, 'where': 'page'}])
         self.assertEqual(without, [{'w': w, 's': 1, 'a': 5, 'where': None}])
 
+    def test_a_doubt_from_off_the_page_lets_go_when_that_place_is_heard_wrong(self):
+        """An-Naba' 78:25 «إِلَّا حَمِيمًۭا وَغَسَّاقًۭا» with its own page open: Sad 38:57 («حَمِيمٌۭ وَغَسَّاقٌۭ») fits
+        better at first and holds the page's lock back, until its own locator hears a word wrong; then the page
+        locks. (With the doubt held for good, this take never locked.)"""
+        if not (BENCH / 'alafasy.p7.clean.clean.wav').exists():
+            self.skipTest('bench-v0 is not here')
+        w = engine().words.first_word(78, 25)
+        locks, _ = self.lock(self.cut('alafasy.p7.clean.clean', w), 78, 1, (78, 30))
+        self.assertEqual(locks, [{'w': w, 's': 78, 'a': 25, 'where': 'page'}])
+
 
 class LookAlikes(unittest.TestCase):
     def test_a_spelling_apart_only_in_shadda_or_madd_is_not_a_lookalike(self):

@@ -103,15 +103,18 @@ MAX_SEARCH = 480    # words searched at most (the server allows a page of 400, p
 # than none (Majd).
 QURAN_AFTER = 3.0
 QURAN_EVERY = 4     # hops between two votes (2 s): with QURAN_SECS, about 0.1 vCPU while unlocked on Cloud Run
-QURAN_SECS = 10.0   # speech fitted, from its first sound
+QURAN_SECS = 15.0   # speech fitted, from its first sound
 QURAN_STOP = 30.0   # seconds of speech after which the Qur'an-wide search gives up (the take fails silently)
 QURAN_TOP = 10
 QURAN_CHAIN = 20    # words of each place fitted
 QURAN_FIT = 1.2     # nats a frame
-QURAN_MARGIN = 0.3  # nats a frame between the best place and the next
+QURAN_MARGIN = 0.2  # nats a frame between the best place and the next, for it to get a locator (which then locks only
+                    # on QURAN_WORDS words said nowhere else)
 QURAN_WORDS = 5
-QURAN_DOUBT = 0.15  # nats a frame by which a place off the page must fit better to hold back a page lock (startIn):
-                    # it only waits, so it can doubt sooner than a jump may be made
+QURAN_DOUBT_MAX = 8.0  # (startIn) while a place off the page has its own locator and every word it has heard so far is
+                       # right, the page's word rule waits, for this long at most: 78:29 «وكل شيء أحصيناه كتابا» with
+                       # Ya-Sin's first page open locked on 36:12 (the same first three words). A wrong word there lets
+                       # the page lock at once (78:25 «حميما وغساقا» on its own page, against 38:57 «حميم وغساق»).
 NEG = checker.Decoder.NEG
 _pool = None
 
@@ -1018,6 +1021,8 @@ class LiveSession:
         self._qloc_hist = []
         self._q_hops = 0
         self._q_fits = (-1, [])          # (frame, _quran_fits then): kept for QURAN_EVERY hops, the page's doubt too
+        self._doubt_from = None          # the frame a page lock was first held back (QURAN_DOUBT_MAX)
+        self._q_failing = False          # the Qur'an-wide locator's words so far include one heard wrong
 
     def _locate_quran(self, now):
         """One hop of the Qur'an-wide search (QURAN_AFTER): vote and fit places every QURAN_EVERY hops; the winning
@@ -1044,7 +1049,7 @@ class LiveSession:
         self._q_hops += 1
         rng = self._quran_range(idx, onset)  # fitted anew every QURAN_EVERY hops (_quran_fits)
         if rng is not None and rng != self.qsearch:
-            self.qsearch, self.qloc, self._qloc_hist = rng, None, []
+            self.qsearch, self.qloc, self._qloc_hist, self._q_failing = rng, None, [], False
         if self.qsearch is None:
             return []
         if self.qloc is None:
@@ -1069,7 +1074,9 @@ class LiveSession:
         while k + 1 < W and visits[k + 1] and visits[k + 1][-1]['end'] <= dec.t - cf:
             k += 1
         n = k + 1 - w0
-        if n < QURAN_WORDS or not all(st.get(loc.app[w]) == 'correct' for w in range(w0, k + 1)):
+        all_right = all(st.get(loc.app[w]) == 'correct' for w in range(w0, k + 1))
+        self._q_failing = n >= 2 and not all_right
+        if n < QURAN_WORDS or not all_right:
             return []
         texts = [kw['text'] for kw in loc.kws]
         if any(texts[j:j + n] == texts[w0:k + 1] for j in range(W - n + 1) if j != w0) \
@@ -1132,27 +1139,30 @@ class LiveSession:
         return a, min(W.first[v1] + W.counts[v1], a + MAX_SEARCH, self.end)
 
     def _page_doubted(self):
-        """(start_in) A place off the page fits what was heard clearly better than any place on it: the page's
-        locator doesn't lock (on its rule for words; the page's top keeps its own)."""
+        """(start_in) The page's locator waits (QURAN_DOUBT_MAX): a place off the page fits what was heard better, has
+        its own locator, and that locator has heard every word right so far."""
         if not self.start_in:
             return False
         idx, onset = QuranIndex.of(self.E), self._speech_onset()
         if idx is None or onset is None or (self.T - onset) / FPS > QURAN_STOP:
             return False
         t0 = time.perf_counter()
-        lo, hi = self.search
-
-        def doubted(fits):
-            on = [f for w, f, _ in fits if lo <= w < hi]
-            off = [f for w, f, n in fits if not lo <= w < hi and n >= 2]
-            return bool(off) and off[0] <= QURAN_FIT and (not on or off[0] + QURAN_DOUBT < on[0])
-
-        d = doubted(self._quran_fits(idx, onset))  # a doubt may rest on the last fits (QURAN_EVERY)...
-        if not d and self._q_fits[0] != self.T:   # ...a lock only on everything heard so far
-            self._q_fits = (-1, [])
-            d = doubted(self._quran_fits(idx, onset))
-        self.ms['search_quran'] = self.ms.get('search_quran', 0.0) + (time.perf_counter() - t0) * 1000
-        return d
+        try:
+            rng = self._quran_range(idx, onset)  # on the last fits (QURAN_EVERY)...
+            if (rng is None or self.qsearch is None or self._q_failing) and self._q_fits[0] != self.T:
+                self._q_fits = (-1, [])  # ...a lock only on everything heard so far
+                rng = self._quran_range(idx, onset)
+        finally:
+            self.ms['search_quran'] = self.ms.get('search_quran', 0.0) + (time.perf_counter() - t0) * 1000
+        if rng is None:  # the best place is on the page
+            return False
+        if rng != self.qsearch:
+            self.qsearch, self.qloc, self._qloc_hist, self._q_failing = rng, None, [], False
+        if self.qsearch is None or self._q_failing:
+            return False
+        if self._doubt_from is None:
+            self._doubt_from = self.T
+        return self.T - self._doubt_from < QURAN_DOUBT_MAX * FPS
 
     def _said_once(self, w0, n):
         """App words w0 .. w0 + n - 1 (n >= 2) are a run of words said nowhere else in the Qur'an (letters only)."""
