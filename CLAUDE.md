@@ -708,6 +708,16 @@ README has the deploy and the undo); never deploy the root `firebase.json`'s hos
   `recite.label`: owners, admins and **labellers**; revisely-dev only, `LABEL_PROJECTS`). Majd, Nov 15–16 2026: "if the
   issue is those recitations don't say what is right or wrong then i can help with that … i can even get my quran
   teacher to help with that". Its own page, made for a phone held in one hand, and linked from the console's tabs.
+  - **The layout** (redesigned Nov 16 2026 after Majd's first try: "i dont see a way to go to next clip … not have to
+    refresh if it gets stuck"): a progress line and "Clip 24 of 150"; a bar always at the bottom (‹ Previous, ▶,
+    Next ›, which says "2 marks left" until it can go); swipes move clips too. One question at a time ("Is this a
+    mistake?"). Speed and text size live in ⋯ Settings.
+    - Nothing needs a reload. Every load has a 10 s watchdog that becomes Try again with the reason. Saves retry by
+      themselves and show Saving… / Saved / Couldn't save · Retry. The clip's answers are kept as a draft, so a reload
+      resumes them. Previous on a fresh visit uses `labels.recent`. The page's own failures go to the log
+      (`labels.log`, event `labels.client`).
+    - Majd's stuck session (Nov 16): `labels.stats` needed an index with the summed fields, (by.uid, at, answers, ms),
+      and nothing on screen said how to move on.
   - **The flow:** one clip at a time, played as it opens, with the passage's words (Amiri Quran; Larger and Smaller text
     in ⋯, kept per device) and the checker's marks. Each mark gets Mistake, Not a mistake or Can't tell (All fine sets
     the rest to Not a mistake); tapping a word the checker missed labels it (wrong word, skipped, extra word after it,

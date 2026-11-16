@@ -766,6 +766,7 @@ const consoleDeps = {
   invites: LABEL_PROJECTS.includes(PROJECT_ID) || testing,
   labels: {
     db: adminDb,
+    log: (entry: Record<string, unknown>) => logger.warn('console', entry),
     open: LABEL_PROJECTS.includes(PROJECT_ID) || testing,
     async audio(path: string) {
       if (!path.startsWith(LABEL_AUDIO_PREFIX)) throw new Error('not a label clip');

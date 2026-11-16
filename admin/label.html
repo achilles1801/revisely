@@ -17,6 +17,7 @@
 </head>
 <body class="lab">
 <div class="lab-app" id="app">
+  <div class="lab-progress" aria-hidden="true"><div class="lab-progress-fill" id="progressFill"></div></div>
   <header class="lab-top">
     <a class="lab-home" id="homeLink" href="/" aria-label="Revisely Console"><span class="mark" aria-hidden="true">R</span></a>
     <div class="lab-title">
@@ -24,48 +25,63 @@
       <span class="lab-stats" id="stats" aria-live="polite"></span>
     </div>
     <span class="env" id="env" hidden></span>
-    <button class="lab-icon" id="menuBtn" type="button" aria-label="More" aria-haspopup="menu" hidden>⋯</button>
+    <button class="lab-save" id="saveState" type="button" hidden aria-live="polite"></button>
+    <button class="lab-icon" id="menuBtn" type="button" aria-label="Settings" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+    </button>
   </header>
 
   <p class="lab-boot" id="boot" aria-live="polite">Loading…</p>
 
   <section class="lab-clip" id="clipView" hidden>
     <div class="lab-meta">
+      <span class="lab-clipno" id="clipNo"></span>
       <span id="where"></span>
       <span class="lab-src" id="source"></span>
-      <span class="lab-time mono" id="time">0:00</span>
     </div>
-    <div class="lab-player">
-      <button class="lab-play" id="playBtn" type="button" aria-label="Play the clip">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path id="playIcon" d="M8 5v14l11-7z"/></svg>
-      </button>
-      <button class="lab-small" id="backBtn" type="button" aria-label="Back 2 seconds">−2s</button>
+    <div class="lab-bar-row">
       <div class="lab-bar" id="bar" role="slider" aria-label="Position in the clip" aria-valuemin="0" tabindex="0">
         <div class="lab-bar-fill" id="barFill"></div>
         <div class="lab-ticks" id="ticks"></div>
       </div>
-      <button class="lab-small" id="speedBtn" type="button" aria-label="Speed" aria-pressed="false">1×</button>
+      <span class="lab-time mono" id="time">0:00</span>
     </div>
     <div class="lab-words" id="words" dir="rtl" lang="ar"></div>
+    <p class="lab-hint" id="hint" hidden>Tip: tap any word the checker missed. <button type="button" id="hintClose" aria-label="Hide this tip">✕</button></p>
+    <div class="lab-card" id="card" aria-live="polite"></div>
+  </section>
+
+  <section class="lab-trouble" id="trouble" hidden role="alert">
+    <h2 id="troubleTitle">Something went wrong</h2>
+    <p id="troubleText"></p>
+    <button class="lab-btn primary" id="troubleRetry" type="button">Try again</button>
   </section>
 
   <section class="lab-empty" id="emptyView" hidden>
-    <h2>Nothing left to label</h2>
+    <div class="lab-done-mark" aria-hidden="true">✓</div>
+    <h2>All done for now</h2>
     <p id="emptyText">Every clip has a label. New ones show up here when the lab adds them.</p>
-    <button class="lab-btn" id="emptyReload" type="button">Check again</button>
+    <button class="lab-btn" id="emptyReload" type="button">Check for new clips</button>
   </section>
 
-  <footer class="lab-foot" id="foot" hidden>
-    <div class="lab-card" id="card" aria-live="polite"></div>
-    <div class="lab-actions" id="actions"></div>
-  </footer>
+  <nav class="lab-nav" id="nav" hidden aria-label="Clips">
+    <button class="lab-nav-btn" id="prevBtn" type="button"><span aria-hidden="true">‹</span> Previous</button>
+    <button class="lab-play" id="playBtn" type="button" aria-label="Play the clip">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path id="playIcon" d="M8 5v14l11-7z"/></svg>
+    </button>
+    <button class="lab-nav-btn next" id="nextBtn" type="button"><span class="lab-next-t">Next</span> <span aria-hidden="true">›</span><small id="nextNote"></small></button>
+  </nav>
 </div>
 
 <div class="lab-start" id="start" hidden>
   <div class="lab-start-in">
     <h2>Label recitations</h2>
-    <p>Each clip plays as it opens. For every mark, say whether it is a mistake. Tap any word the checker missed.</p>
-    <p class="lab-keys">Keys: <kbd>Space</kbd> play · <kbd>R</kbd> the mark again · <kbd>1</kbd> not a mistake · <kbd>2</kbd> can’t tell · <kbd>3</kbd> mistake · <kbd>F</kbd> all fine · <kbd>Enter</kbd> next clip · <kbd>U</kbd> undo</p>
+    <ol class="lab-steps">
+      <li>Listen: each clip plays as it opens.</li>
+      <li>For each highlighted word, answer: is it a mistake?</li>
+      <li>Tap any word the checker missed, then Next.</li>
+    </ol>
+    <p class="lab-keys">Keys: <kbd>Space</kbd> play · <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> answer · <kbd>F</kbd> all fine · <kbd>N</kbd> note · <kbd>Enter</kbd> next · <kbd>U</kbd> undo · <kbd>B</kbd> previous</p>
     <button class="lab-btn primary" id="startBtn" type="button">Start</button>
   </div>
 </div>
@@ -77,6 +93,7 @@
     <span class="lab-sheet-title" id="sheetTitle"></span>
     <button class="lab-icon" id="sheetPlay" type="button" aria-label="Play this word">▶</button>
   </div>
+  <p class="lab-sheet-q">What did you hear on this word?</p>
   <div class="lab-sheet-opts" id="sheetOpts"></div>
   <button class="lab-btn lab-sheet-cancel" id="sheetCancel" type="button">Cancel</button>
 </div>
@@ -97,20 +114,30 @@
   </div>
 </div>
 
-<div class="lab-menu" id="menu" role="menu" hidden>
-  <button type="button" role="menuitem" data-act="back">Back to the last clip</button>
-  <button type="button" role="menuitem" data-act="clipnote">Note on this clip</button>
-  <button type="button" role="menuitem" data-act="skip-audio">Unusable: the audio is bad</button>
-  <button type="button" role="menuitem" data-act="skip-passage">Unusable: not this passage</button>
-  <button type="button" role="menuitem" data-act="skip-other">Unusable: another reason</button>
-  <button type="button" role="menuitem" data-act="text+">Larger text</button>
-  <button type="button" role="menuitem" data-act="text-">Smaller text</button>
-  <button type="button" role="menuitem" data-act="keys">Keys</button>
-  <a role="menuitem" id="menuConsole" href="/">Revisely Console</a>
-  <button type="button" role="menuitem" data-act="signout">Sign out</button>
+<div class="lab-sheet-back" id="setBack" hidden></div>
+<div class="lab-sheet" id="settings" role="dialog" aria-modal="true" aria-labelledby="setTitle" hidden>
+  <div class="lab-sheet-h"><span class="lab-sheet-title big" id="setTitle">Settings</span></div>
+  <div class="lab-set-row"><span>Playback speed</span>
+    <div class="seg" role="group" aria-label="Playback speed" id="speedSeg"><button type="button" data-speed="1" aria-pressed="true">1×</button><button type="button" data-speed="0.75" aria-pressed="false">0.75×</button></div>
+  </div>
+  <div class="lab-set-row"><span>Text size</span>
+    <div class="seg" role="group" aria-label="Text size"><button type="button" id="textSmaller" aria-label="Smaller text">A−</button><button type="button" id="textLarger" aria-label="Larger text">A+</button></div>
+  </div>
+  <div class="lab-set-group">
+    <span class="lab-set-label">This clip</span>
+    <button class="lab-btn" type="button" data-act="clipnote">Note on this clip</button>
+    <button class="lab-btn" type="button" data-act="skip-audio">Unusable: the audio is bad</button>
+    <button class="lab-btn" type="button" data-act="skip-passage">Unusable: not this passage</button>
+    <button class="lab-btn" type="button" data-act="skip-other">Unusable: another reason</button>
+  </div>
+  <div class="lab-set-group">
+    <a class="lab-btn" id="menuConsole" href="/">Revisely Console</a>
+    <button class="lab-btn" type="button" data-act="signout">Sign out</button>
+  </div>
+  <button class="lab-btn primary lab-sheet-cancel" id="setDone" type="button">Done</button>
 </div>
 
-<div class="toast" id="toast" role="status" hidden></div>
+<div class="toast lab-toast" id="toast" role="status" hidden></div>
 
 <script type="module" src="/label.js"></script>
 </body>

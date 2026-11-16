@@ -130,6 +130,8 @@ export interface Clip {
 
 export interface LabelDeps {
   db: Firestore;
+  /** the console's log (Cloud Logging); the page's own failures go here */
+  log?(entry: Record<string, unknown>): void;
   /** the project has the labelling page (LABEL_PROJECTS) */
   open: boolean;
   /** a clip's audio from the bucket */
@@ -356,6 +358,19 @@ export async function handleLabels(caller: StaffCaller, action: string, data: Re
         });
         return { saved: true, result: checked.clip };
       });
+    }
+
+    case 'labels.recent': {
+      // The caller's latest labels, newest first: "Previous" on a fresh visit goes back through these.
+      const snap = await deps.db.collectionGroup(LABELS).where('by.uid', '==', caller.uid).orderBy('at', 'desc').limit(30).get();
+      return { ids: snap.docs.map((d) => d.ref.parent.parent?.id).filter((x): x is string => !!x) };
+    }
+
+    case 'labels.log': {
+      // A failure on the page (its own error handler), so a stuck page leaves a trace: the message and where, nothing else.
+      const text = (v: unknown, n: number) => (typeof v === 'string' ? v.slice(0, n) : '');
+      deps.log?.({ event: 'labels.client', by: caller.uid, message: text(data.message, 300), where: text(data.where, 200), stack: text(data.stack, 600) });
+      return { ok: true };
     }
 
     case 'labels.stats': {
