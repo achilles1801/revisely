@@ -69,9 +69,11 @@ function aggregate(records) {
       if (seen.has(once)) continue;
       seen.add(once);
       const key = `${f.flow}|${rec.platform}`;
-      if (!rows.has(key)) rows.set(key, { flow: f.flow, platform: rec.platform, runs: 0, first: 0, retry: 0, failed: 0, misses: [] });
+      if (!rows.has(key)) rows.set(key, { flow: f.flow, platform: rec.platform, runs: 0, first: 0, retry: 0, failed: 0, lostTaps: 0, misses: [] });
       const row = rows.get(key);
       row.runs++;
+      // Taps tap-to-open.yaml found lost and tapped again (attempts.js), in any attempt.
+      row.lostTaps += f.attempts.reduce((n, a) => n + (Number(a.lostTaps) || 0), 0);
       const passed = f.attempts.some((a) => a.passed);
       if (f.attempts[0].passed) row.first++;
       else if (passed) row.retry++;
@@ -128,6 +130,18 @@ function render({ rows, since, until, jobs, mention = '' }) {
     `Rate: passed first time ÷ runs that passed. Runs where both attempts failed are counted apart: most are a branch's ` +
       `own bug, not a flake. In bold: under ${Math.round(THRESHOLD * 100)}% with ${MIN_RUNS} or more passing runs.`,
   );
+  const lost = rows.filter((r) => r.lostTaps > 0).sort((a, b) => b.lostTaps - a.lostTaps || a.flow.localeCompare(b.flow));
+  if (lost.length) {
+    out.push('');
+    out.push('### Lost taps, tapped again');
+    out.push('');
+    out.push(
+      'Taps that reached nothing and were tapped again (`.maestro/subflows/tap-to-open.yaml`). The run went on, so the ' +
+        'table above doesn\'t show them. Each one has a `lost-tap-…` screenshot in its run\'s screens artifact.',
+    );
+    out.push('');
+    for (const r of lost) out.push(`- ${r.flow} (${PLATFORM[r.platform] ?? r.platform}): ${r.lostTaps} in ${r.runs} ${r.runs === 1 ? 'run' : 'runs'}`);
+  }
   const shown = rows.filter((r) => r.retry > 0);
   if (shown.length) {
     out.push('');
