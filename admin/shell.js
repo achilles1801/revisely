@@ -1,7 +1,7 @@
 // Revisely Console's shell: sign-in gate, the header, the tabs a role may see, and the routes. Signed out, every
 // address goes to /sign-in (which also says "No access" to an account without a role). The server refuses anything a
 // role doesn't allow (functions/src/console/roles.ts); this only hides it.
-import { boot, currentUser, onUserChange, signInUrl, signOutNow } from '/firebase.js';
+import { boot, currentUser, forgetDevice, onUserChange, signInUrl, signOutNow } from '/firebase.js';
 import { metricsShown, refreshMetrics, startMetrics } from '/console.js';
 import * as openDoor from '/opendoor.js';
 import * as auditLog from '/audit.js';
@@ -99,22 +99,44 @@ async function start() {
     location.replace(signInUrl());
     return;
   }
-  let me;
-  try {
-    me = await ctx.call('adminConsole', { action: 'me' });
-  } catch (err) {
-    const code = String((err && err.code) || '').replace('functions/', '');
-    if (code === 'unauthenticated') {
+  // Speed (Majd, Nov 16 2026: "it takes so long for it to initially load"): with this account's role from the last
+  // visit (kept on this device), the console opens at once and the server's answer checks it alongside the first
+  // view's own calls. The server decides what may be read whatever this copy says; a role that changed reloads the page.
+  const cached = readMe(user.uid);
+  const fresh = ctx.call('adminConsole', { action: 'me' });
+  let me = cached;
+  if (cached) {
+    fresh.then(
+      (m) => {
+        if (!m.role) return leave(user.uid);
+        if (meKey(m) !== meKey(cached)) {
+          writeMe(user.uid, m);
+          location.reload();
+        } else writeMe(user.uid, m);
+      },
+      (err) => {
+        const code = String((err && err.code) || '').replace('functions/', '');
+        if (code === 'unauthenticated') leave(user.uid);
+      },
+    );
+  } else {
+    try {
+      me = await fresh;
+    } catch (err) {
+      const code = String((err && err.code) || '').replace('functions/', '');
+      if (code === 'unauthenticated') {
+        location.replace(signInUrl());
+        return;
+      }
+      fail('The console didn’t answer (' + (code || 'no connection') + '). Reload in a minute.');
+      return;
+    }
+    // No role: the sign-in page says "Waiting for access" (with sign-out) and nothing here loads.
+    if (!me.role) {
       location.replace(signInUrl());
       return;
     }
-    fail('The console didn’t answer (' + (code || 'no connection') + '). Reload in a minute.');
-    return;
-  }
-  // No role: the sign-in page says "No access" (with sign-out) and nothing here loads.
-  if (!me.role) {
-    location.replace(signInUrl());
-    return;
+    writeMe(user.uid, me);
   }
   ctx.me = me;
   ctx.can = (permission) => me.permissions.includes(permission);
@@ -165,6 +187,29 @@ $('tabs').addEventListener('click', (e) => {
   go(VIEWS[a.dataset.view].path);
 });
 $('refreshBtn').addEventListener('click', () => refreshMetrics());
+// ---------- this account's role from the last visit (a convenience: the server checks every call) ----------
+const ME_KEY = 'rvc.me.';
+const meKey = (m) => JSON.stringify([m.role, m.permissions, m.openDoor, m.labels, (m.metricsEnvs || []).map((e) => e.env)]);
+function readMe(uid) {
+  try {
+    const m = JSON.parse(localStorage.getItem(ME_KEY + uid) || 'null');
+    return m && m.uid === uid && m.role ? m : null;
+  } catch {
+    return null;
+  }
+}
+function writeMe(uid, m) {
+  try {
+    localStorage.setItem(ME_KEY + uid, JSON.stringify(m));
+  } catch {
+    // private mode: the next visit asks first, as before
+  }
+}
+function leave() {
+  forgetDevice();
+  location.replace(signInUrl());
+}
+
 $('signOutBtn').addEventListener('click', async () => {
   await signOutNow(ctx).catch(() => {});
   location.replace('/sign-in');

@@ -731,6 +731,12 @@ README has the deploy and the undo); never deploy the root `firebase.json`'s hos
     Majd's own recordings (`own`), recordings gathered with the reciter's permission (`permission`). Never the /record
     takes or anyone's Dev takes (`recite-tests/`, the lab's `dev-takes`, `record-raw`, `record-v1`): their consent says
     nobody listens. The script refuses a clip without one of those sources, and audio from those folders.
+- **Opening fast** (Majd, Nov 16 2026: "it takes so long for it to initially load"): the Overview's numbers come from
+  `adminMetrics` (2.3–10 s; for Production it asks production's `consoleMetrics`, cold or not). So the device keeps the
+  role from the last visit (`rvc.me.<uid>`) and the last numbers per environment (`rvc.metrics.<uid>.<env>`). The
+  console opens with them at once ("Updated … · N min ago"), while `me` and `adminMetrics` go out together. A role that
+  changed reloads the page, and no role signs out. Every sign-out forgets them (`signOutNow` → `forgetDevice`). The
+  server still checks every call.
 - **Testing locally:** the console runs against the emulators from any static server that serves `admin/` with the
   rewrites and an `init.json` carrying `emulators` (`{auth, functionsHost, functionsPort}`; only a localhost page
   reads it). `functions/src/__tests__/review.emulator.test.ts` runs in CI against the Auth and Firestore emulators.

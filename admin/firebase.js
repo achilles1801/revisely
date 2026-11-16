@@ -169,7 +169,18 @@ export async function finishEmailLink(ctx, email) {
   return res;
 }
 
+/** What this device kept for the console: the role from the last visit and the Overview's last numbers (shell.js,
+ * console.js). Forgotten on every sign-out, and when the server says the account has no role. */
+export function forgetDevice() {
+  try {
+    for (const k of Object.keys(localStorage)) if (k.startsWith('rvc.me.') || k.startsWith('rvc.metrics.')) localStorage.removeItem(k);
+  } catch {
+    // nothing kept
+  }
+}
+
 export function signOutNow(ctx) {
+  forgetDevice();
   return signOut(ctx.auth);
 }
 

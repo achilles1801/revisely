@@ -308,7 +308,33 @@ export function startMetrics(c) {
   state.env = state.envs.some((e) => e.env === savedEnv) ? savedEnv : state.envs.length ? state.envs[0].env : null;
   $('envSeg').innerHTML = state.envs.map((e) => '<button type="button" data-env="' + esc(e.env) + '">' + esc(e.label) + '</button>').join('');
   $('envBar').hidden = state.envs.length < 2;
+  // The last numbers this device saw, at once ("Updated … · N min ago" says how old), while the server's come.
+  for (const e of state.envs.length ? state.envs.map((x) => x.env) : [null]) {
+    const m = readNumbers(e);
+    if (m && e) state.byEnv[e] = m;
+    if (m && e === state.env) state.m = m;
+  }
+  if (state.m) render();
   load(false);
+}
+
+// ---------- the last numbers, kept on this device per account and environment (forgotten at sign-out) ----------
+const numbersKey = (env) => 'rvc.metrics.' + (state.user && state.user.uid) + '.' + (env || 'here');
+function readNumbers(env) {
+  try {
+    const m = JSON.parse(localStorage.getItem(numbersKey(env)) || 'null');
+    return m && m.generatedAt ? m : null;
+  } catch (e) {
+    return null;
+  }
+}
+function writeNumbers(env, m) {
+  try {
+    const text = JSON.stringify(m);
+    if (text.length < 1500000) localStorage.setItem(numbersKey(env), text);
+  } catch (e) {
+    // full or private: the next visit waits for the server, as before
+  }
 }
 
 /** The Production / Dev switch. Conversations open in either (the other project checks the staff sign-in itself). */
@@ -348,6 +374,7 @@ async function load(refresh) {
   try {
     const m = await ctx.call('adminMetrics', env ? { refresh, env } : { refresh }, 130000);
     if (env) state.byEnv[env] = m;
+    writeNumbers(env, m);
     if (env === state.env) {
       state.m = m;
       state.rendered = null;

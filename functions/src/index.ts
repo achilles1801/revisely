@@ -778,8 +778,8 @@ export const adminConsole = onCall({ cors: CONSOLE_ORIGINS, timeoutSeconds: 60, 
   } catch (err) {
     const known = consoleErrorOf(err);
     if (known) throw new HttpsError(known.code, known.message);
-    // Never the request's data: it may hold a note.
-    logger.error('adminConsole failed', { message: (err as Error).message });
+    // Never the request's data: it may hold a note. The reason goes in the message (#645: a field named `message` is lost).
+    logger.error(failure('adminConsole', err));
     throw new HttpsError('internal', 'The console could not do that. Try again.');
   }
 });
