@@ -54,7 +54,9 @@ import {
   revealNextWord,
   Revealed,
   scorePill,
+  wordShown,
 } from '../../lib/reciteLive/view';
+import { NOTHING_PEEKED, Peeked, peekedByAyah, peekedLine } from '../../lib/reciteLive/peeked';
 import { LiveMode, useLiveRecitation } from '../../components/reciteLive/useLiveRecitation';
 import { ReciteMic, ReciteMicMode } from '../../components/reciteLive/ReciteMic';
 import { ReciteMenuMode, ReciteModeMenu } from '../../components/reciteLive/ReciteModeMenu';
@@ -69,7 +71,11 @@ import { markTitle } from '../../lib/reciteLive/describe';
 import { drillMarks, drillRange, openDrill } from '../../lib/reciteLive/drill';
 import { describeAyahs } from '../../lib/passages';
 import { foundSpan, TakeSpan } from '../../lib/reciteLive/span';
+import { TestPlace, testJuz, testPlaces, TestResult, testResult } from '../../lib/reciteLive/testMe';
+import { memorizedAyahs } from '../../lib/memorizedAyahs';
+import { outcomeText, TestMeScopeSheet, TestSummarySheet } from '../../components/reciteLive/TestMeSheets';
 import { CheckIntroPage } from '../../components/reciteLive/CheckIntroPage';
+import { TakeActivity } from '../../components/reciteLive/TakeActivity';
 import { markAt, wordBox } from '../../lib/reciteLive/geometry';
 import { similarPhrases } from '../../lib/reciteLive/similar';
 import type { Mark } from '../../lib/reciteLive/contract';
@@ -92,6 +98,9 @@ import type { TakeRecord } from '../../lib/reciteMemory/record';
 import { countsAsMistake, isUnclear } from '../../lib/reciteLive/contract';
 import { pageAccuracy } from '../../lib/reciteLive/score';
 import { sendLabel } from '../../lib/reciteCheck/service';
+
+/** Said to screen reader users only, after Stop, when a take's start was never found (everyone else: nothing). */
+const START_NOT_FOUND_SPOKEN = 'Couldn’t follow that take. Try starting at the top of the page.';
 
 /** What the recite bar says when a take ends without its answer. */
 const LIVE_FAILURE: Record<LiveFailure, string> = {
@@ -143,7 +152,7 @@ export default function QuranReaderScreen() {
   const { timer, notePage } = useReadingTimer();
   // Hold a verse: highlight, Play (Husary), Translation. Recitation turns pages.
   // Record yourself reading; saved under today's (revision day's) reading.
-  const { user } = useApp();
+  const { user, pages } = useApp();
   const { day: today } = useRevisionDay(user);
   // After ending a recording: "Recording saved · Undo · View" (View opens it in Activity).
   const [savedRecording, setSavedRecording] = useState<SavedRecording | null>(null);
@@ -360,9 +369,11 @@ export default function QuranReaderScreen() {
   });
   noteTakeRecording.current = remembering.noteRecording;
   const takeRecord = remembering.current;
+  // Words shown by hand during the take (‹, ‹‹): kept in quiet grey on the page, listed in the summary, drilled.
+  const [peeked, setPeeked] = useState<Peeked>(NOTHING_PEEKED);
   const [modeMenu, setModeMenu] = useState(false);
   // The AI notice comes before the first take: the take it was asked for starts once it's agreed.
-  const [noticeFor, setNoticeFor] = useState<{ mode: LiveMode; span: TakeSpan | null } | null>(null);
+  const [noticeFor, setNoticeFor] = useState<{ mode: LiveMode; span: TakeSpan | null; reveal: Revealed } | null>(null);
   // Check: the word a card is open on (and where it is on screen), similar phrases, the summary, Check's page.
   const [cardAt, setCardAt] = useState<{ w: number; anchor: Box } | null>(null);
   // What the card plays stops when the card closes, and when the reader goes (Majd, Nov 15 2026: Husary played on past
@@ -388,15 +399,36 @@ export default function QuranReaderScreen() {
   // What a tap on the mic starts: Record, or Recite, marking mistakes when the switch is on and the account has it.
   const markMistakes = owned && reciteSettings.markMistakes;
   const micMode: ReciteMicMode = reciteSettings.mode === 'record' ? 'record' : markMistakes ? 'check' : 'recite';
+  // Test me (Majd, Nov 15 2026; lib/reciteLive/testMe): five random places in what's memorized, or in one juz. Each is a
+  // Mark mistakes take with the page hidden but for its first two words; the bar says how it went, with Next and ✕.
+  const [testPick, setTestPick] = useState(false);
+  const [test, setTest] = useState<{
+    juz: number | null;
+    places: TestPlace[];
+    at: number;
+    results: TestResult[];
+    hiddenBefore: boolean;
+  } | null>(null);
+  const testRef = useRef(test);
+  testRef.current = test;
+  const [testSummary, setTestSummary] = useState<{ juz: number | null; results: TestResult[] } | null>(null);
+  const memorized = useMemo(() => (liveOn ? memorizedAyahs(pages ?? []) : []), [liveOn, pages]);
+  const testableJuz = useMemo(() => (liveOn && qw ? testJuz(memorized, qw) : []), [liveOn, qw, memorized]);
+  const testPlace = test ? test.places[test.at] : null;
   const liveInfo = useMemo(
-    () => ({ saidUpTo: furthestWord(live.state), startWord: live.startWord, cursor: live.state.cursor }),
-    [live.state, live.startWord],
+    () => ({
+      saidUpTo: furthestWord(live.state),
+      // Before the checker has found the start of a test's place: from the place (‹ shows its third word, not the page's first).
+      startWord: live.startWord ?? testPlace?.cue[0] ?? null,
+      cursor: live.state.cursor,
+    }),
+    [live.state, live.startWord, testPlace],
   );
 
   // Recite the mistakes again: what the take before found in the stretch, for its summary ("Before: …").
   const [drillBefore, setDrillBefore] = useState<string | null>(null);
   const startMode = useCallback(
-    (mode: ReciteMicMode, span: TakeSpan | null = null) => {
+    (mode: ReciteMicMode, span: TakeSpan | null = null, reveal: Revealed = NOTHING_SHOWN) => {
       if (mode === 'record') {
         void recorder.start();
         return;
@@ -407,10 +439,11 @@ export default function QuranReaderScreen() {
         return;
       }
       if (!reciteSettings.noticeSeen) {
-        setNoticeFor({ mode, span });
+        setNoticeFor({ mode, span, reveal });
         return;
       }
-      setRevealed(NOTHING_SHOWN);
+      setRevealed(reveal);
+      setPeeked(NOTHING_PEEKED);
       setDrillBefore(null);
       void live.start(mode, span);
     },
@@ -438,14 +471,64 @@ export default function QuranReaderScreen() {
     if (!pageDrill) return;
     setModeMenu(false);
     setRevealed(NOTHING_SHOWN);
+    setPeeked(NOTHING_PEEKED);
     // The summary's "Before: …": what those words were last time.
     setDrillBefore(findingsLine(pageDrill.marks));
     if (!reciteSettings.noticeSeen) {
-      setNoticeFor({ mode: 'check', span: pageDrill.range });
+      setNoticeFor({ mode: 'check', span: pageDrill.range, reveal: NOTHING_SHOWN });
       return;
     }
     void live.start('check', pageDrill.range);
   }, [pageDrill, reciteSettings.noticeSeen, live]);
+  // A test's place: the page hidden but for the place's first two words, and a take over its ayahs.
+  const beginPlace = useCallback(
+    (place: TestPlace) => {
+      setCardAt(null);
+      setHidden(true);
+      startMode('check', place.span, new Set(place.cue));
+    },
+    [startMode],
+  );
+  const startTest = useCallback(
+    (juz: number | null) => {
+      setTestPick(false);
+      setTestSummary(null);
+      if (!qw) return;
+      const places = testPlaces(memorized, qw, { juz });
+      if (places.length === 0) return;
+      setTest({ juz, places, at: 0, results: [], hiddenBefore: testRef.current?.hiddenBefore ?? hidden });
+      beginPlace(places[0]);
+    },
+    [qw, memorized, hidden, beginPlace],
+  );
+  const nextPlace = useCallback(() => {
+    const run = testRef.current;
+    if (!run || run.at + 1 >= run.places.length) return;
+    live.clear();
+    setTest({ ...run, at: run.at + 1 });
+    beginPlace(run.places[run.at + 1]);
+  }, [live, beginPlace]);
+  /** The test ends (its last place, or ✕): the take goes, the page as it was, and the summary if a place was done. */
+  const endTest = useCallback(
+    (results: TestResult[]) => {
+      const run = testRef.current;
+      live.clear();
+      setCardAt(null);
+      setRevealed(NOTHING_SHOWN);
+      setTest(null);
+      if (run) setHidden(run.hiddenBefore);
+      if (run && results.length > 0) setTestSummary({ juz: run.juz, results });
+    },
+    [live],
+  );
+  // A test whose take never started (the notice closed, the microphone refused, Premium refused): it ends, so the next
+  // take isn't counted as one of its places. Between places the microphone is already starting.
+  const testStalled = test != null && live.state.status === 'idle' && live.mic !== 'starting' && noticeFor == null;
+  useEffect(() => {
+    if (testStalled && testRef.current) endTest(testRef.current.results);
+    // endTest is stable enough: only when the test stalls.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [testStalled]);
   // A voice search with one result (Majd, Nov 15 2026: "take them to that page as if they're about to recite it"): a
   // take starts as the reader opens, the checker looking for the start only in the ayahs found. Recite, marking
   // mistakes when the switch is on, whatever a tap on the mic would start. It waits for the account's settings (the
@@ -487,22 +570,33 @@ export default function QuranReaderScreen() {
     setHidden((h) => !h);
   }, []);
   // Each tells the checker which word was shown (the ayah's first word not shown before, for ‹‹).
+  /** During a take, the words that `next` shows that weren't showing: peeks. */
+  const notePeeks = useCallback(
+    (next: Revealed) => {
+      if (!live.active) return;
+      const newly = [...next].filter((w) => !wordShown(w, revealed, liveInfo));
+      if (newly.length) setPeeked((p) => new Set([...p, ...newly]));
+    },
+    [live.active, revealed, liveInfo],
+  );
   const showNextWord = useCallback(() => {
     if (!qw) return;
     const next = revealNextWord(qw, currentPage, revealed, liveInfo);
     const added = [...next].find((w) => !revealed.has(w));
     if (added == null) return;
     live.hint(added, 'word');
+    notePeeks(next);
     setRevealed(next);
-  }, [qw, currentPage, revealed, liveInfo, live]);
+  }, [qw, currentPage, revealed, liveInfo, live, notePeeks]);
   const showWholeAyah = useCallback(() => {
     if (!qw) return;
     const next = revealAyah(qw, currentPage, revealed, liveInfo);
     const added = [...next].find((w) => !revealed.has(w));
     if (added == null) return;
     live.hint(added, 'ayah');
+    notePeeks(next);
     setRevealed(next);
-  }, [qw, currentPage, revealed, liveInfo, live]);
+  }, [qw, currentPage, revealed, liveInfo, live, notePeeks]);
 
   const checkTake = live.mode === 'check';
   const cardMarks = useMemo<Mark[]>(
@@ -662,10 +756,21 @@ export default function QuranReaderScreen() {
   useEffect(() => {
     if (live.state.status !== 'done' || !takeId || summaryFor === takeId) return;
     setSummaryFor(takeId);
+    // A test's place: how it went is kept, and the bar says so with Next (or the test's summary after its last place).
+    const run = testRef.current;
+    if (run) {
+      stopTrace.end();
+      const results = [...run.results.slice(0, run.at), testResult(run.places[run.at], live.state, peeked.size)];
+      if (run.at + 1 >= run.places.length) endTest(results);
+      else setTest({ ...run, results });
+      return;
+    }
     // The checker never found where the reciter started: it fails silently (Majd, Nov 14 2026). No summary or
-    // message; Stop just ends the take.
+    // message; Stop just ends the take. With VoiceOver or TalkBack one line is said, the microphone already off (Majd,
+    // Nov 15 2026): they can't see the bar never leave "Listening…", and a take gone without a word reads as a crash.
     if (startNotFound(live.state)) {
       live.clear();
+      if (screenReader) say(START_NOT_FOUND_SPOKEN);
       return;
     }
     stopTrace.step('summary-asked');
@@ -750,22 +855,33 @@ export default function QuranReaderScreen() {
   );
   // The next word's cover turns red while something else is being said in its slot (the checker's `off`, draft 7).
   const offWord = live.state.off?.w ?? null;
+  // Peeked words in quiet grey while the take lasts, but for one with a mistake (its highlight shows as it is).
+  const veiled = useMemo(() => {
+    if (!live.active || peeked.size === 0) return [];
+    const marked = new Set(Object.values(live.state.marks).map((m) => m.w));
+    return [...peeked].filter((w) => !marked.has(w));
+  }, [live.active, peeked, live.state.marks]);
   const pageOverlay = useMemo(
     () =>
-      liveOn && qw && hidden
+      liveOn && qw && (hidden || veiled.length > 0)
         ? (page: number, scale: number) => (
             <LiveOverlay
               page={page}
               scale={scale}
-              hidden={{
-                follow: hiddenFollow(qw, revealed, liveInfo),
-                ...coverColors,
-                off: offWord != null ? { w: offWord, words: qw, colour: v2.markWord } : null,
-              }}
+              hidden={
+                hidden
+                  ? {
+                      follow: hiddenFollow(qw, revealed, liveInfo),
+                      ...coverColors,
+                      off: offWord != null ? { w: offWord, words: qw, colour: v2.markWord } : null,
+                    }
+                  : null
+              }
+              peeked={veiled.length ? { words: qw, peeked: veiled, veil: palette.peekVeil } : null}
             />
           )
         : undefined,
-    [liveOn, qw, hidden, revealed, liveInfo, coverColors, offWord, v2],
+    [liveOn, qw, hidden, revealed, liveInfo, coverColors, offWord, v2, veiled, palette],
   );
   // The marks as elements of their own (VoiceOver, the tests). Given whenever the live UI is on, so the pager's pages
   // keep one shape through takes.
@@ -783,9 +899,28 @@ export default function QuranReaderScreen() {
   );
 
   const liveStatus = live.state.status;
+  // An immersive page (Majd, Nov 15 2026; Tarteel's): during a take a tap on the page puts the header and the bar away
+  // too, leaving the page, the juz and surah above it and the take's time beside its number. The status bar stays (the
+  // time and battery). A tap brings them back, and so do a mark's card and the take's end. With VoiceOver or TalkBack
+  // the bar never goes, so Stop is always there.
+  const [takeImmersive, setTakeImmersive] = useState(false);
+  const takeListening = liveStatus === 'connecting' || liveStatus === 'listening';
+  useEffect(() => {
+    if (!takeListening || cardAt) setTakeImmersive(false);
+  }, [takeListening, cardAt]);
+  const immersive = takeImmersive && takeListening && !screenReader && !cardAt;
+  const chromeShown = modeMenu || (live.active ? !immersive : chrome.visible);
+  const onTapReader = useCallback(() => {
+    if (takeListening && !screenReader) {
+      dismissHint();
+      setTakeImmersive((v) => !v);
+      return;
+    }
+    onTapPage();
+  }, [takeListening, screenReader, dismissHint, onTapPage]);
   const barPhase: 'live' | 'checking' | 'done' =
     liveStatus === 'checking' ? 'checking' : liveStatus === 'done' || liveStatus === 'failed' ? 'done' : 'live';
-  const barStatus =
+  const baseStatus =
     liveStatus === 'connecting'
       ? 'Starting…'
       : liveStatus === 'checking'
@@ -795,6 +930,17 @@ export default function QuranReaderScreen() {
           : liveStatus === 'done'
             ? 'Done'
             : 'Listening…';
+  // In a test: which place it is, and once it's done, how it went ("Clean · 2 of 5").
+  const placeResult = test && liveStatus === 'done' ? test.results[test.at] : undefined;
+  // Short, for a crowded bar (an SE at the largest text): while listening which place it is; once done, how it went
+  // (Next says which place comes).
+  const barStatus = test
+    ? placeResult
+      ? outcomeText(placeResult)
+      : liveStatus === 'listening' || liveStatus === 'connecting'
+        ? `${test.at + 1} of ${test.places.length}`
+        : baseStatus
+    : baseStatus;
 
   // Previous / next go when the capsule is crowded (a recording, a timer) on
   // anything narrower than the largest phones.
@@ -806,9 +952,10 @@ export default function QuranReaderScreen() {
   return (
     <View style={styles.container}>
       <ReaderFrame
-        chromeVisible={chrome.visible || live.active || modeMenu}
+        chromeVisible={chromeShown}
+        keepStatusBar={live.active}
         active={isScreenFocused}
-        onBackgroundPress={onTapPage}
+        onBackgroundPress={onTapReader}
         background={palette.pageBg}
         isDark={isDark}
         quietHeader={
@@ -849,10 +996,12 @@ export default function QuranReaderScreen() {
                 onToggleHidden={toggleHidden}
                 onNextWord={showNextWord}
                 onWholeAyah={showWholeAyah}
-                score={checkTake ? scorePill(live.state, qw, live.startWord) : null}
+                // A test's place says how it went in words: no score pill (it crowded the bar out).
+                score={checkTake && !test ? scorePill(live.state, qw, live.startWord) : null}
                 seconds={live.seconds}
                 recording={live.recording && live.mic === 'on'}
-                words={barWords(live.state, qw, { check: checkTake, startWord: live.startWord })}
+                // A test's place, once done, says how it went in the words' place.
+                words={placeResult ? [] : barWords(live.state, qw, { check: checkTake, startWord: live.startWord })}
                 status={barStatus}
                 phase={barPhase}
                 paused={live.paused}
@@ -860,10 +1009,19 @@ export default function QuranReaderScreen() {
                 onResume={() => void live.resume()}
                 onStop={live.stop}
                 onClose={() => {
+                  if (test) {
+                    endTest(test.results);
+                    return;
+                  }
                   setCardAt(null);
                   setSummaryShown(null);
                   live.clear();
                 }}
+                next={
+                  test && placeResult && test.at + 1 < test.places.length
+                    ? { label: `Next place, ${test.at + 2} of ${test.places.length}`, onPress: nextPlace }
+                    : undefined
+                }
                 surface={{ background: palette.control, border: palette.divider }}
               />
             ) : (
@@ -922,7 +1080,11 @@ export default function QuranReaderScreen() {
           ) : null
         }
         activity={
-          <ReaderActivity recorder={recorder} playback={verseActions.player.state} onPress={chrome.show} />
+          live.active ? (
+            <TakeActivity seconds={live.seconds} recording={live.recording && live.mic === 'on'} onPress={() => setTakeImmersive(false)} />
+          ) : (
+            <ReaderActivity recorder={recorder} playback={verseActions.player.state} onPress={chrome.show} />
+          )
         }
       >
         <MushafPager
@@ -937,13 +1099,13 @@ export default function QuranReaderScreen() {
             verseActions.highlightedAyah ??
             (live.state.status === 'connecting' || live.state.status === 'listening' || live.state.status === 'checking' ? null : searchHighlight)
           }
-          onTap={onTapPage}
+          onTap={onTapReader}
           onUserSwipe={chrome.hide}
           pageUnderlay={pageUnderlay}
           pageOverlay={pageOverlay}
           pageAccessories={pageAccessories}
           onTapPoint={onTapPoint}
-          extraData={liveOn ? `${live.state.cursor}|${live.state.saidUpTo}|${Object.keys(live.state.marks).length}|${hidden}|${revealed.size}|${offWord}|${showPast ? memoryRecords.length : -1}|${pastAt?.w ?? ''}|${showing ? `${shownTake?.id}:${shownTake?.marks.length}` : ''}|${shownCardAt?.w ?? ''}` : undefined}
+          extraData={liveOn ? `${live.state.cursor}|${live.state.saidUpTo}|${Object.keys(live.state.marks).length}|${hidden}|${revealed.size}|${offWord}|${veiled.length}|${showPast ? memoryRecords.length : -1}|${pastAt?.w ?? ''}|${showing ? `${shownTake?.id}:${shownTake?.marks.length}` : ''}|${shownCardAt?.w ?? ''}` : undefined}
         />
       </ReaderFrame>
 
@@ -990,9 +1152,26 @@ export default function QuranReaderScreen() {
               setModeMenu(false);
               setIntroOpen(true);
             }}
+            onTest={() => {
+              setModeMenu(false);
+              setTestPick(true);
+            }}
+            testReady={testableJuz.length > 0}
             onClose={() => setModeMenu(false)}
             drill={menuDrill}
             onDrill={drillHere}
+          />
+          <TestMeScopeSheet visible={testPick} juz={testableJuz} onStart={startTest} onClose={() => setTestPick(false)} />
+          <TestSummarySheet
+            visible={testSummary != null}
+            results={testSummary?.results ?? []}
+            onPlace={(r) => {
+              setTestSummary(null);
+              setHidden(false);
+              if (qw) pagerRef.current?.scrollToPage(qw.pageOf(r.place.cue[0]));
+            }}
+            onAgain={() => startTest(testSummary?.juz ?? null)}
+            onDone={() => setTestSummary(null)}
           />
           {qw ? (
             <MarkCard
@@ -1176,13 +1355,15 @@ export default function QuranReaderScreen() {
             }}
             onDrill={() => {
               const marks = Object.values(live.state.marks);
-              const range = drillRange(marks);
+              const peekedAyahs = qw ? peekedByAyah(qw, peeked).map((p) => p.ayah) : [];
+              const range = drillRange(marks, peekedAyahs);
               if (!range) return;
               setSummaryShown(null);
               setCardAt(null);
               live.clear();
               setRevealed(NOTHING_SHOWN);
-              setDrillBefore(findingsLine(drillMarks(marks)));
+              setDrillBefore([findingsLine(drillMarks(marks)), peeked.size ? peekedLine(peeked.size) : ''].filter(Boolean).join(', '));
+              setPeeked(NOTHING_PEEKED);
               void live.start('check', range);
             }}
             before={drillBefore}
@@ -1191,6 +1372,11 @@ export default function QuranReaderScreen() {
               if (!takeRecord) return;
               setSummaryShown(null);
               setProgressFor({ from: takeRecord.from, to: takeRecord.to, back: 'summary' });
+            }}
+            peeked={qw ? peekedByAyah(qw, peeked) : []}
+            onPeeked={(w) => {
+              setSummaryShown(null);
+              if (qw) pagerRef.current?.scrollToPage(qw.pageOf(w));
             }}
             onDone={() => setSummaryShown(null)}
             // The summary is on screen: the take's Stop trace ends (lib/reciteLive/stopTrace).
@@ -1210,7 +1396,8 @@ export default function QuranReaderScreen() {
               setReciteCheckSettings(user?.id, { noticeSeen: true });
               setNoticeFor(null);
               if (asked) {
-                setRevealed(NOTHING_SHOWN);
+                setRevealed(asked.reveal);
+                setPeeked(NOTHING_PEEKED);
                 void live.start(asked.mode, asked.span);
               }
             }}

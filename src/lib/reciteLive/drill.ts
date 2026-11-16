@@ -18,15 +18,18 @@ export interface AyahRange {
 /** The marks worth reciting again: every one but tajweed notes ("not clear" ones too: say them more clearly). */
 export const drillMarks = (marks: Mark[]) => marks.filter((m) => m.kind !== 'tajweed');
 
-/** The stretch to recite again, or null when there's nothing to drill. */
-export function drillRange(marks: Mark[]): AyahRange | null {
-  const ms = drillMarks(marks);
-  if (ms.length === 0) return null;
-  const key = (m: Mark) => m.ayah[0] * 1000 + m.ayah[1];
-  const first = ms.reduce((a, b) => (key(b) < key(a) ? b : a));
-  const last = ms.reduce((a, b) => (key(b) > key(a) ? b : a));
-  const [s, a] = first.ayah;
-  return { from: [s, a > 1 ? a - 1 : a], to: [last.ayah[0], last.ayah[1]] };
+/**
+ * The stretch to recite again, or null when there's nothing to drill. The ayahs with words peeked count too (Majd, Nov
+ * 15 2026): a word shown by hand is one not recalled.
+ */
+export function drillRange(marks: Mark[], peekedAyahs: readonly (readonly [number, number])[] = []): AyahRange | null {
+  const ayahs = [...drillMarks(marks).map((m) => m.ayah), ...peekedAyahs];
+  if (ayahs.length === 0) return null;
+  const key = (x: readonly [number, number]) => x[0] * 1000 + x[1];
+  const first = ayahs.reduce((a, b) => (key(b) < key(a) ? b : a));
+  const last = ayahs.reduce((a, b) => (key(b) > key(a) ? b : a));
+  const [s, a] = first;
+  return { from: [s, a > 1 ? a - 1 : a], to: [last[0], last[1]] };
 }
 
 /** The range's last word (where a drill take stops by itself). */

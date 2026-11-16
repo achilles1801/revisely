@@ -21,6 +21,13 @@ appId: com.revisionbuddy.app
 # as a throwaway account (scripts/warm-premium.js), or the app's first call can pass its 20 s on a CI runner.
 - runScript:
     file: ../scripts/warm-premium.js
+# Page 379 (An-Naml, juz 19) memorized beside the onboarding's Juz 30, for Test me below. Written by an admin, so a
+# relaunch reads it (as other flows' seeds do), before the Dev UI's link, which the app keeps in memory.
+- runScript:
+    file: ../scripts/server-memorized.js
+    env:
+      PAGES: '379'
+- runFlow: ../subflows/relaunch.yaml
 
 # The Dev UI, then the reader at An-Naml 23.
 - openLink:
@@ -290,6 +297,70 @@ appId: com.revisionbuddy.app
       id: past-mark-word
     timeout: 5000
 
+# Test me (Majd, Nov 15 2026): random places in what's memorized, or in one juz of it. Page 379 (An-Naml, juz 19) was
+# marked memorized at the start, beside the onboarding's Juz 30, and the test is given Juz 19, so its places are on the
+# one page E2E has. At each place the page is hidden but for its ayah's first two words; the E2E take (lib/e2e/
+# reciteLive's placeTake) carries on from there to the place's end, where it stops by itself: "Clean · 1 of N" and
+# Next. ✕ after the second place ends the test: its summary. (Recording saved's note has gone, above: it sat over the
+# mic, and a long press there was its View.)
+- runFlow: ../subflows/reader-controls.yaml
+- longPressOn:
+    id: recite-mic
+- extendedWaitUntil:
+    visible:
+      id: recite-mode-test
+    timeout: 5000
+- tapOn:
+    id: recite-mode-test
+- extendedWaitUntil:
+    visible:
+      id: test-me-juz-19
+    timeout: 15000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl08a-test-me-where
+- tapOn:
+    id: test-me-juz-19
+- extendedWaitUntil:
+    visible:
+      id: recite-eye-group
+    timeout: 10000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl08b-test-me-place
+- extendedWaitUntil:
+    visible:
+      id: recite-next
+    timeout: 45000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl08c-test-me-clean
+- tapOn:
+    id: recite-next
+- extendedWaitUntil:
+    visible:
+      id: recite-next
+    timeout: 45000
+- tapOn:
+    id: recite-close
+- extendedWaitUntil:
+    visible:
+      id: test-summary
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl08d-test-me-summary
+- tapOn:
+    id: test-summary-done
+- extendedWaitUntil:
+    visible:
+      id: recite-mic
+    timeout: 8000
+
 # In dark: a take marking mistakes again (Mark mistakes stays on). Back from the reader is the Read tab.
 - tapOn:
     id: reader-back
@@ -460,6 +531,24 @@ appId: com.revisionbuddy.app
     file: ../subflows/shot.yaml
     env:
       NAME: rl13-started-mid-page-dark
+# An immersive page (Majd, Nov 15 2026): a tap during the take puts the header and the bar away (the status bar stays,
+# the take's time by the page number); another tap brings them back.
+- tapOn:
+    id: reader-background
+- extendedWaitUntil:
+    visible:
+      id: reader-take-activity
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl13b-immersive-dark
+- tapOn:
+    id: reader-take-activity
+- extendedWaitUntil:
+    visible:
+      id: recite-stop
+    timeout: 5000
 - tapOn:
     id: recite-stop
 - extendedWaitUntil:
@@ -509,10 +598,13 @@ appId: com.revisionbuddy.app
     id: calendar-day-2026-11-14
 - tapOn:
     id: preview-open
+# The block's header, not the block: by now the day holds Test me's takes too, and the block (899pt high on the iOS
+# runner, run 43843930204) is taller than the screen, so the whole of it is never visible.
 - scrollUntilVisible:
     element:
-      id: activity-block-recited
+      id: activity-block-recited-header
     direction: DOWN
+    centerElement: true
     timeout: 15000
 - runFlow:
     file: ../subflows/shot.yaml

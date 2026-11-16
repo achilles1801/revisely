@@ -9,7 +9,7 @@
 // middle of the page (Majd's start anywhere, Nov 14 2026). Either way the checker first finds where the take started
 // (`locked`). Stop brings the checker's final answer at once.
 
-import type { LiveConnect, ReplayLog } from '../reciteLive/feed';
+import type { LiveConnect, ReplayLog, StartFrame } from '../reciteLive/feed';
 import { replayFeed } from '../reciteLive/feed';
 
 let on = false;
@@ -131,7 +131,39 @@ export function e2eToneSecond(second: number): Int16Array {
   return out;
 }
 
-/** The recorded take, played as a checker would send it. */
+/**
+ * A Test me place's take (a span with an end, its start looked for in its first ayah): the reciter carries on after the
+ * two words shown, says every word to the place's end with no mistake, and the take stops by itself there.
+ */
+function placeTake(start: StartFrame): ReplayLog | null {
+  const { getQuranWords } = require('../recite/quranWords') as typeof import('../recite/quranWords');
+  const words = getQuranWords();
+  if (!words || start.s2 == null || start.a2 == null) return null;
+  const first = words.verseFirstWord(start.s, start.a) + 2;
+  const last = words.verseRange(start.s2, start.a2)[1] - 1;
+  const events: ReplayLog['events'] = [
+    { t: 0.3, type: 'ready', v: 2, take: 'e2e-place', engine: 'e2e', protocol: 6 },
+    // A moment with only the two words shown, then the start found where the reciter carried on.
+    { t: 4, type: 'locked', w: first, s: start.s, a: start.a },
+  ];
+  let t = 4.1;
+  for (let w = first; w <= last; w++, t += 0.4) {
+    events.push({ t, type: 'at', w });
+    if (w - 1 >= first) events.push({ t: t + 0.1, type: 'said', upTo: w - 1 });
+  }
+  events.push({ t, type: 'said', upTo: last });
+  events.push({
+    t: 600,
+    type: 'done',
+    result: { v: 2, take: 'e2e-place', from: first - 2, to: last + 1, start: first, secs: Math.round(t), marks: [], score: { reached: last - first + 1, mistakes: 0, tajweed: 0, accuracy: 1 } },
+  });
+  return { events };
+}
+
+/** The recorded take, played as a checker would send it (a Test me place gets one of its own). */
 export function e2eLiveConnect(): LiveConnect {
-  return (start, handlers) => replayFeed(take(start.follow === true))(start, handlers);
+  return (start, handlers) => {
+    const place = start.startBy && start.s2 != null ? placeTake(start) : null;
+    return replayFeed(place ?? take(start.follow === true))(start, handlers);
+  };
 }

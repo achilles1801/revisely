@@ -344,8 +344,16 @@ until its part is set up.
   - **A take starts anywhere on the page** (Majd, Nov 14 2026; protocol 6). The start frame sends `startBy` (the page's
     last ayah), and the checker says where the reciter started (`locked`; recite-contract.md in the shared notes).
     - Until then the bar says Listening…, with no cursor and no score. If it is never found, the take fails silently
-      (Majd): no message (`nolock` isn't read), and Stop just ends it, with no summary.
+      (Majd): no message (`nolock` isn't read), and Stop just ends it, with no summary. The one exception (Majd, Nov
+      15 2026): with VoiceOver or TalkBack on, once Stop has turned the microphone off, one line is said ("Couldn't
+      follow that take. Try starting at the top of the page."); nothing on screen changes for anyone.
     - A page turned by hand searches that page again (`seek` with `startBy`).
+    - **Anywhere in the Qur'an** (Majd, Nov 15 2026, step 2; protocol 7, shape A in recite-contract.md): a take from
+      the mic also sends `startIn: "quran"`. When the page doesn't match, the checker looks in the whole Qur'an and locks
+      only on a place it is sure is the one (`locked.where: "quran"`); the reader turns there (the cursor's page turn),
+      VoiceOver hears "Started at …", and a Sentry breadcrumb notes it (numbers only; the checker keeps where every kept
+      take locked). Drills, Test me places and a voice search's ayahs never send it. Older checkers ignore it. Never
+      found anywhere: still silent.
     - Nothing before the start is skipped, and the summary counts from the start.
     - A checker below protocol 6 (`ready.protocol`) doesn't search: the take starts at the page's first ayah, as
       before. So does a cursor that comes with no `locked` (`lib/reciteLive/state`).
@@ -378,6 +386,35 @@ until its part is set up.
     `getVerseTranslation`, no Arabic fetched; fetched only once its card has been on screen, since each Clear Quran block
     spends the account's and everyone's daily budget), then Share, Copy (the ayat from the word data on the phone, so they
     work offline; "Copied") and Open in the reader.
+  - **Test me** (Majd, Nov 15 2026: approved, "random within all memorized pages, with an optional juz pick";
+    `lib/reciteLive/testMe`, `components/reciteLive/TestMeSheets`). The mic's menu has Test me under Recite (Premium,
+    locked like Mark mistakes; "Mark what you've memorized first" with nothing memorized). It asks where from:
+    everything memorized, or one juz of it (only the juz with somewhere to start). Five places at random, none sharing
+    an ayah, each starting in a memorized ayah of at least four words.
+    - At each place the page turns there and is hidden but for the ayah's first two words. A Mark mistakes take covers
+      that ayah and the next two (those memorized, in the same surah) and stops by itself at the end. The checker looks
+      for the start only in the first ayah (`startBy`), so starting the ayah again or carrying on both work.
+    - While listening the bar says which place it is ("1 of 5"); then how it went in the words' place ("Clean", "1 wrong
+      word", "Stopped before the end", "Not continued" when the start was never found), with Next and ✕ and no score
+      pill (an SE at the largest text had no room). ✕ ends the test early.
+    - After the last place (or ✕): the summary, "4 of 5 continued cleanly" and each place with how it went (a tap shows
+      it on the page), Test me again (the same juz) and Done. The page goes back to shown or hidden as before.
+    - Each place's take is kept as a recording, as any take is.
+    - E2E: flow 18 marks page 379 memorized (`scripts/server-memorized.js`) and tests Juz 19; a place gets a take of
+      its own that says every word (`placeTake` in `lib/e2e/reciteLive`).
+  - **An immersive page** (Majd, Nov 15 2026; Tarteel's): during a take a tap on the page puts the header and the bar
+    away too, leaving the page, the juz and surah above it, and the take's time beside the page number
+    (`TakeActivity`, red dot while recording; a tap on it brings the controls back). The status bar stays
+    (`keepStatusBar` on `ReaderFrame`). A tap brings them back, and so do a mark's card and the take's end. With
+    VoiceOver or TalkBack the bar never goes, so Stop is always there. Outside a take the page's tap is as before.
+  - **Peeked words** (Majd, Nov 15 2026; `lib/reciteLive/peeked`): words shown by hand during a take (‹, ‹‹; with ‹‹
+    only the words of the ayah not yet shown) stay in quiet grey ink on the page while the take lasts, shown or
+    hidden, recited or not: a veil of the page's colour over their ink (`peekVeil` in `theme/readPalette`), never over
+    a word with a mistake (its highlight shows as it is). Grey, not amber: amber is a slip. The summary says "3 words
+    peeked" and lists each ayah's peeked words in a row (a tap shows it on the page). Recite the mistakes again takes
+    in their ayahs (offered for peeks alone too; its summary's "Before:" counts them). Peeks never count in the score
+    (the checker counts them as `helped`). In Test me a place said to its end with a peek is "1 word peeked", not
+    clean. The words Test me shows to start a place aren't peeks.
 
 ## How updates reach phones
 

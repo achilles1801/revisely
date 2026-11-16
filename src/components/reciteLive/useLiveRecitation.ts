@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, AppState } from 'react-native';
 import { getAuth } from 'firebase/auth';
+import * as Sentry from '@sentry/react-native';
 import { getRecordingPermissionsAsync, requestRecordingPermissionsAsync } from 'expo-audio';
 import { claimAudio, enterRecordingMode, isAudioSessionError, setAudioMode } from '../../lib/audioFocus';
 import { getRecitation } from '../../lib/recitation';
@@ -60,6 +61,13 @@ const SEND_HINTS = true;
  */
 export const START_ANYWHERE = true;
 
+/**
+ * A take from the reader's mic may start anywhere in the Qur'an (Majd, Nov 15 2026: step 2 of search and follow-along;
+ * protocol 7): when the page doesn't match, the checker looks in the whole Qur'an and the reader turns to where it
+ * locks. Never for a span (a drill, a Test me place, a voice search's ayahs): those know where they are.
+ */
+export const START_IN_QURAN = true;
+
 /** The page's last ayah: the start frame's `startBy`. */
 function lastAyahOf(page: number): [number, number] {
   const verses = versesOnPage(page);
@@ -109,6 +117,7 @@ export function startFrameFor(
     keep: settings.keep,
     follow: mode === 'recite',
     ...(startBy ? { startBy } : {}),
+    ...(startBy && !span && START_IN_QURAN ? { startIn: 'quran' as const } : {}),
   };
 }
 
@@ -180,6 +189,11 @@ export function useLiveRecitation({
   /** Each event the take receives: its type to the Stop trace, then the live state. */
   const onEvent = useCallback((e: LiveEvent) => {
     stopTrace.event(e.type);
+    // Found elsewhere in the Qur'an (protocol 7): a breadcrumb for any report that follows (numbers only; the checker
+    // keeps where every kept take locked).
+    if (e.type === 'locked' && e.where === 'quran') {
+      Sentry.addBreadcrumb({ category: 'recite', message: 'locked elsewhere in the Quran', data: { page: getQuranWords()?.pageOf(e.w) } });
+    }
     if (e.type === 'at' && !wordTimes.current.has(e.w)) wordTimes.current.set(e.w, e.t ?? samples.current / SAMPLE_RATE);
     setState((s) => applyEvent(s, e));
   }, []);

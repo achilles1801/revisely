@@ -53,7 +53,9 @@ export const drillLabel = (count: number) => `Recite your ${count} ${count === 1
  * 2026). Without Premium it is off with a lock, and a tap opens the Premium page. Its level is in Settings.
  *
  * With Premium, a page that still has words to fix in Recite's memory adds one more row: "Recite your N mistakes
- * here", one take over the stretch that holds them, which stops by itself at its end (the idea of Nov 15 2026).
+ * here", one take over the stretch that holds them, which stops by itself at its end (the idea of Nov 15 2026). Last,
+ * Test me (Premium too; Majd, Nov 15 2026): a test at random places in what's memorized. It starts a test; it isn't
+ * what a tap on the mic starts.
  */
 export function ReciteModeMenu({
   visible,
@@ -65,6 +67,8 @@ export function ReciteModeMenu({
   onPick,
   onMarkMistakes,
   onLocked,
+  onTest,
+  testReady = false,
   onClose,
   drill,
   onDrill,
@@ -82,6 +86,10 @@ export function ReciteModeMenu({
   onMarkMistakes: (on: boolean) => void;
   /** The locked switch was tapped. */
   onLocked: () => void;
+  /** Test me was tapped (without Premium, onLocked is called instead). Absent: no Test me row. */
+  onTest?: () => void;
+  /** Something is memorized to test (otherwise the row says so and does nothing). */
+  testReady?: boolean;
   onClose: () => void;
   /** The page's remembered mistakes to recite again, when it has any (and the account has Premium). */
   drill?: MenuDrill | null;
@@ -198,6 +206,39 @@ export function ReciteModeMenu({
                   </Text>
                 </View>
                 <View style={styles.tick} />
+              </Pressable>
+            </>
+          ) : null}
+          {onTest ? (
+            <>
+              <View style={[styles.separator, { backgroundColor: palette.separator }]} />
+              <Pressable
+                onPress={() => (!owned ? onLocked() : testReady ? onTest() : undefined)}
+                disabled={owned && !testReady}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  !owned
+                    ? 'Test me, part of Premium, locked'
+                    : testReady
+                      ? 'Test me, a random place in what you’ve memorized'
+                      : 'Test me, mark what you’ve memorized first'
+                }
+                accessibilityState={{ disabled: owned && !testReady }}
+                style={({ pressed }) => [styles.row, pressed && { backgroundColor: palette.fill }]}
+                testID="recite-mode-test"
+              >
+                <View style={styles.icon}>
+                  <Ionicons name="shuffle" size={21} color={owned && !testReady ? palette.secondary : palette.text} />
+                </View>
+                <View style={styles.label}>
+                  <Text style={[typeV2.menu, { color: owned && !testReady ? palette.secondary : palette.text }]} maxFontSizeMultiplier={1.4}>
+                    Test me
+                  </Text>
+                  <Text style={[typeV2.meta, { color: palette.secondary }]} numberOfLines={2} maxFontSizeMultiplier={1.3}>
+                    {owned && !testReady ? 'Mark what you’ve memorized first' : 'A random place in what you’ve memorized'}
+                  </Text>
+                </View>
+                {owned ? <View style={styles.tick} /> : <Ionicons name="lock-closed" size={14} color={palette.premium[0]} testID="recite-test-locked" />}
               </Pressable>
             </>
           ) : null}
