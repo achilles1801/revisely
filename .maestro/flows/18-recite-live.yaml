@@ -17,8 +17,9 @@ appId: com.revisionbuddy.app
     file: ../scripts/server-revo.js
     env:
       MODE: tester
-# Get Premium (and Settings' Premium switch later) call devGrantPremium and devRevokePremium: start their workers first,
-# as a throwaway account (scripts/warm-premium.js), or the app's first call can pass its 20 s on a CI runner.
+# Get Premium (and Settings' Premium switch later) call devGrantPremium and devRevokePremium, and Apply for support calls
+# supportLink: start their workers first, as a throwaway account (scripts/warm-premium.js), or the app's first call can
+# pass its 20 s (or the flow's wait) on a CI runner.
 - runScript:
     file: ../scripts/warm-premium.js
 # Page 379 (An-Naml, juz 19) memorized beside the onboarding's Juz 30, for Test me below. Written by an admin, so a
