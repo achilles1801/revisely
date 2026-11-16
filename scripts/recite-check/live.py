@@ -37,6 +37,7 @@ import numpy as np
 
 from engine import FPS, SAID, WORDS_P, BadRequest, ayah_pieces, heard_sounds, score, settings_of  # puts the harness on the path
 import checker  # noqa: E402  (the harness's)
+import similar  # noqa: E402  (fit_many, for the Qur'an-wide search)
 
 SR = 16000
 LIVE = {'hop': 0.5, 'win': 4.0, 'look': 1.0, 'commit': 0.5, 'context': 30.0, 'stable': 1, 'skip_wait': 'start',
@@ -93,6 +94,27 @@ LONG_EXTRA = 2
 TOP_HOPS = 2
 TOP_SOUNDS = 3
 MAX_SEARCH = 480    # words searched at most (the server allows a page of 400, plus an ayah either side)
+# Anywhere in the Qur'an (recite-anywhere step 2, contract protocol 7, `startIn: "quran"`): when the page hasn't locked
+# after QURAN_AFTER seconds of speech, the sounds heard (greedy, as consonants) vote for places Qur'an-wide
+# (QuranIndex), the best QURAN_TOP are fitted with the ear (similar.fit_many), and a place off the page that fits well
+# (QURAN_FIT) and clearly better than the next (QURAN_MARGIN) gets its own locator over its ayah and the ones around it.
+# That locator locks as the page's does, but stricter: QURAN_WORDS settled words, all heard as correct, held LOCK_HOPS
+# hops, and never a run of words the Qur'an has elsewhere (2:5 and 31:5 wait until they part). A wrong jump is worse
+# than none (Majd).
+QURAN_AFTER = 3.0
+QURAN_EVERY = 4     # hops between two votes (2 s): with QURAN_SECS, about 0.1 vCPU while unlocked on Cloud Run
+QURAN_SECS = 15.0   # speech fitted, from its first sound
+QURAN_STOP = 30.0   # seconds of speech after which the Qur'an-wide search gives up (the take fails silently)
+QURAN_TOP = 10
+QURAN_CHAIN = 20    # words of each place fitted
+QURAN_FIT = 1.2     # nats a frame
+QURAN_MARGIN = 0.2  # nats a frame between the best place and the next, for it to get a locator (which then locks only
+                    # on QURAN_WORDS words said nowhere else)
+QURAN_WORDS = 5
+QURAN_DOUBT_MAX = 8.0  # (startIn) while a place off the page has its own locator and every word it has heard so far is
+                       # right, the page's word rule waits, for this long at most: 78:29 «وكل شيء أحصيناه كتابا» with
+                       # Ya-Sin's first page open locked on 36:12 (the same first three words). A wrong word there lets
+                       # the page lock at once (78:25 «حميما وغساقا» on its own page, against 38:57 «حميم وغساق»).
 NEG = checker.Decoder.NEG
 _pool = None
 
@@ -223,6 +245,63 @@ def _letters(text):
     alif is said, so it stays an alif (مَٰلِكِ is not مَلِكِ)."""
     return ''.join(ch for ch in unicodedata.normalize('NFD', text.replace('\u0671', '\u0627').replace('\u0670', '\u0627'))
                    if unicodedata.category(ch) != 'Mn' and ch != '\u0640')
+
+
+class QuranIndex:
+    """Every word of the Qur'an as the ear's consonants (checker.skeleton of its first form), in one string, with where
+    each run of N consonants is: the sounds heard vote for the word a run starts at (a diagonal, as in a dot plot).
+    Built ahead into the word table (make_words.py --merge: table['quran']), keyed with it; worked out from the table's
+    words when it isn't there (0.4 s on the Mac). None without a table (Key.passage is ~100 ms a word on Cloud Run)."""
+    N = 4
+    _made = {}
+
+    @classmethod
+    def of(cls, E):
+        t = getattr(E, 'table', None)
+        if t is None:
+            return None
+        if id(t) not in cls._made:
+            d = t.get('quran')
+            cls._made.clear()
+            cls._made[id(t)] = cls(d if d is not None and d.get('n') == cls.N else cls.data(t))
+        return cls._made[id(t)]
+
+    @classmethod
+    def data(cls, table):
+        """The index of a word table, as plain arrays (what make_words.py keeps in it)."""
+        import pickle
+        off, blob = table['offsets'], table['blob']
+        skel = []
+        for w in range(table['words']):
+            k = pickle.loads(blob[off[w]:off[w + 1]])
+            skel.append('' if isinstance(k, tuple) else checker.skeleton(checker.norm_sounds(k['forms'][0]['sounds'])))
+        q = ''.join(skel)
+        word_at = np.repeat(np.arange(len(skel), dtype=np.int32), [len(x) for x in skel])
+        grams = {}
+        for i in range(len(q) - cls.N + 1):
+            grams.setdefault(q[i:i + cls.N], []).append(i)
+        return {'n': cls.N, 'word_at': word_at, 'grams': {g: np.array(v, np.int32) for g, v in grams.items()}}
+
+    def __init__(self, data):
+        self.word_at, self.grams = data['word_at'], data['grams']
+
+    def places(self, heard, top=QURAN_TOP, use=40):
+        """The words most of the first `use` consonants heard vote for as the start (a word either side of a better
+        place is that place), best first."""
+        h, votes = heard[:use], {}
+        for i in range(len(h) - self.N + 1):
+            ps = self.grams.get(h[i:i + self.N])
+            if ps is None:
+                continue
+            for w in self.word_at[ps[ps >= i] - i].tolist():
+                votes[w] = votes.get(w, 0) + 1
+        out = []
+        for w, _ in sorted(votes.items(), key=lambda kv: (-kv[1], kv[0])):
+            if not any(abs(w - u) <= 1 for u in out):
+                out.append(w)
+                if len(out) >= top:
+                    break
+        return out
 
 
 class Decoder(checker.Decoder):
@@ -495,7 +574,7 @@ class LiveSession:
     to send, in order (dicts, recite-contract.md)."""
 
     def __init__(self, engine, s, a, s2=None, a2=None, settings=None, follow=False, defer=False, open_end=False,
-                 start_by=None):
+                 start_by=None, start_in=None):
         E = self.E = engine
         # follow (Recite, contract draft 5): the cursor and `said` only; words are decided (said needs them) but no
         # mark is made, letters and tajweed aren't judged, and no mark, unmark or score is sent
@@ -519,6 +598,9 @@ class LiveSession:
         self._top_hist = []              # whether that start was the page's top, hop by hop (TOP_HOPS)
         self._search_top = self.lo       # the page's first word
         self._search_speech = 0.0        # seconds of speech the current search has heard (for the log)
+        # start_in 'quran' (with start_by): off the page, the start is searched for Qur'an-wide too (QURAN_AFTER)
+        self.start_in = start_in if start_in == 'quran' and start_by is not None else None
+        self._q_reset()
         self.start_w = None              # the word the take was locked to start at
         self.locked_ev = None            # the `locked` event, for a resume's snapshot
         # open_end: the phone gave no end and the server runs the take on to the end of the Qur'an (server.LAST_AYAH);
@@ -572,6 +654,8 @@ class LiveSession:
                    # defer: ayat handed to the thread, the hops' waits for it (total, worst), `done`'s wait, and the
                    # ayat `done` judged again itself
                    'ayah_jobs': 0, 'due_wait': 0.0, 'worst_due_wait': 0.0, 'done_wait': 0.0, 'done_notes': 0}
+        if self.start_in:
+            self.ms['search_quran'] = 0.0  # the Qur'an-wide search's time (start_in)
         self._judged_here = 0
         self._jump = None                # a big cursor move waiting for the next hop to agree (_cursor)
         self._seeked = False
@@ -675,6 +759,7 @@ class LiveSession:
                 _, ev = self._close_segment() if self.seg is not None else (None, [])
                 self.seg, self.search, self.loc, self._loc_hist, self._top_hist = None, rng, None, [], []
                 self._search_f0, self._search_speech, self._search_top = self.T, 0.0, w
+                self._q_reset()
                 return ev
             if not isinstance(w, int) or isinstance(w, bool) or not min(self.lo, self.range_lo) - SEG_WORDS <= w < self.end:
                 return []
@@ -924,6 +1009,168 @@ class LiveSession:
         return lo, min(W.first[v1] + W.counts[v1], lo + MAX_SEARCH, self.end)
 
     def _locate(self, now):
+        """One hop of the search: on the page, then (start_in) Qur'an-wide once the page has had its chance."""
+        ev = self._locate_page(now)
+        if ev or self.search is None or not self.start_in:
+            return ev
+        return self._locate_quran(now)
+
+    def _q_reset(self):
+        self.qsearch = None              # the Qur'an-wide search's range of app words (start_in), once a place wins
+        self.qloc = None                 # its locator
+        self._qloc_hist = []
+        self._q_hops = 0
+        self._q_fits = (-1, [])          # (frame, _quran_fits then): kept for QURAN_EVERY hops, the page's doubt too
+        self._doubt_from = None          # the frame a page lock was first held back (QURAN_DOUBT_MAX)
+        self._q_failing = False          # the Qur'an-wide locator's words so far include one heard wrong
+
+    def _locate_quran(self, now):
+        """One hop of the Qur'an-wide search (QURAN_AFTER): vote and fit places every QURAN_EVERY hops; the winning
+        place's locator locks only as strictly as QURAN_WORDS says, and only on words said nowhere else."""
+        t0 = time.perf_counter()
+        try:
+            return self._locate_quran_hop(now)
+        finally:
+            self.ms['search_quran'] = self.ms.get('search_quran', 0.0) + (time.perf_counter() - t0) * 1000
+
+    def _speech_onset(self):
+        """The frame of the first sound heard since the search began, or None."""
+        toks = self._tokens(self._search_f0, self.T)
+        return self._search_f0 + toks[0][1] if toks else None
+
+    def _locate_quran_hop(self, now):
+        idx = QuranIndex.of(self.E)
+        onset = self._speech_onset()
+        if idx is None or onset is None:
+            return []
+        speech = (self.T - onset) / FPS
+        if speech < QURAN_AFTER or speech > QURAN_STOP:
+            return []
+        self._q_hops += 1
+        rng = self._quran_range(idx, onset)  # fitted anew every QURAN_EVERY hops (_quran_fits)
+        if rng is not None and rng != self.qsearch:
+            self.qsearch, self.qloc, self._qloc_hist, self._q_failing = rng, None, [], False
+        if self.qsearch is None:
+            return []
+        if self.qloc is None:
+            lo, hi = self.qsearch
+            self.qloc = Segment(self.E, self.P, lo, hi, lo, self._search_f0, 'anywhere')
+        loc = self.qloc
+        if self.T > loc.frames():
+            loc.dec.feed(self.lp[loc.frames():self.T])
+        dec = loc.dec
+        path, _ = dec.traceback(final=False)
+        st, _, _, _, _, visits, _ = checker.decide(loc.kws, loc.g, self.lp[loc.f0:loc.frames()], path, self.P,
+                                                   self.E.ear.vocab, self._tokens(loc.f0, loc.frames()))
+        heard = [w for w in range(loc.g.W) if visits[w]]
+        if not heard:
+            return []
+        w0 = min(heard, key=lambda w: visits[w][0]['start'])
+        self._qloc_hist.append(w0)
+        if len(self._qloc_hist) < LOCK_HOPS or len(set(self._qloc_hist[-LOCK_HOPS:])) > 1:
+            return []
+        cf, W = int(self.P['commit'] * FPS), loc.g.W
+        k = w0
+        while k + 1 < W and visits[k + 1] and visits[k + 1][-1]['end'] <= dec.t - cf:
+            k += 1
+        n = k + 1 - w0
+        all_right = all(st.get(loc.app[w]) == 'correct' for w in range(w0, k + 1))
+        self._q_failing = n >= 2 and not all_right
+        if n < QURAN_WORDS or not all_right:
+            return []
+        texts = [kw['text'] for kw in loc.kws]
+        if any(texts[j:j + n] == texts[w0:k + 1] for j in range(W - n + 1) if j != w0) \
+                or not self._said_once(loc.app[w0], n):
+            return []
+        f_start = loc.f0 + visits[w0][0]['start']
+        self._search_speech = (self.T - f_start) / FPS
+        return self._lock(loc.app[w0], f_start, now, where='quran')
+
+    def _quran_fits(self, idx, onset):
+        """The places the sounds heard from frame onset vote for, fitted: [(w, nats a frame, words heard)], best fit
+        first. Worked out at most once every QURAN_EVERY hops."""
+        if self._q_fits[0] >= 0 and self.T - self._q_fits[0] < QURAN_EVERY * self.P['hop'] * FPS:
+            return self._q_fits[1]
+        fits = self._quran_fits_now(idx, onset)
+        self._q_fits = (self.T, fits)
+        return fits
+
+    def _quran_fits_now(self, idx, onset):
+        W = self.E.words
+        f1 = min(self.T, onset + int(QURAN_SECS * FPS))
+        sounds = ''.join(self.E.ear.vocab[c - 1] for c, _, _ in self._tokens(onset, f1))
+        voted = idx.places(checker.skeleton(checker.norm_sounds(sounds)))
+        # each place from a word either side too (the vote merges neighbours): the best start of the three stands
+        starts = sorted({u for w in voted for u in (w - 1, w, w + 1) if 0 <= u < min(self.end, W.total)})
+        if not starts:
+            return []
+        chains = []
+        for w in starts:
+            lab, ends = [], []
+            for kw in self.E.passage_words(w, min(w + QURAN_CHAIN, W.total)):
+                lab += kw['forms'][0]['labels']
+                ends.append(len(lab))
+            chains.append((lab, ends))
+        fit = dict(zip(starts, similar.fit_many(self.lp[onset:f1], chains)))
+        out = []
+        for w in voted:
+            u = min((u for u in (w - 1, w, w + 1) if u in fit), key=lambda u: fit[u][0], default=None)
+            if u is not None:
+                out.append((u, fit[u][0], fit[u][1]))
+        return sorted(out, key=lambda x: x[1])
+
+    def _quran_range(self, idx, onset):
+        """The range a place off the page wins (its ayah, the one before and two after), or the current one when none
+        wins clearly this time; None while the best place is on the page (its own locator decides)."""
+        W = self.E.words
+        fits = self._quran_fits(idx, onset)
+        if not fits:
+            return self.qsearch
+        best, fit, words = fits[0]
+        nxt = fits[1][1] if len(fits) > 1 else 99.0
+        lo, hi = self.search
+        if lo <= best < hi:
+            return None
+        if fit > QURAN_FIT or words < 2 or nxt - fit < QURAN_MARGIN:
+            return self.qsearch
+        v = self.E.slip_index.verse[best]
+        v0, v1 = max(0, v - 1), min(len(W.counts) - 1, v + 2)
+        a = W.first[v0]
+        return a, min(W.first[v1] + W.counts[v1], a + MAX_SEARCH, self.end)
+
+    def _page_doubted(self):
+        """(start_in) The page's locator waits (QURAN_DOUBT_MAX): a place off the page fits what was heard better, has
+        its own locator, and that locator has heard every word right so far."""
+        if not self.start_in:
+            return False
+        idx, onset = QuranIndex.of(self.E), self._speech_onset()
+        if idx is None or onset is None or (self.T - onset) / FPS > QURAN_STOP:
+            return False
+        t0 = time.perf_counter()
+        try:
+            rng = self._quran_range(idx, onset)  # on the last fits (QURAN_EVERY)...
+            if (rng is None or self.qsearch is None or self._q_failing) and self._q_fits[0] != self.T:
+                self._q_fits = (-1, [])  # ...a lock only on everything heard so far
+                rng = self._quran_range(idx, onset)
+        finally:
+            self.ms['search_quran'] = self.ms.get('search_quran', 0.0) + (time.perf_counter() - t0) * 1000
+        if rng is None:  # the best place is on the page
+            return False
+        if rng != self.qsearch:
+            self.qsearch, self.qloc, self._qloc_hist, self._q_failing = rng, None, [], False
+        if self.qsearch is None or self._q_failing:
+            return False
+        if self._doubt_from is None:
+            self._doubt_from = self.T
+        return self.T - self._doubt_from < QURAN_DOUBT_MAX * FPS
+
+    def _said_once(self, w0, n):
+        """App words w0 .. w0 + n - 1 (n >= 2) are a run of words said nowhere else in the Qur'an (letters only)."""
+        idx = self.E.slip_index
+        run = idx.norm[w0:w0 + n]
+        return not any(j - 2 != w0 and idx.norm[j - 2:j - 2 + n] == run for j in idx.pairs.get((run[0], run[1]), ()))
+
+    def _locate_page(self, now):
         """One hop of the search: the locator's best path, and the lock once its start is sure (LOCK_WORDS)."""
         if self.loc is None:
             lo, hi = self.search
@@ -977,11 +1224,11 @@ class LiveSession:
         long_search = (self.T - self._search_f0) / FPS > LONG_SEARCH
         need = LOCK_WORDS + (LONG_EXTRA if long_search else 0)
         if len(correct) > need and sum(correct) >= LOCK_WORDS:
-            return ev + self._lock(loc.app[w0], f_start, now)
+            return ev if self._page_doubted() else ev + self._lock(loc.app[w0], f_start, now)
         n = QUICK_WORDS
         if not long_search and not missing and k - w0 + 1 >= n and all(correct[:n]) \
                 and all(self._heard_well(visits[w][-1]) for w in range(w0, w0 + n)):
-            return ev + self._lock(loc.app[w0], f_start, now)
+            return ev if self._page_doubted() else ev + self._lock(loc.app[w0], f_start, now)
         return ev
 
     @staticmethod
@@ -1008,11 +1255,15 @@ class LiveSession:
         run, n = texts[w0:k + 1], k + 1 - w0
         return not any(texts[j:j + n] == run for j in range(len(texts) - n + 1) if j != w0)
 
-    def _lock(self, w, f_start, now, seek=False):
+    def _lock(self, w, f_start, now, seek=False, where='page'):
         """The take starts at app word w (heard from frame f_start): the follower takes over from there, as after a
         seek. Words before w aren't part of the take: never decided, never skipped, not in `said` or the score. A
-        plain seek while searching locks at its word (the phone placed the reader; `locked` all the same)."""
+        plain seek while searching locks at its word (the phone placed the reader; `locked` all the same). where
+        'quran': found off the page (start_in); the take's range starts there."""
         self.search, self.loc, self._loc_hist, self._top_hist = None, None, [], []
+        self._q_reset()
+        if where == 'quran' and self.start_w is None:
+            self.range_lo = w
         # a search again after a page turn: the take's start stays the first lock (recite-ui), and what it covers
         # widens to the new place if that is earlier; words decided since stay as they are
         self.lo = w if self.start_w is None else min(self.lo, w)
@@ -1020,6 +1271,8 @@ class LiveSession:
         self.origin = w
         s, a, _ = self.E.key.where(w)
         self.locked_ev = {'type': 'locked', 'w': w, 's': s, 'a': a, 't': round(now, 2)}
+        if self.start_in:  # protocol 7: where it was found
+            self.locked_ev['where'] = where
         if seek:
             self._seeked = True
             self._start_segment(w, f_start, 'lead')
@@ -1160,10 +1413,13 @@ class LiveSession:
         if not path or path[-1][1] >= 0 or self.off_w is not None:
             return []
         gi = -path[-1][1] - 1
-        if gi >= seg.g.W or seg.app[gi] != nxt or any(m['w'] == nxt for m in self.marks.values()):
+        if gi >= seg.g.W or seg.app[gi] != nxt or nxt in self.marked_words():
             return []
         self.off_w = nxt
         return [{'type': 'off', 'w': nxt, 't': round(now, 2)}]
+
+    def marked_words(self):
+        return {m['w'] for m in self.marks.values()}
 
     def _cursor(self, w):
         """The `at` to send for this hop's cursor word w, or None. A move back more than JUMP_BACK words or ahead more
