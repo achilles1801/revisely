@@ -380,6 +380,11 @@ const SAMPLES = [
     facts: [F('open the day', /day/i, true), F('tap a page in the Revised strip', /strip|tap (?:a|the) page/i, true), F('it opens in the reader', /reader/i, true)],
     screen: 'activity',
   },
+  {
+    q: 'I found an ayah with search. How do I copy it?',
+    ctx: steady,
+    facts: [F('Copy under the ayah found', /copy/i, true), F('works offline', /offline/i)],
+  },
   // Revisely Dev (the Dev guide, Nov 16 2026): Recite, its marks, the hidden page and the takes kept.
   {
     q: 'How do I get the app to check my recitation for mistakes?',
@@ -425,6 +430,25 @@ const SAMPLES = [
     ctx: devSteady,
     dev: true,
     facts: [F('yes: a newer model for Words & harakat and Recite', /newer|new model|updated/i, true), F('fewer marks on right recitation; word slips caught as before', /word|skipped|changed|added/i, true), F('Strict unchanged', /strict/i)],
+  },
+  {
+    q: 'Can the app test me on random places in what I’ve memorized?',
+    ctx: devSteady,
+    dev: true,
+    facts: [F('yes: hold the mic → Test me', /test me/i, true), F('five places, everything memorized or one juz', /five|5|juz|everything you/i, true)],
+    screen: 'reader',
+  },
+  {
+    q: 'Why are some words grey on the page after I uncovered them?',
+    ctx: devSteady,
+    dev: true,
+    facts: [F('they were peeked (uncovered with ‹ or ‹‹)', /peek/i, true), F('never counted in the score', /score|count/i, true)],
+  },
+  {
+    q: 'I searched by voice and the reader started listening to me. Why?',
+    ctx: devSteady,
+    dev: true,
+    facts: [F('one place found: it opens there and starts a take', /one (?:place|result)|just one|only one/i, true), F('carry on, or start the ayah again', /carry on|go on|start (?:the|that) ayah/i, true)],
   },
   {
     q: 'Can I use Recite during my revision session?',
