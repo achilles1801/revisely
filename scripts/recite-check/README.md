@@ -35,6 +35,22 @@ released model. `stage.sh` adds v5 from the lab (`models/ft-v5-onnx`, written by
 rule is judged on the released model. v5 runs on each judged ayah's audio only: +0.6 s for 112 s of audio. On Majd's head-to-head
 take (2:38–43): words and harakat gave his five slips and nothing else; strict added one idgham note.
 
+**Recite and Words and harakat run on v6** (Nov 16 2026), the lab's small model fine-tuned again with women's and
+children's voices drawn three times as often and distilled from the large teacher; Strict stays on the released model
+and v5, since v6 narrowly fails the women's check on one tajweed rule (noon mushaddadah's length). Each take runs one
+model (`Engine.level`), so the CPU per take stays the same apart from the padding v6 is run with (+20% a hop). v6 has
+its own bars (`bars.v6.json`, the same rule as the released model's: 0.3% of professionals' correct words) and its own
+word settings (`engine.WORDS_P_V6`). `stage.sh` adds it from the lab (`models/ft-v6-onnx`); without it, or with
+`RECITE_WORDS_EAR=0` in the service's environment, every level runs on the released model. The word table is the same.
+In the lab (same checker; the released model in brackets): learners' correct clips with any mark at this level 25%
+(34%), with a mark that counts 12% (20%); their clips with mistakes marked 57% (68%). Professionals' planted slips
+caught 97.1% (97.4%), false alarms 0.45 per 100 words (0.40; in quiet 0.19, 0.20). The page scorecard, live: correct
+quiet pages with a mark 20% (23%), in mild babble 20% (37%), in loud babble 57% (73%); planted slips caught 95% (99%).
+/record: 5 of 6 slips, no false alarm (6 of 6, 5 false alarms). Quieter on correct recitation; it catches about as
+many word slips, and fewer of learners' small harakat and letter slips. Naming a slip (`into`) has its own thresholds
+on v6 (`engine.SIMILAR_P_V6`): 134 of bench-v0's 275 planted slips and swapped endings named (188), none wrong or
+false, nothing named on learners' clips, /record's two named as before.
+
 ## What it judges
 
 One recording against a passage (from an ayah to the end of its surah, or to a given ayah), with the lab's

@@ -32,6 +32,14 @@ if [ -f "$V5" ]; then
   cp "$V5" "$STAGE/lab/models/tajweed-v5/"
   LAB=$LAB RECITE_HARNESS=$H "$PY" -I "$HERE/make_bars.py" "$STAGE/lab/bars.v5.json" v5 > /dev/null
 fi
+# Recite and Words & harakat's ear: v6 (engine.WORDS_EAR), with its own bars. Without it every level runs on the
+# released model.
+V6=$LAB/models/ft-v6-onnx/model-int8.onnx
+if [ -f "$V6" ]; then
+  mkdir -p "$STAGE/lab/models/words-v6"
+  cp "$V6" "$STAGE/lab/models/words-v6/"
+  LAB=$LAB RECITE_HARNESS=$H "$PY" -I "$HERE/make_bars.py" "$STAGE/lab/bars.v6.json" v6 > /dev/null
+fi
 cp "$HERE"/{server.py,health.py,engine.py,live.py,auth.py,store.py,make_words.py,fetch_takes.py,digest.py,requirements.txt,Dockerfile} "$STAGE/"  # fetch_takes, digest: for their tests
 rm -rf "$STAGE/tests" && mkdir -p "$STAGE/tests" && cp "$HERE"/tests/*.py "$STAGE/tests/"
 git -C "$REPO" rev-parse "$HARNESS_COMMIT" > "$STAGE/CHECKER_COMMIT"

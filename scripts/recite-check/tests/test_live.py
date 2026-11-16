@@ -230,6 +230,78 @@ class Model(unittest.TestCase):
         with self.assertRaises(BadRequest):
             live.LiveSession(engine(), 2, 5, 2, 1, {})
 
+    def counting_level(self, **bars):
+        """A words level (Engine.level) on the released model that counts its runs, with its own word settings."""
+        import engine as engine_mod
+        E = engine()
+
+        class Counting:
+            def __init__(self, ear):
+                self.ear, self.calls, self.vocab, self.index = ear, 0, ear.vocab, ear.index
+
+            def _run(self, x):
+                self.calls += 1
+                return self.ear._run(x)
+
+            def logprobs(self, x):
+                self.calls += 1
+                return self.ear.logprobs(x)
+        return engine_mod.Level('test', Counting(E.ear), dict(E.bars, **bars),
+                                dict(engine_mod.WORDS_P, alt_pen=-3.0))
+
+    def test_each_level_runs_its_own_model(self):
+        """Recite and Words & harakat run on the words level's model (v6 in the image) with its word settings; Strict
+        on the released model (and v5). One model a take: the other is never run."""
+        import engine as engine_mod
+        import live
+        E = engine()
+        lv = self.counting_level()
+        pcm = noise(6)
+        with unittest.mock.patch.object(E, 'words_level', lv):
+            for settings, follow, mine in (({'tajweed': '0', 'letters': '1'}, False, True), ({}, True, True),
+                                           ({'tajweed': '0'}, False, True), ({}, False, False),
+                                           ({'letters': '1'}, False, False)):
+                lv.ear.calls = 0
+                sess = live.LiveSession(E, 1, 1, 1, 7, settings, follow=follow)
+                run(sess, chunks(pcm, 3200) + [{'type': 'end'}])
+                self.assertEqual(sess.lv is lv, mine, settings)
+                self.assertEqual(lv.ear.calls > 0, mine, settings)
+                self.assertEqual(sess.P['alt_pen'], -3.0 if mine else engine_mod.WORDS_P['alt_pen'])
+            x = np.frombuffer(noise(3), '<i2').astype(np.float32) / 32768
+            lv.ear.calls = 0
+            E.check(x, 1, 1, 1, 7, {'tajweed': '0', 'letters': '1'}, v=2)
+            self.assertEqual(lv.ear.calls, 1)
+            E.check(x, 1, 1, 1, 7, {}, v=2)
+            self.assertEqual(lv.ear.calls, 1)
+            self.assertEqual(E.ears()['harakat'], 'test')
+            self.assertTrue(E.ears()['strict'].startswith('released'))
+        with unittest.mock.patch.object(E, 'words_level', None):  # an image without v6: every level on the released
+            self.assertIs(live.LiveSession(E, 1, 1, 1, 7, {'tajweed': '0'}).lv, E.released)
+            self.assertIs(live.LiveSession(E, 1, 1, 1, 7, {}, follow=True).lv, E.released)
+
+    def test_letters_are_judged_against_the_levels_own_bars(self):
+        """An ayah's letters on the words level use its bars (bars.v6.json), Strict's the released model's."""
+        import engine as engine_mod
+        E = engine()
+        lv = self.counting_level(letters={'bar': E.bars['letters']['bar'] + 100, 'shadda_max': 1.0})
+        first = E.words.first[E.words.vindex[(1, 2)]]
+        n = E.words.counts[E.words.vindex[(1, 2)]]
+        statuses = {first + i: 'correct' for i in range(n)}
+        spans = {first + i: (20 + 40 * i, 50 + 40 * i) for i in range(n)}
+        lp = np.zeros((400, len(E.ear.vocab) + 1), np.float32)
+        score = E.bars['letters']['bar'] + 1  # past the released bar, under the test level's
+        rows = [[(score, 'ص→س', None, 'س')] for _ in range(n)]
+        got = {}
+        with unittest.mock.patch.object(E, 'words_level', lv), \
+                unittest.mock.patch.object(engine_mod.letters_v2, 'words_judge', lambda *a, **k: rows), \
+                unittest.mock.patch.object(engine_mod.tajweed, 'judge', lambda *a, **k: []), \
+                unittest.mock.patch.object(E, 'ear2', None):
+            for name, st in (('harakat', {'letters': True, 'tajweed': False}),
+                             ('strict', {'letters': True, 'tajweed': True})):
+                _, letters = E.ayah_notes(lp, 1, 2, statuses, spans, dict(st, mon=4, mot=4, aar=0))
+                got[name] = len(letters)
+        self.assertEqual(got, {'harakat': 0, 'strict': n})
+
 
 @unittest.skipUnless(MODEL.exists() and ITEM.exists(), 'the model or the bench recitation is not here')
 class Bench(unittest.TestCase):
