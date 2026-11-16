@@ -620,7 +620,10 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
         const { width, height } = e.nativeEvent.layout;
         setSpace((prev) => (prev.width === width && prev.height === height ? prev : { width, height }));
       }}
-      style={{ backgroundColor: palette.pageBg }}
+      // Left to right whatever the app's language (BEHAVIOUR.md LANG-1): `inverted` already puts page 1
+      // on the right, and the verse boxes are placed from the image's left edge. Right to left would
+      // turn the pages backwards and mirror every highlight (React Native swaps left and right).
+      style={{ backgroundColor: palette.pageBg, direction: 'ltr' }}
     />
   );
 });

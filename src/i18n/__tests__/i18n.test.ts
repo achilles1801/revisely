@@ -87,6 +87,10 @@ describe('the English strings', () => {
     }
   });
 
+  it('hold no › or ‹: the code adds chevron() or backChevron(), which turn round right to left', () => {
+    for (const [key, value] of leaves(en)) expect([key, /[›‹]/.test(String(value))]).toEqual([key, false]);
+  });
+
   it('have balanced {{values}}', () => {
     for (const [key, value] of leaves(en)) {
       const text = String(value);

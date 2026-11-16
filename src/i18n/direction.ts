@@ -28,3 +28,16 @@ export function syncLayoutDirection(language: string, manager: DirectionManager 
   manager.forceRTL(rtl);
   return manager.isRTL !== rtl;
 }
+
+/**
+ * The › that ends a line leading somewhere ("Starts at Al-Mujadila ›"), pointing the way the
+ * language reads: ‹ right to left. Text in src/i18n/en never holds one; the code adds it.
+ */
+export function chevron(): string {
+  return I18nManager.isRTL ? '‹' : '›';
+}
+
+/** The ‹ that leads back (a previous month, a page back): › right to left. */
+export function backChevron(): string {
+  return I18nManager.isRTL ? '›' : '‹';
+}
