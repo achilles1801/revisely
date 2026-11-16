@@ -188,6 +188,28 @@ describe('the Dev guide goes only with questions from Revisely Dev', () => {
     expect(() => validateContext({ ...plain, app: 'store' })).toThrow();
     expect(() => validateContext({ ...plain, app: true })).toThrow();
   });
+
+  it('Gaps’ figures come only from Revisely Dev, and reach the model as their lines (ACT-28, ACT-30)', () => {
+    const plain = JSON.parse(JSON.stringify(context())) as Record<string, unknown>;
+    const gaps = {
+      lastRevisedDaysAgo: 6,
+      longestGap: { days: 9, endedDaysAgo: 6 },
+      usualStepDays: 1,
+      longGaps: 2,
+      fullRevision: { latePages: 18, pushedBackDays: 5, cycleDays: 5 },
+      surahs: [{ name: 'Al-Kahf', daysAgo: 9 }],
+    };
+    // The store app has no Gaps: a context with them and no app "dev" is refused.
+    expect(() => validateContext({ ...plain, gaps })).toThrow();
+    const dev = validateContext({ ...plain, app: 'dev', gaps });
+    expect(dev.gaps).toEqual(gaps);
+    const request = JSON.stringify(ask(dev));
+    expect(request).toContain('last revised 6 days ago');
+    expect(request).toContain('pushed back 5 days');
+    expect(request).toContain('Al-Kahf 9 days ago');
+    // They go with the question, not the system blocks (which stay cached as they were).
+    expect(ask(dev).system.map((s) => s.text)).toEqual([REVO_SYSTEM_PROMPT, DEV_GUIDE_SYSTEM]);
+  });
 });
 
 describe('the screens Revo may open (REVO-31)', () => {

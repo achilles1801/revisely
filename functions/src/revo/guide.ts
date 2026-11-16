@@ -405,6 +405,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
       '- "Full revision pushed back 5 days": pages their current plan brings round later than it would have (missed in a gap, or slid back by a catch-up), with when they were due and when they will come; "Full revision on schedule" when none are late.',
       '- “When did I last revise…?” (end of Gaps, or a tap on the full revision line) opens “Last revised”: memorized surahs, juz, hizbs or pages (“Surah”, “Juz”, “Hizb”, “Page”, kept), longest waiting first; a group opens to its pages, a page opens the reader. “Not revised yet”: memorized under 30 days ago; “Never revised”: older.',
       '- Say long lengths in weeks or months as the app does, exact days when asked; welcome them back after a long gap, never scold. Recency only, with Smart Tracking on or off.',
+      '- For gap questions, or when they last revised a surah, answer from the context’s Gaps and Last revised lines, then the path once.',
     ),
   },
   {
