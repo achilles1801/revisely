@@ -54,6 +54,22 @@ const JUMP_SETTLE_MS = 500;
 const END = -1;
 const NO_HIGHLIGHT: readonly AyahRef[] = [];
 
+// E2E builds only (the bundler folds this away in every other build): the pager's drags, momentum, jumps and the
+// page the list settles on, in the build's log (lib/e2e/log, app.log beside a failed flow). On the Android emulator a
+// session page sometimes ignored two swipes in a row: both touches reached the app and the native scroll took them,
+// but the page never turned (flow 04, run 43768521638). These lines say whether the list moved and snapped back, or
+// never moved.
+// Every call is behind its own `process.env.EXPO_PUBLIC_E2E === '1'`, which the bundler inlines, so other builds
+// drop the calls and their text (a test on a variable would leave them in).
+const e2eSay = (line: string) => {
+  // eslint-disable-next-line no-console
+  console.log(`[e2e] pager ${line}`);
+};
+const e2eX = (e?: NativeSyntheticEvent<NativeScrollEvent>): string => {
+  const x = e?.nativeEvent?.contentOffset?.x;
+  return typeof x === 'number' ? `x ${Math.round(x)} (index ${(x / SCREEN_WIDTH).toFixed(2)})` : 'x ?';
+};
+
 interface MushafPagerProps {
   pages: number[];
   initialPage?: number;
@@ -444,6 +460,8 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
   // On iOS CI a 30 s stall did that, and the page between went uncounted (E2E
   // 04, run 42746203992). Emptied by every page change and every jump.
   const dragStartsRef = useRef<number[]>([]);
+  // E2E builds: the page under the offset as last logged (e2eSay's onScroll).
+  const e2eScrollIndex = useRef<number | null>(null);
 
   // Download the pages around the starting one before they are swiped to (and
   // around the current one when another print is chosen).
@@ -464,7 +482,11 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
     setTimeout(() => {
       // A jump made meanwhile (scrollToPage) is where the pager belongs: this
       // scroll must not pull it back to the starting page.
-      if (currentIndexRef.current !== idx) return;
+      if (currentIndexRef.current !== idx) {
+        if (process.env.EXPO_PUBLIC_E2E === '1') e2eSay(`start-up scroll to index ${idx} skipped: at ${currentIndexRef.current}`);
+        return;
+      }
+      if (process.env.EXPO_PUBLIC_E2E === '1') e2eSay(`start-up scroll to index ${idx}`);
       listRef.current?.scrollToIndex({ index: idx, animated: false });
     }, 50);
   }, [initialPage, pages]);
@@ -479,6 +501,7 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
         // sees no change and cannot mistake the jump for advancing.
         const from = currentIndexRef.current;
         const changed = idx !== from;
+        if (process.env.EXPO_PUBLIC_E2E === '1') e2eSay(`jump to page ${pageNumber} (index ${idx}) from index ${from}`);
         currentIndexRef.current = idx;
         draggedRef.current = false;
         dragStartsRef.current = [];
@@ -509,6 +532,10 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
 
   const handleViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      if (process.env.EXPO_PUBLIC_E2E === '1') e2eSay(
+        `viewable ${viewableItems.map((v) => v.index).join(',') || 'none'}; at index ${currentIndexRef.current}, ` +
+          `${draggedRef.current ? 'dragged' : 'not dragged'}, drags from ${dragStartsRef.current.join(',') || 'none'}`,
+      );
       if (viewableItems.length === 0) return;
       const first = viewableItems[0];
       if (first.index == null) return;
@@ -538,7 +565,10 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
       // other page is where the list really is (e.g. the user swiped meanwhile).
       const jump = jumpRef.current;
       if (jump) {
-        if (newIndex === jump.from && newIndex !== jump.to && Date.now() < jump.until) return;
+        if (newIndex === jump.from && newIndex !== jump.to && Date.now() < jump.until) {
+          if (process.env.EXPO_PUBLIC_E2E === '1') e2eSay(`viewable ${newIndex} ignored: the jump from it is settling`);
+          return;
+        }
         jumpRef.current = null;
       }
       shownIndexRef.current = newIndex;
@@ -623,7 +653,29 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
           typeof x === 'number' ? Math.min(Math.max(Math.round(x / SCREEN_WIDTH), 0), data.length - 1) : shownIndexRef.current;
         if (at != null) dragStartsRef.current.push(at);
         draggedRef.current = true;
+        if (process.env.EXPO_PUBLIC_E2E === '1') e2eSay(`drag begins at ${e2eX(e)}; shown index ${shownIndexRef.current}, at index ${currentIndexRef.current}`);
       }}
+      onScrollEndDrag={
+        process.env.EXPO_PUBLIC_E2E === '1'
+          ? (e: NativeSyntheticEvent<NativeScrollEvent>) =>
+              e2eSay(`drag ends at ${e2eX(e)}, velocity ${e?.nativeEvent?.velocity?.x?.toFixed(2) ?? '?'}`)
+          : undefined
+      }
+      onMomentumScrollBegin={process.env.EXPO_PUBLIC_E2E === '1' ? (e: NativeSyntheticEvent<NativeScrollEvent>) => e2eSay(`momentum begins at ${e2eX(e)}`) : undefined}
+      onMomentumScrollEnd={process.env.EXPO_PUBLIC_E2E === '1' ? (e: NativeSyntheticEvent<NativeScrollEvent>) => e2eSay(`momentum ends at ${e2eX(e)}`) : undefined}
+      onScroll={
+        process.env.EXPO_PUBLIC_E2E === '1'
+          ? (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+              // Only when the page under the offset changes, so a swipe is a line or two, not one per frame.
+              const x = e?.nativeEvent?.contentOffset?.x;
+              if (typeof x !== 'number') return;
+              const under = Math.round(x / SCREEN_WIDTH);
+              if (under === e2eScrollIndex.current) return;
+              e2eScrollIndex.current = under;
+              e2eSay(`scrolled to ${e2eX(e)}`);
+            }
+          : undefined
+      }
       viewabilityConfig={viewabilityConfig}
       getItemLayout={(_, index) => ({
         length: SCREEN_WIDTH,
@@ -637,6 +689,7 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
       extraData={`${extraData ?? ''}|${highlights.map((h) => `${h.page}:${h.sura}:${h.ayah}`).join(',')}|${pageSize.width}|${sized}|${edition}`}
       onLayout={(e) => {
         const { width, height } = e.nativeEvent.layout;
+        if (process.env.EXPO_PUBLIC_E2E === '1') e2eSay(`layout ${Math.round(width)}×${Math.round(height)} (pages ${SCREEN_WIDTH} wide)`);
         setSpace((prev) => (prev.width === width && prev.height === height ? prev : { width, height }));
       }}
       // Left to right whatever the app's language (BEHAVIOUR.md LANG-1): `inverted` already puts page 1
