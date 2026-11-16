@@ -201,6 +201,8 @@ export const settings = {
     any: 'Any',
     save: 'Save recordings when you recite',
     saveSub: 'On this phone only, with your recordings in Activity',
+    showPast: 'Show past mistakes',
+    showPastSub: 'Lightly, until each is said right on 2 different days',
   },
   notifications: {
     enable: 'Enable notifications',
