@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { logger } from '../../lib/logger';
 import type { QuranWords } from '../../lib/recite/quranWords';
 import { startNotFound, type LiveState } from '../../lib/reciteLive/state';
@@ -50,7 +50,7 @@ export function useRememberTake({
   level: TakeLevel;
   /** The account's records (for the words that had a remembered mistake). */
   records: readonly MemoryRecord[];
-}): { noteRecording: (saved: { recordingId: string }) => void } {
+}): { noteRecording: (saved: { recordingId: string }) => void; current: TakeRecord | null } {
   const status = live.state.status;
   // This take: its record's id and start, whether the page was hidden, its recording, what was written last.
   const take = useRef<{ id: string; createdAt: number; hidden: boolean; recordingId: string | null; written: TakeRecord | null } | null>(null);
@@ -58,6 +58,8 @@ export function useRememberTake({
   const pending = useRef<TakeRecord | null>(null);
   const uidRef = useRef(uid);
   uidRef.current = uid;
+  // This take's record as last built (the summary's rows read it): null until its final answer, and again once closed.
+  const [current, setCurrent] = useState<TakeRecord | null>(null);
 
   const flush = useCallback(() => {
     if (timer.current) clearTimeout(timer.current);
@@ -77,6 +79,7 @@ export function useRememberTake({
     flush();
     prev.current = take.current;
     take.current = { id: memoryId(), createdAt: Date.now(), hidden, recordingId: null, written: null };
+    setCurrent(null);
     // Only when a take starts.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
@@ -109,6 +112,7 @@ export function useRememberTake({
     const r = build();
     if (!t || !r || sameTake(r, t.written)) return;
     t.written = r;
+    setCurrent(r);
     pending.current = r;
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(flush, SETTLE_MS);
@@ -118,7 +122,10 @@ export function useRememberTake({
   const marks = live.state.marks;
   useEffect(() => {
     if (status === 'done') schedule();
-    else if (status === 'idle') flush();
+    else if (status === 'idle') {
+      flush();
+      setCurrent(null);
+    }
     // `marks` changes with Not a mistake and Put back.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, marks]);
@@ -146,5 +153,5 @@ export function useRememberTake({
     },
     [schedule, status],
   );
-  return { noteRecording };
+  return { noteRecording, current };
 }

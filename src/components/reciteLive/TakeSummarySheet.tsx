@@ -17,6 +17,7 @@ import { drillMarks } from '../../lib/reciteLive/drill';
 import type { ScoreLevel } from '../../lib/reciteLive/score';
 import { mistakesLabel } from '../../lib/reciteLive/score';
 import { CheckMark } from './ReciteMic';
+import { Sparkline } from '../reciteMemory/AccuracyChart';
 
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 /** "1 minute 42 seconds", for VoiceOver. */
@@ -95,6 +96,8 @@ export function TakeSummarySheet({
   onAgain,
   onDrill,
   before = null,
+  memory = null,
+  onProgress,
   onDone,
   onShown,
 }: {
@@ -120,6 +123,13 @@ export function TakeSummarySheet({
   onDrill?: () => void;
   /** This take recited the mistakes of the one before: what that one found there ("1 wrong word, 1 not clear"). */
   before?: string | null;
+  /**
+   * Recite's memory (lib/reciteMemory; agreed with Recite UI): the words this take cleared from the page (said right on
+   * a second day), and its passage's trend (accuracy over its takes, oldest first, with the line saying it).
+   */
+  memory?: { cleared: string[]; trend: number[]; line: string | null } | null;
+  /** "Your progress here": the passage's progress sheet. */
+  onProgress?: () => void;
   onDone: () => void;
   /** The sheet is on screen (its modal has been presented). */
   onShown?: () => void;
@@ -304,6 +314,41 @@ export function TakeSummarySheet({
             : null}
         </View>
       ) : null}
+      {check && memory && memory.cleared.length > 0 ? (
+        <View style={[styles.row, { borderTopColor: palette.separator }]} accessible testID="take-summary-cleared">
+          <View style={styles.rowText}>
+            <Text style={[typeV2.name, { color: palette.text }]} maxFontSizeMultiplier={CHROME_MAX}>
+              {`${memory.cleared.length} cleared from the page`}
+            </Text>
+            <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={CHROME_MAX}>
+              Right on 2 different days
+            </Text>
+          </View>
+          <Text style={[arabicV2(20), styles.cleared, { color: palette.text }]} maxFontSizeMultiplier={ARABIC_MAX} numberOfLines={2}>
+            {memory.cleared.join(' ')}
+          </Text>
+        </View>
+      ) : null}
+      {check && memory?.line && onProgress ? (
+        <Tap
+          onPress={onProgress}
+          style={[styles.row, { borderTopColor: palette.separator }]}
+          accessibilityRole="button"
+          accessibilityLabel={`Your progress here. ${memory.line}`}
+          testID="take-summary-progress"
+        >
+          <View style={styles.rowText}>
+            <Text style={[typeV2.name, { color: palette.text }]} maxFontSizeMultiplier={CHROME_MAX}>
+              Your progress here
+            </Text>
+            <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={CHROME_MAX}>
+              {memory.line}
+            </Text>
+          </View>
+          <Sparkline values={memory.trend} />
+          <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
+        </Tap>
+      ) : null}
       {!check && !checkOwned ? (
         <Tap
           onPress={onCheck}
@@ -358,6 +403,7 @@ const styles = StyleSheet.create({
   putBack: { height: 32, paddingHorizontal: 13, borderRadius: 16, borderWidth: 1, justifyContent: 'center' },
   putBackText: { fontSize: 14, fontWeight: '600' },
   arStacked: { alignSelf: 'flex-end', marginTop: 4 },
+  cleared: { writingDirection: 'rtl', textAlign: 'right', maxWidth: '45%' },
   buttons: { paddingHorizontal: layoutV2.gutter, paddingTop: 16, gap: 10 },
   kept: { textAlign: 'center', paddingHorizontal: layoutV2.gutter, paddingTop: 10, paddingBottom: 6 },
 });

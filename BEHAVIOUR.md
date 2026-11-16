@@ -312,6 +312,35 @@ Recite with Mark mistakes remembers each take (Majd, Nov 15 2026; Tarteel's bigg
   different revision days. Getting it wrong again starts the count over. A take counts only for what it
   checked: Words & harakat never clears a tajweed note. Not clear marks are never remembered, and a take
   that heard a word's harakat only as Not clear is not a try at them. Clear now clears a word at once.
+- **RMEM-3.** Outside a take, a word with a remembered mistake stays marked on the page, in its highlight
+  colour made lighter (red for a word, amber for harakat and letters, violet for tajweed). A word shows one
+  mark, its most severe. Marks don't show during a take, where only that take's marks do. They also don't
+  show on a hidden page, or with Settings → Recite → Show past mistakes off. Tapping one opens its history,
+  which shows:
+  - the kind in words, with its place and how often it went wrong;
+  - what was expected;
+  - its latest takes: the date, right or what was said, whether the page was hidden, and ▶ your own voice
+    when that take's recording is on the phone;
+  - where the clear rule stands;
+  - Hear it and Similar phrases.
+
+  Clear now takes the mark off at once, with Undo.
+- **RMEM-4.** A take's summary names the words it cleared from the page (said right on a second day).
+  Once its passage has two takes or more, the summary also shows the passage's trend, with a small line:
+  "Up from 95.1% on Mon 2 Nov · 6 takes". The trend opens the passage's progress, which shows:
+  - the latest accuracy by the page;
+  - a chart of every take of the passage (a take counts when it covers at least half of it);
+  - the words still to fix there;
+  - the takes, newest first.
+
+  A word's card opens the same page (See all). From the summary, Done goes back to the summary.
+- **RMEM-5.** A day in Activity lists its recitation takes in a Recited block. Each take shows its
+  passage, its score by the page, its line (time, mistakes, words cleared, page hidden), its recording and
+  Show on the page. A take's recording shows there and not in Read. All activity has Recitations, with All
+  takes, With mistakes and Page hidden. Show on the page opens the reader at the take's page with that
+  take's marks at full strength and nothing else, until Done. Its bar has ▶ for the take's recording while
+  that recording is on the phone. Each mark has its card, and Not a mistake there updates the take. The
+  progress page's takes open it too.
 
 ## Searching the Qur'an
 
