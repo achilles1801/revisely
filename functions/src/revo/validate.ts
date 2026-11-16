@@ -25,6 +25,7 @@ import {
   RevoPassageFacts,
   RevoPattern,
   RevoPlanTally,
+  RevoGaps,
   RevoRecitation,
   RevoRecitedAyah,
   RevoRecitedPassage,
@@ -182,8 +183,10 @@ export function validateContext(v: unknown): RevoContext {
   // `week[].caughtUp`, `week[].ahead`, `week[].started` and `patterns` come from apps after Nov 9 2026 (REVO-40).
   // `recitation` comes only from Revisely Dev apps whose account recites (Nov 2026).
   // `app` ('dev') comes only from Revisely Dev, from Nov 16 2026: its requests carry the Dev guide (guide.ts).
-  keys(c, ['totals', 'today', 'weakPages', 'week', 'streak', 'patterns', 'passages', 'pageNames', 'recitation', 'app', 'localTime'], 'context', ['totals', 'today', 'weakPages', 'week']);
+  // `gaps` comes only from Revisely Dev, with `app`, from Nov 16 2026 (Insights' Gaps, ACT-28).
+  keys(c, ['totals', 'today', 'weakPages', 'week', 'streak', 'patterns', 'passages', 'pageNames', 'recitation', 'app', 'gaps', 'localTime'], 'context', ['totals', 'today', 'weakPages', 'week']);
   if (c.app !== undefined && c.app !== 'dev') fail('context.app');
+  if (c.gaps !== undefined && c.app !== 'dev') fail('context.gaps');
 
   const t = obj(c.totals, 'context.totals');
   keys(t, REVO_TOTALS, 'context.totals');
@@ -281,6 +284,7 @@ export function validateContext(v: unknown): RevoContext {
     ...(pageNames ? { pageNames } : {}),
     ...(recitation ? { recitation } : {}),
     ...(c.app === 'dev' ? { app: 'dev' as const } : {}),
+    ...(c.gaps !== undefined ? { gaps: validateGaps(c.gaps, 'context.gaps') } : {}),
     localTime: lt,
   };
 }
@@ -321,6 +325,46 @@ function recitedAyah(v: unknown, path: string): RevoRecitedAyah {
     ayah: int(o.ayah, 1, MAX_AYAH, `${path}.ayah`),
     name: passageText(o.name, MAX_PAGE_NAME, `${path}.name`),
   };
+}
+
+const MAX_GAP_DAYS = 10_000;
+const SURAH_COUNT = 114;
+const MAX_SURAH_NAME = 40;
+
+/** Insights' Gaps (ACT-28, ACT-29), checked: bounded counts, a full revision late only with pages late, every surah named. */
+export function validateGaps(v: unknown, path: string): RevoGaps {
+  const g = obj(v, path);
+  keys(g, ['lastRevisedDaysAgo', 'longestGap', 'usualStepDays', 'longGaps', 'fullRevision', 'surahs'], path);
+  const lastRevisedDaysAgo = int(g.lastRevisedDaysAgo, 0, MAX_GAP_DAYS, `${path}.lastRevisedDaysAgo`);
+  let longestGap: RevoGaps['longestGap'] = null;
+  if (g.longestGap !== null) {
+    const l = obj(g.longestGap, `${path}.longestGap`);
+    keys(l, ['days', 'endedDaysAgo'], `${path}.longestGap`);
+    const days = int(l.days, 2, MAX_GAP_DAYS, `${path}.longestGap.days`);
+    const endedDaysAgo = l.endedDaysAgo === null ? null : int(l.endedDaysAgo, 0, MAX_GAP_DAYS, `${path}.longestGap.endedDaysAgo`);
+    longestGap = { days, endedDaysAgo };
+  }
+  const usualStepDays = g.usualStepDays === null ? null : num(g.usualStepDays, 1, MAX_GAP_DAYS, `${path}.usualStepDays`);
+  if (usualStepDays !== null && !Number.isInteger(usualStepDays * 2)) fail(`${path}.usualStepDays`);
+  const longGaps = int(g.longGaps, 0, 30, `${path}.longGaps`);
+  let fullRevision: RevoGaps['fullRevision'] = null;
+  if (g.fullRevision !== null) {
+    const f = obj(g.fullRevision, `${path}.fullRevision`);
+    keys(f, ['latePages', 'pushedBackDays', 'cycleDays'], `${path}.fullRevision`);
+    const latePages = int(f.latePages, 0, 604, `${path}.fullRevision.latePages`);
+    const pushedBackDays = int(f.pushedBackDays, 0, MAX_GAP_DAYS, `${path}.fullRevision.pushedBackDays`);
+    if ((latePages === 0) !== (pushedBackDays === 0)) fail(`${path}.fullRevision.pushedBackDays`);
+    fullRevision = { latePages, pushedBackDays, cycleDays: int(f.cycleDays, 1, MAX_GAP_DAYS, `${path}.fullRevision.cycleDays`) };
+  }
+  const surahs = list(g.surahs, SURAH_COUNT, `${path}.surahs`, (x, p) => {
+    const s = obj(x, p);
+    keys(s, ['name', 'daysAgo', 'notYet'], p, ['name', 'daysAgo']);
+    const name = passageText(s.name, MAX_SURAH_NAME, `${p}.name`);
+    const daysAgo = s.daysAgo === null ? null : int(s.daysAgo, 0, MAX_GAP_DAYS, `${p}.daysAgo`);
+    if (s.notYet !== undefined && (s.notYet !== true || daysAgo !== null)) fail(`${p}.notYet`);
+    return s.notYet === true ? { name, daysAgo, notYet: true as const } : { name, daysAgo };
+  });
+  return { lastRevisedDaysAgo, longestGap, usualStepDays, longGaps, fullRevision, surahs };
 }
 
 /** Their recitation over the window, checked to add up. */

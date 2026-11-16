@@ -365,6 +365,20 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     ),
   },
   {
+    title: 'Gaps and Last revised',
+    covers: ['ACT-28', 'ACT-29'],
+    routes: ['Activity', 'LastRevised', 'QuranReader'],
+    text: lines(
+      '- Activity → Insights → “Gaps”, after Consistency: how long they go between revisions, over the Insights range. A revision day is a day with a page revised (a session, pages revised ahead, pages logged as revised elsewhere), on the revision day Activity files it under; reading and memorizing don’t count. A gap is the days from one revision day to the next: Monday then Thursday is 3 days, and revising every day leaves none.',
+      '- The figure is how long since the last revision: a number under 2 weeks (red from 3 days), words and the date from 2 weeks, never red; “Today” once they revised today. Under it a strip of the range, a dot per revision day and each gap of 3 days or more in red with its length; then the longest gap (a tap opens the calendar at that month) and their usual rhythm, how often they usually revise.',
+      '- “Days”, at the section’s top right when something is said in weeks or months, shows every length in exact days; a tap again goes back to words. It is kept on the phone.',
+      '- The full revision line ("Full revision pushed back 5 days"): pages their plan, as it is now, brings round later than it would have, because they were missed in a gap or a catch-up slid the plan. The dates say when they would have come round and when they will. Days off don’t count. "Full revision on schedule" when none are late. To catch up sooner, the catch-up offer on Home (see Catching up) or “Jump to…”.',
+      '- “When did I last revise…?”, at the end of Gaps (or a tap on the full revision line), opens “Last revised”: every memorized surah, juz, hizb or page by when it was last revised, longest waiting first. “Surah”, “Juz”, “Hizb” and “Page” switch the view, and the choice is kept. A surah, juz or hizb gives its least recently revised page’s date and opens to its pages; a page opens the reader there. “Not revised yet” is a page memorized under 30 days ago; “Never revised”, older.',
+      '- Saying it: lengths under 2 weeks in days ("6 days"); longer, as the app does, in weeks or months ("over 3 weeks", "about 2 months"), and exact days when they ask. Someone back after a long gap is welcomed back, never scolded. Asked when they last revised a surah, answer from the context’s Last revised list, then the path once.',
+      '- Recency only: the same with Smart Tracking on or off, nothing about strength.',
+    ),
+  },
+  {
     title: 'Not possible in Revisely Dev (yet)',
     covers: [],
     routes: [],

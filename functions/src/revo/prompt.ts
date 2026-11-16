@@ -9,6 +9,7 @@ import { REVO_MODEL } from '../coach/pricing';
 import { attachedText } from './attachText';
 import { DEV_GUIDE_SYSTEM, GUIDE_PROMPT, OPEN_SCREEN_ACTION } from './guide';
 import { RECITATION_SYSTEM, recitationText } from './recitation';
+import { gapsText } from './gaps';
 import { REVO_OUTPUT_CONFIG } from './replySchema';
 import { RevoAttachment, RevoContext, RevoPattern, StoredMessage } from './types';
 
@@ -271,6 +272,7 @@ export function contextText(day: string, context: RevoContext, memory: readonly 
     lines.push(`Weak pages, the longest since revised first: ${weak.join('; ')}.`);
   }
   if (context.recitation) lines.push(recitationText(context.recitation));
+  if (context.gaps) lines.push(gapsText(context.gaps));
   if (memory.length > 0) lines.push(`Remembered about them:\n${memory.map((m) => `- ${m}`).join('\n')}`);
   return lines.join('\n');
 }

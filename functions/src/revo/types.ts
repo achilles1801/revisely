@@ -59,6 +59,11 @@ export interface RevoContext {
    */
   recitation?: RevoRecitation;
   /**
+   * Insights' Gaps and Last revised (BEHAVIOUR.md ACT-28, ACT-29), from Revisely Dev only (with `app: 'dev'`), from
+   * Nov 16 2026: the app's lib/revo/gaps, checked in validate.ts and written out by gaps.ts.
+   */
+  gaps?: RevoGaps;
+  /**
    * 'dev' from Revisely Dev (lib/variant's isDevVariant), from Nov 16 2026: the request then carries the Dev guide
    * (guide.ts DEV_GUIDE_SECTIONS) as a system block of its own. The store app never sends it.
    */
@@ -90,6 +95,22 @@ export const REVO_RECITATION_WEEKS = 8;
 export const REVO_RECITATION_LIST = 5;
 
 /** What the app's Insights shows of their recitation over the last `days` revision days (the app's lib/reciteInsights). */
+/** Insights' Gaps over the last 30 days, the full revision against the plan, and each memorized surah's last revision. */
+export interface RevoGaps {
+  /** Whole days since the last revision day (0 = today). */
+  lastRevisedDaysAgo: number;
+  /** The longest gap (days from one revision day to the next); `endedDaysAgo` null while it is still open. */
+  longestGap: { days: number; endedDaysAgo: number | null } | null;
+  /** The usual step between revision days (1 = every day, 1.5 = every 1–2 days). */
+  usualStepDays: number | null;
+  /** Gaps of 3 days or more, the open one included. */
+  longGaps: number;
+  /** Pages the plan brings round later than their spacing, how far that pushed the full revision back, the plan's cycle. */
+  fullRevision: { latePages: number; pushedBackDays: number; cycleDays: number } | null;
+  /** Memorized surahs, longest since revised first: days since (null: never; `notYet`: memorized under 30 days ago). */
+  surahs: { name: string; daysAgo: number | null; notYet?: true }[];
+}
+
 export interface RevoRecitation {
   /** The window, in revision days (28). */
   days: number;
