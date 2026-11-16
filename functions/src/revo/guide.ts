@@ -2,11 +2,20 @@
  * How Revisely works, for Revo: the source of truth it answers "how", "where" and "why" questions
  * from (the cached part of its system prompt, prompt.ts). Plain and compact, written for a model.
  *
+ * Two parts (Majd, Nov 16 2026: "whatever app changes we make, revo should get that update too"):
+ * - GUIDE_SECTIONS, in the system prompt every account gets: what the store app does (and its testers').
+ * - DEV_GUIDE_SECTIONS, a system block of its own sent only from Revisely Dev (the context's `app: 'dev'`,
+ *   prompt.ts): what only Revisely Dev has. Store requests never carry it, so they stay byte-identical.
+ *
  * Keep it true (guide.test.ts):
- * - every rule id in BEHAVIOUR.md is in a section's `covers`, or in GUIDE_INTERNAL with a reason;
+ * - every rule id in BEHAVIOUR.md is in a section's `covers`, or in GUIDE_INTERNAL with a reason that starts
+ *   with one of GUIDE_INTERNAL_KINDS (nothing a user sees: timing, server, layout, an owner's tool…);
+ * - a rule under a BEHAVIOUR.md heading marked "(Revisely Dev)", or marked so right after its id
+ *   ("- **ACT-28.** (Revisely Dev) …"), is in the Dev guide, never in the main one; the Dev guide covers only those;
  * - every route in a section's `routes` is a screen in src/navigation/MainNavigator.tsx;
  * - every label in curly quotes (“Edit schedule”) is text the app shows, word for word (src/).
- * Change it in the same PR as the feature. Verified against the code on Nov 9 2026, as of the release
+ * Change it in the same PR as the feature: every change a user can see updates the guide (main or Dev).
+ * Verified against the code on Nov 9 2026, as of the release
  * that opens Activity, memorizing by the ayah, help, What's new and every QuranEnc translation to
  * everyone (recite mode and Settings → Testing stay testers'; searching the Qur'an, typed and by voice
  * on an iPhone, opened to everyone on Nov 9 2026).
@@ -305,42 +314,155 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
   },
 ];
 
-/** Rules with nothing for a user to ask Revo about, on purpose, and why. */
+/**
+ * What only Revisely Dev has (the test app that installs beside Revisely, on the dev backend, and gets new features
+ * first), in the same form as GUIDE_SECTIONS. Sent as its own system block only from Revisely Dev (DEV_GUIDE_SYSTEM).
+ * When a feature moves to the store app, move its section (or its lines) to GUIDE_SECTIONS.
+ */
+export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
+  {
+    title: 'Recite and Mark mistakes',
+    covers: [],
+    routes: ['QuranReader', 'Settings'],
+    text: lines(
+      '- Who has it: Revisely Dev, a tester account ("Tester: yes"), an iPhone and the Madani 1405 mushaf (Settings → Mushaf → “Mushaf”). The reader’s bar then has an eye and a mic in place of the record button. On Android or with the 1441 print it is the usual record button. It needs the internet: the checking runs on Revisely’s server.',
+      '- The mic: tap it to start a take. Hold it to choose: “Record” (“Just record your recitation”) or “Recite” (“The page follows you”), and under Recite the “Mark mistakes” switch. Recite follows them on the page; with Mark mistakes on it also marks mistakes as they recite. Mark mistakes is part of Premium, free in Revisely Dev (Settings → Testing → “Premium”: off shows it locked).',
+      '- A take starts anywhere on the page: the bar says “Listening…” until it finds where they are, and nothing shows before that. Then a grey band on the line and a grey box on the word follow them, and the page turns with them. Turning the page by hand makes it look on that page. If it never finds the place, nothing is marked and Stop just ends it.',
+      '- The bar during a take: the words being said and the time, “Pause” and “Resume” (the mic goes off and the take stays open), Stop (then “Checking…”), and ✕ to close it.',
+      '- Settings → Recite: “Mistakes to mark”: “Words & harakat” (wrong, skipped and added words, letter and haraka slips) or “Strict” (the same, and tajweed: madd lengths, qalqalah, ghunnah, ikhfa, idgham, iqlab), where “Madd munfasil”, “Madd muttasil” and “Madd ʿarid” set the lengths. “Save recordings when you recite” keeps a take’s audio on this phone, with the recordings in Activity.',
+      '- Since mid-November 2026, “Words & harakat” and Recite listen with a newer model: it marks recitation that was right less often, especially with noise in the background, and catches word slips (a skipped, changed or added word) about as before. Small haraka or letter slips are marked a little less often, and "You continued with …" shows for fewer slips. “Strict” is unchanged.',
+      '- It is AI and can make mistakes (Settings → About → “Recitation check notice”). Software checks the recitation; nobody listens. Settings → Testing → “Keep my recitations as test data” keeps takes for Revisely’s tests.',
+    ),
+  },
+  {
+    title: 'Marks and the take’s summary',
+    covers: [],
+    routes: ['QuranReader'],
+    text: lines(
+      '- Mistakes are highlights behind the word, three colours: red for a wrong, skipped or extra word (an extra word marks the word before it); amber for a haraka or letter slip, and for “Not clear”; violet for a tajweed note (“Strict” only).',
+      '- “Not clear”: a haraka or letter the checker couldn’t hear clearly enough to judge. It is never a mistake and never counts in the score. Going back a few words to restart an ayah is never marked.',
+      '- Tap a marked word: its card names each mark (“Wrong word”, “Skipped word”, “Extra word”, “Harakat slip”, “Letter slip”, “Not clear” or the tajweed rule), with “Expected” and what was heard. “Not a mistake” takes a mark off (Undo for a few seconds). “Hear it” plays the reciter’s ayah (it pauses a take); “Your recitation” plays their own voice at that word, until the take is closed; “Similar phrases” lists “Ayahs that read almost the same”.',
+      '- After Stop, with Mark mistakes on, “Your recitation” opens: the score by the page, then each mark (tap one to see it on the page). Going on with a similar ayah gets its own row ("You continued with Luqman 31:6, a similar ayah", or "You ended ayah 5 as ayah 3 ends"); a tap opens that ayah in the reader. "1 marked not a mistake" lists marks taken off, each with “Put back”.',
+      '- Its buttons: “Recite the mistakes again” (one take over just the stretch with mistakes; it stops by itself at the end and says "Before: …"), “Recite again” and “Done”.',
+    ),
+  },
+  {
+    title: 'Reciting with the page hidden',
+    covers: [],
+    routes: ['QuranReader'],
+    text: lines(
+      '- The eye beside the mic (“Hide the page”) covers the words, to recite from memory; the verse markers stay whole. During a take the words appear in place as they are recited.',
+      '- In the bar during a take: “Show the next word” (‹) uncovers one word, “Show the whole ayah” uncovers the ayah, and “Show the page” uncovers everything.',
+      '- When they say something other than the next word, its cover turns red, the word still hidden. It is a hint, never a mark, and never counts; it goes once the word is said or they go back.',
+    ),
+  },
+  {
+    title: 'Takes kept, and past mistakes on the page',
+    covers: ['RMEM-1', 'RMEM-2', 'RMEM-3', 'RMEM-4', 'RMEM-5'],
+    routes: ['QuranReader', 'ActivityDay', 'ActivityAll'],
+    text: lines(
+      '- Every take with Mark mistakes is kept on the account as text (its marks, less those taken off with “Not a mistake”, where it ran, its score and whether the page was hidden), so it follows them to another phone. Never audio: a recording stays on the phone. A take with Recite alone (following, no marks), a failed take, or one whose start was never found keeps nothing.',
+      '- A word missed stays marked until it is said right in 2 takes in a row, on 2 different revision days; wrong again starts the count over. “Words & harakat” never clears a tajweed note, and “Not clear” is never remembered.',
+      '- Outside a take, those words stay marked on the page in a lighter red, amber or violet (one mark a word, its strongest). Not during a take (only that take’s marks show), not on a hidden page, and not with Settings → Recite → “Show past mistakes” off. Tap one for its card: the kind, its place, how often it went wrong, what was expected, its latest takes (“Right” or what was said, page hidden, ▶ their own voice while that take’s recording is on the phone), "Say it right on 2 different days to clear it.", “Hear it” and “Similar phrases”; “See all” lists every take. “Clear now” clears the word at once, with Undo; its history stays, and a later mistake marks it again.',
+      '- With Premium, holding the mic on a page that still has such words adds "Recite your 3 mistakes here" ("Recite your 1 mistake here" for one), under the stretch it covers (e.g. An-Naml, ayahs 23–26): one take from the ayah before the first such word to the last one’s ayah, tajweed notes left out. It stops by itself at the end, and its summary says what those words were last time ("Before: …").',
+      '- A take’s summary says what it cleared ("2 cleared from the page") and, once the passage has two takes or more, “Your progress here” with its trend ("Up from 95.1% on Mon 2 Nov · 6 takes"). That opens “Your progress”: the latest score, a chart of every take of the passage (one that covers at least half of it), “Still to fix here” (a tap shows the word on the page) and “Your takes here”, newest first (a tap opens one on the page).',
+      '- Activity: a day lists its takes in a “Recited” block: the passage, the score, a line (time, mistakes, words cleared, page hidden), the take’s recording and “Show on the page”. “See all” has “Recitations”, with “All takes”, “With mistakes” and “Page hidden”.',
+      '- “Show on the page” opens the reader at the take’s page with only that take’s marks, and a bar: ▶ its recording (while it is on the phone), its time, score and mistakes, and Done. Tap a mark for its card; “Not a mistake” there updates the kept take.',
+    ),
+  },
+  {
+    title: 'Recite and Revo',
+    covers: ['RINS-1'],
+    routes: [],
+    text: lines(
+      '- Revo knows what their takes show: the last 4 weeks’ takes and score, mistakes by kind, words still marked and cleared, the passages that keep slipping, the similar ayahs they went on with, and the latest take. It never hears the audio, and knows only what the checker marked.',
+    ),
+  },
+  {
+    title: 'Gaps (Insights)',
+    covers: ['ACT-28'],
+    routes: ['Activity', 'ActivityDay'],
+    text: lines(
+      '- Activity → “Insights” → “Gaps”, after Consistency: how long they go between revisions, over the Insights range. A revision day has a page revised (a session, pages revised ahead, pages logged as revised elsewhere), on the revision day Activity files it under; reading and memorizing don’t count. Monday then Thursday is a 3-day gap; revising every day leaves none, and one missed day is a 2-day gap.',
+      '- The figure is how long since the last revision (a tap opens that day): a number under 2 weeks, red from 3 days; from 2 weeks words and the date, never red ("Over 3 weeks since your last revision, on 24 Oct"); “Today” once they revised today ("you’re back, after over 3 weeks" after a long gap). Under it a strip of the range: a dot per revision day, each gap of 3 days or more in red with its length (a tap opens the day touched). Then the longest gap (a tap opens the calendar at that month) and how often they usually revise ("Every 2 days").',
+      '- “Days”, at the section’s top right when something is said in weeks or months, shows exact days; it is kept on the phone.',
+      '- "Full revision pushed back 5 days": pages their plan, as it is now, brings round later than it would have, missed in a gap or slid back by a catch-up; the dates say when they would have come round and when they will. "Full revision on schedule" when none are late.',
+      '- Say long lengths as the app does, in weeks or months, and exact days when asked; welcome someone back after a long gap, never scold. Recency only, the same with Smart Tracking on or off.',
+    ),
+  },
+  {
+    title: 'Not possible in Revisely Dev (yet)',
+    covers: [],
+    routes: [],
+    text: lines(
+      '- Recite in a revision session: no, it is in the reader only. Closest: open the pages in the reader (Read tab, or a day’s page in Activity) and recite there.',
+      '- Recite on Android, with the Madani 1441 print, or offline; a teacher hearing the takes: not yet.',
+    ),
+  },
+];
+
+/**
+ * Why a rule can stay out of the guide: each GUIDE_INTERNAL reason starts with one of these and a colon.
+ * Nothing here is something a user sees and could ask about: such a rule goes in the guide (Dev-only ones in the Dev
+ * guide), never here (guide.test.ts).
+ */
+export const GUIDE_INTERNAL_KINDS = [
+  'timing', // when something loads, refreshes or waits
+  'server', // what the server does or repairs on its own
+  'layout', // how the screen is laid out, with nothing to do
+  'owner tool', // the owner's scripts and consoles
+  'signed out', // screens before sign-in: Revo is for signed-in users
+  'superseded', // a feature Revo replaced
+  'prompt', // how Revo itself is asked and told
+] as const;
+
+/** Rules with nothing for a user to ask Revo about, on purpose, and why (a kind from GUIDE_INTERNAL_KINDS first). */
 export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
-  'RMEM-1': 'Recite’s memory is Revisely Dev only (Mark mistakes), not the store app Revo answers for',
-  'RMEM-2': 'Recite’s memory is Revisely Dev only (Mark mistakes), not the store app Revo answers for',
-  'RMEM-3': 'Recite’s memory is Revisely Dev only (Mark mistakes), not the store app Revo answers for',
-  'RMEM-4': 'Recite’s memory is Revisely Dev only (Mark mistakes), not the store app Revo answers for',
-  'RMEM-5': 'Recite’s memory is Revisely Dev only (Mark mistakes), not the store app Revo answers for',
-  'ACT-27': 'Activity refreshes by itself and with a pull; nothing to ask Revo about',
-  'ACT-28': 'Insights’ Gaps is Revisely Dev only until a release opens it; the release adds it to Activity’s section',
-  'NEW-4': 'what waits for the walkthrough; nothing for Revo to explain',
-  'RINS-1': 'Revisely Dev only: Revo’s recitation rules travel with a recitation (recitation.ts RECITATION_SYSTEM), not in the guide every account gets',
-  'ONBOARD-2': 'the server repairs a sign-up stopped half way; nothing to do',
-  'LANG-1': 'the layout follows the app’s language, not the phone’s; nothing for Revo to explain',
-  'SHEET-1': 'one sheet at a time, so the screen under them always takes taps again; nothing for Revo to explain',
-  'SYNC-4': 'a new account loads with no relaunch; nothing to do',
-  'ACCOUNT-2': 'the sign-in screen keeps what was typed after a failed attempt; Revo is for signed-in users',
-  'AUTH-1': 'a passing Google outage at launch keeps the sign-in; nothing to do',
-  'ACCOUNT-3': 'how long Delete account waits for the server; the app says what happened itself',
-  'AUTH-2': 'the sign-in screen says when the phone was signed out; Revo is for signed-in users',
-  'RESET-1': 'the owner’s reset script',
-  'ACT-9': 'when a day’s items load',
-  'ACT-13': 'an add from the day’s + shows there at once, offline too; nothing to ask (the + itself is in Activity’s section)',
-  'COACH-1': 'the Ask coach’s limits (Revo supersedes it)',
-  'COACH-2': 'what the Ask coach is sent',
-  'COACH-3': 'the Ask coach’s model and key',
-  'COACH-4': 'the Ask coach’s opt-in (Revo supersedes it)',
-  'COACH-5': 'the Ask coach’s sheet',
-  'REVO-4': 'the monthly cost cap',
-  'REVO-6': 'Revo’s model, key and logs',
-  'REVO-24': 'the sheet’s layout with the keyboard',
-  'REVO-26': 'how Revo’s context is built',
-  'REVO-27': 'how Revo words its answers (its tone, in the prompt)',
+  'ACT-27': 'timing: Activity refreshes by itself and with a pull; nothing to ask Revo about',
+  'NEW-4': 'timing: what waits for the walkthrough to end; nothing for Revo to explain',
+  'ONBOARD-2': 'server: the server repairs a sign-up stopped half way; nothing to do',
+  'LANG-1': 'layout: the layout follows the app’s language, not the phone’s; nothing for Revo to explain',
+  'SHEET-1': 'layout: one sheet at a time, so the screen under them always takes taps again; nothing for Revo to explain',
+  'SYNC-4': 'timing: a new account loads with no relaunch; nothing to do',
+  'ACCOUNT-2': 'signed out: the sign-in screen keeps what was typed after a failed attempt',
+  'AUTH-1': 'server: a passing Google outage at launch keeps the sign-in; nothing to do',
+  'ACCOUNT-3': 'timing: how long Delete account waits for the server; the app says what happened itself',
+  'AUTH-2': 'signed out: the sign-in screen says when the phone was signed out',
+  'RESET-1': 'owner tool: the owner’s reset script',
+  'ACT-9': 'timing: when a day’s items load',
+  'ACT-13': 'timing: an add from the day’s + shows there at once, offline too (the + itself is in Activity’s section)',
+  'COACH-1': 'superseded: the Ask coach’s limits (Revo supersedes it)',
+  'COACH-2': 'superseded: what the Ask coach is sent',
+  'COACH-3': 'superseded: the Ask coach’s model and key',
+  'COACH-4': 'superseded: the Ask coach’s opt-in (Revo supersedes it)',
+  'COACH-5': 'superseded: the Ask coach’s sheet',
+  'REVO-4': 'server: the monthly cost cap',
+  'REVO-6': 'server: Revo’s model, key and logs',
+  'REVO-24': 'layout: the sheet’s layout with the keyboard',
+  'REVO-26': 'prompt: how Revo’s context is built',
+  'REVO-27': 'prompt: how Revo words its answers (its tone, in the prompt)',
 };
 
 /** The guide as Revo reads it. */
 export const REVO_GUIDE = GUIDE_SECTIONS.map((s) => `### ${s.title}\n${s.text}`).join('\n\n');
+
+/** The Dev guide as Revo reads it. */
+export const DEV_GUIDE = DEV_GUIDE_SECTIONS.map((s) => `### ${s.title}\n${s.text}`).join('\n\n');
+
+/**
+ * The system block sent after the main prompt, only from Revisely Dev (prompt.ts; cached on its own). Every other
+ * request stays exactly as it was, and with it the store's prompt cache and the recorded replies.
+ */
+export const DEV_GUIDE_SYSTEM = [
+  'Revisely Dev:',
+  '- They use Revisely Dev, the test app that installs beside Revisely and gets new features first. Everything in the guide holds there too; the Dev guide below adds what only Revisely Dev has. Answer how, where and why questions about it the same way as from the guide: the answer, then the path once, about 35 words.',
+  '- What the Dev guide says needs a tester account is in their app only when the question says "Tester: yes". For anyone else, say it isn’t in their app yet.',
+  '- Never invent a Dev feature, a button or a path either: what isn’t in the guide or the Dev guide, you aren’t sure exists.',
+  '',
+  '<dev-guide>',
+  DEV_GUIDE,
+  '</dev-guide>',
+].join('\n');
 
 /** What each screen of an `openScreen` action opens, for the prompt (REVO-31). */
 export const SCREEN_HINTS: Readonly<Record<RevoScreen, string>> = {

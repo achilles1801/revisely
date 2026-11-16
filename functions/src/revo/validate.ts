@@ -181,7 +181,9 @@ export function validateContext(v: unknown): RevoContext {
   // `week[].done` come from apps after Nov 7 2026 (lib/todaySnapshot); older apps send without them.
   // `week[].caughtUp`, `week[].ahead`, `week[].started` and `patterns` come from apps after Nov 9 2026 (REVO-40).
   // `recitation` comes only from Revisely Dev apps whose account recites (Nov 2026).
-  keys(c, ['totals', 'today', 'weakPages', 'week', 'streak', 'patterns', 'passages', 'pageNames', 'recitation', 'localTime'], 'context', ['totals', 'today', 'weakPages', 'week']);
+  // `app` ('dev') comes only from Revisely Dev, from Nov 16 2026: its requests carry the Dev guide (guide.ts).
+  keys(c, ['totals', 'today', 'weakPages', 'week', 'streak', 'patterns', 'passages', 'pageNames', 'recitation', 'app', 'localTime'], 'context', ['totals', 'today', 'weakPages', 'week']);
+  if (c.app !== undefined && c.app !== 'dev') fail('context.app');
 
   const t = obj(c.totals, 'context.totals');
   keys(t, REVO_TOTALS, 'context.totals');
@@ -278,6 +280,7 @@ export function validateContext(v: unknown): RevoContext {
     ...(passages ? { passages } : {}),
     ...(pageNames ? { pageNames } : {}),
     ...(recitation ? { recitation } : {}),
+    ...(c.app === 'dev' ? { app: 'dev' as const } : {}),
     localTime: lt,
   };
 }

@@ -7,7 +7,7 @@
 import { MessagesRequest } from '../coach/call';
 import { REVO_MODEL } from '../coach/pricing';
 import { attachedText } from './attachText';
-import { GUIDE_PROMPT, OPEN_SCREEN_ACTION } from './guide';
+import { DEV_GUIDE_SYSTEM, GUIDE_PROMPT, OPEN_SCREEN_ACTION } from './guide';
 import { RECITATION_SYSTEM, recitationText } from './recitation';
 import { REVO_OUTPUT_CONFIG } from './replySchema';
 import { RevoAttachment, RevoContext, RevoPattern, StoredMessage } from './types';
@@ -314,10 +314,13 @@ function alternate(turns: { role: 'user' | 'assistant'; content: string }[], ope
  * Every Revo request: the cached system prompt, the conversation, and structured output, so the
  * reply is the one JSON object the app reads (revo/replySchema.ts; reply.ts still checks it).
  */
-function request(messages: MessagesRequest['messages'], recitation = false): MessagesRequest {
+function request(messages: MessagesRequest['messages'], blocks: { dev?: boolean; recitation?: boolean } = {}): MessagesRequest {
   const system: MessagesRequest['system'] = [{ type: 'text', text: REVO_SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }];
+  // Only from Revisely Dev (the context's `app`): the Dev guide, what only Revisely Dev has (guide.ts). Store requests
+  // never carry it, so they (their cache, and the recorded replies) stay exactly as they were.
+  if (blocks.dev) system.push({ type: 'text', text: DEV_GUIDE_SYSTEM, cache_control: { type: 'ephemeral' } });
   // Revisely Dev's recitation rules, only with a recitation: every other request (and its cache) stays as it was.
-  if (recitation) system.push({ type: 'text', text: RECITATION_SYSTEM, cache_control: { type: 'ephemeral' } });
+  if (blocks.recitation) system.push({ type: 'text', text: RECITATION_SYSTEM, cache_control: { type: 'ephemeral' } });
   return {
     model: REVO_MODEL,
     max_tokens: REVO_MAX_TOKENS,
@@ -363,11 +366,15 @@ export function buildAskRequest(input: AskInput): MessagesRequest {
   parts.push(`Question: ${input.question}`);
   const turns = [...input.history.slice(-REVO_HISTORY).map((m) => historyTurn(m, opts)), { role: 'user' as const, content: parts.join('\n') }];
   const opening = input.chat?.kind === 'review' ? `Day in review (${weekdayOf(input.chat.day)}).` : '(Earlier in this chat.)';
-  return request(alternate(turns, opening), carriesRecitation(input.context, input.attached, input.history.slice(-REVO_HISTORY)));
+  return request(alternate(turns, opening), {
+    dev: input.context.app === 'dev',
+    recitation: carriesRecitation(input.context, input.attached, input.history.slice(-REVO_HISTORY)),
+  });
 }
 
 /** The Messages API body for a day in review. */
 export function buildReviewRequest(input: { day: string; context: RevoContext; memory: readonly string[]; smartTracking?: boolean; tester?: boolean }): MessagesRequest {
   const content = `${contextText(input.day, input.context, input.memory, { smartTracking: input.smartTracking, tester: input.tester })}\nWrite the day in review for this revision day.`;
-  return request([{ role: 'user', content }], carriesRecitation(input.context, []));
+  // A day in review answers no how-to question, so it never needs the Dev guide.
+  return request([{ role: 'user', content }], { recitation: carriesRecitation(input.context, []) });
 }
