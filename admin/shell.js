@@ -5,6 +5,7 @@ import { boot, currentUser, onUserChange, signInUrl, signOutNow } from '/firebas
 import { metricsShown, refreshMetrics, startMetrics } from '/console.js';
 import * as openDoor from '/opendoor.js';
 import * as auditLog from '/audit.js';
+import * as staffPage from '/staff.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -12,6 +13,7 @@ const VIEWS = {
   overview: { path: '/', permission: 'metrics.read', section: 'view-overview', wide: false },
   opendoor: { path: '/open-door', permission: 'openDoor.read', section: 'view-opendoor', wide: true },
   audit: { path: '/audit', permission: 'audit.read', section: 'view-audit', wide: true },
+  staff: { path: '/staff', permission: 'roles.manage', section: 'view-staff', wide: true },
 };
 
 let ctx = null;
@@ -26,6 +28,7 @@ function allowed(view) {
 function viewOf(path) {
   if (path === '/open-door' || path.startsWith('/open-door/')) return 'opendoor';
   if (path === '/audit') return 'audit';
+  if (path === '/staff') return 'staff';
   return 'overview';
 }
 
@@ -53,7 +56,7 @@ function route() {
     $('asof').hidden = view !== 'overview';
     $('refreshBtn').hidden = view !== 'overview';
     current = view;
-    document.title = { overview: 'Overview', opendoor: 'Open Door', audit: 'Audit log' }[view] + ' · Revisely Console';
+    document.title = { overview: 'Overview', opendoor: 'Open Door', audit: 'Audit log', staff: 'Staff' }[view] + ' · Revisely Console';
   }
   if (view === 'overview') {
     if (!started.has(view)) startMetrics(ctx);
@@ -64,6 +67,9 @@ function route() {
   } else if (view === 'audit') {
     if (!started.has(view)) auditLog.start(ctx);
     auditLog.shown();
+  } else if (view === 'staff') {
+    if (!started.has(view)) staffPage.start(ctx);
+    staffPage.shown();
   }
   started.add(view);
 }

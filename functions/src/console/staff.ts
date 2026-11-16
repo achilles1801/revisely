@@ -1,6 +1,7 @@
 /**
  * Giving and taking console roles (roles.ts), with each change in the audit log. Used by
- * functions/scripts/set-role.js today and by an owner-only page later, so both write the same record.
+ * functions/scripts/set-role.js and by the console's owner-only Staff page (adminConsole staff.*), so both write the
+ * same record.
  *
  *   consoleAudit/<id>  { kind: 'role', uid, email, from, to, at, by: { uid, email, via } }   closed to clients
  *
@@ -71,9 +72,40 @@ export async function setRole(
   return roleChangeFrom(ref.id, change);
 }
 
-/** Every account with a role (a scan of Firebase Auth: fine for a script, not for a page). */
-export async function staff(auth: Auth): Promise<{ uid: string; email: string | null; role: Role }[]> {
-  const out: { uid: string; email: string | null; role: Role }[] = [];
+export interface StaffMember {
+  uid: string;
+  email: string | null;
+  role: Role;
+}
+
+/**
+ * Whether `caller` may move `target` from `from` to `to` (the console's Staff page; set-role.js keeps the same
+ * last-owner rule). Nobody changes their own role, the App Review account never gets one, and the last owner stays.
+ * Returns the refusal's words, or null. Two owners demoting each other at the same moment could both pass; the script
+ * (with a service-account key) can always put an owner back.
+ */
+export function roleChangeRefusal(opts: {
+  callerUid: string;
+  targetUid: string;
+  targetEmail: string | null;
+  from: Role | null;
+  to: Role | null;
+  owners: number;
+  protectedEmails: readonly string[];
+}): { code: 'failed-precondition' | 'permission-denied'; message: string } | null {
+  if (opts.callerUid === opts.targetUid) return { code: 'failed-precondition', message: 'You can’t change your own role. Another owner can.' };
+  if (opts.targetEmail && opts.protectedEmails.includes(opts.targetEmail.toLowerCase())) {
+    return { code: 'permission-denied', message: 'Leave the App Review account alone.' };
+  }
+  if (opts.from === 'owner' && opts.to !== 'owner' && opts.owners <= 1) {
+    return { code: 'failed-precondition', message: 'This is the last owner. Give another account owner first.' };
+  }
+  return null;
+}
+
+/** Every account with a role (a scan of Firebase Auth: fine while there are a few thousand accounts). */
+export async function staff(auth: Auth): Promise<StaffMember[]> {
+  const out: StaffMember[] = [];
   let token: string | undefined;
   do {
     const page = await auth.listUsers(1000, token);

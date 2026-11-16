@@ -9,7 +9,7 @@ import { getAuth } from 'firebase-admin/auth';
 import { Firestore, Timestamp, getFirestore } from 'firebase-admin/firestore';
 import { AccountInfo, ConsoleDeps, handleAdminConsole } from '../console/handler';
 import { roleOf } from '../console/roles';
-import { rolesPage, setRole } from '../console/staff';
+import { rolesPage, setRole, staff } from '../console/staff';
 import { applicationFrom, deleteSupportData, entitlementsFrom } from '../support/admin';
 import { REAPPLY_AFTER_DAYS, SupportError, stateOf } from '../support/logic';
 import {
@@ -175,6 +175,8 @@ const BY: Reviewer = { uid: 'staff1', email: 'owner@example.com', role: 'owner',
       accounts: async (uids) => new Map(uids.map((uid) => [uid, accounts[uid] ?? { uid, exists: false, email: null, emailHidden: false, providers: [], createdAt: null, lastSignInAt: null, disabled: false }])),
       accountByEmail: async (email) => Object.values(accounts).find((a) => a.email === email) ?? null,
       hasPlan: async (uid) => uid === 'c1',
+      staff: () => staff(getAuth(app)),
+      setRole: (uid, role, by) => setRole(getAuth(app), db, uid, role, by),
       programOpen: true,
       project: PROJECT,
       now: () => NOW,
