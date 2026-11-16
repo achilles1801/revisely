@@ -324,7 +324,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
 export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
   {
     title: 'Recite and Mark mistakes',
-    covers: [],
+    covers: ['RECITE-1', 'RECITE-5'],
     routes: ['QuranReader', 'Settings'],
     text: lines(
       '- Who has it: Revisely Dev, a tester account ("Tester: yes"), an iPhone and the Madani 1405 mushaf (Settings → Mushaf → “Mushaf”). The reader’s bar then has an eye and a mic in place of the record button. On Android or with the 1441 print it is the usual record button. It needs the internet: the checking runs on Revisely’s server.',
@@ -339,7 +339,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'Marks and the take’s summary',
-    covers: [],
+    covers: ['RECITE-2', 'RECITE-3', 'RECITE-4', 'RECITE-7'],
     routes: ['QuranReader'],
     text: lines(
       '- Mistakes are highlights behind the word, three colours: red for a wrong, skipped or extra word (an extra word marks the word before it); amber for a haraka or letter slip, and for “Not clear”; violet for a tajweed note (“Strict” only).',
@@ -351,7 +351,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'Reciting with the page hidden',
-    covers: [],
+    covers: ['RECITE-6'],
     routes: ['QuranReader'],
     text: lines(
       '- The eye beside the mic (“Hide the page”) covers the words, to recite from memory; the verse markers stay whole. During a take the words appear in place as they are recited.',
@@ -362,7 +362,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'Test me',
-    covers: [],
+    covers: ['RECITE-8'],
     routes: ['QuranReader'],
     text: lines(
       '- Hold the mic → “Test me” (“A random place in what you’ve memorized”), part of Premium like Mark mistakes; with nothing memorized it says “Mark what you’ve memorized first”. Then: “Everything you’ve memorized”, or one juz of it.',

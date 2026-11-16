@@ -5,7 +5,7 @@ import type { Rect } from '../../lib/ayahBounds';
 import type { QuranWords } from '../../lib/recite/quranWords';
 import type { WordFollow } from '../../lib/recite/hiddenPage';
 import type { Mark, MarkGroup } from '../../lib/reciteLive/contract';
-import { GROUP_RANK, markGroup } from '../../lib/reciteLive/contract';
+import { markGroup, strongestByWord } from '../../lib/reciteLive/contract';
 import { markTitle } from '../../lib/reciteLive/describe';
 import { currentLineBand, cursorBox, markBox, markHighlight, offBox, wordBox } from '../../lib/reciteLive/geometry';
 
@@ -49,12 +49,7 @@ export function LiveUnderlay({
   const here = cursor != null && words.pageOf(cursor) === page;
   const line = here && !hidden ? currentLineBand(words, page, cursor) : null;
   // One highlight per word: its strongest mark (a word mistake over a slip over a tajweed note).
-  const byWord = new Map<number, Mark>();
-  for (const m of marks) {
-    if (words.pageOf(m.w) !== page) continue;
-    const had = byWord.get(m.w);
-    if (!had || GROUP_RANK[markGroup(m)] > GROUP_RANK[markGroup(had)]) byWord.set(m.w, m);
-  }
+  const byWord = strongestByWord(marks.filter((m) => words.pageOf(m.w) === page));
   const picked = selected && words.pageOf(selected.w) === page ? selected : null;
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill} testID={`live-underlay-${page}`}>

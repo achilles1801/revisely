@@ -338,6 +338,45 @@ has them; Revisely Dev's Revo knows them from its Dev guide.
   the same with Smart Tracking on or off (ACT-19). (Majd, Nov 16
   2026: "being able to click on a page or surah or juz or hizb and seeing the last time u revised it".)
 
+## Recite (Revisely Dev)
+
+The reader's mic follows the reciter on the page and, with Mark mistakes, marks their mistakes as they recite (Majd,
+Nov 11–16 2026). The checking runs on Revisely's checker (Cloud Run); these rules are what the app shows of what it says.
+
+- **RECITE-1.** A take starts anywhere on the page, or anywhere in the Qur'an. Until the checker has found where the
+  reciter is, the take shows nothing of them: no band on the line, no box on a word ("Listening…"). The first place
+  found is where the take started, and nothing before it is ever marked skipped, during the take or in its summary.
+  Turning the page by hand during a take looks for the reciter on that page, keeping what was already decided. A take
+  whose start is never found ends with nothing: no summary, no score, and nothing kept.
+- **RECITE-2.** With Mark mistakes, a take marks a word said wrong, skipped or added, and a slip in a word's harakat
+  or letters; with Strict, tajweed notes too. The score is the share of the words reached said right, and a tajweed
+  note never counts against it. A word with several marks shows its strongest: a word mistake, then a slip, then a
+  tajweed note. The marks are highlights in three colours: red for words, amber for harakat and letters (and Not
+  clear), violet for tajweed.
+- **RECITE-3.** A haraka or letter the checker couldn't hear clearly enough to judge is "Not clear", never wrong: it
+  never counts in the score, whether or not the checker left it out of its own count.
+- **RECITE-4.** "Not a mistake" takes a mark off at once, with what it counted in the score; Undo, or the summary's
+  Put back, brings it back as it was, its count too. A mark taken off stays off whatever the checker sends again,
+  during the take or in its final answer.
+- **RECITE-5.** A take whose connection drops and comes back shows the same take: its start, the words recited, its
+  marks and its score. Anything the checker sends again changes none of them. (The hidden view's red cover, a hint,
+  may show again on the next word until it is reached.)
+- **RECITE-6.** With the page hidden, the words show as they are recited, from where the take started. ‹ shows the
+  next hidden word and ‹‹ the rest of its ayah: a word shown by hand is peeked, never counts in the score, and its
+  ayah joins Recite the mistakes again. While something else is said where the next word goes, that word's cover
+  turns red. It goes once the word is reached or said, the reciter goes back, or a mark lands on it (or an extra word
+  just before it); it is never a mark and never counts.
+- **RECITE-7.** Recite the mistakes again is one take over the stretch from the ayah before the first mistake (in its
+  surah) to the last mistake's ayah. Tajweed notes are left out, and peeked ayahs are in. It stops by itself once
+  that ayah's last word is decided. Holding the mic on a page that still has remembered mistakes offers the same
+  stretch over them ("Recite your N mistakes here"), one each per word.
+- **RECITE-8.** Test me picks up to five places at random in what the account has memorized, or in one juz of it,
+  no two sharing an ayah. Each starts in an ayah long enough to go on after its first two words, which are all the
+  hidden page shows. Its take covers that ayah and up to two more memorized ayahs of the same surah, and stops at
+  their end. A place is clean when it reached the end with no mistake and nothing peeked; peeks make it "helped".
+  Tajweed notes and Not clear never count against it, and a place whose start was never found counts as not
+  continued.
+
 ## Recite insights (Revisely Dev)
 
 What a user's takes with Mark mistakes show over time, and Revo knowing it (Majd, Nov 16 2026).

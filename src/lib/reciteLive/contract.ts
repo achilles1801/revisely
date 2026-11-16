@@ -325,6 +325,16 @@ export function markGroup(mark: Pick<Mark, 'kind'>): MarkGroup {
 /** Which of a word's marks shows when it has several: a word mistake over a slip over a tajweed note. */
 export const GROUP_RANK: Record<MarkGroup, number> = { tajweed: 0, slip: 1, word: 2 };
 
+/** One highlight per word: its strongest mark, a word mistake over a slip over a tajweed note (RECITE-2). */
+export function strongestByWord(marks: readonly Mark[]): Map<number, Mark> {
+  const byWord = new Map<number, Mark>();
+  for (const m of marks) {
+    const had = byWord.get(m.w);
+    if (!had || GROUP_RANK[markGroup(m)] > GROUP_RANK[markGroup(had)]) byWord.set(m.w, m);
+  }
+  return byWord;
+}
+
 /** Marks the checker's `mistakes` has counted (everything but tajweed notes; "not clear" ones too, until `unclear`). */
 export const countsAsMistake = (mark: Pick<Mark, 'kind'>) => mark.kind !== 'tajweed';
 
