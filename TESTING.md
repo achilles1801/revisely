@@ -130,8 +130,9 @@ passed 06 once in the smoke set, and broke 06 on develop for everyone.
   runs nightly and on PRs into main. macOS runners are five at a time: on Nov 16 2026, every iOS flow
   twice for #627 (an `e2e.yml` change) held a runner for over six hours, and Recite PRs that each
   edited flow 18 ran 02 04 05 06 18 on iOS in three jobs, until 24 iOS jobs waited for up to 2.5 hours.
-- **The jobs:** four flows or fewer run in one job a platform (the four slowest, with a retry, fit
-  its limit); more run in the full run's jobs, each keeping only the flows touched
+- **The jobs:** five flows or fewer run in one job a platform, in the full run's order with 10 first
+  (the five slowest, with a retry, fit its limit); more run in the full run's jobs, each keeping only
+  the flows touched
   (`scripts/e2e/__tests__/shards.test.js`). Two jobs didn't: #574 touched 21 flows through
   `signup.yaml`, and its iOS job of 11 ran out of time with every flow passing (run 43706009559).
   A run with one iOS job has no separate `ios-build` job (a second wait in the macOS queue): the job

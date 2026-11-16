@@ -185,9 +185,9 @@ jobs:
           smoke_ios='[{"name":"smoke: 02 04 05 06","flows":".maestro/flows/0[2456]-*.yaml"}]'
           build='[{"name":"native build","flows":""}]'
           # A change to shared test code (CI's plan): the flows it touches, or every flow, once with a
-          # retry. Four flows or fewer: one job (the four slowest with a retry fit its limit on either
-          # platform; the smoke set, which a workflow change runs on iOS, is one macOS job). More: the
-          # full run's jobs, each keeping only the
+          # retry. Five flows or fewer: one job, in the full run's order with 10 first (the five slowest
+          # with a retry fit its limit on either platform; the smoke set, and the smoke set with the flow
+          # a PR edits, are one macOS job). More: the full run's jobs, each keeping only the
           # flows touched, in its order (10 before the 09 seeds), so each fits its limit as the full
           # job does (shards.test.js checks both, running this). Splitting them into two jobs didn't
           # fit: #574 touched 21 flows through signup.yaml, and its iOS job of 11 needed about 200 of
@@ -195,13 +195,12 @@ jobs:
           # shards test fails on one) gets a job of its own rather than none.
           infra_jq='
             ($f | split(" ") | map(select(. != ""))) as $all
-            | (if ($all | length) <= 4 then [$all]
-               else [$full[] | [.flows | split(" ") | .[] | select(. != "")
-                       | ("^" + (gsub("\\."; "\\.") | gsub("\\*"; "[^/]*") | gsub("\\?"; "[^/]")) + "$") as $re
-                       | $all[] | select(test($re))]
-                     | select(length > 0)]
-                 | . + ([$all - flatten] | map(select(length > 0)))
-               end)
+            | [$full[] | [.flows | split(" ") | .[] | select(. != "")
+                 | ("^" + (gsub("\\."; "\\.") | gsub("\\*"; "[^/]*") | gsub("\\?"; "[^/]")) + "$") as $re
+                 | $all[] | select(test($re))]
+               | select(length > 0)]
+            | . + ([$all - flatten] | map(select(length > 0)))
+            | (if ($all | length) <= 5 then [flatten | map(select(test("/10-"))) + map(select(test("/10-") | not))] else . end)
             | map({name: ("changed: " + (map(split("/") | last | split("-") | first) | join(" "))), flows: join(" ")})'
           if [ "$INFRA_ONLY" = all ]; then infra="$full"
           else infra=$(jq -cn --arg f "$INFRA_ONLY" --argjson full "$full" "$infra_jq"); fi

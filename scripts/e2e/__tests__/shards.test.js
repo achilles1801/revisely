@@ -176,28 +176,40 @@ describe('the jobs for a change to shared test code', () => {
     return jobs;
   }
 
-  it('runs four flows or fewer in one job, inside its limit even for the four slowest', () => {
-    const four = flows.slice(0, 4);
-    expect(infraJobs(four)).toEqual([four]);
+  it("runs five flows or fewer in one job, in the full run's order with 10 first, inside its limit even for the five slowest", () => {
+    const five = flows.slice(0, 5);
+    const [job] = infraJobs(five);
+    expect(infraJobs(five)).toHaveLength(1);
+    expect([...job].sort()).toEqual([...five].sort());
+    const order = fullJobs().flatMap(flowsOf);
+    expect(job).toEqual([...five].sort((a, b) => order.indexOf(a) - order.indexOf(b)));
     expect(infraJobs(flows.slice(5, 6))).toEqual([flows.slice(5, 6)]);
+    // 10 deletes its account: after the 09 seeds it took past the app's 30 s (#217), so it goes first.
+    const seeds = flows.filter((f) => /\/(09-activity|09-insights|10-)/.test(f));
+    expect(seeds.length).toBeLessThanOrEqual(5);
+    expect(short(infraJobs([...seeds].reverse())[0][0])).toBe('10');
     for (const platform of ['ios', 'android']) {
-      const each = [...flows].map((f) => minutes[platform][base(f)]).sort((a, b) => b - a).slice(0, 4);
+      const each = [...flows].map((f) => minutes[platform][base(f)]).sort((a, b) => b - a).slice(0, 5);
       const total = OVERHEAD[platform] + each.reduce((a, b) => a + b, 0) + each[0];
       expect({ platform, total, fits: total <= limit(platform) }).toEqual({ platform, total, fits: true });
     }
   });
 
   // A change to the workflows runs the smoke set on iOS (affected-flows.js): one macOS job, not three.
-  it('runs the smoke set in one job', () => {
+  // With a flow the same PR edits (18), still one.
+  it('runs the smoke set in one job, and the smoke set with one more flow', () => {
     const smoke = affected(['.github/workflows/e2e.yml']).ios;
     expect(smoke.map(short)).toEqual(['02', '04', '05', '06']);
-    expect(infraJobs(smoke)).toEqual([smoke]);
+    expect(infraJobs(smoke)).toHaveLength(1);
+    const withEighteen = affected(['.github/workflows/e2e.yml', '.maestro/flows/18-recite-live.yaml']).ios;
+    expect(withEighteen.map(short)).toEqual(['02', '04', '05', '06', '18']);
+    expect(infraJobs(withEighteen)).toHaveLength(1);
   });
 
   it('runs more in the full jobs, keeping only the flows touched, each job inside its limit', () => {
     expect(check(flows)).toEqual(fullJobs().map(flowsOf));
     check(flows.filter((_, i) => i % 3 !== 0));
-    check(flows.slice(0, 5));
+    check(flows.slice(0, 6));
   });
 
   it("fits the flows the sign-up's subflows touch (#574)", () => {
