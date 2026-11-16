@@ -335,6 +335,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
       '- Settings → Recite: “Mistakes to mark”: “Words & harakat” (wrong, skipped and added words, letter and haraka slips) or “Strict” (the same, and tajweed: madd lengths, qalqalah, ghunnah, ikhfa, idgham, iqlab), where “Madd munfasil”, “Madd muttasil” and “Madd ʿarid” set the lengths. “Save recordings when you recite” keeps a take’s audio on this phone, with the recordings in Activity.',
       '- Since mid-November 2026, “Words & harakat” and Recite listen with a newer model: it marks recitation that was right less often, especially with noise in the background, and catches word slips (a skipped, changed or added word) about as before. Small haraka or letter slips are marked a little less often, and "You continued with …" shows for fewer slips. “Strict” is unchanged.',
       '- It is AI and can make mistakes (Settings → About → “Recitation check notice”). Software checks the recitation; nobody listens. Settings → Testing → “Keep my recitations as test data” keeps takes for Revisely’s tests.',
+      '- Help: the reader’s ? (top right) leads to Recite’s own sheets, “How Recite works”, “During a take”, “Your past mistakes” and “Test me and voice search”; during a take it opens “How Recite works”. A day’s ? leads to “Your past mistakes”, and Insights’ to “More in Insights” (Gaps, Last revised, Recitation).',
     ),
   },
   {

@@ -47,6 +47,25 @@
   "recite.marks": {},
   "recite.card": {},
   "recite.after": {},
+  "reciteTake.page": {},
+  "reciteTake.hidden": {},
+  "reciteTake.peeked": {},
+  "reciteTake.pause": {},
+  "reciteMemory.page": {
+    "RMEM-2": "d901ff9d17f10a8e",
+    "RMEM-3": "7cf8886140fe4b7e"
+  },
+  "reciteMemory.drill": {},
+  "reciteMemory.progress": {
+    "RMEM-4": "a81a2f21197bbc1e"
+  },
+  "reciteMemory.activity": {
+    "RMEM-5": "76cd61ef1fbd37b3",
+    "RINS-3": "2072221743aa2f49"
+  },
+  "reciteTest.start": {},
+  "reciteTest.result": {},
+  "reciteTest.search": {},
   "schedule.cycle": {
     "SCHED-1": "e34c5d66002488e4",
     "SCHED-3": "29523ed2e8b9d054",
@@ -81,6 +100,9 @@
     "ACT-5": "492efd0797908129",
     "ACT-17": "62b54494328e1e9d"
   },
+  "activity.sections": {
+    "ACT-29": "ca708b3266119b71"
+  },
   "insights.coverage": {
     "ACT-4": "9105a4f613b7539e",
     "ACT-21": "b309872a5b9f1cb8",
@@ -100,6 +122,18 @@
   "insights.pace": {
     "ACT-4": "9105a4f613b7539e",
     "ACT-23": "bc761a4eb1d943b5"
+  },
+  "insightsMore.gaps": {
+    "ACT-28": "b79477dba3d7b077"
+  },
+  "insightsMore.lastRevised": {
+    "ACT-30": "1afb8509460457f9"
+  },
+  "insightsMore.recitation": {
+    "RINS-2": "827aac3517cdb95d"
+  },
+  "insightsMore.sections": {
+    "ACT-29": "ca708b3266119b71"
   },
   "day.change": {
     "ACT-6": "68186ff52bb557fb",
