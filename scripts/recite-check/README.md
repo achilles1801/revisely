@@ -149,6 +149,18 @@ from the first word of `s:a` through the end of `startBy`.
   - The server says 6 only when `live.LiveSession` takes `start_by` (`protocol()`). Until the follower has it, the
     server says 5 and ignores `startBy`, whichever of the two is deployed first.
 - **Kept takes.** The kept take's request records `startBy`.
+
+**Anywhere in the Qur'an** (Majd approved step 2, Nov 16 2026; protocol 7; recite-contract.md, draft 7).
+- `"startIn":"quran"` beside `startBy`: the page is searched first, as above. If it hasn't locked, the follower also
+  searches the whole Qur'an, and locks only on a place that is unique and held. `locked` then carries
+  `"where":"quran"` (else `"page"`).
+- The server passes it on only with `startBy`, and `startBy` keeps its 400-word check (it limits the page, never the
+  Qur'an-wide search). The kept take's request records `startIn`.
+- The server says 7 only when `live.LiveSession` takes `start_in`. With `start_by` alone it says 6 and ignores
+  `startIn`.
+- **The cost** is `ms.search_quran`, and the health line has `search_quran_per_s`, `start: "quran"` and `where`. The
+  search runs at most every 2 s, in the first 10 s of speech, and stops at 30 s (live.py `QURAN_*`). The index is in
+  the word table (`make_words.py --merge`, `table['quran']`, about 4 MB), so it comes with the image.
 - **The search is the model session's** (`live.py`, `start_by=(sura, ayah)`).
 - **Measuring it:** `cut_take.py` cuts a public bench take to begin at an ayah mid-page, and `live_e2e.py --page
   S:A-S:A` sends it with the page's range and reports where and how soon it locked.
