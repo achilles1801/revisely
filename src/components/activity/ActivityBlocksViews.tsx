@@ -358,8 +358,11 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
             visible={editing === 'insights'}
             onClose={() => setEditing(null)}
             layout={sections.insights}
-            // Recitation only for an account that recites; Weak spots with Smart Tracking off is its invite.
-            has={(id: InsightsSection) => id !== 'recitation' || (recitation != null && onOpenAyahs != null)}
+            // Recitation only for an account that recites, Gaps where it is open; Weak spots with Smart Tracking off
+            // is its invite.
+            has={(id: InsightsSection) =>
+              id === 'recitation' ? recitation != null && onOpenAyahs != null : id === 'gaps' ? gapsOn : true
+            }
             notes={smartTrackingOn(user) ? {} : { weak: 'Smart Tracking is off' }}
           />
         </>

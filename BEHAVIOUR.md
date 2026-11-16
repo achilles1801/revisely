@@ -658,8 +658,9 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   of the tabs row) opens the tab's sections, each with a switch to show or hide it; holding a section (350 ms,
   still) lifts it to drag to another place, and VoiceOver has Move up and Move down. Every change shows at once.
   Overview's month header stays on top; under it the month's totals, the calendar (always shown), its key and the
-  picked day's summary. Insights: Coverage, Consistency, Weak spots (its Smart Tracking invite when that is off),
-  Recitation (for an account that recites), Memorization, Pace. A section the account can't have keeps its place;
+  picked day's summary. Insights: Coverage, Consistency, Gaps (where it is open, ACT-28), Weak spots (its Smart
+  Tracking invite when that is off), Recitation (for an account that recites), Memorization, Pace; a section added
+  later comes in after the one it follows in the usual order. A section the account can't have keeps its place;
   the first one shown has no hairline above it; with every Insights section hidden, one line says so with Edit
   sections. The layout is kept per account on the phone, never on the account; another account, or a new one,
   starts with the usual layout, which "Show all, in the usual order" brings back. Everyone else keeps the usual

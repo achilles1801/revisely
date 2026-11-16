@@ -63,6 +63,7 @@ import {
 import { PaceSheet } from './PaceSheet';
 import { GapsSection } from './GapsSection';
 import type { PushBack } from '../../lib/gapsCycle';
+import { gapsView } from '../../lib/insightsGaps';
 import { RecitationInsights } from './RecitationInsights';
 import { FirstSection, useFirstSection } from './sectionPlace';
 import { DEFAULT_SECTIONS, sectionsToShow, type InsightsSection, type TabLayout } from '../../lib/activitySections';
@@ -206,6 +207,13 @@ export function InsightsView({
   const span = rangeSpan(data.range ?? 30, data.today, data.firstDay);
   const hasPace =
     paceView({ revised: data.revised.filter((r) => r.day === r.countsFor), read: data.read, today: data.today, capacity: data.capacity, window: span.window }) != null;
+  // Gaps: for the accounts it is open to, once anything was revised (ACT-28).
+  const hasGaps = useMemo(
+    () =>
+      data.gaps === true &&
+      gapsView({ revised: data.revised, today: data.today, window: span.window, firstDay: data.firstDay, knownSince: data.itemsFrom, lastRevisedOn: data.lastRevisedOn }) != null,
+    [data.gaps, data.revised, data.today, span.window, data.firstDay, data.itemsFrom, data.lastRevisedOn],
+  );
   const has = (id: InsightsSection) =>
     id === 'weak'
       ? data.smartTracking !== false || onTurnOnSmartTracking != null
@@ -213,7 +221,9 @@ export function InsightsView({
         ? data.recitation != null && onOpenAyahs != null
         : id === 'pace'
           ? hasPace
-          : true;
+          : id === 'gaps'
+            ? hasGaps
+            : true;
   const shown = sectionsToShow(sections, has);
   const part = (id: InsightsSection): React.ReactNode => {
     switch (id) {
@@ -221,6 +231,23 @@ export function InsightsView({
         return <Coverage data={data} onPlanIt={onPlanIt} onAddToPlan={onAddToPlan} onOpenJuz={openJuz} onOpenPage={onOpenPage} />;
       case 'consistency':
         return <Consistency data={data} onOpenDay={onOpenDay} onOpenCalendar={onOpenCalendar} />;
+      case 'gaps':
+        return data.gaps ? (
+          <GapsSection
+            revised={data.revised}
+            today={data.today}
+            window={span.window}
+            inWords={span.inWords}
+            lastWords={span.lastWords}
+            all={span.all}
+            firstDay={data.firstDay}
+            knownSince={data.itemsFrom}
+            lastRevisedOn={data.lastRevisedOn}
+            onOpenDay={onOpenDay}
+            onOpenCalendar={onOpenCalendar}
+            pushBack={data.pushBack}
+          />
+        ) : null;
       case 'weak':
         return data.smartTracking !== false ? (
           <WeakSpots data={data} onReviseTomorrow={onReviseTomorrow} onOpenPage={onOpenPage} onSeeAllPages={onSeeAllPages} />

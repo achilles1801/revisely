@@ -9,6 +9,7 @@ import { State } from 'react-native-gesture-handler';
 import { fireGestureHandler, getByGestureTestId } from 'react-native-gesture-handler/jest-utils';
 import { ActivityBlocksViews } from '../../../src/components/activity/ActivityBlocksViews';
 import { loadActivitySections } from '../../../src/lib/activitySections';
+import Constants from 'expo-constants';
 
 const TODAY = '2026-11-05';
 jest.mock('react-native-reanimated', () => ({
@@ -62,6 +63,7 @@ const TESTER = { id: 'tester-1', previewTester: true, smartTrackingEnabled: true
 const INSIGHTS_IDS: Record<string, string> = {
   'insights-coverage': 'coverage',
   'insights-consistency': 'consistency',
+  'insights-gaps': 'gaps',
   'insights-weak-spots': 'weak',
   'insights-smart-tracking': 'weak',
   'insights-memorization': 'memorization',
@@ -184,7 +186,8 @@ describe('Activity’s sections', () => {
     });
     await done();
     expect(order(INSIGHTS_IDS)).toEqual(['consistency', 'weak', 'coverage', 'memorization', 'pace']);
-    expect((await stored()).insights.order.slice(0, 3)).toEqual(['consistency', 'weak', 'coverage']);
+    // Gaps (Revisely Dev only) keeps its slot in what is stored, though this account doesn't have it.
+    expect((await stored()).insights.order.slice(0, 4)).toEqual(['consistency', 'gaps', 'weak', 'coverage']);
     const border = (testID: string) =>
       [screen.getByTestId(testID).props.style].flat(Infinity).reduce((w: number, s: { borderTopWidth?: number } | false | null) => (s && s.borderTopWidth) || w, 0);
     expect(border('insights-consistency')).toBe(0);
@@ -200,7 +203,8 @@ describe('Activity’s sections', () => {
     expect(row('coverage').props.accessibilityRole).toBe('switch');
     expect(row('coverage').props.accessibilityState).toEqual({ checked: true });
     expect(row('coverage').props.accessibilityActions.map((a: { name: string }) => a.name)).toEqual(['activate', 'moveDown']);
-    // Five rows: no Recitation for an account without a take.
+    // Five rows: no Recitation for an account without a take, and no Gaps outside Revisely Dev (ACT-28).
+    expect(screen.queryByTestId('sections-item-gaps')).toBeNull();
     expect(screen.queryByTestId('sections-item-recitation')).toBeNull();
     expect(row('pace').props.accessibilityActions.map((a: { name: string }) => a.name)).toEqual(['activate', 'moveUp']);
     fireEvent(row('pace'), 'accessibilityAction', { nativeEvent: { actionName: 'moveUp' } });
@@ -272,6 +276,38 @@ describe('Activity’s sections', () => {
     // No Recitation row for an account without a take.
     expect(screen.queryByTestId('sections-row-recitation')).toBeNull();
     await done();
+  });
+
+  it('[ACT-29] [ACT-28] in Revisely Dev Gaps is one of the sections: after Consistency, hidden and moved like the rest', async () => {
+    const extra = (Constants.expoConfig ?? { extra: {} }).extra as Record<string, unknown>;
+    const before = extra.variant;
+    extra.variant = 'dev';
+    try {
+      // A layout saved before Gaps came: it comes in after Consistency.
+      await AsyncStorage.setItem(`@revisely_activity_sections:v1:${TESTER.id}`, JSON.stringify({ insights: { order: ['consistency', 'coverage', 'weak', 'recitation', 'memorization', 'pace'], hidden: [] } }));
+      open();
+      await toInsights();
+      expect(order(INSIGHTS_IDS)).toEqual(['consistency', 'gaps', 'coverage', 'weak', 'memorization', 'pace']);
+      const border = (testID: string) =>
+        [screen.getByTestId(testID).props.style].flat(Infinity).reduce((w: number, s: { borderTopWidth?: number } | false | null) => (s && s.borderTopWidth) || w, 0);
+      expect(border('insights-gaps')).toBeGreaterThan(0);
+      await edit();
+      expect(screen.getByTestId('sections-item-gaps').props.accessibilityLabel).toBe('Gaps');
+      // Gaps up to the top, then Consistency off: Gaps is drawn first, with no hairline.
+      fireEvent(screen.getByTestId('sections-item-gaps'), 'accessibilityAction', { nativeEvent: { actionName: 'moveUp' } });
+      tapRow('consistency');
+      await done();
+      expect(order(INSIGHTS_IDS)).toEqual(['gaps', 'coverage', 'weak', 'memorization', 'pace']);
+      expect(border('insights-gaps')).toBe(0);
+      expect((await stored()).insights).toEqual({ order: ['gaps', 'consistency', 'coverage', 'weak', 'recitation', 'memorization', 'pace'], hidden: ['consistency'] });
+      // Hidden, it goes like any section.
+      await edit();
+      tapRow('gaps');
+      await done();
+      expect(order(INSIGHTS_IDS)).toEqual(['coverage', 'weak', 'memorization', 'pace']);
+    } finally {
+      extra.variant = before;
+    }
   });
 
   it('[ACT-29] testers only for now: anyone else has no Edit sections and the usual layout, whatever this phone holds', async () => {

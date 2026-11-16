@@ -205,12 +205,13 @@ describe('Gaps in Insights', () => {
 
   it('comes right after Consistency', () => {
     renderInsights(data);
-    const order = screen
-      .getByTestId('activity-insights')
-      .props.children.flat()
-      .filter((c: unknown) => c && typeof c === 'object')
-      .map((c: { type: { name?: string } }) => c.type?.name ?? '');
-    expect(order.indexOf('GapsSection')).toBe(order.indexOf('Consistency') + 1);
+    // The sections on screen, top to bottom (host views: a component and its view share a testID).
+    const sections = ['insights-coverage', 'insights-consistency', 'insights-gaps', 'insights-smart-tracking', 'insights-weak-spots', 'insights-memorization', 'insights-pace'];
+    const order = screen.UNSAFE_root
+      .findAll((n: { type: unknown; props: { testID?: string } }) => typeof n.type === 'string' && sections.includes(n.props.testID ?? ''))
+      .map((n: { props: { testID?: string } }) => n.props.testID);
+    expect(order.indexOf('insights-consistency')).toBeGreaterThanOrEqual(0);
+    expect(order.indexOf('insights-gaps')).toBe(order.indexOf('insights-consistency') + 1);
     expect(within(screen.getByTestId('insights-gaps')).getByText('6 days')).toBeTruthy();
   });
 

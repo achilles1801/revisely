@@ -15,7 +15,7 @@ export type ActivityTab = 'overview' | 'insights';
 /** Overview under its month header (which stays first): the month's totals, the calendar, its key, the picked day. */
 export const OVERVIEW_SECTIONS = ['totals', 'calendar', 'key', 'day'] as const;
 /** Insights, as the tab shows them. */
-export const INSIGHTS_SECTIONS = ['coverage', 'consistency', 'weak', 'recitation', 'memorization', 'pace'] as const;
+export const INSIGHTS_SECTIONS = ['coverage', 'consistency', 'gaps', 'weak', 'recitation', 'memorization', 'pace'] as const;
 
 export type OverviewSection = (typeof OVERVIEW_SECTIONS)[number];
 export type InsightsSection = (typeof INSIGHTS_SECTIONS)[number];
@@ -38,6 +38,7 @@ export const SECTION_LABELS: { [T in ActivityTab]: Record<SectionId<T>, string> 
   insights: {
     coverage: 'Coverage',
     consistency: 'Consistency',
+    gaps: 'Gaps',
     weak: 'Weak spots',
     recitation: 'Recitation',
     memorization: 'Memorization',
