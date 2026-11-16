@@ -12,7 +12,18 @@ import { appSourceFiles, rawStringsIn, rawStringsUnder, readsAsText } from '../.
 const SRC = path.resolve(__dirname, '../..');
 
 /** Folders and files (relative to src/) whose UI text all comes from src/i18n. */
-const EXTRACTED: string[] = ['components/updates', 'lib/updates'];
+const EXTRACTED: string[] = [
+  'components/help',
+  'components/memorization',
+  'components/mushaf',
+  'components/offline',
+  'components/player',
+  'components/revision',
+  'components/updates',
+  'components/v2',
+  'lib/updates',
+  'navigation',
+];
 
 describe('UI text comes from src/i18n', () => {
   it('reads words as words and ids as ids', () => {

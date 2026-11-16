@@ -7,5 +7,6 @@ type Navigate = (name: string, params: object) => void;
  * to that page if it is (QuranReaderScreen follows a new pageNumber).
  */
 export function openReaderAt(navigation: { navigate: unknown }, verse: VerseKey): void {
+  // i18n-ignore (a route name)
   (navigation.navigate as Navigate)('Read', { screen: 'QuranReader', params: { pageNumber: pageOfVerse(verse) } });
 }

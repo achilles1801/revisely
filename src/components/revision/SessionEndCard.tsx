@@ -7,6 +7,7 @@ import { useReduceMotion } from '../../design/motion';
 import { typeV2 } from '../../theme/v2';
 import { Confetti } from '../v2/Confetti';
 import { PillButton } from '../v2/PillButton';
+import { t } from '../../i18n';
 
 /**
  * After a revision session's last page, as one more page: swiping onto it
@@ -22,7 +23,7 @@ export function SessionEndCard({
   total,
   done,
   celebrate,
-  dayLabel = 'today',
+  forDay,
   what,
   next,
   onKeepGoing,
@@ -32,8 +33,8 @@ export function SessionEndCard({
   done: number;
   /** Goes up each time a swipe finished the session. */
   celebrate: number;
-  /** What this card closes: "today", or the weekday of a day revised ahead. */
-  dayLabel?: string;
+  /** The weekday of a day revised ahead ("Tue"); left out, today. */
+  forDay?: string;
   /** What was revised, by surah or juz (lib/passages): "Al-Mujadila to At-Tahrim", "Juz 28". */
   what?: string;
   /**
@@ -76,7 +77,7 @@ export function SessionEndCard({
           </Reanimated.View>
         ) : null}
         <Text style={[typeV2.title, styles.center, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
-          {complete ? 'Revision complete' : `${done} of ${total} revised`}
+          {complete ? t('revision.end.complete') : t('revision.end.progress', { done, total })}
         </Text>
         {complete && what ? (
           <Text style={[typeV2.body, styles.center, { color: palette.text }]} maxFontSizeMultiplier={1.4} testID="session-end-what">
@@ -85,23 +86,25 @@ export function SessionEndCard({
         ) : null}
         <Text style={[typeV2.body, styles.center, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
           {complete
-            ? `${total} ${total === 1 ? 'page' : 'pages'} revised ${dayLabel}`
-            : 'Swipe back for the pages left.'}
+            ? forDay
+              ? t('revision.end.revisedFor', { count: total, day: forDay })
+              : t('revision.end.revisedToday', { count: total })
+            : t('revision.end.swipeBack')}
         </Text>
       </View>
       {complete && next && onKeepGoing ? (
         <View style={styles.keep}>
           <Text style={[typeV2.meta, styles.center, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
-            {[next.cycle ? 'Next cycle' : `Next: ${next.label}`, next.what, `${next.pages} ${next.pages === 1 ? 'page' : 'pages'}`]
+            {[next.cycle ? t('revision.end.nextCycle') : t('revision.end.next', { day: next.label }), next.what, t('common.pages', { count: next.pages })]
               .filter(Boolean)
               .join(' · ')}
           </Text>
-          <PillButton title="Keep going" onPress={onKeepGoing} testID="session-end-keep-going" />
+          <PillButton title={t('revision.end.keepGoing')} onPress={onKeepGoing} testID="session-end-keep-going" />
         </View>
       ) : null}
       {onListenBack ? (
         <PillButton
-          title="Listen back"
+          title={t('revision.end.listenBack')}
           icon="headset-outline"
           variant="outline"
           onPress={onListenBack}

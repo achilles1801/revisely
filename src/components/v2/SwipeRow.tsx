@@ -9,6 +9,7 @@ import { runOnJS } from "react-native-reanimated";
 import { useTheme } from "../../context/ThemeContext";
 import { useHaptics } from "../../design/haptics";
 import { typeV2 } from "../../theme/v2";
+import { t } from '../../i18n';
 
 /** The width of the red action a row slides open. */
 export const SWIPE_ACTION_WIDTH = 84;
@@ -30,7 +31,7 @@ export function SwipeRow({
   children,
   onDelete,
   onHold,
-  deleteLabel = "Delete",
+  deleteLabel = t('common.delete'),
   actions = [],
   accessibilityLabel,
   accessible = true,

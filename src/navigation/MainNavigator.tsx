@@ -118,7 +118,7 @@ const HIDE_TAB_BAR_ON = new Set([
   'PlanEdit',
   'PlanDayEdit',
   'ActiveRevision',
-  'Memorization',
+  'Memorization', // i18n-ignore (route names)
   'QuranReader',
   'QuranSearch',
   'JournalEntry',
