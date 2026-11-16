@@ -598,10 +598,13 @@ appId: com.revisionbuddy.app
     id: calendar-day-2026-11-14
 - tapOn:
     id: preview-open
+# The block's header, not the block: by now the day holds Test me's takes too, and the block (899pt high on the iOS
+# runner, run 43843930204) is taller than the screen, so the whole of it is never visible.
 - scrollUntilVisible:
     element:
-      id: activity-block-recited
+      id: activity-block-recited-header
     direction: DOWN
+    centerElement: true
     timeout: 15000
 - runFlow:
     file: ../subflows/shot.yaml
