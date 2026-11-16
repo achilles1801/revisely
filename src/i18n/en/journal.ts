@@ -29,6 +29,8 @@ export const journal = {
   offline: { title: "Couldn't load this day's log", body: 'Connect to the internet to see and add to it.' },
   options: 'Options',
   newEntry: 'New entry',
+  /** VoiceOver's hint on the top bar's Done while typing. */
+  keyboardDoneHint: 'Puts the keyboard away',
   /** The composer while a note is edited. */
   editing: { memorization: 'Editing memorization', revision: 'Editing revision', note: 'Editing note' },
   fillFromSession: 'Fill from your session',

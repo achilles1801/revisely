@@ -2,10 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  InputAccessoryView,
   Keyboard,
   Platform,
-  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -52,6 +50,7 @@ import { UndoToast } from '../../components/revision/UndoToast';
 import { parsePageRange } from '../../lib/memorizationLog';
 import { RangePickerSheet } from '../../components/memorization/RangePickerSheet';
 import { describePassage, plainText } from '../../lib/passages';
+import { revealAboveKeyboard } from '../../lib/revealAboveKeyboard';
 import { tagFor } from '../../lib/noteTags';
 import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
 import { useHaptics } from '../../design/haptics';
@@ -137,6 +136,63 @@ export default function JournalEntryScreen() {
   const [editing, setEditing] = useState<{ note: JournalNote; draft: Draft } | null>(null);
   // The note whose ⋯ menu is open.
   const [menuNote, setMenuNote] = useState<JournalNote | null>(null);
+
+  // The keyboard. While it is up for the composer, the top bar has Done, which puts it away: the bar
+  // above the keyboard (InputAccessoryView) didn't show on iOS 26, and a tap outside the field doesn't
+  // blur it in this list, so nothing on screen closed the keyboard. As it opens, the list scrolls once
+  // so the composer's buttons sit above it: on an iPhone SE an edited note's Save was under it (E2E,
+  // Nov 16 2026). Android doesn't resize the window for the keyboard, so the list gets room under it.
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [typing, setTyping] = useState(false);
+  const typingRef = useRef(false);
+  const onFieldFocus = () => {
+    typingRef.current = true;
+    setTyping(true);
+  };
+  const onFieldBlur = () => {
+    typingRef.current = false;
+    setTyping(false);
+  };
+  const listRef = useRef<React.ElementRef<typeof ScrollView>>(null);
+  const composerRef = useRef<View>(null);
+  const actionsRef = useRef<View>(null);
+  const scrollY = useRef(0);
+  const [reveal, setReveal] = useState<{ keyboardTop: number } | null>(null);
+  useEffect(() => {
+    const ios = Platform.OS === 'ios';
+    const subs = [
+      Keyboard.addListener(ios ? 'keyboardWillShow' : 'keyboardDidShow', (e) => setKeyboardHeight(e.endCoordinates.height)),
+      Keyboard.addListener(ios ? 'keyboardWillHide' : 'keyboardDidHide', () => setKeyboardHeight(0)),
+      // Once a keyboard has opened for a composer field: not on every keystroke.
+      Keyboard.addListener('keyboardDidShow', (e) => {
+        if (typingRef.current) setReveal({ keyboardTop: e.endCoordinates.screenY });
+      }),
+    ];
+    return () => subs.forEach((sub) => sub.remove());
+  }, []);
+  // After the render that gave Android its room: the composer's buttons above the keyboard.
+  useEffect(() => {
+    if (!reveal) return;
+    const list = listRef.current;
+    const listView = list?.getNativeScrollRef();
+    const composer = composerRef.current;
+    const actions = actionsRef.current;
+    if (!list || !listView || !composer || !actions) return;
+    actions.measureInWindow((_ax, actionsTop, _aw, actionsHeight) => {
+      composer.measureInWindow((_cx, composerTop) => {
+        listView.measureInWindow((_lx, listTop) => {
+          const y = revealAboveKeyboard({
+            offset: scrollY.current,
+            targetBottom: actionsTop + actionsHeight,
+            blockTop: composerTop,
+            listTop,
+            keyboardTop: reveal.keyboardTop,
+          });
+          if (y != null) list.scrollTo({ y, animated: true });
+        });
+      });
+    });
+  }, [reveal]);
 
   // Reads of the day can overlap (the first load, and one after each outbox
   // change) and answer out of order: a read started before a note reached the
@@ -533,6 +589,22 @@ export default function JournalEntryScreen() {
             </Text>
           </View>
         }
+        right={
+          typing && keyboardHeight > 0 ? (
+            <Tap
+              onPress={() => Keyboard.dismiss()}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.done')}
+              accessibilityHint={t('journal.keyboardDoneHint')}
+              hitSlop={8}
+              testID="journal-keyboard-done"
+            >
+              <Text style={[typeV2.body, styles.done, { color: palette.accentText }]} maxFontSizeMultiplier={1.4}>
+                {t('common.done')}
+              </Text>
+            </Tap>
+          ) : null
+        }
         separator
       />
 
@@ -561,12 +633,19 @@ export default function JournalEntryScreen() {
       ) : (
         // iOS would add the home indicator's inset again: the padding below is the only one.
       <ScrollView
+          ref={listRef}
           style={styles.scroll}
-          contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+          // iOS adds the keyboard's inset itself (automaticallyAdjustKeyboardInsets); Android, whose
+          // window keeps its size, gets the room here.
+          contentContainerStyle={{ paddingBottom: insets.bottom + 24 + (Platform.OS === 'android' ? keyboardHeight : 0) }}
           contentInsetAdjustmentBehavior="never"
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
           automaticallyAdjustKeyboardInsets
+          scrollEventThrottle={16}
+          onScroll={(e) => {
+            scrollY.current = e.nativeEvent.contentOffset.y;
+          }}
           testID="journal-v2"
         >
           {notes.map((n) => {
@@ -596,6 +675,7 @@ export default function JournalEntryScreen() {
             );
           })}
 
+          <View ref={composerRef} collapsable={false} testID="journal-composer-frame">
           <ThreadRow
             mark={<Mark icon={editing ? 'create-outline' : 'add-outline'} />}
             name={editing ? t(`journal.editing.${composingKind}`) : t('journal.newEntry')}
@@ -675,6 +755,8 @@ export default function JournalEntryScreen() {
                   placeholder={t('journal.fromPage')}
                   placeholderTextColor={palette.secondary}
                   keyboardType="number-pad"
+                  onFocus={onFieldFocus}
+                  onBlur={onFieldBlur}
                   style={[field, { flex: 1 }]}
                   accessibilityLabel={t('journal.fromPage')}
                   testID="memorize-from"
@@ -685,6 +767,8 @@ export default function JournalEntryScreen() {
                   placeholder={t('journal.toPage')}
                   placeholderTextColor={palette.secondary}
                   keyboardType="number-pad"
+                  onFocus={onFieldFocus}
+                  onBlur={onFieldBlur}
                   style={[field, { flex: 1 }]}
                   accessibilityLabel={t('journal.toPage')}
                   testID="memorize-to"
@@ -701,7 +785,8 @@ export default function JournalEntryScreen() {
                 multiline={composingKind === 'note'}
                 maxLength={journalTextMax(composingKind)}
                 textAlignVertical="top"
-                inputAccessoryViewID={KEYBOARD_DONE_ID}
+                onFocus={onFieldFocus}
+                onBlur={onFieldBlur}
                 style={[field, composingKind === 'note' && v2.notes]}
                 accessibilityLabel={
                   composingKind === 'note'
@@ -713,10 +798,16 @@ export default function JournalEntryScreen() {
                 testID="journal-text-input"
               />
               {composingKind !== 'note' && (
-                <MinutesFieldV2 value={minutesText} onChange={setMinutesText} label={t('journal.minutes')} />
+                <MinutesFieldV2
+                  value={minutesText}
+                  onChange={setMinutesText}
+                  label={t('journal.minutes')}
+                  onFocus={onFieldFocus}
+                  onBlur={onFieldBlur}
+                />
               )}
             </View>
-            <View style={v2.actions}>
+            <View ref={actionsRef} collapsable={false} style={v2.actions} testID="journal-actions">
               {editing && (
                 <PillButton
                   title={t('common.cancel')}
@@ -737,6 +828,7 @@ export default function JournalEntryScreen() {
               />
             </View>
           </ThreadRow>
+          </View>
 
           {notes.length > 0 && (
             <Tap
@@ -754,23 +846,6 @@ export default function JournalEntryScreen() {
         </ScrollView>
       )}
 
-      {Platform.OS === 'ios' && (
-        // The bar above the keyboard: one Done key puts the keyboard away for
-        // a note or the minutes, whichever is typing.
-        <InputAccessoryView nativeID={KEYBOARD_DONE_ID}>
-          <View style={[styles.doneBar, { backgroundColor: palette.bg, borderTopColor: palette.separator }]}>
-            <Pressable
-              onPress={() => Keyboard.dismiss()}
-              accessibilityRole="button"
-              accessibilityLabel={t('common.done')}
-              testID="journal-keyboard-done"
-              hitSlop={8}
-            >
-              <Text style={[typeV2.body, { color: palette.accentText, fontWeight: '600' }]}>{t('common.done')}</Text>
-            </Pressable>
-          </View>
-        </InputAccessoryView>
-      )}
 
       <ContextMenu
         visible={menuNote != null}
@@ -801,7 +876,19 @@ export default function JournalEntryScreen() {
 }
 
 /** Minutes beside a field (new design): a quiet chip that grows with its text. */
-function MinutesFieldV2({ value, onChange, label }: { value: string; onChange: (v: string) => void; label: string }) {
+function MinutesFieldV2({
+  value,
+  onChange,
+  label,
+  onFocus,
+  onBlur,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  label: string;
+  onFocus: () => void;
+  onBlur: () => void;
+}) {
   const { palette } = useTheme();
   return (
     <View style={[v2.minutes, { backgroundColor: palette.fill }]}>
@@ -812,7 +899,8 @@ function MinutesFieldV2({ value, onChange, label }: { value: string; onChange: (
         placeholderTextColor={palette.secondary}
         selectionColor={palette.accentText}
         keyboardType="number-pad"
-        inputAccessoryViewID={KEYBOARD_DONE_ID}
+        onFocus={onFocus}
+        onBlur={onBlur}
         maxLength={4}
         style={[typeV2.body, typeV2.numeral, v2.minutesInput, { color: palette.text }]}
         accessibilityLabel={label}
@@ -827,17 +915,8 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   failed: { gap: 12, paddingHorizontal: 32 },
   scroll: { flex: 1 },
-  doneBar: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    paddingHorizontal: layoutV2.gutter,
-    paddingVertical: 8,
-    borderTopWidth: layoutV2.hairline,
-  },
+  done: { fontWeight: '600' },
 });
-
-/** The iOS keyboard bar with Done, shown above the note and minutes fields. */
-const KEYBOARD_DONE_ID = 'journal-keyboard-done';
 
 // The new design: rows on the ground, the fields borderless like a composer.
 const v2 = StyleSheet.create({
