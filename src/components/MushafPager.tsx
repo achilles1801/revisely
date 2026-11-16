@@ -139,11 +139,13 @@ interface PageItemProps {
   bg: string;
   /** The page as drawn: fits the pager, so controls never cover it. */
   size: PageSize;
+  /** The pager has measured itself, so `size` is the page's real size (its image is drawn only then). */
+  sized: boolean;
   /** Over the image (pageOverlay). */
   overlay?: (image: PageImage | null) => React.ReactNode;
   /** Behind the image's ink (pageUnderlay). */
   underlay?: React.ReactNode;
-  /** pageAccessories (undefined when the pager has none: the page alone). */
+  /** pageAccessories (undefined when the pager has none). */
   accessories?: React.ReactNode;
   onTapPoint?: (pageNumber: number, x: number, y: number, toWindow: (r: Rect) => Box) => boolean;
   onTapVerse?: (ayah: AyahRef) => boolean;
@@ -162,6 +164,7 @@ const PageItem = React.memo(function PageItem({
   mutedColor,
   bg,
   size,
+  sized,
   overlay,
   underlay,
   accessories,
@@ -316,51 +319,60 @@ const PageItem = React.memo(function PageItem({
               ]}
             />
           ))}
-          <Image
-            testID="page-image"
-            source={{ uri }}
-            {...pageImageProps()}
-            style={[
-              { width: size.width, height: size.height },
-              pageTint != null && { tintColor: pageTint, opacity: 0.92 },
-            ]}
-            fadeDuration={0}
-            onLoadStart={() => setLoading(true)}
-            onLoadEnd={() => setLoading(false)}
-            onError={() => {
-              setLoading(false);
-              if (!isRemote) {
-                // A whole file that failed to decode (memory) stays; Try again
-                // shows it. A broken one is deleted (and downloaded again).
-                if (evictCachedPage(pageNumber, uri, edition)) {
-                  setMissing('failed');
-                  return;
-                }
-                // Moved meanwhile (the first launch's move out of the caches directory)?
-                const moved = getCachedPageUri(pageNumber, edition);
-                if (moved && moved !== uri) setUri(moved);
-                else if (knownOffline()) {
-                  setUri(null);
-                  setMissing('offline');
+          {/* Until the pager has measured itself the page's size is a guess (the screen's width). iOS decodes an image
+              at the size it's laid out at, so drawing it then decoded every page on screen twice on opening, with a
+              blank between the two (a 2600×4206 page each time). */}
+          {!sized ? (
+            <View style={{ width: size.width, height: size.height }} />
+          ) : (
+            <Image
+              testID="page-image"
+              source={{ uri }}
+              {...pageImageProps()}
+              style={[
+                { width: size.width, height: size.height },
+                pageTint != null && { tintColor: pageTint, opacity: 0.92 },
+              ]}
+              fadeDuration={0}
+              onLoadStart={() => setLoading(true)}
+              onLoadEnd={() => setLoading(false)}
+              onError={() => {
+                setLoading(false);
+                if (!isRemote) {
+                  // A whole file that failed to decode (memory) stays; Try again
+                  // shows it. A broken one is deleted (and downloaded again).
+                  if (evictCachedPage(pageNumber, uri, edition)) {
+                    setMissing('failed');
+                    return;
+                  }
+                  // Moved meanwhile (the first launch's move out of the caches directory)?
+                  const moved = getCachedPageUri(pageNumber, edition);
+                  if (moved && moved !== uri) setUri(moved);
+                  else if (knownOffline()) {
+                    setUri(null);
+                    setMissing('offline');
+                  } else {
+                    setUri(nativeRequestUrl(getQuranPageImageUrl(pageNumber, undefined, edition)));
+                  }
                 } else {
-                  setUri(nativeRequestUrl(getQuranPageImageUrl(pageNumber, undefined, edition)));
+                  setMissing(knownOffline() ? 'offline' : 'failed');
                 }
-              } else {
-                setMissing(knownOffline() ? 'offline' : 'failed');
-              }
-            }}
-          />
+              }}
+            />
+          )}
           {overlay ? overlay({ uri, width: size.width, height: size.height }) : null}
         </Pressable>
       ) : null}
     </Pressable>
   );
-  if (accessories === undefined) return pageView;
-  // Beside the page, in the image's frame (the page centres it), so they are elements of their own.
+  // Accessories go beside the page, in the image's frame (the page centres it), so they are elements of their own.
+  // The page is wrapped the same way with or without them: a screen that starts passing them (the reader, once its
+  // word data has loaded on the first open after launch) would otherwise remount every page, and each image would
+  // load again, blank meanwhile.
   return (
     <View style={styles.pageWrap}>
       {pageView}
-      {uri != null && !missing ? (
+      {accessories !== undefined && uri != null && !missing ? (
         <View pointerEvents="box-none" style={styles.accessories}>
           <View pointerEvents="box-none" style={{ width: size.width, height: size.height }}>
             {accessories}
@@ -406,6 +418,7 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
   const [space, setSpace] = useState<{ width: number; height: number }>({ width: SCREEN_WIDTH, height: 0 });
   const aspect = mushafEdition(edition).aspect;
   const pageSize = useMemo<PageSize>(() => fitPage(space.width, space.height, aspect), [space, aspect]);
+  const sized = space.height > 0;
   // Where the list starts, from its first frame (READ-1). It used to start at page 1 and scroll to the page 50 ms
   // after mount: a surah opened from the Read tab showed Al-Fatihah for about half a second first (Majd, Nov 15 2026).
   const [startIndex] = useState(() => pagerStartIndex(pages, initialPage));
@@ -580,6 +593,7 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
           mutedColor={palette.textSecondary}
           bg={palette.pageBg}
           size={pageSize}
+          sized={sized}
           overlay={pageOverlay ? (image: PageImage | null) => pageOverlay(item, pageSize.scale, image) : undefined}
           underlay={pageUnderlay ? pageUnderlay(item, pageSize.scale) : null}
           accessories={pageAccessories ? pageAccessories(item, pageSize.scale) : undefined}
@@ -587,7 +601,7 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
           onTapVerse={onTapVerse}
         />
       ),
-    [onTap, onLongPressAyah, highlights, v2, palette, pageSize, endCard, pageOverlay, pageUnderlay, pageAccessories, onTapPoint, onTapVerse, edition],
+    [onTap, onLongPressAyah, highlights, v2, palette, pageSize, sized, endCard, pageOverlay, pageUnderlay, pageAccessories, onTapPoint, onTapVerse, edition],
   );
 
   return (
@@ -620,7 +634,7 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
       initialNumToRender={3}
       maxToRenderPerBatch={3}
       windowSize={5}
-      extraData={`${extraData ?? ''}|${highlights.map((h) => `${h.page}:${h.sura}:${h.ayah}`).join(',')}|${pageSize.width}|${edition}`}
+      extraData={`${extraData ?? ''}|${highlights.map((h) => `${h.page}:${h.sura}:${h.ayah}`).join(',')}|${pageSize.width}|${sized}|${edition}`}
       onLayout={(e) => {
         const { width, height } = e.nativeEvent.layout;
         setSpace((prev) => (prev.width === width && prev.height === height ? prev : { width, height }));
