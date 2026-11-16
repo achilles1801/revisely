@@ -687,18 +687,23 @@ README has the deploy and the undo); never deploy the root `firebase.json`'s hos
   (`OWN_AUTH_DOMAIN_HOSTS` in `admin/firebase.js`: metrics.revisely.app, revisely-dev.web.app); a host joins only once
   its `/__/auth/handler` is a redirect URI of the project's Web OAuth client and an authorized domain. Phones sign in
   with a full-page redirect there.
-- **Invites and the waiting list** (`functions/src/console/invites.ts`; Majd, Nov 16 2026: "that should be its own role
-  i can attach to a approved user … how would signing up work for them?"; the dev console only, `invites` in index.ts).
-  - **Adding someone:** on the Staff page, an owner adds an email with a role. If the account has signed in before, it gets
-    the role now. If not, a pending invite (`consoleInvites/{email}`).
-  - **The first sign-in:** when that person signs in with that email, verified (Google or the email link; a password
-    sign-up's email is not), adminConsole `me` gives the role through setRole (`via: 'invite'`) and marks the invite used.
-  - **No role and no invite:** they see "Waiting for access" and are listed on the Staff page (`consoleWaiting/{uid}`,
-    30 days) with a one-tap Give role.
-  - **Cancelling and the audit log:** invites can be cancelled. Invites made and cancelled are in the audit log's Role
-    changes, beside the role changes themselves.
+- **Access requests, the main way in** (`functions/src/console/invites.ts`; Majd, Nov 16 2026: "i don't wanna manually
+  type their email, once they attempt to sign in i should be able to see their 'attempt' in the console and then i can do
+  actions on it"; the dev console only, `invites` in index.ts).
+  - **The request:** anyone who signs in to the console with no role is an access request, `consoleRequests/{uid}`:
+    name, email, Google photo, sign-in method, first and last attempt, attempts. They see "Waiting for access. Majd has
+    been asked." and nothing else. That page asks again every 15 s while in front (`me` with `poll: true`, which isn't
+    an attempt) and opens by itself once they have a role.
+  - **The Staff page** lists pending requests first, newest first, with Give Labeller (one tap), another role (with a
+    confirmation), Dismiss and Block. The Staff tab's badge counts them (`me.requests`, owners).
+    - A dismissed request comes back on their next sign-in. A blocked one never does.
+    - Every request seen, granted, dismissed or blocked is in the audit log's Role changes.
+  - **By email, the fallback:** "Add someone by email instead" gives the role at once to an account that has signed
+    in, or invites an email (`consoleInvites/{email}`). The first verified sign-in (Google or an email link, never a
+    password sign-up's email) claims the invite through setRole (`via: 'invite'`). Invites can be cancelled, and are
+    audited too.
   - **Sign-in methods:** the email link needs "Email link (passwordless sign-in)" on in Firebase Auth's Email/Password
-    provider (revisely-dev). It makes the account the first time.
+    provider. It is on for revisely-dev (Nov 16 2026), and it makes the account the first time.
 - **Label recitations** (`/label`, `admin/label.*`; adminConsole `labels.*`, `functions/src/console/labels.ts`; permission
   `recite.label`: owners, admins and **labellers**; revisely-dev only, `LABEL_PROJECTS`). Majd, Nov 15–16 2026: "if the
   issue is those recitations don't say what is right or wrong then i can help with that … i can even get my quran

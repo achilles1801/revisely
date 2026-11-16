@@ -86,6 +86,10 @@ function render() {
     thead.innerHTML = '<tr><th>When</th><th>Account</th><th>Role</th><th>By</th></tr>';
     tbody.innerHTML = st.rows.length
       ? st.rows.map((r) => {
+          if (r.kind === 'request') {
+            const what = { seen: 'Asked for access (signed in with no role)', granted: 'Request granted' + (r.role ? ' as <b>' + esc(ROLE[r.role] || r.role) + '</b>' : ''), dismissed: 'Request dismissed', blocked: 'Blocked' }[r.action] || esc(r.action);
+            return '<tr><td>' + esc(when(r.at)) + '</td><td>' + esc(r.email || r.uid) + '</td><td>' + what + '</td><td>' + (r.action === 'seen' ? '<span class="sub">—</span>' : by(r.by)) + '</td></tr>';
+          }
           if (r.kind === 'invite') {
             const what = r.action === 'cancelled' ? 'Invite cancelled' : 'Invited';
             return '<tr><td>' + esc(when(r.at)) + '</td><td>' + esc(r.email) + '</td><td>' + what + (r.role ? ' as <b>' + esc(ROLE[r.role] || r.role) + '</b>' : '') + '</td><td>' + by(r.by) + '</td></tr>';

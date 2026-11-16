@@ -109,6 +109,7 @@ async function start() {
     fresh.then(
       (m) => {
         if (!m.role) return leave(user.uid);
+        if (ctx.setRequests) ctx.setRequests(m.requests || 0);
         if (meKey(m) !== meKey(cached)) {
           writeMe(user.uid, m);
           location.reload();
@@ -141,6 +142,12 @@ async function start() {
   ctx.me = me;
   ctx.can = (permission) => me.permissions.includes(permission);
   ctx.go = go;
+  // Access requests waiting, on the Staff tab (owners): from `me`, and from the Staff page whenever it loads.
+  ctx.setRequests = (n) => {
+    $('staffBadge').hidden = !n;
+    $('staffBadge').textContent = n ? String(n) : '';
+  };
+  ctx.setRequests(me.requests || 0);
 
   // The one console shows production and dev (Overview's switch), so its host project gets no badge; only a local
   // test server or an unknown project does.

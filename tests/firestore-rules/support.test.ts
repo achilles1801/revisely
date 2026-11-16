@@ -80,13 +80,13 @@ describe('Premium and the support program', () => {
     await assertFails(setDoc(doc(alice, 'supportLimits/alice'), { day: '2026-11-14', links: 0, applies: 0 }));
   });
 
-  it('the console audit log (decisions, role changes), invites and the waiting list are closed to everyone, staff included', async () => {
+  it('the console audit log (decisions, role changes), invites and access requests are closed to everyone, staff included', async () => {
     await env.withSecurityRulesDisabled(async (ctx) => {
       const db = ctx.firestore();
       await setDoc(doc(db, 'supportDecisions/d1'), { uid: 'alice', action: 'approve', note: 'internal' });
       await setDoc(doc(db, 'consoleAudit/a1'), { kind: 'role', uid: 'staff', to: 'owner' });
       await setDoc(doc(db, 'consoleInvites/new@example.com'), { email: 'new@example.com', role: 'labeller', status: 'pending' });
-      await setDoc(doc(db, 'consoleWaiting/alice'), { uid: 'alice', email: 'alice@example.com', verified: true });
+      await setDoc(doc(db, 'consoleRequests/alice'), { uid: 'alice', email: 'alice@example.com', status: 'pending' });
     });
     const alice = env.authenticatedContext('alice').firestore();
     const owner = env.authenticatedContext('staff', { role: 'owner', admin: true }).firestore();
@@ -96,11 +96,11 @@ describe('Premium and the support program', () => {
       await assertFails(setDoc(doc(db, 'supportDecisions/d2'), { uid: 'alice', action: 'approve' }));
       await assertFails(getDoc(doc(db, 'consoleAudit/a1')));
       await assertFails(setDoc(doc(db, 'consoleAudit/a2'), { kind: 'role', uid: 'staff', to: 'owner' }));
-      // Invites and the waiting list (console/invites.ts): an invite written by a client would hand out a role.
+      // Invites and access requests (console/invites.ts): an invite written by a client would hand out a role.
       await assertFails(getDoc(doc(db, 'consoleInvites/new@example.com')));
       await assertFails(setDoc(doc(db, 'consoleInvites/me@example.com'), { email: 'me@example.com', role: 'owner', status: 'pending' }));
-      await assertFails(getDoc(doc(db, 'consoleWaiting/alice')));
-      await assertFails(setDoc(doc(db, 'consoleWaiting/alice'), { uid: 'alice' }));
+      await assertFails(getDoc(doc(db, 'consoleRequests/alice')));
+      await assertFails(setDoc(doc(db, 'consoleRequests/alice'), { uid: 'alice', status: 'granted' }));
     }
   });
 

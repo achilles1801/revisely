@@ -33,7 +33,7 @@ html, body { margin: 0; }
       <a href="/" data-view="overview" hidden><span class="k"></span>Overview</a>
       <a href="/open-door" data-view="opendoor" hidden><span class="k"></span>Open Door <span class="badge" id="odBadge" hidden></span></a>
       <a href="/audit" data-view="audit" hidden><span class="k"></span>Audit log</a>
-      <a href="/staff" data-view="staff" hidden><span class="k"></span>Staff</a>
+      <a href="/staff" data-view="staff" hidden><span class="k"></span>Staff <span class="badge" id="staffBadge" hidden></span></a>
       <a href="/label" id="labelsTab" hidden>Label recitations ›</a>
     </nav>
   </div>
@@ -226,18 +226,22 @@ html, body { margin: 0; }
     <span class="sub">Who can use Revisely Console, and what their role opens. Owners only.</span>
   </div>
   <div class="conn" id="staffConn" hidden></div>
-  <form class="staff-give w" id="staffGive" autocomplete="off">
-    <label for="staffEmail">Add someone</label>
-    <input id="staffEmail" type="email" placeholder="Their email" spellcheck="false" autocapitalize="off" required>
-    <select id="staffRole" aria-label="Role"></select>
-    <button type="submit" class="btn primary">Add</button>
-    <p class="sub">Already signed in once: the role is theirs now. Not yet: they get it the first time they sign in on the console with this email (Google, or the email link). Send them the console’s address.</p>
-  </form>
-  <div class="w" id="staffWaitingBox" hidden><div class="w-h"><h3>Waiting for access</h3><span class="sub">Signed in to the console with no role. They see nothing until you give one.</span></div>
-    <div class="tbl-wrap"><table id="staffWaiting"><thead><tr><th>Account</th><th>Signed in</th><th>Role</th><th></th></tr></thead><tbody></tbody></table></div></div>
+  <div class="w req-box" id="staffReqBox">
+    <div class="w-h"><h3>Access requests</h3><span class="sub" id="staffReqSub">People who signed in to the console without a role. They see nothing until you act.</span></div>
+    <div class="req-list" id="staffReqs"></div>
+  </div>
+  <div class="w"><div class="w-h"><h3>Have a role</h3></div><div class="tbl-wrap"><table id="staffTable"><thead><tr><th>Account</th><th>Role</th><th>Last sign-in</th><th></th></tr></thead><tbody></tbody></table></div></div>
   <div class="w" id="staffInvitesBox" hidden><div class="w-h"><h3>Invited</h3><span class="sub">The role attaches when they first sign in with this email.</span></div>
     <div class="tbl-wrap"><table id="staffInvites"><thead><tr><th>Email</th><th>Role</th><th>Invited</th><th></th></tr></thead><tbody></tbody></table></div></div>
-  <div class="w"><div class="w-h"><h3>Have a role</h3></div><div class="tbl-wrap"><table id="staffTable"><thead><tr><th>Account</th><th>Role</th><th>Last sign-in</th><th></th></tr></thead><tbody></tbody></table></div></div>
+  <details class="w staff-more">
+    <summary>Add someone by email instead</summary>
+    <form class="staff-give" id="staffGive" autocomplete="off">
+      <input id="staffEmail" type="email" placeholder="Their email" spellcheck="false" autocapitalize="off" required aria-label="Their email">
+      <select id="staffRole" aria-label="Role"></select>
+      <button type="submit" class="btn">Add</button>
+      <p class="sub">Already signed in once: the role is theirs now. Not yet: they get it the first time they sign in with this email (Google, or the email link).</p>
+    </form>
+  </details>
   <div class="sec-h" style="margin-top:18px"><h2>What each role opens</h2></div>
   <div class="grid staff-roles" id="staffRoles"></div>
 </section>

@@ -75,7 +75,8 @@ html, body { margin: 0; }
     </div>
     <h1 id="noAccessTitle">Waiting for access</h1>
     <p class="auth-sub">You’re signed in as <b id="noAccessEmail"></b>.</p>
-    <p class="auth-sub">Ask Majd to add <b id="noAccessEmail2"></b> to Revisely Console. Once he has, tap Check again.</p>
+    <p class="auth-sub" id="noAccessAsked">Majd has been asked. This page opens by itself once he lets you in: you can leave it open.</p>
+    <p class="auth-sub" id="noAccessBlocked" hidden>This account can’t use Revisely Console.</p>
     <p class="auth-sub" id="noAccessUnverified" hidden>This email isn’t verified yet. Signing in with Google, or with an email link, verifies it.</p>
     <div class="auth-actions">
       <button type="button" class="btn primary" id="recheckBtn">Check again</button>

@@ -90,6 +90,10 @@ export interface StaffCaller {
   role: Role | null;
   /** the account's email is verified (Google, an email link): only then does it claim an invite */
   emailVerified?: boolean;
+  /** for an access request: the account's name and photo, and how it signed in (the ID token's sign_in_provider) */
+  name?: string | null;
+  photo?: string | null;
+  method?: string | null;
 }
 
 /** The caller, if their role allows `permission`; refused otherwise, with no hint of what else exists. */

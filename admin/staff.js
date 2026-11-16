@@ -1,6 +1,7 @@
-// Staff in Revisely Console (owner only, roles.manage): who has which role; adding someone by email (a role now if
-// they have signed in before, else an invite that attaches on their first sign-in); who is waiting for access, with a
-// one-tap role; changing or taking a role away (adminConsole staff.*; functions/src/console/staff.ts and invites.ts).
+// Staff in Revisely Console (owner only, roles.manage). First the access requests: people who signed in without a role,
+// each with Give Labeller (one tap), another role, Dismiss and Block. Then who has which role (change or take away), the
+// pending invites, and adding someone by email (a role now if they have signed in before, else an invite that attaches
+// on their first sign-in). adminConsole staff.*; functions/src/console/staff.ts and invites.ts.
 // The server refuses your own role, the App Review account and the last owner; every change, invite and cancelled
 // invite goes to the audit log's Role changes.
 import { confirmDialog, dayYear, esc, failureText, toast } from '/ui.js';
@@ -8,7 +9,7 @@ import { confirmDialog, dayYear, esc, failureText, toast } from '/ui.js';
 const $ = (id) => document.getElementById(id);
 
 let ctx = null;
-const st = { rows: [], roles: [], invites: [], waiting: [], loaded: false };
+const st = { rows: [], roles: [], invites: [], requests: [], loaded: false };
 
 const nameOf = (role) => (st.roles.find((r) => r.role === role) || {}).name || role;
 
@@ -29,12 +30,24 @@ export function start(c) {
     sel.value = row.role; // stays as it is until the change is confirmed and reloaded
     if (to !== row.role) ask({ uid: row.uid, role: to, label: row.email || row.uid, from: row.role });
   });
-  $('staffWaiting').addEventListener('click', (e) => {
-    const b = e.target.closest('button[data-give]');
-    if (!b) return;
-    const w = st.waiting.find((x) => x.uid === b.dataset.give);
-    const role = $('staffWaiting').querySelector('select[data-for="' + CSS.escape(w.uid) + '"]').value;
-    ask({ uid: w.uid, role, label: w.email || w.uid, from: null });
+  $('staffReqs').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-act]');
+    if (!b || b.disabled) return;
+    const r = st.requests.find((x) => x.uid === b.dataset.uid);
+    if (!r) return;
+    const label = r.email || r.name || r.uid;
+    if (b.dataset.act === 'labeller') give(r, 'labeller', b);
+    else if (b.dataset.act === 'role') {
+      const role = $('staffReqs').querySelector('select[data-uid="' + CSS.escape(r.uid) + '"]').value;
+      if (role === 'labeller') give(r, role, b);
+      else ask({ uid: r.uid, role, label, from: null });
+    } else if (b.dataset.act === 'dismiss') settle(r, 'dismiss', b);
+    else if (b.dataset.act === 'block') {
+      confirmDialog('Block this account?', '<p><b>' + esc(label) + '</b> leaves the list and won’t come back to it, however often they sign in. You can still give them a role later from Add someone by email.</p><p class="sub">The audit log records it with your name.</p>', [
+        { label: 'Cancel' },
+        { label: 'Block', cls: 'danger', run: async () => { const p = await settle(r, 'block'); return p; } },
+      ]);
+    }
   });
   $('staffInvites').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-cancel]');
@@ -77,7 +90,8 @@ async function load() {
     st.rows = res.rows;
     st.roles = res.roles;
     st.invites = res.invites || [];
-    st.waiting = res.waiting || [];
+    st.requests = res.requests || [];
+    ctx.setRequests?.(st.requests.length);
     conn.hidden = true;
   } catch (err) {
     conn.hidden = false;
@@ -85,6 +99,32 @@ async function load() {
   }
   st.loaded = true;
   render();
+}
+
+/** One tap: the role now (Labeller, the common case), no dialog; the toast says what happened. */
+async function give(r, role, button) {
+  button.disabled = true;
+  try {
+    await ctx.call('adminConsole', { action: 'staff.set', uid: r.uid, role });
+    toast(esc(r.email || r.name || r.uid) + ' is ' + esc(nameOf(role)) + ' now. Their page opens to it on its own.', 6000);
+    load();
+  } catch (err) {
+    button.disabled = false;
+    toast(esc(failureText(err)), 6000, true);
+  }
+}
+
+async function settle(r, decision, button) {
+  if (button) button.disabled = true;
+  try {
+    await ctx.call('adminConsole', { action: 'staff.request', uid: r.uid, decision });
+    toast(esc(r.email || r.name || r.uid) + (decision === 'block' ? ' is blocked.' : ' dismissed. If they sign in again, they’re back on the list.'), 5000);
+    load();
+    return null;
+  } catch (err) {
+    if (button) button.disabled = false;
+    return failureText(err);
+  }
 }
 
 function ask({ uid, email, role, label, from }) {
@@ -125,12 +165,31 @@ function render() {
   if (!$('staffRole').options.length && st.roles.length) {
     $('staffRole').innerHTML = roleOptions('labeller');
   }
-  $('staffWaitingBox').hidden = !st.waiting.length;
-  $('staffWaiting').querySelector('tbody').innerHTML = st.waiting
-    .map((w) =>
-      '<tr><td>' + esc(w.email || w.uid) + (w.verified ? '' : ' <span class="tag">email not verified</span>') + '</td><td>' + esc(dayYear(w.at)) + '</td>' +
-      '<td><select data-for="' + esc(w.uid) + '" aria-label="Role for ' + esc(w.email || w.uid) + '">' + roleOptions('labeller') + '</select></td>' +
-      '<td><button type="button" class="btn sm primary" data-give="' + esc(w.uid) + '">Give role</button></td></tr>')
+  const ago = (t) => {
+    const m = Math.round((Date.now() - t) / 60000);
+    return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : dayYear(t);
+  };
+  $('staffReqSub').textContent = st.requests.length
+    ? st.requests.length + (st.requests.length === 1 ? ' person' : ' people') + ' signed in without a role. They see nothing until you act.'
+    : 'Nobody is waiting. When someone signs in to the console without a role, they show up here.';
+  $('staffReqs').innerHTML = st.requests
+    .map((r) => {
+      const initial = esc(String(r.name || r.email || '?').trim().charAt(0).toUpperCase());
+      const face = r.photo
+        ? '<img class="req-face" src="' + esc(r.photo) + '" alt="" referrerpolicy="no-referrer" loading="lazy">'
+        : '<span class="req-face">' + initial + '</span>';
+      return '<div class="req">' +
+        '<div class="req-who">' + face + '<div class="req-id"><b>' + esc(r.name || r.email || r.uid) + '</b>' +
+        (r.name && r.email ? '<span>' + esc(r.email) + '</span>' : '') +
+        '<span class="sub">' + esc(r.method) + (r.verified ? '' : ' · email not verified') + ' · ' + (r.attempts > 1 ? r.attempts + ' tries, last ' : '') + esc(ago(r.lastAt)) + '</span></div></div>' +
+        '<div class="req-acts">' +
+        '<button type="button" class="btn primary" data-act="labeller" data-uid="' + esc(r.uid) + '">Give Labeller</button>' +
+        '<span class="req-other"><select data-uid="' + esc(r.uid) + '" aria-label="Another role for ' + esc(r.email || r.uid) + '">' + roleOptions('reviewer') + '</select>' +
+        '<button type="button" class="btn" data-act="role" data-uid="' + esc(r.uid) + '">Give</button></span>' +
+        '<button type="button" class="btn" data-act="dismiss" data-uid="' + esc(r.uid) + '">Dismiss</button>' +
+        '<button type="button" class="btn danger-text" data-act="block" data-uid="' + esc(r.uid) + '">Block</button>' +
+        '</div></div>';
+    })
     .join('');
   $('staffInvitesBox').hidden = !st.invites.length;
   $('staffInvites').querySelector('tbody').innerHTML = st.invites

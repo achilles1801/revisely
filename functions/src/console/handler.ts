@@ -14,6 +14,7 @@
  *   staff.set        give, change or take a role (by email or id); an email
  *                    with no account yet gets an invite (invites.ts)  roles.manage
  *   staff.cancelInvite  cancel a pending invite                       roles.manage
+ *   staff.request    dismiss or block an access request               roles.manage
  *   labels.next      the next recitation clip to label, with its audio  recite.label (labels.ts)
  *   labels.get       one clip again (going back)                      recite.label
  *   labels.save      the caller's label on a clip (+ an audit entry)  recite.label
@@ -40,7 +41,7 @@ import {
 import { ConsoleError, GRANTS, PERMISSIONS, Permission, ROLES, ROLE_NAMES, Role, StaffCaller, isRole, permissionsOf, requirePermission } from './roles';
 import { RoleActor, RoleChange, StaffMember, roleChangeRefusal, rolesPage } from './staff';
 import { LabelDeps, handleLabels, labelAuditPage } from './labels';
-import { cancelInvite, claimInvite, clearWaiting, createInvite, noteWaiting, normalEmail, pendingInvites, waitingList } from './invites';
+import { RequestStatus, cancelInvite, claimInvite, createInvite, normalEmail, noteRequest, pendingInvites, pendingRequestCount, pendingRequests, requestStatus, settleRequest } from './invites';
 
 /** Accounts nobody may decide on from the console (the script refuses them too). */
 export const PROTECTED_EMAILS = ['applereview@revisely.app'];
@@ -111,6 +112,10 @@ export interface Me {
   metricsEnvs: { env: string; label: string; here: boolean }[];
   /** the labelling page (/label) is here and the role may use it */
   labels: boolean;
+  /** with no role: the access request's status (pending, or blocked) */
+  request?: RequestStatus;
+  /** for an owner: access requests waiting (the header's badge) */
+  requests?: number;
 }
 
 export type QueueItem = QueueRow & {
@@ -143,12 +148,16 @@ export async function handleAdminConsole(
 
   if (action === 'me') {
     let role = caller.role;
-    // No role yet: an invite for this verified email gives it now (invites.ts); otherwise they wait, listed on Staff.
+    let request: RequestStatus | undefined;
+    // No role yet: an invite for this verified email gives it now (invites.ts); otherwise an access request, listed on
+    // Staff for the owner.
     if (!role && deps.invites) {
-      const who = { uid: caller.uid, email: caller.email, emailVerified: !!caller.emailVerified };
+      const who = { uid: caller.uid, email: caller.email, emailVerified: !!caller.emailVerified, name: caller.name, photo: caller.photo, method: caller.method };
       role = await claimInvite(deps.db, who, (uid, r, by) => deps.setRole(uid, r, by), deps.now());
       if (role) deps.log({ event: 'invite.claimed', uid: caller.uid, role });
-      else await noteWaiting(deps.db, who, deps.now());
+      // `poll`: the waiting page asking again on its own; that isn't a new attempt (and doesn't undo a dismissal).
+      else if (data.poll === true) request = (await requestStatus(deps.db, caller.uid)) ?? (await noteRequest(deps.db, who, deps.now()));
+      else request = await noteRequest(deps.db, who, deps.now());
     }
     const permissions = permissionsOf(role);
     const me: Me = {
@@ -162,6 +171,8 @@ export async function handleAdminConsole(
       metricsEnvs: permissions.includes('metrics.read') ? (deps.metricsEnvs ?? []) : [],
       labels: !!deps.labels?.open && permissions.includes('recite.label'),
     };
+    if (request) me.request = request;
+    if (deps.invites && permissions.includes('roles.manage')) me.requests = await pendingRequestCount(deps.db);
     return me;
   }
 
@@ -298,10 +309,10 @@ export async function handleAdminConsole(
         })
         .sort((a, b) => order(a.role) - order(b.role) || String(a.email).localeCompare(String(b.email)));
       const roles = ROLES.map((role) => ({ role, name: ROLE_NAMES[role], permissions: GRANTS[role].map((p) => PERMISSIONS[p]) }));
-      if (!deps.invites) return { rows, roles, invites: [], waiting: [] };
-      const [invites, waiting] = await Promise.all([pendingInvites(deps.db), waitingList(deps.db, deps.now())]);
+      if (!deps.invites) return { rows, roles, invites: [], requests: [] };
+      const [invites, requests] = await Promise.all([pendingInvites(deps.db), pendingRequests(deps.db)]);
       const staffUids = new Set(members.map((m) => m.uid));
-      return { rows, roles, invites, waiting: waiting.filter((w) => !staffUids.has(w.uid)) };
+      return { rows, roles, invites, requests: requests.filter((r) => !staffUids.has(r.uid)) };
     }
 
     case 'staff.set': {
@@ -340,9 +351,21 @@ export async function handleAdminConsole(
       });
       if (refusal) throw new ConsoleError(refusal.code, refusal.message);
       const change = await deps.setRole(account.uid, to, { uid: who.uid, email: who.email, via: 'console' });
-      if (deps.invites && to) await clearWaiting(deps.db, account.uid);
+      if (deps.invites && to) await settleRequest(deps.db, account.uid, 'granted', { uid: who.uid, email: who.email }, deps.now(), to);
       deps.log({ event: 'roles.set', by: caller.uid, uid: account.uid, from: change?.from ?? null, to, changed: !!change });
       return { changed: !!change, change };
+    }
+
+    case 'staff.request': {
+      const who = requirePermission(caller, 'roles.manage');
+      if (!deps.invites) throw new ConsoleError('failed-precondition', 'Access requests aren’t on in this project.');
+      const uid = uidArg(data);
+      const decision = str(data, 'decision');
+      if (decision !== 'dismiss' && decision !== 'block') throw new ConsoleError('invalid-argument', 'Dismiss or block.');
+      const found = await settleRequest(deps.db, uid, decision === 'dismiss' ? 'dismissed' : 'blocked', { uid: who.uid, email: who.email }, deps.now());
+      if (!found) throw new ConsoleError('not-found', 'That request is gone.');
+      deps.log({ event: `request.${decision}`, by: caller.uid, uid });
+      return { done: true };
     }
 
     case 'staff.cancelInvite': {

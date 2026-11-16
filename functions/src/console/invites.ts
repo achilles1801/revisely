@@ -7,10 +7,12 @@
  * - The first time that person signs in to the console with that email, verified (Google, or an email link), adminConsole
  *   `me` gives them the role through setRole (audited as `via: 'invite'`) and marks the invite used. An unverified email
  *   never claims an invite: anyone can type any email into a password sign-up.
- * - Someone signed in with no role and no invite is noted in `consoleWaiting/{uid}`, so the Staff page can list them with
- *   a one-tap role. They see "Waiting for access" and nothing else.
- * - Creating and cancelling an invite go to the audit log (consoleAudit, kind `invite`); the role itself is recorded by
- *   setRole as every role change is.
+ * - Someone signed in with no role and no invite is an access request, `consoleRequests/{uid}` (name, email, photo,
+ *   sign-in method, first and last attempt): the main way in. The Staff page lists pending ones with one-tap actions
+ *   (give Labeller, another role, dismiss, block), and the header shows how many wait. They see "Waiting for access"
+ *   and nothing else.
+ * - Audit (consoleAudit): an invite created or cancelled (kind `invite`), a request seen, granted, dismissed or blocked
+ *   (kind `request`); the role itself is recorded by setRole as every role change is.
  *
  * Both collections are closed to clients (firestore.rules' catch-all).
  */
@@ -20,22 +22,14 @@ import { ConsoleError, Role, isRole } from './roles';
 import { CONSOLE_AUDIT, RoleActor, RoleChange } from './staff';
 
 export const INVITES = 'consoleInvites';
-export const WAITING = 'consoleWaiting';
-/** Who waited longer ago than this drops off the Staff page's list. */
-export const WAITING_DAYS = 30;
+/** Access requests: accounts that signed in to the console with no role, by uid. */
+export const REQUESTS = 'consoleRequests';
 
 export interface Invite {
   email: string;
   role: Role;
   at: number;
   by: { uid: string | null; email: string | null };
-}
-
-export interface Waiting {
-  uid: string;
-  email: string | null;
-  verified: boolean;
-  at: number;
 }
 
 export interface InviteEvent {
@@ -115,30 +109,163 @@ export async function claimInvite(
   });
   if (!invite) return null;
   await setRole(who.uid, invite.role, { uid: invite.by.uid ?? null, email: invite.by.email ?? null, via: 'invite' });
-  await db.collection(WAITING).doc(who.uid).delete();
+  // An earlier request of theirs (signed in before the invite was verified) is answered too.
+  await settleRequest(db, who.uid, 'granted', { uid: invite.by.uid ?? null, email: invite.by.email ?? null }, now, invite.role);
   return invite.role;
 }
 
-/** Notes a signed-in account with no role, for the Staff page (at most once a minute per account). */
-export async function noteWaiting(db: Firestore, who: { uid: string; email: string | null; emailVerified: boolean }, now: number): Promise<void> {
-  const ref = db.collection(WAITING).doc(who.uid);
-  const doc = await ref.get();
-  if (doc.exists && now - ms(doc.get('at')) < 60_000) return;
-  await ref.set({ uid: who.uid, email: who.email, verified: who.emailVerified, at: Timestamp.fromMillis(now) });
+/** How they signed in, in words (from the ID token's `firebase.sign_in_provider`). */
+export function methodName(provider: string | null | undefined): string {
+  if (provider === 'google.com') return 'Google';
+  if (provider === 'emailLink') return 'Email link';
+  if (provider === 'password') return 'Email';
+  if (provider === 'apple.com') return 'Apple';
+  if (provider === 'custom') return 'Test sign-in';
+  return provider || 'Unknown';
 }
 
-export async function waitingList(db: Firestore, now: number): Promise<Waiting[]> {
-  const snap = await db
-    .collection(WAITING)
-    .where('at', '>=', Timestamp.fromMillis(now - WAITING_DAYS * 86_400_000))
-    .orderBy('at', 'desc')
-    .limit(50)
-    .get();
-  return snap.docs.map((d) => ({ uid: d.id, email: (d.get('email') as string | null) ?? null, verified: d.get('verified') === true, at: ms(d.get('at')) }));
+export type RequestStatus = 'pending' | 'granted' | 'dismissed' | 'blocked';
+
+export interface AccessRequest {
+  uid: string;
+  email: string | null;
+  name: string | null;
+  photo: string | null;
+  method: string;
+  verified: boolean;
+  firstAt: number;
+  lastAt: number;
+  attempts: number;
+  status: RequestStatus;
 }
 
-export async function clearWaiting(db: Firestore, uid: string): Promise<void> {
-  await db.collection(WAITING).doc(uid).delete();
+export interface Requester {
+  uid: string;
+  email: string | null;
+  emailVerified: boolean;
+  name?: string | null;
+  photo?: string | null;
+  method?: string | null;
+}
+
+/**
+ * Records a sign-in to the console by an account with no role (Majd, Nov 16 2026: "once they attempt to sign in i should
+ * be able to see their 'attempt' in the console and then i can do actions on it"). The first attempt is a new request
+ * (audited as seen); later ones move its last attempt on, at most once a minute. A dismissed request comes back on the
+ * next attempt; a blocked one never does. Returns the request's status.
+ */
+export async function noteRequest(db: Firestore, who: Requester, now: number): Promise<RequestStatus> {
+  const ref = db.collection(REQUESTS).doc(who.uid);
+  return db.runTransaction(async (tx) => {
+    const doc = await tx.get(ref);
+    const about = {
+      email: who.email,
+      name: who.name ?? null,
+      photo: typeof who.photo === 'string' && /^https:\/\//.test(who.photo) ? who.photo : null,
+      method: methodName(who.method),
+      verified: who.emailVerified,
+    };
+    if (!doc.exists) {
+      tx.set(ref, { uid: who.uid, ...about, firstAt: Timestamp.fromMillis(now), lastAt: Timestamp.fromMillis(now), attempts: 1, status: 'pending' });
+      tx.set(db.collection(CONSOLE_AUDIT).doc(), {
+        kind: 'request',
+        action: 'seen',
+        uid: who.uid,
+        email: who.email,
+        at: Timestamp.fromMillis(now),
+        by: { uid: null, email: null, via: 'console' },
+      });
+      return 'pending';
+    }
+    const status = doc.get('status') as RequestStatus;
+    if (now - ms(doc.get('lastAt')) < 60_000 && status !== 'dismissed' && status !== 'granted') return status;
+    const next: RequestStatus = status === 'blocked' ? 'blocked' : 'pending';
+    tx.update(ref, { ...about, lastAt: Timestamp.fromMillis(now), attempts: (doc.get('attempts') ?? 0) + 1, status: next });
+    return next;
+  });
+}
+
+/** The request's status without counting an attempt (the waiting page asking whether access has come). */
+export async function requestStatus(db: Firestore, uid: string): Promise<RequestStatus | null> {
+  const doc = await db.collection(REQUESTS).doc(uid).get();
+  return doc.exists ? (doc.get('status') as RequestStatus) : null;
+}
+
+export async function pendingRequests(db: Firestore): Promise<AccessRequest[]> {
+  const snap = await db.collection(REQUESTS).where('status', '==', 'pending').limit(200).get();
+  return snap.docs
+    .map((d) => ({
+      uid: d.id,
+      email: (d.get('email') as string | null) ?? null,
+      name: (d.get('name') as string | null) ?? null,
+      photo: (d.get('photo') as string | null) ?? null,
+      method: (d.get('method') as string) ?? 'Unknown',
+      verified: d.get('verified') === true,
+      firstAt: ms(d.get('firstAt')),
+      lastAt: ms(d.get('lastAt')),
+      attempts: (d.get('attempts') as number) ?? 1,
+      status: 'pending' as const,
+    }))
+    .sort((a, b) => b.lastAt - a.lastAt);
+}
+
+export async function pendingRequestCount(db: Firestore): Promise<number> {
+  return (await db.collection(REQUESTS).where('status', '==', 'pending').count().get()).data().count;
+}
+
+/** Dismisses, blocks or marks granted a request, with an audit entry; false if there was no request. */
+export async function settleRequest(
+  db: Firestore,
+  uid: string,
+  status: 'granted' | 'dismissed' | 'blocked',
+  by: { uid: string | null; email: string | null },
+  now: number,
+  role: Role | null = null,
+): Promise<boolean> {
+  const ref = db.collection(REQUESTS).doc(uid);
+  return db.runTransaction(async (tx) => {
+    const doc = await tx.get(ref);
+    if (!doc.exists) return false;
+    if (doc.get('status') === status) return true;
+    tx.update(ref, { status, settledAt: Timestamp.fromMillis(now), settledBy: by });
+    tx.set(db.collection(CONSOLE_AUDIT).doc(), {
+      kind: 'request',
+      action: status,
+      uid,
+      email: (doc.get('email') as string | null) ?? null,
+      ...(role ? { role } : {}),
+      at: Timestamp.fromMillis(now),
+      by: { ...by, via: 'console' },
+    });
+    return true;
+  });
+}
+
+export interface RequestEvent {
+  id: string;
+  kind: 'request';
+  action: 'seen' | 'granted' | 'dismissed' | 'blocked';
+  uid: string;
+  email: string | null;
+  role: Role | null;
+  at: number;
+  by: { uid: string | null; email: string | null; via: 'console' | 'script' };
+}
+
+export function requestEventFrom(id: string, d: Record<string, unknown> | undefined): RequestEvent | null {
+  if (!d || d.kind !== 'request' || typeof d.uid !== 'string') return null;
+  const by = (d.by ?? {}) as Record<string, unknown>;
+  const action = ['seen', 'granted', 'dismissed', 'blocked'].includes(d.action as string) ? (d.action as RequestEvent['action']) : 'seen';
+  return {
+    id,
+    kind: 'request',
+    action,
+    uid: d.uid,
+    email: typeof d.email === 'string' ? d.email : null,
+    role: isRole(d.role) ? d.role : null,
+    at: ms(d.at),
+    by: { uid: typeof by.uid === 'string' ? by.uid : null, email: typeof by.email === 'string' ? by.email : null, via: by.via === 'script' ? 'script' : 'console' },
+  };
 }
 
 export function inviteEventFrom(id: string, d: Record<string, unknown> | undefined): InviteEvent | null {

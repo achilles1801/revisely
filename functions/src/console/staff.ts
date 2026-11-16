@@ -13,7 +13,7 @@ import type { DocumentData, Firestore, Query } from 'firebase-admin/firestore';
 import { FieldPath, Timestamp } from 'firebase-admin/firestore';
 import { decodeCursor, encodeCursor, PAGE_DEFAULT, PAGE_MAX } from '../support/review';
 import { Role, claimsWithRole, isRole, roleOf } from './roles';
-import { InviteEvent, inviteEventFrom } from './invites';
+import { InviteEvent, RequestEvent, inviteEventFrom, requestEventFrom } from './invites';
 
 export const CONSOLE_AUDIT = 'consoleAudit';
 
@@ -126,16 +126,16 @@ export async function staff(auth: Auth): Promise<StaffMember[]> {
 }
 
 /** The role changes and invites, newest first. */
-export async function rolesPage(db: Firestore, opts: { limit?: number; cursor?: unknown }): Promise<{ rows: (RoleChange | InviteEvent)[]; next: string | null }> {
+export async function rolesPage(db: Firestore, opts: { limit?: number; cursor?: unknown }): Promise<{ rows: (RoleChange | InviteEvent | RequestEvent)[]; next: string | null }> {
   const limit = Math.min(PAGE_MAX, Math.max(1, Math.floor(opts.limit ?? PAGE_DEFAULT)));
-  let q: Query = db.collection(CONSOLE_AUDIT).where('kind', 'in', ['role', 'invite']).orderBy('at', 'desc').orderBy(FieldPath.documentId(), 'desc');
+  let q: Query = db.collection(CONSOLE_AUDIT).where('kind', 'in', ['role', 'invite', 'request']).orderBy('at', 'desc').orderBy(FieldPath.documentId(), 'desc');
   const after = decodeCursor(opts.cursor);
   if (after) q = q.startAfter(Timestamp.fromMillis(after.at), after.uid);
   const snap = await q.limit(limit + 1).get();
   const rows = snap.docs
     .slice(0, limit)
-    .map((d) => roleChangeFrom(d.id, d.data()) ?? inviteEventFrom(d.id, d.data()))
-    .filter((d): d is RoleChange | InviteEvent => !!d);
+    .map((d) => roleChangeFrom(d.id, d.data()) ?? inviteEventFrom(d.id, d.data()) ?? requestEventFrom(d.id, d.data()))
+    .filter((d): d is RoleChange | InviteEvent | RequestEvent => !!d);
   const last = rows[rows.length - 1];
   return { rows, next: snap.docs.length > limit && last ? encodeCursor(last.at, last.id) : null };
 }

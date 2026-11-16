@@ -462,12 +462,19 @@ function adminFailure(name: string, err: unknown): HttpsError {
  */
 async function staffClaims(
   auth: { uid: string } | undefined,
-): Promise<{ uid: string; email: string | null; emailVerified: boolean; claims: Record<string, unknown> } | null> {
+): Promise<{ uid: string; email: string | null; emailVerified: boolean; name: string | null; photo: string | null; claims: Record<string, unknown> } | null> {
   if (!auth?.uid) return null;
   try {
     const user = await getAuth().getUser(auth.uid);
     if (user.disabled) return null;
-    return { uid: user.uid, email: user.email ?? null, emailVerified: user.emailVerified, claims: (user.customClaims ?? {}) as Record<string, unknown> };
+    return {
+      uid: user.uid,
+      email: user.email ?? null,
+      emailVerified: user.emailVerified,
+      name: user.displayName ?? null,
+      photo: user.photoURL ?? null,
+      claims: (user.customClaims ?? {}) as Record<string, unknown>,
+    };
   } catch (err) {
     if ((err as { code?: string }).code === 'auth/user-not-found') return null;
     throw err;
@@ -772,7 +779,10 @@ const consoleDeps = {
 export const adminConsole = onCall({ cors: CONSOLE_ORIGINS, timeoutSeconds: 60, maxInstances: 3 }, async (request) => {
   try {
     const staff = await staffClaims(request.auth);
-    const caller: StaffCaller | null = staff ? { uid: staff.uid, email: staff.email, role: roleOf(staff.claims), emailVerified: staff.emailVerified } : null;
+    const provider = (request.auth?.token as { firebase?: { sign_in_provider?: string } } | undefined)?.firebase?.sign_in_provider ?? null;
+    const caller: StaffCaller | null = staff
+      ? { uid: staff.uid, email: staff.email, role: roleOf(staff.claims), emailVerified: staff.emailVerified, name: staff.name, photo: staff.photo, method: provider }
+      : null;
     // The test emulator decodes App Check tokens without verifying them, and the console there has none.
     return await handleAdminConsole(caller, request.data, !!request.app || testing, consoleDeps);
   } catch (err) {

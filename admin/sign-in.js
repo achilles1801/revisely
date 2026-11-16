@@ -52,9 +52,13 @@ async function settle(user) {
       return;
     }
     $('noAccessEmail').textContent = user.email || 'an account with no email';
-    $('noAccessEmail2').textContent = user.email || 'this account';
-    $('noAccessUnverified').hidden = !!user.emailVerified;
+    const blocked = me.request === 'blocked';
+    $('noAccessAsked').hidden = blocked;
+    $('noAccessBlocked').hidden = !blocked;
+    $('noAccessUnverified').hidden = blocked || !!user.emailVerified;
+    $('recheckBtn').hidden = blocked;
     show('noAccess');
+    if (!blocked) waitForAccess();
   } catch (err) {
     const code = String((err && err.code) || '').replace('functions/', '');
     if (code === 'unauthenticated') {
@@ -99,6 +103,42 @@ async function start() {
   }
   await settle(user);
 }
+
+// Waiting: ask again every 15 s while the page is in front (for up to an hour), so it opens as soon as the owner acts.
+let waitTimer = 0;
+let waitUntil = 0;
+function waitForAccess() {
+  clearTimeout(waitTimer);
+  if (!waitUntil) waitUntil = Date.now() + 3_600_000;
+  if (Date.now() > waitUntil) return;
+  waitTimer = setTimeout(async () => {
+    if ($('noAccess').hidden) return;
+    if (document.visibilityState !== 'visible') return waitForAccess();
+    try {
+      const me = await ctx.call('adminConsole', { action: 'me', poll: true });
+      if (me.role) return location.replace(next);
+      if (me.request === 'blocked') {
+        $('noAccessAsked').hidden = true;
+        $('noAccessBlocked').hidden = false;
+        $('recheckBtn').hidden = true;
+        return;
+      }
+    } catch {
+      // a dropped connection: try again next time
+    }
+    waitForAccess();
+  }, 15_000);
+}
+document.addEventListener('visibilitychange', () => {
+  // Back on the page: ask at once (as a poll, not a new attempt).
+  if (document.visibilityState === 'visible' && !$('noAccess').hidden) {
+    clearTimeout(waitTimer);
+    ctx.call('adminConsole', { action: 'me', poll: true }).then(
+      (me) => (me.role ? location.replace(next) : me.request === 'blocked' ? null : waitForAccess()),
+      () => waitForAccess(),
+    );
+  }
+});
 
 async function finishLink(email) {
   show('loading');

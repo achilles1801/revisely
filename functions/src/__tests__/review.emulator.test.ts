@@ -334,9 +334,14 @@ const BY: Reviewer = { uid: 'staff1', email: 'owner@example.com', role: 'owner',
       invites: true,
     };
     const owner = { uid: 'staff1', email: 'owner@example.com', role: 'owner' as const };
-    type Me = { role: string | null; permissions: string[]; labels: boolean };
-    const me = async (uid: string, email: string, emailVerified: boolean) =>
-      (await handleAdminConsole({ uid, email, role: (roles.get(uid) ?? null) as never, emailVerified }, { action: 'me' }, false, deps)) as Me;
+    type Me = { role: string | null; permissions: string[]; labels: boolean; request?: string; requests?: number };
+    const me = async (uid: string, email: string, emailVerified: boolean, poll = false) =>
+      (await handleAdminConsole(
+        { uid, email, role: (roles.get(uid) ?? null) as never, emailVerified, name: 'Test ' + uid, photo: 'https://example.com/p.png', method: 'google.com' },
+        { action: 'me', ...(poll ? { poll: true } : {}) },
+        false,
+        deps,
+      )) as Me;
 
     // An account that already exists gets the role at once, as before.
     expect(await handleAdminConsole(owner, { action: 'staff.set', email: 'known@example.com', role: 'labeller' }, true, deps)).toMatchObject({ changed: true });
@@ -350,28 +355,52 @@ const BY: Reviewer = { uid: 'staff1', email: 'owner@example.com', role: 'owner',
     const labeller = { uid: 'old1', email: 'known@example.com', role: 'labeller' as const };
     await expect(handleAdminConsole(labeller, { action: 'staff.set', email: 'x@example.com', role: 'owner' }, true, deps)).rejects.toThrow('Your role doesn’t allow this.');
 
-    // A sign-in with that email, not verified: no role, and they wait.
-    expect(await me('u-new', 'new.person@example.com', false)).toMatchObject({ role: null, permissions: [] });
-    let list = (await handleAdminConsole(owner, { action: 'staff.list' }, true, deps)) as { invites: { email: string }[]; waiting: { uid: string; verified: boolean }[] };
+    // A sign-in with that email, not verified: no role; an access request instead.
+    expect(await me('u-new', 'new.person@example.com', false)).toMatchObject({ role: null, permissions: [], request: 'pending' });
+    let list = (await handleAdminConsole(owner, { action: 'staff.list' }, true, deps)) as {
+      invites: { email: string }[];
+      requests: { uid: string; verified: boolean; name: string; photo: string; method: string; attempts: number }[];
+    };
     expect(list.invites.map((i) => i.email)).toEqual(['new.person@example.com']);
-    expect(list.waiting).toEqual([expect.objectContaining({ uid: 'u-new', verified: false })]);
+    expect(list.requests).toEqual([expect.objectContaining({ uid: 'u-new', verified: false, name: 'Test u-new', photo: 'https://example.com/p.png', method: 'Google', attempts: 1 })]);
+    // The owner's `me` carries the count, for the header's badge.
+    expect(await handleAdminConsole(owner, { action: 'me' }, false, deps)).toMatchObject({ requests: 1 });
     // Verified (Google, an email link): the invite's role, once, recorded as from an invite by the owner.
     expect(await me('u-new', 'New.Person@example.com', true)).toMatchObject({ role: 'labeller', permissions: ['recite.label'], labels: false });
     expect(set.at(-1)).toEqual({ uid: 'u-new', role: 'labeller', via: 'invite' });
     expect((await db.doc('consoleInvites/new.person@example.com').get()).data()).toMatchObject({ status: 'used', usedBy: 'u-new' });
     list = (await handleAdminConsole(owner, { action: 'staff.list' }, true, deps)) as typeof list;
     expect(list.invites).toEqual([]);
-    expect(list.waiting).toEqual([]);
+    // u-new has a role now, so their old request isn't listed.
+    expect(list.requests).toEqual([]);
     // Someone else with the same email later claims nothing.
-    expect(await me('u-other', 'new.person@example.com', true)).toMatchObject({ role: null });
+    expect(await me('u-other', 'new.person@example.com', true)).toMatchObject({ role: null, request: 'pending' });
 
-    // Someone with no invite waits; one tap gives the role and takes them off the list.
+    // One tap gives the role and marks the request granted.
     list = (await handleAdminConsole(owner, { action: 'staff.list' }, true, deps)) as typeof list;
-    expect(list.waiting.map((w) => w.uid)).toEqual(['u-other']);
+    expect(list.requests.map((w) => w.uid)).toEqual(['u-other']);
     accounts.set('u-other', account('u-other', 'new.person@example.com'));
     await handleAdminConsole(owner, { action: 'staff.set', uid: 'u-other', role: 'labeller' }, true, deps);
+    expect((await db.doc('consoleRequests/u-other').get()).get('status')).toBe('granted');
     list = (await handleAdminConsole(owner, { action: 'staff.list' }, true, deps)) as typeof list;
-    expect(list.waiting).toEqual([]);
+    expect(list.requests).toEqual([]);
+
+    // Dismiss: off the list; the waiting page's polls don't bring it back, a new sign-in does.
+    await me('u-d', 'd@example.com', true);
+    await handleAdminConsole(owner, { action: 'staff.request', uid: 'u-d', decision: 'dismiss' }, true, deps);
+    expect(await me('u-d', 'd@example.com', true, true)).toMatchObject({ request: 'dismissed' });
+    list = (await handleAdminConsole(owner, { action: 'staff.list' }, true, deps)) as typeof list;
+    expect(list.requests.map((r) => r.uid)).toEqual([]);
+    expect(await me('u-d', 'd@example.com', true)).toMatchObject({ request: 'pending' });
+    list = (await handleAdminConsole(owner, { action: 'staff.list' }, true, deps)) as typeof list;
+    expect(list.requests.map((r) => [r.uid, r.attempts])).toEqual([['u-d', 2]]);
+    // Block: off the list for good, whatever they do.
+    await handleAdminConsole(owner, { action: 'staff.request', uid: 'u-d', decision: 'block' }, true, deps);
+    expect(await me('u-d', 'd@example.com', true)).toMatchObject({ role: null, request: 'blocked' });
+    list = (await handleAdminConsole(owner, { action: 'staff.list' }, true, deps)) as typeof list;
+    expect(list.requests).toEqual([]);
+    await expect(handleAdminConsole(owner, { action: 'staff.request', uid: 'nobody', decision: 'block' }, true, deps)).rejects.toThrow('That request is gone.');
+    await expect(handleAdminConsole(labeller, { action: 'staff.request', uid: 'u-d', decision: 'dismiss' }, true, deps)).rejects.toThrow('Your role doesn’t allow this.');
 
     // Cancelling: the invite no longer gives anything.
     await handleAdminConsole(owner, { action: 'staff.set', email: 'later@example.com', role: 'admin' }, true, deps);
@@ -385,6 +414,17 @@ const BY: Reviewer = { uid: 'staff1', email: 'owner@example.com', role: 'owner',
       ['cancelled', 'later@example.com', 'admin'],
       ['created', 'later@example.com', 'admin'],
       ['created', 'new.person@example.com', 'labeller'],
+    ]);
+    expect(page.rows.filter((r) => r.kind === 'request').map((r) => [r.action, r.email])).toEqual([
+      ['seen', 'later@example.com'],
+      ['blocked', 'd@example.com'],
+      ['dismissed', 'd@example.com'],
+      ['seen', 'd@example.com'],
+      ['granted', 'new.person@example.com'],
+      ['seen', 'new.person@example.com'],
+      // u-new's own request, answered when the invite gave the role
+      ['granted', 'new.person@example.com'],
+      ['seen', 'new.person@example.com'],
     ]);
   });
 
