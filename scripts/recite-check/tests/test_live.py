@@ -286,10 +286,11 @@ class Bench(unittest.TestCase):
                          {k: last['score'][k] for k in ('reached', 'mistakes')})
 
     def test_follow_mode_sends_the_cursor_and_said_but_no_marks_or_score(self):
+        """…and `off` (the hidden view's next word, when something else is said there: word 4 here)."""
         import live
         sess = live.LiveSession(engine(), 1, 1, 1, 7, {'letters': '1'}, follow=True)
         ev = run(sess, chunks(bench_pcm(), 3200) + [{'type': 'end'}])
-        self.assertEqual({e['type'] for e in ev} - {'at', 'said', 'ayah', 'done'}, set())
+        self.assertEqual({e['type'] for e in ev} - {'at', 'said', 'ayah', 'done', 'off'}, set())
         res = ev[-1]['result']
         self.assertEqual((res['marks'], res['score']), ([], None))  # the contract's shape, empty
         self.assertEqual(res['settings']['letters'], False)
@@ -704,8 +705,27 @@ class SimilarPassage(unittest.TestCase):
             self.assertEqual(self.named(name, 1, 1, 1, 7), [{}, {}])
 
 
-if __name__ == '__main__':
-    unittest.main()
+
+class OffHere(unittest.TestCase):
+    """`off`: something else said in the next word's slot, for the hidden view (2026-11-15 idea, approved)."""
+
+    def events(self, item):
+        import live
+        with wave.open(str(item.with_suffix('.wav'))) as f:
+            pcm = f.readframes(f.getnframes())
+        return run(live.LiveSession(engine(), 1, 1, 1, 7, {}, follow=True), chunks(pcm, 3200) + [{'type': 'end'}])
+
+    def test_a_word_said_as_another_is_off_before_it_is_decided(self):
+        """Al-Fatiha with word 4 said as another word: `off` for 4, while the word in its place is still being said,
+        before `said` passes it."""
+        ev = self.events(ITEM)
+        off = [e for e in ev if e['type'] == 'off']
+        self.assertEqual([e['w'] for e in off][:1], [4])
+        passed = next(e['t'] for e in ev if e['type'] == 'said' and e['upTo'] >= 4)
+        self.assertLess(off[0]['t'], passed)
+
+    def test_nothing_is_off_in_a_correct_take(self):
+        self.assertEqual([e for e in self.events(CLEAN) if e['type'] == 'off'], [])
 
 
 class LookAlikes(unittest.TestCase):
@@ -751,3 +771,7 @@ class DevTake(unittest.TestCase):
         self.assertEqual(live_marks, [(31428, 'harakat')])
         self.assertEqual([(m['w'], m['kind'], m['sure']) for m in ev[-1]['result']['marks']],
                          [(31428, 'harakat', 'clear')])
+
+
+if __name__ == '__main__':
+    unittest.main()
