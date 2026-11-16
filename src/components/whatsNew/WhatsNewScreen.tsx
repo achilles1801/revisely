@@ -46,6 +46,10 @@ import { pictureFor } from './pictures';
 import { RevoMoment } from './RevoMoment';
 import { markRevoMomentSeen } from '../../lib/revo/momentSeen';
 import { isDevVariant } from '../../lib/variant';
+
+/** E2E builds: the next release, as Revisely Dev shows it (lib/e2e/whatsNew). Others: never. */
+const e2eNextRelease = (): boolean =>
+  process.env.EXPO_PUBLIC_E2E === '1' ? (require('../../lib/e2e/whatsNew') as typeof import('../../lib/e2e/whatsNew')).e2eNextRelease() : false;
 import { auth } from '../../lib/firebase';
 import { greetingName } from '../../lib/displayName';
 import { smartTrackingOn } from '../../lib/smartTracking';
@@ -164,7 +168,7 @@ export function WhatsNewScreen({
   /** Tests pass a release to run its cards; otherwise the current one, or the next for a tester in Revisely Dev. */
   release?: WhatsNewRelease;
 }) {
-  const release = given ?? releaseFor(mode, isDevVariant());
+  const release = given ?? releaseFor(mode, isDevVariant() || e2eNextRelease());
   const { palette } = useTheme();
   const { fontScale } = useWindowDimensions();
   const insets = useSafeAreaInsets();

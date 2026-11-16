@@ -1,0 +1,170 @@
+# Captures of What's new's next release (NEXT_RELEASE, the mistake detection release 1.0.5), as Revisely Dev's testers
+# see it: each card, light then dark. A capture run by hand on its branch (`flows: 19-*`), not one of a job's flows:
+# E2E builds aren't Revisely Dev, so `e2e/whats-new?next=1` lets the replay show the next release, and
+# `e2e/recite-live?on=1` opens Recite for the tester, as in Revisely Dev.
+# Screenshots: n1-recite … n5-more, then the same with -dark.
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    file: ../subflows/new-account.yaml
+    env:
+      CLOCK: 2026-11-03T19:00
+      BOUNDARY: midnight
+# A tester: the replay is theirs until the release, and Recite opens only for a tester.
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: tester
+- extendedWaitUntil:
+    visible:
+      id: today-post
+    timeout: 20000
+- openLink:
+    link: revisely://e2e/recite-live?on=1
+    optional: true
+- runFlow: ../subflows/open-link-prompt.yaml
+- openLink:
+    link: revisely://e2e/whats-new?next=1
+    optional: true
+- runFlow: ../subflows/open-link-prompt.yaml
+
+# Light: Settings → About → What's new.
+- tapOn:
+    id: open-settings
+- runFlow:
+    file: ../subflows/settings-row.yaml
+    env:
+      ROW: settings-whats-new
+- tapOn:
+    id: settings-whats-new
+- extendedWaitUntil:
+    visible:
+      id: whats-new-replay
+    timeout: 10000
+- extendedWaitUntil:
+    visible:
+      id: whats-new-title
+      text: '.*Recite, and see your mistakes'
+    timeout: 10000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: n1-recite
+- tapOn:
+    id: whats-new-next
+- extendedWaitUntil:
+    visible:
+      id: whats-new-title
+      text: '.*Every mistake, explained'
+    timeout: 10000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: n2-marks
+- tapOn:
+    id: whats-new-next
+- extendedWaitUntil:
+    visible:
+      id: whats-new-title
+      text: '.*Until it sticks'
+    timeout: 10000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: n3-again
+- tapOn:
+    id: whats-new-next
+- extendedWaitUntil:
+    visible:
+      id: whats-new-title
+      text: '.*Gaps, in Insights'
+    timeout: 10000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: n4-gaps
+- tapOn:
+    id: whats-new-next
+- extendedWaitUntil:
+    visible:
+      id: whats-new-title
+      text: '.*Also new'
+    timeout: 10000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: n5-more
+- tapOn:
+    id: whats-new-close
+- extendedWaitUntil:
+    notVisible:
+      id: whats-new-replay
+    timeout: 10000
+- runFlow: ../subflows/back-home.yaml
+
+# Dark: Settings → Theme → Dark, then the replay again.
+- runFlow:
+    file: ../subflows/theme.yaml
+    env:
+      THEME: Dark
+- tapOn:
+    id: open-settings
+- runFlow:
+    file: ../subflows/settings-row.yaml
+    env:
+      ROW: settings-whats-new
+- tapOn:
+    id: settings-whats-new
+- extendedWaitUntil:
+    visible:
+      id: whats-new-title
+      text: '.*Recite, and see your mistakes'
+    timeout: 10000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: n1-recite-dark
+- tapOn:
+    id: whats-new-next
+- extendedWaitUntil:
+    visible:
+      id: whats-new-title
+      text: '.*Every mistake, explained'
+    timeout: 10000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: n2-marks-dark
+- tapOn:
+    id: whats-new-next
+- extendedWaitUntil:
+    visible:
+      id: whats-new-title
+      text: '.*Until it sticks'
+    timeout: 10000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: n3-again-dark
+- tapOn:
+    id: whats-new-next
+- extendedWaitUntil:
+    visible:
+      id: whats-new-title
+      text: '.*Gaps, in Insights'
+    timeout: 10000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: n4-gaps-dark
+- tapOn:
+    id: whats-new-next
+- extendedWaitUntil:
+    visible:
+      id: whats-new-title
+      text: '.*Also new'
+    timeout: 10000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: n5-more-dark
