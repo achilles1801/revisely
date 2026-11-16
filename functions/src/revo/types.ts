@@ -52,8 +52,129 @@ export interface RevoContext {
   passages?: Partial<Record<RevoPassageKey, string>>;
   /** Each page the context names, in words ("Al-Hashr, ayahs 17–24 · Juz 28"), keyed by page number. */
   pageNames?: Record<string, string>;
+  /**
+   * Their recitation (Recite with Mark mistakes, Revisely Dev only): what the app's lib/reciteInsights found in the
+   * takes kept on the account. Sent only by Dev apps whose account recites; with it, the request carries the
+   * recitation rules (recitation.ts) as a second system block.
+   */
+  recitation?: RevoRecitation;
   localTime: string | null;
 }
+
+/** A passage of one surah by its ayahs, with the app's words for it ("Al-Kahf, ayahs 22–23"). */
+export interface RevoRecitedPassage {
+  sura: number;
+  from: number;
+  to: number;
+  name: string;
+}
+
+/** One ayah, with the app's short words for it ("Al-Baqarah 48"). */
+export interface RevoRecitedAyah {
+  sura: number;
+  ayah: number;
+  name: string;
+}
+
+/** Mistakes by kind, as Recite's summary counts them: never Not clear, never tajweed. */
+export const REVO_MISTAKE_KINDS = ['wrong', 'skipped', 'added', 'harakat', 'letter'] as const;
+export type RevoMistakeKinds = Record<(typeof REVO_MISTAKE_KINDS)[number], number>;
+
+/** Weeks of scores the app sends, the current one last. */
+export const REVO_RECITATION_WEEKS = 8;
+export const REVO_RECITATION_LIST = 5;
+
+/** What the app's Insights shows of their recitation over the last `days` revision days (the app's lib/reciteInsights). */
+export interface RevoRecitation {
+  /** The window, in revision days (28). */
+  days: number;
+  takes: number;
+  /** Revision days with a take. */
+  daysRecited: number;
+  minutes: number;
+  words: number;
+  mistakes: number;
+  kinds: RevoMistakeKinds;
+  /** Not clear: never counted as mistakes. */
+  unclear: number;
+  /** Tajweed notes; null when no take in the window was at the Strict level. */
+  tajweed: number | null;
+  /** The score by the page (0–1), each take weighted by the words it recited; null with no takes in the window. */
+  score: number | null;
+  /** The same for the `days` before. */
+  earlierScore: number | null;
+  /** Each week's score, oldest first, the current week last; null for a week with no takes. */
+  weeks: (number | null)[];
+  /** Words still marked on the page now, and words cleared in the window. */
+  stillMarked: number;
+  cleared: number;
+  /** Passages with words still marked, the most slipped first. */
+  slipping: { passage: RevoRecitedPassage; words: number; wordMistakes: number; wrong: number; tries: number; daysAgo: number }[];
+  /** Slips into a similar ayah in the window (the checker's `into`), the most often first. */
+  similar: { from: RevoRecitedAyah; into: RevoRecitedAyah; ending: boolean; times: number; also: number; daysAgo: number }[];
+  /** The latest take, any time. */
+  last: { daysAgo: number; passage: RevoRecitedPassage; score: number; mistakes: number; unclear: number; hidden: boolean; strict: boolean } | null;
+}
+
+/** A mark's kind, finer detail and tajweed rule, as the checker names them (recite-contract.md). */
+export const REVO_MARK_KINDS = ['word', 'skipped', 'added', 'harakat', 'letter', 'tajweed'] as const;
+export const REVO_MARK_DETAILS = ['lookalike', 'sound', 'replaced', 'order', 'trail', 'shadda'] as const;
+export const REVO_TAJWEED_RULES = [
+  'madd_munfasil',
+  'madd_muttasil',
+  'madd_aared',
+  'madd_lazim',
+  'madd_dropped',
+  'qalqalah',
+  'ghunnah',
+  'ikhfa',
+  'idgham',
+  'idgham_no_ghunnah',
+  'iqlab',
+] as const;
+
+/** One mark of an attached take, in mushaf order. */
+export interface RevoTakeMark {
+  sura: number;
+  ayah: number;
+  /** The ayah in the app's short words ("Al-Baqarah 48"). */
+  name: string;
+  kind: (typeof REVO_MARK_KINDS)[number];
+  /** A haraka or letter heard only past the normal bar: "Not clear", never a mistake. */
+  unclear: boolean;
+  detail?: (typeof REVO_MARK_DETAILS)[number];
+  /** The word expected (the Qur'an's text); absent for an extra word. */
+  expected?: string;
+  /** What was heard instead: a real word, or the expected word with the heard haraka or letter. Never a sound spelt out. */
+  heard?: string;
+  rule?: (typeof REVO_TAJWEED_RULES)[number];
+  /** Madds: counts heard, and counts set. */
+  got?: number;
+  set?: number;
+  /** Went on with a similar ayah, or ended the ayah as `into` ends. */
+  into?: { sura: number; ayah: number; name: string; ending: boolean; also: number };
+}
+
+/** What the app shows for one take (Recite with Mark mistakes), attached by the user. */
+export interface RevoTakeFacts {
+  daysAgo: number;
+  passage: RevoRecitedPassage;
+  level: 'words' | 'strict';
+  hidden: boolean;
+  secs: number;
+  words: number;
+  score: number;
+  mistakes: number;
+  unclear: number;
+  tajweed: number;
+  /** Its marks, at most REVO_TAKE_MARKS. */
+  marks: RevoTakeMark[];
+  /** Words this take cleared from the page. */
+  cleared: number;
+  /** The score of the take before it of the same passage, if any. */
+  before: number | null;
+}
+export const REVO_TAKE_MARKS = 60;
 
 /**
  * A pattern in the account's last days, found by the app from its own credits and session times
@@ -75,7 +196,8 @@ export const REVO_PATTERN_KINDS = ['catchingUp', 'aheadBurst', 'lateNights', 'st
 export const REVO_PASSAGE_KEYS = ['today', 'startsAt', 'next', 'nextAt', 'weakNext', 'weak', 'memorizedToday'] as const;
 export type RevoPassageKey = (typeof REVO_PASSAGE_KEYS)[number];
 
-export const REVO_INSIGHTS = ['coverage', 'consistency', 'weakSpots', 'pace'] as const;
+/** `recitation`: Insights' Recitation section (Revisely Dev). */
+export const REVO_INSIGHTS = ['coverage', 'consistency', 'weakSpots', 'pace', 'recitation'] as const;
 export type RevoInsight = (typeof REVO_INSIGHTS)[number];
 
 /** How often a part of the Qur'an was revised in a window (the app's lib/revo/facts). */
@@ -152,7 +274,9 @@ export type RevoAttachment =
   | { kind: 'surah'; label: string; surah: number; facts: RevoPassageFacts }
   | { kind: 'juz'; label: string; juz: number; facts: RevoPassageFacts }
   | { kind: 'pages'; label: string; pages: number[]; facts: RevoPassageFacts }
-  | { kind: 'revisionDay'; label: string; day: string; facts: RevoDayFacts };
+  | { kind: 'revisionDay'; label: string; day: string; facts: RevoDayFacts }
+  /** A take with Mark mistakes (Revisely Dev), from Activity's hold menu or +. */
+  | { kind: 'reciteTake'; label: string; day: string; facts: RevoTakeFacts };
 
 export type RevoChart = { kind: 'pageRatings'; title: string; pages: number[] } | { kind: 'dailyPages'; title: string; days: 7 | 30 };
 

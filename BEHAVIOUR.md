@@ -280,6 +280,19 @@ How the tests are made: `tests/scenarios/README.md`.
   A sitting offers one thing: pages not memorized come first (MEM-5). Pages not scheduled that day,
   already revised, or on an older day were reading, and offer nothing.
 
+## Recite insights (Revisely Dev)
+
+What a user's takes with Mark mistakes show over time, and Revo knowing it (Majd, Nov 16 2026).
+
+- **RINS-1.** Revo knows what Recite found in the account's takes, worked out on the phone: the last 4
+  weeks' takes and score, mistakes by kind, Not clear and tajweed notes apart, words still marked and
+  cleared, the passages that keep slipping and the similar ayahs gone on with, and the latest take. A take's
+  own marks go only when the user attaches it. It is told text only: never audio, recordings or ids, and
+  never a sound spelt out. Its rules for this come only with a recitation, so every other question is asked
+  exactly as before. It speaks only of marks that exist, says Not clear wasn't clear enough to check (never
+  wrong), puts words and similar ayahs before harakat, never calls going back to restart a mistake, and
+  names surahs and ayahs, never pages.
+
 ## Recite's memory (Revisely Dev)
 
 Recite with Mark mistakes remembers each take (Majd, Nov 15 2026; Tarteel's biggest lead over Revisely).
