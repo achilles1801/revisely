@@ -310,6 +310,12 @@ describe('the redesign (Majd, Nov 16 2026: the mic in reach of a thumb, clearer 
     expect(kids[kids.length - 1].props.testID).toBe('search-bar');
   });
 
+  it('the header clears the status bar from the first frame: the top inset from the provider, not a native view', async () => {
+    await open();
+    const { SafeAreaView } = require('react-native-safe-area-context');
+    expect(screen.UNSAFE_queryAllByType(SafeAreaView)).toHaveLength(0);
+  });
+
   it('listening: what is heard so far, large, and the voice’s level; one tap on the same button stops it', async () => {
     mockVoice.status = 'listening';
     mockVoice.partial = 'قل لو شاء';

@@ -5,7 +5,6 @@ import { FlatList } from 'react-native-gesture-handler';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { TopSafeAreaView } from '../../components/SafeAreaView';
 import { Mark } from '../../components/v2/Mark';
 import { Tap } from '../../components/v2/Tap';
 import { SpeechModelSheet } from '../../components/recite/SpeechModelSheet';
@@ -478,7 +477,10 @@ export default function QuranSearchScreen() {
   }
 
   return (
-    <TopSafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
+    // The top inset from the app's provider, right from the first frame (CLAUDE.md, ScreenSafeAreaView): the native
+    // safe-area view applied it a beat after the screen slid in, and the header sat on the status bar meanwhile (an SE
+    // at the largest text, Nov 16 2026). The bottom is the bar's own.
+    <View style={[styles.container, { backgroundColor: palette.bg, paddingTop: insets.top }]}>
       {header}
       {/* The keyboard pushes the field and the mic up with it, on Android too (edge to edge: the window isn't resized). */}
       <KeyboardAvoidingView style={styles.fill} behavior="padding">
@@ -507,7 +509,7 @@ export default function QuranSearchScreen() {
         title="Search by voice"
         intro="Recite a few words and Revisely finds the ayah."
       />
-    </TopSafeAreaView>
+    </View>
   );
 }
 
