@@ -8,6 +8,7 @@ import {
   finishEmailLink,
   isEmailLink,
   linkEmail,
+  onUserChange,
   safeNext,
   sendEmailLink,
   signInEmail,
@@ -18,11 +19,24 @@ import {
 
 const $ = (id) => document.getElementById(id);
 const next = safeNext(new URLSearchParams(location.search).get('next'));
+const STORAGE_OK = (() => {
+  try {
+    localStorage.setItem('rvc.probe', '1');
+    localStorage.removeItem('rvc.probe');
+    return true;
+  } catch {
+    return false;
+  }
+})();
+const IN_APP = !STORAGE_OK || /FBAN|FBAV|Instagram|Line\/|GSA\/|; wv\)|Outlook|OutlookMobile|LinkedInApp|Snapchat|Twitter/i.test(navigator.userAgent);
+$('inAppHost').textContent = location.host;
 let ctx = null;
 let busy = false;
 
 function show(id) {
-  for (const s of ['loading', 'signIn', 'linkSent', 'linkConfirm', 'noAccess', 'broken']) $(s).hidden = s !== id;
+  for (const s of ['loading', 'signIn', 'linkSent', 'linkConfirm', 'linkExpired', 'noAccess', 'broken']) $(s).hidden = s !== id;
+  // Inside another app's browser (or with storage blocked), a sign-in may not stick: say how to get out.
+  $('inAppHint').hidden = !(IN_APP && ['signIn', 'linkSent', 'linkConfirm', 'linkExpired'].includes(id));
 }
 
 function error(text) {
@@ -87,6 +101,10 @@ async function start() {
     $('env').dataset.kind = ctx.env.kind;
   }
   $('legal').hidden = ctx.env.kind === 'local';
+  // Signed in from another tab (the link opened there): this page moves on too, without a reload.
+  onUserChange(ctx, (u) => {
+    if (u && ['signIn', 'linkSent', 'linkConfirm', 'linkExpired'].some((id) => !$(id).hidden)) settle(u);
+  });
   // Opened from a sign-in link: finish it (asking for the email if this browser didn't send the link).
   if (isEmailLink(ctx)) {
     const email = linkEmail();
@@ -146,10 +164,38 @@ async function finishLink(email) {
     const res = await finishEmailLink(ctx, email);
     await settle(res.user);
   } catch (err) {
+    const code = String((err && err.code) || '');
+    // Already signed in here (the link was opened twice): carry on as that account.
+    const { user } = await currentUser(ctx);
+    if (user) return settle(user);
+    history.replaceState(null, '', '/sign-in' + (next !== '/' ? '?next=' + encodeURIComponent(next) : ''));
+    if (code === 'auth/invalid-action-code' || code === 'auth/expired-action-code') {
+      $('linkAgainEmail').value = email || '';
+      show('linkExpired');
+      return;
+    }
+    if (code === 'auth/invalid-email' || code === 'auth/missing-email') {
+      show('linkConfirm');
+      $('linkConfirmErr').hidden = false;
+      $('linkConfirmErr').textContent = 'That isn’t the email the link was sent to. Check it and try again.';
+      return;
+    }
     show('signIn');
     error(signInMessage(err));
   }
 }
+
+$('linkAgainForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const email = $('linkAgainEmail').value.trim();
+  if (!email.includes('@')) {
+    $('linkExpiredErr').hidden = false;
+    $('linkExpiredErr').textContent = 'Type your email address.';
+    return;
+  }
+  sendLink(email);
+});
+$('googleBtn2').addEventListener('click', () => $('googleBtn').click());
 
 async function sendLink(email) {
   error(null);

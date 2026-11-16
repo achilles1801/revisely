@@ -54,6 +54,7 @@ html, body { margin: 0; }
     <p class="auth-sub">We sent a sign-in link to <b id="linkSentEmail"></b>. Open it on this phone or computer: it signs you in here.</p>
     <p class="auth-sub"><b>Check your inbox and your spam folder.</b> The email comes from noreply@revisely-dev.firebaseapp.com, subject “Sign in to …”.</p>
     <p class="auth-sub">No email? Going back and using <b>Continue with Google</b> needs none.</p>
+    <p class="auth-sub">Opened the link already, in this browser? This page moves on by itself.</p>
     <div class="auth-actions">
       <button type="button" class="btn" id="linkAgainBtn">Send it again</button>
       <button type="button" class="btn" id="linkBackBtn">Use another way</button>
@@ -61,14 +62,27 @@ html, body { margin: 0; }
   </section>
 
   <section class="auth-card" id="linkConfirm" hidden aria-labelledby="linkConfirmTitle">
-    <h1 id="linkConfirmTitle">Confirm your email</h1>
-    <p class="auth-sub">This link was opened in a different browser from the one that asked for it. Type the email it was sent to.</p>
+    <h1 id="linkConfirmTitle">Finish signing in</h1>
+    <p class="auth-sub">This link opened in a different browser or app from the one that asked for it. Confirm the email it was sent to, then tap Sign in.</p>
     <form id="linkConfirmForm" novalidate>
       <label class="field"><span>Email</span><input type="email" id="linkConfirmEmail" autocomplete="email" required inputmode="email" autocapitalize="off" spellcheck="false"></label>
       <button type="submit" class="btn primary auth-submit" id="linkConfirmBtn">Sign in</button>
     </form>
     <p class="auth-err" id="linkConfirmErr" role="alert" hidden></p>
   </section>
+
+  <section class="auth-card" id="linkExpired" hidden aria-labelledby="linkExpiredTitle">
+    <h1 id="linkExpiredTitle">That link has expired</h1>
+    <p class="auth-sub">Sign-in links work once, and only for a while. Send yourself a new one, or use Google.</p>
+    <form id="linkAgainForm" novalidate>
+      <label class="field"><span>Email</span><input type="email" id="linkAgainEmail" autocomplete="email" required inputmode="email" autocapitalize="off" spellcheck="false"></label>
+      <button type="submit" class="btn primary auth-submit">Send a new link</button>
+    </form>
+    <button type="button" class="btn auth-google" id="googleBtn2">Continue with Google</button>
+    <p class="auth-err" id="linkExpiredErr" role="alert" hidden></p>
+  </section>
+
+  <p class="auth-hint" id="inAppHint" hidden>Opened inside another app (Gmail, Mail…)? If signing in doesn’t stick, open <b id="inAppHost"></b> in Safari and sign in there.</p>
 
   <section class="auth-card" id="noAccess" hidden aria-labelledby="noAccessTitle">
     <div class="auth-lock" aria-hidden="true">
