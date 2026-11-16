@@ -52,12 +52,7 @@ appId: com.revisionbuddy.app
                 optional: true
 
 # The controls: one mic (no record button) and the eye.
-- tapOn:
-    id: reader-background
-- extendedWaitUntil:
-    visible:
-      id: recite-mic
-    timeout: 10000
+- runFlow: ../subflows/reader-controls.yaml
 - assertNotVisible: "Record your recitation"
 - runFlow:
     file: ../subflows/shot.yaml
@@ -276,8 +271,7 @@ appId: com.revisionbuddy.app
     visible:
       id: reader-background
     timeout: 10000
-- tapOn:
-    id: reader-background
+- runFlow: ../subflows/reader-controls.yaml
 - tapOn:
     id: recite-mic
 - extendedWaitUntil:
@@ -381,8 +375,7 @@ appId: com.revisionbuddy.app
     visible:
       id: reader-background
     timeout: 10000
-- tapOn:
-    id: reader-background
+- runFlow: ../subflows/reader-controls.yaml
 - longPressOn:
     id: recite-mic
 - assertVisible:
@@ -420,13 +413,7 @@ appId: com.revisionbuddy.app
 # mistakes is locked now, so the mic starts Recite, whose recorded take begins there: "Listening…" until the checker
 # has found where (`locked`), then the cursor at An-Naml 25, and the summary names what was recited from there, not
 # from the page's top.
-- runFlow:
-    when:
-      notVisible:
-        id: recite-mic
-    commands:
-      - tapOn:
-          id: reader-background
+- runFlow: ../subflows/reader-controls.yaml
 - tapOn:
     id: recite-mic
 - extendedWaitUntil:
