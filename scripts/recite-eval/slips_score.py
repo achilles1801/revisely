@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """bench_slips.py's takes against a checker run: none of their events is a mistake, so every mark at one is wrong.
   hes / pause: a mark on the word after it or the one before, or an extra word there;
-  corr: a mark on the words said again or the one replaced (a `corrected` status is right), or an extra word there;
+  corr: a mark on the words said again, the one replaced, the word before or after them (a `corrected` status is
+        right), or an extra word there;
   hadr: marks per 100 words at 1.0x (processed), 1.3x and 1.6x, against bench-v0's same takes as recorded.
 
   python slips_score.py --run runs/slips --results slips.hisn.wp [--clean-results ft.hisn.wp.glide]
@@ -41,8 +42,10 @@ def main():
         for e in t.get('events', []):
             at = e['at']
             if e['type'] == 'corr':
-                near = range(at - e['back'] + 1, at + 1)
-                ex = range(at - e['back'], at + 1)
+                # the words said again, the one replaced, and the word before them: the dropped word can be heard
+                # as a repeat of it (a word of the passage said in the wrong place, then a jump back)
+                near = range(at - e['back'], at + 2)
+                ex = range(at - e['back'] - 1, at + 2)
             else:
                 near = range(at - 1, at + 1)
                 ex = range(at - 2, at + 1)

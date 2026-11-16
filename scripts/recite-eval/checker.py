@@ -46,6 +46,19 @@ DEFAULTS = {
     'skip_max': 12,     # longest jump (an ayah skip)
     'back': -8.0,       # going back to an earlier word (a repeat)
     'back_max': 30,
+    'gap_back': -8.0,   # going back to an earlier word from the filler after a later one: a word tried, dropped and
+                        # said again (a correction); None: never (the filler then took the first saying in with it, an
+                        # extra word). bench_slips.py's 108 planted corrections marked 80% -> 9% (Nov 15 2026); bench
+                        # false alarms 0.49 -> 0.50 per 100 words, planted caught 97.1 -> 97.4%, inserted words 95.2 ->
+                        # 94.0% (one in loud babble heard as a poor first try at the next word); /record false alarms
+                        # 11 -> 6, its slips 6/6; -4 lost three inserted words
+    'revisit_keep': True,  # a word said right, then said poorly on going back over it, keeps its right reading (the
+                           # dropped word heard as the word before the ones said again): with gap_back, corrections 9 ->
+                           # 6%, bench false alarms 0.50 -> 0.40 per 100 words, catches the same, /record 6 -> 5
+    'restart_fit': None,    # a filler before a word that begins with that word said whole (this well, nats a frame)
+                            # is the word said, dropped and begun again, not an extra word; None: off (at 1.0:
+                            # corrections 6 -> 3%, but inserted words 94.0 -> 85.7%: an extra word that begins like the
+                            # next one is excused)
     'fill': -0.5,       # per frame in the filler between words (an extra or replaced word)
     'fill_in': -6.0,    # entering the filler
     'fill_sub': -4.0,   # leaving it for the word after next (the word was replaced)
@@ -563,6 +576,12 @@ class Decoder:
                 c2 = np.full(W, NEG); c2[:W - o] = ex[o:]
                 b = c2 > win; win[b] = c2[b]; warg[b] = o
             offer(win + P['back'], 4, widx + warg)
+            if P.get('gap_back') is not None:  # back from the filler after word w + o (gap w + o + 1)
+                win = np.full(W, NEG); warg = np.zeros(W, np.int64)
+                for o in range(self.backs + 1):
+                    c2 = np.full(W, NEG); c2[:W - o] = gap[o + 1:W + 1]
+                    b = c2 > win; win[b] = c2[b]; warg[b] = o
+                offer(win + P['gap_back'], 7, widx + warg + 1)
         c = gap[:W].copy(); c[0] = NEG
         offer(c, 5, widx)
         c = np.full(W, NEG); c[1:] = gap[1:W] + P['fill_sub']
@@ -761,6 +780,33 @@ def prefix_fit(lp, labels):
     return float((lp.max(axis=1).sum() - d.max()) / T)
 
 
+def said_first(lp, kw):
+    """How well the start of lp says word kw whole (any of its forms): a CTC path through all its labels, ending on the
+    last one or the blank after it at any frame; the best nats a frame below the free best over those frames, 99 if
+    never (restart_fit)."""
+    best = 99.0
+    free = np.cumsum(lp.max(axis=1))
+    for f in kw['forms']:
+        labels = f['labels']
+        if not labels or lp.shape[0] < len(labels):
+            continue
+        L = len(labels); S = 2 * L + 1
+        ext = np.zeros(S, np.int64); ext[1::2] = labels
+        skip = np.zeros(S, bool)
+        if L > 1:
+            skip[3::2] = np.array(labels[1:]) != np.array(labels[:-1])
+        d = np.full(S, -1e30); d[0] = lp[0, 0]; d[1] = lp[0, ext[1]]
+        for t in range(1, lp.shape[0]):
+            n = d.copy()
+            n[1:] = np.maximum(n[1:], d[:-1])
+            n[2:] = np.where(skip[2:], np.maximum(n[2:], d[:-2]), n[2:])
+            d = n + lp[t, ext]
+            end = max(d[S - 1], d[S - 2])
+            if end > -1e29:
+                best = min(best, float((free[t] - end) / (t + 1)))
+    return best
+
+
 def trail_refs(lo_next, n=4):
     """Labels the speech after a passage may be without being an extra word: the next words, and each closing."""
     refs = []
@@ -862,6 +908,11 @@ def decide(key_words, g, lp, path, P, vocab=None, toks=None, refs=None):
     replaced = set()
     extras = []
     for gi, a, b in fillers:
+        if gi > 0 and any(abs(v['start'] - b) <= 1 for w in range(max(0, gi - 1 - int(P['back_max'])), gi)
+                          for v in visits[w]):
+            continue  # the reciter went back from here (gap_back): a word tried and dropped, then said again
+        if P.get('gap_back') is not None and gi < W and any(abs(v['start'] - b) <= 1 for v in visits[gi][:-1]):
+            continue  # the word after it was said again later: the reciter went back over this, extra and all
         if gi == W and P.get('trail_extra') and (b - a) / FPS >= P['trail_extra'] and refs is not None:
             if min((prefix_fit(lp[a:b], r) for r in refs), default=99.0) > P.get('trail_fit', 1.0):
                 extras.append({'after': key_words[W - 1]['word'], 't': b / FPS + P['delay'], 'trail': True})
@@ -877,6 +928,9 @@ def decide(key_words, g, lp, path, P, vocab=None, toks=None, refs=None):
             if w < W and any(abs(v['start'] - b) <= 1 for v in visits[w]):
                 nxt = w
                 break
+        if nxt == gi and P.get('restart_fit') is not None and dur >= P['extra_min'] \
+                and said_first(lp[a:b], key_words[gi]) <= P['restart_fit']:
+            continue  # it begins with the word after it, said whole: that word said, dropped and begun again
         if nxt == gi + 1:
             replaced.add(gi)
         elif dur >= P['extra_min']:
@@ -899,6 +953,8 @@ def decide(key_words, g, lp, path, P, vocab=None, toks=None, refs=None):
             flagged[app_w] = {'t': end_s + P['delay'], 'kind': 'order'}
         elif vs:
             v = vs[-1]
+            if P.get('revisit_keep') and len(vs) > 1 and v['bad'] and any(not x['bad'] for x in vs[:-1]):
+                v = [x for x in vs[:-1] if not x['bad']][-1]  # said right before: a poor reading on the way back
             worst = min(v['scores']) if v['scores'] else 0.0
             end_s = v['end'] / FPS
             shown[app_w] = v['start'] / FPS + 0.3
