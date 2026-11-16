@@ -16,7 +16,7 @@ import time
 
 BOOT = time.monotonic()  # the server imports this first, so an instance's age counts from about its start
 STATE = {'takes': 0}     # takes started on this instance: the first one met whatever the cold start left
-PARTS = ('model', 'words', 'tajweed', 'similar')  # the checker's `ms` parts, as CPU per second of audio
+PARTS = ('model', 'words', 'tajweed', 'similar', 'search_quran')  # the checker's `ms` parts, per second of audio
 APP = re.compile(r'^[0-9A-Za-z .()_-]{1,48}$')   # "1.0.4 (40) dev 3fa9c1d2", as the app tags /check
 
 
