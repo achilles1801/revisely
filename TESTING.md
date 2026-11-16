@@ -132,6 +132,11 @@ passed 06 once in the smoke set, and broke 06 on develop for everyone.
   runs nightly and on PRs into main. macOS runners are five at a time: on Nov 16 2026, every iOS flow
   twice for #627 (an `e2e.yml` change) held a runner for over six hours, and Recite PRs that each
   edited flow 18 ran 02 04 05 06 18 on iOS in three jobs, until 24 iOS jobs waited for up to 2.5 hours.
+- **The job lists (`scripts/e2e/jobs.json`):** the full run's jobs and the smoke sets, which `e2e.yml`
+  reads. A change to the file alone runs the flows whose job it changed (what the job runs, in order,
+  against the base's file), on both platforms: a long flow split into a file of its own runs that job,
+  not every flow. Until Nov 16 2026 the lists were in `e2e.yml`, and #663's split would have run every
+  flow; it moved the steps into another flow instead.
 - **The jobs:** five flows or fewer run in one job a platform, in the full run's order with 10 first
   (the five slowest, with a retry, fit its limit); more run in the full run's jobs, each keeping only
   the flows touched
@@ -141,10 +146,15 @@ passed 06 once in the smoke set, and broke 06 on develop for everyone.
   restores the app or builds it itself, inside its 120 minutes.
 - **PRs built on one another** (each into develop, each branch holding the commits of the one before,
   without GitHub's stacks): the top one tests them all. A PR whose commits another open, non-draft PR
-  into develop holds runs the fast checks and scenarios only, and its check is "Required (under #N)",
-  so it merges with #N, not alone; #N's run cancels the runs of the PRs under it (`layers` and
-  `supersede` in ci.yml). To merge a lower PR alone, mark the one above a draft (or close it) and run
-  the lower PR's CI again.
+  into develop holds runs the fast checks and scenarios only, and its check is "Required (under #N)".
+  #N's run cancels the runs of the PRs under it (`layers` and `supersede` in ci.yml), and once it has
+  passed it posts "Required" on each one's head (`pass-lower`, `.github/scripts/pass-lower.js`): still
+  open, the same head, no failed run of its own. So a lower PR merges with #N or on its own, and two
+  separate PRs, one of which holds the other's commits, don't keep the lower one waiting. If #N's run
+  fails, mark #N a draft (or close it) and run the lower PR's CI again.
+- **Drafts:** whether a PR is a draft is read from GitHub when its run starts (`live` in ci.yml's plan),
+  not from the event: a push and `gh pr ready` seconds apart once made a single run with the draft
+  payload, no E2E and "Required (draft)", and the PR sat with every check green (#674, Nov 16 2026).
 - **The scenario harness, its Jest config or `scripts/emulators.sh`:** the scenario suite twice. The
   second run starts from empty Firestore and Auth emulators (`harness/clearEmulators.js`), as the
   first does: it had found the first run's data, and the day's Revo spend put Revo to rest halfway

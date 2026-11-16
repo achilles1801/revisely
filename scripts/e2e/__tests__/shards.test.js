@@ -1,5 +1,5 @@
-// Every flow runs in a full E2E run: each file in .maestro/flows is in exactly one of e2e.yml's
-// `full` jobs. Flows 12 and 13 were in none for a day (Nov 7–8 2026): develop's pushes, PRs into
+// Every flow runs in a full E2E run: each file in .maestro/flows is in exactly one of the `full` jobs
+// (scripts/e2e/jobs.json, which e2e.yml reads; until Nov 16 2026 they were written in e2e.yml). Flows 12 and 13 were in none for a day (Nov 7–8 2026): develop's pushes, PRs into
 // main and the nightly run never ran them, and nothing said so. It caught 15 the same way.
 //
 // And every full job ends inside its time limit. When 09 grew to five files, the iOS job holding it
@@ -12,6 +12,7 @@ const path = require('path');
 const root = path.join(__dirname, '..', '..', '..');
 const workflow = fs.readFileSync(path.join(root, '.github/workflows/e2e.yml'), 'utf8');
 const minutes = require('../flow-minutes.json');
+const jobsFile = require('../jobs.json');
 const flows = fs
   .readdirSync(path.join(root, '.maestro/flows'))
   .filter((f) => f.endsWith('.yaml'))
@@ -24,19 +25,9 @@ const flows = fs
 const OVERHEAD = { ios: 17, android: 9 };
 
 /** A shell glob of the kind e2e.yml uses (`*`, `?`, `[…]`) as a regular expression. */
-function globRegex(glob) {
-  const body = glob
-    .replace(/[.+^${}()|\\]/g, '\\$&')
-    .replace(/\*/g, '[^/]*')
-    .replace(/\?/g, '[^/]');
-  return new RegExp(`^${body}$`);
-}
+const { globRegex } = require('../../../.github/scripts/affected-flows');
 
-function fullJobs() {
-  const line = workflow.split('\n').find((l) => /^\s*full='/.test(l));
-  if (!line) throw new Error("e2e.yml has no full='…' line");
-  return JSON.parse(line.trim().slice("full='".length, -1));
-}
+const fullJobs = () => jobsFile.full;
 
 // A job's flows in the order it runs them: each glob in turn, its matches sorted, as the shell
 // expands them for run.sh. A flow two globs match comes twice, which the one-job check reports.
@@ -81,6 +72,21 @@ it('puts every flow in exactly one job of a full run', () => {
 
 it('names each job by the flows it runs, in the order it runs them', () => {
   for (const job of fullJobs()) expect(job.name).toBe(flowsOf(job).map(short).join(' '));
+});
+
+// e2e.yml reads each list from the file (and none is written in it any more), and the smoke jobs run the
+// smoke set that ci.yml and affected-flows.js name (02 04 05 06), each flow once.
+it('reads the job lists from scripts/e2e/jobs.json', () => {
+  for (const set of ['full', 'smoke_android', 'smoke_ios']) {
+    expect(workflow).toContain(`${set}=$(jq -c .${set} "$jobs")`);
+    expect(workflow).not.toMatch(new RegExp(`\\n\\s*${set}='\\[`));
+  }
+  expect(workflow).toContain('sparse-checkout: scripts/e2e/jobs.json');
+  const smoke = flows.filter((f) => /\/0[2456]-/.test(f));
+  for (const set of ['smoke_android', 'smoke_ios']) {
+    expect(jobsFile[set].flatMap(flowsOf).sort()).toEqual(smoke);
+    for (const job of jobsFile[set]) expect(job.name).toBe(`smoke: ${flowsOf(job).map(short).join(' ')}`);
+  }
 });
 
 it('knows how long every flow takes on each platform (scripts/e2e/flow-minutes.json)', () => {

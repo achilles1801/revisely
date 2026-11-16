@@ -29,7 +29,8 @@ concurrency:
 #       a lower layer of a GitHub stack: none (the top layer tests the whole stack);
 #       a PR into develop whose commits another open PR into develop holds (branches built
 #         on one another, without GitHub's stacks): none, and its check is "Required (under
-#         #N)", so it merges with #N (`layers`); `supersede` cancels its runs once #N's starts;
+#         #N)", so it merges with #N, or alone once #N's run has passed (`layers`, `pass-lower`);
+#         `supersede` cancels its runs once #N's starts;
 #       the top of a stack into develop, a PR into main, a merge group: every flow, iOS and Android;
 #       a single PR into develop (or claude-fix's run by hand): the Android smoke set;
 #       a change to test code (`infra`): the flows it touches (once, one retry); a change to
@@ -56,6 +57,7 @@ jobs:
       only_ios: ${{ steps.plan.outputs.only_ios }}
       upper: ${{ steps.layers.outputs.upper }}
       lower: ${{ steps.layers.outputs.lower }}
+      draft: ${{ steps.live.outputs.draft }}
       repeat: ${{ steps.plan.outputs.repeat }}
       scenario_repeat: ${{ steps.plan.outputs.scenario_repeat }}
     steps:
@@ -64,6 +66,27 @@ jobs:
           sparse-checkout: |
             .maestro
             .github
+            scripts/e2e
+      # Whether the PR is a draft now, read from GitHub, not from the event that started the run. On #674 a
+      # push and `gh pr ready` seconds apart made one run, with the push's draft payload, and no
+      # ready_for_review run came: it ran no E2E and posted "Required (draft)", and the PR sat BLOCKED with
+      # every check green until it was made a draft and ready again (run 43876874743, Nov 16 2026).
+      # `layers`, `plan` and the required check's name read this; the payload's value if the read fails.
+      - id: live
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          PAYLOAD_DRAFT: ${{ github.event.pull_request.draft }}
+        run: |
+          draft=$(gh api "repos/$REPO/pulls/$PR" --jq .draft 2>/dev/null) || draft=""
+          case "$draft" in
+            true|false) ;;
+            *) draft=$PAYLOAD_DRAFT; echo "::warning title=CI::Couldn't read whether #$PR is a draft; the event's value ($draft) stands." ;;
+          esac
+          [ "$draft" = "$PAYLOAD_DRAFT" ] || echo "::notice title=CI::The event says draft=$PAYLOAD_DRAFT; #$PR is now draft=$draft, which this run follows."
+          echo "draft=$draft" >> "$GITHUB_OUTPUT"
       # Test the tests: what a PR changes in the code flows and scenarios share
       # (.github/scripts/affected-flows.js). Its flows run on both platforms, once
       # with run.sh's one retry (a pass on the retry passes, and the weekly flake
@@ -79,13 +102,21 @@ jobs:
           PR: ${{ github.event.pull_request.number }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           STACK_BASE_SHA: ${{ github.event.pull_request.stack.base.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           if [ -n "$STACK_BASE_SHA" ]; then
             files=$(gh api "repos/$REPO/compare/$STACK_BASE_SHA...$HEAD_SHA" --jq '.files[] | .filename, (.previous_filename // empty)')
           else
             files=$(gh api --paginate "repos/$REPO/pulls/$PR/files" --jq '.[] | .filename, (.previous_filename // empty)')
           fi
-          out=$(printf '%s\n' "$files" | node .github/scripts/affected-flows.js)
+          # The E2E job lists as they are on the base: a change to them runs the flows whose job changed
+          # (affected-flows.js), or, with nothing to compare, every flow.
+          before=""
+          if printf '%s\n' "$files" | grep -qx 'scripts/e2e/jobs.json'; then
+            before="$RUNNER_TEMP/jobs-before.json"
+            gh api -H 'Accept: application/vnd.github.raw' "repos/$REPO/contents/scripts/e2e/jobs.json?ref=${STACK_BASE_SHA:-$BASE_SHA}" > "$before" || before=""
+          fi
+          out=$(printf '%s\n' "$files" | E2E_JOBS_BEFORE="$before" node .github/scripts/affected-flows.js)
           echo "Shared test code: $out"
           { echo "flows=$(jq -c .flows <<<"$out")"; echo "ios_flows=$(jq -c .ios <<<"$out")"; echo "scenarios=$(jq -r .scenarios <<<"$out")"; } >> "$GITHUB_OUTPUT"
       # PRs into develop built on one another's branches without GitHub's stacks: the Recite PRs of
@@ -93,10 +124,11 @@ jobs:
       # flow it touched on iOS for commits the PR above held too, and sessions cancelled the
       # lower runs by hand. Here, an open, non-draft PR into develop whose branch holds all of this
       # PR's commits is `upper`: this PR runs no E2E, and its check is "Required (under #N)", not
-      # "Required", so it doesn't merge alone; it merges when #N does (GitHub marks a PR merged once
-      # its commits reach its base). The PRs whose commits this one holds are `lower`, and
-      # `supersede` cancels their runs. To merge a lower PR alone: mark the one above a draft (or
-      # close it) and run the lower PR's CI again.
+      # "Required", so it doesn't merge on that run alone: it merges when #N does (GitHub marks a PR
+      # merged once its commits reach its base), or on its own once #N's run has passed, which posts
+      # "Required" on its head (`pass-lower`). The PRs whose commits this one holds are `lower`, and
+      # `supersede` cancels their runs. If #N's run fails, a lower PR merges alone after the one above
+      # is marked a draft (or closed) and the lower PR's CI is run again.
       # Commits only (no trees or files): about a second and 1.3 MB for 20 open PRs. Anything that
       # fails here leaves the plan as it was.
       - id: layers
@@ -108,7 +140,7 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           BASE: ${{ github.base_ref }}
           STACK_SIZE: ${{ github.event.pull_request.stack.size }}
-          DRAFT: ${{ github.event.pull_request.draft }}
+          DRAFT: ${{ steps.live.outputs.draft }}
         run: |
           if [ "$BASE" != develop ] || [ -n "$STACK_SIZE" ] || [ "$DRAFT" = true ]; then printf 'upper=\nlower=[]\n' >> "$GITHUB_OUTPUT"; exit 0; fi
           prs=$(gh pr list --repo "$REPO" --base develop --state open --limit 200 --json number,headRefOid,isDraft \
@@ -149,7 +181,7 @@ jobs:
           STACK_SIZE: ${{ github.event.pull_request.stack.size }}
           STACK_POSITION: ${{ github.event.pull_request.stack.position }}
           STACK_BASE: ${{ github.event.pull_request.stack.base.ref }}
-          DRAFT: ${{ github.event.pull_request.draft }}
+          DRAFT: ${{ steps.live.outputs.draft }}
           LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
           INFRA_FLOWS: ${{ steps.infra.outputs.flows }}
           INFRA_IOS_FLOWS: ${{ steps.infra.outputs.ios_flows }}
@@ -372,8 +404,9 @@ jobs:
     # A draft's run is "Required (draft)": it runs no E2E, and its green check counted for the commit once
     # the PR was marked ready, until the ready run posted its own; #499 merged on it the moment it was
     # marked ready with auto-merge on (Nov 10 2026). Marked ready, the PR waits for that run's "Required".
-    # A PR another PR's branch holds (`layers`) is "Required (under #N)": it merges with #N, not alone.
-    name: "${{ github.event.pull_request.draft && 'Required (draft)' || (needs.plan.outputs.upper != '' && format('Required (under #{0})', needs.plan.outputs.upper)) || ((github.event.pull_request.stack.base.ref || github.base_ref) == 'main' && needs.plan.outputs.ios == 'full' && needs.plan.outputs.android == 'full' && 'Release gate' || 'Required') }}"
+    # A PR another PR's branch holds (`layers`) is "Required (under #N)": it merges with #N, or alone once
+    # #N's run has passed (`pass-lower`). Whether it's a draft is GitHub's answer at the run (`live` in plan).
+    name: "${{ needs.plan.outputs.draft == 'true' && 'Required (draft)' || (needs.plan.outputs.upper != '' && format('Required (under #{0})', needs.plan.outputs.upper)) || ((github.event.pull_request.stack.base.ref || github.base_ref) == 'main' && needs.plan.outputs.ios == 'full' && needs.plan.outputs.android == 'full' && 'Release gate' || 'Required') }}"
     needs: [plan, fast, scenarios, e2e]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
@@ -390,3 +423,33 @@ jobs:
             | select(.key != "e2e" or $e2e == "true" or .value.result != "skipped") | .key')
           if [ -n "$bad" ]; then echo "::error::Not passed: $(echo $bad)"; exit 1; fi
           echo "Every job this change needs passed."
+
+  # -----------------------------------------------------------------------
+  # The PRs whose commits this PR holds (`lower` in `plan`) planned no E2E, and their check is "Required
+  # (under #N)". Once this run has passed, it has tested their commits too, and each gets "Required" on
+  # its head, so it can merge on its own as well as with this PR (.github/scripts/pass-lower.js says which:
+  # still open, the same head, and no run of its own failed). From #676 until Nov 16 2026 a lower PR merged
+  # only with the PR above it: two separate PRs into develop, one of which happened to hold the other's
+  # commits, kept the lower one waiting for the upper to merge.
+  # -----------------------------------------------------------------------
+  pass-lower:
+    name: Pass the PRs this run tested
+    needs: [plan, required]
+    if: ${{ github.event_name == 'pull_request' && needs.plan.outputs.draft != 'true' && needs.plan.outputs.upper == '' && needs.plan.outputs.lower != '' && needs.plan.outputs.lower != '[]' && needs.required.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          LOWER: ${{ needs.plan.outputs.lower }}
+          UPPER_PR: ${{ github.event.pull_request.number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node .github/scripts/pass-lower.js
