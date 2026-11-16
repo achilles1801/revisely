@@ -35,7 +35,7 @@ import unicodedata
 
 import numpy as np
 
-from engine import FPS, SAID, WORDS_P, BadRequest, ayah_pieces, heard_sounds, score, settings_of  # puts the harness on the path
+from engine import FPS, SAID, WORDS_P, BadRequest, SideFrames, ayah_pieces, heard_sounds, score, settings_of  # puts the harness on the path
 import checker  # noqa: E402  (the harness's)
 import similar  # noqa: E402  (fit_many, for the Qur'an-wide search)
 
@@ -149,6 +149,29 @@ def _ayah_submit(idle, fn, *args, **kw):
         if _ayah_pool is None:
             _ayah_pool = concurrent.futures.ThreadPoolExecutor(1, 'ayah', initializer=_ayah_lowest_priority)
     return _ayah_pool.submit(_ayah_job, idle, fn, *args, **kw)
+
+
+# A take on v6 names its slips on the released model's frames (Engine.name_slips, SideFrames). With `defer` they are
+# worked out as the take goes, a chunk at a time, on one background thread that runs only when nothing else wants the
+# CPU (SCHED_IDLE on Linux: below the hops and the ayah thread), so `done` waits only for chunks the thread hasn't
+# reached, worked out then at the session's own priority. RECITE_SIDE_FRAMES=0: named on v6's own frames, as before.
+_side_pool = None
+
+
+def _side_idle():
+    if sys.platform.startswith('linux'):
+        try:
+            os.sched_setscheduler(0, os.SCHED_IDLE, os.sched_param(0))
+        except (OSError, AttributeError):
+            _ayah_lowest_priority()
+
+
+def _side_submit(fn, *args):
+    global _side_pool
+    with _ayah_pool_lock:
+        if _side_pool is None:
+            _side_pool = concurrent.futures.ThreadPoolExecutor(1, 'side', initializer=_side_idle)
+    return _side_pool.submit(fn, *args)
 
 
 def _ayah_job(idle, fn, *args, **kw):
@@ -597,6 +620,12 @@ class LiveSession:
         self.lv = E.level(self.st)
         self.ear = self.lv.ear
         self.P = dict(self.lv.words_p, **LIVE)
+        # a v6 take's slips are named on the released model's frames (SideFrames), worked out as the take goes when
+        # deferred (the server), else at the end; Recite names nothing
+        self.side = None
+        if not self.follow and self.lv is not E.released and getattr(E, 'table', None) is not None \
+                and os.environ.get('RECITE_SIDE_FRAMES') != '0':
+            self.side = SideFrames(E.released.ear, self._samples, _side_submit if defer else None)
         if (s2 is None) != (a2 is None):
             raise BadRequest('both or neither of s2, a2')
         self.lo, self.end = E.passage(s, a, s2, a2, max_words=10 ** 6)
@@ -695,6 +724,8 @@ class LiveSession:
                 self.xf = grown
             self.xf[self.n:self.n + len(x)] = x.astype(np.float32) / 32768.0
         self.n += len(x)
+        if self.side is not None:
+            self.side.feed(self.n)
         with self._working():
             ev = self._run()
             if self.n >= MAX_SECONDS * SR:
@@ -724,6 +755,9 @@ class LiveSession:
     @property
     def seconds(self):
         return self.n / SR
+
+    def _samples(self, s0, s1):
+        return self.pcm[s0:s1].astype(np.float32) / 32768.0
 
     @contextlib.contextmanager
     def _working(self):
@@ -1721,7 +1755,10 @@ class LiveSession:
         heard = heard_sounds(spans, self._tokens(0, self.T), self.ear.vocab)
         out['marks'] = self.E.marks(words, flagged, heard, ex, tj, letters if self.st['letters'] else [])
         out['ms']['similar'] = self.E.name_slips(out['marks'], self.lp[:self.T], [r['w'] for r in words], statuses,
-                                                 spans, ex, self.lv)
+                                                 spans, ex, self.lv, self.side)
+        if self.side is not None:  # the released model's time for naming (all of it), and what `done` waited for it
+            out['ms']['side'] = int(self.side.close() + self.side.ms)
+            out['ms']['side_wait'] = int(self.side.ms + self.side.waited)
         out['score'] = score(statuses, out['marks'], self.dismissed)
         out['score']['helped'] = len(self.helped)
         out['v'] = 2
