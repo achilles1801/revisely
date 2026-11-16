@@ -8,6 +8,7 @@ import { mushaf } from './mushaf';
 import { offline } from './offline';
 import { player } from './player';
 import { qibla } from './qibla';
+import { reader } from './reader';
 import { recordings } from './recordings';
 import { revision } from './revision';
 import { timer } from './timer';
@@ -23,6 +24,7 @@ export const en = {
   offline,
   player,
   qibla,
+  reader,
   recordings,
   revision,
   timer,

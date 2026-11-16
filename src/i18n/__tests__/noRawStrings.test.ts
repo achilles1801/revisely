@@ -19,6 +19,7 @@ const EXTRACTED: string[] = [
   'components/offline',
   'components/player',
   'components/qibla',
+  'components/reader',
   'components/revision',
   'components/updates',
   'components/v2',
