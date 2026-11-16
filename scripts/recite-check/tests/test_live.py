@@ -706,6 +706,8 @@ class SimilarPassage(unittest.TestCase):
 
 
 
+@unittest.skipUnless(MODEL.exists() and ITEM.exists() and CLEAN.exists(),
+                     'the model or the bench recitations are not here (the image has the model, not the bench)')
 class OffHere(unittest.TestCase):
     """`off`: something else said in the next word's slot, for the hidden view (2026-11-15 idea, approved)."""
 
