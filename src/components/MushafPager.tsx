@@ -40,6 +40,7 @@ import { AyahRef, ayahAt, ayahRects, Rect } from '../lib/ayahBounds';
 import { Box, unionBox } from './verse/menuPlacement';
 import { fitPage, PageSize } from '../lib/pageFit';
 import { MushafEditionId, mushafEdition, useMushafEdition } from '../lib/mushafEdition';
+import { pagerStartIndex } from '../lib/pagerStart';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -405,7 +406,10 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
   const [space, setSpace] = useState<{ width: number; height: number }>({ width: SCREEN_WIDTH, height: 0 });
   const aspect = mushafEdition(edition).aspect;
   const pageSize = useMemo<PageSize>(() => fitPage(space.width, space.height, aspect), [space, aspect]);
-  const currentIndexRef = useRef(0);
+  // Where the list starts, from its first frame (READ-1). It used to start at page 1 and scroll to the page 50 ms
+  // after mount: a surah opened from the Read tab showed Al-Fatihah for about half a second first (Majd, Nov 15 2026).
+  const [startIndex] = useState(() => pagerStartIndex(pages, initialPage));
+  const currentIndexRef = useRef(startIndex ?? 0);
   // Only auto-scroll on first mount. After that, the user drives position by
   // swiping; re-scrolling on every `pages` reference change would yank them
   // back whenever a parent prop bump occurs (e.g. context re-renders from
@@ -612,6 +616,7 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
         offset: SCREEN_WIDTH * index,
         index,
       })}
+      initialScrollIndex={startIndex}
       initialNumToRender={3}
       maxToRenderPerBatch={3}
       windowSize={5}
