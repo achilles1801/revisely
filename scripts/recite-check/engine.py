@@ -212,9 +212,16 @@ def load_table(path):
 NAME_AROUND = (3, 6)    # (bench-v0, naming through the engine: 108/111 slips into a similar ayah, 80/164 swapped
 NAME_JOIN = 6           # endings, none false; with the checker before gap_back 107 and 76)
 NAME_PAD = 25
-NAME_FRAMES = 8000  # frames decoded again for naming in one take at most (live.Decoder: ~60 µs a frame on the Mac, so
-                   # at most ~0.5 s there and ~2.3 s on Cloud Run; bench-v0's takes with 6 planted mistakes: median
-                   # 167 ms, at most 661 ms on the Mac; correct takes: none, 79 ms at p90)
+# Work for re-decoding a take's runs for naming, in frames x (graph states + NAME_STATE_COST): a run's decode takes
+# ~15 ns a unit on the Mac (fitted on 826 decodes of bench-v0, bench-endings and recite-server's cut takes), ~3.3x that
+# on Cloud Run. A run whose decode doesn't fit what is left is skipped (a later, smaller one may still fit), so the
+# answer is the same on any machine. 25 M units: ~0.4 s on the Mac at most. bench-v0's takes need 4 M (median), 16 M
+# (p90), 27 M (most), and name the same as with no bound (the released model 188 of 275 slips and endings, v6 134;
+# 15 M: 169 and 116); ms.similar on the Mac at most 0.5 s. Before (8,000 frames whatever the graph), recite-server's cut
+# take with 41 runs joined into one 160 s run (100 M units) waited 5.4 s after Stop on Cloud Run; now it isn't decoded
+# again (2 ms).
+NAME_WORK = int(os.environ.get('NAME_WORK', 25e6))
+NAME_STATE_COST = 2000
 
 V5_KINDS = ('Qalqalah', 'Lazem Madd')  # tajweed.judge kinds judged on the strict ear (v5) when it is there; and the
 # nasal places (idgham, idgham without ghunnah, iqlab). Lab, Nov 11 2026: v5 caught idgham / idgham without ghunnah /
@@ -575,7 +582,7 @@ class Engine:
         lv = lv or self.released
         P, sp = lv.words_p, lv.similar_p
         t0 = time.perf_counter()
-        work = {'left': similar.P['budget'], 'frames': NAME_FRAMES}
+        work = {'left': similar.P['budget'], 'decode': NAME_WORK}
         names = []
         try:
             if P.get('gap_back') is None:
@@ -661,11 +668,12 @@ class Engine:
             return None
         f0 = max(0, min(a for a, _ in heard) - NAME_PAD)
         f1 = min(len(lp), max(b for _, b in heard) + NAME_PAD)
-        if f1 - f0 > work['frames']:
-            return None
-        work['frames'] -= f1 - f0
         kws = self.passage_words(lo, hi)
         g = checker.Graph(kws)
+        units = (f1 - f0) * (g.S + NAME_STATE_COST)
+        if units > work['decode']:
+            return None
+        work['decode'] -= units
         P = dict(P0 or WORDS_P, gap_back=None, revisit_keep=False)
         if ends_heard:
             P['stop'] = -1e6
