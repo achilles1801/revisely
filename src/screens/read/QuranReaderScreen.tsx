@@ -42,7 +42,7 @@ import { SittingSavedToast } from '../../components/timer/SittingSavedToast';
 import type { ReadStackParamList } from '../../navigation/MainNavigator';
 import { reciteLiveEnabled } from '../../lib/reciteLive/availability';
 import { premiumErrorText, setDevPremium, supportLinkUrl, usePremium } from '../../lib/premium';
-import { setReciteCheckSettings, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
+import { reciteCheckSettingsLoaded, setReciteCheckSettings, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
 import { loadQuranWords, getQuranWords, QuranWords } from '../../lib/recite/quranWords';
 import { furthestWord, marksOnPage, removedMarks, startNotFound } from '../../lib/reciteLive/state';
 import { stopTrace } from '../../lib/reciteLive/stopTrace';
@@ -66,8 +66,9 @@ import { SimilarPhrasesSheet } from '../../components/reciteLive/SimilarPhrasesS
 import { findingsLine, TakeSummarySheet } from '../../components/reciteLive/TakeSummarySheet';
 import { say, undoMs, useScreenReaderOn } from '../../components/reciteLive/a11y';
 import { markTitle } from '../../lib/reciteLive/describe';
-import { AyahRange, drillMarks, drillRange, openDrill } from '../../lib/reciteLive/drill';
+import { drillMarks, drillRange, openDrill } from '../../lib/reciteLive/drill';
 import { describeAyahs } from '../../lib/passages';
+import { foundSpan, TakeSpan } from '../../lib/reciteLive/span';
 import { CheckIntroPage } from '../../components/reciteLive/CheckIntroPage';
 import { markAt, wordBox } from '../../lib/reciteLive/geometry';
 import { similarPhrases } from '../../lib/reciteLive/similar';
@@ -360,9 +361,8 @@ export default function QuranReaderScreen() {
   noteTakeRecording.current = remembering.noteRecording;
   const takeRecord = remembering.current;
   const [modeMenu, setModeMenu] = useState(false);
-  const [noticeFor, setNoticeFor] = useState<LiveMode | null>(null);
-  // The stretch a take waits to start on while the notice is up (Recite your mistakes here on a phone that hasn't seen it).
-  const [noticeRange, setNoticeRange] = useState<AyahRange | null>(null);
+  // The AI notice comes before the first take: the take it was asked for starts once it's agreed.
+  const [noticeFor, setNoticeFor] = useState<{ mode: LiveMode; span: TakeSpan | null } | null>(null);
   // Check: the word a card is open on (and where it is on screen), similar phrases, the summary, Check's page.
   const [cardAt, setCardAt] = useState<{ w: number; anchor: Box } | null>(null);
   // What the card plays stops when the card closes, and when the reader goes (Majd, Nov 15 2026: Husary played on past
@@ -396,7 +396,7 @@ export default function QuranReaderScreen() {
   // Recite the mistakes again: what the take before found in the stretch, for its summary ("Before: …").
   const [drillBefore, setDrillBefore] = useState<string | null>(null);
   const startMode = useCallback(
-    (mode: ReciteMicMode) => {
+    (mode: ReciteMicMode, span: TakeSpan | null = null) => {
       if (mode === 'record') {
         void recorder.start();
         return;
@@ -407,12 +407,12 @@ export default function QuranReaderScreen() {
         return;
       }
       if (!reciteSettings.noticeSeen) {
-        setNoticeFor(mode);
+        setNoticeFor({ mode, span });
         return;
       }
       setRevealed(NOTHING_SHOWN);
       setDrillBefore(null);
-      void live.start(mode);
+      void live.start(mode, span);
     },
     [recorder, owned, reciteSettings.noticeSeen, live],
   );
@@ -441,12 +441,34 @@ export default function QuranReaderScreen() {
     // The summary's "Before: …": what those words were last time.
     setDrillBefore(findingsLine(pageDrill.marks));
     if (!reciteSettings.noticeSeen) {
-      setNoticeRange(pageDrill.range);
-      setNoticeFor('check');
+      setNoticeFor({ mode: 'check', span: pageDrill.range });
       return;
     }
     void live.start('check', pageDrill.range);
   }, [pageDrill, reciteSettings.noticeSeen, live]);
+  // A voice search with one result (Majd, Nov 15 2026: "take them to that page as if they're about to recite it"): a
+  // take starts as the reader opens, the checker looking for the start only in the ayahs found. Recite, marking
+  // mistakes when the switch is on, whatever a tap on the mic would start. It waits for the account's settings (the
+  // notice first, if it hasn't been agreed) and, with the switch on, for Premium to be known (3 s at most).
+  const reciteOnOpen = useRef(route.params.recite === true ? (route.params.highlight ?? null) : null);
+  const settingsLoaded = reciteCheckSettingsLoaded(user?.id);
+  const [premiumWaited, setPremiumWaited] = useState(false);
+  useEffect(() => {
+    if (!reciteOnOpen.current) return;
+    const t = setTimeout(() => setPremiumWaited(true), 3000);
+    return () => clearTimeout(t);
+  }, []);
+  const premiumKnown = premium.known;
+  const showChrome = chrome.show;
+  useEffect(() => {
+    const found = reciteOnOpen.current;
+    if (!found || !liveOn || !settingsLoaded) return;
+    if (reciteSettings.markMistakes && !premiumKnown && !premiumWaited) return;
+    reciteOnOpen.current = null;
+    // The controls up, as after a tap on the page: once the take is closed the player and its mic are there.
+    showChrome();
+    startMode(markMistakes ? 'check' : 'recite', foundSpan(found));
+  }, [liveOn, settingsLoaded, premiumKnown, premiumWaited, reciteSettings.markMistakes, markMistakes, startMode, showChrome]);
   const pickMode = useCallback(
     (mode: ReciteMenuMode) => {
       setModeMenu(false);
@@ -909,7 +931,12 @@ export default function QuranReaderScreen() {
           initialPage={initialPage}
           onPageChange={handlePageChange}
           onLongPressAyah={verseActions.onLongPressAyah}
-          highlightedAyah={verseActions.highlightedAyah ?? searchHighlight}
+          // While a take runs the page shows only Recite's own colours: the search's highlight waits until it's done
+          // (after it, an ayah the take slipped into is highlighted the same way).
+          highlightedAyah={
+            verseActions.highlightedAyah ??
+            (live.state.status === 'connecting' || live.state.status === 'listening' || live.state.status === 'checking' ? null : searchHighlight)
+          }
           onTap={onTapPage}
           onUserSwipe={chrome.hide}
           pageUnderlay={pageUnderlay}
@@ -1179,20 +1206,18 @@ export default function QuranReaderScreen() {
           <ReciteNoticeSheet
             visible={noticeFor != null}
             onAgree={() => {
-              const mode = noticeFor;
-              const range = noticeRange;
+              const asked = noticeFor;
               setReciteCheckSettings(user?.id, { noticeSeen: true });
               setNoticeFor(null);
-              setNoticeRange(null);
-              if (mode) {
+              if (asked) {
                 setRevealed(NOTHING_SHOWN);
-                void (range ? live.start(mode, range) : live.start(mode));
+                void live.start(asked.mode, asked.span);
               }
             }}
             onClose={() => {
-              if (noticeRange) setDrillBefore(null);
+              // A stretch's take that never started (Recite your mistakes here) leaves no "Before:" behind.
+              if (noticeFor?.span) setDrillBefore(null);
               setNoticeFor(null);
-              setNoticeRange(null);
             }}
           />
         </>

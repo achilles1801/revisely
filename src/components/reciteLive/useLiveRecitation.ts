@@ -18,7 +18,7 @@ import type { LiveEvent, Mark } from '../../lib/reciteLive/contract';
 import type { LiveConnect, LiveConnection, StartFrame } from '../../lib/reciteLive/feed';
 import { socketFeed } from '../../lib/reciteLive/socket';
 import { stopHearing } from '../../lib/reciteLive/hearAudio';
-import { AyahRange, lastWordOf } from '../../lib/reciteLive/drill';
+import { spanEndWord, TakeSpan } from '../../lib/reciteLive/span';
 import { stopTrace } from '../../lib/reciteLive/stopTrace';
 import { SavedTake, startTakeRecording, TakeRecording } from '../../lib/reciteLive/takeRecording';
 import {
@@ -82,23 +82,25 @@ const defaultConnect: LiveConnect = (start, handlers) => {
 
 /**
  * The start frame for a take on `page`, with the account's settings (contract draft 5): anywhere on the page
- * (`startBy`, the page's last ayah), or from its first ayah; or over a given stretch of ayahs ("Recite the mistakes
- * again"), from its first ayah to its last.
+ * (`startBy`, the page's last ayah), or from its first ayah; or over a given span (lib/reciteLive/span): a stretch of
+ * ayahs ("Recite the mistakes again", from its first ayah to its last), or the ayahs a voice search found (the start
+ * looked for only there).
  */
 export function startFrameFor(
   page: number,
   mode: LiveMode,
   settings: ReciteCheckSettings,
   anywhere: boolean = START_ANYWHERE,
-  range: AyahRange | null = null,
+  span: TakeSpan | null = null,
 ): StartFrame {
   const first = versesOnPage(page)[0] ?? { sura: 1, ayah: 1 };
+  const startBy = span ? span.startBy : anywhere ? lastAyahOf(page) : undefined;
   return {
     type: 'start',
-    s: range ? range.from[0] : first.sura,
-    a: range ? range.from[1] : first.ayah,
-    s2: range ? range.to[0] : null,
-    a2: range ? range.to[1] : null,
+    s: span ? span.from[0] : first.sura,
+    a: span ? span.from[1] : first.ayah,
+    s2: span?.to ? span.to[0] : null,
+    a2: span?.to ? span.to[1] : null,
     mon: settings.munfasil,
     mot: settings.muttasil,
     aar: settings.aared,
@@ -106,7 +108,7 @@ export function startFrameFor(
     tajweed: settings.level === 'strict',
     keep: settings.keep,
     follow: mode === 'recite',
-    ...(anywhere && !range ? { startBy: lastAyahOf(page) } : {}),
+    ...(startBy ? { startBy } : {}),
   };
 }
 
@@ -170,7 +172,7 @@ export function useLiveRecitation({
   // and when the cursor first reached each word, in seconds of the take (for a mark that carries no time of its own).
   const lastConn = useRef<LiveConnection | null>(null);
   const wordTimes = useRef(new Map<number, number>());
-  /** A drill take's last word: it stops by itself once the checker has decided it. */
+  /** A drill take's last word (a span with an end): it stops by itself once the checker has decided it. */
   const endWord = useRef<number | null>(null);
   // For the Stop trace (lib/reciteLive/stopTrace), read when Stop is tapped.
   const traceRef = useRef({ state, mode, seconds });
@@ -248,7 +250,7 @@ export function useLiveRecitation({
   }, [stopMic]);
 
   const start = useCallback(
-    async (take: LiveMode, range: AyahRange | null = null) => {
+    async (take: LiveMode, span: TakeSpan | null = null) => {
       if (conn.current || source.current) return;
       stopHearing();
       pausedRef.current = false;
@@ -259,15 +261,15 @@ export function useLiveRecitation({
       setSeconds(0);
       samples.current = 0;
       endWord.current = null;
-      /** The page the take starts on: the stretch's first ayah's (turned to), or the one on screen. */
+      /** The page the take starts on: the span's first ayah's (turned to), or the one on screen. */
       const startPage = (qw: QuranWords) => {
-        if (!range) return pageRef.current;
-        const page = qw.pageOf(qw.verseFirstWord(range.from[0], range.from[1]));
+        if (!span) return pageRef.current;
+        const page = qw.pageOf(qw.verseFirstWord(span.from[0], span.from[1]));
         if (page !== pageRef.current) {
           turningTo.current = page;
           onShowPageRef.current(page);
         }
-        endWord.current = lastWordOf(qw, range);
+        endWord.current = spanEndWord(qw, span);
         return page;
       };
       // The inlined variable folds this branch away in every other build.
@@ -284,7 +286,7 @@ export function useLiveRecitation({
         }
         setWords(qw);
         const page = startPage(qw);
-        const frame = startFrameFor(page, take, settings, START_ANYWHERE, range);
+        const frame = startFrameFor(page, take, settings, START_ANYWHERE, span);
         setTestData(frame.keep);
         setMode(take);
         setState(connectingFor(frame, qw));
@@ -333,7 +335,7 @@ export function useLiveRecitation({
         const qw = await loadQuranWords();
         setWords(qw);
         const page = startPage(qw);
-        const frame = startFrameFor(page, take, settings, START_ANYWHERE, range);
+        const frame = startFrameFor(page, take, settings, START_ANYWHERE, span);
         setTestData(frame.keep);
         claimAudio('recorder', owner);
         getRecitation().stop();

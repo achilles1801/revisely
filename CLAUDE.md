@@ -356,6 +356,28 @@ until its part is set up.
     (some pages and lines draw it smaller, page 3 wider; a sajdah sign stays with its marker) and checks that no marker
     ink is under a cover and no word's ink shows beside a marker, on the originals and Android's w1080 and w1440. Run it
     after any change to the page lines or the images; `hiddenPage.test` pins measured markers (page 2's among them).
+  - **A voice search with one result opens the reader reciting** (Majd, Nov 15 2026: "take them to that page as if
+    they're about to recite it"). When a search by voice finds exactly one place (the list would say "1 result", not
+    "Closest matches"), the search screen opens the reader there with `recite: true`, and a take starts as it opens:
+    Recite, or marking mistakes when the switch is on, whatever a tap on the mic would start. The checker looks for the
+    start only in the ayahs found (`startBy`, `foundSpan` in `lib/reciteLive/span`), so the reciter can carry on from
+    the words they searched with or begin the ayah again. The search's highlight stays off the page while the take runs.
+    - Only after a voice search, never a typed one: the microphone starts with no tap only when the person was already
+      speaking to the app. Several results stay a list, and the result's row opens the page with no take.
+    - The AI notice comes first if it hasn't been agreed, then the same take. It waits for the account's settings and,
+      with Mark mistakes on, for Premium to be known (3 s at most).
+    - E2E: `revisely://e2e/voice-search?heard=…` (flow 18, An-Naml 25).
+  - **The search screen** (Majd, Nov 16 2026: "the mic button being top right is annoying to have to reach up there
+    just to end the check"; Tarteel's as inspiration, built in our own design; for everyone with search): the field
+    and a 56pt mic sit in one bar at the bottom (`search-bar`), in reach of a thumb, and the keyboard pushes them up
+    (`KeyboardAvoidingView` padding, Android too). Stopping is one tap on the same button. While listening: what is
+    heard so far, large, and the voice's level (`LiveWaveform` fed by `useVoiceSearch().levels`). A verse found is a
+    row of its own (`components/search/SearchVerseCard`): surah and ayah first (the page a quiet detail), the ayat
+    large with the words found in full ink, the account's translation exactly as given (raised footnote markers, its
+    footnotes and its credit with the version kept, as QuranEnc's and The Clear Quran's terms ask;
+    `getVerseTranslation`, no Arabic fetched; fetched only once its card has been on screen, since each Clear Quran block
+    spends the account's and everyone's daily budget), then Share, Copy (the ayat from the word data on the phone, so they
+    work offline; "Copied") and Open in the reader.
 
 ## How updates reach phones
 

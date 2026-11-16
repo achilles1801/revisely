@@ -91,13 +91,15 @@ export type HomeStackParamList = {
 export type ReadStackParamList = {
   ReadIndex: undefined;
   /** `highlight`: a verse found by search, highlighted on its page until the page is turned; with
-   *  `last`, the verses from it to `last` (a match that runs on into the next ayah). */
+   *  `last`, the verses from it to `last` (a match that runs on into the next ayah). `recite`: a voice
+   *  search's one result (Revisely Dev's live check): a take starts there as the reader opens. */
   QuranReader: {
     pageNumber: number;
     source?: 'index' | 'recent' | 'search';
     highlight?: { sura: number; ayah: number; last?: { sura: number; ayah: number } };
     /** A past recitation take (Recite's memory, Revisely Dev) shown on its page with its marks. */
     showTake?: string;
+    recite?: boolean;
   };
   /** Search the Qur'an (testers); `listen`: start listening at once (the Read tab's mic). */
   QuranSearch: { listen?: boolean } | undefined;
