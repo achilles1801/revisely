@@ -312,10 +312,8 @@ appId: com.revisionbuddy.app
 # says what the take before found there.
 - tapOn:
     id: take-summary-drill
-- extendedWaitUntil:
-    visible:
-      id: recite-bar
-    timeout: 10000
+# No wait for the bar between: the drill is short and stops by itself, so on Android its summary can be up before
+# Maestro has seen the bar (#632's run 43770950205). Only the drill's summary has "Before:".
 - extendedWaitUntil:
     visible:
       id: take-summary-before
