@@ -120,18 +120,22 @@ it merges (`plan` in ci.yml, `.github/scripts/affected-flows.js`): #286 changed 
 passed 06 once in the smoke set, and broke 06 on develop for everyone.
 
 - **A subflow or a script under `.maestro/`, or a flow:** every flow that uses it (followed through
-  other subflows), on **both platforms, twice**, with no reruns (`E2E_REPEAT=2`: every run must
-  pass). Android adds the smoke set it runs anyway; iOS runs only the flows touched.
-- **`run.sh`, `.maestro/config.yaml`, `e2e.yml` or `ci.yml`:** every flow on Android, twice; on iOS
-  the smoke set (one job) and the flows the PR's other test files touch, twice. Every iOS flow still
+  other subflows), on **both platforms**, once with run.sh's one retry. A pass on the retry passes,
+  and the weekly flake report counts it (`attempts.json`); a flow it marks under 95% is fixed like a
+  failing one. Android adds the smoke set it runs anyway; iOS runs only the flows touched. (Until
+  Nov 16 2026 each ran twice with no reruns, which doubled the macOS minutes of every PR that edits a
+  flow; the flake report is now how a change that makes a flow flaky shows.)
+- **`run.sh`, `.maestro/config.yaml`, `e2e.yml` or `ci.yml`:** every flow on Android; on iOS the
+  smoke set (one job) and the flows the PR's other test files touch. Every iOS flow still
   runs nightly and on PRs into main. macOS runners are five at a time: on Nov 16 2026, every iOS flow
   twice for #627 (an `e2e.yml` change) held a runner for over six hours, and Recite PRs that each
   edited flow 18 ran 02 04 05 06 18 on iOS in three jobs, until 24 iOS jobs waited for up to 2.5 hours.
-- **The jobs:** four flows or fewer run in one job a platform (the four slowest, twice, fit its 180
-  minutes); more run in the full run's jobs, each keeping only the flows touched, so each fits its 180
-  minutes with every flow run twice (`scripts/e2e/__tests__/shards.test.js`). Two jobs didn't: #574
-  touched 21 flows through `signup.yaml`, and its iOS job of 11 ran out of time with every flow
-  passing (run 43706009559).
+- **The jobs:** four flows or fewer run in one job a platform (the four slowest, with a retry, fit
+  its limit); more run in the full run's jobs, each keeping only the flows touched
+  (`scripts/e2e/__tests__/shards.test.js`). Two jobs didn't: #574 touched 21 flows through
+  `signup.yaml`, and its iOS job of 11 ran out of time with every flow passing (run 43706009559).
+  A run with one iOS job has no separate `ios-build` job (a second wait in the macOS queue): the job
+  restores the app or builds it itself, inside its 120 minutes.
 - **PRs built on one another** (each into develop, each branch holding the commits of the one before,
   without GitHub's stacks): the top one tests them all. A PR whose commits another open, non-draft PR
   into develop holds runs the fast checks and scenarios only, and its check is "Required (under #N)",

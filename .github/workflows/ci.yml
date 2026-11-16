@@ -32,8 +32,8 @@ concurrency:
 #         #N)", so it merges with #N (`layers`); `supersede` cancels its runs once #N's starts;
 #       the top of a stack into develop, a PR into main, a merge group: every flow, iOS and Android;
 #       a single PR into develop (or claude-fix's run by hand): the Android smoke set;
-#       a change to test code (`infra`): the flows it touches, twice; a change to the
-#         workflows, run.sh or config.yaml: every flow on Android, the smoke set on iOS;
+#       a change to test code (`infra`): the flows it touches (once, one retry); a change to
+#         the workflows, run.sh or config.yaml: every flow on Android, the smoke set on iOS;
 #       a push to develop (what just landed): every Android flow, and the iOS native
 #       build kept for PRs (no iOS flows);
 #     nightly and by hand: e2e.yml's own schedule and Run workflow.
@@ -65,10 +65,12 @@ jobs:
             .maestro
             .github
       # Test the tests: what a PR changes in the code flows and scenarios share
-      # (.github/scripts/affected-flows.js). Its flows run on both platforms,
-      # twice, with no reruns; a change to the scenario harness runs the suite
-      # twice. #286 changed swipe-page.yaml, passed 06 once in the smoke set and
-      # broke 06 on develop.
+      # (.github/scripts/affected-flows.js). Its flows run on both platforms, once
+      # with run.sh's one retry (a pass on the retry passes, and the weekly flake
+      # report counts it); a change to the scenario harness runs the suite twice.
+      # #286 changed swipe-page.yaml, passed 06 once in the smoke set and broke 06
+      # on develop. Each touched flow ran twice with no reruns until Nov 16 2026,
+      # which doubled the macOS minutes of every PR that edits a flow.
       - id: infra
         if: github.event_name == 'pull_request'
         env:
@@ -88,7 +90,7 @@ jobs:
           { echo "flows=$(jq -c .flows <<<"$out")"; echo "ios_flows=$(jq -c .ios <<<"$out")"; echo "scenarios=$(jq -r .scenarios <<<"$out")"; } >> "$GITHUB_OUTPUT"
       # PRs into develop built on one another's branches without GitHub's stacks: the Recite PRs of
       # Nov 15 2026 (#621 → #625 → #628 → #629 → #630 → #659, #632 → #633 → #635) each ran every
-      # flow it touched on iOS, twice, for commits the PR above held too, and sessions cancelled the
+      # flow it touched on iOS for commits the PR above held too, and sessions cancelled the
       # lower runs by hand. Here, an open, non-draft PR into develop whose branch holds all of this
       # PR's commits is `upper`: this PR runs no E2E, and its check is "Required (under #N)", not
       # "Required", so it doesn't merge alone; it merges when #N does (GitHub marks a PR merged once
@@ -175,10 +177,10 @@ jobs:
               fi
               # Test the tests (not for drafts, nor a stack's lower layers, nor PRs into main,
               # which run every flow anyway): the flows using the shared code it changed, both
-              # platforms, twice.
+              # platforms, once with a retry.
               if [ "$target" = develop ] && [ "$DRAFT" != true ] && [ -z "$UPPER" ] && { [ -z "$STACK_SIZE" ] || [ "$STACK_POSITION" = "$STACK_SIZE" ]; }; then
                 if [ -n "$INFRA_FLOWS" ] && [ "$INFRA_FLOWS" != '[]' ]; then
-                  ios=infra; android=infra; repeat=2
+                  ios=infra; android=infra
                   # Android: with the smoke set a single PR runs anyway (each flow once in the list).
                   only=$(jq -r --arg smoke "$(ls .maestro/flows/0[2456]-*.yaml | tr '\n' ' ')" \
                     'if . == "all" then "all" else (. + ($smoke | split(" ") | map(select(. != "")))) | unique | join(" ") end' <<<"$INFRA_FLOWS")
@@ -187,7 +189,7 @@ jobs:
                   # the smoke set (affected-flows.js).
                   only_ios=$(jq -r 'join(" ")' <<<"${INFRA_IOS_FLOWS:-[]}")
                   [ -n "$only_ios" ] || ios=none
-                  what="$what; it changes test code: on Android $only, on iOS ${only_ios:-nothing}, twice"
+                  what="$what; it changes test code: on Android $only, on iOS ${only_ios:-nothing}"
                 fi
                 if [ "$INFRA_SCENARIOS" = true ]; then
                   scenario_repeat=2; what="$what; it changes the scenario harness: the suite twice"

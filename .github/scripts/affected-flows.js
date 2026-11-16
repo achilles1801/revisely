@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Which E2E flows and suites a change to shared test code touches (ci.yml `plan`, "test the tests",
 // TESTING.md). A PR that changes what flows share must run every flow that uses it, on both
-// platforms, twice, before it merges: #286 changed swipe-page.yaml, passed 06 once in the smoke set,
-// and broke 06 on develop.
+// platforms, before it merges: #286 changed swipe-page.yaml, passed 06 once in the smoke set, and
+// broke 06 on develop. (Once with a retry since Nov 16 2026; twice with no reruns before.)
 //
 //   git diff --name-only … | node .github/scripts/affected-flows.js
 //   → {"flows":"all"} | {"flows":[".maestro/flows/06-offline.yaml", …]} | {"flows":[]},
@@ -10,7 +10,7 @@
 //
 // - run.sh, .maestro/config.yaml, e2e.yml, ci.yml: every flow on Android. On iOS, the smoke set (02 04
 //   05 06) and the flows the change's other test files touch: macOS runners are five at a time, and
-//   every iOS flow twice took four of them for up to three hours (#627, Nov 16 2026). Every iOS flow
+//   every iOS flow, twice, took four of them for up to three hours (#627, Nov 16 2026). Every iOS flow
 //   still runs on develop's nightly run and on PRs into main.
 // - a subflow or a script under .maestro: every flow that uses it, through other subflows too
 //   (runFlow / runScript / file: references, followed from each flow).

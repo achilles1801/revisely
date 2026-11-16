@@ -130,7 +130,7 @@ it('reads the time limits from e2e.yml', () => {
   }
 });
 
-// A change to shared test code runs the flows it touches, each twice (ci.yml `plan`, `infra`). The
+// A change to shared test code runs the flows it touches, once with a retry (ci.yml `plan`, `infra`). The
 // jobs come from e2e.yml's `infra_jq`, run here with jq as the workflow runs it. They used to be two
 // jobs whatever the flows: #574 touched 21 flows through signup.yaml, and its iOS job of 11 needed
 // about 200 of its 180 minutes (run 43706009559).
@@ -155,7 +155,7 @@ describe('the jobs for a change to shared test code', () => {
     ).map((job) => job.flows.split(' '));
 
   // Each touched flow once, each job a full job's flows in its order with only the touched ones
-  // kept, and each job inside its limit with every flow run twice.
+  // kept, and each job inside its limit with its longest flow run a second time (run.sh's retry).
   function check(touched) {
     const jobs = infraJobs(touched);
     expect(jobs.flat().sort()).toEqual([...touched].sort());
@@ -165,9 +165,12 @@ describe('the jobs for a change to shared test code', () => {
     }
     for (const platform of ['ios', 'android']) {
       const over = jobs
-        .map((job) => ({ job, total: OVERHEAD[platform] + 2 * job.reduce((a, f) => a + minutes[platform][base(f)], 0) }))
-        .filter(({ total }) => total > limit(platform, 2))
-        .map(({ job, total }) => `${job.map(short).join(' ')}: ${total} of ${limit(platform, 2)} minutes`);
+        .map((job) => {
+          const each = job.map((f) => minutes[platform][base(f)]);
+          return { job, total: OVERHEAD[platform] + each.reduce((a, b) => a + b, 0) + Math.max(...each) };
+        })
+        .filter(({ total }) => total > limit(platform))
+        .map(({ job, total }) => `${job.map(short).join(' ')}: ${total} of ${limit(platform)} minutes`);
       expect({ platform, over }).toEqual({ platform, over: [] });
     }
     return jobs;
@@ -178,9 +181,9 @@ describe('the jobs for a change to shared test code', () => {
     expect(infraJobs(four)).toEqual([four]);
     expect(infraJobs(flows.slice(5, 6))).toEqual([flows.slice(5, 6)]);
     for (const platform of ['ios', 'android']) {
-      const slowest = [...flows].sort((a, b) => minutes[platform][base(b)] - minutes[platform][base(a)]).slice(0, 4);
-      const total = OVERHEAD[platform] + 2 * slowest.reduce((a, f) => a + minutes[platform][base(f)], 0);
-      expect({ platform, total, fits: total <= limit(platform, 2) }).toEqual({ platform, total, fits: true });
+      const each = [...flows].map((f) => minutes[platform][base(f)]).sort((a, b) => b - a).slice(0, 4);
+      const total = OVERHEAD[platform] + each.reduce((a, b) => a + b, 0) + each[0];
+      expect({ platform, total, fits: total <= limit(platform) }).toEqual({ platform, total, fits: true });
     }
   });
 

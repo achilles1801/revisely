@@ -146,6 +146,7 @@ jobs:
       ios_shards: ${{ steps.shards.outputs.ios }}
       android_shards: ${{ steps.shards.outputs.android }}
       run_ios: ${{ steps.shards.outputs.run_ios }}
+      ios_one: ${{ steps.shards.outputs.ios_one }}
       run_android: ${{ steps.shards.outputs.run_android }}
     steps:
       # The jobs and their flows. Every flow: four jobs a platform, balanced by time so
@@ -183,9 +184,10 @@ jobs:
           smoke_android='[{"name":"smoke: 02 05","flows":".maestro/flows/0[25]-*.yaml"},{"name":"smoke: 04 06","flows":".maestro/flows/0[46]-*.yaml"}]'
           smoke_ios='[{"name":"smoke: 02 04 05 06","flows":".maestro/flows/0[2456]-*.yaml"}]'
           build='[{"name":"native build","flows":""}]'
-          # A change to shared test code (CI's plan): the flows it touches, or every flow, each run
-          # twice. Four flows or fewer: one job (the four slowest, twice, fit its 180 minutes on either
-          # platform; the smoke set, which a workflow change runs on iOS, is one macOS job). More: the full run's jobs, each keeping only the
+          # A change to shared test code (CI's plan): the flows it touches, or every flow, once with a
+          # retry. Four flows or fewer: one job (the four slowest with a retry fit its limit on either
+          # platform; the smoke set, which a workflow change runs on iOS, is one macOS job). More: the
+          # full run's jobs, each keeping only the
           # flows touched, in its order (10 before the 09 seeds), so each fits its limit as the full
           # job does (shards.test.js checks both, running this). Splitting them into two jobs didn't
           # fit: #574 touched 21 flows through signup.yaml, and its iOS job of 11 needed about 200 of
@@ -249,7 +251,10 @@ jobs:
           fi
           run_ios=true; if [ "$ios" = '[]' ]; then run_ios=false; fi
           run_android=true; if [ "$android" = '[]' ]; then run_android=false; fi
-          { echo "ios=$ios"; echo "android=$android"; echo "run_ios=$run_ios"; echo "run_android=$run_android"; } >> "$GITHUB_OUTPUT"
+          # One iOS job (a PR's flows, the smoke set, develop's native build): it restores or builds
+          # the app itself, with no ios-build job before it to wait in the macOS queue for.
+          ios_one=false; if [ "$(jq length <<<"$ios")" = 1 ]; then ios_one=true; fi
+          { echo "ios=$ios"; echo "android=$android"; echo "run_ios=$run_ios"; echo "ios_one=$ios_one"; echo "run_android=$run_android"; } >> "$GITHUB_OUTPUT"
           echo "iOS: $ios"; echo "Android: $android"
 
       # What the change holds. A PR: its files; the top of a stack: the whole
@@ -320,10 +325,13 @@ jobs:
   # the four iOS jobs built the app (26 minutes) inside its 90, and the two longest ran out with their
   # flows still going (#496's run 42727081470). On a miss this builds it once and keeps it in the run's
   # own scope; on a hit it only looks (lookup-only) and ends in about three minutes.
+  # Only for two iOS jobs or more: with one, it was a second wait in the macOS queue for a minute's
+  # lookup (57 minutes before #659's flows could even queue, Nov 16 2026), and the one job builds the
+  # app itself if it isn't kept.
   ios-build:
     name: E2E (iOS Simulator, the native build)
     needs: changes
-    if: ${{ needs.changes.outputs.app == 'true' && needs.changes.outputs.run_ios == 'true' }}
+    if: ${{ needs.changes.outputs.app == 'true' && needs.changes.outputs.run_ios == 'true' && needs.changes.outputs.ios_one != 'true' }}
     runs-on: macos-26
     timeout-minutes: 60
     steps:
@@ -401,10 +409,11 @@ jobs:
     # After the native build, which each job restores (its own build steps stay for a cache evicted
     # in between).
     needs: [changes, ios-build]
-    if: ${{ needs.changes.outputs.app == 'true' && needs.changes.outputs.run_ios == 'true' && needs.ios-build.result == 'success' }}
+    if: ${{ !cancelled() && needs.changes.outputs.app == 'true' && needs.changes.outputs.run_ios == 'true' && (needs.ios-build.result == 'success' || (needs.ios-build.result == 'skipped' && needs.changes.outputs.ios_one == 'true')) }}
     runs-on: macos-26
-    # Each flow run twice (a change to shared test code): twice the flows' time.
-    timeout-minutes: ${{ inputs.repeat == '2' && 180 || 90 }}
+    # Each flow run twice (a run by hand with repeat 2): twice the flows' time. 120, not 90: a run's one
+    # iOS job builds the app itself when it isn't kept (26–35 minutes, a native change).
+    timeout-minutes: ${{ inputs.repeat == '2' && 180 || 120 }}
     # The macOS runner takes 4–14 minutes a flow, and a native build 20 to 35
     # (when the fingerprint has none kept: a native change). (On Nov 4 a third job
     # sometimes waited for a macOS runner until GitHub gave up on it; none has since,
@@ -691,7 +700,7 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.app == 'true' && needs.changes.outputs.run_android == 'true' }}
     runs-on: ubuntu-latest
-    # Each flow run twice (a change to shared test code): twice the flows' time.
+    # Each flow run twice (a run by hand with repeat 2): twice the flows' time.
     timeout-minutes: ${{ inputs.repeat == '2' && 180 || 90 }}
     strategy:
       fail-fast: false
@@ -986,6 +995,7 @@ jobs:
           CHANGES: ${{ needs.changes.result }}
           APP: ${{ needs.changes.outputs.app }}
           RUN_IOS: ${{ needs.changes.outputs.run_ios }}
+          IOS_ONE: ${{ needs.changes.outputs.ios_one }}
           RUN_ANDROID: ${{ needs.changes.outputs.run_android }}
           IOS_BUILD: ${{ needs.ios-build.result }}
           IOS: ${{ needs.ios.result }}
@@ -1001,7 +1011,8 @@ jobs:
             if [ "$3" != success ]; then echo "::error::E2E on $1: $3"; return 1; fi
           }
           ok=0
-          expect "ios (the native build)" "$RUN_IOS" "$IOS_BUILD" || ok=1
+          build_planned=$RUN_IOS; [ "$IOS_ONE" = true ] && build_planned=false
+          expect "ios (the native build)" "$build_planned" "$IOS_BUILD" || ok=1
           expect ios "$RUN_IOS" "$IOS" || ok=1
           expect android "$RUN_ANDROID" "$ANDROID" || ok=1
           exit $ok
