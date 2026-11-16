@@ -27,6 +27,8 @@ t('updates.store.body', { version, store });      // "Revisely 1.0.4 is on the A
   `'Get version ' + minimum + ' or later'`. Word order differs between languages.
 - **Plurals:** two keys, `pages_one: '{{count}} page'` and `pages_other: '{{count}} pages'`, used as
   `t('x.pages', { count })`. Not `n === 1 ? 'page' : 'pages'`: Arabic has six forms.
+- **No › or ‹ in a string.** They must point the other way in Arabic: the code adds `chevron()` or
+  `backChevron()` (`src/i18n/direction.ts`) after the text, joined with a no-break space as before.
 - **Keys** say what the text is, in camelCase, grouped by screen or part: `updates.required.title`.
   A word used in two places with two meanings gets two keys ("Done" the button, "Done" the status).
 - **The English stays exactly as it was** when a string moves. Values are text only: no colours, no

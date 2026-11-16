@@ -657,3 +657,13 @@ describe('<MushafPager /> pages not on the phone', () => {
     expect(screen.getByText("Couldn't load page 300")).toBeTruthy();
   });
 });
+
+describe('<MushafPager /> left to right in any language (LANG-1)', () => {
+  it('lays its pages out left to right, so page order and verse boxes never mirror', () => {
+    setup();
+    // `inverted` puts page 1 on the right; the boxes are placed from the image's left edge.
+    const list = screen.UNSAFE_getByType(FlatList);
+    expect(list.props.inverted).toBe(true);
+    expect(StyleSheet.flatten(list.props.style).direction).toBe('ltr');
+  });
+});

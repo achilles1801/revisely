@@ -312,6 +312,7 @@ export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
   'ACT-27': 'Activity refreshes by itself and with a pull; nothing to ask Revo about',
   'NEW-4': 'what waits for the walkthrough; nothing for Revo to explain',
   'ONBOARD-2': 'the server repairs a sign-up stopped half way; nothing to do',
+  'LANG-1': 'the layout follows the app’s language, not the phone’s; nothing for Revo to explain',
   'SHEET-1': 'one sheet at a time, so the screen under them always takes taps again; nothing for Revo to explain',
   'SYNC-4': 'a new account loads with no relaunch; nothing to do',
   'ACCOUNT-2': 'the sign-in screen keeps what was typed after a failed attempt; Revo is for signed-in users',
