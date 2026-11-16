@@ -10,7 +10,7 @@ import { shiftDay } from '../journal';
 import type { HistoryItem } from '../streakFromItems';
 import type { TodaySnapshot } from '../todaySnapshot';
 import { daySignals, revoPatterns, sessionStarts } from './patterns';
-import type { RevoContext, RevoRecitation, RevoTotals } from './types';
+import type { RevoContext, RevoGaps, RevoRecitation, RevoTotals } from './types';
 import { contextWords, memorizedWords } from './words';
 import { isDevVariant } from '../variant';
 import { isRevisable, memorizedAyahs, memorizedPageShare, partlyMemorizedAyahs, revisablePages } from '../memorizedAyahs';
@@ -83,9 +83,12 @@ export function buildRevoContext(input: {
   patterns?: boolean;
   /** Their recitation (Revisely Dev, RINS-1; lib/revo/recitation), only for an account that recites. */
   recitation?: RevoRecitation | null;
+  /** Insights' Gaps and Last revised (Revisely Dev, ACT-28, ACT-30; lib/revo/gaps). Only Revisely Dev sends them. */
+  gaps?: RevoGaps | null;
   now?: Date;
 }): RevoContext {
   const { user, pages, logs, snapshot } = input;
+  const dev = isDevVariant();
   const today = snapshot.day;
   const byNumber = new Map(pages.map((p) => [p.pageNumber, p]));
   const list = new Set(snapshot.pages);
@@ -157,7 +160,9 @@ export function buildRevoContext(input: {
     ...(input.recitation ? { recitation: input.recitation } : {}),
     // Revisely Dev: the server adds the Dev guide, what only Revisely Dev has (functions/src/revo/guide.ts). The
     // store app never sends it, so its questions are asked exactly as before.
-    ...(isDevVariant() ? { app: 'dev' as const } : {}),
+    ...(dev ? { app: 'dev' as const } : {}),
+    // Gaps go only beside it: the server refuses them from any other app, and with them the whole question.
+    ...(dev && input.gaps ? { gaps: input.gaps } : {}),
     localTime: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
   };
 }

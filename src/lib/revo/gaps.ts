@@ -12,25 +12,12 @@ import { lastRevisedRows } from '../lastRevised';
 import { revisablePages } from '../memorizedAyahs';
 import { coverageSince, daysSince, lastRevisedDay } from '../recency';
 import { plainText, surahName } from '../passages';
+import type { RevoGaps } from './types';
+
+export type { RevoGaps };
 
 /** Revo's window for the gaps, whatever range Insights shows. */
 export const REVO_GAPS_WINDOW = 30;
-
-/** The server's shape (functions/src/revo/types.ts RevoGaps). */
-export interface RevoGaps {
-  /** Whole days since the last revision day (0 = today). */
-  lastRevisedDaysAgo: number;
-  /** The longest gap in the last 30 days; `endedDaysAgo` null while it is still open. */
-  longestGap: { days: number; endedDaysAgo: number | null } | null;
-  /** The usual step between revision days (1 = every day), from at least two steps. */
-  usualStepDays: number | null;
-  /** Gaps of 3 days or more in the last 30 days, the open one included. */
-  longGaps: number;
-  /** The full revision against the plan (lib/gapsCycle). */
-  fullRevision: { latePages: number; pushedBackDays: number; cycleDays: number } | null;
-  /** Memorized surahs, longest waiting first: days since revised (null: never; `notYet`: memorized under 30 days ago). */
-  surahs: { name: string; daysAgo: number | null; notYet?: true }[];
-}
 
 export function revoGaps(input: {
   user: User;

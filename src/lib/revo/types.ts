@@ -81,6 +81,11 @@ export interface RevoContext {
   recitation?: RevoRecitation;
   /** 'dev' from Revisely Dev (lib/variant): the server then adds the Dev guide to the question. Never from the store app. */
   app?: 'dev';
+  /**
+   * Insights' Gaps and Last revised (Revisely Dev, ACT-28 and ACT-30): the figures the section and the screen show, from
+   * lib/revo/gaps. Sent only with `app: 'dev'`: the server refuses them without it.
+   */
+  gaps?: RevoGaps;
   localTime: string | null;
 }
 
@@ -97,6 +102,22 @@ export interface RevoRecitedAyah {
   sura: number;
   ayah: number;
   name: string;
+}
+
+/** The server's shape (functions/src/revo/types.ts RevoGaps), checked there (validate.ts validateGaps). */
+export interface RevoGaps {
+  /** Whole days since the last revision day (0 = today). */
+  lastRevisedDaysAgo: number;
+  /** The longest gap in the last 30 days; `endedDaysAgo` null while it is still open. */
+  longestGap: { days: number; endedDaysAgo: number | null } | null;
+  /** The usual step between revision days (1 = every day), from at least two steps. */
+  usualStepDays: number | null;
+  /** Gaps of 3 days or more in the last 30 days, the open one included. */
+  longGaps: number;
+  /** The full revision against the plan (lib/gapsCycle). */
+  fullRevision: { latePages: number; pushedBackDays: number; cycleDays: number } | null;
+  /** Memorized surahs, longest waiting first: days since revised (null: never; `notYet`: memorized under 30 days ago). */
+  surahs: { name: string; daysAgo: number | null; notYet?: true }[];
 }
 
 /** The server's shape (functions/src/revo/types.ts RevoRecitation), checked there to add up. */
