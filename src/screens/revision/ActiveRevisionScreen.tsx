@@ -1158,7 +1158,7 @@ export default function ActiveRevisionScreen() {
               total={lastSectionPages.length}
               done={lastSectionPages.filter((p) => completedPages.has(p)).length}
               celebrate={celebrate}
-              dayLabel={lastSectionDay === sessionDay ? 'today' : `for ${aheadDayLabel(sessionDay ?? lastSectionDay, lastSectionDay)}`}
+              forDay={lastSectionDay === sessionDay ? undefined : aheadDayLabel(sessionDay ?? lastSectionDay, lastSectionDay)}
               what={describePassage(lastSectionPages, { order: 'given' })}
               next={
                 keepGoingPlan

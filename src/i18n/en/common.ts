@@ -7,6 +7,15 @@ export const common = {
   delete: 'Delete',
   done: 'Done',
   more: 'More',
+  remove: 'Remove',
+  undo: 'Undo',
+  /** A count of pages on its own: "1 page", "20 pages". */
+  pages_one: '{{count}} page',
+  pages_other: '{{count}} pages',
+  surah: 'Surah',
+  juz: 'Juz',
+  surahN: 'Surah {{n}}',
+  juzN: 'Juz {{n}}',
   tryAgain: 'Try again',
   signOut: 'Sign out',
 } as const;

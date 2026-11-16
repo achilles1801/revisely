@@ -8,6 +8,7 @@ import { PillTabs } from '../v2/PillTabs';
 import { WheelPicker, type WheelItem } from '../v2/WheelPicker';
 import { getPagesForJuz, getPagesForSurah, getSurahDisplay } from '../../lib/quranData';
 import { layoutV2 } from '../../theme/v2';
+import { t } from '../../i18n';
 
 type Kind = 'surah' | 'juz';
 
@@ -39,12 +40,12 @@ export function RangePickerSheet({
     () =>
       Array.from({ length: 114 }, (_, i) => ({
         key: `surah-${i + 1}`,
-        label: getSurahDisplay(i + 1)?.nameDisplay ?? `Surah ${i + 1}`,
+        label: getSurahDisplay(i + 1)?.nameDisplay ?? t('common.surahN', { n: i + 1 }),
       })),
     [],
   );
   const juz: WheelItem[] = useMemo(
-    () => Array.from({ length: 30 }, (_, i) => ({ key: `juz-${i + 1}`, label: `Juz ${i + 1}` })),
+    () => Array.from({ length: 30 }, (_, i) => ({ key: `juz-${i + 1}`, label: t('common.juzN', { n: i + 1 }) })),
     [],
   );
   const items = kind === 'surah' ? surahs : juz;
@@ -53,9 +54,9 @@ export function RangePickerSheet({
     <Sheet
       visible={visible}
       onClose={onClose}
-      title={kind === 'surah' ? 'Surah' : 'Juz'}
+      title={kind === 'surah' ? t('common.surah') : t('common.juz')}
       footer={{
-        label: 'Use these pages',
+        label: t('memorization.useThesePages'),
         onPress: () => {
           onUse(rangeOf(kind, index));
           onClose();
@@ -66,8 +67,8 @@ export function RangePickerSheet({
       <View style={styles.body}>
         <PillTabs<Kind>
           options={[
-            { value: 'surah', label: 'Surah' },
-            { value: 'juz', label: 'Juz' },
+            { value: 'surah', label: t('common.surah') },
+            { value: 'juz', label: t('common.juz') },
           ]}
           value={kind}
           onChange={(k) => {
@@ -79,7 +80,7 @@ export function RangePickerSheet({
         {/* A row: the wheel is `flex: 1` (its width), with its own height. In the column it had no
             height at all (Nov 2026: Surah and Juz showed no wheel). */}
         <View style={styles.wheelRow}>
-          <WheelPicker items={items} index={index} onChange={setIndex} label={kind === 'surah' ? 'Surah' : 'Juz'} testID="range-wheel" />
+          <WheelPicker items={items} index={index} onChange={setIndex} label={kind === 'surah' ? t('common.surah') : t('common.juz')} testID="range-wheel" />
         </View>
       </View>
     </Sheet>
