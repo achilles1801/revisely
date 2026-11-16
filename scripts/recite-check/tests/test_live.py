@@ -796,6 +796,29 @@ class QuranStart(unittest.TestCase):
         self.assertEqual(locks, [{'w': w, 's': 78, 'a': 25, 'where': 'page'}])
 
 
+# the lab's bench_slips.py: bench-v0's passages with hesitations, pauses and corrections planted (none a mistake)
+SLIPS = pathlib.Path(os.environ.get('RECITE_BENCH_SLIPS',
+                                    pathlib.Path.home() / 'revisely-mistake-lab/data/bench-slips/items'))
+
+
+@unittest.skipUnless((SLIPS / 'alafasy.p2.slips.clean.wav').exists(), "the lab's planted-slips bench is not here")
+class Corrections(unittest.TestCase):
+    def test_a_word_tried_dropped_and_said_again_is_not_marked(self):
+        """Al-Fatiha with «نَعْبُدُ» said in place of «ٱلْمَغْضُوبِ» (25), a pause, then back to «أَنْعَمْتَ» (22) and on, right.
+        Before the decoder could go back from a filler, it took the first «أَنْعَمْتَ عَلَيْهِمْ غَيْرِ» and the dropped
+        word in as one extra word after «ٱلَّذِينَ» (21); a correction is not a mistake (recite-contract.md). The
+        hesitations and the pause planted in the same take aren't marked either."""
+        import live
+        with wave.open(str(SLIPS / 'alafasy.p2.slips.clean.wav')) as f:
+            pcm = f.readframes(f.getnframes())
+        x = np.frombuffer(pcm, '<i2').astype(np.float32) / 32768
+        checked = engine().check(x, 1, 1, 1, 7, v=2)
+        ev = run(live.LiveSession(engine(), 1, 1, 1, 7, {}), chunks(pcm, 3200) + [{'type': 'end'}])
+        for res in (checked, ev[-1]['result']):
+            self.assertEqual([(m['w'], m['kind']) for m in res['marks'] if m['kind'] != 'tajweed'], [])
+        self.assertEqual([e['mark']['w'] for e in ev if e['type'] == 'mark' and e['mark']['kind'] != 'tajweed'], [])
+
+
 class LookAlikes(unittest.TestCase):
     def test_a_spelling_apart_only_in_shadda_or_madd_is_not_a_lookalike(self):
         """يَـٰبَنِىَّ (baniyya, 12:87) and يَـٰبَنِىٓ (banī) are written alike; only the shadda and the madd differ, which is
