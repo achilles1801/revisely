@@ -204,6 +204,15 @@ def load_table(path):
     return t
 
 
+# Naming slips with gap_back on (name_slips): each run of marks is decoded again without it, over NAME_AROUND words
+# before and after the run (runs closer than NAME_JOIN words together), with NAME_PAD frames of audio either side
+NAME_AROUND = (3, 6)    # (bench-v0, naming through the engine: 108/111 slips into a similar ayah, 80/164 swapped
+NAME_JOIN = 6           # endings, none false; with the checker before gap_back 107 and 76)
+NAME_PAD = 25
+NAME_FRAMES = 8000  # frames decoded again for naming in one take at most (live.Decoder: ~60 µs a frame on the Mac, so
+                   # at most ~0.5 s there and ~2.3 s on Cloud Run; bench-v0's takes with 6 planted mistakes: median
+                   # 167 ms, at most 661 ms on the Mac; correct takes: none, 79 ms at p90)
+
 V5_KINDS = ('Qalqalah', 'Lazem Madd')  # tajweed.judge kinds judged on the strict ear (v5) when it is there; and the
 # nasal places (idgham, idgham without ghunnah, iqlab). Lab, Nov 11 2026: v5 caught idgham / idgham without ghunnah /
 # iqlab 97 / 85 / 98% (released 85 / 47 / 66), flagged 1% of correct learners' qalqalah (7%), and judged no lazim madd
@@ -497,17 +506,28 @@ class Engine:
         if self.table is None:
             return 0
         t0 = time.perf_counter()
-        work = {'left': similar.P['budget']}
+        work = {'left': similar.P['budget'], 'frames': NAME_FRAMES}
         names = []
         try:
-            names = similar.find(lp, order, statuses, spans, extras, self._labels_of, self.slip_index, work=work)
-            marked = {n['mark'] for n in names}
-            names += [n for n in similar.endings(lp, order, statuses, spans, self._forms_of, self.slip_index,
-                                                 work=work) if n['mark'] not in marked]
+            if WORDS_P.get('gap_back') is None:
+                names = self._slips_in(lp, order, statuses, spans, extras, work)
+            else:
+                # each run of marks that could be a slip (a similar passage forks off near its start, or it ends an
+                # ayah) is decoded again without going back from a filler, and named from that alone: named from the
+                # take's own decode, bench-v0's correct takes got 3 false names
+                for lo, hi, ends_heard, first, last in self._mark_runs(order, statuses, extras, spans):
+                    if not self._could_name(first, last):
+                        continue
+                    plain = self._decode_plain(lp, lo, hi, spans, work, ends_heard)
+                    if plain is not None:
+                        named = {n['mark'] for n in names}
+                        names += [n for n in self._slips_in(lp, *plain, work) if n['mark'] not in named]
         except Exception as e:  # naming is extra: it never costs the answer
             print(f'similar: {type(e).__name__}: {e}', file=sys.stderr)
+        word_marks = sorted((m for m in marks if m['kind'] in ('skipped', 'word')), key=lambda m: m['w'])
         for n in names:
-            m = next((m for m in marks if m['w'] == n['mark'] and m['kind'] in ('skipped', 'word')), None)
+            hi = n['upto'] if n['upto'] is not None else 10 ** 9
+            m = next((m for m in word_marks if n['mark'] <= m['w'] < hi and 'into' not in m), None)
             if m is None:
                 continue
             ayah = self.slip_index.ayah(n['w'])
@@ -519,6 +539,74 @@ class Engine:
             m['into'] = ({'w': int(n['w']), 'ayah': ayah} | ({'also': also[:5]} if also else {})
                          | ({'ending': True} if n.get('kind') == 'ending' else {}))
         return int((time.perf_counter() - t0) * 1000)
+
+    def _slips_in(self, lp, order, statuses, spans, extras, work):
+        """similar.find, then similar.endings on the runs it didn't name."""
+        names = similar.find(lp, order, statuses, spans, extras, self._labels_of, self.slip_index, work=work)
+        marked = {n['mark'] for n in names}
+        return names + [n for n in similar.endings(lp, order, statuses, spans, self._forms_of, self.slip_index,
+                                                   work=work) if n['mark'] not in marked]
+
+    @staticmethod
+    def _mark_runs(order, statuses, extras, spans):
+        """App word ranges [lo, hi) around each run of words skipped or said wrong (or an extra word), runs closer than
+        NAME_JOIN words taken together: from the first word heard up to NAME_AROUND[0] before the run to the last word
+        heard up to NAME_AROUND[1] after it (the decode again ends on a word the take's own decode heard)."""
+        at = {w: i for i, w in enumerate(order)}
+        bad = sorted({at[w] for w, st in statuses.items() if st in ('wrong', 'missed') and w in at}
+                     | {at[e['after']] for e in extras if not e.get('trail') and e['after'] in at})
+        runs = []
+        for i in bad:
+            if runs and i - runs[-1][1] <= NAME_JOIN:
+                runs[-1][1] = i
+            else:
+                runs.append([i, i])
+        before, after = NAME_AROUND
+        out = []
+        for a, b in runs:
+            lo = next((i for i in range(max(0, a - before), a + 1) if order[i] in spans), a)
+            hi = next((i for i in range(min(len(order) - 1, b + after), b, -1) if order[i] in spans), None)
+            out.append((order[lo], order[hi] + 1 if hi is not None else order[min(len(order) - 1, b + after)] + 1,
+                        hi is not None, order[a], order[b]))
+        return out
+
+    def _could_name(self, first, last):
+        """App words first..last (a run of marks) could be named: a similar passage forks off within two words of its
+        start, or one of them ends an ayah (similar.endings)."""
+        idx = self.slip_index
+        return any(idx.places(f) for f in range(max(2, first - 2), first + 3) if f < len(idx.norm)) \
+            or any(w in idx.is_last for w in range(first, last + 1))
+
+    def _decode_plain(self, lp, lo, hi, spans, work, ends_heard=True):
+        """App words [lo, hi) decoded again over their own audio without going back from a filler (gap_back off, the
+        decoder similar.py was measured on): (order, statuses, spans, extras) as decide() gives them, spans in the
+        take's frames; None when its words weren't heard or the naming's work is spent. With gap_back, a slip into a
+        similar passage is often heard as words tried and taken back (a short word visited again and again between
+        fillers), which leaves no run to name: bench-v0's 111 planted slips named 107 -> 72 without this, 107 with.
+        ends_heard: [lo, hi) ends on a word the take's decode heard, and this decode must end there too: over a short
+        window, free speech is cheaper than the jumps across a long run of skipped words that the whole take's decode
+        has to make (2:255 slipping into 20:8 for 45 words)."""
+        import live  # noqa: E402  (its Decoder: the checker's step, vectorized; live imports this module first)
+        heard = [spans[w] for w in range(lo, hi) if w in spans]
+        if not heard:
+            return None
+        f0 = max(0, min(a for a, _ in heard) - NAME_PAD)
+        f1 = min(len(lp), max(b for _, b in heard) + NAME_PAD)
+        if f1 - f0 > work['frames']:
+            return None
+        work['frames'] -= f1 - f0
+        kws = self.passage_words(lo, hi)
+        g = checker.Graph(kws)
+        P = dict(WORDS_P, gap_back=None, revisit_keep=False)
+        if ends_heard:
+            P['stop'] = -1e6
+        dec = live.Decoder(g, P, cap=f1 - f0 + 10)
+        dec.feed(lp[f0:f1])
+        path, _ = dec.traceback(final=True)
+        st, _, _, _, extras, visits, _ = checker.decide(kws, g, lp[f0:f1], path, P, self.ear.vocab)
+        sp = {kws[i]['word']: (f0 + min(v['start'] for v in visits[i]), f0 + max(v['end'] for v in visits[i]))
+              for i in range(len(kws)) if visits[i]}
+        return [k['word'] for k in kws], st, sp, extras
 
     def _forms_of(self, w):
         """Word w's forms (joined, started on, stopped on), for similar.endings."""
