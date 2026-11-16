@@ -23,6 +23,7 @@ import { useModalHold } from '../v2/modalTurn';
 import { alertSessionSaved } from './sessionSavedAlert';
 import { TimerControls } from './TimerControls';
 import { t } from '../../i18n';
+import type { SittingEnded } from '../../lib/sitting';
 
 /** Where the card grows from and shrinks back to: the chip that opened it, on screen. */
 export interface Frame {
@@ -92,7 +93,7 @@ export function TimerCard({
   /** "Open the Quran" in the controls; omitted where the Quran is already open. */
   onOpenQuran?: () => void;
   /** A session was saved (TimerControls); by default the "Session saved" alert. The reader says it its own way (REC-1). */
-  onSaved?: (date: string, seconds: number, ended: { pages: number[] }) => void;
+  onSaved?: (date: string, seconds: number, ended: SittingEnded) => void;
   /** Runs before End finishes the session (TimerControls): the reader stops its recording (REC-1). */
   beforeEnd?: () => Promise<void>;
 }) {

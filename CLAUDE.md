@@ -1365,6 +1365,10 @@ How it works:
     that go's segments and their page marks go, and the earlier recording stays. Those segments never uploaded; a
     segment that did is refused ("Couldn't undo"), since a segment can't leave the backup on its own.
   - With VoiceOver or TalkBack the note stays 15 s and is said aloud (never while the microphone is on).
+  - **"Saved to today · Undo · View"** (REC-1, Nov 15 2026; `components/timer/SittingSavedToast`, `undoSitting` in
+    `lib/sitting`): a sitting's note can be undone too. Undo deletes the session (`reading.delete`, as the day's Delete
+    session) and undoes the recording that ended with it, the same way. That recording's hold lasts while the note
+    shows. The timer's `finish()` returns the saved session's id for it.
 - **Listing:** the backup is listed on an account's first run, then at most every 15 minutes.
 - **Account deletion:** `deleteUserAccount` deletes the Storage prefix first.
 - **Known limits:**

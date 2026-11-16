@@ -268,7 +268,9 @@ How the tests are made: `tests/scenarios/README.md`.
   thing that pops up is Surah Fatiha, and then after like a half second or so, it jumps to the surah").
 - **REC-1.** A sitting in the reader: ending the timer while a recording runs, or is paused,
   ends both. The recording is saved first, then the timed sitting. One note says what was saved, by
-  surah and ayah, and opens its day: "Saved to today: Al-Mulk, ayahs 1–26, 41 min · View". It takes the
+  surah and ayah, and opens its day: "Saved to today: Al-Mulk, ayahs 1–26, 41 min · Undo · View". Its
+  Undo takes back the sitting and the recording that ended with it, as the day's Delete session does; the
+  recording uploads only once the note has gone, so an undone one never leaves the phone. It takes the
   place of the "Session saved" alert and the "Recording saved" note. The sitting is named by the pages
   it held, each on screen a minute or more (time paused doesn't count); a page only glanced at isn't
   named. Stopping only the recording leaves the timer running.

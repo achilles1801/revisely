@@ -91,16 +91,35 @@ describe('the help names what the app has', () => {
 });
 
 describe('the help stays short and plain', () => {
-  it(`shows at most ${MAX_TOPICS} topics a screen, with Smart Tracking on or off, the hidden page offered or not`, () => {
+  it(`shows at most ${MAX_TOPICS} topics a screen, with Smart Tracking on or off, the hidden page or Recite offered or not`, () => {
     for (const s of screens) {
       for (const smartTracking of [true, false]) {
         for (const recite of [true, false]) {
-          const n = topicsFor(s, { smartTracking, recite }).length;
-          expect(n).toBeLessThanOrEqual(MAX_TOPICS);
-          expect(n).toBeGreaterThan(0);
+          for (const liveRecite of [true, false]) {
+            const n = topicsFor(s, { smartTracking, recite, liveRecite }).length;
+            expect(n).toBeLessThanOrEqual(MAX_TOPICS);
+            expect(n).toBeGreaterThan(0);
+          }
         }
       }
     }
+  });
+
+  it('the reader tells of Recite only with it (Revisely Dev), in place of its recording topic', () => {
+    const ids = (liveRecite: boolean) => topicsFor('reader', { smartTracking: true, liveRecite }).map((t) => t.id);
+    expect(ids(false)).toContain('reader.sitting');
+    expect(ids(false)).not.toContain('reader.recite');
+    expect(ids(true)).toContain('reader.recite');
+    expect(ids(true)).not.toContain('reader.sitting');
+  });
+
+  it('Recite’s help says what Revisely Dev’s Recite does, and nothing it no longer does (Nov 15 2026)', () => {
+    const text = HELP.recite.topics.map((t) => t.text).join(' ');
+    for (const said of ['anywhere', 'Red', 'Amber', 'Violet', '{{Not clear}}', '{{Hear it}}', '{{Your recitation}}', '{{Not a mistake}}', '{{Put back}}', '{{Recite the mistakes again}}', '[[eye]]', '{{Recording saved}}']) {
+      expect(text).toContain(said);
+    }
+    // The old names and marks: the Check button, circles, a red ×.
+    expect(text).not.toMatch(/\bCheck\b|circle|×/);
   });
 
   it('topic ids are unique and start with their screen', () => {

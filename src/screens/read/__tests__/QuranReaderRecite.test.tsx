@@ -397,6 +397,28 @@ describe('a take kept as a recording (Save recordings, on by default)', () => {
     undo.mockRestore();
   });
 
+  it('the reader’s help tells of Recite (holding the mic), in place of its recording topic', async () => {
+    setReciteCheckSettings('u1', { noticeSeen: true, mode: 'recite', markMistakes: false });
+    await open();
+    fireEvent.press(await screen.findByTestId('help-button-reader'));
+    expect(await screen.findByTestId('help-sheet-reader')).toBeTruthy();
+    expect(screen.getByTestId('help-topic-reader.recite')).toBeTruthy();
+    expect(screen.queryByTestId('help-topic-reader.sitting')).toBeNull();
+  });
+
+  it('while a take is open, the ? tells how Recite works', async () => {
+    await startTake('check');
+    fireEvent.press(await screen.findByTestId('help-button-reader'));
+    expect(await screen.findByTestId('help-sheet-recite')).toBeTruthy();
+    expect(screen.getByText('How Recite works')).toBeTruthy();
+    for (const id of ['recite.start', 'recite.marks', 'recite.card', 'recite.after']) {
+      expect(screen.getByTestId(`help-topic-${id}`)).toBeTruthy();
+    }
+    // It's the reader's help: no "Ask Revo" (REVO-25), as flow 18's first shot of it showed there was.
+    expect(jest.requireActual('../../../components/help/HelpSheet').NO_REVO.has('recite')).toBe(true);
+    expect(screen.queryByTestId('help-ask-revo')).toBeNull();
+  });
+
   it('Save recordings off: nothing is kept and there is no dot', async () => {
     setReciteCheckSettings('u1', { saveRecording: false });
     await startTake('recite');

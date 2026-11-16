@@ -34,11 +34,19 @@
   "reader.turning": {},
   "reader.recitation": {},
   "reader.sitting": {
-    "REC-1": "971b7fa368411aaa",
+    "REC-1": "dec0b6f83b53c68a",
     "REC-2": "06be0811d7eedf49",
     "MEM-5": "2b610dd93d4012d9",
     "DAY-9": "d1f48e9dc60411f1"
   },
+  "reader.recite": {
+    "REC-1": "dec0b6f83b53c68a",
+    "REC-2": "06be0811d7eedf49"
+  },
+  "recite.start": {},
+  "recite.marks": {},
+  "recite.card": {},
+  "recite.after": {},
   "schedule.cycle": {
     "SCHED-1": "e34c5d66002488e4",
     "SCHED-3": "29523ed2e8b9d054",

@@ -68,8 +68,11 @@ function TopicRow({ topic, marks }: { topic: HelpTopic; marks: boolean }) {
   );
 }
 
-/** Help sheets with no "Ask Revo": the reader (the Read tab) and a session (Majd, Nov 8 2026; REVO-25). */
-export const NO_REVO: ReadonlySet<HelpScreen> = new Set<HelpScreen>(['reader', 'session']);
+/**
+ * Help sheets with no "Ask Revo": the reader (the Read tab, and Recite's sheet there while a take is open) and a session
+ * (Majd, Nov 8 2026; REVO-25).
+ */
+export const NO_REVO: ReadonlySet<HelpScreen> = new Set<HelpScreen>(['reader', 'session', 'recite']);
 
 /**
  * A screen's help (HELP-1): its few topics, then "Ask Revo ›" (while Revo is on for the account, but never in
@@ -83,6 +86,7 @@ export function HelpSheet({
   onClose,
   onHide,
   recite = false,
+  liveRecite = false,
 }: {
   screen: HelpScreen;
   visible: boolean;
@@ -91,13 +95,15 @@ export function HelpSheet({
   onHide: () => void;
   /** The hidden page (recite mode) is offered here: its topic shows. */
   recite?: boolean;
+  /** The reader's Recite (Revisely Dev) is offered: its topics show, in place of those without it. */
+  liveRecite?: boolean;
 }) {
   const { palette } = useTheme();
   const { user } = useApp();
   const { fontScale } = useWindowDimensions();
   const pending = useRef<null | 'revo' | 'hide'>(null);
   const entry = HELP[screen];
-  const topics = topicsFor(screen, { smartTracking: user?.smartTrackingEnabled === true, recite });
+  const topics = topicsFor(screen, { smartTracking: user?.smartTrackingEnabled === true, recite, liveRecite });
   // Revo is on for this account (RevoHost is mounted): it follows Revo's own switch, whoever that opens it to.
   // Never in the reader's or a session's help: there is no Revo there (REVO-25).
   const revo = useRevoPresent() && !NO_REVO.has(screen);

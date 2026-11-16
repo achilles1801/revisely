@@ -16,14 +16,18 @@ import type { Ionicons } from '@expo/vector-icons';
 
 export type HelpIcon = keyof typeof Ionicons.glyphMap;
 
-/** The screens with help. */
-export type HelpScreen = 'home' | 'session' | 'reader' | 'schedule' | 'activity' | 'insights' | 'day';
+/** The screens with help. `recite` is the reader while a take is open (Recite, Revisely Dev). */
+export type HelpScreen = 'home' | 'session' | 'reader' | 'schedule' | 'activity' | 'insights' | 'day' | 'recite';
 
 /**
- * When a topic shows: only with Smart Tracking on, only with it off, or only where the hidden page
- * (recite mode, the session's eye) is offered.
+ * When a topic shows: only with Smart Tracking on, only with it off, only where the hidden page
+ * (recite mode, the session's eye) is offered, or only with the reader's Recite (Revisely Dev's one mic) or
+ * only without it.
  */
-export type HelpWhen = 'smartTracking' | 'noSmartTracking' | 'recite';
+export type HelpWhen = 'smartTracking' | 'noSmartTracking' | 'recite' | 'liveRecite' | 'noLiveRecite';
+
+/** Why Recite's topics have no rules to cover: it isn't in BEHAVIOUR.md (Revisely Dev only, its checker on Cloud Run). */
+const RECITE_UNRULED = 'Recite is in Revisely Dev only and has no BEHAVIOUR.md rules yet (its checker runs on Cloud Run)';
 
 export interface HelpTopic {
   id: string;
@@ -172,6 +176,63 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         title: 'Recording and timer',
         text: '[[mic]] records you and [[timer]] times you. {{End}} saves both to the day in Activity, where you can add what you memorized.',
         covers: ['REC-1', 'REC-2', 'MEM-5', 'DAY-9'],
+        when: 'noLiveRecite',
+      },
+      {
+        // The same mic, with Recite (Revisely Dev): while a take is open, the ? opens "How Recite works".
+        id: 'reader.recite',
+        icon: 'mic-outline',
+        title: 'Recording and reciting',
+        text: '[[mic]] records you; hold it and choose {{Recite}}, and the page follows you. [[timer]] times you, and {{End}} saves both to the day in Activity.',
+        covers: ['REC-1', 'REC-2'],
+        when: 'liveRecite',
+      },
+    ],
+  },
+  recite: {
+    // Majd, Nov 15 2026: in line with what Revisely Dev's Recite does (highlights in three colours, Not clear, Undo
+    // and Put back, Hear it, Recite the mistakes again, the hidden view, Recording saved's Undo).
+    title: 'How Recite works',
+    topics: [
+      {
+        id: 'recite.start',
+        icon: 'reader-outline',
+        title: 'Recite',
+        text:
+          'Start anywhere on the page: it finds where you are and follows you. ' +
+          'With {{Mark mistakes}} on, it marks your mistakes; [[eye]] hides the words until you say them.',
+        covers: [],
+        unruled: RECITE_UNRULED,
+      },
+      {
+        id: 'recite.marks',
+        icon: 'color-palette-outline',
+        title: 'The highlights',
+        text:
+          'Red: a word skipped, wrong or extra. Amber: a haraka or letter, or {{Not clear}} (not counted). ' +
+          'Violet: tajweed, with {{Strict}}. Tap one to see what it is.',
+        covers: [],
+        unruled: RECITE_UNRULED,
+      },
+      {
+        id: 'recite.card',
+        icon: 'chatbox-ellipses-outline',
+        title: 'A mistake',
+        text:
+          '{{Hear it}} plays the ayah and pauses your take; {{Your recitation}} plays you there. ' +
+          '{{Not a mistake}} takes it off, and {{Undo}} or {{Put back}} brings it back.',
+        covers: [],
+        unruled: RECITE_UNRULED,
+      },
+      {
+        id: 'recite.after',
+        icon: 'repeat-outline',
+        title: 'After the take',
+        text:
+          '{{Recite the mistakes again}} takes you over them once more. ' +
+          'Your take is kept as a recording; {{Undo}} on {{Recording saved}} deletes it.',
+        covers: [],
+        unruled: RECITE_UNRULED,
       },
     ],
   },
@@ -340,13 +401,18 @@ export const MAX_TOPICS = 4;
 
 /**
  * A screen's topics for this account (HELP-3): the Smart Tracking ones only with it on, their
- * stand-ins only with it off, and the hidden page's only where it's offered.
+ * stand-ins only with it off, the hidden page's only where it's offered, and Recite's only with it.
  */
-export function topicsFor(screen: HelpScreen, opts: { smartTracking: boolean; recite?: boolean }): HelpTopic[] {
+export function topicsFor(
+  screen: HelpScreen,
+  opts: { smartTracking: boolean; recite?: boolean; liveRecite?: boolean },
+): HelpTopic[] {
   return HELP[screen].topics.filter((t) => {
     if (t.when === 'smartTracking') return opts.smartTracking;
     if (t.when === 'noSmartTracking') return !opts.smartTracking;
     if (t.when === 'recite') return opts.recite === true;
+    if (t.when === 'liveRecite') return opts.liveRecite === true;
+    if (t.when === 'noLiveRecite') return opts.liveRecite !== true;
     return true;
   });
 }
