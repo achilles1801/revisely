@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { pageOfVerse } from '../../lib/verses';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -171,6 +172,13 @@ export default function ActivityScreen() {
               firstTomorrow={firstTomorrow}
               // The reader over Activity, so back returns here (as a day's strip does, ACT-20).
               onOpenPage={(pageNumber) => navigation.navigate('QuranReader', { pageNumber })}
+              // Insights' Recitation rows (RINS-2): those ayahs, highlighted until the page is turned.
+              onOpenAyahs={(sura, from, to) =>
+                navigation.navigate('QuranReader', {
+                  pageNumber: pageOfVerse({ sura, ayah: from }),
+                  highlight: { sura, ayah: from, ...(to > from ? { last: { sura, ayah: to } } : {}) },
+                })
+              }
               onSeeAllPages={() => navigation.navigate('PagesByStrength')}
               onTurnOnSmartTracking={() => navigation.navigate('Settings', { section: 'revision' })}
               onViewChange={setView}

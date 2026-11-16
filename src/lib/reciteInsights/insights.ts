@@ -214,6 +214,11 @@ function markedWords(memories: Map<string, WordMemory>): { words: MarkedWord[]; 
   return { words, byWord };
 }
 
+/** Every word still marked on the page (wrong words and slips; tajweed apart), in mushaf order. */
+export function stillMarkedWords(records: readonly MemoryRecord[]): MarkedWord[] {
+  return markedWords(wordMemories(records)).words;
+}
+
 /** Words still marked, gathered into runs of neighbouring ayat of one surah, the most slipped first. */
 export function slippingPassages(memories: Map<string, WordMemory>): SlippingPassage[] {
   const { words, byWord } = markedWords(memories);

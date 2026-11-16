@@ -336,6 +336,13 @@ What a user's takes with Mark mistakes show over time, and Revo knowing it (Majd
   exactly as before. It speaks only of marks that exist, says Not clear wasn't clear enough to check (never
   wrong), puts words and similar ayahs before harakat, never calls going back to restart a mistake, and
   names surahs and ayahs, never pages.
+- **RINS-2.** Activity's Insights has a Recitation section for an account that recites, over Insights'
+  range: the score (each take's own score weighted by the words it recited) and its weeks; the passages
+  with words still marked, the most slipped first, each with those words on their highlights, opening the
+  reader there; the similar ayahs gone on with; and one line of the words cleared and the kinds, words
+  first, Not clear never counted. With Smart Tracking on, a passage rated strong that still slips is named,
+  and Weak spots say how many words Recite still marks there. Off, nothing about strength: a passage's
+  row says when it was last recited instead of how often it went wrong.
 
 ## Recite's memory (Revisely Dev)
 
