@@ -74,6 +74,7 @@ import { HelpToast } from '../../components/help/HelpToast';
 import { describeStart, jumpTo, undoJump, type JumpTarget } from '../../lib/jump';
 import type { User } from '../../types';
 import { partlyMemorizedAyahs, revisablePages } from '../../lib/memorizedAyahs';
+import { t } from '../../i18n';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'Dashboard'>;
 
@@ -315,16 +316,16 @@ export default function DashboardScreen() {
         <View style={styles.loadingContainer}>
           {error ? (
             <>
-              <Text style={styles.errorTitle}>Couldn't load your data</Text>
+              <Text style={styles.errorTitle}>{t('home.screen.loadFailed')}</Text>
               <Text style={styles.errorMessage}>{error}</Text>
               <PillButton
-                title="Try again"
+                title={t('common.tryAgain')}
                 onPress={loadData}
                 style={styles.retryButton}
               />
             </>
           ) : (
-            <Text style={styles.loadingText}>Loading…</Text>
+            <Text style={styles.loadingText}>{t('common.loading')}</Text>
           )}
         </View>
       </TopSafeAreaView>
@@ -424,7 +425,7 @@ export default function DashboardScreen() {
       setReadingSessions((prev) => [{ ...session, id }, ...prev]);
     } catch (err) {
       logger.error('Failed to save Al-Kahf reading session', err);
-      Alert.alert("Couldn't save", 'Please try again.');
+      Alert.alert(t('home.screen.saveFailed'), t('common.pleaseTryAgain'));
     } finally {
       kahfSavingRef.current = false;
       setKahfSaving(false);
@@ -440,7 +441,7 @@ export default function DashboardScreen() {
       const memorized = revisablePages(pages);
       await saveUser(applyCarryOver(user, memorized, leftovers.pages, revisionDate, leftovers.from));
     } catch {
-      Alert.alert("Couldn't update today's session", 'Please try again.');
+      Alert.alert(t('home.screen.carryFailed'), t('common.pleaseTryAgain'));
     } finally {
       carryingRef.current = false;
       setCarrying(false);
@@ -454,15 +455,18 @@ export default function DashboardScreen() {
     const memorized = revisablePages(pages);
     const result = jumpTo(user, target, { revisionDate, memorized, logs });
     if (!result) {
-      Alert.alert("Couldn't start there", "That part isn't in your schedule.");
+      Alert.alert(t('home.screen.jumpRefused'), t('home.screen.jumpRefusedBody'));
       return;
     }
     try {
       await saveUser(result.user);
       const where = describeStart(target, result.startPage);
-      setJumped({ message: result.today ? `Today now starts at ${where}` : `Your next revision starts at ${where}`, before: user });
+      setJumped({
+        message: result.today ? t('home.screen.todayStartsAt', { where }) : t('home.screen.nextStartsAt', { where }),
+        before: user,
+      });
     } catch {
-      Alert.alert("Couldn't update your schedule", 'Please try again.');
+      Alert.alert(t('home.screen.jumpFailed'), t('common.pleaseTryAgain'));
     }
   };
 
@@ -473,7 +477,7 @@ export default function DashboardScreen() {
     try {
       await saveUser(undoJump(user, last.before));
     } catch {
-      Alert.alert("Couldn't undo", 'Please try again.');
+      Alert.alert(t('home.screen.undoFailed'), t('common.pleaseTryAgain'));
     }
   };
 
@@ -518,9 +522,9 @@ export default function DashboardScreen() {
         }
         right={
           <>
-            <IconButton icon="compass-outline" label="Find the Qibla" onPress={() => openPrayer('qibla')} testID="open-qibla" />
-            <IconButton icon="pulse-outline" label="Open activity" onPress={() => navigation.navigate('Activity')} testID="open-activity" />
-            <IconButton icon="settings-outline" label="Open settings" onPress={() => navigation.navigate('Settings')} testID="open-settings" />
+            <IconButton icon="compass-outline" label={t('home.screen.qibla')} onPress={() => openPrayer('qibla')} testID="open-qibla" />
+            <IconButton icon="pulse-outline" label={t('home.screen.activity')} onPress={() => navigation.navigate('Activity')} testID="open-activity" />
+            <IconButton icon="settings-outline" label={t('home.screen.settings')} onPress={() => navigation.navigate('Settings')} testID="open-settings" />
           </>
         }
         // Three icons on the right: both sides widen so the salam stays centred.
@@ -581,9 +585,9 @@ export default function DashboardScreen() {
         )}
 
         <RecentSection
-          title="Recent sessions"
+          title={t('home.screen.recent')}
           count={recent.length}
-          emptyText="No sessions yet. Start your first revision above."
+          emptyText={t('home.screen.noSessions')}
           onSeeAll={() => navigation.navigate('ActivityAll', { kind: 'revision' })}
           testID="home-recent"
         >

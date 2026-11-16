@@ -35,6 +35,7 @@ import { RevoHistory, RevoMemory, RevoOptIn } from './RevoPages';
 import { RevoAddSheet } from './RevoAddSheet';
 import { RevoSheetFrame } from './RevoSheetFrame';
 import { useModalHold } from '../v2/modalTurn';
+import { t } from '../../i18n';
 
 type View_ = { name: 'chat' } | { name: 'history' } | { name: 'memory' } | { name: 'optin' } | { name: 'add' };
 
@@ -423,7 +424,7 @@ function RevoHostInner({ available, onOpenChange }: { available: boolean; onOpen
         <View style={{ flex: 1, backgroundColor: palette.bg }} testID="revo-intro">
           <RevoMoment
             mode="intro"
-            title="Meet Revo"
+            title={t('revo.meet')}
             text=""
             firstName={greetingName(user?.name, auth.currentUser?.displayName ?? null).split(' ')[0]}
             smartTracking={smartTrackingOn(user)}

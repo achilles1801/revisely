@@ -5,6 +5,7 @@ import { useTheme } from '../../context/ThemeContext';
 import type { RevoAttachment } from '../../lib/revo/types';
 import { Tap } from '../v2/Tap';
 import { ContextChip } from './RevoParts';
+import { t } from '../../i18n';
 
 export const QUESTION_MAX = 600;
 
@@ -56,7 +57,7 @@ export function RevoComposer({
           disabled={disabled}
           style={[styles.plus, { backgroundColor: palette.bubble }]}
           accessibilityRole="button"
-          accessibilityLabel="Add to chat"
+          accessibilityLabel={t('revo.add.title')}
           accessibilityState={{ disabled }}
           testID="revo-plus"
         >
@@ -68,9 +69,9 @@ export function RevoComposer({
           <TextInput
             ref={input}
             value={text}
-            onChangeText={(t) => setText(t.slice(0, QUESTION_MAX))}
+            onChangeText={(value) => setText(value.slice(0, QUESTION_MAX))}
             editable={!disabled}
-            placeholder={disabled ? disabledText : 'Ask Revo anything'}
+            placeholder={disabled ? disabledText : t('revo.composer.placeholder')}
             placeholderTextColor={palette.secondary}
             style={[styles.input, { color: palette.text }]}
             multiline
@@ -79,7 +80,7 @@ export function RevoComposer({
             submitBehavior="blurAndSubmit"
             returnKeyType="send"
             onSubmitEditing={send}
-            accessibilityLabel="Ask Revo anything"
+            accessibilityLabel={t('revo.composer.placeholder')}
             testID="revo-input"
           />
           {text.trim().length > 0 ? (
@@ -88,7 +89,7 @@ export function RevoComposer({
               disabled={!canSend}
               hitSlop={8}
               accessibilityRole="button"
-              accessibilityLabel="Send"
+              accessibilityLabel={t('revo.composer.send')}
               testID="revo-send"
             >
               <Ionicons name="arrow-up-circle" size={30} color={canSend ? palette.primary : palette.secondary} />
@@ -100,7 +101,7 @@ export function RevoComposer({
               disabled={disabled}
               hitSlop={8}
               accessibilityRole="button"
-              accessibilityLabel="Dictate with the keyboard"
+              accessibilityLabel={t('revo.composer.dictate')}
               testID="revo-mic"
             >
               <Ionicons name="mic-outline" size={20} color={palette.secondary} />

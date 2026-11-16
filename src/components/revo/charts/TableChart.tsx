@@ -10,6 +10,7 @@ import type { RevoTableColumn } from '../../../lib/revo/types';
 import { Tap } from '../../v2/Tap';
 import { CHART_TEXT_MAX, ChartFrame } from './ChartFrame';
 import { ChartButtons, DetailLine, RatingCounts, RatingStrip } from './ChartParts';
+import { t } from '../../../i18n';
 
 /**
  * Juz or surahs side by side in up to three columns, each from what the app shows for them. A
@@ -46,7 +47,9 @@ export function TableChart({
   const [sort, setSort] = useState<{ col: RevoTableColumn; worst: boolean } | null>(null);
   const [open, setOpen] = useState<number | null>(null);
   const shown = useMemo(() => (sort ? sortRows(rows, sort.col, sort.worst) : rows), [rows, sort]);
-  const hint = sort ? `Sorted by ${TABLE_HEADS[sort.col].toLowerCase()} · tap a row to see it` : 'Tap a heading to sort, a row to see it';
+  const hint = sort
+    ? t('revo.chart.sortedBy', { column: TABLE_HEADS[sort.col].toLowerCase() })
+    : t('revo.chart.tableHint');
 
   const head = (col: RevoTableColumn) => {
     const on = sort?.col === col;
@@ -58,7 +61,7 @@ export function TableChart({
         style={[styles.value, styles.headCell]}
         onPress={() => setSort(on ? { col, worst: !sort!.worst } : { col, worst: true })}
         accessibilityRole="button"
-        accessibilityLabel={`Sort by ${TABLE_HEADS[col]}`}
+        accessibilityLabel={t('revo.chart.sortBy', { column: TABLE_HEADS[col] })}
         accessibilityState={{ selected: on }}
         hitSlop={6}
         testID={`${testID}-sort-${col}`}
@@ -75,7 +78,7 @@ export function TableChart({
     <ChartFrame title={title} hint={hint} readout={null} onClear={() => undefined} testID={testID}>
       <View style={[styles.row, styles.heads, { borderBottomColor: palette.separator }]}>
         <Text style={[styles.head, styles.name, { color: palette.secondary }]} maxFontSizeMultiplier={CHART_TEXT_MAX}>
-          {byJuz ? 'Juz' : 'Surah'}
+          {byJuz ? t('common.juz') : t('common.surah')}
         </Text>
         {shownColumns.map(head)}
         <View style={styles.chevron} />

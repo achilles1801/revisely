@@ -6,7 +6,7 @@
 import type { User } from '../../types';
 import { getNextRevisionDayStart } from '../fajrBoundary';
 import { type RevoRelease, useRevoRelease } from './release';
-import { formatTime } from '../../i18n';
+import { t, formatTime } from '../../i18n';
 
 export function revoAvailable(user: Pick<User, 'previewTester'> | null | undefined, release: RevoRelease): boolean {
   if (!user || release === 'off') return false;
@@ -22,7 +22,7 @@ export function useRevoAvailable(user: Pick<User, 'previewTester'> | null | unde
  * The screens the button shows on (REVO-25): Home and Activity's. Never the Read tab, its list or the
  * reader (Majd, Nov 8 2026: "no revo in the mushaf tab at all"), a session, an editor or Settings.
  */
-export const REVO_BUTTON_ROUTES = new Set(['Dashboard', 'Activity', 'ActivityDay', 'ActivityAll', 'PagesByStrength']);
+export const REVO_BUTTON_ROUTES = new Set(['Dashboard', 'Activity', 'ActivityDay', 'ActivityAll', 'PagesByStrength']); // i18n-ignore (route names)
 
 /**
  * When Revo is back after the day's questions: the next revision day's start. "after Fajr, at
@@ -31,7 +31,7 @@ export const REVO_BUTTON_ROUTES = new Set(['Dashboard', 'Activity', 'ActivityDay
 export function revoBackAt(user: User | null | undefined, now: Date): { short: string; long: string } {
   const at = getNextRevisionDayStart(user, now);
   const fajr = !!(user?.fajrBoundaryEnabled && user.locationCoords);
-  if (!fajr) return { short: 'Back at midnight', long: 'Revo is back at midnight.' };
+  if (!fajr) return { short: t('revo.back.midnight'), long: t('revo.back.midnightLong') };
   const time = formatTime(at);
-  return { short: 'Back after Fajr', long: `Revo is back after Fajr, at ${time}.` };
+  return { short: t('revo.back.fajr'), long: t('revo.back.fajrLong', { time }) };
 }

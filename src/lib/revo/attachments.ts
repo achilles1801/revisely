@@ -10,7 +10,7 @@ import type { RecordingMeta } from '../recordings';
 import { dayFacts, type DayExtras, passageFacts, type Prepared } from './facts';
 import { juzOf, passageShort } from './words';
 import type { RevoAttachment, RevoInsight } from './types';
-import { formatDate, formatTime } from '../../i18n';
+import { t, formatDate, formatTime } from '../../i18n';
 
 /** At most this many pages in a pick of pages (Al-Baqarah has 48). */
 export const MAX_PICK_PAGES = 60;
@@ -20,8 +20,8 @@ const shortDay = (day: string) =>
 
 /** "Today · Tue 3 Nov", "Yesterday · Mon 2 Nov", or "Sun 1 Nov". */
 export function dayLabel(day: string, today: string, yesterday: string): string {
-  if (day === today) return `Today · ${shortDay(day)}`;
-  if (day === yesterday) return `Yesterday · ${shortDay(day)}`;
+  if (day === today) return t('revo.attach.today', { day: shortDay(day) });
+  if (day === yesterday) return t('revo.attach.yesterday', { day: shortDay(day) });
   return shortDay(day);
 }
 
@@ -38,14 +38,14 @@ export function juzPages(juz: number): number[] {
 }
 
 export function surahAttachment(surah: number, prepared: Prepared): RevoAttachment {
-  const name = plainText(getSurah(surah)?.name ?? `Surah ${surah}`);
+  const name = plainText(getSurah(surah)?.name ?? t('common.surahN', { n: surah }));
   const pages = surahPages(surah);
   // Named by the surah itself ("Yusuf · Juz 12–13"): its first page may end the surah before.
   return { kind: 'surah', label: name, surah, facts: passageFacts(pages, prepared, `${name} · ${plainText(juzOf(pages))}`) };
 }
 
 export function juzAttachment(juz: number, prepared: Prepared): RevoAttachment {
-  return { kind: 'juz', label: `Juz ${juz}`, juz, facts: passageFacts(juzPages(juz), prepared) };
+  return { kind: 'juz', label: t('common.juzN', { n: juz }), juz, facts: passageFacts(juzPages(juz), prepared) };
 }
 
 /** Pages the user picked (named by their surahs: "Al-Mulk", "Al-Baqarah 142–176"). */
@@ -58,7 +58,7 @@ export function pagesAttachment(pages: readonly number[], prepared: Prepared, la
 export function dayAttachment(day: string, label: string, prepared: Prepared, extras: DayExtras = {}): RevoAttachment {
   const facts = dayFacts(day, prepared, extras);
   const notes = facts.notes?.length ?? 0;
-  const withNotes = notes > 0 ? `${label} · ${notes} ${notes === 1 ? 'note' : 'notes'}` : label;
+  const withNotes = notes > 0 ? t('revo.attach.withNotes', { label, count: notes }) : label;
   return { kind: 'revisionDay', label: withNotes.slice(0, 60), day, facts };
 }
 
@@ -71,7 +71,7 @@ export function findPassages(text: string): Found[] {
   const juz = /^(?:juz'?|j)\s*(\d{1,2})$/.exec(q);
   if (juz) {
     const n = Number(juz[1]);
-    return n >= 1 && n <= 30 ? [{ kind: 'juz', juz: n, label: `Juz ${n}` }] : [];
+    return n >= 1 && n <= 30 ? [{ kind: 'juz', juz: n, label: t('common.juzN', { n }) }] : [];
   }
   const page = /^(?:p\.?|page)?\s*(\d{1,3})$/.exec(q);
   if (page) {
@@ -98,7 +98,7 @@ export function recordingAttachment(rec: Pick<RecordingMeta, 'day' | 'kind' | 'd
   const time = formatTime(new Date(rec.createdAt));
   return {
     kind: 'recording',
-    label: `Recording · ${shortDay(rec.day)}, ${time}`.slice(0, 40),
+    label: t('revo.attach.recording', { day: shortDay(rec.day), time }).slice(0, 40),
     day: rec.day,
     of: rec.kind,
     seconds: Math.min(86400, Math.round(rec.durationMs / 1000)),
@@ -106,14 +106,6 @@ export function recordingAttachment(rec: Pick<RecordingMeta, 'day' | 'kind' | 'd
   };
 }
 
-const INSIGHT_LABEL: Record<RevoInsight, string> = {
-  coverage: 'Coverage',
-  consistency: 'Consistency',
-  weakSpots: 'Weak spots',
-  pace: 'Pace',
-  recitation: 'Recitation',
-};
-
 export function insightAttachment(insight: RevoInsight): RevoAttachment {
-  return { kind: 'insight', label: INSIGHT_LABEL[insight], insight };
+  return { kind: 'insight', label: t(`revo.attach.${insight}`), insight };
 }

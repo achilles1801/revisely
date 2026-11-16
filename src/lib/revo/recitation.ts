@@ -15,6 +15,7 @@ import { liveTakes, mistakeKindOf, recitationInsights, WINDOW_DAYS, wordsOf } fr
 import { dayLabel } from './attachments';
 import type { RevoAttachment, RevoRecitation, RevoRecitedAyah, RevoRecitedPassage, RevoTakeFacts, RevoTakeMark } from './types';
 import { passageWords, shortWords } from './words';
+import { t } from '../../i18n';
 
 /** Lists the server takes at most (functions/src/revo/types.ts). */
 const LIST = 5;
@@ -192,6 +193,6 @@ export function takeAttachment(records: readonly MemoryRecord[], take: TakeRecor
     cleared: clearedBy(records, take).length,
     before: takeBefore(records, take)?.accuracy ?? null,
   };
-  const short = shortWords(describeAyahs(takeKeys(words, take), { form: 'short', juz: false })) ?? 'A take';
+  const short = shortWords(describeAyahs(takeKeys(words, take), { form: 'short', juz: false })) ?? t('revo.attach.take');
   return { kind: 'reciteTake', label: `${short} · ${dayLabel(take.day, today, shiftDay(today, -1))}`.slice(0, 60), day: take.day, facts };
 }

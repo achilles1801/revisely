@@ -6,6 +6,7 @@ import { common } from './common';
 import { help } from './help';
 import { home } from './home';
 import { insights } from './insights';
+import { insightsTab } from './insightsTab';
 import { journal } from './journal';
 import { memorization } from './memorization';
 import { mushaf } from './mushaf';
@@ -21,6 +22,7 @@ import { recite } from './recite';
 import { recordings } from './recordings';
 import { reminders } from './reminders';
 import { revision } from './revision';
+import { revo } from './revo';
 import { settings } from './settings';
 import { timer } from './timer';
 import { updates } from './updates';
@@ -35,6 +37,7 @@ export const en = {
   help,
   home,
   insights,
+  insightsTab,
   journal,
   memorization,
   mushaf,
@@ -50,6 +53,7 @@ export const en = {
   recordings,
   reminders,
   revision,
+  revo,
   settings,
   timer,
   updates,

@@ -1,7 +1,7 @@
 // Revo's History: conversations grouped by the day they were last active, newest first.
 
 import type { RevoChat } from './types';
-import { formatDate, formatTime } from '../../i18n';
+import { t, formatDate, formatTime } from '../../i18n';
 
 export interface HistorySection {
   title: string;
@@ -15,8 +15,8 @@ const localDay = (ms: number) => {
 
 /** "Today", "Yesterday", or "Sunday 1 November". */
 export function historyDayTitle(day: string, today: string, yesterday: string): string {
-  if (day === today) return 'Today';
-  if (day === yesterday) return 'Yesterday';
+  if (day === today) return t('common.today');
+  if (day === yesterday) return t('common.yesterday');
   return formatDate(new Date(`${day}T12:00:00`), { weekday: 'long', day: 'numeric', month: 'long' }, 'device');
 }
 
@@ -41,5 +41,8 @@ export function historySections(chats: readonly RevoChat[], now: Date, query = '
 /** "9:52 PM · plan added". */
 export function historyLine(chat: RevoChat): string {
   const time = formatTime(new Date(chat.updatedAt));
-  return chat.meta ? `${time} · ${chat.meta}` : time;
+  if (!chat.meta) return time;
+  // The stored mark (lib/revo/backend), in words; a Day in review's line comes from the server.
+  const meta = chat.meta === 'plan added' ? t('revo.planAdded') : chat.meta; // i18n-ignore (the stored mark)
+  return `${time} · ${meta}`;
 }

@@ -7,6 +7,7 @@ import { dotSizeFor, nearestMark, shortDate, stepIndex, timelineData, timelineDe
 import { spokenText } from '../../../lib/passages';
 import { CHART_TEXT_MAX, ChartFrame, ChartPlot } from './ChartFrame';
 import { ChartButtons, DetailLine, DetailTitle, Legend, useBandColor } from './ChartParts';
+import { t } from '../../../i18n';
 
 /** How near (pt) a tap must land to a revision's dot to pick it. */
 const DOT_REACH = 22;
@@ -86,8 +87,8 @@ export function TimelineChart({
     >
       <ChartPlot
         testID={`${testID}-plot`}
-        label={`${title}. ${data.marks.length ? data.marks.map((m) => `${shortDate(m.day)}${smart && m.band ? `, ${m.band}` : ''}`).join('; ') : timelineHint(data.marks, days)}`}
-        value={readout ? spokenText(`${readout.title}, ${readout.line}`) : 'Swipe up or down to pick a revision'}
+        label={`${title}. ${data.marks.length ? data.marks.map((m) => `${shortDate(m.day)}${smart && m.band ? `, ${t(`revo.bands.${m.band}`)}` : ''}`).join('; ') : timelineHint(data.marks, days)}`}
+        value={readout ? spokenText(`${readout.title}, ${readout.line}`) : t('revo.chart.pickRevision')}
         onStep={(by) => pick(stepIndex(picked, by, data.marks.length))}
         onActivate={() => pick(picked == null && data.marks.length > 0 ? data.marks.length - 1 : null)}
         onTap={(x, _y, size) => {
@@ -145,17 +146,17 @@ export function TimelineChart({
             {shortDate(data.start)}
           </Text>
           <Text style={[styles.axis, { color: palette.secondary }]} maxFontSizeMultiplier={CHART_TEXT_MAX}>
-            Today
+            {t('common.today')}
           </Text>
         </View>
       </ChartPlot>
       {smart ? (
         <Legend
           items={[
-            { color: color('weak'), label: 'weak', round: true },
-            { color: color('moderate'), label: 'moderate', round: true },
-            { color: color('strong'), label: 'strong', round: true },
-            { color: color(null), label: 'not rated', round: true },
+            { color: color('weak'), label: t('revo.bands.weak'), round: true },
+            { color: color('moderate'), label: t('revo.bands.moderate'), round: true },
+            { color: color('strong'), label: t('revo.bands.strong'), round: true },
+            { color: color(null), label: t('revo.chart.notRated'), round: true },
           ]}
         />
       ) : null}

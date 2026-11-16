@@ -25,6 +25,7 @@ import type { HistoryItem } from '../streakFromItems';
 import type { TodaySnapshot } from '../todaySnapshot';
 import type { RevoDayFacts, RevoPassageFacts, RevoPlanTally, RevoTimes } from './types';
 import { isRevisable } from '../memorizedAyahs';
+import { t } from '../../i18n';
 
 /** Everything the facts are read from: what Home's snapshot (and so Revo's context) was built from. */
 export interface FactSources {
@@ -398,30 +399,29 @@ export function dayFacts(day: string, prepared: Prepared, extras: DayExtras = {}
 // One line each, for a row in the picker: what the user's data says before they add it.
 // ---------------------------------------------------------------------------------------------
 
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-
 /** "Revised 6× in 30 days · 2 weak spots", "Not memorized", "Not revised in 30 days". */
 export function passagePreview(f: RevoPassageFacts): string {
-  if (f.memorized === 0) return 'Not memorized';
+  if (f.memorized === 0) return t('revo.preview.notMemorized');
   const parts: string[] = [];
-  const t = f.revised.last30;
-  if (t.days === 0) parts.push('Not revised in 30 days');
-  else if (f.memorized === 1) parts.push(`Revised ${t.maxEach}× in 30 days`);
+  const last30 = f.revised.last30;
+  if (last30.days === 0) parts.push(t('revo.preview.notRevised'));
+  else if (f.memorized === 1) parts.push(t('revo.preview.revisedTimes', { n: last30.maxEach }));
   // Revised in full (every memorized page) that many times; else only some of it was.
-  else parts.push(t.minEach > 0 ? `Revised ${t.minEach}× in 30 days` : 'Partly revised in 30 days');
-  if (f.weakSpots.length > 0) parts.push(plural(f.weakSpots.length, 'weak spot'));
-  if (f.memorized < f.pages) parts.push(`${f.memorized} of ${f.pages} pages memorized`);
+  else parts.push(last30.minEach > 0 ? t('revo.preview.revisedTimes', { n: last30.minEach }) : t('revo.preview.partly'));
+  if (f.weakSpots.length > 0) parts.push(t('revo.preview.weakSpots', { count: f.weakSpots.length }));
+  if (f.memorized < f.pages) parts.push(t('revo.preview.memorizedOf', { n: f.memorized, total: f.pages }));
   return parts.join(' · ');
 }
 
 /** "12 of 20 pages · 25 min · includes 2 notes", "Nothing revised". */
 export function dayPreview(f: RevoDayFacts): string {
   const parts: string[] = [];
-  if (f.plan) parts.push(`${f.plan.pages - f.plan.notDone} of ${plural(f.plan.pages, 'page')}`);
-  else if (f.revised.pages > 0) parts.push(`${plural(f.revised.pages, 'page')} revised`);
-  else parts.push('Nothing revised');
-  if (f.minutes) parts.push(`${f.minutes} min`);
-  if (f.recordings?.count) parts.push(plural(f.recordings.count, 'recording'));
-  if (f.notes?.length) parts.push(`includes ${plural(f.notes.length, 'note')}`);
+  if (f.plan) {
+    parts.push(t('revo.preview.ofPages', { done: f.plan.pages - f.plan.notDone, pages: t('common.pages', { count: f.plan.pages }) }));
+  } else if (f.revised.pages > 0) parts.push(t('revo.preview.pagesRevised', { pages: t('common.pages', { count: f.revised.pages }) }));
+  else parts.push(t('revo.month.nothingRevised'));
+  if (f.minutes) parts.push(t('revo.month.minutes', { n: f.minutes }));
+  if (f.recordings?.count) parts.push(t('revo.preview.recordings', { count: f.recordings.count }));
+  if (f.notes?.length) parts.push(t('revo.preview.includesNotes', { count: f.notes.length }));
   return parts.join(' · ');
 }

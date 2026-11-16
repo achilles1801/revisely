@@ -45,6 +45,7 @@ import { arabicV2, layoutV2, typeV2 } from '../../theme/v2';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
 import { arabicLabelLines } from '../../lib/platformUi';
 import { revisablePages } from '../../lib/memorizedAyahs';
+import { t } from '../../i18n';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'PlanDayEdit'>;
 type RouteProps = RouteProp<HomeStackParamList, 'PlanDayEdit'>;
@@ -184,10 +185,10 @@ export default function PlanDayEditScreen() {
         index: String(g.number),
         title: g.name,
         subtitle: partial
-          ? `${onDay} of ${g.pages.length} pages already on this day`
+          ? t('plan.day.partOnDay', { n: onDay, total: g.pages.length })
           : g.pages.length === g.totalPages
             ? pageCountLabel(g.pages.length)
-            : `${g.pages.length} of ${g.totalPages} pages memorized`,
+            : t('plan.day.partMemorized', { n: g.pages.length, total: g.totalPages }),
         trailing: g.nameArabic,
         search: String(g.number),
         checked: draft.has(`surah:${g.number}`),
@@ -199,9 +200,9 @@ export default function PlanDayEditScreen() {
       return {
         key: `juz:${g.juz}`,
         index: String(g.juz),
-        title: `Juz ${g.juz}`,
+        title: t('common.juzN', { n: g.juz }),
         subtitle: partial
-          ? `${onDay} of ${g.pages.length} pages already on this day`
+          ? t('plan.day.partOnDay', { n: onDay, total: g.pages.length })
           : `${describePassage(g.pages, { form: 'short', wholeJuz: false, max: 2 })} · ${pageCountLabel(g.pages.length)}`,
         trailing: g.name,
         search: String(g.juz),
@@ -209,8 +210,8 @@ export default function PlanDayEditScreen() {
       };
     });
     return [
-      { key: 'surah', label: 'Surahs', items: surahItems, emptyText: 'No memorized surahs yet.' },
-      { key: 'juz', label: 'Juz', items: juzItems, emptyText: 'No memorized ajzaʼ yet.' },
+      { key: 'surah', label: t('plan.day.surahs'), items: surahItems, emptyText: t('plan.day.noSurahs') },
+      { key: 'juz', label: t('common.juz'), items: juzItems, emptyText: t('plan.day.noJuz') },
     ];
   }, [surahGroups, juzGroups, draft, pages]);
 
@@ -235,17 +236,17 @@ export default function PlanDayEditScreen() {
   const picker = (
     <ListPickerSheet
       ref={pickerRef}
-      title={dayIndex === 0 ? "Today's revision" : title}
+      title={dayIndex === 0 ? t('plan.day.todaysRevision') : title}
       tabs={pickerTabs}
       activeTab={pickerTab}
       onTabChange={(k) => setPickerTab(k as PickerTabKey)}
       onSelect={toggleDraft}
       onLeft={() => pickerRef.current?.dismiss()}
-      rightLabel="Done"
+      rightLabel={t('common.done')}
       onRight={applyPicker}
       rightDisabled={!draftChanged}
-      searchPlaceholder="Search surahs or ajzaʼ"
-      footer="Checked items are fully on this day. Unchecking one removes it."
+      searchPlaceholder={t('plan.day.search')}
+      footer={t('plan.day.pickerFooter')}
     />
   );
 
@@ -255,7 +256,7 @@ export default function PlanDayEditScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
       <TopBar
         left={
-          <IconButton icon="chevron-back" onPress={commit} label="Back to schedule" size={26} testID="back" />
+          <IconButton icon="chevron-back" onPress={commit} label={t('plan.day.back')} size={26} testID="back" />
         }
         title={title}
         separator
@@ -276,8 +277,12 @@ export default function PlanDayEditScreen() {
           </Text>
           <Text style={[typeV2.body, v2.heroSubtitle, { color: palette.secondary }]}>
             {hasContent
-              ? `${pageCountLabel(pages.length)}${isDirty ? ' · Edited' : ''}`
-              : `Nothing to revise ${dayIndex === 0 ? 'today' : 'on this day'}`}
+              ? isDirty
+                ? t('plan.day.edited', { pages: pageCountLabel(pages.length) })
+                : pageCountLabel(pages.length)
+              : dayIndex === 0
+                ? t('plan.day.nothingToday')
+                : t('plan.day.nothingOnDay')}
           </Text>
           {note ? (
             <Text style={[typeV2.meta, v2.heroNote, { color: palette.secondary }]} testID="plan-day-note">
@@ -288,9 +293,9 @@ export default function PlanDayEditScreen() {
 
         {hasContent ? (
           <GroupedSection
-            header="On this day"
+            header={t('plan.day.onThisDay')}
             headerRight={
-              <HeaderTextButton label={editing ? 'Done' : 'Edit'} bold={editing} onPress={() => setEditing((v) => !v)} />
+              <HeaderTextButton label={editing ? t('common.done') : t('common.edit')} bold={editing} onPress={() => setEditing((v) => !v)} />
             }
           >
             {surahsOnDay.map((s) => (
@@ -304,7 +309,7 @@ export default function PlanDayEditScreen() {
                       onPress={() => removeSurah(s)}
                       hitSlop={8}
                       accessibilityRole="button"
-                      accessibilityLabel={`Remove ${s.name}`}
+                      accessibilityLabel={t('plan.day.remove', { name: s.name })}
                       testID={`remove-surah-${s.number}`}
                     >
                       <Ionicons name="remove-circle-outline" size={24} color={palette.red} />
@@ -325,14 +330,14 @@ export default function PlanDayEditScreen() {
         <GroupedSection
           footer={
             !canPick
-              ? "You haven't marked any pages as memorized yet."
+              ? t('plan.day.noneMemorized')
               : hasContent
-                ? 'Only content you have memorized is listed.'
-                : 'This is a rest day. Add a surah or juz to revise on it.'
+                ? t('plan.day.onlyMemorized')
+                : t('plan.day.restDay')
           }
         >
           <GroupedRow
-            title={hasContent ? 'Add or remove content' : 'Add surahs or ajzaʼ'}
+            title={hasContent ? t('plan.day.addOrRemove') : t('plan.day.add')}
             icon="add-circle-outline"
             onPress={openPicker}
             disabled={!canPick}
@@ -340,7 +345,7 @@ export default function PlanDayEditScreen() {
           />
           {hasContent ? (
             <GroupedRow
-              title="Make rest day"
+              title={t('plan.day.makeRest')}
               icon="moon-outline"
               tone="destructive"
               onPress={makeRest}
