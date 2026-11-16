@@ -41,6 +41,20 @@ appId: com.revisionbuddy.app
     visible:
       id: whats-new-replay
     timeout: 10000
+# Card 1 is a moment (ReciteMoment): a frame mid-take (about 4 s in), then its end with the card's words.
+- extendedWaitUntil:
+    visible:
+      id: never-there
+    timeout: 4000
+    optional: true
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: n1-moment
+- extendedWaitUntil:
+    visible:
+      id: whats-new-next
+    timeout: 20000
 - extendedWaitUntil:
     visible:
       id: whats-new-title
@@ -115,6 +129,20 @@ appId: com.revisionbuddy.app
       ROW: settings-whats-new
 - tapOn:
     id: settings-whats-new
+# Card 1 is a moment (ReciteMoment): a frame mid-take (about 4 s in), then its end with the card's words.
+- extendedWaitUntil:
+    visible:
+      id: never-there
+    timeout: 4000
+    optional: true
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: n1-moment-dark
+- extendedWaitUntil:
+    visible:
+      id: whats-new-next
+    timeout: 20000
 - extendedWaitUntil:
     visible:
       id: whats-new-title
