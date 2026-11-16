@@ -107,6 +107,7 @@ describe('adminConsole: who gets what', () => {
       { action: 'audit.decisions' },
       { action: 'audit.roles' },
       { action: 'premium.summary' },
+      { action: 'accounts.get', query: 'a@example.com' },
       { action: 'staff.list' },
       { action: 'staff.set', email: 'a@example.com', role: 'owner' },
     ];
@@ -119,7 +120,7 @@ describe('adminConsole: who gets what', () => {
       expect(await code(handleAdminConsole(as('admin'), data, true, deps()))).toBe('permission-denied');
       expect(await code(handleAdminConsole(as('reviewer'), data, true, deps()))).toBe('permission-denied');
     }
-    for (const data of [actions[5], actions[6], actions[7], actions[8]]) {
+    for (const data of [actions[5], actions[6], actions[7], actions[8], actions[9]]) {
       expect(await code(handleAdminConsole(as('reviewer'), data, true, deps()))).toBe('permission-denied');
     }
   });
@@ -136,6 +137,8 @@ describe('adminConsole: who gets what', () => {
     expect(await code(handleAdminConsole(as('owner'), { action: 'od.revoke', uid: 'u1', note: '  ' }, true, deps()))).toBe('invalid-argument');
     expect(await code(handleAdminConsole(as('owner'), { action: 'od.decide', uid: 'u1', decision: 'approve', until: 'soon' }, true, deps()))).toBe('invalid-argument');
     expect(await code(handleAdminConsole(as('owner'), { action: 'od.find', query: ' ' }, true, deps()))).toBe('invalid-argument');
+    expect(await code(handleAdminConsole(as('owner'), { action: 'accounts.get', query: '  ' }, true, deps()))).toBe('invalid-argument');
+    expect(await code(handleAdminConsole(as('owner'), { action: 'accounts.get', query: '../users/x' }, true, deps()))).toBe('invalid-argument');
   });
 
   it('refuses to decide on the App Review account', async () => {

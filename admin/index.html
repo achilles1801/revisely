@@ -33,6 +33,7 @@ html, body { margin: 0; }
       <a href="/" data-view="overview" hidden><span class="k"></span>Overview</a>
       <a href="/open-door" data-view="opendoor" hidden><span class="k"></span>Open Door <span class="badge" id="odBadge" hidden></span></a>
       <a href="/audit" data-view="audit" hidden><span class="k"></span>Audit log</a>
+      <a href="/accounts" data-view="accounts" hidden><span class="k"></span>Accounts</a>
       <a href="/premium" data-view="premium" hidden><span class="k"></span>Premium</a>
       <a href="/staff" data-view="staff" hidden><span class="k"></span>Staff</a>
     </nav>
@@ -217,6 +218,18 @@ html, body { margin: 0; }
   <div class="conn" id="auditConn" hidden></div>
   <div class="w"><div class="tbl-wrap"><table id="auditTable"><thead></thead><tbody></tbody></table></div>
   <div class="queue-f" style="border:0;padding:10px 0 0"><span id="auditRange"></span><span class="sp"></span><button type="button" class="btn" id="auditNewer" disabled>‹ Newer</button><button type="button" class="btn" id="auditOlder" disabled>Older ›</button></div></div>
+</section>
+
+<section id="view-accounts" hidden aria-labelledby="acctTitle">
+  <div class="od-head">
+    <h2 id="acctTitle">Accounts</h2>
+    <span class="sub">One account at a time, read-only. Every lookup is logged.</span>
+    <form class="search" id="acctFind" role="search">
+      <span class="ic" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5" stroke-linecap="round"/></svg></span>
+      <input id="acctQuery" type="search" placeholder="Exact email or account id" aria-label="Find an account by its exact email or account id" autocomplete="off" spellcheck="false" autocapitalize="off">
+    </form>
+  </div>
+  <div id="acctPage" aria-live="polite"></div>
 </section>
 
 <section id="view-premium" hidden aria-labelledby="premiumTitle">

@@ -54,6 +54,14 @@
         "destination": "/index.html"
       },
       {
+        "source": "/accounts",
+        "destination": "/index.html"
+      },
+      {
+        "source": "/accounts/**",
+        "destination": "/index.html"
+      },
+      {
         "source": "/premium",
         "destination": "/index.html"
       },

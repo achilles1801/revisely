@@ -23,6 +23,7 @@ export const PERMISSIONS = {
   'openDoor.decide': 'Approve or decline Open Door applications',
   'openDoor.revoke': 'Take Premium through Open Door back',
   'premium.read': 'Premium: how many have it, from where, and what ends soon (counts only)',
+  'accounts.read': 'Accounts: one account by exact email or id (sign-in, plan, Premium, Open Door state, Revo counts, tester flag)',
   'audit.read': 'The audit log: every decision and role change',
   'roles.manage': 'Give and take roles',
 } as const;

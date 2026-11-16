@@ -11,6 +11,7 @@
  *   audit.decisions  the decisions, newest first                      audit.read
  *   audit.roles      role changes, newest first                       audit.read
  *   premium.summary  Premium counts: by source, ending soon, ended    premium.read
+ *   accounts.get     one account by exact email or id, read-only      accounts.read
  *   staff.list       who has which role, and what each role may do    roles.manage
  *   staff.set        give, change or take a role (by email or id)     roles.manage
  *
@@ -34,6 +35,7 @@ import {
 import { ConsoleError, GRANTS, PERMISSIONS, Permission, ROLES, ROLE_NAMES, Role, StaffCaller, isRole, permissionsOf, requirePermission } from './roles';
 import { RoleActor, RoleChange, StaffMember, roleChangeRefusal, rolesPage } from './staff';
 import { premiumSummary } from './premium';
+import { accountOverview } from './accounts';
 
 /** Projects whose accounts get dev grants (the Dev app's "Get Premium"), so the Premium overview counts them. */
 const DEV_PROJECTS = ['revisely-dev', 'demo-revisely'];
@@ -260,6 +262,21 @@ export async function handleAdminConsole(
     case 'premium.summary': {
       requirePermission(caller, 'premium.read');
       return premiumSummary(deps.db, deps.now(), { devProject: DEV_PROJECTS.includes(deps.project) });
+    }
+
+    case 'accounts.get': {
+      requirePermission(caller, 'accounts.read');
+      const query = (str(data, 'query') ?? '').trim();
+      if (!query) throw new ConsoleError('invalid-argument', 'Type an email or an account id.');
+      let account: AccountInfo | null = null;
+      if (query.includes('@')) account = await deps.accountByEmail(query);
+      else if (UID.test(query)) account = (await deps.accounts([query])).get(query) ?? null;
+      else throw new ConsoleError('invalid-argument', 'That is neither an email nor an account id.');
+      if (!account || !account.exists) return { found: false };
+      // Who read whom, as Open Door's reads are (Cloud Logging; never the account's data).
+      deps.log({ event: 'accounts.read', by: caller.uid, uid: account.uid });
+      const overview = await accountOverview(deps.db, account.uid, deps.now());
+      return { found: true, account, ...overview, protected: !!account.email && PROTECTED_EMAILS.includes(account.email.toLowerCase()) };
     }
 
     case 'staff.list': {

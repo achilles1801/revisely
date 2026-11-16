@@ -11,6 +11,7 @@ import { AccountInfo, ConsoleDeps, handleAdminConsole } from '../console/handler
 import { roleOf } from '../console/roles';
 import { rolesPage, setRole, staff } from '../console/staff';
 import { premiumSummary } from '../console/premium';
+import { accountOverview } from '../console/accounts';
 import { applicationFrom, deleteSupportData, entitlementsFrom, entitlementsTo } from '../support/admin';
 import { REAPPLY_AFTER_DAYS, SupportError, stateOf } from '../support/logic';
 import {
@@ -241,5 +242,41 @@ const BY: Reviewer = { uid: 'staff1', email: 'owner@example.com', role: 'owner',
     expect(out.supportEnded).toBe(2); // c and e
     expect(out.devGrants).toBe(1);
     expect((await premiumSummary(db, NOW, { devProject: false })).devGrants).toBeNull();
+  });
+
+  it('the Accounts page reads one account: plan, tester, Premium, Open Door state and decisions without notes, Revo as counts', async () => {
+    await seed('acc1', NOW - 3 * DAY);
+    await review(db, { uid: 'acc1', action: 'approve', by: BY, requestId: newRequestId(), note: 'internal note', until: null }, NOW - DAY);
+    await db.doc('users/acc1').set({ previewTester: true, onboardingComplete: true });
+    await db.doc('coachSettings/acc1').set({ revoOn: true, memoryOn: false });
+    await db.doc('revoUsage/acc1').set({ uid: 'acc1', day: '2026-11-14', count: 7 });
+    const monthStartMs = Date.UTC(2026, 10, 1);
+    await db.doc('users/acc1/revoChats/c1').set({ uid: 'acc1', kind: 'chat', createdAt: monthStartMs + DAY, title: 'private words' });
+    await db.doc('users/acc1/revoChats/c2').set({ uid: 'acc1', kind: 'review', createdAt: NOW - DAY });
+    await db.doc('users/acc1/revoChats/c0').set({ uid: 'acc1', kind: 'chat', createdAt: monthStartMs - DAY });
+    for (const id of ['m1', 'm2', 'm3']) await db.doc(`users/acc1/revoMemory/${id}`).set({ uid: 'acc1', text: 'private' });
+
+    const out = await accountOverview(db, 'acc1', NOW);
+    expect(out).toEqual({
+      hasPlan: true,
+      previewTester: true,
+      premium: { source: 'support', grantedAt: NOW - DAY, until: null },
+      grants: [{ source: 'support', grantedAt: NOW - DAY, until: null }],
+      openDoor: { status: 'approved', createdAt: NOW - 3 * DAY, decidedAt: NOW - DAY, applyAgainFrom: null, count: 1, via: 'app' },
+      decisions: [{ action: 'approve', at: NOW - DAY, by: 'owner@example.com', until: null }],
+      revo: { on: true, memoryOn: false, chatsThisMonth: 2, memoryItems: 3, today: { day: '2026-11-14', count: 7 } },
+    });
+    expect(JSON.stringify(out)).not.toMatch(/internal note|private|their own words/);
+
+    // An account that never opened the app: nothing but its sign-in.
+    expect(await accountOverview(db, 'nobody', NOW)).toEqual({
+      hasPlan: false,
+      previewTester: false,
+      premium: null,
+      grants: [],
+      openDoor: null,
+      decisions: [],
+      revo: { on: false, memoryOn: true, chatsThisMonth: 0, memoryItems: 0, today: null },
+    });
   });
 });

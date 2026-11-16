@@ -7,6 +7,7 @@ import * as openDoor from '/opendoor.js';
 import * as auditLog from '/audit.js';
 import * as staffPage from '/staff.js';
 import * as premiumPage from '/premium.js';
+import * as accountsPage from '/accounts.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -14,6 +15,7 @@ const VIEWS = {
   overview: { path: '/', permission: 'metrics.read', section: 'view-overview', wide: false },
   opendoor: { path: '/open-door', permission: 'openDoor.read', section: 'view-opendoor', wide: true },
   audit: { path: '/audit', permission: 'audit.read', section: 'view-audit', wide: true },
+  accounts: { path: '/accounts', permission: 'accounts.read', section: 'view-accounts', wide: true },
   premium: { path: '/premium', permission: 'premium.read', section: 'view-premium', wide: true },
   staff: { path: '/staff', permission: 'roles.manage', section: 'view-staff', wide: true },
 };
@@ -32,6 +34,7 @@ function viewOf(path) {
   if (path === '/audit') return 'audit';
   if (path === '/staff') return 'staff';
   if (path === '/premium') return 'premium';
+  if (path === '/accounts' || path.startsWith('/accounts/')) return 'accounts';
   return 'overview';
 }
 
@@ -59,7 +62,7 @@ function route() {
     $('asof').hidden = view !== 'overview';
     $('refreshBtn').hidden = view !== 'overview';
     current = view;
-    document.title = { overview: 'Overview', opendoor: 'Open Door', audit: 'Audit log', premium: 'Premium', staff: 'Staff' }[view] + ' · Revisely Console';
+    document.title = { overview: 'Overview', opendoor: 'Open Door', audit: 'Audit log', accounts: 'Accounts', premium: 'Premium', staff: 'Staff' }[view] + ' · Revisely Console';
   }
   if (view === 'overview') {
     if (!started.has(view)) startMetrics(ctx);
@@ -70,6 +73,9 @@ function route() {
   } else if (view === 'audit') {
     if (!started.has(view)) auditLog.start(ctx);
     auditLog.shown();
+  } else if (view === 'accounts') {
+    if (!started.has(view)) accountsPage.start(ctx);
+    accountsPage.shown(location.pathname.startsWith('/accounts/') ? decodeURIComponent(location.pathname.slice('/accounts/'.length)) : null);
   } else if (view === 'premium') {
     if (!started.has(view)) premiumPage.start(ctx);
     premiumPage.shown();
