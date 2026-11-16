@@ -279,6 +279,23 @@ class Model(unittest.TestCase):
             self.assertIs(live.LiveSession(E, 1, 1, 1, 7, {'tajweed': '0'}).lv, E.released)
             self.assertIs(live.LiveSession(E, 1, 1, 1, 7, {}, follow=True).lv, E.released)
 
+    def test_naming_redecodes_within_its_work(self):
+        """A run's re-decode for naming costs frames x (graph states + NAME_STATE_COST); one that doesn't fit what is
+        left of the take's NAME_WORK is skipped and costs nothing (a cut take's 41 runs, joined into one 160 s run,
+        waited 5.4 s after Stop on Cloud Run)."""
+        import engine as engine_mod
+        E = engine()
+        lp = np.zeros((1600, len(E.ear.vocab) + 1), np.float32)
+        spans = {w: (100 + 40 * k, 130 + 40 * k) for k, w in enumerate(range(0, 29))}
+        work = {'left': 1e9, 'decode': 1000}
+        self.assertIsNone(E._decode_plain(lp, 0, 29, spans, work))
+        self.assertEqual(work['decode'], 1000)
+        work = {'left': 1e9, 'decode': engine_mod.NAME_WORK}
+        self.assertIsNotNone(E._decode_plain(lp, 0, 29, spans, work))
+        g = engine_mod.checker.Graph(E.passage_words(0, 29))
+        frames = min(len(lp), 130 + 40 * 28 + engine_mod.NAME_PAD) - (100 - engine_mod.NAME_PAD)
+        self.assertEqual(engine_mod.NAME_WORK - work['decode'], frames * (g.S + engine_mod.NAME_STATE_COST))
+
     def test_letters_are_judged_against_the_levels_own_bars(self):
         """An ayah's letters on the words level use its bars (bars.v6.json), Strict's the released model's."""
         import engine as engine_mod
