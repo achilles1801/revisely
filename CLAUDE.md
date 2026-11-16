@@ -214,9 +214,10 @@ until its part is set up.
   filmed with it.
 - **Recitation check** (Majd, Nov 11 2026: "push the best version we have so far on dev"): the lab's mistake
   detection in the Dev app only (`lib/reciteCheck`: `isDevVariant()`, `previewTester`, a binary with the
-  microphone stream). Hold a verse → Check my recitation: record, stop, and the passage comes back with the words
-  skipped, said wrong or added, and tajweed notes (madd lengths per the sheet's settings, qalqalah, ghunnah,
-  ikhfa, idgham, iqlab); letters behind an off-by-default switch.
+  microphone stream). The reader's one mic: Recite follows the reciter on the page, and with Mark mistakes (Premium) it
+  marks the words skipped, said wrong or added, harakat and letter slips and, with Strict, tajweed notes (madd lengths
+  per Settings → Recite, qalqalah, ghunnah, ikhfa, idgham, iqlab). The verse menu's old "Check my recitation" row
+  (record, then check) is gone (Nov 15 2026; nothing showed it any more).
   - The checker runs on Cloud Run in revisely-dev (`scripts/recite-check`, its README): the app has no JS-only way
     to run the model on the phone. It is deployed by hand, never to production, and the store app never calls it.
   - **Two services** (recite-server, Nov 15 2026; Majd approved halving the light levels' cost; recite-contract.md,
