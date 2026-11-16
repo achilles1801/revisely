@@ -312,6 +312,13 @@ stays on `recite-check`, one take per instance.
 
   The same take marked the same alone and paired. The worst hop went from 400 to about 580 ms. Before ayah judging
   moved off the hop, a Words & Harakat pair took 3 s to its summary on a fast instance (Nov 15 morning); now 0.4 s.
+- **Words & Harakat with letters doesn't pair.** The app's Words & Harakat sends `letters: true` (level
+  `harakat+letters`), so only Recite reaches the pair service today. Measured paired on a slow instance (0.21, Nov 16):
+  - the CPU for the pair came to 1.06 of the one vCPU (from the takes' health lines), 3.2× one take's 0.34 instead of
+    2×. Without letters, the pair used 0.77, and Recite pairs 0.66;
+  - the cursor's p90 went from 1.01 s to 1.30 and 1.36 s, and the worst lag was 2.7 s.
+
+  So `LEVELS` stays `recite,harakat`. The extra cost of letters under contention is open.
 - `live_e2e.py --iam-token-file` (`gcloud auth print-identity-token`) reaches it while it isn't open to the internet.
 
 ## The word table
