@@ -67,6 +67,7 @@ import { Tap } from '../v2/Tap';
 import { Stepper } from '../Stepper';
 import { R_TRACE } from './rTrace';
 import { MOMENT_CAPTURE } from '../../lib/whatsNew/capture';
+import { t } from '../../i18n';
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
@@ -529,7 +530,7 @@ function HomeSketch({ p, firstName, topInset, tabBar }: { p: P; firstName: strin
         </View>
         <View style={[styles.flex, { gap: 10 }]}>
           <Text style={[styles.cardTitle, { color: palette.text }]} numberOfLines={1} maxFontSizeMultiplier={1}>
-            {firstName || 'Today'}
+            {firstName || t('common.today')}
           </Text>
           {bar('70%', 16)}
           {bar('55%')}
@@ -781,7 +782,7 @@ export function RevoMoment({
                 <Text
                   style={[styles.endTitle, { color: palette.text }]}
                   accessibilityRole="header"
-                  accessibilityLabel={mode === 'whatsNew' ? `Step ${step} of ${total}. ${title}` : title}
+                  accessibilityLabel={mode === 'whatsNew' ? t('whatsNew.step', { step, total, title }) : title}
                   maxFontSizeMultiplier={TEXT_MAX}
                   testID="whats-new-title"
                 >
@@ -865,7 +866,7 @@ export function RevoMoment({
         </Tap>
       )}
       {closable && !MOMENT_CAPTURE ? (
-        <Tap onPress={() => onClose?.()} accessibilityRole="button" accessibilityLabel="Close" hitSlop={12} style={[styles.close, { top: top + 6 }]} testID="whats-new-close">
+        <Tap onPress={() => onClose?.()} accessibilityRole="button" accessibilityLabel={t('common.close')} hitSlop={12} style={[styles.close, { top: top + 6 }]} testID="whats-new-close">
           <Ionicons name="close" size={26} color={palette.text} />
         </Tap>
       ) : null}

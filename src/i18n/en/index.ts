@@ -20,6 +20,7 @@ import { revision } from './revision';
 import { timer } from './timer';
 import { updates } from './updates';
 import { v2 } from './v2';
+import { whatsNew } from './whatsNew';
 
 export const en = {
   auth,
@@ -42,6 +43,7 @@ export const en = {
   timer,
   updates,
   v2,
+  whatsNew,
 } as const;
 
 export type Strings = typeof en;
