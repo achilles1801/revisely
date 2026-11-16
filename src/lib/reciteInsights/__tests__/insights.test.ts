@@ -140,6 +140,16 @@ describe('Recite insights: passages that keep slipping', () => {
     expect(ins.stillMarkedTajweed).toBe(1);
   });
 
+  it('a passage was last recited by the latest take over its words, one that heard them only as Not clear too', () => {
+    const records: MemoryRecord[] = [
+      take(-5, [mark(KAHF23, [18, 23], 'harakat')]),
+      // Heard only as Not clear: not a try at the slip, but the passage was recited.
+      take(-1, [mark(KAHF23, [18, 23], 'harakat', { sure: 'likely' })]),
+    ];
+    const [p] = recitationInsights(records, TODAY).slipping;
+    expect(p).toMatchObject({ sura: 18, from: 23, wrong: 1, tries: 1, lastDay: day(-1) });
+  });
+
   it('keeps passages in different surahs apart, even when their ayah numbers touch', () => {
     const records: MemoryRecord[] = [take(-1, [mark(100, [1, 7], 'word'), mark(101, [2, 1], 'word')], { from: 90, to: 110 })];
     expect(slippingPassages(wordMemories(records)).map((p) => [p.sura, p.from])).toEqual([

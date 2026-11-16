@@ -70,8 +70,9 @@ export type HomeStackParamList = {
   ActivityDay: { date: string; focusRecordingId?: string; focusBlock?: 'revised' | 'memorized' | 'read' | 'notes' };
   // The reader over Activity (a page of a day's strip, a weak spot): back returns to where it was
   // opened (ACT-20), unlike the Read tab's reader.
+  // `highlight`: ayahs highlighted until the page is turned (Insights' Recitation rows, RINS-2), as the Read tab's.
   // `showTake`: a past recitation take (Recite's memory, Revisely Dev) shown on its page with its marks.
-  QuranReader: { pageNumber: number; showTake?: string };
+  QuranReader: { pageNumber: number; highlight?: { sura: number; ayah: number; last?: { sura: number; ayah: number } }; showTake?: string };
   // A recording played over the pages it was recorded on, from fromMs (ms
   // into it; default the start).
   ListenBack: { recordingId: string; fromMs?: number };

@@ -28,6 +28,7 @@ import { revisablePages } from '../../lib/memorizedAyahs';
 import { lastRevisedDay } from '../../lib/recency';
 import { CalendarMonth } from './CalendarMonth';
 import { InsightsView } from './InsightsView';
+import { useRecitation } from '../../lib/reciteInsights/useRecitation';
 import { useActivityReload } from './useActivityReload';
 import { listRecordings, onRecordingsChanged } from '../../lib/recordings';
 import { coverageSince } from '../../lib/recency';
@@ -50,6 +51,8 @@ interface Props {
   onAddToPlan?: (pages: number[]) => void;
   /** A weak spot's row: the reader at that page. */
   onOpenPage: (page: number) => void;
+  /** The Recitation section's rows (Revisely Dev, RINS-2): the reader at those ayahs, highlighted. */
+  onOpenAyahs?: (sura: number, from: number, to: number) => void;
   /** Pages already first tomorrow (Insights' carry): their buttons show they're done (ACT-24). */
   firstTomorrow?: ReadonlySet<number>;
   /** Weak spots' "See all pages by strength" (ACT-12). */
@@ -66,9 +69,10 @@ interface Props {
   refreshRef?: React.MutableRefObject<(() => Promise<unknown>) | null>;
 }
 
-export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorrow, onPlanIt, onAddToPlan, onOpenPage, onSeeAllPages, onTurnOnSmartTracking, firstTomorrow, onViewChange, refreshRef }: Props) {
+export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorrow, onPlanIt, onAddToPlan, onOpenPage, onOpenAyahs, onSeeAllPages, onTurnOnSmartTracking, firstTomorrow, onViewChange, refreshRef }: Props) {
   const { pages, logs, user } = useApp();
   const revo = useRevoAvailable(user);
+  const recitation = useRecitation(user);
   const [view, setView] = useState<ViewKind>('calendar');
   const viewChange = useRef(onViewChange);
   viewChange.current = onViewChange;
@@ -317,6 +321,7 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
             gaps: gapsOn,
             pushBack: fullRevision,
             itemsFrom: rangeFrom,
+            recitation,
           }}
           onOpenDay={onOpenDay}
           onOpenCalendar={openCalendar}
@@ -324,6 +329,7 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
           onPlanIt={onPlanIt}
           onAddToPlan={onAddToPlan}
           onOpenPage={onOpenPage}
+          onOpenAyahs={onOpenAyahs}
           onSeeAllPages={onSeeAllPages}
           onTurnOnSmartTracking={onTurnOnSmartTracking}
         />

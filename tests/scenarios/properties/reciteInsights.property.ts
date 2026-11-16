@@ -10,6 +10,8 @@ import { wordMemories } from '../../../src/lib/reciteMemory/memory';
 import type { ClearRecord, MemoryRecord, TakeRecord } from '../../../src/lib/reciteMemory/record';
 import { liveTakes, recitationInsights } from '../../../src/lib/reciteInsights/insights';
 import { recitationForRevo, takeAttachment } from '../../../src/lib/revo/recitation';
+import { kindsLine, passageName, scoreLine, similarNote, similarTitle, slipNote } from '../../../src/lib/reciteInsights/describe';
+import { plainText } from '../../../src/lib/passages';
 import { recitationText } from '../../../functions/src/revo/recitation';
 import { attachedText } from '../../../functions/src/revo/attachText';
 import { validateAttachment, validateContext } from '../../../functions/src/revo/validate';
@@ -232,5 +234,39 @@ describe('Recite insights over generated takes [RINS-1]', () => {
     const recs = records([{ from: a, to: b, offset: 0, strict: false, hidden: false, deleted: false, accuracy: 0.98, secs: 60, marks: [] }], []);
     expect(recitationForRevo(recs, TODAY, null)).toBeNull();
     expect(recitationForRevo(recs, TODAY, words)?.last?.passage.name).toBe('Al-Kahf, ayahs 17–26');
+  });
+});
+
+describe('Insights’ Recitation section in words [RINS-2]', () => {
+  it('names surahs and ayahs, never pages; counts words first and never Not clear; and says nothing of strength with Smart Tracking off [RINS-2]', () => {
+    fc.assert(
+      fc.property(accountArb, fc.constantFrom<7 | 30 | 90>(7, 30, 90), ({ takes, clears }, window) => {
+        const recs = records(takes, clears);
+        const ins = recitationInsights(recs, TODAY, window);
+        const lines = [
+          scoreLine(ins, `in ${window} days`),
+          kindsLine(ins),
+          ...ins.slipping.flatMap((p) => [passageName(p.sura, p.from, p.to), slipNote(p, false, TODAY)]),
+          ...ins.similar.flatMap((x) => [similarTitle(x), similarNote(x, TODAY)]),
+        ].map(plainText);
+        for (const line of lines) {
+          expect(line).not.toMatch(/\bp(?:ages?|p?\.)\s?\d/);
+          // Smart Tracking off: nothing about strength or how often a passage went wrong.
+          expect(line).not.toMatch(/strong|weak|rated|rating|wrong in/i);
+        }
+        // The kinds' numbers are the mistakes; Not clear is said apart, as not counted.
+        const kinds = kindsLine(ins);
+        if (ins.mistakes > 0) {
+          const listed = (kinds.split('.')[0].split(':')[1] ?? '').match(/\d+/g)?.map(Number) ?? [];
+          expect(listed.reduce((a, b) => a + b, 0)).toBe(ins.mistakes);
+          // Words before harakat and letters.
+          const list = kinds.split('.')[0].split(':')[1] ?? '';
+          const order = ['wrong', 'skipped', 'extra', 'harakat', 'letter'].map((k) => list.indexOf(` ${k}`)).filter((i) => i >= 0);
+          expect([...order].sort((a, b) => a - b)).toEqual(order);
+        }
+        if (ins.unclear > 0) expect(kinds).toContain('clear enough to check (not counted)');
+      }),
+      { numRuns: 120 },
+    );
   });
 });

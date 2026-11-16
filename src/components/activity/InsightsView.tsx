@@ -63,6 +63,9 @@ import {
 import { PaceSheet } from './PaceSheet';
 import { GapsSection } from './GapsSection';
 import type { PushBack } from '../../lib/gapsCycle';
+import { RecitationInsights } from './RecitationInsights';
+import { stillMarkedWords } from '../../lib/reciteInsights/insights';
+import type { Recitation } from '../../lib/reciteInsights/useRecitation';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import {
   activeDays,
@@ -123,6 +126,8 @@ export interface InsightsData {
   itemsFrom?: string | null;
   /** The full revision against the plan (Gaps, ACT-28; lib/gapsCycle). */
   pushBack?: PushBack | null;
+  /** The takes with Mark mistakes (Revisely Dev, an account that recites): the Recitation section (RINS-2). */
+  recitation?: Recitation | null;
 }
 
 /**
@@ -163,6 +168,7 @@ export function InsightsView({
   onTurnOnSmartTracking,
   onOpenDay,
   onOpenCalendar,
+  onOpenAyahs,
 }: {
   data: InsightsData;
   onReviseTomorrow: (pages: number[]) => void;
@@ -178,6 +184,8 @@ export function InsightsView({
   onOpenDay?: (day: string) => void;
   /** Overview at a month (Consistency's figure: ACT-23). */
   onOpenCalendar?: (month: string) => void;
+  /** The reader at some ayahs, highlighted (the Recitation section's rows, RINS-2). */
+  onOpenAyahs?: (sura: number, from: number, to: number) => void;
 }) {
   // The juz sheet (ACT-21): mounted from its first opening on, so it can slide away after.
   const [juz, setJuz] = useState<number | null>(null);
@@ -210,6 +218,19 @@ export function InsightsView({
         <WeakSpots data={data} onReviseTomorrow={onReviseTomorrow} onOpenPage={onOpenPage} onSeeAllPages={onSeeAllPages} />
       ) : onTurnOnSmartTracking ? (
         <SmartTrackingInvite onPress={onTurnOnSmartTracking} />
+      ) : null}
+      {data.recitation && onOpenAyahs ? (
+        <RecitationInsights
+          records={data.recitation.records}
+          words={data.recitation.words}
+          today={data.today}
+          window={rangeSpan(data.range ?? 30, data.today, data.firstDay).window}
+          inWords={rangeSpan(data.range ?? 30, data.today, data.firstDay).inWords}
+          smartTracking={data.smartTracking !== false}
+          rating={data.rating}
+          revo={data.revo}
+          onOpenAyahs={onOpenAyahs}
+        />
       ) : null}
       <Memorization data={data} onOpenDay={onOpenDay} />
       <Pace data={data} onOpenDay={onOpenDay} />
@@ -923,6 +944,19 @@ function WeakSpots({
     inWords: rangeSpan(data.range ?? 30, data.today, data.firstDay).inWords,
   });
   const pages = rows.flatMap((r) => r.pages);
+  // Words Recite still marks on each page (Revisely Dev, RINS-2): said on the weak spot's row.
+  const marked = useMemo(() => {
+    const words = data.recitation?.words;
+    const byPage = new Map<number, number>();
+    if (!data.recitation || !words) return byPage;
+    for (const w of stillMarkedWords(data.recitation.records)) byPage.set(words.pageOf(w.w), (byPage.get(words.pageOf(w.w)) ?? 0) + 1);
+    return byPage;
+  }, [data.recitation]);
+  const markedOn = (rowPages: number[]) => rowPages.reduce((n, p) => n + (marked.get(p) ?? 0), 0);
+  const reasonOf = (r: { pages: number[]; reason: string }) => {
+    const n = markedOn(r.pages);
+    return n > 0 ? `${r.reason} · ${n} ${n === 1 ? 'word' : 'words'} still marked in Recite` : r.reason;
+  };
   return (
     <Section
       title="Weak spots"
@@ -952,7 +986,7 @@ function WeakSpots({
               key={r.label}
               onPress={() => onOpenPage(r.pages[0])}
               accessibilityRole="button"
-              accessibilityLabel={`${spokenText(r.label)}. ${r.reason}. Open it`}
+              accessibilityLabel={`${spokenText(r.label)}. ${reasonOf(r)}. Open it`}
               style={[styles.weakRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.separator }]}
               testID={`weak-spot-${r.pages[0]}`}
             >
@@ -963,7 +997,7 @@ function WeakSpots({
                   <ChromeText style={[typeV2.name, { color: palette.text }]}>{r.label}</ChromeText>
                   <ChromeText style={[typeV2.body, { color: palette.secondary }]}>{`  ${r.pagesNote}`}</ChromeText>
                 </ChromeText>
-                <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{r.reason}</ChromeText>
+                <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{reasonOf(r)}</ChromeText>
               </View>
               <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
             </Tap>

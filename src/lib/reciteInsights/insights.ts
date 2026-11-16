@@ -114,7 +114,7 @@ export interface SlippingPassage {
   /** Takes that got any of them wrong, and takes that reached any of them (all time, as the word's card counts). */
   wrong: number;
   tries: number;
-  /** The revision day of the latest take that reached any of them. */
+  /** The revision day of the latest take that recited any of them (whether or not it was a try at them). */
   lastDay: string;
 }
 
@@ -212,6 +212,11 @@ function markedWords(memories: Map<string, WordMemory>): { words: MarkedWord[]; 
     .map((m) => ({ w: m.w, group: m.group, kind: (m.lastMark as Mark).kind, ayah: (m.lastMark as Mark).ayah }))
     .sort((a, b) => a.w - b.w);
   return { words, byWord };
+}
+
+/** Every word still marked on the page (wrong words and slips; tajweed apart), in mushaf order. */
+export function stillMarkedWords(records: readonly MemoryRecord[]): MarkedWord[] {
+  return markedWords(wordMemories(records)).words;
 }
 
 /** Words still marked, gathered into runs of neighbouring ayat of one surah, the most slipped first. */
@@ -325,7 +330,12 @@ export function recitationInsights(records: readonly MemoryRecord[], today: stri
     }
   }
   cleared.sort((a, b) => b.day.localeCompare(a.day) || a.w - b.w);
-  const slipping = slippingPassages(memories);
+  // "Last recited": the latest take over any of a passage's words, a take that heard them only as Not clear included.
+  const slipping = slippingPassages(memories).map((p) => {
+    let lastDay = p.lastDay;
+    for (const t of takes) if (t.day > lastDay && p.words.some((w) => t.from <= w.w && w.w <= t.to)) lastDay = t.day;
+    return lastDay === p.lastDay ? p : { ...p, lastDay };
+  });
   return {
     from,
     today,

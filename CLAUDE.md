@@ -1757,6 +1757,10 @@ app; `askCoach`/`setCoachOptIn` stay as they were until Insights links to Revo. 
   second system block sent only with a recitation, so every other request, its cache and the recorded replies are
   unchanged. Before this could reach production, the privacy policy's Revo part and the store answers need the Recite
   results (Majd's call).
+  Activity → Insights shows the same for the user (RINS-2, `components/activity/RecitationInsights`, `useRecitation`):
+  a Recitation section after Weak spots, over Insights' range, with the score and its weeks, Keeps slipping (a row opens
+  the reader at its ayahs, highlighted), Similar ayahs and one quiet line; Weak spots say how many words Recite still
+  marks on a page. Smart Tracking off: nothing about strength (rows say when the passage was last recited).
 - **Opening a screen** (`openScreen`, REVO-31): Revo's card can open Jump to…, Edit schedule, the memorized pages,
   Activity, the daily log, Settings at a section, prayer times, the Qibla or the reader at a surah or juz
   (`REVO_SCREENS`, the same list in `functions/src/revo/types.ts` and `src/lib/revo/types.ts`; `src/lib/revo/screens`

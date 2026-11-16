@@ -371,10 +371,12 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     ),
   },
   {
-    title: 'Recite and Revo',
-    covers: ['RINS-1'],
-    routes: [],
+    title: 'Recitation in Insights, and Revo',
+    covers: ['RINS-1', 'RINS-2'],
+    routes: ['Activity', 'QuranReader'],
     text: lines(
+      '- Activity → “Insights” → “Recitation” (after Weak spots), over the range chip: the score by the page and how it moved ("Up from 96.9% 3 weeks ago"), with its weeks; “Keeps slipping”, the passages with words still marked (a tap opens the reader there; “Show fewer” after “See all”); “Similar ayahs” they went on with ("Al-Baqarah 48 → 123"); a line of the words cleared and the kinds, words first, “Not clear” never counted; and “Ask”, which opens Revo on it.',
+      '- With Smart Tracking on, “Rated strong, but slips” names a passage rated strong that still slips, and Weak spots say how many words Recite still marks there. Off, nothing about strength: a passage says when it was last recited.',
       '- Revo knows what their takes show: the last 4 weeks’ takes and score, mistakes by kind, words still marked and cleared, the passages that keep slipping, the similar ayahs they went on with, and the latest take. It never hears the audio, and knows only what the checker marked.',
     ),
   },
