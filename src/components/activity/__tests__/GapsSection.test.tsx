@@ -1,9 +1,10 @@
 // Insights' Gaps (ACT-28): the figure, the strip, the two tiles, what each tap opens, and where it sits.
 import React from 'react';
-import { fireEvent, render, screen, within } from '@testing-library/react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Text as SvgText } from 'react-native-svg';
-import { GapsSection } from '../GapsSection';
+import { GAPS_IN_DAYS_KEY, GapsSection } from '../GapsSection';
 import { InsightsView, type InsightsData } from '../InsightsView';
 
 const mockPalette = new Proxy(
@@ -116,14 +117,63 @@ describe('Gaps', () => {
     expect(screen.getByText('8 Nov', { includeHiddenElements: true })).toBeTruthy();
   });
 
+  it('away a while: words and the date, not in red; no Days switch while nothing reads differently', async () => {
+    renderGaps(['2026-10-23', '2026-10-24']);
+    const figure = screen.getByTestId('insights-gaps-figure');
+    expect(within(figure).getByText('Over 3 weeks')).toBeTruthy();
+    expect(within(figure).getByText(/since your last revision, on 24 Oct/)).toBeTruthy();
+    expect(flat(within(figure).getByText('Over 3 weeks').props.style).color).toBe('#000000');
+    await act(async () => undefined);
+    screen.unmount();
+    renderGaps(BOARD);
+    expect(screen.queryByTestId('insights-gaps-in-days')).toBeNull();
+  });
+
+  it('Days shows every length in exact days, and is kept on the phone', async () => {
+    await AsyncStorage.removeItem(GAPS_IN_DAYS_KEY);
+    renderGaps(['2026-10-23', '2026-10-24']);
+    const days = screen.getByTestId('insights-gaps-in-days');
+    expect(days.props.accessibilityState).toMatchObject({ checked: false });
+    await act(async () => {
+      fireEvent.press(days);
+    });
+    expect(within(screen.getByTestId('insights-gaps-figure')).getByText('22 days')).toBeTruthy();
+    expect(await AsyncStorage.getItem(GAPS_IN_DAYS_KEY)).toBe('1');
+    screen.unmount();
+    // Opened again: still in days.
+    renderGaps(['2026-10-23', '2026-10-24']);
+    await waitFor(() => expect(within(screen.getByTestId('insights-gaps-figure')).getByText('22 days')).toBeTruthy());
+    await AsyncStorage.removeItem(GAPS_IN_DAYS_KEY);
+  });
+
+  it('back today after an absence: gently, "you’re back"', () => {
+    renderGaps(['2026-10-23', '2026-10-24', TODAY]);
+    expect(within(screen.getByTestId('insights-gaps-figure')).getByText(/you’re back, after over 3 weeks/)).toBeTruthy();
+  });
+
+  it('the full revision, pushed back or on schedule', () => {
+    renderGaps(BOARD, {
+      pushBack: { cycleDays: 16, late: Array.from({ length: 60 }, (_, i) => ({ page: 100 + i, due: '2026-11-12', next: '2026-11-28' })), due: '2026-11-14', next: '2026-11-30', days: 16, missed: true },
+    });
+    const line = screen.getByTestId('insights-gaps-revision');
+    expect(line.props.accessibilityLabel).toBe(
+      'Full revision pushed back over 2 weeks. 60 pages from your gaps come round by 30 Nov instead of 14 Nov. Your plan goes round every 16 days.',
+    );
+    screen.unmount();
+    renderGaps(BOARD, { pushBack: { cycleDays: 16, late: [], due: null, next: null, days: 0, missed: false } });
+    expect(screen.getByTestId('insights-gaps-revision').props.accessibilityLabel).toBe(
+      'Full revision on schedule. Every page comes round within 16 days, as your plan has it.',
+    );
+  });
+
   it('hides with nothing revised on record', () => {
     renderGaps([]);
     expect(screen.queryByTestId('insights-gaps')).toBeNull();
   });
 
-  it('from a page’s own record when no item reaches back: 56 days', () => {
+  it('from a page’s own record when no item reaches back: 56 days, "over a month"', () => {
     renderGaps([], { lastRevisedOn: new Map([[582, '2026-09-20T07:30:00.000Z']]) });
-    expect(within(screen.getByTestId('insights-gaps-figure')).getByText('56 days')).toBeTruthy();
+    expect(within(screen.getByTestId('insights-gaps-figure')).getByText('Over a month')).toBeTruthy();
   });
 });
 

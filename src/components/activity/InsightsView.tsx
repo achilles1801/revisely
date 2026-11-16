@@ -62,6 +62,7 @@ import {
 } from '../../lib/coverageViews';
 import { PaceSheet } from './PaceSheet';
 import { GapsSection } from './GapsSection';
+import type { PushBack } from '../../lib/gapsCycle';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import {
   activeDays,
@@ -116,10 +117,12 @@ export interface InsightsData {
   coverageSince?: Map<number, string>;
   /** Pages already first tomorrow (Insights' carry): their buttons show "First tomorrow ✓" (ACT-24). */
   firstTomorrow?: ReadonlySet<number>;
-  /** Gaps (ACT-28): Revisely Dev and testers until a release opens it (lib/insightsGaps gapsInsightsEnabled). */
+  /** Gaps (ACT-28): Revisely Dev until a release opens it (lib/insightsGaps gapsInsightsEnabled). */
   gaps?: boolean;
   /** The first day the items were read from (Gaps: a gap before it began on a day not read, ACT-28). */
   itemsFrom?: string | null;
+  /** The full revision against the plan (Gaps, ACT-28; lib/gapsCycle). */
+  pushBack?: PushBack | null;
 }
 
 /**
@@ -200,6 +203,7 @@ export function InsightsView({
           lastRevisedOn={data.lastRevisedOn}
           onOpenDay={onOpenDay}
           onOpenCalendar={onOpenCalendar}
+          pushBack={data.pushBack}
         />
       ) : null}
       {data.smartTracking !== false ? (
