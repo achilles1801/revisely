@@ -10,8 +10,11 @@
  *
  * --dry checks everything without a call: every context as the server takes it, every request
  * built, every fact grounded in the guide where it says so. The key is read from the environment,
- * sent only to api.anthropic.com, and never written or printed. ~27 requests to claude-sonnet-5-5,
+ * sent only to api.anthropic.com, and never written or printed. ~35 requests to claude-sonnet-5-5,
  * the guide cached after the first: well under a dollar.
+ *
+ * Questions marked `dev` are asked as Revisely Dev asks them (the context's `app: 'dev'`, a tester account), so
+ * they carry the Dev guide (guide.ts DEV_GUIDE_SECTIONS); their facts may come from either guide.
  */
 const fs = require('fs');
 const os = require('os');
@@ -38,7 +41,7 @@ if (!key && !DRY) {
 
 const { ANTHROPIC_URL, ANTHROPIC_VERSION } = require(path.join(lib, 'coach/call.js'));
 const { buildAskRequest, REVO_SYSTEM_PROMPT } = require(path.join(lib, 'revo/prompt.js'));
-const { REVO_GUIDE } = require(path.join(lib, 'revo/guide.js'));
+const { DEV_GUIDE, DEV_GUIDE_SYSTEM, REVO_GUIDE } = require(path.join(lib, 'revo/guide.js'));
 const { parseReply } = require(path.join(lib, 'revo/reply.js'));
 const { contextPages, validateContext } = require(path.join(lib, 'revo/validate.js'));
 const { barePageNumbers, replyWords } = require(path.join(lib, 'revo/pageWords.js'));
@@ -113,6 +116,9 @@ const doneToday = {
   pageNames: {},
   localTime: '20:05',
 };
+
+// The same account in Revisely Dev: the app says so, and the request carries the Dev guide.
+const devSteady = { ...steady, app: 'dev' };
 
 // ---------------------------------------------------------------------------------------------
 // The questions. Each fact is [what the answer must say, a pattern any of the answer's words
@@ -374,12 +380,59 @@ const SAMPLES = [
     facts: [F('open the day', /day/i, true), F('tap a page in the Revised strip', /strip|tap (?:a|the) page/i, true), F('it opens in the reader', /reader/i, true)],
     screen: 'activity',
   },
+  // Revisely Dev (the Dev guide, Nov 16 2026): Recite, its marks, the hidden page and the takes kept.
+  {
+    q: 'How do I get the app to check my recitation for mistakes?',
+    ctx: devSteady,
+    dev: true,
+    facts: [F('in the reader, the mic', /reader|mic/i, true), F('hold it: Recite, with Mark mistakes on', /mark mistakes/i, true)],
+    screen: 'reader',
+  },
+  {
+    q: 'Can I recite from memory with the words covered?',
+    ctx: devSteady,
+    dev: true,
+    facts: [F('yes: the eye, Hide the page', /hide the page|eye/i, true), F('words appear as recited, or Show the next word', /appear|next word|whole ayah/i, true)],
+    screen: 'reader',
+  },
+  {
+    q: 'What does an amber highlight on a word mean?',
+    ctx: devSteady,
+    dev: true,
+    facts: [F('a haraka or letter slip', /haraka|harakat|letter/i, true), F('or Not clear, which never counts', /not clear/i, true)],
+  },
+  {
+    q: 'It marked a word I said correctly. What can I do?',
+    ctx: devSteady,
+    dev: true,
+    facts: [F('tap the word', /tap/i), F('Not a mistake', /not a mistake/i, true)],
+  },
+  {
+    q: 'Does Revisely remember the words I got wrong last time?',
+    ctx: devSteady,
+    dev: true,
+    facts: [F('yes, kept on the account', /yes|kept|remember/i, true), F('until said right in 2 takes on 2 different days', /2 (?:right )?takes|two (?:right )?takes|2 different|two different/i, true)],
+  },
+  {
+    q: 'How do I make it check my tajweed too?',
+    ctx: devSteady,
+    dev: true,
+    facts: [F('Settings → Recite → Mistakes to mark', /mistakes to mark|settings/i, true), F('Strict', /strict/i, true)],
+    screen: 'settings',
+  },
+  {
+    q: 'Can I use Recite during my revision session?',
+    ctx: devSteady,
+    dev: true,
+    note: 'not possible: the reader only',
+    facts: [F('no: only in the reader', /no\b|not|only in the reader|reader only/i), F('closest: the reader', /reader/i, true), UNSURE],
+  },
 ];
 
 // ---------------------------------------------------------------------------------------------
 
 async function ask(s) {
-  const body = buildAskRequest({ day: DAY, question: s.q, context: s.ctx, attached: [], memory: [], history: [] });
+  const body = buildAskRequest({ day: DAY, question: s.q, context: s.ctx, attached: [], memory: [], history: [], ...(s.dev ? { tester: true } : {}) });
   const res = await fetch(ANTHROPIC_URL, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': ANTHROPIC_VERSION },
@@ -445,19 +498,25 @@ function show(s, r) {
   if (DRY) {
     const problems = [];
     if (!REVO_SYSTEM_PROMPT.includes(REVO_GUIDE)) problems.push('the system prompt does not carry the guide');
+    if (!DEV_GUIDE_SYSTEM.includes(DEV_GUIDE)) problems.push('the Dev guide block does not carry the Dev guide');
     const guide = REVO_GUIDE.replace(/'/g, '’');
+    const devGuide = `${guide}\n${DEV_GUIDE.replace(/'/g, '’')}`;
     for (const s of samples) {
       validateContext(s.ctx);
-      const body = buildAskRequest({ day: DAY, question: s.q, context: s.ctx, attached: [], memory: [], history: [] });
+      const body = buildAskRequest({ day: DAY, question: s.q, context: s.ctx, attached: [], memory: [], history: [], ...(s.dev ? { tester: true } : {}) });
       if (body.system[0].text !== REVO_SYSTEM_PROMPT) problems.push(`${s.n}: the system prompt differs`);
+      // The store's questions carry the main prompt alone; Revisely Dev's add the Dev guide after it.
+      const blocks = body.system.map((b) => b.text);
+      if (s.dev && (blocks.length !== 2 || blocks[1] !== DEV_GUIDE_SYSTEM)) problems.push(`${s.n}: a Revisely Dev question without the Dev guide`);
+      if (!s.dev && blocks.length !== 1) problems.push(`${s.n}: a store question with more than the main prompt`);
       if (s.facts.length === 0) problems.push(`${s.n}: no facts`);
-      for (const f of s.facts) if (f.guide && !f.re.test(guide)) problems.push(`${s.n}: “${f.label}” is not in the guide`);
+      for (const f of s.facts) if (f.guide && !f.re.test(s.dev ? devGuide : guide)) problems.push(`${s.n}: “${f.label}” is not in the guide`);
     }
     if (problems.length) {
       console.error(problems.join('\n'));
       process.exit(1);
     }
-    console.log(`${samples.length} questions build, every context is valid, and every fact marked “in the guide” is in it. The system prompt is ${REVO_SYSTEM_PROMPT.length} characters (about ${Math.round(REVO_SYSTEM_PROMPT.length / 3.6)} tokens).`);
+    console.log(`${samples.length} questions build, every context is valid, and every fact marked “in the guide” is in it. The system prompt is ${REVO_SYSTEM_PROMPT.length} characters (about ${Math.round(REVO_SYSTEM_PROMPT.length / 3.6)} tokens); Revisely Dev’s guide adds ${DEV_GUIDE_SYSTEM.length} (about ${Math.round(DEV_GUIDE_SYSTEM.length / 3.6)} tokens).`);
     return;
   }
   const parts = [];
