@@ -288,6 +288,11 @@ const SAMPLES = [
     facts: [F('the mic, in the reader or a session', /mic|record/i, true), F('Listen back (end card or Activity)', /listen back/i, true)],
   },
   {
+    q: 'I ended the timer in the reader by mistake and it saved my sitting. Can I take it back?',
+    ctx: steady,
+    facts: [F('Undo on the "Saved to today" note', /undo/i, true), F('it takes the recording back too', /recording/i, true)],
+  },
+  {
     q: 'Can I slow down the recitation and repeat each verse three times?',
     ctx: steady,
     facts: [F('Audio Options', /audio options/i, true), F('Playback speed', /speed/i, true), F('Repeat', /repeat/i, true)],
