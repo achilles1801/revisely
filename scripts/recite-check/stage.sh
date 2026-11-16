@@ -43,7 +43,9 @@ WK=$(cd "$STAGE" && LAB=$STAGE/lab RECITE_HARNESS=$H "$PY" -c 'import engine; pr
 PARTS=$(mktemp -d)
 if [ -n "$WK" ] && CLOUDSDK_PYTHON=${CLOUDSDK_PYTHON:-$PY} gcloud storage cp --project revisely-dev \
     "gs://revisely-dev.firebasestorage.app/recite-cache/$WK/words-*.pkl" "$PARTS/" >/dev/null 2>&1; then
-  "$PY" -I "$HERE/make_words.py" --merge "$STAGE/lab/words.bin" "$PARTS"/words-*.pkl \
+  # from the stage, with the harness: the merge imports live (the Qur'an-wide start index, table['quran'], #665),
+  # and -I would leave the stage's own modules off the path, so no table would be made
+  (cd "$STAGE" && LAB=$STAGE/lab RECITE_HARNESS=$H "$PY" make_words.py --merge "$STAGE/lab/words.bin" "$PARTS"/words-*.pkl) \
     || echo "the word table for $WK is incomplete: not used (run the job again for the missing slices)"
 else
   echo "no word table for words key ${WK:-?}: the service works words out as it needs them (slower when cold)"
