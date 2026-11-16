@@ -109,8 +109,8 @@ main is strictly for production"):
   and `preview.yml` treats a fingerprint with that tag (or an EAS build, i.e. build 11 and earlier) as built.
 - Never run `eas update` or `eas build` from a laptop to ship. Everything on a phone should trace to a
   commit on `develop` (TestFlight) or `main` (App Store, promoted).
-- Pushes that touch only docs, tests, `functions/`, `scripts/`, `worker/`, `wrangler*.jsonc`, workflows,
-  Firestore rules or `.md` files publish nothing (`paths-ignore` in both workflows). Firebase rules and functions still deploy by hand
+- Pushes that touch only docs, tests, `functions/`, `scripts/`, `worker/`, `admin/` (the staff console), `wrangler*.jsonc`,
+  workflows, Firestore rules or `.md` files publish nothing (`paths-ignore` in both workflows). Firebase rules and functions still deploy by hand
   (`firebase deploy`, see README).
 
 ## Dev stack (Revisely Dev, the dev backend, dev.revisely.app)
