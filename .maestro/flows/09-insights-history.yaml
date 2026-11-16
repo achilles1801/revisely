@@ -2,6 +2,11 @@
 # 2026, on a day-old account: "think i found a bug when u filter by all time or 3 months" (a weeks-grid cell
 # stretched to the width, a gap under it, "0 cycles", "1 of 1 days"). Screenshots only: the rules, a year's
 # history included, are tested by tests/scenarios/scenarios/insightsShortHistory.scenario.tsx.
+# Last, Insights' Recitation section (Revisely Dev, RINS-2) for an account that recites: takes kept by Recite's memory
+# (scripts/seed-recite-takes.js: An-Naba 1–16 slipping at ayahs 9 and 14, Al-Infitar 14 going on with Al-Mutaffifin
+# 23, Al-Falaq 3 ended as ayah 5 ends, then cleared), the Dev UI on with `e2e/recite-live`. Screenshots
+# 09-activity-recitation-*: the section's top and end, Smart Tracking on in light and dark, then off in dark (no strength:
+# rows say when a passage was last recited). Its rules: RecitationInsights.test.tsx and reciteInsights.property.ts.
 appId: com.revisionbuddy.app
 ---
 # An account 1 day old.
@@ -56,3 +61,49 @@ appId: com.revisionbuddy.app
     env:
       AGE: 7-days
       THEME: dark
+# An account that recites (Revisely Dev): a fresh install, so light.
+- runFlow:
+    file: ../subflows/new-account.yaml
+    env:
+      CLOCK: 2026-11-16T20:00
+      BOUNDARY: midnight
+- runScript:
+    file: ../scripts/seed-recite-takes.js
+- runFlow: ../subflows/relaunch.yaml
+- runFlow: ../subflows/backup-notice.yaml
+- openLink:
+    link: revisely://e2e/recite-live?on=1
+    optional: true
+- runFlow: ../subflows/open-link-prompt.yaml
+- runFlow:
+    file: ../subflows/recitation-insights.yaml
+    env:
+      NAME: 09-activity-recitation-light
+- assertVisible:
+    id: insights-recitation-strong-82-14
+- runFlow: ../subflows/back-home.yaml
+- runFlow:
+    file: ../subflows/theme.yaml
+    env:
+      THEME: Dark
+- runFlow:
+    file: ../subflows/recitation-insights.yaml
+    env:
+      NAME: 09-activity-recitation-dark
+- runFlow: ../subflows/back-home.yaml
+# Smart Tracking off: the account written again, the app opened again (the Dev UI's switch is kept in memory only).
+- runScript:
+    file: ../scripts/seed-recite-takes.js
+    env:
+      SMART: "off"
+- runFlow: ../subflows/relaunch.yaml
+- openLink:
+    link: revisely://e2e/recite-live?on=1
+    optional: true
+- runFlow: ../subflows/open-link-prompt.yaml
+- runFlow:
+    file: ../subflows/recitation-insights.yaml
+    env:
+      NAME: 09-activity-recitation-off-dark
+- assertNotVisible:
+    id: insights-recitation-strong-82-14
