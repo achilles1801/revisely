@@ -34,4 +34,53 @@ export const insights = {
   filterByStrength: 'Filter by strength',
   showLess: 'Show less',
   showAll: 'Show all ({{hidden}})',
+  /** Activity → Insights → Gaps (ACT-28): the days between revisions. */
+  gaps: {
+    title: 'Gaps',
+    detail: 'Days between your revisions',
+    /** The figure: "6 days" "since your last revision"; "Today" "you revised, after 6 days". */
+    days_one: '{{count}} day',
+    days_other: '{{count}} days',
+    sinceLast: 'since your last revision',
+    today: 'Today',
+    revisedToday: 'you revised',
+    revisedTodayAfter_one: 'you revised, after {{count}} day',
+    revisedTodayAfter_other: 'you revised, after {{count}} days',
+    figureHint: 'Opens the day of your last revision',
+    /** The strip's gap labels: "9 days", "60+ days", "6 days so far". */
+    gapLabel_one: '{{count}} day',
+    gapLabel_other: '{{count}} days',
+    gapLabelAtLeast: '{{count}}+ days',
+    openLabel_one: '{{count}} day so far',
+    openLabel_other: '{{count}} days so far',
+    stripToday: 'Today',
+    /** A range longer than the account: "since 2 November" (ACT-22). */
+    since: 'since {{date}}',
+    /** The strip for VoiceOver: "Last 30 days: revised on 14 days. Gaps of 3 days or more: 9 days, from 28 October to 6 November." */
+    stripLabel_one: '{{range}}: revised on {{count}} day.',
+    stripLabel_other: '{{range}}: revised on {{count}} days.',
+    stripLongGaps: 'Gaps of 3 days or more: {{gaps}}.',
+    stripNoLongGaps: 'No gaps of 3 days or more.',
+    stripGap: '{{days}}, from {{from}} to {{to}}',
+    stripGapOpen: '{{days}} so far, since {{from}}',
+    stripGapUnknown: '{{days}}, until {{to}}',
+    stripHint: 'Opens the day you touch',
+    stripHintMonth: 'Opens the calendar at the month you touch',
+    /** The longest gap's tile: "9 days" "Longest gap, 28 Oct – 6 Nov". */
+    unit_one: 'day',
+    unit_other: 'days',
+    longest: 'Longest gap, {{from}} – {{to}}',
+    longestOpen: 'Longest gap, since {{from}}',
+    longestUnknown: 'Longest gap, until {{to}}',
+    longestHint: 'Opens the calendar at that month',
+    noGaps: 'None',
+    noGapsText: 'No gaps {{range}}',
+    /** The usual rhythm's tile: "Every day" "Your usual rhythm · 2 gaps of 3+ days". */
+    every_one: 'Every day',
+    every_other: 'Every {{count}} days',
+    everyBetween: 'Every {{low}}–{{high}} days',
+    rhythmNone: 'Your usual rhythm · no gaps of 3+ days',
+    rhythm_one: 'Your usual rhythm · {{count}} gap of 3+ days',
+    rhythm_other: 'Your usual rhythm · {{count}} gaps of 3+ days',
+  },
 } as const;

@@ -580,6 +580,23 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   refresh reads everything again, the items Overview and Insights read included, and its spinner always ends
   (after 10 s at most), on a transparent ground as Home's. (Majd, Nov 9 2026: "shouldnt this update whenever
   a user scrolls down to refresh the page instead of having to close out the app?")
+- **ACT-28.** Insights' Gaps, after Consistency, says how long the user goes between revisions. A revision day is a
+  revision day (DAY-2, DAY-9) with at least one page revised: a session, pages revised ahead (on the day they were
+  done) or pages logged as revised elsewhere; reading and memorizing don't count. A gap is the days from one revision
+  day to the next (Monday, then Thursday, is 3 days); revising every day leaves none, and one missed day is a 2-day
+  gap. Its figure is the days since the last revision ("6 days since your last revision", in red from 3 days; the
+  pages' own last revised dates when no item reaches that far back), or "Today, you revised" ("after 6 days" when
+  today ended a gap of 3 days or more); it opens the day of the last revision. Under it, a strip of the range (ACT-22;
+  at most half a year, never before the account's first day): a dot per revision day, joined while they run on,
+  each gap of 3 days or more in red with its length above it ("9 days"), and the gap still open dashed up to
+  today ("6 days so far"); a touch opens the day under the finger (longer than a month: Overview at that month).
+  Then two tiles: the longest gap with a missed day in the range, the open one included and counted in full when it
+  began before the range ("9 days · Longest gap, 28 Oct – 6 Nov", opening Overview at its month; "60+ days" when it
+  began before the days read; "None · No gaps in 30 days"), and the usual rhythm, the median step between revision
+  days in the range, from two steps ("Every day", "Every 2 days", "Every 1–2 days", with how many gaps of 3 days or
+  more). Nothing revised on record: no section. Recency only, the same with Smart Tracking on or off (ACT-19).
+  Revisely Dev and previewTester accounts until a release opens it. (Majd, Nov 16 2026: "some metric in insights
+  that give the user an idea on their 'gaps' between session"; mocks insights-gaps.)
 
 ## Ask coach
 
