@@ -324,6 +324,17 @@ has them; Revisely Dev's Revo knows them from its Dev guide.
   (Majd, Nov 16 2026: "some metric in insights
   that give the user an idea on their 'gaps' between session"; mocks insights-gaps.)
 
+- **ACT-30.** Last revised says when each memorized surah, juz, hizb or page was last revised, longest waiting first.
+  It opens from Gaps' "When did I last revise…?" at the section's end and from its full revision line (ACT-28).
+  Surah | Juz | Hizb | Page as Activity's ink tabs, Surah at first; the choice is kept on the phone. A surah, juz or
+  hizb is as recent as its least recently revised memorized page (a page shared by two surahs is under both) and
+  says that page's date and how long ago ("24 Oct · 22 days ago", "14 Nov · yesterday", "Today"); a tap opens it to
+  its memorized pages, longest waiting first too (the page that dates it comes first), each with its own date, and a
+  page opens the reader there. A page never revised waits from
+  the day it was memorized: "Not revised yet" for its first 30 days, "Never revised" after (ACT-25). Recency only,
+  the same with Smart Tracking on or off (ACT-19). (Majd, Nov 16
+  2026: "being able to click on a page or surah or juz or hizb and seeing the last time u revised it".)
+
 ## Recite insights (Revisely Dev)
 
 What a user's takes with Mark mistakes show over time, and Revo knowing it (Majd, Nov 16 2026).

@@ -174,6 +174,7 @@ export function InsightsView({
   onOpenAyahs,
   sections = DEFAULT_SECTIONS.insights,
   onEditSections,
+  onOpenLastRevised,
 }: {
   data: InsightsData;
   onReviseTomorrow: (pages: number[]) => void;
@@ -195,6 +196,8 @@ export function InsightsView({
   sections?: TabLayout<'insights'>;
   /** Edit sections (ACT-29): from the line shown when every section is hidden. */
   onEditSections?: () => void;
+  /** When each surah, juz, hizb or page was last revised (Gaps' link: ACT-30). */
+  onOpenLastRevised?: () => void;
 }) {
   // The juz sheet (ACT-21): mounted from its first opening on, so it can slide away after.
   const [juz, setJuz] = useState<number | null>(null);
@@ -246,6 +249,7 @@ export function InsightsView({
             onOpenDay={onOpenDay}
             onOpenCalendar={onOpenCalendar}
             pushBack={data.pushBack}
+            onOpenLastRevised={onOpenLastRevised}
           />
         ) : null;
       case 'weak':

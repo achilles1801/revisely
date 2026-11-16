@@ -60,6 +60,8 @@ interface Props {
   firstTomorrow?: ReadonlySet<number>;
   /** Weak spots' "See all pages by strength" (ACT-12). */
   onSeeAllPages?: () => void;
+  /** Gaps' "When did I last revise…?" (ACT-30). */
+  onOpenLastRevised?: () => void;
   /** Smart Tracking off: Insights' line that opens Settings at its switch (ACT-12). */
   onTurnOnSmartTracking?: () => void;
   /** Days with a note in the log (the calendar's note dot). */
@@ -72,7 +74,7 @@ interface Props {
   refreshRef?: React.MutableRefObject<(() => Promise<unknown>) | null>;
 }
 
-export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorrow, onPlanIt, onAddToPlan, onOpenPage, onOpenAyahs, onSeeAllPages, onTurnOnSmartTracking, firstTomorrow, onViewChange, refreshRef }: Props) {
+export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorrow, onPlanIt, onAddToPlan, onOpenPage, onOpenAyahs, onSeeAllPages, onOpenLastRevised, onTurnOnSmartTracking, firstTomorrow, onViewChange, refreshRef }: Props) {
   const { pages, logs, user } = useApp();
   const revo = useRevoAvailable(user);
   const recitation = useRecitation(user);
@@ -332,7 +334,9 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
             lastRevisedOn,
             coverageSince: coverageSinceByPage,
             firstTomorrow,
-            gaps: gapsOn,
+            // Gaps waits for the items: drawn from none, it fell back on the pages' last revisions and read "Today you
+            // revised" over a strip of "revised on 0 days" while they loaded (ACT-28).
+            gaps: gapsOn && data != null,
             pushBack: fullRevision,
             itemsFrom: rangeFrom,
             recitation,
@@ -345,6 +349,7 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
           onOpenPage={onOpenPage}
           onOpenAyahs={onOpenAyahs}
           onSeeAllPages={onSeeAllPages}
+          onOpenLastRevised={onOpenLastRevised}
           onTurnOnSmartTracking={onTurnOnSmartTracking}
           sections={sections.insights}
           onEditSections={editable ? () => setEditing('insights') : undefined}

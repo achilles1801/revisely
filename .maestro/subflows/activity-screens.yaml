@@ -477,6 +477,33 @@ appId: com.revisionbuddy.app
     file: shot.yaml
     env:
       NAME: 09-insights-gaps-${THEME}
+# When did I last revise…? (ACT-30): Last revised by surah, longest waiting first, its first surah opened.
+- scrollUntilVisible:
+    element:
+      id: insights-gaps-last-revised
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- tapOn:
+    id: insights-gaps-last-revised
+- extendedWaitUntil:
+    visible:
+      id: last-revised-views
+    timeout: 10000
+- tapOn:
+    id: "last-revised-row-surah-.*"
+    index: 0
+- waitForAnimationToEnd
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-last-revised-${THEME}
+- tapOn:
+    id: back
+- extendedWaitUntil:
+    visible:
+      id: activity-insights
+    timeout: 10000
 # Weak spots in the middle of the screen, with Revo's Ask beside its title (d4's middle).
 - scrollUntilVisible:
     element:

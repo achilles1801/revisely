@@ -180,6 +180,7 @@ export default function ActivityScreen() {
                 })
               }
               onSeeAllPages={() => navigation.navigate('PagesByStrength')}
+              onOpenLastRevised={() => navigation.navigate('LastRevised')}
               onTurnOnSmartTracking={() => navigation.navigate('Settings', { section: 'revision' })}
               onViewChange={setView}
               refreshRef={blocksRefresh}

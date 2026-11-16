@@ -6,12 +6,14 @@ import { act, fireEvent, render as rtlRender, screen, waitFor, within } from '@t
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ActivityBlocksViews } from '../ActivityBlocksViews';
 import { plainText } from '../../../lib/passages';
+import * as insightsGaps from '../../../lib/insightsGaps';
+import * as gapsCycle from '../../../lib/gapsCycle';
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(() => Promise.resolve(null)),
   setItem: jest.fn(() => Promise.resolve()),
 }));
-let mockPages: { pageNumber: number; status: string; weaknessRating: number }[] = [];
+let mockPages: { pageNumber: number; status: string; weaknessRating: number; lastRevisedDate?: string }[] = [];
 // Smart Tracking on unless a test turns it off: Weak spots needs it (ACT-12).
 let mockUser: { smartTrackingEnabled: boolean } = { smartTrackingEnabled: true };
 jest.mock('../../../context/AppContext', () => ({ useApp: () => ({ pages: mockPages, user: mockUser, logs: [] }) }));
@@ -344,5 +346,39 @@ describe('Insights (gap audit §5)', () => {
     expect(screen.queryByText(/Al-Hashr/, { normalizer: plainText })).toBeNull();
     expect(screen.queryByTestId('insights-see-all-pages')).toBeNull();
     expect(screen.queryByTestId('insights-ask-revo')).toBeNull();
+  });
+});
+
+describe('Gaps in Activity (ACT-28)', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  it('[ACT-28] waits for Activity’s items: never drawn from the pages’ last revisions alone while they load', async () => {
+    // Revisely Dev's gate, and no plan to read forwards (the full revision line isn't what this checks).
+    jest.spyOn(insightsGaps, 'gapsInsightsEnabled').mockReturnValue(true);
+    jest.spyOn(gapsCycle, 'pushBack').mockReturnValue(null);
+    // The page says it was revised today, before the items have come.
+    mockPages = [{ pageNumber: 582, status: 'memorized', weaknessRating: 4, lastRevisedDate: `${TODAY}T15:00:00.000Z` }];
+    const service = jest.requireMock('../../../services/firestoreService') as { getActivityItemsBetween: jest.Mock };
+    let arrive!: (items: unknown) => void;
+    service.getActivityItemsBetween.mockReturnValue(new Promise((resolve) => (arrive = resolve)));
+    try {
+      render(<ActivityBlocksViews {...props} />);
+      fireEvent.press(await screen.findByText('Insights'));
+      expect(await screen.findByTestId('activity-insights')).toBeTruthy();
+      // Before: "Today you revised" over a strip of "revised on 0 days".
+      expect(screen.queryByTestId('insights-gaps')).toBeNull();
+      await act(async () => {
+        arrive({
+          revisions: [{ id: TODAY, day: TODAY, countsFor: TODAY, pages: [582], skipped: [], assigned: [582], minutes: 10, occurredAt: null }],
+          memorized: [],
+          reads: [],
+        });
+      });
+      expect(await screen.findByTestId('insights-gaps')).toBeTruthy();
+      expect(screen.getByTestId('insights-gaps-figure').props.accessibilityLabel).toBe('Today you revised');
+      expect(screen.getByTestId('insights-gaps-strip').props.accessibilityLabel).not.toMatch(/revised on 0 days/);
+    } finally {
+      service.getActivityItemsBetween.mockImplementation(() => Promise.resolve({ revisions: [], memorized: [], reads: [] }));
+    }
   });
 });

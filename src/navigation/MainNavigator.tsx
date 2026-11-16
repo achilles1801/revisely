@@ -21,6 +21,7 @@ import ActivityScreen from '../screens/activity/ActivityScreen';
 import ActivityDayScreen from '../screens/activity/ActivityDayScreen';
 import ActivityAllScreen from '../screens/activity/ActivityAllScreen';
 import PagesByStrengthScreen from '../screens/activity/PagesByStrengthScreen';
+import LastRevisedScreen from '../screens/activity/LastRevisedScreen';
 import { activityBlocksEnabled } from '../components/activity/DayBlocks';
 import type { ActivityKind } from '../lib/activityItems';
 import { ReadingTimerProvider } from '../context/ReadingTimerContext';
@@ -80,6 +81,8 @@ export type HomeStackParamList = {
   ActivityAll: { kind?: ActivityKind } | undefined;
   // Every revised page by strength (the Insights tab's Browse), from Activity's Weak spots.
   PagesByStrength: undefined;
+  // When each surah, juz, hizb or page was last revised (ACT-30), from Insights' Gaps.
+  LastRevised: undefined;
   // Daily-log editor. date is YYYY-MM-DD; omitted means "today" (fajr-aware
   // revision day).
   JournalEntry: { date?: string; kind?: JournalKind } | undefined;
@@ -154,6 +157,7 @@ function HomeStackNavigator() {
       <HomeStack.Screen name="ListenBack" component={ListenBackScreen} />
       <HomeStack.Screen name="ActivityAll" component={ActivityAllScreen} />
       <HomeStack.Screen name="PagesByStrength" component={PagesByStrengthScreen} />
+      <HomeStack.Screen name="LastRevised" component={LastRevisedScreen} />
       <HomeStack.Screen name="JournalEntry" component={JournalEntryScreen} />
       <HomeStack.Screen name="QuranReader" component={QuranReaderScreen} />
     </HomeStack.Navigator>

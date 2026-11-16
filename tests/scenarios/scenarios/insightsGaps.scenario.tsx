@@ -9,6 +9,7 @@ import { MINUTE, setNow, setZone, ZONES } from '../harness/clock';
 import { Home, activityStack, homeStack } from '../harness/screens';
 import { Phone, type Booted, type OpenApp } from '../harness/phone';
 import { fajrOn } from './dayWeeks';
+import { plain } from '../harness/words';
 
 const label = (app: OpenApp, testID: string) => app.screen.queryByTestId(testID)?.props.accessibilityLabel as string | undefined;
 
@@ -46,7 +47,21 @@ async function openInsights(phone: Phone): Promise<OpenApp> {
   return app;
 }
 
-it('[ACT-28] [DAY-2] Gaps counts by the revision day: a session after midnight, before Fajr, is the day before', async () => {
+/**
+ * Waits for Gaps' strip to read `strip`, and fails if Gaps was ever drawn from none of Activity's items on the way
+ * (it then read "Today you revised" over "revised on 0 days" while they loaded, ACT-28).
+ */
+async function stripReads(app: OpenApp, strip: string) {
+  let partial: string | undefined;
+  await app.until(() => {
+    const now = label(app, 'insights-gaps-strip');
+    if (now?.includes('revised on 0 days')) partial = now;
+    return now === strip;
+  }, `Gaps: ${strip}`);
+  expect(partial).toBeUndefined();
+}
+
+it('[ACT-28] [ACT-30] [DAY-2] Gaps counts by the revision day: a session after midnight, before Fajr, is the day before', async () => {
   setZone(ZONES.chicago);
   setNow('2026-11-02 20:00');
   const phone = new Phone();
@@ -66,34 +81,48 @@ it('[ACT-28] [DAY-2] Gaps counts by the revision day: a session after midnight, 
   // Monday 9 November, evening: two days since Saturday (one, had the session counted for Sunday).
   setNow('2026-11-09 20:00');
   const app = await openInsights(phone);
-  // The figure can come from the pages' own last revised dates before Insights has read its items, so wait for the
-  // strip too (it counts the items' revision days).
-  await app.until(
-    () => label(app, 'insights-gaps-figure') === '2 days since your last revision' && label(app, 'insights-gaps-strip')?.includes('revised on 3 days') === true,
-    'the days since Saturday’s revision, and the items read',
-  );
+  // The account is a week old: the strip and its words start on its first day.
+  await stripReads(app, 'Since 2 November: revised on 3 days. Gaps of 3 days or more: 4 days, from 3 November to 7 November.');
+  expect(label(app, 'insights-gaps-figure')).toBe('2 days since your last revision');
   // 3 → 7 November is a gap of 4 days; 7 → today, open, two (not yet long).
   expect(label(app, 'insights-gaps-longest')).toBe('4 days Longest gap, 3 Nov – 7 Nov');
   // Steps of 1 and 4 days: usually every 2–3 days.
   expect(label(app, 'insights-gaps-rhythm')).toBe('Every 2–3 days. Your usual rhythm · 1 gap of 3+ days');
-  // The account is a week old: the strip and its words start on its first day.
-  expect(label(app, 'insights-gaps-strip')).toBe('Since 2 November: revised on 3 days. Gaps of 3 days or more: 4 days, from 3 November to 7 November.');
   // The full revision (the plan read forwards from today): 23 pages, five a day, so each comes round every 5
   // days. Missed on 4–6 November: Juz 30's end (592–604, never revised since it was memorized), 589–591 (last
   // revised on the 3rd) and 582–583 (the 2nd). 18 pages, the last due on the 8th, the last back on the 13th.
   expect(label(app, 'insights-gaps-revision')).toBe(
     'Full revision pushed back 5 days. 18 pages from your gaps come round by 13 Nov instead of 8 Nov. Your plan goes round every 5 days.',
   );
+
+  // When did I last revise…? (ACT-30): by surah, longest waiting first. An-Naba's 582 was last revised on the 2nd
+  // (7 days), as long as Juz 30's end has waited since it was memorized; An-Naba comes first among them.
+  const { fireEvent } = app.mods.rtl;
+  await app.act(async () => {
+    fireEvent.press(app.screen.getByTestId('insights-gaps-last-revised'));
+  });
+  await app.until(() => app.screen.queryAllByTestId(/^last-revised-row-surah-/).length > 0, 'Last revised');
+  const rows = app.screen.getAllByTestId(/^last-revised-row-surah-/);
+  expect(rows[0].props.testID).toBe('last-revised-row-surah-78');
+  expect(plain(label(app, 'last-revised-row-surah-78')!)).toBe('An-Naba. 2 Nov · 7 days ago. Shows its pages');
+  await app.act(async () => {
+    fireEvent.press(app.screen.getByTestId('last-revised-row-surah-78'));
+  });
+  await app.until(() => app.screen.queryByTestId('last-revised-page-surah-78-582') != null, 'An-Naba’s pages');
+  await app.act(async () => {
+    fireEvent.press(app.screen.getByTestId('last-revised-page-surah-78-582'));
+  });
+  const nav = app.mods.require<{ navigation: { current: any } }>('./navRef').navigation;
+  await app.until(() => nav.current.getCurrentRoute()?.name === 'QuranReader', 'the reader');
+  expect(nav.current.getCurrentRoute().params).toMatchObject({ pageNumber: 582 });
   await app.close();
 
   // Revising now ends the open gap: "Today, you revised", and a 2-day gap isn't named.
   await revise(phone, '2026-11-09 20:30');
   const after = await openInsights(phone);
-  await after.until(
-    () => label(after, 'insights-gaps-figure') === 'Today you revised' && label(after, 'insights-gaps-strip')?.includes('revised on 4 days') === true,
-    'today’s revision in Gaps, and the items read',
-  );
-  expect(label(after, 'insights-gaps-strip')).toBe('Since 2 November: revised on 4 days. Gaps of 3 days or more: 4 days, from 3 November to 7 November.');
+  // Wait for the strip itself: the session can reach the server (and the items) after the pages say today.
+  await stripReads(after, 'Since 2 November: revised on 4 days. Gaps of 3 days or more: 4 days, from 3 November to 7 November.');
+  expect(label(after, 'insights-gaps-figure')).toBe('Today you revised');
   // Today's five (594–598) are no longer late.
   expect(label(after, 'insights-gaps-revision')).toBe(
     'Full revision pushed back 5 days. 13 pages from your gaps come round by 13 Nov instead of 8 Nov. Your plan goes round every 5 days.',

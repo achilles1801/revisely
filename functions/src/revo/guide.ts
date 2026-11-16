@@ -397,14 +397,14 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'Gaps (Insights)',
-    covers: ['ACT-28'],
-    routes: ['Activity', 'ActivityDay'],
+    covers: ['ACT-28', 'ACT-30'],
+    routes: ['Activity', 'ActivityDay', 'LastRevised', 'QuranReader'],
     text: lines(
-      '- Activity → “Insights” → “Gaps”, after Consistency: how long they go between revisions, over the Insights range. A revision day has a page revised (a session, pages revised ahead, pages logged as revised elsewhere), on the revision day Activity files it under; reading and memorizing don’t count. Monday then Thursday is a 3-day gap; revising every day leaves none, and one missed day is a 2-day gap.',
-      '- The figure is how long since the last revision (a tap opens that day): a number under 2 weeks, red from 3 days; from 2 weeks words and the date, never red ("Over 3 weeks since your last revision, on 24 Oct"); “Today” once they revised today ("you’re back, after over 3 weeks" after a long gap). Under it a strip of the range: a dot per revision day, each gap of 3 days or more in red with its length (a tap opens the day touched). Then the longest gap (a tap opens the calendar at that month) and how often they usually revise ("Every 2 days").',
-      '- “Days”, at the section’s top right when something is said in weeks or months, shows exact days; it is kept on the phone.',
-      '- "Full revision pushed back 5 days": pages their plan, as it is now, brings round later than it would have, missed in a gap or slid back by a catch-up; the dates say when they would have come round and when they will. "Full revision on schedule" when none are late.',
-      '- Say long lengths as the app does, in weeks or months, and exact days when asked; welcome someone back after a long gap, never scold. Recency only, the same with Smart Tracking on or off.',
+      '- Activity → “Insights” → “Gaps”, after Consistency: the days between revisions over the Insights range, by the revision day Activity files a page revised under (a session, revised ahead, or logged as revised elsewhere; reading and memorizing don’t count). Monday then Thursday is a 3-day gap; one missed day, a 2-day gap.',
+      '- The figure: days since the last revision (a tap opens that day), red from 3; from 2 weeks in words with the date, never red ("Over 3 weeks since your last revision, on 24 Oct"); “Today” once revised today. Then a strip of the range (a dot per revision day, gaps of 3+ days red with their length; a tap opens the day), the longest gap (a tap opens its month) and the usual rhythm ("Every 2 days"). “Days” (top right) shows exact days, kept on the phone.',
+      '- "Full revision pushed back 5 days": pages their current plan brings round later than it would have (missed in a gap, or slid back by a catch-up), with when they were due and when they will come; "Full revision on schedule" when none are late.',
+      '- “When did I last revise…?” (end of Gaps, or a tap on the full revision line) opens “Last revised”: memorized surahs, juz, hizbs or pages (“Surah”, “Juz”, “Hizb”, “Page”, kept), longest waiting first; a group opens to its pages, a page opens the reader. “Not revised yet”: memorized under 30 days ago; “Never revised”: older.',
+      '- Say long lengths in weeks or months as the app does, exact days when asked; welcome them back after a long gap, never scold. Recency only, with Smart Tracking on or off.',
     ),
   },
   {
