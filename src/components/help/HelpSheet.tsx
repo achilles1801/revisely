@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
@@ -13,10 +13,14 @@ import {
   HELP,
   helpPlainText,
   helpTextParts,
+  linksFor,
   topicsFor,
   type HelpScreen,
   type HelpTopic,
 } from '../../lib/help/topics';
+import { reciteLiveForAccount } from '../../lib/reciteLive/availability';
+import { gapsInsightsEnabled } from '../../lib/insightsGaps';
+import { activitySectionsEnabled } from '../../lib/activitySections';
 import { t } from '../../i18n';
 
 /** Past this text size the topics' marks drop out, so the words get the width (beside 46pt text they were specks). */
@@ -75,7 +79,8 @@ function TopicRow({ topic, marks }: { topic: HelpTopic; marks: boolean }) {
 export const NO_REVO: ReadonlySet<HelpScreen> = new Set<HelpScreen>(['reader', 'session', 'recite']);
 
 /**
- * A screen's help (HELP-1): its few topics, then "Ask Revo ›" (while Revo is on for the account, but never in
+ * A screen's help (HELP-1): its few topics, then the sheets it leads to (their titles, ›; a tap shows that sheet in this
+ * one's place, as Recite's sheets from the reader's), then "Ask Revo ›" (while Revo is on for the account, but never in
  * the reader's or a session's help; nothing is counted until a question is sent) and "Hide help buttons" (HELP-2), and Done. Both actions run once
  * the sheet has gone. The topics follow Smart Tracking (HELP-3). Topic text is reading text: it grows
  * all the way with Dynamic Type and the sheet scrolls; the title and the two actions stop at 1.4×.
@@ -86,7 +91,7 @@ export function HelpSheet({
   onClose,
   onHide,
   recite = false,
-  liveRecite = false,
+  liveRecite,
 }: {
   screen: HelpScreen;
   visible: boolean;
@@ -95,17 +100,33 @@ export function HelpSheet({
   onHide: () => void;
   /** The hidden page (recite mode) is offered here: its topic shows. */
   recite?: boolean;
-  /** The reader's Recite (Revisely Dev) is offered: its topics show, in place of those without it. */
+  /**
+   * The reader's Recite (Revisely Dev) is offered: its topics show, in place of those without it. Left out, the
+   * account's (Activity's sheets: Recite's past takes and Insights' Recitation).
+   */
   liveRecite?: boolean;
 }) {
   const { palette } = useTheme();
   const { user } = useApp();
   const { fontScale } = useWindowDimensions();
   const pending = useRef<null | 'revo' | 'hide'>(null);
-  const entry = HELP[screen];
-  const topics = topicsFor(screen, { smartTracking: user?.smartTrackingEnabled === true, recite, liveRecite });
+  // The sheet on show: the screen's own, or one its links led to. Each opening starts at the screen's own.
+  const [shown, setShown] = useState<HelpScreen>(screen);
+  useEffect(() => {
+    if (visible) setShown(screen);
+  }, [visible, screen]);
+  const entry = HELP[shown];
+  const opts = {
+    smartTracking: user?.smartTrackingEnabled === true,
+    recite,
+    liveRecite: liveRecite ?? reciteLiveForAccount(user),
+    devApp: gapsInsightsEnabled(user),
+    sections: activitySectionsEnabled(user),
+  };
+  const topics = topicsFor(shown, opts);
+  const links = linksFor(shown, opts);
   // Revo is on for this account (RevoHost is mounted): it follows Revo's own switch, whoever that opens it to.
-  // Never in the reader's or a session's help: there is no Revo there (REVO-25).
+  // Never in the reader's or a session's help, whichever of its sheets shows: there is no Revo there (REVO-25).
   const revo = useRevoPresent() && !NO_REVO.has(screen);
   const marks = fontScale <= MARKS_UP_TO;
 
@@ -130,9 +151,23 @@ export function HelpSheet({
       footer={{ label: t('common.done'), onPress: onClose, testID: 'help-done' }}
       testID="help-sheet"
     >
-      <View testID={`help-sheet-${screen}`}>
+      <View testID={`help-sheet-${shown}`}>
         {topics.map((topic) => (
           <TopicRow key={topic.id} topic={topic} marks={marks} />
+        ))}
+        {links.map((to, i) => (
+          <Tap
+            key={to}
+            onPress={() => setShown(to)}
+            accessibilityRole="button"
+            style={[styles.link, i === 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.separator }]}
+            testID={`help-link-${to}`}
+          >
+            <Text style={[typeV2.name, styles.linkText, { color: palette.link }]} maxFontSizeMultiplier={CHROME_MAX_SCALE}>
+              {HELP[to].title}
+            </Text>
+            <Ionicons name="chevron-forward" size={14} color={palette.link} />
+          </Tap>
         ))}
         {revo ? (
           <Tap onPress={() => after('revo')} accessibilityRole="button" style={styles.revo} testID="help-ask-revo">
@@ -166,6 +201,8 @@ const styles = StyleSheet.create({
   topicText: { flex: 1, minWidth: 0, gap: 2 },
   revo: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 12, paddingBottom: 14 },
   revoLabel: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  link: { flexDirection: 'row', alignItems: 'center', gap: 3, minHeight: 44, paddingVertical: 8 },
+  linkText: { flexShrink: 1 },
   hide: {
     minHeight: 44,
     alignItems: 'center',

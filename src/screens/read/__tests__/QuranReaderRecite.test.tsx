@@ -427,6 +427,22 @@ describe('a take kept as a recording (Save recordings, on by default)', () => {
     expect(screen.queryByTestId('help-topic-reader.sitting')).toBeNull();
   });
 
+  it('with no take open, the reader’s help leads to every Recite sheet, each shown in its place (Nov 16 2026)', async () => {
+    setReciteCheckSettings('u1', { noticeSeen: true, mode: 'recite', markMistakes: false });
+    await open();
+    fireEvent.press(await screen.findByTestId('help-button-reader'));
+    expect(await screen.findByTestId('help-sheet-reader')).toBeTruthy();
+    for (const to of ['recite', 'reciteTake', 'reciteMemory', 'reciteTest']) expect(screen.getByTestId(`help-link-${to}`)).toBeTruthy();
+    fireEvent.press(screen.getByTestId('help-link-reciteTest'));
+    expect(await screen.findByTestId('help-sheet-reciteTest')).toBeTruthy();
+    expect(screen.getByText('Test me and voice search')).toBeTruthy();
+    expect(screen.getByTestId('help-topic-reciteTest.start')).toBeTruthy();
+    // From there, the other Recite sheets; never Ask Revo (the reader's help, REVO-25).
+    fireEvent.press(screen.getByTestId('help-link-reciteMemory'));
+    expect(await screen.findByTestId('help-topic-reciteMemory.page')).toBeTruthy();
+    expect(screen.queryByTestId('help-ask-revo')).toBeNull();
+  });
+
   it('while a take is open, the ? tells how Recite works', async () => {
     await startTake('check');
     fireEvent.press(await screen.findByTestId('help-button-reader'));
