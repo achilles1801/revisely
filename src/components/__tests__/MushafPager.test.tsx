@@ -404,7 +404,34 @@ describe('<MushafPager /> turning the page by swiping', () => {
   });
 });
 
+/** The page images finish loading, as they do on a phone once decoded. */
+function drawPages() {
+  for (const image of screen.getAllByTestId('page-image')) fireEvent(image, 'load');
+}
+
 describe('<MushafPager /> a verse’s highlight', () => {
+  it('appears with its page, never before it (a search result opening the reader)', () => {
+    // Majd, Nov 16 2026: the boxes showed on a blank page while the reader slid in, before the page was drawn.
+    render(<MushafPager pages={[17]} highlightedAyah={{ page: 17, sura: 2, ayah: 106 }} />);
+    expect(screen.queryAllByTestId('ayah-highlight')).toHaveLength(0);
+    // Measured: the image is asked for, and decodes meanwhile.
+    act(() => screen.UNSAFE_getByType(FlatList).props.onLayout({ nativeEvent: { layout: { x: 0, y: 0, width: 402, height: 626 } } }));
+    expect(screen.getByTestId('page-image')).toBeTruthy();
+    expect(screen.queryAllByTestId('ayah-highlight')).toHaveLength(0);
+    // Drawn: the highlight with it.
+    drawPages();
+    expect(screen.getAllByTestId('ayah-highlight')).toHaveLength(ayahRects(17, 2, 106).length);
+  });
+
+  it('a page whose image fails shows no highlight', () => {
+    render(<MushafPager pages={[17]} highlightedAyah={{ page: 17, sura: 2, ayah: 106 }} />);
+    act(() => screen.UNSAFE_getByType(FlatList).props.onLayout({ nativeEvent: { layout: { x: 0, y: 0, width: 402, height: 626 } } }));
+    act(() => {
+      fireEvent(screen.getByTestId('page-image'), 'loadEnd');
+    });
+    expect(screen.queryAllByTestId('ayah-highlight')).toHaveLength(0);
+  });
+
   // The pager's own measured frame decides the page's size; the image and the
   // boxes are drawn in one frame of exactly that size, so a box is the verse's
   // bounds × the page's scale whatever the phone or the controls around it.
@@ -416,6 +443,7 @@ describe('<MushafPager /> a verse’s highlight', () => {
     render(<MushafPager pages={[3]} highlightedAyah={{ page: 3, sura: 2, ayah: 13 }} onLongPressAyah={jest.fn()} />);
     const list = screen.UNSAFE_getByType(FlatList);
     act(() => list.props.onLayout({ nativeEvent: { layout: { x: 0, y: 0, width, height } } }));
+    drawPages();
     const size = fitPage(width, height);
     const rects = ayahRects(3, 2, 13);
     const boxes = screen.getAllByTestId('ayah-highlight');
@@ -456,6 +484,7 @@ describe('<MushafPager /> a verse’s highlight', () => {
     );
     const list = screen.UNSAFE_getByType(FlatList);
     act(() => list.props.onLayout({ nativeEvent: { layout: { x: 0, y: 0, width: 393, height: 760 } } }));
+    drawPages();
     expect(ayahRects(3, 2, 14).length).toBeGreaterThan(0);
     expect(screen.getAllByTestId('ayah-highlight')).toHaveLength(ayahRects(3, 2, 13).length + ayahRects(3, 2, 14).length);
   });
