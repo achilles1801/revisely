@@ -69,6 +69,78 @@ describe('affected flows', () => {
     expect(affected(['scripts/emulators.sh'], root).scenarios).toBe(true);
   });
 
+  // The E2E job lists live in scripts/e2e/jobs.json (until Nov 16 2026 in e2e.yml, whose change runs every
+  // flow): a change to them runs the flows whose job changed, so splitting a long flow costs only its job.
+  describe('the E2E jobs file', () => {
+    const jobs = (full) => ({ full, smoke_ios: [{ name: 'smoke: 02 05 06', flows: '.maestro/flows/0[256]-*.yaml' }] });
+    const before = jobs([
+      { name: '02 05', flows: '.maestro/flows/0[25]-*.yaml' },
+      { name: '06', flows: '.maestro/flows/06-*.yaml' },
+    ]);
+    const withJobs = (after) => repo({
+      '.maestro/flows/02-revision-session.yaml': '---\n- launchApp\n',
+      '.maestro/flows/05-daily-log.yaml': '---\n- launchApp\n',
+      '.maestro/flows/06-offline.yaml': '---\n- launchApp\n',
+      '.maestro/flows/07-recordings.yaml': '---\n- launchApp\n',
+      'scripts/e2e/jobs.json': JSON.stringify(after),
+    });
+
+    it('runs the flows of each job it changed, on both platforms', () => {
+      // 05 moved into 06's job: both jobs changed.
+      const moved = withJobs(jobs([
+        { name: '02', flows: '.maestro/flows/02-*.yaml' },
+        { name: '05 06', flows: '.maestro/flows/0[56]-*.yaml' },
+      ]));
+      const all = ['.maestro/flows/02-revision-session.yaml', '.maestro/flows/05-daily-log.yaml', '.maestro/flows/06-offline.yaml'];
+      expect(affected(['scripts/e2e/jobs.json'], moved, before)).toEqual({ flows: all, ios: all, scenarios: false });
+    });
+
+    it('runs a new flow added to a job, and that job\'s other flows, and nothing else', () => {
+      const added = withJobs(jobs([
+        { name: '02 05', flows: '.maestro/flows/0[25]-*.yaml' },
+        { name: '06 07', flows: '.maestro/flows/0[67]-*.yaml' },
+      ]));
+      expect(affected(['scripts/e2e/jobs.json', '.maestro/flows/07-recordings.yaml'], added, before).flows).toEqual([
+        '.maestro/flows/06-offline.yaml',
+        '.maestro/flows/07-recordings.yaml',
+      ]);
+    });
+
+    it('runs nothing for a job renamed with the same flows, nor for a glob that runs the same flows', () => {
+      const renamed = withJobs(jobs([
+        { name: 'two and five', flows: '.maestro/flows/02-*.yaml .maestro/flows/05-*.yaml' },
+        { name: '06', flows: '.maestro/flows/06-offline.yaml' },
+      ]));
+      expect(affected(['scripts/e2e/jobs.json'], renamed, before).flows).toEqual([]);
+    });
+
+    it('runs the flows of a job whose order changed (10 goes before the 09 seeds for a reason)', () => {
+      const reordered = withJobs(jobs([
+        { name: '05 02', flows: '.maestro/flows/05-*.yaml .maestro/flows/02-*.yaml' },
+        { name: '06', flows: '.maestro/flows/06-*.yaml' },
+      ]));
+      expect(affected(['scripts/e2e/jobs.json'], reordered, before).flows).toEqual([
+        '.maestro/flows/02-revision-session.yaml',
+        '.maestro/flows/05-daily-log.yaml',
+      ]);
+    });
+
+    it('runs the smoke flows when a smoke set changed', () => {
+      const smoke = withJobs({ ...before, smoke_ios: [{ name: 'smoke: 02 05', flows: '.maestro/flows/0[25]-*.yaml' }, { name: 'smoke: 06', flows: '.maestro/flows/06-*.yaml' }] });
+      expect(affected(['scripts/e2e/jobs.json'], smoke, before).flows).toEqual([
+        '.maestro/flows/02-revision-session.yaml',
+        '.maestro/flows/05-daily-log.yaml',
+        '.maestro/flows/06-offline.yaml',
+      ]);
+    });
+
+    it('runs every flow, as for e2e.yml, with no base file to compare (or none here)', () => {
+      const same = withJobs(before);
+      expect(affected(['scripts/e2e/jobs.json'], same, undefined).flows).toBe('all');
+      expect(affected(['scripts/e2e/jobs.json'], repo({ '.maestro/flows/02-revision-session.yaml': '---\n' }), before).flows).toBe('all');
+    });
+  });
+
   it('reads the real flows of this repository', () => {
     const real = affected(['.maestro/subflows/swipe-page.yaml']);
     expect(real.flows).toEqual(expect.arrayContaining(['.maestro/flows/02-revision-session.yaml', '.maestro/flows/06-offline.yaml']));

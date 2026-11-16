@@ -66,6 +66,7 @@ jobs:
           sparse-checkout: |
             .maestro
             .github
+            scripts/e2e
       # Whether the PR is a draft now, read from GitHub, not from the event that started the run. On #674 a
       # push and `gh pr ready` seconds apart made one run, with the push's draft payload, and no
       # ready_for_review run came: it ran no E2E and posted "Required (draft)", and the PR sat BLOCKED with
@@ -101,13 +102,21 @@ jobs:
           PR: ${{ github.event.pull_request.number }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           STACK_BASE_SHA: ${{ github.event.pull_request.stack.base.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           if [ -n "$STACK_BASE_SHA" ]; then
             files=$(gh api "repos/$REPO/compare/$STACK_BASE_SHA...$HEAD_SHA" --jq '.files[] | .filename, (.previous_filename // empty)')
           else
             files=$(gh api --paginate "repos/$REPO/pulls/$PR/files" --jq '.[] | .filename, (.previous_filename // empty)')
           fi
-          out=$(printf '%s\n' "$files" | node .github/scripts/affected-flows.js)
+          # The E2E job lists as they are on the base: a change to them runs the flows whose job changed
+          # (affected-flows.js), or, with nothing to compare, every flow.
+          before=""
+          if printf '%s\n' "$files" | grep -qx 'scripts/e2e/jobs.json'; then
+            before="$RUNNER_TEMP/jobs-before.json"
+            gh api -H 'Accept: application/vnd.github.raw' "repos/$REPO/contents/scripts/e2e/jobs.json?ref=${STACK_BASE_SHA:-$BASE_SHA}" > "$before" || before=""
+          fi
+          out=$(printf '%s\n' "$files" | E2E_JOBS_BEFORE="$before" node .github/scripts/affected-flows.js)
           echo "Shared test code: $out"
           { echo "flows=$(jq -c .flows <<<"$out")"; echo "ios_flows=$(jq -c .ios <<<"$out")"; echo "scenarios=$(jq -r .scenarios <<<"$out")"; } >> "$GITHUB_OUTPUT"
       # PRs into develop built on one another's branches without GitHub's stacks: the Recite PRs of
