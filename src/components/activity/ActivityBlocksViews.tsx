@@ -70,11 +70,13 @@ interface Props {
   onOpenDay: (day: string, block?: PreviewBlock) => void;
   /** The tab on show changed (Overview or Insights): the top bar's help explains that one. */
   onViewChange?: (view: ViewKind) => void;
+  /** Insights opened Overview's calendar: the screen scrolls to its top, so the month's title and the calendar show. */
+  onShowTop?: () => void;
   /** Filled with what reads the items again, for the screen's pull to refresh (ACT-27). */
   refreshRef?: React.MutableRefObject<(() => Promise<unknown>) | null>;
 }
 
-export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorrow, onPlanIt, onAddToPlan, onOpenPage, onOpenAyahs, onSeeAllPages, onOpenLastRevised, onTurnOnSmartTracking, firstTomorrow, onViewChange, refreshRef }: Props) {
+export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorrow, onPlanIt, onAddToPlan, onOpenPage, onOpenAyahs, onSeeAllPages, onOpenLastRevised, onTurnOnSmartTracking, firstTomorrow, onViewChange, onShowTop, refreshRef }: Props) {
   const { pages, logs, user } = useApp();
   const revo = useRevoAvailable(user);
   const recitation = useRecitation(user);
@@ -231,6 +233,7 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
   // where it shows, marked (lib/activityCalendar periodForGap).
   const openCalendar = (m: string, gap?: Omit<CalendarGap, 'key'>) => {
     setView('calendar');
+    onShowTop?.();
     if (gap) {
       const period = periodForGap(gap);
       setMonth(period.month);

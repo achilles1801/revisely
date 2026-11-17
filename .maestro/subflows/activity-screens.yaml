@@ -521,6 +521,15 @@ appId: com.revisionbuddy.app
     visible:
       id: calendar-gap-cue
     timeout: 10000
+# Overview starts at its top (it shares Insights' scroll): the tabs and October's title show with the band.
+- extendedWaitUntil:
+    visible:
+      id: calendar-month-title
+    timeout: 10000
+- extendedWaitUntil:
+    visible:
+      id: pill-insights
+    timeout: 10000
 - waitForAnimationToEnd
 - runFlow:
     file: shot.yaml

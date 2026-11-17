@@ -310,7 +310,7 @@ has them; Revisely Dev's Revo knows them from its Dev guide.
   Overview at that month).
   Then two tiles: the longest gap with a missed day in the range, the open one included and counted in full when it
   began before the range ("9 days · Longest gap, 28 Oct – 6 Nov"; "60+ days" when it began before the days read;
-  "None · No gaps in 30 days"). A tap on it opens Overview with the gap marked on the calendar: a band in the
+  "None · No gaps in 30 days"). A tap on it opens Overview, at its top, with the gap marked on the calendar: a band in the
   red's quiet fill behind the days from the revision day before it to the one that ended it (an open gap: to
   today), both inside it, drawn in from its first day to its last with a red edge that then settles (with Reduce
   Motion it fades in whole), and "Longest gap, 28 Oct – 6 Nov · 9 days" above the grid, said once for VoiceOver.

@@ -19,6 +19,7 @@ import { useActivitySources } from '../../components/activity/useActivitySources
 import { ActivityCalendar } from '../../components/activity/ActivityCalendar';
 import { ActivityBlocksViews, type ViewKind } from '../../components/activity/ActivityBlocksViews';
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
+import { useReduceMotion } from '../../design/motion';
 import { HelpButton } from '../../components/help/HelpButton';
 import { HelpToast } from '../../components/help/HelpToast';
 import type { PreviewBlock } from '../../components/activity/CalendarMonth';
@@ -93,6 +94,11 @@ export default function ActivityScreen() {
   const blocksRefresh = useRef<(() => Promise<unknown>) | null>(null);
   const refreshAll = useCallback(() => Promise.all([load(), blocksRefresh.current?.()]), [load]);
   const { refreshing, onRefresh } = usePullToRefresh(refreshAll);
+  // Insights opening Overview's calendar (the longest gap, a month's bar) starts it at the top: the two views share
+  // this scroll, so from deep in Insights the calendar's title was left under the header (ACT-28).
+  const scrollRef = useRef<ScrollView>(null);
+  const reduceMotion = useReduceMotion();
+  const showTop = useCallback(() => scrollRef.current?.scrollTo({ y: 0, animated: !reduceMotion }), [reduceMotion]);
   const recordingDays = useMemo(() => recordings.map((rec) => rec.day), [recordings]);
 
   const days = useMemo(
@@ -149,6 +155,7 @@ export default function ActivityScreen() {
         </View>
       ) : (
         <ScrollView
+          ref={scrollRef}
           style={styles.scroll}
           contentInsetAdjustmentBehavior="never" contentContainerStyle={{ paddingBottom: tabFootprint + layoutV2.rowPad }}
           refreshControl={
@@ -183,6 +190,7 @@ export default function ActivityScreen() {
               onOpenLastRevised={() => navigation.navigate('LastRevised')}
               onTurnOnSmartTracking={() => navigation.navigate('Settings', { section: 'revision' })}
               onViewChange={setView}
+              onShowTop={showTop}
               refreshRef={blocksRefresh}
               // First tomorrow on every plan, for that day only (Majd, Nov 8 2026: a custom plan's day
               // used to open, and saving it replaced that day in every cycle).

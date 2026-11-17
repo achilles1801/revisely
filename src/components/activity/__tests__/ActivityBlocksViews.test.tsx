@@ -371,8 +371,8 @@ describe('Gaps in Activity (ACT-28)', () => {
       service().getActivityItemsBetween.mockImplementation(empty);
       storage().getItem.mockImplementation(() => Promise.resolve(null));
     });
-    const openLongest = async () => {
-      render(<ActivityBlocksViews {...props} />);
+    const openLongest = async (onShowTop?: () => void) => {
+      render(<ActivityBlocksViews {...props} onShowTop={onShowTop} />);
       fireEvent.press(await screen.findByText('Insights'));
       fireEvent.press(await screen.findByTestId('insights-gaps-longest'));
     };
@@ -395,6 +395,13 @@ describe('Gaps in Activity (ACT-28)', () => {
       fireEvent.press(screen.getByTestId('calendar-day-2026-10-12'));
       expect(screen.queryByTestId('calendar-gap-cue')).toBeNull();
       expect(screen.queryByTestId('calendar-gap-band-2026-10-25')).toBeNull();
+    });
+
+    it('[ACT-28] asks the screen to start Overview at its top, where the month and the band show (they share one scroll)', async () => {
+      const onShowTop = jest.fn();
+      await openLongest(onShowTop);
+      expect(await screen.findByText('November 2026')).toBeTruthy();
+      expect(onShowTop).toHaveBeenCalledTimes(1);
     });
 
     it('[ACT-28] in Week, the week it begins in, and › carries the band on into the next', async () => {
