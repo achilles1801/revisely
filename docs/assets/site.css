@@ -396,6 +396,16 @@ html:not(.no-js) .home .s-pitch:not(.fanned) .fan .screen { --x: 0%; --r: 0deg; 
 .home .show.stopped .toggle .i-pause { display: none; }
 
 /* Revo, a section of its own */
+/* Mark mistakes (#mistakes): the words, and a page with its marks in a rounded frame, the way the app's intro shows it. */
+.home .marks .wrap {
+  display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr); gap: 56px; align-items: center;
+  padding-top: 96px; padding-bottom: 96px;
+}
+.home .marks p { max-width: 34em; margin: 18px 0 0; color: var(--secondary); font-size: 17px; }
+.home .marks .note { margin-top: 18px; font-size: 14px; }
+.home .marks .points a { color: var(--accent); white-space: nowrap; }
+.home .marks-visual picture { display: block; border-radius: 28px; overflow: hidden; box-shadow: inset 0 0 0 1px var(--outline), 0 24px 60px -30px rgb(0 0 0 / 0.35); }
+.home .marks-visual img { display: block; width: 100%; height: auto; }
 .home .revo { position: relative; overflow: hidden; background: var(--revo-bg); }
 .home .revo::before { content: ""; position: absolute; inset: 0; background: var(--revo-glow); pointer-events: none; }
 .home .revo .wrap {
@@ -461,6 +471,7 @@ html:not(.no-js) .home .s-pitch:not(.fanned) .fan .screen { --x: 0%; --r: 0deg; 
   .home .fan .screen { top: 46%; height: min(calc(100cqh - 52px), calc(100cqw * 0.86)); }
   .home .controls { height: 58px; gap: 10px; }
   .home .revo .wrap { grid-template-columns: minmax(0, 1fr); gap: 40px; padding-top: 64px; padding-bottom: 64px; }
+  .home .marks .wrap { grid-template-columns: minmax(0, 1fr); gap: 36px; padding-top: 64px; padding-bottom: 32px; }
   .home .revo .screen { height: min(600px, 74vh); height: min(600px, 74svh); }
   .home .clip-toggle { right: calc(50% - min(600px, 74svh) * 0.23 - 24px); }
 }
