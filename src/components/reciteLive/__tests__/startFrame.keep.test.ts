@@ -21,3 +21,10 @@ describe('the start frame’s keep', () => {
     expect(startFrameFor(562, 'check', { ...settings, keep: false }).keep).toBe(false);
   });
 });
+
+describe('the start frame’s namesAfter (contract draft 8)', () => {
+  it('Mark mistakes asks for the summary at once and the names after it; Recite names nothing, so it doesn’t', () => {
+    expect(startFrameFor(562, 'check', RECITE_CHECK_DEFAULTS).namesAfter).toBe(true);
+    expect(startFrameFor(562, 'recite', RECITE_CHECK_DEFAULTS).namesAfter).toBeUndefined();
+  });
+});

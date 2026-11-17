@@ -128,6 +128,11 @@ export type LiveEvent =
   | { type: 'ayah'; s: number; a: number }
   | { type: 'score'; score: LiveScore }
   | { type: 'done'; result: FinalResult }
+  /**
+   * Where the slips went, after `done` (contract draft 8): only on a take started with `namesAfter`, whose `done` comes
+   * without `into` so the summary needn't wait for it. `names` is empty when nothing was named.
+   */
+  | { type: 'into'; names: { id: string; into: MarkInto }[] }
   | { type: 'error'; reason: LiveFailure };
 
 const KINDS: MarkKind[] = ['word', 'skipped', 'added', 'harakat', 'letter', 'tajweed'];
@@ -303,6 +308,17 @@ export function parseEvent(raw: unknown): LiveEvent | null {
     case 'done': {
       const result = parseFinal(x.result);
       return result ? { type: 'done', result } : null;
+    }
+    case 'into': {
+      // A malformed entry is dropped, never the rest (as a malformed `into` on a mark is).
+      if (!Array.isArray(x.names)) return null;
+      const names: { id: string; into: MarkInto }[] = [];
+      for (const n of x.names as unknown[]) {
+        const r = n && typeof n === 'object' ? (n as Record<string, unknown>) : null;
+        const into = r ? parseInto(r.into) : null;
+        if (r && typeof r.id === 'string' && r.id && into) names.push({ id: r.id, into });
+      }
+      return { type: 'into', names };
     }
     case 'error': {
       const reason = (x.reason ?? x.error) as LiveFailure;

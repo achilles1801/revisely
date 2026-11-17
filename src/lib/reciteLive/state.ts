@@ -237,6 +237,23 @@ export function applyEvent(state: LiveState, e: LiveEvent): LiveState {
         final: e.result,
       };
     }
+    case 'into': {
+      // The names that came after the final answer (contract draft 8): each joins its mark by id, wherever it is (shown,
+      // taken off, or in the final answer), so Put back and the kept take have it too.
+      if (state.status !== 'done' || !e.names.length) return state;
+      const byId = new Map(e.names.map((n) => [n.id, n.into]));
+      const named = (m: Mark): Mark => (byId.has(m.id) ? { ...m, into: byId.get(m.id) } : m);
+      const marks: Record<string, Mark> = {};
+      for (const [id, m] of Object.entries(state.marks)) marks[id] = named(m);
+      const removed: Record<string, Removed> = {};
+      for (const [id, r] of Object.entries(state.removed)) removed[id] = { ...r, mark: named(r.mark) };
+      return {
+        ...state,
+        marks,
+        removed,
+        final: state.final ? { ...state.final, marks: state.final.marks.map(named) } : state.final,
+      };
+    }
     case 'error':
       // A take that has its final answer keeps it; otherwise what was shown stays, marked as failed.
       return state.status === 'done' ? state : { ...state, status: 'failed', failure: e.reason, off: null };
