@@ -26,9 +26,31 @@ import {
 import { JournalFilter, journalFilterLabel } from '../../lib/journal';
 import type { HomeStackParamList } from '../../navigation/MainNavigator';
 import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
+import { reciteLiveForAccount } from '../../lib/reciteLive/availability';
+import { useMemoryRecords } from '../../lib/reciteMemory/store';
+import type { TakeRecord } from '../../lib/reciteMemory/record';
+import { takeWhen } from '../../lib/reciteMemory/describe';
+import { useTakeRecordings } from '../../lib/reciteMemory/takeAudio';
+import { TakeListRow, useQuranWordsWhen } from '../../components/reciteMemory/TakeRows';
+import { passageOf } from '../../components/reciteLive/TakeSummarySheet';
+import { plainText } from '../../lib/passages';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'ActivityAll'>;
-type Kind = ActivityKind | 'all';
+/** `recitation`: Recite's takes (Revisely Dev), listed from its memory rather than the activity items. */
+type Kind = ActivityKind | 'all' | 'recitation';
+type TakesFilter = 'all' | 'mistakes' | 'hidden';
+const TAKES_FILTERS: { value: TakesFilter; label: string }[] = [
+  { value: 'all', label: 'All takes' },
+  { value: 'mistakes', label: 'With mistakes' },
+  { value: 'hidden', label: 'Page hidden' },
+];
+
+/** The ISO day `n` days from `day`. */
+function addDays(day: string, n: number): string {
+  const [y, m, d] = day.split('-').map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d + n));
+  return t.toISOString().slice(0, 10);
+}
 
 /**
  * Everything done, newest first, behind "See all" on Activity and Home (new
@@ -54,7 +76,42 @@ export default function ActivityAllScreen() {
     () => buildActivityItems({ logs, readings, journal, recordings }, user),
     [logs, readings, journal, recordings, user],
   );
-  const shown = useMemo(() => filterActivityItems(items, { kind, range, query }, today), [items, kind, range, query, today]);
+  const shown = useMemo(
+    () => (kind === 'recitation' ? [] : filterActivityItems(items, { kind, range, query }, today)),
+    [items, kind, range, query, today],
+  );
+  // Recite's takes (Revisely Dev): every take with Mark mistakes, newest first, with their own choices.
+  const memoryOn = reciteLiveForAccount(user);
+  const memoryRecords = useMemoryRecords(user?.id, memoryOn);
+  const reciting = kind === 'recitation';
+  const takeWords = useQuranWordsWhen(reciting);
+  const takeRecordings = useTakeRecordings(reciting);
+  const [takesFilter, setTakesFilter] = useState<TakesFilter>('all');
+  const now = Date.now();
+  const takesShown = useMemo(() => {
+    if (!reciting) return [];
+    const q = query.trim().toLowerCase();
+    return memoryRecords
+      .filter((r): r is TakeRecord => r.kind === 'take' && !r.deleted)
+      .filter((t) => (takesFilter === 'mistakes' ? t.mistakes > 0 : takesFilter === 'hidden' ? t.hidden : true))
+      .filter((t) =>
+        range === 'all'
+          ? true
+          : range === 'last7'
+            ? t.day >= addDays(today, -6)
+            : range === 'last30'
+              ? t.day >= addDays(today, -29)
+              : t.day.startsWith(range),
+      )
+      .filter((t) => {
+        if (!q) return true;
+        const name = takeWords ? plainText(passageOf(takeWords, t.from, t.to)).toLowerCase() : '';
+        return name.includes(q) || t.day.includes(q) || takeWhen(t.createdAt, now).toLowerCase().includes(q);
+      })
+      .sort((a, b) => b.createdAt - a.createdAt);
+    // `now` moves every render; the list needn't.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reciting, memoryRecords, takesFilter, range, query, today, takeWords]);
   const months = useMemo(() => [...new Set(items.map((i) => i.day.slice(0, 7)))].sort().reverse(), [items]);
 
   const open = (it: ActivityItem) =>
@@ -95,18 +152,38 @@ export default function ActivityAllScreen() {
           accessibilityLabel={`Dates: ${journalFilterLabel(range)}`}
           testID="filter-range"
         />
-        {(['all', ...ACTIVITY_KINDS] as Kind[]).map((k) => (
+        {(['all', ...ACTIVITY_KINDS.flatMap((x) => (x === 'revision' && memoryOn ? [x, 'recitation'] : [x]))] as Kind[]).map((k) => (
           <PillButton
             key={k}
-            title={k === 'all' ? 'All' : ACTIVITY_KIND_LABELS[k]}
+            title={k === 'all' ? 'All' : k === 'recitation' ? 'Recitations' : ACTIVITY_KIND_LABELS[k]}
             size="sm"
             variant={kind === k ? 'solid' : 'outline'}
             onPress={() => setKind(k)}
-            accessibilityLabel={`Show ${k === 'all' ? 'everything' : ACTIVITY_KIND_LABELS[k]}`}
+            accessibilityLabel={`Show ${k === 'all' ? 'everything' : k === 'recitation' ? 'Recitations' : ACTIVITY_KIND_LABELS[k]}`}
             testID={`filter-${k}`}
           />
         ))}
       </ScrollView>
+      {reciting ? (
+        <>
+          <View style={styles.pills}>
+            {TAKES_FILTERS.map((f) => (
+              <PillButton
+                key={f.value}
+                title={f.label}
+                size="sm"
+                variant={takesFilter === f.value ? 'solid' : 'outline'}
+                onPress={() => setTakesFilter(f.value)}
+                accessibilityLabel={`Show ${f.label.toLowerCase()}`}
+                testID={`filter-takes-${f.value}`}
+              />
+            ))}
+          </View>
+          <Text style={[typeV2.meta, styles.takesCount, { color: palette.secondary }]} testID="activity-all-takes-count">
+            {`${takesShown.length} ${takesShown.length === 1 ? 'take' : 'takes'} · ${takesShown.reduce((n, t) => n + t.mistakes, 0)} mistakes`}
+          </Text>
+        </>
+      ) : null}
     </View>
   );
 
@@ -118,6 +195,34 @@ export default function ActivityAllScreen() {
           <ActivityIndicator color={palette.secondary} />
         </View>
       ) : (
+        reciting ? (
+          <FlatList
+            data={takesShown}
+            keyExtractor={(t) => t.id}
+            renderItem={({ item, index }) => (
+              <TakeListRow
+                take={item}
+                words={takeWords}
+                now={now}
+                first={index === 0}
+                playable={item.recordingId != null && takeRecordings.has(item.recordingId)}
+                onPlay={() => item.recordingId && navigation.navigate('ListenBack', { recordingId: item.recordingId })}
+                onPress={() => navigation.navigate('ActivityDay', { date: item.day })}
+              />
+            )}
+            ListHeaderComponent={header}
+            ListEmptyComponent={
+              <Text style={[typeV2.body, styles.empty, { color: palette.secondary }]} testID="all-empty">
+                {filtered ? 'Nothing matches.' : 'No takes yet.'}
+              </Text>
+            }
+            keyboardDismissMode="on-drag"
+            keyboardShouldPersistTaps="handled"
+            contentInsetAdjustmentBehavior="never"
+            contentContainerStyle={{ paddingBottom: tabFootprint + layoutV2.rowPad }}
+            testID="activity-all-takes"
+          />
+        ) : (
         <FlatList
           data={shown}
           keyExtractor={(it) => it.key}
@@ -134,6 +239,7 @@ export default function ActivityAllScreen() {
           initialNumToRender={15}
           testID="activity-all"
         />
+        )
       )}
       <OptionSheet<JournalFilter>
         visible={rangeOpen}
@@ -156,6 +262,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   controls: { paddingTop: 12, borderBottomWidth: layoutV2.hairline },
+  takesCount: { paddingHorizontal: layoutV2.gutter, paddingBottom: 10 },
   search: {
     flexDirection: 'row',
     alignItems: 'center',

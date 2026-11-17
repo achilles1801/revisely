@@ -19,6 +19,7 @@ import {
   scrubberPreview,
 } from '../lib/mushafScrubber';
 import { getJuzForPage } from '../lib/quranData';
+import { t } from '../i18n';
 
 // Room either side of the track so the thumb can sit on page 1 / 604 and
 // still be under a finger.
@@ -118,9 +119,9 @@ export function MushafScrubber({
     <View style={styles.wrap} pointerEvents="box-none">
       {preview && (
         <View style={styles.bubble} pointerEvents="none">
-          <Text style={styles.bubblePage}>Page {preview.page}</Text>
+          <Text style={styles.bubblePage}>{t('mushaf.scrubber.page', { page: preview.page })}</Text>
           <Text style={styles.bubbleMeta} numberOfLines={1}>
-            {preview.surahs} · Juz {preview.juz}
+            {t('mushaf.scrubber.where', { surahs: preview.surahs, juz: preview.juz })}
           </Text>
         </View>
       )}
@@ -130,9 +131,9 @@ export function MushafScrubber({
         {...responder.panHandlers}
         accessible
         accessibilityRole="adjustable"
-        accessibilityLabel="Page position"
-        accessibilityHint="Drag to jump to another page"
-        accessibilityValue={{ min: 1, max: totalPages, now: page, text: `Page ${page}` }}
+        accessibilityLabel={t('mushaf.scrubber.label')}
+        accessibilityHint={t('mushaf.scrubber.hint')}
+        accessibilityValue={{ min: 1, max: totalPages, now: page, text: t('mushaf.scrubber.page', { page }) }}
         accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
         onAccessibilityAction={onAccessibilityAction}
         testID="mushaf-scrubber"

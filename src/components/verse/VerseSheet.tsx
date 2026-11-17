@@ -51,6 +51,7 @@ import { resolveVoice, voiceLabel } from '../../lib/recitation';
 import { ReciterList } from './ReciterList';
 import { TranslationPicker } from './TranslationPicker';
 import { AyahRef } from '../../lib/ayahBounds';
+import { t } from '../../i18n';
 
 interface VerseSheetProps {
   /** Verse shown; null hides the sheet. */
@@ -311,8 +312,8 @@ export function VerseSheet({
   const arabicHere = offline && !!verse && hasArabicForPage(verse.page);
   const alternative =
     arabicHere && verse
-      ? fallbackTranslation(translation, verse.sura, offeredTranslations(everyTranslation), (t, sura) =>
-          t.id === DEFAULT_TRANSLATION_ID ? hasSaheehSura(sura) : hasTranslationSura(t, sura),
+      ? fallbackTranslation(translation, verse.sura, offeredTranslations(everyTranslation), (option, sura) =>
+          option.id === DEFAULT_TRANSLATION_ID ? hasSaheehSura(sura) : hasTranslationSura(option, sura),
         )
       : null;
   const notDownloaded = arabicHere && translation.source === 'quranenc' && translation.id !== DEFAULT_TRANSLATION_ID;
@@ -324,7 +325,7 @@ export function VerseSheet({
       {/* Gestures inside a native modal need their own root (iOS). */}
       <GestureHandlerRootView style={styles.overlay}>
         <Reanimated.View style={[StyleSheet.absoluteFill, styles.dim, dimmed]} pointerEvents="none" />
-        <Backdrop onPress={onClose} label="Close translation" />
+        <Backdrop onPress={onClose} label={t('verse.sheet.closeTranslation')} />
         <Reanimated.View style={dragged}>
           <View
             style={[
@@ -353,11 +354,11 @@ export function VerseSheet({
                     hitSlop={{ top: 8, bottom: 8, left: 40, right: 40 }}
                     style={styles.grabberHit}
                     accessibilityRole="button"
-                    accessibilityLabel={expanded ? 'Make the translation smaller' : 'Expand the translation'}
+                    accessibilityLabel={expanded ? t('verse.sheet.smaller') : t('verse.sheet.expand')}
                     // VoiceOver: the grabber also closes the sheet (Actions rotor).
                     accessibilityActions={[
-                      { name: 'activate', label: expanded ? 'Make smaller' : 'Expand' },
-                      { name: 'close', label: 'Close' },
+                      { name: 'activate', label: expanded ? t('verse.sheet.smallerAction') : t('verse.sheet.expandAction') },
+                      { name: 'close', label: t('common.close') },
                     ]}
                     onAccessibilityAction={(e) => {
                       if (e.nativeEvent.actionName === 'close') onClose();
@@ -373,7 +374,7 @@ export function VerseSheet({
                       hitSlop={8}
                       style={styles.roundBtn}
                       accessibilityRole="button"
-                      accessibilityLabel="Close"
+                      accessibilityLabel={t('common.close')}
                     >
                       <Ionicons name="close" size={24} color={palette.text} />
                     </Tap>
@@ -389,7 +390,7 @@ export function VerseSheet({
                         ) : null}
                       </View>
                       <Text style={styles.ayahLabel} accessibilityRole="header" maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
-                        Ayah {verse?.ayah}
+                        {t('verse.sheet.ayah', { n: verse?.ayah ?? '' })}
                       </Text>
                     </View>
                     <View style={styles.pill}>
@@ -398,7 +399,7 @@ export function VerseSheet({
                         disabled={!prev}
                         hitSlop={6}
                         accessibilityRole="button"
-                        accessibilityLabel="Previous verse"
+                        accessibilityLabel={t('verse.sheet.previous')}
                         accessibilityState={{ disabled: !prev }}
                         style={[styles.pillBtn, !prev && v2Only.disabled]}
                       >
@@ -409,7 +410,7 @@ export function VerseSheet({
                         disabled={!next}
                         hitSlop={6}
                         accessibilityRole="button"
-                        accessibilityLabel="Next verse"
+                        accessibilityLabel={t('verse.sheet.next')}
                         accessibilityState={{ disabled: !next }}
                         style={[styles.pillBtn, !next && v2Only.disabled]}
                       >
@@ -421,7 +422,7 @@ export function VerseSheet({
                       hitSlop={8}
                       style={styles.roundBtn}
                       accessibilityRole="button"
-                      accessibilityLabel="More"
+                      accessibilityLabel={t('common.more')}
                       accessibilityState={{ expanded: menu !== 'closed' }}
                       testID="verse-more"
                     >
@@ -462,13 +463,13 @@ export function VerseSheet({
                           }
                         }}
                         accessibilityRole="button"
-                        accessibilityLabel={`Select translation, ${pickerTitle(translation)}`}
+                        accessibilityLabel={t('verse.sheet.selectTranslationLabel', { name: pickerTitle(translation) })}
                         testID="verse-select-translation"
                       >
                         <Ionicons name="language-outline" size={22} color={palette.text} />
                         <View style={v2Only.flex}>
                           <Text style={[typeV2.menu, { color: palette.text }]} maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
-                            Select translation
+                            {t('verse.sheet.selectTranslation')}
                           </Text>
                           <Text
                             style={[typeV2.meta, { color: palette.secondary }]}
@@ -484,12 +485,12 @@ export function VerseSheet({
                         style={styles.dropRow}
                         onPress={() => setMenu('reciters')}
                         accessibilityRole="button"
-                        accessibilityLabel={`Select reciter, ${voiceLabel(resolveVoice(reciter))}`}
+                        accessibilityLabel={t('verse.sheet.selectReciterLabel', { name: voiceLabel(resolveVoice(reciter)) })}
                       >
                         <Ionicons name="volume-high-outline" size={22} color={palette.text} />
                         <View style={v2Only.flex}>
                           <Text style={[typeV2.menu, { color: palette.text }]} maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
-                            Select reciter
+                            {t('verse.sheet.selectReciter')}
                           </Text>
                           <Text
                             style={[typeV2.meta, { color: palette.secondary }]}
@@ -512,16 +513,16 @@ export function VerseSheet({
                       maxHeight={Math.max(160, Math.min(320, sheetHeight - headerBottom - spacing.md))}
                     />
                   ) : (
-                    TRANSLATIONS.map((t) => {
-                      const available = isTranslationAvailable(t);
-                      const chosen = t.id === translation.id;
+                    TRANSLATIONS.map((option) => {
+                      const available = isTranslationAvailable(option);
+                      const chosen = option.id === translation.id;
                       return (
                         <Tap
-                          key={t.id}
+                          key={option.id}
                           style={[styles.dropRow, !available && v2Only.disabled]}
                           disabled={!available}
                           onPress={() => {
-                            onChangeTranslation(t.id);
+                            onChangeTranslation(option.id);
                             setMenu('closed');
                           }}
                           accessibilityRole="button"
@@ -529,12 +530,12 @@ export function VerseSheet({
                         >
                           <View style={v2Only.flex}>
                             <Text style={[typeV2.menu, { color: palette.text }]} maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
-                              {pickerTitle(t)}
+                              {pickerTitle(option)}
                             </Text>
                             {/* Credited as in the sheet: the source's site. */}
                             <Text style={styles.creditText} maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
-                              {available ? `${t.language} · ` : 'Not available yet · '}
-                              <Text style={styles.creditLink}>{t.credit.linkLabel}</Text>
+                              {available ? `${option.language} · ` : `${t('verse.sheet.notAvailable')} · `}
+                              <Text style={styles.creditLink}>{option.credit.linkLabel}</Text>
                             </Text>
                           </View>
                           {chosen && <Ionicons name="checkmark" size={20} color={palette.text} />}
@@ -556,53 +557,53 @@ export function VerseSheet({
                     // show. Saheeh International can, once it's on the phone; only if chosen.
                     <>
                       <Text style={[typeV2.name, v2Only.centerText, { color: palette.text }]} testID="verse-offline">
-                        The Clear Quran® needs the internet
+                        {t('verse.sheet.clearQuranOffline')}
                       </Text>
                       <Text style={[typeV2.meta, v2Only.centerText, { color: palette.secondary }]}>
                         {alternative
-                          ? `${nameWithLanguage(alternative)} is available offline.`
-                          : "Verses you've read before show offline. Try again once you're online."}
+                          ? t('verse.sheet.availableOffline', { name: nameWithLanguage(alternative) })
+                          : t('verse.sheet.readBefore')}
                       </Text>
                     </>
                   ) : notDownloaded ? (
                     // A QuranEnc translation with this sura not on the phone (TRANS-7).
                     <>
                       <Text style={[typeV2.name, v2Only.centerText, { color: palette.text }]} testID="verse-offline">
-                        This translation isn't downloaded
+                        {t('verse.sheet.notDownloaded')}
                       </Text>
                       <Text style={[typeV2.meta, v2Only.centerText, { color: palette.secondary }]}>
                         {alternative
-                          ? `${nameWithLanguage(alternative)} is available offline.`
-                          : 'Download it from Select translation to read it offline.'}
+                          ? t('verse.sheet.availableOffline', { name: nameWithLanguage(alternative) })
+                          : t('verse.sheet.downloadIt')}
                       </Text>
                     </>
                   ) : offline ? (
                     <Text style={[typeV2.body, v2Only.centerText, { color: palette.secondary }]}>
-                      This verse isn't downloaded yet. It shows when you're back online.
+                      {t('verse.sheet.verseNotDownloaded')}
                     </Text>
                   ) : translation.id === CLEAR_QURAN_ID ? (
                     // Only ever this, or its own text: never another translation under its name.
                     <>
-                      <Text style={[typeV2.name, { color: palette.text }]}>Couldn't load translation</Text>
+                      <Text style={[typeV2.name, { color: palette.text }]}>{t('verse.sheet.couldNotLoadTranslation')}</Text>
                       <Text style={[typeV2.meta, v2Only.centerText, { color: palette.secondary }]}>
                         {clearQuranErrorHint(view.error)}
                       </Text>
                     </>
                   ) : (
                     <Text style={[typeV2.body, v2Only.centerText, { color: palette.secondary }]}>
-                      Couldn't load this verse. Check your connection.
+                      {t('verse.sheet.couldNotLoadVerse')}
                     </Text>
                   )}
                   <View style={styles.errorActions}>
                     {alternative && (
                       <PillButton
-                        title={`Show ${nameWithLanguage(alternative)}`}
+                        title={t('verse.sheet.show', { name: nameWithLanguage(alternative) })}
                         variant="outline"
                         onPress={() => onChangeTranslation(alternative.id)}
                         testID={alternative.id === DEFAULT_TRANSLATION_ID ? 'verse-use-saheeh' : 'verse-use-offline'}
                       />
                     )}
-                    <PillButton title="Try again" onPress={() => setAttempt((a) => a + 1)} testID="verse-retry" />
+                    <PillButton title={t('common.tryAgain')} onPress={() => setAttempt((a) => a + 1)} testID="verse-retry" />
                   </View>
                 </View>
               )}
@@ -672,7 +673,7 @@ export function VerseSheet({
                         maxFontSizeMultiplier={CHROME_TEXT_SCALE}
                         onPress={() => Linking.openURL(ARABIC_CREDIT.url).catch(() => undefined)}
                         accessibilityRole="link"
-                        accessibilityLabel={`${ARABIC_CREDIT.linkLabel}, opens the website`}
+                        accessibilityLabel={t('verse.sheet.opensWebsite', { name: ARABIC_CREDIT.linkLabel })}
                         suppressHighlighting={false}
                       >
                         {ARABIC_CREDIT.linkLabel}
@@ -692,7 +693,7 @@ export function VerseSheet({
                     maxFontSizeMultiplier={CHROME_TEXT_SCALE}
                     onPress={() => Linking.openURL(translation.credit.url).catch(() => undefined)}
                     accessibilityRole="link"
-                    accessibilityLabel={`${translation.credit.linkLabel}, opens the website`}
+                    accessibilityLabel={t('verse.sheet.opensWebsite', { name: translation.credit.linkLabel })}
                     suppressHighlighting={false}
                   >
                     {translation.credit.linkLabel}

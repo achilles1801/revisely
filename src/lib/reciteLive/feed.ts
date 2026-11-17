@@ -22,11 +22,22 @@ export interface StartFrame {
   /** Carry on a take after a dropped connection. */
   resume?: string;
   /**
+   * The final answer at once, where the slips went after it (contract draft 8): `done` comes without `into`, and an
+   * `into` event follows. Check takes send it; a server that doesn't read it sends one `done` with the names.
+   */
+  namesAfter?: boolean;
+  /**
    * Start anywhere on the page (Majd, Nov 14 2026): the reciter starts at some word from s:a through the end of this
    * ayah (the page's last), and the checker finds where (`locked`). Absent: the take starts at s:a. A server that
    * doesn't read it starts at s:a, and its first `at` comes with no `locked` (lib/reciteLive/state).
    */
   startBy?: [number, number];
+  /**
+   * Recite anywhere in the Qur'an (protocol 7, Majd's step 2): beside `startBy`, the checker also looks in the whole
+   * Qur'an when the page doesn't match, and locks there only on a place it is sure is the one (`locked.where`). Sent
+   * for takes from the reader's mic only. A server before 7 ignores it.
+   */
+  startIn?: 'quran';
 }
 
 export type ClientFrame =
@@ -90,10 +101,12 @@ export function replayFeed(log: ReplayLog, opts: { speed?: number; timers?: Time
     let next = 0;
     let closed = false;
     const handles = new Set<unknown>();
+    // A recorded take whose names came after `done` (contract draft 8) ends with its `into`.
+    const namesAfter = events.some((x) => x.e.type === 'into');
     const emit = (e: LiveEvent) => {
       if (closed) return;
       handlers.onEvent(e);
-      if (e.type === 'done' || e.type === 'error') close();
+      if (e.type === 'error' || e.type === 'into' || (e.type === 'done' && !namesAfter)) close();
     };
     const close = () => {
       if (closed) return;

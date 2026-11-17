@@ -1453,7 +1453,7 @@ export async function callFunction(
   return withTimeLimit(
     callFunctionNow(user, name, data, controller.signal),
     opts.timeoutMs,
-    `${name} didn't answer in time.`,
+    `${name} didn't answer in time.`, // i18n-ignore (an error for logs)
     () => controller.abort(),
   );
 }
@@ -1504,7 +1504,7 @@ async function callFunctionNow(
 
   if (!resp.ok) {
     const text = await resp.text();
-    let message = `HTTP ${resp.status}: ${text.slice(0, 200)}`;
+    let message = `HTTP ${resp.status}: ${text.slice(0, 200)}`; // i18n-ignore (an error for logs)
     // The callable's error status (e.g. RESOURCE_EXHAUSTED) and details, for callers that tell cases apart.
     let code: string | undefined;
     let details: unknown;

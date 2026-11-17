@@ -3,6 +3,8 @@
 // way the phone points. Pure; the compass sheet (components/qibla) feeds it the
 // position and the heading, which never leave the phone.
 
+import { formatNumber } from '../i18n';
+
 /** The Kaaba, Makkah. */
 export const KAABA = { latitude: 21.4225, longitude: 39.8262 } as const;
 
@@ -78,8 +80,8 @@ export function formatBearing(bearing: number): string {
 
 /** "4,794 km"; under 10 km with one decimal ("3.2 km"). */
 export function formatDistance(km: number): string {
-  if (km < 10) return `${(Math.round(km * 10) / 10).toFixed(1)} km`;
-  return `${Math.round(km).toLocaleString('en-US')} km`;
+  if (km < 10) return `${formatNumber(Math.round(km * 10) / 10, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km`;
+  return `${formatNumber(Math.round(km))} km`;
 }
 
 export interface City {

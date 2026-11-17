@@ -27,11 +27,13 @@ import { PillTabs } from '../v2/PillTabs';
 import { Sheet } from '../v2/Sheet';
 import { WheelItem, WheelPicker } from '../v2/WheelPicker';
 import { ReciterList } from './ReciterList';
+import { t } from '../../i18n';
 
 /** Slowest first, for the stepper's − and +. */
 const SPEEDS_UP = [...SPEEDS].sort((a, b) => a - b);
 
-export const verseLabel = (v: VerseKey) => `${getSurahDisplay(v.sura)?.nameDisplay ?? `Surah ${v.sura}`} ${v.sura}:${v.ayah}`;
+export const verseLabel = (v: VerseKey) =>
+  `${getSurahDisplay(v.sura)?.nameDisplay ?? t('common.surahN', { n: v.sura })} ${v.sura}:${v.ayah}`;
 
 const SURAHS: WheelItem[] = Array.from({ length: 114 }, (_, i) => {
   const s = getSurahDisplay(i + 1);
@@ -59,7 +61,7 @@ function VersePicker({
     () =>
       Array.from({ length: ayahCount(value.sura) - firstAyah + 1 }, (_, i) => ({
         key: String(firstAyah + i),
-        label: `Ayah ${firstAyah + i}`,
+        label: t('verse.audio.ayahN', { n: firstAyah + i }),
       })),
     [value.sura, firstAyah],
   );
@@ -74,21 +76,22 @@ function VersePicker({
           const ayah = Math.min(value.ayah, ayahCount(sura));
           onChange(min ? clampTo(min, { sura, ayah }) : { sura, ayah });
         }}
-        label="Surah"
+        label={t('verse.audio.surah')}
         testID={`${testID}-surah`}
       />
       <WheelPicker
         items={ayahs}
         index={value.ayah - firstAyah}
         onChange={(i) => onChange({ sura: value.sura, ayah: firstAyah + i })}
-        label="Ayah"
+        label={t('verse.audio.ayah')}
         testID={`${testID}-ayah`}
       />
     </View>
   );
 }
 
-const REPEAT_ITEMS: WheelItem[] = REPEATS.map((r) => ({ key: String(r), label: r === Infinity ? 'Loop ∞' : repeatLabel(r) }));
+const repeatItems = (): WheelItem[] =>
+  REPEATS.map((r) => ({ key: String(r), label: r === Infinity ? t('verse.audio.loop') : repeatLabel(r) }));
 
 /**
  * Audio Options: the reciter, the speed, which ayahs to play (From, To, and
@@ -136,7 +139,7 @@ export function AudioOptionsSheet({
 
   const changeFrom = (v: VerseKey) => {
     setFrom(v);
-    setTo((t) => (options.playUpTo === 'custom' ? clampTo(v, t) : rangeEnd(v, options.playUpTo)));
+    setTo((prev) => (options.playUpTo === 'custom' ? clampTo(v, prev) : rangeEnd(v, options.playUpTo)));
   };
   const changeTo = (v: VerseKey) => {
     setTo(clampTo(from, v));
@@ -155,7 +158,7 @@ export function AudioOptionsSheet({
     <View>
       <GroupedSection>
         <GroupedRow
-          title="Reciter"
+          title={t('verse.audio.reciter')}
           value={shortVoiceLabel(resolveVoice(reciter))}
           accessory="chevron"
           onPress={() => setView('reciter')}
@@ -163,14 +166,14 @@ export function AudioOptionsSheet({
         />
         <Separator />
         <GroupedRow
-          title="Playback speed"
+          title={t('verse.audio.speed')}
           trailing={
             <InlineStepper
               value={speedIndex}
               min={0}
               max={SPEEDS_UP.length - 1}
               onChange={(i) => onChangeOptions({ speed: SPEEDS_UP[i] })}
-              label="playback speed"
+              label={t('verse.audio.speedLabel')}
               formatValue={(i) => speedLabel(SPEEDS_UP[i])}
             />
           }
@@ -179,31 +182,31 @@ export function AudioOptionsSheet({
       </GroupedSection>
 
       <GroupedSection
-        header="Ayahs to play"
-        footer="Page, Surah and Juz’ set To for you, and are kept for next time. Choose To yourself and it’s Custom."
+        header={t('verse.audio.ayahs')}
+        footer={t('verse.audio.ayahsFooter')}
       >
         <GroupedRow
-          title="From"
+          title={t('verse.audio.from')}
           value={verseLabel(from)}
           accessory="chevron"
           onPress={() => toggle('from')}
-          accessibilityHint="Shows a picker"
+          accessibilityHint={t('verse.audio.showsPicker')}
           testID="audio-from"
         />
         {open === 'from' ? <VersePicker value={from} onChange={changeFrom} testID="audio-from-picker" /> : null}
         <Separator />
         <GroupedRow
-          title="To"
+          title={t('verse.audio.to')}
           value={verseLabel(to)}
           accessory="chevron"
           onPress={() => toggle('to')}
-          accessibilityHint="Shows a picker"
+          accessibilityHint={t('verse.audio.showsPicker')}
           testID="audio-to"
         />
         {open === 'to' ? <VersePicker value={to} min={from} onChange={changeTo} testID="audio-to-picker" /> : null}
         <Separator />
         <View style={styles.block}>
-          <GroupedRow title="Play up to" style={styles.flatRow} />
+          <GroupedRow title={t('verse.audio.playUpTo')} style={styles.flatRow} />
           <PillTabs
             options={PLAY_UP_TO.map((u) => ({ value: u, label: PLAY_UP_TO_LABELS[u] }))}
             value={options.playUpTo}
@@ -214,32 +217,32 @@ export function AudioOptionsSheet({
       </GroupedSection>
 
       <GroupedSection
-        header="Each verse"
-        footer="A pause about as long as the verse (1×) leaves time to recite it back from memory before the next one."
+        header={t('verse.audio.eachVerse')}
+        footer={t('verse.audio.eachVerseFooter')}
         divider={false}
       >
         <GroupedRow
-          title="Repeat"
+          title={t('verse.audio.repeat')}
           value={repeatLabel(options.repeat)}
           accessory="chevron"
           onPress={() => toggle('repeat')}
-          accessibilityHint="Shows a picker"
+          accessibilityHint={t('verse.audio.showsPicker')}
           testID="audio-repeat"
         />
         {open === 'repeat' ? (
           <View style={styles.wheels}>
             <WheelPicker
-              items={REPEAT_ITEMS}
+              items={repeatItems()}
               index={REPEATS.indexOf(options.repeat as (typeof REPEATS)[number])}
               onChange={(i) => onChangeOptions({ repeat: REPEATS[i] })}
-              label="Repeat"
+              label={t('verse.audio.repeat')}
               testID="audio-repeat-picker"
             />
           </View>
         ) : null}
         <Separator />
         <View style={styles.block}>
-          <GroupedRow title="Pause after each verse" style={styles.flatRow} />
+          <GroupedRow title={t('verse.audio.pause')} style={styles.flatRow} />
           <PillTabs
             options={PAUSES.map((p) => ({ value: String(p), label: pauseLabel(p) }))}
             value={String(options.pauseFactor)}
@@ -255,16 +258,16 @@ export function AudioOptionsSheet({
     <Sheet
       visible={visible}
       onClose={onClose}
-      title={view === 'options' ? 'Audio Options' : 'Reciter'}
+      title={view === 'options' ? t('verse.audio.title') : t('verse.audio.reciter')}
       left={
         view === 'options'
-          ? { label: 'Close', icon: 'close', onPress: onClose, testID: 'audio-close' }
-          : { label: 'Back', icon: 'chevron-back', onPress: () => setView('options'), testID: 'audio-back' }
+          ? { label: t('common.close'), icon: 'close', onPress: onClose, testID: 'audio-close' }
+          : { label: t('common.back'), icon: 'chevron-back', onPress: () => setView('options'), testID: 'audio-back' }
       }
       right={
         view === 'options'
           ? {
-              label: 'Play with these settings',
+              label: t('verse.audio.play'),
               icon: 'play',
               round: true,
               onPress: () => onPlay({ from, to: compareVerses(to, from) < 0 ? from : to }),

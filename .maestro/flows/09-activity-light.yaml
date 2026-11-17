@@ -25,3 +25,8 @@ appId: com.revisionbuddy.app
     file: ../subflows/tabs-merge-screens.yaml
     env:
       THEME: light
+# Edit sections (ACT-29): the insights editor and the tab without what it hid. Last: the layout stays on the phone.
+- runFlow:
+    file: ../subflows/activity-sections-insights.yaml
+    env:
+      THEME: light

@@ -61,6 +61,14 @@ import {
   type SurahCoverage,
 } from '../../lib/coverageViews';
 import { PaceSheet } from './PaceSheet';
+import { GapsSection } from './GapsSection';
+import type { PushBack } from '../../lib/gapsCycle';
+import { gapsView } from '../../lib/insightsGaps';
+import { RecitationInsights } from './RecitationInsights';
+import { FirstSection, useFirstSection } from './sectionPlace';
+import { DEFAULT_SECTIONS, sectionsToShow, type InsightsSection, type TabLayout } from '../../lib/activitySections';
+import { stillMarkedWords } from '../../lib/reciteInsights/insights';
+import type { Recitation } from '../../lib/reciteInsights/useRecitation';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import {
   activeDays,
@@ -115,6 +123,14 @@ export interface InsightsData {
   coverageSince?: Map<number, string>;
   /** Pages already first tomorrow (Insights' carry): their buttons show "First tomorrow ✓" (ACT-24). */
   firstTomorrow?: ReadonlySet<number>;
+  /** Gaps (ACT-28): Revisely Dev until a release opens it (lib/insightsGaps gapsInsightsEnabled). */
+  gaps?: boolean;
+  /** The first day the items were read from (Gaps: a gap before it began on a day not read, ACT-28). */
+  itemsFrom?: string | null;
+  /** The full revision against the plan (Gaps, ACT-28; lib/gapsCycle). */
+  pushBack?: PushBack | null;
+  /** The takes with Mark mistakes (Revisely Dev, an account that recites): the Recitation section (RINS-2). */
+  recitation?: Recitation | null;
 }
 
 /**
@@ -155,6 +171,10 @@ export function InsightsView({
   onTurnOnSmartTracking,
   onOpenDay,
   onOpenCalendar,
+  onOpenAyahs,
+  sections = DEFAULT_SECTIONS.insights,
+  onEditSections,
+  onOpenLastRevised,
 }: {
   data: InsightsData;
   onReviseTomorrow: (pages: number[]) => void;
@@ -170,6 +190,14 @@ export function InsightsView({
   onOpenDay?: (day: string) => void;
   /** Overview at a month (Consistency's figure: ACT-23). */
   onOpenCalendar?: (month: string) => void;
+  /** The reader at some ayahs, highlighted (the Recitation section's rows, RINS-2). */
+  onOpenAyahs?: (sura: number, from: number, to: number) => void;
+  /** The user's order and the sections hidden (ACT-29); the usual layout without it. */
+  sections?: TabLayout<'insights'>;
+  /** Edit sections (ACT-29): from the line shown when every section is hidden. */
+  onEditSections?: () => void;
+  /** When each surah, juz, hizb or page was last revised (Gaps' link: ACT-30). */
+  onOpenLastRevised?: () => void;
 }) {
   // The juz sheet (ACT-21): mounted from its first opening on, so it can slide away after.
   const [juz, setJuz] = useState<number | null>(null);
@@ -178,17 +206,86 @@ export function InsightsView({
     setJuzUsed(true);
     setJuz(n);
   };
+  // The sections in the user's order, those hidden left out (ACT-29). A section the account can't have keeps its slot.
+  const span = rangeSpan(data.range ?? 30, data.today, data.firstDay);
+  const hasPace =
+    paceView({ revised: data.revised.filter((r) => r.day === r.countsFor), read: data.read, today: data.today, capacity: data.capacity, window: span.window }) != null;
+  // Gaps: for the accounts it is open to, once anything was revised (ACT-28).
+  const hasGaps = useMemo(
+    () =>
+      data.gaps === true &&
+      gapsView({ revised: data.revised, today: data.today, window: span.window, firstDay: data.firstDay, knownSince: data.itemsFrom, lastRevisedOn: data.lastRevisedOn }) != null,
+    [data.gaps, data.revised, data.today, span.window, data.firstDay, data.itemsFrom, data.lastRevisedOn],
+  );
+  const has = (id: InsightsSection) =>
+    id === 'weak'
+      ? data.smartTracking !== false || onTurnOnSmartTracking != null
+      : id === 'recitation'
+        ? data.recitation != null && onOpenAyahs != null
+        : id === 'pace'
+          ? hasPace
+          : id === 'gaps'
+            ? hasGaps
+            : true;
+  const shown = sectionsToShow(sections, has);
+  const part = (id: InsightsSection): React.ReactNode => {
+    switch (id) {
+      case 'coverage':
+        return <Coverage data={data} onPlanIt={onPlanIt} onAddToPlan={onAddToPlan} onOpenJuz={openJuz} onOpenPage={onOpenPage} />;
+      case 'consistency':
+        return <Consistency data={data} onOpenDay={onOpenDay} onOpenCalendar={onOpenCalendar} />;
+      case 'gaps':
+        return data.gaps ? (
+          <GapsSection
+            revised={data.revised}
+            today={data.today}
+            window={span.window}
+            inWords={span.inWords}
+            lastWords={span.lastWords}
+            all={span.all}
+            firstDay={data.firstDay}
+            knownSince={data.itemsFrom}
+            lastRevisedOn={data.lastRevisedOn}
+            onOpenDay={onOpenDay}
+            onOpenCalendar={onOpenCalendar}
+            pushBack={data.pushBack}
+            onOpenLastRevised={onOpenLastRevised}
+          />
+        ) : null;
+      case 'weak':
+        return data.smartTracking !== false ? (
+          <WeakSpots data={data} onReviseTomorrow={onReviseTomorrow} onOpenPage={onOpenPage} onSeeAllPages={onSeeAllPages} />
+        ) : onTurnOnSmartTracking ? (
+          <SmartTrackingInvite onPress={onTurnOnSmartTracking} />
+        ) : null;
+      case 'recitation':
+        return data.recitation && onOpenAyahs ? (
+          <RecitationInsights
+            records={data.recitation.records}
+            words={data.recitation.words}
+            today={data.today}
+            window={span.window}
+            inWords={span.inWords}
+            smartTracking={data.smartTracking !== false}
+            rating={data.rating}
+            revo={data.revo}
+            onOpenAyahs={onOpenAyahs}
+          />
+        ) : null;
+      case 'memorization':
+        return <Memorization data={data} onOpenDay={onOpenDay} />;
+      case 'pace':
+        return <Pace data={data} onOpenDay={onOpenDay} />;
+    }
+  };
   return (
     <View testID="activity-insights">
-      <Coverage data={data} onPlanIt={onPlanIt} onAddToPlan={onAddToPlan} onOpenJuz={openJuz} onOpenPage={onOpenPage} />
-      <Consistency data={data} onOpenDay={onOpenDay} onOpenCalendar={onOpenCalendar} />
-      {data.smartTracking !== false ? (
-        <WeakSpots data={data} onReviseTomorrow={onReviseTomorrow} onOpenPage={onOpenPage} onSeeAllPages={onSeeAllPages} />
-      ) : onTurnOnSmartTracking ? (
-        <SmartTrackingInvite onPress={onTurnOnSmartTracking} />
-      ) : null}
-      <Memorization data={data} onOpenDay={onOpenDay} />
-      <Pace data={data} onOpenDay={onOpenDay} />
+      {shown.map((id, i) => (
+        <FirstSection.Provider key={id} value={i === 0}>
+          {part(id)}
+        </FirstSection.Provider>
+      ))}
+      {shown.length === 0 ? <NothingShown onEdit={onEditSections} /> : null}
       {juzUsed ? (
         <JuzSheet
           juz={juz}
@@ -224,8 +321,10 @@ function Section({
   testID?: string;
 }) {
   const { palette } = useTheme();
+  // The first section shown has no hairline above it, whichever it is (ACT-29).
+  const isFirst = useFirstSection() || first;
   return (
-    <View style={[styles.section, !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.separator }]} testID={testID}>
+    <View style={[styles.section, !isFirst && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.separator }]} testID={testID}>
       <View style={styles.sectionHead}>
         <View style={styles.flex}>
           <ChromeText style={[styles.sectionTitle, { color: palette.text }]} accessibilityRole="header">
@@ -442,7 +541,6 @@ function Coverage({
 
   return (
     <Section
-      first
       title="Coverage"
       detail={detail}
       testID="insights-coverage"
@@ -863,10 +961,29 @@ const INVITE = 'Turn on Smart Tracking to see your weak spots';
  * Smart Tracking off: no page is rated, so Weak spots gives way to one line that turns it on
  * (Settings → Revision, at its switch). A label, not a guide (ACT-12).
  */
-function SmartTrackingInvite({ onPress }: { onPress: () => void }) {
+/** Every section hidden (ACT-29): one quiet line, and the way back. */
+function NothingShown({ onEdit }: { onEdit?: () => void }) {
   const { palette } = useTheme();
   return (
-    <View style={[styles.section, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.separator }]}>
+    <View style={styles.section} testID="insights-nothing-shown">
+      <ChromeText style={[typeV2.body, { color: palette.secondary }]}>Every section is hidden.</ChromeText>
+      {onEdit ? (
+        <Tap onPress={onEdit} accessibilityRole="button" hitSlop={8} style={styles.invite} testID="insights-edit-sections">
+          <ChromeText style={[typeV2.name, styles.linkText, { color: palette.link }]} maxFontSizeMultiplier={LINK_MAX_SCALE}>
+            Edit sections
+          </ChromeText>
+          <Ionicons name="chevron-forward" size={16} color={palette.link} />
+        </Tap>
+      ) : null}
+    </View>
+  );
+}
+
+function SmartTrackingInvite({ onPress }: { onPress: () => void }) {
+  const { palette } = useTheme();
+  const first = useFirstSection();
+  return (
+    <View style={[styles.section, !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.separator }]}>
       <Tap onPress={onPress} accessibilityRole="link" accessibilityLabel={INVITE} hitSlop={8} style={styles.invite} testID="insights-smart-tracking">
         <ChromeText style={[typeV2.name, styles.linkText, { color: palette.link }]} maxFontSizeMultiplier={LINK_MAX_SCALE}>
           {INVITE}
@@ -899,6 +1016,19 @@ function WeakSpots({
     inWords: rangeSpan(data.range ?? 30, data.today, data.firstDay).inWords,
   });
   const pages = rows.flatMap((r) => r.pages);
+  // Words Recite still marks on each page (Revisely Dev, RINS-2): said on the weak spot's row.
+  const marked = useMemo(() => {
+    const words = data.recitation?.words;
+    const byPage = new Map<number, number>();
+    if (!data.recitation || !words) return byPage;
+    for (const w of stillMarkedWords(data.recitation.records)) byPage.set(words.pageOf(w.w), (byPage.get(words.pageOf(w.w)) ?? 0) + 1);
+    return byPage;
+  }, [data.recitation]);
+  const markedOn = (rowPages: number[]) => rowPages.reduce((n, p) => n + (marked.get(p) ?? 0), 0);
+  const reasonOf = (r: { pages: number[]; reason: string }) => {
+    const n = markedOn(r.pages);
+    return n > 0 ? `${r.reason} · ${n} ${n === 1 ? 'word' : 'words'} still marked in Recite` : r.reason;
+  };
   return (
     <Section
       title="Weak spots"
@@ -928,7 +1058,7 @@ function WeakSpots({
               key={r.label}
               onPress={() => onOpenPage(r.pages[0])}
               accessibilityRole="button"
-              accessibilityLabel={`${spokenText(r.label)}. ${r.reason}. Open it`}
+              accessibilityLabel={`${spokenText(r.label)}. ${reasonOf(r)}. Open it`}
               style={[styles.weakRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.separator }]}
               testID={`weak-spot-${r.pages[0]}`}
             >
@@ -939,7 +1069,7 @@ function WeakSpots({
                   <ChromeText style={[typeV2.name, { color: palette.text }]}>{r.label}</ChromeText>
                   <ChromeText style={[typeV2.body, { color: palette.secondary }]}>{`  ${r.pagesNote}`}</ChromeText>
                 </ChromeText>
-                <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{r.reason}</ChromeText>
+                <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{reasonOf(r)}</ChromeText>
               </View>
               <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
             </Tap>

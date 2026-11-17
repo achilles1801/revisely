@@ -13,8 +13,11 @@
 # A tap toggles: never again once the switch reads the new state.
 appId: com.revisionbuddy.app
 ---
-- tapOn:
-    id: open-settings
+- runFlow:
+    file: tap-to-open.yaml
+    env:
+      ID: open-settings
+      OPENS: back
 # Centred (on iOS Maestro counts a row cut off by the tab bar as visible).
 - runFlow:
     file: settings-row.yaml
@@ -65,8 +68,12 @@ appId: com.revisionbuddy.app
       id: fajr-resets-at
       text: ${RESETS}
     timeout: 15000
-- tapOn:
-    id: back
+# Back to Home, again if the tap was lost (theme.yaml says when it was).
+- runFlow:
+    file: tap-to-open.yaml
+    env:
+      ID: back
+      OPENS: today-post
 - extendedWaitUntil:
     visible:
       id: today-post

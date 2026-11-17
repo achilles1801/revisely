@@ -10,6 +10,7 @@ import { PillButton } from '../v2/PillButton';
 import { Tap } from '../v2/Tap';
 import { RevoMark } from './RevoMark';
 import { RevoSubHeader } from './RevoParts';
+import { t, formatDate } from '../../i18n';
 
 export const REVO_PRIVACY_URL = 'https://revisely.app/privacy/#revo';
 
@@ -34,17 +35,17 @@ export function RevoHistory({
   return (
     <View style={styles.fill}>
       <View style={styles.gutter}>
-        <RevoSubHeader title="History" onBack={onBack} right={{ icon: 'create-outline', label: 'New conversation', onPress: onNew, testID: 'revo-new-chat' }} />
+        <RevoSubHeader title={t('revo.history')} onBack={onBack} right={{ icon: 'create-outline', label: t('revo.historyPage.newChat'), onPress: onNew, testID: 'revo-new-chat' }} />
         <View style={[styles.search, { backgroundColor: palette.bubble }]}>
           <Ionicons name="search" size={20} color={palette.secondary} />
           <TextInput
             value={q}
             onChangeText={setQ}
-            placeholder="Search conversations"
+            placeholder={t('revo.historyPage.search')}
             placeholderTextColor={palette.secondary}
             style={[styles.searchInput, { color: palette.text }]}
             returnKeyType="search"
-            accessibilityLabel="Search conversations"
+            accessibilityLabel={t('revo.historyPage.search')}
             testID="revo-history-search"
           />
         </View>
@@ -52,7 +53,7 @@ export function RevoHistory({
       <ScrollView contentContainerStyle={styles.listPad} keyboardShouldPersistTaps="handled" testID="revo-history-list">
         {chats != null && sections.length === 0 ? (
           <Text style={[styles.empty, { color: palette.secondary }]} testID="revo-history-empty">
-            {q ? 'No conversations match.' : 'Your conversations with Revo will be here.'}
+            {q ? t('revo.historyPage.noMatch') : t('revo.historyPage.empty')}
           </Text>
         ) : null}
         {sections.map((s) => (
@@ -87,9 +88,11 @@ export function RevoHistory({
 }
 
 const sourceLine = (m: RevoMemoryItem, today: string) => {
-  if (m.source === 'review') return 'From your Activity';
-  if (m.day === today) return 'From a chat today';
-  return `From a chat on ${new Date(`${m.day}T12:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}`;
+  if (m.source === 'review') return t('revo.memoryPage.fromActivity');
+  if (m.day === today) return t('revo.memoryPage.fromChatToday');
+  return t('revo.memoryPage.fromChatOn', {
+    date: formatDate(new Date(`${m.day}T12:00:00`), { day: 'numeric', month: 'short' }, 'device'),
+  });
 };
 
 /** What Revo remembers: each item can be deleted; a switch turns memory off; Clear deletes all. */
@@ -102,10 +105,10 @@ export function RevoMemory({ uid, settings, today, onBack }: { uid: string; sett
   useEffect(() => backend.watchMemory(uid, setItems), [backend, uid]);
   useEffect(() => setMemoryOn(settings.memoryOn), [settings.memoryOn]);
   const clearAll = () =>
-    Alert.alert('Clear Revo’s memory?', 'Everything Revo remembers is deleted. Your conversations stay.', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('revo.memoryPage.clearTitle'), t('revo.memoryPage.clearBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Clear',
+        text: t('revo.memoryPage.clear'),
         style: 'destructive',
         onPress: () => {
           haptics.warning();
@@ -116,13 +119,13 @@ export function RevoMemory({ uid, settings, today, onBack }: { uid: string; sett
   return (
     <View style={styles.fill}>
       <View style={styles.gutter}>
-        <RevoSubHeader title="Memory" onBack={onBack} />
+        <RevoSubHeader title={t('revo.memory')} onBack={onBack} />
       </View>
       <ScrollView contentContainerStyle={styles.listPad}>
         <View style={[styles.switchCard, { backgroundColor: palette.bubble }]}>
           <View style={styles.rowText}>
-            <Text style={[styles.switchTitle, { color: palette.text }]}>Let Revo remember</Text>
-            <Text style={[styles.rowLine, { color: palette.secondary }]}>Short notes from your chats, so answers fit you</Text>
+            <Text style={[styles.switchTitle, { color: palette.text }]}>{t('revo.memoryPage.letRemember')}</Text>
+            <Text style={[styles.rowLine, { color: palette.secondary }]}>{t('revo.memoryPage.letRememberSub')}</Text>
           </View>
           <Switch
             value={memoryOn}
@@ -132,16 +135,16 @@ export function RevoMemory({ uid, settings, today, onBack }: { uid: string; sett
             }}
             trackColor={{ false: palette.switchOff, true: palette.primary }}
             thumbColor={palette.switchThumb}
-            accessibilityLabel="Let Revo remember"
+            accessibilityLabel={t('revo.memoryPage.letRemember')}
             testID="revo-memory-switch"
           />
         </View>
         <Text style={[styles.sectionTitle, styles.memoryHead, { color: palette.secondary }]} accessibilityRole="header">
-          What Revo remembers
+          {t('revo.memoryPage.remembers')}
         </Text>
         {items != null && items.length === 0 ? (
           <Text style={[styles.empty, { color: palette.secondary }]} testID="revo-memory-empty">
-            Nothing yet. Revo keeps a short note when something in a chat will help later.
+            {t('revo.memoryPage.empty')}
           </Text>
         ) : null}
         {(items ?? []).map((m, i) => (
@@ -154,7 +157,7 @@ export function RevoMemory({ uid, settings, today, onBack }: { uid: string; sett
               onPress={() => void backend.deleteMemory(uid, m.id)}
               hitSlop={10}
               accessibilityRole="button"
-              accessibilityLabel={`Delete: ${m.text}`}
+              accessibilityLabel={t('revo.memoryPage.deleteItem', { text: m.text })}
               testID={`revo-memory-delete-${m.id}`}
             >
               <Ionicons name="trash-outline" size={22} color={palette.secondary} />
@@ -163,7 +166,7 @@ export function RevoMemory({ uid, settings, today, onBack }: { uid: string; sett
         ))}
         {items != null && items.length > 0 ? (
           <Tap onPress={clearAll} style={styles.clear} accessibilityRole="button" testID="revo-memory-clear">
-            <Text style={[styles.clearText, { color: palette.red }]}>Clear Revo’s memory</Text>
+            <Text style={[styles.clearText, { color: palette.red }]}>{t('revo.memoryPage.clearAll')}</Text>
           </Tap>
         ) : null}
       </ScrollView>
@@ -183,21 +186,21 @@ export function optInRows(smartTracking: boolean): OptInRow[] {
   return [
     {
       icon: 'stats-chart-outline',
-      title: 'Uses your totals',
+      title: t('revo.optIn.totals'),
       // With Smart Tracking off there are no ratings to send, so no weak spots (REVO-36).
-      line: smartTracking ? 'Coverage, consistency, weak spots and pace.' : 'Coverage, consistency and pace.',
+      line: smartTracking ? t('revo.optIn.totalsLineSmart') : t('revo.optIn.totalsLine'),
     },
     {
       icon: 'cloud-outline',
-      title: 'Answered by Claude, from Anthropic',
-      line: 'Your questions, the chat so far and the totals Revo needs go to Anthropic to write each answer. Anthropic doesn’t train its models on them.',
+      title: t('revo.optIn.claude'),
+      line: t('revo.optIn.claudeLine'),
     },
     {
       icon: 'lock-closed-outline',
-      title: 'Your notes and recordings stay private',
-      line: 'A day’s notes go only when you add that day to a question. Revo never gets your audio.',
+      title: t('revo.optIn.private'),
+      line: t('revo.optIn.privateLine'),
     },
-    { icon: 'settings-outline', title: 'Off any time', line: 'Settings → Revo AI. Your history can be deleted there too.' },
+    { icon: 'settings-outline', title: t('revo.optIn.off'), line: t('revo.optIn.offLine') },
   ];
 }
 
@@ -223,12 +226,12 @@ export function RevoOptIn({
       <ScrollView contentContainerStyle={styles.optIn}>
         <RevoMark size={short ? 84 : 120} style={short ? styles.optInMarkShort : styles.optInMark} />
         <Text style={[styles.optInTitle, { color: palette.text }]} accessibilityRole="header">
-          Meet Revo
+          {t('revo.meet')}
         </Text>
         <Text style={[styles.optInBody, { color: palette.secondary }]}>
           {smartTracking
-            ? 'Your revision coach. Ask about your progress, your weak spots or your plan, and get answers from your own Revisely data.'
-            : 'Your revision coach. Ask about your progress or your plan, and get answers from your own Revisely data.'}
+            ? t('revo.optIn.bodySmart')
+            : t('revo.optIn.body')}
         </Text>
         <View style={styles.optInRows}>
           {optInRows(smartTracking).map((r) => (
@@ -251,14 +254,14 @@ export function RevoOptIn({
             {error}
           </Text>
         ) : null}
-        <PillButton title="Turn on Revo" onPress={onTurnOn} size="lg" busy={busy} testID="revo-turn-on" />
+        <PillButton title={t('revo.optIn.turnOn')} onPress={onTurnOn} size="lg" busy={busy} testID="revo-turn-on" />
         <Tap onPress={onNotNow} style={styles.notNow} accessibilityRole="button" testID="revo-not-now">
-          <Text style={[styles.notNowText, { color: palette.text }]}>Not now</Text>
+          <Text style={[styles.notNowText, { color: palette.text }]}>{t('common.notNow')}</Text>
         </Tap>
         <Text style={[styles.fine, { color: palette.secondary }]}>
-          Revo AI can make mistakes.{' '}
+          {t('revo.optIn.mistakes')}{' '}
           <Text style={{ color: palette.link }} onPress={() => void Linking.openURL(REVO_PRIVACY_URL)} accessibilityRole="link">
-            How your data is used
+            {t('revo.optIn.howData')}
           </Text>
         </Text>
       </View>

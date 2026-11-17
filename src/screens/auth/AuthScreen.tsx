@@ -27,6 +27,7 @@ import {
   isErrorWithCode,
 } from '../../lib/googleAuth';
 import { signInWithApple as triggerAppleSignIn } from '../../lib/appleAuth';
+import { t } from '../../i18n';
 
 type AuthMode = 'login' | 'signup' | 'reset';
 
@@ -80,7 +81,7 @@ function FieldV2({
             hitSlop={8}
             style={v2.eye}
             accessibilityRole="button"
-            accessibilityLabel={reveal.shown ? 'Hide password' : 'Show password'}
+            accessibilityLabel={reveal.shown ? t('auth.screen.hidePassword') : t('auth.screen.showPassword')}
             testID={`${testID}-reveal`}
           >
             <Ionicons name={reveal.shown ? 'eye-off-outline' : 'eye-outline'} size={22} color={palette.secondary} />
@@ -231,7 +232,8 @@ export default function AuthScreen() {
   };
 
   const displayError = localError || error;
-  const title = mode === 'login' ? 'Welcome back' : mode === 'signup' ? 'Create account' : 'Reset password';
+  const title =
+    mode === 'login' ? t('auth.screen.welcomeBack') : mode === 'signup' ? t('auth.screen.createAccount') : t('auth.screen.resetPassword');
   // Flat: the bismillah and a title, filled fields, the one solid action,
   // then Apple and Google under "or". Errors are a red line of text with an
   // icon, read out as they appear.
@@ -264,7 +266,7 @@ export default function AuthScreen() {
             </Text>
             {mode === 'reset' && !resetSent ? (
               <Text style={[typeV2.body, v2.centered, v2.subtitle, { color: palette.secondary }]}>
-                We'll email you a link to set a new password.
+                {t('auth.screen.resetIntro')}
               </Text>
             ) : null}
             {/* AUTH-2: a sign-in saved on this phone that Firebase dropped at launch. One quiet line. */}
@@ -274,7 +276,7 @@ export default function AuthScreen() {
                 maxFontSizeMultiplier={1.6}
                 testID="auth-signed-out"
               >
-                You were signed out. Sign in again to carry on.
+                {t('auth.screen.signedOut')}
               </Text>
             ) : null}
           </View>
@@ -287,10 +289,10 @@ export default function AuthScreen() {
                 accessibilityRole="alert"
                 accessibilityLiveRegion="polite"
               >
-                Password reset email sent. Check your inbox.
+                {t('auth.screen.resetSent')}
               </Text>
               <PillButton
-                title="Back to sign in"
+                title={t('auth.screen.backToSignIn')}
                 size="lg"
                 onPress={() => switchMode('login')}
                 style={v2.sentButton}
@@ -302,17 +304,17 @@ export default function AuthScreen() {
               <View style={v2.form}>
                 {mode === 'signup' && (
                   <FieldV2
-                    label="Name"
+                    label={t('auth.screen.name')}
                     value={name}
                     onChangeText={setName}
-                    placeholder="Your name"
+                    placeholder={t('auth.screen.namePlaceholder')}
                     autoCapitalize="words"
                     autoCorrect={false}
                     testID="auth-name"
                   />
                 )}
                 <FieldV2
-                  label="Email"
+                  label={t('auth.screen.email')}
                   value={email}
                   onChangeText={setEmail}
                   placeholder="your@email.com"
@@ -324,7 +326,7 @@ export default function AuthScreen() {
                 />
                 {mode !== 'reset' && (
                   <FieldV2
-                    label="Password"
+                    label={t('auth.screen.password')}
                     value={password}
                     onChangeText={setPassword}
                     placeholder="••••••••"
@@ -335,7 +337,7 @@ export default function AuthScreen() {
                 )}
                 {mode === 'signup' && (
                   <FieldV2
-                    label="Confirm Password"
+                    label={t('auth.screen.confirmPassword')}
                     value={confirmPassword}
                     onChangeText={setConfirmPassword}
                     placeholder="••••••••"
@@ -351,7 +353,7 @@ export default function AuthScreen() {
                     accessible
                     accessibilityRole="alert"
                     accessibilityLiveRegion="polite"
-                    accessibilityLabel={`Error: ${displayError}`}
+                    accessibilityLabel={t('auth.screen.error', { message: displayError })}
                     testID="auth-error"
                   >
                     <Ionicons name="alert-circle-outline" size={18} color={palette.red} style={v2.errorIcon} />
@@ -362,7 +364,13 @@ export default function AuthScreen() {
                 ) : null}
 
                 <PillButton
-                  title={mode === 'login' ? 'Sign in' : mode === 'signup' ? 'Create account' : 'Send reset link'}
+                  title={
+                    mode === 'login'
+                      ? t('auth.screen.signIn')
+                      : mode === 'signup'
+                        ? t('auth.screen.createAccount')
+                        : t('auth.screen.sendResetLink')
+                  }
                   size="lg"
                   onPress={handleSubmit}
                   busy={submitting}
@@ -379,7 +387,7 @@ export default function AuthScreen() {
                     testID="auth-forgot"
                   >
                     <Text style={[typeV2.body, { color: palette.link }]} maxFontSizeMultiplier={1.6}>
-                      Forgot password?
+                      {t('auth.screen.forgotPassword')}
                     </Text>
                   </Tap>
                 )}
@@ -392,9 +400,9 @@ export default function AuthScreen() {
                 testID="auth-switch-mode"
               >
                 <Text style={[typeV2.body, v2.centered, { color: palette.secondary }]} maxFontSizeMultiplier={1.6}>
-                  {mode === 'login' ? "Don't have an account? " : mode === 'signup' ? 'Already have an account? ' : ''}
+                  {mode === 'login' ? t('auth.screen.noAccount') : mode === 'signup' ? t('auth.screen.haveAccount') : ''}
                   <Text style={[typeV2.name, { color: palette.link }]}>
-                    {mode === 'login' ? 'Sign up' : mode === 'signup' ? 'Sign in' : 'Back to sign in'}
+                    {mode === 'login' ? t('auth.screen.signUp') : mode === 'signup' ? t('auth.screen.signIn') : t('auth.screen.backToSignIn')}
                   </Text>
                 </Text>
               </Tap>
@@ -402,7 +410,7 @@ export default function AuthScreen() {
               <View style={v2.divider}>
                 <View style={[v2.dividerLine, { backgroundColor: palette.separator }]} />
                 <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={1.6}>
-                  or
+                  {t('auth.screen.or')}
                 </Text>
                 <View style={[v2.dividerLine, { backgroundColor: palette.separator }]} />
               </View>
@@ -434,7 +442,7 @@ export default function AuthScreen() {
                     busy && !googleLoading && v2.dimmed,
                   ]}
                   accessibilityRole="button"
-                  accessibilityLabel="Continue with Google"
+                  accessibilityLabel={t('auth.screen.google')}
                   accessibilityState={{ disabled: busy, busy: googleLoading }}
                   testID="auth-google"
                 >
@@ -444,7 +452,7 @@ export default function AuthScreen() {
                     <>
                       <GoogleGIcon size={18} />
                       <Text style={[typeV2.button, { color: palette.text }]} numberOfLines={1} maxFontSizeMultiplier={1.4}>
-                        Continue with Google
+                        {t('auth.screen.google')}
                       </Text>
                     </>
                   )}

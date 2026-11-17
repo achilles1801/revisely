@@ -35,6 +35,32 @@ released model. `stage.sh` adds v5 from the lab (`models/ft-v5-onnx`, written by
 rule is judged on the released model. v5 runs on each judged ayah's audio only: +0.6 s for 112 s of audio. On Majd's head-to-head
 take (2:38–43): words and harakat gave his five slips and nothing else; strict added one idgham note.
 
+**Recite and Words and harakat run on v6** (Nov 16 2026), the lab's small model fine-tuned again with women's and
+children's voices drawn three times as often and distilled from the large teacher; Strict stays on the released model
+and v5, since v6 narrowly fails the women's check on one tajweed rule (noon mushaddadah's length). Each take runs one
+model (`Engine.level`), so the CPU per take stays the same apart from the padding v6 is run with (+20% a hop). v6 has
+its own bars (`bars.v6.json`, the same rule as the released model's: 0.3% of professionals' correct words) and its own
+word settings (`engine.WORDS_P_V6`). `stage.sh` adds it from the lab (`models/ft-v6-onnx`); without it, or with
+`RECITE_WORDS_EAR=0` in the service's environment, every level runs on the released model. The word table is the same.
+In the lab (same checker; the released model in brackets): learners' correct clips with any mark at this level 25%
+(34%), with a mark that counts 12% (20%); their clips with mistakes marked 57% (68%). Professionals' planted slips
+caught 97.1% (97.4%), false alarms 0.45 per 100 words (0.40; in quiet 0.19, 0.20). The page scorecard, live: correct
+quiet pages with a mark 20% (23%), in mild babble 20% (37%), in loud babble 57% (73%); planted slips caught 95% (99%).
+/record: 5 of 6 slips, no false alarm (6 of 6, 5 false alarms). Quieter on correct recitation; it catches about as
+many word slips, and fewer of learners' small harakat and letter slips.
+
+**Naming a v6 take's slips on the released model's frames** (Nov 16 2026). Naming (`into`) was measured on the released
+model's frames, and on v6's it named far fewer: 139 of bench-v0's 275 planted slips and swapped endings, live (the
+released model 188). So a v6 take works out the released model's frames as it goes (`engine.SideFrames`): 8 s chunks
+with 2 s of audio either side, each handed to one background thread once its audio is in (`live._side_submit`, at
+SCHED_IDLE on Linux, below the hops and the ayah thread), and the runs of marks are decoded again and named on those
+with the released model's settings. Live on the Mac: 171 named, 1 wrong (the released model's own), none false, nothing
+named on learners' clips; `done` waits only for chunks the thread hasn't reached (the last one: at most 12 s of audio,
+and only when a run reaches it), 0 ms median and 81 ms at most on the Mac, so the slowest take's wait after Stop doesn't
+move. The thread costs about a fifth of the hops' model time. `done.ms` has `side` (all of it) and `side_wait` (what
+`done` waited); health lines `side_per_s`. `RECITE_SIDE_FRAMES=0` names on v6's own frames (`engine.SIMILAR_P_V6`,
+134), with no new image.
+
 ## What it judges
 
 One recording against a passage (from an ayah to the end of its surah, or to a given ayah), with the lab's
@@ -128,6 +154,12 @@ in the order they were tapped, the latest for a mark winning, so an undone "Not 
    take is then stored and `{"type":"kept","take":…,"ok":true|false}` follows before the server closes the socket
    (the phone needn't wait for it). Every event has `t`, the seconds of the take it was decided at. `error`
    (`sign_in`, `testers_only`, `limit`, `idle`, `bad_request`, `server`, `premium_required`) closes the socket.
+5. **`"namesAfter": true`** in the start frame (Nov 16 2026): `done` comes without `into`, and right after it
+   `{"type":"into","names":[{"id":<mark id>,"into":{…}}],"t":…}` with where each named slip went (`names: []` when
+   nothing is named, Recite's included), before `kept`. Naming is most of the wait after Stop on a long take with
+   slips: on the Mac, Stop to `done` went from 356 to 41 ms (alafasy.p8.m1), 421 to 107 (alafasy.p4.m1), 540 to 289
+   (husary.p1.m1), with `into` 110–312 ms after it (about five times that on Cloud Run). The kept result has the names.
+   Without `namesAfter`, one `done` with the names, as before.
 
 **Start anywhere on the page** (Majd, Nov 14 2026; protocol 6; recite-contract.md has the agreed shape). The start
 frame's `s`/`a` stay the page's first ayah, and `"startBy":[sura,ayah]` is its last: the reciter begins at some word
@@ -149,6 +181,18 @@ from the first word of `s:a` through the end of `startBy`.
   - The server says 6 only when `live.LiveSession` takes `start_by` (`protocol()`). Until the follower has it, the
     server says 5 and ignores `startBy`, whichever of the two is deployed first.
 - **Kept takes.** The kept take's request records `startBy`.
+
+**Anywhere in the Qur'an** (Majd approved step 2, Nov 16 2026; protocol 7; recite-contract.md, draft 7).
+- `"startIn":"quran"` beside `startBy`: the page is searched first, as above. If it hasn't locked, the follower also
+  searches the whole Qur'an, and locks only on a place that is unique and held. `locked` then carries
+  `"where":"quran"` (else `"page"`).
+- The server passes it on only with `startBy`, and `startBy` keeps its 400-word check (it limits the page, never the
+  Qur'an-wide search). The kept take's request records `startIn`.
+- The server says 7 only when `live.LiveSession` takes `start_in`. With `start_by` alone it says 6 and ignores
+  `startIn`.
+- **The cost** is `ms.search_quran`, and the health line has `search_quran_per_s`, `start: "quran"` and `where`. The
+  search runs at most every 2 s, in the first 10 s of speech, and stops at 30 s (live.py `QURAN_*`). The index is in
+  the word table (`make_words.py --merge`, `table['quran']`, about 4 MB), so it comes with the image.
 - **The search is the model session's** (`live.py`, `start_by=(sura, ayah)`).
 - **Measuring it:** `cut_take.py` cuts a public bench take to begin at an ayah mid-page, and `live_e2e.py --page
   S:A-S:A` sends it with the page's range and reports where and how soon it locked.
@@ -173,7 +217,8 @@ changes nothing on screen. Right after `ready`, a resume on the same instance al
 showing (every mark shown, every `unmark`, the `ayah` events, `at`, `said`, `score`): the dropped socket may have
 swallowed events of the last audio it was checking, and that audio isn't sent again. The phone keeps the take's PCM for this (it needs it for "play this word" too).
 A resume of a take that already ended on this instance (the phone missed `done`) gets `ready` (`from` = every sample)
-and the same `done` again, for 2 minutes; on the other instance it runs again, and the copy already stored stays.
+and the same `done` again, for 2 minutes (with `namesAfter`, then its `into`, waited for if it's still being worked
+out); on the other instance it runs again, and the copy already stored stays.
 
 **How it decides** (`live.py`): the lab's live checker (`checker.run_item_live`): every 0.5 s of audio the model runs
 on the last 4 s; frames with 1 s of audio after them are final and go to the Viterbi decoder; a word is decided once
@@ -215,11 +260,13 @@ only counts, seconds, levels and reasons (the server tests check it).
   - `lag_p50`, `lag_p90`, `lag_max` (seconds from audio arriving to its events going out);
   - `cpu_s` and `cpu_per_s` (the process's CPU, the take's own at one take per instance);
   - `<part>_per_s` from the checker's `ms`. `model_per_s` is also the instance's speed, 0.12–0.27 on Cloud Run's CPUs;
-  - `sockets`, `restarted` (a resume this instance didn't have, run again from the first sample), `why`, `marks`, `kept`.
+  - `sockets`, `restarted` (a resume this instance didn't have, run again from the first sample), `why`, `marks`, `kept`;
+  - `appcheck` (`ok`, `missing`, `bad`, `unreachable`) when `APP_CHECK` is log or on.
 - **`instance`:** where a cold start's seconds go. `imports_s` (process start → the server imported), `engine_s` (the
   checker, the model and the word table), `ready_s` (process start → the port opens), `words`, and `bench_ms` (a
   fixed bit of Python, timed: the CPU apart from any take).
-- **`refused`** (`route`, `reason`: `sign_in`, `testers_only`, `premium_required`, `limit`, `bad_request`), **`error`**
+- **`refused`** (`route`, `reason`: `sign_in`, `testers_only`, `premium_required`, `app_check`, `paused`, `limit`,
+  `bad_request`), **`error`**
   (`route`), **`label`** (a dismiss or an undismiss), and **`dropped`**: a session whose phone went and didn't come
   back here (`at`: `timeout` after RESUME_TTL, or `shutdown`).
 
@@ -239,6 +286,10 @@ signs in with its own read-only provider and account (`RECITE_DIGEST_WIF_PROVIDE
 variables exist, it skips with a notice.
 
 ## Deploying (revisely-dev only)
+
+`deploy/deploy.sh dev --source DIR` does what follows for both services, with their settings in `deploy/dev.env`
+(`--migrate` then moves the traffic and tags the image `serving`). Without `--yes` it prints the commands and calls
+nothing. The commands by hand:
 
 The image holds the checker (pinned in `stage.sh`), the app's word list and, from the lab, the model, the lexicon
 and the bars. None of those go into git.
@@ -286,6 +337,40 @@ Its own account (`recite-check@`) may read Firestore (`roles/datastore.viewer`) 
 and a check of a minute's recitation takes a few seconds of CPU. The image is about 120 MB of Artifact Registry's
 free 0.5 GB; each deploy adds one, so delete old images in `cloud-run-source-deploy` after a few.
 
+## Production (built dark: nothing exists there yet)
+
+The plan is `~/Documents/revisely-release/checker-prod.md`, outside the repository. It covers where the checker runs,
+cost, alerts, the kill switches and older app versions. Nothing in it is created or deployed without Majd's word.
+What's here for it:
+- **Switches on the same image** (`server.py`). Each defaults to what dev's services have always done:
+
+  | Variable | Dev | Production | What it does |
+  | --- | --- | --- | --- |
+  | `PROJECT` | `revisely-dev` | `revision-buddy-3a398` | whose ID tokens and `entitlements` |
+  | `TESTERS_ONLY` | on (unset) | `0` | `previewTester` accounts only |
+  | `CHECK_GATE` | off | `on` | Mark mistakes needs `entitlements/{uid}.premium`; Recite needs only a sign-in |
+  | `APP_CHECK` | `log` | `log`, then `on` | the app's App Check token (`appCheck` in the start frame, `X-Firebase-AppCheck` on HTTP): counted, then refused without (`app_check`). Needs `PROJECT_NUMBER`. |
+  | `BUCKET` | dev's bucket | empty | where kept takes go. Empty: nothing is kept and labels do nothing (`{"ok": true, "kept": false}`). |
+  | `PAUSED` | `0` | `0` | `1` refuses new takes with `paused` (503); a take under way finishes, and `/health` says `paused` |
+
+  A wrong `APP_CHECK` (or log or on without a numeric `PROJECT_NUMBER`) stops the service at start, so the deploy
+  fails instead of checking nothing. `auth.app_check` verifies the token against App Check's published keys
+  (RS256), its issuer and its audience (the project's number). It keeps the keys 6 hours, fetches them again for an
+  unknown key at most once a minute, and keeps using them through a short outage at Google.
+- **`deploy/`:**
+  - `dev.env` and `prod.env`: everything that differs.
+  - `deploy.sh`: production takes only an image dev has run, by digest. It is copied into production's repository by
+    a Cloud Build in production (`copy-image.yaml`, `gcloud container images add-tag`, which keeps the digest; tried
+    between two dev repositories on Nov 16: 16 s, same digest).
+  - `setup-prod.sh`: the one-time setup, steps 1–8. It covers the service accounts, the repository and its cleanup,
+    the first deploy, opening the services, the budget on label `app=recite-check`, and the error metric with three
+    alerts (`alerts/`).
+  - All of them only print without `--yes`.
+- **The phones' switch:** `config/app.reciteCheckOff` (`functions/scripts/set-app-config.js --recite-check off|on`).
+  The app reads it once the release has the code (the release owner's).
+- **The digest:** `digest.py --project revision-buddy-3a398` reads production's lines and posts on its own issue (label
+  `recite-health-prod`).
+
 ## Two takes per instance: `recite-check-pair` (Majd approved Nov 15 2026)
 
 A take holds a whole instance for as long as its socket is open, while Recite and Words & Harakat use about 0.3 of its
@@ -312,6 +397,13 @@ stays on `recite-check`, one take per instance.
 
   The same take marked the same alone and paired. The worst hop went from 400 to about 580 ms. Before ayah judging
   moved off the hop, a Words & Harakat pair took 3 s to its summary on a fast instance (Nov 15 morning); now 0.4 s.
+- **Words & Harakat with letters doesn't pair.** The app's Words & Harakat sends `letters: true` (level
+  `harakat+letters`), so only Recite reaches the pair service today. Measured paired on a slow instance (0.21, Nov 16):
+  - the CPU for the pair came to 1.06 of the one vCPU (from the takes' health lines), 3.2× one take's 0.34 instead of
+    2×. Without letters, the pair used 0.77, and Recite pairs 0.66;
+  - the cursor's p90 went from 1.01 s to 1.30 and 1.36 s, and the worst lag was 2.7 s.
+
+  So `LEVELS` stays `recite,harakat`. The extra cost of letters under contention is open.
 - `live_e2e.py --iam-token-file` (`gcloud auth print-identity-token`) reaches it while it isn't open to the internet.
 
 ## The word table

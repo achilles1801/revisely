@@ -22,6 +22,7 @@ import { logger } from '../../lib/logger';
 import { getReadPalette } from '../../theme/readPalette';
 import { spacing } from '../../theme/spacing';
 import { typeV2 } from '../../theme/v2';
+import { dateLocale } from '../../i18n';
 
 const FOOTER_HEIGHT = CAPSULE_HEIGHT + spacing.sm;
 
@@ -122,7 +123,7 @@ export default function ListenBackScreen() {
   );
 
   const when = rec
-    ? new Date(rec.createdAt).toLocaleString([], {
+    ? new Date(rec.createdAt).toLocaleString(dateLocale('device'), {
         weekday: 'short',
         day: 'numeric',
         month: 'short',

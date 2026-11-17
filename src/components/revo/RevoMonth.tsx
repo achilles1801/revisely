@@ -13,6 +13,7 @@ import type { RevoDayFacts } from '../../lib/revo/types';
 import { typeV2 } from '../../theme/v2';
 import { BlockMark, RevisedMark } from '../activity/BlockMark';
 import { Tap } from '../v2/Tap';
+import { t, dayMonth } from '../../i18n';
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const DISC = 34;
@@ -26,8 +27,7 @@ export function ringOf(f: RevoDayFacts): number | null {
 
 /** "Tuesday 27 October": the mock's order, no comma. */
 function longDay(day: string): string {
-  const d = new Date(`${day}T00:00:00`);
-  return `${d.toLocaleDateString('en-US', { weekday: 'long' })} ${d.getDate()} ${d.toLocaleDateString('en-US', { month: 'long' })}`;
+  return dayMonth(new Date(`${day}T00:00:00`), { weekday: 'long' });
 }
 
 export function RevoMonth({
@@ -64,16 +64,24 @@ export function RevoMonth({
   const rows: { key: string; mark: React.ReactNode; label: string; value: string; mics?: number }[] = [];
   if (f) {
     const ring = ringOf(f);
-    const minutes = f.minutes ? ` · ${f.minutes} min` : '';
-    const revised = f.plan ? `${f.plan.pages - f.plan.notDone} of ${f.plan.pages}${minutes}` : f.revised.pages > 0 ? `${f.revised.pages} pages${minutes}` : 'Nothing revised';
-    rows.push({ key: 'revised', mark: <RevisedMark fraction={ring ?? 0} done={(ring ?? 0) >= 1} size={26} />, label: 'Revised', value: revised, mics: f.recordings?.count || undefined });
-    if (f.revised.name) rows.push({ key: 'passages', mark: <IconDot icon="layers-outline" />, label: 'Passages', value: f.revised.name });
+    const withMinutes = (value: string) => (f.minutes ? t('revo.month.withMinutes', { value, minutes: f.minutes }) : value);
+    const revised = f.plan
+      ? withMinutes(t('revo.month.ofPlan', { done: f.plan.pages - f.plan.notDone, total: f.plan.pages }))
+      : f.revised.pages > 0
+        ? withMinutes(t('revo.month.pagesN', { n: f.revised.pages }))
+        : t('revo.month.nothingRevised');
+    rows.push({ key: 'revised', mark: <RevisedMark fraction={ring ?? 0} done={(ring ?? 0) >= 1} size={26} />, label: t('revo.month.revised'), value: revised, mics: f.recordings?.count || undefined });
+    if (f.revised.name) rows.push({ key: 'passages', mark: <IconDot icon="layers-outline" />, label: t('revo.month.passages'), value: f.revised.name });
     const r = f.ratings;
-    const rated = [r.weak ? `${r.weak} weak` : '', r.moderate ? `${r.moderate} moderate` : '', r.strong ? `${r.strong} strong` : ''].filter(Boolean);
-    if (rated.length) rows.push({ key: 'ratings', mark: <IconDot icon="pulse-outline" />, label: 'Ratings', value: rated.join(' · ') });
-    if (f.memorized.pages > 0) rows.push({ key: 'memorized', mark: <BlockMark kind="memorized" size={26} />, label: 'Memorized', value: `+${f.memorized.pages} ${f.memorized.pages === 1 ? 'page' : 'pages'}` });
-    if (f.readMinutes) rows.push({ key: 'read', mark: <BlockMark kind="read" size={26} />, label: 'Read', value: `${f.readMinutes} min` });
-    if (f.notes?.length) rows.push({ key: 'notes', mark: <BlockMark kind="notes" size={26} />, label: 'Notes', value: `${f.notes.length}, sent with the day` });
+    const rated = [
+      r.weak ? t('revo.month.weak', { n: r.weak }) : '',
+      r.moderate ? t('revo.month.moderate', { n: r.moderate }) : '',
+      r.strong ? t('revo.month.strong', { n: r.strong }) : '',
+    ].filter(Boolean);
+    if (rated.length) rows.push({ key: 'ratings', mark: <IconDot icon="pulse-outline" />, label: t('revo.month.ratings'), value: rated.join(' · ') });
+    if (f.memorized.pages > 0) rows.push({ key: 'memorized', mark: <BlockMark kind="memorized" size={26} />, label: t('revo.month.memorized'), value: t('revo.month.memorizedPages', { count: f.memorized.pages }) });
+    if (f.readMinutes) rows.push({ key: 'read', mark: <BlockMark kind="read" size={26} />, label: t('revo.month.read'), value: t('revo.month.minutes', { n: f.readMinutes }) });
+    if (f.notes?.length) rows.push({ key: 'notes', mark: <BlockMark kind="notes" size={26} />, label: t('revo.month.notes'), value: t('revo.month.notesSent', { n: f.notes.length }) });
   }
 
   return (
@@ -81,13 +89,13 @@ export function RevoMonth({
       <View style={styles.head}>
         <Text style={[styles.title, { color: palette.text }]}>{monthTitle(month)}</Text>
         <View style={styles.chevrons}>
-          <Tap onPress={() => setMonth((m) => shiftMonth(m, -1))} accessibilityRole="button" accessibilityLabel="Previous month" hitSlop={8} testID="revo-add-month-prev">
+          <Tap onPress={() => setMonth((m) => shiftMonth(m, -1))} accessibilityRole="button" accessibilityLabel={t('revo.month.previous')} hitSlop={8} testID="revo-add-month-prev">
             <Ionicons name="chevron-back" size={21} color={palette.text} />
           </Tap>
           <Tap
             onPress={() => setMonth((m) => (m < today.slice(0, 7) ? shiftMonth(m, 1) : m))}
             accessibilityRole="button"
-            accessibilityLabel="Next month"
+            accessibilityLabel={t('revo.month.next')}
             hitSlop={8}
             testID="revo-add-month-next"
           >
@@ -124,7 +132,7 @@ export function RevoMonth({
             onPress={() => onToggle(picked)}
             disabled={!isChosen && !canAdd}
             accessibilityRole="button"
-            accessibilityLabel={isChosen ? 'Remove this day' : 'Add this day'}
+            accessibilityLabel={isChosen ? t('revo.month.removeDay') : t('revo.month.addThisDay')}
             accessibilityState={{ selected: isChosen, disabled: !isChosen && !canAdd }}
             style={[
               styles.addDay,
@@ -134,7 +142,7 @@ export function RevoMonth({
             testID="revo-add-day"
           >
             <Ionicons name={isChosen ? 'checkmark' : 'add'} size={17} color={isChosen ? palette.text : palette.onPrimary} />
-            <Text style={[typeV2.button, { color: isChosen ? palette.text : palette.onPrimary }]}>{isChosen ? 'Added' : 'Add day'}</Text>
+            <Text style={[typeV2.button, { color: isChosen ? palette.text : palette.onPrimary }]}>{isChosen ? t('revo.month.added') : t('revo.month.addDay')}</Text>
           </Tap>
         ) : null}
       </View>
@@ -180,7 +188,13 @@ function DayCell({ day, today, facts, picked, chosen, onPress }: { day: string; 
       onPress={onPress}
       disabled={future}
       accessibilityRole="button"
-      accessibilityLabel={`${longDay(day)}${ring != null ? `, revised ${Math.round(ring * 100)} percent` : ''}${chosen ? ', added' : ''}`}
+      accessibilityLabel={[
+        longDay(day),
+        ring != null ? t('revo.month.revisedPercent', { percent: Math.round(ring * 100) }) : '',
+        chosen ? t('revo.month.addedLower') : '',
+      ]
+        .filter(Boolean)
+        .join(', ')}
       accessibilityState={{ selected: picked, disabled: future }}
       style={[styles.cell, picked && { backgroundColor: palette.accentSubtle }]}
       testID={`revo-add-day-${day}`}

@@ -22,12 +22,20 @@ import { ChoiceChip } from './ChoiceChip';
 import { dayAndMonth, daysToLoad, INSIGHTS_RANGE_KEY, INSIGHTS_RANGES, parseRange, rangeLabel, rangeSpan, type InsightsRange } from '../../lib/insightsRange';
 import { journalFirstDay } from '../../lib/journal';
 import { smartTrackingOn } from '../../lib/smartTracking';
+import { gapsInsightsEnabled } from '../../lib/insightsGaps';
+import { pushBack } from '../../lib/gapsCycle';
+import { revisablePages } from '../../lib/memorizedAyahs';
+import { lastRevisedDay } from '../../lib/recency';
 import { CalendarMonth } from './CalendarMonth';
 import { InsightsView } from './InsightsView';
+import { useRecitation } from '../../lib/reciteInsights/useRecitation';
 import { useActivityReload } from './useActivityReload';
 import { listRecordings, onRecordingsChanged } from '../../lib/recordings';
 import { coverageSince } from '../../lib/recency';
 import type { PreviewBlock, RecordingCounts } from './CalendarMonth';
+import { activitySectionsEnabled, useActivitySections, type InsightsSection } from '../../lib/activitySections';
+import { IconButton } from '../v2/TopBar';
+import { SectionsSheet } from './SectionsSheet';
 
 const shiftDays = (day: string, n: number) => {
   const d = new Date(`${day}T00:00:00Z`);
@@ -46,10 +54,14 @@ interface Props {
   onAddToPlan?: (pages: number[]) => void;
   /** A weak spot's row: the reader at that page. */
   onOpenPage: (page: number) => void;
+  /** The Recitation section's rows (Revisely Dev, RINS-2): the reader at those ayahs, highlighted. */
+  onOpenAyahs?: (sura: number, from: number, to: number) => void;
   /** Pages already first tomorrow (Insights' carry): their buttons show they're done (ACT-24). */
   firstTomorrow?: ReadonlySet<number>;
   /** Weak spots' "See all pages by strength" (ACT-12). */
   onSeeAllPages?: () => void;
+  /** Gaps' "When did I last revise…?" (ACT-30). */
+  onOpenLastRevised?: () => void;
   /** Smart Tracking off: Insights' line that opens Settings at its switch (ACT-12). */
   onTurnOnSmartTracking?: () => void;
   /** Days with a note in the log (the calendar's note dot). */
@@ -62,9 +74,14 @@ interface Props {
   refreshRef?: React.MutableRefObject<(() => Promise<unknown>) | null>;
 }
 
-export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorrow, onPlanIt, onAddToPlan, onOpenPage, onSeeAllPages, onTurnOnSmartTracking, firstTomorrow, onViewChange, refreshRef }: Props) {
+export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorrow, onPlanIt, onAddToPlan, onOpenPage, onOpenAyahs, onSeeAllPages, onOpenLastRevised, onTurnOnSmartTracking, firstTomorrow, onViewChange, refreshRef }: Props) {
   const { pages, logs, user } = useApp();
   const revo = useRevoAvailable(user);
+  const recitation = useRecitation(user);
+  // The sections each tab shows, and in what order (ACT-29): the user's, kept on this phone for the account.
+  const editable = activitySectionsEnabled(user);
+  const sections = useActivitySections(user?.id, editable);
+  const [editing, setEditing] = useState<ViewKind | null>(null);
   const [view, setView] = useState<ViewKind>('calendar');
   const viewChange = useRef(onViewChange);
   viewChange.current = onViewChange;
@@ -221,6 +238,14 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
     return out;
   }, [pages, firstDay]);
   const ratedWeak = useMemo(() => ratedWeakCounts(logs, today, rangeSpan(range, today, firstDay).window), [logs, today, range, firstDay]);
+  // Gaps' full revision against the plan (ACT-28): only while Insights shows it.
+  const gapsOn = gapsInsightsEnabled(user);
+  const fullRevision = useMemo(() => {
+    if (!gapsOn || view !== 'insights' || !user) return null;
+    const plan = revisablePages(pages);
+    const lastBy = new Map(plan.filter((p) => p.lastRevisedDate).map((p) => [p.pageNumber, lastRevisedDay(user, p.lastRevisedDate as string)]));
+    return pushBack({ user, memorized: plan, today, lastRevised: (p) => lastBy.get(p) ?? null, since: (p) => coverageSinceByPage.get(p) ?? null });
+  }, [gapsOn, view, user, pages, today, coverageSinceByPage]);
 
   const revised: Revised[] = useMemo(() => (data?.revisions ?? []).map((r) => ({ day: r.day, countsFor: r.countsFor, pages: r.pages, assigned: r.assigned, minutes: r.minutes })), [data]);
   const memorized: Memorized[] = useMemo(() => (data?.memorized ?? []).map((m) => ({ day: m.day, pages: m.pages })), [data]);
@@ -240,17 +265,23 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
           tone="ink"
           hug
         />
-        {/* Insights' range (ACT-22; mock i1): at the end of the tabs row, on Insights only. */}
-        {view === 'insights' ? (
-          <ChoiceChip
-            label={rangeLabel(range)}
-            onPress={() => setRangeMenu(true)}
-            accessibilityLabel={`Insights for ${rangeLabel(range)}`}
-            accessibilityHint="Choose how far back Insights look"
-            size="md"
-            testID="insights-range"
-          />
-        ) : null}
+        <RNView style={styles.ends}>
+          {/* Insights' range (ACT-22; mock i1): at the end of the tabs row, on Insights only. */}
+          {view === 'insights' ? (
+            <ChoiceChip
+              label={rangeLabel(range)}
+              onPress={() => setRangeMenu(true)}
+              accessibilityLabel={`Insights for ${rangeLabel(range)}`}
+              accessibilityHint="Choose how far back Insights look"
+              size="md"
+              testID="insights-range"
+            />
+          ) : null}
+          {/* Edit sections (ACT-29): what the tab on show shows, and in what order. */}
+          {editable ? (
+            <IconButton icon="options-outline" label="Edit sections" onPress={() => setEditing(view)} size={22} testID="activity-edit-sections" />
+          ) : null}
+        </RNView>
       </RNView>
       <ActionSheet
         visible={rangeMenu}
@@ -281,6 +312,7 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
             onPick={setPicked}
             onOpen={onOpenDay}
             recordings={recordings}
+            sections={sections.overview}
           />
         </RNView>
       ) : (
@@ -302,6 +334,12 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
             lastRevisedOn,
             coverageSince: coverageSinceByPage,
             firstTomorrow,
+            // Gaps waits for the items: drawn from none, it fell back on the pages' last revisions and read "Today you
+            // revised" over a strip of "revised on 0 days" while they loaded (ACT-28).
+            gaps: gapsOn && data != null,
+            pushBack: fullRevision,
+            itemsFrom: rangeFrom,
+            recitation,
           }}
           onOpenDay={onOpenDay}
           onOpenCalendar={openCalendar}
@@ -309,10 +347,31 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
           onPlanIt={onPlanIt}
           onAddToPlan={onAddToPlan}
           onOpenPage={onOpenPage}
+          onOpenAyahs={onOpenAyahs}
           onSeeAllPages={onSeeAllPages}
+          onOpenLastRevised={onOpenLastRevised}
           onTurnOnSmartTracking={onTurnOnSmartTracking}
+          sections={sections.insights}
+          onEditSections={editable ? () => setEditing('insights') : undefined}
         />
       )}
+      {editable ? (
+        <>
+          <SectionsSheet tab="overview" visible={editing === 'calendar'} onClose={() => setEditing(null)} layout={sections.overview} />
+          <SectionsSheet
+            tab="insights"
+            visible={editing === 'insights'}
+            onClose={() => setEditing(null)}
+            layout={sections.insights}
+            // Recitation only for an account that recites, Gaps where it is open; Weak spots with Smart Tracking off
+            // is its invite.
+            has={(id: InsightsSection) =>
+              id === 'recitation' ? recitation != null && onOpenAyahs != null : id === 'gaps' ? gapsOn : true
+            }
+            notes={smartTrackingOn(user) ? {} : { weak: 'Smart Tracking is off' }}
+          />
+        </>
+      ) : null}
     </RNView>
   );
 }
@@ -320,4 +379,6 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
 const styles = StyleSheet.create({
   // The range chip wraps under the tabs when the row can't hold all three (large text, an SE).
   switch: { paddingHorizontal: layoutV2.gutter, paddingTop: layoutV2.rowPad, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', columnGap: 8, rowGap: 8 },
+  // The range chip and Edit sections, together at the end of the row.
+  ends: { flexDirection: 'row', alignItems: 'center', gap: 14, marginLeft: 'auto' },
 });

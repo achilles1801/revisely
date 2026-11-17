@@ -14,6 +14,7 @@ import { PillButton } from '../../v2/PillButton';
 import { ThreadRow } from '../../v2/ThreadRow';
 import { ProgressBar } from '../../ProgressBar';
 import { Tap } from '../../v2/Tap';
+import { t } from '../../../i18n';
 
 export type { TodayStatus } from '../../../lib/todayLines';
 
@@ -31,7 +32,7 @@ export function memorizedText(pages: UserPage[]) {
   // A partly memorized page counts by its share of the page (MEM-2).
   const fraction = stats.share / 604;
   return {
-    body: `${formatPercent(fraction)} of the Quran memorized`,
+    body: t('home.today.memorized', { percent: formatPercent(fraction) }),
     /** Of the 604 pages. */
     fraction,
     /** Each juz's memorized share, juz 1 first (the juz dots). */
@@ -128,20 +129,20 @@ export function TodayPost({
   const grace = streakGrace ?? null;
   // In grace the streak that can come back shows dimmed, with a ring for the missed pages (SESS-6).
   const meta = grace
-    ? `Today · ${grace.previous}-day streak`
+    ? t('home.today.streak', { days: grace.previous })
     : streak > 0
-      ? `Today · ${streak}-day streak`
-      : 'Today';
+      ? t('home.today.streak', { days: streak })
+      : t('common.today');
 
   const actions: SheetAction[] = [
     {
       key: 'jump',
-      label: 'Jump to…',
-      subtitle: 'Start today at another juz, surah or page',
+      label: t('home.today.jump'),
+      subtitle: t('home.today.jumpSubtitle'),
       icon: 'locate-outline',
       onPress: onJump,
     },
-    { key: 'schedule', label: 'Edit schedule', icon: 'calendar-outline', onPress: onEditSchedule },
+    { key: 'schedule', label: t('home.today.editSchedule'), icon: 'calendar-outline', onPress: onEditSchedule },
   ];
 
   // Two lines, each at most two lines tall: where today starts (ink), then how
@@ -174,7 +175,7 @@ export function TodayPost({
             numberOfLines={1}
             maxFontSizeMultiplier={LINES_MAX_SCALE}
           >
-            {`${detail.done} of ${detail.total}`}
+            {t('common.nOfTotal', { n: detail.done, total: detail.total })}
           </Text>
         </View>
       ) : (
@@ -189,7 +190,7 @@ export function TodayPost({
     <View testID="today-thread">
       <ThreadRow
         mark={<Mark label={initial} />}
-        name={name || 'Today'}
+        name={name || t('common.today')}
         meta={name ? meta : undefined}
         figure={
           grace || help ? (
@@ -216,11 +217,11 @@ export function TodayPost({
                   {catchUp.title}
                 </Text>
                 <PillButton
-                  title={carrying ? 'Adding…' : 'Add to today'}
+                  title={carrying ? t('home.today.adding') : t('home.today.addToToday')}
                   variant="outline"
                   onPress={onCarryOver}
                   disabled={carrying}
-                  accessibilityLabel={`${catchUp.label}. Add to today`}
+                  accessibilityLabel={t('home.today.addToTodayLabel', { line: catchUp.label })}
                   testID="today-carry-over"
                 />
               </View>
@@ -252,7 +253,7 @@ export function TodayPost({
               onPress={onMemorization}
               hitSlop={6}
               accessibilityRole="button"
-              accessibilityLabel={`${memorized.body}. Edit memorized pages`}
+              accessibilityLabel={t('home.today.editMemorizedLabel', { line: memorized.body })}
               style={styles.memorized}
               testID="today-memorized"
             >
@@ -275,7 +276,7 @@ export function TodayPost({
             onPress={() => setMenuOpen(true)}
             accessibilityRole="button"
             accessibilityLabel={lines.label}
-            accessibilityHint="Jump to another start, or edit the schedule"
+            accessibilityHint={t('home.today.summaryHint')}
             testID="today-summary"
           >
             {summary}
@@ -286,7 +287,7 @@ export function TodayPost({
       <ActionSheet
         visible={menuOpen}
         onClose={() => setMenuOpen(false)}
-        title="Today"
+        title={t('common.today')}
         message={lines.ranges}
         // A header line, like the title and the rows (1.4): at the largest
         // sizes a surah name would otherwise split mid-word on a small phone.

@@ -21,6 +21,7 @@ import ActivityScreen from '../screens/activity/ActivityScreen';
 import ActivityDayScreen from '../screens/activity/ActivityDayScreen';
 import ActivityAllScreen from '../screens/activity/ActivityAllScreen';
 import PagesByStrengthScreen from '../screens/activity/PagesByStrengthScreen';
+import LastRevisedScreen from '../screens/activity/LastRevisedScreen';
 import { activityBlocksEnabled } from '../components/activity/DayBlocks';
 import type { ActivityKind } from '../lib/activityItems';
 import { ReadingTimerProvider } from '../context/ReadingTimerContext';
@@ -70,7 +71,9 @@ export type HomeStackParamList = {
   ActivityDay: { date: string; focusRecordingId?: string; focusBlock?: 'revised' | 'memorized' | 'read' | 'notes' };
   // The reader over Activity (a page of a day's strip, a weak spot): back returns to where it was
   // opened (ACT-20), unlike the Read tab's reader.
-  QuranReader: { pageNumber: number };
+  // `highlight`: ayahs highlighted until the page is turned (Insights' Recitation rows, RINS-2), as the Read tab's.
+  // `showTake`: a past recitation take (Recite's memory, Revisely Dev) shown on its page with its marks.
+  QuranReader: { pageNumber: number; highlight?: { sura: number; ayah: number; last?: { sura: number; ayah: number } }; showTake?: string };
   // A recording played over the pages it was recorded on, from fromMs (ms
   // into it; default the start).
   ListenBack: { recordingId: string; fromMs?: number };
@@ -78,6 +81,8 @@ export type HomeStackParamList = {
   ActivityAll: { kind?: ActivityKind } | undefined;
   // Every revised page by strength (the Insights tab's Browse), from Activity's Weak spots.
   PagesByStrength: undefined;
+  // When each surah, juz, hizb or page was last revised (ACT-30), from Insights' Gaps.
+  LastRevised: undefined;
   // Daily-log editor. date is YYYY-MM-DD; omitted means "today" (fajr-aware
   // revision day).
   JournalEntry: { date?: string; kind?: JournalKind } | undefined;
@@ -89,11 +94,14 @@ export type HomeStackParamList = {
 export type ReadStackParamList = {
   ReadIndex: undefined;
   /** `highlight`: a verse found by search, highlighted on its page until the page is turned; with
-   *  `last`, the verses from it to `last` (a match that runs on into the next ayah). */
+   *  `last`, the verses from it to `last` (a match that runs on into the next ayah). `recite`: a voice
+   *  search's one result (Revisely Dev's live check): a take starts there as the reader opens. */
   QuranReader: {
     pageNumber: number;
     source?: 'index' | 'recent' | 'search';
     highlight?: { sura: number; ayah: number; last?: { sura: number; ayah: number } };
+    /** A past recitation take (Recite's memory, Revisely Dev) shown on its page with its marks. */
+    showTake?: string;
   };
   /** Search the Qur'an (testers); `listen`: start listening at once (the Read tab's mic). */
   QuranSearch: { listen?: boolean } | undefined;
@@ -118,7 +126,7 @@ const HIDE_TAB_BAR_ON = new Set([
   'PlanEdit',
   'PlanDayEdit',
   'ActiveRevision',
-  'Memorization',
+  'Memorization', // i18n-ignore (route names)
   'QuranReader',
   'QuranSearch',
   'JournalEntry',
@@ -148,6 +156,7 @@ function HomeStackNavigator() {
       <HomeStack.Screen name="ListenBack" component={ListenBackScreen} />
       <HomeStack.Screen name="ActivityAll" component={ActivityAllScreen} />
       <HomeStack.Screen name="PagesByStrength" component={PagesByStrengthScreen} />
+      <HomeStack.Screen name="LastRevised" component={LastRevisedScreen} />
       <HomeStack.Screen name="JournalEntry" component={JournalEntryScreen} />
       <HomeStack.Screen name="QuranReader" component={QuranReaderScreen} />
     </HomeStack.Navigator>

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, AppState } from 'react-native';
+import { AccessibilityInfo, AppState, LayoutAnimation } from 'react-native';
 import { getAuth } from 'firebase/auth';
+import * as Sentry from '@sentry/react-native';
 import { getRecordingPermissionsAsync, requestRecordingPermissionsAsync } from 'expo-audio';
 import { claimAudio, enterRecordingMode, isAudioSessionError, setAudioMode } from '../../lib/audioFocus';
 import { getRecitation } from '../../lib/recitation';
@@ -18,7 +19,7 @@ import type { LiveEvent, Mark } from '../../lib/reciteLive/contract';
 import type { LiveConnect, LiveConnection, StartFrame } from '../../lib/reciteLive/feed';
 import { socketFeed } from '../../lib/reciteLive/socket';
 import { stopHearing } from '../../lib/reciteLive/hearAudio';
-import { AyahRange, lastWordOf } from '../../lib/reciteLive/drill';
+import { spanEndWord, TakeSpan } from '../../lib/reciteLive/span';
 import { stopTrace } from '../../lib/reciteLive/stopTrace';
 import { SavedTake, startTakeRecording, TakeRecording } from '../../lib/reciteLive/takeRecording';
 import {
@@ -32,6 +33,8 @@ import {
   liveStopping,
   seekOnPage,
 } from '../../lib/reciteLive/state';
+import { isDevVariant } from '../../lib/variant';
+import { useReduceMotion } from '../../design/motion';
 
 /** What the mic does while reciting: follow along (free), or follow and mark mistakes (Check). */
 export type LiveMode = 'recite' | 'check';
@@ -60,6 +63,13 @@ const SEND_HINTS = true;
  */
 export const START_ANYWHERE = true;
 
+/**
+ * A take from the reader's mic may start anywhere in the Qur'an (Majd, Nov 15 2026: step 2 of search and follow-along;
+ * protocol 7): when the page doesn't match, the checker looks in the whole Qur'an and the reader turns to where it
+ * locks. Never for a span (a drill, a Test me place, a voice search's ayahs): those know where they are.
+ */
+export const START_IN_QURAN = true;
+
 /** The page's last ayah: the start frame's `startBy`. */
 function lastAyahOf(page: number): [number, number] {
   const verses = versesOnPage(page);
@@ -82,31 +92,38 @@ const defaultConnect: LiveConnect = (start, handlers) => {
 
 /**
  * The start frame for a take on `page`, with the account's settings (contract draft 5): anywhere on the page
- * (`startBy`, the page's last ayah), or from its first ayah; or over a given stretch of ayahs ("Recite the mistakes
- * again"), from its first ayah to its last.
+ * (`startBy`, the page's last ayah), or from its first ayah; or over a given span (lib/reciteLive/span): a stretch of
+ * ayahs ("Recite the mistakes again", from its first ayah to its last), or the ayahs a voice search found (the start
+ * looked for only there).
  */
 export function startFrameFor(
   page: number,
   mode: LiveMode,
   settings: ReciteCheckSettings,
   anywhere: boolean = START_ANYWHERE,
-  range: AyahRange | null = null,
+  span: TakeSpan | null = null,
 ): StartFrame {
   const first = versesOnPage(page)[0] ?? { sura: 1, ayah: 1 };
+  const startBy = span ? span.startBy : anywhere ? lastAyahOf(page) : undefined;
   return {
     type: 'start',
-    s: range ? range.from[0] : first.sura,
-    a: range ? range.from[1] : first.ayah,
-    s2: range ? range.to[0] : null,
-    a2: range ? range.to[1] : null,
+    s: span ? span.from[0] : first.sura,
+    a: span ? span.from[1] : first.ayah,
+    s2: span?.to ? span.to[0] : null,
+    a2: span?.to ? span.to[1] : null,
     mon: settings.munfasil,
     mot: settings.muttasil,
     aar: settings.aared,
     letters: true,
     tajweed: settings.level === 'strict',
-    keep: settings.keep,
+    // Kept as test data only on Revisely Dev's checker: production's keeps nothing (recite-server-prod-plan.md), so the
+    // store app never asks, and never says a take was kept.
+    keep: settings.keep && isDevVariant(),
     follow: mode === 'recite',
-    ...(anywhere && !range ? { startBy: lastAyahOf(page) } : {}),
+    // Mark mistakes: the summary at once, where a slip went a moment later (contract draft 8)
+    ...(mode === 'check' ? { namesAfter: true } : {}),
+    ...(startBy ? { startBy } : {}),
+    ...(startBy && !span && START_IN_QURAN ? { startIn: 'quran' as const } : {}),
   };
 }
 
@@ -141,6 +158,9 @@ export function useLiveRecitation({
   connect?: LiveConnect;
 }) {
   const [state, setState] = useState<LiveState>(LIVE_IDLE);
+  const reduceMotion = useReduceMotion();
+  const reduceMotionRef = useRef(reduceMotion);
+  reduceMotionRef.current = reduceMotion;
   const [mode, setMode] = useState<LiveMode | null>(null);
   const [mic, setMic] = useState<MicStatus>('off');
   const [seconds, setSeconds] = useState(0);
@@ -170,7 +190,7 @@ export function useLiveRecitation({
   // and when the cursor first reached each word, in seconds of the take (for a mark that carries no time of its own).
   const lastConn = useRef<LiveConnection | null>(null);
   const wordTimes = useRef(new Map<number, number>());
-  /** A drill take's last word: it stops by itself once the checker has decided it. */
+  /** A drill take's last word (a span with an end): it stops by itself once the checker has decided it. */
   const endWord = useRef<number | null>(null);
   // For the Stop trace (lib/reciteLive/stopTrace), read when Stop is tapped.
   const traceRef = useRef({ state, mode, seconds });
@@ -178,7 +198,16 @@ export function useLiveRecitation({
   /** Each event the take receives: its type to the Stop trace, then the live state. */
   const onEvent = useCallback((e: LiveEvent) => {
     stopTrace.event(e.type);
+    // Found elsewhere in the Qur'an (protocol 7): a breadcrumb for any report that follows (numbers only; the checker
+    // keeps where every kept take locked).
+    if (e.type === 'locked' && e.where === 'quran') {
+      Sentry.addBreadcrumb({ category: 'recite', message: 'locked elsewhere in the Quran', data: { page: getQuranWords()?.pageOf(e.w) } });
+    }
     if (e.type === 'at' && !wordTimes.current.has(e.w)) wordTimes.current.set(e.w, e.t ?? samples.current / SAMPLE_RATE);
+    // Where the slips went, after the summary is up (namesAfter): its rows ease in rather than push the rest down at once
+    if (e.type === 'into' && e.names.length && !reduceMotionRef.current) {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    }
     setState((s) => applyEvent(s, e));
   }, []);
 
@@ -248,8 +277,14 @@ export function useLiveRecitation({
   }, [stopMic]);
 
   const start = useCallback(
-    async (take: LiveMode, range: AyahRange | null = null) => {
-      if (conn.current || source.current) return;
+    async (take: LiveMode, span: TakeSpan | null = null) => {
+      if (source.current) return;
+      if (conn.current) {
+        // The take before has its final answer and only waits for where its slips went (namesAfter): it ends here.
+        if (traceRef.current.state.status !== 'done') return;
+        conn.current.close();
+        conn.current = null;
+      }
       stopHearing();
       pausedRef.current = false;
       setPaused(false);
@@ -259,15 +294,15 @@ export function useLiveRecitation({
       setSeconds(0);
       samples.current = 0;
       endWord.current = null;
-      /** The page the take starts on: the stretch's first ayah's (turned to), or the one on screen. */
+      /** The page the take starts on: the span's first ayah's (turned to), or the one on screen. */
       const startPage = (qw: QuranWords) => {
-        if (!range) return pageRef.current;
-        const page = qw.pageOf(qw.verseFirstWord(range.from[0], range.from[1]));
+        if (!span) return pageRef.current;
+        const page = qw.pageOf(qw.verseFirstWord(span.from[0], span.from[1]));
         if (page !== pageRef.current) {
           turningTo.current = page;
           onShowPageRef.current(page);
         }
-        endWord.current = lastWordOf(qw, range);
+        endWord.current = spanEndWord(qw, span);
         return page;
       };
       // The inlined variable folds this branch away in every other build.
@@ -284,7 +319,7 @@ export function useLiveRecitation({
         }
         setWords(qw);
         const page = startPage(qw);
-        const frame = startFrameFor(page, take, settings, START_ANYWHERE, range);
+        const frame = startFrameFor(page, take, settings, START_ANYWHERE, span);
         setTestData(frame.keep);
         setMode(take);
         setState(connectingFor(frame, qw));
@@ -333,7 +368,7 @@ export function useLiveRecitation({
         const qw = await loadQuranWords();
         setWords(qw);
         const page = startPage(qw);
-        const frame = startFrameFor(page, take, settings, START_ANYWHERE, range);
+        const frame = startFrameFor(page, take, settings, START_ANYWHERE, span);
         setTestData(frame.keep);
         claimAudio('recorder', owner);
         getRecitation().stop();

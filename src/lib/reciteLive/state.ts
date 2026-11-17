@@ -56,6 +56,11 @@ export interface LiveState {
   seekFrom: number | null;
   /** The checker's protocol (`ready`); null until it's ready. Below 6 it doesn't look: the take starts at s:a. */
   protocol: number | null;
+  /**
+   * Something else is being said where word `w` goes (the checker's `off`, contract draft 7): the hidden view's red cover
+   * on `w`. `from`: the cursor when it came, so going back clears it. Never a mark, never counted.
+   */
+  off: { w: number; from: number | null } | null;
 }
 
 /** A mark taken off with "Not a mistake": the mark, and what it had counted in the score (taken off with it). */
@@ -81,6 +86,7 @@ export const LIVE_IDLE: LiveState = {
   seeking: false,
   seekFrom: null,
   protocol: null,
+  off: null,
 };
 
 /**
@@ -116,7 +122,20 @@ export function checkerLooks(state: LiveState): boolean {
  * take's start. The cursor goes until it's found; what was decided stays.
  */
 export function seekOnPage(state: LiveState, w: number): LiveState {
-  return { ...state, seeking: true, seekFrom: w, cursor: null };
+  return { ...state, seeking: true, seekFrom: w, cursor: null, off: null };
+}
+
+/**
+ * What clears the red cover: the word reached (`at` on it or past it) or decided (`said`), the reciter going back (`at`
+ * before where it was when `off` came), or a mark on the word, or an extra word marked just before it (the same stray
+ * speech, decided).
+ */
+function offAfter(off: LiveState['off'], e: LiveEvent): LiveState['off'] {
+  if (!off) return off;
+  if (e.type === 'at') return e.w >= off.w || (off.from != null && e.w < off.from) ? null : off;
+  if (e.type === 'said') return e.upTo >= off.w ? null : off;
+  if (e.type === 'mark') return e.mark.w === off.w || (e.mark.kind === 'added' && e.mark.w === off.w - 1) ? null : off;
+  return off;
 }
 
 /** The checker's cursor came without `locked` (a checker that doesn't look): it began at the searched page's top. */
@@ -129,10 +148,12 @@ const beforeStart = (m: Mark, start: number | null) => start != null && m.kind =
 
 /** Stop was tapped: the live marks stay while the final answer comes. */
 export function liveStopping(state: LiveState): LiveState {
-  return state.status === 'listening' || state.status === 'connecting' ? { ...state, status: 'checking' } : state;
+  return state.status === 'listening' || state.status === 'connecting' ? { ...state, status: 'checking', off: null } : state;
 }
 
 export function applyEvent(state: LiveState, e: LiveEvent): LiveState {
+  const off = offAfter(state.off, e);
+  if (off !== state.off) state = { ...state, off };
   switch (e.type) {
     case 'ready': {
       const protocol = e.protocol ?? 5;
@@ -153,6 +174,7 @@ export function applyEvent(state: LiveState, e: LiveEvent): LiveState {
         ...state,
         start,
         seeking: false,
+        off: null,
         cursor: e.w,
         marks: Object.fromEntries(Object.entries(state.marks).filter(([, m]) => !beforeStart(m, start))),
       };
@@ -173,6 +195,11 @@ export function applyEvent(state: LiveState, e: LiveEvent): LiveState {
       delete marks[e.id];
       return { ...state, marks };
     }
+    case 'off':
+      // Only while reciting, once the reciter is found, and for a word not reached yet (a resume replays it).
+      if (state.status !== 'listening' || state.seeking || (state.cursor != null && state.cursor >= e.w)) return state;
+      if (state.saidUpTo != null && state.saidUpTo >= e.w) return state;
+      return state.off?.w === e.w ? state : { ...state, off: { w: e.w, from: state.cursor } };
     case 'ayah':
       return { ...state, lastAyah: [e.s, e.a] };
     case 'score':
@@ -202,6 +229,7 @@ export function applyEvent(state: LiveState, e: LiveEvent): LiveState {
         removed,
         start,
         seeking: false,
+        off: null,
         status: 'done',
         take: e.result.take ?? state.take,
         marks,
@@ -209,9 +237,26 @@ export function applyEvent(state: LiveState, e: LiveEvent): LiveState {
         final: e.result,
       };
     }
+    case 'into': {
+      // The names that came after the final answer (contract draft 8): each joins its mark by id, wherever it is (shown,
+      // taken off, or in the final answer), so Put back and the kept take have it too.
+      if (state.status !== 'done' || !e.names.length) return state;
+      const byId = new Map(e.names.map((n) => [n.id, n.into]));
+      const named = (m: Mark): Mark => (byId.has(m.id) ? { ...m, into: byId.get(m.id) } : m);
+      const marks: Record<string, Mark> = {};
+      for (const [id, m] of Object.entries(state.marks)) marks[id] = named(m);
+      const removed: Record<string, Removed> = {};
+      for (const [id, r] of Object.entries(state.removed)) removed[id] = { ...r, mark: named(r.mark) };
+      return {
+        ...state,
+        marks,
+        removed,
+        final: state.final ? { ...state.final, marks: state.final.marks.map(named) } : state.final,
+      };
+    }
     case 'error':
       // A take that has its final answer keeps it; otherwise what was shown stays, marked as failed.
-      return state.status === 'done' ? state : { ...state, status: 'failed', failure: e.reason };
+      return state.status === 'done' ? state : { ...state, status: 'failed', failure: e.reason, off: null };
   }
 }
 

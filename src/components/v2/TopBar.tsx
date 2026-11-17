@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { layoutV2, typeV2 } from '../../theme/v2';
 import { Tap } from './Tap';
+import { t } from '../../i18n';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -70,7 +71,7 @@ export function TopBar({
       ]}
     >
       <View style={[styles.side, styles.left, { width: sideWidth }]}>
-        {onBack ? <IconButton icon="chevron-back" onPress={onBack} label="Back" size={26} testID="back" /> : left}
+        {onBack ? <IconButton icon="chevron-back" onPress={onBack} label={t('common.back')} size={26} testID="back" /> : left}
       </View>
       <View style={styles.center}>
         {center ??

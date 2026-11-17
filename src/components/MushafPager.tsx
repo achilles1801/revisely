@@ -40,6 +40,8 @@ import { AyahRef, ayahAt, ayahRects, Rect } from '../lib/ayahBounds';
 import { Box, unionBox } from './verse/menuPlacement';
 import { fitPage, PageSize } from '../lib/pageFit';
 import { MushafEditionId, mushafEdition, useMushafEdition } from '../lib/mushafEdition';
+import { pagerStartIndex } from '../lib/pagerStart';
+import { t } from '../i18n';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -52,6 +54,23 @@ const JUMP_SETTLE_MS = 500;
 // The end card's item in the list (page numbers are 1–604).
 const END = -1;
 const NO_HIGHLIGHT: readonly AyahRef[] = [];
+
+// E2E builds only (the bundler folds this away in every other build): the pager's drags, momentum, jumps and the
+// page the list settles on, in the build's log (lib/e2e/log, app.log beside a failed flow). On the Android emulator a
+// session page sometimes ignored two swipes in a row: both touches reached the app and the native scroll took them,
+// but the page never turned (flow 04, run 43768521638). These lines say whether the list moved and snapped back, or
+// never moved.
+// Every call is behind its own `process.env.EXPO_PUBLIC_E2E === '1'`, which the bundler inlines, so other builds
+// drop the calls and their text (a test on a variable would leave them in).
+const e2eSay = (line: string) => {
+  // eslint-disable-next-line no-console
+  console.log(`[e2e] pager ${line}`);
+};
+const e2eX = (e?: NativeSyntheticEvent<NativeScrollEvent>): string => {
+  const x = e?.nativeEvent?.contentOffset?.x;
+  // i18n-ignore (an E2E log line)
+  return typeof x === 'number' ? `x ${Math.round(x)} (index ${(x / SCREEN_WIDTH).toFixed(2)})` : 'x ?';
+};
 
 interface MushafPagerProps {
   pages: number[];
@@ -138,15 +157,19 @@ interface PageItemProps {
   bg: string;
   /** The page as drawn: fits the pager, so controls never cover it. */
   size: PageSize;
+  /** The pager has measured itself, so `size` is the page's real size (its image is drawn only then). */
+  sized: boolean;
   /** Over the image (pageOverlay). */
   overlay?: (image: PageImage | null) => React.ReactNode;
   /** Behind the image's ink (pageUnderlay). */
   underlay?: React.ReactNode;
-  /** pageAccessories (undefined when the pager has none: the page alone). */
+  /** pageAccessories (undefined when the pager has none). */
   accessories?: React.ReactNode;
   onTapPoint?: (pageNumber: number, x: number, y: number, toWindow: (r: Rect) => Box) => boolean;
   onTapVerse?: (ayah: AyahRef) => boolean;
 }
+
+const NO_RECTS: readonly Rect[] = [];
 
 const PageItem = React.memo(function PageItem({
   pageNumber,
@@ -161,6 +184,7 @@ const PageItem = React.memo(function PageItem({
   mutedColor,
   bg,
   size,
+  sized,
   overlay,
   underlay,
   accessories,
@@ -175,6 +199,11 @@ const PageItem = React.memo(function PageItem({
   const [uri, setUri] = useState<string | null>(() => getCachedPageUri(pageNumber, edition));
   const [attempt, setAttempt] = useState(0);
   const [loading, setLoading] = useState(false);
+  // The image that has been drawn (its onLoad). A verse's highlight waits for it, so the boxes and the page appear
+  // together: drawn before it, they showed on a blank page while the reader slid in, since the image waits for the
+  // pager's size and then decodes (Majd, Nov 16 2026: "it should show up at the same time").
+  const [drawnUri, setDrawnUri] = useState<string | null>(null);
+  const pageDrawn = sized && uri != null && drawnUri === uri;
   // Couldn't be shown: 'offline' (not on the phone, no connection) or 'failed'.
   const [missing, setMissing] = useState<'offline' | 'failed' | null>(null);
   const isRemote = uri != null && uri.startsWith('http');
@@ -262,8 +291,8 @@ const PageItem = React.memo(function PageItem({
       // The placeholder's text and button are read on their own.
       accessible={!missing}
       accessibilityRole="button"
-      accessibilityLabel={`Page ${pageNumber}`}
-      accessibilityHint={onTap ? 'Shows or hides the controls' : undefined}
+      accessibilityLabel={t('mushaf.pager.page', { page: pageNumber })}
+      accessibilityHint={onTap ? t('mushaf.pager.hint') : undefined}
     >
       {(uri == null || (isRemote && loading)) && !missing && (
         <View style={styles.loadingOverlay}>
@@ -278,12 +307,12 @@ const PageItem = React.memo(function PageItem({
             color={mutedColor}
           />
           <Text style={[typeV2.name, styles.missingText, { color: tintColor }]}>
-            {missing === 'offline' ? `Page ${pageNumber} isn't downloaded yet` : `Couldn't load page ${pageNumber}`}
+            {missing === 'offline' ? t('mushaf.pager.notDownloaded', { page: pageNumber }) : t('mushaf.pager.couldNotLoad', { page: pageNumber })}
           </Text>
           <Text style={[typeV2.meta, styles.missingText, { color: mutedColor }]}>
-            {missing === 'offline' ? "It shows when you're back online." : 'Check your connection and try again.'}
+            {missing === 'offline' ? t('mushaf.pager.backOnline') : t('common.checkConnection')}
           </Text>
-          <PillButton title="Try again" variant="outline" size="sm" onPress={retry} testID="page-retry" />
+          <PillButton title={t('common.tryAgain')} variant="outline" size="sm" onPress={retry} testID="page-retry" />
         </View>
       ) : uri != null ? (
         // The pressable is exactly the image, so touch locations are page
@@ -296,8 +325,8 @@ const PageItem = React.memo(function PageItem({
           accessible={false}
         >
           {underlay}
-          {/* The verse's lines, in the image's own frame: bounds × the page's scale. */}
-          {highlightRects.map((r, i) => (
+          {/* The verse's lines, in the image's own frame: bounds × the page's scale; once the page is drawn. */}
+          {(pageDrawn ? highlightRects : NO_RECTS).map((r, i) => (
             <View
               key={i}
               testID="ayah-highlight"
@@ -315,51 +344,61 @@ const PageItem = React.memo(function PageItem({
               ]}
             />
           ))}
-          <Image
-            testID="page-image"
-            source={{ uri }}
-            {...pageImageProps()}
-            style={[
-              { width: size.width, height: size.height },
-              pageTint != null && { tintColor: pageTint, opacity: 0.92 },
-            ]}
-            fadeDuration={0}
-            onLoadStart={() => setLoading(true)}
-            onLoadEnd={() => setLoading(false)}
-            onError={() => {
-              setLoading(false);
-              if (!isRemote) {
-                // A whole file that failed to decode (memory) stays; Try again
-                // shows it. A broken one is deleted (and downloaded again).
-                if (evictCachedPage(pageNumber, uri, edition)) {
-                  setMissing('failed');
-                  return;
-                }
-                // Moved meanwhile (the first launch's move out of the caches directory)?
-                const moved = getCachedPageUri(pageNumber, edition);
-                if (moved && moved !== uri) setUri(moved);
-                else if (knownOffline()) {
-                  setUri(null);
-                  setMissing('offline');
+          {/* Until the pager has measured itself the page's size is a guess (the screen's width). iOS decodes an image
+              at the size it's laid out at, so drawing it then decoded every page on screen twice on opening, with a
+              blank between the two (a 2600×4206 page each time). */}
+          {!sized ? (
+            <View style={{ width: size.width, height: size.height }} />
+          ) : (
+            <Image
+              testID="page-image"
+              source={{ uri }}
+              {...pageImageProps()}
+              style={[
+                { width: size.width, height: size.height },
+                pageTint != null && { tintColor: pageTint, opacity: 0.92 },
+              ]}
+              fadeDuration={0}
+              onLoadStart={() => setLoading(true)}
+              onLoad={() => setDrawnUri(uri)}
+              onLoadEnd={() => setLoading(false)}
+              onError={() => {
+                setLoading(false);
+                if (!isRemote) {
+                  // A whole file that failed to decode (memory) stays; Try again
+                  // shows it. A broken one is deleted (and downloaded again).
+                  if (evictCachedPage(pageNumber, uri, edition)) {
+                    setMissing('failed');
+                    return;
+                  }
+                  // Moved meanwhile (the first launch's move out of the caches directory)?
+                  const moved = getCachedPageUri(pageNumber, edition);
+                  if (moved && moved !== uri) setUri(moved);
+                  else if (knownOffline()) {
+                    setUri(null);
+                    setMissing('offline');
+                  } else {
+                    setUri(nativeRequestUrl(getQuranPageImageUrl(pageNumber, undefined, edition)));
+                  }
                 } else {
-                  setUri(nativeRequestUrl(getQuranPageImageUrl(pageNumber, undefined, edition)));
+                  setMissing(knownOffline() ? 'offline' : 'failed');
                 }
-              } else {
-                setMissing(knownOffline() ? 'offline' : 'failed');
-              }
-            }}
-          />
+              }}
+            />
+          )}
           {overlay ? overlay({ uri, width: size.width, height: size.height }) : null}
         </Pressable>
       ) : null}
     </Pressable>
   );
-  if (accessories === undefined) return pageView;
-  // Beside the page, in the image's frame (the page centres it), so they are elements of their own.
+  // Accessories go beside the page, in the image's frame (the page centres it), so they are elements of their own.
+  // The page is wrapped the same way with or without them: a screen that starts passing them (the reader, once its
+  // word data has loaded on the first open after launch) would otherwise remount every page, and each image would
+  // load again, blank meanwhile.
   return (
     <View style={styles.pageWrap}>
       {pageView}
-      {uri != null && !missing ? (
+      {accessories !== undefined && uri != null && !missing ? (
         <View pointerEvents="box-none" style={styles.accessories}>
           <View pointerEvents="box-none" style={{ width: size.width, height: size.height }}>
             {accessories}
@@ -405,7 +444,11 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
   const [space, setSpace] = useState<{ width: number; height: number }>({ width: SCREEN_WIDTH, height: 0 });
   const aspect = mushafEdition(edition).aspect;
   const pageSize = useMemo<PageSize>(() => fitPage(space.width, space.height, aspect), [space, aspect]);
-  const currentIndexRef = useRef(0);
+  const sized = space.height > 0;
+  // Where the list starts, from its first frame (READ-1). It used to start at page 1 and scroll to the page 50 ms
+  // after mount: a surah opened from the Read tab showed Al-Fatihah for about half a second first (Majd, Nov 15 2026).
+  const [startIndex] = useState(() => pagerStartIndex(pages, initialPage));
+  const currentIndexRef = useRef(startIndex ?? 0);
   // Only auto-scroll on first mount. After that, the user drives position by
   // swiping; re-scrolling on every `pages` reference change would yank them
   // back whenever a parent prop bump occurs (e.g. context re-renders from
@@ -427,6 +470,8 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
   // On iOS CI a 30 s stall did that, and the page between went uncounted (E2E
   // 04, run 42746203992). Emptied by every page change and every jump.
   const dragStartsRef = useRef<number[]>([]);
+  // E2E builds: the page under the offset as last logged (e2eSay's onScroll).
+  const e2eScrollIndex = useRef<number | null>(null);
 
   // Download the pages around the starting one before they are swiped to (and
   // around the current one when another print is chosen).
@@ -447,7 +492,11 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
     setTimeout(() => {
       // A jump made meanwhile (scrollToPage) is where the pager belongs: this
       // scroll must not pull it back to the starting page.
-      if (currentIndexRef.current !== idx) return;
+      if (currentIndexRef.current !== idx) {
+        if (process.env.EXPO_PUBLIC_E2E === '1') e2eSay(`start-up scroll to index ${idx} skipped: at ${currentIndexRef.current}`);
+        return;
+      }
+      if (process.env.EXPO_PUBLIC_E2E === '1') e2eSay(`start-up scroll to index ${idx}`);
       listRef.current?.scrollToIndex({ index: idx, animated: false });
     }, 50);
   }, [initialPage, pages]);
@@ -462,6 +511,7 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
         // sees no change and cannot mistake the jump for advancing.
         const from = currentIndexRef.current;
         const changed = idx !== from;
+        if (process.env.EXPO_PUBLIC_E2E === '1') e2eSay(`jump to page ${pageNumber} (index ${idx}) from index ${from}`);
         currentIndexRef.current = idx;
         draggedRef.current = false;
         dragStartsRef.current = [];
@@ -492,6 +542,10 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
 
   const handleViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      if (process.env.EXPO_PUBLIC_E2E === '1') e2eSay(
+        `viewable ${viewableItems.map((v) => v.index).join(',') || 'none'}; at index ${currentIndexRef.current}, ` +
+          `${draggedRef.current ? 'dragged' : 'not dragged'}, drags from ${dragStartsRef.current.join(',') || 'none'}`,
+      );
       if (viewableItems.length === 0) return;
       const first = viewableItems[0];
       if (first.index == null) return;
@@ -521,7 +575,10 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
       // other page is where the list really is (e.g. the user swiped meanwhile).
       const jump = jumpRef.current;
       if (jump) {
-        if (newIndex === jump.from && newIndex !== jump.to && Date.now() < jump.until) return;
+        if (newIndex === jump.from && newIndex !== jump.to && Date.now() < jump.until) {
+          if (process.env.EXPO_PUBLIC_E2E === '1') e2eSay(`viewable ${newIndex} ignored: the jump from it is settling`);
+          return;
+        }
         jumpRef.current = null;
       }
       shownIndexRef.current = newIndex;
@@ -576,6 +633,7 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
           mutedColor={palette.textSecondary}
           bg={palette.pageBg}
           size={pageSize}
+          sized={sized}
           overlay={pageOverlay ? (image: PageImage | null) => pageOverlay(item, pageSize.scale, image) : undefined}
           underlay={pageUnderlay ? pageUnderlay(item, pageSize.scale) : null}
           accessories={pageAccessories ? pageAccessories(item, pageSize.scale) : undefined}
@@ -583,7 +641,7 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
           onTapVerse={onTapVerse}
         />
       ),
-    [onTap, onLongPressAyah, highlights, v2, palette, pageSize, endCard, pageOverlay, pageUnderlay, pageAccessories, onTapPoint, onTapVerse, edition],
+    [onTap, onLongPressAyah, highlights, v2, palette, pageSize, sized, endCard, pageOverlay, pageUnderlay, pageAccessories, onTapPoint, onTapVerse, edition],
   );
 
   return (
@@ -605,22 +663,49 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
           typeof x === 'number' ? Math.min(Math.max(Math.round(x / SCREEN_WIDTH), 0), data.length - 1) : shownIndexRef.current;
         if (at != null) dragStartsRef.current.push(at);
         draggedRef.current = true;
+        if (process.env.EXPO_PUBLIC_E2E === '1') e2eSay(`drag begins at ${e2eX(e)}; shown index ${shownIndexRef.current}, at index ${currentIndexRef.current}`);
       }}
+      onScrollEndDrag={
+        process.env.EXPO_PUBLIC_E2E === '1'
+          ? (e: NativeSyntheticEvent<NativeScrollEvent>) =>
+              e2eSay(`drag ends at ${e2eX(e)}, velocity ${e?.nativeEvent?.velocity?.x?.toFixed(2) ?? '?'}`)
+          : undefined
+      }
+      onMomentumScrollBegin={process.env.EXPO_PUBLIC_E2E === '1' ? (e: NativeSyntheticEvent<NativeScrollEvent>) => e2eSay(`momentum begins at ${e2eX(e)}`) : undefined}
+      onMomentumScrollEnd={process.env.EXPO_PUBLIC_E2E === '1' ? (e: NativeSyntheticEvent<NativeScrollEvent>) => e2eSay(`momentum ends at ${e2eX(e)}`) : undefined}
+      onScroll={
+        process.env.EXPO_PUBLIC_E2E === '1'
+          ? (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+              // Only when the page under the offset changes, so a swipe is a line or two, not one per frame.
+              const x = e?.nativeEvent?.contentOffset?.x;
+              if (typeof x !== 'number') return;
+              const under = Math.round(x / SCREEN_WIDTH);
+              if (under === e2eScrollIndex.current) return;
+              e2eScrollIndex.current = under;
+              e2eSay(`scrolled to ${e2eX(e)}`);
+            }
+          : undefined
+      }
       viewabilityConfig={viewabilityConfig}
       getItemLayout={(_, index) => ({
         length: SCREEN_WIDTH,
         offset: SCREEN_WIDTH * index,
         index,
       })}
+      initialScrollIndex={startIndex}
       initialNumToRender={3}
       maxToRenderPerBatch={3}
       windowSize={5}
-      extraData={`${extraData ?? ''}|${highlights.map((h) => `${h.page}:${h.sura}:${h.ayah}`).join(',')}|${pageSize.width}|${edition}`}
+      extraData={`${extraData ?? ''}|${highlights.map((h) => `${h.page}:${h.sura}:${h.ayah}`).join(',')}|${pageSize.width}|${sized}|${edition}`}
       onLayout={(e) => {
         const { width, height } = e.nativeEvent.layout;
+        if (process.env.EXPO_PUBLIC_E2E === '1') e2eSay(`layout ${Math.round(width)}×${Math.round(height)} (pages ${SCREEN_WIDTH} wide)`);
         setSpace((prev) => (prev.width === width && prev.height === height ? prev : { width, height }));
       }}
-      style={{ backgroundColor: palette.pageBg }}
+      // Left to right whatever the app's language (BEHAVIOUR.md LANG-1): `inverted` already puts page 1
+      // on the right, and the verse boxes are placed from the image's left edge. Right to left would
+      // turn the pages backwards and mirror every highlight (React Native swaps left and right).
+      style={{ backgroundColor: palette.pageBg, direction: 'ltr' }}
     />
   );
 });

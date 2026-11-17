@@ -262,9 +262,15 @@ How the tests are made: `tests/scenarios/README.md`.
 
 ## The reader
 
+- **READ-1.** The reader opens on the page it was opened for (a surah or juz from the Read tab, a search
+  result, Jump to, a day's or a session's page): its first frame is that page, never page 1 first. Before
+  Nov 15 2026 it began at Al-Fatihah and moved to the page a moment later (Majd, on Revisely Dev: "the first
+  thing that pops up is Surah Fatiha, and then after like a half second or so, it jumps to the surah").
 - **REC-1.** A sitting in the reader: ending the timer while a recording runs, or is paused,
   ends both. The recording is saved first, then the timed sitting. One note says what was saved, by
-  surah and ayah, and opens its day: "Saved to today: Al-Mulk, ayahs 1–26, 41 min · View". It takes the
+  surah and ayah, and opens its day: "Saved to today: Al-Mulk, ayahs 1–26, 41 min · Undo · View". Its
+  Undo takes back the sitting and the recording that ended with it, as the day's Delete session does; the
+  recording uploads only once the note has gone, so an undone one never leaves the phone. It takes the
   place of the "Session saved" alert and the "Recording saved" note. The sitting is named by the pages
   it held, each on screen a minute or more (time paused doesn't count); a page only glanced at isn't
   named. Stopping only the recording leaves the timer running.
@@ -280,6 +286,122 @@ How the tests are made: `tests/scenarios/README.md`.
   A sitting offers one thing: pages not memorized come first (MEM-5). Pages not scheduled that day,
   already revised, or on an older day were reading, and offer nothing.
 
+## Gaps and Last revised (Revisely Dev)
+
+Activity → Insights in Revisely Dev only (`gapsInsightsEnabled`), until a release opens them once the main Revo guide
+has them; Revisely Dev's Revo knows them from its Dev guide.
+
+- **ACT-28.** Insights' Gaps, after Consistency, says how long the user goes between revisions. A revision day is a
+  revision day (DAY-2, DAY-9) with at least one page revised: a session, pages revised ahead (on the day they were
+  done) or pages logged as revised elsewhere; reading and memorizing don't count. A gap is the days from one revision
+  day to the next (Monday, then Thursday, is 3 days); revising every day leaves none, and one missed day is a 2-day
+  gap. Lengths under 2 weeks are days; from 2 weeks they are said as a person says them, weeks ("over 3 weeks"),
+  from 6 weeks months ("about 2 months"), from a year years, and Days at the section's top right (shown only when
+  something reads differently) switches every length to exact days, kept on the phone. (Majd, Nov 16 2026: "saying
+  25 days gap is kinda pointless … but 'days' specifically should always be an option".) Its figure is how long
+  since the last revision: under 2 weeks a number ("6 days since your last revision", red from 3 days); from 2
+  weeks words and the date, never red ("Over 3 weeks since your last revision, on 24 Oct"); the pages' own last
+  revised dates when no item reaches that far back. Revised today: "Today, you revised", "after 6 days" when it
+  ended a gap of 3 days or more, "you're back, after over 3 weeks" after 2 weeks or more. It opens the day of the
+  last revision. Under it, a strip of the range (ACT-22;
+  at most half a year, never before the account's first day): a dot per revision day, joined while they run on,
+  each gap of 3 days or more in red with its length above it ("9 days"), and the gap still open dashed up to
+  today ("6 days so far"; grey from 2 weeks); a touch opens the day under the finger (longer than a month:
+  Overview at that month).
+  Then two tiles: the longest gap with a missed day in the range, the open one included and counted in full when it
+  began before the range ("9 days · Longest gap, 28 Oct – 6 Nov", opening Overview at its month; "60+ days" when it
+  began before the days read; "None · No gaps in 30 days"), and the usual rhythm, the median step between revision
+  days in the range, from two steps ("Every day", "Every 2 days", "Every 1–2 days", with how many gaps of 3 days or
+  more). Under them, the full revision against the plan as it is now, read forwards from today (nothing records
+  what an older plan scheduled): a page's spacing is the days between its next two slots (days off, custom plans,
+  juz mode and carried pages included), it is due its spacing after its last revision (never revised: after the
+  day it was memorized), and it is late when its next slot comes after that. "Full revision pushed back 5 days ·
+  18 pages from your gaps come round by 13 Nov instead of 8 Nov. Your plan goes round every 5 days." runs from the
+  latest due day of a late page to the latest day one comes round ("from your gaps" when every late page was due
+  before today; a catch-up that slid the plan back says only "come round"); none late: "Full revision on
+  schedule". A plan changed mid-cycle is judged by the new plan; pages it doesn't hold are left out. Nothing
+  revised on record: no section. Recency only, the same with Smart Tracking on or off (ACT-19). Revo is told the
+  same figures over the last 30 days with each question, and when each memorized surah was last revised (ACT-30),
+  from the items Home read and only once they have loaded; only Revisely Dev sends them, and the server refuses them
+  from any other app.
+  (Majd, Nov 16 2026: "some metric in insights
+  that give the user an idea on their 'gaps' between session"; mocks insights-gaps.)
+
+- **ACT-30.** Last revised says when each memorized surah, juz, hizb or page was last revised, longest waiting first.
+  It opens from Gaps' "When did I last revise…?" at the section's end and from its full revision line (ACT-28).
+  Surah | Juz | Hizb | Page as Activity's ink tabs, Surah at first; the choice is kept on the phone. A surah, juz or
+  hizb is as recent as its least recently revised memorized page (a page shared by two surahs is under both) and
+  says that page's date and how long ago ("24 Oct · 22 days ago", "14 Nov · yesterday", "Today"); a tap opens it to
+  its memorized pages, longest waiting first too (the page that dates it comes first), each with its own date, and a
+  page opens the reader there. A page never revised waits from
+  the day it was memorized: "Not revised yet" for its first 30 days, "Never revised" after (ACT-25). Recency only,
+  the same with Smart Tracking on or off (ACT-19). (Majd, Nov 16
+  2026: "being able to click on a page or surah or juz or hizb and seeing the last time u revised it".)
+
+## Recite (Revisely Dev)
+
+The reader's mic follows the reciter on the page and, with Mark mistakes, marks their mistakes as they recite (Majd,
+Nov 11–16 2026). The checking runs on Revisely's checker (Cloud Run); these rules are what the app shows of what it says.
+
+- **RECITE-1.** A take starts anywhere on the page, or anywhere in the Qur'an. Until the checker has found where the
+  reciter is, the take shows nothing of them: no band on the line, no box on a word ("Listening…"). The first place
+  found is where the take started, and nothing before it is ever marked skipped, during the take or in its summary.
+  Turning the page by hand during a take looks for the reciter on that page, keeping what was already decided. A take
+  whose start is never found ends with nothing: no summary, no score, and nothing kept.
+- **RECITE-2.** With Mark mistakes, a take marks a word said wrong, skipped or added, and a slip in a word's harakat
+  or letters; with Strict, tajweed notes too. The score is the share of the words reached said right, and a tajweed
+  note never counts against it. A word with several marks shows its strongest: a word mistake, then a slip, then a
+  tajweed note. The marks are highlights in three colours: red for words, amber for harakat and letters (and Not
+  clear), violet for tajweed.
+- **RECITE-3.** A haraka or letter the checker couldn't hear clearly enough to judge is "Not clear", never wrong: it
+  never counts in the score, whether or not the checker left it out of its own count.
+- **RECITE-4.** "Not a mistake" takes a mark off at once, with what it counted in the score; Undo, or the summary's
+  Put back, brings it back as it was, its count too. A mark taken off stays off whatever the checker sends again,
+  during the take or in its final answer.
+- **RECITE-5.** A take whose connection drops and comes back shows the same take: its start, the words recited, its
+  marks and its score. Anything the checker sends again changes none of them. (The hidden view's red cover, a hint,
+  may show again on the next word until it is reached.)
+- **RECITE-6.** With the page hidden, the words show as they are recited, from where the take started. ‹ shows the
+  next hidden word and ‹‹ the rest of its ayah: a word shown by hand is peeked, never counts in the score, and its
+  ayah joins Recite the mistakes again. While something else is said where the next word goes, that word's cover
+  turns red. It goes once the word is reached or said, the reciter goes back, or a mark lands on it (or an extra word
+  just before it); it is never a mark and never counts.
+- **RECITE-7.** Recite the mistakes again is one take over the stretch from the ayah before the first mistake (in its
+  surah) to the last mistake's ayah. Tajweed notes are left out, and peeked ayahs are in. It stops by itself once
+  that ayah's last word is decided. Holding the mic on a page that still has remembered mistakes offers the same
+  stretch over them ("Recite your N mistakes here"), one each per word.
+- **RECITE-8.** Test me picks up to five places at random in what the account has memorized, or in one juz of it,
+  no two sharing an ayah. Each starts in an ayah long enough to go on after its first two words, which are all the
+  hidden page shows. Its take covers that ayah and up to two more memorized ayahs of the same surah, and stops at
+  their end. A place is clean when it reached the end with no mistake and nothing peeked; peeks make it "helped".
+  Tajweed notes and Not clear never count against it, and a place whose start was never found counts as not
+  continued.
+
+## Recite insights (Revisely Dev)
+
+What a user's takes with Mark mistakes show over time, and Revo knowing it (Majd, Nov 16 2026).
+
+- **RINS-1.** Revo knows what Recite found in the account's takes, worked out on the phone: the last 4
+  weeks' takes and score, mistakes by kind, Not clear and tajweed notes apart, words still marked and
+  cleared, the passages that keep slipping and the similar ayahs gone on with, and the latest take. A take's
+  own marks go only when the user attaches it. It is told text only: never audio, recordings or ids, and
+  never a sound spelt out. Its rules for this come only with a recitation, so every other question is asked
+  exactly as before. It speaks only of marks that exist, says Not clear wasn't clear enough to check (never
+  wrong), puts words and similar ayahs before harakat, never calls going back to restart a mistake, and
+  names surahs and ayahs, never pages.
+- **RINS-2.** Activity's Insights has a Recitation section for an account that recites, over Insights'
+  range: the score (each take's own score weighted by the words it recited) and its weeks; the passages
+  with words still marked, the most slipped first, each with those words on their highlights, opening the
+  reader there; the similar ayahs gone on with; and one line of the words cleared and the kinds, words
+  first, Not clear never counted. With Smart Tracking on, a passage rated strong that still slips is named,
+  and Weak spots say how many words Recite still marks there. Off, nothing about strength: a passage's
+  row says when it was last recited instead of how often it went wrong.
+- **RINS-3.** A take in a day's Recited block that slipped into a similar ayah says so under its line ("You
+  went on with Yusuf 90, a similar ayah"; an ending, "You ended Al-Falaq 3 as ayah 5 ends"), two at most.
+  Holding the take's passage and lines opens its menu: Show on the page, and Ask Revo about this take while
+  Revo is on for the account, which opens Revo with that take attached (as Revo's + attaches one). VoiceOver
+  has the same two as actions on the take.
+
 ## Recite's memory (Revisely Dev)
 
 Recite with Mark mistakes remembers each take (Majd, Nov 15 2026; Tarteel's biggest lead over Revisely).
@@ -293,6 +415,35 @@ Recite with Mark mistakes remembers each take (Majd, Nov 15 2026; Tarteel's bigg
   different revision days. Getting it wrong again starts the count over. A take counts only for what it
   checked: Words & harakat never clears a tajweed note. Not clear marks are never remembered, and a take
   that heard a word's harakat only as Not clear is not a try at them. Clear now clears a word at once.
+- **RMEM-3.** Outside a take, a word with a remembered mistake stays marked on the page, in its highlight
+  colour made lighter (red for a word, amber for harakat and letters, violet for tajweed). A word shows one
+  mark, its most severe. Marks don't show during a take, where only that take's marks do. They also don't
+  show on a hidden page, or with Settings → Recite → Show past mistakes off. Tapping one opens its history,
+  which shows:
+  - the kind in words, with its place and how often it went wrong;
+  - what was expected;
+  - its latest takes: the date, right or what was said, whether the page was hidden, and ▶ your own voice
+    when that take's recording is on the phone;
+  - where the clear rule stands;
+  - Hear it and Similar phrases.
+
+  Clear now takes the mark off at once, with Undo.
+- **RMEM-4.** A take's summary names the words it cleared from the page (said right on a second day).
+  Once its passage has two takes or more, the summary also shows the passage's trend, with a small line:
+  "Up from 95.1% on Mon 2 Nov · 6 takes". The trend opens the passage's progress, which shows:
+  - the latest accuracy by the page;
+  - a chart of every take of the passage (a take counts when it covers at least half of it);
+  - the words still to fix there;
+  - the takes, newest first.
+
+  A word's card opens the same page (See all). From the summary, Done goes back to the summary.
+- **RMEM-5.** A day in Activity lists its recitation takes in a Recited block. Each take shows its
+  passage, its score by the page, its line (time, mistakes, words cleared, page hidden), its recording and
+  Show on the page. A take's recording shows there and not in Read. All activity has Recitations, with All
+  takes, With mistakes and Page hidden. Show on the page opens the reader at the take's page with that
+  take's marks at full strength and nothing else, until Done. Its bar has ▶ for the take's recording while
+  that recording is on the phone. Each mark has its card, and Not a mistake there updates the take. The
+  progress page's takes open it too.
 
 ## Searching the Qur'an
 
@@ -315,6 +466,15 @@ microphone's purpose string (in the binary) names searching only from 1.0.4.
   with or without its "al-" ("Yunus", "Fatiha", "الكهف"), an ayah ("2:255", "Yunus 16", in Arabic
   digits too), a page ("page 62") or a juz ("juz 30"). A bare number offers the surah and the page.
   A number that isn't in the mushaf goes nowhere.
+- **SEARCH-3.** Searching by voice hears only what is said. Under "Listening…" nothing shows until the person
+  speaks, and the room (silence, its steady noise, the microphone's first moments) is never taken for words: the
+  speech model writes a word for any of them. Words show as they are said, and someone who speaks at once is heard.
+  Listening that hears nothing ends after 8 seconds and searches nothing.
+- **SEARCH-4.** (Revisely Dev, with Recite, until the release) A voice search that finds exactly one place (the list
+  would say "1 result", not "Closest matches") opens the reader at that ayah, highlighted as the result's Open in the
+  reader does, with nothing recording or listening: listening ended with the search. Back returns to the search, its
+  words and that result still there. Several results, the closest there is, or a typed search stay a list, and nothing
+  opens by itself.
 
 ## Translations
 
@@ -561,6 +721,18 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   refresh reads everything again, the items Overview and Insights read included, and its spinner always ends
   (after 10 s at most), on a transparent ground as Home's. (Majd, Nov 9 2026: "shouldnt this update whenever
   a user scrolls down to refresh the page instead of having to close out the app?")
+- **ACT-29.** Activity's sections are the user's to arrange (testers for now): Edit sections (an icon at the end
+  of the tabs row) opens the tab's sections, each with a switch to show or hide it; holding a section (350 ms,
+  still) lifts it to drag to another place, and VoiceOver has Move up and Move down. Every change shows at once.
+  Overview's month header stays on top; under it the month's totals, the calendar (always shown), its key and the
+  picked day's summary. Insights: Coverage, Consistency, Gaps (where it is open, ACT-28), Weak spots (its Smart
+  Tracking invite when that is off), Recitation (for an account that recites), Memorization, Pace; a section added
+  later comes in after the one it follows in the usual order. A section the account can't have keeps its place;
+  the first one shown has no hairline above it; with every Insights section hidden, one line says so with Edit
+  sections. The layout is kept per account on the phone, never on the account; another account, or a new one,
+  starts with the usual layout, which "Show all, in the usual order" brings back. Everyone else keeps the usual
+  layout and no Edit sections. (Majd, Nov 16 2026: "all these 'sections' on activity should be configurable so
+  users can pick what they want to see and should be able to drag and move them around".)
 
 ## Ask coach
 
@@ -730,7 +902,9 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   when the guide doesn't mention it at all, Revo says it isn't sure that's possible in Revisely rather than guess. The guide
   covers every rule in this file (or says why one isn't for users to ask about) and names only screens the navigation
   has and labels the app shows, word for word; a test fails when that stops being true, so a feature's PR changes the
-  guide with it.
+  guide with it. In Revisely Dev, Revo also knows what only Revisely Dev has (Recite and its marks, the hidden page,
+  the takes kept): that part of the guide goes only with Revisely Dev's questions, so the store app's are asked exactly
+  as before.
 
 - **REVO-31.** An answer can offer to open a screen (`openScreen`): Jump to…, the schedule editor, the memorized
   pages, Activity (Insights are a tab at its top), the daily log, Settings at one of its sections, the prayer
@@ -934,6 +1108,14 @@ shows up once and they must go through it and complete it … just the main stuf
   and To). Any ayahs, not only whole pages, are named the same way: whole surahs and juz by name,
   the rest by surah and ayah ("Al-Mulk, ayahs 1–20", "Al-Mulk 27 to Al-Qalam 15"). Whole pages and
   the ayahs they hold read alike.
+
+## Language and layout
+
+- **LANG-1.** The app lays out the way its language reads, not the phone's: while it shows English it
+  is left to right on every phone, Arabic or Persian or Hebrew included, from the next launch after it
+  starts (React Native reads the direction at launch). (Until Nov 2026 an Android phone set to an
+  RTL language mirrored the English app: rows, the tab swipe, the verse highlights and the mushaf's
+  page order; `src/i18n/direction.ts`.)
 
 ## Known bugs
 

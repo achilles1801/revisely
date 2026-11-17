@@ -288,7 +288,7 @@ export class ReciteSession {
   private timing(): string {
     const audioMs = Math.round((this.audioSamples / 16000) * 1000);
     const wallMs = Date.now() - this.wallStart;
-    return `| audio ${audioMs} ms, wall ${wallMs} ms, behind ${wallMs - audioMs} ms`;
+    return `| audio ${audioMs} ms, wall ${wallMs} ms, behind ${wallMs - audioMs} ms`; // i18n-ignore (a trace for logs)
   }
 
   private end(reason: ReciteEnd) {

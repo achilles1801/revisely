@@ -8,22 +8,23 @@ import { radius } from '../../theme/radius';
 import { CAPSULE_HEIGHT } from '../reader/PlayerCapsule';
 import type { ListenStatus } from './usePauseListener';
 import type { FollowStatus } from './useReciteFollow';
+import { t } from '../../i18n';
 
 /** What the panel says about listening. */
 export function listenLabel(status: ListenStatus, hearing: boolean): string {
   switch (status) {
     case 'listening':
-      return hearing ? 'Hearing you' : 'Listening';
+      return hearing ? t('recite.panel.hearing') : t('recite.panel.listening');
     case 'starting':
-      return 'Starting…';
+      return t('recite.panel.starting');
     case 'paused':
-      return 'Paused · tap the mic';
+      return t('recite.panel.paused');
     case 'denied':
-      return 'Microphone is off';
+      return t('recite.panel.micDenied');
     case 'error':
-      return 'Microphone busy';
+      return t('recite.panel.micBusy');
     default:
-      return 'Mic off';
+      return t('recite.panel.micOff');
   }
 }
 
@@ -31,19 +32,19 @@ export function listenLabel(status: ListenStatus, hearing: boolean): string {
 export function followLabel(status: FollowStatus): string {
   switch (status) {
     case 'starting':
-      return 'Starting…';
+      return t('recite.panel.starting');
     case 'finding':
-      return 'Start reciting';
+      return t('recite.panel.startReciting');
     case 'following':
-      return 'Following';
+      return t('recite.panel.following');
     case 'paused':
-      return 'Paused · tap the mic';
+      return t('recite.panel.paused');
     case 'denied':
-      return 'Microphone is off';
+      return t('recite.panel.micDenied');
     case 'error':
-      return 'Couldn’t listen · tap the mic';
+      return t('recite.panel.couldNotListen');
     default:
-      return 'Mic off';
+      return t('recite.panel.micOff');
   }
 }
 
@@ -56,11 +57,15 @@ export function WordByWordChip({ progress, onPress }: { progress: number | null;
       hitSlop={6}
       style={[styles.next, { borderColor: theme.border }]}
       accessibilityRole="button"
-      accessibilityLabel={progress == null ? 'Follow word by word' : `Downloading the speech model, ${Math.round(progress * 100)}%`}
+      accessibilityLabel={
+        progress == null
+          ? t('recite.panel.followWordByWord')
+          : t('recite.panel.downloadingModel', { percent: Math.round(progress * 100) })
+      }
       testID="recite-word-by-word"
     >
       <Text style={[typography.caption, styles.nextText, { color: theme.textPrimary }]} maxFontSizeMultiplier={1.2}>
-        {progress == null ? 'Word by word' : `${Math.round(progress * 100)}%`}
+        {progress == null ? t('recite.panel.wordByWord') : t('recite.panel.percent', { percent: Math.round(progress * 100) })}
       </Text>
     </Pressable>
   );
@@ -109,11 +114,11 @@ export function RecitePanel({
   const pressMic = () => {
     if (status === 'denied') {
       Alert.alert(
-        'Microphone access is off',
-        'Allow Revisely to use the microphone in Settings to show each verse when you pause.',
+        t('recite.panel.micAccessOff'),
+        t('recite.panel.micAccessBody'),
         [
-          { text: 'Not now', style: 'cancel' },
-          { text: 'Open Settings', onPress: () => Linking.openSettings() },
+          { text: t('common.notNow'), style: 'cancel' },
+          { text: t('common.openSettings'), onPress: () => Linking.openSettings() },
         ],
       );
       return;
@@ -137,7 +142,7 @@ export function RecitePanel({
           on && !hearing && styles.quiet,
         ]}
         accessibilityRole="switch"
-        accessibilityLabel="Show each verse when you pause"
+        accessibilityLabel={t('recite.panel.showWhenPause')}
         accessibilityState={{ checked: on }}
         testID="recite-mic"
       >
@@ -159,7 +164,7 @@ export function RecitePanel({
         hitSlop={6}
         style={[styles.next, { borderColor: theme.border, opacity: nextDisabled ? 0.4 : 1 }]}
         accessibilityRole="button"
-        accessibilityLabel="Show the next verse"
+        accessibilityLabel={t('recite.panel.showNext')}
         accessibilityState={{ disabled: nextDisabled }}
         testID="recite-next"
       >
@@ -167,7 +172,7 @@ export function RecitePanel({
           <Ionicons name="eye-outline" size={16} color={theme.textPrimary} />
         ) : (
           <Text style={[typography.caption, styles.nextText, { color: theme.textPrimary }]} maxFontSizeMultiplier={1.2}>
-            Next verse
+            {t('recite.panel.nextVerse')}
           </Text>
         )}
       </Pressable>

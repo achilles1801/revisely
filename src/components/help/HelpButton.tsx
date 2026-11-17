@@ -5,6 +5,7 @@ import { Tap } from '../v2/Tap';
 import { HELP, type HelpScreen } from '../../lib/help/topics';
 import { HelpSheet } from './HelpSheet';
 import { useHelpButtons } from './useHelpButtons';
+import { t } from '../../i18n';
 
 export const HELP_ICON = 'help-circle-outline' as const;
 
@@ -12,7 +13,10 @@ export const HELP_ICON = 'help-circle-outline' as const;
  * A screen's help sheet, for a screen that places its own way in (a menu row, a round button):
  * `shown` while the help buttons show, `open()`, and the sheet to render.
  */
-export function useHelpSheet(screen: HelpScreen, opts: { recite?: boolean } = {}) {
+export function useHelpSheet(
+  screen: HelpScreen,
+  opts: { recite?: boolean; liveRecite?: boolean; hideAs?: HelpScreen } = {},
+) {
   const help = useHelpButtons();
   const [open, setOpen] = useState(false);
   const sheet =
@@ -21,11 +25,13 @@ export function useHelpSheet(screen: HelpScreen, opts: { recite?: boolean } = {}
         screen={screen}
         visible={open}
         recite={opts.recite}
+        liveRecite={opts.liveRecite}
         onClose={() => setOpen(false)}
-        onHide={() => help.hideFrom(screen)}
+        // Said by the screen it's on (its HelpToast): the reader's, for Recite's sheet.
+        onHide={() => help.hideFrom(opts.hideAs ?? screen)}
       />
     ) : null;
-  return { shown: help.shown, open: () => setOpen(true), sheet, label: `Help: ${HELP[screen].title}` };
+  return { shown: help.shown, open: () => setOpen(true), sheet, label: t('help.button', { title: HELP[screen].title }) };
 }
 
 /**
@@ -42,8 +48,14 @@ export function HelpButton({
   maxFontSizeMultiplier,
   render,
   placeholder = null,
+  liveRecite,
+  hideAs,
 }: {
   screen: HelpScreen;
+  /** The reader's Recite is offered (Revisely Dev): its topics show. */
+  liveRecite?: boolean;
+  /** Hidden from this screen's help, "Help buttons hidden" shows on this one (the screen it's on). */
+  hideAs?: HelpScreen;
   size?: number;
   /** The glyph's colour (a top bar's ink by default; Home's post header uses grey). */
   color?: string;
@@ -53,7 +65,7 @@ export function HelpButton({
   placeholder?: React.ReactNode;
 }) {
   const { palette } = useTheme();
-  const help = useHelpSheet(screen);
+  const help = useHelpSheet(screen, { liveRecite, hideAs });
   return (
     <>
       {!help.shown ? (

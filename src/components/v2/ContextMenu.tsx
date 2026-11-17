@@ -12,6 +12,7 @@ import { Tap } from './Tap';
 import { DISMISS_FALLBACK_MS } from './Sheet';
 import { useModalTurn } from './modalTurn';
 import { layoutV2, typeV2 } from '../../theme/v2';
+import { t } from '../../i18n';
 
 export interface ContextMenuAction {
   key: string;
@@ -52,8 +53,8 @@ export function ContextMenu({
       release();
       return;
     }
-    const t = setTimeout(release, DISMISS_FALLBACK_MS);
-    return () => clearTimeout(t);
+    const timer = setTimeout(release, DISMISS_FALLBACK_MS);
+    return () => clearTimeout(timer);
   }, [turn, release]);
   const run = (action: ContextMenuAction) => {
     onClose();
@@ -66,7 +67,7 @@ export function ContextMenu({
         style={[StyleSheet.absoluteFill, { backgroundColor: palette.overlay }]}
         onPress={onClose}
         accessibilityRole="button"
-        accessibilityLabel="Close menu"
+        accessibilityLabel={t('v2.closeMenu')}
       />
       <View style={styles.column} pointerEvents="box-none" testID={testID}>
         {preview ? (

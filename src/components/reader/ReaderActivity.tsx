@@ -11,6 +11,7 @@ import type { RecitationState } from '../../lib/recitation';
 import type { RecorderPhase } from '../../hooks/useVoiceRecorder';
 import { typeV2 } from '../../theme/v2';
 import { Tap } from '../v2/Tap';
+import { t } from '../../i18n';
 
 interface ReaderActivityProps {
   recorder: {
@@ -55,11 +56,13 @@ export function ReaderActivity({ recorder, playback, onPress }: ReaderActivityPr
   const time = formatRecordingTime(recordedMs(baseMs, segmentStartedAt, now));
   const clock = timer ? formatClock(displayMs(timer, timerNow)) : '';
   const label = [
-    recordingShown ? `${capturing ? 'Recording' : 'Recording paused'}, ${time}` : null,
+    recordingShown ? t(capturing ? 'reader.activity.recording' : 'reader.activity.recordingPaused', { time }) : null,
     reciting
-      ? `${playback.status === 'playing' ? 'Reciting' : 'Recitation paused'} ${playback.verse!.sura}:${playback.verse!.ayah}`
+      ? t(playback.status === 'playing' ? 'reader.activity.reciting' : 'reader.activity.recitationPaused', {
+          verse: `${playback.verse!.sura}:${playback.verse!.ayah}`,
+        })
       : null,
-    timer ? `${timing ? 'Timer running' : 'Timer paused'}, ${clock}` : null,
+    timer ? t(timing ? 'reader.activity.timerRunning' : 'reader.activity.timerPaused', { clock }) : null,
   ]
     .filter(Boolean)
     .join('. ');
@@ -73,7 +76,7 @@ export function ReaderActivity({ recorder, playback, onPress }: ReaderActivityPr
       hitSlop={10}
       style={[styles.pill, { backgroundColor: palette.fill, borderColor: palette.separator }]}
       accessibilityRole="button"
-      accessibilityLabel={`${label}. Show the controls`}
+      accessibilityLabel={t('reader.activity.label', { what: label })}
       testID="reader-activity"
     >
       {recordingShown && (

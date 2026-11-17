@@ -17,6 +17,8 @@ import { drillMarks } from '../../lib/reciteLive/drill';
 import type { ScoreLevel } from '../../lib/reciteLive/score';
 import { mistakesLabel } from '../../lib/reciteLive/score';
 import { CheckMark } from './ReciteMic';
+import { Sparkline } from '../reciteMemory/AccuracyChart';
+import { peekedLine } from '../../lib/reciteLive/peeked';
 
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 /** "1 minute 42 seconds", for VoiceOver. */
@@ -95,6 +97,10 @@ export function TakeSummarySheet({
   onAgain,
   onDrill,
   before = null,
+  memory = null,
+  onProgress,
+  peeked = [],
+  onPeeked,
   onDone,
   onShown,
 }: {
@@ -120,6 +126,17 @@ export function TakeSummarySheet({
   onDrill?: () => void;
   /** This take recited the mistakes of the one before: what that one found there ("1 wrong word, 1 not clear"). */
   before?: string | null;
+  /**
+   * Recite's memory (lib/reciteMemory; agreed with Recite UI): the words this take cleared from the page (said right on
+   * a second day), and its passage's trend (accuracy over its takes, oldest first, with the line saying it).
+   */
+  memory?: { cleared: string[]; trend: number[]; line: string | null } | null;
+  /** "Your progress here": the passage's progress sheet. */
+  onProgress?: () => void;
+  /** Words shown by hand during the take, by ayah (Majd, Nov 15 2026): "3 words peeked", a row per ayah. */
+  peeked?: { ayah: [number, number]; words: number[] }[];
+  /** A peeked row was tapped: its first word, to show on the page. */
+  onPeeked?: (w: number) => void;
   onDone: () => void;
   /** The sheet is on screen (its modal has been presented). */
   onShown?: () => void;
@@ -133,6 +150,9 @@ export function TakeSummarySheet({
   // "Not clear" marks never count (Majd, Nov 15 2026), so they come last.
   const mistakes = marks.filter((m) => m.kind !== 'tajweed' && !isUnclear(m)).length;
   const findings = [...marks.filter((m) => !isUnclear(m)), ...marks.filter(isUnclear)];
+  const peekedCount = peeked.reduce((n, p) => n + p.words.length, 0);
+  // Something to recite again: a mistake (not a tajweed note), or a word peeked.
+  const drillable = check && onDrill != null && (drillMarks(marks).length > 0 || peekedCount > 0);
   const scoreColor = score?.level === 'good' ? palette.good : score?.level === 'warn' ? palette.warn : palette.onRedSubtle;
   // Once, when the summary is on screen: what was recited, how long, and (Check) the score. Nothing is spoken while
   // the microphone is on, where it would be recorded with the recitation.
@@ -141,6 +161,7 @@ export function TakeSummarySheet({
     passage ? spokenText(passage) : '',
     spokenClock(seconds),
     check && score ? `${score.text}, ${mistakesLabel(mistakes)}` : '',
+    peekedCount ? peekedLine(peekedCount) : '',
   ]
     .filter(Boolean)
     .join('. ');
@@ -153,13 +174,11 @@ export function TakeSummarySheet({
   // end of a long scroll).
   const actions = (
     <View style={styles.buttons}>
-      {check && onDrill && drillMarks(marks).length ? (
-        <PillButton title="Recite the mistakes again" size="lg" onPress={onDrill} testID="take-summary-drill" />
-      ) : null}
+      {drillable ? <PillButton title="Recite the mistakes again" size="lg" onPress={onDrill} testID="take-summary-drill" /> : null}
       <PillButton
         title="Recite again"
         size="lg"
-        variant={check && onDrill && drillMarks(marks).length ? 'outline' : undefined}
+        variant={drillable ? 'outline' : undefined}
         onPress={onAgain}
         testID="take-summary-again"
       />
@@ -190,6 +209,11 @@ export function TakeSummarySheet({
         {check && marks.length ? (
           <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={CHROME_MAX}>
             {findingsLine(marks)}
+          </Text>
+        ) : null}
+        {peekedCount ? (
+          <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={CHROME_MAX} testID="take-summary-peeked">
+            {peekedLine(peekedCount)}
           </Text>
         ) : null}
         {check && before ? (
@@ -261,6 +285,38 @@ export function TakeSummarySheet({
             );
           })
         : null}
+      {words
+        ? peeked.map((p, i) => {
+            const place = manySurahs ? describeAyahs([ayahKey(p.ayah[0], p.ayah[1])]) : `ayah ${p.ayah[1]}`;
+            const arabic = p.words.map((w) => words.uthmani(w)).join(' ');
+            return (
+              <Tap
+                key={`peeked-${p.ayah.join(':')}`}
+                onPress={() => onPeeked?.(p.words[0])}
+                style={[styles.row, { borderTopColor: palette.separator }, i === 0 && findings.length === 0 && styles.firstRow]}
+                accessibilityRole="button"
+                accessibilityLabel={`Peeked, ${spokenText(place)}: ${arabic}. Show it on the page`}
+                testID="take-summary-peeked-row"
+              >
+                <View style={styles.rowText}>
+                  <Text style={[typeV2.name, styles.title, { color: palette.text }]} maxFontSizeMultiplier={CHROME_MAX}>
+                    {`Peeked · ${place}`}
+                  </Text>
+                  {stacked ? (
+                    <Text style={[arabicV2(21), { color: palette.secondary }]} maxFontSizeMultiplier={ARABIC_MAX} accessibilityLanguage="ar">
+                      {arabic}
+                    </Text>
+                  ) : null}
+                </View>
+                {stacked ? null : (
+                  <Text style={[arabicV2(21), styles.peekedArabic, { color: palette.secondary }]} numberOfLines={1} maxFontSizeMultiplier={ARABIC_MAX} accessibilityLanguage="ar">
+                    {arabic}
+                  </Text>
+                )}
+              </Tap>
+            );
+          })
+        : null}
       {check && removed.length && onPutBack ? (
         <View testID="take-summary-removed">
           <Tap
@@ -303,6 +359,41 @@ export function TakeSummarySheet({
               ))
             : null}
         </View>
+      ) : null}
+      {check && memory && memory.cleared.length > 0 ? (
+        <View style={[styles.row, { borderTopColor: palette.separator }]} accessible testID="take-summary-cleared">
+          <View style={styles.rowText}>
+            <Text style={[typeV2.name, { color: palette.text }]} maxFontSizeMultiplier={CHROME_MAX}>
+              {`${memory.cleared.length} cleared from the page`}
+            </Text>
+            <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={CHROME_MAX}>
+              Right on 2 different days
+            </Text>
+          </View>
+          <Text style={[arabicV2(20), styles.cleared, { color: palette.text }]} maxFontSizeMultiplier={ARABIC_MAX} numberOfLines={2}>
+            {memory.cleared.join(' ')}
+          </Text>
+        </View>
+      ) : null}
+      {check && memory?.line && onProgress ? (
+        <Tap
+          onPress={onProgress}
+          style={[styles.row, { borderTopColor: palette.separator }]}
+          accessibilityRole="button"
+          accessibilityLabel={`Your progress here. ${memory.line}`}
+          testID="take-summary-progress"
+        >
+          <View style={styles.rowText}>
+            <Text style={[typeV2.name, { color: palette.text }]} maxFontSizeMultiplier={CHROME_MAX}>
+              Your progress here
+            </Text>
+            <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={CHROME_MAX}>
+              {memory.line}
+            </Text>
+          </View>
+          <Sparkline values={memory.trend} />
+          <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
+        </Tap>
       ) : null}
       {!check && !checkOwned ? (
         <Tap
@@ -353,11 +444,13 @@ const styles = StyleSheet.create({
   /** A flat swatch of the mark's colour, beside its name (never a round mark). */
   swatch: { width: 12, height: 12, borderRadius: 3 },
   arWrap: { borderRadius: 7, paddingHorizontal: 6 },
+  peekedArabic: { flexShrink: 1, maxWidth: '55%', writingDirection: 'rtl' },
   removedHead: { paddingVertical: 10 },
   removedRow: { paddingVertical: 8 },
   putBack: { height: 32, paddingHorizontal: 13, borderRadius: 16, borderWidth: 1, justifyContent: 'center' },
   putBackText: { fontSize: 14, fontWeight: '600' },
   arStacked: { alignSelf: 'flex-end', marginTop: 4 },
+  cleared: { writingDirection: 'rtl', textAlign: 'right', maxWidth: '45%' },
   buttons: { paddingHorizontal: layoutV2.gutter, paddingTop: 16, gap: 10 },
   kept: { textAlign: 'center', paddingHorizontal: layoutV2.gutter, paddingTop: 10, paddingBottom: 6 },
 });

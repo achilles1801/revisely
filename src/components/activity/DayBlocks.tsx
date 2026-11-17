@@ -18,6 +18,15 @@ import { BlockMark, RevisedMark } from './BlockMark';
 import { creditLine, formatMinutesLong, windowFooter } from '../../lib/activityFormat';
 import { describePassage } from '../../lib/passages';
 import { RecordingsList } from '../recordings/RecordingsList';
+import { RecitedMark, TakeDayItem, takeLine, useQuranWordsWhen, type TakeMenuAction } from '../reciteMemory/TakeRows';
+import { passageOf } from '../reciteLive/TakeSummarySheet';
+import { takeAttachment } from '../../lib/revo/recitation';
+import { openRevo } from '../../lib/revo/open';
+import { useRevoPresent } from '../../lib/revo/presence';
+import { useMemoryRecords } from '../../lib/reciteMemory/store';
+import { clearedBy } from '../../lib/reciteMemory/memory';
+import type { TakeRecord } from '../../lib/reciteMemory/record';
+import { reciteLiveForAccount } from '../../lib/reciteLive/availability';
 import { listRecordings, type RecordingMeta } from '../../lib/recordings';
 import { describeSurahRuns, describeSurahs, pageRuns } from '../../lib/pageRanges';
 import { logger } from '../../lib/logger';
@@ -53,6 +62,7 @@ import { smartTrackingOn } from '../../lib/smartTracking';
 import { juzOfPages } from '../../lib/juzSheet';
 import { PillButton } from '../v2/PillButton';
 import type { UserPage } from '../../types';
+import { formatDate, formatTime } from '../../i18n';
 
 const EMPTY_DAY: DayItems = { revisions: [], memorized: [], reads: [], doneAhead: [] };
 
@@ -88,6 +98,8 @@ interface Props {
   onFocusBlockLayout?: (y: number) => void;
   /** Opens a recording (Listen back). */
   onOpenRecording: (id: string) => void;
+  /** A recitation take on its page with its marks (Recite's memory, Revisely Dev). */
+  onShowTake?: (take: TakeRecord, page: number) => void;
   /** Deletes a timed session (the screen confirms first). */
   onDeleteReading: (session: ReadingSession) => void;
   /** Memorized today, on an automatic plan: put the pages first tomorrow (Insights' Plan it). */
@@ -112,7 +124,7 @@ export type UndoOffer = { text: string; undo: () => void };
  */
 export const timeRange = (start: number | null | undefined, minutes: number | null) => {
   if (start == null) return '';
-  const fmt = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const fmt = (ms: number) => formatTime(new Date(ms));
   if (minutes == null || minutes <= 0) return fmt(start);
   const from = fmt(start);
   const to = fmt(start + minutes * 60_000);
@@ -160,6 +172,7 @@ export function DayBlocks({
   focusBlock,
   onFocusBlockLayout,
   onOpenRecording,
+  onShowTake,
   onDeleteReading,
   onReviseTomorrow,
   onEditSchedule,
@@ -263,8 +276,44 @@ export function DayBlocks({
       .then((all) => setRecs(all.filter((r) => r.day === day)))
       .catch((err) => logger.warn('Could not list the day’s recordings', err));
   }, [day]);
+  // Recite's memory (Revisely Dev): the day's recitation takes have a block of their own, with their recordings.
+  const memoryRecords = useMemoryRecords(user?.id, reciteLiveForAccount(user));
+  const dayTakes = useMemo(
+    () => memoryRecords.filter((r): r is TakeRecord => r.kind === 'take' && !r.deleted && r.day === day).sort((a, b) => a.createdAt - b.createdAt),
+    [memoryRecords, day],
+  );
+  const takeRecordings = useMemo(() => new Set(dayTakes.map((t) => t.recordingId).filter((id): id is string => id != null)), [dayTakes]);
+  const notTake = useCallback((r: RecordingMeta) => !takeRecordings.has(r.id), [takeRecordings]);
+  const takeWords = useQuranWordsWhen(dayTakes.length > 0);
+  // A take's menu (RINS-3): Show on the page, and Ask Revo about this take while Revo is on (the take goes with
+  // the question, as Revo's + attaches it).
+  const revoOn = useRevoPresent();
+  const takeActions = (take: TakeRecord): TakeMenuAction[] => {
+    if (!takeWords) return [];
+    const out: TakeMenuAction[] = [{ key: 'show', label: 'Show on the page', onPress: () => onShowTake?.(take, takeWords.pageOf(take.from)) }];
+    if (revoOn) {
+      out.push({
+        key: 'ask-revo',
+        label: 'Ask Revo about this take',
+        onPress: () => {
+          const attach = takeAttachment(memoryRecords, take, takeWords, today);
+          openRevo(attach ? { attach } : {});
+        },
+      });
+    }
+    return out;
+  };
+  const takeMenu = (take: TakeRecord, cleared: number) => {
+    const actions = takeActions(take);
+    if (!takeWords || actions.length === 0) return;
+    setMenu({
+      title: passageOf(takeWords, take.from, take.to),
+      text: takeLine(take, cleared),
+      actions: actions.map((a) => ({ ...a, icon: a.key === 'ask-revo' ? 'sparkles-outline' : 'book-outline' })),
+    });
+  };
   const revRecs = recs.filter((r) => r.kind === 'revision');
-  const readRecs = recs.filter((r) => r.kind === 'reading');
+  const readRecs = recs.filter((r) => r.kind === 'reading' && notTake(r));
   useActivityReload(load, day);
 
   const memorizedSet = useMemo(() => new Set(pages.filter((p) => p.status === 'memorized').map((p) => p.pageNumber)), [pages]);
@@ -278,7 +327,7 @@ export function DayBlocks({
     return from && to ? { from, to } : null;
   }, [day, user]);
   const footerText = useMemo(() => {
-    const fmt = (x: Date) => x.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    const fmt = (x: Date) => formatTime(x);
     return windowFooter(day, dayWindow ? { from: fmt(dayWindow.from), to: fmt(dayWindow.to) } : null);
   }, [day, dayWindow]);
   const view: DayView | null = useMemo(
@@ -388,7 +437,7 @@ export function DayBlocks({
         }),
     })),
   ]);
-  const timeOf = (at: number) => new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const timeOf = (at: number) => formatTime(new Date(at));
   // A tagged note (ACT-11): "Note · 9:40 PM", then its text.
   const noteItem = (n: JournalNote) => (
     <ItemLine key={n.id} icon="document-text-outline">
@@ -464,7 +513,7 @@ export function DayBlocks({
         ? null
         : at === 0
           ? 'tomorrow'
-          : new Date(y, m - 1, d + 1 + at).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+          : formatDate(new Date(y, m - 1, d + 1 + at), { weekday: 'long', day: 'numeric', month: 'long' }, 'en-GB');
     // Already first tomorrow (its link was tapped, or Insights put them there): it says so, and the link
     // goes, so it can't be tapped twice (ACT-24).
     const first = allFirstTomorrow(mine, firstTomorrowPages(user, shiftDay(today, 1)));
@@ -487,7 +536,7 @@ export function DayBlocks({
   };
   const readRecordings = (
     <View style={styles.underItem}>
-      <RecordingsList day={day} kind="reading" emptyText={null} variant="block" onOpen={(r) => onOpenRecording(r.id)} />
+      <RecordingsList day={day} kind="reading" emptyText={null} variant="block" only={notTake} onOpen={(r) => onOpenRecording(r.id)} />
     </View>
   );
   const memorizedItems: React.ReactNode[] = [
@@ -587,7 +636,7 @@ export function DayBlocks({
       );
     }),
     ...(readItems.items.length === 0 && readRecs.length > 0
-      ? [<RecordingsList key="recordings" day={day} kind="reading" emptyText={null} variant="block" onOpen={(r) => onOpenRecording(r.id)} />]
+      ? [<RecordingsList key="recordings" day={day} kind="reading" emptyText={null} variant="block" only={notTake} onOpen={(r) => onOpenRecording(r.id)} />]
       : []),
     ...readItems.items.flatMap((i) => taggedTo('read', i.id).map(noteItem)),
   ];
@@ -723,6 +772,30 @@ export function DayBlocks({
           header={readMenu}
           onLayout={layoutFor('read')}
           testID="activity-block-read"
+        />
+      )}
+      {dayTakes.length > 0 && (
+        <DayBlock
+          mark={<RecitedMark />}
+          title="Recited"
+          figure={dayTakes.length === 1 ? '1 take' : `${dayTakes.length} takes`}
+          subline={subline([
+            takeWords ? surahsOf(dayTakes.map((t) => takeWords.pageOf(t.from))) : null,
+            formatMinutesLong(Math.max(1, Math.round(dayTakes.reduce((n, t) => n + t.secs, 0) / 60))),
+          ])}
+          items={dayTakes.map((t) => (
+            <TakeDayItem
+              key={t.id}
+              take={t}
+              words={takeWords}
+              cleared={clearedBy(memoryRecords, t).length}
+              onShow={(take) => takeWords && onShowTake?.(take, takeWords.pageOf(take.from))}
+              onOpenRecording={onOpenRecording}
+              onHold={() => takeMenu(t, clearedBy(memoryRecords, t).length)}
+              actions={takeActions(t)}
+            />
+          ))}
+          testID="activity-block-recited"
         />
       )}
       {notesBlock.length > 0 && (

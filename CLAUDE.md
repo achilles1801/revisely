@@ -24,10 +24,39 @@ file is the release mechanics and the traps behind them.
     session wastes the time.
   - Everything else here still holds: privacy, free tiers, one simulator and no heavy jobs beside it, and the
     branch rule below.
+- **Build new features straight into Revisely Dev** (Majd, Nov 16 2026: "the whole point of the dev app is so that
+  we can test new features super quickly ... we don't necessarily need to approve a mock before it's built into the
+  dev app. Just let me know when these things are built so I can go test them out myself in the app ... unless I
+  explicitly ask for a mock before building something").
+  - Draw a mock board if it helps you think, and save it in the area's mocks folder (for example
+    `~/Documents/revisely-recite-mocks/`), but don't wait on an approval. Build it, then tell the orchestrator what is
+    in Revisely Dev and where to find it.
+  - Ask for his look first only when he asks for a mock, or for anything outside Dev: production, store listings, the
+    public site.
+- **Yes to everything that doesn't touch production** (Majd, Nov 15 2026: "yes to everything that doesn't impact
+  production rn"). Approved ideas and choices that stay on develop, Revisely Dev, the dev backend (revisely-dev), the
+  dev checker and tests go ahead. Production, the stores, his accounts and billing, public posts and spending still
+  wait for him.
+- **PRs into develop merge themselves** (Majd, Nov 16 2026: "the only time i should have to manually merge
+  something myself is if it's going to production, all pr's aimed at dev can be automerged by claude"). Turn on
+  auto-merge for every PR into develop once it's ready. PRs into `main` or a `release/*` branch are his to merge.
+- **Google Drive is organized by area, then by item** (Majd, Nov 16 2026). Everything goes in his Drive's
+  `Revisely/` folder:
+  - `Product and design/`: design docs, specs;
+  - `Marketing/`: one folder per piece, for example `Halaqa kit/English (drafts)`, `Influencers`;
+  - `Mistake detection/`: for example `Volunteer recordings (revisely.app-record)`;
+  - `Bug reports/`: one folder per bug, `<date> · <what happens>`.
+
+  Each new idea or feature gets its own folder under the right area; add an area only when none fits. Never leave
+  files loose at the top of his Drive.
+- **One GitHub API limit for every session.** All sessions share one account's 5,000 requests an hour, and they ran
+  out on Nov 15. Check CI once when you need it (`gh pr checks`, or `gh run watch --interval 120`), never in a tight
+  loop.
 - **Hand off before your context fills, and name sessions by topic and number** (Majd, Nov 14 2026).
   - Check your context with `mcp__ccd_session_mgmt__get_usage` (session "self") at milestones and before big
     reads. Auto-compaction starts at about 97% and keeps you going, but it loses detail.
-  - At 80% or more, write a full hand-off doc in `~/Documents/revisely-handoffs/<topic>-<n>.md`:
+  - At about 93–95% (Majd, Nov 16 2026: "80% is too short to swap sessions, i was thinking closer to 95%"), write a
+    full hand-off doc in `~/Documents/revisely-handoffs/<topic>-<n>.md`, before auto-compaction at about 97%:
     - the goal and scope;
     - where things stand;
     - the decisions and why, with Majd's words quoted;
@@ -109,8 +138,8 @@ main is strictly for production"):
   and `preview.yml` treats a fingerprint with that tag (or an EAS build, i.e. build 11 and earlier) as built.
 - Never run `eas update` or `eas build` from a laptop to ship. Everything on a phone should trace to a
   commit on `develop` (TestFlight) or `main` (App Store, promoted).
-- Pushes that touch only docs, tests, `functions/`, `scripts/`, `worker/`, `wrangler*.jsonc`, workflows,
-  Firestore rules or `.md` files publish nothing (`paths-ignore` in both workflows). Firebase rules and functions still deploy by hand
+- Pushes that touch only docs, tests, `functions/`, `scripts/`, `worker/`, `admin/` (the staff console), `wrangler*.jsonc`,
+  workflows, Firestore rules or `.md` files publish nothing (`paths-ignore` in both workflows). Firebase rules and functions still deploy by hand
   (`firebase deploy`, see README).
 
 ## Dev stack (Revisely Dev, the dev backend, dev.revisely.app)
@@ -177,6 +206,11 @@ until its part is set up.
     - It runs keyless: GitHub OIDC through Workload Identity, develop of this repository only.
     - Its variables are `DEV_BACKEND`, `DEV_FIREBASE_PROJECT`, `DEV_WIF_PROVIDER` and `DEV_DEPLOY_SA`.
     - It refuses the production project. Production deploys stay by hand.
+    - It never deletes anything on dev (Nov 16 2026): functions go by name, with no `--force`. Its `--force` deleted
+      Revisely Console's functions and indexes on every develop deploy while they lived on a branch. A function or
+      index taken out of the source stays on dev until it is deleted by hand.
+    - Its `HOLD` lists functions a branch not yet in develop owns on dev, deployed by hand from it, so develop's older
+      copies don't overwrite them. The change that brings them to develop empties it.
   - **Revo** has its own key there (a "revisely-dev" Anthropic workspace with a $10 monthly limit) and a
     `config/coach` cap of $10.
   - **Scripts** reach dev with `GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-dev-admin.json`.
@@ -214,11 +248,24 @@ until its part is set up.
   filmed with it.
 - **Recitation check** (Majd, Nov 11 2026: "push the best version we have so far on dev"): the lab's mistake
   detection in the Dev app only (`lib/reciteCheck`: `isDevVariant()`, `previewTester`, a binary with the
-  microphone stream). Hold a verse → Check my recitation: record, stop, and the passage comes back with the words
-  skipped, said wrong or added, and tajweed notes (madd lengths per the sheet's settings, qalqalah, ghunnah,
-  ikhfa, idgham, iqlab); letters behind an off-by-default switch.
+  microphone stream). The reader's one mic: Recite follows the reciter on the page, and with Mark mistakes (Premium) it
+  marks the words skipped, said wrong or added, harakat and letter slips and, with Strict, tajweed notes (madd lengths
+  per Settings → Recite, qalqalah, ghunnah, ikhfa, idgham, iqlab). The verse menu's old "Check my recitation" row
+  (record, then check) is gone (Nov 15 2026; nothing showed it any more).
   - The checker runs on Cloud Run in revisely-dev (`scripts/recite-check`, its README): the app has no JS-only way
     to run the model on the phone. It is deployed by hand, never to production, and the store app never calls it.
+  - **Two services** (recite-server, Nov 15 2026; Majd approved halving the light levels' cost; recite-contract.md,
+    "Two services"):
+    - Recite (`follow`), and Words & harakat with letters off, go to `recite-check-pair` (two takes an instance);
+      everything else goes to `recite-check`.
+    - The app's Words & harakat sends `letters: true`, so today only Recite goes to the pair.
+    - `lib/reciteLive/socket` picks the address when a take starts. A take the pair refuses (`level_elsewhere`), or
+      can't start (unreachable, or its 403 while private), starts again on `recite-check` as a new take there.
+    - A resume goes to the service that said `ready`.
+    - `warmUpReciteCheck()` wakes both. Its pair `/health` answer also says whether the pair takes this phone's takes:
+      a 403 (still private), or a take it couldn't start, sends takes straight to `recite-check` for an hour
+      (`lib/reciteLive/pairService`, in memory). So even the first take after the reader opens pays no refused upgrade.
+      An answer from `/health` lets takes back.
   - The model's licence (Quran Muaalem License 1.0, 2.1) asks for its AI notice, English and Arabic, before the
     first use and reachable afterwards: the sheet shows it first, and Settings → About has it.
   - "Keep as test data" (on by default; in the sheet and Settings → Testing) keeps each recording and its result
@@ -254,6 +301,13 @@ until its part is set up.
     for is a firmer shade of its own (`…Firm`), no outline. No red ink, dotted lines or + discs. The bar, the card and
     the summary use the same highlights, and a small flat swatch beside the kind's name (never a round mark): the kind
     is always in words.
+  - **The next word's cover turns red while something else is said** (contract draft 7's `off`; Majd's yes, Nov 15 2026):
+    - What shows: in the hidden view only, red over the word's cover (the word-mistake highlight), its text still
+      hidden. It's never a mark and never counted.
+    - When it goes: once the word is said (`at` or `said` reach it), the reciter goes back, or a mark lands on it or an
+      Extra word just before it (`off` in `lib/reciteLive/state`).
+    - What the lab measured: right 86% of the times it fires, and never on hesitations or pauses.
+    - VoiceOver hears nothing: the mic is on throughout a take.
   - **"Not a mistake" can be undone** (Majd, Nov 15 2026; Tarteel's Removed list): for 5 s an Undo toast above the bar,
     and after the take the summary's "1 marked not a mistake" (closed until tapped) lists each with Put back
     (`restoreMark`: the mark and what it counted come back). The checker is told both ways, so the lab never keeps a
@@ -272,6 +326,10 @@ until its part is set up.
     tajweed offers one take over the stretch from the ayah before the first mistake (same surah) to the last mistake's
     ayah (`s2`/`a2`, no `startBy`). It stops by itself once `said` reaches the stretch's last word (reciting on would
     add "Extra word after the end" marks), and its summary says "Before: …" (what the take before found there).
+    - **From the page** (Nov 16 2026; `openDrill`): with Premium, holding the mic on a page that still has words to fix
+      in Recite's memory (open until two right takes on two days; tajweed notes left out) adds "Recite your N mistakes
+      here" under the stretch's name. The same kind of take, over the stretch that holds those words; "Before: …" is
+      each word's latest wrong try. On a phone that hasn't seen the notice, the notice comes first, then that stretch.
   - **Where a slip went** (`into`, contract draft 6; Majd said yes, Nov 15 2026; live on the checker since #617/#618):
     the final answer can name, on the first skipped or wrong word of a run, the similar ayah the reciter went on with,
     or (`ending`) the ayah whose ending they used. The summary gives each a row under its head ("You continued with
@@ -286,8 +344,16 @@ until its part is set up.
   - **A take starts anywhere on the page** (Majd, Nov 14 2026; protocol 6). The start frame sends `startBy` (the page's
     last ayah), and the checker says where the reciter started (`locked`; recite-contract.md in the shared notes).
     - Until then the bar says Listening…, with no cursor and no score. If it is never found, the take fails silently
-      (Majd): no message (`nolock` isn't read), and Stop just ends it, with no summary.
+      (Majd): no message (`nolock` isn't read), and Stop just ends it, with no summary. The one exception (Majd, Nov
+      15 2026): with VoiceOver or TalkBack on, once Stop has turned the microphone off, one line is said ("Couldn't
+      follow that take. Try starting at the top of the page."); nothing on screen changes for anyone.
     - A page turned by hand searches that page again (`seek` with `startBy`).
+    - **Anywhere in the Qur'an** (Majd, Nov 15 2026, step 2; protocol 7, shape A in recite-contract.md): a take from
+      the mic also sends `startIn: "quran"`. When the page doesn't match, the checker looks in the whole Qur'an and locks
+      only on a place it is sure is the one (`locked.where: "quran"`); the reader turns there (the cursor's page turn),
+      VoiceOver hears "Started at …", and a Sentry breadcrumb notes it (numbers only; the checker keeps where every kept
+      take locked). Drills, Test me places and a voice search's ayahs never send it. Older checkers ignore it. Never
+      found anywhere: still silent.
     - Nothing before the start is skipped, and the summary counts from the start.
     - A checker below protocol 6 (`ready.protocol`) doesn't search: the take starts at the page's first ayah, as
       before. So does a cursor that comes with no `locked` (`lib/reciteLive/state`).
@@ -298,6 +364,56 @@ until its part is set up.
     (some pages and lines draw it smaller, page 3 wider; a sajdah sign stays with its marker) and checks that no marker
     ink is under a cover and no word's ink shows beside a marker, on the originals and Android's w1080 and w1440. Run it
     after any change to the page lines or the images; `hiddenPage.test` pins measured markers (page 2's among them).
+  - **A voice search with one result opens the reader at the ayah, nothing listening** (SEARCH-4; Majd, Nov 17 2026:
+    "it takes me to the mushaf with the verse highlighted without it still recording then clicking back shows me that
+    one search result"). It replaced Nov 15's "opens the reader reciting".
+    - When a search by voice finds exactly one place (the list would say "1 result", not "Closest matches"), the search
+      screen opens the reader there, the ayah highlighted as Open in the reader does (`lib/search/voiceOpens`).
+    - Listening ended with the search, and nothing starts by itself. Back returns to the search, its words and result
+      still there.
+    - Several results, or a typed search, stay a list, and nothing opens by itself.
+    - Gated with Recite (`reciteLiveEnabled`), so it's Revisely Dev's until the release.
+    - E2E: `revisely://e2e/voice-search?heard=…` (flow 18, An-Naml 25).
+  - **The search screen** (Majd, Nov 16 2026: "the mic button being top right is annoying to have to reach up there
+    just to end the check"; Tarteel's as inspiration, built in our own design; for everyone with search): the field
+    and a 56pt mic sit in one bar at the bottom (`search-bar`), in reach of a thumb, and the keyboard pushes them up
+    (`KeyboardAvoidingView` padding, Android too). Stopping is one tap on the same button. While listening: what is
+    heard so far, large, and the voice's level (`LiveWaveform` fed by `useVoiceSearch().levels`). A verse found is a
+    row of its own (`components/search/SearchVerseCard`): surah and ayah first (the page a quiet detail), the ayat
+    large with the words found in full ink, the account's translation exactly as given (raised footnote markers, its
+    footnotes and its credit with the version kept, as QuranEnc's and The Clear Quran's terms ask;
+    `getVerseTranslation`, no Arabic fetched; fetched only once its card has been on screen, since each Clear Quran block
+    spends the account's and everyone's daily budget), then Share, Copy (the ayat from the word data on the phone, so they
+    work offline; "Copied") and Open in the reader.
+  - **Test me** (Majd, Nov 15 2026: approved, "random within all memorized pages, with an optional juz pick";
+    `lib/reciteLive/testMe`, `components/reciteLive/TestMeSheets`). The mic's menu has Test me under Recite (Premium,
+    locked like Mark mistakes; "Mark what you've memorized first" with nothing memorized). It asks where from:
+    everything memorized, or one juz of it (only the juz with somewhere to start). Five places at random, none sharing
+    an ayah, each starting in a memorized ayah of at least four words.
+    - At each place the page turns there and is hidden but for the ayah's first two words. A Mark mistakes take covers
+      that ayah and the next two (those memorized, in the same surah) and stops by itself at the end. The checker looks
+      for the start only in the first ayah (`startBy`), so starting the ayah again or carrying on both work.
+    - While listening the bar says which place it is ("1 of 5"); then how it went in the words' place ("Clean", "1 wrong
+      word", "Stopped before the end", "Not continued" when the start was never found), with Next and ✕ and no score
+      pill (an SE at the largest text had no room). ✕ ends the test early.
+    - After the last place (or ✕): the summary, "4 of 5 continued cleanly" and each place with how it went (a tap shows
+      it on the page), Test me again (the same juz) and Done. The page goes back to shown or hidden as before.
+    - Each place's take is kept as a recording, as any take is.
+    - E2E: flow 18 marks page 379 memorized (`scripts/server-memorized.js`) and tests Juz 19; a place gets a take of
+      its own that says every word (`placeTake` in `lib/e2e/reciteLive`).
+  - **An immersive page** (Majd, Nov 15 2026; Tarteel's): during a take a tap on the page puts the header and the bar
+    away too, leaving the page, the juz and surah above it, and the take's time beside the page number
+    (`TakeActivity`, red dot while recording; a tap on it brings the controls back). The status bar stays
+    (`keepStatusBar` on `ReaderFrame`). A tap brings them back, and so do a mark's card and the take's end. With
+    VoiceOver or TalkBack the bar never goes, so Stop is always there. Outside a take the page's tap is as before.
+  - **Peeked words** (Majd, Nov 15 2026; `lib/reciteLive/peeked`): words shown by hand during a take (‹, ‹‹; with ‹‹
+    only the words of the ayah not yet shown) stay in quiet grey ink on the page while the take lasts, shown or
+    hidden, recited or not: a veil of the page's colour over their ink (`peekVeil` in `theme/readPalette`), never over
+    a word with a mistake (its highlight shows as it is). Grey, not amber: amber is a slip. The summary says "3 words
+    peeked" and lists each ayah's peeked words in a row (a tap shows it on the page). Recite the mistakes again takes
+    in their ayahs (offered for peeks alone too; its summary's "Before:" counts them). Peeks never count in the score
+    (the checker counts them as `helped`). In Test me a place said to its end with a peek is "1 word peeked", not
+    clean. The words Test me shows to start a place aren't peeks.
 
 ## How updates reach phones
 
@@ -424,8 +540,12 @@ Non-testers follow `production`, so nobody sees this on a phone before Promote; 
   - Home's update and store sheets and Revo wait for Home.
   - WidgetSync holds a widget's link until Done.
   - `lib/updates/busy` sees no main screen, so no update restarts the app under it.
-- **The next release:** add an entry to `RELEASES` (a new id, its own cards, `live: false`) and leave the
-  old one. Only the current release shows or replays.
+- **The next release:** write it as `NEXT_RELEASE` in `src/lib/help/whatsNew.ts` (a new id, its own cards, `live:
+  false`), outside `RELEASES`. So the current release stays what store users, TestFlight testers, E2E and the scenarios
+  see, and what onboarding marks, while Revisely Dev's testers see the next one in Settings → About → What's new and the
+  run at launch (`releaseFor`). The release PR appends it to `RELEASES` with `live: true` (and sets `NEXT_RELEASE` back
+  to null), opening its features' gates in the same change. Only the current release shows or replays for everyone
+  else. The mistake detection release's is `1.0.5` (Nov 16 2026).
 - `whatsNewSeen` is in the user document's allowlist (`firestore.rules`, #439). The rules must be live
   before app code that writes it reaches develop: onboarding's write would be refused, and with it
   `onboardingComplete`.
@@ -1343,6 +1463,10 @@ How it works:
     that go's segments and their page marks go, and the earlier recording stays. Those segments never uploaded; a
     segment that did is refused ("Couldn't undo"), since a segment can't leave the backup on its own.
   - With VoiceOver or TalkBack the note stays 15 s and is said aloud (never while the microphone is on).
+  - **"Saved to today · Undo · View"** (REC-1, Nov 15 2026; `components/timer/SittingSavedToast`, `undoSitting` in
+    `lib/sitting`): a sitting's note can be undone too. Undo deletes the session (`reading.delete`, as the day's Delete
+    session) and undoes the recording that ended with it, the same way. That recording's hold lasts while the note
+    shows. The timer's `finish()` returns the saved session's id for it.
 - **Listing:** the backup is listed on an account's first run, then at most every 15 minutes.
 - **Account deletion:** `deleteUserAccount` deletes the Storage prefix first.
 - **Known limits:**
@@ -1698,12 +1822,45 @@ app; `askCoach`/`setCoachOptIn` stay as they were until Insights links to Revo. 
   emulators (only the model is a stand-in), so `[REVO-23]` runs the app's real requests.
 - **The guide** (`functions/src/revo/guide.ts`, REVO-30): how Revisely works, for Revo, in the cached part of its
   prompt: each rule in user words, where every screen and setting is, the steps for common tasks, what is for testers,
-  and what the app can't do with the closest way. **Change the guide in the same PR as a feature** (a rule, a screen, a
-  route, a label, a setting): `guide.test.ts` fails when BEHAVIOUR.md has a rule the guide doesn't cover (or list in
-  `GUIDE_INTERNAL` with why), or the guide names a route or a “label” the app no longer has (curly quotes mean the
-  app's exact text; plain quotes are examples). `functions/scripts/revo-guide-samples.js` asks the real model ~25
-  how-to questions and checks each answer's facts (`--dry` checks the requests; live needs the coach key). A changed
-  guide is a changed system prompt: deploy `revoAsk,revoDayInReview` and re-record (`scripts/record-anthropic.js`).
+  and what the app can't do with the closest way.
+  - **Every change a user can see updates the guide in the same PR** (Majd, Nov 16 2026: "whatever app changes we make,
+    revo should get that update too"): a rule, a screen, a route, a label, a setting, an Undo, a mode. Features in the
+    store app (and its testers') go in `GUIDE_SECTIONS`; features only Revisely Dev has go in `DEV_GUIDE_SECTIONS`.
+    When a Dev feature reaches the store app, move its lines to the main guide.
+  - **The Dev guide** is a system block of its own (`DEV_GUIDE_SYSTEM`), sent after the main prompt only when the
+    context says `app: 'dev'` (Revisely Dev, `isDevVariant()`). Store requests never carry it, so they, their prompt
+    cache and the recorded replies stay byte-identical; a change to the Dev guide needs no re-record. A day in review
+    doesn't carry it.
+  - **`guide.test.ts` fails** when:
+    - BEHAVIOUR.md has a rule no section covers and `GUIDE_INTERNAL` doesn't list;
+    - a `GUIDE_INTERNAL` reason doesn't start with one of `GUIDE_INTERNAL_KINDS` (`timing:`, `server:`, `layout:`,
+      `owner tool:`, `signed out:`, `superseded:`, `prompt:`), or mentions Dev. Nothing a user sees may sit there;
+    - a Dev-only rule isn't in the Dev guide, or is in the main one. A rule is Dev-only when it sits under a
+      BEHAVIOUR.md heading marked "(Revisely Dev)", or carries "(Revisely Dev)" right after its id
+      (`- **ACT-28.** (Revisely Dev) …`). The Dev guide covers only such rules: when a feature reaches the store app,
+      drop the mark and move its lines to the main guide;
+    - the guide names a route or a “label” the app no longer has (curly quotes mean the app's exact text; plain quotes
+      are examples).
+  - `functions/scripts/revo-guide-samples.js` asks the real model ~40 how-to questions (Revisely Dev's marked `dev`)
+    and checks each answer's facts (`--dry` checks the requests; live needs the coach key).
+  - A changed main guide is a changed system prompt: deploy `revoAsk,revoDayInReview` and re-record
+    (`scripts/record-anthropic.js`, needs the coach key). On develop, `dev-backend.yml` deploys them to revisely-dev
+    on merge; production's are deployed by hand with a release.
+- **Recitation** (Revisely Dev, RINS-1; Majd, Nov 16 2026; plan `recite-insights-revo.md` in the orchestrator's notes):
+  for an account that recites with Mark mistakes (`reciteLiveForAccount`), each question carries `context.recitation`.
+  `lib/revo/recitation` builds it from `lib/reciteInsights` over Recite memory's takes: the last 4 weeks' takes and score,
+  mistakes by kind, Not clear and tajweed apart, words still marked and cleared, passages that keep slipping, similar
+  ayahs gone on with, and the latest take. A take attached (`reciteTake`, `takeAttachment`) adds its marks: the expected
+  word, and the heard word only for a real word or a harakat/letter slip, never a `sound`. Text only, no audio or ids.
+  The server (`functions/src/revo/recitation.ts`) checks it adds up and writes it out. Its rules (only marks that exist;
+  Not clear is never wrong; words and similar ayahs before harakat; restarts aren't mistakes; surahs, never pages) are a
+  second system block sent only with a recitation, so every other request, its cache and the recorded replies are
+  unchanged. Before this could reach production, the privacy policy's Revo part and the store answers need the Recite
+  results (Majd's call).
+  Activity → Insights shows the same for the user (RINS-2, `components/activity/RecitationInsights`, `useRecitation`):
+  a Recitation section after Weak spots, over Insights' range, with the score and its weeks, Keeps slipping (a row opens
+  the reader at its ayahs, highlighted), Similar ayahs and one quiet line; Weak spots say how many words Recite still
+  marks on a page. Smart Tracking off: nothing about strength (rows say when the passage was last recited).
 - **Opening a screen** (`openScreen`, REVO-31): Revo's card can open Jump to…, Edit schedule, the memorized pages,
   Activity, the daily log, Settings at a section, prayer times, the Qibla or the reader at a surah or juz
   (`REVO_SCREENS`, the same list in `functions/src/revo/types.ts` and `src/lib/revo/types.ts`; `src/lib/revo/screens`
@@ -1936,6 +2093,19 @@ classic default), and a fresh install starts in light.
   (`systemAppearanceAvailable()`; `resolveThemeMode` in `context/ThemeContext`).
 - `expo-blur` and `expo-glass-effect` were removed from `package.json` (and the tests' mocks) with
   the background-audio build (Oct 28 2026).
+
+## Strings (src/i18n; the app in Arabic)
+
+The app is getting Arabic (Majd approved the groundwork Nov 15 2026; study
+`~/Documents/revisely-ideas/approved/2026-11-15-growth-app-in-arabic-study.md`). UI text moves out of the
+code into `src/i18n/en/<folder>.ts`, folder by folder, with the English unchanged and nothing visible.
+- Use `t('folder.key', { values })` from `src/i18n` (i18next, typed keys). Whole sentences with
+  `{{values}}`, plurals as `_one`/`_other` keys, never `n === 1 ? …` or text glued from pieces.
+- **An extracted folder must stay extracted:** `src/i18n/__tests__/noRawStrings.test.ts` (its `EXTRACTED`
+  list) fails on UI text written into its files. Put new text in its `en/` file, or mark a line that isn't
+  UI text `// i18n-ignore (why)`. How-to and the progress command: `src/i18n/README.md`.
+- Tests, scenarios and E2E builds always run in English (`src/i18n/language.ts`).
+- JavaScript only so far; Arabic, the picker and right-to-left wait for the rest and a native release.
 
 ## UI traps
 

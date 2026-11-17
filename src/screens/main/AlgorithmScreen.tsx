@@ -29,6 +29,7 @@ import {
 } from '../../components/insights/InsightsV2';
 import { BrowseByStrength, PageRow, pageRowText, usePageStrengthRows } from '../../components/insights/BrowseByStrength';
 import { layoutV2, typeV2 } from '../../theme/v2';
+import { t } from '../../i18n';
 
 export { juzMeta } from '../../components/insights/BrowseByStrength';
 
@@ -90,18 +91,18 @@ export default function AlgorithmScreen() {
       >
         <View style={v2.titleBlock}>
           <Text style={[typeV2.largeTitle, { color: palette.text }]} accessibilityRole="header" maxFontSizeMultiplier={1.4}>
-            Insights
+            {t('insightsTab.title')}
           </Text>
-          <Text style={[typeV2.meta, { color: palette.secondary }]}>Where you stand and what to focus on</Text>
+          <Text style={[typeV2.meta, { color: palette.secondary }]}>{t('insightsTab.subtitle')}</Text>
         </View>
         <Hairline />
 
         {!hasEnoughSessions ? (
           <View testID="insights-warming">
-            <SectionHeader title="Insights warming up" />
+            <SectionHeader title={t('insightsTab.warmingUp')} />
             <View style={v2.block}>
               <Text style={[typeV2.body, { color: palette.secondary }]}>
-                {`They start after ${INSIGHTS_MIN_SESSIONS} completed revision sessions.`}
+                {t('insightsTab.startsAfter', { n: INSIGHTS_MIN_SESSIONS })}
               </Text>
               <View style={v2.progress}>
                 <ProgressBar
@@ -111,7 +112,7 @@ export default function AlgorithmScreen() {
                 />
               </View>
               <Text style={[typeV2.meta, typeV2.numeral, { color: palette.secondary }]}>
-                {`${completedSessionCount} of ${INSIGHTS_MIN_SESSIONS} so far`}
+                {t('insightsTab.soFar', { n: completedSessionCount, total: INSIGHTS_MIN_SESSIONS })}
               </Text>
             </View>
             <Hairline />
@@ -121,30 +122,30 @@ export default function AlgorithmScreen() {
             {allPageRows.length > 0 && (
               <>
                 <SectionHeader
-                  title="Strength"
-                  detail={`${allPageRows.length} revised page${allPageRows.length === 1 ? '' : 's'}`}
+                  title={t('insightsTab.strength')}
+                  detail={t('insightsTab.revisedPages', { count: allPageRows.length })}
                 />
                 <StrengthBar ratings={allPageRows.map((r) => r.strength)} />
                 <Hairline />
               </>
             )}
 
-            <SectionHeader title="Focus" detail="Revise these first: the weakest and most overdue" />
+            <SectionHeader title={t('insightsTab.focus')} detail={t('insightsTab.focusDetail')} />
             {topPages.length === 0 ? (
-              <QuietLine testID="focus-empty">Your top priority will appear here.</QuietLine>
+              <QuietLine testID="focus-empty">{t('insightsTab.focusEmpty')}</QuietLine>
             ) : (
               topPages.map((row, i) => {
-                const t = pageRowText(row.pageNumber, (page) => `${getRatingLabel(row.strength)} · ${page} · ${row.reason}`);
+                const text = pageRowText(row.pageNumber, (page) => `${getRatingLabel(row.strength)} · ${page} · ${row.reason}`);
                 return (
                   <InsightRow
                     key={`focus-${row.pageNumber}`}
                     number={row.surahNumber}
-                    name={t.name}
+                    name={text.name}
                     rating={row.strength}
-                    text={t.text}
+                    text={text.text}
                     onPress={() => openPagePreview(row.pageNumber)}
                     separator={i < topPages.length - 1}
-                    accessibilityLabel={t.spoken}
+                    accessibilityLabel={text.spoken}
                     testID={`focus-${row.pageNumber}`}
                   />
                 );
@@ -152,7 +153,7 @@ export default function AlgorithmScreen() {
             )}
             <Hairline />
 
-            <SectionHeader title="Browse" detail="Weakest first" />
+            <SectionHeader title={t('insightsTab.browse')} detail={t('insightsTab.weakestFirst')} />
             <BrowseByStrength rows={allPageRows} onOpenPage={openPagePreview} />
           </>
         )}

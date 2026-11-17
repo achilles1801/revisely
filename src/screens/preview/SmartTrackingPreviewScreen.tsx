@@ -42,6 +42,7 @@ import {
   StrengthBar,
   strengthTone,
 } from '../../components/insights/InsightsV2';
+import { t } from '../../i18n';
 
 type Step = 'intro' | 'rate' | 'insights' | 'cta' | 'not_now_pointer';
 
@@ -163,10 +164,10 @@ export function SmartTrackingPreviewScreen({ visible, onClose }: Props) {
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <View style={[styles.container, { paddingTop: insets.top, backgroundColor: palette.bg }]} testID="smart-preview">
         <TopBar
-          title="Smart Tracking"
+          title={t('preview.title')}
           right={
             step !== 'not_now_pointer' ? (
-              <IconButton icon="close" label="Close preview" onPress={handleClose} testID="preview-close" />
+              <IconButton icon="close" label={t('preview.close')} onPress={handleClose} testID="preview-close" />
             ) : undefined
           }
           separator
@@ -179,16 +180,20 @@ export function SmartTrackingPreviewScreen({ visible, onClose }: Props) {
             <View style={v2.sessionHeader}>
               <View style={v2.sessionTitle}>
                 <Text style={[typeV2.name, { color: read.textPrimary }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>
-                  {`Revising Juz ${demoJuz} `}
+                  {`${t('preview.revisingJuz', { juz: demoJuz })} `}
                   <Text style={{ color: read.textSecondary, fontWeight: '400' }}>{`· ${demoMarked ? 1 : 0}/1`}</Text>
                 </Text>
                 <Text style={[typeV2.meta, { color: read.textSecondary }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>
-                  {`${describePageRange(demoPage.pageNumber, demoPage.pageNumber, { form: 'compact' })} · Juz ${demoJuz} · Hizb ${demoHizb}`}
+                  {t('preview.where', {
+                    what: describePageRange(demoPage.pageNumber, demoPage.pageNumber, { form: 'compact' }),
+                    juz: demoJuz,
+                    hizb: demoHizb,
+                  })}
                 </Text>
               </View>
               <RoundButton
                 icon={demoMarked ? 'checkmark' : 'checkmark-outline'}
-                label={demoMarked ? 'Unmark current page' : 'Mark current page as revised'}
+                label={demoMarked ? t('revision.edit.unmarkCurrent') : t('revision.edit.markCurrent')}
                 onPress={() => {
                   haptics.selection();
                   setDemoMarked((v) => !v);
@@ -196,7 +201,7 @@ export function SmartTrackingPreviewScreen({ visible, onClose }: Props) {
                 palette={read}
                 active={demoMarked}
               />
-              <RoundButton icon="ellipsis-horizontal" label="Session menu" onPress={() => setMenuOpen(true)} palette={read} />
+              <RoundButton icon="ellipsis-horizontal" label={t('revision.edit.menu')} onPress={() => setMenuOpen(true)} palette={read} />
             </View>
             <Text
               style={[typeV2.meta, v2.hint, { color: read.textSecondary }]}
@@ -204,8 +209,8 @@ export function SmartTrackingPreviewScreen({ visible, onClose }: Props) {
               testID="preview-rate-hint"
             >
               {demoRating === null
-                ? 'Tap ⋯, then Rate page strength'
-                : `Rated ${getRatingLabel(demoRating).toLowerCase()}.`}
+                ? t('preview.rateHint')
+                : t('preview.rated', { rating: getRatingLabel(demoRating).toLowerCase() })}
             </Text>
             <View style={styles.viewerContainer}>
               <MushafPager pages={[demoPage.pageNumber]} initialPage={demoPage.pageNumber} />
@@ -235,24 +240,24 @@ export function SmartTrackingPreviewScreen({ visible, onClose }: Props) {
             { borderTopColor: palette.separator, paddingBottom: Math.max(insets.bottom, layoutV2.gutter) },
           ]}
         >
-          {step === 'intro' && <PillButton size="lg" title="Show me" onPress={() => setStep('rate')} testID="preview-show-me" />}
+          {step === 'intro' && <PillButton size="lg" title={t('preview.showMe')} onPress={() => setStep('rate')} testID="preview-show-me" />}
           {step === 'rate' && (
             <PillButton
               size="lg"
-              title={demoRating === null ? 'Rate the page to continue' : 'Continue'}
+              title={demoRating === null ? t('preview.rateToContinue') : t('preview.continue')}
               onPress={() => setStep('insights')}
               disabled={demoRating === null}
               testID="preview-continue"
             />
           )}
-          {step === 'insights' && <PillButton size="lg" title="Next" onPress={() => setStep('cta')} testID="preview-next" />}
+          {step === 'insights' && <PillButton size="lg" title={t('preview.next')} onPress={() => setStep('cta')} testID="preview-next" />}
           {step === 'cta' && (
             <View style={v2.ctaButtons}>
-              <PillButton size="lg" title="Enable" onPress={handleEnable} busy={saving} testID="preview-enable" />
+              <PillButton size="lg" title={t('preview.enable')} onPress={handleEnable} busy={saving} testID="preview-enable" />
               <PillButton
                 size="lg"
                 variant="outline"
-                title="Not now"
+                title={t('common.notNow')}
                 onPress={handleNotNow}
                 disabled={saving}
                 testID="preview-not-now"
@@ -260,7 +265,7 @@ export function SmartTrackingPreviewScreen({ visible, onClose }: Props) {
             </View>
           )}
           {step === 'not_now_pointer' && (
-            <PillButton size="lg" title="Got it" onPress={handleGotIt} testID="preview-got-it" />
+            <PillButton size="lg" title={t('preview.gotIt')} onPress={handleGotIt} testID="preview-got-it" />
           )}
         </View>
 
@@ -269,7 +274,7 @@ export function SmartTrackingPreviewScreen({ visible, onClose }: Props) {
           actions={[
             {
               key: 'rate',
-              label: 'Rate page strength',
+              label: t('preview.ratePageStrength'),
               icon: 'fitness-outline',
               onPress: () => setRatingSheetOpen(true),
             },
@@ -328,14 +333,14 @@ function IntroStepV2() {
   return (
     <View>
       <StepTitleV2
-        title="Meet Smart Tracking"
-        body="An optional layer that learns your weak spots and shows what to focus on next."
+        title={t('preview.intro.title')}
+        body={t('preview.intro.body')}
       />
       <Hairline />
       <View style={v2.points}>
-        <PointV2 icon="pulse-outline" text="Rate a page after revising it, so the app learns where you're shaky." />
-        <PointV2 icon="analytics-outline" text="See the pages that need your attention most." />
-        <PointV2 icon="filter-outline" text="Filter by strength to find weak spots across your memorization." />
+        <PointV2 icon="pulse-outline" text={t('preview.intro.rate')} />
+        <PointV2 icon="analytics-outline" text={t('preview.intro.see')} />
+        <PointV2 icon="filter-outline" text={t('preview.intro.filter')} />
       </View>
     </View>
   );
@@ -357,47 +362,47 @@ function InsightsTabMimicV2({
 }) {
   const { palette } = useTheme();
   const label = getRatingLabel(rating);
-  const reason = rating <= 2 ? `You marked this as ${label.toLowerCase()}` : 'Recently rated, keep it fresh';
+  const reason = rating <= 2 ? t('preview.insights.reasonWeak', { rating: label.toLowerCase() }) : t('preview.insights.reasonRecent');
   return (
     <View>
-      <StepTitleV2 title="Insights" body="This is your Insights tab: where you stand and what to focus on. Tap a page to open it." />
+      <StepTitleV2 title={t('preview.insights.title')} body={t('preview.insights.body')} />
       <Hairline />
-      <SectionHeader title="Strength" detail="1 revised page" />
+      <SectionHeader title={t('preview.insights.strength')} detail={t('preview.insights.revisedPages', { count: 1 })} />
       <StrengthBar ratings={[rating]} />
       <Hairline />
-      <SectionHeader title="Focus" detail="Revise these first: the weakest and most overdue" />
+      <SectionHeader title={t('preview.insights.focus')} detail={t('preview.insights.focusDetail')} />
       <InsightRow
         number={pageNumber}
-        name={`Page ${pageNumber} · ${surahName}`}
+        name={t('preview.insights.rowName', { page: pageNumber, surah: surahName })}
         rating={rating}
-        text={`${label} · ${reason}`}
+        text={t('preview.insights.rowText', { rating: label, reason })}
         onPress={onTapPage}
         separator={false}
         testID="mimic-focus"
       />
       <Hairline />
-      <SectionHeader title="Browse" detail="Weakest first" />
+      <SectionHeader title={t('preview.insights.browse')} detail={t('preview.insights.weakestFirst')} />
       <View style={v2.controls}>
         <PillTabs<'pages' | 'surahs' | 'juz'>
           options={[
-            { value: 'pages', label: 'Pages' },
-            { value: 'surahs', label: 'Surahs' },
-            { value: 'juz', label: 'Juz' },
+            { value: 'pages', label: t('preview.insights.tabs.pages') },
+            { value: 'surahs', label: t('preview.insights.tabs.surahs') },
+            { value: 'juz', label: t('preview.insights.tabs.juz') },
           ]}
           value="pages"
           onChange={() => undefined}
         />
         <View style={v2.filters}>
-          <PillButton title="All juz" icon="filter-outline" size="sm" variant="outline" onPress={() => undefined} />
+          <PillButton title={t('insights.allJuz')} icon="filter-outline" size="sm" variant="outline" onPress={() => undefined} />
           <PillButton title={label} icon="pulse-outline" size="sm" onPress={() => undefined} />
         </View>
       </View>
       <View style={{ height: layoutV2.hairline, backgroundColor: palette.separator }} />
       <InsightRow
         number={pageNumber}
-        name={`Page ${pageNumber} · ${surahName}`}
+        name={t('preview.insights.rowName', { page: pageNumber, surah: surahName })}
         rating={rating}
-        text={`${label} · Juz ${juz} · just rated`}
+        text={t('preview.insights.browseText', { rating: label, juz })}
         onPress={onTapPage}
         testID="mimic-browse"
       />
@@ -409,13 +414,13 @@ function CtaStepV2() {
   return (
     <View>
       <StepTitleV2
-        title="Enable Smart Tracking?"
-        body="Turn it on to rate pages in your revision sessions and see the Insights tab. You can turn it off in Settings any time."
+        title={t('preview.cta.title')}
+        body={t('preview.cta.body')}
       />
       <Hairline />
       <View style={v2.points}>
-        <PointV2 icon="checkmark-circle-outline" text="Rate pages from the session menu while revising." />
-        <PointV2 icon="checkmark-circle-outline" text="The Insights tab shows what to focus on." />
+        <PointV2 icon="checkmark-circle-outline" text={t('preview.cta.rate')} />
+        <PointV2 icon="checkmark-circle-outline" text={t('preview.cta.insights')} />
       </View>
     </View>
   );
@@ -438,9 +443,9 @@ function NotNowPointerStepV2() {
 
   return (
     <View>
-      <StepTitleV2 title="No problem" body="Turn it on any time: Settings, under Revision." />
+      <StepTitleV2 title={t('preview.notNow.title')} body={t('preview.notNow.body')} />
       <Hairline />
-      <SectionHeader title="Revision" />
+      <SectionHeader title={t('preview.notNow.section')} />
       <View style={v2.settingsRow} testID="mimic-settings-row">
         <Animated.View
           pointerEvents="none"
@@ -448,11 +453,11 @@ function NotNowPointerStepV2() {
         />
         <View style={v2.settingsRowHead}>
           <Ionicons name="analytics-outline" size={24} color={palette.text} />
-          <Text style={[typeV2.body, v2.flex, { color: palette.text }]}>Smart Tracking</Text>
-          <Toggle value={false} onValueChange={() => undefined} disabled accessibilityLabel="Smart Tracking" />
+          <Text style={[typeV2.body, v2.flex, { color: palette.text }]}>{t('preview.title')}</Text>
+          <Toggle value={false} onValueChange={() => undefined} disabled accessibilityLabel={t('preview.title')} />
         </View>
         <Text style={[typeV2.meta, v2.settingsHelp, { color: palette.secondary }]}>
-          Turn on to rate pages from the session menu and see personalized insights.
+          {t('preview.notNow.help')}
         </Text>
       </View>
       <Hairline />
@@ -481,9 +486,9 @@ function SandboxRatingSheetV2({
     <Sheet
       visible={visible}
       onClose={onClose}
-      title="Rate this page"
-      message={`${describePageRange(pageNumber, pageNumber, { form: 'compact' })} · p. ${pageNumber}`}
-      left={{ label: 'Cancel', onPress: onClose }}
+      title={t('revision.rating.title')}
+      message={t('revision.rating.message', { what: describePageRange(pageNumber, pageNumber, { form: 'compact' }), page: pageNumber })}
+      left={{ label: t('common.cancel'), onPress: onClose }}
       scroll
       testID="sandbox-rating-sheet"
     >

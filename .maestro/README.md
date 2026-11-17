@@ -7,8 +7,10 @@ emulators, at a time and in a time zone each flow sets. CI (`ci.yml`) runs them 
 | When | Flows | Jobs |
 | --- | --- | --- |
 | A single PR into `develop` (and claude-fix's runs) | the smoke set: 02, 04, 05, 06 | two Android (02 05, 04 06) |
-| A PR into `develop` that changes code flows share (subflows, scripts, `run.sh`, `e2e.yml`, `ci.yml`) | the flows that use it with the smoke set, or all, each run twice with no reruns | both platforms: one job for three flows or fewer, else the full run's jobs with only those flows (TESTING.md, "Changing the tests themselves") |
-| A lower layer of a GitHub stack | none (the top layer tests the stack) | none |
+| A PR into `develop` that changes code flows share (subflows, scripts, flows) | the flows that use it, once with a retry (Android adds the smoke set) | both platforms: one job for five flows or fewer, else the full run's jobs with only those flows (TESTING.md, "Changing the tests themselves") |
+| A PR into `develop` that changes `run.sh`, `config.yaml`, `e2e.yml` or `ci.yml` | Android: every flow; iOS: the smoke set and the flows its other test files touch | Android: the full run's jobs; iOS: one job for the smoke set |
+| A lower layer of a GitHub stack, or a PR into `develop` whose commits another open PR into `develop` holds | none (the top tests them all; the lower PR's check is "Required (under #N)", and the top's passed run posts "Required" on it) | none |
+| By hand | every flow, or the flows asked for | iOS takes at most two macOS runners at a time |
 | The top of a stack into `develop`, a PR into `main`, a merge group | every flow | two iOS, two Android |
 | A push to `develop` (what just landed) | every flow on Android; iOS: the native build alone, kept for PRs | two Android, one iOS |
 | Every night (testing develop), by hand | every flow | two iOS, two Android |
@@ -149,6 +151,11 @@ Before Nov 7 2026 nothing did: Activity screens that didn't match the approved m
   (1080×2400). Every flow captures Indigo in light today. A capture in another accent or theme is
   its own screen, named with suffixes: `-crimson` or `-jade`, then `-dark` (`r4-sheet-jade-dark`;
   `VARIANTS` in `screens.mjs`).
+- **On an iPhone SE:** a run by hand can boot an iPhone SE (3rd generation) instead of the Pro, to check
+  small screens without the Mac's one simulator. Use `gh workflow run e2e.yml -f platform=ios -f device=se`
+  (add `-f flows='12-*'` for some flows). Its screenshots are kept in the screens artifact but not compared,
+  since the baselines are the Pro's size. CI and nightly runs always use the Pro. Flows see which iPhone
+  it is as `E2E_IPHONE` (`pro` or `se`), for the steps an SE needs done another way (`revo-close.yaml`).
 - **Normalised** before comparing or approving (`lib.mjs`): the status bar cropped, what still
   varies between runs masked (pink), and halved (each pixel the mean of 2×2), which keeps a
   baseline at 40–160 KB. The masks (`screens.mjs`, in the raw capture's pixels):
@@ -305,6 +312,7 @@ The app's `Date` runs at an offset from the device's own clock (`src/lib/e2e/clo
 | `revisely://e2e/network?offline=1` (`0`) | the E2E network off: the emulators unreachable (iOS) |
 | `revisely://e2e/update-ready` | as if an update had just downloaded: "A new update is ready" opens by itself, as on a tester's phone (`src/lib/e2e/updates.ts`; flow 17) |
 | `revisely://e2e/recordings?set=activity` | the Activity mocks' recordings, written into the signed-in account's folder (`src/lib/e2e/demoRecordings.ts`; iOS takes `e2eRecordings` at launch instead: `subflows/relaunch-recordings.yaml`) |
+| `revisely://e2e/voice-search?heard=<words, URL-encoded>` (`?off=1`) | voice search on with no microphone or speech model: a search by voice shows Listening… for 4.5 s, then searches with these words (`src/lib/e2e/voiceSearch.ts`; flow 18) |
 
 - Time runs on from there, as on a phone; timers and animations use real time.
 - The offset is kept in a file in the app's Documents: a relaunch keeps the flow's time, and
@@ -366,6 +374,11 @@ A flow names its zone in a header line, `# e2e-zone: Asia/Kathmandu`; the rest r
 3. Select by `id:` (a `testID`). Add a `testID` to the app where one is missing.
 4. Work out what the user should see by hand from the plan, as the scenarios do, not with the app's
    code.
+5. A tap that opens something (a sheet, a modal, a screen) goes through `subflows/tap-to-open.yaml`
+   (`ID`, and `OPENS` as an id regex). On a loaded runner a tap can reach the app and be cancelled
+   before it's a press. This taps again only while `ID` is still there and nothing of `OPENS` has
+   come, at most twice. Each tap again saves a `lost-tap-<n>-<ID>` screenshot, which the weekly flake
+   report counts. Never use it for a switch, Next, or a button that stays on screen once it has worked.
 
 Things that bit:
 - Text with no-break spaces or hyphens (`p. 582`, `10 pages`, `Al‑Fatihah` on Home; the narrow

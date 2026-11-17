@@ -5,6 +5,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { RECITERS, resolveVoice, STYLE_INFO } from '../../lib/recitation';
 import { radiusV2, typeV2 } from '../../theme/v2';
 import { Tap } from '../v2/Tap';
+import { t } from '../../i18n';
 
 /** Names and chips grow with Dynamic Type only this far (chrome). */
 const CHROME_TEXT_SCALE = 1.4;
@@ -77,8 +78,7 @@ export function ReciterList({ value, onChange, maxHeight = 360 }: ReciterListPro
         );
       })}
       <Text style={[typeV2.meta, v2.note, { color: palette.secondary }]}>
-        Murattal: measured. Mujawwad: melodic, slower. Mu'allim: teaching, with a pause to repeat
-        each verse.
+        {t('verse.reciters.styles')}
       </Text>
     </ScrollView>
   );

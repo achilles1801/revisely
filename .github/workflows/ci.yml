@@ -27,8 +27,14 @@ concurrency:
 #   - E2E (e2e.yml, called below), decided by `plan`:
 #       a draft PR: none, unless it has the `e2e` label (marking it ready runs everything);
 #       a lower layer of a GitHub stack: none (the top layer tests the whole stack);
+#       a PR into develop whose commits another open PR into develop holds (branches built
+#         on one another, without GitHub's stacks): none, and its check is "Required (under
+#         #N)", so it merges with #N, or alone once #N's run has passed (`layers`, `pass-lower`);
+#         `supersede` cancels its runs once #N's starts;
 #       the top of a stack into develop, a PR into main, a merge group: every flow, iOS and Android;
 #       a single PR into develop (or claude-fix's run by hand): the Android smoke set;
+#       a change to test code (`infra`): the flows it touches (once, one retry); a change to
+#         the workflows, run.sh or config.yaml: every flow on Android, the smoke set on iOS;
 #       a push to develop (what just landed): every Android flow, and the iOS native
 #       build kept for PRs (no iOS flows);
 #     nightly and by hand: e2e.yml's own schedule and Run workflow.
@@ -48,6 +54,10 @@ jobs:
       ios: ${{ steps.plan.outputs.ios }}
       android: ${{ steps.plan.outputs.android }}
       only: ${{ steps.plan.outputs.only }}
+      only_ios: ${{ steps.plan.outputs.only_ios }}
+      upper: ${{ steps.layers.outputs.upper }}
+      lower: ${{ steps.layers.outputs.lower }}
+      draft: ${{ steps.live.outputs.draft }}
       repeat: ${{ steps.plan.outputs.repeat }}
       scenario_repeat: ${{ steps.plan.outputs.scenario_repeat }}
     steps:
@@ -56,11 +66,34 @@ jobs:
           sparse-checkout: |
             .maestro
             .github
+            scripts/e2e
+      # Whether the PR is a draft now, read from GitHub, not from the event that started the run. On #674 a
+      # push and `gh pr ready` seconds apart made one run, with the push's draft payload, and no
+      # ready_for_review run came: it ran no E2E and posted "Required (draft)", and the PR sat BLOCKED with
+      # every check green until it was made a draft and ready again (run 43876874743, Nov 16 2026).
+      # `layers`, `plan` and the required check's name read this; the payload's value if the read fails.
+      - id: live
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          PAYLOAD_DRAFT: ${{ github.event.pull_request.draft }}
+        run: |
+          draft=$(gh api "repos/$REPO/pulls/$PR" --jq .draft 2>/dev/null) || draft=""
+          case "$draft" in
+            true|false) ;;
+            *) draft=$PAYLOAD_DRAFT; echo "::warning title=CI::Couldn't read whether #$PR is a draft; the event's value ($draft) stands." ;;
+          esac
+          [ "$draft" = "$PAYLOAD_DRAFT" ] || echo "::notice title=CI::The event says draft=$PAYLOAD_DRAFT; #$PR is now draft=$draft, which this run follows."
+          echo "draft=$draft" >> "$GITHUB_OUTPUT"
       # Test the tests: what a PR changes in the code flows and scenarios share
-      # (.github/scripts/affected-flows.js). Its flows run on both platforms,
-      # twice, with no reruns; a change to the scenario harness runs the suite
-      # twice. #286 changed swipe-page.yaml, passed 06 once in the smoke set and
-      # broke 06 on develop.
+      # (.github/scripts/affected-flows.js). Its flows run on both platforms, once
+      # with run.sh's one retry (a pass on the retry passes, and the weekly flake
+      # report counts it); a change to the scenario harness runs the suite twice.
+      # #286 changed swipe-page.yaml, passed 06 once in the smoke set and broke 06
+      # on develop. Each touched flow ran twice with no reruns until Nov 16 2026,
+      # which doubled the macOS minutes of every PR that edits a flow.
       - id: infra
         if: github.event_name == 'pull_request'
         env:
@@ -69,16 +102,75 @@ jobs:
           PR: ${{ github.event.pull_request.number }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           STACK_BASE_SHA: ${{ github.event.pull_request.stack.base.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           if [ -n "$STACK_BASE_SHA" ]; then
             files=$(gh api "repos/$REPO/compare/$STACK_BASE_SHA...$HEAD_SHA" --jq '.files[] | .filename, (.previous_filename // empty)')
           else
             files=$(gh api --paginate "repos/$REPO/pulls/$PR/files" --jq '.[] | .filename, (.previous_filename // empty)')
           fi
-          out=$(printf '%s\n' "$files" | node .github/scripts/affected-flows.js)
+          # The E2E job lists as they are on the base: a change to them runs the flows whose job changed
+          # (affected-flows.js), or, with nothing to compare, every flow.
+          before=""
+          if printf '%s\n' "$files" | grep -qx 'scripts/e2e/jobs.json'; then
+            before="$RUNNER_TEMP/jobs-before.json"
+            gh api -H 'Accept: application/vnd.github.raw' "repos/$REPO/contents/scripts/e2e/jobs.json?ref=${STACK_BASE_SHA:-$BASE_SHA}" > "$before" || before=""
+          fi
+          out=$(printf '%s\n' "$files" | E2E_JOBS_BEFORE="$before" node .github/scripts/affected-flows.js)
           echo "Shared test code: $out"
-          echo "flows=$(jq -c .flows <<<"$out")" >> "$GITHUB_OUTPUT"
-          echo "scenarios=$(jq -r .scenarios <<<"$out")" >> "$GITHUB_OUTPUT"
+          { echo "flows=$(jq -c .flows <<<"$out")"; echo "ios_flows=$(jq -c .ios <<<"$out")"; echo "scenarios=$(jq -r .scenarios <<<"$out")"; } >> "$GITHUB_OUTPUT"
+      # PRs into develop built on one another's branches without GitHub's stacks: the Recite PRs of
+      # Nov 15 2026 (#621 → #625 → #628 → #629 → #630 → #659, #632 → #633 → #635) each ran every
+      # flow it touched on iOS for commits the PR above held too, and sessions cancelled the
+      # lower runs by hand. Here, an open, non-draft PR into develop whose branch holds all of this
+      # PR's commits is `upper`: this PR runs no E2E, and its check is "Required (under #N)", not
+      # "Required", so it doesn't merge on that run alone: it merges when #N does (GitHub marks a PR
+      # merged once its commits reach its base), or on its own once #N's run has passed, which posts
+      # "Required" on its head (`pass-lower`). The PRs whose commits this one holds are `lower`, and
+      # `supersede` cancels their runs. If #N's run fails, a lower PR merges alone after the one above
+      # is marked a draft (or closed) and the lower PR's CI is run again.
+      # Commits only (no trees or files): about a second and 1.3 MB for 20 open PRs. Anything that
+      # fails here leaves the plan as it was.
+      - id: layers
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE: ${{ github.base_ref }}
+          STACK_SIZE: ${{ github.event.pull_request.stack.size }}
+          DRAFT: ${{ steps.live.outputs.draft }}
+        run: |
+          if [ "$BASE" != develop ] || [ -n "$STACK_SIZE" ] || [ "$DRAFT" = true ]; then printf 'upper=\nlower=[]\n' >> "$GITHUB_OUTPUT"; exit 0; fi
+          prs=$(gh pr list --repo "$REPO" --base develop --state open --limit 200 --json number,headRefOid,isDraft \
+            --jq "[.[] | select(.number != $PR and .isDraft == false and .headRefOid != \"$HEAD_SHA\")] | sort_by(.number)") || prs='[]'
+          heads="$RUNNER_TEMP/heads"
+          git init -q --bare "$heads"
+          mapfile -t shas < <(jq -r '.[].headRefOid' <<<"$prs")
+          if [ "$prs" = '[]' ] || ! git -C "$heads" fetch -q --filter=tree:0 "https://github.com/$REPO.git" "$HEAD_SHA" "${shas[@]}"; then
+            printf 'upper=\nlower=[]\n' >> "$GITHUB_OUTPUT"; echo "No other open PR into develop to compare with."; exit 0
+          fi
+          above=(); lower='[]'
+          while read -r n sha; do
+            if git -C "$heads" merge-base --is-ancestor "$HEAD_SHA" "$sha"; then above+=("$n $sha")
+            elif git -C "$heads" merge-base --is-ancestor "$sha" "$HEAD_SHA"; then
+              lower=$(jq -c --argjson n "$n" --arg sha "$sha" '. + [{number: $n, sha: $sha}]' <<<"$lower")
+            fi
+          done < <(jq -r '.[] | "\(.number) \(.headRefOid)"' <<<"$prs")
+          # Of the PRs above, the top one: no other PR above holds its commits.
+          upper=""
+          for a in "${above[@]}"; do
+            top=true
+            for b in "${above[@]}"; do
+              [ "$a" = "$b" ] && continue
+              if git -C "$heads" merge-base --is-ancestor "${a#* }" "${b#* }"; then top=false; break; fi
+            done
+            if [ "$top" = true ]; then upper=${a%% *}; break; fi
+          done
+          [ -z "$upper" ] || echo "#$upper holds this PR's commits: it tests them, and this PR merges with it."
+          [ "$lower" = '[]' ] || echo "This PR holds the commits of $(jq -r 'map("#\(.number)") | join(", ")' <<<"$lower"): their runs are cancelled."
+          { echo "upper=$upper"; echo "lower=$lower"; } >> "$GITHUB_OUTPUT"
       # A stacked PR carries `stack` (position 1 is the bottom; the top has
       # position == size; base.ref is the branch the whole stack targets).
       - id: plan
@@ -89,12 +181,14 @@ jobs:
           STACK_SIZE: ${{ github.event.pull_request.stack.size }}
           STACK_POSITION: ${{ github.event.pull_request.stack.position }}
           STACK_BASE: ${{ github.event.pull_request.stack.base.ref }}
-          DRAFT: ${{ github.event.pull_request.draft }}
+          DRAFT: ${{ steps.live.outputs.draft }}
           LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
           INFRA_FLOWS: ${{ steps.infra.outputs.flows }}
+          INFRA_IOS_FLOWS: ${{ steps.infra.outputs.ios_flows }}
+          UPPER: ${{ steps.layers.outputs.upper }}
           INFRA_SCENARIOS: ${{ steps.infra.outputs.scenarios }}
         run: |
-          ios=none; android=none; only=""; repeat=1; scenario_repeat=1
+          ios=none; android=none; only=""; only_ios=""; repeat=1; scenario_repeat=1
           case "$EVENT" in
             pull_request)
               target=${STACK_BASE:-$BASE}
@@ -102,6 +196,8 @@ jobs:
                 what="a draft PR: the fast checks and scenarios, no E2E (add the e2e label and push, or mark it ready)"
               elif [ -n "$STACK_SIZE" ] && [ "$STACK_POSITION" != "$STACK_SIZE" ]; then
                 what="layer $STACK_POSITION of $STACK_SIZE of a stack into $target: fast checks (the top layer runs E2E for the whole stack)"
+              elif [ -n "$UPPER" ]; then
+                what="a PR into develop whose commits #$UPPER holds: fast checks and scenarios (#$UPPER's run tests both, and this PR merges with it)"
               elif [ "$target" = main ]; then
                 ios=full; android=full; what="a PR into main: every flow"
               elif [ "$target" = develop ] && [ -n "$STACK_SIZE" ]; then
@@ -113,14 +209,19 @@ jobs:
               fi
               # Test the tests (not for drafts, nor a stack's lower layers, nor PRs into main,
               # which run every flow anyway): the flows using the shared code it changed, both
-              # platforms, twice.
-              if [ "$target" = develop ] && [ "$DRAFT" != true ] && { [ -z "$STACK_SIZE" ] || [ "$STACK_POSITION" = "$STACK_SIZE" ]; }; then
+              # platforms, once with a retry.
+              if [ "$target" = develop ] && [ "$DRAFT" != true ] && [ -z "$UPPER" ] && { [ -z "$STACK_SIZE" ] || [ "$STACK_POSITION" = "$STACK_SIZE" ]; }; then
                 if [ -n "$INFRA_FLOWS" ] && [ "$INFRA_FLOWS" != '[]' ]; then
-                  ios=infra; android=infra; repeat=2
-                  # With the smoke set a single PR runs anyway (each flow once in the list).
+                  ios=infra; android=infra
+                  # Android: with the smoke set a single PR runs anyway (each flow once in the list).
                   only=$(jq -r --arg smoke "$(ls .maestro/flows/0[2456]-*.yaml | tr '\n' ' ')" \
                     'if . == "all" then "all" else (. + ($smoke | split(" ") | map(select(. != "")))) | unique | join(" ") end' <<<"$INFRA_FLOWS")
-                  what="$what; it changes code flows share: $only, on both platforms, twice"
+                  # iOS: only the flows it touches (a single PR runs no iOS smoke set: 18 alone for a
+                  # Recite PR, not 02 04 05 06 18 in three macOS jobs), and for a change to the workflows
+                  # the smoke set (affected-flows.js).
+                  only_ios=$(jq -r 'join(" ")' <<<"${INFRA_IOS_FLOWS:-[]}")
+                  [ -n "$only_ios" ] || ios=none
+                  what="$what; it changes test code: on Android $only, on iOS ${only_ios:-nothing}"
                 fi
                 if [ "$INFRA_SCENARIOS" = true ]; then
                   scenario_repeat=2; what="$what; it changes the scenario harness: the suite twice"
@@ -138,7 +239,39 @@ jobs:
           esac
           e2e=true; [ "$ios$android" = nonenone ] && e2e=false
           echo "$what (iOS: $ios, Android: $android)"
-          { echo "ios=$ios"; echo "android=$android"; echo "e2e=$e2e"; echo "only=$only"; echo "repeat=$repeat"; echo "scenario_repeat=$scenario_repeat"; } >> "$GITHUB_OUTPUT"
+          { echo "ios=$ios"; echo "android=$android"; echo "e2e=$e2e"; echo "only=$only"; echo "only_ios=$only_ios"; echo "repeat=$repeat"; echo "scenario_repeat=$scenario_repeat"; } >> "$GITHUB_OUTPUT"
+
+  # -----------------------------------------------------------------------
+  # The runs of the PRs whose commits this PR holds (`layers` in `plan`): this run tests them, so
+  # theirs only hold macOS runners. Their check stays "Required (under #N)" or cancelled, and they
+  # merge with this PR. Not part of `Required`: a cancel that fails changes nothing here.
+  # -----------------------------------------------------------------------
+  supersede:
+    name: Cancel the runs this PR's run covers
+    needs: plan
+    if: ${{ needs.plan.outputs.lower != '' && needs.plan.outputs.lower != '[]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          LOWER: ${{ needs.plan.outputs.lower }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          jq -r '.[] | "\(.number) \(.sha)"' <<<"$LOWER" | while read -r n sha; do
+            [[ "$n" =~ ^[0-9]+$ && "$sha" =~ ^[0-9a-f]{40}$ ]] || continue
+            for r in $(gh api "repos/$REPO/actions/workflows/ci.yml/runs?head_sha=$sha&event=pull_request&per_page=20" \
+                         --jq ".workflow_runs[] | select(.status != \"completed\" and .id != $RUN_ID) | .id"); do
+              if gh api -X POST "repos/$REPO/actions/runs/$r/cancel" >/dev/null; then
+                echo "::notice title=CI::Cancelled run $r of #$n: this PR holds its commits, and this run tests them."
+              else
+                echo "::warning title=CI::Couldn't cancel run $r of #$n."
+              fi
+            done
+          done
 
   # -----------------------------------------------------------------------
   # The fast checks, one job: the secret scan, typechecks, the app's unit and
@@ -261,6 +394,7 @@ jobs:
       ios: ${{ needs.plan.outputs.ios }}
       android: ${{ needs.plan.outputs.android }}
       only: ${{ needs.plan.outputs.only }}
+      only_ios: ${{ needs.plan.outputs.only_ios }}
       repeat: ${{ needs.plan.outputs.repeat || '1' }}
 
   # -----------------------------------------------------------------------
@@ -278,7 +412,9 @@ jobs:
     # A draft's run is "Required (draft)": it runs no E2E, and its green check counted for the commit once
     # the PR was marked ready, until the ready run posted its own; #499 merged on it the moment it was
     # marked ready with auto-merge on (Nov 10 2026). Marked ready, the PR waits for that run's "Required".
-    name: ${{ github.event.pull_request.draft && 'Required (draft)' || ((github.event.pull_request.stack.base.ref || github.base_ref) == 'main' && needs.plan.outputs.ios == 'full' && needs.plan.outputs.android == 'full' && 'Release gate' || 'Required') }}
+    # A PR another PR's branch holds (`layers`) is "Required (under #N)": it merges with #N, or alone once
+    # #N's run has passed (`pass-lower`). Whether it's a draft is GitHub's answer at the run (`live` in plan).
+    name: "${{ needs.plan.outputs.draft == 'true' && 'Required (draft)' || (needs.plan.outputs.upper != '' && format('Required (under #{0})', needs.plan.outputs.upper)) || ((github.event.pull_request.stack.base.ref || github.base_ref) == 'main' && needs.plan.outputs.ios == 'full' && needs.plan.outputs.android == 'full' && 'Release gate' || 'Required') }}"
     needs: [plan, fast, scenarios, e2e]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
@@ -295,3 +431,33 @@ jobs:
             | select(.key != "e2e" or $e2e == "true" or .value.result != "skipped") | .key')
           if [ -n "$bad" ]; then echo "::error::Not passed: $(echo $bad)"; exit 1; fi
           echo "Every job this change needs passed."
+
+  # -----------------------------------------------------------------------
+  # The PRs whose commits this PR holds (`lower` in `plan`) planned no E2E, and their check is "Required
+  # (under #N)". Once this run has passed, it has tested their commits too, and each gets "Required" on
+  # its head, so it can merge on its own as well as with this PR (.github/scripts/pass-lower.js says which:
+  # still open, the same head, and no run of its own failed). From #676 until Nov 16 2026 a lower PR merged
+  # only with the PR above it: two separate PRs into develop, one of which happened to hold the other's
+  # commits, kept the lower one waiting for the upper to merge.
+  # -----------------------------------------------------------------------
+  pass-lower:
+    name: Pass the PRs this run tested
+    needs: [plan, required]
+    if: ${{ github.event_name == 'pull_request' && needs.plan.outputs.draft != 'true' && needs.plan.outputs.upper == '' && needs.plan.outputs.lower != '' && needs.plan.outputs.lower != '[]' && needs.required.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          LOWER: ${{ needs.plan.outputs.lower }}
+          UPPER_PR: ${{ github.event.pull_request.number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node .github/scripts/pass-lower.js

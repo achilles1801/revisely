@@ -122,6 +122,7 @@ export function ReciteBar({
   onResume,
   onStop,
   onClose,
+  next,
   surface,
 }: {
   hidden: boolean;
@@ -144,6 +145,8 @@ export function ReciteBar({
   onResume?: () => void;
   onStop: () => void;
   onClose: () => void;
+  /** Once a take is done, a way on (Test me's next place), beside ✕. */
+  next?: { label: string; onPress: () => void };
   surface: { background: string; border: string };
 }) {
   const { palette } = useTheme();
@@ -200,6 +203,18 @@ export function ReciteBar({
         ) : (
           <BarButton icon="pause" label="Pause" onPress={onPause} testID="recite-pause" />
         )
+      ) : null}
+      {phase === 'done' && next ? (
+        <Tap
+          onPress={next.onPress}
+          hitSlop={6}
+          style={[styles.stop, { backgroundColor: palette.primary }]}
+          accessibilityRole="button"
+          accessibilityLabel={next.label}
+          testID="recite-next"
+        >
+          <Ionicons name="chevron-forward" size={22} color={palette.onPrimary} />
+        </Tap>
       ) : null}
       {phase === 'done' ? (
         <BarButton icon="close" label="Close" onPress={onClose} testID="recite-close" />

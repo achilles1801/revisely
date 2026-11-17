@@ -5,6 +5,9 @@ Tajweed, per ayah said in full: madd lengths against the reciter's settings, a l
 dropped, qalqalah, ghunnah and ikhfa (with their held time), idgham and iqlab. Letters and harakat (experimental,
 off unless asked). Every bar was set on professional reciters so that about 2% of correct places are flagged
 (bars.json, from make_bars.py in the lab).
+
+Each take runs one model, chosen by its level (Engine.level): v6 for Recite and Words & harakat, the released model
+for Strict (with v5 for qalqalah, lazim madd and the nasal places). Each model has its own bars and word settings.
 """
 import hashlib
 import json
@@ -204,6 +207,22 @@ def load_table(path):
     return t
 
 
+# Naming slips with gap_back on (name_slips): each run of marks is decoded again without it, over NAME_AROUND words
+# before and after the run (runs closer than NAME_JOIN words together), with NAME_PAD frames of audio either side
+NAME_AROUND = (3, 6)    # (bench-v0, naming through the engine: 108/111 slips into a similar ayah, 80/164 swapped
+NAME_JOIN = 6           # endings, none false; with the checker before gap_back 107 and 76)
+NAME_PAD = 25
+# Work for re-decoding a take's runs for naming, in frames x (graph states + NAME_STATE_COST): a run's decode takes
+# ~15 ns a unit on the Mac (fitted on 826 decodes of bench-v0, bench-endings and recite-server's cut takes), ~3.3x that
+# on Cloud Run. A run whose decode doesn't fit what is left is skipped (a later, smaller one may still fit), so the
+# answer is the same on any machine. 25 M units: ~0.4 s on the Mac at most. bench-v0's takes need 4 M (median), 16 M
+# (p90), 27 M (most), and name the same as with no bound (the released model 188 of 275 slips and endings, v6 134;
+# 15 M: 169 and 116); ms.similar on the Mac at most 0.5 s. Before (8,000 frames whatever the graph), recite-server's cut
+# take with 41 runs joined into one 160 s run (100 M units) waited 5.4 s after Stop on Cloud Run; now it isn't decoded
+# again (2 ms).
+NAME_WORK = int(os.environ.get('NAME_WORK', 25e6))
+NAME_STATE_COST = 2000
+
 V5_KINDS = ('Qalqalah', 'Lazem Madd')  # tajweed.judge kinds judged on the strict ear (v5) when it is there; and the
 # nasal places (idgham, idgham without ghunnah, iqlab). Lab, Nov 11 2026: v5 caught idgham / idgham without ghunnah /
 # iqlab 97 / 85 / 98% (released 85 / 47 / 66), flagged 1% of correct learners' qalqalah (7%), and judged no lazim madd
@@ -211,6 +230,152 @@ V5_KINDS = ('Qalqalah', 'Lazem Madd')  # tajweed.judge kinds judged on the stric
 # released model.
 STRICT_EAR = 'models/tajweed-v5/model-int8.onnx'
 STRICT_BARS = 'bars.v5.json'
+# Recite and Words & harakat on v6 (Nov 16 2026): the small model fine-tuned again with women's and children's voices
+# drawn 3× and distilled from the large teacher (lab: models/ft-v6, export_onnx.py). Lab, same checker (7c12824d), on
+# learners' clips at the released letters bar: correct clips marked 24.1 / 18.3% (men / women; released 39.8 / 30.5);
+# at equal false marks (~21%) it catches ~55% of mistaken clips (released ~49%). It passes the women's check
+# (default_level.py --by-gender) for words and letters, and fails it narrowly for one tajweed rule (noon mushaddadah's
+# length, women's correct places 6.5%, men's 0/26), so it never judges tajweed: Strict stays on the released model and
+# v5. A take runs one model, so the CPU per take doesn't grow. RECITE_WORDS_EAR=0 keeps every level on the released
+# model (no new image needed to go back).
+WORDS_EAR = 'models/words-v6/model-int8.onnx'
+WORDS_BARS = 'bars.v6.json'
+# v6's word settings (lab, Nov 16 2026, checker 7c12824d; the released model's results in brackets). v6 is surer of what
+# it hears, and hears much of what doesn't fit as blanks, which a word takes in for free. So a look-alike word costs
+# less to hear (alt_pen -2, not -5): bench-v0's professionals, substitutions caught 84 -> 93% (94%). Speech between
+# words costs less (fill -0.4, not -0.5) and an extra word may be 0.3 s long (not 0.35): a word added after one that
+# ends the same was taken in by the word before (inserted words 86 -> 93%, 94%). Planted slips caught 97.1% (97.4%);
+# false alarms 0.45 per 100 words (0.40), 0.19 in quiet (0.20); correct takes with none 145 of 180 (140). /record 5 of 6
+# slips, no false alarm (6 of 6, 5 in 3 takes); planted hesitations marked 1 of 120 (3), corrections 6 of 108 (6).
+# Learners' correct clips with a word mark 9.7% (14.5%), mistaken 32.4% (38.6%). The page scorecard, live: correct
+# quiet pages marked 20% (23%), mild babble 20% (37%), loud 57% (73%); planted slips caught 95% (99%). alt_pen -3 marked
+# fewer (0.36 per 100 words) and caught fewer (live 92%). Not taken: the sound rule (sub_p 0.9–0.95): on learners' clips
+# it catches more at the same false marks, but on professionals' correct pages it nearly doubles the false alarms
+# (0.58–0.77 per 100 words), and /record's (8 in 7 takes).
+WORDS_P_V6 = dict(WORDS_P, alt_pen=-2.0, extra_min=0.3, fill=-0.4)
+# v6's naming thresholds (`into`), over similar.P. v6 fits a passage's words with smaller margins than the released model:
+# at the released model's thresholds it named 100 of bench-v0's 275 planted slips and swapped endings (the released
+# model 188). With these, 134 (79 slips into a similar ayah of 111, 55 endings of 164), none wrong, none false. Used only
+# when the released model's frames aren't there (RECITE_SIDE_FRAMES=0): a v6 take names its slips on those (SideFrames).
+SIMILAR_P_V6 = {'adv': 80.0, 'gain': 0.35, 'end_adv': 20.0, 'end_gain': 0.55}
+# The released model's frames for naming a v6 take (SideFrames): chunks of SIDE_CHUNK seconds, each run with
+# SIDE_CONTEXT seconds of audio either side. The model's frames are better the longer the audio it runs on (bench-v0's
+# 275 slips and endings named on a v6 take, by chunk: 4 s 171, 8 s 173, 16 s 177; the whole take in 20 s windows 179;
+# frames blended across the edges did worse: 4 s 158); 8 s leaves at most 12 s of audio to run when the take ends.
+# Live (LiveSession, Nov 16 2026): 171 named, 1 wrong (as the released model's own), none false, against 139 on v6's
+# own frames; the thread's model time 7.8 ms a second of audio on the Mac (the hops' ~40); `done` waited for the last
+# chunk 0 ms (median), 38 (p90), 81 at most on the Mac, so the slowest take's wait after Stop is unchanged.
+SIDE_CHUNK = 8.0
+SIDE_CONTEXT = 2.0
+
+
+class Level:
+    """The model a take runs on (`ear`), with the settings set on it: its bars (bars.json's shape: letters, tajweed),
+    its word settings (`words_p`, WORDS_P's shape) and its naming thresholds (`similar_p`, over similar.P). Engine.level
+    picks one from a take's settings."""
+
+    def __init__(self, name, ear, bars, words_p, similar_p=None):
+        self.name, self.ear, self.bars, self.words_p = name, ear, bars, words_p
+        self.similar_p = dict(similar_p or {})
+
+
+class SideFrames:
+    """The released model's frames for a take that runs on another model (v6), for naming its slips on them
+    (name_slips' `frames`): naming's rules were measured on the released model's frames. They are worked out in chunks
+    on a fixed grid: chunk j keeps frames [j, j + 1) x SIDE_CHUNK seconds and is run with SIDE_CONTEXT seconds of audio
+    either side (less at the take's start and end). A live session hands each chunk to a background thread once its
+    audio is all in (feed, with `submit`); get() works out what is still missing itself. A chunk's audio depends only on the take (a chunk not yet whole when the take ends runs to its
+    end), so the names never depend on how fast the thread was. audio(s0, s1): the take's samples [s0, s1), float32."""
+
+    def __init__(self, ear, audio, submit=None):
+        self.ear, self.audio, self.submit = ear, audio, submit
+        self.n = 0                # samples of the take so far
+        self.rows = {}            # chunk -> (its window's first frame, the window's frames)
+        self.futs = {}            # chunk -> its background job (submit)
+        self.next = 0             # the next chunk to hand to the thread
+        self.ms = 0.0             # milliseconds of model time spent by get() itself
+        self.bg = 0.0             # ...and by the thread, on the chunks get() took
+        self.waited = 0.0         # milliseconds get() waited for the thread
+
+    @staticmethod
+    def span(j, n):
+        """Chunk j's audio [s0, s1) and the frames it keeps [a, b), for a take of n samples so far."""
+        C, X = int(SIDE_CHUNK * 16000), int(SIDE_CONTEXT * 16000)
+        s0 = max(0, j * C - X)
+        s0 -= s0 % 320
+        s1 = min(n, (j + 1) * C + X)
+        a = j * C // 320
+        b = min((j + 1) * C // 320, (1 + n // 160) // 2) if s1 == n else (j + 1) * C // 320
+        return s0, s1, a, b
+
+    @staticmethod
+    def _work(ear, x):
+        t0 = time.perf_counter()
+        out = ear._run(x)
+        return out, (time.perf_counter() - t0) * 1000
+
+    def feed(self, n):
+        """The take now has n samples: chunks whose audio is all in go to the background thread."""
+        self.n = n
+        if self.submit is None:
+            return
+        C, X = int(SIDE_CHUNK * 16000), int(SIDE_CONTEXT * 16000)
+        while (self.next + 1) * C + X <= n:
+            s0, s1, _, _ = self.span(self.next, n)
+            self.futs[self.next] = (s0, self.submit(self._work, self.ear, self.audio(s0, s1)))
+            self.next += 1
+
+    def _chunk(self, j):
+        """Chunk j's (first frame, frames), worked out or waited for if need be."""
+        if j not in self.rows:
+            s0, fut = self.futs.pop(j, (None, None))
+            if fut is not None and not fut.cancel():  # running or done: wait for it
+                t0 = time.perf_counter()
+                out, ms = fut.result()
+                self.waited += (time.perf_counter() - t0) * 1000
+                self.bg += ms
+            else:
+                s0, s1, _, _ = self.span(j, self.n)
+                out, ms = self._work(self.ear, self.audio(s0, s1))
+                self.ms += ms
+            self.rows[j] = (s0 // 320, out)
+        return self.rows[j]
+
+    def _at(self, j, lo, hi):
+        """Chunk j's frames [lo, hi) of the take (its last frame repeated past its end: the model can give a frame or
+        two fewer than expected)."""
+        f, out = self._chunk(j)
+        r = out[max(0, lo - f):max(0, hi - f)]
+        if len(r) < hi - lo:
+            return np.concatenate([r, np.repeat(out[-1:], hi - lo - len(r), 0)])
+        return r
+
+    def get(self, f0, f1):
+        """The released model's frames [f0, f1) of the take (n samples: feed's last)."""
+        CF = int(SIDE_CHUNK * 16000) // 320
+        T = (1 + self.n // 160) // 2
+        parts = []
+        for j in range(f0 // CF, (max(f0 + 1, min(f1, T)) - 1) // CF + 1):
+            lo, hi = max(j * CF, f0), min((j + 1) * CF, T, f1)
+            if lo < hi:
+                parts.append(self._at(j, lo, hi))
+        rows = np.concatenate(parts) if parts else np.zeros((0, len(self.ear.vocab) + 1), np.float32)
+        if len(rows) < f1 - f0:  # past the take's last frame (another model's count can be a frame longer)
+            rows = np.concatenate([rows, np.repeat(rows[-1:], f1 - f0 - len(rows), 0)])
+        return rows
+
+    def close(self):
+        """Stops what the thread hasn't started; returns the milliseconds of model time it spent (chunks get() took
+        included)."""
+        for _, fut in self.futs.values():
+            fut.cancel()
+        bg = self.bg
+        for _, fut in self.futs.values():
+            if fut.done() and not fut.cancelled():
+                bg += fut.result()[1]
+        self.futs.clear()
+        self.bg = 0.0
+        return bg
 
 
 class PaddedEar(checker.Hisn):
@@ -218,7 +383,9 @@ class PaddedEar(checker.Hisn):
     (hisn_torch: 0.4 s of silence either side, frames cropped back)."""
     name = 'v5'
 
-    def __init__(self, path, threads=2):
+    def __init__(self, path, threads=2, name=None):
+        if name:
+            self.name = name
         import onnxruntime as ort
         m = pathlib.Path(os.environ['LAB']) / 'models/hisnlabs-tajweed-v2'
         self.vocab = json.loads((m / 'config.json').read_text())['phonemes']
@@ -256,6 +423,26 @@ class Engine:
         if (lab / STRICT_EAR).exists() and (lab / STRICT_BARS).exists():
             self.ear2 = PaddedEar(lab / STRICT_EAR, threads)
             self.bars2 = json.loads((lab / STRICT_BARS).read_text())
+        self.released = Level('released', self.ear, self.bars, WORDS_P)
+        self.words_level = None  # v6, for takes that judge no tajweed, when the image carries it
+        if (lab / WORDS_EAR).exists() and (lab / WORDS_BARS).exists() and os.environ.get('RECITE_WORDS_EAR') != '0':
+            ear = PaddedEar(lab / WORDS_EAR, threads, name='v6')
+            if ear.vocab == self.ear.vocab:  # the word table and the word graphs are in the released model's sounds
+                self.words_level = Level('v6', ear, json.loads((lab / WORDS_BARS).read_text()), WORDS_P_V6,
+                                         SIMILAR_P_V6)
+
+    def level(self, st):
+        """The model and settings for a take with settings st (settings_of): v6 when no tajweed is judged (Recite,
+        Words & harakat) and the image has it; else the released model (Strict, with v5 for some rules)."""
+        if self.words_level is not None and not st.get('tajweed', True):
+            return self.words_level
+        return self.released
+
+    def ears(self):
+        """Each level's model, for /health: {'recite': 'v6', 'harakat': 'v6', 'strict': 'released+v5'}."""
+        strict = 'released' + ('+v5' if self.ear2 is not None else '')
+        w = self.level({'tajweed': False}).name
+        return {'recite': w, 'harakat': w, 'strict': strict}
 
     # ------------------------------------------------------------ words
 
@@ -337,7 +524,7 @@ class Engine:
         if len(x) < 16000:
             raise BadRequest('too short')
         t0 = time.perf_counter()
-        lp = self.ear.logprobs(x)
+        lp = self.level(st).ear.logprobs(x)
         t_model = time.perf_counter() - t0
         # no one says more than about 4 words a second: a longer passage only slows the check
         lo, hi = self.passage(s, a, s2, a2, min(MAX_WORDS, int(4 * len(x) / 16000) + 20))
@@ -347,14 +534,14 @@ class Engine:
         """The check on the model's frames (50 a second) for app words [lo, hi): the words, then tajweed and letters
         per ayah said in full. check() runs the model first; a live session judges its streamed frames."""
         t0 = time.perf_counter() - t_model
-        P = WORDS_P
+        lv = self.level(st)  # lp is this level's model's frames
+        P, vocab = lv.words_p, lv.ear.vocab
         kws = self.passage_words(lo, hi)
         g = checker.Graph(kws)
         path, _ = checker.viterbi(lp, g, P)
         refs = checker.trail_refs(hi) if P.get('trail_extra') else None
         toks = checker.heard_tokens(lp)
-        statuses, flagged, _, _, extras, visits, _ = checker.decide(kws, g, lp, path, P, self.ear.vocab, toks=toks,
-                                                                    refs=refs)
+        statuses, flagged, _, _, extras, visits, _ = checker.decide(kws, g, lp, path, P, vocab, toks=toks, refs=refs)
         t_words = time.perf_counter() - t0 - t_model
 
         spans = {}
@@ -390,15 +577,19 @@ class Engine:
             'ms': {'model': int(t_model * 1000), 'words': int(t_words * 1000), 'tajweed': int(t_tajweed * 1000)},
         }
         if v == 2:
-            heard = heard_sounds(spans, toks, self.ear.vocab)
+            heard = heard_sounds(spans, toks, vocab)
             for w_, sp in spans.items():  # a word judged wrong: its own span when it holds a word's worth of sounds
                 if statuses.get(w_) == 'wrong':
-                    own = ''.join(self.ear.vocab[k - 1] for k, pk, _ in toks if sp[0] <= pk < sp[1])
+                    own = ''.join(vocab[k - 1] for k, pk, _ in toks if sp[0] <= pk < sp[1])
                     if len(checker.norm_sounds(own)) >= 3:
                         heard[w_] = own
             out['marks'] = self.marks(words, flagged, heard, out['extras'], tj, letters if st['letters'] else [])
+            frames = None
+            if lv is not self.released and x is not None:  # named on the released model's frames (SideFrames)
+                frames = SideFrames(self.released.ear, lambda s0, s1: np.asarray(x[s0:s1], np.float32))
+                frames.feed(len(x))
             out['ms']['similar'] = self.name_slips(out['marks'], lp, [k['word'] for k in kws], statuses, spans,
-                                                   out['extras'])
+                                                   out['extras'], lv, frames)
             out['score'] = score(statuses, out['marks'])
             out['v'] = 2
         return out
@@ -480,7 +671,7 @@ class Engine:
                 heardExact=False if r.get('_heard') else None)
         return out
 
-    def name_slips(self, marks, lp, order, statuses, spans, extras):
+    def name_slips(self, marks, lp, order, statuses, spans, extras, lv=None, frames=None):
         """Where the reciter went, on the mark of a slip (recite-contract.md, `into`): {w, ayah, also?, ending?}.
         - A run of words skipped or said wrong that is a similar passage's words: `into` on the run's first word mark,
           w being the place's first word said (lab, Nov 15 2026: of bench-v0's 111 planted slips into a similar ayah,
@@ -493,21 +684,44 @@ class Engine:
         Returns the milliseconds it took: 0–20 ms a take on the Mac, 74–104 on Cloud Run. Both passes share
         similar.P['budget'], a measure of work, not time (about 0.5 s on Cloud Run), so a take full of mistakes can't
         hold up the answer and a take names the same on any machine. Without the word table each place's sounds would
-        be worked out here (~100 ms a word), so nothing is named."""
+        be worked out here (~100 ms a word), so nothing is named.
+        lv: the take's level (the released model's if not given): its word settings, and its naming thresholds over
+        similar.P (Level.similar_p), set on its own frames.
+        frames: on another level's take, the released model's frames (SideFrames): each run is decoded again and named
+        on those, with the released model's settings, as on a released take (bench-v0's 275 slips and endings, live:
+        171 named on a v6 take this way, 139 on v6's own frames; 188 on a released take).
+        """
         if self.table is None:
             return 0
+        lv = lv or self.released
+        if frames is not None and lv is not self.released:
+            lv = self.released
+        else:
+            frames = None
+        P, sp = lv.words_p, lv.similar_p
         t0 = time.perf_counter()
-        work = {'left': similar.P['budget']}
+        work = {'left': similar.P['budget'], 'decode': NAME_WORK}
         names = []
         try:
-            names = similar.find(lp, order, statuses, spans, extras, self._labels_of, self.slip_index, work=work)
-            marked = {n['mark'] for n in names}
-            names += [n for n in similar.endings(lp, order, statuses, spans, self._forms_of, self.slip_index,
-                                                 work=work) if n['mark'] not in marked]
+            if P.get('gap_back') is None:
+                names = self._slips_in(lp, order, statuses, spans, extras, work, sp)
+            else:
+                # each run of marks that could be a slip (a similar passage forks off near its start, or it ends an
+                # ayah) is decoded again without going back from a filler, and named from that alone: named from the
+                # take's own decode, bench-v0's correct takes got 3 false names
+                for lo, hi, ends_heard, first, last in self._mark_runs(order, statuses, extras, spans):
+                    if not self._could_name(first, last):
+                        continue
+                    plain = self._decode_plain(lp, lo, hi, spans, work, ends_heard, P, frames)
+                    if plain is not None:
+                        named = {n['mark'] for n in names}
+                        names += [n for n in self._slips_in(*plain, work, sp) if n['mark'] not in named]
         except Exception as e:  # naming is extra: it never costs the answer
             print(f'similar: {type(e).__name__}: {e}', file=sys.stderr)
+        word_marks = sorted((m for m in marks if m['kind'] in ('skipped', 'word')), key=lambda m: m['w'])
         for n in names:
-            m = next((m for m in marks if m['w'] == n['mark'] and m['kind'] in ('skipped', 'word')), None)
+            hi = n['upto'] if n['upto'] is not None else 10 ** 9
+            m = next((m for m in word_marks if n['mark'] <= m['w'] < hi and 'into' not in m), None)
             if m is None:
                 continue
             ayah = self.slip_index.ayah(n['w'])
@@ -519,6 +733,80 @@ class Engine:
             m['into'] = ({'w': int(n['w']), 'ayah': ayah} | ({'also': also[:5]} if also else {})
                          | ({'ending': True} if n.get('kind') == 'ending' else {}))
         return int((time.perf_counter() - t0) * 1000)
+
+    def _slips_in(self, lp, order, statuses, spans, extras, work, sp=None):
+        """similar.find, then similar.endings on the runs it didn't name; sp: thresholds over similar.P."""
+        names = similar.find(lp, order, statuses, spans, extras, self._labels_of, self.slip_index, p=sp, work=work)
+        marked = {n['mark'] for n in names}
+        return names + [n for n in similar.endings(lp, order, statuses, spans, self._forms_of, self.slip_index,
+                                                   p=sp, work=work) if n['mark'] not in marked]
+
+    @staticmethod
+    def _mark_runs(order, statuses, extras, spans):
+        """App word ranges [lo, hi) around each run of words skipped or said wrong (or an extra word), runs closer than
+        NAME_JOIN words taken together: from the first word heard up to NAME_AROUND[0] before the run to the last word
+        heard up to NAME_AROUND[1] after it (the decode again ends on a word the take's own decode heard)."""
+        at = {w: i for i, w in enumerate(order)}
+        bad = sorted({at[w] for w, st in statuses.items() if st in ('wrong', 'missed') and w in at}
+                     | {at[e['after']] for e in extras if not e.get('trail') and e['after'] in at})
+        runs = []
+        for i in bad:
+            if runs and i - runs[-1][1] <= NAME_JOIN:
+                runs[-1][1] = i
+            else:
+                runs.append([i, i])
+        before, after = NAME_AROUND
+        out = []
+        for a, b in runs:
+            lo = next((i for i in range(max(0, a - before), a + 1) if order[i] in spans), a)
+            hi = next((i for i in range(min(len(order) - 1, b + after), b, -1) if order[i] in spans), None)
+            out.append((order[lo], order[hi] + 1 if hi is not None else order[min(len(order) - 1, b + after)] + 1,
+                        hi is not None, order[a], order[b]))
+        return out
+
+    def _could_name(self, first, last):
+        """App words first..last (a run of marks) could be named: a similar passage forks off within two words of its
+        start, or one of them ends an ayah (similar.endings)."""
+        idx = self.slip_index
+        return any(idx.places(f) for f in range(max(2, first - 2), first + 3) if f < len(idx.norm)) \
+            or any(w in idx.is_last for w in range(first, last + 1))
+
+    def _decode_plain(self, lp, lo, hi, spans, work, ends_heard=True, P0=None, frames=None):
+        """App words [lo, hi) decoded again over their own audio without going back from a filler (gap_back off, the
+        decoder similar.py was measured on): (frames, order, statuses, spans, extras), the run's own frames (the take's
+        lp, or `frames`' over the same audio: SideFrames) and the rest as decide() gives them, spans in those frames;
+        None when its words weren't heard or the naming's work is spent. Named on the run's own frames alone, a slip's
+        place is fitted on the run's audio, never past it. With gap_back, a slip into a
+        similar passage is often heard as words tried and taken back (a short word visited again and again between
+        fillers), which leaves no run to name: bench-v0's 111 planted slips named 107 -> 72 without this, 107 with.
+        ends_heard: [lo, hi) ends on a word the take's decode heard, and this decode must end there too: over a short
+        window, free speech is cheaper than the jumps across a long run of skipped words that the whole take's decode
+        has to make (2:255 slipping into 20:8 for 45 words). P0: the take's word settings (WORDS_P if not given)."""
+        import live  # noqa: E402  (its Decoder: the checker's step, vectorized; live imports this module first)
+        heard = [spans[w] for w in range(lo, hi) if w in spans]
+        if not heard:
+            return None
+        f0 = max(0, min(a for a, _ in heard) - NAME_PAD)
+        f1 = min(len(lp), max(b for _, b in heard) + NAME_PAD)
+        if f1 <= f0:
+            return None
+        kws = self.passage_words(lo, hi)
+        g = checker.Graph(kws)
+        units = (f1 - f0) * (g.S + NAME_STATE_COST)
+        if units > work['decode']:
+            return None
+        work['decode'] -= units
+        P = dict(P0 or WORDS_P, gap_back=None, revisit_keep=False)
+        if ends_heard:
+            P['stop'] = -1e6
+        run = frames.get(f0, f1) if frames is not None else lp[f0:f1]
+        dec = live.Decoder(g, P, cap=f1 - f0 + 10)
+        dec.feed(run)
+        path, _ = dec.traceback(final=True)
+        st, _, _, _, extras, visits, _ = checker.decide(kws, g, run, path, P, self.ear.vocab)
+        sp = {kws[i]['word']: (min(v['start'] for v in visits[i]), max(v['end'] for v in visits[i]))
+              for i in range(len(kws)) if visits[i]}
+        return run, [k['word'] for k in kws], st, sp, extras
 
     def _forms_of(self, w):
         """Word w's forms (joined, started on, stopped on), for similar.endings."""
@@ -569,7 +857,8 @@ class Engine:
         (going back to restart, which is no mistake: Majd, Nov 14 2026) is judged on each word's last reading in
         order, the earlier reading and the pause cut out (ayah_pieces)."""
         SL, ms = self.slots(st)
-        B = self.bars
+        lv = self.level(st)  # lp is this level's model's frames, judged against its own bars
+        ear, B = lv.ear, lv.bars
         S = B.get('strict', {})  # strict bars: past one, a mark is `clear` (bars.json from before them: all `likely`)
         first = self.words.first[self.words.vindex[(s, a)]]
         n = self.words.counts[self.words.vindex[(s, a)]]
@@ -609,7 +898,7 @@ class Engine:
             out.append(row)
 
         try:
-            judged = tajweed.judge(win, self.ear, SL.ayah(s, a)) if st.get('tajweed', True) else []
+            judged = tajweed.judge(win, ear, SL.ayah(s, a)) if st.get('tajweed', True) else []
         except Exception:
             judged = []
         if win2 is not None:  # qalqalah and lazim madd from the strict ear, the rest from the released one
@@ -661,7 +950,7 @@ class Engine:
             if pls and win2 is not None:
                 margins = nasal_rules.judge(win2, self.ear2, ph, pls)
             else:
-                margins = nasal_rules.judge(win, self.ear, ph, pls) if pls else []
+                margins = nasal_rules.judge(win, ear, ph, pls) if pls else []
         except Exception:
             pls, margins = [], []
         NB = (B2 or B)['nasal']

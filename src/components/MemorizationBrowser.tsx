@@ -34,6 +34,7 @@ import { UserPage } from '../types';
 import { describePageRange } from '../lib/passages';
 import { PageStatus } from '../lib/memorizationChanges';
 import { arabicLabelLines } from '../lib/platformUi';
+import { t } from '../i18n';
 
 if (
   Platform.OS === 'android' &&
@@ -389,7 +390,7 @@ function ChapterList({
             <BaseRow
               number={s.number}
               englishTitle={s.name}
-              englishSub={`${surahPages.length} page${surahPages.length === 1 ? '' : 's'}`}
+              englishSub={t('common.pages', { count: surahPages.length })}
               arabic={s.nameArabic}
               expanded={isExpanded}
               markMode={markMode}
@@ -460,7 +461,7 @@ function JuzList({
           <View key={`j-${juzNumber}`}>
             <BaseRow
               number={juzNumber}
-              englishTitle={`Juz ${juzNumber}`}
+              englishTitle={t('common.juzN', { n: juzNumber })}
               // What the juz holds, by surah (surahs and juz first, never page numbers).
               englishSub={describePageRange(range.start, range.end, { form: 'short', wholeJuz: false })}
               arabic={startingSurah?.nameArabic ?? ''}
@@ -489,7 +490,7 @@ function JuzList({
                       <BaseRow
                         number={s.number}
                         englishTitle={s.name}
-                        englishSub={`${s.pagesInJuz.length} page${s.pagesInJuz.length === 1 ? '' : 's'} in juz`}
+                        englishSub={t('memorization.browser.pagesInJuz', { count: s.pagesInJuz.length })}
                         arabic={s.nameArabic}
                         expanded={sExpanded}
                         markMode={markMode}
@@ -618,9 +619,9 @@ function HizbRow({
     <View>
       <BaseRow
         number={hizb.number}
-        englishTitle={`Hizb ${hizb.number}`}
+        englishTitle={t('memorization.browser.hizbN', { n: hizb.number })}
         englishSub={describePageRange(hizb.startPage, hizb.endPage, { form: 'short', wholeJuz: false })}
-        englishSubAlt={`Juz ${hizb.juzNumber}`}
+        englishSubAlt={t('common.juzN', { n: hizb.juzNumber })}
         arabic={startingSurah?.nameArabic ?? ''}
         expanded={expanded}
         markMode={markMode}
@@ -647,7 +648,7 @@ function HizbRow({
                 <BaseRow
                   number={s.number}
                   englishTitle={s.name}
-                  englishSub={`${s.pagesInHizb.length} page${s.pagesInHizb.length === 1 ? '' : 's'} in hizb`}
+                  englishSub={t('memorization.browser.pagesInHizb', { count: s.pagesInHizb.length })}
                   arabic={s.nameArabic}
                   expanded={sExpanded}
                   markMode={markMode}
@@ -703,10 +704,10 @@ function ChildGroup({ children }: { children: React.ReactNode }) {
 
 // ===== Controls and rows =====
 
-const BROWSER_MODES_V2: { value: BrowserMode; label: string }[] = [
-  { value: 'chapter', label: 'Surahs' },
-  { value: 'juz', label: 'Juz' },
-  { value: 'hizb', label: 'Hizb' },
+const browserModes = (): { value: BrowserMode; label: string }[] => [
+  { value: 'chapter', label: t('memorization.browser.modes.surahs') },
+  { value: 'juz', label: t('memorization.browser.modes.juz') },
+  { value: 'hizb', label: t('memorization.browser.modes.hizb') },
 ];
 
 function ControlsV2({
@@ -725,12 +726,12 @@ function ControlsV2({
   return (
     <View style={[v2s.controls, { borderBottomColor: palette.separator }]}>
       <View style={v2s.flex}>
-        <PillTabs<BrowserMode> options={BROWSER_MODES_V2} value={mode} onChange={onMode} testID="browser-modes" />
+        <PillTabs<BrowserMode> options={browserModes()} value={mode} onChange={onMode} testID="browser-modes" />
       </View>
       {onMarkMode ? (
         <IconButton
           icon={markMode ? 'checkmark' : 'create-outline'}
-          label={markMode ? 'Done marking' : 'Mark memorized pages'}
+          label={markMode ? t('memorization.browser.doneMarking') : t('memorization.browser.markPages')}
           onPress={onMarkMode}
           testID="browser-mark-toggle"
         />
@@ -768,7 +769,7 @@ function CheckV2({
       disabled={!onPress}
       hitSlop={8}
       accessibilityRole="checkbox"
-      accessibilityLabel={`${label} memorized`}
+      accessibilityLabel={t('memorization.browser.checkLabel', { label })}
       accessibilityState={{ checked: full ? true : partial ? 'mixed' : false }}
       style={[
         v2s.check,
@@ -811,12 +812,12 @@ function BaseRow({
   const partial = checkState === 'partial';
   const state =
     checkState === 'full'
-      ? 'memorized'
+      ? t('memorization.browser.memorized')
       : partial
         ? typeof progress === 'number'
-          ? `${Math.round(progress * 100)}% memorized`
-          : 'partly memorized'
-        : 'not memorized';
+          ? t('memorization.browser.percentMemorized', { percent: Math.round(progress * 100) })
+          : t('memorization.browser.partly')
+        : t('memorization.browser.notMemorized');
   return (
     <View style={[v2s.rowWrap, { borderBottomColor: palette.separator }]}>
       <View style={[v2s.row, nested && v2s.nestedRow]}>
@@ -861,14 +862,13 @@ function PageGrid({ pages, getStatus, markMode, togglePage, nested, focusSet }: 
   return (
     <View style={[v2s.grid, nested && v2s.nestedGrid, { borderBottomColor: palette.separator }]}>
       <Text style={[typeV2.meta, { color: palette.secondary }]}>
-        {markMode ? 'Tap a page to mark it memorized, or not' : 'Memorized pages are filled'}
+        {markMode ? t('memorization.browser.tapToMark') : t('memorization.browser.filled')}
       </Text>
       <View style={v2s.chips}>
         {pages.map((p) => {
           const on = getStatus(p) === 'memorized';
           const focused = focusSet?.has(p) ?? false;
           const style = [v2s.chip, { backgroundColor: on ? palette.done : palette.fill }, focused && { borderWidth: 2, borderColor: palette.text }];
-          const where = focused ? ', in the entry you opened' : '';
           const label = (
             <Text
               style={[typeV2.meta, typeV2.numeral, on && v2s.chipOn, { color: on ? palette.onDone : palette.text }]}
@@ -885,7 +885,7 @@ function PageGrid({ pages, getStatus, markMode, togglePage, nested, focusSet }: 
                 togglePage(p);
               }}
               accessibilityRole="checkbox"
-              accessibilityLabel={`Page ${p}${where}`}
+              accessibilityLabel={t(focused ? 'memorization.browser.pageOpened' : 'memorization.browser.page', { page: p })}
               accessibilityState={{ checked: on }}
               style={style}
               testID={`page-chip-${p}`}
@@ -897,7 +897,10 @@ function PageGrid({ pages, getStatus, markMode, togglePage, nested, focusSet }: 
               key={`pg-${p}`}
               style={style}
               accessible
-              accessibilityLabel={`Page ${p}${where}, ${on ? 'memorized' : 'not memorized'}`}
+              accessibilityLabel={t(focused ? 'memorization.browser.pageOpenedState' : 'memorization.browser.pageState', {
+                page: p,
+                state: on ? t('memorization.browser.memorized') : t('memorization.browser.notMemorized'),
+              })}
               testID={`page-chip-${p}`}
             >
               {label}

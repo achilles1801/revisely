@@ -12,7 +12,7 @@
 
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { HELP, HELP_INLINE_ICONS, helpTextParts, MAX_TOPICS, topicsFor, type HelpScreen } from '../topics';
+import { HELP, HELP_INLINE_ICONS, helpTextParts, linksFor, MAX_TOPICS, topicsFor, type HelpOpts, type HelpScreen } from '../topics';
 import { appSource, readRepo, ruleHash as hash, ruleTexts } from '../../../../jest/behaviourRules';
 
 const REVIEWED = join(__dirname, '../reviewed.json');
@@ -91,16 +91,84 @@ describe('the help names what the app has', () => {
 });
 
 describe('the help stays short and plain', () => {
-  it(`shows at most ${MAX_TOPICS} topics a screen, with Smart Tracking on or off, the hidden page offered or not`, () => {
+  // Every account's kind: Smart Tracking, the hidden page, Recite, Revisely Dev and arranging sections, each on or off.
+  const accounts: HelpOpts[] = [];
+  for (const smartTracking of [true, false])
+    for (const recite of [true, false])
+      for (const liveRecite of [true, false])
+        for (const devApp of [true, false])
+          for (const sections of [true, false]) accounts.push({ smartTracking, recite, liveRecite, devApp, sections });
+
+  it(`shows at most ${MAX_TOPICS} topics a sheet, for every kind of account; a screen's own sheet is never empty`, () => {
     for (const s of screens) {
-      for (const smartTracking of [true, false]) {
-        for (const recite of [true, false]) {
-          const n = topicsFor(s, { smartTracking, recite }).length;
-          expect(n).toBeLessThanOrEqual(MAX_TOPICS);
-          expect(n).toBeGreaterThan(0);
-        }
+      for (const opts of accounts) {
+        const n = topicsFor(s, opts).length;
+        expect(n).toBeLessThanOrEqual(MAX_TOPICS);
+        // A sheet reached from another's links (or Recite's, while a take is open) may have nothing: its row doesn't show.
+        if (!HELP[s].linked) expect(n).toBeGreaterThan(0);
       }
     }
+  });
+
+  it('a sheet leads only to sheets that exist and have something for the account', () => {
+    for (const s of screens) {
+      for (const to of HELP[s].more ?? []) expect(screens).toContain(to);
+      for (const opts of accounts) for (const to of linksFor(s, opts)) expect(topicsFor(to, opts).length).toBeGreaterThan(0);
+    }
+    // Every linked sheet is reached from somewhere.
+    const reached = new Set(screens.flatMap((s) => HELP[s].more ?? []));
+    expect(screens.filter((s) => HELP[s].linked && !reached.has(s))).toEqual([]);
+  });
+
+  it('the reader’s ? reaches every Recite sheet without a take open, only with Recite (Revisely Dev, Nov 16 2026)', () => {
+    const recite: HelpScreen[] = ['recite', 'reciteTake', 'reciteMemory', 'reciteTest'];
+    expect(linksFor('reader', { smartTracking: true, liveRecite: true })).toEqual(recite);
+    expect(linksFor('reader', { smartTracking: true, liveRecite: false })).toEqual([]);
+    for (const s of recite) {
+      expect(topicsFor(s, { smartTracking: true, liveRecite: false })).toEqual([]);
+      expect(HELP[s].topics.every((t) => t.when === 'liveRecite')).toBe(true);
+      // Each Recite sheet leads to the others.
+      expect(linksFor(s, { smartTracking: true, liveRecite: true })).toEqual(recite.filter((r) => r !== s));
+    }
+    // A day's Recited block: from the day's help.
+    expect(linksFor('day', { smartTracking: true, liveRecite: true })).toEqual(['reciteMemory']);
+    expect(linksFor('day', { smartTracking: true, liveRecite: false })).toEqual([]);
+  });
+
+  it('Insights’ second sheet tells of Gaps, Last revised, Recitation and sections only where they are', () => {
+    const more = (opts: Partial<HelpOpts>) => topicsFor('insightsMore', { smartTracking: true, ...opts }).map((t) => t.id);
+    expect(more({})).toEqual([]);
+    expect(linksFor('insights', { smartTracking: true })).toEqual([]);
+    expect(more({ devApp: true })).toEqual(['insightsMore.gaps', 'insightsMore.lastRevised']);
+    expect(more({ liveRecite: true })).toEqual(['insightsMore.recitation']);
+    expect(more({ sections: true })).toEqual(['insightsMore.sections']);
+    expect(linksFor('insights', { smartTracking: true, sections: true })).toEqual(['insightsMore']);
+    expect(topicsFor('activity', { smartTracking: true, sections: true }).map((t) => t.id)).toContain('activity.sections');
+    expect(topicsFor('activity', { smartTracking: true }).map((t) => t.id)).not.toContain('activity.sections');
+  });
+
+  it('the reader tells of Recite only with it (Revisely Dev), in place of its recording topic', () => {
+    const ids = (liveRecite: boolean) => topicsFor('reader', { smartTracking: true, liveRecite }).map((t) => t.id);
+    expect(ids(false)).toContain('reader.sitting');
+    expect(ids(false)).not.toContain('reader.recite');
+    expect(ids(true)).toContain('reader.recite');
+    expect(ids(true)).not.toContain('reader.sitting');
+  });
+
+  it('Recite’s help says what Revisely Dev’s Recite does, and nothing it no longer does (Nov 15–16 2026)', () => {
+    const recite: HelpScreen[] = ['recite', 'reciteTake', 'reciteMemory', 'reciteTest'];
+    const text = recite.flatMap((s) => HELP[s].topics.map((t) => t.text)).join(' ');
+    for (const said of [
+      'anywhere', 'elsewhere in the Qur’an', 'Red', 'Amber', 'Violet', '{{Not clear}}', '{{Hear it}}', '{{Your recitation}}',
+      '{{Not a mistake}}', '{{Put back}}', '{{Recite the mistakes again}}', '[[eye]]', '{{Recording saved}}', 'similar ayah',
+      // Nov 16: the page put away, peeked words, past mistakes, a passage's progress, Activity's takes, Test me, voice search.
+      'header and the bar away', 'grey', '{{Clear now}}', '{{Your progress}}', '{{Recited}}', '{{Show on the page}}',
+      'Recite your 3 mistakes here', '{{Test me}}', '{{Test me again}}', 'Search by voice',
+    ]) {
+      expect(text).toContain(said);
+    }
+    // The old names and marks: the Check button, circles, a red ×.
+    expect(text).not.toMatch(/\bCheck\b|circle|×/);
   });
 
   it('topic ids are unique and start with their screen', () => {

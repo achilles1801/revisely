@@ -77,6 +77,7 @@ import {
 import { logger } from '../../lib/logger';
 import { pagesToUnrevise, removeRevisedPages, removeRoundPages } from '../../lib/revisionSession';
 import { dismissPresentedRevisionReminders } from '../../lib/reminders/sync';
+import { t } from '../../i18n';
 
 const NO_PAGES: number[] = [];
 
@@ -556,11 +557,11 @@ export default function ActiveRevisionScreen() {
           .filter((j): j is number => typeof j === 'number'),
       ),
     ].sort((a, b) => a - b);
-    if (juzes.length === 1) return `Juz ${juzes[0]}`;
-    if (juzes.length === 2 && juzes[1] === juzes[0] + 1) return `Juz ${juzes[0]}–${juzes[1]}`;
+    if (juzes.length === 1) return t('common.juzN', { n: juzes[0] });
+    if (juzes.length === 2 && juzes[1] === juzes[0] + 1) return t('common.juzRange', { from: juzes[0], to: juzes[1] });
     const words = describePassage(shownPages, { form: 'short', order: 'given', max: 1 });
     if (words && words.length <= 16 && !words.includes(' more')) return words;
-    return `${shownPages.length} pages`;
+    return t('common.pages', { count: shownPages.length });
   }, [shownPages, quranData]);
 
   // ===== Mark / unmark =====
@@ -600,7 +601,7 @@ export default function ActiveRevisionScreen() {
       if (undoTimer.current) clearTimeout(undoTimer.current);
       setUndoState({
         page: leftPage,
-        message: `${describePageRange(leftPage, leftPage, { form: 'compact' })} marked as revised`,
+        message: t('revision.session.markedRevised', { what: describePageRange(leftPage, leftPage, { form: 'compact' }) }),
       });
     },
     [assignedPages, completedPages, markRevised],
@@ -654,7 +655,7 @@ export default function ActiveRevisionScreen() {
       haptics.success();
       setCelebrate((c) => c + 1);
       AccessibilityInfo.announceForAccessibility(
-        `Revision complete. ${dayPages.length} ${dayPages.length === 1 ? 'page' : 'pages'} revised.`,
+        t('revision.session.complete', { count: dayPages.length }),
       );
     },
     [assignedPages, completedPages, handleAdvance, haptics, sections],
@@ -842,16 +843,16 @@ export default function ActiveRevisionScreen() {
         <View style={styles.loadingContainer}>
           {error ? (
             <>
-              <Text style={styles.errorTitle}>Couldn't load your session</Text>
+              <Text style={styles.errorTitle}>{t('revision.session.loadFailed')}</Text>
               <Text style={styles.errorMessage}>{error}</Text>
               <PillButton
-                title="Try again"
+                title={t('common.tryAgain')}
                 onPress={loadData}
                 style={styles.retryButton}
               />
             </>
           ) : (
-            <Text style={styles.loadingText}>Loading…</Text>
+            <Text style={styles.loadingText}>{t('revision.session.loading')}</Text>
           )}
         </View>
       </SafeAreaView>
@@ -937,7 +938,7 @@ export default function ActiveRevisionScreen() {
       ? [
           {
             key: 'rate',
-            label: 'Rate page strength',
+            label: t('revision.session.ratePageStrength'),
             icon: 'fitness-outline' as const,
             onPress: () => setShowRating(true),
           },
@@ -945,11 +946,11 @@ export default function ActiveRevisionScreen() {
       : []),
     {
       key: 'bulk',
-      label: 'Jump or mark in bulk',
+      label: t('revision.session.bulk'),
       icon: 'list-outline',
       onPress: () => setShowBulkActions(true),
     },
-    ...(help.shown ? [{ key: 'help', label: 'How a session works', icon: HELP_ICON, onPress: help.open }] : []),
+    ...(help.shown ? [{ key: 'help', label: t('revision.session.help'), icon: HELP_ICON, onPress: help.open }] : []),
   ];
 
   const palette = getReadPalette(isDark);
@@ -987,7 +988,7 @@ export default function ActiveRevisionScreen() {
               maxFontSizeMultiplier={1.3}
               testID="session-quiet-count"
             >
-              {hidden ? 'Hidden' : `Juz ${currentJuz}`} · {viewDone}/{totalPages}
+              {hidden ? t('revision.session.hidden') : t('common.juzN', { n: currentJuz })} · {viewDone}/{totalPages}
             </Text>
             {fromInsights ? (
               <Text
@@ -996,7 +997,7 @@ export default function ActiveRevisionScreen() {
                 maxFontSizeMultiplier={1.3}
                 testID="session-from-insights"
               >
-                {`From Insights: ${describePassage(insightsFirst, { form: 'short' })}`}
+                {t('revision.session.fromInsights', { what: describePassage(insightsFirst, { form: 'short' }) })}
               </Text>
             ) : null}
             {hidden ? (
@@ -1007,10 +1008,10 @@ export default function ActiveRevisionScreen() {
                 testID="recite-hint"
               >
                 {wordMode && listenOn
-                  ? 'Recite: each word shows as you say it'
+                  ? t('revision.session.reciteWords')
                   : listener.status === 'listening'
-                    ? 'Pause after a verse to see it'
-                    : 'Tap a verse to see it'}
+                    ? t('revision.session.pauseToSee')
+                    : t('revision.session.tapToSee')}
               </Text>
             ) : firstSurahOnPage ? (
               <View style={styles.crumbRight}>
@@ -1028,7 +1029,7 @@ export default function ActiveRevisionScreen() {
         }
         header={
           <View style={styles.header}>
-            <RoundButton icon="chevron-back" label="Back" onPress={handleSaveAndBack} palette={palette} />
+            <RoundButton icon="chevron-back" label={t('common.back')} onPress={handleSaveAndBack} palette={palette} />
             <View style={styles.titleCol}>
               <Text
                 style={[styles.title, typeV2.name, { color: palette.textPrimary }]}
@@ -1036,7 +1037,9 @@ export default function ActiveRevisionScreen() {
                 maxFontSizeMultiplier={1.3}
                 testID="session-title"
               >
-                {aheadView ? `Revising ahead · ${aheadDayLabel(sessionDay ?? viewDay, viewDay)}` : `Revising ${scopeLabel}`}{' '}
+                {aheadView
+                  ? t('revision.session.revisingAhead', { day: aheadDayLabel(sessionDay ?? viewDay, viewDay) })
+                  : t('revision.session.revising', { scope: scopeLabel })}{' '}
                 <Text style={{ color: palette.textSecondary, fontWeight: '400' }}>
                   · {viewDone}/{totalPages}
                 </Text>
@@ -1048,13 +1051,17 @@ export default function ActiveRevisionScreen() {
                 testID="session-page"
               >
                 {/* What the page holds, by surah; the printed page number is under the page. */}
-                {describePageRange(displayPageNumber, displayPageNumber, { form: 'compact' })} · Juz {currentJuz} · Hizb {currentHizb}
+                {t('revision.session.where', {
+                  what: describePageRange(displayPageNumber, displayPageNumber, { form: 'compact' }),
+                  juz: currentJuz,
+                  hizb: currentHizb,
+                })}
               </Text>
             </View>
             {reciteAvailable ? (
               <RoundButton
                 icon={hidden ? 'eye-outline' : 'eye-off-outline'}
-                label={hidden ? 'Show the page' : 'Hide the page'}
+                label={hidden ? t('revision.session.showPage') : t('revision.session.hidePage')}
                 onPress={toggleHidden}
                 palette={palette}
                 active={hidden}
@@ -1062,12 +1069,12 @@ export default function ActiveRevisionScreen() {
             ) : null}
             <RoundButton
               icon={isCurrentRevised ? 'checkmark' : 'checkmark-outline'}
-              label={isCurrentRevised ? 'Unmark current page' : 'Mark current page as revised'}
+              label={isCurrentRevised ? t('revision.edit.unmarkCurrent') : t('revision.edit.markCurrent')}
               onPress={handleToggleCurrent}
               palette={palette}
               active={isCurrentRevised}
             />
-            <RoundButton icon="ellipsis-horizontal" label="Session menu" onPress={() => setMenuOpen(true)} palette={palette} />
+            <RoundButton icon="ellipsis-horizontal" label={t('revision.edit.menu')} onPress={() => setMenuOpen(true)} palette={palette} />
           </View>
         }
         footer={
@@ -1078,7 +1085,7 @@ export default function ActiveRevisionScreen() {
                 hearing={wordMode && !recorder.recording ? follow.status === 'following' : listener.hearing}
                 {...(wordMode && !recorder.recording
                   ? {
-                      label: listenOn ? followLabel(follow.status) : 'Mic off',
+                      label: listenOn ? followLabel(follow.status) : t('revision.session.micOff'),
                       on: listenOn && ['starting', 'finding', 'following'].includes(follow.status),
                     }
                   : {})}
@@ -1134,7 +1141,7 @@ export default function ActiveRevisionScreen() {
         hint={
           tapHint.shown ? (
             <Text style={[styles.quietText, { color: palette.textSecondary }]} maxFontSizeMultiplier={1.3}>
-              Tap the page for the controls
+              {t('revision.session.tapHint')}
             </Text>
           ) : null
         }
@@ -1158,7 +1165,7 @@ export default function ActiveRevisionScreen() {
               total={lastSectionPages.length}
               done={lastSectionPages.filter((p) => completedPages.has(p)).length}
               celebrate={celebrate}
-              dayLabel={lastSectionDay === sessionDay ? 'today' : `for ${aheadDayLabel(sessionDay ?? lastSectionDay, lastSectionDay)}`}
+              forDay={lastSectionDay === sessionDay ? undefined : aheadDayLabel(sessionDay ?? lastSectionDay, lastSectionDay)}
               what={describePassage(lastSectionPages, { order: 'given' })}
               next={
                 keepGoingPlan

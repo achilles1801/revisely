@@ -16,6 +16,7 @@ import {
   useDownloadsTick,
 } from '../../lib/translationDownloads';
 import { moveFavorite, toggleFavorite, useFavorites } from '../../lib/translationFavorites';
+import { t } from '../../i18n';
 
 /** Names and lines grow with Dynamic Type only this far (chrome). */
 const CHROME_TEXT_SCALE = 1.4;
@@ -60,27 +61,31 @@ export function TranslationPicker({ translations, chosenId, onChoose, accountId 
     [translations, query, chosenId, favorites, editing, tick],
   );
 
-  const confirmRemove = (t: TranslationInfo, s: DownloadStatus) =>
-    Alert.alert(`Remove ${t.name}?`, `This frees ${megabytes(s.bytesOnPhone)}. You can download it again.`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: () => removeTranslation(t) },
-    ]);
+  const confirmRemove = (option: TranslationInfo, s: DownloadStatus) =>
+    Alert.alert(
+      t('verse.picker.removeTitle', { name: option.name }),
+      t('verse.picker.removeBody', { size: megabytes(s.bytesOnPhone) }),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('common.remove'), style: 'destructive', onPress: () => removeTranslation(option) },
+      ],
+    );
 
   return (
     <View style={styles.flex} testID="translation-picker">
       <View style={styles.titleRow}>
         <Text style={[typeV2.sheetTitle, { color: palette.text }]} accessibilityRole="header" maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
-          Translations
+          {t('verse.picker.title')}
         </Text>
         <Tap
           onPress={() => setEditing((e) => !e)}
           hitSlop={10}
           accessibilityRole="button"
-          accessibilityLabel={editing ? 'Done editing' : 'Edit favorites and downloads'}
+          accessibilityLabel={editing ? t('verse.picker.doneEditing') : t('verse.picker.edit')}
           testID="translation-edit"
         >
           <Text style={[typeV2.button, { color: palette.link }]} maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
-            {editing ? 'Done' : 'Edit'}
+            {editing ? t('common.done') : t('common.edit')}
           </Text>
         </Tap>
       </View>
@@ -89,13 +94,13 @@ export function TranslationPicker({ translations, chosenId, onChoose, accountId 
         <TextInput
           value={query}
           onChangeText={setQuery}
-          placeholder="Language or translator"
+          placeholder={t('verse.picker.search')}
           placeholderTextColor={palette.secondary}
           style={[styles.searchInput, { color: palette.text }]}
           returnKeyType="search"
           autoCorrect={false}
           autoCapitalize="none"
-          accessibilityLabel="Search translations by language or translator"
+          accessibilityLabel={t('verse.picker.searchLabel')}
           testID="translation-search"
         />
         {query ? (
@@ -103,7 +108,7 @@ export function TranslationPicker({ translations, chosenId, onChoose, accountId 
             onPress={() => setQuery('')}
             hitSlop={10}
             accessibilityRole="button"
-            accessibilityLabel="Clear the search"
+            accessibilityLabel={t('verse.picker.clearSearch')}
             testID="translation-search-clear"
           >
             <Ionicons name="close-circle" size={17} color={palette.secondary} />
@@ -112,7 +117,7 @@ export function TranslationPicker({ translations, chosenId, onChoose, accountId 
       </View>
       <SectionList
         sections={sections}
-        keyExtractor={(t) => t.id}
+        keyExtractor={(item) => item.id}
         stickySectionHeadersEnabled={false}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
@@ -120,7 +125,7 @@ export function TranslationPicker({ translations, chosenId, onChoose, accountId 
         testID="translation-list"
         ListEmptyComponent={
           <Text style={[typeV2.body, styles.empty, { color: palette.secondary }]} maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
-            {editing ? 'No favorites or downloads yet' : `No translation matches “${query.trim()}”`}
+            {editing ? t('verse.picker.noFavorites') : t('verse.picker.noMatch', { query: query.trim() })}
           </Text>
         }
         renderSectionHeader={({ section }) => (
@@ -182,7 +187,7 @@ export function TranslationPicker({ translations, chosenId, onChoose, accountId 
               {editing ? (
                 section.key === 'favorites' ? (
                   <FavoriteEdits
-                    t={item}
+                    tr={item}
                     uid={accountId}
                     first={section.data[0] === item}
                     last={section.data[section.data.length - 1] === item}
@@ -191,20 +196,20 @@ export function TranslationPicker({ translations, chosenId, onChoose, accountId 
                   <IconButton
                     icon="trash-outline"
                     color={palette.red}
-                    label={`Remove ${item.name} from this phone, ${megabytes(status.bytesOnPhone)}`}
+                    label={t('verse.picker.removeFromPhone', { name: item.name, size: megabytes(status.bytesOnPhone) })}
                     onPress={() => confirmRemove(item, status)}
                     testID={`translation-remove-${item.id}`}
                   />
                 ) : null
               ) : (
                 <>
-                  {status?.manageable ? <DownloadButton t={item} s={status} onRemove={confirmRemove} /> : null}
+                  {status?.manageable ? <DownloadButton tr={item} s={status} onRemove={confirmRemove} /> : null}
                   {accountId ? (
                     <IconButton
                       icon={starred ? 'star' : 'star-outline'}
                       color={starred ? palette.accentText : palette.secondary}
                       size={20}
-                      label={starred ? `Remove ${item.name} from favorites` : `Add ${item.name} to favorites`}
+                      label={starred ? t('verse.picker.unfavorite', { name: item.name }) : t('verse.picker.favorite', { name: item.name })}
                       selected={starred}
                       onPress={() => void toggleFavorite(accountId, item.id)}
                       testID={`translation-star-${item.id}`}
@@ -256,7 +261,7 @@ function IconButton({
 }
 
 /** Edit, a favorite: up, down, and its star taken away. */
-function FavoriteEdits({ t, uid, first, last }: { t: TranslationInfo; uid?: string; first: boolean; last: boolean }) {
+function FavoriteEdits({ tr, uid, first, last }: { tr: TranslationInfo; uid?: string; first: boolean; last: boolean }) {
   const { palette } = useTheme();
   if (!uid) return null;
   return (
@@ -264,25 +269,25 @@ function FavoriteEdits({ t, uid, first, last }: { t: TranslationInfo; uid?: stri
       <IconButton
         icon="chevron-up"
         color={palette.text}
-        label={`Move ${t.name} up`}
+        label={t('verse.picker.moveUp', { name: tr.name })}
         disabled={first}
-        onPress={() => void moveFavorite(uid, t.id, -1)}
-        testID={`translation-up-${t.id}`}
+        onPress={() => void moveFavorite(uid, tr.id, -1)}
+        testID={`translation-up-${tr.id}`}
       />
       <IconButton
         icon="chevron-down"
         color={palette.text}
-        label={`Move ${t.name} down`}
+        label={t('verse.picker.moveDown', { name: tr.name })}
         disabled={last}
-        onPress={() => void moveFavorite(uid, t.id, 1)}
-        testID={`translation-down-${t.id}`}
+        onPress={() => void moveFavorite(uid, tr.id, 1)}
+        testID={`translation-down-${tr.id}`}
       />
       <IconButton
         icon="remove-circle-outline"
         color={palette.red}
-        label={`Remove ${t.name} from favorites`}
-        onPress={() => void toggleFavorite(uid, t.id)}
-        testID={`translation-unstar-${t.id}`}
+        label={t('verse.picker.unfavorite', { name: tr.name })}
+        onPress={() => void toggleFavorite(uid, tr.id)}
+        testID={`translation-unstar-${tr.id}`}
       />
     </>
   );
@@ -290,13 +295,13 @@ function FavoriteEdits({ t, uid, first, last }: { t: TranslationInfo; uid?: stri
 
 /** Download (with its size), stop a download, or remove it from the phone. */
 function DownloadButton({
-  t,
+  tr,
   s,
   onRemove,
 }: {
-  t: TranslationInfo;
+  tr: TranslationInfo;
   s: DownloadStatus;
-  onRemove: (t: TranslationInfo, s: DownloadStatus) => void;
+  onRemove: (tr: TranslationInfo, s: DownloadStatus) => void;
 }) {
   const { palette } = useTheme();
   if (s.phase === 'downloading') {
@@ -304,9 +309,9 @@ function DownloadButton({
       <IconButton
         icon="stop-circle-outline"
         color={palette.text}
-        label={`Stop downloading ${t.name}`}
-        onPress={() => stopDownload(t)}
-        testID={`translation-stop-${t.id}`}
+        label={t('verse.picker.stopDownload', { name: tr.name })}
+        onPress={() => stopDownload(tr)}
+        testID={`translation-stop-${tr.id}`}
       />
     );
   }
@@ -315,9 +320,9 @@ function DownloadButton({
       <IconButton
         icon="trash-outline"
         color={palette.red}
-        label={`Remove ${t.name} from this phone, ${megabytes(s.bytesOnPhone)}`}
-        onPress={() => onRemove(t, s)}
-        testID={`translation-remove-${t.id}`}
+        label={t('verse.picker.removeFromPhone', { name: tr.name, size: megabytes(s.bytesOnPhone) })}
+        onPress={() => onRemove(tr, s)}
+        testID={`translation-remove-${tr.id}`}
       />
     );
   }
@@ -325,9 +330,9 @@ function DownloadButton({
     <IconButton
       icon="cloud-download-outline"
       color={palette.text}
-      label={`Download ${t.name}, ${megabytes(s.bytes)}`}
-      onPress={() => void startDownload(t)}
-      testID={`translation-download-${t.id}`}
+      label={t('verse.picker.download', { name: tr.name, size: megabytes(s.bytes) })}
+      onPress={() => void startDownload(tr)}
+      testID={`translation-download-${tr.id}`}
     />
   );
 }

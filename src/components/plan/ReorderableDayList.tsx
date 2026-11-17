@@ -39,6 +39,7 @@ import {
 } from '../../lib/reorder';
 import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
 import { DateBadge, DAY_ROW_INSET, dayTitle } from './DayRow';
+import { t } from '../../i18n';
 
 /** The scroll view the list sits in, for scrolling while a row is dragged near an edge. */
 export interface ScrollLink {
@@ -301,7 +302,7 @@ export function ReorderableDayList({
       applyMove(from, to);
       latest.current.haptics.selection();
       AccessibilityInfo.announceForAccessibility(
-        `${summarizeDay(pages).title} moved to ${dayTitle(to, latest.current.today)}`,
+        t('plan.days.moved', { what: summarizeDay(pages).title, day: dayTitle(to, latest.current.today) }),
       );
     },
     [applyMove],
@@ -576,12 +577,12 @@ function DayItem({
   const dimStyle = useAnimatedStyle(() => ({ opacity: 1 - pressed.value * PRESS_DIM }));
   const actionStyle = useAnimatedStyle(() => ({ width: Math.max(0, -x.value) }));
 
-  const name = `${dayTitle(index, today)}: ${summary.title}, ${summary.subtitle}`;
+  const name = t('plan.days.label', { day: dayTitle(index, today), title: summary.title, subtitle: summary.subtitle });
   const actions = [
-    { name: 'activate', label: 'Edit' },
-    ...(index > 0 ? [{ name: 'moveUp', label: 'Move up' }] : []),
-    ...(index < count - 1 ? [{ name: 'moveDown', label: 'Move down' }] : []),
-    ...(canDelete ? [{ name: 'delete', label: 'Delete' }] : []),
+    { name: 'activate', label: t('common.edit') },
+    ...(index > 0 ? [{ name: 'moveUp', label: t('plan.days.moveUp') }] : []),
+    ...(index < count - 1 ? [{ name: 'moveDown', label: t('plan.days.moveDown') }] : []),
+    ...(canDelete ? [{ name: 'delete', label: t('common.delete') }] : []),
   ];
   const onAction = (e: AccessibilityActionEvent) => {
     switch (e.nativeEvent.actionName) {
@@ -611,7 +612,7 @@ function DayItem({
           accessible
           accessibilityRole="button"
           accessibilityLabel={name}
-          accessibilityHint="Double-tap to change what's on this day."
+          accessibilityHint={t('plan.days.hint')}
           accessibilityActions={actions}
           onAccessibilityAction={onAction}
           testID={`day-item-${index}`}
@@ -658,11 +659,11 @@ function DayItem({
             onPress={deleteNow}
             style={styles.actionButton}
             accessibilityRole="button"
-            accessibilityLabel={`Delete ${dayTitle(index, today)}`}
+            accessibilityLabel={t('plan.days.deleteDay', { day: dayTitle(index, today) })}
             testID={`day-delete-${index}`}
           >
             <Text style={[typeV2.button, { color: palette.onRedFill }]} maxFontSizeMultiplier={1.4}>
-              Delete
+              {t('common.delete')}
             </Text>
           </Pressable>
         </Animated.View>

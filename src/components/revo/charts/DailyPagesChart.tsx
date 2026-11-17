@@ -8,11 +8,12 @@ import { spokenText } from '../../../lib/passages';
 import type { RevoDayFacts } from '../../../lib/revo/types';
 import { CHART_TEXT_MAX, ChartFrame, ChartPlot } from './ChartFrame';
 import { ChartButtons, DetailLine, DetailTitle, Legend, RatingCounts, RatingStrip } from './ChartParts';
+import { t, formatDate } from '../../../i18n';
 
 const BAR_AREA = 104;
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-const weekdayLetter = (day: string) => new Date(`${day}T12:00:00`).toLocaleDateString('en-US', { weekday: 'narrow' });
+const weekdayLetter = (day: string) => formatDate(new Date(`${day}T12:00:00`), { weekday: 'narrow' });
 
 /**
  * Pages revised per day over 7 or 30 days, the plan as a grey bar behind each. A tap (or a slide
@@ -71,12 +72,15 @@ export function DailyPagesChart({
     haptics.selection();
     pick(i);
   };
-  const spoken = (b: DayBar) => `${shortDate(b.day)}: ${plural(b.pages, 'page')}${b.planned ? ` of ${b.planned} planned` : ''}`;
+  const spoken = (b: DayBar) =>
+    b.planned
+      ? t('revo.chart.daySpokenPlanned', { date: shortDate(b.day), pages: plural(b.pages, 'page'), planned: b.planned })
+      : t('revo.chart.daySpoken', { date: shortDate(b.day), pages: plural(b.pages, 'page') });
 
   return (
     <ChartFrame
       title={title}
-      hint={`${plural(total, 'page')} · tap a day to see it`}
+      hint={t('revo.chart.dailyHint', { pages: plural(total, 'page') })}
       readout={detail ? { title: detail.title, line: detail.line } : null}
       onClear={() => pick(null)}
       testID={testID}
@@ -86,7 +90,7 @@ export function DailyPagesChart({
             {detail.passage ? (
               <DetailTitle text={detail.passage} testID={`${testID}-passage`} />
             ) : null}
-            {detail.planned ? <DetailLine text="Planned, not revised" /> : null}
+            {detail.planned ? <DetailLine text={t('revo.chart.plannedNotRevised')} /> : null}
             {/* A day with no ratings has nothing for the strip to say: the passage names it. */}
             {smart && detail.strip.some((s) => s.band) ? (
               <>
@@ -102,7 +106,7 @@ export function DailyPagesChart({
       <ChartPlot
         testID={`${testID}-plot`}
         label={`${title}. ${bars.map(spoken).join(', ')}`}
-        value={detail ? spokenText(`${detail.title}, ${detail.line}`) : 'Swipe up or down to pick a day'}
+        value={detail ? spokenText(`${detail.title}, ${detail.line}`) : t('revo.chart.pickDay')}
         onStep={(by) => pick(stepIndex(picked, by, bars.length))}
         onActivate={() => pick(picked == null ? bars.length - 1 : null)}
         onTap={(x, _y, size) => {
@@ -154,8 +158,8 @@ export function DailyPagesChart({
       </ChartPlot>
       <Legend
         items={[
-          { color: palette.primary, label: 'Revised' },
-          ...(bars.some((b) => b.planned > 0) ? [{ color: palette.track, label: 'Planned' }] : []),
+          { color: palette.primary, label: t('revo.chart.revised') },
+          ...(bars.some((b) => b.planned > 0) ? [{ color: palette.track, label: t('revo.chart.planned') }] : []),
         ]}
       />
     </ChartFrame>

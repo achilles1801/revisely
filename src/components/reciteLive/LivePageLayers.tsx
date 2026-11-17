@@ -5,9 +5,9 @@ import type { Rect } from '../../lib/ayahBounds';
 import type { QuranWords } from '../../lib/recite/quranWords';
 import type { WordFollow } from '../../lib/recite/hiddenPage';
 import type { Mark, MarkGroup } from '../../lib/reciteLive/contract';
-import { GROUP_RANK, markGroup } from '../../lib/reciteLive/contract';
+import { markGroup, strongestByWord } from '../../lib/reciteLive/contract';
 import { markTitle } from '../../lib/reciteLive/describe';
-import { currentLineBand, cursorBox, markBox, markHighlight } from '../../lib/reciteLive/geometry';
+import { currentLineBand, cursorBox, markBox, markHighlight, offBox, wordBox } from '../../lib/reciteLive/geometry';
 
 const NO_REVEALED: ReadonlySet<string> = new Set();
 
@@ -49,12 +49,7 @@ export function LiveUnderlay({
   const here = cursor != null && words.pageOf(cursor) === page;
   const line = here && !hidden ? currentLineBand(words, page, cursor) : null;
   // One highlight per word: its strongest mark (a word mistake over a slip over a tajweed note).
-  const byWord = new Map<number, Mark>();
-  for (const m of marks) {
-    if (words.pageOf(m.w) !== page) continue;
-    const had = byWord.get(m.w);
-    if (!had || GROUP_RANK[markGroup(m)] > GROUP_RANK[markGroup(had)]) byWord.set(m.w, m);
-  }
+  const byWord = strongestByWord(marks.filter((m) => words.pageOf(m.w) === page));
   const picked = selected && words.pageOf(selected.w) === page ? selected : null;
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill} testID={`live-underlay-${page}`}>
@@ -85,22 +80,45 @@ export function LiveUnderlay({
 }
 
 /**
- * Over the page's ink, on a hidden page: the covers (words show as recited, or shown by hand), with no band on any line
+ * Over the page's ink: on a hidden page, the covers (words show as recited, or shown by hand), with no band on any line
  * (Majd, Nov 15 2026). The newest word's grey box and the marks' highlights are behind the ink (LiveUnderlay).
+ * `off`: the next word, while something else is being said in its slot (the checker's `off`): its cover turns red, the
+ * word-mistake highlight over it, its text still hidden. Not a mark: it goes when the word is said, the reciter goes
+ * back, or a mark comes (lib/reciteLive/state). During a take, the words peeked (shown by hand) under a veil of the
+ * page's colour, so their ink is a quiet grey, in either view and once recited too; a peeked word with a mistake keeps
+ * its highlight unveiled.
  */
 export function LiveOverlay({
   page,
   scale,
   hidden,
+  peeked = null,
 }: {
   page: number;
   scale: number;
-  hidden: { follow: WordFollow; cover: string; guide: string } | null;
+  hidden: { follow: WordFollow; cover: string; guide: string; off?: { w: number; words: QuranWords; colour: string } | null } | null;
+  peeked?: { words: QuranWords; peeked: readonly number[]; veil: string } | null;
 }) {
-  if (!hidden) return null;
+  const veiled = peeked ? peeked.peeked.filter((w) => peeked.words.pageOf(w) === page) : [];
+  if (!hidden && veiled.length === 0) return null;
+  const off = hidden?.off && hidden.off.words.pageOf(hidden.off.w) === page && !hidden.follow.shown(hidden.off.w) ? hidden.off : null;
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill} testID={`live-overlay-${page}`}>
-      <HiddenPageOverlay page={page} scale={scale} revealed={NO_REVEALED} follow={hidden.follow} colors={{ cover: hidden.cover, guide: hidden.guide }} />
+      {hidden ? (
+        <HiddenPageOverlay page={page} scale={scale} revealed={NO_REVEALED} follow={hidden.follow} colors={{ cover: hidden.cover, guide: hidden.guide }} />
+      ) : null}
+      {off ? (
+        <View testID="live-off" style={[styles.abs, styles.box, rectStyle(offBox(off.words, off.w), scale), { backgroundColor: off.colour }]} />
+      ) : null}
+      {peeked
+        ? veiled.map((w) => (
+            <View
+              key={w}
+              testID="live-peeked"
+              style={[styles.abs, rectStyle(wordBox(peeked.words, w), scale), { backgroundColor: peeked.veil }]}
+            />
+          ))
+        : null}
     </View>
   );
 }

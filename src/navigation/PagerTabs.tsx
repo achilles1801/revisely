@@ -15,7 +15,7 @@
 //   take over an animation in flight.
 
 import React, { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, useWindowDimensions, View } from 'react-native';
+import { I18nManager, StyleSheet, useWindowDimensions, View } from 'react-native';
 import {
   createNavigatorFactory,
   DefaultNavigatorOptions,
@@ -40,6 +40,11 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { useHaptics } from '../design/haptics';
+
+// Right to left (an RTL language; BEHAVIOUR.md LANG-1), the row lays the tabs out from the right
+// and a swipe to the next tab goes right, but a transform and a finger's travel don't flip by
+// themselves: they are multiplied by this. It is fixed for the launch, as React Native's direction is.
+const DIR = I18nManager.isRTL ? -1 : 1;
 
 /** Pages past either end move this much: the iOS rubber band (c = 0.55). */
 export function rubberBand(overPages: number): number {
@@ -237,14 +242,14 @@ function PagerTabs({
         })
         .onUpdate((e) => {
           if (!swipeOn.value) return;
-          const raw = start.value - e.translationX / pageWidth.value;
+          const raw = start.value - (DIR * e.translationX) / pageWidth.value;
           if (raw < lo.value) position.value = lo.value - rubberBand(lo.value - raw);
           else if (raw > hi.value) position.value = hi.value + rubberBand(raw - hi.value);
           else position.value = raw;
         })
         .onEnd((e) => {
           if (!swipeOn.value) return;
-          const velocity = -e.velocityX / pageWidth.value;
+          const velocity = (-DIR * e.velocityX) / pageWidth.value;
           const page = snapPage(start.value, position.value, velocity, FLING_VELOCITY / pageWidth.value, lo.value, hi.value);
           target.value = page;
           position.value = withSpring(page, { ...SPRING, velocity });
@@ -255,7 +260,7 @@ function PagerTabs({
             // Past the last page toward a tab that isn't one (yet): judged as a
             // swipe to a next page would be, on the distance before the rubber
             // band shortened it. The pager springs back; the tab's tap runs.
-            const raw = start.value - e.translationX / pageWidth.value;
+            const raw = start.value - (DIR * e.translationX) / pageWidth.value;
             const beyond = snapPage(start.value, raw, velocity, FLING_VELOCITY / pageWidth.value, lo.value, hi.value + 1);
             if (beyond === hi.value + 1) {
               runOnJS(tick)();
@@ -267,7 +272,7 @@ function PagerTabs({
     [go, tick, swipedPastEnd, position, start, target, pageWidth, lo, hi, swipeOn, pastEndOn],
   );
 
-  const row = useAnimatedStyle(() => ({ transform: [{ translateX: -position.value * pageWidth.value }] }));
+  const row = useAnimatedStyle(() => ({ transform: [{ translateX: -DIR * position.value * pageWidth.value }] }));
 
   return (
     <NavigationContent>

@@ -63,6 +63,7 @@ import { getRevisionDateForUser } from '../../lib/fajrBoundary';
 import { partlyMemorizedAyahs, revisablePages } from '../../lib/memorizedAyahs';
 import { describePagesToRevise } from '../../lib/passages';
 import { sittingsEnabled } from '../../lib/sitting';
+import { t } from '../../i18n';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'PlanEdit'>;
 type RouteProps = RouteProp<HomeStackParamList, 'PlanEdit'>;
@@ -241,10 +242,10 @@ export default function PlanEditScreen() {
       navigation.addListener('beforeRemove', (e) => {
         if (!isDirty || leavingRef.current) return;
         e.preventDefault();
-        Alert.alert('Discard changes?', "Your schedule edits haven't been saved.", [
-          { text: 'Keep Editing', style: 'cancel' },
+        Alert.alert(t('plan.edit.discardTitle'), t('plan.edit.discardBody'), [
+          { text: t('plan.edit.keepEditing'), style: 'cancel' },
           {
-            text: 'Discard',
+            text: t('plan.edit.discard'),
             style: 'destructive',
             onPress: () => {
               leavingRef.current = true;
@@ -278,7 +279,7 @@ export default function PlanEditScreen() {
       leave();
     } catch {
       setSaving(false);
-      Alert.alert("Couldn't save", 'Please try again.');
+      Alert.alert(t('plan.edit.saveFailed'), t('common.pleaseTryAgain'));
     }
   };
 
@@ -372,17 +373,17 @@ export default function PlanEditScreen() {
       if (nameLive || isDirty) setPlanName(name);
       haptics.success();
     } catch {
-      Alert.alert("Couldn't save plan", 'Please try again.');
+      Alert.alert(t('plan.edit.savePlanFailed'), t('common.pleaseTryAgain'));
     }
   }, [user, nameDraft, days, direction, saveUser, haptics, isDirty]);
 
   const deleteSavedPlan = useCallback(
     (plan: SavedPlan) => {
       if (!user) return;
-      Alert.alert(`Delete "${plan.name}"?`, 'This saved plan will be removed.', [
-        { text: 'Cancel', style: 'cancel' },
+      Alert.alert(t('plan.edit.deletePlanTitle', { name: plan.name }), t('plan.edit.deletePlanBody'), [
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -391,7 +392,7 @@ export default function PlanEditScreen() {
                 savedPlans: (user.savedPlans ?? []).filter((p) => p.id !== plan.id),
               });
             } catch {
-              Alert.alert("Couldn't delete", 'Please try again.');
+              Alert.alert(t('plan.edit.deleteFailed'), t('common.pleaseTryAgain'));
             }
           },
         },
@@ -406,7 +407,9 @@ export default function PlanEditScreen() {
   };
 
   const savedPlanMessage = (plan: SavedPlan) =>
-    `${plan.days.length}-day cycle${plan.direction === 'reverse' ? ', reverse order' : ''}. Loading it replaces the days above — tap Save to keep it.`;
+    t(plan.direction === 'reverse' ? 'plan.edit.savedPlanMessageReverse' : 'plan.edit.savedPlanMessage', {
+      n: plan.days.length,
+    });
 
   const openSavedPlan = (plan: SavedPlan) => {
     setMenuPlan(plan);
@@ -446,7 +449,7 @@ export default function PlanEditScreen() {
       quotaSheetRef.current?.dismiss();
       haptics.success();
     } catch {
-      Alert.alert("Couldn't save", 'Please try again.');
+      Alert.alert(t('plan.edit.saveFailed'), t('common.pleaseTryAgain'));
     } finally {
       setSaving(false);
     }
@@ -455,12 +458,12 @@ export default function PlanEditScreen() {
   const handleUseAutomatic = () => {
     if (!user || saving) return;
     Alert.alert(
-      'Use the automatic schedule?',
-      'Your custom plan will be removed and Revisely will go back to moving through your memorized pages by your daily amount.',
+      t('plan.edit.automaticTitle'),
+      t('plan.edit.automaticBody'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Use Automatic',
+          text: t('plan.edit.useAutomatic'),
           style: 'destructive',
           onPress: () => saveSchedule(null, true),
         },
@@ -489,52 +492,53 @@ export default function PlanEditScreen() {
 
   const quotaSummary =
     user.scheduleMode === 'juz'
-      ? `${user.dailyJuzCount ?? 1} juz`
+      ? t('common.juzCount', { count: user.dailyJuzCount ?? 1 })
       : pageCountLabel(user.dailyPageCapacity);
 
   const perDay =
     stats.minPerDay === stats.maxPerDay
       ? pageCountLabel(stats.maxPerDay)
-      : `${stats.minPerDay}–${stats.maxPerDay} pages`;
-  const cycleSummary = `${days.length}-day cycle · ${perDay} a day${
-    stats.restDays > 0 ? ` · ${stats.restDays} rest day${stats.restDays === 1 ? '' : 's'}` : ''
-  }. Tap Cycle to show the days.`;
+      : t('plan.builder.pagesRange', { min: stats.minPerDay, max: stats.maxPerDay });
+  const cycleSummary =
+    stats.restDays > 0
+      ? t('plan.edit.cycleSummaryRest', { n: days.length, perDay, count: stats.restDays })
+      : t('plan.edit.cycleSummary', { n: days.length, perDay });
 
   const cycleFooter = isLongCycle
-    ? `A ${days.length}-day cycle is a long gap between revisions. Past about two weeks, pages usually need more reinforcement.`
-    : 'Tap a day to change what’s on it. Touch and hold to move it to another date; swipe left to delete it.';
+    ? t('plan.edit.longCycle', { n: days.length })
+    : t('plan.edit.cycleFooter');
 
   const planKind = !hasMemorized
-    ? 'Nothing to schedule yet'
+    ? t('plan.edit.nothingToSchedule')
     : days.length === 0
-      ? 'No days in this cycle'
+      ? t('plan.edit.noDays')
       : user.customPlan || isDirty
         ? customPlanTitle(planName)
-        : 'Automatic';
-  const repeats = `Repeats every ${days.length === 1 ? 'day' : `${days.length} days`}`;
+        : t('plan.edit.automatic');
+  const repeats = t('plan.edit.repeats', { count: days.length });
 
   const removedSummary = removed ? summarizeDay(removed.pages) : null;
   const removedMessage = removedSummary
     ? removedSummary.isRest
-      ? 'Rest day deleted'
-      : `${removedSummary.title} deleted`
+      ? t('plan.edit.restDayDeleted')
+      : t('plan.edit.dayDeleted', { title: removedSummary.title })
     : '';
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]} testID="plan-edit">
       <TopBar
-        title="Schedule"
+        title={t('plan.edit.title')}
         onBack={() => navigation.goBack()}
         right={
           <>
             <HelpButton screen="schedule" />
             <PillButton
-              title="Save"
+              title={t('common.save')}
               size="sm"
               onPress={handleSave}
               disabled={!canSave}
               busy={saving}
-              accessibilityLabel="Save schedule"
+              accessibilityLabel={t('plan.edit.saveLabel')}
               testID="plan-save"
             />
           </>
@@ -563,21 +567,21 @@ export default function PlanEditScreen() {
           ) : null}
           {isDirty ? (
             <Text style={[typeV2.meta, styles.heroLineV2, { color: palette.accentText }]} testID="plan-dirty">
-              Unsaved changes
+              {t('plan.edit.unsaved')}
             </Text>
           ) : null}
         </View>
 
         {outsidePlan.length > 0 ? (
           <GroupedSection
-            header="Not in your plan"
-            footer="Your custom plan doesn’t add new pages by itself. Add them where they fit, then Save."
+            header={t('plan.edit.notInPlan')}
+            footer={t('plan.edit.notInPlanFooter')}
           >
             <GroupedRow
               title={outsideName}
               subtitle={pageCountLabel(outsidePlan.length)}
               icon="leaf-outline"
-              value="Add"
+              value={t('plan.edit.add')}
               accessory="chevron"
               onPress={() => setNotInPlanOpen(true)}
               testID="plan-not-in-plan"
@@ -587,7 +591,7 @@ export default function PlanEditScreen() {
 
         {days.length > 0 ? (
           <GroupedSection
-            header="Cycle"
+            header={t('plan.edit.cycle')}
             collapsed={cycleCollapsed}
             onToggleCollapsed={() => setCycleCollapsedPersisted(!cycleCollapsed)}
             collapsedFooter={cycleSummary}
@@ -607,7 +611,7 @@ export default function PlanEditScreen() {
             />
             {!showAll ? (
               <GroupedRow
-                title={`Show all ${days.length} days`}
+                title={t('plan.edit.showAll', { n: days.length })}
                 tone="link"
                 onPress={() => setExpanded(true)}
                 // In line with the days' content.
@@ -617,7 +621,7 @@ export default function PlanEditScreen() {
             ) : null}
             {/* A new day: the + in the date column, the label where a day's content is. */}
             <GroupedRow
-              title="Add rest day"
+              title={t('plan.edit.addRestDay')}
               leading={
                 <View style={styles.dateColumnV2}>
                   <Ionicons name="add-circle-outline" size={24} color={palette.text} />
@@ -632,8 +636,8 @@ export default function PlanEditScreen() {
           <GroupedSection
             footer={
               hasMemorized
-                ? 'Create a plan to get started.'
-                : "You haven't marked any pages as memorized yet, so there's nothing to schedule."
+                ? t('plan.edit.createToStart')
+                : t('plan.edit.nothingMemorized')
             }
           >
             {null}
@@ -644,12 +648,12 @@ export default function PlanEditScreen() {
           <GroupedSection
             footer={
               smartTrackingEnabled
-                ? 'Auto-balance from any starting point, plan by juz, or put your weakest pages first.'
-                : 'Auto-balance from any starting point, or plan by juz.'
+                ? t('plan.edit.createFooterWeakest')
+                : t('plan.edit.createFooter')
             }
           >
             <GroupedRow
-              title="Create new plan"
+              title={t('plan.edit.create')}
               icon="sparkles-outline"
               accessory="chevron"
               onPress={() => builderRef.current?.present()}
@@ -659,14 +663,14 @@ export default function PlanEditScreen() {
         ) : null}
 
         <GroupedSection
-          header="Saved plans"
-          footer={savedPlans.length > 0 ? 'Tap a saved plan to load or delete it.' : undefined}
+          header={t('plan.edit.savedPlans')}
+          footer={savedPlans.length > 0 ? t('plan.edit.savedPlansFooter') : undefined}
         >
           {savedPlans.map((plan) => (
             <GroupedRow
               key={plan.id}
               title={plan.name}
-              value={`${plan.days.length} day${plan.days.length === 1 ? '' : 's'}`}
+              value={t('plan.edit.days', { count: plan.days.length })}
               onPress={() => openSavedPlan(plan)}
               onLongPress={() => deleteSavedPlan(plan)}
               accessory="chevron"
@@ -674,7 +678,7 @@ export default function PlanEditScreen() {
             />
           ))}
           <GroupedRow
-            title="Save current plan…"
+            title={t('plan.edit.saveCurrent')}
             icon="bookmark-outline"
             onPress={openSaveName}
             disabled={days.length === 0}
@@ -683,15 +687,15 @@ export default function PlanEditScreen() {
         </GroupedSection>
 
         <GroupedSection
-          header="More"
+          header={t('common.more')}
           footer={
             user.customPlan
-              ? 'Your daily amount drives the automatic schedule and is the starting point for new plans.'
-              : 'Without a custom plan, Revisely moves through your memorized pages in order using your daily amount.'
+              ? t('plan.edit.moreFooterCustom')
+              : t('plan.edit.moreFooterAuto')
           }
         >
           <GroupedRow
-            title="Daily amount"
+            title={t('plan.edit.dailyAmount')}
             icon="speedometer-outline"
             value={quotaSummary}
             accessory="chevron"
@@ -700,7 +704,7 @@ export default function PlanEditScreen() {
           />
           {user.customPlan ? (
             <GroupedRow
-              title="Use automatic schedule"
+              title={t('plan.edit.useAutomaticSchedule')}
               icon="refresh-outline"
               tone="destructive"
               onPress={handleUseAutomatic}
@@ -738,19 +742,25 @@ export default function PlanEditScreen() {
       <ActionSheet
         visible={notInPlanOpen}
         onClose={() => setNotInPlanOpen(false)}
-        title={`Add ${outsideName}`}
+        title={t('plan.edit.addOutside', { name: outsideName })}
         actions={[
           {
             key: 'tomorrow',
-            label: 'With tomorrow’s pages',
-            subtitle: days.length > 1 ? `${pageCountLabel(days[1].length)}, then ${pageCountLabel(days[1].length + outsidePlan.length)}` : undefined,
+            label: t('plan.edit.withTomorrow'),
+            subtitle:
+              days.length > 1
+                ? t('plan.edit.thenTotal', {
+                    now: pageCountLabel(days[1].length),
+                    after: pageCountLabel(days[1].length + outsidePlan.length),
+                  })
+                : undefined,
             icon: 'add-circle-outline',
             onPress: () => addOutsideTo('tomorrow'),
           },
           {
             key: 'own',
-            label: 'As a day of its own, tomorrow',
-            subtitle: `The cycle becomes ${days.length + 1} days`,
+            label: t('plan.edit.ownDay'),
+            subtitle: t('plan.edit.cycleBecomes', { n: days.length + 1 }),
             icon: 'calendar-outline',
             onPress: () => addOutsideTo('own'),
           },
@@ -766,10 +776,10 @@ export default function PlanEditScreen() {
         actions={
           menuPlan
             ? [
-                { key: 'load', label: 'Load plan', icon: 'download-outline', onPress: () => loadSavedPlan(menuPlan) },
+                { key: 'load', label: t('plan.edit.loadPlan'), icon: 'download-outline', onPress: () => loadSavedPlan(menuPlan) },
                 {
                   key: 'delete',
-                  label: 'Delete plan',
+                  label: t('plan.edit.deletePlan'),
                   icon: 'trash-outline',
                   destructive: true,
                   onPress: () => deleteSavedPlan(menuPlan),
@@ -782,10 +792,10 @@ export default function PlanEditScreen() {
 
       <PlanSheet
         ref={quotaSheetRef}
-        title="Daily amount"
-        leftLabel="Cancel"
+        title={t('plan.edit.dailyAmount')}
+        leftLabel={t('common.cancel')}
         onLeft={() => quotaSheetRef.current?.dismiss()}
-        rightLabel="Save"
+        rightLabel={t('common.save')}
         onRight={handleSaveQuota}
         rightLoading={saving}
       >
@@ -793,8 +803,8 @@ export default function PlanEditScreen() {
           <View style={styles.sheetPillsV2}>
             <PillTabs<QuotaMode>
               options={[
-                { value: 'pages', label: 'Pages' },
-                { value: 'juz', label: 'Juz' },
+                { value: 'pages', label: t('plan.edit.pages') },
+                { value: 'juz', label: t('common.juz') },
               ]}
               value={tempMode}
               onChange={setTempMode}
@@ -805,33 +815,33 @@ export default function PlanEditScreen() {
             divider={false}
             footer={
               tempMode === 'pages'
-                ? 'How many pages you revise on a typical day.'
-                : 'How many whole ajzaʼ you revise on a typical day.'
+                ? t('plan.edit.pagesFooter')
+                : t('plan.edit.juzFooter')
             }
           >
             {tempMode === 'pages' ? (
               <GroupedRow
-                title="Pages per day"
+                title={t('plan.builder.pagesPerDay')}
                 trailing={
                   <InlineStepper
                     value={tempCapacity}
                     min={1}
                     max={60}
                     onChange={setTempCapacity}
-                    label="pages per day"
+                    label={t('plan.builder.pagesPerDayLower')}
                   />
                 }
               />
             ) : (
               <GroupedRow
-                title="Ajzaʼ per day"
+                title={t('plan.edit.ajzaPerDay')}
                 trailing={
                   <InlineStepper
                     value={tempJuzCount}
                     min={1}
                     max={5}
                     onChange={setTempJuzCount}
-                    label="ajzaʼ per day"
+                    label={t('plan.edit.ajzaPerDayLower')}
                   />
                 }
               />
@@ -842,10 +852,10 @@ export default function PlanEditScreen() {
 
       <PlanSheet
         ref={saveNameSheetRef}
-        title="Save plan"
-        leftLabel="Cancel"
+        title={t('plan.edit.savePlan')}
+        leftLabel={t('common.cancel')}
         onLeft={() => saveNameSheetRef.current?.dismiss()}
-        rightLabel="Save"
+        rightLabel={t('common.save')}
         onRight={confirmSavePlan}
         rightDisabled={!nameDraft.trim()}
         onPresented={() => nameInputRef.current?.focus()}
@@ -856,18 +866,18 @@ export default function PlanEditScreen() {
               ref={nameInputRef}
               value={nameDraft}
               onChangeText={setNameDraft}
-              placeholder="Name, e.g. Ramadan rotation"
+              placeholder={t('plan.edit.namePlaceholder')}
               placeholderTextColor={palette.secondary}
               style={[typeV2.body, styles.nameInputV2, { color: palette.text }]}
               maxLength={40}
               returnKeyType="done"
               onSubmitEditing={confirmSavePlan}
-              accessibilityLabel="Plan name"
+              accessibilityLabel={t('plan.edit.nameLabel')}
               testID="plan-name"
             />
           </View>
           <Text style={[typeV2.meta, styles.nameFooterV2, { color: palette.secondary }]}>
-            {`${stats.dayCount}-day cycle. You can load it again any time from this screen.`}
+            {t('plan.edit.nameFooter', { n: stats.dayCount })}
           </Text>
         </View>
       </PlanSheet>

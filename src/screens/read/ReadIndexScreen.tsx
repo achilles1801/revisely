@@ -29,6 +29,7 @@ import { useTabBarFootprint } from '../../navigation/TabBar';
 import type { ReadStackParamList } from '../../navigation/MainNavigator';
 import { arabicLabelLines } from '../../lib/platformUi';
 import { ayahsInSurah, spokenText } from '../../lib/passages';
+import { formatDate } from '../../i18n';
 
 type NavigationProp = NativeStackNavigationProp<ReadStackParamList, 'ReadIndex'>;
 
@@ -44,7 +45,7 @@ function formatRelativeTime(iso: string): string {
   if (diffHr < 24) return diffHr === 1 ? '1 hour ago' : `${diffHr} hours ago`;
   const diffDay = Math.round(diffHr / 24);
   if (diffDay < 7) return diffDay === 1 ? 'yesterday' : `${diffDay} days ago`;
-  return new Date(iso).toLocaleDateString();
+  return formatDate(new Date(iso), {}, 'device');
 }
 
 interface SurahRow {

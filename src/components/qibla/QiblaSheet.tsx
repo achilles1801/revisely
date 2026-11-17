@@ -9,6 +9,7 @@ import { PillButton } from '../v2/PillButton';
 import { Sheet } from '../v2/Sheet';
 import { DialMode, QiblaDial } from './QiblaDial';
 import { QiblaReading, useQibla } from './useQibla';
+import { t } from '../../i18n';
 
 /** Below this heading accuracy (0–3) "Facing the Qibla" isn't claimed. */
 const TRUST_ACCURACY = 2;
@@ -135,8 +136,8 @@ export function QiblaContent({
     <Sheet
       visible={visible}
       onClose={onClose}
-      title="Qibla"
-      footer={{ label: qiblaAsking(view) ? 'Not now' : 'Done', onPress: onClose, testID: 'qibla-done' }}
+      title={t('qibla.title')}
+      footer={{ label: qiblaAsking(view) ? t('common.notNow') : t('common.done'), onPress: onClose, testID: 'qibla-done' }}
       testID="qibla-sheet"
     >
       <QiblaBody view={view} onAllow={onAllow} onOpenSettings={onOpenSettings} onRetry={onRetry} />
@@ -179,7 +180,7 @@ export function QiblaBody({
     mode = 'atKaaba';
   }
 
-  const facts = (b: number, km: number) => `${formatBearing(b)} from north · ${formatDistance(km)} to Makkah`;
+  const facts = (b: number, km: number) => t('qibla.facts', { bearing: formatBearing(b), distance: formatDistance(km) });
   const title = (text: string, color = palette.text) => (
     <Text
       style={[typeV2.barTitle, typeV2.numeral, styles.centred, { color }]}
@@ -226,7 +227,7 @@ export function QiblaBody({
     case 'aligned':
       text = (
         <>
-          {title('Facing the Qibla', palette.doneText)}
+          {title(t('qibla.facing'), palette.doneText)}
           {line(facts(view.bearing, view.distanceKm))}
           {place(view.place)}
         </>
@@ -235,8 +236,8 @@ export function QiblaBody({
     case 'calibrate':
       text = (
         <>
-          {title('Calibrate your compass')}
-          {body('Move your phone in a figure 8 a few times, away from metal and magnets.')}
+          {title(t('qibla.calibrate.title'))}
+          {body(t('qibla.calibrate.body'))}
         </>
       );
       break;
@@ -244,8 +245,8 @@ export function QiblaBody({
       // No compass (or none yet): the direction as a bearing from north.
       text = (
         <>
-          {title(`${formatBearing(view.bearing)} from north`)}
-          {line(view.waiting ? `Finding north… · ${formatDistance(view.distanceKm)} to Makkah` : `${formatDistance(view.distanceKm)} to Makkah`)}
+          {title(t('qibla.fromNorth', { bearing: formatBearing(view.bearing) }))}
+          {line(t(view.waiting ? 'qibla.findingNorth' : 'qibla.toMakkah', { distance: formatDistance(view.distanceKm) }))}
           {place(view.place)}
         </>
       );
@@ -253,7 +254,7 @@ export function QiblaBody({
     case 'atKaaba':
       text = (
         <>
-          {title("You're at the Kaaba")}
+          {title(t('qibla.atKaaba'))}
           {place(view.place)}
         </>
       );
@@ -261,34 +262,34 @@ export function QiblaBody({
     case 'permission':
       text = (
         <>
-          {title('Allow location to find the Qibla')}
-          {body('Revisely works out the direction of Makkah from where you are. Your location stays on this phone.')}
+          {title(t('qibla.permission.title'))}
+          {body(t('qibla.permission.body'))}
         </>
       );
-      action = <PillButton title="Allow location" size="lg" onPress={onAllow} testID="qibla-allow" />;
+      action = <PillButton title={t('qibla.permission.allow')} size="lg" onPress={onAllow} testID="qibla-allow" />;
       break;
     case 'denied':
       text = (
         <>
-          {title('Location is off for Revisely')}
-          {body('Turn it on in Settings to find the Qibla.')}
+          {title(t('qibla.denied.title'))}
+          {body(t('qibla.denied.body'))}
         </>
       );
-      action = <PillButton title="Open Settings" size="lg" onPress={onOpenSettings} testID="qibla-settings" />;
+      action = <PillButton title={t('common.openSettings')} size="lg" onPress={onOpenSettings} testID="qibla-settings" />;
       break;
     case 'locating':
-      text = title('Finding where you are…');
+      text = title(t('qibla.locating'));
       break;
     case 'checking':
       break;
     case 'noLocation':
       text = (
         <>
-          {title("Couldn't find where you are")}
-          {body('Check that Location Services is on, then try again.')}
+          {title(t('qibla.noLocation.title'))}
+          {body(t('qibla.noLocation.body'))}
         </>
       );
-      action = <PillButton title="Try again" variant="outline" size="lg" onPress={onRetry} testID="qibla-retry" />;
+      action = <PillButton title={t('common.tryAgain')} variant="outline" size="lg" onPress={onRetry} testID="qibla-retry" />;
       break;
   }
 

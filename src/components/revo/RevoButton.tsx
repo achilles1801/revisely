@@ -4,6 +4,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useHaptics } from '../../design/haptics';
 import { REVO_BUTTON_GAP, REVO_BUTTON_SIZE } from '../../lib/revo/presence';
 import { RevoMark } from './RevoMark';
+import { t } from '../../i18n';
 
 export { REVO_BUTTON_GAP, REVO_BUTTON_SIZE };
 /** From the right edge, and above the tab bar (and the mini player). */
@@ -34,8 +35,8 @@ export function RevoButton({ bottom, dot, onPress }: { bottom: number; dot: bool
         }}
         hitSlop={REVO_BUTTON_SLOP}
         accessibilityRole="button"
-        accessibilityLabel={dot ? 'Revo, a new Day in review' : 'Revo'}
-        accessibilityHint="Ask about your revision"
+        accessibilityLabel={dot ? t('revo.button.newReview') : t('revo.revo')}
+        accessibilityHint={t('revo.button.hint')}
         style={({ pressed }) => [styles.button, lift, Platform.OS === 'android' && styles.elevation, pressed && styles.pressed]}
         testID="revo-button"
       >

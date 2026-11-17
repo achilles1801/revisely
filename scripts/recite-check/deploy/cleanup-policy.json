@@ -1,0 +1,8 @@
+[
+  {"name": "delete-older-than-3d", "action": {"type": "Delete"},
+   "condition": {"tagState": "any", "olderThan": "259200s"}},
+  {"name": "keep-newest-3", "action": {"type": "Keep"},
+   "mostRecentVersions": {"packageNamePrefixes": ["recite-check"], "keepCount": 3}},
+  {"name": "keep-serving", "action": {"type": "Keep"},
+   "condition": {"tagState": "tagged", "tagPrefixes": ["serving", "keep-"]}}
+]

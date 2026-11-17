@@ -13,12 +13,15 @@ import { join } from 'path';
 import { appSource, readRepo, ruleHash, ruleTexts } from '../../../../jest/behaviourRules';
 import { HELP_INLINE_ICONS } from '../topics';
 import {
+  ALL_RELEASES,
   CURRENT_RELEASE,
+  NEXT_RELEASE,
   RELEASES,
   SEEN_ALL,
   cardsFor,
   hasSeen,
   needsOf,
+  releaseFor,
   whatsNewParts,
   whatsNewPlainText,
   type WhatsNewRelease,
@@ -29,7 +32,7 @@ const REVIEWED = join(__dirname, '../whatsNewReviewed.json');
 const rules = ruleTexts(readRepo('BEHAVIOUR.md'));
 
 /** Every piece of text with rules: each card with words, each row of a rows card. */
-const pieces = RELEASES.flatMap((r) =>
+const pieces = ALL_RELEASES.flatMap((r) =>
   r.cards.flatMap((c) =>
     c.rows
       ? c.rows.map((row) => ({ id: `${r.id}/${c.id}.${row.id}`, text: row.text, title: row.title, covers: row.covers }))
@@ -39,7 +42,7 @@ const pieces = RELEASES.flatMap((r) =>
 
 describe("What's new: its releases", () => {
   it('each release has an id the rules accept, once', () => {
-    const ids = RELEASES.map((r) => r.id);
+    const ids = ALL_RELEASES.map((r) => r.id);
     expect(new Set(ids).size).toBe(ids.length);
     for (const id of ids) expect(id).toMatch(/^[a-z0-9.-]{1,20}$/);
     expect(ids).not.toContain(SEEN_ALL);
@@ -47,7 +50,7 @@ describe("What's new: its releases", () => {
   });
 
   it('a release is short: at most five cards, the last with at most four rows', () => {
-    for (const r of RELEASES) {
+    for (const r of ALL_RELEASES) {
       expect(r.cards.length).toBeGreaterThan(0);
       expect(r.cards.length).toBeLessThanOrEqual(5);
       for (const c of r.cards) if (c.rows) expect(c.rows.length).toBeLessThanOrEqual(4);
@@ -55,7 +58,7 @@ describe("What's new: its releases", () => {
   });
 
   it('a card has words and a picture or a moment, or rows', () => {
-    for (const r of RELEASES) {
+    for (const r of ALL_RELEASES) {
       for (const c of r.cards) {
         if (c.rows) expect(c.text).toBeUndefined();
         else {
@@ -157,29 +160,53 @@ describe('who has seen a release (NEW-1)', () => {
 });
 
 describe('the cards an account sees', () => {
+  const NOV = RELEASES.find((r) => r.id === '2026-11')!;
+  const RECITE_RELEASE = NEXT_RELEASE!;
+
   it('a card or row whose feature is closed to it is left out; a rows card with none left goes', () => {
-    const all = cardsFor(CURRENT_RELEASE, () => true);
-    expect(all.map((c) => c.id)).toEqual(CURRENT_RELEASE.cards.map((c) => c.id));
-    const none = cardsFor(CURRENT_RELEASE, () => false);
+    const all = cardsFor(NOV, () => true);
+    expect(all.map((c) => c.id)).toEqual(NOV.cards.map((c) => c.id));
+    const none = cardsFor(NOV, () => false);
     // Only what needs nothing is left: the last card, with its offline row.
     expect(none.map((c) => c.id)).toEqual(['more']);
     expect(none[0].rows?.map((r) => r.id)).toEqual(['offline']);
-    const noRevo = cardsFor(CURRENT_RELEASE, (n) => n !== 'revo');
+    const noRevo = cardsFor(NOV, (n) => n !== 'revo');
     expect(noRevo.map((c) => c.id)).not.toContain('revo');
   });
 
-  it('a tester has every card; so does an account that isn’t one, with only Revo’s waiting on its own switch', () => {
+  it('November 2026’s: a tester has every card; so does an account that isn’t one, with only Revo’s waiting on its own switch', () => {
     const tester = { previewTester: true };
-    expect(cardsFor(CURRENT_RELEASE, (n) => needOpen(n, tester, 'testers'))).toHaveLength(CURRENT_RELEASE.cards.length);
+    expect(cardsFor(NOV, (n) => needOpen(n, tester, 'testers'))).toHaveLength(NOV.cards.length);
     // previewTester unset and false: an App Store account.
     for (const account of [{}, { previewTester: false }]) {
-      const all = cardsFor(CURRENT_RELEASE, (n) => needOpen(n, account, 'everyone'));
-      expect(all.map((c) => c.id)).toEqual(CURRENT_RELEASE.cards.map((c) => c.id));
-      expect(all.find((c) => c.rows)?.rows?.map((r) => r.id)).toEqual(CURRENT_RELEASE.cards.find((c) => c.rows)?.rows?.map((r) => r.id));
+      const all = cardsFor(NOV, (n) => needOpen(n, account, 'everyone'));
+      expect(all.map((c) => c.id)).toEqual(NOV.cards.map((c) => c.id));
+      expect(all.find((c) => c.rows)?.rows?.map((r) => r.id)).toEqual(NOV.cards.find((c) => c.rows)?.rows?.map((r) => r.id));
       // Revo still for testers (config/app.revo unset): every card but Revo's.
-      const revoForTesters = cardsFor(CURRENT_RELEASE, (n) => needOpen(n, account, 'testers')).map((c) => c.id);
-      expect(revoForTesters).toEqual(CURRENT_RELEASE.cards.filter((c) => c.needs !== 'revo').map((c) => c.id));
+      const revoForTesters = cardsFor(NOV, (n) => needOpen(n, account, 'testers')).map((c) => c.id);
+      expect(revoForTesters).toEqual(NOV.cards.filter((c) => c.needs !== 'revo').map((c) => c.id));
     }
+  });
+
+  it('the next release is shown only to a tester in Revisely Dev, never to anyone in the required walkthrough', () => {
+    expect(releaseFor('required', true)).toBe(CURRENT_RELEASE);
+    expect(releaseFor('replay', false)).toBe(CURRENT_RELEASE);
+    expect(releaseFor('forced', false)).toBe(CURRENT_RELEASE);
+    expect(releaseFor('replay', true)).toBe(NEXT_RELEASE);
+    expect(releaseFor('forced', true)).toBe(NEXT_RELEASE);
+    expect(RELEASES).not.toContain(NEXT_RELEASE);
+  });
+
+  it('the mistake detection release, still dark: the store app shows only what everyone has (the search row)', () => {
+    // Outside Revisely Dev, Recite and Gaps are closed (lib/reciteLive/availability, lib/insightsGaps).
+    for (const account of [{}, { previewTester: false }, { previewTester: true }]) {
+      const shown = cardsFor(RECITE_RELEASE, (n) => needOpen(n, account, 'everyone'));
+      expect(shown.map((c) => c.id)).toEqual(['more']);
+      expect(shown[0].rows?.map((r) => r.id)).toEqual(['search']);
+    }
+    // Every card when its features are open: mistake detection first, then Insights, then the rest.
+    expect(cardsFor(RECITE_RELEASE, () => true).map((c) => c.id)).toEqual(['recite', 'marks', 'again', 'gaps', 'more']);
+    expect(RECITE_RELEASE.live).toBe(false);
   });
 
   it('a release switched on needs nothing that is still for testers only', () => {

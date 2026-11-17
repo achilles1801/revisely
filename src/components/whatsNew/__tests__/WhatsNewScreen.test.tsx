@@ -16,18 +16,18 @@ import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import { WhatsNewScreen } from '../WhatsNewScreen';
 import { ThemeProvider } from '../../../context/ThemeContext';
 import { DesignProvider } from '../../../design/DesignContext';
-import { CURRENT_RELEASE } from '../../../lib/help/whatsNew';
+import { CURRENT_RELEASE, type WhatsNewRelease } from '../../../lib/help/whatsNew';
 import { loadWhatsNew, resetWhatsNewForTests, setForcedAtLaunch } from '../../../lib/whatsNew/state';
 
 const KEY = '@revisely_whats_new:v1:u1';
 const titles = CURRENT_RELEASE.cards.map((c) => c.title);
 
-async function show(mode: 'required' | 'forced' | 'replay', onClose = jest.fn()) {
+async function show(mode: 'required' | 'forced' | 'replay', onClose = jest.fn(), release: WhatsNewRelease = CURRENT_RELEASE) {
   await loadWhatsNew('u1');
   const view = render(
     <DesignProvider initial={{}}>
       <ThemeProvider>
-        <WhatsNewScreen mode={mode} onClose={onClose} />
+        <WhatsNewScreen mode={mode} onClose={onClose} release={release} />
       </ThemeProvider>
     </DesignProvider>,
   );

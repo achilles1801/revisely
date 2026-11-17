@@ -13,6 +13,18 @@ export interface PagerProps {
   onAdvance?: (leftPage: number, currentPage: number) => void;
   onReachEnd?: (lastPage: number, bySwipe: boolean) => void;
   endCard?: React.ReactNode;
+  /** Behind the page's ink, and beside it (the reader's Recite layers): drawn for the page shown, at scale 1. */
+  pageUnderlay?: (page: number, scale: number) => React.ReactNode;
+  pageAccessories?: (page: number, scale: number) => React.ReactNode;
+  /** A tap at a point of the page (bounds units); the scenario taps a word with `tapPoint`. */
+  onTapPoint?: (page: number, x: number, y: number, toWindow: (r: { x0: number; y0: number; x1: number; y1: number }) => Box) => boolean;
+}
+
+interface Box {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
 interface PagerHandle {
@@ -47,8 +59,18 @@ export const MushafPager = forwardRef<PagerHandle, PagerProps>(function MushafPa
         <Text testID="pager-pages">{props.pages.join(',')}</Text>
       </Pressable>
       {props.endCard}
+      {state.current != null ? props.pageUnderlay?.(state.current, 1) : null}
+      {state.current != null ? props.pageAccessories?.(state.current, 1) : null}
     </View>
   );
 });
+
+/** A finger on the page at (x, y) in its bounds units: what the reader does with a tap there (true: it took it). */
+export function tapPoint(x: number, y: number): boolean {
+  const state = pagerState();
+  if (state.current == null || !state.props?.onTapPoint) return false;
+  const toWindow = (r: { x0: number; y0: number; x1: number; y1: number }): Box => ({ x: r.x0, y: r.y0, width: r.x1 - r.x0, height: r.y1 - r.y0 });
+  return state.props.onTapPoint(state.current, x, y, toWindow);
+}
 
 export default { MushafPager };

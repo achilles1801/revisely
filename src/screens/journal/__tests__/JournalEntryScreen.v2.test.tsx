@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert, Keyboard, Modal } from 'react-native';
+import { Alert, DeviceEventEmitter, Keyboard, Modal, ScrollView } from 'react-native';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
@@ -662,14 +662,79 @@ describe('[LOG-1, LOG-2] a change already written stays until the server shows i
   });
 });
 
-describe('the keyboard: a Done key puts it away', () => {
-  it('the text and minutes fields carry the Done bar, which dismisses the keyboard', async () => {
+// On an iPhone SE an edited note's Save was under the keyboard, and nothing on screen put the keyboard away:
+// the bar above it (InputAccessoryView) didn't show on iOS 26, and a tap outside the field didn't blur it
+// (E2E runs 43873599186 and 43904405319, Nov 16 2026).
+describe('the keyboard: Done in the top bar, and the buttons above the keyboard as it opens', () => {
+  // An iPhone SE's points: the list from y 68, the keyboard from 405.
+  const keyboard = (event: string, screenY: number, height: number) =>
+    act(() => {
+      DeviceEventEmitter.emit(event, { endCoordinates: { height, screenY, screenX: 0, width: 375 }, duration: 0 });
+    });
+  // Where each part is on screen, by testID (React Native's test mocks share one measureInWindow).
+  const frames: Record<string, [number, number, number, number]> = {
+    'journal-v2': [0, 68, 375, 599],
+    'journal-composer-frame': [0, 216, 375, 232],
+    'journal-actions': [70, 402, 289, 30],
+  };
+  const MockNativeMethods = require('react-native/jest/MockNativeMethods').default;
+  let scrollTo: jest.SpyInstance;
+  beforeEach(() => {
+    MockNativeMethods.measureInWindow.mockImplementation(function (this: { props: { testID?: string } }, cb: (...f: number[]) => void) {
+      const f = frames[this.props.testID ?? ''];
+      if (f) cb(...f);
+    });
+    jest.spyOn(ScrollView.prototype as any, 'getNativeScrollRef').mockImplementation(function (this: unknown) {
+      return this;
+    });
+    scrollTo = jest.spyOn(ScrollView.prototype as any, 'scrollTo');
+  });
+  afterEach(() => {
+    MockNativeMethods.measureInWindow.mockReset();
+    jest.restoreAllMocks();
+  });
+
+  it('Done shows in the top bar only while the keyboard is up for the composer, and puts it away', async () => {
     await renderScreen();
-    expect(screen.getByTestId('journal-text-input').props.inputAccessoryViewID).toBe('journal-keyboard-done');
+    expect(screen.queryByTestId('journal-keyboard-done')).toBeNull();
+    fireEvent(screen.getByTestId('journal-text-input'), 'focus');
+    keyboard('keyboardWillShow', 405, 262);
     const dismiss = jest.spyOn(Keyboard, 'dismiss');
     fireEvent.press(screen.getByTestId('journal-keyboard-done'));
     expect(dismiss).toHaveBeenCalled();
-    dismiss.mockRestore();
+    fireEvent(screen.getByTestId('journal-text-input'), 'blur');
+    keyboard('keyboardWillHide', 667, 0);
+    expect(screen.queryByTestId('journal-keyboard-done')).toBeNull();
+    // The old bar above the keyboard is gone: no field points at it.
+    expect(screen.getByTestId('journal-text-input').props.inputAccessoryViewID).toBeUndefined();
+  });
+
+  it('editing a note on a small phone: the list scrolls once as the keyboard opens, so Save sits above it', async () => {
+    mockService.getJournalEntry.mockResolvedValue(journalDayFromEntries('2026-10-20', [memo]));
+    await renderScreen();
+    holdNote('n1');
+    await chooseMenuAction('edit');
+    fireEvent(screen.getByTestId('journal-text-input'), 'focus');
+    keyboard('keyboardWillShow', 405, 262);
+    keyboard('keyboardDidShow', 405, 262);
+    await act(async () => {});
+    // Save's bottom (432) and a 12-point margin above the keyboard (405): 39 points up.
+    expect(scrollTo).toHaveBeenCalledTimes(1);
+    expect(scrollTo).toHaveBeenCalledWith({ y: 39, animated: true });
+    // Not on every keystroke.
+    fireEvent.changeText(screen.getByTestId('journal-text-input'), '2/3 p3');
+    fireEvent.changeText(screen.getByTestId('journal-text-input'), '2/3 p3 and 4');
+    await act(async () => {});
+    expect(scrollTo).toHaveBeenCalledTimes(1);
+  });
+
+  it("a keyboard that opens for something else (not the composer's fields) moves nothing", async () => {
+    await renderScreen();
+    keyboard('keyboardWillShow', 405, 262);
+    keyboard('keyboardDidShow', 405, 262);
+    await act(async () => {});
+    expect(scrollTo).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('journal-keyboard-done')).toBeNull();
   });
 });
 

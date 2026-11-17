@@ -37,6 +37,13 @@
  *                                the update for everyone, without an update, in
  *                                case a card turns out wrong. Phones read it at
  *                                launch and back in front after 10 minutes.
+ *   reciteCheckOff               The phones' kill switch for mistake detection (the
+ *                                release plan, checker-prod.md, "Switching it off"):
+ *                                true hides Recite and Mark mistakes, and the mic
+ *                                records as before. The checker's own switch is
+ *                                PAUSED on its Cloud Run services, which refuses new
+ *                                takes within a minute; this one reaches phones as
+ *                                whatsNewOff does. Unset: on.
  *
  * Run from the functions/ directory:
  *   GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-admin.json \
@@ -51,6 +58,8 @@
  *   ... node scripts/set-app-config.js --revo-patterns off       # phones stop sending them
  *   ... node scripts/set-app-config.js --whats-new off           # stop the What's new walkthrough
  *   ... node scripts/set-app-config.js --whats-new on            # let it show again
+ *   ... node scripts/set-app-config.js --recite-check off        # hide Recite and Mark mistakes on phones
+ *   ... node scripts/set-app-config.js --recite-check on         # offer them again
  *
  * A minimum above what the store has now is refused without --force: the app
  * would ignore it until the store caught up, then block everyone below it at once.
@@ -99,6 +108,11 @@ function parseArgs(argv) {
       if (!WHATS_NEW.includes(v)) throw new Error(`--whats-new needs on or off (got ${v ?? 'nothing'})`);
       opts.whatsNew = v;
     }
+    else if (a === '--recite-check') {
+      const v = argv[++i];
+      if (!WHATS_NEW.includes(v)) throw new Error(`--recite-check needs on or off (got ${v ?? 'nothing'})`);
+      opts.reciteCheck = v;
+    }
     else if (a === '--force') opts.force = true;
     else if (a === '--clear-min') opts.clearMin = true;
     else if (flags[a]) {
@@ -124,7 +138,7 @@ async function main() {
   } catch (err) {
     console.error(err.message);
     console.error(
-      'Usage: node scripts/set-app-config.js --show | [--min-ios V] [--min-android V] [--latest-android V [--latest-android-code N]] [--clear-min] [--revo testers|everyone|off] [--revo-patterns on|off] [--whats-new on|off] [--force]',
+      'Usage: node scripts/set-app-config.js --show | [--min-ios V] [--min-android V] [--latest-android V [--latest-android-code N]] [--clear-min] [--revo testers|everyone|off] [--revo-patterns on|off] [--whats-new on|off] [--recite-check on|off] [--force]',
     );
     process.exit(1);
   }
@@ -151,6 +165,7 @@ async function main() {
           revo: REVO.includes(data.revo) ? data.revo : 'testers (unset)',
           revoPatterns: data.revoPatterns === true ? 'on' : 'off',
           whatsNew: data.whatsNewOff === true ? 'off' : 'on',
+          reciteCheck: data.reciteCheckOff === true ? 'off' : 'on',
         },
         null,
         2,
@@ -158,7 +173,8 @@ async function main() {
     );
     console.log(`App Store has ${store ?? 'unknown'}.`);
   };
-  const changes = opts.minIos || opts.minAndroid || opts.latestAndroid || opts.clearMin || opts.revo || opts.revoPatterns || opts.whatsNew;
+  const changes = opts.minIos || opts.minAndroid || opts.latestAndroid || opts.clearMin || opts.revo || opts.revoPatterns || opts.whatsNew
+    || opts.reciteCheck;
   if (opts.show || !changes) {
     show(current);
     return;
@@ -193,6 +209,7 @@ async function main() {
   if (opts.revo) update.revo = opts.revo;
   if (opts.revoPatterns) update.revoPatterns = opts.revoPatterns === 'on' ? true : FieldValue.delete();
   if (opts.whatsNew) update.whatsNewOff = opts.whatsNew === 'off' ? true : FieldValue.delete();
+  if (opts.reciteCheck) update.reciteCheckOff = opts.reciteCheck === 'off' ? true : FieldValue.delete();
   if (opts.clearMin && (opts.minIos || opts.minAndroid)) {
     console.error('--clear-min with a minimum: pick one.');
     process.exit(1);

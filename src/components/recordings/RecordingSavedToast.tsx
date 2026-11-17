@@ -5,6 +5,7 @@ import { say, useScreenReaderOn } from '../reciteLive/a11y';
 import { navigateToActivityDay } from '../../navigation/navigationRef';
 import { RecordingUndo, releaseUpload, undoRecording } from '../../lib/recordings';
 import { logger } from '../../lib/logger';
+import { t } from '../../i18n';
 
 /** A recording just saved, as the note after it knows it. */
 export interface SavedRecording {
@@ -40,7 +41,7 @@ export function RecordingSavedToast({
   quietRef.current = quiet;
   const shown = saved?.recordingId ?? null;
   useEffect(() => {
-    if (shown && screenReader && !quietRef.current) say('Recording saved. Undo and View are at the bottom of the screen.');
+    if (shown && screenReader && !quietRef.current) say(t('recordings.saved.announce'));
   }, [shown, screenReader]);
 
   const undo = () => {
@@ -50,26 +51,26 @@ export function RecordingSavedToast({
       .then((result) => {
         if (result === 'backedUp') {
           Alert.alert(
-            "Couldn't undo",
-            'Part of this recording is backed up already. You can delete the recording from its day in Activity.',
+            t('recordings.saved.undoFailed'),
+            t('recordings.saved.undoBackedUp'),
           );
           return;
         }
-        if (screenReader && !quietRef.current) say('Recording deleted');
+        if (screenReader && !quietRef.current) say(t('recordings.saved.deleted'));
       })
       .catch((err) => {
         logger.error('Could not undo a recording', err);
-        Alert.alert("Couldn't undo", 'Please try again from its day in Activity.');
+        Alert.alert(t('recordings.saved.undoFailed'), t('recordings.saved.undoRetry'));
       });
   };
 
   return (
     <UndoToast
       visible={!!saved}
-      message="Recording saved"
-      actionLabel="View"
+      message={t('recordings.saved.toast')}
+      actionLabel={t('recordings.saved.view')}
       duration={recordingSavedMs(screenReader)}
-      secondAction={{ label: 'Undo', onPress: undo, testID: 'recording-saved-undo' }}
+      secondAction={{ label: t('common.undo'), onPress: undo, testID: 'recording-saved-undo' }}
       onUndo={() => {
         const s = saved;
         onClose();

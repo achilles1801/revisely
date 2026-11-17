@@ -1,0 +1,8 @@
+# Cloud Build, in the production project, as PROMOTE_SA: copies one image, by digest, from dev's repository into
+# production's. add-tag copies the manifest as it is, so the digest in production is the digest dev ran.
+steps:
+  - name: gcr.io/google.com/cloudsdktool/google-cloud-cli:slim
+    entrypoint: gcloud
+    args: [container, images, add-tag, '${_SRC}', '${_DST}', --quiet]
+options:
+  logging: CLOUD_LOGGING_ONLY

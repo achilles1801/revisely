@@ -85,6 +85,8 @@ test('findCaptures takes the last attempt that took the screenshot', () => {
   put('android/02-revision-session-retry1/run/2026-11-07_011030/02-revision-session/takeScreenshot/02-home-done.png');
   put('android/02-revision-session/run/2026-11-07_010930/02-revision-session/takeScreenshot/02-session-page.png');
   put('ios/01-onboarding/run/x/01-onboarding/takeScreenshot/01-home-day-one.png');
+  // tap-to-open.yaml's evidence of a lost tap: not a screen to compare.
+  put('android/02-revision-session/run/2026-11-07_010930/02-revision-session/takeScreenshot/lost-tap-1-revo-button.png');
   const found = findCaptures(dir, 'android');
   assert.deepEqual(
     found.map((c) => [c.name, c.flow, c.attempt]),

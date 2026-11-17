@@ -102,6 +102,13 @@ export type LiveFailure =
    */
   | 'check_locked'
   | 'premium_required'
+  /** A service that doesn't take this level (recite-check-pair): the socket starts the take on recite-check instead. */
+  | 'level_elsewhere'
+  /** Production's checker (recite-server-prod-plan.md): its kill switch (`PAUSED`), and App Check refused once it's on. */
+  | 'paused'
+  | 'app_check'
+  /** The phone's own, as `offline`: every instance was busy (Cloud Run's 429/503, or the socket never opened). */
+  | 'busy'
   | 'offline';
 
 export type LiveEvent =
@@ -111,14 +118,21 @@ export type LiveEvent =
    * (still searching after about 8 s of speech) isn't read: a search that never finds the start fails silently
    * (Majd, Nov 14 2026), so the phone shows nothing for it.
    */
-  | { type: 'locked'; w: number; s: number; a: number; t?: number }
+  | { type: 'locked'; w: number; s: number; a: number; t?: number; where?: 'page' | 'quran' }
   | { type: 'at'; w: number; t?: number }
+  /** Something other than word `w` (the next to say) is being said in its slot: the hidden view's red cover (draft 7). */
+  | { type: 'off'; w: number; t?: number }
   | { type: 'said'; upTo: number }
   | { type: 'mark'; mark: Mark }
   | { type: 'unmark'; id: string; why: 'corrected' | 'retracted' }
   | { type: 'ayah'; s: number; a: number }
   | { type: 'score'; score: LiveScore }
   | { type: 'done'; result: FinalResult }
+  /**
+   * Where the slips went, after `done` (contract draft 8): only on a take started with `namesAfter`, whose `done` comes
+   * without `into` so the summary needn't wait for it. `names` is empty when nothing was named.
+   */
+  | { type: 'into'; names: { id: string; into: MarkInto }[] }
   | { type: 'error'; reason: LiveFailure };
 
 const KINDS: MarkKind[] = ['word', 'skipped', 'added', 'harakat', 'letter', 'tajweed'];
@@ -137,6 +151,9 @@ const FAILURES: LiveFailure[] = [
   'server',
   'check_locked',
   'premium_required',
+  'level_elsewhere',
+  'paused',
+  'app_check',
 ];
 
 /** The server refused marking mistakes for want of Premium (either name). */
@@ -257,10 +274,20 @@ export function parseEvent(raw: unknown): LiveEvent | null {
       };
     case 'locked':
       return isWord(x.w) && isNum(x.s) && isNum(x.a)
-        ? { type: 'locked', w: x.w, s: x.s, a: x.a, ...(isNum(x.t) ? { t: x.t } : {}) }
+        ? {
+            type: 'locked',
+            w: x.w,
+            s: x.s,
+            a: x.a,
+            ...(isNum(x.t) ? { t: x.t } : {}),
+            // Protocol 7: found on the open page, or elsewhere in the Qur'an.
+            ...(x.where === 'page' || x.where === 'quran' ? { where: x.where } : {}),
+          }
         : null;
     case 'at':
       return isWord(x.w) ? { type: 'at', w: x.w, ...(isNum(x.t) ? { t: x.t } : {}) } : null;
+    case 'off':
+      return isWord(x.w) ? { type: 'off', w: x.w, ...(isNum(x.t) ? { t: x.t } : {}) } : null;
     case 'said':
       return isWord(x.upTo) ? { type: 'said', upTo: x.upTo } : null;
     case 'mark': {
@@ -281,6 +308,17 @@ export function parseEvent(raw: unknown): LiveEvent | null {
     case 'done': {
       const result = parseFinal(x.result);
       return result ? { type: 'done', result } : null;
+    }
+    case 'into': {
+      // A malformed entry is dropped, never the rest (as a malformed `into` on a mark is).
+      if (!Array.isArray(x.names)) return null;
+      const names: { id: string; into: MarkInto }[] = [];
+      for (const n of x.names as unknown[]) {
+        const r = n && typeof n === 'object' ? (n as Record<string, unknown>) : null;
+        const into = r ? parseInto(r.into) : null;
+        if (r && typeof r.id === 'string' && r.id && into) names.push({ id: r.id, into });
+      }
+      return { type: 'into', names };
     }
     case 'error': {
       const reason = (x.reason ?? x.error) as LiveFailure;
@@ -309,6 +347,16 @@ export function markGroup(mark: Pick<Mark, 'kind'>): MarkGroup {
 }
 /** Which of a word's marks shows when it has several: a word mistake over a slip over a tajweed note. */
 export const GROUP_RANK: Record<MarkGroup, number> = { tajweed: 0, slip: 1, word: 2 };
+
+/** One highlight per word: its strongest mark, a word mistake over a slip over a tajweed note (RECITE-2). */
+export function strongestByWord(marks: readonly Mark[]): Map<number, Mark> {
+  const byWord = new Map<number, Mark>();
+  for (const m of marks) {
+    const had = byWord.get(m.w);
+    if (!had || GROUP_RANK[markGroup(m)] > GROUP_RANK[markGroup(had)]) byWord.set(m.w, m);
+  }
+  return byWord;
+}
 
 /** Marks the checker's `mistakes` has counted (everything but tajweed notes; "not clear" ones too, until `unclear`). */
 export const countsAsMistake = (mark: Pick<Mark, 'kind'>) => mark.kind !== 'tajweed';

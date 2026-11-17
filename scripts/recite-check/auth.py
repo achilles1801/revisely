@@ -1,14 +1,18 @@
 """Who is asking: a Firebase ID token for this project, and the account's previewTester flag (read from Firestore
 with the service's own identity; clients can't write that field)."""
+import base64
 import datetime
+import json
 import os
 import threading
 import time
 
 import cachecontrol
 import google.auth
+import google.auth.jwt
 import google.auth.transport.requests
 import requests
+import rsa
 from google.oauth2 import id_token
 
 PROJECT = os.environ.get('PROJECT', 'revisely-dev')
@@ -20,6 +24,7 @@ _testers = {}  # uid -> (is a tester, when read)
 TESTER_TTL = 600
 _checks = {}  # uid -> (has Check, when read)
 CHECK_TTL = 60  # a grant (or a revocation) takes effect within a minute
+CHECK_TTL_NO = 10  # a no is trusted for less: a grant written just after sign-up (early access) unlocks within seconds
 # The entitlements/{uid} field that unlocks Check (apply-support.md draft 2: `premium`, Check being a Premium feature;
 # draft 1 had `check`). Present, and `until` null or later; the `grants` map beside it is the writers' bookkeeping.
 ENTITLEMENT = os.environ.get('ENTITLEMENT', 'premium')
@@ -92,7 +97,7 @@ def has_check(uid, now=None):
     a purchase); any source counts. Read with the service's own identity, as previewTester is."""
     hit = _checks.get(uid)
     t = time.time() if now is None else now
-    if hit and t - hit[1] < CHECK_TTL:
+    if hit and t - hit[1] < (CHECK_TTL if hit[0] else CHECK_TTL_NO):
         return hit[0]
     url = (f'https://firestore.googleapis.com/v1/projects/{PROJECT}/databases/(default)/documents/entitlements/{uid}'
            f'?mask.fieldPaths={ENTITLEMENT}')
@@ -117,6 +122,79 @@ def check_open(field, now):
     except ValueError:
         return False
     return when > now
+
+
+# ------------------------------------------------------------------ App Check
+
+APP_CHECK_JWKS = 'https://firebaseappcheck.googleapis.com/v1/jwks'
+APP_CHECK_KEYS_TTL = 6 * 3600  # Firebase: cache the keys no longer than 6 hours
+APP_CHECK_REFETCH = 60         # an unknown key id fetches the keys again, at most once a minute
+_jwks = {'keys': {}, 'at': None, 'tried': None}  # kid -> PEM; when fetched; when last tried
+_jwks_lock = threading.Lock()
+
+
+def b64url(s):
+    return base64.urlsafe_b64decode(s + '=' * (-len(s) % 4))
+
+
+def pem_of(jwk):
+    """An RSA JWK (n, e) as a PKCS#1 PEM public key, which google-auth's verifier reads."""
+    n = int.from_bytes(b64url(jwk['n']), 'big')
+    e = int.from_bytes(b64url(jwk['e']), 'big')
+    return rsa.PublicKey(n, e).save_pkcs1().decode()
+
+
+def app_check_keys(kid, now):
+    """App Check's public keys {kid: PEM}, fetched when older than 6 hours or when `kid` is new to us."""
+    with _jwks_lock:
+        fresh = _jwks['at'] is not None and now - _jwks['at'] < APP_CHECK_KEYS_TTL
+        recently = _jwks['tried'] is not None and now - _jwks['tried'] < APP_CHECK_REFETCH
+        if (not fresh or kid not in _jwks['keys']) and not recently:
+            _jwks['tried'] = now
+            try:
+                r = call(requests.get, APP_CHECK_JWKS, timeout=10)
+                keys = {k['kid']: pem_of(k) for k in r.json().get('keys', [])
+                        if k.get('kty') == 'RSA' and k.get('kid') and k.get('n') and k.get('e')}
+            except (Unreachable, ValueError, KeyError, TypeError):
+                if not _jwks['keys']:
+                    raise Unreachable('App Check keys') from None
+                keys = None  # keep the keys we have: a short outage at Google doesn't refuse everyone
+            if keys:
+                _jwks['keys'], _jwks['at'] = keys, now
+        return dict(_jwks['keys'])
+
+
+def app_check(token, project_number, now=None):
+    """'ok', 'missing' or 'bad': whether `token` is a Firebase App Check token for this project (the project's number),
+    signed by App Check (RS256, its published keys), from App Check, for this project, and not expired. The token's
+    subject (the app id) isn't needed: any of the project's registered apps may call. Keys that can't be fetched are
+    Unreachable, never 'bad': the caller decides what that means."""
+    if not token:
+        return 'missing'
+    if not isinstance(token, str) or len(token) > 8192 or token.count('.') != 2:
+        return 'bad'
+    t = time.time() if now is None else now
+    try:
+        header = json.loads(b64url(token.split('.')[0]))
+    except (ValueError, TypeError):
+        return 'bad'
+    if not isinstance(header, dict) or header.get('alg') != 'RS256' or header.get('typ') != 'JWT' \
+            or not isinstance(header.get('kid'), str):
+        return 'bad'
+    keys = app_check_keys(header['kid'], t)
+    if header['kid'] not in keys:
+        return 'bad'
+    try:
+        claims = google.auth.jwt.decode(token, certs={header['kid']: keys[header['kid']]}, verify=True,
+                                        clock_skew_in_seconds=10)
+    except Exception:
+        return 'bad'
+    aud = claims.get('aud')
+    aud = aud if isinstance(aud, list) else [aud]
+    if claims.get('iss') != f'https://firebaseappcheck.googleapis.com/{project_number}' \
+            or f'projects/{project_number}' not in aud:
+        return 'bad'
+    return 'ok'
 
 
 class Limiter:

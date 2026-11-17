@@ -7,6 +7,7 @@ summed up as Markdown. Numbers only, as the lines are.
   python digest.py --post          also a comment on the "Recitation checker health" issue (label recite-health),
                                    made if missing (gh, signed in to this repository)
   python digest.py --file F.json   lines from a file (a JSON list of log entries) instead of Cloud Logging
+  python digest.py --project revision-buddy-3a398   production's checker (once it exists), posted on its own issue
 
 Reads revisely-dev's logs with `gcloud logging read` (logging.viewer is enough). README, "Health".
 """
@@ -17,6 +18,7 @@ import subprocess
 import sys
 
 PROJECT = 'revisely-dev'
+PROD = 'revision-buddy-3a398'
 SERVICES = ('recite-check', 'recite-check-pair')  # every level, one take an instance; Recite and Words & Harakat, two
 REPO = 'achilles1801/revisely'
 LABEL = 'recite-health'
@@ -27,12 +29,12 @@ PRICE_VCPU_S, PRICE_GIB_S = 0.000024, 0.0000025
 FREE_VCPU_S, FREE_GIB_S = 180_000, 360_000  # a month, per billing account (shared with everything else on it)
 
 
-def read_logs(days):
+def read_logs(days, project=PROJECT):
     since = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=days)).strftime('%Y-%m-%dT%H:%M:%SZ')
     names = ' OR '.join(f'"{s}"' for s in SERVICES)
     q = (f'resource.type="cloud_run_revision" AND resource.labels.service_name=({names}) '
          f'AND jsonPayload.health:* AND timestamp>="{since}"')
-    out = subprocess.run(['gcloud', 'logging', 'read', q, '--project', PROJECT, '--format', 'json', '--limit',
+    out = subprocess.run(['gcloud', 'logging', 'read', q, '--project', project, '--format', 'json', '--limit',
                           '100000'], check=True, capture_output=True, text=True).stdout
     return json.loads(out or '[]')
 
@@ -88,7 +90,20 @@ def f(x, unit='', nd=2):
     return '–' if x is None else f'{x:.{nd}f}{unit}'
 
 
-def summarize(entries, days, now=None):
+def stop_to_done(live):
+    """The summary's wait after Stop (`done_s`), for the takes that mark mistakes (Recite's is the words alone), and
+    with namesAfter how long the names came after it (`names_after_ms`)."""
+    marked = [p.get('done_s') for p in live if p.get('level') != 'recite' and p.get('done_s') is not None]
+    names = [p.get('names_after_ms') / 1000 for p in live if p.get('names_after_ms') is not None]
+    line = (f"- Stop → the summary (`done`), Mark mistakes: median {f(q(marked, .5), ' s')}, p90 {f(q(marked, .9), ' s')}, "
+            f"worst {f(q(marked, 1), ' s')} ({len(marked)} takes)")
+    if names:
+        line += (f"; the names after it (namesAfter, {len(names)} takes): median {f(q(names, .5), ' s')}, "
+                 f"worst {f(q(names, 1), ' s')}")
+    return line + '.'
+
+
+def summarize(entries, days, now=None, project=PROJECT):
     """The digest's Markdown."""
     now = now or dt.datetime.now(dt.timezone.utc)
     rows = list(lines(entries))
@@ -102,7 +117,8 @@ def summarize(entries, days, now=None):
     labels = [p for k, p, *_ in rows if k == 'label']
     revs = sorted({r for *_, r, _ in rows if r})
 
-    out = [f'## Recitation checker, the last {days} days (to {now:%Y-%m-%d %H:%M} UTC)', '',
+    where = '' if project == PROJECT else ' in production' if project == PROD else f' in {project}'
+    out = [f'## Recitation checker{where}, the last {days} days (to {now:%Y-%m-%d %H:%M} UTC)', '',
            f'Revisions: {", ".join(revs) or "none"}. Numbers only, from the checker\'s health lines '
            f'(`scripts/recite-check/health.py`).', '']
     if not rows:
@@ -111,7 +127,14 @@ def summarize(entries, days, now=None):
     audio_h = sum(p.get('audio_s', 0) for p in takes) / 3600
     by_level = {}
     for p in takes:
-        by_level.setdefault(f"{p.get('kind')} · {p.get('level')}" + (' (pair)' if p.get('_pair') else ''), []).append(p)
+        by_level.setdefault(f"{p.get('kind')} · {p.get('level')}" + (f" · {p['ear']}" if p.get('ear') else '')
+                            + (' (pair)' if p.get('_pair') else ''), []).append(p)
+    # the model's CPU per second of audio, per model: v6 pads each window (about 20% more than the released model), so
+    # instance speed is read within one model. A line from before `ear` was on the released model.
+    by_ear = {}
+    for p in takes:
+        if p.get('model_per_s') is not None:
+            by_ear.setdefault((p.get('ear') or 'released').split('+')[0], []).append(p['model_per_s'])
     out += ['### Takes', '', '| | Takes | Audio | p50 length | Kept | Marks (median) |', '| --- | --- | --- | --- | --- | --- |']
     for name, ps in sorted(by_level.items()):
         kept = [p['kept'] for p in ps if 'kept' in p]
@@ -135,9 +158,10 @@ def summarize(entries, days, now=None):
     out += ['### Keeping up with the reciter (live)', '',
             f"- Audio waiting before its events went out: median of takes' p50 {f(q([p.get('lag_p50') for p in live], .5), ' s')}, "
             f"median p90 {f(q([p.get('lag_p90') for p in live], .5), ' s')}, worst {f(q([p.get('lag_max') for p in live], 1), ' s')}.",
-            f"- Instance speed (the model's CPU per second of audio; Cloud Run's CPUs differ): "
-            f"{f(q([p.get('model_per_s') for p in takes], 0), '', 3)}–{f(q([p.get('model_per_s') for p in takes], 1), '', 3)}"
-            f", median {f(q([p.get('model_per_s') for p in takes], .5), '', 3)}. Pure-Python bench at start: "
+            stop_to_done(live),
+            f"- Instance speed (the model's CPU per second of audio; Cloud Run's CPUs differ): " + ('; '.join(
+                f"{ear} {f(q(xs, 0), '', 3)}–{f(q(xs, 1), '', 3)}, median {f(q(xs, .5), '', 3)}"
+                for ear, xs in sorted(by_ear.items())) or '–') + ". Pure-Python bench at start: "
             f"{f(q([p.get('bench_ms') for p in inst], 0), ' ms', 0)}–{f(q([p.get('bench_ms') for p in inst], 1), ' ms', 0)}.",
             '- CPU per second of audio, median by level: ' + (', '.join(
                 f"{name} {f(q([p.get('cpu_per_s') for p in ps], .5), '', 2)}" for name, ps in sorted(by_level.items()))
@@ -150,6 +174,9 @@ def summarize(entries, days, now=None):
             f"- Dropped (the phone went and never came back here): {len(drop)}"
             + (f" ({', '.join(f'{k} {v}' for k, v in sorted(count(drop, 'at').items()))})" if drop else '') + '.',
             '- Refused: ' + (', '.join(f'{k} {v}' for k, v in sorted(count(refused, 'route', 'reason').items())) or 'none') + '.',
+            *(['- App Check (APP_CHECK log or on), takes: '
+               + ', '.join(f'{k} {v}' for k, v in sorted(count(checked, 'appcheck').items())) + '.']
+              if (checked := [p for p in takes if p.get('appcheck')]) else []),
             '- Errors: ' + (', '.join(f'{k} {v}' for k, v in sorted(count(errors, 'route').items())) or 'none') + '.',
             '- "Not a mistake": ' + (', '.join(f'{k} {v}' for k, v in sorted(count(labels, 'kind').items())) or 'none') + '.',
             '- Why live takes ended: ' + (', '.join(f'{k} {v}' for k, v in sorted(count(live, 'why').items())) or '–') + '.',
@@ -176,17 +203,20 @@ def count(ps, *keys):
     return out
 
 
-def post(body):
+def post(body, project=PROJECT):
+    """A comment on the digest's issue: dev's, or (production) its own issue, label recite-health-prod."""
     gh = ['gh', '-R', REPO]
-    found = subprocess.run(gh + ['issue', 'list', '--label', LABEL, '--state', 'open', '--json', 'number', '--jq',
+    prod = project == PROD
+    label, title = (LABEL + '-prod', TITLE.replace('health', 'health, production')) if prod else (LABEL, TITLE)
+    found = subprocess.run(gh + ['issue', 'list', '--label', label, '--state', 'open', '--json', 'number', '--jq',
                                  '.[0].number'], check=True, capture_output=True, text=True).stdout.strip()
     if not found:
-        subprocess.run(gh + ['label', 'create', LABEL, '--color', '5319e7', '--description',
-                             'The recitation checker (dev): its weekly digest', '--force'], check=True,
-                       capture_output=True)
-        url = subprocess.run(gh + ['issue', 'create', '--title', TITLE, '--label', LABEL, '--body',
+        subprocess.run(gh + ['label', 'create', label, '--color', '5319e7', '--description',
+                             f'The recitation checker ({"production" if prod else "dev"}): its weekly digest',
+                             '--force'], check=True, capture_output=True)
+        url = subprocess.run(gh + ['issue', 'create', '--title', title, '--label', label, '--body',
                                    'The recitation checker\'s weekly digest (`scripts/recite-check/digest.py`): '
-                                   'numbers only, from revisely-dev\'s logs. Dev only.'],
+                                   f'numbers only, from {project}\'s logs.' + ('' if prod else ' Dev only.')],
                              check=True, capture_output=True, text=True).stdout.strip()
         found = url.rstrip('/').rsplit('/', 1)[-1]
     subprocess.run(gh + ['issue', 'comment', found, '--body-file', '-'], input=body, check=True, text=True,
@@ -199,12 +229,13 @@ def main():
     ap.add_argument('--days', type=int, default=7)
     ap.add_argument('--post', action='store_true')
     ap.add_argument('--file')
+    ap.add_argument('--project', default=PROJECT, help=f'whose checker: {PROJECT} (default) or {PROD}')
     a = ap.parse_args()
-    entries = json.load(open(a.file)) if a.file else read_logs(a.days)
-    body = summarize(entries, a.days)
+    entries = json.load(open(a.file)) if a.file else read_logs(a.days, a.project)
+    body = summarize(entries, a.days, project=a.project)
     print(body)
     if a.post:
-        print(f'\nposted on #{post(body)}', file=sys.stderr)
+        print(f'\nposted on #{post(body, a.project)}', file=sys.stderr)
 
 
 if __name__ == '__main__':

@@ -6,12 +6,26 @@
 // from there is sent again, with each seek, dismissal and the end at the point in the audio where it first went. The
 // checker then sends the same events again (on another instance it re-runs the take), which the live state applies
 // as snapshots and by id, so nothing counts twice.
+//
+// Two services (recite-contract.md, "Two services"; Majd approved Nov 15 2026): the light levels (Recite, and Words &
+// harakat with letters off) go to recite-check-pair, two takes an instance; everything else to recite-check. A take the
+// pair service refuses (`level_elsewhere`) or can't start (unreachable, or its 403 while it is private) starts again on
+// recite-check, with no resume; once a service has said `ready`, a resume goes back to it. A pair service that couldn't
+// start a take, or whose /health refused (lib/reciteLive/pairService), is passed over for an hour.
 
 import { LiveEvent, parseEvent } from './contract';
+import { pairClosed, pairOpen } from './pairService';
 import type { ClientFrame, LiveConnect, LiveConnection, LiveHandlers, StartFrame } from './feed';
 
 /** The checker's live endpoint (the same Cloud Run service as lib/reciteCheck/service). */
 export const RECITE_LIVE_URL = 'wss://recite-check-433792838929.us-east1.run.app/live';
+/** recite-check-pair's (the same image and protocol): Recite and Words & harakat without letters only. */
+export const RECITE_PAIR_LIVE_URL = 'wss://recite-check-pair-433792838929.us-east1.run.app/live';
+
+/** Whether recite-check-pair takes this take: what the server calls `recite` or `harakat` (health.level). */
+export function pairTakes(start: StartFrame): boolean {
+  return start.follow === true || (start.tajweed === false && start.letters === false);
+}
 
 /** The take's audio rate (16 kHz mono). */
 const SAMPLE_RATE_HZ = 16_000;
@@ -19,6 +33,11 @@ const SAMPLE_RATE_HZ = 16_000;
 const RESEND_SAMPLES = 16_000;
 /** Tries to reconnect before giving up, and the waits between them. */
 const RETRY_WAITS_MS = [500, 1500, 4000];
+/**
+ * A take started with `namesAfter` (contract draft 8): after `done` the socket waits this long at most for `into`, where
+ * the slips went. The checker always sends it (with no names when naming failed); this is for a checker that doesn't.
+ */
+export const NAMES_WAIT_MS = 5000;
 
 /** The parts of a WebSocket this uses (React Native's, or a test's). */
 export interface SocketLike {
@@ -33,6 +52,9 @@ export interface SocketLike {
 
 export interface SocketDeps {
   url?: string;
+  /** recite-check-pair's endpoint (RECITE_PAIR_LIVE_URL); null: every take on `url`. */
+  pairUrl?: string | null;
+  now?: () => number;
   /** A fresh Firebase ID token for each socket. */
   token: () => Promise<string | null>;
   /** The app's version, kept with the take ("1.0.4 (40) dev 1a2b3c4d"). */
@@ -60,7 +82,9 @@ function typeOf(data: unknown): unknown {
 }
 
 export function socketFeed(deps: SocketDeps): LiveConnect {
-  const url = deps.url ?? RECITE_LIVE_URL;
+  const mainUrl = deps.url ?? RECITE_LIVE_URL;
+  const pairUrl = deps.pairUrl === undefined ? RECITE_PAIR_LIVE_URL : deps.pairUrl;
+  const now = deps.now ?? Date.now;
   const open = deps.open ?? ((u: string) => new WebSocket(u) as unknown as SocketLike);
   const timers = deps.timers ?? {
     set: (fn: () => void, ms: number) => setTimeout(fn, ms),
@@ -78,8 +102,24 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
     /** Sending live (after `ready` and the held audio). */
     let live = false;
     let finished = false;
+    /** `done` came on a take started with namesAfter: only `into` is still to come. */
+    let answered = false;
+    let namesWait: unknown = null;
     let tries = 0;
     let retry: unknown = null;
+    /** Where the take goes: the pair service for the light levels while it's up, else recite-check. */
+    let url = pairUrl && pairTakes(start) && pairOpen(now()) ? pairUrl : mainUrl;
+    /** On the pair service, which hasn't said `ready` yet: a refusal or a drop sends the take to recite-check. */
+    let unproven = url !== mainUrl;
+    /** Start again on recite-check, as a new take there. `down`: the pair service couldn't be reached. */
+    const toMain = (down: boolean) => {
+      if (down) pairClosed(now());
+      url = mainUrl;
+      unproven = false;
+      take = null;
+      tries = 0;
+      void connect();
+    };
     /** The take has ended (`end` went): only its answer is still to come. */
     const ended = () => controls.some((c) => c.frame.type === 'end');
 
@@ -87,6 +127,7 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
       if (finished) return;
       finished = true;
       if (retry != null) timers.clear(retry);
+      if (namesWait != null) timers.clear(namesWait);
       if (e) handlers.onEvent(e);
       const s = socket;
       socket = null;
@@ -145,7 +186,8 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
       try {
         s = open(url);
       } catch {
-        dropped();
+        if (unproven) toMain(true);
+        else dropped();
         return;
       }
       socket = s;
@@ -165,7 +207,21 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
           if (typeOf(m.data) === 'done') finish({ type: 'error', reason: 'server' });
           return;
         }
+        if (e.type === 'error' && e.reason === 'level_elsewhere' && unproven) {
+          // This service doesn't take that level: the take starts on recite-check.
+          socket = null;
+          s.onclose = null;
+          s.onmessage = null;
+          try {
+            s.close();
+          } catch {
+            // already closed
+          }
+          toMain(false);
+          return;
+        }
         if (e.type === 'ready') {
+          unproven = false;
           take = e.take ?? take;
           // Once the take has ended, a resume only waits for the answer: its tries aren't renewed, so a checker
           // that keeps closing without one can't hold the take on Checking… for good.
@@ -174,7 +230,19 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
           catchUp(s, Math.min(samples, Math.max(0, e.from ?? 0)));
           return;
         }
-        if (e.type === 'done' || e.type === 'error') {
+        if (e.type === 'done' && start.namesAfter) {
+          // The final answer at once; where the slips went comes after it (`into`), NAMES_WAIT_MS at most.
+          handlers.onEvent(e);
+          if (!answered) {
+            answered = true;
+            namesWait = timers.set(() => {
+              namesWait = null;
+              finish();
+            }, NAMES_WAIT_MS);
+          }
+          return;
+        }
+        if (e.type === 'done' || e.type === 'error' || (e.type === 'into' && answered)) {
           finish(e);
           return;
         }
@@ -183,7 +251,15 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
       s.onerror = () => undefined;
       s.onclose = () => {
         if (socket !== s) return;
-        dropped();
+        socket = null;
+        // The take has its final answer: the names are only a nicety, not worth a resume.
+        if (answered) {
+          finish();
+          return;
+        }
+        // The pair service didn't start the take (unreachable, or 403 while private): recite-check does.
+        if (unproven) toMain(true);
+        else dropped();
       };
     };
 
@@ -223,7 +299,8 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
       send: control,
       close: () => finish(),
       status: () =>
-        finished ? 'finished' : retry != null ? `retry ${tries}` : socket ? (live ? 'live' : 'opening') : 'none',
+        (finished ? 'finished' : retry != null ? `retry ${tries}` : socket ? (live ? 'live' : 'opening') : 'none') +
+        (url !== mainUrl ? ' pair' : ''),
       // Still there after the take ends (the audio is held for resuming), for "Your recitation" on its marks.
       audioClip: (from, to) => {
         const a = Math.max(0, Math.floor(from * SAMPLE_RATE_HZ));

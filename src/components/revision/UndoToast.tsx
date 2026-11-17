@@ -9,6 +9,7 @@ import { Tap } from '../v2/Tap';
 import { useTheme } from '../../context/ThemeContext';
 import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
 import { spacing } from '../../theme/spacing';
+import { t } from '../../i18n';
 
 interface UndoToastProps {
   visible: boolean;
@@ -39,7 +40,7 @@ export function UndoToast({
   onDismiss,
   duration = 3000,
   bottomInset = 0,
-  actionLabel = 'Undo',
+  actionLabel = t('common.undo'),
   secondAction,
 }: UndoToastProps) {
   const { palette } = useTheme();
