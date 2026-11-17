@@ -397,6 +397,8 @@ def forget_old():
             del SESSIONS[sid]
             if not s.sess.stopped:  # its phone went and never came back here (it may have finished elsewhere)
                 health.emit('dropped', **dropped_fields(s), at='timeout')
+                if getattr(s.sess, 'side', None) is not None:  # the naming frames it no longer needs
+                    s.sess.side.close()
     for sid, f in list(FINISHED.items()):
         if now - f[3] > RESUME_TTL:
             del FINISHED[sid]

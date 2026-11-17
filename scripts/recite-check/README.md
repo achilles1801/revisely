@@ -47,9 +47,19 @@ In the lab (same checker; the released model in brackets): learners' correct cli
 caught 97.1% (97.4%), false alarms 0.45 per 100 words (0.40; in quiet 0.19, 0.20). The page scorecard, live: correct
 quiet pages with a mark 20% (23%), in mild babble 20% (37%), in loud babble 57% (73%); planted slips caught 95% (99%).
 /record: 5 of 6 slips, no false alarm (6 of 6, 5 false alarms). Quieter on correct recitation; it catches about as
-many word slips, and fewer of learners' small harakat and letter slips. Naming a slip (`into`) has its own thresholds
-on v6 (`engine.SIMILAR_P_V6`): 134 of bench-v0's 275 planted slips and swapped endings named (188), none wrong or
-false, nothing named on learners' clips, /record's two named as before.
+many word slips, and fewer of learners' small harakat and letter slips.
+
+**Naming a v6 take's slips on the released model's frames** (Nov 16 2026). Naming (`into`) was measured on the released
+model's frames, and on v6's it named far fewer: 139 of bench-v0's 275 planted slips and swapped endings, live (the
+released model 188). So a v6 take works out the released model's frames as it goes (`engine.SideFrames`): 8 s chunks
+with 2 s of audio either side, each handed to one background thread once its audio is in (`live._side_submit`, at
+SCHED_IDLE on Linux, below the hops and the ayah thread), and the runs of marks are decoded again and named on those
+with the released model's settings. Live on the Mac: 171 named, 1 wrong (the released model's own), none false, nothing
+named on learners' clips; `done` waits only for chunks the thread hasn't reached (the last one: at most 12 s of audio,
+and only when a run reaches it), 0 ms median and 81 ms at most on the Mac, so the slowest take's wait after Stop doesn't
+move. The thread costs about a fifth of the hops' model time. `done.ms` has `side` (all of it) and `side_wait` (what
+`done` waited); health lines `side_per_s`. `RECITE_SIDE_FRAMES=0` names on v6's own frames (`engine.SIMILAR_P_V6`,
+134), with no new image.
 
 ## What it judges
 

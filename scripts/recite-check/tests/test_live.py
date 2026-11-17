@@ -279,6 +279,76 @@ class Model(unittest.TestCase):
             self.assertIs(live.LiveSession(E, 1, 1, 1, 7, {'tajweed': '0'}).lv, E.released)
             self.assertIs(live.LiveSession(E, 1, 1, 1, 7, {}, follow=True).lv, E.released)
 
+    def test_side_frames_are_the_same_whoever_works_them_out(self):
+        """The released model's frames for naming a v6 take (SideFrames): chunks the background thread worked out as
+        the take went and chunks worked out at the end are the same frames, each chunk's own, run on its audio with
+        SIDE_CONTEXT either side (a chunk not yet whole when the take ends runs to its end); any piece read on its own
+        is that piece of the whole."""
+        import concurrent.futures
+        import engine as engine_mod
+        E = engine()
+        pcm = np.frombuffer(noise(13.3, seed=5), '<i2')
+        x = pcm.astype(np.float32) / 32768
+        n, T = len(x), (1 + len(x) // 160) // 2
+
+        def audio(s0, s1):
+            return x[s0:s1].copy()
+
+        def now(fn, *args):
+            f = concurrent.futures.Future()
+            f.set_result(fn(*args))
+            return f
+        live_ = engine_mod.SideFrames(E.ear, audio, now)
+        for k in range(0, n, 1600):
+            live_.feed(min(n, k + 1600))
+        self.assertEqual(live_.next, 1)  # 0–8 s was whole by 13.3 s (with 2 s after it); 8–13.3 s wasn't
+        end = engine_mod.SideFrames(E.ear, audio)
+        end.feed(n)
+        got = [s.get(0, T) for s in (live_, end)]
+        self.assertEqual(got[0].shape, (T, len(E.ear.vocab) + 1))
+        self.assertTrue(np.array_equal(got[0], got[1]))
+        self.assertGreater(live_.ms, 0)  # 8–13.3 s was worked out at the end
+        piece = engine_mod.SideFrames(E.ear, audio)
+        piece.feed(n)
+        self.assertTrue(np.array_equal(piece.get(150, 450), got[1][150:450]))  # across the edge, read on its own
+        self.assertEqual(engine_mod.SideFrames.span(0, n), (0, 160000, 0, 400))
+        self.assertEqual(engine_mod.SideFrames.span(1, n), (96000, n, 400, T))
+        for j in range(2):
+            s0, s1, a, b = engine_mod.SideFrames.span(j, n)
+            own = E.ear._run(x[s0:s1])[a - s0 // 320:b - s0 // 320]
+            self.assertTrue(np.array_equal(got[1][a:a + len(own)], own), j)
+
+    def test_a_v6_take_names_on_the_released_models_frames(self):
+        """A take on the words level (v6) names its slips on the released model's frames, with the released model's
+        settings: worked out from the take's audio (a check) or as it streamed (live), only around its runs."""
+        import engine as engine_mod
+        import live
+        E = engine()
+        if E.table is None:
+            self.skipTest('no word table for these words: nothing is named without it')
+        lv = self.counting_level()
+        seen = []
+        real = E.name_slips
+
+        def spy(marks, lp, order, statuses, spans, extras, lv_=None, frames=None):
+            seen.append((lv_, frames))
+            return real(marks, lp, order, statuses, spans, extras, lv_, frames)
+        pcm = noise(6)
+        x = np.frombuffer(pcm, '<i2').astype(np.float32) / 32768
+        with unittest.mock.patch.object(E, 'words_level', lv), unittest.mock.patch.object(E, 'name_slips', spy):
+            E.check(x, 1, 1, 1, 7, {'tajweed': '0'}, v=2)
+            E.check(x, 1, 1, 1, 7, {}, v=2)
+            sess = live.LiveSession(E, 1, 1, 1, 7, {'tajweed': '0'})
+            run(sess, chunks(pcm, 3200) + [{'type': 'end'}])
+            self.assertIsInstance(sess.side, engine_mod.SideFrames)
+            self.assertIn('side', sess.result['ms'])
+            self.assertIsNone(live.LiveSession(E, 1, 1, 1, 7, {}).side)  # Strict: its own frames
+            self.assertIsNone(live.LiveSession(E, 1, 1, 1, 7, {}, follow=True).side)  # Recite names nothing
+            with unittest.mock.patch.dict(os.environ, {'RECITE_SIDE_FRAMES': '0'}):
+                self.assertIsNone(live.LiveSession(E, 1, 1, 1, 7, {'tajweed': '0'}).side)
+        self.assertEqual([(a is lv, isinstance(b, engine_mod.SideFrames)) for a, b in seen],
+                         [(True, True), (False, False), (True, True)])
+
     def test_naming_redecodes_within_its_work(self):
         """A run's re-decode for naming costs frames x (graph states + NAME_STATE_COST); one that doesn't fit what is
         left of the take's NAME_WORK is skipped and costs nothing (a cut take's 41 runs, joined into one 160 s run,
