@@ -386,11 +386,15 @@ function useGapBand(gap: CalendarGap | null) {
       return;
     }
     let live = true;
-    Animated.timing(opacity, { toValue: 0, duration: 220, useNativeDriver: false }).start(() => {
+    const gone = () => {
       if (live) setShown(null);
-    });
+    };
+    Animated.timing(opacity, { toValue: 0, duration: 220, useNativeDriver: false }).start(gone);
+    // Gone by then even if the frames lag behind (a busy JavaScript thread).
+    const timer = setTimeout(gone, 300);
     return () => {
       live = false;
+      clearTimeout(timer);
     };
     // Only a new gap (or none) starts it again: stepping to another month keeps it as it is.
     // eslint-disable-next-line react-hooks/exhaustive-deps
