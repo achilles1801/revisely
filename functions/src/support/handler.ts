@@ -126,7 +126,10 @@ export async function handleDevPremium(
   const now = store.now();
   let premium = false;
   await store.setGrants(uid, (current) => {
-    const next = withGrant(current, 'dev', on ? { source: 'dev', grantedAt: now, until: null } : null);
+    const dev = withGrant(current, 'dev', on ? { source: 'dev', grantedAt: now, until: null } : null);
+    // Off lifts early access's grant too (revisely-dev only), so a tester can still see the lock while everyone has
+    // Premium (early.ts). In production nothing removes an early grant.
+    const next = on ? dev : withGrant(dev, 'early', null);
     premium = !!next.premium && (next.premium.until == null || next.premium.until > now);
     return next;
   });

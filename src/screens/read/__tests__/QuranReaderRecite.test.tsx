@@ -182,6 +182,17 @@ jest.mock('../../../lib/reciteLive/clipFile', () => ({ writeClip: jest.fn(() => 
 const mockTake: { started: { day: string; page: number } | null; added: number; finished: number } = { started: null, added: 0, finished: 0 };
 // Premium: the account's grant (lib/premium, its own test). A tester here has it unless a test says not.
 const mockPremium = { has: true };
+// Premium early access (PREM-1): config/app's switch, and the claim the intro's Get Premium makes while it's on.
+const mockEarly = { on: false };
+jest.mock('../../../lib/earlyAccess', () => ({
+  ...jest.requireActual('../../../lib/earlyAccess'),
+  useEarlyAccess: () => mockEarly.on,
+  claimEarlyAccess: jest.fn(async () => {
+    mockPremium.has = true;
+  mockEarly.on = false;
+    return true;
+  }),
+}));
 jest.mock('../../../lib/premium', () => ({
   usePremium: () => ({ has: mockPremium.has, known: true, grant: null }),
   setDevPremium: jest.fn(async (on: boolean) => {
@@ -1258,6 +1269,27 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
     fireEvent(screen.getByTestId('recite-mic'), 'longPress');
     expect(screen.getByTestId('recite-mistakes-off')).toBeTruthy();
     expect(screen.queryByTestId('recite-mistakes-locked')).toBeNull();
+    alert.mockRestore();
+  });
+
+  it('[PREM-1] in early access the intro says Premium is free now and kept for good, hides Apply for support, and Get Premium gives it', async () => {
+    mockPremium.has = false;
+    mockEarly.on = true;
+    const alert = jest.spyOn(Alert, 'alert');
+    setReciteCheckSettings('u1', { noticeSeen: true });
+    await open();
+    fireEvent(screen.getByTestId('recite-mic'), 'longPress');
+    fireEvent.press(screen.getByTestId('recite-mistakes'));
+    await flush();
+    expect(screen.getByTestId('check-intro-early')).toBeTruthy();
+    expect(screen.getByText(/Free while Premium is in early access\. It will be paid later, and you’ll keep it for good, bi-idhnillah\./)).toBeTruthy();
+    expect(screen.queryByText('Can’t afford it? Apply for support')).toBeNull();
+    expect(screen.queryByText(/trial/i)).toBeNull();
+    const { claimEarlyAccess } = jest.requireMock('../../../lib/earlyAccess');
+    await act(async () => fireEvent.press(screen.getByTestId('check-intro-get')));
+    expect(claimEarlyAccess).toHaveBeenCalled();
+    expect(alert).not.toHaveBeenCalledWith('Premium in Revisely Dev', expect.anything(), expect.anything());
+    expect(screen.queryByTestId('check-intro')).toBeNull();
     alert.mockRestore();
   });
 

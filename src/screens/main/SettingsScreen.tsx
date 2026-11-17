@@ -90,6 +90,7 @@ import { showsTestScenarios } from '../../lib/testScenarios';
 import { releaseSync } from '../../lib/offline/sync';
 import { reciteLiveForAccount } from '../../lib/reciteLive/availability';
 import { premiumErrorText, setDevPremium, usePremium } from '../../lib/premium';
+import { earlyAccessLine, useEarlyAccess } from '../../lib/earlyAccess';
 import { setReciteCheckSettings, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
 import { ReciteCheckNotice } from '../../components/reciteCheck/ReciteCheckNotice';
 import { t } from '../../i18n';
@@ -294,6 +295,8 @@ export default function SettingsScreen() {
   const [checkLevelSheet, setCheckLevelSheet] = useState(false);
   // Premium (lib/premium): in Revisely Dev a tester turns it on and off here, free, to see marking mistakes locked.
   const premium = usePremium(user?.id, reciteCheck);
+  // Premium early access (lib/earlyAccess, PREM-1): the Recite section's Premium row says it's free now and kept.
+  const earlyAccessOn = useEarlyAccess();
   const [premiumBusy, setPremiumBusy] = useState(false);
   const switchPremium = useCallback((on: boolean) => {
     setPremiumBusy(true);
@@ -921,6 +924,14 @@ export default function SettingsScreen() {
 
         {reciteCheck ? (
           <Section title={t('settings.sections.recite')} footer={t('settings.recite.footer')}>
+            {premium.has ? (
+              <Row
+                icon="sparkles-outline"
+                label={t('settings.recite.premium')}
+                subtitle={earlyAccessLine(premium, earlyAccessOn) ?? t('settings.recite.premiumSub')}
+                testID="settings-premium-row"
+              />
+            ) : null}
             <Row
               icon="checkmark-done-outline"
               label={t('settings.recite.level')}

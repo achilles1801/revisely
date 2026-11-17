@@ -8,6 +8,7 @@ import { Tap } from '../v2/Tap';
 import { useModalTurn } from '../v2/modalTurn';
 import { DISMISS_FALLBACK_MS } from '../v2/Sheet';
 import { BarButton } from './ReciteBar';
+import { EARLY_ACCESS_INTRO_LINE } from '../../lib/earlyAccess';
 
 /** The real screen the page shows: a take marking mistakes on An-Naml 23 (E2E flow 18's screenshot), light and dark. */
 const PREVIEW: Record<'light' | 'dark', ImageSourcePropType> = {
@@ -23,6 +24,8 @@ const PREVIEW_ASPECT = 1206 / 1140;
  * "Can’t afford it? Apply for support" (the Quran Muaalem License's free path, in plain view). It's part of Revisely
  * Premium (the paid side is "Premium", with no feature name and no prices: nothing is for sale yet), so the button is
  * Get Premium, a placeholder until Premium exists. One line says it's Premium, following along stays free, and it's AI.
+ * In early access (lib/earlyAccess, PREM-1) Get Premium gives it for nothing, and in place of Apply for support one line
+ * says it's free in early access, paid later, and kept for good: every account has Premium, so support has no purpose.
  */
 export function CheckIntroPage({
   visible,
@@ -30,8 +33,11 @@ export function CheckIntroPage({
   onGet,
   onSupport,
   onClose,
+  earlyAccess = false,
 }: {
   visible: boolean;
+  /** Premium is in early access: free, kept for good; Apply for support is hidden. */
+  earlyAccess?: boolean;
   /** Get Premium is under way. */
   getting?: boolean;
   onGet: () => void;
@@ -83,6 +89,11 @@ export function CheckIntroPage({
         </ScrollView>
         <View style={styles.bottom}>
           <PillButton title="Get Premium" size="lg" onPress={onGet} busy={getting} testID="check-intro-get" />
+          {earlyAccess ? (
+            <Text style={[typeV2.meta, styles.early, { color: palette.text }]} maxFontSizeMultiplier={1.4} testID="check-intro-early">
+              {EARLY_ACCESS_INTRO_LINE}
+            </Text>
+          ) : (
           <Tap
             onPress={onSupport}
             style={styles.support}
@@ -94,6 +105,7 @@ export function CheckIntroPage({
               Can’t afford it? Apply for support
             </Text>
           </Tap>
+          )}
           <Text style={[typeV2.meta, styles.note, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
             Part of Premium. Following along stays free. It’s AI and can make mistakes.
           </Text>
@@ -104,6 +116,7 @@ export function CheckIntroPage({
 }
 
 const styles = StyleSheet.create({
+  early: { textAlign: 'center', marginTop: 14, paddingHorizontal: 8 },
   root: { flex: 1 },
   top: { height: 48, paddingHorizontal: 8, justifyContent: 'center' },
   content: { paddingHorizontal: 24, paddingBottom: 16 },

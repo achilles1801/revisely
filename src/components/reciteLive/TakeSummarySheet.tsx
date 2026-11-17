@@ -98,12 +98,15 @@ export function TakeSummarySheet({
   onDrill,
   before = null,
   memory = null,
+  premiumNote = null,
   onProgress,
   peeked = [],
   onPeeked,
   onDone,
   onShown,
 }: {
+  /** One quiet line about Premium in early access (lib/earlyAccess, PREM-1), or null. */
+  premiumNote?: string | null;
   visible: boolean;
   check: boolean;
   words: QuranWords | null;
@@ -183,6 +186,11 @@ export function TakeSummarySheet({
         testID="take-summary-again"
       />
       <PillButton title="Done" size="lg" variant="outline" onPress={onDone} testID="take-summary-done" />
+      {premiumNote ? (
+        <Text style={[typeV2.meta, styles.premiumNote, { color: palette.secondary }]} maxFontSizeMultiplier={1.4} testID="take-summary-premium">
+          {premiumNote}
+        </Text>
+      ) : null}
     </View>
   );
   return (
@@ -425,6 +433,7 @@ export function TakeSummarySheet({
 }
 
 const styles = StyleSheet.create({
+  premiumNote: { textAlign: 'center', marginTop: 2 },
   head: { paddingHorizontal: layoutV2.gutter, paddingTop: 16, paddingBottom: 12, gap: 2 },
   scoreRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 10, marginBottom: 4 },
   score: { fontSize: 44, lineHeight: 50, fontWeight: '300', letterSpacing: -1 },

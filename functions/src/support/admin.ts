@@ -54,7 +54,7 @@ export function entitlementsFrom(d: DocumentData | undefined): Entitlements | nu
   return { grants, ...(premium ? { premium } : {}) };
 }
 
-function entitlementsTo(e: { grants?: Entitlements['grants']; premium: Grant | null }): DocumentData {
+export function entitlementsTo(e: { grants?: Entitlements['grants']; premium: Grant | null }): DocumentData {
   const grants: DocumentData = {};
   for (const s of SOURCES) if (e.grants?.[s]) grants[s] = grantTo(e.grants[s]!);
   return { grants, premium: e.premium ? grantTo(e.premium) : null };

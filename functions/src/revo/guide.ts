@@ -324,11 +324,12 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
 export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
   {
     title: 'Recite and Mark mistakes',
-    covers: ['RECITE-1', 'RECITE-5', 'SEARCH-4'],
+    covers: ['RECITE-1', 'RECITE-5', 'SEARCH-4', 'PREM-1'],
     routes: ['QuranReader', 'Settings'],
     text: lines(
       '- Who has it: Revisely Dev, a tester account ("Tester: yes"), an iPhone and the Madani 1405 mushaf (Settings → Mushaf → “Mushaf”). The reader’s bar then has an eye and a mic in place of the record button. On Android or with the 1441 print it is the usual record button. It needs the internet: the checking runs on Revisely’s server.',
       '- The mic: tap it to start a take. Hold it to choose: “Record” (“Just record your recitation”) or “Recite” (“The page follows you”), and under Recite the “Mark mistakes” switch. Recite follows them on the page; with Mark mistakes on it also marks mistakes as they recite. Mark mistakes is part of Premium, free in Revisely Dev (Settings → Testing → “Premium”: off shows it locked).',
+      '- Premium early access: while Premium is in early access, every account has it free, with no end date, and keeps it for good after Premium becomes paid; new accounts get it when they’re set up. Settings → Recite → “Premium” says so, and so does a Mark mistakes take’s summary. An account without it yet gets it from “Get Premium” in Mark mistakes’ intro; “Can’t afford it? Apply for support” isn’t shown meanwhile. There are no prices yet, and it isn’t a trial: nothing is charged.',
       '- A take starts anywhere: the bar says “Listening…” until it finds where they are, and nothing shows before that. It looks on the page, then in the whole Qur’an, and turns there once sure (VoiceOver says "Started at …"). Then a grey band on the line and a grey box on the word follow them, and the page turns with them. Turning the page by hand makes it look on that page. If it never finds the place, nothing is marked and Stop just ends it; with VoiceOver, one line says so ("Couldn’t follow that take. Try starting at the top of the page.").',
       '- The bar during a take: the words being said and the time, “Pause” and “Resume” (the mic goes off and the take stays open), Stop (then “Checking…”), and ✕ to close it. A tap on the page puts the header and the bar away, leaving the page and the take’s time by the page number; a tap brings them back. With VoiceOver the bar stays.',
       '- A voice search (“Search the Quran”, the mic) that finds just one place opens the reader there with the ayah highlighted, and nothing listening; Back returns to the search with its result. A typed search, or several results, only lists them.',

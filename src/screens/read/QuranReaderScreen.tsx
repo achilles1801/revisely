@@ -42,6 +42,7 @@ import { SittingSavedToast } from '../../components/timer/SittingSavedToast';
 import type { ReadStackParamList } from '../../navigation/MainNavigator';
 import { reciteLiveEnabled } from '../../lib/reciteLive/availability';
 import { premiumErrorText, setDevPremium, supportLinkUrl, usePremium } from '../../lib/premium';
+import { claimEarlyAccess, earlyAccessShortLine, useEarlyAccess } from '../../lib/earlyAccess';
 import { setReciteCheckSettings, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
 import { loadQuranWords, getQuranWords, QuranWords } from '../../lib/recite/quranWords';
 import { furthestWord, marksOnPage, removedMarks, startNotFound } from '../../lib/reciteLive/state';
@@ -308,8 +309,21 @@ export default function QuranReaderScreen() {
   const premium = usePremium(user?.id, liveOn);
   const owned = premium.has;
   const [gettingPremium, setGettingPremium] = useState(false);
+  // Premium early access (lib/earlyAccess, PREM-1): every account has it for nothing, kept for good. Get Premium then
+  // gives it at once (an account the sign-up grant hasn't reached), and Apply for support is hidden.
+  const earlyAccessOn = useEarlyAccess();
   // Revisely Dev: Premium is free (nothing is charged); it says so before turning it on.
   const getPremium = useCallback(() => {
+    if (earlyAccessOn) {
+      setGettingPremium(true);
+      claimEarlyAccess()
+        .then((on) => {
+          if (on) setIntroOpen(false);
+        })
+        .catch((err) => Alert.alert('Couldn’t turn on Premium', premiumErrorText(err)))
+        .finally(() => setGettingPremium(false));
+      return;
+    }
     Alert.alert('Premium in Revisely Dev', 'Free while testing: nothing is charged. Turn it off in Settings → Testing.', [
       { text: 'Cancel', style: 'cancel' },
       {
@@ -325,7 +339,7 @@ export default function QuranReaderScreen() {
         },
       },
     ]);
-  }, []);
+  }, [earlyAccessOn]);
   // "Can't afford it? Apply for support": the program's page, opened with a one-time link for this account.
   const applyForSupport = useCallback(() => {
     supportLinkUrl()
@@ -1301,6 +1315,7 @@ export default function QuranReaderScreen() {
             score={checkTake && qw ? scorePill(live.state, qw, live.startWord) : null}
             kept={live.testData}
             removed={removedMarks(live.state)}
+            premiumNote={checkTake ? earlyAccessShortLine(premium, earlyAccessOn) : null}
             onPutBack={(id) => {
               if (undoFor === id) setUndoFor(null);
               const m = live.state.removed[id]?.mark;
@@ -1368,6 +1383,7 @@ export default function QuranReaderScreen() {
             getting={gettingPremium}
             onGet={getPremium}
             onSupport={applyForSupport}
+            earlyAccess={earlyAccessOn}
             onClose={() => setIntroOpen(false)}
           />
           <ReciteNoticeSheet
