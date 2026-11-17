@@ -12,6 +12,7 @@ GET  /health
 import health  # noqa: I001  first: an instance's age counts from about here (health.py: the numbers-only log lines)
 import asyncio
 import contextlib
+import copy
 import inspect
 import io
 import json
@@ -380,7 +381,8 @@ class Live:
 
 
 SESSIONS = {}
-FINISHED = {}  # take -> (uid, samples held, its `done`, when): a resume after the end gets the same `done` again
+FINISHED = {}  # take -> (uid, samples held, its `done`, when, its `into` events): a resume after the end gets the same
+# `done` again, and with namesAfter its `into` (a future while the names are still being worked out)
 
 
 def dropped_fields(s):
@@ -404,11 +406,12 @@ def forget_old():
             del FINISHED[sid]
 
 
-def keep_take(s, partial=False):
+def keep_take(s, partial=False, parts=('.wav', '.json')):
     """The audio, the events and the dismissals (and the end result) under recite-tests/<uid>/<take>; a dropped
     session's so far under <take>.part-<time> (names are written once, and another instance may finish it). A take
     already kept under its name (finished before, then resumed and run again, maybe on the other instance) is left as
-    it is: the run is the same audio, so the same events."""
+    it is: the run is the same audio, so the same events. parts: which files (with namesAfter the audio goes up while the
+    names are worked out, and the result once they're in it)."""
     name = store.name_for(s.uid, s.sid) + (f'.part-{store.new_take()}' if partial else '')
     sess = s.sess
     for suffix, write in (('.wav', lambda n: store.put(n, wav_bytes(sess.pcm[:sess.n]), 'audio/wav')),
@@ -416,6 +419,8 @@ def keep_take(s, partial=False):
                               'mode': 'live', 'request': s.request, 'app': s.app, 'engine': VERSION,
                               'events': s.events, 'dismissed': sorted(sess.dismissed), 'hints': sess.hints,
                               'result': sess.result, 'secs': round(sess.seconds, 1)}))):
+        if suffix not in parts:
+            continue
         try:
             write(name + suffix)
         except store.Exists:
@@ -471,7 +476,7 @@ def start_note(s):
     return f'locked at {locks[0]} s ({len(locks)} locks)' if locks else f'no lock in {s.sess.seconds:.1f} s'
 
 
-def take_fields(s, r, kept=None):
+def take_fields(s, r, kept=None, names_ms=None):
     """A finished live take's health line (health.py): numbers, levels and reasons only. `open_s` is from its first
     socket's connect to now; `cpu_s` the process's CPU meanwhile (one take per instance: the take's own)."""
     secs = s.sess.seconds
@@ -487,7 +492,8 @@ def take_fields(s, r, kept=None):
             'ready_s': s.ready_s, 'cold': s.cold, 'age_s': round(s.age, 1), 'sockets': s.sockets,
             'restarted': s.restarted, 'why': r.get('why'), 'marks': len(r.get('marks') or []), 'kept': kept,
             'cpu_s': round(cpu_s, 2), 'cpu_per_s': round(cpu_s / secs, 3) if secs else None,
-            'appcheck': s.appcheck, **health.lag(s.lag), **health.per_second(r.get('ms'), secs)}
+            'appcheck': s.appcheck, 'names_after_ms': names_ms, **health.lag(s.lag),
+            **health.per_second(r.get('ms'), secs)}
 
 
 def ayah_pair(v):
@@ -545,16 +551,21 @@ async def open_session(msg, uid):
     # Anywhere in the Qur'an (protocol 7): with startBy only, as the page is searched first. startBy keeps its 400-word
     # check, which limits the page, never the Qur'an-wide search.
     start_in = 'quran' if start_by and msg.get('startIn') == 'quran' and protocol() >= 7 else None
+    # namesAfter: `done` without `into`, then an `into` event (the summary doesn't wait for the names)
+    names_after = msg.get('namesAfter') is True
     # defer: each ayah's letters and tajweed are judged off the hop, so they never hold up the cursor (live.py)
     sess = await asyncio.to_thread(live.LiveSession, ENGINE['e'], *run, settings, follow, defer=True,
                                    open_end=open_end, **({'start_by': start_by} if start_by else {}),
-                                   **({'start_in': start_in} if start_in else {}))
+                                   **({'start_in': start_in} if start_in else {}),
+                                   **({'names_after': True} if names_after else {}))
     sid = rid if isinstance(rid, str) and store.TAKE.match(rid) else store.new_take()
     request = dict(zip(('s', 'a', 's2', 'a2'), passage), settings=settings, follow=follow, open=open_end)
     if start_by:
         request['startBy'] = list(start_by)
     if start_in:
         request['startIn'] = start_in
+    if names_after:
+        request['namesAfter'] = True
     s = Live(sid, uid, sess, msg.get('keep') is True and store.enabled(), request, msg.get('app') if isinstance(msg.get('app'), str)
              else None)
     SESSIONS[sid] = s
@@ -610,22 +621,49 @@ async def live_socket(ws: WebSocket):
             await ws.close(code)
 
     async def finish(events):
-        """The take is over: send the rest with `done` at once, then keep the take (when asked) and say so with
-        `kept`, and close. The phone has its answer without waiting for the upload; the socket stays open for it."""
+        """The take is over: send the rest with `done` at once, then (namesAfter) the names as `into`, then keep the
+        take (when asked) and say so with `kept`, and close. The phone has its answer without waiting for the names or
+        the upload; the socket stays open for them."""
         SESSIONS.pop(s.sid, None)
         r = s.sess.result
         r.update(engine=VERSION, take=s.sid)
         done = next((e for e in events if e['type'] == 'done'), None)
-        FINISHED[s.sid] = (s.uid, s.sess.n, done, time.time())
+        late = asyncio.get_running_loop().create_future() if s.request.get('namesAfter') else None
+        # a copy: names() writes `into` onto the result's marks, and a resume's `done` must stay without them
+        FINISHED[s.sid] = (s.uid, s.sess.n, copy.deepcopy(done) if late is not None else done, time.time(), late)
         s.events += [e for e in events if e['type'] != 'done']  # the result is kept on its own
+        with contextlib.suppress(WebSocketDisconnect):
+            await send(events, record=False)
+        wav, names_ms = None, None
+        if late is not None:  # the names, worked out after `done` (they go with the kept result too)
+            if s.keep:  # the audio goes up meanwhile; the result waits for the names
+                wav = asyncio.ensure_future(asyncio.to_thread(keep_take, s, False, ('.wav',)))
+            t0 = time.perf_counter()
+            named = [{'type': 'into', 'names': [], 't': round(s.sess.seconds, 2)}]
+            try:
+                named = await asyncio.to_thread(s.run, s.sess.names)
+            except Exception:  # never leaves the phone waiting: no names, as naming never costs the answer
+                log.exception('live: naming failed')
+            finally:  # cancelled too (a shutdown): a resume waiting on it gets no names, not 10 s of nothing
+                if not late.done():
+                    late.set_result(named)
+            names_ms = int((time.perf_counter() - t0) * 1000)
+            FINISHED[s.sid] = FINISHED[s.sid][:4] + (named,)
+            with contextlib.suppress(WebSocketDisconnect):
+                await send(named, record=False)
         log.info('live: %.1f s audio, %s words reached, %d marks, why %s, ms %s, sockets %d, keep %s, start %s',
                  s.sess.seconds, (r.get('score') or {}).get('reached', len(r.get('words') or [])),
                  len(r.get('marks') or []), r.get('why'), r.get('ms'), s.sockets, s.keep, start_note(s))
-        with contextlib.suppress(WebSocketDisconnect):
-            await send(events, record=False)
         if s.keep:
             t0 = time.perf_counter()
-            job = asyncio.ensure_future(asyncio.to_thread(keep_take, s))  # shielded: it finishes if the phone goes
+
+            async def keep_all():
+                if wav is None:
+                    await asyncio.to_thread(keep_take, s)
+                else:
+                    await wav
+                    await asyncio.to_thread(keep_take, s, False, ('.json',))
+            job = asyncio.ensure_future(keep_all())  # shielded: it finishes if the phone goes
             job.add_done_callback(lambda j: j.cancelled() or j.exception() is None
                                   or log.error('keeping the live take failed: %r', j.exception()))
             ok = True
@@ -638,7 +676,7 @@ async def live_socket(ws: WebSocket):
             log.info('live: kept in %d ms (%s)', (time.perf_counter() - t0) * 1000, 'ok' if ok else 'failed')
             with contextlib.suppress(Exception):
                 await send([{'type': 'kept', 'take': s.sid, 'ok': ok, 't': round(s.sess.seconds, 2)}], record=False)
-        health.emit('take', **take_fields(s, r, kept=ok if s.keep else None))
+        health.emit('take', **take_fields(s, r, kept=ok if s.keep else None, names_ms=names_ms))
         with contextlib.suppress(Exception):
             await ws.close(1000)
 
@@ -661,9 +699,16 @@ async def live_socket(ws: WebSocket):
         rid = msg.get('resume')
         f = FINISHED.get(rid) if isinstance(rid, str) else None
         if f and f[0] == uid and f[2] is not None:
-            # the take ended on this instance and the phone missed its `done`: the same answer again, not a re-run
+            # the take ended on this instance and the phone missed its `done`: the same answer again, not a re-run,
+            # at once; then its names, waited for if they're still being worked out
             await send([{'type': 'ready', 'v': 2, 'engine': VERSION, 'server': SERVER, 'protocol': protocol(),
                          'take': rid, 'from': f[1]}, f[2]], record=False)
+            late = f[4]
+            if isinstance(late, asyncio.Future):
+                with contextlib.suppress(Exception):
+                    late = await asyncio.wait_for(asyncio.shield(late), 10)
+            if isinstance(late, list):
+                await send(late, record=False)
             with contextlib.suppress(Exception):
                 await ws.close(1000)
             return
