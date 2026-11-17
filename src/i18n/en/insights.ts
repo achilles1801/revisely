@@ -110,7 +110,7 @@ export const insights = {
     longest: 'Longest gap, {{from}} – {{to}}',
     longestOpen: 'Longest gap, since {{from}}',
     longestUnknown: 'Longest gap, until {{to}}',
-    longestHint: 'Opens the calendar at that month',
+    longestHint: 'Shows it on the calendar',
     noGaps: 'None',
     noGapsText: 'No gaps {{range}}',
     /** The usual rhythm's tile: "Every day" "Your usual rhythm · 2 gaps of 3+ days". */

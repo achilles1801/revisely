@@ -66,14 +66,15 @@ describe('Gaps', () => {
     expect(flat(within(figure).getByText('Today').props.style).color).toBe('#000000');
   });
 
-  it('the longest gap and the usual rhythm, side by side; the longest opens Overview at its month', () => {
+  it('the longest gap and the usual rhythm, side by side; the longest opens Overview with it marked', () => {
     const { onOpenCalendar } = renderGaps(BOARD);
     const longest = screen.getByTestId('insights-gaps-longest');
     expect(within(longest).getByText('9')).toBeTruthy();
     expect(within(longest).getByText('days')).toBeTruthy();
     expect(within(longest).getByText(/Longest gap, 28 Oct – 6 Nov/)).toBeTruthy();
     fireEvent.press(longest);
-    expect(onOpenCalendar).toHaveBeenCalledWith('2026-10');
+    // Overview with the gap marked on its calendar, from the revision before it to the one that ended it.
+    expect(onOpenCalendar).toHaveBeenCalledWith('2026-10', { from: '2026-10-28', to: '2026-11-06', cue: 'Longest gap, 28 Oct – 6 Nov · 9 days' });
     const rhythm = screen.getByTestId('insights-gaps-rhythm');
     expect(within(rhythm).getByText('Every day')).toBeTruthy();
     expect(within(rhythm).getByText('Your usual rhythm · 2 gaps of 3+ days')).toBeTruthy();

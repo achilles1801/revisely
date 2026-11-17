@@ -67,3 +67,51 @@ export function periodForSpan(
 export function showsToday(span: CalendarSpan, { month, week }: CalendarPeriod, today: string): boolean {
   return span === 'week' ? week === weekStart(today) : month === today.slice(0, 7);
 }
+
+// ── A gap on the calendar (ACT-28) ──────────────────────────────────────
+//
+// Insights' longest gap opens Overview with the gap marked on it (Majd, Nov 16 2026: "it should take them to the
+// overview tab with some 'animation' or visual que showing the user their gap on the calendar itself"). The band
+// runs from the revision day before the gap to the one that ended it (an open gap: today), both inside it, as the
+// strip's line runs from dot to dot.
+
+/** The gap marked: its two ends (days), the words above the grid, and a key per opening (it draws in once). */
+export interface CalendarGap {
+  from: string;
+  to: string;
+  cue: string;
+  key: number;
+}
+
+/**
+ * Where the calendar opens for a gap. Month: the month holding most of its days (the earlier of equals), so as
+ * much of it shows as can. Week: the week it begins in, so it reads forwards; › carries on with it. Both are set,
+ * each kept while the other span shows (as periodForSpan keeps them).
+ */
+export function periodForGap(gap: Pick<CalendarGap, 'from' | 'to'>): CalendarPeriod {
+  const counts = new Map<string, number>();
+  for (let d = gap.from; d <= gap.to; d = shiftDay(d, 1)) counts.set(d.slice(0, 7), (counts.get(d.slice(0, 7)) ?? 0) + 1);
+  let month = gap.from.slice(0, 7);
+  for (const [m, n] of counts) if (n > (counts.get(month) ?? 0)) month = m;
+  return { month, week: weekStart(gap.from) };
+}
+
+/**
+ * The part of the band in one row of the grid (seven days, null for a blank cell): the first and last column it
+ * covers, and whether it begins and ends there (a rounded end) or carries on past the row, the month or the week
+ * (a flat end). null when the row holds none of it.
+ */
+export function bandInRow(
+  row: readonly (string | null)[],
+  gap: Pick<CalendarGap, 'from' | 'to'>,
+): { first: number; last: number; starts: boolean; ends: boolean } | null {
+  let first = -1;
+  let last = -1;
+  row.forEach((d, i) => {
+    if (d == null || d < gap.from || d > gap.to) return;
+    if (first < 0) first = i;
+    last = i;
+  });
+  if (first < 0) return null;
+  return { first, last, starts: row[first] === gap.from, ends: row[last] === gap.to };
+}

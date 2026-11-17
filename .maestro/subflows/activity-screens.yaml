@@ -508,6 +508,30 @@ appId: com.revisionbuddy.app
     visible:
       id: activity-insights
     timeout: 10000
+# The longest gap (8 – 11 October) on Overview's calendar, marked across two weeks (ACT-28).
+- scrollUntilVisible:
+    element:
+      id: insights-gaps-longest
+    direction: UP
+    centerElement: true
+    timeout: 15000
+- tapOn:
+    id: insights-gaps-longest
+- extendedWaitUntil:
+    visible:
+      id: calendar-gap-cue
+    timeout: 10000
+- waitForAnimationToEnd
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-gaps-calendar-${THEME}
+- tapOn:
+    id: pill-insights
+- extendedWaitUntil:
+    visible:
+      id: activity-insights
+    timeout: 10000
 # Weak spots in the middle of the screen, with Revo's Ask beside its title (d4's middle).
 - scrollUntilVisible:
     element:

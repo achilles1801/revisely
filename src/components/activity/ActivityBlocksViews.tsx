@@ -5,7 +5,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PanResponder } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { CALENDAR_SCREEN_LABEL, CALENDAR_SPAN_KEY, parseSpan, periodForSpan, shiftWeek, showsToday, weekDays, type CalendarSpan } from '../../lib/activityCalendar';
+import { CALENDAR_SCREEN_LABEL, CALENDAR_SPAN_KEY, parseSpan, periodForGap, periodForSpan, shiftWeek, showsToday, weekDays, type CalendarGap, type CalendarSpan } from '../../lib/activityCalendar';
 import { weekStart as weekStartOf } from '../../lib/activityHeatmap';
 import { StyleSheet, View as RNView } from 'react-native';
 import { useApp } from '../../context/AppContext';
@@ -89,7 +89,15 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
   const [month, setMonth] = useState(today.slice(0, 7));
   const [span, setSpanState] = useState<CalendarSpan>('month');
   const [week, setWeek] = useState(weekStartOf(today));
-  const [picked, setPicked] = useState<string | null>(null);
+  const [picked, setPickedState] = useState<string | null>(null);
+  // Insights' longest gap marked on the calendar (ACT-28). It stays while the arrows or a swipe step on, so a gap
+  // across weeks or months can be followed, and fades at the first touch on the calendar itself: a day picked,
+  // Today, or Week | Month.
+  const [gapMark, setGapMark] = useState<CalendarGap | null>(null);
+  const setPicked = (day: string | null) => {
+    setGapMark(null);
+    setPickedState(day);
+  };
   // The last Week | Month choice is kept on the phone (a per-device convenience, not synced).
   useEffect(() => {
     AsyncStorage.getItem(CALENDAR_SPAN_KEY)
@@ -101,6 +109,7 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
     const period = periodForSpan(next, { span, month, week, picked, today });
     setMonth(period.month);
     setWeek(period.week);
+    setGapMark(null);
     setSpanState(next);
     AsyncStorage.setItem(CALENDAR_SPAN_KEY, next).catch(() => undefined);
   };
@@ -218,9 +227,18 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
     () => new Map(pages.filter((p) => p.lastRevisedDate).map((p) => [p.pageNumber, (p.lastRevisedDate as string).slice(0, 10)])),
     [pages],
   );
-  // Consistency's figure (ACT-23): Overview at that month, with today (or nothing) picked.
-  const openCalendar = (m: string) => {
+  // Consistency's figure (ACT-23): Overview at that month, with today (or nothing) picked. Gaps' longest gap (ACT-28):
+  // where it shows, marked (lib/activityCalendar periodForGap).
+  const openCalendar = (m: string, gap?: Omit<CalendarGap, 'key'>) => {
     setView('calendar');
+    if (gap) {
+      const period = periodForGap(gap);
+      setMonth(period.month);
+      setWeek(period.week);
+      setPicked(null);
+      setGapMark({ ...gap, key: Date.now() });
+      return;
+    }
     setMonth(m);
     setWeek(weekStartOf(m === today.slice(0, 7) ? today : `${m}-01`));
     setPicked(null);
@@ -260,7 +278,10 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
             { value: 'insights', label: 'Insights' },
           ]}
           value={view}
-          onChange={setView}
+          onChange={(v) => {
+            setGapMark(null);
+            setView(v);
+          }}
           testID="activity-views"
           tone="ink"
           hug
@@ -311,6 +332,7 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
             onStep={(delta) => stepRef.current(delta)}
             onPick={setPicked}
             onOpen={onOpenDay}
+            gap={gapMark}
             recordings={recordings}
             sections={sections.overview}
           />

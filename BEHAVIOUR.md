@@ -309,8 +309,17 @@ has them; Revisely Dev's Revo knows them from its Dev guide.
   today ("6 days so far"; grey from 2 weeks); a touch opens the day under the finger (longer than a month:
   Overview at that month).
   Then two tiles: the longest gap with a missed day in the range, the open one included and counted in full when it
-  began before the range ("9 days · Longest gap, 28 Oct – 6 Nov", opening Overview at its month; "60+ days" when it
-  began before the days read; "None · No gaps in 30 days"), and the usual rhythm, the median step between revision
+  began before the range ("9 days · Longest gap, 28 Oct – 6 Nov"; "60+ days" when it began before the days read;
+  "None · No gaps in 30 days"). A tap on it opens Overview with the gap marked on the calendar: a band in the
+  red's quiet fill behind the days from the revision day before it to the one that ended it (an open gap: to
+  today), both inside it, drawn in from its first day to its last with a red edge that then settles (with Reduce
+  Motion it fades in whole), and "Longest gap, 28 Oct – 6 Nov · 9 days" above the grid, said once for VoiceOver.
+  Month opens at the month holding most of it, Week at the week it begins in; the band is flat where it carries on
+  into the next week or month, and the arrows or a swipe follow it there. It fades at the first touch on the
+  calendar (a day picked, Today, Week | Month) and is gone after leaving Overview. (Majd, Nov 16 2026: "it should
+  take them to the overview tab with some 'animation' or visual que showing the user their gap on the calendar
+  itself… we'd just have to keep in mind the fact the user could have the week view open instead of month.")
+  The second tile is the usual rhythm, the median step between revision
   days in the range, from two steps ("Every day", "Every 2 days", "Every 1–2 days", with how many gaps of 3 days or
   more). Under them, the full revision against the plan as it is now, read forwards from today (nothing records
   what an older plan scheduled): a page's spacing is the days between its next two slots (days off, custom plans,
