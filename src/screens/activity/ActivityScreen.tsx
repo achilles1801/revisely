@@ -187,7 +187,7 @@ export default function ActivityScreen() {
                 })
               }
               onSeeAllPages={() => navigation.navigate('PagesByStrength')}
-              onOpenLastRevised={() => navigation.navigate('LastRevised')}
+              onOpenLastRevised={(sort) => navigation.navigate('LastRevised', sort ? { sort } : undefined)}
               onTurnOnSmartTracking={() => navigation.navigate('Settings', { section: 'revision' })}
               onViewChange={setView}
               onShowTop={showTop}

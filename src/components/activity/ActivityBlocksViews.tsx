@@ -60,8 +60,8 @@ interface Props {
   firstTomorrow?: ReadonlySet<number>;
   /** Weak spots' "See all pages by strength" (ACT-12). */
   onSeeAllPages?: () => void;
-  /** Gaps' "When did I last revise…?" (ACT-30). */
-  onOpenLastRevised?: () => void;
+  /** Gaps' "When did I last revise…?" (ACT-30); its full revision line asks for longest waiting first. */
+  onOpenLastRevised?: (sort?: 'waiting') => void;
   /** Smart Tracking off: Insights' line that opens Settings at its switch (ACT-12). */
   onTurnOnSmartTracking?: () => void;
   /** Days with a note in the log (the calendar's note dot). */

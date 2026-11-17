@@ -549,7 +549,7 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         id: 'insightsMore.lastRevised',
         icon: 'time-outline',
         title: 'Last revised',
-        text: '{{When did I last revise…?}}, under Gaps, lists every surah, juz or hizb you’ve memorized, the longest waiting first.',
+        text: '{{When did I last revise…?}}, under Gaps, says when you last revised what you’ve memorized. Choose surahs, juz, hizbs or pages, the order, and a filter.',
         covers: ['ACT-30'],
         when: 'devApp',
       },

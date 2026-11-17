@@ -481,7 +481,8 @@ appId: com.revisionbuddy.app
     file: shot.yaml
     env:
       NAME: 09-insights-gaps-${THEME}
-# When did I last revise…? (ACT-30): Last revised by surah, longest waiting first, its first surah opened.
+# When did I last revise…? (ACT-30): Last revised in the unit that suits the account (Juz, with 305 pages), recent
+# first, its first row opened: its pages drawn as part of it.
 - scrollUntilVisible:
     element:
       id: insights-gaps-last-revised
@@ -492,10 +493,10 @@ appId: com.revisionbuddy.app
     id: insights-gaps-last-revised
 - extendedWaitUntil:
     visible:
-      id: last-revised-views
+      id: last-revised-controls
     timeout: 10000
 - tapOn:
-    id: "last-revised-row-surah-.*"
+    id: "last-revised-row-.*"
     index: 0
 - waitForAnimationToEnd
 - runFlow:

@@ -63,8 +63,9 @@ export interface GapsSectionProps {
   onOpenCalendar?: (month: string, gap?: { from: string; to: string; cue: string }) => void;
   /** The full revision against the plan (lib/gapsCycle pushBack); none: no line. */
   pushBack?: PushBack | null;
-  /** Last revised (ACT-30): the link at the section's end, and the full revision line. */
-  onOpenLastRevised?: () => void;
+  /** Last revised (ACT-30): the link at the section's end, and the full revision line (longest waiting first: the
+   * late pages at the top). */
+  onOpenLastRevised?: (sort?: 'waiting') => void;
 }
 
 export function GapsSection(props: GapsSectionProps) {
@@ -204,7 +205,7 @@ function Gaps({ view, all, firstDay, onOpenDay, onOpenCalendar, pushBack, onOpen
 
       {revision ? (
         <Tap
-          onPress={onOpenLastRevised}
+          onPress={onOpenLastRevised ? () => onOpenLastRevised('waiting') : undefined}
           disabled={!onOpenLastRevised}
           style={[styles.revision, { borderTopColor: palette.separator }]}
           accessibilityRole={onOpenLastRevised ? 'button' : 'text'}
@@ -225,7 +226,7 @@ function Gaps({ view, all, firstDay, onOpenDay, onOpenCalendar, pushBack, onOpen
 
       {onOpenLastRevised ? (
         <Tap
-          onPress={onOpenLastRevised}
+          onPress={() => onOpenLastRevised()}
           accessibilityRole="button"
           accessibilityHint={t('insights.lastRevised.linkHint')}
           hitSlop={8}

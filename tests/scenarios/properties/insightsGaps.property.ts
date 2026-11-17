@@ -3,7 +3,7 @@
 
 import fc from 'fast-check';
 import { gapsView, LONG_GAP_DAYS, STRIP_MAX_DAYS } from '../../../src/lib/insightsGaps';
-import { lastRevisedRows, type LastRevisedView } from '../../../src/lib/lastRevised';
+import { lastRevisedRows, matchesFilter, pageRecency, type LastRevisedFilter, type LastRevisedSort, type LastRevisedView, type PageRecency } from '../../../src/lib/lastRevised';
 import { runs } from './fixtures';
 
 const TODAY = '2026-11-15';
@@ -89,6 +89,36 @@ describe('Last revised (ACT-30)', () => {
         const listed = new Set(rows.flatMap((r) => r.pages.map((p) => p.page)));
         expect(listed).toEqual(new Set(memorized));
         if (view === 'page') expect(rows.length).toBe(memorized.length);
+      }),
+      { numRuns: runs(200) },
+    );
+  });
+
+  it('[ACT-30] any sort and filter: rows and their pages in its order, each row dated by its oldest page shown and out of its total; exactly the memorized pages that pass are listed', () => {
+    const lastArb = fc.dictionary(fc.integer({ min: 1, max: 604 }).map(String), fc.integer({ min: 0, max: 120 }));
+    const views = fc.constantFrom('surah', 'juz', 'hizb', 'page') as fc.Arbitrary<LastRevisedView>;
+    const sorts = fc.constantFrom('recent', 'waiting', 'mushaf') as fc.Arbitrary<LastRevisedSort>;
+    const filters = fc.constantFrom('all', 'week', 'waiting', 'never') as fc.Arbitrary<LastRevisedFilter>;
+    fc.assert(
+      fc.property(fc.uniqueArray(fc.integer({ min: 1, max: 604 }), { maxLength: 60 }), lastArb, fc.integer({ min: 0, max: 60 }), views, sorts, filters, (memorized, ago, memorizedAgo, view, sort, filter) => {
+        const input = { memorized, last: (p: number) => (ago[p] != null ? dayOf(T - ago[p]) : null), since: () => dayOf(T - memorizedAgo), today: TODAY };
+        const rows = lastRevisedRows(view, input, { sort, filter });
+        const key = (p: PageRecency) => (sort === 'waiting' ? -p.wait : sort === 'recent' ? (p.state === 'dated' ? p.wait : Infinity) : 0);
+        for (let i = 1; i < rows.length; i++) {
+          const [a, b] = [rows[i - 1], rows[i]];
+          expect(key(a.oldest) < key(b.oldest) || (key(a.oldest) === key(b.oldest) && a.number < b.number)).toBe(true);
+        }
+        const all = new Map(lastRevisedRows(view, input).map((r) => [r.number, r.pages.length]));
+        for (const r of rows) {
+          for (let i = 1; i < r.pages.length; i++) {
+            const [a, b] = [r.pages[i - 1], r.pages[i]];
+            expect(key(a) < key(b) || (key(a) === key(b) && a.page < b.page)).toBe(true);
+          }
+          expect(r.oldest.wait).toBe(Math.max(...r.pages.map((p) => p.wait)));
+          expect(r.total).toBe(all.get(r.number));
+        }
+        const listed = new Set(rows.flatMap((r) => r.pages.map((p) => p.page)));
+        expect(listed).toEqual(new Set(memorized.filter((p) => matchesFilter(pageRecency(p, input), filter))));
       }),
       { numRuns: runs(200) },
     );

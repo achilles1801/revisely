@@ -108,10 +108,11 @@ it('[ACT-28] [ACT-30] [DAY-2] Gaps counts by the revision day: a session after m
   });
   await app.until(() => app.screen.queryByTestId('insights-gaps-last-revised') != null, 'Gaps again');
 
-  // When did I last revise…? (ACT-30): by surah, longest waiting first. An-Naba's 582 was last revised on the 2nd
-  // (7 days), as long as Juz 30's end has waited since it was memorized; An-Naba comes first among them.
+  // Last revised (ACT-30), from the full revision line: longest waiting first, by surah (it suits this account, whose
+  // pages span several surahs). An-Naba's 582 was last revised on the 2nd (7 days), as long as Juz 30's end has
+  // waited since it was memorized; An-Naba comes first among them.
   await app.act(async () => {
-    fireEvent.press(app.screen.getByTestId('insights-gaps-last-revised'));
+    fireEvent.press(app.screen.getByTestId('insights-gaps-revision'));
   });
   await app.until(() => app.screen.queryAllByTestId(/^last-revised-row-surah-/).length > 0, 'Last revised');
   const rows = app.screen.getAllByTestId(/^last-revised-row-surah-/);

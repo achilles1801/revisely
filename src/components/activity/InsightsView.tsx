@@ -198,7 +198,7 @@ export function InsightsView({
   /** Edit sections (ACT-29): from the line shown when every section is hidden. */
   onEditSections?: () => void;
   /** When each surah, juz, hizb or page was last revised (Gaps' link: ACT-30). */
-  onOpenLastRevised?: () => void;
+  onOpenLastRevised?: (sort?: 'waiting') => void;
 }) {
   // The juz sheet (ACT-21): mounted from its first opening on, so it can slide away after.
   const [juz, setJuz] = useState<number | null>(null);
