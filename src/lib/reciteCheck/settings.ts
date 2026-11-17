@@ -1,5 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { isDevVariant } from '../variant';
+import { strictReleased } from '../release/mistakeDetection';
 
 /**
  * The recitation check's settings, kept on this phone per account (Dev app, testers; not synced: a synced field
@@ -49,6 +51,16 @@ export const RECITE_CHECK_DEFAULTS: ReciteCheckSettings = {
   saveRecording: true,
   showPast: true,
 };
+
+/** Whether Strict is offered: Revisely Dev's, until its own switch is on (lib/release/mistakeDetection). */
+export const strictOffered = (): boolean => isDevVariant() || strictReleased();
+
+/**
+ * The level a take checks: Strict only where it is offered, so a Strict kept on a phone (Revisely Dev's settings, or
+ * one from before) checks Words & harakat everywhere else.
+ */
+export const checkLevel = (s: Pick<ReciteCheckSettings, 'level'>): 'words' | 'strict' =>
+  s.level === 'strict' && strictOffered() ? 'strict' : 'words';
 
 const KEY = (uid: string) => `@revisely_recite_check:v1:${uid}`;
 

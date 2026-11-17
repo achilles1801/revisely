@@ -90,7 +90,7 @@ import { releaseSync } from '../../lib/offline/sync';
 import { reciteLiveForAccount } from '../../lib/reciteLive/availability';
 import { premiumErrorText, setDevPremium, usePremium } from '../../lib/premium';
 import { earlyAccessLine, useEarlyAccess } from '../../lib/earlyAccess';
-import { setReciteCheckSettings, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
+import { checkLevel, setReciteCheckSettings, strictOffered, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
 import { ReciteCheckNotice } from '../../components/reciteCheck/ReciteCheckNotice';
 import { t } from '../../i18n';
 import { isDevVariant } from '../../lib/variant';
@@ -930,14 +930,17 @@ export default function SettingsScreen() {
                 testID="settings-premium-row"
               />
             ) : null}
-            <Row
-              icon="checkmark-done-outline"
-              label={t('settings.recite.level')}
-              value={reciteCheckSettings.level === 'strict' ? t('settings.recite.strict') : t('settings.recite.words')}
-              onPress={() => setCheckLevelSheet(true)}
-              testID="settings-check-level"
-            />
-            {reciteCheckSettings.level === 'strict' ? (
+            {/* Mistakes to mark: a choice only where Strict is offered (Revisely Dev, until its own switch is on). */}
+            {strictOffered() ? (
+              <Row
+                icon="checkmark-done-outline"
+                label={t('settings.recite.level')}
+                value={checkLevel(reciteCheckSettings) === 'strict' ? t('settings.recite.strict') : t('settings.recite.words')}
+                onPress={() => setCheckLevelSheet(true)}
+                testID="settings-check-level"
+              />
+            ) : null}
+            {checkLevel(reciteCheckSettings) === 'strict' ? (
               <>
                 <Row
                   label={t('settings.recite.munfasil')}
@@ -1254,7 +1257,7 @@ export default function SettingsScreen() {
         onReady={() => setSpeechSheet(false)}
       />
       <ActionSheet
-        visible={checkLevelSheet}
+        visible={checkLevelSheet && strictOffered()}
         onClose={() => setCheckLevelSheet(false)}
         title={t('settings.recite.level')}
         actions={[

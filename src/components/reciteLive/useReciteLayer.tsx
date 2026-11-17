@@ -29,7 +29,7 @@ import { useMushafEdition } from '../../lib/mushafEdition';
 import { reciteLiveEnabled } from '../../lib/reciteLive/availability';
 import { premiumErrorText, setDevPremium, supportLinkUrl, usePremium } from '../../lib/premium';
 import { claimEarlyAccess, earlyAccessShortLine, useEarlyAccess } from '../../lib/earlyAccess';
-import { setReciteCheckSettings, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
+import { checkLevel, setReciteCheckSettings, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
 import { loadQuranWords, getQuranWords, QuranWords } from '../../lib/recite/quranWords';
 import { furthestWord, marksOnPage, removedMarks, startNotFound } from '../../lib/reciteLive/state';
 import { stopTrace } from '../../lib/reciteLive/stopTrace';
@@ -253,7 +253,7 @@ export function useReciteLayer({
     live,
     hidden,
     day,
-    level: reciteSettings.level === 'strict' ? 'strict' : 'words',
+    level: checkLevel(reciteSettings),
     records: memoryRecords,
   });
   noteTakeRecording.current = remembering.noteRecording;

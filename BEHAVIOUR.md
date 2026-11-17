@@ -387,7 +387,9 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   or letters; with Strict, tajweed notes too. The score is the share of the words reached said right, and a tajweed
   note never counts against it. A word with several marks shows its strongest: a word mistake, then a slip, then a
   tajweed note. The marks are highlights in three colours: red for words, amber for harakat and letters (and Not
-  clear), violet for tajweed.
+  clear), violet for tajweed. Strict has a switch of its own and stays Revisely Dev's until it is on, even once the
+  rest of Recite is everyone's: elsewhere a take checks words and harakat whatever level the phone kept, Settings
+  offers no choice of level, and What's new shows no tajweed note.
 - **RECITE-3.** A haraka or letter the checker couldn't hear clearly enough to judge is "Not clear", never wrong: it
   never counts in the score, whether or not the checker left it out of its own count.
 - **RECITE-4.** "Not a mistake" takes a mark off at once, with what it counted in the score; Undo, or the summary's

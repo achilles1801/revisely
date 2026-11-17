@@ -23,6 +23,7 @@ import { PAST_OPACITY } from '../reciteMemory/RememberedLayers';
 import { useQuranWordsWhen } from '../reciteMemory/TakeRows';
 import { PillButton } from '../v2/PillButton';
 import { arabicV2 } from '../../theme/v2';
+import { strictOffered } from '../../lib/reciteCheck/settings';
 import type { QuranWords } from '../../lib/recite/quranWords';
 import type { Mark, MarkKind } from '../../lib/reciteLive/contract';
 import DEMO_TAKE from '../../data/whatsNewTake.json';
@@ -264,6 +265,8 @@ export function demoTakeOf(words: QuranWords): DemoTake {
 }
 
 export const TAKE = DEMO_TAKE as DemoTake;
+/** The marks the cards show: no tajweed note where Strict isn't offered (Majd, Nov 17 2026: Strict waits). */
+export const demoMarks = (): Mark[] => (strictOffered() ? TAKE.marks : TAKE.marks.filter((m) => m.kind !== 'tajweed'));
 export const textOf = (w: number) => TAKE.lines.flat().find((x) => x.w === w)?.text ?? '';
 
 /**
@@ -274,13 +277,13 @@ export function TakeLines({
   live,
   past,
   cursor = TAKE.cursor,
-  marks = TAKE.marks,
+  marks = demoMarks(),
 }: {
   live: boolean;
   past: boolean;
   /** The word being said (the take's own by default; the moment moves it; null: none yet). */
   cursor?: number | null;
-  /** The marks shown (the take's three by default; the moment lands them one by one). */
+  /** The marks shown (the take's, `demoMarks()`, by default; the moment lands them one by one). */
   marks?: Mark[];
 }) {
   const { palette, isDark } = useTheme();
