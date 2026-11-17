@@ -6,6 +6,8 @@ import type { TakeRecord } from '../../../lib/reciteMemory/record';
 
 const mockRemember = jest.fn(async (_uid: string, _r: TakeRecord) => undefined);
 jest.mock('../../../lib/reciteMemory/store', () => ({ remember: (...a: [string, TakeRecord]) => mockRemember(...a) }));
+const mockDeleteRecording = jest.fn(async (_id: string) => 1);
+jest.mock('../../../lib/recordings', () => ({ deleteRecording: (id: string) => mockDeleteRecording(id) }));
 
 import { LiveTakeView, useRememberTake } from '../useRememberTake';
 
@@ -46,6 +48,7 @@ function setup(initial: Props) {
 beforeEach(() => {
   jest.useFakeTimers();
   mockRemember.mockClear();
+  mockDeleteRecording.mockClear();
 });
 afterEach(() => jest.useRealTimers());
 
@@ -118,5 +121,35 @@ describe('remembering a take', () => {
     h.rerender({ live: view(done([mark])), hidden: false, enabled: true });
     h.rerender({ live: view(LIVE_IDLE), hidden: false, enabled: true });
     expect(mockRemember).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('deleting the take from its summary (RMEM-6)', () => {
+  it('its record goes as a tombstone, with its audio', () => {
+    const h = setup({ live: view(connecting), hidden: false, enabled: true });
+    h.rerender({ live: view({ ...listening, status: 'checking' }), hidden: false, enabled: true });
+    act(() => h.result.current.noteRecording({ recordingId: 'rec-3' }));
+    h.rerender({ live: view(done([mark])), hidden: false, enabled: true });
+    settle();
+    const kept = mockRemember.mock.calls[0][1];
+    act(() => h.result.current.forget());
+    expect(mockRemember.mock.calls[1][1]).toMatchObject({ id: kept.id, deleted: true });
+    expect(mockDeleteRecording).toHaveBeenCalledWith('rec-3');
+    expect(h.result.current.current).toBeNull();
+    // A later change to its marks writes nothing again.
+    h.rerender({ live: view(dismissMark(done([mark]), mark.id)), hidden: false, enabled: true });
+    settle();
+    expect(mockRemember).toHaveBeenCalledTimes(2);
+  });
+
+  it('deleted before it was written or its audio saved: nothing reaches the account, and the audio goes as it arrives', () => {
+    const h = setup({ live: view(connecting), hidden: false, enabled: true });
+    h.rerender({ live: view(done([mark])), hidden: false, enabled: true });
+    act(() => h.result.current.forget());
+    settle();
+    expect(mockRemember).not.toHaveBeenCalled();
+    act(() => h.result.current.noteRecording({ recordingId: 'rec-4' }));
+    expect(mockDeleteRecording).toHaveBeenCalledWith('rec-4');
+    expect(mockRemember).not.toHaveBeenCalled();
   });
 });

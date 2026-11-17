@@ -442,13 +442,22 @@ Recite with Mark mistakes remembers each take (Majd, Nov 15 2026; Tarteel's bigg
   - the takes, newest first.
 
   A word's card opens the same page (See all). From the summary, Done goes back to the summary.
-- **RMEM-5.** A day in Activity lists its recitation takes in a Recited block. Each take shows its
-  passage, its score by the page, its line (time, mistakes, words cleared, page hidden), its recording and
-  Show on the page. A take's recording shows there and not in Read. All activity has Recitations, with All
-  takes, With mistakes and Page hidden. Show on the page opens the reader at the take's page with that
-  take's marks at full strength and nothing else, until Done. Its bar has ▶ for the take's recording while
-  that recording is on the phone. Each mark has its card, and Not a mistake there updates the take. The
-  progress page's takes open it too.
+- **RMEM-5.** A day in Activity lists its recitation takes in one Recited row ("3 takes"), which opens
+  them: each take with its passage, its score by the page, its line (time, mistakes, words cleared, page
+  hidden) and ▶ its audio while that is on the phone; a tap shows it on the page. All activity has
+  Recitations, with All takes, With mistakes and Page hidden. Show on the page opens the reader at the
+  take's page with that take's marks at full strength and nothing else, until Done. Its bar has ▶ for the
+  take's audio while that audio is on the phone. Each mark has its card, and Not a mistake there updates the
+  take. The progress page's takes open it too.
+- **RMEM-6.** A take is never a recording, a sitting or pages revised (Majd, Nov 16 2026: "separate normal
+  recordings from those recorded with mistake detection because it's clobbering the journals"). A take with
+  Mark mistakes keeps its audio with the take (Save recordings, on by default); Recite alone keeps nothing.
+  No note follows a take: its summary is its end, with "Delete this take" in its ⋯ (after a confirm the
+  take, its marks and its audio go, as they do from the take's menu in Activity) and "In today's Recited ›".
+  A take's audio is never in a day's Read, All activity's recordings, the calendar's count of recordings,
+  Settings' recordings or what Revo is told of a day's recordings, and Settings' Delete all recordings
+  leaves it. A take saved before as a plain recording becomes a take's audio again once its take is on the
+  phone; Recite alone's old audio has no take, so it stays a recording.
 
 ## Searching the Qur'an
 

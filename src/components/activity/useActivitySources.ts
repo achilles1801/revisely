@@ -3,6 +3,7 @@ import * as firestoreService from '../../services/firestoreService';
 import { withPendingJournal, withPendingReadings } from '../../lib/offline/queue';
 import { listRecordings, RecordingMeta } from '../../lib/recordings';
 import { logger } from '../../lib/logger';
+import { sortTakeAudio } from '../../lib/reciteMemory/apart';
 import type { JournalEntry, ReadingSession } from '../../types';
 import { useActivityReload } from './useActivityReload';
 
@@ -24,7 +25,9 @@ export function useActivitySources() {
       firestoreService.getReadingSessions().then((list) => withPendingReadings(list)),
       firestoreService.getJournalEntries(400).then((list) => withPendingJournal(list)),
     ]);
-    listRecordings()
+    // Old takes' audio out of the recordings first (RMEM-6): once a launch.
+    sortTakeAudio()
+      .then(() => listRecordings())
       .then(setRecordings)
       .catch((err) => logger.warn('Could not list recordings', err));
     if (r.status === 'fulfilled') setReadings(r.value);

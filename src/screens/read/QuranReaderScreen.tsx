@@ -227,7 +227,6 @@ export default function QuranReaderScreen() {
     day: today ?? null,
     focused: isScreenFocused,
     recorder,
-    onRecordingSaved: setSavedRecording,
     chromeVisible: chrome.visible,
     onTapPage,
     dismissHint,

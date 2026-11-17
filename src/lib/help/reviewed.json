@@ -56,7 +56,8 @@
     "RECITE-4": "a8f1800e158b9f79"
   },
   "recite.after": {
-    "RECITE-7": "f7ca3a916a566009"
+    "RECITE-7": "f7ca3a916a566009",
+    "RMEM-6": "59619cdefc24bef0"
   },
   "reciteTake.page": {},
   "reciteTake.hidden": {
@@ -77,7 +78,8 @@
     "RMEM-4": "a81a2f21197bbc1e"
   },
   "reciteMemory.activity": {
-    "RMEM-5": "76cd61ef1fbd37b3",
+    "RMEM-5": "3d666d6222f23980",
+    "RMEM-6": "59619cdefc24bef0",
     "RINS-3": "2072221743aa2f49"
   },
   "reciteTest.start": {

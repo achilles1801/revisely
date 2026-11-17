@@ -4,7 +4,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { layoutV2, typeV2 } from '../../theme/v2';
 import { Tap } from '../v2/Tap';
-import { RecordingsList } from '../recordings/RecordingsList';
 import { getQuranWords, loadQuranWords, type QuranWords } from '../../lib/recite/quranWords';
 import { formatAccuracy, mistakesLabel, scoreLevel } from '../../lib/reciteLive/score';
 import type { TakeRecord } from '../../lib/reciteMemory/record';
@@ -70,27 +69,32 @@ export function takeLine(take: TakeRecord, cleared: number): string {
 }
 
 /**
- * A take in its day's Recited block: its passage and score, what it found and cleared, its recording (the take's own,
- * moved here from Read), and Show on the page.
+ * A take in its day's Recited sheet (RMEM-5, RMEM-6): ▶ its audio (Listen back) while that is on the phone, its passage,
+ * its line (time, mistakes, words cleared, page hidden) and any slip into a similar ayah, and its score. A tap shows it
+ * on the page; a hold opens its menu (RINS-3).
  */
-export function TakeDayItem({
+export function TakeSheetRow({
   take,
   words,
   cleared,
+  playable,
   onShow,
-  onOpenRecording,
+  onPlay,
   onHold,
   actions = [],
+  first,
 }: {
   take: TakeRecord;
   words: QuranWords | null;
   cleared: number;
+  playable: boolean;
   onShow: (take: TakeRecord) => void;
-  onOpenRecording: (id: string) => void;
-  /** Its menu (RINS-3): a hold on its passage and lines. */
+  onPlay: (recordingId: string) => void;
+  /** Its menu (RINS-3): a hold on the row. */
   onHold?: () => void;
   /** The same actions for VoiceOver. */
   actions?: TakeMenuAction[];
+  first: boolean;
 }) {
   const { palette } = useTheme();
   const colour = useScoreColour();
@@ -99,25 +103,39 @@ export function TakeDayItem({
   const into = similarSlips([take]).slice(0, INTO_LINES).map(intoLine);
   const line = takeLine(take, cleared);
   return (
-    <View testID={`activity-take-${take.id}`}>
-      <Tap
-        onLongPress={onHold}
-        delayLongPress={350}
-        pressedOpacity={onHold ? 0.55 : 1}
-        accessible
-        accessibilityLabel={[passage, formatAccuracy(take.accuracy), line, ...into.map(plainText)].join(', ')}
-        accessibilityActions={actions.map((a) => ({ name: a.key, label: a.label }))}
-        onAccessibilityAction={(e) => actions.find((a) => a.key === e.nativeEvent.actionName)?.onPress()}
-        testID="activity-take-head"
-      >
-        <View style={styles.titleRow}>
-          <Text style={[typeV2.name, styles.flex, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
-            {passage}
-          </Text>
-          <Text style={[typeV2.name, typeV2.numeral, { color: colour(take.accuracy) }]} maxFontSizeMultiplier={1.3}>
-            {formatAccuracy(take.accuracy)}
-          </Text>
+    <Tap
+      onPress={() => onShow(take)}
+      onLongPress={onHold}
+      delayLongPress={350}
+      style={[styles.listRow, !first && { borderTopColor: palette.separator, borderTopWidth: layoutV2.hairline }]}
+      accessibilityRole="button"
+      accessibilityLabel={[passage, formatAccuracy(take.accuracy), line, ...into.map(plainText)].join(', ')}
+      accessibilityHint="Shows it on the page, with its marks"
+      accessibilityActions={actions.map((a) => ({ name: a.key, label: a.label }))}
+      onAccessibilityAction={(e) => actions.find((a) => a.key === e.nativeEvent.actionName)?.onPress()}
+      testID="activity-take-head"
+    >
+      {playable && take.recordingId ? (
+        <Tap
+          onPress={() => take.recordingId && onPlay(take.recordingId)}
+          hitSlop={6}
+          accessibilityRole="button"
+          accessibilityLabel={`Listen back: ${passage}`}
+          testID="activity-take-play"
+        >
+          <View style={[styles.disc, { backgroundColor: palette.fill }]}>
+            <Ionicons name="play" size={16} color={palette.text} style={styles.playIcon} />
+          </View>
+        </Tap>
+      ) : (
+        <View style={[styles.disc, { backgroundColor: palette.fill }]}>
+          <Ionicons name="mic-outline" size={18} color={palette.secondary} />
         </View>
+      )}
+      <View style={styles.flex}>
+        <Text style={[typeV2.name, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
+          {passage}
+        </Text>
         <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={1.4} testID="activity-take-line">
           {line}
         </Text>
@@ -126,32 +144,14 @@ export function TakeDayItem({
             {text}
           </Text>
         ))}
-      </Tap>
-      {take.recordingId ? (
-        <View style={styles.recording}>
-          <RecordingsList
-            day={take.day}
-            kind="reading"
-            emptyText={null}
-            variant="block"
-            only={(r) => r.id === take.recordingId}
-            onOpen={(r) => onOpenRecording(r.id)}
-          />
-        </View>
-      ) : null}
-      <Tap
-        onPress={() => onShow(take)}
-        hitSlop={8}
-        style={styles.show}
-        accessibilityRole="button"
-        accessibilityLabel={`Show ${passage} on the page, with its marks`}
-        testID="activity-take-show"
-      >
-        <Text style={[typeV2.meta, styles.showText, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
-          Show on the page ›
+      </View>
+      <View style={styles.scoreCol}>
+        <Text style={[typeV2.name, typeV2.numeral, { color: colour(take.accuracy) }]} maxFontSizeMultiplier={1.3}>
+          {formatAccuracy(take.accuracy)}
         </Text>
-      </Tap>
-    </View>
+        <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
+      </View>
+    </Tap>
   );
 }
 
@@ -218,11 +218,8 @@ export function TakeListRow({
 
 const styles = StyleSheet.create({
   bubble: { alignItems: 'center', justifyContent: 'center' },
-  titleRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
   flex: { flex: 1, minWidth: 0 },
-  recording: { marginTop: 8 },
-  show: { alignSelf: 'flex-end', marginTop: 8 },
-  showText: { fontWeight: '600' },
+  scoreCol: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   listRow: { flexDirection: 'row', alignItems: 'center', gap: layoutV2.markGap, paddingHorizontal: layoutV2.gutter, paddingVertical: 10 },
   disc: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   playIcon: { marginLeft: 2 },

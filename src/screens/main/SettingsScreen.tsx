@@ -686,7 +686,7 @@ export default function SettingsScreen() {
                                         text: t('settings.activity.deleteOnPhone'),
                                         style: 'destructive',
                                         onPress: async () => {
-                                          await deleteAllRecordings(uid);
+                                          await deleteAllRecordings(uid, { keepTakes: true });
                                           loadRecordings();
                                         },
                                       },

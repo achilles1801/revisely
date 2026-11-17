@@ -23,6 +23,15 @@ jest.mock('expo-file-system', () => {
     delete() {
       for (const k of [...mockFs.keys()]) if (k.startsWith(this.uri + '/')) mockFs.delete(k);
     }
+    list() {
+      const names = new Set<string>();
+      for (const k of mockFs.keys()) {
+        if (!k.startsWith(this.uri + '/')) continue;
+        const rest = k.slice(this.uri.length + 1);
+        if (rest && !rest.includes('/')) names.add(rest);
+      }
+      return [...names].map((n) => new File(this.uri, n));
+    }
   }
   class File {
     uri: string;
@@ -107,6 +116,7 @@ import {
   uploadHeld,
   undoRecording,
   UPLOAD_HOLD_MS,
+  markTakeAudio,
 } from '../recordings';
 import { formatBytes, formatRecordingTime } from '../recordingFormat';
 
@@ -1057,5 +1067,60 @@ describe('waveform levels (kept on this phone only)', () => {
     entries[0].segments[0].levels = [1, 'x'];
     mockFs.set(indexUri, JSON.stringify(entries));
     expect((await listRecordings())[0].segments[0]).not.toHaveProperty('levels');
+  });
+});
+
+describe('Recite takes’ audio, never a recording (RMEM-6)', () => {
+  const wav = (name: string) => {
+    const uri = `cache/${name}.wav`;
+    mockFs.set(uri, 'pcm');
+    return uri;
+  };
+  const take = (name: string, createdAt: number, extra: { take?: boolean } = { take: true }) =>
+    appendSegment(null, wav(name), { kind: 'reading', day: '2026-11-16', segmentMs: 5000, pageMarks: [{ atMs: 0, page: 246 }], createdAt, localOnly: true, ...extra });
+  const recording = (name: string, createdAt: number) =>
+    saveRecording(temp(name), { kind: 'reading', day: '2026-11-16', durationMs: 5000, pageMarks: [], createdAt });
+
+  it('is left out of the recordings, and listed only when asked for', async () => {
+    const mine = await recording('mine', 100);
+    const { id: t } = await take('t', 200);
+    expect((await listRecordings()).map((r) => r.id)).toEqual([mine!.id]);
+    expect((await listRecordings('takes')).map((r) => r.id)).toEqual([t]);
+    expect((await listRecordings('all')).map((r) => r.id)).toEqual([t, mine!.id]);
+    expect((await listRecordings('takes'))[0].take).toBe(true);
+  });
+
+  it('a take saved before (a plain recording) becomes a take only when a take record names it, and only its own WAV', async () => {
+    const mine = await recording('mine', 100);
+    const { id: old } = await take('old', 200, {});
+    const { id: unnamed } = await take('unnamed', 300, {});
+    expect((await listRecordings()).length).toBe(3);
+    const before = new Map(mockFs);
+    expect(await markTakeAudio([old!, mine!.id, 'gone'])).toBe(1);
+    expect((await listRecordings()).map((r) => r.id).sort()).toEqual([mine!.id, unnamed!].sort());
+    expect((await listRecordings('takes')).map((r) => r.id)).toEqual([old]);
+    // The index alone changes: every file is where it was.
+    expect([...mockFs.keys()].filter((k) => !k.endsWith('index.json')).sort()).toEqual([...before.keys()].filter((k) => !k.endsWith('index.json')).sort());
+    expect(await markTakeAudio([old!])).toBe(0);
+  });
+
+  it('Settings’ Delete all recordings keeps the takes’ audio; signing out or a reset takes everything', async () => {
+    const mine = await recording('mine', 100);
+    const { id: t } = await take('t', 200);
+    const takeFile = (await listRecordings('takes'))[0].uri;
+    await deleteAllRecordings('alice', { keepTakes: true });
+    expect(mockFs.has(mine!.uri)).toBe(false);
+    expect(mockFs.has(takeFile)).toBe(true);
+    expect(await listRecordings()).toEqual([]);
+    expect((await listRecordings('takes')).map((r) => r.id)).toEqual([t]);
+    await deleteAllRecordings('alice');
+    expect([...mockFs.keys()].some((k) => k.startsWith('doc/recordings/alice'))).toBe(false);
+  });
+
+  it('deleting a timed session’s recordings leaves the takes recited during it', async () => {
+    await recording('mine', 300);
+    await take('t', 400);
+    expect(await deleteRecordings(isReadingRecordingDuring(250, 500))).toBe(1);
+    expect((await listRecordings('takes')).length).toBe(1);
   });
 });

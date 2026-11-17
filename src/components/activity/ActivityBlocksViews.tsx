@@ -31,6 +31,7 @@ import { InsightsView } from './InsightsView';
 import { useRecitation } from '../../lib/reciteInsights/useRecitation';
 import { useActivityReload } from './useActivityReload';
 import { listRecordings, onRecordingsChanged } from '../../lib/recordings';
+import { sortTakeAudio } from '../../lib/reciteMemory/apart';
 import { coverageSince } from '../../lib/recency';
 import type { PreviewBlock, RecordingCounts } from './CalendarMonth';
 import { activitySectionsEnabled, useActivitySections, type InsightsSection } from '../../lib/activitySections';
@@ -154,7 +155,9 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
   const [recordings, setRecordings] = useState<Map<string, RecordingCounts>>(new Map());
   useEffect(() => {
     const read = () => {
-      listRecordings()
+      // Old takes' audio out of the recordings first (RMEM-6): once a launch; marking them reads again.
+      sortTakeAudio()
+        .then(() => listRecordings())
         .then((all) => {
           const out = new Map<string, RecordingCounts>();
           for (const r of all) {

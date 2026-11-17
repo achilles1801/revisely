@@ -219,7 +219,8 @@ export async function deleteAllEverywhere(
     logger.warn('Could not list the backup before deleting everything', err);
     return false;
   }
-  await io.deleteAll(uid, { withBackup: true, alsoIds: listing.live.map((c) => c.id) });
+  // Recite takes' audio stays with the takes (RMEM-6): it isn't a recording there.
+  await io.deleteAll(uid, { withBackup: true, alsoIds: listing.live.map((c) => c.id), keepTakes: true });
   requestBackup();
   return true;
 }

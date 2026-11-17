@@ -49,7 +49,7 @@ export default function ListenBackScreen() {
   const [missing, setMissing] = useState(false);
   useEffect(() => {
     let live = true;
-    listRecordings()
+    listRecordings('all')
       .then((all) => {
         if (!live) return;
         const found = all.find((r) => r.id === recordingId);

@@ -302,7 +302,6 @@ export default function ActiveRevisionScreen() {
     day: sessionDay,
     focused: isScreenFocused,
     recorder,
-    onRecordingSaved: setSavedRecording,
     chromeVisible: chrome.visible,
     onTapPage,
     dismissHint,

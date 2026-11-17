@@ -500,6 +500,7 @@ export default function ActivityDayScreen() {
               onFocusBlockLayout={(y) => scrollRef.current?.scrollTo({ y: Math.max(0, y - spacing.md), animated: true })}
               onOpenRecording={(id) => navigation.navigate('ListenBack', { recordingId: id })}
               onShowTake={(take, page) => navigation.navigate('QuranReader', { pageNumber: page, showTake: take.id })}
+              onSeeAllTakes={() => navigation.navigate('ActivityAll', { kind: 'recitation' })}
               onDeleteReading={removeReading}
               // Memorized today (MEM-4): first tomorrow on an automatic plan, or onto a custom plan's day.
               // A toast says so, with Undo (ACT-24): the tap used to save with no sign of it.
