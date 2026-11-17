@@ -249,22 +249,12 @@ appId: com.revisionbuddy.app
     id: recite-close
 - assertVisible:
     id: recite-mic
-# The take was kept as a recording (Save recordings, on by default; the E2E take records a tone). It stays on the
-# phone (never uploaded), so no backup notice comes.
-- extendedWaitUntil:
-    visible: "Recording saved"
-    timeout: 8000
-- runFlow:
-    file: ../subflows/shot.yaml
-    env:
-      NAME: rl07b-recording-saved
+# The take kept its audio with the take (Save recordings, on by default; the E2E take records a tone), never as a
+# recording (RMEM-6): no "Recording saved" note follows it.
+- assertNotVisible: "Recording saved"
 
 # Recite's memory (RMEM-3): with the take closed, its word mistake stays on the page, lighter. A tap on it shows its
-# history: this take, wrong, and the clear rule. Clear now takes it off; Undo puts it back. (The "Recording saved" note
-# goes first: its View sits where Undo will.)
-- extendedWaitUntil:
-    notVisible: "Recording saved"
-    timeout: 12000
+# history: this take, wrong, and the clear rule. Clear now takes it off; Undo puts it back.
 - extendedWaitUntil:
     visible:
       id: past-mark-word
@@ -302,8 +292,7 @@ appId: com.revisionbuddy.app
 # marked memorized at the start, beside the onboarding's Juz 30, and the test is given Juz 19, so its places are on the
 # one page E2E has. At each place the page is hidden but for its ayah's first two words; the E2E take (lib/e2e/
 # reciteLive's placeTake) carries on from there to the place's end, where it stops by itself: "Clean · 1 of N" and
-# Next. ✕ after the second place ends the test: its summary. (Recording saved's note has gone, above: it sat over the
-# mic, and a long press there was its View.)
+# Next. ✕ after the second place ends the test: its summary.
 - runFlow: ../subflows/reader-controls.yaml
 - longPressOn:
     id: recite-mic
@@ -584,7 +573,8 @@ appId: com.revisionbuddy.app
       id: recite-mic
     timeout: 5000
 
-# Recite's memory (RMEM-5): the day's takes in a Recited block, and Show on the page (a take on its page with its marks).
+# Recite's memory (RMEM-5, RMEM-6): the day's takes in one Recited row that opens them, and Show on the page (a take on its
+# page with its marks).
 - tapOn:
     id: reader-back
 - tapOn:
@@ -599,8 +589,6 @@ appId: com.revisionbuddy.app
     id: calendar-day-2026-11-14
 - tapOn:
     id: preview-open
-# The block's header, not the block: by now the day holds Test me's takes too, and the block (899pt high on the iOS
-# runner, run 43843930204) is taller than the screen, so the whole of it is never visible.
 - scrollUntilVisible:
     element:
       id: activity-block-recited-header
@@ -611,18 +599,28 @@ appId: com.revisionbuddy.app
     file: ../subflows/shot.yaml
     env:
       NAME: rm04-day-recited-dark
-- scrollUntilVisible:
-    element:
-      id: activity-take-show
-    direction: DOWN
-    timeout: 10000
+# The row opens the day's takes (by now Test me's too), newest first, each with ▶ its audio.
 - tapOn:
-    id: activity-take-show
+    id: activity-block-recited-header
+- extendedWaitUntil:
+    visible:
+      id: recited-sheet
+    timeout: 5000
+- extendedWaitUntil:
+    visible:
+      id: activity-take-play
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rm04b-day-takes-dark
+- tapOn:
+    id: activity-take-head
 - extendedWaitUntil:
     visible:
       id: shown-take-bar
     timeout: 10000
-# ▶ for the take's recording, which is on the phone (the day lists it).
+# ▶ for the take's audio, which is on the phone (the sheet lists it).
 - extendedWaitUntil:
     visible:
       id: shown-take-play

@@ -1,9 +1,10 @@
 import React from 'react';
-import { AccessibilityInfo, Platform, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { AccessibilityInfo, Alert, Platform, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { arabicV2, layoutV2, typeV2 } from '../../theme/v2';
 import { Sheet } from '../v2/Sheet';
+import { ActionSheet } from '../v2/ActionSheet';
 import { PillButton } from '../v2/PillButton';
 import { Tap } from '../v2/Tap';
 import { describeAyahs, spokenText } from '../../lib/passages';
@@ -104,6 +105,8 @@ export function TakeSummarySheet({
   onPeeked,
   onDone,
   onShown,
+  onDelete,
+  onRecited,
 }: {
   /** One quiet line about Premium in early access (lib/earlyAccess, PREM-1), or null. */
   premiumNote?: string | null;
@@ -143,11 +146,21 @@ export function TakeSummarySheet({
   onDone: () => void;
   /** The sheet is on screen (its modal has been presented). */
   onShown?: () => void;
+  /** "Delete this take" in the header's ⋯ (RMEM-6: a take is no recording, so no note offers Undo): after a confirm. */
+  onDelete?: () => void;
+  /** "In today's Recited ›": the take's day in Activity, its Recited open (where a kept take lives, RMEM-6). */
+  onRecited?: () => void;
 }) {
   const { palette } = useTheme();
   const stacked = useWindowDimensions().fontScale >= STACK_FINDINGS_AT;
   // Removed (Majd, Nov 15 2026; Tarteel keeps one too): closed until tapped, so the findings stay first.
   const [removedOpen, setRemovedOpen] = React.useState(false);
+  const [menuOpen, setMenuOpen] = React.useState(false);
+  const confirmDelete = () =>
+    Alert.alert('Delete this take?', 'Its marks and its recording are deleted. This can’t be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: onDelete },
+    ]);
   const passage = words && from != null && to != null && to >= from ? passageOf(words, from, to) : '';
   const manySurahs = words != null && from != null && to != null && to >= from && words.ref(from).sura !== words.ref(to).sura;
   // "Not clear" marks never count (Majd, Nov 15 2026), so they come last.
@@ -186,6 +199,20 @@ export function TakeSummarySheet({
         testID="take-summary-again"
       />
       <PillButton title="Done" size="lg" variant="outline" onPress={onDone} testID="take-summary-done" />
+      {onRecited ? (
+        <Tap
+          onPress={onRecited}
+          hitSlop={8}
+          style={styles.recited}
+          accessibilityRole="link"
+          accessibilityLabel="In today’s Recited, in Activity"
+          testID="take-summary-recited"
+        >
+          <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
+            In today’s Recited ›
+          </Text>
+        </Tap>
+      ) : null}
       {premiumNote ? (
         <Text style={[typeV2.meta, styles.premiumNote, { color: palette.secondary }]} maxFontSizeMultiplier={1.4} testID="take-summary-premium">
           {premiumNote}
@@ -194,7 +221,25 @@ export function TakeSummarySheet({
     </View>
   );
   return (
-    <Sheet visible={visible} onClose={onDone} onShow={shown} title="Your recitation" scroll pinned={actions} testID="take-summary">
+    <Sheet
+      visible={visible}
+      onClose={onDone}
+      onShow={shown}
+      title="Your recitation"
+      right={onDelete ? { label: 'More', icon: 'ellipsis-horizontal', onPress: () => setMenuOpen(true), testID: 'take-summary-more' } : undefined}
+      scroll
+      pinned={actions}
+      testID="take-summary"
+    >
+      {onDelete ? (
+        <ActionSheet
+          visible={menuOpen}
+          onClose={() => setMenuOpen(false)}
+          title="Your recitation"
+          actions={[{ key: 'delete', label: 'Delete this take', icon: 'trash-outline', destructive: true, onPress: confirmDelete }]}
+          testID="take-summary-menu"
+        />
+      ) : null}
       <View style={styles.head}>
         {check && score ? (
           <View style={styles.scoreRow} accessible accessibilityLabel={`Score ${score.text}, ${mistakesLabel(mistakes)}`}>
@@ -461,5 +506,6 @@ const styles = StyleSheet.create({
   arStacked: { alignSelf: 'flex-end', marginTop: 4 },
   cleared: { writingDirection: 'rtl', textAlign: 'right', maxWidth: '45%' },
   buttons: { paddingHorizontal: layoutV2.gutter, paddingTop: 16, gap: 10 },
+  recited: { alignSelf: 'center', paddingVertical: 4 },
   kept: { textAlign: 'center', paddingHorizontal: layoutV2.gutter, paddingTop: 10, paddingBottom: 6 },
 });

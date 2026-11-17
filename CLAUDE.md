@@ -298,6 +298,17 @@ until its part is set up.
     `useKeepCheckerWarm` GETs `/health` (no sign-in, no model) on opening, every 10 minutes, and on coming back once
     10 minutes have passed. It skips this while a take is connecting, listening or checking, since its connection holds
     the instance.
+  - **Takes are not recordings** (Majd picked option A, Nov 16 2026: "separate normal recordings from those recorded
+    with mistake detection because it's clobbering the journals"; RMEM-6; mocks
+    `~/Documents/revisely-today-mocks/takes-vs-recordings/`): a take never makes a recording, a sitting or revised pages.
+    - A Mark mistakes take keeps its audio with the take (`take: true` on its `lib/recordings` entry, `localOnly`);
+      Recite alone keeps nothing (`keepsAudio`). `listRecordings()` leaves take audio out ('takes' or 'all' to ask),
+      so a day's Read, All activity, the calendar's mic count, Settings and Revo's day never see it; Settings' Delete all
+      keeps it (`keepTakes`).
+    - No note after a take: the summary's ⋯ has "Delete this take" (`useRememberTake.forget`, `apart.deleteTake`) and
+      "In today's Recited ›" opens the day at its takes. A day's Recited is one row that opens `RecitedSheet`.
+    - Takes saved before were plain recordings: `sortTakeAudio` (`lib/reciteMemory/apart`) marks those a take record
+      names, once a launch, index only. Recite alone's old audio stays a recording.
   - **Calm, exact tracking** (Majd's Dev take, Nov 15 2026; Tarteel's mic take as the reference): a quiet grey band on
     the line being recited (the ayah's part of it, `currentLineBand`) and a grey box on the word. It is not a blue band
     over the whole ayah, which covered lines not yet said and read as running ahead (the checker's `at` was 1.0 s
@@ -410,7 +421,7 @@ until its part is set up.
       pill (an SE at the largest text had no room). ✕ ends the test early.
     - After the last place (or ✕): the summary, "4 of 5 continued cleanly" and each place with how it went (a tap shows
       it on the page), Test me again (the same juz) and Done. The page goes back to shown or hidden as before.
-    - Each place's take is kept as a recording, as any take is.
+    - Each place's take keeps its audio with the take, as any Mark mistakes take does (never as a recording, RMEM-6).
     - E2E: flow 18 marks page 379 memorized (`scripts/server-memorized.js`) and tests Juz 19; a place gets a take of
       its own that says every word (`placeTake` in `lib/e2e/reciteLive`).
   - **An immersive page** (Majd, Nov 15 2026; Tarteel's): during a take a tap on the page puts the header and the bar
@@ -1433,7 +1444,7 @@ How it works:
   - The network is checked before every chunk.
   - The chunk in flight is cancelled on leaving Wi-Fi, sign-out or account deletion.
 - **"Recording saved · Undo · View"** (Majd, Nov 15 2026: "there should be an undo button for it not just view";
-  `components/recordings/RecordingSavedToast`, in the reader, a session and after a Recite take):
+  `components/recordings/RecordingSavedToast`, in the reader and a session; never after a Recite take, RMEM-6):
   - **The hold:** a recording uploads nothing while the recorder runs, nor while its note offers Undo
     (`holdUpload` in `lib/recordings`). Each segment is held as `appendSegment` writes it, so no run sees it unheld.
     Stopping gives it `UPLOAD_HOLD_MS` (20 s). The note going, or View, releases it; so does leaving a session kept

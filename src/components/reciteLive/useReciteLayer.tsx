@@ -54,6 +54,7 @@ import { MarkCard } from './MarkCard';
 import { SimilarPhrasesSheet } from './SimilarPhrasesSheet';
 import { findingsLine, TakeSummarySheet } from './TakeSummarySheet';
 import { say, undoMs, useScreenReaderOn } from './a11y';
+import { navigateToActivityDay } from '../../navigation/navigationRef';
 import { markTitle } from '../../lib/reciteLive/describe';
 import { drillMarks, drillRange, openDrill } from '../../lib/reciteLive/drill';
 import { describeAyahs } from '../../lib/passages';
@@ -131,8 +132,6 @@ export interface ReciteLayerOptions {
   focused: boolean;
   /** The screen's recorder: Record (the held mic's menu) starts it, and the mic stands in for its button while idle. */
   recorder: { phase: string; start: () => Promise<unknown> | unknown };
-  /** A take kept as a recording, told once the take is closed and the player is back ("Recording saved · View"). */
-  onRecordingSaved: (saved: { day: string; recordingId: string }) => void;
   /** The screen's controls, shown or put away (a tap on the page). */
   chromeVisible: boolean;
   /** The screen's own tap on the page; while a take listens, a tap makes the page immersive instead. */
@@ -155,7 +154,6 @@ export function useReciteLayer({
   day,
   focused,
   recorder,
-  onRecordingSaved,
   chromeVisible,
   onTapPage,
   dismissHint,
@@ -170,8 +168,6 @@ export function useReciteLayer({
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const edition = useMushafEdition();
-  const onSavedRef = useRef(onRecordingSaved);
-  onSavedRef.current = onRecordingSaved;
   const onShowTakeEndRef = useRef(onShowTakeEnd);
   onShowTakeEndRef.current = onShowTakeEnd;
   /** A page: turned to when the pager holds it, otherwise opened in the reader. */
@@ -230,18 +226,13 @@ export function useReciteLayer({
       })
       .catch((err) => Alert.alert('Apply for support', premiumErrorText(err)));
   }, []);
-  // A take kept as a recording (Save recordings, on by default) is told about once the take is closed (✕) and the
-  // player is back: "Recording saved · View", over the player as after any recording, never over the recite bar.
-  const [takeSaved, setTakeSaved] = useState<{ day: string; recordingId: string } | null>(null);
+  // A take's audio stays with the take (RMEM-6: never a recording, so no "Recording saved" note): its record notes it.
   const live = useLiveRecitation({
     settings: reciteSettings,
     currentPage,
     onShowPage: showPage,
     recordingDay: day,
-    onRecordingSaved: (saved) => {
-      setTakeSaved(saved);
-      noteTakeRecording.current(saved);
-    },
+    onRecordingSaved: (saved) => noteTakeRecording.current(saved),
   });
   // Recite's memory (lib/reciteMemory): every take with Mark mistakes, kept on the account.
   const memoryRecords = useMemoryRecords(user?.id, liveOn);
@@ -667,13 +658,6 @@ export function useReciteLayer({
     // Only when a take fails so.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [takeStatus, takeFailure]);
-  const micStatus = live.mic;
-  useEffect(() => {
-    // Recite again starts the next take at once (the mic is starting): its own end tells the latest recording.
-    if (!takeSaved || takeStatus !== 'idle' || micStatus !== 'off') return;
-    onSavedRef.current(takeSaved);
-    setTakeSaved(null);
-  }, [takeSaved, takeStatus, micStatus]);
   const pageMarks = useCallback(
     (page: number) => (checkTake && qw ? marksOnPage(live.state, qw, page) : []),
     [checkTake, qw, live.state],
@@ -1177,6 +1161,26 @@ export function useReciteLayer({
           onDone={() => setSummaryShown(null)}
           // The summary is on screen: the take's Stop trace ends (lib/reciteLive/stopTrace).
           onShown={() => stopTrace.end()}
+          // RMEM-6: a take is no recording, so its summary is where it can be deleted, and where to find it after.
+          onDelete={
+            takeRecord
+              ? () => {
+                  remembering.forget();
+                  setSummaryShown(null);
+                  setCardAt(null);
+                  live.clear();
+                  say('Take deleted');
+                }
+              : undefined
+          }
+          onRecited={
+            takeRecord
+              ? () => {
+                  setSummaryShown(null);
+                  navigateToActivityDay(takeRecord.day, undefined, 'recited');
+                }
+              : undefined
+          }
         />
         <CheckIntroPage
           visible={introOpen}

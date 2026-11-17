@@ -1,4 +1,4 @@
-// A take in a day's Recited block (BEHAVIOUR.md, RINS-3): a slip into a similar ayah says so under its line, and a hold
+// A take in a day's Recited sheet (BEHAVIOUR.md, RINS-3): a slip into a similar ayah says so under its line, and a hold
 // opens its menu, Show on the page and, while Revo is on, Ask Revo about this take. The real day screen, on an account
 // whose takes are on the server, in Revisely Dev (the live check's gate: the Dev app, a tester, the microphone stream).
 
@@ -44,8 +44,18 @@ async function openDay(phone: Phone, day: string): Promise<OpenApp> {
   const { setQuranWordsForTests } = app.mods.require('src/lib/recite/quranWords');
   setQuranWordsForTests(app.mods.require('src/lib/recite/__fixtures__/quranWords').wordsData());
   await app.act(() => nav(app).current.navigate('ActivityDay', { date: day }));
-  await app.until(() => app.screen.queryByTestId('activity-block-recited') != null, 'the Recited block');
+  await app.until(() => app.screen.queryByTestId('activity-block-recited') != null, 'the Recited row');
+  await openTakes(app);
   return app;
+}
+
+/** The day's one Recited row opens its takes (RMEM-6). */
+async function openTakes(app: OpenApp): Promise<void> {
+  const { fireEvent } = app.mods.rtl;
+  await app.act(async () => {
+    fireEvent.press(app.screen.getByTestId('activity-block-recited-header'));
+  });
+  await app.until(() => app.screen.queryByTestId('activity-take-head') != null, 'the day’s takes');
 }
 
 async function hold(app: OpenApp): Promise<void> {
@@ -87,11 +97,12 @@ it('[RINS-3] a slip into a similar ayah says so under the take; a hold offers Sh
   expect(nav(app).current.getCurrentRoute()?.params).toMatchObject({ pageNumber: 246, showTake: 'take1' });
   await app.act(() => nav(app).current.goBack());
   await app.until(() => app.screen.queryByTestId('activity-block-recited') != null, 'back on the day');
+  await openTakes(app);
 
   // Revo on: Ask Revo about this take, with the take attached; VoiceOver has both as actions.
   await app.act(() => app.mods.require('src/lib/revo/presence').setRevoPresent(true));
   const head = app.screen.getByTestId('activity-take-head');
-  expect(head.props.accessibilityActions.map((a: { label: string }) => a.label)).toEqual(['Show on the page', 'Ask Revo about this take']);
+  expect(head.props.accessibilityActions.map((a: { label: string }) => a.label)).toEqual(['Show on the page', 'Ask Revo about this take', 'Delete this take']);
   await hold(app);
   await app.act(async () => {
     fireEvent.press(app.screen.getByTestId('sheet-action-ask-revo'));

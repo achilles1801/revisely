@@ -134,11 +134,19 @@ function connectingFor(frame: StartFrame, words: QuranWords): LiveState {
 }
 
 /**
+ * Whether a take keeps its audio (RMEM-6): with Mark mistakes (a take Recite remembers, which the audio stays with),
+ * Save recordings on (the default) and a revision day. Recite alone keeps nothing.
+ */
+export function keepsAudio(mode: LiveMode, saveRecording: boolean, day: string | null): boolean {
+  return mode === 'check' && saveRecording && day != null;
+}
+
+/**
  * A live take on the reader (Revisely Dev): the microphone streams to the checker's `/live`, and its events become
  * what the page and the bar show (lib/reciteLive/state). The reciter's place turns the page; a page turned by hand
  * tells the checker where to look (`seek`). Leaving the app ends the take. The take's audio stays on the phone for
- * resuming (lib/reciteLive/socket). With Save recordings on (the default) and a revision day, the take is also kept as
- * a reading recording of that day (lib/reciteLive/takeRecording), whatever ends it.
+ * resuming (lib/reciteLive/socket). A take with Mark mistakes also keeps its audio for that revision day, with the take
+ * (lib/reciteLive/takeRecording, `keepsAudio`), whatever ends it: never as a recording of its own.
  */
 export function useLiveRecitation({
   settings,
@@ -152,9 +160,9 @@ export function useLiveRecitation({
   currentPage: number;
   /** Turns the screen to a page; false when it doesn't hold that page (a session's pager holds its day's alone). */
   onShowPage: (page: number) => boolean | void;
-  /** The revision day a saved recording belongs to (null: nothing is saved). */
+  /** The revision day a take's audio belongs to (null: nothing is kept). */
   recordingDay?: string | null;
-  /** A take's recording was saved. */
+  /** A take's audio was saved (its record notes it). */
   onRecordingSaved?: (saved: SavedTake) => void;
   connect?: LiveConnect;
 }) {
@@ -337,8 +345,9 @@ export function useLiveRecitation({
         });
         conn.current = c;
         lastConn.current = c;
-        recordingRef.current =
-          settings.saveRecording && recordingDay ? startTakeRecording({ day: recordingDay, page }) : null;
+        recordingRef.current = keepsAudio(take, settings.saveRecording, recordingDay)
+          ? startTakeRecording({ day: recordingDay as string, page })
+          : null;
         setRecording(recordingRef.current != null);
         let second = 0;
         const openTone = async (): Promise<AudioSource> => {
@@ -385,8 +394,9 @@ export function useLiveRecitation({
         });
         conn.current = c;
         lastConn.current = c;
-        recordingRef.current =
-          settings.saveRecording && recordingDay ? startTakeRecording({ day: recordingDay, page }) : null;
+        recordingRef.current = keepsAudio(take, settings.saveRecording, recordingDay)
+          ? startTakeRecording({ day: recordingDay as string, page })
+          : null;
         setRecording(recordingRef.current != null);
         const handlers = {
           onAudio: (pcm: Int16Array) => {

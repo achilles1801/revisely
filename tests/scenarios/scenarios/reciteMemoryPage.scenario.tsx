@@ -98,7 +98,7 @@ it('[RMEM-3] [RMEM-4] a word missed before stays marked on the page; its card sh
   await app.close();
 });
 
-it('[RMEM-5] a day lists its takes in a Recited block; Show on the page opens the take with its marks until Done; All activity has Recitations', async () => {
+it('[RMEM-5] a day lists its takes in one Recited row that opens them; Show on the page opens the take with its marks until Done; All activity has Recitations', async () => {
   setZone(ZONES.chicago);
   setNow('2026-11-15 19:51');
   const phone = new Phone('phone');
@@ -117,11 +117,15 @@ it('[RMEM-5] a day lists its takes in a Recited block; Show on the page opens th
   const { setQuranWordsForTests } = app.mods.require('src/lib/recite/quranWords');
   setQuranWordsForTests(app.mods.require('src/lib/recite/__fixtures__/quranWords').wordsData());
   await app.act(() => nav(app).current.navigate('ActivityDay', { date: today }));
-  await app.until(() => app.screen.queryByTestId('activity-block-recited') != null, 'the Recited block');
+  await app.until(() => app.screen.queryByTestId('activity-block-recited') != null, 'the Recited row');
+  expect(app.screen.getByText('1 take ›')).toBeTruthy();
+  // The row opens the day's takes.
+  await tap(app, 'activity-block-recited-header');
+  await app.until(() => app.screen.queryByTestId('activity-take-line') != null, 'the day’s takes');
   expect(app.screen.getByTestId('activity-take-line').props.children).toBe('7:51 PM · 1 mistake');
 
-  // Show on the page: the reader at page 246 with the take's mark, and its bar.
-  await tap(app, 'activity-take-show');
+  // A tap: Show on the page, the reader at page 246 with the take's mark, and its bar.
+  await tap(app, 'activity-take-head');
   await app.until(() => nav(app).current.getCurrentRoute()?.name === 'QuranReader', 'the reader');
   expect(nav(app).current.getCurrentRoute()?.params).toMatchObject({ pageNumber: 246, showTake: 'take1' });
   await app.until(() => app.screen.queryByTestId('shown-take-bar') != null && app.screen.queryByTestId('live-mark-word') != null, 'the take on its page');

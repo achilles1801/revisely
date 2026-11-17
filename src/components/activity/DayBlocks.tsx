@@ -15,11 +15,13 @@ import { getFajrTimeFor } from '../../lib/fajrBoundary';
 import { PageStrip, StrengthCounts, StripSummary, WindowFooter } from './DayParts';
 import { DayBlock, ItemLine, PageChip } from './DayBlockFrame';
 import { BlockMark, RevisedMark } from './BlockMark';
-import { creditLine, formatMinutesLong, windowFooter } from '../../lib/activityFormat';
+import { creditLine, dayTitle, formatMinutesLong, windowFooter } from '../../lib/activityFormat';
 import { describePassage } from '../../lib/passages';
 import { RecordingsList } from '../recordings/RecordingsList';
-import { RecitedMark, TakeDayItem, takeLine, useQuranWordsWhen, type TakeMenuAction } from '../reciteMemory/TakeRows';
-import { passageOf } from '../reciteLive/TakeSummarySheet';
+import { RecitedMark, useQuranWordsWhen, type TakeMenuAction } from '../reciteMemory/TakeRows';
+import { RecitedSheet } from '../reciteMemory/RecitedSheet';
+import { deleteTake } from '../../lib/reciteMemory/apart';
+import { useTakeRecordings } from '../../lib/reciteMemory/takeAudio';
 import { takeAttachment } from '../../lib/revo/recitation';
 import { openRevo } from '../../lib/revo/open';
 import { useRevoPresent } from '../../lib/revo/presence';
@@ -28,6 +30,7 @@ import { clearedBy } from '../../lib/reciteMemory/memory';
 import type { TakeRecord } from '../../lib/reciteMemory/record';
 import { reciteLiveForAccount } from '../../lib/reciteLive/availability';
 import { listRecordings, type RecordingMeta } from '../../lib/recordings';
+import { sortTakeAudio } from '../../lib/reciteMemory/apart';
 import { describeSurahRuns, describeSurahs, pageRuns } from '../../lib/pageRanges';
 import { logger } from '../../lib/logger';
 import { parseTag } from '../../lib/noteTags';
@@ -67,7 +70,7 @@ import { formatDate, formatTime } from '../../i18n';
 const EMPTY_DAY: DayItems = { revisions: [], memorized: [], reads: [], doneAhead: [] };
 
 /** The day's blocks, by the names Overview's preview rows use for them. */
-export type DayBlockKind = 'revised' | 'memorized' | 'read' | 'notes';
+export type DayBlockKind = 'revised' | 'memorized' | 'read' | 'notes' | 'recited';
 
 /** Whether the Activity blocks show (every account since the November 2026 release): lib/activityBlocks. */
 export { activityBlocksEnabled } from '../../lib/activityBlocks';
@@ -100,6 +103,8 @@ interface Props {
   onOpenRecording: (id: string) => void;
   /** A recitation take on its page with its marks (Recite's memory, Revisely Dev). */
   onShowTake?: (take: TakeRecord, page: number) => void;
+  /** All activity's Recitations (the Recited sheet's All recitations). */
+  onSeeAllTakes?: () => void;
   /** Deletes a timed session (the screen confirms first). */
   onDeleteReading: (session: ReadingSession) => void;
   /** Memorized today, on an automatic plan: put the pages first tomorrow (Insights' Plan it). */
@@ -173,6 +178,7 @@ export function DayBlocks({
   onFocusBlockLayout,
   onOpenRecording,
   onShowTake,
+  onSeeAllTakes,
   onDeleteReading,
   onReviseTomorrow,
   onEditSchedule,
@@ -272,7 +278,8 @@ export function DayBlocks({
         const shown = withPending(EMPTY_DAY);
         if (shown !== EMPTY_DAY) setItems(shown);
       });
-    listRecordings()
+    sortTakeAudio()
+      .then(() => listRecordings())
       .then((all) => setRecs(all.filter((r) => r.day === day)))
       .catch((err) => logger.warn('Could not list the day’s recordings', err));
   }, [day]);
@@ -285,32 +292,58 @@ export function DayBlocks({
   const takeRecordings = useMemo(() => new Set(dayTakes.map((t) => t.recordingId).filter((id): id is string => id != null)), [dayTakes]);
   const notTake = useCallback((r: RecordingMeta) => !takeRecordings.has(r.id), [takeRecordings]);
   const takeWords = useQuranWordsWhen(dayTakes.length > 0);
+  // The day's takes in their own sheet (RMEM-6): one Recited row opens it, and a day opened at its takes (the take
+  // summary's "In today's Recited") opens with it.
+  const [recitedOpen, setRecitedOpen] = useState(false);
+  const recitedAsked = useRef(focusBlock === 'recited');
+  useEffect(() => {
+    if (!recitedAsked.current || dayTakes.length === 0) return;
+    recitedAsked.current = false;
+    setRecitedOpen(true);
+  }, [dayTakes.length]);
+  const takeAudio = useTakeRecordings(dayTakes.length > 0);
   // A take's menu (RINS-3): Show on the page, and Ask Revo about this take while Revo is on (the take goes with
   // the question, as Revo's + attaches it).
   const revoOn = useRevoPresent();
+  const showTake = (take: TakeRecord) => {
+    if (!takeWords) return;
+    setRecitedOpen(false);
+    onShowTake?.(take, takeWords.pageOf(take.from));
+  };
   const takeActions = (take: TakeRecord): TakeMenuAction[] => {
     if (!takeWords) return [];
-    const out: TakeMenuAction[] = [{ key: 'show', label: 'Show on the page', onPress: () => onShowTake?.(take, takeWords.pageOf(take.from)) }];
+    const out: TakeMenuAction[] = [{ key: 'show', label: 'Show on the page', onPress: () => showTake(take) }];
     if (revoOn) {
       out.push({
         key: 'ask-revo',
         label: 'Ask Revo about this take',
         onPress: () => {
+          setRecitedOpen(false);
           const attach = takeAttachment(memoryRecords, take, takeWords, today);
           openRevo(attach ? { attach } : {});
         },
       });
     }
+    // A take is no recording (RMEM-6): it is deleted here, with its marks and its audio.
+    if (user?.id) {
+      const uid = user.id;
+      out.push({
+        key: 'delete',
+        label: 'Delete this take',
+        onPress: () =>
+          Alert.alert('Delete this take?', 'Its marks and its recording are deleted. This can’t be undone.', [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Delete',
+              style: 'destructive',
+              onPress: () => {
+                deleteTake(uid, take).catch((err) => logger.warn('Could not delete the take', err));
+              },
+            },
+          ]),
+      });
+    }
     return out;
-  };
-  const takeMenu = (take: TakeRecord, cleared: number) => {
-    const actions = takeActions(take);
-    if (!takeWords || actions.length === 0) return;
-    setMenu({
-      title: passageOf(takeWords, take.from, take.to),
-      text: takeLine(take, cleared),
-      actions: actions.map((a) => ({ ...a, icon: a.key === 'ask-revo' ? 'sparkles-outline' : 'book-outline' })),
-    });
   };
   const revRecs = recs.filter((r) => r.kind === 'revision');
   const readRecs = recs.filter((r) => r.kind === 'reading' && notTake(r));
@@ -775,29 +808,47 @@ export function DayBlocks({
         />
       )}
       {dayTakes.length > 0 && (
+        // One quiet row a day (RMEM-6): it opens the day's takes.
         <DayBlock
           mark={<RecitedMark />}
           title="Recited"
-          figure={dayTakes.length === 1 ? '1 take' : `${dayTakes.length} takes`}
+          figure={`${dayTakes.length === 1 ? '1 take' : `${dayTakes.length} takes`} ›`}
           subline={subline([
             takeWords ? surahsOf(dayTakes.map((t) => takeWords.pageOf(t.from))) : null,
             formatMinutesLong(Math.max(1, Math.round(dayTakes.reduce((n, t) => n + t.secs, 0) / 60))),
           ])}
-          items={dayTakes.map((t) => (
-            <TakeDayItem
-              key={t.id}
-              take={t}
-              words={takeWords}
-              cleared={clearedBy(memoryRecords, t).length}
-              onShow={(take) => takeWords && onShowTake?.(take, takeWords.pageOf(take.from))}
-              onOpenRecording={onOpenRecording}
-              onHold={() => takeMenu(t, clearedBy(memoryRecords, t).length)}
-              actions={takeActions(t)}
-            />
-          ))}
+          items={[]}
+          onPress={() => setRecitedOpen(true)}
+          pressHint="Opens the day’s takes"
+          onLayout={layoutFor('recited')}
           testID="activity-block-recited"
         />
       )}
+      {dayTakes.length > 0 ? (
+        <RecitedSheet
+          visible={recitedOpen}
+          dayLabel={dayTitle(day, today).title}
+          takes={dayTakes}
+          words={takeWords}
+          clearedOf={(t) => clearedBy(memoryRecords, t).length}
+          playable={takeAudio}
+          onShow={showTake}
+          onPlay={(id) => {
+            setRecitedOpen(false);
+            onOpenRecording(id);
+          }}
+          actionsFor={takeActions}
+          onSeeAll={
+            onSeeAllTakes
+              ? () => {
+                  setRecitedOpen(false);
+                  onSeeAllTakes();
+                }
+              : undefined
+          }
+          onClose={() => setRecitedOpen(false)}
+        />
+      ) : null}
       {notesBlock.length > 0 && (
         <DayBlock
           mark={<BlockMark kind="notes" />}

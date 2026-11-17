@@ -234,8 +234,8 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
   // topic carries `when: 'liveRecite'`; when Recite reaches the store app, drop the `when`s and the sheets go with it.
   recite: {
     // Majd, Nov 15 2026: in line with what Revisely Dev's Recite does (highlights in three colours, Not clear, Undo
-    // and Put back, Hear it, Recite the mistakes again, the hidden view, Recording saved's Undo). Nov 16: anywhere in
-    // the Qur'an, a slip into a similar ayah, and links to Recite's other sheets.
+    // and Put back, Hear it, Recite the mistakes again, the hidden view). Nov 16: anywhere in the Qur'an, a slip into a
+    // similar ayah, links to Recite's other sheets, and takes kept apart from recordings (RMEM-6).
     title: 'How Recite works',
     linked: true,
     more: ['reciteTake', 'reciteMemory', 'reciteTest'],
@@ -276,8 +276,8 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         title: 'After the take',
         text:
           '{{Recite the mistakes again}} goes over them once more; a slip into a similar ayah gets its own line. ' +
-          '{{Undo}} on {{Recording saved}} deletes the recording.',
-        covers: ['RECITE-7'],
+          '[[more]] → {{Delete this take}} deletes it.',
+        covers: ['RECITE-7', 'RMEM-6'],
         when: 'liveRecite',
       },
     ],
@@ -365,9 +365,9 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         icon: 'calendar-outline',
         title: 'In Activity',
         text:
-          'A day lists its takes under {{Recited}}, with a slip into a similar ayah named. ' +
-          '{{Show on the page}} opens a take with its marks.',
-        covers: ['RMEM-5', 'RINS-3'],
+          'A day keeps its takes in one {{Recited}} row, apart from your recordings. ' +
+          'Tap a take for {{Show on the page}}: it opens with its marks.',
+        covers: ['RMEM-5', 'RMEM-6', 'RINS-3'],
         when: 'liveRecite',
       },
     ],

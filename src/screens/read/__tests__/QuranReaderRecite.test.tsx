@@ -383,9 +383,9 @@ describe('Recite: following along', () => {
   });
 });
 
-describe('a take kept as a recording (Save recordings, on by default)', () => {
-  it('the red dot while it records; Stop keeps it, and once the take is closed: Recording saved · View', async () => {
-    await startTake('recite');
+describe('a take’s audio stays with the take, never a recording (RMEM-6)', () => {
+  it('with Mark mistakes: the red dot while it records; Stop keeps it with the take, and no note says Recording saved', async () => {
+    await startTake('check');
     await act(async () => mockMic!.onAudio(new Int16Array(16000)));
     expect(mockTake.started?.page).toBe(379);
     expect(mockTake.started?.day).toMatch(/^\d{4}-\d{2}-\d{2}$/);
@@ -394,39 +394,65 @@ describe('a take kept as a recording (Save recordings, on by default)', () => {
     fireEvent.press(screen.getByTestId('recite-stop'));
     await flush();
     expect(mockTake.finished).toBe(1);
-    // Not while the checker still answers, nor over the summary or the recite bar.
-    expect(screen.queryByText('Recording saved')).toBeNull();
     await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [], score: null } });
     expect(screen.getByTestId('take-summary')).toBeTruthy();
-    expect(screen.queryByText('Recording saved')).toBeNull();
     fireEvent.press(screen.getByTestId('take-summary-done'));
     await flush();
-    expect(screen.queryByText('Recording saved')).toBeNull();
     fireEvent.press(screen.getByTestId('recite-close'));
     await flush();
-    expect(screen.getByText('Recording saved')).toBeTruthy();
-    fireEvent.press(screen.getByText('View'));
-    const { navigateToActivityDay } = jest.requireMock('../../../navigation/navigationRef');
-    expect(navigateToActivityDay).toHaveBeenCalledWith(mockTake.started?.day, 'rec-1');
+    expect(screen.queryByText('Recording saved')).toBeNull();
+    expect(screen.queryByTestId('recording-saved-undo')).toBeNull();
   });
 
-  it('a take kept as a recording: Undo on its note deletes it (the whole take)', async () => {
-    const recordings = require('../../../lib/recordings');
-    const undo = jest.spyOn(recordings, 'undoRecording').mockResolvedValue('deleted');
+  it('Recite alone keeps nothing: no audio, no dot, no note', async () => {
     await startTake('recite');
+    await act(async () => mockMic!.onAudio(new Int16Array(16000)));
+    expect(mockTake.started).toBeNull();
+    expect(screen.queryByTestId('recite-recording')).toBeNull();
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [], score: null } });
+    fireEvent.press(screen.getByTestId('take-summary-done'));
+    await flush();
+    fireEvent.press(screen.getByTestId('recite-close'));
+    await flush();
+    expect(screen.queryByText('Recording saved')).toBeNull();
+  });
+
+  // What reaches the account (nothing, or a tombstone) is useRememberTake's own test.
+  it('the summary’s ⋯ deletes the take, after a confirm: its audio, and the summary closes', async () => {
+    const recordings = require('../../../lib/recordings');
+    const del = jest.spyOn(recordings, 'deleteRecording').mockResolvedValue(1);
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation((_t, _m, buttons) => {
+      buttons?.find((b) => b.style === 'destructive')?.onPress?.();
+    });
+    await startTake('check');
     await act(async () => mockMic!.onAudio(new Int16Array(16000)));
     fireEvent.press(screen.getByTestId('recite-stop'));
     await flush();
     await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [], score: null } });
-    fireEvent.press(screen.getByTestId('take-summary-done'));
+    fireEvent.press(screen.getByTestId('take-summary-more'));
+    // An ActionSheet runs its action once the sheet has closed (iOS reports it).
+    fireEvent.press(await screen.findByTestId('sheet-action-delete'));
+    await act(async () => {
+      screen.UNSAFE_getAllByType(Modal).forEach((m) => m.props.onDismiss?.());
+    });
     await flush();
-    fireEvent.press(screen.getByTestId('recite-close'));
+    expect(alert).toHaveBeenCalledWith('Delete this take?', expect.any(String), expect.any(Array));
+    expect(del).toHaveBeenCalledWith('rec-1');
+    await waitFor(() => expect(screen.queryByTestId('take-summary')).toBeNull(), { timeout: 4000 });
+    del.mockRestore();
+    alert.mockRestore();
+  }, 15_000);
+
+  it('“In today’s Recited” opens the take’s day in Activity, at its takes', async () => {
+    await startTake('check');
+    fireEvent.press(screen.getByTestId('recite-stop'));
     await flush();
-    fireEvent.press(screen.getByTestId('recording-saved-undo'));
+    await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [], score: null } });
+    fireEvent.press(screen.getByTestId('take-summary-recited'));
     await flush();
-    expect(undo).toHaveBeenCalledWith('rec-1', undefined);
-    expect(screen.queryByText('Recording saved')).toBeNull();
-    undo.mockRestore();
+    const { navigateToActivityDay } = jest.requireMock('../../../navigation/navigationRef');
+    expect(navigateToActivityDay).toHaveBeenCalledWith(expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), undefined, 'recited');
   });
 
   it('the reader’s help tells of Recite (holding the mic), in place of its recording topic', async () => {
@@ -481,7 +507,7 @@ describe('a take kept as a recording (Save recordings, on by default)', () => {
     expect(screen.queryByText('Recording saved')).toBeNull();
   });
 
-  it('Recite again: the next take starts at once, and the note waits for its end', async () => {
+  it('Recite again: the next take starts at once, with no note between', async () => {
     await startTake('recite');
     await act(async () => mockMic!.onAudio(new Int16Array(16000)));
     fireEvent.press(screen.getByTestId('recite-stop'));
@@ -1081,7 +1107,7 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
 
   describe('Pause and Resume on the bar', () => {
     it('Pause turns the microphone off and keeps the take; Stop while paused still ends it, and keeps its recording', async () => {
-      await startTake('recite');
+      await startTake('check');
       const mic = (await jest.requireMock('../../../lib/recite/micSource').startMicStream.mock.results[0].value) as { stop: jest.Mock };
       await act(async () => fireEvent.press(screen.getByTestId('recite-pause')));
       expect(mic.stop).toHaveBeenCalled();
