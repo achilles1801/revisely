@@ -1,8 +1,8 @@
 /**
  * The owner's metrics console (scripts/metrics/README.md): who may call it, and what each call returns.
- * - adminMetrics: every number (aggregate.ts), for an account whose ID token carries `admin: true`
- *   (set with functions/scripts/set-admin.js). Cached a couple of minutes unless asked to refresh.
- * - adminRevo: one account's Revo conversations and memory, read live for the owner. Locked until
+ * - adminMetrics: every number (aggregate.ts), for an account whose role allows metrics.read
+ *   (console/roles.ts; given with functions/scripts/set-role.js). Cached a couple of minutes unless asked to refresh.
+ * - adminRevo: one account's Revo conversations and memory, read live (revo.conversations: owner and admin). Locked until
  *   config/admin.conversations is true, which is flipped only once the privacy policy says the
  *   developer may read them. Each read is logged with who read whose account, never the content.
  * - metricsTotals: the GitHub workflow's Sentry and App Store totals (its OIDC token proves it is
@@ -11,8 +11,9 @@
  */
 import { CallerError, GithubClaims, REPOSITORY, REPOSITORY_ID } from '../playAvailable';
 import { Alert, Input, Metrics, Totals, build } from './aggregate';
+import { Permission, can, roleOf } from '../console/roles';
 
-export type AdminErrorCode = 'unauthenticated' | 'permission-denied' | 'invalid-argument' | 'not-found';
+export type AdminErrorCode = 'unauthenticated' | 'permission-denied' | 'invalid-argument' | 'not-found' | 'unavailable';
 export class AdminError extends Error {
   constructor(readonly code: AdminErrorCode, message: string) {
     super(message);
@@ -29,10 +30,15 @@ export function consoleOrigins(project: string): string[] {
   return [`https://${project}.web.app`, `https://${project}.firebaseapp.com`, `https://${CONSOLE_DOMAIN}`];
 }
 
-/** The caller, if their ID token carries the admin claim. */
-export function requireAdmin(auth: Caller | undefined): string {
+/**
+ * The caller, if their role allows `permission` (console/roles.ts). `token` is the account's custom claims; index.ts
+ * passes them read live from Firebase Auth, so a role taken away stops working at once.
+ */
+export function requireAdmin(auth: Caller | undefined, permission: Permission = 'metrics.read'): string {
   if (!auth?.uid) throw new AdminError('unauthenticated', 'Sign in first.');
-  if (auth.token?.admin !== true) throw new AdminError('permission-denied', 'This account is not an admin.');
+  const role = roleOf(auth.token);
+  if (!role) throw new AdminError('permission-denied', 'This account has no access to Revisely Console.');
+  if (!can(role, permission)) throw new AdminError('permission-denied', 'Your role doesn’t allow this.');
   return auth.uid;
 }
 
@@ -47,6 +53,10 @@ export interface MetricsDeps {
   collect: (now: number) => Promise<Omit<Input, 'now'>>;
   now: () => number;
   log: AdminLog;
+  /** This project's environment ('prod' or 'dev'; console/peer.ts). */
+  here?: string;
+  /** Another environment's metrics, from that project's consoleMetrics (console/peer.ts); absent: none. */
+  peer?: (env: string, refresh: boolean) => Promise<Metrics>;
 }
 
 const CACHE_MS = 2 * 60e3;
@@ -58,13 +68,25 @@ export function clearMetricsCache(): void {
 
 export async function handleAdminMetrics(auth: Caller | undefined, data: unknown, deps: MetricsDeps): Promise<Metrics> {
   const uid = requireAdmin(auth);
-  const refresh = typeof data === 'object' && data !== null && (data as { refresh?: unknown }).refresh === true;
+  const d = (typeof data === 'object' && data !== null ? data : {}) as { refresh?: unknown; env?: unknown };
+  const refresh = d.refresh === true;
+  // Another environment (Majd, Nov 14 2026: both in one console): its own server's numbers, never read from here.
+  if (d.env != null && d.env !== deps.here) {
+    if (typeof d.env !== 'string' || !deps.peer) throw new AdminError('invalid-argument', 'This console can’t show that environment.');
+    deps.log({ event: 'metrics.peer', reader: uid, env: d.env, refresh });
+    return deps.peer(d.env, refresh);
+  }
+  return metricsFor(uid, refresh, deps);
+}
+
+/** The numbers, from the cache unless asked to refresh. `reader` is tagged "you" in the accounts (none for a peer). */
+export async function metricsFor(reader: string | null, refresh: boolean, deps: MetricsDeps): Promise<Metrics> {
   const now = deps.now();
   if (!refresh && cached && now - cached.at < CACHE_MS) return cached.metrics;
   const input = await deps.collect(now);
-  const metrics = build({ ...input, now, ownerUids: new Set([...(input.ownerUids ?? []), uid]) });
+  const metrics = build({ ...input, now, ownerUids: new Set([...(input.ownerUids ?? []), ...(reader ? [reader] : [])]) });
   cached = { at: now, metrics };
-  deps.log({ event: 'metrics', reader: uid, refresh, sources: metrics.sources });
+  deps.log({ event: 'metrics', reader: reader ?? 'peer', refresh, sources: metrics.sources });
   return metrics;
 }
 
@@ -105,7 +127,7 @@ const UID = /^[A-Za-z0-9]{20,128}$/;
 const CHAT = /^[A-Za-z0-9_-]{1,64}$/;
 
 export async function handleAdminRevo(auth: Caller | undefined, data: unknown, deps: RevoDeps): Promise<AdminRevoResult> {
-  const reader = requireAdmin(auth);
+  const reader = requireAdmin(auth, 'revo.conversations');
   if (typeof data !== 'object' || data === null) throw new AdminError('invalid-argument', 'Name an account.');
   const { uid, chatId } = data as { uid?: unknown; chatId?: unknown };
   if (typeof uid !== 'string' || !UID.test(uid)) throw new AdminError('invalid-argument', 'That is not an account id.');

@@ -78,4 +78,30 @@ describe('Premium and the support program', () => {
     await assertFails(getDoc(doc(alice, 'supportLimits/alice')));
     await assertFails(setDoc(doc(alice, 'supportLimits/alice'), { day: '2026-11-14', links: 0, applies: 0 }));
   });
+
+  it('the console audit log (decisions and role changes) is closed to everyone, staff included', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, 'supportDecisions/d1'), { uid: 'alice', action: 'approve', note: 'internal' });
+      await setDoc(doc(db, 'consoleAudit/a1'), { kind: 'role', uid: 'staff', to: 'owner' });
+    });
+    const alice = env.authenticatedContext('alice').firestore();
+    const owner = env.authenticatedContext('staff', { role: 'owner', admin: true }).firestore();
+    for (const db of [alice, owner, env.unauthenticatedContext().firestore()]) {
+      await assertFails(getDoc(doc(db, 'supportDecisions/d1')));
+      await assertFails(getDocs(collection(db, 'supportDecisions')));
+      await assertFails(setDoc(doc(db, 'supportDecisions/d2'), { uid: 'alice', action: 'approve' }));
+      await assertFails(getDoc(doc(db, 'consoleAudit/a1')));
+      await assertFails(setDoc(doc(db, 'consoleAudit/a2'), { kind: 'role', uid: 'staff', to: 'owner' }));
+    }
+  });
+
+  it('the owner can read a revoked application of their own, and still not change it', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'supportApplications/alice'), { uid: 'alice', status: 'revoked', createdAt: new Date(), count: 1 });
+    });
+    const alice = env.authenticatedContext('alice').firestore();
+    await assertSucceeds(getDoc(doc(alice, 'supportApplications/alice')));
+    await assertFails(updateDoc(doc(alice, 'supportApplications/alice'), { status: 'approved' }));
+  });
 });

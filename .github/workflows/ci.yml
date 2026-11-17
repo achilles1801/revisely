@@ -356,6 +356,14 @@ jobs:
         working-directory: tests/firestore-rules
         run: npm install -g firebase-tools && npm test
 
+      # Open Door's review (functions/src/support/review.ts) and the console's role changes
+      # against the Auth and Firestore emulators: the real transactions, queries and cursors.
+      - name: Open Door review (emulators)
+        id: review
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        working-directory: functions
+        run: bash ../scripts/emulators.sh exec auth,firestore demo-revisely 'npx jest --ci review.emulator'
+
   # -----------------------------------------------------------------------
   # Scenario and property tests (tests/scenarios, BEHAVIOUR.md): the app's own
   # code and screens against the Firebase emulators, with a test clock and

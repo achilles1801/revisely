@@ -1,15 +1,9 @@
 /**
- * Give an account access to the owner's metrics console (adminMetrics, adminRevo), or take it away:
- * the custom claim `admin: true` on its Firebase Auth user. Nothing else reads the claim (no Firestore
- * or Storage rule does), so it opens the console and nothing more. By uid, since one email can have
- * several user documents after a reset.
- *
- * Run from the functions/ directory:
- *   GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-admin.json node scripts/set-admin.js <uid>        # on
- *   ... node scripts/set-admin.js <uid> --off   # off
- *   ... node scripts/set-admin.js <uid> --show  # its claims
- *
- * The console sees the claim at its next sign-in, or within an hour (when the ID token refreshes).
+ * Console access is now a role (Nov 14 2026): use scripts/set-role.js (owner, admin, reviewer, dev), which records
+ * each change in the audit log. The old claim this script gave, `admin: true`, still counts as owner until
+ * set-role.js replaces it, and this script can still take it away or show an account's claims:
+ *   GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-admin.json node scripts/set-admin.js <uid> --off
+ *   ... node scripts/set-admin.js <uid> --show
  *
  * The console's conversation view stays locked until Firestore config/admin.conversations is true:
  *   ... node scripts/set-admin.js --conversations on|off
@@ -40,10 +34,10 @@ async function main() {
     console.log(`${user.uid}  ${user.email ?? '(no email)'}  claims: ${JSON.stringify(claims)}`);
     return;
   }
-  if (flag === '--off') delete claims.admin;
-  else claims.admin = true;
+  if (flag !== '--off') throw new Error('Roles replaced this: node scripts/set-role.js <email|uid> owner');
+  delete claims.admin;
   await admin.auth().setCustomUserClaims(user.uid, Object.keys(claims).length ? claims : null);
-  console.log(`✓ ${user.email ?? user.uid} (${user.uid}) ${flag === '--off' ? 'no longer has' : 'now has'} the metrics console.`);
+  console.log(`✓ ${user.email ?? user.uid} (${user.uid}) no longer has the old admin claim.`);
 }
 
 main().catch((err) => {
