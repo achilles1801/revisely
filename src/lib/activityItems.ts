@@ -7,7 +7,7 @@ import { describePageRuns, pageRuns } from './pageRanges';
 import { describePassage, describeSession, plainText } from './passages';
 import { getSurahsForPage } from './quranData';
 import { formatClock } from './readingTimer';
-import { formatDate } from '../i18n';
+import { formatDate, formatDay } from '../i18n';
 
 // Activity as single things done (a revision session, a timed reading, a
 // recording, a day's log), newest first: Recent on Activity and Home, and the
@@ -67,12 +67,10 @@ export function sessionPages(log: RevisionLog): number[] {
 const passageText = (pages: number[]) => describePassage(pages, { form: 'short', max: 2 });
 
 function dateWords(day: string): string {
-  const [y, m, d] = day.split('-').map(Number);
-  const date = new Date(y, m - 1, d);
   return [
-    formatDate(date, { weekday: 'long' }),
-    formatDate(date, { month: 'long', day: 'numeric' }),
-    formatDate(date, { month: 'short', day: 'numeric' }),
+    formatDay(day, { weekday: 'long' }),
+    formatDay(day, { month: 'long', day: 'numeric' }),
+    formatDay(day, { month: 'short', day: 'numeric' }),
     day,
   ].join(' ');
 }

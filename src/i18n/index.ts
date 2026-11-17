@@ -7,6 +7,7 @@ export {
   dateLocale,
   numberLocale,
   formatDate,
+  formatDay,
   formatTime,
   formatNumber,
   weekdayName,
