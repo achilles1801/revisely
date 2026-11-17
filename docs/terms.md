@@ -76,10 +76,10 @@ Revisely relies on third-party services to operate, including Apple, Google (Fir
 
 Revisely is currently free to download and use, and contains no in-app purchases or subscriptions: nothing in it is for sale.
 
-**Premium early access.** Revisely Premium (for example, marking mistakes as you recite) is in early access: every account has it, free of charge, while early access lasts. Premium will be paid in the future. Every account that has Premium during early access keeps it, still free of charge, after Premium becomes paid. That means:
+**Premium early access.** Revisely Premium (for example, marking mistakes as you recite) is in early access: every account has it, free of charge, while early access lasts. Premium will be paid in the future. Every account that has Premium during early access keeps it, still free of charge, after Premium becomes paid, bi-idhnillah (بإذن الله). That means:
 
 - It belongs to the Revisely account it was given to. It can't be moved to another account, sold or exchanged, and deleting the account ends it.
-- It is Premium as it is for everyone at the time: its features may change over time, as Revisely's do.
+- It includes every Premium feature, including features added later, as Premium is for everyone at the time.
 - It lasts for as long as Revisely runs. We may end it for an account that breaks these Terms (Section 11).
 - Nothing is charged for it, so there is nothing to refund.
 
