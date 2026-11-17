@@ -2,7 +2,7 @@
 // go there at once (lib/whatsNew/reciteMoment is its clock).
 
 import React from 'react';
-import { AccessibilityInfo } from 'react-native';
+import { AccessibilityInfo, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
@@ -50,10 +50,12 @@ describe('<ReciteMoment />', () => {
     expect(onNext).toHaveBeenCalledTimes(1);
   });
 
-  it('Skip goes to its end at once', async () => {
+  it('Skip goes to its end at once, where the title shows (it never takes flex: in the column it would collapse)', async () => {
     await show();
     fireEvent.press(screen.getByTestId('recite-moment-skip'));
     expect(screen.getByTestId('whats-new-next')).toBeTruthy();
+    // CI's capture (run 43978262904) found the title at no height: a flex text in a column without a height.
+    expect(StyleSheet.flatten(screen.getByTestId('whats-new-title').props.style).flex).toBeUndefined();
   });
 
   it('with Reduce Motion, and with VoiceOver, it starts at its end', async () => {

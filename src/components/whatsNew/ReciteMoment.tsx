@@ -107,7 +107,7 @@ export function ReciteMoment({
 
       {/* The take: decoration for VoiceOver (the card's words say it), never touched. */}
       <View style={styles.stage} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-        <Text style={[typeV2.meta, styles.center, { color: palette.secondary }]} maxFontSizeMultiplier={1}>
+        <Text style={[typeV2.meta, styles.middle, { color: palette.secondary }]} maxFontSizeMultiplier={1}>
           {t('whatsNew.reciteMoment.example')}
         </Text>
         <TakeLines live past={false} cursor={frame.cursor} marks={frame.marks} />
@@ -129,7 +129,7 @@ export function ReciteMoment({
           />
         </View>
         {!frame.ended ? (
-          <Text style={[typeV2.body, styles.center, styles.caption, { color: palette.text }]} maxFontSizeMultiplier={1.4} testID="recite-moment-caption">
+          <Text style={[typeV2.body, styles.middle, styles.caption, { color: palette.text }]} maxFontSizeMultiplier={1.4} testID="recite-moment-caption">
             {t(`whatsNew.reciteMoment.${frame.caption}`)}
           </Text>
         ) : null}
@@ -138,7 +138,7 @@ export function ReciteMoment({
       {frame.ended ? (
         <View style={styles.words}>
           <Text
-            style={[typeV2.largeTitle, styles.center, { color: palette.text }]}
+            style={[typeV2.largeTitle, styles.middle, { color: palette.text }]}
             accessibilityRole="header"
             accessibilityLabel={t('whatsNew.step', { step, total, title })}
             maxFontSizeMultiplier={1.6}
@@ -159,9 +159,12 @@ const styles = StyleSheet.create({
   top: { flexDirection: 'row', alignItems: 'center', minHeight: 44 },
   side: { width: 64 },
   right: { alignItems: 'flex-end' },
+  /** The top bar's title: it takes the room between the corners. */
   center: { flex: 1, textAlign: 'center' },
+  /** Centred text in the column (no flex: a column item with flex and no height collapses to nothing). */
+  middle: { textAlign: 'center' },
   stage: { flex: 1, justifyContent: 'center', gap: 14 },
   bar: { marginTop: 4 },
-  caption: { flex: 0, marginTop: 6 },
+  caption: { marginTop: 6 },
   words: { gap: 12, paddingTop: 8 },
 });
