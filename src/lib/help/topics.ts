@@ -400,10 +400,9 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         icon: 'search-outline',
         title: 'Voice search',
         text:
-          'Search by voice and find just one ayah, and the reader opens there listening: ' +
-          'carry on from the words you said, or start the ayah again.',
-        covers: [],
-        unruled: RECITE_UNRULED,
+          'Search by voice and find just one ayah, and the reader opens there with it highlighted. ' +
+          'Back takes you to the search; tap [[mic]] in the reader to recite it.',
+        covers: ['SEARCH-4'],
         when: 'liveRecite',
       },
     ],

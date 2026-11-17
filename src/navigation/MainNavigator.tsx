@@ -102,7 +102,6 @@ export type ReadStackParamList = {
     highlight?: { sura: number; ayah: number; last?: { sura: number; ayah: number } };
     /** A past recitation take (Recite's memory, Revisely Dev) shown on its page with its marks. */
     showTake?: string;
-    recite?: boolean;
   };
   /** Search the Qur'an (testers); `listen`: start listening at once (the Read tab's mic). */
   QuranSearch: { listen?: boolean } | undefined;

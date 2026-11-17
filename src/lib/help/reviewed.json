@@ -84,7 +84,9 @@
   "reciteTest.result": {
     "RECITE-8": "55d683320bb0e707"
   },
-  "reciteTest.search": {},
+  "reciteTest.search": {
+    "SEARCH-4": "b85ce4452b4f717e"
+  },
   "schedule.cycle": {
     "SCHED-1": "e34c5d66002488e4",
     "SCHED-3": "29523ed2e8b9d054",

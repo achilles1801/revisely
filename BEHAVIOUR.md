@@ -470,6 +470,11 @@ microphone's purpose string (in the binary) names searching only from 1.0.4.
   speaks, and the room (silence, its steady noise, the microphone's first moments) is never taken for words: the
   speech model writes a word for any of them. Words show as they are said, and someone who speaks at once is heard.
   Listening that hears nothing ends after 8 seconds and searches nothing.
+- **SEARCH-4.** (Revisely Dev, with Recite, until the release) A voice search that finds exactly one place (the list
+  would say "1 result", not "Closest matches") opens the reader at that ayah, highlighted as the result's Open in the
+  reader does, with nothing recording or listening: listening ended with the search. Back returns to the search, its
+  words and that result still there. Several results, the closest there is, or a typed search stay a list, and nothing
+  opens by itself.
 
 ## Translations
 
