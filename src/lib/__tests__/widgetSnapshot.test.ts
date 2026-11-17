@@ -146,9 +146,29 @@ describe('buildWidgetSnapshot', () => {
 
   it('carries the accent’s colours for light and dark', () => {
     expect(buildWidgetSnapshot(inputs()).colors).toEqual({
-      light: { accentText: '#624BD5', done: '#624BD5', onDone: '#FFFFFF', primary: '#624BD5', onPrimary: '#FFFFFF' },
-      dark: { accentText: '#9789DA', done: '#624BD5', onDone: '#FFFFFF', primary: '#624BD5', onPrimary: '#FFFFFF' },
+      light: {
+        accentText: '#624BD5',
+        done: '#624BD5',
+        onDone: '#FFFFFF',
+        primary: '#624BD5',
+        onPrimary: '#FFFFFF',
+        accentSubtle: '#EFECFB',
+        subtleText: '#624BD5',
+      },
+      dark: {
+        accentText: '#9789DA',
+        done: '#624BD5',
+        onDone: '#FFFFFF',
+        primary: '#624BD5',
+        onPrimary: '#FFFFFF',
+        accentSubtle: '#16113A',
+        subtleText: '#9789DA',
+      },
     });
+    // Android's 4×1 prayer widget tints the next prayer's cell: the theme's own pair, ≥ 4.5:1.
+    const crimson = buildWidgetSnapshot(inputs({ accent: 'crimson' }));
+    expect(crimson.colors.light).toMatchObject({ accentSubtle: '#FCE8EB', subtleText: '#B30F28' });
+    expect(crimson.colors.dark).toMatchObject({ accentSubtle: '#2E0E15', subtleText: '#F03C56' });
     const jade = buildWidgetSnapshot(inputs({ accent: 'jade' }));
     expect(jade.accent).toBe('jade');
     expect(jade.colors.light.done).toBe('#0E6B5A');

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- White, tinted by the widget: the primary pill (v2/PillButton). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+  <solid android:color="#FFFFFF" />
+  <corners android:radius="999dp" />
+</shape>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The widget's ground: white or black, the launcher's corner. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+  <solid android:color="@color/aw_bg" />
+  <corners android:radius="@dimen/aw_radius" />
+</shape>
