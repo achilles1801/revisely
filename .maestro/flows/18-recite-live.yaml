@@ -638,9 +638,9 @@ appId: com.revisionbuddy.app
       id: shown-take-bar
     timeout: 5000
 
-# A voice search with one result opens the reader reciting there (Majd, Nov 15 2026). E2E builds have no microphone or
-# speech model: the search hears An-Naml 25's opening words (lib/e2e/voiceSearch), its one result opens page 379 with a
-# Recite take already listening (no tap on the reader's mic), and the recorded take, begun at An-Naml 25, follows.
+# A voice search with one result opens the reader on that ayah, highlighted, with nothing listening (SEARCH-4; Majd, Nov
+# 17 2026, replacing Nov 15's take that started by itself). E2E builds have no microphone or speech model: the search
+# hears An-Naml 25's opening words (lib/e2e/voiceSearch), and its one result opens page 379 with no take.
 - openLink:
     link: revisely://e2e/voice-search?heard=%D8%A3%D9%84%D8%A7%20%D9%8A%D8%B3%D8%AC%D8%AF%D9%88%D8%A7%20%D9%84%D9%84%D9%87%20%D8%A7%D9%84%D8%B0%D9%8A%20%D9%8A%D8%AE%D8%B1%D8%AC%20%D8%A7%D9%84%D8%AE%D8%A8%D8%A1
     optional: true
@@ -672,35 +672,22 @@ appId: com.revisionbuddy.app
       NAME: rl15-voice-search-listening-dark
 - extendedWaitUntil:
     visible:
-      id: recite-bar
+      id: reader-background
     timeout: 15000
-- runFlow:
-    file: ../subflows/shot.yaml
-    env:
-      NAME: rl16-voice-search-reciting-dark
-- extendedWaitUntil:
-    visible:
-      id: recite-words
-    timeout: 20000
-- runFlow:
-    file: ../subflows/shot.yaml
-    env:
-      NAME: rl17-voice-search-following-dark
-- tapOn:
-    id: recite-stop
-- extendedWaitUntil:
-    visible:
-      id: take-summary-passage
-      text: "An.Naml,.ayahs.25.{1,4}26.*"
-    timeout: 10000
-- tapOn:
-    id: take-summary-done
-- tapOn:
-    id: recite-close
+# Nothing listening: no take's bar; with the controls up, the reader's mic waits for a tap.
+- assertNotVisible:
+    id: recite-bar
+- runFlow: ../subflows/reader-controls.yaml
 - extendedWaitUntil:
     visible:
       id: recite-mic
     timeout: 5000
+- assertNotVisible:
+    id: recite-bar
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl16-voice-search-reader-dark
 # The search's results (Majd, Nov 16 2026: the field and the mic at the bottom, clearer results). With the live check off a
 # voice search's one result stays on the results: Al-Ikhlas 1, whose Saheeh International E2E builds carry
 # (lib/e2e/demoTranslations), so its card shows the ayah, the translation and its credit, Share, Copy and Open.

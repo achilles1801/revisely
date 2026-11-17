@@ -42,7 +42,7 @@ import { SittingSavedToast } from '../../components/timer/SittingSavedToast';
 import type { ReadStackParamList } from '../../navigation/MainNavigator';
 import { reciteLiveEnabled } from '../../lib/reciteLive/availability';
 import { premiumErrorText, setDevPremium, supportLinkUrl, usePremium } from '../../lib/premium';
-import { reciteCheckSettingsLoaded, setReciteCheckSettings, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
+import { setReciteCheckSettings, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
 import { loadQuranWords, getQuranWords, QuranWords } from '../../lib/recite/quranWords';
 import { furthestWord, marksOnPage, removedMarks, startNotFound } from '../../lib/reciteLive/state';
 import { stopTrace } from '../../lib/reciteLive/stopTrace';
@@ -70,7 +70,7 @@ import { say, undoMs, useScreenReaderOn } from '../../components/reciteLive/a11y
 import { markTitle } from '../../lib/reciteLive/describe';
 import { drillMarks, drillRange, openDrill } from '../../lib/reciteLive/drill';
 import { describeAyahs } from '../../lib/passages';
-import { foundSpan, TakeSpan } from '../../lib/reciteLive/span';
+import { TakeSpan } from '../../lib/reciteLive/span';
 import { TestPlace, testJuz, testPlaces, TestResult, testResult } from '../../lib/reciteLive/testMe';
 import { memorizedAyahs } from '../../lib/memorizedAyahs';
 import { outcomeText, TestMeScopeSheet, TestSummarySheet } from '../../components/reciteLive/TestMeSheets';
@@ -533,29 +533,6 @@ export default function QuranReaderScreen() {
     // endTest is stable enough: only when the test stalls.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [testStalled]);
-  // A voice search with one result (Majd, Nov 15 2026: "take them to that page as if they're about to recite it"): a
-  // take starts as the reader opens, the checker looking for the start only in the ayahs found. Recite, marking
-  // mistakes when the switch is on, whatever a tap on the mic would start. It waits for the account's settings (the
-  // notice first, if it hasn't been agreed) and, with the switch on, for Premium to be known (3 s at most).
-  const reciteOnOpen = useRef(route.params.recite === true ? (route.params.highlight ?? null) : null);
-  const settingsLoaded = reciteCheckSettingsLoaded(user?.id);
-  const [premiumWaited, setPremiumWaited] = useState(false);
-  useEffect(() => {
-    if (!reciteOnOpen.current) return;
-    const t = setTimeout(() => setPremiumWaited(true), 3000);
-    return () => clearTimeout(t);
-  }, []);
-  const premiumKnown = premium.known;
-  const showChrome = chrome.show;
-  useEffect(() => {
-    const found = reciteOnOpen.current;
-    if (!found || !liveOn || !settingsLoaded) return;
-    if (reciteSettings.markMistakes && !premiumKnown && !premiumWaited) return;
-    reciteOnOpen.current = null;
-    // The controls up, as after a tap on the page: once the take is closed the player and its mic are there.
-    showChrome();
-    startMode(markMistakes ? 'check' : 'recite', foundSpan(found));
-  }, [liveOn, settingsLoaded, premiumKnown, premiumWaited, reciteSettings.markMistakes, markMistakes, startMode, showChrome]);
   const pickMode = useCallback(
     (mode: ReciteMenuMode) => {
       setModeMenu(false);

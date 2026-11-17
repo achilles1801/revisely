@@ -23,6 +23,7 @@ import { surahName } from '../../lib/passages';
 import { pageOfVerse } from '../../lib/verses';
 import { loadQuranWords, QuranWords } from '../../lib/recite/quranWords';
 import { matchedWords, searchText, VerseHit } from '../../lib/search/quranSearch';
+import { onlyVerseFound, readerFor } from '../../lib/search/voiceOpens';
 import { hasArabic, parseReference, SearchTarget } from '../../lib/search/parseQuery';
 import { addRecentSearch, clearRecentSearches, getRecentSearches } from '../../lib/search/recentSearches';
 import { voiceSearchEnabled } from '../../lib/search/availability';
@@ -50,16 +51,6 @@ interface Results {
   total: number;
   /** The best match in the text is only close. */
   closest: boolean;
-}
-
-/**
- * The one place a search found, when it found exactly one and not just the closest there is (the list would say
- * "1 result"): a voice search then opens the reader there ready to recite (Revisely Dev's live check). Null otherwise.
- */
-export function onlyVerseFound(results: Pick<Results, 'rows' | 'total' | 'closest'>): VerseHit | null {
-  if (results.closest || results.total !== 1 || results.rows.length !== 1) return null;
-  const row = results.rows[0];
-  return row.kind === 'verse' ? row.hit : null;
 }
 
 function verseTitle(sura: number, ayah: number): string {
@@ -151,9 +142,9 @@ export default function QuranSearchScreen() {
   }, [uid]);
 
   const open = useCallback(
-    (pageNumber: number, highlight?: ReadStackParamList['QuranReader']['highlight'], recite = false) => {
+    (pageNumber: number, highlight?: ReadStackParamList['QuranReader']['highlight']) => {
       Keyboard.dismiss();
-      navigation.push('QuranReader', { pageNumber, source: 'search', highlight, ...(recite ? { recite: true } : {}) });
+      navigation.push('QuranReader', { pageNumber, source: 'search', highlight });
     },
     [navigation],
   );
@@ -183,11 +174,13 @@ export default function QuranSearchScreen() {
       }
       setResults({ query: q, rows, total, closest });
       if (uid) addRecentSearch(uid, q).then(setRecent);
-      // Searched by voice with one place found (Majd, Nov 15 2026: "take them to that page as if they're about to recite
-      // it"): the reader opens there and starts reciting, looking for where the reciter goes on. Only after a voice
-      // search (the person was already speaking to the app), never a typed one; several results stay a list.
+      // Searched by voice with one place found (SEARCH-4; Majd, Nov 17 2026: "it takes me to the mushaf with the verse
+      // highlighted without it still recording then clicking back shows me that one search result"): the reader opens
+      // there with the ayah highlighted, as Open in the reader does, and nothing listening; this screen stays under it
+      // with its words and result. Only after a voice search, never a typed one; several results stay a list. With
+      // Recite open to the account (Revisely Dev until the release), as before.
       const only = voice && reciteOn ? onlyVerseFound({ rows, total, closest }) : null;
-      if (only) open(pageOfVerse(only), { sura: only.sura, ayah: only.ayah, last: only.last }, true);
+      if (only) open(pageOfVerse(only), readerFor(only));
     },
     [uid, reciteOn, open],
   );

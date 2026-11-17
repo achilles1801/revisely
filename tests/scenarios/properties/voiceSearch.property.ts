@@ -11,6 +11,7 @@ import { SAMPLE_RATE } from '../../../src/lib/recite/segmenter';
 import { VoiceQuery } from '../../../src/lib/search/voiceQuery';
 import type { AudioSourceHandlers } from '../../../src/lib/recite/micSource';
 import { runs } from './fixtures';
+import { onlyVerseFound, readerFor, type FoundRow } from '../../../src/lib/search/voiceOpens';
 
 const FRAME = (SAMPLE_RATE * 30) / 1000;
 const CHUNK = SAMPLE_RATE / 10;
@@ -128,6 +129,43 @@ describe('[SEARCH-3] searching by voice hears only what is said', () => {
         },
       ),
       { numRuns: runs(40) },
+    );
+  });
+});
+
+// SEARCH-4: a voice search with exactly one place found opens the reader there, highlighted, nothing listening.
+
+const hitArb = fc
+  .record({ sura: fc.integer({ min: 1, max: 114 }), ayah: fc.integer({ min: 1, max: 6 }), runs: fc.boolean(), from: fc.nat(80000) })
+  .map(({ sura, ayah, runs, from }) => ({ sura, ayah, last: { sura, ayah: runs ? ayah + 1 : ayah }, from, to: from + 4, score: 1 }));
+
+describe('[SEARCH-4] a voice search that finds one place opens the reader there; anything else stays a list', () => {
+  it('exactly one ayah found (not just the closest): that ayah, through the next one a run of words reached', () => {
+    fc.assert(
+      fc.property(hitArb, (hit) => {
+        const found = onlyVerseFound({ rows: [{ kind: 'verse', hit }], total: 1, closest: false });
+        expect(found).toBe(hit);
+        // Highlighted as Open in the reader does, and nothing else: no take, no listening.
+        expect(readerFor(hit)).toEqual({ sura: hit.sura, ayah: hit.ayah, last: hit.last });
+      }),
+      { numRuns: runs(100) },
+    );
+  });
+
+  it('several found, only the closest, a place named by reference, or nothing: no reader opens by itself', () => {
+    fc.assert(
+      fc.property(
+        fc.array(hitArb, { minLength: 0, maxLength: 4 }),
+        fc.integer({ min: 0, max: 30 }),
+        fc.boolean(),
+        fc.boolean(),
+        (hits, total, closest, named) => {
+          const rows: FoundRow[] = [...(named ? [{ kind: 'target' as const }] : []), ...hits.map((hit) => ({ kind: 'verse' as const, hit }))];
+          fc.pre(!(rows.length === 1 && rows[0].kind === 'verse' && total === 1 && !closest));
+          expect(onlyVerseFound({ rows, total, closest })).toBeNull();
+        },
+      ),
+      { numRuns: runs(200) },
     );
   });
 });

@@ -65,7 +65,8 @@ jest.mock('../../../lib/translation', () => {
 const mockClipboard = { copied: [] as string[] };
 jest.mock('../../../lib/clipboard', () => ({ copyText: (t: string) => mockClipboard.copied.push(t) }));
 
-import QuranSearchScreen, { onlyVerseFound } from '../QuranSearchScreen';
+import QuranSearchScreen from '../QuranSearchScreen';
+import { onlyVerseFound } from '../../../lib/search/voiceOpens';
 import { DesignProvider } from '../../../design/DesignContext';
 import { ThemeProvider } from '../../../context/ThemeContext';
 import { setQuranWordsForTests } from '../../../lib/recite/quranWords';
@@ -238,17 +239,17 @@ describe('searching the Quran', () => {
   );
 });
 
-describe('a voice search with one result opens the reader reciting (Revisely Dev, Majd, Nov 15 2026)', () => {
+describe('a voice search with one result opens the reader at the ayah, highlighted, nothing listening (SEARCH-4)', () => {
   const YUNUS_16 = { pageNumber: pageOfVerse({ sura: 10, ayah: 16 }), source: 'search', highlight: { sura: 10, ayah: 16, last: { sura: 10, ayah: 16 } } };
 
-  it('one place found by voice: the reader opens there with a take starting (`recite`), and the result stays listed behind it', async () => {
+  it('one place found by voice: the reader opens there highlighted, with no take, and the result stays listed behind it', async () => {
     mockDev = true;
     await open();
     await act(async () => mockVoice.heard?.('قل لو شاء الله ما تلوتو عليكم'));
     expect(mockNavigation.push).toHaveBeenCalledTimes(1);
-    expect(mockNavigation.push).toHaveBeenCalledWith('QuranReader', { ...YUNUS_16, recite: true });
+    expect(mockNavigation.push).toHaveBeenCalledWith('QuranReader', YUNUS_16);
     expect(screen.getByTestId('search-count')).toHaveTextContent('1 result');
-    // Its Open in the reader opens the page as before, with no take.
+    // Back on the search: its Open in the reader opens the same.
     fireEvent.press(within(screen.getByTestId('search-verse-10-16')).getByTestId('search-verse-open'));
     expect(mockNavigation.push).toHaveBeenLastCalledWith('QuranReader', YUNUS_16);
   });
@@ -261,7 +262,6 @@ describe('a voice search with one result opens the reader reciting (Revisely Dev
       pageNumber: 379,
       source: 'search',
       highlight: { sura: 27, ayah: 25, last: { sura: 27, ayah: 25 } },
-      recite: true,
     });
   });
 
@@ -301,7 +301,7 @@ describe('a voice search with one result opens the reader reciting (Revisely Dev
     expect(onlyVerseFound({ rows: [verse], total: 1, closest: false })).toBe(hit);
     expect(onlyVerseFound({ rows: [verse], total: 1, closest: true })).toBeNull();
     expect(onlyVerseFound({ rows: [verse], total: 3, closest: false })).toBeNull();
-    expect(onlyVerseFound({ rows: [{ kind: 'target', key: 't0', target: { kind: 'page', page: 62 } }], total: 0, closest: false })).toBeNull();
+    expect(onlyVerseFound({ rows: [{ kind: 'target' }], total: 0, closest: false })).toBeNull();
     expect(onlyVerseFound({ rows: [], total: 0, closest: false })).toBeNull();
   });
 });
