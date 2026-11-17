@@ -91,13 +91,12 @@ describe('the help names what the app has', () => {
 });
 
 describe('the help stays short and plain', () => {
-  // Every account's kind: Smart Tracking, the hidden page, Recite, Revisely Dev and arranging sections, each on or off.
+  // Every account's kind: Smart Tracking, Recite, Revisely Dev and arranging sections, each on or off.
   const accounts: HelpOpts[] = [];
   for (const smartTracking of [true, false])
-    for (const recite of [true, false])
-      for (const liveRecite of [true, false])
-        for (const devApp of [true, false])
-          for (const sections of [true, false]) accounts.push({ smartTracking, recite, liveRecite, devApp, sections });
+    for (const liveRecite of [true, false])
+      for (const devApp of [true, false])
+        for (const sections of [true, false]) accounts.push({ smartTracking, liveRecite, devApp, sections });
 
   it(`shows at most ${MAX_TOPICS} topics a sheet, for every kind of account; a screen's own sheet is never empty`, () => {
     for (const s of screens) {
@@ -130,6 +129,9 @@ describe('the help stays short and plain', () => {
       // Each Recite sheet leads to the others.
       expect(linksFor(s, { smartTracking: true, liveRecite: true })).toEqual(recite.filter((r) => r !== s));
     }
+    // A session's ⋯ help (Nov 17 2026): every Recite sheet but Test me's, which a session doesn't have.
+    expect(linksFor('session', { smartTracking: true, liveRecite: true })).toEqual(['recite', 'reciteTake', 'reciteMemory']);
+    expect(linksFor('session', { smartTracking: true, liveRecite: false })).toEqual([]);
     // A day's Recited block: from the day's help.
     expect(linksFor('day', { smartTracking: true, liveRecite: true })).toEqual(['reciteMemory']);
     expect(linksFor('day', { smartTracking: true, liveRecite: false })).toEqual([]);
@@ -187,7 +189,7 @@ describe('the help stays short and plain', () => {
 
   it('says nothing about ratings or strength with Smart Tracking off', () => {
     const words = /\b(rat(e|ed|es|ing|ings)|weak|weaker|weakest|moderate|strong|strength)\b/i;
-    const off = screens.flatMap((s) => topicsFor(s, { smartTracking: false, recite: true }));
+    const off = screens.flatMap((s) => topicsFor(s, { smartTracking: false, liveRecite: true }));
     expect(off.filter((t) => words.test(t.text) || words.test(t.title)).map((t) => t.id)).toEqual([]);
   });
 });

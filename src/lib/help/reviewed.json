@@ -29,7 +29,9 @@
     "ACT-8": "17530ba6416770ba",
     "ACT-12": "4afb073e2a87d454"
   },
-  "session.hidden": {},
+  "session.recite": {
+    "RECITE-9": "76319d1742c337f9"
+  },
   "reader.hold": {},
   "reader.turning": {},
   "reader.recitation": {},

@@ -1535,6 +1535,15 @@ describe('Recite your mistakes here (the held mic: the page’s remembered mista
     expect(screen.getByTestId('recite-mode-drill')).toHaveTextContent(/Recite your 1 mistake here/);
   });
 
+  it('not with Settings → Recite → “Show past mistakes” off (the page doesn’t show them then)', async () => {
+    await remember('u1', takeWith([wrongAt(27, 24)]));
+    setReciteCheckSettings('u1', { noticeSeen: true, mode: 'recite', markMistakes: true, showPast: false });
+    await open();
+    await holdMic();
+    expect(screen.getByTestId('recite-mode-menu')).toBeTruthy();
+    expect(screen.queryByTestId('recite-mode-drill')).toBeNull();
+  });
+
   it('not offered without Premium, when the page has nothing to fix, or for tajweed notes alone', async () => {
     setReciteCheckSettings('u1', { noticeSeen: true, mode: 'recite', markMistakes: true });
     await open();

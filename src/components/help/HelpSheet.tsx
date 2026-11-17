@@ -90,7 +90,6 @@ export function HelpSheet({
   visible,
   onClose,
   onHide,
-  recite = false,
   liveRecite,
 }: {
   screen: HelpScreen;
@@ -98,8 +97,6 @@ export function HelpSheet({
   onClose: () => void;
   /** "Hide help buttons": runs after the sheet has gone. */
   onHide: () => void;
-  /** The hidden page (recite mode) is offered here: its topic shows. */
-  recite?: boolean;
   /**
    * The reader's Recite (Revisely Dev) is offered: its topics show, in place of those without it. Left out, the
    * account's (Activity's sheets: Recite's past takes and Insights' Recitation).
@@ -118,7 +115,6 @@ export function HelpSheet({
   const entry = HELP[shown];
   const opts = {
     smartTracking: user?.smartTrackingEnabled === true,
-    recite,
     liveRecite: liveRecite ?? reciteLiveForAccount(user),
     devApp: gapsInsightsEnabled(user),
     sections: activitySectionsEnabled(user),

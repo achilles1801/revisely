@@ -35,17 +35,15 @@ export type HelpScreen =
   | 'reciteTest';
 
 /**
- * When a topic shows: only with Smart Tracking on, only with it off, only where the hidden page
- * (recite mode, the session's eye) is offered, only with the reader's Recite (Revisely Dev's one mic) or
- * only without it, only in Revisely Dev (Insights' Gaps and Last revised), or only where Activity's
- * sections can be arranged (testers).
+ * When a topic shows: only with Smart Tracking on, only with it off, only with Recite (Revisely Dev's one mic, in the
+ * reader and sessions) or only without it, only in Revisely Dev (Insights' Gaps and Last revised), or only where
+ * Activity's sections can be arranged (testers).
  */
-export type HelpWhen = 'smartTracking' | 'noSmartTracking' | 'recite' | 'liveRecite' | 'noLiveRecite' | 'devApp' | 'sections';
+export type HelpWhen = 'smartTracking' | 'noSmartTracking' | 'liveRecite' | 'noLiveRecite' | 'devApp' | 'sections';
 
 /** What decides which topics an account sees (HELP-3). */
 export interface HelpOpts {
   smartTracking: boolean;
-  recite?: boolean;
   liveRecite?: boolean;
   devApp?: boolean;
   sections?: boolean;
@@ -169,17 +167,19 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         when: 'smartTracking',
       },
       {
-        id: 'session.hidden',
-        icon: 'eye-off-outline',
-        title: 'Hidden page',
+        // The reader's mic in a session (Revisely Dev, Majd, Nov 17 2026). While a take is open, ⋯'s help is How Recite works.
+        id: 'session.recite',
+        icon: 'mic-outline',
+        title: 'Reciting',
         text:
-          "[[eye]] hides the page so you recite from memory. Each verse appears when you pause; " +
-          "{{Next verse}} shows one if you're stuck.",
-        covers: [],
-        unruled: 'recite mode needs on-device speech recognition, which the scenarios can’t run',
-        when: 'recite',
+          '[[mic]] records you; hold it and choose {{Recite}}, and the page follows you. ' +
+          'A take never marks a page revised: swipe on or [[check]] as always.',
+        covers: ['RECITE-9'],
+        when: 'liveRecite',
       },
     ],
+    // Recite's sheets, with it (their topics' `when`). Test me isn't in a session (it goes anywhere in what's memorized).
+    more: ['recite', 'reciteTake', 'reciteMemory'],
   },
   reader: {
     title: 'How the reader works',
@@ -628,14 +628,13 @@ export const MAX_TOPICS = 4;
 
 /**
  * A screen's topics for this account (HELP-3): the Smart Tracking ones only with it on, their
- * stand-ins only with it off, the hidden page's only where it's offered, Recite's only with it, Revisely
+ * stand-ins only with it off, Recite's only with it, Revisely
  * Dev's only there, and arranging Activity's sections only where it can be done.
  */
 export function topicsFor(screen: HelpScreen, opts: HelpOpts): HelpTopic[] {
   return HELP[screen].topics.filter((t) => {
     if (t.when === 'smartTracking') return opts.smartTracking;
     if (t.when === 'noSmartTracking') return !opts.smartTracking;
-    if (t.when === 'recite') return opts.recite === true;
     if (t.when === 'liveRecite') return opts.liveRecite === true;
     if (t.when === 'noLiveRecite') return opts.liveRecite !== true;
     if (t.when === 'devApp') return opts.devApp === true;

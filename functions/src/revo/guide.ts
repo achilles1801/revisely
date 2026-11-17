@@ -17,7 +17,7 @@
  * Change it in the same PR as the feature: every change a user can see updates the guide (main or Dev).
  * Verified against the code on Nov 9 2026, as of the release
  * that opens Activity, memorizing by the ayah, help, What's new and every QuranEnc translation to
- * everyone (recite mode and Settings → Testing stay testers'; searching the Qur'an, typed and by voice
+ * everyone (Settings → Testing stays testers'; searching the Qur'an, typed and by voice
  * on an iPhone, opened to everyone on Nov 9 2026).
  *
  * Name parts of the Qur'an by surah and juz here too (the owner's rule); page numbers only where
@@ -268,7 +268,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
     routes: ['Settings'],
     text: lines(
       '- Account: display name. Activity: “Activity”, “Recordings”, “Back up recordings”, “Time in app”, “Memorized pages”. Home screen: “Next prayer”, “Friday Al-Kahf reminder”. Prayer: as above.',
-      '- Revision: “Smart Tracking” (rate pages, Insights), “Keep daily amount”, and on an iPhone “Speech model” (searching by voice; for testers, the hidden page too).',
+      '- Revision: “Smart Tracking” (rate pages, Insights), “Keep daily amount”, and on an iPhone “Speech model” (searching by voice).',
       '- Revo AI: Revo on or off, “What Revo can do” (Revo’s short introduction, which also plays before Revo is first turned on; Skip ends it), “Memory”, “Delete conversations”.',
       '- Mushaf: “Mushaf”, “Offline mushaf”, “Download over mobile data”. Notifications: “Enable notifications” (revision reminders: 8:00 AM, after Asr, and an hour before the day ends, while today isn’t done; there is no setting for their times). Appearance: “Theme” (Light or Dark) and “Accent” (Indigo, Crimson or Jade).',
       '- Support: “Share Revisely”, “Send feedback”, “Report a problem”, “Contact support”, “Help buttons”. About: “What’s new”, “Privacy Policy”, “Terms of Service”, the version.',
@@ -281,7 +281,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['RESET-2', 'RESET-3', 'ACT-29'],
     routes: ['Settings', 'Activity'],
     text: lines(
-      '- Testers (TestFlight or Google Play testing, marked by the Revisely team) get Settings → Testing, the hidden page in sessions (the eye button at the top, with the Madani 1405 mushaf: recite from memory; following the recitation word by word needs “Speech model” on an iPhone), and updates early.',
+      '- Testers (TestFlight or Google Play testing, marked by the Revisely team) get Settings → Testing and updates early. A session has no eye at the top any more (the old hidden page for testers is gone).',
       '- “Reset my data” (type RESET): a backup is kept, then the account starts again as new, still signed in; not again within 10 minutes. “Load test scenario” replaces the data with a ready-made situation the same way.',
       '- Testers can arrange Activity: “Edit sections” (the icon at the end of the Overview and Insights tabs) shows, hides and reorders the tab’s sections (hold one, then drag); “Show all, in the usual order” puts it back. Kept on this phone.',
     ),
@@ -327,7 +327,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['RECITE-1', 'RECITE-5', 'SEARCH-4', 'PREM-1'],
     routes: ['QuranReader', 'Settings'],
     text: lines(
-      '- Who has it: Revisely Dev, a tester account ("Tester: yes"), an iPhone and the Madani 1405 mushaf (Settings → Mushaf → “Mushaf”). The reader’s bar then has an eye and a mic in place of the record button. On Android or with the 1441 print it is the usual record button. It needs the internet: the checking runs on Revisely’s server.',
+      '- Who has it: Revisely Dev, a tester account ("Tester: yes"), an iPhone and the Madani 1405 mushaf (Settings → Mushaf → “Mushaf”). The reader’s bar, and a revision session’s, then has an eye and a mic in place of the record button. On Android or with the 1441 print it is the usual record button. It needs the internet: the checking runs on Revisely’s server.',
       '- The mic: tap it to start a take. Hold it to choose: “Record” (“Just record your recitation”) or “Recite” (“The page follows you”), and under Recite the “Mark mistakes” switch. Recite follows them on the page; with Mark mistakes on it also marks mistakes as they recite. Mark mistakes is part of Premium, free in Revisely Dev (Settings → Testing → “Premium”: off shows it locked).',
       '- Premium early access: while Premium is in early access, every account has it free, with no end date, and keeps it for good after Premium becomes paid; new accounts get it when they’re set up. Settings → Recite → “Premium” says so, and so does a Mark mistakes take’s summary. An account without it yet gets it from “Get Premium” in Mark mistakes’ intro; “Can’t afford it? Apply for support” isn’t shown meanwhile. There are no prices yet, and it isn’t a trial: nothing is charged.',
       '- A take starts anywhere: the bar says “Listening…” until it finds where they are, and nothing shows before that. It looks on the page, then in the whole Qur’an, and turns there once sure (VoiceOver says "Started at …"). Then a grey band on the line and a grey box on the word follow them, and the page turns with them. Turning the page by hand makes it look on that page. If it never finds the place, nothing is marked and Stop just ends it; with VoiceOver, one line says so ("Couldn’t follow that take. Try starting at the top of the page.").',
@@ -336,7 +336,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
       '- Settings → Recite: “Mistakes to mark”: “Words & harakat” (wrong, skipped and added words, letter and haraka slips) or “Strict” (the same, and tajweed: madd lengths, qalqalah, ghunnah, ikhfa, idgham, iqlab), where “Madd munfasil”, “Madd muttasil” and “Madd ʿarid” set the lengths. “Save recordings when you recite” keeps a take’s audio on this phone, with the recordings in Activity.',
       '- Since mid-November 2026, “Words & harakat” and Recite listen with a newer model: it marks recitation that was right less often, especially with noise in the background, and catches word slips (a skipped, changed or added word) about as before. Small haraka or letter slips are marked a little less often, and "You continued with …" shows for fewer slips. “Strict” is unchanged.',
       '- It is AI and can make mistakes (Settings → About → “Recitation check notice”). Software checks the recitation; nobody listens. Settings → Testing → “Keep my recitations as test data” keeps takes for Revisely’s tests.',
-      '- Help: the reader’s ? (top right) leads to Recite’s own sheets, “How Recite works”, “During a take”, “Your past mistakes” and “Test me and voice search”; during a take it opens “How Recite works”. A day’s ? leads to “Your past mistakes”, and Insights’ to “More in Insights” (Gaps, Last revised, Recitation).',
+      '- Help: the reader’s ? (top right) leads to Recite’s own sheets, “How Recite works”, “During a take”, “Your past mistakes” and “Test me and voice search”; during a take it opens “How Recite works”. A session’s ⋯ → “How a session works” leads to the same sheets but Test me’s, and during a take to “How Recite works”. A day’s ? leads to “Your past mistakes”, and Insights’ to “More in Insights” (Gaps, Last revised, Recitation).',
     ),
   },
   {
@@ -349,6 +349,16 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
       '- Tap a marked word: its card names each mark (“Wrong word”, “Skipped word”, “Extra word”, “Harakat slip”, “Letter slip”, “Not clear” or the tajweed rule), with “Expected” and what was heard. “Not a mistake” takes a mark off (Undo for a few seconds). “Hear it” plays the reciter’s ayah (it pauses a take); “Your recitation” plays their own voice at that word, until the take is closed; “Similar phrases” lists “Ayahs that read almost the same”.',
       '- After Stop, with Mark mistakes on, “Your recitation” opens: the score by the page, then each mark (tap one to see it on the page). Going on with a similar ayah gets its own row ("You continued with Luqman 31:6, a similar ayah", or "You ended ayah 5 as ayah 3 ends"); a tap opens that ayah in the reader. "1 marked not a mistake" lists marks taken off, each with “Put back”.',
       '- Its buttons: “Recite the mistakes again” (one take over just the stretch with mistakes; it stops by itself at the end and says "Before: …"), “Recite again” and “Done”.',
+    ),
+  },
+  {
+    title: 'Recite in a revision session',
+    covers: ['RECITE-9'],
+    routes: ['ActiveRevision', 'QuranReader'],
+    text: lines(
+      '- A session has the reader’s mic and eye in the bar under the page (tap the page for the controls): the same takes, marks, hidden view, cards and summary, and "Recite your 3 mistakes here" on a page with words still marked. Test me is the reader’s only.',
+      '- A take never marks a page revised: the page turns with them, but only swiping off a page or the ✓ at the top marks it, as always. The session’s pages, their order, the timer and the end card stay as they are.',
+      '- A place outside the session’s pages (a similar ayah they went on with, “Show on the page” for a past take) opens in the reader over the session; Back comes back to it.',
     ),
   },
   {
@@ -415,7 +425,6 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: [],
     routes: [],
     text: lines(
-      '- Recite in a revision session: no, it is in the reader only. Closest: open the pages in the reader (Read tab, or a day’s page in Activity) and recite there.',
       '- Recite on Android, with the Madani 1441 print, or offline; a teacher hearing the takes: not yet.',
     ),
   },

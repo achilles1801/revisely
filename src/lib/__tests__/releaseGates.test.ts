@@ -13,7 +13,6 @@ import { replayOffered, walkthroughDue } from '../whatsNew/due';
 import { insightsTab, mainTabRoutes, swipeableTabCount } from '../../navigation/tabPages';
 import { needOpen } from '../../components/whatsNew/needs';
 import { revoAvailable } from '../revo/availability';
-import { reciteModeEnabled } from '../recite/availability';
 import { showsResetMyData } from '../testerReset';
 import { showsTestScenarios } from '../testScenarios';
 import { quranSearchEnabled, voiceSearchEnabled } from '../search/availability';
@@ -106,11 +105,9 @@ describe('still for testers', () => {
     expect(revoAvailable(TESTER, 'testers')).toBe(true);
   });
 
-  it.each(APP_STORE)('[RESET-2] [RESET-3] hidden recite mode, Reset my data and Load test scenario, for %o', (user) => {
-    expect(reciteModeEnabled(user)).toBe(false);
+  it.each(APP_STORE)('[RESET-2] [RESET-3] Reset my data and Load test scenario, for %o', (user) => {
     expect(showsResetMyData(user)).toBe(false);
     expect(showsTestScenarios(user)).toBe(false);
-    expect(reciteModeEnabled(TESTER)).toBe(true);
     expect(showsResetMyData(TESTER)).toBe(true);
     expect(showsTestScenarios(TESTER)).toBe(true);
   });

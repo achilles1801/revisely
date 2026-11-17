@@ -1,12 +1,4 @@
-import {
-  hiddenPageLayout,
-  hidePageAgain,
-  NOTHING_REVEALED,
-  nextHiddenVerse,
-  revealedOn,
-  revealVerse,
-  verseKey,
-} from '../hiddenPage';
+import { hiddenPageLayout, verseKey } from '../hiddenPage';
 import { pageLines, subtractSpans } from '../pageLines';
 import { ayahRects, versesOnPage } from '../../ayahBounds';
 
@@ -117,20 +109,10 @@ describe('hidden page', () => {
     expect(lines.every((l) => l.covers.length === 0 && !l.current)).toBe(true);
   });
 
-  it('the reveal state: per page, once each, in order; covered again', () => {
-    let s = revealVerse(NOTHING_REVEALED, 1, { sura: 1, ayah: 2 });
-    s = revealVerse(s, 1, { sura: 1, ayah: 1 });
-    expect(revealVerse(s, 1, { sura: 1, ayah: 1 })).toBe(s);
-    expect(s[1].verses).toEqual(['1:2', '1:1']);
-    expect([...revealedOn(s, 2)]).toEqual([]);
-    expect(nextHiddenVerse(s, 1) && verseKey(nextHiddenVerse(s, 1)!)).toBe('1:3');
-    expect(hidePageAgain(s, 1)).toEqual({});
-  });
-
   it('a page whose first verse began on the page before starts with it', () => {
     // Page 3 begins mid-verse (2:6 starts on page 3? its first verse is 2:6).
     const first = versesOnPage(3)[0];
-    expect(nextHiddenVerse(NOTHING_REVEALED, 3)).toEqual(first);
+    expect(hiddenPageLayout(3, new Set()).next).toEqual(first);
   });
 });
 

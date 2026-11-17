@@ -31,7 +31,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { FajrBoundaryCard } from '../../components/FajrBoundaryCard';
 import { SpeechModelSheet } from '../../components/recite/SpeechModelSheet';
 import { ActionSheet } from '../../components/v2/ActionSheet';
-import { reciteModeEnabled } from '../../lib/recite/availability';
 import { voiceSearchEnabled } from '../../lib/search/availability';
 import { formatModelSize } from '../../lib/recite/speechModel';
 import { removeSpeechModel, useSpeechModelState } from '../../lib/recite/speechModelStore';
@@ -354,7 +353,6 @@ export default function SettingsScreen() {
   const speechModel = useSpeechModelState();
   // The speech model searches by voice (everyone, on an iPhone) and follows recitation (testers).
   const speechModelShown = voiceSearchEnabled(user);
-  const followsRecitation = reciteModeEnabled(user);
   const [speechSheet, setSpeechSheet] = useState(false);
   const [deleteSpeechOpen, setDeleteSpeechOpen] = useState(false);
   const mushaf = useMushafOffline();
@@ -829,7 +827,7 @@ export default function SettingsScreen() {
             <Row
               icon="mic-outline"
               label={t('settings.revision.speechModel')}
-              subtitle={followsRecitation ? t('settings.revision.speechFollows') : t('settings.revision.speechSearches')}
+              subtitle={t('settings.revision.speechSearches')}
               value={
                 speechModel.status === 'ready'
                   ? formatModelSize(speechModel.bytes)
@@ -1254,7 +1252,6 @@ export default function SettingsScreen() {
         visible={speechSheet}
         onClose={() => setSpeechSheet(false)}
         onReady={() => setSpeechSheet(false)}
-        {...(followsRecitation ? {} : { title: t('settings.revision.searchByVoice'), intro: t('settings.revision.searchByVoiceIntro') })}
       />
       <ActionSheet
         visible={checkLevelSheet}
@@ -1282,7 +1279,7 @@ export default function SettingsScreen() {
         visible={deleteSpeechOpen}
         onClose={() => setDeleteSpeechOpen(false)}
         title={t('settings.revision.speechModel')}
-        message={t(followsRecitation ? 'settings.revision.deleteSpeechFollows' : 'settings.revision.deleteSpeech', { size: formatModelSize() })}
+        message={t('settings.revision.deleteSpeech', { size: formatModelSize() })}
         actions={[{ key: 'delete', label: t('settings.revision.deleteSpeechModel'), icon: 'trash-outline', destructive: true, onPress: removeSpeechModel }]}
         testID="speech-model-delete-menu"
       />
