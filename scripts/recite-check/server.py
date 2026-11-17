@@ -12,6 +12,7 @@ GET  /health
 import health  # noqa: I001  first: an instance's age counts from about here (health.py: the numbers-only log lines)
 import asyncio
 import contextlib
+import copy
 import inspect
 import io
 import json
@@ -628,7 +629,8 @@ async def live_socket(ws: WebSocket):
         r.update(engine=VERSION, take=s.sid)
         done = next((e for e in events if e['type'] == 'done'), None)
         late = asyncio.get_running_loop().create_future() if s.request.get('namesAfter') else None
-        FINISHED[s.sid] = (s.uid, s.sess.n, done, time.time(), late)
+        # a copy: names() writes `into` onto the result's marks, and a resume's `done` must stay without them
+        FINISHED[s.sid] = (s.uid, s.sess.n, copy.deepcopy(done) if late is not None else done, time.time(), late)
         s.events += [e for e in events if e['type'] != 'done']  # the result is kept on its own
         with contextlib.suppress(WebSocketDisconnect):
             await send(events, record=False)
@@ -637,13 +639,15 @@ async def live_socket(ws: WebSocket):
             if s.keep:  # the audio goes up meanwhile; the result waits for the names
                 wav = asyncio.ensure_future(asyncio.to_thread(keep_take, s, False, ('.wav',)))
             t0 = time.perf_counter()
+            named = [{'type': 'into', 'names': [], 't': round(s.sess.seconds, 2)}]
             try:
                 named = await asyncio.to_thread(s.run, s.sess.names)
             except Exception:  # never leaves the phone waiting: no names, as naming never costs the answer
                 log.exception('live: naming failed')
-                named = [{'type': 'into', 'names': [], 't': round(s.sess.seconds, 2)}]
+            finally:  # cancelled too (a shutdown): a resume waiting on it gets no names, not 10 s of nothing
+                if not late.done():
+                    late.set_result(named)
             names_ms = int((time.perf_counter() - t0) * 1000)
-            late.set_result(named)
             FINISHED[s.sid] = FINISHED[s.sid][:4] + (named,)
             with contextlib.suppress(WebSocketDisconnect):
                 await send(named, record=False)
@@ -695,16 +699,16 @@ async def live_socket(ws: WebSocket):
         rid = msg.get('resume')
         f = FINISHED.get(rid) if isinstance(rid, str) else None
         if f and f[0] == uid and f[2] is not None:
-            # the take ended on this instance and the phone missed its `done`: the same answer again, not a re-run
-            # (and its names, waited for if they're still being worked out)
+            # the take ended on this instance and the phone missed its `done`: the same answer again, not a re-run,
+            # at once; then its names, waited for if they're still being worked out
+            await send([{'type': 'ready', 'v': 2, 'engine': VERSION, 'server': SERVER, 'protocol': protocol(),
+                         'take': rid, 'from': f[1]}, f[2]], record=False)
             late = f[4]
             if isinstance(late, asyncio.Future):
-                try:
+                with contextlib.suppress(Exception):
                     late = await asyncio.wait_for(asyncio.shield(late), 10)
-                except Exception:
-                    late = None
-            await send([{'type': 'ready', 'v': 2, 'engine': VERSION, 'server': SERVER, 'protocol': protocol(),
-                         'take': rid, 'from': f[1]}, f[2]] + (late or []), record=False)
+            if isinstance(late, list):
+                await send(late, record=False)
             with contextlib.suppress(Exception):
                 await ws.close(1000)
             return

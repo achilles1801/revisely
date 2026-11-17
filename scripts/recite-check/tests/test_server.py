@@ -636,10 +636,38 @@ class LiveTests(Base):
         with self.socket() as ws:
             ws.send_text(start(keep=False, namesAfter=True, resume=ready['take']))
             self.assertEqual(ws.receive_json()['type'], 'ready')
-            self.assertEqual(ws.receive_json()['type'], 'done')
+            done = ws.receive_json()
+            self.assertEqual((done['type'], done['result']['marks']), ('done', []))  # still without the names
             self.assertEqual(ws.receive_json(), into)
             with self.assertRaises(WebSocketDisconnect):
                 ws.receive_json()
+        self.assertEqual(len(FakeSession.made), 1)
+
+    def test_a_resume_while_naming_gets_done_at_once(self):
+        """A phone back while the names are still being worked out gets `ready` and `done` at once, then `into`
+        when it's ready; no second run."""
+        gate = threading.Event()
+
+        class Slow(FakeSession):
+            def names(self):
+                gate.wait(5)
+                return super().names()
+        with mock.patch.object(live, 'LiveSession', Slow):
+            with self.socket() as ws:
+                ws.send_text(start(keep=False, namesAfter=True))
+                ready = ws.receive_json()
+                ws.send_bytes(second_of_audio() * 3)
+                ws.send_text(json.dumps({'type': 'end'}))
+                while ws.receive_json()['type'] != 'done':
+                    pass
+                with self.socket() as back:
+                    back.send_text(start(keep=False, namesAfter=True, resume=ready['take']))
+                    self.assertEqual(back.receive_json()['type'], 'ready')
+                    self.assertEqual(back.receive_json()['type'], 'done')
+                    self.assertFalse(gate.is_set())  # both came while naming was still held up
+                    gate.set()
+                    self.assertEqual(back.receive_json()['type'], 'into')
+                self.assertEqual(ws.receive_json()['type'], 'into')
         self.assertEqual(len(FakeSession.made), 1)
 
     def test_a_take_run_again_elsewhere_keeps_the_first_copy(self):
