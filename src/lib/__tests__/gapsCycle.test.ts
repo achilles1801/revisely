@@ -1,4 +1,5 @@
 import { pushBack, pushBackLine, type PushBackInput } from '../gapsCycle';
+import { juzKeyForPage } from '../algorithm';
 import type { User, UserPage } from '../../types';
 
 // 20 pages, 5 a day from 1 January: a 4-day cycle. 1 Jan 1–5, 2 Jan 6–10, 3 Jan 11–15, 4 Jan 16–20, 5 Jan 1–5…
@@ -131,6 +132,22 @@ describe('pushBack', () => {
     expect(pushBack(input({}, { memorized: [] }))).toBeNull();
     const empty: User = { ...user, customPlan: { days: [[]], cycleStartDate: '2026-01-01', direction: 'forward' } };
     expect(pushBack(input({}, { user: empty }))).toBeNull();
+  });
+});
+
+describe('pushBack on a hafiz’s juz plan', () => {
+  // The Heavy user test scenario (a juz a day, about 450 pages) took 2 to 4 s to open Insights on the scenario harness,
+  // nearly all of it here: each of the 92 days read worked out every memorized page's juz again for every day of the
+  // cycle (Nov 17 2026).
+  it('reads 450 pages, a juz a day, at once', () => {
+    const juzPlan: User = { ...user, scheduleMode: 'juz', dailyJuzCount: 1 };
+    const memorized = pages(155, 604);
+    const juz = new Set(memorized.map((p) => juzKeyForPage(p.pageNumber))).size;
+    const started = performance.now();
+    const v = pushBack({ user: juzPlan, memorized, today: TODAY, lastRevised: () => '2026-01-08', since: () => null })!;
+    const took = performance.now() - started;
+    expect(v.cycleDays).toBe(juz);
+    expect(took).toBeLessThan(100); // about 4 ms on a laptop; 2 s before
   });
 });
 
