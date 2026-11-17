@@ -210,7 +210,12 @@ How the tests are made: `tests/scenarios/README.md`.
   account is reset as in RESET-2 (the same backup first) and filled with the scenario, on the revision
   days this phone shows (its zone, clock and Fajr). Every rule above that can be read off an account
   holds for each scenario, and the phone shows it with no relaunch. No other account can, and not
-  again within 2 minutes (30 a day). The Offline queue scenario holds its changes on the phone until
+  again within 2 minutes (30 a day). Settings offers three (Majd, Nov 17 2026: "3 scenarios should be
+  sufficient with the most important being a super heavy user with a lot of activity and months of data"):
+  Heavy user (seven months: a juz a day, gaps, the daily log, recordings, sittings, over a hundred Recite
+  takes with marks, Revo's conversations and memory), Missed yesterday (the streak's grace ring and the
+  catch-up) and Getting started (two weeks, Al-Mulk ayah by ayah, the first takes). The older, narrow
+  scenarios stay loadable for the automated tests; their Offline queue holds its changes on the phone until
   "Send held changes" (or the next start of the app), then sends them in order.
 - **ACCOUNT-1.** Delete account (Settings, confirmed twice) removes the account from the server with everything of it
   (pages, sessions, notes, Revo's and the coach's data, backed-up recordings) and signs the phone out. Offline, or when
