@@ -359,7 +359,7 @@ function PageLine({
           />
         ) : null}
         <View style={styles.lineText}>
-          <Text style={[thread ? typeV2.body : typeV2.name, { color: palette.text }]}>
+          <Text style={[thread ? typeV2.body : typeV2.name, styles.lineName, { color: palette.text }]}>
             {name}
             <Text style={[typeV2.meta, { color: palette.secondary }]}>{`  ${pagesNote([page])}`}</Text>
           </Text>
@@ -385,8 +385,12 @@ const styles = StyleSheet.create({
   line: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingRight: layoutV2.gutter },
   lineIn: { minHeight: 44, paddingVertical: 10, paddingLeft: layoutV2.gutter + markV2.top + layoutV2.markGap },
   lineTop: { minHeight: 52, paddingVertical: 14, paddingLeft: layoutV2.gutter },
-  lineText: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 10, rowGap: 2 },
-  when: { marginLeft: 'auto' },
+  // The name wraps in its own column and the recency keeps the right one, level with the name's first line, so a
+  // long name ("Adh-Dhariyat 52 to At-Tur 14") never pushes it down a line on its own. At the largest text it may
+  // wrap too, within its share of the row.
+  lineText: { flex: 1, flexDirection: 'row', alignItems: 'baseline', columnGap: 10 },
+  lineName: { flex: 1 },
+  when: { flexShrink: 0, maxWidth: '45%', textAlign: 'right' },
   thread: { position: 'absolute', left: THREAD_X, width: layoutV2.threadLine, borderRadius: 1, top: 0 },
   threadThrough: { bottom: 0 },
   threadEnd: { height: '50%' },
