@@ -454,6 +454,7 @@ export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
   'LANG-1': 'layout: the layout follows the app’s language, not the phone’s; nothing for Revo to explain',
   'SHEET-1': 'layout: one sheet at a time, so the screen under them always takes taps again; nothing for Revo to explain',
   'SYNC-4': 'timing: a new account loads with no relaunch; nothing to do',
+  'SYNC-6': 'timing: a page keeps its last revised day, count and rating however long the history grows; nothing to do',
   'ACCOUNT-2': 'signed out: the sign-in screen keeps what was typed after a failed attempt',
   'AUTH-1': 'server: a passing Google outage at launch keeps the sign-in; nothing to do',
   'ACCOUNT-3': 'timing: how long Delete account waits for the server; the app says what happened itself',
