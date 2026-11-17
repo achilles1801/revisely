@@ -405,11 +405,12 @@ def forget_old():
             del FINISHED[sid]
 
 
-def keep_take(s, partial=False):
+def keep_take(s, partial=False, parts=('.wav', '.json')):
     """The audio, the events and the dismissals (and the end result) under recite-tests/<uid>/<take>; a dropped
     session's so far under <take>.part-<time> (names are written once, and another instance may finish it). A take
     already kept under its name (finished before, then resumed and run again, maybe on the other instance) is left as
-    it is: the run is the same audio, so the same events."""
+    it is: the run is the same audio, so the same events. parts: which files (with namesAfter the audio goes up while the
+    names are worked out, and the result once they're in it)."""
     name = store.name_for(s.uid, s.sid) + (f'.part-{store.new_take()}' if partial else '')
     sess = s.sess
     for suffix, write in (('.wav', lambda n: store.put(n, wav_bytes(sess.pcm[:sess.n]), 'audio/wav')),
@@ -417,6 +418,8 @@ def keep_take(s, partial=False):
                               'mode': 'live', 'request': s.request, 'app': s.app, 'engine': VERSION,
                               'events': s.events, 'dismissed': sorted(sess.dismissed), 'hints': sess.hints,
                               'result': sess.result, 'secs': round(sess.seconds, 1)}))):
+        if suffix not in parts:
+            continue
         try:
             write(name + suffix)
         except store.Exists:
@@ -472,7 +475,7 @@ def start_note(s):
     return f'locked at {locks[0]} s ({len(locks)} locks)' if locks else f'no lock in {s.sess.seconds:.1f} s'
 
 
-def take_fields(s, r, kept=None):
+def take_fields(s, r, kept=None, names_ms=None):
     """A finished live take's health line (health.py): numbers, levels and reasons only. `open_s` is from its first
     socket's connect to now; `cpu_s` the process's CPU meanwhile (one take per instance: the take's own)."""
     secs = s.sess.seconds
@@ -488,7 +491,8 @@ def take_fields(s, r, kept=None):
             'ready_s': s.ready_s, 'cold': s.cold, 'age_s': round(s.age, 1), 'sockets': s.sockets,
             'restarted': s.restarted, 'why': r.get('why'), 'marks': len(r.get('marks') or []), 'kept': kept,
             'cpu_s': round(cpu_s, 2), 'cpu_per_s': round(cpu_s / secs, 3) if secs else None,
-            'appcheck': s.appcheck, **health.lag(s.lag), **health.per_second(r.get('ms'), secs)}
+            'appcheck': s.appcheck, 'names_after_ms': names_ms, **health.lag(s.lag),
+            **health.per_second(r.get('ms'), secs)}
 
 
 def ayah_pair(v):
@@ -628,12 +632,17 @@ async def live_socket(ws: WebSocket):
         s.events += [e for e in events if e['type'] != 'done']  # the result is kept on its own
         with contextlib.suppress(WebSocketDisconnect):
             await send(events, record=False)
+        wav, names_ms = None, None
         if late is not None:  # the names, worked out after `done` (they go with the kept result too)
+            if s.keep:  # the audio goes up meanwhile; the result waits for the names
+                wav = asyncio.ensure_future(asyncio.to_thread(keep_take, s, False, ('.wav',)))
+            t0 = time.perf_counter()
             try:
                 named = await asyncio.to_thread(s.run, s.sess.names)
-            except Exception:
+            except Exception:  # never leaves the phone waiting: no names, as naming never costs the answer
                 log.exception('live: naming failed')
                 named = [{'type': 'into', 'names': [], 't': round(s.sess.seconds, 2)}]
+            names_ms = int((time.perf_counter() - t0) * 1000)
             late.set_result(named)
             FINISHED[s.sid] = FINISHED[s.sid][:4] + (named,)
             with contextlib.suppress(WebSocketDisconnect):
@@ -643,7 +652,14 @@ async def live_socket(ws: WebSocket):
                  len(r.get('marks') or []), r.get('why'), r.get('ms'), s.sockets, s.keep, start_note(s))
         if s.keep:
             t0 = time.perf_counter()
-            job = asyncio.ensure_future(asyncio.to_thread(keep_take, s))  # shielded: it finishes if the phone goes
+
+            async def keep_all():
+                if wav is None:
+                    await asyncio.to_thread(keep_take, s)
+                else:
+                    await wav
+                    await asyncio.to_thread(keep_take, s, False, ('.json',))
+            job = asyncio.ensure_future(keep_all())  # shielded: it finishes if the phone goes
             job.add_done_callback(lambda j: j.cancelled() or j.exception() is None
                                   or log.error('keeping the live take failed: %r', j.exception()))
             ok = True
@@ -656,7 +672,7 @@ async def live_socket(ws: WebSocket):
             log.info('live: kept in %d ms (%s)', (time.perf_counter() - t0) * 1000, 'ok' if ok else 'failed')
             with contextlib.suppress(Exception):
                 await send([{'type': 'kept', 'take': s.sid, 'ok': ok, 't': round(s.sess.seconds, 2)}], record=False)
-        health.emit('take', **take_fields(s, r, kept=ok if s.keep else None))
+        health.emit('take', **take_fields(s, r, kept=ok if s.keep else None, names_ms=names_ms))
         with contextlib.suppress(Exception):
             await ws.close(1000)
 

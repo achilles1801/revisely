@@ -610,6 +610,9 @@ class LiveTests(Base):
                                     't': 3.0})
             self.assertEqual(ws.receive_json()['type'], 'kept')
         self.assertEqual(FakeSession.made[-1].kw, {'names_after': True})
+        self.assertIn(f"recite-tests/tester1/{ready['take']}.wav", self.stored)
+        line = [f for k, f in self.health if k == 'take'][-1]
+        self.assertGreaterEqual(line['names_after_ms'], 0)
         kept = json.loads(self.stored[f"recite-tests/tester1/{ready['take']}.json"])
         self.assertEqual(kept['request']['namesAfter'], True)
         self.assertEqual(kept['result']['marks'][0]['into'], {'w': 9001, 'ayah': [3, 5]})
@@ -618,6 +621,7 @@ class LiveTests(Base):
             self.assertEqual(done['result']['marks'][0]['into'], {'w': 9001, 'ayah': [3, 5]})
             self.assertEqual(ws.receive_json()['type'], 'kept')
         self.assertEqual(FakeSession.made[-1].kw, {})
+        self.assertNotIn('names_after_ms', [f for k, f in self.health if k == 'take'][-1])
 
     def test_a_resume_after_the_end_gets_the_names_too(self):
         """With namesAfter, a phone that missed the end gets `done` and then `into` again, from this instance."""
