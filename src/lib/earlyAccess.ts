@@ -6,7 +6,7 @@
 // - Read at launch and again when the app comes back after EARLY_ACCESS_EVERY_MS; the last value is kept on the phone.
 // - The words: "Premium" stays the name, with no prices or dates. "Early access", never "trial" (both stores use
 //   trial for time-limited subscription trials). While it's on, "Can't afford it? Apply for support" is hidden: every
-//   account has Premium for nothing.
+//   account has Premium for nothing. "bi-idhnillah" (Majd, Nov 16 2026), spelled as the terms spell it.
 import { useEffect, useSyncExternalStore } from 'react';
 import { AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -91,11 +91,11 @@ export function resetEarlyAccessForTests(): void {
 
 /** Settings' Premium row, while early access is on. */
 export const EARLY_ACCESS_LINE =
-  'Premium is free while it’s in early access. It will be paid later, and every account that has it now keeps it for good.';
+  'Premium is free while it’s in early access. It will be paid later, and every account that has it now keeps it for good, bi-idhnillah.';
 /** Settings' Premium row, after early access, for an account that had it then. */
 export const EARLY_ACCESS_KEPT_LINE = 'Yours for good: your account had Premium in early access.';
 /** Marking mistakes' intro (an account without Premium yet), in place of Apply for support. */
-export const EARLY_ACCESS_INTRO_LINE = 'Free while Premium is in early access. It will be paid later, and you’ll keep it for good.';
+export const EARLY_ACCESS_INTRO_LINE = 'Free while Premium is in early access. It will be paid later, and you’ll keep it for good, bi-idhnillah.';
 
 /** The account's Premium, as lib/premium's usePremium gives it. */
 interface PremiumNow {

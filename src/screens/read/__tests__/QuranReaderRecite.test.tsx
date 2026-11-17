@@ -1282,7 +1282,7 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
     fireEvent.press(screen.getByTestId('recite-mistakes'));
     await flush();
     expect(screen.getByTestId('check-intro-early')).toBeTruthy();
-    expect(screen.getByText(/Free while Premium is in early access\. It will be paid later, and you’ll keep it for good\./)).toBeTruthy();
+    expect(screen.getByText(/Free while Premium is in early access\. It will be paid later, and you’ll keep it for good, bi-idhnillah\./)).toBeTruthy();
     expect(screen.queryByText('Can’t afford it? Apply for support')).toBeNull();
     expect(screen.queryByText(/trial/i)).toBeNull();
     const { claimEarlyAccess } = jest.requireMock('../../../lib/earlyAccess');
