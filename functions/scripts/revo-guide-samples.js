@@ -160,6 +160,18 @@ const SAMPLES = [
     ],
   },
   {
+    q: 'What’s this ring next to the ? on Home for?',
+    aboutToday: true,
+    ctx: missedYesterday,
+    note: 'Majd’s question, Nov 16 2026 (the streak’s grace ring, SESS-6)',
+    facts: [
+      F('it fills as yesterday’s missed pages are revised', /yesterday’s (?:\w+ ){0,3}pages|missed pages|pages (?:you )?missed/i, true),
+      F('full: the streak comes back', /streak (?:comes|is) back|brings? (?:back )?(?:your|the) streak|streak back|restore/i, true),
+      F('before today ends', /before today ends|until today ends|by the end of today|today’s revision day ends|before (?:fajr|midnight)|by (?:fajr|midnight)/i),
+      F('how: Add to today', /add to today/i),
+    ],
+  },
+  {
     q: 'I missed two days. Is my streak gone? Can I get it back?',
     aboutToday: true,
     ctx: missedTwo,

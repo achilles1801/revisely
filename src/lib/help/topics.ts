@@ -126,8 +126,8 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         icon: 'flame-outline',
         title: 'Streak',
         text:
-          'Days in a row with all their pages revised. Missed yesterday? Revise its pages before today ends ' +
-          'and the streak comes back.',
+          'Days in a row with all their pages revised. Missed yesterday? A ring beside [[help]] fills as you ' +
+          'revise its pages. Fill it before today ends and the streak comes back.',
         covers: ['SESS-2', 'SESS-6'],
       },
       {
