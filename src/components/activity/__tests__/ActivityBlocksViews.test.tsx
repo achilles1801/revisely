@@ -391,9 +391,9 @@ describe('Gaps in Activity (ACT-28)', () => {
       fireEvent.press(screen.getByLabelText('Previous month'));
       expect(await screen.findByText('October 2026')).toBeTruthy();
       expect(screen.getByTestId('calendar-gap-band-2026-10-25')).toBeTruthy();
-      // A touch on the calendar: it fades.
+      // A touch on the calendar: it goes (fading out: CalendarMonth.test).
       fireEvent.press(screen.getByTestId('calendar-day-2026-10-12'));
-      await waitFor(() => expect(screen.queryByTestId('calendar-gap-cue')).toBeNull(), { timeout: 3000 });
+      expect(screen.queryByTestId('calendar-gap-cue')).toBeNull();
       expect(screen.queryByTestId('calendar-gap-band-2026-10-25')).toBeNull();
     });
 

@@ -105,16 +105,23 @@ export function CalendarMonth({
   // The grid's inner width: where each day's disc sits, for the band.
   const [rowWidth, setRowWidth] = useState(0);
   const bandParts = band.shown && rowWidth > 0 ? layoutBand(span === 'week' ? [weekDays(week)] : monthGrid(month), band.shown, rowWidth) : [];
+  // Fading out after a touch: still drawn for a moment, but no longer there for VoiceOver.
+  const leaving = band.shown != null && gap == null;
   const bandRow = (r: number, first: string | undefined) => {
     const part = bandParts[r];
     return part ? (
       <Animated.View style={[StyleSheet.absoluteFill, { opacity: band.opacity }]} pointerEvents="none">
-        <GapBand part={part} progress={band.progress} testID={`calendar-gap-band-${first}`} />
+        <GapBand part={part} progress={band.progress} testID={leaving ? `calendar-gap-band-leaving-${first}` : `calendar-gap-band-${first}`} />
       </Animated.View>
     ) : null;
   };
   const cue = band.shown ? (
-    <Animated.View style={[styles.cue, { opacity: band.opacity }]} testID="calendar-gap-cue">
+    <Animated.View
+      style={[styles.cue, { opacity: band.opacity }]}
+      accessibilityElementsHidden={leaving}
+      importantForAccessibility={leaving ? 'no-hide-descendants' : 'auto'}
+      testID={leaving ? 'calendar-gap-cue-leaving' : 'calendar-gap-cue'}
+    >
       <View style={[styles.cueSwatch, { backgroundColor: palette.redSubtle, borderColor: palette.red }]} />
       <Text style={[typeV2.meta, styles.cueText, { color: palette.text }]} maxFontSizeMultiplier={MAX_SCALE}>
         {band.shown.cue}
