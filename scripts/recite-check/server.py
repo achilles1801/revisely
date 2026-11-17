@@ -374,6 +374,9 @@ class Live:
         self.restarted = False          # a resume this instance didn't have: run again from the first sample
         self.lag = []                   # seconds from audio arriving to its events going out, per piece of work
         self.appcheck = None            # its latest socket's App Check result (APP_CHECK log or on)
+        self.end_came = None            # when the frame that ended the take arrived (Stop, or the last audio)
+        self.done_s = None              # from then to `done` sent: what the summary waited (the names too without
+        #                                 namesAfter)
 
     def run(self, fn, *args):
         with self.lock:
@@ -492,7 +495,7 @@ def take_fields(s, r, kept=None, names_ms=None):
             'ready_s': s.ready_s, 'cold': s.cold, 'age_s': round(s.age, 1), 'sockets': s.sockets,
             'restarted': s.restarted, 'why': r.get('why'), 'marks': len(r.get('marks') or []), 'kept': kept,
             'cpu_s': round(cpu_s, 2), 'cpu_per_s': round(cpu_s / secs, 3) if secs else None,
-            'appcheck': s.appcheck, 'names_after_ms': names_ms, **health.lag(s.lag),
+            'appcheck': s.appcheck, 'done_s': s.done_s, 'names_after_ms': names_ms, **health.lag(s.lag),
             **health.per_second(r.get('ms'), secs)}
 
 
@@ -634,6 +637,8 @@ async def live_socket(ws: WebSocket):
         s.events += [e for e in events if e['type'] != 'done']  # the result is kept on its own
         with contextlib.suppress(WebSocketDisconnect):
             await send(events, record=False)
+        if s.end_came is not None:
+            s.done_s = round(time.monotonic() - s.end_came, 3)
         wav, names_ms = None, None
         if late is not None:  # the names, worked out after `done` (they go with the kept result too)
             if s.keep:  # the audio goes up meanwhile; the result waits for the names
@@ -762,6 +767,7 @@ async def live_socket(ws: WebSocket):
                 else:
                     events = await asyncio.to_thread(s.run, s.sess.control, item)
                 if s.sess.stopped:
+                    s.end_came = came
                     await finish(events)
                     break
                 await send(events)

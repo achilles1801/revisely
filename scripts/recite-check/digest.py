@@ -90,6 +90,19 @@ def f(x, unit='', nd=2):
     return '–' if x is None else f'{x:.{nd}f}{unit}'
 
 
+def stop_to_done(live):
+    """The summary's wait after Stop (`done_s`), for the takes that mark mistakes (Recite's is the words alone), and
+    with namesAfter how long the names came after it (`names_after_ms`)."""
+    marked = [p.get('done_s') for p in live if p.get('level') != 'recite' and p.get('done_s') is not None]
+    names = [p.get('names_after_ms') / 1000 for p in live if p.get('names_after_ms') is not None]
+    line = (f"- Stop → the summary (`done`), Mark mistakes: median {f(q(marked, .5), ' s')}, p90 {f(q(marked, .9), ' s')}, "
+            f"worst {f(q(marked, 1), ' s')} ({len(marked)} takes)")
+    if names:
+        line += (f"; the names after it (namesAfter, {len(names)} takes): median {f(q(names, .5), ' s')}, "
+                 f"worst {f(q(names, 1), ' s')}")
+    return line + '.'
+
+
 def summarize(entries, days, now=None, project=PROJECT):
     """The digest's Markdown."""
     now = now or dt.datetime.now(dt.timezone.utc)
@@ -145,6 +158,7 @@ def summarize(entries, days, now=None, project=PROJECT):
     out += ['### Keeping up with the reciter (live)', '',
             f"- Audio waiting before its events went out: median of takes' p50 {f(q([p.get('lag_p50') for p in live], .5), ' s')}, "
             f"median p90 {f(q([p.get('lag_p90') for p in live], .5), ' s')}, worst {f(q([p.get('lag_max') for p in live], 1), ' s')}.",
+            stop_to_done(live),
             f"- Instance speed (the model's CPU per second of audio; Cloud Run's CPUs differ): " + ('; '.join(
                 f"{ear} {f(q(xs, 0), '', 3)}–{f(q(xs, 1), '', 3)}, median {f(q(xs, .5), '', 3)}"
                 for ear, xs in sorted(by_ear.items())) or '–') + ". Pure-Python bench at start: "

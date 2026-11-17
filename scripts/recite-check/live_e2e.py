@@ -10,6 +10,9 @@ where each word is and what was planted); never anyone's own recordings.
                 writes one; it is never printed)
   --fast        send as fast as possible (no latencies; checks resume and the answer)
   --drop-at S   close the socket after S seconds of audio and resume on a new one, as a phone that lost signal
+  --names-after `namesAfter` in the start frame: `done` without the names, then an `into` event (end -> into is timed)
+  --resume-after-done  with --names-after: close the socket as `done` arrives and resume, as a phone that dropped
+                then: the same `done` again and its `into`, timed from the new connect
 
 Latency of an event = when it arrived minus when the audio it is about was sent: `at` from the word's start, `said`
 from the end of each word it covers, a mark from the end of its word (a skipped word: the end of the word after it).
@@ -48,8 +51,9 @@ def quantiles(xs):
            f"max {xs[-1]:.2f} s (n={len(xs)})"
 
 
-async def session(url, token, start, pcm, fast, drop_at, chunk=3200, headers=None):
+async def session(url, token, start, pcm, fast, drop_at, chunk=3200, headers=None, resume_after_done=False):
     """Returns (events with their arrival time, wall time each sample position was sent, timings)."""
+    last = 'into' if start.get('namesAfter') else 'done'  # the event that ends the take for this phone
     events, sent_at = [], {}
     t_conn = time.perf_counter()
     stamps = {}
@@ -77,7 +81,7 @@ async def session(url, token, start, pcm, fast, drop_at, chunk=3200, headers=Non
                     e = json.loads(m)
                     e['_at'] = time.perf_counter()
                     events.append(e)
-                    if e['type'] in ('done', 'error'):
+                    if e['type'] == 'error' or e['type'] == last or (e['type'] == 'done' and resume_after_done):
                         return
 
             rd = asyncio.create_task(reader())
@@ -101,8 +105,25 @@ async def session(url, token, start, pcm, fast, drop_at, chunk=3200, headers=Non
             stamps['audio_sent'] = time.perf_counter()
             await ws.send(json.dumps({'type': 'end'}))
             await asyncio.wait_for(rd, 300)
-            stamps['done'] = time.perf_counter() - stamps['audio_sent']
+            for e in events:
+                if e['type'] in ('done', 'into') and e['type'] not in stamps:
+                    stamps[e['type']] = e['_at'] - stamps['audio_sent']
+            if resume_after_done:
+                await ws.close()
+                break
             return events, sent_at, stamps, rounds
+    # the phone dropped as `done` came: resume, and the service should send the same `done` and its `into`
+    t_re = time.perf_counter()
+    async with websockets.connect(url, max_size=2 ** 24, open_timeout=60, additional_headers=headers) as ws:
+        await ws.send(json.dumps(dict(start, token=token, resume=take)))
+        again = []
+        async for m in ws:
+            e = json.loads(m)
+            again.append((e, time.perf_counter() - t_re))
+            if e['type'] in ('into', 'error'):
+                break
+    stamps['again'] = again
+    return events, sent_at, stamps, rounds + 1
 
 
 def when_sent(sent_at, seconds):
@@ -122,6 +143,8 @@ def main():
     ap.add_argument('--item', required=True)
     ap.add_argument('--fast', action='store_true')
     ap.add_argument('--drop-at', type=float, default=0)
+    ap.add_argument('--names-after', action='store_true')
+    ap.add_argument('--resume-after-done', action='store_true')
     ap.add_argument('--letters', action='store_true')
     ap.add_argument('--no-tajweed', action='store_true', help='the "words and harakat" level (tajweed off)')
     ap.add_argument('--follow', action='store_true', help='Recite: the cursor and said only')
@@ -138,6 +161,10 @@ def main():
     start = {'type': 'start', 's': truth['sura'], 'a': truth['ayat'][0], 's2': truth['sura'], 'a2': truth['ayat'][1],
              'mon': 4, 'mot': 4, 'aar': 0, 'letters': args.letters, 'tajweed': not args.no_tajweed,
              'follow': args.follow, 'keep': False, 'app': 'live_e2e'}
+    if args.names_after:
+        start['namesAfter'] = True
+    if args.resume_after_done and not args.names_after:
+        raise SystemExit('--resume-after-done goes with --names-after')
     if args.page:
         (s, a), (s2, a2) = (tuple(map(int, x.split(':'))) for x in args.page.split('-'))
         start.update(s=s, a=a, s2=None, a2=None, startBy=[s2, a2])
@@ -148,7 +175,7 @@ def main():
         iam = pathlib.Path(args.iam_token_file).expanduser().read_text().strip()
         headers = {'X-Serverless-Authorization': f'Bearer {iam}'}
     events, sent_at, stamps, rounds = asyncio.run(session(args.url, token, start, pcm, args.fast, args.drop_at,
-                                                          headers=headers))
+                                                          headers=headers, resume_after_done=args.resume_after_done))
 
     tl = {e['word']: e for e in truth['timeline'] if e.get('word') is not None and not e.get('extra')}
     planted = [(e.get('type'), e.get('words')) for e in truth['events']]
@@ -157,7 +184,19 @@ def main():
     print(f"{truth['id']}: {len(pcm) / 2 / SR:.1f} s of audio, {truth['sura']}:{truth['ayat'][0]}-{truth['ayat'][1]}, "
           f"{'fast' if args.fast else 'real time'}, {rounds} socket(s)")
     print(f"  connect -> ready {stamps['ready']:.2f} s; end -> done {stamps.get('done', float('nan')):.2f} s"
+          + (f"; end -> into {stamps['into']:.2f} s" if 'into' in stamps else '')
           + (f"; resumed from sample {stamps['resumed_from']}" if 'resumed_from' in stamps else ''))
+    into = next((e for e in events if e['type'] == 'into'), None)
+    if args.names_after:
+        print('  into:', [(n['id'], n['into']) for n in into['names']] if into else 'NONE')
+    if 'again' in stamps:  # the resume after `done`
+        print('  resume after done:', ', '.join(f"{e['type']} {t:.2f} s" for e, t in stamps['again']))
+        got = {e['type']: e for e, _ in stamps['again']}
+        d0 = next((e for e in events if e['type'] == 'done'), None)
+        same = d0 is not None and 'done' in got and \
+            [m['id'] for m in got['done']['result']['marks']] == [m['id'] for m in d0['result']['marks']]
+        print('  the same done again:', same, '| into again:',
+              [(n['id'], n['into']) for n in got['into']['names']] if 'into' in got else 'NONE')
     print('  events:', {k: sum(1 for e in events if e['type'] == k)
                         for k in ('at', 'said', 'mark', 'unmark', 'ayah', 'score', 'done', 'error')})
     if errors:
@@ -174,7 +213,7 @@ def main():
         else:
             print('  done marks:', [m['id'] for m in r['marks']])
             print('  done score:', r['score'], 'ms:', r.get('ms'))
-    if not args.fast and rounds == 1:
+    if not args.fast and (rounds == 1 or 'again' in stamps):
         lat_at, lat_said, lat_mark = [], [], []
         slow_at = []  # (latency, word): the slowest cursor moves, to tell planted mistakes from a slow hop
         seen_at = set()
