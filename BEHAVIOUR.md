@@ -231,6 +231,11 @@ How the tests are made: `tests/scenarios/README.md`.
   that was ended, a disabled or deleted account, or any other answer still signs it out, as before.
 - **SYNC-5.** The same day revised on two phones while both were offline keeps every page either
   phone revised, in one session for the day.
+- **SYNC-6.** A page keeps its last revised day, its number of revisions and its rating however long the
+  history grows. The app reads the latest 100 days of sessions; a page last revised before them keeps what it
+  had, and one rated before them keeps its rating until a session rates it again. (Nov 17 2026: past 100 days of
+  sessions, every launch wiped the last revised day, count and rating of each page last revised before them, and
+  saved that to the account.)
 - **AUTH-2.** When the app finds the phone signed out at launch, though a sign-in was saved on it (the
   account's sign-ins were ended on the server, or it was disabled or deleted), the sign-in screen says "You were
   signed out. Sign in again to carry on." until the next sign-in, and Sentry hears of it once, with no account

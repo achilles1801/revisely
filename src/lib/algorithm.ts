@@ -41,11 +41,18 @@ export interface HandAddedRevision {
  * count in each page's last revised day and number of revisions, so Pages by strength, Coverage and
  * weakest-first plans see revision done elsewhere. They carry no rating, so a page keeps the one its
  * sessions gave it. On their day they come after the day's session.
+ *
+ * `completeSince`: the logs hold every session from that day on but not the ones before it (the app
+ * reads the latest 100 days of sessions; SYNC-6). A page then keeps what the logs can't speak for: its
+ * last revised day when that is before the window, its rating when no session in the window rated it,
+ * and a count and skips never lower than it had. Before Nov 17 2026 a page last revised before the
+ * window lost its day, its count and its rating on every launch once an account passed 100 days.
  */
 export function recomputePagesFromLogs(
   pages: UserPage[],
   logs: RevisionLog[],
   handAdds: readonly HandAddedRevision[] = [],
+  completeSince: string | null = null,
 ): UserPage[] {
   const asLogs: RevisionLog[] = handAdds.map((h, i) => ({
     id: `hand-${i}`,
@@ -65,6 +72,7 @@ export function recomputePagesFromLogs(
     let lastRevisedDate: string | null = null;
     let totalRevisionCount = 0;
     let weaknessRating = DEFAULT_WEAKNESS_RATING;
+    let rated = false;
 
     for (const log of sortedLogs) {
       if (log.pagesRevised.includes(page.pageNumber)) {
@@ -72,7 +80,10 @@ export function recomputePagesFromLogs(
         lastRevisedDate = log.date;
       }
       const wu = log.weaknessUpdates.find((w) => w.page === page.pageNumber);
-      if (wu) weaknessRating = wu.rating;
+      if (wu) {
+        weaknessRating = wu.rating;
+        rated = true;
+      }
     }
 
     // skipCount = consecutive skips since the most recent revision.
@@ -80,6 +91,29 @@ export function recomputePagesFromLogs(
     for (const log of sortedLogs) {
       if (lastRevisedDate && log.date <= lastRevisedDate) continue;
       if (log.pagesSkipped.includes(page.pageNumber)) skipCount++;
+    }
+
+    if (completeSince != null && !(lastRevisedDate && lastRevisedDate >= completeSince)) {
+      // Last revised before the window (or never, as far as it shows): the page's own state is the
+      // only record of the sessions before it.
+      const before = page.lastRevisedDate ? page.lastRevisedDate.slice(0, 10) : null;
+      return {
+        ...page,
+        lastRevisedDate: before && (!lastRevisedDate || before >= lastRevisedDate) ? page.lastRevisedDate : lastRevisedDate,
+        totalRevisionCount: Math.max(page.totalRevisionCount ?? 0, totalRevisionCount),
+        skipCount: Math.max(page.skipCount ?? 0, skipCount),
+        weaknessRating: rated ? weaknessRating : page.weaknessRating ?? DEFAULT_WEAKNESS_RATING,
+      };
+    }
+    if (completeSince != null) {
+      // Revised in the window: its day and skips are exact, but revisions before the window still count.
+      return {
+        ...page,
+        lastRevisedDate,
+        totalRevisionCount: Math.max(page.totalRevisionCount ?? 0, totalRevisionCount),
+        skipCount,
+        weaknessRating: rated ? weaknessRating : page.weaknessRating ?? DEFAULT_WEAKNESS_RATING,
+      };
     }
 
     return {
