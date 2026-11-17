@@ -130,8 +130,22 @@ class FakeSession:
             if self.follow:  # Recite's answer: words only, no marks or score
                 self.result = {'v': 2, 'follow': True, 'words': [], 'marks': [], 'score': None,
                                'secs': round(self.seconds, 1), 'why': 'end'}
+            if self.kw.get('names_after'):  # the names come after `done` (names())
+                return [{'type': 'done', 'result': self.result}]
+            self.result['marks'] = [{'id': '101:skipped:', 'w': 101, 'kind': 'skipped', 'ayah': [1, 1],
+                                     'into': {'w': 9001, 'ayah': [3, 5]}}] if not self.follow else []
             return [{'type': 'done', 'result': self.result}]
         return []
+
+    def names(self):
+        if not self.kw.get('names_after') or getattr(self, 'named', False):
+            return []
+        self.named = True
+        into = {'w': 9001, 'ayah': [3, 5]}
+        if not self.follow:
+            self.result['marks'] = [{'id': '101:skipped:', 'w': 101, 'kind': 'skipped', 'ayah': [1, 1], 'into': into}]
+        return [{'type': 'into', 'names': [] if self.follow else [{'id': '101:skipped:', 'into': into}],
+                 't': round(self.seconds, 2)}]
 
 
 def uid_of(header):
@@ -579,6 +593,50 @@ class LiveTests(Base):
                     ws.receive_json()
             self.assertEqual(len(FakeSession.made), 1)
             self.assertEqual(len(self.stored), 2)
+
+    def test_names_after_done(self):
+        """namesAfter in the start frame: `done` goes without `into` and the names follow in an `into` event, before
+        `kept`; the kept result has them. A start frame without it gets one `done` with the names, as before."""
+        with self.socket() as ws:
+            ws.send_text(start(keep=True, namesAfter=True))
+            ready = ws.receive_json()
+            ws.send_bytes(second_of_audio() * 3)
+            ws.send_text(json.dumps({'type': 'end'}))
+            while (done := ws.receive_json())['type'] != 'done':
+                pass
+            self.assertEqual(done['result']['marks'], [])  # the fake's marks come with its names
+            into = ws.receive_json()
+            self.assertEqual(into, {'type': 'into', 'names': [{'id': '101:skipped:', 'into': {'w': 9001, 'ayah': [3, 5]}}],
+                                    't': 3.0})
+            self.assertEqual(ws.receive_json()['type'], 'kept')
+        self.assertEqual(FakeSession.made[-1].kw, {'names_after': True})
+        kept = json.loads(self.stored[f"recite-tests/tester1/{ready['take']}.json"])
+        self.assertEqual(kept['request']['namesAfter'], True)
+        self.assertEqual(kept['result']['marks'][0]['into'], {'w': 9001, 'ayah': [3, 5]})
+        with self.socket() as ws:  # an older app
+            ready, done = self.end_a_take(ws)
+            self.assertEqual(done['result']['marks'][0]['into'], {'w': 9001, 'ayah': [3, 5]})
+            self.assertEqual(ws.receive_json()['type'], 'kept')
+        self.assertEqual(FakeSession.made[-1].kw, {})
+
+    def test_a_resume_after_the_end_gets_the_names_too(self):
+        """With namesAfter, a phone that missed the end gets `done` and then `into` again, from this instance."""
+        with self.socket() as ws:
+            ws.send_text(start(keep=False, namesAfter=True))
+            ready = ws.receive_json()
+            ws.send_bytes(second_of_audio() * 3)
+            ws.send_text(json.dumps({'type': 'end'}))
+            got = self.closed(ws)
+        into = got[-1]
+        self.assertEqual(into['type'], 'into')
+        with self.socket() as ws:
+            ws.send_text(start(keep=False, namesAfter=True, resume=ready['take']))
+            self.assertEqual(ws.receive_json()['type'], 'ready')
+            self.assertEqual(ws.receive_json()['type'], 'done')
+            self.assertEqual(ws.receive_json(), into)
+            with self.assertRaises(WebSocketDisconnect):
+                ws.receive_json()
+        self.assertEqual(len(FakeSession.made), 1)
 
     def test_a_take_run_again_elsewhere_keeps_the_first_copy(self):
         """The other instance finishes a take this one already kept (its `done` was missed): the name is taken, so

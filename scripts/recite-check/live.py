@@ -606,7 +606,7 @@ class LiveSession:
     to send, in order (dicts, recite-contract.md)."""
 
     def __init__(self, engine, s, a, s2=None, a2=None, settings=None, follow=False, defer=False, open_end=False,
-                 start_by=None, start_in=None):
+                 start_by=None, start_in=None, names_after=False):
         E = self.E = engine
         # follow (Recite, contract draft 5): the cursor and `said` only; words are decided (said needs them) but no
         # mark is made, letters and tajweed aren't judged, and no mark, unmark or score is sent
@@ -622,6 +622,11 @@ class LiveSession:
         self.P = dict(self.lv.words_p, **LIVE)
         # a v6 take's slips are named on the released model's frames (SideFrames), worked out as the take goes when
         # deferred (the server), else at the end; Recite names nothing
+        # names_after (start frame `namesAfter`, Nov 16 2026): `done` goes without `into`, and names() works the names
+        # out after it, so the summary doesn't wait for them (1.3–1.9 s of a long take's answer on Cloud Run)
+        self.names_after = bool(names_after)
+        self._naming = None              # what names() names, held back from `done`
+        self._named = False
         self.side = None
         if not self.follow and self.lv is not E.released and getattr(E, 'table', None) is not None \
                 and os.environ.get('RECITE_SIDE_FRAMES') != '0':
@@ -1687,6 +1692,27 @@ class LiveSession:
 
     # ------------------------------------------------------------ the end
 
+    def names(self):
+        """With names_after, once `done` is out: [{'type': 'into', 'names': [{'id', 'into'}], 't'}], where the
+        reciter went for each mark named (recite-contract.md, `into`), `names` empty when nothing is (Recite names
+        nothing). The result's marks get their `into` too (the kept take). Once only; [] without names_after."""
+        if not self.names_after or self.result is None or self._named:
+            return []
+        self._named = True
+        names = []
+        if self._naming is not None:
+            naming, self._naming = self._naming, None
+            self._name(self.result, *naming)
+            names = [{'id': m['id'], 'into': m['into']} for m in naming[0] if m.get('into')]
+        return [{'type': 'into', 'names': names, 't': round(self.seconds, 2)}]
+
+    def _name(self, out, marks, lp, order, statuses, spans, ex):
+        """Where the slips went (Engine.name_slips): `into` on out's marks, and its time in out's `ms`."""
+        out['ms']['similar'] = self.E.name_slips(marks, lp, order, statuses, spans, ex, self.lv, self.side)
+        if self.side is not None:  # the released model's time for naming (all of it), and what naming waited for it
+            out['ms']['side'] = int(self.side.close() + self.side.ms)
+            out['ms']['side_wait'] = int(self.side.ms + self.side.waited)
+
     def _final(self):
         """The whole take decided once more (run_item_live's final, per segment): the v2 answer."""
         seg, P = self.seg, self.P
@@ -1754,11 +1780,11 @@ class LiveSession:
                 ('start',) if 'start' in out else ())} | {'v': 2, 'follow': True, 'marks': [], 'score': None}
         heard = heard_sounds(spans, self._tokens(0, self.T), self.ear.vocab)
         out['marks'] = self.E.marks(words, flagged, heard, ex, tj, letters if self.st['letters'] else [])
-        out['ms']['similar'] = self.E.name_slips(out['marks'], self.lp[:self.T], [r['w'] for r in words], statuses,
-                                                 spans, ex, self.lv, self.side)
-        if self.side is not None:  # the released model's time for naming (all of it), and what `done` waited for it
-            out['ms']['side'] = int(self.side.close() + self.side.ms)
-            out['ms']['side_wait'] = int(self.side.ms + self.side.waited)
+        naming = (out['marks'], self.lp[:self.T], [r['w'] for r in words], statuses, spans, ex)
+        if self.names_after:
+            self._naming = naming
+        else:
+            self._name(out, *naming)
         out['score'] = score(statuses, out['marks'], self.dismissed)
         out['score']['helped'] = len(self.helped)
         out['v'] = 2

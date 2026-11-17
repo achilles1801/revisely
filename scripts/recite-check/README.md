@@ -154,6 +154,12 @@ in the order they were tapped, the latest for a mark winning, so an undone "Not 
    take is then stored and `{"type":"kept","take":…,"ok":true|false}` follows before the server closes the socket
    (the phone needn't wait for it). Every event has `t`, the seconds of the take it was decided at. `error`
    (`sign_in`, `testers_only`, `limit`, `idle`, `bad_request`, `server`, `premium_required`) closes the socket.
+5. **`"namesAfter": true`** in the start frame (Nov 16 2026): `done` comes without `into`, and right after it
+   `{"type":"into","names":[{"id":<mark id>,"into":{…}}],"t":…}` with where each named slip went (`names: []` when
+   nothing is named, Recite's included), before `kept`. Naming is most of the wait after Stop on a long take with
+   slips: on the Mac, Stop to `done` went from 356 to 41 ms (alafasy.p8.m1), 421 to 107 (alafasy.p4.m1), 540 to 289
+   (husary.p1.m1), with `into` 110–312 ms after it (about five times that on Cloud Run). The kept result has the names.
+   Without `namesAfter`, one `done` with the names, as before.
 
 **Start anywhere on the page** (Majd, Nov 14 2026; protocol 6; recite-contract.md has the agreed shape). The start
 frame's `s`/`a` stay the page's first ayah, and `"startBy":[sura,ayah]` is its last: the reciter begins at some word
@@ -211,7 +217,8 @@ changes nothing on screen. Right after `ready`, a resume on the same instance al
 showing (every mark shown, every `unmark`, the `ayah` events, `at`, `said`, `score`): the dropped socket may have
 swallowed events of the last audio it was checking, and that audio isn't sent again. The phone keeps the take's PCM for this (it needs it for "play this word" too).
 A resume of a take that already ended on this instance (the phone missed `done`) gets `ready` (`from` = every sample)
-and the same `done` again, for 2 minutes; on the other instance it runs again, and the copy already stored stays.
+and the same `done` again, for 2 minutes (with `namesAfter`, then its `into`, waited for if it's still being worked
+out); on the other instance it runs again, and the copy already stored stays.
 
 **How it decides** (`live.py`): the lab's live checker (`checker.run_item_live`): every 0.5 s of audio the model runs
 on the last 4 s; frames with 1 s of audio after them are final and go to the Viterbi decoder; a word is decided once

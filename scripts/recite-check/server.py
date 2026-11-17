@@ -380,7 +380,8 @@ class Live:
 
 
 SESSIONS = {}
-FINISHED = {}  # take -> (uid, samples held, its `done`, when): a resume after the end gets the same `done` again
+FINISHED = {}  # take -> (uid, samples held, its `done`, when, its `into` events): a resume after the end gets the same
+# `done` again, and with namesAfter its `into` (a future while the names are still being worked out)
 
 
 def dropped_fields(s):
@@ -545,16 +546,21 @@ async def open_session(msg, uid):
     # Anywhere in the Qur'an (protocol 7): with startBy only, as the page is searched first. startBy keeps its 400-word
     # check, which limits the page, never the Qur'an-wide search.
     start_in = 'quran' if start_by and msg.get('startIn') == 'quran' and protocol() >= 7 else None
+    # namesAfter: `done` without `into`, then an `into` event (the summary doesn't wait for the names)
+    names_after = msg.get('namesAfter') is True
     # defer: each ayah's letters and tajweed are judged off the hop, so they never hold up the cursor (live.py)
     sess = await asyncio.to_thread(live.LiveSession, ENGINE['e'], *run, settings, follow, defer=True,
                                    open_end=open_end, **({'start_by': start_by} if start_by else {}),
-                                   **({'start_in': start_in} if start_in else {}))
+                                   **({'start_in': start_in} if start_in else {}),
+                                   **({'names_after': True} if names_after else {}))
     sid = rid if isinstance(rid, str) and store.TAKE.match(rid) else store.new_take()
     request = dict(zip(('s', 'a', 's2', 'a2'), passage), settings=settings, follow=follow, open=open_end)
     if start_by:
         request['startBy'] = list(start_by)
     if start_in:
         request['startIn'] = start_in
+    if names_after:
+        request['namesAfter'] = True
     s = Live(sid, uid, sess, msg.get('keep') is True and store.enabled(), request, msg.get('app') if isinstance(msg.get('app'), str)
              else None)
     SESSIONS[sid] = s
@@ -610,19 +616,31 @@ async def live_socket(ws: WebSocket):
             await ws.close(code)
 
     async def finish(events):
-        """The take is over: send the rest with `done` at once, then keep the take (when asked) and say so with
-        `kept`, and close. The phone has its answer without waiting for the upload; the socket stays open for it."""
+        """The take is over: send the rest with `done` at once, then (namesAfter) the names as `into`, then keep the
+        take (when asked) and say so with `kept`, and close. The phone has its answer without waiting for the names or
+        the upload; the socket stays open for them."""
         SESSIONS.pop(s.sid, None)
         r = s.sess.result
         r.update(engine=VERSION, take=s.sid)
         done = next((e for e in events if e['type'] == 'done'), None)
-        FINISHED[s.sid] = (s.uid, s.sess.n, done, time.time())
+        late = asyncio.get_running_loop().create_future() if s.request.get('namesAfter') else None
+        FINISHED[s.sid] = (s.uid, s.sess.n, done, time.time(), late)
         s.events += [e for e in events if e['type'] != 'done']  # the result is kept on its own
+        with contextlib.suppress(WebSocketDisconnect):
+            await send(events, record=False)
+        if late is not None:  # the names, worked out after `done` (they go with the kept result too)
+            try:
+                named = await asyncio.to_thread(s.run, s.sess.names)
+            except Exception:
+                log.exception('live: naming failed')
+                named = [{'type': 'into', 'names': [], 't': round(s.sess.seconds, 2)}]
+            late.set_result(named)
+            FINISHED[s.sid] = FINISHED[s.sid][:4] + (named,)
+            with contextlib.suppress(WebSocketDisconnect):
+                await send(named, record=False)
         log.info('live: %.1f s audio, %s words reached, %d marks, why %s, ms %s, sockets %d, keep %s, start %s',
                  s.sess.seconds, (r.get('score') or {}).get('reached', len(r.get('words') or [])),
                  len(r.get('marks') or []), r.get('why'), r.get('ms'), s.sockets, s.keep, start_note(s))
-        with contextlib.suppress(WebSocketDisconnect):
-            await send(events, record=False)
         if s.keep:
             t0 = time.perf_counter()
             job = asyncio.ensure_future(asyncio.to_thread(keep_take, s))  # shielded: it finishes if the phone goes
@@ -662,8 +680,15 @@ async def live_socket(ws: WebSocket):
         f = FINISHED.get(rid) if isinstance(rid, str) else None
         if f and f[0] == uid and f[2] is not None:
             # the take ended on this instance and the phone missed its `done`: the same answer again, not a re-run
+            # (and its names, waited for if they're still being worked out)
+            late = f[4]
+            if isinstance(late, asyncio.Future):
+                try:
+                    late = await asyncio.wait_for(asyncio.shield(late), 10)
+                except Exception:
+                    late = None
             await send([{'type': 'ready', 'v': 2, 'engine': VERSION, 'server': SERVER, 'protocol': protocol(),
-                         'take': rid, 'from': f[1]}, f[2]], record=False)
+                         'take': rid, 'from': f[1]}, f[2]] + (late or []), record=False)
             with contextlib.suppress(Exception):
                 await ws.close(1000)
             return

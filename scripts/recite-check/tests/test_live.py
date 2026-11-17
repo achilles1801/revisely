@@ -860,6 +860,31 @@ class SimilarPassage(unittest.TestCase):
         self.assertFalse([m for m in got['marks'] if 'into' in m])
         self.assertTrue([m for m in got['marks'] if m['kind'] == 'skipped'])  # the marks themselves are all there
 
+    def test_names_can_come_after_done(self):
+        """names_after (start frame `namesAfter`): `done` comes without `into`, and names() then gives the same names
+        as one `into` event (the result's marks get them too); once only. Nothing named: an `into` event with none, so
+        the phone never waits for one that isn't coming; Recite's too."""
+        import live
+        with wave.open(str(BENCH / 'alafasy.p8.m1.clean.wav')) as f:
+            pcm = f.readframes(f.getnframes())
+        whole = run(live.LiveSession(engine(), 2, 255, 2, 257, {}), chunks(pcm, 3200) + [{'type': 'end'}])
+        sess = live.LiveSession(engine(), 2, 255, 2, 257, {}, names_after=True)
+        ev = run(sess, chunks(pcm, 3200) + [{'type': 'end'}])
+        self.assertFalse([m for m in ev[-1]['result']['marks'] if 'into' in m])
+        self.assertNotIn('similar', sess.result['ms'])
+        want = [{'id': m['id'], 'into': m['into']} for m in whole[-1]['result']['marks'] if 'into' in m]
+        self.assertTrue(want)
+        got = sess.names()
+        self.assertEqual([(e['type'], e['names']) for e in got], [('into', want)])
+        self.assertEqual([{'id': m['id'], 'into': m['into']} for m in sess.result['marks'] if 'into' in m], want)
+        self.assertIn('similar', sess.result['ms'])
+        self.assertEqual(sess.names(), [])
+        for follow in (False, True):
+            plain = live.LiveSession(engine(), 1, 1, 1, 7, {}, follow=follow, names_after=True)
+            run(plain, chunks(noise(4), 3200) + [{'type': 'end'}])
+            self.assertEqual([(e['type'], e['names']) for e in plain.names()], [('into', [])])
+        self.assertEqual(live.LiveSession(engine(), 1, 1, 1, 7, {}).names(), [])
+
     def test_no_name_without_a_slip(self):
         """Al-Fatiha with a word said as another and one skipped, and as recited: nothing named."""
         for name in ('alafasy.p2.m1.clean', 'alafasy.p2.clean.clean'):
