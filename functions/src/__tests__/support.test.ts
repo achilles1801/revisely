@@ -320,6 +320,15 @@ describe('Premium in the Dev app', () => {
     expect(m.ents.get('alice')?.premium?.source).toBe('support');
   });
 
+  it("turning it off lifts early access's grant too, so a tester can see the lock; on gives only the dev grant", async () => {
+    const m = memoryStore(USERS);
+    m.ents.set('alice', { grants: { early: grant('early', null) }, premium: grant('early', null) });
+    expect(await handleDevPremium({ auth: { uid: 'alice' } }, m.store, true, false)).toEqual({ premium: false });
+    expect(m.ents.get('alice')?.grants?.early).toBeUndefined();
+    expect(await handleDevPremium({ auth: { uid: 'alice' } }, m.store, true, true)).toEqual({ premium: true });
+    expect(Object.keys(m.ents.get('alice')?.grants ?? {})).toEqual(['dev']);
+  });
+
   it('refuses outside Revisely Dev and without a sign-in', async () => {
     const m = memoryStore(USERS);
     expect((await refusal(handleDevPremium({ auth: { uid: 'alice' } }, m.store, false, true))).code).toBe('permission-denied');

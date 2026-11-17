@@ -24,7 +24,7 @@ afterEach(() => {
   dims = null;
 });
 
-function show({ fontScale = 1, to = A23 + 20, marks = [wrong(A23 + 3, [27, 23])], check = true } = {}) {
+function show({ fontScale = 1, to = A23 + 20, marks = [wrong(A23 + 3, [27, 23])], check = true, premiumNote = null as string | null } = {}) {
   dims = jest.spyOn(Dimensions, 'get').mockReturnValue({ width: 375, height: 667, scale: 2, fontScale });
   render(
     <SafeAreaProvider initialMetrics={METRICS}>
@@ -38,6 +38,7 @@ function show({ fontScale = 1, to = A23 + 20, marks = [wrong(A23 + 3, [27, 23])]
       marks={marks}
       score={check ? { text: '96%', level: 'good' } : null}
       kept={false}
+      premiumNote={premiumNote}
       checkOwned
       onFinding={() => undefined}
       onCheck={() => undefined}
@@ -103,6 +104,17 @@ describe('the take summary with screen readers and the largest text', () => {
     const [said, opts] = (AccessibilityInfo.announceForAccessibilityWithOptions as jest.Mock).mock.calls[0];
     expect(said).toMatch(/^Your recitation\. An-Naml, ayahs 23 to 2\d\. 1 minute 42 seconds\. 96%, 1 mistake$/);
     expect(opts).toEqual({ queue: true });
+  });
+
+  it('[PREM-1] one quiet line about Premium in early access, under the buttons, only when given', () => {
+    show({ premiumNote: 'Premium is free in early access, and yours to keep.' });
+    expect(screen.getByTestId('take-summary-premium')).toBeTruthy();
+    expect(screen.getByText('Premium is free in early access, and yours to keep.')).toBeTruthy();
+  });
+
+  it('no Premium line without one', () => {
+    show();
+    expect(screen.queryByTestId('take-summary-premium')).toBeNull();
   });
 
   it('following along (no Check): the passage and the time, no score', async () => {

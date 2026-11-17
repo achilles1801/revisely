@@ -188,6 +188,8 @@ export const settings = {
     cellularLabel: 'Download the mushaf over mobile data',
   },
   recite: {
+    premium: 'Premium',
+    premiumSub: 'Marking mistakes and Test me are part of it',
     footer: 'Marking mistakes is AI and can make mistakes. Recordings are checked by software; nobody listens.',
     level: 'Mistakes to mark',
     strict: 'Strict',

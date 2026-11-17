@@ -54,7 +54,9 @@ export class SupportError extends Error {
 // ---------------------------------------------------------------------------------------------------------------
 // Premium
 
-export const SOURCES = ['support', 'dev', 'purchase', 'gift', 'family'] as const;
+// `early`: Premium early access (Majd, Nov 16 2026): every account while config/app.earlyAccess is on, with no end date,
+// kept after paid Premium launches (early.ts). Last, so a tie between grants with no end date keeps its old winner.
+export const SOURCES = ['support', 'dev', 'purchase', 'gift', 'family', 'early'] as const;
 export type Source = (typeof SOURCES)[number];
 
 /** A grant, times in ms (admin.ts stores Timestamps). */

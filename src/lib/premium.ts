@@ -5,6 +5,8 @@
 // - The owner may get the document (and so listen to it); no client writes.
 // - In Revisely Dev, Get Premium is free: `devGrantPremium` / `devRevokePremium` (revisely-dev and the emulators only).
 // - "Can't afford it? Apply for support" opens the page `supportLink` answers with (a one-time code for the account).
+// - Early access (lib/earlyAccess, PREM-1): the grant `early`, kept for good. `early` below says the account has it,
+//   whichever grant `premium` names (a tie between grants with no end date keeps support or dev).
 
 import { useEffect, useSyncExternalStore } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -13,7 +15,7 @@ import { auth, db } from './firebase';
 import { logger } from './logger';
 import { callFunction } from '../services/firestoreService';
 
-export type PremiumSource = 'support' | 'dev' | 'purchase' | 'gift' | 'family';
+export type PremiumSource = 'support' | 'dev' | 'purchase' | 'gift' | 'family' | 'early';
 
 export interface PremiumGrant {
   source: PremiumSource;
@@ -23,7 +25,7 @@ export interface PremiumGrant {
   until: number | null;
 }
 
-const SOURCES: PremiumSource[] = ['support', 'dev', 'purchase', 'gift', 'family'];
+const SOURCES: PremiumSource[] = ['support', 'dev', 'purchase', 'gift', 'family', 'early'];
 
 /** The grant as stored, or null when there is none or it isn't one. */
 export function parseGrant(raw: unknown): PremiumGrant | null {
@@ -53,12 +55,14 @@ export function hasPremium(grant: PremiumGrant | null | undefined, now: number):
 interface PremiumState {
   uid: string | null;
   grant: PremiumGrant | null;
+  /** The account has the early-access grant (grants.early), kept for good. */
+  early: boolean;
   /** Heard from the server (or a copy of it kept on the phone) at least once. */
   known: boolean;
 }
 
 const KEY = (uid: string) => `@revisely_premium:v1:${uid}`;
-const NONE: PremiumState = { uid: null, grant: null, known: false };
+const NONE: PremiumState = { uid: null, grant: null, early: false, known: false };
 let state: PremiumState = NONE;
 let stop: (() => void) | null = null;
 let users = 0;
@@ -73,12 +77,15 @@ function set(next: PremiumState) {
 function start(uid: string) {
   if (state.uid === uid && stop) return;
   stop?.();
-  set({ uid, grant: null, known: false });
+  set({ uid, grant: null, early: false, known: false });
   // The copy kept on the phone, until the server answers (no locked flash on a cold start, and offline).
   AsyncStorage.getItem(KEY(uid))
     .then((raw) => {
       if (state.uid !== uid || state.known || raw == null) return;
-      set({ uid, grant: parseGrant(JSON.parse(raw)), known: true });
+      // { grant, early }; a copy from before early access is the grant alone.
+      const kept = JSON.parse(raw) as { grant?: unknown; early?: unknown; source?: unknown } | null;
+      const old = !!kept && 'source' in kept;
+      set({ uid, grant: parseGrant(old ? kept : kept?.grant), early: !old && kept?.early === true, known: true });
     })
     .catch(() => undefined);
   stop = onSnapshot(
@@ -87,9 +94,11 @@ function start(uid: string) {
       if (state.uid !== uid) return;
       // An empty first answer from Firestore's memory isn't the server's.
       if (snap.metadata.fromCache && !snap.exists()) return;
-      const grant = snap.exists() ? parseGrant((snap.data() as { premium?: unknown }).premium) : null;
-      set({ uid, grant, known: true });
-      AsyncStorage.setItem(KEY(uid), JSON.stringify(grant)).catch(() => undefined);
+      const data = snap.exists() ? (snap.data() as { premium?: unknown; grants?: { early?: unknown } }) : null;
+      const grant = data ? parseGrant(data.premium) : null;
+      const early = !!data && parseGrant(data.grants?.early) != null;
+      set({ uid, grant, early, known: true });
+      AsyncStorage.setItem(KEY(uid), JSON.stringify({ grant, early })).catch(() => undefined);
     },
     (err) => logger.warn('Premium: the grant could not be read', err),
   );
@@ -104,7 +113,10 @@ function subscribe(l: () => void) {
  * The account's Premium, live: `has` (by the rule above, now), whether it is `known` yet, and the grant. `enabled`
  * false (the store app, a non-tester) reads nothing.
  */
-export function usePremium(uid: string | null | undefined, enabled: boolean): { has: boolean; known: boolean; grant: PremiumGrant | null } {
+export function usePremium(
+  uid: string | null | undefined,
+  enabled: boolean,
+): { has: boolean; known: boolean; grant: PremiumGrant | null; early: boolean } {
   useEffect(() => {
     if (!uid || !enabled) return;
     users += 1;
@@ -121,7 +133,7 @@ export function usePremium(uid: string | null | undefined, enabled: boolean): { 
   const s = useSyncExternalStore(subscribe, () => state);
   const mine = enabled && !!uid && s.uid === uid;
   const grant = mine ? s.grant : null;
-  return { has: hasPremium(grant, Date.now()), known: mine && s.known, grant };
+  return { has: hasPremium(grant, Date.now()), known: mine && s.known, grant, early: mine && s.early };
 }
 
 /** Tests only. */
@@ -150,7 +162,10 @@ export async function setDevPremium(on: boolean): Promise<boolean> {
     | { result?: { premium?: unknown } }
     | null;
   const premium = out?.result?.premium === true;
-  if (state.uid) set({ uid: state.uid, known: true, grant: premium ? { source: 'dev', grantedAt: Date.now(), until: null } : null });
+  // Off takes early access's grant too, on revisely-dev (devRevokePremium).
+  if (state.uid) {
+    set({ uid: state.uid, known: true, early: on && state.early, grant: premium ? { source: 'dev', grantedAt: Date.now(), until: null } : null });
+  }
   return premium;
 }
 
