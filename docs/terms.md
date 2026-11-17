@@ -6,7 +6,7 @@ permalink: /terms/
 # Terms of Service for Revisely
 
 **Effective date: 2026-05-11**
-**Last updated: 2026-11-08**
+**Last updated: 2026-11-16**
 
 These Terms of Service ("Terms") govern your use of the Revisely mobile application ("the app", "Revisely"). Revisely is operated by `Majd Khawaldeh` ("we", "us", or "our"). By creating an account or using Revisely, you agree to these Terms. If you do not agree, do not use the app.
 
@@ -72,9 +72,20 @@ The Holy Quran itself is in the public domain. Page images displayed in the app 
 
 Revisely relies on third-party services to operate, including Apple, Google (Firebase), Sentry, Expo and Anthropic (Revo's answers). Your use of Sign in with Apple or Google Sign-In is also subject to their terms. Section 5 of the [Privacy Policy](/privacy/) lists each service and what it is used for.
 
-## 8. Pricing
+## 8. Pricing and Premium early access
 
-Revisely is currently free to download and use, and contains no in-app purchases or subscriptions. If we introduce paid features in the future, they will be sold exclusively through Apple's In-App Purchase system, any auto-renewing terms will be clearly disclosed at the point of sale, and these Terms will be updated before any charge applies.
+Revisely is currently free to download and use, and contains no in-app purchases or subscriptions: nothing in it is for sale.
+
+**Premium early access.** Revisely Premium (for example, marking mistakes as you recite) is in early access: every account has it, free of charge, while early access lasts. Premium will be paid in the future. Every account that has Premium during early access keeps it, still free of charge, after Premium becomes paid. That means:
+
+- It belongs to the Revisely account it was given to. It can't be moved to another account, sold or exchanged, and deleting the account ends it.
+- It is Premium as it is for everyone at the time: its features may change over time, as Revisely's do.
+- It lasts for as long as Revisely runs. We may end it for an account that breaks these Terms (Section 11).
+- Nothing is charged for it, so there is nothing to refund.
+
+When early access ends, new accounts no longer get Premium for free.
+
+If we introduce paid features in the future, they will be sold through Apple's In-App Purchase on iPhone and Google Play's billing on Android, any auto-renewing terms will be clearly disclosed at the point of sale, and these Terms will be updated before any charge applies.
 
 ## 9. Disclaimer of warranties
 
