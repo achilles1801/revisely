@@ -1,13 +1,13 @@
 {
   "recordedAt": null,
-  "how": "functions/scripts/record-anthropic.js on 2026-11-10T02:34:05.365Z; request moved by hand to the system prompt of guide.ts with the search screen's cards, Share, Copy and Open in the reader (Nov 16 2026) (the reply is that recording, not re-recorded: record again with the coach key)",
+  "how": "functions/scripts/record-anthropic.js on 2026-11-10T02:34:05.365Z; request moved by hand to the system prompt of Home help: the streak's ring (SESS-6) in Revo's guide (the reply is that recording, not re-recorded: record again with the coach key)",
   "request": {
     "model": "claude-sonnet-5-5",
     "max_tokens": 800,
     "thinking": {
       "type": "between_tools"
     },
-    "systemSha256": "ca84559c4a88461e7e82f09c655bdd336332ffa2aa3eaedaef99ac70605f782d",
+    "systemSha256": "934e573038372dae23a29596b90af043c31097e94232d34a7ea9afe416d18485",
     "outputSchemaSha256": "ca725b35345fa9d4316a6e08e45b7f3a3c7c7833def4ea0b669b4c4d39dfba1e"
   },
   "status": 200,
