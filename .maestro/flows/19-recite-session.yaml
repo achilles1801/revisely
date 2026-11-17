@@ -147,12 +147,22 @@ appId: com.revisionbuddy.app
 - assertVisible:
     id: session-title
     text: ".*0/2.*"
+# A take kept as a recording says "Recording saved", over the mic: a long press there would be its View (flow 18 waits
+# the same way). It goes by itself.
+- extendedWaitUntil:
+    notVisible: "Recording saved"
+    timeout: 12000
+
+# The take was kept in Recite's memory: its words stay marked on the page, and the held mic offers them as one take.
+- extendedWaitUntil:
+    visible:
+      id: past-mark-word
+    timeout: 10000
 - runFlow:
     file: ../subflows/shot.yaml
     env:
       NAME: rs05-after
-
-# The take was kept in Recite's memory: its words stay marked on the page, and the held mic offers them as one take.
+- runFlow: ../subflows/reader-controls.yaml
 - longPressOn:
     id: recite-mic
 - extendedWaitUntil:
