@@ -1,21 +1,13 @@
-// The hidden recite mode's state and what it covers (pure).
+// What a hidden page covers (pure): Recite's hidden view (components/reciteLive/LivePageLayers draws it).
 //
-// While the page is hidden every line is covered except its verse markers
-// (lib/recite/pageLines); a verse is shown again when it is revealed: reached
-// by a pause in the reciter's voice (lib/recite/pauseDetector), or the "Next
-// verse" button (never by a tap: Majd, Nov 14 2026). The line where the next hidden verse starts carries the
-// follow band (blue, never the accent).
-//
-// Reveals go through one place (revealVerse) whatever made them, so speech
-// recognition can drive them later (word by word: a verse's words up to the one
-// recited, `words`), and mistakes can be kept beside them (`marks`), without
-// changing how a page is drawn.
+// While the page is hidden every line is covered except its verse markers (lib/recite/pageLines), and the words
+// recited show in place (`WordFollow`, from the take). Revealed verses (keys) open whole; the live view passes none.
 
 import { AyahRef, ayahRects, Rect, versesOnPage } from '../ayahBounds';
 import { pageLines, Span, subtractSpans } from './pageLines';
 import type { QuranWords } from './quranWords';
 
-/** Following the reciter word by word (on-device recognition, lib/recite/reciteSession). */
+/** Following the reciter word by word (a live take's words recited, lib/reciteLive/view's hiddenFollow). */
 export interface WordFollow {
   words: QuranWords;
   /** Whether a word has been recited (it shows). */
@@ -24,48 +16,8 @@ export interface WordFollow {
   next: number | null;
 }
 
-/** What revealed a verse. 'speech' is for recognition (not in this version). */
-export type RevealSource = 'pause' | 'next' | 'speech';
-
 /** A verse as a key: "2:255". */
 export const verseKey = (a: { sura: number; ayah: number }) => `${a.sura}:${a.ayah}`;
-
-/** What is shown of one hidden page. */
-export interface PageReveal {
-  /** Verses shown again, in the order they were revealed. */
-  verses: readonly string[];
-}
-
-/** Per page; a page with nothing revealed has no entry. */
-export type RevealState = Readonly<Record<number, PageReveal>>;
-
-export const NOTHING_REVEALED: RevealState = {};
-
-export function revealedOn(state: RevealState, page: number): ReadonlySet<string> {
-  return new Set(state[page]?.verses ?? []);
-}
-
-/** The state with `verse` shown on `page` (unchanged if it already is). */
-export function revealVerse(state: RevealState, page: number, verse: { sura: number; ayah: number }): RevealState {
-  const key = verseKey(verse);
-  const verses = state[page]?.verses ?? [];
-  if (verses.includes(key)) return state;
-  return { ...state, [page]: { verses: [...verses, key] } };
-}
-
-/** The page covered again. */
-export function hidePageAgain(state: RevealState, page: number): RevealState {
-  if (!state[page]) return state;
-  const next = { ...state };
-  delete next[page];
-  return next;
-}
-
-/** The first verse on the page (top to bottom) not shown yet, or null. */
-export function nextHiddenVerse(state: RevealState, page: number): AyahRef | null {
-  const shown = revealedOn(state, page);
-  return versesOnPage(page).find((v) => !shown.has(verseKey(v))) ?? null;
-}
 
 /** One line of a hidden page, in bounds space. */
 export interface CoverLine {

@@ -252,6 +252,18 @@ until its part is set up.
   marks the words skipped, said wrong or added, harakat and letter slips and, with Strict, tajweed notes (madd lengths
   per Settings → Recite, qalqalah, ghunnah, ikhfa, idgham, iqlab). The verse menu's old "Check my recitation" row
   (record, then check) is gone (Nov 15 2026; nothing showed it any more).
+  - **In revision sessions too** (Majd, Nov 17 2026: "add the mistake detection and mic functionality same as mushaf to
+    the revision sessions themselves and get rid of that old hidden view thing on the top"; RECITE-9). Everything Recite
+    puts on a page lives in `components/reciteLive/useReciteLayer`, used by the reader and `ActiveRevisionScreen` alike:
+    the mic and its menu, the take's bar, the page layers, the cards, the summary, the notice and the Premium page. A
+    screen gives it `showPage` (its pager's `scrollToPage`, false for a page it doesn't hold) and puts `bar`,
+    `controls`, `activity`, `pager` and `sheets` where they go.
+    - A take never marks a session's page revised: its page turns are `scrollToPage`, which never reports an advance,
+      so only a swipe or ✓ marks one (SESS-1). A take past the session's last page leaves the page where it is.
+    - A place the session doesn't hold (a similar ayah, a slip's ayah, a past take) opens the reader over it
+      (`navigation.push('QuranReader', …)`); Back comes back. Test me is the reader's only (`testMe: false`).
+    - The old hidden recite mode (the eye at the top of a session, `reciteModeEnabled`, on-device word following and
+      pause detection) is gone with its help topic. The on-device speech model stays: voice search uses it.
   - The checker runs on Cloud Run in revisely-dev (`scripts/recite-check`, its README): the app has no JS-only way
     to run the model on the phone. It is deployed by hand, never to production, and the store app never calls it.
   - **Two services** (recite-server, Nov 15 2026; Majd approved halving the light levels' cost; recite-contract.md,
@@ -522,8 +534,8 @@ Non-testers follow `production`, so nobody sees this on a phone before Promote; 
 - `HELP_FOR_EVERYONE` (`lib/help/availability`): the ? buttons (HELP-1, HELP-4).
 - What's new `2026-11` `live: true`; `components/whatsNew/needs` reads the gates above.
 - Revo is not one of them: it follows `config/app.revo` (REVO-37).
-- Still testers only: hidden recite mode (`reciteModeEnabled`), Reset my data, Load test scenario, the
-  update tools and the `preview` channel, the old Ask coach.
+- Still testers only: Reset my data, Load test scenario, the update tools and the `preview` channel, the old Ask
+  coach.
 - The old Activity (no blocks) and the Insights tab stay in the code as what the gate falls back to;
   `ActivityScreens.test` and `ActivityScreens.v2.test` pin them by mocking the gate off.
 - A loaded test scenario writes `whatsNewSeen: 'all'` (`functions/src/testScenarios.ts`), so it opens on
@@ -1482,8 +1494,8 @@ choice is kept per phone (`@revisely_mushaf_edition:v1`), not on the account.
 - **On the phone:** `Documents/mushaf/1441/<set>/`; `pageCache` keys everything by edition, and the
   offline download follows the edition chosen. The other print's pages stay (switching back is
   instant) until removed in the picker. "Remove from this phone" under Offline mushaf removes both.
-- Hidden recite mode needs line and word data, which only the 1405 pages have: its button is hidden
-  for the 1441 print (`MushafEdition.reciteData`).
+- Recite needs line and word data, which only the 1405 pages have: with the 1441 print the mic is the plain record
+  button (`MushafEdition.reciteData`).
 - **The picker** is a row per print (thumbnail, name, "On this phone" / "n of 604 pages" / "153 MB to
   download", a check) and one credit line per publisher (`mushafCredits`; both prints are the King
   Fahd Complex's, so one line). No explanations: the owner had the page-numbers note removed (Nov 3
@@ -1570,7 +1582,7 @@ before production can be applied for.
   - expo-location sends a heading only after a ~2° turn, so a phone held still can show
     "Finding north…" until it moves.
   - Widgets are iOS only (WidgetKit); Android home-screen widgets are a follow-up.
-- **Not on Android yet:** home-screen widgets, recite mode's speech recognition (whisper.rn's iOS
+- **Not on Android yet:** home-screen widgets, voice search's speech recognition (whisper.rn's iOS
   path only), Sign in with Apple, previous/next verse in the media notification and on the lock
   screen.
 - **Testing on an emulator** without touching production: the Firebase emulators (Auth, Firestore,
@@ -2004,7 +2016,7 @@ classic default), and a fresh install starts in light.
       explains (`covers`). `src/lib/help/__tests__/topics.test.ts` keeps a hash of each covered rule
       in `reviewed.json` and fails when a rule changes until its topic is reviewed: read the topic
       against the rule, fix the words, then `UPDATE_HELP_REVIEWED=1 npx jest src/lib/help`. A topic
-      no rule covers yet says why (`unruled`: the reader's gestures and player, the hidden page); the
+      no rule covers yet says why (`unruled`: the reader's gestures and player); the
       check can't watch those, so a rule with a scenario for one turns it into `covers`.
     - A change to something a topic describes (a label, a gesture, where a button is) updates the
       topic in the same PR. `{{labels}}` must be text the app shows (the test checks `src/`).

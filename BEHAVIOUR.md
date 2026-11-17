@@ -341,7 +341,7 @@ has them; Revisely Dev's Revo knows them from its Dev guide.
 ## Recite (Revisely Dev)
 
 The reader's mic follows the reciter on the page and, with Mark mistakes, marks their mistakes as they recite (Majd,
-Nov 11–16 2026). The checking runs on Revisely's checker (Cloud Run); these rules are what the app shows of what it says.
+Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checking runs on Revisely's checker (Cloud Run); these rules are what the app shows of what it says.
 
 - **RECITE-1.** A take starts anywhere on the page, or anywhere in the Qur'an. Until the checker has found where the
   reciter is, the take shows nothing of them: no band on the line, no box on a word ("Listening…"). The first place
@@ -376,6 +376,11 @@ Nov 11–16 2026). The checking runs on Revisely's checker (Cloud Run); these ru
   their end. A place is clean when it reached the end with no mistake and nothing peeked; peeks make it "helped".
   Tajweed notes and Not clear never count against it, and a place whose start was never found counts as not
   continued.
+- **RECITE-9.** A revision session has the reader's mic, with the same takes, marks, hidden view, cards and summary;
+  Test me stays in the reader. A take there stays in Recite: it never marks a page revised, since its own page turns
+  credit nothing, so only a swipe off a page or ✓ marks one (SESS-1). Its page turns stay on the session's pages, and
+  a place outside them (a similar ayah, a past take) opens in the reader over the session; Back comes back to it.
+  (Majd, Nov 17 2026: "add the mistake detection and mic functionality same as mushaf to the revision sessions".)
 
 ## Recite insights (Revisely Dev)
 
@@ -1062,8 +1067,8 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   hidden across launches. The screen they were hidden from says "Help buttons hidden. Settings → Support
   brings them back." with Undo. Settings → Support → Help buttons turns them back on, or off again.
 - **HELP-3.** Help follows Smart Tracking: with it off, no topic mentions ratings or strength. A session's
-  Rating topic and the new plan's "weakest first" show only with it on. The hidden page's topic shows only
-  where the hidden page is offered.
+  Rating topic and the new plan's "weakest first" show only with it on. Recite's topics show only where Recite is
+  offered.
 - **HELP-4.** The ? buttons are on by default: an account that has help sees them on every phone where
   its user hasn't hidden them, new or existing, with nothing stored. Only the user takes them away, with
   "Hide help buttons" or Settings → Support → Help buttons (HELP-2); a setting that can't be read leaves

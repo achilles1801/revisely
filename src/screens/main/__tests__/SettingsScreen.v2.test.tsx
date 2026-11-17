@@ -246,13 +246,13 @@ describe('Settings: the speech model', () => {
     expect(screen.getByTestId('speech-model-sheet')).toHaveTextContent('Recite a few words and Revisely finds the ayah.', { exact: false });
   });
 
-  it('a tester: the row names following the recitation too', async () => {
+  it('a tester too: voice search alone (the old hidden page that followed the recitation is gone, Nov 17 2026)', async () => {
     mockUser.previewTester = true;
     await renderV2();
-    expect(screen.getByText('Searches by voice and follows your recitation, on this iPhone')).toBeTruthy();
+    expect(screen.getByText('Searches the Quran by voice, on this iPhone')).toBeTruthy();
     fireEvent.press(screen.getByText('Speech model'));
     await act(async () => {});
-    expect(screen.getByTestId('speech-model-sheet')).toHaveTextContent('Follow word by word', { exact: false });
+    expect(screen.getByTestId('speech-model-sheet')).toHaveTextContent('Search by voice', { exact: false });
   });
 
   it('on the phone: its size, and Delete', async () => {

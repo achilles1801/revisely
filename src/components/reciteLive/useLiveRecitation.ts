@@ -150,7 +150,8 @@ export function useLiveRecitation({
 }: {
   settings: ReciteCheckSettings;
   currentPage: number;
-  onShowPage: (page: number) => void;
+  /** Turns the screen to a page; false when it doesn't hold that page (a session's pager holds its day's alone). */
+  onShowPage: (page: number) => boolean | void;
   /** The revision day a saved recording belongs to (null: nothing is saved). */
   recordingDay?: string | null;
   /** A take's recording was saved. */
@@ -300,7 +301,7 @@ export function useLiveRecitation({
         const page = qw.pageOf(qw.verseFirstWord(span.from[0], span.from[1]));
         if (page !== pageRef.current) {
           turningTo.current = page;
-          onShowPageRef.current(page);
+          if (onShowPageRef.current(page) === false) turningTo.current = null;
         }
         endWord.current = spanEndWord(qw, span);
         return page;
@@ -556,7 +557,8 @@ export function useLiveRecitation({
     const page = words.pageOf(state.cursor);
     if (page !== pageRef.current) {
       turningTo.current = page;
-      onShowPageRef.current(page);
+      // A page the screen doesn't hold (past a session's last page) isn't turned to: nothing to wait for.
+      if (onShowPageRef.current(page) === false) turningTo.current = null;
     }
   }, [live, state.cursor, words]);
 
