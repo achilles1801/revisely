@@ -95,11 +95,24 @@ it('[ACT-28] [ACT-30] [DAY-2] Gaps counts by the revision day: a session after m
     'Full revision pushed back 5 days. 18 pages from your gaps come round by 13 Nov instead of 8 Nov. Your plan goes round every 5 days.',
   );
 
-  // When did I last revise…? (ACT-30): by surah, longest waiting first. An-Naba's 582 was last revised on the 2nd
-  // (7 days), as long as Juz 30's end has waited since it was memorized; An-Naba comes first among them.
   const { fireEvent } = app.mods.rtl;
+  // The longest gap opens Overview with it marked on the calendar, at November, from the 3rd to the 7th.
   await app.act(async () => {
-    fireEvent.press(app.screen.getByTestId('insights-gaps-last-revised'));
+    fireEvent.press(app.screen.getByTestId('insights-gaps-longest'));
+  });
+  await app.until(() => app.screen.queryByTestId('calendar-gap-cue') != null, 'the gap on the calendar');
+  expect(app.screen.getByText('Longest gap, 3 Nov – 7 Nov · 4 days')).toBeTruthy();
+  expect(app.screen.getByTestId('calendar-month-title').props.children).toBe('November 2026');
+  await app.act(async () => {
+    fireEvent.press(app.screen.getByTestId('pill-insights'));
+  });
+  await app.until(() => app.screen.queryByTestId('insights-gaps-last-revised') != null, 'Gaps again');
+
+  // Last revised (ACT-30), from the full revision line: longest waiting first, by surah (it suits this account, whose
+  // pages span several surahs). An-Naba's 582 was last revised on the 2nd (7 days), as long as Juz 30's end has
+  // waited since it was memorized; An-Naba comes first among them.
+  await app.act(async () => {
+    fireEvent.press(app.screen.getByTestId('insights-gaps-revision'));
   });
   await app.until(() => app.screen.queryAllByTestId(/^last-revised-row-surah-/).length > 0, 'Last revised');
   const rows = app.screen.getAllByTestId(/^last-revised-row-surah-/);

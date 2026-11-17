@@ -82,7 +82,7 @@ export type HomeStackParamList = {
   // Every revised page by strength (the Insights tab's Browse), from Activity's Weak spots.
   PagesByStrength: undefined;
   // When each surah, juz, hizb or page was last revised (ACT-30), from Insights' Gaps.
-  LastRevised: undefined;
+  LastRevised: { sort?: 'recent' | 'waiting' | 'mushaf' } | undefined;
   // Daily-log editor. date is YYYY-MM-DD; omitted means "today" (fajr-aware
   // revision day).
   JournalEntry: { date?: string; kind?: JournalKind } | undefined;

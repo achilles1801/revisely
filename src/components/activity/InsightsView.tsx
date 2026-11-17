@@ -189,7 +189,8 @@ export function InsightsView({
   /** A day (Consistency's circles and grid, a month's memorizations: ACT-23). */
   onOpenDay?: (day: string) => void;
   /** Overview at a month (Consistency's figure: ACT-23). */
-  onOpenCalendar?: (month: string) => void;
+  /** Overview at a month; Gaps' longest gap also passes the gap, to mark on the calendar (ACT-28). */
+  onOpenCalendar?: (month: string, gap?: { from: string; to: string; cue: string }) => void;
   /** The reader at some ayahs, highlighted (the Recitation section's rows, RINS-2). */
   onOpenAyahs?: (sura: number, from: number, to: number) => void;
   /** The user's order and the sections hidden (ACT-29); the usual layout without it. */
@@ -197,7 +198,7 @@ export function InsightsView({
   /** Edit sections (ACT-29): from the line shown when every section is hidden. */
   onEditSections?: () => void;
   /** When each surah, juz, hizb or page was last revised (Gaps' link: ACT-30). */
-  onOpenLastRevised?: () => void;
+  onOpenLastRevised?: (sort?: 'waiting') => void;
 }) {
   // The juz sheet (ACT-21): mounted from its first opening on, so it can slide away after.
   const [juz, setJuz] = useState<number | null>(null);

@@ -315,6 +315,17 @@ export function longestTile(longest: Gap | null, inWords: string, inDays = false
 }
 
 /**
+ * The longest gap on Overview's calendar (ACT-28): the band's ends, from the revision day before it to the one that
+ * ended it (open: today; begun before the days read: as far back as it is known to reach), and the words above the
+ * grid: "Longest gap, 28 Oct – 6 Nov · 9 days".
+ */
+export function gapOnCalendar(g: Gap, today: string, inDays = false): { from: string; to: string; cue: string } {
+  const to = g.to ?? today;
+  const from = g.from ?? dayOf(dayNumber(to) - g.days);
+  return { from, to, cue: `${longestTile(g, '', inDays).text} · ${gapLabel(g, inDays)}` };
+}
+
+/**
  * The usual rhythm's tile: "Every day", "Every 2 days", "Every 1–2 days" (from 2 weeks, "About every 2 weeks",
  * "About every month"), and how many long gaps.
  */

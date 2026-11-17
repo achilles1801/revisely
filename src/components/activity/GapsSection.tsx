@@ -20,6 +20,7 @@ import { Tap } from '../v2/Tap';
 import {
   gapDate,
   gapLabel,
+  gapOnCalendar,
   gapsFigure,
   gapsHaveNatural,
   gapsView,
@@ -58,12 +59,13 @@ export interface GapsSectionProps {
   lastRevisedOn?: ReadonlyMap<number, string>;
   /** A day (the figure: the last revision; the strip: the day touched). */
   onOpenDay?: (day: string) => void;
-  /** Overview at a month (the longest gap; a long strip's month touched). */
-  onOpenCalendar?: (month: string) => void;
+  /** Overview at a month (a long strip's month touched), or with a gap marked on it (the longest gap). */
+  onOpenCalendar?: (month: string, gap?: { from: string; to: string; cue: string }) => void;
   /** The full revision against the plan (lib/gapsCycle pushBack); none: no line. */
   pushBack?: PushBack | null;
-  /** Last revised (ACT-30): the link at the section's end, and the full revision line. */
-  onOpenLastRevised?: () => void;
+  /** Last revised (ACT-30): the link at the section's end, and the full revision line (longest waiting first: the
+   * late pages at the top). */
+  onOpenLastRevised?: (sort?: 'waiting') => void;
 }
 
 export function GapsSection(props: GapsSectionProps) {
@@ -107,7 +109,10 @@ function Gaps({ view, all, firstDay, onOpenDay, onOpenCalendar, pushBack, onOpen
   const longest = longestTile(view.longest, inWords, inDays);
   const rhythm = view.usual != null ? rhythmTile(view.usual, view.longCount, inDays) : null;
   const revision = pushBack ? pushBackLine(pushBack, inDays) : null;
-  const longestMonth = view.longest ? (view.longest.from ?? view.longest.to!).slice(0, 7) : null;
+  // The longest gap opens Overview with the gap marked on its calendar (Majd, Nov 16 2026: "it should take them to the
+  // overview tab with some 'animation' or visual que showing the user their gap on the calendar itself").
+  const longestGap = view.longest ? gapOnCalendar(view.longest, props.today, inDays) : null;
+  const longestOpens = longestGap != null && onOpenCalendar != null;
 
   const figureInner = (
     <>
@@ -166,11 +171,11 @@ function Gaps({ view, all, firstDay, onOpenDay, onOpenCalendar, pushBack, onOpen
 
       <View style={[styles.tiles, stacked && styles.tilesStacked]} testID="insights-gaps-tiles">
         <Tap
-          onPress={longestMonth && onOpenCalendar ? () => onOpenCalendar(longestMonth) : undefined}
-          disabled={!longestMonth || !onOpenCalendar}
-          accessibilityRole={longestMonth && onOpenCalendar ? 'button' : 'text'}
+          onPress={longestOpens ? () => onOpenCalendar(longestGap.from.slice(0, 7), longestGap) : undefined}
+          disabled={!longestOpens}
+          accessibilityRole={longestOpens ? 'button' : 'text'}
           accessibilityLabel={[longest.value, longest.unit, longest.text].filter(Boolean).join(' ')}
-          accessibilityHint={longestMonth && onOpenCalendar ? t('insights.gaps.longestHint') : undefined}
+          accessibilityHint={longestOpens ? t('insights.gaps.longestHint') : undefined}
           style={[styles.tile, { backgroundColor: palette.bubble }]}
           testID="insights-gaps-longest"
         >
@@ -180,7 +185,7 @@ function Gaps({ view, all, firstDay, onOpenDay, onOpenCalendar, pushBack, onOpen
           </View>
           <ChromeText style={[typeV2.meta, styles.tileText, { color: palette.secondary }]}>
             {longest.text}
-            {longestMonth && onOpenCalendar ? ` ${chevron()}` : ''}
+            {longestOpens ? ` ${chevron()}` : ''}
           </ChromeText>
         </Tap>
         {rhythm ? (
@@ -200,7 +205,7 @@ function Gaps({ view, all, firstDay, onOpenDay, onOpenCalendar, pushBack, onOpen
 
       {revision ? (
         <Tap
-          onPress={onOpenLastRevised}
+          onPress={onOpenLastRevised ? () => onOpenLastRevised('waiting') : undefined}
           disabled={!onOpenLastRevised}
           style={[styles.revision, { borderTopColor: palette.separator }]}
           accessibilityRole={onOpenLastRevised ? 'button' : 'text'}
@@ -221,7 +226,7 @@ function Gaps({ view, all, firstDay, onOpenDay, onOpenCalendar, pushBack, onOpen
 
       {onOpenLastRevised ? (
         <Tap
-          onPress={onOpenLastRevised}
+          onPress={() => onOpenLastRevised()}
           accessibilityRole="button"
           accessibilityHint={t('insights.lastRevised.linkHint')}
           hitSlop={8}

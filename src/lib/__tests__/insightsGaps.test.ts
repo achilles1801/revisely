@@ -5,6 +5,7 @@ import {
   gapDate,
   gapsInsightsEnabled,
   gapLabel,
+  gapOnCalendar,
   gapsFigure,
   gapsView,
   longestTile,
@@ -252,6 +253,32 @@ describe('words', () => {
     );
     const daily = gapsView({ revised: items([TODAY]), today: TODAY, window: 30 })!;
     expect(stripLabel(daily, 'last 30 days')).toBe('Last 30 days: revised on 1 day. No gaps of 3 days or more.');
+  });
+});
+
+describe('the longest gap on the calendar (ACT-28)', () => {
+  const gap = (g: Partial<Parameters<typeof gapOnCalendar>[0]>) => ({ from: null, to: null, days: 0, atLeast: false, open: false, long: true, ...g });
+  it('runs from the revision day before it to the one that ended it, named above the grid', () => {
+    expect(gapOnCalendar(gap({ from: '2026-10-28', to: '2026-11-06', days: 9 }), TODAY)).toEqual({
+      from: '2026-10-28',
+      to: '2026-11-06',
+      cue: 'Longest gap, 28 Oct – 6 Nov · 9 days',
+    });
+  });
+
+  it('still open: to today; begun before the days read: as far back as it is known; long ones in words, or days', () => {
+    expect(gapOnCalendar(gap({ from: '2026-11-09', days: 6, open: true }), TODAY)).toEqual({
+      from: '2026-11-09',
+      to: TODAY,
+      cue: 'Longest gap, since 9 Nov · 6 days so far',
+    });
+    expect(gapOnCalendar(gap({ to: '2026-11-07', days: 60, atLeast: true }), TODAY)).toEqual({
+      from: '2026-09-08',
+      to: '2026-11-07',
+      cue: 'Longest gap, until 7 Nov · 60+ days',
+    });
+    expect(gapOnCalendar(gap({ from: '2026-10-01', to: '2026-10-23', days: 22 }), TODAY).cue).toBe('Longest gap, 1 Oct – 23 Oct · over 3 weeks');
+    expect(gapOnCalendar(gap({ from: '2026-10-01', to: '2026-10-23', days: 22 }), TODAY, true).cue).toBe('Longest gap, 1 Oct – 23 Oct · 22 days');
   });
 });
 

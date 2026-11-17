@@ -7,14 +7,15 @@
 // room of both words, and the header stays one line on an SE with Today and the arrows beside it. It is
 // the same control as Insights' range chip, so both tabs read alike.
 
-import React, { useState } from 'react';
-import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { AccessibilityInfo, Animated, Easing, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { Tap } from '../v2/Tap';
 import { monthGrid, monthTitle } from '../../lib/activityHeatmap';
-import { weekDays, weekTitle, type CalendarSpan } from '../../lib/activityCalendar';
+import { bandInRow, weekDays, weekTitle, type CalendarGap, type CalendarSpan } from '../../lib/activityCalendar';
+import { useReduceMotion } from '../../design/motion';
 import { ActionSheet } from '../v2/ActionSheet';
 import { ChoiceChip } from './ChoiceChip';
 import { dayMarks, dayPreview } from '../../lib/activityInsights';
@@ -34,6 +35,11 @@ const TOTALS_TWO_BY_TWO = 1.2;
 
 /** From this text size Today and the arrows take a line of their own under the title and its chip. */
 const HEADER_WRAPS = 1.2;
+
+/** The grid's side padding, the room between its days, and a day's disc (the band is as tall). */
+const GRID_PAD = 16;
+const CELL_GAP = 4;
+const DISC = 34;
 
 /** The letters above the grid, Sunday first, as monthGrid's weeks are (activityHeatmap.weekStart). */
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -68,6 +74,7 @@ export function CalendarMonth({
   onOpen,
   recordings,
   sections = DEFAULT_SECTIONS.overview,
+  gap = null,
 }: {
   /** 'YYYY-MM' (the month shown, and the grid's days). */
   month: string;
@@ -88,10 +95,39 @@ export function CalendarMonth({
   recordings?: Map<string, RecordingCounts>;
   /** The user's order of the sections under the header, and those hidden (ACT-29); the usual layout without it. */
   sections?: TabLayout<'overview'>;
+  /** Insights' longest gap, marked on the days (ACT-28); it fades when it goes. */
+  gap?: CalendarGap | null;
 }) {
   const { palette } = useTheme();
   const { fontScale } = useWindowDimensions();
   const [spanMenu, setSpanMenu] = useState(false);
+  const band = useGapBand(gap);
+  // The grid's inner width: where each day's disc sits, for the band.
+  const [rowWidth, setRowWidth] = useState(0);
+  const bandParts = band.shown && rowWidth > 0 ? layoutBand(span === 'week' ? [weekDays(week)] : monthGrid(month), band.shown, rowWidth) : [];
+  // Fading out after a touch: still drawn for a moment, but no longer there for VoiceOver.
+  const leaving = band.shown != null && gap == null;
+  const bandRow = (r: number, first: string | undefined) => {
+    const part = bandParts[r];
+    return part ? (
+      <Animated.View style={[StyleSheet.absoluteFill, { opacity: band.opacity }]} pointerEvents="none">
+        <GapBand part={part} progress={band.progress} testID={leaving ? `calendar-gap-band-leaving-${first}` : `calendar-gap-band-${first}`} />
+      </Animated.View>
+    ) : null;
+  };
+  const cue = band.shown ? (
+    <Animated.View
+      style={[styles.cue, { opacity: band.opacity }]}
+      accessibilityElementsHidden={leaving}
+      importantForAccessibility={leaving ? 'no-hide-descendants' : 'auto'}
+      testID={leaving ? 'calendar-gap-cue-leaving' : 'calendar-gap-cue'}
+    >
+      <View style={[styles.cueSwatch, { backgroundColor: palette.redSubtle, borderColor: palette.red }]} />
+      <Text style={[typeV2.meta, styles.cueText, { color: palette.text }]} maxFontSizeMultiplier={MAX_SCALE}>
+        {band.shown.cue}
+      </Text>
+    </Animated.View>
+  ) : null;
   const unit = span === 'week' ? 'week' : 'month';
   const grid = monthGrid(month);
   const days = grid.flat().filter((d): d is string => d != null);
@@ -141,8 +177,10 @@ export function CalendarMonth({
     ) : null;
   const calendar =
     span === 'week' ? (
-      <View style={styles.grid} testID="calendar-week">
+      <View style={styles.grid} testID="calendar-week" onLayout={(e) => setRowWidth(e.nativeEvent.layout.width - 2 * GRID_PAD)}>
+        {cue}
         <View style={styles.weekRow}>
+          {bandRow(0, weekShown[0])}
           {weekShown.map((d) => (
             <DayCell key={d} day={d} today={today} picked={picked} data={data} onPick={onPick} onOpen={onOpen} />
           ))}
@@ -153,7 +191,8 @@ export function CalendarMonth({
       </View>
     ) : (
       // Grid: letters (18 tall), then the weeks, each day 50 tall.
-      <View style={styles.grid} testID="calendar-grid">
+      <View style={styles.grid} testID="calendar-grid" onLayout={(e) => setRowWidth(e.nativeEvent.layout.width - 2 * GRID_PAD)}>
+        {cue}
         <View style={styles.weekRow}>
           {WEEKDAYS.map((w, i) => (
             <Text key={i} style={[styles.letter, { color: palette.secondary }]} maxFontSizeMultiplier={MAX_SCALE}>
@@ -163,6 +202,7 @@ export function CalendarMonth({
         </View>
         {grid.map((row, r) => (
           <View key={r} style={styles.weekRow}>
+            {bandRow(r, row.find((d): d is string => d != null))}
             {row.map((d, c) => (d ? <DayCell key={c} day={d} today={today} picked={picked} data={data} onPick={onPick} onOpen={onOpen} /> : <View key={c} style={styles.cell} />))}
           </View>
         ))}
@@ -326,6 +366,102 @@ export function CalendarMonth({
   );
 }
 
+/**
+ * The gap marked on the calendar (ACT-28): it draws in from its first day to its last, row by row, with a red edge
+ * that then settles into the quiet fill; with Reduce Motion it fades in whole. When it goes (a touch on the
+ * calendar), it fades out. The words above the grid are said once for VoiceOver.
+ */
+function useGapBand(gap: CalendarGap | null) {
+  const reduceMotion = useReduceMotion();
+  const [shown, setShown] = useState<CalendarGap | null>(gap);
+  const progress = useRef(new Animated.Value(gap ? 0 : 1)).current;
+  const opacity = useRef(new Animated.Value(1)).current;
+  const key = gap?.key ?? null;
+  useEffect(() => {
+    if (gap) {
+      setShown(gap);
+      opacity.setValue(reduceMotion ? 0 : 1);
+      progress.setValue(reduceMotion ? 1 : 0);
+      Animated.timing(reduceMotion ? opacity : progress, {
+        toValue: 1,
+        duration: reduceMotion ? 250 : 750,
+        delay: reduceMotion ? 0 : 150,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false,
+      }).start();
+      AccessibilityInfo.announceForAccessibility?.(gap.cue);
+      return;
+    }
+    let live = true;
+    const gone = () => {
+      if (live) setShown(null);
+    };
+    Animated.timing(opacity, { toValue: 0, duration: 220, useNativeDriver: false }).start(gone);
+    // Gone by then even if the frames lag behind (a busy JavaScript thread).
+    const timer = setTimeout(gone, 300);
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+    // Only a new gap (or none) starts it again: stepping to another month keeps it as it is.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  return { shown, progress, opacity };
+}
+
+interface BandPart {
+  left: number;
+  length: number;
+  starts: boolean;
+  ends: boolean;
+  /** Where it falls along the whole band on screen (0–1): rows draw one after another. */
+  from: number;
+  to: number;
+}
+
+/**
+ * The band in the rows on screen (the month's weeks, or the one week): in each row, from the gap's first day's disc
+ * to its last day's, behind the discs, rounded where it begins or ends and flat where it carries on into the next
+ * row, month or week (lib/activityCalendar bandInRow).
+ */
+function layoutBand(rows: readonly (readonly (string | null)[])[], gap: CalendarGap, width: number): (BandPart | null)[] {
+  const cell = (width - 6 * CELL_GAP) / 7;
+  const at = (c: number) => c * (cell + CELL_GAP);
+  const parts = rows.map((row) => {
+    const p = bandInRow(row, gap);
+    if (!p) return null;
+    const left = p.starts ? at(p.first) + cell / 2 - DISC / 2 : at(p.first);
+    const right = p.ends ? at(p.last) + cell / 2 + DISC / 2 : at(p.last) + cell;
+    return { left, length: right - left, starts: p.starts, ends: p.ends };
+  });
+  const total = parts.reduce((n, p) => n + (p?.length ?? 0), 0);
+  let done = 0;
+  return parts.map((p) => {
+    if (!p || total <= 0) return null;
+    const from = done / total;
+    done += p.length;
+    return { ...p, from, to: done / total };
+  });
+}
+
+/** One row's part of the band, drawn in its turn as `progress` runs; its red edge settles at the end. */
+function GapBand({ part, progress, testID }: { part: BandPart; progress: Animated.Value; testID: string }) {
+  const { palette } = useTheme();
+  const drawn = progress.interpolate({ inputRange: [part.from, Math.max(part.to, part.from + 0.0001)], outputRange: [0, part.length], extrapolate: 'clamp' });
+  const edge = progress.interpolate({ inputRange: [0, 0.85, 1], outputRange: [1, 1, 0.4] });
+  const radius = {
+    borderTopLeftRadius: part.starts ? DISC / 2 : 0,
+    borderBottomLeftRadius: part.starts ? DISC / 2 : 0,
+    borderTopRightRadius: part.ends ? DISC / 2 : 0,
+    borderBottomRightRadius: part.ends ? DISC / 2 : 0,
+  };
+  return (
+    <Animated.View pointerEvents="none" style={[styles.band, radius, { left: part.left, width: drawn, backgroundColor: palette.redSubtle }]} testID={testID}>
+      <Animated.View style={[styles.bandOutline, radius, { width: part.length, borderColor: palette.red, opacity: edge }]} />
+    </Animated.View>
+  );
+}
+
 /** One day's cell: the disc, its number, and the dots (the grid and the week share it). */
 function DayCell({
   day,
@@ -471,8 +607,13 @@ const styles = StyleSheet.create({
   totalLabel: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   totalLabelText: { flexShrink: 1 },
   totalValue: { fontSize: 17, lineHeight: 22, fontWeight: '600', fontVariant: ['tabular-nums'], marginTop: 3 },
-  grid: { paddingTop: 12, paddingHorizontal: 16 },
-  weekRow: { flexDirection: 'row', gap: 4, marginBottom: 4 },
+  grid: { paddingTop: 12, paddingHorizontal: GRID_PAD },
+  weekRow: { flexDirection: 'row', gap: CELL_GAP, marginBottom: 4 },
+  band: { position: 'absolute', top: 4, height: DISC, overflow: 'hidden' },
+  bandOutline: { ...StyleSheet.absoluteFillObject, borderWidth: 1.5 },
+  cue: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  cueSwatch: { width: 18, height: 10, borderRadius: 5, borderWidth: 1 },
+  cueText: { flexShrink: 1, fontWeight: '600' },
   letter: { flex: 1, minHeight: 18, lineHeight: 18, fontSize: 13, textAlign: 'center' },
   cell: { flex: 1, height: 50, borderRadius: 12, paddingTop: 4, alignItems: 'center' },
   disc: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 17 },

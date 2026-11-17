@@ -309,8 +309,17 @@ has them; Revisely Dev's Revo knows them from its Dev guide.
   today ("6 days so far"; grey from 2 weeks); a touch opens the day under the finger (longer than a month:
   Overview at that month).
   Then two tiles: the longest gap with a missed day in the range, the open one included and counted in full when it
-  began before the range ("9 days · Longest gap, 28 Oct – 6 Nov", opening Overview at its month; "60+ days" when it
-  began before the days read; "None · No gaps in 30 days"), and the usual rhythm, the median step between revision
+  began before the range ("9 days · Longest gap, 28 Oct – 6 Nov"; "60+ days" when it began before the days read;
+  "None · No gaps in 30 days"). A tap on it opens Overview, at its top, with the gap marked on the calendar: a band in the
+  red's quiet fill behind the days from the revision day before it to the one that ended it (an open gap: to
+  today), both inside it, drawn in from its first day to its last with a red edge that then settles (with Reduce
+  Motion it fades in whole), and "Longest gap, 28 Oct – 6 Nov · 9 days" above the grid, said once for VoiceOver.
+  Month opens at the month holding most of it, Week at the week it begins in; the band is flat where it carries on
+  into the next week or month, and the arrows or a swipe follow it there. It fades at the first touch on the
+  calendar (a day picked, Today, Week | Month) and is gone after leaving Overview. (Majd, Nov 16 2026: "it should
+  take them to the overview tab with some 'animation' or visual que showing the user their gap on the calendar
+  itself… we'd just have to keep in mind the fact the user could have the week view open instead of month.")
+  The second tile is the usual rhythm, the median step between revision
   days in the range, from two steps ("Every day", "Every 2 days", "Every 1–2 days", with how many gaps of 3 days or
   more). Under them, the full revision against the plan as it is now, read forwards from today (nothing records
   what an older plan scheduled): a page's spacing is the days between its next two slots (days off, custom plans,
@@ -327,16 +336,32 @@ has them; Revisely Dev's Revo knows them from its Dev guide.
   (Majd, Nov 16 2026: "some metric in insights
   that give the user an idea on their 'gaps' between session"; mocks insights-gaps.)
 
-- **ACT-30.** Last revised says when each memorized surah, juz, hizb or page was last revised, longest waiting first.
-  It opens from Gaps' "When did I last revise…?" at the section's end and from its full revision line (ACT-28).
-  Surah | Juz | Hizb | Page as Activity's ink tabs, Surah at first; the choice is kept on the phone. A surah, juz or
-  hizb is as recent as its least recently revised memorized page (a page shared by two surahs is under both) and
-  says that page's date and how long ago ("24 Oct · 22 days ago", "14 Nov · yesterday", "Today"); a tap opens it to
-  its memorized pages, longest waiting first too (the page that dates it comes first), each with its own date, and a
-  page opens the reader there. A page never revised waits from
-  the day it was memorized: "Not revised yet" for its first 30 days, "Never revised" after (ACT-25). Recency only,
-  the same with Smart Tracking on or off (ACT-19). (Majd, Nov 16
-  2026: "being able to click on a page or surah or juz or hizb and seeing the last time u revised it".)
+- **ACT-30.** Last revised says when each memorized surah, juz, hizb or page was last revised. It opens from Gaps'
+  "When did I last revise…?" at the section's end and from its full revision line (ACT-28), which opens it longest
+  waiting first for that visit. Three chips at its top choose what it shows (Majd, Nov 16 2026: "showing recents with
+  either surah/juz/hizb/page depending on what makes the most sense for each user then there should be a filter and
+  sort options like by date"):
+  - the unit ("Surahs", "Juz", "Hizbs", "Pages"). Until the user picks one, it is the one that suits the account
+    ("Suggested for you" in its sheet): Juz on the juz plan or with 200 pages or more memorized, Page while every
+    memorized page is in one surah, Surah otherwise;
+  - the sort: "Recent first" (the latest revised at the top, never revised last), "Longest waiting first", or
+    "Mushaf order";
+  - the filter, All at each visit: "Revised this week" (the last 7 days), "2 weeks or more" (waiting 14 days or more
+    since the last revision, or since it was memorized when never revised) or "Not revised yet". It is filled in ink
+    while on. A surah, juz or hizb shows when one of its memorized pages passes, lists only those, and says how many
+    of its pages they are ("6 of 20 pages"). A line under the chips counts the rows ("5 surahs", "3 of 15 juz"); when
+    nothing passes, "Nothing here with this filter" and Show all.
+
+  The unit and sort picked are kept on the phone for the account. A surah, juz or hizb is as recent as its least
+  recently revised page shown (a page shared by two surahs is under both) and says that page's date and how long ago
+  ("24 Oct · 22 days ago", "14 Nov · yesterday", "Today"). A tap opens it to those pages, in the same order, drawn as
+  part of it (Majd: "it's hard to tell which card falls under what when a user opens up a surah"): no disc, indented
+  to its name, the thread line from its disc running down through them, one line each with how long ago ("6 days
+  ago"; a surah's pages named by their ayahs alone, "Ayahs 1–5 · p. 2"), and no separator until the group ends. In
+  Pages, each page is one line with its date. A page opens the reader there. A page never revised waits from the day
+  it was memorized: "Not revised yet" for its first 30 days, "Never revised" after (ACT-25). Recency only, the same
+  with Smart Tracking on or off (ACT-19). (Majd, Nov 16 2026: "being able to click on a page or surah or juz or hizb
+  and seeing the last time u revised it".)
 
 ## Recite (Revisely Dev)
 
