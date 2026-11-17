@@ -33,6 +33,11 @@ const SAMPLE_RATE_HZ = 16_000;
 const RESEND_SAMPLES = 16_000;
 /** Tries to reconnect before giving up, and the waits between them. */
 const RETRY_WAITS_MS = [500, 1500, 4000];
+/**
+ * A take started with `namesAfter` (contract draft 8): after `done` the socket waits this long at most for `into`, where
+ * the slips went. The checker always sends it (with no names when naming failed); this is for a checker that doesn't.
+ */
+export const NAMES_WAIT_MS = 5000;
 
 /** The parts of a WebSocket this uses (React Native's, or a test's). */
 export interface SocketLike {
@@ -97,6 +102,9 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
     /** Sending live (after `ready` and the held audio). */
     let live = false;
     let finished = false;
+    /** `done` came on a take started with namesAfter: only `into` is still to come. */
+    let answered = false;
+    let namesWait: unknown = null;
     let tries = 0;
     let retry: unknown = null;
     /** Where the take goes: the pair service for the light levels while it's up, else recite-check. */
@@ -119,6 +127,7 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
       if (finished) return;
       finished = true;
       if (retry != null) timers.clear(retry);
+      if (namesWait != null) timers.clear(namesWait);
       if (e) handlers.onEvent(e);
       const s = socket;
       socket = null;
@@ -221,7 +230,19 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
           catchUp(s, Math.min(samples, Math.max(0, e.from ?? 0)));
           return;
         }
-        if (e.type === 'done' || e.type === 'error') {
+        if (e.type === 'done' && start.namesAfter) {
+          // The final answer at once; where the slips went comes after it (`into`), NAMES_WAIT_MS at most.
+          handlers.onEvent(e);
+          if (!answered) {
+            answered = true;
+            namesWait = timers.set(() => {
+              namesWait = null;
+              finish();
+            }, NAMES_WAIT_MS);
+          }
+          return;
+        }
+        if (e.type === 'done' || e.type === 'error' || (e.type === 'into' && answered)) {
           finish(e);
           return;
         }
@@ -231,6 +252,11 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
       s.onclose = () => {
         if (socket !== s) return;
         socket = null;
+        // The take has its final answer: the names are only a nicety, not worth a resume.
+        if (answered) {
+          finish();
+          return;
+        }
         // The pair service didn't start the take (unreachable, or 403 while private): recite-check does.
         if (unproven) toMain(true);
         else dropped();

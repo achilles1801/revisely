@@ -398,6 +398,26 @@ describe('the replayed feed', () => {
     expect(got.length).toBe(n);
   });
 
+  it('a recorded take whose names came after `done` ends with them (draft 8)', () => {
+    const got: LiveEvent[] = [];
+    let closed = false;
+    const log: ReplayLog = {
+      events: [
+        { t: 0, type: 'ready', take: 't1' },
+        { t: 3, type: 'done', result: { v: 2, from: 0, to: 10, secs: 3, marks: [], score: null } },
+        { t: 3.5, type: 'into', names: [] },
+      ],
+    };
+    replayFeed(log)(
+      { type: 'start', s: 1, a: 1, s2: null, a2: null, mon: 4, mot: 4, aar: 0, letters: false, keep: false, namesAfter: true },
+      { onEvent: (e) => got.push(e), onClose: () => (closed = true) },
+    );
+    jest.advanceTimersByTime(3000);
+    expect([got.map((e) => e.type), closed]).toEqual([['ready', 'done'], false]);
+    jest.advanceTimersByTime(500);
+    expect([got.map((e) => e.type), closed]).toEqual([['ready', 'done', 'into'], true]);
+  });
+
   it('closing early stops every event', () => {
     const got: LiveEvent[] = [];
     const conn = replayFeed(fixture('alafasy.p2.clean.clean'))(
@@ -666,6 +686,30 @@ describe('`into`: where a slip into a similar ayah went (contract draft 6, final
     expect(plainText(intoLine(ending, 'ayah 5'))).toBe('You ended ayah 5 as ayah 3 ends');
     // VoiceOver hears the surah and ayah in words, not "31:6".
     expect(spokenIntoLine(m, 'ayah 5')).toBe(`You continued with ${surahName(31)}, ayah 6, a similar ayah`);
+  });
+
+  it('after the final answer (draft 8): `into` joins each mark by id, shown, taken off or in the final answer', () => {
+    expect(parseEvent({ type: 'into', names: [{ id: 'a', into: { w: 3500, ayah: [31, 6] } }, { id: 'b', into: 'x' }, { into: { w: 1, ayah: [1, 1] } }], t: 9 }))
+      .toEqual({ type: 'into', names: [{ id: 'a', into: { w: 3500, ayah: [31, 6] } }] });
+    expect(parseEvent({ type: 'into', names: [] })).toEqual({ type: 'into', names: [] });
+    expect(parseEvent({ type: 'into' })).toBeNull();
+    const a = { ...base, id: 'a' };
+    const b = { ...base, id: 'b', w: 41, kind: 'word' as const };
+    const c = { ...base, id: 'c', w: 42 };
+    let st = applyEvent(applyEvent(LIVE_IDLE, { type: 'mark', mark: c }), { type: 'ready', take: 't1' } as LiveEvent);
+    st = dismissMark(st, 'c');
+    const into = { w: 3500, ayah: [31, 6] as [number, number] };
+    const early = applyEvent(st, { type: 'into', names: [{ id: 'a', into }] });
+    expect(early).toBe(st); // nothing to join before the final answer
+    st = applyEvent(st, { type: 'done', result: { v: 2, from: 40, to: 50, secs: 9, marks: [a, b, c], score: null, take: 't1' } } as LiveEvent);
+    expect(applyEvent(st, { type: 'into', names: [] })).toBe(st);
+    const named = applyEvent(st, { type: 'into', names: [{ id: 'a', into }, { id: 'c', into }, { id: 'zz', into }] });
+    expect(named.marks.a.into).toEqual(into);
+    expect(named.marks.b.into).toBeUndefined();
+    expect(named.removed.c.mark.into).toEqual(into); // Put back brings it with its name
+    expect(named.final!.marks.find((m) => m.id === 'a')!.into).toEqual(into);
+    expect(Object.keys(named.marks)).toEqual(Object.keys(st.marks));
+    expect(restoreMark(named, 'c').marks.c.into).toEqual(into);
   });
 
   it('only marks that carry one, in page order', () => {

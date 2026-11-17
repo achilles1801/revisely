@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, AppState } from 'react-native';
+import { AccessibilityInfo, AppState, LayoutAnimation } from 'react-native';
 import { getAuth } from 'firebase/auth';
 import * as Sentry from '@sentry/react-native';
 import { getRecordingPermissionsAsync, requestRecordingPermissionsAsync } from 'expo-audio';
@@ -34,6 +34,7 @@ import {
   seekOnPage,
 } from '../../lib/reciteLive/state';
 import { isDevVariant } from '../../lib/variant';
+import { useReduceMotion } from '../../design/motion';
 
 /** What the mic does while reciting: follow along (free), or follow and mark mistakes (Check). */
 export type LiveMode = 'recite' | 'check';
@@ -119,6 +120,8 @@ export function startFrameFor(
     // store app never asks, and never says a take was kept.
     keep: settings.keep && isDevVariant(),
     follow: mode === 'recite',
+    // Mark mistakes: the summary at once, where a slip went a moment later (contract draft 8)
+    ...(mode === 'check' ? { namesAfter: true } : {}),
     ...(startBy ? { startBy } : {}),
     ...(startBy && !span && START_IN_QURAN ? { startIn: 'quran' as const } : {}),
   };
@@ -155,6 +158,9 @@ export function useLiveRecitation({
   connect?: LiveConnect;
 }) {
   const [state, setState] = useState<LiveState>(LIVE_IDLE);
+  const reduceMotion = useReduceMotion();
+  const reduceMotionRef = useRef(reduceMotion);
+  reduceMotionRef.current = reduceMotion;
   const [mode, setMode] = useState<LiveMode | null>(null);
   const [mic, setMic] = useState<MicStatus>('off');
   const [seconds, setSeconds] = useState(0);
@@ -198,6 +204,10 @@ export function useLiveRecitation({
       Sentry.addBreadcrumb({ category: 'recite', message: 'locked elsewhere in the Quran', data: { page: getQuranWords()?.pageOf(e.w) } });
     }
     if (e.type === 'at' && !wordTimes.current.has(e.w)) wordTimes.current.set(e.w, e.t ?? samples.current / SAMPLE_RATE);
+    // Where the slips went, after the summary is up (namesAfter): its rows ease in rather than push the rest down at once
+    if (e.type === 'into' && e.names.length && !reduceMotionRef.current) {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    }
     setState((s) => applyEvent(s, e));
   }, []);
 
@@ -268,7 +278,13 @@ export function useLiveRecitation({
 
   const start = useCallback(
     async (take: LiveMode, span: TakeSpan | null = null) => {
-      if (conn.current || source.current) return;
+      if (source.current) return;
+      if (conn.current) {
+        // The take before has its final answer and only waits for where its slips went (namesAfter): it ends here.
+        if (traceRef.current.state.status !== 'done') return;
+        conn.current.close();
+        conn.current = null;
+      }
       stopHearing();
       pausedRef.current = false;
       setPaused(false);

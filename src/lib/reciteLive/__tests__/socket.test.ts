@@ -32,7 +32,7 @@ const flush = async () => {
   for (let i = 0; i < 5; i++) await Promise.resolve();
 };
 
-function setup(tokens: (string | null)[] = ['tok1', 'tok2', 'tok3', 'tok4']) {
+function setup(tokens: (string | null)[] = ['tok1', 'tok2', 'tok3', 'tok4'], start: StartFrame = START) {
   const sockets: FakeSocket[] = [];
   const queue: { fn: () => void; ms: number }[] = [];
   const events: LiveEvent[] = [];
@@ -59,7 +59,7 @@ function setup(tokens: (string | null)[] = ['tok1', 'tok2', 'tok3', 'tok4']) {
       },
     },
   });
-  const conn = connect(START, { onEvent: (e) => events.push(e), onClose: () => closed++ });
+  const conn = connect(start, { onEvent: (e) => events.push(e), onClose: () => closed++ });
   const runTimer = () => queue.shift()!.fn();
   return { conn, sockets, events, queue, runTimer, closed: () => closed };
 }
@@ -100,6 +100,56 @@ describe('the live socket', () => {
     // Nothing after it.
     t.conn.sendAudio(pcm(9));
     expect(s.out().slice(-1)).toEqual([{ type: 'end' }]);
+  });
+
+  describe('with namesAfter (contract draft 8)', () => {
+    const DONE = { type: 'done', result: { v: 2, from: 48707, to: 48717, secs: 9, marks: [], score: null, take: 'take1', why: 'end' } };
+    const INTO = { type: 'into', names: [{ id: '48711:skipped:', into: { w: 40127, ayah: [20, 8] } }], t: 9 };
+    const ended = async () => {
+      const t = setup(undefined, { ...START, namesAfter: true });
+      await flush();
+      const s = t.sockets[0];
+      s.onopen!();
+      expect((s.out()[0] as { namesAfter?: boolean }).namesAfter).toBe(true);
+      s.answer({ type: 'ready', v: 2, take: 'take1', from: 0 });
+      t.conn.send({ type: 'end' });
+      s.answer(DONE);
+      return { t, s };
+    };
+
+    it('the final answer comes at once, the socket stays for where the slips went, then closes', async () => {
+      const { t, s } = await ended();
+      expect(t.events.map((e) => e.type)).toEqual(['ready', 'done']);
+      expect((t.closed(), s.closed)).toBe(false);
+      s.answer(INTO);
+      expect(t.events.slice(-1)).toEqual([{ type: 'into', names: [{ id: '48711:skipped:', into: { w: 40127, ayah: [20, 8] } }] }]);
+      expect([t.closed(), s.closed, t.queue.length]).toEqual([1, true, 0]);
+    });
+
+    it('no `into` within NAMES_WAIT_MS: it closes without the names', async () => {
+      const { t, s } = await ended();
+      expect(t.queue.map((q) => q.ms)).toEqual([5000]);
+      t.runTimer();
+      expect([t.closed(), s.closed]).toEqual([1, true]);
+      expect(t.events.map((e) => e.type)).toEqual(['ready', 'done']);
+    });
+
+    it('a drop after the final answer ends the take: no resume for the names', async () => {
+      const { t, s } = await ended();
+      s.onclose!({ code: 1006 });
+      expect([t.closed(), t.sockets.length, t.queue.length]).toEqual([1, 1, 0]);
+    });
+
+    it('without namesAfter, `done` still closes it', async () => {
+      const t = setup();
+      await flush();
+      const s = t.sockets[0];
+      s.onopen!();
+      expect((s.out()[0] as { namesAfter?: boolean }).namesAfter).toBeUndefined();
+      s.answer({ type: 'ready', v: 2, take: 'take1', from: 0 });
+      s.answer(DONE);
+      expect(t.closed()).toBe(1);
+    });
   });
 
   it('a dropped socket resumes the take: a fresh token, and the audio from where the checker stopped, frames at their places', async () => {
