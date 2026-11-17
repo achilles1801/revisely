@@ -90,6 +90,9 @@ function firestoreUserToLocal(fsUser: FirestoreUser): User {
   };
 }
 
+/** How many sessions (days) the app reads, the latest first (SYNC-6: the self-heal knows it holds no more). */
+const SESSIONS_READ = 100;
+
 function firestorePageToLocal(fsPage: FirestorePage): UserPage {
   return {
     pageNumber: fsPage.pageNumber,
@@ -751,7 +754,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         saveCopy(uid, 'sessions', sessions);
       },
       uid,
-      100,
+      SESSIONS_READ,
       onListenError,
     );
 
@@ -927,7 +930,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (uidRef.current !== forUid) return;
         if (pagesRef.current.length > 0) base = pagesRef.current;
       }
-      const next = recomputePagesFromLogs(base, freshLogs, hand);
+      // The app reads the latest SESSIONS_READ days of sessions: past that, older sessions aren't in the logs, and
+      // a page last revised before them keeps what it had (SYNC-6).
+      const read = baseRef.current?.uid === forUid ? baseRef.current?.sessions : undefined;
+      const completeSince = read && read.length >= SESSIONS_READ ? read.reduce((d, s) => (s.date < d ? s.date : d), read[0].date) : null;
+      const next = recomputePagesFromLogs(base, freshLogs, hand, completeSince);
       const changed = next
         .filter((p) => {
           const old = base.find((c) => c.pageNumber === p.pageNumber);

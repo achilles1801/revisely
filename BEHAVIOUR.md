@@ -210,7 +210,12 @@ How the tests are made: `tests/scenarios/README.md`.
   account is reset as in RESET-2 (the same backup first) and filled with the scenario, on the revision
   days this phone shows (its zone, clock and Fajr). Every rule above that can be read off an account
   holds for each scenario, and the phone shows it with no relaunch. No other account can, and not
-  again within 2 minutes (30 a day). The Offline queue scenario holds its changes on the phone until
+  again within 2 minutes (30 a day). Settings offers three (Majd, Nov 17 2026: "3 scenarios should be
+  sufficient with the most important being a super heavy user with a lot of activity and months of data"):
+  Heavy user (seven months: a juz a day, gaps, the daily log, recordings, sittings, over a hundred Recite
+  takes with marks, Revo's conversations and memory), Missed yesterday (the streak's grace ring and the
+  catch-up) and Getting started (two weeks, Al-Mulk ayah by ayah, the first takes). The older, narrow
+  scenarios stay loadable for the automated tests; their Offline queue holds its changes on the phone until
   "Send held changes" (or the next start of the app), then sends them in order.
 - **ACCOUNT-1.** Delete account (Settings, confirmed twice) removes the account from the server with everything of it
   (pages, sessions, notes, Revo's and the coach's data, backed-up recordings) and signs the phone out. Offline, or when
@@ -231,6 +236,11 @@ How the tests are made: `tests/scenarios/README.md`.
   that was ended, a disabled or deleted account, or any other answer still signs it out, as before.
 - **SYNC-5.** The same day revised on two phones while both were offline keeps every page either
   phone revised, in one session for the day.
+- **SYNC-6.** A page keeps its last revised day, its number of revisions and its rating however long the
+  history grows. The app reads the latest 100 days of sessions; a page last revised before them keeps what it
+  had, and one rated before them keeps its rating until a session rates it again. (Nov 17 2026: past 100 days of
+  sessions, every launch wiped the last revised day, count and rating of each page last revised before them, and
+  saved that to the account.)
 - **AUTH-2.** When the app finds the phone signed out at launch, though a sign-in was saved on it (the
   account's sign-ins were ended on the server, or it was disabled or deleted), the sign-in screen says "You were
   signed out. Sign in again to carry on." until the next sign-in, and Sentry hears of it once, with no account

@@ -6,7 +6,7 @@ import { assertSucceeds, RulesTestEnvironment } from '@firebase/rules-unit-testi
 import { doc, serverTimestamp, setDoc, Timestamp, updateDoc } from 'firebase/firestore';
 import { getTestEnv, cleanupTestEnv } from './setup';
 import {
-  SCENARIO_IDS,
+  ALL_SCENARIO_IDS,
   ScenarioId,
   SeedContext,
   addDays,
@@ -44,7 +44,7 @@ beforeEach(async () => {
 });
 
 describe('every test scenario is made of documents the app itself could write', () => {
-  it.each(SCENARIO_IDS.map((s) => [s]))('%s', async (scenario) => {
+  it.each(ALL_SCENARIO_IDS.map((s) => [s]))('%s', async (scenario) => {
     const plan = buildScenario(scenario, context(scenario), ALICE);
     const db = testEnv.authenticatedContext(ALICE).firestore();
 

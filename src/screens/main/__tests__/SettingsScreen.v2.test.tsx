@@ -339,7 +339,7 @@ describe('Settings: Load test scenario (testers)', () => {
     await act(async () => {
       fireEvent.press(label);
     });
-    expect(screen.getByTestId('test-scenario-hafiz')).toBeTruthy();
+    expect(screen.getByTestId('test-scenario-heavy')).toBeTruthy();
     expect(screen.getByTestId('test-scenario-confirm').props.accessibilityState).toMatchObject({ disabled: true });
   });
 });
