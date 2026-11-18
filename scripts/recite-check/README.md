@@ -49,6 +49,17 @@ quiet pages with a mark 20% (23%), in mild babble 20% (37%), in loud babble 57% 
 /record: 5 of 6 slips, no false alarm (6 of 6, 5 false alarms). Quieter on correct recitation; it catches about as
 many word slips, and fewer of learners' small harakat and letter slips.
 
+**v7, v6 without Tadabur** (Nov 18 2026; `~/Documents/revisely-release/retrain-no-tadabur.md`): v6's recipe without
+Tadabur's recordings (CC BY-NC 4.0), on Muaalem's shards, Tarteel users' copy and tlog. `stage.sh` puts it beside v6
+(`models/words-v7`, `bars.v7.json`), and `RECITE_WORDS_EAR=v7` in the service's environment runs Recite and Words and
+harakat on it (Dev). Without the variable they stay on v6 (an image without v7, or a name it doesn't know, does too).
+Its settings (`engine.WORDS_EARS`): v6's words settings with `mean_gop` −5.0, and a letters bar at 0.35% of
+professionals' correct words (`make_bars.LETTERS_SHARE`). In the lab (v6 in brackets): professionals' planted slips
+caught 96.9% (97.1%), false alarms 0.50 per 100 words (0.45); learners' correct clips with any mark 20.0% (25.2%),
+their clips with mistakes 54.1% (57.3%); /record 6 of 6 slips, 1 false alarm (5 of 6, none); the page scorecard, live,
+20 / 20 / 60% (20 / 20 / 57%), slips caught 93% (95%); the women's check passes; slips named live 174 of 275, 1 wrong,
+none false (171).
+
 **Naming a v6 take's slips on the released model's frames** (Nov 16 2026). Naming (`into`) was measured on the released
 model's frames, and on v6's it named far fewer: 139 of bench-v0's 275 planted slips and swapped endings, live (the
 released model 188). So a v6 take works out the released model's frames as it goes (`engine.SideFrames`): 8 s chunks

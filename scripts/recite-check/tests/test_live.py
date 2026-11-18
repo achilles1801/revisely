@@ -65,6 +65,31 @@ def chunks(pcm, size):
     return [pcm[i:i + size] for i in range(0, len(pcm), size)]
 
 
+class WordsEar(unittest.TestCase):
+    def test_the_environment_picks_the_words_ear_the_image_carries(self):
+        """RECITE_WORDS_EAR picks Recite and Words & harakat's model: v6 unset; v7 when asked and the image has it;
+        v6 for a v7 the image lacks or a name it doesn't know; none with 0 (every level on the released model)."""
+        import tempfile
+        import engine as engine_mod
+        with tempfile.TemporaryDirectory() as d:
+            lab = pathlib.Path(d)
+
+            def carry(name):
+                path, bars, _ = engine_mod.WORDS_EARS[name]
+                (lab / path).parent.mkdir(parents=True, exist_ok=True)
+                (lab / path).write_bytes(b'')
+                (lab / bars).write_text('{}')
+
+            self.assertIsNone(engine_mod.words_ear_name(lab, 'v6'))
+            carry('v6')
+            self.assertEqual([engine_mod.words_ear_name(lab, w) for w in ('v6', 'v7', 'v9', '', '0')],
+                             ['v6', 'v6', 'v6', 'v6', None])
+            carry('v7')
+            self.assertEqual([engine_mod.words_ear_name(lab, w) for w in ('v6', 'v7', 'v9', '0')],
+                             ['v6', 'v7', 'v6', None])
+        self.assertEqual(engine_mod.WORDS_EARS['v7'][2], dict(engine_mod.WORDS_P_V6, mean_gop=-5.0))
+
+
 @unittest.skipUnless(MODEL.exists(), 'the model is not here')
 class Model(unittest.TestCase):
     def test_traceback_is_the_checkers_cut_at_the_window(self):

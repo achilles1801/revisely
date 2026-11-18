@@ -40,6 +40,13 @@ if [ -f "$V6" ]; then
   cp "$V6" "$STAGE/lab/models/words-v6/"
   LAB=$LAB RECITE_HARNESS=$H "$PY" -I "$HERE/make_bars.py" "$STAGE/lab/bars.v6.json" v6 > /dev/null
 fi
+# v7 (engine.WORDS_EARS, v6's recipe without Tadabur), beside v6: the service runs it only with RECITE_WORDS_EAR=v7.
+V7=$LAB/models/ft-v7-onnx/model-int8.onnx
+if [ -f "$V7" ]; then
+  mkdir -p "$STAGE/lab/models/words-v7"
+  cp "$V7" "$STAGE/lab/models/words-v7/"
+  LAB=$LAB RECITE_HARNESS=$H "$PY" -I "$HERE/make_bars.py" "$STAGE/lab/bars.v7.json" v7 > /dev/null
+fi
 cp "$HERE"/{server.py,health.py,engine.py,live.py,auth.py,store.py,make_words.py,fetch_takes.py,digest.py,requirements.txt,Dockerfile} "$STAGE/"  # fetch_takes, digest: for their tests
 rm -rf "$STAGE/tests" && mkdir -p "$STAGE/tests" && cp "$HERE"/tests/*.py "$STAGE/tests/"
 git -C "$REPO" rev-parse "$HARNESS_COMMIT" > "$STAGE/CHECKER_COMMIT"

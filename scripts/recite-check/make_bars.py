@@ -19,6 +19,8 @@ LAB = pathlib.Path(os.environ.get('LAB', pathlib.Path.home() / 'revisely-mistake
 HARNESS = pathlib.Path(os.environ.get('RECITE_HARNESS', LAB / 'code/harness/scripts/recite-eval'))
 sys.path.insert(0, str(HARNESS))
 
+LETTERS_SHARE = {'v7': 0.0035}  # the letters (`likely`) bar's share of professionals' words, where not 0.3%
+
 
 def main():
     out = pathlib.Path(sys.argv[1])
@@ -46,7 +48,9 @@ def main():
     smax = float(np.percentile(held, 5))
     best = lambda w: max([m for m, why, h, *_ in w if letters_v2.kind_of(why) != 'length'
                           and not (why.startswith('no shadda') and (h is None or h > smax))] or [-1e9])
-    lbar = float(np.quantile([best(w) for w in pro_words], 1 - 0.003))
+    # the letters bar flags LETTERS_SHARE of professionals' correct words: 0.3%, 0.35% for v7, whose scores put 0.3%
+    # where it marks fewer learners than v6 (engine.WORDS_EARS); the strict bar stays at 0.1% for every ear
+    lbar = float(np.quantile([best(w) for w in pro_words], 1 - LETTERS_SHARE.get(ear, 0.003)))
     strict['letters'] = float(np.quantile([best(w) for w in pro_words], 1 - 0.001))
     bars = {'ear': ear, 'margin': margin, 'timing': timing, 'nasal': nasal,
             'letters': {'bar': lbar, 'shadda_max': smax}, 'strict': strict}

@@ -237,7 +237,7 @@ STRICT_BARS = 'bars.v5.json'
 # (default_level.py --by-gender) for words and letters, and fails it narrowly for one tajweed rule (noon mushaddadah's
 # length, women's correct places 6.5%, men's 0/26), so it never judges tajweed: Strict stays on the released model and
 # v5. A take runs one model, so the CPU per take doesn't grow. RECITE_WORDS_EAR=0 keeps every level on the released
-# model (no new image needed to go back).
+# model (no new image needed to go back); RECITE_WORDS_EAR=v7 runs them on v7 (below) when the image carries it.
 WORDS_EAR = 'models/words-v6/model-int8.onnx'
 WORDS_BARS = 'bars.v6.json'
 # v6's word settings (lab, Nov 16 2026, checker 7c12824d; the released model's results in brackets). v6 is surer of what
@@ -258,6 +258,38 @@ WORDS_P_V6 = dict(WORDS_P, alt_pen=-2.0, extra_min=0.3, fill=-0.4)
 # model 188). With these, 134 (79 slips into a similar ayah of 111, 55 endings of 164), none wrong, none false. Used only
 # when the released model's frames aren't there (RECITE_SIDE_FRAMES=0): a v6 take names its slips on those (SideFrames).
 SIMILAR_P_V6 = {'adv': 80.0, 'gain': 0.35, 'end_adv': 20.0, 'end_gain': 0.55}
+# v7 (Nov 18 2026): v6's recipe without Tadabur (CC BY-NC 4.0): a teacher from Muaalem's own weights, then the small
+# model distilled from it, on Muaalem's shards, Tarteel users' copy and tlog only (lab: models/ft-v7; the plan and its
+# gates: ~/Documents/revisely-release/retrain-no-tadabur.md). Picked with RECITE_WORDS_EAR=v7 (Dev); without it the
+# words level stays on v6. Lab, against v6 (in brackets), same checker:
+# - v6's word settings missed 5 replaced words that v6 marks (v7 heard them as the expected word): planted slips 95.6%.
+#   A word whose sounds fit badly on average is wrong from -5.0 (mean_gop; -6.0 on v6): professionals' planted slips
+#   caught 96.9% (97.1%), false alarms 0.50 per 100 words (0.45); learners' word marks unchanged by it.
+# - Letters: the bar flags 0.35% of professionals' correct words (0.3% on v6 and the released model). v7's letters
+#   scores put the 0.3% bar where it marks fewer learners: 19.1% of correct clips, 53.1% of mistaken. At 0.35%: 20.0 /
+#   54.1% (v6 at 0.3%: 25.2 / 57.3%). Past the bar but not the strict one (0.1%) a mark is `likely`, "Not clear" in the
+#   app, never counted, so the bar sets how many "Not clear" notes show.
+# - Women's check: pass. /record: 6 of 6 slips, 1 false alarm (5 of 6, none). Planted hesitations 1 of 120 (1),
+#   corrections 5 of 108 (6). The page scorecard, live: correct pages marked 20 / 20 / 60% (20 / 20 / 57%), planted
+#   slips caught 93% (95%).
+# - Naming a take's slips on the released model's frames (SideFrames), live: 174 of 275 right, 1 wrong, none false (171).
+WORDS_EARS = {'v6': (WORDS_EAR, WORDS_BARS, WORDS_P_V6),
+              'v7': ('models/words-v7/model-int8.onnx', 'bars.v7.json', dict(WORDS_P_V6, mean_gop=-5.0))}
+
+
+def words_ear_name(lab, which):
+    """The words level's model (RECITE_WORDS_EAR is `which`): that ear when the image under `lab` carries it, else v6
+    when it does (an image without it, or a name it doesn't know), so a slip in the variable never puts Recite on the
+    released model; None with '0' or neither."""
+    if which == '0':
+        return None
+    for name in dict.fromkeys([which if which in WORDS_EARS else 'v6', 'v6']):
+        path, bars, _ = WORDS_EARS[name]
+        if (lab / path).exists() and (lab / bars).exists():
+            return name
+    return None
+
+
 # The released model's frames for naming a v6 take (SideFrames): chunks of SIDE_CHUNK seconds, each run with
 # SIDE_CONTEXT seconds of audio either side. The model's frames are better the longer the audio it runs on (bench-v0's
 # 275 slips and endings named on a v6 take, by chunk: 4 s 171, 8 s 173, 16 s 177; the whole take in 20 s windows 179;
@@ -424,12 +456,13 @@ class Engine:
             self.ear2 = PaddedEar(lab / STRICT_EAR, threads)
             self.bars2 = json.loads((lab / STRICT_BARS).read_text())
         self.released = Level('released', self.ear, self.bars, WORDS_P)
-        self.words_level = None  # v6, for takes that judge no tajweed, when the image carries it
-        if (lab / WORDS_EAR).exists() and (lab / WORDS_BARS).exists() and os.environ.get('RECITE_WORDS_EAR') != '0':
-            ear = PaddedEar(lab / WORDS_EAR, threads, name='v6')
+        self.words_level = None  # v6 (or v7), for takes that judge no tajweed, when the image carries it
+        name = words_ear_name(lab, os.environ.get('RECITE_WORDS_EAR', 'v6'))
+        if name is not None:
+            path, bars, words_p = WORDS_EARS[name]
+            ear = PaddedEar(lab / path, threads, name=name)
             if ear.vocab == self.ear.vocab:  # the word table and the word graphs are in the released model's sounds
-                self.words_level = Level('v6', ear, json.loads((lab / WORDS_BARS).read_text()), WORDS_P_V6,
-                                         SIMILAR_P_V6)
+                self.words_level = Level(name, ear, json.loads((lab / bars).read_text()), words_p, SIMILAR_P_V6)
 
     def level(self, st):
         """The model and settings for a take with settings st (settings_of): v6 when no tajweed is judged (Recite,
