@@ -51,6 +51,7 @@
   // Apple's App Store badge in the page's language: Apple's badge service has Arabic artwork ("تنزيل من App Store"), at
   // the same address with ar-ar for en-us. Its alt text says the same words.
   var BADGE = /(\/badges\/download-on-the-app-store\/(?:black|white)\/)(?:en-us|ar-ar)/;
+  var PLAY = /(\/badges\/)(?:en|ar)(_badge_web_generic\.png)/;
   function badges(root) {
     var loc = lang() === 'ar' ? 'ar-ar' : 'en-us';
     var els = root.querySelectorAll('img[src*="download-on-the-app-store"], source[srcset*="download-on-the-app-store"]');
@@ -58,6 +59,12 @@
       var attr = els[i].tagName === 'IMG' ? 'src' : 'srcset';
       els[i].setAttribute(attr, els[i].getAttribute(attr).replace(BADGE, '$1' + loc));
       if (attr === 'src') els[i].setAttribute('alt', t('badge.appStore'));
+    }
+    // Google Play's badge the same way: Google's Arabic artwork ("احصل عليه من Google Play") is ar_ for en_.
+    var play = root.querySelectorAll('img[src*="_badge_web_generic.png"]');
+    for (var j = 0; j < play.length; j++) {
+      play[j].setAttribute('src', play[j].getAttribute('src').replace(PLAY, '$1' + (lang() === 'ar' ? 'ar' : 'en') + '$2'));
+      play[j].setAttribute('alt', t('badge.play'));
     }
   }
 

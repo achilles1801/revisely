@@ -4,10 +4,10 @@
 window.RV_STRINGS = {
   en: {
     'nav.premium': 'Premium', 'nav.program': 'Open Door', 'nav.signin': 'Sign in', 'nav.account': 'Account',
-    'nav.support': 'Support', 'nav.getApp': 'Get the app', 'nav.download': 'Download', 'soon.small': 'Coming to', 'nav.menu': 'Menu', 'nav.close': 'Close', lang: 'عربي',
+    'nav.support': 'Support', 'nav.getApp': 'Get the app', 'nav.download': 'Download', 'nav.menu': 'Menu', 'nav.close': 'Close', lang: 'عربي',
     'foot.privacy': 'Privacy', 'foot.terms': 'Terms', 'foot.support': 'Support',
     'doc.englishOnly': 'This page is in English only.',
-    'badge.appStore': 'Download on the App Store',
+    'badge.appStore': 'Download on the App Store', 'badge.play': 'Get it on Google Play',
 
     'p.title.doc': 'Premium · Revisely',
     'p.label': 'Revisely Premium',
@@ -29,7 +29,7 @@ window.RV_STRINGS = {
     'g.marks': 'Mark mistakes', 'r.check': 'Wrong and skipped words', 'r.hara': 'Harakat and letters',
     'g.revo': 'Revo', 'r.revoDay': 'Day in review',
     'g.more': 'Everything else', 'r.widgets': 'Widgets',
-    'p.get': 'Get Revisely', 'p.getSub': 'Free on iPhone. Android is coming to Google Play.',
+    'p.get': 'Get Revisely', 'p.getSub': 'Free on iPhone and Android.',
 
     'a.title.doc': 'Your account · Revisely',
     'a.title': 'Your account', 'a.lede': 'Sign in with the account you use in the Revisely app to see your plan and your Open Door application.',
@@ -108,10 +108,10 @@ window.RV_STRINGS = {
   },
   ar: {
     'nav.premium': 'بريميوم', 'nav.program': 'الباب المفتوح', 'nav.signin': 'تسجيل الدخول', 'nav.account': 'الحساب',
-    'nav.support': 'الدعم', 'nav.getApp': 'تنزيل التطبيق', 'nav.download': 'تنزيل', 'soon.small': 'قريبًا على', 'nav.menu': 'القائمة', 'nav.close': 'إغلاق', lang: 'English',
+    'nav.support': 'الدعم', 'nav.getApp': 'تنزيل التطبيق', 'nav.download': 'تنزيل', 'nav.menu': 'القائمة', 'nav.close': 'إغلاق', lang: 'English',
     'foot.privacy': 'الخصوصية', 'foot.terms': 'الشروط', 'foot.support': 'الدعم',
     'doc.englishOnly': 'هذه الصفحة متوفرة بالإنجليزية فقط.',
-    'badge.appStore': 'تنزيل من App Store',
+    'badge.appStore': 'تنزيل من App Store', 'badge.play': 'احصل عليه من Google Play',
 
     'p.title.doc': 'بريميوم · ريفايزلي',
     'p.label': 'ريفايزلي بريميوم',
@@ -133,7 +133,7 @@ window.RV_STRINGS = {
     'g.marks': 'تحديد الأخطاء', 'r.check': 'الكلمات الخاطئة والمنسية', 'r.hara': 'الحركات والحروف',
     'g.revo': 'Revo', 'r.revoDay': 'ملخّص اليوم',
     'g.more': 'كل ما سوى ذلك', 'r.widgets': 'الأدوات على الشاشة الرئيسية',
-    'p.get': 'احصل على ريفايزلي', 'p.getSub': 'مجاني على iPhone، ويصل قريبًا إلى Google Play لأجهزة Android.',
+    'p.get': 'احصل على ريفايزلي', 'p.getSub': 'مجاني على iPhone وAndroid.',
 
     'a.title.doc': 'حسابك · ريفايزلي',
     'a.title': 'حسابك', 'a.lede': 'سجّل الدخول بالحساب الذي تستخدمه في تطبيق ريفايزلي لترى خطتك وطلبك في الباب المفتوح.',
