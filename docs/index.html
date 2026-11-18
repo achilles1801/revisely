@@ -56,7 +56,7 @@
         </picture>
       </a>
       <nav class="site-nav" aria-label="Main">
-        <a class="hide-sm" href="#recite" data-when="RECITE_SECTION" data-t="h.nav.recite">Recite</a>
+        <a class="hide-sm" href="#mistakes" data-when="RECITE_SECTION" data-t="h.nav.mistakes">Mark mistakes</a>
         <a href="#revo">Revo</a>
         <a class="hide-sm" href="/support/" data-t="nav.support">Support</a>
         <a class="pill" href="https://apps.apple.com/app/revisely/id6767990248" data-t="nav.download">Download</a>
@@ -252,17 +252,18 @@
       </div>
     </section>
 
-    <!-- Recite and Mark mistakes (mistake detection): on dev.revisely.app only until the release. site.css hides
+    <!-- Recite and Mark mistakes (mistake detection), #mistakes: the store listing links here. On dev.revisely.app only
+         until the release. site.css hides
          everything marked data-when="RECITE_SECTION" unless <body> has the class recite-on, which the worker adds
          where RECITE_SECTION is "1" (wrangler.dev.jsonc). revisely.app serves this page straight from the assets, so
          at the release the one line is <body class="home recite-on"> below (worker/__tests__/reciteSection.test.ts).
          The screens are Revisely Dev's own (E2E flow 18; scripts/site-clips/recite.py). -->
-    <section class="recite" id="recite" aria-labelledby="recite-title" data-when="RECITE_SECTION">
+    <section class="recite" id="mistakes" aria-labelledby="recite-title" data-when="RECITE_SECTION">
       <div class="wrap">
         <div class="recite-head">
-          <span class="kicker" data-t="h.rc.kicker">Recite</span>
-          <h2 id="recite-title" class="title" data-t="h.rc.title">Recite from memory, and see where you slipped.</h2>
-          <p class="line" data-t="h.rc.line">Tap the mic in the reader and recite. Revisely listens and follows you on the page, and with Mark mistakes on, it highlights each mistake as you go.</p>
+          <span class="kicker" data-t="h.rc.kicker">New in Revisely Premium</span>
+          <h2 id="recite-title" class="title" data-t="h.rc.title">See your mistakes as you recite.</h2>
+          <p class="line" data-t="h.rc.line">Recite from memory and Revisely follows you on the mushaf’s page. Turn on Mark mistakes, and a wrong, missed or extra word turns red, and a haraka or letter slip amber, as you go. Tap one to see what you said.</p>
         </div>
         <ol class="steps">
           <li class="step">
@@ -275,7 +276,7 @@
               </picture>
             </div>
             <h3 data-t="h.rc.s1.title">The page follows you</h3>
-            <p data-t="h.rc.s1.p">Start anywhere on the page. Revisely finds your place and follows along as you recite.</p>
+            <p data-t="h.rc.s1.p">Tap the mic in the reader and start anywhere on the page. Revisely finds your place and follows along.</p>
           </li>
           <li class="step">
             <div class="screen">
@@ -287,7 +288,7 @@
               </picture>
             </div>
             <h3 data-t="h.rc.s2.title">Every mistake, explained</h3>
-            <p data-t="h.rc.s2.p">A word said wrong, skipped or added is marked in red, a slip in its harakat or letters in amber. Tap one to see what was expected and what was heard, and to hear the ayah.</p>
+            <p data-t="h.rc.s2.p">Tap a mark to see what was expected and what was heard, and to hear the ayah. A haraka or letter it couldn’t hear clearly is Not clear, never wrong, and Not a mistake takes a mark off.</p>
           </li>
           <li class="step">
             <div class="screen">
@@ -314,9 +315,12 @@
             <p data-t="h.rc.s4.p">Up to five places at random in what you’ve memorized, or in one juz. The page hides all but an ayah’s first two words, and you carry on from there.</p>
           </li>
         </ol>
-        <!-- PLACEHOLDER until Website & Open Door sends Premium's early-access wording (it owns Premium's words). -->
-        <p class="recite-premium" data-t="h.rc.premium">Following along is free. Mark mistakes and Test me are part of Premium, and while Revisely is in early access, Premium is free for everyone. Everyone who has it keeps it for good.</p>
-        <p class="note" data-t="h.rc.note">Mark mistakes is AI, so it can be wrong. A haraka or letter it couldn’t hear clearly is marked Not clear, never wrong, and Not a mistake takes a mark off.</p>
+        <ul class="points">
+          <li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.2 4.2L19 7"/></svg><span data-t-html="h.rc.p1">Mark mistakes is part of Revisely Premium. Premium is free for every account while it’s in early access. It will be paid later, and every account that has it now keeps it for good, bi-idhnillah, with every Premium feature, including ones added later. <a href="/terms/#premium-early-access">What that means</a></span></li>
+          <li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.2 4.2L19 7"/></svg><span data-t="h.rc.p2">Following along as you recite stays free for everyone.</span></li>
+          <li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.2 4.2L19 7"/></svg><span data-t="h.rc.p3">Software on our server checks your recitation. Nobody listens to it.</span></li>
+        </ul>
+        <p class="note" data-t="h.rc.note">It’s AI and can make mistakes, so check anything that matters against the mushaf.</p>
       </div>
     </section>
 

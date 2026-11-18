@@ -244,7 +244,9 @@ until its part is set up.
       line is `<body class="home recite-on">` in `docs/index.html`, with `RELEASED` in
       `worker/__tests__/reciteSection.test.ts` (which also fails if `wrangler.jsonc` ever sets the var).
     - Its screens are Revisely Dev's own, from E2E flow 18 (`scripts/site-clips/recite.py`, README there).
-    - Premium's line is a placeholder until Website & Open Door gives the early-access wording.
+    - `#mistakes` (the store listing links it); the words start from #728 (Website & Open Door's, closed) with Premium's
+      early-access wording (Majd, Nov 17: kept for good, bi-idhnillah, with every Premium feature) linking
+      `/terms/#premium-early-access`, which arrives with #727 (terms, into main, held for the release).
   - Its API accepts only the dev project's sign-ins.
   - **No Clear Quran key.** The Clear Quran's portal allows one active Production key per product
     ("duplicate key … api_keys_active_developer_account_id_product_environment"), and revisely.app holds

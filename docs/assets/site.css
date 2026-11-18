@@ -399,7 +399,7 @@ html:not(.no-js) .home .s-pitch:not(.fanned) .fan .screen { --x: 0%; --r: 0deg; 
    data-when="RECITE_SECTION" stays hidden unless <body> has recite-on (the dev worker adds it; docs/index.html). */
 body.home:not(.recite-on) [data-when="RECITE_SECTION"] { display: none !important; }
 /* Its header link from 880px: narrower, dev's header (with Premium, Open Door and the account) has no room for it. */
-@media (max-width: 879px) { .home .site-nav a[href="#recite"] { display: none; } }
+@media (max-width: 879px) { .home .site-nav a[href="#mistakes"] { display: none; } }
 .home .recite { border-top: 0.5px solid var(--separator); }
 .home .recite .wrap { padding-top: 96px; padding-bottom: 88px; }
 .home .recite-head { max-width: 640px; }
@@ -416,10 +416,8 @@ body.home:not(.recite-on) [data-when="RECITE_SECTION"] { display: none !importan
 }
 .home .step h3 { margin: 34px 0 0; font-size: 19px; line-height: 1.3; letter-spacing: -0.01em; }
 .home .step p { margin: 8px 0 0; color: var(--secondary); font-size: 15px; line-height: 1.5; text-wrap: pretty; }
-.home .recite-premium {
-  max-width: 44em; margin: 56px 0 0; padding: 16px 20px; border-radius: 14px;
-  background: var(--accent-subtle); font-size: 16px; line-height: 1.5;
-}
+.home .recite .points { max-width: 46em; margin-top: 56px; }
+.home .recite .points a { color: var(--accent); }
 .home .recite .note { max-width: 44em; margin: 14px 0 0; color: var(--secondary); font-size: 14px; }
 
 /* Revo, a section of its own */
@@ -499,7 +497,7 @@ body.home:not(.recite-on) [data-when="RECITE_SECTION"] { display: none !importan
   .home .step { scroll-snap-align: start; }
   .home .recite .screen { margin-left: 8px; margin-right: auto; max-width: 220px; }
   .home .step h3 { margin-top: 26px; font-size: 18px; }
-  .home .recite-premium { margin-top: 36px; font-size: 15px; }
+  .home .recite .points { margin-top: 36px; }
   .home .revo .wrap { grid-template-columns: minmax(0, 1fr); gap: 40px; padding-top: 64px; padding-bottom: 64px; }
   .home .revo .screen { height: min(600px, 74vh); height: min(600px, 74svh); }
   .home .clip-toggle { right: calc(50% - min(600px, 74svh) * 0.23 - 24px); }

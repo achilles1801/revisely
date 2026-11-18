@@ -48,8 +48,8 @@ describe("the home's Recite section", () => {
     expect(homeBody()).toContain('home');
     expect(homeBody().includes(RECITE_ON)).toBe(RELEASED);
     // The section and its header link are the ones marked; site.css hides them unless <body> has recite-on.
-    expect(home).toMatch(/<section class="recite" id="recite"[^>]* data-when="RECITE_SECTION">/);
-    expect(home).toMatch(/<a [^>]*href="#recite" data-when="RECITE_SECTION"/);
+    expect(home).toMatch(/<section class="recite" id="mistakes"[^>]* data-when="RECITE_SECTION">/);
+    expect(home).toMatch(/<a [^>]*href="#mistakes" data-when="RECITE_SECTION"/);
     expect(read('docs/assets/site.css')).toContain(
       `body.home:not(.${RECITE_ON}) [data-when="RECITE_SECTION"] { display: none !important; }`,
     );
