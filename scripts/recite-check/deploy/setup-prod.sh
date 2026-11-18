@@ -49,6 +49,17 @@ run() {
   [ "$YES" = 1 ] || return 0
   "$@"
 }
+# Like run, but tried again for up to 2 minutes: Google takes a moment to see what was just made. On Nov 18 2026 the
+# role for a service account made a second earlier failed ("does not exist"), and so did the first alert on a log
+# metric made a second earlier (404).
+again() {
+  printf '  $'; printf ' %q' "$@"; printf '\n'
+  [ "$YES" = 1 ] || return 0
+  local i
+  for i in 1 2 3 4 5 6 7 8 9 10 11 12; do "$@" && return 0; echo "  (not there yet; again in 10 s)"; sleep 10; done
+  return 1
+}
+have() { [ "$YES" = 1 ] && "$@" >/dev/null 2>&1; }  # have CMD…: in a real run, whether CMD finds it already there
 token() { gcloud auth print-access-token; }
 api() {  # api METHOD URL [JSON]: Cloud Monitoring's REST API (no gcloud component needed)
   printf '  $ curl -X %s %s%s\n' "$1" "$2" "${3:+ (a JSON body)}" >&2
@@ -67,13 +78,15 @@ step 1 "the project's number" && {
 }
 
 step 2 "service accounts" && {
-  run "${G[@]}" iam service-accounts create "$RUNTIME" --display-name "Recitation checker (Cloud Run)"
-  run "${G[@]}" iam service-accounts create "$PROMOTE" --display-name "Recitation checker: copies images from dev"
+  if have "${G[@]}" iam service-accounts describe "$SA"; then echo "  $RUNTIME is there"
+  else run "${G[@]}" iam service-accounts create "$RUNTIME" --display-name "Recitation checker (Cloud Run)"; fi
+  if have "${G[@]}" iam service-accounts describe "$PROMOTE_SA"; then echo "  $PROMOTE is there"
+  else run "${G[@]}" iam service-accounts create "$PROMOTE" --display-name "Recitation checker: copies images from dev"; fi
   # Firestore can't grant one collection: the service reads entitlements/{uid} (and nothing else, by its code)
-  run "${G[@]}" projects add-iam-policy-binding "$PROJECT" --member "serviceAccount:$SA" \
-    --role roles/datastore.viewer --condition None
-  run "${G[@]}" projects add-iam-policy-binding "$PROJECT" --member "serviceAccount:$PROMOTE_SA" \
-    --role roles/logging.logWriter --condition None
+  again "${G[@]}" projects add-iam-policy-binding "$PROJECT" --member "serviceAccount:$SA" \
+    --role roles/datastore.viewer --condition None --format none
+  again "${G[@]}" projects add-iam-policy-binding "$PROJECT" --member "serviceAccount:$PROMOTE_SA" \
+    --role roles/logging.logWriter --condition None --format none
 }
 
 step 3 "the image repository" && {
@@ -117,18 +130,35 @@ step 7 "a budget on the checker's spend (\$$BUDGET a month)" && {
 }
 
 step 8 "alerts" && {
-  run "${G[@]}" logging metrics create recite_check_errors \
+  if have "${G[@]}" logging metrics describe recite_check_errors; then echo "  the metric recite_check_errors is there"
+  else run "${G[@]}" logging metrics create recite_check_errors \
     --description "The recitation checker's health=error lines (scripts/recite-check/health.py)" \
     --log-filter 'resource.type="cloud_run_revision" AND resource.labels.service_name=~"^recite-check" AND jsonPayload.health="error"'
+  fi
   M=https://monitoring.googleapis.com/v3/projects/$PROJECT
-  ch=$(api POST "$M/notificationChannels" "$(python3 -c 'import json, sys; print(json.dumps({"type": "email",
+  ch='' made=''  # a second run reuses the channel and skips the alerts the first one made
+  if [ "$YES" = 1 ]; then
+    ch=$(curl -fsS "$M/notificationChannels" -H "Authorization: Bearer $(token)" | python3 -c 'import json, sys
+c = [x["name"] for x in json.load(sys.stdin).get("notificationChannels", []) if x.get("displayName") == "Recitation checker alerts"]
+print(c[0] if c else "")')
+    made=$(curl -fsS "$M/alertPolicies" -H "Authorization: Bearer $(token)" | python3 -c 'import json, sys
+print("|".join(p["displayName"] for p in json.load(sys.stdin).get("alertPolicies", [])))')
+  fi
+  if [ -n "$ch" ]; then echo "  the channel is there"
+  else ch=$(api POST "$M/notificationChannels" "$(python3 -c 'import json, sys; print(json.dumps({"type": "email",
     "displayName": "Recitation checker alerts", "labels": {"email_address": sys.argv[1]}}))' "$EMAIL")" \
-    | python3 -c 'import json, sys; print(json.load(sys.stdin)["name"])')
+    | python3 -c 'import json, sys; print(json.load(sys.stdin)["name"])'); fi
   for f in errors at-max refused; do
     # "at its maximum": more than MAX - 0.5 instances active
     body=$(sed -e "s#__CHANNEL__#$ch#" -e "s#__MAX_CHECK_LESS_HALF__#$((MAX_CHECK - 1)).5#" \
       -e "s#__MAX_PAIR_LESS_HALF__#$((MAX_PAIR - 1)).5#" "$HERE/alerts/$f.json")
-    api POST "$M/alertPolicies" "$body" >/dev/null
+    name=$(echo "$body" | python3 -c 'import json, sys; print(json.load(sys.stdin)["displayName"])')
+    case "|$made|" in *"|$name|"*) echo "  alert: $f is there"; continue ;; esac
+    for i in 1 2 3 4 5 6 7 8 9 10 11 12; do  # Monitoring may not know a log metric made a second ago (404)
+      api POST "$M/alertPolicies" "$body" >/dev/null && break
+      [ "$i" = 12 ] && exit 1
+      echo "  (not there yet; again in 10 s)"; sleep 10
+    done
     echo "  alert: $f"
   done
 }
