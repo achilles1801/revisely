@@ -15,6 +15,7 @@
     'h.nav.features': 'الميزات',
     'foot.donate': 'التبرّع',
     'h.badge': 'تنزيل من App Store',
+    'h.badgePlay': 'احصل عليه من Google Play',
 
     // ---- the home ----
     'h.title.doc': 'ريفايزلي: مراجعة القرآن في موعدها',
@@ -138,7 +139,7 @@
     'sp.part.kept': '<strong>ما يُحذف وما يبقى:</strong> ما تحذفه يُزال من حسابك فورًا. ويُحذف صوت التسجيل المحذوف من تخزيننا، وأي نسخ متبقية خلال ٣٠ يومًا. وتبقى ملاحظة صغيرة بأنه حُذف، بلا صوت، كي لا ترفعه هواتفك الأخرى مرة أخرى. وتقارير الأعطال، ولا تحمل إلا معرّفًا داخليًا للحساب، تُحذف بعد ٩٠ يومًا مهما حذفت. والرسائل مع الدعم تُحفظ سنتين. وتجد التفاصيل في القسم ٧ من <a href="/privacy/">سياسة الخصوصية</a> (بالإنجليزية)، ⁨Data retention⁩. ولحذف كل شيء، انظر <a href="#delete-account">حذف حسابك</a>.',
 
     'sp.os.h': 'على iPhone وAndroid',
-    'sp.os.p': 'تطبيق iPhone متوفر على <a href="https://apps.apple.com/app/revisely/id6767990248">App Store</a>. وتطبيق Android قادم إلى Google Play، بالحساب نفسه على كليهما: سجّل الدخول باستخدام Google أو البريد الإلكتروني على أي هاتف.',
+    'sp.os.p': 'تطبيق iPhone متوفر على <a href="https://apps.apple.com/app/revisely/id6767990248">App Store</a>، وتطبيق Android متوفر على <a href="https://play.google.com/store/apps/details?id=com.revisionbuddy.app">Google Play</a>، بالحساب نفسه على كليهما: سجّل الدخول باستخدام Google أو البريد الإلكتروني على أي هاتف.',
   };
   for (var k in ar) S.ar[k] = ar[k];
 })();

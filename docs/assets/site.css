@@ -338,6 +338,9 @@ html:has(body.home) { scroll-padding-top: 0; }
 .home .stores { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 30px; }
 .home .badge-link { display: inline-block; border-radius: 9px; line-height: 0; }
 .home .badge-link img { width: auto; height: 52px; }
+/* Google Play's badge: its artwork sits inside a margin of about 16% of its height, so it is drawn larger and the margin
+   taken back, to stand as tall as the App Store's. */
+.home .badge-link.play img { height: 77px; margin: -12.5px -12px; }
 .home .soon {
   display: inline-flex; flex-direction: column; justify-content: center;
   min-height: 52px; margin: 0; padding: 0 18px; border-radius: 9px;
@@ -471,6 +474,7 @@ body.home:not(.recite-on) [data-when="RECITE_SECTION"] { display: none !importan
   .home .s-pitch .line { margin-top: 12px; }
   .home .stores { margin-top: 18px; gap: 10px; }
   .home .badge-link img { height: 46px; }
+  .home .badge-link.play img { height: 68px; margin: -11px -10.5px; }
   .home .soon { min-height: 46px; padding: 0 16px; }
   .home .soon b { font-size: 16px; }
   .home .screen {

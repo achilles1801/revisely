@@ -33,7 +33,7 @@
       // Generate campaign link (the pt= number). Public, the same for every campaign. Empty: plain links, no ct.
       var PT = '';
       // Google Play production: set to true once Revisely is live there for everyone.
-      var PLAY_LIVE = false;
+      var PLAY_LIVE = true;
 
       var SOURCES = { ig: 'instagram', tt: 'tiktok', yt: 'youtube', x: 'x', th: 'threads', fb: 'facebook' };
       var q = new URLSearchParams(location.search);
@@ -91,7 +91,7 @@
             <img class="badge-light" src="https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/black/en-us" width="156" height="52" alt="Download on the App Store">
             <img class="badge-dark" src="https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/white/en-us" width="156" height="52" alt="Download on the App Store">
           </a>
-          <p class="android" id="android"><strong>Android</strong> coming soon to Google Play</p>
+          <p class="android" id="android"><a href="https://play.google.com/store/apps/details?id=com.revisionbuddy.app"><strong>Android</strong> on Google Play</a></p>
           <p class="android"><a href="/">What is Revisely?</a></p>
         </div>
       </div>
