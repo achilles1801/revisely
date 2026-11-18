@@ -9,6 +9,8 @@ import {
   NOTE_MAX,
   REAPPLY_AFTER_DAYS,
   REPLY_WITHIN_DAYS,
+  SUPPORT_ORIGINS,
+  SUPPORT_PAGES,
   SupportError,
   SupportLimits,
   accountLabel,
@@ -293,7 +295,15 @@ describe('supportApplication', () => {
     expect((await refusal(handleSupportApplication({ data: { action: 'status', code } }, m.store, PAGE))).message).toBe('This link has expired.');
   });
 
-  it('refuses everything in a project with no program page (production, for now)', async () => {
+  it('production and dev each have their program page, and the browser may call from those two sites only', () => {
+    expect(SUPPORT_PAGES).toEqual({
+      'revisely-dev': 'https://dev.revisely.app/apply/',
+      'revision-buddy-3a398': 'https://revisely.app/apply/',
+    });
+    expect(SUPPORT_ORIGINS).toEqual(['https://dev.revisely.app', 'https://revisely.app']);
+  });
+
+  it('refuses everything in a project with no program page', async () => {
     const m = memoryStore(USERS);
     expect((await refusal(handleSupportApplication({ data: { action: 'apply', answers: OK }, auth: { uid: 'bob' } }, m.store, undefined))).code).toBe(
       'failed-precondition',

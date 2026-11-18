@@ -25,13 +25,18 @@ export const REPLY_WITHIN_DAYS = 7;
 export const REAPPLY_AFTER_DAYS = 30;
 const DAY_MS = 86_400_000;
 
-/** Where the program page is, per Firebase project. A project not listed has none: supportLink refuses. */
+/**
+ * Where the program page is, per Firebase project. A project not listed has none: supportLink and
+ * supportApplication refuse. Production joined on Majd's word (Nov 18 2026: the account, Premium and Open Door
+ * pages live on revisely.app).
+ */
 export const SUPPORT_PAGES: Record<string, string> = {
   'revisely-dev': 'https://dev.revisely.app/apply/',
+  'revision-buddy-3a398': 'https://revisely.app/apply/',
 };
 
-/** The sites that call the callable from a browser (its CORS). revisely.app joins on Majd's word. */
-export const SUPPORT_ORIGINS = ['https://dev.revisely.app'];
+/** The sites that call the callable from a browser (its CORS). */
+export const SUPPORT_ORIGINS = ['https://dev.revisely.app', 'https://revisely.app'];
 
 export type SupportErrorCode =
   | 'unauthenticated'
