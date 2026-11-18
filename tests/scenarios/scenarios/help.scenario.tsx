@@ -258,7 +258,8 @@ describe('the help in Activity', () => {
     await app.until(() => app.screen.queryByTestId('help-button-activity') != null, 'Activity’s ?');
     await press(app, 'help-button-activity');
     await app.until(() => app.screen.queryByTestId('help-sheet-activity') != null, 'How Activity works');
-    expect(topicIds(app)).toEqual(['activity.calendar', 'activity.day', 'activity.adding']);
+    // Activity's sections are every account's from the mistake detection release (ACT-29): their topic shows too.
+    expect(topicIds(app)).toEqual(['activity.calendar', 'activity.day', 'activity.adding', 'activity.sections']);
     await press(app, 'help-done');
     await app.until(() => app.screen.queryByTestId('help-sheet-activity') == null, 'the sheet to close');
 
