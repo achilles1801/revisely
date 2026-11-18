@@ -109,7 +109,9 @@ step 7 "a budget on the checker's spend (\$$BUDGET a month)" && {
   if [ "$YES" = 1 ]; then
     acct=$("${G[@]}" billing projects describe "$PROJECT" --format 'value(billingAccountName)'); acct=${acct#billingAccounts/}
   else acct='<the billing account>'; fi
-  run gcloud billing budgets create --billing-account "$acct" --display-name "Recitation checker (Cloud Run)" \
+  # the Budget API isn't on in production yet (Nov 17 2026); with user credentials it is billed to the --project
+  run "${G[@]}" services enable billingbudgets.googleapis.com
+  run "${G[@]}" billing budgets create --billing-account "$acct" --display-name "Recitation checker (Cloud Run)" \
     --budget-amount "${BUDGET}USD" --filter-projects "projects/$PROJECT" --filter-labels app=recite-check \
     --threshold-rule percent=0.5 --threshold-rule percent=0.9 --threshold-rule percent=1.0
 }
