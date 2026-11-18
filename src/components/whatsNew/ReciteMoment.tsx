@@ -5,7 +5,7 @@
 // anywhere else does nothing (Majd, Nov 9 2026, of Revo's moment). Drawn with the pictures' own pieces (TakeLines,
 // ReciteBar), marked Example, with no account's numbers. Reduce Motion and VoiceOver: the end at once.
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -51,6 +51,14 @@ export function ReciteMoment({
   const length = momentLength(take);
   const [at, setAt] = useState(0);
   const straightToEnd = reduceMotion || screenReader;
+  // The clock while it plays. Skip stops it: a tick after Skip would set the moment back to the time played, so it
+  // would carry on from there, the end shown for a tick at most (Nov 18 2026).
+  const clock = useRef<ReturnType<typeof setInterval> | null>(null);
+  const toEnd = () => {
+    if (clock.current) clearInterval(clock.current);
+    clock.current = null;
+    setAt(length);
+  };
 
   useEffect(() => {
     AccessibilityInfo.isScreenReaderEnabled()
@@ -69,7 +77,11 @@ export function ReciteMoment({
       setAt(now);
       if (now >= length) clearInterval(timer);
     }, TICK_MS);
-    return () => clearInterval(timer);
+    clock.current = timer;
+    return () => {
+      clearInterval(timer);
+      clock.current = null;
+    };
   }, [straightToEnd, length]);
 
   const frame = momentAt(at, take);
@@ -96,7 +108,7 @@ export function ReciteMoment({
         </Text>
         <View style={[styles.side, styles.right]}>
           {!frame.ended ? (
-            <Tap onPress={() => setAt(length)} accessibilityRole="button" hitSlop={12} testID="recite-moment-skip">
+            <Tap onPress={toEnd} accessibilityRole="button" hitSlop={12} testID="recite-moment-skip">
               <Text style={[typeV2.name, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
                 {t('whatsNew.reciteMoment.skip')}
               </Text>

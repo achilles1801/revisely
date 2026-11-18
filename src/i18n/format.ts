@@ -33,6 +33,28 @@ export function formatDate(date: Date, options: Intl.DateTimeFormatOptions, engl
   return date.toLocaleDateString(dateLocale(english), options);
 }
 
+/**
+ * A calendar day ('YYYY-MM-DD') with Intl's date options: "Tuesday", "November 17". It names the day as written in
+ * any time zone, so each language and set of options makes its formatter once: toLocaleDateString makes a new one on
+ * every call, and Activity's search words asked three times an item (Nov 17 2026).
+ */
+export function formatDay(day: string, options: Intl.DateTimeFormatOptions, english: EnglishLocale = 'en-US'): string {
+  const [y, m, d] = day.split('-').map(Number);
+  const locale = dateLocale(english);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  // The phone's own locale can change while the app runs: only named locales are kept.
+  if (locale === undefined) return date.toLocaleDateString(locale, { ...options, timeZone: 'UTC' });
+  const key = `${locale}|${JSON.stringify(options)}`;
+  let format = dayFormats.get(key);
+  if (!format) {
+    format = new Intl.DateTimeFormat(locale, { ...options, timeZone: 'UTC' });
+    dayFormats.set(key, format);
+  }
+  return format.format(date);
+}
+
+const dayFormats = new Map<string, Intl.DateTimeFormat>();
+
 /** A clock time, "5:07 AM", in the phone's 12- or 24-hour style. */
 export function formatTime(
   date: Date,

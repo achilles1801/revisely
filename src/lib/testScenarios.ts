@@ -38,18 +38,27 @@ export interface TestScenario {
   detail: string;
 }
 
-/** The scenarios, in the order Settings lists them (ids as functions/src/testScenarios.ts). */
+/**
+ * The scenarios, in the order Settings lists them (ids as functions/src/testScenarios.ts's SCENARIO_IDS; Majd,
+ * Nov 17 2026: three, the main one a heavy user with months of data). The older, narrow ones stay on the server for
+ * the automated tests (CHECK_SCENARIO_IDS) and aren't listed.
+ */
 export const TEST_SCENARIOS: TestScenario[] = [
-  { id: 'new', title: 'New account', detail: 'Just onboarded: Juz 30, five pages a day, nothing done yet.' },
-  { id: 'beginner', title: 'Beginner', detail: 'Juz 30, two pages a day, a week of history with gaps.' },
-  { id: 'hafiz', title: 'Hafiz', detail: 'All 604 pages, one juz a day, 60 days of history, ratings, recordings.' },
-  { id: 'partial-today', title: 'Partly done today', detail: 'Today’s session half done; yesterday left two pages.' },
-  { id: 'missed-days', title: 'Missed days', detail: 'The last session was three days ago.' },
-  { id: 'revise-ahead', title: 'Revised ahead', detail: 'Today done, and two of tomorrow’s pages revised ahead.' },
-  { id: 'fajr-edge', title: 'Fajr edge', detail: 'Fajr boundary on; sessions after midnight and just before Fajr.' },
-  { id: 'custom-reverse', title: 'Custom reverse plan', detail: 'Juz 30 backwards, a page on two neighbouring days.' },
-  { id: 'heavy-activity', title: 'Heavy Activity', detail: 'Three months of sessions, readings, notes and memorizing.' },
-  { id: 'offline-queue', title: 'Offline queue', detail: 'Today’s session, a note and a reading held until you send them.' },
+  {
+    id: 'heavy',
+    title: 'Heavy user',
+    detail: 'Seven months: 21 juz memorized and more in part, a juz a day, gaps, the daily log, recordings, over a hundred Recite takes, Revo.',
+  },
+  {
+    id: 'steady',
+    title: 'Missed yesterday',
+    detail: 'Six weeks of ten pages a day: a twelve-day run, then yesterday missed. The streak’s grace ring and the catch-up.',
+  },
+  {
+    id: 'starting',
+    title: 'Getting started',
+    detail: 'Two weeks in: Juz 30, Al-Mulk ayah by ayah, four pages a day, the first Recite takes.',
+  },
 ];
 
 /** Who sees Load test scenario: a previewTester account, as the server requires. */

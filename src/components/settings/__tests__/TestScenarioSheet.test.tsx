@@ -63,7 +63,7 @@ describe('Load test scenario (testers)', () => {
     });
     expect(load).not.toHaveBeenCalled(); // none picked yet
 
-    fireEvent.press(screen.getByTestId('test-scenario-hafiz'));
+    fireEvent.press(screen.getByTestId('test-scenario-steady'));
     fireEvent.changeText(screen.getByTestId('test-scenario-input'), 'reset');
     await act(async () => {
       fireEvent.press(confirmButton());
@@ -74,13 +74,13 @@ describe('Load test scenario (testers)', () => {
   it('loads the picked scenario, then closes', async () => {
     const load = jest.fn(async () => ({}));
     const onClose = await open(load);
-    fireEvent.press(screen.getByTestId('test-scenario-revise-ahead'));
+    fireEvent.press(screen.getByTestId('test-scenario-heavy'));
     fireEvent.changeText(screen.getByTestId('test-scenario-input'), 'RESET');
-    expect(screen.getByText('Load Revised ahead')).toBeTruthy();
+    expect(screen.getByText('Load Heavy user')).toBeTruthy();
     await act(async () => {
       fireEvent.press(confirmButton());
     });
-    expect(load).toHaveBeenCalledWith('revise-ahead');
+    expect(load).toHaveBeenCalledWith('heavy');
     expect(onClose).toHaveBeenCalled();
   });
 
@@ -89,7 +89,7 @@ describe('Load test scenario (testers)', () => {
       throw new Error('You loaded a test scenario less than 2 minutes ago. Try again in 2 min.');
     });
     const onClose = await open(load);
-    fireEvent.press(screen.getByTestId('test-scenario-new'));
+    fireEvent.press(screen.getByTestId('test-scenario-starting'));
     fireEvent.changeText(screen.getByTestId('test-scenario-input'), 'RESET');
     await act(async () => {
       fireEvent.press(confirmButton());
