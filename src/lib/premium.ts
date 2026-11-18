@@ -5,7 +5,7 @@
 // - The owner may get the document (and so listen to it); no client writes.
 // - In Revisely Dev, Get Premium is free: `devGrantPremium` / `devRevokePremium` (revisely-dev and the emulators only).
 // - "Can't afford it? Apply for support" opens the page `supportLink` answers with (a one-time code for the account).
-// - Early access (lib/earlyAccess, PREM-1): the grant `early`, kept for good. `early` below says the account has it,
+// - Early access (lib/earlyAccess, PREM-1): the grant `early`, kept for life. `early` below says the account has it,
 //   whichever grant `premium` names (a tie between grants with no end date keeps support or dev).
 
 import { useEffect, useSyncExternalStore } from 'react';
@@ -55,7 +55,7 @@ export function hasPremium(grant: PremiumGrant | null | undefined, now: number):
 interface PremiumState {
   uid: string | null;
   grant: PremiumGrant | null;
-  /** The account has the early-access grant (grants.early), kept for good. */
+  /** The account has the early-access grant (grants.early), kept for life. */
   early: boolean;
   /** Heard from the server (or a copy of it kept on the phone) at least once. */
   known: boolean;

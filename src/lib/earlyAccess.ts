@@ -1,5 +1,8 @@
 // Premium early access (Majd, Nov 16 2026; BEHAVIOUR.md PREM-1): "give everyone premium access right now … it'll be
-// paid for in the future but anyone who has premium now will keep it forever".
+// paid for in the future but anyone who has premium now will keep it forever". Nov 18 2026: "for end date tbd i meant
+// new people from singing up and taking advantage of this deal. those users can have premium for life": free for
+// everyone who signs up during early access, whose end date isn't set yet, and every account that got it then keeps it
+// for life ("for life", his word, in place of "for good").
 // - Firestore config/app's `earlyAccess` (true: early access is on). The functions give every account set up then
 //   the grant `early` (Premium, no end date; functions/src/support/early.ts), and older accounts get it from a script.
 //   Set it with functions/scripts/set-app-config.js --early-access on|off.
@@ -91,16 +94,21 @@ export function resetEarlyAccessForTests(): void {
 
 /** Settings' Premium row, while early access is on. */
 export const EARLY_ACCESS_LINE =
-  'Premium is free while it’s in early access. It will be paid later, and every account that has it now keeps it for good, bi-idhnillah.';
+  'Premium is free for everyone who signs up during early access, which has no end date yet. After it ends, Premium will be paid, and every account that got it during early access keeps it for life, bi-idhnillah.';
 /** Settings' Premium row, after early access, for an account that had it then. */
-export const EARLY_ACCESS_KEPT_LINE = 'Yours for good: your account had Premium in early access.';
+export const EARLY_ACCESS_KEPT_LINE = 'Yours for life: your account got Premium during early access.';
 /** Marking mistakes' intro (an account without Premium yet), in place of Apply for support. */
-export const EARLY_ACCESS_INTRO_LINE = 'Free while Premium is in early access. It will be paid later, and you’ll keep it for good, bi-idhnillah.';
+export const EARLY_ACCESS_INTRO_LINE =
+  'Premium is free for everyone during early access, which has no end date yet. After it ends, Premium will be paid, and you’ll keep it for life, bi-idhnillah.';
+/** The take summary's quiet line, while early access is on. */
+export const EARLY_ACCESS_SHORT_LINE = 'Premium is free for everyone during early access, and yours for life.';
+/** The take summary's quiet line, after early access, for an account that had it then. */
+export const EARLY_ACCESS_KEPT_SHORT_LINE = 'Premium is yours for life, from early access.';
 
 /** The account's Premium, as lib/premium's usePremium gives it. */
 interface PremiumNow {
   has: boolean;
-  /** The account has the early-access grant (kept for good). */
+  /** The account has the early-access grant (kept for life). */
   early: boolean;
 }
 
@@ -114,8 +122,8 @@ export function earlyAccessLine(premium: PremiumNow, earlyAccessOn: boolean): st
 /** The take summary's quiet line, or null. */
 export function earlyAccessShortLine(premium: PremiumNow, earlyAccessOn: boolean): string | null {
   if (!premium.has) return null;
-  if (earlyAccessOn) return 'Premium is free in early access, and yours to keep.';
-  return premium.early ? 'Premium is yours for good, from early access.' : null;
+  if (earlyAccessOn) return EARLY_ACCESS_SHORT_LINE;
+  return premium.early ? EARLY_ACCESS_KEPT_SHORT_LINE : null;
 }
 
 // ------------------------------------------------------------------ claiming it

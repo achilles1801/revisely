@@ -1298,7 +1298,7 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
     alert.mockRestore();
   });
 
-  it('[PREM-1] in early access the intro says Premium is free now and kept for good, hides Apply for support, and Get Premium gives it', async () => {
+  it('[PREM-1] in early access the intro says Premium is free now, with no end date yet, and kept for life, hides Apply for support, and Get Premium gives it', async () => {
     mockPremium.has = false;
     mockEarly.on = true;
     const alert = jest.spyOn(Alert, 'alert');
@@ -1308,7 +1308,7 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
     fireEvent.press(screen.getByTestId('recite-mistakes'));
     await flush();
     expect(screen.getByTestId('check-intro-early')).toBeTruthy();
-    expect(screen.getByText(/Free while Premium is in early access\. It will be paid later, and you’ll keep it for good, bi-idhnillah\./)).toBeTruthy();
+    expect(screen.getByText(/Premium is free for everyone during early access, which has no end date yet\. After it ends, Premium will be paid, and you’ll keep it for life, bi-idhnillah\./)).toBeTruthy();
     expect(screen.queryByText('Can’t afford it? Apply for support')).toBeNull();
     expect(screen.queryByText(/trial/i)).toBeNull();
     const { claimEarlyAccess } = jest.requireMock('../../../lib/earlyAccess');

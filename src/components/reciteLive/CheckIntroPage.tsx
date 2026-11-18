@@ -25,7 +25,7 @@ const PREVIEW_ASPECT = 1206 / 1140;
  * Premium (the paid side is "Premium", with no feature name and no prices: nothing is for sale yet), so the button is
  * Get Premium, a placeholder until Premium exists. One line says it's Premium, following along stays free, and it's AI.
  * In early access (lib/earlyAccess, PREM-1) Get Premium gives it for nothing, and in place of Apply for support one line
- * says it's free in early access, paid later, and kept for good: every account has Premium, so support has no purpose.
+ * says it's free in early access, paid later, and kept for life: every account has Premium, so support has no purpose.
  */
 export function CheckIntroPage({
   visible,
@@ -36,7 +36,7 @@ export function CheckIntroPage({
   earlyAccess = false,
 }: {
   visible: boolean;
-  /** Premium is in early access: free, kept for good; Apply for support is hidden. */
+  /** Premium is in early access: free, kept for life; Apply for support is hidden. */
   earlyAccess?: boolean;
   /** Get Premium is under way. */
   getting?: boolean;

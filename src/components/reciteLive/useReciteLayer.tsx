@@ -185,7 +185,7 @@ export function useReciteLayer({
   const premium = usePremium(user?.id, liveOn);
   const owned = premium.has;
   const [gettingPremium, setGettingPremium] = useState(false);
-  // Premium early access (lib/earlyAccess, PREM-1): every account has it for nothing, kept for good. Get Premium then
+  // Premium early access (lib/earlyAccess, PREM-1): every account has it for nothing, kept for life. Get Premium then
   // gives it at once (an account the sign-up grant hasn't reached), and Apply for support is hidden.
   const earlyAccessOn = useEarlyAccess();
   // Revisely Dev: Premium is free (nothing is charged); it says so before turning it on.

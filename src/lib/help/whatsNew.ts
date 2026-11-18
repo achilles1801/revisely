@@ -209,20 +209,22 @@ export const NEXT_RELEASE: WhatsNewRelease | null = {
           needs: 'recite',
         },
         {
+          // With Revo's row (Nov 18 2026), so Premium has a row of its own: the last card has four at most.
           id: 'recitation',
           icon: 'trending-up-outline',
           title: 'Your recitation in Insights',
-          text: 'Your score over time, and the passages that keep slipping.',
-          covers: ['RINS-2'],
+          text: 'Your score over time, and the passages that keep slipping. Revo knows them too: ask it what keeps slipping, or about one take.',
+          covers: ['RINS-2', 'RINS-1', 'RINS-3'],
           needs: 'recite',
         },
         {
-          id: 'revo',
-          icon: 'chatbubble-ellipses-outline',
-          title: 'Revo knows your recitation',
-          text: 'Ask what keeps slipping, or about one take.',
-          covers: ['RINS-1', 'RINS-3'],
-          needs: 'reciteRevo',
+          // Majd, Nov 18 2026: free for everyone who signs up during early access, kept for life (PREM-1).
+          id: 'premium',
+          icon: 'star-outline',
+          title: 'Premium, in early access',
+          text: '{{Mark mistakes}} and {{Test me}} are part of Premium: free for everyone during early access, and yours for life.',
+          covers: ['PREM-1'],
+          needs: 'recite',
         },
         {
           id: 'search',

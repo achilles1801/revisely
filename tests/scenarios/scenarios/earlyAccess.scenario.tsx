@@ -32,7 +32,7 @@ afterEach(async () => {
   await deleteServerFields('config/app', ['earlyAccess']);
 });
 
-it("[PREM-1] an account set up in early access gets Premium for good; once early access ends new accounts don't, and the first keeps it", async () => {
+it("[PREM-1] an account set up in early access gets Premium for life; once early access ends new accounts don't, and the first keeps it", async () => {
   setZone(ZONES.chicago);
   setNow('2031-07-01 10:00');
   await setServerDoc('config/app', { earlyAccess: true });
@@ -59,6 +59,6 @@ it("[PREM-1] an account set up in early access gets Premium for good; once early
   await second.idle(3000); // the function, had it granted, would have by now
   expect(((await getServerDoc(`entitlements/${second.uid}`)) as Ent | null)?.grants?.early).toBeUndefined();
 
-  // The first account keeps its Premium for good.
+  // The first account keeps its Premium for life.
   expect(((await getServerDoc(`entitlements/${uid}`)) as Ent).grants?.early).toEqual(ent.grants?.early);
 });
