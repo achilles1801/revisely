@@ -6,6 +6,7 @@ window.RV_STRINGS = {
     'nav.premium': 'Premium', 'nav.program': 'Open Door', 'nav.signin': 'Sign in', 'nav.account': 'Account',
     'nav.support': 'Support', 'nav.getApp': 'Get the app', 'nav.download': 'Download', 'soon.small': 'Coming to', 'nav.menu': 'Menu', 'nav.close': 'Close', lang: 'عربي',
     'foot.privacy': 'Privacy', 'foot.terms': 'Terms', 'foot.support': 'Support',
+    'doc.englishOnly': 'This page is in English only.',
 
     'p.title.doc': 'Premium · Revisely',
     'p.label': 'Revisely Premium',
@@ -109,6 +110,7 @@ window.RV_STRINGS = {
     'nav.premium': 'بريميوم', 'nav.program': 'الباب المفتوح', 'nav.signin': 'تسجيل الدخول', 'nav.account': 'الحساب',
     'nav.support': 'الدعم', 'nav.getApp': 'تنزيل التطبيق', 'nav.download': 'تنزيل', 'soon.small': 'قريبًا على', 'nav.menu': 'القائمة', 'nav.close': 'إغلاق', lang: 'English',
     'foot.privacy': 'الخصوصية', 'foot.terms': 'الشروط', 'foot.support': 'الدعم',
+    'doc.englishOnly': 'هذه الصفحة متوفرة بالإنجليزية فقط.',
 
     'p.title.doc': 'بريميوم · ريفايزلي',
     'p.label': 'ريفايزلي بريميوم',

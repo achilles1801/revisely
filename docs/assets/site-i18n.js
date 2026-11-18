@@ -93,6 +93,23 @@
     if (b) set(lang() === 'ar' ? 'en' : 'ar');
   });
 
+  // A page with no Arabic yet (privacy, terms, donate) keeps its English left to right, under one Arabic line that
+  // says so: its main content says it is English, and site-rtl.css lays it out that way.
+  function markEnglishOnly() {
+    var main = document.getElementById('main');
+    if (!main || main.querySelector('[data-t],[data-t-html],[data-t-ph],[data-t-aria],[data-t-alt]')) return;
+    main.setAttribute('lang', 'en');
+    main.setAttribute('dir', 'ltr');
+    var note = document.createElement('p');
+    note.className = 'en-only-note';
+    note.setAttribute('lang', 'ar');
+    note.setAttribute('dir', 'rtl');
+    note.setAttribute('data-t', 'doc.englishOnly');
+    var host = main.querySelector('.wrap') || main;
+    host.insertBefore(note, host.firstChild);
+  }
+
+  markEnglishOnly();
   apply(document);
   html.classList.add('i18n');
 })();

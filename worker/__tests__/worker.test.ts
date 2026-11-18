@@ -694,6 +694,19 @@ describe("the site's navigation on dev: the account, Premium and Open Door pages
     }
   });
 
+  it("dev: the pages with no Arabic yet (privacy, terms, donate) get the switch, and their Download pill its key", async () => {
+    for (const p of ['privacy/index.html', 'terms/index.html', 'donate/index.html']) {
+      const res = await worker.fetch(new Request('https://dev.revisely.app/'), { ...ENV, ASSETS: html(page(p)), NOINDEX: '1', ACCOUNT_PAGES: '1' }, ctx());
+      const body = await res.text();
+      const header = body.slice(body.indexOf('<nav class="site-nav"'), body.indexOf('data-menu-panel'));
+      expect([p, header]).toEqual([p, expect.stringContaining('data-t="nav.download">Download</a>')]);
+      expect(body).toContain('/assets/site-i18n.js');
+    }
+    // The home already carries the key: it isn't added twice.
+    const res = await worker.fetch(new Request('https://dev.revisely.app/'), { ...ENV, ASSETS: html(page('index.html')), NOINDEX: '1', ACCOUNT_PAGES: '1' }, ctx());
+    expect((await res.text()).match(/data-t="nav.download"/g)).toHaveLength(1);
+  });
+
   it('revisely.app: Support comes through untouched too, with no Arabic switch or script', async () => {
     const support = page('support/index.html');
     const res = await worker.fetch(new Request('https://revisely.app/support/'), { ...ENV, ASSETS: html(support) }, ctx());
