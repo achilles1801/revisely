@@ -10,6 +10,9 @@
  *   GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-dev-admin.json node scripts/early-access.js --yes    # grant
  * Production (revision-buddy-3a398) also needs --production, and runs only on Majd's word.
  *
+ * --testers: only accounts with previewTester (the release's rehearsal: Premium for testers before everyone). The grant
+ * is the same `early` grant, for life, so a tester given it in the rehearsal keeps it.
+ *
  * Prints counts only: no emails or account ids.
  */
 const fs = require('fs');
@@ -25,7 +28,7 @@ function fail(msg) {
 }
 
 const args = new Set(process.argv.slice(2));
-for (const a of args) if (!['--yes', '--production'].includes(a)) fail(`unknown option ${a}`);
+for (const a of args) if (!['--yes', '--production', '--testers'].includes(a)) fail(`unknown option ${a}`);
 const creds = process.env.GOOGLE_APPLICATION_CREDENTIALS;
 if (!creds || !fs.existsSync(creds)) fail('Set GOOGLE_APPLICATION_CREDENTIALS to the project\'s service account JSON.');
 if (!fs.existsSync(path.join(LIB, 'early.js'))) fail('Run `npm run build` first (lib/support/early.js is missing).');
@@ -43,8 +46,10 @@ const db = admin.firestore();
 
 async function main() {
   const switchOn = earlyAccessOn((await db.doc('config/app').get()).data());
-  // Accounts set up in the app: user documents that exist (ids only).
-  const users = (await db.collection('users').select().get()).docs.map((d) => d.id);
+  // Accounts set up in the app: user documents that exist (ids only); with --testers, previewTester accounts only.
+  const testersOnly = args.has('--testers');
+  const query = testersOnly ? db.collection('users').where('previewTester', '==', true) : db.collection('users');
+  const users = (await query.select().get()).docs.map((d) => d.id);
   const missing = [];
   for (let i = 0; i < users.length; i += 300) {
     const refs = users.slice(i, i + 300).map((uid) => db.doc(`entitlements/${uid}`));
@@ -54,7 +59,9 @@ async function main() {
     });
   }
   console.log(`Project ${project}. config/app.earlyAccess is ${switchOn ? 'on' : 'off'} (new accounts ${switchOn ? 'get' : "don't get"} it).`);
-  console.log(`${users.length} accounts; ${users.length - missing.length} already have early access; ${missing.length} to grant.`);
+  console.log(
+    `${users.length} ${testersOnly ? 'tester accounts' : 'accounts'}; ${users.length - missing.length} already have early access; ${missing.length} to grant.`,
+  );
   if (!write) {
     console.log('Dry run: nothing written. Add --yes to grant.');
     return;
