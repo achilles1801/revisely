@@ -170,7 +170,7 @@ The English is the app's label (as in `src/i18n/en`), or the concept where there
 | English | Arabic | Avoid | Why |
 | --- | --- | --- | --- |
 | Recite (the page follows you) | متابعة التلاوة; in a sentence «الصفحة تتابع تلاوتك» | تتبّع | [TT «متابعة التلاوة»] |
-| Mark mistakes | تحديد الأخطاء **(confirm)** | تعليم الأخطاء | «تعليم» reads first as "teaching". [TT] says «اكتشاف أخطاء الحفظ». |
+| Mark mistakes | تحديد الأخطاء | تعليم الأخطاء | Majd confirmed it (Nov 18). «تعليم» reads first as "teaching"; [TT] says «اكتشاف أخطاء الحفظ». |
 | reciting from memory (to check it) | التسميع، سمّع | الاختبار | The community's word [TT] |
 | a take | تسميع (pl. مرات التسميع / التسميعات) **(confirm)** | محاولة, as a noun for it | One go at reciting with the checker |
 | Recited (a day's takes) | ما سمّعته | | |
@@ -230,7 +230,7 @@ The English is the app's label (as in `src/i18n/en`), or the concept where there
 | Search, See all, More | البحث، عرض الكل، المزيد | | [AP] |
 | Couldn't load / connect… | تعذّر تحميل… / تعذّر الاتصال… | فشل | Apple's and Google's error opening |
 | Help, What's new | المساعدة، الجديد في ريفايزلي | | |
-| Premium | بريميوم **(confirm)** | | Majd approved بريميوم (Nov 14). Tarteel and Telegram translate it («ترتيل المميز»). |
+| Premium | بريميوم | المميّز | Majd confirmed it (Nov 18), though Tarteel and Telegram translate it («ترتيل المميز»). |
 | Free (the plan) | مجاني; the Free plan الخطة المجانية | المجاني, as a title | |
 | early access | الوصول المبكر | | Google Play's Arabic |
 | subscription, gift, family plan | اشتراك، هدية، خطة العائلة | | |
@@ -275,8 +275,8 @@ From `~/Documents/revisely-handoffs/app-in-arabic-2.md`. Each has App in Arabic'
 
 ## Open questions (native speaker or Majd)
 
-1. **Premium:** بريميوم, as approved, or «المميّز», as Tarteel and Telegram write it?
-2. **Mark mistakes:** تحديد الأخطاء, «اكتشاف الأخطاء» or «التنبيه على الأخطاء»?
+1. ~~Premium~~: «بريميوم» (Majd, Nov 18).
+2. ~~Mark mistakes~~: «تحديد الأخطاء» (Majd, Nov 18).
 3. **Skipped word:** «متروكة» or «ساقطة» (the halaqa word: أسقط كلمة)?
 4. **Strict:** «الوضع الصارم» or «وضع التدقيق»?
 5. **A take:** «تسميع» (pl. «التسميعات»)?
