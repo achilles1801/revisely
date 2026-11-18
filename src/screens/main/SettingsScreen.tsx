@@ -6,7 +6,6 @@ import {
   ScrollView,
   Alert,
   Platform,
-  Linking,
   Share,
   TextInput,
   AccessibilityState,
@@ -64,7 +63,8 @@ import { askTurnOffBackup, backupLabel, deleteAllEverywhere, useBackupStatus } f
 import { formatBytes } from '../../lib/recordingFormat';
 import { logger } from '../../lib/logger';
 import { setHomePrefs, useHomePrefs } from '../../lib/homePrefs';
-import { supportMailto } from '../../lib/contact';
+import { SUPPORT_EMAIL, supportMailto } from '../../lib/contact';
+import { openEmail, openWebPage } from '../../lib/openWebPage';
 import { PillTabs } from '../../components/v2/PillTabs';
 import { setMushafCellular } from '../../lib/mushafOffline';
 import { describeMushaf, mushafMenuActions, useMushafOffline } from '../../lib/mushafOfflineUi';
@@ -987,9 +987,7 @@ export default function SettingsScreen() {
           <Row
             icon="mail-outline"
             label="Contact support"
-            onPress={() =>
-              Linking.openURL(supportMailto())
-            }
+            onPress={() => void openEmail(supportMailto(), SUPPORT_EMAIL)}
           />
         </Section>
 
@@ -1005,12 +1003,12 @@ export default function SettingsScreen() {
           <Row
             icon="document-text-outline"
             label="Privacy Policy"
-            onPress={() => Linking.openURL('https://revisely.app/privacy/')}
+            onPress={() => void openWebPage('https://revisely.app/privacy/')}
           />
           <Row
             icon="document-outline"
             label="Terms of Service"
-            onPress={() => Linking.openURL('https://revisely.app/terms/')}
+            onPress={() => void openWebPage('https://revisely.app/terms/')}
           />
           <AppInfo tools={showsUpdateTools(user)} />
         </Section>

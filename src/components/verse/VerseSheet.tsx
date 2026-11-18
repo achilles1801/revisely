@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Linking,
   Modal,
   Pressable,
   ScrollView,
@@ -46,6 +45,7 @@ import {
 import { clearQuranErrorHint, clearQuranSegments } from '../../lib/clearQuran';
 import { hasSaheehSura, saheehFootnotes, saheehSegments } from '../../lib/saheeh';
 import { knownOffline, onNetworkState } from '../../lib/networkState';
+import { openWebPage } from '../../lib/openWebPage';
 import { nextVerse, previousVerse } from '../../lib/verses';
 import { resolveVoice, voiceLabel } from '../../lib/recitation';
 import { ReciterList } from './ReciterList';
@@ -670,7 +670,7 @@ export function VerseSheet({
                       <Text
                         style={styles.creditLink}
                         maxFontSizeMultiplier={CHROME_TEXT_SCALE}
-                        onPress={() => Linking.openURL(ARABIC_CREDIT.url).catch(() => undefined)}
+                        onPress={() => void openWebPage(ARABIC_CREDIT.url)}
                         accessibilityRole="link"
                         accessibilityLabel={`${ARABIC_CREDIT.linkLabel}, opens the website`}
                         suppressHighlighting={false}
@@ -690,7 +690,7 @@ export function VerseSheet({
                   <Text
                     style={styles.creditLink}
                     maxFontSizeMultiplier={CHROME_TEXT_SCALE}
-                    onPress={() => Linking.openURL(translation.credit.url).catch(() => undefined)}
+                    onPress={() => void openWebPage(translation.credit.url)}
                     accessibilityRole="link"
                     accessibilityLabel={`${translation.credit.linkLabel}, opens the website`}
                     suppressHighlighting={false}
