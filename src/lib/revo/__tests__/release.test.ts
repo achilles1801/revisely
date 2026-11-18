@@ -16,7 +16,7 @@ jest.mock('../../logger', () => ({ logger: { warn: jest.fn(), error: jest.fn() }
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 import { revoAvailable, useRevoAvailable } from '../availability';
-import { REVO_PATTERNS_KEY, REVO_RELEASE_EVERY_MS, REVO_RELEASE_KEY, refreshRevoRelease, resetRevoReleaseForTests, revoPatternsOn, revoReleaseOf, startRevoRelease, useRevoRelease } from '../release';
+import { REVO_PATTERNS_KEY, REVO_RECITE_KEY, REVO_RELEASE_EVERY_MS, REVO_RELEASE_KEY, refreshRevoRelease, resetRevoReleaseForTests, revoPatternsOn, revoReciteOn, revoReleaseOf, startRevoRelease, useRevoRelease } from '../release';
 
 const tester = { previewTester: true };
 const member = { previewTester: false };
@@ -89,6 +89,21 @@ describe('whether the server takes the patterns (REVO-40)', () => {
     mockConfig = { revo: 'everyone' };
     await act(() => refreshRevoRelease(true));
     expect(revoPatternsOn()).toBe(false);
+  });
+
+  it('[RINS-1] off until config/app.revoRecite is true (release day, after revoAsk is deployed); kept on the phone, and off again', async () => {
+    expect(revoReciteOn()).toBe(false);
+    mockConfig = { revo: 'everyone', revoRecite: 'on' };
+    await act(() => refreshRevoRelease(true));
+    expect(revoReciteOn()).toBe(false);
+    mockConfig = { revo: 'everyone', revoRecite: true };
+    await act(() => refreshRevoRelease(true));
+    expect(revoReciteOn()).toBe(true);
+    expect(await AsyncStorage.getItem(REVO_RECITE_KEY)).toBe('1');
+    mockConfig = { revo: 'everyone' };
+    await act(() => refreshRevoRelease(true));
+    expect(revoReciteOn()).toBe(false);
+    expect(await AsyncStorage.getItem(REVO_RECITE_KEY)).toBe('0');
   });
 
   it('[REVO-40] a launch offline uses the value kept from the last read', async () => {

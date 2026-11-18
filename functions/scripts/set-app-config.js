@@ -25,6 +25,11 @@
  *                                after 10 minutes, or at once when the server
  *                                refuses Revo. Turning Revo off and deleting its
  *                                data stay open to every account.
+ *   revoRecite                   Whether store phones send Revo the recitation and
+ *                                Insights' gaps (the 1.0.5 release; src/lib/revo/
+ *                                release revoReciteOn). On only after revoAsk and
+ *                                revoDayInReview from the release are deployed:
+ *                                older ones refuse both. Revisely Dev always sends them.
  *   revoPatterns                 Whether phones send Revo the patterns in their days
  *                                and each day's facts (REVO-40, src/lib/revo/release
  *                                revoPatternsOn). Turn it on only after revoAsk and
@@ -62,6 +67,8 @@
  *   ... node scripts/set-app-config.js --revo testers            # back to testers only
  *   ... node scripts/set-app-config.js --revo-patterns on        # after deploying revoAsk,revoDayInReview with REVO-40
  *   ... node scripts/set-app-config.js --revo-patterns off       # phones stop sending them
+ *   ... node scripts/set-app-config.js --revo-recite on          # after deploying revoAsk,revoDayInReview with the 1.0.5 release
+ *   ... node scripts/set-app-config.js --revo-recite off         # store phones stop sending recitation and gaps
  *   ... node scripts/set-app-config.js --whats-new off           # stop the What's new walkthrough
  *   ... node scripts/set-app-config.js --whats-new on            # let it show again
  *   ... node scripts/set-app-config.js --recite-check off        # hide Recite and Mark mistakes on phones
@@ -111,6 +118,11 @@ function parseArgs(argv) {
       if (!WHATS_NEW.includes(v)) throw new Error(`--revo-patterns needs on or off (got ${v ?? 'nothing'})`);
       opts.revoPatterns = v;
     }
+    else if (a === '--revo-recite') {
+      const v = argv[++i];
+      if (!WHATS_NEW.includes(v)) throw new Error(`--revo-recite needs on or off (got ${v ?? 'nothing'})`);
+      opts.revoRecite = v;
+    }
     else if (a === '--early-access') {
       const v = argv[++i];
       if (!WHATS_NEW.includes(v)) throw new Error(`--early-access needs on or off (got ${v ?? 'nothing'})`);
@@ -151,7 +163,7 @@ async function main() {
   } catch (err) {
     console.error(err.message);
     console.error(
-      'Usage: node scripts/set-app-config.js --show | [--min-ios V] [--min-android V] [--latest-android V [--latest-android-code N]] [--clear-min] [--revo testers|everyone|off] [--revo-patterns on|off] [--whats-new on|off] [--recite-check on|off] [--early-access on|off] [--force]',
+      'Usage: node scripts/set-app-config.js --show | [--min-ios V] [--min-android V] [--latest-android V [--latest-android-code N]] [--clear-min] [--revo testers|everyone|off] [--revo-patterns on|off] [--revo-recite on|off] [--whats-new on|off] [--recite-check on|off] [--early-access on|off] [--force]',
     );
     process.exit(1);
   }
@@ -177,6 +189,7 @@ async function main() {
           testing: testing ? { android: { version: testing.version, code: testing.code } } : {},
           revo: REVO.includes(data.revo) ? data.revo : 'testers (unset)',
           revoPatterns: data.revoPatterns === true ? 'on' : 'off',
+          revoRecite: data.revoRecite === true ? 'on' : 'off',
           whatsNew: data.whatsNewOff === true ? 'off' : 'on',
           reciteCheck: data.reciteCheckOff === true ? 'off' : 'on',
           earlyAccess: data.earlyAccess === true ? 'on' : 'off',
@@ -187,7 +200,7 @@ async function main() {
     );
     console.log(`App Store has ${store ?? 'unknown'}.`);
   };
-  const changes = opts.minIos || opts.minAndroid || opts.latestAndroid || opts.clearMin || opts.revo || opts.revoPatterns || opts.whatsNew
+  const changes = opts.minIos || opts.minAndroid || opts.latestAndroid || opts.clearMin || opts.revo || opts.revoPatterns || opts.revoRecite || opts.whatsNew
     || opts.reciteCheck || opts.earlyAccess;
   if (opts.show || !changes) {
     show(current);
@@ -222,6 +235,7 @@ async function main() {
   }
   if (opts.revo) update.revo = opts.revo;
   if (opts.revoPatterns) update.revoPatterns = opts.revoPatterns === 'on' ? true : FieldValue.delete();
+  if (opts.revoRecite) update.revoRecite = opts.revoRecite === 'on' ? true : FieldValue.delete();
   if (opts.whatsNew) update.whatsNewOff = opts.whatsNew === 'off' ? true : FieldValue.delete();
   if (opts.reciteCheck) update.reciteCheckOff = opts.reciteCheck === 'off' ? true : FieldValue.delete();
   if (opts.earlyAccess) update.earlyAccess = opts.earlyAccess === 'on';
