@@ -66,10 +66,10 @@ export function injectAccountNav(html: string): string {
   return out.replace('</body>', `${scripts}</body>`);
 }
 
-/** An HTML page from the assets, with the account navigation added; anything else as it was. */
-export async function withAccountNav(res: Response): Promise<Response> {
+/** An HTML page from the assets, changed by `change` (the account navigation, the Recite section); anything else as it was. */
+export async function withPageChange(res: Response, change: (html: string) => string): Promise<Response> {
   if (res.status !== 200 || !(res.headers.get('Content-Type') ?? '').includes('text/html')) return res;
-  const out = new Response(injectAccountNav(await res.text()), res);
+  const out = new Response(change(await res.text()), res);
   out.headers.delete('Content-Length');
   out.headers.delete('ETag');
   return out;

@@ -233,8 +233,18 @@ until its part is set up.
     `develop`. After a site PR merges into `main`, merge `main` back into `develop` (or send site work
     through `develop`); dev had drifted a whole redesign behind until Nov 14 2026.
   - **Which branch a Worker change goes to:** a dev-only change (behind a var only `wrangler.dev.jsonc`
-    sets, like `DEV_GATE` or `ACCOUNT_PAGES`) goes through `develop` and reaches `main` with the next
+    sets, like `DEV_GATE`, `ACCOUNT_PAGES` or `RECITE_SECTION`) goes through `develop` and reaches `main` with the next
     release, switched off there. Only a change meant for revisely.app goes to `main` first.
+  - **The home's Recite section** (mistake detection: Recite, Mark mistakes, Recite the mistakes again, Test me,
+    Premium's early access; Nov 17 2026), on dev only until the release:
+    - `RECITE_SECTION` "1" (`wrangler.dev.jsonc` only) makes the worker add `recite-on` to the home's `<body>`
+      (`worker/recite.ts`). `site.css` hides everything marked `data-when="RECITE_SECTION"` (the section and its
+      header link) without it.
+    - revisely.app serves its home straight from the assets, so the var can't turn it on there. **At the release** the
+      line is `<body class="home recite-on">` in `docs/index.html`, with `RELEASED` in
+      `worker/__tests__/reciteSection.test.ts` (which also fails if `wrangler.jsonc` ever sets the var).
+    - Its screens are Revisely Dev's own, from E2E flow 18 (`scripts/site-clips/recite.py`, README there).
+    - Premium's line is a placeholder until Website & Open Door gives the early-access wording.
   - Its API accepts only the dev project's sign-ins.
   - **No Clear Quran key.** The Clear Quran's portal allows one active Production key per product
     ("duplicate key … api_keys_active_developer_account_id_product_environment"), and revisely.app holds

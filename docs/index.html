@@ -56,6 +56,7 @@
         </picture>
       </a>
       <nav class="site-nav" aria-label="Main">
+        <a class="hide-sm" href="#recite" data-when="RECITE_SECTION" data-t="h.nav.recite">Recite</a>
         <a href="#revo">Revo</a>
         <a class="hide-sm" href="/support/" data-t="nav.support">Support</a>
         <a class="pill" href="https://apps.apple.com/app/revisely/id6767990248" data-t="nav.download">Download</a>
@@ -248,6 +249,74 @@
         <div class="dots" role="group" aria-label="Choose a slide" data-t-aria="h.dots"></div>
         <button class="ctl next" type="button" aria-label="Next slide" data-t-aria="h.next"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
         <button class="ctl toggle" type="button" aria-label="Pause the slideshow"><svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg><svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5v14l11-7z"/></svg></button>
+      </div>
+    </section>
+
+    <!-- Recite and Mark mistakes (mistake detection): on dev.revisely.app only until the release. site.css hides
+         everything marked data-when="RECITE_SECTION" unless <body> has the class recite-on, which the worker adds
+         where RECITE_SECTION is "1" (wrangler.dev.jsonc). revisely.app serves this page straight from the assets, so
+         at the release the one line is <body class="home recite-on"> below (worker/__tests__/reciteSection.test.ts).
+         The screens are Revisely Dev's own (E2E flow 18; scripts/site-clips/recite.py). -->
+    <section class="recite" id="recite" aria-labelledby="recite-title" data-when="RECITE_SECTION">
+      <div class="wrap">
+        <div class="recite-head">
+          <span class="kicker" data-t="h.rc.kicker">Recite</span>
+          <h2 id="recite-title" class="title" data-t="h.rc.title">Recite from memory, and see where you slipped.</h2>
+          <p class="line" data-t="h.rc.line">Tap the mic in the reader and recite. Revisely listens and follows you on the page, and with Mark mistakes on, it highlights each mistake as you go.</p>
+        </div>
+        <ol class="steps">
+          <li class="step">
+            <div class="screen">
+              <picture>
+                <source srcset="/assets/img/recite/follow-dark.webp" media="(prefers-color-scheme: dark)">
+                <img src="/assets/img/recite/follow-light.webp" width="600" height="1304" loading="lazy" decoding="async"
+                  data-t-alt="h.rc.s1.alt"
+                  alt="The mushaf at An-Naml, ayah 23, during a take: a band on the line being recited, the word just heard in the bar below, and the score, 100%.">
+              </picture>
+            </div>
+            <h3 data-t="h.rc.s1.title">The page follows you</h3>
+            <p data-t="h.rc.s1.p">Start anywhere on the page. Revisely finds your place and follows along as you recite.</p>
+          </li>
+          <li class="step">
+            <div class="screen">
+              <picture>
+                <source srcset="/assets/img/recite/marks-dark.webp" media="(prefers-color-scheme: dark)">
+                <img src="/assets/img/recite/marks-light.webp" width="600" height="1304" loading="lazy" decoding="async"
+                  data-t-alt="h.rc.s2.alt"
+                  alt="An-Naml, ayah 23, with two marks: a wrong word in red and a haraka slip in amber. The wrong word’s card shows the word expected above the word heard, with Hear it, Similar phrases and Not a mistake.">
+              </picture>
+            </div>
+            <h3 data-t="h.rc.s2.title">Every mistake, explained</h3>
+            <p data-t="h.rc.s2.p">A word said wrong, skipped or added is marked in red, a slip in its harakat or letters in amber. Tap one to see what was expected beside what was heard, and hear the ayah.</p>
+          </li>
+          <li class="step">
+            <div class="screen">
+              <picture>
+                <source srcset="/assets/img/recite/again-dark.webp" media="(prefers-color-scheme: dark)">
+                <img src="/assets/img/recite/again-light.webp" width="600" height="1304" loading="lazy" decoding="async"
+                  data-t-alt="h.rc.s3.alt"
+                  alt="After the take, the wrong word in An-Naml, ayah 23, is still marked on the page, lighter. Its card shows the take where it went wrong and says: Say it right on 2 different days to clear it.">
+              </picture>
+            </div>
+            <h3 data-t="h.rc.s3.title">Until it sticks</h3>
+            <p data-t="h.rc.s3.p">Recite the mistakes again goes over just those ayahs. A mistake stays on the page, lighter, until you’ve said it right on two different days.</p>
+          </li>
+          <li class="step">
+            <div class="screen">
+              <picture>
+                <source srcset="/assets/img/recite/test-dark.webp" media="(prefers-color-scheme: dark)">
+                <img src="/assets/img/recite/test-light.webp" width="600" height="1304" loading="lazy" decoding="async"
+                  data-t-alt="h.rc.s4.alt"
+                  alt="Test me in An-Naml: the page is hidden but for the ayahs just recited from memory, and the place is marked Clean, with the next place a tap away.">
+              </picture>
+            </div>
+            <h3 data-t="h.rc.s4.title">Test me</h3>
+            <p data-t="h.rc.s4.p">Up to five places at random in what you’ve memorized, or in one juz. The page hides all but an ayah’s first two words, and you carry on from there.</p>
+          </li>
+        </ol>
+        <!-- PLACEHOLDER until Website & Open Door sends Premium's early-access wording (it owns Premium's words). -->
+        <p class="recite-premium" data-t="h.rc.premium">Following along is free. Mark mistakes and Test me are part of Premium, and while Revisely is in early access, Premium is free for everyone. Everyone who has it keeps it for good.</p>
+        <p class="note" data-t="h.rc.note">The checking is AI, so it can be wrong. A word it couldn’t hear clearly is marked Not clear, never as a mistake, and Not a mistake takes a mark off.</p>
       </div>
     </section>
 

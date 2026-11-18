@@ -101,6 +101,27 @@ a visitor with Reduce Motion sees until they press play; the end card would show
 Later as buttons that do nothing on a web page. Update the picture's `alt` in `docs/index.html` if
 the moment changes.
 
+## Recite (dev.revisely.app until the release)
+
+The Recite section (mistake detection) shows four phones: the page following a take, a mark's card, a remembered
+mistake after the take, and Test me (`docs/assets/img/recite/`, light and dark). They are Revisely Dev's own screens
+from E2E flow `18-recite-live` on iOS (An-Naml 23–24 from the E2E build's recorded take), not the demo account. The
+light set is any run's; the dark set needs the same flow with the phone in dark from the start (a throwaway branch
+whose flow switches to Dark after its first relaunch, run by hand: `gh workflow run e2e.yml --ref <branch>
+-f platform=ios -f flows='18-*'`). Then:
+
+```bash
+gh run download <light run> -p 'e2e-ios-screens-*' -D /tmp/light
+gh run download <dark run> -p 'e2e-ios-screens-*' -D /tmp/dark
+python3 scripts/site-clips/recite.py \
+  --light "$(find /tmp/light -type d -name takeScreenshot)" --dark "$(find /tmp/dark -type d -name takeScreenshot)"
+```
+
+It writes 600×1304 WebPs, with the slideshow's 9:41 status bar in place of the test clock's and the E2E build's
+clock line painted out. The section's first set came from runs 43997254931 (light) and 44219247050 (dark), Nov 17
+2026. If the screens change in the app, update the pictures' `alt` in `docs/index.html` and Arabic in
+`strings-site.js`.
+
 ## Share image
 
 `python3 scripts/site-clips/stills.py` puts the App Store Home screenshot
