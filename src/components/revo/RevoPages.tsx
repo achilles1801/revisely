@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Linking, ScrollView, StyleSheet, Switch, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Switch, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { useHaptics } from '../../design/haptics';
 import { revoBackend } from '../../lib/revo/backend';
 import { historyLine, historySections } from '../../lib/revo/history';
 import type { RevoChat, RevoMemoryItem, RevoSettings } from '../../lib/revo/types';
+import { openWebPage } from '../../lib/openWebPage';
 import { PillButton } from '../v2/PillButton';
 import { Tap } from '../v2/Tap';
 import { RevoMark } from './RevoMark';
@@ -257,7 +258,7 @@ export function RevoOptIn({
         </Tap>
         <Text style={[styles.fine, { color: palette.secondary }]}>
           Revo AI can make mistakes.{' '}
-          <Text style={{ color: palette.link }} onPress={() => void Linking.openURL(REVO_PRIVACY_URL)} accessibilityRole="link">
+          <Text style={{ color: palette.link }} onPress={() => void openWebPage(REVO_PRIVACY_URL)} accessibilityRole="link">
             How your data is used
           </Text>
         </Text>
