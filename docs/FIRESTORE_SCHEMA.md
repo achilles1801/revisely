@@ -19,8 +19,12 @@ firestore/
 │       │   └── {pageNumber}/        # Individual page progress (604 docs)
 │       └── sessions/
 │           └── {date}/              # Daily revision sessions
-└── config/
-    └── app                          # Supported and latest app versions (read by every install)
+├── config/
+│   └── app                          # Supported and latest app versions (read by every install)
+├── entitlements/{userId}            # Revisely Premium: what the account has, and from where
+├── supportApplications/{userId}     # The support program: one application per account
+├── supportCodes/{sha256}            # One-time links from the app to the program page (functions only)
+└── supportLimits/{userId}           # Links and applications per day (functions only)
 ```
 
 ## Document Schemas
@@ -285,6 +289,62 @@ interface FirestoreAppConfig {
 
 The App Store's version comes from Apple's public lookup instead. TestFlight and
 App Review installs ignore the document.
+
+### 8. Entitlements Document (Revisely Premium)
+
+**Path:** `entitlements/{userId}`
+
+Written only by the admin SDK (functions/src/support: the review script, the Dev
+app's Get Check, later purchases, gifts and family plans). The owner may get and
+listen to it. Readers (the app, the recitation checker) read `premium` only: has
+Premium = `premium` exists and `until` is null or later than now.
+
+```typescript
+type Source = 'support' | 'dev' | 'purchase' | 'gift' | 'family';
+interface Grant {
+  source: Source;
+  grantedAt: Timestamp;
+  until: Timestamp | null;              // null: no end date
+  store?: 'app_store' | 'play' | 'web'; // purchase only
+  productId?: string;                   // purchase only
+}
+interface FirestoreEntitlements {
+  premium: Grant | null;                // the grant in `grants` that lasts longest
+  grants: Partial<Record<Source, Grant>>;
+}
+```
+
+### 9. Support Application Document
+
+**Path:** `supportApplications/{userId}`
+
+The support program (free Premium for anyone who can't pay). Written only by the
+`supportApplication` function, after checking the answers; decided with
+`functions/scripts/support-applications.js`. A decision deletes `answers`, so only
+the outcome stays. The owner may get it. Account deletion deletes it, with the
+entitlements, codes and limits.
+
+```typescript
+interface FirestoreSupportApplication {
+  uid: string;
+  status: 'pending' | 'approved' | 'declined';
+  createdAt: Timestamp;
+  decidedAt: Timestamp | null;
+  applyAgainFrom: Timestamp | null;     // declined: 30 days on
+  count: number;                        // applications this account has made
+  via: 'app' | 'web';
+  answers?: {                           // until decided
+    cantAfford: boolean;
+    noPayment: boolean;                 // at least one of the two is true
+    heard?: 'store' | 'friend' | 'teacher' | 'social' | 'other';
+    country?: string;                   // ISO 3166-1 alpha-2
+    memorizing?: 'yes' | 'revising' | 'not_yet';
+    amount?: 'lt1' | '1to5' | '6to10' | '11to20' | '21to29' | 'all';
+    teacher?: boolean;
+    note?: string;                      // at most 1,000 characters
+  };
+}
+```
 
 ## Query Patterns
 
