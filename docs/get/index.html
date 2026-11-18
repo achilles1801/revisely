@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Get Revisely</title>
+  <meta name="description" content="Revisely, Quran revision on a schedule. Free on the App Store.">
+  <meta name="robots" content="noindex">
+  <link rel="canonical" href="https://revisely.app/">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Revisely">
+  <meta property="og:url" content="https://revisely.app/get/">
+  <meta property="og:title" content="Get Revisely">
+  <meta property="og:description" content="Quran revision on a schedule. Free on the App Store.">
+  <meta property="og:image" content="https://revisely.app/assets/img/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="/favicon.ico" sizes="48x48">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="stylesheet" href="/assets/site.css">
+  <script>
+    /*
+     * The link in Revisely's social bios: revisely.app/get?s=ig (tt, yt, x, th, fb), or ?c=<campaign> for a
+     * creator's own link. iPhones go straight to the App Store, Android to Google Play once it's live there;
+     * anything else stays on this page. Nothing is stored, sent or logged: the source only becomes the App Store
+     * campaign token (ct) and Play's utm_source, which Apple and Google count for us.
+     */
+    (function () {
+      // The App Store provider token: App Store Connect → Apps → Revisely → Analytics → Acquisition → Campaigns →
+      // Generate campaign link (the pt= number). Public, the same for every campaign. Empty: plain links, no ct.
+      var PT = '';
+      // Google Play production: set to true once Revisely is live there for everyone.
+      var PLAY_LIVE = false;
+
+      var SOURCES = { ig: 'instagram', tt: 'tiktok', yt: 'youtube', x: 'x', th: 'threads', fb: 'facebook' };
+      var q = new URLSearchParams(location.search);
+      var s = (q.get('s') || '').toLowerCase();
+      var c = (q.get('c') || '').toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 30);
+      var source = SOURCES[s] || (c ? 'creator' : 'web');
+      var campaign = c || (SOURCES[s] ? s + '_bio' : 'web_get');
+
+      var appStore = 'https://apps.apple.com/app/revisely/id6767990248';
+      if (PT) {
+        appStore = 'https://apps.apple.com/app/apple-store/id6767990248?pt=' + encodeURIComponent(PT) +
+          '&ct=' + encodeURIComponent(campaign) + '&mt=8';
+      }
+      var play = 'https://play.google.com/store/apps/details?id=com.revisionbuddy.app&referrer=' +
+        encodeURIComponent('utm_source=' + source + '&utm_medium=social&utm_campaign=' + campaign);
+
+      var ua = navigator.userAgent || '';
+      var ios = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      var android = /Android/.test(ua);
+      if (ios) {
+        location.replace(appStore);
+      } else if (android && PLAY_LIVE) {
+        location.replace(play);
+      }
+      window.REVISELY_GET = { appStore: appStore, play: play, playLive: PLAY_LIVE, android: android };
+    })();
+  </script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="/" aria-label="Revisely, home">
+        <picture>
+          <source srcset="/assets/img/logo-dark.svg" media="(prefers-color-scheme: dark)">
+          <img src="/assets/img/logo-light.svg" width="108" height="32" alt="">
+        </picture>
+      </a>
+      <nav class="site-nav" aria-label="Main">
+        <a class="hide-sm" href="/#features">Features</a>
+        <a class="hide-sm" href="/support/">Support</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="cta" aria-labelledby="get-title" style="border-top: 0">
+      <div class="wrap">
+        <img class="icon" src="/apple-touch-icon.png" width="72" height="72" alt="">
+        <h1 id="get-title" class="title">Revisely</h1>
+        <p class="lede" style="margin: 8px auto 0; max-width: 32rem">Quran revision on a schedule. Keep what you’ve memorized fresh, a few pages a day.</p>
+        <div class="get">
+          <a class="badge-link" id="app-store" href="https://apps.apple.com/app/revisely/id6767990248">
+            <img class="badge-light" src="https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/black/en-us" width="156" height="52" alt="Download on the App Store">
+            <img class="badge-dark" src="https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/white/en-us" width="156" height="52" alt="Download on the App Store">
+          </a>
+          <p class="android" id="android"><strong>Android</strong> coming soon to Google Play</p>
+          <p class="android"><a href="/">What is Revisely?</a></p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <p>© 2026 Majd Khawaldeh</p>
+      <nav aria-label="Footer">
+        <a href="/privacy/">Privacy</a>
+        <a href="/terms/">Terms</a>
+        <a href="/support/">Support</a>
+        <a href="mailto:support@revisely.app">support@revisely.app</a>
+      </nav>
+    </div>
+  </footer>
+
+  <script>
+    (function () {
+      var g = window.REVISELY_GET;
+      if (!g) return;
+      document.getElementById('app-store').href = g.appStore;
+      if (g.playLive) {
+        var a = document.createElement('a');
+        a.href = g.play;
+        a.innerHTML = '<strong>Android</strong> on Google Play';
+        var p = document.getElementById('android');
+        p.textContent = '';
+        p.appendChild(a);
+      }
+    })();
+  </script>
+</body>
+</html>

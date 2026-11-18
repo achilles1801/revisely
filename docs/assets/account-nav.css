@@ -1,0 +1,41 @@
+/*
+ * The header's account button and the phone menu: the account, Premium and Open Door pages, and on dev.revisely.app every
+ * page (the worker adds this file, the links and the script where ACCOUNT_PAGES is "1"; revisely.app never gets them).
+ */
+:root { --outline: #d1d5db; }
+@media (prefers-color-scheme: dark) { :root { --outline: #333333; } }
+[hidden] { display: none !important; }
+
+.site-header .wrap { position: relative; }
+.site-nav .lang { background: none; border: 0; padding: 0; color: var(--secondary); font: inherit; font-size: 15px; cursor: pointer; }
+html[dir="rtl"] .site-nav .lang { font-family: var(--font); }
+.site-nav .lang:hover { color: var(--text); }
+
+/* The account: an icon signed out, the initial signed in. Phones get it in the menu instead. */
+.site-nav .acct-btn {
+  width: 32px; height: 32px; border-radius: 50%; flex: none; display: none; place-items: center;
+  color: var(--text); box-shadow: inset 0 0 0 1px var(--outline); text-decoration: none;
+}
+.site-nav .acct-btn svg { width: 19px; height: 19px; }
+.site-nav .acct-btn.avatar { box-shadow: none; background: var(--accent-subtle); color: var(--accent); font-weight: 700; font-size: 14px; }
+@media (min-width: 640px) { .site-nav .acct-btn { display: grid; } }
+
+.menu-btn { width: 32px; height: 32px; display: grid; place-items: center; background: none; border: 0; padding: 0; color: var(--text); cursor: pointer; flex: none; }
+.menu-btn svg { width: 22px; height: 22px; }
+@media (min-width: 640px) { .menu-btn { display: none; } }
+@media (max-width: 639px) { .site-nav { gap: 14px; } }
+@media (max-width: 380px) { .site-nav .pill { padding: 0 13px; } }
+
+.menu-panel {
+  position: absolute; top: 56px; inset-inline-end: var(--gutter); z-index: 6; min-width: 230px;
+  padding: 8px; border-radius: 16px; background: var(--bg); border: 0.5px solid var(--separator);
+  box-shadow: 0 16px 40px -12px rgba(0, 0, 0, .28);
+}
+.menu-panel a, .menu-panel button {
+  display: block; width: 100%; padding: 11px 12px; border-radius: 10px; border: 0; background: none;
+  color: var(--text); text-decoration: none; font: inherit; font-size: 16px; text-align: start; cursor: pointer;
+}
+.menu-panel a:hover, .menu-panel button:hover { background: var(--fill); color: var(--text); }
+.menu-panel .menu-who { color: var(--secondary); font-size: 14px; padding: 6px 12px 2px; overflow-wrap: anywhere; }
+.menu-panel hr { border: 0; border-top: 0.5px solid var(--separator); margin: 6px 4px; }
+@media (min-width: 640px) { .menu-panel { display: none !important; } }

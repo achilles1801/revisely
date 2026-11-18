@@ -615,6 +615,126 @@ describe('routing', () => {
   });
 });
 
+describe('the account, Premium and Open Door pages', () => {
+  const assets = { fetch: jest.fn(async (r: Request) => new Response(new URL(r.url).pathname)) };
+
+  it('answer 404 on revisely.app until ACCOUNT_PAGES is set there', async () => {
+    const c = ctx();
+    for (const path of ['/apply/', '/apply', '/premium/', '/account/', '/account/x']) {
+      const res = await worker.fetch(new Request(`https://revisely.app${path}`), { ...ENV, ASSETS: assets }, c);
+      expect(res.status).toBe(404);
+    }
+    const other = await worker.fetch(new Request('https://revisely.app/applications-and-more/'), { ...ENV, ASSETS: assets }, c);
+    expect(await other.text()).toBe('/applications-and-more/');
+  });
+
+  it('are served where ACCOUNT_PAGES is "1" (dev.revisely.app)', async () => {
+    const dev = { ...ENV, ASSETS: assets, NOINDEX: '1', ACCOUNT_PAGES: '1' };
+    const res = await worker.fetch(new Request('https://dev.revisely.app/apply/'), dev, ctx());
+    expect(await res.text()).toBe('/apply/');
+    expect(res.headers.get('X-Robots-Tag')).toBe('noindex, nofollow');
+  });
+
+  it("serve the project's web config from its Hosting site, and nothing without one", async () => {
+    const fetchMock = jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"projectId":"revisely-dev"}'));
+    const dev = { ...ENV, ASSETS: assets, ACCOUNT_PAGES: '1', FIREBASE_HOSTING: 'revisely-dev.web.app' };
+    const res = await worker.fetch(new Request('https://dev.revisely.app/__/firebase/init.json'), dev, ctx());
+    expect(await res.json()).toEqual({ projectId: 'revisely-dev' });
+    expect(fetchMock.mock.calls[0][0]).toBe('https://revisely-dev.web.app/__/firebase/init.json');
+    const none = await worker.fetch(new Request('https://revisely.app/__/firebase/init.json'), { ...ENV, ASSETS: assets }, ctx());
+    expect(none.status).toBe(404);
+  });
+});
+
+describe("the site's navigation on dev: the account, Premium and Open Door pages", () => {
+  // The real pages: production's home, and the Open Door page (which has the navigation in its own markup).
+  const fs = jest.requireActual('fs') as typeof import('fs');
+  const path = jest.requireActual('path') as typeof import('path');
+  const page = (p: string) => fs.readFileSync(path.join(__dirname, '../../docs', p), 'utf8');
+  const html = (body: string) => ({ fetch: jest.fn(async () => new Response(body, { headers: { 'Content-Type': 'text/html; charset=utf-8', ETag: '"x"' } })) });
+
+  it('revisely.app: the pages come through untouched, with no link to a page that answers 404 there', async () => {
+    const home = page('index.html');
+    const res = await worker.fetch(new Request('https://revisely.app/'), { ...ENV, ASSETS: html(home) }, ctx());
+    const body = await res.text();
+    expect(body).toBe(home);
+    for (const link of ['/premium/', '/apply/', '/account/', 'account-nav']) expect(body).not.toContain(link);
+  });
+
+  it('dev: the home gets Premium, Open Door and the account in its header, menu and footer', async () => {
+    const res = await worker.fetch(new Request('https://dev.revisely.app/'), { ...ENV, ASSETS: html(page('index.html')), NOINDEX: '1', ACCOUNT_PAGES: '1' }, ctx());
+    const body = await res.text();
+    const header = body.slice(body.indexOf('<nav class="site-nav"'), body.indexOf('data-menu-panel'));
+    expect(header).toContain('href="/premium/"');
+    expect(header).toContain('href="/apply/"');
+    expect(header).toContain('data-account-btn');
+    expect(header.indexOf('data-account-btn')).toBeLessThan(header.indexOf('class="pill"'));
+    expect(body).toContain('data-menu-panel hidden');
+    const footer = body.slice(body.indexOf('<nav aria-label="Footer"'));
+    for (const link of ['/premium/', '/apply/', '/account/']) expect(footer).toContain(`href="${link}"`);
+    expect(body).toContain('/assets/account-nav.css');
+    expect(body).toContain('<script type="module" src="/assets/account-nav.js">');
+    expect(res.headers.get('ETag')).toBeNull();
+  });
+
+  it('dev: the home and Support get Arabic: the switch, the language before the first paint, its words and styles', async () => {
+    for (const p of ['index.html', 'support/index.html']) {
+      const res = await worker.fetch(new Request('https://dev.revisely.app/'), { ...ENV, ASSETS: html(page(p)), NOINDEX: '1', ACCOUNT_PAGES: '1' }, ctx());
+      const body = await res.text();
+      const head = body.slice(0, body.indexOf('</head>'));
+      expect(head).toContain("d.dir = l === 'ar' ? 'rtl' : 'ltr'");
+      expect(head).toContain('/assets/site-rtl.css');
+      const header = body.slice(body.indexOf('<nav class="site-nav"'), body.indexOf('data-menu-panel'));
+      expect(header).toContain('data-lang-switch');
+      expect(header.indexOf('data-lang-switch')).toBeLessThan(header.indexOf('data-account-btn'));
+      // strings-site.js after strings.js and before site-i18n.js, which reads both.
+      const order = ['/assets/strings.js', '/assets/strings-site.js', '/assets/site-i18n.js'].map((s) => body.indexOf(s));
+      expect(order.every((i) => i > 0)).toBe(true);
+      expect(order).toEqual([...order].sort((a, b) => a - b));
+    }
+  });
+
+  it("dev: the pages with no Arabic yet (privacy, terms, donate) get the switch, and their Download pill its key", async () => {
+    for (const p of ['privacy/index.html', 'terms/index.html', 'donate/index.html']) {
+      const res = await worker.fetch(new Request('https://dev.revisely.app/'), { ...ENV, ASSETS: html(page(p)), NOINDEX: '1', ACCOUNT_PAGES: '1' }, ctx());
+      const body = await res.text();
+      const header = body.slice(body.indexOf('<nav class="site-nav"'), body.indexOf('data-menu-panel'));
+      expect([p, header]).toEqual([p, expect.stringContaining('data-t="nav.download">Download</a>')]);
+      expect(body).toContain('/assets/site-i18n.js');
+    }
+    // The home already carries the key: it isn't added twice.
+    const res = await worker.fetch(new Request('https://dev.revisely.app/'), { ...ENV, ASSETS: html(page('index.html')), NOINDEX: '1', ACCOUNT_PAGES: '1' }, ctx());
+    expect((await res.text()).match(/data-t="nav.download"/g)).toHaveLength(1);
+  });
+
+  it('revisely.app: Support comes through untouched too, with no Arabic switch or script', async () => {
+    const support = page('support/index.html');
+    const res = await worker.fetch(new Request('https://revisely.app/support/'), { ...ENV, ASSETS: html(support) }, ctx());
+    const body = await res.text();
+    expect(body).toBe(support);
+    for (const s of ['data-lang-switch', 'strings-site.js', 'site-i18n.js', 'site-rtl.css']) expect(body).not.toContain(s);
+  });
+
+  it('dev: a page is always fetched whole, so a copy cached before the navigation never answers (no 304)', async () => {
+    const assets = html(page('index.html'));
+    const req = new Request('https://dev.revisely.app/', { headers: { Accept: 'text/html', 'If-None-Match': '"x"', 'If-Modified-Since': 'Sat, 14 Nov 2026 00:00:00 GMT' } });
+    await worker.fetch(req, { ...ENV, ASSETS: assets, ACCOUNT_PAGES: '1' }, ctx());
+    const asked = assets.fetch.mock.calls[0][0] as unknown as Request;
+    expect(asked.headers.get('If-None-Match')).toBeNull();
+    expect(asked.headers.get('If-Modified-Since')).toBeNull();
+  });
+
+  it('dev: the account, Premium and Open Door pages keep their own navigation; other files pass through', async () => {
+    const apply = page('apply/index.html');
+    const env = { ...ENV, ACCOUNT_PAGES: '1' };
+    const res = await worker.fetch(new Request('https://dev.revisely.app/apply/'), { ...env, ASSETS: html(apply) }, ctx());
+    expect(await res.text()).toBe(apply);
+    const css = { fetch: jest.fn(async () => new Response('a{}', { headers: { 'Content-Type': 'text/css' } })) };
+    const res2 = await worker.fetch(new Request('https://dev.revisely.app/assets/site.css'), { ...env, ASSETS: css }, ctx());
+    expect(await res2.text()).toBe('a{}');
+  });
+});
+
 describe('sign-in: odd tokens are refused with 401, never a server error', () => {
   const enc = (o: unknown) => b64url(JSON.stringify(o));
   it.each([

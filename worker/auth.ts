@@ -22,11 +22,14 @@ export class AuthError extends Error {}
 
 let keys: { byKid: Map<string, CryptoKey>; expires: number } | null = null;
 let lastFetch = -Infinity;
+/** The fetch of Google's keys under way, which every check that needs them waits for. */
+let inflight: Promise<void> | null = null;
 
 /** For tests: forget the cached keys. */
 export function resetKeyCache(): void {
   keys = null;
   lastFetch = -Infinity;
+  inflight = null;
 }
 
 async function fetchKeys(now: number, fetchImpl: typeof fetch): Promise<void> {
@@ -58,13 +61,22 @@ async function signingKey(kid: string, now: number, fetchImpl: typeof fetch): Pr
   // Google rotates keys: an unknown kid refetches too. Either way at most once a
   // minute, so tokens with made-up kids can't make every request fetch.
   const wanted = stale || !keys!.byKid.has(kid);
-  if (wanted && now - lastFetch >= REFETCH_AFTER) {
-    try {
-      await fetchKeys(now, fetchImpl);
-    } catch (err) {
-      // Keep using the keys we have (Google publishes them well ahead of use).
-      if (!keys) throw err;
-      console.warn('auth: could not refresh Google keys; using the previous ones', err);
+  if (wanted) {
+    // Many requests at once on a new isolate (a page's files, right after the dev site's gate lets someone in):
+    // one fetches the keys and the others wait for it. Before, they found no keys yet and failed with a 500.
+    if (!inflight && now - lastFetch >= REFETCH_AFTER) {
+      inflight = fetchKeys(now, fetchImpl).finally(() => {
+        inflight = null;
+      });
+    }
+    if (inflight) {
+      try {
+        await inflight;
+      } catch (err) {
+        // Keep using the keys we have (Google publishes them well ahead of use).
+        if (!keys) throw err;
+        console.warn('auth: could not refresh Google keys; using the previous ones', err);
+      }
     }
   }
   if (!keys) throw new Error('Google keys: unavailable');
@@ -109,6 +121,16 @@ export async function verifyIdToken(
   now: number = Math.floor(Date.now() / 1000),
   fetchImpl: typeof fetch = fetch,
 ): Promise<string> {
+  return (await verifyIdTokenClaims(token, projectId, now, fetchImpl)).sub;
+}
+
+/** As verifyIdToken, with the token's claims too (custom claims, email, exp). */
+export async function verifyIdTokenClaims(
+  token: string,
+  projectId: string,
+  now: number = Math.floor(Date.now() / 1000),
+  fetchImpl: typeof fetch = fetch,
+): Promise<{ sub: string; claims: Record<string, unknown> }> {
   const parts = token.split('.');
   if (parts.length !== 3 || parts.some((p) => p.length === 0)) throw new AuthError('Malformed token');
   const header = decodeObject(parts[0]);
@@ -133,5 +155,5 @@ export async function verifyIdToken(
   if (!(num('auth_time') <= now + SKEW)) throw new AuthError('Signed in in the future');
   const sub = claims.sub;
   if (typeof sub !== 'string' || sub.length === 0 || sub.length > 128) throw new AuthError('No user');
-  return sub;
+  return { sub, claims };
 }

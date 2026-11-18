@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Premium · Revisely</title>
+  <meta name="rv-title" content="p.title.doc">
+  <meta name="description" content="Revisely Premium is on its way. What’s free today stays free.">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="/favicon.ico" sizes="48x48">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="stylesheet" href="/assets/site.css">
+  <link rel="stylesheet" href="/assets/account.css">
+  <link rel="stylesheet" href="/assets/account-nav.css">
+  <script>
+    // The language before the first paint: ?lang=ar|en, else the switch's choice, else the browser's.
+    (function () {
+      var d = document.documentElement, l;
+      d.classList.remove('no-js');
+      try { l = localStorage.getItem('rv.lang'); } catch (e) {}
+      var q = /[?&]lang=(ar|en)\b/.exec(location.search);
+      if (q) { l = q[1]; try { localStorage.setItem('rv.lang', l); } catch (e) {} }
+      if (l !== 'ar' && l !== 'en') l = /^ar\b/i.test(navigator.language || '') ? 'ar' : 'en';
+      d.lang = l; d.dir = l === 'ar' ? 'rtl' : 'ltr';
+    })();
+  </script>
+</head>
+<body class="acct">
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="/" aria-label="Revisely, home">
+        <picture>
+          <source srcset="/assets/img/logo-dark.svg" media="(prefers-color-scheme: dark)">
+          <img src="/assets/img/logo-light.svg" width="108" height="32" alt="">
+        </picture>
+      </a>
+      <nav class="site-nav" aria-label="Main" data-acct-nav>
+        <a class="hide-sm" href="/premium/" data-t="nav.premium">Premium</a>
+        <a class="hide-sm" href="/apply/" data-t="nav.program">Open Door</a>
+        <button class="lang" type="button" data-lang-switch data-t="lang">عربي</button>
+        <a class="acct-btn" href="/account/" data-account-btn data-t-aria="nav.signin" aria-label="Sign in"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8.5" r="3.6"/><path d="M5 19.5c.9-3.3 3.6-5.1 7-5.1s6.1 1.8 7 5.1"/></svg></a>
+        <a class="pill" href="https://apps.apple.com/app/revisely/id6767990248" data-t="nav.download">Download</a>
+        <button class="menu-btn" type="button" data-menu aria-expanded="false" data-t-aria="nav.menu" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+      </nav>
+      <div class="menu-panel" data-menu-panel hidden>
+        <p class="menu-who latin" data-menu-who hidden></p>
+        <a href="/account/" data-menu-account data-t="nav.signin">Sign in</a>
+        <a href="/premium/" data-t="nav.premium">Premium</a>
+        <a href="/apply/" data-t="nav.program">Open Door</a>
+        <a href="/support/" data-t="nav.support">Support</a>
+        <hr data-menu-signout hidden>
+        <button type="button" data-menu-signout data-t="a.signout" hidden>Sign out</button>
+      </div>
+    </div>
+  </header>
+
+  <!--
+    Nothing is for sale: no prices, no buy buttons (Majd, Nov 14 2026). The split of Free and Premium is his.
+  -->
+  <main id="main">
+    <section class="page-hero">
+      <div class="wrap">
+        <span class="kicker" data-t="p.label">Revisely Premium</span>
+        <h1 data-t="p.title">Premium is on its way.</h1>
+        <p class="lede" data-t="p.lede"></p>
+      </div>
+    </section>
+
+    <section class="sec" style="border-top:0;padding-top:0">
+      <div class="wrap">
+        <div class="plans">
+          <div class="plan">
+            <div class="plan-head"><h2 data-t="p.free">Free</h2><span class="badge" data-t="p.freeBadge">Yours today</span></div>
+            <p class="desc" data-t="p.freeDesc"></p>
+            <ul><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.25 4.25L19 7"/></svg><span data-t="p.f1"></span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.25 4.25L19 7"/></svg><span data-t="p.f2"></span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.25 4.25L19 7"/></svg><span data-t="p.f3"></span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.25 4.25L19 7"/></svg><span data-t="p.f4"></span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.25 4.25L19 7"/></svg><span data-t="p.f5"></span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.25 4.25L19 7"/></svg><span data-t="p.f6"></span></li></ul>
+          </div>
+          <div class="plan premium">
+            <div class="plan-head"><h2 data-t="p.prem">Premium</h2><span class="badge accent" data-t="p.premBadge">Coming soon</span></div>
+            <p class="desc" data-t="p.premDesc"></p>
+            <p class="plus" data-t="p.plus"></p>
+            <ul><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.25 4.25L19 7"/></svg><span data-t="p.p1"></span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.25 4.25L19 7"/></svg><span data-t="p.p2"></span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.25 4.25L19 7"/></svg><span data-t="p.p3"></span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.25 4.25L19 7"/></svg><span data-t="p.p4"></span></li></ul>
+            <p class="note" data-t-html="p.note"></p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="sec">
+      <div class="wrap">
+        <h2 class="sec-title" data-t="p.cmpTitle">Free and Premium, side by side</h2>
+        <p class="sec-sub" data-t="p.cmpSub"></p>
+        <table class="compare">
+          <thead><tr><th><span class="visually-hidden">Feature</span></th><th class="c" data-t="p.colF">Free</th><th class="c" data-t="p.colP">Premium</th></tr></thead>
+          <tbody>
+            <tr class="grp"><th colspan="3" data-t="g.rev"></th></tr><tr><th scope="row" data-t="r.plan"></th><td class="c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.25 4.25L19 7"/></svg></td><td class="c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.25 4.25L19 7"/></svg></td></tr><tr><th scope="row" data-t="r.act"></th><td class="c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.25 4.25L19 7"/></svg></td><td class="c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.25 4.25L19 7"/></svg></td></tr><tr><th scope="row" data-t="r.jump"></th><td class="c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.25 4.25L19 7"/></svg></td><td class="c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.25 4.25L19 7"/></svg></td></tr>
+            <tr class="grp"><th colspan="3" data-t="g.mus"></th></tr><tr><th scope="row" data-t="r.prints"></th><td class="c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.25 4.25L19 7"/></svg></td><td class="c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.25 4.25L19 7"/></svg></td></tr><tr><th scope="row" data-t="r.off"></th><td class="c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.25 4.25L19 7"/></svg></td><td class="c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.25 4.25L19 7"/></svg></td></tr><tr><th scope="row" data-t="r.trans"></th><td class="c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.25 4.25L19 7"/></svg></td><td class="c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.25 4.25L19 7"/></svg></td></tr>
+            <tr class="grp"><th colspan="3" data-t="g.rec"></th></tr><tr><th scope="row" data-t="r.recite"></th><td class="c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.25 4.25L19 7"/></svg></td><td class="c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.25 4.25L19 7"/></svg></td></tr><tr><th scope="row" data-t="r.recs"></th><td class="c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.25 4.25L19 7"/></svg></td><td class="c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.25 4.25L19 7"/></svg></td></tr>
+            <tr class="grp"><th colspan="3" data-t="g.marks"></th></tr><tr><th scope="row" data-t="r.check"></th><td class="c dash" aria-label="–">–</td><td class="c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.25 4.25L19 7"/></svg></td></tr><tr><th scope="row" data-t="r.hara"></th><td class="c dash" aria-label="–">–</td><td class="c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.25 4.25L19 7"/></svg></td></tr><tr><th scope="row" data-t="r.taj"></th><td class="c dash" aria-label="–">–</td><td class="c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.25 4.25L19 7"/></svg></td></tr>
+            <tr class="grp"><th colspan="3" data-t="g.revo"></th></tr><tr><th scope="row" data-t="r.revoq"></th><td class="c soft" data-t="p.twenty">20</td><td class="c soft" data-t="p.more">More</td></tr><tr><th scope="row" data-t="r.revoDay"></th><td class="c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.25 4.25L19 7"/></svg></td><td class="c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.25 4.25L19 7"/></svg></td></tr>
+            <tr class="grp"><th colspan="3" data-t="g.more"></th></tr><tr><th scope="row" data-t="r.prayer"></th><td class="c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.25 4.25L19 7"/></svg></td><td class="c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.25 4.25L19 7"/></svg></td></tr><tr><th scope="row" data-t="r.widgets"></th><td class="c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.25 4.25L19 7"/></svg></td><td class="c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.25 4.25L19 7"/></svg></td></tr>
+          </tbody>
+        </table>
+        <div class="later"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="8.5" width="17" height="4" rx="1"/><path d="M5 12.5v7.5h14v-7.5M12 8.5V20M12 8.5c-1.5-3-5-3.5-5-1.25S10 8.5 12 8.5zm0 0c1.5-3 5-3.5 5-1.25S14 8.5 12 8.5z"/></svg></span><div><strong data-t="p.laterT">Family plans and gifts</strong><span data-t="p.later"></span></div></div>
+      </div>
+    </section>
+
+    <section class="sec get-app">
+      <div class="wrap">
+        <h2 class="sec-title" data-t="p.get">Get Revisely</h2>
+        <p class="sec-sub" data-t="p.getSub"></p>
+        <div class="stores">
+          <a class="badge-link" href="https://apps.apple.com/app/revisely/id6767990248">
+            <picture>
+              <source srcset="https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/white/en-us" media="(prefers-color-scheme: dark)">
+              <img src="https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/black/en-us" width="156" height="52" alt="Download on the App Store">
+            </picture>
+          </a>
+          <p class="soon"><small data-t="soon.small">Coming to</small> <b>Google Play</b></p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <p class="latin"><bdi>© 2026 Majd Khawaldeh</bdi></p>
+      <nav aria-label="Footer" data-acct-nav>
+        <a href="/premium/" data-t="nav.premium">Premium</a>
+        <a href="/account/" data-t="nav.account">Account</a>
+        <a href="/apply/" data-t="nav.program">Open Door</a>
+        <a href="/privacy/" data-t="foot.privacy">Privacy</a>
+        <a href="/terms/" data-t="foot.terms">Terms</a>
+        <a href="/support/" data-t="foot.support">Support</a>
+        <a class="latin" href="mailto:support@revisely.app">support@revisely.app</a>
+      </nav>
+    </div>
+  </footer>
+
+  <script src="/assets/strings.js"></script>
+  <script src="/assets/site-i18n.js"></script>
+  <script type="module" src="/assets/premium.js"></script>
+</body>
+</html>

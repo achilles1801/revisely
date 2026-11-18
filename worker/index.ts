@@ -1,18 +1,53 @@
 // The revisely worker: the public pages in /docs (privacy, terms) as static
-// assets, and a small API under /api/ for the app (wrangler.jsonc sends only
-// /api/* here; everything else is served from the assets without this code).
+// assets, and a small API under /api/ for the app (wrangler.jsonc sends /api/*,
+// the account, Premium and Open Door pages and /__/* here; everything else is
+// served from the assets without this code).
 // The same code runs as "revisely-dev" (dev.revisely.app, wrangler.dev.jsonc),
 // which sends every path here and sets NOINDEX.
 
 import { errorResponse, handleTcq, TcqEnv } from './tcq';
+import { gate, GateEnv } from './gate';
+import { injectAccountNav, withPageChange } from './nav';
+import { showReciteSection } from './recite';
 
 // The Durable Object class behind TCQ_BUDGET (wrangler.jsonc).
 export { TcqBudget } from './budget';
 
-interface Env extends TcqEnv {
+interface Env extends TcqEnv, GateEnv {
   ASSETS: Fetcher;
   /** "1" on the dev Worker only: search engines are asked to leave every page alone. */
   NOINDEX?: string;
+  /**
+   * "1" where the account, Premium and Open Door pages are open (dev.revisely.app for now). Elsewhere they answer
+   * 404, so they reach revisely.app only when Majd sets it there (wrangler.jsonc sends their paths here).
+   */
+  ACCOUNT_PAGES?: string;
+  /**
+   * "1" where the home shows its Recite section, mistake detection (dev.revisely.app until the release; recite.ts).
+   * revisely.app serves its home without the worker, so setting it there would do nothing: see recite.ts.
+   */
+  RECITE_SECTION?: string;
+  /**
+   * The Firebase Hosting site of the project the pages sign in to (revisely-dev.web.app on dev). Its
+   * /__/firebase/init.json is the web config, served here at the same path, so no key is kept in the repository.
+   */
+  FIREBASE_HOSTING?: string;
+}
+
+/** The pages behind ACCOUNT_PAGES. */
+const ACCOUNT_PAGE = /^\/(apply|premium|account)(\/|$)/;
+
+function notFound(): Response {
+  return new Response('Not found', { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+}
+
+/** The project's web config, from its Hosting site (an hour at the edge). */
+async function firebaseConfig(host: string): Promise<Response> {
+  const res = await fetch(`https://${host}/__/firebase/init.json`, { cf: { cacheTtl: 3600, cacheEverything: true } } as RequestInit);
+  if (!res.ok) return new Response('{}', { status: 502, headers: { 'Content-Type': 'application/json' } });
+  return new Response(await res.text(), {
+    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=3600' },
+  });
 }
 
 /** robots.txt where NOINDEX is set: nothing may be crawled. */
@@ -27,6 +62,11 @@ function noindex(res: Response): Response {
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    // dev.revisely.app only (gate.ts): accounts with the devSite claim, or the gate page.
+    if (env.DEV_GATE === '1') {
+      const stop = await gate(request, env);
+      if (stop) return env.NOINDEX === '1' ? noindex(stop) : stop;
+    }
     if (env.NOINDEX !== '1') return answer(request, env, ctx);
     if (new URL(request.url).pathname === '/robots.txt') {
       return noindex(new Response(ROBOTS_DISALLOW, { headers: { 'Content-Type': 'text/plain; charset=utf-8' } }));
@@ -38,6 +78,10 @@ export default {
 /** The site from the assets, the API under /api/. */
 async function answer(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   const { pathname } = new URL(request.url);
+  if (ACCOUNT_PAGE.test(pathname) && env.ACCOUNT_PAGES !== '1') return notFound();
+  if (pathname === '/__/firebase/init.json') {
+    return env.FIREBASE_HOSTING ? firebaseConfig(env.FIREBASE_HOSTING) : notFound();
+  }
   if (pathname === '/api' || pathname.startsWith('/api/')) {
     try {
       if (pathname.startsWith('/api/tcq/')) return await handleTcq(request, env, ctx);
@@ -48,5 +92,20 @@ async function answer(request: Request, env: Env, ctx: ExecutionContext): Promis
       return errorResponse(500, 'UPSTREAM_ERROR', 'Something went wrong; try again');
     }
   }
-  return env.ASSETS.fetch(request);
+  const nav = env.ACCOUNT_PAGES === '1';
+  const recite = env.RECITE_SECTION === '1';
+  if (!nav && !recite) return env.ASSETS.fetch(request);
+  // dev.revisely.app: the site's own pages link the account, Premium and Open Door pages (nav.ts), and the home shows
+  // its Recite section (recite.ts). A page asks the assets without its validators, so a copy cached before either
+  // was added (a 304) never stands in for it.
+  let ask = request;
+  if ((request.headers.get('Accept') ?? '').includes('text/html')) {
+    ask = new Request(request);
+    ask.headers.delete('If-None-Match');
+    ask.headers.delete('If-Modified-Since');
+  }
+  return withPageChange(await env.ASSETS.fetch(ask), (html) => {
+    const page = nav ? injectAccountNav(html) : html;
+    return recite ? showReciteSection(page) : page;
+  });
 }

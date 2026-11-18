@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Open Door · Revisely</title>
+  <meta name="rv-title" content="o.title.doc">
+  <meta name="description" content="Revisely Premium, free for anyone who can’t pay for it.">
+  <meta name="referrer" content="no-referrer">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="/favicon.ico" sizes="48x48">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="stylesheet" href="/assets/site.css">
+  <link rel="stylesheet" href="/assets/account.css">
+  <link rel="stylesheet" href="/assets/account-nav.css">
+  <script>
+    // Before the first paint: the language (?lang=ar|en, else the switch's choice, else the browser's), and whether the app opened
+    // this page (#c=<code>): then it is bare, with nothing a purchase could follow (App Store 3.1.1).
+    (function () {
+      var d = document.documentElement, l, c;
+      d.classList.remove('no-js');
+      try { l = localStorage.getItem('rv.lang'); } catch (e) {}
+      var q = /[?&]lang=(ar|en)\b/.exec(location.search);
+      if (q) { l = q[1]; try { localStorage.setItem('rv.lang', l); } catch (e) {} }
+      if (l !== 'ar' && l !== 'en') l = /^ar\b/i.test(navigator.language || '') ? 'ar' : 'en';
+      d.lang = l; d.dir = l === 'ar' ? 'rtl' : 'ltr';
+      try { c = sessionStorage.getItem('revisely.apply.code'); } catch (e) {}
+      if (/(?:^#|&)c=/.test(location.hash) || c) d.classList.add('from-app');
+    })();
+  </script>
+</head>
+<body class="acct">
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="wrap">
+      <!-- The logo links home on the website; the page the app opens links nowhere (App Store 3.1.1). -->
+      <a class="brand public-only" href="/" aria-label="Revisely, home">
+        <picture>
+          <source srcset="/assets/img/logo-dark.svg" media="(prefers-color-scheme: dark)">
+          <img src="/assets/img/logo-light.svg" width="108" height="32" alt="">
+        </picture>
+      </a>
+      <span class="brand app-only" aria-label="Revisely">
+        <picture>
+          <source srcset="/assets/img/logo-dark.svg" media="(prefers-color-scheme: dark)">
+          <img src="/assets/img/logo-light.svg" width="108" height="32" alt="">
+        </picture>
+      </span>
+      <nav class="site-nav" aria-label="Main" data-acct-nav>
+        <a class="hide-sm public-only" href="/premium/" data-t="nav.premium">Premium</a>
+        <a class="hide-sm public-only" href="/apply/" data-t="nav.program">Open Door</a>
+        <button class="lang" type="button" data-lang-switch data-t="lang">عربي</button>
+        <a class="acct-btn public-only" href="/account/" data-account-btn data-t-aria="nav.signin" aria-label="Sign in"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8.5" r="3.6"/><path d="M5 19.5c.9-3.3 3.6-5.1 7-5.1s6.1 1.8 7 5.1"/></svg></a>
+        <a class="pill public-only" href="https://apps.apple.com/app/revisely/id6767990248" data-t="nav.download">Download</a>
+        <button class="menu-btn public-only" type="button" data-menu aria-expanded="false" data-t-aria="nav.menu" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+      </nav>
+      <div class="menu-panel public-only" data-menu-panel hidden>
+        <p class="menu-who latin" data-menu-who hidden></p>
+        <a href="/account/" data-menu-account data-t="nav.signin">Sign in</a>
+        <a href="/premium/" data-t="nav.premium">Premium</a>
+        <a href="/apply/" data-t="nav.program">Open Door</a>
+        <a href="/support/" data-t="nav.support">Support</a>
+        <hr data-menu-signout hidden>
+        <button type="button" data-menu-signout data-t="a.signout" hidden>Sign out</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="page-hero">
+      <div class="wrap">
+        <figure class="hero-verse">
+          <div class="arabic" role="img" aria-label="وَلَقَدْ يَسَّرْنَا الْقُرْآنَ لِلذِّكْرِ فَهَلْ مِن مُّدَّكِرٍ"></div>
+          <p data-t="o.verse">“And We have certainly made the Quran easy to remember. So is there anyone who will be mindful?”</p>
+          <cite data-t="o.verseRef">Al-Qamar 54:17</cite>
+        </figure>
+        <span class="kicker" data-t="o.kicker">Revisely Premium, free</span>
+        <h1 data-t="o.name">Open Door</h1>
+        <p class="sub" data-t="o.sub">Premium, free for anyone who can’t pay for it</p>
+        <p class="intro public-only" data-t-html="o.intro">Revisely is a free Quran revision app: a little review every day, across everything you’ve memorized. <a href="/">How it works</a></p>
+        <p class="lede" data-t="o.pitch">Nobody should stop memorizing the Quran because of money.</p>
+        <div class="actions">
+          <a class="pill pill-lg" href="#apply" data-t="o.apply">Apply</a>
+          <p class="quiet-link public-only" data-t-html="o.status">Already applied? <a href="/account/">See your status</a></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="sec">
+      <div class="wrap">
+        <h2 class="sec-title" data-t="o.stepsT">How it works</h2>
+        <p class="sec-sub" data-t="o.stepsSub">Two minutes from you, a week at most from us.</p>
+        <ol class="step-cards">
+          <li><span class="mark" data-num="1">1</span><div><h3 data-t="o.s1T">Apply in two minutes</h3><p data-t="o.s1"></p></div></li>
+          <li><span class="mark" data-num="2">2</span><div><h3 data-t="o.s2T">We reply within 7 days</h3><p data-t="o.s2"></p></div></li>
+          <li><span class="mark" data-num="3">3</span><div><h3 data-t="o.s3T">Premium unlocks</h3><p data-t="o.s3"></p></div></li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="sec">
+      <div class="wrap">
+        <h2 class="sec-title" data-t="o.faqT">Questions</h2>
+        <div class="faq-list">
+          <details open><summary data-t="o.q1">Who can apply?</summary><p data-t="o.a1"></p></details>
+          <details><summary data-t="o.q2">What do I get?</summary><p data-t="o.a2"></p></details>
+          <details><summary data-t="o.q3">How long does it last?</summary><p data-t="o.a3"></p></details>
+          <details><summary data-t="o.q4">What happens to my answers?</summary><p data-t="o.a4"></p></details>
+          <details><summary data-t="o.q5">What if I’m not approved?</summary><p data-t="o.a5"></p></details>
+          <details class="public-only"><summary data-t="o.q6">Can I apply in the app?</summary><p data-t="o.a6"></p></details>
+        </div>
+      </div>
+    </section>
+
+    <section class="sec" id="apply" aria-live="polite">
+      <div class="wrap">
+        <h2 class="sec-title" data-t="o.formT">Apply to Open Door</h2>
+
+        <div data-view="loading"><div class="spinner" aria-hidden="true"></div></div>
+
+        <!-- On the website, signed out. -->
+        <div data-view="signin" class="signin-ask" hidden>
+          <div class="status-card">
+            <h3 data-t="o.signInT">Sign in to apply</h3>
+            <p data-t="o.signIn"></p>
+            <button class="pill pill-lg" type="button" data-signin data-t="o.signInBtn">Sign in</button>
+          </div>
+          <p class="form-foot" data-t="o.orApp"></p>
+          <!-- For someone who arrives without the app: accounts are made there. -->
+          <p class="store-line public-only" data-t="a.new2">New to Revisely? Accounts are made in the app.</p>
+          <div class="stores public-only">
+            <a class="badge-link" href="https://apps.apple.com/app/revisely/id6767990248">
+              <picture>
+                <source srcset="https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/white/en-us" media="(prefers-color-scheme: dark)">
+                <img src="https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/black/en-us" width="156" height="52" alt="Download on the App Store">
+              </picture>
+            </a>
+            <p class="soon"><small data-t="soon.small">Coming to</small> <b>Google Play</b></p>
+          </div>
+        </div>
+
+        <!-- The form. -->
+        <form data-view="form" class="apply-form" novalidate hidden>
+          <div class="who">
+            <span class="avatar latin" data-fill="initial">A</span>
+            <div>
+              <p class="email latin" data-fill="email"></p>
+              <p class="hint" data-fill="who"></p>
+            </div>
+          </div>
+          <p class="form-foot" data-fill="ended" hidden></p>
+
+          <fieldset class="q">
+            <legend><span data-t="o.which">Which applies to you?</span> <span class="opt" data-t="o.whichOpt">(at least one)</span></legend>
+            <div class="certs">
+              <label class="cert"><input type="checkbox" name="cantAfford"><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.25 4.25L19 7"/></svg></span><span data-t="o.c1">I can’t afford Premium right now</span></label>
+              <label class="cert"><input type="checkbox" name="noPayment"><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.25 4.25L19 7"/></svg></span><span data-t="o.c2">I have no payment method that works for it</span></label>
+            </div>
+          </fieldset>
+
+          <h3 class="group-title"><span data-t="o.about">About you</span> <span class="opt" data-t="o.aboutOpt">(optional)</span></h3>
+
+          <div class="q">
+            <label for="heard" data-t="o.heard">How did you hear about Revisely?</label>
+            <select class="select" id="heard" name="heard">
+              <option value="" data-t="o.pick">Choose…</option>
+              <option value="store" data-t="o.h.store">App Store or Google Play search</option>
+              <option value="friend" data-t="o.h.friend">A friend or family member</option>
+              <option value="teacher" data-t="o.h.teacher">My teacher or mosque</option>
+              <option value="social" data-t="o.h.social">Social media</option>
+              <option value="other" data-t="o.h.other">Somewhere else</option>
+            </select>
+          </div>
+
+          <div class="q">
+            <label for="country" data-t="o.country">Country</label>
+            <select class="select" id="country" name="country"><option value="" data-t="o.countryPick">Choose your country</option></select>
+          </div>
+
+          <fieldset class="q">
+            <legend data-t="o.mem">Are you memorizing now?</legend>
+            <div class="seg">
+              <label><input type="radio" name="memorizing" value="yes"><span data-t="o.m1">Yes</span></label>
+              <label><input type="radio" name="memorizing" value="revising"><span data-t="o.m2">Revising</span></label>
+              <label><input type="radio" name="memorizing" value="not_yet"><span data-t="o.m3">Not yet</span></label>
+            </div>
+          </fieldset>
+
+          <div class="q">
+            <label for="amount" data-t="o.how">How much have you memorized?</label>
+            <select class="select" id="amount" name="amount">
+              <option value="" data-t="o.pick">Choose…</option>
+              <option value="lt1" data-t="o.am.lt1">Less than 1 juz</option>
+              <option value="1to5" data-t="o.am.1to5">1 to 5 juz</option>
+              <option value="6to10" data-t="o.am.6to10">6 to 10 juz</option>
+              <option value="11to20" data-t="o.am.11to20">11 to 20 juz</option>
+              <option value="21to29" data-t="o.am.21to29">21 to 29 juz</option>
+              <option value="all" data-t="o.am.all">The whole Quran</option>
+            </select>
+          </div>
+
+          <fieldset class="q">
+            <legend data-t="o.teacher">Do you study with a teacher?</legend>
+            <div class="seg">
+              <label><input type="radio" name="teacher" value="yes"><span data-t="o.t1">Yes</span></label>
+              <label><input type="radio" name="teacher" value="no"><span data-t="o.t2">No</span></label>
+            </div>
+          </fieldset>
+
+          <div class="q">
+            <label for="note" data-t="o.note">Anything else you’d like us to know?</label>
+            <textarea class="ta" id="note" name="note" maxlength="1000" rows="4" autocomplete="off" dir="auto"></textarea>
+            <p class="count" data-fill="count"></p>
+          </div>
+
+          <p class="form-error" data-fill="formError" role="alert" hidden></p>
+          <div class="send-row"><button class="pill pill-lg" type="submit" data-t="o.send">Send application</button></div>
+          <p class="form-foot" data-t-html="o.foot"></p>
+        </form>
+
+        <!-- Every other state: sent, waiting, approved, already Premium, declined, link expired, couldn't load. -->
+        <div data-view="status" hidden>
+          <div class="status-card" data-fill="card">
+            <span class="state-mark" aria-hidden="true" data-fill="mark"></span>
+            <h3 data-fill="title" tabindex="-1"></h3>
+            <p data-fill="text"></p>
+            <p class="form-foot" data-fill="hint" hidden></p>
+            <button class="pill pill-lg" type="button" data-retry hidden data-t="o.retry">Try again</button>
+          </div>
+        </div>
+
+        <noscript><p class="form-foot">Turn on JavaScript to apply.</p></noscript>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <p class="latin"><bdi>© 2026 Majd Khawaldeh</bdi></p>
+      <nav aria-label="Footer" data-acct-nav>
+        <a class="public-only" href="/premium/" data-t="nav.premium">Premium</a>
+        <a class="public-only" href="/account/" data-t="nav.account">Account</a>
+        <a href="/privacy/" data-t="foot.privacy">Privacy</a>
+        <a href="/terms/" data-t="foot.terms">Terms</a>
+        <a class="public-only" href="/support/" data-t="foot.support">Support</a>
+        <a class="latin" href="mailto:support@revisely.app">support@revisely.app</a>
+      </nav>
+    </div>
+  </footer>
+
+  <script src="/assets/strings.js"></script>
+  <script src="/assets/site-i18n.js"></script>
+  <script type="module" src="/assets/apply.js"></script>
+</body>
+</html>

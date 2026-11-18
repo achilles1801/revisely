@@ -32,6 +32,16 @@
   },
   "vars": {
     "NOINDEX": "1",
+    // Only accounts of the dev project with the custom claim devSite get past the gate (worker/gate.ts); set it
+    // with functions/scripts/set-dev-site.js. /api/* stays open for the Dev app.
+    "DEV_GATE": "1",
+    // The account, Premium and Open Door pages (docs/account, docs/premium, docs/apply) are open here only.
+    "ACCOUNT_PAGES": "1",
+    // The home's Recite section, mistake detection (docs/index.html, worker/recite.ts): here only until the release.
+    "RECITE_SECTION": "1",
+    // Their sign-in's web config: revisely-dev's Hosting site serves it at /__/firebase/init.json (an empty site,
+    // released only for that), and the worker serves it at the same path here.
+    "FIREBASE_HOSTING": "revisely-dev.web.app",
     // The dev Firebase project (PLAN §3.C): only its sign-ins are accepted. Until it exists, every
     // /api call answers 401 and the pages still serve.
     "FIREBASE_PROJECT_ID": "revisely-dev",

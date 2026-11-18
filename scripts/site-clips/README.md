@@ -1,8 +1,8 @@
 # Website screens and clips
 
-revisely.app's home is one frame: a slideshow of eight slides, each a line or two and a phone, then
+revisely.app's home is one frame: a slideshow of seven slides, each a line or two and a phone, then
 a Revo section and a small footer (`docs/index.html`, `docs/assets/site.css`, `docs/assets/site.js`).
-Each phone shows a picture (`docs/assets/img/slides/`, light and dark), and four of them play a loop
+Each phone shows a picture (`docs/assets/img/slides/`, light and dark), and three of them play a loop
 over it (`docs/assets/clips/`). Everything shown comes from the demo accounts, never a real user's data.
 
 | Slide | Light | Dark |
@@ -11,10 +11,13 @@ over it (`docs/assets/clips/`). Everything shown comes from the demo accounts, n
 | 2 Today | Home (store capture) | Home (store capture) |
 | 3 Time and record | loop `recite` | loop `session-dark` (the stopwatch, no recording) |
 | 4 Search | loop `search` | still: the results |
-| 5 Translations | loop `translations` | still: the picker (store capture) |
-| 6 Activity | loop `activity` | still: the month (store capture) |
-| 7 Prayer times and the Qibla | stills: Times and Qibla, crossfading | the same, dark |
-| 8 Offline | still: Al-Mulk's opening page | the same, dark |
+| 5 Activity | loop `activity` | still: the month (store capture) |
+| 6 Widgets | still: the Home Screen with Today, the next prayer and the Qibla (store capture) | the same picture |
+| 7 Offline | still: Al-Mulk's opening page | the same, dark |
+
+Translations and prayer times with the Qibla were slides 5 and 7 until Nov 18 2026. Majd's rule for the store and the
+site: they aren't selling points, widgets are, so Widgets took their place. Their pictures and the translations loop
+were removed.
 
 A slide with no dark loop shows its dark picture: `data-clip-dark` is simply left out.
 
@@ -24,6 +27,10 @@ A slide with no dark loop shows its dark picture: `data-clip-dark` is simply lef
 python3 scripts/site-clips/slides.py --captures ~/Documents/revisely-today-mocks/store-104/captures \
   --stills <dir of the site's stills> --posters <dir where cut.py wrote the loops>
 ```
+
+`python3 scripts/site-clips/stills.py` puts the Home screenshot (`store/screenshots/raw/01-home.png`, a
+bare capture: the 1.0.4 store set has headlines) into the phone in `docs/assets/img/og.png`, the link
+preview.
 
 writes `docs/assets/img/slides/<name>.webp` at 600×1304 (the loops' size; about 1 MB for all 22).
 The list of which picture comes from where is `SCREENS` in `slides.py`:
@@ -96,6 +103,27 @@ the first frame, so the loop has no seam. The poster is the "Revo" wordmark at 4
 a visitor with Reduce Motion sees until they press play; the end card would show Turn on Revo and
 Later as buttons that do nothing on a web page. Update the picture's `alt` in `docs/index.html` if
 the moment changes.
+
+## Recite (dev.revisely.app until the release)
+
+The Recite section (mistake detection) shows four phones: the page following a take, a mark's card, a remembered
+mistake after the take, and Test me (`docs/assets/img/recite/`, light and dark). They are Revisely Dev's own screens
+from E2E flow `18-recite-live` on iOS (An-Naml 23–24 from the E2E build's recorded take), not the demo account. The
+light set is any run's; the dark set needs the same flow with the phone in dark from the start (a throwaway branch
+whose flow switches to Dark after its first relaunch, run by hand: `gh workflow run e2e.yml --ref <branch>
+-f platform=ios -f flows='18-*'`). Then:
+
+```bash
+gh run download <light run> -p 'e2e-ios-screens-*' -D /tmp/light
+gh run download <dark run> -p 'e2e-ios-screens-*' -D /tmp/dark
+python3 scripts/site-clips/recite.py \
+  --light "$(find /tmp/light -type d -name takeScreenshot)" --dark "$(find /tmp/dark -type d -name takeScreenshot)"
+```
+
+It writes 600×1304 WebPs, with the slideshow's 9:41 status bar in place of the test clock's and the E2E build's
+clock line painted out. The section's first set came from runs 43997254931 (light) and 44219247050 (dark), Nov 17
+2026. If the screens change in the app, update the pictures' `alt` in `docs/index.html` and Arabic in
+`strings-site.js`.
 
 ## Share image
 

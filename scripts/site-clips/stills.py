@@ -2,17 +2,17 @@
 
     python3 scripts/site-clips/stills.py
 
-Reads store/screenshots/01-home.png (the approved 6.9" set, 1320x2868) and writes
-docs/assets/img/og.png: the 1200x630 link preview, with the Home screenshot (and the Dynamic Island
-drawn in) put into the phone that's already drawn there. The rest of the image is kept as it is.
-The slideshow's screens come from slides.py.
+Reads store/screenshots/raw/01-home.png (a bare 6.9" capture, 1320x2868: the 1.0.4 store set has
+headlines) and writes docs/assets/img/og.png: the 1200x630 link preview, with the Home screenshot (and
+the Dynamic Island drawn in) put into the phone that's already drawn there. The rest of the image is kept
+as it is. The slideshow's screens come from slides.py.
 """
 import os
 
 from PIL import Image, ImageDraw
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-SHOTS = os.path.join(ROOT, 'store', 'screenshots')
+SHOTS = os.path.join(ROOT, 'store', 'screenshots', 'raw')  # bare captures: the store set has headlines
 OG = os.path.join(ROOT, 'docs', 'assets', 'img', 'og.png')
 
 HOME = '01-home.png'

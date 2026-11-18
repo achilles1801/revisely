@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- revisely.app's public pages for search engines. Pages marked noindex (/record, /get) stay out; Premium, Open Door
-     and the account join when they're live on revisely.app and indexable. No lastmod: a date nobody keeps up is worse
-     than none. -->
+<!-- revisely.app's public pages for search engines. Pages marked noindex (/record, /get, /account) stay out. No lastmod:
+     a date nobody keeps up is worse than none. -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://revisely.app/</loc></url>
   <url><loc>https://revisely.app/support/</loc></url>
   <url><loc>https://revisely.app/privacy/</loc></url>
   <url><loc>https://revisely.app/terms/</loc></url>
   <url><loc>https://revisely.app/donate/</loc></url>
+  <url><loc>https://revisely.app/premium/</loc></url>
+  <url><loc>https://revisely.app/apply/</loc></url>
 </urlset>
