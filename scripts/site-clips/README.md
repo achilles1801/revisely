@@ -7,24 +7,34 @@ over it (`docs/assets/clips/`). Everything shown comes from the demo accounts, n
 
 | Slide | Light | Dark |
 | --- | --- | --- |
-| 1 Pitch | Home in Indigo, Crimson and Jade, fanned (store captures) | the same, dark |
-| 2 Today | Home (store capture) | Home (store capture) |
-| 3 Time and record | loop `recite` | loop `session-dark` (the stopwatch, no recording) |
-| 4 Search | loop `search` | still: the results |
-| 5 Activity | loop `activity` | still: the month (store capture) |
-| 6 Widgets | still: the Home Screen with Today, the next prayer and the Qibla (store capture) | the same picture |
-| 7 Offline | still: Al-Mulk's opening page | the same, dark |
+| 1 Pitch | Home in Indigo, Crimson and Jade, fanned | the same, dark |
+| 2 Today | Home | Home |
+| 3 Time and record | loop `recite`: the mic's menu, Record, then the stopwatch over Al-Mulk while it records | loop `session-dark`: a revision session's controls with the Recite mic, then the stopwatch |
+| 4 Search | loop `search`: the mic hears Ayat al-Kursi's opening, two results with their cards, and Al-Baqarah 255 opens on its page | still: the results |
+| 5 Activity | loop `activity`: the month, October, then Insights' coverage by surah and Gaps | still: October |
+| 6 Widgets | still: the Home Screen with Today, the next prayer and the Qibla (the 1.0.4 store capture) | the same picture |
+| 7 Offline | still: Al-Mulk's opening page, with the Recite mic in the bar | the same, dark |
 
 Translations and prayer times with the Qibla were slides 5 and 7 until Nov 18 2026. Majd's rule for the store and the
 site: they aren't selling points, widgets are, so Widgets took their place. Their pictures and the translations loop
 were removed.
+
+**1.0.5's pictures and loops** (Nov 18 2026) come from the E2E build (`.maestro/scripts/build-ios.sh`) on an iPhone 17
+Pro Max simulator against the emulators (`.maestro/scripts/emulators.sh`), not from production: a new account signed up
+with `.maestro/subflows/new-account.yaml`, then `functions/scripts/seed-screenshots.js` pointed at the emulators
+(`FIRESTORE_EMULATOR_HOST`, `FIREBASE_AUTH_EMULATOR_HOST`, `GCLOUD_PROJECT=demo-revisely`) and
+`.maestro/scripts/seed-recite-takes.js`, the reader's mic on with `revisely://e2e/recite-live?on=1`, the app's clock at 9:41
+(`revisely://e2e/clock?at=…`), and the accent set on the account in the Firestore emulator. The E2E build fetches no
+page images or translations, so the pages shown (42, 50, 542–545, 562, 563, 604, from the public bucket) were put in
+the app's `Documents/mushaf/full/`, and Saheeh International's Al-Baqarah and Al Imran in its translation store, before
+recording. Its status line was hidden for the capture (bundled with a local change; it isn't in the repository).
 
 A slide with no dark loop shows its dark picture: `data-clip-dark` is simply left out.
 
 ## Pictures
 
 ```bash
-python3 scripts/site-clips/slides.py --captures ~/Documents/revisely-today-mocks/store-104/captures \
+python3 scripts/site-clips/slides.py --captures ~/Documents/revisely-today-mocks/site-105/captures \
   --stills <dir of the site's stills> --posters <dir where cut.py wrote the loops>
 ```
 
@@ -68,12 +78,12 @@ Sentry stays off on simulators.
 
    ```bash
    cd scripts/site-clips
-   python3 cut.py raw/recite.mp4 out recite --start 7.6 --end 33 --hold 1.4 --keep 22.5-33 --fade 0.5 --poster 13.5
-   python3 cut.py raw/session-dark.mp4 out session-dark --start 7.4 --end 29.6 --hold 1.5 --fade 0.5 \
-     --keep 16.5-28.5 --drop 20.6-27.0 --poster 3.2
-   python3 cut.py raw/search.mp4 out search --start 13.0 --hold 1.9 --fade 0.5 --poster 7.6 --vp9-crf 43
-   python3 cut.py raw/translations.mp4 out translations --start 8.6 --hold 1.6 --fade 0.5 --drop 26.8-38.7 --poster 6.0
-   python3 cut.py raw/activity.mp4 out activity --start 11.62 --hold 1.6 --fade 0.5 --poster 3.0
+   python3 cut.py raw/recite.mp4 out recite --start 9.0 --end 50 --hold 1.4 --drop 11.6-13.4 --drop 18.5-29.0 \
+     --drop 32.0-37.6 --keep 37.6-50 --fade 0.5 --poster 13.5
+   python3 cut.py raw/session-dark.mp4 out session-dark --start 9.7 --end 32.4 --hold 1.5 --keep 18.5-28.4 \
+     --drop 21.0-27.0 --fade 0.5 --poster 3.2 --vp9-crf 43
+   python3 cut.py raw/search.mp4 out search --start 11.0 --drop 16.0-17.4 --hold 1.9 --fade 0.5 --poster 7.6 --vp9-crf 43
+   python3 cut.py raw/activity.mp4 out activity --start 9.3 --hold 1.6 --fade 0.5 --poster 3.0
    ```
 
    A ticking clock never looks still to the freeze detection, hence `--keep` around the stopwatch.
