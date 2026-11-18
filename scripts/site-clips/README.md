@@ -1,8 +1,8 @@
 # Website screens and clips
 
-revisely.app's home is one frame: a slideshow of eight slides, each a line or two and a phone, then
+revisely.app's home is one frame: a slideshow of seven slides, each a line or two and a phone, then
 a Revo section and a small footer (`docs/index.html`, `docs/assets/site.css`, `docs/assets/site.js`).
-Each phone shows a picture (`docs/assets/img/slides/`, light and dark), and four of them play a loop
+Each phone shows a picture (`docs/assets/img/slides/`, light and dark), and three of them play a loop
 over it (`docs/assets/clips/`). Everything shown comes from the demo accounts, never a real user's data.
 
 | Slide | Light | Dark |
@@ -11,10 +11,13 @@ over it (`docs/assets/clips/`). Everything shown comes from the demo accounts, n
 | 2 Today | Home (store capture) | Home (store capture) |
 | 3 Time and record | loop `recite` | loop `session-dark` (the stopwatch, no recording) |
 | 4 Search | loop `search` | still: the results |
-| 5 Translations | loop `translations` | still: the picker (store capture) |
-| 6 Activity | loop `activity` | still: the month (store capture) |
-| 7 Prayer times and the Qibla | stills: Times and Qibla, crossfading | the same, dark |
-| 8 Offline | still: Al-Mulk's opening page | the same, dark |
+| 5 Activity | loop `activity` | still: the month (store capture) |
+| 6 Widgets | still: the Home Screen with Today, the next prayer and the Qibla (store capture) | the same picture |
+| 7 Offline | still: Al-Mulk's opening page | the same, dark |
+
+Translations and prayer times with the Qibla were slides 5 and 7 until Nov 18 2026. Majd's rule for the store and the
+site: they aren't selling points, widgets are, so Widgets took their place. Their pictures and the translations loop
+were removed.
 
 A slide with no dark loop shows its dark picture: `data-clip-dark` is simply left out.
 
