@@ -7,6 +7,7 @@ window.RV_STRINGS = {
     'nav.support': 'Support', 'nav.getApp': 'Get the app', 'nav.download': 'Download', 'soon.small': 'Coming to', 'nav.menu': 'Menu', 'nav.close': 'Close', lang: 'عربي',
     'foot.privacy': 'Privacy', 'foot.terms': 'Terms', 'foot.support': 'Support',
     'doc.englishOnly': 'This page is in English only.',
+    'badge.appStore': 'Download on the App Store',
 
     'p.title.doc': 'Premium · Revisely',
     'p.label': 'Revisely Premium',
@@ -111,6 +112,7 @@ window.RV_STRINGS = {
     'nav.support': 'الدعم', 'nav.getApp': 'تنزيل التطبيق', 'nav.download': 'تنزيل', 'soon.small': 'قريبًا على', 'nav.menu': 'القائمة', 'nav.close': 'إغلاق', lang: 'English',
     'foot.privacy': 'الخصوصية', 'foot.terms': 'الشروط', 'foot.support': 'الدعم',
     'doc.englishOnly': 'هذه الصفحة متوفرة بالإنجليزية فقط.',
+    'badge.appStore': 'تنزيل من App Store',
 
     'p.title.doc': 'بريميوم · ريفايزلي',
     'p.label': 'ريفايزلي بريميوم',
