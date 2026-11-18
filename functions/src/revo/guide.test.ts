@@ -84,8 +84,10 @@ describe('nothing a user can see is left out of the guide (Majd, Nov 16 2026)', 
     expect(Object.entries(GUIDE_INTERNAL).filter(([, why]) => /\bDev\b/.test(why))).toEqual([]);
   });
 
-  it('reads the rules marked Revisely Dev', () => {
-    expect(devRules).toEqual(expect.arrayContaining(['RINS-1', 'RMEM-1', 'RMEM-2']));
+  it('reads the rules marked Revisely Dev: none since mistake detection reached the store app (1.0.5)', () => {
+    // Recite, its memory, Insights' Recitation, Gaps and Premium's early access are every account's now, in the main guide.
+    for (const id of ['RECITE-1', 'RINS-1', 'RMEM-1', 'RMEM-2', 'ACT-28', 'ACT-30', 'PREM-1']) expect(devRules).not.toContain(id);
+    expect(Array.isArray(devRules)).toBe(true);
   });
 
   it('a rule only Revisely Dev has is in the Dev guide, never in the guide every account gets', () => {
@@ -123,10 +125,12 @@ describe('Revo’s guide names what the app has', () => {
   });
 
   it('stays compact: the prompt carries it on every question', () => {
-    // About 4 characters a token: under ~7,500 tokens (raised from 24,000 characters on Nov 8 2026, for
-    // the interactive Activity and memorizing by the ayah). It rides on every question in the cached
-    // system prompt: a cache miss costs about 0.3¢ more per 1,000 tokens. Trim before raising it again.
-    expect(REVO_GUIDE.length).toBeLessThan(30_000);
+    // About 4 characters a token: under ~8,750 tokens. Raised from 24,000 characters on Nov 8 2026 (the interactive
+    // Activity, memorizing by the ayah), and from 30,000 on Nov 18 2026 for mistake detection reaching the store app
+    // (1.0.5): its lines came over from the Dev guide condensed, about 5,000 characters from 14,000, and the Dev block
+    // shrank by as much. On Sonnet 5.5 the 5,000 are about $0.00014 a question cached and $0.0035 on a cache miss. It
+    // rides on every question in the cached system prompt. Trim before raising it again.
+    expect(REVO_GUIDE.length).toBeLessThan(35_000);
     expect(REVO_GUIDE).not.toMatch(/\b[A-Z]+-\d+\b/);
   });
 
@@ -189,7 +193,7 @@ describe('the Dev guide goes only with questions from Revisely Dev', () => {
     expect(() => validateContext({ ...plain, app: true })).toThrow();
   });
 
-  it('Gaps’ figures come only from Revisely Dev, and reach the model as their lines (ACT-28, ACT-30)', () => {
+  it('Gaps’ figures come from any app that has them, and reach the model as their lines (ACT-28, ACT-30)', () => {
     const plain = JSON.parse(JSON.stringify(context())) as Record<string, unknown>;
     const gaps = {
       lastRevisedDaysAgo: 6,
@@ -199,8 +203,10 @@ describe('the Dev guide goes only with questions from Revisely Dev', () => {
       fullRevision: { latePages: 18, pushedBackDays: 5, cycleDays: 5 },
       surahs: [{ name: 'Al-Kahf', daysAgo: 9 }],
     };
-    // The store app has no Gaps: a context with them and no app "dev" is refused.
-    expect(() => validateContext({ ...plain, gaps })).toThrow();
+    // The store app has Gaps from the mistake detection release: no app "dev" needed, and no Dev guide sent.
+    const store = validateContext({ ...plain, gaps });
+    expect(store.gaps).toEqual(gaps);
+    expect(ask(store).system.map((s) => s.text)).toEqual([REVO_SYSTEM_PROMPT]);
     const dev = validateContext({ ...plain, app: 'dev', gaps });
     expect(dev.gaps).toEqual(gaps);
     const request = JSON.stringify(ask(dev));

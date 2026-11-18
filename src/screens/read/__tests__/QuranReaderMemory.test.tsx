@@ -10,6 +10,10 @@ import type { LiveEvent } from '../../../lib/reciteLive/contract';
 import { STOP_TRACE_KEY } from '../../../lib/reciteLive/stopTrace';
 import { versesOnPage } from '../../../lib/ayahBounds';
 import { paletteV2 } from '../../../theme/v2';
+import { setMistakeDetectionReleasedForTests } from '../../../lib/release/mistakeDetection';
+
+// The release's switch is the kill switch: these tests run with it as each says, and back to as it ships.
+afterEach(() => setMistakeDetectionReleasedForTests(undefined));
 
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
 jest.mock('expo-linear-gradient', () => ({ LinearGradient: ({ children }: { children?: React.ReactNode }) => children ?? null }));
@@ -379,7 +383,8 @@ describe("Recite's memory on the page", () => {
     expect(screen.queryByTestId('past-highlight-word')).toBeNull();
   });
 
-  it('outside Revisely Dev nothing is drawn', async () => {
+  it('with the release switched off: outside Revisely Dev nothing is drawn', async () => {
+    setMistakeDetectionReleasedForTests(false);
     mockState.dev = false;
     await open();
     expect(screen.queryByTestId('past-highlight-word')).toBeNull();

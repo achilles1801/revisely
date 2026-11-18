@@ -16,11 +16,13 @@
 import { LiveEvent, parseEvent } from './contract';
 import { pairClosed, pairOpen } from './pairService';
 import type { ClientFrame, LiveConnect, LiveConnection, LiveHandlers, StartFrame } from './feed';
+import { checker } from '../reciteCheck/endpoints';
 
-/** The checker's live endpoint (the same Cloud Run service as lib/reciteCheck/service). */
-export const RECITE_LIVE_URL = 'wss://recite-check-433792838929.us-east1.run.app/live';
+const live = (base: string) => `${base.replace(/^https:/, 'wss:')}/live`;
+/** The checker's live endpoint (the same Cloud Run service as lib/reciteCheck/service, in the app's own project). */
+export const RECITE_LIVE_URL = live(checker().base);
 /** recite-check-pair's (the same image and protocol): Recite and Words & harakat without letters only. */
-export const RECITE_PAIR_LIVE_URL = 'wss://recite-check-pair-433792838929.us-east1.run.app/live';
+export const RECITE_PAIR_LIVE_URL = live(checker().pair);
 
 /** Whether recite-check-pair takes this take: what the server calls `recite` or `harakat` (health.level). */
 export function pairTakes(start: StartFrame): boolean {

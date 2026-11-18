@@ -54,9 +54,10 @@ describe('Revo’s context says which app asks', () => {
     expect(build().app).toBe('dev');
   });
 
-  // ACT-28, ACT-30: the server refuses Gaps from any app but Revisely Dev, and with them the whole question.
-  it('Gaps go only from Revisely Dev, beside app "dev"', () => {
-    expect('gaps' in build({ gaps })).toBe(false);
+  // ACT-28, ACT-30: Gaps are every account's from the mistake detection release, so they go from any app that has them.
+  it('[ACT-28] Gaps go from the store app too, without app "dev"', () => {
+    expect(build({ gaps })).toMatchObject({ gaps });
+    expect('app' in build({ gaps })).toBe(false);
     mockDev = true;
     expect(build({ gaps })).toMatchObject({ app: 'dev', gaps });
     expect('gaps' in build({ gaps: null })).toBe(false);

@@ -9,6 +9,10 @@ import { getCurrentRevisionDay } from '../../../lib/algorithm';
 import { dateToLocalISODay } from '../../../lib/schedulePlans';
 import type { RevisionLog, User, UserPage } from '../../../types';
 import { navigateToActivityDay } from '../../../navigation/navigationRef';
+import { setMistakeDetectionReleasedForTests } from '../../../lib/release/mistakeDetection';
+
+// The release's switch is the kill switch: these tests run with it as each says, and back to as it ships.
+afterEach(() => setMistakeDetectionReleasedForTests(undefined));
 
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
 jest.mock('react-native-reanimated', () => require('react-native-reanimated/mock'));
@@ -373,6 +377,8 @@ describe('ActiveRevisionScreen — a failed load', () => {
 });
 
 describe('ActiveRevisionScreen — reading and the controls', () => {
+  // The plain record button (no Recite): the release switched off, as on a binary without Recite.
+  beforeEach(() => setMistakeDetectionReleasedForTests(false));
   it('opens on the page alone: its number, the juz and surah; the controls hidden', () => {
     setup([332, 333]);
     render(<ActiveRevisionScreen />);
@@ -891,7 +897,8 @@ describe('ActiveRevisionScreen — Recite (Revisely Dev)', () => {
     fireEvent.press(screen.getByLabelText('The page'));
   };
 
-  it('not Revisely Dev (or not a tester): the record button, as before, and no eye at the top', async () => {
+  it('with the release switched off: not Revisely Dev (or not a tester): the record button, as before, and no eye at the top', async () => {
+    setMistakeDetectionReleasedForTests(false);
     setup([]);
     mockApp.user = { ...mockApp.user, previewTester: true };
     render(<ActiveRevisionScreen />);

@@ -4,9 +4,10 @@ import type { VerseKey } from '../verses';
 import { CheckResult, parseCheckResult } from './result';
 import type { ReciteCheckSettings } from './settings';
 import { pairAnswered, pairClosed } from '../reciteLive/pairService';
+import { checker } from './endpoints';
 
-/** The recitation check service on revisely-dev (Cloud Run, us-east1; scripts/recite-check). */
-export const RECITE_CHECK_URL = 'https://recite-check-433792838929.us-east1.run.app';
+/** The recitation check service in the app's own Firebase project (Cloud Run; scripts/recite-check; ./endpoints). */
+export const RECITE_CHECK_URL = checker().base;
 /** The service takes at most 4 minutes. */
 export const MAX_SECONDS = 240;
 
@@ -119,7 +120,7 @@ export async function sendLabel(
 }
 
 /** recite-check-pair: Recite and Words & harakat without letters, two takes an instance (lib/reciteLive/socket). */
-export const RECITE_CHECK_PAIR_URL = 'https://recite-check-pair-433792838929.us-east1.run.app';
+export const RECITE_CHECK_PAIR_URL = checker().pair;
 
 /**
  * Wake both services while the user gets ready (they sleep when unused; waking takes a few seconds). The pair service's

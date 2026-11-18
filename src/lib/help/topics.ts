@@ -35,9 +35,9 @@ export type HelpScreen =
   | 'reciteTest';
 
 /**
- * When a topic shows: only with Smart Tracking on, only with it off, only with Recite (Revisely Dev's one mic, in the
- * reader and sessions) or only without it, only in Revisely Dev (Insights' Gaps and Last revised), or only where
- * Activity's sections can be arranged (testers).
+ * When a topic shows: only with Smart Tracking on, only with it off, only with Recite (the one mic, in the reader and
+ * sessions, on a phone and print that have it) or only without it, only where Insights has Gaps and Last revised
+ * (`devApp`: gapsInsightsEnabled, everyone's from 1.0.5), or only where Activity's sections can be arranged.
  */
 export type HelpWhen = 'smartTracking' | 'noSmartTracking' | 'liveRecite' | 'noLiveRecite' | 'devApp' | 'sections';
 
@@ -50,7 +50,7 @@ export interface HelpOpts {
 }
 
 /** Why a Recite topic has no rule to cover: RECITE-1 to RECITE-8 (BEHAVIOUR.md) don't describe that part of it yet. */
-const RECITE_UNRULED = 'no RECITE rule in BEHAVIOUR.md describes this part of Recite yet (Revisely Dev only)';
+const RECITE_UNRULED = 'no RECITE rule in BEHAVIOUR.md describes this part of Recite yet';
 
 export interface HelpTopic {
   id: string;
@@ -230,8 +230,8 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
     // detection stuff in the help icon"). Recite's sheets show only with it (their topics' `when`).
     more: ['recite', 'reciteTake', 'reciteMemory', 'reciteTest'],
   },
-  // Recite's four sheets (Revisely Dev): how it works, during a take, past mistakes, Test me and voice search. Each
-  // topic carries `when: 'liveRecite'`; when Recite reaches the store app, drop the `when`s and the sheets go with it.
+  // Recite's four sheets: how it works, during a take, past mistakes, Test me and voice search. Each topic carries
+  // `when: 'liveRecite'`: Recite is everyone's from 1.0.5, but only on a phone and print that have it.
   recite: {
     // Majd, Nov 15 2026: in line with what Revisely Dev's Recite does (highlights in three colours, Not clear, Undo
     // and Put back, Hear it, Recite the mistakes again, the hidden view). Nov 16: anywhere in the Qur'an, a slip into a

@@ -83,7 +83,7 @@ export function buildRevoContext(input: {
   patterns?: boolean;
   /** Their recitation (Revisely Dev, RINS-1; lib/revo/recitation), only for an account that recites. */
   recitation?: RevoRecitation | null;
-  /** Insights' Gaps and Last revised (Revisely Dev, ACT-28, ACT-30; lib/revo/gaps). Only Revisely Dev sends them. */
+  /** Insights' Gaps and Last revised (ACT-28, ACT-30; lib/revo/gaps): for an account that has them (gapsInsightsEnabled). */
   gaps?: RevoGaps | null;
   now?: Date;
 }): RevoContext {
@@ -161,8 +161,8 @@ export function buildRevoContext(input: {
     // Revisely Dev: the server adds the Dev guide, what only Revisely Dev has (functions/src/revo/guide.ts). The
     // store app never sends it, so its questions are asked exactly as before.
     ...(dev ? { app: 'dev' as const } : {}),
-    // Gaps go only beside it: the server refuses them from any other app, and with them the whole question.
-    ...(dev && input.gaps ? { gaps: input.gaps } : {}),
+    // Gaps, for an account that has them (the mistake detection release opened them to everyone; ACT-28).
+    ...(input.gaps ? { gaps: input.gaps } : {}),
     localTime: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
   };
 }

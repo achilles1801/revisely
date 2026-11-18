@@ -82,8 +82,9 @@ export interface RevoContext {
   /** 'dev' from Revisely Dev (lib/variant): the server then adds the Dev guide to the question. Never from the store app. */
   app?: 'dev';
   /**
-   * Insights' Gaps and Last revised (Revisely Dev, ACT-28 and ACT-30): the figures the section and the screen show, from
-   * lib/revo/gaps. Sent only with `app: 'dev'`: the server refuses them without it.
+   * Insights' Gaps and Last revised (ACT-28 and ACT-30): the figures the section and the screen show, from lib/revo/gaps,
+   * for an account that has them. A server from before the mistake detection release refuses them without `app: 'dev'`,
+   * so it is deployed with the release (before its Promote).
    */
   gaps?: RevoGaps;
   localTime: string | null;

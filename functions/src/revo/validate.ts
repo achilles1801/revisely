@@ -183,10 +183,10 @@ export function validateContext(v: unknown): RevoContext {
   // `week[].caughtUp`, `week[].ahead`, `week[].started` and `patterns` come from apps after Nov 9 2026 (REVO-40).
   // `recitation` comes only from Revisely Dev apps whose account recites (Nov 2026).
   // `app` ('dev') comes only from Revisely Dev, from Nov 16 2026: its requests carry the Dev guide (guide.ts).
-  // `gaps` comes only from Revisely Dev, with `app`, from Nov 16 2026 (Insights' Gaps, ACT-28).
+  // `gaps` comes from Revisely Dev from Nov 16 2026, and from every app with the mistake detection release (Insights'
+  // Gaps, ACT-28). `recitation` likewise, for an account that recites.
   keys(c, ['totals', 'today', 'weakPages', 'week', 'streak', 'patterns', 'passages', 'pageNames', 'recitation', 'app', 'gaps', 'localTime'], 'context', ['totals', 'today', 'weakPages', 'week']);
   if (c.app !== undefined && c.app !== 'dev') fail('context.app');
-  if (c.gaps !== undefined && c.app !== 'dev') fail('context.gaps');
 
   const t = obj(c.totals, 'context.totals');
   keys(t, REVO_TOTALS, 'context.totals');

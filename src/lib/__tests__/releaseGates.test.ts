@@ -120,7 +120,7 @@ describe('still for testers', () => {
   });
 });
 
-describe('the mistake detection release (1.0.5): one switch, off until the release PR', () => {
+describe('the mistake detection release (1.0.5): everyone’s, through one switch', () => {
   // Outside Revisely Dev, as the store app is.
   const { reciteLiveForAccount } = require('../reciteLive/availability') as typeof import('../reciteLive/availability');
   const { gapsInsightsEnabled } = require('../insightsGaps') as typeof import('../insightsGaps');
@@ -152,13 +152,21 @@ describe('the mistake detection release (1.0.5): one switch, off until the relea
 
   it.each(APP_STORE)('on: every card of its What’s new is open, for %o (none drops out at the release)', (user) => {
     setMistakeDetectionReleasedForTests(true);
-    const { NEXT_RELEASE } = require('../help/whatsNew') as typeof import('../help/whatsNew');
-    expect(NEXT_RELEASE).not.toBeNull();
-    expect(needsOf(NEXT_RELEASE!).filter((n) => !needOpen(n, user, 'everyone'))).toEqual([]);
+    const { CURRENT_RELEASE: current, NEXT_RELEASE } = require('../help/whatsNew') as typeof import('../help/whatsNew');
+    expect(current.id).toBe('1.0.5');
+    expect(current.live).toBe(true);
+    expect(NEXT_RELEASE).toBeNull();
+    expect(needsOf(current).filter((n) => !needOpen(n, user, 'everyone'))).toEqual([]);
   });
 
-  it('develop ships it off: store users get it only with the release PR’s Promote', () => {
-    expect(MISTAKE_DETECTION_RELEASED).toBe(false);
+  it('the release PR ships it on: store users get it with this release’s Promote', () => {
+    expect(MISTAKE_DETECTION_RELEASED).toBe(true);
+  });
+
+  it.each(APP_STORE)('[ACT-29] Activity’s sections (show, hide, drag) are every account’s, for %o', (user) => {
+    const { activitySectionsEnabled } = require('../activitySections') as typeof import('../activitySections');
+    expect(activitySectionsEnabled(user)).toBe(true);
+    expect(activitySectionsEnabled(null)).toBe(false);
   });
 });
 

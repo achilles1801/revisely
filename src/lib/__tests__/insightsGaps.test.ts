@@ -15,6 +15,10 @@ import {
   stripLabel,
   usualSteps,
 } from '../insightsGaps';
+import { setMistakeDetectionReleasedForTests } from '../release/mistakeDetection';
+
+// The release's switch is the kill switch: these tests run with it as each says, and back to as it ships.
+afterEach(() => setMistakeDetectionReleasedForTests(undefined));
 
 let mockDev = false;
 jest.mock('../variant', () => ({ isDevVariant: () => mockDev }));
@@ -287,7 +291,8 @@ describe('who sees it', () => {
     mockDev = false;
   });
 
-  it('every account in Revisely Dev, nobody signed out; not the store app, testers included', () => {
+  it('with the release switched off: every account in Revisely Dev, nobody signed out; not the store app, testers included', () => {
+    setMistakeDetectionReleasedForTests(false);
     expect(gapsInsightsEnabled({ previewTester: true })).toBe(false);
     expect(gapsInsightsEnabled({})).toBe(false);
     mockDev = true;

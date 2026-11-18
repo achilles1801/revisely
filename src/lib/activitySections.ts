@@ -65,8 +65,8 @@ export const DEFAULT_SECTIONS: SectionsLayout = {
 
 export const activitySectionsKey = (uid: string) => `@revisely_activity_sections:v1:${uid}`;
 
-/** Testers only for now: everyone else keeps the layout as it was. */
-export const activitySectionsEnabled = (user: { previewTester?: boolean } | null | undefined) => user?.previewTester === true;
+/** Every signed-in account, from the mistake detection release (1.0.5; Majd, Nov 17 2026: Activity sections are in). */
+export const activitySectionsEnabled = (user: { previewTester?: boolean } | null | undefined) => user != null;
 
 /**
  * A tab's layout from whatever was stored: known sections only, each once, in the stored order; a section the

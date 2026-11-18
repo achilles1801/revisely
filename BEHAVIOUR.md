@@ -301,10 +301,10 @@ How the tests are made: `tests/scenarios/README.md`.
   A sitting offers one thing: pages not memorized come first (MEM-5). Pages not scheduled that day,
   already revised, or on an older day were reading, and offer nothing.
 
-## Gaps and Last revised (Revisely Dev)
+## Gaps and Last revised
 
-Activity → Insights in Revisely Dev only (`gapsInsightsEnabled`), until a release opens them once the main Revo guide
-has them; Revisely Dev's Revo knows them from its Dev guide.
+Activity → Insights for every account, from the mistake detection release (`gapsInsightsEnabled`); Revo's main guide
+has them.
 
 - **ACT-28.** Insights' Gaps, after Consistency, says how long the user goes between revisions. A revision day is a
   revision day (DAY-2, DAY-9) with at least one page revised: a session, pages revised ahead (on the day they were
@@ -346,8 +346,7 @@ has them; Revisely Dev's Revo knows them from its Dev guide.
   schedule". A plan changed mid-cycle is judged by the new plan; pages it doesn't hold are left out. Nothing
   revised on record: no section. Recency only, the same with Smart Tracking on or off (ACT-19). Revo is told the
   same figures over the last 30 days with each question, and when each memorized surah was last revised (ACT-30),
-  from the items Home read and only once they have loaded; only Revisely Dev sends them, and the server refuses them
-  from any other app.
+  from the items Home read and only once they have loaded; any app whose account has Gaps sends them.
   (Majd, Nov 16 2026: "some metric in insights
   that give the user an idea on their 'gaps' between session"; mocks insights-gaps.)
 
@@ -378,7 +377,7 @@ has them; Revisely Dev's Revo knows them from its Dev guide.
   with Smart Tracking on or off (ACT-19). (Majd, Nov 16 2026: "being able to click on a page or surah or juz or hizb
   and seeing the last time u revised it".)
 
-## Recite (Revisely Dev)
+## Recite
 
 The reader's mic follows the reciter on the page and, with Mark mistakes, marks their mistakes as they recite (Majd,
 Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checking runs on Revisely's checker (Cloud Run); these rules are what the app shows of what it says.
@@ -424,7 +423,7 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   a place outside them (a similar ayah, a past take) opens in the reader over the session; Back comes back to it.
   (Majd, Nov 17 2026: "add the mistake detection and mic functionality same as mushaf to the revision sessions".)
 
-## Recite insights (Revisely Dev)
+## Recite insights
 
 What a user's takes with Mark mistakes show over time, and Revo knowing it (Majd, Nov 16 2026).
 
@@ -449,7 +448,7 @@ What a user's takes with Mark mistakes show over time, and Revo knowing it (Majd
   Revo is on for the account, which opens Revo with that take attached (as Revo's + attaches one). VoiceOver
   has the same two as actions on the take.
 
-## Recite's memory (Revisely Dev)
+## Recite's memory
 
 Recite with Mark mistakes remembers each take (Majd, Nov 15 2026; Tarteel's biggest lead over Revisely).
 
@@ -526,7 +525,7 @@ microphone's purpose string (in the binary) names searching only from 1.0.4.
   speaks, and the room (silence, its steady noise, the microphone's first moments) is never taken for words: the
   speech model writes a word for any of them. Words show as they are said, and someone who speaks at once is heard.
   Listening that hears nothing ends after 8 seconds and searches nothing.
-- **SEARCH-4.** (Revisely Dev, with Recite, until the release) A voice search that finds exactly one place (the list
+- **SEARCH-4.** (With Recite) A voice search that finds exactly one place (the list
   would say "1 result", not "Closest matches") opens the reader at that ayah, highlighted as the result's Open in the
   reader does, with nothing recording or listening: listening ended with the search. Back returns to the search, its
   words and that result still there. Several results, the closest there is, or a typed search stay a list, and nothing
@@ -777,7 +776,7 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   refresh reads everything again, the items Overview and Insights read included, and its spinner always ends
   (after 10 s at most), on a transparent ground as Home's. (Majd, Nov 9 2026: "shouldnt this update whenever
   a user scrolls down to refresh the page instead of having to close out the app?")
-- **ACT-29.** Activity's sections are the user's to arrange (testers for now): Edit sections (an icon at the end
+- **ACT-29.** Activity's sections are the user's to arrange (every account from the mistake detection release): Edit sections (an icon at the end
   of the tabs row) opens the tab's sections, each with a switch to show or hide it; holding a section (350 ms,
   still) lifts it to drag to another place, and VoiceOver has Move up and Move down. Every change shows at once.
   Overview's month header stays on top; under it the month's totals, the calendar (always shown), its key and the
@@ -1173,7 +1172,7 @@ shows up once and they must go through it and complete it … just the main stuf
   RTL language mirrored the English app: rows, the tab swipe, the verse highlights and the mushaf's
   page order; `src/i18n/direction.ts`.)
 
-## Premium early access (Revisely Dev)
+## Premium early access
 
 Majd, Nov 16 2026: "give everyone premium access right now … it'll be paid for in the future but anyone who has
 premium now will keep it forever". Nov 18 2026: "for end date tbd i meant new people from singing up and taking advantage
