@@ -10,8 +10,8 @@ second guess who wrote it". Terms marked **(confirm)** wait for a native speaker
 **Sources:**
 - **[MS]** Microsoft's *Arabic (Saudi Arabia) Localization Style Guide*.
 - **[AP]** Apple's Arabic support pages and iOS.
-- **[TT]** Tarteel's Arabic App Store page.
-- **[QC]** Quran.com in Arabic.
+- **[TT]** Tarteel's Arabic App Store and Google Play pages.
+- **[QC]** Quran.com in Arabic (its open-source strings: quran.com-frontend-next, `locales/ar`).
 - **[MU]** The Madani mushaf's own text.
 - **[CLDR]** Unicode's Arabic plural rules (what i18next uses).
 
@@ -31,8 +31,8 @@ Standard UI terms are taken from these sources. Nobody's sentences are copied.
   «إلغاء», «لاحقًا». Links that are calls to action may be imperatives («قدِّم طلبك في الباب المفتوح»).
 - **The user is "you", masculine singular,** as the generic form Apple, Google and Microsoft Arabic use («اضغط على…»,
   «حفظت ٣ أجزاء»). Where a verbal noun or an impersonal form reads as well, prefer it: it speaks to everyone. Words for
-  people are general («المستخدمون», «الأشخاص») [MS §3.1]. **(confirm:** whether to address women too, see the open
-  questions.)
+  people are general («المستخدمون», «الأشخاص») [MS §3.1]. Women are addressed by the same generic form, as [QC] and
+  [TT] do (settled Nov 18).
 - **"Your" once, not on every noun.** Never «الخاص بك/بها» [MS §2.1.3]. Write «خطتك», or «الخطة» when the owner is plain.
 - **Passive only when it reads naturally,** with a damma on the first letter where it could be misread: «قُبل طلبك»,
   «تُنشأ الحسابات في التطبيق» [MS §4.1.16].
@@ -156,13 +156,13 @@ The English is the app's label (as in `src/i18n/en`), or the concept where there
 | session; revision session | جلسة؛ جلسة مراجعة | حصة | |
 | Start revision | بدء المراجعة | ابدأ المراجعة, on a button | Verbal noun on a button |
 | sitting (a timed reading) | جلسة قراءة | | |
-| streak | الأيام المتتالية («٧ أيام متتالية») | سلسلة، ستريك | [TT «تتابع الأيام»]. «سلسلة» alone doesn't say what it counts. |
+| streak | الأيام المتتالية («٧ أيام متتالية») | سلسلة، ستريك | [QC «أيام متتالية»]; [TT «تتابع الأيام»]. «سلسلة» alone doesn't say what it counts. |
 | catch-up, carried pages | استدراك ما فات؛ «٤ صفحات من الأمس أولًا» | | |
 | Jump to | الانتقال إلى | القفز إلى | |
 | Activity | النشاط | | |
 | Insights | الإحصاءات | الرؤى | What the website already says |
 | Daily log | السجل اليومي | المذكرات | |
-| teacher (one you recite to) | معلّم / شيخ; «تقرأ عليه» | «تدرس مع» | The community's phrasing: القراءة على شيخ |
+| teacher (one you recite to) | معلّم / شيخ; «تقرأ عليه» | «تدرس مع» | The community's phrasing: القراءة على شيخ. The generic masculine covers women teachers too, as [QC] «المعلمين» does. |
 | halaqa | حلقة التحفيظ | | |
 
 ### Recite and mistakes
@@ -172,17 +172,17 @@ The English is the app's label (as in `src/i18n/en`), or the concept where there
 | Recite (the page follows you) | متابعة التلاوة; in a sentence «الصفحة تتابع تلاوتك» | تتبّع | [TT «متابعة التلاوة»] |
 | Mark mistakes | تحديد الأخطاء | تعليم الأخطاء | Majd confirmed it (Nov 18). «تعليم» reads first as "teaching"; [TT] says «اكتشاف أخطاء الحفظ». |
 | reciting from memory (to check it) | التسميع، سمّع | الاختبار | The community's word [TT] |
-| a take | تسميع (pl. مرات التسميع / التسميعات) **(confirm)** | محاولة, as a noun for it | One go at reciting with the checker |
+| a take | تسميع (pl. مرات التسميع / التسميعات) | محاولة, as a noun for it | One go at reciting with the checker; [TT] «قبل تسميعك القادم» (settled Nov 18) |
 | Recited (a day's takes) | ما سمّعته | | |
 | wrong word | كلمة خاطئة | كلمة خطأ | The adjective, not the noun |
-| skipped word | كلمة متروكة **(confirm:** or ساقطة**)** | محذوفة | |
+| skipped word | كلمة منسية | متروكة، ساقطة، محذوفة | [TT «الكلمات المنسية»]: the word memorizers already read for it (settled Nov 18). |
 | extra word | كلمة زائدة | | |
 | harakat slip | خطأ في الحركات | خطأ تشكيل, in labels | |
 | letter slip | خطأ في الحروف | | |
 | Not clear | غير واضح | | |
 | tajweed note | ملاحظة تجويد | خطأ تجويد | It is never counted as a mistake |
 | Not a mistake / Put back / Undo | ليس خطأً / إعادة / تراجع | | Undo is تراجع [AP] |
-| Strict | الوضع الصارم **(confirm:** or وضع التدقيق**)** | | Strict modes in Arabic browsers say «صارم» |
+| Strict | الوضع الصارم | وضع التدقيق | Microsoft Edge's Arabic names its strictest level «صارم» (settled Nov 18) |
 | Words & harakat | الكلمات والحركات | | |
 | Peek | إلقاء نظرة | | [TT] |
 | hide the verses / hidden view | إخفاء الآيات | | [TT] |
@@ -230,9 +230,9 @@ The English is the app's label (as in `src/i18n/en`), or the concept where there
 | Search, See all, More | البحث، عرض الكل، المزيد | | [AP] |
 | Couldn't load / connect… | تعذّر تحميل… / تعذّر الاتصال… | فشل | Apple's and Google's error opening |
 | Help, What's new | المساعدة، الجديد في ريفايزلي | | |
-| Premium | بريميوم | المميّز | Majd confirmed it (Nov 18), though Tarteel and Telegram translate it («ترتيل المميز»). |
+| Premium | بريميوم | المميّز | Majd confirmed it (Nov 18). Tarteel's Google Play page writes «ترتيل بريميوم» too; its App Store page «ترتيل المميز». |
 | Free (the plan) | مجاني; the Free plan الخطة المجانية | المجاني, as a title | |
-| early access | الوصول المبكر | | Google Play's Arabic |
+| early access | الوصول المبكر | | Google Play's and Steam's Arabic |
 | subscription, gift, family plan | اشتراك، هدية، خطة العائلة | | |
 | Open Door | الباب المفتوح | | |
 | Revo; assistant | Revo; المساعد | ريفو | A name stays Latin [MS §5.2] |
@@ -275,14 +275,16 @@ From `~/Documents/revisely-handoffs/app-in-arabic-2.md`. Each has App in Arabic'
 
 ## Open questions (native speaker or Majd)
 
+On Nov 18 Majd asked to settle these from what Tarteel and Quran.com already write rather than ask. What no
+reference settles is left open.
+
 1. ~~Premium~~: «بريميوم» (Majd, Nov 18).
 2. ~~Mark mistakes~~: «تحديد الأخطاء» (Majd, Nov 18).
-3. **Skipped word:** «متروكة» or «ساقطة» (the halaqa word: أسقط كلمة)?
-4. **Strict:** «الوضع الصارم» or «وضع التدقيق»?
-5. **A take:** «تسميع» (pl. «التسميعات»)?
+3. ~~Skipped word~~: «منسية», as Tarteel writes it (Nov 18).
+4. ~~Strict~~: «الوضع الصارم», as Microsoft Edge writes it (Nov 18).
+5. ~~A take~~: «تسميع», as Tarteel writes it («قبل تسميعك القادم», Nov 18).
 6. **Digits:** see Majd's open choice 1.
-7. **Addressing women:** keep the generic masculine (as Apple and Google), or add feminine forms where they are cheap?
-   Women memorize with women teachers, so «معلّم» might become «معلّم أو معلّمة» in places.
-8. **Recite:** «متابعة التلاوة» as its Arabic name?
+7. ~~Addressing women~~: the generic masculine, as Apple, Google, Quran.com and Tarteel write (Nov 18).
+8. ~~Recite~~: «متابعة التلاوة», Tarteel's name for the same feature (Nov 18).
 9. **Saheeh International's credit:** may the Arabic UI translate the words around the names («issued by» → «صادرة عن»),
    or does the whole credit stay as QuranEnc gives it? (The Clear Quran® credit and Tanzil's notice stay word for word.)
