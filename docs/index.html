@@ -43,6 +43,16 @@
     "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
   }
   </script>
+  <script>(function () {
+    var d = document.documentElement, l;
+    try { l = localStorage.getItem('rv.lang'); } catch (e) {}
+    var q = /[?&]lang=(ar|en)\b/.exec(location.search);
+    if (q) { l = q[1]; try { localStorage.setItem('rv.lang', l); } catch (e) {} }
+    if (l !== 'ar' && l !== 'en') l = /^ar\b/i.test(navigator.language || '') ? 'ar' : 'en';
+    d.lang = l; d.dir = l === 'ar' ? 'rtl' : 'ltr';
+  })();</script>
+  <link rel="stylesheet" href="/assets/account-nav.css">
+  <link rel="stylesheet" href="/assets/site-rtl.css">
 </head>
 <body class="home recite-on">
   <a class="skip" href="#main" data-t="h.skip">Skip to content</a>
@@ -55,12 +65,26 @@
           <img src="/assets/img/logo-light.svg" width="108" height="32" alt="">
         </picture>
       </a>
-      <nav class="site-nav" aria-label="Main">
+      <nav class="site-nav" aria-label="Main" data-acct-nav>
+        <a class="hide-sm" href="/premium/" data-t="nav.premium">Premium</a>
+        <a class="hide-sm" href="/apply/" data-t="nav.program">Open Door</a>
         <a class="hide-sm" href="#mistakes" data-when="RECITE_SECTION" data-t="h.nav.mistakes">Mark mistakes</a>
         <a href="#revo">Revo</a>
         <a class="hide-sm" href="/support/" data-t="nav.support">Support</a>
+        <button class="lang" type="button" data-lang-switch data-t="lang">عربي</button>
+        <a class="acct-btn" href="/account/" data-account-btn aria-label="Sign in"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8.5" r="3.6"/><path d="M5 19.5c.9-3.3 3.6-5.1 7-5.1s6.1 1.8 7 5.1"/></svg></a>
         <a class="pill" href="https://apps.apple.com/app/revisely/id6767990248" data-t="nav.download">Download</a>
+        <button class="menu-btn" type="button" data-menu aria-expanded="false" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
       </nav>
+      <div class="menu-panel" data-menu-panel hidden>
+        <p class="menu-who" data-menu-who hidden></p>
+        <a href="/account/" data-menu-account data-t="nav.signin">Sign in</a>
+        <a href="/premium/" data-t="nav.premium">Premium</a>
+        <a href="/apply/" data-t="nav.program">Open Door</a>
+        <a href="/support/" data-t="nav.support">Support</a>
+        <hr data-menu-signout hidden>
+        <button type="button" data-menu-signout data-t="a.signout" hidden>Sign out</button>
+      </div>
     </div>
   </header>
 
@@ -236,6 +260,8 @@
           <span class="kicker" data-t="h.rc.kicker">New in Revisely Premium</span>
           <h2 id="recite-title" class="title" data-t="h.rc.title">See your mistakes as you recite.</h2>
           <p class="line" data-t="h.rc.line">Recite from memory and Revisely follows you on the mushaf’s page. Turn on Mark mistakes, and a wrong, missed or extra word turns red, and a haraka or letter slip amber, as you go. Tap one to see what you said.</p>
+          <!-- Until 1.0.5 is in the stores: take this line out with the release. -->
+          <p class="note" data-t="h.rc.soon">Coming in Revisely’s next update, on iPhone and Android.</p>
         </div>
         <ol class="steps">
           <li class="step">
@@ -333,7 +359,10 @@
   <footer class="site-footer">
     <div class="wrap">
       <p class="latin"><bdi>© 2026 Majd Khawaldeh</bdi></p>
-      <nav aria-label="Footer">
+      <nav aria-label="Footer" data-acct-nav>
+        <a href="/premium/" data-t="nav.premium">Premium</a>
+        <a href="/apply/" data-t="nav.program">Open Door</a>
+        <a href="/account/" data-t="nav.account">Account</a>
         <a href="/privacy/" data-t="foot.privacy">Privacy</a>
         <a href="/terms/" data-t="foot.terms">Terms</a>
         <a href="/support/" data-t="foot.support">Support</a>
@@ -344,5 +373,9 @@
   </footer>
 
   <script src="/assets/site.js" defer></script>
+<script src="/assets/strings.js"></script>
+<script src="/assets/strings-site.js"></script>
+<script src="/assets/site-i18n.js"></script>
+<script type="module" src="/assets/account-nav.js"></script>
 </body>
 </html>
