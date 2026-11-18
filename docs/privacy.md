@@ -23,6 +23,9 @@ Revisely is a mobile application that helps users track and review their Quran m
 - **Profile information** received from Apple Sign-In or Google Sign-In if you choose to authenticate that way (typically your name, email address, and profile picture URL).
 - **Memorization data** — the pages, surahs, or juz you mark as memorized; weakness ratings you assign to pages; revision sessions you complete; entries you write in the Daily log (what you memorized or revised, minutes spent, and any personal notes); and reading sessions you time with the reading timer (start/end time, length, and the pages you assign to them).
 - **Revo conversations (optional)**: if you turn on Revo, the questions you ask it, its answers, and the short facts it remembers about your routine. See [Revo, the AI assistant](#revo).
+- **Signing in on revisely.app (optional)** — you can sign in on our website with the same account (Google, or email and password) to see your plan and Premium, or to apply to Open Door. Firebase Authentication handles it; your browser keeps the sign-in (in Firebase's own browser storage) until you sign out. Signing in with Google opens Google's own window, under Google's privacy policy.
+- **Open Door applications (optional)** — if you ask for Premium for free because you can't pay, we receive what the form asks: that you can't afford it or have no way to pay, and, only if you answer, how you heard of Revisely, your country, what and how much you're memorizing, whether you have a teacher, and a note of up to 1,000 characters. It is linked to your account, read only by the Revisely team to decide, and never shared. Once a decision is made the answers are deleted; only the outcome stays (the status, its dates and how many times you've applied).
+- **Premium** — if your account has Premium (from early access or Open Door), a record of it: where it came from, when it was given and until when (no end date for early access). The app and the recitation checker read it to know you have Premium. It holds no payment details: nothing is sold.
 
 ### Information collected automatically
 - **Device and app information** — device model, operating system version, app version, language, time zone, and anonymous device identifiers (used by Firebase to manage your session).
@@ -97,7 +100,7 @@ We do **not**:
 
 If you are in the European Economic Area, the United Kingdom, or Switzerland, we process your information on the following bases:
 
-- **Performance of a contract** — to create and operate your account, sync your data, provide the core memorization-tracking service, check the recitation you ask the app to check, and process a donation you make.
+- **Performance of a contract** — to create and operate your account, sync your data, provide the core memorization-tracking service, check the recitation you ask the app to check, decide an Open Door application you make, and process a donation you make.
 - **Consent**: for push notifications, location (when you enable the fajr-aligned day boundary), Revo (you turn it on in the app and can turn it off at any time), and Apple/Google sign-in (you consent through the system permission prompts).
 - **Legitimate interests** — to detect crashes, prevent abuse, improve the app (including reviewing Revo conversations), and thank people who donate. We balance this against your right to privacy and have minimized what we collect.
 - **Legal obligation** — to respond to lawful requests from authorities and retain records required by law.
@@ -141,6 +144,8 @@ Our processors are located in the United States. If you are in the European Econ
 - **Revo's daily question count**: kept for the life of your account.
 - **What your recitation takes found** (no audio): kept until you forget the take, clear the mistake, or delete your account.
 - **The recitation checker's logs**: counts and timings only (no audio, words, account ID or IP address), kept for 30 days.
+- **Open Door applications**: the answers until a decision is made, then deleted; the outcome for the life of your account.
+- **Premium records**: for the life of your account; deleting your account deletes them.
 - **Push notification tokens** — kept until you uninstall the app or revoke notification permission.
 - **Crash logs** — kept for 90 days.
 - **Support email correspondence** — kept for 2 years.
@@ -187,7 +192,7 @@ No method of transmission over the Internet or electronic storage is 100% secure
 
 ## 11. Cookies and tracking technologies
 
-Revisely is a mobile app and does not use browser cookies, and our website doesn't set any either. If you donate, Stripe's checkout page uses Stripe's own cookies, as its privacy policy describes. Our backend services (Firebase) use device identifiers, installation IDs, and similar technologies to manage your session, deliver push notifications, and detect abuse. We do not use any advertising or behavioral-tracking technologies.
+Revisely is a mobile app and does not use browser cookies, and our website doesn't set any either. If you sign in on the website, your browser keeps the sign-in in Firebase's own browser storage, and the site keeps a note in your browser that you're signed in and the language you chose; none of it is used for tracking. If you donate, Stripe's checkout page uses Stripe's own cookies, as its privacy policy describes. Our backend services (Firebase) use device identifiers, installation IDs, and similar technologies to manage your session, deliver push notifications, and detect abuse. We do not use any advertising or behavioral-tracking technologies.
 
 ## 12. Do-Not-Track signals
 
