@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Linking,
   Modal,
   Pressable,
   ScrollView,
@@ -52,6 +51,7 @@ import { ReciterList } from './ReciterList';
 import { TranslationPicker } from './TranslationPicker';
 import { AyahRef } from '../../lib/ayahBounds';
 import { t } from '../../i18n';
+import { openWebPage } from '../../lib/openWebPage';
 
 interface VerseSheetProps {
   /** Verse shown; null hides the sheet. */
@@ -671,7 +671,7 @@ export function VerseSheet({
                       <Text
                         style={styles.creditLink}
                         maxFontSizeMultiplier={CHROME_TEXT_SCALE}
-                        onPress={() => Linking.openURL(ARABIC_CREDIT.url).catch(() => undefined)}
+                        onPress={() => void openWebPage(ARABIC_CREDIT.url)}
                         accessibilityRole="link"
                         accessibilityLabel={t('verse.sheet.opensWebsite', { name: ARABIC_CREDIT.linkLabel })}
                         suppressHighlighting={false}
@@ -691,7 +691,7 @@ export function VerseSheet({
                   <Text
                     style={styles.creditLink}
                     maxFontSizeMultiplier={CHROME_TEXT_SCALE}
-                    onPress={() => Linking.openURL(translation.credit.url).catch(() => undefined)}
+                    onPress={() => void openWebPage(translation.credit.url)}
                     accessibilityRole="link"
                     accessibilityLabel={t('verse.sheet.opensWebsite', { name: translation.credit.linkLabel })}
                     suppressHighlighting={false}

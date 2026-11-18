@@ -258,6 +258,15 @@ How the tests are made: `tests/scenarios/README.md`.
   timer, nor while another sheet is open (it waits until that one has gone, then the delay again).
   Later puts it off until the next cold start.
 
+## Links
+
+- **LINK-1.** A link to a web page opens in the app's own browser: the privacy policy and the terms
+  (Settings), Revo's "How your data is used", the credits under a translation and the Arabic, and the
+  support program's page. If that browser can't open it, the phone's browser does; if neither can,
+  the page's address shows with Copy. Contact support does the same with the email address when no
+  email app opens. A tap on a link never does nothing. (Nov 18 2026: App Review's iPhone couldn't
+  hand links to Safari, and "How your data is used" and Privacy Policy did nothing when tapped.)
+
 ## Recitation
 
 - **AUDIO-1.** On Android, a recitation that stops leaves no notification behind: ■ or ✕ in the app,
