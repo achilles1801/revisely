@@ -23,7 +23,9 @@ _lock = threading.Lock()
 _testers = {}  # uid -> (is a tester, when read)
 TESTER_TTL = 600
 _checks = {}  # uid -> (has Check, when read)
-CHECK_TTL = 60  # a grant (or a revocation) takes effect within a minute
+# A yes is kept 10 minutes: early access is for life and Open Door grants have no end date, so only a revocation waits
+# that long; and from europe-west1 each read of production's Firestore (nam5) takes 0.25–0.8 s (Nov 18 2026).
+CHECK_TTL = int(os.environ.get('CHECK_TTL', 600))
 CHECK_TTL_NO = 10  # a no is trusted for less: a grant written just after sign-up (early access) unlocks within seconds
 # The entitlements/{uid} field that unlocks Check (apply-support.md draft 2: `premium`, Check being a Premium feature;
 # draft 1 had `check`). Present, and `until` null or later; the `grants` map beside it is the writers' bookkeeping.
@@ -40,6 +42,18 @@ class Refused(Exception):
 class Unreachable(Exception):
     """Firestore or Storage refused, or couldn't be reached. It says only how (a status, or the kind of error):
     requests puts the URL in its own errors, and these URLs hold the account's uid, which never goes in a log."""
+
+
+_local = threading.local()
+
+
+def _read(url, **kw):
+    """A GET on this thread's own kept-alive connection, for the Firestore reads: a new connection each time added its
+    handshake to every read. requests.Session isn't promised to be thread-safe, so each worker thread has its own."""
+    s = getattr(_local, 'session', None)
+    if s is None:
+        s = _local.session = requests.Session()
+    return s.get(url, **kw)
 
 
 def call(fn, url, fine=(), **kw):
@@ -85,7 +99,7 @@ def is_tester(uid):
         return hit[0]
     url = (f'https://firestore.googleapis.com/v1/projects/{PROJECT}/databases/(default)/documents/users/{uid}'
            '?mask.fieldPaths=previewTester')
-    r = call(requests.get, url, fine=(404,), headers={'Authorization': f'Bearer {token()}'}, timeout=10)
+    r = call(_read, url, fine=(404,), headers={'Authorization': f'Bearer {token()}'}, timeout=10)
     ok = r.status_code != 404 and r.json().get('fields', {}).get('previewTester', {}).get('booleanValue') is True
     _testers[uid] = (ok, time.time())
     return ok
@@ -101,7 +115,7 @@ def has_check(uid, now=None):
         return hit[0]
     url = (f'https://firestore.googleapis.com/v1/projects/{PROJECT}/databases/(default)/documents/entitlements/{uid}'
            f'?mask.fieldPaths={ENTITLEMENT}')
-    r = call(requests.get, url, fine=(404,), headers={'Authorization': f'Bearer {token()}'}, timeout=10)
+    r = call(_read, url, fine=(404,), headers={'Authorization': f'Bearer {token()}'}, timeout=10)
     ok = r.status_code != 404 and check_open(r.json().get('fields', {}).get(ENTITLEMENT), t)
     _checks[uid] = (ok, t)
     return ok

@@ -864,6 +864,25 @@ class CheckGateTests(Base):
                 self.assertEqual(ws.receive_json()['type'], 'ready')
 
 
+    def test_the_check_is_timed_in_the_take_line(self):
+        """gate_ms: how long a take's Premium check took (a read of entitlements, or the cache), so the digest shows
+        what it adds before `ready`. Recite has no check, and no gate_ms."""
+        def take(**extra):
+            with self.client.websocket_connect('/live') as ws:
+                ws.send_text(start(token='good', **extra))
+                self.assertEqual(ws.receive_json()['type'], 'ready')
+                ws.send_bytes(second_of_audio())
+                ws.send_text(json.dumps({'type': 'end'}))
+                while ws.receive_json()['type'] != 'done':
+                    pass
+            return [f for k, f in self.health if k == 'take'][-1]
+        with mock.patch.object(server, 'CHECK_GATE', True):
+            line = take()
+            self.assertGreaterEqual(line['gate_ms'], 0)
+            self.assertLess(line['gate_ms'], 5000)
+            self.assertNotIn('gate_ms', take(follow=True))
+
+
 class ProductionSwitchTests(Base):
     """The switches production sets (checker-prod.md): each one's default is what dev's services have always done."""
 
@@ -1115,7 +1134,7 @@ class EntitlementTests(unittest.TestCase):
             calls.append(url)
             return answers[url.split('/entitlements/')[1].split('?')[0]]
         auth._checks.clear()
-        with mock.patch.object(auth.requests, 'get', get), mock.patch.object(auth, 'token', lambda: 'x'):
+        with mock.patch.object(auth, '_read', get), mock.patch.object(auth, 'token', lambda: 'x'):
             self.assertFalse(auth.has_check('nobody', now=100))
             self.assertTrue(auth.has_check('granted', now=100))
             self.assertFalse(auth.has_check('empty', now=100))
@@ -1150,7 +1169,7 @@ class EntitlementTests(unittest.TestCase):
             seen.append(url)
             return R()
         auth._checks.clear()
-        with mock.patch.object(auth, 'ENTITLEMENT', 'check'), mock.patch.object(auth.requests, 'get', get), \
+        with mock.patch.object(auth, 'ENTITLEMENT', 'check'), mock.patch.object(auth, '_read', get), \
                 mock.patch.object(auth, 'token', lambda: 'x'):
             self.assertTrue(auth.has_check('someone', now=100))
         self.assertIn('mask.fieldPaths=check', seen[0])
@@ -1188,13 +1207,40 @@ class NoUidInLogsTests(unittest.TestCase):
                 self.assertNotIn(self.UID, text + repr(e))
         self.assertEqual(str(self.logged(lambda: auth.call(unreachable, name))[0]), 'ConnectionError')
 
+    def test_reads_keep_their_connection(self):
+        """Firestore reads reuse one kept-alive connection per worker thread (from europe-west1 each read of nam5 took
+        0.25–0.8 s, and a new connection each time added its handshake); another thread gets its own."""
+        made = []
+
+        class S:
+            def __init__(self):
+                made.append(self)
+
+            def get(self, url, **kw):
+                return (self, url)
+        auth._local = threading.local()
+        with mock.patch.object(auth.requests, 'Session', S):
+            a, b = auth._read('u1'), auth._read('u2')
+            self.assertIs(a[0], b[0])
+            other = []
+            t = threading.Thread(target=lambda: other.append(auth._read('u3')))
+            t.start()
+            t.join()
+            self.assertIsNot(other[0][0], a[0])
+        self.assertEqual(len(made), 2)
+        auth._local = threading.local()
+
+    def test_a_yes_is_kept_ten_minutes(self):
+        self.assertEqual(auth.CHECK_TTL, 600)  # early access is for life; only a revocation waits this long
+        self.assertEqual(auth.CHECK_TTL_NO, 10)
+
     def test_firestore_failures(self):
         class R:
             status_code = 503
         auth._testers.clear()
         auth._checks.clear()
         with mock.patch.object(auth, 'token', lambda: 'x'), \
-                mock.patch.object(auth.requests, 'get', lambda url, **kw: R()):
+                mock.patch.object(auth, '_read', lambda url, **kw: R()):
             for read in (auth.is_tester, auth.has_check):
                 e, text = self.logged(lambda: read(self.UID))
                 self.assertEqual(str(e), 'HTTP 503')

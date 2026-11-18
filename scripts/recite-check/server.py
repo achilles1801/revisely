@@ -375,6 +375,7 @@ class Live:
         self.lag = []                   # seconds from audio arriving to its events going out, per piece of work
         self.appcheck = None            # its latest socket's App Check result (APP_CHECK log or on)
         self.end_came = None            # when the frame that ended the take arrived (Stop, or the last audio)
+        self.gate_ms = None             # the Premium check on its first socket (CHECK_GATE), in ms: read, or from cache
         self.done_s = None              # from then to `done` sent: what the summary waited (the names too without
         #                                 namesAfter)
 
@@ -495,7 +496,7 @@ def take_fields(s, r, kept=None, names_ms=None):
             'ready_s': s.ready_s, 'cold': s.cold, 'age_s': round(s.age, 1), 'sockets': s.sockets,
             'restarted': s.restarted, 'why': r.get('why'), 'marks': len(r.get('marks') or []), 'kept': kept,
             'cpu_s': round(cpu_s, 2), 'cpu_per_s': round(cpu_s / secs, 3) if secs else None,
-            'appcheck': s.appcheck, 'done_s': s.done_s, 'names_after_ms': names_ms, **health.lag(s.lag),
+            'appcheck': s.appcheck, 'gate_ms': s.gate_ms, 'done_s': s.done_s, 'names_after_ms': names_ms, **health.lag(s.lag),
             **health.per_second(r.get('ms'), secs)}
 
 
@@ -697,8 +698,11 @@ async def live_socket(ws: WebSocket):
         uid = await signed_in('Bearer ' + token if isinstance(token, str) else ws.headers.get('authorization'))
         ac = msg.get('appCheck')
         appcheck = await app_checked(ac if isinstance(ac, str) else ws.headers.get('x-firebase-appcheck'))
+        gate_ms = None
         if not follow_of(msg):
+            g0 = time.perf_counter()
             await may_check(uid)  # on every socket, a resume's too
+            gate_ms = round((time.perf_counter() - g0) * 1000)
         may_run(health.level(settings_from(msg), follow_of(msg)))
         forget_old()
         rid = msg.get('resume')
@@ -722,6 +726,7 @@ async def live_socket(ws: WebSocket):
         if not resumed:  # a new session on this instance (a take, or a resume started again here)
             s.opened, s.cpu0, s.age = accepted, cpu0, age0
             s.cold = health.STATE['takes'] == 0
+            s.gate_ms = gate_ms
             s.restarted = isinstance(msg.get('resume'), str)
             health.STATE['takes'] += 1
 
