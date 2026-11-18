@@ -224,6 +224,25 @@ const UTIYAT = A23 + 4;
 
 const flush = () => act(async () => {});
 /**
+ * Waits for `check` to pass, 50 ms at a time inside act, as everything else here runs. waitFor polls outside act, where
+ * this screen's re-renders through a sheet's 180 ms closing animation took 1.5 s on a laptop and past 4 s on a loaded CI
+ * runner (the RMEM-6 delete test, Nov 17–18 2026). Inside act the same close takes about 0.1 s.
+ */
+async function settle(check: () => void, timeout = 5000): Promise<void> {
+  const end = Date.now() + timeout;
+  for (;;) {
+    try {
+      check();
+      return;
+    } catch (e) {
+      if (Date.now() > end) throw e;
+    }
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+  }
+}
+/**
  * The app goes to the background: every AppState listener hears it, as on a phone. (Taking the last one registered was
  * order-dependent: other hooks register theirs too, some after a promise.)
  */
@@ -1203,7 +1222,7 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
     fireEvent.press(screen.getByTestId('take-summary-check'));
     await flush();
     expect(screen.queryByTestId('check-intro')).toBeNull();
-    await waitFor(() => expect(screen.getByTestId('check-intro')).toBeTruthy(), { timeout: 3000 });
+    await settle(() => expect(screen.getByTestId('check-intro')).toBeTruthy());
     expect(screen.queryByTestId('take-summary')).toBeNull();
   });
 
@@ -1775,7 +1794,7 @@ describe('Test me (Majd, Nov 15 2026: random within what’s memorized, with an 
     await flush();
     fireEvent.press(screen.getByTestId('test-me-all'));
     // The notice takes its turn once the where-from sheet has gone (SHEET-1; in Jest, the fallback about a second on).
-    await waitFor(() => expect(screen.getByTestId('recite-notice-sheet')).toBeTruthy(), { timeout: 3000 });
+    await settle(() => expect(screen.getByTestId('recite-notice-sheet')).toBeTruthy());
     expect(mockLive.start).toBeUndefined();
     const { ReciteNoticeSheet } = require('../../../components/reciteLive/ReciteNoticeSheet');
     await act(async () => screen.UNSAFE_getByType(ReciteNoticeSheet).props.onClose());
