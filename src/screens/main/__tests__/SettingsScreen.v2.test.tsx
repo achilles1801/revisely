@@ -77,6 +77,16 @@ jest.mock('../../../lib/recite/speechModelStore', () => ({
   cancelModelDownload: jest.fn(),
 }));
 jest.mock('@react-native-community/netinfo', () => ({ fetch: jest.fn(async () => ({ type: 'wifi' })) }));
+// Revisely Dev or the store app (lib/variant); the store app unless a test says otherwise.
+let mockDev = false;
+jest.mock('../../../lib/variant', () => ({ ...jest.requireActual('../../../lib/variant'), isDevVariant: () => mockDev }));
+// The checker's model row asks the checker over the network: its own test covers it (CheckerModelRow.test).
+jest.mock('../../../components/settings/CheckerModelRow', () => ({
+  CheckerModelRow: () => {
+    const { Text } = require('react-native');
+    return <Text testID="settings-checker-model">Mistake detection model</Text>;
+  },
+}));
 
 import SettingsScreen from '../SettingsScreen';
 import { DesignProvider } from '../../../design/DesignContext';
@@ -303,6 +313,30 @@ describe('Settings: Reset my data (testers)', () => {
     });
     expect(screen.getByTestId('reset-data-input')).toBeTruthy();
     expect(screen.getByTestId('reset-data-confirm').props.accessibilityState).toMatchObject({ disabled: true });
+  });
+});
+
+describe("Settings: the checker's model (Revisely Dev's testers)", () => {
+  afterEach(() => {
+    mockDev = false;
+    delete mockUser.previewTester;
+  });
+
+  it('Revisely Dev, a tester: the row is in Testing', async () => {
+    mockDev = true;
+    mockUser.previewTester = true;
+    await renderV2();
+    expect(screen.getByText('Testing')).toBeTruthy();
+    expect(screen.getByTestId('settings-checker-model')).toBeTruthy();
+  });
+
+  it('the store app, tester or not: no row', async () => {
+    mockUser.previewTester = true;
+    await renderV2();
+    expect(screen.queryByTestId('settings-checker-model')).toBeNull();
+    delete mockUser.previewTester;
+    await renderV2();
+    expect(screen.queryByTestId('settings-checker-model')).toBeNull();
   });
 });
 

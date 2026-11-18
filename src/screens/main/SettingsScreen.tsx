@@ -94,6 +94,7 @@ import { checkLevel, setReciteCheckSettings, strictOffered, useReciteCheckSettin
 import { ReciteCheckNotice } from '../../components/reciteCheck/ReciteCheckNotice';
 import { t } from '../../i18n';
 import { isDevVariant } from '../../lib/variant';
+import { CheckerModelRow } from '../../components/settings/CheckerModelRow';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'Settings'>;
 
@@ -1175,6 +1176,8 @@ export default function SettingsScreen() {
                 }
               />
             ) : null}
+            {/* Revisely Dev only: which model its checker runs for each level (Majd, Nov 18 2026). */}
+            {reciteCheck && isDevVariant() ? <CheckerModelRow /> : null}
             {reciteCheck ? (
               <Row
                 icon="sparkles-outline"
