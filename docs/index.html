@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Revisely: Quran revision, on schedule</title>
   <meta name="rv-title" content="h.title.doc">
-  <meta name="description" content="Revisely plans a little Quran revision every day across everything you’ve memorized, on the pages of the Madani mushaf. Free on iPhone.">
+  <meta name="description" content="Revisely plans a little Quran revision every day across everything you’ve memorized, on the pages of the Madani mushaf. Free on iPhone and Android.">
   <link rel="canonical" href="https://revisely.app/">
   <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
@@ -15,7 +15,7 @@
   <meta property="og:site_name" content="Revisely">
   <meta property="og:url" content="https://revisely.app/">
   <meta property="og:title" content="Revisely: Quran revision, on schedule">
-  <meta property="og:description" content="A little revision every day across everything you’ve memorized. Free on iPhone.">
+  <meta property="og:description" content="A little revision every day across everything you’ve memorized. Free on iPhone and Android.">
   <meta property="og:image" content="https://revisely.app/assets/img/og.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
@@ -35,11 +35,11 @@
     "@context": "https://schema.org",
     "@type": "MobileApplication",
     "name": "Revisely",
-    "operatingSystem": "iOS",
+    "operatingSystem": "iOS, Android",
     "applicationCategory": "EducationalApplication",
     "description": "A Quran revision tracker that schedules your daily review on a cycle through everything you have memorized.",
     "url": "https://revisely.app/",
-    "downloadUrl": "https://apps.apple.com/app/revisely/id6767990248",
+    "downloadUrl": ["https://apps.apple.com/app/revisely/id6767990248", "https://play.google.com/store/apps/details?id=app.revisely"],
     "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
   }
   </script>
@@ -106,7 +106,10 @@
                   <img src="https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/black/en-us" width="156" height="52" alt="Download on the App Store" data-t-alt="h.badge">
                 </picture>
               </a>
-              <p class="soon"><small data-t="soon.small">Coming to</small> <b>Google Play</b></p>
+              <!-- Google's badge as Google gives it (its PNG has a margin of its own, which the CSS takes back). -->
+              <a class="badge-link play" href="https://play.google.com/store/apps/details?id=app.revisely">
+                <img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" width="646" height="250" alt="Get it on Google Play">
+              </a>
             </div>
           </div>
           <div class="visual fan" role="img" aria-label="Revisely’s Home three times, fanned like cards, in its three accents: Indigo, Crimson and Jade. Each shows today’s revision, starting at Al-Mujadila in Juz 28, with Start revision." data-t-aria="h.s1.alt">

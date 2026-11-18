@@ -23,7 +23,7 @@ html[lang="ar"] .ar-only[hidden] { display: block !important; }
 html[dir="rtl"] body { font-family: "Amiri", var(--font); font-size: 19px; line-height: 1.85; }
 html[dir="rtl"] * { letter-spacing: 0 !important; }
 html[dir="rtl"] h1, html[dir="rtl"] h2, html[dir="rtl"] h3 { line-height: 1.5; }
-html[dir="rtl"] .latin, html[dir="rtl"] .brand, html[dir="rtl"] .soon b { font-family: var(--font); }
+html[dir="rtl"] .latin, html[dir="rtl"] .brand { font-family: var(--font); }
 html[dir="rtl"] .site-nav .lang { font-family: var(--font); }
 
 /* The home's slideshow: the track keeps scrolling left to right (site.js counts scrollLeft from the left), and each
@@ -39,7 +39,6 @@ html[dir="rtl"] .home .revo p { font-size: 19px; line-height: 1.8; }
 html[dir="rtl"] .home .asks li { font-size: 17px; }
 html[dir="rtl"] .home .points li { font-size: 17px; line-height: 1.7; }
 html[dir="rtl"] .home .revo .note { font-size: 16px; }
-html[dir="rtl"] .home .soon small { font-size: 13px; }
 html[dir="rtl"] .home .step h3 { font-size: 21px; line-height: 1.5; }
 html[dir="rtl"] .home .step p { font-size: 17px; line-height: 1.75; }
 html[dir="rtl"] .home .recite .note { font-size: 16px; }
