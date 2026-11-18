@@ -336,3 +336,15 @@ describe('Premium in the Dev app', () => {
     expect(m.ents.size).toBe(0);
   });
 });
+
+describe('where the program runs', () => {
+  const { SUPPORT_PAGES, SUPPORT_ORIGINS } = require('../support/logic') as typeof import('../support/logic');
+  it('revisely-dev and production have their program page; any other project has none (supportLink refuses)', () => {
+    expect(SUPPORT_PAGES['revisely-dev']).toBe('https://dev.revisely.app/apply/');
+    expect(SUPPORT_PAGES['revision-buddy-3a398']).toBe('https://revisely.app/apply/');
+    expect(SUPPORT_PAGES['demo-revisely']).toBeUndefined();
+  });
+  it('only the two sites may call it from a browser', () => {
+    expect([...SUPPORT_ORIGINS].sort()).toEqual(['https://dev.revisely.app', 'https://revisely.app']);
+  });
+});
