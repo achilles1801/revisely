@@ -4,6 +4,7 @@ import { AccessibilityInfo, Alert, Modal, StatusBar } from 'react-native';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import QuranReaderScreen from '../QuranReaderScreen';
+import { Sheet } from '../../../components/v2/Sheet';
 import { resetReciteCheckSettingsForTests, setReciteCheckSettings } from '../../../lib/reciteCheck/settings';
 import type { LiveEvent } from '../../../lib/reciteLive/contract';
 import { STOP_TRACE_KEY } from '../../../lib/reciteLive/stopTrace';
@@ -439,7 +440,11 @@ describe('a take’s audio stays with the take, never a recording (RMEM-6)', () 
     await flush();
     expect(alert).toHaveBeenCalledWith('Delete this take?', expect.any(String), expect.any(Array));
     expect(del).toHaveBeenCalledWith('rec-1');
-    await waitFor(() => expect(screen.queryByTestId('take-summary')).toBeNull(), { timeout: 4000 });
+    // The summary is closed at once. Its sheet's own going (the closing animation, then the modal) is v2/Sheet's to
+    // test: waiting for it here timed this screen's re-renders, about 1.5 s on a laptop and past the 4 s allowed on a
+    // loaded CI runner (Nov 17–18 2026).
+    const summary = screen.UNSAFE_getAllByType(Sheet).find((s) => s.props.testID === 'take-summary');
+    expect(summary?.props.visible).toBe(false);
     del.mockRestore();
     alert.mockRestore();
   }, 15_000);
