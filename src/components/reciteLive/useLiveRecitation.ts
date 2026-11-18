@@ -13,7 +13,7 @@ import { placeOfAyah, spokenText } from '../../lib/passages';
 import { AudioSource, startMicStream } from '../../lib/recite/micSource';
 import { SAMPLE_RATE } from '../../lib/recite/segmenter';
 import { getQuranWords, loadQuranWords, QuranWords } from '../../lib/recite/quranWords';
-import type { ReciteCheckSettings } from '../../lib/reciteCheck/settings';
+import { checkLevel, type ReciteCheckSettings } from '../../lib/reciteCheck/settings';
 import { sendLabel } from '../../lib/reciteCheck/service';
 import type { LiveEvent, Mark } from '../../lib/reciteLive/contract';
 import type { LiveConnect, LiveConnection, StartFrame } from '../../lib/reciteLive/feed';
@@ -115,7 +115,7 @@ export function startFrameFor(
     mot: settings.muttasil,
     aar: settings.aared,
     letters: true,
-    tajweed: settings.level === 'strict',
+    tajweed: checkLevel(settings) === 'strict',
     // Kept as test data only on Revisely Dev's checker: production's keeps nothing (recite-server-prod-plan.md), so the
     // store app never asks, and never says a take was kept.
     keep: settings.keep && isDevVariant(),

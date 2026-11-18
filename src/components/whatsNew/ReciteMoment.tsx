@@ -18,7 +18,7 @@ import { PillButton } from '../v2/PillButton';
 import { ReciteBar } from '../reciteLive/ReciteBar';
 import { scoreLevel } from '../../lib/reciteLive/score';
 import { momentAt, momentLength } from '../../lib/whatsNew/reciteMoment';
-import { TAKE, TakeLines, textOf } from './pictures';
+import { demoMarks, TAKE, TakeLines, textOf } from './pictures';
 import { t } from '../../i18n';
 
 const TICK_MS = 80;
@@ -47,7 +47,7 @@ export function ReciteMoment({
   const read = getReadPalette(isDark);
   const reduceMotion = useReduceMotion();
   const [screenReader, setScreenReader] = useState(false);
-  const take = useMemo(() => ({ order: TAKE.lines.flat().map((x) => x.w), marks: TAKE.marks }), []);
+  const take = useMemo(() => ({ order: TAKE.lines.flat().map((x) => x.w), marks: demoMarks() }), []);
   const length = momentLength(take);
   const [at, setAt] = useState(0);
   const straightToEnd = reduceMotion || screenReader;
