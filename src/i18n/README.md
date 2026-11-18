@@ -34,8 +34,6 @@ t('updates.store.body', { version, store });      // "Revisely 1.0.4 is on the A
 - **The English stays exactly as it was** when a string moves. Values are text only: no colours, no
   markup.
 
-**Arabic:** the words and rules (one term per concept, plurals, digits, typography) are in `ar-glossary.md`.
-
 ## Dates and numbers
 
 From `src/i18n` too (`format.ts`), so another language writes them its own way:

@@ -41,11 +41,10 @@ Standard UI terms are taken from these sources. Nobody's sentences are copied.
 
 - **Punctuation:** the Arabic comma ، semicolon ؛ and question mark ؟. No space before them and one after
   [MS §4.1.14]. Quotation marks are « » [the brief; Arabic print convention]. Ellipsis is «…».
-- **Digits** are Arabic-Indic (٠١٢٣٤٥٦٧٨٩), with ٫ for decimals and ٪ for percent («٢٠٫٥٪»). The website already writes
-  them (`ar-u-nu-arab`), and so do Quran.com's Arabic and the mushaf's verse numbers [QC][MU]. Microsoft prefers
-  Western digits [MS §4.1.12], and many Gulf apps follow it. **(Majd decides:** the App in Arabic study, decision 1; its
-  pick is "the phone's own setting, else Arabic-Indic".) Use `formatNumber` and the date helpers from `src/i18n`, never
-  digits typed into a string.
+- **Digits: Arabic-Indic (٠١٢٣٤٥٦٧٨٩) by default, until Majd decides** (open choice 1 below). Decimals are ٫ and percent
+  is ٪ («٢٠٫٥٪»). The website already writes them (`ar-u-nu-arab`), and so do Quran.com's Arabic and the mushaf's
+  verse numbers [QC][MU]. Microsoft prefers Western digits [MS §4.1.12], and many Gulf apps follow it. Use
+  `formatNumber` and the date helpers from `src/i18n`, never digits typed into a string, so the decision is one change.
 - **0, 1 and 2 are words, not digits:** «لا توجد صفحات», «صفحة واحدة», «صفحتان» [MS §4.1.12]. The plural keys below
   carry them.
 - **Hamza:**
@@ -64,10 +63,14 @@ Standard UI terms are taken from these sources. Nobody's sentences are copied.
   - a fronted object («يقرأ كلَّ طلبٍ إنسانٌ»);
   - «وِرد», which would otherwise read as «وَرد» (roses).
   Surah names are the exception: they are voweled only where the design shows `nameArabicVoweled`.
-- **Latin inside Arabic sits in a first-strong isolate** (⁨…⁩, U+2068/U+2069): app labels, Revo, emails, a `{value}`
-  that could hold Latin. The repo's rule is CLAUDE.md, "The design → Fonts".
-  - A multi-word label quoted mid-sentence also gets Arabic quotes outside the isolate: «⁨Mark mistakes⁩».
-  - A one-word label needs only the isolate: ⁨Settings⁩.
+- **Latin inside Arabic sits in a first-strong isolate** (⁨…⁩, U+2068/U+2069): Revo, reciter names, version numbers,
+  emails, a `{{value}}` that could hold Latin. The repo's rule is CLAUDE.md, "The design → Fonts".
+- **Quoting the app's labels:**
+  - **Text that quotes the English app** (the website and store listings, while the app is English) keeps the English
+    label in an isolate. A multi-word label mid-sentence also gets Arabic quotes outside the isolate: «⁨Mark mistakes⁩».
+    A one-word label needs only the isolate: ⁨Settings⁩.
+  - **In the `ar/` strings and the Arabic help topics,** a label is the Arabic UI text itself, with no isolate. Help's
+    `{{Label}}` must match it exactly, which is why one term per concept matters most there.
 - **Steps in a path** are joined with «←», which points the reading way in Arabic: ⁨Settings⁩ ← ⁨Prayer⁩.
 - **Chevrons never go in a string.** The code adds `chevron()` / `backChevron()` (`src/i18n/direction.ts`).
 - **Names stay in Latin** (brands, products, platforms): App Store, Google Play, iPhone, Android, Google, Apple,
@@ -76,7 +79,9 @@ Standard UI terms are taken from these sources. Nobody's sentences are copied.
 
 ## Numbers and plurals
 
-i18next uses Arabic's six CLDR forms, so a counted string needs all six keys: `_zero`, `_one`, `_two`, `_few` (3–10, and
+i18next uses Arabic's six CLDR forms (Intl.PluralRules), so a counted string needs all six keys. Arabic uses `_zero`
+at 0, where English shows "0 pages", so `_zero` says what nothing reads as. `_one` and `_two` may leave out
+`{{count}}`. The keys: `_zero`, `_one`, `_two`, `_few` (3–10, and
 103–110…), `_many` (11–99, and 111–199…) and `_other` (100–102, 200…). With digits, the noun's form is what changes:
 
 | Key | صفحة (page) | آية (ayah) | جزء (juz) | سورة (surah) | يوم (day) | دقيقة (minute) |
@@ -253,6 +258,21 @@ Qur'an quotations go between the ornate brackets ﴿ ﴾, followed by the citati
   phone's locale can make.
 - Morning and evening are «ص» and «م». "Today", "yesterday" and "tomorrow" are «اليوم», «أمس» and «غدًا».
 
+## Already on the website
+
+The website's Arabic (`docs/assets/strings.js`, approved by Majd on Nov 14; `strings-site.js`) uses these terms since
+the review's #747: «تحديد الأخطاء» (it said «تعليم الأخطاء»), «الصفحة تتابع تلاوتك (Recite)» (it said «تتبعك الصفحة»),
+and «نسخة احتياطية» for backup (it said «محفوظة» / «وحفظها»). If Majd picks another term below, the site and the app
+change in the same decision.
+
+## Majd's four open choices (App in Arabic)
+
+From `~/Documents/revisely-handoffs/app-in-arabic-2.md`. Each has App in Arabic's pick; none is settled yet.
+1. **Digits:** follow the phone's setting, else Arabic-Indic like the site.
+2. **Font:** system Arabic for the interface, Amiri for the Qur'an and surah names.
+3. **Revo's language:** the app's language.
+4. **Translation:** Claude drafts, Majd checks.
+
 ## Open questions (native speaker or Majd)
 
 1. **Premium:** بريميوم, as approved, or «المميّز», as Tarteel and Telegram write it?
@@ -260,6 +280,9 @@ Qur'an quotations go between the ornate brackets ﴿ ﴾, followed by the citati
 3. **Skipped word:** «متروكة» or «ساقطة» (the halaqa word: أسقط كلمة)?
 4. **Strict:** «الوضع الصارم» or «وضع التدقيق»?
 5. **A take:** «تسميع» (pl. «التسميعات»)?
-6. **Digits:** Arabic-Indic everywhere, or the phone's setting (study decision 1)?
+6. **Digits:** see Majd's open choice 1.
 7. **Addressing women:** keep the generic masculine (as Apple and Google), or add feminine forms where they are cheap?
    Women memorize with women teachers, so «معلّم» might become «معلّم أو معلّمة» in places.
+8. **Recite:** «متابعة التلاوة» as its Arabic name?
+9. **Saheeh International's credit:** may the Arabic UI translate the words around the names («issued by» → «صادرة عن»),
+   or does the whole credit stay as QuranEnc gives it? (The Clear Quran® credit and Tanzil's notice stay word for word.)
