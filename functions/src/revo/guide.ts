@@ -371,6 +371,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     text: lines(
       '- Settings → Recite → “Mistakes to mark”: “Words & harakat”, or “Strict”, which also marks tajweed in violet (madd lengths, set by “Madd munfasil”, “Madd muttasil” and “Madd ʿarid”; qalqalah, ghunnah, ikhfa, idgham, iqlab). The store app marks words and harakat only.',
       '- Settings → Testing → “Keep my recitations as test data” keeps takes for Revisely’s tests; nobody listens. Settings → Testing → “Premium” turns Premium off to see Mark mistakes locked.',
+      '- Settings → Testing → “Mistake detection model” says which model the checker runs for Recite, Words & harakat and Strict (for example v7), read from the checker when Settings opens; a tap asks again.',
     ),
   },
 ];

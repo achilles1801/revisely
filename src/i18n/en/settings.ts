@@ -244,6 +244,14 @@ export const settings = {
     whatsNewAtLaunchSub: 'As App Store users will see it after the update',
     keep: 'Keep my recitations as test data',
     keepSub: 'Recitation checks, for Revisely’s tests. Software checks them; nobody listens.',
+    /** Revisely Dev's row naming the checker's models (components/settings/CheckerModelRow). */
+    model: 'Mistake detection model',
+    modelLine: 'Recite {{recite}} · Words & harakat {{harakat}} · Strict {{strict}}',
+    /** The checker's commit, a quiet detail under the models. */
+    modelServer: 'Checker {{server}}',
+    modelReading: 'Asking the checker…',
+    modelFailed: 'Couldn’t reach the checker. Tap to try again.',
+    modelHint: 'Asks the checker again',
     premium: 'Premium',
     premiumSub: 'Free in Revisely Dev. Turn it off to see Mark mistakes locked',
     premiumOnFailed: 'Couldn’t turn on Premium',
