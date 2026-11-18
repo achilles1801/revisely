@@ -28,7 +28,7 @@ class Digest(unittest.TestCase):
             entry({'health': 'take', 'kind': 'live', 'level': 'strict', 'audio_s': 300, 'open_s': 302, 'ready_s': 0.2,
                    'cold': False, 'sockets': 2, 'why': 'end', 'marks': 7, 'kept': True, 'lag_p50': 0.02,
                    'lag_p90': 0.6, 'lag_max': 2.0, 'model_per_s': 0.24, 'cpu_per_s': 0.55, 'done_s': 0.8,
-                   'names_after_ms': 1900}),
+                   'names_after_ms': 1900, 'gate_ms': 150}),
             entry({'health': 'take', 'kind': 'check', 'v': 2, 'level': 'harakat', 'audio_s': 60, 'wall_s': 8,
                    'marks': 2, 'kept': False}),
             entry({'health': 'refused', 'route': 'live', 'reason': 'limit'}),
@@ -45,6 +45,8 @@ class Digest(unittest.TestCase):
         self.assertIn('Instances started: 1. Process start → ready: median 6.2 s', md)
         self.assertIn('Live takes resumed on the same instance: 1; started again on another: 0.', md)
         self.assertIn('Refused: live / limit 1.', md)
+        self.assertIn('- Connect → `ready`, Mark mistakes: median 0.20 s, p90 0.20 s; the Premium check in it: median 0.15 s, '
+                      'p90 0.15 s (1 takes).', md)
         self.assertIn('Stop → the summary (`done`), Mark mistakes: median 0.80 s, p90 0.80 s, worst 0.80 s (1 takes); '
                       'the names after it (namesAfter, 1 takes): median 1.90 s, worst 1.90 s.', md)
         self.assertIn('Dropped (the phone went and never came back here): 1 (timeout 1).', md)

@@ -103,6 +103,17 @@ def stop_to_done(live):
     return line + '.'
 
 
+def premium_check(live):
+    """Connect → `ready` for the takes that mark mistakes (`ready_s`), and how much of it was the Premium check
+    (`gate_ms`: a read of entitlements, from production's Firestore in nam5, or the cache). None where nothing checks."""
+    gate = [p['gate_ms'] / 1000 for p in live if p.get('gate_ms') is not None]
+    if not gate:
+        return None
+    ready = [p['ready_s'] for p in live if p.get('gate_ms') is not None and p.get('ready_s') is not None]
+    return (f"- Connect → `ready`, Mark mistakes: median {f(q(ready, .5), ' s')}, p90 {f(q(ready, .9), ' s')}; the Premium "
+            f"check in it: median {f(q(gate, .5), ' s')}, p90 {f(q(gate, .9), ' s')} ({len(gate)} takes).")
+
+
 def summarize(entries, days, now=None, project=PROJECT):
     """The digest's Markdown."""
     now = now or dt.datetime.now(dt.timezone.utc)
@@ -153,7 +164,7 @@ def summarize(entries, days, now=None, project=PROJECT):
             + (f" ({100 * len(cold) / len(live):.0f}%)" if live else '') + '.',
             f"- Connect → `ready`: cold median {f(q([p.get('ready_s') for p in cold], .5), ' s')}, warm median "
             f"{f(q([p.get('ready_s') for p in live if not p.get('cold')], .5), ' s')}, worst "
-            f"{f(q([p.get('ready_s') for p in live], 1), ' s')}.", '']
+            f"{f(q([p.get('ready_s') for p in live], 1), ' s')}.", *[x for x in [premium_check(live)] if x], '']
 
     out += ['### Keeping up with the reciter (live)', '',
             f"- Audio waiting before its events went out: median of takes' p50 {f(q([p.get('lag_p50') for p in live], .5), ' s')}, "
