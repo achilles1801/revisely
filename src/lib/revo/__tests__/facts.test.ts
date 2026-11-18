@@ -180,5 +180,8 @@ describe('search', () => {
     expect(findPassages('juz 31')).toEqual([]);
     expect(findPassages('p. 288')).toEqual([{ kind: 'pages', pages: [288], label: expect.any(String) }]);
     expect(findPassages('yusuf')).toEqual([{ kind: 'surah', surah: 12, label: 'Yusuf' }]);
+    // Arabic, with or without its hamzas.
+    expect(findPassages('ابراهيم')).toEqual([{ kind: 'surah', surah: 14, label: 'Ibrahim' }]);
+    expect(findPassages('يوسف')).toEqual([{ kind: 'surah', surah: 12, label: 'Yusuf' }]);
   });
 });

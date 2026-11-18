@@ -9,6 +9,7 @@ import { plainText } from '../passages';
 import type { RecordingMeta } from '../recordings';
 import { dayFacts, type DayExtras, passageFacts, type Prepared } from './facts';
 import { juzOf, passageShort } from './words';
+import { normalizeWord } from '../recite/arabic';
 import type { RevoAttachment, RevoInsight } from './types';
 import { t, formatDate, formatTime } from '../../i18n';
 
@@ -81,8 +82,10 @@ export function findPassages(text: string): Found[] {
   const plain = (s: string) => s.toLowerCase().replace(/[^a-z؀-ۿ]/g, '');
   const want = plain(q);
   if (!want) return [];
+  // Arabic with or without hamzas and harakat, ة as ه ("ابراهيم" finds إبراهيم).
+  const arabic = normalizeWord(q);
   return getAllSurahs()
-    .filter((s) => plain(s.name).includes(want) || s.nameArabic.includes(q))
+    .filter((s) => plain(s.name).includes(want) || (arabic !== '' && normalizeWord(s.nameArabic).includes(arabic)))
     .slice(0, 8)
     .map((s) => ({ kind: 'surah', surah: s.number, label: plainText(s.name) }));
 }

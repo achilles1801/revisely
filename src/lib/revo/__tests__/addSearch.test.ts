@@ -12,6 +12,10 @@ describe('search', () => {
     expect(searchAdd('Yusuf', TODAY)).toEqual([{ kind: 'surah', surah: 12, label: 'Yusuf' }]);
     expect(searchAdd('al hashr', TODAY)[0]).toEqual({ kind: 'surah', surah: 59, label: 'Al-Hashr' });
     expect(searchAdd('الحشر', TODAY)[0]).toMatchObject({ kind: 'surah', surah: 59 });
+    // Arabic typed with or without its hamzas finds the name as the mushaf writes it (إبراهيم, الانفطار).
+    expect(searchAdd('ابراهيم', TODAY)[0]).toMatchObject({ kind: 'surah', surah: 14 });
+    expect(searchAdd('إبراهيم', TODAY)[0]).toMatchObject({ kind: 'surah', surah: 14 });
+    expect(searchAdd('الإنفطار', TODAY)[0]).toMatchObject({ kind: 'surah', surah: 82 });
     // One surah named: its juz beside it, when it is in one.
     expect(searchAdd('Al-Mulk', TODAY)).toEqual([
       { kind: 'surah', surah: 67, label: 'Al-Mulk' },

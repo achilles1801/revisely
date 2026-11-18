@@ -8,6 +8,7 @@ import { pageOfVerse } from '../verses';
 import { describePassage, plainText } from '../passages';
 import { shiftDay } from '../journal';
 import { t } from '../../i18n';
+import { normalizeWord } from '../recite/arabic';
 
 export type AddFound =
   | { kind: 'surah'; surah: number; label: string }
@@ -33,8 +34,12 @@ function weekdayOf(day: string): number {
 export function matchSurahs(text: string): number[] {
   const want = letters(text);
   if (!want) return [];
+  // Arabic as people type it: with or without hamzas and harakat, ة as ه ("ابراهيم" finds إبراهيم).
+  const arabic = normalizeWord(text);
   const exact = getAllSurahs().filter((s) => letters(s.name) === want);
-  const rest = getAllSurahs().filter((s) => letters(s.name) !== want && (letters(s.name).includes(want) || s.nameArabic.includes(text.trim())));
+  const rest = getAllSurahs().filter(
+    (s) => letters(s.name) !== want && (letters(s.name).includes(want) || (arabic !== '' && normalizeWord(s.nameArabic).includes(arabic))),
+  );
   return [...exact, ...rest].map((s) => s.number);
 }
 
