@@ -245,7 +245,8 @@ until its part is set up.
       `worker/__tests__/reciteSection.test.ts` (which also fails if `wrangler.jsonc` ever sets the var).
     - Its screens are Revisely Dev's own, from E2E flow 18 (`scripts/site-clips/recite.py`, README there).
     - `#mistakes` (the store listing links it); the words start from #728 (Website & Open Door's, closed) with Premium's
-      early-access wording (Majd, Nov 17: kept for good, bi-idhnillah, with every Premium feature) linking
+      early-access wording (Majd, Nov 18: free for every account and sign-up, no end date yet, kept for life with
+      features added later, bi-idhnillah) linking
       `/terms/#premium-early-access`, which arrives with #727 (terms, into main, held for the release).
   - Its API accepts only the dev project's sign-ins.
   - **No Clear Quran key.** The Clear Quran's portal allows one active Production key per product
