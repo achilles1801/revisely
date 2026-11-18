@@ -1262,6 +1262,16 @@ app from the home screen to clear the back-link in the status bar.
   - The app preview (886×1920, 30 s, 0:09.5 poster, silent) and Play's promo come from screen
     recordings through `scripts/store/video.py` (full bleed, a caption pill, the Dynamic Island
     painted out). They aren't in git (about 40 MB each) and go up by hand.
+- 1.0.5 (Nov 18 2026, waiting on Majd's OK): eight slides that lead with Mark mistakes, in the same order on both
+  stores (mistakes, a mark's card, Revo, widgets, Home, timer and recording, Activity, Insights with Recitation).
+  1.0.4's sets are kept in `store/screenshots/1.0.4/` and `store/android/screenshots/1.0.4/`, which the upload
+  scripts skip.
+  - The takes are the E2E build's recorded take (`lib/e2e/reciteLive`, as flow 18), against the Firebase emulators:
+    a new account signed up there, then `seed-screenshots.js` and `.maestro/scripts/seed-recite-takes.js` pointed at
+    the emulators. No production data. The status line was hidden with a local change that was never committed.
+  - Android: use the `Revisely_E2E` AVD (API 35). Maestro's driver dies on the API 37 image. The timer slide (both
+    stores), Activity (App Store), and Revo and widgets (Play) are 1.0.4's captures; those screens haven't changed.
+  - The app preview (28 s, poster 0:08.5) is in `~/Documents/revisely-today-mocks/store-105/final/`, not in git.
 - The recordings are demo audio (a synthesized tone), placed on the simulator: two `.m4a` files and
   an `index.json` entry each (`levels` drawn to look like recitation) in the app's
   `Documents/recordings/<uid>/`, with the app closed. The seed turns the account's recording backup
