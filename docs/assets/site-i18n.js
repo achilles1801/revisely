@@ -48,6 +48,19 @@
     ['data-t-alt', function (el) { return el.getAttribute('alt'); }, function (el, s) { el.setAttribute('alt', s); }],
   ];
 
+  // Apple's App Store badge in the page's language: Apple's badge service has Arabic artwork ("تنزيل من App Store"), at
+  // the same address with ar-ar for en-us. Its alt text says the same words.
+  var BADGE = /(\/badges\/download-on-the-app-store\/(?:black|white)\/)(?:en-us|ar-ar)/;
+  function badges(root) {
+    var loc = lang() === 'ar' ? 'ar-ar' : 'en-us';
+    var els = root.querySelectorAll('img[src*="download-on-the-app-store"], source[srcset*="download-on-the-app-store"]');
+    for (var i = 0; i < els.length; i++) {
+      var attr = els[i].tagName === 'IMG' ? 'src' : 'srcset';
+      els[i].setAttribute(attr, els[i].getAttribute(attr).replace(BADGE, '$1' + loc));
+      if (attr === 'src') els[i].setAttribute('alt', t('badge.appStore'));
+    }
+  }
+
   function apply(root) {
     root = root || document;
     for (var k = 0; k < KINDS.length; k++) {
@@ -60,6 +73,7 @@
         KINDS[k][2](els[i], t(key));
       }
     }
+    badges(root);
     // The switch names the other language in that language ("عربي", "English"): a screen reader reads it in its voice.
     var sw = root.querySelectorAll('[data-lang-switch]');
     for (var j = 0; j < sw.length; j++) sw[j].setAttribute('lang', lang() === 'ar' ? 'en' : 'ar');
@@ -93,6 +107,23 @@
     if (b) set(lang() === 'ar' ? 'en' : 'ar');
   });
 
+  // A page with no Arabic yet (privacy, terms, donate) keeps its English left to right, under one Arabic line that
+  // says so: its main content says it is English, and site-rtl.css lays it out that way.
+  function markEnglishOnly() {
+    var main = document.getElementById('main');
+    if (!main || main.querySelector('[data-t],[data-t-html],[data-t-ph],[data-t-aria],[data-t-alt]')) return;
+    main.setAttribute('lang', 'en');
+    main.setAttribute('dir', 'ltr');
+    var note = document.createElement('p');
+    note.className = 'en-only-note';
+    note.setAttribute('lang', 'ar');
+    note.setAttribute('dir', 'rtl');
+    note.setAttribute('data-t', 'doc.englishOnly');
+    var host = main.querySelector('.wrap') || main;
+    host.insertBefore(note, host.firstChild);
+  }
+
+  markEnglishOnly();
   apply(document);
   html.classList.add('i18n');
 })();

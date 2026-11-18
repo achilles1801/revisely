@@ -50,7 +50,9 @@ export function injectAccountNav(html: string): string {
     const withAccount = /<a class="pill"/.test(inner)
       ? inner.replace(/<a class="pill"/, `${LANG_BUTTON}\n        ${ACCOUNT_BUTTON}\n        <a class="pill"`)
       : `${inner}  ${LANG_BUTTON}\n        ${ACCOUNT_BUTTON}\n      `;
-    return `<nav class="site-nav" aria-label="Main" data-acct-nav>${HEAD_LINKS}${withAccount.replace(/\s*$/, '')}\n        ${MENU_BUTTON}\n      </nav>${MENU}`;
+    // The Download pill in the page's language too: the home and Support carry its key, privacy, terms and donate don't.
+    const pill = withAccount.replace(/<a class="pill"((?:(?!data-t=)[^>])*)>Download<\/a>/, '<a class="pill"$1 data-t="nav.download">Download</a>');
+    return `<nav class="site-nav" aria-label="Main" data-acct-nav>${HEAD_LINKS}${pill.replace(/\s*$/, '')}\n        ${MENU_BUTTON}\n      </nav>${MENU}`;
   });
   out = out.replace('<nav aria-label="Footer">', `<nav aria-label="Footer" data-acct-nav>${FOOT_LINKS}`);
   if (out === html) return html; // no site navigation on this page

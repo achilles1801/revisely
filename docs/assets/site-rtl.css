@@ -48,8 +48,19 @@ html[dir="rtl"] .home .recite .note { font-size: 16px; }
 }
 
 /* Support and the other documents. */
-html[dir="rtl"] .doc ul, html[dir="rtl"] .doc ol { padding-left: 0; padding-right: 1.3rem; }
-html[dir="rtl"] .doc .card-list { padding-right: 0; }
-html[dir="rtl"] .doc h1 { line-height: 1.4; }
-html[dir="rtl"] .doc .card-list h2 { font-size: 20px; }
-html[dir="rtl"] .doc p, html[dir="rtl"] .doc li { line-height: 1.85; }
+html[dir="rtl"] .doc:not([lang="en"]) ul, html[dir="rtl"] .doc:not([lang="en"]) ol { padding-left: 0; padding-right: 1.3rem; }
+html[dir="rtl"] .doc:not([lang="en"]) .card-list { padding-right: 0; }
+html[dir="rtl"] .doc:not([lang="en"]) h1 { line-height: 1.4; }
+html[dir="rtl"] .doc:not([lang="en"]) .card-list h2 { font-size: 20px; }
+html[dir="rtl"] .doc:not([lang="en"]) p, html[dir="rtl"] .doc:not([lang="en"]) li { line-height: 1.85; }
+
+/* Pages with no Arabic yet (privacy, terms, donate): site-i18n.js marks their content English. It keeps reading left
+   to right in the Latin font, under one Arabic line that says so, instead of English sentences laid out right to left
+   (their full stops and list numbers landed on the wrong side). */
+.en-only-note { display: none; }
+html[lang="ar"] .en-only-note {
+  display: block; margin: 0 0 1.5rem; font-family: "Amiri", var(--font); font-size: 18px; line-height: 1.8;
+  text-align: right; color: var(--secondary);
+}
+html[lang="ar"] .give-hero .en-only-note { text-align: center; }
+html[dir="rtl"] main[lang="en"] { font: 17px/1.55 var(--font); text-align: left; }
