@@ -1,6 +1,7 @@
 /**
  * Premium early access (Majd, Nov 16 2026: "give everyone premium access right now … it'll be paid for in the future
- * but anyone who has premium now will keep it forever").
+ * but anyone who has premium now will keep it forever"; Nov 18: its end date isn't set, and every account that gets it
+ * before then keeps it for life).
  *
  * - While `config/app.earlyAccess` is true, every account gets Premium when it is set up (its user document is
  *   created: the trigger in index.ts), as the grant `early` in `entitlements/{uid}`, with no end date.

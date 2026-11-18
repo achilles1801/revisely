@@ -107,9 +107,9 @@ describe('the take summary with screen readers and the largest text', () => {
   });
 
   it('[PREM-1] one quiet line about Premium in early access, under the buttons, only when given', () => {
-    show({ premiumNote: 'Premium is free in early access, and yours to keep.' });
+    show({ premiumNote: 'Premium is free for everyone during early access, and yours for life.' });
     expect(screen.getByTestId('take-summary-premium')).toBeTruthy();
-    expect(screen.getByText('Premium is free in early access, and yours to keep.')).toBeTruthy();
+    expect(screen.getByText('Premium is free for everyone during early access, and yours for life.')).toBeTruthy();
   });
 
   it('no Premium line without one', () => {

@@ -1169,15 +1169,17 @@ shows up once and they must go through it and complete it … just the main stuf
 ## Premium early access (Revisely Dev)
 
 Majd, Nov 16 2026: "give everyone premium access right now … it'll be paid for in the future but anyone who has
-premium now will keep it forever".
+premium now will keep it forever". Nov 18 2026: "for end date tbd i meant new people from singing up and taking advantage
+of this deal. those users can have premium for life".
 
 - **PREM-1.** While Premium is in early access (`config/app.earlyAccess`), every account gets Premium with no end date:
   an account set up then gets it from the server as soon as it is set up, and older accounts get it from the owner's
-  script. Marking mistakes' intro says Premium is free in early access, paid later and kept for good, and its Get
-  Premium gives it at once; "Can't afford it? Apply for support" is hidden. Settings' Premium row and a Mark mistakes
-  take's summary say the same. A grant once given is never changed or taken away, after early access too; once early
-  access ends, new accounts don't get it and the intro's Get Premium no longer gives it. The words say early access,
-  never trial, a price or a date.
+  script. Early access itself has no end date yet. Marking mistakes' intro says Premium is free for everyone during
+  early access, which has no end date yet, will be paid after it, and is kept for life, and its Get Premium gives it at
+  once; "Can't afford it? Apply for support" is hidden. Settings' Premium row and a Mark mistakes take's summary say the
+  same. A grant once given is never changed or taken away, after early access too; once early access ends, new
+  accounts don't get it and the intro's Get Premium no longer gives it. The words say early access and for life, never
+  trial, a price or a date.
 
 ## Known bugs
 

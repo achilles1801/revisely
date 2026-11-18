@@ -51,11 +51,12 @@
     "RECITE-8": "55d683320bb0e707"
   },
   "1.0.5/more.recitation": {
-    "RINS-2": "827aac3517cdb95d"
-  },
-  "1.0.5/more.revo": {
+    "RINS-2": "827aac3517cdb95d",
     "RINS-1": "804db16c46a96b4d",
     "RINS-3": "2072221743aa2f49"
+  },
+  "1.0.5/more.premium": {
+    "PREM-1": "fdedf5edd3f30a7a"
   },
   "1.0.5/more.search": {
     "SEARCH-1": "25d3ce6d14ad81fe"

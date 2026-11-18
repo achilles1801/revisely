@@ -294,7 +294,7 @@ export default function SettingsScreen() {
   const [checkLevelSheet, setCheckLevelSheet] = useState(false);
   // Premium (lib/premium): in Revisely Dev a tester turns it on and off here, free, to see marking mistakes locked.
   const premium = usePremium(user?.id, reciteCheck);
-  // Premium early access (lib/earlyAccess, PREM-1): the Recite section's Premium row says it's free now and kept.
+  // Premium early access (lib/earlyAccess, PREM-1): the Recite section's Premium row says it's free now and kept for life.
   const earlyAccessOn = useEarlyAccess();
   const [premiumBusy, setPremiumBusy] = useState(false);
   const switchPremium = useCallback((on: boolean) => {
