@@ -17,9 +17,23 @@
  *   REVIEWER_EMAIL=other@example.com node scripts/seed-reviewer.js
  *
  * Idempotent: re-running overwrites all seeded docs cleanly.
+ *
+ * Mistake detection (1.0.5): the account also gets Premium (the early-access grant, as every account during early
+ * access) and three Recite takes with marks on yesterday and one three days ago, so App Review can see marks without
+ * reciting (Activity > yesterday > Recited > a take > Show on the page). Needs `npm run build` first (it uses lib/).
  */
 
 const admin = require('firebase-admin');
+const fs = require('fs');
+const path = require('path');
+
+const LIB = path.join(__dirname, '..', 'lib');
+if (!fs.existsSync(path.join(LIB, 'scenarioTakes.js'))) {
+  console.error('ERROR: Run `npm run build` first (lib/scenarioTakes.js is missing).');
+  process.exit(1);
+}
+const takes = require(path.join(LIB, 'scenarioTakes.js'));
+const { grantEarlyAccess } = require(path.join(LIB, 'support', 'early.js'));
 
 const EMAIL = process.env.REVIEWER_EMAIL || 'applereview@revisely.app';
 
@@ -226,7 +240,66 @@ async function main() {
   });
   console.log(`✓ Wrote user doc (onboardingComplete=true, streak=${SESSION_COUNT}, ${MEMORIZED_PAGES.length} memorized)`);
 
+  // Premium: the early-access grant every account gets during early access (kept for life; PREM-1).
+  const granted = await grantEarlyAccess(db, uid);
+  console.log(`✓ Premium (early access): ${granted ? 'granted' : 'already had it'}`);
+
+  // Recite takes with marks (users/<uid>/reciteTakes, as the app stores them), so marks show without reciting.
+  const written = await seedTakes(uid);
+  console.log(`✓ Wrote ${written} Recite takes with marks (yesterday and 3 days ago)`);
+
   console.log(`\nDone. ${EMAIL} can sign in and will land on a populated dashboard.`);
+}
+
+/** A small seeded random source, so the takes are the same on every run. */
+function seeded(n) {
+  let x = n;
+  return () => {
+    x = (x * 1103515245 + 12345) % 2147483648;
+    return x / 2147483648;
+  };
+}
+
+/**
+ * Three takes yesterday and one three days ago, each over one memorized page: a skipped word, a wrong word, a haraka
+ * slip and a "Not clear" (never counted), in the last juz the account has memorized. Fixed ids: a re-run overwrites.
+ */
+async function seedTakes(uid) {
+  const rand = seeded(7);
+  const plan = [
+    { id: 'review-mulk', page: 562, daysBack: 1, hour: 18, hidden: false },
+    { id: 'review-naba', page: 582, daysBack: 1, hour: 19, hidden: true },
+    { id: 'review-ala', page: 591, daysBack: 1, hour: 20, hidden: false },
+    { id: 'review-mulk-earlier', page: 562, daysBack: 3, hour: 18, hidden: false },
+  ];
+  const batch = db.batch();
+  for (const p of plan) {
+    const [from, to] = takes.pageWords(p.page);
+    const at = (k) => from + Math.floor((to - from) * k);
+    const marks = [
+      takes.skippedMark(`${p.id}-1`, at(0.2)),
+      takes.wrongWordMark(`${p.id}-2`, at(0.45), at(0.45) + 3),
+      takes.harakatMark(`${p.id}-3`, at(0.7), rand),
+      takes.harakatMark(`${p.id}-4`, at(0.85), rand, 'likely'),
+    ].filter(Boolean);
+    const day = daysAgo(p.daysBack);
+    const createdAt = new Date(day);
+    createdAt.setUTCHours(p.hour, 10, 0, 0);
+    const take = {
+      id: p.id,
+      createdAt: createdAt.getTime(),
+      day: ymd(day),
+      level: 'words',
+      hidden: p.hidden,
+      from,
+      to,
+      secs: Math.round((to - from) * 0.55),
+      marks: takes.timeMarks(marks, from),
+    };
+    batch.set(db.doc(`users/${uid}/reciteTakes/${p.id}`), takes.takeDocument(take, admin.firestore.FieldValue.serverTimestamp()));
+  }
+  await batch.commit();
+  return plan.length;
 }
 
 main().catch((err) => {
