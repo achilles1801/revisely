@@ -40,6 +40,9 @@ html[dir="rtl"] .home .asks li { font-size: 17px; }
 html[dir="rtl"] .home .points li { font-size: 17px; line-height: 1.7; }
 html[dir="rtl"] .home .revo .note { font-size: 16px; }
 html[dir="rtl"] .home .soon small { font-size: 13px; }
+html[dir="rtl"] .home .step h3 { font-size: 21px; line-height: 1.5; }
+html[dir="rtl"] .home .step p { font-size: 17px; line-height: 1.75; }
+html[dir="rtl"] .home .recite .note { font-size: 16px; }
 @media (max-width: 760px) {
   html[dir="rtl"] .home .line { margin-top: 6px; font-size: 17px; line-height: 1.65; }
 }
