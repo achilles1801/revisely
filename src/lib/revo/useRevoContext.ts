@@ -15,7 +15,7 @@ import { logger } from '../logger';
 import { buildRevoContext } from './context';
 import { revoGaps } from './gaps';
 import { recitationForRevo } from './recitation';
-import { revoPatternsOn } from './release';
+import { revoPatternsOn, revoReciteOn } from './release';
 import type { FactSources } from './facts';
 import type { GreetingExtras } from './greeting';
 import type { RevoContext } from './types';
@@ -62,7 +62,7 @@ export function useRevoContext(): {
   const build = useCallback(() => {
     const src = sources();
     return src
-      ? buildRevoContext({ user: src.user, pages: src.pages, logs: src.logs, snapshot: src.snapshot, history: src.history, patterns: revoPatternsOn(), recitation: recitation(), gaps })
+      ? buildRevoContext({ user: src.user, pages: src.pages, logs: src.logs, snapshot: src.snapshot, history: src.history, patterns: revoPatternsOn(), recite: revoReciteOn(), recitation: recitation(), gaps })
       : null;
   }, [sources, recitation, gaps]);
   const { context, extras } = useMemo(() => {
@@ -78,7 +78,7 @@ export function useRevoContext(): {
       }
     }
     return {
-      context: buildRevoContext({ user: src.user, pages: src.pages, logs: src.logs, snapshot, history: src.history, patterns: revoPatternsOn(), recitation: recitation(), gaps }),
+      context: buildRevoContext({ user: src.user, pages: src.pages, logs: src.logs, snapshot, history: src.history, patterns: revoPatternsOn(), recite: revoReciteOn(), recitation: recitation(), gaps }),
       // Smart Tracking unset is off, as Activity reads it.
       extras: { doneCount: snapshot.done.size, next, strength: src.user.smartTrackingEnabled === true },
     };

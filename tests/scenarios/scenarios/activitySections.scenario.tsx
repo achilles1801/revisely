@@ -9,6 +9,7 @@ import { State } from 'react-native-gesture-handler';
 import { fireGestureHandler, getByGestureTestId } from 'react-native-gesture-handler/jest-utils';
 import { ActivityBlocksViews } from '../../../src/components/activity/ActivityBlocksViews';
 import { loadActivitySections } from '../../../src/lib/activitySections';
+import { setMistakeDetectionReleasedForTests } from '../../../src/lib/release/mistakeDetection';
 import Constants from 'expo-constants';
 
 const TODAY = '2026-11-05';
@@ -130,12 +131,16 @@ const stored = async (uid = TESTER.id) => JSON.parse((await AsyncStorage.getItem
 
 describe('Activity’s sections', () => {
   beforeEach(async () => {
+    // The editor itself, on Insights as it was before the mistake detection release (no Gaps outside Revisely Dev):
+    // the release's switch off. Gaps in the editor are the Revisely Dev case below.
+    setMistakeDetectionReleasedForTests(false);
     await AsyncStorage.clear();
     await act(async () => {
       await loadActivitySections(null);
     });
   });
   afterEach(async () => {
+    setMistakeDetectionReleasedForTests(undefined);
     await act(async () => {
       await new Promise((r) => setTimeout(r, 400));
     });
@@ -310,12 +315,15 @@ describe('Activity’s sections', () => {
     }
   });
 
-  it('[ACT-29] testers only for now: anyone else has no Edit sections and the usual layout, whatever this phone holds', async () => {
+  it('[ACT-29] every signed-in account has Edit sections and its own layout, testers or not (the mistake detection release)', async () => {
     const plain = { ...TESTER, id: 'plain-1', previewTester: false };
     await AsyncStorage.setItem('@revisely_activity_sections:v1:plain-1', JSON.stringify({ insights: { order: ['pace'], hidden: ['coverage'] } }));
     open(plain);
     await toInsights();
-    expect(screen.queryByTestId('activity-edit-sections')).toBeNull();
-    expect(order(INSIGHTS_IDS)).toEqual(['coverage', 'consistency', 'weak', 'memorization', 'pace']);
+    expect(screen.getByTestId('activity-edit-sections')).toBeTruthy();
+    // Its own layout from this phone: Coverage hidden as it stored, the rest shown.
+    const shown = order(INSIGHTS_IDS);
+    expect(shown).not.toContain('coverage');
+    expect(shown).toEqual(expect.arrayContaining(['pace', 'consistency', 'weak', 'memorization']));
   });
 });

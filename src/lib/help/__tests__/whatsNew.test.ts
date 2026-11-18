@@ -28,6 +28,9 @@ import {
 } from '../whatsNew';
 import { needOpen } from '../../../components/whatsNew/needs';
 
+// A phone that streams the microphone (every 1.0.5 binary): Recite's cards need it, as the app does.
+jest.mock('../../recite/micSource', () => ({ isMicStreamAvailable: () => true }));
+
 const REVIEWED = join(__dirname, '../whatsNewReviewed.json');
 const rules = ruleTexts(readRepo('BEHAVIOUR.md'));
 
@@ -161,7 +164,7 @@ describe('who has seen a release (NEW-1)', () => {
 
 describe('the cards an account sees', () => {
   const NOV = RELEASES.find((r) => r.id === '2026-11')!;
-  const RECITE_RELEASE = NEXT_RELEASE!;
+  const RECITE_RELEASE = RELEASES.find((r) => r.id === '1.0.5')!;
 
   it('a card or row whose feature is closed to it is left out; a rows card with none left goes', () => {
     const all = cardsFor(NOV, () => true);
@@ -188,25 +191,22 @@ describe('the cards an account sees', () => {
     }
   });
 
-  it('the next release is shown only to a tester in Revisely Dev, never to anyone in the required walkthrough', () => {
-    expect(releaseFor('required', true)).toBe(CURRENT_RELEASE);
-    expect(releaseFor('replay', false)).toBe(CURRENT_RELEASE);
-    expect(releaseFor('forced', false)).toBe(CURRENT_RELEASE);
-    expect(releaseFor('replay', true)).toBe(NEXT_RELEASE);
-    expect(releaseFor('forced', true)).toBe(NEXT_RELEASE);
-    expect(RELEASES).not.toContain(NEXT_RELEASE);
+  it('with no next release (the release PR set it back), everyone, Revisely Dev included, gets the current one', () => {
+    expect(NEXT_RELEASE).toBeNull();
+    expect(CURRENT_RELEASE).toBe(RECITE_RELEASE);
+    for (const mode of ['required', 'replay', 'forced'] as const) {
+      expect(releaseFor(mode, true)).toBe(CURRENT_RELEASE);
+      expect(releaseFor(mode, false)).toBe(CURRENT_RELEASE);
+    }
   });
 
-  it('the mistake detection release, still dark: the store app shows only what everyone has (the search row)', () => {
-    // Outside Revisely Dev, Recite and Gaps are closed (lib/reciteLive/availability, lib/insightsGaps).
+  it('the mistake detection release, live: an App Store account sees every card, mistake detection first', () => {
     for (const account of [{}, { previewTester: false }, { previewTester: true }]) {
       const shown = cardsFor(RECITE_RELEASE, (n) => needOpen(n, account, 'everyone'));
-      expect(shown.map((c) => c.id)).toEqual(['more']);
-      expect(shown[0].rows?.map((r) => r.id)).toEqual(['search']);
+      expect(shown.map((c) => c.id)).toEqual(['recite', 'marks', 'again', 'gaps', 'more']);
+      expect(shown[4].rows?.map((r) => r.id)).toEqual(['test', 'recitation', 'premium', 'search']);
     }
-    // Every card when its features are open: mistake detection first, then Insights, then the rest.
-    expect(cardsFor(RECITE_RELEASE, () => true).map((c) => c.id)).toEqual(['recite', 'marks', 'again', 'gaps', 'more']);
-    expect(RECITE_RELEASE.live).toBe(false);
+    expect(RECITE_RELEASE.live).toBe(true);
   });
 
   it('a release switched on needs nothing that is still for testers only', () => {

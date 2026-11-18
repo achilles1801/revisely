@@ -16,13 +16,17 @@ import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import { WhatsNewScreen } from '../WhatsNewScreen';
 import { ThemeProvider } from '../../../context/ThemeContext';
 import { DesignProvider } from '../../../design/DesignContext';
-import { CURRENT_RELEASE, type WhatsNewRelease } from '../../../lib/help/whatsNew';
+import { RELEASES, type WhatsNewRelease } from '../../../lib/help/whatsNew';
+
+// The walkthrough's own behaviour, on the November 2026 release's cards (Revo's moment among them). 1.0.5's cards are
+// WhatsNewScreen.next.test's.
+const NOV = RELEASES.find((r) => r.id === '2026-11')!;
 import { loadWhatsNew, resetWhatsNewForTests, setForcedAtLaunch } from '../../../lib/whatsNew/state';
 
 const KEY = '@revisely_whats_new:v1:u1';
-const titles = CURRENT_RELEASE.cards.map((c) => c.title);
+const titles = NOV.cards.map((c) => c.title);
 
-async function show(mode: 'required' | 'forced' | 'replay', onClose = jest.fn(), release: WhatsNewRelease = CURRENT_RELEASE) {
+async function show(mode: 'required' | 'forced' | 'replay', onClose = jest.fn(), release: WhatsNewRelease = NOV) {
   await loadWhatsNew('u1');
   const view = render(
     <DesignProvider initial={{}}>
@@ -68,7 +72,7 @@ describe('<WhatsNewScreen />', () => {
     await next();
     expect(title()).toBe(titles[2]);
     first.unmount();
-    expect(JSON.parse((await AsyncStorage.getItem(KEY)) ?? '{}')).toMatchObject({ release: CURRENT_RELEASE.id, card: CURRENT_RELEASE.cards[2].id });
+    expect(JSON.parse((await AsyncStorage.getItem(KEY)) ?? '{}')).toMatchObject({ release: NOV.id, card: NOV.cards[2].id });
     // A new run of the app: what's on the phone is read again.
     resetWhatsNewForTests();
     await show('required');
@@ -97,7 +101,7 @@ describe('<WhatsNewScreen />', () => {
     for (let i = 1; i < titles.length; i++) await next();
     fireEvent.press(screen.getByTestId('whats-new-done'));
     await act(async () => {});
-    expect(mockMark).toHaveBeenCalledWith(CURRENT_RELEASE.id);
+    expect(mockMark).toHaveBeenCalledWith(NOV.id);
     expect(JSON.parse((await AsyncStorage.getItem(KEY)) ?? '{}')).toEqual({});
   });
 
@@ -126,7 +130,7 @@ describe('<WhatsNewScreen />', () => {
       mockApp.user = user;
       const view = await show('required');
       // Revo's switch unread here: testers only (lib/revo/release), so its card waits.
-      const shown = CURRENT_RELEASE.cards.filter((c) => c.needs !== 'revo').map((c) => c.title);
+      const shown = NOV.cards.filter((c) => c.needs !== 'revo').map((c) => c.title);
       expect(title()).toBe(shown[0]);
       expect(screen.getByTestId('whats-new-title').props.accessibilityLabel).toBe(`Step 1 of ${shown.length}. ${shown[0]}`);
       for (let i = 1; i < shown.length; i++) {
@@ -134,7 +138,7 @@ describe('<WhatsNewScreen />', () => {
         expect(title()).toBe(shown[i]);
       }
       // The last card has every row: help and every translation are everyone's.
-      for (const row of CURRENT_RELEASE.cards[CURRENT_RELEASE.cards.length - 1].rows ?? []) {
+      for (const row of NOV.cards[NOV.cards.length - 1].rows ?? []) {
         expect(screen.getByTestId(`whats-new-row-${row.id}`)).toBeTruthy();
       }
       expect(screen.getByTestId('whats-new-done')).toBeTruthy();
@@ -148,7 +152,7 @@ describe('<WhatsNewScreen />', () => {
     // Jest's screen has 2× text; at an ordinary size the card is the moment.
     jest.spyOn(Dimensions, 'get').mockReturnValue({ width: 402, height: 874, scale: 3, fontScale: 1 });
     await show('required');
-    const revo = CURRENT_RELEASE.cards.findIndex((c) => c.moment === 'revo');
+    const revo = NOV.cards.findIndex((c) => c.moment === 'revo');
     for (let i = 0; i < revo; i++) await next();
     expect(screen.getByTestId('whats-new-revo-moment')).toBeTruthy();
     expect(screen.getByTestId('whats-new-card-revo')).toBeTruthy();
@@ -163,7 +167,7 @@ describe('<WhatsNewScreen />', () => {
 
   it('past 1.6× text, Revo’s card is its words and Next, as any card', async () => {
     await show('required');
-    const revo = CURRENT_RELEASE.cards.findIndex((c) => c.moment === 'revo');
+    const revo = NOV.cards.findIndex((c) => c.moment === 'revo');
     for (let i = 0; i < revo; i++) await next();
     expect(title()).toBe('Meet Revo');
     expect(screen.queryByTestId('whats-new-revo-moment')).toBeNull();

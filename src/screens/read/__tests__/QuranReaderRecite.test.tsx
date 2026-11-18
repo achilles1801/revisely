@@ -10,6 +10,10 @@ import type { LiveEvent } from '../../../lib/reciteLive/contract';
 import { STOP_TRACE_KEY } from '../../../lib/reciteLive/stopTrace';
 import { versesOnPage } from '../../../lib/ayahBounds';
 import { paletteV2 } from '../../../theme/v2';
+import { setMistakeDetectionReleasedForTests } from '../../../lib/release/mistakeDetection';
+
+// The release's switch is the kill switch: these tests run with it as each says, and back to as it ships.
+afterEach(() => setMistakeDetectionReleasedForTests(undefined));
 
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
 jest.mock('expo-linear-gradient', () => ({ LinearGradient: ({ children }: { children?: React.ReactNode }) => children ?? null }));
@@ -312,7 +316,8 @@ async function startTake(mode: 'recite' | 'check', lock: number | null = A23) {
 }
 
 describe('the one mic (Revisely Dev)', () => {
-  it('outside the Dev app, or for non-testers, the reader keeps today’s record button', async () => {
+  it('with the release switched off: outside the Dev app, or for non-testers, the reader keeps today’s record button', async () => {
+    setMistakeDetectionReleasedForTests(false);
     mockState.dev = false;
     await open();
     expect(screen.getByLabelText('Record your recitation')).toBeTruthy();

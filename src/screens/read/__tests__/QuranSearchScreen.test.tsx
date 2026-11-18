@@ -73,6 +73,10 @@ import { setQuranWordsForTests } from '../../../lib/recite/quranWords';
 import { wordsData } from '../../../lib/recite/__fixtures__/quranWords';
 import { pageOfVerse } from '../../../lib/verses';
 import { plainText } from '../../../lib/passages';
+import { setMistakeDetectionReleasedForTests } from '../../../lib/release/mistakeDetection';
+
+// The release's switch is the kill switch: these tests run with it as each says, and back to as it ships.
+afterEach(() => setMistakeDetectionReleasedForTests(undefined));
 
 beforeAll(() => setQuranWordsForTests(wordsData()));
 afterAll(() => setQuranWordsForTests(null));
@@ -281,7 +285,8 @@ describe('a voice search with one result opens the reader at the ayah, highlight
     expect(mockNavigation.push).not.toHaveBeenCalled();
   });
 
-  it('only for accounts with the live check: not in the store app, nor for an account that isn’t a tester', async () => {
+  it('with the release switched off: only for accounts with the live check: not in the store app, nor for an account that isn’t a tester', async () => {
+    setMistakeDetectionReleasedForTests(false);
     await open();
     await act(async () => mockVoice.heard?.('قل لو شاء الله ما تلوتو عليكم'));
     expect(screen.getByTestId('search-verse-10-16')).toBeTruthy();

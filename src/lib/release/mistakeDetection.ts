@@ -6,7 +6,7 @@
 // NEXT_RELEASE to RELEASES with `live: true` (lib/help/whatsNew); releaseGates.test.ts holds each gate both ways.
 // Production gets JavaScript only through Promote, so store users get it in the same update as its What's new.
 
-export const MISTAKE_DETECTION_RELEASED = false;
+export const MISTAKE_DETECTION_RELEASED = true;
 
 let forTests: boolean | undefined;
 
