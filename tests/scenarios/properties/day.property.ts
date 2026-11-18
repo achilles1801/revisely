@@ -282,7 +282,54 @@ describe('[DAY-1] [DAY-2] [DAY-3] [DAY-6] [DAY-8] revision day', () => {
         expect(t.dhuhr && dayOf(t.dhuhr)).toBe(dayOf(midnight));
         if (t.fajr && t.sunrise) expect(t.fajr.getTime()).toBeLessThan(t.sunrise.getTime());
       }),
+      {
+        numRuns: runs(300),
+        // Found by CI (Nov 17 2026): Turkey's method moved sunrise past the high-latitude Fajr.
+        examples: [[{ zone: CITIES.reykjavik.zone, coords: { latitude: 65.63737476912041, longitude: -21.9426 } }, 532, 'Turkey']],
+      },
+    );
+  });
+
+  // Turkey's method (Diyanet) shows sunrise 7 minutes early, Dubai's 3. Near the
+  // Arctic Circle around the June solstice, a seventh of the night is less than
+  // that, so the moved sunrise came at or before the high-latitude Fajr.
+  it('far north around the June solstice, with every method: Fajr comes before sunrise, and sunrise before Dhuhr', () => {
+    const zoneAt = (lng: number) => (lng < -10 ? CITIES.reykjavik.zone : lng < 15 ? 'Europe/Oslo' : 'Europe/Helsinki');
+    // Mostly the methods that move sunrise: the rest are checked too.
+    const methods = fc.oneof({ arbitrary: fc.constantFrom('Turkey', 'Dubai'), weight: 2 }, { arbitrary: methodArb, weight: 1 });
+    fc.assert(
+      fc.property(
+        fc.double({ min: 62, max: 72, noNaN: true }),
+        fc.double({ min: -25, max: 32, noNaN: true }),
+        fc.integer({ min: 0, max: 28 }),
+        methods,
+        (latitude, longitude, d, method) => {
+          useZone(zoneAt(longitude));
+          const day = new Date(2026, 5, 7 + d);
+          const prefs = getPrayerPrefs();
+          const t = dayTimes({ latitude, longitude }, day, { method, highLatitude: prefs.highLatitude, madhab: prefs.madhab, adjustments: prefs.adjustments });
+          expect(t.day).toBe(dayOf(day));
+          if (t.fajr && t.sunrise) expect(t.fajr.getTime()).toBeLessThan(t.sunrise.getTime());
+          if (t.sunrise && t.dhuhr) expect(t.sunrise.getTime()).toBeLessThan(t.dhuhr.getTime());
+        },
+      ),
       { numRuns: runs(300) },
     );
+  });
+
+  it('example: Tromsø with Turkey’s method on 2026-06-21: Fajr before sunrise, both to the minute', () => {
+    useZone('Europe/Oslo');
+    const prefs = getPrayerPrefs();
+    const t = dayTimes({ latitude: 69.65, longitude: 18.96 }, new Date(2026, 5, 21), {
+      method: 'Turkey',
+      highLatitude: prefs.highLatitude,
+      madhab: prefs.madhab,
+      adjustments: prefs.adjustments,
+    });
+    expect(t.fajr && t.sunrise).toBeTruthy();
+    expect(t.fajr!.getTime()).toBeLessThan(t.sunrise!.getTime());
+    for (const time of [t.fajr, t.sunrise, t.dhuhr, t.asr, t.maghrib, t.isha]) {
+      if (time) expect(time.getTime() % MINUTE).toBe(0);
+    }
   });
 });
