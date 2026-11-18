@@ -58,6 +58,23 @@ describe('<ReciteMoment />', () => {
     expect(StyleSheet.flatten(screen.getByTestId('whats-new-title').props.style).flex).toBeUndefined();
   });
 
+  it('Skip stays at its end: the clock stops, so no later tick takes it back into the take', async () => {
+    jest.useFakeTimers();
+    await show();
+    await act(async () => {
+      jest.advanceTimersByTime(800);
+    });
+    fireEvent.press(screen.getByTestId('recite-moment-skip'));
+    expect(screen.getByTestId('whats-new-title')).toBeTruthy();
+    // The clock's next ticks, well before the take would have ended by itself: still the end, with Next.
+    await act(async () => {
+      jest.advanceTimersByTime(500);
+    });
+    expect(screen.queryByTestId('recite-moment-skip')).toBeNull();
+    expect(screen.getByTestId('whats-new-title')).toBeTruthy();
+    expect(screen.getByTestId('whats-new-next')).toBeTruthy();
+  });
+
   it('with Reduce Motion, and with VoiceOver, it starts at its end', async () => {
     mockReduce = true;
     await show();
