@@ -236,7 +236,8 @@ until its part is set up.
     sets, like `DEV_GATE`, `ACCOUNT_PAGES` or `RECITE_SECTION`) goes through `develop` and reaches `main` with the next
     release, switched off there. Only a change meant for revisely.app goes to `main` first.
   - **The home's Recite section** (mistake detection: Recite, Mark mistakes, Recite the mistakes again, Test me,
-    Premium's early access; Nov 17 2026), on dev only until the release:
+    Premium's early access; Nov 17 2026). On for both sites since the 1.0.5 release (`<body class="home recite-on">`);
+    before it, dev only:
     - `RECITE_SECTION` "1" (`wrangler.dev.jsonc` only) makes the worker add `recite-on` to the home's `<body>`
       (`worker/recite.ts`). `site.css` hides everything marked `data-when="RECITE_SECTION"` (the section and its
       header link) without it.
