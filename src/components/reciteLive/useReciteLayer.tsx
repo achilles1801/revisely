@@ -26,6 +26,7 @@ import { toAyahRef } from '../../lib/verses';
 import { ayahKey, ayahsBetween } from '../../lib/ayahKeys';
 import type { AyahRef } from '../../lib/ayahBounds';
 import { useMushafEdition } from '../../lib/mushafEdition';
+import { openWebPage } from '../../lib/openWebPage';
 import { reciteLiveEnabled } from '../../lib/reciteLive/availability';
 import { premiumErrorText, setDevPremium, supportLinkUrl, usePremium } from '../../lib/premium';
 import { claimEarlyAccess, earlyAccessShortLine, useEarlyAccess } from '../../lib/earlyAccess';
@@ -218,12 +219,9 @@ export function useReciteLayer({
   }, [earlyAccessOn]);
   // "Can't afford it? Apply for support": the program's page, opened with a one-time link for this account.
   const applyForSupport = useCallback(() => {
+    // The in-app browser, else the phone's, else the address to copy (LINK-1): only getting the link can fail here.
     supportLinkUrl()
-      .then((url) => {
-        // Required here, so screens and tests that never open it don't load it (expo-web-browser is in every binary).
-        const WebBrowser = require('expo-web-browser') as typeof import('expo-web-browser');
-        return WebBrowser.openBrowserAsync(url);
-      })
+      .then((url) => openWebPage(url))
       .catch((err) => Alert.alert('Apply for support', premiumErrorText(err)));
   }, []);
   // A take's audio stays with the take (RMEM-6: never a recording, so no "Recording saved" note): its record notes it.

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Linking, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { arabicV2, layoutV2, typeV2 } from '../../theme/v2';
@@ -14,6 +14,7 @@ import type { VerseHit } from '../../lib/search/quranSearch';
 import { CLEAR_QURAN_ID, creditLine, getVerseTranslation, peekVerseTranslation, VerseTranslation } from '../../lib/translation';
 import { clearQuranSegments } from '../../lib/clearQuran';
 import { saheehFootnotes, saheehSegments } from '../../lib/saheeh';
+import { openWebPage } from '../../lib/openWebPage';
 
 const NBSP = ' ';
 /** A match runs over at most this many ayat in its card (as the reader highlights). */
@@ -174,7 +175,7 @@ export function SearchVerseCard({
             <Text
               style={{ color: palette.link }}
               accessibilityRole="link"
-              onPress={() => Linking.openURL(t.credit.url).catch(() => undefined)}
+              onPress={() => void openWebPage(t.credit.url)}
             >
               {t.credit.linkLabel}
             </Text>

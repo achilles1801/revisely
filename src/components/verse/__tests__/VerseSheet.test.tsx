@@ -3,6 +3,9 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 import { ThemeProvider } from '../../../context/ThemeContext';
 
+// Web links open through lib/openWebPage (the in-app browser first, LINK-1).
+const mockOpenWebPage = jest.fn(async (_url: string) => 'in-app');
+jest.mock('../../../lib/openWebPage', () => ({ openWebPage: (url: string) => mockOpenWebPage(url) }));
 jest.mock('firebase/auth', () => ({ getAuth: () => ({ currentUser: null }) }));
 // Shared values that last across renders, as on a device (the stock mock makes a
 // new one every render, and the sheet re-renders as its verse loads).
@@ -261,7 +264,6 @@ describe('verseSheetRelease', () => {
 describe('VerseSheet: The Clear Quran', () => {
   const { getVerseText } = jest.requireMock('../../../lib/translation');
   const { ClearQuranError } = jest.requireActual('../../../lib/clearQuran');
-  const { Linking } = require('react-native');
   const tcqVerse = (translation: string) => (page: number, sura: number, ayah: number) =>
     Promise.resolve({ sura, ayah, surahName: 'Al-Baqarah', arabic: mockLongArabic, translation, translationName: 'The Clear Quran®' });
 
@@ -269,7 +271,8 @@ describe('VerseSheet: The Clear Quran', () => {
     getVerseText.mockImplementationOnce(
       tcqVerse('Indeed, those who persist in disbelief—it is the same whether you warn them or not—they will never believe.<footnote id="9" number="1"></footnote>'),
     );
-    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    const open = mockOpenWebPage;
+    open.mockClear();
     render(wrap(<VerseSheet {...props({ page: 3, sura: 2, ayah: 6 })} translationId="en.khattab" />));
     await screen.findByTestId('verse-translation', {}, { timeout: 10_000 });
     // The words untouched; the footnote marker as its raised number.
@@ -286,7 +289,6 @@ describe('VerseSheet: The Clear Quran', () => {
     }
     fireEvent.press(screen.getByText('theclearquran.org'));
     expect(open).toHaveBeenCalledWith('https://theclearquran.org');
-    open.mockRestore();
   });
 
   it("when its text can't be loaded: \"Couldn't load translation\" and a retry, never another translation", async () => {
@@ -351,7 +353,8 @@ describe('VerseSheet: The Clear Quran', () => {
         version: '1.1.2',
       }),
     );
-    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    const open = mockOpenWebPage;
+    open.mockClear();
     render(wrap(<VerseSheet {...props({ page: 1, sura: 1, ayah: 1 })} />));
     await screen.findByTestId('verse-translation', {}, { timeout: 10_000 });
     expect(screen.queryByText(/\[2\]/)).toBeNull();
@@ -367,7 +370,6 @@ describe('VerseSheet: The Clear Quran', () => {
     expect(screen.getByText('Arabic text: Tanzil Project · ')).toBeTruthy();
     fireEvent.press(screen.getByText('tanzil.net'));
     expect(open).toHaveBeenCalledWith('https://tanzil.net');
-    open.mockRestore();
   });
 
   describe('offline', () => {
