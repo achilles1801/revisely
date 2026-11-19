@@ -14,7 +14,7 @@ import ts from 'typescript';
 import worker from '../index';
 import { RECITE_ON, showReciteSection } from '../recite';
 
-const RELEASED = false;
+const RELEASED = true;
 
 const ROOT = path.join(__dirname, '..', '..');
 const read = (p: string) => fs.readFileSync(path.join(ROOT, p), 'utf8');
@@ -62,7 +62,8 @@ describe("the home's Recite section", () => {
     const on = await worker.fetch(new Request('https://dev.revisely.app/'), { ...ENV, ASSETS: assets(home), RECITE_SECTION: '1' }, ctx());
     const body = await on.text();
     expect(body).toContain(`<body class="home ${RECITE_ON}">`);
-    expect(body.replace(` ${RECITE_ON}"`, '"')).toBe(home);
+    // Before the release the worker adds the class; after it the page already has it and comes through unchanged.
+    expect(body).toBe(RELEASED ? home : home.replace('<body class="home">', `<body class="home ${RECITE_ON}">`));
 
     // With the account navigation too (dev.revisely.app sets both).
     const both = await worker.fetch(
