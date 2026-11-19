@@ -5,6 +5,7 @@
 // and every way The Clear Quran API can fail.
 
 import worker from '../index';
+import { injectAccountNav } from '../nav';
 import { resetKeyCache, verifyIdToken } from '../auth';
 import {
   cacheVersion,
@@ -653,12 +654,23 @@ describe("the site's navigation on dev: the account, Premium and Open Door pages
   const page = (p: string) => fs.readFileSync(path.join(__dirname, '../../docs', p), 'utf8');
   const html = (body: string) => ({ fetch: jest.fn(async () => new Response(body, { headers: { 'Content-Type': 'text/html; charset=utf-8', ETag: '"x"' } })) });
 
-  it('revisely.app: the pages come through untouched, with no link to a page that answers 404 there', async () => {
-    const home = page('index.html');
-    const res = await worker.fetch(new Request('https://revisely.app/'), { ...ENV, ASSETS: html(home) }, ctx());
-    const body = await res.text();
-    expect(body).toBe(home);
-    for (const link of ['/premium/', '/apply/', '/account/', 'account-nav']) expect(body).not.toContain(link);
+  // Since Nov 18 2026 the site's own pages carry the navigation and Arabic in their HTML (written once by nav.ts), so
+  // revisely.app serves them straight from the assets, and the pages they link answer there (ACCOUNT_PAGES "1").
+  it('revisely.app: the pages carry their links and Arabic themselves, and the pages they link answer there', async () => {
+    const ts = jest.requireActual('typescript') as typeof import('typescript');
+    const prod = ts.parseConfigFileTextToJson('wrangler.jsonc', fs.readFileSync(path.join(__dirname, '../../wrangler.jsonc'), 'utf8')).config;
+    expect(prod.vars.ACCOUNT_PAGES).toBe('1');
+    for (const p of ['index.html', 'support/index.html', 'privacy/index.html', 'terms/index.html', 'donate/index.html']) {
+      const own = page(p);
+      for (const s of ['data-acct-nav', 'href="/premium/"', 'href="/apply/"', 'data-lang-switch', '/assets/strings-site.js']) {
+        expect([p, own.includes(s)]).toEqual([p, true]);
+      }
+      // The worker leaves them as they are, with the account pages on or off.
+      for (const env of [ENV, { ...ENV, ACCOUNT_PAGES: '1' }]) {
+        const res = await worker.fetch(new Request(`https://revisely.app/${p}`), { ...env, ASSETS: html(own) }, ctx());
+        expect(await res.text()).toBe(own);
+      }
+    }
   });
 
   it('dev: the home gets Premium, Open Door and the account in its header, menu and footer', async () => {
@@ -707,12 +719,8 @@ describe("the site's navigation on dev: the account, Premium and Open Door pages
     expect((await res.text()).match(/data-t="nav.download"/g)).toHaveLength(1);
   });
 
-  it('revisely.app: Support comes through untouched too, with no Arabic switch or script', async () => {
-    const support = page('support/index.html');
-    const res = await worker.fetch(new Request('https://revisely.app/support/'), { ...ENV, ASSETS: html(support) }, ctx());
-    const body = await res.text();
-    expect(body).toBe(support);
-    for (const s of ['data-lang-switch', 'strings-site.js', 'site-i18n.js', 'site-rtl.css']) expect(body).not.toContain(s);
+  it('nav.ts adds nothing twice: a page that already carries the navigation comes back as it was', () => {
+    for (const p of ['index.html', 'support/index.html']) expect(injectAccountNav(page(p))).toBe(page(p));
   });
 
   it('dev: a page is always fetched whole, so a copy cached before the navigation never answers (no 304)', async () => {
