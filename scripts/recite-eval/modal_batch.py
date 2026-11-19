@@ -126,10 +126,12 @@ def pitch_one(d: str, name: str):
     return name
 
 
-@app.function(image=image_m, volumes={'/vol': vol}, gpu='L40S', cpu=8.0,
-              memory=32768, timeout=3600)
-def distil_part(args: list, workers: int = 6):
-    """The student's training with the teacher beside it (train.py --teacher), up to about 45 minutes a call."""
+@app.function(image=image_m, volumes={'/vol': vol}, gpu='L40S', cpu=16.0,
+              memory=65536, timeout=3600)
+def distil_part(args: list, workers: int = 14):
+    """The student's training with the teacher beside it (train.py --teacher), up to about 45 minutes a call.
+    16 cores and 14 batch builders (Nov 18 2026): with 8 and 6, v7's distillation waited for data 53% of the time
+    (its log's "waiting for data"), so the L40S idled; cores cost about a quarter of the GPU's price an hour."""
     _setup()
     os.environ['HF_HOME'] = '/vol/hf-cache'
     _local_data(args)

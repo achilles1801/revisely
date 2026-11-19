@@ -1,6 +1,12 @@
 """A fine-tuned checkpoint as the service runs models: ONNX with the released export's interface (mel [b, 80, t],
-riwaya [b] -> logprobs [b, f, 43]), then int8 weights (onnxruntime dynamic quantization). Checks the int8 copy against
-the PyTorch model on recordings: the share of frames whose top sound agrees and the sounds' edit distance.
+riwaya [b] -> logprobs [b, f, 43]), in full precision (model-fp32.onnx) and with int8 weights (model-int8.onnx,
+onnxruntime dynamic quantization). Checks the int8 copy against the PyTorch model on recordings: the share of frames
+whose top sound agrees and the sounds' edit distance.
+
+The riwaya embedding is zeroed (Nov 18 2026): train.py trains the students without the riwaya input, but the service
+passes Hafs (0), which added the released model's embedding to every frame. On bench-v0 that cost v7 half a point of
+professionals' planted slips, and int8 rounding 0.3 more; the full-precision file with it zeroed measures exactly what
+the checkpoint does (the service's RECITE_EAR_EXPORT=fp32 runs it).
 
   python export_onnx.py models/ft-v5/step41000.pt models/ft-v5-onnx WAV [WAV ...]
 """
@@ -29,16 +35,17 @@ def main():
     ckpt, out_dir, wavs = sys.argv[1], pathlib.Path(sys.argv[2]), sys.argv[3:]
     out_dir.mkdir(parents=True, exist_ok=True)
     m = hisn_torch.load(ckpt, 'cpu')
+    with torch.no_grad():
+        m.riwaya.weight.zero_()  # trained without the riwaya input: served the same
     w = Wrap(m).eval()
     mel = torch.zeros(1, 80, 1000)
-    fp32, int8 = out_dir / 'model.onnx', out_dir / 'model-int8.onnx'
+    fp32, int8 = out_dir / 'model-fp32.onnx', out_dir / 'model-int8.onnx'
     torch.onnx.export(w, (mel, torch.zeros(1, dtype=torch.long)), str(fp32), input_names=['mel', 'riwaya'],
                       output_names=['logprobs'], opset_version=17, dynamo=False,
                       dynamic_axes={'mel': {0: 'b', 2: 't'}, 'riwaya': {0: 'b'}, 'logprobs': {0: 'b', 1: 'f'}})
     from onnxruntime.quantization import QuantType, quantize_dynamic
     quantize_dynamic(str(fp32), str(int8), weight_type=QuantType.QInt8)
-    fp32.unlink()
-    print(f'{int8}: {int8.stat().st_size / 1e6:.1f} MB')
+    print(f'{fp32}: {fp32.stat().st_size / 1e6:.1f} MB; {int8}: {int8.stat().st_size / 1e6:.1f} MB')
 
     import Levenshtein
     import onnxruntime as ort
