@@ -52,6 +52,10 @@ DEFAULTS = {
                         # false alarms 0.49 -> 0.50 per 100 words, planted caught 97.1 -> 97.4%, inserted words 95.2 ->
                         # 94.0% (one in loud babble heard as a poor first try at the next word); /record false alarms
                         # 11 -> 6, its slips 6/6; -4 lost three inserted words
+    'order_again': False,  # out of order only if the later word isn't heard again after the word's first hearing: a
+                           # path that jumps ahead to a like phrase while the reciter is in another ayah (2:6 said as
+                           # 3:91: "لهم عذاب" -> 2:7's "ولهم عذاب"), then follows them back through the ayah, marked
+                           # every word before that phrase wrong as a swap; a real swap (B A, then on) keeps its mark
     'revisit_keep': True,  # a word said right, then said poorly on going back over it, keeps its right reading (the
                            # dropped word heard as the word before the ones said again): with gap_back, corrections 9 ->
                            # 6%, bench false alarms 0.50 -> 0.40 per 100 words, catches the same, /record 6 -> 5
@@ -937,9 +941,11 @@ def decide(key_words, g, lp, path, P, vocab=None, toks=None, refs=None):
             extras.append({'after': key_words[gi - 1]['word'], 't': b / FPS + P['delay']})
     # out of order: a word first heard only after a later word had been heard (a swap)
     first = {w: visits[w][0]['start'] for w in range(W) if visits[w]}
+    last = {w: visits[w][-1]['start'] for w in range(W) if visits[w]}
+    again = P.get('order_again')
     late = set()
     for w, t0 in first.items():
-        if any(u > w and tu < t0 for u, tu in first.items()):
+        if any(u > w and tu < t0 and not (again and last[u] >= t0) for u, tu in first.items()):
             late.add(w)
     for w in range(W):
         app_w = key_words[w]['word']
