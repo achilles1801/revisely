@@ -89,6 +89,25 @@ class WordsEar(unittest.TestCase):
                              ['v6', 'v7', 'v6', None])
         self.assertEqual(engine_mod.WORDS_EARS['v7'][2], dict(engine_mod.WORDS_P_V6, mean_gop=-5.0))
 
+    def test_the_fixed_export_runs_only_when_asked_and_carried(self):
+        """RECITE_EAR_EXPORT=fp32 runs a words ear's fixed export (model-fp32.onnx beside its int8 file) when the image
+        carries it; unset, or without the file, the int8 file as before (production)."""
+        import tempfile
+        import engine as engine_mod
+        path = pathlib.Path(engine_mod.WORDS_EARS['v7'][0])
+        with tempfile.TemporaryDirectory() as d, unittest.mock.patch.dict(os.environ, {}):
+            lab = pathlib.Path(d)
+            (lab / path).parent.mkdir(parents=True)
+            (lab / path).write_bytes(b'')
+            os.environ.pop('RECITE_EAR_EXPORT', None)
+            self.assertEqual(engine_mod.ear_file(lab, path), path)
+            os.environ['RECITE_EAR_EXPORT'] = 'fp32'
+            self.assertEqual(engine_mod.ear_file(lab, path), path)  # not carried: the int8 file
+            (lab / path.with_name('model-fp32.onnx')).write_bytes(b'')
+            self.assertEqual(engine_mod.ear_file(lab, path).name, 'model-fp32.onnx')
+            os.environ['RECITE_EAR_EXPORT'] = 'int8'
+            self.assertEqual(engine_mod.ear_file(lab, path), path)
+
 
 @unittest.skipUnless(MODEL.exists(), 'the model is not here')
 class Model(unittest.TestCase):

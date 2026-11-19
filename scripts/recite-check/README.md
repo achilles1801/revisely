@@ -60,6 +60,27 @@ their clips with mistakes 54.1% (57.3%); /record 6 of 6 slips, 1 false alarm (5 
 20 / 20 / 60% (20 / 20 / 57%), slips caught 93% (95%); the women's check passes; slips named live 174 of 275, 1 wrong,
 none false (171).
 
+**The words ears' fixed exports** (Nov 18 2026). The gates measure v6 and v7 on their checkpoints, but the service runs
+their int8 exports, and those heard a little worse:
+- **The riwaya input.** The students are trained without it (`train.py` calls the model with no riwaya), but the
+  export adds the released model's Hafs embedding to every frame. That cost v7 half a point. Zeroing it costs nothing.
+- **int8 rounding** costs 0.3 more, per channel too.
+
+On bench-v0, professionals' planted slips caught at false alarms per 100 words:
+
+| Model | Shipped int8 | Fixed export (`model-fp32.onnx`, 82 MB) | The gates (checkpoint) |
+| --- | --- | --- | --- |
+| v6 | 96.4% at 0.50 | 97.1% at 0.45 | 97.1% at 0.45 |
+| v7 | 96.1% at 0.50 | 96.9% at 0.50 | 96.9% at 0.50 |
+
+The fixed export (riwaya zeroed, full precision) matches the gates exactly, learners' clips included. It runs at the
+same speed on the Mac (6.9 ms per second of audio).
+
+How it's switched:
+- `stage.sh` copies `model-fp32.onnx` beside each words ear's int8 file when the lab has it.
+- `RECITE_EAR_EXPORT=fp32` runs it (`engine.ear_file`; `/health`'s `ears.words_file` says which file runs). `dev.env`
+  sets it. Production's `prod.env` leaves it unset, so production keeps its int8 files.
+
 **Naming a v6 take's slips on the released model's frames** (Nov 16 2026). Naming (`into`) was measured on the released
 model's frames, and on v6's it named far fewer: 139 of bench-v0's 275 planted slips and swapped endings, live (the
 released model 188). So a v6 take works out the released model's frames as it goes (`engine.SideFrames`): 8 s chunks
