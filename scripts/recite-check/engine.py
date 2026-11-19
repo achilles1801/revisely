@@ -275,6 +275,24 @@ SIMILAR_P_V6 = {'adv': 80.0, 'gain': 0.35, 'end_adv': 20.0, 'end_gain': 0.55}
 # - Naming a take's slips on the released model's frames (SideFrames), live: 174 of 275 right, 1 wrong, none false (171).
 WORDS_EARS = {'v6': (WORDS_EAR, WORDS_BARS, WORDS_P_V6),
               'v7': ('models/words-v7/model-int8.onnx', 'bars.v7.json', dict(WORDS_P_V6, mean_gop=-5.0))}
+# The words ears' fixed exports (Nov 18 2026). The students are trained without the riwaya input (train.py calls the model
+# without it), but export_onnx.py's int8 files add the released model's Hafs embedding to every frame, and int8 rounding
+# costs a little more. On bench-v0 the shipped files caught fewer of professionals' planted slips than the gates measured
+# on the checkpoints: v6 96.4% at 0.50 false alarms per 100 words (gates: 97.1% at 0.45), v7 96.1% at 0.50 (96.9% at
+# 0.50); v7's substitutions 90.6% (92.8%). The fixed exports (riwaya zeroed, full precision: model-fp32.onnx beside
+# model-int8.onnx, 82 MB) measure exactly what the gates did, learners' clips included, at the same speed on the Mac
+# (6.9 ms a second of audio). Riwaya zeroed alone recovers v7's half point; any int8 rounding (per channel too) still costs
+# 0.3. RECITE_EAR_EXPORT=fp32 runs them when the image carries them (Dev); unset, the int8 files as before.
+FIXED_EXPORT = 'model-fp32.onnx'
+
+
+def ear_file(lab, path):
+    """The file a words ear runs (path: its int8 export under lab): the fixed export beside it with RECITE_EAR_EXPORT=fp32
+    when the image carries it, else the int8 file."""
+    path = pathlib.Path(path)
+    if os.environ.get('RECITE_EAR_EXPORT') == 'fp32' and (lab / path.with_name(FIXED_EXPORT)).exists():
+        return path.with_name(FIXED_EXPORT)
+    return path
 
 
 def words_ear_name(lab, which):
@@ -457,12 +475,15 @@ class Engine:
             self.bars2 = json.loads((lab / STRICT_BARS).read_text())
         self.released = Level('released', self.ear, self.bars, WORDS_P)
         self.words_level = None  # v6 (or v7), for takes that judge no tajweed, when the image carries it
+        self.words_export = None  # which of its files runs: 'int8' (as shipped first) or 'fp32' (the fixed export)
         name = words_ear_name(lab, os.environ.get('RECITE_WORDS_EAR', 'v6'))
         if name is not None:
             path, bars, words_p = WORDS_EARS[name]
-            ear = PaddedEar(lab / path, threads, name=name)
+            f = ear_file(lab, path)
+            ear = PaddedEar(lab / f, threads, name=name)
             if ear.vocab == self.ear.vocab:  # the word table and the word graphs are in the released model's sounds
                 self.words_level = Level(name, ear, json.loads((lab / bars).read_text()), words_p, SIMILAR_P_V6)
+                self.words_export = 'fp32' if f.name == FIXED_EXPORT else 'int8'
 
     def level(self, st):
         """The model and settings for a take with settings st (settings_of): v6 when no tajweed is judged (Recite,
@@ -472,10 +493,11 @@ class Engine:
         return self.released
 
     def ears(self):
-        """Each level's model, for /health: {'recite': 'v6', 'harakat': 'v6', 'strict': 'released+v5'}."""
+        """Each level's model, for /health: {'recite': 'v6', 'harakat': 'v6', 'strict': 'released+v5'}, and with a words
+        level the file it runs ('words_file': 'int8', or 'fp32' for the fixed export, ear_file)."""
         strict = 'released' + ('+v5' if self.ear2 is not None else '')
         w = self.level({'tajweed': False}).name
-        return {'recite': w, 'harakat': w, 'strict': strict}
+        return {'recite': w, 'harakat': w, 'strict': strict} | ({'words_file': self.words_export} if self.words_export else {})
 
     # ------------------------------------------------------------ words
 
