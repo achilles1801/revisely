@@ -81,7 +81,8 @@ const clip = (s, n) => {
   return t.length > n ? `${t.slice(0, n - 1)}…` : t;
 };
 
-const shortRelease = (r) => safe(r, 'release').replace(/^com\.revisionbuddy\.app@/, '');
+// Drops the app id (com.revisionbuddy.app@ on iOS, app.revisely@ for Android's store app since Nov 2026).
+const shortRelease = (r) => safe(r, 'release').replace(/^[A-Za-z0-9._-]+@/, '');
 
 function issueTitle(issue) {
   return clip(`[Sentry] ${safe(issue.shortId, 'shortId', 'issue')}: ${sanitize(issue.title, { max: 150 })}`, 180);

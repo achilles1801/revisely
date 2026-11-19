@@ -11,7 +11,7 @@
 # rows say when a passage was last recited). Its rules: RecitationInsights.test.tsx and reciteInsights.property.ts.
 # It was at the end of 09-insights-history, which it took past iOS's 20 minutes (#663's run 43842097868); here it sits
 # beside what Revo makes of the same takes.
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - runFlow:
     file: ../subflows/new-account.yaml

@@ -3,7 +3,7 @@
 # comes from Activity's day (the + → Note), which is how a day without notes
 # reaches its log; the second is written in the log itself.
 # Rules (BEHAVIOUR.md): LOG-1, LOG-2, ACT-5
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - runFlow:
     file: ../subflows/new-account.yaml

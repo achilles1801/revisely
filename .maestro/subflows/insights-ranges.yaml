@@ -1,7 +1,7 @@
 # Activity → Insights at each range (30 days, 3 months, All time; ACT-22), the top and then Consistency,
 # for the account seed-history.js made. From Home, back to Home. Screenshots 09-insights-<AGE>-<range>-<THEME>.
 #   env AGE (1-day, 7-days, 1-year), THEME (light, dark)
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - tapOn:
     id: open-activity

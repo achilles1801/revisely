@@ -7,7 +7,7 @@
 # 591–600; Thursday 601–604, 1, 582–586.
 # Rules (BEHAVIOUR.md): DAY-1, DAY-2, DAY-3, DAY-5, AHEAD-1, LOG-3
 # e2e-zone: America/Chicago
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - runFlow:
     file: ../subflows/location.yaml

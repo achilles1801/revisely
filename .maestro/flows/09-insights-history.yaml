@@ -2,7 +2,7 @@
 # 2026, on a day-old account: "think i found a bug when u filter by all time or 3 months" (a weeks-grid cell
 # stretched to the width, a gap under it, "0 cycles", "1 of 1 days"). Screenshots only: the rules, a year's
 # history included, are tested by tests/scenarios/scenarios/insightsShortHistory.scenario.tsx.
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 # An account 1 day old.
 - runFlow:

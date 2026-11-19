@@ -1,6 +1,6 @@
 # On an open day (today or yesterday): the + → Note, TEXT, Add (ACT-5, ACT-13). The note is in the
 # day's Notes once the sheet has gone.
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - tapOn:
     id: day-add

@@ -2,7 +2,7 @@
 # across a cold start, played, and deleted. The audio is whatever the device's
 # microphone hears.
 # Rules (BEHAVIOUR.md): none yet; recordings have no rule there.
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - runFlow:
     file: ../subflows/new-account.yaml

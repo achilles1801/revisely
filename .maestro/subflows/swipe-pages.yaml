@@ -11,7 +11,7 @@
 # the flow swiped on to the end card (02 on Android, runs 42149084931 and
 # 42169490060, Nov 6 2026). A swipe that is lost (the page doesn't turn) is
 # made again in swipe-page.yaml, once its count has had time to move.
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - runFlow:
     when:

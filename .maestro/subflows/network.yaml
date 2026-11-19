@@ -2,7 +2,7 @@
 # airplane mode. iOS: the Simulator has none, so the E2E build makes the
 # emulators unreachable (src/lib/e2e/network.ts) and NetInfo with them; the
 # status line says "offline" while it is.
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - runFlow:
     when:

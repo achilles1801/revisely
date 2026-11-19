@@ -7,7 +7,7 @@
 #   its end shows, up to 40 s (it lasts about 19).
 # - Skip's tap doesn't wait for the screen to settle (it never does while the moment plays) and isn't
 #   retried (a retried tap landed on what came next, run 42537579159).
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - extendedWaitUntil:
     visible:

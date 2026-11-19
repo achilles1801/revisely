@@ -10,7 +10,7 @@
 # matched by id, with .* before them.
 # Screenshots: the replay, each card of the run, Home after (w1–w7).
 # Rules (BEHAVIOUR.md): NEW-2, NEW-3
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - runFlow:
     file: ../subflows/new-account.yaml

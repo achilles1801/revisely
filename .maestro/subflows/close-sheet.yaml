@@ -3,7 +3,7 @@
 # handle is a plain view (it closes by a drag, or VoiceOver's activate), and the backdrop's own "Close"
 # is tapped at the screen's middle, which on a tall, scrolling sheet (the juz sheet) is the sheet itself:
 # a page of its strip or a surah row opened the reader (E2E 09, iOS and Android, Nov 8 2026).
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - tapOn:
     point: 50%, 8%

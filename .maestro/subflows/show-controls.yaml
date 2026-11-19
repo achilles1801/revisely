@@ -11,7 +11,7 @@
 # after the tap on "Tomorrow starts at …": Home was still up, the point (50%,
 # 30%) was Home's Review session, and it opened the editor over the ahead
 # session, which then never showed its title.
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - extendedWaitUntil:
     visible:

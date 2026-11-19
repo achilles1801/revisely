@@ -10,7 +10,7 @@
 # either sets the position here or the app can't see one (lib/widgets/position never asks).
 # `scripts/e2e/__tests__/location.test.js` keeps every launch and setLocation to this.
 #   env LATITUDE, LONGITUDE
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - evalScript: ${output.location = 'allow'}
 - setLocation:

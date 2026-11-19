@@ -2,7 +2,7 @@
 # always shown), then Overview without its key. Last in a flow: the layout stays on the phone.
 #   env THEME  light or dark (in the screenshots' names)
 # Screenshots 09-activity-sections-overview-<THEME> and 09-activity-sections-overview-edited-<THEME>.
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - scrollUntilVisible:
     element:

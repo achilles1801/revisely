@@ -5,7 +5,7 @@
 # Rules (BEHAVIOUR.md): ACT-5, ACT-13, ACT-14, ACT-17
 # The account is the Activity mocks' (scripts/seed-activity.js): today is Tuesday 3 November, its
 # session 18 of 20 with At-Taghabun (556–557) not revised, p. 562 memorized, 562–563 read at 8:05.
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - runFlow:
     file: ../subflows/new-account.yaml

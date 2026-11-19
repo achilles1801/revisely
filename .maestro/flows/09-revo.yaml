@@ -4,7 +4,7 @@
 # each screen the mocks show (~/Documents/revisely-today-mocks/revo), for the screenshot-vs-mock
 # boards, in light and then in dark (…-dark), and the sheet with the keyboard up (r5k-keyboard).
 # Rules (BEHAVIOUR.md): REVO-20, REVO-21, REVO-22, REVO-23, REVO-24, REVO-25, REVO-39
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - runFlow:
     file: ../subflows/new-account.yaml

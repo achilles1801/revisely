@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+
 import { describeRelease, diagnosticLines, releaseTags, sentryReports, shortUpdate, ReleaseInput } from '../releaseInfo';
 
 const base: ReleaseInput = {
@@ -22,6 +24,12 @@ describe('releaseInfo', () => {
     expect(r.sentryEnvironment).toBe('preview');
     expect(r.sentryDist).toBe('19');
     expect(r.versionLabel).toBe('1.0.2 (19)');
+  });
+
+  it("names Android's release after the store app's own package, as Sentry's native default does", () => {
+    jest.replaceProperty(Platform, 'OS', 'android');
+    expect(describeRelease(base).sentryRelease).toBe('app.revisely@1.0.2+19.u84b0091f');
+    jest.replaceProperty(Platform, 'OS', 'ios');
   });
 
   it('the built-in bundle keeps the plain release (as before)', () => {

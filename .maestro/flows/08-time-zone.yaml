@@ -3,7 +3,7 @@
 # (subflows/onboard.yaml): Tuesday 1, 582–590; Wednesday 591–600.
 # Rules (BEHAVIOUR.md): DAY-1, DAY-6
 # e2e-zone: Asia/Kathmandu
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - runFlow:
     file: ../subflows/new-account.yaml

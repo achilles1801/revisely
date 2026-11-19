@@ -4,7 +4,7 @@
 # iOS Simulator in CI: the note was added empty). Done again if so.
 # On iOS the multiline field is found by its label (log-input.yaml); its text is
 # its value, which `text:` matches.
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - runFlow:
     when:

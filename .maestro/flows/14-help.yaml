@@ -4,7 +4,7 @@
 # relaunch, until Settings → Support → Help buttons brings it back. Screenshots of the button, the
 # sheet and the toast (h1–h3).
 # Rules (BEHAVIOUR.md): HELP-1, HELP-2
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - runFlow:
     file: ../subflows/new-account.yaml

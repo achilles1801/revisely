@@ -1,6 +1,6 @@
 # Home → Activity → today: the day's blocks. Activity opens on today's month with today picked, and
 # the preview's date opens it (ACT-18).
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 # Right after a relaunch the first tap can be lost (CI): tapped again until
 # Activity shows.

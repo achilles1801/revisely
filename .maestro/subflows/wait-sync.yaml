@@ -3,7 +3,7 @@
 # A note that showed when added but dropped out once it was sent (or a deleted
 # one that came back) is the bug of #213 and #220 (Nov 5): the check right after
 # the tap alone missed it whenever the server's copy came late.
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - extendedWaitUntil:
     visible:

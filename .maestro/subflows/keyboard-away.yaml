@@ -18,7 +18,7 @@
 # visible` loop did that after every Return (about 7 s each, six times a sign-up), and in run
 # 43721829261 (01 on iOS) Maestro's iOS driver crashed during that poll, 3 s after the keyboard
 # had gone ("Failed to resolve remote element", reading the status bar).
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - runFlow:
     when:

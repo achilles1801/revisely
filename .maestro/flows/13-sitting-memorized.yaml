@@ -9,7 +9,7 @@
 # The account: onboarded (Juz 30 and Al-Fatihah memorized, so Al-Mulk's first page, 562, is not), and
 # not a tester: sittings and the Day's blocks are every account's since the November 2026 release
 # (sittingsEnabled, activityBlocksEnabled).
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - runFlow:
     file: ../subflows/new-account.yaml

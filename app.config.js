@@ -8,6 +8,12 @@ import 'dotenv/config';
 // it that way: a dev-only plugin or value goes behind DEV, never into the store app's config.
 const DEV = process.env.APP_VARIANT === 'dev';
 const BUNDLE_ID = DEV ? "com.revisionbuddy.app.dev" : "com.revisionbuddy.app";
+// The store app's Android package is its own (Nov 2026): Google Play lists Revisely under Revisely
+// LLC's organization developer account, as a new app, and a Play package name is permanent, so
+// com.revisionbuddy.app stays with the first (personal) account's app. iOS keeps its bundle id, and
+// Revisely Dev keeps com.revisionbuddy.app.dev on both (its Play app stays where it is). Keep in step
+// with STORE_ANDROID_PACKAGE in src/lib/variant.ts, scripts/play.js and .maestro/run.sh.
+const ANDROID_PACKAGE = DEV ? "com.revisionbuddy.app.dev" : "app.revisely";
 const APP_GROUP = DEV ? "group.com.revisionbuddy.app.dev" : "group.com.revisionbuddy.app";
 const SCHEME = DEV ? "revisely-dev" : "revisely";
 // The Dev icon's ground (assets/dev/, assets/brand/dev/): amber, so it never passes for the store app.
@@ -87,7 +93,7 @@ export default {
       color: "#624BD5"
     },
     android: {
-      package: BUNDLE_ID,
+      package: ANDROID_PACKAGE,
       // Expo adds these by default. The app never draws over other apps (only the dev menu
       // did) and stores files in its own folders (no storage permission since Android 10);
       // Play lists every permission on the store page.

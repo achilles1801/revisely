@@ -13,6 +13,9 @@ const { SENTRY, sentryApi } = require('../sentry/api');
 const RANGES = { '1h': '5m', '24h': '1h', '7d': '6h', '30d': '1d' };
 /** Below this build number a release is Android's (version codes are counted apart from iOS builds). */
 const IOS_MIN_BUILD = Number(process.env.METRICS_IOS_MIN_BUILD || 20);
+// The store app's Android package (app.config.js ANDROID_PACKAGE, since Nov 2026): its releases are Android's,
+// whatever their build number. Older Android releases share the iOS bundle id and fall back to the rules below.
+const ANDROID_RELEASE_PREFIX = 'app.revisely@';
 
 async function sentry(path, params) {
   const token = process.env.SENTRY_API_TOKEN;
@@ -50,20 +53,24 @@ function platformMap(eventRows) {
     cur[p] += Number(r['count()']) || 0;
     byRelease.set(r.release, cur);
   }
+  // A build is the app id with its version and build: Android's store app (app.revisely@) counts its
+  // builds apart from the iOS bundle id's, which can reach the same numbers.
+  const buildKey = (rel, p) => `${String(rel).slice(0, String(rel).indexOf('@') + 1)}${p.version}+${p.build}`;
   const byBuild = new Map();
   for (const [rel, c] of byRelease) {
     const p = parseRelease(rel);
     if (!p) continue;
-    const k = `${p.version}+${p.build}`;
+    const k = buildKey(rel, p);
     const cur = byBuild.get(k) || { ios: 0, android: 0 };
     cur.ios += c.ios; cur.android += c.android;
     byBuild.set(k, cur);
   }
   const pick = (c) => (c.android > c.ios ? 'android' : 'ios');
   return function platformOf(release) {
+    if (String(release || '').startsWith(ANDROID_RELEASE_PREFIX)) return 'android';
     if (byRelease.has(release)) return pick(byRelease.get(release));
     const p = parseRelease(release);
-    if (p && byBuild.has(`${p.version}+${p.build}`)) return pick(byBuild.get(`${p.version}+${p.build}`));
+    if (p && byBuild.has(buildKey(release, p))) return pick(byBuild.get(buildKey(release, p)));
     return p && p.build < IOS_MIN_BUILD ? 'android' : 'ios';
   };
 }

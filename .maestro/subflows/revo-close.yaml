@@ -4,7 +4,7 @@
 # and 09-revo-attach, every attempt, in the SE run 43873599186 (Nov 16 2026). So on an SE the sheet is
 # closed by a tap on the backdrop: the strip above a full sheet, between the status bar and the sheet
 # (y 20–28; 4% is 26.7), as a tap anywhere outside it closes it.
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - runFlow:
     when:

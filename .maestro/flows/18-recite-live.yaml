@@ -6,7 +6,7 @@
 # mistakes-toggle-after.png): the reader with the mic, the mic's menu (Mark mistakes off, then on),
 # following, a mark and the score, the hidden view, done, reciting the mistakes again, and the locked switch's
 # Premium page. Last, a Recite take begun in the middle of the page (An-Naml 25), as a take can start anywhere on it.
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - runFlow:
     file: ../subflows/new-account.yaml

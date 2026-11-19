@@ -1,6 +1,6 @@
 # Signs up with email and password (the Auth emulator), on to onboarding.
 # Leaves the address in output.email.
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - evalScript: ${output.email = 'e2e' + Date.now() + '@example.com'}
 # Sign up (a tap made while the screen settles can be lost: check it took).

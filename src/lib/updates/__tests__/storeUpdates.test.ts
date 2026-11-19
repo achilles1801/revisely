@@ -210,9 +210,9 @@ describe('Android', () => {
     expect(currentStoreDecision().offer).toBeNull();
   });
 
-  it('opens Google Play', async () => {
+  it("opens Google Play at Revisely LLC's listing (its own package, not the iOS bundle id)", async () => {
     const open = jest.spyOn(Linking, 'openURL').mockResolvedValueOnce(true);
     await openStore();
-    expect(open).toHaveBeenLastCalledWith('market://details?id=com.revisionbuddy.app');
+    expect(open).toHaveBeenLastCalledWith('market://details?id=app.revisely');
   });
 });

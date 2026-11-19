@@ -2,7 +2,7 @@
 # the run's artifacts; scripts/verify/activity-boards.py puts them beside the mocks.
 # Rules (BEHAVIOUR.md): ACT-12 at the end (a tester's tab bar is Home and Read; Weak spots' "See all"
 # opens Pages by strength, subflows/tabs-merge-screens.yaml). The rest looks; it doesn't test the rules.
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - runFlow:
     file: ../subflows/new-account.yaml

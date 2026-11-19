@@ -3,7 +3,7 @@
 # day (the default), the day resetting at BOUNDARY (midnight | fajr). The days
 # (SCHED-1): 1, 582–590 | 591–600 | 601–604, 1, 582–586 | 587–596 …
 # For fajr, set the location first (setLocation) and launch with location allowed.
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - tapOn:
     id: welcome-begin

@@ -1,5 +1,5 @@
 # Checks the app's clock is at AT's date and hour (it runs on from there).
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - extendedWaitUntil:
     visible:

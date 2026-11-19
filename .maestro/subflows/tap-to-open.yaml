@@ -23,7 +23,7 @@
 # Each check below is one Maestro answers at once: visible on what is there, or on what isn't once 7 s have passed
 # since the tap. A visible check on something absent waits up to 7 s minus the time since the last tap (README,
 # "Things that bit"). The caller still waits for what it expects next.
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - tapOn:
     id: ${ID}

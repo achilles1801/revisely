@@ -60,6 +60,12 @@ mkdir -p "$OUT"
 DEVICE=${E2E_DEVICE:-}
 # Passed on Android too, as pro: a flow's condition on it is read on both platforms.
 IPHONE=${E2E_IPHONE:-pro}
+# The app under test: the flows' `appId: ${APP_ID}`. iOS keeps the bundle id; the store app's Android
+# package is its own since Nov 2026 (app.config.js ANDROID_PACKAGE: Revisely LLC's Play listing).
+case "$PLATFORM" in
+  ios) APP_ID=com.revisionbuddy.app ;;
+  android) APP_ID=app.revisely ;;
+esac
 if [ -z "$DEVICE" ]; then
   if [ "$PLATFORM" = ios ]; then
     DEVICE=$(xcrun simctl list devices booted -j | node -e '
@@ -199,7 +205,7 @@ run_flow() {
     # shellcheck disable=SC2086
     with_limit "$FLOW_LIMIT" env SIMCTL_CHILD_TZ="$zone" "$MAESTRO" --device "$DEVICE" test $reuse \
       -e E2E_AUTH_URL="$AUTH_URL" -e E2E_FIRESTORE_URL="$FIRESTORE_URL" -e E2E_FUNCTIONS_URL="$FUNCTIONS_URL" \
-      -e E2E_IPHONE="$IPHONE" \
+      -e E2E_IPHONE="$IPHONE" -e APP_ID="$APP_ID" \
       --format junit --output "$out/report.xml" --debug-output "$out/debug" \
       --test-output-dir "$out/run" \
       "$flow" > "$out/maestro.log" 2>&1
@@ -207,7 +213,7 @@ run_flow() {
     set_android_zone "$zone" || return 1
     with_limit "$FLOW_LIMIT" "$MAESTRO" --device "$DEVICE" test \
       -e E2E_AUTH_URL="$AUTH_URL" -e E2E_FIRESTORE_URL="$FIRESTORE_URL" -e E2E_FUNCTIONS_URL="$FUNCTIONS_URL" \
-      -e E2E_IPHONE="$IPHONE" \
+      -e E2E_IPHONE="$IPHONE" -e APP_ID="$APP_ID" \
       --format junit --output "$out/report.xml" --debug-output "$out/debug" \
       --test-output-dir "$out/run" \
       "$flow" > "$out/maestro.log" 2>&1
@@ -218,7 +224,7 @@ run_flow() {
 echo "▶ warm-up ($PLATFORM)"
 mkdir -p "$OUT/$PLATFORM"
 # It installs Maestro's driver afresh; the flows then use it (DRIVER above).
-if with_limit "$WARMUP_LIMIT" "$MAESTRO" --device "$DEVICE" test "$ROOT/.maestro/subflows/warm-up.yaml" > "$OUT/$PLATFORM/warm-up.log" 2>&1; then
+if with_limit "$WARMUP_LIMIT" "$MAESTRO" --device "$DEVICE" test -e APP_ID="$APP_ID" "$ROOT/.maestro/subflows/warm-up.yaml" > "$OUT/$PLATFORM/warm-up.log" 2>&1; then
   DRIVER=reuse
 else
   echo "  warm-up failed (see $OUT/$PLATFORM/warm-up.log); going on"

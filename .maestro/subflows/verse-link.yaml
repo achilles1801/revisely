@@ -3,7 +3,7 @@
 #   env T:      a translation id (en.sahih, qe.urdu_junagarhi)
 #   env CREDIT: a pattern for the start of its credit
 #   env THEME:  light or dark
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - openLink:
     link: revisely://e2e/verse?ref=112:2&t=${T}&theme=${THEME}

@@ -2,7 +2,7 @@
 # and coming back, the check, and finishing on the end card. Day one is pages
 # 1, 582–590 (subflows/onboard.yaml).
 # Rules (BEHAVIOUR.md): SESS-1, SESS-2, SESS-3, ACT-12
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - runFlow:
     file: ../subflows/new-account.yaml

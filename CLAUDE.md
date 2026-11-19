@@ -589,7 +589,8 @@ Non-testers follow `production`, so nobody sees this on a phone before Promote; 
 ## Health (Sentry → GitHub → Claude)
 
 - Every launch is a Sentry session labelled with the JavaScript it ran (`src/lib/releaseInfo.ts`):
-  release `com.revisionbuddy.app@<version>+<build>` for the built-in bundle and
+  release `com.revisionbuddy.app@<version>+<build>` for the built-in bundle (`app.revisely@…` for the store app on
+  Android since the package split, Nov 2026: the app's own id, as Sentry's native default) and
   `…+<build>.u<first 8 of the update group>` for an update; environment = the update channel
   (`production`, `preview`); tags `update_id`, `update_group`, `channel`, `runtime`, `build`. No IP
   addresses (`sendDefaultPii` off); events carry only the pseudonymous account id.
@@ -740,7 +741,8 @@ Non-testers follow `production`, so nobody sees this on a phone before Promote; 
   devices as monthly CSVs to its Cloud Storage bucket (Download reports → Statistics → copy the
   `gs://pubsite_prod_…` URI). Invite a Google Cloud service account in Play Console → Users and
   permissions with "View app information and download bulk reports". Then fill in `play()` in
-  `scripts/stats/weekly.js` to read `stats/installs/installs_com.revisionbuddy.app_YYYYMM_overview.csv`,
+  `scripts/stats/weekly.js` to read `stats/installs/installs_app.revisely_YYYYMM_overview.csv` (the store app's
+  package since the split; `com.revisionbuddy.app`'s for the first listing),
   with secrets `PLAY_REPORTS_BUCKET` and `PLAY_REPORTS_SA_KEY`.
 
 **Rolling back** a production update: Actions → Promote to production → Run workflow on `main` →
@@ -1568,13 +1570,22 @@ choice is kept per phone (`@revisely_mushaf_edition:v1`), not on the account.
 
 ## Android (Google Play)
 
-Package `com.revisionbuddy.app`, the same as the iOS bundle id (permanent). `versionCode` comes from
+**Package `app.revisely`** (Nov 2026, Revisely LLC; `ANDROID_PACKAGE` in app.config.js, apart from the iOS bundle id).
+Google refused production to the personal account on Nov 18 2026 (its 12-tester rule), so the store app is listed as a
+new app in Revisely LLC's organization developer account, and a Play package name is permanent. `com.revisionbuddy.app`
+stays with the first account's listing: closed testing until the new app is live, then unpublished. Revisely Dev keeps
+`com.revisionbuddy.app.dev` on both platforms, in the first account (internal testing needs no production). The plan and
+the store-side checklist are outside the repository (the LLC session's notes). Keep `STORE_ANDROID_PACKAGE`
+(`src/lib/variant.ts`), `scripts/play.js` (`PLAY_PACKAGE` reaches the others), `.maestro/run.sh` (the flows' `appId:
+${APP_ID}`) and `.maestro/scripts/firebase-demo-config.sh` in step with it. The new app's first `versionCode` is set
+above the first listing's (`eas build:version:set`), because `playBuildAvailable` and `config/app` take only a higher
+code. `versionCode` comes from
 EAS (`appVersionSource: remote`, `autoIncrement`), counted apart from iOS build numbers; the version
 string is the same `version` in app.config.js. Target SDK 36, min 24; every native library is 16 KB
 aligned (checked on an API 37 16 KB-page emulator). `store/android/` holds the listing, Data safety
 and content rating answers and the click-by-click setup. On Play since Nov 1 2026: internal testing,
 and Closed testing (track `alpha`) approved; a personal account needs 12 testers opted in for 14 days
-before production can be applied for.
+before production can be applied for (the reason for the package above).
 
 **Android moves with iOS.** Same branches, same version, same flow:
 
@@ -2019,7 +2030,7 @@ fingerprint doesn't move. No headless JavaScript: the widgets read the snapshot 
   (`cd android && ./gradlew :android-widgets:testDebugUnitTest` after `npx expo prebuild -p android`; not in
   CI); the bridge and the shared files in Jest (`widgetStorage`, `androidWidgets`).
 - **On an emulator** without signing in: a debug build has `DebugSnapshotReceiver` (`src/debug`, absent from
-  release builds): `adb shell am broadcast -n com.revisionbuddy.app/app.revisely.widgets.DebugSnapshotReceiver
+  release builds): `adb shell am broadcast -n app.revisely/app.revisely.widgets.DebugSnapshotReceiver
   -a app.revisely.widgets.DEBUG_SNAPSHOT -f 32 --es b64 "$(base64 < snapshot.json)"`. Widgets are added from
   the launcher's picker (`adb shell input draganddrop` from a preview to the home screen works); `adb shell
   cmd uimode night yes` switches the theme; `adb shell dumpsys alarm | grep revisely` shows the alarm.

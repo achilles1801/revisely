@@ -15,7 +15,7 @@
 # 27–28) instead of the controls. The menu keeps VoiceOver to itself, so the page was then not found at all and every
 # tap again failed. So an open menu is closed first, with a touch above it (any touch outside closes it, and goes no
 # further).
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - evalScript: ${output.readerTaps = 0}
 - retry:

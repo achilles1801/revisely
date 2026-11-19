@@ -1,5 +1,5 @@
 # Activity's screens in dark (the same screens as 09-activity-light.yaml), set through Settings.
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - runFlow:
     file: ../subflows/new-account.yaml

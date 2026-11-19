@@ -6,7 +6,7 @@
 # tap opened the session in 2 s on the retry). While Home's button is still on
 # screen and the session isn't, it is tapped again, up to 3 times. A tap that
 # did take leaves Home behind the session, so it is never tapped twice.
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - tapOn:
     id: today-cta

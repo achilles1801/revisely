@@ -1,6 +1,6 @@
 # A fresh install, its clock at CLOCK, signed up and onboarded (onboard.yaml,
 # BOUNDARY midnight or fajr), on Home.
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - runFlow:
     file: launch.yaml

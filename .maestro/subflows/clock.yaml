@@ -1,7 +1,7 @@
 # Sets the app's clock: AT is a wall time in the phone's zone (2026-11-03T00:30)
 # or an instant (…Z). Time runs on from there; the app reads it as a phone
 # would (a relaunch, coming back to the front). See .maestro/README.md.
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 # The link, unless the app already shows AT (an iOS launch carries it:
 # launch.yaml). On a slow CI Simulator `simctl openurl` can time out

@@ -1,7 +1,7 @@
 # Opens today's session from Home and revises all of it, swiping the last page
 # onto the end card, then back to Home. FIRST: the quiet header at the start
 # ("Juz 1 · 0/10").
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - runFlow:
     file: open-session.yaml
