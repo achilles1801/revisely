@@ -32,7 +32,11 @@ import similar  # noqa: E402
 import tajweed  # noqa: E402
 
 FPS = checker.FPS
-WORDS_P = dict(checker.DEFAULTS, sub_p=1.01, alt_rule='skeleton', del_frac=0.67)
+# order_again (harness aba03414; an older harness ignores it): a word is out of order only if the later word isn't
+# heard again after it. Going on into a like ayah and coming back (2:6 said as 3:91, whose "لهم عذاب" pulls the path to
+# 2:7's "ولهم عذاب") marked the right ayah after it wrong as a swap. bench-v0: v7 0.50 -> 0.43 false alarms per 100
+# words, v6 0.45 -> 0.39, every catch the same (swaps 97.0%); learners, hesitations, corrections and /record the same
+WORDS_P = dict(checker.DEFAULTS, sub_p=1.01, alt_rule='skeleton', del_frac=0.67, order_again=True)
 MAX_WORDS = 300  # a passage longer than this is cut at the end of an ayah
 PAD = 15  # frames either side of an ayah's words when judging its tajweed
 SAID = ('correct', 'corrected', 'wrong')
