@@ -1,0 +1,21 @@
+# What's new 1.0.5's first card, the Recite moment (ReciteMoment): Skip if it is still playing.
+# - First, wait until something of it is on screen: Skip while it plays, or its end (the title), since on Android
+#   Maestro reads the screen slowly while the moment moves and it can play through (about 8 s) before it looks.
+# - Skip's tap doesn't wait for the screen to settle (it never does while the moment plays) and isn't retried (a retried
+#   tap would land on what comes next), as for Revo's moment (revo-moment-skip.yaml).
+# The step after this waits for the end's title.
+appId: com.revisionbuddy.app
+---
+- extendedWaitUntil:
+    visible:
+      id: "recite-moment-skip|whats-new-title"
+    timeout: 20000
+- runFlow:
+    when:
+      visible:
+        id: recite-moment-skip
+    commands:
+      - tapOn:
+          id: recite-moment-skip
+          waitToSettleTimeoutMs: 500
+          retryTapIfNoChange: false
