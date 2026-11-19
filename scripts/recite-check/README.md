@@ -74,12 +74,25 @@ On bench-v0, professionals' planted slips caught at false alarms per 100 words:
 | v7 | 96.1% at 0.50 | 96.9% at 0.50 | 96.9% at 0.50 |
 
 The fixed export (riwaya zeroed, full precision) matches the gates exactly, learners' clips included. It runs at the
-same speed on the Mac (6.9 ms per second of audio).
+same speed on the Mac (6.9 ms per second of audio), but not on Cloud Run's x86 (dev, Nov 19 2026; v7, Shuraym's 85 s take,
+cold and warm, against the int8 revision just before):
+
+| Per second of audio | int8 | fixed export |
+| --- | --- | --- |
+| Words & harakat alone: model / CPU | 0.17-0.18 / 0.34-0.35 s | 0.30-0.31 / 0.50-0.53 s |
+| Words & harakat: `at` after a word starts (median, p90); done after Stop | 0.47, 0.78 s; 0.54-0.64 s | 0.52, 0.84 s; 0.71-0.73 s |
+| Recite alone: model / CPU | 0.15 / 0.25-0.26 s | 0.26-0.27 / 0.37-0.38 s |
+| Two Recite takes on one pair instance: `at` (median, p90) | 0.50-0.55, 0.83-0.98 s | 0.67-0.72, 1.07-1.11 s |
+
+Two fixed-export takes saturate the pair's one vCPU (the instance's CPU 1.25 s a second while both ran; lag p90 0.45 s).
 
 How it's switched:
 - `stage.sh` copies `model-fp32.onnx` beside each words ear's int8 file when the lab has it.
-- `RECITE_EAR_EXPORT=fp32` runs it (`engine.ear_file`; `/health`'s `ears.words_file` says which file runs). `dev.env`
-  sets it. Production's `prod.env` leaves it unset, so production keeps its int8 files.
+- `RECITE_EAR_EXPORT=fp32` runs it (`engine.ear_file`; `/health`'s `ears.words_file` says which file runs). The env
+  files set it on recite-check only (`ENV_CHECK`), where Mark mistakes runs, one take an instance. The pair (Recite,
+  which marks and keeps nothing) stays on int8, so two takes still fit its one vCPU. `dev.env` runs v7's; `prod.env`
+  runs v6's from production's next deploy, on Majd's word (his yes, Nov 18 2026: once it was checked on Dev). Rollback:
+  drop it from the env file and deploy the same image again, or move traffic back.
 
 **Naming a v6 take's slips on the released model's frames** (Nov 16 2026). Naming (`into`) was measured on the released
 model's frames, and on v6's it named far fewer: 139 of bench-v0's 275 planted slips and swapped endings, live (the
