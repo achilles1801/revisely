@@ -686,13 +686,11 @@ appId: com.revisionbuddy.app
     file: ../subflows/shot.yaml
     env:
       NAME: rl16-voice-search-reader-dark
-# The search's results (Majd, Nov 16 2026: the field and the mic at the bottom, clearer results). With the live check off a
-# voice search's one result stays on the results: Al-Ikhlas 1, whose Saheeh International E2E builds carry
-# (lib/e2e/demoTranslations), so its card shows the ayah, the translation and its credit, Share, Copy and Open.
-- openLink:
-    link: revisely://e2e/recite-live?on=0
-    optional: true
-- runFlow: ../subflows/open-link-prompt.yaml
+# The search's results (Majd, Nov 16 2026: the field and the mic at the bottom, clearer results), as SEARCH-4 has them with
+# Recite on (every account since 1.0.5, so `e2e/recite-live?on=0` no longer turns it off): a voice search that finds one
+# place, Al-Ikhlas 1, opens the reader there with nothing listening, and Back returns to the search with that result
+# still there. E2E builds carry its Saheeh International (lib/e2e/demoTranslations), so its card shows the ayah, the
+# translation and its credit, Share, Copy and Open.
 - openLink:
     link: revisely://e2e/voice-search?heard=%D9%82%D9%84%20%D9%87%D9%88%20%D8%A7%D9%84%D9%84%D9%87%20%D8%A3%D8%AD%D8%AF
     optional: true
@@ -733,6 +731,15 @@ appId: com.revisionbuddy.app
 - tapOn:
     id: search-mic
     waitToSettleTimeoutMs: 300
+- extendedWaitUntil:
+    visible:
+      id: reader-background
+    timeout: 15000
+- assertNotVisible:
+    id: recite-bar
+- runFlow: ../subflows/reader-controls.yaml
+- tapOn:
+    id: reader-back
 - extendedWaitUntil:
     visible:
       id: search-verse-112-1

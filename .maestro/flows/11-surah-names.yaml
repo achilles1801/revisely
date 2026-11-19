@@ -100,6 +100,13 @@ appId: com.revisionbuddy.app
       NAME: 11-end-card-dark
 - runFlow: ../subflows/show-controls.yaml
 - tapOn: "Back"
+# Home first, as after Tuesday's session: back-home's own check is immediate, and the session can take most of a second
+# to go (0.8 s on an iOS runner, run 44466446047), so it read the session as "not Home" and looked for a Back that had
+# gone with it.
+- extendedWaitUntil:
+    visible:
+      id: today-post
+    timeout: 15000
 
 # Last, as it marks pages memorized (and so changes the schedule): the daily log, where a
 # Memorized entry from its pages is named by its surahs. In dark, then in light. The log
