@@ -494,12 +494,14 @@ Recite with Mark mistakes remembers each take (Majd, Nov 15 2026; Tarteel's bigg
 - **RMEM-1.** A take with Mark mistakes is remembered on the account, so it follows the user to another
   phone. It keeps its marks (less any called Not a mistake, after the take too, and again once put back),
   where it ran, its score by the page, whether the page was hidden, and which recording on the phone is its
-  own. It keeps text only, never audio. A Recite take (following only), a failed take, and a take whose start
-  was never found leave nothing. Forgetting a take removes it from every phone.
+  own. It keeps text only, never audio. A Recite take (following only), and a take whose start was never found
+  (a failure before then included) leave nothing; one that failed after it is kept unfinished (RECITE-11). Forgetting a take removes it from every phone.
 - **RMEM-2.** A remembered mistake on a word clears after 2 right takes of that word in a row, on 2
   different revision days. Getting it wrong again starts the count over. A take counts only for what it
-  checked: Words & harakat never clears a tajweed note. Not clear marks are never remembered, and a take
-  that heard a word's harakat only as Not clear is not a try at them. Clear now clears a word at once.
+  checked: Words & harakat never clears a tajweed note. A Not clear mark is remembered like a slip, amber,
+  until the word is said clearly: a take that heard its harakat only as Not clear hasn't said it clearly, so it
+  counts as wrong. It still never counts in a score. (Majd, Nov 20 2026, on Not clear staying after a take: "yes
+  (a) is fine".) Clear now clears a word at once.
 - **RMEM-3.** Outside a take, a word with a remembered mistake stays marked on the page, in its highlight
   colour made lighter (red for a word, amber for harakat and letters, violet for tajweed). A word shows one
   mark, its most severe. Marks don't show during a take, where only that take's marks do. They also don't
