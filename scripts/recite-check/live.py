@@ -48,6 +48,7 @@ SEG_BACK = 16       # words before a segment's first word, for repeats
 SEG_MARGIN = 24     # a new segment starts when the cursor is this close to the segment's last word
 SEG_FRAMES = 3 * 60 * FPS  # ...or when a segment has taken this many frames (3 minutes)
 MAX_SECONDS = 15 * 60
+KEEP_LIVE = os.environ.get('RECITE_KEEP_LIVE', '1') == '1'  # `done` keeps the marks shown live (_live_kept)
 EXTRA_STABLE = 6    # hops in a row an extra word must be there before it is shown. 2 until Nov 20 2026: on 60 bench
                     # takes with planted mistakes 75 of 172 extra words shown live were gone from the final answer (Majd:
                     # marks "should stay"); at 6, 21 of 118, the same 97 the final keeps, each shown 2 s later
@@ -1866,6 +1867,16 @@ class LiveSession:
             out['ms']['side'] = int(self.side.close() + self.side.ms)
             out['ms']['side_wait'] = int(self.side.ms + self.side.waited)
 
+    def _live_kept(self, marks, statuses):
+        """The marks shown live (not taken back) that the final pass left out, kept in `done` with `live: true` (Majd, Nov
+        20 2026: "as soon as a mistake is made, the color should be highlighted immediately and should stay that way";
+        recite-contract.md draft 10). The final's own mark on a word replaces a live one there; a word the final heard
+        right again after its mistake (`corrected`) drops it."""
+        final_words = {m['w'] for m in marks if m.get('w') is not None}
+        ids = {m['id'] for m in marks}
+        return [dict(m, live=True) for mid, m in self.marks.items()
+                if mid not in ids and m.get('w') not in final_words and statuses.get(m.get('w')) != 'corrected']
+
     @staticmethod
     def _merge(results):
         """Segment results as `done` reads them: each word's row (a word said again, right, in a later segment:
@@ -1943,6 +1954,8 @@ class LiveSession:
                 ('start',) if 'start' in out else ())} | {'v': 2, 'follow': True, 'marks': [], 'score': None}
         heard = heard_sounds(spans, self._tokens(0, self.T), self.ear.vocab)
         out['marks'] = self.E.marks(words, flagged, heard, ex, tj, letters if self.st['letters'] else [])
+        if KEEP_LIVE:
+            out['marks'] += self._live_kept(out['marks'], statuses)
         naming = (out['marks'], self.lp[:self.T], [r['w'] for r in words], statuses, spans, ex)
         if self.names_after:
             self._naming = naming
