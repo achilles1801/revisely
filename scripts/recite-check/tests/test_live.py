@@ -5,6 +5,7 @@
     ~/revisely-mistake-lab/data/bench-v0 has it): both are marked, live and at the end;
   - events depend on the audio only: any chunk size, and a session run again from its messages, give the same.
 """
+import ast
 import json
 import os
 import pathlib
@@ -1169,6 +1170,56 @@ class LookAlikes(unittest.TestCase):
         alts = [nfc(a['text']) for a in kws[1]['alts']]
         self.assertNotIn(nfc('وَإِنَّكَ'), alts)
         self.assertIn(nfc('فَإِنَّكَ'), alts)
+
+
+SLIP_TAKE = BENCH / 'abdulbaset-mujawwad.p1.m1.clean.json'  # 2:6 on; from 2:6's fourth word, 3:91 for 44 s (planted)
+SWAP_TAKE = BENCH / 'abdulbaset-murattal.p5.m1.clean.json'  # Ar-Rahman; two words swapped at 27 s (planted)
+
+
+@unittest.skipUnless(MODEL.exists() and SLIP_TAKE.exists() and SWAP_TAKE.exists(),
+                     'the model or the bench recitations are not here')
+class MarksStay(unittest.TestCase):
+    """Majd (Nov 20 2026): a mistake's highlight should come at once "and should stay that way". Since protocol 8 `done`
+    keeps every mark shown live, a live mark must be one the take keeps."""
+
+    def take(self, item, seconds):
+        import live
+        t = json.loads(item.read_text())
+        ayat = t['ayat'] if isinstance(t['ayat'], list) else json.loads(t['ayat'])
+        sess = live.LiveSession(engine(), int(t['sura']), ayat[0], 114, 6, {'letters': '1', 'tajweed': '0'},
+                                defer=True, open_end=True)
+        with wave.open(str(item.with_suffix('.wav'))) as w:
+            pcm = w.readframes(int(16000 * seconds))
+        return t, run(sess, chunks(pcm, 3200) + [{'type': 'end'}])
+
+    def test_a_word_said_right_is_not_marked_from_a_later_pass(self):
+        """2:6's first words are said right; then the reciter goes on with 3:91 for 44 s. The live window (30 s) read
+        that as passes back over 2:6's first words and marked them wrong, with extra words after them, and `done` kept
+        those marks. They aren't marked now; the slip itself still is, live and at the end."""
+        import live
+        first = engine().words.first[engine().words.vindex[(2, 6)]]
+        for keep in (False, True):
+            with unittest.mock.patch.object(live, 'REVISIT_KEEP', keep):
+                _, ev = self.take(SLIP_TAKE, 42)
+            shown = {e['mark']['w'] for e in ev if e['type'] == 'mark'}
+            done = {m['w'] for m in ev[-1]['result']['marks']}
+            self.assertEqual(bool({first, first + 1} & shown), not keep, (keep, sorted(shown)))
+            if keep:
+                self.assertFalse({first, first + 1} & done, sorted(done))
+                self.assertIn(first + 3, shown & done)  # the slip's first word (3:91 from here)
+
+    def test_a_swapped_word_keeps_its_mark(self):
+        """Two words said the other way round: the first is marked skipped once the second is heard, then heard after
+        it, out of order (not shown live). Its mark used to be taken back a second later and come back only after Stop;
+        now it stays, and the final pass names it out of order."""
+        t, ev = self.take(SWAP_TAKE, 45)
+        events = t['events'] if isinstance(t['events'], list) else ast.literal_eval(t['events'])
+        w = next(e for e in events if e['type'] == 'swap')['words'][0]
+        self.assertIn(f'{w}:skipped:', {e['mark']['id'] for e in ev if e['type'] == 'mark'})
+        self.assertNotIn(f'{w}:skipped:', {e['id'] for e in ev if e['type'] == 'unmark'})
+        marks = ev[-1]['result']['marks']
+        self.assertIn((w, 'word', 'order'), {(m['w'], m['kind'], m.get('detail')) for m in marks})
+        self.assertNotIn(f'{w}:skipped:', {m['id'] for m in marks})
 
 
 DEV_TAKE = sorted(pathlib.Path(os.environ.get('RECITE_DEV_TAKES', pathlib.Path.home() / 'revisely-mistake-lab/data/dev-takes'))
