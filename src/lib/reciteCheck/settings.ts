@@ -36,6 +36,8 @@ export interface ReciteCheckSettings {
   saveRecording: boolean;
   /** Words missed in past takes stay lightly marked on the page until said right (lib/reciteMemory); off in Settings. */
   showPast: boolean;
+  /** A short sound and a tap as a take marks a mistake (lib/reciteLive/mistakeCue; Majd, Nov 20 2026); off in Settings. */
+  mistakeSound: boolean;
 }
 
 export const RECITE_CHECK_DEFAULTS: ReciteCheckSettings = {
@@ -50,6 +52,7 @@ export const RECITE_CHECK_DEFAULTS: ReciteCheckSettings = {
   level: 'words',
   saveRecording: true,
   showPast: true,
+  mistakeSound: true,
 };
 
 /** Whether Strict is offered: Revisely Dev's, until its own switch is on (lib/release/mistakeDetection). */
@@ -91,6 +94,7 @@ export function parseReciteCheckSettings(raw: string | null): ReciteCheckSetting
     level: pick(s.level, ['words', 'strict'] as const, d.level),
     saveRecording: typeof s.saveRecording === 'boolean' ? s.saveRecording : d.saveRecording,
     showPast: typeof s.showPast === 'boolean' ? s.showPast : d.showPast,
+    mistakeSound: typeof s.mistakeSound === 'boolean' ? s.mistakeSound : d.mistakeSound,
   };
 }
 

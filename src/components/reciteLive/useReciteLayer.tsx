@@ -28,6 +28,7 @@ import type { AyahRef } from '../../lib/ayahBounds';
 import { useMushafEdition } from '../../lib/mushafEdition';
 import { openWebPage } from '../../lib/openWebPage';
 import { reciteLiveEnabled } from '../../lib/reciteLive/availability';
+import { isDevVariant } from '../../lib/variant';
 import { premiumErrorText, setDevPremium, supportLinkUrl, usePremium } from '../../lib/premium';
 import { claimEarlyAccess, earlyAccessShortLine, useEarlyAccess } from '../../lib/earlyAccess';
 import { checkLevel, setReciteCheckSettings, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
@@ -37,6 +38,7 @@ import { stopTrace } from '../../lib/reciteLive/stopTrace';
 import {
   barWords,
   hiddenFollow,
+  coverHighlights,
   NOTHING_SHOWN,
   revealAyah,
   revealNextWord,
@@ -80,11 +82,12 @@ import { passageTakes, progressLine } from '../../lib/reciteMemory/progress';
 import { PassageProgressSheet } from '../reciteMemory/PassageProgressSheet';
 import { memoryId, type ClearRecord } from '../../lib/reciteMemory/record';
 import { clipOfTake, useTakeRecordings } from '../../lib/reciteMemory/takeAudio';
-import { RememberedTargets, RememberedUnderlay } from '../reciteMemory/RememberedLayers';
+import { markOf, PAST_OPACITY, RememberedTargets, RememberedUnderlay } from '../reciteMemory/RememberedLayers';
+import { markFill } from './markColours';
 import { WordHistoryCard } from '../reciteMemory/WordHistoryCard';
 import { ShownTakeBar } from '../reciteMemory/ShownTakeBar';
 import type { TakeRecord } from '../../lib/reciteMemory/record';
-import { countsAsMistake, isUnclear } from '../../lib/reciteLive/contract';
+import { countsAsMistake, isUnclear, markGroup } from '../../lib/reciteLive/contract';
 import { pageAccuracy } from '../../lib/reciteLive/score';
 import { sendLabel } from '../../lib/reciteCheck/service';
 
@@ -722,6 +725,30 @@ export function useReciteLayer({
     const marked = new Set(Object.values(live.state.marks).map((m) => m.w));
     return [...peeked].filter((w) => !marked.has(w));
   }, [live.active, peeked, live.state.marks]);
+  // The hidden view keeps mistakes on the covers (Majd, Nov 20 2026; RECITE-13): a take's marks in their colour, and the
+  // words Recite's memory still holds, lighter (with Show past mistakes on), during a take and outside one.
+  // Revisely Dev's until the next release (its Dev guide says so).
+  const coversKeepMarks = isDevVariant();
+  const pastOnCovers = coversKeepMarks && liveOn && !!qw && hidden && reciteSettings.showPast && !showing;
+  const coverMarksOn = useCallback(
+    (page: number): { mark: Mark; fill: string; opacity?: number }[] => {
+      if (!qw || !hidden || !coversKeepMarks) return [];
+      const follow = hiddenFollow(qw, revealed, liveInfo);
+      const liveMarks = live.active && checkTake ? marksOnPage(live.state, qw, page) : [];
+      const past = pastOnCovers
+        ? openInRange(memories, ...qw.pageRange(page)).flatMap((p) => {
+            const m = markOf(p);
+            return m ? [m] : [];
+          })
+        : [];
+      return coverHighlights(qw, page, follow.shown, liveMarks, past).map(({ mark, past: before }) =>
+        before
+          ? { mark, fill: markFill(v2, mark), opacity: isDark ? PAST_OPACITY.dark : PAST_OPACITY.light }
+          : { mark, fill: markColours[markGroup(mark)].fill },
+      );
+    },
+    [qw, hidden, coversKeepMarks, revealed, liveInfo, live.active, live.state, checkTake, markColours, pastOnCovers, memories, v2, isDark],
+  );
   const pageOverlay = useMemo(
     () =>
       liveOn && qw && (hidden || veiled.length > 0)
@@ -739,10 +766,11 @@ export function useReciteLayer({
                   : null
               }
               peeked={veiled.length ? { words: qw, peeked: veiled, veil: palette.peekVeil } : null}
+              coverMarks={hidden ? { words: qw, marks: coverMarksOn(page) } : null}
             />
           )
         : undefined,
-    [liveOn, qw, hidden, revealed, liveInfo, coverColors, offWord, v2, veiled, palette],
+    [liveOn, qw, hidden, revealed, liveInfo, coverColors, offWord, v2, veiled, palette, coverMarksOn],
   );
   // The marks as elements of their own (VoiceOver, the tests). Given whenever the live UI is on, so the pager's pages
   // keep one shape through takes.
@@ -830,7 +858,7 @@ export function useReciteLayer({
       pageAccessories,
       onTapPoint,
       extraData: liveOn
-        ? `${live.state.cursor}|${live.state.saidUpTo}|${Object.keys(live.state.marks).length}|${hidden}|${revealed.size}|${offWord}|${veiled.length}|${showPast ? memoryRecords.length : -1}|${pastAt?.w ?? ''}|${showing ? `${shownTake?.id}:${shownTake?.marks.length}` : ''}|${shownCardAt?.w ?? ''}`
+        ? `${live.state.cursor}|${live.state.saidUpTo}|${Object.keys(live.state.marks).length}|${hidden}|${revealed.size}|${offWord}|${veiled.length}|${showPast || pastOnCovers ? memoryRecords.length : -1}|${pastAt?.w ?? ''}|${showing ? `${shownTake?.id}:${shownTake?.marks.length}` : ''}|${shownCardAt?.w ?? ''}`
         : undefined,
     },
     /** The take's bar, in the footer's place while a take is open. */

@@ -279,7 +279,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'Recite and Mark mistakes',
-    covers: ['RECITE-1', 'RECITE-2', 'RECITE-3', 'RECITE-4', 'RECITE-5', 'RECITE-6', 'RECITE-7', 'RECITE-8', 'RECITE-9', 'SEARCH-4', 'PREM-1'],
+    covers: ['RECITE-1', 'RECITE-2', 'RECITE-3', 'RECITE-4', 'RECITE-5', 'RECITE-6', 'RECITE-7', 'RECITE-8', 'RECITE-9', 'RECITE-14', 'SEARCH-4', 'PREM-1'],
     routes: ['QuranReader', 'ActiveRevision', 'Settings'],
     text: lines(
       '- Who has it: an iPhone, or Android from version 1.0.5, with the Madani 1405 mushaf (Settings → Mushaf → “Mushaf”): the reader’s bar and a session’s have a mic and an eye in place of the record button. It needs the internet: Revisely’s server checks the recitation; nobody listens.',
@@ -384,6 +384,16 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
       '- Stop always shows the take’s summary within a few seconds. If the server’s check of the end hasn’t come by then, or the connection was lost after the take had found where they were, the summary shows what the take found and says the end of the take wasn’t checked; the take is kept, unfinished, with its marks and its recording. If the check comes after all, the summary and the take update.',
       '- Leaving the reader or the session during a take, or while Stop waits, keeps the take too (unfinished); a take that never found where they were keeps nothing.',
       '- In “Recited” and “Recitations” an unfinished take’s line says "unfinished"; one whose audio is all there is (from before takes were kept this way) says "not checked" and shows no score. Unfinished takes never count in the score or in “Your progress”.',
+    ),
+  },
+  {
+    // Majd's Nov 20 2026 asks, in Revisely Dev until the next release.
+    title: 'Mistakes on a hidden page, and the mistake sound',
+    covers: ['RECITE-13', 'RECITE-15'],
+    routes: ['QuranReader', 'ActiveRevision', 'Settings'],
+    text: lines(
+      '- With the page hidden (the eye), a word with a mistake keeps its highlight on its cover, the word still hidden: the take’s marks in their colour during the take and after, and past mistakes lighter (with “Show past mistakes” on), during a take too, so they know where they tend to slip before they get there.',
+      '- Each new mistake plays a short sound and a tap as it is marked (not for Not clear or tajweed notes, at most one every 0.7 s). It plays in silent mode at the media volume; Settings → Recite → “Sound on a mistake” turns it off. While the microphone records, the iPhone plays it from the earpiece, so it is quiet without headphones.',
     ),
   },
 ];

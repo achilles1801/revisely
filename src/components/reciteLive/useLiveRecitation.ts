@@ -23,6 +23,7 @@ import { spanEndWord, TakeSpan } from '../../lib/reciteLive/span';
 import { stopTrace } from '../../lib/reciteLive/stopTrace';
 import { createTakeClock } from '../../lib/reciteLive/takeClock';
 import { createTakeStats } from '../../lib/reciteLive/takeStats';
+import { createMistakeCue, playCueSound, playCueTap } from '../../lib/reciteLive/mistakeCue';
 import { reportLongTake, reportUnfinishedTake } from '../../lib/reciteLive/takeReport';
 import { SavedTake, startTakeRecording, TakeRecording } from '../../lib/reciteLive/takeRecording';
 import {
@@ -230,6 +231,10 @@ export function useLiveRecitation({
   }, []);
   /** This take's long-take numbers have gone (once a take, whatever its answer). */
   const reportedLong = useRef(false);
+  // A sound and a tap as a mistake is marked (Settings → Recite → Sound on a mistake; lib/reciteLive/mistakeCue).
+  const [cue] = useState(() => createMistakeCue({ now: () => Date.now(), sound: playCueSound, tap: playCueTap }));
+  const soundRef = useRef(settings.mistakeSound);
+  soundRef.current = settings.mistakeSound;
   const [words, setWords] = useState<QuranWords | null>(getQuranWords());
   const conn = useRef<LiveConnection | null>(null);
   const source = useRef<AudioSource | null>(null);
@@ -313,6 +318,11 @@ export function useLiveRecitation({
       else if (REPLAYED.has(e.type) && (e.type !== 'locked' || traceRef.current.state.start != null)) return;
     }
     if (e.type === 'at' && e.t != null) shownT.current = Math.max(shownT.current, e.t);
+    // A new mistake while reciting: its sound and tap at once (never one called Not a mistake, or after Stop).
+    if (e.type === 'mark' && traceRef.current.state.status === 'listening' && !traceRef.current.state.dismissed.includes(e.mark.id)) {
+      // Revisely Dev's until the next release.
+      cue.mark(e.mark, soundRef.current && traceRef.current.mode === 'check' && isDevVariant());
+    }
     // The checker's heartbeat is for the connection and the numbers only (lib/reciteLive/socket).
     if (e.type === 'beat') return;
     stopTrace.event(e.type);
@@ -333,7 +343,7 @@ export function useLiveRecitation({
     const wait = e.type === 'done' || e.type === 'error' || LIVE_BATCH_MS <= 0 ? 0 : lastApplied.current + LIVE_BATCH_MS - Date.now();
     if (wait <= 0) applyQueued();
     else if (!batchTimer.current) batchTimer.current = setTimeout(applyQueued, wait);
-  }, [applyQueued, stats]);
+  }, [applyQueued, stats, cue]);
 
   /** The take's recording, kept once the microphone has stopped (on the screen's way out too). */
   const finishRecording = useCallback(() => {
@@ -442,6 +452,7 @@ export function useLiveRecitation({
       readies.current = 0;
       shownT.current = 0;
       replayUntil.current = null;
+      cue.reset();
       setMic('starting');
       clock.set(0);
       samples.current = 0;
@@ -604,7 +615,7 @@ export function useLiveRecitation({
         setState((s) => (s.status === 'connecting' ? { ...s, status: 'failed', failure: 'server' } : s));
       }
     },
-    [connect, owner, settings, stopFor, stopMic, recordingDay, finishRecording, onEvent, clock, dropQueued, clearBudget],
+    [connect, owner, settings, stopFor, stopMic, recordingDay, finishRecording, onEvent, clock, dropQueued, clearBudget, cue],
   );
 
   /**

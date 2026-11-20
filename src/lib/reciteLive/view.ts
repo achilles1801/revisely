@@ -2,7 +2,7 @@
 
 import type { QuranWords } from '../recite/quranWords';
 import type { WordFollow } from '../recite/hiddenPage';
-import { isUnclear, severityOf, type Mark } from './contract';
+import { isUnclear, severityOf, strongestByWord, type Mark } from './contract';
 import { furthestWord, LiveState, mistakeCount } from './state';
 import { formatAccuracy, pageAccuracy, ScoreLevel, scoreLevel } from './score';
 
@@ -117,4 +117,28 @@ export function hiddenFollow(
   live: { saidUpTo: number | null; startWord: number | null; cursor: number | null },
 ): WordFollow {
   return { words, shown: (w) => wordShown(w, revealed, live), next: live.cursor };
+}
+
+/**
+ * The mistakes the hidden page keeps on its covers (RECITE-13; Majd, Nov 20 2026: "if I hide the page, that highlight
+ * should still be there. Obviously, the word won't be shown"): for each word on `page` still covered, the take's mark
+ * (its strongest), else the one Recite's memory holds there (`past`). A word that shows has its highlight behind its ink.
+ */
+export function coverHighlights(
+  words: QuranWords,
+  page: number,
+  shown: (w: number) => boolean,
+  live: readonly Mark[],
+  past: readonly Mark[],
+): { mark: Mark; past: boolean }[] {
+  const [from, to] = words.pageRange(page);
+  const onPage = (m: Mark) => m.w >= from && m.w < to && !shown(m.w);
+  const out: { mark: Mark; past: boolean }[] = [];
+  const marked = new Set<number>();
+  for (const m of strongestByWord(live.filter(onPage)).values()) {
+    marked.add(m.w);
+    out.push({ mark: m, past: false });
+  }
+  for (const m of strongestByWord(past.filter(onPage)).values()) if (!marked.has(m.w)) out.push({ mark: m, past: true });
+  return out;
 }

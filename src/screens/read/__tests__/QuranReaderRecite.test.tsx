@@ -182,6 +182,13 @@ jest.mock('../../../lib/reciteLive/socket', () => ({
   },
 }));
 
+// The mistake sound (lib/reciteLive/mistakeCue): when it plays is the module's own; its sound and tap are watched here.
+jest.mock('../../../lib/reciteLive/mistakeCue', () => ({
+  ...jest.requireActual('../../../lib/reciteLive/mistakeCue'),
+  playCueSound: jest.fn(),
+  playCueTap: jest.fn(),
+}));
+
 // Your recitation's clip as a file (lib/reciteLive/clipFile).
 jest.mock('../../../lib/reciteLive/clipFile', () => ({ writeClip: jest.fn(() => 'file:///cache/recite-your-recitation.wav') }));
 
@@ -2187,5 +2194,102 @@ describe('a resume the checker didn’t hold (long takes, Nov 20 2026)', () => {
     // Past where the page was: it follows again.
     await event({ type: 'at', w: A23 + 9, t: 31 });
     expect(bar()).toContain(words.uthmani(A23 + 9));
+  });
+});
+
+
+describe('Majd’s Nov 20 asks: the mistake sound, and mistakes on a hidden page (Revisely Dev)', () => {
+  const cue = jest.requireMock('../../../lib/reciteLive/mistakeCue') as { playCueSound: jest.Mock; playCueTap: jest.Mock };
+  const { remember, resetMemoryForTests } = jest.requireActual('../../../lib/reciteMemory/store');
+  const wrong = (w: number, id = `${w}:word:sound`) => ({ id, w, ayah: [27, 23], kind: 'word', heard: 'كذا', sure: 'clear' });
+  beforeEach(() => {
+    resetMemoryForTests();
+    cue.playCueSound.mockClear();
+    cue.playCueTap.mockClear();
+  });
+
+  it('[RECITE-15] a new mistake plays the sound and a tap at once; Not clear, a tajweed note and a mark sent again don’t', async () => {
+    await startTake('check');
+    await event({ type: 'mark', mark: wrong(UTIYAT) as never });
+    expect(cue.playCueSound).toHaveBeenCalledTimes(1);
+    expect(cue.playCueTap).toHaveBeenCalledTimes(1);
+    // The same mark again (a resume), Not clear, and a tajweed note: nothing.
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 750));
+    });
+    await event({ type: 'mark', mark: wrong(UTIYAT) as never });
+    await event({ type: 'mark', mark: { id: 'n', w: A23 + 7, ayah: [27, 23], kind: 'harakat', sure: 'likely', slip: { expected: 'ٍ', heard: 'ٌّ' } } as never });
+    await event({ type: 'mark', mark: { id: 'q', w: A23 + 8, ayah: [27, 23], kind: 'tajweed', rule: 'qalqalah', sure: 'clear' } as never });
+    expect(cue.playCueSound).toHaveBeenCalledTimes(1);
+    // A second mistake: its own sound.
+    await event({ type: 'mark', mark: wrong(A23 + 9) as never });
+    expect(cue.playCueSound).toHaveBeenCalledTimes(2);
+  });
+
+  it('[RECITE-15] off in Settings → Recite: no sound and no tap; Recite alone (no marks) has none either', async () => {
+    setReciteCheckSettings('u1', { noticeSeen: true, mode: 'recite', markMistakes: true, mistakeSound: false });
+    await open();
+    fireEvent.press(screen.getByTestId('recite-mic'));
+    await flush();
+    await flush();
+    await event({ type: 'ready', take: 't1', protocol: 6 });
+    await event({ type: 'locked', w: A23, s: 27, a: 23 });
+    await event({ type: 'mark', mark: wrong(UTIYAT) as never });
+    expect(cue.playCueSound).not.toHaveBeenCalled();
+    expect(cue.playCueTap).not.toHaveBeenCalled();
+  });
+
+  it('[RECITE-13] a hidden page keeps a take’s mark on a word still covered, in its colour, the word still hidden', async () => {
+    await startTake('check');
+    fireEvent.press(screen.getByTestId('recite-eye'));
+    await event({ type: 'at', w: A23 + 2 });
+    await event({ type: 'said', upTo: A23 + 1 });
+    // A mark on a word the page still covers.
+    await event({ type: 'mark', mark: wrong(A23 + 6) as never });
+    expect(screen.getByTestId('cover-highlight-word')).toBeTruthy();
+    // Once the word shows, its highlight is behind its ink instead.
+    await event({ type: 'said', upTo: A23 + 7 });
+    expect(screen.queryByTestId('cover-highlight-word')).toBeNull();
+    expect(screen.getByTestId('live-highlight-word')).toBeTruthy();
+  });
+
+  it('[RECITE-13] and the words Recite’s memory holds on the page, lighter, with no take and during one; not with Show past mistakes off', async () => {
+    const [from, to] = words.pageRange(379);
+    await remember('u1', {
+      id: 'mem-1',
+      kind: 'take',
+      take: 'old',
+      createdAt: Date.UTC(2026, 10, 14, 18),
+      rev: Date.UTC(2026, 10, 14, 18),
+      day: '2026-11-14',
+      level: 'words',
+      hidden: false,
+      from,
+      to: to - 1,
+      secs: 60,
+      mistakes: 1,
+      tajweed: 0,
+      unclear: 0,
+      accuracy: 0.9,
+      marks: [wrong(A23 + 12, 'old:word')],
+      passed: [],
+      recordingId: null,
+    });
+    setReciteCheckSettings('u1', { noticeSeen: true, mode: 'recite', markMistakes: true });
+    await open();
+    await flush();
+    expect(screen.queryByTestId('cover-past-word')).toBeNull();
+    fireEvent.press(screen.getByTestId('reader-eye'));
+    await settle(() => expect(screen.getByTestId('cover-past-word')).toBeTruthy());
+    // During a take, before the word is recited.
+    fireEvent.press(screen.getByTestId('recite-mic'));
+    await flush();
+    await flush();
+    await event({ type: 'ready', take: 't1', protocol: 6 });
+    await event({ type: 'locked', w: A23, s: 27, a: 23 });
+    expect(screen.getByTestId('cover-past-word')).toBeTruthy();
+    // Show past mistakes off: none.
+    await act(async () => setReciteCheckSettings('u1', { showPast: false }));
+    expect(screen.queryByTestId('cover-past-word')).toBeNull();
   });
 });

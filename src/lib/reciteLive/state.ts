@@ -236,10 +236,32 @@ export function applyEvent(state: LiveState, e: LiveEvent): LiveState {
       const start = state.start ?? e.result.start ?? null;
       const marks: Record<string, Mark> = {};
       for (const m of e.result.marks) if (!state.dismissed.includes(m.id) && !beforeStart(m, start)) marks[m.id] = m;
+      // A mark shown during the take stays (Majd, Nov 20 2026: "As soon as a mistake is made, the color should be
+      // highlighted immediately and should stay that way"; RECITE-14). One the final answer dropped stays as it was
+      // shown, and counts as it did, unless the final answer judged that word itself (its mark there replaces it).
+      const judged = new Set(Object.values(marks).map((m) => m.w));
+      const kept = { mistakes: 0, unclear: 0, tajweed: 0 };
+      for (const m of Object.values(state.marks)) {
+        if (marks[m.id] || judged.has(m.w) || state.dismissed.includes(m.id) || beforeStart(m, start)) continue;
+        marks[m.id] = m;
+        if (isUnclear(m)) kept.unclear++;
+        else if (countsAsMistake(m)) kept.mistakes++;
+        else if (m.kind === 'tajweed') kept.tajweed++;
+      }
       // A mark taken off keeps its final version (the final answer holds dismissed marks too), so Put back restores
       // that; one the checker dropped in the end has nothing to put back.
       // The checker's final score leaves out what was dismissed during the take, so putting one back counts it again.
-      const finalScore = e.result.score ?? state.score;
+      const answered = e.result.score ?? state.score;
+      const finalScore: LiveScore | null =
+        answered && (kept.mistakes || kept.unclear || kept.tajweed)
+          ? {
+              ...answered,
+              mistakes: answered.mistakes + kept.mistakes,
+              tajweed: answered.tajweed + kept.tajweed,
+              ...(answered.unclear != null ? { unclear: answered.unclear + kept.unclear } : {}),
+              accuracy: answered.reached > 0 ? Math.max(0, 1 - (answered.mistakes + kept.mistakes) / answered.reached) : 1,
+            }
+          : answered;
       const removed: Record<string, Removed> = {};
       for (const m of e.result.marks) {
         if (!state.removed[m.id]) continue;
