@@ -1222,6 +1222,33 @@ class MarksStay(unittest.TestCase):
         self.assertNotIn(f'{w}:skipped:', {m['id'] for m in marks})
 
 
+LATE_LOCK = BENCH / 'rifai.p6.clean.clean.json'  # Al-Mulk; 67:13 from 154.27 s (the lock benchmark's case)
+
+
+@unittest.skipUnless(MODEL.exists() and LATE_LOCK.exists(), 'the model or the bench recitation is not here')
+class TakeBack(unittest.TestCase):
+    def test_a_lock_a_word_into_its_ayah_takes_back_the_word_said_before(self):
+        """Rifai from 67:13's first word, «وَأَسِرُّوا۟», on the page 67:13-26 (the lock benchmark): the lock lands on
+        the second word, the first heard on the way. Its ayah's words said before it count (Majd, Nov 20 2026), so the
+        take starts at the first word, which is said and judged; without the take-back, a word late. A word not said is
+        never taken back (the lock benchmark: 0 of 161 locks earlier than the start)."""
+        import live
+        with wave.open(str(LATE_LOCK.with_suffix('.wav'))) as w:
+            w.setpos(int(154.267 * 16000))
+            pcm = w.readframes(16000 * 30)
+        first = engine().words.first[engine().words.vindex[(67, 13)]]
+        for back, want in ((0, first + 1), (live.TAKE_BACK, first)):
+            with unittest.mock.patch.object(live, 'TAKE_BACK', back):
+                sess = live.LiveSession(engine(), 67, 13, 114, 6, {'letters': '1', 'tajweed': '0'}, defer=True,
+                                        open_end=True, start_by=(67, 26), start_in='quran')
+                ev = run(sess, chunks(pcm, 3200) + [{'type': 'end'}])
+            self.assertEqual([e['w'] for e in ev if e['type'] == 'locked'], [want], back)
+            done = ev[-1]['result']
+            self.assertEqual(done['start'], want)
+            self.assertEqual(min(r['w'] for r in done['words']), want)
+            self.assertFalse([m for m in done['marks'] if m['w'] == want], done['marks'])
+
+
 DEV_TAKE = sorted(pathlib.Path(os.environ.get('RECITE_DEV_TAKES', pathlib.Path.home() / 'revisely-mistake-lab/data/dev-takes'))
                   .glob('*/20261115-015943-4cd655.wav'))
 

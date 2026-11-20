@@ -82,6 +82,16 @@ SETTLE = 3.0        # seconds a seam must be behind the newest final frame: the 
 # locked within 25 s 118 → 57.
 LOCK_WORDS = 3
 LOCK_HOPS = 2
+# A lock TAKE_BACK words or fewer into its ayah takes back the ayah's words said before it (Majd, Nov 20 2026: words
+# of the ayah recited before the lock count; recite-feedback-nov20.md, item 1): the speech of the TAKE_BACK_SECS before
+# it, decoded on those words and the lock word alone, when every one of them is heard right and runs into the lock
+# word. Never a word that wasn't heard: that would be marked skipped. The lock benchmark (recite-server, long-takes.md):
+# a surah's first word heard as a stray sound (50:1 ق, 27:1 طس, 56:1 إذا) or an ayah's first word missed locked a word
+# late. RECITE_TAKE_BACK=0: as before.
+TAKE_BACK = 3 if os.environ.get('RECITE_TAKE_BACK', '1') == '1' else 0
+TAKE_BACK_SECS = 8.0
+TAKE_BACK_NEAR = 25  # frames between the earlier words' end and the lock word's start, at most
+TAKE_BACK_SLACK = 5  # frames past the lock word's start the earlier words may end
 # Sooner on QUICK_WORDS: the path's first QUICK_WORDS words (one fewer than the rule above), all heard as correct, none
 # missing, each heard well (its sounds score QUICK_MEAN or better on average: 0 is the ear's own best guess), in the
 # first LONG_SEARCH seconds. Bench end to end (Nov 15 2026, 8 reciters × 8 passages): from an ayah start a third in
@@ -1457,6 +1467,8 @@ class LiveSession:
         seek. Words before w aren't part of the take: never decided, never skipped, not in `said` or the score. A
         plain seek while searching locks at its word (the phone placed the reader; `locked` all the same). where
         'quran': found off the page (start_in); the take's range starts there."""
+        if not seek:
+            w, f_start = self._take_back(w, f_start)
         self.search, self.loc, self._loc_hist, self._top_hist = None, None, [], []
         self._q_reset()
         if where == 'quran' and self.start_w is None:
@@ -1476,6 +1488,39 @@ class LiveSession:
             return [dict(self.locked_ev)]
         self._start_segment(w, max(self._search_f0, f_start - LEAD_FRAMES), 'lead')
         return [dict(self.locked_ev)] + self._decide(now, None)
+
+    def _take_back(self, w, f_start):
+        """(w, f_start) for the lock, moved back to its ayah's first word when the words before it in the ayah were said
+        just before it (TAKE_BACK)."""
+        s, a, k = self.E.key.where(w)
+        first = w - k
+        if not 0 < k <= TAKE_BACK or (self.search is not None and first < self.search[0]):
+            return w, f_start
+        f0 = max(self._search_f0, f_start - int(TAKE_BACK_SECS * FPS))
+        f1 = min(self.T, f_start + TAKE_BACK_SLACK)
+        if f1 - f0 < 10:
+            return w, f_start
+        try:
+            kws = self.E.passage_words(first, w)
+        except Exception:  # noqa: BLE001
+            return w, f_start
+        # the earlier words alone, up to where the lock word begins, all of them said by then (final): a word that
+        # wasn't said lines up with whatever came before and is heard wrong
+        g = checker.Graph(kws)
+        dec = Decoder(g, self.P, cap=f1 - f0 + 10)
+        dec.feed(self.lp[f0:f1])
+        path, _ = dec.traceback(final=True)
+        st, _, _, _, _, visits, _ = checker.decide(kws, g, self.lp[f0:f1], path, self.P, self.ear.vocab,
+                                                   self._tokens(f0, f1))
+        # each heard right on its last reading (a poor try before it is no mistake), in order, the last one ending
+        # where the lock word begins
+        ok = all(visits[i] and st.get(kws[i]['word']) in ('correct', 'corrected') for i in range(k)) \
+            and all(visits[i][-1]['end'] <= visits[i + 1][-1]['start'] + 2 for i in range(k - 1)) \
+            and f0 + visits[k - 1][-1]['end'] >= f_start - TAKE_BACK_NEAR
+        if not ok:
+            return w, f_start
+        self.ms['took_back'] = k
+        return first, f0 + visits[0][-1]['start']
 
     # ------------------------------------------------------------ decisions
 
