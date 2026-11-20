@@ -896,6 +896,25 @@ describe('[RECITE-14] a mark shown during the take stays after Stop', () => {
   });
 });
 
+describe('[RECITE-14] a checker from protocol 8 keeps the live marks in its final answer itself', () => {
+  it('its final answer’s marks are the take’s (but those taken off, or skipped before the start), and its score stands', () => {
+    fc.assert(
+      fc.property(takeArb.chain((t) => fc.tuple(fc.constant(t), fc.array(markArb(t.page), { maxLength: 6 }))), ([t, finalMarks]) => {
+        // The take's checker says protocol 8 (its last `ready`, as on a resume).
+        const s = liveStopping(applyEvent(played(t), { type: 'ready', take: 't', protocol: 8 }));
+        const [from, to] = words.pageRange(t.page);
+        const score = scoreOf(finalMarks, to - from, true);
+        const done = applyEvent(s, { type: 'done', result: finalOf(finalMarks, from, to - 1, t.lock, score) });
+        const start = done.start;
+        const expected = finalMarks.filter((m) => !s.dismissed.includes(m.id) && !(start != null && m.kind === 'skipped' && m.w < start));
+        expect(Object.keys(done.marks).sort()).toEqual([...new Set(expected.map((m) => m.id))].sort());
+        expect(done.score).toEqual(score);
+      }),
+      { numRuns: runs(200) },
+    );
+  });
+});
+
 describe('[RECITE-15] a sound and a tap on each new mistake', () => {
   it('once for each new mistake that counts, never for Not clear or tajweed or a mark sent again, at most one every 700 ms, none when off', () => {
     fc.assert(
