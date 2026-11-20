@@ -58,9 +58,10 @@ SETTLE = 3.0        # seconds a seam must be behind the newest final frame: the 
 # Start anywhere on the page (Majd, Nov 14 2026; contract protocol 6, `startBy`): the start is searched for over the
 # page and an ayah either side, and locked once the best path's first word has held LOCK_HOPS hops, LOCK_WORDS words
 # after it are heard and final, and the words heard so far occur only once in the range searched (a phrase the page
-# repeats waits until the two places part). A take that never locks fails silently (Majd: no prompt, since a reciter
-# may have the page hidden; nonsense or a passage off the page shows nothing): no cursor, no marks, `done` with no
-# words and start null, and `ms.search_speech` (speech heard without a lock) for the server's log.
+# repeats waits until the two places part). It must always find the reciter (Majd, Nov 20 2026: "it should always find
+# where i am there's no exception"; no prompt): the lock benchmark (recite-server, long-takes.md) is the measure. A take
+# that never locks (no recitation in it) shows nothing: no cursor, no marks, `done` with no words and start null, and
+# `ms.search_speech` (speech heard without a lock) for the server's log.
 # One word of the run may be missing (a skip right after the start: 1:5 said without نعبد never locked, recite-server
 # Nov 15 2026); it doesn't count toward LOCK_WORDS. Bench takes cut one word before a planted mistake (206): never
 # locked within 25 s 118 → 57.
@@ -91,6 +92,8 @@ LONG_EXTRA = 2
 # locks 6 of those same 7, later. 2 hops, not 3 (Nov 15 2026), for room under the 3 s bar once Cloud Run and the
 # network are added (one take took 3.03 s there): 2.7 → 2.2 s (median; p90 2.9 → 2.4 s), the same places, and no more
 # locks off the page.
+# A page top whose first word is short (TOP_SOUNDS sounds or fewer, «مَا») also needs the next word heard after it: a
+# take from 18:7's third word «مَا» locked at its page's top, 18:5's «مَّا», after 2 s (Nov 20 2026, the lock benchmark).
 TOP_HOPS = 2
 TOP_SOUNDS = 3
 MAX_SEARCH = 480    # words searched at most (the server allows a page of 400, plus an ayah either side)
@@ -103,14 +106,17 @@ MAX_SEARCH = 480    # words searched at most (the server allows a page of 400, p
 # than none (Majd).
 QURAN_AFTER = 3.0
 QURAN_EVERY = 4     # hops between two votes (2 s): with QURAN_SECS, about 0.1 vCPU while unlocked on Cloud Run
-QURAN_SECS = 15.0   # speech fitted, from its first sound
-QURAN_STOP = 30.0   # seconds of speech after which the Qur'an-wide search gives up (the take fails silently)
+QURAN_SECS = 15.0   # speech fitted, from its first sound; while the search goes on, up to QURAN_SECS_MAX: 2:255 and
+                    # 3:2 share their first seven words, which take longer than 15 s in a slow recitation
+QURAN_SECS_MAX = 35.0
+QURAN_STOP = 50.0   # seconds of speech after which the Qur'an-wide search gives up
 QURAN_TOP = 10
 QURAN_CHAIN = 20    # words of each place fitted
 QURAN_FIT = 1.2     # nats a frame
 QURAN_MARGIN = 0.2  # nats a frame between the best place and the next, for it to get a locator (which then locks only
                     # on QURAN_WORDS words said nowhere else)
 QURAN_WORDS = 5
+QURAN_LONG = 8      # ...or this many with one heard wrong
 QURAN_DOUBT_MAX = 8.0  # (startIn) while a place off the page has its own locator and every word it has heard so far is
                        # right, the page's word rule waits, for this long at most: 78:29 «وكل شيء أحصيناه كتابا» with
                        # Ya-Sin's first page open locked on 36:12 (the same first three words). A wrong word there lets
@@ -1118,6 +1124,7 @@ class LiveSession:
         self._q_fits = (-1, [])          # (frame, _quran_fits then): kept for QURAN_EVERY hops, the page's doubt too
         self._doubt_from = None          # the frame a page lock was first held back (QURAN_DOUBT_MAX)
         self._q_failing = False          # the Qur'an-wide locator's words so far include one heard wrong
+        self._q_basmala_only = False     # ...or are all the basmala's (_basmala_lead)
 
     def _locate_quran(self, now):
         """One hop of the Qur'an-wide search (QURAN_AFTER): vote and fit places every QURAN_EVERY hops; the winning
@@ -1171,12 +1178,19 @@ class LiveSession:
         n = k + 1 - w0
         all_right = all(st.get(loc.app[w]) == 'correct' for w in range(w0, k + 1))
         self._q_failing = n >= 2 and not all_right
-        if n < QURAN_WORDS or not all_right:
+        lead = self._basmala_lead(loc.app[w0], loc.app[k])  # the basmala's words don't count (_basmala_lead)
+        self._q_basmala_only = n >= 1 and n <= lead
+        wrong = sum(st.get(loc.app[w]) != 'correct' for w in range(w0, k + 1))
+        # all right, or a longer run with one word heard wrong (QURAN_LONG): Rifai's 2:255 had won the vote by far and
+        # its locator held 2:255's start from 16 s, but one word judged wrong kept it from locking for good
+        if not (n - lead >= QURAN_WORDS and all_right) and not (n - lead >= QURAN_LONG and wrong <= 1):
             return []
         texts = [kw['text'] for kw in loc.kws]
         if any(texts[j:j + n] == texts[w0:k + 1] for j in range(W - n + 1) if j != w0) \
                 or not self._said_once(loc.app[w0], n):
             return []
+        if lead and loc.app[w0] >= 4:  # the take starts after the basmala, unless it is Al-Fatiha's own 1:1
+            w0 += lead
         f_start = loc.f0 + visits[w0][0]['start']
         self._search_speech = (self.T - f_start) / FPS
         return self._lock(loc.app[w0], f_start, now, where='quran')
@@ -1192,7 +1206,7 @@ class LiveSession:
 
     def _quran_fits_now(self, idx, onset):
         W = self.E.words
-        f1 = min(self.T, onset + int(QURAN_SECS * FPS))
+        f1 = min(self.T, onset + int(max(QURAN_SECS, min(QURAN_SECS_MAX, (self.T - onset) / FPS)) * FPS))
         sounds = ''.join(self.ear.vocab[c - 1] for c, _, _ in self._tokens(onset, f1))
         voted = idx.places(checker.skeleton(checker.norm_sounds(sounds)))
         # each place from a word either side too (the vote merges neighbours): the best start of the three stands
@@ -1233,6 +1247,22 @@ class LiveSession:
         a = W.first[v0]
         return a, min(W.first[v1] + W.counts[v1], a + MAX_SEARCH, self.end)
 
+    def _basmala_lead(self, w0, k):
+        """How many of app words w0..k, from w0, read as the basmala's words in order (from its first or second word;
+        two at least, else 0). The Qur'an-wide search doesn't count them: a reciter says the basmala before any surah,
+        and it is Al-Fatiha's 1:1 and part of 27:30. With الحمد لله after it (Al-Kahf, Al-An'am, Saba', Fatir) it is
+        Al-Fatiha word for word, and Husary's Al-Kahf locked at 1:1; with الٓمٓ after it, 27:30's basmala and 27:31's
+        «أَلَّا» locked instead (Nov 20 2026, the lock benchmark)."""
+        norm = self.E.slip_index.norm
+        b = norm[0:4]
+        for j in (0, 1):
+            if norm[w0] == b[j]:
+                n = 0
+                while j + n < 4 and w0 + n <= k and norm[w0 + n] == b[j + n]:
+                    n += 1
+                return n if n >= 2 else 0
+        return 0
+
     def _page_doubted(self):
         """(start_in) The page's locator waits (QURAN_DOUBT_MAX): a place off the page fits what was heard better, has
         its own locator, and that locator has heard every word right so far."""
@@ -1253,7 +1283,7 @@ class LiveSession:
             return False
         if rng != self.qsearch:
             self.qsearch, self.qloc, self._qloc_hist, self._q_failing = rng, None, [], False
-        if self.qsearch is None or self._q_failing:
+        if self.qsearch is None or self._q_failing or self._q_basmala_only:  # nothing but the basmala: no doubt
             return False
         if self._doubt_from is None:
             self._doubt_from = self.T
@@ -1287,7 +1317,8 @@ class LiveSession:
         # order begins, and the path is judged from there. The isti'adha and the basmala before a surah's first page
         # read as words of it ("min", "lā"), and a stray later word made every word after it out of order (`order`),
         # so the take never locked: Majd's page 2 of Al-Baqarah, twice in a row (Nov 20 2026).
-        b, fb = self._run_start(visits, heard, loc.g.W)
+        opens = self._surah_opens(loc)
+        b, fb = self._run_start(visits, heard, loc.g.W, opens, loc)
         if (b, fb) != (w0, visits[w0][0]['start']):
             path = [x for x in path if x[0] >= fb]
             st, _, _, _, _, visits, _ = checker.decide(loc.kws, loc.g, self.lp[loc.f0:loc.frames()], path, self.P,
@@ -1302,8 +1333,12 @@ class LiveSession:
         while p + 1 < loc.g.W and visits[p + 1]:
             p += 1
         top = self._search_top - loc.a
-        at_top = 0 <= top < loc.g.W and loc.app[top] == self._search_top and st.get(loc.app[w0]) == 'correct' \
-            and (w0 == top or self._reads_as(w0, top, p + 1 - w0)) and self._sounds_heard(visits[w0][-1], w0)
+        page_top = 0 <= top < loc.g.W and loc.app[top] == self._search_top \
+            and (w0 == top or self._reads_as(w0, top, p + 1 - w0))
+        if not page_top and w0 in opens:  # a surah opening on the page locks as soon as the page's top would
+            page_top, top = True, w0
+        at_top = page_top and st.get(loc.app[w0]) == 'correct' and self._sounds_heard(visits[w0][-1], w0) \
+            and (p > w0 or self._sound_count(w0, visits[w0][-1]) > TOP_SOUNDS)
         self._top_hist.append(at_top)
         if at_top:
             if len(self._top_hist) >= TOP_HOPS and all(self._top_hist[-TOP_HOPS:]):
@@ -1339,12 +1374,20 @@ class LiveSession:
             return ev if self._page_doubted() else ev + self._lock(loc.app[w0], f_start, now)
         return ev
 
-    @staticmethod
-    def _run_start(visits, heard, W):
+    def _surah_opens(self, loc):
+        """The locator's words that open a surah (its first ayah's first word), within the range searched."""
+        if getattr(loc, '_opens', None) is None:
+            loc._opens = {i for i in range(loc.g.W) if tuple(self.E.key.where(loc.app[i]))[1:] == (1, 0)}
+        return loc._opens
+
+    def _run_start(self, visits, heard, W, opens=(), loc=None):
         """(word, frame) where the longest run of words heard in order begins: each next word has a visit starting
         after the one before (one word may be missing, as for the lock). Ties go to the earliest, so a take with no stray
-        words keeps the path's first word."""
-        best = None
+        words keeps the path's first word. A run from a surah's opening (opens) wins as soon as it has two words, or one
+        long word heard (الٓمٓ), the latest such: the isti'adha and the basmala before it are fitted as stray words, and
+        waiting for the opening's run to outgrow theirs held a muqatta'at opening after the basmala 10 s (17.5 s after the
+        isti'adha too) against 3 s without them (Nov 20 2026, the lock benchmark)."""
+        best, opened = None, None
         for w in heard:
             for v in visits[w]:
                 n, p, t, skipped = 1, w, v['start'], False
@@ -1359,6 +1402,11 @@ class LiveSession:
                     p, t, n, skipped = p + 2, min(nxt), n + 1, True
                 if best is None or (n, -v['start']) > best[0]:
                     best = ((n, -v['start']), w, v['start'])
+                if w in opens and (n >= 2 or self._sound_count(w, v, loc) > TOP_SOUNDS) \
+                        and (opened is None or (v['start'], n) > opened[0]):
+                    opened = ((v['start'], n), w, v['start'])
+        if opened is not None:
+            return opened[1], opened[2]
         return best[1], best[2]
 
     @staticmethod
@@ -1368,9 +1416,12 @@ class LiveSession:
 
     def _sounds_heard(self, v, w):
         """The visit v of the locator's word w has covered TOP_SOUNDS of its sounds (all, for a shorter word)."""
-        g = self.loc.g
-        tot = int(np.count_nonzero((g.word_of == w) & (g.kind == 1) & (g.alt_of == v['alt'])))
-        return len(v['scores']) >= min(TOP_SOUNDS, tot)
+        return len(v['scores']) >= min(TOP_SOUNDS, self._sound_count(w, v))
+
+    def _sound_count(self, w, v, loc=None):
+        """How many sounds the locator's word w has, as visit v reads it."""
+        g = (loc or self.loc).g
+        return int(np.count_nonzero((g.word_of == w) & (g.kind == 1) & (g.alt_of == v['alt'])))
 
     def _reads_as(self, w0, top, n):
         """The locator's n words from w0 read, letter for letter (harakat and marks aside), as the n from top."""

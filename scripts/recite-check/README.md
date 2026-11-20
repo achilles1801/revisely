@@ -241,6 +241,25 @@ from the first word of `s:a` through the end of `startBy`.
 - **The search is the model session's** (`live.py`, `start_by=(sura, ayah)`).
 - **Measuring it:** `cut_take.py` cuts a public bench take to begin at an ayah mid-page, and `live_e2e.py --page
   S:A-S:A` sends it with the page's range and reports where and how soon it locked.
+- **The lock benchmark** (Nov 20 2026, after Majd's "it should always find where i am there's no exception"; scripts in
+  recite-server's scratchpad `long/lockcases`, results in `long-takes.md` in the shared notes). 3,618 public takes
+  through `live.LiveSession`:
+  - bench-v0 (8 reciters) from every ayah's start, clean and in babble, and mid-ayah;
+  - a 4 s pause before, a false start, 1.25× fast, quiet;
+  - every muqatta'at surah's opening and 11 others (Husary and Alafasy from EveryAyah), plain, after the basmala, and
+    after the isti'adha and the basmala;
+  - refrains the page repeats, starts off the page shown, and Majd's kept takes (no truth: where and when they lock).
+- **What it found and fixed:**
+  - Before: 142 misses and 33 wrong locks. 70 of 174 muqatta'at openings never locked, 20 locked wrong.
+  - After: no miss on the page shown except a take that is only a refrain the page repeats (55:28 alone; with the next
+    ayah all 22 refrain takes lock right), and 3 locks two words or an ayah off.
+  - Openings lock in 2.5 s (p90 5.8 s). Mid-page starts lock after 5 words (p90 6).
+  - The fixes:
+    - the longest run heard in order starts the search, and a surah's opening on the page wins as soon as it's heard;
+    - a short page-top word needs the next word;
+    - the basmala doesn't count in the Qur'an-wide search;
+    - the Qur'an-wide fit grows to 35 s, and a long run with one wrong word locks.
+  - A timed best-guess lock was tried and dropped: it added 2 wrong locks off the page for one slow take found sooner.
 
 **Check is a Premium feature** (apply-support.md draft 2; Premium is free through "Apply for support"): with
 `CHECK_GATE=on`, `/check` and `/live` without `follow` need `entitlements/{uid}.premium` (present, and `until` null or

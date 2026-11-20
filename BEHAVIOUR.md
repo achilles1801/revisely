@@ -394,8 +394,12 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
 - **RECITE-1.** A take starts anywhere on the page, or anywhere in the Qur'an. Until the checker has found where the
   reciter is, the take shows nothing of them: no band on the line, no box on a word ("Listening…"). The first place
   found is where the take started, and nothing before it is ever marked skipped, during the take or in its summary.
-  Turning the page by hand during a take looks for the reciter on that page, keeping what was already decided. A take
-  whose start is never found ends with nothing: no summary, no score, and nothing kept.
+  Turning the page by hand during a take looks for the reciter on that page, keeping what was already decided. It
+  always finds them (Majd, Nov 20 2026: "it should always find where i am there's no exception"; there is no "can't find
+  you" message): past the isti'adha, the basmala and anything else said before the start, at a surah's opening as soon
+  as its first word is heard, and mid-ayah. Only while what was said reads the same in two places on the page (a refrain)
+  does it wait, for the words that part them. A take whose start is never found (no recitation in it) ends with
+  nothing: no summary, no score, and nothing kept.
 - **RECITE-2.** With Mark mistakes, a take marks a word said wrong, skipped or added, and a slip in a word's harakat
   or letters; with Strict, tajweed notes too. The score is the share of the words reached said right, and a tajweed
   note never counts against it. A word with several marks shows its strongest: a word mistake, then a slip, then a

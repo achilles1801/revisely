@@ -737,6 +737,47 @@ class StartAnywhere(unittest.TestCase):
         ev = run(sess, chunks(take, 3200)[:int(15 / 0.1)])
         self.assertEqual([e['w'] for e in ev if e['type'] == 'locked'], [w])
 
+    def basmala_then(self, passage):
+        """Alafasy's basmala (his Al-Fatiha's 1:1), half a second, then his bench passage from its first word; and how
+        long the basmala part is."""
+        import ast
+
+        def load(name):
+            t = json.loads((BENCH / f'alafasy.{name}.clean.clean.json').read_text())
+            tl = ast.literal_eval(t['timeline']) if isinstance(t['timeline'], str) else t['timeline']
+            with wave.open(str(BENCH / f'alafasy.{name}.clean.clean.wav')) as w:
+                return [e for e in tl if e.get('word') is not None and not e.get('extra')], w.readframes(w.getnframes())
+        tl, pcm = load('p2')
+        cut = lambda x, a, b: x[int(a * 16000) * 2:int(b * 16000) * 2]  # noqa: E731
+        basmala = cut(pcm, tl[0]['start'] - 0.1, tl[3]['end'] + 0.1) + b'\0\0' * 8000
+        tl2, pcm2 = load(passage)
+        return basmala + cut(pcm2, tl2[0]['start'] - 0.3, 10 ** 6), len(basmala) / 32000 + 0.3, tl2[0]['word']
+
+    def test_a_surah_opening_after_the_basmala_locks_at_once(self):
+        """Ya-Sin after the basmala, on its page (35:45-36:12): the basmala was fitted as stray words of the page, and the
+        opening waited for its own run to outgrow theirs (muqatta'at openings after the basmala: 10 s at the median, 2.7 s
+        now; Nov 20 2026, the lock benchmark)."""
+        import live
+        if not (BENCH / 'alafasy.p4.clean.clean.json').exists():
+            self.skipTest('bench-v0 passage 4 is not here')
+        take, at, first = self.basmala_then('p4')
+        sess = live.LiveSession(engine(), 35, 45, 114, 6, {}, start_by=(36, 12), start_in='quran')
+        ev = run(sess, chunks(take, 3200)[:int((at + 12) / 0.1)])
+        lock = [e for e in ev if e['type'] == 'locked']
+        self.assertEqual([e['w'] for e in lock], [first])
+        self.assertLess(lock[0]['t'] - at, 5.0)
+
+    def test_the_basmala_before_al_kahf_is_not_al_fatiha(self):
+        """The basmala and «الحمد لله» are Al-Fatiha's first words too: the Qur'an-wide search locked Husary's Al-Kahf at
+        1:1 (Nov 20 2026). Here Al-Kahf after the basmala, its page shown (17:105-18:4), locks at 18:1."""
+        import live
+        if not (BENCH / 'alafasy.p3.clean.clean.json').exists():
+            self.skipTest('bench-v0 passage 3 is not here')
+        take, at, first = self.basmala_then('p3')
+        sess = live.LiveSession(engine(), 17, 105, 114, 6, {}, start_by=(18, 4), start_in='quran')
+        ev = run(sess, chunks(take, 3200)[:int((at + 20) / 0.1)])
+        self.assertEqual([(e['w'], e.get('where')) for e in ev if e['type'] == 'locked'], [(first, 'page')])
+
     def test_a_phrase_the_page_repeats_waits_until_the_places_part(self):
         """1:3 (ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ) is also the end of 1:1: it may not lock on 1:1."""
         self.check(3)
