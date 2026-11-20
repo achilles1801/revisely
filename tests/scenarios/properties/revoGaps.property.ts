@@ -48,7 +48,7 @@ describe('Revo and Gaps', () => {
           const checked = validateGaps(JSON.parse(JSON.stringify(g)), 'context.gaps');
           expect(checked).toEqual(g);
           const text = gapsText(checked);
-          expect(text).toMatch(/^Gaps, the last 30 days/);
+          expect(text).toMatch(/^Gaps \(2 days or more in a row without revising\), the last 30 days/);
           for (const s of g.surahs) expect(text).toContain(s.name);
         },
       ),

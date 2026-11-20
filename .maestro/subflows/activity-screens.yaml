@@ -470,10 +470,10 @@ appId: com.revisionbuddy.app
     notVisible:
       id: insights-uncovered
     timeout: 10000
-# Gaps (ACT-28, mocks insights-gaps): the days since the last revision, the strip and its two tiles.
+# Gaps (ACT-28, mocks insights-gaps): the days since the last revision, the line under it and the gaps listed.
 - scrollUntilVisible:
     element:
-      id: insights-gaps-tiles
+      id: insights-gaps-list
     direction: DOWN
     centerElement: true
     timeout: 15000
@@ -509,15 +509,15 @@ appId: com.revisionbuddy.app
     visible:
       id: activity-insights
     timeout: 10000
-# The longest gap (8 – 11 October) on Overview's calendar, marked across two weeks (ACT-28).
+# The range's one gap (9 – 10 October, 2 days without revising) on Overview's calendar (ACT-28).
 - scrollUntilVisible:
     element:
-      id: insights-gaps-longest
+      id: insights-gap-2026-10-09
     direction: UP
     centerElement: true
     timeout: 15000
 - tapOn:
-    id: insights-gaps-longest
+    id: insights-gap-2026-10-09
 - extendedWaitUntil:
     visible:
       id: calendar-gap-cue

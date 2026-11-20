@@ -111,12 +111,16 @@ export function coverageCount(memorized: Set<number>, last: Map<number, string>,
 
 const LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
-/** The last seven days, oldest first, each with its weekday letter and whether it was active. */
-export function weekCircles(active: Set<string>, today: string): { day: string; letter: string; done: boolean }[] {
-  const out: { day: string; letter: string; done: boolean }[] = [];
+/**
+ * The last seven days, oldest first, each with its weekday letter, whether it was active, and whether it came before
+ * the account's first day (drawn faintly, never "missed": ACT-31).
+ */
+export function weekCircles(active: Set<string>, today: string, firstDay?: string | null): { day: string; letter: string; done: boolean; before: boolean }[] {
+  const out: { day: string; letter: string; done: boolean; before: boolean }[] = [];
+  const first = firstDay ? firstDay.slice(0, 10) : null;
   for (let k = 6; k >= 0; k--) {
     const day = shiftDay(today, -k);
-    out.push({ day, letter: LETTERS[new Date(`${day}T00:00:00Z`).getUTCDay()], done: active.has(day) });
+    out.push({ day, letter: LETTERS[new Date(`${day}T00:00:00Z`).getUTCDay()], done: active.has(day), before: first != null && day < first });
   }
   return out;
 }
@@ -136,14 +140,20 @@ export function monthName(month: string): string {
   return formatDate(new Date(`${month}-01T00:00:00Z`), { month: 'long', timeZone: 'UTC' });
 }
 
-/** Active days in the month, out of its days so far (all of them once it is over). */
-export function monthCount(active: Set<string>, month: string, today: string): { done: number; of: number } {
+/**
+ * Active days in the month, out of its days so far (all of them once it is over). An account begun in the month counts
+ * from its first day (`from`: "10 of 12 since 8 November"); one begun after it has nothing to count (null).
+ */
+export function monthCount(active: Set<string>, month: string, today: string, firstDay?: string | null): { done: number; of: number; from: string | null } | null {
   const [y, m] = month.split('-').map(Number);
   const length = new Date(Date.UTC(y, m, 0)).getUTCDate();
-  const of = today.startsWith(month) ? Number(today.slice(8, 10)) : length;
+  const end = today.startsWith(month) ? Number(today.slice(8, 10)) : length;
+  const first = firstDay ? firstDay.slice(0, 10) : null;
+  if (first && first.slice(0, 7) > month) return null;
+  const start = first && first.startsWith(month) ? Number(first.slice(8, 10)) : 1;
   let done = 0;
-  for (let d = 1; d <= of; d++) if (active.has(`${month}-${String(d).padStart(2, '0')}`)) done++;
-  return { done, of };
+  for (let d = start; d <= end; d++) if (active.has(`${month}-${String(d).padStart(2, '0')}`)) done++;
+  return { done, of: Math.max(0, end - start + 1), from: start > 1 ? first : null };
 }
 
 /**
@@ -169,6 +179,16 @@ export function minutesByHour(
     }
   }
   return hours;
+}
+
+/** Consistency's hours show once timed revisions or reads fall on this many days of the range (ACT-31). */
+export const HOURS_FROM_DAYS = 3;
+
+/** The days of the range with a timed revision or read: the hours say little from fewer than HOURS_FROM_DAYS. */
+export function timedDays(items: { day: string; occurredAt?: number | null; minutes: number | null }[], today: string, window: number): number {
+  const days = new Set<string>();
+  for (const i of items) if (i.occurredAt != null && i.minutes != null && i.minutes > 0 && within(i.day, today, window)) days.add(i.day);
+  return days.size;
 }
 
 const hourParts = (h: number) => ({ n: h % 12 === 0 ? 12 : h % 12, p: h % 24 < 12 ? 'AM' : 'PM' });

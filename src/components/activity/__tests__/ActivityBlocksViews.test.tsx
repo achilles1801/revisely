@@ -352,8 +352,9 @@ describe('Insights (gap audit §5)', () => {
 describe('Gaps in Activity (ACT-28)', () => {
   afterEach(() => jest.restoreAllMocks());
 
-  describe('the longest gap on the calendar', () => {
-    // Revised on 30 October and 4 November: a 5-day gap, two of its days in October and four in November.
+  describe('a gap on the calendar', () => {
+    // Revised on 30 October and 4 November: a 4-day gap without revising, 31 October to 3 November (one day in October,
+    // three in November).
     const items = {
       revisions: ['2026-10-30', '2026-11-04'].map((day) => ({ id: day, day, countsFor: day, pages: [582], skipped: [], assigned: [582], minutes: 10, occurredAt: null })),
       memorized: [],
@@ -371,18 +372,18 @@ describe('Gaps in Activity (ACT-28)', () => {
       service().getActivityItemsBetween.mockImplementation(empty);
       storage().getItem.mockImplementation(() => Promise.resolve(null));
     });
-    const openLongest = async (onShowTop?: () => void) => {
+    const openGap = async (onShowTop?: () => void) => {
       render(<ActivityBlocksViews {...props} onShowTop={onShowTop} />);
       fireEvent.press(await screen.findByText('Insights'));
-      fireEvent.press(await screen.findByTestId('insights-gaps-longest'));
+      fireEvent.press(await screen.findByTestId('insights-gap-2026-10-31'));
     };
     // Layout doesn't run in Jest: the grid's width is given, as a phone's would be.
     const lay = (testID: string) => fireEvent(screen.getByTestId(testID), 'layout', { nativeEvent: { layout: { width: 393 } } });
 
-    it('[ACT-28] opens Overview at the month holding most of it, marked from one revision to the next; a day picked clears it', async () => {
-      await openLongest();
+    it('[ACT-28] opens Overview at the month holding most of it, its days without a revision marked; a day picked clears it', async () => {
+      await openGap();
       expect(await screen.findByText('November 2026')).toBeTruthy();
-      expect(screen.getByTestId('calendar-gap-cue')).toHaveTextContent('Longest gap, 30 Oct – 4 Nov · 5 days');
+      expect(screen.getByTestId('calendar-gap-cue')).toHaveTextContent('Gap, 31 Oct – 3 Nov · 4 days');
       lay('calendar-grid');
       // November's first week holds 1–4 November; the band carries on from October, so it begins flat there.
       expect(screen.getByTestId('calendar-gap-band-2026-11-01')).toBeTruthy();
@@ -399,14 +400,14 @@ describe('Gaps in Activity (ACT-28)', () => {
 
     it('[ACT-28] asks the screen to start Overview at its top, where the month and the band show (they share one scroll)', async () => {
       const onShowTop = jest.fn();
-      await openLongest(onShowTop);
+      await openGap(onShowTop);
       expect(await screen.findByText('November 2026')).toBeTruthy();
       expect(onShowTop).toHaveBeenCalledTimes(1);
     });
 
     it('[ACT-28] in Week, the week it begins in, and › carries the band on into the next', async () => {
       storage().getItem.mockImplementation((key: string) => Promise.resolve(key === 'activity.calendarSpan' ? 'week' : null));
-      await openLongest();
+      await openGap();
       expect(await screen.findByText('Oct 25 – 31')).toBeTruthy();
       expect(screen.getByTestId('calendar-gap-cue')).toBeTruthy();
       lay('calendar-week');
@@ -420,7 +421,7 @@ describe('Gaps in Activity (ACT-28)', () => {
     it('Consistency’s figure opens a month with nothing marked', async () => {
       render(<ActivityBlocksViews {...props} />);
       fireEvent.press(await screen.findByText('Insights'));
-      fireEvent.press(await screen.findByTestId('insights-gaps-longest'));
+      fireEvent.press(await screen.findByTestId('insights-gap-2026-10-31'));
       expect(await screen.findByTestId('calendar-gap-cue')).toBeTruthy();
       // Back to Insights and out again by a month: no mark comes with it.
       fireEvent.press(screen.getByText('Insights'));
@@ -444,7 +445,7 @@ describe('Gaps in Activity (ACT-28)', () => {
       render(<ActivityBlocksViews {...props} />);
       fireEvent.press(await screen.findByText('Insights'));
       expect(await screen.findByTestId('activity-insights')).toBeTruthy();
-      // Before: "Today you revised" over a strip of "revised on 0 days".
+      // Before: "Today you revised" from the page alone, with nothing read to say what came before.
       expect(screen.queryByTestId('insights-gaps')).toBeNull();
       await act(async () => {
         arrive({
@@ -455,7 +456,7 @@ describe('Gaps in Activity (ACT-28)', () => {
       });
       expect(await screen.findByTestId('insights-gaps')).toBeTruthy();
       expect(screen.getByTestId('insights-gaps-figure').props.accessibilityLabel).toBe('Today you revised');
-      expect(screen.getByTestId('insights-gaps-strip').props.accessibilityLabel).not.toMatch(/revised on 0 days/);
+      expect(screen.getByTestId('insights-gaps-summary').props.children).toBe('No gaps yet');
     } finally {
       service.getActivityItemsBetween.mockImplementation(() => Promise.resolve({ revisions: [], memorized: [], reads: [] }));
     }

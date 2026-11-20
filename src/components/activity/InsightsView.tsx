@@ -19,6 +19,7 @@ import {
   formatPace,
   juzTiles,
   memorizationMonths,
+  HOURS_FROM_DAYS,
   minutesByHour,
   monthCount,
   monthLabel,
@@ -27,6 +28,7 @@ import {
   quranShare,
   reportMonth,
   reviseFirstLabel,
+  timedDays,
   untouchedJuz,
   weakSpotRows,
   weekCircles,
@@ -189,7 +191,7 @@ export function InsightsView({
   /** A day (Consistency's circles and grid, a month's memorizations: ACT-23). */
   onOpenDay?: (day: string) => void;
   /** Overview at a month (Consistency's figure: ACT-23). */
-  /** Overview at a month; Gaps' longest gap also passes the gap, to mark on the calendar (ACT-28). */
+  /** Overview at a month; a gap from Gaps also passes the gap, to mark on the calendar (ACT-28). */
   onOpenCalendar?: (month: string, gap?: { from: string; to: string; cue: string }) => void;
   /** The reader at some ayahs, highlighted (the Recitation section's rows, RINS-2). */
   onOpenAyahs?: (sura: number, from: number, to: number) => void;
@@ -791,9 +793,9 @@ function Consistency({ data, onOpenDay, onOpenCalendar }: { data: InsightsData; 
   const active = useMemo(() => new Set([...data.revised.map((r) => r.day), ...data.read.map((r) => r.day)]), [data.revised, data.read]);
   const range = data.range ?? 30;
   const span = rangeSpan(range, data.today, data.firstDay);
-  const week = weekCircles(active, data.today);
+  const week = weekCircles(active, data.today, data.firstDay);
   const month = reportMonth(data.today);
-  const m = monthCount(active, month, data.today);
+  const m = monthCount(active, month, data.today, data.firstDay);
   const inRange = activeDays(active, data.today, span.window, data.firstDay);
   // 3 months and All time: a weeks grid by weekday (up to half a year) and the missed days' pattern;
   // 7 and 30 days: the week's circles. The grid has a column per week since the account's first (a short
@@ -806,13 +808,19 @@ function Consistency({ data, onOpenDay, onOpenCalendar }: { data: InsightsData; 
   const cell = Math.max(8, Math.min(GRID_CELL_MAX, Math.floor((width - 32 - GRID_LABEL_W - fullWeeks * GRID_GAP) / fullWeeks)));
   // A count from the account's first day names it, whatever the range ("since 8 November").
   const sinceFirst = data.firstDay ? `since ${dayAndMonth(data.firstDay)}` : 'since you started';
+  // 7 days: the week and its month beside it ("5 of the last 7 days · 10 of 19 in November"), the month counted from the
+  // account's first day when it began in it ("· 10 of 12 since 8 November"); an account younger than the week counts
+  // from its first day alone, as the other ranges do (ACT-31: "1 of 19 in November" on a day-old account).
+  const monthWords = m && m.of > 0 ? (m.from ? `${m.done} of ${m.of} since ${dayAndMonth(m.from)}` : `${m.done} of ${m.of} in ${monthName(month)}`) : null;
   const figureText =
-    range === 7
-      ? `of the last 7 days · ${m.done} of ${m.of} in ${monthName(month)}`
-      : span.all || inRange.sinceStart
-        ? `of ${inRange.of} ${unit(inRange.of, 'day')} ${sinceFirst}`
+    span.all || inRange.sinceStart
+      ? `of ${inRange.of} ${unit(inRange.of, 'day')} ${sinceFirst}`
+      : range === 7
+        ? ['of the last 7 days', monthWords].filter(Boolean).join(' · ')
         : `of the last ${inRange.of} days`;
   const hours = useMemo(() => minutesByHour([...data.revised, ...data.read], data.today, span.window), [data.revised, data.read, data.today, span.window]);
+  // The hours from 3 days with something timed: one session's hour says nothing about when they revise (ACT-31).
+  const hoursShown = useMemo(() => timedDays([...data.revised, ...data.read], data.today, span.window) >= HOURS_FROM_DAYS, [data.revised, data.read, data.today, span.window]);
   // The hours scrub (i8): a press that slides picks the hour under the finger; letting go puts it back.
   const [heldHour, setHeldHour] = useState<number | null>(null);
   const barsWidth = React.useRef(0);
@@ -837,7 +845,7 @@ function Consistency({ data, onOpenDay, onOpenCalendar }: { data: InsightsData; 
   return (
     <Section title="Consistency" detail="How often, and when" testID="insights-consistency">
       <Figure
-        value={String(range === 7 ? week.filter((d) => d.done).length : inRange.done)}
+        value={String(inRange.done)}
         text={figureText}
         onPress={onOpenCalendar ? () => onOpenCalendar(range === 7 ? month : data.today.slice(0, 7)) : undefined}
         hint="Opens the calendar"
@@ -887,18 +895,25 @@ function Consistency({ data, onOpenDay, onOpenCalendar }: { data: InsightsData; 
       ) : (
       <View style={styles.circles}>
         {week.map((d) => (
-          // A day's circle opens that day; a missed one opens empty, with its + (ACT-23).
+          // A day's circle opens that day; a missed one opens empty, with its + (ACT-23). A day before the account is
+          // faint and opens nothing: it wasn't missed (ACT-31).
           <Tap
             key={d.day}
-            onPress={onOpenDay ? () => onOpenDay(d.day) : undefined}
-            disabled={!onOpenDay}
+            onPress={onOpenDay && !d.before ? () => onOpenDay(d.day) : undefined}
+            disabled={!onOpenDay || d.before}
             style={styles.circleCol}
+            accessible={!d.before}
             accessibilityRole="button"
             accessibilityLabel={`${d.day}, ${d.done ? 'revised or read' : 'missed'}`}
             accessibilityHint="Opens the day"
-            testID={`insights-day-${d.day}`}
+            testID={d.before ? `insights-day-before-${d.day}` : `insights-day-${d.day}`}
           >
-            <View style={[styles.circle, d.done ? { backgroundColor: palette.primary } : { borderWidth: 1.5, borderColor: palette.outline }]}>
+            <View
+              style={[
+                styles.circle,
+                d.done ? { backgroundColor: palette.primary } : d.before ? { backgroundColor: palette.track, opacity: 0.35 } : { borderWidth: 1.5, borderColor: palette.outline },
+              ]}
+            >
               {d.done ? <Ionicons name="checkmark" size={16} color={palette.onPrimary} /> : null}
             </View>
             <ChromeText style={[typeV2.meta, styles.letter, { color: palette.secondary }]}>{d.letter}</ChromeText>
@@ -911,7 +926,7 @@ function Consistency({ data, onOpenDay, onOpenCalendar }: { data: InsightsData; 
           {pattern}
         </ChromeText>
       ) : null}
-      {busiest ? (
+      {busiest && hoursShown ? (
         <View style={styles.hoursBlock} testID="insights-hours">
           {/* Press and slide on the bars (i8): the title becomes the hour under the finger. */}
           <ChromeText style={[typeV2.name, { color: palette.text }]} testID="insights-hours-title">
@@ -1140,7 +1155,10 @@ function Memorization({ data, onOpenDay }: { data: InsightsData; onOpenDay?: (da
           testID="insights-memorization-figure"
         />
       )}
-      <View style={styles.monthBars}>
+      {/* No month with a page memorized: twelve empty bars say nothing (ACT-31). */}
+      {months.some((m) => m.pages > 0) ? (
+      <>
+      <View style={styles.monthBars} testID="insights-month-bars">
         {months.map((m, i) => {
           const last = i === months.length - 1;
           const lit = picked ? m.month === picked : last;
@@ -1176,6 +1194,8 @@ function Memorization({ data, onOpenDay }: { data: InsightsData; onOpenDay?: (da
           </ChromeText>
         ))}
       </View>
+      </>
+      ) : null}
       {shownMonth ? (
         <View style={styles.monthList} testID="insights-month-list">
           {(allShown ? shownMonth.items : shownMonth.items.slice(0, 4)).map((it, i) => (

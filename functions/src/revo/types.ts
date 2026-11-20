@@ -99,11 +99,15 @@ export const REVO_RECITATION_LIST = 5;
 export interface RevoGaps {
   /** Whole days since the last revision day (0 = today). */
   lastRevisedDaysAgo: number;
-  /** The longest gap (days from one revision day to the next); `endedDaysAgo` null while it is still open. */
+  /**
+   * The longest gap, in days without revising (2 or more; still open: the days since the last revision, today
+   * included); `endedDaysAgo` null while it is still open. Apps before Nov 20 2026 sent the days from one revision day
+   * to the next, one more for a closed gap.
+   */
   longestGap: { days: number; endedDaysAgo: number | null } | null;
   /** The usual step between revision days (1 = every day, 1.5 = every 1–2 days). */
   usualStepDays: number | null;
-  /** Gaps of 3 days or more, the open one included. */
+  /** Gaps (2 days or more without revising), the open one included. */
   longGaps: number;
   /** Pages the plan brings round later than their spacing, how far that pushed the full revision back, the plan's cycle. */
   fullRevision: { latePages: number; pushedBackDays: number; cycleDays: number } | null;

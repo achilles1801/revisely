@@ -181,7 +181,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'Insights and page strength',
-    covers: ['ACT-4', 'ACT-8', 'ACT-12', 'ACT-16', 'ACT-19', 'ACT-21', 'ACT-22', 'ACT-23', 'ACT-24', 'ACT-25', 'ACT-26'],
+    covers: ['ACT-4', 'ACT-8', 'ACT-12', 'ACT-16', 'ACT-19', 'ACT-21', 'ACT-22', 'ACT-23', 'ACT-24', 'ACT-25', 'ACT-26', 'ACT-31'],
     routes: ['Activity', 'ActivityDay', 'PagesByStrength', 'QuranReader'],
     text: lines(
       '- Activity → “Insights”. One range for the whole tab, from the chip at the end of the Overview | Insights row ("30 days ⌄" at first): “7 days”, “30 days”, “3 months” or “All time” (since the account’s first day). It is kept on the phone; a range longer than the account counts from its first day.',
@@ -189,6 +189,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
       '- The juz sheet (from a Coverage tile, the untouched row, or a day’s Revised block): the juz named by its surahs, when it was last revised and on how many days in the last 30, a strip of its pages and a row per surah. Tap a page, a row or “Open in the reader” to read it there; a juz left too long offers “Plan it for tomorrow first”.',
       '- “Consistency”: days with a revision or a read in the range, and the minutes by hour (press and slide along the hour bars to read each hour). A day’s circle opens that day; the figure opens Overview at its month. At 3 months: a weeks grid and, if there is one, the missed days’ pattern ("Every missed day was a Saturday").',
       '- “Memorization”: pages memorized each month; tap a month’s bar for that month’s memorizations, each opening its day. “Pace”: minutes per page, shown from ten timed items, against the same length before; tap its "From 24 timed revisions ›" line for each one.',
+      '- A new account sees no chart that says nothing yet: days before the account count as neither done nor missed (faint circles; "1 of 1 day since 19 November"), the minutes by hour show once something timed falls on 3 days of the range, and Memorization’s month bars once a month has a page memorized.',
       '- Strength comes from ratings: 1–2 weak, 3 moderate, 4–5 strong (an unrated revised page counts as strong). Rating needs “Smart Tracking” (Settings → Revision), then ⋯ → “Rate page strength” in a session.',
       '- Smart Tracking on: “Weak spots” (pages weak now or skipped twice, with “Revise … first tomorrow” and “Ask”), strength in the juz sheet and on a day, and at the foot of Weak spots “See all pages by strength”: every revised page, weakest first, by “Pages”, “Surahs” or “Juz”, filtered by juz or strength.',
       '- Smart Tracking off: nothing in Activity shows strength (no weak, moderate or strong counts, no weak marks, no Weak spots); when a part was last revised and how often show instead. In Weak spots’ place, “Turn on Smart Tracking to see your weak spots” turns it on (Settings → Revision).',
@@ -312,7 +313,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['ACT-28', 'ACT-29', 'ACT-30'],
     routes: ['Activity', 'ActivityDay', 'LastRevised', 'QuranReader'],
     text: lines(
-      '- Activity → “Insights” → “Gaps” (after Consistency): days since the last revision (red from 3), a strip of the range (gaps of 3+ days red), the longest gap and the usual rhythm ("Every 2 days"); “Days” shows exact days. "Full revision pushed back 5 days" (or "Full revision on schedule") says how late their plan’s pages come round.',
+      '- Activity → “Insights” → “Gaps” (after Consistency): a gap is 2 days or more in a row without revising (Monday, then Thursday, is a 2-day gap; one day missed is not a gap). It shows the days since the last revision (red from 3), how many gaps the range had and how often they usually revise ("you usually revise every 2 days"; "No gaps yet" on their first day), then each gap, the latest first, with its days and a bar for its length; a tap shows it on the Overview calendar. “Days” shows exact days. "Full revision pushed back 5 days" (or "Full revision on schedule", after a gap) says how late their plan’s pages come round.',
       '- “When did I last revise…?” opens “Last revised”: “Surahs”, “Juz”, “Hizbs” or “Pages”, sorted “Recent first”, “Longest waiting first” or “Mushaf order”, filtered “Revised this week”, “2 weeks or more” or “Not revised yet”; a page opens the reader. Say long gaps in weeks or months, welcome them back, never scold.',
       '- “Edit sections” (the icon at the end of the Overview and Insights tabs) shows, hides and reorders a tab’s sections (hold one, then drag); “Show all, in the usual order” puts it back. Kept on this phone.',
     ),

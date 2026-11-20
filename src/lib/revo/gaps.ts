@@ -1,7 +1,7 @@
 // Revo's view of Insights' Gaps and Last revised (ACT-28, ACT-30; Majd, Nov 16 2026: "whatever app changes we make,
 // revo should get that update too"). The same figures the section and the screen show, over the last 30 days, as
 // numbers the server checks and writes out in words (functions/src/revo: gaps): how long since the last revision,
-// the longest gap, the usual rhythm, how far gaps pushed the full revision back, and when each memorized surah was
+// the longest gap (days without revising, as the section counts them), the usual rhythm, how far gaps pushed the full revision back, and when each memorized surah was
 // last revised. Days only (never dates); surahs in words, as every part of the Qur'an the app sends (lib/revo/words).
 // Revisely Dev only, as the section.
 
@@ -59,7 +59,7 @@ export function revoGaps(input: {
       ? { days: view.longest.days, endedDaysAgo: view.longest.to ? Math.max(0, daysSince(view.longest.to, today)) : null }
       : null,
     usualStepDays: view.usual,
-    longGaps: view.longCount,
+    longGaps: view.gaps.length,
     fullRevision: pb ? { latePages: pb.late.length, pushedBackDays: pb.days, cycleDays: pb.cycleDays } : null,
     surahs,
   };
