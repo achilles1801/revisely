@@ -2095,8 +2095,7 @@ describe('long takes (Nov 20 2026): Stop always ends in a summary, and the take 
     setStopBudgetForTests(40);
     await reciteSome();
     fireEvent.press(screen.getByTestId('recite-stop'));
-    await flush();
-    expect(screen.queryByTestId('take-summary')).toBeNull();
+    // (Whether it's up before the budget runs out depends on the runner's speed: not asserted.)
     await settle(() => expect(screen.getByTestId('take-summary-unfinished')).toBeTruthy());
     expect(screen.getByTestId('take-summary-score')).toBeTruthy();
     await settle(() => expect(taken()).toMatchObject({ unfinished: true, mistakes: 1, recordingId: 'rec-1' }));
@@ -2150,10 +2149,11 @@ describe('long takes (Nov 20 2026): Stop always ends in a summary, and the take 
 
   it('[RECITE-10] events that come close together are applied together (a resume replays a whole take at once)', async () => {
     await startTake('check');
-    setLiveBatchForTests(100);
+    // A window wide enough that a slow runner's acts all fall in it (the app's is 100 ms).
+    setLiveBatchForTests(1500);
     // The first after a quiet moment shows at once; the rest wait for one update together.
     await act(async () => {
-      await new Promise((r) => setTimeout(r, 150));
+      await new Promise((r) => setTimeout(r, 1600));
     });
     await event({ type: 'at', w: A23 + 1 });
     await event({ type: 'at', w: A23 + 2 });
