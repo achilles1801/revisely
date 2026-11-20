@@ -587,25 +587,20 @@ appId: com.revisionbuddy.app
     timeout: 15000
 - tapOn:
     id: calendar-day-2026-11-14
+# The preview lists the day's takes (RMEM-5); its Recited row opens the day at them.
+- extendedWaitUntil:
+    visible:
+      id: preview-row-recited
+    timeout: 10000
 - tapOn:
-    id: preview-open
+    id: preview-row-recited
+# The day lists its takes (by now Test me's too), newest first, each a row with ▶ its audio.
 - scrollUntilVisible:
     element:
-      id: activity-block-recited-header
+      id: activity-take-head
     direction: DOWN
     centerElement: true
     timeout: 15000
-- runFlow:
-    file: ../subflows/shot.yaml
-    env:
-      NAME: rm04-day-recited-dark
-# The row opens the day's takes (by now Test me's too), newest first, each with ▶ its audio.
-- tapOn:
-    id: activity-block-recited-header
-- extendedWaitUntil:
-    visible:
-      id: recited-sheet
-    timeout: 5000
 - extendedWaitUntil:
     visible:
       id: activity-take-play
@@ -613,14 +608,14 @@ appId: com.revisionbuddy.app
 - runFlow:
     file: ../subflows/shot.yaml
     env:
-      NAME: rm04b-day-takes-dark
+      NAME: rm04-day-recited-dark
 - tapOn:
     id: activity-take-head
 - extendedWaitUntil:
     visible:
       id: shown-take-bar
     timeout: 10000
-# ▶ for the take's audio, which is on the phone (the sheet lists it).
+# ▶ for the take's audio, which is on the phone (its row in the day has it).
 - extendedWaitUntil:
     visible:
       id: shown-take-play

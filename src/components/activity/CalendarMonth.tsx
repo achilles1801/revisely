@@ -22,6 +22,7 @@ import { dayMarks, dayPreview } from '../../lib/activityInsights';
 import { formatDayLong, formatMinutesLong } from '../../lib/activityFormat';
 import { describePassage } from '../../lib/passages';
 import { typeV2 } from '../../theme/v2';
+import { RecitedMark } from '../reciteMemory/TakeRows';
 import { BlockMark, RevisedMark } from './BlockMark';
 import type { Memorized, Read, Revised } from '../../lib/activityInsights';
 import { formatDate } from '../../i18n';
@@ -45,7 +46,13 @@ const DISC = 34;
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
 /** The picked day's preview rows, each the block of the day it opens at (DayBlocks' DayBlockKind). */
-export type PreviewBlock = 'revised' | 'memorized' | 'read' | 'notes';
+export type PreviewBlock = 'revised' | 'memorized' | 'read' | 'notes' | 'recited';
+
+/** A day's Recite takes, for its preview row (RMEM-5): how many, and the pages they ran on (once the words have loaded). */
+export interface RecitedDay {
+  takes: number;
+  pages: number[];
+}
 
 /** A day's recordings on this phone: revision ones (the Revised row) and reading ones (Read). */
 export interface RecordingCounts {
@@ -73,6 +80,7 @@ export function CalendarMonth({
   onPick,
   onOpen,
   recordings,
+  recited,
   sections = DEFAULT_SECTIONS.overview,
   gap = null,
 }: {
@@ -93,6 +101,8 @@ export function CalendarMonth({
   onOpen: (day: string, block?: PreviewBlock) => void;
   /** Recordings by day: the preview's mic and count beside the block they belong to. */
   recordings?: Map<string, RecordingCounts>;
+  /** Recite takes by day (Revisely Dev): the preview's Recited row (RMEM-5). */
+  recited?: Map<string, RecitedDay>;
   /** The user's order of the sections under the header, and those hidden (ACT-29); the usual layout without it. */
   sections?: TabLayout<'overview'>;
   /** Insights' longest gap, marked on the days (ACT-28); it fades when it goes. */
@@ -143,7 +153,7 @@ export function CalendarMonth({
   const shownDay = picked ?? today;
   const preview = dayPreview(shownDay, data);
   const recs = recordings?.get(shownDay);
-  const previewRows: { key: string; kind: 'revised' | 'memorized' | 'read' | 'notes'; label: string; value: string; mics?: number }[] = [];
+  const previewRows: { key: string; kind: PreviewBlock; label: string; value: string; mics?: number }[] = [];
   if (preview.revised) {
     const minutes = preview.revised.minutes != null && preview.revised.minutes > 0 ? ` · ${formatMinutesLong(preview.revised.minutes)}` : '';
     previewRows.push({ key: 'revised', kind: 'revised', label: 'Revised', value: `${preview.revised.done} of ${preview.revised.assigned}${minutes}`, mics: recs?.revision });
@@ -156,6 +166,12 @@ export function CalendarMonth({
   if (preview.readPages > 0) {
     const minutes = preview.readMinutes != null && preview.readMinutes > 0 ? ` · ${formatMinutesLong(preview.readMinutes)}` : '';
     previewRows.push({ key: 'read', kind: 'read', label: 'Read', value: `${describePassage(pagesOf(data.read), { form: 'short' })}${minutes}`, mics: recs?.reading });
+  }
+  // The day's takes, where the day is looked at (Majd, Nov 20 2026): its passages and how many (RMEM-5).
+  const takes = recited?.get(shownDay);
+  if (takes && takes.takes > 0) {
+    const count = takes.takes === 1 ? '1 take' : `${takes.takes} takes`;
+    previewRows.push({ key: 'recited', kind: 'recited', label: 'Recited', value: takes.pages.length > 0 ? `${describePassage(takes.pages, { form: 'short' })} · ${count}` : count });
   }
   if (preview.notes) previewRows.push({ key: 'notes', kind: 'notes', label: 'Notes', value: '1' });
 
@@ -262,7 +278,13 @@ export function CalendarMonth({
           style={styles.previewRow}
           testID={`preview-row-${r.key}`}
         >
-          {r.kind === 'revised' ? <RevisedMark fraction={dayMarks(shownDay, data).ring ?? 0} done={(dayMarks(shownDay, data).ring ?? 0) >= 1} size={26} /> : <BlockMark kind={r.kind} size={26} />}
+          {r.kind === 'revised' ? (
+            <RevisedMark fraction={dayMarks(shownDay, data).ring ?? 0} done={(dayMarks(shownDay, data).ring ?? 0) >= 1} size={26} />
+          ) : r.kind === 'recited' ? (
+            <RecitedMark size={26} />
+          ) : (
+            <BlockMark kind={r.kind} size={26} />
+          )}
           <Text style={[typeV2.body, { color: palette.text, minWidth: 84 }]} numberOfLines={1} maxFontSizeMultiplier={MAX_SCALE}>
             {r.label}
           </Text>

@@ -365,8 +365,8 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         icon: 'calendar-outline',
         title: 'In Activity',
         text:
-          'A day keeps its takes in one {{Recited}} row, apart from your recordings. ' +
-          'Tap a take for {{Show on the page}}: it opens with its marks.',
+          'A day lists each take under {{Recited}}, apart from your recordings. ' +
+          'Tap one for {{Show on the page}}: it opens with its marks.',
         covers: ['RMEM-5', 'RMEM-6', 'RINS-3'],
         when: 'liveRecite',
       },

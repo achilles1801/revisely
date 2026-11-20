@@ -33,7 +33,10 @@ import { useActivityReload } from './useActivityReload';
 import { listRecordings, onRecordingsChanged } from '../../lib/recordings';
 import { sortTakeAudio } from '../../lib/reciteMemory/apart';
 import { coverageSince } from '../../lib/recency';
-import type { PreviewBlock, RecordingCounts } from './CalendarMonth';
+import type { PreviewBlock, RecitedDay, RecordingCounts } from './CalendarMonth';
+import { useMemoryRecords } from '../../lib/reciteMemory/store';
+import { reciteLiveForAccount } from '../../lib/reciteLive/availability';
+import { useQuranWordsWhen } from '../reciteMemory/TakeRows';
 import { activitySectionsEnabled, useActivitySections, type InsightsSection } from '../../lib/activitySections';
 import { IconButton } from '../v2/TopBar';
 import { SectionsSheet } from './SectionsSheet';
@@ -184,6 +187,23 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
     read();
     return onRecordingsChanged(read);
   }, []);
+
+  // Recite's takes by day (Revisely Dev): the picked day's Recited row (RMEM-5), its passages once the words are in.
+  const memory = useMemoryRecords(user?.id, reciteLiveForAccount(user));
+  const takeWords = useQuranWordsWhen(memory.length > 0);
+  const recited = useMemo(() => {
+    const out = new Map<string, RecitedDay>();
+    for (const r of memory) {
+      if (r.kind !== 'take' || r.deleted) continue;
+      const d = out.get(r.day) ?? { takes: 0, pages: [] };
+      d.takes += 1;
+      if (takeWords) {
+        for (let p = takeWords.pageOf(r.from); p <= takeWords.pageOf(r.to); p++) if (!d.pages.includes(p)) d.pages.push(p);
+      }
+      out.set(r.day, d);
+    }
+    return out;
+  }, [memory, takeWords]);
 
   // Swipe between weeks or months (a horizontal drag on the calendar).
   const stepRef = useRef<(delta: number) => void>(() => undefined);
@@ -340,6 +360,7 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
             onOpen={onOpenDay}
             gap={gapMark}
             recordings={recordings}
+            recited={recited}
             sections={sections.overview}
           />
         </RNView>

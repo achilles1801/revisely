@@ -141,12 +141,15 @@ export async function remember(uid: string, record: MemoryRecord): Promise<void>
 
 /**
  * The account was reset on the server since what this phone holds (`mark`, the user document's `dataResetAt`): what
- * it held goes, and the next pull reads everything again.
+ * it held from before goes, and the next pull reads everything again. A record written since the reset stays: a take
+ * kept after Reset my data, before this screen heard of it, may not have reached the account yet (RMEM-5).
  */
 export async function adoptResetMark(uid: string, mark: number | null): Promise<void> {
   const h = await loadMemory(uid);
   if (mark == null || h.resetMark === mark) return;
-  held.set(uid, { records: {}, pulledAt: 0, resetMark: mark });
+  const since: Record<string, MemoryRecord> = {};
+  for (const r of Object.values(h.records)) if (r.rev > mark) since[r.id] = r;
+  held.set(uid, { records: since, pulledAt: 0, resetMark: mark });
   lastPull.delete(uid);
   notify(uid);
   await persist(uid);

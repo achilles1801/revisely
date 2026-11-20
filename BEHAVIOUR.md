@@ -492,9 +492,13 @@ Recite with Mark mistakes remembers each take (Majd, Nov 15 2026; Tarteel's bigg
   - the takes, newest first.
 
   A word's card opens the same page (See all). From the summary, Done goes back to the summary.
-- **RMEM-5.** A day in Activity lists its recitation takes in one Recited row ("3 takes"), which opens
-  them: each take with its passage, its score by the page, its line (time, mistakes, words cleared, page
-  hidden) and ▶ its audio while that is on the phone; a tap shows it on the page. All activity has
+- **RMEM-5.** A day in Activity lists its recitation takes in a block of their own, Recited ("2 takes"), newest first,
+  each take a row: its passage, its line (time, length, mistakes, Not clear, words cleared, page hidden), its score by
+  the page, and ▶ its audio while that is on the phone; a tap shows it on the page, a hold opens its menu. A day with
+  more than five shows the newest four and "All N takes". Overview's preview of the picked day has a Recited row (its
+  passages and how many takes) that opens the day at its takes. (Majd, Nov 20 2026: "after I finished my recording, I
+  go to my journal to go take a look at it ... today is Thursday, so I'll go to Thursday to see what I did". Before,
+  the preview had no takes and the day one quiet "1 take ›" row.) All activity has
   Recitations, with All takes, With mistakes and Page hidden. Show on the page opens the reader at the
   take's page with that take's marks at full strength and nothing else, until Done. Its bar has ▶ for the
   take's audio while that audio is on the phone. Each mark has its card, and Not a mistake there updates the

@@ -118,11 +118,10 @@ it('[RMEM-5] a day lists its takes in one Recited row that opens them; Show on t
   setQuranWordsForTests(app.mods.require('src/lib/recite/__fixtures__/quranWords').wordsData());
   await app.act(() => nav(app).current.navigate('ActivityDay', { date: today }));
   await app.until(() => app.screen.queryByTestId('activity-block-recited') != null, 'the Recited row');
-  expect(app.screen.getByText('1 take ›')).toBeTruthy();
-  // The row opens the day's takes.
-  await tap(app, 'activity-block-recited-header');
-  await app.until(() => app.screen.queryByTestId('activity-take-line') != null, 'the day’s takes');
-  expect(app.screen.getByTestId('activity-take-line').props.children).toBe('7:51 PM · 1 mistake');
+  expect(app.screen.getByText('1 take')).toBeTruthy();
+  // The day lists the take itself, under Recited: its time, length and mistakes.
+  await app.until(() => app.screen.queryByTestId('activity-take-line') != null, 'the day’s take');
+  expect(app.screen.getByTestId('activity-take-line').props.children).toBe('7:51 PM · 2 min · 1 mistake');
 
   // A tap: Show on the page, the reader at page 246 with the take's mark, and its bar.
   await tap(app, 'activity-take-head');
