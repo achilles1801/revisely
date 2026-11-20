@@ -29,6 +29,8 @@ describe("a take's numbers on the phone (long takes, Nov 20 2026)", () => {
     t.tick(STATS_BEAT_MS + 900); // the thread held 900 ms
     t.tick(STATS_BEAT_MS + 100); // a hiccup, not a stall
     t.stats.event({ type: 'at', t: 10 }, 11.5);
+    // A re-check's times (from 0) aren't the checker's lag.
+    t.stats.event({ type: 'at', t: 1 }, 300, true);
     t.stats.event({ type: 'beat', t: 20 }, 23);
     t.stats.event({ type: 'mark' }, 23);
     const arrived = t.at();
@@ -41,7 +43,7 @@ describe("a take's numbers on the phone (long takes, Nov 20 2026)", () => {
       secs: 26,
       stallMax: 900,
       stalls: 1,
-      events: 2,
+      events: 3,
       beats: 2,
       applyMax: 40,
       applyAvg: 40,

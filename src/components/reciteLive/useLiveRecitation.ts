@@ -306,17 +306,20 @@ export function useLiveRecitation({
   const replayUntil = useRef<number | null>(null);
   /** Each event the take receives: its type to the Stop trace, then the live state. */
   const onEvent = useCallback((e: LiveEvent) => {
-    stats.event(e, samples.current / SAMPLE_RATE);
     if (e.type === 'ready') {
       readies.current++;
       // A resume onto a checker that holds less than the page shows: it checks the take again from there.
       if (readies.current > 1 && (e.from ?? 0) / SAMPLE_RATE < shownT.current - 1) replayUntil.current = shownT.current;
     }
+    let replayed = false;
     if (replayUntil.current != null) {
       const t = e.type === 'at' || e.type === 'beat' ? e.t : undefined;
       if (t != null && t >= replayUntil.current - 0.5) replayUntil.current = null;
-      else if (REPLAYED.has(e.type) && (e.type !== 'locked' || traceRef.current.state.start != null)) return;
+      else replayed = true;
     }
+    // A re-check's times start again from 0: not the checker's lag (the E2E long take read 306 s).
+    stats.event(e, samples.current / SAMPLE_RATE, replayed);
+    if (replayed && REPLAYED.has(e.type) && (e.type !== 'locked' || traceRef.current.state.start != null)) return;
     if (e.type === 'at' && e.t != null) shownT.current = Math.max(shownT.current, e.t);
     // A new mistake while reciting: its sound and tap at once (never one called Not a mistake, or after Stop).
     if (e.type === 'mark' && traceRef.current.state.status === 'listening' && !traceRef.current.state.dismissed.includes(e.mark.id)) {

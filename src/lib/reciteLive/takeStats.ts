@@ -47,8 +47,8 @@ export interface TakeStatsDeps {
 export interface TakeStatsTracker {
   /** The take began: the heartbeat starts. */
   start(): void;
-  /** An event arrived, with the seconds of audio sent so far. */
-  event(e: { type: string; t?: number }, sentSecs: number): void;
+  /** An event arrived, with the seconds of audio sent so far; `replayed`: a re-check's, whose times start again from 0. */
+  event(e: { type: string; t?: number }, sentSecs: number, replayed?: boolean): void;
   /** Events that arrived at `arrivedAt` were applied now. */
   applied(arrivedAt: number): void;
   /** The take ended: the heartbeat stops (the numbers stay). */
@@ -120,13 +120,13 @@ export function createTakeStats(deps: TakeStatsDeps): TakeStatsTracker {
         }
       }, STATS_BEAT_MS);
     },
-    event(e, sentSecs) {
+    event(e, sentSecs, replayed = false) {
       const now = deps.now();
       if (beat != null) s.quietMax = Math.max(s.quietMax, now - lastHeard);
       lastHeard = now;
       if (e.type === 'beat') s.beats++;
       else s.events++;
-      if ((e.type === 'at' || e.type === 'beat') && typeof e.t === 'number') {
+      if (!replayed && (e.type === 'at' || e.type === 'beat') && typeof e.t === 'number') {
         const lag = Math.max(0, Math.round((sentSecs - e.t) * 10) / 10);
         s.lagLast = lag;
         s.lagMax = s.lagMax == null ? lag : Math.max(s.lagMax, lag);
