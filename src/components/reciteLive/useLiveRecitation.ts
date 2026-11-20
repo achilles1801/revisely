@@ -807,6 +807,7 @@ export function useLiveRecitation({
       if (process.env.EXPO_PUBLIC_E2E === '1') {
         // eslint-disable-next-line no-console
         console.log(`[e2e] take stats ${JSON.stringify({ unfinished: isUnfinished(traceRef.current.state), ...stats.snapshot() })}`);
+        e2e?.e2eTakeEnded(stats.snapshot());
       }
       if (!reportedLong.current) {
         reportedLong.current = true;

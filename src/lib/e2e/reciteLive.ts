@@ -321,3 +321,36 @@ export function e2eLongConnect(): LiveConnect {
     open: () => new LongTakeChecker(events),
   });
 }
+
+// ------------------------------------------------------------------------------------- the long take's numbers
+
+/** The last long take's numbers, for the status line (E2ERoot): an E2E log isn't kept for a flow that passes. */
+let statsLine = '';
+const statsListeners = new Set<() => void>();
+export function e2eTakeStatsLine(): string {
+  return statsLine;
+}
+export function onE2ETakeStats(listener: () => void): () => void {
+  statsListeners.add(listener);
+  return () => statsListeners.delete(listener);
+}
+/** A take ended: its numbers, shortly (stall, event to screen, the checker's lag, the heap), once a long take ends. */
+export function e2eTakeEnded(s: {
+  secs: number;
+  stallMax: number;
+  stalls: number;
+  applyMax: number;
+  applyAvg: number;
+  lagMax: number | null;
+  quietMax: number;
+  heapStart: number | null;
+  heapMax: number | null;
+  events: number;
+}): void {
+  if (!longMinutes) return;
+  const heap = s.heapStart != null && s.heapMax != null ? ` heap ${s.heapStart}→${s.heapMax}MB` : '';
+  statsLine =
+    `take ${s.secs}s ev ${s.events} stall max ${Math.round(s.stallMax)}ms ×${s.stalls} ` +
+    `apply ${s.applyAvg}/${s.applyMax}ms lag ${s.lagMax ?? '–'}s quiet ${Math.round(s.quietMax / 1000)}s${heap}`;
+  for (const l of [...statsListeners]) l();
+}

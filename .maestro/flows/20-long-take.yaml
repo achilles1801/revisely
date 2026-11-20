@@ -166,3 +166,16 @@ appId: com.revisionbuddy.app
     file: ../subflows/shot.yaml
     env:
       NAME: lt05-summary
+
+# The take's own numbers (lib/reciteLive/takeStats) on the status line once the summary closes: an E2E log isn't kept
+# for a flow that passes.
+- tapOn:
+    id: take-summary-done
+- extendedWaitUntil:
+    visible:
+      id: e2e-take-stats
+    timeout: 8000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: lt06-numbers
