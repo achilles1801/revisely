@@ -1283,6 +1283,19 @@ class LiveSession:
         if not heard:
             return ev
         w0 = min(heard, key=lambda w: visits[w][0]['start'])  # the path's first word
+        # Speech before the start, fitted as stray words, is passed over: the take starts where the longest run heard in
+        # order begins, and the path is judged from there. The isti'adha and the basmala before a surah's first page
+        # read as words of it ("min", "lā"), and a stray later word made every word after it out of order (`order`),
+        # so the take never locked: Majd's page 2 of Al-Baqarah, twice in a row (Nov 20 2026).
+        b, fb = self._run_start(visits, heard, loc.g.W)
+        if (b, fb) != (w0, visits[w0][0]['start']):
+            path = [x for x in path if x[0] >= fb]
+            st, _, _, _, _, visits, _ = checker.decide(loc.kws, loc.g, self.lp[loc.f0:loc.frames()], path, self.P,
+                                                       self.ear.vocab, self._tokens(loc.f0, loc.frames()))
+            heard = [w for w in range(loc.g.W) if visits[w]]
+            if not heard:
+                return ev
+            w0 = min(heard, key=lambda w: visits[w][0]['start'])
         f_start = loc.f0 + visits[w0][0]['start']
         self._search_speech = (self.T - f_start) / FPS
         p = w0  # the words from w0 on heard in order so far, settled or not
@@ -1325,6 +1338,28 @@ class LiveSession:
                 and all(self._heard_well(visits[w][-1]) for w in range(w0, w0 + n)):
             return ev if self._page_doubted() else ev + self._lock(loc.app[w0], f_start, now)
         return ev
+
+    @staticmethod
+    def _run_start(visits, heard, W):
+        """(word, frame) where the longest run of words heard in order begins: each next word has a visit starting
+        after the one before (one word may be missing, as for the lock). Ties go to the earliest, so a take with no stray
+        words keeps the path's first word."""
+        best = None
+        for w in heard:
+            for v in visits[w]:
+                n, p, t, skipped = 1, w, v['start'], False
+                while p + 1 < W:
+                    nxt = [u['start'] for u in visits[p + 1] if u['start'] >= t]
+                    if nxt:
+                        p, t, n = p + 1, min(nxt), n + 1
+                        continue
+                    nxt = [] if skipped or p + 2 >= W else [u['start'] for u in visits[p + 2] if u['start'] >= t]
+                    if not nxt:
+                        break
+                    p, t, n, skipped = p + 2, min(nxt), n + 1, True
+                if best is None or (n, -v['start']) > best[0]:
+                    best = ((n, -v['start']), w, v['start'])
+        return best[1], best[2]
 
     @staticmethod
     def _heard_well(v):

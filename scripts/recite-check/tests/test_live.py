@@ -718,6 +718,25 @@ class StartAnywhere(unittest.TestCase):
         self.check(5)
         self.check(5, follow=True)
 
+    def test_speech_before_the_start_read_as_a_later_word_is_passed_over(self):
+        """Majd's page 2 of Al-Baqarah (Nov 20 2026): the isti'adha and the basmala before 2:1 were fitted as stray words
+        of the page (2:5's «مِّن», 2:2's «لَا»), and a later word heard before the start made every word after it out of
+        order, so the take never locked. Here a word of 1:6 comes before a take from 1:2: it locks at 1:2."""
+        import ast
+        import live
+        t = json.loads(CLEAN.read_text())
+        tl = ast.literal_eval(t['timeline']) if isinstance(t['timeline'], str) else t['timeline']
+        E = engine()
+        stray = next(e for e in tl if not e.get('extra') and E.key.where(e['word'])[:3] == (1, 6, 0))
+        with wave.open(str(CLEAN.with_suffix('.wav'))) as w:
+            full = w.readframes(w.getnframes())
+        cut = lambda a, b: full[int(a * 16000) * 2:int(b * 16000) * 2]  # noqa: E731
+        w, pcm = self.take_from(2)
+        take = cut(stray['start'] - 0.1, stray['end'] + 0.1) + b'\0\0' * 8000 + pcm
+        sess = live.LiveSession(E, 1, 1, 1, 7, {}, start_by=(1, 7))
+        ev = run(sess, chunks(take, 3200)[:int(15 / 0.1)])
+        self.assertEqual([e['w'] for e in ev if e['type'] == 'locked'], [w])
+
     def test_a_phrase_the_page_repeats_waits_until_the_places_part(self):
         """1:3 (ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ) is also the end of 1:1: it may not lock on 1:1."""
         self.check(3)
