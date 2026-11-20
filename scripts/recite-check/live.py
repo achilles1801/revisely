@@ -48,7 +48,9 @@ SEG_BACK = 16       # words before a segment's first word, for repeats
 SEG_MARGIN = 24     # a new segment starts when the cursor is this close to the segment's last word
 SEG_FRAMES = 3 * 60 * FPS  # ...or when a segment has taken this many frames (3 minutes)
 MAX_SECONDS = 15 * 60
-EXTRA_STABLE = 2    # hops in a row an extra word must be there before it is shown
+EXTRA_STABLE = 6    # hops in a row an extra word must be there before it is shown. 2 until Nov 20 2026: on 60 bench
+                    # takes with planted mistakes 75 of 172 extra words shown live were gone from the final answer (Majd:
+                    # marks "should stay"); at 6, 21 of 118, the same 97 the final keeps, each shown 2 s later
 FIX_STABLE = 4      # hops in a row a marked word must be heard right again before it is unmarked
 JUMP_BACK = 3       # the cursor moving back more than this many words, or ahead more than JUMP_AHEAD, is shown only
 JUMP_AHEAD = 6      # once the next hop agrees (within a word): one hop's provisional frames once took it 13 words back
