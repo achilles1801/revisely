@@ -848,18 +848,20 @@ export function DayBlocks({
           testID="activity-block-recited"
         />
       )}
-      <ActionSheet
-        visible={heldTake != null}
-        onClose={() => setHeldTake(null)}
-        title={heldTake && takeWords ? passageOf(takeWords, heldTake.from, heldTake.to) : 'Recited'}
-        message={heldTake ? dayTakeLine(heldTake, clearedBy(memoryRecords, heldTake).length) : undefined}
-        actions={(heldTake ? takeActions(heldTake) : []).map((a) => ({
-          ...a,
-          icon: a.key === 'ask-revo' ? 'sparkles-outline' : a.key === 'delete' ? 'trash-outline' : 'book-outline',
-          destructive: a.key === 'delete',
-        }))}
-        testID="activity-take-menu"
-      />
+      {dayTakes.length > 0 ? (
+        <ActionSheet
+          visible={heldTake != null}
+          onClose={() => setHeldTake(null)}
+          title={heldTake && takeWords ? passageOf(takeWords, heldTake.from, heldTake.to) : 'Recited'}
+          message={heldTake ? dayTakeLine(heldTake, clearedBy(memoryRecords, heldTake).length) : undefined}
+          actions={(heldTake ? takeActions(heldTake) : []).map((a) => ({
+            ...a,
+            icon: a.key === 'ask-revo' ? 'sparkles-outline' : a.key === 'delete' ? 'trash-outline' : 'book-outline',
+            destructive: a.key === 'delete',
+          }))}
+          testID="activity-take-menu"
+        />
+      ) : null}
       {dayTakes.length > 0 ? (
         <RecitedSheet
           visible={recitedOpen}
