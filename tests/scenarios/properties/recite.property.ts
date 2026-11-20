@@ -24,9 +24,18 @@ import {
   mistakeCount,
   restoreMark,
   seekOnPage,
+  settleUnfinished,
+  isUnfinished,
+  liveStopping,
   startNotFound,
   type LiveState,
 } from '../../../src/lib/reciteLive/state';
+import { socketFeed, CATCHUP_SLICE_SAMPLES, CATCHUP_TICK_MS, WATCHDOG_MS, type SocketLike } from '../../../src/lib/reciteLive/socket';
+import type { StartFrame } from '../../../src/lib/reciteLive/feed';
+import { meanScore } from '../../../src/lib/reciteInsights/insights';
+import { passageTakes } from '../../../src/lib/reciteMemory/progress';
+import { orphanTakes } from '../../../src/lib/reciteMemory/apart';
+import type { RecordingMeta } from '../../../src/lib/recordings';
 import { markFill } from '../../../src/components/reciteLive/markColours';
 import { markTitle } from '../../../src/lib/reciteLive/describe';
 import { NOTHING_SHOWN, revealAyah, revealNextWord, wordShown } from '../../../src/lib/reciteLive/view';
@@ -534,6 +543,272 @@ describe('[RECITE-8] Test me: places at random in what is memorized, and how eac
         expect(r.outcome).toBe(!reached ? 'unfinished' : peeked > 0 ? 'helped' : 'clean');
       }),
       { numRuns: runs(200) },
+    );
+  });
+});
+
+
+// ---------------------------------------------------------------------------------------------------- long takes
+
+/** A socket the tests answer for, and timers they run (lib/reciteLive/socket). */
+class TestSocket implements SocketLike {
+  binaryType?: string;
+  onopen: (() => void) | null = null;
+  onmessage: ((e: { data: unknown }) => void) | null = null;
+  onclose: ((e?: { code?: number }) => void) | null = null;
+  onerror: ((e?: unknown) => void) | null = null;
+  sent: (string | ArrayBuffer)[] = [];
+  closed = false;
+  send(d: string | ArrayBuffer) {
+    this.sent.push(d);
+  }
+  close() {
+    this.closed = true;
+  }
+  answer(e: Record<string, unknown>) {
+    this.onmessage?.({ data: JSON.stringify(e) });
+  }
+}
+const START: StartFrame = { type: 'start', s: 2, a: 6, s2: null, a2: null, mon: 4, mot: 4, aar: 0, letters: true, keep: false };
+const micro = async () => {
+  for (let i = 0; i < 5; i++) await Promise.resolve();
+};
+function harness() {
+  const sockets: TestSocket[] = [];
+  const timers: { fn: () => void; ms: number }[] = [];
+  let now = 0;
+  const connect = socketFeed({
+    url: 'wss://example.test/live',
+    pairUrl: null,
+    now: () => now,
+    token: async () => 'tok',
+    open: () => {
+      const s = new TestSocket();
+      sockets.push(s);
+      return s;
+    },
+    timers: {
+      set: (fn, ms) => {
+        const t = { fn, ms };
+        timers.push(t);
+        return t;
+      },
+      clear: (h) => {
+        const i = timers.indexOf(h as { fn: () => void; ms: number });
+        if (i >= 0) timers.splice(i, 1);
+      },
+    },
+  });
+  return { connect, sockets, timers, later: (ms: number) => (now += ms) };
+}
+/** What a socket was sent after its start frame: samples in order, and each text frame with the sample it came at. */
+function sentStream(s: TestSocket): { samples: number[]; frames: { at: number; type: string }[] } {
+  const samples: number[] = [];
+  const frames: { at: number; type: string }[] = [];
+  for (const d of s.sent.slice(1)) {
+    if (typeof d === 'string') frames.push({ at: samples.length, type: (JSON.parse(d) as { type: string }).type });
+    else samples.push(...Array.from(new Int16Array(d)));
+  }
+  return { samples, frames };
+}
+
+describe('[RECITE-10] a long take keeps up: a resume never holds the screen, and a quiet connection is noticed', () => {
+  it('a resume sends the held audio a slice at a time: the same samples, each frame at its place, live after', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.array(fc.record({ len: fc.integer({ min: 1, max: 30_000 }), frame: fc.option(fc.constantFrom('dismiss', 'seek', 'hint'), { nil: null }) }), { minLength: 1, maxLength: 25 }),
+        fc.integer({ min: 0, max: 100 }),
+        async (chunks, fromPct) => {
+          const h = harness();
+          const conn = h.connect(START, { onEvent: () => undefined, onClose: () => undefined });
+          await micro();
+          const s1 = h.sockets[0];
+          s1.onopen!();
+          s1.answer({ type: 'ready', take: 'k', from: 0 });
+          let n = 0;
+          const expected: { at: number; type: string }[] = [];
+          const all: number[] = [];
+          for (const c of chunks) {
+            if (c.frame) {
+              conn.send(c.frame === 'seek' ? { type: 'seek', w: 100 } : c.frame === 'hint' ? { type: 'hint', w: 100, what: 'word' } : { type: 'dismiss', id: 'm' });
+              expected.push({ at: n, type: c.frame });
+            }
+            const pcm = new Int16Array(c.len).map((_, i) => (n + i) % 32_000);
+            all.push(...Array.from(pcm));
+            n += c.len;
+            conn.sendAudio(pcm);
+          }
+          s1.onclose!();
+          h.timers.shift()!.fn();
+          await micro();
+          const s2 = h.sockets[1];
+          s2.onopen!();
+          const from = Math.floor((n * fromPct) / 100);
+          s2.answer({ type: 'ready', take: 'k', from });
+          // Each slice is at most CATCHUP_SLICE_SAMPLES of audio, then the next waits for a timer.
+          let slices = 1;
+          while (h.timers.some((t) => t.ms === CATCHUP_TICK_MS)) {
+            const i = h.timers.findIndex((t) => t.ms === CATCHUP_TICK_MS);
+            h.timers.splice(i, 1)[0].fn();
+            slices++;
+          }
+          const out = sentStream(s2);
+          expect(out.samples).toEqual(all.slice(from));
+          expect(out.frames).toEqual(expected.filter((f) => f.at >= from).map((f) => ({ ...f, at: f.at - from })));
+          expect(slices).toBeLessThanOrEqual(Math.ceil((n - from) / CATCHUP_SLICE_SAMPLES) + 1);
+          // Live again: the next audio goes at once.
+          conn.sendAudio(new Int16Array([7]));
+          expect(Array.from(new Int16Array(s2.sent[s2.sent.length - 1] as ArrayBuffer))).toEqual([7]);
+        },
+      ),
+      { numRuns: runs(60) },
+    );
+  });
+
+  it('once the checker beats, the connection is dropped exactly when it says nothing for longer than the watchdog allows', async () => {
+    await fc.assert(
+      fc.asyncProperty(fc.array(fc.integer({ min: 0, max: 12_000 }), { minLength: 1, maxLength: 12 }), fc.boolean(), async (gaps, beats) => {
+        const h = harness();
+        h.connect(START, { onEvent: () => undefined, onClose: () => undefined });
+        await micro();
+        const s = h.sockets[0];
+        s.onopen!();
+        s.answer({ type: 'ready', take: 'k', from: 0 });
+        if (beats) s.answer({ type: 'beat', t: 0 });
+        let quietSince = 0;
+        let elapsed = 0;
+        let dropped = false;
+        for (const gap of gaps) {
+          // Time passes in the watchdog's steps; a message ends each gap.
+          let left = gap;
+          while (left > 0 && !dropped) {
+            const step = Math.min(2000, left);
+            h.later(step);
+            elapsed += step;
+            left -= step;
+            const look = h.timers.findIndex((t) => t.ms === 2000);
+            if (look >= 0) h.timers.splice(look, 1)[0].fn();
+            if (s.closed) dropped = true;
+          }
+          if (dropped) break;
+          expect(s.closed).toBe(false);
+          // Silence beyond the watchdog's limit, looked at every 2 s, is always noticed by the next look.
+          if (beats) expect(elapsed - quietSince).toBeLessThanOrEqual(WATCHDOG_MS + 2000);
+          s.answer({ type: 'at', w: 10, t: elapsed / 1000 });
+          quietSince = elapsed;
+        }
+        if (!beats) expect(s.closed).toBe(false);
+        if (dropped) expect(beats).toBe(true);
+      }),
+      { numRuns: runs(100) },
+    );
+  });
+});
+
+describe('[RECITE-11] Stop always ends in a summary: what the take found, unfinished, until its final answer', () => {
+  it('a found take settles as done and unfinished, with exactly its marks and score; a final answer after replaces it as if it had come in time', () => {
+    fc.assert(
+      fc.property(
+        takeArb.chain((t) => fc.tuple(fc.constant(t), fc.array(markArb(t.page), { maxLength: 6 }), fc.nat(1000))),
+        ([t, finalMarks, secs]) => {
+          const checking = liveStopping(played(t));
+          const settled = settleUnfinished(checking, secs);
+          expect(settled.status).toBe('done');
+          expect(isUnfinished(settled)).toBe(true);
+          expect(settled.marks).toEqual(checking.marks);
+          expect(settled.score).toEqual(checking.score);
+          expect(settled.final!.marks).toEqual(Object.values(checking.marks));
+          const [from, to] = words.pageRange(t.page);
+          const done: LiveEvent = { type: 'done', result: finalOf(finalMarks, from, to - 1, t.lock, null) };
+          const late = applyEvent(settled, done);
+          expect(isUnfinished(late)).toBe(false);
+          expect(late).toEqual(applyEvent(checking, done));
+        },
+      ),
+      { numRuns: runs(200) },
+    );
+  });
+
+  it('its record is unfinished, and an unfinished take never counts in a score or a passage’s progress', () => {
+    fc.assert(
+      fc.property(takeArb, fc.nat(600), (t, secs) => {
+        const settled = settleUnfinished(liveStopping(played(t)), secs);
+        const r = recordFromTake(settled, words, {
+          id: 'r',
+          createdAt: 1,
+          rev: 2,
+          day: '2026-11-19',
+          level: 'words',
+          hidden: true,
+          secs,
+          recordingId: 'rec',
+          timeOf: () => null,
+          openWords: () => [],
+        }) as TakeRecord;
+        expect(r.unfinished).toBe(true);
+        expect(meanScore([r])).toBeNull();
+        expect(passageTakes([r], r.from, r.to)).toEqual([]);
+      }),
+      { numRuns: runs(150) },
+    );
+  });
+});
+
+describe('[RECITE-12] a take let go before its answer is kept; take audio no take names comes back as a take', () => {
+  it('a take whose start was never found has nothing to keep', () => {
+    fc.assert(
+      fc.property(
+        pageArb.chain((page) => fc.tuple(fc.constant(page), fc.array(eventArb(page, false).filter((e) => e.type !== 'at'), { maxLength: 15 }))),
+        ([page, events]) => {
+          const s = liveStopping(fold(anywhere(page), events));
+          expect(startNotFound(s)).toBe(true);
+          expect(settleUnfinished(s, 30)).toBe(s);
+        },
+      ),
+      { numRuns: runs(100) },
+    );
+  });
+
+  it('take audio becomes a take exactly when no take names it: never checked, over its pages, its audio its own', () => {
+    fc.assert(
+      fc.property(
+        fc.array(fc.record({ id: fc.constantFrom('a', 'b', 'c', 'd', 'e'), take: fc.boolean(), pages: fc.array(pageArb, { minLength: 1, maxLength: 3 }), named: fc.boolean() }), { maxLength: 6 }),
+        (items) => {
+          const seen = new Set<string>();
+          const audio = items
+            .filter((i) => !seen.has(i.id) && (seen.add(i.id), true))
+            .map(
+              (i) =>
+                ({
+                  id: i.id,
+                  kind: 'reading',
+                  day: '2026-11-19',
+                  createdAt: 1,
+                  durationMs: 61_000,
+                  pageMarks: i.pages.map((p, k) => ({ atMs: k * 1000, page: p })),
+                  take: i.take,
+                  uri: 'file:///x.wav',
+                  segments: [],
+                  sizeBytes: 1,
+                  backedUp: false,
+                }) as unknown as RecordingMeta,
+            );
+          const namedIds: string[] = items.filter((i) => i.named).map((i) => i.id);
+          const records: TakeRecord[] = namedIds.map((id) => ({ ...(orphanTakes([audio[0] ?? ({} as RecordingMeta)], [], words, 1)[0] ?? ({} as TakeRecord)), id: `r-${id}`, kind: 'take', recordingId: id }) as TakeRecord);
+          const out = orphanTakes(audio, records, words, 9);
+          const expected = audio.filter((a) => a.take && !namedIds.includes(a.id)).map((a) => a.id);
+          expect(out.map((t) => t.recordingId)).toEqual(expected);
+          for (const t of out) {
+            const a = audio.find((x) => x.id === t.recordingId)!;
+            const pages = a.pageMarks.map((m) => m.page);
+            expect(t).toMatchObject({ unfinished: true, take: null, marks: [], secs: 61 });
+            expect(t.from).toBe(words.pageRange(Math.min(...pages))[0]);
+            expect(t.to).toBe(words.pageRange(Math.max(...pages))[1] - 1);
+            expect(meanScore([t])).toBeNull();
+          }
+        },
+      ),
+      { numRuns: runs(150) },
     );
   });
 });

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { logger } from '../../lib/logger';
 import type { QuranWords } from '../../lib/recite/quranWords';
-import { startNotFound, type LiveState } from '../../lib/reciteLive/state';
+import { settleUnfinished, startNotFound, type LiveState } from '../../lib/reciteLive/state';
 import { recordFromTake, sameTake } from '../../lib/reciteMemory/fromTake';
 import { openWordsBetween } from '../../lib/reciteMemory/memory';
 import { memoryId, MemoryRecord, TakeLevel, TakeRecord } from '../../lib/reciteMemory/record';
@@ -55,7 +55,18 @@ export function useRememberTake({
 }): { noteRecording: (saved: { recordingId: string }) => void; forget: () => void; current: TakeRecord | null } {
   const status = live.state.status;
   // This take: its record's id and start, whether the page was hidden, its recording, what was written last.
-  const take = useRef<{ id: string; createdAt: number; hidden: boolean; recordingId: string | null; written: TakeRecord | null } | null>(null);
+  // `left`: the screen went before the take's final answer; it's kept unfinished, from what it had found.
+  const take = useRef<{
+    id: string;
+    createdAt: number;
+    hidden: boolean;
+    recordingId: string | null;
+    written: TakeRecord | null;
+    left?: boolean;
+  } | null>(null);
+  // The take as last rendered, for the screen's way out (useRememberTake's own cleanup runs after the live take's).
+  const liveRef = useRef(live);
+  liveRef.current = live;
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pending = useRef<TakeRecord | null>(null);
   const uidRef = useRef(uid);
@@ -99,18 +110,21 @@ export function useRememberTake({
 
   const build = useCallback((): TakeRecord | null => {
     const t = take.current;
-    const words = live.words;
-    if (!enabled || !t || !words || live.mode !== 'check' || startNotFound(live.state)) return null;
-    return recordFromTake(live.state, words, {
+    const view = t?.left ? liveRef.current : live;
+    const words = view.words;
+    if (!enabled || !t || !words || view.mode !== 'check' || startNotFound(view.state)) return null;
+    // A take the screen let go before its answer: what it had found, unfinished.
+    const state = t.left ? settleUnfinished(view.state, view.seconds) : view.state;
+    return recordFromTake(state, words, {
       id: t.id,
       createdAt: t.createdAt,
       rev: Date.now(),
       day: day ?? localDay(t.createdAt),
       level,
       hidden: t.hidden,
-      secs: live.seconds,
+      secs: view.seconds,
       recordingId: t.recordingId,
-      timeOf: live.wordTime,
+      timeOf: view.wordTime,
       openWords: (from, to) => openWordsBetween(records, from, to),
     });
   }, [enabled, live, day, level, records]);
@@ -139,14 +153,36 @@ export function useRememberTake({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, marks]);
 
-  // Leaving the reader: what's waiting is written now.
-  useEffect(() => () => flush(), [flush]);
+  // Leaving the reader: what's waiting is written now. A take not yet written (still listening, or checking after Stop)
+  // is kept from what it had found, unfinished (long takes, Nov 20 2026: Majd left a take whose Stop spun, and it was
+  // gone from Recited). Its recording, saved a moment after the microphone stops, joins it when it comes.
+  useEffect(
+    () => () => {
+      flush();
+      const t = take.current;
+      const view = liveRef.current;
+      const st = view.state.status;
+      if (!t || t.written || forgotten.current.has(t.id)) return;
+      if (st !== 'listening' && st !== 'checking' && st !== 'connecting' && st !== 'failed') return;
+      t.left = true;
+      const r = build();
+      const forUid = uidRef.current;
+      if (!r || !forUid) return;
+      t.written = r;
+      sent.current.add(r.id);
+      remember(forUid, r).catch((err) => logger.warn('Recite memory: the unfinished take was not kept', err));
+    },
+    // Only on the way out.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
 
   const noteRecording = useCallback(
     (saved: { recordingId: string }) => {
       const t = take.current;
-      // A take still recording can't have been saved yet: this is the take before's (Recite again).
-      const reciting = status === 'connecting' || status === 'listening';
+      // A take still recording can't have been saved yet: this is the take before's (Recite again). Unless the screen
+      // has let this one go (its microphone stopped on the way out).
+      const reciting = (status === 'connecting' || status === 'listening') && !t?.left;
       const before = prev.current;
       const owner = reciting ? before : t;
       if (owner && forgotten.current.has(owner.id)) {

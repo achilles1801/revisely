@@ -435,6 +435,21 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   credit nothing, so only a swipe off a page or ✓ marks one (SESS-1). Its page turns stay on the session's pages, and
   a place outside them (a similar ayah, a past take) opens in the reader over the session; Back comes back to it.
   (Majd, Nov 17 2026: "add the mistake detection and mic functionality same as mushaf to the revision sessions".)
+- **RECITE-10.** A long take keeps up: what the checker sends is shown as it comes, and a burst of it never holds the
+  screen. After a dropped connection the take's audio is sent again paced, never as one pile, and a checker that checks
+  the take again from its start never moves the page back: its cursor shows again once it passes where the page was. A
+  checker that sends a heartbeat is watched: about 8 s without a word from it counts as a dropped connection, and the
+  take resumes, so a connection that goes quiet without closing never leaves the page not following. (Majd, Nov 19
+  2026: "being able to keep up with longer sessions like 3min+ at least"; his take stopped following for 76 s.)
+- **RECITE-11.** (Revisely Dev) Stop always ends in a summary within a few seconds. If the checker's final answer hasn't come by then,
+  or the connection failed after the take's start was found, the summary shows what the take found, says its end
+  wasn't checked, and the take is kept as unfinished with its marks and its recording. A final answer that comes after
+  replaces it. An unfinished take never counts in a score or a passage's progress. (Majd, Nov 19 2026: Stop "kept
+  loading for so long i had to click out and come back in and it was gone".)
+- **RECITE-12.** (Revisely Dev) Leaving the screen during a take, or while Stop waits, keeps the take as unfinished, with its
+  recording; one whose start was never found leaves nothing. A take that ends without its final answer is reported
+  (Revisely Dev, numbers only). A take's audio that no take names (saved before takes were kept this way) shows in
+  Recited as an unfinished take of its own, never checked: no score, and no part in any.
 
 ## Recite insights
 

@@ -10,7 +10,7 @@ import { currentRelease } from '../../lib/releaseInfo';
 import { versesOnPage } from '../../lib/ayahBounds';
 import { ayahKey } from '../../lib/ayahKeys';
 import { placeOfAyah, spokenText } from '../../lib/passages';
-import { AudioSource, startMicStream } from '../../lib/recite/micSource';
+import { AudioSource, decodePcm, startMicStream } from '../../lib/recite/micSource';
 import { SAMPLE_RATE } from '../../lib/recite/segmenter';
 import { getQuranWords, loadQuranWords, QuranWords } from '../../lib/recite/quranWords';
 import { checkLevel, type ReciteCheckSettings } from '../../lib/reciteCheck/settings';
@@ -21,12 +21,17 @@ import { socketFeed } from '../../lib/reciteLive/socket';
 import { stopHearing } from '../../lib/reciteLive/hearAudio';
 import { spanEndWord, TakeSpan } from '../../lib/reciteLive/span';
 import { stopTrace } from '../../lib/reciteLive/stopTrace';
+import { createTakeClock } from '../../lib/reciteLive/takeClock';
+import { createTakeStats } from '../../lib/reciteLive/takeStats';
+import { reportLongTake, reportUnfinishedTake } from '../../lib/reciteLive/takeReport';
 import { SavedTake, startTakeRecording, TakeRecording } from '../../lib/reciteLive/takeRecording';
 import {
   applyEvent,
   checkerLooks,
   dismissMark,
   restoreMark,
+  isUnfinished,
+  settleUnfinished,
   LIVE_IDLE,
   liveConnecting,
   LiveState,
@@ -41,6 +46,38 @@ export type LiveMode = 'recite' | 'check';
 
 /** The microphone: off, asking for it, on, paused (the take goes on), refused, or failed to start. */
 export type MicStatus = 'off' | 'starting' | 'on' | 'paused' | 'denied' | 'error';
+
+/**
+ * The checker's events are applied at most this often (ms): the first at once, those that follow within the window
+ * together (Revisely Dev's long takes, Nov 20 2026). Each event was a render of the whole reader, and a resume replays
+ * every event of the take at once: about 300 for Majd's 3.5 minutes, each a full re-render on the phone.
+ */
+let LIVE_BATCH_MS = process.env.NODE_ENV === 'test' ? 0 : 100;
+/** Tests apply each event at once (the default under Jest, where each event is its own act), or batch as the app does. */
+export function setLiveBatchForTests(ms: number): void {
+  LIVE_BATCH_MS = ms;
+}
+
+/**
+ * After Stop, the checker's final answer has this long (ms); then the summary shows what the take found, marked
+ * unfinished, and a final answer that comes later replaces it (long takes, Nov 20 2026: Majd's Stop spun until he left).
+ */
+export const STOP_BUDGET_MS = 5000;
+let stopBudgetMs = STOP_BUDGET_MS;
+/** Tests shorten the wait (and put it back with no argument). */
+export function setStopBudgetForTests(ms: number = STOP_BUDGET_MS): void {
+  stopBudgetMs = ms;
+}
+
+/**
+ * What a re-check sends again from the take's start (a resume the checker didn't hold: another instance, `ready.from`
+ * behind what the page shows): its cursor and what follows it, ignored until the re-check passes where the page was
+ * (the checker session's ask, Nov 20 2026). Marks still apply, by id.
+ */
+const REPLAYED = new Set(['at', 'said', 'off', 'ayah', 'score', 'locked']);
+
+/** Failures a take ends on without what it found being kept: the checker's gate (the Premium page opens instead). */
+const GATE_FAILURES = new Set(['check_locked', 'premium_required']);
 
 /** What ended a take: Stop tapped, the app left, iOS took the microphone, or a drill reached its end. */
 type StopWhy = 'tap' | 'background' | 'mic-lost' | 'reached';
@@ -172,7 +209,27 @@ export function useLiveRecitation({
   reduceMotionRef.current = reduceMotion;
   const [mode, setMode] = useState<LiveMode | null>(null);
   const [mic, setMic] = useState<MicStatus>('off');
-  const [seconds, setSeconds] = useState(0);
+  // The take's time: outside React state, so its second-by-second ticks re-render only what shows it (lib/reciteLive/takeClock).
+  const [clock] = useState(createTakeClock);
+  // The take's own numbers (JavaScript stalls, event-to-screen time, the checker's lag): lib/reciteLive/takeStats.
+  const [stats] = useState(() =>
+    createTakeStats({
+      now: () => Date.now(),
+      every: (fn, ms) => setInterval(fn, ms),
+      clear: (h) => clearInterval(h as ReturnType<typeof setInterval>),
+      heap: () =>
+        (globalThis as { HermesInternal?: { getInstrumentedStats?: () => { js_heapSize?: number } } }).HermesInternal?.getInstrumentedStats?.()
+          ?.js_heapSize ?? null,
+    }),
+  );
+  /** After Stop: the summary shows what the take found once STOP_BUDGET_MS passes without a final answer. */
+  const stopBudget = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearBudget = useCallback(() => {
+    if (stopBudget.current) clearTimeout(stopBudget.current);
+    stopBudget.current = null;
+  }, []);
+  /** This take's long-take numbers have gone (once a take, whatever its answer). */
+  const reportedLong = useRef(false);
   const [words, setWords] = useState<QuranWords | null>(getQuranWords());
   const conn = useRef<LiveConnection | null>(null);
   const source = useRef<AudioSource | null>(null);
@@ -202,10 +259,62 @@ export function useLiveRecitation({
   /** A drill take's last word (a span with an end): it stops by itself once the checker has decided it. */
   const endWord = useRef<number | null>(null);
   // For the Stop trace (lib/reciteLive/stopTrace), read when Stop is tapped.
-  const traceRef = useRef({ state, mode, seconds });
-  traceRef.current = { state, mode, seconds };
+  const traceRef = useRef({ state, mode });
+  traceRef.current = { state, mode };
+  // Events waiting to be applied together (LIVE_BATCH_MS), and when they last were.
+  const queued = useRef<LiveEvent[]>([]);
+  const batchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastApplied = useRef(0);
+  // When the oldest event waiting arrived, and that of the last batch applied (for event-to-screen time).
+  const queuedSince = useRef<number | null>(null);
+  const appliedFrom = useRef<number | null>(null);
+  /** Everything waiting, applied in one update, in the order it came. */
+  const applyQueued = useCallback(() => {
+    if (batchTimer.current) clearTimeout(batchTimer.current);
+    batchTimer.current = null;
+    const batch = queued.current;
+    if (!batch.length) return;
+    queued.current = [];
+    appliedFrom.current = queuedSince.current;
+    queuedSince.current = null;
+    lastApplied.current = Date.now();
+    setState((s) => batch.reduce(applyEvent, s));
+  }, []);
+  /** A new take, or the take let go: nothing waiting carries over. */
+  const dropQueued = useCallback(() => {
+    if (batchTimer.current) clearTimeout(batchTimer.current);
+    batchTimer.current = null;
+    queued.current = [];
+    queuedSince.current = null;
+  }, []);
+  useEffect(() => () => dropQueued(), [dropQueued]);
+  // Each batch on screen: how long its oldest event waited (the take's numbers).
+  useEffect(() => {
+    const from = appliedFrom.current;
+    appliedFrom.current = null;
+    if (from != null) stats.applied(from);
+  }, [state, stats]);
+  // The take's `ready`s (a second one is a resume), the furthest audio time the cursor has shown, and while a re-check
+  // replays the take, the time it must pass before its cursor shows again.
+  const readies = useRef(0);
+  const shownT = useRef(0);
+  const replayUntil = useRef<number | null>(null);
   /** Each event the take receives: its type to the Stop trace, then the live state. */
   const onEvent = useCallback((e: LiveEvent) => {
+    stats.event(e, samples.current / SAMPLE_RATE);
+    if (e.type === 'ready') {
+      readies.current++;
+      // A resume onto a checker that holds less than the page shows: it checks the take again from there.
+      if (readies.current > 1 && (e.from ?? 0) / SAMPLE_RATE < shownT.current - 1) replayUntil.current = shownT.current;
+    }
+    if (replayUntil.current != null) {
+      const t = e.type === 'at' || e.type === 'beat' ? e.t : undefined;
+      if (t != null && t >= replayUntil.current - 0.5) replayUntil.current = null;
+      else if (REPLAYED.has(e.type) && (e.type !== 'locked' || traceRef.current.state.start != null)) return;
+    }
+    if (e.type === 'at' && e.t != null) shownT.current = Math.max(shownT.current, e.t);
+    // The checker's heartbeat is for the connection and the numbers only (lib/reciteLive/socket).
+    if (e.type === 'beat') return;
     stopTrace.event(e.type);
     // Found elsewhere in the Qur'an (protocol 7): a breadcrumb for any report that follows (numbers only; the checker
     // keeps where every kept take locked).
@@ -217,8 +326,14 @@ export function useLiveRecitation({
     if (e.type === 'into' && e.names.length && !reduceMotionRef.current) {
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     }
-    setState((s) => applyEvent(s, e));
-  }, []);
+    queued.current.push(e);
+    if (queuedSince.current == null) queuedSince.current = Date.now();
+    // The final answer and a failure show at once; so does an event after a quiet moment. Those that follow within
+    // LIVE_BATCH_MS wait for one update together.
+    const wait = e.type === 'done' || e.type === 'error' || LIVE_BATCH_MS <= 0 ? 0 : lastApplied.current + LIVE_BATCH_MS - Date.now();
+    if (wait <= 0) applyQueued();
+    else if (!batchTimer.current) batchTimer.current = setTimeout(applyQueued, wait);
+  }, [applyQueued, stats]);
 
   /** The take's recording, kept once the microphone has stopped (on the screen's way out too). */
   const finishRecording = useCallback(() => {
@@ -260,22 +375,44 @@ export function useLiveRecitation({
       stopTrace.stop({
         mode: `${t.mode ?? '?'}${why === 'tap' ? '' : ` (${why})`}`,
         status: t.state.status,
-        seconds: t.seconds,
+        seconds: clock.get(),
         take: t.state.take,
         socket: conn.current?.status?.(),
       });
       stopHearing();
       void stopMic();
       conn.current?.send({ type: 'end' });
+      applyQueued();
       setState((s) => liveStopping(s));
+      // The summary within a few seconds, whatever the checker does: what the take found, if its answer is late.
+      clearBudget();
+      stopBudget.current = setTimeout(() => {
+        stopBudget.current = null;
+        applyQueued();
+        setState((s) => {
+          if (s.status !== 'checking') return s;
+          const settled = settleUnfinished(s, clock.get());
+          if (settled !== s) {
+            stopTrace.step('unfinished', conn.current?.status?.());
+            stats.stop(clock.get());
+            reportUnfinishedTake({ why: 'late', mode: traceRef.current.mode ?? '?', socket: conn.current?.status?.(), stats: stats.snapshot() });
+          }
+          return settled;
+        });
+      }, stopBudgetMs);
     },
-    [stopMic],
+    [stopMic, clock, applyQueued, clearBudget, stats],
   );
   const stop = useCallback(() => stopFor('tap'), [stopFor]);
 
   /** Throw the take away (the screen left): nothing more comes. */
   const cancel = useCallback(() => {
-    stopTrace.end();
+    dropQueued();
+    clearBudget();
+    stats.stop(clock.get());
+    // Let go between Stop and the summary (the reader left while it checked): Sentry hears of it, with the numbers.
+    // The take itself is kept by Recite's memory (components/reciteMemory/useRememberTake), unfinished.
+    stopTrace.abandon(stats.snapshot() as unknown as Record<string, unknown>);
     stopHearing();
     lastConn.current = null;
     void stopMic();
@@ -283,7 +420,7 @@ export function useLiveRecitation({
     conn.current = null;
     setState(LIVE_IDLE);
     setMode(null);
-  }, [stopMic]);
+  }, [stopMic, dropQueued, clearBudget, stats, clock]);
 
   const start = useCallback(
     async (take: LiveMode, span: TakeSpan | null = null) => {
@@ -299,8 +436,14 @@ export function useLiveRecitation({
       setPaused(false);
       lastConn.current = null;
       wordTimes.current = new Map();
+      dropQueued();
+      clearBudget();
+      reportedLong.current = false;
+      readies.current = 0;
+      shownT.current = 0;
+      replayUntil.current = null;
       setMic('starting');
-      setSeconds(0);
+      clock.set(0);
       samples.current = 0;
       endWord.current = null;
       /** The page the take starts on: the span's first ayah's (turned to), or the one on screen. */
@@ -332,7 +475,11 @@ export function useLiveRecitation({
         setTestData(frame.keep);
         setMode(take);
         setState(connectingFor(frame, qw));
-        const c = e2e.e2eLiveConnect()(frame, {
+        stats.start();
+        // A long take (long takes, Nov 20 2026): the real socket to a stand-in checker, the microphone's frames 10 a
+        // second as the native module sends them (lib/e2e/reciteLive).
+        const long = e2e.e2eLongTakeMinutes() > 0;
+        const c = (long ? e2e.e2eLongConnect() : e2e.e2eLiveConnect())(frame, {
           onEvent,
           onClose: () => {
             stopTrace.step('closed');
@@ -351,8 +498,25 @@ export function useLiveRecitation({
         setRecording(recordingRef.current != null);
         let second = 0;
         const openTone = async (): Promise<AudioSource> => {
+          if (long) {
+            const b64 = e2e.e2eToneFrameBase64();
+            const frames = setInterval(() => {
+              if (conn.current !== c) return;
+              const pcm = decodePcm(b64);
+              c.sendAudio(pcm);
+              recordingRef.current?.add(pcm);
+              const before = Math.floor(samples.current / SAMPLE_RATE);
+              samples.current += pcm.length;
+              if (Math.floor(samples.current / SAMPLE_RATE) !== before) clock.set(Math.floor(samples.current / SAMPLE_RATE));
+            }, 100);
+            return {
+              stop: async () => {
+                clearInterval(frames);
+              },
+            };
+          }
           const tick = setInterval(() => {
-            setSeconds((n) => n + 1);
+            clock.set(clock.get() + 1);
             recordingRef.current?.add(e2e.e2eToneSecond(second++));
           }, 1000);
           return {
@@ -384,6 +548,7 @@ export function useLiveRecitation({
         getRecitation().stop();
         setMode(take);
         setState(connectingFor(frame, qw));
+        stats.start();
         const c = connect(frame, {
           onEvent,
           onClose: () => {
@@ -405,7 +570,7 @@ export function useLiveRecitation({
             recordingRef.current?.add(pcm);
             const before = Math.floor(samples.current / SAMPLE_RATE);
             samples.current += pcm.length;
-            if (Math.floor(samples.current / SAMPLE_RATE) !== before) setSeconds(Math.floor(samples.current / SAMPLE_RATE));
+            if (Math.floor(samples.current / SAMPLE_RATE) !== before) clock.set(Math.floor(samples.current / SAMPLE_RATE));
           },
           // iOS took the microphone (a call, headphones out): the take ends there.
           onStop: () => stopFor('mic-lost'),
@@ -439,7 +604,7 @@ export function useLiveRecitation({
         setState((s) => (s.status === 'connecting' ? { ...s, status: 'failed', failure: 'server' } : s));
       }
     },
-    [connect, owner, settings, stopFor, stopMic, recordingDay, finishRecording, onEvent],
+    [connect, owner, settings, stopFor, stopMic, recordingDay, finishRecording, onEvent, clock, dropQueued, clearBudget],
   );
 
   /**
@@ -525,9 +690,10 @@ export function useLiveRecitation({
   const dismiss = useCallback(
     (id: string) => {
       label('dismiss', id);
+      applyQueued();
       setState((s) => dismissMark(s, id));
     },
-    [label],
+    [label, applyQueued],
   );
 
   /** Put back (Undo, or the summary's Removed list): the mark returns, and the checker takes the label back. */
@@ -535,9 +701,10 @@ export function useLiveRecitation({
     (id: string) => {
       if (!traceRef.current.state.removed[id]) return;
       label('undismiss', id);
+      applyQueued();
       setState((s) => restoreMark(s, id));
     },
-    [label],
+    [label, applyQueued],
   );
 
   /** When the cursor first reached `w`, in seconds of the take (Recite's memory keeps it for ▶ on a right try). */
@@ -550,6 +717,8 @@ export function useLiveRecitation({
 
   /** Done with the take: back to idle (the summary closed). */
   const clear = useCallback(() => {
+    dropQueued();
+    clearBudget();
     stopTrace.end();
     stopHearing();
     lastConn.current = null;
@@ -558,7 +727,7 @@ export function useLiveRecitation({
     conn.current = null;
     setState(LIVE_IDLE);
     setMode(null);
-  }, [stopMic]);
+  }, [stopMic, dropQueued, clearBudget]);
 
   // The reciter's place turns the page.
   const live = state.status === 'listening';
@@ -598,6 +767,7 @@ export function useLiveRecitation({
     if (checkerLooks(state)) {
       // The reciter is somewhere on this page: the checker looks for where, as at the take's start (protocol 6).
       conn.current.send({ type: 'seek', w, startBy: lastAyahOf(currentPage) });
+      applyQueued();
       setState((s) => seekOnPage(s, w));
       return;
     }
@@ -617,10 +787,34 @@ export function useLiveRecitation({
 
   // The Stop trace: the final answer came, or the take failed (the bar says so, so the trace has ended).
   const status = state.status;
+  const failure = state.failure;
   useEffect(() => {
-    if (status === 'done') stopTrace.step('done', conn.current?.status?.());
-    else if (status === 'failed') stopTrace.end();
-  }, [status]);
+    if (status === 'done') {
+      clearBudget();
+      stopTrace.step(isUnfinished(traceRef.current.state) ? 'summary-unfinished' : 'done', conn.current?.status?.());
+      stats.stop(clock.get());
+      if (process.env.EXPO_PUBLIC_E2E === '1') {
+        // eslint-disable-next-line no-console
+        console.log(`[e2e] take stats ${JSON.stringify({ unfinished: isUnfinished(traceRef.current.state), ...stats.snapshot() })}`);
+      }
+      if (!reportedLong.current) {
+        reportedLong.current = true;
+        reportLongTake({ mode: traceRef.current.mode ?? '?', unfinished: isUnfinished(traceRef.current.state), stats: stats.snapshot() });
+      }
+    } else if (status === 'failed') {
+      clearBudget();
+      // A take that had found its start keeps what it found, unfinished, with its summary (long takes, Nov 20 2026):
+      // before, a lost connection showed "Couldn't reach…" in the bar and the take was gone. The checker's gate isn't
+      // one: the Premium page opens instead.
+      if (traceRef.current.state.start != null && !GATE_FAILURES.has(failure ?? '')) {
+        stats.stop(clock.get());
+        reportUnfinishedTake({ why: 'failed', mode: traceRef.current.mode ?? '?', failure, socket: conn.current?.status?.(), stats: stats.snapshot() });
+        setState((s) => (s.status === 'failed' ? settleUnfinished(s, clock.get()) : s));
+        return;
+      }
+      stopTrace.end();
+    }
+  }, [status, failure, clearBudget, stats, clock]);
 
   // Leaving the screen throws the take away.
   useEffect(() => () => cancel(), [cancel]);
@@ -645,7 +839,11 @@ export function useLiveRecitation({
     recording,
     /** The take went to the checker with Keep as test data on (it is stored there). */
     testData,
-    seconds,
+    /** The take's time in seconds, as of now (read it when needed; `clock` re-renders what shows it). */
+    get seconds() {
+      return clock.get();
+    },
+    clock,
     words,
     /** The first word recited (where the score's pages and the summary start); null while the checker looks for it. */
     startWord: state.start,

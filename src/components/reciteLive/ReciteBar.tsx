@@ -2,6 +2,7 @@ import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
+import { TakeClock, useTakeSeconds } from '../../lib/reciteLive/takeClock';
 import { arabicV2, typeV2 } from '../../theme/v2';
 import { Tap } from '../v2/Tap';
 import type { BarWord } from '../../lib/reciteLive/view';
@@ -113,6 +114,7 @@ export function ReciteBar({
   onWholeAyah,
   score,
   seconds,
+  clock: takeClock,
   recording,
   words,
   status,
@@ -130,7 +132,9 @@ export function ReciteBar({
   onNextWord: () => void;
   onWholeAyah: () => void;
   score: { text: string; level: ScoreLevel } | null;
-  seconds: number;
+  /** The take's time, given as a number (What's new's moment), or its clock (a take: only the bar re-renders each second). */
+  seconds?: number;
+  clock?: TakeClock | null;
   /** A recording is being kept (the red dot). */
   recording: boolean;
   words: BarWord[];
@@ -150,6 +154,8 @@ export function ReciteBar({
   surface: { background: string; border: string };
 }) {
   const { palette } = useTheme();
+  const ticking = useTakeSeconds(takeClock);
+  const secs = takeClock ? ticking : seconds ?? 0;
   // Each word as VoiceOver and TalkBack read it, its mark said in words: in the bar a mistake is a colour behind the
   // word, and colour must never be the only signal.
   const spoken = words.map(spokenBarWord).join(' ');
@@ -164,13 +170,13 @@ export function ReciteBar({
       {score ? <ScorePill text={score.text} level={score.level} /> : null}
       {/* Not a live region: its clock changes every second, and TalkBack would speak each one over the recitation, where
           the microphone hears it. VoiceOver reads it when focused; the summary is spoken once when it shows. */}
-      <View style={styles.middle} accessible accessibilityLabel={`${clock(seconds)}${recording && phase === 'live' && !paused ? ', recording' : ''}. ${paused ? shownStatus : spoken || status}`} testID="recite-middle">
+      <View style={styles.middle} accessible accessibilityLabel={`${clock(secs)}${recording && phase === 'live' && !paused ? ', recording' : ''}. ${paused ? shownStatus : spoken || status}`} testID="recite-middle">
         <View style={styles.time}>
           {recording && phase === 'live' && !paused ? (
             <View style={[styles.dot, { backgroundColor: palette.red }]} testID="recite-recording" />
           ) : null}
           <Text style={[styles.timeText, typeV2.numeral, { color: palette.secondary }]} maxFontSizeMultiplier={1.2} testID="recite-time">
-            {clock(seconds)}
+            {clock(secs)}
           </Text>
         </View>
         {shownWords.length ? (

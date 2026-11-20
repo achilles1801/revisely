@@ -5,9 +5,50 @@
 
 import { getAuth } from 'firebase/auth';
 import { logger } from '../logger';
-import { deleteRecording, markTakeAudio } from '../recordings';
-import type { TakeRecord } from './record';
+import { deleteRecording, listRecordings, markTakeAudio, type RecordingMeta } from '../recordings';
+import { getQuranWords, loadQuranWords, type QuranWords } from '../recite/quranWords';
+import { memoryId, type MemoryRecord, type TakeRecord } from './record';
 import { loadMemory, memoryRecords, remember } from './store';
+
+/**
+ * Take audio no take names (RECITE-12): saved when a take's microphone stopped, the take itself never kept, because its
+ * final answer never came and the screen was left (Majd's take of Nov 19 2026, before takes were kept unfinished). Each
+ * becomes an unfinished take of its own, never checked (no checker's id, no marks: rows show no score and scores leave
+ * it out), over the pages it turned through, so Recited lists it with its audio. Pure.
+ */
+export function orphanTakes(audio: readonly RecordingMeta[], records: readonly MemoryRecord[], words: QuranWords, now: number): TakeRecord[] {
+  const named = new Set(records.flatMap((r) => (r.kind === 'take' && r.recordingId ? [r.recordingId] : [])));
+  const out: TakeRecord[] = [];
+  for (const a of audio) {
+    if (!a.take || named.has(a.id) || a.pageMarks.length === 0) continue;
+    const pages = a.pageMarks.map((m) => m.page).filter((p) => p >= 1 && p <= 604);
+    if (pages.length === 0) continue;
+    const from = words.pageRange(Math.min(...pages))[0];
+    const to = words.pageRange(Math.max(...pages))[1] - 1;
+    out.push({
+      id: memoryId(),
+      kind: 'take',
+      take: null,
+      createdAt: a.createdAt,
+      rev: now,
+      day: a.day,
+      level: 'words',
+      hidden: false,
+      from,
+      to: Math.max(from, to),
+      secs: Math.round(a.durationMs / 1000),
+      mistakes: 0,
+      tajweed: 0,
+      unclear: 0,
+      accuracy: 1,
+      marks: [],
+      passed: [],
+      recordingId: a.id,
+      unfinished: true,
+    });
+  }
+  return out;
+}
 
 const sorted = new Set<string>();
 
@@ -29,6 +70,12 @@ export async function sortTakeAudio(account?: string | null): Promise<void> {
     await loadMemory(uid);
     const ids = memoryRecords(uid).flatMap((r) => (r.kind === 'take' && !r.deleted && r.recordingId ? [r.recordingId] : []));
     await markTakeAudio(ids);
+    // Take audio no take names: kept as an unfinished take of its own (RECITE-12).
+    const audio = await listRecordings('takes');
+    if (audio.length > 0) {
+      const words = getQuranWords() ?? (await loadQuranWords());
+      for (const r of orphanTakes(audio, memoryRecords(uid), words, Date.now())) await remember(uid, r);
+    }
   } catch (err) {
     sorted.delete(uid);
     logger.warn('Recite memory: old takes were not sorted from the recordings', err);

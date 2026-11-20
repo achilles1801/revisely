@@ -374,6 +374,18 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
       '- Settings → Testing → “Mistake detection model” says which model the checker runs for Recite, Words & harakat and Strict (for example v7), read from the checker when Settings opens; a tap asks again.',
     ),
   },
+  {
+    // Long takes (Nov 20 2026), in Revisely Dev until the mistake detection release brings them to the main guide (with
+    // its re-record).
+    title: 'Takes that end without their final check',
+    covers: ['RECITE-11', 'RECITE-12'],
+    routes: ['QuranReader', 'ActiveRevision', 'ActivityDay', 'ActivityAll'],
+    text: lines(
+      '- Stop always shows the take’s summary within a few seconds. If the server’s check of the end hasn’t come by then, or the connection was lost after the take had found where they were, the summary shows what the take found and says the end of the take wasn’t checked; the take is kept, unfinished, with its marks and its recording. If the check comes after all, the summary and the take update.',
+      '- Leaving the reader or the session during a take, or while Stop waits, keeps the take too (unfinished); a take that never found where they were keeps nothing.',
+      '- In “Recited” and “Recitations” an unfinished take’s line says "unfinished"; one whose audio is all there is (from before takes were kept this way) says "not checked" and shows no score. Unfinished takes never count in the score or in “Your progress”.',
+    ),
+  },
 ];
 
 /**
@@ -393,6 +405,7 @@ export const GUIDE_INTERNAL_KINDS = [
 
 /** Rules with nothing for a user to ask Revo about, on purpose, and why (a kind from GUIDE_INTERNAL_KINDS first). */
 export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
+  'RECITE-10': 'timing: how a take keeps up with the server and resumes a connection gone quiet; nothing to do',
   'ACT-27': 'timing: Activity refreshes by itself and with a pull; nothing to ask Revo about',
   'NEW-4': 'timing: what waits for the walkthrough to end; nothing for Revo to explain',
   'ONBOARD-2': 'server: the server repairs a sign-up stopped half way; nothing to do',

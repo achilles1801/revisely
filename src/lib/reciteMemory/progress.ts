@@ -12,7 +12,8 @@ export function passageTakes(records: readonly MemoryRecord[], from: number, to:
   const length = to - from + 1;
   if (length <= 0) return [];
   return records
-    .filter((r): r is TakeRecord => r.kind === 'take' && !r.deleted)
+    // A take kept without its final answer (RECITE-11) isn't a point on a passage's progress: its end wasn't checked.
+    .filter((r): r is TakeRecord => r.kind === 'take' && !r.deleted && !r.unfinished)
     .filter((t) => Math.min(to, t.to) - Math.max(from, t.from) + 1 >= length / 2)
     .sort((a, b) => a.createdAt - b.createdAt);
 }

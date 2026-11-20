@@ -16,6 +16,8 @@ import { setMistakeDetectionReleasedForTests } from '../../../lib/release/mistak
 afterEach(() => setMistakeDetectionReleasedForTests(undefined));
 
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
+// What a take tells Sentry (lib/reciteLive/takeReport, the Stop trace): watched, never sent.
+jest.mock('@sentry/react-native', () => ({ ...jest.requireActual('@sentry/react-native'), captureMessage: jest.fn(), addBreadcrumb: jest.fn() }));
 jest.mock('expo-linear-gradient', () => ({ LinearGradient: ({ children }: { children?: React.ReactNode }) => children ?? null }));
 jest.mock('react-native-reanimated', () => require('react-native-reanimated/mock'));
 jest.mock('expo-haptics', () => ({
@@ -2055,5 +2057,135 @@ describe('recite anywhere in the Qur’an (Majd, Nov 15 2026: step 2; protocol 7
     await flush();
     expect(screen.queryByTestId('take-summary')).toBeNull();
     expect(screen.getByTestId('recite-mic')).toBeTruthy();
+  });
+});
+
+describe('long takes (Nov 20 2026): Stop always ends in a summary, and the take is kept', () => {
+  const { memoryRecords, resetMemoryForTests } = jest.requireActual('../../../lib/reciteMemory/store');
+  const { setStopBudgetForTests, setLiveBatchForTests } = jest.requireActual('../../../components/reciteLive/useLiveRecitation');
+  const captured = jest.requireMock('@sentry/react-native').captureMessage as jest.Mock;
+  beforeEach(() => {
+    resetMemoryForTests();
+    captured.mockClear();
+  });
+  afterEach(() => {
+    setStopBudgetForTests();
+    setLiveBatchForTests(0);
+  });
+  // Each waits for Recite's memory to write the take (800 ms to settle), on a loaded runner too.
+  jest.setTimeout(20_000);
+  const wrong = { id: `${UTIYAT}:word:sound`, w: UTIYAT, ayah: [27, 23], kind: 'word', heard: 'وَأُوهِيَتْ', sure: 'clear' };
+  // This test's take: the newest. (An earlier test's reader, cleaned up mid-take, keeps its take too, RECITE-12, and
+  // that write may land after this test's reset.)
+  const taken = () =>
+    (memoryRecords('u1') as { kind: string; createdAt: number; unfinished?: boolean; mistakes: number; recordingId: string | null; to: number }[])
+      .filter((r) => r.kind === 'take')
+      .sort((a, b) => b.createdAt - a.createdAt)[0];
+  /** A take that reached An-Naml 23's seventh word, with one wrong word. */
+  async function reciteSome() {
+    await startTake('check');
+    await event({ type: 'at', w: A23 + 7 });
+    await event({ type: 'said', upTo: A23 + 6 });
+    await event({ type: 'mark', mark: wrong as never });
+    await event({ type: 'score', reached: 7, mistakes: 1, tajweed: 0, accuracy: 6 / 7 } as never);
+  }
+  const messages = () => captured.mock.calls.map((c) => c[0]);
+
+  it('[RECITE-11] no final answer within the budget: the summary shows what the take found, says its end wasn’t checked, and the take is kept unfinished', async () => {
+    setStopBudgetForTests(40);
+    await reciteSome();
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    // (Whether it's up before the budget runs out depends on the runner's speed: not asserted.)
+    await settle(() => expect(screen.getByTestId('take-summary-unfinished')).toBeTruthy());
+    expect(screen.getByTestId('take-summary-score')).toBeTruthy();
+    await settle(() => expect(taken()).toMatchObject({ unfinished: true, mistakes: 1, recordingId: 'rec-1' }));
+    expect(messages()).toContain('Recite: a take ended without its final answer');
+    // The final answer after all: the summary and the take become the finished ones.
+    await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 8, start: A23, secs: 12, marks: [wrong], score: { reached: 7, mistakes: 1, tajweed: 0, accuracy: 6 / 7 } } as never });
+    await settle(() => expect(screen.queryByTestId('take-summary-unfinished')).toBeNull());
+    await settle(() => expect(taken()?.unfinished).toBeUndefined());
+  });
+
+  it('[RECITE-11] the connection lost after the start was found: the same summary, the take kept, Sentry told', async () => {
+    await reciteSome();
+    await event({ type: 'error', reason: 'offline' });
+    await act(async () => mockLive.onClose?.());
+    await settle(() => expect(screen.getByTestId('take-summary-unfinished')).toBeTruthy());
+    await settle(() => expect(taken()).toMatchObject({ unfinished: true, mistakes: 1 }));
+    const call = captured.mock.calls.find((c) => c[0] === 'Recite: a take ended without its final answer');
+    expect(call?.[1]).toMatchObject({ tags: { recite_unfinished: 'failed', recite_failure: 'offline' } });
+  });
+
+  it('[RECITE-12] leaving the reader while Stop waits keeps the take (with its recording) and sends its Stop trace to Sentry', async () => {
+    setStopBudgetForTests(60_000);
+    await reciteSome();
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await flush();
+    await flush();
+    expect(await AsyncStorage.getItem(STOP_TRACE_KEY)).not.toBeNull();
+    screen.unmount();
+    await settle(() => expect(taken()).toMatchObject({ unfinished: true, mistakes: 1, recordingId: 'rec-1' }));
+    const call = captured.mock.calls.find((c) => c[0] === "Recite: a take's Stop never reached the summary");
+    expect(call).toBeTruthy();
+    const trace = (call![1] as { extra: { trace: { steps: { s: string }[]; stats?: { events: number } } } }).extra.trace;
+    expect(trace.steps.map((s) => s.s)).toContain('left');
+    expect(trace.stats?.events).toBeGreaterThan(0);
+    await settle(async () => expect(await AsyncStorage.getItem(STOP_TRACE_KEY)).toBeNull());
+  });
+
+  it('[RECITE-12] leaving mid-take keeps it too; a take whose start was never found leaves nothing', async () => {
+    await reciteSome();
+    screen.unmount();
+    await settle(() => expect(taken()).toMatchObject({ unfinished: true, mistakes: 1 }));
+    const since = Date.now();
+    await startTake('check', null);
+    screen.unmount();
+    await flush();
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 100));
+    });
+    expect(taken().createdAt).toBeLessThan(since);
+  });
+
+  it('[RECITE-10] events that come close together are applied together (a resume replays a whole take at once)', async () => {
+    await startTake('check');
+    // A window wide enough that a slow runner's acts all fall in it (the app's is 100 ms).
+    setLiveBatchForTests(1500);
+    // The first after a quiet moment shows at once; the rest wait for one update together.
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 1600));
+    });
+    await event({ type: 'at', w: A23 + 1 });
+    await event({ type: 'at', w: A23 + 2 });
+    await event({ type: 'said', upTo: A23 + 1 });
+    expect(screen.getByTestId('recite-words')).toBeTruthy();
+    const bar = () => screen.getByTestId('recite-middle').props.accessibilityLabel as string;
+    expect(bar()).toContain(words.uthmani(A23 + 1));
+    expect(bar()).not.toContain(words.uthmani(A23 + 2));
+    await settle(() => expect(bar()).toContain(words.uthmani(A23 + 2)));
+  });
+});
+
+describe('a resume the checker didn’t hold (long takes, Nov 20 2026)', () => {
+  it('[RECITE-10] its re-check from the start never moves the page back: the cursor shows again once it passes where it was', async () => {
+    await startTake('check');
+    await event({ type: 'at', w: A23 + 8, t: 30 });
+    await event({ type: 'said', upTo: A23 + 7 });
+    const bar = () => screen.getByTestId('recite-middle').props.accessibilityLabel as string;
+    expect(bar()).toContain(words.uthmani(A23 + 8));
+    // Another instance: it holds nothing, and checks the take again from its start.
+    await event({ type: 'ready', take: 't1', protocol: 8, from: 0 });
+    await event({ type: 'locked', w: A23, s: 27, a: 23, t: 0.8 });
+    await event({ type: 'at', w: A23 + 1, t: 2 });
+    await event({ type: 'said', upTo: A23 });
+    await event({ type: 'score', reached: 1, mistakes: 0, tajweed: 0, accuracy: 1 } as never);
+    expect(bar()).toContain(words.uthmani(A23 + 8));
+    expect(bar()).not.toContain(words.uthmani(A23 + 1));
+    // A mark it finds again applies (by id).
+    await event({ type: 'mark', mark: { id: `${A23 + 4}:word:sound`, w: A23 + 4, ayah: [27, 23], kind: 'word', heard: 'وَأُوهِيَتْ', sure: 'clear' } as never });
+    expect(screen.getAllByTestId('live-mark-word').length).toBe(1);
+    // Past where the page was: it follows again.
+    await event({ type: 'at', w: A23 + 9, t: 31 });
+    expect(bar()).toContain(words.uthmani(A23 + 9));
   });
 });
