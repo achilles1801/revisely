@@ -18,7 +18,9 @@ import { BlockMark, RevisedMark } from './BlockMark';
 import { creditLine, dayTitle, formatMinutesLong, windowFooter } from '../../lib/activityFormat';
 import { describePassage } from '../../lib/passages';
 import { RecordingsList } from '../recordings/RecordingsList';
-import { RecitedMark, useQuranWordsWhen, type TakeMenuAction } from '../reciteMemory/TakeRows';
+import { RecitedMark, TakeDayRow, dayTakeLine, useQuranWordsWhen, type TakeMenuAction } from '../reciteMemory/TakeRows';
+import { ActionSheet } from '../v2/ActionSheet';
+import { passageOf } from '../reciteLive/TakeSummarySheet';
 import { RecitedSheet } from '../reciteMemory/RecitedSheet';
 import { deleteTake } from '../../lib/reciteMemory/apart';
 import { useTakeRecordings } from '../../lib/reciteMemory/takeAudio';
@@ -71,6 +73,9 @@ const EMPTY_DAY: DayItems = { revisions: [], memorized: [], reads: [], doneAhead
 
 /** The day's blocks, by the names Overview's preview rows use for them. */
 export type DayBlockKind = 'revised' | 'memorized' | 'read' | 'notes' | 'recited';
+
+/** Takes a day lists in its Recited block; past this, the newest TAKES_SHOWN − 1 and "All N takes" (the Recited sheet). */
+export const TAKES_SHOWN = 5;
 
 /** Whether the Activity blocks show (every account since the November 2026 release): lib/activityBlocks. */
 export { activityBlocksEnabled } from '../../lib/activityBlocks';
@@ -289,18 +294,15 @@ export function DayBlocks({
     () => memoryRecords.filter((r): r is TakeRecord => r.kind === 'take' && !r.deleted && r.day === day).sort((a, b) => a.createdAt - b.createdAt),
     [memoryRecords, day],
   );
+  const newestTakes = useMemo(() => [...dayTakes].reverse(), [dayTakes]);
   const takeRecordings = useMemo(() => new Set(dayTakes.map((t) => t.recordingId).filter((id): id is string => id != null)), [dayTakes]);
   const notTake = useCallback((r: RecordingMeta) => !takeRecordings.has(r.id), [takeRecordings]);
   const takeWords = useQuranWordsWhen(dayTakes.length > 0);
-  // The day's takes in their own sheet (RMEM-6): one Recited row opens it, and a day opened at its takes (the take
-  // summary's "In today's Recited") opens with it.
+  // The day's takes in their own block (RMEM-5, RMEM-6), each a row of its own; a day with more than TAKES_SHOWN has
+  // the rest in the Recited sheet. A day opened at its takes (the take summary's "In today's Recited") scrolls to them.
   const [recitedOpen, setRecitedOpen] = useState(false);
-  const recitedAsked = useRef(focusBlock === 'recited');
-  useEffect(() => {
-    if (!recitedAsked.current || dayTakes.length === 0) return;
-    recitedAsked.current = false;
-    setRecitedOpen(true);
-  }, [dayTakes.length]);
+  // A take held in the block: its menu.
+  const [heldTake, setHeldTake] = useState<TakeRecord | null>(null);
   const takeAudio = useTakeRecordings(dayTakes.length > 0);
   // A take's menu (RINS-3): Show on the page, and Ask Revo about this take while Revo is on (the take goes with
   // the question, as Revo's + attaches it).
@@ -808,22 +810,56 @@ export function DayBlocks({
         />
       )}
       {dayTakes.length > 0 && (
-        // One quiet row a day (RMEM-6): it opens the day's takes.
+        // The day's takes, each a row (RMEM-5): apart from its recordings (RMEM-6), but there to see.
         <DayBlock
           mark={<RecitedMark />}
           title="Recited"
-          figure={`${dayTakes.length === 1 ? '1 take' : `${dayTakes.length} takes`} ›`}
+          figure={dayTakes.length === 1 ? '1 take' : `${dayTakes.length} takes`}
           subline={subline([
             takeWords ? surahsOf(dayTakes.map((t) => takeWords.pageOf(t.from))) : null,
             formatMinutesLong(Math.max(1, Math.round(dayTakes.reduce((n, t) => n + t.secs, 0) / 60))),
           ])}
-          items={[]}
-          onPress={() => setRecitedOpen(true)}
-          pressHint="Opens the day’s takes"
+          items={[
+            // Newest first, as the take's summary leaves it: the one just recited is at the top.
+            ...(dayTakes.length > TAKES_SHOWN ? newestTakes.slice(0, TAKES_SHOWN - 1) : newestTakes).map((t) => (
+              <TakeDayRow
+                key={t.id}
+                take={t}
+                words={takeWords}
+                cleared={clearedBy(memoryRecords, t).length}
+                playable={t.recordingId != null && takeAudio.has(t.recordingId)}
+                onShow={showTake}
+                onPlay={onOpenRecording}
+                onHold={() => setHeldTake(t)}
+                actions={takeActions(t)}
+              />
+            )),
+            ...(dayTakes.length > TAKES_SHOWN
+              ? [
+                  <Tap key="all-takes" onPress={() => setRecitedOpen(true)} accessibilityRole="button" hitSlop={6} testID="activity-takes-all">
+                    <Text style={[typeV2.body, { color: palette.link }]} maxFontSizeMultiplier={1.4}>
+                      {`All ${dayTakes.length} takes`}
+                    </Text>
+                  </Tap>,
+                ]
+              : []),
+          ]}
           onLayout={layoutFor('recited')}
           testID="activity-block-recited"
         />
       )}
+      <ActionSheet
+        visible={heldTake != null}
+        onClose={() => setHeldTake(null)}
+        title={heldTake && takeWords ? passageOf(takeWords, heldTake.from, heldTake.to) : 'Recited'}
+        message={heldTake ? dayTakeLine(heldTake, clearedBy(memoryRecords, heldTake).length) : undefined}
+        actions={(heldTake ? takeActions(heldTake) : []).map((a) => ({
+          ...a,
+          icon: a.key === 'ask-revo' ? 'sparkles-outline' : a.key === 'delete' ? 'trash-outline' : 'book-outline',
+          destructive: a.key === 'delete',
+        }))}
+        testID="activity-take-menu"
+      />
       {dayTakes.length > 0 ? (
         <RecitedSheet
           visible={recitedOpen}

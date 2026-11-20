@@ -13,6 +13,7 @@ import { passageOf } from '../reciteLive/TakeSummarySheet';
 import { similarSlips } from '../../lib/reciteInsights/insights';
 import { intoLine } from '../../lib/reciteInsights/describe';
 import { plainText } from '../../lib/passages';
+import { formatMinutesLong } from '../../lib/activityFormat';
 
 /** At most this many similar-ayah lines under a take; the rest are on the page (Show on the page). */
 const INTO_LINES = 2;
@@ -60,12 +61,112 @@ function useScoreColour() {
   };
 }
 
+/** "7:51 PM", the phone's own clock. */
+function clockTime(ms: number): string {
+  const d = new Date(ms);
+  const h = d.getHours();
+  return `${h % 12 === 0 ? 12 : h % 12}:${String(d.getMinutes()).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
+}
+
 /** "7:51 PM · 1 mistake · 2 cleared · page hidden". */
 export function takeLine(take: TakeRecord, cleared: number): string {
-  const d = new Date(take.createdAt);
-  const h = d.getHours();
-  const time = `${h % 12 === 0 ? 12 : h % 12}:${String(d.getMinutes()).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
-  return [time, mistakesLabel(take.mistakes), cleared > 0 ? `${cleared} cleared` : null, take.hidden ? 'page hidden' : null].filter(Boolean).join(' · ');
+  return [clockTime(take.createdAt), mistakesLabel(take.mistakes), cleared > 0 ? `${cleared} cleared` : null, take.hidden ? 'page hidden' : null]
+    .filter(Boolean)
+    .join(' · ');
+}
+
+/** A take as its day lists it: "9:41 PM · 4 min · 1 mistake · 2 not clear · page hidden" (RMEM-5). */
+export function dayTakeLine(take: TakeRecord, cleared: number): string {
+  return [
+    clockTime(take.createdAt),
+    formatMinutesLong(Math.max(1, Math.round(take.secs / 60))),
+    mistakesLabel(take.mistakes),
+    take.unclear > 0 ? `${take.unclear} not clear` : null,
+    cleared > 0 ? `${cleared} cleared` : null,
+    take.hidden ? 'page hidden' : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+
+/**
+ * A take in its day's Recited block (RMEM-5), where the day is read (Majd, Nov 20 2026: "after I finished my recording,
+ * I go to my journal to go take a look at it"): what was recited, when and how it went, and its score. ▶ plays its audio
+ * while that is on the phone (a mic otherwise); a tap shows it on the page with its marks; a hold opens its menu (RINS-3).
+ * Takes stay in a block of their own, apart from the day's recordings (RMEM-6).
+ */
+export function TakeDayRow({
+  take,
+  words,
+  cleared,
+  playable,
+  onShow,
+  onPlay,
+  onHold,
+  actions = [],
+}: {
+  take: TakeRecord;
+  words: QuranWords | null;
+  cleared: number;
+  playable: boolean;
+  onShow: (take: TakeRecord) => void;
+  onPlay: (recordingId: string) => void;
+  onHold?: () => void;
+  actions?: TakeMenuAction[];
+}) {
+  const { palette } = useTheme();
+  const colour = useScoreColour();
+  const passage = words ? passageOf(words, take.from, take.to) : 'Recited';
+  const into = similarSlips([take]).slice(0, INTO_LINES).map(intoLine);
+  const line = dayTakeLine(take, cleared);
+  return (
+    <Tap
+      onPress={() => onShow(take)}
+      onLongPress={onHold}
+      delayLongPress={350}
+      style={styles.dayRow}
+      accessibilityRole="button"
+      accessibilityLabel={[passage, formatAccuracy(take.accuracy), line, ...into.map(plainText)].join(', ')}
+      accessibilityHint="Shows it on the page, with its marks"
+      accessibilityActions={actions.map((a) => ({ name: a.key, label: a.label }))}
+      onAccessibilityAction={(e) => actions.find((a) => a.key === e.nativeEvent.actionName)?.onPress()}
+      testID="activity-take-head"
+    >
+      {playable && take.recordingId ? (
+        <Tap
+          onPress={() => take.recordingId && onPlay(take.recordingId)}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={`Listen back: ${passage}`}
+          testID="activity-take-play"
+        >
+          <View style={[styles.dayDisc, { backgroundColor: palette.fill }]}>
+            <Ionicons name="play" size={13} color={palette.text} style={styles.playIcon} />
+          </View>
+        </Tap>
+      ) : (
+        <View style={[styles.dayDisc, { backgroundColor: palette.fill }]}>
+          <Ionicons name="mic-outline" size={15} color={palette.secondary} />
+        </View>
+      )}
+      <View style={styles.flex}>
+        <Text style={[typeV2.name, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
+          {passage}
+        </Text>
+        <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={1.4} testID="activity-take-line">
+          {line}
+        </Text>
+        {into.map((text, i) => (
+          <Text key={i} style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={1.4} testID="activity-take-into">
+            {text}
+          </Text>
+        ))}
+      </View>
+      <Text style={[typeV2.name, typeV2.numeral, { color: colour(take.accuracy) }]} maxFontSizeMultiplier={1.3} testID="activity-take-score">
+        {formatAccuracy(take.accuracy)}
+      </Text>
+    </Tap>
+  );
 }
 
 /**
@@ -222,6 +323,8 @@ const styles = StyleSheet.create({
   scoreCol: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   listRow: { flexDirection: 'row', alignItems: 'center', gap: layoutV2.markGap, paddingHorizontal: layoutV2.gutter, paddingVertical: 10 },
   disc: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  dayRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 4 },
+  dayDisc: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
   playIcon: { marginLeft: 2 },
   right: { alignItems: 'flex-end' },
 });

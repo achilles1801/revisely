@@ -72,22 +72,21 @@ it('[RMEM-6] a take is never a recording: the day’s Read and All activity’s 
   await app.act(() => nav(app).current.navigate('ActivityDay', { date: today }));
   await app.until(() => app.screen.queryByTestId('activity-block-recited') != null, 'the Recited row');
 
-  // The day: Read holds the user's recording alone; the takes are one Recited row.
+  // The day: Read holds the user's recording alone; the takes are in their own block, Recited.
   await app.until(() => app.screen.queryByTestId(`recording-${mine}`) != null, 'the user’s recording under Read');
   expect(app.screen.queryByTestId(`recording-${audio}`)).toBeNull();
   expect(app.screen.queryByTestId(`recording-${old}`)).toBeNull();
-  expect(app.screen.getByText('2 takes ›')).toBeTruthy();
+  expect(app.screen.getByText('2 takes')).toBeTruthy();
   const rec = app.mods.require<Recordings>('src/lib/recordings');
   expect((await app.act(() => rec.listRecordings())).map((r) => r.id)).toEqual([mine]);
   expect((await app.act(() => rec.listRecordings('takes'))).map((r) => r.id).sort()).toEqual([audio, old].sort());
 
-  // The row opens the day's takes, newest first, each with ▶ its audio.
-  await tap(app, 'activity-block-recited-header');
+  // Each take is a row of its own, with ▶ its audio (RMEM-5).
   await app.until(() => app.screen.queryAllByTestId('activity-take-head').length === 2, 'the day’s two takes');
   expect(app.screen.getAllByTestId('activity-take-play')).toHaveLength(2);
 
-  // All recitations: All activity's Recitations, both takes. Its recordings: the user's own alone.
-  await tap(app, 'recited-see-all');
+  // All activity's Recitations: both takes. Its recordings: the user's own alone.
+  await app.act(() => nav(app).current.navigate('ActivityAll', { kind: 'recitation' }));
   await app.until(() => nav(app).current.getCurrentRoute()?.name === 'ActivityAll', 'All activity');
   await app.until(() => app.screen.queryAllByTestId('activity-all-take').length === 2, 'both takes in Recitations');
   await tap(app, 'filter-recording');

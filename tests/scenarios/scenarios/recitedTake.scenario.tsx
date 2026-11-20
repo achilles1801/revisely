@@ -49,12 +49,8 @@ async function openDay(phone: Phone, day: string): Promise<OpenApp> {
   return app;
 }
 
-/** The day's one Recited row opens its takes (RMEM-6). */
+/** The day lists its takes under Recited, each a row (RMEM-5). */
 async function openTakes(app: OpenApp): Promise<void> {
-  const { fireEvent } = app.mods.rtl;
-  await app.act(async () => {
-    fireEvent.press(app.screen.getByTestId('activity-block-recited-header'));
-  });
   await app.until(() => app.screen.queryByTestId('activity-take-head') != null, 'the day’s takes');
 }
 
@@ -80,7 +76,7 @@ it('[RINS-3] a slip into a similar ayah says so under the take; a hold offers Sh
   await app.close();
 
   app = await openDay(phone, today);
-  expect(app.screen.getByTestId('activity-take-line').props.children).toBe('7:51 PM · 1 mistake');
+  expect(app.screen.getByTestId('activity-take-line').props.children).toBe('7:51 PM · 2 min · 1 mistake');
   const into = app.screen.getAllByTestId('activity-take-into');
   expect(into.map((t) => plain(t.props.children))).toEqual(['You went on with Yusuf 90, a similar ayah']);
   expect(plain(app.screen.getByTestId('activity-take-head').props.accessibilityLabel)).toContain('You went on with Yusuf 90, a similar ayah');
