@@ -36,7 +36,14 @@ FPS = checker.FPS
 # heard again after it. Going on into a like ayah and coming back (2:6 said as 3:91, whose "لهم عذاب" pulls the path to
 # 2:7's "ولهم عذاب") marked the right ayah after it wrong as a swap. bench-v0: v7 0.50 -> 0.43 false alarms per 100
 # words, v6 0.45 -> 0.39, every catch the same (swaps 97.0%); learners, hesitations, corrections and /record the same
-WORDS_P = dict(checker.DEFAULTS, sub_p=1.01, alt_rule='skeleton', del_frac=0.67, order_again=True)
+# back_prev / back_far (harness 3909c4e6; Majd, Nov 20 2026: after a breath a reciter goes back "the last few words I
+# recited, and then that verse in general, and then the previous verse"): a repeat into the ayah before the one being
+# recited costs 1 more, two or more ayat back 6 more. With a flat cost, going back 17 words into 2:11 («وَإِذَا قِيلَ
+# لَهُمْ», «قَالُوا») tied with going back 2 in 2:13: restart bench p1, jumps away 4 -> 0; bench-v0 and learners' marks
+# the same in all 360 takes. back_max 30 -> 60: a restart from Ayat al-Kursi's 47th word to its start is followed in 7
+# of 8 (5 before), marks on those takes 3 -> 1, catches the same (models session, recite-feedback-nov20.md, 5).
+WORDS_P = dict(checker.DEFAULTS, sub_p=1.01, alt_rule='skeleton', del_frac=0.67, order_again=True,
+               back_prev=-1.0, back_far=-6.0, back_max=60)
 MAX_WORDS = 300  # a passage longer than this is cut at the end of an ayah
 PAD = 15  # frames either side of an ayah's words when judging its tajweed
 SAID = ('correct', 'corrected', 'wrong')

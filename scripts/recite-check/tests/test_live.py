@@ -145,6 +145,9 @@ class Model(unittest.TestCase):
                 g = checker.Graph(E.key.passage(lo, lo + n, 4, 'skeleton'))
                 ref = checker.Decoder(g, P, lp.shape[0])
                 mine = live.Decoder(g, P, cap=10)
+                if n >= 60:  # passages across ayat: the repeat costs by ayah are in play (back_prev, back_far)
+                    self.assertTrue(mine.backpen is not None and (mine.backpen < 0).any())
+                    self.assertEqual(mine.backs, min(int(P['back_max']), g.W - 1))
                 for f in range(lp.shape[0]):
                     ref.feed(lp[f:f + 1])
                     mine.feed(lp[f:f + 1])
