@@ -69,6 +69,13 @@ export function setStopBudgetForTests(ms: number = STOP_BUDGET_MS): void {
   stopBudgetMs = ms;
 }
 
+/**
+ * What a re-check sends again from the take's start (a resume the checker didn't hold: another instance, `ready.from`
+ * behind what the page shows): its cursor and what follows it, ignored until the re-check passes where the page was
+ * (the checker session's ask, Nov 20 2026). Marks still apply, by id.
+ */
+const REPLAYED = new Set(['at', 'said', 'off', 'ayah', 'score', 'locked']);
+
 /** Failures a take ends on without what it found being kept: the checker's gate (the Premium page opens instead). */
 const GATE_FAILURES = new Set(['check_locked', 'premium_required']);
 
@@ -287,9 +294,25 @@ export function useLiveRecitation({
     appliedFrom.current = null;
     if (from != null) stats.applied(from);
   }, [state, stats]);
+  // The take's `ready`s (a second one is a resume), the furthest audio time the cursor has shown, and while a re-check
+  // replays the take, the time it must pass before its cursor shows again.
+  const readies = useRef(0);
+  const shownT = useRef(0);
+  const replayUntil = useRef<number | null>(null);
   /** Each event the take receives: its type to the Stop trace, then the live state. */
   const onEvent = useCallback((e: LiveEvent) => {
     stats.event(e, samples.current / SAMPLE_RATE);
+    if (e.type === 'ready') {
+      readies.current++;
+      // A resume onto a checker that holds less than the page shows: it checks the take again from there.
+      if (readies.current > 1 && (e.from ?? 0) / SAMPLE_RATE < shownT.current - 1) replayUntil.current = shownT.current;
+    }
+    if (replayUntil.current != null) {
+      const t = e.type === 'at' || e.type === 'beat' ? e.t : undefined;
+      if (t != null && t >= replayUntil.current - 0.5) replayUntil.current = null;
+      else if (REPLAYED.has(e.type) && (e.type !== 'locked' || traceRef.current.state.start != null)) return;
+    }
+    if (e.type === 'at' && e.t != null) shownT.current = Math.max(shownT.current, e.t);
     // The checker's heartbeat is for the connection and the numbers only (lib/reciteLive/socket).
     if (e.type === 'beat') return;
     stopTrace.event(e.type);
@@ -416,6 +439,9 @@ export function useLiveRecitation({
       dropQueued();
       clearBudget();
       reportedLong.current = false;
+      readies.current = 0;
+      shownT.current = 0;
+      replayUntil.current = null;
       setMic('starting');
       clock.set(0);
       samples.current = 0;

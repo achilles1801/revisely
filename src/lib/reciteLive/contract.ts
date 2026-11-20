@@ -117,7 +117,16 @@ export type LiveFailure =
   | 'offline';
 
 export type LiveEvent =
-  | { type: 'ready'; take: string | null; engine?: string; session?: string; from?: number; protocol?: number }
+  | {
+      type: 'ready';
+      take: string | null;
+      engine?: string;
+      session?: string;
+      from?: number;
+      protocol?: number;
+      /** The checker beats every this many seconds (contract draft 9): its silence then means a dead socket. */
+      beat?: number;
+    }
   /**
    * A take started anywhere on the page: the checker has found where the reciter is (once per search). Its `nolock`
    * (still searching after about 8 s of speech) isn't read: a search that never finds the start fails silently
@@ -139,11 +148,12 @@ export type LiveEvent =
    */
   | { type: 'into'; names: { id: string; into: MarkInto }[] }
   /**
-   * The checker's heartbeat (long takes, Nov 20 2026): every ~2 s while the connection is open, with the seconds of the
-   * take's audio it has processed (`t`) and received (`got`). A phone that has had one treats silence as a dead
-   * connection and resumes (lib/reciteLive/socket); `t` against the audio sent is how far behind the checker is.
+   * The checker's heartbeat (contract draft 9, long takes, Nov 20 2026): every `ready.beat` seconds while the take is
+   * open on the socket, with the seconds of the take's audio it has checked (`t`) and received (`rx`). The phone treats
+   * its silence as a dead socket and resumes (lib/reciteLive/socket), paces a resume's held audio by `rx`, and reads
+   * the checker's lag as the audio sent minus `t`.
    */
-  | { type: 'beat'; t: number; got?: number }
+  | { type: 'beat'; t: number; rx?: number }
   | { type: 'error'; reason: LiveFailure };
 
 const KINDS: MarkKind[] = ['word', 'skipped', 'added', 'harakat', 'letter', 'tajweed'];
@@ -282,6 +292,7 @@ export function parseEvent(raw: unknown): LiveEvent | null {
         ...(typeof x.session === 'string' ? { session: x.session } : {}),
         ...(isNum(x.from) ? { from: x.from } : {}),
         ...(isNum(x.protocol) ? { protocol: x.protocol } : {}),
+        ...(isNum(x.beat) && x.beat > 0 ? { beat: x.beat } : {}),
       };
     case 'locked':
       return isWord(x.w) && isNum(x.s) && isNum(x.a)
@@ -332,7 +343,7 @@ export function parseEvent(raw: unknown): LiveEvent | null {
       return { type: 'into', names };
     }
     case 'beat':
-      return isNum(x.t) ? { type: 'beat', t: x.t, ...(isNum(x.got) ? { got: x.got } : {}) } : null;
+      return isNum(x.t) ? { type: 'beat', t: x.t, ...(isNum(x.rx) ? { rx: x.rx } : {}) } : null;
     case 'error': {
       const reason = (x.reason ?? x.error) as LiveFailure;
       return { type: 'error', reason: FAILURES.includes(reason) ? reason : 'server' };

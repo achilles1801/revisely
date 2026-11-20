@@ -279,8 +279,8 @@ class LongTakeChecker implements SocketLike {
     const frame = JSON.parse(data) as { type: string; resume?: string };
     if (frame.type === 'start') {
       setTimeout(() => {
-        this.emit({ type: 'ready', v: 2, take: 'e2e-long', engine: 'e2e', protocol: 8, from: 0 });
-        this.beat = setInterval(() => this.emit({ type: 'beat', t: this.got / SAMPLE_RATE, got: this.got / SAMPLE_RATE }), 2000);
+        this.emit({ type: 'ready', v: 2, take: 'e2e-long', engine: 'e2e', protocol: 8, from: 0, beat: 2 });
+        this.beat = setInterval(() => this.emit({ type: 'beat', t: this.got / SAMPLE_RATE, rx: this.got / SAMPLE_RATE }), 2000);
       }, 300);
       if (frame.resume) {
         // eslint-disable-next-line no-console

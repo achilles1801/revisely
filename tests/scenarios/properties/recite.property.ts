@@ -30,7 +30,7 @@ import {
   startNotFound,
   type LiveState,
 } from '../../../src/lib/reciteLive/state';
-import { socketFeed, CATCHUP_SLICE_SAMPLES, WATCHDOG_MS, type SocketLike } from '../../../src/lib/reciteLive/socket';
+import { socketFeed, CATCHUP_SLICE_SAMPLES, CATCHUP_TICK_MS, WATCHDOG_MS, type SocketLike } from '../../../src/lib/reciteLive/socket';
 import type { StartFrame } from '../../../src/lib/reciteLive/feed';
 import { meanScore } from '../../../src/lib/reciteInsights/insights';
 import { passageTakes } from '../../../src/lib/reciteMemory/progress';
@@ -647,8 +647,8 @@ describe('[RECITE-10] a long take keeps up: a resume never holds the screen, and
           s2.answer({ type: 'ready', take: 'k', from });
           // Each slice is at most CATCHUP_SLICE_SAMPLES of audio, then the next waits for a timer.
           let slices = 1;
-          while (h.timers.some((t) => t.ms === 0)) {
-            const i = h.timers.findIndex((t) => t.ms === 0);
+          while (h.timers.some((t) => t.ms === CATCHUP_TICK_MS)) {
+            const i = h.timers.findIndex((t) => t.ms === CATCHUP_TICK_MS);
             h.timers.splice(i, 1)[0].fn();
             slices++;
           }

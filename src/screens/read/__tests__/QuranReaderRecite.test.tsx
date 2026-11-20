@@ -2165,3 +2165,27 @@ describe('long takes (Nov 20 2026): Stop always ends in a summary, and the take 
     await settle(() => expect(bar()).toContain(words.uthmani(A23 + 2)));
   });
 });
+
+describe('a resume the checker didn’t hold (long takes, Nov 20 2026)', () => {
+  it('[RECITE-10] its re-check from the start never moves the page back: the cursor shows again once it passes where it was', async () => {
+    await startTake('check');
+    await event({ type: 'at', w: A23 + 8, t: 30 });
+    await event({ type: 'said', upTo: A23 + 7 });
+    const bar = () => screen.getByTestId('recite-middle').props.accessibilityLabel as string;
+    expect(bar()).toContain(words.uthmani(A23 + 8));
+    // Another instance: it holds nothing, and checks the take again from its start.
+    await event({ type: 'ready', take: 't1', protocol: 8, from: 0 });
+    await event({ type: 'locked', w: A23, s: 27, a: 23, t: 0.8 });
+    await event({ type: 'at', w: A23 + 1, t: 2 });
+    await event({ type: 'said', upTo: A23 });
+    await event({ type: 'score', reached: 1, mistakes: 0, tajweed: 0, accuracy: 1 } as never);
+    expect(bar()).toContain(words.uthmani(A23 + 8));
+    expect(bar()).not.toContain(words.uthmani(A23 + 1));
+    // A mark it finds again applies (by id).
+    await event({ type: 'mark', mark: { id: `${A23 + 4}:word:sound`, w: A23 + 4, ayah: [27, 23], kind: 'word', heard: 'وَأُوهِيَتْ', sure: 'clear' } as never });
+    expect(screen.getAllByTestId('live-mark-word').length).toBe(1);
+    // Past where the page was: it follows again.
+    await event({ type: 'at', w: A23 + 9, t: 31 });
+    expect(bar()).toContain(words.uthmani(A23 + 9));
+  });
+});

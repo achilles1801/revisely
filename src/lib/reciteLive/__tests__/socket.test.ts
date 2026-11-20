@@ -199,6 +199,8 @@ describe('the live socket', () => {
     const s2 = t.sockets[1];
     s2.onopen!();
     s2.answer({ type: 'ready', v: 2, take: 'take1', from: 0 });
+    // Paced, a second a tick (RECITE-10).
+    while (t.queue.length) t.runTimer();
     const out = s2.out().slice(1);
     expect(out.map((x) => (Array.isArray(x) ? x.length : x))).toEqual([16_000, 16_000, 8_000, { type: 'end' }]);
     expect((out as number[][]).slice(0, 3).flat()).toEqual(Array.from(long));
@@ -454,13 +456,14 @@ describe('long takes (Nov 20 2026): a quiet connection, and a resume’s held au
     const s1 = t.sockets[0];
     s1.onopen!();
     s1.answer({ type: 'ready', v: 2, take: 'take1', from: 0, protocol: 8 });
-    s1.answer({ type: 'beat', t: 0.5, got: 0.5 });
+    s1.answer({ type: 'beat', t: 0.5, rx: 0.5 });
     expect(t.events.map((e) => e.type)).toEqual(['ready', 'beat']);
+    expect(t.events[1]).toEqual({ type: 'beat', t: 0.5, rx: 0.5 });
     t.conn.sendAudio(pcm(1, 2, 3));
     // Beats keep it alive.
     later(2000);
     t.runTimer();
-    s1.answer({ type: 'beat', t: 2.5, got: 2.5 });
+    s1.answer({ type: 'beat', t: 2.5, rx: 2.5 });
     later(2000);
     t.runTimer();
     expect(s1.closed).toBe(false);
@@ -510,16 +513,16 @@ describe('long takes (Nov 20 2026): a quiet connection, and a resume’s held au
     expect(t.closed()).toBe(1);
   });
 
-  it('[RECITE-10] a resume sends the held audio a slice at a time between frames, in order, then goes live', async () => {
+  it('[RECITE-10] a resume sends the held audio a slice at a time (1 s every 125 ms), in order, then goes live', async () => {
     const t = setup();
     await flush();
     const s1 = t.sockets[0];
     s1.onopen!();
     s1.answer({ type: 'ready', v: 2, take: 'take1', from: 0 });
-    // 12 s of audio, a dismissal at 4 s.
+    // 4 s of audio, a dismissal at 2 s.
     const second = (k: number) => new Int16Array(16_000).fill(k);
-    for (let k = 0; k < 12; k++) {
-      if (k === 4) t.conn.send({ type: 'dismiss', id: 'm1' });
+    for (let k = 0; k < 4; k++) {
+      if (k === 2) t.conn.send({ type: 'dismiss', id: 'm1' });
       t.conn.sendAudio(second(k));
     }
     s1.onclose!();
@@ -529,19 +532,56 @@ describe('long takes (Nov 20 2026): a quiet connection, and a resume’s held au
     s2.onopen!();
     s2.answer({ type: 'ready', v: 2, take: 'take1', from: 0 });
     const shape = () => s2.out().slice(1).map((x) => (Array.isArray(x) ? `a${x[0]}` : (x as { type: string }).type));
-    // The first 5 s at once; the rest waits for the next slice.
-    expect(shape()).toEqual(['a0', 'a1', 'a2', 'a3', 'dismiss', 'a4']);
-    expect(t.queue.map((q) => q.ms)).toEqual([0]);
+    // The first second at once; the rest a second a tick.
+    expect(shape()).toEqual(['a0']);
+    expect(t.queue.map((q) => q.ms)).toEqual([125]);
     // Audio that comes meanwhile joins the end, and isn't sent ahead of the held audio.
-    t.conn.sendAudio(second(12));
-    expect(shape().length).toBe(6);
+    t.conn.sendAudio(second(4));
+    expect(shape()).toEqual(['a0']);
     t.runTimer();
-    expect(shape()).toEqual(['a0', 'a1', 'a2', 'a3', 'dismiss', 'a4', 'a5', 'a6', 'a7', 'a8', 'a9']);
+    expect(shape()).toEqual(['a0', 'a1']);
     t.runTimer();
-    expect(shape()).toEqual(['a0', 'a1', 'a2', 'a3', 'dismiss', 'a4', 'a5', 'a6', 'a7', 'a8', 'a9', 'a10', 'a11', 'a12']);
+    expect(shape()).toEqual(['a0', 'a1', 'dismiss', 'a2']);
+    t.runTimer();
+    t.runTimer();
+    expect(shape()).toEqual(['a0', 'a1', 'dismiss', 'a2', 'a3', 'a4']);
     expect(t.queue).toEqual([]);
     // Live again.
     t.conn.sendAudio(pcm(7));
     expect(s2.out().slice(-1)).toEqual([[7]]);
+  });
+
+  it('[RECITE-10] with beats, the held audio goes no further than 5 s ahead of what the checker has received', async () => {
+    const t = setup();
+    await flush();
+    const s1 = t.sockets[0];
+    s1.onopen!();
+    s1.answer({ type: 'ready', v: 2, take: 'take1', from: 0, beat: 2 });
+    for (let k = 0; k < 12; k++) t.conn.sendAudio(new Int16Array(16_000).fill(k));
+    s1.onclose!();
+    t.runTimer();
+    await flush();
+    const s2 = t.sockets[1];
+    s2.onopen!();
+    // The checker holds the first 2 s: what it has, it has received.
+    s2.answer({ type: 'ready', v: 2, take: 'take1', from: 32_000, beat: 2 });
+    const seconds = () => s2.out().slice(1).filter(Array.isArray).map((x) => (x as number[])[0]);
+    const runPacing = () => {
+      for (let i = 0; i < 20; i++) {
+        const k = t.queue.findIndex((q) => q.ms === 125);
+        if (k < 0) return;
+        t.queue.splice(k, 1)[0].fn();
+      }
+    };
+    runPacing();
+    // Up to 5 s ahead of the 2 s received: seconds 2–6.
+    expect(seconds()).toEqual([2, 3, 4, 5, 6]);
+    // The checker says it has received up to 5 s: up to 10.
+    s2.answer({ type: 'beat', t: 4, rx: 5 });
+    runPacing();
+    expect(seconds()).toEqual([2, 3, 4, 5, 6, 7, 8, 9]);
+    s2.answer({ type: 'beat', t: 9, rx: 9 });
+    runPacing();
+    expect(seconds()).toEqual([2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
   });
 });

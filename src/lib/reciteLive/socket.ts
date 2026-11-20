@@ -14,9 +14,12 @@
 // start a take, or whose /health refused (lib/reciteLive/pairService), is passed over for an hour.
 //
 // Long takes (Majd's 3.5-minute take of Nov 19 2026, lost): a connection can go quiet without closing, and the phone
-// then sent audio into it for 76 s with nothing coming back. A checker that beats (`beat`, every ~2 s) is watched: once
-// it has beaten, WATCHDOG_MS without a word from it counts as a drop, and the take resumes. And a resume's held audio
-// goes out a slice at a time between frames, never in one loop that holds the JavaScript thread.
+// then sent audio into it for 76 s with nothing coming back. A checker that beats (`ready.beat`, contract draft 9) is
+// watched: WATCHDOG_MS without a word from it counts as a drop, and the take resumes. And a resume's held audio goes out
+// a slice at a time, paced: never in one loop that holds the JavaScript thread, and never as one pile on the uplink,
+// where the socket's keepalive pong queued behind 38 s of resent audio and the checker dropped it after 20 s (the
+// checker session's finding). With beats, no more than CATCHUP_LEAD_SAMPLES ahead of what the checker has received
+// (`beat.rx`); without, CATCHUP_SLICE_SAMPLES every CATCHUP_TICK_MS.
 
 import { LiveEvent, parseEvent } from './contract';
 import { pairClosed, pairOpen } from './pairService';
@@ -38,8 +41,11 @@ export function pairTakes(start: StartFrame): boolean {
 const SAMPLE_RATE_HZ = 16_000;
 /** Samples per frame when sending held audio again after a drop (1 s). */
 const RESEND_SAMPLES = 16_000;
-/** Held audio sent in one go while catching up after a drop (5 s of samples); the rest follows a slice at a time. */
-export const CATCHUP_SLICE_SAMPLES = 5 * SAMPLE_RATE_HZ;
+/** Held audio sent at a time while catching up after a drop (1 s of samples), and how often (ms): 8× real time at most. */
+export const CATCHUP_SLICE_SAMPLES = SAMPLE_RATE_HZ;
+export const CATCHUP_TICK_MS = 125;
+/** With beats: held audio sent no further than this ahead of what the checker says it has received (5 s). */
+export const CATCHUP_LEAD_SAMPLES = 5 * SAMPLE_RATE_HZ;
 /** Once the checker has beaten: this long without a word from it, and the connection counts as dropped (ms). */
 export const WATCHDOG_MS = 8000;
 /** How often the watchdog looks (ms). */
@@ -124,6 +130,8 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
     let beats = false;
     /** When the current socket last heard from the checker, and the watchdog's next look. */
     let heardAt = 0;
+    /** The take's audio the checker has received, by its last beat (samples); null until a beat on this socket. */
+    let rxSamples: number | null = null;
     let watch: unknown = null;
     /** A resume's held audio still going out (the next slice's timer). */
     let catching: unknown = null;
@@ -187,7 +195,9 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
       const step = () => {
         catching = null;
         if (socket !== s || finished) return;
+        // Paced: a slice a tick, and with beats no further ahead of what the checker has received than the lead allows.
         let budget = CATCHUP_SLICE_SAMPLES;
+        if (rxSamples != null) budget = Math.min(budget, rxSamples + CATCHUP_LEAD_SAMPLES - at);
         while (budget > 0) {
           while (c < controls.length && controls[c].at <= at) s.send(JSON.stringify(controls[c++].frame));
           if (ci >= audio.length) break;
@@ -204,8 +214,10 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
           budget -= stop - at;
           at = stop;
         }
+        // Past the chunks sent in full: nothing held left means live now, not a tick later.
+        while (ci < audio.length && at >= pos + audio[ci].length) pos += audio[ci++].length;
         if (ci < audio.length) {
-          catching = timers.set(step, 0);
+          catching = timers.set(step, CATCHUP_TICK_MS);
           return;
         }
         while (c < controls.length) s.send(JSON.stringify(controls[c++].frame));
@@ -302,6 +314,9 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
         if (e.type === 'ready') {
           unproven = false;
           take = e.take ?? take;
+          // A checker that beats announces it (draft 9): watched from now. What it already holds, it has received.
+          if (e.beat) beats = true;
+          rxSamples = beats ? Math.max(0, e.from ?? 0) : null;
           // Once the take has ended, a resume only waits for the answer: its tries aren't renewed, so a checker
           // that keeps closing without one can't hold the take on Checking… for good.
           if (!ended()) tries = 0;
@@ -312,6 +327,7 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
         }
         if (e.type === 'beat') {
           beats = true;
+          if (e.rx != null) rxSamples = Math.round(e.rx * SAMPLE_RATE_HZ);
           watchFrom();
           handlers.onEvent(e);
           return;
@@ -338,6 +354,7 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
       s.onclose = () => {
         if (socket !== s) return;
         socket = null;
+        rxSamples = null;
         stopWatch();
         // The take has its final answer: the names are only a nicety, not worth a resume.
         if (answered) {
