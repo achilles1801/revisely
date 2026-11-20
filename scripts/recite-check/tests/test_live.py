@@ -257,6 +257,18 @@ class Model(unittest.TestCase):
         self.assertEqual(hop(40), 40)  # the phone moved the reader there: at once
         self.assertEqual(hop(5), None)  # and the rule holds again after it
 
+    def test_done_keeps_the_marks_shown_live(self):
+        """Majd (Nov 20 2026): a mark "should stay that way". A live mark the final pass left out stays in `done` with
+        `live: true`; the final's own mark on that word replaces it; a word heard right again after it drops it."""
+        import live
+        sess = live.LiveSession(engine(), 1, 1, 1, 7, {})
+        sess.marks = {'5:skipped:': {'id': '5:skipped:', 'w': 5, 'kind': 'skipped'},
+                      '6:added:': {'id': '6:added:', 'w': 6, 'kind': 'added'},
+                      '7:skipped:': {'id': '7:skipped:', 'w': 7, 'kind': 'skipped'}}
+        final = [{'id': '6:word:sound', 'w': 6, 'kind': 'word'}]
+        kept = sess._live_kept(final, {5: 'correct', 6: 'wrong', 7: 'corrected'})
+        self.assertEqual(kept, [{'id': '5:skipped:', 'w': 5, 'kind': 'skipped', 'live': True}])
+
     def test_a_lazim_madd_is_judged_on_time_only(self):
         """A lazim madd read short is marked only when the reciter's pace was measured in the ayah: alone, الٓمٓ has no
         short syllables, and the model's own count reads long madds short (Majd's three takes, Nov 14 2026)."""
