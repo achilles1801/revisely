@@ -213,6 +213,10 @@ from the first word of `s:a` through the end of `startBy`.
   - Once sure, it sends `{"type":"locked","w":…,"s":…,"a":…,"t":…}`, and nothing (`at`, `said`, marks, `score`) comes
     before it.
   - Words before `w` aren't part of the take: never skipped, not in `done.result.words` or the score.
+  - A lock one to three words into its ayah takes back the ayah's words said just before it (`TAKE_BACK`, Nov 20
+    2026): those words decoded alone up to the lock word, each heard right, move `w` to the ayah's first word. A word
+    not said is never taken back. Lock benchmark: 10 of the 41 starts a word off now right (50:1 ق, 27:1 طس, 56:1 إذا
+    among them), none worse.
   - No lock means silence (Majd): nothing is sent, the search goes on, and `done.result.start` is null. Otherwise
     it's the locked `w`.
   - The take's log line says when it locked and how many times, or that it didn't, in numbers only (`start_note`).

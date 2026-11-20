@@ -397,7 +397,9 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   Turning the page by hand during a take looks for the reciter on that page, keeping what was already decided. It
   always finds them (Majd, Nov 20 2026: "it should always find where i am there's no exception"; there is no "can't find
   you" message): past the isti'adha, the basmala and anything else said before the start, at a surah's opening as soon
-  as its first word is heard, and mid-ayah. Only while what was said reads the same in two places on the page (a refrain)
+  as its first word is heard, and mid-ayah. Found a word or a few into an ayah, the take starts at that ayah's first word
+  when those words were said just before (Majd, Nov 20 2026: they count), and never takes in a word that wasn't said.
+  Only while what was said reads the same in two places on the page (a refrain)
   does it wait, for the words that part them. A take whose start is never found (no recitation in it) ends with
   nothing: no summary, no score, and nothing kept.
 - **RECITE-2.** With Mark mistakes, a take marks a word said wrong, skipped or added, and a slip in a word's harakat
