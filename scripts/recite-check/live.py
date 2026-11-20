@@ -451,11 +451,15 @@ class Decoder(checker.Decoder):
         if self.backs > 0:  # repeats: the best exit of words w .. w + backs, the first o with it
             pad = np.concatenate([ex, np.full(self.backs, NEG)])
             view = np.lib.stride_tricks.sliding_window_view(pad, self.backs + 1)[:W]
+            if self.backpen is not None:  # back_prev / back_far: a repeat into an earlier ayah costs more
+                view = view + self.backpen
             warg = view.argmax(axis=1)
             offer(view[rows, warg] + P['back'], 4, widx + warg)
             if P.get('gap_back') is not None:  # back from the filler after words w .. w + backs (gaps w + 1 ..)
                 pad = np.concatenate([gap[1:], np.full(self.backs, NEG)])
                 view = np.lib.stride_tricks.sliding_window_view(pad, self.backs + 1)[:W]
+                if self.backpen is not None:
+                    view = view + self.backpen
                 warg = view.argmax(axis=1)
                 offer(view[rows, warg] + P['gap_back'], 7, widx + warg + 1)
         c = gap[:W].copy(); c[0] = NEG
@@ -505,12 +509,13 @@ class Decoder(checker.Decoder):
             sk = np.lib.stride_tricks.sliding_window_view(pad, self._K + 1)[:W][:, self._kcol] + self._kpen
             np.maximum(cand, sk.max(axis=1), out=cand)
         if self.backs > 0:
+            pen = 0.0 if self.backpen is None else self.backpen
             pad = np.concatenate([ex, np.full(self.backs, NEG)])
-            np.maximum(cand, np.lib.stride_tricks.sliding_window_view(pad, self.backs + 1)[:W].max(axis=1)
+            np.maximum(cand, (np.lib.stride_tricks.sliding_window_view(pad, self.backs + 1)[:W] + pen).max(axis=1)
                        + P['back'], out=cand)
             if P.get('gap_back') is not None:
                 pad = np.concatenate([gap[1:], np.full(self.backs, NEG)])
-                np.maximum(cand, np.lib.stride_tricks.sliding_window_view(pad, self.backs + 1)[:W].max(axis=1)
+                np.maximum(cand, (np.lib.stride_tricks.sliding_window_view(pad, self.backs + 1)[:W] + pen).max(axis=1)
                            + P['gap_back'], out=cand)
         c = gap[:W].copy(); c[0] = NEG
         np.maximum(cand, c, out=cand)

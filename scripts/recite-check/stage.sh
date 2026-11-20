@@ -5,7 +5,7 @@
 # lexicon, Tanzil's text and the bars. The model and data never go into git; they go into the image only.
 set -euo pipefail
 STAGE=${1:?usage: stage.sh DIR}
-HARNESS_COMMIT=aba03414  # scripts/recite-eval on claude/mistake-eval: the checker this service runs
+HARNESS_COMMIT=3909c4e6  # scripts/recite-eval on claude/mistake-eval: the checker this service runs
 LAB=${LAB:-$HOME/revisely-mistake-lab}
 HERE=$(cd "$(dirname "$0")" && pwd)
 REPO=$(git -C "$HERE" rev-parse --show-toplevel)
