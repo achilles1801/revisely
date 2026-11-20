@@ -297,6 +297,12 @@ the final pass didn't make itself), so a live mark has to be one worth keeping:
   similar ayah that reads as one, used to mark words said right half a minute before, and `done` kept them.
 - A word marked skipped, then heard after the word that followed it (a swap), keeps its mark; the final pass names it
   out of order. A word said again in its place after going back over it is `corrected` and taken back, as before.
+- Harakat and letters are judged a word at a time (`engine.LETTERS_PER_WORD`, Nov 20 2026): a word on its window, the
+  two words before it and the one after in its ayah, once the next word is decided, on the ayah thread. Its slip shows
+  then, not when the whole ayah has been judged (12.2 s after the word, p90 56 s). The final pass judges the same
+  windows, in an ayah not said in full too (words whose window was said). The lab's planted harakat bench: the same
+  marks and sure levels as judging the whole ayah (recite-feedback-nov20.md, 3c). `RECITE_LETTERS_PER_WORD=0`: per
+  ayah, as before.
 - Measured on 60 bench-v0 takes with planted mistakes (Words & harakat with letters, recite-server's `markbench2.py`):
   marks the final pass wouldn't have made, kept only because shown, 24 → 1; marks taken back live 36 → 17; planted
   mistakes shown live and kept 502 → 510; no change in how soon marks come.

@@ -35,6 +35,7 @@ import unicodedata
 
 import numpy as np
 
+import engine as engine_mod  # noqa: E402  (LETTERS_PER_WORD, read when used: tests turn it off)
 from engine import FPS, SAID, WORDS_P, BadRequest, SideFrames, ayah_pieces, heard_sounds, score, settings_of  # puts the harness on the path
 import checker  # noqa: E402  (the harness's)
 import similar  # noqa: E402  (fit_many, for the Qur'an-wide search)
@@ -691,6 +692,9 @@ class LiveSession:
         # defer: each ayah's letters and tajweed off the hop (see _ayah_submit); with nothing to judge, nothing to defer
         self.defer = bool(defer) and not self.follow and (self.st['letters'] or self.st.get('tajweed', True))
         self._pending = []               # (notes key, s, a, future, due) of ayat judged in the background, in order
+        self._wl_wait = set()            # words decided whose letters aren't judged yet (_letters_later)
+        self._wl_done = set()            # words whose letters were handed over (judged once)
+        self._wl_pending = []            # (app word, future) of words' letters judged in the background, in order
         self._idle = threading.Event()   # set while the session isn't working on a chunk (see _working)
         self._idle.set()
         self._depth = 0
@@ -732,7 +736,7 @@ class LiveSession:
         self.ms = {'model': 0.0, 'words': 0.0, 'tajweed': 0.0, 'hops': 0, 'worst_hop': 0.0,
                    # defer: ayat handed to the thread, the hops' waits for it (total, worst), `done`'s wait, and the
                    # ayat `done` judged again itself
-                   'ayah_jobs': 0, 'due_wait': 0.0, 'worst_due_wait': 0.0, 'done_wait': 0.0, 'done_notes': 0}
+                   'ayah_jobs': 0, 'word_jobs': 0, 'due_wait': 0.0, 'worst_due_wait': 0.0, 'done_wait': 0.0, 'done_notes': 0}
         if self.start_in:
             self.ms['search_quran'] = 0.0  # the Qur'an-wide search's time (start_in)
         self._judged_here = 0
@@ -1612,6 +1616,8 @@ class LiveSession:
                     st[aw] = 'correct'
                 self.decided.setdefault(aw, now)
                 self.status[aw] = st[aw]
+                if aw not in self._wl_done:
+                    self._wl_wait.add(aw)
                 self.bad_run[aw] = self.bad_run.get(aw, 0) + 1 if bad else 0
                 if bad:
                     self.good_run[aw] = 0
@@ -1646,6 +1652,7 @@ class LiveSession:
                 self._keep_mark(m)
                 ev.append({'type': 'mark', 'mark': m, 't': round(now, 2)})
         t1 = time.perf_counter()
+        self._letters_later()
         ev += self._ayah_marks(now)
         self.ms['tajweed'] += (time.perf_counter() - t1) * 1000
         ev += self._maybe_rebase(cw + seg.a if cw is not None else None)
@@ -1756,7 +1763,7 @@ class LiveSession:
     def _due(self, now, every=False):
         """The ayat handed to the background thread whose time has come (every one, at the end), in order: their
         marks, the `ayah` event, then the score. A job not done yet is waited for, and may run meanwhile."""
-        ev = []
+        ev = self._letters_due(now, every)
         while self._pending and (every or self._pending[0][4] <= now):
             key, s, a, fut, _ = self._pending.pop(0)
             if not fut.done():
@@ -1782,6 +1789,60 @@ class LiveSession:
             self.ayah_sent.append(ev[-1])
         if ev:
             ev += self._score_event(now)
+        return ev
+
+    def _letters_later(self):
+        """Harakat and letters a word at a time (engine.LETTERS_PER_WORD; Majd, Nov 20 2026: a mistake's highlight should
+        come "immediately"): a word once it and the next word of its ayah are decided (its ayah's last word, once it is),
+        on its window (engine.word_letters), each word once. With `defer` on the ayah thread, shown as soon as worked
+        out (_letters_due), not at the ayah's end; the ayah's own job still judges the same windows for `done`. A word
+        whose window holds a word not said (skipped, before the take) isn't judged here, as its ayah isn't at the end."""
+        if not (engine_mod.LETTERS_PER_WORD and self.st['letters']) or self.follow:
+            self._wl_wait.clear()
+            return
+        for aw in sorted(self._wl_wait):
+            s, a, i = self.E.key.where(aw)
+            first, n = self._ayah_bounds(s, a)
+            if i + 1 < n and aw + 1 not in self.decided and self.status.get(aw) not in (None, 'missed', 'wrong'):
+                continue  # the next word isn't decided yet
+            self._wl_wait.discard(aw)
+            if self.status.get(aw) not in SAID or self.status.get(aw) == 'wrong' or first < self.lo \
+                    or first + n > self.end:
+                continue  # a word heard wrong or skipped has no letters to judge; an ayah begun before the take: as done
+            win = range(first + max(0, i - engine_mod.LETTERS_BACK), first + min(n - 1, i + engine_mod.LETTERS_AHEAD) + 1)
+            if any(self.status.get(w) not in SAID or w not in self.spans for w in win):
+                continue
+            args = (self.lp[:self.T], s, a, i, {w: self.status[w] for w in win}, {w: self.spans[w] for w in win},
+                    self.st)
+            kw = {'readings': {w: self.readings[w] for w in win if w in self.readings}}
+            if self.defer:
+                fut = _ayah_submit(self._idle, self.E.word_letters, *args, **kw)
+            else:
+                fut = concurrent.futures.Future()
+                t0 = time.perf_counter()
+                fut.set_result((self.E.word_letters(*args, **kw), (time.perf_counter() - t0) * 1000))
+            self._wl_pending.append((aw, fut))
+            self._wl_done.add(aw)
+            self.ms['word_jobs'] += 1
+
+    def _letters_due(self, now, every=False):
+        """The marks of the words' letters worked out (every one, at the end, waited for), in order."""
+        ev = []
+        while self._wl_pending and (every or self._wl_pending[0][1].done()):
+            aw, fut = self._wl_pending.pop(0)
+            if not fut.done():
+                self._idle.set()
+                t0 = time.perf_counter()
+                fut.result()
+                self.ms['done_wait'] += (time.perf_counter() - t0) * 1000
+                if self._depth:
+                    self._idle.clear()
+            rows, ms = fut.result()
+            self.ms['tajweed'] += ms
+            for m in self.E.marks([], {}, {}, [], [], [dict(r) for r in rows or []]):
+                if m['id'] not in self.marks:
+                    self._keep_mark(m)
+                    ev.append({'type': 'mark', 'mark': m, 't': round(now, 2)})
         return ev
 
     def _keep_mark(self, m):
