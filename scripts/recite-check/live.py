@@ -53,6 +53,15 @@ EXTRA_STABLE = 6    # hops in a row an extra word must be there before it is sho
                     # takes with planted mistakes 75 of 172 extra words shown live were gone from the final answer (Majd:
                     # marks "should stay"); at 6, 21 of 118, the same 97 the final keeps, each shown 2 s later
 FIX_STABLE = 4      # hops in a row a marked word must be heard right again before it is unmarked
+# A word heard right once isn't marked from a later pass over it (Majd, Nov 20 2026: a mistake "should stay that way";
+# recite-feedback-nov20.md, 3): read worse on the way back, out of the window now and so jumped, or with an extra word
+# after it. The final pass keeps the right reading too (revisit_keep), so these marks were kept in `done` only because
+# they had been shown (protocol 8). The live window sees 30 s, and a restart, or a slip into a similar ayah whose words
+# read as a restart of the page's, put a word's right reading out of its sight. On 60 bench-v0 takes with planted
+# mistakes (markbench2, recite-server): marks the final pass would not have made, kept only because shown, 24 -> 1;
+# wrong-kind skips on a swap's word 30 s later gone; no mark on a planted mistake lost. REVISIT_KEEP=False: as before.
+REVISIT_KEEP = True
+REVISIT_SLACK = 5   # frames: a later visit starts at least this close to the end of the first right one
 JUMP_BACK = 3       # the cursor moving back more than this many words, or ahead more than JUMP_AHEAD, is shown only
 JUMP_AHEAD = 6      # once the next hop agrees (within a word): one hop's provisional frames once took it 13 words back
                     # and forward again (Majd's Recite take, 3:1, Nov 14 2026)
@@ -695,6 +704,7 @@ class LiveSession:
         self.marks = {}                  # id -> Mark, shown now
         self.extra_run = {}
         self.good_run = {}
+        self.first_right = {}            # app word -> frame its first visit heard right ended (REVISIT_KEEP)
         self.dismissed = set()
         self.ayat_done = set()
         self.ctrl = []                   # (samples received when it came, message)
@@ -1522,6 +1532,7 @@ class LiveSession:
             if wb > wa + 1:
                 jumped.update(range(wa + 1, wb))
         new_marks = []
+        win0 = seg.f0 + lo_t + REVISIT_SLACK  # the window's first frame (absolute): earlier frames aren't in sight
         if seen:
             w_first = min(seen)
             if lo_t > 0 and visits[w_first][0]['start'] <= lo_t + 1:
@@ -1547,6 +1558,13 @@ class LiveSession:
                     if visits[w] and visits[w][-1]['start'] > 0 and not bad:
                         ev += self._unmark_if_corrected(aw, seg.f0 + visits[w][-1]['start'], now)
                     continue
+                fr = self.first_right.get(aw)
+                if visits[w] and not bad:
+                    self.first_right.setdefault(aw, seg.f0 + visits[w][-1]['end'])
+                elif bad and REVISIT_KEEP and fr is not None and (
+                        seg.f0 + visits[w][-1]['start'] >= fr - REVISIT_SLACK if visits[w] else fr < win0):
+                    bad = False  # said right before: a poorer reading on a later pass, or none in sight now
+                    st[aw] = 'correct'
                 self.decided.setdefault(aw, now)
                 self.status[aw] = st[aw]
                 self.bad_run[aw] = self.bad_run.get(aw, 0) + 1 if bad else 0
@@ -1561,13 +1579,16 @@ class LiveSession:
                     if visits[w]:
                         row['t'] = secs(self.spans[aw])
                     new_marks.append(self._word_mark(row, fl.get(aw)))
-                elif not bad and visits[w]:
+                elif not bad and visits[w] and kind != 'order':  # said late (a swap): its mark stays
                     ev += self._unmark_if_corrected(aw, seg.f0 + visits[w][-1]['start'], now)
         # extra words: once their filler is behind the commit point, in EXTRA_STABLE hops in a row
         now_extra = set()
         for e in [] if self.follow else extra_rows(extras, fillers, seg.kws, P['delay'], seg.f0):
             if e['trail'] or not e['span'] or not seg.own_extra(e) or e['span'][1] - seg.f0 > dec.t - cf:
                 continue
+            if REVISIT_KEEP and all(self.first_right.get(u, 1 << 30) <= e['span'][0] + REVISIT_SLACK
+                                    for u in (e['after'], e['after'] + 1)):
+                continue  # between two words both heard right before it: a later pass over them
             now_extra.add(e['after'])
             self.extra_run[e['after']] = self.extra_run.get(e['after'], 0) + 1
             if self.extra_run[e['after']] == EXTRA_STABLE:

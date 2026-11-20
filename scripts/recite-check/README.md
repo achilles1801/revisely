@@ -283,6 +283,19 @@ the socket (`idle`). uvicorn pings every 10 s, so a phone gone without closing i
   again with the resume, from `from`. Before, the instance went on through the pile after the socket had closed, and
   Cloud Run gives an instance with no open request almost no CPU: Majd's 38 s took 5 minutes, holding the session.
 - Each socket's end is a `socket` health line (below).
+
+**Marks that stay** (contract draft 10, protocol 8; Majd, Nov 20 2026: a mistake's highlight should come at once "and
+should stay that way"). `done.result.marks` keeps every mark shown live and not taken back (`live: true` on the ones
+the final pass didn't make itself), so a live mark has to be one worth keeping:
+- An extra word is shown once it has held 6 hops (`EXTRA_STABLE`).
+- A word heard right once isn't marked from a later pass over it: read worse on the way back, jumped once its right
+  reading is out of the live window (30 s), or with an extra word after it (`REVISIT_KEEP`). A restart, or a slip into a
+  similar ayah that reads as one, used to mark words said right half a minute before, and `done` kept them.
+- A word marked skipped, then heard after the word that followed it (a swap), keeps its mark; the final pass names it
+  out of order. A word said again in its place after going back over it is `corrected` and taken back, as before.
+- Measured on 60 bench-v0 takes with planted mistakes (Words & harakat with letters, recite-server's `markbench2.py`):
+  marks the final pass wouldn't have made, kept only because shown, 24 → 1; marks taken back live 36 → 17; planted
+  mistakes shown live and kept 502 → 510; no change in how soon marks come.
 - `done`'s letters and tajweed for an ayah the closed segments hold whole are worked out before the end (live.py
   `_prejudge`), on the ayah thread while it has nothing live to judge. A 10-minute take's `done` judged 9 ayat again
   at the end: 5.6 s of its 5.7 s on Cloud Run. The answer is the same.
