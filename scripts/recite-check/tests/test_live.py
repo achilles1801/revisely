@@ -230,8 +230,11 @@ class Model(unittest.TestCase):
             self.assertEqual(ev[-1]['type'], 'done')
 
     def test_a_big_cursor_move_waits_for_the_next_hop(self):
-        """A one-hop slip back (Majd's Recite take: 13 words back for one hop) never shows; a repeat or a skip shows a
-        hop later; small moves and a seek show at once."""
+        """A one-hop slip back (Majd's Recite take: 13 words back for one hop) never shows; small moves and a seek show at
+        once. Majd's precedence for a bigger move (Nov 20 2026: "the last few words I recited, and then that verse in
+        general, and then the previous verse"): within the ayah being recited or back into the one before it, a hop
+        later; anywhere else, only after JUMP_FAR hops in a row. Al-Fatiha's words: 1:2 is 4-7, 1:4 10-12, 1:5 13-16,
+        1:6 17-19, 1:7 20-28."""
         import live
         sess = live.LiveSession(engine(), 1, 1, 2, 10, {}, follow=True)
 
@@ -241,10 +244,15 @@ class Model(unittest.TestCase):
                 sess.sent['at'] = got
             return got
         self.assertEqual([hop(w) for w in (0, 1, 2, 2, 4)], [0, 1, 2, None, 4])  # moving on: at once
-        self.assertEqual([hop(w) for w in (20, 21)], [None, 21])  # 16 ahead: waits a hop, shown when the next agrees
-        self.assertEqual([hop(w) for w in (8, 22)], [None, 22])  # a slip 13 back for one hop: never shown
-        self.assertEqual([hop(w) for w in (10, 10, 11)], [None, 10, 11])  # a repeat from word 10: a hop later
-        self.assertEqual(hop(9), 9)  # one or two words back (the reciter going over a word): at once
+        far = live.JUMP_FAR
+        self.assertEqual([hop(w) for w in [20] * far], [None] * (far - 1) + [20])  # 1:2 to 1:7: JUMP_FAR hops
+        self.assertEqual([hop(w) for w in (24, 25, 26)], [24, 25, 26])
+        self.assertEqual([hop(w) for w in (8, 27)], [None, 27])  # a slip 19 back for one hop: never shown
+        self.assertEqual([hop(w) for w in (20, 20)], [None, 20])  # a restart at its ayah's start: a hop later
+        self.assertEqual([hop(w) for w in (21, 22, 23, 24)], [21, 22, 23, 24])
+        self.assertEqual([hop(w) for w in (17, 17)], [None, 17])  # back into the ayah before (1:6): a hop later
+        self.assertEqual(hop(16), 16)  # one word back (the reciter going over a word): at once
+        self.assertEqual([hop(w) for w in [5] * far], [None] * (far - 1) + [5])  # 1:5 back to 1:2: JUMP_FAR hops
         sess._seeked = True
         self.assertEqual(hop(40), 40)  # the phone moved the reader there: at once
         self.assertEqual(hop(5), None)  # and the rule holds again after it

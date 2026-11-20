@@ -53,6 +53,9 @@ FIX_STABLE = 4      # hops in a row a marked word must be heard right again befo
 JUMP_BACK = 3       # the cursor moving back more than this many words, or ahead more than JUMP_AHEAD, is shown only
 JUMP_AHEAD = 6      # once the next hop agrees (within a word): one hop's provisional frames once took it 13 words back
                     # and forward again (Majd's Recite take, 3:1, Nov 14 2026)
+JUMP_FAR = 4        # ...and a move out of the ayah being recited and the one before it, only after this many hops in a
+                    # row (Majd, Nov 20 2026: a restart a few words back after a breath jumped to another ayah sharing a
+                    # word, then came back)
 LEAD_FRAMES = 10    # a filler starting this close to a segment's first frame is the pause it started in, not a word
 SETTLE = 3.0        # seconds a seam must be behind the newest final frame: the path there no longer moves
 # Start anywhere on the page (Majd, Nov 14 2026; contract protocol 6, `startBy`): the start is searched for over the
@@ -1613,10 +1616,21 @@ class LiveSession:
         if last is None or self._seeked or not (w < last - JUMP_BACK or w > last + JUMP_AHEAD):
             self._seeked = False
             return w
-        if held is not None and abs(held - w) <= 1:
+        # Majd's precedence (Nov 20 2026): "the last few words I recited, and then that verse in general, and then the
+        # previous verse". A move within the ayah being recited, or back into the one before it (a restart), shows once
+        # the next hop agrees; anywhere else (another ayah sharing a word) only after JUMP_FAR hops in a row
+        need = 2 if self._in_reach(last, w) else JUMP_FAR
+        n = held[1] + 1 if held is not None and abs(held[0] - w) <= 1 else 1
+        if n >= need:
             return w
-        self._jump = w
+        self._jump = (w, n)
         return None
+
+    def _in_reach(self, last, w):
+        """App word w is in the ayah of app word last, or in the ayah before it."""
+        s, a, _ = self.E.key.where(last)
+        s2, a2, _ = self.E.key.where(w)
+        return s2 == s and a2 in (a, a - 1)
 
     def _notes(self, s, a, statuses, spans, readings=None):
         """Engine.ayah_notes on the take's frames (and its samples, for the second model in Strict). It reads only the
