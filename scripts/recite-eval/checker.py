@@ -46,6 +46,11 @@ DEFAULTS = {
     'skip_max': 12,     # longest jump (an ayah skip)
     'back': -8.0,       # going back to an earlier word (a repeat)
     'back_max': 30,
+    'back_prev': 0.0,   # added to a repeat into the ayah before the one being recited, and back_far to one two ayat or
+    'back_far': 0.0,    # more back: a restart goes back a few words, or to the ayah's start, far more often than into
+                        # another ayah sharing those words (Majd, Nov 20 2026). With them flat, 2:13's «قالوا» and
+                        # «وإذا قيل لهم» restarted hopped to 2:11's (17 words back cost as 2 did). -1 / -6: restart
+                        # bench 4 jumps -> 0; bench-v0 and learners' marks the same (runs/backcost in the lab)
     'gap_back': -8.0,   # going back to an earlier word from the filler after a later one: a word tried, dropped and
                         # said again (a correction); None: never (the filler then took the first saying in with it, an
                         # extra word). bench_slips.py's 108 planted corrections marked 80% -> 9% (Nov 15 2026); bench
@@ -468,6 +473,7 @@ class Graph:
         self.W = W = len(key_words)
         # gaps before a surah that starts inside the passage, where a basmala is said (Al-Falaq after Al-Ikhlas)
         self.surah_gap = [g for g in range(0, W) if _starts_surah(key_words[g]['word'])]  # 0: the passage opens a surah
+        self.ayah_ix = _ayah_index([kw['word'] for kw in key_words])
         lab, word_of, chain_of, kind, madd_back, alt_of = [], [], [], [], [], []
         entries = [[] for _ in range(W)]
         entry_alt = [[] for _ in range(W)]
@@ -532,6 +538,12 @@ class Decoder:
         self.widx = np.arange(W)
         self.skips = [k for k in range(1, int(P['skip_max']) + 1) if k < W]
         self.backs = min(int(P['back_max']), W - 1)
+        self.backpen = None  # a repeat's extra cost by how many ayat back it goes: [target w, offset o] (back_prev/far)
+        if self.backs > 0 and (P.get('back_prev') or P.get('back_far')) and getattr(g, 'ayah_ix', None) is not None:
+            ai = g.ayah_ix
+            src = np.minimum(np.arange(W)[:, None] + np.arange(self.backs + 1)[None, :], W - 1)
+            d = ai[src] - ai[:, None]
+            self.backpen = np.where(d <= 0, 0.0, np.where(d == 1, P.get('back_prev', 0.0), P.get('back_far', 0.0)))
         self.pen = np.full(W + 1, P['fill']); self.pen[0] = self.pen[W] = P['edge']
         for gg in getattr(g, 'surah_gap', []):  # a basmala there is cheap, so it isn't forced into the surah's first word
             self.pen[gg] = P.get('lead_fill', -0.25) if gg == 0 else P.get('basmala_fill', -0.1)
@@ -578,12 +590,16 @@ class Decoder:
             win = np.full(W, NEG); warg = np.zeros(W, np.int64)
             for o in range(self.backs + 1):
                 c2 = np.full(W, NEG); c2[:W - o] = ex[o:]
+                if self.backpen is not None:
+                    c2[:W - o] += self.backpen[:W - o, o]
                 b = c2 > win; win[b] = c2[b]; warg[b] = o
             offer(win + P['back'], 4, widx + warg)
             if P.get('gap_back') is not None:  # back from the filler after word w + o (gap w + o + 1)
                 win = np.full(W, NEG); warg = np.zeros(W, np.int64)
                 for o in range(self.backs + 1):
                     c2 = np.full(W, NEG); c2[:W - o] = gap[o + 1:W + 1]
+                    if self.backpen is not None:
+                        c2[:W - o] += self.backpen[:W - o, o]
                     b = c2 > win; win[b] = c2[b]; warg[b] = o
                 offer(win + P['gap_back'], 7, widx + warg + 1)
         c = gap[:W].copy(); c[0] = NEG
@@ -750,6 +766,21 @@ def substitutions(expected, heard, vocab, edge_free=2, span=None, edge_frames=99
         dels += exp[i - 1] not in LONG
         i -= 1
     return subs, dels, sum(1 for c in exp if c not in LONG)
+
+
+def _ayah_index(app_words):
+    """Each word's ayah, counted from 0 along the passage."""
+    out, last, n = [], object(), -1
+    for w in app_words:
+        try:
+            s, a, _ = KEY.where(w)
+            k = (s, a)
+        except Exception:
+            return None  # no key: no ayat, no costs by ayah
+        if k != last:
+            n, last = n + 1, k
+        out.append(n)
+    return np.array(out, np.int64)
 
 
 def _starts_surah(app_word):
