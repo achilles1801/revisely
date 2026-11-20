@@ -431,6 +431,54 @@ class Model(unittest.TestCase):
         frames = min(len(lp), 130 + 40 * 28 + engine_mod.NAME_PAD) - (100 - engine_mod.NAME_PAD)
         self.assertEqual(engine_mod.NAME_WORK - work['decode'], frames * (g.S + engine_mod.NAME_STATE_COST))
 
+    def test_a_words_letters_are_judged_on_its_window(self):
+        """engine.word_letters (lab, Nov 20 2026, recite-feedback-nov20.md 3c): word i of an ayah on words i-2..i+1,
+        only its own slip kept; nothing for a word heard wrong; not yet while a word of the window isn't said. An ayah
+        not said in full still has its other words' letters judged, as live judges them."""
+        import engine as engine_mod
+        E = engine()
+        st = {'letters': True, 'tajweed': False, 'mon': 4, 'mot': 4, 'aar': 0}
+        first = E.words.first[E.words.vindex[(2, 2)]]
+        n = E.words.counts[E.words.vindex[(2, 2)]]  # 7: ذَٰلِكَ ٱلْكِتَـٰبُ لَا رَيْبَ ۛ فِيهِ ۛ هُدًى لِّلْمُتَّقِينَ
+        statuses = {first + i: 'correct' for i in range(n)}
+        spans = {first + i: (20 + 40 * i, 50 + 40 * i) for i in range(n)}
+        lp = np.zeros((400, len(E.ear.vocab) + 1), np.float32)
+        score = E.level(st).bars['letters']['bar'] + 1
+        windows = []
+
+        def judge(win, sounds, j):
+            windows.append(len(sounds))
+            return [(score, 'ص→س', None, 'س')]
+
+        with unittest.mock.patch.object(engine_mod, 'words_judge_one', judge), \
+                unittest.mock.patch.object(E, 'ear2', None):
+            got = {i: E.word_letters(lp, 2, 2, i, statuses, spans, st) for i in (0, 3, n - 1)}
+            self.assertEqual(windows, [2, 4, 3])  # i..i+1 at the start, i-2..i+1, i-2..i at the end
+            self.assertEqual({i: [r['w'] for r in rows] for i, rows in got.items()},
+                             {0: [first], 3: [first + 3], n - 1: [first + n - 1]})
+            self.assertEqual(E.word_letters(lp, 2, 2, 3, statuses | {first + 3: 'wrong'}, spans, st), [])
+            skipped = statuses | {first + 4: 'missed'}
+            self.assertIsNone(E.word_letters(lp, 2, 2, 3, skipped, spans, st))
+            _, letters = E.ayah_notes(lp, 2, 2, skipped, spans, st)
+            self.assertEqual([r['w'] - first for r in letters], [0, 1, 2])  # 3, 5 and 6 have word 4 in their window
+            with unittest.mock.patch.object(engine_mod, 'LETTERS_PER_WORD', False):
+                self.assertEqual(E.ayah_notes(lp, 2, 2, skipped, spans, st)[1], [])
+
+    def test_one_words_letters_are_words_judges_own(self):
+        """engine.words_judge_one: word j of a window judged alone gives letters_v2.words_judge's rows for it, on noise
+        and on a recitation (the window lined up and paced the same; only the other words aren't judged)."""
+        import engine as engine_mod
+        E = engine()
+        sources = [np.frombuffer(noise(6, seed=5), '<i2')]
+        if ITEM.exists():
+            sources.append(np.frombuffer(bench_pcm()[16000 * 2 * 4: 16000 * 2 * 12], '<i2'))
+        sounds = E.sounds(1, 2)  # ٱلْحَمْدُ لِلَّهِ رَبِّ ٱلْعَـٰلَمِينَ
+        for x in sources:
+            lp = E.ear.logprobs(x.astype(np.float32) / 32768)
+            for lo, hi in ((0, 2), (0, 4), (1, 4)):
+                whole = engine_mod.letters_v2.words_judge(lp, sounds[lo:hi])
+                self.assertEqual([engine_mod.words_judge_one(lp, sounds[lo:hi], j) for j in range(hi - lo)], whole)
+
     def test_letters_are_judged_against_the_levels_own_bars(self):
         """An ayah's letters on the words level use its bars (bars.v6.json), Strict's the released model's."""
         import engine as engine_mod
@@ -446,6 +494,7 @@ class Model(unittest.TestCase):
         got = {}
         with unittest.mock.patch.object(E, 'words_level', lv), \
                 unittest.mock.patch.object(engine_mod.letters_v2, 'words_judge', lambda *a, **k: rows), \
+                unittest.mock.patch.object(engine_mod, 'words_judge_one', lambda win, sounds, j: rows[j]), \
                 unittest.mock.patch.object(engine_mod.tajweed, 'judge', lambda *a, **k: []), \
                 unittest.mock.patch.object(E, 'ear2', None):
             for name, st in (('harakat', {'letters': True, 'tajweed': False}),
@@ -543,9 +592,9 @@ class Bench(unittest.TestCase):
         seen = []
         real = E.ayah_notes
 
-        def notes(lp, s, a, statuses, spans, st, audio=None, readings=None):
+        def notes(lp, s, a, statuses, spans, st, audio=None, readings=None, letters_cache=None):
             seen.append(None if audio is None else len(audio))
-            return real(lp, s, a, statuses, spans, st, readings=readings)
+            return real(lp, s, a, statuses, spans, st, readings=readings, letters_cache=letters_cache)
         pcm = bench_pcm()[: 16000 * 2 * 20]
         with unittest.mock.patch.object(E, 'ayah_notes', notes), unittest.mock.patch.object(E, 'ear2', object(),
                                                                                              create=True):
@@ -580,10 +629,10 @@ class Bench(unittest.TestCase):
         real = E.ayah_notes
         go, threads = threading.Event(), []
 
-        def notes(lp, s, a, statuses, spans, st, audio=None, readings=None):
+        def notes(lp, s, a, statuses, spans, st, audio=None, readings=None, letters_cache=None):
             threads.append(threading.current_thread().name)
             self.assertTrue(go.wait(30))
-            return real(lp, s, a, statuses, spans, st, readings=readings)
+            return real(lp, s, a, statuses, spans, st, readings=readings, letters_cache=letters_cache)
         pcm, end = bench_pcm(), [{'type': 'end'}]
         msgs = chunks(pcm, 3200)
         session = lambda **kw: live.LiveSession(E, 1, 1, 1, 7, settings, **kw)
@@ -1247,6 +1296,40 @@ class TakeBack(unittest.TestCase):
             self.assertEqual(done['start'], want)
             self.assertEqual(min(r['w'] for r in done['words']), want)
             self.assertFalse([m for m in done['marks'] if m['w'] == want], done['marks'])
+
+
+HARAKAT_TAKE = pathlib.Path(os.environ.get('RECITE_BENCH_HARAKAT', pathlib.Path.home() /
+                                           'revisely-mistake-lab/data/bench-harakat/items')) / 'alafasy.p2.h1.clean.json'
+
+
+@unittest.skipUnless(MODEL.exists() and HARAKAT_TAKE.exists(), "the model or the lab's planted harakat bench is not here")
+class LettersPerWord(unittest.TestCase):
+    def test_a_harakat_slip_is_marked_before_its_ayah_ends(self):
+        """Al-Fatiha with harakat slips planted in 1:2's third word and 1:4's (the lab's planted harakat bench). Judged
+        a word at a time, each is marked once the word after it is decided, before its ayah's `ayah` event; judged per
+        ayah, with it. The same marks either way, and `done` has them."""
+        import engine as engine_mod
+        import live
+        t = json.loads(HARAKAT_TAKE.read_text())
+        with wave.open(str(HARAKAT_TAKE.with_suffix('.wav'))) as w:
+            pcm = w.readframes(w.getnframes())
+        got = {}
+        for per_word in (False, True):
+            with unittest.mock.patch.object(engine_mod, 'LETTERS_PER_WORD', per_word):
+                sess = live.LiveSession(engine(), 1, 1, 114, 6, {'letters': '1', 'tajweed': '0'}, defer=True,
+                                        open_end=True)
+                ev = run(sess, chunks(pcm, 3200) + [{'type': 'end'}])
+            ayah_t = {e['a']: e['t'] for e in ev if e['type'] == 'ayah'}
+            marks = [e for e in ev if e['type'] == 'mark' and e['mark']['kind'] in ('harakat', 'letter')]
+            got[per_word] = {(e['mark']['w'], e['mark']['ayah'][1]): e['t'] < ayah_t[e['mark']['ayah'][1]] for e in marks}
+            self.assertEqual({m['w'] for m in ev[-1]['result']['marks'] if m['kind'] in ('harakat', 'letter')},
+                             {w for w, _ in got[per_word]})
+        planted = {e['words'][0] for e in (t['events'] if isinstance(t['events'], list) else ast.literal_eval(t['events']))
+                   if e['type'] == 'hsub'}
+        self.assertEqual({w for w, _ in got[True]}, planted)
+        self.assertEqual(set(got[True]), set(got[False]))
+        self.assertTrue(all(got[True].values()), got[True])
+        self.assertFalse(any(got[False].values()), got[False])
 
 
 DEV_TAKE = sorted(pathlib.Path(os.environ.get('RECITE_DEV_TAKES', pathlib.Path.home() / 'revisely-mistake-lab/data/dev-takes'))
