@@ -266,6 +266,12 @@ async function startTake(mode: 'recite' | 'check', lock: number | null = A23) {
 
 // Recite's memory: the account's records come from the test (lib/reciteMemory/store's own test covers the store).
 const mockMemory: { records: unknown[]; remembered: unknown[] } = { records: [], remembered: [] };
+/**
+ * What was remembered of one kind or id. An earlier test's reader that a cleanup unmounted mid-take keeps its take
+ * (unfinished, RECITE-12), and that write can land during a later test: never read `remembered` by position.
+ */
+const rememberedWhere = (match: (r: { id?: string; kind?: string }) => boolean) =>
+  (mockMemory.remembered as { id?: string; kind?: string }[]).find(match);
 jest.mock('../../../lib/reciteMemory/store', () => ({
   useMemoryRecords: () => mockMemory.records,
   remember: jest.fn(async (_uid: string, r: unknown) => {
@@ -354,12 +360,12 @@ describe("Recite's memory on the page", () => {
     await tapWord(UTIYAT);
     fireEvent.press(screen.getByTestId('past-card-clear'));
     await flush();
-    expect(mockMemory.remembered[0]).toMatchObject({ kind: 'clear', w: UTIYAT, group: 'word' });
+    expect(rememberedWhere((r) => r.kind === 'clear')).toMatchObject({ kind: 'clear', w: UTIYAT, group: 'word' });
     expect(screen.queryByTestId('past-card')).toBeNull();
     expect(screen.getByText('Cleared from the page')).toBeTruthy();
     fireEvent.press(screen.getByText('Undo'));
     await flush();
-    expect(mockMemory.remembered[1]).toMatchObject({ kind: 'clear', w: UTIYAT, deleted: true });
+    expect(rememberedWhere((r) => r.kind === 'clear' && (r as { deleted?: boolean }).deleted === true)).toMatchObject({ kind: 'clear', w: UTIYAT });
   });
 
   it('during a take the remembered marks step aside: the page shows only that take’s marks', async () => {
@@ -452,7 +458,7 @@ describe('Show on the page', () => {
     await tapWord(UTIYAT);
     fireEvent.press(screen.getByTestId('mark-card-dismiss'));
     await flush();
-    expect(mockMemory.remembered[0]).toMatchObject({ id: 'past1', marks: [], mistakes: 0, accuracy: 1 });
+    expect(rememberedWhere((r) => r.id === 'past1')).toMatchObject({ id: 'past1', marks: [], mistakes: 0, accuracy: 1 });
     expect(jest.requireMock('../../../lib/reciteCheck/service').sendLabel).not.toHaveBeenCalled();
     // (The store here doesn't change, so the card stays open over the bar: modal for VoiceOver.)
     fireEvent.press(screen.getByTestId('shown-take-done', { includeHiddenElements: true }));
