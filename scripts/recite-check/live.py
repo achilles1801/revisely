@@ -704,6 +704,11 @@ class LiveSession:
         if self.start_in:
             self.ms['search_quran'] = 0.0  # the Qur'an-wide search's time (start_in)
         self._judged_here = 0
+        # done's notes worked out ahead (_prejudge): an ayah the closed segments hold whole, judged on the ayah thread
+        # one at a time while it has no live ayah to judge, then found in the cache by `done`
+        self._pre = {}                   # notes key -> its job
+        self._pre_todo = []              # (key, s, a, statuses, spans, readings) not handed over yet
+        self._pre_busy = None            # the job handed over last
         self._jump = None                # a big cursor move waiting for the next hop to agree (_cursor)
         self._seeked = False
         self.seg = None                  # built on the first hop: a new session answers at once
@@ -872,6 +877,8 @@ class LiveSession:
         t1 = time.perf_counter()
         ev = self._decide(t_end / SR, prov)
         ev += self._due(t_end / SR)
+        if self._pre_todo and not last:
+            self._pre_next()
         t2 = time.perf_counter()
         self.ms['model'] += (t1 - t0) * 1000
         self.ms['words'] += (t2 - t1) * 1000
@@ -1000,7 +1007,43 @@ class LiveSession:
                     if m['id'] not in self.marks:
                         self._keep_mark(m)
                         ev.append({'type': 'mark', 'mark': m, 't': now})
+            if self.defer:
+                self._prejudge()
         return c, ev
+
+    def _prejudge(self):
+        """With `defer`: queue `done`'s notes for every ayah the closed segments hold whole, to be worked out before the
+        end (_pre_next). `done` judges again each ayah whose words or edges the final pass decided differently from the
+        live window, which on a 10-minute take was 9 ayat and 5.6 s of its 5.7 s on Cloud Run (Nov 20 2026). These are
+        the inputs `_final` gives `_notes` for those ayat (_merge of the closed segments), so the same key and the same
+        notes; an ayah a later segment changes (a correction, a seek back) has another key and is judged in `done` as
+        before. Only an ayah whose frames are all final now (its pieces end by T), as Engine.ayah_notes clips to them."""
+        rows, spans, readings, _ = self._merge(self.segs)
+        statuses = {w: r['status'] for w, r in rows.items()}
+        for s_, a_ in sorted({tuple(self.E.ayah_of(w)) for w in rows}):
+            first, n = self._ayah_bounds(s_, a_)
+            if first < self.lo or first + n > self.end or not all(w in rows for w in range(first, first + n)):
+                continue
+            key = self._notes_key(s_, a_, statuses, spans, readings)
+            if key[3] is None or max(b for _, b in key[3]) > self.T or key in self._notes_cache or key in self._pre \
+                    or any(t[0] == key for t in self._pre_todo):
+                continue
+            self._pre_todo.append((key, s_, a_, statuses, spans, readings))
+
+    def _pre_next(self):
+        """Hand the next queued ayah to the ayah thread: one at a time, and only while no live ayah waits there (theirs
+        hold up a hop when late; one ayah of ours delays theirs by well under AYAH_DUE). One thread for both, as
+        ayah_notes isn't safe on two at once (tajweed.ctc_align returns its frames through a module attribute)."""
+        if self._pending or (self._pre_busy is not None and not self._pre_busy.done()):
+            return
+        while self._pre_todo:
+            key, s_, a_, statuses, spans, readings = self._pre_todo.pop(0)
+            if key in self._notes_cache or key in self._pre:
+                continue
+            kw = {'audio': self.xf[:self.n]} if self.v5 else {}
+            self._pre[key] = self._pre_busy = _ayah_submit(self._idle, self.E.ayah_notes, self.lp[:self.T], s_, a_,
+                                                           statuses, spans, self.st, readings=readings, **kw)
+            return
 
     def _segment_result(self, seg, path, upto, P, refs=None, extras_to=None):
         lp = self.lp[seg.f0:seg.frames()]
@@ -1494,6 +1537,14 @@ class LiveSession:
         ayah's word statuses, its first word's start, its last word's end and final frames there, so an ayah judged
         live is not judged again in `done` when those are the same (the second model is ~1 s an ayah on Cloud Run)."""
         key = self._notes_key(s, a, statuses, spans, readings)
+        if key not in self._notes_cache and key in self._pre:  # worked out ahead (_prejudge)
+            try:
+                got, ms = self._pre.pop(key).result()
+                self._notes_cache[key] = got
+                self.ms['tajweed'] += ms
+                self.ms['prejudged'] = self.ms.get('prejudged', 0) + 1
+            except Exception:
+                pass
         if key not in self._notes_cache:
             # in `done`: an ayah not judged live (not said in full then, or the last one), or one whose words or edges
             # the final pass decided differently. Reusing the live notes when only its start had moved kept a false
@@ -1713,16 +1764,10 @@ class LiveSession:
             out['ms']['side'] = int(self.side.close() + self.side.ms)
             out['ms']['side_wait'] = int(self.side.ms + self.side.waited)
 
-    def _final(self):
-        """The whole take decided once more (run_item_live's final, per segment): the v2 answer."""
-        seg, P = self.seg, self.P
-        PF = dict(P, delay=P['look'] + P['commit'])
-        results = list(self.segs)
-        if seg is not None and seg.dec.t >= 5:
-            at_end = seg.b == self.end
-            path, _ = seg.dec.traceback(final=at_end)
-            refs = checker.trail_refs(self.end) if at_end and P.get('trail_extra') else None
-            results.append(self._segment_result(seg, path, seg.b, PF, refs))
+    @staticmethod
+    def _merge(results):
+        """Segment results as `done` reads them: each word's row (a word said again, right, in a later segment:
+        corrected), spans (heard ones only), readings and extras."""
         rows, spans, readings, extras = {}, {}, {}, []
         for r in results:
             for row in r['words']:
@@ -1734,10 +1779,26 @@ class LiveSession:
             for w, stt in r['back'].items():
                 if w in rows and rows[w]['status'] in ('wrong', 'missed') and stt in ('correct', 'corrected'):
                     rows[w] = {'w': w, 'status': 'corrected', **({'t': rows[w]['t']} if 't' in rows[w] else {})}
+        return rows, {w: s for w, s in spans.items() if s}, readings, extras
+
+    def _final(self):
+        """The whole take decided once more (run_item_live's final, per segment): the v2 answer."""
+        seg, P = self.seg, self.P
+        PF = dict(P, delay=P['look'] + P['commit'])
+        results = list(self.segs)
+        if seg is not None and seg.dec.t >= 5:
+            at_end = seg.b == self.end
+            path, _ = seg.dec.traceback(final=at_end)
+            refs = checker.trail_refs(self.end) if at_end and P.get('trail_extra') else None
+            results.append(self._segment_result(seg, path, seg.b, PF, refs))
+        rows, spans, readings, extras = self._merge(results)
         words = [rows[w] for w in sorted(rows)]
         statuses = {r['w']: r['status'] for r in words}
         flagged = {r['w']: {'kind': r.get('kind')} for r in words if r['status'] == 'wrong'}
-        spans = {w: s for w, s in spans.items() if s}
+        self._pre_todo = []  # what wasn't handed over is judged here; the job under way finishes first (one thread)
+        if self._pre_busy is not None:
+            with contextlib.suppress(Exception):
+                self._pre_busy.result()
         t0 = time.perf_counter()
         tj, letters = [], []
         done = set()

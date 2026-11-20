@@ -252,6 +252,22 @@ dev account has Premium (`devGrantPremium`); `--update-env-vars CHECK_GATE=on` t
 **Limits.** A take is at most 15 minutes (then `done`, `why: "too_long"`). 30 s without a frame from the phone closes
 the socket (`idle`). uvicorn pings every 10 s, so a phone gone without closing is noticed within 20 s.
 
+**Beats and piles** (contract draft 9, Nov 20 2026, after Majd's 3-minute take dropped twice and never got an answer):
+- `ready` says `"beat": 2`, and every 2 s from then on, from a task of its own, the server sends
+  `{"type":"beat","t":…,"rx":…}`: the seconds of audio checked and received. They go out during long work too, so a
+  silent socket really is dead (the phone's watchdog resumes), and `sent − t` is the checker's lag. Beats are never
+  kept with the take and stop at `done`.
+- Audio that piles up (a resume's catch-up, a phone that sent a burst) is checked one second at a time, with its events
+  sent between the slices. Before, the pile was one piece of work with nothing sent meanwhile: the 38 s Majd's phone
+  resent took the cursor nowhere for its whole length.
+- A socket that is gone, or replaced by the phone's next one, stops the work within a slice. What wasn't checked comes
+  again with the resume, from `from`. Before, the instance went on through the pile after the socket had closed, and
+  Cloud Run gives an instance with no open request almost no CPU: Majd's 38 s took 5 minutes, holding the session.
+- Each socket's end is a `socket` health line (below).
+- `done`'s letters and tajweed for an ayah the closed segments hold whole are worked out before the end (live.py
+  `_prejudge`), on the ayah thread while it has nothing live to judge. A 10-minute take's `done` judged 9 ayat again
+  at the end: 5.6 s of its 5.7 s on Cloud Run. The answer is the same.
+
 **Resume.** A dropped socket: open a new one and send the start frame again with `"resume":"<take>"` (and a fresh
 token). `ready.from` says how many samples the server holds: send the take's PCM from there (and any seek, dismiss or
 undismiss at the point of the audio where it was first sent), then carry on. On the same instance (within 2 minutes)
@@ -314,6 +330,10 @@ only counts, seconds, levels and reasons (the server tests check it).
   `bad_request`), **`error`**
   (`route`), **`label`** (a dismiss or an undismiss), and **`dropped`**: a session whose phone went and didn't come
   back here (`at`: `timeout` after RESUME_TTL, or `shutdown`).
+- **`socket`:** how each live socket ended: `why` (`done`, `gone`: the phone or the network closed it, `replaced`: the
+  phone came back on another socket, `idle`, `ended`), the close `code` (1011 with uvicorn's keepalive timeout, 1006
+  when the connection just went), `open_s`, `rx_s` and `checked_s` (audio received and checked on the take by then),
+  `behind_s` (received but never checked here), and that socket's `lag_*`.
 
 **The digest** (`digest.py`): the last 7 days of those lines from both services (`recite-check` and
 `recite-check-pair`, its rows marked "(pair)"), as Markdown. It covers:

@@ -604,6 +604,26 @@ class Bench(unittest.TestCase):
         longest = max(live.AYAH_DUE, live.AYAH_DUE_SHARE['strict'] * 20)  # Al-Fatiha's ayat take under 20 s here
         self.assertTrue(late and all(0 <= d <= longest + live.LIVE['hop'] for d in late), late)
 
+    def test_done_takes_the_closed_segments_ayat_judged_ahead(self):
+        """With defer, each ayah the closed segments hold whole is judged on the ayah thread before the end, and `done`
+        takes it from the cache: a 10-minute take's `done` judged 9 ayat again, 5.6 s of its 5.7 s on Cloud Run (Nov 20
+        2026). The answer is the same as judging them all at the end."""
+        import live
+        item = BENCH / 'minshawi-murattal.p1.m1.clean.json'  # Al-Baqarah 2:6-16 (a page), with planted mistakes
+        if not item.exists():
+            self.skipTest('bench-v0 page 1 is not here')
+        with wave.open(str(item.with_suffix('.wav'))) as w:
+            pcm = w.readframes(w.getnframes())
+        st, msgs = {'tajweed': '0', 'letters': '1'}, chunks(pcm, 16000) + [{'type': 'end'}]
+        ahead = live.LiveSession(engine(), 2, 6, 2, 16, st, defer=True)
+        got = run(ahead, msgs)
+        self.assertGreater(ahead.result['ms'].get('prejudged', 0), 0)
+        self.assertLess(ahead.result['ms']['done_notes'], 8)  # 8 judged in `done` before
+        plain = live.LiveSession(engine(), 2, 6, 2, 16, st, defer=True)
+        plain._prejudge = lambda: None
+        self.assertEqual(run(plain, msgs), got)
+        self.assertNotIn('prejudged', plain.result['ms'])
+
     def test_same_events_for_any_chunk_size(self):
         pcm = bench_pcm()[: 16000 * 2 * 20]
         a = run(self.session(), chunks(pcm, 3200) + [{'type': 'end'}])
