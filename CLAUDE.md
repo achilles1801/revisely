@@ -379,17 +379,27 @@ until its part is set up.
     reached the summary", tag `recite_stop_last`). It holds no audio or words, only event types.
   - **A take starts anywhere on the page** (Majd, Nov 14 2026; protocol 6). The start frame sends `startBy` (the page's
     last ayah), and the checker says where the reciter started (`locked`; recite-contract.md in the shared notes).
-    - Until then the bar says Listening…, with no cursor and no score. If it is never found, the take fails silently
-      (Majd): no message (`nolock` isn't read), and Stop just ends it, with no summary. The one exception (Majd, Nov
-      15 2026): with VoiceOver or TalkBack on, once Stop has turned the microphone off, one line is said ("Couldn't
-      follow that take. Try starting at the top of the page."); nothing on screen changes for anyone.
+    - Until then the bar says Listening…, with no cursor and no score. **It must always find where he is** (Majd, Nov 20
+      2026: "it should always find where i am there's no exception"), so there is no "can't find you" message: finding
+      the place every time is the bar, measured by the lock benchmark (recite-server's `long/lockcases` in the shared
+      notes' `long-takes.md`: 3,600 public takes from every kind of start, surah openings with and without the
+      isti'adha and basmala, pauses, false starts, fast, quiet, off the page, and his kept takes). A take with no
+      recitation in it still ends with nothing (`nolock` isn't read), and Stop just ends it, with no summary. With
+      VoiceOver or TalkBack on, once Stop has turned the microphone off, one line is said then ("Couldn't follow that
+      take. Try starting at the top of the page."; Majd, Nov 15 2026); nothing on screen changes for anyone.
+    - What it passes over (live.py, Nov 20 2026, #786 and after): speech before the start fitted as stray words (the
+      isti'adha and the basmala before 2:1 never locked); the basmala in the Qur'an-wide search (with الحمد لله after
+      it, it is Al-Fatiha word for word); a short first word that reads like the page's first word. A surah's opening on
+      the page locks as soon as its first word is heard (الٓمٓ after the basmala: 10 s → 2.7 s). A refrain the page
+      repeats waits for the next ayah.
     - A page turned by hand searches that page again (`seek` with `startBy`).
     - **Anywhere in the Qur'an** (Majd, Nov 15 2026, step 2; protocol 7, shape A in recite-contract.md): a take from
       the mic also sends `startIn: "quran"`. When the page doesn't match, the checker looks in the whole Qur'an and locks
       only on a place it is sure is the one (`locked.where: "quran"`); the reader turns there (the cursor's page turn),
       VoiceOver hears "Started at …", and a Sentry breadcrumb notes it (numbers only; the checker keeps where every kept
-      take locked). Drills, Test me places and a voice search's ayahs never send it. Older checkers ignore it. Never
-      found anywhere: still silent.
+      take locked). Drills, Test me places and a voice search's ayahs never send it. Older checkers ignore it. It fits up
+      to 35 s of speech while it searches (50 s at most), and a long run (8 words, one heard wrong) locks too: 2:255 and
+      3:2 share their first seven words.
     - Nothing before the start is skipped, and the summary counts from the start.
     - A checker below protocol 6 (`ready.protocol`) doesn't search: the take starts at the page's first ayah, as
       before. So does a cursor that comes with no `locked` (`lib/reciteLive/state`).

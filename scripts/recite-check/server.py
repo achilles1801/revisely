@@ -36,7 +36,7 @@ from engine import BadRequest, Engine
 HERE = pathlib.Path(__file__).resolve().parent
 VERSION = (HERE / 'CHECKER_COMMIT').read_text().strip()[:12] if (HERE / 'CHECKER_COMMIT').exists() else 'local'
 SERVER = (HERE / 'SERVER_COMMIT').read_text().strip()[:12] if (HERE / 'SERVER_COMMIT').exists() else 'local'
-PROTOCOL = 7  # the contract this server speaks (recite-contract.md): 5 = follow, hint, tajweed, premium_required;
+PROTOCOL = 8  # the contract this server speaks (recite-contract.md): 8 = beats and done keeping live marks (drafts 9-10); 5 = follow, hint, tajweed, premium_required;
               # 6 = start anywhere on the page (startBy, locked, nolock, done.result.start);
               # 7 = anywhere in the Qur'an (startIn "quran", locked.where); see protocol()
 MAX_SECONDS = 240

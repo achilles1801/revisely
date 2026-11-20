@@ -230,8 +230,11 @@ class Model(unittest.TestCase):
             self.assertEqual(ev[-1]['type'], 'done')
 
     def test_a_big_cursor_move_waits_for_the_next_hop(self):
-        """A one-hop slip back (Majd's Recite take: 13 words back for one hop) never shows; a repeat or a skip shows a
-        hop later; small moves and a seek show at once."""
+        """A one-hop slip back (Majd's Recite take: 13 words back for one hop) never shows; small moves and a seek show at
+        once. Majd's precedence for a bigger move (Nov 20 2026: "the last few words I recited, and then that verse in
+        general, and then the previous verse"): within the ayah being recited or back into the one before it, a hop
+        later; anywhere else, only after JUMP_FAR hops in a row. Al-Fatiha's words: 1:2 is 4-7, 1:4 10-12, 1:5 13-16,
+        1:6 17-19, 1:7 20-28."""
         import live
         sess = live.LiveSession(engine(), 1, 1, 2, 10, {}, follow=True)
 
@@ -241,13 +244,30 @@ class Model(unittest.TestCase):
                 sess.sent['at'] = got
             return got
         self.assertEqual([hop(w) for w in (0, 1, 2, 2, 4)], [0, 1, 2, None, 4])  # moving on: at once
-        self.assertEqual([hop(w) for w in (20, 21)], [None, 21])  # 16 ahead: waits a hop, shown when the next agrees
-        self.assertEqual([hop(w) for w in (8, 22)], [None, 22])  # a slip 13 back for one hop: never shown
-        self.assertEqual([hop(w) for w in (10, 10, 11)], [None, 10, 11])  # a repeat from word 10: a hop later
-        self.assertEqual(hop(9), 9)  # one or two words back (the reciter going over a word): at once
+        far = live.JUMP_FAR
+        self.assertEqual([hop(w) for w in [20] * far], [None] * (far - 1) + [20])  # 1:2 to 1:7: JUMP_FAR hops
+        self.assertEqual([hop(w) for w in (24, 25, 26)], [24, 25, 26])
+        self.assertEqual([hop(w) for w in (8, 27)], [None, 27])  # a slip 19 back for one hop: never shown
+        self.assertEqual([hop(w) for w in (20, 20)], [None, 20])  # a restart at its ayah's start: a hop later
+        self.assertEqual([hop(w) for w in (21, 22, 23, 24)], [21, 22, 23, 24])
+        self.assertEqual([hop(w) for w in (17, 17)], [None, 17])  # back into the ayah before (1:6): a hop later
+        self.assertEqual(hop(16), 16)  # one word back (the reciter going over a word): at once
+        self.assertEqual([hop(w) for w in [5] * far], [None] * (far - 1) + [5])  # 1:5 back to 1:2: JUMP_FAR hops
         sess._seeked = True
         self.assertEqual(hop(40), 40)  # the phone moved the reader there: at once
         self.assertEqual(hop(5), None)  # and the rule holds again after it
+
+    def test_done_keeps_the_marks_shown_live(self):
+        """Majd (Nov 20 2026): a mark "should stay that way". A live mark the final pass left out stays in `done` with
+        `live: true`; the final's own mark on that word replaces it; a word heard right again after it drops it."""
+        import live
+        sess = live.LiveSession(engine(), 1, 1, 1, 7, {})
+        sess.marks = {'5:skipped:': {'id': '5:skipped:', 'w': 5, 'kind': 'skipped'},
+                      '6:added:': {'id': '6:added:', 'w': 6, 'kind': 'added'},
+                      '7:skipped:': {'id': '7:skipped:', 'w': 7, 'kind': 'skipped'}}
+        final = [{'id': '6:word:sound', 'w': 6, 'kind': 'word'}]
+        kept = sess._live_kept(final, {5: 'correct', 6: 'wrong', 7: 'corrected'})
+        self.assertEqual(kept, [{'id': '5:skipped:', 'w': 5, 'kind': 'skipped', 'live': True}])
 
     def test_a_lazim_madd_is_judged_on_time_only(self):
         """A lazim madd read short is marked only when the reciter's pace was measured in the ayah: alone, الٓمٓ has no
@@ -736,6 +756,47 @@ class StartAnywhere(unittest.TestCase):
         sess = live.LiveSession(E, 1, 1, 1, 7, {}, start_by=(1, 7))
         ev = run(sess, chunks(take, 3200)[:int(15 / 0.1)])
         self.assertEqual([e['w'] for e in ev if e['type'] == 'locked'], [w])
+
+    def basmala_then(self, passage):
+        """Alafasy's basmala (his Al-Fatiha's 1:1), half a second, then his bench passage from its first word; and how
+        long the basmala part is."""
+        import ast
+
+        def load(name):
+            t = json.loads((BENCH / f'alafasy.{name}.clean.clean.json').read_text())
+            tl = ast.literal_eval(t['timeline']) if isinstance(t['timeline'], str) else t['timeline']
+            with wave.open(str(BENCH / f'alafasy.{name}.clean.clean.wav')) as w:
+                return [e for e in tl if e.get('word') is not None and not e.get('extra')], w.readframes(w.getnframes())
+        tl, pcm = load('p2')
+        cut = lambda x, a, b: x[int(a * 16000) * 2:int(b * 16000) * 2]  # noqa: E731
+        basmala = cut(pcm, tl[0]['start'] - 0.1, tl[3]['end'] + 0.1) + b'\0\0' * 8000
+        tl2, pcm2 = load(passage)
+        return basmala + cut(pcm2, tl2[0]['start'] - 0.3, 10 ** 6), len(basmala) / 32000 + 0.3, tl2[0]['word']
+
+    def test_a_surah_opening_after_the_basmala_locks_at_once(self):
+        """Ya-Sin after the basmala, on its page (35:45-36:12): the basmala was fitted as stray words of the page, and the
+        opening waited for its own run to outgrow theirs (muqatta'at openings after the basmala: 10 s at the median, 2.7 s
+        now; Nov 20 2026, the lock benchmark)."""
+        import live
+        if not (BENCH / 'alafasy.p4.clean.clean.json').exists():
+            self.skipTest('bench-v0 passage 4 is not here')
+        take, at, first = self.basmala_then('p4')
+        sess = live.LiveSession(engine(), 35, 45, 114, 6, {}, start_by=(36, 12), start_in='quran')
+        ev = run(sess, chunks(take, 3200)[:int((at + 12) / 0.1)])
+        lock = [e for e in ev if e['type'] == 'locked']
+        self.assertEqual([e['w'] for e in lock], [first])
+        self.assertLess(lock[0]['t'] - at, 5.0)
+
+    def test_the_basmala_before_al_kahf_is_not_al_fatiha(self):
+        """The basmala and «الحمد لله» are Al-Fatiha's first words too: the Qur'an-wide search locked Husary's Al-Kahf at
+        1:1 (Nov 20 2026). Here Al-Kahf after the basmala, its page shown (17:105-18:4), locks at 18:1."""
+        import live
+        if not (BENCH / 'alafasy.p3.clean.clean.json').exists():
+            self.skipTest('bench-v0 passage 3 is not here')
+        take, at, first = self.basmala_then('p3')
+        sess = live.LiveSession(engine(), 17, 105, 114, 6, {}, start_by=(18, 4), start_in='quran')
+        ev = run(sess, chunks(take, 3200)[:int((at + 20) / 0.1)])
+        self.assertEqual([(e['w'], e.get('where')) for e in ev if e['type'] == 'locked'], [(first, 'page')])
 
     def test_a_phrase_the_page_repeats_waits_until_the_places_part(self):
         """1:3 (ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ) is also the end of 1:1: it may not lock on 1:1."""

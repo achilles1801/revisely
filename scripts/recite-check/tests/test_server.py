@@ -195,7 +195,7 @@ class CheckTests(Base):
         r = self.client.get('/health')
         self.assertEqual(r.status_code, 200)
         body = r.json()
-        self.assertEqual((body['ok'], body['protocol']), (True, 7))
+        self.assertEqual((body['ok'], body['protocol']), (True, 8))
         self.assertIn('server', body)
         self.assertIn('engine', body)
         self.assertIs(body['words'], False)  # FakeEngine has no word table
@@ -334,7 +334,7 @@ class LiveTests(Base):
         with self.socket() as ws:
             ws.send_text(start(keep=True, mon=5, aar=2, letters=True))
             ready = ws.receive_json()
-            self.assertEqual((ready['type'], ready['from'], ready['v'], ready['protocol']), ('ready', 0, 2, 7))
+            self.assertEqual((ready['type'], ready['from'], ready['v'], ready['protocol']), ('ready', 0, 2, 8))
             self.assertTrue(store.TAKE.match(ready['take']))
             self.assertEqual(FakeSession.made[0].args, (1, 1, 114, 6, {'mon': 5, 'mot': 4, 'aar': 2,
                                                                        'letters': '1', 'tajweed': '1'}))
@@ -412,7 +412,7 @@ class LiveTests(Base):
             while ws.receive_json()['type'] != 'done':
                 pass
             self.closed(ws)
-        self.assertEqual(ready['protocol'], 7)
+        self.assertEqual(ready['protocol'], 8)
         self.assertEqual(FakeSession.made[0].kw, {'start_by': (2, 16)})
         self.assertEqual(FakeSession.made[0].args[:4], (2, 6, 114, 6))
         kept = json.loads(self.stored[f"recite-tests/tester1/{ready['take']}.json"])
@@ -428,7 +428,7 @@ class LiveTests(Base):
             ws.send_text(start(s=2, a=6))
             ws.receive_json()
         self.assertEqual(FakeSession.made[0].kw, {})
-        self.assertEqual(self.client.get('/health').json()['protocol'], 7)
+        self.assertEqual(self.client.get('/health').json()['protocol'], 8)
 
     def test_anywhere_in_the_quran(self):
         """startIn "quran" (protocol 7) reaches the session as start_in, only with startBy (the page is searched
@@ -1370,7 +1370,7 @@ class HealthTests(Base):
                          {'kind': 'live', 'level': 'strict+letters', 'ear': 'released+v5', 'start': 'fixed',
                           'audio_s': 2.0, 'sockets': 1,
                           'cold': True, 'restarted': False, 'why': 'end', 'kept': True, 'app': '1.0.4 (40) dev 3fa9c1d2',
-                          'protocol': 7})
+                          'protocol': 8})
         for k in ('open_s', 'ready_s', 'age_s', 'cpu_s', 'lag_p50', 'lag_p90', 'lag_max'):
             self.assertGreaterEqual(line[k], 0, k)
         self.assertLessEqual(line['lag_p50'], line['lag_max'])
