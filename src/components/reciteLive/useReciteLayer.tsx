@@ -32,7 +32,7 @@ import { premiumErrorText, setDevPremium, supportLinkUrl, usePremium } from '../
 import { claimEarlyAccess, earlyAccessShortLine, useEarlyAccess } from '../../lib/earlyAccess';
 import { checkLevel, setReciteCheckSettings, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
 import { loadQuranWords, getQuranWords, QuranWords } from '../../lib/recite/quranWords';
-import { furthestWord, marksOnPage, removedMarks, startNotFound } from '../../lib/reciteLive/state';
+import { furthestWord, isUnfinished, marksOnPage, removedMarks, startNotFound } from '../../lib/reciteLive/state';
 import { stopTrace } from '../../lib/reciteLive/stopTrace';
 import {
   barWords,
@@ -843,7 +843,7 @@ export function useReciteLayer({
           onWholeAyah={showWholeAyah}
           // A test's place says how it went in words: no score pill (it crowded the bar out).
           score={checkTake && !test ? scorePill(live.state, qw, live.startWord) : null}
-          seconds={live.seconds}
+          clock={live.clock}
           recording={live.recording && live.mic === 'on'}
           // A test's place, once done, says how it went in the words' place.
           words={placeResult ? [] : barWords(live.state, qw, { check: checkTake, startWord: live.startWord })}
@@ -891,7 +891,7 @@ export function useReciteLayer({
       ) : null,
     /** Beside the page's number during a take: its time (a tap brings the controls back). */
     activity: live.active ? (
-      <TakeActivity seconds={live.seconds} recording={live.recording && live.mic === 'on'} onPress={() => setTakeImmersive(false)} />
+      <TakeActivity clock={live.clock} recording={live.recording && live.mic === 'on'} onPress={() => setTakeImmersive(false)} />
     ) : null,
     /** The cards, sheets and notes, rendered last. */
     sheets: liveOn ? (
@@ -1098,6 +1098,7 @@ export function useReciteLayer({
           kept={live.testData}
           removed={removedMarks(live.state)}
           premiumNote={checkTake ? earlyAccessShortLine(premium, earlyAccessOn) : null}
+          unfinished={isUnfinished(live.state)}
           onPutBack={(id) => {
             if (undoFor === id) setUndoFor(null);
             const m = live.state.removed[id]?.mark;

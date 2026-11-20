@@ -146,6 +146,34 @@ function startedUnlocked(state: LiveState): LiveState {
 /** A word mark the take's start leaves out: nothing before where the reciter started is skipped. */
 const beforeStart = (m: Mark, start: number | null) => start != null && m.kind === 'skipped' && m.w < start;
 
+/**
+ * A take that ends without the checker's final answer (long takes, Nov 20 2026; Majd's take of Nov 19 spun on Stop until
+ * he left, and was lost): Stop's answer is late, or the connection failed after the start was found. What the take
+ * found stands as its result, marked unfinished, so Stop always ends in a summary and the take is kept. A final answer
+ * that comes afterwards replaces it (`done`). A take whose start was never found has nothing to keep.
+ */
+export function settleUnfinished(state: LiveState, secs: number): LiveState {
+  if (state.status === 'done' || state.status === 'idle' || state.start == null) return state;
+  const last = Math.max(furthestWord(state) ?? state.start, state.start);
+  const final: FinalResult = {
+    v: 2,
+    take: state.take,
+    from: state.start,
+    to: last + 1,
+    secs: Math.round(secs),
+    marks: Object.values(state.marks),
+    score: state.score,
+    start: state.start,
+    unfinished: true,
+  };
+  return { ...state, status: 'done', final, failure: null, off: null, seeking: false };
+}
+
+/** The take's result is what it found before the end, not the checker's final answer (`settleUnfinished`). */
+export function isUnfinished(state: LiveState): boolean {
+  return state.status === 'done' && state.final?.unfinished === true;
+}
+
 /** Stop was tapped: the live marks stay while the final answer comes. */
 export function liveStopping(state: LiveState): LiveState {
   return state.status === 'listening' || state.status === 'connecting' ? { ...state, status: 'checking', off: null } : state;
@@ -254,6 +282,9 @@ export function applyEvent(state: LiveState, e: LiveEvent): LiveState {
         final: state.final ? { ...state.final, marks: state.final.marks.map(named) } : state.final,
       };
     }
+    case 'beat':
+      // The checker's heartbeat: for the connection (lib/reciteLive/socket) and the take's numbers, not the page.
+      return state;
     case 'error':
       // A take that has its final answer keeps it; otherwise what was shown stays, marked as failed.
       return state.status === 'done' ? state : { ...state, status: 'failed', failure: e.reason, off: null };

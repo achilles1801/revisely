@@ -62,10 +62,12 @@ export const wordsOf = (t: Pick<TakeRecord, 'from' | 'to'>): number => Math.max(
  * The takes' score: each take's own score (by the page, as its row shows it) weighted by the words it recited, so a long
  * take counts for more than a line and the figure always lies between the scores the rows show. Null with no takes.
  */
-export function meanScore(takes: readonly Pick<TakeRecord, 'from' | 'to' | 'accuracy'>[]): number | null {
+export function meanScore(takes: readonly (Pick<TakeRecord, 'from' | 'to' | 'accuracy'> & { unfinished?: boolean })[]): number | null {
   let words = 0;
   let sum = 0;
   for (const t of takes) {
+    // A take kept without its final answer (RECITE-11) never counts in a score: its end wasn't checked.
+    if (t.unfinished) continue;
     const n = wordsOf(t);
     words += n;
     sum += n * t.accuracy;

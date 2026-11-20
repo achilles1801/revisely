@@ -12,6 +12,11 @@
 // pair service refuses (`level_elsewhere`) or can't start (unreachable, or its 403 while it is private) starts again on
 // recite-check, with no resume; once a service has said `ready`, a resume goes back to it. A pair service that couldn't
 // start a take, or whose /health refused (lib/reciteLive/pairService), is passed over for an hour.
+//
+// Long takes (Majd's 3.5-minute take of Nov 19 2026, lost): a connection can go quiet without closing, and the phone
+// then sent audio into it for 76 s with nothing coming back. A checker that beats (`beat`, every ~2 s) is watched: once
+// it has beaten, WATCHDOG_MS without a word from it counts as a drop, and the take resumes. And a resume's held audio
+// goes out a slice at a time between frames, never in one loop that holds the JavaScript thread.
 
 import { LiveEvent, parseEvent } from './contract';
 import { pairClosed, pairOpen } from './pairService';
@@ -33,6 +38,12 @@ export function pairTakes(start: StartFrame): boolean {
 const SAMPLE_RATE_HZ = 16_000;
 /** Samples per frame when sending held audio again after a drop (1 s). */
 const RESEND_SAMPLES = 16_000;
+/** Held audio sent in one go while catching up after a drop (5 s of samples); the rest follows a slice at a time. */
+export const CATCHUP_SLICE_SAMPLES = 5 * SAMPLE_RATE_HZ;
+/** Once the checker has beaten: this long without a word from it, and the connection counts as dropped (ms). */
+export const WATCHDOG_MS = 8000;
+/** How often the watchdog looks (ms). */
+const WATCH_EVERY_MS = 2000;
 /** Tries to reconnect before giving up, and the waits between them. */
 const RETRY_WAITS_MS = [500, 1500, 4000];
 /**
@@ -109,6 +120,19 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
     let namesWait: unknown = null;
     let tries = 0;
     let retry: unknown = null;
+    /** The checker beats (it has sent `beat`): its silence then means a dead connection. */
+    let beats = false;
+    /** When the current socket last heard from the checker, and the watchdog's next look. */
+    let heardAt = 0;
+    let watch: unknown = null;
+    /** A resume's held audio still going out (the next slice's timer). */
+    let catching: unknown = null;
+    const stopWatch = () => {
+      if (watch != null) timers.clear(watch);
+      watch = null;
+      if (catching != null) timers.clear(catching);
+      catching = null;
+    };
     /** Where the take goes: the pair service for the light levels while it's up, else recite-check. */
     let url = pairUrl && pairTakes(start) && pairOpen(now()) ? pairUrl : mainUrl;
     /** On the pair service, which hasn't said `ready` yet: a refusal or a drop sends the take to recite-check. */
@@ -128,6 +152,7 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
     const finish = (e?: LiveEvent) => {
       if (finished) return;
       finished = true;
+      stopWatch();
       if (retry != null) timers.clear(retry);
       if (namesWait != null) timers.clear(namesWait);
       if (e) handlers.onEvent(e);
@@ -146,29 +171,80 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
       handlers.onClose();
     };
 
-    /** Send the held audio from sample `from`, each text frame at its place in it, then go live. */
+    /**
+     * Send the held audio from sample `from`, each text frame at its place in it, then go live. A slice at a time
+     * (CATCHUP_SLICE_SAMPLES), the rest between frames: after a drop on another instance it's the whole take again, which
+     * in one loop held the JavaScript thread (and the screen) for as long as it took. Audio and frames that come in
+     * meanwhile join the end, in order.
+     */
     const catchUp = (s: SocketLike, from: number) => {
       // Frames sent before `from` reached the checker with the audio it holds.
       let c = controls.findIndex((x) => x.at >= from);
       if (c < 0) c = controls.length;
+      let at = from;
+      let ci = 0;
       let pos = 0;
-      for (const chunk of audio) {
-        const end = pos + chunk.length;
-        let at = Math.max(pos, from);
-        while (at < end) {
-          const next = c < controls.length ? controls[c].at : Infinity;
-          if (next <= at) {
-            s.send(JSON.stringify(controls[c++].frame));
+      const step = () => {
+        catching = null;
+        if (socket !== s || finished) return;
+        let budget = CATCHUP_SLICE_SAMPLES;
+        while (budget > 0) {
+          while (c < controls.length && controls[c].at <= at) s.send(JSON.stringify(controls[c++].frame));
+          if (ci >= audio.length) break;
+          const chunk = audio[ci];
+          const end = pos + chunk.length;
+          if (at >= end) {
+            pos = end;
+            ci++;
             continue;
           }
-          const stop = Math.min(end, at + RESEND_SAMPLES, next);
+          const next = c < controls.length ? controls[c].at : Infinity;
+          const stop = Math.min(end, at + Math.min(RESEND_SAMPLES, budget), next);
           s.send(bytes(chunk.subarray(at - pos, stop - pos)));
+          budget -= stop - at;
           at = stop;
         }
-        pos = end;
+        if (ci < audio.length) {
+          catching = timers.set(step, 0);
+          return;
+        }
+        while (c < controls.length) s.send(JSON.stringify(controls[c++].frame));
+        live = true;
+      };
+      step();
+    };
+
+    /** The socket went quiet (the watchdog): let it go as if it had closed, and resume. */
+    const stale = (s: SocketLike) => {
+      if (socket !== s) return;
+      socket = null;
+      s.onclose = null;
+      s.onmessage = null;
+      try {
+        s.close();
+      } catch {
+        // already closed
       }
-      while (c < controls.length) s.send(JSON.stringify(controls[c++].frame));
-      live = true;
+      if (answered) {
+        finish();
+        return;
+      }
+      dropped();
+    };
+    const look = () => {
+      watch = null;
+      const s = socket;
+      if (finished || !s || !beats) return;
+      if (now() - heardAt > WATCHDOG_MS) {
+        stale(s);
+        return;
+      }
+      watch = timers.set(look, WATCH_EVERY_MS);
+    };
+    /** Watch the socket once it's ready and the checker beats. */
+    const watchFrom = () => {
+      if (watch != null || !beats || finished) return;
+      watch = timers.set(look, WATCH_EVERY_MS);
     };
 
     const connect = async () => {
@@ -202,6 +278,7 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
       };
       s.onmessage = (m) => {
         if (socket !== s || typeof m.data !== 'string') return;
+        heardAt = now();
         const e = parseEvent(m.data);
         if (!e) {
           // A final answer this app can't read still ends the take. Resuming instead had the checker finish it
@@ -230,6 +307,13 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
           if (!ended()) tries = 0;
           handlers.onEvent(e);
           catchUp(s, Math.min(samples, Math.max(0, e.from ?? 0)));
+          watchFrom();
+          return;
+        }
+        if (e.type === 'beat') {
+          beats = true;
+          watchFrom();
+          handlers.onEvent(e);
           return;
         }
         if (e.type === 'done' && start.namesAfter) {
@@ -254,6 +338,7 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
       s.onclose = () => {
         if (socket !== s) return;
         socket = null;
+        stopWatch();
         // The take has its final answer: the names are only a nicety, not worth a resume.
         if (answered) {
           finish();
@@ -269,6 +354,7 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
     const dropped = () => {
       socket = null;
       live = false;
+      stopWatch();
       if (finished) return;
       if (tries >= RETRY_WAITS_MS.length) {
         finish({ type: 'error', reason: 'offline' });

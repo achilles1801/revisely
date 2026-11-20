@@ -68,11 +68,31 @@ function clockTime(ms: number): string {
   return `${h % 12 === 0 ? 12 : h % 12}:${String(d.getMinutes()).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
 }
 
+/**
+ * A take kept without its final answer (RECITE-11): `unfinished`. One whose audio is all there is (RECITE-12: saved
+ * before the take was kept, as Majd's of Nov 19 was) was never checked: it has no checker's take id and no marks, and
+ * shows no score.
+ */
+export function takeChecked(take: TakeRecord): boolean {
+  return !(take.unfinished && take.take == null && take.marks.length === 0);
+}
+
+/** A take's score where its rows show one; a dash for a take that was never checked. */
+export function takeScoreText(take: TakeRecord): string {
+  return takeChecked(take) ? formatAccuracy(take.accuracy) : '–';
+}
+
 /** "7:51 PM · 1 mistake · 2 cleared · page hidden". */
 export function takeLine(take: TakeRecord, cleared: number): string {
-  return [clockTime(take.createdAt), mistakesLabel(take.mistakes), cleared > 0 ? `${cleared} cleared` : null, take.hidden ? 'page hidden' : null]
+  return [clockTime(take.createdAt), takeResult(take), cleared > 0 ? `${cleared} cleared` : null, take.hidden ? 'page hidden' : null]
     .filter(Boolean)
     .join(' · ');
+}
+
+/** How a take went, in its line: its mistakes, "unfinished" after them when it has no final answer, or "not checked". */
+function takeResult(take: TakeRecord): string {
+  if (!takeChecked(take)) return 'not checked';
+  return take.unfinished ? `${mistakesLabel(take.mistakes)}, unfinished` : mistakesLabel(take.mistakes);
 }
 
 /** A take as its day lists it: "9:41 PM · 4 min · 1 mistake · 2 not clear · page hidden" (RMEM-5). */
@@ -80,7 +100,7 @@ export function dayTakeLine(take: TakeRecord, cleared: number): string {
   return [
     clockTime(take.createdAt),
     formatMinutesLong(Math.max(1, Math.round(take.secs / 60))),
-    mistakesLabel(take.mistakes),
+    takeResult(take),
     take.unclear > 0 ? `${take.unclear} not clear` : null,
     cleared > 0 ? `${cleared} cleared` : null,
     take.hidden ? 'page hidden' : null,
@@ -126,7 +146,7 @@ export function TakeDayRow({
       delayLongPress={350}
       style={styles.dayRow}
       accessibilityRole="button"
-      accessibilityLabel={[passage, formatAccuracy(take.accuracy), line, ...into.map(plainText)].join(', ')}
+      accessibilityLabel={[passage, takeChecked(take) ? formatAccuracy(take.accuracy) : '', line, ...into.map(plainText)].filter(Boolean).join(', ')}
       accessibilityHint="Shows it on the page, with its marks"
       accessibilityActions={actions.map((a) => ({ name: a.key, label: a.label }))}
       onAccessibilityAction={(e) => actions.find((a) => a.key === e.nativeEvent.actionName)?.onPress()}
@@ -162,8 +182,8 @@ export function TakeDayRow({
           </Text>
         ))}
       </View>
-      <Text style={[typeV2.name, typeV2.numeral, { color: colour(take.accuracy) }]} maxFontSizeMultiplier={1.3} testID="activity-take-score">
-        {formatAccuracy(take.accuracy)}
+      <Text style={[typeV2.name, typeV2.numeral, { color: takeChecked(take) ? colour(take.accuracy) : palette.secondary }]} maxFontSizeMultiplier={1.3} testID="activity-take-score">
+        {takeScoreText(take)}
       </Text>
     </Tap>
   );
@@ -210,7 +230,7 @@ export function TakeSheetRow({
       delayLongPress={350}
       style={[styles.listRow, !first && { borderTopColor: palette.separator, borderTopWidth: layoutV2.hairline }]}
       accessibilityRole="button"
-      accessibilityLabel={[passage, formatAccuracy(take.accuracy), line, ...into.map(plainText)].join(', ')}
+      accessibilityLabel={[passage, takeChecked(take) ? formatAccuracy(take.accuracy) : '', line, ...into.map(plainText)].filter(Boolean).join(', ')}
       accessibilityHint="Shows it on the page, with its marks"
       accessibilityActions={actions.map((a) => ({ name: a.key, label: a.label }))}
       onAccessibilityAction={(e) => actions.find((a) => a.key === e.nativeEvent.actionName)?.onPress()}
@@ -247,8 +267,8 @@ export function TakeSheetRow({
         ))}
       </View>
       <View style={styles.scoreCol}>
-        <Text style={[typeV2.name, typeV2.numeral, { color: colour(take.accuracy) }]} maxFontSizeMultiplier={1.3}>
-          {formatAccuracy(take.accuracy)}
+        <Text style={[typeV2.name, typeV2.numeral, { color: takeChecked(take) ? colour(take.accuracy) : palette.secondary }]} maxFontSizeMultiplier={1.3}>
+          {takeScoreText(take)}
         </Text>
         <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
       </View>
@@ -283,7 +303,7 @@ export function TakeListRow({
       onPress={onPress}
       style={[styles.listRow, !first && { borderTopColor: palette.separator, borderTopWidth: layoutV2.hairline }]}
       accessibilityRole="button"
-      accessibilityLabel={`${passage}, ${when}, ${formatAccuracy(take.accuracy)}, ${mistakesLabel(take.mistakes)}`}
+      accessibilityLabel={takeChecked(take) ? `${passage}, ${when}, ${formatAccuracy(take.accuracy)}, ${mistakesLabel(take.mistakes)}` : `${passage}, ${when}, not checked`}
       testID="activity-all-take"
     >
       {playable ? (
@@ -306,11 +326,11 @@ export function TakeListRow({
         </Text>
       </View>
       <View style={styles.right}>
-        <Text style={[typeV2.name, typeV2.numeral, { color: colour(take.accuracy) }]} maxFontSizeMultiplier={1.3}>
-          {formatAccuracy(take.accuracy)}
+        <Text style={[typeV2.name, typeV2.numeral, { color: takeChecked(take) ? colour(take.accuracy) : palette.secondary }]} maxFontSizeMultiplier={1.3}>
+          {takeScoreText(take)}
         </Text>
         <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={1.3}>
-          {mistakesLabel(take.mistakes)}
+          {takeChecked(take) ? mistakesLabel(take.mistakes) : 'not checked'}
         </Text>
       </View>
     </Tap>

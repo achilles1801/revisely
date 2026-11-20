@@ -85,6 +85,11 @@ export interface FinalResult {
    * never found it. Absent from a take that started at a known place.
    */
   start?: number | null;
+  /**
+   * The phone's own, never the checker's: no final answer came (late, or the connection was lost), so this is what the
+   * take found before it (lib/reciteLive/state `settleUnfinished`). A final answer that comes after replaces it.
+   */
+  unfinished?: boolean;
 }
 
 /** Why a take ended without its answer. `offline` is the phone's own: the checker couldn't be reached again. */
@@ -133,6 +138,12 @@ export type LiveEvent =
    * without `into` so the summary needn't wait for it. `names` is empty when nothing was named.
    */
   | { type: 'into'; names: { id: string; into: MarkInto }[] }
+  /**
+   * The checker's heartbeat (long takes, Nov 20 2026): every ~2 s while the connection is open, with the seconds of the
+   * take's audio it has processed (`t`) and received (`got`). A phone that has had one treats silence as a dead
+   * connection and resumes (lib/reciteLive/socket); `t` against the audio sent is how far behind the checker is.
+   */
+  | { type: 'beat'; t: number; got?: number }
   | { type: 'error'; reason: LiveFailure };
 
 const KINDS: MarkKind[] = ['word', 'skipped', 'added', 'harakat', 'letter', 'tajweed'];
@@ -320,6 +331,8 @@ export function parseEvent(raw: unknown): LiveEvent | null {
       }
       return { type: 'into', names };
     }
+    case 'beat':
+      return isNum(x.t) ? { type: 'beat', t: x.t, ...(isNum(x.got) ? { got: x.got } : {}) } : null;
     case 'error': {
       const reason = (x.reason ?? x.error) as LiveFailure;
       return { type: 'error', reason: FAILURES.includes(reason) ? reason : 'server' };

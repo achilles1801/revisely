@@ -38,6 +38,11 @@ describe("a passage's progress", () => {
     expect(passageTakes(records, 1000, 1040).map((t) => t.id)).toEqual(['same', 'whole-page', 'half']);
   });
 
+  it('[RECITE-11] a take kept without its final answer is no point on the progress: its end wasn’t checked', () => {
+    const records = [take('a', 2, 1000, 1040, 0.95), take('cut', 3, 1000, 1040, 0.6, { unfinished: true }), take('b', 4, 1000, 1040, 0.97)];
+    expect(passageTakes(records, 1000, 1040).map((t) => t.id)).toEqual(['a', 'b']);
+  });
+
   it('says how it went: up, down or the same, since the first take', () => {
     expect(progressLine([take('a', 2, 1, 9, 0.951)], NOW)).toBeNull();
     expect(progressLine([take('a', 2, 1, 9, 0.951), take('b', 15, 1, 9, 0.991)], NOW)).toBe('Up from 95.1% on Mon 2 Nov · 2 takes');

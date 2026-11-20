@@ -1,0 +1,168 @@
+# A long take (long takes, Nov 20 2026; Majd's 3.5-minute take of Nov 19 lagged, stopped following and was lost on
+# Stop). Revisely Dev's live check for 10 minutes with Mark mistakes and the page hidden, from An-Naml 23 on page 379:
+# the real socket (lib/reciteLive/socket) to a stand-in checker (lib/e2e/reciteLive, `long=10`) that beats every 2 s and,
+# at 300 s of audio, goes quiet without closing, as Majd's connection did. The phone's watchdog must notice, resume,
+# send the take again and take the checker's replay of it without holding the screen, and keep following to the end.
+# Stop must end in the summary within a few seconds (RECITE-10, RECITE-11). The take's own numbers (JavaScript stalls,
+# event-to-screen time, the checker's lag, the heap) are in the E2E log: "[e2e] take stats".
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    file: ../subflows/new-account.yaml
+    env:
+      CLOCK: 2026-11-14T10:00
+      BOUNDARY: midnight
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: tester
+# Get Premium (and Settings' Premium switch later) call devGrantPremium and devRevokePremium, and Apply for support calls
+# supportLink: start their workers first, as a throwaway account (scripts/warm-premium.js), or the app's first call can
+# pass its 20 s (or the flow's wait) on a CI runner.
+- runScript:
+    file: ../scripts/warm-premium.js
+- runFlow: ../subflows/relaunch.yaml
+
+# The Dev UI, then the reader at An-Naml 23.
+- openLink:
+    link: revisely://e2e/recite-live?on=1&long=10&quiet=300
+    optional: true
+- runFlow: ../subflows/open-link-prompt.yaml
+- openLink:
+    link: revisely://read?page=379
+    optional: true
+- repeat:
+    while:
+      notVisible:
+        id: reader-background
+    times: 6
+    commands:
+      - runFlow: ../subflows/open-link-prompt.yaml
+      - extendedWaitUntil:
+          visible:
+            id: reader-background
+          timeout: 4000
+          optional: true
+      - runFlow:
+          when:
+            notVisible:
+              id: reader-background
+          commands:
+            - openLink:
+                link: revisely://read?page=379
+                optional: true
+
+# The controls: one mic (no record button) and the eye.
+- runFlow: ../subflows/reader-controls.yaml
+- assertNotVisible: "Record your recitation"
+
+# Hold the mic: Record and Recite. A new account has no Premium: Mark mistakes is locked, and a tap opens the
+# Premium page. Get Premium (Revisely Dev's free grant, devGrantPremium in the functions emulator) turns it on.
+- longPressOn:
+    id: recite-mic
+- extendedWaitUntil:
+    visible:
+      id: recite-mode-menu
+    timeout: 5000
+- assertVisible:
+    id: recite-mistakes-locked
+- tapOn:
+    id: recite-mistakes
+- extendedWaitUntil:
+    visible:
+      id: check-intro
+    timeout: 5000
+- tapOn:
+    id: check-intro-get
+- extendedWaitUntil:
+    visible: "Turn on"
+    timeout: 5000
+- assertVisible: "Premium in Revisely Dev"
+- tapOn: "Turn on"
+- extendedWaitUntil:
+    notVisible:
+      id: check-intro
+    timeout: 30000
+
+# Premium on: Mark mistakes unlocks. Switch it on (the menu stays), then Recite.
+- longPressOn:
+    id: recite-mic
+- extendedWaitUntil:
+    visible:
+      id: recite-mistakes-off
+    timeout: 10000
+- tapOn:
+    id: recite-mistakes
+- assertVisible:
+    id: recite-mistakes-on
+- tapOn:
+    id: recite-mode-recite
+
+# The AI notice, once; then the take.
+- extendedWaitUntil:
+    visible:
+      id: recite-notice-agree
+    timeout: 5000
+- tapOn:
+    id: recite-notice-agree
+- extendedWaitUntil:
+    visible:
+      id: recite-words
+    timeout: 10000
+
+# The page hidden, as Majd recited.
+- tapOn:
+    id: recite-eye
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: lt01-hidden-start
+
+# Minute 4: following.
+- extendedWaitUntil:
+    visible:
+      id: never-there
+    timeout: 240000
+    optional: true
+- assertVisible:
+    id: recite-words
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: lt02-minute-4
+
+# Minute 6.5: past the quiet connection (at 5 minutes), its resume and the replay: still following.
+- extendedWaitUntil:
+    visible:
+      id: never-there
+    timeout: 150000
+    optional: true
+- assertVisible:
+    id: recite-words
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: lt03-after-resume
+
+# Minute 10: still following, then Stop. The summary within a few seconds.
+- extendedWaitUntil:
+    visible:
+      id: never-there
+    timeout: 210000
+    optional: true
+- assertVisible:
+    id: recite-words
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: lt04-minute-10
+- tapOn:
+    id: recite-stop
+- extendedWaitUntil:
+    visible:
+      id: take-summary
+    timeout: 8000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: lt05-summary

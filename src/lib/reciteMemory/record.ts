@@ -50,6 +50,11 @@ export interface TakeRecord {
   recordingId: string | null;
   /** Forgotten: kept as a tombstone so every phone drops it. */
   deleted?: boolean;
+  /**
+   * No final answer came (late after Stop, the connection lost, or the screen left before it; long takes, Nov 20 2026):
+   * the marks and score are what the take found before its end.
+   */
+  unfinished?: boolean;
 }
 
 /** "Clear now" on a word: its remembered mistake of `group` goes, as if said right enough times. */
@@ -211,6 +216,8 @@ export function toStored(r: MemoryRecord): Record<string, unknown> {
     passed: r.passed.slice(0, MAX_PASSED),
     recordingId: r.recordingId,
     deleted: r.deleted === true,
+    // Only when true: a finished take's document is as it was (the rules allow the field, firestore.rules).
+    ...(r.unfinished ? { unfinished: true } : {}),
   };
 }
 
@@ -259,6 +266,7 @@ export function fromStored(id: string, raw: unknown): MemoryRecord | null {
     passed,
     recordingId: str(d.recordingId),
     ...deleted,
+    ...(d.unfinished === true ? { unfinished: true } : {}),
   };
 }
 

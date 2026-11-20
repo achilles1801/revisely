@@ -79,6 +79,9 @@ export function findingsLine(marks: Mark[]): string {
  * Recite again, Done, and whether it was kept as test data. Recite (following along): the passage and time, and for
  * an account without Check, one quiet way to it.
  */
+/** A take kept without the checker's final answer: what its summary says (RECITE-11). */
+export const UNFINISHED_LINE = 'The end of this take wasn’t checked. What it found before then is kept.';
+
 export function TakeSummarySheet({
   visible,
   check,
@@ -107,7 +110,13 @@ export function TakeSummarySheet({
   onShown,
   onDelete,
   onRecited,
+  unfinished = false,
 }: {
+  /**
+   * No final answer came (late, or the connection was lost; lib/reciteLive/state `settleUnfinished`): the summary is what
+   * the take found before its end, and says so in one line.
+   */
+  unfinished?: boolean;
   /** One quiet line about Premium in early access (lib/earlyAccess, PREM-1), or null. */
   premiumNote?: string | null;
   visible: boolean;
@@ -178,6 +187,7 @@ export function TakeSummarySheet({
     spokenClock(seconds),
     check && score ? `${score.text}, ${mistakesLabel(mistakes)}` : '',
     peekedCount ? peekedLine(peekedCount) : '',
+    unfinished ? UNFINISHED_LINE : '',
   ]
     .filter(Boolean)
     .join('. ');
@@ -272,6 +282,11 @@ export function TakeSummarySheet({
         {check && before ? (
           <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={CHROME_MAX} testID="take-summary-before">
             {`Before: ${before}`}
+          </Text>
+        ) : null}
+        {unfinished ? (
+          <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={CHROME_MAX} testID="take-summary-unfinished">
+            {UNFINISHED_LINE}
           </Text>
         ) : null}
       </View>
