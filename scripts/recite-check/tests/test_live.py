@@ -592,9 +592,9 @@ class Bench(unittest.TestCase):
         seen = []
         real = E.ayah_notes
 
-        def notes(lp, s, a, statuses, spans, st, audio=None, readings=None):
+        def notes(lp, s, a, statuses, spans, st, audio=None, readings=None, letters_cache=None):
             seen.append(None if audio is None else len(audio))
-            return real(lp, s, a, statuses, spans, st, readings=readings)
+            return real(lp, s, a, statuses, spans, st, readings=readings, letters_cache=letters_cache)
         pcm = bench_pcm()[: 16000 * 2 * 20]
         with unittest.mock.patch.object(E, 'ayah_notes', notes), unittest.mock.patch.object(E, 'ear2', object(),
                                                                                              create=True):
@@ -629,10 +629,10 @@ class Bench(unittest.TestCase):
         real = E.ayah_notes
         go, threads = threading.Event(), []
 
-        def notes(lp, s, a, statuses, spans, st, audio=None, readings=None):
+        def notes(lp, s, a, statuses, spans, st, audio=None, readings=None, letters_cache=None):
             threads.append(threading.current_thread().name)
             self.assertTrue(go.wait(30))
-            return real(lp, s, a, statuses, spans, st, readings=readings)
+            return real(lp, s, a, statuses, spans, st, readings=readings, letters_cache=letters_cache)
         pcm, end = bench_pcm(), [{'type': 'end'}]
         msgs = chunks(pcm, 3200)
         session = lambda **kw: live.LiveSession(E, 1, 1, 1, 7, settings, **kw)
