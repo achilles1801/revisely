@@ -604,6 +604,26 @@ class Bench(unittest.TestCase):
         longest = max(live.AYAH_DUE, live.AYAH_DUE_SHARE['strict'] * 20)  # Al-Fatiha's ayat take under 20 s here
         self.assertTrue(late and all(0 <= d <= longest + live.LIVE['hop'] for d in late), late)
 
+    def test_done_takes_the_closed_segments_ayat_judged_ahead(self):
+        """With defer, each ayah the closed segments hold whole is judged on the ayah thread before the end, and `done`
+        takes it from the cache: a 10-minute take's `done` judged 9 ayat again, 5.6 s of its 5.7 s on Cloud Run (Nov 20
+        2026). The answer is the same as judging them all at the end."""
+        import live
+        item = BENCH / 'minshawi-murattal.p1.m1.clean.json'  # Al-Baqarah 2:6-16 (a page), with planted mistakes
+        if not item.exists():
+            self.skipTest('bench-v0 page 1 is not here')
+        with wave.open(str(item.with_suffix('.wav'))) as w:
+            pcm = w.readframes(w.getnframes())
+        st, msgs = {'tajweed': '0', 'letters': '1'}, chunks(pcm, 16000) + [{'type': 'end'}]
+        ahead = live.LiveSession(engine(), 2, 6, 2, 16, st, defer=True)
+        got = run(ahead, msgs)
+        self.assertGreater(ahead.result['ms'].get('prejudged', 0), 0)
+        self.assertLess(ahead.result['ms']['done_notes'], 8)  # 8 judged in `done` before
+        plain = live.LiveSession(engine(), 2, 6, 2, 16, st, defer=True)
+        plain._prejudge = lambda: None
+        self.assertEqual(run(plain, msgs), got)
+        self.assertNotIn('prejudged', plain.result['ms'])
+
     def test_same_events_for_any_chunk_size(self):
         pcm = bench_pcm()[: 16000 * 2 * 20]
         a = run(self.session(), chunks(pcm, 3200) + [{'type': 'end'}])
@@ -697,6 +717,25 @@ class StartAnywhere(unittest.TestCase):
     def test_a_take_from_an_ayah_mid_page_is_locked_there(self):
         self.check(5)
         self.check(5, follow=True)
+
+    def test_speech_before_the_start_read_as_a_later_word_is_passed_over(self):
+        """Majd's page 2 of Al-Baqarah (Nov 20 2026): the isti'adha and the basmala before 2:1 were fitted as stray words
+        of the page (2:5's «مِّن», 2:2's «لَا»), and a later word heard before the start made every word after it out of
+        order, so the take never locked. Here a word of 1:6 comes before a take from 1:2: it locks at 1:2."""
+        import ast
+        import live
+        t = json.loads(CLEAN.read_text())
+        tl = ast.literal_eval(t['timeline']) if isinstance(t['timeline'], str) else t['timeline']
+        E = engine()
+        stray = next(e for e in tl if not e.get('extra') and E.key.where(e['word'])[:3] == (1, 6, 0))
+        with wave.open(str(CLEAN.with_suffix('.wav'))) as w:
+            full = w.readframes(w.getnframes())
+        cut = lambda a, b: full[int(a * 16000) * 2:int(b * 16000) * 2]  # noqa: E731
+        w, pcm = self.take_from(2)
+        take = cut(stray['start'] - 0.1, stray['end'] + 0.1) + b'\0\0' * 8000 + pcm
+        sess = live.LiveSession(E, 1, 1, 1, 7, {}, start_by=(1, 7))
+        ev = run(sess, chunks(take, 3200)[:int(15 / 0.1)])
+        self.assertEqual([e['w'] for e in ev if e['type'] == 'locked'], [w])
 
     def test_a_phrase_the_page_repeats_waits_until_the_places_part(self):
         """1:3 (ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ) is also the end of 1:1: it may not lock on 1:1."""

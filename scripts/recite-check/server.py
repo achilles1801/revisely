@@ -42,6 +42,13 @@ PROTOCOL = 7  # the contract this server speaks (recite-contract.md): 5 = follow
 MAX_SECONDS = 240
 FIRST_FRAME = 10      # seconds a new socket has to send its start frame
 IDLE = 30             # seconds without a frame from the phone before a socket is closed
+# Long takes (Majd's 3-minute take of Nov 20 2026 dropped, its resume took 5 minutes and it never got an answer):
+BEAT = 2.0            # seconds between `beat`s ({t, rx}: the audio checked and received so far), from their own task, so
+                      # they go out while a long piece of work runs: the phone's watchdog and lag (contract draft 9).
+                      # `ready.beat` says how often; a checker without it sends none
+FEED_SLICE = 1.0      # seconds of audio checked at a time when more is waiting (a resume, a phone that sent a pile):
+                      # its events go out between slices, and a phone gone or back on another socket stops the work
+                      # within one slice (before, the whole pile was one piece of work, with nothing sent meanwhile)
 RESUME_TTL = 120      # seconds a dropped session waits on this instance for its phone to come back (and a
                       # finished take's `done` is kept for a resume that missed it)
 # Check is a Premium feature, with a free path (apply-support.md draft 2): with CHECK_GATE=on, /check and /live without
@@ -576,9 +583,11 @@ async def open_session(msg, uid):
     return s, False
 
 
-async def read_into(ws, inbox):
+async def read_into(ws, inbox, got=None):
     """Every frame from the phone into the inbox as it comes, with when it came: ('audio', bytes, t),
-    ('control', msg, t), then ('gone', None, t), or ('idle', None, t) after IDLE seconds without a frame."""
+    ('control', msg, t), then ('gone', None, t), or ('idle', None, t) after IDLE seconds without a frame. got (the
+    socket's numbers): `rx` counts the samples received, `gone` is set once the socket has closed, with its `code`."""
+    got = got if got is not None else {'rx': 0}
     try:
         while True:
             try:
@@ -587,8 +596,10 @@ async def read_into(ws, inbox):
                 await inbox.put(('idle', None, time.monotonic()))
                 return
             if m['type'] == 'websocket.disconnect':
+                got['code'] = m.get('code')
                 break
             if m.get('bytes') is not None:
+                got['rx'] = got.get('rx', 0) + len(m['bytes']) // 2
                 await inbox.put(('audio', m['bytes'], time.monotonic()))
             elif m.get('text') is not None:
                 try:
@@ -600,7 +611,21 @@ async def read_into(ws, inbox):
                     await inbox.put(('control', c, time.monotonic()))  # anything else is ignored
     except Exception:
         pass
+    got['gone'] = True
     await inbox.put(('gone', None, time.monotonic()))
+
+
+async def beats(ws, s, me, got):
+    """`beat` every BEAT seconds while the take is open on this socket: the checker is there, has checked `t` and
+    received `rx` seconds of audio (the phone's watchdog: a socket silent for a few beats is dead, resume; its lag: audio
+    sent minus `t`). Never recorded with the take's events."""
+    with contextlib.suppress(Exception):
+        while True:
+            await asyncio.sleep(BEAT)
+            if s.sess.stopped or s.owner is not me or got.get('gone'):
+                return
+            await ws.send_text(json.dumps({'type': 'beat', 't': round(s.sess.seconds, 2),
+                                           'rx': round(got['rx'] / live.SR, 2)}))
 
 
 @app.websocket('/live')
@@ -609,6 +634,9 @@ async def live_socket(ws: WebSocket):
     accepted, cpu0, age0 = time.monotonic(), health.cpu(), health.age()
     me = object()
     s = None
+    got = None    # this socket's numbers once it has a session (read_into): samples received, gone, close code
+    lag0 = 0      # the session's lag entries before this socket
+    beat = None   # its `beat` task
 
     async def send(events, record=True):
         for e in events:
@@ -629,6 +657,8 @@ async def live_socket(ws: WebSocket):
         take (when asked) and say so with `kept`, and close. The phone has its answer without waiting for the names or
         the upload; the socket stays open for them."""
         SESSIONS.pop(s.sid, None)
+        if beat is not None:
+            beat.cancel()
         r = s.sess.result
         r.update(engine=VERSION, take=s.sid)
         done = next((e for e in events if e['type'] == 'done'), None)
@@ -739,7 +769,7 @@ async def live_socket(ws: WebSocket):
         held, snap = await asyncio.to_thread(take_over)
         s.sockets += 1
         await send([{'type': 'ready', 'v': 2, 'engine': VERSION, 'server': SERVER, 'protocol': protocol(),
-                     'take': s.sid, 'from': held}], record=False)
+                     'take': s.sid, 'from': held, 'beat': BEAT}], record=False)
         if s.ready_s is None:
             s.ready_s = round(time.monotonic() - accepted, 3)
         await send(snap, record=False)  # what the dropped socket may have swallowed
@@ -747,18 +777,24 @@ async def live_socket(ws: WebSocket):
         # resending a take (a resume) sends faster than it is checked, and a socket left unread stops answering
         # pings, which ends the connection.
         inbox = asyncio.Queue()
-        reader = asyncio.create_task(read_into(ws, inbox))
+        got, lag0 = {'rx': held, 'gone': False, 'code': None}, len(s.lag)
+        reader = asyncio.create_task(read_into(ws, inbox, got))
+        beat = asyncio.create_task(beats(ws, s, me, got))
         held = None  # a frame taken while gathering audio, to handle next
+        step = int(FEED_SLICE * live.SR) * 2
         try:
             while True:
                 kind, item, came = held or await inbox.get()
                 held = None
                 if kind == 'idle':
+                    got['idle'] = True
                     await fail('idle', 1000)
                     break
-                if kind == 'gone' or s.owner is not me:  # gone, or the phone came back on another socket
+                # gone, or the phone came back on another socket: what's still queued is never checked here (a resume
+                # sends it again, from `from`), so the session is free at once
+                if kind == 'gone' or got['gone'] or s.owner is not me:
                     break
-                if kind == 'audio':  # this and any audio queued right behind it, in one go
+                if kind == 'audio':  # this and any audio queued right behind it, a slice at a time
                     chunks = [item]
                     while not inbox.empty():
                         nxt = inbox.get_nowait()
@@ -766,9 +802,17 @@ async def live_socket(ws: WebSocket):
                             held = nxt
                             break
                         chunks.append(nxt[1])
-                    events = await asyncio.to_thread(s.run, s.sess.feed, b''.join(chunks))
-                    if len(s.lag) < 20000:  # 15 minutes of 100 ms pieces is 9,000
-                        s.lag.append(time.monotonic() - came)
+                    data = b''.join(chunks)
+                    for i in range(0, len(data), step):
+                        events = await asyncio.to_thread(s.run, s.sess.feed, data[i:i + step])
+                        if len(s.lag) < 20000:  # 15 minutes of 100 ms pieces is 9,000
+                            s.lag.append(time.monotonic() - came)
+                        if s.sess.stopped or i + step >= len(data):
+                            break
+                        await send(events)
+                        if got['gone'] or s.owner is not me:
+                            held, events = None, []  # the rest of the pile, and anything behind it, waits for a resume
+                            break
                 else:
                     events = await asyncio.to_thread(s.run, s.sess.control, item)
                 if s.sess.stopped:
@@ -778,6 +822,7 @@ async def live_socket(ws: WebSocket):
                 await send(events)
         finally:
             reader.cancel()
+            beat.cancel()
     except auth.Refused as e:
         health.emit('refused', route='live', reason=e.reason)
         await fail(e.reason)
@@ -792,6 +837,12 @@ async def live_socket(ws: WebSocket):
         health.emit('error', route='live')
         await fail('server', 1011)
     finally:
+        if s is not None and got is not None:  # how this socket ended, in numbers (health.py)
+            health.emit('socket', why='done' if s.sess.stopped else 'replaced' if s.owner is not me
+                        else 'idle' if got.get('idle') else 'gone' if got.get('gone') else 'ended', code=got.get('code'),
+                        open_s=round(time.monotonic() - accepted, 1), rx_s=round(got['rx'] / live.SR, 1),
+                        checked_s=round(s.sess.seconds, 1), behind_s=round((got['rx'] - s.sess.n) / live.SR, 1),
+                        **health.lag(s.lag[lag0:]))
         if s is not None and s.owner is me:
             s.owner, s.left = None, time.time()
             if not s.sess.stopped and s.keep and s.sess.n >= 2 * live.SR:

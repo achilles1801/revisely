@@ -178,6 +178,7 @@ class Base(unittest.TestCase):
             mock.patch.object(store, 'BUCKET', 'test-bucket'),  # dev's services name one; production names none
             mock.patch.object(live, 'LiveSession', FakeSession),
             mock.patch.object(server, 'limiter', auth.Limiter()),
+            mock.patch.object(server, 'BEAT', 3600),  # no beats unless a test asks (they'd come between its events)
         ]
         for p in patches:
             p.start()
@@ -698,7 +699,7 @@ class LiveTests(Base):
         refused = threading.Event()
 
         async def send_text(ws_, data):
-            if '"type": "at"' in data:
+            if '"type": "at"' in data and '"w": 103' in data:  # audio is checked a slice (1 s) at a time: at 3 s
                 refused.set()
                 raise RuntimeError("Unexpected ASGI message 'websocket.send', after sending 'websocket.close'")
             return await real(ws_, data)
@@ -772,6 +773,91 @@ class LiveTests(Base):
         self.assertLess(len(calls), 40)
         self.assertEqual(FakeSession.made[0].dismissed, {'101:skipped:'})
         self.assertEqual(types.count('at'), 4)
+
+    def test_beats_say_what_was_checked_and_received(self):
+        """A `beat` every BEAT seconds from its own task ({t, rx}), announced in `ready`, never kept with the take."""
+        with mock.patch.object(server, 'BEAT', 0.2), self.socket() as ws:
+            ws.send_text(start(keep=True))
+            ready = ws.receive_json()
+            self.assertEqual(ready['beat'], 0.2)
+            ws.send_bytes(second_of_audio())
+            got = []
+            while not any(e['type'] == 'beat' and e['rx'] == 1.0 and e['t'] == 1.0 for e in got):
+                got.append(ws.receive_json())
+            ws.send_text(json.dumps({'type': 'end'}))
+            rest = self.closed(ws)
+        self.assertNotIn('beat', [e['type'] for e in rest[rest.index(next(e for e in rest if e['type'] == 'done')):]])
+        kept = json.loads(self.stored[f"recite-tests/tester1/{ready['take']}.json"])
+        self.assertNotIn('beat', [e['type'] for e in kept['events']])
+
+    def test_beats_go_out_while_a_pile_is_checked(self):
+        """The phone's watchdog must not take a busy checker for a dead socket: beats keep coming during long work."""
+        slow = FakeSession.feed
+
+        def feed(sess, data):
+            time.sleep(0.15)
+            return slow(sess, data)
+        with mock.patch.object(server, 'BEAT', 0.1), mock.patch.object(FakeSession, 'feed', feed), \
+                self.socket() as ws:
+            ws.send_text(start())
+            ws.receive_json()
+            ws.send_bytes(second_of_audio() * 4)  # 4 slices, 0.6 s of work
+            beats = []
+            while True:
+                e = ws.receive_json()
+                if e['type'] == 'beat':
+                    beats.append(e)
+                if e['type'] == 'at' and e['w'] == 104:
+                    break
+        self.assertGreaterEqual(len(beats), 2)
+        self.assertEqual(beats[0]['rx'], 4.0)  # all of it received at once; checked a slice at a time
+        self.assertLess(beats[0]['t'], 4.0)
+
+    def test_a_pile_is_checked_a_slice_at_a_time_with_its_events_between(self):
+        calls = []
+        slow = FakeSession.feed
+
+        def feed(sess, data):
+            calls.append(len(data))
+            time.sleep(0.05)
+            return slow(sess, data)
+        with mock.patch.object(FakeSession, 'feed', feed), self.socket() as ws:
+            ws.send_text(start())
+            ws.receive_json()
+            ws.send_bytes(second_of_audio() * 5)  # one frame of 5 s (a resume's catch-up sends 1 s frames)
+            for w in range(101, 106):
+                e = ws.receive_json()
+                while e['type'] != 'at':
+                    e = ws.receive_json()
+                self.assertEqual(e['w'], w)
+        self.assertEqual(calls[:5], [2 * SR] * 5)
+
+    def test_a_phone_gone_mid_pile_stops_the_work_and_keeps_what_was_checked(self):
+        """Majd's take of Nov 20 2026: its resumed socket closed 20 s in, and the instance went on checking the pile it
+        had left for 5 minutes (Cloud Run gives an instance with no open request almost no CPU), holding the session."""
+        slow = FakeSession.feed
+
+        def feed(sess, data):
+            time.sleep(0.1)
+            return slow(sess, data)
+        with mock.patch.object(FakeSession, 'feed', feed):
+            with self.socket() as ws:
+                ws.send_text(start(keep=True))
+                ws.receive_json()
+                ws.send_bytes(second_of_audio() * 30)
+                while ws.receive_json().get('w') != 103:  # 3 s checked (a part needs 2 s), then the phone goes
+                    pass
+            for _ in range(200):
+                if any('.part-' in n for n in self.stored):
+                    break
+                time.sleep(0.02)
+        sess = FakeSession.made[0]
+        self.assertLess(sess.n, 10 * SR)  # it stopped within a slice or so, not after all 30 s
+        part = next(json.loads(v) for n, v in self.stored.items() if n.endswith('.json'))
+        self.assertEqual(part['secs'], round(sess.n / SR, 1))
+        line = next(f for k, f in self.health if k == 'socket')
+        self.assertEqual((line['why'], line['rx_s']), ('gone', 30.0))
+        self.assertGreater(line['behind_s'], 20)
 
     def test_idle_socket_is_closed(self):
         with mock.patch.object(server, 'IDLE', 0.3):
