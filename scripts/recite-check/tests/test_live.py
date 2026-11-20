@@ -446,11 +446,11 @@ class Model(unittest.TestCase):
         score = E.level(st).bars['letters']['bar'] + 1
         windows = []
 
-        def judge(win, sounds):
+        def judge(win, sounds, j):
             windows.append(len(sounds))
-            return [[(score, 'ص→س', None, 'س')] for _ in sounds]
+            return [(score, 'ص→س', None, 'س')]
 
-        with unittest.mock.patch.object(engine_mod.letters_v2, 'words_judge', judge), \
+        with unittest.mock.patch.object(engine_mod, 'words_judge_one', judge), \
                 unittest.mock.patch.object(E, 'ear2', None):
             got = {i: E.word_letters(lp, 2, 2, i, statuses, spans, st) for i in (0, 3, n - 1)}
             self.assertEqual(windows, [2, 4, 3])  # i..i+1 at the start, i-2..i+1, i-2..i at the end
@@ -463,6 +463,21 @@ class Model(unittest.TestCase):
             self.assertEqual([r['w'] - first for r in letters], [0, 1, 2])  # 3, 5 and 6 have word 4 in their window
             with unittest.mock.patch.object(engine_mod, 'LETTERS_PER_WORD', False):
                 self.assertEqual(E.ayah_notes(lp, 2, 2, skipped, spans, st)[1], [])
+
+    def test_one_words_letters_are_words_judges_own(self):
+        """engine.words_judge_one: word j of a window judged alone gives letters_v2.words_judge's rows for it, on noise
+        and on a recitation (the window lined up and paced the same; only the other words aren't judged)."""
+        import engine as engine_mod
+        E = engine()
+        sources = [np.frombuffer(noise(6, seed=5), '<i2')]
+        if ITEM.exists():
+            sources.append(np.frombuffer(bench_pcm()[16000 * 2 * 4: 16000 * 2 * 12], '<i2'))
+        sounds = E.sounds(1, 2)  # ٱلْحَمْدُ لِلَّهِ رَبِّ ٱلْعَـٰلَمِينَ
+        for x in sources:
+            lp = E.ear.logprobs(x.astype(np.float32) / 32768)
+            for lo, hi in ((0, 2), (0, 4), (1, 4)):
+                whole = engine_mod.letters_v2.words_judge(lp, sounds[lo:hi])
+                self.assertEqual([engine_mod.words_judge_one(lp, sounds[lo:hi], j) for j in range(hi - lo)], whole)
 
     def test_letters_are_judged_against_the_levels_own_bars(self):
         """An ayah's letters on the words level use its bars (bars.v6.json), Strict's the released model's."""
@@ -479,6 +494,7 @@ class Model(unittest.TestCase):
         got = {}
         with unittest.mock.patch.object(E, 'words_level', lv), \
                 unittest.mock.patch.object(engine_mod.letters_v2, 'words_judge', lambda *a, **k: rows), \
+                unittest.mock.patch.object(engine_mod, 'words_judge_one', lambda win, sounds, j: rows[j]), \
                 unittest.mock.patch.object(engine_mod.tajweed, 'judge', lambda *a, **k: []), \
                 unittest.mock.patch.object(E, 'ear2', None):
             for name, st in (('harakat', {'letters': True, 'tajweed': False}),

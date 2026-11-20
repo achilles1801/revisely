@@ -694,6 +694,7 @@ class LiveSession:
         self._pending = []               # (notes key, s, a, future, due) of ayat judged in the background, in order
         self._wl_wait = set()            # words decided whose letters aren't judged yet (_letters_later)
         self._wl_done = set()            # words whose letters were handed over (judged once)
+        self._letters_cache = {}         # engine.word_letters' results, shared by word jobs, ayah jobs and `done`
         self._wl_pending = []            # (app word, future) of words' letters judged in the background, in order
         self._idle = threading.Event()   # set while the session isn't working on a chunk (see _working)
         self._idle.set()
@@ -1078,7 +1079,8 @@ class LiveSession:
                 continue
             kw = {'audio': self.xf[:self.n]} if self.v5 else {}
             self._pre[key] = self._pre_busy = _ayah_submit(self._idle, self.E.ayah_notes, self.lp[:self.T], s_, a_,
-                                                           statuses, spans, self.st, readings=readings, **kw)
+                                                           statuses, spans, self.st, readings=readings,
+                                                           letters_cache=self._letters_cache, **kw)
             return
 
     def _segment_result(self, seg, path, upto, P, refs=None, extras_to=None):
@@ -1728,9 +1730,10 @@ class LiveSession:
             self._judged_here += 1
             if self.v5:
                 got = self.E.ayah_notes(self.lp[:self.T], s, a, statuses, spans, self.st, audio=self.xf[:self.n],
-                                        readings=readings)
+                                        readings=readings, letters_cache=self._letters_cache)
             else:
-                got = self.E.ayah_notes(self.lp[:self.T], s, a, statuses, spans, self.st, readings=readings)
+                got = self.E.ayah_notes(self.lp[:self.T], s, a, statuses, spans, self.st, readings=readings,
+                                        letters_cache=self._letters_cache)
             self._notes_cache[key] = got
         tj, letters = self._notes_cache[key]
         return [dict(r) for r in tj], [dict(r) for r in letters]
@@ -1752,7 +1755,7 @@ class LiveSession:
             return False
         kw = {'audio': self.xf[:self.n]} if self.v5 else {}
         fut = _ayah_submit(self._idle, self.E.ayah_notes, self.lp[:self.T], s, a, dict(self.status), dict(self.spans),
-                           self.st, readings=dict(self.readings), **kw)
+                           self.st, readings=dict(self.readings), letters_cache=self._letters_cache, **kw)
         first, n = self._ayah_bounds(s, a)
         secs = (self.spans[first + n - 1][1] - self.spans[first][0]) / FPS  # both are there: said in full
         share = AYAH_DUE_SHARE['strict' if self.v5 else 'words']
@@ -1814,7 +1817,7 @@ class LiveSession:
                 continue
             args = (self.lp[:self.T], s, a, i, {w: self.status[w] for w in win}, {w: self.spans[w] for w in win},
                     self.st)
-            kw = {'readings': {w: self.readings[w] for w in win if w in self.readings}}
+            kw = {'readings': {w: self.readings[w] for w in win if w in self.readings}, 'cache': self._letters_cache}
             if self.defer:
                 fut = _ayah_submit(self._idle, self.E.word_letters, *args, **kw)
             else:

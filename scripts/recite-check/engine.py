@@ -96,6 +96,41 @@ def ayah_pieces(ws, spans, readings, n_frames):
     return [(max(0, x), min(n_frames, y)) for x, y in pieces if min(n_frames, y) > max(0, x)]
 
 
+def words_judge_one(lp, word_sounds, j):
+    """letters_v2.words_judge(lp, word_sounds)[j]: word j's slips, the window lined up and paced as words_judge does,
+    without judging the window's other words (judging is most of the time: 85% on Husary's 2:6-26). A test holds it to
+    words_judge's own rows."""
+    L2 = letters_v2
+    EAR, aligner = L2.EAR, L2.tajweed
+    ph = ''.join(word_sounds)
+    keep = [i for i, ch in enumerate(ph) if ch in EAR.index]
+    pos_of = {i: k for k, i in enumerate(keep)}
+    spans = aligner.ctc_align(lp, [EAR.index[ph[i]] for i in keep])
+    emit = aligner.ctc_align.emit
+    syl = [emit[pos_of[i + 1]][0] - emit[pos_of[i - 1]][0] for i, ch in enumerate(ph)
+           if ch in L2.HARAKAT and i + 1 < len(ph) and ph[i + 1] not in 'اۥۦ' and (i - 1) in pos_of and (i + 1) in pos_of
+           and pos_of[i - 1] in emit and pos_of[i + 1] in emit]
+    pace = float(np.median(syl)) if len(syl) >= 3 else None
+    a = sum(len(x) for x in word_sounds[:j])
+    snd = word_sounds[j]
+    b = a + len(snd)
+    lo, hi = max(0, a - L2.PAD), min(len(ph), b + L2.PAD)
+    ks = [pos_of[i] for i in range(lo, hi) if i in pos_of and pos_of[i] in spans]
+    if not ks or not snd:
+        return None
+    f0, f1 = max(0, spans[ks[0]][0] - 2), min(lp.shape[0], spans[ks[-1]][1] + 2)
+    rows = []
+    for m, why, alt, i, k in L2.letters.judge_word(lp, EAR, ph[lo:a], snd, ph[b:hi], f0, f1, lengths=False):
+        held = None
+        if why.startswith('no shadda') and pace:
+            g0, g1 = a + i, a + k
+            nxt = next((pos_of[q] for q in range(g1, len(ph)) if q in pos_of), None)
+            if g0 in pos_of and pos_of[g0] in emit and nxt is not None and nxt in emit:
+                held = (emit[nxt][0] - emit[pos_of[g0]][0]) / pace
+        rows.append((round(float(m), 3), why, None if held is None else round(held, 3), alt, i, k))
+    return rows
+
+
 def spell(sounds):
     """The model's sounds written in Arabic letters, close to how they'd be spelt: a doubled consonant once with a
     shadda, a long vowel as one letter, the model's own signs left out. Approximate (`heardExact: false`)."""
@@ -919,7 +954,7 @@ class Engine:
             letters += l_
         return out, letters
 
-    def ayah_notes(self, lp, s, a, statuses, spans, st, audio=None, readings=None):
+    def ayah_notes(self, lp, s, a, statuses, spans, st, audio=None, readings=None, letters_cache=None):
         """Tajweed (and letters) for ayah s:a, on its own frames; nothing unless it was said in full. audio: the take's
         samples (16 kHz float32, lp's frame grid), for the strict ear (V5_KINDS and the nasal places) when there is one.
         readings: each word's last reading (start, end), when the caller knows them: an ayah with a word said again
@@ -942,7 +977,7 @@ class Engine:
             if st['letters'] and LETTERS_PER_WORD:
                 for i in range(n):
                     if sts[i] in SAID and sts[i] != 'wrong':
-                        letters += self.word_letters(lp, s, a, i, statuses, spans, st, readings) or []
+                        letters += self.word_letters(lp, s, a, i, statuses, spans, st, readings, letters_cache) or []
             return out, letters
         pieces = ayah_pieces(ws, spans, readings, lp.shape[0])
         nf = sum(b - a_ for a_, b in pieces)
@@ -1036,7 +1071,7 @@ class Engine:
         if st['letters'] and LETTERS_PER_WORD:
             for i in range(n):
                 if i not in bad:
-                    letters += self.word_letters(lp, s, a, i, statuses, spans, st, readings) or []
+                    letters += self.word_letters(lp, s, a, i, statuses, spans, st, readings, letters_cache) or []
         elif st['letters']:
             try:
                 lj = letters_v2.words_judge(win, self.sounds(s, a))
@@ -1055,11 +1090,13 @@ class Engine:
             got = self._sounds[key] = self.key.phonetize(self.key.uthmani(s, a))
         return got
 
-    def word_letters(self, lp, s, a, i, statuses, spans, st, readings=None):
+    def word_letters(self, lp, s, a, i, statuses, spans, st, readings=None, cache=None):
         """Word i (from 0) of ayah s:a: its harakat and letter slips, as ayah_notes' letters rows, judged on its window
         (LETTERS_BACK words before it and LETTERS_AHEAD after, within the ayah), on the window's frames (ayah_pieces:
         each word's last reading when one was said again). [] for none, or a word heard wrong (its letters aren't
-        judged); None while the window can't be judged yet: a word in it not said, or with no frames."""
+        judged); None while the window can't be judged yet: a word in it not said, or with no frames. cache: a dict of
+        results by what they read (the window's statuses and frames), shared by live's word jobs, its ayah jobs and
+        `done`, so no word is judged twice on the same frames."""
         first = self.words.first[self.words.vindex[(s, a)]]
         n = self.words.counts[self.words.vindex[(s, a)]]
         ws = list(range(first, first + n))
@@ -1069,14 +1106,21 @@ class Engine:
         if any(statuses.get(ws[j]) not in SAID or ws[j] not in spans for j in range(lo, hi + 1)):
             return None
         pieces = ayah_pieces(ws[lo:hi + 1], spans, readings, lp.shape[0])
+        key = (ws[i], self.level(st).name, tuple(statuses.get(ws[j]) for j in range(lo, hi + 1)), tuple(pieces))
+        if cache is not None and key in cache:
+            return [dict(r) for r in cache[key]]
         if sum(b - a_ for a_, b in pieces) < 10:
-            return []
-        win = np.concatenate([lp[a_:b] for a_, b in pieces]) if len(pieces) > 1 else lp[pieces[0][0]:pieces[0][1]]
-        try:
-            rows = letters_v2.words_judge(win, self.sounds(s, a)[lo:hi + 1])[i - lo]
-        except Exception:
-            return []
-        return self._letter_rows(ws[i], rows, self.level(st).bars) if rows is not None else []
+            got = []
+        else:
+            win = np.concatenate([lp[a_:b] for a_, b in pieces]) if len(pieces) > 1 else lp[pieces[0][0]:pieces[0][1]]
+            try:
+                rows = words_judge_one(win, self.sounds(s, a)[lo:hi + 1], i - lo)
+            except Exception:
+                rows = None
+            got = self._letter_rows(ws[i], rows, self.level(st).bars) if rows is not None else []
+        if cache is not None:
+            cache[key] = got
+        return [dict(r) for r in got]
 
     @staticmethod
     def _letter_rows(w, rows, B):
