@@ -38,7 +38,8 @@ import { orphanTakes } from '../../../src/lib/reciteMemory/apart';
 import type { RecordingMeta } from '../../../src/lib/recordings';
 import { markFill } from '../../../src/components/reciteLive/markColours';
 import { markTitle } from '../../../src/lib/reciteLive/describe';
-import { NOTHING_SHOWN, revealAyah, revealNextWord, wordShown } from '../../../src/lib/reciteLive/view';
+import { coverHighlights, NOTHING_SHOWN, revealAyah, revealNextWord, wordShown } from '../../../src/lib/reciteLive/view';
+import { createMistakeCue, cuesMark, CUE_GAP_MS } from '../../../src/lib/reciteLive/mistakeCue';
 import { drillRange, lastWordOf, openDrill } from '../../../src/lib/reciteLive/drill';
 import { CUE_WORDS, TEST_AYAHS, TEST_PLACES, testPlaces, testResult } from '../../../src/lib/reciteLive/testMe';
 import { recordFromTake } from '../../../src/lib/reciteMemory/fromTake';
@@ -809,6 +810,142 @@ describe('[RECITE-12] a take let go before its answer is kept; take audio no tak
         },
       ),
       { numRuns: runs(150) },
+    );
+  });
+});
+
+
+describe('[RECITE-1] the start word itself is shown once said, and a mark on it is kept', () => {
+  it('locked on a word (an ayah opening with muqattaʿāt, الٓمٓ): shown once said, and its mark kept, live and in the final answer', () => {
+    fc.assert(
+      fc.property(
+        pageArb.chain((p) => fc.tuple(fc.constant(p), wordOn(p), fc.constantFrom<MarkKind>('word', 'harakat', 'letter'))),
+        ([page, lock, kind]) => {
+          const r = words.ref(lock);
+          const mark: Mark = { id: `${lock}:${kind}:`, w: lock, ayah: [r.sura, r.ayah], kind, sure: 'clear' };
+          let s = fold(anywhere(page), [{ type: 'locked', w: lock, s: r.sura, a: r.ayah }, { type: 'said', upTo: lock }, { type: 'mark', mark }]);
+          expect(wordShown(lock, NOTHING_SHOWN, { saidUpTo: s.saidUpTo, startWord: s.start })).toBe(true);
+          expect(s.marks[mark.id]).toEqual(mark);
+          s = applyEvent(liveStopping(s), { type: 'done', result: finalOf([mark], lock, lock + 1, lock, null) });
+          expect(s.marks[mark.id]).toEqual(mark);
+        },
+      ),
+      { numRuns: runs(150) },
+    );
+  });
+});
+
+describe('[RECITE-13] the hidden page keeps mistakes on its covers', () => {
+  it('each covered word on the page with a mark shows the take’s strongest, else the one remembered; shown words and other pages none', () => {
+    fc.assert(
+      fc.property(
+        pageArb.chain((p) =>
+          fc.tuple(fc.constant(p), fc.array(markArb(p), { maxLength: 8 }), fc.array(markArb(p), { maxLength: 8 }), fc.array(wordOn(p), { maxLength: 30 }), fc.array(markArb(p === 604 ? 603 : p + 1), { maxLength: 3 })),
+        ),
+        ([page, live, past, shownWords, elsewhere]) => {
+          const shown = new Set(shownWords);
+          const out = coverHighlights(words, page, (w) => shown.has(w), [...live, ...elsewhere], past);
+          const [from, to] = words.pageRange(page);
+          for (const { mark } of out) {
+            expect(mark.w >= from && mark.w < to).toBe(true);
+            expect(shown.has(mark.w)).toBe(false);
+          }
+          // One per word: the take's strongest where it marked one, else memory's.
+          const byWord = new Map(out.map((x) => [x.mark.w, x]));
+          expect(byWord.size).toBe(out.length);
+          const liveCovered = strongestByWord(live.filter((m) => !shown.has(m.w)));
+          for (const [w, m] of liveCovered) expect(byWord.get(w)).toEqual({ mark: m, past: false });
+          const pastCovered = strongestByWord(past.filter((m) => !shown.has(m.w)));
+          for (const [w, m] of pastCovered) if (!liveCovered.has(w)) expect(byWord.get(w)).toEqual({ mark: m, past: true });
+          expect(out.length).toBe(new Set([...liveCovered.keys(), ...pastCovered.keys()]).size);
+        },
+      ),
+      { numRuns: runs(200) },
+    );
+  });
+});
+
+describe('[RECITE-14] a mark shown during the take stays after Stop', () => {
+  it('the final answer’s marks, and every live mark on a word it didn’t judge (not taken off), counting as it did', () => {
+    fc.assert(
+      fc.property(
+        takeArb.chain((t) => fc.tuple(fc.constant(t), fc.array(markArb(t.page), { maxLength: 6 }), fc.nat(5))),
+        ([t, finalMarks, pick]) => {
+          let s = liveStopping(played(t));
+          const shown = Object.values(s.marks);
+          if (shown.length > 0 && pick % 2 === 0) s = dismissMark(s, shown[pick % shown.length].id);
+          const [from, to] = words.pageRange(t.page);
+          const reached = to - from;
+          const score = scoreOf(finalMarks, reached, true);
+          const done = applyEvent(s, { type: 'done', result: finalOf(finalMarks, from, to - 1, t.lock, score) });
+          const start = done.start;
+          const finalKept = finalMarks.filter((m) => !s.dismissed.includes(m.id) && !(start != null && m.kind === 'skipped' && m.w < start));
+          for (const m of finalKept) expect(done.marks[m.id]).toBeTruthy();
+          const judged = new Set(finalKept.map((m) => m.w));
+          const kept = Object.values(s.marks).filter((m) => !judged.has(m.w) && !finalKept.some((f) => f.id === m.id) && !s.dismissed.includes(m.id));
+          for (const m of kept) expect(done.marks[m.id]).toEqual(m);
+          expect(Object.keys(done.marks).length).toBe(new Set([...finalKept.map((m) => m.id), ...kept.map((m) => m.id)]).size);
+          // The score counts what was kept as it was shown.
+          const extra = kept.filter((m) => countsAsMistake(m) && !isUnclear(m)).length;
+          expect(done.score!.mistakes).toBe(score.mistakes + extra);
+          expect(mistakeCount(done)).toBe(score.mistakes + extra);
+        },
+      ),
+      { numRuns: runs(250) },
+    );
+  });
+});
+
+describe('[RECITE-14] a checker from protocol 8 keeps the live marks in its final answer itself', () => {
+  it('its final answer’s marks are the take’s (but those taken off, or skipped before the start), and its score stands', () => {
+    fc.assert(
+      fc.property(takeArb.chain((t) => fc.tuple(fc.constant(t), fc.array(markArb(t.page), { maxLength: 6 }))), ([t, finalMarks]) => {
+        // The take's checker says protocol 8 (its last `ready`, as on a resume).
+        const s = liveStopping(applyEvent(played(t), { type: 'ready', take: 't', protocol: 8 }));
+        const [from, to] = words.pageRange(t.page);
+        const score = scoreOf(finalMarks, to - from, true);
+        const done = applyEvent(s, { type: 'done', result: finalOf(finalMarks, from, to - 1, t.lock, score) });
+        const start = done.start;
+        const expected = finalMarks.filter((m) => !s.dismissed.includes(m.id) && !(start != null && m.kind === 'skipped' && m.w < start));
+        expect(Object.keys(done.marks).sort()).toEqual([...new Set(expected.map((m) => m.id))].sort());
+        expect(done.score).toEqual(score);
+      }),
+      { numRuns: runs(200) },
+    );
+  });
+});
+
+describe('[RECITE-15] a sound and a tap on each new mistake', () => {
+  it('once for each new mistake that counts, never for Not clear or tajweed or a mark sent again, at most one every 700 ms, none when off', () => {
+    fc.assert(
+      fc.property(
+        pageArb.chain((p) => fc.array(fc.tuple(markArb(p), fc.integer({ min: 0, max: 2000 }), fc.boolean()), { maxLength: 20 })),
+        (steps) => {
+          let now = 0;
+          let sounds = 0;
+          let taps = 0;
+          const cue = createMistakeCue({ now: () => now, sound: () => sounds++, tap: () => taps++ });
+          const seen = new Set<string>();
+          let last = -Infinity;
+          let expected = 0;
+          for (const [m, gap, on] of steps) {
+            now += gap;
+            const fired = cue.mark(m, on);
+            const fresh = on && !seen.has(m.id) && cuesMark(m);
+            if (on && cuesMark(m)) seen.add(m.id);
+            const should = fresh && now - last >= CUE_GAP_MS;
+            expect(fired).toBe(should);
+            if (should) {
+              last = now;
+              expected++;
+            }
+            if (fired) expect(countsAsMistake(m) && !isUnclear(m)).toBe(true);
+          }
+          expect(sounds).toBe(expected);
+          expect(taps).toBe(expected);
+        },
+      ),
+      { numRuns: runs(250) },
     );
   });
 });

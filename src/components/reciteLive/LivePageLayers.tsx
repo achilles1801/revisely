@@ -93,11 +93,18 @@ export function LiveOverlay({
   scale,
   hidden,
   peeked = null,
+  coverMarks = null,
 }: {
   page: number;
   scale: number;
   hidden: { follow: WordFollow; cover: string; guide: string; off?: { w: number; words: QuranWords; colour: string } | null } | null;
   peeked?: { words: QuranWords; peeked: readonly number[]; veil: string } | null;
+  /**
+   * Mistakes on words the hidden page still covers (Majd, Nov 20 2026: "if I hide the page, that highlight should still
+   * be there. Obviously, the word won't be shown"): a take's marks in their colour, and Recite's memory's lighter, drawn
+   * over the cover so the word stays hidden. A word that shows has its highlight behind its ink (LiveUnderlay).
+   */
+  coverMarks?: { words: QuranWords; marks: readonly { mark: Mark; fill: string; opacity?: number }[] } | null;
 }) {
   const veiled = peeked ? peeked.peeked.filter((w) => peeked.words.pageOf(w) === page) : [];
   if (!hidden && veiled.length === 0) return null;
@@ -107,6 +114,17 @@ export function LiveOverlay({
       {hidden ? (
         <HiddenPageOverlay page={page} scale={scale} revealed={NO_REVEALED} follow={hidden.follow} colors={{ cover: hidden.cover, guide: hidden.guide }} />
       ) : null}
+      {hidden && coverMarks
+        ? coverMarks.marks.map(({ mark, fill, opacity }) =>
+            coverMarks.words.pageOf(mark.w) === page && !hidden.follow.shown(mark.w) ? (
+              <View
+                key={`cover-${mark.w}`}
+                testID={opacity == null ? `cover-highlight-${markGroup(mark)}` : `cover-past-${markGroup(mark)}`}
+                style={[styles.abs, styles.box, rectStyle(markHighlight(coverMarks.words, mark), scale), { backgroundColor: fill }, opacity == null ? null : { opacity }]}
+              />
+            ) : null,
+          )
+        : null}
       {off ? (
         <View testID="live-off" style={[styles.abs, styles.box, rectStyle(offBox(off.words, off.w), scale), { backgroundColor: off.colour }]} />
       ) : null}

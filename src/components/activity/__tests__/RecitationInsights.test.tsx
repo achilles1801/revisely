@@ -104,8 +104,9 @@ describe('Insights: Recitation (RINS-2)', () => {
     // over it and the week under it, this week last.
     expect(text('insights-recitation-weeks-takeaway')).toBe('Up from 98.0% last week');
     expect(text('insights-recitation-weeks')).toBe('Up from 98.0% last week | 98.0% | 98.3% | 3 Nov | This week');
-    // Al-Kahf 22–23: a wrong word and a harakat slip still marked; Not clear never.
-    expect(text('insights-recitation-slip-18-22')).toContain('Al-Kahf, ayahs 22–23 | 2 words still marked · wrong in 3 of 4 takes');
+    // Al-Kahf 22–23: a wrong word, a harakat slip and a Not clear letter still marked (RMEM-2: Not clear is remembered
+    // like a slip, never counted).
+    expect(text('insights-recitation-slip-18-22')).toContain('Al-Kahf, ayahs 22–23 | 3 words still marked · wrong in 3 of 4 takes');
     expect(text('insights-recitation-slip-2-48')).toContain('Al-Baqarah, ayah 48 | 1 word still marked · wrong in 2 of 2 takes');
     expect(text('insights-recitation-similar-2-48')).toBe('Al-Baqarah 48 → 123 | You went on with the similar ayah · twice, last yesterday');
     // Words first; the Not clear letter in Al-Kahf 23 never counted. Nothing cleared yet, so one line.
@@ -126,14 +127,14 @@ describe('Insights: Recitation (RINS-2)', () => {
     await open(data());
     expect(text('insights-recitation-strong-2-48')).toBe('Al-Baqarah, ayah 48 | Rated strong · wrong in 2 takes');
     expect(screen.queryByTestId('insights-recitation-strong-18-22')).toBeNull();
-    expect(text(`weak-spot-${KAHF_PAGE}`)).toContain('2 words still marked in Recite');
+    expect(text(`weak-spot-${KAHF_PAGE}`)).toContain('3 words still marked in Recite');
   });
 
   it('[RINS-2] Smart Tracking off: nothing about strength; rows say when the passage was last recited', async () => {
     await open(data({ smartTracking: false }));
     const section = text('insights-recitation');
     expect(section).not.toMatch(/strong|weak|rated|wrong in/i);
-    expect(text('insights-recitation-slip-18-22')).toContain('2 words still marked · last recited Saturday');
+    expect(text('insights-recitation-slip-18-22')).toContain('3 words still marked · last recited Saturday');
     expect(screen.queryByTestId('insights-weak-spots')).toBeNull();
   });
 
@@ -141,7 +142,8 @@ describe('Insights: Recitation (RINS-2)', () => {
     await open(data());
     const row = screen.getByTestId('insights-recitation-slip-18-22');
     const chips = within(row).getAllByText(/[\u0600-\u06FF]/, { includeHiddenElements: true });
-    expect(chips.map((c) => c.props.children)).toEqual([words.uthmani(w22), words.uthmani(w23)]);
+    // The Not clear letter too, remembered like a slip (RMEM-2).
+    expect(chips.map((c) => c.props.children)).toEqual([words.uthmani(w22), words.uthmani(w23), words.uthmani(w23 + 1)]);
     // No fixed line height (it cut the harakat off): the font's own ascent and descent.
     for (const c of chips) expect(StyleSheet.flatten(c.props.style).lineHeight).toBeUndefined();
   });

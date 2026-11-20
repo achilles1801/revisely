@@ -450,6 +450,21 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   recording; one whose start was never found leaves nothing. A take that ends without its final answer is reported
   (Revisely Dev, numbers only). A take's audio that no take names (saved before takes were kept this way) shows in
   Recited as an unfinished take of its own, never checked: no score, and no part in any.
+- **RECITE-13.** (Revisely Dev) With the page hidden, a word with a mistake keeps its highlight on its cover, the word
+  still hidden: a take's marks in their colour, during the take and after it, and the words Recite's memory still holds
+  on the page, lighter (with Show past mistakes on), during a take and outside one. A word that shows has its highlight
+  behind its ink, as on a shown page. (Majd, Nov 20 2026: "if I hide the page, that highlight should still be there.
+  Obviously, the word won't be shown, but the highlight should still be there so I know where I typically make
+  mistakes".)
+- **RECITE-14.** A mark shown during a take stays after Stop, on the page and in the summary, unless it was called Not
+  a mistake: one the checker's final answer leaves out stays as it was shown and counts as it did, unless the final
+  answer judged that word itself (its mark there replaces it). (Majd, Nov 20 2026: "As soon as a mistake is made, the
+  color should be highlighted immediately and should stay that way".)
+- **RECITE-15.** (Revisely Dev) Each new mistake that counts (a word wrong, skipped or added, a haraka or letter slip)
+  plays a short sound and a tap as it is marked during a take: never for Not clear or a tajweed note, never twice for
+  one mark (a resume sends marks again), and at most one every 0.7 s. It plays in silent mode, at the volume the
+  buttons set, and Settings → Recite → Sound on a mistake turns it off. (Majd, Nov 20 2026: "there should be some like
+  error sound ... so I know I just made a mistake".)
 
 ## Recite insights
 
@@ -483,16 +498,19 @@ Recite with Mark mistakes remembers each take (Majd, Nov 15 2026; Tarteel's bigg
 - **RMEM-1.** A take with Mark mistakes is remembered on the account, so it follows the user to another
   phone. It keeps its marks (less any called Not a mistake, after the take too, and again once put back),
   where it ran, its score by the page, whether the page was hidden, and which recording on the phone is its
-  own. It keeps text only, never audio. A Recite take (following only), a failed take, and a take whose start
-  was never found leave nothing. Forgetting a take removes it from every phone.
+  own. It keeps text only, never audio. A Recite take (following only), and a take whose start was never found
+  (a failure before then included) leave nothing; one that failed after it is kept unfinished (RECITE-11). Forgetting a take removes it from every phone.
 - **RMEM-2.** A remembered mistake on a word clears after 2 right takes of that word in a row, on 2
   different revision days. Getting it wrong again starts the count over. A take counts only for what it
-  checked: Words & harakat never clears a tajweed note. Not clear marks are never remembered, and a take
-  that heard a word's harakat only as Not clear is not a try at them. Clear now clears a word at once.
+  checked: Words & harakat never clears a tajweed note. A Not clear mark is remembered like a slip, amber,
+  until the word is said clearly: a take that heard its harakat only as Not clear hasn't said it clearly, so it
+  counts as wrong. It still never counts in a score. (Majd, Nov 20 2026, on Not clear staying after a take: "yes
+  (a) is fine".) Clear now clears a word at once.
 - **RMEM-3.** Outside a take, a word with a remembered mistake stays marked on the page, in its highlight
   colour made lighter (red for a word, amber for harakat and letters, violet for tajweed). A word shows one
   mark, its most severe. Marks don't show during a take, where only that take's marks do. They also don't
-  show on a hidden page, or with Settings → Recite → Show past mistakes off. Tapping one opens its history,
+  show on a hidden page, or with Settings → Recite → Show past mistakes off. (In Revisely Dev a hidden page keeps
+  them on its covers, during a take too: RECITE-13.) Tapping one opens its history,
   which shows:
   - the kind in words, with its place and how often it went wrong;
   - what was expected;

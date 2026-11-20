@@ -201,6 +201,8 @@ export const settings = {
     saveSub: 'On this phone only, with your recordings in Activity',
     showPast: 'Show past mistakes',
     showPastSub: 'Lightly, until each is said right on 2 different days',
+    mistakeSound: 'Sound on a mistake',
+    mistakeSoundSub: 'A short tone and a tap as a mistake is marked',
   },
   notifications: {
     enable: 'Enable notifications',

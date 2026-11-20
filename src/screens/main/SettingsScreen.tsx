@@ -1011,6 +1011,21 @@ export default function SettingsScreen() {
                 />
               }
             />
+            {isDevVariant() ? (
+              <Row
+                icon="volume-medium-outline"
+                label={t('settings.recite.mistakeSound')}
+                subtitle={t('settings.recite.mistakeSoundSub')}
+                rightSlot={
+                  <SettingSwitch
+                    value={reciteCheckSettings.mistakeSound}
+                    onValueChange={(mistakeSound) => setReciteCheckSettings(user?.id, { mistakeSound })}
+                    accessibilityLabel={t('settings.recite.mistakeSound')}
+                    testID="settings-recite-sound"
+                  />
+                }
+              />
+            ) : null}
           </Section>
         ) : null}
 

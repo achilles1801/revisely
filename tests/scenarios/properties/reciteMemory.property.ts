@@ -93,15 +93,15 @@ function model(steps: Step[], group: 'word' | 'slip' | 'tajweed'): { everMarked:
     }
     const checked = s.reaches && (group !== 'tajweed' || s.strict);
     if (!checked) continue;
-    if (s.group === group && s.result === 'wrong') {
+    // Wrong, or (harakat and letters) heard only as Not clear: not said clearly (Majd's Nov 20 (a): Not clear is
+    // remembered like a slip until said clearly).
+    if (s.group === group && (s.result === 'wrong' || (group === 'slip' && s.result === 'unclear'))) {
       // A tajweed note comes only from a take that checked tajweed.
       everMarked = true;
       open = true;
       days = new Set();
       continue;
     }
-    // A take that heard this word's harakat only as Not clear isn't a try at them.
-    if (group === 'slip' && s.group === 'slip' && s.result === 'unclear') continue;
     if (open) {
       days.add(day);
       if (days.size >= CLEAR_AFTER) open = false;
@@ -117,7 +117,8 @@ describe("Recite's memory", () => {
   it('[RMEM-2] a mistake clears after two right takes in a row on two different days; wrong again starts over; Clear now clears it', () => {
     fc.assert(
       fc.property(fc.array(stepArb, { minLength: 1, maxLength: 14 }), (raw) => {
-        const steps = valid(raw.map((s) => (s.kind === 'take' && s.result === 'wrong' ? { ...s, reaches: true } : s)));
+        // A take marks only words it reached.
+        const steps = valid(raw.map((s) => (s.kind === 'take' && (s.result === 'wrong' || s.result === 'unclear') ? { ...s, reaches: true } : s)));
         const memories = wordMemories(recordsOf(steps));
         for (const group of ['word', 'slip', 'tajweed'] as const) {
           const m = model(steps, group);
