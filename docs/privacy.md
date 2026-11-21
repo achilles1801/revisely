@@ -6,13 +6,11 @@ permalink: /privacy/
 # Privacy Policy for Revisely
 
 **Effective date: 2026-05-11**
-**Last updated: ‹DATE: YYYY-MM-DD›**
+**Last updated: 2026-11-21**
 
 This Privacy Policy describes how Revisely ("we", "us", or "the app") collects, uses, and protects information when you use the Revisely mobile application, and when you donate to Revisely on our website, revisely.app.
 
 Revisely is operated by **Revisely LLC**, a Texas limited liability company ("Revisely", "we", "us"). Revisely LLC is the controller of your personal data under the EU and UK GDPR, and is responsible for it under other privacy laws. You can reach us at `support@revisely.app`.
-
-Since ‹DATE: Month D, YYYY›, Revisely is provided by Revisely LLC, the company its founder formed to run it. Your account, data and settings are unchanged; Revisely LLC is now responsible for them under this policy.
 
 ## 1. What this app does
 

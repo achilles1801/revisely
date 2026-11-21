@@ -6,7 +6,7 @@ permalink: /terms/
 # Terms of Service for Revisely
 
 **Effective date: 2026-05-11**
-**Last updated: ‹DATE: YYYY-MM-DD›**
+**Last updated: 2026-11-21**
 
 These Terms of Service ("Terms") govern your use of the Revisely mobile application ("the app", "Revisely"). These Terms are an agreement between you and **Revisely LLC**, a Texas limited liability company ("Revisely", "we", "us", or "our"). By creating an account or using Revisely, you agree to these Terms. If you do not agree, do not use the app.
 
