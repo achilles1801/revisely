@@ -68,7 +68,8 @@ GitHub "Metrics" workflow, hourly ── Sentry + App Store totals ──► met
   came back), thumbs, actions taken, attachments, spend against the month's cap and today's allowance,
   and every account (questions, days, reviews, tokens, cost, days at the 20-question limit, failures,
   thumbs, last used). Tap one for its conversations and memory.
-- **Retention** (Nov 2026; `functions/src/metrics/retention.ts`, read by `sources.ts` `readActivity`): accounts
+- **Retention** (Nov 2026; `functions/src/metrics/retention.ts`, read by `sources.ts` `readActivity`; returned by
+  `adminMetrics` and `consoleMetrics`, shown in the staff console's Overview, PR #583's branch): accounts
   active yesterday, this week and in 30 days, a weekly chart since Oct 1, and day 1, 7 and 30 retention by
   sign-up week (exact day, and "day 7 or later"). Active = a revision session with pages or minutes, an
   Activity item (revisions, memorizations, reads), a recited take or a daily log, on the account's own
