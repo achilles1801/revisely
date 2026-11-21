@@ -280,7 +280,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'Recite and Mark mistakes',
-    covers: ['RECITE-1', 'RECITE-2', 'RECITE-3', 'RECITE-4', 'RECITE-5', 'RECITE-6', 'RECITE-7', 'RECITE-8', 'RECITE-9', 'RECITE-14', 'SEARCH-4', 'PREM-1'],
+    covers: ['RECITE-1', 'RECITE-2', 'RECITE-3', 'RECITE-4', 'RECITE-5', 'RECITE-6', 'RECITE-7', 'RECITE-8', 'RECITE-9', 'RECITE-14', 'SEARCH-4', 'PREM-1', 'READ-2'],
     routes: ['QuranReader', 'ActiveRevision', 'Settings'],
     text: lines(
       '- Who has it: an iPhone, or Android from version 1.0.5, with the Madani 1405 mushaf (Settings → Mushaf → “Mushaf”): the reader’s bar and a session’s have a mic and an eye in place of the record button. It needs the internet: Revisely’s server checks the recitation; nobody listens.',

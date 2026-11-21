@@ -225,6 +225,8 @@ export default function QuranReaderScreen() {
   const recite = useReciteLayer({
     currentPage,
     showPage: (page: number) => pagerRef.current?.scrollToPage(page) ?? false,
+    // A similar ayah opens in a reader of its own over this one, so Back comes back to this page as it was (READ-2).
+    openElsewhere: ({ page, highlight, showTake }) => navigation.push('QuranReader', { pageNumber: page, highlight, showTake }),
     day: today ?? null,
     focused: isScreenFocused,
     recorder,
