@@ -193,19 +193,26 @@ How the tests are made: `tests/scenarios/README.md`.
 
 The revision reminders are local notifications that the phone schedules while the app runs
 (`lib/reminders`, `components/RevisionRemindersSync`). Their plan is made again each time the app opens,
-comes back to the front, saves a session or changes the plan.
+comes back to the front, saves a session or changes the plan. Onboarding's Start asks for notification
+permission when "Daily reminders" is on, and a no saves reminders off.
 
 - **REMIND-1.** While today's revision isn't done, up to three a day: 8:00 AM, 20 minutes after Asr at
   the prayer place (3:00 PM without one), and an hour before the revision day ends (quiet between
   midnight and Fajr). Two due within 30 minutes become one. Once today is done, the rest of today's go,
   and the next becomes one quiet congratulation. Tomorrow gets the same three.
 - **REMIND-2.** (Revisely Dev) Someone who doesn't open the app still gets one reminder a day, at the morning time,
-  on each day after tomorrow, for a week counting the day the app was last open. Then they stop until
-  it's opened again, which plans the week again from that day. In the store app, until the release
-  opens it (`lib/reminders/later`), only today and tomorrow are planned, so someone who doesn't open
+  on each day after tomorrow, for a week counting the day the app was last open. It names where that day's
+  revision is, in words that change from one day to the next, and is never a second reminder on a day. Then they stop until
+  it's opened again, which plans the week again from that day. In the store app, until its switch is
+  on (`lib/release/remindersWhileAway`), only today and tomorrow are planned, so someone who doesn't open
   the app on their second day hears nothing more.
 - **REMIND-3.** None is scheduled while the phone doesn't allow notifications, or while reminders are
   off in Settings. Allowed later in the phone's Settings, they're planned once the app is back in front.
+- **REMIND-4.** Home asks for notification permission only for an account with reminders on whose phone
+  hasn't been asked yet (signed in on a new phone, a reinstall, or reminders turned on in Settings), and
+  never asks again once answered. With reminders off, nothing asks. (Changed Nov 2026: the app asked on
+  every launch, so a fresh install asked on its first screen, before sign-in; a no there turned reminders
+  off at onboarding. Home asked again even with reminders off, and a yes there didn't turn them on.)
 
 ## The daily log
 

@@ -14,7 +14,7 @@
 //
 // The plan is made again each time the app runs (RevisionRemindersSync), so
 // only today's and tomorrow's are planned in full. The days after get one each
-// (laterDays, REMIND-2; Revisely Dev until the release, lib/reminders/later):
+// (laterDays, REMIND-2; behind its own switch, lib/release/remindersWhileAway):
 // someone who doesn't open the app would otherwise hear nothing after tomorrow. Nov 2026: of the accounts that never came back after
 // their first day, almost none opened the app again, and those with reminders
 // on came back no more often than those without.
@@ -201,7 +201,7 @@ export function planRevisionReminders(input: PlanReminderInput): PlannedReminder
     slotsFor(tomorrow, input).forEach((slot, i) => add(tomorrow, tomorrowPages, new Set(), slot.kind, slot.at, i + 1));
   }
 
-  // The days after (REMIND-2): one each, nothing revised yet. A day with no pages gets none.
+  // The days after (REMIND-2): one each, nothing revised yet, never more than one a day. A day with no pages gets none.
   let later = tomorrow;
   for (let n = 0; n < (input.laterDays ?? 0); n++) {
     later = revisionAt(user, later.end);
@@ -209,8 +209,8 @@ export function planRevisionReminders(input: PlanReminderInput): PlannedReminder
     if (pages.length === 0) continue;
     const slots = slotsFor(later, input);
     const slot = slots.find((s) => s.kind === 'morning') ?? slots[0];
-    // The same index each day, so the wording alternates from one day to the next.
-    if (slot) add(later, pages, new Set(), slot.kind, slot.at, 1);
+    // At the morning time, worded for a day away; the wording turns with the day (copy's variant).
+    if (slot) add(later, pages, new Set(), 'away', slot.at, 0);
   }
 
   return planned;

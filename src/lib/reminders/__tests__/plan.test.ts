@@ -44,7 +44,10 @@ describe('planRevisionReminders', () => {
   it('the days after tomorrow get one each, in the morning, for a week counting today, then none (REMIND-2)', () => {
     const list = plan({ now: at(7) });
     expect(LATER_DAYS).toBe(6);
-    expect(times(laterOf(list))).toEqual(['morning@30:8:00', 'morning@31:8:00', 'morning@1:8:00', 'morning@2:8:00', 'morning@3:8:00', 'morning@4:8:00']);
+    expect(times(laterOf(list))).toEqual(['away@30:8:00', 'away@31:8:00', 'away@1:8:00', 'away@2:8:00', 'away@3:8:00', 'away@4:8:00']);
+    expect(laterOf(list).map((r) => r.id)).toContain(`${REVISION_REMINDER_PREFIX}2026-11-02-away`);
+    // Never more than one on a day after tomorrow.
+    expect(new Set(laterOf(list).map((r) => r.day)).size).toBe(LATER_DAYS);
     expect(laterOf(list).map((r) => r.day)).toEqual(['2026-10-30', '2026-10-31', '2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04']);
     for (const r of laterOf(list)) {
       expect(r.interruption).toBe('active');
@@ -55,7 +58,7 @@ describe('planRevisionReminders', () => {
       const [y, m, d] = r.day.split('-').map(Number);
       const first = assignedOn(makeUser(), new Date(y, m - 1, d))[0];
       const surah = getSurah(getSurahsForPage(first)[0].number)!.name;
-      expect(plain(r.body)).toContain(plain(surah));
+      expect(plain(`${r.title} ${r.body}`)).toContain(plain(surah));
     }
   });
 
@@ -66,12 +69,11 @@ describe('planRevisionReminders', () => {
     expect(plan({ now: at(7), laterDays: undefined })).toHaveLength(6);
   });
 
-  it('the wording of the days after tomorrow alternates from one day to the next', () => {
-    const bodies = laterOf(plan({ now: at(7), name: 'Amina' })).map((r) => r.body);
-    for (let i = 1; i < bodies.length; i++) {
-      const kind = (b: string) => (b.startsWith('Today starts with') ? 'starts' : 'range');
-      expect(kind(bodies[i])).not.toBe(kind(bodies[i - 1]));
-    }
+  it('the wording of the days after tomorrow differs from one day to the next', () => {
+    const words = laterOf(plan({ now: at(7), name: 'Amina' })).map((r) => `${r.title} | ${r.body}`);
+    for (let i = 1; i < words.length; i++) expect(words[i]).not.toBe(words[i - 1]);
+    // All four wordings come up in a week.
+    expect(new Set(words.map((w) => w.replace(/:.*|,.*/, ''))).size).toBeGreaterThanOrEqual(3);
   });
 
   it('done for today, the days after tomorrow are still planned', () => {

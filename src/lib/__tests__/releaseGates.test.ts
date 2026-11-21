@@ -170,3 +170,33 @@ describe('the mistake detection release (1.0.5): everyone’s, through one switc
   });
 });
 
+
+describe('reminders while away (REMIND-2): everyone’s through one switch of its own', () => {
+  // The days after tomorrow get one reminder each (lib/reminders/plan LATER_DAYS). It can reach App Store users on
+  // its own, before or with any release: REMINDERS_WHILE_AWAY_RELEASED = true is the whole change (plus Revo's guide).
+  const variant = require('../variant') as typeof import('../variant');
+  const { remindersWhileAwayEnabled, REMINDERS_WHILE_AWAY_RELEASED, setRemindersWhileAwayReleasedForTests } =
+    require('../release/remindersWhileAway') as typeof import('../release/remindersWhileAway');
+  afterEach(() => {
+    setRemindersWhileAwayReleasedForTests(undefined);
+    jest.restoreAllMocks();
+  });
+
+  it('[REMIND-2] off: Revisely Dev has them, the store app doesn’t', () => {
+    setRemindersWhileAwayReleasedForTests(false);
+    jest.spyOn(variant, 'isDevVariant').mockReturnValue(false);
+    expect(remindersWhileAwayEnabled()).toBe(false);
+    jest.spyOn(variant, 'isDevVariant').mockReturnValue(true);
+    expect(remindersWhileAwayEnabled()).toBe(true);
+  });
+
+  it('[REMIND-2] on: the store app has them too', () => {
+    setRemindersWhileAwayReleasedForTests(true);
+    jest.spyOn(variant, 'isDevVariant').mockReturnValue(false);
+    expect(remindersWhileAwayEnabled()).toBe(true);
+  });
+
+  it('ships off until Majd opens it: Revisely Dev’s for now (Nov 21 2026)', () => {
+    expect(REMINDERS_WHILE_AWAY_RELEASED).toBe(false);
+  });
+});

@@ -1,5 +1,4 @@
 import * as Notifications from 'expo-notifications';
-import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import { logger } from './logger';
 import { NOTIFICATION_LIGHT_COLOR } from '../theme/v2';
@@ -76,9 +75,9 @@ export async function ensureAndroidChannels(): Promise<void> {
 }
 
 // Requests notification permission (idempotent — no-op if already granted).
-// Returns true if the user has granted permission, false otherwise.
-// Works on simulators for local notifications; the device gate only applies
-// to fetching a push token below.
+// Returns true if the user has granted permission, false otherwise. Works on
+// simulators: the reminders are local notifications. (No push token is asked
+// for: nothing sends push, and the token fetched until Nov 2026 was never read.)
 export async function ensureNotificationsPermission(): Promise<boolean> {
   await ensureAndroidChannels();
 
@@ -86,25 +85,6 @@ export async function ensureNotificationsPermission(): Promise<boolean> {
   if (existingStatus === 'granted') return true;
   const { status } = await Notifications.requestPermissionsAsync();
   return status === 'granted';
-}
-
-export async function registerForPushNotificationsAsync() {
-  const granted = await ensureNotificationsPermission();
-  if (!granted) {
-    logger.log('Notification permission not granted');
-    return;
-  }
-
-  if (!Device.isDevice) {
-    logger.log('Must use physical device for push token');
-    return;
-  }
-
-  try {
-    return (await Notifications.getExpoPushTokenAsync()).data;
-  } catch (error) {
-    logger.log('Error getting push token:', error);
-  }
 }
 
 export async function scheduleDangerAlert(juz: number, enabled: boolean) {

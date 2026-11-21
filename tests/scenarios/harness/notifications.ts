@@ -20,20 +20,37 @@ export interface Scheduled {
 
 interface NotificationState {
   status: Status;
+  /** What the user answers when the app asks (only asked while 'undetermined', as iOS). */
+  answer: 'granted' | 'denied';
+  /** How many times the app asked (requestPermissionsAsync). */
+  asks: number;
   scheduled: Map<string, Scheduled>;
 }
 
 const g = globalThis as unknown as { __scenarioNotifications?: NotificationState };
-const state: NotificationState = (g.__scenarioNotifications ??= { status: 'denied', scheduled: new Map() });
+const state: NotificationState = (g.__scenarioNotifications ??= { status: 'denied', answer: 'denied', asks: 0, scheduled: new Map() });
 
 /** The phone allows notifications (as if the user said yes to iOS's prompt). */
 export function allowNotifications(): void {
   state.status = 'granted';
 }
 
+/** A phone the app hasn't asked yet (a new install); asked, the user answers `answer`. */
+export function notAskedYet(answer: 'granted' | 'denied'): void {
+  state.status = 'undetermined';
+  state.answer = answer;
+}
+
+/** How many times the app has asked for notification permission. */
+export function permissionAsks(): number {
+  return state.asks;
+}
+
 /** Back to a phone that refuses them, with nothing pending (after each test). */
 export function resetNotifications(): void {
   state.status = 'denied';
+  state.answer = 'denied';
+  state.asks = 0;
   state.scheduled.clear();
 }
 
@@ -61,7 +78,11 @@ const api: Record<string, unknown> = {
   SchedulableTriggerInputTypes: { DAILY: 'daily', DATE: 'date', WEEKLY: 'weekly', TIME_INTERVAL: 'timeInterval' },
   AndroidImportance: { DEFAULT: 3, HIGH: 4, MAX: 5, LOW: 2 },
   getPermissionsAsync: async () => permission(),
-  requestPermissionsAsync: async () => permission(),
+  requestPermissionsAsync: async () => {
+    state.asks++;
+    if (state.status === 'undetermined') state.status = state.answer;
+    return permission();
+  },
   scheduleNotificationAsync: async (request: Partial<Scheduled>) => {
     const identifier = request.identifier ?? `scenario-${++counter}`;
     state.scheduled.set(identifier, {
@@ -81,6 +102,8 @@ const api: Record<string, unknown> = {
   getPresentedNotificationsAsync: async () => [],
   getExpoPushTokenAsync: async () => ({ data: 'scenario' }),
   allowNotifications,
+  notAskedYet,
+  permissionAsks,
   resetNotifications,
   pendingNotifications,
 };

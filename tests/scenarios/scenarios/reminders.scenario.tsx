@@ -5,11 +5,12 @@
 // their first day, almost none opened the app again (Nov 21 2026, production counts).
 import { local, setNow, setZone, ZONES } from '../harness/clock';
 import { changeUser, newAccount, pagesRange } from '../harness/account';
-import { allowNotifications, pendingNotifications, type Scheduled } from '../harness/notifications';
+import { allowNotifications, notAskedYet, pendingNotifications, permissionAsks, type Scheduled } from '../harness/notifications';
+import { Home, homeStack } from '../harness/screens';
 import type { OpenApp, Phone as PhoneT } from '../harness/phone';
 import { Phone } from '../harness/phone';
 
-// Revisely Dev: REMIND-2's days after tomorrow are its own until the release (lib/reminders/later).
+// Revisely Dev: REMIND-2's days after tomorrow are its own until their switch is on (lib/release/remindersWhileAway).
 jest.mock('../../../src/lib/variant', () => ({ ...jest.requireActual('../../../src/lib/variant'), isDevVariant: () => mockDev.on }));
 const mockDev = { on: true };
 afterEach(() => {
@@ -117,11 +118,16 @@ it('[REMIND-2] without opening the app, one a day still comes for the week after
   ];
   try {
     await untilPlanned(app, () => walls().join() === lastOpen.join(), 'the week of reminders');
-    // Each names where its day's revision starts: a surah, as Home does.
-    for (const r of reminders()) {
+    // The days after tomorrow: one each, worded for a day away, with sound, each worded unlike the day before.
+    const away = reminders().filter((r) => r.identifier.endsWith('-away'));
+    expect(away.map(wall)).toEqual(lastOpen.slice(4));
+    for (const r of away) {
       expect(r.content.title).toBeTruthy();
       expect(r.content.body).toBeTruthy();
+      expect(r.content.sound).toBe(true);
     }
+    const words = away.map((r) => `${r.content.title} | ${r.content.body}`);
+    for (let i = 1; i < words.length; i++) expect(words[i]).not.toBe(words[i - 1]);
   } finally {
     await app.close();
   }
@@ -183,6 +189,40 @@ it('[REMIND-3] none while the phone does not allow notifications or reminders ar
     // Turned off in Settings: every one goes.
     await changeUser(app, { notificationsEnabled: false });
     await untilPlanned(app, () => reminders().length === 0, 'the reminders to go');
+  } finally {
+    await app.close();
+  }
+});
+
+it('[REMIND-4] Home asks for notification permission only for an account with reminders on, and only once', async () => {
+  setZone(ZONES.chicago);
+  setNow('2026-11-03 09:00');
+  const phone = new Phone('phone');
+  const setup = await newAccount(phone, { memorized: JUZ_30, user: { notificationsEnabled: false } });
+  await setup.close();
+  // A phone that has never been asked (until Nov 2026 the app asked at launch, before sign-in).
+  notAskedYet('granted');
+
+  let app = await phone.open(homeStack);
+  try {
+    await new Home(app).ready();
+    // Reminders switched off at onboarding: Home doesn't ask.
+    await app.idle(800);
+    expect(permissionAsks()).toBe(0);
+
+    // Turned on in Settings: asked once, here.
+    await changeUser(app, { notificationsEnabled: true });
+    await app.until(() => permissionAsks() === 1, 'the permission prompt');
+  } finally {
+    await app.close();
+  }
+
+  // Answered: never asked again.
+  app = await phone.open(homeStack);
+  try {
+    await new Home(app).ready();
+    await app.idle(800);
+    expect(permissionAsks()).toBe(1);
   } finally {
     await app.close();
   }

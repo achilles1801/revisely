@@ -256,6 +256,15 @@ export const settings = {
     version: 'Revisely · v{{version}}',
   },
   testing: {
+    /** Revisely Dev's list of the revision reminders this phone will show (components/settings/ScheduledRemindersRow). */
+    reminders: 'Scheduled reminders',
+    remindersSub: 'What this phone will show, and when',
+    remindersNone: 'None scheduled: reminders are off, or this phone doesn’t allow notifications.',
+    /** "Sat, Nov 22 · 8:00 AM". */
+    remindersWhen: '{{day}} · {{time}}',
+    /** After the time, for the one reminder of a day after tomorrow (REMIND-2). */
+    remindersAway: ' · while away',
+    remindersPreview: 'Show the next one in 5 seconds',
     resetSub: 'Start again as a new account',
     whatsNewAtLaunch: 'Show What’s new at launch',
     whatsNewAtLaunchSub: 'As App Store users will see it after the update',

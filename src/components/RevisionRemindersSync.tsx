@@ -7,10 +7,10 @@ import { useRevisionDay } from '../hooks/useRevisionDay';
 import { greetingName } from '../lib/displayName';
 import { getQuranData } from '../lib/quranData';
 import { logger } from '../lib/logger';
-import { planRevisionReminders } from '../lib/reminders/plan';
+import { LATER_DAYS, planRevisionReminders } from '../lib/reminders/plan';
 import { useActivityHistory, withPhoneSessions } from '../lib/activityHistory';
 import { clearRevisionReminders, syncRevisionReminders } from '../lib/reminders/sync';
-import { laterReminderDays } from '../lib/reminders/later';
+import { remindersWhileAwayEnabled } from '../lib/release/remindersWhileAway';
 import { usePrayerPrefs } from '../lib/prayer/prefs';
 import { prayerPlace, prayerSettings } from './prayer/usePrayerTimes';
 
@@ -77,7 +77,7 @@ export function RevisionRemindersSync() {
           quranData: getQuranData(),
           place,
           settings,
-          laterDays: laterReminderDays(),
+          laterDays: remindersWhileAwayEnabled() ? LATER_DAYS : 0,
         });
         await syncRevisionReminders(planned);
       } catch (err) {
