@@ -585,7 +585,7 @@ it('[ACT-28] [ACT-30] [REVO-23] Revisely Dev tells Revo what Insights’ Gaps an
     // Al-Fatihah (page 1, revised on the 2nd) has waited a week.
     const asked = (await modelRequests(uid)).pop()!;
     const text = asked.messages[0].content;
-    expect(text).toContain('last revised 6 days ago; the longest 6 days, still going; 1 gap of 3 days or more.');
+    expect(text).toContain('last revised 6 days ago; 1 gap, the longest 6 days without revising (still going).');
     expect(text).toContain('Full revision: ');
     expect(text).toMatch(/Last revised, each memorized surah, the longest since first [^\n]*Al-Fatihah 7 days ago/);
     await app.close();

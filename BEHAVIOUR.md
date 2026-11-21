@@ -315,49 +315,50 @@ How the tests are made: `tests/scenarios/README.md`.
 Activity → Insights for every account, from the mistake detection release (`gapsInsightsEnabled`); Revo's main guide
 has them.
 
-- **ACT-28.** Insights' Gaps, after Consistency, says how long the user goes between revisions. A revision day is a
+- **ACT-28.** Insights' Gaps, after Consistency, says how long the user goes without revising. A revision day is a
   revision day (DAY-2, DAY-9) with at least one page revised: a session, pages revised ahead (on the day they were
-  done) or pages logged as revised elsewhere; reading and memorizing don't count. A gap is the days from one revision
-  day to the next (Monday, then Thursday, is 3 days); revising every day leaves none, and one missed day is a 2-day
-  gap. Lengths under 2 weeks are days; from 2 weeks they are said as a person says them, weeks ("over 3 weeks"),
-  from 6 weeks months ("about 2 months"), from a year years, and Days at the section's top right (shown only when
-  something reads differently) switches every length to exact days, kept on the phone. (Majd, Nov 16 2026: "saying
-  25 days gap is kinda pointless … but 'days' specifically should always be an option".) Its figure is how long
-  since the last revision: under 2 weeks a number ("6 days since your last revision", red from 3 days); from 2
-  weeks words and the date, never red ("Over 3 weeks since your last revision, on 24 Oct"); the pages' own last
-  revised dates when no item reaches that far back. Revised today: "Today, you revised", "after 6 days" when it
-  ended a gap of 3 days or more, "you're back, after over 3 weeks" after 2 weeks or more. It opens the day of the
-  last revision. Under it, a strip of the range (ACT-22;
-  at most half a year, never before the account's first day): a dot per revision day, joined while they run on,
-  each gap of 3 days or more in red with its length above it ("9 days"), and the gap still open dashed up to
-  today ("6 days so far"; grey from 2 weeks); a touch opens the day under the finger (longer than a month:
-  Overview at that month).
-  Then two tiles: the longest gap with a missed day in the range, the open one included and counted in full when it
-  began before the range ("9 days · Longest gap, 28 Oct – 6 Nov"; "60+ days" when it began before the days read;
-  "None · No gaps in 30 days"). A tap on it opens Overview, at its top, with the gap marked on the calendar: a band in the
-  red's quiet fill behind the days from the revision day before it to the one that ended it (an open gap: to
-  today), both inside it, drawn in from its first day to its last with a red edge that then settles (with Reduce
-  Motion it fades in whole), and "Longest gap, 28 Oct – 6 Nov · 9 days" above the grid, said once for VoiceOver.
-  Month opens at the month holding most of it, Week at the week it begins in; the band is flat where it carries on
-  into the next week or month, and the arrows or a swipe follow it there. It fades at the first touch on the
-  calendar (a day picked, Today, Week | Month) and is gone after leaving Overview. (Majd, Nov 16 2026: "it should
-  take them to the overview tab with some 'animation' or visual que showing the user their gap on the calendar
-  itself… we'd just have to keep in mind the fact the user could have the week view open instead of month.")
-  The second tile is the usual rhythm, the median step between revision
-  days in the range, from two steps ("Every day", "Every 2 days", "Every 1–2 days", with how many gaps of 3 days or
-  more). Under them, the full revision against the plan as it is now, read forwards from today (nothing records
-  what an older plan scheduled): a page's spacing is the days between its next two slots (days off, custom plans,
-  juz mode and carried pages included), it is due its spacing after its last revision (never revised: after the
-  day it was memorized), and it is late when its next slot comes after that. "Full revision pushed back 5 days ·
-  18 pages from your gaps come round by 13 Nov instead of 8 Nov. Your plan goes round every 5 days." runs from the
-  latest due day of a late page to the latest day one comes round ("from your gaps" when every late page was due
-  before today; a catch-up that slid the plan back says only "come round"); none late: "Full revision on
-  schedule". A plan changed mid-cycle is judged by the new plan; pages it doesn't hold are left out. Nothing
-  revised on record: no section. Recency only, the same with Smart Tracking on or off (ACT-19). Revo is told the
-  same figures over the last 30 days with each question, and when each memorized surah was last revised (ACT-30),
-  from the items Home read and only once they have loaded; any app whose account has Gaps sends them.
-  (Majd, Nov 16 2026: "some metric in insights
-  that give the user an idea on their 'gaps' between session"; mocks insights-gaps.)
+  done) or pages logged as revised elsewhere; reading and memorizing don't count. A gap is 2 days or more in a row
+  without a revision day, counted as the calendar shows them (Monday, then Thursday, is a 2-day gap: Tuesday and
+  Wednesday); one day missed is not a gap. The gap still open counts the days since the last revision, today included
+  ("6 days so far", as the figure says "6 days since your last revision"), once 2 whole days have gone by. (Majd, Nov
+  20 2026, on a day-old account: "there's just a dot on that graph and literally it makes no sense … There has to be a
+  better way to represent this.") Lengths under 2 weeks are days; from 2 weeks they are said as a person says them,
+  weeks ("over 3 weeks"), from 6 weeks months ("about 2 months"), from a year years, and Days at the section's top
+  right (shown only when something reads differently) switches every length to exact days, kept on the phone. (Majd,
+  Nov 16 2026: "saying 25 days gap is kinda pointless … but 'days' specifically should always be an option".) Its
+  figure is how long since the last revision: under 2 weeks a number ("6 days since your last revision", red from 3
+  days); from 2 weeks words and the date, never red ("Over 3 weeks since your last revision, on 24 Oct"); the pages'
+  own last revised dates when no item reaches that far back. Revised today: "Today, you revised", "you revised, after a
+  5-day gap" when it ended a gap, "you're back, after over 3 weeks" after 2 weeks or more. It opens the day of the last
+  revision. Under it one line: how many gaps the range had (ACT-22; never before the account's first day, and named by
+  it then: "1 gap since 19 November"), and the usual rhythm, the median step between revision days in the range, from
+  two steps ("3 gaps in 30 days · you usually revise every 1–2 days"); with no gap, "No gaps in 30 days", or "No gaps
+  yet" while the range has one revision day. Then the gaps themselves, the one still open first, then the latest first,
+  three until "Show all 5 gaps": each its length ("5 days", "6 days so far", "60+ days" when it began before the days
+  read) and its days ("29 Oct – 2 Nov", "14 Nov – today", "until 2 Nov"), over a bar as long against its track as the
+  gap is against the range's longest, red (grey for the one still open from 2 weeks: someone coming back is welcomed,
+  not alarmed). With no gap nothing is drawn. A tap on a gap opens Overview, at its top, with the gap marked on the
+  calendar: a band in the red's quiet fill behind its days without a revision (an open gap: to today), drawn in from
+  its first day to its last with a red edge that then settles (with Reduce Motion it fades in whole), and "Gap, 29 Oct
+  – 2 Nov · 5 days" above the grid, said once for VoiceOver. Month opens at the month holding most of it, Week at the week
+  it begins in; the band is flat where it carries on into the next week or month, and the arrows or a swipe follow it
+  there. It fades at the first touch on the calendar (a day picked, Today, Week | Month) and is gone after leaving
+  Overview. (Majd, Nov 16 2026: "it should take them to the overview tab with some 'animation' or visual que showing
+  the user their gap on the calendar itself… we'd just have to keep in mind the fact the user could have the week view
+  open instead of month.") Under the gaps, the full revision against the plan as it is now, read forwards from today
+  (nothing records what an older plan scheduled): a page's spacing is the days between its next two slots (days off,
+  custom plans, juz mode and carried pages included), it is due its spacing after its last revision (never revised:
+  after the day it was memorized), and it is late when its next slot comes after that. "Full revision pushed back 5
+  days · 18 pages from your gaps come round by 13 Nov instead of 8 Nov. Your plan goes round every 5 days." runs from
+  the latest due day of a late page to the latest day one comes round ("from your gaps" when every late page was due
+  before today; a catch-up that slid the plan back says only "come round"); none late, after a gap in the range: "Full
+  revision on schedule"; none late and no gap: no line. A plan changed mid-cycle is judged by the new plan; pages it
+  doesn't hold are left out. Nothing revised on record: no section. Recency only, the same with Smart Tracking on or
+  off (ACT-19). Revo is told the same figures over the last 30 days with each question (how long since the last
+  revision, how many gaps and the longest in days without revising, the usual rhythm, the full revision), and when each
+  memorized surah was last revised (ACT-30), from the items Home read and only once they have loaded; any app whose
+  account has Gaps sends them. (Majd, Nov 16 2026: "some metric in insights that give the user an idea on their 'gaps'
+  between session"; mocks insights-gaps.)
 
 - **ACT-30.** Last revised says when each memorized surah, juz, hizb or page was last revised. It opens from Gaps'
   "When did I last revise…?" at the section's end and from its full revision line (ACT-28), which opens it longest
@@ -763,6 +764,15 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   insights restricted to just the last 30 days?"; mocks i1 and i2.) Every count agrees with its number ("1 of 1
   day", "1 of 1 memorized page"). (Majd, Nov 8 2026, on a day-old account: "think i found a bug when u filter by
   all time or 3 months".)
+- **ACT-31.** On a young account Insights draws no chart that says nothing (Majd, Nov 20 2026, of Gaps on a day-old
+  account: "It's not telling me anything. I don't know what to make of it."). Days before the account's first day are neither done nor missed: the
+  week's circles draw them faintly and they open nothing, and at 7 days a count from a younger account is "1 of 1 day
+  since 19 November", as the other ranges count, with no month beside it; the month beside the week counts from the
+  account's first day when it began in that month ("5 of the last 7 days · 10 of 12 since 8 November"). Consistency's
+  minutes by hour show once timed revisions or reads fall on 3 days of the range (one session's hour says nothing about
+  when they revise). Memorization's month bars show once a month among them has a page memorized; until then the figure
+  alone. Gaps says "No gaps yet" and draws nothing (ACT-28).
+
 - **ACT-23.** Insights answer a tap: a day's circle (or a day of the weeks grid) opens that day, a missed one
   too (empty, with its +); Consistency's figure opens Overview at its month; Coverage's figure ("264 of 305
   memorized pages in 30 days ›") lists what wasn't revised in the range, a memorized juz as one row ("Juz 4 …

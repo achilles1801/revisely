@@ -70,10 +70,9 @@ export function showsToday(span: CalendarSpan, { month, week }: CalendarPeriod, 
 
 // ── A gap on the calendar (ACT-28) ──────────────────────────────────────
 //
-// Insights' longest gap opens Overview with the gap marked on it (Majd, Nov 16 2026: "it should take them to the
+// A gap in Insights opens Overview with the gap marked on it (Majd, Nov 16 2026: "it should take them to the
 // overview tab with some 'animation' or visual que showing the user their gap on the calendar itself"). The band
-// runs from the revision day before the gap to the one that ended it (an open gap: today), both inside it, as the
-// strip's line runs from dot to dot.
+// covers its days without a revision (an open gap: up to today), as the gap is counted (lib/insightsGaps).
 
 /** The gap marked: its two ends (days), the words above the grid, and a key per opening (it draws in once). */
 export interface CalendarGap {

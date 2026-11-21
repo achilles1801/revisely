@@ -34,11 +34,11 @@ export const insights = {
   filterByStrength: 'Filter by strength',
   showLess: 'Show less',
   showAll: 'Show all ({{hidden}})',
-  /** Activity → Insights → Gaps (ACT-28): the days between revisions. */
+  /** Activity → Insights → Gaps (ACT-28): 2 days or more in a row without revising. */
   gaps: {
     title: 'Gaps',
-    detail: 'Days between your revisions',
-    /** The figure: "6 days" "since your last revision"; "Today" "you revised, after 6 days". */
+    detail: '2 days or more without revising',
+    /** The figure: "6 days" "since your last revision"; "Today" "you revised, after a 5-day gap". */
     days_one: '{{count}} day',
     days_other: '{{count}} days',
     sinceLast: 'since your last revision',
@@ -59,12 +59,8 @@ export const insights = {
     aboutYears_other: 'about {{count}} years',
     overYears_one: 'over a year',
     overYears_other: 'over {{count}} years',
-    /** The open gap from 2 weeks: "over 3 weeks so far". */
+    /** The gap still open, from 2 weeks: "over 3 weeks so far". */
     soFar: '{{duration}} so far',
-    aboutEveryWeeks_one: 'About every week',
-    aboutEveryWeeks_other: 'About every {{count}} weeks',
-    aboutEveryMonths_one: 'About every month',
-    aboutEveryMonths_other: 'About every {{count}} months',
     /** The full revision (lib/gapsCycle pushBackLine). */
     pushedBack: 'Full revision pushed back {{duration}}',
     pushedLate_one: '{{count}} page comes round on {{next}} instead of {{due}}.',
@@ -82,44 +78,41 @@ export const insights = {
     inDaysOff: 'Show exact days',
     today: 'Today',
     revisedToday: 'you revised',
-    revisedTodayAfter_one: 'you revised, after {{count}} day',
-    revisedTodayAfter_other: 'you revised, after {{count}} days',
+    revisedTodayAfter_one: 'you revised, after a {{count}}-day gap',
+    revisedTodayAfter_other: 'you revised, after a {{count}}-day gap',
     figureHint: 'Opens the day of your last revision',
-    /** The strip's gap labels: "9 days", "60+ days", "6 days so far". */
+    /** A range longer than the account: "since 2 November" (ACT-22). */
+    since: 'since {{date}}',
+    /** The line under the figure: "3 gaps in 30 days · you usually revise every day"; "No gaps yet". */
+    count_one: '{{count}} gap {{range}}',
+    count_other: '{{count}} gaps {{range}}',
+    noGapsIn: 'No gaps {{range}}',
+    noGapsYet: 'No gaps yet',
+    usually_one: 'you usually revise every day',
+    usually_other: 'you usually revise every {{count}} days',
+    usuallyBetween: 'you usually revise every {{low}}–{{high}} days',
+    usuallyWeeks_one: 'you usually revise about every week',
+    usuallyWeeks_other: 'you usually revise about every {{count}} weeks',
+    usuallyMonths_one: 'you usually revise about every month',
+    usuallyMonths_other: 'you usually revise about every {{count}} months',
+    /** A gap's row: its length ("5 days", "6 days so far", "60+ days") and its days ("29 Oct – 2 Nov"). */
     gapLabel_one: '{{count}} day',
     gapLabel_other: '{{count}} days',
     gapLabelAtLeast: '{{count}}+ days',
     openLabel_one: '{{count}} day so far',
     openLabel_other: '{{count}} days so far',
-    stripToday: 'Today',
-    /** A range longer than the account: "since 2 November" (ACT-22). */
-    since: 'since {{date}}',
-    /** The strip for VoiceOver: "Last 30 days: revised on 14 days. Gaps of 3 days or more: 9 days, from 28 October to 6 November." */
-    stripLabel_one: '{{range}}: revised on {{count}} day.',
-    stripLabel_other: '{{range}}: revised on {{count}} days.',
-    stripLongGaps: 'Gaps of 3 days or more: {{gaps}}.',
-    stripNoLongGaps: 'No gaps of 3 days or more.',
-    stripGap: '{{days}}, from {{from}} to {{to}}',
-    stripGapOpen: '{{days}} so far, since {{from}}',
-    stripGapUnknown: '{{days}}, until {{to}}',
-    stripHint: 'Opens the day you touch',
-    stripHintMonth: 'Opens the calendar at the month you touch',
-    /** The longest gap's tile: "9 days" "Longest gap, 28 Oct – 6 Nov". */
-    unit_one: 'day',
-    unit_other: 'days',
-    longest: 'Longest gap, {{from}} – {{to}}',
-    longestOpen: 'Longest gap, since {{from}}',
-    longestUnknown: 'Longest gap, until {{to}}',
-    longestHint: 'Shows it on the calendar',
-    noGaps: 'None',
-    noGapsText: 'No gaps {{range}}',
-    /** The usual rhythm's tile: "Every day" "Your usual rhythm · 2 gaps of 3+ days". */
-    every_one: 'Every day',
-    every_other: 'Every {{count}} days',
-    everyBetween: 'Every {{low}}–{{high}} days',
-    rhythmNone: 'Your usual rhythm · no gaps of 3+ days',
-    rhythm_one: 'Your usual rhythm · {{count}} gap of 3+ days',
-    rhythm_other: 'Your usual rhythm · {{count}} gaps of 3+ days',
+    dates: '{{from}} – {{to}}',
+    /** Both in one month: "9–10 Oct". */
+    datesSameMonth: '{{fromDay}}–{{to}}',
+    datesOpen: '{{from}} – today',
+    datesUntil: 'until {{to}}',
+    rowLabel: '{{length}} without revising, {{dates}}',
+    rowHint: 'Shows it on the calendar',
+    showAll_one: 'Show all {{count}} gaps',
+    showAll_other: 'Show all {{count}} gaps',
+    showFewer: 'Show fewer',
+    /** Above Overview's calendar, with the gap marked on it: "Gap, 29 Oct – 2 Nov · 5 days". */
+    cue: 'Gap, {{dates}} · {{length}}',
   },
   /** Activity → Insights → Gaps → "When did I last revise…?" (ACT-30). */
   lastRevised: {

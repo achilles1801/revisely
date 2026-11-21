@@ -109,11 +109,14 @@ export interface RevoRecitedAyah {
 export interface RevoGaps {
   /** Whole days since the last revision day (0 = today). */
   lastRevisedDaysAgo: number;
-  /** The longest gap in the last 30 days; `endedDaysAgo` null while it is still open. */
+  /**
+   * The longest gap in the last 30 days, in days without revising (2 or more; still open: the days since the last
+   * revision, today included); `endedDaysAgo` null while it is still open.
+   */
   longestGap: { days: number; endedDaysAgo: number | null } | null;
   /** The usual step between revision days (1 = every day), from at least two steps. */
   usualStepDays: number | null;
-  /** Gaps of 3 days or more in the last 30 days, the open one included. */
+  /** Gaps (2 days or more without revising) in the last 30 days, the open one included. */
   longGaps: number;
   /** The full revision against the plan (lib/gapsCycle). */
   fullRevision: { latePages: number; pushedBackDays: number; cycleDays: number } | null;

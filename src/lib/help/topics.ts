@@ -541,7 +541,7 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         id: 'insightsMore.gaps',
         icon: 'pulse-outline',
         title: 'Gaps',
-        text: 'How long since you last revised, your longest gap (tap it to see it on the calendar) and how often you usually revise. {{Days}} shows exact days.',
+        text: 'How long since you last revised, and each time you went 2 days or more without revising: tap one to see it on the calendar. {{Days}} shows exact days.',
         covers: ['ACT-28'],
         when: 'devApp',
       },

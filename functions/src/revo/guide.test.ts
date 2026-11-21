@@ -210,7 +210,7 @@ describe('the Dev guide goes only with questions from Revisely Dev', () => {
     const dev = validateContext({ ...plain, app: 'dev', gaps });
     expect(dev.gaps).toEqual(gaps);
     const request = JSON.stringify(ask(dev));
-    expect(request).toContain('last revised 6 days ago');
+    expect(request).toContain('last revised 6 days ago; 2 gaps, the longest 9 days without revising (ended 6 days ago); usually every day.');
     expect(request).toContain('pushed back 5 days');
     expect(request).toContain('Al-Kahf 9 days ago');
     // They go with the question, not the system blocks (which stay cached as they were).

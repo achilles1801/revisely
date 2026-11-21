@@ -1,9 +1,8 @@
-// Insights' Gaps (ACT-28): the figure, the strip, the two tiles, what each tap opens, and where it sits.
+// Insights' Gaps (ACT-28): the figure, the line under it, the gaps listed, what each tap opens, and where it sits.
 import React from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { Text as SvgText } from 'react-native-svg';
 import { GAPS_IN_DAYS_KEY, GapsSection } from '../GapsSection';
 import { InsightsView, type InsightsData } from '../InsightsView';
 
@@ -58,64 +57,72 @@ describe('Gaps', () => {
     expect(onOpenDay).toHaveBeenCalledWith('2026-11-09');
   });
 
-  it('a revision today: "Today, you revised, after 6 days", not in red', () => {
+  it('a revision today: "Today, you revised, after a 5-day gap", not in red', () => {
     renderGaps([...BOARD, TODAY]);
     const figure = screen.getByTestId('insights-gaps-figure');
     expect(within(figure).getByText('Today')).toBeTruthy();
-    expect(within(figure).getByText(/you revised, after 6 days/)).toBeTruthy();
+    expect(within(figure).getByText(/you revised, after a 5-day gap/)).toBeTruthy();
     expect(flat(within(figure).getByText('Today').props.style).color).toBe('#000000');
   });
 
-  it('the longest gap and the usual rhythm, side by side; the longest opens Overview with it marked', () => {
-    const { onOpenCalendar } = renderGaps(BOARD);
-    const longest = screen.getByTestId('insights-gaps-longest');
-    expect(within(longest).getByText('9')).toBeTruthy();
-    expect(within(longest).getByText('days')).toBeTruthy();
-    expect(within(longest).getByText(/Longest gap, 28 Oct – 6 Nov/)).toBeTruthy();
-    fireEvent.press(longest);
-    // Overview with the gap marked on its calendar, from the revision before it to the one that ended it.
-    expect(onOpenCalendar).toHaveBeenCalledWith('2026-10', { from: '2026-10-28', to: '2026-11-06', cue: 'Longest gap, 28 Oct – 6 Nov · 9 days' });
-    const rhythm = screen.getByTestId('insights-gaps-rhythm');
-    expect(within(rhythm).getByText('Every day')).toBeTruthy();
-    expect(within(rhythm).getByText('Your usual rhythm · 2 gaps of 3+ days')).toBeTruthy();
+  it('one line of the range: how many gaps and the usual rhythm', () => {
+    renderGaps(BOARD);
+    expect(screen.getByTestId('insights-gaps-summary').props.children).toBe('2 gaps in 30 days · you usually revise every day');
   });
 
-  it('every day revised: no gaps in the range', () => {
+  it('lists each gap, the one still open first: its length, its days and a bar against the longest; a tap marks it on the calendar', () => {
+    const { onOpenCalendar } = renderGaps(BOARD);
+    const rows = screen.getAllByTestId(/^insights-gap-\d/);
+    expect(rows.map((r) => r.props.testID)).toEqual(['insights-gap-2026-11-10', 'insights-gap-2026-10-29']);
+    const open = screen.getByTestId('insights-gap-2026-11-10');
+    expect(within(open).getByText('6 days so far')).toBeTruthy();
+    expect(within(open).getByText(/10 Nov – today/)).toBeTruthy();
+    expect(open.props.accessibilityLabel).toBe('6 days so far without revising, 10 November – today');
+    const closed = screen.getByTestId('insights-gap-2026-10-29');
+    expect(within(closed).getByText('8 days')).toBeTruthy();
+    expect(within(closed).getByText(/29 Oct – 5 Nov/)).toBeTruthy();
+    // The bars: the longest fills its track; 6 of 8 days fills three quarters. Both red (under 2 weeks).
+    expect(flat(screen.getByTestId('insights-gap-bar-2026-10-29').props.style)).toMatchObject({ width: '100%', backgroundColor: '#DC2626' });
+    expect(flat(screen.getByTestId('insights-gap-bar-2026-11-10').props.style)).toMatchObject({ width: '75%', backgroundColor: '#DC2626' });
+    fireEvent.press(closed);
+    // Overview with the gap marked on its calendar: its days without a revision.
+    expect(onOpenCalendar).toHaveBeenCalledWith('2026-10', { from: '2026-10-29', to: '2026-11-05', cue: 'Gap, 29 Oct – 5 Nov · 8 days' });
+  });
+
+  it('three gaps until "Show all"', () => {
+    // Four gaps of 2 days without revising: 2–3, 5–6, 8–9 and 11–12 November.
+    renderGaps(['2026-11-01', '2026-11-04', '2026-11-07', '2026-11-10', '2026-11-13'], { firstDay: '2026-11-01' });
+    expect(screen.getAllByTestId(/^insights-gap-\d/)).toHaveLength(3);
+    fireEvent.press(screen.getByTestId('insights-gaps-more'));
+    expect(screen.getAllByTestId(/^insights-gap-\d/)).toHaveLength(4);
+    expect(within(screen.getByTestId('insights-gaps-more')).getByText('Show fewer')).toBeTruthy();
+  });
+
+  it('every day revised: no gaps, nothing drawn', () => {
     const days = Array.from({ length: 30 }, (_, i) => new Date(Date.parse(`${TODAY}T00:00:00Z`) - i * 86_400_000).toISOString().slice(0, 10));
     renderGaps(days);
-    const longest = screen.getByTestId('insights-gaps-longest');
-    expect(within(longest).getByText('None')).toBeTruthy();
-    expect(within(longest).getByText('No gaps in 30 days')).toBeTruthy();
-    expect(within(screen.getByTestId('insights-gaps-rhythm')).getByText('Your usual rhythm · no gaps of 3+ days')).toBeTruthy();
+    expect(screen.getByTestId('insights-gaps-summary').props.children).toBe('No gaps in 30 days · you usually revise every day');
+    expect(screen.queryByTestId('insights-gaps-list')).toBeNull();
   });
 
-  it('the strip reads its gaps to VoiceOver and opens the day touched', () => {
-    const { onOpenDay } = renderGaps(BOARD);
-    const strip = screen.getByTestId('insights-gaps-strip');
-    expect(strip.props.accessibilityLabel).toBe(
-      'Last 30 days: revised on 14 days. Gaps of 3 days or more: 9 days, from 28 October to 6 November; 6 days so far, since 9 November.',
-    );
-    // 30 days over 343 pt (6 pt in from each end): the 12th day (28 Oct) is at 6 + 11 × 331 / 29.
-    fireEvent(strip, 'layout', { nativeEvent: { layout: { width: 343, height: 48 } } });
-    fireEvent.press(strip, { nativeEvent: { locationX: 6 + (11 * 331) / 29 } });
-    expect(onOpenDay).toHaveBeenLastCalledWith('2026-10-28');
-    // Each long gap's length is drawn above it; the 2-day gaps (one missed day) have none.
-    expect(screen.UNSAFE_getAllByType(SvgText).map((l) => l.props.children)).toEqual(['9 days', '6 days so far']);
-  });
-
-  it('three months: a touch on the strip opens Overview at that month', () => {
-    const { onOpenCalendar, onOpenDay } = renderGaps(BOARD, { window: 90, inWords: 'in 3 months', lastWords: 'last 3 months' });
-    const strip = screen.getByTestId('insights-gaps-strip');
-    fireEvent(strip, 'layout', { nativeEvent: { layout: { width: 343, height: 48 } } });
-    fireEvent.press(strip, { nativeEvent: { locationX: 340 } });
-    expect(onOpenCalendar).toHaveBeenLastCalledWith('2026-11');
-    expect(onOpenDay).not.toHaveBeenCalled();
+  it('a day-old account (Majd, Nov 20 2026): "Today you revised", "No gaps yet", and no chart, no on-schedule line', () => {
+    renderGaps([TODAY], {
+      window: 7,
+      inWords: 'in 7 days',
+      lastWords: 'last 7 days',
+      firstDay: TODAY,
+      knownSince: TODAY,
+      pushBack: { cycleDays: 18, late: [], due: null, next: null, days: 0, missed: false },
+    });
+    expect(screen.getByTestId('insights-gaps-figure').props.accessibilityLabel).toBe('Today you revised');
+    expect(screen.getByTestId('insights-gaps-summary').props.children).toBe('No gaps yet');
+    expect(screen.queryByTestId('insights-gaps-list')).toBeNull();
+    expect(screen.queryByTestId('insights-gaps-revision')).toBeNull();
   });
 
   it('an account younger than the range names its first day, as Consistency does', () => {
-    renderGaps(['2026-11-12', '2026-11-13', '2026-11-14'], { firstDay: '2026-11-08' });
-    expect(screen.getByTestId('insights-gaps-strip').props.accessibilityLabel).toBe('Since 8 November: revised on 3 days. No gaps of 3 days or more.');
-    expect(screen.getByText('8 Nov', { includeHiddenElements: true })).toBeTruthy();
+    renderGaps(['2026-11-08', '2026-11-12', '2026-11-13', '2026-11-14'], { firstDay: '2026-11-08' });
+    expect(screen.getByTestId('insights-gaps-summary').props.children).toBe('1 gap since 8 November · you usually revise every day');
   });
 
   it('away a while: words and the date, not in red; no Days switch while nothing reads differently', async () => {
@@ -147,9 +154,9 @@ describe('Gaps', () => {
     await AsyncStorage.removeItem(GAPS_IN_DAYS_KEY);
   });
 
-  it('back today after an absence: gently, "you’re back"', () => {
+  it('back today after an absence (24 Oct, then 3 weeks without revising): gently, "you’re back"', () => {
     renderGaps(['2026-10-23', '2026-10-24', TODAY]);
-    expect(within(screen.getByTestId('insights-gaps-figure')).getByText(/you’re back, after over 3 weeks/)).toBeTruthy();
+    expect(within(screen.getByTestId('insights-gaps-figure')).getByText(/you’re back, after 3 weeks/)).toBeTruthy();
   });
 
   it('the full revision, pushed back or on schedule', () => {
@@ -165,6 +172,10 @@ describe('Gaps', () => {
     expect(screen.getByTestId('insights-gaps-revision').props.accessibilityLabel).toBe(
       'Full revision on schedule. Every page comes round within 16 days, as your plan has it.',
     );
+    screen.unmount();
+    // On schedule with no gap in the range says nothing new: no line.
+    renderGaps(['2026-11-13', '2026-11-14', TODAY], { pushBack: { cycleDays: 16, late: [], due: null, next: null, days: 0, missed: false } });
+    expect(screen.queryByTestId('insights-gaps-revision')).toBeNull();
   });
 
   it('hides with nothing revised on record', () => {

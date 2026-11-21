@@ -180,7 +180,7 @@ export const RELEASES: readonly WhatsNewRelease[] = [
       {
         id: 'gaps',
         title: 'Gaps, in Insights',
-        text: 'See the days between your revisions, and with {{Last revised}}, when you last revised each surah and juz.',
+        text: 'See each time you went 2 days or more without revising, and with {{Last revised}}, when you last revised each surah and juz.',
         picture: 'gaps',
         covers: ['ACT-28', 'ACT-30'],
         needs: 'insights',

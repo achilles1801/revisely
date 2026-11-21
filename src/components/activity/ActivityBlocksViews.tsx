@@ -96,7 +96,7 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
   const [span, setSpanState] = useState<CalendarSpan>('month');
   const [week, setWeek] = useState(weekStartOf(today));
   const [picked, setPickedState] = useState<string | null>(null);
-  // Insights' longest gap marked on the calendar (ACT-28). It stays while the arrows or a swipe step on, so a gap
+  // A gap from Insights marked on the calendar (ACT-28). It stays while the arrows or a swipe step on, so a gap
   // across weeks or months can be followed, and fades at the first touch on the calendar itself: a day picked,
   // Today, or Week | Month.
   const [gapMark, setGapMark] = useState<CalendarGap | null>(null);
@@ -252,7 +252,7 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
     () => new Map(pages.filter((p) => p.lastRevisedDate).map((p) => [p.pageNumber, (p.lastRevisedDate as string).slice(0, 10)])),
     [pages],
   );
-  // Consistency's figure (ACT-23): Overview at that month, with today (or nothing) picked. Gaps' longest gap (ACT-28):
+  // Consistency's figure (ACT-23): Overview at that month, with today (or nothing) picked. A gap from Gaps (ACT-28):
   // where it shows, marked (lib/activityCalendar periodForGap).
   const openCalendar = (m: string, gap?: Omit<CalendarGap, 'key'>) => {
     setView('calendar');

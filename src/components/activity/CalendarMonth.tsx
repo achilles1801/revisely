@@ -105,7 +105,7 @@ export function CalendarMonth({
   recited?: Map<string, RecitedDay>;
   /** The user's order of the sections under the header, and those hidden (ACT-29); the usual layout without it. */
   sections?: TabLayout<'overview'>;
-  /** Insights' longest gap, marked on the days (ACT-28); it fades when it goes. */
+  /** A gap from Insights, marked on its days (ACT-28); it fades when it goes. */
   gap?: CalendarGap | null;
 }) {
   const { palette } = useTheme();
