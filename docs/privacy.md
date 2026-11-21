@@ -8,205 +8,114 @@ permalink: /privacy/
 **Effective date: 2026-05-11**
 **Last updated: 2026-11-21**
 
-This Privacy Policy describes how Revisely ("we", "us", or "the app") collects, uses, and protects information when you use the Revisely mobile application, and when you donate to Revisely on our website, revisely.app.
+Revisely is run by **Revisely LLC**, a Texas limited liability company, which is responsible for your personal data (the "controller" under the EU and UK GDPR). This policy covers the Revisely app and our website, revisely.app. Questions or requests: `support@revisely.app`.
 
-Revisely is operated by **Revisely LLC**, a Texas limited liability company ("Revisely", "we", "us"). Revisely LLC is the controller of your personal data under the EU and UK GDPR, and is responsible for it under other privacy laws. You can reach us at `support@revisely.app`.
+In short: we collect what the app needs to work, we don't sell your data or show ads, and nothing you give us trains an AI model.
 
-## 1. What this app does
+## 1. What we collect and why
 
-Revisely is a mobile application that helps users track and review their Quran memorization through scheduled revision sessions. The app records progress, page-level memorization strength, and revision history to suggest what to review next.
+| What | When | Why |
+|---|---|---|
+| **Account:** email, name, and password (stored hashed by Firebase), or the name, email and photo link Apple or Google share | You create an account | Your account, and syncing between devices |
+| **Revision data:** pages you mark memorized, ratings, sessions, Daily log notes, timed reading, time in the app | As you use the app | Your schedule, Activity and Insights |
+| **Recordings** (optional) | You record yourself | Backed up to your account, unless you turn it off in Settings → Activity, so you keep them on a new phone |
+| **Location** (optional) | You turn on "Start day at fajr" | Saved to your account to work out fajr |
+| **Recitation results** (optional) | You recite with Recite | Your mistakes stay marked; Insights and Revo show your progress |
+| **Revo** (optional) | You turn Revo on | See [Revo](#revo) |
+| **Open Door application** (optional) | You apply for free Premium | Deciding it |
+| **Feedback and problem reports** | You send one | Fixing what you report |
+| **Crash reports and app sessions** | Automatically | Fixing bugs, measuring each version's stability |
+| **Device data:** model, system and app version, time zone, a notification token registered with Expo, and App Check tokens | Automatically | Running the app, and confirming requests come from a genuine copy |
+| **Donations:** name, email, amount, payment status, card brand and last four digits | You donate on revisely.app | Your receipt and our financial records |
 
-## 2. Information we collect
-
-### Information you provide
-- **Account information** — your name, email address, and password when you create an account.
-- **Profile information** received from Apple Sign-In or Google Sign-In if you choose to authenticate that way (typically your name, email address, and profile picture URL).
-- **Memorization data** — the pages, surahs, or juz you mark as memorized; weakness ratings you assign to pages; revision sessions you complete; entries you write in the Daily log (what you memorized or revised, minutes spent, and any personal notes); and reading sessions you time with the reading timer (start/end time, length, and the pages you assign to them).
-- **Revo conversations (optional)**: if you turn on Revo, the questions you ask it, its answers, and the short facts it remembers about your routine. See [Revo, the AI assistant](#revo).
-- **Signing in on revisely.app (optional)** — you can sign in on our website with the same account (Google, or email and password) to see your plan and Premium, or to apply to Open Door. Firebase Authentication handles it; your browser keeps the sign-in (in Firebase's own browser storage) until you sign out. Signing in with Google opens Google's own window, under Google's privacy policy.
-- **Open Door applications (optional)** — if you ask for Premium for free because you can't pay, we receive what the form asks: that you can't afford it or have no way to pay, and, only if you answer, how you heard of Revisely, your country, what and how much you're memorizing, whether you have a teacher, and a note of up to 1,000 characters. It is linked to your account, read only by the Revisely team to decide, and never shared. Once a decision is made the answers are deleted; only the outcome stays (the status, its dates and how many times you've applied). From the app, “Apply for support” opens the page with a one-time link that works for 30 minutes; we keep only a scrambled copy of it, deleted within a day.
-- **Premium** — if your account has Premium (from early access or Open Door), a record of it: where it came from, when it was given and until when (no end date for early access). The app and the recitation checker read it to know you have Premium. It holds no payment details: nothing is sold.
-
-### Information collected automatically
-- **Device and app information** — device model, operating system version, app version, language, time zone, and anonymous device identifiers (used by Firebase to manage your session).
-- **App usage time** — the total time you spend with the app open, shown to you in Settings.
-- **Push notification tokens** — to send you the daily revision reminders you've enabled in Settings.
-- **Location** (optional) — if you enable the fajr-aligned day boundary in Settings, we request your device location to calculate accurate local fajr (dawn) prayer times, so a late-night revision session can count toward the correct day. Your coordinates are stored on your account solely to recompute fajr times; they are never used for tracking or advertising. You can decline the permission or turn the feature off at any time. The Qibla compass and the Qibla widget use your location (and the compass, your phone's compass) on your device only; they aren't stored or sent to us. The widget keeps only the Qibla's direction and the distance to Makkah. Prayer times and their notifications are worked out and scheduled on your phone from your location, which stays on your phone; nothing about them is sent to us.
-- **Microphone and voice recordings** (optional) — if you record yourself reciting, the app asks for microphone access. Recordings are saved on your device and, unless you turn it off (Settings → Activity → Back up recordings), backed up to your Revisely account in Google's Cloud Storage for Firebase, so you keep them if you reinstall the app or change phones. Backed-up recordings are linked to your account and can be opened only by your signed-in account; we don't listen to, analyse or share them, and use them only to give them back to you. Backup uses Wi-Fi unless you allow mobile data. Deleting a recording in the app deletes it from your device and from your backup (a note that it was deleted, with no audio, stays so your other phones don't upload it again); when you turn backup off you can also delete the whole backup and keep the recordings on your phone; deleting your account deletes all of them. Recordings on your device may also be included in your device's own backups (iCloud or a computer on iPhone, Google's backup on Android), which are governed by Apple's or Google's terms. When you search the Qur'an by voice (on iPhone), or recite with the page hidden and follow word by word, the app listens through the microphone and recognises the words on your phone, with a speech model it downloads once (from our Cloud Storage, like the mushaf pages); that audio isn't recorded, kept or sent to us or anyone.
-- **Recitation checking (optional)** — when you recite with the reader's mic (Recite, and Mark mistakes), the app sends your recitation's audio over an encrypted connection to our recitation checker, which runs on Google Cloud. It follows you on the page and, with Mark mistakes on, finds your mistakes as you recite; with the audio go which part of the Qur'an you're reciting and your Recite settings. The audio is checked in memory and never stored: it is held only while you recite, and for up to 2 minutes after a dropped connection so your take can carry on. Software checks it; no person listens to it, and it is never used to train an AI model. What a take found is saved with your account: where it ran, its score, whether the page was hidden, and each mistake (the word, the kind of mistake, and for a wrong word what was heard, as text), never audio. This is how your mistakes stay marked on the page and how Insights and Revo can show your progress. You can forget a take or clear a mistake at any time; deleting your account deletes all of it. A take's recording, if you keep one, stays on your phone like your other recordings (and is backed up if backup is on).
-- **Crash and error reports** — when the app encounters an error or crash, technical details (stack trace, device information, app state at the time, the app version and update it was running) are sent to our error monitoring service so we can fix bugs. Each app launch also sends a session record (whether it ended normally or crashed, with the same version details) so we can measure how stable each version is. These reports carry your account's internal ID, not your name, email or IP address.
-- **Problem reports (optional)** — if you use Settings → Report a problem, we receive what you write, a screenshot if you choose to take one, and the same technical details as an error report, including the app's recent activity log (screens opened and actions taken, not the content you entered). They go to the same error monitoring service and are linked to your account's internal ID.
-- **App Check tokens** — small attestation tokens generated by Apple's App Attest service (on iPhone) or Google Play Integrity (on Android) to verify requests come from a real, unmodified install of Revisely. These tokens contain no personal information.
-
-### Information from third parties
-- When you sign in with **Apple** or **Google**, we receive the profile information you authorize them to share (typically name and email).
-- We do not buy data from data brokers, scrape it from public sources, or import contacts from your device.
+Some details:
+- **Recordings** can be opened only by your account. We never listen to them. Deleting one in the app deletes it from the backup too.
+- **Recite** sends your recitation's audio, encrypted, to our checker on Google Cloud. It finds your mistakes in memory and never stores the audio (held at most 2 minutes if the connection drops). No one listens to it, and it trains nothing. Only the results are saved, as text: where you recited, your score and each mistake.
+- **On your phone only:** the Qibla compass, prayer times and their notifications use your location on your phone and send nothing to us. Searching by voice recognises your words on your phone; that audio isn't kept or sent.
+- **Open Door:** only the Revisely team reads an application. Once it's decided, the answers are deleted and only the outcome stays.
+- **Premium:** we keep a record of where your Premium came from and until when. Nothing is sold, so it holds no payment details.
+- **Crash reports** (and problem reports, which add what you write, an optional screenshot and the app's recent screens and actions) carry your account's internal ID, never your name, email or IP address.
+- **Usage counts:** we count how the app is used across all accounts, for example how many accounts revised this week. Only Revisely's developer sees these counts, and they never show what one person did.
+- **Signing in on revisely.app** keeps the sign-in in your browser until you sign out.
+- **Donations** go through Stripe's checkout. We never see your full card number, and donation records aren't linked to an account.
 
 <a id="revo"></a>
-### Revo, the AI assistant (optional)
+## 2. Revo, the AI assistant
 
-Revo is an assistant in the app that answers questions about your own revision. It is off until you turn it on, and before you do, the app tells you what it sends and that Claude, from Anthropic, writes its answers. You can turn it off at any time in Settings → Revo AI.
+Revo is off until you turn it on in Settings → Revo AI. Its answers are written by Claude, from Anthropic.
 
-**What is sent.** When you ask Revo something, our server sends Anthropic, which writes Revo's answers with its Claude models:
-- your question, and the conversation's last 10 messages when you continue a conversation;
-- what the app shows you about your revision: today's plan and how far you've got, this week, your streak, how many pages you have memorized and recently revised, your pace, and the time of day; with Smart Tracking on, also your page ratings and weak pages;
-- the short facts Revo remembers about you, if memory is on;
-- anything you add to that question with +: a surah, juz or pages and when you revised them; a day, with what you did that day and that day's Daily log notes; or a recording's length and the pages it covered, never its audio;
-- if you use Recite, a summary of what your takes found (your score, the kinds of mistakes, and the passages and words that keep slipping), and a take's mistakes when you add that take, as text, never audio.
+**What is sent.** When you ask something, our server sends Anthropic:
+- your question and the conversation's last 10 messages;
+- what the app shows about your revision (plan, progress, streak, pages; ratings if Smart Tracking is on; a summary of your Recite results);
+- the facts Revo remembers about you;
+- anything you attach, such as a day with its Daily log notes, or a take's mistakes as text.
 
-Each evening, on a day you revised or memorized something, Revo may write a short Day in review from the same kind of information about that day, without a question.
+Each evening Revo may write a Day in review from the same kind of information. We never send Anthropic your name, email, account ID, location or any audio. What you type is sent as written.
 
-We never send Anthropic your name, email address, account ID, location, or the audio of any recording. What you type in a question is sent as you wrote it, so leave out personal details you don't want to share.
+**What Anthropic does with it.** Anthropic is our processor. It uses what we send only to answer, doesn't train on it, and deletes it within 30 days. A request its safety systems flag may be kept up to 2 years, or longer if the law requires.
 
-**What Anthropic does with it.** Anthropic acts as our processor. It uses what we send only to write the answer, and under its commercial terms it does not train its models on it. Anthropic deletes it within 30 days. The exceptions: a request its automated safety systems flag as breaking its Usage Policy may be kept for up to 2 years, and the law may require it to keep data longer.
+**What we keep.** We keep your conversations, up to 30 facts Revo remembers (see or delete them in Settings → Revo AI → Memory), the day's first answers so a repeated question isn't sent again, and a daily question count. Revisely's developer may read conversations to improve Revo and keep it safe. Our logs keep counts and costs with your account ID for 30 days, never your words.
 
-**What we store.** We store these with your account in Cloud Firestore:
-- your conversations with Revo: each question with what you added to it, each answer, and any rating you give an answer;
-- up to 30 short facts Revo remembers about your goals and routine (for example "Revises after Fajr"). You can see each one, delete one or all of them, or turn memory off in Settings → Revo AI → Memory;
-- the answer to a first question, kept for that day, so asking the same question again doesn't send it to Anthropic again;
-- a count of the questions you ask each day, which sets the daily limit.
+**Deleting it.** "Delete conversations" deletes them, and turning Revo off deletes your conversations and memory.
 
-We may read your Revo conversations and what it remembers to improve Revo and keep it safe; only Revisely's developer can see them.
+## 3. Who processes your data
 
-Our logs record counts and costs, linked to your account's internal ID and kept for 30 days, never your questions, Revo's answers or your notes.
+We share data only with the companies that run Revisely for us, under their data protection terms:
 
-**Deleting it.** Settings → Revo AI → Delete conversations deletes all your conversations. Turning Revo off deletes your conversations, what it remembers and the kept answers. Deleting your account deletes all of it.
+| Company | For |
+|---|---|
+| Google (Firebase, Google Cloud) | Sign-in, database, file storage, the recitation checker, Sign in with Google, Play Integrity |
+| Apple | Sign in with Apple, App Attest |
+| Anthropic | Revo's answers, if you turn Revo on |
+| Sentry | Crash, error and problem reports |
+| Expo | App updates and notification set-up |
+| Cloudflare | Our website and translation server |
+| Stripe | Donations |
 
-### Donations
-If you donate on revisely.app, you pay on a checkout page run by **Stripe**, which processes your card or other payment details; Revisely never receives your full card number. From Stripe we receive your **full name**, **email address**, the **amount** you gave and the **payment's status** (for example, whether it succeeded or was refunded), along with the limited payment details Stripe shows the businesses it serves, such as the card brand, the last four digits of the card or bank account, and the country. We use this information only to send your receipt, to thank you, and to keep our financial records. If you pay with a service offered on Stripe's checkout page, such as Apple Pay, Link, Cash App Pay or Amazon Pay, that service also processes the payment, under its own privacy policy. How Stripe handles your information is described in the [Stripe Privacy Policy](https://stripe.com/privacy).
+**Qur'an content.** The app fetches verse text, translations and recitation audio from AlQuran Cloud, QuranEnc.com and EveryAyah. Those requests carry only a verse or page number, and the service sees your IP address, as any website does.
 
-Donation records are not linked to a Revisely account, and deleting your account doesn't delete them (see Data retention). Revisely LLC is not a charity, so donations are not tax-deductible.
+**The Clear Quran®** comes through our server, so its publisher sees only verse numbers. Our server doesn't log your IP address or what you read. It keeps the fetched text for up to 60 days, and so does the app on your phone.
 
-## 3. How we use information
+We disclose data if the law requires it. If Revisely is ever sold or merged, your data stays under this policy.
 
-We use the information described above to:
+## 4. Legal bases (EU and UK)
 
-- Operate the app — store your account, sync your revision data across devices, generate your daily revision schedule.
-- Send you the revision reminders you've enabled.
-- Answer your questions with Revo, write its Day in review, and improve Revo, if you turn Revo on.
-- Follow your recitation, find and remember your mistakes, and show your progress, if you use Recite.
-- Respond to support requests you send us.
-- Process donations — send your receipt, thank you, and keep financial records.
-- Detect and fix bugs and crashes.
-- Count how the app is used across all accounts (for example, how many accounts revised this week, and how many come back a week after signing up), so we can decide what to improve. These counts use the revision data described above, are seen only by Revisely's developer, and never show what any one person did.
-- Prevent abuse — verify that requests come from a genuine install of the app.
-- Comply with legal obligations.
+- **Contract:** your account, sync, recordings backup, Recite, Open Door and donations.
+- **Consent:** location for fajr, and Revo. You can withdraw either in Settings at any time.
+- **Legitimate interests:** crash reports, preventing abuse, usage counts, improving Revo, and thanking donors.
+- **Legal obligation:** financial records and lawful requests.
 
-We do **not**:
-- Sell your personal information.
-- Share your personal information with advertisers.
-- Use your data to train any AI model. Anthropic, which writes Revo's answers, doesn't train its models on what we send it either.
+Our providers process data in the United States. These transfers rely on the EU Standard Contractual Clauses (with the UK and Swiss addenda) in their data terms, and on the EU-US Data Privacy Framework where a provider is certified.
 
-## 4. Legal bases (GDPR / UK GDPR)
+## 5. How long we keep it
 
-If you are in the European Economic Area, the United Kingdom, or Switzerland, we process your information on the following bases:
+Your data stays until you delete it or your account. **Settings → Delete account** deletes your account and everything in it, including recordings and Revo, within 30 days.
 
-- **Performance of a contract** — to create and operate your account, sync your data, provide the core memorization-tracking service, check the recitation you ask the app to check, decide an Open Door application you make, and process a donation you make.
-- **Consent**: for push notifications, location (when you enable the fajr-aligned day boundary), Revo (you turn it on in the app and can turn it off at any time), and Apple/Google sign-in (you consent through the system permission prompts).
-- **Legitimate interests** — to detect crashes, prevent abuse, improve the app (including reviewing Revo conversations and counting use across accounts), and thank people who donate. We balance this against your right to privacy and have minimized what we collect.
-- **Legal obligation** — to respond to lawful requests from authorities and retain records required by law.
+What we keep for a set time:
+- crash reports: 90 days;
+- logs: 30 days;
+- support emails: 2 years;
+- donation records: 7 years, as financial records;
+- counts that identify no one: for as long as they're useful.
 
-## 5. Third-party services we use
+## 6. Your rights
 
-We use the following processors to deliver Revisely. Each is bound by their own privacy policy and data processing terms:
+You can ask to access, correct, delete or export your data, object to how we use it, or withdraw consent. Email `support@revisely.app` and we'll answer within 30 days. You can also complain to your data protection authority.
 
-| Service | Purpose | Location |
-|---|---|---|
-| **Google LLC / Firebase** | Authentication, cloud database (Firestore), file storage (backed-up recordings), recitation checking (Cloud Run), push notifications, Google Play, Sign in with Google, Play Integrity | United States |
-| **Apple Inc.** | App Store, Apple Push Notification service, Sign in with Apple, App Attest | United States |
-| **Sentry / Functional Software, Inc.** | Crash and error reporting, problem reports | United States |
-| **Expo / 650 Industries, Inc.** | Build infrastructure and over-the-air updates | United States |
-| **AlQuran Cloud (Islamic Network)** | The Qur'an's Arabic text (Tanzil Project's text) | Not specified |
-| **QuranEnc.com** | Translations of the Qur'an's meanings: Saheeh International, and any other translation you choose | Not specified |
-| **EveryAyah (everyayah.com)** | Recitation audio | Not specified |
-| **The Clear Quran® API (Al-Furqaan Foundation)** | The Clear Quran® English translation, when you choose it | United States |
-| **Cloudflare, Inc.** | Hosts this website and our server that fetches The Clear Quran® translation | United States |
-| **Anthropic, PBC** | Writes Revo's answers (Claude), if you turn Revo on | United States |
-| **Stripe, Inc.** | Payment processing for donations on revisely.app | United States |
+US state privacy laws give you similar rights. We don't sell or "share" personal information, and we use sensitive information, such as precise location, only for the feature you turned on. Using your rights never changes how we treat you.
 
-When you press and hold a verse, the app requests that verse's Arabic text from AlQuran Cloud (api.alquran.cloud) and, with Saheeh International or another QuranEnc.com translation you choose, that translation from QuranEnc.com; when you play a verse, it requests its recitation audio, in the reciter you chose, from EveryAyah (everyayah.com). These requests contain only the page, surah or verse number, nothing from your account; like any web request, they reveal your device's IP address to that service. Text is then kept on your device so the same verse is not requested again. So that the Qur'an can be read offline, the app also downloads, on Wi-Fi unless you allow mobile data, the mushaf's page images (from our Cloud Storage), the whole Arabic text from AlQuran Cloud and the whole Saheeh International translation from QuranEnc.com, and asks QuranEnc.com about once a day whether a translation you use has a newer version; Settings → Offline mushaf removes them from your device. A translation you download from the list of translations is kept on your device until you remove it there.
+## 7. Children
 
-If you choose The Clear Quran® translation, its text comes through our own server instead (revisely.app, hosted by Cloudflare). The app sends that server the verse number and your sign-in token, so that only Revisely users can use our licence for the translation, and our server requests that verse, with the verses around it, from The Clear Quran® API (Al-Furqaan Foundation). The Clear Quran® API receives only verse numbers, from our server: not your IP address and nothing from your account. Our server, like any web server, sees your device's IP address; we don't log or store it, your token, or which verses you read. So that text isn't requested again, our server keeps The Clear Quran® text it has fetched for up to 60 days, and the app keeps the text of verses you have read on your device for up to 60 days, in its private cache folder (not backed up or shared; deleting the app removes it). This is the translation's text only, nothing about you.
+Revisely is for people 13 and older (16 where local law requires) and isn't directed to children. If we learn we've collected data from a child under 13, we delete it. Tell us at `support@revisely.app`.
 
-If you turn on Revo, what it needs to answer goes to Anthropic from our server, never straight from your device: see [Revo, the AI assistant](#revo).
+## 8. Security
 
-We do not transfer your data to any party not listed above for any other purpose.
+Data is encrypted in transit and at rest, and our security rules let each account reach only its own data. Passwords are handled by Firebase Authentication. No system is perfectly secure; if a breach affects your data, we'll tell you and the authorities as the law requires.
 
-## 6. International data transfers
+## 9. Cookies and tracking
 
-Our processors are located in the United States. If you are in the European Economic Area, the United Kingdom, Switzerland, or Canada, your information is transferred to and processed in the United States. We rely on Google Cloud's Standard Contractual Clauses and the EU-US Data Privacy Framework (Google LLC is DPF-certified) for these transfers. Apple, Sentry, Expo, and Stripe maintain comparable safeguards, and Anthropic's data processing terms include the EU Standard Contractual Clauses, with the UK and Swiss addenda.
+We don't use ads, trackers or cookies. Signing in on revisely.app keeps your sign-in and language in your browser's storage, and Stripe's checkout uses its own cookies. We don't track you across sites, so Do-Not-Track signals change nothing here.
 
-## 7. Data retention
+## 10. Changes
 
-- **Account data** — kept for the life of your account, plus 30 days after account deletion.
-- **Memorization and revision history** — kept for the life of your account, plus 30 days after account deletion.
-- **Backed-up recordings** — kept until you delete them (one at a time, all at once, by deleting the backup when you turn backup off, or by deleting your account). They are then deleted from our storage, and any remaining copies within 30 days.
-- **Revo conversations and what it remembers**: kept until you delete them, turn Revo off, or delete your account. Anthropic deletes what Revo sends it within 30 days. It keeps a request for up to 2 years if its safety systems flag it, and longer where the law requires.
-- **Revo's daily question count**: kept for the life of your account.
-- **What your recitation takes found** (no audio): kept until you forget the take, clear the mistake, or delete your account.
-- **The recitation checker's logs**: counts and timings only (no audio, words, account ID or IP address), kept for 30 days.
-- **Open Door applications**: the answers until a decision is made, then deleted; the outcome for the life of your account.
-- **Premium records**: for the life of your account; deleting your account deletes them.
-- **Push notification tokens** — kept until you uninstall the app or revoke notification permission.
-- **Crash logs** — kept for 90 days.
-- **Support email correspondence** — kept for 2 years.
-- **Donation records** — kept for 7 years after the donation, as financial records. Stripe keeps its own records, as its privacy policy describes.
-- **Aggregated, de-identified usage statistics** may be retained indefinitely; these cannot be linked back to you.
-
-If you delete your account, we will delete or de-identify your personal information within 30 days, except where we are required to retain it to comply with legal obligations, resolve disputes, or enforce our agreements.
-
-## 8. Your rights
-
-Depending on where you live, you have some or all of the following rights:
-
-- **Access** the personal information we hold about you.
-- **Correct** information that's inaccurate or incomplete.
-- **Delete** your account and associated data. You can do this from inside the app at **Settings → Delete account**, or by emailing us at `support@revisely.app`. Revo's conversations and what it remembers can also be deleted on their own, in Settings → Revo AI.
-- **Export** your data in a portable format.
-- **Withdraw consent** for processing based on consent (e.g., push notifications, location).
-- **Object** to processing based on legitimate interests.
-- **Lodge a complaint** with your local data-protection authority.
-
-We will respond to verifiable requests within 30 days. We do not discriminate against users who exercise their rights.
-
-### California, Virginia, Colorado, Connecticut, Utah, Texas, and other US state residents
-You have additional rights under your state's privacy law, including the right to know what categories of personal information we collect, to opt out of any "sale" or "sharing" (we do neither), and to limit the use of sensitive personal information. To exercise these rights, contact `support@revisely.app`.
-
-### Quebec residents (Law 25)
-You have the right to access, correct, and request deletion of your personal information. You may also withdraw consent for any consent-based processing. Contact `support@revisely.app`.
-
-## 9. Children
-
-Revisely is not directed to children. It is intended for users 13 and older, or older where the age of digital consent in your country is higher (16 in some EU countries). We do not knowingly collect personal information from children under 13. If we learn that we have, we will delete that information and the associated account promptly. If you believe a child has provided us with personal data, please contact us at `support@revisely.app`.
-
-## 10. Security
-
-We protect your information using:
-
-- TLS encryption for data in transit between your device and our servers.
-- Firestore encryption at rest (managed by Google Cloud).
-- Firebase Authentication for password hashing and session management.
-- Firebase Security Rules that restrict each user's data to their own account.
-- Sentry monitoring for unexpected errors.
-
-No method of transmission over the Internet or electronic storage is 100% secure. While we use industry-standard measures, we cannot guarantee absolute security. If we learn of a security breach affecting your data, we will notify you and the relevant authorities as required by law.
-
-## 11. Cookies and tracking technologies
-
-Revisely is a mobile app and does not use browser cookies, and our website doesn't set any either. If you sign in on the website, your browser keeps the sign-in in Firebase's own browser storage, and the site keeps a note in your browser that you're signed in and the language you chose; none of it is used for tracking. If you donate, Stripe's checkout page uses Stripe's own cookies, as its privacy policy describes. Our backend services (Firebase) use device identifiers, installation IDs, and similar technologies to manage your session, deliver push notifications, and detect abuse. We do not use any advertising or behavioral-tracking technologies.
-
-## 12. Do-Not-Track signals
-
-Do-Not-Track is a browser setting and does not apply to mobile apps. We do not currently respond to Do-Not-Track signals.
-
-## 13. Changes to this policy
-
-We may update this Privacy Policy from time to time. The updated version will be indicated by a new "Last updated" date at the top. For material changes, we will notify you either by prominently posting a notice in the app or by sending you an email. Your continued use of Revisely after a change becomes effective constitutes acceptance of the updated policy.
-
-## 14. Contact
-
-For privacy questions, data requests, or to report a concern, contact:
-
-- **Email:** `support@revisely.app`
-
-If you are in the EU or UK and we have not designated a local representative, you may contact us directly at the email above. We will respond to your request within 30 days.
+When this policy changes, the date above changes. For important changes, we'll also tell you in the app or by email.
