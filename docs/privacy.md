@@ -6,7 +6,7 @@ permalink: /privacy/
 # Privacy Policy for Revisely
 
 **Effective date: 2026-05-11**
-**Last updated: 2026-11-18**
+**Last updated: 2026-11-21**
 
 This Privacy Policy describes how Revisely ("we", "us", or "the app") collects, uses, and protects information when you use the Revisely mobile application, and when you donate to Revisely on our website, revisely.app.
 
@@ -88,6 +88,7 @@ We use the information described above to:
 - Respond to support requests you send us.
 - Process donations — send your receipt, thank you, and keep financial records.
 - Detect and fix bugs and crashes.
+- Count how the app is used across all accounts (for example, how many accounts revised this week, and how many come back a week after signing up), so we can decide what to improve. These counts use the revision data described above, are seen only by Revisely's developer, and never show what any one person did.
 - Prevent abuse — verify that requests come from a genuine install of the app.
 - Comply with legal obligations.
 
@@ -102,7 +103,7 @@ If you are in the European Economic Area, the United Kingdom, or Switzerland, we
 
 - **Performance of a contract** — to create and operate your account, sync your data, provide the core memorization-tracking service, check the recitation you ask the app to check, decide an Open Door application you make, and process a donation you make.
 - **Consent**: for push notifications, location (when you enable the fajr-aligned day boundary), Revo (you turn it on in the app and can turn it off at any time), and Apple/Google sign-in (you consent through the system permission prompts).
-- **Legitimate interests** — to detect crashes, prevent abuse, improve the app (including reviewing Revo conversations), and thank people who donate. We balance this against your right to privacy and have minimized what we collect.
+- **Legitimate interests** — to detect crashes, prevent abuse, improve the app (including reviewing Revo conversations and counting use across accounts), and thank people who donate. We balance this against your right to privacy and have minimized what we collect.
 - **Legal obligation** — to respond to lawful requests from authorities and retain records required by law.
 
 ## 5. Third-party services we use
