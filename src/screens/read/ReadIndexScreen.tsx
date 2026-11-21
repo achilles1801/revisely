@@ -29,7 +29,7 @@ import { useTabBarFootprint } from '../../navigation/TabBar';
 import type { ReadStackParamList } from '../../navigation/MainNavigator';
 import { arabicLabelLines } from '../../lib/platformUi';
 import { ayahsInSurah, spokenText } from '../../lib/passages';
-import { formatDate } from '../../i18n';
+import { formatDate, t } from '../../i18n';
 
 type NavigationProp = NativeStackNavigationProp<ReadStackParamList, 'ReadIndex'>;
 
@@ -38,13 +38,13 @@ function formatRelativeTime(iso: string): string {
   const now = Date.now();
   const then = new Date(iso).getTime();
   const diffSec = Math.max(0, Math.round((now - then) / 1000));
-  if (diffSec < 60) return diffSec <= 1 ? 'just now' : `${diffSec} seconds ago`;
+  if (diffSec < 60) return diffSec <= 1 ? t('read.index.justNow') : t('read.index.secondsAgo', { count: diffSec });
   const diffMin = Math.round(diffSec / 60);
-  if (diffMin < 60) return diffMin === 1 ? '1 minute ago' : `${diffMin} minutes ago`;
+  if (diffMin < 60) return t('read.index.minutesAgo', { count: diffMin });
   const diffHr = Math.round(diffMin / 60);
-  if (diffHr < 24) return diffHr === 1 ? '1 hour ago' : `${diffHr} hours ago`;
+  if (diffHr < 24) return t('read.index.hoursAgo', { count: diffHr });
   const diffDay = Math.round(diffHr / 24);
-  if (diffDay < 7) return diffDay === 1 ? 'yesterday' : `${diffDay} days ago`;
+  if (diffDay < 7) return diffDay === 1 ? t('read.index.yesterday') : t('read.index.daysAgo', { count: diffDay });
   return formatDate(new Date(iso), {}, 'device');
 }
 
@@ -63,11 +63,16 @@ interface JuzGroup {
   surahs: SurahRow[];
 }
 
+/** Makki or Madani, in the app's language. */
+function placeWord(place: string): string {
+  return place === 'Madani' ? t('read.index.madani') : t('read.index.makki');
+}
+
 function fallbackDisplay(name: string, nameArabic: string): SurahDisplay {
   return {
     nameDisplay: name,
     nameArabicVoweled: nameArabic,
-    revelationPlace: 'Makki',
+    revelationPlace: 'Makki', // i18n-ignore (the data's value; shown through placeWord)
     ayahCount: 0,
   };
 }
@@ -135,7 +140,7 @@ export default function ReadIndexScreen() {
     <View>
       <View style={v2.titleBlock}>
         <Text style={[typeV2.largeTitle, { color: v2Palette.text }]} accessibilityRole="header" maxFontSizeMultiplier={1.4}>
-          Surahs
+          {t('read.index.title')}
         </Text>
       </View>
       {searchOn ? (
@@ -143,20 +148,20 @@ export default function ReadIndexScreen() {
           <Tap
             onPress={() => navigation.navigate('QuranSearch')}
             accessibilityRole="button"
-            accessibilityLabel="Search the Quran"
+            accessibilityLabel={t('read.search.label')}
             style={[v2.searchField, { backgroundColor: v2Palette.fill }]}
             testID="read-search"
           >
             <Ionicons name="search" size={18} color={v2Palette.secondary} />
             <Text style={[typeV2.body, { color: v2Palette.secondary }]} numberOfLines={1} maxFontSizeMultiplier={1.4}>
-              Search the Quran
+              {t('read.search.label')}
             </Text>
           </Tap>
           {voiceSearch ? (
             <Tap
               onPress={() => navigation.navigate('QuranSearch', { listen: true })}
               accessibilityRole="button"
-              accessibilityLabel="Search by voice"
+              accessibilityLabel={t('read.search.voice')}
               hitSlop={6}
               style={[v2.searchMic, { backgroundColor: v2Palette.primary }]}
               testID="read-search-voice"
@@ -168,7 +173,7 @@ export default function ReadIndexScreen() {
       ) : null}
       {recent.length > 0 && (
         <View testID="read-recent">
-          <SectionTitleV2 title="Recent pages" />
+          <SectionTitleV2 title={t('read.index.recent')} />
           {recent.map((entry) => (
             <RecentRowV2
               key={`recent-${entry.pageNumber}-${entry.lastReadAt}`}
@@ -194,7 +199,7 @@ export default function ReadIndexScreen() {
         contentInsetAdjustmentBehavior="never" contentContainerStyle={{ paddingBottom: tabFootprint + layoutV2.rowPad }}
         renderItem={({ item }) => (
           <View testID={`read-juz-${item.juz}`}>
-            <SectionTitleV2 title={`Juz' ${item.juz}`} />
+            <SectionTitleV2 title={t('read.index.juzSection', { n: item.juz })} />
             {item.surahs.map((s) => (
               <SurahRowV2 key={s.key} row={s} onPress={() => openPage(s.startPage)} />
             ))}
@@ -227,16 +232,20 @@ function RecentRowV2({ entry, onPress }: { entry: ReadingHistoryEntry; onPress: 
   const display = surah
     ? getSurahDisplay(surah.number) ?? fallbackDisplay(surah.name, surah.nameArabic)
     : null;
-  const name = display?.nameDisplay ?? `Page ${entry.pageNumber}`;
+  const name = display?.nameDisplay ?? t('common.pageN', { n: entry.pageNumber });
   const when = formatRelativeTime(entry.lastReadAt);
   // The surah's ayahs on that page first, the page number a quiet detail (surahs and juz first, CLAUDE.md).
   const ayahs = surah ? ayahsInSurah(surah.number, [entry.pageNumber]) : '';
-  const meta = [ayahs, `p. ${entry.pageNumber}`, when].filter(Boolean).join(' · ');
+  const meta = [ayahs, t('common.pageShort', { n: entry.pageNumber }), when].filter(Boolean).join(' · ');
   return (
     <Tap
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${name}, ${spokenText(ayahs ? `${ayahs}, ` : '')}page ${entry.pageNumber}, read ${when}`}
+      accessibilityLabel={
+        ayahs
+          ? t('read.index.recentLabel', { name, ayahs: spokenText(ayahs), page: entry.pageNumber, when })
+          : t('read.index.recentLabelNoAyahs', { name, page: entry.pageNumber, when })
+      }
       style={[v2.row, { borderBottomColor: palette.separator }]}
       testID={`recent-${entry.pageNumber}`}
     >
@@ -258,8 +267,11 @@ function RecentRowV2({ entry, onPress }: { entry: ReadingHistoryEntry; onPress: 
 
 function SurahRowV2({ row, onPress }: { row: SurahRow; onPress: () => void }) {
   const { palette } = useTheme();
-  const verses = row.ayahCount > 0 ? ` · ${row.ayahCount} verses` : '';
-  const meta = `${row.revelationPlace}${verses} · page ${row.startPage}`;
+  const place = placeWord(row.revelationPlace);
+  const meta =
+    row.ayahCount > 0
+      ? t('read.index.surahMeta', { place, count: row.ayahCount, page: row.startPage })
+      : t('read.index.surahMetaNoVerses', { place, page: row.startPage });
   return (
     <Tap
       onPress={onPress}

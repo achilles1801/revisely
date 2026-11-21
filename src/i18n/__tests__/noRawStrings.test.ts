@@ -36,6 +36,7 @@ const EXTRACTED: string[] = [
   'components/recordings',
   'components/revision',
   'components/revo',
+  'components/search',
   'components/settings',
   'components/timer',
   'components/updates',
@@ -60,6 +61,7 @@ const EXTRACTED: string[] = [
   'screens/onboarding',
   'screens/prayer',
   'screens/preview',
+  'screens/read',
   'screens/revision',
   'services',
 ];

@@ -86,7 +86,7 @@ jest.mock('../../../components/MushafPager', () => {
         }));
         return (
           <View>
-            <Pressable accessibilityLabel="The page" onPress={props.onTap} />
+            <Pressable accessibilityLabel="The page" onPress={props.onTap} /> {/* i18n-ignore (a test stand-in) */}
             {[shown - 1, shown, shown + 1].map((page) => (
               <View key={page}>
                 {props.pageUnderlay?.(page, 0.38)}
@@ -288,6 +288,7 @@ it('a 10-minute take: what each event and frame costs, minute by minute', async 
   );
   await flush();
   await flush();
+  // i18n-ignore (the test's own stand-in, and the reader's English)
   const thePage = screen.queryByLabelText('The page') ?? screen.queryAllByLabelText('Page 3')[0];
   if (thePage) fireEvent.press(thePage);
   fireEvent.press(screen.getByTestId('recite-mic'));
