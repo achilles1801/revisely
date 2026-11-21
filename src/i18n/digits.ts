@@ -33,3 +33,9 @@ export function localNumber(n: number, language: string, options: Intl.NumberFor
   const western = n.toLocaleString('en-US', { useGrouping: false, ...options });
   return localDigits(western.replace(/,/g, '٬').replace(/\./g, '٫').replace(/%/g, '٪'), language);
 }
+
+/** A number already written with Western digits ("0.4", from toFixed) in the language's digits: "٠٫٤". */
+export function localNumeral(text: string, language: string): string {
+  if (!usesArabicIndic(language)) return text;
+  return localDigits(text.replace(/,/g, '٬').replace(/\./g, '٫'), language);
+}

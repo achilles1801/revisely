@@ -39,4 +39,21 @@ export const reminders = {
     streak: '{{days}} days in a row',
     alhamdulillah: "Today's revision is done. Alhamdulillah.",
   },
+  /** Android's notification channels (lib/notifications). */
+  channels: {
+    reminders: 'Reminders',
+    remindersSub: 'Your revision reminders and the reading timer.',
+    remindersSilent: 'Reminders (silent)',
+    remindersSilentSub: 'Revision reminders set to go quietly: overnight, and the congratulation.',
+    prayer: 'Prayer times',
+    prayerSub: 'A prayer’s time, or a reminder before it, with the standard tone.',
+    prayerSilent: 'Prayer times (silent)',
+    prayerSilentSub: 'Prayer notifications set to Silent.',
+    recitation: 'Recitation',
+    recitationSub: 'Play and pause a recitation from the notification and the lock screen.',
+  },
+  review: {
+    title: 'Time to review',
+    body: 'Juz {{juz}} is due for review',
+  },
 } as const;

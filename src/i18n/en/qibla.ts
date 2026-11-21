@@ -17,4 +17,9 @@ export const qibla = {
   denied: { title: 'Location is off for Revisely', body: 'Turn it on in Settings to find the Qibla.' },
   locating: 'Finding where you are…',
   noLocation: { title: "Couldn't find where you are", body: 'Check that Location Services is on, then try again.' },
+  straightAhead: 'Straight ahead',
+  turnRight: 'Turn right {{n}}°',
+  turnLeft: 'Turn left {{n}}°',
+  /** A distance: "4,794 km" (the number already written). */
+  km: '{{n}} km',
 } as const;

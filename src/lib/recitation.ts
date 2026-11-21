@@ -33,6 +33,7 @@ import {
   readMediaNotifications,
   stillOnLockScreen,
 } from './mediaNotification';
+import { t } from '../i18n';
 
 /**
  * How a reciter recites. Per-verse audio is organised by these styles, not by
@@ -40,10 +41,20 @@ import {
  */
 export type RecitationStyle = 'murattal' | 'mujawwad' | 'muallim';
 
+/** A style's words (src/i18n/en/verse.ts, `styles`). */
+const styleInfo = (style: RecitationStyle) => ({
+  get label() {
+    return t(`verse.styles.${style}`);
+  },
+  get description() {
+    return t(`verse.styles.${style}Sub`);
+  },
+});
+
 export const STYLE_INFO: Record<RecitationStyle, { label: string; description: string }> = {
-  murattal: { label: 'Murattal', description: 'Measured, at a steady pace' },
-  mujawwad: { label: 'Mujawwad', description: 'Melodic, slower, with longer pauses' },
-  muallim: { label: "Mu'allim", description: 'Teaching: each verse with a pause to repeat' },
+  murattal: styleInfo('murattal'),
+  mujawwad: styleInfo('mujawwad'),
+  muallim: styleInfo('muallim'),
 };
 
 export interface ReciterInfo {
@@ -57,8 +68,12 @@ export interface ReciterInfo {
 export const RECITERS: ReciterInfo[] = [
   {
     id: 'husary',
-    name: 'Mahmoud Khalil Al-Husary',
-    short: 'Al-Husary',
+    get name() {
+      return t('reciters.husary');
+    },
+    get short() {
+      return t('reciters.husaryShort');
+    },
     styles: [
       { style: 'murattal', folder: 'Husary_64kbps' },
       { style: 'mujawwad', folder: 'Husary_Mujawwad_64kbps' },
@@ -67,8 +82,12 @@ export const RECITERS: ReciterInfo[] = [
   },
   {
     id: 'minshawi',
-    name: 'Muhammad Siddiq Al-Minshawi',
-    short: 'Al-Minshawi',
+    get name() {
+      return t('reciters.minshawi');
+    },
+    get short() {
+      return t('reciters.minshawiShort');
+    },
     styles: [
       { style: 'murattal', folder: 'Minshawy_Murattal_128kbps' },
       // The 64 kbps folder is missing surahs 44-46.
@@ -77,8 +96,12 @@ export const RECITERS: ReciterInfo[] = [
   },
   {
     id: 'abdulbasit',
-    name: 'Abdul Basit Abdul Samad',
-    short: 'Abdul Basit',
+    get name() {
+      return t('reciters.abdulbasit');
+    },
+    get short() {
+      return t('reciters.abdulbasitShort');
+    },
     styles: [
       { style: 'murattal', folder: 'Abdul_Basit_Murattal_64kbps' },
       { style: 'mujawwad', folder: 'Abdul_Basit_Mujawwad_128kbps' },
@@ -86,68 +109,112 @@ export const RECITERS: ReciterInfo[] = [
   },
   {
     id: 'alafasy',
-    name: 'Mishary Rashid Alafasy',
-    short: 'Alafasy',
+    get name() {
+      return t('reciters.alafasy');
+    },
+    get short() {
+      return t('reciters.alafasyShort');
+    },
     styles: [{ style: 'murattal', folder: 'Alafasy_64kbps' }],
   },
   {
     id: 'sudais',
-    name: 'Abdur-Rahman As-Sudais',
-    short: 'As-Sudais',
+    get name() {
+      return t('reciters.sudais');
+    },
+    get short() {
+      return t('reciters.sudaisShort');
+    },
     styles: [{ style: 'murattal', folder: 'Abdurrahmaan_As-Sudais_64kbps' }],
   },
   {
     id: 'shuraim',
-    name: "Sa'ud Ash-Shuraim",
-    short: 'Ash-Shuraim',
+    get name() {
+      return t('reciters.shuraim');
+    },
+    get short() {
+      return t('reciters.shuraimShort');
+    },
     styles: [{ style: 'murattal', folder: 'Saood_ash-Shuraym_64kbps' }],
   },
   {
     id: 'muaiqly',
-    name: 'Maher Al-Muaiqly',
-    short: 'Al-Muaiqly',
+    get name() {
+      return t('reciters.muaiqly');
+    },
+    get short() {
+      return t('reciters.muaiqlyShort');
+    },
     styles: [{ style: 'murattal', folder: 'MaherAlMuaiqly128kbps' }],
   },
   {
     id: 'ghamdi',
-    name: "Sa'ad Al-Ghamdi",
-    short: 'Al-Ghamdi',
+    get name() {
+      return t('reciters.ghamdi');
+    },
+    get short() {
+      return t('reciters.ghamdiShort');
+    },
     styles: [{ style: 'murattal', folder: 'Ghamadi_40kbps' }],
   },
   {
     id: 'ajamy',
-    name: 'Ahmed ibn Ali Al-Ajamy',
-    short: 'Al-Ajamy',
+    get name() {
+      return t('reciters.ajamy');
+    },
+    get short() {
+      return t('reciters.ajamyShort');
+    },
     styles: [{ style: 'murattal', folder: 'ahmed_ibn_ali_al_ajamy_128kbps' }],
   },
   {
     id: 'shatri',
-    name: 'Abu Bakr Ash-Shatri',
-    short: 'Ash-Shatri',
+    get name() {
+      return t('reciters.shatri');
+    },
+    get short() {
+      return t('reciters.shatriShort');
+    },
     styles: [{ style: 'murattal', folder: 'Abu_Bakr_Ash-Shaatree_64kbps' }],
   },
   {
     id: 'hudhaify',
-    name: 'Ali Al-Hudhaify',
-    short: 'Al-Hudhaify',
+    get name() {
+      return t('reciters.hudhaify');
+    },
+    get short() {
+      return t('reciters.hudhaifyShort');
+    },
     styles: [{ style: 'murattal', folder: 'Hudhaify_128kbps' }],
   },
   {
     id: 'ayyub',
-    name: 'Muhammad Ayyub',
-    short: 'Muhammad Ayyub',
+    get name() {
+      return t('reciters.ayyub');
+    },
+    get short() {
+      return t('reciters.ayyubShort');
+    },
     styles: [{ style: 'murattal', folder: 'Muhammad_Ayyoub_64kbps' }],
   },
   {
     id: 'tablawi',
-    name: 'Mohammad Al-Tablawi',
-    short: 'Al-Tablawi',
+    get name() {
+      return t('reciters.tablawi');
+    },
+    get short() {
+      return t('reciters.tablawiShort');
+    },
     styles: [{ style: 'murattal', folder: 'Mohammad_al_Tablaway_64kbps' }],
   },
   {
     id: 'dossari',
-    name: 'Yasser Ad-Dossari',
-    short: 'Ad-Dossari',
+    get name() {
+      return t('reciters.dossari');
+    },
+    get short() {
+      return t('reciters.dossariShort');
+    },
     styles: [{ style: 'murattal', folder: 'Yasser_Ad-Dussary_128kbps' }],
   },
 ];
@@ -196,7 +263,7 @@ export type RecitationStatus = 'idle' | 'loading' | 'playing' | 'paused' | 'erro
 
 /** "Al-Baqarah 2:13": the mini player's and the lock screen's title. */
 export function verseTitle(v: VerseKey): string {
-  return `${getSurahDisplay(v.sura)?.nameDisplay ?? `Surah ${v.sura}`} ${v.sura}:${v.ayah}`;
+  return `${getSurahDisplay(v.sura)?.nameDisplay ?? t('common.surahN', { n: v.sura })} ${v.sura}:${v.ayah}`; // i18n-ignore (a name, then its numbers)
 }
 
 // A second of silence, looped through the pause after a verse: with nothing
@@ -364,7 +431,7 @@ export class Recitation {
     const metadata = {
       title: verseTitle(verse),
       artist: shortVoiceLabel(resolveVoice(this.voice)),
-      albumTitle: 'Revisely',
+      albumTitle: 'Revisely', // i18n-ignore (the app's name)
       artworkUrl: lockScreenArtwork(),
     };
     try {

@@ -44,6 +44,12 @@ export const settings = {
     loading: 'Loading…',
     load: 'Load {{title}}',
     pick: 'Pick a scenario',
+    heavy: 'Heavy user',
+    heavyDetail: 'Seven months: 21 juz memorized and more in part, a juz a day, gaps, the daily log, recordings, over a hundred Recite takes, Revo.',
+    steady: 'Missed yesterday',
+    steadyDetail: 'Six weeks of ten pages a day: a twelve-day run, then yesterday missed. The streak’s grace ring and the catch-up.',
+    starting: 'Getting started',
+    startingDetail: 'Two weeks in: Juz 30, Al-Mulk ayah by ayah, four pages a day, the first Recite takes.',
   },
   /** components/FajrBoundaryCard: the day starting at fajr. */
   fajr: {
@@ -224,6 +230,8 @@ export const settings = {
     restart: 'Restart',
   },
   support: {
+    /** The subject of an email to support. */
+    emailSubject: 'Revisely support',
     helpButtons: 'Help buttons',
     helpButtonsSub: 'A ? on screens that need explaining',
     helpButtonsLabel: 'Help buttons on screens',
