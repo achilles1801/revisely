@@ -92,7 +92,17 @@ import { premiumErrorText, setDevPremium, usePremium } from '../../lib/premium';
 import { earlyAccessLine, useEarlyAccess } from '../../lib/earlyAccess';
 import { checkLevel, setReciteCheckSettings, strictOffered, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
 import { ReciteCheckNotice } from '../../components/reciteCheck/ReciteCheckNotice';
-import { t } from '../../i18n';
+import { currentLanguage, t } from '../../i18n';
+import {
+  chooseLanguage,
+  languageChoice,
+  languagePickerOffered,
+  offeredLanguages,
+  resolveChoice,
+  restartForLanguage,
+  type LanguageChoice,
+} from '../../i18n/choice';
+import { LANGUAGE_NAMES } from '../../i18n/language';
 import { isDevVariant } from '../../lib/variant';
 import { CheckerModelRow } from '../../components/settings/CheckerModelRow';
 
@@ -293,6 +303,24 @@ export default function SettingsScreen() {
   const reciteCheck = reciteLiveForAccount(user);
   const reciteCheckSettings = useReciteCheckSettings(reciteCheck ? user?.id : null);
   const [checkLevelSheet, setCheckLevelSheet] = useState(false);
+  // Revisely Dev: Settings → Appearance → Language (src/i18n/choice.ts).
+  const [languageSheet, setLanguageSheet] = useState(false);
+  const [chosenLanguage, setChosenLanguage] = useState<LanguageChoice>(languageChoice);
+  const pickLanguage = (next: LanguageChoice) => {
+    setChosenLanguage(next);
+    void chooseLanguage(next).then((language) => {
+      if (language === currentLanguage()) return;
+      // Kept either way: Not now shows it from the next launch.
+      Alert.alert(
+        t('settings.language.restartTitle'),
+        t('settings.language.restartBody', { language: LANGUAGE_NAMES[language] }),
+        [
+          { text: t('common.notNow'), style: 'cancel' },
+          { text: t('settings.language.restart'), onPress: () => void restartForLanguage() },
+        ],
+      );
+    });
+  };
   // Premium (lib/premium): in Revisely Dev a tester turns it on and off here, free, to see marking mistakes locked.
   const premium = usePremium(user?.id, reciteCheck);
   // Premium early access (lib/earlyAccess, PREM-1): the Recite section's Premium row says it's free now and kept for life.
@@ -1077,6 +1105,15 @@ export default function SettingsScreen() {
               }}
             />
           </View>
+          {languagePickerOffered() ? (
+            <Row
+              icon="language-outline"
+              label={t('settings.language.row')}
+              value={chosenLanguage === 'system' ? t('settings.language.system') : LANGUAGE_NAMES[chosenLanguage]}
+              onPress={() => setLanguageSheet(true)}
+              testID="settings-language"
+            />
+          ) : null}
         </Section>
 
         <Section title={t('settings.sections.support')}>
@@ -1271,6 +1308,27 @@ export default function SettingsScreen() {
         visible={speechSheet}
         onClose={() => setSpeechSheet(false)}
         onReady={() => setSpeechSheet(false)}
+      />
+      <ActionSheet
+        visible={languageSheet}
+        onClose={() => setLanguageSheet(false)}
+        title={t('settings.language.row')}
+        actions={[
+          {
+            key: 'system',
+            label: t('settings.language.system'),
+            subtitle: t('settings.language.systemSub', { language: LANGUAGE_NAMES[resolveChoice('system')] }),
+            selected: chosenLanguage === 'system',
+            onPress: () => pickLanguage('system'),
+          },
+          ...offeredLanguages().map((language) => ({
+            key: language,
+            label: LANGUAGE_NAMES[language],
+            selected: chosenLanguage === language,
+            onPress: () => pickLanguage(language),
+          })),
+        ]}
+        testID="language-sheet"
       />
       <ActionSheet
         visible={checkLevelSheet && strictOffered()}

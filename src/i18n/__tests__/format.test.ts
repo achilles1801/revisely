@@ -3,6 +3,7 @@
 import fs from 'fs';
 import path from 'path';
 import { dateLocale, dayMonth, formatDate, formatDay, formatNumber, formatTime, monthName, weekdayName } from '..';
+import { localDigits } from '../digits';
 
 const SRC = path.resolve(__dirname, '../..');
 
@@ -72,9 +73,11 @@ describe('in another language', () => {
       const ar = require('../format') as typeof import('../format');
       const d = new Date(2026, 9, 28);
       expect(ar.dateLocale('device')).toBe('ar');
+      // In Arabic-Indic digits whatever Intl gives (digits.ts): Node's 'ar' writes Western ones.
       expect(ar.dayMonth(d, { weekday: 'long' })).toBe(
-        d.toLocaleDateString('ar', { weekday: 'long', day: 'numeric', month: 'long' }),
+        localDigits(d.toLocaleDateString('ar', { weekday: 'long', day: 'numeric', month: 'long' }), 'ar'),
       );
+      expect(ar.dayMonth(d, { weekday: 'long' })).toContain('٢٨');
       expect(ar.weekdayName(d)).toMatch(/[؀-ۿ]/);
     });
   });

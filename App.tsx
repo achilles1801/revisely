@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -24,6 +24,7 @@ import { stopTrace } from './src/lib/reciteLive/stopTrace';
 import { startStoreChecks } from './src/lib/updates/storeUpdates';
 import { UpdateRequiredGate } from './src/components/updates/UpdateRequired';
 import { currentLanguage } from './src/i18n';
+import { languagePickerOffered, loadLanguageChoice } from './src/i18n/choice';
 import { syncLayoutDirection } from './src/i18n/direction';
 
 // Every launch is one Sentry session, labelled with the exact JavaScript it ran
@@ -90,8 +91,9 @@ Sentry.setTags(releaseTags(release));
 startOtaUpdates();
 startStoreChecks();
 // The layout reads the way the app's language does, not the phone's: Android mirrored the English
-// app on a phone set to Arabic (BEHAVIOUR.md LANG-1). Applies from the next launch.
-syncLayoutDirection(currentLanguage());
+// app on a phone set to Arabic (BEHAVIOUR.md LANG-1). Applies from the next launch. Where a language
+// can be chosen (Revisely Dev), loadLanguageChoice does it below, once the choice is read.
+if (!languagePickerOffered()) syncLayoutDirection(currentLanguage());
 // Revisely Dev: a live take whose Stop never reached its summary last run (a freeze, or the app closed then) goes to
 // Sentry once (src/lib/reciteLive/stopTrace.ts).
 void stopTrace.reportLeftover();
@@ -109,8 +111,16 @@ function App() {
     registerForPushNotificationsAsync();
   }, []);
 
+  // Revisely Dev: the language chosen in Settings, applied before the first screen (src/i18n/choice.ts). The store
+  // app has nothing to read.
+  const [languageReady, setLanguageReady] = useState(() => !languagePickerOffered());
+  useEffect(() => {
+    if (languageReady) return;
+    void loadLanguageChoice().finally(() => setLanguageReady(true));
+  }, [languageReady]);
+
   // Something to show: the splash can go once the launch check is done.
-  const fontsSettled = fontsLoaded || !!fontError;
+  const fontsSettled = (fontsLoaded || !!fontError) && languageReady;
   useEffect(() => {
     if (fontsSettled) markUiReady();
   }, [fontsSettled]);

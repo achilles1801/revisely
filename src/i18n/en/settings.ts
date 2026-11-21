@@ -213,6 +213,16 @@ export const settings = {
     light: 'Light',
     dark: 'Dark',
   },
+  /** Settings → Appearance → Language (Revisely Dev until Arabic ships). Each language's own name is LANGUAGE_NAMES. */
+  language: {
+    row: 'Language',
+    /** The choice that follows the phone. */
+    system: 'Phone’s language',
+    systemSub: 'Now {{language}}',
+    restartTitle: 'Restart Revisely?',
+    restartBody: 'It closes and opens again in {{language}}.',
+    restart: 'Restart',
+  },
   support: {
     helpButtons: 'Help buttons',
     helpButtonsSub: 'A ? on screens that need explaining',
