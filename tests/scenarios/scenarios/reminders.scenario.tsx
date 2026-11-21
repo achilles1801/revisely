@@ -7,7 +7,8 @@ import { local, setNow, setZone, ZONES } from '../harness/clock';
 import { changeUser, newAccount, pagesRange } from '../harness/account';
 import { allowNotifications, notAskedYet, pendingNotifications, permissionAsks, type Scheduled } from '../harness/notifications';
 import { Home, homeStack } from '../harness/screens';
-import type { OpenApp, Phone as PhoneT } from '../harness/phone';
+import type { Booted, OpenApp, Phone as PhoneT } from '../harness/phone';
+import type { ReactElement } from 'react';
 import { Phone } from '../harness/phone';
 
 // Revisely Dev: REMIND-2's days after tomorrow are its own until their switch is on (lib/release/remindersWhileAway).
@@ -223,6 +224,96 @@ it('[REMIND-4] Home asks for notification permission only for an account with re
     await new Home(app).ready();
     await app.idle(800);
     expect(permissionAsks()).toBe(1);
+  } finally {
+    await app.close();
+  }
+});
+
+/** The real Settings alone, as MainNavigator's stack holds it. */
+function settingsStack(mods: Booted): ReactElement {
+  const { React, require: req } = mods;
+  const { NavigationContainer } = req<any>('@react-navigation/native');
+  const { createNativeStackNavigator } = req<any>('@react-navigation/native-stack');
+  const Settings = req<any>('src/screens/main/SettingsScreen').default;
+  const nav = req<{ navigation: { current: unknown } }>('./navRef');
+  const { ReadingTimerProvider } = req<any>('src/context/ReadingTimerContext');
+  const Stack = createNativeStackNavigator();
+  const h = React.createElement;
+  return h(
+    ReadingTimerProvider,
+    null,
+    h(
+      NavigationContainer,
+      { ref: nav.navigation },
+      h(Stack.Navigator, { screenOptions: { headerShown: false, animation: 'none' } }, h(Stack.Screen, { name: 'Settings', component: Settings })),
+    ),
+  );
+}
+
+const REFUSED_LINE = 'Off in your phone’s Settings, so no reminders can come';
+
+it('[REMIND-5] Settings: “Enable notifications” is off while the phone refuses them, says so, and offers Open Settings; allowed there, it is on again', async () => {
+  setZone(ZONES.chicago);
+  setNow('2026-11-03 09:00');
+  const phone = new Phone('phone');
+  // Reminders on for the account; this phone refuses notifications and won't ask again (iOS after a no).
+  const setup = await newAccount(phone, { memorized: JUZ_30, user: { notificationsEnabled: true } });
+  await setup.close();
+
+  const app = await phone.open(settingsStack);
+  const { fireEvent } = app.mods.rtl;
+  const toggle = () => app.screen.getByTestId('settings-notifications');
+  try {
+    await app.until(() => app.screen.queryByTestId('settings-notifications') != null, 'Settings');
+    await app.until(() => toggle().props.value === false, 'the switch to show off');
+    expect(app.screen.getByText(REFUSED_LINE)).toBeTruthy();
+
+    // Turned on: the phone's Settings are offered, not a switch that does nothing.
+    const RN = app.mods.require<typeof import('react-native')>('react-native');
+    const openSettings = jest.spyOn(RN.Linking, 'openSettings').mockResolvedValue(undefined);
+    await app.act(async () => {
+      fireEvent(toggle(), 'valueChange', true);
+    });
+    await app.until(() => app.screen.queryByText('Notifications are off for Revisely') != null, 'the sheet');
+    expect(toggle().props.value).toBe(false);
+    await app.act(async () => {
+      fireEvent.press(app.screen.getByText('Open Settings'));
+    });
+    await app.until(() => openSettings.mock.calls.length === 1, 'the phone’s Settings to open');
+    expect(permissionAsks()).toBe(0);
+
+    // Allowed there, and back in the app: on again, as the account had it.
+    allowNotifications();
+    await app.background();
+    await app.foreground();
+    await app.until(() => toggle().props.value === true, 'the switch to show on again');
+    expect(app.screen.queryByText(REFUSED_LINE)).toBeNull();
+  } finally {
+    await app.close();
+  }
+});
+
+it('[REMIND-5] Settings: turned on with the phone not asked yet, it asks; a no leaves reminders off', async () => {
+  setZone(ZONES.chicago);
+  setNow('2026-11-03 09:00');
+  const phone = new Phone('phone');
+  const setup = await newAccount(phone, { memorized: JUZ_30, user: { notificationsEnabled: false } });
+  await setup.close();
+  notAskedYet('denied');
+
+  const app = await phone.open(settingsStack);
+  const { fireEvent } = app.mods.rtl;
+  const toggle = () => app.screen.getByTestId('settings-notifications');
+  try {
+    await app.until(() => app.screen.queryByTestId('settings-notifications') != null, 'Settings');
+    await app.act(async () => {
+      fireEvent(toggle(), 'valueChange', true);
+    });
+    await app.until(() => permissionAsks() === 1, 'the permission prompt');
+    await app.idle(500);
+    expect(app.app.user?.notificationsEnabled).toBe(false);
+    expect(toggle().props.value).toBe(false);
+    expect(app.screen.queryByText('Notifications are off for Revisely')).toBeNull();
   } finally {
     await app.close();
   }

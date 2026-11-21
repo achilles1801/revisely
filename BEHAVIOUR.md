@@ -213,6 +213,12 @@ permission when "Daily reminders" is on, and a no saves reminders off.
   never asks again once answered. With reminders off, nothing asks. (Changed Nov 2026: the app asked on
   every launch, so a fresh install asked on its first screen, before sign-in; a no there turned reminders
   off at onboarding. Home asked again even with reminders off, and a yes there didn't turn them on.)
+- **REMIND-5.** (Revisely Dev) In Settings, "Enable notifications" shows on only while reminders can come.
+  While the phone refuses Revisely's notifications, it shows off and says so ("Off in your phone's
+  Settings"), and turning it on offers Open Settings instead of a switch that does nothing. Allowed there
+  and back in the app, it shows on again if reminders were on. Turned on with the phone not asked yet, it
+  asks, and a no leaves it off. (In the store app, until the reminders-while-away switch is on, the switch
+  shows the account's choice whatever the phone allows.)
 
 ## The daily log
 
