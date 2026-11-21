@@ -57,6 +57,11 @@ export interface LiveConnection {
   send(frame: Exclude<ClientFrame, StartFrame>): void;
   /** Hang up (nothing more comes). */
   close(): void;
+  /**
+   * Paused (the microphone off, the take open): `true` keeps the checker from letting the take go while nothing is
+   * sent, `false` when the audio comes again. Optional: a recorded take has nothing to keep open.
+   */
+  hold?(on: boolean): void;
   /** The connection's state in a word or two, for the Stop trace (lib/reciteLive/stopTrace): "live", "retry 2", … */
   status?(): string;
   /** The take's audio from `from` to `to` seconds (16 kHz mono), as held on the phone; null outside what was heard. */

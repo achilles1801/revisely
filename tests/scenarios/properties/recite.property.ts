@@ -38,7 +38,8 @@ import {
   LIVE_IDLE,
   type LiveState,
 } from '../../../src/lib/reciteLive/state';
-import { socketFeed, CATCHUP_SLICE_SAMPLES, CATCHUP_TICK_MS, WATCHDOG_MS, type SocketLike } from '../../../src/lib/reciteLive/socket';
+import { socketFeed, CATCHUP_SLICE_SAMPLES, CATCHUP_TICK_MS, KEEPALIVE_MS, WATCHDOG_MS, type SocketLike } from '../../../src/lib/reciteLive/socket';
+import { scoreTapOpens } from '../../../src/lib/reciteLive/view';
 import type { StartFrame } from '../../../src/lib/reciteLive/feed';
 import { meanScore } from '../../../src/lib/reciteInsights/insights';
 import { passageTakes } from '../../../src/lib/reciteMemory/progress';
@@ -1012,6 +1013,74 @@ describe('[RECITE-15] a sound and a tap on each new mistake', () => {
         },
       ),
       { numRuns: runs(250) },
+    );
+  });
+});
+
+describe('[RECITE-16] a paused take stays open however long the pause', () => {
+  /** The checker's IDLE: a take without a frame from the phone for this long is let go. */
+  const CHECKER_IDLE_MS = 30_000;
+  it('with the take held, the checker never goes 30 s without a frame; an idle error before the answer never ends the take', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.array(fc.record({ paused: fc.boolean(), ms: fc.integer({ min: 0, max: 600_000 }) }), { minLength: 1, maxLength: 8 }),
+        fc.boolean(),
+        async (stretches, idleError) => {
+          const h = harness();
+          const events: string[] = [];
+          const conn = h.connect(START, { onEvent: (e) => events.push(e.type), onClose: () => undefined });
+          await micro();
+          const s = h.sockets[0];
+          s.onopen!();
+          s.answer({ type: 'ready', take: 'k', from: 0 });
+          let t = 0;
+          let lastFrame = 0;
+          let longest = 0;
+          const sentBefore = () => s.sent.length;
+          for (const st of stretches) {
+            conn.hold!(st.paused);
+            if (!st.paused) {
+              conn.sendAudio(new Int16Array(160));
+              lastFrame = t;
+            }
+            // Time passes: keepalives go as their timers come due; while reciting, audio every second.
+            const end = t + st.ms;
+            while (t < end) {
+              const due = h.timers.filter((x) => x.ms === KEEPALIVE_MS);
+              const step = Math.min(st.paused && due.length ? KEEPALIVE_MS : 1000, end - t);
+              t += step;
+              const n = sentBefore();
+              if (st.paused && due.length && step === KEEPALIVE_MS) {
+                h.timers.splice(h.timers.indexOf(due[0]), 1)[0].fn();
+              } else if (!st.paused) conn.sendAudio(new Int16Array(160));
+              if (s.sent.length > n) {
+                longest = Math.max(longest, t - lastFrame);
+                lastFrame = t;
+              }
+            }
+            longest = Math.max(longest, t - lastFrame < CHECKER_IDLE_MS ? 0 : t - lastFrame);
+          }
+          expect(longest).toBeLessThan(CHECKER_IDLE_MS);
+          if (idleError) s.answer({ type: 'error', reason: 'idle' });
+          expect(events).not.toContain('error');
+        },
+      ),
+      { numRuns: 60 },
+    );
+  });
+});
+
+describe('[RECITE-17] the score opens something whenever it shows', () => {
+  it('while the take runs or Stop waits: what it has found so far; once done: its summary', () => {
+    fc.assert(
+      fc.property(fc.constantFrom('idle', 'connecting', 'listening', 'checking', 'done', 'failed') as fc.Arbitrary<
+        'idle' | 'connecting' | 'listening' | 'checking' | 'done' | 'failed'
+      >, (status) => {
+        const opens = scoreTapOpens(status);
+        if (status === 'listening' || status === 'checking') expect(opens).toBe('so-far');
+        else if (status === 'done') expect(opens).toBe('summary');
+        else expect(opens).toBeNull();
+      }),
     );
   });
 });

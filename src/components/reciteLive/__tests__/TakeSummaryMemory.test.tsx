@@ -24,7 +24,6 @@ function show(memory: { cleared: string[]; trend: number[]; line: string | null 
         seconds={102}
         marks={[]}
         score={check ? { text: '99.1%', level: 'good' } : null}
-        kept={false}
         checkOwned
         onFinding={() => undefined}
         onCheck={() => undefined}

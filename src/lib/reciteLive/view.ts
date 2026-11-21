@@ -3,7 +3,7 @@
 import type { QuranWords } from '../recite/quranWords';
 import type { WordFollow } from '../recite/hiddenPage';
 import { isUnclear, severityOf, strongestByWord, type Mark } from './contract';
-import { furthestWord, LiveState, mistakeCount } from './state';
+import { furthestWord, LiveState, LiveStatus, mistakeCount } from './state';
 import { formatAccuracy, pageAccuracy, ScoreLevel, scoreLevel } from './score';
 
 /**
@@ -132,6 +132,16 @@ export function hiddenFollow(
  * should still be there. Obviously, the word won't be shown"): for each word on `page` still covered, the take's mark
  * (its strongest), else the one Recite's memory holds there (`past`). A word that shows has its highlight behind its ink.
  */
+/**
+ * What a tap on the bar's score opens (RECITE-17; Majd, Nov 21 2026: "the percentage score should be clickable throughout
+ * the whole process"): while the take runs or Stop waits, what it has found so far; once it's done, its summary.
+ */
+export function scoreTapOpens(status: LiveStatus): 'so-far' | 'summary' | null {
+  if (status === 'listening' || status === 'checking') return 'so-far';
+  if (status === 'done') return 'summary';
+  return null;
+}
+
 export function coverHighlights(
   words: QuranWords,
   page: number,
