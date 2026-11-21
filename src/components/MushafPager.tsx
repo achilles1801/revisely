@@ -12,6 +12,7 @@ import {
   Dimensions,
   FlatList,
   GestureResponderEvent,
+  I18nManager,
   Image,
   NativeScrollEvent,
   NativeSyntheticEvent,
@@ -28,6 +29,8 @@ import { getQuranPageImageUrl, pageImageProps } from '../lib/quranImages';
 import { nativeRequestUrl } from '../lib/devNetwork';
 import { knownOffline, onNetworkState } from '../lib/networkState';
 import { typeV2 } from '../theme/v2';
+import { pageIndexAt, pagerLayout } from '../lib/mushafDirection';
+import { logger } from '../lib/logger';
 import { PillButton } from './v2/PillButton';
 import {
   cachePage,
@@ -396,7 +399,7 @@ const PageItem = React.memo(function PageItem({
   // word data has loaded on the first open after launch) would otherwise remount every page, and each image would
   // load again, blank meanwhile.
   return (
-    <View style={styles.pageWrap}>
+    <View style={styles.pageWrap} testID="mushaf-page">
       {pageView}
       {accessories !== undefined && uri != null && !missing ? (
         <View pointerEvents="box-none" style={styles.accessories}>
@@ -440,6 +443,18 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
   const palette = getReadPalette(isDark);
   const edition = useMushafEdition();
   const listRef = useRef<FlatList>(null);
+  // Right to left from launch (the app's language: src/i18n/direction.ts); fixed for the life of the app.
+  const rtl = I18nManager.isRTL;
+  const layout = pagerLayout(rtl);
+  // Right to left, React Native's list can't turn an index into an offset before it has measured its content (it
+  // throws): the starting page comes from initialScrollIndex then, and a jump made that early is skipped.
+  const scrollToIndex = useCallback((index: number) => {
+    try {
+      listRef.current?.scrollToIndex({ index, animated: false });
+    } catch (err) {
+      logger.warn('MushafPager: a scroll before the list was measured', err);
+    }
+  }, []);
   // The space the pager has (unknown until it lays out: then the screen's width).
   const [space, setSpace] = useState<{ width: number; height: number }>({ width: SCREEN_WIDTH, height: 0 });
   const aspect = mushafEdition(edition).aspect;
@@ -497,9 +512,9 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
         return;
       }
       if (process.env.EXPO_PUBLIC_E2E === '1') e2eSay(`start-up scroll to index ${idx}`);
-      listRef.current?.scrollToIndex({ index: idx, animated: false });
+      scrollToIndex(idx);
     }, 50);
-  }, [initialPage, pages]);
+  }, [initialPage, pages, scrollToIndex]);
 
   useImperativeHandle(
     ref,
@@ -517,7 +532,7 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
         dragStartsRef.current = [];
         if (changed) jumpRef.current = { from, to: idx, until: Date.now() + JUMP_SETTLE_MS };
         hasAutoScrolledRef.current = true;
-        listRef.current?.scrollToIndex({ index: idx, animated: false });
+        scrollToIndex(idx);
         if (changed) {
           prefetchPages(pagesAround(pages, idx));
           onPageChange?.(pageNumber, idx);
@@ -525,7 +540,7 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
         return true;
       },
     }),
-    [pages, onPageChange],
+    [pages, onPageChange, scrollToIndex],
   );
 
   const hasEnd = endCard != null;
@@ -652,7 +667,7 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
       renderItem={renderItem}
       horizontal
       pagingEnabled
-      inverted
+      inverted={layout.inverted}
       showsHorizontalScrollIndicator={false}
       onViewableItemsChanged={handleViewableItemsChanged}
       onScrollBeginDrag={(e?: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -660,7 +675,9 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
         // (each page is SCREEN_WIDTH wide, as getItemLayout says).
         const x = e?.nativeEvent?.contentOffset?.x;
         const at =
-          typeof x === 'number' ? Math.min(Math.max(Math.round(x / SCREEN_WIDTH), 0), data.length - 1) : shownIndexRef.current;
+          typeof x === 'number'
+            ? pageIndexAt(x, e?.nativeEvent?.contentSize?.width, e?.nativeEvent?.layoutMeasurement?.width, SCREEN_WIDTH, data.length, rtl)
+            : shownIndexRef.current;
         if (at != null) dragStartsRef.current.push(at);
         draggedRef.current = true;
         if (process.env.EXPO_PUBLIC_E2E === '1') e2eSay(`drag begins at ${e2eX(e)}; shown index ${shownIndexRef.current}, at index ${currentIndexRef.current}`);
@@ -679,7 +696,7 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
               // Only when the page under the offset changes, so a swipe is a line or two, not one per frame.
               const x = e?.nativeEvent?.contentOffset?.x;
               if (typeof x !== 'number') return;
-              const under = Math.round(x / SCREEN_WIDTH);
+              const under = pageIndexAt(x, e.nativeEvent.contentSize?.width, e.nativeEvent.layoutMeasurement?.width, SCREEN_WIDTH, data.length, rtl);
               if (under === e2eScrollIndex.current) return;
               e2eScrollIndex.current = under;
               e2eSay(`scrolled to ${e2eX(e)}`);
@@ -702,10 +719,10 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
         if (process.env.EXPO_PUBLIC_E2E === '1') e2eSay(`layout ${Math.round(width)}×${Math.round(height)} (pages ${SCREEN_WIDTH} wide)`);
         setSpace((prev) => (prev.width === width && prev.height === height ? prev : { width, height }));
       }}
-      // Left to right whatever the app's language (BEHAVIOUR.md LANG-1): `inverted` already puts page 1
-      // on the right, and the verse boxes are placed from the image's left edge. Right to left would
-      // turn the pages backwards and mirror every highlight (React Native swaps left and right).
-      style={{ backgroundColor: palette.pageBg, direction: 'ltr' }}
+      // A printed mushaf's order in either direction (pagerLayout; LANG-1, LANG-2). Each page is left to right inside
+      // (pageWrap), so its verse boxes, covers and Recite's layers stay on their words (React Native swaps left and
+      // right in RTL).
+      style={layout.listDirection ? { backgroundColor: palette.pageBg, direction: layout.listDirection } : { backgroundColor: palette.pageBg }}
     />
   );
 });
@@ -717,7 +734,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  pageWrap: { width: SCREEN_WIDTH, flex: 1 },
+  // Left to right whatever the app's language: the page is an image, and everything drawn on it is placed from its
+  // left edge (LANG-2).
+  pageWrap: { width: SCREEN_WIDTH, flex: 1, direction: 'ltr' },
   accessories: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center' },
 
   highlight: {

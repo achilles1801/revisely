@@ -41,3 +41,11 @@ export function chevron(): string {
 export function backChevron(): string {
   return I18nManager.isRTL ? '›' : '‹';
 }
+
+/**
+ * A box placed `x` points from the screen's left edge whatever the direction: a menu or card positioned from a touch
+ * or a verse's place on the page (window coordinates). React Native swaps left and right in RTL, so there it is `right`.
+ */
+export function fromLeftEdge(x: number, rtl: boolean = I18nManager.isRTL): { left: number } | { right: number } {
+  return rtl ? { right: x } : { left: x };
+}

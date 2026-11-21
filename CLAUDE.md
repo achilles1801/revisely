@@ -2230,6 +2230,12 @@ code into `src/i18n/en/<folder>.ts`, folder by folder, with the English unchange
 - **New layouts use start and end**, never left and right (`marginStart`, `paddingEnd`, `start: 0`). No
   `textAlign: 'left'` on text that should follow the language. Arrows and chevrons come from `chevron()` or a flipped
   icon.
+- **The mushaf in RTL** (LANG-2, Nov 21 2026): the pager keeps a printed mushaf's order in both directions
+  (`lib/mushafDirection`: `inverted` left to right, the list's own order right to left, never pinned `direction: 'ltr'`
+  on the list, which turned the page black because React Native's list measures from the right in RTL). Each page is
+  left to right inside (`pageWrap`), so boxes drawn from the image's left edge stay on their words. A box placed from
+  window coordinates (a held verse's menu) uses `fromLeftEdge` (`src/i18n/direction.ts`): React Native swaps left and
+  right in RTL.
 
 ## UI traps
 

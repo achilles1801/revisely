@@ -22,6 +22,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useReduceMotion } from '../../design/motion';
 import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
 import { Box, placeMenu } from './menuPlacement';
+import { fromLeftEdge } from '../../i18n/direction';
 import { shareIcon } from '../../lib/platformUi';
 import { t } from '../../i18n';
 
@@ -207,7 +208,8 @@ export function VerseMenu({
             borderColor: palette.outline,
             shadowColor: palette.shadow,
             shadowOpacity: isDark ? 0 : 0.14,
-            left: placement?.left ?? 0,
+            // From the screen's left edge in either direction (the verse's place on the page; LANG-2).
+            ...fromLeftEdge(placement?.left ?? 0),
             top: placement?.top ?? 0,
           },
           placement ? { transformOrigin: [placement.origin.x, placement.origin.y, 0] } : styles.unplaced,

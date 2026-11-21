@@ -1241,6 +1241,11 @@ shows up once and they must go through it and complete it … just the main stuf
   starts (React Native reads the direction at launch). (Until Nov 2026 an Android phone set to an
   RTL language mirrored the English app: rows, the tab swipe, the verse highlights and the mushaf's
   page order; `src/i18n/direction.ts`.)
+- **LANG-2.** (Revisely Dev) In Arabic (right to left), the mushaf still reads like a printed one: page 1 on the
+  right, the next page coming from the left (a swipe from left to right turns forward), the same as in English. A
+  page is never mirrored: its image, verse highlights, a hidden page's covers and Recite's marks stay on their words,
+  and a swipe credits the page it left (SESS-1). A held verse's menu opens beside the verse. (Until Nov 21 2026 the
+  pager was pinned left to right while React Native's list measured from the right, and the page came out black.)
 
 ## The Ramadan theme (Revisely Dev)
 
