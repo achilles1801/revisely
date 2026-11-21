@@ -1193,7 +1193,17 @@ hard-coded token was deleted from the console on 2026-10-27.
 
 `scripts/asc.js` drives App Store Connect (listing, screenshots, build, release type, submission).
 Listing text is `store/listing.json`; screenshots are `store/screenshots/` (6.9" iPhone,
-1320×2868, uploaded in file order). It needs a team API key with App Manager access:
+1320×2868, uploaded in file order).
+- **Other localizations** (Majd, Nov 21 2026: en-GB, ar-SA and id, with 1.0.5) are `store/listing.<locale>.json`.
+  - `listing --locale ar-SA` writes one, creating it if it's missing. `--dry` prints field by field and writes
+    nothing. `--version 1.0.5` insists on that version. `--whats-new-form minor|feature` picks the file's What's New.
+  - Only a locale file has `name`: en-US's name, subtitle and keywords stay as Majd set them.
+  - Limits are checked before anything is written, keywords in bytes too, and text over one is refused, never cut.
+    `node scripts/asc.js check` checks every file offline.
+  - `listing.en-GB.json` is listing.json with British spelling only, and `scripts/__tests__/asc.test.js` fails when
+    they drift.
+  - The new locales use the primary language's screenshots.
+  - Play's localized text goes in by hand: play.js's key has no store-listing rights. It needs a team API key with App Manager access:
 
 ```bash
 export ASC_KEY_ID=Y9QXNBSWCN ASC_ISSUER_ID=98e03813-82b9-4a37-8c3b-962d9af24baa \

@@ -1,0 +1,14 @@
+{
+  "_note": "Arabic: approved by Majd, Nov 21 2026 (~/Documents/revisely-store-listings/2026-11-21-store-listings.md). Written to src/i18n/ar-glossary.md. The English words sit in first-strong isolates (U+2068 … U+2069): keep them. Keywords are exactly 100 UTF-8 bytes. Written with: node scripts/asc.js listing --locale ar-SA.",
+  "name": "Revisely - مراجعة حفظ القرآن",
+  "subtitle": "سمّع حفظك واكتشف أخطاءك",
+  "keywords": "تسميع,تثبيت,تحفيظ,مصحف,المتشابهات,القران,حافظ,جزء,سورة",
+  "description": "يساعدك ريفايزلي على تثبيت ما حفظته من القرآن الكريم.\nسمّع من حفظك والصفحة تتابع تلاوتك، وفعّل ميزة «⁨Mark mistakes⁩» (تحديد الأخطاء) لتظهر لك أخطاؤك في أثناء التسميع مع شرح كل خطأ.\nمساعدك في المراجعة ⁨Revo⁩ يعرف خطتك وتسميعك، ويجيب عن أسئلتك.\nتُبقي الأدوات مراجعة اليوم أمام عينيك على الشاشة الرئيسية وشاشة القفل.\nخطّط لمراجعتك، وسجّل ما راجعته، وتابع تقدّمك يومًا بيوم.\nالتطبيق باللغة الإنجليزية حاليًا. ريفايزلي مجاني، وتحديد الأخطاء جزء من بريميوم، وهو مجاني للجميع في فترة الوصول المبكر ويبقى لك مدى الحياة.",
+  "whatsNew": {
+    "minor": "تحسينات وإصلاحات صغيرة.",
+    "feature": "سمّع من حفظك وشاهد أخطاءك في أثناء التسميع: اضغط مطوّلًا على الميكروفون في المصحف وفعّل «⁨Mark mistakes⁩»."
+  },
+  "supportUrl": "https://revisely.app/support/",
+  "marketingUrl": "https://revisely.app",
+  "privacyPolicyUrl": "https://revisely.app/privacy/"
+}
