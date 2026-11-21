@@ -189,6 +189,24 @@ How the tests are made: `tests/scenarios/README.md`.
   revised ahead for today came back in front of the new start, and a leftover offer made after the jump
   was added in front of it: Jump to p. 1 showed pages 236–240 first.)
 
+## Reminders
+
+The revision reminders are local notifications that the phone schedules while the app runs
+(`lib/reminders`, `components/RevisionRemindersSync`). Their plan is made again each time the app opens,
+comes back to the front, saves a session or changes the plan.
+
+- **REMIND-1.** While today's revision isn't done, up to three a day: 8:00 AM, 20 minutes after Asr at
+  the prayer place (3:00 PM without one), and an hour before the revision day ends (quiet between
+  midnight and Fajr). Two due within 30 minutes become one. Once today is done, the rest of today's go,
+  and the next becomes one quiet congratulation. Tomorrow gets the same three.
+- **REMIND-2.** (Revisely Dev) Someone who doesn't open the app still gets one reminder a day, at the morning time,
+  on each day after tomorrow, for a week counting the day the app was last open. Then they stop until
+  it's opened again, which plans the week again from that day. In the store app, until the release
+  opens it (`lib/reminders/later`), only today and tomorrow are planned, so someone who doesn't open
+  the app on their second day hears nothing more.
+- **REMIND-3.** None is scheduled while the phone doesn't allow notifications, or while reminders are
+  off in Settings. Allowed later in the phone's Settings, they're planned once the app is back in front.
+
 ## The daily log
 
 - **LOG-1.** Every note added to a day's log stays, each as its own entry with its text; adding one

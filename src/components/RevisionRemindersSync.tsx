@@ -10,6 +10,7 @@ import { logger } from '../lib/logger';
 import { planRevisionReminders } from '../lib/reminders/plan';
 import { useActivityHistory, withPhoneSessions } from '../lib/activityHistory';
 import { clearRevisionReminders, syncRevisionReminders } from '../lib/reminders/sync';
+import { laterReminderDays } from '../lib/reminders/later';
 import { usePrayerPrefs } from '../lib/prayer/prefs';
 import { prayerPlace, prayerSettings } from './prayer/usePrayerTimes';
 
@@ -17,7 +18,9 @@ import { prayerPlace, prayerSettings } from './prayer/usePrayerTimes';
  * Keeps the revision reminders (lib/reminders) current. Renders nothing.
  * They are worked out from what Home shows and rebuilt whenever that changes:
  * a session saved, the plan or pages edited, notifications on or off, the
- * place for Asr, the app coming back, and the revision day rolling over.
+ * place for Asr, the app coming back, and the revision day rolling over. Only
+ * while the app runs, so the days after tomorrow get one each (REMIND-2) for
+ * someone who doesn't open it.
  * Cleared when signed out, or when notifications are off or not allowed. Never while the account is still loading.
  */
 export function RevisionRemindersSync() {
@@ -74,6 +77,7 @@ export function RevisionRemindersSync() {
           quranData: getQuranData(),
           place,
           settings,
+          laterDays: laterReminderDays(),
         });
         await syncRevisionReminders(planned);
       } catch (err) {

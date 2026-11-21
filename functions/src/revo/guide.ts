@@ -266,7 +266,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'Settings, section by section',
-    covers: ['REVO-39'],
+    covers: ['REVO-39', 'REMIND-1', 'REMIND-3'],
     routes: ['Settings'],
     text: lines(
       '- Account: display name. Activity: “Activity”, “Recordings”, “Back up recordings”, “Time in app”, “Memorized pages”. Home screen: “Next prayer”, “Friday Al-Kahf reminder”. Prayer: as above.',
@@ -363,6 +363,16 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
  * When a feature moves to the store app, move its section (or its lines) to GUIDE_SECTIONS.
  */
 export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
+  {
+    // REMIND-2 (Nov 21 2026), in Revisely Dev until the release opens it (lib/reminders/later); its line then moves
+    // to "Settings, section by section" (with the re-record).
+    title: 'Revision reminders after a few days away',
+    covers: ['REMIND-2'],
+    routes: ['Settings'],
+    text: lines(
+      '- The revision reminders come only while the app has been opened recently: today’s and tomorrow’s as usual, then one each morning for the rest of the week after the app was last open, then none until it is opened again. Opening the app plans them again from that day. There is no setting for how many.',
+    ),
+  },
   {
     // Mistake detection reached the store app with 1.0.5 (its lines are in GUIDE_SECTIONS). Strict stays Revisely Dev's
     // until it has a release of its own (Majd, Nov 17 2026).
