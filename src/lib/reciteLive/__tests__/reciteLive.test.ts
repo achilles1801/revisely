@@ -96,7 +96,7 @@ describe('the contract', () => {
   });
 
   it('reads Recite’s final answer: words only, no marks list or score (live.py’s follow result)', () => {
-    // As the service sends it at the end of a Recite take (scripts/recite-check/live.py, `self.follow`).
+    // As the service sends it at the end of a Recite take (revisely-internal's checker/live.py, `self.follow`).
     const recite = {
       type: 'done',
       result: {

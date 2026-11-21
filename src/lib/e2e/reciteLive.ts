@@ -80,7 +80,7 @@ const A26 = 48749;
 /**
  * Recite's take (`follow`), begun at An-Naml 25, mid-page: what the checker sends it is where it found the start, the
  * cursor and the words said, never a mark or a score, and a final answer of words only (no marks list), as
- * scripts/recite-check's live.py writes it.
+ * revisely-internal's checker/live.py writes it.
  */
 function followTake(): ReplayLog {
   const events: ReplayLog['events'] = [

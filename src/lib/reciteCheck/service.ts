@@ -6,7 +6,7 @@ import type { ReciteCheckSettings } from './settings';
 import { pairAnswered, pairClosed } from '../reciteLive/pairService';
 import { checker } from './endpoints';
 
-/** The recitation check service in the app's own Firebase project (Cloud Run; scripts/recite-check; ./endpoints). */
+/** The recitation check service in the app's own Firebase project (Cloud Run; revisely-internal's checker/; ./endpoints). */
 export const RECITE_CHECK_URL = checker().base;
 /** The service takes at most 4 minutes. */
 export const MAX_SECONDS = 240;

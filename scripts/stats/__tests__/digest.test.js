@@ -1,7 +1,6 @@
 const zlib = require('zlib');
 const D = require('../digest');
 const { salesSummary } = require('../appStore');
-const { appStore } = require('../weekly');
 
 const HEADER = [
   'Provider', 'Provider Country', 'SKU', 'Developer', 'Title', 'Version', 'Product Type Identifier', 'Units',
@@ -127,36 +126,6 @@ describe('salesSummary', () => {
   it('a refused key or a bad vendor number throws (the run fails, GitHub emails)', async () => {
     await expect(salesSummary('2026-11-02', { env, auth: 'x', fetchImpl: fake(403, null, { errors: [{ detail: 'The API key in use does not allow this request' }] }) })).rejects.toThrow(/403/);
     await expect(salesSummary('2026-11-02', { env: {}, auth: 'x', fetchImpl: fake(200, Buffer.from('')) })).rejects.toThrow(/ASC_VENDOR_NUMBER/);
-  });
-});
-
-describe('appStore (the whole collection)', () => {
-  it('the week, the week before, totals since launch (monthly reports, else days), each day fetched once', async () => {
-    const calls = [];
-    const get = async (date, frequency) => {
-      calls.push(`${frequency} ${date}`);
-      if (frequency === 'MONTHLY') return date === '2026-10' ? { rows: D.parseSummary(report(row('1F', 100, 'US'), row('7F', 50, 'US'))) } : { missing: true };
-      if (date === '2026-11-08') return { missing: true };
-      return { rows: D.parseSummary(report(row('1F', 1, date.endsWith('02') ? 'GB' : 'US'), row('7F', 2, 'US'))) };
-    };
-    const r = await appStore(new Date('2026-11-09T15:00:00Z'), {}, get);
-    expect(r.appStore.week).toEqual({ first: 6, redownload: 0, update: 12, countries: { GB: 1, US: 5 } });
-    expect(r.appStore.missing).toEqual(['2026-11-08']);
-    // October from its monthly report; November so far from days (1–8, 8 missing).
-    expect(r.appStore.total.first).toBe(100 + 7);
-    expect(r.appStore.total.update).toBe(50 + 14);
-    const daily = calls.filter((c) => c.startsWith('DAILY'));
-    expect(new Set(daily).size).toBe(daily.length);
-  });
-
-  it("a month whose report says no sales (Apple's answer before it is out) is counted from its days", async () => {
-    const get = async (date, frequency) => {
-      if (frequency === 'MONTHLY') return { rows: [] };
-      return { rows: D.parseSummary(report(row('1F', 1, 'US'))) };
-    };
-    const r = await appStore(new Date('2026-11-02T16:00:00Z'), {}, get);
-    // October 1–31 from its days, November 1 (today, the 2nd, isn't counted).
-    expect(r.appStore.total.first).toBe(31 + 1);
   });
 });
 
