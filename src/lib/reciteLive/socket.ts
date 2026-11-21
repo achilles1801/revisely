@@ -1,4 +1,4 @@
-// The live check's connection to the checker on revisely-dev (`/live`, a WebSocket; scripts/recite-check, the server
+// The live check's connection to the checker on revisely-dev (`/live`, a WebSocket; revisely-internal's checker/, the server
 // session's). Audio goes out as 16 kHz mono PCM; the checker's events come back (lib/reciteLive/contract).
 //
 // A dropped connection carries on: the take's audio stays on the phone, a new socket sends the same start frame with

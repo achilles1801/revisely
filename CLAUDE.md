@@ -277,7 +277,8 @@ until its part is set up.
       (`navigation.push('QuranReader', …)`); Back comes back. Test me is the reader's only (`testMe: false`).
     - The old hidden recite mode (the eye at the top of a session, `reciteModeEnabled`, on-device word following and
       pause detection) is gone with its help topic. The on-device speech model stays: voice search uses it.
-  - The checker runs on Cloud Run in revisely-dev (`scripts/recite-check`, its README): the app has no JS-only way
+  - The checker runs on Cloud Run in revisely-dev (`checker/` in the private repository `achilles1801/revisely-internal`,
+    its README; it left this public repository on Nov 21 2026): the app has no JS-only way
     to run the model on the phone. It is deployed by hand, never to production, and the store app never calls it.
   - **Two services** (recite-server, Nov 15 2026; Majd approved halving the light levels' cost; recite-contract.md,
     "Two services"):
@@ -733,15 +734,20 @@ Non-testers follow `production`, so nobody sees this on a phone before Promote; 
 
 ## Stats (weekly digest)
 
-- `Stats digest` (`.github/workflows/stats-digest.yml`, Mondays 15:00 UTC, `scripts/stats/weekly.js`) is a
-  comment on the "App stats (weekly digest)" issue (label `stats-digest`), mentioning the owner. It
-  shows last week's App Store first-time downloads, re-downloads and updates against the week before,
-  the top five countries for first downloads, and the totals since launch. Days Apple hasn't published
-  yet are named, and they count the next week. Run it by hand from Actions any time.
+- The weekly App Store digest runs in the **private** repository `achilles1801/revisely-internal`
+  (`stats/weekly.js`, `stats-digest.yml`, Mondays 15:00 UTC) and comments on that repository's "App stats (weekly
+  digest)" issue. It moved there on Nov 21 2026 (Majd kept this repository public and moved what competitors
+  shouldn't read). Its README and that workflow say how it works.
+  - It needs the four secrets below in revisely-internal too; until they exist it skips with a notice.
+  - Its Ask coach line comes from `coachDigestDays` (`functions/src/coachDigest.ts`), which still accepts only this
+    repository's old `stats-digest.yml`, so the line is missing until that function accepts revisely-internal and
+    is deployed.
+- `scripts/stats/appStore.js` (Sales and Trends) and `digest.js` (tallies) stay here: the Metrics console's hourly
+  totals (`scripts/metrics/totals.js`) use them.
 - Data: App Store Connect Sales and Trends, daily `SALES`/`SUMMARY` reports, plus a finished month's
   `MONTHLY` once Apple publishes it. Product types `1*` are first downloads, `3*` re-downloads and
   `7*` updates. It reads only this app's Apple ID, `6767990248`. Read-only.
-- Secrets (repository; the run skips with a notice until all four exist):
+- Secrets (repository secrets, here for Metrics and in revisely-internal for the digest):
   - `ASC_REPORTS_KEY_ID`, `ASC_REPORTS_ISSUER_ID` and `ASC_REPORTS_KEY` (the `.p8` file's text): a
     team API key with the **Sales** role only. The App Manager key used by `scripts/asc.js` stays
     off GitHub, and an API key's role can't be changed after it's made.
@@ -750,8 +756,9 @@ Non-testers follow `production`, so nobody sees this on a phone before Promote; 
   devices as monthly CSVs to its Cloud Storage bucket (Download reports → Statistics → copy the
   `gs://pubsite_prod_…` URI). Invite a Google Cloud service account in Play Console → Users and
   permissions with "View app information and download bulk reports". Then fill in `play()` in
-  `scripts/stats/weekly.js` to read `stats/installs/installs_com.revisionbuddy.app_YYYYMM_overview.csv`,
-  with secrets `PLAY_REPORTS_BUCKET` and `PLAY_REPORTS_SA_KEY`.
+  revisely-internal's `stats/weekly.js` to read
+  `stats/installs/installs_com.revisionbuddy.app_YYYYMM_overview.csv`, with secrets `PLAY_REPORTS_BUCKET` and
+  `PLAY_REPORTS_SA_KEY`.
 
 **Rolling back** a production update: Actions → Promote to production → Run workflow on `main` →
 `group` = the previous production update group (`eas update:list --branch production`), `rollback` =
