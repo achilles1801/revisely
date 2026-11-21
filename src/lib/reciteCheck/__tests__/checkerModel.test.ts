@@ -1,6 +1,6 @@
 import { modelsOf, readCheckerModels, shortModel } from '../checkerModel';
 
-// What the checker's /health said on Nov 18 2026 (scripts/recite-check/server.py), dev and production.
+// What the checker's /health said on Nov 18 2026 (revisely-internal's checker/server.py), dev and production.
 const DEV = {
   ok: true,
   engine: '7c12824dd9fa',

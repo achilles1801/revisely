@@ -1,6 +1,6 @@
 // The live recitation check's messages (Revisely Dev only): what the checker on revisely-dev sends while someone
 // recites, and what a mark is. The contract between the model, the server and the app is recite-contract.md
-// (draft 2) in the orchestrator's notes; the server is scripts/recite-check. Anything this file doesn't know is
+// (draft 2) in the orchestrator's notes; the server is revisely-internal's checker/. Anything this file doesn't know is
 // dropped, never guessed, as in lib/reciteCheck/result.ts.
 
 import type { TajweedRule } from '../reciteCheck/result';
