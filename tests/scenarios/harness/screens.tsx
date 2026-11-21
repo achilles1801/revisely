@@ -213,6 +213,11 @@ export class Home {
     return this.text('today-cta');
   }
 
+  /** Friday's Al-Kahf card as one line of text, or null when Home doesn't show it (KAHF-1). */
+  kahf(): string | null {
+    return this.text('kahf-post');
+  }
+
   /** The memorized line under it: "3.4% of the Quran memorized" (MEM-2). */
   memorized(): string | null {
     return this.text('today-memorized');
