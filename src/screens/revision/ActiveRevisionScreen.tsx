@@ -61,6 +61,8 @@ import {
   getSurahsForPage,
 } from '../../lib/quranData';
 import { logger } from '../../lib/logger';
+import { maybeAskForRating, openRatingPage, rateAskEnabled } from '../../lib/rateAsk';
+import { streakDetailFromLogs } from '../../lib/streak';
 import { pagesToUnrevise, removeRevisedPages, removeRoundPages } from '../../lib/revisionSession';
 import { dismissPresentedRevisionReminders } from '../../lib/reminders/sync';
 import { t } from '../../i18n';
@@ -666,6 +668,24 @@ export default function ActiveRevisionScreen() {
     // Only when a swipe finishes the session.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [celebrate]);
+  // A good moment to ask for a rating (SESS-8, lib/rateAsk): the swipe that finished a day, with a streak of 7 days or
+  // more. The day just finished may not be in the logs yet: one finished today counts toward the streak.
+  const [rateAsk, setRateAsk] = useState(false);
+  useEffect(() => {
+    if (celebrate <= 0 || !user || !rateAskEnabled()) return;
+    const today = getCurrentRevisionDay(user);
+    const detail = streakDetailFromLogs({ user, pages, logs, today });
+    const streak = lastSectionDay === today && !detail.done.has(today) ? detail.reading.streak + 1 : detail.reading.streak;
+    let live = true;
+    void maybeAskForRating({ streak, accountCreatedAt: user.createdAt, now: Date.now() }).then((ask) => {
+      if (live && ask) setRateAsk(true);
+    });
+    return () => {
+      live = false;
+    };
+    // Only when a swipe finishes the session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [celebrate]);
 
   // ===== End session =====
 
@@ -1062,6 +1082,7 @@ export default function ActiveRevisionScreen() {
               onListenBack={
                 listenBackId ? () => navigation.navigate('ListenBack', { recordingId: listenBackId }) : undefined
               }
+              onRate={rateAsk ? () => void openRatingPage() : undefined}
             />
           }
           onReachEnd={handleReachEnd}

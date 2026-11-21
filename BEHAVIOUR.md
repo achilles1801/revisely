@@ -113,6 +113,13 @@ How the tests are made: `tests/scenarios/README.md`.
   several in a row) is named by the juz, "Juz 29" or "Juz 28–29", wherever sessions are listed (Home,
   Activity); pages credited ahead to another day don't count toward it. Any other session, a juz
   with a page not revised, or whole juz with other pages besides, is named by its surahs.
+- **SESS-8.** (Revisely Dev) Asking for a rating. When a swipe finishes a day's revision and the streak is 7 days or
+  more (the day just finished counted), the end card adds one quiet line, "Enjoying Revisely? Rate it ›", which opens
+  the App Store's Write a Review page (Revisely's Google Play listing on Android). It shows at most once every 120 days
+  on a phone (a line shown counts as asked, tapped or not), never for an account under 7 days old, and the same way for
+  everyone: no stars asked for, no reward, nothing that sends unhappy users anywhere else. Settings → Support → Rate
+  Revisely opens the same page at any time. The stores' own in-app prompt needs a native module and waits for the
+  next native release (Majd, Nov 21 2026; lib/rateAsk).
 
 ## Revising ahead
 

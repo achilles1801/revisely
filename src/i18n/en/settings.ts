@@ -228,6 +228,8 @@ export const settings = {
     helpButtonsSub: 'A ? on screens that need explaining',
     helpButtonsLabel: 'Help buttons on screens',
     share: 'Share Revisely',
+    /** The store's review page (SESS-8; Revisely Dev). */
+    rate: 'Rate Revisely',
     shareMessage: "I've been using Revisely to stay on top of my Quran memorization — give it a try: https://revisely.app",
     feedback: 'Send feedback',
     feedbackMessage: 'Found a bug or have an idea? Tell us anything. We read every note.',

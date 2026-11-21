@@ -7,7 +7,9 @@ import { useReduceMotion } from '../../design/motion';
 import { typeV2 } from '../../theme/v2';
 import { Confetti } from '../v2/Confetti';
 import { PillButton } from '../v2/PillButton';
+import { Tap } from '../v2/Tap';
 import { t } from '../../i18n';
+import { chevron } from '../../i18n/direction';
 
 /**
  * After a revision session's last page, as one more page: swiping onto it
@@ -17,7 +19,8 @@ import { t } from '../../i18n';
  * check fading in. Pages left: how many are done. The session is saved as it
  * goes, and Back leaves it. When every page is done and a next revision day
  * exists, Keep going continues into its pages (#168). A session that was
- * recorded offers Listen back: the recording over its pages.
+ * recorded offers Listen back: the recording over its pages. After a good
+ * moment, one quiet line asks for a rating (SESS-8, lib/rateAsk).
  */
 export function SessionEndCard({
   total,
@@ -28,6 +31,7 @@ export function SessionEndCard({
   next,
   onKeepGoing,
   onListenBack,
+  onRate,
 }: {
   total: number;
   done: number;
@@ -45,6 +49,8 @@ export function SessionEndCard({
   onKeepGoing?: () => void;
   /** The session was recorded: play it back over its pages. */
   onListenBack?: () => void;
+  /** It's the moment to ask for a rating (lib/rateAsk): "Enjoying Revisely? Rate it ›" opens the store. */
+  onRate?: () => void;
 }) {
   const { palette } = useTheme();
   const reduceMotion = useReduceMotion();
@@ -110,6 +116,19 @@ export function SessionEndCard({
           onPress={onListenBack}
           testID="session-end-listen-back"
         />
+      ) : null}
+      {complete && onRate ? (
+        <Tap
+          onPress={onRate}
+          accessibilityRole="link"
+          accessibilityLabel={t('revision.end.rateAskLabel')}
+          hitSlop={8}
+          testID="session-end-rate"
+        >
+          <Text style={[typeV2.meta, styles.center, { color: palette.link }]} maxFontSizeMultiplier={1.4}>
+            {`${t('revision.end.rateAsk')} ${chevron()}`}
+          </Text>
+        </Tap>
       ) : null}
     </View>
   );
