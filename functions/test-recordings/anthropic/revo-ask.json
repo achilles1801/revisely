@@ -1,5 +1,5 @@
 {
-  "recordedAt": "2026-11-18T05:56:16.797Z",
+  "recordedAt": "2026-11-21T07:25:21.707Z",
   "how": "functions/scripts/record-anthropic.js",
   "request": {
     "model": "claude-sonnet-5-5",
@@ -7,19 +7,19 @@
     "thinking": {
       "type": "between_tools"
     },
-    "systemSha256": "d32ec636ff8a3844c62bca13d732b0740233c3a5d2b7c8347ed3c0d45f3abbfe",
+    "systemSha256": "449ffdbb051b99992587a6ab508d08cef2ca378d267cf0a8c5325d0b31cf5fa0",
     "outputSchemaSha256": "ca725b35345fa9d4316a6e08e45b7f3a3c7c7833def4ea0b669b4c4d39dfba1e"
   },
   "status": 200,
   "body": {
     "model": "claude-sonnet-5-5",
-    "id": "msg_011Ch9sse2n6btwchz1xyUuG",
+    "id": "msg_011ChFg6Fg6tworQiEnierZ8",
     "type": "message",
     "role": "assistant",
     "content": [
       {
         "type": "text",
-        "text": "{\"text\":\"It was a steady week: you finished the whole plan on four of the last six days, and Saturday was the only one missed. Thursday was close, at 9 of 10 pages.\",\"chart\":{\"kind\":\"weeks\",\"title\":\"Your last weeks, day by day\",\"weeks\":4},\"textAfter\":\"Today is still open, so you can add to that run this evening.\",\"action\":{\"kind\":\"startRevision\",\"title\":\"Continue today's revision\",\"detail\":\"6 pages left, from Al-Infitar to Al-Ghashiyah\"},\"remember\":[],\"title\":\"How my week went\",\"chips\":[\"Which pages are weakest?\",\"How is my streak?\",\"Why did I miss Saturday?\"]}"
+        "text": "{\"text\":\"Your week was steady: you finished the whole plan on four days, and you're two days into a streak now. Thursday fell a page short and Saturday was missed, but you still revised on 24 of the last 30 days.\",\"chart\":{\"kind\":\"dailyPages\",\"title\":\"Pages revised this week\",\"days\":7},\"textAfter\":\"Today has 6 pages left, starting from Al-Infitar.\",\"action\":{\"kind\":\"startRevision\",\"title\":\"Continue today's revision\",\"detail\":\"6 pages left, from Al-Infitar to Al-Ghashiyah\"},\"remember\":[],\"title\":\"How my week went\",\"chips\":[\"Which days do I miss?\",\"What are my weak pages?\",\"How was last month?\"]}"
       }
     ],
     "container": null,
@@ -28,13 +28,13 @@
     "stop_details": null,
     "usage": {
       "input_tokens": 551,
-      "cache_creation_input_tokens": 19494,
+      "cache_creation_input_tokens": 19705,
       "cache_read_input_tokens": 0,
       "cache_creation": {
-        "ephemeral_5m_input_tokens": 19494,
+        "ephemeral_5m_input_tokens": 19705,
         "ephemeral_1h_input_tokens": 0
       },
-      "output_tokens": 223,
+      "output_tokens": 231,
       "output_tokens_details": {
         "thinking_tokens": 0
       },
