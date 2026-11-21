@@ -28,6 +28,9 @@ import {
   isUnfinished,
   liveStopping,
   startNotFound,
+  furthestWord,
+  revealedUpTo,
+  LIVE_IDLE,
   type LiveState,
 } from '../../../src/lib/reciteLive/state';
 import { socketFeed, CATCHUP_SLICE_SAMPLES, CATCHUP_TICK_MS, WATCHDOG_MS, type SocketLike } from '../../../src/lib/reciteLive/socket';
@@ -612,6 +615,29 @@ function sentStream(s: TestSocket): { samples: number[]; frames: { at: number; t
   }
   return { samples, frames };
 }
+
+describe('[RECITE-6] a hidden page never shows the word being said', () => {
+  it('while the take runs, what may show stops before the cursor unless the checker has decided that far', () => {
+    fc.assert(
+      fc.property(
+        fc.option(fc.integer({ min: 0, max: 200 }), { nil: null }),
+        fc.option(fc.integer({ min: 0, max: 200 }), { nil: null }),
+        fc.constantFrom('listening', 'connecting', 'checking', 'done') as fc.Arbitrary<'listening' | 'connecting' | 'checking' | 'done'>,
+        (cursor, said, status) => {
+          const state = { ...LIVE_IDLE, status, cursor, saidUpTo: said };
+          const upTo = revealedUpTo(state);
+          if (status === 'listening' || status === 'connecting') {
+            if (cursor != null && (said == null || said < cursor)) expect(upTo == null || upTo < cursor).toBe(true);
+            if (said != null) expect(upTo).toBeGreaterThanOrEqual(said);
+            if (cursor != null) expect(upTo ?? -1).toBeGreaterThanOrEqual(cursor - 1);
+          } else {
+            expect(upTo).toBe(furthestWord(state));
+          }
+        },
+      ),
+    );
+  });
+});
 
 describe('[RECITE-10] a long take keeps up: a resume never holds the screen, and a quiet connection is noticed', () => {
   it('a resume sends the held audio a slice at a time: the same samples, each frame at its place, live after', async () => {

@@ -820,13 +820,13 @@ describe('a take starts anywhere on the page (Majd, Nov 14 2026)', () => {
   });
 
 
-  it('‹ on a hidden page after a start mid-page shows the word after the reciter’s, not the page’s first', async () => {
+  it('‹ on a hidden page after a start mid-page shows the reciter’s word, not the page’s first', async () => {
     await startTake('recite', null);
     await event({ type: 'locked', w: A25, s: 27, a: 25 });
     fireEvent.press(screen.getByTestId('recite-eye'));
     fireEvent.press(screen.getByTestId('recite-next-word'));
-    // The word being recited shows already (as from the page's top); An-Naml 23 and 24 stay hidden.
-    expect(mockLive.sent).toEqual([{ type: 'hint', w: A25 + 1, what: 'word' }]);
+    // The word being recited stays hidden until it's said (RECITE-6), so ‹ shows it; An-Naml 23 and 24 stay hidden.
+    expect(mockLive.sent).toEqual([{ type: 'hint', w: A25, what: 'word' }]);
   });
 });
 
@@ -886,6 +886,26 @@ describe('the hidden view (the eye on the bar)', () => {
     fireEvent.press(screen.getByTestId('recite-eye'));
     expect(screen.getByTestId('hidden-page-379')).toBeTruthy();
     expect(mockPager.onTapVerse).toBeUndefined();
+  });
+});
+
+describe('no word shows before it is said (Majd, Nov 21 2026)', () => {
+  it('[RECITE-6] a hidden page and its bar hold back the word being said until it is decided or the next word begins', async () => {
+    await startTake('check');
+    fireEvent.press(screen.getByTestId('recite-eye'));
+    // The reciter is on An-Naml 23's third word: nothing decided yet, so it stays covered, and the bar doesn't name it.
+    await event({ type: 'at', w: A23 + 2 });
+    await event({ type: 'said', upTo: A23 + 1 });
+    // What the bar says (its words as VoiceOver reads them); the page's covers follow the same word (liveInfo).
+    const barSays = () => screen.getByTestId('recite-middle').props.accessibilityLabel as string;
+    expect(barSays()).not.toContain(words.uthmani(A23 + 2));
+    // The next word begins: the third shows.
+    await event({ type: 'at', w: A23 + 3 });
+    expect(barSays()).toContain(words.uthmani(A23 + 2));
+    expect(barSays()).not.toContain(words.uthmani(A23 + 3));
+    // Decided in full (said), it shows though the cursor hasn't moved on.
+    await event({ type: 'said', upTo: A23 + 3 });
+    expect(barSays()).toContain(words.uthmani(A23 + 3));
   });
 });
 
@@ -1959,8 +1979,8 @@ describe('peeked words (Majd, Nov 15 2026: on the page in quiet grey, in the sum
     hide();
     peek();
     expect(screen.getAllByTestId('live-peeked')).toHaveLength(1);
-    // The word after the reciter's (the cursor's word counts as shown).
-    await event({ type: 'mark', mark: { id: 'p', w: A23 + 1, ayah: [27, 23], kind: 'word', sure: 'clear', heard: 'x', heardExact: false } });
+    // The reciter's word (still hidden until it's said, RECITE-6).
+    await event({ type: 'mark', mark: { id: 'p', w: A23, ayah: [27, 23], kind: 'word', sure: 'clear', heard: 'x', heardExact: false } });
     expect(screen.queryAllByTestId('live-peeked')).toHaveLength(0);
   });
 
