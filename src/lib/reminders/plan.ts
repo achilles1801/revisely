@@ -11,6 +11,13 @@
 // Done for today: the rest of today's reminders go, and the next one becomes a
 // single silent congratulation (none if it would land overnight).
 // Two within 30 minutes become one (the later one stays).
+//
+// The plan is made again each time the app runs (RevisionRemindersSync), so
+// only today's and tomorrow's are planned in full. The days after get one each
+// (laterDays, REMIND-2; behind its own switch, lib/release/remindersWhileAway):
+// someone who doesn't open the app would otherwise hear nothing after tomorrow. Nov 2026: of the accounts that never came back after
+// their first day, almost none opened the app again, and those with reminders
+// on came back no more often than those without.
 
 import { generateDailyAssignment } from '../algorithm';
 import { getFajrTimeFor, getNextRevisionDayStart, getRevisionDateForUser, getRevisionDayForUser } from '../fajrBoundary';
@@ -28,6 +35,12 @@ const NO_PLACE_MIDDAY = { hour: 15, minute: 0 };
 const HOUR_MS = 3_600_000;
 const MERGE_WITHIN_MS = 30 * 60_000;
 const DEFAULT_MORNING = { hour: 8, minute: 0 };
+/**
+ * Revision days after tomorrow that still get one reminder (the morning one, or
+ * the day's first): a week of them counting today, then none until the app is
+ * opened again. Only someone who hasn't opened it since sees them (REMIND-2).
+ */
+export const LATER_DAYS = 6;
 
 /**
  * The morning reminder's clock time: 8:00 AM, or the time the account picked
@@ -67,6 +80,8 @@ export interface PlanReminderInput {
   /** Where Asr is worked out (the prayer place), if the phone has one. */
   place: Place | null;
   settings: CalcSettings;
+  /** Days after tomorrow with one reminder each (REMIND-2): LATER_DAYS, or 0 (the default) for none. */
+  laterDays?: number;
 }
 
 interface Revision {
@@ -184,6 +199,18 @@ export function planRevisionReminders(input: PlanReminderInput): PlannedReminder
   // Tomorrow: nothing revised yet.
   if (tomorrowPages.length > 0) {
     slotsFor(tomorrow, input).forEach((slot, i) => add(tomorrow, tomorrowPages, new Set(), slot.kind, slot.at, i + 1));
+  }
+
+  // The days after (REMIND-2): one each, nothing revised yet, never more than one a day. A day with no pages gets none.
+  let later = tomorrow;
+  for (let n = 0; n < (input.laterDays ?? 0); n++) {
+    later = revisionAt(user, later.end);
+    const pages = pagesOf(later);
+    if (pages.length === 0) continue;
+    const slots = slotsFor(later, input);
+    const slot = slots.find((s) => s.kind === 'morning') ?? slots[0];
+    // At the morning time, worded for a day away; the wording turns with the day (copy's variant).
+    if (slot) add(later, pages, new Set(), 'away', slot.at, 0);
   }
 
   return planned;

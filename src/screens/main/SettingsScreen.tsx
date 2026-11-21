@@ -107,6 +107,7 @@ import { LANGUAGE_NAMES } from '../../i18n/language';
 import { isDevVariant } from '../../lib/variant';
 import { setRamadanTheme, useRamadanThemeSaved } from '../../lib/ramadanTheme';
 import { CheckerModelRow } from '../../components/settings/CheckerModelRow';
+import { ScheduledRemindersRow } from '../../components/settings/ScheduledRemindersRow';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'Settings'>;
 
@@ -1255,6 +1256,8 @@ export default function SettingsScreen() {
                 }
               />
             ) : null}
+            {/* Revisely Dev only: the reminders this phone will show, the days after tomorrow's too (REMIND-2). */}
+            {isDevVariant() ? <ScheduledRemindersRow /> : null}
             {/* Revisely Dev only: which model its checker runs for each level (Majd, Nov 18 2026). */}
             {reciteCheck && isDevVariant() ? <CheckerModelRow /> : null}
             {reciteCheck ? (

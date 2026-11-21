@@ -35,7 +35,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { ThemeColors } from '../../theme/v2';
 import { generateDailyAssignment, scheduleStartingByToday } from '../../lib/algorithm';
 import { getQuranData } from '../../lib/quranData';
-import { registerForPushNotificationsAsync } from '../../lib/notifications';
+import { ensureNotificationsPermission } from '../../lib/notifications';
 import { ReadingSession, RevisionLog } from '../../types';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
 import { useTabBarFootprint } from '../../navigation/TabBar';
@@ -244,9 +244,12 @@ export default function DashboardScreen() {
   // Today's pages that came from earlier days (they come first: "4 from yesterday first").
   const carriedToday = snapshot?.carried.length ?? 0;
 
+  // Reminders on, and this phone never asked (signed in on a new phone, or a reinstall): ask once (REMIND-4). With
+  // reminders off nothing asks, and iOS never asks twice.
+  const remindersOn = user?.notificationsEnabled === true;
   useEffect(() => {
-    registerForPushNotificationsAsync();
-  }, []);
+    if (remindersOn) void ensureNotificationsPermission().catch(() => undefined);
+  }, [remindersOn]);
 
   // The streak (lib/streak): the same rule and the same answer as the widget.
   const streakNow = snapshot?.streak.reading ?? null;

@@ -15,7 +15,7 @@ import { RevisionRemindersSync } from './src/components/RevisionRemindersSync';
 import { DesignProvider } from './src/design/DesignContext';
 import { DesignGate } from './src/design/DesignGate';
 import { AndroidSystemTheme } from './src/components/AndroidSystemTheme';
-import { registerForPushNotificationsAsync } from './src/lib/notifications';
+import { ensureAndroidChannels } from './src/lib/notifications';
 import { setupAppCheck } from './src/lib/appCheck';
 import * as Sentry from '@sentry/react-native';
 import { currentRelease, releaseTags } from './src/lib/releaseInfo';
@@ -108,7 +108,10 @@ function App() {
 
   useEffect(() => {
     setupAppCheck();
-    registerForPushNotificationsAsync();
+    // Android's channels only. Notification permission is asked where it means something (REMIND-4): onboarding's
+    // Start with "Daily reminders" on, or Home for an account with reminders on. Until Nov 2026 it was asked here,
+    // on the first screen of a fresh install before sign-in, and a no there turned reminders off at onboarding.
+    void ensureAndroidChannels();
   }, []);
 
   // Revisely Dev: the language chosen in Settings, applied before the first screen (src/i18n/choice.ts). The store
