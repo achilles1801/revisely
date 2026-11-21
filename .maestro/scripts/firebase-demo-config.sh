@@ -14,6 +14,9 @@ set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 PROJECT=demo-revisely
 BUNDLE=com.revisionbuddy.app
+# The store app's Android package (app.config.js ANDROID_PACKAGE, since Nov 2026): google-services.json
+# must name it, or the Android build stops ("No matching client found for package name").
+PACKAGE=app.revisely
 # Shaped like nothing the secret scan looks for; Firebase only stores it.
 API_KEY=demo-e2e-not-a-key
 SENDER=123456789012
@@ -63,7 +66,7 @@ write_android() {
     {
       "client_info": {
         "mobilesdk_app_id": "1:$SENDER:android:0000000000000000000000",
-        "android_client_info": { "package_name": "$BUNDLE" }
+        "android_client_info": { "package_name": "$PACKAGE" }
       },
       "oauth_client": [],
       "api_key": [{ "current_key": "$API_KEY" }],

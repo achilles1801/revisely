@@ -9,10 +9,27 @@ jest.mock('expo-constants', () => ({
   },
 }));
 
-import { apiBase, appBundleId, isDevVariant, widgetAppGroup, DEV_APP_GROUP, DEV_BUNDLE_ID, STORE_APP_GROUP, STORE_BUNDLE_ID } from '../variant';
+import { Platform } from 'react-native';
+
+import {
+  apiBase,
+  appBundleId,
+  isDevVariant,
+  widgetAppGroup,
+  DEV_APP_GROUP,
+  DEV_BUNDLE_ID,
+  STORE_ANDROID_PACKAGE,
+  STORE_APP_GROUP,
+  STORE_BUNDLE_ID,
+} from '../variant';
 
 beforeEach(() => {
   mockConstants.expoConfig = { extra: {} };
+  jest.replaceProperty(Platform, 'OS', 'ios');
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
 });
 
 describe('which app', () => {
@@ -25,6 +42,14 @@ describe('which app', () => {
     expect(isDevVariant()).toBe(false);
     mockConstants.expoConfig = { extra: { variant: 'store' } };
     expect(isDevVariant()).toBe(false);
+  });
+
+  it("is the store app's own package on Android: Revisely LLC's Play listing, not the bundle id", () => {
+    jest.replaceProperty(Platform, 'OS', 'android');
+    expect(appBundleId()).toBe('app.revisely');
+    mockConstants.expoConfig = { extra: { variant: 'dev' } };
+    // Revisely Dev keeps one id on both platforms.
+    expect(appBundleId()).toBe('com.revisionbuddy.app.dev');
   });
 
   it('is Revisely Dev with its own bundle id, App Group and API', () => {
@@ -65,7 +90,7 @@ describe('app.config.js gives each app the same ids', () => {
     expect(expo.name).toBe('Revisely');
     expect(expo.scheme).toBe('revisely');
     expect(expo.ios.bundleIdentifier).toBe(STORE_BUNDLE_ID);
-    expect(expo.android.package).toBe(STORE_BUNDLE_ID);
+    expect(expo.android.package).toBe(STORE_ANDROID_PACKAGE);
     expect(expo.ios.entitlements['com.apple.security.application-groups']).toEqual([STORE_APP_GROUP]);
     expect(expo.ios.infoPlist.CFBundleURLTypes[1].CFBundleURLSchemes).toEqual(['revisely']);
     expect(expo.icon).toBe('./assets/icon.png');

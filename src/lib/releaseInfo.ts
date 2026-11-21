@@ -33,8 +33,8 @@ export interface ReleaseInput {
 }
 
 export interface ReleaseInfo extends ReleaseInput {
-  /** Sentry release: com.revisionbuddy.app@1.0.2+19, and `.u<group>` when an
-   *  update runs (com.revisionbuddy.app@1.0.2+19.u84b0091f), so sessions and
+  /** Sentry release: com.revisionbuddy.app@1.0.2+19 (app.revisely@… on Android, the app's own id),
+   *  and `.u<group>` when an update runs (com.revisionbuddy.app@1.0.2+19.u84b0091f), so sessions and
    *  crash-free rates come out per update. */
   sentryRelease: string;
   /** Sentry environment: the update channel (production, preview), or development. */

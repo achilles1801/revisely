@@ -25,6 +25,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import InstallSource from '../../../modules/install-source';
 import { BUNDLE_ID } from '../releaseInfo';
+import { STORE_ANDROID_PACKAGE } from '../variant';
 import { isDevVariant } from '../variant';
 import { logger } from '../logger';
 import { t } from '../../i18n';
@@ -43,7 +44,8 @@ import {
 } from './versions';
 
 export const APP_STORE_ID = '6767990248';
-export const PLAY_PACKAGE = 'com.revisionbuddy.app';
+/** The store app's Google Play listing (Revisely LLC's account; app.config.js ANDROID_PACKAGE). */
+export const PLAY_PACKAGE = STORE_ANDROID_PACKAGE;
 export const LOOKUP_URL = `https://itunes.apple.com/lookup?bundleId=${BUNDLE_ID}`;
 
 export const CONFIG_EVERY_MS = 6 * 60 * 60_000;

@@ -9,7 +9,7 @@
 # the field before, and the tap would land on a key.
 #   env ID: the field's id
 #   env TEXT: what it should hold
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - retry:
     maxRetries: 3

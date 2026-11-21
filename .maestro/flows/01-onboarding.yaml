@@ -2,7 +2,7 @@
 # (24 pages), 10 pages a day, the day at midnight. Home's Today post then shows
 # day one, and the next calendar day shows day two.
 # Rules (BEHAVIOUR.md): SCHED-1, SYNC-4, DAY-1
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - runFlow:
     file: ../subflows/launch.yaml

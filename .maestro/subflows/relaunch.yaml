@@ -1,6 +1,6 @@
 # A cold start: the app is stopped and opened again, keeping its data and the
 # clock the flow set. Waits for the first screen.
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - stopApp
 - launchApp:

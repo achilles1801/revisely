@@ -6,7 +6,7 @@
 # the sign-in screen of a fresh install, which is what shows behind it in the screenshots. The screenshots are the proof that
 # every script renders with the system fonts and lays out the right way.
 # Rules (BEHAVIOUR.md): TRANS-1, TRANS-2, TRANS-3, TRANS-5, TRANS-8
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - runFlow:
     file: ../subflows/launch.yaml

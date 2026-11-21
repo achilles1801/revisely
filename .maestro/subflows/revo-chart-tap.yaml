@@ -3,7 +3,7 @@
 # chat sits at its end and a chart's middle can be above the list, under the header; a tap there
 # misses (iOS run 42437606335, Nov 8 2026).
 #   env ID: the element's id
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 # First the keyboard goes. With it up, the list ends above the middle of the screen, where Maestro
 # starts every scroll (scrollUntilVisible's, and hideKeyboard's on iOS): on iOS nothing moved and

@@ -17,12 +17,16 @@
 // uploads. Closed testing and production changes go to Google for review when committed.
 //
 // Key: PLAY_KEY_PATH (a service account JSON key file) or PLAY_SERVICE_ACCOUNT_JSON (its contents).
+// App: PLAY_PACKAGE (default app.revisely, the store app's listing).
 // Moving builds between testing tracks needs "Release apps to testing tracks"; production needs
 // "Release to production, exclude devices, and use Play App Signing" on that account.
 const crypto = require('crypto');
 const fs = require('fs');
 
-const PACKAGE = 'com.revisionbuddy.app';
+// The store app's listing in Revisely LLC's account (app.config.js ANDROID_PACKAGE, since Nov 2026).
+// PLAY_PACKAGE reaches another app the key can see: com.revisionbuddy.app (the first account's
+// listing, unpublished once the new one is live) or com.revisionbuddy.app.dev (Revisely Dev).
+const PACKAGE = process.env.PLAY_PACKAGE || 'app.revisely';
 const API = `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${PACKAGE}`;
 const SCOPE = 'https://www.googleapis.com/auth/androidpublisher';
 const TRACKS = ['internal', 'alpha', 'beta', 'production'];

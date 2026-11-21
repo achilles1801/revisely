@@ -4,6 +4,12 @@ Everything in the repository is ready: the app runs on Android, CI builds it, an
 answers are in this folder (`listing.json`, `data-safety.md`, `app-content.md`, `feature-graphic.png`, `icon-512.png`,
 `screenshots/phone/`). These steps need your accounts. Do them in this order.
 
+> **The store app's package is `app.revisely`** (Nov 2026): Google Play lists it as a new app in Revisely LLC's
+> organization developer account, after the personal account was refused production. `com.revisionbuddy.app` was the
+> first listing, in the personal account. These steps were written for that one and apply to the new app the same way:
+> a new Firebase Android app, its own upload key and Play App Signing key, and the service account invited to the new
+> developer account.
+
 > **New personal Play developer accounts** (created after November 2023) must run a **closed test with at least 12
 > testers, opted in for 14 days in a row**, before Production can be requested. Organisation accounts are exempt.
 > Start step 5 early.
@@ -19,7 +25,7 @@ for step 2. This is the *upload* key. Google keeps the *app signing* key (Play A
 
 ## 2. Firebase: register the keys (5 minutes)
 Firebase Console → project **revision-buddy-3a398** → ⚙ **Project settings** → **Your apps** → the Android app
-`com.revisionbuddy.app` → **Add fingerprint**, once for each:
+`app.revisely` → **Add fingerprint**, once for each:
 - the upload key's SHA-1 and SHA-256 (step 1);
 - the debug key used by development builds: SHA-1 `5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25`,
   SHA-256 `FA:C6:17:45:DC:09:03:78:6F:B9:ED:E6:2A:96:2B:39:9F:73:48:F0:BB:6F:89:9B:83:32:66:75:91:03:3B:9C`

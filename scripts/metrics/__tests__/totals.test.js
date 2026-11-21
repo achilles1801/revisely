@@ -18,6 +18,16 @@ describe('Sentry totals', () => {
     expect(platformOf('com.revisionbuddy.app@1.0.3+6.ubedea4a5')).toBe('android');
     expect(platformOf('com.revisionbuddy.app@1.0.4+33')).toBe('ios');
   });
+  it("counts the store app's Android package (app.revisely, Nov 2026) as Android at any build number", () => {
+    const platformOf = platformMap([
+      { release: 'com.revisionbuddy.app@1.0.5+36', 'os.name': 'iOS', 'count()': 4 },
+      { release: 'app.revisely@1.0.5+36.ucccccccc', 'os.name': 'Android', 'count()': 9 },
+    ]);
+    expect(platformOf('app.revisely@1.0.5+40')).toBe('android');
+    expect(platformOf('app.revisely@1.0.5+36')).toBe('android');
+    // The same numbers under the iOS bundle id stay iOS: builds are counted per app id.
+    expect(platformOf('com.revisionbuddy.app@1.0.5+36.ucccccccc')).toBe('ios');
+  });
   it('adds sessions over statuses, counts crashes and marks the newest update', () => {
     const rel = 'com.revisionbuddy.app@1.0.3+32.u532abc0c';
     const old = 'com.revisionbuddy.app@1.0.3+32.u11111111';

@@ -15,6 +15,7 @@ const {
   productionAlerts,
   dailyReport,
   platformOf,
+  shortRelease,
 } = require('../logic');
 
 const issue = {
@@ -153,6 +154,9 @@ describe('sanitize (event text is untrusted; issues are public)', () => {
 
   it('accepts short values only when they look like what the app sends', () => {
     expect(safe('com.revisionbuddy.app@1.0.1+14', 'release')).toBe('com.revisionbuddy.app@1.0.1+14');
+    // The table drops the app id, whichever app it is (Android's store app is app.revisely since Nov 2026).
+    expect(shortRelease('com.revisionbuddy.app@1.0.1+14')).toBe('1.0.1+14');
+    expect(shortRelease('app.revisely@1.0.5+10.u84b0091f')).toBe('1.0.5+10.u84b0091f');
     expect(safe('1.0 | [x](http://e)', 'release')).toBe('—');
     expect(safe('iPad15,7', 'label')).toBe('iPad15,7');
     expect(safe('<img src=x>', 'label')).toBe('—');

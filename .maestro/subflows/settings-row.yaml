@@ -5,7 +5,7 @@
 # 60 s scrollUntilVisible held three swipes, and the row came into view as it ran out). The rows a
 # flow wants are within 12. Then the centring, a swipe or two.
 #   env ROW
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - repeat:
     while:

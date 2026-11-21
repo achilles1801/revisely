@@ -2,7 +2,7 @@
 # for this flow's account (scripts/server-session.js), and fails if it never
 # does. After airplane mode, Android's sync starts about 30 s after the
 # connection is back.
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - evalScript: ${output.serverPages = -2}
 - repeat:

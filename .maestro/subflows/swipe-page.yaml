@@ -16,7 +16,7 @@
 # swipe offline is found and fixed (being looked into: whether the app stops
 # drawing while it retries page downloads offline; no frames for ~15 s after
 # the swipe in run 42322437281). Then remove it, and a lost swipe fails here.
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - copyTextFrom:
     text: ".*· [0-9]+/[0-9]+"

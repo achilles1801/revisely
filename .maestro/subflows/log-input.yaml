@@ -1,6 +1,6 @@
 # Taps the log's text field. On iOS a multiline field's testID doesn't reach the
 # accessibility tree, so it is found by its label ("Note"), under the kind pills.
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - runFlow:
     when:

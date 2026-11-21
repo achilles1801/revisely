@@ -2,7 +2,7 @@
 # 11-<screen>${SUFFIX}: Home, today's › menu, Jump to (juz and surah), All activity, the schedule
 # and the memorized pages. Starts and ends on Home.
 #   env SUFFIX: "" (light) or "-dark"
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - extendedWaitUntil:
     visible:

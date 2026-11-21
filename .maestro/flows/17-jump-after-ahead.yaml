@@ -5,7 +5,7 @@
 # the offer waits until Jump to has gone. Tuesday is pages 1, 582–590, Wednesday 591–600
 # (subflows/onboard.yaml).
 # Rules (BEHAVIOUR.md): SHEET-1, UPD-1, JUMP-1
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - runFlow:
     file: ../subflows/new-account.yaml

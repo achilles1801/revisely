@@ -5,7 +5,7 @@
 # (SE run 43873599186, 14-help, both attempts). The accessibility tree doesn't clip it, so Maestro counts it
 # as wholly visible.
 # A drag up on the list brings it into view; where the sheet fits (the Pro), nothing moves.
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 # The sheet slides up; a tap or a drag while it moves can miss (iOS).
 - waitForAnimationToEnd

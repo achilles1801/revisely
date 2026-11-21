@@ -3,7 +3,7 @@
 # off, one line in Weak spots' place opens Settings at its switch. Screenshots named
 # tabs-merge-<screen>-${THEME}. Run by 09-activity-light.yaml and 09-activity-dark.yaml after
 # activity-screens.yaml, which leaves Activity on Insights (seed-activity.js turns Smart Tracking on).
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - scrollUntilVisible:
     element:

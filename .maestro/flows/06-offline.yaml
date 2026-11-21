@@ -1,7 +1,7 @@
 # Offline: a session revised with no connection is kept on the phone, survives a
 # cold start offline, and reaches the server once the phone is back online.
 # Rules (BEHAVIOUR.md): SYNC-1, SYNC-2, SESS-3
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 # Where the phone is, as each platform's 06-home-offline was approved: on Android in Chicago, so Home
 # has its next-prayer line (Asr 2:18 PM; the screen's masks expect it), and on iOS nowhere the app can

@@ -2,7 +2,7 @@
 # (in the functions emulator) removes the account and its data from the server, and the app is
 # back at sign-in.
 # Rules (BEHAVIOUR.md): ACCOUNT-1
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - runFlow:
     file: ../subflows/new-account.yaml

@@ -3,7 +3,7 @@
 # nothing attached; leaves it the same way. Each screenshot is named after its mock, with SUFFIX
 # ("" in light, "-dark" in dark).
 #   env SUFFIX: "" or "-dark"
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 # a1: at rest, Surahs in mushaf order, a line of the account's data on each row.
 - tapOn:

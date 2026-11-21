@@ -7,7 +7,7 @@
 # day showed neither "Juz 28" nor "From your session". The Firestore SDK's own retries can hold a
 # write for up to a minute; the wait allows for that, and a flow that times out here says the app
 # couldn't send.
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - extendedWaitUntil:
     visible:

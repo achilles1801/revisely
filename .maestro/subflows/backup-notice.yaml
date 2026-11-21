@@ -2,7 +2,7 @@
 # backed up"): it comes about 2 s after a recording is saved, once the app knows
 # it is on Wi-Fi. Waits for it a little and accepts it (OK) if it shows. The
 # upload itself can't leave an E2E build (src/lib/e2e/network.ts).
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - extendedWaitUntil:
     visible: "Your recordings are backed up"

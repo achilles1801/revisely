@@ -2,7 +2,7 @@
 # writes once the account is signed in. iOS takes the set at launch (as the clock, launch.yaml);
 # Android takes the link. Waits for the first screen.
 #   env SET: the set's name (activity)
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - stopApp
 - launchApp:

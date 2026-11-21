@@ -1,6 +1,6 @@
 # Settings → Theme → THEME ("Light" or "Dark"), back on Home.
 #   env THEME
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 # Settings, again if the tap was lost (tap-to-open.yaml): Settings has a back button, Home has none.
 - runFlow:

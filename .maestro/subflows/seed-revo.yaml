@@ -5,7 +5,7 @@
 # Seeded once, after the app has sent its own changes (app-sent.yaml). A page write of sign-up's
 # still on the phone when the seed landed put Al-Fatihah and Juz 28 back as they were (iOS, Nov 7
 # 2026); seeding until Home showed it hid that instead of preventing it.
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - runFlow: app-sent.yaml
 - runScript:

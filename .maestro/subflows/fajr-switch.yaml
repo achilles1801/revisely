@@ -11,7 +11,7 @@
 # saves, the switch is disabled (FajrBoundaryCard's `busy`). So only a switch
 # that still reads as before, enabled, with the row unchanged, is tapped again.
 # A tap toggles: never again once the switch reads the new state.
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - runFlow:
     file: tap-to-open.yaml

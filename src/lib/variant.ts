@@ -7,9 +7,17 @@
 // constants, so tests can switch variants.
 
 import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 
 /** The store app's ids. The App Store lookup and the store's own release names use these. */
 export const STORE_BUNDLE_ID = 'com.revisionbuddy.app';
+/**
+ * The store app's Android package (app.config.js ANDROID_PACKAGE): its own since Nov 2026, when Google
+ * Play's listing moved to Revisely LLC's organization account as a new app (a Play package name is
+ * permanent, and com.revisionbuddy.app stays with the first account's app). The Play link and the
+ * store app's release names on Android use it.
+ */
+export const STORE_ANDROID_PACKAGE = 'app.revisely';
 export const STORE_APP_GROUP = 'group.com.revisionbuddy.app';
 export const DEV_BUNDLE_ID = 'com.revisionbuddy.app.dev';
 export const DEV_APP_GROUP = 'group.com.revisionbuddy.app.dev';
@@ -31,9 +39,14 @@ export function isDevVariant(): boolean {
   return extra().variant === 'dev';
 }
 
-/** This app's bundle id (iOS) and package (Android): the same string on both. */
+/**
+ * This app's own id: the bundle id on iOS, the package on Android. Revisely Dev has one string on
+ * both; the store app's Android package is its own (STORE_ANDROID_PACKAGE). Sentry's release names
+ * start with it, as Sentry's own native default does.
+ */
 export function appBundleId(): string {
-  return isDevVariant() ? DEV_BUNDLE_ID : STORE_BUNDLE_ID;
+  if (isDevVariant()) return DEV_BUNDLE_ID;
+  return Platform.OS === 'android' ? STORE_ANDROID_PACKAGE : STORE_BUNDLE_ID;
 }
 
 /** The App Group the app shares with its widget extension (targets/widget). */

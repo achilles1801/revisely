@@ -1,7 +1,7 @@
 # From Home: Activity → Insights at 30 days, scrolled to the Recitation section (RINS-2). Screenshots <NAME> (its top)
 # and <NAME>-end (its last line). Stays on Insights.
 #   env NAME
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - tapOn:
     id: open-activity

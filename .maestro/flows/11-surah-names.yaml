@@ -2,7 +2,7 @@
 # screen that names part of the Qur'an, captured in light and then in dark (…-dark). Tuesday is
 # pages 1, 582–590 and Wednesday 591–600 (subflows/onboard.yaml).
 # Rules (BEHAVIOUR.md): NAME-1
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - runFlow:
     file: ../subflows/new-account.yaml

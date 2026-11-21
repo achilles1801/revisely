@@ -9,7 +9,7 @@
 # field's text is its value, which `text:` matches.
 #   env TEXT: what to type. It is matched as a regex, so only letters, digits, spaces and . , ' -
 #   (scripts/e2e/__tests__/type.test.js).
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - inputText: ${TEXT}
 - extendedWaitUntil:

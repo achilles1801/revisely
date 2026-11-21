@@ -5,7 +5,7 @@
 # Screenshots for the mocks (~/Documents/revisely-today-mocks/recite-in-sessions/): the session with the eye and mic
 # (no eye at the top), the mic's menu (no Test me), the take's marks, its summary, the page after it (still not
 # marked revised) and "Recite your N mistakes here" on it.
-appId: com.revisionbuddy.app
+appId: ${APP_ID}
 ---
 - runFlow:
     file: ../subflows/new-account.yaml
