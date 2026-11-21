@@ -9,6 +9,7 @@ import { errorResponse, handleTcq, TcqEnv } from './tcq';
 import { gate, GateEnv } from './gate';
 import { injectAccountNav, withPageChange } from './nav';
 import { showReciteSection } from './recite';
+import { dressesPath, dressForRamadan } from './ramadan';
 
 // The Durable Object class behind TCQ_BUDGET (wrangler.jsonc).
 export { TcqBudget } from './budget';
@@ -27,6 +28,11 @@ interface Env extends TcqEnv, GateEnv {
    * revisely.app serves its home without the worker, so setting it there would do nothing: see recite.ts.
    */
   RECITE_SECTION?: string;
+  /**
+   * "1" where the site is dressed for Ramadan: lanterns, lights, the greeting (dev.revisely.app only; ramadan.ts).
+   * revisely.app serves its own pages without the worker, so setting it there would dress only the account pages.
+   */
+  RAMADAN_THEME?: string;
   /**
    * The Firebase Hosting site of the project the pages sign in to (revisely-dev.web.app on dev). Its
    * /__/firebase/init.json is the web config, served here at the same path, so no key is kept in the repository.
@@ -94,9 +100,10 @@ async function answer(request: Request, env: Env, ctx: ExecutionContext): Promis
   }
   const nav = env.ACCOUNT_PAGES === '1';
   const recite = env.RECITE_SECTION === '1';
-  if (!nav && !recite) return env.ASSETS.fetch(request);
-  // dev.revisely.app: the site's own pages link the account, Premium and Open Door pages (nav.ts), and the home shows
-  // its Recite section (recite.ts). A page asks the assets without its validators, so a copy cached before either
+  const ramadan = env.RAMADAN_THEME === '1' && dressesPath(pathname);
+  if (!nav && !recite && !ramadan) return env.ASSETS.fetch(request);
+  // dev.revisely.app: the site's own pages link the account, Premium and Open Door pages (nav.ts), the home shows its
+  // Recite section (recite.ts), and every page is dressed for Ramadan (ramadan.ts). A page asks the assets without its validators, so a copy cached before either
   // was added (a 304) never stands in for it.
   let ask = request;
   if ((request.headers.get('Accept') ?? '').includes('text/html')) {
@@ -105,7 +112,8 @@ async function answer(request: Request, env: Env, ctx: ExecutionContext): Promis
     ask.headers.delete('If-Modified-Since');
   }
   return withPageChange(await env.ASSETS.fetch(ask), (html) => {
-    const page = nav ? injectAccountNav(html) : html;
-    return recite ? showReciteSection(page) : page;
+    let page = nav ? injectAccountNav(html) : html;
+    if (recite) page = showReciteSection(page);
+    return ramadan ? dressForRamadan(page) : page;
   });
 }

@@ -39,6 +39,9 @@
     "ACCOUNT_PAGES": "1",
     // The home's Recite section, mistake detection (docs/index.html, worker/recite.ts): here only until the release.
     "RECITE_SECTION": "1",
+    // The site dressed for Ramadan (worker/ramadan.ts, docs/assets/ramadan.css): lanterns, lights, the greeting. Here
+    // only; revisely.app gets it on Majd's word (ramadanTheme.test.ts fails if wrangler.jsonc sets it).
+    "RAMADAN_THEME": "1",
     // Their sign-in's web config: revisely-dev's Hosting site serves it at /__/firebase/init.json (an empty site,
     // released only for that), and the worker serves it at the same path here.
     "FIREBASE_HOSTING": "revisely-dev.web.app",

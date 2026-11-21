@@ -7,6 +7,9 @@ window.RV_STRINGS = {
     'nav.support': 'Support', 'nav.getApp': 'Get the app', 'nav.download': 'Download', 'soon.small': 'Coming to', 'nav.menu': 'Menu', 'nav.close': 'Close', lang: 'عربي',
     'foot.privacy': 'Privacy', 'foot.terms': 'Terms', 'foot.support': 'Support',
     'doc.englishOnly': 'This page is in English only.',
+    // The Ramadan greeting (dev.revisely.app while RAMADAN_THEME is on; worker/ramadan.ts).
+    'ramadan.kareem': 'Ramadan Kareem', 'ramadan.line': 'May this month bring you closer to the Qur’an.',
+    'ramadan.foot': 'Ramadan Kareem from everyone at Revisely.',
     'badge.appStore': 'Download on the App Store',
 
     'p.title.doc': 'Premium · Revisely',
@@ -111,6 +114,8 @@ window.RV_STRINGS = {
     'nav.support': 'الدعم', 'nav.getApp': 'تنزيل التطبيق', 'nav.download': 'تنزيل', 'soon.small': 'قريبًا على', 'nav.menu': 'القائمة', 'nav.close': 'إغلاق', lang: 'English',
     'foot.privacy': 'الخصوصية', 'foot.terms': 'الشروط', 'foot.support': 'الدعم',
     'doc.englishOnly': 'هذه الصفحة متوفرة بالإنجليزية فقط.',
+    'ramadan.kareem': 'رمضان كريم', 'ramadan.line': 'جعله الله شهرًا يقرّبكم من القرآن.',
+    'ramadan.foot': 'رمضان كريم من فريق ريفايزلي.',
     'badge.appStore': 'تنزيل من App Store',
 
     'p.title.doc': 'بريميوم · ريفايزلي',
