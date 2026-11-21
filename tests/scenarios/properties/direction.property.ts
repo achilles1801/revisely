@@ -1,7 +1,8 @@
 // The layout direction follows the app's language, not the phone's (src/i18n/direction.ts).
 
 import fc from 'fast-check';
-import { isRTLLanguage, syncLayoutDirection } from '../../../src/i18n/direction';
+import { fromLeftEdge, isRTLLanguage, syncLayoutDirection } from '../../../src/i18n/direction';
+import { pageIndexAt, pagerLayout } from '../../../src/lib/mushafDirection';
 import { runs } from './fixtures';
 
 /** React Native's I18nManager as it starts: right to left or not, as the phone and last launch left it. */
@@ -42,5 +43,26 @@ describe('the layout direction', () => {
       }),
       { numRuns: runs(40) },
     );
+  });
+
+  it('[LANG-2] the mushaf keeps a printed order in either direction, and a drag finds the page under the finger', () => {
+    // Left to right `inverted` gives page 1 on the right; right to left the list's own order does, unpinned.
+    expect(pagerLayout(false)).toEqual({ inverted: true, listDirection: 'ltr' });
+    expect(pagerLayout(true)).toEqual({ inverted: false });
+    fc.assert(
+      fc.property(fc.integer({ min: 1, max: 605 }), fc.integer({ min: 200, max: 1400 }), (count, width) => {
+        const index = (count * 7919) % count;
+        // The native list sends its offset from the content's left edge.
+        expect(pageIndexAt(index * width, count * width, width, width, count, false)).toBe(index);
+        expect(pageIndexAt((count - 1 - index) * width, count * width, width, width, count, true)).toBe(index);
+      }),
+      { numRuns: runs(50) },
+    );
+  });
+
+  it('[LANG-2] a menu placed from a touch stays where the touch was, right to left too', () => {
+    expect(fromLeftEdge(42, false)).toEqual({ left: 42 });
+    // React Native swaps left and right in RTL: `right` is the screen's left edge there.
+    expect(fromLeftEdge(42, true)).toEqual({ right: 42 });
   });
 });
