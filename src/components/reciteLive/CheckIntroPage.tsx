@@ -9,6 +9,7 @@ import { useModalTurn } from '../v2/modalTurn';
 import { DISMISS_FALLBACK_MS } from '../v2/Sheet';
 import { BarButton } from './ReciteBar';
 import { EARLY_ACCESS_INTRO_LINE } from '../../lib/earlyAccess';
+import { t } from '../../i18n';
 
 /** The real screen the page shows: a take marking mistakes on An-Naml 23 (E2E flow 18's screenshot), light and dark. */
 const PREVIEW: Record<'light' | 'dark', ImageSourcePropType> = {
@@ -68,7 +69,7 @@ export function CheckIntroPage({
     <Modal visible={turn} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose} onDismiss={release}>
       <View style={[styles.root, { backgroundColor: palette.bg, paddingTop: insets.top, paddingBottom: insets.bottom + 8 }]} testID="check-intro">
         <View style={styles.top}>
-          <BarButton icon="close" label="Close" onPress={onClose} testID="check-intro-close" />
+          <BarButton icon="close" label={t('common.close')} onPress={onClose} testID="check-intro-close" />
         </View>
         <ScrollView contentContainerStyle={styles.content} bounces={false}>
           <View style={[styles.frame, { width: frameWidth, height: frameHeight, borderColor: palette.outline, backgroundColor: palette.bg }]}>
@@ -76,19 +77,18 @@ export function CheckIntroPage({
               source={PREVIEW[isDark ? 'dark' : 'light']}
               style={{ width: frameWidth, height: frameHeight }}
               resizeMode="cover"
-              accessibilityLabel="A page of An-Naml with its mistakes highlighted"
+              accessibilityLabel={t('reciteLive.intro.image')}
             />
           </View>
           <Text style={[styles.title, { color: palette.text }]} maxFontSizeMultiplier={1.4} accessibilityRole="header">
-            Mark my mistakes
+            {t('reciteLive.intro.title')}
           </Text>
           <Text style={[styles.body, { color: palette.secondary }]} maxFontSizeMultiplier={1.6}>
-            Revisely highlights a wrong, missed or extra word in red, and a haraka or letter slip in amber. Tap one to see
-            what you said.
+            {t('reciteLive.intro.body')}
           </Text>
         </ScrollView>
         <View style={styles.bottom}>
-          <PillButton title="Get Premium" size="lg" onPress={onGet} busy={getting} testID="check-intro-get" />
+          <PillButton title={t('reciteLive.intro.get')} size="lg" onPress={onGet} busy={getting} testID="check-intro-get" />
           {earlyAccess ? (
             <Text style={[typeV2.meta, styles.early, { color: palette.text }]} maxFontSizeMultiplier={1.4} testID="check-intro-early">
               {EARLY_ACCESS_INTRO_LINE}
@@ -98,16 +98,16 @@ export function CheckIntroPage({
             onPress={onSupport}
             style={styles.support}
             accessibilityRole="link"
-            accessibilityLabel="Can’t afford it? Apply for support"
+            accessibilityLabel={t('reciteLive.intro.support')}
             testID="check-intro-support"
           >
             <Text style={[typeV2.button, styles.supportText, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
-              Can’t afford it? Apply for support
+              {t('reciteLive.intro.support')}
             </Text>
           </Tap>
           )}
           <Text style={[typeV2.meta, styles.note, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
-            Part of Premium. Following along stays free. It’s AI and can make mistakes.
+            {t('reciteLive.intro.note')}
           </Text>
         </View>
       </View>

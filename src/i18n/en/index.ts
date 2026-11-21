@@ -19,6 +19,7 @@ import { preview } from './preview';
 import { qibla } from './qibla';
 import { reader } from './reader';
 import { recite } from './recite';
+import { reciteLive } from './reciteLive';
 import { recordings } from './recordings';
 import { reminders } from './reminders';
 import { revision } from './revision';
@@ -50,6 +51,7 @@ export const en = {
   qibla,
   reader,
   recite,
+  reciteLive,
   recordings,
   reminders,
   revision,

@@ -4,6 +4,7 @@ import { Sheet } from '../v2/Sheet';
 import { PillButton } from '../v2/PillButton';
 import { layoutV2 } from '../../theme/v2';
 import { ReciteCheckNotice } from '../reciteCheck/ReciteCheckNotice';
+import { t } from '../../i18n';
 
 /**
  * The model's AI notice (Quran Muaalem License 1.0, 2.1), before the first take that listens (Recite or Check: the
@@ -14,12 +15,12 @@ export function ReciteNoticeSheet({ visible, onAgree, onClose }: { visible: bool
     <Sheet
       visible={visible}
       onClose={onClose}
-      title="Before you recite"
+      title={t('reciteLive.notice.title')}
       scroll
       // Always on screen: at the largest text on an SE the notice runs several screens long, and the button sat at its end.
       pinned={
         <View style={styles.pad}>
-          <PillButton title="I understand" size="lg" onPress={onAgree} testID="recite-notice-agree" />
+          <PillButton title={t('reciteLive.notice.agree')} size="lg" onPress={onAgree} testID="recite-notice-agree" />
         </View>
       }
       testID="recite-notice-sheet"

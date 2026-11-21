@@ -31,6 +31,7 @@ const EXTRACTED: string[] = [
   'components/reader',
   'components/recite',
   'components/reciteCheck',
+  'components/reciteLive',
   'components/recordings',
   'components/revision',
   'components/revo',

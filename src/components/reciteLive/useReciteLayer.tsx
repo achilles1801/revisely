@@ -90,28 +90,27 @@ import type { TakeRecord } from '../../lib/reciteMemory/record';
 import { countsAsMistake, isUnclear, markGroup } from '../../lib/reciteLive/contract';
 import { pageAccuracy } from '../../lib/reciteLive/score';
 import { sendLabel } from '../../lib/reciteCheck/service';
+import { t } from '../../i18n';
+import type { Strings } from '../../i18n/en';
 
-/** Said to screen reader users only, after Stop, when a take's start was never found (everyone else: nothing). */
-const START_NOT_FOUND_SPOKEN = 'Couldn’t follow that take. Try starting at the top of the page.';
-
-/** What the recite bar says when a take ends without its answer. */
-const LIVE_FAILURE: Record<LiveFailure, string> = {
-  sign_in: 'Sign in again to recite',
-  testers_only: 'For testers only',
-  limit: 'That’s a lot for one hour',
-  too_long: '15 minutes reached',
-  idle: 'Stopped: nothing heard',
-  bad_request: 'Couldn’t start',
-  server: 'The checker stopped',
-  check_locked: 'Marking mistakes needs Premium',
-  premium_required: 'Marking mistakes needs Premium',
+/** What the recite bar says when a take ends without its answer (src/i18n/en/reciteLive.ts, `failure`). */
+const LIVE_FAILURE: Record<LiveFailure, keyof Strings['reciteLive']['failure']> = {
+  sign_in: 'signIn',
+  testers_only: 'testersOnly',
+  limit: 'limit',
+  too_long: 'tooLong',
+  idle: 'idle',
+  bad_request: 'cantStart',
+  server: 'server',
+  check_locked: 'needsPremium',
+  premium_required: 'needsPremium',
   // Never shown in practice: the socket moves such a take to recite-check (lib/reciteLive/socket).
-  level_elsewhere: 'Couldn’t start',
+  level_elsewhere: 'cantStart',
   // Production's checker (recite-server-prod-plan.md): its switch, every instance busy, and App Check.
-  paused: 'Checking is paused for now',
-  busy: 'Busy right now, try again in a minute',
-  app_check: 'Couldn’t start: try again later',
-  offline: 'Couldn’t reach the checker',
+  paused: 'paused',
+  busy: 'busy',
+  app_check: 'appCheck',
+  offline: 'offline',
 };
 
 /** A place the screen's pager doesn't hold, for the reader to open (a session holds its day's pages only). */
@@ -200,21 +199,21 @@ export function useReciteLayer({
         .then((on) => {
           if (on) setIntroOpen(false);
         })
-        .catch((err) => Alert.alert('Couldn’t turn on Premium', premiumErrorText(err)))
+        .catch((err) => Alert.alert(t('reciteLive.layer.premiumFailed'), premiumErrorText(err)))
         .finally(() => setGettingPremium(false));
       return;
     }
-    Alert.alert('Premium in Revisely Dev', 'Free while testing: nothing is charged. Turn it off in Settings → Testing.', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('reciteLive.layer.devPremiumTitle'), t('reciteLive.layer.devPremiumBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Turn on',
+        text: t('reciteLive.layer.turnOn'),
         onPress: () => {
           setGettingPremium(true);
           setDevPremium(true)
             .then((on) => {
               if (on) setIntroOpen(false);
             })
-            .catch((err) => Alert.alert('Couldn’t turn on Premium', premiumErrorText(err)))
+            .catch((err) => Alert.alert(t('reciteLive.layer.premiumFailed'), premiumErrorText(err)))
             .finally(() => setGettingPremium(false));
         },
       },
@@ -225,7 +224,7 @@ export function useReciteLayer({
     // The in-app browser, else the phone's, else the address to copy (LINK-1): only getting the link can fail here.
     supportLinkUrl()
       .then((url) => openWebPage(url))
-      .catch((err) => Alert.alert('Apply for support', premiumErrorText(err)));
+      .catch((err) => Alert.alert(t('reciteLive.layer.support'), premiumErrorText(err)));
   }, []);
   // A take's audio stays with the take (RMEM-6: never a recording, so no "Recording saved" note): its record notes it.
   const live = useLiveRecitation({
@@ -641,7 +640,8 @@ export function useReciteLayer({
     // Nov 15 2026): they can't see the bar never leave "Listening…", and a take gone without a word reads as a crash.
     if (startNotFound(live.state)) {
       live.clear();
-      if (screenReader) say(START_NOT_FOUND_SPOKEN);
+      // Said to screen reader users only (everyone else: nothing).
+      if (screenReader) say(t('reciteLive.layer.startNotFound'));
       return;
     }
     stopTrace.step('summary-asked');
@@ -811,14 +811,14 @@ export function useReciteLayer({
     liveStatus === 'checking' ? 'checking' : liveStatus === 'done' || liveStatus === 'failed' ? 'done' : 'live';
   const baseStatus =
     liveStatus === 'connecting'
-      ? 'Starting…'
+      ? t('reciteLive.layer.starting')
       : liveStatus === 'checking'
-        ? 'Checking…'
+        ? t('reciteLive.layer.checking')
         : liveStatus === 'failed'
-          ? LIVE_FAILURE[live.state.failure ?? 'server']
+          ? t(`reciteLive.failure.${LIVE_FAILURE[live.state.failure ?? 'server']}`)
           : liveStatus === 'done'
-            ? 'Done'
-            : 'Listening…';
+            ? t('reciteLive.layer.done')
+            : t('reciteLive.layer.listening');
   // In a test: which place it is, and once it's done, how it went ("Clean · 2 of 5").
   const placeResult = test && liveStatus === 'done' ? test.results[test.at] : undefined;
   // Short, for a crowded bar (an SE at the largest text): while listening which place it is; once done, how it went
@@ -827,7 +827,7 @@ export function useReciteLayer({
     ? placeResult
       ? outcomeText(placeResult)
       : liveStatus === 'listening' || liveStatus === 'connecting'
-        ? `${test.at + 1} of ${test.places.length}`
+        ? t('common.nOfTotal', { n: test.at + 1, total: test.places.length })
         : baseStatus
     : baseStatus;
 
@@ -892,7 +892,7 @@ export function useReciteLayer({
           }}
           next={
             test && placeResult && test.at + 1 < test.places.length
-              ? { label: `Next place, ${test.at + 2} of ${test.places.length}`, onPress: nextPlace }
+              ? { label: t('reciteLive.layer.nextPlace', { n: test.at + 2, total: test.places.length }), onPress: nextPlace }
               : undefined
           }
           surface={{ background: palette.control, border: palette.divider }}
@@ -904,7 +904,7 @@ export function useReciteLayer({
         <>
           <BarButton
             icon={hidden ? 'eye-outline' : 'eye-off-outline'}
-            label={hidden ? 'Show the page' : 'Hide the page'}
+            label={hidden ? t('reciteLive.bar.show') : t('reciteLive.bar.hide')}
             onPress={toggleHidden}
             active={hidden}
             testID="reader-eye"
@@ -926,7 +926,7 @@ export function useReciteLayer({
       <>
         <UndoToast
           visible={undoFor != null}
-          message="Marked not a mistake"
+          message={t('reciteLive.layer.marked')}
           duration={undoMs(screenReader)}
           onUndo={() => {
             const id = undoFor;
@@ -983,7 +983,7 @@ export function useReciteLayer({
             onDismiss={(id) => {
               live.dismiss(id);
               setUndoFor(id);
-              if (live.mic !== 'on') say('Marked not a mistake. Undo is at the bottom of the screen.');
+              if (live.mic !== 'on') say(t('reciteLive.layer.markedSpoken'));
             }}
             // The reciter's ayah on the card's own player (lib/reciteLive/hearAudio): a take still listening pauses first,
             // so it isn't ended and its microphone doesn't hear the reciter (Majd, Nov 15 2026).
@@ -1090,7 +1090,7 @@ export function useReciteLayer({
         />
         <UndoToast
           visible={clearedUndo != null}
-          message="Cleared from the page"
+          message={t('reciteLive.layer.cleared')}
           duration={undoMs(screenReader)}
           onUndo={() => {
             const r = clearedUndo;
@@ -1132,7 +1132,7 @@ export function useReciteLayer({
             const m = live.state.removed[id]?.mark;
             live.restore(id);
             // The row it was on goes: say where it went.
-            if (m) say(`${markTitle(m)} put back`);
+            if (m) say(t('reciteLive.layer.putBack', { title: markTitle(m) }));
           }}
           checkOwned={owned}
           onFinding={(m) => {
@@ -1196,7 +1196,7 @@ export function useReciteLayer({
                   setSummaryShown(null);
                   setCardAt(null);
                   live.clear();
-                  say('Take deleted');
+                  say(t('reciteLive.layer.deleted'));
                 }
               : undefined
           }

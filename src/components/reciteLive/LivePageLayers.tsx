@@ -8,6 +8,7 @@ import type { Mark, MarkGroup } from '../../lib/reciteLive/contract';
 import { markGroup, strongestByWord } from '../../lib/reciteLive/contract';
 import { markTitle } from '../../lib/reciteLive/describe';
 import { currentLineBand, cursorBox, markBox, markHighlight, offBox, wordBox } from '../../lib/reciteLive/geometry';
+import { t } from '../../i18n';
 
 const NO_REVEALED: ReadonlySet<string> = new Set();
 
@@ -158,8 +159,8 @@ export function LiveMarkTargets({ page, scale, words, marks }: { page: number; s
             pointerEvents="none"
             accessible
             accessibilityRole="button"
-            accessibilityLabel={`${markTitle(m)}, ${m.kind === 'added' ? 'after ' : ''}${words.uthmani(m.w)}`}
-            accessibilityHint="Shows what you said"
+            accessibilityLabel={t(m.kind === 'added' ? 'reciteLive.markLabelAfter' : 'reciteLive.markLabel', { title: markTitle(m), word: words.uthmani(m.w) })}
+            accessibilityHint={t('reciteLive.markHint')}
             testID={`live-mark-${m.kind}`}
             style={[styles.abs, rectStyle(box, scale)]}
           />

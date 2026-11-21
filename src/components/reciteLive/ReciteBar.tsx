@@ -8,6 +8,7 @@ import { Tap } from '../v2/Tap';
 import type { BarWord } from '../../lib/reciteLive/view';
 import type { ScoreLevel } from '../../lib/reciteLive/score';
 import { CAPSULE_HEIGHT } from '../reader/PlayerCapsule';
+import { t } from '../../i18n';
 
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
@@ -70,13 +71,13 @@ export function EyeGroup({
 }) {
   const { palette } = useTheme();
   if (!hidden) {
-    return <BarButton icon="eye-off-outline" label="Hide the page" onPress={onToggle} testID="recite-eye" />;
+    return <BarButton icon="eye-off-outline" label={t('reciteLive.bar.hide')} onPress={onToggle} testID="recite-eye" />;
   }
   return (
     <View style={[styles.group, { backgroundColor: palette.bubble }]} testID="recite-eye-group">
-      <BarButton icon="eye-outline" label="Show the page" onPress={onToggle} active testID="recite-eye" />
-      <BarButton icon="chevron-back" label="Show the next word" onPress={onNextWord} testID="recite-next-word" />
-      <BarButton label="Show the whole ayah" onPress={onWholeAyah} testID="recite-whole-ayah">
+      <BarButton icon="eye-outline" label={t('reciteLive.bar.show')} onPress={onToggle} active testID="recite-eye" />
+      <BarButton icon="chevron-back" label={t('reciteLive.bar.nextWord')} onPress={onNextWord} testID="recite-next-word" />
+      <BarButton label={t('reciteLive.bar.wholeAyah')} onPress={onWholeAyah} testID="recite-whole-ayah">
         <DoubleChevron color={palette.text} />
       </BarButton>
     </View>
@@ -103,8 +104,15 @@ export function ScorePill({ text, level }: { text: string; level: ScoreLevel }) 
  */
 /** A word in the bar as a screen reader reads it: "وَأُوهِيَتْ, wrong word". */
 export function spokenBarWord(w: { text: string; tone: string }): string {
-  const mark = w.tone === 'wrong' ? 'wrong word' : w.tone === 'slip' ? 'slip' : w.tone === 'tajweed' ? 'tajweed note' : '';
-  return mark ? `${w.text}, ${mark},` : w.text;
+  const mark =
+    w.tone === 'wrong'
+      ? t('reciteLive.bar.wrong')
+      : w.tone === 'slip'
+        ? t('reciteLive.bar.slip')
+        : w.tone === 'tajweed'
+          ? t('reciteLive.bar.tajweed')
+          : '';
+  return mark ? t('reciteLive.bar.wordWithMark', { word: w.text, mark }) : w.text;
 }
 
 export function ReciteBar({
@@ -160,7 +168,7 @@ export function ReciteBar({
   // word, and colour must never be the only signal.
   const spoken = words.map(spokenBarWord).join(' ');
   const shownWords = paused ? [] : words;
-  const shownStatus = paused ? 'Paused' : status;
+  const shownStatus = paused ? t('reciteLive.bar.paused') : status;
   return (
     <View
       style={[styles.capsule, { backgroundColor: surface.background, borderColor: surface.border }]}
@@ -205,9 +213,9 @@ export function ReciteBar({
       </View>
       {phase === 'live' && onPause && onResume ? (
         paused ? (
-          <BarButton icon="play" label="Resume" onPress={onResume} testID="recite-resume" />
+          <BarButton icon="play" label={t('reciteLive.bar.resume')} onPress={onResume} testID="recite-resume" />
         ) : (
-          <BarButton icon="pause" label="Pause" onPress={onPause} testID="recite-pause" />
+          <BarButton icon="pause" label={t('reciteLive.bar.pause')} onPress={onPause} testID="recite-pause" />
         )
       ) : null}
       {phase === 'done' && next ? (
@@ -223,7 +231,7 @@ export function ReciteBar({
         </Tap>
       ) : null}
       {phase === 'done' ? (
-        <BarButton icon="close" label="Close" onPress={onClose} testID="recite-close" />
+        <BarButton icon="close" label={t('common.close')} onPress={onClose} testID="recite-close" />
       ) : (
         <Tap
           onPress={onStop}
@@ -231,7 +239,7 @@ export function ReciteBar({
           hitSlop={6}
           style={[styles.stop, { backgroundColor: palette.primary }]}
           accessibilityRole="button"
-          accessibilityLabel={phase === 'checking' ? 'Checking' : 'Stop'}
+          accessibilityLabel={phase === 'checking' ? t('reciteLive.bar.checking') : t('reciteLive.bar.stop')}
           accessibilityState={{ busy: phase === 'checking' }}
           testID="recite-stop"
         >

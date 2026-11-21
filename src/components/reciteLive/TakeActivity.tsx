@@ -4,6 +4,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { typeV2 } from '../../theme/v2';
 import { Tap } from '../v2/Tap';
 import { TakeClock, useTakeSeconds } from '../../lib/reciteLive/takeClock';
+import { t } from '../../i18n';
 
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
@@ -20,7 +21,7 @@ export function TakeActivity({ clock: takeClock, recording, onPress }: { clock: 
       hitSlop={10}
       style={[styles.pill, { backgroundColor: palette.fill, borderColor: palette.separator }]}
       accessibilityRole="button"
-      accessibilityLabel={`Reciting, ${clock(seconds)}${recording ? ', recording' : ''}. Show the controls`}
+      accessibilityLabel={t(recording ? 'reciteLive.activityRecording' : 'reciteLive.activity', { time: clock(seconds) })}
       testID="reader-take-activity"
     >
       {recording ? <View style={[styles.dot, { backgroundColor: palette.red }]} /> : null}
