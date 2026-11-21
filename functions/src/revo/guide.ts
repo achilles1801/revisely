@@ -255,13 +255,13 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'Mushaf, prayer times and the Qibla',
-    covers: [],
+    covers: ['KAHF-1', 'KAHF-2', 'KAHF-3'],
     routes: ['Settings', 'PrayerCalculation', 'PrayerNotifications'],
     text: lines(
       '- Settings → Mushaf → “Mushaf”: Madani 1405 (the default) or Madani 1441. Page numbers stay the same for plans.',
       '- Home’s compass opens the Prayer sheet: Times (today’s prayers, the next with a countdown) and Qibla (a compass to the Kaaba; it needs location, which stays on the phone).',
       '- Settings → Prayer: “Prayer times”, “Prayer notifications”, “Calculation” (method and madhab), “Qibla” and “Start day at fajr”. Settings → Home screen → “Next prayer” adds a line under Home’s header.',
-      '- Settings → Home screen → “Friday Al-Kahf reminder”: a card on Home on Fridays.',
+      '- Settings → Home screen → “Friday Al-Kahf reminder”: a card on Home from Thursday’s maghrib to Friday’s (the Prayer sheet’s maghrib). Read on Thursday evening, it counts for that Friday; “Not today” hides it until Friday’s maghrib.',
     ),
   },
   {

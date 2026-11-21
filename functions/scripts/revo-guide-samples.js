@@ -289,6 +289,17 @@ const SAMPLES = [
     screen: 'jumpTo',
   },
   {
+    // KAHF-1, KAHF-2 (Majd, Nov 21 2026): the card follows the Islamic Friday.
+    q: 'Why is the Al-Kahf card on Home on Thursday night?',
+    ctx: steady,
+    facts: [
+      F('the Islamic Friday starts at Thursday’s maghrib', /maghrib/i, true),
+      F('it goes at Friday’s maghrib', /friday[’']s maghrib|maghrib on friday|until maghrib/i, true),
+      F('reading it now counts for Friday', /counts|for (?:that|this) friday|friday[’']s/i),
+      UNSURE,
+    ],
+  },
+  {
     q: 'How do I change how many pages I revise each day?',
     ctx: steady,
     facts: [F('Edit schedule', /edit schedule/i, true), F('Daily amount → Pages per day', /daily amount|pages per day/i, true)],

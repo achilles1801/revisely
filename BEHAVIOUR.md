@@ -220,6 +220,23 @@ permission when "Daily reminders" is on, and a no saves reminders off.
   asks, and a no leaves it off. (In the store app, until the reminders-while-away switch is on, the switch
   shows the account's choice whatever the phone allows.)
 
+## Al-Kahf on Friday
+
+- **KAHF-1.** The Al-Kahf card (Settings → Home screen → "Friday Al-Kahf reminder", on by default) is on Home
+  for the Islamic Friday: from Thursday's maghrib to Friday's maghrib, where the user is. Maghrib is the Prayer
+  sheet's, for the place its times are worked out for (the phone's last position, else the saved Fajr location).
+  With neither, the city the phone's time zone is named after stands in when the bundled city list has it
+  (Chicago for America/Chicago), else 18:00 on the phone's clock. Nothing asks for the location for it. On
+  Thursday evening the card says Friday began at maghrib. It comes and goes on time with Home left open, and on
+  coming back to the app. (Changed Nov 21 2026, Majd: it followed the revision day, so it showed on Friday evening
+  after maghrib and never on Thursday evening.)
+- **KAHF-2.** Al-Kahf read inside that window counts for that Friday: "Mark as read", or every page of it in
+  readings that ended inside it (the reader's timer), with the pages revised on Friday's own revision day. Read on
+  Thursday evening, the card shows it as done on Friday morning. Read on Thursday before maghrib, it doesn't count.
+  Activity still shows each reading on the revision day it was done (DAY-9): a Thursday-evening reading is on
+  Thursday.
+- **KAHF-3.** "Not today" hides the card until that Friday's maghrib, from Thursday evening too.
+
 ## The daily log
 
 - **LOG-1.** Every note added to a day's log stays, each as its own entry with its text; adding one

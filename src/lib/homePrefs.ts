@@ -3,9 +3,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 /** Home's options, kept on this device. */
 export interface HomePrefs {
-  /** Friday card suggesting Surah Al-Kahf. */
+  /** The card suggesting Surah Al-Kahf, from Thursday's maghrib to Friday's (KAHF-1). */
   fridayKahfReminder: boolean;
-  /** Revision day on which the Al-Kahf card was dismissed ("Not today"). */
+  /** The Friday ('YYYY-MM-DD') whose Al-Kahf card was dismissed ("Not today", KAHF-3). */
   kahfDismissedDay: string | null;
 }
 

@@ -18,7 +18,8 @@ import { PillButton } from '../../components/v2/PillButton';
 import { EditSessionModal } from '../../components/EditSessionModal';
 import { greetingName } from '../../lib/displayName';
 import { setHomePrefs, useHomePrefs } from '../../lib/homePrefs';
-import { isKahfDay, kahfCardState, kahfPages, kahfReadingSession, kahfReadOn } from '../../lib/kahf';
+import { kahfCardState, kahfPages, kahfReadingSession, kahfReadOn } from '../../lib/kahf';
+import { useKahfFriday } from '../../hooks/useKahfFriday';
 import * as firestoreService from '../../services/firestoreService';
 import { queueChange, withPendingReadings } from '../../lib/offline/queue';
 import { OfflineNote } from '../../components/offline/OfflineNote';
@@ -276,9 +277,11 @@ export default function DashboardScreen() {
 
   const userName = greetingName(user?.name, firebaseUser?.displayName);
 
-  // Friday: suggest Surah Al-Kahf. Today's reading sessions tell whether it
-  // was already read; they are only fetched on Fridays with the card on.
-  const kahfDay = isKahfDay(revisionDay);
+  // The Islamic Friday (Thursday's maghrib to Friday's, KAHF-1): suggest Surah
+  // Al-Kahf. The latest reading sessions tell whether it was already read inside
+  // that window; they are only fetched then, with the card on.
+  const kahf = useKahfFriday(user);
+  const kahfFriday = kahf?.day ?? null;
   const kahfEnabled = homePrefs.fridayKahfReminder;
   const [readingSessions, setReadingSessions] = useState<ReadingSession[]>([]);
   const [sessionsLoadedFor, setSessionsLoadedFor] = useState<string | null>(null);
@@ -286,7 +289,7 @@ export default function DashboardScreen() {
   const kahfSavingRef = useRef(false);
   useFocusEffect(
     useCallback(() => {
-      if (!kahfDay || !kahfEnabled) return;
+      if (!kahfFriday || !kahfEnabled) return;
       let live = true;
       firestoreService
         .getReadingSessions(20)
@@ -295,27 +298,27 @@ export default function DashboardScreen() {
         })
         .catch((err) => logger.warn('Failed to load reading sessions for Al-Kahf', err))
         .finally(() => {
-          if (live) setSessionsLoadedFor(revisionDay);
+          if (live) setSessionsLoadedFor(kahfFriday);
         });
       return () => {
         live = false;
       };
-    }, [kahfDay, kahfEnabled, revisionDay]),
+    }, [kahfFriday, kahfEnabled]),
   );
   const kahfDone = useMemo(
-    () => kahfReadOn(revisionDay, readingSessions, logs),
-    [revisionDay, readingSessions, logs],
+    () => (kahf ? kahfReadOn(kahf, readingSessions, logs) : false),
+    [kahf, readingSessions, logs],
   );
   const kahfState = kahfCardState({
     enabled: kahfEnabled,
-    today: revisionDay,
+    friday: kahfFriday,
     dismissedDay: homePrefs.kahfDismissedDay,
     done: kahfDone,
   });
-  // Until today's sessions are in, a prompt might be about to turn into
-  // "Read ✓"; wait rather than flash it.
+  // Until the sessions are in, a prompt might be about to turn into
+  // "Done ✓"; wait rather than flash it.
   const showKahfCard =
-    kahfState === 'done' || (kahfState === 'prompt' && sessionsLoadedFor === revisionDay);
+    kahfState === 'done' || (kahfState === 'prompt' && sessionsLoadedFor === kahfFriday);
 
   if (!user || !assignment) {
     return (
@@ -587,10 +590,11 @@ export default function DashboardScreen() {
         {showKahfCard && (
           <KahfPost
             state={kahfState === 'done' ? 'done' : 'prompt'}
+            eve={revisionDay !== kahfFriday}
             saving={kahfSaving}
             onRead={openKahf}
             onMarkRead={markKahfRead}
-            onDismiss={() => setHomePrefs({ kahfDismissedDay: revisionDay })}
+            onDismiss={() => setHomePrefs({ kahfDismissedDay: kahfFriday })}
           />
         )}
 
