@@ -200,6 +200,7 @@ function render() {
   const maxc = Math.max(...accs.map((a) => a.costUsd), 1e-6);
   $('accTable').querySelector('tbody').innerHTML = accs.length ? accs.map((a) => '<tr data-uid="' + esc(a.uid) + '" tabindex="0"><td><span class="id">' + esc(short(a.uid)) + '</span>' + a.tags.map((t) => '<span class="chip' + (t === 'you' ? ' you' : '') + '">' + esc(t) + '</span>').join('') + '</td><td class="n">' + a.q + '</td><td class="n">' + a.days + '</td><td class="n">' + a.reviews + '</td><td class="n">' + fmtTok(a.tokens) + '</td><td class="n">' + (a.costExact || !a.costUsd ? '' : '≈') + usd(a.costUsd) + '<span class="cbar" style="width:' + Math.max(2, (a.costUsd / maxc) * 48).toFixed(0) + 'px"></span></td><td class="n">' + (a.limitDays ? '<span class="limit">' + a.limitDays + '</span>' : '0') + '</td><td class="n">' + a.failed + '</td><td class="n">' + a.up + ' / ' + a.down + '</td><td>' + esc(ago(a.lastAt)) + '</td></tr>').join('') : '<tr><td colspan="10" style="color:var(--ink-3)">Nobody used Revo in this range.</td></tr>';
 
+  renderRetention(m);
   renderApp(m, k);
   renderBackend(m, k);
   const src = Object.entries(m.sources).map(([n, v]) => n + (v === 'ok' ? ' ✓' : ' ✗')).join(' · ');
@@ -217,6 +218,42 @@ function renderSpend(m) {
   lineChart($('c-spend'), { labels, ticks, series: [{ name: 'Spent', values: cum, color: '--rev', area: true }, { name: 'On this pace', values: pace, color: '--ink-3', dash: true }], ref: { value: M.capUsd, label: 'Cap $' + M.capUsd }, ymax: niceMax(Math.max(M.capUsd * 1.05, pace[pace.length - 1] || 0)), yFmt: (v) => '$' + Math.round(v), tipFmt: (v) => '$' + v.toFixed(2), aria: 'Spend this month against the cap' });
   $('todaySpend').textContent = usd(M.todayUsd) + ' of ' + usd(M.dailyCapUsd);
   $('todayBar').style.width = Math.min(100, (M.todayUsd / M.dailyCapUsd) * 100).toFixed(1) + '%';
+}
+
+function renderRetention(m) {
+  const R = m.retention;
+  const host = $('c-retention');
+  if (!R) {
+    $('retTiles').innerHTML = '';
+    $('retTable').querySelector('tbody').innerHTML = '<tr><td colspan="7" style="color:var(--ink-3)">No activity data.</td></tr>';
+    empty(host, m.sources && m.sources.Activity && m.sources.Activity !== 'ok' ? 'Activity could not be read.' : 'No activity data yet.');
+    $('retFoot').textContent = '';
+    return;
+  }
+  const day = (d) => new Date(d + 'T00:00:00Z').toLocaleDateString([], { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  const cell = (c) => (c ? c.n + '/' + c.of + ' <span class="pc">' + Math.round((100 * c.n) / c.of) + '%</span>' : '<span class="pc">–</span>');
+  const pooled = (n) => R.cohorts.reduce((a, c) => { const x = c.day[n]; return x ? { n: a.n + x.n, of: a.of + x.of } : a; }, { n: 0, of: 0 });
+  const d1 = pooled(1), d7 = pooled(7);
+  const share = (p) => (p.of ? Math.round((100 * p.n) / p.of) + '%' : '–');
+  $('retTiles').innerHTML = tiles([
+    ['Active this week', String(R.active.week), R.active.day + ' yesterday · ' + R.active.month + ' in 30 days'],
+    ['Signed up', String(R.accounts), R.onboarded + ' finished onboarding, since ' + day('2026-10-01')],
+    ['Back on day 1', share(d1), d1.n + ' of ' + d1.of + ' accounts'],
+    ['Back on day 7', share(d7), d7.n + ' of ' + d7.of + ' accounts'],
+  ]);
+  const pts = R.series;
+  lineChart(host, {
+    labels: pts.map((p, i) => (i === pts.length - 1 && new Date(p.end + 'T00:00:00Z').getUTCDay() !== 0 ? 'Week to ' + day(p.end) + ' (so far)' : 'Week to ' + day(p.end))),
+    ticks: pts.map((p) => day(p.end)),
+    series: [{ name: 'Active in the week', short: 'Week', values: pts.map((p) => p.wau), color: '--s1' }, { name: 'Active in 30 days', short: '30 days', values: pts.map((p) => p.mau), color: '--s2' }],
+    directLabels: true,
+    aria: 'Accounts active each week and in the 30 days before it',
+  });
+  $('retTable').querySelector('tbody').innerHTML = R.cohorts.length
+    ? R.cohorts.slice().reverse().map((c) => '<tr><td>' + esc(day(c.week)) + '</td><td class="n">' + c.signedUp + '</td><td class="n">' + c.onboarded + '</td><td class="n">' + cell(c.day[1]) + '</td><td class="n">' + cell(c.day[7]) + '</td><td class="n">' + cell(c.day[30]) + '</td><td class="n">' + cell(c.rolling[7]) + '</td></tr>').join('')
+    : '<tr><td colspan="7" style="color:var(--ink-3)">No sign-ups since Oct 1.</td></tr>';
+  const L = R.left || { testers: 0, owner: 0, service: 0 };
+  $('retFoot').textContent = 'Active: a revision session, an Activity item, a recited take or a daily log that day. Day 7+: active on day 7 or any day after. – : not reached yet. Counted to ' + day(R.asOf) + ' (UTC); left out: ' + L.testers + (L.testers === 1 ? ' tester, ' : ' testers, ') + L.service + ' review and screenshot accounts, ' + L.owner + ' staff. Accounts, not devices: the App section counts phones with the app open (Sentry).';
 }
 
 function renderApp(m, k) {
