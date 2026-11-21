@@ -120,6 +120,23 @@ html, body { margin: 0; }
     </div>
   </div>
 
+  <div class="sec" id="sec-retention">
+    <div class="sec-h"><h2>Retention</h2><span class="sub" id="retSub">Accounts that revise, recite or log, and whether they come back</span></div>
+    <div class="tiles" id="retTiles"></div>
+    <div class="grid">
+      <div class="w" id="w-ret-active">
+        <div class="w-h"><h3>Active accounts</h3><span class="sub">Weekly and monthly, each week to Sunday</span></div>
+        <div class="legend"><span><i style="background:var(--s1)"></i>Active in the week</span><span><i style="background:var(--s2)"></i>Active in 30 days</span></div>
+        <div class="chart" id="c-retention"></div>
+      </div>
+      <div class="w" id="w-ret-cohorts">
+        <div class="w-h"><h3>Coming back, by sign-up week</h3><span class="sub">Active on day 1, 7 and 30 after signing up</span></div>
+        <div class="tbl-wrap"><table id="retTable"><thead><tr><th>Week of</th><th class="n">Signed up</th><th class="n">Onboarded</th><th class="n">Day 1</th><th class="n">Day 7</th><th class="n">Day 30</th><th class="n">Day 7+</th></tr></thead><tbody></tbody></table></div>
+        <p class="foot" id="retFoot"></p>
+      </div>
+    </div>
+  </div>
+
   <div class="sec" id="sec-app">
     <div class="sec-h"><h2>App</h2><span class="sub">Active people, crashes, updates, downloads</span>
       <div class="seg" role="group" aria-label="Channel" id="chan" style="margin-left:auto">

@@ -719,7 +719,7 @@ revisely-dev`; nothing deploys Hosting by itself). It shows production and dev (
 (and revision-buddy-3a398.web.app) only redirects there since Nov 14 2026 (`scripts/metrics/metrics-redirect/`, its
 README has the deploy and the undo); never deploy the root `firebase.json`'s hosting to production.
 - **Pages:** `/sign-in` (its own page: Google, or email and password; no sign-up; an account without a role sees "No
-  access" with Sign out, and nothing else), `/` Overview (the metrics), `/open-door` and `/open-door/<uid>`, `/audit`.
+  access" with Sign out, and nothing else), `/` Overview (the metrics, with Retention), `/open-door` and `/open-door/<uid>`, `/audit`.
   Signed out, every address goes to `/sign-in?next=…` (`shell.js`). Hosting's `cleanUrls` and rewrites serve them.
 - **Roles** (`functions/src/console/roles.ts`, the one permission list): `owner` (everything, roles too), `admin`
   (everything but roles), `reviewer` (Open Door read and decide; no revoke, metrics, Revo conversations or audit),
