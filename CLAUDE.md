@@ -761,7 +761,8 @@ true → approve. It republishes that exact update, the same way promotion does.
 
 https://metrics.revisely.app (a Hosting custom domain; also https://revision-buddy-3a398.web.app) (Firebase
 Hosting, `admin/`): Revo per account with its conversations,
-spend against the caps, app health, downloads and functions, read live. Only an account with the custom claim
+spend against the caps, app health, downloads, retention (accounts active and coming back by sign-up week;
+`functions/scripts/retention.js` prints the same, read-only) and functions, read live. Only an account with the custom claim
 `admin: true` gets anything (`functions/scripts/set-admin.js <uid>`); the claim opens nothing else, since no
 rule reads it. Functions `adminMetrics`, `adminRevo` (conversations locked until `config/admin.conversations`)
 and `metricsTotals` (the hourly `metrics.yml` sends Sentry and App Store totals with its GitHub OIDC token, and

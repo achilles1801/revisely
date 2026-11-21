@@ -9,7 +9,7 @@ import type { Firestore } from 'firebase-admin/firestore';
 import type { Input, Totals } from './aggregate';
 import { RANGES } from './aggregate';
 import type { RevoChatRow, RevoMemoryRow, RevoMessageRow, RevoReadStore, TotalsStore } from './admin';
-import { googleClient, metadataToken, readFirestore, readMonitoring, readRevoLines } from './sources';
+import { googleClient, metadataToken, readActivity, readFirestore, readMonitoring, readRevoLines } from './sources';
 
 const str = (v: unknown, fallback = '') => (typeof v === 'string' ? v : fallback);
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
@@ -107,11 +107,12 @@ export function collector(db: Firestore, project: string, opts: { emulator: bool
     };
     const call = googleClient(() => metadataToken());
     const cloud = <T>(name: string, f: () => Promise<T>) => (opts.emulator ? (sources[name] = 'not in the emulator', Promise.resolve(null)) : attempt(name, f));
-    const [fsData, revoLines, monitoring, totals] = await Promise.all([
+    const [fsData, revoLines, monitoring, totals, activity] = await Promise.all([
       attempt('Firestore', () => readFirestore(db)),
       cloud('Revo logs', () => readRevoLines(call, project, new Date(now - RANGES['30d'].ms - 86400e3).toISOString())),
       cloud('Cloud Monitoring', () => readMonitoring(call, project, now)),
       attempt('Sentry and App Store', () => storedTotals(db)),
+      attempt('Activity', () => readActivity(db)),
     ]);
     if (totals?.errors) for (const [k, v] of Object.entries(totals.errors)) if (v) sources[k === 'sentry' ? 'Sentry' : 'App Store'] = String(v).slice(0, 160);
     if (!totals && sources['Sentry and App Store'] === 'ok') sources['Sentry and App Store'] = 'no totals yet (the Metrics workflow sends them hourly)';
@@ -126,6 +127,7 @@ export function collector(db: Firestore, project: string, opts: { emulator: bool
       revoLines,
       monitoring,
       totals,
+      activity,
       sources,
     };
   };

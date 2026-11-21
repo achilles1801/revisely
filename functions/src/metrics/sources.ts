@@ -197,3 +197,88 @@ export async function readMonitoring(call: Call, project: string, now: number): 
   ]);
   return { perRange, revoLatency, firestoreToday: { reads: total(reads), writes: total(writes), denies: total(rules.filter((s) => s.labels.result === 'DENY')) } };
 }
+
+// ---------- Retention (retention.ts) ----------
+
+/** The App Review and screenshot accounts: never people. Matched in memory, never sent anywhere. */
+export const SERVICE_EMAILS = ['applereview@revisely.app', 'screenshots@revisely.app'];
+
+/** One account's activity for retention.ts. The uid stays in the function: it only decides who is left out. */
+export interface ActivityRow {
+  uid: string;
+  signedUp: string | null;
+  firstDay: string | null;
+  onboarded: boolean;
+  tester: boolean;
+  service: boolean;
+  days: string[];
+}
+
+function asDay(v: unknown): string | null {
+  if (v && typeof (v as { toDate?: unknown }).toDate === 'function') return (v as { toDate: () => Date }).toDate().toISOString().slice(0, 10);
+  if (typeof v === 'number' && Number.isFinite(v)) return new Date(v).toISOString().slice(0, 10);
+  if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0, 10);
+  return null;
+}
+
+/** users/{uid}/<collection>/{id} → uid. */
+function accountOf(path: string, collection: string): string | null {
+  const p = path.split('/');
+  return p.length === 4 && p[0] === 'users' && p[2] === collection ? p[1] : null;
+}
+
+/**
+ * Every account's active days. Only dates, page counts and minutes are read (`select`): no notes,
+ * no log text, no take audio or transcripts.
+ */
+export async function readActivity(db: Firestore): Promise<ActivityRow[]> {
+  const [users, sessions, revisions, memorizations, reads, journal, takes] = await Promise.all([
+    db.collection('users').select('createdAt', 'onboardingComplete', 'previewTester', 'email').get(),
+    db.collectionGroup('sessions').select('date', 'pagesRevised', 'durationMinutes').get(),
+    db.collectionGroup('revisions').select('day', 'pages').get(),
+    db.collectionGroup('memorizations').select('day', 'pages').get(),
+    db.collectionGroup('reads').select('day', 'pages').get(),
+    db.collectionGroup('journal').select('date').get(),
+    db.collectionGroup('reciteTakes').select('day', 'createdAt', 'updatedAt').get(),
+  ]);
+  const days = new Map<string, Set<string>>();
+  const add = (uid: string | null, day: string | null) => {
+    if (!uid || !day) return;
+    const s = days.get(uid) ?? new Set<string>();
+    s.add(day);
+    days.set(uid, s);
+  };
+  const pages = (v: unknown) => (Array.isArray(v) ? v.length : 0);
+  const first = new Map<string, string>();
+  for (const d of sessions.docs) {
+    const x = d.data();
+    const uid = accountOf(d.ref.path, 'sessions');
+    const day = asDay(x.date);
+    if (uid && day && (!first.has(uid) || day < first.get(uid)!)) first.set(uid, day);
+    if (pages(x.pagesRevised) > 0 || (typeof x.durationMinutes === 'number' && x.durationMinutes > 0)) add(accountOf(d.ref.path, 'sessions'), asDay(x.date));
+  }
+  for (const [snap, name] of [[revisions, 'revisions'], [memorizations, 'memorizations'], [reads, 'reads']] as const) {
+    for (const d of snap.docs) if (pages(d.get('pages')) > 0) add(accountOf(d.ref.path, name), asDay(d.get('day')));
+  }
+  for (const d of journal.docs) add(accountOf(d.ref.path, 'journal'), asDay(d.get('date') ?? d.id));
+  for (const d of takes.docs) add(accountOf(d.ref.path, 'reciteTakes'), asDay(d.get('day') ?? d.get('createdAt') ?? d.get('updatedAt')));
+
+  const rows: ActivityRow[] = [];
+  const seen = new Set<string>();
+  for (const d of users.docs) {
+    const x = d.data();
+    seen.add(d.id);
+    rows.push({
+      uid: d.id,
+      signedUp: asDay(x.createdAt),
+      firstDay: first.get(d.id) ?? null,
+      onboarded: x.onboardingComplete === true,
+      tester: x.previewTester === true,
+      service: typeof x.email === 'string' && SERVICE_EMAILS.includes(x.email.toLowerCase()),
+      days: [...(days.get(d.id) ?? [])],
+    });
+  }
+  // Activity under an account whose user document is gone (deleted): no sign-up day, still activity.
+  for (const [uid, s] of days) if (!seen.has(uid)) rows.push({ uid, signedUp: null, firstDay: null, onboarded: false, tester: false, service: false, days: [...s] });
+  return rows;
+}
