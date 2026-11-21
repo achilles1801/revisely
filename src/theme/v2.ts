@@ -593,3 +593,46 @@ export const revoV2 = {
   /** The pen's lit tip while the R writes itself (What's new's Revo moment): white on any accent. */
   penTip: '#FFFFFF',
 } as const;
+
+/**
+ * The Ramadan theme's colours (Revisely Dev, Settings → Appearance → Ramadan theme; lib/ramadanTheme): decorations
+ * only, never text. Warm gold for the lanterns, the crescent and the falling light, the same for every accent; one
+ * string-light bulb in three takes the accent. The site's Ramadan theme uses the same values (shared notes,
+ * ramadan-theme.md).
+ */
+export interface RamadanTokens {
+  /** Lantern metal, the crescent, sparkles, the rope the lanterns hang from. */
+  gold: string;
+  /** Lantern glass and its halo, drawn at `glassOpacity`. */
+  glass: string;
+  glassOpacity: number;
+  /** The flame inside a lantern. */
+  flame: string;
+  /** The falling light over Home's glow, at most `moteOpacity`. */
+  mote: string;
+  moteOpacity: number;
+  /** The string lights' wire and the lanterns' strings. */
+  wire: string;
+  /** The string lights' bulbs, in turn. */
+  bulbs: readonly [string, string, string];
+}
+
+const RAMADAN_BASE = {
+  light: { gold: '#B07D1E', glass: '#F7C561', glassOpacity: 0.4, flame: '#FFE7A8', mote: '#C99532', moteOpacity: 0.7, wire: '#CBBFA6', amber: '#E3A72F', third: '#D9774A' },
+  dark: { gold: '#E8B65A', glass: '#FFCF73', glassOpacity: 0.55, flame: '#FFF1CC', mote: '#FFE2A0', moteOpacity: 0.9, wire: '#5A4F3C', amber: '#FFC857', third: '#FFE9B8' },
+} as const;
+
+export function ramadanV2(isDark: boolean, accent: AccentName = DEFAULT_ACCENT): RamadanTokens {
+  const b = RAMADAN_BASE[isDark ? 'dark' : 'light'];
+  return {
+    gold: b.gold,
+    glass: b.glass,
+    glassOpacity: b.glassOpacity,
+    flame: b.flame,
+    mote: b.mote,
+    moteOpacity: b.moteOpacity,
+    wire: b.wire,
+    // doneText: the accent itself for every accent (Jade's accentText is ink).
+    bulbs: [b.amber, paletteV2(isDark, accent).doneText, b.third],
+  };
+}

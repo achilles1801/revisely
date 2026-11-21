@@ -46,6 +46,8 @@ import { KahfPost } from '../../components/home/feed/KahfPost';
 import { RecentSection } from '../../components/activity/ActivityItemRow';
 import { RunningTimerChip } from '../../components/timer/RunningTimerChip';
 import { HeroGlow } from '../../components/v2/HeroGlow';
+import { RamadanHome, WithCrescent } from '../../components/ramadan';
+import { useRamadanTheme } from '../../lib/ramadanTheme';
 import { QiblaSheet } from '../../components/qibla/QiblaSheet';
 import { PrayerSheet, PrayerTab } from '../../components/prayer/PrayerSheet';
 import { NextPrayerLine } from '../../components/prayer/NextPrayerLine';
@@ -95,6 +97,8 @@ export default function DashboardScreen() {
   const salamRoom = screenWidth - 2 * layoutV2.gutter - 2 * TOP_BAR_SIDE - 2 * 12;
   const salamScale = Math.max(1, Math.min(1.4, salamRoom / SALAM_INK_WIDTH));
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  // Revisely Dev's Ramadan theme (THEME-1): decorations only.
+  const ramadan = useRamadanTheme();
 
   const { user, pages, logs, addLog, updateLog, deleteLog, loadData, error, saveUser, pendingChanges } = useApp();
   const { firebaseUser } = useAuth();
@@ -504,22 +508,25 @@ export default function DashboardScreen() {
   // How much of the Quran is memorized: everyone sees it (no setting).
   const memorized = memorizedText(pages);
 
+  const salam = (
+    <Text
+      style={[arabicV2(20), { color: palette.text }]}
+      accessibilityLanguage="ar"
+      // At the largest sizes it ran into the icons (or wrapped, on an SE).
+      maxFontSizeMultiplier={salamScale}
+      testID="salam"
+    >
+      السلام عليكم
+    </Text>
+  );
+
   return (
     <TopSafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
       <HeroGlow />
+      {ramadan ? <RamadanHome /> : null}
       <TopBar
         left={<RunningTimerChip onOpenQuran={() => navigation.getParent()?.navigate('Read')} />}
-        center={
-          <Text
-            style={[arabicV2(20), { color: palette.text }]}
-            accessibilityLanguage="ar"
-            // At the largest sizes it ran into the icons (or wrapped, on an SE).
-            maxFontSizeMultiplier={salamScale}
-            testID="salam"
-          >
-            السلام عليكم
-          </Text>
-        }
+        center={ramadan ? <WithCrescent>{salam}</WithCrescent> : salam}
         right={
           <>
             <IconButton icon="compass-outline" label={t('home.screen.qibla')} onPress={() => openPrayer('qibla')} testID="open-qibla" />
