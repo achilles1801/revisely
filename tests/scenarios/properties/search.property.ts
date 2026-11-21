@@ -87,6 +87,19 @@ const NAML_MISHEARD: [{ start: number; length: number }, number, number, string,
   false,
 ];
 
+/** And on this (seed -256462220, Nov 21 2026): 24:61's بيوت إخوانكم أو بيوت أخواتكم أو with إخوانكم
+ *  heard as إخوالكم. Its two halves read as one phrase said again a letter differently, and that
+ *  phrase once (بيوت إخوالكم أو) is the same ayah's later words word for word: only those were
+ *  found. Said twice, too. */
+const NUR_REPEATED: [{ start: number; length: number }, number, number, string, boolean] = [
+  { start: 46089, length: 6 },
+  1,
+  3,
+  'ل',
+  false,
+];
+const NUR_REPEATED_TWICE: typeof NUR_REPEATED = [NUR_REPEATED[0], 1, 3, 'ل', true];
+
 describe('finding an ayah from its words (SEARCH-1)', () => {
   it('[SEARCH-1] any four to eight words in a row find the ayah they are in', () => {
     fc.assert(
@@ -98,7 +111,10 @@ describe('finding an ayah from its words (SEARCH-1)', () => {
   });
 
   it('[SEARCH-1] still found with one word misheard by a letter, or the phrase said twice', () => {
-    fc.assert(misheardRun, { numRuns: runs(80), examples: [AYAH_BOUNDARY, FATIHAH_TWICE, NAML_MISHEARD] });
+    fc.assert(misheardRun, {
+      numRuns: runs(80),
+      examples: [AYAH_BOUNDARY, FATIHAH_TWICE, NAML_MISHEARD, NUR_REPEATED, NUR_REPEATED_TWICE],
+    });
   });
 
   it('[SEARCH-1] the seed that once found nothing across an ayah boundary passes', () => {
@@ -111,6 +127,16 @@ describe('finding an ayah from its words (SEARCH-1)', () => {
     expect(plain.slice(48787, 48793).join(' ')).toBe('بسم الله الرحمن الرحيم ألا تعلوا');
     // Replayed with the example the run had, which comes first in its order.
     fc.assert(misheardRun, { seed: -378724082, path: '74:2:2:2', examples: [AYAH_BOUNDARY] });
+  });
+
+  it('[SEARCH-1] the seed that once found only a later repetition in 24:61 passes', () => {
+    expect(plain.slice(46089, 46095).join(' ')).toBe('بيوت إخوانكم أو بيوت أخواتكم أو');
+    // Replayed with the examples the run had (Scenarios shard 4/4 of PR #803, Nov 21 2026).
+    fc.assert(misheardRun, {
+      seed: -256462220,
+      path: '25:17:16:16:26:31:39:39:29:29:32',
+      examples: [AYAH_BOUNDARY, FATIHAH_TWICE, NAML_MISHEARD],
+    });
   });
 
   it('[SEARCH-1] a phrase run from one ayah into the next is found at the first, ending in the next', () => {

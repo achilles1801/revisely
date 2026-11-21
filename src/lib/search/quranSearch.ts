@@ -288,9 +288,10 @@ function sameWord(a: QueryWord, b: QueryWord, near: boolean): boolean {
 /**
  * A phrase said again straight after itself, kept once. Speech recognition sometimes
  * repeats itself ("إياك نعبد وإياك نعبد وإياك نعبد…"), and reciters repeat a phrase to
- * get it right; the ayah is found from the phrase once.
+ * get it right; the ayah is found from the phrase once. With `near` off, only a phrase said
+ * again word for word is folded.
  */
-export function withoutRepeats<T extends QueryWord>(list: T[]): T[] {
+export function withoutRepeats<T extends QueryWord>(list: T[], near = true): T[] {
   let out = list.slice();
   let changed = true;
   while (changed) {
@@ -301,7 +302,7 @@ export function withoutRepeats<T extends QueryWord>(list: T[]): T[] {
         // A phrase said again may be heard a little differently the second time. One word
         // must be the very same word: neighbours a letter apart are common in the text
         // (إنما أنا, 22:49).
-        for (let k = 0; k < p && same; k++) same = sameWord(out[s + k], out[s + p + k], p > 1);
+        for (let k = 0; k < p && same; k++) same = sameWord(out[s + k], out[s + p + k], near && p > 1);
         // One word said twice is kept twice when it is short (لا لا, a real repetition in the text).
         if (same && (p > 1 || out[s].key.length >= 4)) {
           out = [...out.slice(0, s + p), ...out.slice(s + 2 * p)];
@@ -477,14 +478,31 @@ export function searchText(words: QuranWords, text: string, limit = 50, work?: S
   // after it, said twice, leave the second basmala in the middle of what's left, which then
   // no longer looks like a repeat (the Fatihah from its start, said twice). The fewer words
   // left is searched.
-  const after = withoutRepeats(said);
-  const before = withoutOpening(withoutRepeats(heard));
-  const once = before.length < after.length ? before : after;
+  const folded = (near: boolean) => {
+    const after = withoutRepeats(said, near);
+    const before = withoutOpening(withoutRepeats(heard, near));
+    return before.length < after.length ? before : after;
+  };
+  const once = folded(true);
   // Words said twice that the text itself has twice (ليلة القدر ليلة القدر, 97:2–3; لم يلد
   // ولم يولد, 112:3) are found as said; a repeat that isn't in the text is searched once.
+  // A phrase "said again a little differently" can be the text too: 24:61 runs بيوت إخوانكم
+  // أو بيوت أخواتكم أو …, and with one of its words misheard the text no longer holds the words
+  // exactly, while the phrase once (بيوت إخوالكم أو) is another place's word for word. So the
+  // words as said, and with only word-for-word repeats folded (that run said twice), are
+  // searched first: found nearly whole, one word off, they are listed with the matches for
+  // the phrase once.
+  let asSaid: { hits: VerseHit[]; words: string[] } | null = null;
   if (once.length < said.length) {
-    const asSaid = align(words, index, said, work);
-    if (asSaid.found.length > 0 && asSaid.found[0].score >= EXACT) return resultOf(index, said, asSaid, 1, limit);
+    const exactly = folded(false);
+    const fuller = exactly.length < said.length && exactly.length > once.length ? [said, exactly] : [said];
+    for (const q of fuller) {
+      const aligned = align(words, index, q, work);
+      if (aligned.found.length > 0 && aligned.found[0].score >= EXACT) return resultOf(index, q, aligned, 1, limit);
+      const nearly = resultOf(index, q, aligned, 1, limit);
+      const hits = nearly.hits.filter((h) => h.score >= CLOSE_TO_EXACT);
+      if (!asSaid && hits.length > 0) asSaid = { hits, words: nearly.words };
+    }
   }
   const m = once.length;
   const tries: QueryWord[][] = [once];
@@ -498,6 +516,7 @@ export function searchText(words: QuranWords, text: string, limit = 50, work?: S
     result = resultOf(index, q, aligned, q === once ? 1 : q.length / m, limit);
     break;
   }
+  if (asSaid) result = withMore(result, asSaid.hits, asSaid.words, limit);
   // The basmala is in the text too (1:1, 27:30). Set aside with only two words after it,
   // little is left to go on, and a misheard word can make those two another ayah's
   // (27:30's basmala and ألا تعلوا heard as ألا تكلوا, 6:119's words): they are searched
@@ -506,19 +525,24 @@ export function searchText(words: QuranWords, text: string, limit = 50, work?: S
   if (m <= 2 && whole.length > m) {
     const aligned = align(words, index, whole, work);
     const more = resultOf(index, whole, aligned, 1, limit).hits.filter(
-      (h) =>
-        h.score >= CLOSE_TO_EXACT &&
-        h.to - h.from > BASMALA.length &&
-        !result?.hits.some((x) => x.from < h.to && h.from < x.to),
+      (h) => h.score >= CLOSE_TO_EXACT && h.to - h.from > BASMALA.length,
     );
-    if (more.length > 0) {
-      const hits = [...(result?.hits ?? []), ...more].sort(
-        (a, b) => Number(b.score >= EXACT) - Number(a.score >= EXACT) || b.score - a.score || a.from - b.from,
-      );
-      result = { hits: hits.slice(0, limit), total: (result?.total ?? 0) + more.length, words: whole.map((w) => w.key) };
-    }
+    result = withMore(result, more, whole.map((w) => w.key), limit);
   }
   return result ?? { hits: [], total: 0, words: once.map((w) => w.key) };
+}
+
+/** `result` with another query's matches (its words `words`, usually fuller) that don't overlap
+ *  its own, in the order matches are listed. */
+function withMore(result: TextSearchResult | null, more: VerseHit[], words: string[], limit: number): TextSearchResult | null {
+  const added = more.filter((h) => !result?.hits.some((x) => x.from < h.to && h.from < x.to));
+  if (added.length === 0) return result;
+  const hits = [...(result?.hits ?? []), ...added].sort(
+    (a, b) => Number(b.score >= EXACT) - Number(a.score >= EXACT) || b.score - a.score || a.from - b.from,
+  );
+  // Every word either query searched for, so each match's words can be highlighted.
+  const all = [...words, ...(result?.words ?? []).filter((w) => !words.includes(w))];
+  return { hits: hits.slice(0, limit), total: (result?.total ?? 0) + added.length, words: all };
 }
 
 /** The matches as ayat: where each starts and ends, from the first word matched to the last. */
