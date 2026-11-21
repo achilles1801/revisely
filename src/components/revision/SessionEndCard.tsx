@@ -32,6 +32,7 @@ export function SessionEndCard({
   onKeepGoing,
   onListenBack,
   onRate,
+  onDismissRate,
 }: {
   total: number;
   done: number;
@@ -51,6 +52,8 @@ export function SessionEndCard({
   onListenBack?: () => void;
   /** It's the moment to ask for a rating (lib/rateAsk): "Enjoying Revisely? Rate it ›" opens the store. */
   onRate?: () => void;
+  /** The line's ✕: never ask again on this phone. */
+  onDismissRate?: () => void;
 }) {
   const { palette } = useTheme();
   const reduceMotion = useReduceMotion();
@@ -118,17 +121,30 @@ export function SessionEndCard({
         />
       ) : null}
       {complete && onRate ? (
-        <Tap
-          onPress={onRate}
-          accessibilityRole="link"
-          accessibilityLabel={t('revision.end.rateAskLabel')}
-          hitSlop={8}
-          testID="session-end-rate"
-        >
-          <Text style={[typeV2.meta, styles.center, { color: palette.link }]} maxFontSizeMultiplier={1.4}>
-            {`${t('revision.end.rateAsk')} ${chevron()}`}
-          </Text>
-        </Tap>
+        <View style={styles.rate}>
+          <Tap
+            onPress={onRate}
+            accessibilityRole="link"
+            accessibilityLabel={t('revision.end.rateAskLabel')}
+            hitSlop={8}
+            testID="session-end-rate"
+          >
+            <Text style={[typeV2.meta, styles.center, { color: palette.link }]} maxFontSizeMultiplier={1.4}>
+              {`${t('revision.end.rateAsk')} ${chevron()}`}
+            </Text>
+          </Tap>
+          {onDismissRate ? (
+            <Tap
+              onPress={onDismissRate}
+              accessibilityRole="button"
+              accessibilityLabel={t('revision.end.rateAskDismiss')}
+              hitSlop={12}
+              testID="session-end-rate-dismiss"
+            >
+              <Ionicons name="close" size={16} color={palette.secondary} />
+            </Tap>
+          ) : null}
+        </View>
       ) : null}
     </View>
   );
@@ -138,6 +154,7 @@ const styles = StyleSheet.create({
   card: { flex: 1, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 28 },
   body: { alignItems: 'center', gap: 8 },
   keep: { alignItems: 'center', gap: 12 },
+  rate: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   check: {
     width: 64,
     height: 64,

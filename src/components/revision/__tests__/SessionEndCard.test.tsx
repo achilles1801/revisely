@@ -31,6 +31,13 @@ describe('SessionEndCard: asking for a rating (SESS-8)', () => {
     expect(onRate).toHaveBeenCalledTimes(1);
   });
 
+  it('has a ✕ that stops asking', async () => {
+    const onDismissRate = jest.fn();
+    await show({ total: 3, done: 3, celebrate: 1, onRate: jest.fn(), onDismissRate });
+    fireEvent.press(screen.getByLabelText("Don't ask again"));
+    expect(onDismissRate).toHaveBeenCalledTimes(1);
+  });
+
   it('shows nothing with pages left, or when it is not the moment', async () => {
     await show({ total: 3, done: 2, celebrate: 1, onRate: jest.fn() });
     expect(screen.queryByTestId('session-end-rate')).toBeNull();

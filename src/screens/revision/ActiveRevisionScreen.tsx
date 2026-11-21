@@ -61,7 +61,7 @@ import {
   getSurahsForPage,
 } from '../../lib/quranData';
 import { logger } from '../../lib/logger';
-import { maybeAskForRating, openRatingPage, rateAskEnabled } from '../../lib/rateAsk';
+import { maybeAskForRating, openRatingPage, rateAskEnabled, stopRatingAsks } from '../../lib/rateAsk';
 import { streakDetailFromLogs } from '../../lib/streak';
 import { pagesToUnrevise, removeRevisedPages, removeRoundPages } from '../../lib/revisionSession';
 import { dismissPresentedRevisionReminders } from '../../lib/reminders/sync';
@@ -1082,7 +1082,18 @@ export default function ActiveRevisionScreen() {
               onListenBack={
                 listenBackId ? () => navigation.navigate('ListenBack', { recordingId: listenBackId }) : undefined
               }
-              onRate={rateAsk ? () => void openRatingPage() : undefined}
+              onRate={
+                rateAsk
+                  ? () => {
+                      setRateAsk(false);
+                      void openRatingPage();
+                    }
+                  : undefined
+              }
+              onDismissRate={() => {
+                setRateAsk(false);
+                void stopRatingAsks();
+              }}
             />
           }
           onReachEnd={handleReachEnd}
