@@ -6,9 +6,9 @@ permalink: /terms/
 # Terms of Service for Revisely
 
 **Effective date: 2026-05-11**
-**Last updated: 2026-11-18**
+**Last updated: 2026-11-21**
 
-These Terms of Service ("Terms") govern your use of the Revisely mobile application ("the app", "Revisely"). Revisely is operated by `Majd Khawaldeh` ("we", "us", or "our"). By creating an account or using Revisely, you agree to these Terms. If you do not agree, do not use the app.
+These Terms of Service ("Terms") govern your use of the Revisely mobile application ("the app", "Revisely"). Revisely is operated by `Revisely LLC`, a Texas limited liability company ("we", "us", or "our"). By creating an account or using Revisely, you agree to these Terms. If you do not agree, do not use the app.
 
 ## 1. Eligibility
 
@@ -64,7 +64,7 @@ We do not use your content to train any AI model, and Anthropic, which writes Re
 
 ## 6. Intellectual property
 
-Revisely, including its name, logo, design, and code, is the property of `Majd Khawaldeh` and is protected by copyright, trademark, and other laws. These Terms do not grant you any rights in our intellectual property except the limited license to use the app in accordance with these Terms.
+Revisely, including its name, logo, design, and code, is the property of `Revisely LLC` and is protected by copyright, trademark, and other laws. These Terms do not grant you any rights in our intellectual property except the limited license to use the app in accordance with these Terms.
 
 The Holy Quran itself is in the public domain. Page images displayed in the app are renderings of the Madani Mushaf produced with the King Fahd Glorious Qur'an Printing Complex fonts, via the open-source quran.com-images project. The translation, ordering, and metadata of Quranic content provided in the app are presented for educational and devotional use.
 
@@ -97,7 +97,7 @@ To the fullest extent permitted by law, we disclaim all implied warranties, incl
 
 ## 10. Limitation of liability
 
-To the maximum extent permitted by law, in no event shall `Majd Khawaldeh`, our affiliates, or our processors be liable for any indirect, incidental, special, consequential, or punitive damages, or any loss of profits, revenue, data, or use, arising out of or related to your use of Revisely, even if we have been advised of the possibility of such damages.
+To the maximum extent permitted by law, in no event shall `Revisely LLC`, its members, our affiliates, or our processors be liable for any indirect, incidental, special, consequential, or punitive damages, or any loss of profits, revenue, data, or use, arising out of or related to your use of Revisely, even if we have been advised of the possibility of such damages.
 
 Our total liability to you for any claim arising from or related to Revisely is limited to the greater of (a) the amount you have paid us, if any, in the 12 months preceding the claim, or (b) USD $10.
 

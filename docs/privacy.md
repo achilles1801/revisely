@@ -10,7 +10,7 @@ permalink: /privacy/
 
 This Privacy Policy describes how Revisely ("we", "us", or "the app") collects, uses, and protects information when you use the Revisely mobile application, and when you donate to Revisely on our website, revisely.app.
 
-Revisely is operated by `Majd Khawaldeh`, a sole developer. You can reach us at `support@revisely.app`.
+Revisely is operated by `Revisely LLC`, a Texas limited liability company. You can reach us at `support@revisely.app`.
 
 ## 1. What this app does
 
