@@ -75,7 +75,7 @@ jest.mock('../../../components/MushafPager', () => {
     ),
   };
 });
-const mockNavigation = { goBack: jest.fn(), navigate: jest.fn() };
+const mockNavigation = { goBack: jest.fn(), navigate: jest.fn(), push: jest.fn() };
 // The reader's params: page 379 unless a test opens it otherwise (a search's result).
 const mockRoute: { params: Record<string, unknown> } = { params: { pageNumber: 379 } };
 jest.mock('@react-navigation/native', () => ({
@@ -1184,6 +1184,11 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
     fireEvent.press(screen.getByTestId('mark-card-similar'));
     expect(screen.getByTestId('similar-sheet')).toBeTruthy();
     expect(screen.getByTestId('similar-27-16')).toBeTruthy();
+    // A tap opens it over this reader, highlighted (READ-2).
+    mockNavigation.push.mockClear();
+    fireEvent.press(screen.getByTestId('similar-27-16'));
+    await flush();
+    expect(mockNavigation.push).toHaveBeenCalledWith('QuranReader', expect.objectContaining({ highlight: { sura: 27, ayah: 16 } }));
   });
 
   it('the final answer brings the summary: the score, the passage, each finding', async () => {
@@ -1208,11 +1213,13 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
     fireEvent.press(screen.getByTestId('recite-stop'));
     await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [mark], score: null } });
     const row = screen.getByTestId('take-summary-into');
+    mockNavigation.push.mockClear();
     fireEvent.press(row);
     await flush();
     const page = words.pageOf(into.w);
-    expect(mockPager.scrolled).toContain(page);
-    expect(mockPager.highlighted).toEqual([expect.objectContaining({ sura: 27, ayah: 16, page })]);
+    // In a reader of its own over this one, so Back comes back to this page (READ-2).
+    expect(mockNavigation.push).toHaveBeenCalledWith('QuranReader', { pageNumber: page, highlight: { sura: 27, ayah: 16 }, showTake: undefined });
+    expect(mockPager.scrolled).not.toContain(page);
   });
 
   it('the summary names what was recited, not the passage’s end (the checker’s `to` is the end of the surah)', async () => {

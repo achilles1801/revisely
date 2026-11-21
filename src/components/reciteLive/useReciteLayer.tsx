@@ -1106,7 +1106,9 @@ export function useReciteLayer({
           places={similar}
           onOpen={(p) => {
             setSimilarFor(null);
-            goTo(p.page);
+            // Over this screen, the ayah highlighted, so Back returns to the page left (READ-2).
+            if (openElsewhere) openElsewhere({ page: p.page, highlight: { sura: p.sura, ayah: p.ayah } });
+            else goTo(p.page);
           }}
           onClose={() => setSimilarFor(null)}
         />
@@ -1145,8 +1147,9 @@ export function useReciteLayer({
             setSummaryShown(null);
             setCardAt(null);
             const target = toAyahRef({ sura: into.ayah[0], ayah: into.ayah[1] });
-            if (showPage(target.page) !== false) onInto(target);
-            else openElsewhere?.({ page: target.page, highlight: { sura: target.sura, ayah: target.ayah } });
+            // Over this screen, so Back returns to the page left (READ-2); highlighted in place where nothing can open.
+            if (openElsewhere) openElsewhere({ page: target.page, highlight: { sura: target.sura, ayah: target.ayah } });
+            else if (showPage(target.page) !== false) onInto(target);
           }}
           onCheck={() => {
             setSummaryShown(null);
