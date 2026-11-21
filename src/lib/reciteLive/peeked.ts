@@ -4,6 +4,7 @@
 // score (the checker counts them as `helped`). The words Test me shows to start a place aren't peeks.
 
 import type { QuranWords } from '../recite/quranWords';
+import { t } from '../../i18n';
 
 export type Peeked = ReadonlySet<number>;
 export const NOTHING_PEEKED: Peeked = new Set();
@@ -21,4 +22,4 @@ export function peekedByAyah(words: QuranWords, peeked: Peeked): { ayah: [number
 }
 
 /** "3 words peeked". */
-export const peekedLine = (n: number) => `${n} ${n === 1 ? 'word' : 'words'} peeked`;
+export const peekedLine = (n: number) => t('reciteLive.peeked', { count: n });

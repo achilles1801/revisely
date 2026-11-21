@@ -19,7 +19,7 @@ import {
   recitedPhrase,
   slipLine,
   tajweedLines,
-  UNCLEAR_NOTE,
+  unclearNote,
 } from '../../lib/reciteLive/describe';
 import { t } from '../../i18n';
 
@@ -42,7 +42,7 @@ export function MarkBlock({
   // Not clear: what the checker thinks it heard is the unclear part, so only what was expected shows, and why.
   const unclear = isUnclear(mark);
   const recited = unclear ? null : recitedPhrase(words, mark);
-  const slip = unclear ? UNCLEAR_NOTE : slipLine(mark);
+  const slip = unclear ? unclearNote() : slipLine(mark);
   return (
     <View style={[styles.block, !first && { borderTopColor: palette.separator, borderTopWidth: layoutV2.hairline }]} testID={`mark-card-${mark.kind}`}>
       <View style={styles.head}>

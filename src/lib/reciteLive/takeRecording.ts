@@ -82,7 +82,7 @@ export function startTakeRecording({ day, page, now = Date.now() }: { day: strin
     handle = file.open();
     handle.offset = 44;
   } catch (err) {
-    fail('could not create the file', err);
+    fail('could not create the file', err); // i18n-ignore (the log's words)
   }
 
   const flush = () => {
@@ -93,7 +93,7 @@ export function startTakeRecording({ day, page, now = Date.now() }: { day: strin
     try {
       handle.writeBytes(bytes);
     } catch (err) {
-      fail('could not write (the phone may be full)', err);
+      fail('could not write (the phone may be full)', err); // i18n-ignore (the log's words)
     }
   };
 
@@ -131,7 +131,7 @@ export function startTakeRecording({ day, page, now = Date.now() }: { day: strin
         handle.close();
         handle = null;
       } catch (err) {
-        fail('could not finish the file', err);
+        fail('could not finish the file', err); // i18n-ignore (the log's words)
         return null;
       }
       if (samples === 0) {
@@ -157,7 +157,7 @@ export function startTakeRecording({ day, page, now = Date.now() }: { day: strin
         });
         return result.kept && result.id ? { day, recordingId: result.id } : null;
       } catch (err) {
-        fail('could not save it as a recording', err);
+        fail('could not save it as a recording', err); // i18n-ignore (the log's words)
         return null;
       }
     },
