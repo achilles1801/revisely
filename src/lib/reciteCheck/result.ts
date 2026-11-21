@@ -1,4 +1,4 @@
-/** What the recitation check service answers (scripts/recite-check/README.md, `v: 1`), and how it is worded. */
+/** What the recitation check service answers (revisely-internal's checker/README.md, `v: 1`), and how it is worded. */
 
 export type WordStatus = 'correct' | 'corrected' | 'wrong' | 'missed';
 export type WordKind = 'skipped' | 'replaced' | 'lookalike' | 'sound' | 'order';

@@ -1,6 +1,6 @@
 // Which model the app's checker runs for each level, for Revisely Dev's Settings → Testing (Majd, Nov 18 2026: "let's
 // put the model number being used in the dev only settings so i know what im using"). Read from the checker's own
-// /health (scripts/recite-check/server.py: `ears`, `server`), which needs no sign-in and never touches the model.
+// /health (revisely-internal's checker/server.py: `ears`, `server`), which needs no sign-in and never touches the model.
 import { checker } from './endpoints';
 
 /** Each level's model as the checker names it ('v7', 'released', 'released+v5'), and the server's commit. */
