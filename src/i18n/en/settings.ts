@@ -206,6 +206,10 @@ export const settings = {
   },
   notifications: {
     enable: 'Enable notifications',
+    /** Under the switch while the phone refuses Revisely's notifications (REMIND-5). */
+    refused: 'Off in your phone’s Settings, so no reminders can come',
+    refusedTitle: 'Notifications are off for Revisely',
+    refusedBody: 'Allow them in your phone’s Settings, then turn reminders on here.',
   },
   appearance: {
     theme: 'Theme',

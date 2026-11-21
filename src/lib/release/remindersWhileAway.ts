@@ -4,9 +4,12 @@
 // made no difference to who came back. With this on, each day after tomorrow gets one reminder, for a week
 // from the last open (lib/reminders/plan LATER_DAYS).
 //
+// The same switch opens Settings' "Enable notifications" telling the truth (REMIND-5): off while the phone refuses
+// Revisely's notifications, saying so, and offering the phone's Settings when turned on.
+//
 // One switch, so it can reach App Store users on its own, before or with any release: off, it is Revisely
 // Dev's; on, everyone's. Turning it on is this one line (REMINDERS_WHILE_AWAY_RELEASED = true), with REMIND-2's
-// line moving from Revo's Dev guide to the main guide (and the re-record). releaseGates.test.ts holds both ways.
+// and REMIND-5's lines moving from Revo's Dev guide to the main guide (and the re-record). releaseGates.test.ts holds both ways.
 
 import { isDevVariant } from '../variant';
 

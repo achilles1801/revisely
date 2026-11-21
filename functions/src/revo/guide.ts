@@ -367,11 +367,12 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     // REMIND-2 (Nov 21 2026), in Revisely Dev until its switch is on (lib/release/remindersWhileAway); its line then
     // moves to "Settings, section by section" (with the re-record).
     title: 'Revision reminders after a few days away',
-    covers: ['REMIND-2'],
+    covers: ['REMIND-2', 'REMIND-5'],
     routes: ['Settings'],
     text: lines(
       '- The revision reminders: today’s and tomorrow’s as usual, then one each morning for the rest of the week after the app was last open (naming where that day’s revision starts, worded differently each day), then none until it is opened again. Opening the app plans them again from that day. There is no setting for how many.',
       '- Settings → Testing → “Scheduled reminders” lists the reminders this phone will show and when; “Show the next one in 5 seconds” shows the next as a real notification.',
+      '- Settings → Notifications → “Enable notifications” is off while the phone refuses Revisely’s notifications, and says so; turning it on then offers “Open Settings” (allow notifications for Revisely there, then turn reminders on). Without notifications allowed, no reminder can come.',
     ),
   },
   {

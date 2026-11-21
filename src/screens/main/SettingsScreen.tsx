@@ -11,7 +11,9 @@ import {
   AccessibilityState,
   Modal,
   useWindowDimensions,
+  Linking,
 } from 'react-native';
+import * as Notifications from 'expo-notifications';
 import { TopSafeAreaView } from '../../components/SafeAreaView';
 import Constants from 'expo-constants';
 import { AppInfo } from '../../components/settings/AppInfo';
@@ -108,6 +110,9 @@ import { isDevVariant } from '../../lib/variant';
 import { setRamadanTheme, useRamadanThemeSaved } from '../../lib/ramadanTheme';
 import { CheckerModelRow } from '../../components/settings/CheckerModelRow';
 import { ScheduledRemindersRow } from '../../components/settings/ScheduledRemindersRow';
+import { useNotificationPermission } from '../../hooks/useNotificationPermission';
+import { ensureNotificationsPermission } from '../../lib/notifications';
+import { remindersWhileAwayEnabled } from '../../lib/release/remindersWhileAway';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'Settings'>;
 
@@ -455,6 +460,18 @@ export default function SettingsScreen() {
     }, [loadRecordings]),
   );
 
+  // Every hook comes before the loading return below: one after it threw "Rendered more hooks than during the
+  // previous render" when Settings rendered before the account had loaded (Nov 2026).
+  const backupStatus = useBackupStatus();
+
+  // REMIND-5 (with the reminders-while-away switch): the switch shows on only while reminders can come. With the
+  // phone refusing notifications it shows off and says so, and turning it on offers the phone's Settings (iOS won't
+  // ask twice), never a switch that does nothing.
+  const refusalShown = remindersWhileAwayEnabled();
+  const { permission: notifyPermission, refresh: refreshNotifyPermission } = useNotificationPermission(refusalShown);
+  const notificationsRefused = refusalShown && notifyPermission?.status === 'denied';
+  const [refusedSheet, setRefusedSheet] = useState(false);
+
   if (!localUser) {
     return (
       <TopSafeAreaView style={styles.container}>
@@ -482,7 +499,21 @@ export default function SettingsScreen() {
     }
   };
 
+  // REMIND-5: turned on while the phone refuses, the phone's Settings are offered; not asked yet, it asks.
   const handleNotificationToggle = async (enabled: boolean) => {
+    if (enabled && refusalShown) {
+      const p = await Notifications.getPermissionsAsync().catch(() => null);
+      if (p && p.status !== 'granted') {
+        if (p.canAskAgain === false) {
+          setRefusedSheet(true);
+          return;
+        }
+        // Not asked yet (or Android may ask again): asked now; a no leaves reminders off.
+        const granted = await ensureNotificationsPermission().catch(() => false);
+        refreshNotifyPermission();
+        if (!granted) return;
+      }
+    }
     await updateUser({ notificationsEnabled: enabled });
   };
 
@@ -493,7 +524,6 @@ export default function SettingsScreen() {
   };
 
   // Recording backup (lib/recordingBackup): on by default.
-  const backupStatus = useBackupStatus();
   const handleBackupToggle = (on: boolean) => {
     const save = (value: boolean) =>
       updateUser({ recordingBackup: value }).catch((err) => logger.warn('Could not change backup', err));
@@ -1065,10 +1095,13 @@ export default function SettingsScreen() {
           <Row
             icon="notifications-outline"
             label={t('settings.notifications.enable')}
+            subtitle={notificationsRefused && localUser.notificationsEnabled ? t('settings.notifications.refused') : undefined}
             rightSlot={
               <SettingSwitch
-                value={localUser.notificationsEnabled}
+                value={localUser.notificationsEnabled && !notificationsRefused}
                 onValueChange={handleNotificationToggle}
+                accessibilityLabel={t('settings.notifications.enable')}
+                testID="settings-notifications"
               />
             }
           />
@@ -1392,6 +1425,15 @@ export default function SettingsScreen() {
       />
       <MushafPickerSheet visible={mushafPicker} onClose={() => setMushafPicker(false)} />
       {replayOffered(user) ? <WhatsNewReplay visible={whatsNewOpen} onClose={() => setWhatsNewOpen(false)} /> : null}
+      <ActionSheet
+        visible={refusedSheet}
+        onClose={() => setRefusedSheet(false)}
+        title={t('settings.notifications.refusedTitle')}
+        message={t('settings.notifications.refusedBody')}
+        actions={[{ key: 'settings', label: t('common.openSettings'), icon: 'settings-outline', onPress: () => Linking.openSettings() }]}
+        cancelLabel={t('common.notNow')}
+        testID="settings-notifications-refused"
+      />
       {showsResetMyData(user) ? <ResetDataSheet visible={resetSheet} onClose={() => setResetSheet(false)} /> : null}
       {reciteCheck ? (
         <Sheet visible={reciteNotice} onClose={() => setReciteNotice(false)} title={t('settings.about.reciteNoticeTitle')} testID="settings-recite-notice-sheet">
