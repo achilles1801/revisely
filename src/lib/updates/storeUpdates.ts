@@ -26,6 +26,7 @@ import { db } from '../firebase';
 import InstallSource from '../../../modules/install-source';
 import { BUNDLE_ID } from '../releaseInfo';
 import { isDevVariant } from '../variant';
+import { APP_STORE_ID, PLAY_PACKAGE } from '../storeIds';
 import { logger } from '../logger';
 import { t } from '../../i18n';
 import {
@@ -42,8 +43,7 @@ import {
   storeDecision,
 } from './versions';
 
-export const APP_STORE_ID = '6767990248';
-export const PLAY_PACKAGE = 'com.revisionbuddy.app';
+export { APP_STORE_ID, PLAY_PACKAGE };
 export const LOOKUP_URL = `https://itunes.apple.com/lookup?bundleId=${BUNDLE_ID}`;
 
 export const CONFIG_EVERY_MS = 6 * 60 * 60_000;

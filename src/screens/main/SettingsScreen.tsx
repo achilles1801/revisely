@@ -63,6 +63,7 @@ import { formatBytes } from '../../lib/recordingFormat';
 import { logger } from '../../lib/logger';
 import { setHomePrefs, useHomePrefs } from '../../lib/homePrefs';
 import { SUPPORT_EMAIL, supportMailto } from '../../lib/contact';
+import { openRatingPage, rateAskEnabled } from '../../lib/rateAsk';
 import { openEmail, openWebPage } from '../../lib/openWebPage';
 import { PillTabs } from '../../components/v2/PillTabs';
 import { setMushafCellular } from '../../lib/mushafOffline';
@@ -1155,6 +1156,14 @@ export default function SettingsScreen() {
             label={t('settings.support.share')}
             onPress={handleShareApp}
           />
+          {rateAskEnabled() ? (
+            <Row
+              icon="star-outline"
+              label={t('settings.support.rate')}
+              onPress={() => void openRatingPage()}
+              testID="settings-rate"
+            />
+          ) : null}
           <Row
             icon="chatbubble-ellipses-outline"
             label={t('settings.support.feedback')}

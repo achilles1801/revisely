@@ -367,13 +367,14 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     // Mistake detection reached the store app with 1.0.5 (its lines are in GUIDE_SECTIONS). Strict stays Revisely Dev's
     // until it has a release of its own (Majd, Nov 17 2026).
     title: 'Only in Revisely Dev',
-    covers: [],
+    covers: ['SESS-8'],
     routes: ['Settings'],
     text: lines(
       '- Settings → Recite → “Mistakes to mark”: “Words & harakat”, or “Strict”, which also marks tajweed in violet (madd lengths, set by “Madd munfasil”, “Madd muttasil” and “Madd ʿarid”; qalqalah, ghunnah, ikhfa, idgham, iqlab). The store app marks words and harakat only.',
       '- Settings → Testing → “Keep my recitations as test data” keeps takes for Revisely’s tests; nobody listens. Settings → Testing → “Premium” turns Premium off to see Mark mistakes locked.',
       '- Settings → Testing → “Mistake detection model” says which model the checker runs for Recite, Words & harakat and Strict (for example v7), read from the checker when Settings opens; a tap asks again.',
       '- Settings → Appearance → “Language”: “Phone’s language”, English or العربية (Arabic, right to left). Revisely restarts to change it (“Restart”, or “Not now” for the next launch). The Arabic is still being written: what isn’t translated yet shows in English. The store app is English only for now.',
+      '- Rating Revisely: Settings → Support → “Rate Revisely” opens the App Store’s Write a Review page (Revisely’s Google Play page on Android). After finishing a day’s revision with a streak of 7 days or more, the end card may also show “Enjoying Revisely? Rate it”: at most 3 times ever, four months apart, never in an account’s first week, and never again once it is tapped or dismissed with its ✕ (or Rate Revisely is used). Rating is always optional and nothing is given for it.',
     ),
   },
   {
