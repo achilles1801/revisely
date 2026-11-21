@@ -11,6 +11,7 @@ import { takeWhen } from '../../lib/reciteMemory/describe';
 import { useTakeRecording } from '../../lib/reciteMemory/takeAudio';
 import { useRecordingPlayback } from '../../hooks/useRecordingPlayback';
 import type { RecordingMeta } from '../../lib/recordings';
+import { t } from '../../i18n';
 
 const PLAY = 36;
 
@@ -25,7 +26,7 @@ function TakePlay({ recording }: { recording: RecordingMeta }) {
       onPress={() => void togglePause(recording)}
       style={[styles.play, { backgroundColor: palette.text }]}
       accessibilityRole="button"
-      accessibilityLabel={playing ? 'Pause your take' : 'Play your take'}
+      accessibilityLabel={playing ? t('reciteMemory.shown.pause') : t('reciteMemory.shown.play')}
       testID="shown-take-play"
     >
       {downloadingId === recording.id ? (
@@ -48,19 +49,19 @@ export function ShownTakeBar({ take, now, bottom, onDone }: { take: TakeRecord; 
   return (
     <View
       style={[styles.bar, { bottom, backgroundColor: palette.sheet, borderColor: palette.outline, shadowColor: palette.shadow, shadowOpacity: isDark ? 0 : 0.12 }]}
-      accessibilityLabel={`Your take, ${takeWhen(take.createdAt, now, true)}`}
+      accessibilityLabel={t('reciteMemory.shown.label', { when: takeWhen(take.createdAt, now, true) })}
       testID="shown-take-bar"
     >
       {recording ? <TakePlay recording={recording} /> : null}
       <View style={styles.text}>
         <Text style={[typeV2.name, { color: palette.text }]} maxFontSizeMultiplier={1.4} numberOfLines={1}>
-          {`Your take · ${takeWhen(take.createdAt, now, true)}`}
+          {t('reciteMemory.shown.title', { when: takeWhen(take.createdAt, now, true) })}
         </Text>
         <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={1.4} testID="shown-take-line">
-          {[formatAccuracy(take.accuracy), mistakesLabel(take.mistakes), take.hidden ? 'recited with the page hidden' : null].filter(Boolean).join(' · ')}
+          {[formatAccuracy(take.accuracy), mistakesLabel(take.mistakes), take.hidden ? t('reciteMemory.shown.hidden') : null].filter(Boolean).join(' · ')}
         </Text>
       </View>
-      <PillButton title="Done" size="sm" variant="outline" onPress={onDone} testID="shown-take-done" />
+      <PillButton title={t('common.done')} size="sm" variant="outline" onPress={onDone} testID="shown-take-done" />
     </View>
   );
 }
