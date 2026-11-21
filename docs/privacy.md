@@ -6,11 +6,11 @@ permalink: /privacy/
 # Privacy Policy for Revisely
 
 **Effective date: 2026-05-11**
-**Last updated: 2026-11-18**
+**Last updated: 2026-11-21**
 
 This Privacy Policy describes how Revisely ("we", "us", or "the app") collects, uses, and protects information when you use the Revisely mobile application, and when you donate to Revisely on our website, revisely.app.
 
-Revisely is operated by `Majd Khawaldeh`, a sole developer. You can reach us at `support@revisely.app`.
+Revisely is operated by **Revisely LLC**, a Texas limited liability company ("Revisely", "we", "us"). Revisely LLC is the controller of your personal data under the EU and UK GDPR, and is responsible for it under other privacy laws. You can reach us at `support@revisely.app`.
 
 ## 1. What this app does
 
@@ -75,7 +75,7 @@ Our logs record counts and costs, linked to your account's internal ID and kept 
 ### Donations
 If you donate on revisely.app, you pay on a checkout page run by **Stripe**, which processes your card or other payment details; Revisely never receives your full card number. From Stripe we receive your **full name**, **email address**, the **amount** you gave and the **payment's status** (for example, whether it succeeded or was refunded), along with the limited payment details Stripe shows the businesses it serves, such as the card brand, the last four digits of the card or bank account, and the country. We use this information only to send your receipt, to thank you, and to keep our financial records. If you pay with a service offered on Stripe's checkout page, such as Apple Pay, Link, Cash App Pay or Amazon Pay, that service also processes the payment, under its own privacy policy. How Stripe handles your information is described in the [Stripe Privacy Policy](https://stripe.com/privacy).
 
-Donation records are not linked to a Revisely account, and deleting your account doesn't delete them (see Data retention). Revisely is not a charity, so donations are not tax-deductible.
+Donation records are not linked to a Revisely account, and deleting your account doesn't delete them (see Data retention). Revisely LLC is not a charity, so donations are not tax-deductible.
 
 ## 3. How we use information
 
@@ -88,6 +88,7 @@ We use the information described above to:
 - Respond to support requests you send us.
 - Process donations — send your receipt, thank you, and keep financial records.
 - Detect and fix bugs and crashes.
+- Count how the app is used across all accounts (for example, how many accounts revised this week, and how many come back a week after signing up), so we can decide what to improve. These counts use the revision data described above, are seen only by Revisely's developer, and never show what any one person did.
 - Prevent abuse — verify that requests come from a genuine install of the app.
 - Comply with legal obligations.
 
@@ -102,7 +103,7 @@ If you are in the European Economic Area, the United Kingdom, or Switzerland, we
 
 - **Performance of a contract** — to create and operate your account, sync your data, provide the core memorization-tracking service, check the recitation you ask the app to check, decide an Open Door application you make, and process a donation you make.
 - **Consent**: for push notifications, location (when you enable the fajr-aligned day boundary), Revo (you turn it on in the app and can turn it off at any time), and Apple/Google sign-in (you consent through the system permission prompts).
-- **Legitimate interests** — to detect crashes, prevent abuse, improve the app (including reviewing Revo conversations), and thank people who donate. We balance this against your right to privacy and have minimized what we collect.
+- **Legitimate interests** — to detect crashes, prevent abuse, improve the app (including reviewing Revo conversations and counting use across accounts), and thank people who donate. We balance this against your right to privacy and have minimized what we collect.
 - **Legal obligation** — to respond to lawful requests from authorities and retain records required by law.
 
 ## 5. Third-party services we use
