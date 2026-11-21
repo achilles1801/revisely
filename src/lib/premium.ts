@@ -14,6 +14,7 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { logger } from './logger';
 import { callFunction } from '../services/firestoreService';
+import { t } from '../i18n';
 
 export type PremiumSource = 'support' | 'dev' | 'purchase' | 'gift' | 'family' | 'early';
 
@@ -182,18 +183,18 @@ export function premiumErrorText(err: unknown): string {
   const code = (err as { code?: unknown } | null)?.code;
   switch (code) {
     case 'RESOURCE_EXHAUSTED':
-      return 'That’s a lot of tries for one day. Try again tomorrow.';
+      return t('premium.errors.tooMany');
     case 'UNAUTHENTICATED':
-      return 'Sign in again, then try once more.';
+      return t('premium.errors.signIn');
     case 'FAILED_PRECONDITION':
-      return 'Applying for support isn’t open yet.';
+      return t('premium.errors.notOpen');
     case 'PERMISSION_DENIED':
-      return 'Only in Revisely Dev.';
+      return t('premium.errors.devOnly');
     case 'UNAVAILABLE':
     case 'DEADLINE_EXCEEDED':
     case 'deadline-exceeded':
-      return 'Couldn’t connect. Try again when you’re online.';
+      return t('premium.errors.offline');
     default:
-      return err instanceof TypeError ? 'Couldn’t connect. Try again when you’re online.' : 'Something went wrong. Try again.';
+      return err instanceof TypeError ? t('premium.errors.offline') : t('premium.errors.other');
   }
 }

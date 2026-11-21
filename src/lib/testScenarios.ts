@@ -31,6 +31,7 @@ import { deleteAllRecordings, forgetCloudDeletes } from './recordings';
 import { DEFAULT_FAJR_METHOD, getFajrTimeFor } from './fajrBoundary';
 import { auth } from './firebase';
 import { logger } from './logger';
+import { t } from '../i18n';
 
 export interface TestScenario {
   id: string;
@@ -46,18 +47,30 @@ export interface TestScenario {
 export const TEST_SCENARIOS: TestScenario[] = [
   {
     id: 'heavy',
-    title: 'Heavy user',
-    detail: 'Seven months: 21 juz memorized and more in part, a juz a day, gaps, the daily log, recordings, over a hundred Recite takes, Revo.',
+    get title() {
+      return t('settings.scenario.heavy');
+    },
+    get detail() {
+      return t('settings.scenario.heavyDetail');
+    },
   },
   {
     id: 'steady',
-    title: 'Missed yesterday',
-    detail: 'Six weeks of ten pages a day: a twelve-day run, then yesterday missed. The streak’s grace ring and the catch-up.',
+    get title() {
+      return t('settings.scenario.steady');
+    },
+    get detail() {
+      return t('settings.scenario.steadyDetail');
+    },
   },
   {
     id: 'starting',
-    title: 'Getting started',
-    detail: 'Two weeks in: Juz 30, Al-Mulk ayah by ayah, four pages a day, the first Recite takes.',
+    get title() {
+      return t('settings.scenario.starting');
+    },
+    get detail() {
+      return t('settings.scenario.startingDetail');
+    },
   },
 ];
 

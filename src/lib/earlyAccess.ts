@@ -17,6 +17,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { logger } from './logger';
 import { callFunction } from '../services/firestoreService';
+import { t } from '../i18n';
 
 export const EARLY_ACCESS_EVERY_MS = 10 * 60_000;
 export const EARLY_ACCESS_KEY = '@revisely_early_access';
@@ -93,17 +94,15 @@ export function resetEarlyAccessForTests(): void {
 // ------------------------------------------------------------------ the words
 
 /** Settings' Premium row, while early access is on. */
-export const EARLY_ACCESS_LINE =
-  'Premium is free for everyone who signs up during early access, which has no end date yet. After it ends, Premium will be paid, and every account that got it during early access keeps it for life, bi-idhnillah.';
+const fullLine = () => t('premium.earlyAccess.line');
 /** Settings' Premium row, after early access, for an account that had it then. */
-export const EARLY_ACCESS_KEPT_LINE = 'Yours for life: your account got Premium during early access.';
+const keptLine = () => t('premium.earlyAccess.kept');
 /** Marking mistakes' intro (an account without Premium yet), in place of Apply for support. */
-export const EARLY_ACCESS_INTRO_LINE =
-  'Premium is free for everyone during early access, which has no end date yet. After it ends, Premium will be paid, and you’ll keep it for life, bi-idhnillah.';
+export const earlyAccessIntroLine = () => t('premium.earlyAccess.intro');
 /** The take summary's quiet line, while early access is on. */
-export const EARLY_ACCESS_SHORT_LINE = 'Premium is free for everyone during early access, and yours for life.';
+const shortLine = () => t('premium.earlyAccess.short');
 /** The take summary's quiet line, after early access, for an account that had it then. */
-export const EARLY_ACCESS_KEPT_SHORT_LINE = 'Premium is yours for life, from early access.';
+const keptShortLine = () => t('premium.earlyAccess.keptShort');
 
 /** The account's Premium, as lib/premium's usePremium gives it. */
 interface PremiumNow {
@@ -115,15 +114,15 @@ interface PremiumNow {
 /** Settings' line under Premium, or null when there's nothing about early access to say. */
 export function earlyAccessLine(premium: PremiumNow, earlyAccessOn: boolean): string | null {
   if (!premium.has) return null;
-  if (earlyAccessOn) return EARLY_ACCESS_LINE;
-  return premium.early ? EARLY_ACCESS_KEPT_LINE : null;
+  if (earlyAccessOn) return fullLine();
+  return premium.early ? keptLine() : null;
 }
 
 /** The take summary's quiet line, or null. */
 export function earlyAccessShortLine(premium: PremiumNow, earlyAccessOn: boolean): string | null {
   if (!premium.has) return null;
-  if (earlyAccessOn) return EARLY_ACCESS_SHORT_LINE;
-  return premium.early ? EARLY_ACCESS_KEPT_SHORT_LINE : null;
+  if (earlyAccessOn) return shortLine();
+  return premium.early ? keptShortLine() : null;
 }
 
 // ------------------------------------------------------------------ claiming it

@@ -2,14 +2,12 @@
 jest.mock('firebase/firestore', () => ({ doc: () => ({}), getDoc: async () => ({ exists: () => false }) }));
 jest.mock('../firebase', () => ({ auth: { currentUser: null }, db: {} }));
 jest.mock('../../services/firestoreService', () => ({ callFunction: jest.fn() }));
-import {
-  EARLY_ACCESS_KEPT_LINE,
-  EARLY_ACCESS_LINE,
-  EARLY_ACCESS_INTRO_LINE,
-  earlyAccessLine,
-  earlyAccessOf,
-  earlyAccessShortLine,
-} from '../earlyAccess';
+import { earlyAccessIntroLine, earlyAccessLine, earlyAccessOf, earlyAccessShortLine } from '../earlyAccess';
+import { en } from '../../i18n/en';
+
+const EARLY_ACCESS_LINE = en.premium.earlyAccess.line;
+const EARLY_ACCESS_KEPT_LINE = en.premium.earlyAccess.kept;
+const EARLY_ACCESS_INTRO_LINE = earlyAccessIntroLine();
 
 const ALL = [EARLY_ACCESS_LINE, EARLY_ACCESS_KEPT_LINE, EARLY_ACCESS_INTRO_LINE];
 

@@ -3,7 +3,7 @@
 // way the phone points. Pure; the compass sheet (components/qibla) feeds it the
 // position and the heading, which never leave the phone.
 
-import { formatNumber } from '../i18n';
+import { formatNumber, t } from '../i18n';
 
 /** The Kaaba, Makkah. */
 export const KAABA = { latitude: 21.4225, longitude: 39.8262 } as const;
@@ -69,19 +69,19 @@ export function isAligned(relative: number, wasAligned: boolean): boolean {
 /** "Turn right 34°", "Turn left 12°"; "Straight ahead" under half a degree. */
 export function turnText(relative: number): string {
   const by = Math.round(Math.abs(relative));
-  if (by === 0) return 'Straight ahead';
-  return `Turn ${relative > 0 ? 'right' : 'left'} ${by}°`;
+  if (by === 0) return t('qibla.straightAhead');
+  return relative > 0 ? t('qibla.turnRight', { n: by }) : t('qibla.turnLeft', { n: by });
 }
 
 /** "119°" (360 rounds back to 0). */
 export function formatBearing(bearing: number): string {
-  return `${Math.round(normalize(bearing)) % 360}°`;
+  return `${formatNumber(Math.round(normalize(bearing)) % 360)}°`;
 }
 
 /** "4,794 km"; under 10 km with one decimal ("3.2 km"). */
 export function formatDistance(km: number): string {
-  if (km < 10) return `${formatNumber(Math.round(km * 10) / 10, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km`;
-  return `${formatNumber(Math.round(km))} km`;
+  if (km < 10) return t('qibla.km', { n: formatNumber(Math.round(km * 10) / 10, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) });
+  return t('qibla.km', { n: formatNumber(Math.round(km)) });
 }
 
 export interface City {

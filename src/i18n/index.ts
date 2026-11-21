@@ -10,6 +10,7 @@ export {
   formatDay,
   formatTime,
   formatNumber,
+  formatNumeral,
   weekdayName,
   monthName,
   dayMonth,

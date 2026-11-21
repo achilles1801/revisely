@@ -13,6 +13,7 @@
 
 import { getSurahDisplay } from './quranData';
 import { getArabicVerse } from './translation';
+import { t } from '../i18n';
 
 /** RIGHT-TO-LEFT EMBEDDING … POP DIRECTIONAL FORMATTING. */
 export const RLE = '\u202B';
@@ -36,8 +37,8 @@ export function verseEndMark(ayah: number): string {
 
 /** "Āli-'Imrān, Ayah 5". */
 export function verseReference(sura: number, ayah: number): string {
-  const name = getSurahDisplay(sura)?.nameDisplay ?? `Surah ${sura}`;
-  return `${name}, Ayah ${ayah}`.normalize('NFC');
+  const name = getSurahDisplay(sura)?.nameDisplay ?? t('common.surahN', { n: sura });
+  return t('verse.reference', { name, ayah }).normalize('NFC');
 }
 
 /** The text that Copy puts on the clipboard and Share sends. */

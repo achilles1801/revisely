@@ -5,7 +5,7 @@
 // or 'device' (the phone's own, for clock times: 12 or 24 hours as the phone is set). The orders
 // the designs chose by hand ("Wednesday 28 October", no comma) stay hand-built in English.
 // Another language uses Intl with its own locale and order for all of them.
-import { localDigits, localNumber } from './digits';
+import { localDigits, localNumber, localNumeral } from './digits';
 import { currentLanguage } from './instance';
 
 export type EnglishLocale = 'en-US' | 'en-GB' | 'device';
@@ -71,6 +71,11 @@ export function formatTime(
 /** A number, "1,234" (in Arabic "١٢٣٤": digits.ts). */
 export function formatNumber(n: number, options?: Intl.NumberFormatOptions): string {
   return isEnglish() ? n.toLocaleString(numberLocale(), options) : localNumber(n, currentLanguage(), options);
+}
+
+/** A number written by the code ("0.4" from toFixed) in the language's digits; unchanged in English. */
+export function formatNumeral(text: string): string {
+  return isEnglish() ? text : localNumeral(text, currentLanguage());
 }
 
 /** "Wednesday", "Wed", "W". */

@@ -43,6 +43,7 @@ import {
 import { QURANENC_CATALOGUE, QuranEncEntry, quranEncPageUrl, quranEncStore, QuranEncVerse } from './quranenc';
 import { languageName } from './translationLanguages';
 import { nextVerse, pageOfVerse, previousVerse, VerseKey } from './verses';
+import { t } from '../i18n';
 
 export interface TranslationInfo {
   id: string;
@@ -73,6 +74,7 @@ export interface Credit {
 
 export const CLEAR_QURAN_ID = 'en.khattab';
 
+// i18n-ignore-start (licensed names and credits, shown exactly as their publishers ask, in every language)
 export const TRANSLATIONS: TranslationInfo[] = [
   {
     id: 'en.sahih',
@@ -108,6 +110,7 @@ export const TRANSLATIONS: TranslationInfo[] = [
     },
   },
 ];
+// i18n-ignore-end
 
 export const DEFAULT_TRANSLATION_ID = 'en.sahih';
 
@@ -181,12 +184,15 @@ export function creditLine(t: TranslationInfo, version?: string): string {
 
 /** The Arabic's source, as Tanzil's terms ask: named, with a link to tanzil.net. */
 export const ARABIC_CREDIT: Credit = {
-  text: 'Arabic text: Tanzil Project',
+  get text() {
+    return t('verse.arabicCredit');
+  },
   linkLabel: 'tanzil.net',
   url: 'https://tanzil.net',
 };
 
 /** Tanzil's notice (tanzil.net/docs/text_license), kept in every copy of its text (the downloaded file). */
+// i18n-ignore-start (Tanzil's notice, word for word as its terms ask)
 export const TANZIL_NOTICE = [
   'Tanzil Quran Text',
   'Copyright (C) 2007-2021 Tanzil Project',
@@ -201,6 +207,7 @@ export const TANZIL_NOTICE = [
   '',
   'Please check updates at: http://tanzil.net/updates/',
 ].join('\n');
+// i18n-ignore-end
 
 /** The translation to use for a saved choice, falling back to the default. */
 export function resolveTranslation(id: string | null | undefined): TranslationInfo {
