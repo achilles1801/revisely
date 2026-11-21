@@ -6,11 +6,13 @@ permalink: /privacy/
 # Privacy Policy for Revisely
 
 **Effective date: 2026-05-11**
-**Last updated: 2026-11-21**
+**Last updated: ‹DATE: YYYY-MM-DD›**
 
 This Privacy Policy describes how Revisely ("we", "us", or "the app") collects, uses, and protects information when you use the Revisely mobile application, and when you donate to Revisely on our website, revisely.app.
 
-Revisely is operated by `Revisely LLC`, a Texas limited liability company. You can reach us at `support@revisely.app`.
+Revisely is operated by `Revisely LLC`, a Texas limited liability company ("Revisely", "we", "us"). Revisely LLC is the controller of your personal data under the EU and UK GDPR, and is responsible for it under other privacy laws. You can reach us at `support@revisely.app`.
+
+Since ‹DATE: Month D, YYYY›, Revisely is provided by Revisely LLC, the company its founder formed to run it. Your account, data and settings are unchanged; Revisely LLC is now responsible for them under this policy.
 
 ## 1. What this app does
 
@@ -75,7 +77,7 @@ Our logs record counts and costs, linked to your account's internal ID and kept 
 ### Donations
 If you donate on revisely.app, you pay on a checkout page run by **Stripe**, which processes your card or other payment details; Revisely never receives your full card number. From Stripe we receive your **full name**, **email address**, the **amount** you gave and the **payment's status** (for example, whether it succeeded or was refunded), along with the limited payment details Stripe shows the businesses it serves, such as the card brand, the last four digits of the card or bank account, and the country. We use this information only to send your receipt, to thank you, and to keep our financial records. If you pay with a service offered on Stripe's checkout page, such as Apple Pay, Link, Cash App Pay or Amazon Pay, that service also processes the payment, under its own privacy policy. How Stripe handles your information is described in the [Stripe Privacy Policy](https://stripe.com/privacy).
 
-Donation records are not linked to a Revisely account, and deleting your account doesn't delete them (see Data retention). Revisely is not a charity, so donations are not tax-deductible.
+Donation records are not linked to a Revisely account, and deleting your account doesn't delete them (see Data retention). Revisely LLC is not a charity, so donations are not tax-deductible.
 
 ## 3. How we use information
 
