@@ -88,6 +88,17 @@ jest.mock('../../../components/settings/CheckerModelRow', () => ({
   },
 }));
 
+// The language picker (src/i18n/choice): Revisely Dev only. Tests run in English, so the real one never offers it.
+const mockChooseLanguage = jest.fn(async (_choice: string) => 'ar');
+const mockRestartForLanguage = jest.fn(async () => undefined);
+jest.mock('../../../i18n/choice', () => ({
+  ...jest.requireActual('../../../i18n/choice'),
+  languagePickerOffered: () => mockDev,
+  offeredLanguages: () => ['en', 'ar'],
+  chooseLanguage: (choice: string) => mockChooseLanguage(choice),
+  restartForLanguage: () => mockRestartForLanguage(),
+}));
+
 import SettingsScreen from '../SettingsScreen';
 import { DesignProvider } from '../../../design/DesignContext';
 import { ThemeProvider } from '../../../context/ThemeContext';
@@ -193,6 +204,42 @@ describe('Settings: Appearance and haptics (Oct 28)', () => {
     await renderV2();
     expect(screen.queryByText('Haptics')).toBeNull();
     expect(screen.queryByLabelText('Haptics')).toBeNull();
+  });
+});
+
+describe('Settings: Language (Revisely Dev until Arabic ships)', () => {
+  afterEach(() => {
+    mockDev = false;
+  });
+
+  it('the store app: no Language row', async () => {
+    await renderV2();
+    expect(screen.queryByTestId('settings-language')).toBeNull();
+  });
+
+  it("Revisely Dev: the row follows the phone until a language is picked; picking Arabic keeps it and offers a restart", async () => {
+    mockDev = true;
+    await renderV2();
+    const row = screen.getByTestId('settings-language');
+    expect(within(row).getByText('Phone’s language')).toBeTruthy();
+    fireEvent.press(row);
+    await act(async () => {});
+    const sheet = screen.getByTestId('language-sheet');
+    expect(within(sheet).getByText('English')).toBeTruthy();
+    expect(within(sheet).getByText('Now English')).toBeTruthy();
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    fireEvent.press(within(sheet).getByText('العربية'));
+    await act(async () => {
+      screen.UNSAFE_getAllByType(require('react-native').Modal).forEach((m: { props: { onDismiss?: () => void } }) => m.props.onDismiss?.());
+    });
+    expect(mockChooseLanguage).toHaveBeenCalledWith('ar');
+    expect(within(screen.getByTestId('settings-language')).getByText('العربية')).toBeTruthy();
+    expect(alert).toHaveBeenCalledWith('Restart Revisely?', 'It closes and opens again in العربية.', expect.any(Array));
+    const buttons = alert.mock.calls[0][2] as AlertButton[];
+    expect(buttons.map((b) => b.text)).toEqual(['Not now', 'Restart']);
+    buttons[1].onPress?.();
+    expect(mockRestartForLanguage).toHaveBeenCalled();
+    alert.mockRestore();
   });
 });
 

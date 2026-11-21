@@ -2209,7 +2209,16 @@ code into `src/i18n/en/<folder>.ts`, folder by folder, with the English unchange
   list) fails on UI text written into its files. Put new text in its `en/` file, or mark a line that isn't
   UI text `// i18n-ignore (why)`. How-to and the progress command: `src/i18n/README.md`.
 - Tests, scenarios and E2E builds always run in English (`src/i18n/language.ts`).
-- JavaScript only so far; Arabic, the picker and right-to-left wait for the rest and a native release.
+- **Arabic (part 2, Majd, Nov 21 2026):** `src/i18n/ar/` mirrors `en/` (a missing key shows in English; six plural
+  forms; `__tests__/arabic.test.ts`). Words: `src/i18n/ar-glossary.md`; take a new term from Tarteel's Arabic or
+  Quran.com's `locales/ar` before asking Majd (his Nov 18 rule). Numbers come out in Arabic-Indic digits
+  (`src/i18n/digits.ts`).
+- **The picker is Revisely Dev only** (Settings → Appearance → Language, `src/i18n/choice.ts`). It restarts the app
+  into the language and its direction. The store app offers English alone (`SHIPPED`) until Arabic ships with the
+  native release that declares it; that release's changes move the fingerprints, so they wait for the release owner.
+- **New layouts use start and end**, never left and right (`marginStart`, `paddingEnd`, `start: 0`). No
+  `textAlign: 'left'` on text that should follow the language. Arrows and chevrons come from `chevron()` or a flipped
+  icon.
 
 ## UI traps
 

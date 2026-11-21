@@ -1,10 +1,21 @@
-// Which language the app shows. English until another language ships whole: a language is
-// added to LANGUAGES only once every screen has it (src/i18n/README.md).
+// Which language the app shows. English is the source and the fallback. Arabic has strings (src/i18n/ar) but is
+// offered only in Revisely Dev until every screen has it and the native release that declares it is out
+// (src/i18n/README.md, "Arabic"): the store app offers SHIPPED alone.
 
-/** The languages the app has strings for. English is the source and the fallback. */
-export const LANGUAGES = ['en'] as const;
+/** The languages the app has strings for. */
+export const LANGUAGES = ['en', 'ar'] as const;
 export type Language = (typeof LANGUAGES)[number];
 export const FALLBACK: Language = 'en';
+
+/** The languages the store app offers. Arabic joins once it ships whole. */
+export const SHIPPED: readonly Language[] = ['en'];
+
+/** Each language's name in itself, as the picker shows it. */
+export const LANGUAGE_NAMES: Record<Language, string> = { en: 'English', ar: 'العربية' };
+
+export function isLanguage(value: unknown): value is Language {
+  return typeof value === 'string' && (LANGUAGES as readonly string[]).includes(value);
+}
 
 /**
  * Tests and E2E builds always run in English, whatever the machine's or simulator's language:
@@ -20,16 +31,16 @@ export function pinnedToEnglish(env: Record<string, string | undefined> = proces
  */
 export function resolveLanguage(
   preferred: readonly string[],
-  supported: readonly string[] = LANGUAGES,
+  supported: readonly string[] = SHIPPED,
   pinned: boolean = pinnedToEnglish(),
-): string {
+): Language {
   if (pinned) return FALLBACK;
   for (const tag of preferred) {
     const lower = tag.toLowerCase().replace(/_/g, '-');
     const exact = supported.find((l) => l.toLowerCase() === lower);
-    if (exact) return exact;
+    if (isLanguage(exact)) return exact;
     const base = supported.find((l) => l.toLowerCase() === lower.split('-')[0]);
-    if (base) return base;
+    if (isLanguage(base)) return base;
   }
   return FALLBACK;
 }
