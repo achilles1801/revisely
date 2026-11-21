@@ -1242,7 +1242,7 @@ function buildHeavy(b: Builder): void {
 
   for (let k = -HISTORY; k <= -1; k++) {
     const d = day(k);
-    // Sittings: Al-Kahf on Fridays, and the page about to be memorized.
+    // Sittings: Al-Kahf on Fridays (in the morning: inside the Islamic Friday, KAHF-2), and the page about to be memorized.
     if (isFriday(d)) {
       const s = b.reading(b.at(d, 10, b.int(0, 30)), b.int(22, 38), range(293, 304));
       if (k >= -60 && b.chance(0.6)) b.recording(s.startedAt + 2 * 60_000, range(293, 296), 'reading');
