@@ -104,6 +104,7 @@ import {
 } from '../../i18n/choice';
 import { LANGUAGE_NAMES } from '../../i18n/language';
 import { isDevVariant } from '../../lib/variant';
+import { setRamadanTheme, useRamadanThemeSaved } from '../../lib/ramadanTheme';
 import { CheckerModelRow } from '../../components/settings/CheckerModelRow';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'Settings'>;
@@ -285,6 +286,7 @@ export default function SettingsScreen() {
   const { firebaseUser, signOutUser, deleteAccount } = useAuth();
   const { theme, palette, themeMode, setThemeMode } = useTheme();
   const design = useDesign();
+  const ramadanTheme = useRamadanThemeSaved();
   const tabFootprint = useTabBarFootprint();
   const [localUser, setLocalUser] = useState(user);
 
@@ -1112,6 +1114,22 @@ export default function SettingsScreen() {
               value={chosenLanguage === 'system' ? t('settings.language.system') : LANGUAGE_NAMES[chosenLanguage]}
               onPress={() => setLanguageSheet(true)}
               testID="settings-language"
+            />
+          ) : null}
+          {/* Revisely Dev only (THEME-1): decorations, kept on this phone. */}
+          {isDevVariant() ? (
+            <Row
+              icon="moon-outline"
+              label={t('settings.appearance.ramadan')}
+              subtitle={t('settings.appearance.ramadanSub')}
+              rightSlot={
+                <SettingSwitch
+                  value={ramadanTheme}
+                  onValueChange={(on) => void setRamadanTheme(on)}
+                  accessibilityLabel={t('settings.appearance.ramadan')}
+                  testID="settings-ramadan-theme"
+                />
+              }
             />
           ) : null}
         </Section>

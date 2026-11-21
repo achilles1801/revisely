@@ -29,6 +29,8 @@ export const settings: NonNullable<ArStrings['settings']> = {
     system: 'النظام',
     light: 'فاتح',
     dark: 'داكن',
+    ramadan: 'سمة رمضان',
+    ramadanSub: 'فوانيس وأضواء ونجوم تتساقط',
   },
   language: {
     row: 'اللغة',

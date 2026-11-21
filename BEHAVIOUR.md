@@ -1234,6 +1234,15 @@ shows up once and they must go through it and complete it … just the main stuf
   RTL language mirrored the English app: rows, the tab swipe, the verse highlights and the mushaf's
   page order; `src/i18n/direction.ts`.)
 
+## The Ramadan theme (Revisely Dev)
+
+- **THEME-1.** Settings → Appearance → Ramadan theme (off until turned on, kept on that phone, not the account) dresses
+  the app for Ramadan and changes nothing it does (Majd, Nov 21 2026): on Home, light falling softly over the glow,
+  lanterns hanging in the top bar's empty side (gone while the timer chip shows there) and a crescent by the greeting;
+  string lights along the tab bar. None of it is drawn over the mushaf page, a revision session's page or a Recite take,
+  none of it takes a touch or is read by VoiceOver, and with Reduce Motion it stays still. The store app has no switch
+  and never shows it (`lib/ramadanTheme`, `components/ramadan`).
+
 ## Premium early access
 
 Majd, Nov 16 2026: "give everyone premium access right now … it'll be paid for in the future but anyone who has
