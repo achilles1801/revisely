@@ -224,6 +224,101 @@ body.ramadan .doc h1::before, body.ramadan .page-hero h1::before {
 }
 html[dir="rtl"] body.ramadan .page-hero h1::before { background-position: 100% 50%; margin-inline-start: 0; }
 
+/* ---------- The phases (ramadan.js sets data-rm-phase on the visitor's clock) ---------- */
+
+/* Only the current phase's words show: before Ramadan (counting down), during it, at Eid. */
+body.ramadan[data-rm-phase="before"] [data-rm-when]:not([data-rm-when~="before"]),
+body.ramadan[data-rm-phase="during"] [data-rm-when]:not([data-rm-when~="during"]),
+body.ramadan[data-rm-phase="eid"] [data-rm-when]:not([data-rm-when~="eid"]) { display: none !important; }
+/* The live numbers wait for ramadan.js, so they never jump from the worker's guess to the visitor's clock. */
+body.ramadan:not(.rm-live) .rm-clock, body.ramadan:not(.rm-live) .rm-unit b { visibility: hidden; }
+
+/* The strip's clock before Ramadan, and its link (wider screens). */
+body.ramadan .rm-clock {
+  flex: none; direction: ltr; unicode-bidi: isolate;
+  min-width: 6.4em; padding: 1px 9px; border-radius: 999px;
+  box-shadow: inset 0 0 0 1px rgb(244 199 106 / 0.45);
+  color: var(--rm-gold-hi); font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; text-align: center;
+}
+body.ramadan .rm-greet-line { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body.ramadan .rm-greet-cta {
+  flex: none; padding: 3px 12px; border-radius: 999px;
+  background: var(--rm-gold); color: #1a1438; font-size: 13px; font-weight: 700; text-decoration: none; white-space: nowrap;
+}
+body.ramadan .rm-greet-cta:hover { background: var(--rm-gold-hi); color: #1a1438; }
+@media (max-width: 899px) { body.ramadan .rm-greet-cta { display: none; } }
+@media (max-width: 479px) {
+  body.ramadan .rm-banner { gap: 8px; }
+  body.ramadan .rm-greet { gap: 8px; }
+  body.ramadan[data-rm-phase="before"] .rm-greet .rm-moon { display: none; }
+  body.ramadan .rm-clock { min-width: 0; padding: 1px 7px; font-size: 13px; }
+  html[lang="ar"] body.ramadan .rm-greet strong { font-size: 16px; }
+}
+body.ramadan .rm-greet-eid { width: 64px; height: 21px; }
+
+/* ---------- The home's card: the countdown, then Ramadan's and Eid's words ---------- */
+
+body.ramadan .rm-count { padding: 64px 0 40px; }
+body.ramadan .rm-count-card {
+  position: relative; overflow: hidden; isolation: isolate;
+  max-width: 880px; margin: 0 auto; padding: 48px 24px 44px; border-radius: 28px;
+  text-align: center; color: var(--rm-cream);
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='36'%3E%3Cg fill='none' stroke='%23f4c76a' stroke-opacity='.16' stroke-width='1'%3E%3Cpath d='M9 9h18v18H9z'/%3E%3Cpath d='M18 5.3L30.7 18 18 30.7 5.3 18z'/%3E%3Cpath d='M9 9L0 0M27 9l9-9M27 27l9 9M9 27l-9 9'/%3E%3C/g%3E%3C/svg%3E") 50% 0 / 36px 36px,
+    radial-gradient(60% 70% at 50% 0, rgb(255 190 90 / 0.2), rgb(255 190 90 / 0)),
+    linear-gradient(160deg, var(--rm-night-2), var(--rm-night) 72%);
+  box-shadow: inset 0 0 0 1px rgb(244 199 106 / 0.24), 0 30px 60px -30px rgb(12 17 50 / 0.55);
+}
+body.ramadan .rm-kicker {
+  display: inline-flex; align-items: center; gap: 8px; margin: 0 0 10px;
+  color: var(--rm-gold); font-size: 14px; font-weight: 600; letter-spacing: 0.02em;
+}
+body.ramadan .rm-kicker .rm-moon { width: 16px; height: 16px; filter: drop-shadow(0 0 5px rgb(255 200 90 / 0.6)); }
+body.ramadan .rm-count-title {
+  color: var(--rm-gold-hi); font-size: clamp(30px, 4.4vw, 48px); line-height: 1.08; letter-spacing: -0.03em; text-wrap: balance;
+}
+body.ramadan .rm-timer { display: flex; justify-content: center; gap: 10px; margin: 28px 0 0; }
+body.ramadan .rm-unit {
+  min-width: 82px; padding: 14px 8px 11px; border-radius: 18px;
+  background: rgb(255 255 255 / 0.06); box-shadow: inset 0 0 0 1px rgb(244 199 106 / 0.28);
+}
+body.ramadan .rm-unit b {
+  display: block; color: #fff3d6; font-size: clamp(30px, 5vw, 46px); font-weight: 700; line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+body.ramadan .rm-unit span { display: block; margin-top: 8px; color: var(--rm-cream); font-size: 12px; letter-spacing: 0.04em; opacity: 0.8; }
+body.ramadan .rm-expected { margin: 16px auto 0; max-width: 34rem; color: var(--rm-cream); font-size: 14px; opacity: 0.8; text-wrap: balance; }
+body.ramadan .rm-count-text {
+  margin: 18px auto 0; max-width: 34rem; color: #f6eedb; font-size: clamp(16px, 1.5vw, 18px); line-height: 1.55; text-wrap: pretty;
+}
+body.ramadan .rm-cta {
+  display: inline-flex; align-items: center; justify-content: center; min-height: 48px; margin-top: 26px; padding: 0 28px;
+  border-radius: 999px; background: var(--rm-gold); color: #1a1438; font-size: 16px; font-weight: 700; text-decoration: none;
+}
+body.ramadan .rm-cta:hover { background: var(--rm-gold-hi); color: #1a1438; }
+body.ramadan .rm-cta:focus-visible { outline-color: var(--rm-gold-hi); }
+/* Two lanterns hang into the card's top corners, where there's room beside the title. */
+body.ramadan .rm-count-hang {
+  display: none; position: absolute; top: 0; z-index: -1; width: 34px;
+  padding-top: 22px; background: linear-gradient(rgb(244 199 106 / 0.55), rgb(244 199 106 / 0.55)) no-repeat 50% 0 / 1px 22px;
+  transform-origin: 50% 0;
+}
+body.ramadan .rm-count-hang-start { inset-inline-start: 8%; }
+body.ramadan .rm-count-hang-end { inset-inline-end: 8%; padding-top: 44px; background-size: 1px 44px; }
+body.ramadan .rm-count-hang .rm-lantern { width: 100%; height: auto; }
+@media (min-width: 720px) { body.ramadan .rm-count-hang { display: block; } }
+@media (max-width: 480px) {
+  body.ramadan .rm-count { padding: 44px 0 28px; }
+  body.ramadan .rm-count-card { padding: 40px 16px 34px; border-radius: 22px; }
+  body.ramadan .rm-timer { gap: 8px; }
+  body.ramadan .rm-unit { flex: 1; min-width: 0; padding: 12px 4px 9px; border-radius: 14px; }
+}
+html[dir="rtl"] body.ramadan .rm-count-title { line-height: 1.45; }
+html[dir="rtl"] body.ramadan .rm-unit span { font-size: 15px; }
+html[dir="rtl"] body.ramadan .rm-count-text { font-size: 19px; line-height: 1.8; }
+html[dir="rtl"] body.ramadan .rm-expected, html[dir="rtl"] body.ramadan .rm-kicker { font-size: 16px; }
+html[dir="rtl"] body.ramadan .rm-clock { font-family: var(--font); }
+
 /* ---------- Motion (only for those who haven't asked for less) ---------- */
 
 @media (prefers-reduced-motion: no-preference) {
@@ -243,6 +338,8 @@ html[dir="rtl"] body.ramadan .page-hero h1::before { background-position: 100% 5
   body.ramadan .rm-hl::after { animation: rm-breathe 3.2s ease-in-out infinite alternate; }
   body.ramadan .rm-banner-hang .rm-lantern { animation: rm-sway-small 4.8s ease-in-out infinite alternate; }
   body.ramadan .rm-banner-hang:last-child .rm-lantern { animation-delay: -2.2s; }
+  body.ramadan .rm-count-hang { animation: rm-sway 6s ease-in-out infinite alternate; }
+  body.ramadan .rm-count-hang-end { animation-duration: 5.2s; animation-delay: -2s; }
 
   body.ramadan .rm-sky::before { animation: rm-stars 4.5s ease-in-out infinite alternate; }
 }
@@ -255,5 +352,5 @@ html[dir="rtl"] body.ramadan .page-hero h1::before { background-position: 100% 5
 
 @media print {
   body.ramadan .rm-banner, body.ramadan .rm-lights, body.ramadan .rm-hangers, body.ramadan .rm-sky,
-  body.ramadan .rm-foot-greet, body.ramadan .doc h1::before { display: none; }
+  body.ramadan .rm-foot-greet, body.ramadan .rm-count, body.ramadan .doc h1::before { display: none; }
 }

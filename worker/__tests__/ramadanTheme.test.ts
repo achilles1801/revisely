@@ -9,7 +9,17 @@ import ts from 'typescript';
 import vm from 'vm';
 
 import worker from '../index';
-import { RAMADAN_ON, dressesPath, dressForRamadan } from '../ramadan';
+import {
+  EID_DAYS,
+  RAMADAN_ON,
+  daysLeftEnglish,
+  dressesPath,
+  dressForRamadan,
+  expectedEnglish,
+  ramadanDates,
+  ramadanOver,
+  ramadanPhase,
+} from '../ramadan';
 
 const ROOT = path.join(__dirname, '..', '..');
 const read = (p: string) => fs.readFileSync(path.join(ROOT, p), 'utf8');
@@ -116,8 +126,14 @@ describe('the Ramadan theme', () => {
     // Every <use> points at the sprite.
     const ids = new Set([...out.matchAll(/<symbol id="([^"]+)"/g)].map((m) => m[1]));
     for (const m of out.matchAll(/<use href="#([^"]+)"/g)) expect(ids.has(m[1])).toBe(true);
-    // The page's own markup is all still there, in order.
-    expect(out.replace(/\s+/g, '')).toContain(html.slice(html.indexOf('<main'), html.indexOf('</main>')).replace(/\s+/g, ''));
+    // The page's own markup is all still there, in order (the home's Ramadan card aside).
+    const own = out.replace(/<section class="rm-count"[\s\S]*?<\/section>\s*/, '');
+    expect(own.replace(/\s+/g, '')).toContain(html.slice(html.indexOf('<main'), html.indexOf('</main>')).replace(/\s+/g, ''));
+    // The script that switches the phases, once, at the end.
+    expect(out.match(/<script src="\/assets\/ramadan\.js" defer><\/script>/g)).toHaveLength(1);
+    expect(out.indexOf('/assets/ramadan.js')).toBeGreaterThan(out.lastIndexOf('</footer>'));
+    // The countdown card on the home only.
+    expect(out.includes('class="rm-count"')).toBe(file === 'docs/index.html');
   });
 
   it('the decorations are hidden from screen readers, and the greeting is read once', () => {
@@ -127,7 +143,7 @@ describe('the Ramadan theme', () => {
     }
     expect(out).toMatch(/<svg class="rm-sprite"[^>]* aria-hidden="true"/);
     // The Arabic beside the English greeting is drawn, and hidden (in Arabic the greeting itself is Arabic).
-    expect(out).toContain('<span class="rm-greet-ar" aria-hidden="true">');
+    expect(out).toContain('<span class="rm-greet-ar" data-rm-when="during" aria-hidden="true">');
     expect((out.match(/data-t="ramadan\.kareem"/g) ?? []).length).toBe(1);
   });
 
@@ -136,13 +152,94 @@ describe('the Ramadan theme', () => {
     vm.createContext(c);
     vm.runInContext(read('docs/assets/strings.js'), c);
     const s = c.window.RV_STRINGS!;
-    const keys = [...dressForRamadan(read('docs/support/index.html')).matchAll(/data-t="(ramadan\.[^"]+)"/g)].map((m) => m[1]);
-    expect(keys.sort()).toEqual(['ramadan.foot', 'ramadan.kareem', 'ramadan.line']);
+    const marked = [...dressForRamadan(read('docs/index.html')).matchAll(/data-t="(ramadan\.[^"]+)"/g)].map((m) => m[1]);
+    expect(marked).toEqual(expect.arrayContaining(['ramadan.kareem', 'ramadan.soonTitle', 'ramadan.eid', 'ramadan.u.d', 'ramadan.cta']));
+    // And the ones ramadan.js words itself (a number or the date in them).
+    const script = read('docs/assets/ramadan.js');
+    const written = ['ramadan.expected', ...['zero', 'one', 'two', 'few', 'many', 'other'].map((f) => `ramadan.inDays_${f}`)];
+    expect(script).toContain("t('ramadan.inDays_' + form");
+    expect(script).toContain("t('ramadan.expected'");
+    const keys = [...new Set([...marked, ...written])];
     for (const k of keys) {
       expect(s.en[k]).toBeTruthy();
       expect(s.ar[k]).toMatch(/[؀-ۿ]/);
     }
     expect(s.ar['ramadan.kareem']).toBe('رمضان كريم');
+    expect(s.ar['ramadan.inDays_many']).toBe('رمضان بعد {n} يومًا');
+    expect(s.en['ramadan.expected']).toContain('{date}');
+    expect(s.ar['ramadan.expected']).toContain('{date}');
+  });
+
+  describe('its phases', () => {
+    const dates = { start: '2027-02-08', eid: '2027-03-09' };
+    const at = (iso: string) => Date.parse(iso);
+
+    it('reads the dates from the worker\'s vars, and leaves out a malformed one', () => {
+      expect(ramadanDates({ RAMADAN_START: '2027-02-08', RAMADAN_EID: '2027-03-09' })).toEqual(dates);
+      expect(ramadanDates({ RAMADAN_START: 'Feb 8', RAMADAN_EID: '2027-3-9' })).toEqual({});
+      expect(ramadanDates({})).toEqual({});
+      const dev = wrangler('wrangler.dev.jsonc').vars!;
+      expect(ramadanDates(dev)).toEqual({ start: dev.RAMADAN_START, eid: dev.RAMADAN_EID });
+    });
+
+    it('counts down before the first day, then Ramadan, then Eid for its days, then nothing', () => {
+      expect(ramadanPhase(at('2026-11-21T12:00:00Z'), dates)).toBe('before');
+      expect(ramadanPhase(at('2027-02-07T23:59:59Z'), dates)).toBe('before');
+      expect(ramadanPhase(at('2027-02-08T00:00:00Z'), dates)).toBe('during');
+      expect(ramadanPhase(at('2027-03-08T23:59:59Z'), dates)).toBe('during');
+      expect(ramadanPhase(at('2027-03-09T00:00:00Z'), dates)).toBe('eid');
+      expect(ramadanPhase(at('2027-03-11T23:59:59Z'), dates)).toBe('eid');
+      expect(ramadanPhase(at('2027-03-12T00:00:00Z'), dates)).toBe('after');
+      expect(EID_DAYS).toBe(3);
+      // A clock ahead of UTC gets there first.
+      expect(ramadanPhase(at('2027-02-07T20:00:00Z'), dates, 5)).toBe('during');
+      // With no dates it's Ramadan itself, as before there were phases; with no Eid it never ends.
+      expect(ramadanPhase(at('2026-11-21T12:00:00Z'), {})).toBe('during');
+      expect(ramadanPhase(at('2031-01-01T00:00:00Z'), { start: '2027-02-08' })).toBe('during');
+    });
+
+    it('is over only once the last time zone is past Eid', () => {
+      expect(ramadanOver(at('2027-03-12T00:00:00Z'), dates)).toBe(false);
+      expect(ramadanOver(at('2027-03-12T11:59:59Z'), dates)).toBe(false);
+      expect(ramadanOver(at('2027-03-12T12:00:00Z'), dates)).toBe(true);
+      expect(ramadanOver(at('2027-01-01T00:00:00Z'), {})).toBe(false);
+    });
+
+    it('words the days left and the expected day as ramadan.js does in English', () => {
+      expect(daysLeftEnglish(at('2026-11-21T12:00:00Z'), dates)).toBe('Ramadan in 78 days');
+      expect(daysLeftEnglish(at('2027-02-06T12:00:00Z'), dates)).toBe('Ramadan in 1 day');
+      expect(daysLeftEnglish(at('2027-02-07T12:00:00Z'), dates)).toBe('Ramadan begins in');
+      expect(expectedEnglish(dates)).toBe('Expected around Monday, February 8, 2027 (the first fast), depending on the moon sighting.');
+    });
+
+    const env = (extra: object) => ({ ...ENV, RAMADAN_THEME: '1', RAMADAN_START: dates.start, RAMADAN_EID: dates.eid, ...extra });
+    afterEach(() => jest.useRealTimers());
+
+    it('the worker paints the phase it sees, the countdown before Ramadan and the present tense during it', async () => {
+      const home = read('docs/index.html');
+      jest.useFakeTimers({ now: at('2026-11-21T12:00:00Z'), doNotFake: ['setTimeout', 'setImmediate', 'queueMicrotask'] });
+      const before = await (await worker.fetch(new Request('https://dev.revisely.app/'), env({ ASSETS: assets(home) }), ctx())).text();
+      expect(before).toMatch(/<body class="home recite-on ramadan" data-rm-phase="before" data-rm-start="2027-02-08" data-rm-eid="2027-03-09">/);
+      expect(before).toContain('<strong data-rm-when="before" data-rm-days>Ramadan in 78 days</strong>');
+      expect(before).toContain('class="rm-timer" data-rm-when="before" role="timer"');
+      expect(before).toContain('Expected around Monday, February 8, 2027');
+
+      jest.setSystemTime(at('2027-02-20T12:00:00Z'));
+      const during = await (await worker.fetch(new Request('https://dev.revisely.app/'), env({ ASSETS: assets(home) }), ctx())).text();
+      expect(during).toContain('data-rm-phase="during"');
+
+      jest.setSystemTime(at('2027-03-10T12:00:00Z'));
+      const eid = await (await worker.fetch(new Request('https://dev.revisely.app/'), env({ ASSETS: assets(home) }), ctx())).text();
+      expect(eid).toContain('data-rm-phase="eid"');
+    });
+
+    it('after Eid the worker leaves every page as it is', async () => {
+      const support = read('docs/support/index.html');
+      jest.useFakeTimers({ now: at('2027-03-13T00:00:00Z'), doNotFake: ['setTimeout', 'setImmediate', 'queueMicrotask'] });
+      const res = await worker.fetch(new Request('https://dev.revisely.app/support/'), env({ ASSETS: assets(support) }), ctx());
+      expect(await res.text()).toBe(support);
+      expect(dressForRamadan(support, { phase: 'after', dates })).toBe(support);
+    });
   });
 
   describe('ramadan.css', () => {

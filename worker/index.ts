@@ -9,7 +9,7 @@ import { errorResponse, handleTcq, TcqEnv } from './tcq';
 import { gate, GateEnv } from './gate';
 import { injectAccountNav, withPageChange } from './nav';
 import { showReciteSection } from './recite';
-import { dressesPath, dressForRamadan } from './ramadan';
+import { dressesPath, dressForRamadan, ramadanDates, ramadanOver, ramadanPhase } from './ramadan';
 
 // The Durable Object class behind TCQ_BUDGET (wrangler.jsonc).
 export { TcqBudget } from './budget';
@@ -33,6 +33,9 @@ interface Env extends TcqEnv, GateEnv {
    * revisely.app serves its own pages without the worker, so setting it there would dress only the account pages.
    */
   RAMADAN_THEME?: string;
+  /** The first day of Ramadan and of Eid al-Fitr (YYYY-MM-DD): the theme's countdown and phases (ramadan.ts). */
+  RAMADAN_START?: string;
+  RAMADAN_EID?: string;
   /**
    * The Firebase Hosting site of the project the pages sign in to (revisely-dev.web.app on dev). Its
    * /__/firebase/init.json is the web config, served here at the same path, so no key is kept in the repository.
@@ -100,7 +103,9 @@ async function answer(request: Request, env: Env, ctx: ExecutionContext): Promis
   }
   const nav = env.ACCOUNT_PAGES === '1';
   const recite = env.RECITE_SECTION === '1';
-  const ramadan = env.RAMADAN_THEME === '1' && dressesPath(pathname);
+  const dates = ramadanDates(env);
+  const now = Date.now();
+  const ramadan = env.RAMADAN_THEME === '1' && dressesPath(pathname) && !ramadanOver(now, dates);
   if (!nav && !recite && !ramadan) return env.ASSETS.fetch(request);
   // dev.revisely.app: the site's own pages link the account, Premium and Open Door pages (nav.ts), the home shows its
   // Recite section (recite.ts), and every page is dressed for Ramadan (ramadan.ts). A page asks the assets without its validators, so a copy cached before either
@@ -114,6 +119,6 @@ async function answer(request: Request, env: Env, ctx: ExecutionContext): Promis
   return withPageChange(await env.ASSETS.fetch(ask), (html) => {
     let page = nav ? injectAccountNav(html) : html;
     if (recite) page = showReciteSection(page);
-    return ramadan ? dressForRamadan(page) : page;
+    return ramadan ? dressForRamadan(page, { phase: ramadanPhase(now, dates), dates, now }) : page;
   });
 }
