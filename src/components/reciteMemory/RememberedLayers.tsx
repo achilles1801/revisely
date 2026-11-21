@@ -8,6 +8,7 @@ import { markBox, markHighlight } from '../../lib/reciteLive/geometry';
 import type { WordMemory } from '../../lib/reciteMemory/memory';
 import type { PaletteV2 } from '../../theme/v2';
 import { markFill, markFirm } from '../reciteLive/markColours';
+import { t } from '../../i18n';
 
 /**
  * How strong a remembered mistake is drawn: the take's own highlight colour, lighter, so it reads as "from before"
@@ -90,8 +91,8 @@ export function RememberedTargets({ page, scale, words, memories }: { page: numb
             pointerEvents="none"
             accessible
             accessibilityRole="button"
-            accessibilityLabel={`Past mistake: ${markTitle(mark)}, ${mark.kind === 'added' ? 'after ' : ''}${words.uthmani(m.w)}`}
-            accessibilityHint="Shows your takes of this word"
+            accessibilityLabel={t(mark.kind === 'added' ? 'reciteMemory.pastLabelAfter' : 'reciteMemory.pastLabel', { title: markTitle(mark), word: words.uthmani(m.w) })}
+            accessibilityHint={t('reciteMemory.pastHint')}
             testID={`past-mark-${m.group}`}
             style={[styles.abs, rectStyle(markBox(words, mark), scale)]}
           />

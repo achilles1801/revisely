@@ -20,6 +20,8 @@ import { mistakesLabel } from '../../lib/reciteLive/score';
 import { CheckMark } from './ReciteMic';
 import { Sparkline } from '../reciteMemory/AccuracyChart';
 import { peekedLine } from '../../lib/reciteLive/peeked';
+import { t } from '../../i18n';
+import { chevron } from '../../i18n/direction';
 
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 /** "1 minute 42 seconds", for VoiceOver. */
@@ -38,7 +40,7 @@ export const STACK_FINDINGS_AT = 1.3;
 
 /** Where a finding is: "ayah 23", or with its surah when the take ran into another ("Al-Qasas, ayah 1"). */
 export function findingPlace(mark: Mark, manySurahs: boolean): string {
-  return manySurahs ? describeAyahs([ayahKey(mark.ayah[0], mark.ayah[1])]) : `ayah ${mark.ayah[1]}`;
+  return manySurahs ? describeAyahs([ayahKey(mark.ayah[0], mark.ayah[1])]) : t('reciteLive.summary.ayahN', { n: mark.ayah[1] });
 }
 
 /** "An-Naml, ayahs 23–31" for the words of a take. */
@@ -53,7 +55,7 @@ export function passageOf(words: QuranWords, from: number, to: number): string {
 }
 
 /** "1 marked not a mistake": the Removed list's line. */
-export const removedLine = (n: number) => `${n} marked not a mistake`;
+export const removedLine = (n: number) => t('reciteLive.summary.removed', { count: n });
 
 /** "1 wrong word, 1 harakat slip, 1 tajweed note, 2 not clear". */
 export function findingsLine(marks: Mark[]): string {
@@ -65,12 +67,12 @@ export function findingsLine(marks: Mark[]): string {
   const slips = n(['harakat', 'letter']);
   const tajweed = n(['tajweed']);
   const unclear = marks.filter(isUnclear).length;
-  if (wrong) parts.push(`${wrong} wrong ${wrong === 1 ? 'word' : 'words'}`);
-  if (skipped) parts.push(`${skipped} skipped`);
-  if (added) parts.push(`${added} extra`);
-  if (slips) parts.push(`${slips} harakat ${slips === 1 ? 'slip' : 'slips'}`);
-  if (tajweed) parts.push(`${tajweed} tajweed ${tajweed === 1 ? 'note' : 'notes'}`);
-  if (unclear) parts.push(`${unclear} not clear`);
+  if (wrong) parts.push(t('reciteLive.summary.wrong', { count: wrong }));
+  if (skipped) parts.push(t('reciteLive.summary.skipped', { count: skipped }));
+  if (added) parts.push(t('reciteLive.summary.extra', { count: added }));
+  if (slips) parts.push(t('reciteLive.summary.slips', { count: slips }));
+  if (tajweed) parts.push(t('reciteLive.summary.tajweed', { count: tajweed }));
+  if (unclear) parts.push(t('reciteLive.summary.unclear', { count: unclear }));
   return parts.join(', ');
 }
 
@@ -80,7 +82,9 @@ export function findingsLine(marks: Mark[]): string {
  * an account without Check, one quiet way to it.
  */
 /** A take kept without the checker's final answer: what its summary says (RECITE-11). */
-export const UNFINISHED_LINE = 'The end of this take wasn’t checked. What it found before then is kept.';
+export function unfinishedLine(): string {
+  return t('reciteLive.summary.unfinished');
+}
 
 export function TakeSummarySheet({
   visible,
@@ -166,9 +170,9 @@ export function TakeSummarySheet({
   const [removedOpen, setRemovedOpen] = React.useState(false);
   const [menuOpen, setMenuOpen] = React.useState(false);
   const confirmDelete = () =>
-    Alert.alert('Delete this take?', 'Its marks and its recording are deleted. This can’t be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: onDelete },
+    Alert.alert(t('reciteLive.summary.deleteTitle'), t('reciteLive.summary.deleteBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('common.delete'), style: 'destructive', onPress: onDelete },
     ]);
   const passage = words && from != null && to != null && to >= from ? passageOf(words, from, to) : '';
   const manySurahs = words != null && from != null && to != null && to >= from && words.ref(from).sura !== words.ref(to).sura;
@@ -182,12 +186,12 @@ export function TakeSummarySheet({
   // Once, when the summary is on screen: what was recited, how long, and (Check) the score. Nothing is spoken while
   // the microphone is on, where it would be recorded with the recitation.
   const spokenSummary = [
-    'Your recitation',
+    t('reciteLive.summary.title'),
     passage ? spokenText(passage) : '',
     spokenClock(seconds),
-    check && score ? `${score.text}, ${mistakesLabel(mistakes)}` : '',
+    check && score ? `${score.text}, ${mistakesLabel(mistakes)}` : '', // i18n-ignore (two texts joined as a list)
     peekedCount ? peekedLine(peekedCount) : '',
-    unfinished ? UNFINISHED_LINE : '',
+    unfinished ? unfinishedLine() : '',
   ]
     .filter(Boolean)
     .join('. ');
@@ -200,26 +204,26 @@ export function TakeSummarySheet({
   // end of a long scroll).
   const actions = (
     <View style={styles.buttons}>
-      {drillable ? <PillButton title="Recite the mistakes again" size="lg" onPress={onDrill} testID="take-summary-drill" /> : null}
+      {drillable ? <PillButton title={t('reciteLive.summary.drill')} size="lg" onPress={onDrill} testID="take-summary-drill" /> : null}
       <PillButton
-        title="Recite again"
+        title={t('reciteLive.summary.again')}
         size="lg"
         variant={drillable ? 'outline' : undefined}
         onPress={onAgain}
         testID="take-summary-again"
       />
-      <PillButton title="Done" size="lg" variant="outline" onPress={onDone} testID="take-summary-done" />
+      <PillButton title={t('common.done')} size="lg" variant="outline" onPress={onDone} testID="take-summary-done" />
       {onRecited ? (
         <Tap
           onPress={onRecited}
           hitSlop={8}
           style={styles.recited}
           accessibilityRole="link"
-          accessibilityLabel="In today’s Recited, in Activity"
+          accessibilityLabel={t('reciteLive.summary.recitedLabel')}
           testID="take-summary-recited"
         >
           <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
-            In today’s Recited ›
+            {`${t('reciteLive.summary.recited')} ${chevron()}`}
           </Text>
         </Tap>
       ) : null}
@@ -235,8 +239,8 @@ export function TakeSummarySheet({
       visible={visible}
       onClose={onDone}
       onShow={shown}
-      title="Your recitation"
-      right={onDelete ? { label: 'More', icon: 'ellipsis-horizontal', onPress: () => setMenuOpen(true), testID: 'take-summary-more' } : undefined}
+      title={t('reciteLive.summary.title')}
+      right={onDelete ? { label: t('common.more'), icon: 'ellipsis-horizontal', onPress: () => setMenuOpen(true), testID: 'take-summary-more' } : undefined}
       scroll
       pinned={actions}
       testID="take-summary"
@@ -245,14 +249,14 @@ export function TakeSummarySheet({
         <ActionSheet
           visible={menuOpen}
           onClose={() => setMenuOpen(false)}
-          title="Your recitation"
-          actions={[{ key: 'delete', label: 'Delete this take', icon: 'trash-outline', destructive: true, onPress: confirmDelete }]}
+          title={t('reciteLive.summary.title')}
+          actions={[{ key: 'delete', label: t('reciteLive.summary.deleteTake'), icon: 'trash-outline', destructive: true, onPress: confirmDelete }]}
           testID="take-summary-menu"
         />
       ) : null}
       <View style={styles.head}>
         {check && score ? (
-          <View style={styles.scoreRow} accessible accessibilityLabel={`Score ${score.text}, ${mistakesLabel(mistakes)}`}>
+          <View style={styles.scoreRow} accessible accessibilityLabel={t('reciteLive.summary.score', { score: score.text, mistakes: mistakesLabel(mistakes) })}>
             <Text style={[styles.score, typeV2.numeral, { color: scoreColor }]} maxFontSizeMultiplier={1.3} testID="take-summary-score">
               {score.text}
             </Text>
@@ -281,12 +285,12 @@ export function TakeSummarySheet({
         ) : null}
         {check && before ? (
           <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={CHROME_MAX} testID="take-summary-before">
-            {`Before: ${before}`}
+            {t('reciteLive.summary.before', { before })}
           </Text>
         ) : null}
         {unfinished ? (
           <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={CHROME_MAX} testID="take-summary-unfinished">
-            {UNFINISHED_LINE}
+            {unfinishedLine()}
           </Text>
         ) : null}
       </View>
@@ -300,7 +304,7 @@ export function TakeSummarySheet({
                 onPress={() => onInto(m.into)}
                 style={[styles.row, { borderTopColor: palette.separator }, i === 0 && styles.firstRow]}
                 accessibilityRole="button"
-                accessibilityLabel={`${spokenIntoLine(m, place)}. Show it in the reader`}
+                accessibilityLabel={t('reciteLive.summary.intoLabel', { line: spokenIntoLine(m, place) })}
                 testID="take-summary-into"
               >
                 <Ionicons name={m.into.ending ? 'return-down-back-outline' : 'git-compare-outline'} size={20} color={palette.secondary} />
@@ -331,14 +335,14 @@ export function TakeSummarySheet({
                 onPress={() => onFinding(m)}
                 style={[styles.row, { borderTopColor: palette.separator }, i === 0 && styles.firstRow]}
                 accessibilityRole="button"
-                accessibilityLabel={`${markTitle(m)}, ${spokenText(place)}. Show it on the page`}
+                accessibilityLabel={t('reciteLive.summary.findingLabel', { title: markTitle(m), place: spokenText(place) })}
                 testID={`take-summary-finding-${m.kind}`}
               >
                 <View style={styles.rowText} testID="take-summary-finding-text">
                   <View style={styles.titleRow}>
                     <View style={[styles.swatch, { backgroundColor: fill }]} testID={`take-summary-swatch-${markGroup(m)}`} />
                     <Text style={[typeV2.name, styles.title, { color: palette.text }]} maxFontSizeMultiplier={CHROME_MAX} testID="take-summary-finding-title">
-                      {`${markTitle(m)} · ${place}`}
+                      {t('reciteLive.summary.findingTitle', { title: markTitle(m), place })}
                     </Text>
                   </View>
                   {findingNote(m) ? (
@@ -355,7 +359,7 @@ export function TakeSummarySheet({
         : null}
       {words
         ? peeked.map((p, i) => {
-            const place = manySurahs ? describeAyahs([ayahKey(p.ayah[0], p.ayah[1])]) : `ayah ${p.ayah[1]}`;
+            const place = manySurahs ? describeAyahs([ayahKey(p.ayah[0], p.ayah[1])]) : t('reciteLive.summary.ayahN', { n: p.ayah[1] });
             const arabic = p.words.map((w) => words.uthmani(w)).join(' ');
             return (
               <Tap
@@ -363,12 +367,12 @@ export function TakeSummarySheet({
                 onPress={() => onPeeked?.(p.words[0])}
                 style={[styles.row, { borderTopColor: palette.separator }, i === 0 && findings.length === 0 && styles.firstRow]}
                 accessibilityRole="button"
-                accessibilityLabel={`Peeked, ${spokenText(place)}: ${arabic}. Show it on the page`}
+                accessibilityLabel={t('reciteLive.summary.peekedLabel', { place: spokenText(place), arabic })}
                 testID="take-summary-peeked-row"
               >
                 <View style={styles.rowText}>
                   <Text style={[typeV2.name, styles.title, { color: palette.text }]} maxFontSizeMultiplier={CHROME_MAX}>
-                    {`Peeked · ${place}`}
+                    {t('reciteLive.summary.peekedTitle', { place })}
                   </Text>
                   {stacked ? (
                     <Text style={[arabicV2(21), { color: palette.secondary }]} maxFontSizeMultiplier={ARABIC_MAX} accessibilityLanguage="ar">
@@ -392,7 +396,7 @@ export function TakeSummarySheet({
             style={[styles.row, styles.removedHead, { borderTopColor: palette.separator }]}
             accessibilityRole="button"
             accessibilityState={{ expanded: removedOpen }}
-            accessibilityLabel={`${removedLine(removed.length)}. ${removedOpen ? 'Hide' : 'Show'} them`}
+            accessibilityLabel={t(removedOpen ? 'reciteLive.summary.removedHide' : 'reciteLive.summary.removedShow', { line: removedLine(removed.length) })}
             testID="take-summary-removed-toggle"
           >
             <Text style={[typeV2.meta, styles.rowText, { color: palette.secondary }]} maxFontSizeMultiplier={CHROME_MAX}>
@@ -407,7 +411,7 @@ export function TakeSummarySheet({
                     <View style={styles.titleRow}>
                       <View style={[styles.swatch, { backgroundColor: markFill(palette, m) }]} />
                       <Text style={[typeV2.name, styles.title, { color: palette.secondary }]} maxFontSizeMultiplier={CHROME_MAX}>
-                        {`${markTitle(m)} · ${findingPlace(m, manySurahs)}`}
+                        {t('reciteLive.summary.findingTitle', { title: markTitle(m), place: findingPlace(m, manySurahs) })}
                       </Text>
                     </View>
                   </View>
@@ -416,11 +420,11 @@ export function TakeSummarySheet({
                     hitSlop={6}
                     style={[styles.putBack, { borderColor: palette.outline }]}
                     accessibilityRole="button"
-                    accessibilityLabel={`Put back: ${markTitle(m)}, ${spokenText(findingPlace(m, manySurahs))}`}
+                    accessibilityLabel={t('reciteLive.summary.putBackLabel', { title: markTitle(m), place: spokenText(findingPlace(m, manySurahs)) })}
                     testID="take-summary-put-back"
                   >
                     <Text style={[styles.putBackText, { color: palette.text }]} maxFontSizeMultiplier={CHROME_MAX}>
-                      Put back
+                      {t('reciteLive.summary.putBack')}
                     </Text>
                   </Tap>
                 </View>
@@ -432,10 +436,10 @@ export function TakeSummarySheet({
         <View style={[styles.row, { borderTopColor: palette.separator }]} accessible testID="take-summary-cleared">
           <View style={styles.rowText}>
             <Text style={[typeV2.name, { color: palette.text }]} maxFontSizeMultiplier={CHROME_MAX}>
-              {`${memory.cleared.length} cleared from the page`}
+              {t('reciteLive.summary.cleared', { count: memory.cleared.length })}
             </Text>
             <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={CHROME_MAX}>
-              Right on 2 different days
+              {t('reciteLive.summary.clearedSub')}
             </Text>
           </View>
           <Text style={[arabicV2(20), styles.cleared, { color: palette.text }]} maxFontSizeMultiplier={ARABIC_MAX} numberOfLines={2}>
@@ -448,12 +452,12 @@ export function TakeSummarySheet({
           onPress={onProgress}
           style={[styles.row, { borderTopColor: palette.separator }]}
           accessibilityRole="button"
-          accessibilityLabel={`Your progress here. ${memory.line}`}
+          accessibilityLabel={t('reciteLive.summary.progressLabel', { line: memory.line })}
           testID="take-summary-progress"
         >
           <View style={styles.rowText}>
             <Text style={[typeV2.name, { color: palette.text }]} maxFontSizeMultiplier={CHROME_MAX}>
-              Your progress here
+              {t('reciteLive.summary.progress')}
             </Text>
             <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={CHROME_MAX}>
               {memory.line}
@@ -468,16 +472,16 @@ export function TakeSummarySheet({
           onPress={onCheck}
           style={[styles.row, styles.firstRow, { borderTopColor: palette.separator }]}
           accessibilityRole="button"
-          accessibilityLabel="See your mistakes, part of Premium"
+          accessibilityLabel={t('reciteLive.summary.seeLabel')}
           testID="take-summary-check"
         >
           <CheckMark size={36} locked />
           <View style={styles.rowText}>
             <Text style={[typeV2.name, { color: palette.premium[0] }]} maxFontSizeMultiplier={CHROME_MAX}>
-              See your mistakes
+              {t('reciteLive.summary.see')}
             </Text>
             <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={CHROME_MAX}>
-              Mark mistakes shows each one as you recite
+              {t('reciteLive.summary.seeSub')}
             </Text>
           </View>
           <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
@@ -485,7 +489,7 @@ export function TakeSummarySheet({
       ) : null}
       {kept ? (
         <Text style={[typeV2.meta, styles.kept, { color: palette.secondary }]} maxFontSizeMultiplier={CHROME_MAX}>
-          Kept as test data. Software checks it; nobody listens.
+          {t('reciteLive.summary.kept')}
         </Text>
       ) : null}
     </Sheet>

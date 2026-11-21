@@ -404,6 +404,7 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
       send: control,
       close: () => finish(),
       status: () =>
+        // i18n-ignore (a status for the log and Sentry)
         (finished ? 'finished' : retry != null ? `retry ${tries}` : socket ? (live ? 'live' : 'opening') : 'none') +
         (url !== mainUrl ? ' pair' : ''),
       // Still there after the take ends (the audio is held for resuming), for "Your recitation" on its marks.

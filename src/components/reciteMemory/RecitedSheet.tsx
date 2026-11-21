@@ -9,6 +9,7 @@ import type { QuranWords } from '../../lib/recite/quranWords';
 import { passageOf } from '../reciteLive/TakeSummarySheet';
 import type { TakeRecord } from '../../lib/reciteMemory/record';
 import { takeLine, TakeSheetRow, type TakeMenuAction } from './TakeRows';
+import { t } from '../../i18n';
 
 /**
  * A day's takes (RMEM-5, RMEM-6; Majd's option A, Nov 16 2026): what the day's one Recited row opens. Each take is a
@@ -48,7 +49,7 @@ export function RecitedSheet({
   // Held: its menu, presented by this sheet (one modal at a time on iOS).
   const [held, setHeld] = React.useState<TakeRecord | null>(null);
   return (
-    <Sheet visible={visible} onClose={onClose} title="Recited" message={dayLabel} scroll testID="recited-sheet">
+    <Sheet visible={visible} onClose={onClose} title={t('reciteMemory.recited.title')} message={dayLabel} scroll testID="recited-sheet">
       {/* Newest first, as the progress page and All activity list takes. */}
       {[...takes].reverse().map((t, i) => (
         <TakeSheetRow
@@ -67,7 +68,7 @@ export function RecitedSheet({
       <ActionSheet
         visible={held != null}
         onClose={() => setHeld(null)}
-        title={held && words ? passageOf(words, held.from, held.to) : 'Recited'}
+        title={held && words ? passageOf(words, held.from, held.to) : t('reciteMemory.recited.title')}
         message={held ? takeLine(held, clearedOf(held)) : undefined}
         actions={(held ? actionsFor(held) : []).map((a) => ({
           ...a,
@@ -80,7 +81,7 @@ export function RecitedSheet({
         <View style={[styles.foot, { borderTopColor: palette.separator }]}>
           <Tap onPress={onSeeAll} hitSlop={8} accessibilityRole="button" testID="recited-see-all">
             <Text style={[typeV2.body, { color: palette.link }]} maxFontSizeMultiplier={1.4}>
-              All recitations
+              {t('reciteMemory.recited.all')}
             </Text>
           </Tap>
         </View>

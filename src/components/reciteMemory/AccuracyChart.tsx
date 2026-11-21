@@ -2,9 +2,9 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Line, Path, Text as SvgText } from 'react-native-svg';
 import { useTheme } from '../../context/ThemeContext';
+import { dayMonth, t } from '../../i18n';
 
 const DAY_MS = 86_400_000;
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /** The y axis's floor: a few points under the lowest take, on an even percent, at most 100 − 2. */
 export function chartFloor(values: number[]): number {
@@ -16,7 +16,9 @@ export function chartFloor(values: number[]): number {
 export function axisDates(firstAt: number, lastAt: number, now: number): [string, string | null] {
   const label = (at: number) => {
     const d = new Date(at);
-    return Math.round((now - at) / DAY_MS) < 1 && new Date(now).getDate() === d.getDate() ? 'Today' : `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+    return Math.round((now - at) / DAY_MS) < 1 && new Date(now).getDate() === d.getDate()
+      ? t('reciteMemory.chart.today')
+      : dayMonth(d, { month: 'short' });
   };
   const a = label(firstAt);
   const b = label(lastAt);
@@ -47,7 +49,7 @@ export function AccuracyChart({ points, width, height = 146, now }: { points: Ar
   const path = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(p.at).toFixed(1)},${y(p.accuracy).toFixed(1)}`).join(' ');
   const [fromDate, toDate] = axisDates(points[0].at, points[points.length - 1].at, now);
   return (
-    <View testID="progress-chart" accessible accessibilityLabel={`Accuracy over ${points.length} takes`}>
+    <View testID="progress-chart" accessible accessibilityLabel={t('reciteMemory.chart.label', { count: points.length })}>
       <Svg width={width} height={by + 8}>
         {grid.map((g) => (
           <React.Fragment key={g}>

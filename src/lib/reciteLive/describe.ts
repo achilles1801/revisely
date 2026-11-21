@@ -4,36 +4,37 @@ import { surahName } from '../passages';
 import { tajweedName } from '../reciteCheck/result';
 import type { QuranWords } from '../recite/quranWords';
 import { isUnclear, type Mark, type MarkInto } from './contract';
+import { t } from '../../i18n';
 
 /** A "not clear" mark's line, on its card and in the summary. */
-export const UNCLEAR_NOTE = 'Say it more clearly. Not counted in the score.';
-
-const NBSP = ' ';
+export function unclearNote(): string {
+  return t('reciteLive.describe.unclearNote');
+}
 
 /** "Wrong word", "Harakat slip", "Madd munfasil". */
 export function markTitle(mark: Mark): string {
-  if (isUnclear(mark)) return 'Not clear';
+  if (isUnclear(mark)) return t('reciteLive.describe.notClear');
   switch (mark.kind) {
     case 'word':
-      return mark.detail === 'order' ? 'Out of order' : 'Wrong word';
+      return mark.detail === 'order' ? t('reciteLive.describe.outOfOrder') : t('reciteLive.describe.wrongWord');
     case 'skipped':
-      return 'Skipped word';
+      return t('reciteLive.describe.skippedWord');
     case 'added':
       // "Extra": the page highlights the word before it (an extra word has no text there).
-      return mark.detail === 'trail' ? 'Extra word after the end' : 'Extra word';
+      return mark.detail === 'trail' ? t('reciteLive.describe.extraAfterEnd') : t('reciteLive.describe.extraWord');
     case 'harakat':
-      return mark.detail === 'shadda' ? 'Shadda slip' : 'Harakat slip';
+      return mark.detail === 'shadda' ? t('reciteLive.describe.shaddaSlip') : t('reciteLive.describe.harakatSlip');
     case 'letter':
-      return 'Letter slip';
+      return t('reciteLive.describe.letterSlip');
     case 'tajweed':
-      return mark.rule ? tajweedName(mark.rule) : 'Tajweed';
+      return mark.rule ? tajweedName(mark.rule) : t('reciteLive.describe.tajweed');
   }
 }
 
 /** "An-Naml, ayah 23", and "· likely" for a mark past the normal bar only. */
 export function markPlace(mark: Mark): string {
-  const place = `${surahName(mark.ayah[0])}, ayah${NBSP}${mark.ayah[1]}`;
-  return mark.sure === 'likely' && !isUnclear(mark) ? `${place} · likely` : place;
+  const place = t('reciteLive.describe.place', { surah: surahName(mark.ayah[0]), ayah: mark.ayah[1] });
+  return mark.sure === 'likely' && !isUnclear(mark) ? t('reciteLive.describe.placeLikely', { place }) : place;
 }
 
 /**
@@ -43,22 +44,28 @@ export function markPlace(mark: Mark): string {
  */
 export function intoLine(mark: Mark & { into: MarkInto }, place: string): string {
   const [s, a] = mark.into.ayah;
-  const there = `${surahName(s)}${NBSP}${s}:${a}`;
+  const there = t('reciteLive.describe.there', { surah: surahName(s), sura: s, ayah: a });
   if (mark.into.ending) {
-    const as = s === mark.ayah[0] ? `ayah${NBSP}${a}` : there;
-    return `You ended ${place} as ${as} ends`;
+    const as = s === mark.ayah[0] ? t('reciteLive.describe.ayahN', { n: a }) : there;
+    return t('reciteLive.describe.endedAs', { place, as });
   }
   const others = mark.into.also?.length ?? 0;
-  return `You continued with ${there}, a similar ayah${others ? ` (and ${others} ${others === 1 ? 'other' : 'others'})` : ''}`;
+  return others
+    ? t('reciteLive.describe.continuedOthers', { there, count: others })
+    : t('reciteLive.describe.continued', { there });
 }
 
 /** The same for VoiceOver: the surah and ayah in words. */
 export function spokenIntoLine(mark: Mark & { into: MarkInto }, place: string): string {
   const [s, a] = mark.into.ayah;
-  const there = `${surahName(s)}, ayah ${a}`;
-  if (mark.into.ending) return `You ended ${place} as ${s === mark.ayah[0] ? `ayah ${a}` : there} ends`;
+  const there = t('reciteLive.describe.spokenThere', { surah: surahName(s), ayah: a });
+  if (mark.into.ending) {
+    return t('reciteLive.describe.endedAs', { place, as: s === mark.ayah[0] ? t('reciteLive.describe.spokenAyahN', { n: a }) : there });
+  }
   const others = mark.into.also?.length ?? 0;
-  return `You continued with ${there}, a similar ayah${others ? `, and ${others} ${others === 1 ? 'other' : 'others'}` : ''}`;
+  return others
+    ? t('reciteLive.describe.spokenContinuedOthers', { there, count: others })
+    : t('reciteLive.describe.continued', { there });
 }
 
 /** Marks that name where a slip went, in page order (none taken off: those are in the Removed list). */
@@ -66,9 +73,11 @@ export const intoMarks = (marks: Mark[]): (Mark & { into: MarkInto })[] =>
   marks.filter((m): m is Mark & { into: MarkInto } => m.into != null).sort((x, y) => x.w - y.w);
 
 /** The label of the Recited row: what was heard spelt out isn't exact. */
-export const recitedLabel = (mark: Mark) => (mark.heardExact === false ? 'As heard' : 'Recited');
+export const recitedLabel = (mark: Mark) =>
+  mark.heardExact === false ? t('reciteLive.describe.asHeard') : t('reciteLive.describe.recited');
 
-const HARAKA_NAMES: Record<string, string> = {
+// i18n-ignore-start (each haraka's key in src/i18n/en/reciteLive.ts, describe)
+const HARAKA_NAMES: Record<string, 'fathatan' | 'dammatan' | 'kasratan' | 'fatha' | 'damma' | 'kasra' | 'shadda' | 'sukun' | 'daggerAlif'> = {
   '\u064B': 'fathatan',
   '\u064C': 'dammatan',
   '\u064D': 'kasratan',
@@ -77,16 +86,22 @@ const HARAKA_NAMES: Record<string, string> = {
   '\u0650': 'kasra',
   '\u0651': 'shadda',
   '\u0652': 'sukun',
-  '\u0670': 'a dagger alif',
+  '\u0670': 'daggerAlif',
 };
+// i18n-ignore-end
 
 /** A slip's side in words: harakat by name ("dammatan and shadda"), letters as Arabic in an isolate. */
 function slipSide(text: string): string {
   const chars = [...text];
   if (chars.length && chars.every((c) => HARAKA_NAMES[c])) {
     // A shadda first reads best: "shadda and damma".
-    const names = chars.map((c) => HARAKA_NAMES[c]);
-    return names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+    const names = chars.map((c) => t(`reciteLive.describe.${HARAKA_NAMES[c]}`));
+    return names.length === 1
+      ? names[0]
+      : t('reciteLive.describe.listAnd', {
+          list: names.slice(0, -1).join(t('reciteLive.describe.listSeparator')),
+          last: names[names.length - 1],
+        });
   }
   return `\u2068${text}\u2069`;
 }
@@ -99,36 +114,39 @@ export function slipLine(mark: Mark): string | null {
   if (!mark.slip || (mark.kind !== 'harakat' && mark.kind !== 'letter')) return null;
   const cap = (x: string) => (x.startsWith('\u2068') ? x : x.charAt(0).toUpperCase() + x.slice(1));
   const { expected, heard } = mark.slip;
-  if (!heard) return `${cap(slipSide(expected))} not heard`;
-  if (!expected) return `${cap(slipSide(heard))} added`;
-  return `${cap(slipSide(heard))} heard for ${slipSide(expected)}`;
+  if (!heard) return t('reciteLive.describe.notHeard', { side: cap(slipSide(expected)) });
+  if (!expected) return t('reciteLive.describe.added', { side: cap(slipSide(heard)) });
+  return t('reciteLive.describe.heardFor', { heard: cap(slipSide(heard)), expected: slipSide(expected) });
 }
 
 /** For a tajweed note: what was heard, and the setting. */
 export function tajweedLines(mark: Mark): { main: string; sub: string | null } {
-  const counts = (n: number) => `${Math.round(n)} ${Math.round(n) === 1 ? 'count' : 'counts'}`;
+  const counts = (n: number) => t('reciteLive.describe.counts', { count: Math.round(n) });
   switch (mark.rule) {
     case 'madd_munfasil':
     case 'madd_muttasil':
     case 'madd_aared':
       return {
-        main: mark.got != null ? `Held about ${counts(mark.got)}` : 'Not the length set',
-        sub: mark.expected != null ? `Your setting: ${counts(mark.expected)}` : null,
+        main: mark.got != null ? t('reciteLive.describe.heldAbout', { counts: counts(mark.got) }) : t('reciteLive.describe.notLengthSet'),
+        sub: mark.expected != null ? t('reciteLive.describe.yourSetting', { counts: counts(mark.expected) }) : null,
       };
     case 'madd_lazim':
-      return { main: mark.got != null ? `Held about ${counts(mark.got)}` : 'Held short', sub: 'Hold it for 6 counts' };
+      return {
+        main: mark.got != null ? t('reciteLive.describe.heldAbout', { counts: counts(mark.got) }) : t('reciteLive.describe.heldShort'),
+        sub: t('reciteLive.describe.holdSix'),
+      };
     case 'madd_dropped':
-      return { main: 'The madd wasn’t heard', sub: null };
+      return { main: t('reciteLive.describe.maddNotHeard'), sub: null };
     case 'qalqalah':
-      return { main: 'The qalqalah wasn’t heard', sub: null };
+      return { main: t('reciteLive.describe.qalqalahNotHeard'), sub: null };
     case 'ghunnah':
-      return { main: 'The ghunnah wasn’t held', sub: null };
+      return { main: t('reciteLive.describe.ghunnahNotHeld'), sub: null };
     case 'ikhfa':
     case 'idgham':
     case 'idgham_no_ghunnah':
-      return { main: 'The noon was said clearly', sub: null };
+      return { main: t('reciteLive.describe.noonClear'), sub: null };
     case 'iqlab':
-      return { main: 'The noon was said clearly', sub: 'It turns into a meem here' };
+      return { main: t('reciteLive.describe.noonClear'), sub: t('reciteLive.describe.turnsMeem') };
     default:
       return { main: '', sub: null };
   }
@@ -187,11 +205,11 @@ export function findingNote(mark: Mark): string {
   const iso = (s: string) => `⁨${s}⁩`;
   if (mark.kind === 'tajweed') {
     const { main, sub } = tajweedLines(mark);
-    return sub ? `${main} · ${sub}` : main;
+    return sub ? t('reciteLive.describe.noteWithSub', { main, sub }) : main;
   }
-  if (mark.kind === 'skipped') return 'Left out';
-  if (isUnclear(mark)) return UNCLEAR_NOTE;
+  if (mark.kind === 'skipped') return t('reciteLive.describe.leftOut');
+  if (isUnclear(mark)) return unclearNote();
   const slip = slipLine(mark);
-  if (!mark.heard) return mark.kind === 'word' ? 'Said as another word' : (slip ?? '');
-  return `${recitedLabel(mark)} ${iso(mark.heard)}`;
+  if (!mark.heard) return mark.kind === 'word' ? t('reciteLive.describe.anotherWord') : (slip ?? '');
+  return t('reciteLive.describe.recitedNote', { label: recitedLabel(mark), word: iso(mark.heard) });
 }

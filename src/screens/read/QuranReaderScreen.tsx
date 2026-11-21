@@ -40,6 +40,7 @@ import { SavedSitting, SittingEnded, sittingSavedText, sittingsEnabled } from '.
 import { SittingSavedToast } from '../../components/timer/SittingSavedToast';
 import type { ReadStackParamList } from '../../navigation/MainNavigator';
 import { useReciteLayer } from '../../components/reciteLive/useReciteLayer';
+import { t } from '../../i18n';
 
 type NavigationProp = NativeStackNavigationProp<ReadStackParamList, 'QuranReader'>;
 type RouteProps = RouteProp<ReadStackParamList, 'QuranReader'>;
@@ -255,18 +256,18 @@ export default function QuranReaderScreen() {
         quietHeader={
           <View style={styles.quietHeader}>
             <Text style={styles.quietText} numberOfLines={1} maxFontSizeMultiplier={1.3}>
-              Juz {juz}
+              {t('common.juzN', { n: juz })}
             </Text>
             <SurahName surah={firstSurah} palette={palette} quiet />
           </View>
         }
         header={
           <View style={styles.header}>
-            <RoundButton icon="chevron-back" label="Back" onPress={() => navigation.goBack()} palette={palette} testID="reader-back" />
+            <RoundButton icon="chevron-back" label={t('common.back')} onPress={() => navigation.goBack()} palette={palette} testID="reader-back" />
             <View style={styles.titleCol}>
               <SurahName surah={firstSurah} palette={palette} />
               <Text style={styles.subtitle} numberOfLines={1} maxFontSizeMultiplier={1.3}>
-                Page {currentPage} · Juz {juz} · Hizb {hizb}
+                {t('read.reader.subtitle', { page: currentPage, juz, hizb })}
               </Text>
             </View>
             {/* Its help (HELP-1), a round button like Back; hidden, the same room keeps the title centred. */}
@@ -315,7 +316,7 @@ export default function QuranReaderScreen() {
         hint={
           tapHint.shown ? (
             <Text style={styles.hint} maxFontSizeMultiplier={1.3}>
-              Tap the page for the controls
+              {t('read.reader.tapHint')}
             </Text>
           ) : null
         }

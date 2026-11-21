@@ -7,13 +7,14 @@ import { Tap } from '../v2/Tap';
 import { getQuranWords, loadQuranWords, type QuranWords } from '../../lib/recite/quranWords';
 import { formatAccuracy, mistakesLabel, scoreLevel } from '../../lib/reciteLive/score';
 import type { TakeRecord } from '../../lib/reciteMemory/record';
-import { takeWhen } from '../../lib/reciteMemory/describe';
+import { takeClock, takeWhen } from '../../lib/reciteMemory/describe';
 import { logger } from '../../lib/logger';
 import { passageOf } from '../reciteLive/TakeSummarySheet';
 import { similarSlips } from '../../lib/reciteInsights/insights';
 import { intoLine } from '../../lib/reciteInsights/describe';
 import { plainText } from '../../lib/passages';
 import { formatMinutesLong } from '../../lib/activityFormat';
+import { t } from '../../i18n';
 
 /** At most this many similar-ayah lines under a take; the rest are on the page (Show on the page). */
 const INTO_LINES = 2;
@@ -61,12 +62,8 @@ function useScoreColour() {
   };
 }
 
-/** "7:51 PM", the phone's own clock. */
-function clockTime(ms: number): string {
-  const d = new Date(ms);
-  const h = d.getHours();
-  return `${h % 12 === 0 ? 12 : h % 12}:${String(d.getMinutes()).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
-}
+/** "7:51 PM" (lib/reciteMemory/describe). */
+const clockTime = takeClock;
 
 /**
  * A take kept without its final answer (RECITE-11): `unfinished`. One whose audio is all there is (RECITE-12: saved
@@ -84,15 +81,20 @@ export function takeScoreText(take: TakeRecord): string {
 
 /** "7:51 PM · 1 mistake · 2 cleared · page hidden". */
 export function takeLine(take: TakeRecord, cleared: number): string {
-  return [clockTime(take.createdAt), takeResult(take), cleared > 0 ? `${cleared} cleared` : null, take.hidden ? 'page hidden' : null]
+  return [
+    clockTime(take.createdAt),
+    takeResult(take),
+    cleared > 0 ? t('reciteMemory.rows.cleared', { count: cleared }) : null,
+    take.hidden ? t('reciteMemory.rows.pageHidden') : null,
+  ]
     .filter(Boolean)
     .join(' · ');
 }
 
 /** How a take went, in its line: its mistakes, "unfinished" after them when it has no final answer, or "not checked". */
 function takeResult(take: TakeRecord): string {
-  if (!takeChecked(take)) return 'not checked';
-  return take.unfinished ? `${mistakesLabel(take.mistakes)}, unfinished` : mistakesLabel(take.mistakes);
+  if (!takeChecked(take)) return t('reciteMemory.rows.notChecked');
+  return take.unfinished ? t('reciteMemory.rows.unfinished', { mistakes: mistakesLabel(take.mistakes) }) : mistakesLabel(take.mistakes);
 }
 
 /** A take as its day lists it: "9:41 PM · 4 min · 1 mistake · 2 not clear · page hidden" (RMEM-5). */
@@ -101,9 +103,9 @@ export function dayTakeLine(take: TakeRecord, cleared: number): string {
     clockTime(take.createdAt),
     formatMinutesLong(Math.max(1, Math.round(take.secs / 60))),
     takeResult(take),
-    take.unclear > 0 ? `${take.unclear} not clear` : null,
-    cleared > 0 ? `${cleared} cleared` : null,
-    take.hidden ? 'page hidden' : null,
+    take.unclear > 0 ? t('reciteMemory.rows.unclear', { count: take.unclear }) : null,
+    cleared > 0 ? t('reciteMemory.rows.cleared', { count: cleared }) : null,
+    take.hidden ? t('reciteMemory.rows.pageHidden') : null,
   ]
     .filter(Boolean)
     .join(' · ');
@@ -136,7 +138,7 @@ export function TakeDayRow({
 }) {
   const { palette } = useTheme();
   const colour = useScoreColour();
-  const passage = words ? passageOf(words, take.from, take.to) : 'Recited';
+  const passage = words ? passageOf(words, take.from, take.to) : t('reciteMemory.recited.title');
   const into = similarSlips([take]).slice(0, INTO_LINES).map(intoLine);
   const line = dayTakeLine(take, cleared);
   return (
@@ -147,7 +149,7 @@ export function TakeDayRow({
       style={styles.dayRow}
       accessibilityRole="button"
       accessibilityLabel={[passage, takeChecked(take) ? formatAccuracy(take.accuracy) : '', line, ...into.map(plainText)].filter(Boolean).join(', ')}
-      accessibilityHint="Shows it on the page, with its marks"
+      accessibilityHint={t('reciteMemory.rows.hint')}
       accessibilityActions={actions.map((a) => ({ name: a.key, label: a.label }))}
       onAccessibilityAction={(e) => actions.find((a) => a.key === e.nativeEvent.actionName)?.onPress()}
       testID="activity-take-head"
@@ -157,7 +159,7 @@ export function TakeDayRow({
           onPress={() => take.recordingId && onPlay(take.recordingId)}
           hitSlop={8}
           accessibilityRole="button"
-          accessibilityLabel={`Listen back: ${passage}`}
+          accessibilityLabel={t('reciteMemory.rows.listenBack', { passage })}
           testID="activity-take-play"
         >
           <View style={[styles.dayDisc, { backgroundColor: palette.fill }]}>
@@ -219,7 +221,7 @@ export function TakeSheetRow({
 }) {
   const { palette } = useTheme();
   const colour = useScoreColour();
-  const passage = words ? passageOf(words, take.from, take.to) : 'Recited';
+  const passage = words ? passageOf(words, take.from, take.to) : t('reciteMemory.recited.title');
   // A slip into a similar ayah says so under the take's line (RINS-3).
   const into = similarSlips([take]).slice(0, INTO_LINES).map(intoLine);
   const line = takeLine(take, cleared);
@@ -231,7 +233,7 @@ export function TakeSheetRow({
       style={[styles.listRow, !first && { borderTopColor: palette.separator, borderTopWidth: layoutV2.hairline }]}
       accessibilityRole="button"
       accessibilityLabel={[passage, takeChecked(take) ? formatAccuracy(take.accuracy) : '', line, ...into.map(plainText)].filter(Boolean).join(', ')}
-      accessibilityHint="Shows it on the page, with its marks"
+      accessibilityHint={t('reciteMemory.rows.hint')}
       accessibilityActions={actions.map((a) => ({ name: a.key, label: a.label }))}
       onAccessibilityAction={(e) => actions.find((a) => a.key === e.nativeEvent.actionName)?.onPress()}
       testID="activity-take-head"
@@ -241,7 +243,7 @@ export function TakeSheetRow({
           onPress={() => take.recordingId && onPlay(take.recordingId)}
           hitSlop={6}
           accessibilityRole="button"
-          accessibilityLabel={`Listen back: ${passage}`}
+          accessibilityLabel={t('reciteMemory.rows.listenBack', { passage })}
           testID="activity-take-play"
         >
           <View style={[styles.disc, { backgroundColor: palette.fill }]}>
@@ -296,18 +298,22 @@ export function TakeListRow({
 }) {
   const { palette } = useTheme();
   const colour = useScoreColour();
-  const passage = words ? passageOf(words, take.from, take.to) : 'Recited';
-  const when = [takeWhen(take.createdAt, now), take.hidden ? 'page hidden' : null].filter(Boolean).join(' · ');
+  const passage = words ? passageOf(words, take.from, take.to) : t('reciteMemory.recited.title');
+  const when = [takeWhen(take.createdAt, now), take.hidden ? t('reciteMemory.rows.pageHidden') : null].filter(Boolean).join(' · ');
   return (
     <Tap
       onPress={onPress}
       style={[styles.listRow, !first && { borderTopColor: palette.separator, borderTopWidth: layoutV2.hairline }]}
       accessibilityRole="button"
-      accessibilityLabel={takeChecked(take) ? `${passage}, ${when}, ${formatAccuracy(take.accuracy)}, ${mistakesLabel(take.mistakes)}` : `${passage}, ${when}, not checked`}
+      accessibilityLabel={
+        takeChecked(take)
+          ? t('reciteMemory.rows.allLabel', { passage, when, score: formatAccuracy(take.accuracy), mistakes: mistakesLabel(take.mistakes) })
+          : t('reciteMemory.rows.allLabelUnchecked', { passage, when })
+      }
       testID="activity-all-take"
     >
       {playable ? (
-        <Tap onPress={onPlay} hitSlop={6} accessibilityRole="button" accessibilityLabel={`Listen back: ${passage}`} testID="activity-all-take-play">
+        <Tap onPress={onPlay} hitSlop={6} accessibilityRole="button" accessibilityLabel={t('reciteMemory.rows.listenBack', { passage })} testID="activity-all-take-play">
           <View style={[styles.disc, { backgroundColor: palette.fill }]}>
             <Ionicons name="play" size={16} color={palette.text} style={styles.playIcon} />
           </View>
@@ -330,7 +336,7 @@ export function TakeListRow({
           {takeScoreText(take)}
         </Text>
         <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={1.3}>
-          {takeChecked(take) ? mistakesLabel(take.mistakes) : 'not checked'}
+          {takeChecked(take) ? mistakesLabel(take.mistakes) : t('reciteMemory.rows.notChecked')}
         </Text>
       </View>
     </Tap>

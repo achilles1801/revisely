@@ -15,8 +15,8 @@ import { CLEAR_QURAN_ID, creditLine, getVerseTranslation, peekVerseTranslation, 
 import { clearQuranSegments } from '../../lib/clearQuran';
 import { saheehFootnotes, saheehSegments } from '../../lib/saheeh';
 import { openWebPage } from '../../lib/openWebPage';
+import { t } from '../../i18n';
 
-const NBSP = ' ';
 /** A match runs over at most this many ayat in its card (as the reader highlights). */
 const MAX_CARD_AYAHS = 12;
 /** Chrome text stops growing here (CLAUDE.md, UI traps); the Arabic and the translation grow further. */
@@ -32,7 +32,7 @@ export function hitAyahs(hit: VerseHit): number[] {
 /** "Yunus, ayah 16", or the run: "Al-Hajj, ayahs 49–50". */
 export function hitTitle(hit: VerseHit): string {
   const ayahs = hitAyahs(hit);
-  return ayahs.length > 1 ? describeAyahs(ayahs, { wholeJuz: false }) : `${surahName(hit.sura)}, ayah${NBSP}${hit.ayah}`;
+  return ayahs.length > 1 ? describeAyahs(ayahs, { wholeJuz: false }) : t('read.search.cardTitle', { surah: surahName(hit.sura), ayah: hit.ayah });
 }
 
 /**
@@ -70,7 +70,7 @@ function useTranslations(ayahs: number[], translationId: string | null | undefin
     for (const k of ayahs) {
       if (loaded[k]) continue;
       getVerseTranslation(suraOf(k), ayahOf(k), translationId)
-        .then((t) => live && setLoaded((m) => ({ ...m, [k]: t })))
+        .then((v) => live && setLoaded((m) => ({ ...m, [k]: v })))
         .catch(() => live && setLoaded((m) => ({ ...m, [k]: 'failed' })));
     }
     return () => {
@@ -112,16 +112,16 @@ export function SearchVerseCard({
   const title = hitTitle(hit);
   const page = pageOfVerse(hit);
   const translations = useTranslations(ayahs, translationId, load);
-  const shown = ayahs.map((k) => translations[k]).filter((t): t is VerseTranslation => t != null && t !== 'failed');
+  const shown = ayahs.map((k) => translations[k]).filter((v): v is VerseTranslation => v != null && v !== 'failed');
   const failed = ayahs.some((k) => translations[k] === 'failed');
-  const t = shown[0]?.translation;
+  const tr = shown[0]?.translation;
   return (
     <View style={[styles.card, { borderBottomColor: palette.separator }]} testID={`search-verse-${hit.sura}-${hit.ayah}`}>
-      <Tap onPress={onOpen} accessibilityRole="button" accessibilityLabel={`${spokenText(title)}, page ${page}. Open in the reader`} style={styles.head}>
+      <Tap onPress={onOpen} accessibilityRole="button" accessibilityLabel={t('read.search.openLabel', { title: spokenText(title), page })} style={styles.head}>
         <Text style={[typeV2.name, styles.title, { color: palette.text }]} numberOfLines={2} maxFontSizeMultiplier={CHROME_MAX}>
           {title}
         </Text>
-        <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={CHROME_MAX}>{`p.${NBSP}${page}`}</Text>
+        <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={CHROME_MAX}>{t('common.pageShort', { n: page })}</Text>
       </Tap>
       <Text style={[arabicV2(26), styles.arabic]} accessibilityLanguage="ar" maxFontSizeMultiplier={2} testID="search-verse-arabic">
         {ayahs.map((key, n) => {
@@ -139,7 +139,7 @@ export function SearchVerseCard({
           );
         })}
       </Text>
-      {shown.length > 0 && t ? (
+      {shown.length > 0 && tr ? (
         <View style={styles.translation} testID="search-verse-translation">
           {ayahs.map((key) => {
             const v = translations[key];
@@ -171,30 +171,30 @@ export function SearchVerseCard({
             );
           })}
           <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={CHROME_MAX} testID="search-verse-credit">
-            {`${creditLine(t, shown[0]?.version)} · `}
+            {`${creditLine(tr, shown[0]?.version)} · `}
             <Text
               style={{ color: palette.link }}
               accessibilityRole="link"
-              onPress={() => void openWebPage(t.credit.url)}
+              onPress={() => void openWebPage(tr.credit.url)}
             >
-              {t.credit.linkLabel}
+              {tr.credit.linkLabel}
             </Text>
           </Text>
         </View>
       ) : failed ? (
         <Text style={[typeV2.meta, styles.translation, { color: palette.secondary }]} maxFontSizeMultiplier={CHROME_MAX}>
-          Couldn’t load the translation.
+          {t('read.search.translationFailed')}
         </Text>
       ) : null}
       <View style={styles.actions}>
-        <Tap onPress={onShare} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Share ${spokenText(title)}`} style={styles.icon} testID="search-verse-share">
+        <Tap onPress={onShare} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('read.search.share', { title: spokenText(title) })} style={styles.icon} testID="search-verse-share">
           <Ionicons name="share-outline" size={20} color={palette.text} />
         </Tap>
-        <Tap onPress={onCopy} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Copy ${spokenText(title)}`} style={styles.icon} testID="search-verse-copy">
+        <Tap onPress={onCopy} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('read.search.copy', { title: spokenText(title) })} style={styles.icon} testID="search-verse-copy">
           <Ionicons name="copy-outline" size={20} color={palette.text} />
         </Tap>
         <View style={styles.spacer} />
-        <PillButton title="Open in the reader" size="sm" variant="outline" icon="book-outline" onPress={onOpen} testID="search-verse-open" />
+        <PillButton title={t('read.search.open')} size="sm" variant="outline" icon="book-outline" onPress={onOpen} testID="search-verse-open" />
       </View>
     </View>
   );

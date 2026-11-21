@@ -19,8 +19,9 @@ import {
   recitedPhrase,
   slipLine,
   tajweedLines,
-  UNCLEAR_NOTE,
+  unclearNote,
 } from '../../lib/reciteLive/describe';
+import { t } from '../../i18n';
 
 const CARD_MARGIN = 12;
 
@@ -41,7 +42,7 @@ export function MarkBlock({
   // Not clear: what the checker thinks it heard is the unclear part, so only what was expected shows, and why.
   const unclear = isUnclear(mark);
   const recited = unclear ? null : recitedPhrase(words, mark);
-  const slip = unclear ? UNCLEAR_NOTE : slipLine(mark);
+  const slip = unclear ? unclearNote() : slipLine(mark);
   return (
     <View style={[styles.block, !first && { borderTopColor: palette.separator, borderTopWidth: layoutV2.hairline }]} testID={`mark-card-${mark.kind}`}>
       <View style={styles.head}>
@@ -56,7 +57,7 @@ export function MarkBlock({
             {markPlace(mark)}
           </Text>
         </View>
-        <SmallPill label="Not a mistake" onPress={() => onDismiss(mark.id)} testID="mark-card-dismiss" />
+        <SmallPill label={t('reciteLive.card.notMistake')} onPress={() => onDismiss(mark.id)} testID="mark-card-dismiss" />
       </View>
       {mark.kind === 'tajweed' ? (
         <View style={styles.tajweed}>
@@ -74,7 +75,7 @@ export function MarkBlock({
         </View>
       ) : (
         <View>
-          <Row label="Expected" first>
+          <Row label={t('reciteLive.card.expected')} first>
             <Phrase parts={expectedPhrase(words, mark)} fill={fill} />
           </Row>
           {recited ? (
@@ -177,12 +178,12 @@ export function MarkCard({
           <MarkBlock key={m.id} mark={m} words={words} onDismiss={onDismiss} first={i === 0} />
         ))}
         <View style={styles.actions}>
-          <SmallPill icon="volume-high-outline" label="Hear it" onPress={() => onHear(main)} testID="mark-card-hear" />
+          <SmallPill icon="volume-high-outline" label={t('reciteLive.card.hear')} onPress={() => onHear(main)} testID="mark-card-hear" />
           {onYours ? (
-            <SmallPill icon="person-outline" label="Your recitation" onPress={() => onYours(main)} testID="mark-card-yours" />
+            <SmallPill icon="person-outline" label={t('reciteLive.card.yours')} onPress={() => onYours(main)} testID="mark-card-yours" />
           ) : null}
           {hasSimilar ? (
-            <SmallPill icon="git-compare-outline" label="Similar phrases" onPress={() => onSimilar(main)} testID="mark-card-similar" />
+            <SmallPill icon="git-compare-outline" label={t('reciteLive.card.similar')} onPress={() => onSimilar(main)} testID="mark-card-similar" />
           ) : null}
         </View>
       </View>

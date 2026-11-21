@@ -6,6 +6,7 @@ import { act, render, screen } from '@testing-library/react-native';
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
 import { readRepo } from '../../../../jest/behaviourRules';
 import { PICTURE_WORDS, demoTakeOf, pictureFor } from '../pictures';
+import { en } from '../../../i18n/en';
 import { ThemeProvider } from '../../../context/ThemeContext';
 import { DesignProvider } from '../../../design/DesignContext';
 import { setQuranWordsForTests } from '../../../lib/recite/quranWords';
@@ -43,7 +44,9 @@ describe('the pictures', () => {
   });
 
   it("the drill's button is the take summary's", () => {
-    expect(source('src/components/reciteLive/TakeSummarySheet.tsx')).toContain(`title="${PICTURE_WORDS.drill}"`);
+    // The summary's button is t('reciteLive.summary.drill') (src/i18n): the picture draws the same English.
+    expect(source('src/components/reciteLive/TakeSummarySheet.tsx')).toContain("title={t('reciteLive.summary.drill')}");
+    expect(en.reciteLive.summary.drill).toBe(PICTURE_WORDS.drill);
   });
 
   it('each draws, hidden from VoiceOver and never touched', async () => {

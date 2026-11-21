@@ -17,8 +17,13 @@ import { player } from './player';
 import { prayer } from './prayer';
 import { preview } from './preview';
 import { qibla } from './qibla';
+import { read } from './read';
 import { reader } from './reader';
 import { recite } from './recite';
+import { reciteCheck } from './reciteCheck';
+import { reciteInsights } from './reciteInsights';
+import { reciteLive } from './reciteLive';
+import { reciteMemory } from './reciteMemory';
 import { recordings } from './recordings';
 import { reminders } from './reminders';
 import { revision } from './revision';
@@ -48,8 +53,13 @@ export const en = {
   prayer,
   preview,
   qibla,
+  read,
   reader,
   recite,
+  reciteCheck,
+  reciteInsights,
+  reciteLive,
+  reciteMemory,
   recordings,
   reminders,
   revision,

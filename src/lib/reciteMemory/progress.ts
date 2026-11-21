@@ -1,8 +1,9 @@
 // A passage's progress over the takes of it (pure): which takes count, the trend, and how to say it.
 
 import type { MemoryRecord, TakeRecord } from './record';
-import { takeWhen } from './describe';
+import { takeDaysAgo, takeWhen } from './describe';
 import { formatAccuracy } from '../reciteLive/score';
+import { t } from '../../i18n';
 
 /**
  * The takes that count for a passage (words `from`..`to`): those covering at least half of it, oldest first. A take of
@@ -25,9 +26,19 @@ export function progressLine(takes: readonly TakeRecord[], now: number): string 
   const last = takes[takes.length - 1];
   const a = formatAccuracy(first.accuracy);
   const b = formatAccuracy(last.accuracy);
-  const when = takeWhen(first.createdAt, now);
+  const days = takeDaysAgo(first.createdAt, now);
   // "earlier today", "yesterday", "on Mon 2 Nov".
-  const on = when.startsWith('Today') ? 'earlier today' : when.startsWith('Yesterday') ? 'yesterday' : `on ${when}`;
-  const lead = b === a ? `The same as ${on}` : last.accuracy > first.accuracy ? `Up from ${a} ${on}` : `Down from ${a} ${on}`;
-  return `${lead} · ${takes.length} takes`;
+  const on =
+    days === 0
+      ? t('reciteMemory.earlierToday')
+      : days === 1
+        ? t('reciteMemory.yesterday')
+        : t('reciteMemory.onDate', { date: takeWhen(first.createdAt, now) });
+  const lead =
+    b === a
+      ? t('reciteMemory.sameAs', { on })
+      : last.accuracy > first.accuracy
+        ? t('reciteMemory.upFrom', { from: a, on })
+        : t('reciteMemory.downFrom', { from: a, on });
+  return t('reciteMemory.progress', { lead, count: takes.length });
 }

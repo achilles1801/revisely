@@ -7,6 +7,7 @@
 // Both go through the same figure and colour.
 
 import type { QuranWords } from '../recite/quranWords';
+import { t } from '../../i18n';
 
 /** good: at most a mistake a page. warn: two or three. bad: more. */
 export type ScoreLevel = 'good' | 'warn' | 'bad';
@@ -42,6 +43,6 @@ export function pageAccuracy(words: QuranWords, mistakes: number, first: number,
 
 /** "No mistakes", "1 mistake", "3 mistakes". */
 export function mistakesLabel(n: number): string {
-  if (n <= 0) return 'No mistakes';
-  return n === 1 ? '1 mistake' : `${n} mistakes`;
+  if (n <= 0) return t('reciteLive.noMistakes');
+  return t('reciteLive.mistakes', { count: n });
 }

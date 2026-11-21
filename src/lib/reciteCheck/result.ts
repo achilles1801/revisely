@@ -1,3 +1,5 @@
+import { t } from '../../i18n';
+import type { Strings } from '../../i18n/en';
 /** What the recitation check service answers (scripts/recite-check/README.md, `v: 1`), and how it is worded. */
 
 export type WordStatus = 'correct' | 'corrected' | 'wrong' | 'missed';
@@ -98,67 +100,70 @@ export function parseCheckResult(raw: unknown): CheckResult | null {
   };
 }
 
-const counts = (n: number) => `${Math.round(n)} ${Math.round(n) === 1 ? 'count' : 'counts'}`;
+const counts = (n: number) => t('reciteCheck.counts', { count: Math.round(n) });
 
 /** One line for a word that wasn't said right. */
 export function describeWord(word: CheckedWord): string | null {
-  if (word.status === 'missed') return 'Skipped';
+  if (word.status === 'missed') return t('reciteCheck.skipped');
   if (word.status !== 'wrong') return null;
   switch (word.kind) {
     case 'lookalike':
-      return word.heard ? `Said as ${word.heard}` : 'Said as another word';
+      return word.heard ? t('reciteCheck.saidAs', { heard: word.heard }) : t('reciteCheck.saidAsAnother');
     case 'replaced':
-      return 'Said differently';
+      return t('reciteCheck.saidDifferently');
     case 'order':
-      return 'Out of order';
+      return t('reciteCheck.outOfOrder');
     default:
-      return 'A sound said wrong';
+      return t('reciteCheck.soundWrong');
   }
 }
 
-const RULE_NAMES: Record<TajweedRule, string> = {
-  madd_munfasil: 'Madd munfasil',
-  madd_muttasil: 'Madd muttasil',
-  madd_aared: 'Madd ʿarid',
-  madd_lazim: 'Madd lazim',
-  madd_dropped: 'Madd',
-  qalqalah: 'Qalqalah',
-  ghunnah: 'Ghunnah',
-  ikhfa: 'Ikhfa',
-  idgham: 'Idgham',
-  idgham_no_ghunnah: 'Idgham without ghunnah',
-  iqlab: 'Iqlab',
+/** Each rule's key in src/i18n/en/reciteCheck.ts (`rules`). */
+const RULE_KEYS: Record<TajweedRule, keyof Strings['reciteCheck']['rules']> = {
+  madd_munfasil: 'maddMunfasil',
+  madd_muttasil: 'maddMuttasil',
+  madd_aared: 'maddAared',
+  madd_lazim: 'maddLazim',
+  madd_dropped: 'maddDropped',
+  qalqalah: 'qalqalah',
+  ghunnah: 'ghunnah',
+  ikhfa: 'ikhfa',
+  idgham: 'idgham',
+  idgham_no_ghunnah: 'idghamNoGhunnah',
+  iqlab: 'iqlab',
 };
 
 /** "Madd munfasil", "Idgham without ghunnah". */
 export function tajweedName(rule: TajweedRule): string {
-  return RULE_NAMES[rule];
+  return t(`reciteCheck.rules.${RULE_KEYS[rule]}`);
 }
 
 /** "Madd munfasil · about 2 counts, set to 4", "Qalqalah · not heard". */
 export function describeTajweed(note: TajweedNote): string {
-  const name = RULE_NAMES[note.rule];
+  const name = tajweedName(note.rule);
   switch (note.rule) {
     case 'madd_munfasil':
     case 'madd_muttasil':
     case 'madd_aared':
       return note.got != null && note.expected != null
-        ? `${name} · about ${counts(note.got)}, set to ${note.expected}`
-        : `${name} · not the length set`;
+        ? t('reciteCheck.aboutSetTo', { name, counts: counts(note.got), expected: note.expected })
+        : t('reciteCheck.notLengthSet', { name });
     case 'madd_lazim':
-      return note.got != null ? `${name} · about ${counts(note.got)}, hold it for 6` : `${name} · hold it for 6`;
+      return note.got != null
+        ? t('reciteCheck.aboutHoldSix', { name, counts: counts(note.got) })
+        : t('reciteCheck.holdSix', { name });
     case 'madd_dropped':
-      return `${name} · not said`;
+      return t('reciteCheck.notSaid', { name });
     case 'qalqalah':
-      return `${name} · not heard`;
+      return t('reciteCheck.notHeard', { name });
     case 'ghunnah':
-      return `${name} · not held`;
+      return t('reciteCheck.notHeld', { name });
     case 'ikhfa':
     case 'idgham':
     case 'idgham_no_ghunnah':
-      return `${name} · the noon said clearly`;
+      return t('reciteCheck.noonClear', { name });
     case 'iqlab':
-      return `${name} · the noon said clearly, not as a meem`;
+      return t('reciteCheck.noonClearNotMeem', { name });
   }
 }
 
@@ -168,8 +173,8 @@ export function summary(r: CheckResult): string {
   const tajweed = r.tajweed.length;
   const letters = r.letters?.length ?? 0;
   const parts: string[] = [];
-  if (words) parts.push(`${words} ${words === 1 ? 'word' : 'words'}`);
-  if (letters) parts.push(`${letters} ${letters === 1 ? 'letter' : 'letters'}`);
-  if (tajweed) parts.push(`${tajweed} tajweed ${tajweed === 1 ? 'note' : 'notes'}`);
-  return parts.length ? parts.join(', ') : 'No mistakes heard';
+  if (words) parts.push(t('reciteCheck.words', { count: words }));
+  if (letters) parts.push(t('reciteCheck.letters', { count: letters }));
+  if (tajweed) parts.push(t('reciteCheck.tajweedNotes', { count: tajweed }));
+  return parts.length ? parts.join(', ') : t('reciteCheck.noMistakes');
 }

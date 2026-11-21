@@ -41,6 +41,7 @@ import {
 } from '../../lib/reciteLive/state';
 import { isDevVariant } from '../../lib/variant';
 import { useReduceMotion } from '../../design/motion';
+import { t } from '../../i18n';
 
 /** What the mic does while reciting: follow along (free), or follow and mark mistakes (Check). */
 export type LiveMode = 'recite' | 'check';
@@ -842,7 +843,7 @@ export function useLiveRecitation({
     startBefore.current = state.start;
     if (before != null || state.start == null || !live || !searched || !words) return;
     const r = words.ref(state.start);
-    AccessibilityInfo.announceForAccessibility(`Started at ${spokenText(placeOfAyah(ayahKey(r.sura, r.ayah)))}`);
+    AccessibilityInfo.announceForAccessibility(t('reciteLive.startedAt', { place: spokenText(placeOfAyah(ayahKey(r.sura, r.ayah))) }));
   }, [state.start, live, searched, words]);
 
   return {
