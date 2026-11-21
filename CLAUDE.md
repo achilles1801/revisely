@@ -653,7 +653,7 @@ revisely-dev`; nothing deploys Hosting by itself). It shows production and dev (
 (and revision-buddy-3a398.web.app) only redirects there since Nov 14 2026 (`scripts/metrics/metrics-redirect/`, its
 README has the deploy and the undo); never deploy the root `firebase.json`'s hosting to production.
 - **Pages:** `/sign-in` (its own page, phone-first: Google, an email link for people without Google, or email and
-  password; an account with no role and no invite sees "Waiting for access" with its email and nothing else), `/` Overview (the metrics), `/open-door` and `/open-door/<uid>`, `/audit`,
+  password; an account with no role and no invite sees "Waiting for access" with its email and nothing else), `/` Overview (the metrics, with Retention), `/open-door` and `/open-door/<uid>`, `/audit`,
   `/staff` (owners only: give a role by exact email, change or take one; no changing your own, never the App Review
   account, never the last owner; each change in the audit log), `/label` (below). Signed out, every address goes to
   `/sign-in?next=…` (`shell.js`). Hosting's `cleanUrls` and rewrites serve them.

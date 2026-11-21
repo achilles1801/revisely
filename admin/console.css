@@ -495,3 +495,5 @@ td.wrap { white-space: normal; min-width: 18ch; max-width: 48ch; overflow-wrap: 
   .req-acts > .btn.primary { flex: 1 1 100%; min-height: 46px; }
 }
 .auth-hint { margin: 0; padding: 10px 12px; border-radius: 10px; background: var(--warn-bg); color: var(--warn-ink); font-size: 13px; line-height: 1.45; }
+/* Retention table: a share beside each count */
+#retTable .pc { color: var(--ink-3); font-size: 12px; margin-left: 4px; }
