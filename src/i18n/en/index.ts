@@ -19,6 +19,8 @@ import { preview } from './preview';
 import { qibla } from './qibla';
 import { reader } from './reader';
 import { recite } from './recite';
+import { reciteCheck } from './reciteCheck';
+import { reciteInsights } from './reciteInsights';
 import { reciteLive } from './reciteLive';
 import { reciteMemory } from './reciteMemory';
 import { recordings } from './recordings';
@@ -52,6 +54,8 @@ export const en = {
   qibla,
   reader,
   recite,
+  reciteCheck,
+  reciteInsights,
   reciteLive,
   reciteMemory,
   recordings,

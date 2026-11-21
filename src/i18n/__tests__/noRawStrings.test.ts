@@ -45,6 +45,8 @@ const EXTRACTED: string[] = [
   'hooks',
   'lib/prayer',
   'lib/recite',
+  'lib/reciteCheck',
+  'lib/reciteInsights',
   'lib/reciteLive',
   'lib/reciteMemory',
   'lib/reminders',
