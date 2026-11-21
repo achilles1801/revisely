@@ -2253,7 +2253,23 @@ describe('Majd’s Nov 20 asks: the mistake sound, and mistakes on a hidden page
     expect(screen.getByTestId('live-highlight-word')).toBeTruthy();
   });
 
+  /**
+   * The tests before this one leave takes listening. Their reader keeps each as an unfinished take when it goes
+   * (RECITE-12), and writes it again with its recording 800 ms after that comes (useRememberTake's SETTLE_MS): on a slow
+   * runner, into the next test's memory, after its reset, with that take's marks on page 379 (develop's CI, Nov 20 2026:
+   * "Found multiple elements with testID: cover-past-word"). This lets those writes land, then starts Recite's memory
+   * empty, on the phone too.
+   */
+  async function afterLeftTakes() {
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 2000));
+    });
+    resetMemoryForTests();
+    await AsyncStorage.clear();
+  }
+
   it('[RECITE-13] and the words Recite’s memory holds on the page, lighter, with no take and during one; not with Show past mistakes off', async () => {
+    await afterLeftTakes();
     const [from, to] = words.pageRange(379);
     await remember('u1', {
       id: 'mem-1',
