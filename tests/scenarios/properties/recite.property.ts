@@ -1235,6 +1235,10 @@ describe('[RECITE-18] Your recitation plays the phrase the mistake is in', () =>
           for (let i = p0; i < p1; i++) expect(endsPhrase(i)).toBe(false);
         }
       }),
+    );
+  });
+});
+
 describe('[RECITE-19] highlights are soft washes wider than their word; with the page shown no word is washed', () => {
   // Every word of the 1405 print that has a box (pages 1 to 604).
   const wordArb = fc.integer({ min: 0, max: words.count - 1 });
