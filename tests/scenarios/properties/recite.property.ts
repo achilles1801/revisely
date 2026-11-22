@@ -1281,11 +1281,11 @@ describe('[RECITE-19] highlights are soft washes wider than their word; with the
     );
   });
 
-  it('the page shown: only the ayah’s band follows the reciter, no word is washed or inked', () => {
+  it('the page shown: the ayah’s band and the box on the word being recited follow the cursor (never ahead of it), no word inked', () => {
     const at = fc.option(wordArb, { nil: null });
     fc.assert(
       fc.property(at, at, (cursor, newest) => {
-        expect(followCues(false, cursor, newest)).toEqual({ band: cursor, ink: null });
+        expect(followCues(false, cursor, newest)).toEqual({ band: cursor, box: cursor, ink: null });
       }),
       { numRuns: runs(100) },
     );
@@ -1318,6 +1318,7 @@ describe('[RECITE-20] on a hidden page the newest word shown is in the following
       fc.property(fc.option(wordArb, { nil: null }), fc.option(wordArb, { nil: null }), fc.uniqueArray(wordArb, { maxLength: 6 }), (cursor, newest, marked) => {
         const cues = followCues(true, cursor, newest, (w) => marked.includes(w));
         expect(cues.band).toBeNull();
+        expect(cues.box).toBeNull();
         if (newest == null || marked.includes(newest)) expect(cues.ink).toBeNull();
         else expect(cues.ink).toBe(newest);
       }),

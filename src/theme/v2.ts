@@ -163,6 +163,11 @@ export interface PaletteV2 extends AccentTokens {
    */
   highlight: string;
   highlightSoft: string;
+  /**
+   * Its firmer shade: the rectangle on the word being recited on a shown page, inside the ayah's band (Majd, Nov 22
+   * 2026, of Tarteel's: "follow along is clearly shading each word … a boxed rectangle kinda that moves side to side").
+   */
+  highlightFirm: string;
   followInk: string;
   /**
    * Recite's mistakes as highlights behind the word, three colours at most (Majd, Nov 15 2026: "only things we should
@@ -217,6 +222,7 @@ const BASE_LIGHT: Base = {
   goodSubtle: '#E6F2EF',
   highlight: '#DEDEE3',
   highlightSoft: '#F2F2F4',
+  highlightFirm: '#C8C8CC',
   followInk: '#1A7A44',
   markWord: '#F6B9BC',
   markWordFirm: '#EF9CA1',
@@ -255,6 +261,7 @@ const BASE_DARK: Base = {
   goodSubtle: '#0D2721',
   highlight: '#26262B',
   highlightSoft: '#121214',
+  highlightFirm: '#444446',
   followInk: '#86E0B0',
   markWord: '#7A3D48',
   markWordFirm: '#94505E',
