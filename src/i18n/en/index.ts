@@ -9,6 +9,7 @@ import { insights } from './insights';
 import { insightsTab } from './insightsTab';
 import { journal } from './journal';
 import { languages } from './languages';
+import { lib } from './lib';
 import { memorization } from './memorization';
 import { mushaf } from './mushaf';
 import { offline } from './offline';
@@ -48,6 +49,7 @@ export const en = {
   insightsTab,
   journal,
   languages,
+  lib,
   memorization,
   mushaf,
   offline,

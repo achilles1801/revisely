@@ -33,6 +33,7 @@ import pageVerseTable from '../data/pageVerses.json';
 import { ayahOf, ayahRuns, ayahsOnPage, firstAyahOfPage, lastAyahOfPage, nextAyah, pageOfAyah, previousAyah, suraOf } from './ayahKeys';
 import { getMushafEdition, MushafEditionId } from './mushafEdition';
 import { getJuzForPage, getJuzRange, getSurah, getSurahDisplay } from './quranData';
+import { currentLanguage, formatNumber, t } from '../i18n';
 
 /** A no-break space. */
 export const NBSP = ' ';
@@ -87,12 +88,19 @@ export function lastVerseOfPage(page: number, edition: MushafEditionId = getMush
   return next.ayah > 1 ? { sura: next.sura, ayah: next.ayah - 1 } : { sura: next.sura - 1, ayah: ayahCount(next.sura - 1) };
 }
 
-/** A surah's name, held together: "Al‑Baqarah", "Ali 'Imran" never break inside. */
+/**
+ * A surah's name, held together: "Al‑Baqarah", "Ali 'Imran" never break inside. In Arabic, its Arabic name
+ * («البقرة»).
+ */
 export function surahName(sura: number): string {
-  return (getSurah(sura)?.name ?? '').split('-').join(NBHY).split(' ').join(NBSP);
+  const surah = getSurah(sura);
+  const name = currentLanguage() === 'ar' ? (surah?.nameArabic ?? surah?.name) : surah?.name;
+  return (name ?? '').split('-').join(NBHY).split(' ').join(NBSP);
 }
 
-const juzLabel = (a: number, b: number) => (a === b ? `Juz${NBSP}${a}` : `Juz${NBSP}${a}–${b}`);
+const juzLabel = (a: number, b: number) => (a === b ? t('lib.passages.juz', { n: a }) : t('lib.passages.juzRange', { from: a, to: b }));
+/** Whether a passage's words already name a juz ("Juz 28", "the end of Juz 3"): then no "· Juz" is added. */
+const namesJuz = (text: string) => text.includes(t('lib.passages.juz', { n: '' }));
 const juzStart = (j: number) => getJuzRange(j).start;
 const juzEnd = (j: number) => getJuzRange(j).end;
 
@@ -102,6 +110,11 @@ interface Run {
 }
 
 /** Runs of consecutive pages. 'given' keeps first-seen order and joins descending steps too (the reverse plan). */
+/** How many runs of pages describePassage names (one: no "N more" however small `max` is). */
+export function passageRunCount(pages: Iterable<number>, order: 'mushaf' | 'given' = 'mushaf'): number {
+  return runsOf([...pages].filter(validPage), order).length;
+}
+
 function runsOf(pages: Iterable<number>, order: 'mushaf' | 'given'): Run[] {
   const seen = [...new Set([...pages].filter(validPage))];
   const list = order === 'mushaf' ? seen.sort((a, b) => a - b) : seen;
@@ -160,18 +173,24 @@ function ayahPhrase(run: AyahRun, form: PassageForm, wholeJuz: boolean, edition:
   if (f.sura === l.sura) {
     if (startsSurah && endsSurah) return a;
     if (form === 'short') {
-      if (startsSurah) return `the start of ${a}`;
-      if (endsSurah) return `the end of ${a}`;
-      return `${a}${NBSP}${f.ayah}–${l.ayah}`;
+      if (startsSurah) return t('lib.passages.startOf', { surah: a });
+      if (endsSurah) return t('lib.passages.endOf', { surah: a });
+      return t('lib.passages.surahAyahs', { surah: a, from: f.ayah, to: l.ayah });
     }
-    if (!alone || form === 'compact') return f.ayah === l.ayah ? `${a}${NBSP}${f.ayah}` : `${a}${NBSP}${f.ayah}–${l.ayah}`;
-    return f.ayah === l.ayah ? `${a}, ayah${NBSP}${f.ayah}` : `${a}, ayahs${NBSP}${f.ayah}–${l.ayah}`;
+    if (!alone || form === 'compact') {
+      return f.ayah === l.ayah
+        ? t('lib.passages.surahAyah', { surah: a, ayah: f.ayah })
+        : t('lib.passages.surahAyahs', { surah: a, from: f.ayah, to: l.ayah });
+    }
+    return f.ayah === l.ayah
+      ? t('lib.passages.surahAyahLong', { surah: a, ayah: f.ayah })
+      : t('lib.passages.surahAyahsLong', { surah: a, from: f.ayah, to: l.ayah });
   }
-  if (form === 'short') return `${a} to ${b}`;
-  const from = startsSurah ? a : `${a}${NBSP}${f.ayah}`;
+  if (form === 'short') return t('lib.passages.fromTo', { from: a, to: b });
+  const from = startsSurah ? a : t('lib.passages.surahAyah', { surah: a, ayah: f.ayah });
   const endsJuz = run.to === lastAyahOfPage(juzEnd(jb), edition);
-  const to = endsSurah ? b : endsJuz ? `the end of Juz${NBSP}${jb}` : `${b}${NBSP}${l.ayah}`;
-  return `${from} to ${to}`;
+  const to = endsSurah ? b : endsJuz ? t('lib.passages.endOfJuz', { n: jb }) : t('lib.passages.surahAyah', { surah: b, ayah: l.ayah });
+  return t('lib.passages.fromTo', { from, to });
 }
 
 /** One run of pages, in words (ayahPhrase on the ayahs it holds). */
@@ -222,7 +241,9 @@ function runParts(run: AyahRun, wholeJuz: boolean, edition: MushafEditionId): Pa
 }
 
 const andList = (parts: string[]) =>
-  parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}` : parts[0] ?? '';
+  parts.length > 1
+    ? t('lib.passages.listAnd', { list: parts.slice(0, -1).join(t('lib.passages.listSeparator')), last: parts[parts.length - 1] })
+    : (parts[0] ?? '');
 
 /** "Juz 28" for pages in one juz, "Juz 27–28" for two in a row; else null. */
 function juzOfPages(pages: number[]): string | null {
@@ -255,19 +276,19 @@ export function describePassage(pages: Iterable<number>, opts: PassageOptions = 
   if (runs.length === 0) return '';
 
   const more = (parts: string[]) =>
-    parts.length > max ? [...parts.slice(0, max - 1), `${parts.length - max + 1} more`] : parts;
+    parts.length > max ? [...parts.slice(0, max - 1), t('lib.passages.more', { count: parts.length - max + 1 })] : parts;
   let text: string;
   if (order === 'given' && runs.length > 1) {
-    text = more(runs.map((r) => runPhrase(r, form, wholeJuz, edition, false))).join(', then ');
+    text = more(runs.map((r) => runPhrase(r, form, wholeJuz, edition, false))).join(t('lib.passages.thenSeparator'));
   } else if (order === 'given') {
     text = runPhrase(runs[0], form, wholeJuz, edition);
   } else {
     text = partsText(runs.map((r) => ayahsOfRun(r, edition)), form, wholeJuz, edition, more);
   }
 
-  if (opts.juz && !text.includes(`Juz${NBSP}`)) {
+  if (opts.juz && !namesJuz(text)) {
     const juz = juzOfPages(list);
-    if (juz) text = `${text} · ${juz}`;
+    if (juz) text = t('lib.passages.withJuz', { text, juz });
   }
   return finish(text, opts.sentence);
 }
@@ -300,12 +321,12 @@ export function describeAyahs(keys: Iterable<number>, opts: Omit<PassageOptions,
   const runs = ayahRuns(keys);
   if (runs.length === 0) return '';
   const more = (parts: string[]) =>
-    parts.length > max ? [...parts.slice(0, max - 1), `${parts.length - max + 1} more`] : parts;
+    parts.length > max ? [...parts.slice(0, max - 1), t('lib.passages.more', { count: parts.length - max + 1 })] : parts;
   let text = partsText(runs, form, wholeJuz, edition, more);
-  if (opts.juz && !text.includes(`Juz${NBSP}`)) {
+  if (opts.juz && !namesJuz(text)) {
     const pages = runs.flatMap((r) => [pageOfAyah(r.from, edition), pageOfAyah(r.to, edition)]);
     const juz = juzOfPages(pages);
-    if (juz) text = `${text} · ${juz}`;
+    if (juz) text = t('lib.passages.withJuz', { text, juz });
   }
   return finish(text, opts.sentence);
 }
@@ -329,10 +350,12 @@ export function describePagesToRevise(pages: Iterable<number>, partial: PartialP
   // In the order given: each run of pages apart, joined ", then ", as describePassage does.
   const max = Math.max(1, opts.max ?? 3);
   const runs = runsOf(list, 'given').map((r) => describeAyahs(ayahsOf(Array.from({ length: r.last - r.first + 1 }, (_, i) => r.first + i)), { ...rest, max: 99 }));
-  let text = (runs.length > max ? [...runs.slice(0, max - 1), `${runs.length - max + 1} more`] : runs).join(', then ');
-  if (juz && !text.includes(`Juz${NBSP}`)) {
+  let text = (runs.length > max ? [...runs.slice(0, max - 1), t('lib.passages.more', { count: runs.length - max + 1 })] : runs).join(
+    t('lib.passages.thenSeparator'),
+  );
+  if (juz && !namesJuz(text)) {
     const j = juzOfPages(list);
-    if (j) text = `${text} · ${j}`;
+    if (j) text = t('lib.passages.withJuz', { text, juz: j });
   }
   return finish(text, sentence);
 }
@@ -397,7 +420,7 @@ export function placeOfAyah(key: number, opts: Pick<PassageOptions, 'form'> = {}
   if (sura < 1 || sura > 114) return '';
   const name = surahName(sura);
   if (ayah === 1) return name;
-  return opts.form === 'short' ? `${name}${NBSP}${ayah}` : `${name}, ayah${NBSP}${ayah}`;
+  return opts.form === 'short' ? t('lib.passages.surahAyah', { surah: name, ayah }) : t('lib.passages.surahAyahLong', { surah: name, ayah });
 }
 
 /**
@@ -419,9 +442,10 @@ export function ayahsInSurah(sura: number, pages: Iterable<number>, edition: Mus
     else spans.push([a, b]);
   }
   if (spans.length === 0) return '';
-  if (spans.length === 1 && spans[0][0] === 1 && spans[0][1] === count) return 'Whole surah';
+  if (spans.length === 1 && spans[0][0] === 1 && spans[0][1] === count) return t('lib.passages.wholeSurah');
   const one = spans.length === 1 && spans[0][0] === spans[0][1];
-  return `${one ? 'Ayah' : 'Ayahs'}${NBSP}${spans.map(([x, y]) => (x === y ? `${x}` : `${x}–${y}`)).join(', ')}`;
+  const list = spans.map(([x, y]) => (x === y ? formatNumber(x) : `${formatNumber(x)}–${formatNumber(y)}`)).join(t('lib.passages.listSeparator'));
+  return one ? t('lib.passages.ayahOne', { list }) : t('lib.passages.ayahsMany', { list });
 }
 
 /**

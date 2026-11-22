@@ -54,7 +54,7 @@ import { catchUpDayOf, duePagesOf, insightsPagesOn } from '../../lib/carryOver';
 import { revisablePages } from '../../lib/memorizedAyahs';
 import { aheadCreditFor, creditedOnDay, doneOnDay, sessionCredit } from '../../lib/aheadCredit';
 import { aheadDayLabel, nextRevisionDayPlan, revisionDayPlan, startsCycle, type RevisionDayPlan } from '../../lib/aheadPlan';
-import { describePageRange, describePassage } from '../../lib/passages';
+import { describePageRange, describePassage, passageRunCount } from '../../lib/passages';
 import {
   getHizbForPage,
   getQuranData,
@@ -492,7 +492,8 @@ export default function ActiveRevisionScreen() {
     if (juzes.length === 1) return t('common.juzN', { n: juzes[0] });
     if (juzes.length === 2 && juzes[1] === juzes[0] + 1) return t('common.juzRange', { from: juzes[0], to: juzes[1] });
     const words = describePassage(shownPages, { form: 'short', order: 'given', max: 1 });
-    if (words && words.length <= 16 && !words.includes(' more')) return words;
+    // One run of pages (two or more would read "N more" at max 1): a value, never the English word.
+    if (words && words.length <= 16 && passageRunCount(shownPages, 'given') <= 1) return words;
     return t('common.pages', { count: shownPages.length });
   }, [shownPages, quranData]);
 
