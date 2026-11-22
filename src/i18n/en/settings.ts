@@ -150,6 +150,7 @@ export const settings = {
   prayer: {
     times: 'Prayer times',
     notifications: 'Prayer notifications',
+    athanVoice: 'Athan voice',
     /** How many prayers notify: "3 on". */
     nOn: '{{count}} on',
     calculation: 'Calculation',
