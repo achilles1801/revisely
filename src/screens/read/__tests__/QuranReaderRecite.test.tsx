@@ -2377,6 +2377,7 @@ describe('Majd’s Nov 21 asks: Pause keeps the take, the score opens what it ha
   });
 
   it('[RECITE-17] the score during a take opens what it has found so far, Done only, and the take goes on; after it, the summary again', async () => {
+    const summaryVisible = () => screen.UNSAFE_getAllByType(Sheet).find((x) => x.props.testID === 'take-summary')?.props.visible;
     await startTake('check');
     await event({ type: 'said', upTo: A23 + 8 });
     await event({ type: 'mark', mark: wrong(A23 + 6) as never });
@@ -2388,11 +2389,9 @@ describe('Majd’s Nov 21 asks: Pause keeps the take, the score opens what it ha
     expect(screen.queryByTestId('take-summary-more')).toBeNull();
     expect(mockLive.sent).not.toContainEqual({ type: 'end' });
     fireEvent.press(screen.getByTestId('take-summary-done'));
-    // iOS reports the sheet gone (the harness doesn't): its turn ends, as on a phone.
-    await act(async () => {
-      screen.UNSAFE_getAllByType(Modal).forEach((m) => m.props.onDismiss?.());
-    });
-    await settle(() => expect(screen.queryByTestId('take-summary')).toBeNull());
+    await flush();
+    // Asked to close (whether iOS has finished its animation and turn is the sheet's business, SHEET-1).
+    expect(summaryVisible()).toBe(false);
     expect(screen.getByTestId('recite-stop')).toBeTruthy();
     // Stopped and answered: the summary; closed, the score opens it again.
     fireEvent.press(screen.getByTestId('recite-stop'));
@@ -2400,11 +2399,9 @@ describe('Majd’s Nov 21 asks: Pause keeps the take, the score opens what it ha
     await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [wrong(A23 + 6) as never], score: null } });
     expect(screen.getByTestId('take-summary-again')).toBeTruthy();
     fireEvent.press(screen.getByTestId('take-summary-done'));
-    // iOS reports the sheet gone (the harness doesn't): its turn ends, as on a phone.
-    await act(async () => {
-      screen.UNSAFE_getAllByType(Modal).forEach((m) => m.props.onDismiss?.());
-    });
-    await settle(() => expect(screen.queryByTestId('take-summary')).toBeNull());
+    await flush();
+    // Asked to close (whether iOS has finished its animation and turn is the sheet's business, SHEET-1).
+    expect(summaryVisible()).toBe(false);
     fireEvent.press(screen.getByTestId('recite-score-tap'));
     await flush();
     expect(screen.getByTestId('take-summary-again')).toBeTruthy();
