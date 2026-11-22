@@ -70,6 +70,7 @@ import { followCues, washOf, washReach } from '../../../src/lib/reciteLive/wash'
 import { followBox, hiddenInkPlan } from '../../../src/components/reciteLive/HiddenInkLayer';
 import { hiddenTakeInfo, keepRecited, revealedOnHide } from '../../../src/lib/reciteLive/hideSwitch';
 import { pageLines } from '../../../src/lib/recite/pageLines';
+import { CAP_S, chainView, endsAyah, nextLinkStart, ROLL_FROM_S, ROLL_NOW_S, rolloverDue } from '../../../src/lib/reciteLive/chain';
 
 const words = quranWords();
 const KINDS: MarkKind[] = ['word', 'skipped', 'added', 'harakat', 'letter', 'tajweed'];
@@ -1431,6 +1432,117 @@ describe('[RECITE-19] on a shown page the band is the whole ayah being recited',
         expect(bands.some((b) => b.y0 <= mid && mid <= b.y1)).toBe(true);
         // One rect a line, top to bottom, none overlapping the next.
         for (let i = 1; i < bands.length; i++) expect(bands[i].y0).toBeGreaterThanOrEqual(bands[i - 1].y0);
+      }),
+      { numRuns: runs(200) },
+    );
+  });
+});
+
+describe('[RECITE-22] a recitation past the checker’s 15 minutes: chained takes never overlap, never leave a gap, never lose the reciter’s place', () => {
+  /**
+   * A recitation from the top of a page: each word 0.5–1.6 s, a breath of 0–2.5 s after each ayah, for 16–46 minutes. A
+   * checker that decides a word as the voice stops (`voice`) says so of an ayah's last word half a second into a breath
+   * long enough; otherwise a word is decided as the next one begins.
+   */
+  const recitationArb = fc.record({
+    page: fc.integer({ min: 1, max: 560 }),
+    pace: fc.array(fc.double({ min: 0.5, max: 1.6, noNaN: true }), { minLength: 32, maxLength: 32 }),
+    breath: fc.array(fc.double({ min: 0, max: 2.5, noNaN: true }), { minLength: 16, maxLength: 16 }),
+    minutes: fc.integer({ min: 16, max: 46 }),
+    voice: fc.boolean(),
+  });
+  type Timed = { t: number; e: LiveEvent };
+  function recitation(r: { page: number; pace: number[]; breath: number[]; minutes: number; voice: boolean }): { events: Timed[]; start: number; end: number } {
+    const start = words.pageRange(r.page)[0];
+    const events: Timed[] = [];
+    let t = 1;
+    for (let w = start, i = 0; t < r.minutes * 60 && w < words.count - 1; w++, i++) {
+      const dur = r.pace[i % r.pace.length];
+      events.push({ t, e: { type: 'at', w } });
+      if (w > start) events.push({ t: t + 0.05, e: { type: 'said', upTo: w - 1 } });
+      let next = t + dur;
+      if (endsAyah(words, w)) {
+        const breath = r.breath[i % r.breath.length];
+        if (r.voice && breath >= 0.6) events.push({ t: t + dur + 0.5, e: { type: 'said', upTo: w } });
+        next += breath;
+      }
+      t = next;
+    }
+    return { events: events.sort((a, b) => a.t - b.t), start, end: t };
+  }
+
+  it('the phone rolls over before the cap, at a pause unless the cap is seconds away, and the screen keeps the reciter throughout', () => {
+    fc.assert(
+      fc.property(recitationArb, (r) => {
+        const { events, start, end } = recitation(r);
+        const fresh = () => applyEvent(liveConnecting({ anywhereFrom: start }), { type: 'ready', take: 't', protocol: 9 });
+        const links: { state: LiveState; offset: number }[] = [];
+        let cur = fresh();
+        let linkStart = 0;
+        let k = 0;
+        let said = -1;
+        for (let step = 1; step / 10 < end; step++) {
+          const now = step / 10;
+          // The current take hears what's said from its own start; it finds the place a second after the first word it hears.
+          while (k < events.length && events[k].t <= now) {
+            const x = events[k];
+            if (cur.start == null) {
+              if (x.e.type !== 'at' || x.t < linkStart) {
+                k++;
+                continue;
+              }
+              if (now < x.t + 1) break;
+              const at = words.ref(x.e.w);
+              cur = applyEvent(cur, { type: 'locked', w: x.e.w, s: at.sura, a: at.ayah });
+            }
+            cur = applyEvent(cur, x.e);
+            k++;
+          }
+          const view = chainView(links, { state: cur, offset: linkStart });
+          if (links.length > 0 || cur.start != null) {
+            // Never loses the reciter: a cursor throughout, and a hidden page's words never covered again.
+            expect(view.cursor).not.toBeNull();
+            expect(view.saidUpTo ?? -1).toBeGreaterThanOrEqual(said);
+            said = view.saidUpTo ?? said;
+            expect(view.status).toBe('listening');
+          }
+          const linkSecs = now - linkStart;
+          // Never the checker's cap.
+          expect(linkSecs).toBeLessThan(CAP_S);
+          if (!rolloverDue(cur, words, linkSecs)) continue;
+          if (linkSecs < ROLL_NOW_S) {
+            // At a pause: the word under the cursor decided, so the next take hears the next word whole.
+            expect(cur.cursor).not.toBeNull();
+            expect(cur.cursor!).toBeLessThanOrEqual(cur.saidUpTo!);
+          }
+          links.push({ state: liveStopping(cur), offset: linkStart });
+          linkStart = now;
+          cur = fresh();
+        }
+        // Each take begins where the last ended (no overlap, no gap) and holds less than the cap.
+        const starts = [...links.map((l) => l.offset), linkStart];
+        for (let i = 1; i < starts.length; i++) expect(starts[i] - starts[i - 1]).toBeLessThan(CAP_S);
+        if (end > CAP_S) expect(links.length).toBeGreaterThanOrEqual(1);
+      }),
+      { numRuns: runs(12) },
+    );
+  });
+
+  it('at the checker’s cap the next take begins where it stopped hearing, with what the phone sent past it: nothing heard twice or missed', () => {
+    const rate = 16_000;
+    fc.assert(
+      fc.property(fc.nat(10_000_000), fc.integer({ min: 0, max: 5 * rate }), fc.boolean(), (linkStart, past, cap) => {
+        const samples = linkStart + Math.round((cap ? CAP_S : ROLL_FROM_S) * rate) + past;
+        const next = nextLinkStart(cap, linkStart, samples, rate);
+        if (!cap) {
+          expect(next).toEqual({ start: samples, tail: null });
+          return;
+        }
+        // The checker heard [linkStart, linkStart + CAP); the next take hears from there, the tail first, then the microphone.
+        const heard = linkStart + Math.round(CAP_S * rate);
+        expect(next.start).toBe(heard);
+        const tail = next.tail ? Math.round((next.tail[1] - next.tail[0]) * rate) : 0;
+        expect(next.start + tail).toBe(samples);
       }),
       { numRuns: runs(200) },
     );

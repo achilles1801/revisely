@@ -4,7 +4,7 @@ import type { QuranWords } from '../recite/quranWords';
 import { pageAccuracy } from '../reciteLive/score';
 import { furthestWord, LiveState, marksInOrder, mistakeCount } from '../reciteLive/state';
 import { countsAsMistake, isUnclear } from '../reciteLive/contract';
-import { MAX_MARKS, MAX_PASSED, TakeLevel, TakeRecord } from './record';
+import { MAX_LINKS, MAX_MARKS, MAX_PASSED, TakeLevel, TakeRecord } from './record';
 
 export interface TakeContext {
   id: string;
@@ -19,6 +19,8 @@ export interface TakeContext {
   timeOf: (w: number) => number | null;
   /** Those words. */
   openWords: (from: number, to: number) => number[];
+  /** A recitation longer than the checker's cap: its takes, each one's id and first word (RECITE-22). */
+  links?: Array<{ take: string | null; from: number }> | null;
 }
 
 /**
@@ -61,6 +63,7 @@ export function recordFromTake(state: LiveState, words: QuranWords, ctx: TakeCon
     recordingId: ctx.recordingId,
     // No final answer came (lib/reciteLive/state `settleUnfinished`): what the take found before it.
     ...(state.final.unfinished ? { unfinished: true } : {}),
+    ...(ctx.links && ctx.links.length > 1 ? { links: ctx.links.slice(0, MAX_LINKS) } : {}),
   };
 }
 

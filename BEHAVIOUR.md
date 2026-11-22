@@ -643,6 +643,18 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   recited stay shown with those shown by hand, after it is closed too, until the page is hidden again (Majd's Dev take,
   Nov 22 2026: "it should show me the first two verses revealed since that's what i recited"). (Majd, Nov 22 2026, of Tarteel's
   smart switching: "do the same".)
+- **RECITE-22.** (Revisely Dev) A recitation goes on past the checker's 15 minutes a take, as long as the reciter does
+  (a 20-page session runs 30–45 minutes), and shows as one take. From 14 minutes into a take, at a pause after an
+  ayah's or a phrase's last word (later at any pause, and five seconds before the cap at once), the take ends and the
+  next starts by itself on the page on screen, which the checker finds as at any start; a take the checker's cap ends
+  is followed the same way. The microphone never stops: every moment of the recitation goes to exactly one take, none
+  twice and none missed. Nothing on screen changes: the bar listens on, the clock runs on, every mark stays, and the
+  cursor and a hidden page's words stay where the reciter was until the next take has found the place. Stop, ✕,
+  leaving the app or a drill's or a test's end never start a next take. The summary covers the whole recitation once
+  every take has its answer (a take whose answer doesn't come stands unfinished, RECITE-11), with one score, one
+  recording and one record in Recite's memory, whose Not a mistake labels go to the take that judged the word. "Your
+  recitation" on an earlier take's mark plays from the recording while the recitation lasts. (The release owner's plan,
+  Nov 22 2026: Recite in a revision session stopped at 15 minutes.)
 
 - **RECITE-24.** (Revisely Dev) A take's summary: a take of 2 pages or more says its mistakes per page beside the count
   ("3 mistakes · 1.5 a page"; never in the bar), where a % alone hides how many there were. Insights' Recitation

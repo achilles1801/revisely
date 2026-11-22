@@ -55,6 +55,11 @@ export interface TakeRecord {
    * the marks and score are what the take found before its end.
    */
   unfinished?: boolean;
+  /**
+   * A recitation longer than the checker's cap is a chain of its takes (lib/reciteLive/chain, RECITE-22): each one's
+   * checker take and the first word it recited, in order. Absent for a single take (`take` is its id).
+   */
+  links?: Array<{ take: string | null; from: number }>;
 }
 
 /** "Clear now" on a word: its remembered mistake of `group` goes, as if said right enough times. */
@@ -74,6 +79,15 @@ export type MemoryRecord = TakeRecord | ClearRecord;
 /** Firestore's limits a record must stay under (the rules check the same). */
 export const MAX_MARKS = 400;
 export const MAX_PASSED = 400;
+export const MAX_LINKS = 20;
+
+/** The checker take that judged word `w` of a take's record: its link's in a chain (the last to start at or before it). */
+export function takeOfWord(r: TakeRecord, w: number): string | null {
+  if (!r.links?.length) return r.take;
+  let take = r.links[0].take;
+  for (const l of r.links) if (l.from <= w) take = l.take;
+  return take;
+}
 
 /** A document id like Firestore's own (20 letters and digits), made on the phone. */
 export function memoryId(random: () => number = Math.random): string {
@@ -218,6 +232,8 @@ export function toStored(r: MemoryRecord): Record<string, unknown> {
     deleted: r.deleted === true,
     // Only when true: a finished take's document is as it was (the rules allow the field, firestore.rules).
     ...(r.unfinished ? { unfinished: true } : {}),
+    // Only for a chain of takes (RECITE-22).
+    ...(r.links && r.links.length > 1 ? { links: r.links.slice(0, MAX_LINKS).map((l) => ({ take: l.take, from: l.from })) } : {}),
   };
 }
 
@@ -267,7 +283,17 @@ export function fromStored(id: string, raw: unknown): MemoryRecord | null {
     recordingId: str(d.recordingId),
     ...deleted,
     ...(d.unfinished === true ? { unfinished: true } : {}),
+    ...linksFromStored(d.links),
   };
+}
+
+/** A chain's links from its document (dropped when damaged: the record stays, its labels go by `take`). */
+function linksFromStored(raw: unknown): { links?: TakeRecord['links'] } {
+  if (!Array.isArray(raw)) return {};
+  const links = raw
+    .map((l) => (l && typeof l === 'object' ? { take: str((l as { take?: unknown }).take), from: num((l as { from?: unknown }).from) } : null))
+    .filter((l): l is { take: string | null; from: number } => l != null && l.from != null);
+  return links.length > 1 ? { links } : {};
 }
 
 /** The newer of two copies of one record (a tie keeps the one already held). */

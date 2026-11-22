@@ -100,7 +100,7 @@ import { clearedBy, memoryOfWord, openInRange, wordMemories, type WordMemory } f
 import { comparableTakes, passageTakes, progressLine } from '../../lib/reciteMemory/progress';
 import { historyRows, passageHistory } from '../../lib/reciteMemory/history';
 import { PassageProgressSheet } from '../reciteMemory/PassageProgressSheet';
-import { memoryId, type ClearRecord } from '../../lib/reciteMemory/record';
+import { memoryId, takeOfWord, type ClearRecord } from '../../lib/reciteMemory/record';
 import { clipOfTake, useTakeRecordings } from '../../lib/reciteMemory/takeAudio';
 import { markOf, PAST_OPACITY, RememberedTargets, RememberedUnderlay } from '../reciteMemory/RememberedLayers';
 import { markFill, markFirm } from './markColours';
@@ -621,7 +621,9 @@ export function useReciteLayer({
         rev: Date.now(),
       };
       remember(user.id, next).catch((err) => logger.warn('Recite memory: Not a mistake was not kept', err));
-      if (shownTake.take) void sendLabel('dismiss', shownTake.take, id, Date.now());
+      // The take that judged it (a long recitation's own link, RECITE-22).
+      const judgedBy = takeOfWord(shownTake, m.w);
+      if (judgedBy) void sendLabel('dismiss', judgedBy, id, Date.now());
     },
     [shownTake, user?.id, qw],
   );

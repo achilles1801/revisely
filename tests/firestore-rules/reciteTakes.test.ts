@@ -86,6 +86,19 @@ describe("Recite's memory: users/<uid>/reciteTakes", () => {
     await assertFails(setDoc(doc(alice, path(ALICE, 't4')), take({ unfinished: 'yes' })));
   });
 
+  it('a recitation longer than the checker’s cap keeps its takes (links: 2 to 20), and nothing else in their place', async () => {
+    const alice = env.authenticatedContext(ALICE).firestore();
+    const links = [
+      { take: 'take-a', from: 48707 },
+      { take: 'take-b', from: 49310 },
+      { take: null, from: 49902 },
+    ];
+    await assertSucceeds(setDoc(doc(alice, path(ALICE, 't5')), take({ links })));
+    await assertFails(setDoc(doc(alice, path(ALICE, 't6')), take({ links: [links[0]] })));
+    await assertFails(setDoc(doc(alice, path(ALICE, 't6')), take({ links: Array.from({ length: 21 }, (_, i) => ({ take: `t${i}`, from: 48707 + i })) })));
+    await assertFails(setDoc(doc(alice, path(ALICE, 't6')), take({ links: 'take-a,take-b' })));
+  });
+
   it('nobody else reads or writes them, signed in or not', async () => {
     await env.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(doc(ctx.firestore(), path(ALICE, 't1')), { ...take(), updatedAt: new Date() });
