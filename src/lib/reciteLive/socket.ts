@@ -22,6 +22,7 @@
 // (`beat.rx`); without, CATCHUP_SLICE_SAMPLES every CATCHUP_TICK_MS.
 
 import { LiveEvent, parseEvent } from './contract';
+import { encodeBlock, MAX_BLOCK_SAMPLES } from './adpcm';
 import { pairClosed, pairOpen } from './pairService';
 import type { ClientFrame, LiveConnect, LiveConnection, LiveHandlers, StartFrame } from './feed';
 import { checker } from '../reciteCheck/endpoints';
@@ -92,7 +93,7 @@ export interface SocketDeps {
 
 type Control = Exclude<ClientFrame, StartFrame>;
 
-/** A sample range of the take as a frame of its own (the chunk's bytes only). */
+/** A sample range of the take as a frame of its own, raw (the chunk's bytes only). */
 function bytes(chunk: Int16Array): ArrayBuffer {
   return chunk.buffer.slice(chunk.byteOffset, chunk.byteOffset + chunk.byteLength) as ArrayBuffer;
 }
@@ -143,6 +144,21 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
     let watch: unknown = null;
     /** A resume's held audio still going out (the next slice's timer). */
     let catching: unknown = null;
+    /** This socket's checker decodes ADPCM (its `ready`), and the step index the last block ended at. */
+    let adpcm = false;
+    let adpcmIndex = 0;
+    /** A sample range as frames: IMA-ADPCM blocks (at most MAX_BLOCK_SAMPLES each) when the checker said so, else raw. */
+    const sendAudioTo = (s: SocketLike, chunk: Int16Array) => {
+      if (!adpcm) {
+        s.send(bytes(chunk));
+        return;
+      }
+      for (let at = 0; at < chunk.length; at += MAX_BLOCK_SAMPLES) {
+        const r = encodeBlock(chunk.subarray(at, Math.min(chunk.length, at + MAX_BLOCK_SAMPLES)), adpcmIndex);
+        adpcmIndex = r.index;
+        s.send(r.block);
+      }
+    };
     /** Paused: the keepalive's next frame. */
     let holding = false;
     let keep: unknown = null;
@@ -229,7 +245,7 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
           }
           const next = c < controls.length ? controls[c].at : Infinity;
           const stop = Math.min(end, at + Math.min(RESEND_SAMPLES, budget), next);
-          s.send(bytes(chunk.subarray(at - pos, stop - pos)));
+          sendAudioTo(s, chunk.subarray(at - pos, stop - pos));
           budget -= stop - at;
           at = stop;
         }
@@ -300,6 +316,9 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
         return;
       }
       socket = s;
+      // Raw until this socket's `ready` says the checker decodes ADPCM (a resume may land on a checker that doesn't).
+      adpcm = false;
+      adpcmIndex = 0;
       s.binaryType = 'arraybuffer';
       s.onopen = () => {
         const frame: Record<string, unknown> = { ...start, token };
@@ -335,6 +354,8 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
           take = e.take ?? take;
           // A checker that beats announces it (draft 9): watched from now. What it already holds, it has received.
           if (e.beat) beats = true;
+          // The audio 4:1 from here, only if this checker said it decodes it (and the start frame asked).
+          adpcm = start.audio === 'adpcm' && e.audio === 'adpcm';
           rxSamples = beats ? Math.max(0, e.from ?? 0) : null;
           // Once the take has ended, a resume only waits for the answer: its tries aren't renewed, so a checker
           // that keeps closing without one can't hold the take on Checking… for good.
@@ -424,7 +445,7 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
         const copy = new Int16Array(pcm);
         audio.push(copy);
         samples += copy.length;
-        if (live && socket) socket.send(bytes(copy));
+        if (live && socket) sendAudioTo(socket, copy);
       },
       send: control,
       close: () => finish(),

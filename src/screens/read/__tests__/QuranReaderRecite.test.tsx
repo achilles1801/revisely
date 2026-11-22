@@ -2611,3 +2611,10 @@ describe('a refused or failed microphone says so (Majd’s Android store build, 
     alert.mockRestore();
   });
 });
+
+describe('the audio 4:1 (contract "ADPCM uplink", Nov 22 2026)', () => {
+  it('[RECITE-5] Revisely Dev’s start frame asks to send the audio as ADPCM (the checker’s ready decides)', async () => {
+    await startTake('check');
+    expect(mockLive.start).toMatchObject({ audio: 'adpcm' });
+  });
+});

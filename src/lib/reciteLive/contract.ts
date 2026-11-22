@@ -128,6 +128,8 @@ export type LiveEvent =
       said?: 'voice';
       /** The checker beats every this many seconds (contract draft 9): its silence then means a dead socket. */
       beat?: number;
+      /** "adpcm": the checker decodes the IMA-ADPCM blocks the start frame asked to send (contract "ADPCM uplink"). */
+      audio?: 'adpcm';
     }
   /**
    * A take started anywhere on the page: the checker has found where the reciter is (once per search). Its `nolock`
@@ -301,6 +303,7 @@ export function parseEvent(raw: unknown): LiveEvent | null {
         ...(isNum(x.protocol) ? { protocol: x.protocol } : {}),
         ...(x.said === 'voice' ? { said: 'voice' as const } : {}),
         ...(isNum(x.beat) && x.beat > 0 ? { beat: x.beat } : {}),
+        ...(x.audio === 'adpcm' ? { audio: 'adpcm' as const } : {}),
       };
     case 'locked':
       return isWord(x.w) && isNum(x.s) && isNum(x.a)

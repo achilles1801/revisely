@@ -494,7 +494,9 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   marks and its score. Anything the checker sends again changes none of them. (The hidden view's red cover, a hint,
   may show again on the next word until it is reached.) When a slow connection leaves the checker 3 s or more behind
   what was recorded and still falling behind, the bar's line says "Slow connection: checking is behind" in place of the
-  words until it is under 2 s behind again: quietly, never a pop-up, a sound or speech.
+  words until it is under 2 s behind again: quietly, never a pop-up, a sound or speech. In Revisely Dev a take's audio goes 4:1
+  (IMA-ADPCM, one self-contained block a frame) to a checker whose `ready` says it decodes it, and raw to any other, a
+  resume included.
 - **RECITE-6.** With the page hidden, the words show as they are recited, from where the take started: a word shows
   once it has been said in full (the checker has decided it), the next word has begun, or it has been the word being
   said about as long as it takes to say (its letters at the reciter's pace, a held madd longer; 0.7–2.5 s; with a
