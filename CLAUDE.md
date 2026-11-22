@@ -324,7 +324,8 @@ until its part is set up.
     - Takes saved before were plain recordings: `sortTakeAudio` (`lib/reciteMemory/apart`) marks those a take record
       names, once a launch, index only. Recite alone's old audio stays a recording.
   - **Calm, exact tracking** (Majd's Dev take, Nov 15 2026; Tarteel's mic take as the reference): a quiet grey band on
-    the line being recited (the ayah's part of it, `currentLineBand`) and a grey box on the word. It is not a blue band
+    the line being recited (the ayah's part of it, `currentLineBand`) and a grey box on the word (the page's one
+    highlight, `highlightSoft` and `highlight` in theme/v2, below in "The design"). It is not a blue band
     over the whole ayah, which covered lines not yet said and read as running ahead (the checker's `at` was 1.0 s
     behind, never ahead). Blue (`followInk`) is only for the word being said in the bar. None of Recite's colours follow
     the accent (design.test). Nothing shows before the checker has found where the reciter is (`locked`): no band or
@@ -2182,6 +2183,17 @@ classic default), and a fresh install starts in light.
   component. Status colours don't follow it: weak is `red`, strong is `good` (green); a warning
   that is advice (a long cycle) is ink, not red. Every combination is checked in
   `src/design/__tests__` (text 4.5:1, including ink and grey on `accentSubtle`; fills 3:1).
+- **The page's one highlight is grey, never the accent** (Majd, Nov 21 2026: "i don't think we should highlite verses
+  with the accent color because it can conflict with the mistake colors especially red-- we should have one global
+  highlite color that doesnt conflict with other colors, maybe gray?"). `highlight` in `theme/v2` (light `#DEDEE3`,
+  dark `#26262B`, solid, behind the ink) is every ayah highlighted on a mushaf page (`MushafPager`'s
+  `highlightedAyah`: a held verse, the recitation playing, a search result, a similar ayah, "You continued with…", a
+  passage opened from Insights) and Recite's box on the word being said; `highlightSoft` (`#F2F2F4` / `#121214`) is
+  its lighter shade, Recite's band on the line. Mistakes keep their three colours (`mark…`), peeked words their veil.
+  design.test holds it neutral, the same for every accent, at least ΔE 20 from every mistake colour, the peek veil's
+  grey ink and the Ramadan theme, apart from the paper, and the ink at 4.5:1 on it. Before, an ayah was the accent's
+  text colour at a quarter (Crimson's read as a mistake's red). A new highlight on a page uses these two, never a
+  new colour.
 - Taps don't buzz (`PressableScale` shrinks, `v2/Tap` dims); outcomes use `design/haptics`
   (`useHaptics()`). There is no Haptics setting (removed Oct 28 2026 to keep Settings short; the
   old stored value is cleared): they are only on outcomes, and iOS's System Haptics silences them.

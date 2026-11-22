@@ -423,6 +423,19 @@ describe('<MushafPager /> a verse’s highlight', () => {
     expect(screen.getAllByTestId('ayah-highlight')).toHaveLength(ayahRects(17, 2, 106).length);
   });
 
+  it('is the page’s one grey highlight, solid, never the accent', () => {
+    // Majd, Nov 21 2026: the accent's tint (Crimson's especially) could be read as a mistake's red.
+    const { paletteLight } = jest.requireActual('../../theme/v2');
+    render(<MushafPager pages={[17]} highlightedAyah={{ page: 17, sura: 2, ayah: 106 }} />);
+    act(() => screen.UNSAFE_getByType(FlatList).props.onLayout({ nativeEvent: { layout: { x: 0, y: 0, width: 402, height: 626 } } }));
+    drawPages();
+    for (const box of screen.getAllByTestId('ayah-highlight')) {
+      const style = StyleSheet.flatten(box.props.style);
+      expect(style.backgroundColor).toBe(paletteLight.highlight);
+      expect(style.opacity).toBeUndefined();
+    }
+  });
+
   it('a page whose image fails shows no highlight', () => {
     render(<MushafPager pages={[17]} highlightedAyah={{ page: 17, sura: 2, ayah: 106 }} />);
     act(() => screen.UNSAFE_getByType(FlatList).props.onLayout({ nativeEvent: { layout: { x: 0, y: 0, width: 402, height: 626 } } }));

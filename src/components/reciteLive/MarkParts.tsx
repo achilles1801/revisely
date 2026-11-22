@@ -26,7 +26,7 @@ export function Phrase({ parts, fill }: { parts: PhrasePart[]; fill: string }) {
             </Text>
           ) : (
             <Text
-              style={p.role === 'expected' ? { backgroundColor: palette.followWord } : p.role === 'recited' ? { backgroundColor: fill } : undefined}
+              style={p.role === 'expected' ? { backgroundColor: palette.highlight } : p.role === 'recited' ? { backgroundColor: fill } : undefined}
               testID={p.role === 'context' ? undefined : `mark-card-${p.role}`}
             >
               {p.text}

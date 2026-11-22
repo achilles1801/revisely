@@ -641,7 +641,7 @@ describe('mistakes are highlights (Majd, Nov 15 2026: “only things we should s
     fireEvent.press(screen.getByTestId('recite-eye'));
     await event({ type: 'locked', w: A23, s: 27, a: 23 });
     await event({ type: 'at', w: A23 + 3 });
-    expect(bg('live-word-box')).toBe(p.followWord);
+    expect(bg('live-word-box')).toBe(p.highlight);
     expect(screen.queryByTestId('live-line-band')).toBeNull();
     expect(screen.queryAllByTestId('hidden-band')).toHaveLength(0);
   });
@@ -951,7 +951,7 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
     expect(style('mark-card-swatch-word').backgroundColor).toBe(p.markWord);
     expect(style('mark-card-swatch-tajweed').backgroundColor).toBe(p.markTajweed);
     expect(style('mark-card-recited').backgroundColor).toBe(p.markWord);
-    expect(style('mark-card-expected').backgroundColor).toBe(p.followWord);
+    expect(style('mark-card-expected').backgroundColor).toBe(p.highlight);
     expect(style('mark-card-expected').color).toBeUndefined();
     // Both marks on the word, each with its own Not a mistake.
     expect(screen.getByTestId('mark-card-tajweed')).toBeTruthy();

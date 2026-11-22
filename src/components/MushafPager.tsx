@@ -150,9 +150,8 @@ interface PageItemProps {
   /** The highlighted verses, each drawn on every page it has lines on (a verse
    *  can run onto the next page). */
   highlight: readonly AyahRef[];
+  /** The page's one highlight (theme/v2 `highlight`), solid, behind the ink. */
   highlightColor: string;
-  /** The highlight's opacity (it tints with a palette colour). */
-  highlightOpacity?: number;
   pageTint: string | null;
   tintColor: string;
   /** Secondary text (the "not downloaded" placeholder). */
@@ -181,7 +180,6 @@ const PageItem = React.memo(function PageItem({
   onLongPressAyah,
   highlight,
   highlightColor,
-  highlightOpacity,
   pageTint,
   tintColor,
   mutedColor,
@@ -338,7 +336,6 @@ const PageItem = React.memo(function PageItem({
                 styles.highlight,
                 {
                   backgroundColor: highlightColor,
-                  opacity: highlightOpacity,
                   left: r.x0 * BOUNDS_SCALE,
                   top: r.y0 * BOUNDS_SCALE,
                   width: (r.x1 - r.x0) * BOUNDS_SCALE,
@@ -621,7 +618,8 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
 
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
 
-  // The verse a sheet is about is tinted: the accent's text colour at a quarter.
+  // The verses highlighted (held, playing, a search's): the page's one grey highlight, the same with every accent
+  // (Majd, Nov 21 2026: the accent's tint could be read as a mistake's red).
   // One list, the same object while the highlight is the same (pages are memoised on it).
   const highlights = useMemo<readonly AyahRef[]>(
     () => (highlightedAyah == null ? NO_HIGHLIGHT : 'sura' in highlightedAyah ? [highlightedAyah] : highlightedAyah),
@@ -641,8 +639,7 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
           onTap={onTap}
           onLongPressAyah={onLongPressAyah}
           highlight={highlights}
-          highlightColor={v2.accentText}
-          highlightOpacity={0.25}
+          highlightColor={v2.highlight}
           pageTint={palette.pageTint}
           tintColor={palette.textPrimary}
           mutedColor={palette.textSecondary}

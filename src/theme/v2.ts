@@ -38,7 +38,7 @@ interface AccentTokens {
   onDone: string;
   /** "Done" as text (≥ 4.5:1 on every ground). */
   doneText: string;
-  /** Text in the accent: the active tab, highlighted words (≥ 4.5:1 on every ground). */
+  /** Text in the accent: the active tab, a chosen row's tick (≥ 4.5:1 on every ground; never a highlight on the page). */
   accentText: string;
   /** Text on an `accentText` fill (≥ 4.5:1). */
   onAccentText: string;
@@ -149,15 +149,17 @@ export interface PaletteV2 extends AccentTokens {
   warnSubtle: string;
   goodSubtle: string;
   /**
-   * Following a recitation (the reader's live take, the hidden pages): the line being recited (a soft band behind the
-   * page's ink; none on a hidden page) and the word being recited, or the newest one shown on a hidden page (a firmer
-   * box), both quiet greys like Tarteel's (Majd, Nov 15 2026: the blue ayah band read as running ahead); and `followInk`,
-   * the word being said in the bar, the one place blue is used. None of it follows the accent, so it never reads as a
-   * mistake (Majd, Nov 14 2026: Crimson's follow looked like mistakes). Ink reads at 4.5:1 on the band and the box;
-   * `followInk` as text at 4.5:1 on the ground.
+   * The one highlight on a mushaf page, a neutral grey for every accent (Majd, Nov 21 2026: "we should have one global
+   * highlite color that doesnt conflict with other colors, maybe gray?"): `highlight` for an ayah (held, playing, a
+   * search result, a similar ayah, "You continued with…", a passage opened from Insights) and Recite's box on the word
+   * being said (or the newest one shown on a hidden page); `highlightSoft`, its lighter shade, for Recite's band on the
+   * line being recited (none on a hidden page). Grey like Tarteel's (Majd, Nov 15 2026: the blue ayah band read as
+   * running ahead). It never follows the accent, so it never reads as a mistake (Nov 14: Crimson's follow looked like
+   * one), and it stays apart from the mistake highlights (`mark…`) and the peek veil. The page's ink reads at 4.5:1 on
+   * both. `followInk`, the word being said in the bar, is the one place Recite uses blue, as text at 4.5:1 on the ground.
    */
-  followBand: string;
-  followWord: string;
+  highlight: string;
+  highlightSoft: string;
   followInk: string;
   /**
    * Recite's mistakes as highlights behind the word, three colours at most (Majd, Nov 15 2026: "only things we should
@@ -208,8 +210,8 @@ const BASE_LIGHT: Base = {
   onRedSubtle: '#B91C1C',
   warnSubtle: '#FDF2E2',
   goodSubtle: '#E6F2EF',
-  followBand: '#F2F2F4',
-  followWord: '#DEDEE3',
+  highlight: '#DEDEE3',
+  highlightSoft: '#F2F2F4',
   followInk: '#1D4ED8',
   markWord: '#F49A9A',
   markWordFirm: '#EC7A7A',
@@ -246,8 +248,8 @@ const BASE_DARK: Base = {
   onRedSubtle: '#F87171',
   warnSubtle: '#2A2008',
   goodSubtle: '#0D2721',
-  followBand: '#121214',
-  followWord: '#26262B',
+  highlight: '#26262B',
+  highlightSoft: '#121214',
   followInk: '#7DB3F5',
   markWord: '#7A2424',
   markWordFirm: '#A33434',
