@@ -496,7 +496,8 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   what was recorded and still falling behind, the bar's line says "Slow connection: checking is behind" in place of the
   words until it is under 2 s behind again: quietly, never a pop-up, a sound or speech. A resume is measured afresh,
   and while the checker checks the take again from its start (its held audio going out again) the note never shows:
-  the words stay. In Revisely Dev a take's audio goes 4:1
+  the words stay. A take the checker hasn't answered within 20 s of its start (at capacity it holds a new take, then
+  refuses it) ends there, the bar saying it is busy, rather than minutes of "Starting…". In Revisely Dev a take's audio goes 4:1
   (IMA-ADPCM, one self-contained block a frame) to a checker whose `ready` says it decodes it, and raw to any other, a
   resume included.
 - **RECITE-6.** With the page hidden, the words show as they are recited, from where the take started: a word shows

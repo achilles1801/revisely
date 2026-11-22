@@ -1,4 +1,4 @@
-import { KEEPALIVE_MS, socketFeed, SocketLike } from '../socket';
+import { KEEPALIVE_MS, READY_WAIT_MS, socketFeed, SocketLike } from '../socket';
 import { pairAnswered, pairClosed, pairOpen, PAIR_CLOSED_MS } from '../pairService';
 import type { LiveEvent } from '../contract';
 import type { StartFrame } from '../feed';
@@ -39,6 +39,8 @@ const later = (ms: number) => (clockNow += ms);
 function setup(tokens: (string | null)[] = ['tok1', 'tok2', 'tok3', 'tok4'], start: StartFrame = START) {
   const sockets: FakeSocket[] = [];
   const queue: { fn: () => void; ms: number }[] = [];
+  // The first-ready wait is kept apart, so the other timers' order stays as each test expects.
+  const waits: { fn: () => void; ms: number }[] = [];
   const events: LiveEvent[] = [];
   let closed = 0;
   let n = 0;
@@ -55,18 +57,20 @@ function setup(tokens: (string | null)[] = ['tok1', 'tok2', 'tok3', 'tok4'], sta
     timers: {
       set: (fn, ms) => {
         const t = { fn, ms };
-        queue.push(t);
+        (ms === READY_WAIT_MS ? waits : queue).push(t);
         return t;
       },
       clear: (h) => {
-        const i = queue.indexOf(h as { fn: () => void; ms: number });
-        if (i >= 0) queue.splice(i, 1);
+        for (const list of [queue, waits]) {
+          const i = list.indexOf(h as { fn: () => void; ms: number });
+          if (i >= 0) list.splice(i, 1);
+        }
       },
     },
   });
   const conn = connect(start, { onEvent: (e) => events.push(e), onClose: () => closed++ });
   const runTimer = () => queue.shift()!.fn();
-  return { conn, sockets, events, queue, runTimer, closed: () => closed };
+  return { conn, sockets, events, queue, waits, runTimer, closed: () => closed };
 }
 
 describe('the live socket', () => {
@@ -341,7 +345,8 @@ describe('two services: the light levels on recite-check-pair (recite-contract.m
       timers: {
         set: (fn, ms) => {
           const t = { fn, ms };
-          timers.push(t);
+          // The first-ready wait (READY_WAIT_MS) isn't what these tests look at.
+          if (ms !== READY_WAIT_MS) timers.push(t);
           return t;
         },
         clear: (h) => {
@@ -690,5 +695,24 @@ describe('the audio 4:1 (contract "ADPCM uplink", Nov 22 2026)', () => {
     s.answer({ type: 'ready', v: 2, take: 'k', from: 0, audio: 'adpcm' });
     t.conn.sendAudio(new Int16Array(1600));
     expect((s.sent[s.sent.length - 1] as ArrayBuffer).byteLength).toBe(3200);
+  });
+});
+
+describe('a checker at capacity (Nov 22 2026: Cloud Run holds a new take about 35 s, then refuses it)', () => {
+  it('[RECITE-5] no ready within 20 s of the start: the take ends as busy, said in the bar, not minutes of Starting…', async () => {
+    const t = setup();
+    await flush();
+    t.sockets[0].onopen!();
+    expect(t.waits).toHaveLength(1);
+    t.waits[0].fn();
+    expect(t.events).toContainEqual({ type: 'error', reason: 'busy' });
+  });
+
+  it('a ready in time clears it, and a later resume isn’t held to it', async () => {
+    const t = setup();
+    await flush();
+    t.sockets[0].onopen!();
+    t.sockets[0].answer({ type: 'ready', v: 2, take: 'k', from: 0 });
+    expect(t.waits).toHaveLength(0);
   });
 });

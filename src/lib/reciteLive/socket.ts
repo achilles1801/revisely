@@ -50,6 +50,12 @@ export const CATCHUP_LEAD_SAMPLES = 5 * SAMPLE_RATE_HZ;
 /** Once the checker has beaten: this long without a word from it, and the connection counts as dropped (ms). */
 export const WATCHDOG_MS = 8000;
 /**
+ * How long a take waits for its first `ready` (ms) before it ends as `busy`. At capacity Cloud Run holds a new take about
+ * 35 s and then refuses it, and with the retries a take said "Starting…" for over two minutes while the microphone
+ * recorded (the checker's capacity test, Nov 22 2026). A cold instance answers within about 10 s.
+ */
+export const READY_WAIT_MS = 20_000;
+/**
  * While a take is paused (the microphone off, the take open), a frame this often (ms). The checker lets a take go after
  * 30 s without a frame from the phone (`IDLE`, error `idle`): Majd paused a take in a session and its summary came up
  * by itself (Nov 21 2026). Any text frame counts, and it ignores a type it doesn't know.
@@ -133,6 +139,8 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
     /** `done` came on a take started with namesAfter: only `into` is still to come. */
     let answered = false;
     let namesWait: unknown = null;
+    /** The first `ready`'s deadline (READY_WAIT_MS from the take's start); null once it has come or the take ended. */
+    let readyWait: unknown = null;
     let tries = 0;
     let retry: unknown = null;
     /** The checker beats (it has sent `beat`): its silence then means a dead connection. */
@@ -198,6 +206,8 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
       keep = null;
       if (retry != null) timers.clear(retry);
       if (namesWait != null) timers.clear(namesWait);
+      if (readyWait != null) timers.clear(readyWait);
+      readyWait = null;
       if (e) handlers.onEvent(e);
       const s = socket;
       socket = null;
@@ -351,6 +361,8 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
         }
         if (e.type === 'ready') {
           unproven = false;
+          if (readyWait != null) timers.clear(readyWait);
+          readyWait = null;
           take = e.take ?? take;
           // A checker that beats announces it (draft 9): watched from now. What it already holds, it has received.
           if (e.beat) beats = true;
@@ -430,6 +442,11 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
       }, wait);
     };
 
+    // The first `ready` must come in time; a resume after it is the retries' business.
+    readyWait = timers.set(() => {
+      readyWait = null;
+      if (!take && !finished) finish({ type: 'error', reason: 'busy' });
+    }, READY_WAIT_MS);
     void connect();
 
     const control = (frame: Control) => {
