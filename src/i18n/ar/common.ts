@@ -62,4 +62,9 @@ export const common: NonNullable<ArStrings['common']> = {
   pageDidNotOpenBody: 'انسخ عنوانها لفتحها في المتصفح.\n\n⁨{{address}}⁩',
   emailDidNotOpen: 'تعذّر فتح تطبيق البريد',
   emailDidNotOpenBody: 'انسخ عنواننا لتراسلنا من أي تطبيق بريد.\n\n⁨{{address}}⁩',
+  juzList: 'الأجزاء {{list}}',
+  megabytesTight: '{{n}}\u00a0ميغابايت',
+  gigabytes: '{{n}} غيغابايت',
+  salam: 'السلام عليكم',
+  tookTooLong: 'استغرق الأمر وقتًا طويلًا.',
 };
