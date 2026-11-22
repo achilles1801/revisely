@@ -398,16 +398,18 @@ describe('Recite: following along', () => {
     await event({ type: 'mark', mark: { id: 'a', w: UTIYAT, ayah: [27, 23], kind: 'word', sure: 'likely', heard: 'وَأُوهِيَتْ', heardExact: false } });
     await event({ type: 'at', w: UTIYAT + 1 });
     expect(screen.getByTestId('recite-words')).toBeTruthy();
-    // Where the reciter is (Majd's Dev take, Nov 15 2026): a quiet band on its line only. Not a band over the whole ayah,
-    // which covered lines not yet said and read as running ahead. With the page shown no word is washed (Majd, Nov 21
-    // 2026: "They dont even use shades when ur reciting with the page shown ie not hidden, which is actually really nice").
+    // Where the reciter is: a flat grey band behind the whole ayah, every line of it, and no word washed (Majd, Nov 21 and
+    // 22 2026: "They dont even use shades when ur reciting with the page shown", "we should follow how tarteel does it here").
     expect(screen.queryByTestId('live-word-box')).toBeNull();
-    expect(screen.queryAllByTestId('live-ayah-band')).toHaveLength(0);
-    const band = flatStyle(screen.getByTestId('live-line-band'));
-    const { wordBox } = require('../../../lib/reciteLive/geometry');
-    const line = wordBox(words, UTIYAT + 1);
-    expect(band.top as number).toBeLessThanOrEqual(line.y0 * 0.38);
-    expect((band.top as number) + (band.height as number)).toBeGreaterThanOrEqual(line.y1 * 0.38);
+    const { ayahBand } = require('../../../lib/reciteLive/geometry');
+    const expected = ayahBand(379, 27, 23);
+    const bands = screen.getAllByTestId('live-ayah-band').map(flatStyle);
+    expect(bands).toHaveLength(expected.length);
+    bands.forEach((b, i) => {
+      expect(b.backgroundColor).toBe(paletteV2(false, 'indigo').highlight);
+      expect(b.top as number).toBeCloseTo(expected[i].y0 * 0.38);
+      expect(b.width as number).toBeCloseTo((expected[i].x1 - expected[i].x0) * 0.38);
+    });
     expect(screen.queryByTestId('recite-score')).toBeNull();
     expect(screen.queryByTestId('live-mark-word')).toBeNull();
   });
@@ -698,6 +700,43 @@ describe('mistakes are highlights (Majd, Nov 15 2026: “only things we should s
     expect((wash.left as number) + (wash.width as number) + shadow.spreadDistance + shadow.blurRadius).toBeGreaterThan(b.x1 * 0.38);
   });
 
+  it('[RECITE-21] hidden mid-take keeps everything behind the reciter and hides what is ahead; hidden after the take hides everything', async () => {
+    // Majd, Nov 22 2026, of Tarteel's: "do the same".
+    const A25 = words.verseFirstWord(27, 25);
+    await startTake('check', null);
+    await event({ type: 'locked', w: A25, s: 27, a: 25 });
+    await event({ type: 'said', upTo: A25 + 2 });
+    await event({ type: 'at', w: A25 + 3 });
+    await event({ type: 'mark', mark: { id: 'm', w: A25 + 1, ayah: [27, 25], kind: 'word', sure: 'clear', heard: 'x', heardExact: false } });
+    const runs = () =>
+      screen.queryAllByTestId('hidden-shown').map((v) => {
+        const st = flatStyle(v);
+        return { x0: (st.left as number) / 0.38, x1: ((st.left as number) + (st.width as number)) / 0.38, top: (st.top as number) / 0.38 };
+      });
+    const { pageLines } = require('../../../lib/recite/pageLines');
+    const drawn = (w: number) => {
+      const r = words.rect(w);
+      const l = pageLines(379).find((x: { line: number }) => x.line === words.lineOf(w));
+      return runs().some((b) => Math.abs(b.top - l.coverTop) < 0.5 && b.x0 <= r.x0 + 0.01 && b.x1 >= r.x1 - 0.01);
+    };
+    fireEvent.press(screen.getByTestId('recite-eye'));
+    const [from] = words.pageRange(379);
+    // Behind the reciter: the page's words before the start, and the words recited.
+    for (const w of [from, A23, A25 - 1, A25, A25 + 1]) expect(drawn(w)).toBe(true);
+    // Ahead: hidden.
+    for (const w of [A25 + 4, A25 + 6]) expect(drawn(w)).toBe(false);
+    // Stopped: the page stays as it is until it is switched again; switched to hidden after the take, it hides everything,
+    // its mistakes still marked.
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await flush();
+    await event({ type: 'done', result: { v: 2, take: 't1', from: A25, to: A25 + 3, secs: 6, marks: [], score: null } });
+    expect(drawn(A25)).toBe(true);
+    const eye = screen.queryByTestId('recite-eye') ?? screen.getByTestId('reader-eye');
+    fireEvent.press(eye);
+    fireEvent.press(screen.queryByTestId('recite-eye') ?? screen.getByTestId('reader-eye'));
+    for (const w of [from, A23, A25, A25 + 1]) expect(drawn(w)).toBe(false);
+  });
+
   it('[RECITE-20] the hidden view: the newest word shown in the following ink over its own, the ones before in the page’s ink; no band or wash', async () => {
     await startTake('check', null);
     fireEvent.press(screen.getByTestId('recite-eye'));
@@ -717,7 +756,7 @@ describe('mistakes are highlights (Majd, Nov 15 2026: “only things we should s
     expect(flatStyle(image)).toMatchObject({ tintColor: p.followInk, width: 389, height: 629, left: -(box.x0 - 1) * 0.38 });
     expect(screen.queryAllByTestId('live-follow-ink')).toHaveLength(1);
     expect(screen.queryByTestId('live-word-box')).toBeNull();
-    expect(screen.queryByTestId('live-line-band')).toBeNull();
+    expect(screen.queryAllByTestId('live-ayah-band')).toHaveLength(0);
     expect(screen.queryAllByTestId('hidden-band')).toHaveLength(0);
     // A word with a mark keeps its wash, in the page's ink: the mark says more than where the reciter is.
     await event({ type: 'mark', mark: { id: 'm', w: A23 + 2, ayah: [27, 23], kind: 'word', sure: 'clear', heard: 'x', heardExact: false } });
@@ -729,7 +768,7 @@ describe('mistakes are highlights (Majd, Nov 15 2026: “only things we should s
     // The page shown: no ink, only the band.
     fireEvent.press(screen.getByTestId('recite-eye'));
     expect(screen.queryByTestId('live-follow-ink')).toBeNull();
-    expect(screen.getByTestId('live-line-band')).toBeTruthy();
+    expect(screen.queryAllByTestId('live-ayah-band').length).toBeGreaterThan(0);
   });
 
   it('something else said in the next word’s slot (`off`): its cover turns red, its text still hidden, until it’s said', async () => {
@@ -780,7 +819,7 @@ describe('a take starts anywhere on the page (Majd, Nov 14 2026)', () => {
     expect(screen.queryByTestId('recite-words')).toBeNull();
     expect(screen.queryByTestId('live-word-box')).toBeNull();
     // Never on the page's top line by default: the checker hasn't said where the reciter is.
-    expect(screen.queryByTestId('live-line-band')).toBeNull();
+    expect(screen.queryAllByTestId('live-ayah-band')).toHaveLength(0);
     expect(screen.queryByTestId('recite-score')).toBeNull();
   });
 
@@ -789,7 +828,7 @@ describe('a take starts anywhere on the page (Majd, Nov 14 2026)', () => {
     await startTake('check', null);
     await event({ type: 'locked', w: A25, s: 27, a: 25 });
     // The page shown: the band on the line found, no word washed.
-    expect(screen.getByTestId('live-line-band')).toBeTruthy();
+    expect(screen.queryAllByTestId('live-ayah-band').length).toBeGreaterThan(0);
     expect(screen.queryByTestId('live-word-box')).toBeNull();
     expect(screen.getByTestId('recite-words')).toBeTruthy();
     expect(screen.getByTestId('recite-score')).toBeTruthy();
@@ -953,7 +992,7 @@ describe('the hidden view (the eye on the bar)', () => {
     expect(screen.getByTestId('hidden-page-379')).toBeTruthy();
     const covered = screen.getAllByTestId('hidden-cover').length;
     expect(screen.queryAllByTestId('hidden-band')).toHaveLength(0);
-    expect(screen.queryByTestId('live-line-band')).toBeNull();
+    expect(screen.queryAllByTestId('live-ayah-band')).toHaveLength(0);
     expect(screen.queryByTestId('live-word-box')).toBeNull();
     // Found: the words recited show in place, and still no band.
     await event({ type: 'locked', w: A23, s: 27, a: 23 });
@@ -1030,16 +1069,16 @@ describe('the guess before the lock (contract draft 11, protocol 9; Majd: the cu
   it('[RECITE-1] the start frame asks for guesses; a guess shows as the cursor on the page shown, Listening… stays, and the lock takes over', async () => {
     await begin(9);
     expect(mockLive.start).toMatchObject({ guess: true });
-    expect(screen.queryByTestId('live-line-band')).toBeNull();
+    expect(screen.queryAllByTestId('live-ayah-band')).toHaveLength(0);
     await event({ type: 'guess', w: A23 + 2 } as LiveEvent);
     // The cursor on a shown page is the band on its line, no word washed (RECITE-19).
-    expect(screen.getByTestId('live-line-band')).toBeTruthy();
+    expect(screen.queryAllByTestId('live-ayah-band').length).toBeGreaterThan(0);
     expect(screen.queryByTestId('live-word-box')).toBeNull();
     expect(screen.getByTestId('recite-status').props.children).toBe('Listening…');
     // Sure now, somewhere else: the cursor jumps there; a guess after the lock is ignored.
     await event({ type: 'locked', w: A23 + 5, s: 27, a: 23 });
     await event({ type: 'guess', w: A23 + 1 } as LiveEvent);
-    expect(screen.getByTestId('live-line-band')).toBeTruthy();
+    expect(screen.queryAllByTestId('live-ayah-band').length).toBeGreaterThan(0);
     expect(screen.queryByTestId('recite-status')).toBeNull();
   });
 
@@ -1048,16 +1087,16 @@ describe('the guess before the lock (contract draft 11, protocol 9; Majd: the cu
     fireEvent.press(screen.getByTestId('recite-eye'));
     await event({ type: 'guess', w: A23 + 2 } as LiveEvent);
     expect(screen.queryByTestId('live-word-box')).toBeNull();
-    expect(screen.queryByTestId('live-line-band')).toBeNull();
+    expect(screen.queryAllByTestId('live-ayah-band')).toHaveLength(0);
     expect(screen.queryByTestId('live-cover-current')).toBeNull();
     fireEvent.press(screen.getByTestId('recite-eye'));
-    expect(screen.getByTestId('live-line-band')).toBeTruthy();
+    expect(screen.queryAllByTestId('live-ayah-band').length).toBeGreaterThan(0);
   });
 
   it('a checker before protocol 9: its guesses are ignored', async () => {
     await begin(8);
     await event({ type: 'guess', w: A23 + 2 } as LiveEvent);
-    expect(screen.queryByTestId('live-line-band')).toBeNull();
+    expect(screen.queryAllByTestId('live-ayah-band')).toHaveLength(0);
     expect(screen.queryByTestId('live-word-box')).toBeNull();
   });
 });

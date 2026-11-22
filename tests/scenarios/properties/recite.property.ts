@@ -63,9 +63,10 @@ import type { TakeRecord } from '../../../src/lib/reciteMemory/record';
 import { ayahKey, ayahsBetween, ayahCount, suraOf, ayahOf, type AyahKey } from '../../../src/lib/ayahKeys';
 import { getJuzForPage } from '../../../src/lib/quranData';
 import { runs } from './fixtures';
-import { cursorBox, markHighlight, wordBox } from '../../../src/lib/reciteLive/geometry';
+import { ayahBand, cursorBox, markHighlight, wordBox } from '../../../src/lib/reciteLive/geometry';
 import { followCues, washOf, washReach } from '../../../src/lib/reciteLive/wash';
 import { followBox, hiddenInkPlan } from '../../../src/components/reciteLive/HiddenInkLayer';
+import { hiddenTakeInfo, revealedOnHide } from '../../../src/lib/reciteLive/hideSwitch';
 import { pageLines } from '../../../src/lib/recite/pageLines';
 
 const words = quranWords();
@@ -1280,7 +1281,7 @@ describe('[RECITE-19] highlights are soft washes wider than their word; with the
     );
   });
 
-  it('the page shown: only the line’s band follows the reciter, no word is washed or inked', () => {
+  it('the page shown: only the ayah’s band follows the reciter, no word is washed or inked', () => {
     const at = fc.option(wordArb, { nil: null });
     fc.assert(
       fc.property(at, at, (cursor, newest) => {
@@ -1386,6 +1387,51 @@ describe('[RECITE-20] a hidden page is drawn empty: faint rules where words are 
         }
       }),
       { numRuns: runs(150) },
+    );
+  });
+});
+
+describe('[RECITE-19] on a shown page the band is the whole ayah being recited', () => {
+  it('the band behind the cursor’s ayah takes every line of it on the page, the cursor’s own line among them', () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 0, max: words.count - 1 }), (w) => {
+        const page = words.pageOf(w);
+        const ref = words.ref(w);
+        const bands = ayahBand(page, ref.sura, ref.ayah);
+        const box = wordBox(words, w);
+        const mid = (box.y0 + box.y1) / 2;
+        expect(bands.length).toBeGreaterThan(0);
+        expect(bands.some((b) => b.y0 <= mid && mid <= b.y1)).toBe(true);
+        // One rect a line, top to bottom, none overlapping the next.
+        for (let i = 1; i < bands.length; i++) expect(bands[i].y0).toBeGreaterThanOrEqual(bands[i - 1].y0);
+      }),
+      { numRuns: runs(200) },
+    );
+  });
+});
+
+describe('[RECITE-21] switched to hidden: mid-take everything behind the reciter stays, after a take nothing', () => {
+  it('during a take, the page’s words before the start stay (and those recited show anyway); none at or after the start', () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 1, max: 604 }), fc.integer({ min: 0, max: words.count - 1 }), (page, start) => {
+        const kept = revealedOnHide(words, page, { running: true, startWord: start });
+        const [from, to] = words.pageRange(page);
+        for (let w = from; w < to; w++) expect(kept.has(w)).toBe(w < start);
+        // With what the take recited (from its start up to where it is), every word behind the reciter shows.
+        const info = { saidUpTo: Math.min(to - 1, start + 3), startWord: start, cursor: null };
+        for (let w = from; w < to && w <= info.saidUpTo; w++) expect(wordShown(w, kept, info)).toBe(true);
+      }),
+      { numRuns: runs(150) },
+    );
+  });
+  it('after a take (or before one), nothing stays, and the take’s recited words no longer show', () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 1, max: 604 }), fc.integer({ min: 0, max: words.count - 1 }), (page, start) => {
+        expect(revealedOnHide(words, page, { running: false, startWord: start }).size).toBe(0);
+        const info = hiddenTakeInfo({ saidUpTo: start + 5, startWord: start, cursor: start + 6 }, true);
+        expect(wordShown(start + 1, new Set(), info)).toBe(false);
+      }),
+      { numRuns: runs(80) },
     );
   });
 });

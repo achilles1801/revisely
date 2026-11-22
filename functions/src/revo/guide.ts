@@ -416,7 +416,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     // Majd's Nov 20 2026 asks, in Revisely Dev until the next release (Not clear's line too: the store app has it, and
     // the release's re-record brings it to the main guide).
     title: 'Mistakes on a hidden page, Not clear, the mistake sound, Your recitation, and how highlights look',
-    covers: ['RECITE-13', 'RECITE-15', 'RECITE-16', 'RECITE-17', 'RECITE-18', 'RECITE-19', 'RECITE-20'],
+    covers: ['RECITE-13', 'RECITE-15', 'RECITE-16', 'RECITE-17', 'RECITE-18', 'RECITE-19', 'RECITE-20', 'RECITE-21'],
     routes: ['QuranReader', 'ActiveRevision', 'Settings'],
     text: lines(
       '- With the page hidden (the eye), a word with a mistake keeps its highlight on its cover, the word still hidden: the take’s marks in their colour during the take and after, and past mistakes lighter (with “Show past mistakes” on), during a take too, so they know where they tend to slip before they get there. A tap on a highlighted cover opens that word’s card, as on a shown page (it shows the word).',
@@ -429,7 +429,8 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
       '- When a take starts, the cursor shows where they seem to be within a second or two of their first word (the page shown only), and settles once the app is sure where they started; "Listening…" stays until then.',
       '- On a hidden page a word shows once it has been said in full, the next word has begun, or it has been the word being said about as long as it takes to say (a long madd waits for its end), never a word ahead; the word being said is still hidden, its place lightly marked, and the newest word shown is in green ink, the following colour (as the word being said in the bar); the words before it are in the page’s own ink, and a word with a mark keeps its highlight instead. The bar shows no more than the page.',
       '- A hidden page looks empty: a faint line where each line’s words are still hidden, the ayah markers whole, and each word appears in place, whole, once it is shown.',
-      '- Highlights on the page are soft pastel washes behind the word (rounded, fading out at the edges, a little wider than the word), not boxes: the mistakes’ red, amber and violet, and past mistakes lighter. With the page shown, nothing marks the word being said: only a quiet band on its line (this replaces the grey box on the word).',
+      '- Hiding the page during a take keeps everything they have already passed on show (the page before where they started, and what they recited) and hides only what comes next. Hiding it after a take hides everything; the take’s mistakes still show where they are and can be tapped.',
+      '- Highlights on the page are soft pastel washes behind the word (rounded, fading out at the edges, a little wider than the word), not boxes: the mistakes’ red, amber and violet, and past mistakes lighter. With the page shown, nothing marks the word being said: only a flat grey band behind the whole ayah being recited, across every line of it, moving on per ayah (this replaces the band on the line and the grey box on the word).',
     ),
   },
   {

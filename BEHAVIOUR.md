@@ -575,7 +575,9 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   rounded core with an edge that fades out all round, reaching a little past its word on every side, with no outline
   and the ink as it is. That holds for the mistakes (red for words, amber for harakat, letters and Not clear, violet for
   tajweed; the mark a card is open for a firmer shade), Recite's memory's past mistakes (lighter), and what marks a hidden
-  page's covers. With the page shown, nothing marks the word being said: only a quiet band on its line. (Majd, Nov 21 2026: Tarteel's shading "is way more elegant than ours and also
+  page's covers. With the page shown, nothing marks the word being said: only a flat grey band behind the whole ayah
+  being recited, across every line of it on the page, full line height and without blur, moving on per ayah (Majd, Nov
+  22 2026: "we should follow how tarteel does it here"). (Majd, Nov 21 2026: Tarteel's shading "is way more elegant than ours and also
   seems like a blurb or splash … They dont even use shades when ur reciting with the page shown ie not hidden, which is
   actually really nice. I also like their color shades its like more pastel which is what we should aim for".)
 - **RECITE-20.** (Revisely Dev) A hidden page is an empty page: a faint rule where each line's words are still hidden,
@@ -587,6 +589,11 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   inked (RECITE-19). (Majd, Nov 22 2026, of Tarteel's hidden page: "i dont see the words being a different color as its
   recited with page hidden, why are we not taking that up?"; and of the empty page with rules: "let's do it and test
   it".)
+- **RECITE-21.** (Revisely Dev) Switched to hidden during a take, the page keeps everything behind the reciter on
+  show: the words before where the take started on the page, and the words recited. Only what is ahead hides. Switched
+  to hidden after a take, the page hides everything, the words recited too. The take's mistakes still show on their
+  words' places, and a tap still opens them. Stop alone changes nothing on the page. (Majd, Nov 22 2026, of Tarteel's
+  smart switching: "do the same".)
 
 ## Recite insights
 

@@ -6,7 +6,7 @@ import type { WordFollow } from '../../lib/recite/hiddenPage';
 import type { Mark, MarkGroup } from '../../lib/reciteLive/contract';
 import { markGroup, strongestByWord } from '../../lib/reciteLive/contract';
 import { markTitle } from '../../lib/reciteLive/describe';
-import { currentLineBand, markBox, markHighlight, offBox, wordBox } from '../../lib/reciteLive/geometry';
+import { ayahBand, markBox, markHighlight, offBox, wordBox } from '../../lib/reciteLive/geometry';
 import { followCues } from '../../lib/reciteLive/wash';
 import { t } from '../../i18n';
 import { HiddenInkLayer, shownOnHiddenPage, type InkWash } from './HiddenInkLayer';
@@ -23,8 +23,9 @@ export type MarkColours = Record<MarkGroup, { fill: string; firm: string }>;
 
 /**
  * Behind the page's ink, in its frame: what follows the reciter (lib/reciteLive/wash's followCues: with the page shown,
- * only a quiet grey band on the line being recited and no word washed, Majd, Nov 21 2026: "They dont even use shades
- * when ur reciting with the page shown … which is actually really nice"; with it hidden, no band: the newest word shown
+ * only a flat grey band behind the whole ayah being recited and no word washed, Majd, Nov 21 and 22 2026: "They dont even
+ * use shades when ur reciting with the page shown … which is actually really nice", "we should follow how tarteel does
+ * it here"; with it hidden, no band: the newest word shown
  * is in the following ink, over the ink, LiveOverlay), and the marks (Check) behind their words, three colours at most: red for words, amber for slips
  * and "Not clear", violet for tajweed (Majd, Nov 15 2026: "only things we should show are highlites for mistakes 3
  * colors max"). Every highlight is a soft pastel wash (Wash), never a box. An extra word is highlighted on the word
@@ -44,7 +45,7 @@ export function LiveUnderlay({
   page: number;
   scale: number;
   words: QuranWords;
-  /** The cursor's word: the band on its line, on a shown page. */
+  /** The cursor's word: the band behind its ayah, on a shown page. */
   cursor: number | null;
   marks: Mark[];
   selected: Mark | null;
@@ -53,15 +54,18 @@ export function LiveUnderlay({
   colors: { band: string; marks: MarkColours };
 }) {
   const cues = followCues(hidden, cursor, null);
-  const line = cues.band != null ? currentLineBand(words, page, cues.band) : null;
+  // The whole ayah being recited, every line of it on this page (Majd, Nov 22 2026: "we should follow how tarteel does
+  // it here"): flat, full line height, moving per ayah, never per word.
+  const ayah = cues.band != null && words.pageOf(cues.band) === page ? words.ref(cues.band) : null;
+  const bands = ayah ? ayahBand(page, ayah.sura, ayah.ayah) : [];
   // One highlight per word: its strongest mark (a word mistake over a slip over a tajweed note).
   const byWord = strongestByWord(marks.filter((m) => words.pageOf(m.w) === page));
   const picked = selected && words.pageOf(selected.w) === page ? selected : null;
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill} testID={`live-underlay-${page}`}>
-      {line ? (
-        <View testID="live-line-band" style={[styles.abs, styles.band, rectStyle(line, scale), { backgroundColor: colors.band }]} />
-      ) : null}
+      {bands.map((r, i) => (
+        <View key={`band-${i}`} testID="live-ayah-band" style={[styles.abs, styles.band, rectStyle(r, scale), { backgroundColor: colors.band }]} />
+      ))}
       {[...byWord.values()].map((m) => {
         const group = markGroup(picked && picked.w === m.w ? picked : m);
         const firm = picked != null && picked.w === m.w;
@@ -198,5 +202,5 @@ export function LiveMarkTargets({ page, scale, words, marks }: { page: number; s
 
 const styles = StyleSheet.create({
   abs: { position: 'absolute' },
-  band: { borderRadius: 8 },
+  band: { borderRadius: 3 },
 });

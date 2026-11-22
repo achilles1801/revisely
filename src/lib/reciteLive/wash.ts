@@ -51,8 +51,9 @@ export function washReach(wash: Wash): Rect {
 }
 
 /**
- * What follows the reciter on a page during a take: with the page shown, only the quiet band on the line being recited
- * (`band`, the cursor's word; Majd, Nov 21 2026: no shades with the page shown); with it hidden, no band, and the newest
+ * What follows the reciter on a page during a take: with the page shown, only the flat band behind the ayah being recited
+ * (`band`, the cursor's word, whose ayah it is; Majd, Nov 21 and 22 2026: no shades with the page shown, the band as
+ * Tarteel's); with it hidden, no band, and the newest
  * word shown (`newest`) in its own ink in the following colour (`ink`; Majd, Nov 22 2026, of Tarteel's hidden page: "i
  * dont see the words being a different color as its recited"), unless it carries a mark (`marked`): its wash says more.
  * The words recited before it are in the page's own ink. No word is washed to follow the reciter.
