@@ -19,6 +19,12 @@ jest.mock('react-native-safe-area-context', () => require('react-native-safe-are
 // Any glass left in the new design would show up as this.
 jest.mock('../../../navigation/TabBar', () => ({ useTabBarFootprint: () => 0 }));
 jest.mock('../../../components/settings/AppInfo', () => ({ AppInfo: () => null }));
+jest.mock('../../../components/prayer/useChosenAthanVoice', () => ({
+  useChosenAthanVoice: () => ({ id: 'makkah-regular', name: 'Makkah – Masjid al-Haram' }),
+}));
+// The athan is Revisely Dev's, on iPhone (lib/athan `athanEnabled`).
+const mockAthan = { enabled: false };
+jest.mock('../../../lib/athan', () => ({ athanEnabled: () => mockAthan.enabled }));
 
 const mockNavigation = { goBack: jest.fn(), navigate: jest.fn() };
 jest.mock('@react-navigation/native', () => {
@@ -271,6 +277,20 @@ describe('Settings: Prayer (every account from 1.0.3)', () => {
     expect(mockNavigation.navigate).toHaveBeenCalledWith('PrayerNotifications');
     fireEvent.press(screen.getByText('Calculation'));
     expect(mockNavigation.navigate).toHaveBeenCalledWith('PrayerCalculation');
+    // No athan in the store app (or on Android).
+    expect(screen.queryByText('Athan voice')).toBeNull();
+  });
+
+  it('Revisely Dev on iPhone: the athan voice, by name, opens its picker', async () => {
+    mockAthan.enabled = true;
+    try {
+      await renderV2();
+      expect(screen.getByText('Makkah – Masjid al-Haram')).toBeTruthy();
+      fireEvent.press(screen.getByText('Athan voice'));
+      expect(mockNavigation.navigate).toHaveBeenCalledWith('AthanVoice');
+    } finally {
+      mockAthan.enabled = false;
+    }
   });
 });
 

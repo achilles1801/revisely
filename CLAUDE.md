@@ -16,7 +16,7 @@ Read its file first:
 - The stats digest and the metrics console: `handbook/stats-metrics.md`
 - Offline (the account copy, the outbox), the offline mushaf, Saheeh International, QuranEnc: `handbook/offline.md`
 - TestFlight, App Store submission, the icon, screenshots, the public pages: `handbook/app-store.md`
-- The reader (verse positions, Copy and Share, The Clear Quran, recitation, Qibla, mushaf editions): `handbook/reader.md`
+- The reader (verse positions, Copy and Share, The Clear Quran, recitation, the athan, Qibla, mushaf editions): `handbook/reader.md`
 - Recording backup: `handbook/recordings.md`
 - Android and Google Play: `handbook/android.md`
 - The website (account, Premium, Open Door) and the worker (revisely.app/api): `handbook/website.md`

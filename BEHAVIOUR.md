@@ -220,6 +220,22 @@ permission when "Daily reminders" is on, and a no saves reminders off.
   asks, and a no leaves it off. (In the store app, until the reminders-while-away switch is on, the switch
   shows the account's choice whatever the phone allows.)
 
+## The athan (Revisely Dev)
+
+On iPhone only, until a version with the athan's sounds built in (Android plays a notification's sound from sounds
+inside the app). Majd, Nov 22 2026: "genuine adthan notifications like the athan actually playing instead of our
+current basic sounds". October 2026's version was removed for the voices it offered.
+
+- **ATHAN-1.** A prayer's notification sound can be the athan: at the prayer's time its voice's athan plays, as far
+  as an iPhone notification can play one (its first 30 seconds). A reminder before the prayer keeps the standard
+  tone. Silent mode and Focus are the phone's, as for any notification.
+- **ATHAN-2.** A voice is chosen for every prayer at once (Settings → Prayer → Athan voice), which leaves which
+  prayers play the athan as they are, or for one prayer from its sound, which sets that prayer to the athan. Fajr
+  takes the voice's own Fajr athan when the voice has one.
+- **ATHAN-3.** A prayer's notification never goes quiet for the athan's sake. Until its voice has downloaded, after
+  it is removed or withdrawn, with no voice chosen, and wherever the athan isn't offered (the store app, Android), a
+  prayer set to the athan plays the standard tone.
+
 ## Al-Kahf on Friday
 
 - **KAHF-1.** The Al-Kahf card (Settings → Home screen → "Friday Al-Kahf reminder", on by default) is on Home
