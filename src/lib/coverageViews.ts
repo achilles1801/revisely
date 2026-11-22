@@ -6,6 +6,7 @@
 import { getAllSurahs, getPagesForJuz } from './quranData';
 import { surahName } from './passages';
 import { coverageRecency, type CoverageRecency } from './recency';
+import { t } from '../i18n';
 
 export type CoverageView = 'juz' | 'surah' | 'page';
 export const COVERAGE_VIEWS: readonly CoverageView[] = ['juz', 'surah', 'page'];
@@ -55,12 +56,12 @@ export function stateOf(c: CoverageCounts): CoverageRecency | 'none' {
 export function coverageWords(c: CoverageCounts): string {
   const total = totalOf(c);
   const revised = c.week + c.month;
-  const of = (n: number) => `${n} of ${total} ${total === 1 ? 'page' : 'pages'}`;
-  if (total === 0) return 'not memorized';
-  if (c.stale > 0) return c.stale === total ? 'over 30 days' : `${of(c.stale)} over 30 days`;
-  if (c.new > 0) return revised > 0 ? `${of(revised)} revised, the rest not revised yet` : 'not revised yet';
-  if (c.month > 0) return c.week > 0 ? `${of(c.week)} this week, the rest this month` : 'revised this month';
-  return 'revised this week';
+  const of = (n: number) => t('lib.coverage.of', { n, count: total });
+  if (total === 0) return t('lib.coverage.notMemorized');
+  if (c.stale > 0) return c.stale === total ? t('lib.coverage.over30') : t('lib.coverage.someOver30', { of: of(c.stale) });
+  if (c.new > 0) return revised > 0 ? t('lib.coverage.someRevised', { of: of(revised) }) : t('lib.coverage.notRevised');
+  if (c.month > 0) return c.week > 0 ? t('lib.coverage.someWeek', { of: of(c.week) }) : t('lib.coverage.revisedMonth');
+  return t('lib.coverage.revisedWeek');
 }
 
 // ── Surah ────────────────────────────────────────────────────────────────
@@ -179,12 +180,12 @@ export function pageCoverage(input: CoverageInput): { juz: number; cells: PageCe
 /** A page's state in words, after its surah and page ("At-Takwir, page 586, not revised yet"). */
 export function pageWords(state: CoverageRecency | 'none'): string {
   return state === 'week'
-    ? 'revised this week'
+    ? t('lib.coverage.revisedWeek')
     : state === 'month'
-      ? 'revised this month'
+      ? t('lib.coverage.revisedMonth')
       : state === 'new'
-        ? 'not revised yet'
+        ? t('lib.coverage.notRevised')
         : state === 'stale'
-          ? 'over 30 days'
-          : 'not memorized';
+          ? t('lib.coverage.over30')
+          : t('lib.coverage.notMemorized');
 }
