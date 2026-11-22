@@ -14,10 +14,10 @@ import { AudioSource, decodePcm, startMicStream } from '../../lib/recite/micSour
 import { SAMPLE_RATE } from '../../lib/recite/segmenter';
 import { getQuranWords, loadQuranWords, QuranWords } from '../../lib/recite/quranWords';
 import { checkLevel, type ReciteCheckSettings } from '../../lib/reciteCheck/settings';
-import { sendLabel } from '../../lib/reciteCheck/service';
+import { sendLabel, warmUpReciteCheck } from '../../lib/reciteCheck/service';
 import type { LiveEvent, Mark } from '../../lib/reciteLive/contract';
 import type { ClientFrame, LiveConnect, LiveConnection, StartFrame } from '../../lib/reciteLive/feed';
-import { CAP_S, chainTakes, chainView, LINK_ANSWER_MS, nextLinkStart, ROLL_FROM_S, rolloverDue, settleLink, type ChainLink } from '../../lib/reciteLive/chain';
+import { CAP_S, chainTakes, chainView, LINK_ANSWER_MS, nextLinkStart, ROLL_FROM_S, rolloverDue, settleLink, WARM_NEXT_S, type ChainLink } from '../../lib/reciteLive/chain';
 import { socketFeed } from '../../lib/reciteLive/socket';
 import { stopHearing } from '../../lib/reciteLive/hearAudio';
 import { clipRange } from '../../lib/reciteLive/phrase';
@@ -245,6 +245,8 @@ export function useLiveRecitation({
   const linkStart = useRef(0);
   /** The take may roll over: one from the mic, not a span (a drill, a Test me place, a voice search's ayahs). */
   const chainable = useRef(false);
+  /** The link whose next take's instance has been woken (WARM_NEXT_S). */
+  const warmedFor = useRef(0);
   const updatePrior = useCallback((no: number, fn: (s: LiveState) => LiveState) => {
     let changed = false;
     priorRef.current = priorRef.current.map((l) => {
@@ -707,7 +709,13 @@ export function useLiveRecitation({
       const before = Math.floor(samples.current / SAMPLE_RATE);
       samples.current += pcm.length;
       if (Math.floor(samples.current / SAMPLE_RATE) !== before) clock.set(Math.floor(samples.current / SAMPLE_RATE));
-      if (!chainable.current || pausedRef.current || !source.current || linkSecs() < ROLL_FROM_S) return;
+      if (!chainable.current || pausedRef.current || !source.current) return;
+      // Wake an instance for the next take while this one holds its own (once a link).
+      if (linkSecs() >= WARM_NEXT_S && warmedFor.current !== linkNo.current) {
+        warmedFor.current = linkNo.current;
+        warmUpReciteCheck();
+      }
+      if (linkSecs() < ROLL_FROM_S) return;
       const qw = wordsRef.current ?? getQuranWords();
       if (qw && rolloverDue(curRef.current, qw, linkSecs())) rollOver(null);
     },

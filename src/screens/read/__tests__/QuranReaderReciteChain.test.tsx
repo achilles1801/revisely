@@ -321,7 +321,14 @@ describe('[RECITE-22] a recitation past the checker’s 15 minutes is one take o
 
   it('before the cap, at a pause after an ayah: the take ends there and the next carries on from the next sample, none sent twice or lost', async () => {
     const a = await startLong();
-    await recite(845);
+    const { warmUpReciteCheck } = jest.requireMock('../../../lib/reciteCheck/service');
+    await recite(805);
+    const warmed = (warmUpReciteCheck as jest.Mock).mock.calls.length;
+    // At 13:30 the next take's instance is woken, once.
+    await recite(10);
+    expect(warmUpReciteCheck).toHaveBeenCalledTimes(warmed + 1);
+    await recite(30);
+    expect(warmUpReciteCheck).toHaveBeenCalledTimes(warmed + 1);
     // At a pause mid-ayah: not an ayah's end.
     await say(a, { type: 'at', w: A23 + 9 });
     await say(a, { type: 'said', upTo: A23 + 9 });

@@ -20,6 +20,12 @@ import { endsPhrase } from './phrase';
 
 /** The checker's cap on a take's audio (s): `MAX_SECONDS` in its live.py. */
 export const CAP_S = 15 * 60;
+/**
+ * Here the next take's instance is woken (s of a take's audio): recite-check runs one take an instance, so while this take
+ * holds one, a `/health` lands on another and starts it, and the next take doesn't wait 6–9 s for a cold one with the
+ * cursor blank (the checker session, Nov 22 2026).
+ */
+export const WARM_NEXT_S = 13 * 60 + 30;
 /** From here a take rolls over at the next ayah's or phrase's end, at a pause (s of its audio). */
 export const ROLL_FROM_S = 14 * 60;
 /** From here at any pause between words. */
