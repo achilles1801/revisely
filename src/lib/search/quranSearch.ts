@@ -249,7 +249,12 @@ function similarities(index: Index, q: QueryWord, work?: SearchWork): Float32Arr
   for (let v = 0; v < n; v++) {
     const k = index.key[v];
     const a = index.alt[v];
-    if (q.key === k || q.key === a || q.loose === index.loose[v] || (q.alike != null && (q.alike === k || q.alike === a))) {
+    if (
+      q.key === k ||
+      q.key === a ||
+      q.loose === index.loose[v] ||
+      (q.alike != null && (q.alike === k || q.alike === a))
+    ) {
       out[v] = 1;
       continue;
     }
@@ -359,7 +364,10 @@ function align(
   const joinedEnds = new Int32Array(V);
   for (let j = 2; j <= m; j++) {
     for (let k = 2; k <= Math.min(MAX_PARTS, j); k++) {
-      const said = query.slice(j - k, j).map((w) => w.key).join(' ');
+      const said = query
+        .slice(j - k, j)
+        .map((w) => w.key)
+        .join(' ');
       for (const v of index.joined.get(said) ?? []) {
         if (index.partCount[v] !== k) continue;
         joinedEnds[v] |= 1 << j;
@@ -527,14 +535,24 @@ export function searchText(words: QuranWords, text: string, limit = 50, work?: S
     const more = resultOf(index, whole, aligned, 1, limit).hits.filter(
       (h) => h.score >= CLOSE_TO_EXACT && h.to - h.from > BASMALA.length,
     );
-    result = withMore(result, more, whole.map((w) => w.key), limit);
+    result = withMore(
+      result,
+      more,
+      whole.map((w) => w.key),
+      limit,
+    );
   }
   return result ?? { hits: [], total: 0, words: once.map((w) => w.key) };
 }
 
 /** `result` with another query's matches (its words `words`, usually fuller) that don't overlap
  *  its own, in the order matches are listed. */
-function withMore(result: TextSearchResult | null, more: VerseHit[], words: string[], limit: number): TextSearchResult | null {
+function withMore(
+  result: TextSearchResult | null,
+  more: VerseHit[],
+  words: string[],
+  limit: number,
+): TextSearchResult | null {
   const added = more.filter((h) => !result?.hits.some((x) => x.from < h.to && h.from < x.to));
   if (added.length === 0) return result;
   const hits = [...(result?.hits ?? []), ...added].sort(
@@ -581,7 +599,8 @@ export function matchedWords(words: QuranWords, hit: VerseHit, query: string[]):
   // Words printed as one that the query said apart (يا أيها).
   const joined = new Set<number>();
   for (let k = 2; k <= MAX_PARTS; k++) {
-    for (let j = 0; j + k <= query.length; j++) for (const v of index.joined.get(query.slice(j, j + k).join(' ')) ?? []) joined.add(v);
+    for (let j = 0; j + k <= query.length; j++)
+      for (const v of index.joined.get(query.slice(j, j + k).join(' ')) ?? []) joined.add(v);
   }
   for (let i = hit.from; i < hit.to; i++) {
     const v = index.wordVocab[i];
@@ -592,7 +611,12 @@ export function matchedWords(words: QuranWords, hit: VerseHit, query: string[]):
       continue;
     }
     for (const q of query) {
-      if (q.length >= 3 && Math.abs(q.length - k.length) <= 1 && editDistance(q, k, 1) <= 1 && Math.max(q.length, k.length) >= 4) {
+      if (
+        q.length >= 3 &&
+        Math.abs(q.length - k.length) <= 1 &&
+        editDistance(q, k, 1) <= 1 &&
+        Math.max(q.length, k.length) >= 4
+      ) {
         set.add(i);
         break;
       }

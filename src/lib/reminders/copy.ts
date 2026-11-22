@@ -101,7 +101,11 @@ function pageCopy(input: ReminderCopyInput): ReminderCopy {
     return {
       title: input.beforeNoon ? t('reminders.goodMorning') : t('reminders.todaysRevision'),
       body: t(
-        position === 'first' ? 'reminders.pickUpWith' : position === 'end' ? 'reminders.pickUpNearEnd' : 'reminders.pickUpIn',
+        position === 'first'
+          ? 'reminders.pickUpWith'
+          : position === 'end'
+            ? 'reminders.pickUpNearEnd'
+            : 'reminders.pickUpIn',
         { place: surah },
       ),
     };
@@ -190,7 +194,10 @@ function awayCopy(input: ReminderCopyInput): ReminderCopy {
     const juz = juzOf(input.all[0]);
     const options: ReminderCopy[] = [
       { title: greeting(input), body: t('reminders.juzWhenReady', { juz }) },
-      { title: t('reminders.away.placeToday', { place: t('common.juzN', { n: juz }) }), body: t('reminders.away.keepClose') },
+      {
+        title: t('reminders.away.placeToday', { place: t('common.juzN', { n: juz }) }),
+        body: t('reminders.away.keepClose'),
+      },
       { title: t('reminders.away.ready'), body: t('reminders.away.juzWhenever', { juz }) },
     ];
     return pick(options, input.variant);
@@ -198,7 +205,10 @@ function awayCopy(input: ReminderCopyInput): ReminderCopy {
   const range = describeSurahRuns(pageRuns(input.all));
   const place = surahOf(input.all[0]).name;
   const options: ReminderCopy[] = [
-    { title: greeting(input), body: input.beforeNoon ? t('reminders.todayIs', { range }) : t('reminders.rangeOnly', { range }) },
+    {
+      title: greeting(input),
+      body: input.beforeNoon ? t('reminders.todayIs', { range }) : t('reminders.rangeOnly', { range }),
+    },
     { title: greeting(input), body: t('reminders.startsWith', { place }) },
     { title: t('reminders.away.placeToday', { place }), body: t('reminders.away.keepClose') },
     { title: t('reminders.away.ready'), body: t('reminders.away.whenever', { range }) },

@@ -9,7 +9,11 @@ import type { VerseHit } from './quranSearch';
 export type FoundRow = { kind: 'target' } | { kind: 'verse'; hit: VerseHit };
 
 /** The one place found, when exactly one was and not just the closest there is (the list says "1 result"); else null. */
-export function onlyVerseFound(results: { rows: readonly FoundRow[]; total: number; closest: boolean }): VerseHit | null {
+export function onlyVerseFound(results: {
+  rows: readonly FoundRow[];
+  total: number;
+  closest: boolean;
+}): VerseHit | null {
   if (results.closest || results.total !== 1 || results.rows.length !== 1) return null;
   const row = results.rows[0];
   return row.kind === 'verse' ? row.hit : null;

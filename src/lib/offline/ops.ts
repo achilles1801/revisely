@@ -217,7 +217,8 @@ const union = (a: number[], b: number[]) => [...a, ...b.filter((p) => !a.include
  * page held as revised, catch-up pages included), else its pagesRevised. Credit for an unchecked page
  * is dropped (aheadWithin).
  */
-const checkedOf = (op: { checked?: number[] }, pagesRevised: number[]): number[] => union(op.checked ?? [], pagesRevised);
+const checkedOf = (op: { checked?: number[] }, pagesRevised: number[]): number[] =>
+  union(op.checked ?? [], pagesRevised);
 
 const weaknessKey = (w: { pageNumber: number; newRating: number; changedAt: unknown }) =>
   `${w.pageNumber}:${w.newRating}:${
@@ -453,7 +454,10 @@ export function overlayJournal(days: JournalEntry[], entries: OutboxEntry[], dat
       notesByDay.set(op.date, [...notesOf(op.date).filter((n) => n.id !== op.entry.id), op.entry]);
       touched.add(op.date);
     } else if (op.kind === 'journal.entry.delete') {
-      notesByDay.set(op.date, notesOf(op.date).filter((n) => n.id !== op.id));
+      notesByDay.set(
+        op.date,
+        notesOf(op.date).filter((n) => n.id !== op.id),
+      );
       touched.add(op.date);
     } else if (op.kind === 'journal.save') {
       const others = notesOf(op.entry.date).filter((n) => n.id !== LEGACY_NOTE_ID);

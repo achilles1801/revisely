@@ -141,7 +141,9 @@ describe('searchText', () => {
       expect([...matchedWords(words, r.hits[1], r.words)].map((i) => i - from)).toEqual([26, 27, 28, 29, 30, 31]);
     }
     // Said right, the run alone; a phrase said again that the text doesn't run on with, once.
-    expect(searchText(words, 'بيوت إخوانكم أو بيوت أخواتكم أو').hits.map((h) => [h.from - from, h.to - from])).toEqual([[26, 32]]);
+    expect(searchText(words, 'بيوت إخوانكم أو بيوت أخواتكم أو').hits.map((h) => [h.from - from, h.to - from])).toEqual([
+      [26, 32],
+    ]);
     expect(found('بيوت أخوالكم أو بيوت أخوالكم أو')).toEqual(['24:61']);
   });
 
@@ -168,7 +170,12 @@ describe('searchText: how much work a search does', () => {
   it.each([
     ['12 words of 2:255: lined up once', say(verse(2, 255).slice(0, 12)), 1, 12],
     ['all of 2:255: its first 24 words, once', say(verse(2, 255)), 1, 24],
-    ['words not in the Quran: as said, then without the last, the first, both', 'كيف حالك اليوم يا صديقي', 4, 5 + 4 + 4 + 3],
+    [
+      'words not in the Quran: as said, then without the last, the first, both',
+      'كيف حالك اليوم يا صديقي',
+      4,
+      5 + 4 + 4 + 3,
+    ],
   ])('%s', (_, text, alignments, queryWords) => {
     const work = counted(text);
     expect(work.alignments).toBe(alignments);
@@ -190,7 +197,12 @@ describe('searchText: how much work a search does', () => {
 describe('withoutRepeats', () => {
   const ws = (text: string) => queryWords(text);
   it('keeps a phrase said twice in a row once', () => {
-    expect(withoutRepeats(ws('فارجع البصر فارجع البصر هل ترى')).map((w) => w.key)).toEqual(['فارجع', 'البصر', 'هل', 'تري']);
+    expect(withoutRepeats(ws('فارجع البصر فارجع البصر هل ترى')).map((w) => w.key)).toEqual([
+      'فارجع',
+      'البصر',
+      'هل',
+      'تري',
+    ]);
   });
   it('keeps a short word said twice (it can be in the text twice)', () => {
     expect(withoutRepeats(ws('كلا كلا')).map((w) => w.key)).toEqual(['كلا', 'كلا']);
@@ -202,8 +214,22 @@ describe('withoutRepeats', () => {
   it('folds a phrase said again a letter differently, or with near off only word for word', () => {
     const run = 'بيوت إخوالكم أو بيوت أخواتكم أو';
     expect(withoutRepeats(ws(run)).map((w) => w.key)).toEqual(['بيوت', 'اخوالكم', 'او']);
-    expect(withoutRepeats(ws(run), false).map((w) => w.key)).toEqual(['بيوت', 'اخوالكم', 'او', 'بيوت', 'اخواتكم', 'او']);
-    expect(withoutRepeats(ws(`${run} ${run}`), false).map((w) => w.key)).toEqual(['بيوت', 'اخوالكم', 'او', 'بيوت', 'اخواتكم', 'او']);
+    expect(withoutRepeats(ws(run), false).map((w) => w.key)).toEqual([
+      'بيوت',
+      'اخوالكم',
+      'او',
+      'بيوت',
+      'اخواتكم',
+      'او',
+    ]);
+    expect(withoutRepeats(ws(`${run} ${run}`), false).map((w) => w.key)).toEqual([
+      'بيوت',
+      'اخوالكم',
+      'او',
+      'بيوت',
+      'اخواتكم',
+      'او',
+    ]);
   });
 });
 
@@ -219,6 +245,16 @@ describe('matchedWords', () => {
     const set = matchedWords(words, r.hits[0], r.words);
     const [from] = words.verseRange(22, 49);
     const [next] = words.verseRange(22, 50);
-    expect([...set].sort((a, b) => a - b)).toEqual([from + 1, from + 2, from + 3, from + 4, from + 5, from + 6, from + 7, next, next + 1]);
+    expect([...set].sort((a, b) => a - b)).toEqual([
+      from + 1,
+      from + 2,
+      from + 3,
+      from + 4,
+      from + 5,
+      from + 6,
+      from + 7,
+      next,
+      next + 1,
+    ]);
   });
 });

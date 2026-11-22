@@ -326,12 +326,35 @@ export async function getUser(userId?: string): Promise<FirestoreUser | null> {
 export function userUpdateFields(updates: UpdateUserInput): Record<string, unknown> {
   const fields: Record<string, unknown> = {};
   const keys = [
-    'displayName', 'dailyPageCapacity', 'scheduleMode', 'dailyJuzCount', 'smartTrackingEnabled',
-    'hasSeenSmartTrackingPreview', 'theme', 'currentMemorizationJuz', 'currentMemorizationPage',
-    'currentKhatamPage', 'customPlan', 'savedPlans', 'onboardingComplete', 'totalMemorizedPages',
-    'streak', 'lastRevisionDate', 'memorizedSurahs', 'fajrBoundaryEnabled', 'locationCoords',
-    'fajrCalculationMethod', 'scheduleAnchorDate', 'carryOverMode', 'accent', 'carryOver',
-    'scheduleShiftPages', 'translationId', 'recordingBackup', 'recordingBackupCellular', 'reciter',
+    'displayName',
+    'dailyPageCapacity',
+    'scheduleMode',
+    'dailyJuzCount',
+    'smartTrackingEnabled',
+    'hasSeenSmartTrackingPreview',
+    'theme',
+    'currentMemorizationJuz',
+    'currentMemorizationPage',
+    'currentKhatamPage',
+    'customPlan',
+    'savedPlans',
+    'onboardingComplete',
+    'totalMemorizedPages',
+    'streak',
+    'lastRevisionDate',
+    'memorizedSurahs',
+    'fajrBoundaryEnabled',
+    'locationCoords',
+    'fajrCalculationMethod',
+    'scheduleAnchorDate',
+    'carryOverMode',
+    'accent',
+    'carryOver',
+    'scheduleShiftPages',
+    'translationId',
+    'recordingBackup',
+    'recordingBackupCellular',
+    'reciter',
   ] as const;
   for (const k of keys) {
     if (updates[k] !== undefined) fields[k] = updates[k];
@@ -502,7 +525,10 @@ function onQuerySnapshot<T>(
       const fromCache = snapshot.metadata.fromCache;
       if (fromCache === lastFromCache && snapshot.docChanges().length === 0) return;
       lastFromCache = fromCache;
-      callback(snapshot.docs.map((d) => d.data() as T), { fromCache });
+      callback(
+        snapshot.docs.map((d) => d.data() as T),
+        { fromCache },
+      );
     },
     onError,
   );
@@ -526,11 +552,7 @@ export async function getAllPages(userId?: string): Promise<FirestorePage[]> {
   return snapshot.docs.map((d) => d.data() as FirestorePage);
 }
 
-export async function updatePage(
-  pageNumber: number,
-  updates: UpdatePageInput,
-  userId?: string,
-): Promise<void> {
+export async function updatePage(pageNumber: number, updates: UpdatePageInput, userId?: string): Promise<void> {
   const updateData: Record<string, unknown> = { updatedAt: serverTimestamp() };
 
   if (updates.status !== undefined) updateData.status = updates.status;
@@ -547,10 +569,7 @@ export async function updatePage(
  * Batch update multiple pages — the primary write operation used at the end
  * of a revision session. Chunks at 450 ops to stay under Firestore's limit.
  */
-export async function batchUpdatePages(
-  updates: BatchPageUpdate[],
-  userId?: string,
-): Promise<void> {
+export async function batchUpdatePages(updates: BatchPageUpdate[], userId?: string): Promise<void> {
   if (updates.length === 0) return;
 
   const uid = userId || getCurrentUserId();
@@ -623,10 +642,7 @@ export async function pagesExistOnServer(userId?: string): Promise<boolean> {
 // ============================================================================
 
 /** Create a new session keyed by date for uniqueness. */
-export async function createSession(
-  input: CreateSessionInput,
-  userId?: string,
-): Promise<FirestoreSession> {
+export async function createSession(input: CreateSessionInput, userId?: string): Promise<FirestoreSession> {
   const now = Timestamp.now();
   const sessionId = input.date;
 
@@ -650,19 +666,12 @@ export async function createSession(
   return sessionData;
 }
 
-export async function getSession(
-  sessionId: string,
-  userId?: string,
-): Promise<FirestoreSession | null> {
+export async function getSession(sessionId: string, userId?: string): Promise<FirestoreSession | null> {
   const snapshot = await getDoc(getSessionRef(sessionId, userId));
   return snapshot.exists() ? (snapshot.data() as FirestoreSession) : null;
 }
 
-export async function updateSession(
-  sessionId: string,
-  updates: UpdateSessionInput,
-  userId?: string,
-): Promise<void> {
+export async function updateSession(sessionId: string, updates: UpdateSessionInput, userId?: string): Promise<void> {
   const updateData: Record<string, unknown> = { updatedAt: serverTimestamp() };
 
   if (updates.state !== undefined) updateData.state = updates.state;
@@ -678,15 +687,8 @@ export async function updateSession(
   await updateDoc(getSessionRef(sessionId, userId), updateData);
 }
 
-export async function getRecentSessions(
-  limitCount: number = 30,
-  userId?: string,
-): Promise<FirestoreSession[]> {
-  const q = query(
-    getSessionsCollectionRef(userId),
-    orderBy('date', 'desc'),
-    limit(limitCount),
-  );
+export async function getRecentSessions(limitCount: number = 30, userId?: string): Promise<FirestoreSession[]> {
+  const q = query(getSessionsCollectionRef(userId), orderBy('date', 'desc'), limit(limitCount));
   const snapshot = await getDocs(q);
   return snapshot.docs.map((d) => d.data() as FirestoreSession);
 }
@@ -756,7 +758,9 @@ export async function deleteRevisionItem(id: string, userId?: string): Promise<v
  * only: a partial copy from the phone's memory would leave some out.
  */
 export async function getManualRevisionItems(userId: string): Promise<{ id: string; day: string; pages: number[] }[]> {
-  const snap = await getDocsFromServer(query(collection(db, 'users', userId, 'revisions'), where('source', '==', 'manual')));
+  const snap = await getDocsFromServer(
+    query(collection(db, 'users', userId, 'revisions'), where('source', '==', 'manual')),
+  );
   return snap.docs.map((d) => ({ id: d.id, day: d.data().day, pages: d.data().pages ?? [] }));
 }
 
@@ -825,7 +829,14 @@ function mergeNotes(legacy: JournalNote[], notes: JournalNote[]): JournalNote[] 
 }
 
 function noteFromFirestore(id: string, data: FirestoreJournalNote): JournalNote {
-  return { id, at: data.at, kind: data.kind, text: data.text ?? '', minutes: data.minutes ?? null, tag: data.tag ?? null };
+  return {
+    id,
+    at: data.at,
+    kind: data.kind,
+    text: data.text ?? '',
+    minutes: data.minutes ?? null,
+    tag: data.tag ?? null,
+  };
 }
 
 function noteToFirestore(note: JournalNote, uid: string, date: string): FirestoreJournalNote {
@@ -864,10 +875,7 @@ function journalDaysFrom(
 }
 
 /** Daily logs, newest day first: the days' summaries built from their timestamped notes. */
-export async function getJournalEntries(
-  limitCount: number = 400,
-  userId?: string,
-): Promise<JournalEntry[]> {
+export async function getJournalEntries(limitCount: number = 400, userId?: string): Promise<JournalEntry[]> {
   const uid = userId || getCurrentUserId();
   const [dayDocs, noteDocs] = await Promise.all([
     getDocs(query(collection(db, 'users', uid, 'journal'), orderBy('date', 'desc'), limit(limitCount))),
@@ -877,10 +885,7 @@ export async function getJournalEntries(
 }
 
 /** One day's log: its notes oldest first, null when it has none. */
-export async function getJournalEntry(
-  date: string,
-  userId?: string,
-): Promise<JournalEntry | null> {
+export async function getJournalEntry(date: string, userId?: string): Promise<JournalEntry | null> {
   const dayRef = getJournalRef(date, userId);
   const [dayDoc, noteDocs] = await Promise.all([getDoc(dayRef), getDocs(collection(dayRef, 'entries'))]);
   const legacy = dayDoc.exists() ? legacyNotesOf(dayDoc.data() as FirestoreJournalEntry, date) : [];
@@ -907,11 +912,7 @@ const EMPTY_JOURNAL_BLOCK = {
  * block into its first entry in the same transaction (the block's fields are
  * cleared, so it isn't read twice). Repeating a change gives the same result.
  */
-export async function applyJournalNote(
-  date: string,
-  change: JournalNoteChange,
-  userId?: string,
-): Promise<void> {
+export async function applyJournalNote(date: string, change: JournalNoteChange, userId?: string): Promise<void> {
   const uid = userId || getCurrentUserId();
   const dayRef = getJournalRef(date, uid);
   await runTransaction(db, async (tx) => {
@@ -984,27 +985,17 @@ function readingSessionFromFirestore(id: string, data: FirestoreReadingSession):
 }
 
 /** Most recent reading sessions, newest first. */
-export async function getReadingSessions(
-  limitCount: number = 500,
-  userId?: string,
-): Promise<ReadingSession[]> {
+export async function getReadingSessions(limitCount: number = 500, userId?: string): Promise<ReadingSession[]> {
   const q = query(getReadingSessionsRef(userId), orderBy('startedAt', 'desc'), limit(limitCount));
   const snapshot = await getDocs(q);
-  return snapshot.docs.map((d) =>
-    readingSessionFromFirestore(d.id, d.data() as FirestoreReadingSession),
-  );
+  return snapshot.docs.map((d) => readingSessionFromFirestore(d.id, d.data() as FirestoreReadingSession));
 }
 
 /** Sessions on one revision day (no ordering: sorted by the caller). */
-export async function getReadingSessionsForDay(
-  date: string,
-  userId?: string,
-): Promise<ReadingSession[]> {
+export async function getReadingSessionsForDay(date: string, userId?: string): Promise<ReadingSession[]> {
   const q = query(getReadingSessionsRef(userId), where('date', '==', date));
   const snapshot = await getDocs(q);
-  return snapshot.docs.map((d) =>
-    readingSessionFromFirestore(d.id, d.data() as FirestoreReadingSession),
-  );
+  return snapshot.docs.map((d) => readingSessionFromFirestore(d.id, d.data() as FirestoreReadingSession));
 }
 
 /**
@@ -1016,9 +1007,24 @@ export async function getActivityItemsForDay(
   day: string,
   userId?: string,
 ): Promise<{
-  revisions: { id: string; day: string; countsFor: string; pages: number[]; skipped: number[]; assigned: number[]; minutes: number | null }[];
+  revisions: {
+    id: string;
+    day: string;
+    countsFor: string;
+    pages: number[];
+    skipped: number[];
+    assigned: number[];
+    minutes: number | null;
+  }[];
   /** `updatedAt`: when the item last took minutes from an add (ms), so the same add is never counted twice. */
-  memorized: { id: string; day: string; pages: number[]; minutes?: number | null; updatedAt?: number | null; verses?: number[] }[];
+  memorized: {
+    id: string;
+    day: string;
+    pages: number[];
+    minutes?: number | null;
+    updatedAt?: number | null;
+    verses?: number[];
+  }[];
   reads: { id: string; day: string; pages: number[]; minutes: number | null; occurredAt: number | null }[];
   /** Pages revised in an earlier session, credited to this day ("done ahead"). */
   doneAhead: { fromDay: string; pages: number[] }[];
@@ -1052,7 +1058,13 @@ export async function getActivityItemsForDay(
       // Added by the ayah: its ayahs (MEM-2).
       ...(Array.isArray(d.data().verses) ? { verses: d.data().verses as number[] } : {}),
     })),
-    reads: read.docs.map((d) => ({ id: d.id, day: d.data().day, pages: d.data().pages ?? [], minutes: d.data().minutes ?? null, occurredAt: d.data().occurredAt ?? null })),
+    reads: read.docs.map((d) => ({
+      id: d.id,
+      day: d.data().day,
+      pages: d.data().pages ?? [],
+      minutes: d.data().minutes ?? null,
+      occurredAt: d.data().occurredAt ?? null,
+    })),
     doneAhead: ahead.docs
       .filter((d) => d.data().day !== day)
       .map((d) => ({ fromDay: d.data().day, pages: d.data().pages ?? [] })),
@@ -1076,7 +1088,13 @@ export async function addMemorizationPages(
   await runTransaction(db, async (tx) => {
     const snap = await tx.get(ref);
     const prev = snap.exists()
-      ? (snap.data() as { pages?: number[]; occurredAt?: number; minutes?: number | null; updatedAt?: unknown; verses?: number[] })
+      ? (snap.data() as {
+          pages?: number[];
+          occurredAt?: number;
+          minutes?: number | null;
+          updatedAt?: unknown;
+          verses?: number[];
+        })
       : null;
     const merged = [...new Set([...(prev?.pages ?? []), ...pages])].sort((a, b) => a - b);
     // The add sheet's minutes join the day's once (ACT-5): a change sent again adds nothing.
@@ -1084,7 +1102,13 @@ export async function addMemorizationPages(
     // An item keeps every ayah it was given by the ayah; whole pages added beside them bring their
     // own, so the item counts by its ayahs alone (lib/memorizedAyahs memorizedItemShare).
     const byAyah = (verses && verses.length > 0) || (prev?.verses && prev.verses.length > 0);
-    const ayahs = byAyah ? sortedAyahs([...(prev?.verses ?? []), ...(verses ?? []), ...(verses && verses.length > 0 ? [] : ayahsOfPages(pages))]) : null;
+    const ayahs = byAyah
+      ? sortedAyahs([
+          ...(prev?.verses ?? []),
+          ...(verses ?? []),
+          ...(verses && verses.length > 0 ? [] : ayahsOfPages(pages)),
+        ])
+      : null;
     tx.set(ref, {
       id: day,
       uid: userId,
@@ -1104,7 +1128,12 @@ export async function addMemorizationPages(
  * Pages un-memorized: removed from every item that holds them; an item left empty is removed. With
  * `day`, from that day's item alone (Undo of an add on the Day, ACT-7: another day's item keeps them).
  */
-export async function removeMemorizationPages(pages: number[], userId: string, verses?: number[], day?: string): Promise<void> {
+export async function removeMemorizationPages(
+  pages: number[],
+  userId: string,
+  verses?: number[],
+  day?: string,
+): Promise<void> {
   const drop = new Set(pages);
   const dropAyahs = new Set(verses ?? []);
   const items = collection(db, 'users', userId, 'memorizations');
@@ -1125,7 +1154,11 @@ export async function removeMemorizationPages(pages: number[], userId: string, v
       // An item left with no pages goes. One left with whole pages but no ayahs keeps the pages
       // (added whole before any ayah that day), as a whole-pages item.
       if (rest.length === 0) await deleteDoc(d.ref);
-      else await updateDoc(d.ref, { pages: rest, ...(ayahsChanged ? { verses: restAyahs!.length > 0 ? restAyahs : deleteField() } : {}) });
+      else
+        await updateDoc(d.ref, {
+          pages: rest,
+          ...(ayahsChanged ? { verses: restAyahs!.length > 0 ? restAyahs : deleteField() } : {}),
+        });
     }),
   );
 }
@@ -1159,7 +1192,16 @@ export async function getActivityItemsBetween(
   to: string,
   userId?: string,
 ): Promise<{
-  revisions: { id: string; day: string; countsFor: string; pages: number[]; skipped: number[]; assigned: number[]; minutes: number | null; occurredAt: number | null }[];
+  revisions: {
+    id: string;
+    day: string;
+    countsFor: string;
+    pages: number[];
+    skipped: number[];
+    assigned: number[];
+    minutes: number | null;
+    occurredAt: number | null;
+  }[];
   memorized: { id: string; day: string; pages: number[]; minutes?: number | null }[];
   reads: { id: string; day: string; pages: number[]; minutes: number | null; occurredAt: number | null }[];
 }> {
@@ -1170,43 +1212,81 @@ export async function getActivityItemsBetween(
   return {
     revisions: rev.docs.map((d) => {
       const x = d.data();
-      const occurred = x.occurredAt && typeof x.occurredAt.toMillis === 'function' ? x.occurredAt.toMillis() : typeof x.occurredAt === 'number' ? x.occurredAt : null;
-      return { id: d.id, day: x.day, countsFor: x.countsFor, pages: x.pages ?? [], skipped: x.skipped ?? [], assigned: x.assigned ?? [], minutes: x.minutes ?? null, occurredAt: occurred };
+      const occurred =
+        x.occurredAt && typeof x.occurredAt.toMillis === 'function'
+          ? x.occurredAt.toMillis()
+          : typeof x.occurredAt === 'number'
+            ? x.occurredAt
+            : null;
+      return {
+        id: d.id,
+        day: x.day,
+        countsFor: x.countsFor,
+        pages: x.pages ?? [],
+        skipped: x.skipped ?? [],
+        assigned: x.assigned ?? [],
+        minutes: x.minutes ?? null,
+        occurredAt: occurred,
+      };
     }),
-    memorized: mem.docs.map((d) => ({ id: d.id, day: d.data().day, pages: d.data().pages ?? [], minutes: d.data().minutes ?? null })),
+    memorized: mem.docs.map((d) => ({
+      id: d.id,
+      day: d.data().day,
+      pages: d.data().pages ?? [],
+      minutes: d.data().minutes ?? null,
+    })),
     reads: read.docs.map((d) => {
       const x = d.data();
-      const occurred = x.occurredAt && typeof x.occurredAt.toMillis === 'function' ? x.occurredAt.toMillis() : typeof x.occurredAt === 'number' ? x.occurredAt : null;
+      const occurred =
+        x.occurredAt && typeof x.occurredAt.toMillis === 'function'
+          ? x.occurredAt.toMillis()
+          : typeof x.occurredAt === 'number'
+            ? x.occurredAt
+            : null;
       return { id: d.id, day: x.day, pages: x.pages ?? [], minutes: x.minutes ?? null, occurredAt: occurred };
     }),
   };
 }
 
 /** Every memorization item of the account, with its ayahs when added by the ayah (deleting one, ACT-7). */
-export async function getMemorizationItems(userId: string): Promise<{ id: string; day: string; pages: number[]; verses?: number[] }[]> {
+export async function getMemorizationItems(
+  userId: string,
+): Promise<{ id: string; day: string; pages: number[]; verses?: number[] }[]> {
   const snap = await getDocs(collection(db, 'users', userId, 'memorizations'));
   return snap.docs.map((d) => {
     const data = d.data();
-    return { id: d.id, day: data.day, pages: data.pages ?? [], ...(Array.isArray(data.verses) ? { verses: data.verses as number[] } : {}) };
+    return {
+      id: d.id,
+      day: data.day,
+      pages: data.pages ?? [],
+      ...(Array.isArray(data.verses) ? { verses: data.verses as number[] } : {}),
+    };
   });
 }
 
 /** The memorization items between two revision days, inclusive (Insights' twelve months). */
-export async function getMemorizationsBetween(from: string, to: string, userId?: string): Promise<{ day: string; pages: number[]; verses?: number[] }[]> {
+export async function getMemorizationsBetween(
+  from: string,
+  to: string,
+  userId?: string,
+): Promise<{ day: string; pages: number[]; verses?: number[] }[]> {
   const uid = userId || getCurrentUserId();
-  const snap = await getDocs(query(collection(db, 'users', uid, 'memorizations'), where('day', '>=', from), where('day', '<=', to)));
+  const snap = await getDocs(
+    query(collection(db, 'users', uid, 'memorizations'), where('day', '>=', from), where('day', '<=', to)),
+  );
   // An item added by the ayah carries its ayahs (MEM-2: it counts by their share of the page).
   return snap.docs.map((d) => {
     const data = d.data();
-    return { day: data.day, pages: data.pages ?? [], ...(Array.isArray(data.verses) ? { verses: data.verses as number[] } : {}) };
+    return {
+      day: data.day,
+      pages: data.pages ?? [],
+      ...(Array.isArray(data.verses) ? { verses: data.verses as number[] } : {}),
+    };
   });
 }
 
 /** Save a finished session. Returns the new document id. */
-export async function addReadingSession(
-  session: Omit<ReadingSession, 'id'>,
-  userId?: string,
-): Promise<string> {
+export async function addReadingSession(session: Omit<ReadingSession, 'id'>, userId?: string): Promise<string> {
   const ref = await addDoc(getReadingSessionsRef(userId), {
     date: session.date,
     startedAt: Timestamp.fromMillis(session.startedAt),
@@ -1248,11 +1328,7 @@ export async function putReadingSession(
 }
 
 /** Only the page assignment is editable after the fact. */
-export async function updateReadingSessionPages(
-  sessionId: string,
-  pages: number[],
-  userId?: string,
-): Promise<void> {
+export async function updateReadingSessionPages(sessionId: string, pages: number[], userId?: string): Promise<void> {
   await updateDoc(doc(getReadingSessionsRef(userId), sessionId), {
     pages,
     updatedAt: serverTimestamp(),
@@ -1273,7 +1349,7 @@ function getUsageRef(userId?: string): DocumentReference {
 
 export async function getAppUsageSeconds(userId?: string): Promise<number> {
   const snapshot = await getDoc(getUsageRef(userId));
-  return snapshot.exists() ? (snapshot.data() as FirestoreUsageStats).appSeconds ?? 0 : 0;
+  return snapshot.exists() ? ((snapshot.data() as FirestoreUsageStats).appSeconds ?? 0) : 0;
 }
 
 /** Atomically add foreground seconds to the running total. */
@@ -1330,7 +1406,9 @@ export async function deleteAccount(): Promise<void> {
     resumeListeners();
     if (isDeadlineError(err)) {
       throw Object.assign(
-        new Error("The server didn't answer in time, so your account may not be deleted. Check your connection and try again."),
+        new Error(
+          "The server didn't answer in time, so your account may not be deleted. Check your connection and try again.",
+        ),
         { code: 'deadline-exceeded' },
       );
     }
@@ -1382,9 +1460,9 @@ export interface TesterResetResult {
 export async function resetMyDataOnServer(): Promise<TesterResetResult> {
   const user = auth.currentUser;
   if (!user) throw new Error('No signed-in user.');
-  const out = (await whileServerRewrites(user.uid, () =>
-    callFunction(user, 'resetMyData', { confirm: 'RESET' }),
-  )) as { result?: TesterResetResult } | null;
+  const out = (await whileServerRewrites(user.uid, () => callFunction(user, 'resetMyData', { confirm: 'RESET' }))) as {
+    result?: TesterResetResult;
+  } | null;
   if (!out?.result?.ok) throw new Error('The reset did not answer as expected.');
   return out.result;
 }
