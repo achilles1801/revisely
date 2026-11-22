@@ -1,8 +1,11 @@
 // Every Arabic string, one file per English file (src/i18n/README.md, "Arabic"). A key not here yet shows in
 // English. Words, voice, plurals and typography: src/i18n/ar-glossary.md.
+import { auth } from './auth';
 import { common } from './common';
 import { home } from './home';
 import { insights } from './insights';
+import { mushaf } from './mushaf';
+import { onboarding } from './onboarding';
 import { plan } from './plan';
 import { prayer } from './prayer';
 import { read } from './read';
@@ -20,9 +23,12 @@ import { verse } from './verse';
 import type { ArStrings } from './types';
 
 export const ar: ArStrings = {
+  auth,
   common,
   home,
   insights,
+  mushaf,
+  onboarding,
   plan,
   prayer,
   read,
