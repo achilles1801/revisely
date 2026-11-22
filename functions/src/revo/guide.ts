@@ -402,6 +402,17 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     ),
   },
   {
+    // RMEM-7 (Nov 22 2026; Majd, after the Tarteel analysis): Revisely Dev's until the next release brings it to the main
+    // guide (with its re-record).
+    title: 'A passage’s earlier takes, in the take’s summary',
+    covers: ['RMEM-7'],
+    routes: ['QuranReader', 'ActiveRevision'],
+    text: lines(
+      '- After a take with Mark mistakes, its summary lists their earlier takes of the same stretch, newest first, up to 5, as "This passage: your last 3 takes": a take counts when it shares at least half of its ayat with this one and this one at least half of its own (a whole-page take isn’t the history of two of its ayat). Each row says the day (“Earlier today”, “Yesterday”, a weekday, then "9 days ago", "3 weeks ago"), its score by the page and its mistakes (tajweed notes and Not clear never count), its ayat when they differ from this take’s, and whether the page was hidden. Unfinished and deleted takes aren’t listed. With no earlier take there is no such section.',
+      '- A tap on a row shows that take on its page with its marks until Done, as Show on the page does. “Your progress here” under it still opens every take of the passage with the chart.',
+    ),
+  },
+  {
     // Majd's Nov 20 2026 asks, in Revisely Dev until the next release (Not clear's line too: the store app has it, and
     // the release's re-record brings it to the main guide).
     title: 'Mistakes on a hidden page, Not clear, the mistake sound, and Your recitation',

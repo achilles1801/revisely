@@ -77,6 +77,19 @@ export const reciteMemory = {
     allLabel: '{{passage}}, {{when}}, {{score}}, {{mistakes}}',
     allLabelUnchecked: '{{passage}}, {{when}}, not checked',
   },
+  /** The summary's "This passage" rows (lib/reciteMemory/history, RMEM-7): when a take was, as a day. */
+  history: {
+    earlierToday: 'Earlier today',
+    yesterday: 'Yesterday',
+    daysAgo_one: '{{count}} day ago',
+    daysAgo_other: '{{count}} days ago',
+    weeksAgo_one: '{{count}} week ago',
+    weeksAgo_other: '{{count}} weeks ago',
+    monthsAgo_one: '{{count}} month ago',
+    monthsAgo_other: '{{count}} months ago',
+    /** A row, for VoiceOver: "Yesterday: 97.2%, Ayahs 80 to 98, 2 mistakes. Show it on the page". */
+    rowLabel: '{{when}}: {{score}}, {{detail}}. Show it on the page',
+  },
   card: {
     yours: 'Your recitation, {{when}}',
     clearNow: 'Clear now',

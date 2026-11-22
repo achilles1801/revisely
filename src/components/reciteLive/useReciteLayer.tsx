@@ -90,6 +90,7 @@ import { useRememberTake } from '../reciteMemory/useRememberTake';
 import { remember, useMemoryRecords } from '../../lib/reciteMemory/store';
 import { clearedBy, memoryOfWord, openInRange, wordMemories, type WordMemory } from '../../lib/reciteMemory/memory';
 import { passageTakes, progressLine } from '../../lib/reciteMemory/progress';
+import { historyRows, passageHistory } from '../../lib/reciteMemory/history';
 import { PassageProgressSheet } from '../reciteMemory/PassageProgressSheet';
 import { memoryId, type ClearRecord } from '../../lib/reciteMemory/record';
 import { clipOfTake, useTakeRecordings } from '../../lib/reciteMemory/takeAudio';
@@ -627,6 +628,13 @@ export function useReciteLayer({
       line: progressLine(takes, Date.now()),
     };
   }, [takeRecord, memoryRecords, qw]);
+  // The take's summary: this passage's takes before it, newest first (RMEM-7). Revisely Dev's until the next release (its
+  // Dev guide says so).
+  const historyOn = isDevVariant();
+  const summaryHistory = useMemo(
+    () => (historyOn && takeRecord && qw ? historyRows(qw, takeRecord, passageHistory(memoryRecords, takeRecord), Date.now()) : []),
+    [historyOn, takeRecord, memoryRecords, qw],
+  );
   // A passage's progress: from the summary (Done goes back to it) or a word's card.
   const [progressFor, setProgressFor] = useState<{ from: number; to: number; back: 'summary' | null } | null>(null);
   const progressTakes = useMemo(() => {
@@ -641,6 +649,19 @@ export function useReciteLayer({
   const [summaryShown, setSummaryShown] = useState<string | null>(null);
   // The score tapped during the take: what it has found so far (Majd, Nov 21 2026), the take going on.
   const [soFar, setSoFar] = useState(false);
+  // A past take from the progress page or the summary's history (RMEM-5, RMEM-7): on its page here, its marks shown until
+  // Done; a page this screen doesn't hold (a session's) opens the reader showing it.
+  const openPastTake = (t: TakeRecord) => {
+    setProgressFor(null);
+    setSummaryShown(null);
+    setSoFar(false);
+    setPastAt(null);
+    if (live.active) live.clear();
+    if (!qw) return;
+    const page = qw.pageOf(t.from);
+    if (showPage(page) !== false) setShowTakeId(t.id);
+    else openElsewhere?.({ page, showTake: t.id });
+  };
   // A new take may get the id of the one before (E2E's recorded takes all do): its summary must still show.
   useEffect(() => {
     if (live.state.status === 'connecting') {
@@ -1158,17 +1179,7 @@ export function useReciteLayer({
           takes={progressTakes}
           memories={memories}
           now={Date.now()}
-          onOpenTake={(t) => {
-            setProgressFor(null);
-            setSummaryShown(null);
-            setPastAt(null);
-            if (live.active) live.clear();
-            if (!qw) return;
-            // On its page, here; a page this screen doesn't hold (a session's) opens the reader showing it.
-            const page = qw.pageOf(t.from);
-            if (showPage(page) !== false) setShowTakeId(t.id);
-            else openElsewhere?.({ page, showTake: t.id });
-          }}
+          onOpenTake={openPastTake}
           onClose={() => {
             const back = progressFor?.back;
             setProgressFor(null);
@@ -1274,6 +1285,8 @@ export function useReciteLayer({
             setSummaryShown(null);
             setProgressFor({ from: takeRecord.from, to: takeRecord.to, back: 'summary' });
           }}
+          history={checkTake ? summaryHistory : []}
+          onPastTake={openPastTake}
           peeked={qw ? peekedByAyah(qw, peeked) : []}
           onPeeked={(w) => {
             setSummaryShown(null);

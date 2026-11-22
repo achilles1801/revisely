@@ -20,6 +20,7 @@ import { mistakesLabel } from '../../lib/reciteLive/score';
 import { CheckMark } from './ReciteMic';
 import { Sparkline } from '../reciteMemory/AccuracyChart';
 import { peekedLine } from '../../lib/reciteLive/peeked';
+import type { HistoryRow } from '../../lib/reciteMemory/history';
 import { t } from '../../i18n';
 import { chevron } from '../../i18n/direction';
 
@@ -106,6 +107,8 @@ export function TakeSummarySheet({
   before = null,
   memory = null,
   onProgress,
+  history = [],
+  onPastTake,
   peeked = [],
   onPeeked,
   onDone,
@@ -153,6 +156,13 @@ export function TakeSummarySheet({
   memory?: { cleared: string[]; trend: number[]; line: string | null } | null;
   /** "Your progress here": the passage's progress sheet. */
   onProgress?: () => void;
+  /**
+   * This passage's takes before this one, newest first, at most 5 (lib/reciteMemory/history; RMEM-7, Revisely Dev): "This
+   * passage: your last 3 takes", each row its day, score and mistakes. None: no section.
+   */
+  history?: HistoryRow[];
+  /** A row of the history was tapped: that take, shown on its page as past takes are. */
+  onPastTake?: (take: HistoryRow['take']) => void;
   /** Words shown by hand during the take, by ayah (Majd, Nov 15 2026): "3 words peeked", a row per ayah. */
   peeked?: { ayah: [number, number]; words: number[] }[];
   /** A peeked row was tapped: its first word, to show on the page. */
@@ -448,6 +458,44 @@ export function TakeSummarySheet({
           </Text>
         </View>
       ) : null}
+      {check && !during && history.length > 0 ? (
+        <View testID="take-summary-history">
+          <Text
+            style={[typeV2.name, styles.historyTitle, { color: palette.text, borderTopColor: palette.separator }]}
+            maxFontSizeMultiplier={CHROME_MAX}
+            accessibilityRole="header"
+          >
+            {t('reciteLive.summary.history', { count: history.length })}
+          </Text>
+          {history.map((row) => {
+            const color = row.level === 'good' ? palette.good : row.level === 'warn' ? palette.warn : palette.onRedSubtle;
+            return (
+              <Tap
+                key={row.take.id}
+                onPress={() => onPastTake?.(row.take)}
+                disabled={!onPastTake}
+                style={styles.historyRow}
+                accessibilityRole="button"
+                accessibilityLabel={row.label}
+                testID="take-summary-history-row"
+              >
+                <View style={styles.rowText}>
+                  <Text style={[typeV2.body, { color: palette.text }]} maxFontSizeMultiplier={CHROME_MAX}>
+                    {row.when}
+                  </Text>
+                  <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={CHROME_MAX}>
+                    {row.detail}
+                  </Text>
+                </View>
+                <Text style={[typeV2.button, typeV2.numeral, { color }]} maxFontSizeMultiplier={1.3} testID="take-summary-history-score">
+                  {row.score}
+                </Text>
+                {onPastTake ? <Ionicons name="chevron-forward" size={15} color={palette.secondary} /> : null}
+              </Tap>
+            );
+          })}
+        </View>
+      ) : null}
       {check && !during && memory?.line && onProgress ? (
         <Tap
           onPress={onProgress}
@@ -519,6 +567,8 @@ const styles = StyleSheet.create({
   putBackText: { fontSize: 14, fontWeight: '600' },
   arStacked: { alignSelf: 'flex-end', marginTop: 4 },
   cleared: { writingDirection: 'rtl', textAlign: 'right', maxWidth: '45%' },
+  historyTitle: { paddingHorizontal: layoutV2.gutter, paddingTop: 12, paddingBottom: 2, borderTopWidth: layoutV2.hairline },
+  historyRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: layoutV2.gutter, paddingVertical: 8 },
   buttons: { paddingHorizontal: layoutV2.gutter, paddingTop: 16, gap: 10 },
   recited: { alignSelf: 'center', paddingVertical: 4 },
 });

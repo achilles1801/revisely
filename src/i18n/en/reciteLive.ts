@@ -124,6 +124,9 @@ export const reciteLive = {
     cleared_one: '{{count}} cleared from the page',
     cleared_other: '{{count}} cleared from the page',
     clearedSub: 'Right on 2 different days',
+    /** The passage's earlier takes, newest first (RMEM-7): "This passage: your last 3 takes". */
+    history_one: 'This passage: your last take',
+    history_other: 'This passage: your last {{count}} takes',
     progressLabel: 'Your progress here. {{line}}',
     progress: 'Your progress here',
     seeLabel: 'See your mistakes, part of Premium',
