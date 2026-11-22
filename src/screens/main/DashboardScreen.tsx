@@ -67,7 +67,7 @@ import { reviewPagesInOrder } from '../../lib/aheadCredit';
 import { ownRevised } from '../../lib/activityItems';
 import { aheadLead, nextRevisionDayPlan } from '../../lib/aheadPlan';
 import type { HistoryItem } from '../../lib/streakFromItems';
-import { handLogsOf, loadActivityHistory, shareActivityHistory, withPendingHandLogs } from '../../lib/activityHistory';
+import { handLogsOf, loadActivityHistory, sameHistory, shareActivityHistory, withPendingHandLogs } from '../../lib/activityHistory';
 import { pendingEntries } from '../../lib/offline/outbox';
 import { todaySnapshot } from '../../lib/todaySnapshot';
 import { JumpSheet } from '../../components/home/JumpSheet';
@@ -180,31 +180,40 @@ export default function DashboardScreen() {
   // number of sessions changes, and shared with Revo (lib/activityHistory), which builds from it too.
   // Also each time Home comes back into view: pages added by hand in Activity change no session, and
   // the streak didn't move until the next session (ACT-15, Nov 2026).
+  // Coming back reads it again without rendering Home first, and a history that came back the same renders
+  // nothing: every swipe back from Read rendered all of Home twice, as the pager settled (Android froze it).
   const [history, setHistory] = useState<HistoryItem[] | null>(null);
-  const [historyKey, setHistoryKey] = useState(0);
+  const reloadHistory = useRef<() => void>(() => undefined);
   const focusedOnce = useRef(false);
   useFocusEffect(
     useCallback(() => {
-      if (focusedOnce.current) setHistoryKey((k) => k + 1);
+      if (focusedOnce.current) reloadHistory.current();
       focusedOnce.current = true;
     }, []),
   );
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
+    let latestRead = 0;
     const to = revisionDay;
     const uid = user.id;
-    loadActivityHistory(to)
-      .then((items) => {
-        if (cancelled) return;
-        setHistory(items);
-        shareActivityHistory(uid, to, items);
-      })
-      .catch(() => undefined);
+    const load = () => {
+      const read = ++latestRead;
+      loadActivityHistory(to)
+        .then((items) => {
+          if (cancelled || read !== latestRead) return;
+          setHistory((had) => (had && sameHistory(had, items) ? had : items));
+          shareActivityHistory(uid, to, items);
+        })
+        .catch(() => undefined);
+    };
+    reloadHistory.current = load;
+    load();
     return () => {
       cancelled = true;
+      reloadHistory.current = () => undefined;
     };
-  }, [user, revisionDay, logs.length, historyKey]);
+  }, [user, revisionDay, logs.length]);
 
   // Today as Home shows it (lib/todaySnapshot): its pages, how far they've got, done or not, and the
   // streak. Revo's context is built from the same function, so the two never disagree.
