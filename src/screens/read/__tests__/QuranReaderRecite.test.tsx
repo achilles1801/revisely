@@ -757,16 +757,17 @@ describe('mistakes are highlights (Majd, Nov 15 2026: “only things we should s
     await event({ type: 'said', upTo: A25 + 2 });
     await event({ type: 'at', w: A25 + 3 });
     await event({ type: 'mark', mark: { id: 'm', w: A25 + 1, ayah: [27, 25], kind: 'word', sure: 'clear', heard: 'x', heardExact: false } });
-    const runs = () =>
-      screen.queryAllByTestId('hidden-shown').map((v) => {
-        const st = flatStyle(v);
-        return { x0: (st.left as number) / 0.38, x1: ((st.left as number) + (st.width as number)) / 0.38, top: (st.top as number) / 0.38 };
-      });
-    const { pageLines } = require('../../../lib/recite/pageLines');
+    // A word shows when no cover is over its middle (the page's own ink, through the covers' openings).
     const drawn = (w: number) => {
       const r = words.rect(w);
+      const mid = ((r.x0 + r.x1) / 2) * 0.38;
+      const { pageLines } = require('../../../lib/recite/pageLines');
       const l = pageLines(379).find((x: { line: number }) => x.line === words.lineOf(w));
-      return runs().some((b) => Math.abs(b.top - l.coverTop) < 0.5 && b.x0 <= r.x0 + 0.01 && b.x1 >= r.x1 - 0.01);
+      const y = ((l.y0 + l.y1) / 2) * 0.38;
+      return !screen.queryAllByTestId('hidden-cover').some((c) => {
+        const st = flatStyle(c);
+        return (st.left as number) <= mid && mid <= (st.left as number) + (st.width as number) && (st.top as number) <= y && y <= (st.top as number) + (st.height as number);
+      });
     };
     fireEvent.press(screen.getByTestId('recite-eye'));
     const [from] = words.pageRange(379);
@@ -1013,14 +1014,73 @@ describe('a take starts anywhere on the page (Majd, Nov 14 2026)', () => {
 });
 
 describe('the hidden view (the eye on the bar)', () => {
+  // A word shows when no cover is over its middle (the page's own ink, through the covers' openings).
+  const uncovered = (w: number) => {
+    const { pageLines } = require('../../../lib/recite/pageLines');
+    const r = words.rect(w);
+    const mid = ((r.x0 + r.x1) / 2) * 0.38;
+    const l = pageLines(379).find((x: { line: number }) => x.line === words.lineOf(w));
+    const y = ((l.y0 + l.y1) / 2) * 0.38;
+    return !screen.queryAllByTestId('hidden-cover').some((c) => {
+      const st = flatStyle(c);
+      return (st.left as number) <= mid && mid <= (st.left as number) + (st.width as number) && (st.top as number) <= y && y <= (st.top as number) + (st.height as number);
+    });
+  };
+
+  it('[RECITE-20] hidden, the page is ready at once: the markers open, nothing of the page drawn again', async () => {
+    // Majd's Dev take, Nov 22 2026: "when i click the button to hide the mushaf, the page starts off blank then starts
+    // filling in the verse number bubbles one by one -- it should just appear ready from the start like it was before".
+    await open();
+    fireEvent.press(screen.getByTestId('reader-eye'));
+    const { pageLines } = require('../../../lib/recite/pageLines');
+    const covers = screen.getAllByTestId('hidden-cover').map(flatStyle);
+    for (const l of pageLines(379)) {
+      for (const [a, b] of l.markers as [number, number][]) {
+        const y = ((l.y0 + l.y1) / 2) * 0.38;
+        for (const c of covers) {
+          const inRow = (c.top as number) <= y && y <= (c.top as number) + (c.height as number);
+          const overlap = Math.min((c.left as number) + (c.width as number), b * 0.38) - Math.max(c.left as number, a * 0.38);
+          if (inRow) expect(overlap).toBeLessThanOrEqual(0);
+        }
+      }
+    }
+    // The markers and words come from the page's own image under the covers: no copy of it is waiting to load.
+    expect(screen.queryAllByTestId('hidden-marker')).toHaveLength(0);
+    expect(screen.queryAllByTestId('hidden-shown')).toHaveLength(0);
+    expect(screen.queryByTestId('live-follow-ink')).toBeNull();
+  });
+
+  it('[RECITE-21] when a take stops, the verses recited stay shown with the one revealed by hand', async () => {
+    // Majd's Dev take, Nov 22 2026: "i recited the first verse with page hidden then clicked to reveal the next verse and
+    // then ended the session ... it should show me the first two verses revealed since that's what i recited".
+    await startTake('check');
+    fireEvent.press(screen.getByTestId('recite-eye'));
+    const [, end23] = words.verseRange(27, 23);
+    await event({ type: 'said', upTo: end23 - 1 });
+    await event({ type: 'at', w: end23 });
+    fireEvent.press(screen.getByTestId('recite-whole-ayah'));
+    const [from24, end24] = words.verseRange(27, 24);
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await flush();
+    await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: end23, secs: 20, marks: [], score: null } as never });
+    // The take closed: what it recited stays, with the ayah revealed.
+    const close = screen.queryByTestId('recite-close');
+    if (close) fireEvent.press(close);
+    await flush();
+    for (const w of [A23, A23 + 3, end23 - 1, from24, end24 - 1]) expect(uncovered(w)).toBe(true);
+    // Hidden again after the take: everything hides (RECITE-21).
+    fireEvent.press(screen.queryByTestId('recite-eye') ?? screen.getByTestId('reader-eye'));
+    fireEvent.press(screen.queryByTestId('recite-eye') ?? screen.getByTestId('reader-eye'));
+    for (const w of [A23, end23 - 1, from24]) expect(uncovered(w)).toBe(false);
+  });
+
   it('covers the page; ‹ shows the next word, ‹‹ the whole ayah', async () => {
     await startTake('recite');
     fireEvent.press(screen.getByTestId('recite-eye'));
     expect(screen.getByTestId('recite-eye-group')).toBeTruthy();
     expect(screen.getByTestId('hidden-page-379')).toBeTruthy();
-    // Every line is covered, and what shows is drawn again in the page's ink (Majd, Nov 22 2026: an empty page with
-    // faint rules, the words appearing in their own ink).
-    const drawn = () => screen.queryAllByTestId('hidden-shown').length;
+    // What shows is the page's own ink through the covers' openings: the covers' total width shrinks as words show.
+    const drawn = () => -screen.queryAllByTestId('hidden-cover').reduce((n, c) => n + (flatStyle(c).width as number), 0);
     // How much of the page's lines still shows a rule (a word shown takes its stretch of rule).
     const rules = () => screen.queryAllByTestId('hidden-guide').reduce((n, r) => n + (flatStyle(r).width as number), 0);
     const [before, rulesBefore] = [drawn(), rules()];
@@ -1043,15 +1103,15 @@ describe('the hidden view (the eye on the bar)', () => {
     await startTake('recite', null);
     fireEvent.press(screen.getByTestId('recite-eye'));
     expect(screen.getByTestId('hidden-page-379')).toBeTruthy();
-    const covered = screen.getAllByTestId('hidden-cover').length;
+    const coveredWidth = screen.getAllByTestId('hidden-cover').reduce((n, c) => n + (flatStyle(c).width as number), 0);
     expect(screen.queryAllByTestId('hidden-band')).toHaveLength(0);
     expect(screen.queryAllByTestId('live-ayah-band')).toHaveLength(0);
     expect(screen.queryByTestId('live-word-box')).toBeNull();
     // Found: the words recited show in place, and still no band.
     await event({ type: 'locked', w: A23, s: 27, a: 23 });
     await event({ type: 'at', w: A23 + 3 });
-    expect(screen.getAllByTestId('hidden-cover')).toHaveLength(covered);
-    expect(screen.queryAllByTestId('hidden-shown').length).toBeGreaterThan(0);
+    const width = (cs: ReturnType<typeof screen.getAllByTestId>) => cs.reduce((n, c) => n + (flatStyle(c).width as number), 0);
+    expect(width(screen.getAllByTestId('hidden-cover'))).toBeLessThan(coveredWidth);
     expect(screen.queryAllByTestId('hidden-band')).toHaveLength(0);
   });
 

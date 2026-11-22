@@ -624,9 +624,10 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   shading each word and i like how it looks essentially like a boxed rectangle kinda that moves side to side"). (Majd,
   Nov 21 2026: Tarteel's shading "is way more elegant than ours and also seems like a blurb or splash … I also like their
   color shades its like more pastel which is what we should aim for".)
-- **RECITE-20.** (Revisely Dev) A hidden page is an empty page: a faint rule where each line's words are still hidden,
-  the ayah markers whole, and each word shown (recited, peeked, or in an ayah shown whole) appearing in place in its own
-  ink, drawn whole. During a take the newest word shown is in the following colour (green, the same as the word being
+- **RECITE-20.** (Revisely Dev) A hidden page is an empty page, ready at once when it is hidden: a faint rule where each
+  line's words are still hidden, the ayah markers whole, and each word shown (recited, peeked, or in an ayah shown whole)
+  in place in its own ink. Nothing of it fills in afterwards (Majd's Dev take, Nov 22 2026: "it should just appear ready
+  from the start like it was before"). During a take the newest word shown is in the following colour (green, the same as the word being
   said in the bar) and the words before it in the page's own ink; it moves on with each word shown, never to a word
   still covered. A word with a mark keeps its wash and the page's ink instead: the mark says more than where the reciter
   is. Mistakes' washes show on a hidden word's place as on a shown word, behind the ink. With the page shown nothing is
@@ -636,7 +637,9 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
 - **RECITE-21.** (Revisely Dev) Switched to hidden during a take, the page keeps everything behind the reciter on
   show: the words before where the take started on the page, and the words recited. Only what is ahead hides. Switched
   to hidden after a take, the page hides everything, the words recited too. The take's mistakes still show on their
-  words' places, and a tap still opens them. Stop alone changes nothing on the page. (Majd, Nov 22 2026, of Tarteel's
+  words' places, and a tap still opens them. Stop alone changes nothing on the page: when a take stops, the words it
+  recited stay shown with those shown by hand, after it is closed too, until the page is hidden again (Majd's Dev take,
+  Nov 22 2026: "it should show me the first two verses revealed since that's what i recited"). (Majd, Nov 22 2026, of Tarteel's
   smart switching: "do the same".)
 
 - **RECITE-24.** (Revisely Dev) A take's summary: a take of 2 pages or more says its mistakes per page beside the count

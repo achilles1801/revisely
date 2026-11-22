@@ -197,9 +197,12 @@ until its part is set up.
     shouldn't be an always there highlight at the top when the verses are hidden").
   - **The hidden page is drawn empty** (RECITE-20, `components/reciteLive/HiddenInkLayer`; Majd, Nov 22 2026, of
     Tarteel's: "i dont see the words being a different color as its recited with page hidden", "let's do it and test
-    it"): each line covered, a faint rule where its words are still hidden, the washes over the covers, then the markers
-    and every run of words shown drawn again from the page's image through their boxes (given by MushafPager's
-    `pageOverlay`), the newest tinted green. A word with a mark keeps its wash and the page's ink instead.
+    it"): covers over the words still hidden with a faint rule on each, leaving the markers and every run of words shown
+    open in the page's own ink (ready at once: #877 first drew them again as ~30 copies of the page image, which filled
+    in one by one), and the newest word drawn again tinted green (the one copy; the page image from MushafPager's
+    `pageOverlay`). A shown word's wash is behind the ink (`ShownWashes`), a hidden word's on its cover with no take
+    running. A word with a mark keeps its wash and the page's ink instead. When a take stops, what it recited stays shown
+    (`keepRecited`).
     - During a take nothing is drawn on a word still hidden: not the word being said, not its marks or past mistakes
       (Majd's Dev take, Nov 22 2026: they gave words away). With no take running, a hidden word's marks show on its place.
     - Switched to hidden mid-take it keeps everything behind the reciter (the page before the start too) and hides only

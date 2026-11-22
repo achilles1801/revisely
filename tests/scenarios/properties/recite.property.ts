@@ -68,7 +68,7 @@ import { runs } from './fixtures';
 import { ayahBand, cursorBox, markHighlight, wordBox } from '../../../src/lib/reciteLive/geometry';
 import { followCues, washOf, washReach } from '../../../src/lib/reciteLive/wash';
 import { followBox, hiddenInkPlan } from '../../../src/components/reciteLive/HiddenInkLayer';
-import { hiddenTakeInfo, revealedOnHide } from '../../../src/lib/reciteLive/hideSwitch';
+import { hiddenTakeInfo, keepRecited, revealedOnHide } from '../../../src/lib/reciteLive/hideSwitch';
 import { pageLines } from '../../../src/lib/recite/pageLines';
 
 const words = quranWords();
@@ -1361,42 +1361,47 @@ describe('[RECITE-20] a hidden page is drawn empty: faint rules where words are 
     });
   });
 
-  it('every line is covered; each word shown is inside a run drawn in ink on its line, each hidden word outside them; every marker is drawn whole', () => {
+  it('ready at once: covers over the words still hidden, the markers and the words shown left open in the page’s own ink; no rule under them', () => {
     fc.assert(
       fc.property(caseArb, ({ page, start, length, extra }) => {
         const shown = (w: number) => (w >= start && w < start + length) || extra.includes(w);
         const plan = hiddenInkPlan(words, page, shown);
         const lines = pageLines(page);
         expect(plan.lines.map((l) => l.line)).toEqual(lines.map((l) => l.line));
-        const runsOn = (line: number) => {
-          const l = lines.find((x) => x.line === line)!;
-          return plan.ink.filter((p) => p.kind === 'shown' && p.box.y0 === l.coverTop).map((p) => p.box);
-        };
+        const lineOf = (line: number) => lines.find((x) => x.line === line)!;
+        const coversOn = (line: number) => plan.lines.find((x) => x.line === line)!.covers;
+        const openOn = (line: number, kind: 'marker' | 'shown') =>
+          plan.open.filter((p) => p.kind === kind && p.box.y0 === lineOf(line).coverTop).map((p) => p.box);
         const [from, to] = words.pageRange(page);
         for (let w = from; w < to; w++) {
           const r = words.rect(w);
-          const runs = runsOn(words.lineOf(w));
-          if (shown(w)) expect(runs.some((b) => b.x0 <= r.x0 && b.x1 >= r.x1)).toBe(true);
-          else {
-            // A run spans only consecutive words shown, so a hidden word's middle is never in one, unless the word data
-            // puts it inside a shown word's own box (a few boxes overlap their neighbours; the fitted boxes fix those).
-            const mid = (r.x0 + r.x1) / 2;
-            const insideShownWord = (() => {
-              for (let v = from; v < to; v++) {
-                if (!shown(v) || words.lineOf(v) !== words.lineOf(w)) continue;
-                const o = words.rect(v);
-                if (o.x0 < mid && mid < o.x1) return true;
-              }
-              return false;
-            })();
-            if (!insideShownWord) expect(runs.filter((b) => b.x0 + 1 < mid && mid < b.x1 - 1)).toEqual([]);
+          const mid = (r.x0 + r.x1) / 2;
+          const line = words.lineOf(w);
+          if (shown(w)) {
+            // Open, whole: inside a run, and no cover reaches into the word.
+            expect(openOn(line, 'shown').some((b) => b.x0 <= r.x0 && b.x1 >= r.x1)).toBe(true);
+            for (const c of coversOn(line)) expect(Math.min(c.x1, r.x1) - Math.max(c.x0, r.x0)).toBeLessThanOrEqual(0);
+          } else {
+            // Hidden: its middle under a cover, unless the word data puts it inside a shown word's own box (a few boxes
+            // overlap their neighbours; the fitted boxes fix those).
+            let insideShown = false;
+            for (let v = from; v < to; v++) {
+              if (!shown(v) || words.lineOf(v) !== line) continue;
+              const o = words.rect(v);
+              if (o.x0 < mid && mid < o.x1) insideShown = true;
+            }
+            if (!insideShown) expect(coversOn(line).some((c) => c.x0 <= mid && mid <= c.x1)).toBe(true);
           }
         }
         for (const l of lines) {
-          for (const [a, b] of l.markers) expect(plan.ink.some((p) => p.kind === 'marker' && p.box.x0 <= a && p.box.x1 >= b && p.box.y0 === l.coverTop)).toBe(true);
+          // Every marker whole: open, and no cover reaches into it.
+          for (const [a, b] of l.markers) {
+            expect(openOn(l.line, 'marker').some((m) => m.x0 <= a && m.x1 >= b)).toBe(true);
+            for (const c of coversOn(l.line)) expect(Math.min(c.x1, b) - Math.max(c.x0, a)).toBeLessThanOrEqual(0);
+          }
           // The rule never runs under a word shown or a marker.
           const rules = plan.lines.find((x) => x.line === l.line)!.rules;
-          for (const box of runsOn(l.line)) for (const [a, b] of rules) expect(Math.min(b, box.x1 - 1) - Math.max(a, box.x0 + 1)).toBeLessThanOrEqual(0);
+          for (const box of openOn(l.line, 'shown')) for (const [a, b] of rules) expect(Math.min(b, box.x1 - 1) - Math.max(a, box.x0 + 1)).toBeLessThanOrEqual(0);
         }
         // The newest word's ink: its own x, its line's band.
         if (length > 0) {
@@ -1486,6 +1491,27 @@ describe('[RECITE-24] the summary: mistakes per page for a long take, Expected a
         const [a0, a1] = words.verseRange(r.sura, r.ayah);
         expect(expected.length).toBeLessThanOrEqual(Math.min(5, a1 - a0));
       }),
+    );
+  });
+});
+
+describe('[RECITE-21] when a take stops, the words it recited stay shown with those shown by hand', () => {
+  it('every word from the take’s start to the last one shown stays, and every word shown by hand', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 0, max: words.count - 40 }),
+        fc.integer({ min: 0, max: 30 }),
+        fc.uniqueArray(fc.integer({ min: 0, max: words.count - 1 }), { maxLength: 8 }),
+        (start, n, byHand) => {
+          const kept = keepRecited(new Set(byHand), start, start + n);
+          for (let w = start; w <= start + n; w++) expect(kept.has(w)).toBe(true);
+          for (const w of byHand) expect(kept.has(w)).toBe(true);
+          expect(kept.size).toBe(new Set([...byHand, ...Array.from({ length: n + 1 }, (_, i) => start + i)]).size);
+          // A take that never found its start keeps nothing more.
+          expect(keepRecited(new Set(byHand), null, null).size).toBe(new Set(byHand).size);
+        },
+      ),
+      { numRuns: runs(120) },
     );
   });
 });

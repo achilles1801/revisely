@@ -25,3 +25,15 @@ export function revealedOnHide(words: QuranWords, page: number, take: { running:
 export function hiddenTakeInfo<T extends { saidUpTo: number | null; startWord: number | null; cursor: number | null }>(info: T, hiddenAfterTake: boolean): T {
   return hiddenAfterTake ? { ...info, saidUpTo: null, startWord: null } : info;
 }
+
+/**
+ * What a page keeps shown when a take stops: what was shown by hand (`revealed`) and the words the take recited, from its
+ * start to the last word shown (Majd's Dev take, Nov 22 2026: "it should show me the first two verses revealed since
+ * that's what i recited"). They stay until the page is hidden again.
+ */
+export function keepRecited(revealed: Revealed, startWord: number | null, saidUpTo: number | null): Revealed {
+  if (startWord == null || saidUpTo == null || saidUpTo < startWord) return revealed;
+  const out = new Set(revealed);
+  for (let w = startWord; w <= saidUpTo; w++) out.add(w);
+  return out;
+}
