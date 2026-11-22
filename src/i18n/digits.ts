@@ -39,3 +39,11 @@ export function localNumeral(text: string, language: string): string {
   if (!usesArabicIndic(language)) return text;
   return localDigits(text.replace(/,/g, '٬').replace(/\./g, '٫'), language);
 }
+
+/**
+ * Digits typed in any script as 0–9, for reading what the user typed: Arabic-Indic (٠–٩) and Persian (۰–۹). A number
+ * field that keeps only 0–9 runs this first, or digits typed on an Arabic keyboard would vanish.
+ */
+export function westernDigits(text: string): string {
+  return text.replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660)).replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0));
+}

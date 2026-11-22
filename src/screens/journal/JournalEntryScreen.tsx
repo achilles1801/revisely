@@ -65,6 +65,7 @@ import type { HomeStackParamList } from '../../navigation/MainNavigator';
 import type { JournalEntry, JournalKind, JournalNote } from '../../types';
 import { JOURNAL_KIND_ICONS } from './journalKinds';
 import { t, formatTime } from '../../i18n';
+import { westernDigits } from '../../i18n/digits';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'JournalEntry'>;
 type ScreenRoute = RouteProp<HomeStackParamList, 'JournalEntry'>;
@@ -751,7 +752,7 @@ export default function JournalEntryScreen() {
                 />
                 <TextInput
                   value={draft.from ?? ''}
-                  onChangeText={(v) => setDraft({ from: v.replace(/[^0-9]/g, '') })}
+                  onChangeText={(v) => setDraft({ from: westernDigits(v).replace(/[^0-9]/g, '') })}
                   placeholder={t('journal.fromPage')}
                   placeholderTextColor={palette.secondary}
                   keyboardType="number-pad"
@@ -763,7 +764,7 @@ export default function JournalEntryScreen() {
                 />
                 <TextInput
                   value={draft.to ?? ''}
-                  onChangeText={(v) => setDraft({ to: v.replace(/[^0-9]/g, '') })}
+                  onChangeText={(v) => setDraft({ to: westernDigits(v).replace(/[^0-9]/g, '') })}
                   placeholder={t('journal.toPage')}
                   placeholderTextColor={palette.secondary}
                   keyboardType="number-pad"
@@ -894,7 +895,7 @@ function MinutesFieldV2({
     <View style={[v2.minutes, { backgroundColor: palette.fill }]}>
       <TextInput
         value={value}
-        onChangeText={(v) => onChange(v.replace(/[^0-9]/g, ''))}
+        onChangeText={(v) => onChange(westernDigits(v).replace(/[^0-9]/g, ''))}
         placeholder="0"
         placeholderTextColor={palette.secondary}
         selectionColor={palette.accentText}
