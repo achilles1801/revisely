@@ -42,6 +42,7 @@ import {
   shownUpTo,
   revealDelay,
   wordLetters,
+  guessCursor,
 } from '../../lib/reciteLive/state';
 import { stopTrace } from '../../lib/reciteLive/stopTrace';
 import {
@@ -750,7 +751,7 @@ export function useReciteLayer({
                     ? liveInfo.saidUpTo != null && liveInfo.startWord != null && liveInfo.saidUpTo >= liveInfo.startWord
                       ? liveInfo.saidUpTo
                       : null
-                    : live.state.cursor
+                    : live.state.cursor ?? guessCursor(live.state)
               }
               marks={pageMarks(page)}
               selected={cardMarks[0] ?? null}
@@ -935,7 +936,7 @@ export function useReciteLayer({
       pageAccessories,
       onTapPoint,
       extraData: liveOn
-        ? `${live.state.cursor}|${live.state.saidUpTo}|${heldCursor ?? ''}|${Object.keys(live.state.marks).length}|${hidden}|${revealed.size}|${offWord}|${veiled.length}|${showPast || pastOnCovers ? memoryRecords.length : -1}|${pastAt?.w ?? ''}|${showing ? `${shownTake?.id}:${shownTake?.marks.length}` : ''}|${shownCardAt?.w ?? ''}`
+        ? `${live.state.cursor}|${live.state.guess ?? ''}|${live.state.saidUpTo}|${heldCursor ?? ''}|${Object.keys(live.state.marks).length}|${hidden}|${revealed.size}|${offWord}|${veiled.length}|${showPast || pastOnCovers ? memoryRecords.length : -1}|${pastAt?.w ?? ''}|${showing ? `${shownTake?.id}:${shownTake?.marks.length}` : ''}|${shownCardAt?.w ?? ''}`
         : undefined,
     },
     /** The take's bar, in the footer's place while a take is open. */

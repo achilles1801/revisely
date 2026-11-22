@@ -164,6 +164,8 @@ export function startFrameFor(
     ...(mode === 'check' ? { namesAfter: true } : {}),
     ...(startBy ? { startBy } : {}),
     ...(startBy && !span && START_IN_QURAN ? { startIn: 'quran' as const } : {}),
+    // The checker's guess before it's sure (protocol 9; older checkers ignore the field).
+    ...(startBy ? { guess: true } : {}),
   };
 }
 

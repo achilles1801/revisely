@@ -38,6 +38,8 @@ export interface StartFrame {
    * for takes from the reader's mic only. A server before 7 ignores it.
    */
   startIn?: 'quran';
+  /** Protocol 9: send `guess` events before `locked` (older checkers ignore it). */
+  guess?: boolean;
 }
 
 export type ClientFrame =

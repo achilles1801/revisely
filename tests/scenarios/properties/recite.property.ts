@@ -30,6 +30,7 @@ import {
   startNotFound,
   furthestWord,
   revealedUpTo,
+  guessCursor,
   shownUpTo,
   revealDelay,
   wordLetters,
@@ -622,6 +623,43 @@ function sentStream(s: TestSocket): { samples: number[]; frames: { at: number; t
   }
   return { samples, frames };
 }
+
+describe('[RECITE-1] the guess before the lock (protocol 9) is only a cursor', () => {
+  it('never a start, cursor or said; ignored once locked, from older checkers, and cleared by the lock or a page turn', () => {
+    fc.assert(
+      fc.property(
+        fc.array(
+          fc.oneof(
+            fc.record({ type: fc.constant('guess' as const), w: fc.integer({ min: 0, max: 300 }) }),
+            fc.record({ type: fc.constant('locked' as const), w: fc.integer({ min: 0, max: 300 }), s: fc.constant(27), a: fc.constant(23) }),
+          ),
+          { maxLength: 12 },
+        ),
+        fc.constantFrom(8, 9),
+        fc.boolean(),
+        (events, protocol, seekAfter) => {
+          let state: LiveState = { ...LIVE_IDLE, status: 'listening', seeking: true, protocol };
+          let locked = false;
+          for (const e of events) {
+            const before = state;
+            state = applyEvent(state, e as never);
+            if (e.type === 'guess') {
+              expect(state.start).toBe(before.start);
+              expect(state.cursor).toBe(before.cursor);
+              expect(state.saidUpTo).toBe(before.saidUpTo);
+              if (locked || protocol < 9) expect(guessCursor(state)).toBeNull();
+              else expect(guessCursor(state)).toBe(e.w);
+            } else {
+              locked = true;
+              expect(guessCursor(state)).toBeNull();
+            }
+          }
+          if (seekAfter) expect(guessCursor(seekOnPage(state, 100))).toBeNull();
+        },
+      ),
+    );
+  });
+});
 
 describe('[RECITE-6] the word being said shows once it has been under the cursor a moment, never a word ahead', () => {
   it('held counts only for the cursor’s own word while listening, and never shows past it', () => {
