@@ -39,6 +39,12 @@ export interface CoverLine {
 
 /** Room taken off a revealed verse beside a hidden one, so no stroke of the hidden one shows. */
 const EDGE = 2;
+/**
+ * Word by word, none: a word's box is fitted to its ink with room beside it (scripts/check-word-boxes.py), so a hidden
+ * word's box already holds all of its ink. Two units more took the end of the word just recited under the next word's
+ * cover wherever the gap between them was under 4 units (Majd, Nov 21 2026: "partially cut off").
+ */
+const WORD_EDGE = 0;
 
 const onLine = (r: Rect, y0: number, y1: number) => {
   const mid = (r.y0 + r.y1) / 2;
@@ -103,7 +109,7 @@ function followedPageLayout(page: number, revealed: ReadonlySet<string>, follow:
     if (!entry) byLine.set(line, (entry = { shown: [], hidden: [] }));
     const r = words.rect(w);
     if (shown) entry.shown.push([r.x0, r.x1]);
-    else entry.hidden.push([r.x0 - EDGE, r.x1 + EDGE]);
+    else entry.hidden.push([r.x0 - WORD_EDGE, r.x1 + WORD_EDGE]);
   }
   // The band: on the next word to recite when it's on this page, else on the first hidden one.
   const nextWord = follow.next != null && follow.next >= from && follow.next < to ? follow.next : firstHidden;
