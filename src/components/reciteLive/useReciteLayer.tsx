@@ -33,7 +33,15 @@ import { premiumErrorText, setDevPremium, supportLinkUrl, usePremium } from '../
 import { claimEarlyAccess, earlyAccessShortLine, useEarlyAccess } from '../../lib/earlyAccess';
 import { checkLevel, setReciteCheckSettings, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
 import { loadQuranWords, getQuranWords, QuranWords } from '../../lib/recite/quranWords';
-import { furthestWord, isUnfinished, marksOnPage, removedMarks, startNotFound, revealedUpTo } from '../../lib/reciteLive/state';
+import {
+  furthestWord,
+  isUnfinished,
+  marksOnPage,
+  removedMarks,
+  startNotFound,
+  shownUpTo,
+  REVEAL_AFTER_MS,
+} from '../../lib/reciteLive/state';
 import { stopTrace } from '../../lib/reciteLive/stopTrace';
 import {
   barWords,
@@ -303,15 +311,27 @@ export function useReciteLayer({
   const memorized = useMemo(() => (liveOn ? memorizedAyahs(pages ?? []) : []), [liveOn, pages]);
   const testableJuz = useMemo(() => (liveOn && qw ? testJuz(memorized, qw) : []), [liveOn, qw, memorized]);
   const testPlace = test ? test.places[test.at] : null;
+  // The word under the cursor, once it has been there REVEAL_AFTER_MS while the take listens: a hidden page shows it then
+  // (Majd, Nov 22 2026: "under one second max").
+  const [heldCursor, setHeldCursor] = useState<number | null>(null);
+  const cursorNow = live.state.cursor;
+  const listeningNow = live.state.status === 'listening' && !live.paused;
+  useEffect(() => {
+    setHeldCursor(null);
+    if (cursorNow == null || !listeningNow) return;
+    const id = setTimeout(() => setHeldCursor(cursorNow), REVEAL_AFTER_MS);
+    return () => clearTimeout(id);
+  }, [cursorNow, listeningNow]);
   const liveInfo = useMemo(
     () => ({
-      // What the hidden page shows: never the word being said (RECITE-6).
-      saidUpTo: revealedUpTo(live.state),
+      // What the hidden page shows (RECITE-6): what's decided or left behind, and the word being said once it has been
+      // under the cursor REVEAL_AFTER_MS.
+      saidUpTo: shownUpTo(live.state, heldCursor),
       // Before the checker has found the start of a test's place: from the place (‹ shows its third word, not the page's first).
       startWord: live.startWord ?? testPlace?.cue[0] ?? null,
       cursor: live.state.cursor,
     }),
-    [live.state, live.startWord, testPlace],
+    [live.state, live.startWord, testPlace, heldCursor],
   );
 
   // Recite the mistakes again: what the take before found in the stretch, for its summary ("Before: …").
@@ -707,7 +727,16 @@ export function useReciteLayer({
               page={page}
               scale={scale}
               words={qw}
-              cursor={live.state.status === 'listening' ? live.state.cursor : null}
+              // A hidden page: the grey box on the newest word shown, behind its ink (the cursor's word is covered).
+              cursor={
+                live.state.status !== 'listening'
+                  ? null
+                  : hidden
+                    ? liveInfo.saidUpTo != null && liveInfo.startWord != null && liveInfo.saidUpTo >= liveInfo.startWord
+                      ? liveInfo.saidUpTo
+                      : null
+                    : live.state.cursor
+              }
               marks={pageMarks(page)}
               selected={cardMarks[0] ?? null}
               hidden={hidden}
@@ -715,7 +744,7 @@ export function useReciteLayer({
             />
           )
         : undefined,
-    [liveOn, qw, live.active, live.state, v2, cardMarks, pageMarks, hidden, markColours, showPast, pastOnPage, pastAt, isDark, showing, shownOnPage, shownCardMarks],
+    [liveOn, qw, live.active, live.state, v2, cardMarks, pageMarks, hidden, markColours, showPast, pastOnPage, pastAt, isDark, showing, shownOnPage, shownCardMarks, liveInfo],
   );
   // The next word's cover turns red while something else is being said in its slot (the checker's `off`, draft 7).
   const offWord = live.state.off?.w ?? null;
@@ -762,6 +791,8 @@ export function useReciteLayer({
                       follow: hiddenFollow(qw, revealed, liveInfo),
                       ...coverColors,
                       off: offWord != null ? { w: offWord, words: qw, colour: v2.markWord } : null,
+                      current:
+                        live.state.status === 'listening' && live.state.cursor != null ? { w: live.state.cursor, words: qw, colour: v2.followWord } : null,
                     }
                   : null
               }
@@ -770,7 +801,7 @@ export function useReciteLayer({
             />
           )
         : undefined,
-    [liveOn, qw, hidden, revealed, liveInfo, coverColors, offWord, v2, veiled, palette, coverMarksOn],
+    [liveOn, qw, hidden, revealed, liveInfo, coverColors, offWord, v2, veiled, palette, coverMarksOn, live.state.status, live.state.cursor],
   );
   // The marks as elements of their own (VoiceOver, the tests). Given whenever the live UI is on, so the pager's pages
   // keep one shape through takes.
@@ -858,7 +889,7 @@ export function useReciteLayer({
       pageAccessories,
       onTapPoint,
       extraData: liveOn
-        ? `${live.state.cursor}|${live.state.saidUpTo}|${Object.keys(live.state.marks).length}|${hidden}|${revealed.size}|${offWord}|${veiled.length}|${showPast || pastOnCovers ? memoryRecords.length : -1}|${pastAt?.w ?? ''}|${showing ? `${shownTake?.id}:${shownTake?.marks.length}` : ''}|${shownCardAt?.w ?? ''}`
+        ? `${live.state.cursor}|${live.state.saidUpTo}|${heldCursor ?? ''}|${Object.keys(live.state.marks).length}|${hidden}|${revealed.size}|${offWord}|${veiled.length}|${showPast || pastOnCovers ? memoryRecords.length : -1}|${pastAt?.w ?? ''}|${showing ? `${shownTake?.id}:${shownTake?.marks.length}` : ''}|${shownCardAt?.w ?? ''}`
         : undefined,
     },
     /** The take's bar, in the footer's place while a take is open. */
@@ -874,7 +905,7 @@ export function useReciteLayer({
           clock={live.clock}
           recording={live.recording && live.mic === 'on'}
           // A test's place, once done, says how it went in the words' place.
-          words={placeResult ? [] : barWords(live.state, qw, { check: checkTake, startWord: live.startWord, upTo: hidden ? revealedUpTo(live.state) : undefined })}
+          words={placeResult ? [] : barWords(live.state, qw, { check: checkTake, startWord: live.startWord, upTo: hidden ? liveInfo.saidUpTo : undefined })}
           status={barStatus}
           phase={barPhase}
           paused={live.paused}

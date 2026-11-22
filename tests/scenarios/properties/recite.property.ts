@@ -30,6 +30,7 @@ import {
   startNotFound,
   furthestWord,
   revealedUpTo,
+  shownUpTo,
   LIVE_IDLE,
   type LiveState,
 } from '../../../src/lib/reciteLive/state';
@@ -615,6 +616,26 @@ function sentStream(s: TestSocket): { samples: number[]; frames: { at: number; t
   }
   return { samples, frames };
 }
+
+describe('[RECITE-6] the word being said shows once it has been under the cursor a moment, never a word ahead', () => {
+  it('held counts only for the cursor’s own word while listening, and never shows past it', () => {
+    fc.assert(
+      fc.property(
+        fc.option(fc.integer({ min: 0, max: 200 }), { nil: null }),
+        fc.option(fc.integer({ min: 0, max: 200 }), { nil: null }),
+        fc.option(fc.integer({ min: 0, max: 200 }), { nil: null }),
+        fc.constantFrom('listening', 'connecting', 'checking', 'done') as fc.Arbitrary<'listening' | 'connecting' | 'checking' | 'done'>,
+        (cursor, said, held, status) => {
+          const state = { ...LIVE_IDLE, status, cursor, saidUpTo: said };
+          const shown = shownUpTo(state, held);
+          if (status === 'listening' && held != null && held === cursor) expect(shown).toBeGreaterThanOrEqual(cursor);
+          else expect(shown).toBe(revealedUpTo(state));
+          if (status === 'listening' && cursor != null && (said == null || said <= cursor)) expect(shown ?? -1).toBeLessThanOrEqual(cursor);
+        },
+      ),
+    );
+  });
+});
 
 describe('[RECITE-6] a hidden page never shows the word being said', () => {
   it('while the take runs, what may show stops before the cursor unless the checker has decided that far', () => {

@@ -98,7 +98,14 @@ export function LiveOverlay({
 }: {
   page: number;
   scale: number;
-  hidden: { follow: WordFollow; cover: string; guide: string; off?: { w: number; words: QuranWords; colour: string } | null } | null;
+  hidden: {
+    follow: WordFollow;
+    cover: string;
+    guide: string;
+    off?: { w: number; words: QuranWords; colour: string } | null;
+    /** The word being said, still covered: its cover lightly marked, so the reciter sees where they are (Majd, Nov 22 2026). */
+    current?: { w: number; words: QuranWords; colour: string } | null;
+  } | null;
   peeked?: { words: QuranWords; peeked: readonly number[]; veil: string } | null;
   /**
    * Mistakes on words the hidden page still covers (Majd, Nov 20 2026: "if I hide the page, that highlight should still
@@ -110,6 +117,10 @@ export function LiveOverlay({
   const veiled = peeked ? peeked.peeked.filter((w) => peeked.words.pageOf(w) === page) : [];
   if (!hidden && veiled.length === 0) return null;
   const off = hidden?.off && hidden.off.words.pageOf(hidden.off.w) === page && !hidden.follow.shown(hidden.off.w) ? hidden.off : null;
+  const current =
+    hidden?.current && hidden.current.words.pageOf(hidden.current.w) === page && !hidden.follow.shown(hidden.current.w) && off?.w !== hidden.current.w
+      ? hidden.current
+      : null;
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill} testID={`live-overlay-${page}`}>
       {hidden ? (
@@ -126,6 +137,9 @@ export function LiveOverlay({
             ) : null,
           )
         : null}
+      {current ? (
+        <View testID="live-cover-current" style={[styles.abs, styles.box, rectStyle(offBox(current.words, current.w), scale), { backgroundColor: current.colour }]} />
+      ) : null}
       {off ? (
         <View testID="live-off" style={[styles.abs, styles.box, rectStyle(offBox(off.words, off.w), scale), { backgroundColor: off.colour }]} />
       ) : null}

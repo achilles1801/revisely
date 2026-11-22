@@ -415,6 +415,23 @@ export function revealedUpTo(state: LiveState): number | null {
   return xs.length ? Math.max(...xs) : null;
 }
 
+/**
+ * How long the word under the cursor waits before a hidden page shows it, while the take listens (ms): Majd, Nov 22
+ * 2026, "i recite a word and honestly it should be under one second max that it shows up". The cursor reaches a word
+ * while it is being said (p95 0.13 s before its end), so this shows it about as it ends, not as it begins.
+ */
+export const REVEAL_AFTER_MS = 700;
+
+/**
+ * What a hidden page shows (RECITE-6): `revealedUpTo`, and the word under the cursor once it has been there
+ * REVEAL_AFTER_MS (`held`: that word, given by the screen's timer), while the take listens.
+ */
+export function shownUpTo(state: LiveState, held: number | null): number | null {
+  const upTo = revealedUpTo(state);
+  if (held == null || held !== state.cursor || state.status !== 'listening') return upTo;
+  return Math.max(upTo ?? -1, held);
+}
+
 /** The furthest word reached (the cursor or what's decided). */
 export function furthestWord(state: LiveState): number | null {
   const xs = [state.cursor, state.saidUpTo].filter((x): x is number => x != null);
