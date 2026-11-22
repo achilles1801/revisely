@@ -167,6 +167,8 @@ export function startFrameFor(
     ...(startBy && !span && START_IN_QURAN ? { startIn: 'quran' as const } : {}),
     // The checker's guess before it's sure (protocol 9; older checkers ignore the field).
     ...(startBy ? { guess: true } : {}),
+    // The audio 4:1 (contract "ADPCM uplink"), if the checker's `ready` agrees; Revisely Dev only until Majd's word.
+    ...(isDevVariant() ? { audio: 'adpcm' as const } : {}),
   };
 }
 

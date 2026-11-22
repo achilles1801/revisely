@@ -639,3 +639,56 @@ describe('a paused take (Nov 21 2026: the checker let a paused take go after 30 
     expect(t.closed()).toBe(0);
   });
 });
+
+describe('the audio 4:1 (contract "ADPCM uplink", Nov 22 2026)', () => {
+  const { decodeBlock } = jest.requireActual('../adpcm');
+  const ADPCM_START: StartFrame = { ...START, audio: 'adpcm' };
+  const setupAdpcm = async () => {
+    const t = setup(['tok1', 'tok2', 'tok3', 'tok4'], ADPCM_START);
+    await flush();
+    t.sockets[0].onopen!();
+    return t;
+  };
+  const isBlock = (d: string | ArrayBuffer, n: number) => typeof d !== 'string' && d.byteLength === 6 + Math.ceil((n - 1) / 2);
+
+  it('[RECITE-5] raw until ready says "adpcm"; then each frame is a block that decodes to the same number of samples', async () => {
+    const t = await setupAdpcm();
+    const s = t.sockets[0];
+    expect(s.out()[0]).toMatchObject({ audio: 'adpcm' });
+    t.conn.sendAudio(new Int16Array(1600).fill(100)); // held before ready
+    s.answer({ type: 'ready', v: 2, take: 'k', from: 0, audio: 'adpcm' });
+    const held = s.sent[1];
+    expect(isBlock(held, 1600)).toBe(true);
+    expect(decodeBlock(held as ArrayBuffer).length).toBe(1600);
+    t.conn.sendAudio(new Int16Array(1600).fill(-50));
+    expect(isBlock(s.sent[s.sent.length - 1], 1600)).toBe(true);
+  });
+
+  it('a checker that doesn’t answer "adpcm" gets raw audio, and so does a resume onto one', async () => {
+    const t = await setupAdpcm();
+    const s1 = t.sockets[0];
+    s1.answer({ type: 'ready', v: 2, take: 'k', from: 0, audio: 'adpcm' });
+    t.conn.sendAudio(new Int16Array(1600));
+    s1.onclose!({ code: 1006 });
+    t.runTimer();
+    await flush();
+    const s2 = t.sockets[1];
+    s2.onopen!();
+    s2.answer({ type: 'ready', v: 2, take: 'k', from: 0 });
+    // The held audio goes again, raw (3,200 bytes for 1,600 samples).
+    const frames = s2.sent.slice(1).filter((d) => typeof d !== 'string');
+    expect(frames.length).toBeGreaterThan(0);
+    for (const f of frames) expect((f as ArrayBuffer).byteLength % 2).toBe(0);
+    expect(frames.reduce((n, f) => n + (f as ArrayBuffer).byteLength, 0)).toBe(3200);
+  });
+
+  it('a start frame that didn’t ask gets raw audio even if the checker says "adpcm"', async () => {
+    const t = setup();
+    await flush();
+    const s = t.sockets[0];
+    s.onopen!();
+    s.answer({ type: 'ready', v: 2, take: 'k', from: 0, audio: 'adpcm' });
+    t.conn.sendAudio(new Int16Array(1600));
+    expect((s.sent[s.sent.length - 1] as ArrayBuffer).byteLength).toBe(3200);
+  });
+});

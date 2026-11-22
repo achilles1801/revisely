@@ -1277,3 +1277,22 @@ describe('[RECITE-19] highlights are soft washes wider than their word; with the
     );
   });
 });
+
+describe('[RECITE-5] the audio 4:1: any block decodes to its own length, its first sample exact, a quarter of the bytes', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { encodeBlock, decodeBlock } = require('../../../src/lib/reciteLive/adpcm');
+  it('for any samples and starting step index', () => {
+    fc.assert(
+      fc.property(fc.array(fc.integer({ min: -32768, max: 32767 }), { minLength: 1, maxLength: 4000 }), fc.integer({ min: 0, max: 88 }), (xs, index) => {
+        const pcm = Int16Array.from(xs);
+        const { block, index: end } = encodeBlock(pcm, index);
+        expect(block.byteLength).toBe(6 + Math.ceil((pcm.length - 1) / 2));
+        const out = decodeBlock(block);
+        expect(out.length).toBe(pcm.length);
+        expect(out[0]).toBe(pcm[0]);
+        expect(end).toBeGreaterThanOrEqual(0);
+        expect(end).toBeLessThanOrEqual(88);
+      }),
+    );
+  });
+});
