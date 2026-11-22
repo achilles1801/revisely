@@ -10,8 +10,8 @@ import { RevoMark } from '../revo/RevoMark';
 import { useRevoPresent } from '../../lib/revo/presence';
 import { openRevo } from '../../lib/revo/open';
 import {
-  HELP,
   helpPlainText,
+  helpTitle,
   helpTextParts,
   linksFor,
   topicsFor,
@@ -112,7 +112,6 @@ export function HelpSheet({
   useEffect(() => {
     if (visible) setShown(screen);
   }, [visible, screen]);
-  const entry = HELP[shown];
   const opts = {
     smartTracking: user?.smartTrackingEnabled === true,
     liveRecite: liveRecite ?? reciteLiveForAccount(user),
@@ -141,7 +140,7 @@ export function HelpSheet({
     <Sheet
       visible={visible}
       onClose={onClose}
-      title={entry.title}
+      title={helpTitle(shown)}
       scroll
       onHidden={runPending}
       footer={{ label: t('common.done'), onPress: onClose, testID: 'help-done' }}
@@ -160,7 +159,7 @@ export function HelpSheet({
             testID={`help-link-${to}`}
           >
             <Text style={[typeV2.name, styles.linkText, { color: palette.link }]} maxFontSizeMultiplier={CHROME_MAX_SCALE}>
-              {HELP[to].title}
+              {helpTitle(to)}
             </Text>
             <Ionicons name="chevron-forward" size={14} color={palette.link} />
           </Tap>
