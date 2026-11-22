@@ -10,6 +10,7 @@ import type { LiveEvent } from '../../../lib/reciteLive/contract';
 import { STOP_TRACE_KEY } from '../../../lib/reciteLive/stopTrace';
 import { versesOnPage } from '../../../lib/ayahBounds';
 import { paletteV2 } from '../../../theme/v2';
+import { harakatClip } from '../../../../jest/arabicLines';
 import { setMistakeDetectionReleasedForTests } from '../../../lib/release/mistakeDetection';
 
 // The release's switch is the kill switch: these tests run with it as each says, and back to as it ships.
@@ -344,10 +345,10 @@ describe("Recite's memory on the page", () => {
     // The card is modal for VoiceOver, so the page behind it counts as hidden.
     expect(screen.getByTestId('past-highlight-word-picked', { includeHiddenElements: true })).toBeTruthy();
     expect(screen.getAllByTestId('past-try-wrong')).toHaveLength(1);
-    // What was said, on the mark's highlight (WordChip: no fixed lineHeight, so its harakat aren't cut off).
+    // What was said, on the mark's highlight (WordChip: a line that holds every haraka, so none is cut off).
     const heard = screen.getByTestId('past-try-heard');
     expect(flatStyle(heard).backgroundColor).toBe(flatStyle(screen.getByTestId('past-card-swatch-word')).backgroundColor);
-    expect(flatStyle(screen.getByText('وَأُوهِيَتْ')).lineHeight).toBeUndefined();
+    expect(harakatClip(screen.getByText('وَأُوهِيَتْ').props.style)).toBeNull();
     expect(screen.getByText('Say it right on 2 different days to clear it.')).toBeTruthy();
     // ▶ plays your voice there, cut from that take's recording on the phone.
     fireEvent.press(screen.getByTestId('past-try-play'));

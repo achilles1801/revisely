@@ -5,18 +5,19 @@ import React from 'react';
 import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
-import { arabicV2, layoutV2, typeV2 } from '../../theme/v2';
+import { arabicFullV2, layoutV2, typeV2 } from '../../theme/v2';
 import { Tap } from '../v2/Tap';
 import type { PhrasePart } from '../../lib/reciteLive/describe';
 
 /**
  * An Arabic phrase with the mark's word highlighted, as on the page (Majd, Nov 15 2026: highlights, no coloured text):
  * what was recited on the mark's colour, what was expected on a quiet grey, a skipped word's gap on the mark's colour.
+ * Each line is tall enough for every haraka (arabicFullV2), so the highlights cover the marks too.
  */
 export function Phrase({ parts, fill }: { parts: PhrasePart[]; fill: string }) {
   const { palette } = useTheme();
   return (
-    <Text style={[arabicV2(21), styles.ar, { color: palette.text }]} maxFontSizeMultiplier={1.6}>
+    <Text style={[arabicFullV2(21), styles.ar, { color: palette.text }]} maxFontSizeMultiplier={1.6}>
       {parts.map((p, i) => (
         <Text key={i}>
           {i > 0 ? ' ' : ''}

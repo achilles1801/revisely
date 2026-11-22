@@ -544,9 +544,63 @@ export const typeV2 = t({
   numeral: { fontVariant: ['tabular-nums'] },
 });
 
-/** Arabic text in Amiri: a little larger than the Latin beside it, with room for its marks. */
+/**
+ * Arabic text in Amiri: a little larger than the Latin beside it. Its 1.6× line is shorter than the font's own, so
+ * iOS cuts the top of the line: harakat above the letters clip (a fatha needs 1.04× above the baseline; this line
+ * leaves 0.97×). Fine for a surah's name; Qur'an words and anything voweled use arabicFullV2.
+ */
 export function arabicV2(size: number): TextStyle {
   return { fontFamily: fontsV2.arabic, fontSize: size, lineHeight: Math.round(size * 1.6) };
+}
+
+/**
+ * Amiri's own line, as fractions of the font size: the ascender and descender of its hhea table (unitsPerEm 1000),
+ * which both platforms build a line from. arabicLines.test reads them from assets/fonts/Amiri-Regular.ttf.
+ */
+export const AMIRI_LINE = { ascent: 1.124, descent: 0.634 } as const;
+
+/**
+ * How far voweled Amiri's ink reaches from the baseline, as fractions of the font size: the highest and the lowest of
+ * every word of the Qur'an, shaped by CoreText (`swift scripts/measure-amiri-ink.swift`, Nov 22 2026: ظَمَأٌۭ reaches
+ * 1.481 above, عَظِيمٌۭ 0.950 below). Half of all words reach past the font's own ascent: stacked marks (a shadda and
+ * its haraka over a lam, dammatan on a hamza over an alif) sit higher than the line the font declares.
+ */
+export const AMIRI_INK = { above: 1.481, below: 0.95 } as const;
+
+/** Room beyond the measured ink, for Android's shaping and pixel rounding (a fraction of the font size). */
+const INK_MARGIN = 0.02;
+
+/**
+ * A line taller than the font's own gets half the extra above the ascent and half below the descent, on iOS
+ * (RCTApplyBaselineOffset) and Android (CustomLineHeightSpan) alike, React Native 0.81. So the line that holds the ink
+ * adds twice the larger overshoot to the font's own line: 2.51× the font size.
+ */
+export const ARABIC_FULL_LINE =
+  AMIRI_LINE.ascent +
+  AMIRI_LINE.descent +
+  2 * (Math.max(AMIRI_INK.above - AMIRI_LINE.ascent, AMIRI_INK.below - AMIRI_LINE.descent) + INK_MARGIN);
+
+/**
+ * Voweled Arabic in Amiri that never clips (Majd, Nov 22 2026: on a mistake's card "u cant even see if theres a dumma
+ * or fatha on the top"): every line tall enough for every haraka above and below, on iOS and Android. A highlight
+ * behind a word (a nested Text's background) fills the line, so it covers the marks too. The line grows with the text
+ * size, as the font does. Use it for Qur'an words, phrases and anything with harakat.
+ */
+export function arabicFullV2(size: number): TextStyle {
+  return { fontFamily: fontsV2.arabic, fontSize: size, lineHeight: Math.ceil(size * ARABIC_FULL_LINE) };
+}
+
+/**
+ * Room above and below the baseline in a line of Amiri `lineHeight` tall, as React Native 0.81 lays it out: a taller
+ * line than the font's own is centred on both platforms; a shorter one loses its top on iOS (TextKit keeps the
+ * descent) and half from each end on Android, so the smaller of the two.
+ */
+export function amiriRoom(fontSize: number, lineHeight: number): { above: number; below: number } {
+  const ascent = AMIRI_LINE.ascent * fontSize;
+  const descent = AMIRI_LINE.descent * fontSize;
+  const half = (lineHeight - ascent - descent) / 2;
+  if (half >= 0) return { above: ascent + half, below: descent + half };
+  return { above: Math.min(lineHeight - descent, ascent + half), below: descent + half };
 }
 
 /** Avatar-size marks: a top-level row, a reply, a nested reply. */

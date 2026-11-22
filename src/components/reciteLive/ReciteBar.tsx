@@ -3,12 +3,22 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { TakeClock, useTakeSeconds } from '../../lib/reciteLive/takeClock';
-import { arabicV2, typeV2 } from '../../theme/v2';
+import { arabicFullV2, typeV2 } from '../../theme/v2';
 import { Tap } from '../v2/Tap';
 import type { BarWord } from '../../lib/reciteLive/view';
 import type { ScoreLevel } from '../../lib/reciteLive/score';
 import { CAPSULE_HEIGHT } from '../reader/PlayerCapsule';
 import { t } from '../../i18n';
+
+/** The capsule's height inside its hairline border (at most half a point each side, on any screen). */
+export const BAR_ROOM = CAPSULE_HEIGHT - 1;
+/**
+ * The words heard, every haraka whole (arabicFullV2): a 51 pt line inside the 52 pt capsule's border, which clips what
+ * overflows it. So they grow with the text size only as far as the capsule holds them (at 20 pt, not at all), as the
+ * bar itself doesn't grow; VoiceOver and TalkBack read them in full.
+ */
+export const BAR_WORDS = arabicFullV2(20);
+export const BAR_WORDS_MAX_SCALE = Math.max(1, BAR_ROOM / (BAR_WORDS.lineHeight as number));
 
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
@@ -207,7 +217,7 @@ export function ReciteBar({
           </Text>
         </View>
         {shownWords.length ? (
-          <Text style={[arabicV2(20), styles.words]} numberOfLines={1} maxFontSizeMultiplier={1.3} testID="recite-words">
+          <Text style={[BAR_WORDS, styles.words]} numberOfLines={1} maxFontSizeMultiplier={BAR_WORDS_MAX_SCALE} testID="recite-words">
             {shownWords.map((w, i) => (
               <Text
                 key={w.w}

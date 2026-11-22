@@ -2,7 +2,7 @@ import React from 'react';
 import { AccessibilityInfo, Alert, Platform, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
-import { arabicV2, layoutV2, typeV2 } from '../../theme/v2';
+import { arabicFullV2, layoutV2, typeV2 } from '../../theme/v2';
 import { Sheet } from '../v2/Sheet';
 import { ActionSheet } from '../v2/ActionSheet';
 import { PillButton } from '../v2/PillButton';
@@ -325,7 +325,7 @@ export function TakeSummarySheet({
             const place = findingPlace(m, manySurahs);
             const arabic = (
               <View style={[styles.arWrap, { backgroundColor: fill }, stacked && styles.arStacked]} testID="take-summary-finding-highlight">
-                <Text style={[arabicV2(21), { color: palette.text }]} maxFontSizeMultiplier={ARABIC_MAX} testID="take-summary-finding-arabic">
+                <Text style={[arabicFullV2(21), { color: palette.text }]} maxFontSizeMultiplier={ARABIC_MAX} testID="take-summary-finding-arabic">
                   {words.uthmani(m.w)}
                 </Text>
               </View>
@@ -376,13 +376,13 @@ export function TakeSummarySheet({
                     {t('reciteLive.summary.peekedTitle', { place })}
                   </Text>
                   {stacked ? (
-                    <Text style={[arabicV2(21), { color: palette.secondary }]} maxFontSizeMultiplier={ARABIC_MAX} accessibilityLanguage="ar">
+                    <Text style={[arabicFullV2(21), { color: palette.secondary }]} maxFontSizeMultiplier={ARABIC_MAX} accessibilityLanguage="ar">
                       {arabic}
                     </Text>
                   ) : null}
                 </View>
                 {stacked ? null : (
-                  <Text style={[arabicV2(21), styles.peekedArabic, { color: palette.secondary }]} numberOfLines={1} maxFontSizeMultiplier={ARABIC_MAX} accessibilityLanguage="ar">
+                  <Text style={[arabicFullV2(21), styles.peekedArabic, { color: palette.secondary }]} numberOfLines={1} maxFontSizeMultiplier={ARABIC_MAX} accessibilityLanguage="ar">
                     {arabic}
                   </Text>
                 )}
@@ -443,7 +443,7 @@ export function TakeSummarySheet({
               {t('reciteLive.summary.clearedSub')}
             </Text>
           </View>
-          <Text style={[arabicV2(20), styles.cleared, { color: palette.text }]} maxFontSizeMultiplier={ARABIC_MAX} numberOfLines={2}>
+          <Text style={[arabicFullV2(20), styles.cleared, { color: palette.text }]} maxFontSizeMultiplier={ARABIC_MAX} numberOfLines={2}>
             {memory.cleared.join(' ')}
           </Text>
         </View>

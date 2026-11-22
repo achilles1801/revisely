@@ -3,7 +3,7 @@ import { LayoutChangeEvent, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
-import { arabicV2, layoutV2, typeV2 } from '../../theme/v2';
+import { arabicFullV2, layoutV2, typeV2 } from '../../theme/v2';
 import { Tap } from '../v2/Tap';
 import { Box, placeMenu } from '../verse/menuPlacement';
 import type { QuranWords } from '../../lib/recite/quranWords';
@@ -68,7 +68,7 @@ export function MarkBlock({
             ) : null}
           </View>
           <View style={[styles.arWrap, { backgroundColor: fill }]}>
-            <Text style={[arabicV2(24), { color: palette.text }]} maxFontSizeMultiplier={1.6}>
+            <Text style={[arabicFullV2(24), { color: palette.text }]} maxFontSizeMultiplier={1.6}>
               {words.uthmani(mark.w)}
             </Text>
           </View>

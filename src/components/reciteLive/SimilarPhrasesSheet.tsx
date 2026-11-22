@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
-import { arabicV2, layoutV2, markV2, typeV2 } from '../../theme/v2';
+import { arabicFullV2, layoutV2, markV2, typeV2 } from '../../theme/v2';
 import { Sheet } from '../v2/Sheet';
 import { Tap } from '../v2/Tap';
 import { surahName } from '../../lib/passages';
@@ -66,7 +66,7 @@ export function SimilarPhrasesSheet({
             <View style={styles.spacer} />
             <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
           </View>
-          <Text style={[arabicV2(21), styles.ar]}>
+          <Text style={[arabicFullV2(21), styles.ar]}>
             {Array.from({ length: to - from }, (_, i) => from + i).map((x, i) => (
               <Text key={x} style={{ color: x === w ? palette.followInk : same.has(x) ? palette.text : palette.secondary }}>
                 {i > 0 ? ' ' : ''}
