@@ -15,7 +15,7 @@ import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { typeV2 } from '../../theme/v2';
 import { t } from '../../i18n';
-import { chevron } from '../../i18n/direction';
+import { chevron, forwardIcon } from '../../i18n/direction';
 import { ChromeText, STACK_AT_SCALE } from './ChromeText';
 import { Tap } from '../v2/Tap';
 import {
@@ -214,7 +214,7 @@ function Gaps({ view, all, firstDay, onOpenDay, onOpenCalendar, pushBack, onOpen
             <ChromeText style={[typeV2.name, { color: palette.text }]}>{revision.title}</ChromeText>
             <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{revision.detail}</ChromeText>
           </View>
-          {onOpenLastRevised ? <Ionicons name="chevron-forward" size={16} color={palette.secondary} style={styles.revisionChevron} /> : null}
+          {onOpenLastRevised ? <Ionicons name={forwardIcon()} size={16} color={palette.secondary} style={styles.revisionChevron} /> : null}
         </Tap>
       ) : null}
 
@@ -230,7 +230,7 @@ function Gaps({ view, all, firstDay, onOpenDay, onOpenCalendar, pushBack, onOpen
           <ChromeText style={[typeV2.name, styles.linkText, { color: palette.link }]} maxFontSizeMultiplier={1.4}>
             {t('insights.lastRevised.link')}
           </ChromeText>
-          <Ionicons name="chevron-forward" size={16} color={palette.link} />
+          <Ionicons name={forwardIcon()} size={16} color={palette.link} />
         </Tap>
       ) : null}
     </View>

@@ -22,6 +22,7 @@ import { reciteLiveForAccount } from '../../lib/reciteLive/availability';
 import { gapsInsightsEnabled } from '../../lib/insightsGaps';
 import { activitySectionsEnabled } from '../../lib/activitySections';
 import { t } from '../../i18n';
+import { forwardIcon } from '../../i18n/direction';
 
 /** Past this text size the topics' marks drop out, so the words get the width (beside 46pt text they were specks). */
 export const MARKS_UP_TO = 1.6;
@@ -161,7 +162,7 @@ export function HelpSheet({
             <Text style={[typeV2.name, styles.linkText, { color: palette.link }]} maxFontSizeMultiplier={CHROME_MAX_SCALE}>
               {helpTitle(to)}
             </Text>
-            <Ionicons name="chevron-forward" size={14} color={palette.link} />
+            <Ionicons name={forwardIcon()} size={14} color={palette.link} />
           </Tap>
         ))}
         {revo ? (
@@ -171,7 +172,7 @@ export function HelpSheet({
               <Text style={[typeV2.name, { color: palette.link }]} maxFontSizeMultiplier={CHROME_MAX_SCALE}>
                 {t('help.askRevo')}
               </Text>
-              <Ionicons name="chevron-forward" size={14} color={palette.link} />
+              <Ionicons name={forwardIcon()} size={14} color={palette.link} />
             </View>
           </Tap>
         ) : null}

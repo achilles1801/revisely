@@ -27,6 +27,7 @@ import { strictOffered } from '../../lib/reciteCheck/settings';
 import type { QuranWords } from '../../lib/recite/quranWords';
 import type { Mark, MarkKind } from '../../lib/reciteLive/contract';
 import DEMO_TAKE from '../../data/whatsNewTake.json';
+import { forwardIcon } from '../../i18n/direction';
 
 /** The words the pictures show, as the screens they're drawn from show them (pictures.test.ts). */
 export const PICTURE_WORDS = {
@@ -154,7 +155,7 @@ function ElsewherePicture() {
                 {sub}
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color={palette.secondary} />
+            <Ionicons name={forwardIcon()} size={18} color={palette.secondary} />
           </View>
         ))}
       </View>

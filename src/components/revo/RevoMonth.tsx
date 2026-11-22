@@ -14,6 +14,7 @@ import { typeV2 } from '../../theme/v2';
 import { BlockMark, RevisedMark } from '../activity/BlockMark';
 import { Tap } from '../v2/Tap';
 import { t, dayMonth } from '../../i18n';
+import { forwardIcon, backIcon } from '../../i18n/direction';
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const DISC = 34;
@@ -90,7 +91,7 @@ export function RevoMonth({
         <Text style={[styles.title, { color: palette.text }]}>{monthTitle(month)}</Text>
         <View style={styles.chevrons}>
           <Tap onPress={() => setMonth((m) => shiftMonth(m, -1))} accessibilityRole="button" accessibilityLabel={t('revo.month.previous')} hitSlop={8} testID="revo-add-month-prev">
-            <Ionicons name="chevron-back" size={21} color={palette.text} />
+            <Ionicons name={backIcon()} size={21} color={palette.text} />
           </Tap>
           <Tap
             onPress={() => setMonth((m) => (m < today.slice(0, 7) ? shiftMonth(m, 1) : m))}
@@ -99,7 +100,7 @@ export function RevoMonth({
             hitSlop={8}
             testID="revo-add-month-next"
           >
-            <Ionicons name="chevron-forward" size={21} color={month < today.slice(0, 7) ? palette.text : palette.separator} />
+            <Ionicons name={forwardIcon()} size={21} color={month < today.slice(0, 7) ? palette.text : palette.separator} />
           </Tap>
         </View>
       </View>

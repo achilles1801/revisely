@@ -51,6 +51,7 @@ import {
   type LastRevisedView,
   type PageRecency,
 } from '../../lib/lastRevised';
+import { forwardIcon } from '../../i18n/direction';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'LastRevised'>;
 
@@ -365,7 +366,7 @@ function PageLine({
           </Text>
           <Text style={[typeV2.meta, styles.when, { color: palette.secondary }]}>{when}</Text>
         </View>
-        <Ionicons name="chevron-forward" size={14} color={palette.secondary} />
+        <Ionicons name={forwardIcon()} size={14} color={palette.secondary} />
       </Tap>
       {!thread || last ? <View style={{ height: layoutV2.hairline, backgroundColor: palette.separator }} /> : null}
     </View>

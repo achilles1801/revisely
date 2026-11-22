@@ -12,6 +12,7 @@ import { RevoMark } from './RevoMark';
 import { RevoSubHeader } from './RevoParts';
 import { t, formatDate } from '../../i18n';
 import { openWebPage } from '../../lib/openWebPage';
+import { forwardIcon } from '../../i18n/direction';
 
 export const REVO_PRIVACY_URL = 'https://revisely.app/privacy/#revo';
 
@@ -78,7 +79,7 @@ export function RevoHistory({
                   </Text>
                   <Text style={[styles.rowLine, { color: palette.secondary }]}>{historyLine(c)}</Text>
                 </View>
-                <Ionicons name="chevron-forward" size={18} color={palette.secondary} />
+                <Ionicons name={forwardIcon()} size={18} color={palette.secondary} />
               </Tap>
             ))}
           </View>

@@ -22,6 +22,7 @@ import { typeV2 } from '../../theme/v2';
 import { PillTabs } from '../v2/PillTabs';
 import { Tap } from '../v2/Tap';
 import { t } from '../../i18n';
+import { forwardIcon, backIcon } from '../../i18n/direction';
 
 export type CalendarRange = 'month' | 'week';
 
@@ -90,7 +91,7 @@ export function ActivityCalendar({
   return (
     <View testID="activity-calendar">
       <View style={styles.header}>
-        <StepButton icon="chevron-back" label={unit === 'week' ? t('activity.calendar.previousWeek') : t('activity.calendar.previousMonth')} disabled={!canBack} onPress={() => step(-1)} />
+        <StepButton icon={backIcon()} label={unit === 'week' ? t('activity.calendar.previousWeek') : t('activity.calendar.previousMonth')} disabled={!canBack} onPress={() => step(-1)} />
         <Text
           style={[typeV2.barTitle, styles.title, { color: palette.text }]}
           accessibilityRole="header"
@@ -100,7 +101,7 @@ export function ActivityCalendar({
         >
           {isMonth ? monthTitle(month) : weekTitle(weekStart(anchor), today)}
         </Text>
-        <StepButton icon="chevron-forward" label={unit === 'week' ? t('activity.calendar.nextWeek') : t('activity.calendar.nextMonth')} disabled={!canForward} onPress={() => step(1)} />
+        <StepButton icon={forwardIcon()} label={unit === 'week' ? t('activity.calendar.nextWeek') : t('activity.calendar.nextMonth')} disabled={!canForward} onPress={() => step(1)} />
         <View style={styles.spacer} />
         <View style={styles.tabs}>
           <PillTabs<CalendarRange>
@@ -290,7 +291,7 @@ function WeekRow({
           </Text>
         ) : null}
       </View>
-      {facts.length > 0 ? <Ionicons name="chevron-forward" size={16} color={palette.secondary} /> : null}
+      {facts.length > 0 ? <Ionicons name={forwardIcon()} size={16} color={palette.secondary} /> : null}
     </>
   );
   if (facts.length === 0) {
@@ -362,7 +363,7 @@ function DayLine({
           testID="heat-day-line"
         >
           {text}
-          <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
+          <Ionicons name={forwardIcon()} size={16} color={palette.secondary} />
         </Tap>
       ) : (
         <View style={styles.line} testID="heat-day-line">

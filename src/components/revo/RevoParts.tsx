@@ -7,6 +7,7 @@ import { useReduceMotion } from '../../design/motion';
 import { Tap } from '../v2/Tap';
 import { RevoMark } from './RevoMark';
 import { t, formatTime } from '../../i18n';
+import { forwardIcon, backIcon } from '../../i18n/direction';
 
 /** Revo's header: the "Revo" capsule, then History and Memory. */
 export function RevoHeader({ onHistory, onMemory }: { onHistory: () => void; onMemory: () => void }) {
@@ -48,7 +49,7 @@ export function RevoSubHeader({
   return (
     <View style={styles.subHeader}>
       <Tap onPress={onBack} hitSlop={10} style={styles.side} accessibilityRole="button" accessibilityLabel={t('common.back')} testID="revo-back">
-        <Ionicons name="chevron-back" size={26} color={palette.text} />
+        <Ionicons name={backIcon()} size={26} color={palette.text} />
       </Tap>
       <Text style={[styles.subTitle, { color: palette.text }]} accessibilityRole="header" maxFontSizeMultiplier={1.3}>
         {title}
@@ -234,7 +235,7 @@ export function ReviewRow({ at, onOpen }: { at: number; onOpen: () => void }) {
           {time}
         </Text>
       </View>
-      <Ionicons name="chevron-forward" size={18} color={palette.secondary} />
+      <Ionicons name={forwardIcon()} size={18} color={palette.secondary} />
     </Tap>
   );
 }

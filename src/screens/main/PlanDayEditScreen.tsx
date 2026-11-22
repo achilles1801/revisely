@@ -46,6 +46,7 @@ import { useRevisionDay } from '../../hooks/useRevisionDay';
 import { arabicLabelLines } from '../../lib/platformUi';
 import { revisablePages } from '../../lib/memorizedAyahs';
 import { t } from '../../i18n';
+import { backIcon } from '../../i18n/direction';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'PlanDayEdit'>;
 type RouteProps = RouteProp<HomeStackParamList, 'PlanDayEdit'>;
@@ -256,7 +257,7 @@ export default function PlanDayEditScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
       <TopBar
         left={
-          <IconButton icon="chevron-back" onPress={commit} label={t('plan.day.back')} size={26} testID="back" />
+          <IconButton icon={backIcon()} onPress={commit} label={t('plan.day.back')} size={26} testID="back" />
         }
         title={title}
         separator

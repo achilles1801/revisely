@@ -87,7 +87,7 @@ import {
   type InsightsRange,
 } from '../../lib/insightsRange';
 import { t } from '../../i18n';
-import { chevron } from '../../i18n/direction';
+import { chevron, forwardIcon } from '../../i18n/direction';
 
 /** Consistency's weeks grid: the gap between cells, and the largest a cell gets (3 months on a wide phone). */
 const GRID_GAP = 3;
@@ -800,7 +800,7 @@ function UncoveredLine({ row, separator, onPress }: { row: UncoveredRow; separat
           {row.detail}
         </ChromeText>
       </View>
-      <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
+      <Ionicons name={forwardIcon()} size={16} color={palette.secondary} />
     </Tap>
   );
 }
@@ -1015,7 +1015,7 @@ function NothingShown({ onEdit }: { onEdit?: () => void }) {
           <ChromeText style={[typeV2.name, styles.linkText, { color: palette.link }]} maxFontSizeMultiplier={LINK_MAX_SCALE}>
             {t('activity.insights.editSections')}
           </ChromeText>
-          <Ionicons name="chevron-forward" size={16} color={palette.link} />
+          <Ionicons name={forwardIcon()} size={16} color={palette.link} />
         </Tap>
       ) : null}
     </View>
@@ -1031,7 +1031,7 @@ function SmartTrackingInvite({ onPress }: { onPress: () => void }) {
         <ChromeText style={[typeV2.name, styles.linkText, { color: palette.link }]} maxFontSizeMultiplier={LINK_MAX_SCALE}>
           {t('activity.insights.smartTrackingInvite')}
         </ChromeText>
-        <Ionicons name="chevron-forward" size={16} color={palette.link} />
+        <Ionicons name={forwardIcon()} size={16} color={palette.link} />
       </Tap>
     </View>
   );
@@ -1114,7 +1114,7 @@ function WeakSpots({
                 </ChromeText>
                 <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{reasonOf(r)}</ChromeText>
               </View>
-              <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
+              <Ionicons name={forwardIcon()} size={16} color={palette.secondary} />
             </Tap>
           ))}
         </View>
@@ -1142,7 +1142,7 @@ function WeakSpots({
           <ChromeText style={[typeV2.name, styles.linkText, { color: palette.link }]} maxFontSizeMultiplier={LINK_MAX_SCALE}>
             {t('activity.insights.seeAllByStrength')}
           </ChromeText>
-          <Ionicons name="chevron-forward" size={16} color={palette.link} />
+          <Ionicons name={forwardIcon()} size={16} color={palette.link} />
         </Tap>
       ) : null}
     </Section>
@@ -1247,7 +1247,7 @@ function Memorization({ data, onOpenDay }: { data: InsightsData; onOpenDay?: (da
                   {it.when}
                 </ChromeText>
               </View>
-              <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
+              <Ionicons name={forwardIcon()} size={16} color={palette.secondary} />
             </Tap>
           ))}
           {shownMonth.items.length === 0 ? (

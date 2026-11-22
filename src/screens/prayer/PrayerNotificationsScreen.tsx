@@ -25,6 +25,7 @@ import { usePrayerNotifyPermission } from '../../components/prayer/usePrayerNoti
 import { useScheduledPrayerDays } from '../../lib/prayer/status';
 import { previewPrayerSound } from '../../lib/prayer/soundPreview';
 import { t } from '../../i18n';
+import { forwardIcon } from '../../i18n/direction';
 
 /** "Standard tone · 10 min before", "Silent". */
 export function alertSummary(a: PrayerAlert): string {
@@ -92,7 +93,7 @@ export default function PrayerNotificationsScreen() {
                       <Text style={[typeV2.meta, { color: palette.accentText }]} maxFontSizeMultiplier={1.4}>
                         {alertSummary(a)}
                       </Text>
-                      <Ionicons name="chevron-forward" size={12} color={palette.accentText} />
+                      <Ionicons name={forwardIcon()} size={12} color={palette.accentText} />
                     </Tap>
                   ) : (
                     <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>

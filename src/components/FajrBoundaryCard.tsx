@@ -15,6 +15,7 @@ import {
   DEFAULT_FAJR_METHOD,
 } from '../lib/fajrBoundary';
 import { t, formatTime } from '../i18n';
+import { forwardIcon } from '../i18n/direction';
 
 /**
  * Settings card for the fajr-based day boundary (`compact`: the toggle alone,
@@ -140,7 +141,7 @@ export function FajrBoundaryCard({ compact = false }: { compact?: boolean } = {}
             <Text style={[typeV2.body, v2.value, { color: palette.secondary }]} numberOfLines={1}>
               {currentMethodLabel}
             </Text>
-            <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
+            <Ionicons name={forwardIcon()} size={16} color={palette.secondary} />
           </View>
         </Tap>
       )}

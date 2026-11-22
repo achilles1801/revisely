@@ -15,6 +15,7 @@ import { usePrayerTimes, PrayerTimesNow } from './usePrayerTimes';
 import { usePrayerLocation } from './usePrayerLocation';
 import { usePrayerNotifyPermission } from './usePrayerNotifyPermission';
 import { t } from '../../i18n';
+import { forwardIcon } from '../../i18n/direction';
 
 export type PrayerTab = 'times' | 'qibla';
 
@@ -149,7 +150,7 @@ export function TimesBody({
         <Text style={[typeV2.body, styles.calcValue, { color: palette.secondary }]} numberOfLines={1}>
           {methodLabel(settings.method, true)} · {settings.madhab === 'hanafi' ? t('prayer.sheet.hanafi') : t('prayer.sheet.standard')}
         </Text>
-        <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
+        <Ionicons name={forwardIcon()} size={16} color={palette.secondary} />
       </Tap>
     </View>
   );

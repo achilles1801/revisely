@@ -20,6 +20,7 @@ import { PAST_OPACITY } from './RememberedLayers';
 import { AccuracyChart } from './AccuracyChart';
 import { WordChip } from '../reciteLive/WordChip';
 import { t } from '../../i18n';
+import { forwardIcon } from '../../i18n/direction';
 
 /** A word's remembered highlight on the sheet: the page's past shade (PAST_OPACITY) as one solid colour, WordChip's fill. */
 function pastFill(palette: PaletteV2, mark: Pick<Mark, 'kind'>, isDark: boolean): string {
@@ -133,7 +134,7 @@ export function PassageProgressSheet({
             <Text style={[typeV2.button, typeV2.numeral, { color }]} maxFontSizeMultiplier={1.3}>
               {formatAccuracy(take.accuracy)}
             </Text>
-            {onOpenTake ? <Ionicons name="chevron-forward" size={15} color={palette.secondary} /> : null}
+            {onOpenTake ? <Ionicons name={forwardIcon()} size={15} color={palette.secondary} /> : null}
           </>
         );
         return onOpenTake ? (

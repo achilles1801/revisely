@@ -15,6 +15,7 @@ import { ThreadRow } from '../../v2/ThreadRow';
 import { ProgressBar } from '../../ProgressBar';
 import { Tap } from '../../v2/Tap';
 import { t } from '../../../i18n';
+import { forwardIcon } from '../../../i18n/direction';
 
 export type { TodayStatus } from '../../../lib/todayLines';
 
@@ -54,7 +55,7 @@ export const HEADER_MAX_SCALE = 1.4;
  * Put a no-break space before it so it never starts a line alone.
  */
 function Chevron({ color }: { color: string }) {
-  return <Ionicons name="chevron-forward" size={14} color={color} allowFontScaling />;
+  return <Ionicons name={forwardIcon()} size={14} color={color} allowFontScaling />;
 }
 
 /**
