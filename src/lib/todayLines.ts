@@ -24,6 +24,7 @@ import type { Leftovers } from './carryOver';
 import { describePagesToRevise, NBHY, NBSP, pagesNote, placeOfPageToRevise, spokenText, type PartialPages } from './passages';
 import { suraOf } from './ayahKeys';
 import { getSurah } from './quranData';
+import { t } from '../i18n';
 
 export type { PartialPages };
 const NONE: PartialPages = new Map();
@@ -44,10 +45,10 @@ export function catchUpLine(leftovers: Leftovers, partial: PartialPages = NONE):
   const when =
     leftovers.days.length === 1
       ? leftovers.days[0].ago === 1
-        ? 'yesterday'
-        : `${leftovers.days[0].ago} days ago`
-      : `${leftovers.days.length} days`;
-  const title = `${missed ? 'Missed' : 'Left'} ${when} · Revise ${what}`;
+        ? t('lib.today.yesterday')
+        : t('lib.today.daysAgo', { count: leftovers.days[0].ago })
+      : t('lib.today.days', { count: leftovers.days.length });
+  const title = missed ? t('lib.today.missed', { when, what }) : t('lib.today.left', { when, what });
   return { title, label: spoken(title) };
 }
 
@@ -70,9 +71,12 @@ export interface TodayLines {
 }
 
 /** How VoiceOver should read a line: "Al-Mujadila to At-Tahrim", "ayahs 1 to 11", "pages 542 to 561". */
-export const spoken = (s: string) => spokenText(s.split(`${NBSP}→ `).join(' → ').split(' → ').join(' to '));
+export const spoken = (s: string) => {
+  const arrow = t('lib.today.arrow');
+  return spokenText(s.split(`${NBSP}${arrow} `).join(` ${arrow} `).split(` ${arrow} `).join(` ${t('lib.today.toWord')} `));
+};
 
-const pages = (n: number) => `${n}${NBSP}page${n === 1 ? '' : 's'}`;
+const pages = (n: number) => t('lib.today.pages', { count: n });
 /** A surah's name, held together ("Al‑Mujadila" never breaks after "Al-"). */
 const held = (name: string | undefined) => (name ?? '').split('-').join(NBHY);
 const firstSurah = (p: number, partial: PartialPages = NONE) => {
@@ -102,13 +106,13 @@ export function runsInOrder(list: number[]): PageRun[] {
 /** "Juz 28", "Juz 27–28"; null for more than two (or none). */
 export function juzSpan(list: number[]): string | null {
   const js = [...new Set(list.map(getJuzForPage))].sort((a, b) => a - b);
-  if (js.length === 1) return `Juz${NBSP}${js[0]}`;
-  if (js.length === 2) return `Juz${NBSP}${js[0]}–${js[1]}`;
+  if (js.length === 1) return t('lib.today.juz', { n: js[0] });
+  if (js.length === 2) return t('lib.today.juzRange', { from: js[0], to: js[1] });
   return null;
 }
 
 /** A "→" held to the name before it: a line may end with it, never start with it. */
-const to = (a: string, b: string) => `${a}${NBSP}→ ${b}`;
+const to = (a: string, b: string) => `${a}${NBSP}${t('lib.today.arrow')} ${b}`;
 
 /** "Al-Mujadila → At-Tahrim", or one name when the run is inside one surah. */
 function surahSpan(run: PageRun, partial: PartialPages = NONE): string {
@@ -133,7 +137,7 @@ export function rangesText(list: number[], partial: PartialPages = NONE): string
  * at Al-Baqarah, ayah 142 ›"). `lead` is "Tomorrow", or the weekday after that.
  */
 export function aheadLine(lead: string, first: number, partial: PartialPages = NONE): { text: string; label: string } {
-  const text = `${lead} starts at ${placeOf(first, partial)}`;
+  const text = t('lib.today.startsAtAhead', { lead, place: placeOf(first, partial) });
   return { text, label: spoken(text) };
 }
 
@@ -155,15 +159,15 @@ export function todayLines(
   const ordered = [...new Set(list)];
   const total = ordered.length;
   if (total === 0) {
-    const title = 'Nothing to revise yet';
-    const detail = "Start by marking what you've memorized. Most people begin with Juz 30.";
+    const title = t('lib.today.nothingTitle');
+    const detail = t('lib.today.nothingDetail');
     return {
       title: { text: title, dot: false, chevron: false },
       detail: { kind: 'text', text: detail },
       ranges: '',
-      label: spoken(`${title}. ${detail}`),
+      label: spoken(t('lib.today.titleDetail', { title, detail })),
       empty: true,
-      cta: 'Mark memorized pages',
+      cta: t('lib.today.markCta'),
       solid: true,
     };
   }
@@ -173,7 +177,7 @@ export function todayLines(
 
   if (status === 'completed') {
     // The day's done pages, the same set "Review session" lists (see doneOnDay).
-    const title = `Done · ${pages(done.size)}`;
+    const title = t('lib.today.done', { pages: pages(done.size) });
     const span =
       runs.length === 1
         ? surahSpan(runs[0], partial)
@@ -184,51 +188,56 @@ export function todayLines(
       title: { text: title, dot: true, chevron: false },
       detail: { kind: 'text', text: detail },
       ranges,
-      label: spoken(`${title}. ${detail}`),
+      label: spoken(t('lib.today.titleDetail', { title, detail })),
       empty: false,
       // Today is done, and pages added from earlier days are still to revise (SESS-6, SESS-7:
       // yesterday can be restored until today ends): the button goes on to them.
-      cta: carriedLeft > 0 ? 'Continue revision' : 'Review session',
+      cta: carriedLeft > 0 ? t('lib.today.continueCta') : t('lib.today.reviewCta'),
       solid: carriedLeft > 0,
     };
   }
 
   if (doneHere > 0) {
     const next = ordered.find((p) => !done.has(p)) ?? ordered[ordered.length - 1];
-    const title = `Continue at ${placeOf(next, partial)}`;
+    const title = t('lib.today.continueAt', { place: placeOf(next, partial) });
     return {
       title: { text: title, dot: false, chevron: true },
       detail: { kind: 'progress', done: doneHere, total },
       ranges,
-      label: spoken(`${title}. ${doneHere} of ${total} pages done`),
+      label: spoken(t('lib.today.progressLabel', { title, done: doneHere, total })),
       empty: false,
-      cta: 'Continue revision',
+      cta: t('lib.today.continueCta'),
       solid: true,
     };
   }
 
   const start = ordered[0];
-  const title = `Starts at ${placeOf(start, partial)}`;
+  const title = t('lib.today.startsAt', { place: placeOf(start, partial) });
   let detail: string;
   if (carried > 0) {
     // "2 from Insights first", "4 from yesterday first", or both: "2 from Insights, 5 from yesterday first".
     const insights = Math.min(carriedInsights, carried);
     const left = carried - insights;
-    const from = insights === 0 ? `${carried} from yesterday` : left === 0 ? `${carried} from Insights` : `${insights} from Insights, ${left} from yesterday`;
-    detail = `${pages(total)} · ${from} first`;
+    const from =
+      insights === 0
+        ? t('lib.today.fromYesterday', { count: carried })
+        : left === 0
+          ? t('lib.today.fromInsights', { count: carried })
+          : t('lib.today.fromBoth', { insights, left });
+    detail = t('lib.today.first', { pages: pages(total), from });
   } else if (runs.length > 1) {
-    detail = `${pages(total)} · then ${placeOf(runs[1].first, partial)}`;
+    detail = t('lib.today.then', { pages: pages(total), place: placeOf(runs[1].first, partial) });
   } else {
     const end = lastSurah(ordered[total - 1], partial);
-    detail = [pages(total), end !== firstSurah(start, partial) ? `to ${end}` : null, juzSpan(ordered)].filter(Boolean).join(' · ');
+    detail = [pages(total), end !== firstSurah(start, partial) ? t('lib.today.toEnd', { end }) : null, juzSpan(ordered)].filter(Boolean).join(' · ');
   }
   return {
     title: { text: title, dot: false, chevron: true },
     detail: { kind: 'text', text: detail },
     ranges,
-    label: spoken(`${title}. ${detail}`),
+    label: spoken(t('lib.today.titleDetail', { title, detail })),
     empty: false,
-    cta: 'Start revision',
+    cta: t('lib.today.startCta'),
     solid: true,
   };
 }
