@@ -18,8 +18,8 @@ rows hold its middle, then to a word:
     piece that crosses the boundary between two glyph boxes by REACH or more on both sides is split at its thinnest
     column near there, if that column is a junction (at most THIN of the band in ink).
   - A verse marker's opening (pageLines.json, fitted by check-page-markers.py) is always open, so what is in it is no
-    word's. A sajdah's overline (all 15) and a quarter's sign ۞ (all 199: large, and in no word's glyph box) are no
-    word's either, or the run fails.
+    word's. A sajdah's overline (all 15) is no word's either, nor a quarter's sign ۞: each of the 199 is found by its
+    shape before the ayah quranWaqf.json says it starts, and taken out like a marker. A sign not found fails the run.
   The boxes that steer this start as the glyph data's (from git, GLYPH_REF), then are the fitted ones, until nothing
   moves: the same every run, whatever the file holds.
 
@@ -65,7 +65,7 @@ from pathlib import Path
 
 import numpy as np
 from PIL import Image
-from scipy import ndimage
+from scipy import ndimage, signal
 
 ROOT = Path(__file__).resolve().parent.parent
 WORDS_FILE = ROOT / "src" / "data" / "quranWords.dat"
@@ -100,8 +100,12 @@ THIN = 0.07
 ABUT = 8
 # The most passes for which ink is whose to settle.
 ROUNDS = 5
-# The quarter signs (۞) before ayahs in the mushaf (Tanzil's Uthmani text has as many), no word's ink.
-QUARTERS = 199
+# The quarter signs (۞, rub' al-hizb): before the first words quranWaqf.json lists (from Tanzil's text). Each is found
+# by its shape (a clean one, before 12:7 on page 236, is the template) right of that word, or at the end of the line
+# before, and taken out like a marker.
+WAQF_FILE = ROOT / "src" / "data" / "quranWaqf.json"
+STAR_AT = (236, 5, 485, 545)
+STAR_SCORE = 0.85
 # The 15 sajdah ayahs' pages: each has an overline over its word.
 SAJDAH_PAGES = [176, 251, 272, 293, 309, 334, 341, 365, 379, 416, 454, 480, 528, 589, 597]
 
@@ -177,7 +181,40 @@ def piece(lab, k, r0, r1, lo, hi, s, band):
                 h=h, wd=wd, body=h >= BODY * band or wd >= WIDE * band or yy.size >= AREA * band * band, cols=sub.sum(axis=0))
 
 
-def pieces_of(a, page, lines, glyph_by_line):
+def star_template(images):
+    """The quarter sign's ink (its ring, points and centre), from a clean one."""
+    page, line, x0, x1 = STAR_AT
+    a = alpha(images, page)
+    s = a.shape[1] / 1024
+    l = next(x for x in lines_of(json.loads(LINES_FILE.read_text())[str(page)]) if x["line"] == line)
+    r0, r1 = cover_rows(l, s, a.shape[0])
+    ink = a[r0:r1, int(x0 * s):int(x1 * s)] > INK
+    lab, n = ndimage.label(ink, structure=np.ones((3, 3)))
+    biggest = 1 + int(np.argmax(ndimage.sum(ink, lab, np.arange(1, n + 1))))
+    ys, xs = ndimage.find_objects(lab)[biggest - 1]
+    return ink[ys, xs]
+
+
+def find_star(ink, tpl, r0, r1, c0, c1):
+    """The quarter sign's best place in ink[r0:r1, c0:c1]: (score, top, left, template at its size)."""
+    win = ink[r0:r1, c0:c1].astype(np.float32)
+    best = (-1.0, 0, 0, tpl)
+    for k in [1.0] + [round(x, 2) for x in np.arange(0.8, 1.21, 0.05) if abs(x - 1) > 1e-9]:
+        tk = tpl if k == 1.0 else np.asarray(Image.fromarray(tpl.astype(np.uint8) * 255).resize(
+            (max(1, round(tpl.shape[1] * k)), max(1, round(tpl.shape[0] * k))), Image.BILINEAR)) > 127
+        if win.shape[0] < tk.shape[0] or win.shape[1] < tk.shape[1]:
+            continue
+        corr = signal.fftconvolve(win, tk[::-1, ::-1].astype(np.float32), mode="valid")
+        iy, ix = np.unravel_index(np.argmax(corr), corr.shape)
+        score = float(corr[iy, ix] / tk.sum())
+        if score > best[0]:
+            best = (score, r0 + iy, c0 + ix, tk)
+        if best[0] >= 0.95:
+            break
+    return best
+
+
+def pieces_of(a, page, lines, glyph_by_line, stars=(), tpl=None):
     """Per line: its cover rows and its pieces (touching words split at glyph boundaries); the overlines; the labels."""
     H, W = a.shape
     s = W / 1024
@@ -189,10 +226,35 @@ def pieces_of(a, page, lines, glyph_by_line):
         r0, r1 = cover_rows(l, s, H)
         for m0, m1 in l["markers"]:
             ink[r0:r1, max(0, int(math.floor(m0 * s))):min(W, int(math.ceil(m1 * s)))] = False
+    # The quarter signs, taken out like markers (one touching its word, 384:5, leaves the word a piece of its own).
+    quarters, missed = [], []
+    by_number = {l["line"]: l for l in lines}
+    for line, gx0, gx1 in stars:
+        found = None
+        for l, c0, c1 in ((by_number.get(line), gx1 - 60, gx1 + 90), (by_number.get(line - 1), None, None)):
+            if l is None:
+                continue
+            if c0 is None:  # the end of the line before
+                c0, c1 = l["x0"] - 10, l["x0"] + 90
+            r0, r1 = cover_rows(l, s, H)
+            r0, r1 = max(0, r0 - int(15 * s)), min(H, r1 + int(15 * s))
+            score, py, px, tk = find_star(ink, tpl, r0, r1, max(0, int(c0 * s)), min(W, int(c1 * s)))
+            if score >= STAR_SCORE:
+                found = (l["line"], py, px, tk, score)
+                break
+        if found is None:
+            missed.append((page, line))
+            continue
+        line_, py, px, tk, score = found
+        mask = ndimage.binary_dilation(np.pad(tk, 3), iterations=3)
+        y0, x0 = py - 3, px - 3
+        sub = ink[max(0, y0):y0 + mask.shape[0], max(0, x0):x0 + mask.shape[1]]
+        sub &= ~mask[max(0, -y0):max(0, -y0) + sub.shape[0], max(0, -x0):max(0, -x0) + sub.shape[1]]
+        quarters.append((page, line_, round(px / s, 1), round((px + tk.shape[1]) / s, 1), round(score, 3)))
     lab, n = ndimage.label(ink, structure=np.ones((3, 3)))
     objs = ndimage.find_objects(lab)
     mass = ndimage.center_of_mass(ink, lab, np.arange(1, n + 1))
-    out, overlines, splits, quarters = [], [], [], []
+    out, overlines, splits = [], [], []
     for l in lines:
         r0, r1 = cover_rows(l, s, H)
         band = (l["y1"] - l["y0"]) * s
@@ -213,11 +275,6 @@ def pieces_of(a, page, lines, glyph_by_line):
             # A sajdah's overline: long and thin, over its words (no word's own: a cover may take part of it).
             if p["wd"] >= 25 * s and p["h"] <= 0.12 * band and p["wd"] >= 6 * p["h"]:
                 overlines.append((page, l["line"], round(p["x0"], 1), round(p["x1"], 1)))
-                continue
-            # The start of a quarter (۞, rub' al-hizb), before an ayah's first word: large, and in no word's glyph box.
-            if p["wd"] >= 25 * s and p["h"] >= 0.5 * band and \
-                    all(min(p["x1"], g[1]) - max(p["x0"], g[0]) <= 2 for g in glyph):
-                quarters.append((page, l["line"], round(p["x0"], 1), round(p["x1"], 1)))
                 continue
             # Touching words: split at a junction near each glyph boundary it crosses well.
             todo, done, used = [p], [], set()
@@ -245,11 +302,11 @@ def pieces_of(a, page, lines, glyph_by_line):
                 splits.append((page, l["line"], round(cut / s, 1)))
                 todo += [x for x in (left, right) if x is not None]
             pieces += done
-        # What lies inside a quarter's sign (its centre) is the sign's too.
-        here = [(q[2], q[3]) for q in quarters if q[1] == l["line"]]
+        # What is left of a quarter's sign (an edge the template missed) is the sign's too.
+        here = [(q[2] - 2, q[3] + 2) for q in quarters if q[1] == l["line"]]
         pieces = [p for p in pieces if not any(q0 <= p["x0"] and p["x1"] <= q1 for q0, q1 in here)]
         out.append(dict(line=l, rows=(r0, r1), pieces=pieces))
-    return out, overlines + [("quarter",) + q for q in quarters], splits, lab
+    return out, overlines + [("quarter",) + q for q in quarters] + [("missed",) + m for m in missed], splits, lab
 
 
 def assign(pieces, guide):
@@ -383,14 +440,15 @@ def fit_line(l, ws, s):
 
 def measure(job):
     """One page: each word's ink and fitted box at the originals' size, then (a smaller set) its ink there."""
-    images, like, page, page_words, flat_lines = job
+    images, like, page, page_words, flat_lines, stars, tpl = job
     lines = lines_of(flat_lines)
     orig = alpha(like or images, page)
     s = orig.shape[1] / 1024
     by_line = {}
     for w in page_words:
         by_line.setdefault(w["line"], []).append(w)
-    out, overlines, splits, lab = pieces_of(orig, page, lines, {k: [w["glyph"] for w in ws] for k, ws in by_line.items()})
+    out, overlines, splits, lab = pieces_of(orig, page, lines, {k: [w["glyph"] for w in ws] for k, ws in by_line.items()},
+                                            stars, tpl)
     seen = orig > INK
     for pl in out:
         l, (r0, r1), pieces = pl["line"], pl["rows"], pl["pieces"]
@@ -408,6 +466,8 @@ def measure(job):
             guide = settled
         pl["owner"], pl["words"] = owner, ws
     if like is None:
+        for pl in out:
+            del pl["pieces"], pl["owner"]
         return page, orig.shape[1], s, out, overlines, splits
     # A smaller set: which word a pixel is comes from the originals. A pixel goes to the word with most ink in the
     # original pixels it was made from; a solid pixel with none (the scaling's spread) to the nearest word's within a
@@ -441,6 +501,8 @@ def measure(job):
         for j, w in enumerate(pl["words"]):
             yy, xx = np.nonzero(solid & (near == j))
             keep_ink(w, yy + r0, xx, seen, s_small)
+    for pl in out:
+        del pl["pieces"], pl["owner"]
     return page, W, s_small, out, overlines, splits
 
 
@@ -494,7 +556,12 @@ def main():
         p, line, x0, x1 = boxes[4 * i:4 * i + 4]
         by_page.setdefault(p, []).append(dict(i=i, page=p, line=line, file=(x0, x1), glyph=(glyph[4 * i + 2], glyph[4 * i + 3]),
                                               ref=refs[i]))
-    jobs = [(images, like, p, by_page.get(p, []), lines[str(p)]) for p in pages]
+    waqf = json.loads(WAQF_FILE.read_text())
+    stars = {}
+    for w in waqf["quarters"]:
+        stars.setdefault(glyph[4 * w], []).append((glyph[4 * w + 1], glyph[4 * w + 2], glyph[4 * w + 3]))
+    tpl = star_template(like or images)
+    jobs = [(images, like, p, by_page.get(p, []), lines[str(p)], stars.get(p, []), tpl) for p in pages]
     with ProcessPoolExecutor(max_workers=workers) as ex:
         results = list(ex.map(measure, jobs))
     width = results[0][1]
@@ -519,8 +586,9 @@ def main():
             fitted_lines.append((page, l))
             words += ws
     found_marks = [o for r in results for o in r[4]]
-    overlines = [o for o in found_marks if o[0] != "quarter"]
+    overlines = [o for o in found_marks if o[0] not in ("quarter", "missed")]
     quarters = [o[1:] for o in found_marks if o[0] == "quarter"]
+    missed = [o[1:] for o in found_marks if o[0] == "missed"]
     splits = [x for r in results for x in r[5]]
     missing = [w for w in words if not w["ink"] or w["nobody"] or w["fit"][0] >= w["fit"][1]]
     found = sorted({o[0] for o in overlines})
@@ -529,8 +597,8 @@ def main():
     if found != expected:
         print("sajdah overlines found on pages", found, "not", expected, overlines)
         sys.exit(1)
-    if len(pages) == 604 and len(quarters) != QUARTERS:
-        print(f"{len(quarters)} quarter signs (۞) found, not {QUARTERS}:", quarters)
+    if missed:
+        print(f"quarter signs (۞) not found before the first word of an ayah on (page, line): {missed}")
         sys.exit(1)
     print(f"{len(words)} words on {len(pages)} page(s), images {width} wide; {len(overlines)} sajdah overline(s), "
           f"{len(quarters)} quarter sign(s) (۞); "
