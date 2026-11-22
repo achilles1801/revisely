@@ -24,7 +24,8 @@ a cover takes:
   1. cut: with a word shown and every other word hidden, none of its ink is under a
      cover;
   2. shows: with a word hidden and every other word shown, none of its ink is in
-     another word's opening.
+     another word's opening, or past its line's ends (pageLines.json's x0, x1: a
+     cover runs only between them).
 
 Two words whose ink shares columns (a tail sweeping under the next word) can't both
 be whole with straight-edged covers: their boxes meet at the column that leaves the
@@ -32,7 +33,8 @@ least ink on the wrong side, and what is left there is counted, never failed.
 
 --write sets each box to its word's ink with half the gap to the next ink on each
 side (at most PAD), rounded outwards to a tenth; two words that share columns meet
-at that best column. Only from the originals.
+at that best column. A line's ends in pageLines.json widen to its words' boxes.
+Only from the originals.
 
   python3 -m venv /tmp/wb && /tmp/wb/bin/pip install pillow numpy scipy
   mkdir -p /tmp/mushaf && cd /tmp/mushaf && seq -f "%03g" 1 604 | xargs -P 12 -I{} \\
@@ -312,9 +314,10 @@ def check_line(l, ws, s, boxes_of):
         opened = spans_minus(box, [(o[0] - EDGE, o[1] + EDGE) for o in others])
         covered = spans_minus(span, list(l["markers"]) + opened)
         w["cut"] = cols_in(w["vis"], covered, s)
-        # Hidden, the rest shown: what of its ink is in another's opening.
+        # Hidden, the rest shown: what of its ink is in another's opening, or past the line's ends (no cover reaches
+        # there).
         hole = (box[0] - EDGE, box[1] + EDGE)
-        shown = [sp for o in others for sp in spans_minus(o, [hole])]
+        shown = [sp for o in others for sp in spans_minus(o, [hole])] + [(-1e9, span[0]), (span[1], 1e9)]
         w["shows"] = cols_in(w["vis"], shown, s)
 
 
@@ -346,13 +349,21 @@ def main():
         sys.exit(1)
     words, gaps = [], []
     overlines = [o for r in results for o in r[4]]
+    fitted_lines = []
     for page, W, s, page_lines, _ in results:
         for pl in page_lines:
             l, ws = pl["line"], pl["words"]
             fit_line(l, ws, s)
+            # The line's ends: as far as its words' fitted boxes reach (a cover runs only between them).
+            fitted = [w["fit"] for w in ws if w.get("fit")]
+            l["fit_x"] = [min([l["x0"]] + [f[0] for f in fitted]), max([l["x1"]] + [f[1] for f in fitted])]
             # --try checks the boxes --write would write, without writing them.
-            check_line(l, ws, s, (lambda w: tuple(w["fit"]) if w.get("fit") else (w["x0"], w["x1"])) if "--try" in sys.argv
-                       else (lambda w: (w["x0"], w["x1"])))
+            if "--try" in sys.argv:
+                check_line(dict(l, x0=l["fit_x"][0], x1=l["fit_x"][1]), ws, s,
+                           lambda w: tuple(w["fit"]) if w.get("fit") else (w["x0"], w["x1"]))
+            else:
+                check_line(l, ws, s, lambda w: (w["x0"], w["x1"]))
+            fitted_lines.append((page, l))
             # A smaller set: a pixel allowed where the next ink is within two pixels.
             if W < ORIGINAL_WIDTH:
                 for w in ws:
@@ -374,7 +385,21 @@ def main():
             boxes[4 * w["i"] + 2], boxes[4 * w["i"] + 3] = x0, x1
         WORDS_FILE.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")))
         moved = sum(1 for w in words if (w["x0"], w["x1"]) != tuple(w["fit"]))
-        print(f"refitted {moved} of {len(words)} word boxes in {WORDS_FILE.name}")
+        # A line's ends widened to its words (pageLines.json: x0, x1 at a line's 5th and 6th values).
+        widened = 0
+        for page, l in fitted_lines:
+            flat = lines[str(page)]
+            i = 0
+            while i + 8 <= len(flat):
+                if int(flat[i]) == l["line"]:
+                    x0, x1 = l["fit_x"]
+                    if (x0, x1) != (flat[i + 5], flat[i + 6]):
+                        widened += 1
+                        flat[i + 5], flat[i + 6] = [int(v) if v == int(v) else v for v in (x0, x1)]
+                    break
+                i += 8 + 2 * int(flat[i + 7])
+        LINES_FILE.write_text(json.dumps(lines, separators=(",", ":")))
+        print(f"refitted {moved} of {len(words)} word boxes in {WORDS_FILE.name}; widened {widened} line(s) in {LINES_FILE.name}")
         return
     if "--dump" in sys.argv:
         Path(arg("--dump", "")).write_text(json.dumps(
