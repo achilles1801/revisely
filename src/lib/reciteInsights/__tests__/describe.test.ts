@@ -1,6 +1,8 @@
-import { clearedLine, dayWords, intoLine, kindsLine, passageName, scoreLine, similarNote, similarTitle, slipNote, weekLabel, weeksSpoken, weeksTakeaway, weeksToDraw } from '../describe';
+import { clearedLine, dayWords, intoLine, kindsLine, passageName, perPageLine, perPageTenths, scoreLine, similarNote, similarTitle, slipNote, weekLabel, weeksSpoken, weeksTakeaway, weeksToDraw } from '../describe';
 import { NO_KINDS, type SimilarSlip, type SlippingPassage } from '../insights';
 import { plainText } from '../../passages';
+import { perPageLabel, PER_PAGE_FROM } from '../../reciteLive/score';
+import { i18n } from '../../../i18n';
 
 const TODAY = '2026-11-16'; // a Monday
 
@@ -104,5 +106,37 @@ describe('Recite insights in words', () => {
 
   it('the figure gives only the takes once the weeks say how it moved', () => {
     expect(scoreLine({ takes: 14, score: 0.986, earlierScore: 0.972 }, 'in 30 days', false)).toBe('14 takes');
+  });
+});
+
+describe('Recite insights: mistakes a page in long takes, in words (RECITE-24)', () => {
+  const p = (mistakes: number, pages: number) => ({ takes: 1, pages, mistakes });
+
+  it('says the mistakes a page to a tenth, as the take’s summary rounds them', () => {
+    expect(perPageLine(null)).toBeNull();
+    expect(perPageLine(p(3, 2))).toBe('Takes of 2 pages or more: 1.5 mistakes a page');
+    expect(perPageLine(p(2, 2))).toBe('Takes of 2 pages or more: 1 mistake a page');
+    expect(perPageLine(p(7, 3))).toBe('Takes of 2 pages or more: 2.3 mistakes a page');
+    expect(perPageLine(p(0, 6))).toBe('Takes of 2 pages or more: no mistakes');
+    // A mistake over many pages never reads as none.
+    expect(perPageLine(p(1, 30))).toBe('Takes of 2 pages or more: under 0.1 mistakes a page');
+    // The summary's figure for the same take (lib/reciteLive/score).
+    for (const [m, n] of [[3, 2], [7, 3], [5, 4], [1, 12]]) expect(perPageLabel(m, n)).toBe(`${perPageTenths(p(m, n))} a page`);
+  });
+
+  it('the words say 2 pages, so they change with PER_PAGE_FROM', () => {
+    expect(PER_PAGE_FROM).toBe(2);
+  });
+
+  it('in Arabic, with Arabic-Indic digits', async () => {
+    await i18n.changeLanguage('ar');
+    try {
+      expect(perPageLine(p(3, 2))).toBe('مرات التسميع من صفحتين أو أكثر: ١٫٥ خطأ في الصفحة');
+      expect(perPageLine(p(2, 2))).toBe('مرات التسميع من صفحتين أو أكثر: خطأ واحد في الصفحة');
+      expect(perPageLine(p(0, 4))).toBe('مرات التسميع من صفحتين أو أكثر: بلا أخطاء');
+      expect(perPageLine(p(1, 30))).toBe('مرات التسميع من صفحتين أو أكثر: أقل من ٠٫١ خطأ في الصفحة');
+    } finally {
+      await i18n.changeLanguage('en');
+    }
   });
 });

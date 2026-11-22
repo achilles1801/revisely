@@ -78,7 +78,7 @@ export function takePassage(words: QuranWords, take: Pick<TakeRecord, 'from' | '
 export function recitationForRevo(records: readonly MemoryRecord[], today: string, words: QuranWords | null): RevoRecitation | null {
   const takes = liveTakes(records);
   if (takes.length === 0 || !words) return null;
-  const ins = recitationInsights(records, today);
+  const ins = recitationInsights(records, today, WINDOW_DAYS, words);
   const latest = ins.last as TakeRecord;
   const lastPassage = takePassage(words, latest);
   if (!lastPassage) return null;
@@ -121,6 +121,8 @@ export function recitationForRevo(records: readonly MemoryRecord[], today: strin
       hidden: latest.hidden,
       strict: latest.level === 'strict',
     },
+    // The mistakes a page Insights shows for long takes (RECITE-24), only when there are some: without, as before.
+    ...(ins.perPage ? { perPage: ins.perPage } : {}),
   };
 }
 

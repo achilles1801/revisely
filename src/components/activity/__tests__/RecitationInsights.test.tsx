@@ -148,6 +148,21 @@ describe('Insights: Recitation (RINS-2)', () => {
     for (const c of chips) expect(harakatClip(c.props.style)).toBeNull();
   });
 
+  it('[RECITE-24] under the figure, the mistakes a page in the range’s takes of 2 pages or more, in words', async () => {
+    await open(data());
+    // Al-Kahf 17–26 is pages 295–296: three takes in the range, 4 mistakes over 6 pages (the Not clear letter never
+    // counts). Al-Baqarah 40–48 is one page: left out.
+    expect(text('insights-recitation-per-page')).toBe('Takes of 2 pages or more: 0.7 mistakes a page');
+  });
+
+  it('[RECITE-24] no line without a take of 2 pages or more, or before the word data has loaded', async () => {
+    await open(data({ recitation: { records: records.filter((r) => r.kind !== 'take' || r.from !== KAHF[0]), words } }));
+    expect(screen.getByTestId('insights-recitation')).toBeTruthy();
+    expect(screen.queryByTestId('insights-recitation-per-page')).toBeNull();
+    await open(data({ recitation: { records, words: null } }));
+    expect(screen.queryByTestId('insights-recitation-per-page')).toBeNull();
+  });
+
   it('[RINS-2] nothing shows for an account that doesn’t recite', async () => {
     await open(data({ recitation: null }));
     expect(screen.queryByTestId('insights-recitation')).toBeNull();

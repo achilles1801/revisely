@@ -289,6 +289,8 @@ export const reciteLive: NonNullable<ArStrings['reciteLive']> = {
   mistakes_few: '{{count}} أخطاء',
   mistakes_many: '{{count}} خطأً',
   mistakes_other: '{{count}} خطأ',
+  perPage: '{{n}} في الصفحة',
+  mistakesPerPage: '{{mistakes}} · {{perPage}}',
   allClean: 'أكملت المواضع كلها ({{count}}) بلا أخطاء',
   someClean: 'أكملت {{clean}} من {{total}} بلا أخطاء',
 };

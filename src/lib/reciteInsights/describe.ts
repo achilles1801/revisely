@@ -7,7 +7,7 @@ import { ayahKey } from '../ayahKeys';
 import { describeAyahs, surahName } from '../passages';
 import { daysSince } from '../recency';
 import { formatAccuracy } from '../reciteLive/score';
-import type { RecitationInsights, SimilarSlip, SlippingPassage } from './insights';
+import type { PerPage, RecitationInsights, SimilarSlip, SlippingPassage } from './insights';
 
 const takesWord = (n: number) => t('reciteInsights.takes', { count: n, n: formatNumber(n) });
 const timesWord = (n: number) =>
@@ -55,6 +55,23 @@ export function scoreLine(ins: Pick<RecitationInsights, 'takes' | 'score' | 'ear
   const then = formatAccuracy(ins.earlierScore);
   if (now === then) return t('reciteInsights.sameAsBefore', { takes });
   return ins.score > ins.earlierScore ? t('reciteInsights.upFrom', { takes, then }) : t('reciteInsights.downFrom', { takes, then });
+}
+
+/** Mistakes a page to a tenth, as the take's summary rounds them (lib/reciteLive/score `perPageLabel`). */
+export const perPageTenths = (p: Pick<PerPage, 'mistakes' | 'pages'>): number => Math.round((Math.max(0, p.mistakes) / p.pages) * 10) / 10;
+
+/**
+ * Under the figure, for the range's takes of 2 pages or more (RECITE-24; Majd, Nov 22 2026: beside the % "for long
+ * recitations", "we should aim to keep it clean"): "Takes of 2 pages or more: 1.2 mistakes a page", "…: no mistakes",
+ * "…: under 0.1 mistakes a page" (a mistake or two over many pages never reads as none). Null with no long takes. The
+ * words say 2 pages: they change with PER_PAGE_FROM (describe.test pins it).
+ */
+export function perPageLine(p: PerPage | null): string | null {
+  if (!p || p.pages <= 0) return null;
+  if (p.mistakes <= 0) return t('reciteInsights.perPageNone');
+  const tenths = perPageTenths(p);
+  if (tenths <= 0) return t('reciteInsights.perPageUnder', { n: formatNumber(0.1, { minimumFractionDigits: 1 }) });
+  return t('reciteInsights.perPage', { count: tenths, n: formatNumber(tenths, { maximumFractionDigits: 1 }) });
 }
 
 /**

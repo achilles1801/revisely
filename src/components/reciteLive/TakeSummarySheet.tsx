@@ -13,10 +13,11 @@ import type { QuranWords } from '../../lib/recite/quranWords';
 import type { Mark, MarkInto } from '../../lib/reciteLive/contract';
 import { isUnclear, markGroup } from '../../lib/reciteLive/contract';
 import { markFill } from './markColours';
-import { findingNote, intoLine, intoMarks, markTitle, spokenIntoLine } from '../../lib/reciteLive/describe';
+import { expectedPhrase, findingNote, intoLine, intoMarks, markTitle, recitedLabel, recitedPhrase, spokenIntoLine } from '../../lib/reciteLive/describe';
+import { Phrase, Row } from './MarkParts';
 import { drillMarks } from '../../lib/reciteLive/drill';
 import type { ScoreLevel } from '../../lib/reciteLive/score';
-import { mistakesLabel } from '../../lib/reciteLive/score';
+import { mistakesLabel, pagesReached, perPageLabel } from '../../lib/reciteLive/score';
 import { CheckMark } from './ReciteMic';
 import { Sparkline } from '../reciteMemory/AccuracyChart';
 import { peekedLine } from '../../lib/reciteLive/peeked';
@@ -189,6 +190,11 @@ export function TakeSummarySheet({
   const manySurahs = words != null && from != null && to != null && to >= from && words.ref(from).sura !== words.ref(to).sura;
   // "Not clear" marks never count (Majd, Nov 15 2026), so they come last.
   const mistakes = marks.filter((m) => m.kind !== 'tajweed' && !isUnclear(m)).length;
+  // A long take (2 pages or more) says its mistakes per page beside the count, where a % alone hides how many there
+  // were (RECITE-24; Tarteel's "N /pg"; Majd, Nov 22 2026: "we should aim to keep it clean": the summary only, never the
+  // bar).
+  const perPage = check && words && from != null && to != null ? perPageLabel(mistakes, pagesReached(words, from, to)) : null;
+  const mistakesNote = perPage ? t('reciteLive.mistakesPerPage', { mistakes: mistakesLabel(mistakes), perPage }) : mistakesLabel(mistakes);
   const findings = [...marks.filter((m) => !isUnclear(m)), ...marks.filter(isUnclear)];
   const peekedCount = peeked.reduce((n, p) => n + p.words.length, 0);
   // Something to recite again: a mistake (not a tajweed note), or a word peeked.
@@ -267,12 +273,12 @@ export function TakeSummarySheet({
       ) : null}
       <View style={styles.head}>
         {check && score ? (
-          <View style={styles.scoreRow} accessible accessibilityLabel={t('reciteLive.summary.score', { score: score.text, mistakes: mistakesLabel(mistakes) })}>
+          <View style={styles.scoreRow} accessible accessibilityLabel={t('reciteLive.summary.score', { score: score.text, mistakes: mistakesNote })}>
             <Text style={[styles.score, typeV2.numeral, { color: scoreColor }]} maxFontSizeMultiplier={1.3} testID="take-summary-score">
               {score.text}
             </Text>
-            <Text style={[typeV2.meta, styles.scoreNote, { color: palette.secondary }]} maxFontSizeMultiplier={1.3}>
-              {mistakesLabel(mistakes)}
+            <Text style={[typeV2.meta, styles.scoreNote, { color: palette.secondary }]} maxFontSizeMultiplier={1.3} testID="take-summary-mistakes">
+              {mistakesNote}
             </Text>
           </View>
         ) : null}
@@ -333,6 +339,9 @@ export function TakeSummarySheet({
             // the word in ink on its colour.
             const fill = markFill(palette, m);
             const place = findingPlace(m, manySurahs);
+            // A wrong word, haraka or letter with what was heard: Expected and Recited, each the phrase around it, as the
+            // mark's card shows them (RECITE-24; Tarteel's two lines; Majd, Nov 22 2026: "recommended is fine").
+            const recited = (m.kind === 'word' || m.kind === 'harakat' || m.kind === 'letter') && !isUnclear(m) ? recitedPhrase(words, m) : null;
             const arabic = (
               <View style={[styles.arWrap, { backgroundColor: fill }, stacked && styles.arStacked]} testID="take-summary-finding-highlight">
                 <Text style={[arabicFullV2(21), { color: palette.text }]} maxFontSizeMultiplier={ARABIC_MAX} testID="take-summary-finding-arabic">
@@ -356,14 +365,23 @@ export function TakeSummarySheet({
                       {t('reciteLive.summary.findingTitle', { title: markTitle(m), place })}
                     </Text>
                   </View>
-                  {findingNote(m) ? (
+                  {recited ? (
+                    <View testID="take-summary-finding-diff">
+                      <Row label={t('reciteLive.card.expected')} first>
+                        <Phrase parts={expectedPhrase(words, m)} fill={fill} />
+                      </Row>
+                      <Row label={recitedLabel(m)}>
+                        <Phrase parts={recited} fill={fill} />
+                      </Row>
+                    </View>
+                  ) : findingNote(m) ? (
                     <Text style={[typeV2.meta, { color: palette.secondary }]} numberOfLines={stacked ? 4 : 2} maxFontSizeMultiplier={CHROME_MAX}>
                       {findingNote(m)}
                     </Text>
                   ) : null}
-                  {stacked ? arabic : null}
+                  {stacked && !recited ? arabic : null}
                 </View>
-                {stacked ? null : arabic}
+                {stacked || recited ? null : arabic}
               </Tap>
             );
           })

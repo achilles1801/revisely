@@ -148,6 +148,8 @@ export interface RevoRecitation {
   slipping: { passage: RevoRecitedPassage; words: number; wordMistakes: number; wrong: number; tries: number; daysAgo: number }[];
   similar: { from: RevoRecitedAyah; into: RevoRecitedAyah; ending: boolean; times: number; also: number; daysAgo: number }[];
   last: { daysAgo: number; passage: RevoRecitedPassage; score: number; mistakes: number; unclear: number; hidden: boolean; strict: boolean } | null;
+  /** The window's long takes (2 pages or more), their pages and mistakes (RECITE-24); left out with none. */
+  perPage?: { takes: number; pages: number; mistakes: number };
 }
 
 export interface RevoTakeMark {

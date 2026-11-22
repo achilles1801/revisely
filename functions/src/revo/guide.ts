@@ -428,7 +428,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     // Majd's Nov 20 2026 asks, in Revisely Dev until the next release (Not clear's line too: the store app has it, and
     // the release's re-record brings it to the main guide).
     title: 'Mistakes on a hidden page, Not clear, the mistake sound, Your recitation, and how highlights look',
-    covers: ['RECITE-13', 'RECITE-15', 'RECITE-16', 'RECITE-17', 'RECITE-18', 'RECITE-19', 'RECITE-20', 'RECITE-21'],
+    covers: ['RECITE-13', 'RECITE-15', 'RECITE-16', 'RECITE-17', 'RECITE-18', 'RECITE-19', 'RECITE-20', 'RECITE-21', 'RECITE-24'],
     routes: ['QuranReader', 'ActiveRevision', 'Settings'],
     text: lines(
       '- With the page hidden (the eye) and no take running, a word with a mistake keeps its highlight on its place, the word still hidden: the take’s marks in their colour after it, and past mistakes lighter (with “Show past mistakes” on), so they know where they tend to slip. During a take nothing is drawn on a word still hidden, past mistakes included; each shows once its word does. A tap on a highlighted place opens that word’s card, as on a shown page (it shows the word).',
@@ -437,6 +437,8 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
       '- Mark mistakes checks recitation in Hafs ʿan ʿĀṣim (its intro says so); other riwayat aren’t checked yet.',
       '- On a slow connection, when checking falls a few seconds behind, the bar says “Slow connection: checking is behind” in place of the words until it catches up.',
       '- Each new mistake plays a short sound and a tap as it is marked (not for Not clear or tajweed notes, at most one every 0.7 s). It plays in silent mode at the media volume; Settings → Recite → “Sound on a mistake” turns it off. While the microphone records, the iPhone plays it from the earpiece, so it is quiet without headphones.',
+      '- After a take, its summary says the mistakes per page beside the count when it covered 2 pages or more ("3 mistakes · 1.5 a page"), and each wrong word or haraka shows “Expected” and what was recited, each with the words around it.',
+      '- Activity → “Insights” → “Recitation” says the same for its range, under the score: the mistakes a page across their takes of 2 pages or more ("Takes of 2 pages or more: 1.2 mistakes a page"). You are told it for the last 4 weeks; takes of a page or less aren’t in it.',
       '- “Your recitation” on a mark’s card plays the phrase the mistake is in, from the pause mark before it to the next (any but ۙ), or the whole ayah when it’s short (12 words or fewer, or 8 seconds or less); never more than 15 seconds. A skipped word plays from the word before it, so the jump is heard.',
       '- When a take starts, the cursor shows where they seem to be within a second or two of their first word (the page shown only), and settles once the app is sure where they started; "Listening…" stays until then.',
       '- On a hidden page a word shows once it has been said in full, the next word has begun, or it has been the word being said about as long as it takes to say (a long madd waits for its end), never a word ahead; nothing is drawn on the word being said, still hidden, and the newest word shown is in green ink, the following colour (as the word being said in the bar); the words before it are in the page’s own ink, and a word with a mark keeps its highlight instead. The bar shows no more than the page.',

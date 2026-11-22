@@ -12,6 +12,7 @@ import {
   REVO_MARK_KINDS,
   REVO_MISTAKE_KINDS,
   REVO_PASSAGE_KEYS,
+  REVO_PER_PAGE_FROM,
   REVO_RECITATION_LIST,
   REVO_RECITATION_WEEKS,
   REVO_TAJWEED_RULES,
@@ -373,7 +374,9 @@ export function validateGaps(v: unknown, path: string): RevoGaps {
 /** Their recitation over the window, checked to add up. */
 export function validateRecitation(v: unknown, path: string): RevoRecitation {
   const r = obj(v, path);
-  keys(r, ['days', 'takes', 'daysRecited', 'minutes', 'words', 'mistakes', 'kinds', 'unclear', 'tajweed', 'score', 'earlierScore', 'weeks', 'stillMarked', 'cleared', 'slipping', 'similar', 'last'], path);
+  const required = ['days', 'takes', 'daysRecited', 'minutes', 'words', 'mistakes', 'kinds', 'unclear', 'tajweed', 'score', 'earlierScore', 'weeks', 'stillMarked', 'cleared', 'slipping', 'similar', 'last'];
+  // `perPage` (RECITE-24) comes only when the window has long takes; apps from before it never send it.
+  keys(r, [...required, 'perPage'], path, required);
   const days = int(r.days, 7, 90, `${path}.days`);
   const takes = int(r.takes, 0, MAX_COUNT, `${path}.takes`);
   const daysRecited = int(r.daysRecited, 0, Math.min(days, takes), `${path}.daysRecited`);
@@ -434,6 +437,22 @@ export function validateRecitation(v: unknown, path: string): RevoRecitation {
   });
   // A take in the window is the latest take or later than it.
   if (takes > 0 && (!last || last.daysAgo >= days)) fail(`${path}.last`);
+  // The long takes are some of the window's takes, each of 2 pages or more, and their mistakes some of its mistakes.
+  const perPage =
+    r.perPage === undefined
+      ? undefined
+      : (() => {
+          const p = `${path}.perPage`;
+          const o = obj(r.perPage, p);
+          keys(o, ['takes', 'pages', 'mistakes'], p);
+          if (takes === 0) fail(p);
+          const long = int(o.takes, 1, takes, `${p}.takes`);
+          return {
+            takes: long,
+            pages: int(o.pages, long * REVO_PER_PAGE_FROM, MAX_COUNT, `${p}.pages`),
+            mistakes: int(o.mistakes, 0, mistakes, `${p}.mistakes`),
+          };
+        })();
   return {
     days,
     takes,
@@ -452,6 +471,7 @@ export function validateRecitation(v: unknown, path: string): RevoRecitation {
     slipping,
     similar,
     last,
+    ...(perPage ? { perPage } : {}),
   };
 }
 
