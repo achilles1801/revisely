@@ -250,6 +250,9 @@ export const reciteLive = {
   noMistakes: 'No mistakes',
   mistakes_one: '{{count}} mistake',
   mistakes_other: '{{count}} mistakes',
+  /** A long take's mistakes per page, beside its count: "3 mistakes · 1.5 a page". */
+  perPage: '{{n}} a page',
+  mistakesPerPage: '{{mistakes}} · {{perPage}}',
   /** Test me's headline. */
   allClean: 'All {{count}} continued cleanly',
   someClean: '{{clean}} of {{total}} continued cleanly',

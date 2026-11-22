@@ -600,6 +600,11 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   words' places, and a tap still opens them. Stop alone changes nothing on the page. (Majd, Nov 22 2026, of Tarteel's
   smart switching: "do the same".)
 
+- **RECITE-24.** (Revisely Dev) A take's summary: a take of 2 pages or more says its mistakes per page beside the count
+  ("3 mistakes · 1.5 a page"; never in the bar), where a % alone hides how many there were. Each wrong word, haraka or
+  letter slip with what was heard shows two lines, Expected and what was recited, each the phrase around it (two words
+  either side, in its ayah), as its card does. (Majd, Nov 22 2026, Tarteel picks 4 and 5: "ur recommended is fine, we
+  should aim to keep it clean", "recommended is fine".)
 ## Recite insights
 
 What a user's takes with Mark mistakes show over time, and Revo knowing it (Majd, Nov 16 2026).

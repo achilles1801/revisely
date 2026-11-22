@@ -45,6 +45,8 @@ import {
   type LiveState,
 } from '../../../src/lib/reciteLive/state';
 import { AT_LAG, clipRange, endsPhrase, LEAD, MAX_SECONDS, phraseOf, SHORT_WORDS, TAIL } from '../../../src/lib/reciteLive/phrase';
+import { pagesReached, perPageLabel, PER_PAGE_FROM } from '../../../src/lib/reciteLive/score';
+import { expectedPhrase, recitedPhrase } from '../../../src/lib/reciteLive/describe';
 import { socketFeed, CATCHUP_SLICE_SAMPLES, CATCHUP_TICK_MS, KEEPALIVE_MS, WATCHDOG_MS, type SocketLike } from '../../../src/lib/reciteLive/socket';
 import { scoreTapOpens } from '../../../src/lib/reciteLive/view';
 import type { StartFrame } from '../../../src/lib/reciteLive/feed';
@@ -1451,6 +1453,38 @@ describe('[RECITE-21] switched to hidden: mid-take everything behind the reciter
         expect(wordShown(start + 1, new Set(), info)).toBe(false);
       }),
       { numRuns: runs(80) },
+    );
+  });
+});
+
+describe('[RECITE-24] the summary: mistakes per page for a long take, Expected and Recited for a wrong word', () => {
+  it('per page only from 2 pages, the mistakes over the pages reached to a tenth', () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 0, max: words.count - 1 }), fc.integer({ min: 0, max: 1500 }), fc.nat(40), (a, span, mistakes) => {
+        const b = Math.min(words.count - 1, a + span);
+        const pages = pagesReached(words, a, b);
+        expect(pages).toBe(words.pageOf(b) - words.pageOf(a) + 1);
+        const label = perPageLabel(mistakes, pages);
+        if (pages < PER_PAGE_FROM) expect(label).toBeNull();
+        else expect(label).toBe(`${Math.round((mistakes / pages) * 10) / 10} a page`);
+      }),
+    );
+  });
+
+  it('a wrong word with what was heard: the same words either side in both lines, the mark’s word or what was said between', () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 0, max: words.count - 1 }), fc.constantFrom<'word' | 'harakat' | 'letter'>('word', 'harakat', 'letter'), (w, kind) => {
+        const r = words.ref(w);
+        const m: Mark = { id: 'm', w, ayah: [r.sura, r.ayah], kind, sure: 'clear', heard: 'قَالَ', heardExact: true };
+        const expected = expectedPhrase(words, m);
+        const recited = recitedPhrase(words, m)!;
+        expect(recited.map((p) => (p.role === 'recited' ? 'X' : p.text))).toEqual(expected.map((p) => (p.role === 'expected' ? 'X' : p.text)));
+        expect(expected.filter((p) => p.role === 'expected').map((p) => p.text)).toEqual([words.uthmani(w)]);
+        expect(recited.filter((p) => p.role === 'recited').map((p) => p.text)).toEqual(['قَالَ']);
+        // Never past its ayah, at most two words either side.
+        const [a0, a1] = words.verseRange(r.sura, r.ayah);
+        expect(expected.length).toBeLessThanOrEqual(Math.min(5, a1 - a0));
+      }),
     );
   });
 });
