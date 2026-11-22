@@ -41,21 +41,28 @@ function sameSet(a: number[], b: number[]): boolean {
 }
 
 /**
+ * What a schedule is saved as: a custom plan (or null for the automatic schedule), and for Edit schedule
+ * (SCHED-8) the amount a day and where the automatic schedule starts.
+ */
+export type ScheduleFields = Pick<User, 'customPlan'> &
+  Partial<Pick<User, 'scheduleMode' | 'dailyPageCapacity' | 'dailyJuzCount' | 'scheduleAnchorDate' | 'scheduleShiftPages'>>;
+
+/**
  * The user to save when `before` switches to `schedule` (its `customPlan`, or
- * null for the automatic schedule) on the revision day `revisionDate`.
+ * null for the automatic schedule, with any amount and start fields) on the revision day `revisionDate`.
  * `newPlan`: a plan built or loaded (not an edit of the one shown), or the
  * automatic schedule; it always takes over today.
  */
 export function userWithNewSchedule(
   before: User,
-  schedule: Pick<User, 'customPlan'>,
+  schedule: ScheduleFields,
   ctx: { revisionDate: Date; memorized: UserPage[]; logs: RevisionLog[]; newPlan: boolean },
 ): User {
   const { revisionDate, memorized, logs, newPlan } = ctx;
   const today = dateToLocalISODay(revisionDate);
   // The editor showed the schedule with any carry-over shift in it, so the
   // shift is now part of what was saved.
-  const settled: User = { ...settleCarryOverForNewPlan(before), customPlan: schedule.customPlan };
+  const settled: User = { ...settleCarryOverForNewPlan(before), ...schedule };
 
   const changesToday = !sameSet(
     getPagesScheduledForDate(before, revisionDate, memorized),

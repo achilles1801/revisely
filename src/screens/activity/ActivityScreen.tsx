@@ -85,7 +85,7 @@ export default function ActivityScreen() {
   // "Add to plan" (a custom plan, under "First tomorrow"): tomorrow's day of the plan with the pages
   // added; the plan changes only when it is saved (ACT-24).
   const addToPlan = (added: number[]) => {
-    if (user?.customPlan) navigation.navigate('PlanDayEdit', addToPlanParams(user, revisablePages(pages), revisionDate, added));
+    if (user?.customPlan) navigation.navigate('PlanEdit', { openDay: addToPlanParams(user, revisablePages(pages), revisionDate, added) });
   };
   // Pages already first tomorrow: their buttons say so ("First tomorrow ✓") and can't be tapped again.
   const firstTomorrow = useMemo(() => firstTomorrowPages(user, shiftDay(today, 1)), [user, today]);

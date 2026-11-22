@@ -512,7 +512,7 @@ export default function ActivityDayScreen() {
               }}
               onEditSchedule={() => navigation.navigate('PlanEdit')}
               // Added to tomorrow's day of the plan, beside its own pages (it opened with these alone).
-              onAddToPlan={(memorizedToday) => user && navigation.navigate('PlanDayEdit', addToPlanParams(user, revisablePages(pages), revisionDate, memorizedToday))}
+              onAddToPlan={(memorizedToday) => user && navigation.navigate('PlanEdit', { openDay: addToPlanParams(user, revisablePages(pages), revisionDate, memorizedToday) })}
               onUndoOffer={setUndoOffer}
             />
           )}

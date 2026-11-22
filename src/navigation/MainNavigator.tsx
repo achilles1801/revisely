@@ -7,7 +7,6 @@ import AlgorithmScreen from '../screens/main/AlgorithmScreen';
 import SettingsScreen from '../screens/main/SettingsScreen';
 import MemorizationScreen from '../screens/main/MemorizationScreen';
 import PlanEditScreen from '../screens/main/PlanEditScreen';
-import PlanDayEditScreen from '../screens/main/PlanDayEditScreen';
 import PrayerCalculationScreen from '../screens/prayer/PrayerCalculationScreen';
 import PrayerNotificationsScreen from '../screens/prayer/PrayerNotificationsScreen';
 import ActiveRevisionScreen from '../screens/revision/ActiveRevisionScreen';
@@ -60,12 +59,9 @@ export type HomeStackParamList = {
   // edit: open with the pages ready to edit (Home's Memorized line). focusPages: open at those pages
   // (Activity's Memorized → Edit): their surah open and scrolled to, the pages ringed.
   Memorization: { edit?: boolean; focusPages?: number[] } | undefined;
-  // editedDay is set by PlanDayEdit when navigating back, so PlanEdit can
-  // merge the day-level edit into its in-memory days[] without round-tripping
-  // through a context or store.
-  PlanEdit: { editedDay?: { index: number; pages: number[] } } | undefined;
-  /** `basePages`: the day as saved, when `initialPages` already adds to it ("Add to plan"); `note`: one line under the title. */
-  PlanDayEdit: { dayIndex: number; initialPages: number[]; basePages?: number[]; note?: string };
+  // openDay: open with that day's sheet up ("Add to your plan", ACT-24). `basePages`: the day as saved, when
+  // `initialPages` already adds to it; `note`: one line under the day.
+  PlanEdit: { openDay?: { dayIndex: number; initialPages: number[]; basePages?: number[]; note?: string } } | undefined;
   // Revision sessions, timed sessions and the daily log, day by day.
   Activity: undefined;
   // date is a revision day, YYYY-MM-DD.
@@ -127,7 +123,6 @@ const e2eScreenListeners =
 // are full screen or render their own bottom-edge chrome.
 const HIDE_TAB_BAR_ON = new Set([
   'PlanEdit',
-  'PlanDayEdit',
   'ActiveRevision',
   'Memorization', // i18n-ignore (route names)
   'QuranReader',
@@ -151,7 +146,6 @@ function HomeStackNavigator() {
       <HomeStack.Screen name="Settings" component={SettingsScreen} />
       <HomeStack.Screen name="Memorization" component={MemorizationScreen} />
       <HomeStack.Screen name="PlanEdit" component={PlanEditScreen} />
-      <HomeStack.Screen name="PlanDayEdit" component={PlanDayEditScreen} />
       <HomeStack.Screen name="PrayerCalculation" component={PrayerCalculationScreen} />
       <HomeStack.Screen name="PrayerNotifications" component={PrayerNotificationsScreen} />
       <HomeStack.Screen name="Activity" component={ActivityScreen} />

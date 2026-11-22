@@ -102,15 +102,17 @@
   "schedule.days": {
     "CARRY-5": "a16d57685246f888"
   },
-  "schedule.new": {
+  "schedule.settings": {
     "SCHED-1": "e34c5d66002488e4",
     "SCHED-2": "9898aac73caf73d2",
-    "SCHED-4": "cd9b1e2c930dc819"
+    "SCHED-4": "cd9b1e2c930dc819",
+    "SCHED-8": "d395239070d341ef"
   },
-  "schedule.new.off": {
+  "schedule.settings.off": {
     "SCHED-1": "e34c5d66002488e4",
     "SCHED-2": "9898aac73caf73d2",
-    "SCHED-4": "cd9b1e2c930dc819"
+    "SCHED-4": "cd9b1e2c930dc819",
+    "SCHED-8": "d395239070d341ef"
   },
   "activity.calendar": {
     "ACT-3": "66440e5b3b9fbfc8",
@@ -142,7 +144,7 @@
     "ACT-12": "4afb073e2a87d454",
     "ACT-8": "17530ba6416770ba",
     "ACT-20": "e576925144fbc092",
-    "ACT-24": "84ed5272370beade"
+    "ACT-24": "4eb14b95f1c315b5"
   },
   "insights.pace": {
     "ACT-4": "9105a4f613b7539e",

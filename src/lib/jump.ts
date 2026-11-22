@@ -160,6 +160,24 @@ function jumpJuz(user: User, ctx: JumpContext, target: Set<number>) {
 }
 
 /**
+ * The automatic schedule's fields that start today at `startPage` (Edit schedule's "Today starts at", SCHED-8):
+ * the page offset (pages a day) or the start date (juz a day), as Jump to sets them. `user` is the automatic
+ * schedule as it will be saved (no custom plan, its amount); null when the schedule doesn't go through the page.
+ */
+export function automaticStartFields(
+  user: User,
+  startPage: number,
+  ctx: Pick<JumpContext, 'revisionDate' | 'memorized'>,
+): Pick<User, 'scheduleShiftPages'> & Partial<Pick<User, 'scheduleAnchorDate'>> | null {
+  const started = scheduleStartingByToday(user, ctx.revisionDate) ?? user;
+  const jump = { ...ctx, logs: [] };
+  const page = new Set([startPage]);
+  const moved = isJuzMode(started) ? jumpJuz(started, jump, page) : jumpPages(started, jump, page);
+  if (!moved) return null;
+  return { scheduleAnchorDate: started.scheduleAnchorDate, ...moved.fields };
+}
+
+/**
  * The user with today's revision starting at `target`, or null when the
  * schedule doesn't go through it (nothing of it memorized, or not in the plan).
  */

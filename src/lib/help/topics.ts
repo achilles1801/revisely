@@ -442,24 +442,28 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         icon: 'reorder-three-outline',
         title: 'Changing days',
         text:
-          'Tap a day to change it, hold and drag to move it, swipe left to delete it. ' +
-          'Saving leaves today as it is unless you edited today.',
+          'Tap a day to change what’s on it, make it a rest day or delete it. Hold and drag to move it. ' +
+          'Saving leaves today as it is unless you changed today.',
         covers: ['CARRY-5'],
       },
       {
-        id: 'schedule.new',
-        icon: 'sparkles-outline',
-        title: 'New plan',
-        text: '{{Create new plan}} makes a fresh cycle: even pages, whole juz or weakest first, forwards or in reverse.',
-        covers: ['SCHED-1', 'SCHED-2', 'SCHED-4'],
+        id: 'schedule.settings',
+        icon: 'options-outline',
+        title: 'Pages a day and order',
+        text:
+          '{{Pages a day}} and {{Order}} build your days: in order, backwards or weakest first. ' +
+          '{{Today starts at}} sets where today begins. Nothing changes until {{Save}}.',
+        covers: ['SCHED-1', 'SCHED-2', 'SCHED-4', 'SCHED-8'],
         when: 'smartTracking',
       },
       {
-        id: 'schedule.new.off',
-        icon: 'sparkles-outline',
-        title: 'New plan',
-        text: '{{Create new plan}} makes a fresh cycle: even pages or whole juz, forwards or in reverse.',
-        covers: ['SCHED-1', 'SCHED-2', 'SCHED-4'],
+        id: 'schedule.settings.off',
+        icon: 'options-outline',
+        title: 'Pages a day and order',
+        text:
+          '{{Pages a day}} and {{Order}} build your days, in order or backwards. ' +
+          '{{Today starts at}} sets where today begins. Nothing changes until {{Save}}.',
+        covers: ['SCHED-1', 'SCHED-2', 'SCHED-4', 'SCHED-8'],
         when: 'noSmartTracking',
       },
     ],

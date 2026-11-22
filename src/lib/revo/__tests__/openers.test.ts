@@ -266,7 +266,7 @@ describe('where Revo is opened from (REVO-38) and where its button shows (REVO-2
 
   it('[REVO-25] the button shows on Home and Activity’s screens, never on the Read tab, in a session, an editor or Settings', () => {
     expect([...REVO_BUTTON_ROUTES].sort()).toEqual(['Activity', 'ActivityAll', 'ActivityDay', 'Dashboard', 'PagesByStrength']);
-    for (const name of ['ReadIndex', 'QuranReader', 'ActiveRevision', 'PlanEdit', 'PlanDayEdit', 'Memorization', 'Settings', 'JournalEntry']) {
+    for (const name of ['ReadIndex', 'QuranReader', 'ActiveRevision', 'PlanEdit', 'Memorization', 'Settings', 'JournalEntry']) {
       expect(REVO_BUTTON_ROUTES.has(name)).toBe(false);
     }
   });

@@ -139,8 +139,8 @@ const SAMPLES = [
     ctx: steady,
     note: 'Majd’s first example',
     facts: [
-      F('Reverse order, in a new plan', /reverse order/i, true),
-      F('where: Edit schedule → Create new plan', /create new plan|edit schedule/i, true),
+      F('Order → An-Nas to Al-Fatihah', /an-nas to al-fatihah|order/i, true),
+      F('where: Edit schedule', /edit schedule/i, true),
       F('start at Juz 29 (Today starts at)', /today starts at|start(?:s|ing)? at (?:the end of )?juz 29|juz 29/i, true),
       F('says the whole plan goes backwards (no single-juz reverse)', /whole plan|carries on|then (?:juz 28|the juz before)|rest of|all (?:your )?memorized|not (?:just|only) (?:that|one) juz|only for the whole|(?:just|only) one juz|one juz backwards|no way to|not as (?:a single option|such)|single option/i),
       UNSURE,
@@ -206,7 +206,7 @@ const SAMPLES = [
     ctx: steady,
     facts: [
       F('Edit schedule', /edit schedule/i, true),
-      F('By Juz (Create new plan) or Daily amount → Juz', /by juz|daily amount/i, true),
+      F('Revise by → Juz', /revise by|juz/i, true),
       F('one juz per day', /juz per day|1 juz|one juz/i),
     ],
     screen: 'planEditor',
@@ -214,7 +214,7 @@ const SAMPLES = [
   {
     q: 'How do I make my plan go backwards, from An-Nas to Al-Fatiha?',
     ctx: steady,
-    facts: [F('Reverse order', /reverse order/i, true), F('Create new plan (in Edit schedule)', /create new plan|edit schedule/i, true)],
+    facts: [F('Order → An-Nas to Al-Fatihah', /an-nas to al-fatihah|order/i, true), F('in Edit schedule', /edit schedule/i, true)],
     screen: 'planEditor',
   },
   {
@@ -257,7 +257,7 @@ const SAMPLES = [
     ctx: steady,
     facts: [
       F('no surah plan (pages, juz or weakest)', /no surah|not (?:as )?a (?:surah )?(?:plan|mode)|isn’t a surah|there’s no|not possible|can’t/i),
-      F('closest: Edit schedule → a day → Add or remove content → Surahs, or Jump to a surah', /add or remove content|jump to/i, true),
+      F('closest: Edit schedule → a day → Add a surah or juz, or Jump to a surah', /add a surah or juz|jump to/i, true),
       UNSURE,
     ],
   },
@@ -302,7 +302,7 @@ const SAMPLES = [
   {
     q: 'How do I change how many pages I revise each day?',
     ctx: steady,
-    facts: [F('Edit schedule', /edit schedule/i, true), F('Daily amount → Pages per day', /daily amount|pages per day/i, true)],
+    facts: [F('Edit schedule', /edit schedule/i, true), F('Pages a day', /pages a day/i, true)],
     screen: 'planEditor',
   },
   {

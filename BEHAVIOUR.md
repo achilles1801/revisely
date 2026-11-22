@@ -68,12 +68,26 @@ How the tests are made: `tests/scenarios/README.md`.
   opened after missed days shows that day's pages.
 - **SCHED-6.** A day never holds the same page twice. A plan with a page on two neighbouring days,
   shifted by a carry-over, takes that page once and the next page after it.
-- **SCHED-7.** The Schedule screen's header names the plan: "Automatic", or a custom plan by its
-  name, "Custom plan" only when it has none. A saved plan loaded and saved keeps its name (on every
-  phone), and so does an edit of it. "Save current plan…" on a custom plan names it too (at once
-  when it has no unsaved edits, with the next Save when it has). A plan made with "Create new plan"
-  has no name. On the automatic schedule, "Save current plan…" only keeps a copy. A saved plan is a
-  copy: editing the plan in use doesn't change it, and deleting it doesn't rename the plan in use.
+- **SCHED-7.** Edit schedule's header says how often each page comes round ("Every page, every 11 days") and how
+  much a day ("10 pages a day · 104 pages memorized"), never "Automatic" or "Custom plan". A named plan shows its
+  name above that. A saved plan loaded and saved keeps its name (on every phone), and so does an edit of it.
+  "Save this schedule as a copy…" (More → Saved plans) on a custom plan names it too (at once when it has no unsaved
+  edits, with the next Save when it has). Days rebuilt from the settings have no name. On the automatic schedule,
+  saving a copy only keeps a copy. A saved plan is a copy: editing the plan in use doesn't change it, and deleting it
+  doesn't rename the plan in use.
+- **SCHED-8.** Edit schedule's settings build the days (Majd chose option B of the Edit schedule audit, Nov 22 2026:
+  "i feel like option B is way better and cleaner let's do that"): Revise by (pages or juz), Pages a day or Ajzaʼ a
+  day, Order (Al-Fatihah to An-Nas, An-Nas to Al-Fatihah, or Weakest first with Smart Tracking) and Today starts at.
+  Each change shows at once in the header and the days; nothing is saved until Save, the amount included. A day is
+  changed in one sheet: its surahs checked (unchecking one takes it off), "Add a surah or juz", "Make it a rest day",
+  "Delete this day". Saved plans and "Reset to automatic" are under More.
+  - A plan made from the settings alone, in Al-Fatihah to An-Nas order, is saved as the automatic schedule, so pages
+    memorized later join it by themselves (MEM-6). Days changed by hand, An-Nas to Al-Fatihah or Weakest first make a
+    custom plan, and on the automatic schedule the header says so before Save.
+  - Changing Revise by, the amount or the order after days were changed by hand rebuilds the days from the settings,
+    and the header says so before Save (one switch, `REBUILD_OVER_HAND_EDITS`; off, those days stay and "Rebuild days
+    from these settings" is offered). Changing where today starts keeps days changed by hand and turns them so today
+    starts there. Back to the settings it opened with, it is the schedule as it was.
 
 ## A revision session
 
@@ -947,8 +961,8 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   first; a day with no pages of its own (an off day) is done once the pages from Insights are revised.
   (Nov 8 2026: with every page of the day put first, none was its own, and Home said "28 of 28" and Continue
   revision for good.) On a custom plan this is temporary too, and the plan is never changed by it: under
-  Plan it's "First tomorrow" (the untouched row, the juz sheet), "Add to plan ›" opens tomorrow's day of
-  the plan with the pages added after its own, saying "… to this day in every cycle"; the plan changes
+  Plan it's "First tomorrow" (the untouched row, the juz sheet), "Add to plan ›" opens Edit schedule with
+  tomorrow's day of the plan up, the pages added after its own, saying "… to this day in every cycle"; the plan changes
   only when it is saved (Majd, Nov 8 2026: "a temp change by default with the option to make it a perm
   change"; Plan it used to open that day with the juz alone, and saving replaced the day). The session
   names them ("From Insights: Juz 1"; it said "the weak pages" whatever put them there), and Home says
@@ -1304,11 +1318,14 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
     add new pages by itself, it offers Add to your plan: tomorrow's day of it with the pages added after
     its own (it opened with them alone, and saving replaced the day).
 
-- **MEM-6.** The schedule editor lists, under "Not in your plan", the memorized and partly
+- **MEM-6.** Edit schedule lists, under "Not in your plan", the memorized and partly
   memorized pages a custom plan doesn't hold, named by their ayahs. A custom plan never adds new pages by
   itself. Add offers "With tomorrow's pages" (they join tomorrow's day) or "As a day of its own,
   tomorrow" (the cycle grows by a day). Either is an edit to Save, and the list leaves at once. The
-  automatic schedule holds every memorized page, so it has no such list.
+  automatic schedule holds every memorized page, so it has no such list. Edit schedule never turns the automatic
+  schedule into a custom plan quietly: changing the amount, the juz or where today starts keeps it automatic
+  (SCHED-8), and changing a day by hand, or an order other than Al-Fatihah to An-Nas, says before Save that pages
+  memorized later won't join by themselves.
 
 - **MEM-7.** The juz sheet shows a juz being learned (Activity). A page memorized in part is
   filled by the share of it that is memorized ("Part of a page" in the legend). A surah with ayahs
