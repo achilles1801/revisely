@@ -302,6 +302,13 @@ permission when "Daily reminders" is on, and a no saves reminders off.
   signed out. Sign in again to carry on." until the next sign-in, and Sentry hears of it once, with no account
   details. A sign-out or an account deletion from the app says nothing.
 
+## Tabs
+
+- **TAB-1.** A sideways swipe never presses what is under the finger: a touch that has moved more than
+  12 pt sideways opens nothing, whether or not it changed the tab. A press that comes without a touch
+  (VoiceOver, TalkBack) always counts. (Nov 22 2026: on Android, a swipe from Read toward Home that the
+  tab pager didn't take opened the surah under the finger, 4 swipes in about 100 on the emulator.)
+
 ## Sheets and updates
 
 - **SHEET-1.** One sheet at a time: a sheet asked to open while another is open, or still closing,
