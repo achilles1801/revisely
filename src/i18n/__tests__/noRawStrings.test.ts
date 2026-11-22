@@ -76,7 +76,8 @@ const EXTRACTED: string[] = [
 const WAITING: Record<string, string> = {
   'lib/releaseInfo.ts': 'App info’s lines (testers only); open PR #780 changes this file, so it goes once that merges.',
   'lib/revo/openers.ts':
-    'Revo’s first lines are built from English sentence parts (a day’s “on”/bare forms, “both pages”, “you” added or not): Arabic needs a module of its own with the same signature, as lib/help will.',
+    'Revo’s first lines, built from English sentence parts (a day’s “on”/bare forms, “both pages”, “you” added or not): per-language sentence builders, as lib/help; the Arabic ones are openers.ar.ts.',
+  'lib/revo/openers.ar.ts': 'openers.ts’s sentence builders in Arabic (Arabic number-and-noun agreement): per-language content, as lib/help.',
   'lib/revo/charts.ts':
     'Its readouts lean on lib/recency’s words (timesWord, recencyWords) and English grammar: it goes with lib’s own files.',
 };
