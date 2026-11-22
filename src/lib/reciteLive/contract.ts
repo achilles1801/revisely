@@ -133,6 +133,8 @@ export type LiveEvent =
       beat?: number;
       /** "adpcm": the checker decodes the IMA-ADPCM blocks the start frame asked to send (contract "ADPCM uplink"). */
       audio?: 'adpcm';
+      /** The checker holds a parked take after a `pause` frame and its socket's close (contract draft 12). */
+      pause?: true;
     }
   /**
    * A take started anywhere on the page: the checker has found where the reciter is (once per search). Its `nolock`
@@ -307,6 +309,7 @@ export function parseEvent(raw: unknown): LiveEvent | null {
         ...(x.said === 'voice' ? { said: 'voice' as const } : {}),
         ...(isNum(x.beat) && x.beat > 0 ? { beat: x.beat } : {}),
         ...(x.audio === 'adpcm' ? { audio: 'adpcm' as const } : {}),
+        ...(x.pause === true ? { pause: true as const } : {}),
       };
     case 'locked':
       return isWord(x.w) && isNum(x.s) && isNum(x.a)

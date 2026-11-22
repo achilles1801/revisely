@@ -20,6 +20,13 @@
 // where the socket's keepalive pong queued behind 38 s of resent audio and the checker dropped it after 20 s (the
 // checker session's finding). With beats, no more than CATCHUP_LEAD_SAMPLES ahead of what the checker has received
 // (`beat.rx`); without, CATCHUP_SLICE_SAMPLES every CATCHUP_TICK_MS.
+//
+// A long pause parks the take (contract draft 12, Nov 22 2026): a paused take held a checker instance, billed and closed
+// to anyone else, for as long as the pause lasted (one Dev take: 25 s of audio on a socket open 299 s). With a checker
+// whose `ready` says `pause`, a pause past PARK_AFTER_MS sends `pause` and closes the socket, no `end`: the checker
+// keeps the take in memory, the phone keeps its audio, and Resume (or Stop) connects again with `resume`, as after a
+// drop. A connection that drops while such a take is paused waits for Resume too. Shorter pauses keep the socket open
+// (most pauses are under a minute), and a checker that doesn't say `pause` keeps it open however long the pause lasts.
 
 import { LiveEvent, parseEvent } from './contract';
 import { encodeBlock, MAX_BLOCK_SAMPLES } from './adpcm';
@@ -62,6 +69,12 @@ export const READY_WAIT_MS = 20_000;
  */
 export const KEEPALIVE_MS = 10_000;
 const KEEPALIVE_FRAME = JSON.stringify({ type: 'keepalive' });
+/**
+ * A pause longer than this parks the take (ms; contract draft 12): `pause`, then the socket closed until Resume or Stop.
+ * Five of the six paused Dev takes the checker measured (Nov 22 2026) paused for under 45 s, and they keep their socket.
+ */
+export const PARK_AFTER_MS = 60_000;
+const PAUSE_FRAME = JSON.stringify({ type: 'pause' });
 
 /** How often the watchdog looks (ms). */
 const WATCH_EVERY_MS = 2000;
@@ -170,6 +183,11 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
     /** Paused: the keepalive's next frame. */
     let holding = false;
     let keep: unknown = null;
+    /** The last `ready` said its checker holds a parked take (draft 12). */
+    let pausable = false;
+    /** Parked: paused, the socket let go; Resume or Stop connects again (draft 12). And the park's timer. */
+    let parked = false;
+    let parkWait: unknown = null;
     const keepAlive = () => {
       keep = null;
       if (!holding || finished) return;
@@ -204,6 +222,8 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
       stopWatch();
       if (keep != null) timers.clear(keep);
       keep = null;
+      if (parkWait != null) timers.clear(parkWait);
+      parkWait = null;
       if (retry != null) timers.clear(retry);
       if (namesWait != null) timers.clear(namesWait);
       if (readyWait != null) timers.clear(readyWait);
@@ -329,6 +349,7 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
       // Raw until this socket's `ready` says the checker decodes ADPCM (a resume may land on a checker that doesn't).
       adpcm = false;
       adpcmIndex = 0;
+      pausable = false;
       s.binaryType = 'arraybuffer';
       s.onopen = () => {
         const frame: Record<string, unknown> = { ...start, token };
@@ -368,6 +389,7 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
           if (e.beat) beats = true;
           // The audio 4:1 from here, only if this checker said it decodes it (and the start frame asked).
           adpcm = start.audio === 'adpcm' && e.audio === 'adpcm';
+          pausable = e.pause === true;
           rxSamples = beats ? Math.max(0, e.from ?? 0) : null;
           // Once the take has ended, a resume only waits for the answer: its tries aren't renewed, so a checker
           // that keeps closing without one can't hold the take on Checking… for good.
@@ -431,6 +453,12 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
       live = false;
       stopWatch();
       if (finished) return;
+      // Paused on a checker that holds a parked take (draft 12): connecting again now would only hold an instance for the
+      // rest of the pause (the checker's own `idle` backstop included). Resume or Stop connects.
+      if (holding && pausable && !ended()) {
+        parked = true;
+        return;
+      }
       if (tries >= RETRY_WAITS_MS.length) {
         finish({ type: 'error', reason: 'offline' });
         return;
@@ -440,6 +468,33 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
         retry = null;
         void connect();
       }, wait);
+    };
+
+    /** Paused for PARK_AFTER_MS on a checker that holds a parked take: `pause`, then let the socket go (draft 12). */
+    const park = () => {
+      parkWait = null;
+      const s = socket;
+      if (!holding || finished || parked || ended() || !s || !live || !pausable) return;
+      s.send(PAUSE_FRAME);
+      parked = true;
+      socket = null;
+      live = false;
+      rxSamples = null;
+      stopWatch();
+      s.onclose = null;
+      s.onmessage = null;
+      try {
+        s.close();
+      } catch {
+        // already closed
+      }
+    };
+    /** Resume or Stop on a parked take: connect again with `resume`, as after a drop. */
+    const wake = () => {
+      if (!parked || finished) return;
+      parked = false;
+      tries = 0;
+      void connect();
     };
 
     // The first `ready` must come in time; a resume after it is the retries' business.
@@ -453,6 +508,8 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
       if (finished) return;
       controls.push({ at: samples, frame });
       if (live && socket) socket.send(JSON.stringify(frame));
+      // Stop while parked: the end goes out with the held audio once the checker is back.
+      else if (frame.type === 'end') wake();
     };
 
     return {
@@ -470,11 +527,18 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
         holding = on;
         if (keep != null) timers.clear(keep);
         keep = null;
-        if (on) keepAlive();
+        if (parkWait != null) timers.clear(parkWait);
+        parkWait = null;
+        if (on) {
+          keepAlive();
+          parkWait = timers.set(park, PARK_AFTER_MS);
+          return;
+        }
+        wake();
       },
       status: () =>
         // i18n-ignore (a status for the log and Sentry)
-        (finished ? 'finished' : retry != null ? `retry ${tries}` : socket ? (live ? 'live' : 'opening') : 'none') +
+        (finished ? 'finished' : parked ? 'parked' : retry != null ? `retry ${tries}` : socket ? (live ? 'live' : 'opening') : 'none') +
         (url !== mainUrl ? ' pair' : ''),
       // Still there after the take ends (the audio is held for resuming), for "Your recitation" on its marks.
       audioClip: (from, to) => {
