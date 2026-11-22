@@ -78,6 +78,11 @@ classic default), and a fresh install starts in light.
     surah names, so the › never stands alone and "Al-" never ends a line. Each line is two lines at most (`maxFontSizeMultiplier` 1.6, then it shrinks to
     fit); the name and streak and the sheet's header stop at 1.4, and so does the greeting, which
     also keeps 12pt from the icons (about 1.05 on an iPhone SE).
+  - **Edit schedule, tidied** (Majd chose option A of the Edit schedule audit, Nov 22 2026: "for edit schedule let's
+    do option A (tidy up) for now"; mocks `~/Documents/revisely-schedule-mocks/`, A1): the header says how much a day and
+    how often each page comes round (never "Automatic"); Daily amount is the first row; the days don't fold; "Create
+    new plan" and "Saved plans" (a sheet) are two rows; an edit on the automatic schedule says before Save that it
+    becomes a custom plan (MEM-6). Other directions are being explored as mocks only.
   - Activity is a calendar (`activity/ActivityCalendar`): **a month by default**, ‹ › to step,
     and **Week as the finest view** (seven rows, each day's facts), kept per device. Day shades
     are `lib/activityHeatmap` levels in `palette.heat` (≥ 2:1 on the ground) with

@@ -11,7 +11,6 @@ import { SafeAreaView } from '../../components/SafeAreaView';
 import Animated, { useAnimatedRef, useScrollOffset, useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { BottomSheetModal, BottomSheetTextInput } from '@gorhom/bottom-sheet';
@@ -24,7 +23,7 @@ import {
   buildJuzCycleDays,
   buildWeakestFirstPlanDays,
 } from '../../lib/algorithm';
-import { createCustomPlanFromDraft, customPlanTitle } from '../../lib/schedulePlans';
+import { createCustomPlanFromDraft } from '../../lib/schedulePlans';
 import { userWithNewSchedule } from '../../lib/planChange';
 import {
   defaultStartPage,
@@ -45,6 +44,7 @@ import { PlanSheet } from '../../components/plan/PlanSheet';
 import { InlineStepper } from '../../components/plan/InlineStepper';
 import { DAY_ROW_INSET } from '../../components/plan/DayRow';
 import { ReorderableDayList, ScrollLink } from '../../components/plan/ReorderableDayList';
+import { SavedPlansSheet } from '../../components/plan/SavedPlansSheet';
 import { UndoToast } from '../../components/revision/UndoToast';
 import { HelpButton } from '../../components/help/HelpButton';
 import { HelpToast } from '../../components/help/HelpToast';
@@ -73,8 +73,6 @@ type QuotaMode = 'pages' | 'juz';
 const LONG_CYCLE_DAYS = 14;
 /** Days shown before "Show All". */
 const COLLAPSED_DAYS = 7;
-/** Per-device memory of whether the Cycle block is folded away. */
-const CYCLE_COLLAPSED_KEY = '@revisely_plan_cycle_collapsed';
 
 function makeId(): string {
   return `${Date.now().toString(36)}-${Math.round(Math.random() * 1e9).toString(36)}`;
@@ -112,6 +110,7 @@ export default function PlanEditScreen() {
   const builderRef = useRef<PlanBuilderHandle>(null);
   const quotaSheetRef = useRef<BottomSheetModal>(null);
   const saveNameSheetRef = useRef<BottomSheetModal>(null);
+  const savedSheetRef = useRef<BottomSheetModal>(null);
   const nameInputRef = useRef<React.ComponentRef<typeof BottomSheetTextInput>>(null);
   const leavingRef = useRef(false);
 
@@ -168,32 +167,17 @@ export default function PlanEditScreen() {
     () => ({ ref: scrollRef, offset: scrollOffset, contentHeight }),
     [scrollRef, scrollOffset, contentHeight],
   );
-  const [cycleCollapsed, setCycleCollapsed] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
   const [tempMode, setTempMode] = useState<QuotaMode>(user?.scheduleMode ?? 'pages');
   const [tempCapacity, setTempCapacity] = useState(user?.dailyPageCapacity ?? 20);
   const [tempJuzCount, setTempJuzCount] = useState(user?.dailyJuzCount ?? 1);
-  // Menus are v2/ActionSheet: a saved plan's Load / Delete.
-  const [menuPlan, setMenuPlan] = useState<SavedPlan | null>(null);
   // "Not in your plan" (MEM-6): its Add's choices.
   const [notInPlanOpen, setNotInPlanOpen] = useState(false);
-  const [planMenuOpen, setPlanMenuOpen] = useState(false);
 
   const savedPlans = useMemo(
     () => [...(user?.savedPlans ?? [])].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     [user?.savedPlans],
   );
-
-  useEffect(() => {
-    AsyncStorage.getItem(CYCLE_COLLAPSED_KEY)
-      .then((v) => setCycleCollapsed(v === 'true'))
-      .catch(() => {});
-  }, []);
-
-  const setCycleCollapsedPersisted = useCallback((next: boolean) => {
-    setCycleCollapsed(next);
-    AsyncStorage.setItem(CYCLE_COLLAPSED_KEY, next ? 'true' : 'false').catch(() => {});
-  }, []);
 
   // Merge an edited day coming back from PlanDayEdit.
   useEffect(() => {
@@ -406,16 +390,6 @@ export default function PlanEditScreen() {
     startPlan(plan.days.map((d) => [...d]), plan.direction, plan.name);
   };
 
-  const savedPlanMessage = (plan: SavedPlan) =>
-    t(plan.direction === 'reverse' ? 'plan.edit.savedPlanMessageReverse' : 'plan.edit.savedPlanMessage', {
-      n: plan.days.length,
-    });
-
-  const openSavedPlan = (plan: SavedPlan) => {
-    setMenuPlan(plan);
-    setPlanMenuOpen(true);
-  };
-
   // ---- Automatic schedule / quota ---------------------------------------------------
   const presentQuota = () => {
     if (!user) return;
@@ -499,23 +473,16 @@ export default function PlanEditScreen() {
     stats.minPerDay === stats.maxPerDay
       ? pageCountLabel(stats.maxPerDay)
       : t('plan.builder.pagesRange', { min: stats.minPerDay, max: stats.maxPerDay });
-  const cycleSummary =
-    stats.restDays > 0
-      ? t('plan.edit.cycleSummaryRest', { n: days.length, perDay, count: stats.restDays })
-      : t('plan.edit.cycleSummary', { n: days.length, perDay });
+  const daysFooter = isLongCycle ? t('plan.edit.longCycle', { n: days.length }) : t('plan.edit.dayFooter');
 
-  const cycleFooter = isLongCycle
-    ? t('plan.edit.longCycle', { n: days.length })
-    : t('plan.edit.cycleFooter');
-
-  const planKind = !hasMemorized
+  // The header (SCHED-7): how much a day, then how often each page comes round; a named plan's name above.
+  const amount = !user.customPlan && !isDirty && user.scheduleMode === 'juz' ? quotaSummary : perDay;
+  const heroTitle = !hasMemorized
     ? t('plan.edit.nothingToSchedule')
     : days.length === 0
       ? t('plan.edit.noDays')
-      : user.customPlan || isDirty
-        ? customPlanTitle(planName)
-        : t('plan.edit.automatic');
-  const repeats = t('plan.edit.repeats', { count: days.length });
+      : t('plan.edit.perDay', { amount });
+  const repeats = t('plan.edit.everyPage', { count: days.length });
 
   const removedSummary = removed ? summarizeDay(removed.pages) : null;
   const removedMessage = removedSummary
@@ -561,9 +528,20 @@ export default function PlanEditScreen() {
       >
         {/* What the plan is, as the day screen shows what's on a day. */}
         <View style={styles.heroV2} testID="plan-hero">
-          <Text style={[typeV2.title, { color: palette.text }]}>{planKind}</Text>
+          {planName && (user.customPlan || isDirty) ? (
+            <Text style={[typeV2.meta, { color: palette.secondary }]} testID="plan-name-line">
+              {planName}
+            </Text>
+          ) : null}
+          <Text style={[typeV2.title, { color: palette.text }]}>{heroTitle}</Text>
           {hasMemorized && days.length > 0 ? (
             <Text style={[typeV2.body, styles.heroLineV2, { color: palette.secondary }]}>{repeats}</Text>
+          ) : null}
+          {/* MEM-6: saving an edit turns the automatic schedule into a custom plan; say so before Save. */}
+          {!user.customPlan && isDirty && hasMemorized ? (
+            <Text style={[typeV2.meta, styles.heroNoteV2, { color: palette.secondary }]} testID="plan-custom-note">
+              {t('plan.edit.customNote')}
+            </Text>
           ) : null}
           {isDirty ? (
             <Text style={[typeV2.meta, styles.heroLineV2, { color: palette.accentText }]} testID="plan-dirty">
@@ -571,6 +549,19 @@ export default function PlanEditScreen() {
             </Text>
           ) : null}
         </View>
+
+        {hasMemorized ? (
+          <GroupedSection>
+            <GroupedRow
+              title={t('plan.edit.dailyAmount')}
+              icon="speedometer-outline"
+              value={quotaSummary}
+              accessory="chevron"
+              onPress={presentQuota}
+              testID="plan-quota"
+            />
+          </GroupedSection>
+        ) : null}
 
         {outsidePlan.length > 0 ? (
           <GroupedSection
@@ -591,11 +582,8 @@ export default function PlanEditScreen() {
 
         {days.length > 0 ? (
           <GroupedSection
-            header={t('plan.edit.cycle')}
-            collapsed={cycleCollapsed}
-            onToggleCollapsed={() => setCycleCollapsedPersisted(!cycleCollapsed)}
-            collapsedFooter={cycleSummary}
-            footer={cycleFooter}
+            header={t('plan.edit.yourDays')}
+            footer={daysFooter}
             footerTone={isLongCycle ? 'warning' : 'default'}
             separatorInset={DAY_ROW_INSET}
           >
@@ -644,14 +632,8 @@ export default function PlanEditScreen() {
           </GroupedSection>
         )}
 
-        {hasMemorized ? (
-          <GroupedSection
-            footer={
-              smartTrackingEnabled
-                ? t('plan.edit.createFooterWeakest')
-                : t('plan.edit.createFooter')
-            }
-          >
+        <GroupedSection divider={false}>
+          {hasMemorized ? (
             <GroupedRow
               title={t('plan.edit.create')}
               icon="sparkles-outline"
@@ -659,48 +641,14 @@ export default function PlanEditScreen() {
               onPress={() => builderRef.current?.present()}
               testID="plan-create"
             />
-          </GroupedSection>
-        ) : null}
-
-        <GroupedSection
-          header={t('plan.edit.savedPlans')}
-          footer={savedPlans.length > 0 ? t('plan.edit.savedPlansFooter') : undefined}
-        >
-          {savedPlans.map((plan) => (
-            <GroupedRow
-              key={plan.id}
-              title={plan.name}
-              value={t('plan.edit.days', { count: plan.days.length })}
-              onPress={() => openSavedPlan(plan)}
-              onLongPress={() => deleteSavedPlan(plan)}
-              accessory="chevron"
-              testID={`saved-plan-${plan.id}`}
-            />
-          ))}
+          ) : null}
           <GroupedRow
-            title={t('plan.edit.saveCurrent')}
+            title={t('plan.edit.savedPlans')}
             icon="bookmark-outline"
-            onPress={openSaveName}
-            disabled={days.length === 0}
-            testID="plan-save-current"
-          />
-        </GroupedSection>
-
-        <GroupedSection
-          header={t('common.more')}
-          footer={
-            user.customPlan
-              ? t('plan.edit.moreFooterCustom')
-              : t('plan.edit.moreFooterAuto')
-          }
-        >
-          <GroupedRow
-            title={t('plan.edit.dailyAmount')}
-            icon="speedometer-outline"
-            value={quotaSummary}
+            value={savedPlans.length > 0 ? String(savedPlans.length) : undefined}
             accessory="chevron"
-            onPress={presentQuota}
-            testID="plan-quota"
+            onPress={() => savedSheetRef.current?.present()}
+            testID="plan-saved-plans"
           />
           {user.customPlan ? (
             <GroupedRow
@@ -768,26 +716,13 @@ export default function PlanEditScreen() {
         testID="plan-not-in-plan-menu"
       />
 
-      <ActionSheet
-        visible={planMenuOpen}
-        onClose={() => setPlanMenuOpen(false)}
-        title={menuPlan?.name}
-        message={menuPlan ? savedPlanMessage(menuPlan) : undefined}
-        actions={
-          menuPlan
-            ? [
-                { key: 'load', label: t('plan.edit.loadPlan'), icon: 'download-outline', onPress: () => loadSavedPlan(menuPlan) },
-                {
-                  key: 'delete',
-                  label: t('plan.edit.deletePlan'),
-                  icon: 'trash-outline',
-                  destructive: true,
-                  onPress: () => deleteSavedPlan(menuPlan),
-                },
-              ]
-            : []
-        }
-        testID="saved-plan-menu"
+      <SavedPlansSheet
+        ref={savedSheetRef}
+        plans={savedPlans}
+        canSaveCopy={days.length > 0}
+        onLoad={loadSavedPlan}
+        onDelete={deleteSavedPlan}
+        onSaveCopy={openSaveName}
       />
 
       <PlanSheet
@@ -814,9 +749,11 @@ export default function PlanEditScreen() {
           <GroupedSection
             divider={false}
             footer={
-              tempMode === 'pages'
-                ? t('plan.edit.pagesFooter')
-                : t('plan.edit.juzFooter')
+              user.customPlan
+                ? t('plan.edit.amountCustomFooter')
+                : tempMode === 'pages'
+                  ? t('plan.edit.pagesFooter')
+                  : t('plan.edit.juzFooter')
             }
           >
             {tempMode === 'pages' ? (
@@ -893,6 +830,7 @@ const styles = StyleSheet.create({
   scrollContentV2: { paddingBottom: spacing.huge },
   heroV2: { paddingHorizontal: layoutV2.gutter, paddingTop: layoutV2.rowPad, paddingBottom: 8 },
   heroLineV2: { marginTop: 2 },
+  heroNoteV2: { marginTop: 6 },
   // A row in line with the cycle's days: past the date column (gutter, 40, 12).
   dayContentV2: { paddingLeft: DAY_ROW_INSET },
   dayRowV2: { gap: 12 },
