@@ -215,9 +215,15 @@ describe('hidden page, word by word (following the reciter)', () => {
     { why: 'its box sat inside its neighbour’s', page: 450, line: 14, ref: [37, 124, 2], ink: [891.27, 948.38] },
     { why: 'touching its verse marker', page: 577, line: 12, ref: [75, 10, 5], ink: [878.67, 950.74] },
     { why: 'smaller print', page: 596, line: 14, ref: [94, 5, 1], ink: [356.82, 404.09] },
+    { why: 'its last letter touching the next word (ءامنتم بِهِۦ)', page: 21, line: 6, ref: [2, 137, 5], ink: [529.72, 643.94] },
+    { why: 'a low, short word (بِهِۦ after كذبوا)', page: 217, line: 9, ref: [10, 74, 15], ink: [523.03, 571.86] },
+    { why: 'a quarter’s sign (۞) touching it', page: 384, line: 5, ref: [27, 82, 1], ink: [52.38, 124.06] },
   ];
   const wordOf = (words: { verseFirstWord: (s: number, a: number) => number }, [s, a, p]: [number, number, number]) =>
     words.verseFirstWord(s, a) + p - 1;
+  // Covers reaching into ink by more than a twentieth of a unit (the pins are to a hundredth, the boxes are 32-bit floats).
+  const cutWord = (lines: { covers: [number, number][]; line: number }[], line: number, [x0, x1]: [number, number]) =>
+    lines.find((l) => l.line === line)!.covers.filter(([a, b]) => Math.min(b, x1) - Math.max(a, x0) > 0.05);
   /** What of [x0, x1] shows: outside every cover and in no marker's opening is open; this is the rest. */
   const showing = (lines: { covers: [number, number][]; line: number }[], page: number, line: number, [x0, x1]: [number, number]) =>
     subtractSpans(x0, x1, [...lines.find((l) => l.line === line)!.covers, ...pageLines(page).find((l) => l.line === line)!.markers]);
@@ -229,7 +235,7 @@ describe('hidden page, word by word (following the reciter)', () => {
       expect({ word: m.why, line: words.lineOf(w) }).toEqual({ word: m.why, line: m.line });
       // Recited up to it, the next to say after it: none of its ink under a cover.
       const recited = hiddenPageLayout(m.page, new Set(), { words, shown: (v: number) => v <= w, next: w + 1 }).lines;
-      expect({ word: m.why, cut: cut(recited, m.line, m.ink) }).toEqual({ word: m.why, cut: [] });
+      expect({ word: m.why, cut: cutWord(recited, m.line, m.ink) }).toEqual({ word: m.why, cut: [] });
       // It is next: all its ink covered (a unit at each end is its faint edge, and the next ink can be that close).
       const next = hiddenPageLayout(m.page, new Set(), { words, shown: (v: number) => v < w, next: w }).lines;
       expect({ word: m.why, shows: showing(next, m.page, m.line, [m.ink[0] + 1, m.ink[1] - 1]) }).toEqual({ word: m.why, shows: [] });
@@ -237,14 +243,15 @@ describe('hidden page, word by word (following the reciter)', () => {
   });
 
   it('two words whose ink shares columns (a kaf’s top stroke over the word before): the one recited stays whole', () => {
-    // 12:6, page 236 line 4: كَمَآ’s kaf reaches over يَعْقُوبَ’s last letter. No straight edge keeps both whole, so the
-    // edge leaves the stroke’s tip (about 18 units) over يَعْقُوبَ rather than cut يَعْقُوبَ (check-word-boxes.py).
+    // 12:6, page 236 line 4: كَمَآ’s kaf reaches over يَعْقُوبَ’s last letter and touches it. check-word-boxes.py splits
+    // the two at the junction; no straight edge keeps both whole, so the edge leaves the stroke’s tip (about 2 units)
+    // over يَعْقُوبَ rather than cut يَعْقُوبَ.
     const words = getQuranWords();
     const yaqub = wordOf(words, [12, 6, 13]);
     const lines = hiddenPageLayout(236, new Set(), { words, shown: (v: number) => v <= yaqub, next: yaqub + 1 }).lines;
-    expect(cut(lines, 4, [701.05, 825.5])).toEqual([]);
-    const tip = total(showing(lines, 236, 4, [646.3, 719.95]));
+    expect(cutWord(lines, 4, [697.9, 825.5])).toEqual([]);
+    const tip = total(showing(lines, 236, 4, [646.3, 700.26]));
     expect(tip).toBeGreaterThan(0);
-    expect(tip).toBeLessThanOrEqual(19);
+    expect(tip).toBeLessThanOrEqual(3);
   });
 });
