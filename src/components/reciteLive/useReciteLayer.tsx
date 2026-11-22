@@ -97,7 +97,7 @@ import { PassageProgressSheet } from '../reciteMemory/PassageProgressSheet';
 import { memoryId, type ClearRecord } from '../../lib/reciteMemory/record';
 import { clipOfTake, useTakeRecordings } from '../../lib/reciteMemory/takeAudio';
 import { markOf, PAST_OPACITY, RememberedTargets, RememberedUnderlay } from '../reciteMemory/RememberedLayers';
-import { markFill } from './markColours';
+import { markFill, markFirm } from './markColours';
 import { WordHistoryCard } from '../reciteMemory/WordHistoryCard';
 import { ShownTakeBar } from '../reciteMemory/ShownTakeBar';
 import type { TakeRecord } from '../../lib/reciteMemory/record';
@@ -751,7 +751,7 @@ export function useReciteLayer({
               colors={{ band: v2.highlightSoft, marks: markColours }}
             />
           )
-        : showPast && qw
+        : showPast && qw && !pastOnCovers
         ? (page: number, scale: number) => (
             <RememberedUnderlay
               page={page}
@@ -772,14 +772,15 @@ export function useReciteLayer({
               // The band on the cursor's line, on a shown page only (followCues); a hidden page's newest word is inked over
               // the ink (LiveOverlay's follow).
               cursor={live.state.status !== 'listening' ? null : live.state.cursor ?? guessCursor(live.state)}
-              marks={pageMarks(page)}
+              // A hidden page draws its marks over its covers (LiveOverlay).
+              marks={hidden ? [] : pageMarks(page)}
               selected={cardMarks[0] ?? null}
               hidden={hidden}
               colors={{ band: v2.highlightSoft, marks: markColours }}
             />
           )
         : undefined,
-    [liveOn, qw, live.active, live.state, v2, cardMarks, pageMarks, hidden, markColours, showPast, pastOnPage, pastAt, isDark, showing, shownOnPage, shownCardMarks, liveInfo],
+    [liveOn, qw, live.active, live.state, v2, cardMarks, pageMarks, hidden, markColours, showPast, pastOnPage, pastAt, isDark, showing, shownOnPage, shownCardMarks, liveInfo, pastOnCovers],
   );
   // The next word's cover turns red while something else is being said in its slot (the checker's `off`, draft 7).
   const offWord = live.state.off?.w ?? null;
@@ -789,10 +790,11 @@ export function useReciteLayer({
     const marked = new Set(Object.values(live.state.marks).map((m) => m.w));
     return [...peeked].filter((w) => !marked.has(w));
   }, [live.active, peeked, live.state.marks]);
+  // A hidden page draws every mark on the page over its covers (LiveOverlay), shown words' too: the page under them is
+  // covered. `picked`: the one a card is open for, in its firm shade.
   const coverMarksOn = useCallback(
-    (page: number): { mark: Mark; fill: string; opacity?: number }[] => {
+    (page: number): { mark: Mark; fill: string; opacity?: number; picked?: boolean }[] => {
       if (!qw || !hidden || !coversKeepMarks) return [];
-      const follow = hiddenFollow(qw, revealed, liveInfo);
       const liveMarks = live.active && checkTake ? marksOnPage(live.state, qw, page) : [];
       const past = pastOnCovers
         ? openInRange(memories, ...qw.pageRange(page)).flatMap((p) => {
@@ -800,13 +802,19 @@ export function useReciteLayer({
             return m ? [m] : [];
           })
         : [];
-      return coverHighlights(qw, page, follow.shown, liveMarks, past).map(({ mark, past: before }) =>
+      const pickedLive = cardMarks[0]?.w ?? null;
+      const pickedPast = pastAt?.w ?? null;
+      return coverHighlights(qw, page, () => false, liveMarks, past).map(({ mark, past: before }) =>
         before
-          ? { mark, fill: markFill(v2, mark), opacity: isDark ? PAST_OPACITY.dark : PAST_OPACITY.light }
-          : { mark, fill: markColours[markGroup(mark)].fill },
+          ? mark.w === pickedPast
+            ? { mark, fill: markFirm(v2, mark), opacity: 1, picked: true }
+            : { mark, fill: markFill(v2, mark), opacity: isDark ? PAST_OPACITY.dark : PAST_OPACITY.light }
+          : mark.w === pickedLive
+            ? { mark, fill: markColours[markGroup(mark)].firm, picked: true }
+            : { mark, fill: markColours[markGroup(mark)].fill },
       );
     },
-    [qw, hidden, coversKeepMarks, revealed, liveInfo, live.active, live.state, checkTake, markColours, pastOnCovers, memories, v2, isDark],
+    [qw, hidden, coversKeepMarks, live.active, live.state, checkTake, markColours, pastOnCovers, memories, v2, isDark, cardMarks, pastAt],
   );
   // A tap on the page: the shown take's marks; else this take's marks, then the past mistakes on show (on the page, or
   // on a hidden page's covers: Majd, Nov 21 2026, "the shaded mistakes when the page is hidden aren't clickable"). The
@@ -865,6 +873,7 @@ export function useReciteLayer({
                 hidden
                   ? {
                       follow: hiddenFollow(qw, revealed, liveInfo),
+                      ink: { colour: palette.pageTint, opacity: palette.pageTint != null ? 0.92 : undefined },
                       ...coverColors,
                       off: offWord != null ? { w: offWord, words: qw, colour: v2.markWord } : null,
                       current:

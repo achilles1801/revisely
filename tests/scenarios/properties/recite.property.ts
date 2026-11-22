@@ -65,6 +65,8 @@ import { getJuzForPage } from '../../../src/lib/quranData';
 import { runs } from './fixtures';
 import { cursorBox, markHighlight, wordBox } from '../../../src/lib/reciteLive/geometry';
 import { followCues, washOf, washReach } from '../../../src/lib/reciteLive/wash';
+import { followBox, hiddenInkPlan } from '../../../src/components/reciteLive/HiddenInkLayer';
+import { pageLines } from '../../../src/lib/recite/pageLines';
 
 const words = quranWords();
 const KINDS: MarkKind[] = ['word', 'skipped', 'added', 'harakat', 'letter', 'tajweed'];
@@ -1319,6 +1321,71 @@ describe('[RECITE-20] on a hidden page the newest word shown is in the following
         else expect(cues.ink).toBe(newest);
       }),
       { numRuns: runs(200) },
+    );
+  });
+});
+
+describe('[RECITE-20] a hidden page is drawn empty: faint rules where words are hidden, the markers and the words shown in their own ink', () => {
+  // A page, and what it shows: a run of words from where a take started (the words recited), and maybe a few more shown
+  // by hand further on (peeks, a verse shown whole).
+  const caseArb = fc.integer({ min: 3, max: 604 }).chain((page) => {
+    const [from, to] = words.pageRange(page);
+    return fc.record({
+      page: fc.constant(page),
+      start: fc.integer({ min: from, max: to - 1 }),
+      length: fc.integer({ min: 0, max: to - from }),
+      extra: fc.uniqueArray(fc.integer({ min: from, max: to - 1 }), { maxLength: 4 }),
+    });
+  });
+
+  it('every line is covered; each word shown is inside a run drawn in ink on its line, each hidden word outside them; every marker is drawn whole', () => {
+    fc.assert(
+      fc.property(caseArb, ({ page, start, length, extra }) => {
+        const shown = (w: number) => (w >= start && w < start + length) || extra.includes(w);
+        const plan = hiddenInkPlan(words, page, shown);
+        const lines = pageLines(page);
+        expect(plan.lines.map((l) => l.line)).toEqual(lines.map((l) => l.line));
+        const runsOn = (line: number) => {
+          const l = lines.find((x) => x.line === line)!;
+          return plan.ink.filter((p) => p.kind === 'shown' && p.box.y0 === l.coverTop).map((p) => p.box);
+        };
+        const [from, to] = words.pageRange(page);
+        for (let w = from; w < to; w++) {
+          const r = words.rect(w);
+          const runs = runsOn(words.lineOf(w));
+          if (shown(w)) expect(runs.some((b) => b.x0 <= r.x0 && b.x1 >= r.x1)).toBe(true);
+          else {
+            // A run spans only consecutive words shown, so a hidden word's middle is never in one, unless the word data
+            // puts it inside a shown word's own box (a few boxes overlap their neighbours; the fitted boxes fix those).
+            const mid = (r.x0 + r.x1) / 2;
+            const insideShownWord = (() => {
+              for (let v = from; v < to; v++) {
+                if (!shown(v) || words.lineOf(v) !== words.lineOf(w)) continue;
+                const o = words.rect(v);
+                if (o.x0 < mid && mid < o.x1) return true;
+              }
+              return false;
+            })();
+            if (!insideShownWord) expect(runs.filter((b) => b.x0 + 1 < mid && mid < b.x1 - 1)).toEqual([]);
+          }
+        }
+        for (const l of lines) {
+          for (const [a, b] of l.markers) expect(plan.ink.some((p) => p.kind === 'marker' && p.box.x0 <= a && p.box.x1 >= b && p.box.y0 === l.coverTop)).toBe(true);
+          // The rule never runs under a word shown or a marker.
+          const rules = plan.lines.find((x) => x.line === l.line)!.rules;
+          for (const box of runsOn(l.line)) for (const [a, b] of rules) expect(Math.min(b, box.x1 - 1) - Math.max(a, box.x0 + 1)).toBeLessThanOrEqual(0);
+        }
+        // The newest word's ink: its own x, its line's band.
+        if (length > 0) {
+          const w = start + length - 1 < to ? start + length - 1 : to - 1;
+          const box = followBox(words, plan, w);
+          const l = lines.find((x) => x.line === words.lineOf(w))!;
+          expect([box.y0, box.y1]).toEqual([l.coverTop, l.coverBottom]);
+          expect(box.x0).toBeLessThan(words.rect(w).x0);
+          expect(box.x1).toBeGreaterThan(words.rect(w).x1);
+        }
+      }),
+      { numRuns: runs(150) },
     );
   });
 });

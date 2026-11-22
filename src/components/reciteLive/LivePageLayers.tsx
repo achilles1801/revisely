@@ -1,16 +1,15 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import { HiddenPageOverlay } from '../recite/HiddenPageOverlay';
 import type { Rect } from '../../lib/ayahBounds';
 import type { QuranWords } from '../../lib/recite/quranWords';
 import type { WordFollow } from '../../lib/recite/hiddenPage';
 import type { Mark, MarkGroup } from '../../lib/reciteLive/contract';
 import { markGroup, strongestByWord } from '../../lib/reciteLive/contract';
 import { markTitle } from '../../lib/reciteLive/describe';
-import { currentLineBand, grow, markBox, markHighlight, offBox, wordBox } from '../../lib/reciteLive/geometry';
+import { currentLineBand, markBox, markHighlight, offBox, wordBox } from '../../lib/reciteLive/geometry';
 import { followCues } from '../../lib/reciteLive/wash';
 import { t } from '../../i18n';
-import { FollowInk } from './FollowInk';
+import { HiddenInkLayer, shownOnHiddenPage, type InkWash } from './HiddenInkLayer';
 import { Wash } from './Wash';
 
 const NO_REVEALED: ReadonlySet<string> = new Set();
@@ -81,14 +80,16 @@ export function LiveUnderlay({
 }
 
 /**
- * Over the page's ink: on a hidden page, the covers (words show as recited, or shown by hand), with no band on any line
- * (Majd, Nov 15 2026). The newest word's grey wash and the marks' washes are behind the ink (LiveUnderlay); what marks a
- * cover (a mistake on a hidden word, the word being said, `off`) is a wash too, over the cover.
- * `off`: the next word, while something else is being said in its slot (the checker's `off`): its cover turns red, the
- * word-mistake highlight over it, its text still hidden. Not a mark: it goes when the word is said, the reciter goes
- * back, or a mark comes (lib/reciteLive/state). During a take, the words peeked (shown by hand) under a veil of the
- * page's colour, so their ink is a quiet grey, in either view and once recited too; a peeked word with a mistake keeps
- * its highlight unveiled.
+ * Over the page's ink. On a hidden page, the page drawn empty (HiddenInkLayer; Majd, Nov 22 2026): each line covered,
+ * a faint rule where its words are still hidden, the washes over the covers (every mark on the page, a take's in their
+ * colour and Recite's memory's lighter, so a hidden word's still shows where it is: Majd, Nov 20 2026, "if I hide the
+ * page, that highlight should still be there"; the covered word being said lightly marked; `off`), then the verse
+ * markers and the words shown drawn again in the page's own ink, the newest in the following colour (`follow`;
+ * followCues decides which word, none for a word with a mark). No band on any line (Majd, Nov 15 2026).
+ * `off`: the next word, while something else is being said in its slot (the checker's `off`): the word-mistake wash on
+ * its place, its text still hidden. Not a mark: it goes when the word is said, the reciter goes back, or a mark comes
+ * (lib/reciteLive/state). During a take, the words peeked (shown by hand) under a veil of the page's colour, so their ink
+ * is a quiet grey, in either view and once recited too; a peeked word with a mistake keeps its highlight unveiled.
  */
 export function LiveOverlay({
   page,
@@ -102,61 +103,58 @@ export function LiveOverlay({
   page: number;
   scale: number;
   hidden: {
+    /** What the hidden page shows (recited, peeked, shown by hand). */
     follow: WordFollow;
     cover: string;
     guide: string;
+    /** How the pager tints the page image, so words drawn again match it. */
+    ink?: { colour: string | null; opacity?: number };
     off?: { w: number; words: QuranWords; colour: string } | null;
-    /** The word being said, still covered: its cover lightly marked, so the reciter sees where they are (Majd, Nov 22 2026). */
+    /** The word being said, still covered: its place lightly marked, so the reciter sees where they are (Majd, Nov 22 2026). */
     current?: { w: number; words: QuranWords; colour: string } | null;
   } | null;
   peeked?: { words: QuranWords; peeked: readonly number[]; veil: string } | null;
-  /**
-   * Mistakes on words the hidden page still covers (Majd, Nov 20 2026: "if I hide the page, that highlight should still
-   * be there. Obviously, the word won't be shown"): a take's marks in their colour, and Recite's memory's lighter, drawn
-   * over the cover so the word stays hidden. A word that shows has its highlight behind its ink (LiveUnderlay).
-   */
-  coverMarks?: { words: QuranWords; marks: readonly { mark: Mark; fill: string; opacity?: number }[] } | null;
-  /**
-   * On a hidden page, the newest word shown, drawn again in the following ink over its own (FollowInk; followCues
-   * decides which word, none for a word with a mark). Drawn first, so a cover over a neighbour stays on top.
-   */
+  /** On a hidden page, the marks on the page: a take's (`opacity` unset) and Recite's memory's, `picked` the one a card is open for. */
+  coverMarks?: { words: QuranWords; marks: readonly { mark: Mark; fill: string; opacity?: number; picked?: boolean }[] } | null;
+  /** On a hidden page, the newest word shown, in the following ink over its own. */
   follow?: { w: number; words: QuranWords; colour: string } | null;
-  /** The page's image as the pager draws it, for drawing a word again. */
+  /** The page's image as the pager draws it, for drawing words again. */
   image?: { uri: string; width: number; height: number } | null;
 }) {
   const veiled = peeked ? peeked.peeked.filter((w) => peeked.words.pageOf(w) === page) : [];
   if (!hidden && veiled.length === 0) return null;
-  const off = hidden?.off && hidden.off.words.pageOf(hidden.off.w) === page && !hidden.follow.shown(hidden.off.w) ? hidden.off : null;
-  const current =
-    hidden?.current && hidden.current.words.pageOf(hidden.current.w) === page && !hidden.follow.shown(hidden.current.w) && off?.w !== hidden.current.w
-      ? hidden.current
-      : null;
-  const inked =
-    hidden && follow && image && follow.words.pageOf(follow.w) === page && hidden.follow.shown(follow.w) ? follow : null;
+  const words = hidden?.follow.words ?? null;
+  const shown = hidden && words ? shownOnHiddenPage(words, hidden.follow, NO_REVEALED) : null;
+  const washes: InkWash[] = [];
+  if (hidden && words && shown) {
+    for (const { mark, fill, opacity, picked } of coverMarks?.marks ?? []) {
+      if (words.pageOf(mark.w) !== page) continue;
+      const g = markGroup(mark);
+      const past = opacity != null;
+      const id = shown(mark.w) ? (past ? `past-highlight-${g}` : `live-highlight-${g}`) : past ? `cover-past-${g}` : `cover-highlight-${g}`;
+      washes.push({ box: markHighlight(words, mark), colour: fill, opacity: picked ? undefined : opacity, testID: picked ? `${id}-picked` : id });
+    }
+    const off = hidden.off && words.pageOf(hidden.off.w) === page && !shown(hidden.off.w) ? hidden.off : null;
+    const current =
+      hidden.current && words.pageOf(hidden.current.w) === page && !shown(hidden.current.w) && off?.w !== hidden.current.w ? hidden.current : null;
+    if (current) washes.push({ box: offBox(words, current.w), colour: current.colour, testID: 'live-cover-current' });
+    if (off) washes.push({ box: offBox(words, off.w), colour: off.colour, testID: 'live-off' });
+  }
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill} testID={`live-overlay-${page}`}>
-      {inked && image ? (
-        <FollowInk testID="live-follow-ink" box={grow(wordBox(inked.words, inked.w), 1, 0)} scale={scale} image={image} colour={inked.colour} />
+      {hidden && words && shown ? (
+        <HiddenInkLayer
+          page={page}
+          scale={scale}
+          words={words}
+          shown={shown}
+          image={image}
+          ink={hidden.ink ?? { colour: null }}
+          colors={{ cover: hidden.cover, guide: hidden.guide }}
+          washes={washes}
+          follow={follow ? { w: follow.w, colour: follow.colour } : null}
+        />
       ) : null}
-      {hidden ? (
-        <HiddenPageOverlay page={page} scale={scale} revealed={NO_REVEALED} follow={hidden.follow} colors={{ cover: hidden.cover, guide: hidden.guide }} />
-      ) : null}
-      {hidden && coverMarks
-        ? coverMarks.marks.map(({ mark, fill, opacity }) =>
-            coverMarks.words.pageOf(mark.w) === page && !hidden.follow.shown(mark.w) ? (
-              <Wash
-                key={`cover-${mark.w}`}
-                testID={opacity == null ? `cover-highlight-${markGroup(mark)}` : `cover-past-${markGroup(mark)}`}
-                box={markHighlight(coverMarks.words, mark)}
-                scale={scale}
-                colour={fill}
-                opacity={opacity}
-              />
-            ) : null,
-          )
-        : null}
-      {current ? <Wash testID="live-cover-current" box={offBox(current.words, current.w)} scale={scale} colour={current.colour} /> : null}
-      {off ? <Wash testID="live-off" box={offBox(off.words, off.w)} scale={scale} colour={off.colour} /> : null}
       {peeked
         ? veiled.map((w) => (
             <View

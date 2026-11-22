@@ -578,12 +578,15 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   page's covers. With the page shown, nothing marks the word being said: only a quiet band on its line. (Majd, Nov 21 2026: Tarteel's shading "is way more elegant than ours and also
   seems like a blurb or splash … They dont even use shades when ur reciting with the page shown ie not hidden, which is
   actually really nice. I also like their color shades its like more pastel which is what we should aim for".)
-- **RECITE-20.** (Revisely Dev) With the page hidden, the newest word shown during a take is in its own ink in the
-  following colour (green, the same as the word being said in the bar), and the words shown before it are in the page's
-  own ink; it moves on with each word shown, never to a word still covered. A word with a mark keeps its wash and the
-  page's ink instead: the mark says more than where the reciter is. With the page shown nothing is inked (RECITE-19).
-  (Majd, Nov 22 2026, of Tarteel's hidden page: "i dont see the words being a different color as its recited with page
-  hidden, why are we not taking that up?")
+- **RECITE-20.** (Revisely Dev) A hidden page is an empty page: a faint rule where each line's words are still hidden,
+  the ayah markers whole, and each word shown (recited, peeked, or in an ayah shown whole) appearing in place in its own
+  ink, drawn whole. During a take the newest word shown is in the following colour (green, the same as the word being
+  said in the bar) and the words before it in the page's own ink; it moves on with each word shown, never to a word
+  still covered. A word with a mark keeps its wash and the page's ink instead: the mark says more than where the reciter
+  is. Mistakes' washes show on a hidden word's place as on a shown word, behind the ink. With the page shown nothing is
+  inked (RECITE-19). (Majd, Nov 22 2026, of Tarteel's hidden page: "i dont see the words being a different color as its
+  recited with page hidden, why are we not taking that up?"; and of the empty page with rules: "let's do it and test
+  it".)
 
 ## Recite insights
 

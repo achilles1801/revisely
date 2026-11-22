@@ -926,10 +926,15 @@ describe('the hidden view (the eye on the bar)', () => {
     fireEvent.press(screen.getByTestId('recite-eye'));
     expect(screen.getByTestId('recite-eye-group')).toBeTruthy();
     expect(screen.getByTestId('hidden-page-379')).toBeTruthy();
-    const covered = () => screen.getAllByTestId('hidden-cover').length;
-    const before = covered();
+    // Every line is covered, and what shows is drawn again in the page's ink (Majd, Nov 22 2026: an empty page with
+    // faint rules, the words appearing in their own ink).
+    const drawn = () => screen.queryAllByTestId('hidden-shown').length;
+    // How much of the page's lines still shows a rule (a word shown takes its stretch of rule).
+    const rules = () => screen.queryAllByTestId('hidden-guide').reduce((n, r) => n + (flatStyle(r).width as number), 0);
+    const [before, rulesBefore] = [drawn(), rules()];
     fireEvent.press(screen.getByTestId('recite-whole-ayah'));
-    expect(covered()).toBeLessThan(before);
+    expect(drawn()).toBeGreaterThan(before);
+    expect(rules()).toBeLessThan(rulesBefore);
     fireEvent.press(screen.getByTestId('recite-next-word'));
     // The checker is told (contract draft 5): a shown word counts as helped, never as a mistake for being shown.
     const [from, to] = words.verseRange(27, 23);
@@ -953,7 +958,8 @@ describe('the hidden view (the eye on the bar)', () => {
     // Found: the words recited show in place, and still no band.
     await event({ type: 'locked', w: A23, s: 27, a: 23 });
     await event({ type: 'at', w: A23 + 3 });
-    expect(screen.getAllByTestId('hidden-cover').length).toBeLessThanOrEqual(covered);
+    expect(screen.getAllByTestId('hidden-cover')).toHaveLength(covered);
+    expect(screen.queryAllByTestId('hidden-shown').length).toBeGreaterThan(0);
     expect(screen.queryAllByTestId('hidden-band')).toHaveLength(0);
   });
 
