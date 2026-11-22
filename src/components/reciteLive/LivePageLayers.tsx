@@ -87,7 +87,7 @@ export function LiveUnderlay({
  * Over the page's ink. On a hidden page, the page drawn empty (HiddenInkLayer; Majd, Nov 22 2026): each line covered,
  * a faint rule where its words are still hidden, the washes over the covers (every mark on the page, a take's in their
  * colour and Recite's memory's lighter, so a hidden word's still shows where it is: Majd, Nov 20 2026, "if I hide the
- * page, that highlight should still be there"; the covered word being said lightly marked; `off`), then the verse
+ * page, that highlight should still be there", outside a take; during one, nothing on a word still hidden; `off`), then the verse
  * markers and the words shown drawn again in the page's own ink, the newest in the following colour (`follow`;
  * followCues decides which word, none for a word with a mark). No band on any line (Majd, Nov 15 2026).
  * `off`: the next word, while something else is being said in its slot (the checker's `off`): the word-mistake wash on
@@ -114,8 +114,12 @@ export function LiveOverlay({
     /** How the pager tints the page image, so words drawn again match it. */
     ink?: { colour: string | null; opacity?: number };
     off?: { w: number; words: QuranWords; colour: string } | null;
-    /** The word being said, still covered: its place lightly marked, so the reciter sees where they are (Majd, Nov 22 2026). */
-    current?: { w: number; words: QuranWords; colour: string } | null;
+    /**
+     * A take is running: nothing is drawn on a word still hidden, its marks and past mistakes included (Majd's Dev take,
+     * Nov 22 2026: the marked next word and the boxes on lines not yet recited gave words away); they show once their
+     * word does. Outside a take a hidden word's marks show on its place (RECITE-13).
+     */
+    duringTake?: boolean;
   } | null;
   peeked?: { words: QuranWords; peeked: readonly number[]; veil: string } | null;
   /** On a hidden page, the marks on the page: a take's (`opacity` unset) and Recite's memory's, `picked` the one a card is open for. */
@@ -133,15 +137,13 @@ export function LiveOverlay({
   if (hidden && words && shown) {
     for (const { mark, fill, opacity, picked } of coverMarks?.marks ?? []) {
       if (words.pageOf(mark.w) !== page) continue;
+      if (hidden.duringTake && !shown(mark.w)) continue;
       const g = markGroup(mark);
       const past = opacity != null;
       const id = shown(mark.w) ? (past ? `past-highlight-${g}` : `live-highlight-${g}`) : past ? `cover-past-${g}` : `cover-highlight-${g}`;
       washes.push({ box: markHighlight(words, mark), colour: fill, opacity: picked ? undefined : opacity, testID: picked ? `${id}-picked` : id });
     }
     const off = hidden.off && words.pageOf(hidden.off.w) === page && !shown(hidden.off.w) ? hidden.off : null;
-    const current =
-      hidden.current && words.pageOf(hidden.current.w) === page && !shown(hidden.current.w) && off?.w !== hidden.current.w ? hidden.current : null;
-    if (current) washes.push({ box: offBox(words, current.w), colour: current.colour, testID: 'live-cover-current' });
     if (off) washes.push({ box: offBox(words, off.w), colour: off.colour, testID: 'live-off' });
   }
   return (

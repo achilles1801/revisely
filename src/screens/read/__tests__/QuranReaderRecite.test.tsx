@@ -1034,9 +1034,9 @@ describe('no word shows before it is said (Majd, Nov 21 2026)', () => {
     // What the bar says (its words as VoiceOver reads them); the page's covers follow the same word (liveInfo).
     const barSays = () => screen.getByTestId('recite-middle').props.accessibilityLabel as string;
     expect(barSays()).not.toContain(words.uthmani(A23 + 2));
-    // Where they are, still covered: the word being said has its cover lightly marked, and the newest shown word is in the
-    // following ink.
-    expect(screen.getByTestId('live-cover-current')).toBeTruthy();
+    // Where they are: the newest shown word in the following ink, and nothing at all on the word being said, still hidden
+    // (Majd's Dev take, Nov 22 2026: the marked next word gave it away).
+    expect(screen.queryByTestId('live-cover-current')).toBeNull();
     expect(screen.getByTestId('live-follow-ink')).toBeTruthy();
     // The next word begins: the third shows.
     await event({ type: 'at', w: A23 + 3 });
@@ -2490,18 +2490,25 @@ describe('Majd’s Nov 20 asks: the mistake sound, and mistakes on a hidden page
     expect(cue.playCueTap).not.toHaveBeenCalled();
   });
 
-  it('[RECITE-13] a hidden page keeps a take’s mark on a word still covered, in its colour, the word still hidden', async () => {
+  it('[RECITE-13] a take’s mark on a word still hidden: nothing during the take, behind its ink once shown, on its place after the take', async () => {
     await startTake('check');
     fireEvent.press(screen.getByTestId('recite-eye'));
     await event({ type: 'at', w: A23 + 2 });
     await event({ type: 'said', upTo: A23 + 1 });
-    // A mark on a word the page still covers.
+    // A mark on a word the page still hides: during the take nothing is drawn on it (Majd's Dev take, Nov 22 2026).
     await event({ type: 'mark', mark: wrong(A23 + 6) as never });
-    expect(screen.getByTestId('cover-highlight-word')).toBeTruthy();
-    // Once the word shows, its highlight is behind its ink instead.
-    await event({ type: 'said', upTo: A23 + 7 });
     expect(screen.queryByTestId('cover-highlight-word')).toBeNull();
+    expect(screen.queryByTestId('live-highlight-word')).toBeNull();
+    // Once the word shows, its wash is behind its ink.
+    await event({ type: 'said', upTo: A23 + 7 });
     expect(screen.getByTestId('live-highlight-word')).toBeTruthy();
+    // After the take, hidden again: the page hides everything, the mark still on its word's place.
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await flush();
+    await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 8, secs: 9, marks: [wrong(A23 + 6)], score: null } as never });
+    fireEvent.press(screen.queryByTestId('recite-eye') ?? screen.getByTestId('reader-eye'));
+    fireEvent.press(screen.queryByTestId('recite-eye') ?? screen.getByTestId('reader-eye'));
+    expect(screen.getByTestId('cover-highlight-word')).toBeTruthy();
   });
 
   /**
@@ -2554,10 +2561,15 @@ describe('Majd’s Nov 20 asks: the mistake sound, and mistakes on a hidden page
     await flush();
     await event({ type: 'ready', take: 't1', protocol: 6 });
     await event({ type: 'locked', w: A23, s: 27, a: 23 });
-    expect(screen.getByTestId('cover-past-word')).toBeTruthy();
+    // During a take, nothing on a word still hidden, past mistakes included (Majd's Dev take, Nov 22 2026); once it
+    // shows, its past mistake is a lighter wash behind its ink.
+    expect(screen.queryByTestId('cover-past-word')).toBeNull();
+    await event({ type: 'said', upTo: A23 + 12 });
+    expect(screen.getByTestId('past-highlight-word')).toBeTruthy();
     // Show past mistakes off: none.
     await act(async () => setReciteCheckSettings('u1', { showPast: false }));
     expect(screen.queryByTestId('cover-past-word')).toBeNull();
+    expect(screen.queryByTestId('past-highlight-word')).toBeNull();
   });
 });
 

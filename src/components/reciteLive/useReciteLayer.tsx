@@ -889,8 +889,8 @@ export function useReciteLayer({
                       ink: { colour: palette.pageTint, opacity: palette.pageTint != null ? 0.92 : undefined },
                       ...coverColors,
                       off: offWord != null ? { w: offWord, words: qw, colour: v2.markWord } : null,
-                      current:
-                        live.state.status === 'listening' && live.state.cursor != null ? { w: live.state.cursor, words: qw, colour: v2.highlight } : null,
+                      // Nothing on a word still hidden during a take (Majd's Dev take, Nov 22 2026).
+                      duringTake: takeRunning,
                     }
                   : null
               }
@@ -899,7 +899,7 @@ export function useReciteLayer({
             />
           )
         : undefined,
-    [liveOn, qw, hidden, revealed, hiddenInfo, coverColors, offWord, v2, veiled, palette, coverMarksOn, live.state.status, live.state.cursor, followWord],
+    [liveOn, qw, hidden, revealed, hiddenInfo, coverColors, offWord, v2, veiled, palette, coverMarksOn, takeRunning, followWord],
   );
   // The marks as elements of their own (VoiceOver, the tests). Given whenever the live UI is on, so the pager's pages
   // keep one shape through takes.
