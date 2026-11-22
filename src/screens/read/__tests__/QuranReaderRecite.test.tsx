@@ -8,6 +8,7 @@ import { Sheet } from '../../../components/v2/Sheet';
 import { resetReciteCheckSettingsForTests, setReciteCheckSettings } from '../../../lib/reciteCheck/settings';
 import type { LiveEvent } from '../../../lib/reciteLive/contract';
 import { STOP_TRACE_KEY } from '../../../lib/reciteLive/stopTrace';
+import { REVEAL_AFTER_MS } from '../../../lib/reciteLive/state';
 import { versesOnPage } from '../../../lib/ayahBounds';
 import { paletteV2 } from '../../../theme/v2';
 import { setMistakeDetectionReleasedForTests } from '../../../lib/release/mistakeDetection';
@@ -890,7 +891,7 @@ describe('the hidden view (the eye on the bar)', () => {
 });
 
 describe('no word shows before it is said (Majd, Nov 21 2026)', () => {
-  it('[RECITE-6] a hidden page and its bar hold back the word being said until it is decided or the next word begins', async () => {
+  it('[RECITE-6] a hidden page and its bar hold back the word being said until it is decided, the next word begins, or 0.7 s have passed', async () => {
     await startTake('check');
     fireEvent.press(screen.getByTestId('recite-eye'));
     // The reciter is on An-Naml 23's third word: nothing decided yet, so it stays covered, and the bar doesn't name it.
@@ -899,6 +900,9 @@ describe('no word shows before it is said (Majd, Nov 21 2026)', () => {
     // What the bar says (its words as VoiceOver reads them); the page's covers follow the same word (liveInfo).
     const barSays = () => screen.getByTestId('recite-middle').props.accessibilityLabel as string;
     expect(barSays()).not.toContain(words.uthmani(A23 + 2));
+    // Where they are, still covered: the word being said has its cover lightly marked, and the newest shown word its box.
+    expect(screen.getByTestId('live-cover-current')).toBeTruthy();
+    expect(screen.getByTestId('live-word-box')).toBeTruthy();
     // The next word begins: the third shows.
     await event({ type: 'at', w: A23 + 3 });
     expect(barSays()).toContain(words.uthmani(A23 + 2));
@@ -906,6 +910,14 @@ describe('no word shows before it is said (Majd, Nov 21 2026)', () => {
     // Decided in full (said), it shows though the cursor hasn't moved on.
     await event({ type: 'said', upTo: A23 + 3 });
     expect(barSays()).toContain(words.uthmani(A23 + 3));
+    // Under the cursor for 0.7 s (Majd, Nov 22 2026: "under one second max"), the word being said shows too.
+    await event({ type: 'at', w: A23 + 4 });
+    expect(barSays()).not.toContain(words.uthmani(A23 + 4));
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, REVEAL_AFTER_MS + 100));
+    });
+    expect(barSays()).toContain(words.uthmani(A23 + 4));
+    expect(screen.queryByTestId('live-cover-current')).toBeNull();
   });
 });
 
