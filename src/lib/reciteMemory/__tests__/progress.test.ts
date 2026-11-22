@@ -1,4 +1,4 @@
-import { passageTakes, progressLine } from '../progress';
+import { comparableTakes, passageTakes, progressLine } from '../progress';
 import type { TakeRecord } from '../record';
 
 const at = (d: number, h = 20) => new Date(2026, 10, d, h, 0).getTime();
@@ -49,4 +49,14 @@ describe("a passage's progress", () => {
     expect(progressLine([take('a', 14, 1, 9, 0.983), take('b', 15, 1, 9, 0.975)], NOW)).toBe('Down from 98.3% yesterday · 2 takes');
     expect(progressLine([take('a', 15, 1, 9, 1, { createdAt: at(15, 8) }), take('b', 15, 1, 9, 1)], NOW)).toBe('The same as earlier today · 2 takes');
   });
+
+  it('[RMEM-7] compares like with like: only the takes sharing at least half of each one’s words', () => {
+    const records = [take('whole-page', 9, 1000, 1124, 0.97), take('same', 2, 1000, 1040, 0.95), take('half', 11, 1020, 1060, 0.98)];
+    const here = passageTakes(records, 1000, 1040);
+    expect(here.map((t) => t.id)).toEqual(['same', 'whole-page', 'half']);
+    expect(comparableTakes(here, 1000, 1040).map((t) => t.id)).toEqual(['same', 'half']);
+    // The whole page's own progress keeps its own takes.
+    expect(comparableTakes(passageTakes(records, 1000, 1124), 1000, 1124).map((t) => t.id)).toEqual(['whole-page']);
+  });
 });
+

@@ -57,8 +57,9 @@ export const reciteMemory: NonNullable<ArStrings['reciteMemory']> = {
     first: 'أول تسميع لك هنا',
     toFix: 'ما بقي لتصحيحه هنا',
     takes: 'مرات تسميعك هنا',
+    sameAyatOnly: 'لا تحسب النتيجة والرسم إلا مرات تسميعك لهذه الآيات',
     pageHidden: 'الصفحة مخفية',
-    takeLabel: '{{when}}، {{score}}، {{mistakes}}. عرضه على الصفحة',
+    takeLabel: '{{when}}، {{ayat}}، {{score}}، {{mistakes}}. عرضه على الصفحة',
   },
   recited: {
     title: 'ما سمّعته',

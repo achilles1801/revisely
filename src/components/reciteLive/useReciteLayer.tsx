@@ -89,7 +89,7 @@ import { logger } from '../../lib/logger';
 import { useRememberTake } from '../reciteMemory/useRememberTake';
 import { remember, useMemoryRecords } from '../../lib/reciteMemory/store';
 import { clearedBy, memoryOfWord, openInRange, wordMemories, type WordMemory } from '../../lib/reciteMemory/memory';
-import { passageTakes, progressLine } from '../../lib/reciteMemory/progress';
+import { comparableTakes, passageTakes, progressLine } from '../../lib/reciteMemory/progress';
 import { historyRows, passageHistory } from '../../lib/reciteMemory/history';
 import { PassageProgressSheet } from '../reciteMemory/PassageProgressSheet';
 import { memoryId, type ClearRecord } from '../../lib/reciteMemory/record';
@@ -617,20 +617,22 @@ export function useReciteLayer({
     },
     [user?.id, day],
   );
-  // The take's summary: the words it cleared, and its passage's trend (with this take in, before it has synced).
+  // The take's summary: this passage's takes before it, newest first, and its progress comparing like with like (RMEM-7).
+  // Revisely Dev's until the next release (its Dev guide says so).
+  const historyOn = isDevVariant();
+  // The take's summary: the words it cleared, and its passage's trend (with this take in, before it has synced): in
+  // Revisely Dev only the takes of the same stretch, so a longer take's mistakes elsewhere never count for or against it.
   const summaryMemory = useMemo(() => {
     if (!takeRecord || !qw) return null;
     const all = [...memoryRecords.filter((r) => r.id !== takeRecord.id), takeRecord];
-    const takes = passageTakes(all, takeRecord.from, takeRecord.to);
+    const here = passageTakes(all, takeRecord.from, takeRecord.to);
+    const takes = historyOn ? comparableTakes(here, takeRecord.from, takeRecord.to) : here;
     return {
       cleared: clearedBy(all, takeRecord).map((m) => qw.uthmani(m.w)),
       trend: takes.map((t) => t.accuracy),
       line: progressLine(takes, Date.now()),
     };
-  }, [takeRecord, memoryRecords, qw]);
-  // The take's summary: this passage's takes before it, newest first (RMEM-7). Revisely Dev's until the next release (its
-  // Dev guide says so).
-  const historyOn = isDevVariant();
+  }, [historyOn, takeRecord, memoryRecords, qw]);
   const summaryHistory = useMemo(
     () => (historyOn && takeRecord && qw ? historyRows(qw, takeRecord, passageHistory(memoryRecords, takeRecord), Date.now()) : []),
     [historyOn, takeRecord, memoryRecords, qw],
@@ -1179,6 +1181,7 @@ export function useReciteLayer({
           takes={progressTakes}
           memories={memories}
           now={Date.now()}
+          sameStretch={historyOn}
           onOpenTake={openPastTake}
           onClose={() => {
             const back = progressFor?.back;

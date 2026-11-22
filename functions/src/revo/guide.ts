@@ -410,6 +410,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     text: lines(
       '- After a take with Mark mistakes, its summary lists their earlier takes of the same stretch, newest first, up to 5, as "This passage: your last 3 takes": a take counts when it shares at least half of its ayat with this one and this one at least half of its own (a whole-page take isn’t the history of two of its ayat). Each row says the day (“Earlier today”, “Yesterday”, a weekday, then "9 days ago", "3 weeks ago"), its score by the page and its mistakes (tajweed notes and Not clear never count), its ayat when they differ from this take’s, and whether the page was hidden. Unfinished and deleted takes aren’t listed. With no earlier take there is no such section.',
       '- A tap on a row shows that take on its page with its marks until Done, as Show on the page does. “Your progress here” under it still opens every take of the passage with the chart.',
+      '- “Your progress here” and “Your progress” compare like with like: the trend line, the score and the chart count only takes of the same stretch (by the same rule), so a longer take’s mistakes in other ayat never count for or against it. “Your takes here” still lists every take that covers half of the passage, each with its ayat; “The score and chart count only your takes of these ayat” says when some are left out of the chart.',
     ),
   },
   {

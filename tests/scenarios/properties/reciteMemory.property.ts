@@ -5,7 +5,8 @@ import fc from 'fast-check';
 import type { Mark } from '../../../src/lib/reciteLive/contract';
 import { isUnclear } from '../../../src/lib/reciteLive/contract';
 import { formatAccuracy, mistakesLabel } from '../../../src/lib/reciteLive/score';
-import { historyRows, HISTORY_MAX, passageHistory } from '../../../src/lib/reciteMemory/history';
+import { historyRows, HISTORY_MAX, passageHistory, samePassage } from '../../../src/lib/reciteMemory/history';
+import { comparableTakes, passageTakes } from '../../../src/lib/reciteMemory/progress';
 import { CLEAR_AFTER, memoryOfWord, openInRange, wordMemories } from '../../../src/lib/reciteMemory/memory';
 import type { ClearRecord, MemoryRecord, TakeRecord } from '../../../src/lib/reciteMemory/record';
 import { runs } from './fixtures';
@@ -220,7 +221,7 @@ function pastTake(p: Past, i: number): TakeRecord {
 }
 
 describe("A take's passage history", () => {
-  it('[RMEM-7] the summary lists the takes of the same stretch before this one (sharing at least half of each), newest first, five at most; never a forgotten or unfinished one', () => {
+  it('[RMEM-7] the summary lists the takes of the same stretch before this one (sharing at least half of each), newest first, five at most; never a forgotten or unfinished one; its progress compares the same takes', () => {
     fc.assert(
       fc.property(fc.integer({ min: 0, max: 100 }), fc.integer({ min: 3, max: 140 }), fc.array(pastArb, { maxLength: 14 }), (start, length, pasts) => {
         const current = { id: 'now', createdAt: NOW, from: P0 + start, to: P0 + start + length - 1 };
@@ -239,6 +240,15 @@ describe("A take's passage history", () => {
           .map((r) => r.id);
         const got = passageHistory(records, current);
         expect(got.map((r) => r.id)).toEqual(expected);
+        // Its progress compares like with like: exactly the takes listed for it that are of the same stretch, this one
+        // included, so a longer take's score never counts for or against it.
+        const here = passageTakes(records, current.from, current.to);
+        const compared = comparableTakes(here, current.from, current.to);
+        expect(compared.map((r) => r.id)).toEqual(here.filter((r) => samePassage(r, current)).map((r) => r.id));
+        expect(compared.map((r) => r.id)).toContain('now');
+        expect(compared.filter((r) => r.id !== 'now' && r.createdAt < NOW).map((r) => r.id).sort()).toEqual(
+          takes.filter((r) => !r.deleted && !r.unfinished && r.createdAt < NOW && samePassage(r, current)).map((r) => r.id).sort(),
+        );
         // Each row: its day in words (never a date), its score, and its mistakes as the summary counts them.
         for (const row of historyRows(words, current, got, NOW)) {
           expect(row.when).toMatch(/^(Earlier today|Yesterday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|\d+ (days?|weeks?|months?) ago)$/);
