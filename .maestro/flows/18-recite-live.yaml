@@ -271,7 +271,7 @@ appId: com.revisionbuddy.app
     timeout: 5000
 - assertVisible:
     id: past-try-wrong
-- assertVisible: "Say it right on 2 different days to clear it."
+- assertVisible: "2 more right takes, on 2 different days, clear it."
 - runFlow:
     file: ../subflows/shot.yaml
     env:
