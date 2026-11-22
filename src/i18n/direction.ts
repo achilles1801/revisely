@@ -6,7 +6,8 @@
 // verse highlights and the mushaf's page order (BEHAVIOUR.md LANG-1). iOS only does it for an app
 // that declares an RTL language, which Revisely doesn't yet.
 //
-// React Native reads the direction when the app starts, so a change applies from the next launch.
+// React Native reads the direction when the app starts, so a change applies from the next launch; a launch that
+// started the wrong way restarts once, in the splash (restartForDirection, src/i18n/choice.ts).
 import { I18nManager } from 'react-native';
 
 /** Languages that read right to left. */
@@ -27,6 +28,22 @@ export function syncLayoutDirection(language: string, manager: DirectionManager 
   manager.allowRTL(rtl);
   manager.forceRTL(rtl);
   return manager.isRTL !== rtl;
+}
+
+/**
+ * LANG-1: whether a launch laid out the other way from its language restarts once, in the splash, so the first screen
+ * reads the right way. That launch is the first on a phone whose language reads the other way (Android mirrors any
+ * app on a phone set to Arabic; an iPhone in Arabic starts an Arabic app left to right), or the first after the phone's
+ * language changed under "phone's language". Once per direction (`restartedFor`, the direction the last restart was
+ * for): a restart that didn't take isn't tried again, so the app never loops. Never in tests or E2E builds (`pinned`).
+ */
+export function restartForDirection(
+  wrongWay: boolean,
+  wanted: 'rtl' | 'ltr',
+  restartedFor: string | null,
+  pinned: boolean,
+): boolean {
+  return wrongWay && !pinned && restartedFor !== wanted;
 }
 
 /**

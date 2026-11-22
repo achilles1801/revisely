@@ -1,7 +1,7 @@
 // The layout direction follows the app's language, not the phone's (src/i18n/direction.ts).
 
 import fc from 'fast-check';
-import { fromLeftEdge, isRTLLanguage, syncLayoutDirection } from '../../../src/i18n/direction';
+import { fromLeftEdge, isRTLLanguage, restartForDirection, syncLayoutDirection } from '../../../src/i18n/direction';
 import { pageIndexAt, pagerLayout } from '../../../src/lib/mushafDirection';
 import { runs } from './fixtures';
 
@@ -29,6 +29,30 @@ describe('the layout direction', () => {
         expect(wrongWay).toBe(startedRTL);
       }),
       { numRuns: runs(10) },
+    );
+  });
+
+  it('[LANG-1] a launch that started the wrong way restarts once, never in tests or E2E builds, and never loops', () => {
+    const wanted = fc.constantFrom('rtl' as const, 'ltr' as const);
+    const lastRestart = fc.constantFrom(null, 'rtl', 'ltr');
+    fc.assert(
+      fc.property(phoneLanguages, fc.boolean(), lastRestart, fc.boolean(), (language, startedRTL, restartedFor, pinned) => {
+        const m = manager(startedRTL);
+        const wrongWay = syncLayoutDirection(language, m);
+        const want = isRTLLanguage(language) ? 'rtl' : 'ltr';
+        const restart = restartForDirection(wrongWay, want, restartedFor, pinned);
+        // Only the wrong way round, outside tests, and not twice for the same direction.
+        expect(restart).toBe(wrongWay && !pinned && restartedFor !== want);
+        // The launch after a restart that took is the right way: no second restart.
+        const after = manager(isRTLLanguage(language));
+        expect(restartForDirection(syncLayoutDirection(language, after), want, want, pinned)).toBe(false);
+      }),
+      { numRuns: runs(40) },
+    );
+    // A restart that didn't take: the launch after it is still the wrong way, and carries on as it is.
+    fc.assert(
+      fc.property(wanted, (want) => expect(restartForDirection(true, want, want, false)).toBe(false)),
+      { numRuns: runs(4) },
     );
   });
 
