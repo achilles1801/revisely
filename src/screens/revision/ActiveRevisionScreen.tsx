@@ -28,7 +28,7 @@ import { SessionEndCard } from '../../components/revision/SessionEndCard';
 import { ElsewherePlace, useReciteLayer } from '../../components/reciteLive/useReciteLayer';
 import { AyahRef, ayahRects } from '../../lib/ayahBounds';
 import { useVerseActions } from '../../components/verse/useVerseActions';
-import { navigateToActivityDay, navigationRef } from '../../navigation/navigationRef';
+import { navigationRef } from '../../navigation/navigationRef';
 import { RecordButton, recorderTakesCapsule } from '../../components/recordings/RecordButton';
 import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
 import { listRecordings, onRecordingsChanged } from '../../lib/recordings';
@@ -52,7 +52,7 @@ import { ThemeColors } from '../../theme/v2';
 import { generateDailyAssignment, getCurrentRevisionDay } from '../../lib/algorithm';
 import { catchUpDayOf, duePagesOf, insightsPagesOn } from '../../lib/carryOver';
 import { revisablePages } from '../../lib/memorizedAyahs';
-import { aheadCreditFor, creditedOnDay, doneOnDay, sessionCredit } from '../../lib/aheadCredit';
+import { creditedOnDay, doneOnDay, sessionCredit } from '../../lib/aheadCredit';
 import { aheadDayLabel, nextRevisionDayPlan, revisionDayPlan, startsCycle, type RevisionDayPlan } from '../../lib/aheadPlan';
 import { describePageRange, describePassage } from '../../lib/passages';
 import {
@@ -85,7 +85,7 @@ export default function ActiveRevisionScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProp<HomeStackParamList, 'ActiveRevision'>>();
   const { user, pages, logs, updatePages, addLog, updateLog, loadData, error } = useApp();
-  const { theme, isDark, palette: v2Palette } = useTheme();
+  const { theme, isDark } = useTheme();
   const haptics = useHaptics();
   const styles = useMemo(() => makeStyles(theme), [theme]);
 

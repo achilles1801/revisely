@@ -29,8 +29,8 @@ import { autoId } from '../../lib/offline/apply';
 import { queueChange, withPendingJournalDay } from '../../lib/offline/queue';
 import { subscribeOutbox } from '../../lib/offline/outbox';
 import { onApplied } from '../../lib/offline/sync';
-import type { OutboxEntry, OutboxOp } from '../../lib/offline/ops';
-import { journalChangeShown, journalNoteIdOf, unshownChanges } from '../../lib/journalLocal';
+import type { OutboxEntry } from '../../lib/offline/ops';
+import { journalNoteIdOf, unshownChanges } from '../../lib/journalLocal';
 import { getRevisionDayForUser } from '../../lib/fajrBoundary';
 import {
   JOURNAL_ENTRIES_PER_DAY,

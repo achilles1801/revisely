@@ -173,13 +173,6 @@ function localDay(s: string): Date {
   return new Date(y, m - 1, d);
 }
 
-function previousDay(s: string): string {
-  const d = localDay(s);
-  d.setDate(d.getDate() - 1);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
 export { aliveStreak };
 
 export function buildWidgetSnapshot(input: WidgetInputs): WidgetSnapshot {
