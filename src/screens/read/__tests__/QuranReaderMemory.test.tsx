@@ -211,6 +211,12 @@ const UTIYAT = A23 + 4;
 
 const flush = () => act(async () => {});
 const event = (e: LiveEvent) => act(async () => mockLive.onEvent?.(e));
+
+/** After Stop the bar shows the take's result; nothing opens by itself (Nov 22 2026). A tap on it opens the summary. */
+async function openResult() {
+  fireEvent.press(screen.getByTestId('recite-result'));
+  await flush();
+}
 /** An element's style, flattened. */
 const flatStyle = (el: { props: { style?: unknown } }): Record<string, unknown> => {
   const flat = (st: unknown): Record<string, unknown> => (Array.isArray(st) ? Object.assign({}, ...st.map(flat)) : ((st as Record<string, unknown>) ?? {}));
@@ -418,6 +424,7 @@ describe("Recite's memory in the take's summary", () => {
     fireEvent.press(screen.getByTestId('recite-stop'));
     await flush();
     await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: UTIYAT + 25, secs: 12, marks: [], score: { reached: 30, mistakes: 0, tajweed: 0, accuracy: 1 }, start: A23 } });
+    await openResult();
     expect(screen.getByTestId('take-summary')).toBeTruthy();
     // One right take so far: nothing cleared yet (it needs a second day).
     expect(screen.queryByTestId('take-summary-cleared')).toBeNull();
@@ -437,6 +444,7 @@ describe("Recite's memory in the take's summary", () => {
     fireEvent.press(screen.getByTestId('recite-stop'));
     await flush();
     await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: UTIYAT + 25, secs: 12, marks: [], score: { reached: 30, mistakes: 0, tajweed: 0, accuracy: 1 }, start: A23 } });
+    await openResult();
     expect(screen.getByText('This passage: your last take')).toBeTruthy();
     const rows = screen.getAllByTestId('take-summary-history-row');
     expect(rows).toHaveLength(1);
@@ -459,6 +467,8 @@ describe("Recite's memory in the take's summary", () => {
       fireEvent.press(screen.getByTestId('recite-stop'));
       await flush();
       await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: UTIYAT + 25, secs: 12, marks: [], score: { reached: 30, mistakes: 0, tajweed: 0, accuracy: 1 }, start: A23 } });
+      // Revisely Dev: the summary opens from the bar's result (nothing opens by itself); the store app opens it as before.
+      if (mockState.dev) await openResult();
     };
     mockMemory.records = [page, pastTake()];
     await finish();
@@ -489,6 +499,7 @@ describe("Recite's memory in the take's summary", () => {
     fireEvent.press(screen.getByTestId('recite-stop'));
     await flush();
     await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: UTIYAT + 25, secs: 12, marks: [], score: { reached: 30, mistakes: 0, tajweed: 0, accuracy: 1 }, start: A23 } });
+    await openResult();
     expect(screen.getByText('1 cleared from the page')).toBeTruthy();
   });
 });

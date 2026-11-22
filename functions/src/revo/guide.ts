@@ -396,7 +396,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['RECITE-11', 'RECITE-12'],
     routes: ['QuranReader', 'ActiveRevision', 'ActivityDay', 'ActivityAll'],
     text: lines(
-      '- Stop always shows the take’s summary within a few seconds. If the server’s check of the end hasn’t come by then, or the connection was lost after the take had found where they were, the summary shows what the take found and says the end of the take wasn’t checked; the take is kept, unfinished, with its marks and its recording. If the check comes after all, the summary and the take update.',
+      '- Stop always ends within a few seconds: nothing opens by itself; the bar shows the take’s result (the score and mistakes, or “Done”), and a tap on it opens the summary. If the server’s check of the end hasn’t come by then, or the connection was lost after the take had found where they were, the summary shows what the take found and says the end of the take wasn’t checked; the take is kept, unfinished, with its marks and its recording. If the check comes after all, the summary and the take update.',
       '- Leaving the reader or the session during a take, or while Stop waits, keeps the take too (unfinished); a take that never found where they were keeps nothing.',
       '- In “Recited” and “Recitations” an unfinished take’s line says "unfinished"; one whose audio is all there is (from before takes were kept this way) says "not checked" and shows no score. Unfinished takes never count in the score or in “Your progress”.',
     ),

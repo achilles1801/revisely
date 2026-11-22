@@ -43,6 +43,8 @@ import {
   revealDelay,
   wordLetters,
   guessCursor,
+  mistakeCount,
+  type LiveState,
 } from '../../lib/reciteLive/state';
 import { stopTrace } from '../../lib/reciteLive/stopTrace';
 import {
@@ -102,7 +104,7 @@ import { markFill, markFirm } from './markColours';
 import { WordHistoryCard } from '../reciteMemory/WordHistoryCard';
 import { ShownTakeBar } from '../reciteMemory/ShownTakeBar';
 import type { TakeRecord } from '../../lib/reciteMemory/record';
-import { pageAccuracy } from '../../lib/reciteLive/score';
+import { mistakesLabel, pageAccuracy } from '../../lib/reciteLive/score';
 import { sendLabel } from '../../lib/reciteCheck/service';
 import { t } from '../../i18n';
 import type { Strings } from '../../i18n/en';
@@ -162,6 +164,17 @@ export interface ReciteLayerOptions {
   /** A past take to show on its page (Activity's Show on the page), and the screen told when showing it ends. */
   showTake?: string | null;
   onShowTakeEnd?: () => void;
+}
+
+
+/**
+ * A finished take's result in a few words, for the bar and a screen reader: Mark mistakes' score and mistakes ("96% · 1
+ * mistake"), or "Done" for following along.
+ */
+function takeResultText(state: LiveState, qw: QuranWords | null, startWord: number | null, check: boolean): string {
+  const score = check && qw ? scorePill(state, qw, startWord) : null;
+  // i18n-ignore (two texts joined as a list)
+  return score ? `${score.text} · ${mistakesLabel(mistakeCount(state))}` : t('reciteLive.bar.resultDone');
 }
 
 export function useReciteLayer({
@@ -603,6 +616,8 @@ export function useReciteLayer({
   // words Recite's memory still holds, lighter (with Show past mistakes on), during a take and outside one.
   // Revisely Dev's until the next release (its Dev guide says so).
   const coversKeepMarks = isDevVariant();
+  // Stop ends in the bar's result, the summary only on a tap (Majd, Nov 22 2026): Revisely Dev's until the release.
+  const quietEnd = isDevVariant();
   const pastOnCovers = coversKeepMarks && liveOn && !!qw && hidden && reciteSettings.showPast && !showing;
   const pastOnPage = useCallback(
     (page: number): WordMemory[] => (showPast && qw ? openInRange(memories, ...qw.pageRange(page)) : []),
@@ -708,8 +723,16 @@ export function useReciteLayer({
       if (screenReader) say(t('reciteLive.layer.startNotFound'));
       return;
     }
-    stopTrace.step('summary-asked');
-    setSummaryShown(takeId);
+    // Nothing opens by itself (Majd, Nov 22 2026: "nothing pops up in my face at any time"; Tarteel leaves the page as it
+    // was): the bar settles into the take's result, and a tap on it opens the summary. Said once to a screen reader.
+    if (!quietEnd) {
+      stopTrace.step('summary-asked');
+      setSummaryShown(takeId);
+      return;
+    }
+    stopTrace.step('result');
+    stopTrace.end();
+    if (screenReader) say(t('reciteLive.bar.resultSpoken', { result: takeResultText(live.state, qw, live.startWord, checkTake) }));
     // Only when a take finishes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [live.state.status, takeId]);
@@ -1004,6 +1027,11 @@ export function useReciteLayer({
           onPause={() => void live.pause()}
           onResume={() => void live.resume()}
           onStop={live.stop}
+          result={
+            quietEnd && barPhase === 'done' && takeId && !test
+              ? { text: takeResultText(live.state, qw, live.startWord, checkTake), onPress: () => setSummaryShown(takeId) }
+              : null
+          }
           onScore={() => {
             const opens = scoreTapOpens(live.state.status);
             if (opens === 'summary' && takeId) setSummaryShown(takeId);

@@ -9,6 +9,7 @@ import type { BarWord } from '../../lib/reciteLive/view';
 import type { ScoreLevel } from '../../lib/reciteLive/score';
 import { CAPSULE_HEIGHT } from '../reader/PlayerCapsule';
 import { t } from '../../i18n';
+import { chevron } from '../../i18n/direction';
 
 /** The capsule's height inside its hairline border (at most half a point each side, on any screen). */
 export const BAR_ROOM = CAPSULE_HEIGHT - 1;
@@ -146,6 +147,7 @@ export function ReciteBar({
   next,
   surface,
   onScore,
+  result = null,
 }: {
   hidden: boolean;
   onToggleHidden: () => void;
@@ -176,6 +178,11 @@ export function ReciteBar({
   surface: { background: string; border: string };
   /** The score was tapped: what the take has found so far, or its summary once it's done (Majd, Nov 21 2026). */
   onScore?: () => void;
+  /**
+   * Once the take is done: its result in the words' place ("96% · 1 mistake ›", or "Done ›"), and a tap on it opens the
+   * summary. Nothing opens by itself after Stop (Majd, Nov 22 2026: "nothing pops up in my face at any time").
+   */
+  result?: { text: string; onPress: () => void } | null;
 }) {
   const { palette } = useTheme();
   const ticking = useTakeSeconds(takeClock);
@@ -207,7 +214,7 @@ export function ReciteBar({
       ) : null}
       {/* Not a live region: its clock changes every second, and TalkBack would speak each one over the recitation, where
           the microphone hears it. VoiceOver reads it when focused; the summary is spoken once when it shows. */}
-      <View style={styles.middle} accessible accessibilityLabel={`${clock(secs)}${recording && phase === 'live' && !paused ? ', recording' : ''}. ${paused ? shownStatus : spoken || status}`} testID="recite-middle">
+      <View style={styles.middle} accessible={!(phase === 'done' && result)} accessibilityLabel={`${clock(secs)}${recording && phase === 'live' && !paused ? ', recording' : ''}. ${paused ? shownStatus : spoken || status}`} testID="recite-middle">
         <View style={styles.time}>
           {recording && phase === 'live' && !paused ? (
             <View style={[styles.dot, { backgroundColor: palette.red }]} testID="recite-recording" />
@@ -216,7 +223,19 @@ export function ReciteBar({
             {clock(secs)}
           </Text>
         </View>
-        {shownWords.length ? (
+        {phase === 'done' && result ? (
+          <Tap
+            onPress={result.onPress}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={t('reciteLive.bar.resultLabel', { result: result.text })}
+            testID="recite-result"
+          >
+            <Text style={[typeV2.meta, { color: palette.text }]} numberOfLines={1} maxFontSizeMultiplier={1.2}>
+              {`${result.text}\u00a0${chevron()}`}
+            </Text>
+          </Tap>
+        ) : shownWords.length ? (
           <Text style={[BAR_WORDS, styles.words]} numberOfLines={1} maxFontSizeMultiplier={BAR_WORDS_MAX_SCALE} testID="recite-words">
             {shownWords.map((w, i) => (
               <Text
