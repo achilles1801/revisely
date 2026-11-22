@@ -28,6 +28,7 @@ import { Sheet } from '../v2/Sheet';
 import { WheelItem, WheelPicker } from '../v2/WheelPicker';
 import { ReciterList } from './ReciterList';
 import { t } from '../../i18n';
+import { backIcon } from '../../i18n/direction';
 
 /** Slowest first, for the stepper's − and +. */
 const SPEEDS_UP = [...SPEEDS].sort((a, b) => a - b);
@@ -262,7 +263,7 @@ export function AudioOptionsSheet({
       left={
         view === 'options'
           ? { label: t('common.close'), icon: 'close', onPress: onClose, testID: 'audio-close' }
-          : { label: t('common.back'), icon: 'chevron-back', onPress: () => setView('options'), testID: 'audio-back' }
+          : { label: t('common.back'), icon: backIcon(), onPress: () => setView('options'), testID: 'audio-back' }
       }
       right={
         view === 'options'

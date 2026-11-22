@@ -28,6 +28,7 @@ import { Sheet } from '../v2/Sheet';
 import { Tap } from '../v2/Tap';
 import { PillButton } from '../v2/PillButton';
 import { t } from '../../i18n';
+import { forwardIcon } from '../../i18n/direction';
 
 /** Chrome text stops growing here, as headers and menu rows do. */
 const MAX_SCALE = 1.4;
@@ -251,7 +252,7 @@ export function JuzSheet({
                 <ChromeText style={[typeV2.name, { color: palette.link }]} maxFontSizeMultiplier={MAX_SCALE}>
                   {t('activity.juz.planFirst')}
                 </ChromeText>
-                <Ionicons name="chevron-forward" size={16} color={palette.link} />
+                <Ionicons name={forwardIcon()} size={16} color={palette.link} />
               </Tap>
             ) : null}
           </View>
@@ -344,7 +345,7 @@ export function JuzSheet({
                   {s.text}
                 </ChromeText>
               </View>
-              <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
+              <Ionicons name={forwardIcon()} size={16} color={palette.secondary} />
             </Tap>
           ))}
 

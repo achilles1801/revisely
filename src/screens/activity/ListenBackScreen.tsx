@@ -23,6 +23,7 @@ import { getReadPalette } from '../../theme/readPalette';
 import { spacing } from '../../theme/spacing';
 import { typeV2 } from '../../theme/v2';
 import { dateLocale, t } from '../../i18n';
+import { backIcon } from '../../i18n/direction';
 
 const FOOTER_HEIGHT = CAPSULE_HEIGHT + spacing.sm;
 
@@ -145,7 +146,7 @@ export default function ListenBackScreen() {
 
   const header = (
     <View style={styles.header}>
-      <RoundButton icon="chevron-back" label={t('common.back')} onPress={() => navigation.goBack()} palette={palette} />
+      <RoundButton icon={backIcon()} label={t('common.back')} onPress={() => navigation.goBack()} palette={palette} />
       <View style={styles.titleCol}>
         <Text
           style={[typeV2.name, styles.center, { color: palette.textPrimary }]}

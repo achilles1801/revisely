@@ -66,6 +66,7 @@ import { streakDetailFromLogs } from '../../lib/streak';
 import { pagesToUnrevise, removeRevisedPages, removeRoundPages } from '../../lib/revisionSession';
 import { dismissPresentedRevisionReminders } from '../../lib/reminders/sync';
 import { t } from '../../i18n';
+import { backIcon } from '../../i18n/direction';
 
 const NO_PAGES: number[] = [];
 
@@ -969,7 +970,7 @@ export default function ActiveRevisionScreen() {
         }
         header={
           <View style={styles.header}>
-            <RoundButton icon="chevron-back" label={t('common.back')} onPress={handleSaveAndBack} palette={palette} />
+            <RoundButton icon={backIcon()} label={t('common.back')} onPress={handleSaveAndBack} palette={palette} />
             <View style={styles.titleCol}>
               <Text
                 style={[styles.title, typeV2.name, { color: palette.textPrimary }]}

@@ -49,3 +49,16 @@ export function backChevron(): string {
 export function fromLeftEdge(x: number, rtl: boolean = I18nManager.isRTL): { left: number } | { right: number } {
   return rtl ? { right: x } : { left: x };
 }
+
+/**
+ * Ionicons' chevrons, pointing the way the layout reads: an icon is a glyph, so React Native doesn't mirror it in RTL
+ * as it does a row. A "next" or "open" chevron points left right to left; a back one points right.
+ */
+export function forwardIcon(): 'chevron-forward' | 'chevron-back' {
+  return I18nManager.isRTL ? 'chevron-back' : 'chevron-forward';
+}
+
+/** The back chevron's icon, pointing the way back: right in a right-to-left layout. */
+export function backIcon(): 'chevron-forward' | 'chevron-back' {
+  return I18nManager.isRTL ? 'chevron-forward' : 'chevron-back';
+}

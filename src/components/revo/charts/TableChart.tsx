@@ -11,6 +11,7 @@ import { Tap } from '../../v2/Tap';
 import { CHART_TEXT_MAX, ChartFrame } from './ChartFrame';
 import { ChartButtons, DetailLine, RatingCounts, RatingStrip } from './ChartParts';
 import { t } from '../../../i18n';
+import { forwardIcon } from '../../../i18n/direction';
 
 /**
  * Juz or surahs side by side in up to three columns, each from what the app shows for them. A
@@ -109,7 +110,7 @@ export function TableChart({
                   {x.text}
                 </Text>
               ))}
-              <Ionicons name={isOpen ? 'chevron-down' : 'chevron-forward'} size={15} color={palette.secondary} style={styles.chevron} />
+              <Ionicons name={isOpen ? 'chevron-down' : forwardIcon()} size={15} color={palette.secondary} style={styles.chevron} />
             </Tap>
             {isOpen ? <RowDetail row={r} byJuz={byJuz} smart={smart} userPages={userPages} onReviseFirst={onReviseFirst} onOpenPage={onOpenPage} testID={testID} /> : null}
           </View>

@@ -31,6 +31,7 @@ import { reciteLiveEnabled } from '../../lib/reciteLive/availability';
 import { useMushafEdition } from '../../lib/mushafEdition';
 import { logger } from '../../lib/logger';
 import { t } from '../../i18n';
+import { forwardIcon, backIcon } from '../../i18n/direction';
 
 type NavigationProp = NativeStackNavigationProp<ReadStackParamList, 'QuranSearch'>;
 type RouteProps = RouteProp<ReadStackParamList, 'QuranSearch'>;
@@ -292,7 +293,7 @@ export default function QuranSearchScreen() {
   const header = (
     <View style={styles.header}>
       <Tap onPress={() => navigation.goBack()} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.back')} testID="search-back">
-        <Ionicons name="chevron-back" size={26} color={palette.text} />
+        <Ionicons name={backIcon()} size={26} color={palette.text} />
       </Tap>
       <Text style={[typeV2.name, styles.headerTitle, { color: palette.text }]} accessibilityRole="header" maxFontSizeMultiplier={1.4}>
         {t('read.search.title')}
@@ -554,7 +555,7 @@ function TargetRow({ target, onPress }: { target: SearchTarget; onPress: () => v
         </Text>
         {meta ? <Text style={[typeV2.meta, { color: palette.secondary }]}>{meta}</Text> : null}
       </View>
-      <Ionicons name="chevron-forward" size={18} color={palette.secondary} />
+      <Ionicons name={forwardIcon()} size={18} color={palette.secondary} />
     </Tap>
   );
 }

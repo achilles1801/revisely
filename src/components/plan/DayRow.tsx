@@ -7,6 +7,7 @@ import { summarizeDay } from '../../lib/planDisplay';
 import { layoutV2, typeV2 } from '../../theme/v2';
 import { formatDate } from '../../i18n';
 import { t } from '../../i18n';
+import { forwardIcon } from '../../i18n/direction';
 
 export function addDays(date: Date, days: number): Date {
   const next = new Date(date);
@@ -99,7 +100,7 @@ export function DayRow({
       </View>
       {trailing}
       {showChevron && (onPress || onLongPress) ? (
-        <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
+        <Ionicons name={forwardIcon()} size={16} color={palette.secondary} />
       ) : null}
     </View>
   );

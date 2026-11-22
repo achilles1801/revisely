@@ -16,6 +16,7 @@ import { typeV2 } from '../../theme/v2';
 import { Sheet } from '../v2/Sheet';
 import { Tap } from '../v2/Tap';
 import { t } from '../../i18n';
+import { forwardIcon } from '../../i18n/direction';
 
 const CHART_HEIGHT = 120;
 const dayNumber = (day: string) => Math.round(Date.parse(`${day}T00:00:00Z`) / 86_400_000);
@@ -136,7 +137,7 @@ export function PaceSheet({
           <ChromeText style={[typeV2.name, styles.tabular, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
             {formatPace(r.perPage)}
           </ChromeText>
-          <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
+          <Ionicons name={forwardIcon()} size={16} color={palette.secondary} />
         </Tap>
       ))}
       {untimed > 0 ? (

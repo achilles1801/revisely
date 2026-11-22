@@ -17,6 +17,7 @@
 
 import type { Ionicons } from '@expo/vector-icons';
 import { currentLanguage } from '../../i18n';
+import { backIcon, forwardIcon } from '../../i18n/direction';
 import { HELP_TITLES_AR, HELP_TOPICS_AR } from './topics.ar';
 
 export type HelpIcon = keyof typeof Ionicons.glyphMap;
@@ -100,8 +101,13 @@ export const HELP_INLINE_ICONS: Readonly<Record<string, HelpIcon>> = {
   plus: 'add',
   help: 'help-circle-outline',
   pause: 'pause',
-  back: 'chevron-back',
-  next: 'chevron-forward',
+  // The reader's ‹ and › point the way the layout reads (src/i18n/direction).
+  get back() {
+    return backIcon();
+  },
+  get next() {
+    return forwardIcon();
+  },
 };
 
 export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {

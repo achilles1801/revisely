@@ -15,6 +15,7 @@ import { intoLine } from '../../lib/reciteInsights/describe';
 import { plainText } from '../../lib/passages';
 import { formatMinutesLong } from '../../lib/activityFormat';
 import { t } from '../../i18n';
+import { forwardIcon } from '../../i18n/direction';
 
 /** At most this many similar-ayah lines under a take; the rest are on the page (Show on the page). */
 const INTO_LINES = 2;
@@ -272,7 +273,7 @@ export function TakeSheetRow({
         <Text style={[typeV2.name, typeV2.numeral, { color: takeChecked(take) ? colour(take.accuracy) : palette.secondary }]} maxFontSizeMultiplier={1.3}>
           {takeScoreText(take)}
         </Text>
-        <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
+        <Ionicons name={forwardIcon()} size={16} color={palette.secondary} />
       </View>
     </Tap>
   );

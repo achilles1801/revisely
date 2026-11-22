@@ -37,7 +37,7 @@ import { markFill } from '../reciteLive/markColours';
 import { WordChip } from '../reciteLive/WordChip';
 import { useFirstSection } from './sectionPlace';
 import { t } from '../../i18n';
-import { chevron } from '../../i18n/direction';
+import { chevron, forwardIcon } from '../../i18n/direction';
 
 /** Rows shown before "See all". */
 const FIRST_ROWS = 3;
@@ -220,7 +220,7 @@ function PassageRow({
         <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{note}</ChromeText>
         {chips}
       </View>
-      <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
+      <Ionicons name={forwardIcon()} size={16} color={palette.secondary} />
     </Tap>
   );
 }

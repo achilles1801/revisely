@@ -27,6 +27,7 @@ import { BlockMark, RevisedMark } from './BlockMark';
 import type { Memorized, Read, Revised } from '../../lib/activityInsights';
 import { formatDate, t } from '../../i18n';
 import { DEFAULT_SECTIONS, sectionsToShow, type OverviewSection, type TabLayout } from '../../lib/activitySections';
+import { forwardIcon, backIcon } from '../../i18n/direction';
 
 /** Chrome text (the pills, the title, the totals, the grid, the preview) stops growing here, as headers and menu rows do. */
 const MAX_SCALE = 1.4;
@@ -265,7 +266,7 @@ export function CalendarMonth({
           <Text style={[typeV2.name, { color: palette.link }]} maxFontSizeMultiplier={MAX_SCALE}>
             {t('activity.calendar.open')}
           </Text>
-          <Ionicons name="chevron-forward" size={16} color={palette.link} />
+          <Ionicons name={forwardIcon()} size={16} color={palette.link} />
         </View>
       </Tap>
       {previewRows.map((r) => (
@@ -361,10 +362,10 @@ export function CalendarMonth({
           ) : null}
           <View style={styles.chevrons}>
             <Tap onPress={() => onStep(-1)} accessibilityRole="button" accessibilityLabel={unit === 'week' ? t('activity.calendar.previousWeek') : t('activity.calendar.previousMonth')} hitSlop={8}>
-              <Ionicons name="chevron-back" size={22} color={palette.text} />
+              <Ionicons name={backIcon()} size={22} color={palette.text} />
             </Tap>
             <Tap onPress={() => onStep(1)} accessibilityRole="button" accessibilityLabel={unit === 'week' ? t('activity.calendar.nextWeek') : t('activity.calendar.nextMonth')} hitSlop={8}>
-              <Ionicons name="chevron-forward" size={22} color={palette.text} />
+              <Ionicons name={forwardIcon()} size={22} color={palette.text} />
             </Tap>
           </View>
         </View>

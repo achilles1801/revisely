@@ -9,6 +9,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { layoutV2, typeV2 } from '../../theme/v2';
 import { Tap } from '../v2/Tap';
 import { t } from '../../i18n';
+import { forwardIcon } from '../../i18n/direction';
 
 /** What a row's wheels get: the value, the first and last it may be, and a test id. */
 export interface RangeWheelProps {
@@ -57,7 +58,7 @@ export function RangeFields({
       <Text style={[typeV2.body, { color: open === which ? palette.text : palette.secondary }]} numberOfLines={1}>
         {label(value)}
       </Text>
-      <Ionicons name={open === which ? 'chevron-down' : 'chevron-forward'} size={16} color={palette.secondary} />
+      <Ionicons name={open === which ? 'chevron-down' : forwardIcon()} size={16} color={palette.secondary} />
     </Tap>
   );
   return (

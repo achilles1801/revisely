@@ -30,6 +30,7 @@ import { ActionSheet } from "../v2/ActionSheet";
 import { AudioWaveform } from "../v2/AudioWaveform";
 import { HoldRow } from "../v2/SwipeRow";
 import { formatTime, t } from '../../i18n';
+import { forwardIcon } from '../../i18n/direction';
 
 interface RecordingsListProps {
   day: string;
@@ -324,7 +325,7 @@ export function RecordingsList({
                     testID={`recording-open-${r.id}`}
                   >
                     <Ionicons
-                      name="chevron-forward"
+                      name={forwardIcon()}
                       size={18}
                       color={palette.secondary}
                     />

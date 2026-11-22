@@ -41,6 +41,7 @@ import { SittingSavedToast } from '../../components/timer/SittingSavedToast';
 import type { ReadStackParamList } from '../../navigation/MainNavigator';
 import { useReciteLayer } from '../../components/reciteLive/useReciteLayer';
 import { t } from '../../i18n';
+import { backIcon } from '../../i18n/direction';
 
 type NavigationProp = NativeStackNavigationProp<ReadStackParamList, 'QuranReader'>;
 type RouteProps = RouteProp<ReadStackParamList, 'QuranReader'>;
@@ -265,7 +266,7 @@ export default function QuranReaderScreen() {
         }
         header={
           <View style={styles.header}>
-            <RoundButton icon="chevron-back" label={t('common.back')} onPress={() => navigation.goBack()} palette={palette} testID="reader-back" />
+            <RoundButton icon={backIcon()} label={t('common.back')} onPress={() => navigation.goBack()} palette={palette} testID="reader-back" />
             <View style={styles.titleCol}>
               <SurahName surah={firstSurah} palette={palette} />
               <Text style={styles.subtitle} numberOfLines={1} maxFontSizeMultiplier={1.3}>

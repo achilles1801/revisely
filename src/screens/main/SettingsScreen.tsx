@@ -113,6 +113,7 @@ import { ScheduledRemindersRow } from '../../components/settings/ScheduledRemind
 import { useNotificationPermission } from '../../hooks/useNotificationPermission';
 import { ensureNotificationsPermission } from '../../lib/notifications';
 import { remindersWhileAwayEnabled } from '../../lib/release/remindersWhileAway';
+import { forwardIcon } from '../../i18n/direction';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'Settings'>;
 
@@ -213,7 +214,7 @@ function Row({
         </Text>
       )}
       {rightSlot}
-      {onPress && !rightSlot && <Ionicons name="chevron-forward" size={16} color={palette.secondary} />}
+      {onPress && !rightSlot && <Ionicons name={forwardIcon()} size={16} color={palette.secondary} />}
     </View>
   );
   if (!onPress) return row;

@@ -19,6 +19,7 @@ import { AddNoteSheet } from './AddNoteSheet';
 import { revisedOnDay, useDayItems } from './useDayItems';
 import { t } from '../../i18n';
 import { dayWords } from './AddSheetParts';
+import { forwardIcon } from '../../i18n/direction';
 
 type Row = 'revised' | 'memorized' | 'note';
 
@@ -83,7 +84,7 @@ export function AddToDaySheet({
                 <Text style={[styles.rowTitle, { color: palette.text }]}>{r.label}</Text>
                 <Text style={[typeV2.meta, { color: palette.secondary }]}>{r.subtitle}</Text>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={palette.secondary} />
+              <Ionicons name={forwardIcon()} size={18} color={palette.secondary} />
             </Tap>
           ))}
         </View>
