@@ -14,7 +14,7 @@
 // which never reports an advance), so only the session's swipe or ✓ marks a page (RECITE-9, SESS-1).
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, useWindowDimensions } from 'react-native';
+import { Alert, Linking, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -671,6 +671,19 @@ export function useReciteLayer({
     // Only when a take finishes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [live.state.status, takeId]);
+  // The microphone refused, or it couldn't start: say so (a tap that did nothing read as a broken mic; Majd's Android
+  // store build, Nov 22 2026). Before, neither state showed anything.
+  const micNow = live.mic;
+  useEffect(() => {
+    if (micNow === 'denied') {
+      Alert.alert(t('reciteLive.layer.micOffTitle'), t('reciteLive.layer.micOffBody'), [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('common.openSettings'), onPress: () => void Linking.openSettings().catch(() => undefined) },
+      ]);
+    } else if (micNow === 'error') {
+      Alert.alert(t('reciteLive.layer.micFailed'));
+    }
+  }, [micNow]);
   const takeStatus = live.state.status;
   // The checker's gate refused marking mistakes (no Premium): the Premium page, and the take goes.
   const takeFailure = live.state.failure;

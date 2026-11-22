@@ -154,6 +154,9 @@ export const reciteLive = {
     offline: 'Couldn’t reach the checker',
   },
   layer: {
+    micOffTitle: 'Microphone access is off',
+    micOffBody: 'Allow Revisely to use the microphone in Settings to recite.',
+    micFailed: 'Couldn’t start the microphone. Try again.',
     /** Said to screen reader users only, after Stop, when a take's start was never found. */
     startNotFound: 'Couldn’t follow that take. Try starting at the top of the page.',
     premiumFailed: 'Couldn’t turn on Premium',
