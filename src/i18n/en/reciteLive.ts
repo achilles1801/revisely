@@ -32,6 +32,11 @@ export const reciteLive = {
     slip: 'slip',
     tajweed: 'tajweed note',
     paused: 'Paused',
+    /** After Stop, a follow-along take's result in the bar (a tap opens the summary). */
+    resultDone: 'Done',
+    resultLabel: '{{result}}. Show your recitation',
+    /** Said once to screen reader users when a take ends (the microphone already off). */
+    resultSpoken: 'Take done. {{result}}',
     slow: 'Slow connection: checking is behind',
     scoreLabel: 'Score {{score}}. Show your mistakes',
     resume: 'Resume',

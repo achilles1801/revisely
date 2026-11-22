@@ -273,6 +273,12 @@ const toBackground = () =>
     }
   });
 const event = (e: LiveEvent) => act(async () => mockLive.onEvent?.(e));
+
+/** After Stop the bar shows the take's result; nothing opens by itself (Nov 22 2026). A tap on it opens the summary. */
+async function openResult() {
+  fireEvent.press(screen.getByTestId('recite-result'));
+  await flush();
+}
 /** An element's style, flattened. */
 const flatStyle = (el: { props: { style?: unknown } }): Record<string, unknown> => {
   const flat = (st: unknown): Record<string, unknown> => (Array.isArray(st) ? Object.assign({}, ...st.map(flat)) : ((st as Record<string, unknown>) ?? {}));
@@ -485,6 +491,7 @@ describe('a take’s audio stays with the take, never a recording (RMEM-6)', () 
     await flush();
     expect(mockTake.finished).toBe(1);
     await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [], score: null } });
+    await openResult();
     expect(screen.getByTestId('take-summary')).toBeTruthy();
     fireEvent.press(screen.getByTestId('take-summary-done'));
     await flush();
@@ -501,6 +508,7 @@ describe('a take’s audio stays with the take, never a recording (RMEM-6)', () 
     expect(screen.queryByTestId('recite-recording')).toBeNull();
     fireEvent.press(screen.getByTestId('recite-stop'));
     await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [], score: null } });
+    await openResult();
     fireEvent.press(screen.getByTestId('take-summary-done'));
     await flush();
     fireEvent.press(screen.getByTestId('recite-close'));
@@ -520,6 +528,7 @@ describe('a take’s audio stays with the take, never a recording (RMEM-6)', () 
     fireEvent.press(screen.getByTestId('recite-stop'));
     await flush();
     await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [], score: null } });
+    await openResult();
     fireEvent.press(screen.getByTestId('take-summary-more'));
     // An ActionSheet runs its action once the sheet has closed (iOS reports it).
     fireEvent.press(await screen.findByTestId('sheet-action-delete'));
@@ -543,6 +552,7 @@ describe('a take’s audio stays with the take, never a recording (RMEM-6)', () 
     fireEvent.press(screen.getByTestId('recite-stop'));
     await flush();
     await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [], score: null } });
+    await openResult();
     fireEvent.press(screen.getByTestId('take-summary-recited'));
     await flush();
     const { navigateToActivityDay } = jest.requireMock('../../../navigation/navigationRef');
@@ -595,6 +605,7 @@ describe('a take’s audio stays with the take, never a recording (RMEM-6)', () 
     expect(screen.queryByTestId('recite-recording')).toBeNull();
     fireEvent.press(screen.getByTestId('recite-stop'));
     await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [], score: null } });
+    await openResult();
     fireEvent.press(screen.getByTestId('take-summary-done'));
     fireEvent.press(screen.getByTestId('recite-close'));
     await flush();
@@ -606,6 +617,7 @@ describe('a take’s audio stays with the take, never a recording (RMEM-6)', () 
     await act(async () => mockMic!.onAudio(new Int16Array(16000)));
     fireEvent.press(screen.getByTestId('recite-stop'));
     await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [], score: null } });
+    await openResult();
     fireEvent.press(screen.getByTestId('take-summary-again'));
     await flush();
     await flush();
@@ -790,6 +802,8 @@ describe('a take starts anywhere on the page (Majd, Nov 14 2026)', () => {
     await event({ type: 'at', w: A26 + 1 });
     fireEvent.press(screen.getByTestId('recite-stop'));
     await done({ start: A25, marks: [skipped] });
+    await settle(() => expect(screen.getByTestId('recite-result')).toBeTruthy());
+    await openResult();
     const passage = String(screen.getByTestId('take-summary-passage').props.children);
     expect(passage).toMatch(/^An.Naml,\sayahs\s25.26\s·\s/);
     expect(screen.queryByTestId('take-summary-finding-skipped')).toBeNull();
@@ -806,6 +820,8 @@ describe('a take starts anywhere on the page (Majd, Nov 14 2026)', () => {
     await event({ type: 'at', w: A23 + 2 });
     fireEvent.press(screen.getByTestId('recite-stop'));
     await done();
+    await settle(() => expect(screen.getByTestId('recite-result')).toBeTruthy());
+    await openResult();
     expect(String(screen.getByTestId('take-summary-passage').props.children)).toMatch(/^An.Naml,\sayah\s23\s·\s/);
   });
 
@@ -1113,6 +1129,7 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
         type: 'done',
         result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [wrongMark], score: { reached: 11, mistakes: 1, tajweed: 0, accuracy: 0.9 } } as never,
       });
+      await openResult();
       // From the summary to the word's card: Not a mistake there.
       fireEvent.press(screen.getByTestId('take-summary-finding-word'));
       await flush();
@@ -1133,6 +1150,7 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
         type: 'done',
         result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [wrongMark], score: { reached: 11, mistakes: 0, tajweed: 0, accuracy: 1 } } as never,
       });
+      await openResult();
       expect(screen.queryByTestId('take-summary-finding-word')).toBeNull();
       expect(screen.getByText('1 marked not a mistake')).toBeTruthy();
       fireEvent.press(screen.getByTestId('take-summary-removed-toggle'));
@@ -1157,6 +1175,7 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
         type: 'done',
         result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [wrongMark], score: { reached: 11, mistakes: 0, tajweed: 0, accuracy: 1 } } as never,
       });
+      await openResult();
       fireEvent.press(screen.getByTestId('take-summary-removed-toggle'));
       fireEvent.press(screen.getByTestId('take-summary-put-back'));
       expect(spoken).toHaveBeenCalledWith('Wrong word put back', { queue: true });
@@ -1273,6 +1292,7 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
       await event({ type: 'mark', mark });
       fireEvent.press(screen.getByTestId('recite-stop'));
       await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, start: A23, secs: 12, marks: [mark], score: null } });
+      await openResult();
       await act(async () => mockLive.onClose?.());
       fireEvent.press(screen.getByTestId('take-summary-finding-word'));
       await flush();
@@ -1372,6 +1392,7 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
     fireEvent.press(screen.getByTestId('recite-stop'));
     // As the checker answers since Nov 14 2026: `done` at once, without `kept` (a `kept` event follows the hang-up).
     await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [mark], score: null } });
+    await openResult();
     expect(screen.getByTestId('take-summary')).toBeTruthy();
     expect(screen.getByTestId('take-summary-finding-word')).toBeTruthy();
     // No line about test data or Premium under it (Majd, Nov 21 2026; RECITE-17).
@@ -1386,6 +1407,7 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
     const mark = { id: 'a', w: UTIYAT, ayah: [27, 23] as [number, number], kind: 'word' as const, sure: 'clear' as const, into };
     fireEvent.press(screen.getByTestId('recite-stop'));
     await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [mark], score: null } });
+    await openResult();
     const row = screen.getByTestId('take-summary-into');
     mockNavigation.push.mockClear();
     fireEvent.press(row);
@@ -1404,6 +1426,7 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
     // As the checker answers a take with no end ayah: from the start to the end of An-Naml, exclusive.
     const [, end] = words.verseRange(27, 93);
     await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: end, secs: 12, marks: [], score: null } });
+    await openResult();
     const passage = String(screen.getByTestId('take-summary-passage').props.children);
     expect(passage).toMatch(/^An.Naml,\sayahs\s23.24\s·\s/);
     expect(passage).not.toMatch(/Qasas/);
@@ -1418,6 +1441,7 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
     await startTake('recite');
     fireEvent.press(screen.getByTestId('recite-stop'));
     await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [], score: null } });
+    await openResult();
     expect(screen.getByTestId('take-summary')).toBeTruthy();
     fireEvent.press(screen.getByTestId('take-summary-check'));
     await flush();
@@ -1431,6 +1455,7 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
     await startTake('recite');
     fireEvent.press(screen.getByTestId('recite-stop'));
     await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [], score: null } });
+    await openResult();
     expect(screen.getByTestId('take-summary')).toBeTruthy();
     expect(screen.queryByText('Kept as test data. Software checks it; nobody listens.')).toBeNull();
     expect(mockLive.start?.keep).toBe(false);
@@ -1464,6 +1489,7 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
     // Off again: a plain Recite take.
     fireEvent.press(screen.getByTestId('recite-stop'));
     await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [], score: null, start: A23 } });
+    await openResult();
     fireEvent.press(screen.getByTestId('take-summary-done'));
     fireEvent.press(screen.getByTestId('recite-close'));
     fireEvent(screen.getByTestId('recite-mic'), 'longPress');
@@ -1562,7 +1588,7 @@ describe('the Stop trace (Revisely Dev: a freeze after Stop leaves a trace for t
       for (const m of screen.UNSAFE_getAllByType(Modal)) if (m.props.visible !== false) m.props.onShow?.();
     });
 
-  it('Stop writes it, each step to the summary adds to it, and the summary on screen removes it', async () => {
+  it('Stop writes it, each step after adds to it, and the take’s result in the bar removes it', async () => {
     await startTake('check');
     expect(await trace()).toBeNull();
     fireEvent.press(screen.getByTestId('recite-stop'));
@@ -1572,11 +1598,9 @@ describe('the Stop trace (Revisely Dev: a freeze after Stop leaves a trace for t
     expect(atStop!.steps.map((s) => s.s)).toEqual(expect.arrayContaining(['stop', 'mic-off', 'audio-mode']));
     await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, start: A23, secs: 12, marks: [], score: null } });
     await flush();
-    expect(screen.getByTestId('take-summary')).toBeTruthy();
-    const steps = (await trace())!.steps.map((s) => s.s);
-    expect(steps).toEqual(expect.arrayContaining(['ev:done', 'done', 'summary-asked']));
-    await presented();
-    await flush();
+    // The take's result in the bar is the end of Stop (nothing opens by itself, Nov 22 2026): the trace goes.
+    expect(screen.getByTestId('recite-result')).toBeTruthy();
+    expect(screen.queryByTestId('take-summary')).toBeNull();
     expect(await trace()).toBeNull();
   });
 
@@ -1633,6 +1657,8 @@ describe('Recite the mistakes again (Majd, Nov 15 2026: one take from the first 
     const marks = [wrongAt(27, 24), wrongAt(27, 26)];
     for (const mark of marks) await event({ type: 'mark', mark } as LiveEvent);
     await finish(marks);
+    await settle(() => expect(screen.getByTestId('recite-result')).toBeTruthy());
+    await openResult();
     fireEvent.press(screen.getByTestId('take-summary-drill'));
     await flush();
     await flush();
@@ -1652,6 +1678,8 @@ describe('Recite the mistakes again (Majd, Nov 15 2026: one take from the first 
     const marks = [wrongAt(27, 24)];
     await event({ type: 'mark', mark: marks[0] } as LiveEvent);
     await finish(marks);
+    await settle(() => expect(screen.getByTestId('recite-result')).toBeTruthy());
+    await openResult();
     fireEvent.press(screen.getByTestId('take-summary-drill'));
     await flush();
     await flush();
@@ -1665,6 +1693,7 @@ describe('Recite the mistakes again (Majd, Nov 15 2026: one take from the first 
     await flush();
     expect(mockLive.sent).toContainEqual(expect.objectContaining({ type: 'end' }));
     await event({ type: 'done', result: { v: 2, take: 't2', from: A23, to: last + 1, start: words.verseFirstWord(27, 23), secs: 9, marks: [], score: null } } as LiveEvent);
+    await openResult();
     await flush();
     expect(screen.getByTestId('take-summary-before').props.children).toBe('Before: 1 wrong word');
     expect(screen.queryByTestId('take-summary-drill')).toBeNull();
@@ -1675,6 +1704,8 @@ describe('Recite the mistakes again (Majd, Nov 15 2026: one take from the first 
     const marks = [wrongAt(27, 24)];
     await event({ type: 'mark', mark: marks[0] } as LiveEvent);
     await finish(marks);
+    await settle(() => expect(screen.getByTestId('recite-result')).toBeTruthy());
+    await openResult();
     fireEvent.press(screen.getByTestId('take-summary-drill'));
     await flush();
     await flush();
@@ -1682,6 +1713,7 @@ describe('Recite the mistakes again (Majd, Nov 15 2026: one take from the first 
     fireEvent.press(screen.getByTestId('recite-stop'));
     await flush();
     await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 20, start: words.verseFirstWord(27, 23), secs: 9, marks: [], score: null } } as LiveEvent);
+    await openResult();
     await flush();
     expect(screen.getByTestId('take-summary-before')).toBeTruthy();
   });
@@ -1692,6 +1724,8 @@ describe('Recite the mistakes again (Majd, Nov 15 2026: one take from the first 
     await event({ type: 'mark', mark: marks[0] } as LiveEvent);
     await finish(marks);
     mockPager.scrolled = [];
+    await settle(() => expect(screen.getByTestId('recite-result')).toBeTruthy());
+    await openResult();
     fireEvent.press(screen.getByTestId('take-summary-drill'));
     await flush();
     await flush();
@@ -1704,6 +1738,8 @@ describe('Recite the mistakes again (Majd, Nov 15 2026: one take from the first 
     const note = { id: 'n', w: A23 + 2, ayah: [27, 23], kind: 'tajweed', rule: 'qalqalah', sure: 'clear' };
     await event({ type: 'mark', mark: note } as LiveEvent);
     await finish([note]);
+    await settle(() => expect(screen.getByTestId('recite-result')).toBeTruthy());
+    await openResult();
     expect(screen.getByTestId('take-summary')).toBeTruthy();
     expect(screen.queryByTestId('take-summary-drill')).toBeNull();
     fireEvent.press(screen.getByTestId('take-summary-done'));
@@ -1767,6 +1803,7 @@ describe('Recite your mistakes here (the held mic: the page’s remembered mista
     fireEvent.press(screen.getByTestId('recite-stop'));
     await flush();
     await event({ type: 'done', result: { v: 2, take: 't2', from: A23, to: A23 + 40, start: A23, secs: 20, marks: [], score: null } } as LiveEvent);
+    await openResult();
     await flush();
     // Its summary says what those words were last time.
     expect(screen.getByTestId('take-summary-before').props.children).toBe('Before: 2 wrong words');
@@ -2151,6 +2188,8 @@ describe('peeked words (Majd, Nov 15 2026: on the page in quiet grey, in the sum
     peek();
     peek();
     await finish();
+    await settle(() => expect(screen.getByTestId('recite-result')).toBeTruthy());
+    await openResult();
     expect(screen.getByTestId('take-summary-peeked')).toHaveTextContent('2 words peeked');
     const rows = screen.getAllByTestId('take-summary-peeked-row');
     expect(rows).toHaveLength(1);
@@ -2166,6 +2205,8 @@ describe('peeked words (Majd, Nov 15 2026: on the page in quiet grey, in the sum
     hide();
     peek();
     await finish([], a25);
+    await settle(() => expect(screen.getByTestId('recite-result')).toBeTruthy());
+    await openResult();
     fireEvent.press(screen.getByTestId('take-summary-drill'));
     await flush();
     await flush();
@@ -2177,6 +2218,7 @@ describe('peeked words (Majd, Nov 15 2026: on the page in quiet grey, in the sum
     await event({ type: 'said', upTo: last } as LiveEvent);
     await flush();
     await event({ type: 'done', result: { v: 2, take: 't2', from: A23, to: last + 1, start: words.verseFirstWord(27, 24), secs: 9, marks: [], score: null } } as LiveEvent);
+    await openResult();
     await flush();
     expect(screen.getByTestId('take-summary-before').props.children).toBe('Before: 1 word peeked');
   });
@@ -2284,6 +2326,8 @@ describe('long takes (Nov 20 2026): Stop always ends in a summary, and the take 
     await reciteSome();
     fireEvent.press(screen.getByTestId('recite-stop'));
     // (Whether it's up before the budget runs out depends on the runner's speed: not asserted.)
+    await settle(() => expect(screen.getByTestId('recite-result')).toBeTruthy());
+    await openResult();
     await settle(() => expect(screen.getByTestId('take-summary-unfinished')).toBeTruthy());
     expect(screen.getByTestId('take-summary-score')).toBeTruthy();
     await settle(() => expect(taken()).toMatchObject({ unfinished: true, mistakes: 1, recordingId: 'rec-1' }));
@@ -2298,6 +2342,8 @@ describe('long takes (Nov 20 2026): Stop always ends in a summary, and the take 
     await reciteSome();
     await event({ type: 'error', reason: 'offline' });
     await act(async () => mockLive.onClose?.());
+    await settle(() => expect(screen.getByTestId('recite-result')).toBeTruthy());
+    await openResult();
     await settle(() => expect(screen.getByTestId('take-summary-unfinished')).toBeTruthy());
     await settle(() => expect(taken()).toMatchObject({ unfinished: true, mistakes: 1 }));
     const call = captured.mock.calls.find((c) => c[0] === 'Recite: a take ended without its final answer');
@@ -2538,6 +2584,7 @@ describe('Majd’s Nov 21 asks: Pause keeps the take, the score opens what it ha
     fireEvent.press(screen.getByTestId('recite-stop'));
     await flush();
     await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [wrong(A23 + 6) as never], score: null } });
+    await openResult();
     expect(screen.getByTestId('take-summary-again')).toBeTruthy();
     fireEvent.press(screen.getByTestId('take-summary-done'));
     await flush();
@@ -2616,5 +2663,57 @@ describe('the audio 4:1 (contract "ADPCM uplink", Nov 22 2026)', () => {
   it('[RECITE-5] Revisely Dev’s start frame asks to send the audio as ADPCM (the checker’s ready decides)', async () => {
     await startTake('check');
     expect(mockLive.start).toMatchObject({ audio: 'adpcm' });
+  });
+});
+
+describe('after Stop, nothing opens by itself (Majd, Nov 22 2026: "nothing pops up in my face at any time")', () => {
+  const answer = () =>
+    event({
+      type: 'done',
+      result: { v: 2, take: 't1', from: A23, to: A23 + 10, start: A23, secs: 12, marks: [{ id: 'a', w: UTIYAT, ayah: [27, 23], kind: 'word', sure: 'clear', heard: 'x' }] as never, score: null },
+    });
+
+  it('[RECITE-11] Revisely Dev: the bar settles into the take’s result, and only a tap on it opens the summary', async () => {
+    await startTake('check');
+    await event({ type: 'said', upTo: A23 + 9 });
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await answer();
+    await flush();
+    expect(screen.queryByTestId('take-summary')).toBeNull();
+    const result = screen.getByTestId('recite-result');
+    expect(result.props.accessibilityLabel).toMatch(/^\d+(\.\d)?% · 1 mistake\. Show your recitation$/);
+    fireEvent.press(result);
+    await flush();
+    expect(screen.getByTestId('take-summary')).toBeTruthy();
+  });
+
+  it('[RECITE-11] with VoiceOver or TalkBack the result is said once, the microphone already off', async () => {
+    const enabled = AccessibilityInfo.isScreenReaderEnabled as jest.Mock;
+    enabled.mockImplementation(async () => true);
+    const spoken = jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions');
+    try {
+      await startTake('recite');
+      fireEvent.press(screen.getByTestId('recite-stop'));
+      await answer();
+      await flush();
+      expect(spoken.mock.calls.map((c) => c[0]).filter((t) => t === 'Take done. Done')).toHaveLength(1);
+      expect(screen.queryByTestId('take-summary')).toBeNull();
+    } finally {
+      enabled.mockImplementation(async () => false);
+    }
+  });
+
+  it('the store app keeps today’s summary after Stop until the release', async () => {
+    mockState.dev = false;
+    try {
+      await startTake('check');
+      fireEvent.press(screen.getByTestId('recite-stop'));
+      await answer();
+      await flush();
+      expect(screen.getByTestId('take-summary')).toBeTruthy();
+      expect(screen.queryByTestId('recite-result')).toBeNull();
+    } finally {
+      mockState.dev = true;
+    }
   });
 });

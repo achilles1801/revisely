@@ -529,8 +529,10 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   checker that sends a heartbeat is watched: about 8 s without a word from it counts as a dropped connection, and the
   take resumes, so a connection that goes quiet without closing never leaves the page not following. (Majd, Nov 19
   2026: "being able to keep up with longer sessions like 3min+ at least"; his take stopped following for 76 s.)
-- **RECITE-11.** (Revisely Dev) Stop always ends in a summary within a few seconds. If the checker's final answer hasn't come by then,
-  or the connection failed after the take's start was found, the summary shows what the take found, says its end
+- **RECITE-11.** (Revisely Dev) Stop always ends in the take's result within a few seconds: nothing opens by itself, the bar
+  settles into the result (Mark mistakes' score and mistakes, or "Done"), a tap on it opens the summary, and VoiceOver or
+  TalkBack say it once (Majd, Nov 22 2026: "nothing pops up in my face at any time"). If the checker's final answer
+  hasn't come by then, or the connection failed after the take's start was found, the summary shows what the take found, says its end
   wasn't checked, and the take is kept as unfinished with its marks and its recording. A final answer that comes after
   replaces it. An unfinished take never counts in a score or a passage's progress. (Majd, Nov 19 2026: Stop "kept
   loading for so long i had to click out and come back in and it was gone".)
