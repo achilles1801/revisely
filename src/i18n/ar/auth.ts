@@ -1,0 +1,43 @@
+// Arabic for src/i18n/en/auth.ts. Words and forms: src/i18n/ar-glossary.md ("The app and the account").
+import type { ArStrings } from './types';
+
+export const auth: NonNullable<ArStrings['auth']> = {
+  errors: {
+    emailInUse: 'هذا البريد الإلكتروني مسجّل بالفعل',
+    invalidEmail: 'عنوان البريد الإلكتروني غير صالح',
+    notAllowed: 'الحسابات بالبريد الإلكتروني وكلمة المرور غير مفعّلة',
+    weakPassword: 'كلمة المرور ضعيفة جدًا',
+    disabled: 'هذا الحساب معطّل',
+    noAccount: 'لا يوجد حساب بهذا البريد الإلكتروني',
+    wrongPassword: 'كلمة المرور غير صحيحة',
+    invalidCredential: 'البريد الإلكتروني أو كلمة المرور غير صحيحة',
+    tooManyRequests: 'محاولات كثيرة. حاول مرة أخرى لاحقًا',
+    network: 'خطأ في الشبكة. تحقّق من اتصالك',
+    other: 'حدث خطأ. حاول مرة أخرى',
+  },
+  screen: {
+    welcomeBack: 'مرحبًا بعودتك',
+    createAccount: 'إنشاء حساب',
+    resetPassword: 'إعادة تعيين كلمة المرور',
+    resetIntro: 'سنرسل إليك رابطًا لتعيين كلمة مرور جديدة.',
+    signedOut: 'سُجّل خروجك. سجّل الدخول مرة أخرى لتتابع.',
+    resetSent: 'أُرسل بريد إعادة تعيين كلمة المرور. تحقّق من صندوق الوارد.',
+    backToSignIn: 'العودة إلى تسجيل الدخول',
+    name: 'الاسم',
+    namePlaceholder: 'اسمك',
+    email: 'البريد الإلكتروني',
+    password: 'كلمة المرور',
+    confirmPassword: 'تأكيد كلمة المرور',
+    showPassword: 'إظهار كلمة المرور',
+    hidePassword: 'إخفاء كلمة المرور',
+    error: 'خطأ: {{message}}',
+    signIn: 'تسجيل الدخول',
+    sendResetLink: 'إرسال رابط إعادة التعيين',
+    forgotPassword: 'نسيت كلمة المرور؟',
+    noAccount: 'ليس لديك حساب؟ ',
+    haveAccount: 'لديك حساب بالفعل؟ ',
+    signUp: 'إنشاء حساب',
+    or: 'أو',
+    google: 'المتابعة باستخدام ⁨Google⁩',
+  },
+};

@@ -110,7 +110,10 @@ describe('Arabic on screen', () => {
   });
 
   it('a string not translated yet shows in English', () => {
-    expect(arT('updates.ready.title')).toBe('A new update is ready');
+    // A new English string arrives before its Arabic (every key had Arabic when this was written).
+    const ns = (i18n.options.defaultNS as string | undefined) ?? 'translation';
+    i18n.addResource('en', ns, 'common.fallbackProbe', 'Only in English');
+    expect(arT('common.fallbackProbe' as never)).toBe('Only in English');
   });
 
   it('English is exactly as before: Western digits, no grouping added', () => {

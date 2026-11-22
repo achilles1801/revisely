@@ -11,8 +11,13 @@
 // The words: at most four topics a screen, each two short sentences or so. Surahs and juz, never
 // page numbers (NAME-1). With Smart Tracking off, nothing about ratings or strength (`when`).
 // {{Label}} is text the app shows, word for word (drawn in ink); [[icon]] is a button's own glyph.
+//
+// In Arabic the topics come from topics.ar.ts, each with the hash of the English it was translated from
+// (__tests__/topicsArabic.test.ts fails when that English changes).
 
 import type { Ionicons } from '@expo/vector-icons';
+import { currentLanguage } from '../../i18n';
+import { HELP_TITLES_AR, HELP_TOPICS_AR } from './topics.ar';
 
 export type HelpIcon = keyof typeof Ionicons.glyphMap;
 
@@ -640,7 +645,18 @@ export function topicsFor(screen: HelpScreen, opts: HelpOpts): HelpTopic[] {
     if (t.when === 'devApp') return opts.devApp === true;
     if (t.when === 'sections') return opts.sections === true;
     return true;
-  });
+  }).map(inLanguage);
+}
+
+/** A topic in the app's language: its Arabic (topics.ar.ts) when the app is in Arabic and it has one, else as here. */
+function inLanguage(topic: HelpTopic): HelpTopic {
+  const ar = currentLanguage() === 'ar' ? HELP_TOPICS_AR[topic.id] : undefined;
+  return ar?.text != null ? { ...topic, title: ar.title, text: ar.text } : topic;
+}
+
+/** A sheet's title in the app's language. */
+export function helpTitle(screen: HelpScreen): string {
+  return (currentLanguage() === 'ar' ? HELP_TITLES_AR[screen]?.title : undefined) ?? HELP[screen].title;
 }
 
 /** The sheets a sheet leads to for this account: its `more`, less those with nothing for it. */
@@ -667,19 +683,37 @@ export function helpTextParts(text: string): HelpTextPart[] {
 
 /** A topic's text as read aloud (VoiceOver) and in tests: labels as words, icons by their button's name. */
 export function helpPlainText(text: string): string {
-  const spoken: Record<string, string> = {
-    check: '✓',
-    more: '⋯',
-    eye: 'the eye',
-    play: '▶',
-    options: 'Audio Options',
-    mic: 'the microphone',
-    timer: 'the timer',
-    plus: '+',
-    help: '?',
-    pause: 'Pause',
-    back: '‹',
-    next: '›',
-  };
+  const spoken: Record<string, string> = currentLanguage() === 'ar' ? SPOKEN_AR : SPOKEN_EN;
   return text.replace(/\{\{(.+?)\}\}/g, '$1').replace(/\[\[([a-z]+)\]\]/g, (_, n: string) => spoken[n] ?? n);
 }
+
+/** Each [[icon]] as VoiceOver says it: by its button's name. */
+const SPOKEN_EN: Readonly<Record<string, string>> = {
+  check: '✓',
+  more: '⋯',
+  eye: 'the eye',
+  play: '▶',
+  options: 'Audio Options',
+  mic: 'the microphone',
+  timer: 'the timer',
+  plus: '+',
+  help: '?',
+  pause: 'Pause',
+  back: '‹',
+  next: '›',
+};
+
+const SPOKEN_AR: Readonly<Record<string, string>> = {
+  check: '✓',
+  more: '⋯',
+  eye: 'زر العين',
+  play: 'زر التشغيل',
+  options: 'خيارات الصوت',
+  mic: 'الميكروفون',
+  timer: 'المؤقت',
+  plus: '+',
+  help: 'زر المساعدة',
+  pause: 'إيقاف مؤقت',
+  back: 'زر الكلمة التالية',
+  next: 'زر التالي',
+};
