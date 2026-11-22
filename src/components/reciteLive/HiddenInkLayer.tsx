@@ -13,6 +13,8 @@ const RULE_AT = 0.74;
 const INK_EDGE = 1;
 /** Room past a line's text that its cover takes. */
 const COVER_EDGE = 4;
+/** A rule shorter than this (bounds units) is the gap at a line's end beside its last word shown, not a hidden word. */
+const MIN_RULE = 12;
 
 export interface InkWash {
   box: Rect;
@@ -71,7 +73,7 @@ export function hiddenInkPlan(words: QuranWords, page: number, shown: (w: number
     lines.push({
       line: l.line,
       cover: { x0: l.x0 - COVER_EDGE, x1: l.x1 + COVER_EDGE, y0: l.coverTop, y1: l.coverBottom },
-      rules: subtractSpans(l.x0, l.x1, [...l.markers, ...shownSpans]).filter(([a, b]) => b - a > 2),
+      rules: subtractSpans(l.x0, l.x1, [...l.markers, ...shownSpans]).filter(([a, b]) => b - a > MIN_RULE),
       ruleY: l.y0 + RULE_AT * (l.y1 - l.y0),
       top: l.coverTop,
       bottom: l.coverBottom,
