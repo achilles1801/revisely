@@ -721,6 +721,25 @@ describe('[RECITE-5] a slow connection’s note: on at 3 s behind and growing, o
       }),
     );
   });
+
+  it('never on while a resume’s re-check catches up, nor at the first beat after it (measured afresh)', () => {
+    fc.assert(
+      fc.property(fc.array(fc.tuple(fc.double({ min: 0, max: 600, noNaN: true }), fc.boolean()), { minLength: 1, maxLength: 40 }), (beats) => {
+        let on = false;
+        let before: number | null = null;
+        let wasCatchingUp = false;
+        for (const [b, catchingUp] of beats) {
+          const next = slowAfterBeat(on, b, before, catchingUp);
+          if (catchingUp) expect(next).toBe(false);
+          if (!catchingUp && wasCatchingUp) expect(next).toBe(false);
+          // As the phone keeps it: no "before" through a catch-up.
+          before = catchingUp ? null : b;
+          on = next;
+          wasCatchingUp = catchingUp;
+        }
+      }),
+    );
+  });
 });
 
 describe('[RECITE-6] the wait follows the word’s length at the reciter’s pace', () => {
