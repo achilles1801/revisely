@@ -628,7 +628,8 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   color shades its like more pastel which is what we should aim for".)
 - **RECITE-20.** (Revisely Dev) A hidden page is an empty page, ready at once when it is hidden: a faint rule where each
   line's words are still hidden, the ayah markers whole, and each word shown (recited, peeked, or in an ayah shown whole)
-  in place in its own ink. Nothing of it fills in afterwards (Majd's Dev take, Nov 22 2026: "it should just appear ready
+  in place in its own ink. Nothing over or under a marker shows while the word beside it on that side is hidden (a
+  sajdah's overline did beside page 379's ۲٤, Nov 22 2026). Nothing of it fills in afterwards (Majd's Dev take, Nov 22 2026: "it should just appear ready
   from the start like it was before"). During a take the newest word shown is in the following colour (green, the same as the word being
   said in the bar) and the words before it in the page's own ink; it moves on with each word shown, never to a word
   still covered. A word with a mark keeps its wash and the page's ink instead: the mark says more than where the reciter
