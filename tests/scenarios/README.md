@@ -58,7 +58,8 @@ Only a phone's edges are stand-ins, in `harness/`:
 | Leaving and returning to the app | `appState.ts` (`app.background()`, `app.foreground()`). |
 | The disk | `fileSystem.ts`: a folder per phone. |
 | The pager | `pager.tsx`: the Qur'an page images. |
-| Native SDKs with no JS side | `firebaseSetup.ts`: Google Sign-In, Sentry, notifications. |
+| Native SDKs with no JS side | `firebaseSetup.ts`: Google Sign-In, Sentry. |
+| Notifications | `notifications.ts`: the phone's permission (refused unless `allowNotifications()`) and its pending local notifications (`pendingNotifications()`), kept across launches; one whose time has passed is no longer pending. |
 | App Check's attestation (App Attest, Play Integrity) | `appCheck.ts`: a token the functions emulator accepts, or none (`failAppCheck()`). |
 | The route to our functions | `functions.ts`: the app's `cloudfunctions.net` URL goes to the emulator, refused while offline, with the scenario's clock (`X-Revisely-Test-Now`). |
 | Anthropic (inside the functions) | `functions/src/emulator.ts`: a recorded reply; per account, `emulator/anthropic/accounts/<uid>` `mode` makes it fail (`rejected`, `overloaded`, `network`). |

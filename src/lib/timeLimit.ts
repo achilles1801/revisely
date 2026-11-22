@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 // Waiting with a limit: a promise that may never settle (a lost network answer,
 // a native call that stalls) can't keep a screen waiting for good.
 
@@ -17,7 +18,7 @@ export function isDeadlineError(err: unknown): boolean {
 export function withTimeLimit<T>(
   p: Promise<T>,
   ms: number,
-  message = 'This took too long.',
+  message: string = t('common.tookTooLong'),
   onTimeout?: () => void,
 ): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;

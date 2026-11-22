@@ -131,6 +131,14 @@ describe('a record on the account', () => {
     expect((fromStored(r.id, toStored({ ...r, marks: [lookalike] })) as TakeRecord).marks[0].into).toBeUndefined();
   });
 
+  it('[RECITE-11] an unfinished take reads back unfinished; a finished one’s document has no such field', () => {
+    const r = recordFromTake(doneState([lookalike]), words, ctx()) as TakeRecord;
+    expect('unfinished' in toStored(r)).toBe(false);
+    const u = { ...r, unfinished: true };
+    expect(toStored(u).unfinished).toBe(true);
+    expect((fromStored(u.id, JSON.parse(JSON.stringify(toStored(u)))) as TakeRecord).unfinished).toBe(true);
+  });
+
   it('a word cleared by hand, and a forgotten take, read back', () => {
     const c: ClearRecord = { id: 'c1', kind: 'clear', createdAt: 5, rev: 6, day: '2026-11-15', w: 31453, group: 'word' };
     expect(fromStored('c1', toStored(c))).toEqual(c);

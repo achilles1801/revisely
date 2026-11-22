@@ -10,6 +10,8 @@ import { useTheme } from '../../context/ThemeContext';
 import { Tap } from '../v2/Tap';
 import { typeV2 } from '../../theme/v2';
 import { BLOCK_ICON, REVISED_ICON, type BlockKind } from './BlockMark';
+import { formatNumber, t } from '../../i18n';
+import { westernDigits } from '../../i18n/digits';
 
 const MAX_SCALE = 1.4;
 
@@ -17,6 +19,13 @@ const MAX_SCALE = 1.4;
  * The number pad has no return key (and an accessory bar above it doesn't show inside a sheet's
  * modal): a tap on the sheet's empty space, a segment or a strength puts the keyboard away.
  */
+/** The day an add sheet adds to ('today', 'yesterday' or the day's own name), in words for a sentence. */
+export function dayWords(dayName: string): string {
+  if (dayName === 'today') return t('activity.add.today');
+  if (dayName === 'yesterday') return t('activity.add.yesterday');
+  return dayName;
+}
+
 export function DismissArea({ children }: { children: React.ReactNode }) {
   return (
     <Pressable onPress={Keyboard.dismiss} accessible={false} testID="activity-sheet-body">
@@ -90,17 +99,17 @@ export function MinutesField({ value, onChange, testID }: { value: string; onCha
       <TextInput
         testID={testID}
         value={value}
-        onChangeText={(v) => onChange(v.replace(/[^0-9]/g, ''))}
-        placeholder="0"
+        onChangeText={(v) => onChange(westernDigits(v).replace(/[^0-9]/g, ''))}
+        placeholder={formatNumber(0)}
         placeholderTextColor={palette.secondary}
         keyboardType="number-pad"
         keyboardAppearance={isDark ? 'dark' : 'light'}
-        accessibilityLabel="Minutes"
+        accessibilityLabel={t('activity.add.minutes')}
         maxFontSizeMultiplier={MAX_SCALE}
         style={[styles.input, { color: palette.text }]}
       />
       <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={MAX_SCALE}>
-        min
+        {t('activity.insights.min')}
       </Text>
     </View>
   );

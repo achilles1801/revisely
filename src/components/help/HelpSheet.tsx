@@ -10,8 +10,8 @@ import { RevoMark } from '../revo/RevoMark';
 import { useRevoPresent } from '../../lib/revo/presence';
 import { openRevo } from '../../lib/revo/open';
 import {
-  HELP,
   helpPlainText,
+  helpTitle,
   helpTextParts,
   linksFor,
   topicsFor,
@@ -22,6 +22,7 @@ import { reciteLiveForAccount } from '../../lib/reciteLive/availability';
 import { gapsInsightsEnabled } from '../../lib/insightsGaps';
 import { activitySectionsEnabled } from '../../lib/activitySections';
 import { t } from '../../i18n';
+import { forwardIcon } from '../../i18n/direction';
 
 /** Past this text size the topics' marks drop out, so the words get the width (beside 46pt text they were specks). */
 export const MARKS_UP_TO = 1.6;
@@ -90,7 +91,6 @@ export function HelpSheet({
   visible,
   onClose,
   onHide,
-  recite = false,
   liveRecite,
 }: {
   screen: HelpScreen;
@@ -98,8 +98,6 @@ export function HelpSheet({
   onClose: () => void;
   /** "Hide help buttons": runs after the sheet has gone. */
   onHide: () => void;
-  /** The hidden page (recite mode) is offered here: its topic shows. */
-  recite?: boolean;
   /**
    * The reader's Recite (Revisely Dev) is offered: its topics show, in place of those without it. Left out, the
    * account's (Activity's sheets: Recite's past takes and Insights' Recitation).
@@ -115,10 +113,8 @@ export function HelpSheet({
   useEffect(() => {
     if (visible) setShown(screen);
   }, [visible, screen]);
-  const entry = HELP[shown];
   const opts = {
     smartTracking: user?.smartTrackingEnabled === true,
-    recite,
     liveRecite: liveRecite ?? reciteLiveForAccount(user),
     devApp: gapsInsightsEnabled(user),
     sections: activitySectionsEnabled(user),
@@ -145,7 +141,7 @@ export function HelpSheet({
     <Sheet
       visible={visible}
       onClose={onClose}
-      title={entry.title}
+      title={helpTitle(shown)}
       scroll
       onHidden={runPending}
       footer={{ label: t('common.done'), onPress: onClose, testID: 'help-done' }}
@@ -164,9 +160,9 @@ export function HelpSheet({
             testID={`help-link-${to}`}
           >
             <Text style={[typeV2.name, styles.linkText, { color: palette.link }]} maxFontSizeMultiplier={CHROME_MAX_SCALE}>
-              {HELP[to].title}
+              {helpTitle(to)}
             </Text>
-            <Ionicons name="chevron-forward" size={14} color={palette.link} />
+            <Ionicons name={forwardIcon()} size={14} color={palette.link} />
           </Tap>
         ))}
         {revo ? (
@@ -176,7 +172,7 @@ export function HelpSheet({
               <Text style={[typeV2.name, { color: palette.link }]} maxFontSizeMultiplier={CHROME_MAX_SCALE}>
                 {t('help.askRevo')}
               </Text>
-              <Ionicons name="chevron-forward" size={14} color={palette.link} />
+              <Ionicons name={forwardIcon()} size={14} color={palette.link} />
             </View>
           </Tap>
         ) : null}

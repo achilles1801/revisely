@@ -11,8 +11,14 @@
 // The words: at most four topics a screen, each two short sentences or so. Surahs and juz, never
 // page numbers (NAME-1). With Smart Tracking off, nothing about ratings or strength (`when`).
 // {{Label}} is text the app shows, word for word (drawn in ink); [[icon]] is a button's own glyph.
+//
+// In Arabic the topics come from topics.ar.ts, each with the hash of the English it was translated from
+// (__tests__/topicsArabic.test.ts fails when that English changes).
 
 import type { Ionicons } from '@expo/vector-icons';
+import { currentLanguage } from '../../i18n';
+import { backIcon, forwardIcon } from '../../i18n/direction';
+import { HELP_TITLES_AR, HELP_TOPICS_AR } from './topics.ar';
 
 export type HelpIcon = keyof typeof Ionicons.glyphMap;
 
@@ -35,24 +41,22 @@ export type HelpScreen =
   | 'reciteTest';
 
 /**
- * When a topic shows: only with Smart Tracking on, only with it off, only where the hidden page
- * (recite mode, the session's eye) is offered, only with the reader's Recite (Revisely Dev's one mic) or
- * only without it, only in Revisely Dev (Insights' Gaps and Last revised), or only where Activity's
- * sections can be arranged (testers).
+ * When a topic shows: only with Smart Tracking on, only with it off, only with Recite (the one mic, in the reader and
+ * sessions, on a phone and print that have it) or only without it, only where Insights has Gaps and Last revised
+ * (`devApp`: gapsInsightsEnabled, everyone's from 1.0.5), or only where Activity's sections can be arranged.
  */
-export type HelpWhen = 'smartTracking' | 'noSmartTracking' | 'recite' | 'liveRecite' | 'noLiveRecite' | 'devApp' | 'sections';
+export type HelpWhen = 'smartTracking' | 'noSmartTracking' | 'liveRecite' | 'noLiveRecite' | 'devApp' | 'sections';
 
 /** What decides which topics an account sees (HELP-3). */
 export interface HelpOpts {
   smartTracking: boolean;
-  recite?: boolean;
   liveRecite?: boolean;
   devApp?: boolean;
   sections?: boolean;
 }
 
 /** Why a Recite topic has no rule to cover: RECITE-1 to RECITE-8 (BEHAVIOUR.md) don't describe that part of it yet. */
-const RECITE_UNRULED = 'no RECITE rule in BEHAVIOUR.md describes this part of Recite yet (Revisely Dev only)';
+const RECITE_UNRULED = 'no RECITE rule in BEHAVIOUR.md describes this part of Recite yet';
 
 export interface HelpTopic {
   id: string;
@@ -97,8 +101,13 @@ export const HELP_INLINE_ICONS: Readonly<Record<string, HelpIcon>> = {
   plus: 'add',
   help: 'help-circle-outline',
   pause: 'pause',
-  back: 'chevron-back',
-  next: 'chevron-forward',
+  // The reader's ‹ and › point the way the layout reads (src/i18n/direction).
+  get back() {
+    return backIcon();
+  },
+  get next() {
+    return forwardIcon();
+  },
 };
 
 export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
@@ -126,8 +135,8 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         icon: 'flame-outline',
         title: 'Streak',
         text:
-          'Days in a row with all their pages revised. Missed yesterday? Revise its pages before today ends ' +
-          'and the streak comes back.',
+          'Days in a row with all their pages revised. Missed yesterday? A ring beside [[help]] fills as you ' +
+          'revise its pages. Fill it before today ends and the streak comes back.',
         covers: ['SESS-2', 'SESS-6'],
       },
       {
@@ -169,17 +178,19 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         when: 'smartTracking',
       },
       {
-        id: 'session.hidden',
-        icon: 'eye-off-outline',
-        title: 'Hidden page',
+        // The reader's mic in a session (Revisely Dev, Majd, Nov 17 2026). While a take is open, ⋯'s help is How Recite works.
+        id: 'session.recite',
+        icon: 'mic-outline',
+        title: 'Reciting',
         text:
-          "[[eye]] hides the page so you recite from memory. Each verse appears when you pause; " +
-          "{{Next verse}} shows one if you're stuck.",
-        covers: [],
-        unruled: 'recite mode needs on-device speech recognition, which the scenarios can’t run',
-        when: 'recite',
+          '[[mic]] records you; hold it and choose {{Recite}}, and the page follows you. ' +
+          'A take never marks a page revised: swipe on or [[check]] as always.',
+        covers: ['RECITE-9'],
+        when: 'liveRecite',
       },
     ],
+    // Recite's sheets, with it (their topics' `when`). Test me isn't in a session (it goes anywhere in what's memorized).
+    more: ['recite', 'reciteTake', 'reciteMemory'],
   },
   reader: {
     title: 'How the reader works',
@@ -230,12 +241,12 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
     // detection stuff in the help icon"). Recite's sheets show only with it (their topics' `when`).
     more: ['recite', 'reciteTake', 'reciteMemory', 'reciteTest'],
   },
-  // Recite's four sheets (Revisely Dev): how it works, during a take, past mistakes, Test me and voice search. Each
-  // topic carries `when: 'liveRecite'`; when Recite reaches the store app, drop the `when`s and the sheets go with it.
+  // Recite's four sheets: how it works, during a take, past mistakes, Test me and voice search. Each topic carries
+  // `when: 'liveRecite'`: Recite is everyone's from 1.0.5, but only on a phone and print that have it.
   recite: {
     // Majd, Nov 15 2026: in line with what Revisely Dev's Recite does (highlights in three colours, Not clear, Undo
-    // and Put back, Hear it, Recite the mistakes again, the hidden view, Recording saved's Undo). Nov 16: anywhere in
-    // the Qur'an, a slip into a similar ayah, and links to Recite's other sheets.
+    // and Put back, Hear it, Recite the mistakes again, the hidden view). Nov 16: anywhere in the Qur'an, a slip into a
+    // similar ayah, links to Recite's other sheets, and takes kept apart from recordings (RMEM-6).
     title: 'How Recite works',
     linked: true,
     more: ['reciteTake', 'reciteMemory', 'reciteTest'],
@@ -276,8 +287,8 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         title: 'After the take',
         text:
           '{{Recite the mistakes again}} goes over them once more; a slip into a similar ayah gets its own line. ' +
-          '{{Undo}} on {{Recording saved}} deletes the recording.',
-        covers: ['RECITE-7'],
+          '[[more]] → {{Delete this take}} deletes it.',
+        covers: ['RECITE-7', 'RMEM-6'],
         when: 'liveRecite',
       },
     ],
@@ -302,7 +313,7 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         id: 'reciteTake.hidden',
         icon: 'eye-off-outline',
         title: 'From memory',
-        text: '[[eye]] hides the words, and they appear as you say them. [[back]] shows the next word, and ‹‹ the rest of its ayah.',
+        text: '[[eye]] hides the words, and each appears once you’ve said it. [[back]] shows the next word, and ‹‹ the rest of its ayah.',
         covers: ['RECITE-6'],
         when: 'liveRecite',
       },
@@ -365,9 +376,9 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         icon: 'calendar-outline',
         title: 'In Activity',
         text:
-          'A day lists its takes under {{Recited}}, with a slip into a similar ayah named. ' +
-          '{{Show on the page}} opens a take with its marks.',
-        covers: ['RMEM-5', 'RINS-3'],
+          'A day lists each take under {{Recited}}, apart from your recordings. ' +
+          'Tap one for {{Show on the page}}: it opens with its marks.',
+        covers: ['RMEM-5', 'RMEM-6', 'RINS-3'],
         when: 'liveRecite',
       },
     ],
@@ -541,7 +552,7 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         id: 'insightsMore.gaps',
         icon: 'pulse-outline',
         title: 'Gaps',
-        text: 'How long since you last revised, and your gaps over the range: the longest, and how often you usually revise. {{Days}} shows exact days.',
+        text: 'How long since you last revised, and each time you went 2 days or more without revising: tap one to see it on the calendar. {{Days}} shows exact days.',
         covers: ['ACT-28'],
         when: 'devApp',
       },
@@ -549,7 +560,7 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         id: 'insightsMore.lastRevised',
         icon: 'time-outline',
         title: 'Last revised',
-        text: '{{When did I last revise…?}}, under Gaps, lists every surah, juz or hizb you’ve memorized, the longest waiting first.',
+        text: '{{When did I last revise…?}}, under Gaps, says when you last revised what you’ve memorized. Choose surahs, juz, hizbs or pages, the order, and a filter.',
         covers: ['ACT-30'],
         when: 'devApp',
       },
@@ -628,20 +639,30 @@ export const MAX_TOPICS = 4;
 
 /**
  * A screen's topics for this account (HELP-3): the Smart Tracking ones only with it on, their
- * stand-ins only with it off, the hidden page's only where it's offered, Recite's only with it, Revisely
+ * stand-ins only with it off, Recite's only with it, Revisely
  * Dev's only there, and arranging Activity's sections only where it can be done.
  */
 export function topicsFor(screen: HelpScreen, opts: HelpOpts): HelpTopic[] {
   return HELP[screen].topics.filter((t) => {
     if (t.when === 'smartTracking') return opts.smartTracking;
     if (t.when === 'noSmartTracking') return !opts.smartTracking;
-    if (t.when === 'recite') return opts.recite === true;
     if (t.when === 'liveRecite') return opts.liveRecite === true;
     if (t.when === 'noLiveRecite') return opts.liveRecite !== true;
     if (t.when === 'devApp') return opts.devApp === true;
     if (t.when === 'sections') return opts.sections === true;
     return true;
-  });
+  }).map(inLanguage);
+}
+
+/** A topic in the app's language: its Arabic (topics.ar.ts) when the app is in Arabic and it has one, else as here. */
+function inLanguage(topic: HelpTopic): HelpTopic {
+  const ar = currentLanguage() === 'ar' ? HELP_TOPICS_AR[topic.id] : undefined;
+  return ar?.text != null ? { ...topic, title: ar.title, text: ar.text } : topic;
+}
+
+/** A sheet's title in the app's language. */
+export function helpTitle(screen: HelpScreen): string {
+  return (currentLanguage() === 'ar' ? HELP_TITLES_AR[screen]?.title : undefined) ?? HELP[screen].title;
 }
 
 /** The sheets a sheet leads to for this account: its `more`, less those with nothing for it. */
@@ -668,19 +689,37 @@ export function helpTextParts(text: string): HelpTextPart[] {
 
 /** A topic's text as read aloud (VoiceOver) and in tests: labels as words, icons by their button's name. */
 export function helpPlainText(text: string): string {
-  const spoken: Record<string, string> = {
-    check: '✓',
-    more: '⋯',
-    eye: 'the eye',
-    play: '▶',
-    options: 'Audio Options',
-    mic: 'the microphone',
-    timer: 'the timer',
-    plus: '+',
-    help: '?',
-    pause: 'Pause',
-    back: '‹',
-    next: '›',
-  };
+  const spoken: Record<string, string> = currentLanguage() === 'ar' ? SPOKEN_AR : SPOKEN_EN;
   return text.replace(/\{\{(.+?)\}\}/g, '$1').replace(/\[\[([a-z]+)\]\]/g, (_, n: string) => spoken[n] ?? n);
 }
+
+/** Each [[icon]] as VoiceOver says it: by its button's name. */
+const SPOKEN_EN: Readonly<Record<string, string>> = {
+  check: '✓',
+  more: '⋯',
+  eye: 'the eye',
+  play: '▶',
+  options: 'Audio Options',
+  mic: 'the microphone',
+  timer: 'the timer',
+  plus: '+',
+  help: '?',
+  pause: 'Pause',
+  back: '‹',
+  next: '›',
+};
+
+const SPOKEN_AR: Readonly<Record<string, string>> = {
+  check: '✓',
+  more: '⋯',
+  eye: 'زر العين',
+  play: 'زر التشغيل',
+  options: 'خيارات الصوت',
+  mic: 'الميكروفون',
+  timer: 'المؤقت',
+  plus: '+',
+  help: 'زر المساعدة',
+  pause: 'إيقاف مؤقت',
+  back: 'زر الكلمة التالية',
+  next: 'زر التالي',
+};

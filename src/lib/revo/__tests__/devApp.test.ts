@@ -38,7 +38,8 @@ const gaps: RevoGaps = {
   fullRevision: null,
   surahs: [{ name: 'An-Naba', daysAgo: 6 }],
 };
-const build = (extra: { gaps?: RevoGaps | null } = {}) => buildRevoContext({ user, pages, logs: [], snapshot, now: new Date(now), ...extra });
+const build = (extra: { gaps?: RevoGaps | null; recite?: boolean; recitation?: Parameters<typeof buildRevoContext>[0]['recitation'] } = {}) =>
+  buildRevoContext({ user, pages, logs: [], snapshot, now: new Date(now), ...extra });
 
 describe('Revo’s context says which app asks', () => {
   afterEach(() => {
@@ -54,11 +55,38 @@ describe('Revo’s context says which app asks', () => {
     expect(build().app).toBe('dev');
   });
 
-  // ACT-28, ACT-30: the server refuses Gaps from any app but Revisely Dev, and with them the whole question.
-  it('Gaps go only from Revisely Dev, beside app "dev"', () => {
-    expect('gaps' in build({ gaps })).toBe(false);
+  it('the app in Arabic asks for the answer in Arabic (language "ar"); in English nothing is sent', async () => {
+    const { i18n } = jest.requireActual('../../../i18n') as typeof import('../../../i18n');
     mockDev = true;
-    expect(build({ gaps })).toMatchObject({ app: 'dev', gaps });
-    expect('gaps' in build({ gaps: null })).toBe(false);
+    expect('language' in build()).toBe(false);
+    await i18n.changeLanguage('ar');
+    try {
+      expect(build().language).toBe('ar');
+    } finally {
+      await i18n.changeLanguage('en');
+    }
+  });
+
+  // ACT-28, ACT-30, RINS-1: Gaps and the recitation are every account's from the mistake detection release, but a server
+  // from before it refuses them from any app but Revisely Dev, and with them the whole question. So the store app sends
+  // them only once config/app.revoRecite says the server takes them (set on release day, after deploying revoAsk).
+  const recitation = { takes: 3 } as unknown as NonNullable<Parameters<typeof buildRevoContext>[0]['recitation']>;
+  it('[ACT-28] [RINS-1] the store app sends Gaps and its recitation only once config/app.revoRecite is on', () => {
+    // Off (until release day): neither, and the question is as every server takes it.
+    const off = build({ gaps, recitation, recite: false });
+    expect('gaps' in off).toBe(false);
+    expect('recitation' in off).toBe(false);
+    expect('app' in off).toBe(false);
+    // On: both, still without app "dev" (no Dev guide).
+    const on = build({ gaps, recitation, recite: true });
+    expect(on).toMatchObject({ gaps, recitation });
+    expect('app' in on).toBe(false);
+    // Nothing to send: nothing sent, either way.
+    expect('gaps' in build({ gaps: null, recite: true })).toBe(false);
+  });
+
+  it('[ACT-28] Revisely Dev sends them whatever the switch says (its backend has always taken them)', () => {
+    mockDev = true;
+    expect(build({ gaps, recitation, recite: false })).toMatchObject({ app: 'dev', gaps, recitation });
   });
 });

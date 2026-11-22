@@ -5,7 +5,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PanResponder } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { CALENDAR_SCREEN_LABEL, CALENDAR_SPAN_KEY, parseSpan, periodForSpan, shiftWeek, showsToday, weekDays, type CalendarSpan } from '../../lib/activityCalendar';
+import { calendarScreenLabel, CALENDAR_SPAN_KEY, parseSpan, periodForGap, periodForSpan, shiftWeek, showsToday, weekDays, type CalendarGap, type CalendarSpan } from '../../lib/activityCalendar';
 import { weekStart as weekStartOf } from '../../lib/activityHeatmap';
 import { StyleSheet, View as RNView } from 'react-native';
 import { useApp } from '../../context/AppContext';
@@ -31,11 +31,16 @@ import { InsightsView } from './InsightsView';
 import { useRecitation } from '../../lib/reciteInsights/useRecitation';
 import { useActivityReload } from './useActivityReload';
 import { listRecordings, onRecordingsChanged } from '../../lib/recordings';
+import { sortTakeAudio } from '../../lib/reciteMemory/apart';
 import { coverageSince } from '../../lib/recency';
-import type { PreviewBlock, RecordingCounts } from './CalendarMonth';
+import type { PreviewBlock, RecitedDay, RecordingCounts } from './CalendarMonth';
+import { useMemoryRecords } from '../../lib/reciteMemory/store';
+import { reciteLiveForAccount } from '../../lib/reciteLive/availability';
+import { useQuranWordsWhen } from '../reciteMemory/TakeRows';
 import { activitySectionsEnabled, useActivitySections, type InsightsSection } from '../../lib/activitySections';
 import { IconButton } from '../v2/TopBar';
 import { SectionsSheet } from './SectionsSheet';
+import { t } from '../../i18n';
 
 const shiftDays = (day: string, n: number) => {
   const d = new Date(`${day}T00:00:00Z`);
@@ -60,8 +65,8 @@ interface Props {
   firstTomorrow?: ReadonlySet<number>;
   /** Weak spots' "See all pages by strength" (ACT-12). */
   onSeeAllPages?: () => void;
-  /** Gaps' "When did I last revise…?" (ACT-30). */
-  onOpenLastRevised?: () => void;
+  /** Gaps' "When did I last revise…?" (ACT-30); its full revision line asks for longest waiting first. */
+  onOpenLastRevised?: (sort?: 'waiting') => void;
   /** Smart Tracking off: Insights' line that opens Settings at its switch (ACT-12). */
   onTurnOnSmartTracking?: () => void;
   /** Days with a note in the log (the calendar's note dot). */
@@ -70,11 +75,13 @@ interface Props {
   onOpenDay: (day: string, block?: PreviewBlock) => void;
   /** The tab on show changed (Overview or Insights): the top bar's help explains that one. */
   onViewChange?: (view: ViewKind) => void;
+  /** Insights opened Overview's calendar: the screen scrolls to its top, so the month's title and the calendar show. */
+  onShowTop?: () => void;
   /** Filled with what reads the items again, for the screen's pull to refresh (ACT-27). */
   refreshRef?: React.MutableRefObject<(() => Promise<unknown>) | null>;
 }
 
-export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorrow, onPlanIt, onAddToPlan, onOpenPage, onOpenAyahs, onSeeAllPages, onOpenLastRevised, onTurnOnSmartTracking, firstTomorrow, onViewChange, refreshRef }: Props) {
+export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorrow, onPlanIt, onAddToPlan, onOpenPage, onOpenAyahs, onSeeAllPages, onOpenLastRevised, onTurnOnSmartTracking, firstTomorrow, onViewChange, onShowTop, refreshRef }: Props) {
   const { pages, logs, user } = useApp();
   const revo = useRevoAvailable(user);
   const recitation = useRecitation(user);
@@ -89,7 +96,15 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
   const [month, setMonth] = useState(today.slice(0, 7));
   const [span, setSpanState] = useState<CalendarSpan>('month');
   const [week, setWeek] = useState(weekStartOf(today));
-  const [picked, setPicked] = useState<string | null>(null);
+  const [picked, setPickedState] = useState<string | null>(null);
+  // A gap from Insights marked on the calendar (ACT-28). It stays while the arrows or a swipe step on, so a gap
+  // across weeks or months can be followed, and fades at the first touch on the calendar itself: a day picked,
+  // Today, or Week | Month.
+  const [gapMark, setGapMark] = useState<CalendarGap | null>(null);
+  const setPicked = (day: string | null) => {
+    setGapMark(null);
+    setPickedState(day);
+  };
   // The last Week | Month choice is kept on the phone (a per-device convenience, not synced).
   useEffect(() => {
     AsyncStorage.getItem(CALENDAR_SPAN_KEY)
@@ -101,6 +116,7 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
     const period = periodForSpan(next, { span, month, week, picked, today });
     setMonth(period.month);
     setWeek(period.week);
+    setGapMark(null);
     setSpanState(next);
     AsyncStorage.setItem(CALENDAR_SPAN_KEY, next).catch(() => undefined);
   };
@@ -154,7 +170,9 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
   const [recordings, setRecordings] = useState<Map<string, RecordingCounts>>(new Map());
   useEffect(() => {
     const read = () => {
-      listRecordings()
+      // Old takes' audio out of the recordings first (RMEM-6): once a launch; marking them reads again.
+      sortTakeAudio()
+        .then(() => listRecordings())
         .then((all) => {
           const out = new Map<string, RecordingCounts>();
           for (const r of all) {
@@ -170,6 +188,23 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
     read();
     return onRecordingsChanged(read);
   }, []);
+
+  // Recite's takes by day (Revisely Dev): the picked day's Recited row (RMEM-5), its passages once the words are in.
+  const memory = useMemoryRecords(user?.id, reciteLiveForAccount(user));
+  const takeWords = useQuranWordsWhen(memory.length > 0);
+  const recited = useMemo(() => {
+    const out = new Map<string, RecitedDay>();
+    for (const r of memory) {
+      if (r.kind !== 'take' || r.deleted) continue;
+      const d = out.get(r.day) ?? { takes: 0, pages: [] };
+      d.takes += 1;
+      if (takeWords) {
+        for (let p = takeWords.pageOf(r.from); p <= takeWords.pageOf(r.to); p++) if (!d.pages.includes(p)) d.pages.push(p);
+      }
+      out.set(r.day, d);
+    }
+    return out;
+  }, [memory, takeWords]);
 
   // Swipe between weeks or months (a horizontal drag on the calendar).
   const stepRef = useRef<(delta: number) => void>(() => undefined);
@@ -218,9 +253,19 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
     () => new Map(pages.filter((p) => p.lastRevisedDate).map((p) => [p.pageNumber, (p.lastRevisedDate as string).slice(0, 10)])),
     [pages],
   );
-  // Consistency's figure (ACT-23): Overview at that month, with today (or nothing) picked.
-  const openCalendar = (m: string) => {
+  // Consistency's figure (ACT-23): Overview at that month, with today (or nothing) picked. A gap from Gaps (ACT-28):
+  // where it shows, marked (lib/activityCalendar periodForGap).
+  const openCalendar = (m: string, gap?: Omit<CalendarGap, 'key'>) => {
     setView('calendar');
+    onShowTop?.();
+    if (gap) {
+      const period = periodForGap(gap);
+      setMonth(period.month);
+      setWeek(period.week);
+      setPicked(null);
+      setGapMark({ ...gap, key: Date.now() });
+      return;
+    }
     setMonth(m);
     setWeek(weekStartOf(m === today.slice(0, 7) ? today : `${m}-01`));
     setPicked(null);
@@ -256,11 +301,14 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
       <RNView style={styles.switch}>
         <PillTabs
           options={[
-            { value: 'calendar', label: CALENDAR_SCREEN_LABEL },
-            { value: 'insights', label: 'Insights' },
+            { value: 'calendar', label: calendarScreenLabel() },
+            { value: 'insights', label: t('activity.blocks.insights') },
           ]}
           value={view}
-          onChange={setView}
+          onChange={(v) => {
+            setGapMark(null);
+            setView(v);
+          }}
           testID="activity-views"
           tone="ink"
           hug
@@ -271,27 +319,27 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
             <ChoiceChip
               label={rangeLabel(range)}
               onPress={() => setRangeMenu(true)}
-              accessibilityLabel={`Insights for ${rangeLabel(range)}`}
-              accessibilityHint="Choose how far back Insights look"
+              accessibilityLabel={t('activity.blocks.insightsFor', { range: rangeLabel(range) })}
+              accessibilityHint={t('activity.blocks.chooseRange')}
               size="md"
               testID="insights-range"
             />
           ) : null}
           {/* Edit sections (ACT-29): what the tab on show shows, and in what order. */}
           {editable ? (
-            <IconButton icon="options-outline" label="Edit sections" onPress={() => setEditing(view)} size={22} testID="activity-edit-sections" />
+            <IconButton icon="options-outline" label={t('activity.insights.editSections')} onPress={() => setEditing(view)} size={22} testID="activity-edit-sections" />
           ) : null}
         </RNView>
       </RNView>
       <ActionSheet
         visible={rangeMenu}
         onClose={() => setRangeMenu(false)}
-        title="Insights for"
+        title={t('activity.blocks.insightsForTitle')}
         actions={INSIGHTS_RANGES.map((r) => ({
           key: `range-${r}`,
           label: rangeLabel(r),
           // All time names where it starts (the NOTE: "Since 9 September").
-          subtitle: r === 'all' && firstDay ? `Since ${dayAndMonth(firstDay)}` : undefined,
+          subtitle: r === 'all' && firstDay ? t('activity.blocks.since', { day: dayAndMonth(firstDay) }) : undefined,
           selected: r === range,
           onPress: () => setRange(r),
         }))}
@@ -311,7 +359,9 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
             onStep={(delta) => stepRef.current(delta)}
             onPick={setPicked}
             onOpen={onOpenDay}
+            gap={gapMark}
             recordings={recordings}
+            recited={recited}
             sections={sections.overview}
           />
         </RNView>
@@ -368,7 +418,7 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
             has={(id: InsightsSection) =>
               id === 'recitation' ? recitation != null && onOpenAyahs != null : id === 'gaps' ? gapsOn : true
             }
-            notes={smartTrackingOn(user) ? {} : { weak: 'Smart Tracking is off' }}
+            notes={smartTrackingOn(user) ? {} : { weak: t('activity.blocks.smartTrackingOff') }}
           />
         </>
       ) : null}

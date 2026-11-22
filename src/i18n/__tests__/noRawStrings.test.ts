@@ -17,6 +17,7 @@ const SRC = path.resolve(__dirname, '../..');
  */
 const EXTRACTED: string[] = [
   'components/*',
+  'components/activity',
   'components/coach',
   'components/help',
   'components/home',
@@ -31,9 +32,12 @@ const EXTRACTED: string[] = [
   'components/reader',
   'components/recite',
   'components/reciteCheck',
+  'components/reciteLive',
+  'components/reciteMemory',
   'components/recordings',
   'components/revision',
   'components/revo',
+  'components/search',
   'components/settings',
   'components/timer',
   'components/updates',
@@ -41,19 +45,26 @@ const EXTRACTED: string[] = [
   'components/verse',
   'context',
   'hooks',
+  'lib/*',
   'lib/prayer',
   'lib/recite',
+  'lib/reciteCheck',
+  'lib/reciteInsights',
+  'lib/reciteLive',
+  'lib/reciteMemory',
   'lib/reminders',
   'lib/revo',
   'lib/updates',
   'lib/widgets',
   'navigation',
+  'screens/activity',
   'screens/auth',
   'screens/journal',
   'screens/main',
   'screens/onboarding',
   'screens/prayer',
   'screens/preview',
+  'screens/read',
   'screens/revision',
   'services',
 ];
@@ -63,10 +74,10 @@ const EXTRACTED: string[] = [
  * counts in the progress report.
  */
 const WAITING: Record<string, string> = {
+  'lib/releaseInfo.ts': 'App info’s lines (testers only); open PR #780 changes this file, so it goes once that merges.',
   'lib/revo/openers.ts':
-    'Revo’s first lines are built from English sentence parts (a day’s “on”/bare forms, “both pages”, “you” added or not): Arabic needs a module of its own with the same signature, as lib/help will.',
-  'lib/revo/charts.ts':
-    'Its readouts lean on lib/recency’s words (timesWord, recencyWords) and English grammar: it goes with lib’s own files.',
+    'Revo’s first lines, built from English sentence parts (a day’s “on”/bare forms, “both pages”, “you” added or not): per-language sentence builders, as lib/help; the Arabic ones are openers.ar.ts.',
+  'lib/revo/openers.ar.ts': 'openers.ts’s sentence builders in Arabic (Arabic number-and-noun agreement): per-language content, as lib/help.',
 };
 
 describe('UI text comes from src/i18n', () => {

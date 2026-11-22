@@ -1,47 +1,49 @@
-// Insights' Gaps (ACT-28; Majd, Nov 16 2026; board ~/Documents/revisely-today-mocks/insights-gaps/): how long
-// since the last revision, a strip of the range with the gaps drawn on it (3 days or more in red, with their
-// length; the gap still open dashed to today), the longest gap and the usual rhythm. Revision days only, as
-// Activity files them (Fajr or midnight); the same with Smart Tracking on or off (recency, never strength).
-// Long lengths are said as a person says them ("over 3 weeks"), with exact days one tap away (the Days switch,
-// kept on the phone). Under the tiles, the full revision: pushed back by gaps, or on schedule (lib/gapsCycle).
-// The figures come from lib/insightsGaps.
+// Insights' Gaps (ACT-28; Majd, Nov 16 2026; board ~/Documents/revisely-today-mocks/insights-gaps/): how long since the
+// last revision, one line of how many gaps (2 days or more without revising) the range had and the usual rhythm, then
+// the gaps themselves, the latest first: each its length, its days and a bar against the longest, opening it on the
+// calendar. Nov 20 2026 (Majd, on a day-old account: "there's just a dot on that graph and literally it makes no sense …
+// There has to be a better way to represent this"): the strip of dots and the two tiles gave way to that list, and with
+// no gap nothing is drawn. Revision days only, as Activity files them (Fajr or midnight); the same with Smart Tracking
+// on or off (recency, never strength). Long lengths are said as a person says them ("over 3 weeks"), with exact days
+// one tap away (the Days switch, kept on the phone). Under the gaps, the full revision: pushed back by gaps, or on
+// schedule after one (lib/gapsCycle). The figures come from lib/insightsGaps.
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
-import { StyleSheet, useWindowDimensions, View, type GestureResponderEvent } from 'react-native';
-import Svg, { Circle, Line, Text as SvgText } from 'react-native-svg';
+import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { typeV2 } from '../../theme/v2';
 import { t } from '../../i18n';
-import { chevron } from '../../i18n/direction';
+import { chevron, forwardIcon } from '../../i18n/direction';
 import { ChromeText, STACK_AT_SCALE } from './ChromeText';
 import { Tap } from '../v2/Tap';
 import {
+  capital,
   gapDate,
+  gapDates,
   gapLabel,
+  gapOnCalendar,
   gapsFigure,
   gapsHaveNatural,
+  gapsNewestFirst,
+  gapSpoken,
+  gapsSummary,
   gapsView,
-  longestTile,
+  GAPS_SHOWN,
   naturalDiffers,
-  rhythmTile,
-  stripLabel,
+  type Gap,
   type GapsView,
-  type StripPart,
 } from '../../lib/insightsGaps';
 import { pushBackLine, type PushBack } from '../../lib/gapsCycle';
+import { useFirstSection } from './sectionPlace';
 
 /** The Days switch, kept on the phone: '1' shows every length in exact days. */
 export const GAPS_IN_DAYS_KEY = 'insights.gapsInDays';
-import { useFirstSection } from './sectionPlace';
 
-/** The strip's height, where its line runs, and the gap labels' size. */
-const STRIP_H = 48;
-const LINE_Y = 32;
-const LABEL_SIZE = 12;
-/** Up to this many days a touch on the strip opens that day; longer, the month it falls in. */
-const DAY_TAP_MAX = 31;
+/** A gap's bar: its height, and the least of the track it fills (a 2-day gap beside a 2-month one still shows). */
+const BAR_H = 6;
+const BAR_MIN = 0.04;
 
 export interface GapsSectionProps {
   /** Activity's revision items (`day` = the revision day it was done on). */
@@ -56,14 +58,15 @@ export interface GapsSectionProps {
   /** The first day the items were read from. */
   knownSince?: string | null;
   lastRevisedOn?: ReadonlyMap<number, string>;
-  /** A day (the figure: the last revision; the strip: the day touched). */
+  /** A day (the figure: the last revision). */
   onOpenDay?: (day: string) => void;
-  /** Overview at a month (the longest gap; a long strip's month touched). */
-  onOpenCalendar?: (month: string) => void;
+  /** Overview with a gap marked on its calendar, at the month it begins in. */
+  onOpenCalendar?: (month: string, gap?: { from: string; to: string; cue: string }) => void;
   /** The full revision against the plan (lib/gapsCycle pushBack); none: no line. */
   pushBack?: PushBack | null;
-  /** Last revised (ACT-30): the link at the section's end, and the full revision line. */
-  onOpenLastRevised?: () => void;
+  /** Last revised (ACT-30): the link at the section's end, and the full revision line (longest waiting first: the
+   * late pages at the top). */
+  onOpenLastRevised?: (sort?: 'waiting') => void;
 }
 
 export function GapsSection(props: GapsSectionProps) {
@@ -95,19 +98,21 @@ function Gaps({ view, all, firstDay, onOpenDay, onOpenCalendar, pushBack, onOpen
     setInDaysState(next);
     AsyncStorage.setItem(GAPS_IN_DAYS_KEY, next ? '1' : '0').catch(() => undefined);
   };
-  const switchable = gapsHaveNatural(view) || (pushBack != null && naturalDiffers(pushBack.days));
+  const [allShown, setAllShown] = useState(false);
+  // The full revision line: always when pages are late; on schedule only after a gap (with none it says nothing new).
+  const revision = pushBack && (pushBack.late.length > 0 || view.gaps.length > 0) ? pushBackLine(pushBack, inDays) : null;
+  const switchable = gapsHaveNatural(view) || (revision?.late === true && pushBack != null && naturalDiffers(pushBack.days));
   // The first section shown has no hairline above it (ACT-29).
   const first = useFirstSection();
   // A range longer than the account counts from its first day, and says so (ACT-22): "since 2 November".
-  const since = !all && firstDay && view.strip.days[0] === firstDay.slice(0, 10) ? t('insights.gaps.since', { date: gapDate(firstDay, 'long') }) : null;
+  const since = !all && firstDay && view.rangeStart === firstDay.slice(0, 10) ? t('insights.gaps.since', { date: gapDate(firstDay, 'long') }) : null;
   const inWords = since ?? props.inWords;
-  const lastWords = since ?? props.lastWords;
   const stacked = useWindowDimensions().fontScale >= STACK_AT_SCALE;
   const figure = gapsFigure(view, inDays);
-  const longest = longestTile(view.longest, inWords, inDays);
-  const rhythm = view.usual != null ? rhythmTile(view.usual, view.longCount, inDays) : null;
-  const revision = pushBack ? pushBackLine(pushBack, inDays) : null;
-  const longestMonth = view.longest ? (view.longest.from ?? view.longest.to!).slice(0, 7) : null;
+  const summary = gapsSummary(view, inWords, inDays);
+  const gaps = gapsNewestFirst(view.gaps);
+  const shown = allShown ? gaps : gaps.slice(0, GAPS_SHOWN);
+  const longest = Math.max(1, ...gaps.map((g) => g.days));
 
   const figureInner = (
     <>
@@ -116,7 +121,7 @@ function Gaps({ view, all, firstDay, onOpenDay, onOpenCalendar, pushBack, onOpen
       </ChromeText>
       <ChromeText style={[typeV2.body, styles.flex, { color: palette.secondary }]}>
         {figure.text}
-        {onOpenDay ? ` ${chevron()}` : ''}
+        {onOpenDay ? ` ${chevron()}` : ''}
       </ChromeText>
     </>
   );
@@ -162,45 +167,39 @@ function Gaps({ view, all, firstDay, onOpenDay, onOpenCalendar, pushBack, onOpen
         </View>
       )}
 
-      <Strip view={view} lastWords={lastWords} inDays={inDays} onOpenDay={onOpenDay} onOpenCalendar={onOpenCalendar} />
+      <ChromeText style={[typeV2.meta, styles.summary, { color: palette.secondary }]} testID="insights-gaps-summary">
+        {summary}
+      </ChromeText>
 
-      <View style={[styles.tiles, stacked && styles.tilesStacked]} testID="insights-gaps-tiles">
-        <Tap
-          onPress={longestMonth && onOpenCalendar ? () => onOpenCalendar(longestMonth) : undefined}
-          disabled={!longestMonth || !onOpenCalendar}
-          accessibilityRole={longestMonth && onOpenCalendar ? 'button' : 'text'}
-          accessibilityLabel={[longest.value, longest.unit, longest.text].filter(Boolean).join(' ')}
-          accessibilityHint={longestMonth && onOpenCalendar ? t('insights.gaps.longestHint') : undefined}
-          style={[styles.tile, { backgroundColor: palette.bubble }]}
-          testID="insights-gaps-longest"
-        >
-          <View style={styles.tileFigure}>
-            <ChromeText style={[styles.tileNumber, { color: palette.text }]}>{longest.value}</ChromeText>
-            {longest.unit ? <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{longest.unit}</ChromeText> : null}
-          </View>
-          <ChromeText style={[typeV2.meta, styles.tileText, { color: palette.secondary }]}>
-            {longest.text}
-            {longestMonth && onOpenCalendar ? ` ${chevron()}` : ''}
-          </ChromeText>
-        </Tap>
-        {rhythm ? (
-          <View
-            style={[styles.tile, { backgroundColor: palette.bubble }]}
-            accessible
-            accessibilityLabel={`${rhythm.value}. ${rhythm.text}`}
-            testID="insights-gaps-rhythm"
-          >
-            <ChromeText style={[styles.tileNumber, { color: palette.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
-              {rhythm.value}
-            </ChromeText>
-            <ChromeText style={[typeV2.meta, styles.tileText, { color: palette.secondary }]}>{rhythm.text}</ChromeText>
-          </View>
-        ) : null}
-      </View>
+      {gaps.length > 0 ? (
+        <View style={styles.list} testID="insights-gaps-list">
+          {shown.map((g, i) => (
+            <GapRow
+              key={`${g.first}-${g.last}`}
+              gap={g}
+              longest={longest}
+              inDays={inDays}
+              separator={i > 0}
+              onPress={onOpenCalendar ? () => {
+                const mark = gapOnCalendar(g, inDays);
+                onOpenCalendar(mark.from.slice(0, 7), mark);
+              } : undefined}
+            />
+          ))}
+          {gaps.length > GAPS_SHOWN ? (
+            <Tap onPress={() => setAllShown(!allShown)} accessibilityRole="button" hitSlop={8} style={styles.more} testID="insights-gaps-more">
+              <ChromeText style={[typeV2.name, styles.linkText, { color: palette.link }]} maxFontSizeMultiplier={1.4}>
+                {allShown ? t('insights.gaps.showFewer') : t('insights.gaps.showAll', { count: gaps.length })}
+              </ChromeText>
+              <Ionicons name={allShown ? 'chevron-up' : 'chevron-down'} size={16} color={palette.link} />
+            </Tap>
+          ) : null}
+        </View>
+      ) : null}
 
       {revision ? (
         <Tap
-          onPress={onOpenLastRevised}
+          onPress={onOpenLastRevised ? () => onOpenLastRevised('waiting') : undefined}
           disabled={!onOpenLastRevised}
           style={[styles.revision, { borderTopColor: palette.separator }]}
           accessibilityRole={onOpenLastRevised ? 'button' : 'text'}
@@ -215,13 +214,13 @@ function Gaps({ view, all, firstDay, onOpenDay, onOpenCalendar, pushBack, onOpen
             <ChromeText style={[typeV2.name, { color: palette.text }]}>{revision.title}</ChromeText>
             <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{revision.detail}</ChromeText>
           </View>
-          {onOpenLastRevised ? <Ionicons name="chevron-forward" size={16} color={palette.secondary} style={styles.revisionChevron} /> : null}
+          {onOpenLastRevised ? <Ionicons name={forwardIcon()} size={16} color={palette.secondary} style={styles.revisionChevron} /> : null}
         </Tap>
       ) : null}
 
       {onOpenLastRevised ? (
         <Tap
-          onPress={onOpenLastRevised}
+          onPress={() => onOpenLastRevised()}
           accessibilityRole="button"
           accessibilityHint={t('insights.lastRevised.linkHint')}
           hitSlop={8}
@@ -231,7 +230,7 @@ function Gaps({ view, all, firstDay, onOpenDay, onOpenCalendar, pushBack, onOpen
           <ChromeText style={[typeV2.name, styles.linkText, { color: palette.link }]} maxFontSizeMultiplier={1.4}>
             {t('insights.lastRevised.link')}
           </ChromeText>
-          <Ionicons name="chevron-forward" size={16} color={palette.link} />
+          <Ionicons name={forwardIcon()} size={16} color={palette.link} />
         </Tap>
       ) : null}
     </View>
@@ -239,112 +238,36 @@ function Gaps({ view, all, firstDay, onOpenDay, onOpenCalendar, pushBack, onOpen
 }
 
 /**
- * The range as a line: a dot per revision day, joined while they run on; a gap of 3 days or more in red
- * with its length above it; the gap still open dashed up to today's ring. A touch opens the day under the
- * finger (a long range: its month in Overview).
+ * One gap: its length and days on a line, and a bar under them, as long against the track as the gap is against the
+ * longest in the range. Red, but for the one still open from 2 weeks: someone coming back is welcomed, not alarmed
+ * (grey, as the figure). A tap shows it on the calendar.
  */
-function Strip({
-  view,
-  lastWords,
-  inDays,
-  onOpenDay,
-  onOpenCalendar,
-}: {
-  view: GapsView;
-  lastWords: string;
-  inDays: boolean;
-  onOpenDay?: (day: string) => void;
-  onOpenCalendar?: (month: string) => void;
-}) {
+function GapRow({ gap, longest, inDays, separator, onPress }: { gap: Gap; longest: number; inDays: boolean; separator: boolean; onPress?: () => void }) {
   const { palette } = useTheme();
-  const [width, setWidth] = useState(0);
-  const { days, revised, parts } = view.strip;
-  const n = days.length;
-  const pad = 6;
-  const step = n > 1 ? (width - 2 * pad) / (n - 1) : 0;
-  const x = (i: number) => (n > 1 ? pad + i * step : width / 2);
-  const dot = Math.max(1.5, Math.min(4, step * 0.45));
-  const byDay = n <= DAY_TAP_MAX;
-  const opens = byDay ? onOpenDay : onOpenCalendar;
-  const pick = (e: GestureResponderEvent) => {
-    if (!opens || width <= 0 || n === 0) return;
-    const i = Math.max(0, Math.min(n - 1, Math.round((e.nativeEvent.locationX - pad) / Math.max(step, 1))));
-    if (byDay) onOpenDay?.(days[i]);
-    else onOpenCalendar?.(days[i].slice(0, 7));
-  };
-
-  // A label sits over its gap's middle, kept inside the strip, and may reach past its gap's ends; one that would
-  // run into the label before it is left out (the tiles and VoiceOver carry every number).
-  const labels = (() => {
-    const out: React.ReactNode[] = [];
-    let right = -Infinity;
-    const long = parts
-      .map((p, i) => ({ p, i }))
-      .filter((e): e is { p: Extract<StripPart, { kind: 'gap' | 'open' }>; i: number } => e.p.kind !== 'run' && e.p.long)
-      .sort((a, b) => a.p.from - b.p.from);
-    for (const { p, i } of long) {
-      // An absence of 2 weeks or more still open is grey, not red: someone coming back is welcomed, not alarmed.
-      const quiet = p.kind === 'open' && naturalDiffers(p.days);
-      const text = gapLabel({ days: p.days, open: p.kind === 'open', atLeast: p.kind === 'gap' && p.atLeast }, inDays);
-      const textW = text.length * LABEL_SIZE * 0.55;
-      const mid = (x(p.from) + x(p.to)) / 2;
-      const left = Math.max(0, Math.min(width - textW, mid - textW / 2));
-      if (left < right + 6) continue;
-      right = left + textW;
-      out.push(
-        <SvgText key={`l${i}`} x={left} y={LINE_Y - 12} fontSize={LABEL_SIZE} fontWeight="600" fill={quiet ? palette.secondary : palette.red} textAnchor="start">
-          {text}
-        </SvgText>,
-      );
-    }
-    return out;
-  })();
-
+  const quiet = gap.open && naturalDiffers(gap.days);
+  const fill = quiet ? palette.secondary : palette.red;
+  const share = Math.max(BAR_MIN, Math.min(1, gap.days / longest));
   return (
-    <View style={styles.strip}>
-      <Tap
-        onPress={opens ? pick : undefined}
-        disabled={!opens}
-        accessibilityRole={opens ? 'button' : 'image'}
-        accessibilityLabel={stripLabel(view, lastWords)}
-        accessibilityHint={opens ? (byDay ? t('insights.gaps.stripHint') : t('insights.gaps.stripHintMonth')) : undefined}
-        onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
-        style={styles.stripTap}
-        testID="insights-gaps-strip"
-      >
-        {width > 0 ? (
-          <Svg width={width} height={STRIP_H} pointerEvents="none">
-            <Line x1={x(0)} y1={LINE_Y} x2={x(n - 1)} y2={LINE_Y} stroke={palette.track} strokeWidth={2} strokeLinecap="round" />
-            {parts.map((p, i) =>
-              p.kind === 'run' ? (
-                <Line key={`r${i}`} x1={x(p.from)} y1={LINE_Y} x2={x(p.to)} y2={LINE_Y} stroke={palette.primary} strokeWidth={3} strokeLinecap="round" opacity={0.55} />
-              ) : p.kind === 'gap' ? (
-                p.long ? <Line key={`g${i}`} x1={x(p.from)} y1={LINE_Y} x2={x(p.to)} y2={LINE_Y} stroke={palette.red} strokeWidth={3} strokeLinecap="round" /> : null
-              ) : (
-                <Line
-                  key={`o${i}`}
-                  x1={x(p.from)}
-                  y1={LINE_Y}
-                  x2={x(p.to)}
-                  y2={LINE_Y}
-                  stroke={p.long && !naturalDiffers(p.days) ? palette.red : p.long ? palette.secondary : palette.track}
-                  strokeWidth={3}
-                  strokeDasharray="1 5"
-                  strokeLinecap="round"
-                />
-              ),
-            )}
-            {labels}
-            {revised[n - 1] ? null : <Circle cx={x(n - 1)} cy={LINE_Y} r={4.5} fill={palette.bg} stroke={palette.secondary} strokeWidth={1.5} />}
-            {revised.map((r, i) => (r ? <Circle key={days[i]} cx={x(i)} cy={LINE_Y} r={dot} fill={palette.primary} /> : null))}
-          </Svg>
-        ) : null}
-      </Tap>
-      <View style={styles.ends} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
-        <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{n > 0 ? gapDate(days[0]) : ''}</ChromeText>
-        <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{t('insights.gaps.stripToday')}</ChromeText>
+    <Tap
+      onPress={onPress}
+      disabled={!onPress}
+      accessibilityRole={onPress ? 'button' : 'text'}
+      accessibilityLabel={gapSpoken(gap)}
+      accessibilityHint={onPress ? t('insights.gaps.rowHint') : undefined}
+      style={[styles.row, separator && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.separator }]}
+      testID={`insights-gap-${gap.first}`}
+    >
+      <View style={styles.rowHead}>
+        <ChromeText style={[typeV2.name, { color: palette.text }]}>{capital(gapLabel(gap, inDays))}</ChromeText>
+        <ChromeText style={[typeV2.meta, styles.rowDates, { color: palette.secondary }]}>
+          {gapDates(gap)}
+          {onPress ? ` ${chevron()}` : ''}
+        </ChromeText>
       </View>
-    </View>
+      <View style={[styles.track, { backgroundColor: palette.track }]}>
+        <View style={[styles.fill, { width: `${share * 100}%`, backgroundColor: fill }]} testID={`insights-gap-bar-${gap.first}`} />
+      </View>
+    </Tap>
   );
 }
 
@@ -355,21 +278,20 @@ const styles = StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   daysSwitch: { minHeight: 28, borderRadius: 14, borderWidth: 1, paddingHorizontal: 10, justifyContent: 'center' },
   daysText: { fontWeight: '600' },
+  figure: { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginTop: 12 },
+  figureWrap: { flexWrap: 'wrap', rowGap: 4 },
+  big: { fontSize: 28, lineHeight: 32, fontWeight: '700', letterSpacing: -0.6, fontVariant: ['tabular-nums'] },
+  summary: { marginTop: 4 },
+  list: { marginTop: 10 },
+  row: { paddingVertical: 10 },
+  rowHead: { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', columnGap: 8, rowGap: 2, justifyContent: 'space-between' },
+  rowDates: { flexShrink: 1 },
+  track: { height: BAR_H, borderRadius: BAR_H / 2, marginTop: 8, overflow: 'hidden' },
+  fill: { height: BAR_H, borderRadius: BAR_H / 2 },
+  more: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start', marginTop: 6 },
   revision: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginTop: 14, paddingTop: 14, borderTopWidth: StyleSheet.hairlineWidth },
   mark: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   revisionChevron: { alignSelf: 'center' },
   link: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start', marginTop: 14 },
   linkText: { flexShrink: 1 },
-  figure: { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginTop: 12 },
-  figureWrap: { flexWrap: 'wrap', rowGap: 4 },
-  big: { fontSize: 28, lineHeight: 32, fontWeight: '700', letterSpacing: -0.6, fontVariant: ['tabular-nums'] },
-  strip: { marginTop: 10 },
-  stripTap: { height: STRIP_H },
-  ends: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 },
-  tiles: { flexDirection: 'row', gap: 8, marginTop: 14 },
-  tilesStacked: { flexDirection: 'column' },
-  tile: { flex: 1, borderRadius: 14, paddingVertical: 12, paddingHorizontal: 14 },
-  tileFigure: { flexDirection: 'row', alignItems: 'baseline', gap: 5 },
-  tileNumber: { fontSize: 22, lineHeight: 26, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  tileText: { marginTop: 4 },
 });

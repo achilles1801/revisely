@@ -1,4 +1,5 @@
 import { ReadingSession, ReadingTimerMode } from '../types';
+import { westernDigits } from '../i18n/digits';
 
 /** What a timer was started for. Kept on the persisted timer for
  *  compatibility; since there is one floating timer, both behave the same
@@ -215,8 +216,8 @@ export function formatDuration(seconds: number): string {
  * outside 1–604.
  */
 export function parsePageRanges(text: string): number[] | null {
-  const parts = text
-    .split(/[,\s]+/)
+  const parts = westernDigits(text)
+    .split(/[,،\s]+/)
     .map((p) => p.trim())
     .filter(Boolean);
   const pages = new Set<number>();

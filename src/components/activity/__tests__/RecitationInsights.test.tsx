@@ -2,7 +2,6 @@
 // keep slipping with their words on their highlights, the similar ayahs, the quiet line, Smart Tracking on and off,
 // Weak spots naming words Recite still marks, and each row opening the reader at its ayahs.
 import React from 'react';
-import { StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -13,6 +12,7 @@ import type { Mark } from '../../../lib/reciteLive/contract';
 import type { MemoryRecord, TakeRecord } from '../../../lib/reciteMemory/record';
 import { openRevo } from '../../../lib/revo/open';
 import { plainText } from '../../../lib/passages';
+import { harakatClip } from '../../../../jest/arabicLines';
 
 const mockPalette = paletteV2(false, 'indigo');
 jest.mock('../../../context/ThemeContext', () => ({ useTheme: () => ({ palette: mockPalette, theme: mockPalette, isDark: false }) }));
@@ -104,8 +104,9 @@ describe('Insights: Recitation (RINS-2)', () => {
     // over it and the week under it, this week last.
     expect(text('insights-recitation-weeks-takeaway')).toBe('Up from 98.0% last week');
     expect(text('insights-recitation-weeks')).toBe('Up from 98.0% last week | 98.0% | 98.3% | 3 Nov | This week');
-    // Al-Kahf 22–23: a wrong word and a harakat slip still marked; Not clear never.
-    expect(text('insights-recitation-slip-18-22')).toContain('Al-Kahf, ayahs 22–23 | 2 words still marked · wrong in 3 of 4 takes');
+    // Al-Kahf 22–23: a wrong word, a harakat slip and a Not clear letter still marked (RMEM-2: Not clear is remembered
+    // like a slip, never counted).
+    expect(text('insights-recitation-slip-18-22')).toContain('Al-Kahf, ayahs 22–23 | 3 words still marked · wrong in 3 of 4 takes');
     expect(text('insights-recitation-slip-2-48')).toContain('Al-Baqarah, ayah 48 | 1 word still marked · wrong in 2 of 2 takes');
     expect(text('insights-recitation-similar-2-48')).toBe('Al-Baqarah 48 → 123 | You went on with the similar ayah · twice, last yesterday');
     // Words first; the Not clear letter in Al-Kahf 23 never counted. Nothing cleared yet, so one line.
@@ -126,14 +127,14 @@ describe('Insights: Recitation (RINS-2)', () => {
     await open(data());
     expect(text('insights-recitation-strong-2-48')).toBe('Al-Baqarah, ayah 48 | Rated strong · wrong in 2 takes');
     expect(screen.queryByTestId('insights-recitation-strong-18-22')).toBeNull();
-    expect(text(`weak-spot-${KAHF_PAGE}`)).toContain('2 words still marked in Recite');
+    expect(text(`weak-spot-${KAHF_PAGE}`)).toContain('3 words still marked in Recite');
   });
 
   it('[RINS-2] Smart Tracking off: nothing about strength; rows say when the passage was last recited', async () => {
     await open(data({ smartTracking: false }));
     const section = text('insights-recitation');
     expect(section).not.toMatch(/strong|weak|rated|wrong in/i);
-    expect(text('insights-recitation-slip-18-22')).toContain('2 words still marked · last recited Saturday');
+    expect(text('insights-recitation-slip-18-22')).toContain('3 words still marked · last recited Saturday');
     expect(screen.queryByTestId('insights-weak-spots')).toBeNull();
   });
 
@@ -141,9 +142,25 @@ describe('Insights: Recitation (RINS-2)', () => {
     await open(data());
     const row = screen.getByTestId('insights-recitation-slip-18-22');
     const chips = within(row).getAllByText(/[\u0600-\u06FF]/, { includeHiddenElements: true });
-    expect(chips.map((c) => c.props.children)).toEqual([words.uthmani(w22), words.uthmani(w23)]);
-    // No fixed line height (it cut the harakat off): the font's own ascent and descent.
-    for (const c of chips) expect(StyleSheet.flatten(c.props.style).lineHeight).toBeUndefined();
+    // The Not clear letter too, remembered like a slip (RMEM-2).
+    expect(chips.map((c) => c.props.children)).toEqual([words.uthmani(w22), words.uthmani(w23), words.uthmani(w23 + 1)]);
+    // Each word whole: a line that holds every haraka (arabicFullV2; a shorter one cut them off).
+    for (const c of chips) expect(harakatClip(c.props.style)).toBeNull();
+  });
+
+  it('[RECITE-24] under the figure, the mistakes a page in the range’s takes of 2 pages or more, in words', async () => {
+    await open(data());
+    // Al-Kahf 17–26 is pages 295–296: three takes in the range, 4 mistakes over 6 pages (the Not clear letter never
+    // counts). Al-Baqarah 40–48 is one page: left out.
+    expect(text('insights-recitation-per-page')).toBe('Takes of 2 pages or more: 0.7 mistakes a page');
+  });
+
+  it('[RECITE-24] no line without a take of 2 pages or more, or before the word data has loaded', async () => {
+    await open(data({ recitation: { records: records.filter((r) => r.kind !== 'take' || r.from !== KAHF[0]), words } }));
+    expect(screen.getByTestId('insights-recitation')).toBeTruthy();
+    expect(screen.queryByTestId('insights-recitation-per-page')).toBeNull();
+    await open(data({ recitation: { records, words: null } }));
+    expect(screen.queryByTestId('insights-recitation-per-page')).toBeNull();
   });
 
   it('[RINS-2] nothing shows for an account that doesn’t recite', async () => {

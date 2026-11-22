@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
 import { spokenText } from '../../lib/passages';
+import { t } from '../../i18n';
 
 export const MODE_MENU_WIDTH = 276;
 
@@ -45,7 +46,7 @@ export interface MenuDrill {
 }
 
 /** The drill row's label: "Recite your 3 mistakes here". */
-export const drillLabel = (count: number) => `Recite your ${count} ${count === 1 ? 'mistake' : 'mistakes'} here`;
+export const drillLabel = (count: number) => t('reciteLive.menu.drill', { count });
 
 /**
  * Holding the mic: Record or Recite, above the bar at the right (like the held verse's menu: a card in the screen,
@@ -164,22 +165,22 @@ export function ReciteModeMenu({
       >
         <View style={styles.clip}>
           <View style={mode === 'record' ? { backgroundColor: palette.accentSubtle } : undefined}>
-            {row('record', 'Record', 'Just record your recitation', 'radio-button-on', first)}
+            {row('record', t('reciteLive.menu.record'), t('reciteLive.menu.recordSub'), 'radio-button-on', first)}
           </View>
           <View style={[styles.separator, { backgroundColor: palette.separator }]} />
           <View style={recite ? { backgroundColor: palette.accentSubtle } : undefined}>
-            {row('recite', 'Recite', 'The page follows you', 'reader-outline')}
+            {row('recite', t('reciteLive.menu.recite'), t('reciteLive.menu.reciteSub'), 'reader-outline')}
             <Pressable
               onPress={() => (owned ? onMarkMistakes(!on) : onLocked())}
               accessibilityRole="switch"
-              accessibilityLabel={owned ? 'Mark mistakes' : 'Mark mistakes, part of Premium, locked'}
+              accessibilityLabel={owned ? t('reciteLive.menu.markMistakes') : t('reciteLive.menu.markMistakesLocked')}
               accessibilityState={{ checked: on }}
               hitSlop={{ top: 4, bottom: 4 }}
               style={({ pressed }) => [styles.toggle, pressed && { opacity: 0.6 }]}
               testID="recite-mistakes"
             >
               <Text style={[styles.toggleLabel, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
-                Mark mistakes
+                {t('reciteLive.menu.markMistakes')}
               </Text>
               <MiniSwitch on={on} locked={!owned} />
             </Pressable>
@@ -218,10 +219,10 @@ export function ReciteModeMenu({
                 accessibilityRole="button"
                 accessibilityLabel={
                   !owned
-                    ? 'Test me, part of Premium, locked'
+                    ? t('reciteLive.menu.testLocked')
                     : testReady
-                      ? 'Test me, a random place in what you’ve memorized'
-                      : 'Test me, mark what you’ve memorized first'
+                      ? t('reciteLive.menu.testReadyLabel')
+                      : t('reciteLive.menu.testNotReadyLabel')
                 }
                 accessibilityState={{ disabled: owned && !testReady }}
                 style={({ pressed }) => [styles.row, pressed && { backgroundColor: palette.fill }]}
@@ -232,10 +233,10 @@ export function ReciteModeMenu({
                 </View>
                 <View style={styles.label}>
                   <Text style={[typeV2.menu, { color: owned && !testReady ? palette.secondary : palette.text }]} maxFontSizeMultiplier={1.4}>
-                    Test me
+                    {t('reciteLive.menu.testMe')}
                   </Text>
                   <Text style={[typeV2.meta, { color: palette.secondary }]} numberOfLines={2} maxFontSizeMultiplier={1.3}>
-                    {owned && !testReady ? 'Mark what you’ve memorized first' : 'A random place in what you’ve memorized'}
+                    {owned && !testReady ? t('reciteLive.menu.testNotReady') : t('reciteLive.menu.testReady')}
                   </Text>
                 </View>
                 {owned ? <View style={styles.tick} /> : <Ionicons name="lock-closed" size={14} color={palette.premium[0]} testID="recite-test-locked" />}

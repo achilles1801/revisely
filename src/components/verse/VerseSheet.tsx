@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Linking,
   Modal,
   Pressable,
   ScrollView,
@@ -52,6 +51,8 @@ import { ReciterList } from './ReciterList';
 import { TranslationPicker } from './TranslationPicker';
 import { AyahRef } from '../../lib/ayahBounds';
 import { t } from '../../i18n';
+import { openWebPage } from '../../lib/openWebPage';
+import { forwardIcon, backIcon } from '../../i18n/direction';
 
 interface VerseSheetProps {
   /** Verse shown; null hides the sheet. */
@@ -403,7 +404,7 @@ export function VerseSheet({
                         accessibilityState={{ disabled: !prev }}
                         style={[styles.pillBtn, !prev && v2Only.disabled]}
                       >
-                        <Ionicons name="chevron-back" size={22} color={prev ? palette.text : palette.secondary} />
+                        <Ionicons name={backIcon()} size={22} color={prev ? palette.text : palette.secondary} />
                       </Tap>
                       <Tap
                         onPress={() => next && onNavigate(next)}
@@ -414,7 +415,7 @@ export function VerseSheet({
                         accessibilityState={{ disabled: !next }}
                         style={[styles.pillBtn, !next && v2Only.disabled]}
                       >
-                        <Ionicons name="chevron-forward" size={22} color={next ? palette.text : palette.secondary} />
+                        <Ionicons name={forwardIcon()} size={22} color={next ? palette.text : palette.secondary} />
                       </Tap>
                     </View>
                     <Tap
@@ -479,7 +480,7 @@ export function VerseSheet({
                             {translation.name}
                           </Text>
                         </View>
-                        <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
+                        <Ionicons name={forwardIcon()} size={16} color={palette.secondary} />
                       </Tap>
                       <Tap
                         style={styles.dropRow}
@@ -500,7 +501,7 @@ export function VerseSheet({
                             {voiceLabel(resolveVoice(reciter))}
                           </Text>
                         </View>
-                        <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
+                        <Ionicons name={forwardIcon()} size={16} color={palette.secondary} />
                       </Tap>
                     </>
                   ) : menu === 'reciters' ? (
@@ -671,7 +672,7 @@ export function VerseSheet({
                       <Text
                         style={styles.creditLink}
                         maxFontSizeMultiplier={CHROME_TEXT_SCALE}
-                        onPress={() => Linking.openURL(ARABIC_CREDIT.url).catch(() => undefined)}
+                        onPress={() => void openWebPage(ARABIC_CREDIT.url)}
                         accessibilityRole="link"
                         accessibilityLabel={t('verse.sheet.opensWebsite', { name: ARABIC_CREDIT.linkLabel })}
                         suppressHighlighting={false}
@@ -691,7 +692,7 @@ export function VerseSheet({
                   <Text
                     style={styles.creditLink}
                     maxFontSizeMultiplier={CHROME_TEXT_SCALE}
-                    onPress={() => Linking.openURL(translation.credit.url).catch(() => undefined)}
+                    onPress={() => void openWebPage(translation.credit.url)}
                     accessibilityRole="link"
                     accessibilityLabel={t('verse.sheet.opensWebsite', { name: translation.credit.linkLabel })}
                     suppressHighlighting={false}

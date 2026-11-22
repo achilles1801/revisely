@@ -9,8 +9,8 @@
 // not start within LOAD_TIMEOUT_MS (offline) gives up. The screens showing it
 // take it over in turn (`adopt`); elsewhere a mini player stands in
 // (components/player/MiniPlayer). On Android the lock screen's controls are a
-// media notification that can outlive its service; see lib/mediaNotification for
-// what that needs here.
+// media notification that, on binaries before 1.0.4, can outlive its service; see
+// lib/mediaNotification for what that needs here.
 //
 // Audio comes from EveryAyah (everyayah.com), one file per verse named
 // SSSAAA.mp3, in a folder per reciter and style. Every folder listed was checked
@@ -26,7 +26,14 @@ import type { VerseRange } from './playbackPlan';
 import { getSurahDisplay } from './quranData';
 import { lockScreenArtwork } from './nowPlayingArtwork';
 import { logger } from './logger';
-import { dismissNotifications, readMediaNotifications } from './mediaNotification';
+import {
+  dismissNotifications,
+  mediaControlsLevel,
+  onTrackCommand,
+  readMediaNotifications,
+  stillOnLockScreen,
+} from './mediaNotification';
+import { t } from '../i18n';
 
 /**
  * How a reciter recites. Per-verse audio is organised by these styles, not by
@@ -34,10 +41,20 @@ import { dismissNotifications, readMediaNotifications } from './mediaNotificatio
  */
 export type RecitationStyle = 'murattal' | 'mujawwad' | 'muallim';
 
+/** A style's words (src/i18n/en/verse.ts, `styles`). */
+const styleInfo = (style: RecitationStyle) => ({
+  get label() {
+    return t(`verse.styles.${style}`);
+  },
+  get description() {
+    return t(`verse.styles.${style}Sub`);
+  },
+});
+
 export const STYLE_INFO: Record<RecitationStyle, { label: string; description: string }> = {
-  murattal: { label: 'Murattal', description: 'Measured, at a steady pace' },
-  mujawwad: { label: 'Mujawwad', description: 'Melodic, slower, with longer pauses' },
-  muallim: { label: "Mu'allim", description: 'Teaching: each verse with a pause to repeat' },
+  murattal: styleInfo('murattal'),
+  mujawwad: styleInfo('mujawwad'),
+  muallim: styleInfo('muallim'),
 };
 
 export interface ReciterInfo {
@@ -51,8 +68,12 @@ export interface ReciterInfo {
 export const RECITERS: ReciterInfo[] = [
   {
     id: 'husary',
-    name: 'Mahmoud Khalil Al-Husary',
-    short: 'Al-Husary',
+    get name() {
+      return t('reciters.husary');
+    },
+    get short() {
+      return t('reciters.husaryShort');
+    },
     styles: [
       { style: 'murattal', folder: 'Husary_64kbps' },
       { style: 'mujawwad', folder: 'Husary_Mujawwad_64kbps' },
@@ -61,8 +82,12 @@ export const RECITERS: ReciterInfo[] = [
   },
   {
     id: 'minshawi',
-    name: 'Muhammad Siddiq Al-Minshawi',
-    short: 'Al-Minshawi',
+    get name() {
+      return t('reciters.minshawi');
+    },
+    get short() {
+      return t('reciters.minshawiShort');
+    },
     styles: [
       { style: 'murattal', folder: 'Minshawy_Murattal_128kbps' },
       // The 64 kbps folder is missing surahs 44-46.
@@ -71,8 +96,12 @@ export const RECITERS: ReciterInfo[] = [
   },
   {
     id: 'abdulbasit',
-    name: 'Abdul Basit Abdul Samad',
-    short: 'Abdul Basit',
+    get name() {
+      return t('reciters.abdulbasit');
+    },
+    get short() {
+      return t('reciters.abdulbasitShort');
+    },
     styles: [
       { style: 'murattal', folder: 'Abdul_Basit_Murattal_64kbps' },
       { style: 'mujawwad', folder: 'Abdul_Basit_Mujawwad_128kbps' },
@@ -80,68 +109,112 @@ export const RECITERS: ReciterInfo[] = [
   },
   {
     id: 'alafasy',
-    name: 'Mishary Rashid Alafasy',
-    short: 'Alafasy',
+    get name() {
+      return t('reciters.alafasy');
+    },
+    get short() {
+      return t('reciters.alafasyShort');
+    },
     styles: [{ style: 'murattal', folder: 'Alafasy_64kbps' }],
   },
   {
     id: 'sudais',
-    name: 'Abdur-Rahman As-Sudais',
-    short: 'As-Sudais',
+    get name() {
+      return t('reciters.sudais');
+    },
+    get short() {
+      return t('reciters.sudaisShort');
+    },
     styles: [{ style: 'murattal', folder: 'Abdurrahmaan_As-Sudais_64kbps' }],
   },
   {
     id: 'shuraim',
-    name: "Sa'ud Ash-Shuraim",
-    short: 'Ash-Shuraim',
+    get name() {
+      return t('reciters.shuraim');
+    },
+    get short() {
+      return t('reciters.shuraimShort');
+    },
     styles: [{ style: 'murattal', folder: 'Saood_ash-Shuraym_64kbps' }],
   },
   {
     id: 'muaiqly',
-    name: 'Maher Al-Muaiqly',
-    short: 'Al-Muaiqly',
+    get name() {
+      return t('reciters.muaiqly');
+    },
+    get short() {
+      return t('reciters.muaiqlyShort');
+    },
     styles: [{ style: 'murattal', folder: 'MaherAlMuaiqly128kbps' }],
   },
   {
     id: 'ghamdi',
-    name: "Sa'ad Al-Ghamdi",
-    short: 'Al-Ghamdi',
+    get name() {
+      return t('reciters.ghamdi');
+    },
+    get short() {
+      return t('reciters.ghamdiShort');
+    },
     styles: [{ style: 'murattal', folder: 'Ghamadi_40kbps' }],
   },
   {
     id: 'ajamy',
-    name: 'Ahmed ibn Ali Al-Ajamy',
-    short: 'Al-Ajamy',
+    get name() {
+      return t('reciters.ajamy');
+    },
+    get short() {
+      return t('reciters.ajamyShort');
+    },
     styles: [{ style: 'murattal', folder: 'ahmed_ibn_ali_al_ajamy_128kbps' }],
   },
   {
     id: 'shatri',
-    name: 'Abu Bakr Ash-Shatri',
-    short: 'Ash-Shatri',
+    get name() {
+      return t('reciters.shatri');
+    },
+    get short() {
+      return t('reciters.shatriShort');
+    },
     styles: [{ style: 'murattal', folder: 'Abu_Bakr_Ash-Shaatree_64kbps' }],
   },
   {
     id: 'hudhaify',
-    name: 'Ali Al-Hudhaify',
-    short: 'Al-Hudhaify',
+    get name() {
+      return t('reciters.hudhaify');
+    },
+    get short() {
+      return t('reciters.hudhaifyShort');
+    },
     styles: [{ style: 'murattal', folder: 'Hudhaify_128kbps' }],
   },
   {
     id: 'ayyub',
-    name: 'Muhammad Ayyub',
-    short: 'Muhammad Ayyub',
+    get name() {
+      return t('reciters.ayyub');
+    },
+    get short() {
+      return t('reciters.ayyubShort');
+    },
     styles: [{ style: 'murattal', folder: 'Muhammad_Ayyoub_64kbps' }],
   },
   {
     id: 'tablawi',
-    name: 'Mohammad Al-Tablawi',
-    short: 'Al-Tablawi',
+    get name() {
+      return t('reciters.tablawi');
+    },
+    get short() {
+      return t('reciters.tablawiShort');
+    },
     styles: [{ style: 'murattal', folder: 'Mohammad_al_Tablaway_64kbps' }],
   },
   {
     id: 'dossari',
-    name: 'Yasser Ad-Dossari',
-    short: 'Ad-Dossari',
+    get name() {
+      return t('reciters.dossari');
+    },
+    get short() {
+      return t('reciters.dossariShort');
+    },
     styles: [{ style: 'murattal', folder: 'Yasser_Ad-Dussary_128kbps' }],
   },
 ];
@@ -190,7 +263,7 @@ export type RecitationStatus = 'idle' | 'loading' | 'playing' | 'paused' | 'erro
 
 /** "Al-Baqarah 2:13": the mini player's and the lock screen's title. */
 export function verseTitle(v: VerseKey): string {
-  return `${getSurahDisplay(v.sura)?.nameDisplay ?? `Surah ${v.sura}`} ${v.sura}:${v.ayah}`;
+  return `${getSurahDisplay(v.sura)?.nameDisplay ?? t('common.surahN', { n: v.sura })} ${v.sura}:${v.ayah}`; // i18n-ignore (a name, then its numbers)
 }
 
 // A second of silence, looped through the pause after a verse: with nothing
@@ -262,10 +335,14 @@ export class Recitation {
   private appActive = true;
   private checking = false;
   private recheck = false;
+  /** Android: the binary carries expo-audio's notification fix (1.0.4 on; lib/mediaNotification). */
+  private readonly nativeFix = isAndroid() && mediaControlsLevel() >= 1;
 
   constructor() {
-    // Previous and next on the lock screen and in Control Center.
+    // Previous and next on the lock screen and in Control Center; on Android's
+    // notification from 1.0.4 (lib/mediaNotification).
     NowPlayingCommands?.addListener('onRemoteCommand', ({ command }) => this.skip(command === 'next' ? 1 : -1));
+    if (isAndroid()) onTrackCommand((direction) => this.skip(direction));
     // A recording starting or playing takes over the audio.
     onAudioClaimed((activity) => {
       if (activity !== 'recitation') this.stop();
@@ -354,7 +431,7 @@ export class Recitation {
     const metadata = {
       title: verseTitle(verse),
       artist: shortVoiceLabel(resolveVoice(this.voice)),
-      albumTitle: 'Revisely',
+      albumTitle: 'Revisely', // i18n-ignore (the app's name)
       artworkUrl: lockScreenArtwork(),
     };
     try {
@@ -434,7 +511,15 @@ export class Recitation {
       const { media, orphans } = await readMediaNotifications();
       const leftOver = this.onLockScreen ? orphans : [...media, ...orphans];
       if (leftOver.length) await dismissNotifications(leftOver);
-      if (!this.onLockScreen || media.length) return;
+      if (!this.onLockScreen) return;
+      if (this.nativeFix) {
+        // A notification put away while paused keeps its session (▶ brings it
+        // back), so nothing on show proves nothing: the player says whether its
+        // controls went (the app's task was removed).
+        if (this.player && !stillOnLockScreen(this.player)) this.lostNotification();
+        return;
+      }
+      if (media.length) return;
       const { status } = this.state;
       const settled = Date.now() - this.lockScreenSince >= NOTIFICATION_SETTLE_MS;
       // Playing with no notification may only mean Revisely's notifications are
@@ -452,6 +537,8 @@ export class Recitation {
    * Android, so it reads what is on show again and again for a moment instead.
    */
   private sweepLeftOvers() {
+    // The fixed service leaves nothing behind.
+    if (this.nativeFix) return;
     if (this.appActive) {
       setTimeout(() => void this.checkNotification(), NOTIFICATION_CHECK_MS);
       setTimeout(() => void this.checkNotification(), NOTIFICATION_CHECK_MS * 4);
@@ -657,6 +744,13 @@ export class Recitation {
     if (s.playbackState === 'failed') {
       this.clearLoadTimer();
       this.set({ status: 'error', verse });
+      return;
+    }
+    // Android: stopped from outside (before 1.0.4, "Hide" on the system's media
+    // control sends stop): the verse is no longer loaded, so ▶ loads it again.
+    if (isAndroid() && s.playbackState === 'idle' && this.started && status !== 'loading') {
+      this.started = false;
+      if (status === 'playing') this.set({ status: 'paused', verse });
       return;
     }
     if (s.playing && status === 'loading') {

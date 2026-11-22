@@ -9,6 +9,8 @@ import { layoutV2 } from '../theme/v2';
 import { useReduceMotion } from '../design/motion';
 import { useMiniPlayer } from '../lib/nowPlaying';
 import { MINI_PLAYER_GAP, MINI_PLAYER_HEIGHT } from '../components/player/MiniPlayer';
+import { StringLights } from '../components/ramadan/StringLights';
+import { useRamadanTheme } from '../lib/ramadanTheme';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -64,6 +66,7 @@ type TabBarProps = Omit<PagerTabBarProps, 'position'> & {
 export function TabBar({ state, descriptors, navigation, position, showInsightsTab = true, onInsightsTabPress }: TabBarProps) {
   const { palette } = useTheme();
   const bottomGap = useBottomGap();
+  const ramadan = useRamadanTheme();
   const still = useSharedValue(state.index);
   still.value = state.index;
   const progress = position ?? still;
@@ -81,6 +84,8 @@ export function TabBar({ state, descriptors, navigation, position, showInsightsT
       style={[styles.bar, { backgroundColor: palette.bg, borderTopColor: palette.separator, paddingBottom: bottomGap }]}
       testID="tab-bar-v2"
     >
+      {/* Revisely Dev's Ramadan theme (THEME-1): string lights along the top edge. */}
+      {ramadan ? <StringLights /> : null}
       <SwipeAccent progress={progress} count={visibleRoutes.length} />
       {visibleRoutes.map((route) => (
         <Tab

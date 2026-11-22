@@ -6,13 +6,14 @@ import {
   ScrollView,
   Alert,
   Platform,
-  Linking,
   Share,
   TextInput,
   AccessibilityState,
   Modal,
   useWindowDimensions,
+  Linking,
 } from 'react-native';
+import * as Notifications from 'expo-notifications';
 import { TopSafeAreaView } from '../../components/SafeAreaView';
 import Constants from 'expo-constants';
 import { AppInfo } from '../../components/settings/AppInfo';
@@ -24,14 +25,14 @@ import { Mark } from '../../components/v2/Mark';
 import { PillButton } from '../../components/v2/PillButton';
 import { Tap } from '../../components/v2/Tap';
 import { Sheet } from '../../components/v2/Sheet';
-import { reportProblem } from '../../lib/sentry';
+import { openReportProblem } from '../../lib/report/state';
+import { shareRevisely } from '../../lib/shareApp';
 import { RouteProp, useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { FajrBoundaryCard } from '../../components/FajrBoundaryCard';
 import { SpeechModelSheet } from '../../components/recite/SpeechModelSheet';
 import { ActionSheet } from '../../components/v2/ActionSheet';
-import { reciteModeEnabled } from '../../lib/recite/availability';
 import { voiceSearchEnabled } from '../../lib/search/availability';
 import { formatModelSize } from '../../lib/recite/speechModel';
 import { removeSpeechModel, useSpeechModelState } from '../../lib/recite/speechModelStore';
@@ -39,6 +40,8 @@ import { PrayerSheet, PrayerTab } from '../../components/prayer/PrayerSheet';
 import { usePrayerTimes } from '../../components/prayer/usePrayerTimes';
 import { prayerTimesEnabled } from '../../lib/prayer/status';
 import { PRAYERS, setPrayerPrefs, usePrayerPrefs } from '../../lib/prayer/prefs';
+import { athanEnabled } from '../../lib/athan';
+import { useChosenAthanVoice } from '../../components/prayer/useChosenAthanVoice';
 import { formatTime as formatPrayerTime, methodLabel, TIME_LABELS } from '../../lib/prayer/times';
 import { formatBearing, qiblaBearing, nearestCity, bundledCities } from '../../lib/qibla';
 import { CarryOverSetting } from '../../components/CarryOverSetting';
@@ -53,7 +56,7 @@ import { useApp } from '../../context/AppContext';
 import { showsUpdateTools } from '../../lib/updates/testerTools';
 import { useAuth } from '../../context/AuthContext';
 import { systemAppearanceAvailable, useTheme } from '../../context/ThemeContext';
-import { HomeStackParamList } from '../../navigation/MainNavigator';
+import type { HomeStackParamList } from '../../navigation/MainNavigator';
 import type { RevoSettingsSection } from '../../lib/revo/types';
 import * as firestoreService from '../../services/firestoreService';
 import { getTotalAppUsageSeconds } from '../../lib/appUsage';
@@ -64,7 +67,9 @@ import { askTurnOffBackup, backupLabel, deleteAllEverywhere, useBackupStatus } f
 import { formatBytes } from '../../lib/recordingFormat';
 import { logger } from '../../lib/logger';
 import { setHomePrefs, useHomePrefs } from '../../lib/homePrefs';
-import { supportMailto } from '../../lib/contact';
+import { SUPPORT_EMAIL, supportMailto } from '../../lib/contact';
+import { openRatingPage, rateAskEnabled } from '../../lib/rateAsk';
+import { openEmail, openWebPage } from '../../lib/openWebPage';
 import { PillTabs } from '../../components/v2/PillTabs';
 import { setMushafCellular } from '../../lib/mushafOffline';
 import { describeMushaf, mushafMenuActions, useMushafOffline } from '../../lib/mushafOfflineUi';
@@ -90,10 +95,28 @@ import { showsTestScenarios } from '../../lib/testScenarios';
 import { releaseSync } from '../../lib/offline/sync';
 import { reciteLiveForAccount } from '../../lib/reciteLive/availability';
 import { premiumErrorText, setDevPremium, usePremium } from '../../lib/premium';
-import { setReciteCheckSettings, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
+import { earlyAccessLine, useEarlyAccess } from '../../lib/earlyAccess';
+import { checkLevel, setReciteCheckSettings, strictOffered, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
 import { ReciteCheckNotice } from '../../components/reciteCheck/ReciteCheckNotice';
-import { t } from '../../i18n';
+import { currentLanguage, t } from '../../i18n';
+import {
+  chooseLanguage,
+  languageChoice,
+  languagePickerOffered,
+  offeredLanguages,
+  resolveChoice,
+  restartForLanguage,
+  type LanguageChoice,
+} from '../../i18n/choice';
+import { LANGUAGE_NAMES } from '../../i18n/language';
 import { isDevVariant } from '../../lib/variant';
+import { ramadanThemeOffered, setRamadanTheme, useRamadanThemeSaved } from '../../lib/ramadanTheme';
+import { CheckerModelRow } from '../../components/settings/CheckerModelRow';
+import { ScheduledRemindersRow } from '../../components/settings/ScheduledRemindersRow';
+import { useNotificationPermission } from '../../hooks/useNotificationPermission';
+import { ensureNotificationsPermission } from '../../lib/notifications';
+import { remindersWhileAwayEnabled } from '../../lib/release/remindersWhileAway';
+import { forwardIcon } from '../../i18n/direction';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'Settings'>;
 
@@ -194,7 +217,7 @@ function Row({
         </Text>
       )}
       {rightSlot}
-      {onPress && !rightSlot && <Ionicons name="chevron-forward" size={16} color={palette.secondary} />}
+      {onPress && !rightSlot && <Ionicons name={forwardIcon()} size={16} color={palette.secondary} />}
     </View>
   );
   if (!onPress) return row;
@@ -241,6 +264,19 @@ function ThemeSegmentedControl<T extends string>({
 // Screen
 // ---------------------------------------------------------------------------
 
+/** Settings → Prayer → Athan voice: its own component, so the catalog is read only where it shows. */
+function AthanVoiceRow({ onPress }: { onPress: () => void }) {
+  const voice = useChosenAthanVoice();
+  return (
+    <Row
+      icon="volume-high-outline"
+      label={t('settings.prayer.athanVoice')}
+      value={voice?.name ?? t('prayer.athan.none')}
+      onPress={onPress}
+    />
+  );
+}
+
 export default function SettingsScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProp<HomeStackParamList, 'Settings'>>();
@@ -274,6 +310,7 @@ export default function SettingsScreen() {
   const { firebaseUser, signOutUser, deleteAccount } = useAuth();
   const { theme, palette, themeMode, setThemeMode } = useTheme();
   const design = useDesign();
+  const ramadanTheme = useRamadanThemeSaved();
   const tabFootprint = useTabBarFootprint();
   const [localUser, setLocalUser] = useState(user);
 
@@ -292,8 +329,28 @@ export default function SettingsScreen() {
   const reciteCheck = reciteLiveForAccount(user);
   const reciteCheckSettings = useReciteCheckSettings(reciteCheck ? user?.id : null);
   const [checkLevelSheet, setCheckLevelSheet] = useState(false);
+  // Revisely Dev: Settings → Appearance → Language (src/i18n/choice.ts).
+  const [languageSheet, setLanguageSheet] = useState(false);
+  const [chosenLanguage, setChosenLanguage] = useState<LanguageChoice>(languageChoice);
+  const pickLanguage = (next: LanguageChoice) => {
+    setChosenLanguage(next);
+    void chooseLanguage(next).then((language) => {
+      if (language === currentLanguage()) return;
+      // Kept either way: Not now shows it from the next launch.
+      Alert.alert(
+        t('settings.language.restartTitle'),
+        t('settings.language.restartBody', { language: LANGUAGE_NAMES[language] }),
+        [
+          { text: t('common.notNow'), style: 'cancel' },
+          { text: t('settings.language.restart'), onPress: () => void restartForLanguage() },
+        ],
+      );
+    });
+  };
   // Premium (lib/premium): in Revisely Dev a tester turns it on and off here, free, to see marking mistakes locked.
   const premium = usePremium(user?.id, reciteCheck);
+  // Premium early access (lib/earlyAccess, PREM-1): the Recite section's Premium row says it's free now and kept for life.
+  const earlyAccessOn = useEarlyAccess();
   const [premiumBusy, setPremiumBusy] = useState(false);
   const switchPremium = useCallback((on: boolean) => {
     setPremiumBusy(true);
@@ -351,7 +408,6 @@ export default function SettingsScreen() {
   const speechModel = useSpeechModelState();
   // The speech model searches by voice (everyone, on an iPhone) and follows recitation (testers).
   const speechModelShown = voiceSearchEnabled(user);
-  const followsRecitation = reciteModeEnabled(user);
   const [speechSheet, setSpeechSheet] = useState(false);
   const [deleteSpeechOpen, setDeleteSpeechOpen] = useState(false);
   const mushaf = useMushafOffline();
@@ -421,6 +477,18 @@ export default function SettingsScreen() {
     }, [loadRecordings]),
   );
 
+  // Every hook comes before the loading return below: one after it threw "Rendered more hooks than during the
+  // previous render" when Settings rendered before the account had loaded (Nov 2026).
+  const backupStatus = useBackupStatus();
+
+  // REMIND-5 (with the reminders-while-away switch): the switch shows on only while reminders can come. With the
+  // phone refusing notifications it shows off and says so, and turning it on offers the phone's Settings (iOS won't
+  // ask twice), never a switch that does nothing.
+  const refusalShown = remindersWhileAwayEnabled();
+  const { permission: notifyPermission, refresh: refreshNotifyPermission } = useNotificationPermission(refusalShown);
+  const notificationsRefused = refusalShown && notifyPermission?.status === 'denied';
+  const [refusedSheet, setRefusedSheet] = useState(false);
+
   if (!localUser) {
     return (
       <TopSafeAreaView style={styles.container}>
@@ -439,16 +507,27 @@ export default function SettingsScreen() {
 
   const handleShareApp = async () => {
     try {
-      await Share.share({
-        message: t('settings.support.shareMessage'),
-        url: 'https://revisely.app',
-      });
+      await Share.share(shareRevisely(t('settings.support.shareMessage'), Platform.OS));
     } catch {
       // User dismissed the sheet or platform refused — nothing to do.
     }
   };
 
+  // REMIND-5: turned on while the phone refuses, the phone's Settings are offered; not asked yet, it asks.
   const handleNotificationToggle = async (enabled: boolean) => {
+    if (enabled && refusalShown) {
+      const p = await Notifications.getPermissionsAsync().catch(() => null);
+      if (p && p.status !== 'granted') {
+        if (p.canAskAgain === false) {
+          setRefusedSheet(true);
+          return;
+        }
+        // Not asked yet (or Android may ask again): asked now; a no leaves reminders off.
+        const granted = await ensureNotificationsPermission().catch(() => false);
+        refreshNotifyPermission();
+        if (!granted) return;
+      }
+    }
     await updateUser({ notificationsEnabled: enabled });
   };
 
@@ -459,7 +538,6 @@ export default function SettingsScreen() {
   };
 
   // Recording backup (lib/recordingBackup): on by default.
-  const backupStatus = useBackupStatus();
   const handleBackupToggle = (on: boolean) => {
     const save = (value: boolean) =>
       updateUser({ recordingBackup: value }).catch((err) => logger.warn('Could not change backup', err));
@@ -685,7 +763,7 @@ export default function SettingsScreen() {
                                         text: t('settings.activity.deleteOnPhone'),
                                         style: 'destructive',
                                         onPress: async () => {
-                                          await deleteAllRecordings(uid);
+                                          await deleteAllRecordings(uid, { keepTakes: true });
                                           loadRecordings();
                                         },
                                       },
@@ -784,6 +862,7 @@ export default function SettingsScreen() {
               value={prayerOn > 0 ? t('settings.prayer.nOn', { count: prayerOn }) : t('settings.off')}
               onPress={() => navigation.navigate('PrayerNotifications')}
             />
+            {athanEnabled() ? <AthanVoiceRow onPress={() => navigation.navigate('AthanVoice')} /> : null}
             <Row
               icon="options-outline"
               label={t('settings.prayer.calculation')}
@@ -826,7 +905,7 @@ export default function SettingsScreen() {
             <Row
               icon="mic-outline"
               label={t('settings.revision.speechModel')}
-              subtitle={followsRecitation ? t('settings.revision.speechFollows') : t('settings.revision.speechSearches')}
+              subtitle={t('settings.revision.speechSearches')}
               value={
                 speechModel.status === 'ready'
                   ? formatModelSize(speechModel.bytes)
@@ -921,14 +1000,25 @@ export default function SettingsScreen() {
 
         {reciteCheck ? (
           <Section title={t('settings.sections.recite')} footer={t('settings.recite.footer')}>
-            <Row
-              icon="checkmark-done-outline"
-              label={t('settings.recite.level')}
-              value={reciteCheckSettings.level === 'strict' ? t('settings.recite.strict') : t('settings.recite.words')}
-              onPress={() => setCheckLevelSheet(true)}
-              testID="settings-check-level"
-            />
-            {reciteCheckSettings.level === 'strict' ? (
+            {premium.has ? (
+              <Row
+                icon="sparkles-outline"
+                label={t('settings.recite.premium')}
+                subtitle={earlyAccessLine(premium, earlyAccessOn) ?? t('settings.recite.premiumSub')}
+                testID="settings-premium-row"
+              />
+            ) : null}
+            {/* Mistakes to mark: a choice only where Strict is offered (Revisely Dev, until its own switch is on). */}
+            {strictOffered() ? (
+              <Row
+                icon="checkmark-done-outline"
+                label={t('settings.recite.level')}
+                value={checkLevel(reciteCheckSettings) === 'strict' ? t('settings.recite.strict') : t('settings.recite.words')}
+                onPress={() => setCheckLevelSheet(true)}
+                testID="settings-check-level"
+              />
+            ) : null}
+            {checkLevel(reciteCheckSettings) === 'strict' ? (
               <>
                 <Row
                   label={t('settings.recite.munfasil')}
@@ -998,6 +1088,21 @@ export default function SettingsScreen() {
                 />
               }
             />
+            {isDevVariant() ? (
+              <Row
+                icon="volume-medium-outline"
+                label={t('settings.recite.mistakeSound')}
+                subtitle={t('settings.recite.mistakeSoundSub')}
+                rightSlot={
+                  <SettingSwitch
+                    value={reciteCheckSettings.mistakeSound}
+                    onValueChange={(mistakeSound) => setReciteCheckSettings(user?.id, { mistakeSound })}
+                    accessibilityLabel={t('settings.recite.mistakeSound')}
+                    testID="settings-recite-sound"
+                  />
+                }
+              />
+            ) : null}
           </Section>
         ) : null}
 
@@ -1005,10 +1110,13 @@ export default function SettingsScreen() {
           <Row
             icon="notifications-outline"
             label={t('settings.notifications.enable')}
+            subtitle={notificationsRefused && localUser.notificationsEnabled ? t('settings.notifications.refused') : undefined}
             rightSlot={
               <SettingSwitch
-                value={localUser.notificationsEnabled}
+                value={localUser.notificationsEnabled && !notificationsRefused}
                 onValueChange={handleNotificationToggle}
+                accessibilityLabel={t('settings.notifications.enable')}
+                testID="settings-notifications"
               />
             }
           />
@@ -1049,6 +1157,31 @@ export default function SettingsScreen() {
               }}
             />
           </View>
+          {languagePickerOffered() ? (
+            <Row
+              icon="language-outline"
+              label={t('settings.language.row')}
+              value={chosenLanguage === 'system' ? t('settings.language.system') : LANGUAGE_NAMES[chosenLanguage]}
+              onPress={() => setLanguageSheet(true)}
+              testID="settings-language"
+            />
+          ) : null}
+          {/* Revisely Dev's until the release switch (THEME-1): decorations, kept on this phone. Just the
+              name, no subtitle (Majd, Nov 21 2026). */}
+          {ramadanThemeOffered() ? (
+            <Row
+              icon="moon-outline"
+              label={t('settings.appearance.ramadan')}
+              rightSlot={
+                <SettingSwitch
+                  value={ramadanTheme}
+                  onValueChange={(on) => void setRamadanTheme(on)}
+                  accessibilityLabel={t('settings.appearance.ramadan')}
+                  testID="settings-ramadan-theme"
+                />
+              }
+            />
+          ) : null}
         </Section>
 
         <Section title={t('settings.sections.support')}>
@@ -1072,6 +1205,14 @@ export default function SettingsScreen() {
             label={t('settings.support.share')}
             onPress={handleShareApp}
           />
+          {rateAskEnabled() ? (
+            <Row
+              icon="star-outline"
+              label={t('settings.support.rate')}
+              onPress={() => void openRatingPage()}
+              testID="settings-rate"
+            />
+          ) : null}
           <Row
             icon="chatbubble-ellipses-outline"
             label={t('settings.support.feedback')}
@@ -1083,14 +1224,12 @@ export default function SettingsScreen() {
           <Row
             icon="bug-outline"
             label={t('settings.support.report')}
-            onPress={reportProblem}
+            onPress={openReportProblem}
           />
           <Row
             icon="mail-outline"
             label={t('settings.support.contact')}
-            onPress={() =>
-              Linking.openURL(supportMailto())
-            }
+            onPress={() => void openEmail(supportMailto(), SUPPORT_EMAIL)}
           />
         </Section>
 
@@ -1114,12 +1253,12 @@ export default function SettingsScreen() {
           <Row
             icon="document-text-outline"
             label={t('settings.about.privacy')}
-            onPress={() => Linking.openURL('https://revisely.app/privacy/')}
+            onPress={() => void openWebPage('https://revisely.app/privacy/')}
           />
           <Row
             icon="document-outline"
             label={t('settings.about.terms')}
-            onPress={() => Linking.openURL('https://revisely.app/terms/')}
+            onPress={() => void openWebPage('https://revisely.app/terms/')}
           />
           <AppInfo tools={showsUpdateTools(user)} />
         </Section>
@@ -1165,6 +1304,10 @@ export default function SettingsScreen() {
                 }
               />
             ) : null}
+            {/* Revisely Dev only: the reminders this phone will show, the days after tomorrow's too (REMIND-2). */}
+            {isDevVariant() ? <ScheduledRemindersRow /> : null}
+            {/* Revisely Dev only: which model its checker runs for each level (Majd, Nov 18 2026). */}
+            {reciteCheck && isDevVariant() ? <CheckerModelRow /> : null}
             {reciteCheck ? (
               <Row
                 icon="sparkles-outline"
@@ -1243,10 +1386,30 @@ export default function SettingsScreen() {
         visible={speechSheet}
         onClose={() => setSpeechSheet(false)}
         onReady={() => setSpeechSheet(false)}
-        {...(followsRecitation ? {} : { title: t('settings.revision.searchByVoice'), intro: t('settings.revision.searchByVoiceIntro') })}
       />
       <ActionSheet
-        visible={checkLevelSheet}
+        visible={languageSheet}
+        onClose={() => setLanguageSheet(false)}
+        title={t('settings.language.row')}
+        actions={[
+          {
+            key: 'system',
+            label: t('settings.language.system'),
+            subtitle: t('settings.language.systemSub', { language: LANGUAGE_NAMES[resolveChoice('system')] }),
+            selected: chosenLanguage === 'system',
+            onPress: () => pickLanguage('system'),
+          },
+          ...offeredLanguages().map((language) => ({
+            key: language,
+            label: LANGUAGE_NAMES[language],
+            selected: chosenLanguage === language,
+            onPress: () => pickLanguage(language),
+          })),
+        ]}
+        testID="language-sheet"
+      />
+      <ActionSheet
+        visible={checkLevelSheet && strictOffered()}
         onClose={() => setCheckLevelSheet(false)}
         title={t('settings.recite.level')}
         actions={[
@@ -1271,12 +1434,21 @@ export default function SettingsScreen() {
         visible={deleteSpeechOpen}
         onClose={() => setDeleteSpeechOpen(false)}
         title={t('settings.revision.speechModel')}
-        message={t(followsRecitation ? 'settings.revision.deleteSpeechFollows' : 'settings.revision.deleteSpeech', { size: formatModelSize() })}
+        message={t('settings.revision.deleteSpeech', { size: formatModelSize() })}
         actions={[{ key: 'delete', label: t('settings.revision.deleteSpeechModel'), icon: 'trash-outline', destructive: true, onPress: removeSpeechModel }]}
         testID="speech-model-delete-menu"
       />
       <MushafPickerSheet visible={mushafPicker} onClose={() => setMushafPicker(false)} />
       {replayOffered(user) ? <WhatsNewReplay visible={whatsNewOpen} onClose={() => setWhatsNewOpen(false)} /> : null}
+      <ActionSheet
+        visible={refusedSheet}
+        onClose={() => setRefusedSheet(false)}
+        title={t('settings.notifications.refusedTitle')}
+        message={t('settings.notifications.refusedBody')}
+        actions={[{ key: 'settings', label: t('common.openSettings'), icon: 'settings-outline', onPress: () => Linking.openSettings() }]}
+        cancelLabel={t('common.notNow')}
+        testID="settings-notifications-refused"
+      />
       {showsResetMyData(user) ? <ResetDataSheet visible={resetSheet} onClose={() => setResetSheet(false)} /> : null}
       {reciteCheck ? (
         <Sheet visible={reciteNotice} onClose={() => setReciteNotice(false)} title={t('settings.about.reciteNoticeTitle')} testID="settings-recite-notice-sheet">

@@ -108,9 +108,10 @@ describe('Revo knows the user’s recitation (Revisely Dev) [RINS-1]', () => {
   it('refuses one that doesn’t add up [RINS-1]', () => {
     // The kinds are the mistakes.
     refused(() => validateContext(context({ recitation: recitation({ mistakes: 13 }) })));
-    // No takes in the window, no score; takes, a score.
+    // No takes in the window, no score. (Takes with no score are taken: every one ended without the checker's final
+    // answer, RECITE-11.)
     refused(() => validateContext(context({ recitation: recitation({ takes: 0, daysRecited: 0 }) })));
-    refused(() => validateContext(context({ recitation: recitation({ score: null }) })));
+    expect(validateContext(context({ recitation: recitation({ score: null }) })).recitation?.score).toBeNull();
     // Passages can't hold more words still marked than there are.
     refused(() => validateContext(context({ recitation: recitation({ stillMarked: 2 }) })));
     // A word still marked was wrong at least once, and in no more takes than reached it.

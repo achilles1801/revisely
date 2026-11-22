@@ -1,4 +1,5 @@
 import { onCall, onRequest, HttpsError } from 'firebase-functions/v2/https';
+import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { setGlobalOptions, logger } from 'firebase-functions/v2';
 import { failure } from './failure';
 import { initializeApp, getApps } from 'firebase-admin/app';
@@ -51,6 +52,7 @@ import { handleDevPremium, handleSupportApplication, handleSupportLink } from '.
 import { adminSupportStore, deleteSupportData } from './support/admin';
 import { AccountInfo, consoleErrorOf, handleAdminConsole } from './console/handler';
 import { StaffCaller, roleOf } from './console/roles';
+import { earlyAccessOn, grantEarlyAccess } from './support/early';
 
 setGlobalOptions({ region: 'us-central1', maxInstances: 3 });
 
@@ -695,7 +697,7 @@ export const devGrantPremium = onCall({ enforceAppCheck: true, maxInstances: 2, 
   supportCall('devGrantPremium', () => handleDevPremium(request, supportStore(), DEV_PROJECT || testing, true)),
 );
 
-/** Takes the "dev" grant back, so a tester can see Check locked again. revisely-dev only. */
+/** Takes the "dev" grant (and early access's) back, so a tester can see Check locked again. revisely-dev only. */
 export const devRevokePremium = onCall({ enforceAppCheck: true, maxInstances: 2, timeoutSeconds: 20 }, (request) =>
   supportCall('devRevokePremium', () => handleDevPremium(request, supportStore(), DEV_PROJECT || testing, false)),
 );
@@ -764,4 +766,35 @@ export const adminConsole = onCall({ cors: CONSOLE_ORIGINS, timeoutSeconds: 60, 
     logger.error('adminConsole failed', { message: (err as Error).message });
     throw new HttpsError('internal', 'The console could not do that. Try again.');
   }
+});
+
+/**
+ * Premium early access (support/early.ts): an account set up while config/app.earlyAccess is on gets Premium with no
+ * end date, kept for good. The user document is created once, when the app sets the account up; a grant already there
+ * is never changed. With the switch off (production until Majd turns it on) this reads config/app and stops.
+ */
+export const earlyAccessOnSignUp = onDocumentCreated({ document: 'users/{uid}', maxInstances: 5, timeoutSeconds: 30 }, async (event) => {
+  const uid = event.params.uid;
+  const config = (await adminDb.doc('config/app').get()).data();
+  if (!earlyAccessOn(config)) return;
+  try {
+    await grantEarlyAccess(adminDb, uid);
+  } catch (err) {
+    logger.error('early access: grant failed', { uid, err: String((err as Error)?.message ?? err) });
+    throw err;
+  }
+});
+
+/**
+ * Premium for the caller now, while early access is on (PREM-1): marking mistakes' intro, for an account the sign-up
+ * grant or the script hasn't reached. Off: refused, and nothing is written.
+ */
+export const claimEarlyAccess = onCall({ enforceAppCheck: true, maxInstances: 3, timeoutSeconds: 20 }, async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError('unauthenticated', 'Sign in first.');
+  if (!earlyAccessOn((await adminDb.doc('config/app').get()).data())) {
+    throw new HttpsError('failed-precondition', 'Premium isn’t in early access now.');
+  }
+  await grantEarlyAccess(adminDb, uid);
+  return { premium: true };
 });

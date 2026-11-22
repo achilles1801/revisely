@@ -1,5 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { isDevVariant } from '../variant';
+import { strictReleased } from '../release/mistakeDetection';
 
 /**
  * The recitation check's settings, kept on this phone per account (Dev app, testers; not synced: a synced field
@@ -34,6 +36,8 @@ export interface ReciteCheckSettings {
   saveRecording: boolean;
   /** Words missed in past takes stay lightly marked on the page until said right (lib/reciteMemory); off in Settings. */
   showPast: boolean;
+  /** A short sound and a tap as a take marks a mistake (lib/reciteLive/mistakeCue; Majd, Nov 20 2026); off in Settings. */
+  mistakeSound: boolean;
 }
 
 export const RECITE_CHECK_DEFAULTS: ReciteCheckSettings = {
@@ -48,7 +52,18 @@ export const RECITE_CHECK_DEFAULTS: ReciteCheckSettings = {
   level: 'words',
   saveRecording: true,
   showPast: true,
+  mistakeSound: true,
 };
+
+/** Whether Strict is offered: Revisely Dev's, until its own switch is on (lib/release/mistakeDetection). */
+export const strictOffered = (): boolean => isDevVariant() || strictReleased();
+
+/**
+ * The level a take checks: Strict only where it is offered, so a Strict kept on a phone (Revisely Dev's settings, or
+ * one from before) checks Words & harakat everywhere else.
+ */
+export const checkLevel = (s: Pick<ReciteCheckSettings, 'level'>): 'words' | 'strict' =>
+  s.level === 'strict' && strictOffered() ? 'strict' : 'words';
 
 const KEY = (uid: string) => `@revisely_recite_check:v1:${uid}`;
 
@@ -79,6 +94,7 @@ export function parseReciteCheckSettings(raw: string | null): ReciteCheckSetting
     level: pick(s.level, ['words', 'strict'] as const, d.level),
     saveRecording: typeof s.saveRecording === 'boolean' ? s.saveRecording : d.saveRecording,
     showPast: typeof s.showPast === 'boolean' ? s.showPast : d.showPast,
+    mistakeSound: typeof s.mistakeSound === 'boolean' ? s.mistakeSound : d.mistakeSound,
   };
 }
 

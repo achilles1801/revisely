@@ -17,6 +17,8 @@ const A23 = words.verseFirstWord(27, 23);
 const Q1 = words.verseFirstWord(28, 1);
 
 const wrong = (w: number, ayah: [number, number]): Mark => ({ id: `m${w}`, w, ayah, kind: 'word', sure: 'clear', heard: 'وَأُوهِيَتْ', heardExact: false });
+/** A finding shown as its one word (a wrong word shows its phrase twice instead, RECITE-24). */
+const skipped = (w: number, ayah: [number, number]): Mark => ({ id: `s${w}`, w, ayah, kind: 'skipped', sure: 'clear' });
 
 let dims: jest.SpyInstance | null = null;
 afterEach(() => {
@@ -37,7 +39,6 @@ function show({ fontScale = 1, to = A23 + 20, marks = [wrong(A23 + 3, [27, 23])]
       seconds={102}
       marks={marks}
       score={check ? { text: '96%', level: 'good' } : null}
-      kept={false}
       checkOwned
       onFinding={() => undefined}
       onCheck={() => undefined}
@@ -60,23 +61,50 @@ const grows = (max: number) =>
 
 describe('the take summary with screen readers and the largest text', () => {
   it('at normal sizes a finding’s Arabic word sits beside its title', () => {
-    show({ fontScale: 1 });
+    show({ fontScale: 1, marks: [skipped(A23 + 3, [27, 23])] });
     const rowText = screen.getByTestId('take-summary-finding-text');
     expect(within(rowText).queryByTestId('take-summary-finding-arabic')).toBeNull();
     expect(screen.getByTestId('take-summary-finding-arabic')).toBeTruthy();
   });
 
   it(`from ${STACK_FINDINGS_AT}× it goes under the title, so the title keeps its width`, () => {
-    show({ fontScale: 3.1 });
+    show({ fontScale: 3.1, marks: [skipped(A23 + 3, [27, 23])] });
     const rowText = screen.getByTestId('take-summary-finding-text');
     expect(within(rowText).getByTestId('take-summary-finding-arabic')).toBeTruthy();
   });
 
   it('chrome stops growing at 1.4×, the Arabic word at 1.6×', () => {
-    show({ fontScale: 3.1 });
+    show({ fontScale: 3.1, marks: [skipped(A23 + 3, [27, 23])] });
     const arabic = words.uthmani(A23 + 3);
     expect(grows(1.4).filter((t) => t !== arabic)).toEqual([]);
     expect(grows(1.6)).toEqual([]);
+  });
+
+  it('[RECITE-24] a wrong word with what was heard: Expected and Recited, each the phrase around it, as on its card', () => {
+    show({ fontScale: 3.1 });
+    const diff = screen.getByTestId('take-summary-finding-diff');
+    expect(within(diff).getByText('Expected')).toBeTruthy();
+    // What was heard isn't a real word here (heardExact false): "As heard", as on its card.
+    expect(within(diff).getByText('As heard')).toBeTruthy();
+    expect(flat(within(diff).getByTestId('mark-card-expected').props.children)).toBe(words.uthmani(A23 + 3));
+    expect(flat(within(diff).getByTestId('mark-card-recited').props.children)).toBe('وَأُوهِيَتْ');
+    // The phrase: two words either side, in its ayah.
+    expect(within(diff).getAllByText(words.uthmani(A23 + 1), { exact: false }).length).toBeGreaterThan(0);
+    // No single word beside it (the phrases cap their growth as on the card: MarkParts' own test).
+    expect(screen.queryByTestId('take-summary-finding-arabic')).toBeNull();
+  });
+
+  it('[RECITE-24] a take of 2 pages or more says its mistakes per page beside the count; a shorter one doesn’t', () => {
+    show();
+    expect(flat(screen.getByTestId('take-summary-mistakes').props.children)).toBe('1 mistake');
+    // One sheet at a time (SHEET-1): the first goes before the next opens.
+    screen.unmount();
+    dims?.mockRestore();
+    // From page 379 to page 381: three pages, three mistakes.
+    const end = words.pageRange(words.pageOf(A23) + 2)[0];
+    show({ to: end, marks: [wrong(A23 + 3, [27, 23]), wrong(A23 + 6, [27, 23]), wrong(A23 + 9, [27, 23])] });
+    expect(flat(screen.getByTestId('take-summary-mistakes').props.children)).toBe('3 mistakes · 1 a page');
+    expect(screen.getByLabelText('Score 96%, 3 mistakes · 1 a page')).toBeTruthy();
   });
 
   it('a finding says its ayah; when the take ran into the next surah, the surah too', () => {
@@ -103,6 +131,12 @@ describe('the take summary with screen readers and the largest text', () => {
     const [said, opts] = (AccessibilityInfo.announceForAccessibilityWithOptions as jest.Mock).mock.calls[0];
     expect(said).toMatch(/^Your recitation\. An-Naml, ayahs 23 to 2\d\. 1 minute 42 seconds\. 96%, 1 mistake$/);
     expect(opts).toEqual({ queue: true });
+  });
+
+  it('[PREM-1] no line about Premium or test data after a take (Majd, Nov 21 2026: nothing in the face)', () => {
+    show();
+    expect(screen.queryByTestId('take-summary-premium')).toBeNull();
+    expect(screen.queryByText(/early access|test data|nobody listens/i)).toBeNull();
   });
 
   it('following along (no Check): the passage and the time, no score', async () => {
@@ -144,10 +178,10 @@ describe('the take summary with screen readers and the largest text', () => {
     // The kind is spelled out beside it.
     expect(screen.getByText('Extra word · ayah 23')).toBeTruthy();
     expect(screen.getByText('1 wrong word, 1 extra, 1 harakat slip, 1 tajweed note')).toBeTruthy();
-    // The word in ink on its colour, as on the page.
-    const [first] = screen.getAllByTestId('take-summary-finding-highlight');
-    expect(style(first).backgroundColor).toBe(p.markWord);
+    // The word in ink on its colour, as on the page (the wrong word's, said, on its colour in its phrase: RECITE-24).
+    expect(screen.getAllByTestId('take-summary-finding-highlight').map((e) => style(e).backgroundColor)).toEqual([p.markSlip, p.markTajweed, p.markWord]);
     expect(style(screen.getAllByTestId('take-summary-finding-arabic')[0]).color).toBe(p.text);
+    expect(style(screen.getByTestId('mark-card-recited')).backgroundColor).toBe(p.markWord);
   });
 
   it('Recite again and Done are pinned under the findings, never at the end of a long scroll (an SE at the largest text)', () => {
@@ -177,7 +211,6 @@ describe('where a slip went (`into`, Majd said yes Nov 15 2026)', () => {
           seconds={60}
           marks={props.marks ?? marks}
           score={{ text: '90%', level: 'good' }}
-          kept={false}
           checkOwned
           onFinding={() => undefined}
           onInto={props.onInto}

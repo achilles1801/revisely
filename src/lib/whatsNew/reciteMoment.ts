@@ -1,7 +1,7 @@
 // What's new 1.0.5, card 1 as a moment (components/whatsNew/ReciteMoment; the orchestrator's yes, Nov 17 2026): a take
-// on Al-Mulk 1–2 plays by itself. The reader listens, the page follows the reciter word by word, three marks land as the
-// reciter passes their words (a wrong word, a haraka slip, a tajweed note), the score falls by what counts (never the
-// tajweed note: RECITE-2), then the card's words. This is its clock (pure): what shows at any moment.
+// on Al-Mulk 1–2 plays by itself. The reader listens, the page follows the reciter word by word, its marks land as the
+// reciter passes their words (a wrong word, a haraka slip, and a tajweed note where Strict is offered), the score falls
+// by what counts (never the tajweed note: RECITE-2), then the card's words. This is its clock (pure): what shows at any moment.
 
 import { countsAsMistake, type Mark } from '../reciteLive/contract';
 

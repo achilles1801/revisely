@@ -13,12 +13,13 @@ import { TopSafeAreaView } from '../../components/SafeAreaView';
 import { ScrollView } from 'react-native-gesture-handler';
 import { useFocusEffect, useNavigation, useScrollToTop } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { HomeStackParamList } from '../../navigation/MainNavigator';
+import type { HomeStackParamList } from '../../navigation/MainNavigator';
 import { PillButton } from '../../components/v2/PillButton';
 import { EditSessionModal } from '../../components/EditSessionModal';
 import { greetingName } from '../../lib/displayName';
 import { setHomePrefs, useHomePrefs } from '../../lib/homePrefs';
-import { isKahfDay, kahfCardState, kahfPages, kahfReadingSession, kahfReadOn } from '../../lib/kahf';
+import { kahfCardState, kahfPages, kahfReadingSession, kahfReadOn } from '../../lib/kahf';
+import { useKahfFriday } from '../../hooks/useKahfFriday';
 import * as firestoreService from '../../services/firestoreService';
 import { queueChange, withPendingReadings } from '../../lib/offline/queue';
 import { OfflineNote } from '../../components/offline/OfflineNote';
@@ -35,7 +36,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { ThemeColors } from '../../theme/v2';
 import { generateDailyAssignment, scheduleStartingByToday } from '../../lib/algorithm';
 import { getQuranData } from '../../lib/quranData';
-import { registerForPushNotificationsAsync } from '../../lib/notifications';
+import { ensureNotificationsPermission } from '../../lib/notifications';
 import { ReadingSession, RevisionLog } from '../../types';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
 import { useTabBarFootprint } from '../../navigation/TabBar';
@@ -46,6 +47,8 @@ import { KahfPost } from '../../components/home/feed/KahfPost';
 import { RecentSection } from '../../components/activity/ActivityItemRow';
 import { RunningTimerChip } from '../../components/timer/RunningTimerChip';
 import { HeroGlow } from '../../components/v2/HeroGlow';
+import { RamadanHome, WithCrescent } from '../../components/ramadan';
+import { useRamadanTheme } from '../../lib/ramadanTheme';
 import { QiblaSheet } from '../../components/qibla/QiblaSheet';
 import { PrayerSheet, PrayerTab } from '../../components/prayer/PrayerSheet';
 import { NextPrayerLine } from '../../components/prayer/NextPrayerLine';
@@ -64,7 +67,7 @@ import { reviewPagesInOrder } from '../../lib/aheadCredit';
 import { ownRevised } from '../../lib/activityItems';
 import { aheadLead, nextRevisionDayPlan } from '../../lib/aheadPlan';
 import type { HistoryItem } from '../../lib/streakFromItems';
-import { handLogsOf, loadActivityHistory, shareActivityHistory, withPendingHandLogs } from '../../lib/activityHistory';
+import { handLogsOf, loadActivityHistory, sameHistory, shareActivityHistory, withPendingHandLogs } from '../../lib/activityHistory';
 import { pendingEntries } from '../../lib/offline/outbox';
 import { todaySnapshot } from '../../lib/todaySnapshot';
 import { JumpSheet } from '../../components/home/JumpSheet';
@@ -95,6 +98,8 @@ export default function DashboardScreen() {
   const salamRoom = screenWidth - 2 * layoutV2.gutter - 2 * TOP_BAR_SIDE - 2 * 12;
   const salamScale = Math.max(1, Math.min(1.4, salamRoom / SALAM_INK_WIDTH));
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  // Revisely Dev's Ramadan theme (THEME-1): decorations only.
+  const ramadan = useRamadanTheme();
 
   const { user, pages, logs, addLog, updateLog, deleteLog, loadData, error, saveUser, pendingChanges } = useApp();
   const { firebaseUser } = useAuth();
@@ -175,31 +180,40 @@ export default function DashboardScreen() {
   // number of sessions changes, and shared with Revo (lib/activityHistory), which builds from it too.
   // Also each time Home comes back into view: pages added by hand in Activity change no session, and
   // the streak didn't move until the next session (ACT-15, Nov 2026).
+  // Coming back reads it again without rendering Home first, and a history that came back the same renders
+  // nothing: every swipe back from Read rendered all of Home twice, as the pager settled (Android froze it).
   const [history, setHistory] = useState<HistoryItem[] | null>(null);
-  const [historyKey, setHistoryKey] = useState(0);
+  const reloadHistory = useRef<() => void>(() => undefined);
   const focusedOnce = useRef(false);
   useFocusEffect(
     useCallback(() => {
-      if (focusedOnce.current) setHistoryKey((k) => k + 1);
+      if (focusedOnce.current) reloadHistory.current();
       focusedOnce.current = true;
     }, []),
   );
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
+    let latestRead = 0;
     const to = revisionDay;
     const uid = user.id;
-    loadActivityHistory(to)
-      .then((items) => {
-        if (cancelled) return;
-        setHistory(items);
-        shareActivityHistory(uid, to, items);
-      })
-      .catch(() => undefined);
+    const load = () => {
+      const read = ++latestRead;
+      loadActivityHistory(to)
+        .then((items) => {
+          if (cancelled || read !== latestRead) return;
+          setHistory((had) => (had && sameHistory(had, items) ? had : items));
+          shareActivityHistory(uid, to, items);
+        })
+        .catch(() => undefined);
+    };
+    reloadHistory.current = load;
+    load();
     return () => {
       cancelled = true;
+      reloadHistory.current = () => undefined;
     };
-  }, [user, revisionDay, logs.length, historyKey]);
+  }, [user, revisionDay, logs.length]);
 
   // Today as Home shows it (lib/todaySnapshot): its pages, how far they've got, done or not, and the
   // streak. Revo's context is built from the same function, so the two never disagree.
@@ -240,9 +254,12 @@ export default function DashboardScreen() {
   // Today's pages that came from earlier days (they come first: "4 from yesterday first").
   const carriedToday = snapshot?.carried.length ?? 0;
 
+  // Reminders on, and this phone never asked (signed in on a new phone, or a reinstall): ask once (REMIND-4). With
+  // reminders off nothing asks, and iOS never asks twice.
+  const remindersOn = user?.notificationsEnabled === true;
   useEffect(() => {
-    registerForPushNotificationsAsync();
-  }, []);
+    if (remindersOn) void ensureNotificationsPermission().catch(() => undefined);
+  }, [remindersOn]);
 
   // The streak (lib/streak): the same rule and the same answer as the widget.
   const streakNow = snapshot?.streak.reading ?? null;
@@ -269,17 +286,22 @@ export default function DashboardScreen() {
 
   const userName = greetingName(user?.name, firebaseUser?.displayName);
 
-  // Friday: suggest Surah Al-Kahf. Today's reading sessions tell whether it
-  // was already read; they are only fetched on Fridays with the card on.
-  const kahfDay = isKahfDay(revisionDay);
+  // The Islamic Friday (Thursday's maghrib to Friday's, KAHF-1): suggest Surah
+  // Al-Kahf. The latest reading sessions tell whether it was already read inside
+  // that window; they are only fetched then, with the card on.
+  const kahf = useKahfFriday(user);
+  const kahfFriday = kahf?.day ?? null;
   const kahfEnabled = homePrefs.fridayKahfReminder;
   const [readingSessions, setReadingSessions] = useState<ReadingSession[]>([]);
   const [sessionsLoadedFor, setSessionsLoadedFor] = useState<string | null>(null);
   const [kahfSaving, setKahfSaving] = useState(false);
   const kahfSavingRef = useRef(false);
+  // Read once Auth has a user: on a slow start Home opens on the account's copy before Auth has checked the saved
+  // sign-in, and a read then fails ("User not authenticated") and showed the card unread (KAHF-2).
+  const authUid = firebaseUser?.uid ?? null;
   useFocusEffect(
     useCallback(() => {
-      if (!kahfDay || !kahfEnabled) return;
+      if (!kahfFriday || !kahfEnabled || !authUid) return;
       let live = true;
       firestoreService
         .getReadingSessions(20)
@@ -288,27 +310,27 @@ export default function DashboardScreen() {
         })
         .catch((err) => logger.warn('Failed to load reading sessions for Al-Kahf', err))
         .finally(() => {
-          if (live) setSessionsLoadedFor(revisionDay);
+          if (live) setSessionsLoadedFor(kahfFriday);
         });
       return () => {
         live = false;
       };
-    }, [kahfDay, kahfEnabled, revisionDay]),
+    }, [kahfFriday, kahfEnabled, authUid]),
   );
   const kahfDone = useMemo(
-    () => kahfReadOn(revisionDay, readingSessions, logs),
-    [revisionDay, readingSessions, logs],
+    () => (kahf ? kahfReadOn(kahf, readingSessions, logs) : false),
+    [kahf, readingSessions, logs],
   );
   const kahfState = kahfCardState({
     enabled: kahfEnabled,
-    today: revisionDay,
+    friday: kahfFriday,
     dismissedDay: homePrefs.kahfDismissedDay,
     done: kahfDone,
   });
-  // Until today's sessions are in, a prompt might be about to turn into
-  // "Read ✓"; wait rather than flash it.
+  // Until the sessions are in, a prompt might be about to turn into
+  // "Done ✓"; wait rather than flash it.
   const showKahfCard =
-    kahfState === 'done' || (kahfState === 'prompt' && sessionsLoadedFor === revisionDay);
+    kahfState === 'done' || (kahfState === 'prompt' && sessionsLoadedFor === kahfFriday);
 
   if (!user || !assignment) {
     return (
@@ -504,22 +526,25 @@ export default function DashboardScreen() {
   // How much of the Quran is memorized: everyone sees it (no setting).
   const memorized = memorizedText(pages);
 
+  const salam = (
+    <Text
+      style={[arabicV2(20), { color: palette.text }]}
+      accessibilityLanguage="ar"
+      // At the largest sizes it ran into the icons (or wrapped, on an SE).
+      maxFontSizeMultiplier={salamScale}
+      testID="salam"
+    >
+      السلام عليكم
+    </Text>
+  );
+
   return (
     <TopSafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
       <HeroGlow />
+      {ramadan ? <RamadanHome /> : null}
       <TopBar
         left={<RunningTimerChip onOpenQuran={() => navigation.getParent()?.navigate('Read')} />}
-        center={
-          <Text
-            style={[arabicV2(20), { color: palette.text }]}
-            accessibilityLanguage="ar"
-            // At the largest sizes it ran into the icons (or wrapped, on an SE).
-            maxFontSizeMultiplier={salamScale}
-            testID="salam"
-          >
-            السلام عليكم
-          </Text>
-        }
+        center={ramadan ? <WithCrescent>{salam}</WithCrescent> : salam}
         right={
           <>
             <IconButton icon="compass-outline" label={t('home.screen.qibla')} onPress={() => openPrayer('qibla')} testID="open-qibla" />
@@ -577,10 +602,11 @@ export default function DashboardScreen() {
         {showKahfCard && (
           <KahfPost
             state={kahfState === 'done' ? 'done' : 'prompt'}
+            eve={revisionDay !== kahfFriday}
             saving={kahfSaving}
             onRead={openKahf}
             onMarkRead={markKahfRead}
-            onDismiss={() => setHomePrefs({ kahfDismissedDay: revisionDay })}
+            onDismiss={() => setHomePrefs({ kahfDismissedDay: kahfFriday })}
           />
         )}
 

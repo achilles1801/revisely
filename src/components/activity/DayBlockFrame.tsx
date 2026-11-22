@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { Tap } from '../v2/Tap';
 import { typeV2 } from '../../theme/v2';
+import { t } from '../../i18n';
 
 const GUTTER = 16;
 const MARK = 36;
@@ -165,7 +166,7 @@ export function PageChip({ label, onPress, testID }: { label: string; onPress?: 
   );
   const style = [styles.chip, { backgroundColor: palette.fill, borderColor: palette.separator }];
   return onPress ? (
-    <Tap onPress={onPress} accessibilityRole="button" accessibilityHint="Opens in the reader" hitSlop={6} style={style} testID={testID}>
+    <Tap onPress={onPress} accessibilityRole="button" accessibilityHint={t('activity.juz.opensInReader')} hitSlop={6} style={style} testID={testID}>
       {text}
     </Tap>
   ) : (

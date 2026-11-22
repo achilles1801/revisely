@@ -27,6 +27,19 @@ export const reminders = {
   evenAPage: 'Even a page or two of {{place}} counts.',
   stillOpen: '{{place}} is still open. A few calm minutes would do it.',
   almostDone: 'Almost done with {{place}}. A few calm minutes would do it.',
+  /**
+   * The one reminder of a day after tomorrow, for someone who hasn't opened the app since (REMIND-2). Four
+   * wordings in turn, each naming where that day's revision is; never "missed", "behind" or a streak.
+   */
+  away: {
+    /** "Al-Mulk today" / "Juz 29 today". */
+    placeToday: '{{place}} today',
+    keepClose: 'A few calm minutes are enough to keep it close.',
+    ready: 'Your revision is ready',
+    /** "Al-Mulk to Al-Qalam, whenever you have a few minutes." */
+    whenever: '{{range}}, whenever you have a few minutes.',
+    juzWhenever: 'Juz {{juz}}, whenever you have a few minutes.',
+  },
   done: {
     juz: '{{today}} is done',
     tomorrowJuz: "That's today's revision. Tomorrow is {{tomorrow}}.",
@@ -38,5 +51,22 @@ export const reminders = {
     restWell: 'Rest well.',
     streak: '{{days}} days in a row',
     alhamdulillah: "Today's revision is done. Alhamdulillah.",
+  },
+  /** Android's notification channels (lib/notifications). */
+  channels: {
+    reminders: 'Reminders',
+    remindersSub: 'Your revision reminders and the reading timer.',
+    remindersSilent: 'Reminders (silent)',
+    remindersSilentSub: 'Revision reminders set to go quietly: overnight, and the congratulation.',
+    prayer: 'Prayer times',
+    prayerSub: 'A prayer’s time, or a reminder before it, with the standard tone.',
+    prayerSilent: 'Prayer times (silent)',
+    prayerSilentSub: 'Prayer notifications set to Silent.',
+    recitation: 'Recitation',
+    recitationSub: 'Play and pause a recitation from the notification and the lock screen.',
+  },
+  review: {
+    title: 'Time to review',
+    body: 'Juz {{juz}} is due for review',
   },
 } as const;

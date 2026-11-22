@@ -8,6 +8,8 @@ import { Tap } from '../v2/Tap';
 import { useModalTurn } from '../v2/modalTurn';
 import { DISMISS_FALLBACK_MS } from '../v2/Sheet';
 import { BarButton } from './ReciteBar';
+import { earlyAccessIntroLine } from '../../lib/earlyAccess';
+import { t } from '../../i18n';
 
 /** The real screen the page shows: a take marking mistakes on An-Naml 23 (E2E flow 18's screenshot), light and dark. */
 const PREVIEW: Record<'light' | 'dark', ImageSourcePropType> = {
@@ -23,6 +25,8 @@ const PREVIEW_ASPECT = 1206 / 1140;
  * "Can’t afford it? Apply for support" (the Quran Muaalem License's free path, in plain view). It's part of Revisely
  * Premium (the paid side is "Premium", with no feature name and no prices: nothing is for sale yet), so the button is
  * Get Premium, a placeholder until Premium exists. One line says it's Premium, following along stays free, and it's AI.
+ * In early access (lib/earlyAccess, PREM-1) Get Premium gives it for nothing, and in place of Apply for support one line
+ * says it's free in early access, paid later, and kept for life: every account has Premium, so support has no purpose.
  */
 export function CheckIntroPage({
   visible,
@@ -30,8 +34,11 @@ export function CheckIntroPage({
   onGet,
   onSupport,
   onClose,
+  earlyAccess = false,
 }: {
   visible: boolean;
+  /** Premium is in early access: free, kept for life; Apply for support is hidden. */
+  earlyAccess?: boolean;
   /** Get Premium is under way. */
   getting?: boolean;
   onGet: () => void;
@@ -62,7 +69,7 @@ export function CheckIntroPage({
     <Modal visible={turn} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose} onDismiss={release}>
       <View style={[styles.root, { backgroundColor: palette.bg, paddingTop: insets.top, paddingBottom: insets.bottom + 8 }]} testID="check-intro">
         <View style={styles.top}>
-          <BarButton icon="close" label="Close" onPress={onClose} testID="check-intro-close" />
+          <BarButton icon="close" label={t('common.close')} onPress={onClose} testID="check-intro-close" />
         </View>
         <ScrollView contentContainerStyle={styles.content} bounces={false}>
           <View style={[styles.frame, { width: frameWidth, height: frameHeight, borderColor: palette.outline, backgroundColor: palette.bg }]}>
@@ -70,32 +77,37 @@ export function CheckIntroPage({
               source={PREVIEW[isDark ? 'dark' : 'light']}
               style={{ width: frameWidth, height: frameHeight }}
               resizeMode="cover"
-              accessibilityLabel="A page of An-Naml with its mistakes highlighted"
+              accessibilityLabel={t('reciteLive.intro.image')}
             />
           </View>
           <Text style={[styles.title, { color: palette.text }]} maxFontSizeMultiplier={1.4} accessibilityRole="header">
-            Mark my mistakes
+            {t('reciteLive.intro.title')}
           </Text>
           <Text style={[styles.body, { color: palette.secondary }]} maxFontSizeMultiplier={1.6}>
-            Revisely highlights a wrong, missed or extra word in red, and a haraka or letter slip in amber. Tap one to see
-            what you said.
+            {t('reciteLive.intro.body')}
           </Text>
         </ScrollView>
         <View style={styles.bottom}>
-          <PillButton title="Get Premium" size="lg" onPress={onGet} busy={getting} testID="check-intro-get" />
+          <PillButton title={t('reciteLive.intro.get')} size="lg" onPress={onGet} busy={getting} testID="check-intro-get" />
+          {earlyAccess ? (
+            <Text style={[typeV2.meta, styles.early, { color: palette.text }]} maxFontSizeMultiplier={1.4} testID="check-intro-early">
+              {earlyAccessIntroLine()}
+            </Text>
+          ) : (
           <Tap
             onPress={onSupport}
             style={styles.support}
             accessibilityRole="link"
-            accessibilityLabel="Can’t afford it? Apply for support"
+            accessibilityLabel={t('reciteLive.intro.support')}
             testID="check-intro-support"
           >
             <Text style={[typeV2.button, styles.supportText, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
-              Can’t afford it? Apply for support
+              {t('reciteLive.intro.support')}
             </Text>
           </Tap>
+          )}
           <Text style={[typeV2.meta, styles.note, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
-            Part of Premium. Following along stays free. It’s AI and can make mistakes.
+            {t('reciteLive.intro.note')}
           </Text>
         </View>
       </View>
@@ -104,6 +116,7 @@ export function CheckIntroPage({
 }
 
 const styles = StyleSheet.create({
+  early: { textAlign: 'center', marginTop: 14, paddingHorizontal: 8 },
   root: { flex: 1 },
   top: { height: 48, paddingHorizontal: 8, justifyContent: 'center' },
   content: { paddingHorizontal: 24, paddingBottom: 16 },

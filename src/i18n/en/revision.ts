@@ -14,6 +14,10 @@ export const revision = {
     next: 'Next: {{day}}',
     keepGoing: 'Keep going',
     listenBack: 'Listen back',
+    /** After a good moment (SESS-8): the store's review page. The chevron comes from chevron(). */
+    rateAsk: 'Enjoying Revisely? Rate it',
+    rateAskLabel: 'Rate Revisely',
+    rateAskDismiss: "Don't ask again",
   },
   /** The sheet that marks a session's pages in bulk. */
   bulk: {

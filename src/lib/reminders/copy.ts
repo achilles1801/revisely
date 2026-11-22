@@ -9,7 +9,8 @@ import { describeSurahRuns, pageRuns } from '../pageRanges';
 import { juzLabel } from '../widgets/snapshot';
 import { t } from '../../i18n';
 
-export type ReminderKind = 'morning' | 'midday' | 'evening' | 'congrat';
+/** `away`: the one reminder of a day after tomorrow, for someone who hasn't opened the app since (REMIND-2). */
+export type ReminderKind = 'morning' | 'midday' | 'evening' | 'congrat' | 'away';
 
 export interface ReminderCopy {
   title: string;
@@ -65,6 +66,7 @@ const juzOf = (page: number) => getJuzForPage(page);
 
 export function reminderCopy(input: ReminderCopyInput): ReminderCopy {
   if (input.kind === 'congrat') return congratulation(input);
+  if (input.kind === 'away') return awayCopy(input);
   return input.juzPlan ? juzCopy(input) : pageCopy(input);
 }
 
@@ -177,6 +179,31 @@ function juzCopy(input: ReminderCopyInput): ReminderCopy {
     title: t('reminders.hourLeft'),
     body: progress === 0 ? t('reminders.stillOpen', { place }) : t('reminders.almostDone', { place }),
   };
+}
+
+/**
+ * A day after tomorrow, nothing revised (REMIND-2): one of four wordings by the day, so consecutive days never read
+ * the same, each naming where that day's revision is (the surahs, or the juz on a juz plan).
+ */
+function awayCopy(input: ReminderCopyInput): ReminderCopy {
+  if (input.juzPlan) {
+    const juz = juzOf(input.all[0]);
+    const options: ReminderCopy[] = [
+      { title: greeting(input), body: t('reminders.juzWhenReady', { juz }) },
+      { title: t('reminders.away.placeToday', { place: t('common.juzN', { n: juz }) }), body: t('reminders.away.keepClose') },
+      { title: t('reminders.away.ready'), body: t('reminders.away.juzWhenever', { juz }) },
+    ];
+    return pick(options, input.variant);
+  }
+  const range = describeSurahRuns(pageRuns(input.all));
+  const place = surahOf(input.all[0]).name;
+  const options: ReminderCopy[] = [
+    { title: greeting(input), body: input.beforeNoon ? t('reminders.todayIs', { range }) : t('reminders.rangeOnly', { range }) },
+    { title: greeting(input), body: t('reminders.startsWith', { place }) },
+    { title: t('reminders.away.placeToday', { place }), body: t('reminders.away.keepClose') },
+    { title: t('reminders.away.ready'), body: t('reminders.away.whenever', { range }) },
+  ];
+  return pick(options, input.variant);
 }
 
 function congratulation(input: ReminderCopyInput): ReminderCopy {

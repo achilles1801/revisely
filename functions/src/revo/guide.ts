@@ -17,7 +17,7 @@
  * Change it in the same PR as the feature: every change a user can see updates the guide (main or Dev).
  * Verified against the code on Nov 9 2026, as of the release
  * that opens Activity, memorizing by the ayah, help, What's new and every QuranEnc translation to
- * everyone (recite mode and Settings → Testing stay testers'; searching the Qur'an, typed and by voice
+ * everyone (Settings → Testing stays testers'; searching the Qur'an, typed and by voice
  * on an iPhone, opened to everyone on Nov 9 2026).
  *
  * Name parts of the Qur'an by surah and juz here too (the owner's rule); page numbers only where
@@ -102,7 +102,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
     text: lines(
       '- A revision day counts when every page scheduled for it is revised and credited to that day (in its own session, or revised ahead before it came). Home then says Done.',
       '- The streak is how many such days in a row, counted back from today if today is done, otherwise from yesterday. So it stays alive all day, until today’s revision day ends (at midnight, or at Fajr with “Start day at fajr”). Home shows it as "Today · 12-day streak".',
-      '- Yesterday missed (not all its pages revised) with the days before it complete: the streak shows dimmed, with a ring for yesterday’s missed pages. Revising yesterday’s missed pages before today ends brings it back at once. Only yesterday’s pages count for this, not today’s. How: Home’s "Missed yesterday · …" or "Left yesterday · …" line → “Add to today” → revise them (they come first in today’s session and are credited to yesterday).',
+      '- Yesterday missed (not all its pages revised) with the days before it complete: the streak shows dimmed, with a small ring beside Home’s ? that fills as yesterday’s missed pages are revised. Filled before today ends, it brings the streak back at once. Only yesterday’s pages count for this, not today’s. How: Home’s "Missed yesterday · …" or "Left yesterday · …" line → “Add to today” → revise them (they come first in today’s session and are credited to yesterday).',
       '- Today still needs its own pages: pages carried in from another day never count toward today.',
       '- Two missed days in a row break the streak, and revising an older day later doesn’t bring it back. Their pages are still offered for three days (see Catching up), and finishing today starts a new streak.',
     ),
@@ -181,7 +181,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'Insights and page strength',
-    covers: ['ACT-4', 'ACT-8', 'ACT-12', 'ACT-16', 'ACT-19', 'ACT-21', 'ACT-22', 'ACT-23', 'ACT-24', 'ACT-25', 'ACT-26'],
+    covers: ['ACT-4', 'ACT-8', 'ACT-12', 'ACT-16', 'ACT-19', 'ACT-21', 'ACT-22', 'ACT-23', 'ACT-24', 'ACT-25', 'ACT-26', 'ACT-31'],
     routes: ['Activity', 'ActivityDay', 'PagesByStrength', 'QuranReader'],
     text: lines(
       '- Activity → “Insights”. One range for the whole tab, from the chip at the end of the Overview | Insights row ("30 days ⌄" at first): “7 days”, “30 days”, “3 months” or “All time” (since the account’s first day). It is kept on the phone; a range longer than the account counts from its first day.',
@@ -189,6 +189,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
       '- The juz sheet (from a Coverage tile, the untouched row, or a day’s Revised block): the juz named by its surahs, when it was last revised and on how many days in the last 30, a strip of its pages and a row per surah. Tap a page, a row or “Open in the reader” to read it there; a juz left too long offers “Plan it for tomorrow first”.',
       '- “Consistency”: days with a revision or a read in the range, and the minutes by hour (press and slide along the hour bars to read each hour). A day’s circle opens that day; the figure opens Overview at its month. At 3 months: a weeks grid and, if there is one, the missed days’ pattern ("Every missed day was a Saturday").',
       '- “Memorization”: pages memorized each month; tap a month’s bar for that month’s memorizations, each opening its day. “Pace”: minutes per page, shown from ten timed items, against the same length before; tap its "From 24 timed revisions ›" line for each one.',
+      '- On a new account, days before it are neither done nor missed ("1 of 1 day since 19 November"); the minutes by hour show from 3 days with something timed, Memorization’s bars once a month has a page memorized.',
       '- Strength comes from ratings: 1–2 weak, 3 moderate, 4–5 strong (an unrated revised page counts as strong). Rating needs “Smart Tracking” (Settings → Revision), then ⋯ → “Rate page strength” in a session.',
       '- Smart Tracking on: “Weak spots” (pages weak now or skipped twice, with “Revise … first tomorrow” and “Ask”), strength in the juz sheet and on a day, and at the foot of Weak spots “See all pages by strength”: every revised page, weakest first, by “Pages”, “Surahs” or “Juz”, filtered by juz or strength.',
       '- Smart Tracking off: nothing in Activity shows strength (no weak, moderate or strong counts, no weak marks, no Weak spots); when a part was last revised and how often show instead. In Weak spots’ place, “Turn on Smart Tracking to see your weak spots” turns it on (Settings → Revision).',
@@ -196,7 +197,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'Reading, recitation and translations',
-    covers: ['READ-1', 'AUDIO-1', 'AUDIO-2', 'TRANS-1', 'TRANS-2', 'TRANS-3', 'TRANS-4', 'TRANS-5', 'TRANS-6', 'TRANS-7', 'TRANS-8'],
+    covers: ['READ-1', 'AUDIO-1', 'AUDIO-2', 'AUDIO-3', 'TRANS-1', 'TRANS-2', 'TRANS-3', 'TRANS-4', 'TRANS-5', 'TRANS-6', 'TRANS-7', 'TRANS-8'],
     routes: ['ReadIndex', 'QuranReader'],
     text: lines(
       '- Read tab → a surah, or “Recent pages” → the reader, which opens straight on that page (from a search result, Jump to…, a day or a session too). Tap the page for the controls; swipe to turn pages; the bar at the bottom moves through the mushaf.',
@@ -206,6 +207,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
       '- The player bar: ▶ plays from this page; the reciter’s name picks the reciter; the options icon opens “Audio Options”: “Reciter”, “Playback speed” (0.25× to 2×), “From” and “To” (surah and ayah), “Play up to” (Page, Surah, Juz’ or Custom), “Repeat” (loop, or 1 to 10 times) and “Pause after each verse”. While playing: stop, speed, previous and next verse, pause.',
       '- Reciters: Al-Husary, Al-Minshawi, Abdul Basit, Alafasy, As-Sudais, Ash-Shuraim, Al-Muaiqly, Al-Ghamdi, Al-Ajamy, Ash-Shatri, Al-Hudhaify, Muhammad Ayyub, Al-Tablawi, Ad-Dossari. The reciter follows the account; speed, repeat, pause and Play up to are kept on the phone.',
       '- Recitation goes on after leaving the reader (a mini player above the tab bar: pause, ✕ to stop, › back to the reader), in the background and with the phone locked. It streams, so it needs the internet.',
+      '- On Android (version 1.0.4 on), recitation’s notification has previous and next verse; a paused one can be put away ("Hide" on the media control) and ▶ in the app goes on from there.',
     ),
   },
   {
@@ -253,37 +255,76 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'Mushaf, prayer times and the Qibla',
-    covers: [],
+    covers: ['KAHF-1', 'KAHF-2', 'KAHF-3'],
     routes: ['Settings', 'PrayerCalculation', 'PrayerNotifications'],
     text: lines(
       '- Settings → Mushaf → “Mushaf”: Madani 1405 (the default) or Madani 1441. Page numbers stay the same for plans.',
       '- Home’s compass opens the Prayer sheet: Times (today’s prayers, the next with a countdown) and Qibla (a compass to the Kaaba; it needs location, which stays on the phone).',
       '- Settings → Prayer: “Prayer times”, “Prayer notifications”, “Calculation” (method and madhab), “Qibla” and “Start day at fajr”. Settings → Home screen → “Next prayer” adds a line under Home’s header.',
-      '- Settings → Home screen → “Friday Al-Kahf reminder”: a card on Home on Fridays.',
+      '- Settings → Home screen → “Friday Al-Kahf reminder”: a card on Home from Thursday’s maghrib to Friday’s (the Prayer sheet’s maghrib). Read on Thursday evening, it counts for that Friday; “Not today” hides it until Friday’s maghrib.',
     ),
   },
   {
     title: 'Settings, section by section',
-    covers: ['REVO-39'],
+    covers: ['REVO-39', 'REMIND-1', 'REMIND-3', 'REMIND-4', 'SET-2', 'SET-3', 'SET-4'],
     routes: ['Settings'],
     text: lines(
       '- Account: display name. Activity: “Activity”, “Recordings”, “Back up recordings”, “Time in app”, “Memorized pages”. Home screen: “Next prayer”, “Friday Al-Kahf reminder”. Prayer: as above.',
-      '- Revision: “Smart Tracking” (rate pages, Insights), “Keep daily amount”, and on an iPhone “Speech model” (searching by voice; for testers, the hidden page too).',
+      '- Revision: “Smart Tracking” (rate pages, Insights), “Keep daily amount”, and on an iPhone “Speech model” (searching by voice).',
       '- Revo AI: Revo on or off, “What Revo can do” (Revo’s short introduction, which also plays before Revo is first turned on; Skip ends it), “Memory”, “Delete conversations”.',
       '- Mushaf: “Mushaf”, “Offline mushaf”, “Download over mobile data”. Notifications: “Enable notifications” (revision reminders: 8:00 AM, after Asr, and an hour before the day ends, while today isn’t done; there is no setting for their times). Appearance: “Theme” (Light or Dark) and “Accent” (Indigo, Crimson or Jade).',
-      '- Support: “Share Revisely”, “Send feedback”, “Report a problem”, “Contact support”, “Help buttons”. About: “What’s new”, “Privacy Policy”, “Terms of Service”, the version.',
+      '- Support: “Share Revisely”, “Send feedback”, “Report a problem” (with “Add a screenshot”), “Contact support”, “Help buttons”. About: “What’s new”, “Privacy Policy”, “Terms of Service”, the version.',
       '- Testing (testers only): “Reset my data”, “Load test scenario”. Then “Sign out” and “Delete account”.',
-      '- iPhone widgets (Home Screen and Lock Screen): Today, Verse of the day, Qibla and Prayer times, added like any widget. Android has none yet.',
+      '- Widgets: Today, Verse of the day, Qibla and Prayer times, added like any widget: on an iPhone (Home Screen, Lock Screen) and, from 1.0.4, on Android.',
+    ),
+  },
+  {
+    title: 'Recite and Mark mistakes',
+    covers: ['RECITE-1', 'RECITE-2', 'RECITE-3', 'RECITE-4', 'RECITE-5', 'RECITE-6', 'RECITE-7', 'RECITE-8', 'RECITE-9', 'RECITE-14', 'SEARCH-4', 'PREM-1', 'READ-2'],
+    routes: ['QuranReader', 'ActiveRevision', 'Settings'],
+    text: lines(
+      '- Who has it: an iPhone, or Android from version 1.0.5, with the Madani 1405 mushaf (Settings → Mushaf → “Mushaf”): the reader’s bar and a session’s have a mic and an eye in place of the record button. It needs the internet: Revisely’s server checks the recitation; nobody listens.',
+      '- The mic: tap it to start a take. Hold it for “Record” (“Just record your recitation”), “Recite” (“The page follows you”) with the “Mark mistakes” switch under it, and “Test me”. Recite follows them on the page; with Mark mistakes on it marks mistakes as they recite: wrong, skipped and added words, and haraka and letter slips (tajweed isn’t marked yet).',
+      '- Premium early access: Mark mistakes and Test me are Premium, free for everyone who signs up during early access (no end date yet); every account that got it then keeps it for life once Premium is paid. Settings → Recite → “Premium” says so; an account without it gets it from “Get Premium” in Mark mistakes’ intro. Not a trial: nothing is charged and there are no prices.',
+      '- A take starts anywhere: “Listening…” until it finds where they are (the page, then the whole Qur’an); then a grey band and a grey box on the word follow them, and the page turns. Never found: nothing is marked. In the bar: “Pause”, “Resume”, Stop (then “Checking…”) and ✕; a tap on the page hides the controls.',
+      '- Marks are highlights behind the word: red for a wrong, skipped or extra word; amber for a haraka or letter slip, and for “Not clear” (not heard clearly: never a mistake, never counted). Restarting an ayah is never marked. Tap one: “Expected” and what was heard, “Not a mistake” (Undo for a few seconds), “Hear it” (the reciter’s ayah), “Your recitation” (their own voice there) and “Similar phrases”.',
+      '- After Stop, “Your recitation”: the score by the page, each mark (a tap shows it), a row when they went on with a similar ayah ("You continued with Luqman 31:6, a similar ayah"), “Recite the mistakes again” (one take over just that stretch, then "Before: …"), “Recite again” and “Done”.',
+      '- The eye (“Hide the page”) covers the words; they appear as recited. ‹ (“Show the next word”) and ‹‹ (“Show the whole ayah”) peek: peeked words stay grey and never count. Saying something other than the next word turns its cover red: a hint, never a mark.',
+      '- “Test me”: five random places in what they’ve memorized (“Everything you’ve memorized” or one juz), each hidden but for an ayah’s first two words; then "4 of 5 continued cleanly" and “Test me again”. With nothing memorized: “Mark what you’ve memorized first”. In the reader only.',
+      '- In a session a take never marks a page revised (only swiping off it or ✓ does). A voice search that finds one place opens the reader at the ayah, highlighted, nothing listening; Back returns to the search.',
+      '- Not yet: Recite with the Madani 1441 print or offline, tajweed marks, a teacher hearing the takes.',
+    ),
+  },
+  {
+    title: 'Takes, past mistakes and progress',
+    covers: ['RMEM-1', 'RMEM-2', 'RMEM-3', 'RMEM-4', 'RMEM-5', 'RMEM-6', 'RINS-1', 'RINS-2', 'RINS-3'],
+    routes: ['QuranReader', 'ActivityDay', 'ActivityAll', 'Activity'],
+    text: lines(
+      '- Every take with Mark mistakes is kept on the account as text (its marks, place, score, whether the page was hidden), never audio: its audio stays on the phone. Recite alone keeps nothing.',
+      '- A word missed stays marked on the page (lighter, outside a take, not on a hidden page, not with Settings → Recite → “Show past mistakes” off) until it is said right in 2 takes on 2 different revision days. Tap it for its history, “Hear it” and “Clear now” (with Undo). With Premium, holding the mic there offers "Recite your 3 mistakes here".',
+      '- A summary says what it cleared ("2 cleared from the page") and, from a passage’s second take, “Your progress here”: “Your progress” has its chart, “Still to fix here” and “Your takes here”.',
+      '- A take is never a recording, a sitting or pages revised. Its summary’s ⋯ has “Delete this take”. In Activity a day’s takes are a “Recited” block, a row each, newest first (a tap shows it on the page, a hold opens its menu; past five, the newest four and "All 7 takes"), and Overview’s preview of the picked day has a “Recited” row that opens the day at its takes. A take’s menu has “Show on the page”, “Ask Revo about this take” and “Delete this take”; “See all” → “Recitations” lists every take.',
+      '- Activity → “Insights” → “Recitation”: the score and how it moved, “Keeps slipping” (passages with words still marked; a tap opens them), “Similar ayahs” they went on with, and “Ask”. With Smart Tracking off, nothing about strength.',
+      '- Revo knows what their takes show (the last 4 weeks: takes, score, mistakes by kind, words still marked and cleared, passages that keep slipping, similar ayahs), never the audio, and only what the checker marked.',
+    ),
+  },
+  {
+    title: 'Gaps, Last revised and arranging Activity',
+    covers: ['ACT-28', 'ACT-29', 'ACT-30'],
+    routes: ['Activity', 'ActivityDay', 'LastRevised', 'QuranReader'],
+    text: lines(
+      '- Activity → “Insights” → “Gaps” (after Consistency): a gap is 2 days or more in a row without revising (Monday, then Thursday, is 2 days; one missed day is not one). It shows the days since the last revision (red from 3), how many gaps and how often they usually revise ("No gaps yet" at first), then each gap, latest first, with its days and a bar; a tap marks it on the Overview calendar. “Days” shows exact days. "Full revision pushed back 5 days" (or "Full revision on schedule", after a gap) says how late their plan’s pages come round.',
+      '- “When did I last revise…?” opens “Last revised”: “Surahs”, “Juz”, “Hizbs” or “Pages”, sorted “Recent first”, “Longest waiting first” or “Mushaf order”, filtered “Revised this week”, “2 weeks or more” or “Not revised yet”; a page opens the reader. Say long gaps in weeks or months, welcome them back, never scold.',
+      '- “Edit sections” (the icon at the end of the Overview and Insights tabs) shows, hides and reorders a tab’s sections (hold one, then drag); “Show all, in the usual order” puts it back. Kept on this phone.',
     ),
   },
   {
     title: 'For testers',
-    covers: ['RESET-2', 'RESET-3', 'ACT-29'],
-    routes: ['Settings', 'Activity'],
+    covers: ['RESET-2', 'RESET-3'],
+    routes: ['Settings'],
     text: lines(
-      '- Testers (TestFlight or Google Play testing, marked by the Revisely team) get Settings → Testing, the hidden page in sessions (the eye button at the top, with the Madani 1405 mushaf: recite from memory; following the recitation word by word needs “Speech model” on an iPhone), and updates early.',
+      '- Testers (TestFlight or Google Play testing, marked by the Revisely team) get Settings → Testing and updates early.',
       '- “Reset my data” (type RESET): a backup is kept, then the account starts again as new, still signed in; not again within 10 minutes. “Load test scenario” replaces the data with a ready-made situation the same way.',
-      '- Testers can arrange Activity: “Edit sections” (the icon at the end of the Overview and Insights tabs) shows, hides and reorders the tab’s sections (hold one, then drag); “Show all, in the usual order” puts it back. Kept on this phone.',
     ),
   },
   {
@@ -311,7 +352,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
       '- Revising a passage as a session without touching the plan: no. Closest: “Jump to…” (moves today’s start), or read it in the reader with the timer, and log it with Activity → + → “Revised elsewhere”.',
       '- Pausing the plan for a holiday: there’s no pause, and missed days don’t pile up: the plan follows the calendar, and their pages are offered for three days. Back from the trip, “Jump to…” picks up where you stopped. (Rest days come round every cycle, so they aren’t a pause.)',
       '- Getting a streak back after two missed days, catching up days older than three, or moving a session to another day: no.',
-      '- Following the phone’s light or dark setting, choosing reminder times, translations in Bengali, Russian, Malay, Korean or Italian, tafsir, a tajweed mushaf, recitation offline, sharing progress with a teacher, exporting data, several active plans at once (one is active; others can be saved), Android widgets: not yet.',
+      '- Following the phone’s light or dark setting, choosing reminder times, translations in Bengali, Russian, Malay, Korean or Italian, tafsir, a tajweed mushaf, recitation offline, sharing progress with a teacher, exporting data, several active plans at once (one is active; others can be saved): not yet.',
     ),
   },
 ];
@@ -323,99 +364,97 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
  */
 export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
   {
-    title: 'Recite and Mark mistakes',
-    covers: ['RECITE-1', 'RECITE-5', 'SEARCH-4'],
-    routes: ['QuranReader', 'Settings'],
+    // The athan (Majd, Nov 22 2026): Revisely Dev on iPhone until a version has its sounds built in for Android.
+    title: 'The athan as a prayer’s notification sound (iPhone)',
+    covers: ['ATHAN-1', 'ATHAN-2', 'ATHAN-3'],
+    routes: ['Settings', 'PrayerNotifications', 'AthanVoice'],
     text: lines(
-      '- Who has it: Revisely Dev, a tester account ("Tester: yes"), an iPhone and the Madani 1405 mushaf (Settings → Mushaf → “Mushaf”). The reader’s bar then has an eye and a mic in place of the record button. On Android or with the 1441 print it is the usual record button. It needs the internet: the checking runs on Revisely’s server.',
-      '- The mic: tap it to start a take. Hold it to choose: “Record” (“Just record your recitation”) or “Recite” (“The page follows you”), and under Recite the “Mark mistakes” switch. Recite follows them on the page; with Mark mistakes on it also marks mistakes as they recite. Mark mistakes is part of Premium, free in Revisely Dev (Settings → Testing → “Premium”: off shows it locked).',
-      '- A take starts anywhere: the bar says “Listening…” until it finds where they are, and nothing shows before that. It looks on the page, then in the whole Qur’an, and turns there once sure (VoiceOver says "Started at …"). Then a grey band on the line and a grey box on the word follow them, and the page turns with them. Turning the page by hand makes it look on that page. If it never finds the place, nothing is marked and Stop just ends it; with VoiceOver, one line says so ("Couldn’t follow that take. Try starting at the top of the page.").',
-      '- The bar during a take: the words being said and the time, “Pause” and “Resume” (the mic goes off and the take stays open), Stop (then “Checking…”), and ✕ to close it. A tap on the page puts the header and the bar away, leaving the page and the take’s time by the page number; a tap brings them back. With VoiceOver the bar stays.',
-      '- A voice search (“Search the Quran”, the mic) that finds just one place opens the reader there with the ayah highlighted, and nothing listening; Back returns to the search with its result. A typed search, or several results, only lists them.',
-      '- Settings → Recite: “Mistakes to mark”: “Words & harakat” (wrong, skipped and added words, letter and haraka slips) or “Strict” (the same, and tajweed: madd lengths, qalqalah, ghunnah, ikhfa, idgham, iqlab), where “Madd munfasil”, “Madd muttasil” and “Madd ʿarid” set the lengths. “Save recordings when you recite” keeps a take’s audio on this phone, with the recordings in Activity.',
-      '- Since mid-November 2026, “Words & harakat” and Recite listen with a newer model: it marks recitation that was right less often, especially with noise in the background, and catches word slips (a skipped, changed or added word) about as before. Small haraka or letter slips are marked a little less often, and "You continued with …" shows for fewer slips. “Strict” is unchanged.',
-      '- It is AI and can make mistakes (Settings → About → “Recitation check notice”). Software checks the recitation; nobody listens. Settings → Testing → “Keep my recitations as test data” keeps takes for Revisely’s tests.',
-      '- Help: the reader’s ? (top right) leads to Recite’s own sheets, “How Recite works”, “During a take”, “Your past mistakes” and “Test me and voice search”; during a take it opens “How Recite works”. A day’s ? leads to “Your past mistakes”, and Insights’ to “More in Insights” (Gaps, Last revised, Recitation).',
+      '- On iPhone, a prayer’s notification can play the athan: Settings → Prayer → “Prayer notifications” → a prayer that is on → “Sound” → “Athan”, then “Voice” to choose it for that prayer. Settings → Prayer → “Athan voice” chooses one voice for every prayer set to the athan. Fajr uses the voice’s own Fajr athan when it has one.',
+      '- An iPhone notification can play only the first 30 seconds of an athan. A reminder before the prayer keeps the standard tone. Silent mode and Focus still apply.',
+      '- A voice downloads when chosen (the play button listens to it first); until it has, that prayer plays the standard tone. Android doesn’t have the athan yet.',
     ),
   },
   {
-    title: 'Marks and the take’s summary',
-    covers: ['RECITE-2', 'RECITE-3', 'RECITE-4', 'RECITE-7'],
-    routes: ['QuranReader'],
+    // REMIND-2 (Nov 21 2026), in Revisely Dev until its switch is on (lib/release/remindersWhileAway); its line then
+    // moves to "Settings, section by section" (with the re-record).
+    title: 'Revision reminders after a few days away',
+    covers: ['REMIND-2', 'REMIND-5'],
+    routes: ['Settings'],
     text: lines(
-      '- Mistakes are highlights behind the word, three colours: red for a wrong, skipped or extra word (an extra word marks the word before it); amber for a haraka or letter slip, and for “Not clear”; violet for a tajweed note (“Strict” only).',
-      '- “Not clear”: a haraka or letter the checker couldn’t hear clearly enough to judge. It is never a mistake and never counts in the score. Going back a few words to restart an ayah is never marked.',
-      '- Tap a marked word: its card names each mark (“Wrong word”, “Skipped word”, “Extra word”, “Harakat slip”, “Letter slip”, “Not clear” or the tajweed rule), with “Expected” and what was heard. “Not a mistake” takes a mark off (Undo for a few seconds). “Hear it” plays the reciter’s ayah (it pauses a take); “Your recitation” plays their own voice at that word, until the take is closed; “Similar phrases” lists “Ayahs that read almost the same”.',
-      '- After Stop, with Mark mistakes on, “Your recitation” opens: the score by the page, then each mark (tap one to see it on the page). Going on with a similar ayah gets its own row ("You continued with Luqman 31:6, a similar ayah", or "You ended ayah 5 as ayah 3 ends"); a tap opens that ayah in the reader. "1 marked not a mistake" lists marks taken off, each with “Put back”.',
-      '- Its buttons: “Recite the mistakes again” (one take over just the stretch with mistakes; it stops by itself at the end and says "Before: …"), “Recite again” and “Done”.',
+      '- The revision reminders: today’s and tomorrow’s as usual, then one each morning for the rest of the week after the app was last open (naming where that day’s revision starts, worded differently each day), then none until it is opened again. Opening the app plans them again from that day. There is no setting for how many.',
+      '- Settings → Testing → “Scheduled reminders” lists the reminders this phone will show and when; “Show the next one in 5 seconds” shows the next as a real notification.',
+      '- Settings → Notifications → “Enable notifications” is off while the phone refuses Revisely’s notifications, and says so; turning it on then offers “Open Settings” (allow notifications for Revisely there, then turn reminders on). Without notifications allowed, no reminder can come.',
     ),
   },
   {
-    title: 'Reciting with the page hidden',
-    covers: ['RECITE-6'],
-    routes: ['QuranReader'],
+    // Mistake detection reached the store app with 1.0.5 (its lines are in GUIDE_SECTIONS). Strict stays Revisely Dev's
+    // until it has a release of its own (Majd, Nov 17 2026).
+    title: 'Only in Revisely Dev',
+    covers: ['SESS-8', 'LANG-2'],
+    routes: ['Settings'],
     text: lines(
-      '- The eye beside the mic (“Hide the page”) covers the words, to recite from memory; the verse markers stay whole. During a take the words appear in place as they are recited.',
-      '- In the bar during a take: “Show the next word” (‹) uncovers one word, “Show the whole ayah” (‹‹) uncovers the ayah, and “Show the page” uncovers everything.',
-      '- Words uncovered with ‹ or ‹‹ are peeked: they stay in quiet grey on the page during the take (a word with a mistake keeps its highlight) and never count in the score. The summary says "3 words peeked" and lists them by ayah (a tap shows one on the page); “Recite the mistakes again” takes in their ayahs, offered for peeks alone too.',
-      '- When they say something other than the next word, its cover turns red, the word still hidden. It is a hint, never a mark, and never counts; it goes once the word is said or they go back.',
+      '- Settings → Recite → “Mistakes to mark”: “Words & harakat”, or “Strict”, which also marks tajweed in violet (madd lengths, set by “Madd munfasil”, “Madd muttasil” and “Madd ʿarid”; qalqalah, ghunnah, ikhfa, idgham, iqlab). The store app marks words and harakat only.',
+      '- Settings → Testing → “Keep my recitations as test data” keeps takes for Revisely’s tests; nobody listens. Settings → Testing → “Premium” turns Premium off to see Mark mistakes locked.',
+      '- Settings → Testing → “Mistake detection model” says which model the checker runs for Recite, Words & harakat and Strict (for example v7), read from the checker when Settings opens; a tap asks again.',
+      '- Settings → Appearance → “Language”: “Phone’s language”, English or العربية (Arabic, right to left). Revisely restarts to change it (“Restart”, or “Not now” for the next launch). In Arabic, Revo answers in Arabic too. The Arabic is still being written: what isn’t translated yet shows in English. The store app is English only for now. In Arabic the mushaf still turns like a printed one: page 1 on the right, the next page from the left.',
+      '- Rating Revisely: Settings → Support → “Rate Revisely” opens the App Store’s Write a Review page (Revisely’s Google Play page on Android). After finishing a day’s revision with a streak of 7 days or more, the end card may also show “Enjoying Revisely? Rate it”: at most 3 times ever, four months apart, never in an account’s first week, and never again once it is tapped or dismissed with its ✕ (or Rate Revisely is used). Rating is always optional and nothing is given for it.',
     ),
   },
   {
-    title: 'Test me',
-    covers: ['RECITE-8'],
-    routes: ['QuranReader'],
+    // Long takes (Nov 20 2026), in Revisely Dev until the mistake detection release brings them to the main guide (with
+    // its re-record).
+    title: 'Takes that end without their final check',
+    covers: ['RECITE-11', 'RECITE-12'],
+    routes: ['QuranReader', 'ActiveRevision', 'ActivityDay', 'ActivityAll'],
     text: lines(
-      '- Hold the mic → “Test me” (“A random place in what you’ve memorized”), part of Premium like Mark mistakes; with nothing memorized it says “Mark what you’ve memorized first”. Then: “Everything you’ve memorized”, or one juz of it.',
-      '- Five places at random. At each the page turns there, hidden but for an ayah’s first two words: go on from there (or start that ayah again) through it and up to two more ayahs; it stops by itself. The bar says "1 of 5", then how it went ("Clean", "1 wrong word", "1 word peeked", "Stopped before the end", "Not continued"), with Next. ✕ ends the test.',
-      '- At the end: "4 of 5 continued cleanly", each place with how it went (a tap shows it on the page), “Test me again” (new places, the same juz) and “Done”.',
+      '- Stop always ends within a few seconds: nothing opens by itself; the bar shows the take’s result (the score and mistakes, or “Done”), and a tap on it opens the summary. If the server’s check of the end hasn’t come by then, or the connection was lost after the take had found where they were, the summary shows what the take found and says the end of the take wasn’t checked; the take is kept, unfinished, with its marks and its recording. If the check comes after all, the summary and the take update.',
+      '- Leaving the reader or the session during a take, or while Stop waits, keeps the take too (unfinished); a take that never found where they were keeps nothing.',
+      '- In “Recited” and “Recitations” an unfinished take’s line says "unfinished"; one whose audio is all there is (from before takes were kept this way) says "not checked" and shows no score. Unfinished takes never count in the score or in “Your progress”.',
     ),
   },
   {
-    title: 'Takes kept, and past mistakes on the page',
-    covers: ['RMEM-1', 'RMEM-2', 'RMEM-3', 'RMEM-4', 'RMEM-5', 'RINS-3'],
-    routes: ['QuranReader', 'ActivityDay', 'ActivityAll'],
+    // RMEM-7 (Nov 22 2026; Majd, after the Tarteel analysis): Revisely Dev's until the next release brings it to the main
+    // guide (with its re-record).
+    title: 'A passage’s earlier takes, in the take’s summary',
+    covers: ['RMEM-7'],
+    routes: ['QuranReader', 'ActiveRevision'],
     text: lines(
-      '- Every take with Mark mistakes is kept on the account as text (its marks, less those taken off with “Not a mistake”, where it ran, its score and whether the page was hidden), so it follows them to another phone. Never audio: a recording stays on the phone. A take with Recite alone (following, no marks), a failed take, or one whose start was never found keeps nothing.',
-      '- A word missed stays marked until it is said right in 2 takes in a row, on 2 different revision days; wrong again starts the count over. “Words & harakat” never clears a tajweed note, and “Not clear” is never remembered.',
-      '- Outside a take, those words stay marked on the page in a lighter red, amber or violet (one mark a word, its strongest). Not during a take (only that take’s marks show), not on a hidden page, and not with Settings → Recite → “Show past mistakes” off. Tap one for its card: the kind, its place, how often it went wrong, what was expected, its latest takes (“Right” or what was said, page hidden, ▶ their own voice while that take’s recording is on the phone), "Say it right on 2 different days to clear it.", “Hear it” and “Similar phrases”; “See all” lists every take. “Clear now” clears the word at once, with Undo; its history stays, and a later mistake marks it again.',
-      '- With Premium, holding the mic on a page that still has such words adds "Recite your 3 mistakes here" ("Recite your 1 mistake here" for one), under the stretch it covers (e.g. An-Naml, ayahs 23–26): one take from the ayah before the first such word to the last one’s ayah, tajweed notes left out. It stops by itself at the end, and its summary says what those words were last time ("Before: …").',
-      '- A take’s summary says what it cleared ("2 cleared from the page") and, once the passage has two takes or more, “Your progress here” with its trend ("Up from 95.1% on Mon 2 Nov · 6 takes"). That opens “Your progress”: the latest score, a chart of every take of the passage (one that covers at least half of it), “Still to fix here” (a tap shows the word on the page) and “Your takes here”, newest first (a tap opens one on the page).',
-      '- Activity: a day lists its takes in a “Recited” block: the passage, the score, a line (time, mistakes, words cleared, page hidden), the take’s recording and “Show on the page”. “See all” has “Recitations”, with “All takes”, “With mistakes” and “Page hidden”.',
-      '- “Show on the page” opens the reader at the take’s page with only that take’s marks, and a bar: ▶ its recording (while it is on the phone), its time, score and mistakes, and Done. Tap a mark for its card; “Not a mistake” there updates the kept take.',
-      '- A take that went on into a similar ayah says so under it in Activity ("You went on with Yusuf 90, a similar ayah"; "You ended Al-Falaq 3 as ayah 5 ends"). Holding the take opens its menu: “Show on the page”, and, while Revo is on, “Ask Revo about this take”, which opens Revo with the take attached.',
+      '- After a take with Mark mistakes, its summary lists their earlier takes of the same stretch, newest first, up to 5, as "This passage: your last 3 takes": a take counts when it shares at least half of its ayat with this one and this one at least half of its own (a whole-page take isn’t the history of two of its ayat). Each row says the day (“Earlier today”, “Yesterday”, a weekday, then "9 days ago", "3 weeks ago"), its score by the page and its mistakes (tajweed notes and Not clear never count), its ayat when they differ from this take’s, and whether the page was hidden. Unfinished and deleted takes aren’t listed. With no earlier take there is no such section.',
+      '- A tap on a row shows that take on its page with its marks until Done, as Show on the page does. “Your progress here” under it still opens every take of the passage with the chart.',
+      '- “Your progress here” and “Your progress” compare like with like: the trend line, the score and the chart count only takes of the same stretch (by the same rule), so a longer take’s mistakes in other ayat never count for or against it. “Your takes here” still lists every take that covers half of the passage, each with its ayat; “The score and chart count only your takes of these ayat” says when some are left out of the chart.',
     ),
   },
   {
-    title: 'Recitation in Insights, and Revo',
-    covers: ['RINS-1', 'RINS-2'],
-    routes: ['Activity', 'QuranReader'],
+    // Majd's Nov 20 2026 asks, in Revisely Dev until the next release (Not clear's line too: the store app has it, and
+    // the release's re-record brings it to the main guide).
+    title: 'Mistakes on a hidden page, Not clear, the mistake sound, Your recitation, and how highlights look',
+    covers: ['RECITE-13', 'RECITE-15', 'RECITE-16', 'RECITE-17', 'RECITE-18', 'RECITE-19', 'RECITE-20', 'RECITE-21', 'RECITE-24'],
+    routes: ['QuranReader', 'ActiveRevision', 'Settings'],
     text: lines(
-      '- Activity → “Insights” → “Recitation” (after Weak spots), over the range chip: the score by the page and how it moved ("Up from 96.9% 3 weeks ago"), with its weeks; “Keeps slipping”, the passages with words still marked (a tap opens the reader there; “Show fewer” after “See all”); “Similar ayahs” they went on with ("Al-Baqarah 48 → 123"); a line of the words cleared and the kinds, words first, “Not clear” never counted; and “Ask”, which opens Revo on it.',
-      '- With Smart Tracking on, “Rated strong, but slips” names a passage rated strong that still slips, and Weak spots say how many words Recite still marks there. Off, nothing about strength: a passage says when it was last recited.',
-      '- Revo knows what their takes show: the last 4 weeks’ takes and score, mistakes by kind, words still marked and cleared, the passages that keep slipping, the similar ayahs they went on with, and the latest take. It never hears the audio, and knows only what the checker marked.',
+      '- With the page hidden (the eye) and no take running, a word with a mistake keeps its highlight on its place, the word still hidden: the take’s marks in their colour after it, and past mistakes lighter (with “Show past mistakes” on), so they know where they tend to slip. During a take nothing is drawn on a word still hidden, past mistakes included; each shows once its word does. A tap on a highlighted place opens that word’s card, as on a shown page (it shows the word).',
+      '- Pause on the bar keeps the take open however long the pause; its summary only comes after Stop. During a take the score on the bar opens what it has found so far (Done goes back to the take); after it, the score opens the take’s summary again.',
+      '- “Not clear” words stay amber on the page after the take too (and on a hidden page’s covers), remembered like a slip until the word is said clearly in 2 takes on 2 days; a take that heard it only as Not clear again counts as not clear. They still never count in a score.',
+      '- Mark mistakes checks recitation in Hafs ʿan ʿĀṣim (its intro says so); other riwayat aren’t checked yet.',
+      '- On a slow connection, when checking falls a few seconds behind, the bar says “Slow connection: checking is behind” in place of the words until it catches up.',
+      '- Each new mistake plays a short sound and a tap as it is marked (not for Not clear or tajweed notes, at most one every 0.7 s). It plays in silent mode at the media volume; Settings → Recite → “Sound on a mistake” turns it off. While the microphone records, the iPhone plays it from the earpiece, so it is quiet without headphones.',
+      '- After a take, its summary says the mistakes per page beside the count when it covered 2 pages or more ("3 mistakes · 1.5 a page"), and each wrong word or haraka shows “Expected” and what was recited, each with the words around it.',
+      '- Activity → “Insights” → “Recitation” says the same for its range, under the score: the mistakes a page across their takes of 2 pages or more ("Takes of 2 pages or more: 1.2 mistakes a page"). You are told it for the last 4 weeks; takes of a page or less aren’t in it.',
+      '- “Your recitation” on a mark’s card plays the phrase the mistake is in, from the pause mark before it to the next (any but ۙ), or the whole ayah when it’s short (12 words or fewer, or 8 seconds or less); never more than 15 seconds. A skipped word plays from the word before it, so the jump is heard.',
+      '- When a take starts, the cursor shows where they seem to be within a second or two of their first word (the page shown only), and settles once the app is sure where they started; "Listening…" stays until then.',
+      '- On a hidden page a word shows once it has been said in full, the next word has begun, or it has been the word being said about as long as it takes to say (a long madd waits for its end), never a word ahead; nothing is drawn on the word being said, still hidden, and the newest word shown is in green ink, the following colour (as the word being said in the bar); the words before it are in the page’s own ink, and a word with a mark keeps its highlight instead. The bar shows no more than the page.',
+      '- A hidden page looks empty: a faint line where each line’s words are still hidden, the ayah markers whole, and each word appears in place, whole, once it is shown.',
+      '- Hiding the page during a take keeps everything they have already passed on show (the page before where they started, and what they recited) and hides only what comes next. Hiding it after a take hides everything; the take’s mistakes still show where they are and can be tapped.',
+      '- Highlights on the page are soft pastel washes behind the word (rounded, fading out at the edges, a little wider than the word), not boxes: the mistakes’ red, amber and violet, and past mistakes lighter. With the page shown, a flat grey band lies behind the whole ayah being recited, across every line of it, and a firmer grey rectangle on the word being recited moves word by word with them, never ahead',
     ),
   },
   {
-    title: 'Gaps (Insights)',
-    covers: ['ACT-28', 'ACT-30'],
-    routes: ['Activity', 'ActivityDay', 'LastRevised', 'QuranReader'],
+    // Majd, Nov 21 2026: a Ramadan look to try, Revisely Dev only.
+    title: 'The Ramadan theme',
+    covers: ['THEME-1'],
+    routes: ['Settings', 'Dashboard'],
     text: lines(
-      '- Activity → “Insights” → “Gaps”, after Consistency: the days between revisions over the Insights range, by the revision day Activity files a page revised under (a session, revised ahead, or logged as revised elsewhere; reading and memorizing don’t count). Monday then Thursday is a 3-day gap; one missed day, a 2-day gap.',
-      '- The figure: days since the last revision (a tap opens that day), red from 3; from 2 weeks in words with the date, never red ("Over 3 weeks since your last revision, on 24 Oct"); “Today” once revised today. Then a strip of the range (a dot per revision day, gaps of 3+ days red with their length; a tap opens the day), the longest gap (a tap opens its month) and the usual rhythm ("Every 2 days"). “Days” (top right) shows exact days, kept on the phone.',
-      '- "Full revision pushed back 5 days": pages their current plan brings round later than it would have (missed in a gap, or slid back by a catch-up), with when they were due and when they will come; "Full revision on schedule" when none are late.',
-      '- “When did I last revise…?” (end of Gaps, or a tap on the full revision line) opens “Last revised”: memorized surahs, juz, hizbs or pages (“Surah”, “Juz”, “Hizb”, “Page”, kept), longest waiting first; a group opens to its pages, a page opens the reader. “Not revised yet”: memorized under 30 days ago; “Never revised”: older.',
-      '- Say long lengths in weeks or months as the app does, exact days when asked; welcome them back after a long gap, never scold. Recency only, with Smart Tracking on or off.',
-      '- For gap questions, or when they last revised a surah, answer from the context’s Gaps and Last revised lines, then the path once.',
-    ),
-  },
-  {
-    title: 'Not possible in Revisely Dev (yet)',
-    covers: [],
-    routes: [],
-    text: lines(
-      '- Recite in a revision session: no, it is in the reader only. Closest: open the pages in the reader (Read tab, or a day’s page in Activity) and recite there.',
-      '- Recite on Android, with the Madani 1441 print, or offline; a teacher hearing the takes: not yet.',
+      '- Settings → Appearance → “Ramadan theme” dresses the app for Ramadan: light falling softly over the top of Home, lanterns hanging at the top of Home (not while the timer shows there), a crescent by the greeting and string lights along the tab bar. It changes nothing the app does. It’s on until they turn it off there, and that choice stays on that phone only.',
+      '- It never shows over the Qur’an’s pages, a revision session’s pages or a Recite take. With Reduce Motion on, it stays still.',
     ),
   },
 ];
@@ -437,12 +476,16 @@ export const GUIDE_INTERNAL_KINDS = [
 
 /** Rules with nothing for a user to ask Revo about, on purpose, and why (a kind from GUIDE_INTERNAL_KINDS first). */
 export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
+  'RECITE-10': 'timing: how a take keeps up with the server and resumes a connection gone quiet; nothing to do',
   'ACT-27': 'timing: Activity refreshes by itself and with a pull; nothing to ask Revo about',
   'NEW-4': 'timing: what waits for the walkthrough to end; nothing for Revo to explain',
   'ONBOARD-2': 'server: the server repairs a sign-up stopped half way; nothing to do',
   'LANG-1': 'layout: the layout follows the app’s language, not the phone’s; nothing for Revo to explain',
   'SHEET-1': 'layout: one sheet at a time, so the screen under them always takes taps again; nothing for Revo to explain',
+  'TAB-1': 'layout: a sideways swipe never presses the row under the finger; nothing for Revo to explain',
+  'LINK-1': 'layout: where a link opens (the app’s own browser, else the phone’s, else its address to copy); the links themselves are in the guide',
   'SYNC-4': 'timing: a new account loads with no relaunch; nothing to do',
+  'SYNC-6': 'timing: a page keeps its last revised day, count and rating however long the history grows; nothing to do',
   'ACCOUNT-2': 'signed out: the sign-in screen keeps what was typed after a failed attempt',
   'AUTH-1': 'server: a passing Google outage at launch keeps the sign-in; nothing to do',
   'ACCOUNT-3': 'timing: how long Delete account waits for the server; the app says what happened itself',

@@ -77,6 +77,15 @@ describe("Recite's memory: users/<uid>/reciteTakes", () => {
     await assertSucceeds(deleteDoc(doc(alice, path(ALICE, 'c1'))));
   });
 
+  it('a take kept without its final answer says so (unfinished: true), and only as true', async () => {
+    const alice = env.authenticatedContext(ALICE).firestore();
+    await assertSucceeds(setDoc(doc(alice, path(ALICE, 't3')), take({ unfinished: true })));
+    // Its final answer came after all: written again without it.
+    await assertSucceeds(setDoc(doc(alice, path(ALICE, 't3')), take({ rev: 1_763_200_300_000 })));
+    await assertFails(setDoc(doc(alice, path(ALICE, 't4')), take({ unfinished: false })));
+    await assertFails(setDoc(doc(alice, path(ALICE, 't4')), take({ unfinished: 'yes' })));
+  });
+
   it('nobody else reads or writes them, signed in or not', async () => {
     await env.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(doc(ctx.firestore(), path(ALICE, 't1')), { ...take(), updatedAt: new Date() });

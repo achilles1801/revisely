@@ -12,6 +12,7 @@ import { spokenText } from '../../../lib/passages';
 import { Tap } from '../../v2/Tap';
 import { CHART_TEXT_MAX, ChartFrame, ChartPlot } from './ChartFrame';
 import { t } from '../../../i18n';
+import { forwardIcon } from '../../../i18n/direction';
 
 const BAR_AREA = 96;
 /** How far back the records are read: Insights' window (twelve months, with room). */
@@ -120,7 +121,7 @@ export function MemorizedChart({
                 <Text style={[styles.meta, { color: palette.secondary }]} maxFontSizeMultiplier={CHART_TEXT_MAX}>
                   {plural(d.pages, 'page')}
                 </Text>
-                {onOpenDay ? <Ionicons name="chevron-forward" size={15} color={palette.secondary} /> : null}
+                {onOpenDay ? <Ionicons name={forwardIcon()} size={15} color={palette.secondary} /> : null}
               </Tap>
             ))}
           </View>

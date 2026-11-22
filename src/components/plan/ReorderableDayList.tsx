@@ -40,6 +40,7 @@ import {
 import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
 import { DateBadge, DAY_ROW_INSET, dayTitle } from './DayRow';
 import { t } from '../../i18n';
+import { forwardIcon } from '../../i18n/direction';
 
 /** The scroll view the list sits in, for scrolling while a row is dragged near an edge. */
 export interface ScrollLink {
@@ -644,7 +645,7 @@ function DayItem({
                   </Text>
                 ) : null}
               </View>
-              <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
+              <Ionicons name={forwardIcon()} size={16} color={palette.secondary} />
             </Animated.View>
           </Animated.View>
         </Animated.View>

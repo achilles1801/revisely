@@ -9,8 +9,16 @@ const HEADERS = { Authorization: 'Bearer owner', 'Content-Type': 'application/js
 
 type Plain = null | boolean | number | string | Plain[] | { [k: string]: Plain };
 
+/** A Timestamp field for setServerDoc (as the app and the admin SDK store times), from an ISO time. */
+export function timestamp(iso: string): Plain {
+  return { $timestamp: new Date(iso).toISOString() };
+}
+
 function encode(v: Plain): Record<string, unknown> {
   if (v === null) return { nullValue: null };
+  if (typeof v === 'object' && !Array.isArray(v) && typeof v.$timestamp === 'string' && Object.keys(v).length === 1) {
+    return { timestampValue: v.$timestamp };
+  }
   if (typeof v === 'boolean') return { booleanValue: v };
   if (typeof v === 'number') return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
   if (typeof v === 'string') return { stringValue: v };

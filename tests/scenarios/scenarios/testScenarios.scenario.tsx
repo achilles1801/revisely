@@ -13,7 +13,8 @@ import { checkInvariants } from '../harness/invariants';
 import { Home, homeStack } from '../harness/screens';
 import { OpenApp, Phone } from '../harness/phone';
 import { loadScenario } from '../harness/testScenario';
-import { SCENARIO_IDS, ScenarioId, SeedPlan } from '../../../functions/src/testScenarios';
+import { CHECK_SCENARIO_IDS, SCENARIO_IDS, ScenarioId, SeedPlan } from '../../../functions/src/testScenarios';
+import { listServerDocs } from '../harness/serverDocs';
 
 type Lib = typeof import('../../../src/lib/testScenarios');
 type AheadCredit = typeof import('../../../src/lib/aheadCredit');
@@ -32,7 +33,8 @@ const localDate = (day: string) => {
   return new Date(y, m - 1, d);
 };
 
-it('[RESET-3] a tester loads each test scenario in turn: every rule holds, and each keeps its promise', async () => {
+/** A tester's account on a new phone, loading `ids` in turn: every rule holds, and each keeps its promise. */
+async function loadEach(ids: readonly ScenarioId[]): Promise<void> {
   setZone(ZONES.chicago);
   setNow('2026-11-05 12:00');
   const phone = new Phone('phone');
@@ -46,7 +48,7 @@ it('[RESET-3] a tester loads each test scenario in turn: every rule holds, and e
 
   const server = watchFunction('loadTestScenario');
   try {
-    for (const scenario of SCENARIO_IDS) {
+    for (const scenario of ids) {
       advance(3 * MINUTE); // past the two minutes between loads
       const plan = await loadScenario(app, scenario);
       const answer = server.results[server.results.length - 1] as { result?: { scenario: string; today: string } };
@@ -55,10 +57,18 @@ it('[RESET-3] a tester loads each test scenario in turn: every rule holds, and e
       await checkInvariants(app, plan);
       await promise(app, scenario, plan);
     }
-    expect(server.calls).toBe(SCENARIO_IDS.length);
+    expect(server.calls).toBe(ids.length);
   } finally {
     server.restore();
   }
+}
+
+it('[RESET-3] [SYNC-6] a tester loads each of Settings’ three scenarios in turn: every rule holds, and each keeps its promise', async () => {
+  await loadEach(SCENARIO_IDS);
+}, 900_000);
+
+it('[RESET-3] the older scenarios the tests load still load: every rule holds, and each keeps its promise', async () => {
+  await loadEach(CHECK_SCENARIO_IDS);
 }, 900_000);
 
 it('[RESET-3] an account that is not a tester is refused, and keeps everything', async () => {
@@ -89,7 +99,8 @@ async function promise(app: OpenApp, scenario: ScenarioId, plan: SeedPlan): Prom
   const fajr = app.mods.require<Fajr>('src/lib/fajrBoundary');
   const svc = app.mods.require<Service>('src/services/firestoreService');
   const user = app.app.user!;
-  const memorized = app.app.pages.filter((p) => p.status === 'memorized');
+  const ayahs = app.mods.require<typeof import('../../../src/lib/memorizedAyahs')>('src/lib/memorizedAyahs');
+  const memorized = ayahs.revisablePages(app.app.pages);
   const D = plan.today;
   const todays = algorithm.getPagesScheduledForDate(user, localDate(D), memorized);
   const offer = carry.leftoversFor(user, app.app.logs, D, todays, memorized);
@@ -148,13 +159,48 @@ async function promise(app: OpenApp, scenario: ScenarioId, plan: SeedPlan): Prom
       expect(todays).toEqual([598, 597, 596, 595]); // the plan's third day, two days in
       expect(user.customPlan?.direction).toBe('reverse');
       break;
-    case 'heavy-activity': {
-      const items = await app.act(() => svc.getActivityItemsBetween(addDays(D, -120), D, app.uid));
-      expect(new Set(items.memorized.map((m) => m.day.slice(0, 7))).size).toBeGreaterThanOrEqual(3);
-      expect(items.reads.length).toBeGreaterThan(10);
-      expect(user.smartTrackingEnabled).toBe(true);
+    case 'heavy': {
+      // Seven months: the app reads the latest 100 days, the streak runs 24 days to yesterday, today is begun.
+      expect(app.app.logs).toHaveLength(100);
+      expect(user).toMatchObject({ scheduleMode: 'juz', smartTrackingEnabled: true });
+      await home.untilStreak(24);
+      expect(home.cta()).toMatch(/Continue/);
+      // SYNC-6: the first launch's self-heal leaves every page as the server wrote it, though most of the history is
+      // older than what the app reads (before Nov 17 2026 it wiped counts and ratings past 100 days).
+      await app.idle(1500);
+      await app.untilSynced();
+      for (const p of plan.pages) {
+        const shown = app.app.pages.find((x) => x.pageNumber === p.pageNumber)!;
+        expect([p.pageNumber, shown.totalRevisionCount, shown.weaknessRating, shown.lastRevisedDate?.slice(0, 10) ?? null]).toEqual([
+          p.pageNumber,
+          p.totalRevisionCount,
+          p.weaknessRating,
+          p.lastRevisedAt == null ? null : new Date(p.lastRevisedAt).toISOString().slice(0, 10),
+        ]);
+      }
+      const items = await app.act(() => svc.getActivityItemsBetween(addDays(D, -220), D, app.uid));
+      expect(new Set(items.memorized.map((m) => m.day.slice(0, 7))).size).toBeGreaterThanOrEqual(6);
+      expect(items.reads.length).toBeGreaterThan(50);
+      await recitedAndRevo(app, plan);
       break;
     }
+    case 'steady':
+      // Yesterday missed after a twelve-day run: the streak's grace ring (SESS-6) and yesterday's pages offered.
+      await home.untilStreak(12, true);
+      expect(offer.days).toEqual([{ day: addDays(D, -1), ago: 1, missed: true }]);
+      expect(offer.pages).toHaveLength(10);
+      expect(home.catchUp()).toMatch(/Missed/);
+      expect(user.smartTrackingEnabled).toBeFalsy();
+      await recitedAndRevo(app, plan);
+      break;
+    case 'starting':
+      // Two weeks in: Al-Mulk's second page begun, in the plan by its ayahs (MEM-4); the first takes.
+      expect(app.app.logs).toHaveLength(13);
+      await home.untilStreak(4);
+      expect(app.app.pages.find((p) => p.pageNumber === 563)?.status).toBe('in_progress');
+      expect(home.cta()).not.toMatch(/Continue/);
+      await recitedAndRevo(app, plan);
+      break;
     case 'offline-queue': {
       // Held: today's session, a note and a reading wait on the phone; the server has none of them.
       const sync = app.mods.require<Sync>('src/lib/offline/sync');
@@ -173,4 +219,16 @@ async function promise(app: OpenApp, scenario: ScenarioId, plan: SeedPlan): Prom
       break;
     }
   }
+}
+
+/** The scenario's Recite takes reach the app's own read of Recite's memory, and Revo's conversations are there. */
+async function recitedAndRevo(app: OpenApp, plan: SeedPlan): Promise<void> {
+  const remote = app.mods.require<typeof import('../../../src/lib/reciteMemory/remote')>('src/lib/reciteMemory/remote');
+  const { records } = await app.act(() => remote.pullMemoryRecords(app.uid, 0));
+  expect(records).toHaveLength(plan.takes.length + plan.clears.length);
+  expect(records.filter((r) => r.kind === 'take').reduce((n, r) => n + (r.kind === 'take' ? r.marks.length : 0), 0)).toBe(
+    plan.takes.reduce((n, t) => n + t.marks.length, 0),
+  );
+  expect(await listServerDocs(`users/${app.uid}/revoChats`)).toHaveLength(plan.revoChats.length);
+  expect(await listServerDocs(`users/${app.uid}/revoMemory`)).toHaveLength(plan.revoMemory.length);
 }

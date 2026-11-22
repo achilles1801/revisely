@@ -10,6 +10,7 @@
  * harakat; going back to restart is never a mistake; surahs and ayat first, never pages.
  */
 import type { RevoRecitation, RevoTakeFacts, RevoTakeMark } from './types';
+import { REVO_PER_PAGE_FROM } from './types';
 
 export const RECITATION_SYSTEM = [
   'Their recitation (Revisely Dev only):',
@@ -53,18 +54,34 @@ function kindsText(r: Pick<RevoRecitation, 'kinds'>): string {
   return parts.join(', ');
 }
 
+/**
+ * The long takes' mistakes a page, as Insights and the take's summary show it (RECITE-24): "In their takes of 2 pages or
+ * more (3 takes, 8 pages): 1.4 mistakes a page." To a tenth; a mistake over many pages is "under 0.1", never none.
+ */
+export function perPageText(p: NonNullable<RevoRecitation['perPage']>): string {
+  const lead = `In their takes of ${REVO_PER_PAGE_FROM} pages or more (${count(p.takes, 'take')}, ${count(p.pages, 'page')})`;
+  if (p.mistakes === 0) return `${lead}: no mistakes.`;
+  const tenths = Math.round((p.mistakes / p.pages) * 10) / 10;
+  if (tenths === 0) return `${lead}: under 0.1 mistakes a page.`;
+  return `${lead}: ${tenths} ${tenths === 1 ? 'mistake' : 'mistakes'} a page.`;
+}
+
 /** The context's recitation part, as the model reads it. */
 export function recitationText(r: RevoRecitation): string {
   const lines = [`Their recitation, the last ${r.days} days (Recite with Mark mistakes; follow the rules on recitation):`];
   if (r.takes === 0) lines.push(`- No takes in the last ${r.days} days.`);
   else {
     const before = r.earlierScore === null ? '' : ` (the ${r.days} days before: ${percent(r.earlierScore)})`;
-    lines.push(
-      `- ${count(r.takes, 'take')} on ${count(r.daysRecited, 'day')}, ${r.minutes} min, ${count(r.words, 'word')} recited. Score by the page: ${percent(r.score ?? 1)}${before}.`,
-    );
+    // Takes kept without the checker's final answer never count in a score (RECITE-11): with only those, there is none.
+    const score =
+      r.score === null
+        ? 'No score: none of these takes got the checker’s final answer (the connection ended first), so none was scored'
+        : `Score by the page: ${percent(r.score)}${before}`;
+    lines.push(`- ${count(r.takes, 'take')} on ${count(r.daysRecited, 'day')}, ${r.minutes} min, ${count(r.words, 'word')} recited. ${score}.`);
     const mistakes = r.mistakes === 0 ? 'none' : `${r.mistakes}: ${kindsText(r)}`;
     const tajweed = r.tajweed === null ? '' : ` Tajweed notes (Strict takes): ${r.tajweed}.`;
     lines.push(`- Mistakes: ${mistakes}. Not clear (never counted): ${r.unclear}.${tajweed}`);
+    if (r.perPage) lines.push(`- ${perPageText(r.perPage)}`);
     if (r.weeks.length > 1) lines.push(`- Score week by week, oldest first, this week last: ${r.weeks.map((w) => (w === null ? 'no takes' : percent(w))).join(', ')}.`);
   }
   lines.push(`- Words still marked on the page: ${r.stillMarked}. Cleared in these ${r.days} days: ${r.cleared}.`);

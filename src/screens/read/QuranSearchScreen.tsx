@@ -30,11 +30,12 @@ import { voiceSearchEnabled } from '../../lib/search/availability';
 import { reciteLiveEnabled } from '../../lib/reciteLive/availability';
 import { useMushafEdition } from '../../lib/mushafEdition';
 import { logger } from '../../lib/logger';
+import { t } from '../../i18n';
+import { forwardIcon, backIcon } from '../../i18n/direction';
 
 type NavigationProp = NativeStackNavigationProp<ReadStackParamList, 'QuranSearch'>;
 type RouteProps = RouteProp<ReadStackParamList, 'QuranSearch'>;
 
-const NBSP = ' ';
 /** Below this share of the query, results are the closest there is, not the words said. */
 const CLOSEST = 0.75;
 /** A result row counts as seen (its card may fetch a translation) once a tenth of it has been on screen for 150 ms. */
@@ -54,19 +55,31 @@ interface Results {
 }
 
 function verseTitle(sura: number, ayah: number): string {
-  return `${surahName(sura)}, ayah${NBSP}${ayah}`;
+  return t('read.search.verseTitle', { surah: surahName(sura), ayah });
 }
 
-function targetText(t: SearchTarget): { title: string; meta: string; icon: 'book-outline' | 'document-outline' | 'layers-outline' } {
-  switch (t.kind) {
+function targetText(target: SearchTarget): { title: string; meta: string; icon: 'book-outline' | 'document-outline' | 'layers-outline' } {
+  switch (target.kind) {
     case 'verse':
-      return { title: verseTitle(t.sura, t.ayah), meta: `p.${NBSP}${pageOfVerse(t)}`, icon: 'book-outline' };
+      return {
+        title: verseTitle(target.sura, target.ayah),
+        meta: t('read.search.pageShort', { n: pageOfVerse(target) }),
+        icon: 'book-outline',
+      };
     case 'surah':
-      return { title: surahName(t.sura), meta: `Surah ${t.sura} · p.${NBSP}${pageOfVerse({ sura: t.sura, ayah: 1 })}`, icon: 'book-outline' };
+      return {
+        title: surahName(target.sura),
+        meta: t('read.search.surahMeta', { n: target.sura, page: pageOfVerse({ sura: target.sura, ayah: 1 }) }),
+        icon: 'book-outline',
+      };
     case 'page':
-      return { title: `Page ${t.page}`, meta: '', icon: 'document-outline' };
+      return { title: t('common.pageN', { n: target.page }), meta: '', icon: 'document-outline' };
     case 'juz':
-      return { title: `Juz${NBSP}${t.juz}`, meta: `p.${NBSP}${getJuzRange(t.juz).start}`, icon: 'layers-outline' };
+      return {
+        title: t('read.search.juz', { n: target.juz }),
+        meta: t('read.search.pageShort', { n: getJuzRange(target.juz).start }),
+        icon: 'layers-outline',
+      };
   }
 }
 
@@ -248,9 +261,9 @@ export default function QuranSearchScreen() {
   const thinking = voice.status === 'thinking';
 
   const status = useMemo(() => {
-    if (voice.status === 'denied') return 'Microphone access is off. Turn it on in Settings to search by voice.';
-    if (voice.status === 'error') return 'Couldn’t listen. Try again.';
-    if (loadFailed) return 'Couldn’t load the Quran’s text. Try again later.';
+    if (voice.status === 'denied') return t('read.search.denied');
+    if (voice.status === 'error') return t('read.search.listenFailed');
+    if (loadFailed) return t('read.search.loadFailed');
     return null;
   }, [voice.status, loadFailed]);
 
@@ -262,8 +275,8 @@ export default function QuranSearchScreen() {
       if (!words) return;
       copyText(hitShareText(words, hit));
       haptics.light();
-      setNote('Copied');
-      AccessibilityInfo.announceForAccessibility('Copied');
+      setNote(t('read.search.copied'));
+      AccessibilityInfo.announceForAccessibility(t('read.search.copied'));
     },
     [words, haptics],
   );
@@ -279,11 +292,11 @@ export default function QuranSearchScreen() {
   // "the mic button being top right is annoying to have to reach up there just to end the check").
   const header = (
     <View style={styles.header}>
-      <Tap onPress={() => navigation.goBack()} hitSlop={10} accessibilityRole="button" accessibilityLabel="Back" testID="search-back">
-        <Ionicons name="chevron-back" size={26} color={palette.text} />
+      <Tap onPress={() => navigation.goBack()} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.back')} testID="search-back">
+        <Ionicons name={backIcon()} size={26} color={palette.text} />
       </Tap>
       <Text style={[typeV2.name, styles.headerTitle, { color: palette.text }]} accessibilityRole="header" maxFontSizeMultiplier={1.4}>
-        Search
+        {t('read.search.title')}
       </Text>
       <View style={styles.headerSide} />
     </View>
@@ -299,19 +312,19 @@ export default function QuranSearchScreen() {
         <TextInput
           ref={inputRef}
           value={text}
-          onChangeText={(t) => {
-            setText(t);
-            if (!t.trim()) setResults(null);
+          onChangeText={(value) => {
+            setText(value);
+            if (!value.trim()) setResults(null);
           }}
           onSubmitEditing={() => run(text, words)}
-          placeholder="Surah, 2:255, page 62, or words"
+          placeholder={t('read.search.placeholder')}
           placeholderTextColor={palette.secondary}
           style={[typeV2.body, styles.input, { color: palette.text }]}
           autoCorrect={false}
           autoCapitalize="none"
           returnKeyType="search"
           clearButtonMode="never"
-          accessibilityLabel="Search the Quran"
+          accessibilityLabel={t('read.search.label')}
           maxFontSizeMultiplier={1.6}
           testID="search-input"
         />
@@ -324,7 +337,7 @@ export default function QuranSearchScreen() {
             }}
             hitSlop={10}
             accessibilityRole="button"
-            accessibilityLabel="Clear search"
+            accessibilityLabel={t('read.search.clear')}
             testID="search-clear"
           >
             <Ionicons name="close-circle" size={18} color={palette.secondary} />
@@ -338,7 +351,7 @@ export default function QuranSearchScreen() {
           disabled={thinking || voice.status === 'starting'}
           hitSlop={8}
           accessibilityRole="button"
-          accessibilityLabel={listening ? 'Stop listening' : 'Search by voice'}
+          accessibilityLabel={listening ? t('read.search.stopListening') : t('read.search.voice')}
           style={[styles.mic, { backgroundColor: listening ? palette.red : palette.primary }]}
           testID="search-mic"
         >
@@ -359,7 +372,7 @@ export default function QuranSearchScreen() {
     body = (
       <View style={styles.listening} testID="search-listening">
         <Text style={[typeV2.body, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
-          {thinking ? 'Searching…' : voice.status === 'starting' ? 'Getting ready…' : 'Listening… recite any words of an ayah'}
+          {thinking ? t('read.search.searching') : voice.status === 'starting' ? t('read.search.gettingReady') : t('read.search.listening')}
         </Text>
         <View style={styles.transcriptBox}>
           {voice.partial ? (
@@ -381,12 +394,10 @@ export default function QuranSearchScreen() {
       count === 0
         ? null
         : results.closest && results.rows.every((r) => r.kind === 'verse')
-          ? 'Closest matches'
+          ? t('read.search.closest')
           : results.total > results.rows.filter((r) => r.kind === 'verse').length
-            ? `${results.total} results, the first ${results.rows.length} shown`
-            : count === 1
-              ? '1 result'
-              : `${count} results`;
+            ? t('read.search.firstShown', { count: results.total, shown: results.rows.length })
+            : t('read.search.results', { count });
     body = (
       <FlatList
         // Its own list, not Recent's reused: a FlatList can't gain onViewableItemsChanged once mounted.
@@ -414,7 +425,7 @@ export default function QuranSearchScreen() {
         }
         ListEmptyComponent={
           <Text style={[typeV2.body, styles.empty, { color: palette.secondary }]} testID="search-none">
-            {`Nothing found for “${results.query}”.`}
+            {t('read.search.nothing', { query: results.query })}
           </Text>
         }
         renderItem={({ item }) =>
@@ -449,7 +460,7 @@ export default function QuranSearchScreen() {
           recent.length > 0 ? (
             <View style={styles.recentHead}>
               <Text style={[typeV2.name, { color: palette.text }]} accessibilityRole="header" maxFontSizeMultiplier={1.4}>
-                Recent
+                {t('read.search.recent')}
               </Text>
               <Tap
                 onPress={() => {
@@ -461,7 +472,7 @@ export default function QuranSearchScreen() {
                 testID="search-recent-clear"
               >
                 <Text style={[typeV2.meta, { color: palette.link }]} maxFontSizeMultiplier={1.4}>
-                  Clear
+                  {t('read.search.clearRecent')}
                 </Text>
               </Tap>
             </View>
@@ -474,7 +485,7 @@ export default function QuranSearchScreen() {
               run(item, words);
             }}
             accessibilityRole="button"
-            accessibilityLabel={`Search again: ${item}`}
+            accessibilityLabel={t('read.search.again', { query: item })}
             style={[styles.row, { borderBottomColor: palette.separator }]}
             testID="search-recent"
           >
@@ -519,8 +530,8 @@ export default function QuranSearchScreen() {
           setModelSheet(false);
           void voice.listen();
         }}
-        title="Search by voice"
-        intro="Recite a few words and Revisely finds the ayah."
+        title={t('read.search.voice')}
+        intro={t('read.search.voiceIntro')}
       />
     </View>
   );
@@ -544,7 +555,7 @@ function TargetRow({ target, onPress }: { target: SearchTarget; onPress: () => v
         </Text>
         {meta ? <Text style={[typeV2.meta, { color: palette.secondary }]}>{meta}</Text> : null}
       </View>
-      <Ionicons name="chevron-forward" size={18} color={palette.secondary} />
+      <Ionicons name={forwardIcon()} size={18} color={palette.secondary} />
     </Tap>
   );
 }

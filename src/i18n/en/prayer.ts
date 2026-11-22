@@ -109,6 +109,45 @@ export const prayer = {
     playsSound: 'Plays the sound',
     /** VoiceOver's name for a prayer's row: "Fajr: Standard tone · 10 min before. Change". */
     rowLabel: '{{name}}: {{summary}}. Change',
+    /** The athan as a prayer's sound (Revisely Dev, iPhone). */
+    athan: 'Athan',
+    athanDetail: 'At the prayer’s time. A reminder before it has the standard tone',
+    /** A prayer's sound with its voice: "Athan · Makkah". */
+    athanVoice: 'Athan · {{voice}}',
+    voice: 'Voice',
+    chooseVoice: 'Choose a voice',
+  },
+  /** Settings → Prayer → Athan voice (Revisely Dev, iPhone). */
+  athan: {
+    title: 'Athan voice',
+    /** The picker opened from one prayer: "Athan for Fajr". */
+    titleFor: 'Athan for {{name}}',
+    none: 'None',
+    loading: 'Loading voices…',
+    loadFailed: "Couldn't load the voices. Check your connection and try again.",
+    voices: 'Voices',
+    footerAll: 'Plays at the time of each prayer set to Athan in Prayer notifications. Fajr has its own athan where the voice has one. The notification plays its first 30 seconds.',
+    footerOne: 'Plays at {{name}}’s time. The notification plays its first 30 seconds.',
+    listen: 'Listen',
+    listenFooter: 'Not yet available as a prayer’s sound.',
+    listenOnly: 'Listen only',
+    fajrListenOnly: 'Fajr athan · listen only',
+    downloaded: 'Downloaded',
+    downloading: 'Downloading {{percent}}%',
+    downloadsWhenChosen: 'Downloads when chosen',
+    downloadsWhenChosenSize: 'Downloads when chosen · {{size}}',
+    withFajr: 'With its Fajr athan',
+    stopLabel: 'Stop {{name}}',
+    listenLabel: 'Listen to {{name}}',
+    moreLabel: 'More about {{name}}',
+    licence: 'Licence: {{licence}}',
+    source: 'Where it’s from',
+    stopDownloading: 'Stop downloading',
+    remove: 'Remove download',
+    removeDetail: 'Prayers set to it play the standard tone until it downloads again',
+    report: 'Report a rights issue',
+    notAClip: 'This voice can’t be used for notifications.',
+    downloadStopped: 'The download stopped. Check your connection and try again.',
   },
   notify: {
     ask: {

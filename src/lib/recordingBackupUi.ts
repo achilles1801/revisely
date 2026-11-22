@@ -18,6 +18,7 @@ import { listRecordingDocs } from '../services/firestoreService';
 import { logger } from './logger';
 import { getBackupStatus, onBackupStatus, requestBackup } from './recordingBackupController';
 import type { BackupStatus } from './recordingBackup';
+import { t } from '../i18n';
 
 export function useBackupStatus(): BackupStatus {
   const [status, setStatus] = useState(getBackupStatus());
@@ -28,22 +29,22 @@ export function useBackupStatus(): BackupStatus {
 /** A few words for the Settings row: "Backed up", "3 waiting for Wi-Fi", … */
 export function backupLabel(s: BackupStatus): string {
   const n = s.pending;
-  const files = `${n} recording part${n === 1 ? '' : 's'}`;
+  const files = t('recordings.backup.parts', { count: n });
   switch (s.phase) {
     case 'off':
-      return 'Off';
+      return t('recordings.backup.off');
     case 'running':
-      return n > 0 ? `Backing up ${files}` : 'Checking…';
+      return n > 0 ? t('recordings.backup.backingUp', { files }) : t('recordings.backup.checking');
     case 'waiting-for-wifi':
-      return `${files} waiting for Wi-Fi`;
+      return t('recordings.backup.waitingWifi', { files });
     case 'offline':
-      return n > 0 ? `${files} waiting (offline)` : 'Offline';
+      return n > 0 ? t('recordings.backup.waitingOffline', { files }) : t('recordings.backup.offline');
     case 'error':
-      return n > 0 ? `${files} waiting (will retry)` : 'Will retry';
+      return n > 0 ? t('recordings.backup.waitingRetry', { files }) : t('recordings.backup.willRetry');
     case 'needs-notice':
-      return `${files} to back up`;
+      return t('recordings.backup.toBackUp', { files });
     default:
-      return n > 0 ? `${files} to back up` : 'Backed up';
+      return n > 0 ? t('recordings.backup.toBackUp', { files }) : t('recordings.backup.backedUp');
   }
 }
 
@@ -146,27 +147,24 @@ export function askTurnOffBackup(uid: string, turnOff: () => Promise<unknown> | 
       return { ok: false as const, offline: true as const };
     });
     if (result.ok) {
-      Alert.alert('Backup deleted', 'Your recordings are on this phone only now.');
+      Alert.alert(t('recordings.backup.deletedTitle'), t('recordings.backup.deletedBody'));
     } else if ('busy' in result) {
-      Alert.alert('Backup kept', 'Your backup can’t be deleted right now, so nothing was deleted. Try again in a minute.');
+      Alert.alert(t('recordings.backup.keptTitle'), t('recordings.backup.keptBusy'));
     } else if ('notDownloaded' in result && result.notDownloaded > 0) {
       const n = result.notDownloaded;
-      Alert.alert(
-        'Backup kept',
-        `${n} recording${n === 1 ? ' is' : 's are'} only in your backup and couldn’t be downloaded, so nothing was deleted. Try again with a good connection.`,
-      );
+      Alert.alert(t('recordings.backup.keptTitle'), t('recordings.backup.keptNotDownloaded', { count: n }));
     } else {
-      Alert.alert('Backup kept', 'Your backup couldn’t be reached, so nothing was deleted. Try again when you’re online.');
+      Alert.alert(t('recordings.backup.keptTitle'), t('recordings.backup.keptOffline'));
     }
   };
   Alert.alert(
-    'Stop backing up recordings?',
-    'New recordings will be kept only on this phone. Recordings already backed up stay in your account until you delete them.',
+    t('recordings.backup.stopTitle'),
+    t('recordings.backup.stopBody'),
     [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Turn off', onPress: turnOff },
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('recordings.backup.turnOff'), onPress: turnOff },
       {
-        text: 'Turn off and delete backups',
+        text: t('recordings.backup.turnOffDelete'),
         style: 'destructive',
         onPress: () => {
           if (cloudOnly === 0) {
@@ -175,13 +173,11 @@ export function askTurnOffBackup(uid: string, turnOff: () => Promise<unknown> | 
           }
           // Not losing them: they come to this phone first.
           Alert.alert(
-            'Download recordings first?',
-            `${cloudOnly} recording${cloudOnly === 1 ? ' is' : 's are'} only in your backup. ${
-              cloudOnly === 1 ? 'It' : 'They'
-            } will be downloaded to this phone before the backup is deleted.`,
+            t('recordings.backup.downloadFirstTitle'),
+            t('recordings.backup.downloadFirst', { count: cloudOnly }),
             [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Download and delete backup', style: 'destructive', onPress: () => void deleteBackups() },
+              { text: t('common.cancel'), style: 'cancel' },
+              { text: t('recordings.backup.downloadDelete'), style: 'destructive', onPress: () => void deleteBackups() },
             ],
           );
         },
@@ -219,7 +215,8 @@ export async function deleteAllEverywhere(
     logger.warn('Could not list the backup before deleting everything', err);
     return false;
   }
-  await io.deleteAll(uid, { withBackup: true, alsoIds: listing.live.map((c) => c.id) });
+  // Recite takes' audio stays with the takes (RMEM-6): it isn't a recording there.
+  await io.deleteAll(uid, { withBackup: true, alsoIds: listing.live.map((c) => c.id), keepTakes: true });
   requestBackup();
   return true;
 }

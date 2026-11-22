@@ -13,10 +13,11 @@ const HEADER = 44;
 const BEFORE = 0.7;
 const AFTER = 0.9;
 
-/** The recordings on this phone, by id, with their file (the first segment: a take's recording has one). */
+/** The takes' audio on this phone, by id, with its file (the first segment: a take's has one). 'all': a take saved
+ *  before RMEM-6 is a plain recording until sortTakeAudio marks it. */
 async function takeFiles(): Promise<Map<string, string>> {
   const out = new Map<string, string>();
-  for (const r of await listRecordings()) {
+  for (const r of await listRecordings('all')) {
     const seg = r.segments[0];
     if (seg?.local && /\.wav$/i.test(seg.fileName)) out.set(r.id, seg.uri);
   }
@@ -84,7 +85,7 @@ export function useTakeRecording(recordingId: string | null | undefined): Record
     if (!recordingId) return;
     let alive = true;
     const read = () => {
-      listRecordings()
+      listRecordings('all')
         .then((all) => {
           const r = all.find((x) => x.id === recordingId);
           const seg = r?.segments[0];

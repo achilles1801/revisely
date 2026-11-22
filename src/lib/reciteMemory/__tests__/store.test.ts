@@ -84,6 +84,13 @@ describe('Recite memory on the phone', () => {
     expect(memoryRecords(UID).map((r) => r.id)).toEqual(['c2']);
   });
 
+  it('[RMEM-5] a record written since the reset stays when the phone hears of it later: it may not have reached the account yet', async () => {
+    await remember(UID, clear('before', 1000));
+    await remember(UID, clear('after', 2000));
+    await adoptResetMark(UID, 1500);
+    expect(memoryRecords(UID).map((r) => r.id)).toEqual(['after']);
+  });
+
   it('the hook shows the records, reads the account once the reset mark is known, and stays off when it’s off', async () => {
     mockPull.mockResolvedValue({ records: [clear('c9', 3)], newest: 10 });
     const off = renderHook(() => useMemoryRecords(UID, false));

@@ -7,6 +7,8 @@
 // Both go through the same figure and colour.
 
 import type { QuranWords } from '../recite/quranWords';
+import { t } from '../../i18n';
+import { formatNumber } from '../../i18n/format';
 
 /** good: at most a mistake a page. warn: two or three. bad: more. */
 export type ScoreLevel = 'good' | 'warn' | 'bad';
@@ -40,8 +42,22 @@ export function pageAccuracy(words: QuranWords, mistakes: number, first: number,
   return n > 0 ? Math.max(0, 1 - mistakes / n) : 1;
 }
 
+/** The pages a take reached: whole pages, from its first word's page to its last's (as the score counts them). */
+export function pagesReached(words: QuranWords, first: number, last: number): number {
+  return Math.abs(words.pageOf(last) - words.pageOf(first)) + 1;
+}
+
+/** A take this many pages or longer also says its mistakes per page (RECITE-24): a % alone hides how many there were. */
+export const PER_PAGE_FROM = 2;
+
+/** "1.5 a page" (one decimal) for a take of PER_PAGE_FROM pages or more, else null. */
+export function perPageLabel(mistakes: number, pages: number): string | null {
+  if (pages < PER_PAGE_FROM) return null;
+  return t('reciteLive.perPage', { n: formatNumber(Math.round((Math.max(0, mistakes) / pages) * 10) / 10, { maximumFractionDigits: 1 }) });
+}
+
 /** "No mistakes", "1 mistake", "3 mistakes". */
 export function mistakesLabel(n: number): string {
-  if (n <= 0) return 'No mistakes';
-  return n === 1 ? '1 mistake' : `${n} mistakes`;
+  if (n <= 0) return t('reciteLive.noMistakes');
+  return t('reciteLive.mistakes', { count: n });
 }

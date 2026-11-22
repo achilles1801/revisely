@@ -1,4 +1,14 @@
-import { lastRevisedRows, parseLastRevisedView, pageRecency, recencyText, rowName, type LastRevisedInput } from '../lastRevised';
+import {
+  lastRevisedRows,
+  matchesFilter,
+  pageRecency,
+  parseLastRevisedPrefs,
+  recencyShort,
+  recencyText,
+  rowName,
+  suggestedView,
+  type LastRevisedInput,
+} from '../lastRevised';
 import { plainText } from '../passages';
 
 const TODAY = '2026-11-15';
@@ -82,6 +92,69 @@ describe('lastRevisedRows', () => {
   });
 });
 
+describe('sort and filter (Majd, Nov 16 2026: "a filter and sort options like by date")', () => {
+  it('[ACT-30] recent first: the latest revised at the top, never revised last; mushaf order by number', () => {
+    const recent = lastRevisedRows('surah', input({ memorized: [1, 2, 3, 4, 5, 562, 563, 564, 582] }), { sort: 'recent' });
+    expect(recent.map((r) => [plainText(rowName(r)), r.oldest.state === 'dated' ? r.oldest.wait : r.oldest.state])).toEqual([
+      ['Al-Fatihah', 0],
+      ['An-Naba', 6],
+      ['Al-Qalam', 14],
+      ['Al-Mulk', 18],
+      ['Al-Baqarah', 'never'],
+    ]);
+    // Inside a row, the same order: Al-Baqarah's latest revised page first, the one never revised last.
+    expect(recent[4].pages.map((p) => p.page)).toEqual([4, 2, 3, 5]);
+    expect(recent[4].oldest.page).toBe(5);
+    const mushaf = lastRevisedRows('surah', input(), { sort: 'mushaf' });
+    expect(mushaf.map((r) => r.number)).toEqual([1, 2, 67, 68, 78]);
+    expect(mushaf[1].pages.map((p) => p.page)).toEqual([2, 3, 4]);
+  });
+
+  it('[ACT-30] a filter narrows to the pages that match: a row shows when one of its pages does, with only those, out of its total', () => {
+    const week = lastRevisedRows('surah', input(), { filter: 'week' });
+    expect(week.map((r) => [plainText(rowName(r)), r.pages.map((p) => p.page), r.total])).toEqual([
+      ['Al-Baqarah', [4], 3],
+      ['An-Naba', [582], 1],
+      ['Al-Fatihah', [1], 1],
+    ]);
+    // Dated by the pages shown: Al-Baqarah's page 4, 6 days ago.
+    expect(week[0].oldest.wait).toBe(6);
+    const waiting = lastRevisedRows('juz', input(), { filter: 'waiting' });
+    expect(waiting.map((r) => [rowName(r), r.pages.map((p) => p.page)])).toEqual([
+      ['Juz 1', [2, 3]],
+      ['Juz 29', [562, 563, 564]],
+    ]);
+    const never = lastRevisedRows('surah', input({ memorized: [1, 2, 5] }), { filter: 'never' });
+    expect(never.map((r) => [r.number, r.pages.map((p) => p.page)])).toEqual([[2, [5]]]);
+  });
+
+  it('the filters', () => {
+    const r = (last: string | null, since = '2026-09-01') => pageRecency(1, { last: () => last, since: () => since, today: TODAY });
+    expect(matchesFilter(r('2026-11-09'), 'week')).toBe(true);
+    expect(matchesFilter(r('2026-11-08'), 'week')).toBe(false);
+    expect(matchesFilter(r('2026-11-01'), 'waiting')).toBe(true);
+    expect(matchesFilter(r('2026-11-02'), 'waiting')).toBe(false);
+    // Waiting since it was memorized counts too.
+    expect(matchesFilter(r(null), 'waiting')).toBe(true);
+    expect(matchesFilter(r(null, '2026-11-10'), 'waiting')).toBe(false);
+    expect(matchesFilter(r(null, '2026-11-10'), 'never')).toBe(true);
+    expect(matchesFilter(r(TODAY), 'never')).toBe(false);
+  });
+});
+
+describe('the unit that suits the account', () => {
+  const pages = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
+  it('Juz on the juz plan, or with about 10 juz memorized; Page inside one surah; Surah otherwise', () => {
+    expect(suggestedView({ memorized: pages(582, 604), juzPlan: false })).toBe('surah');
+    expect(suggestedView({ memorized: pages(582, 604), juzPlan: true })).toBe('juz');
+    expect(suggestedView({ memorized: pages(1, 200), juzPlan: false })).toBe('juz');
+    expect(suggestedView({ memorized: pages(1, 199), juzPlan: false })).toBe('surah');
+    // Al-Baqarah's first pages only.
+    expect(suggestedView({ memorized: pages(2, 20), juzPlan: false })).toBe('page');
+    expect(suggestedView({ memorized: [], juzPlan: false })).toBe('surah');
+  });
+});
+
 describe('words', () => {
   it('when', () => {
     const at = (last: string | null, since = '2026-09-01') => recencyText(pageRecency(1, { last: () => last, since: () => since, today: TODAY }));
@@ -92,9 +165,19 @@ describe('words', () => {
     expect(at(null)).toBe('Never revised');
   });
 
-  it('the view kept on the phone, Surah at first', () => {
-    expect(parseLastRevisedView(null)).toBe('surah');
-    expect(parseLastRevisedView('hizb')).toBe('hizb');
-    expect(parseLastRevisedView('nonsense')).toBe('surah');
+  it('under its row, a page says how long ago only: the row gives the date', () => {
+    const at = (last: string | null, since = '2026-09-01') => recencyShort(pageRecency(1, { last: () => last, since: () => since, today: TODAY }));
+    expect(at(TODAY)).toBe('Today');
+    expect(at('2026-11-14')).toBe('Yesterday');
+    expect(at('2026-10-24')).toBe('22 days ago');
+    expect(at(null, '2026-11-10')).toBe('Not revised yet');
+    expect(at(null)).toBe('Never revised');
+  });
+
+  it('the unit and sort picked, kept per account; anything unreadable is nothing picked', () => {
+    expect(parseLastRevisedPrefs(JSON.stringify({ view: 'hizb', sort: 'mushaf' }))).toEqual({ view: 'hizb', sort: 'mushaf' });
+    expect(parseLastRevisedPrefs(JSON.stringify({ view: 'nonsense', sort: 7 }))).toEqual({ view: undefined, sort: undefined });
+    expect(parseLastRevisedPrefs('{')).toEqual({});
+    expect(parseLastRevisedPrefs(null)).toEqual({});
   });
 });

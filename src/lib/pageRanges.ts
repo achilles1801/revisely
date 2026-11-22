@@ -3,6 +3,7 @@
 // than "Juz 27 + 1 more".
 
 import { getJuzForPage, getJuzRange, getSurahsForPage } from './quranData';
+import { formatNumber, t } from '../i18n';
 
 export interface PageRun {
   first: number;
@@ -21,20 +22,22 @@ export function pageRuns(pages: Iterable<number>): PageRun[] {
   return runs;
 }
 
-const span = (r: PageRun) => (r.first === r.last ? `${r.first}` : `${r.first}–${r.last}`);
+const span = (r: PageRun) => (r.first === r.last ? formatNumber(r.first) : `${formatNumber(r.first)}–${formatNumber(r.last)}`);
 
 /** "Page 5", "Pages 537–556", "Pages 1–3, 7 and 20–22", "Pages 1–3, 7 and 3 more ranges". */
 export function describePageRuns(runs: PageRun[], show = 3): string {
   if (runs.length === 0) return '';
   const one = runs.length === 1 && runs[0].first === runs[0].last;
-  const label = one ? 'Page' : 'Pages';
+  const label = (list: string) => (one ? t('lib.pageRanges.page', { list }) : t('lib.pageRanges.pages', { list }));
+  const separator = t('lib.passages.listSeparator');
   if (runs.length <= show) {
     const parts = runs.map(span);
-    const text = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}` : parts[0];
-    return `${label} ${text}`;
+    const text =
+      parts.length > 1 ? t('lib.passages.listAnd', { list: parts.slice(0, -1).join(separator), last: parts[parts.length - 1] }) : parts[0];
+    return label(text);
   }
   const rest = runs.length - (show - 1);
-  return `${label} ${runs.slice(0, show - 1).map(span).join(', ')} and ${rest} more ranges`;
+  return label(t('lib.pageRanges.andMoreRanges', { list: runs.slice(0, show - 1).map(span).join(separator), count: rest }));
 }
 
 /** The surahs a run covers: "Al-Mulk", "Al-Hadid to At-Taghabun". */
@@ -43,7 +46,7 @@ export function describeSurahs(run: PageRun): string {
   const endSurahs = getSurahsForPage(run.last);
   const first = startSurahs[0]?.name ?? '';
   const last = endSurahs[endSurahs.length - 1]?.name ?? first;
-  return first === last ? first : `${first} to ${last}`;
+  return first === last ? first : t('lib.passages.fromTo', { from: first, to: last });
 }
 
 /** Surahs for up to two runs, joined; beyond that, the first and last. */
@@ -71,7 +74,7 @@ export function wholeJuzRun(pages: Iterable<number>): { first: number; last: num
 
 /** "Juz 1", "Juz 1–2". */
 export function juzRunLabel(run: { first: number; last: number }): string {
-  return run.first === run.last ? `Juz ${run.first}` : `Juz ${run.first}–${run.last}`;
+  return run.first === run.last ? t('lib.pageRanges.juz', { n: run.first }) : t('lib.pageRanges.juzRange', { from: run.first, to: run.last });
 }
 
 /**

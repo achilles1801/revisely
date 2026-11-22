@@ -1,7 +1,7 @@
 // What Revo is sent when the user attaches something with + (REVO-32, REVO-33), against what the app
 // shows for it, on the test scenarios Majd loads (Settings → Testing): Yusuf, Juz 14 and a page of
 // the hafiz account (60 days of a juz a day, days missed, one left half done, ratings), and a day
-// of the heavy-activity account (sessions, timed reading, daily-log notes). Majd's questions: "how
+// of the heavy account (sessions, timed reading, daily-log notes). Majd's questions: "how
 // many times have I revised this juz?", "should I revise Yusuf now or later?", "how often am I
 // skipping this surah?" must be answered from the user's own data, exactly.
 //
@@ -283,8 +283,8 @@ it('[REVO-32] Yusuf, Juz 14 and a page attached (hafiz): what Revo is sent is wh
   }
 }, 600_000);
 
-it('[REVO-33] a day attached (heavy activity): its plan, sessions, minutes, reading and notes as Activity shows them; the picker says the notes go with it', async () => {
-  const { app, plan } = await scenarioWithRevo('heavy-activity');
+it('[REVO-33] a day attached (the heavy user): its plan, sessions, minutes, reading and notes as Activity shows them; the picker says the notes go with it', async () => {
+  const { app, plan } = await scenarioWithRevo('heavy');
   const asks = watchFunction('revoAsk');
   try {
     const today = plan.today;

@@ -1,19 +1,26 @@
 import {
   durationWords,
-  gapsHaveNatural,
-  naturalDiffers,
   gapDate,
-  gapsInsightsEnabled,
+  gapDates,
   gapLabel,
+  gapOnCalendar,
+  gapSpoken,
   gapsFigure,
+  gapsHaveNatural,
+  gapsInsightsEnabled,
+  gapsNewestFirst,
+  gapsSummary,
   gapsView,
-  longestTile,
+  naturalDiffers,
   revisionDays,
-  rhythmTile,
-  STRIP_MAX_DAYS,
-  stripLabel,
   usualSteps,
+  usualWords,
+  type Gap,
 } from '../insightsGaps';
+import { setMistakeDetectionReleasedForTests } from '../release/mistakeDetection';
+
+// The release's switch is the kill switch: these tests run with it as each says, and back to as it ships.
+afterEach(() => setMistakeDetectionReleasedForTests(undefined));
 
 let mockDev = false;
 jest.mock('../variant', () => ({ isDevVariant: () => mockDev }));
@@ -47,20 +54,21 @@ describe('revisionDays', () => {
 });
 
 describe('gapsView', () => {
-  it('reads the board: 6 days since the last revision, the longest gap 9 days, usually every day', () => {
+  it('reads the board: 6 days since the last revision, the longest gap 8 days without revising, usually every day', () => {
     const v = gapsView({ revised: items(BOARD), today: TODAY, window: 30, firstDay: '2026-09-01', knownSince: '2026-08-17' })!;
     expect(v.lastDay).toBe('2026-11-09');
     expect(v.sinceLast).toBe(6);
     expect(v.closedToday).toBeNull();
-    expect(v.longest).toEqual({ from: '2026-10-28', to: '2026-11-06', days: 9, atLeast: false, open: false, long: true });
+    // 29 Oct – 5 Nov: the days the calendar shows empty between 28 Oct and 6 Nov.
+    expect(v.longest).toEqual({ from: '2026-10-28', to: '2026-11-06', first: '2026-10-29', last: '2026-11-05', days: 8, atLeast: false, open: false });
     expect(v.usual).toBe(1);
-    // 28 Oct → 6 Nov and the open 6 days; one missed day (19 → 21 Oct, 7 → 9 Nov) is a 2-day gap, not long.
-    expect(v.longCount).toBe(2);
-    expect(v.gaps.map((g) => g.days)).toEqual([2, 9, 2, 6]);
+    // One day missed (20 Oct, 8 Nov) is no gap; the gap still open counts today ("6 days so far").
+    expect(v.gaps.map((g) => [g.first, g.last, g.days, g.open])).toEqual([
+      ['2026-10-29', '2026-11-05', 8, false],
+      ['2026-11-10', TODAY, 6, true],
+    ]);
     expect(v.revisedDays).toBe(14);
-    expect(v.strip.days).toHaveLength(30);
-    expect(v.strip.days[0]).toBe('2026-10-17');
-    expect(v.strip.days[29]).toBe(TODAY);
+    expect(v.rangeStart).toBe('2026-10-17');
   });
 
   it('is null with no revision on record', () => {
@@ -68,33 +76,37 @@ describe('gapsView', () => {
     expect(gapsView({ revised: [{ day: TODAY, pages: [] }], today: TODAY, window: 30 })).toBeNull();
   });
 
-  it('a revision today closes the gap: "after 6 days", and nothing is open', () => {
+  it('a revision today closes the gap: 5 days without revising, and nothing is open', () => {
     const v = gapsView({ revised: items([...BOARD, TODAY]), today: TODAY, window: 30 })!;
     expect(v.sinceLast).toBe(0);
-    expect(v.closedToday).toBe(6);
+    expect(v.closedToday).toBe(5);
     expect(v.gaps.filter((g) => g.open)).toEqual([]);
-    expect(v.longest!.days).toBe(9);
+    expect(v.gaps.map((g) => g.days)).toEqual([8, 5]);
   });
 
-  it('only a long gap closed today is named ("after"): a missed day is not', () => {
-    const v = gapsView({ revised: items(['2026-11-13', TODAY]), today: TODAY, window: 30 })!;
+  it('one day missed is no gap, closed today or before', () => {
+    const v = gapsView({ revised: items(['2026-11-11', '2026-11-13', TODAY]), today: TODAY, window: 30 })!;
     expect(v.closedToday).toBeNull();
-  });
-
-  it('yesterday revised and today not yet is no gap: nothing is missed until today ends', () => {
-    const v = gapsView({ revised: items(['2026-11-13', '2026-11-14']), today: TODAY, window: 30 })!;
-    expect(v.sinceLast).toBe(1);
     expect(v.gaps).toEqual([]);
-    expect(v.longest).toBeNull();
-    // A quiet step to today on the strip.
-    expect(v.strip.parts).toContainEqual({ kind: 'open', from: 28, to: 29, days: 1, long: false, cut: false });
+    expect(v.usual).toBe(2);
   });
 
-  it('two days since the last revision is an open gap, not yet long', () => {
-    const v = gapsView({ revised: items(['2026-11-12', '2026-11-13']), today: TODAY, window: 30 })!;
-    expect(v.sinceLast).toBe(2);
-    expect(v.longest).toEqual({ from: '2026-11-13', to: null, days: 2, atLeast: false, open: true, long: false });
-    expect(v.longCount).toBe(0);
+  it('nothing is open until 2 whole days have gone by: yesterday missed and today not yet is no gap', () => {
+    expect(gapsView({ revised: items(['2026-11-13', '2026-11-14']), today: TODAY, window: 30 })!.gaps).toEqual([]);
+    const two = gapsView({ revised: items(['2026-11-12', '2026-11-13']), today: TODAY, window: 30 })!;
+    expect(two.sinceLast).toBe(2);
+    expect(two.gaps).toEqual([]);
+    const three = gapsView({ revised: items(['2026-11-11', '2026-11-12']), today: TODAY, window: 30 })!;
+    expect(three.longest).toEqual({ from: '2026-11-12', to: null, first: '2026-11-13', last: TODAY, days: 3, atLeast: false, open: true });
+  });
+
+  it('a day-old account: one revision day, no gap, no rhythm (Majd, Nov 20 2026)', () => {
+    const v = gapsView({ revised: items([TODAY]), today: TODAY, window: 7, firstDay: TODAY })!;
+    expect(v.sinceLast).toBe(0);
+    expect(v.gaps).toEqual([]);
+    expect(v.usual).toBeNull();
+    expect(v.revisedDays).toBe(1);
+    expect(v.rangeStart).toBe(TODAY);
   });
 
   it('revising every day leaves no gap; the usual step is a day', () => {
@@ -102,8 +114,6 @@ describe('gapsView', () => {
     const v = gapsView({ revised: items(days), today: TODAY, window: 30 })!;
     expect(v.longest).toBeNull();
     expect(v.usual).toBe(1);
-    expect(v.longCount).toBe(0);
-    expect(v.strip.parts).toEqual([{ kind: 'run', from: 0, to: 29 }]);
   });
 
   it('the usual step is the median, halfway between two when the middle falls between them', () => {
@@ -114,16 +124,14 @@ describe('gapsView', () => {
     expect(gapsView({ revised: items(['2026-11-10', '2026-11-12']), today: TODAY, window: 30 })!.usual).toBeNull();
   });
 
-  it('counts a gap that began before the range at its full length, cut at the strip’s left end', () => {
-    // Revised 1 Oct, then 20 Oct (in the 30 days from 17 Oct): a 19-day gap.
+  it('counts a gap that began before the range at its full length', () => {
+    // Revised 1 Oct, then 20 Oct (in the 7 days from 16 Oct): 18 days without revising, 2–19 Oct.
     const v = gapsView({ revised: items(['2026-10-01', '2026-10-20', '2026-10-21']), today: '2026-10-22', window: 7 })!;
-    expect(v.longest).toMatchObject({ from: '2026-10-01', to: '2026-10-20', days: 19 });
-    expect(v.strip.days[0]).toBe('2026-10-16');
-    expect(v.strip.parts).toContainEqual({ kind: 'gap', from: 0, to: 4, days: 19, long: true, cut: true, atLeast: false });
+    expect(v.longest).toMatchObject({ from: '2026-10-01', to: '2026-10-20', first: '2026-10-02', last: '2026-10-19', days: 18 });
   });
 
-  it('a gap whose missed days are all before the range is not counted', () => {
-    // Range from 9 Nov (7 days); revised 1 Nov, then 9 Nov: the missed days end on 8 Nov.
+  it('a gap whose days are all before the range is not counted', () => {
+    // Range from 9 Nov (7 days); revised 1 Nov, then 9 Nov: the gap's days end on 8 Nov.
     const v = gapsView({ revised: items(['2026-11-01', '2026-11-09', '2026-11-10', '2026-11-11', '2026-11-12', '2026-11-13', '2026-11-14', TODAY]), today: TODAY, window: 7 })!;
     expect(v.longest).toBeNull();
     expect(v.usual).toBe(1);
@@ -132,14 +140,13 @@ describe('gapsView', () => {
   it('no gap before the account’s first day, and the range starts there', () => {
     const v = gapsView({ revised: items(['2026-11-12', '2026-11-13', '2026-11-14']), today: TODAY, window: 30, firstDay: '2026-11-10', knownSince: '2026-08-17' })!;
     expect(v.gaps).toEqual([]);
-    expect(v.strip.days[0]).toBe('2026-11-10');
-    expect(v.strip.days).toHaveLength(6);
+    expect(v.rangeStart).toBe('2026-11-10');
   });
 
   it('a gap before the first day read, in an older account, is at least as long as the days read without one', () => {
     // Items read from 1 Oct; nothing until 20 Oct; the account began in September.
     const v = gapsView({ revised: items(['2026-10-20', '2026-10-21']), today: '2026-10-22', window: 30, firstDay: '2026-09-01', knownSince: '2026-10-01' })!;
-    expect(v.longest).toEqual({ from: null, to: '2026-10-20', days: 20, atLeast: true, open: false, long: true });
+    expect(v.longest).toEqual({ from: null, to: '2026-10-20', first: '2026-10-01', last: '2026-10-19', days: 19, atLeast: true, open: false });
   });
 
   it('with no item read that far back, "since your last revision" comes from the pages’ own records (timestamps)', () => {
@@ -154,8 +161,7 @@ describe('gapsView', () => {
     })!;
     expect(v.lastDay).toBe('2026-09-20');
     expect(v.sinceLast).toBe(56);
-    expect(v.longest).toMatchObject({ open: true, days: 56, long: true });
-    expect(v.strip.parts).toEqual([{ kind: 'open', from: 0, to: 29, days: 56, long: true, cut: true }]);
+    expect(v.longest).toMatchObject({ open: true, days: 56, first: '2026-09-21', last: TODAY });
   });
 
   it('pages revised ahead count on the day they were done', () => {
@@ -163,11 +169,17 @@ describe('gapsView', () => {
     expect(v.lastDay).toBe('2026-11-14');
   });
 
-  it('All time draws at most half a year, and counts every gap since the first day', () => {
+  it('All time counts every gap since the first day', () => {
     const v = gapsView({ revised: items(['2026-01-10', '2026-03-01', TODAY]), today: TODAY, window: 400, firstDay: '2026-01-01' })!;
-    expect(v.strip.days).toHaveLength(STRIP_MAX_DAYS);
-    expect(v.longest!.days).toBe(259);
-    expect(v.gaps.map((g) => g.days)).toEqual([50, 259]);
+    expect(v.gaps.map((g) => g.days)).toEqual([49, 258]);
+    expect(v.longest!.days).toBe(258);
+  });
+
+  it('lists the gap still open first, then the latest first', () => {
+    const v = gapsView({ revised: items(BOARD), today: TODAY, window: 30 })!;
+    expect(gapsNewestFirst(v.gaps).map((g) => g.first)).toEqual(['2026-11-10', '2026-10-29']);
+    const closed = gapsView({ revised: items(['2026-10-01', '2026-10-05', '2026-10-20', '2026-10-24', TODAY]), today: TODAY, window: 60 })!;
+    expect(gapsNewestFirst(closed.gaps).map((g) => g.first)).toEqual(['2026-10-25', '2026-10-21', '2026-10-06', '2026-10-02']);
   });
 });
 
@@ -179,7 +191,7 @@ describe('words', () => {
     expect(at(1)).toEqual({ value: '1 day', text: 'since your last revision', red: false });
     expect(at(13)).toMatchObject({ value: '13 days', red: true });
     expect(at(0)).toEqual({ value: 'Today', text: 'you revised', red: false });
-    expect(at(0, 6)).toEqual({ value: 'Today', text: 'you revised, after 6 days', red: false });
+    expect(at(0, 5)).toEqual({ value: 'Today', text: 'you revised, after a 5-day gap', red: false });
   });
 
   it('the figure from 2 weeks: words and the date, never red; back today, gently; days when asked', () => {
@@ -203,8 +215,8 @@ describe('words', () => {
     expect(naturalDiffers(14)).toBe(true);
   });
 
-  it('a gap on the strip', () => {
-    expect(gapLabel({ days: 9 })).toBe('9 days');
+  it('a gap’s length', () => {
+    expect(gapLabel({ days: 8 })).toBe('8 days');
     expect(gapLabel({ days: 60, atLeast: true })).toBe('60+ days');
     expect(gapLabel({ days: 6, open: true })).toBe('6 days so far');
     expect(gapLabel({ days: 22, open: true })).toBe('over 3 weeks so far');
@@ -212,46 +224,76 @@ describe('words', () => {
     expect(gapLabel({ days: 22 }, true)).toBe('22 days');
   });
 
+  it('a gap’s days: across months, in one month, still open, begun before the days read', () => {
+    const g = (first: string, last: string, extra: Partial<Gap> = {}) => ({ first, last, open: false, atLeast: false, ...extra });
+    expect(gapDates(g('2026-10-29', '2026-11-05'))).toBe('29 Oct – 5 Nov');
+    expect(gapDates(g('2026-10-09', '2026-10-10'))).toBe('9–10 Oct');
+    expect(gapDates(g('2026-11-10', TODAY, { open: true }))).toBe('10 Nov – today');
+    expect(gapDates(g('2026-10-01', '2026-10-19', { atLeast: true }))).toBe('until 19 Oct');
+    expect(gapDates(g('2026-10-29', '2026-11-05'), 'long')).toBe('29 October – 5 November');
+  });
+
+  it('a gap for VoiceOver: exact days, the dates in full', () => {
+    const v = gapsView({ revised: items(BOARD), today: TODAY, window: 30 })!;
+    expect(v.gaps.map(gapSpoken)).toEqual([
+      '8 days without revising, 29 October – 5 November',
+      '6 days so far without revising, 10 November – today',
+    ]);
+  });
+
   it('dates', () => {
     expect(gapDate('2026-10-28')).toBe('28 Oct');
     expect(gapDate('2026-11-06', 'long')).toBe('6 November');
   });
 
-  it('the longest gap’s tile', () => {
-    const v = gapsView({ revised: items(BOARD), today: TODAY, window: 30 })!;
-    expect(longestTile(v.longest, 'in 30 days')).toEqual({ value: '9', unit: 'days', text: 'Longest gap, 28 Oct – 6 Nov' });
-    expect(longestTile(null, 'in 30 days')).toEqual({ value: 'None', unit: null, text: 'No gaps in 30 days' });
-    expect(longestTile({ from: '2026-11-09', to: null, days: 6, atLeast: false, open: true, long: true }, 'in 30 days').text).toBe('Longest gap, since 9 Nov');
-    expect(longestTile({ from: '2026-10-24', to: null, days: 22, atLeast: false, open: true, long: true }, 'in 30 days')).toEqual({
-      value: 'Over 3 weeks',
-      unit: null,
-      text: 'Longest gap, since 24 Oct',
-    });
-    expect(longestTile({ from: '2026-10-24', to: null, days: 22, atLeast: false, open: true, long: true }, 'in 30 days', true)).toMatchObject({ value: '22', unit: 'days' });
-    expect(longestTile({ from: null, to: '2026-10-20', days: 20, atLeast: true, open: false, long: true }, 'in 30 days')).toEqual({
-      value: '20+',
-      unit: 'days',
-      text: 'Longest gap, until 20 Oct',
-    });
+  it('the line under the figure: the gaps in the range and the usual rhythm, or none yet', () => {
+    const board = gapsView({ revised: items(BOARD), today: TODAY, window: 30 })!;
+    expect(gapsSummary(board, 'in 30 days')).toBe('2 gaps in 30 days · you usually revise every day');
+    const one = gapsView({ revised: items(['2026-11-01', '2026-11-02', '2026-11-06', '2026-11-07', TODAY]), today: TODAY, window: 30, firstDay: '2026-11-01' })!;
+    expect(gapsSummary(one, 'since 1 November')).toBe('2 gaps since 1 November · you usually revise every 2–3 days');
+    const daily = gapsView({ revised: items(['2026-11-13', '2026-11-14', TODAY]), today: TODAY, window: 30 })!;
+    expect(gapsSummary(daily, 'in 30 days')).toBe('No gaps in 30 days · you usually revise every day');
+    const first = gapsView({ revised: items([TODAY]), today: TODAY, window: 7, firstDay: TODAY })!;
+    expect(gapsSummary(first, 'since 15 November')).toBe('No gaps yet');
+    const singleGap = gapsView({ revised: items(['2026-11-10', TODAY]), today: TODAY, window: 30 })!;
+    expect(gapsSummary(singleGap, 'in 30 days')).toBe('1 gap in 30 days');
   });
 
-  it('the usual rhythm’s tile', () => {
-    expect(rhythmTile(1, 2)).toEqual({ value: 'Every day', text: 'Your usual rhythm · 2 gaps of 3+ days' });
-    expect(rhythmTile(2, 1)).toEqual({ value: 'Every 2 days', text: 'Your usual rhythm · 1 gap of 3+ days' });
-    expect(rhythmTile(1.5, 0)).toEqual({ value: 'Every 1–2 days', text: 'Your usual rhythm · no gaps of 3+ days' });
+  it('the usual rhythm in words', () => {
+    expect(usualWords(1)).toBe('you usually revise every day');
+    expect(usualWords(2)).toBe('you usually revise every 2 days');
+    expect(usualWords(1.5)).toBe('you usually revise every 1–2 days');
     expect(usualSteps(3.5)).toEqual({ low: 3, high: 4 });
-    expect(rhythmTile(15, 0).value).toBe('About every 2 weeks');
-    expect(rhythmTile(50, 0).value).toBe('About every 2 months');
-    expect(rhythmTile(15, 0, true).value).toBe('Every 15 days');
+    expect(usualWords(15)).toBe('you usually revise about every 2 weeks');
+    expect(usualWords(50)).toBe('you usually revise about every 2 months');
+    expect(usualWords(15, true)).toBe('you usually revise every 15 days');
+  });
+});
+
+describe('a gap on the calendar (ACT-28)', () => {
+  const gap = (g: Partial<Gap>): Gap => ({ from: null, to: null, first: '', last: '', days: 0, atLeast: false, open: false, ...g });
+  it('marks its days without a revision, named above the grid', () => {
+    expect(gapOnCalendar(gap({ from: '2026-10-28', to: '2026-11-06', first: '2026-10-29', last: '2026-11-05', days: 8 }))).toEqual({
+      from: '2026-10-29',
+      to: '2026-11-05',
+      cue: 'Gap, 29 Oct – 5 Nov · 8 days',
+    });
   });
 
-  it('the strip for VoiceOver', () => {
-    const v = gapsView({ revised: items(BOARD), today: TODAY, window: 30 })!;
-    expect(stripLabel(v, 'last 30 days')).toBe(
-      'Last 30 days: revised on 14 days. Gaps of 3 days or more: 9 days, from 28 October to 6 November; 6 days so far, since 9 November.',
-    );
-    const daily = gapsView({ revised: items([TODAY]), today: TODAY, window: 30 })!;
-    expect(stripLabel(daily, 'last 30 days')).toBe('Last 30 days: revised on 1 day. No gaps of 3 days or more.');
+  it('still open: to today; begun before the days read: from as far back as is known; long ones in words, or days', () => {
+    expect(gapOnCalendar(gap({ from: '2026-11-09', first: '2026-11-10', last: TODAY, days: 6, open: true }))).toEqual({
+      from: '2026-11-10',
+      to: TODAY,
+      cue: 'Gap, 10 Nov – today · 6 days so far',
+    });
+    expect(gapOnCalendar(gap({ to: '2026-11-08', first: '2026-09-08', last: '2026-11-07', days: 60, atLeast: true }))).toEqual({
+      from: '2026-09-08',
+      to: '2026-11-07',
+      cue: 'Gap, until 7 Nov · 60+ days',
+    });
+    const long = gap({ from: '2026-10-01', to: '2026-10-24', first: '2026-10-02', last: '2026-10-23', days: 22 });
+    expect(gapOnCalendar(long).cue).toBe('Gap, 2–23 Oct · over 3 weeks');
+    expect(gapOnCalendar(long, true).cue).toBe('Gap, 2–23 Oct · 22 days');
   });
 });
 
@@ -260,7 +302,8 @@ describe('who sees it', () => {
     mockDev = false;
   });
 
-  it('every account in Revisely Dev, nobody signed out; not the store app, testers included', () => {
+  it('with the release switched off: every account in Revisely Dev, nobody signed out; not the store app, testers included', () => {
+    setMistakeDetectionReleasedForTests(false);
     expect(gapsInsightsEnabled({ previewTester: true })).toBe(false);
     expect(gapsInsightsEnabled({})).toBe(false);
     mockDev = true;

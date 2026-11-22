@@ -58,16 +58,24 @@ describe('the history card’s words', () => {
   it('how often it went wrong, and where the clear rule stands', () => {
     const once = wordMemories([take('a', at(2026, 11, 13), '2026-11-13', [mark()])]).get(`${W}|word`)!;
     expect(wrongCount(once)).toBe('wrong in your 1 take');
-    expect(clearLine(once, '2026-11-15')).toBe('Say it right on 2 different days to clear it.');
+    expect(clearLine(once, '2026-11-15')).toBe('2 more right takes, on 2 different days, clear it.');
     const rightToday = wordMemories([take('a', at(2026, 11, 13), '2026-11-13', [mark()]), take('b', at(2026, 11, 15), '2026-11-15', [])]).get(`${W}|word`)!;
     expect(wrongCount(rightToday)).toBe('wrong in 1 of 2 takes');
-    expect(clearLine(rightToday, '2026-11-15')).toBe('Right today. Right again on another day clears it.');
-    expect(clearLine(rightToday, '2026-11-16')).toBe('Right once. Right again on another day clears it.');
+    expect(clearLine(rightToday, '2026-11-15')).toBe('Right today. 1 more right take, on another day, clears it.');
+    expect(clearLine(rightToday, '2026-11-16')).toBe('Right once. 1 more right take, on another day, clears it.');
     const cleared = wordMemories([
       take('a', at(2026, 11, 13), '2026-11-13', [mark()]),
       take('b', at(2026, 11, 14), '2026-11-14', []),
       take('c', at(2026, 11, 15), '2026-11-15', []),
     ]).get(`${W}|word`)!;
     expect(clearLine(cleared, '2026-11-15')).toBe('Cleared: said right on 2 different days.');
+  });
+
+  it('a tajweed note says it clears only with Strict on (Words & harakat never checks one)', () => {
+    const note = mark({ id: `${W}:tajweed:`, kind: 'tajweed', heard: undefined, rule: 'madd_muttasil', got: 2, expected: 4 });
+    const open = wordMemories([take('a', at(2026, 11, 13), '2026-11-13', [note])]).get(`${W}|tajweed`)!;
+    expect(clearLine(open, '2026-11-15')).toBe('2 more right takes with Strict on, on 2 different days, clear it.');
+    const rightToday = wordMemories([take('a', at(2026, 11, 13), '2026-11-13', [note]), take('b', at(2026, 11, 15), '2026-11-15', [])]).get(`${W}|tajweed`)!;
+    expect(clearLine(rightToday, '2026-11-15')).toBe('Right today. 1 more right take with Strict on, on another day, clears it.');
   });
 });

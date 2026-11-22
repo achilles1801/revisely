@@ -15,7 +15,7 @@ export const HELP_ICON = 'help-circle-outline' as const;
  */
 export function useHelpSheet(
   screen: HelpScreen,
-  opts: { recite?: boolean; liveRecite?: boolean; hideAs?: HelpScreen } = {},
+  opts: { liveRecite?: boolean; hideAs?: HelpScreen } = {},
 ) {
   const help = useHelpButtons();
   const [open, setOpen] = useState(false);
@@ -24,7 +24,6 @@ export function useHelpSheet(
       <HelpSheet
         screen={screen}
         visible={open}
-        recite={opts.recite}
         liveRecite={opts.liveRecite}
         onClose={() => setOpen(false)}
         // Said by the screen it's on (its HelpToast): the reader's, for Recite's sheet.

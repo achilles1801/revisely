@@ -20,12 +20,44 @@
 
 import { AuthInfo, ResetError, ResetResult, ResetStore, freshPage, resetTesterAccount } from './testerReset';
 import { SILENCE_M4A_BASE64 } from './silence';
+import {
+  SLIPS,
+  SeedClear,
+  SeedTake,
+  StoredMark,
+  ayahKeysStartingOn,
+  ayahWords,
+  clearDocument,
+  harakatMark,
+  letterMark,
+  pageWords,
+  skippedMark,
+  slipMark,
+  tajweedMark,
+  takeDocument,
+  timeMarks,
+  wrongWordMark,
+} from './scenarioTakes';
 
 // ============================================================================
 // THE SCENARIOS
 // ============================================================================
 
-export const SCENARIO_IDS = [
+/**
+ * The scenarios Settings offers testers (Majd, Nov 17 2026: "3 scenarios should be sufficient with the most
+ * important being a super heavy user with a lot of activity and months of data"), in the order it lists them:
+ * - heavy: seven months of a hafiz-sized memorizer: a juz a day, gaps, the daily log, recordings, sittings, Recite
+ *   takes with marks, Revo's chats and memory;
+ * - steady: six weeks, yesterday missed after a twelve-day run (the streak's grace ring, the catch-up offer);
+ * - starting: a newer memorizer, two weeks in, Al-Mulk ayah by ayah, the first Recite takes.
+ */
+export const SCENARIO_IDS = ['heavy', 'steady', 'starting'] as const;
+
+/**
+ * Older, narrow situations the automated tests load (tests/scenarios, the rules tests) to check one rule each:
+ * not offered in Settings since Nov 17 2026, still loadable by a tester's account.
+ */
+export const CHECK_SCENARIO_IDS = [
   'new',
   'beginner',
   'hafiz',
@@ -34,13 +66,14 @@ export const SCENARIO_IDS = [
   'revise-ahead',
   'fajr-edge',
   'custom-reverse',
-  'heavy-activity',
   'offline-queue',
 ] as const;
-export type ScenarioId = (typeof SCENARIO_IDS)[number];
+
+export const ALL_SCENARIO_IDS = [...SCENARIO_IDS, ...CHECK_SCENARIO_IDS] as const;
+export type ScenarioId = (typeof ALL_SCENARIO_IDS)[number];
 
 export function isScenarioId(v: unknown): v is ScenarioId {
-  return typeof v === 'string' && (SCENARIO_IDS as readonly string[]).includes(v);
+  return typeof v === 'string' && (ALL_SCENARIO_IDS as readonly string[]).includes(v);
 }
 
 // ============================================================================
@@ -324,6 +357,8 @@ export interface MemorizationItem {
   pages: number[];
   minutes: number | null;
   recordings: string[];
+  /** Ayahs memorized by the ayah that day (surah * 1000 + ayah), on a page memorized in part. */
+  verses?: number[];
 }
 
 /** src/lib/readItems.ts's ReadItem. */
@@ -375,12 +410,38 @@ export interface SeedRecording {
 
 export interface SeedPage {
   pageNumber: number;
-  status: 'memorized';
-  dateMemorized: number;
+  /** 'learning': some of its ayahs memorized (`verses`), as the app stores a partly memorized page (MEM-1). */
+  status: 'memorized' | 'learning';
+  /** When it was memorized; null for a page memorized in part (the app keeps none until it is whole). */
+  dateMemorized: number | null;
+  /** A partly memorized page: when its first ayahs were memorized (not stored; the tests' "memorized by then"). */
+  startedAt?: number;
+  /** A partly memorized page's ayahs (surah * 1000 + ayah). */
+  verses?: number[];
   lastRevisedAt: number | null;
   weaknessRating: number;
   totalRevisionCount: number;
   skipCount: number;
+}
+
+/** A Revo conversation as functions/src/revo/admin.ts stores it, with its messages. */
+export interface SeedRevoChat {
+  id: string;
+  kind: 'chat' | 'review';
+  title: string;
+  day: string;
+  createdAt: number;
+  updatedAt: number;
+  messages: { id: string; role: 'user' | 'revo'; text: string; at: number; chips?: string[] }[];
+}
+
+export interface SeedRevoMemory {
+  id: string;
+  text: string;
+  source: 'chat' | 'review';
+  day: string;
+  chatId: string;
+  at: number;
 }
 
 export interface SeedPlan {
@@ -397,6 +458,12 @@ export interface SeedPlan {
   readingSessions: SeedReading[];
   notes: SeedNote[];
   recordings: SeedRecording[];
+  /** Recite's memory (users/<uid>/reciteTakes): takes with Mark mistakes, and words cleared by hand. */
+  takes: SeedTake[];
+  clears: SeedClear[];
+  /** Revo's conversations and memory (written as its functions write them). */
+  revoChats: SeedRevoChat[];
+  revoMemory: SeedRevoMemory[];
   /** Changes the phone queues itself and holds (offline-queue): outbox ops (lib/offline/ops). */
   outbox: Record<string, unknown>[];
 }
@@ -503,7 +570,9 @@ class Builder {
   readonly today: string;
   private readonly rand: () => number;
   private readonly memorized = new Map<number, number>();
-  private readonly memorizedOn = new Map<string, { at: number; pages: number[] }>();
+  /** Pages memorized in part: when their first ayahs were, and the ayahs. */
+  private readonly partial = new Map<number, { at: number; verses: number[] }>();
+  private readonly memorizedOn = new Map<string, { at: number; pages: number[]; verses: number[]; minutes: number | null }>();
   private readonly ratings = new Map<number, number>();
   plan: PlanSpec | null = null;
   readonly user: Record<string, unknown> = {};
@@ -511,6 +580,10 @@ class Builder {
   readonly readingSessions: SeedReading[] = [];
   readonly notes: SeedNote[] = [];
   readonly recordings: SeedRecording[] = [];
+  readonly takes: SeedTake[] = [];
+  readonly clears: SeedClear[] = [];
+  readonly revoChats: SeedRevoChat[] = [];
+  readonly revoMemory: SeedRevoMemory[] = [];
   outbox: Record<string, unknown>[] = [];
 
   constructor(
@@ -524,10 +597,22 @@ class Builder {
     this.rand = random(seed);
   }
 
+  private readonly days = new Map<number, string>();
+
   /** The revision day of a moment, Fajr-aware when the scenario has the boundary on. */
   dayOf(ms: number): string {
-    const fajr = this.ctx.fajr;
-    return revisionDayAt(ms, this.ctx.zone, fajr ? (day) => fajr.days[day] ?? null : null);
+    let day = this.days.get(ms);
+    if (day === undefined) {
+      const fajr = this.ctx.fajr;
+      day = revisionDayAt(ms, this.ctx.zone, fajr ? (d) => fajr.days[d] ?? null : null);
+      this.days.set(ms, day);
+    }
+    return day;
+  }
+
+  /** The scenario's random source, 0 to 1. */
+  rand01(): number {
+    return this.rand();
   }
 
   /** A wall-clock time on a calendar day. */
@@ -540,9 +625,14 @@ class Builder {
     return this.ctx.fajr?.days[day] ?? this.at(day, 0, 0);
   }
 
-  /** A moment today that has passed, `minutesAgo` before now when today allows. */
+  /** Now, to the quarter hour before it: loads a minute apart build the same scenario. */
+  get quarterHour(): number {
+    return Math.floor(this.ctx.now / (15 * MINUTE)) * 15 * MINUTE;
+  }
+
+  /** A moment today that has passed, `minutesAgo` before now (to the quarter hour) when today allows. */
   earlierToday(minutesAgo: number): number {
-    return Math.max(this.startOf(this.today) + MINUTE, this.ctx.now - minutesAgo * MINUTE);
+    return Math.max(this.startOf(this.today) + MINUTE, this.quarterHour - minutesAgo * MINUTE);
   }
 
   id(n = 20): string {
@@ -560,14 +650,33 @@ class Builder {
   }
 
   /** Pages memorized at `at` (one Memorized item on that revision day). */
-  memorize(pages: number[], at: number): void {
+  memorize(pages: number[], at: number, minutes: number | null = null): void {
     const day = this.dayOf(at);
     const fresh = pages.filter((p) => !this.memorized.has(p));
-    for (const p of fresh) this.memorized.set(p, at);
+    for (const p of fresh) {
+      this.memorized.set(p, at);
+      this.partial.delete(p);
+    }
     if (fresh.length === 0) return;
     const item = this.memorizedOn.get(day);
     if (item) item.pages.push(...fresh);
-    else this.memorizedOn.set(day, { at, pages: [...fresh] });
+    else this.memorizedOn.set(day, { at, pages: [...fresh], verses: [], minutes });
+  }
+
+  /**
+   * The first ayahs of a page memorized at `at`, the page still partly memorized (MEM-1): it joins the revision
+   * plan (MEM-4), and the day's Memorized item holds them by the ayah, as the app writes it.
+   */
+  memorizeAyahs(page: number, verses: number[], at: number, minutes: number | null = null): void {
+    if (this.memorized.has(page) || verses.length === 0) return;
+    const had = this.partial.get(page);
+    this.partial.set(page, { at: had?.at ?? at, verses: [...new Set([...(had?.verses ?? []), ...verses])].sort((a, b) => a - b) });
+    const day = this.dayOf(at);
+    const item = this.memorizedOn.get(day);
+    if (item) {
+      if (!item.pages.includes(page)) item.pages.push(page);
+      item.verses.push(...verses);
+    } else this.memorizedOn.set(day, { at, pages: [page], verses: [...verses], minutes });
   }
 
   /** The memorized pages as of `day` (all of them without a day). */
@@ -577,10 +686,49 @@ class Builder {
     return out.sort((a, b) => a - b);
   }
 
-  /** The plan's pages for `day`, from the pages memorized by then. */
+  /** The pages revised as of `day`: memorized, or memorized in part (MEM-4). */
+  revisablePages(day?: string): number[] {
+    const out = this.memorizedPages(day);
+    for (const [page, p] of this.partial) if (!day || this.dayOf(p.at) <= day) out.push(page);
+    return out.sort((a, b) => a - b);
+  }
+
+  /** The plan's pages for `day`, from the pages memorized (or begun) by then. */
   pagesFor(day: string, memorizedByThen = false): number[] {
     if (!this.plan) throw new Error('no plan');
-    return plannedPages(this.plan, this.memorizedPages(memorizedByThen ? day : undefined), day);
+    return plannedPages(this.plan, this.revisablePages(memorizedByThen ? day : undefined), day);
+  }
+
+  /** A take with Mark mistakes (Recite's memory), its marks timed from its first word. */
+  take(spec: Omit<SeedTake, 'id' | 'day' | 'marks'> & { marks: StoredMark[] }): SeedTake {
+    const t: SeedTake = { ...spec, id: this.id(), day: this.dayOf(spec.createdAt), marks: timeMarks(spec.marks, spec.from) };
+    this.takes.push(t);
+    return t;
+  }
+
+  /** "Clear now" on a word's remembered mistake. */
+  clear(w: number, group: SeedClear['group'], at: number): void {
+    this.clears.push({ id: this.id(), createdAt: at, day: this.dayOf(at), w, group });
+  }
+
+  /** A Revo conversation: [role, text, chips?] in turn, a minute or two apart from `at`. */
+  revoChat(kind: SeedRevoChat['kind'], title: string, at: number, turns: [SeedRevoChat['messages'][number]['role'], string, string[]?][]): SeedRevoChat {
+    const id = kind === 'review' ? `review-${this.dayOf(at)}` : this.id();
+    const messages = turns.map(([role, text, chips], i) => ({
+      id: this.id(),
+      role,
+      text,
+      at: at + i * 90_000,
+      ...(chips ? { chips } : {}),
+    }));
+    const chat: SeedRevoChat = { id, kind, title, day: this.dayOf(at), createdAt: at, updatedAt: messages[messages.length - 1].at, messages };
+    this.revoChats.push(chat);
+    return chat;
+  }
+
+  /** Something Revo remembers, from a conversation. */
+  revoRemember(chat: SeedRevoChat, text: string): void {
+    this.revoMemory.push({ id: this.id(), text, source: chat.kind, day: chat.day, chatId: chat.id, at: chat.updatedAt });
   }
 
   session(day: string, spec: SessionSpec = {}, assigned = this.pagesFor(day)): SeedSession {
@@ -639,11 +787,11 @@ class Builder {
     return note;
   }
 
-  recording(at: number, pages: number[]): SeedRecording {
+  recording(at: number, pages: number[], kind: SeedRecording['kind'] = 'revision'): SeedRecording {
     const id = `${at}-${this.id(6).toLowerCase()}`;
     const rec: SeedRecording = {
       id,
-      kind: 'revision',
+      kind,
       day: this.dayOf(at),
       createdAt: at,
       durationMs: 1000,
@@ -686,7 +834,7 @@ class Builder {
   build(): SeedPlan {
     const sessions = [...this.sessions].sort((a, b) => a.date.localeCompare(b.date));
     // Pages as the app derives them from the sessions (lib/algorithm's recomputePagesFromLogs).
-    const pages: SeedPage[] = this.memorizedPages().map((pageNumber) => {
+    const pages: SeedPage[] = this.revisablePages().map((pageNumber) => {
       let last: number | null = null;
       let lastDay: string | null = null;
       let count = 0;
@@ -694,7 +842,9 @@ class Builder {
       for (const s of sessions) {
         if (s.pagesRevised.includes(pageNumber)) {
           count++;
-          last = s.completedAt ?? s.updatedAt;
+          // The day's midnight UTC, as the app's self-heal stores a page's last revised day: a first launch then
+          // finds nothing to rewrite (the heavy scenario's 450 pages included).
+          last = utcOf(s.date);
           lastDay = s.date;
         }
         const w = s.weaknessUpdates.find((x) => x.pageNumber === pageNumber);
@@ -705,10 +855,12 @@ class Builder {
         if (lastDay && s.date <= lastDay) continue;
         if (s.pagesSkipped.includes(pageNumber)) skipCount++;
       }
+      const part = this.partial.get(pageNumber);
       return {
         pageNumber,
-        status: 'memorized',
-        dateMemorized: this.memorized.get(pageNumber)!,
+        status: part ? 'learning' : 'memorized',
+        dateMemorized: part ? null : this.memorized.get(pageNumber)!,
+        ...(part ? { startedAt: part.at, verses: part.verses } : {}),
         lastRevisedAt: last,
         weaknessRating: rating,
         totalRevisionCount: count,
@@ -728,8 +880,8 @@ class Builder {
       // Every "What's new" seen (the app's SEEN_ALL, src/lib/help/whatsNew): a loaded scenario opens on
       // Home, not on a walkthrough. Testers replay it from Settings → About or Settings → Testing.
       whatsNewSeen: 'all',
-      totalMemorizedPages: pages.length,
-      totalLearningPages: 0,
+      totalMemorizedPages: pages.filter((p) => p.status === 'memorized').length,
+      totalLearningPages: pages.filter((p) => p.status === 'learning').length,
       totalSessionsCompleted: done.length,
       totalPagesRevisedAllTime: sessions.reduce((n, s) => n + s.pagesRevised.length, 0),
       streak,
@@ -745,8 +897,11 @@ class Builder {
         occurredAt: m.at,
         source: 'auto',
         pages: [...m.pages].sort((a, b) => a - b),
-        minutes: null,
+        minutes: m.minutes,
         recordings: [],
+        // An item added by the ayah counts by its ayahs (lib/memorizedAyahs' memorizedItemShare), as
+        // firestoreService.addMemorizationPages writes it. The scenarios add ayahs on days of their own.
+        ...(m.verses.length > 0 ? { verses: [...new Set(m.verses)].sort((a, b) => a - b) } : {}),
       }));
 
     return {
@@ -761,6 +916,10 @@ class Builder {
       readingSessions: this.readingSessions,
       notes: this.notes,
       recordings: this.recordings,
+      takes: [...this.takes].sort((a, b) => a.createdAt - b.createdAt),
+      clears: this.clears,
+      revoChats: this.revoChats,
+      revoMemory: this.revoMemory,
       outbox: this.outbox,
     };
   }
@@ -773,6 +932,15 @@ export function buildScenario(scenario: ScenarioId, ctx: SeedContext, uid: strin
   const day = (k: number) => addDays(D, k);
 
   switch (scenario) {
+    case 'heavy':
+      buildHeavy(b);
+      break;
+    case 'steady':
+      buildSteady(b);
+      break;
+    case 'starting':
+      buildStarting(b);
+      break;
     case 'new': {
       // Just onboarded: Juz 30, five pages a day from today, nothing done.
       b.memorize(juzPages(30), b.earlierToday(5));
@@ -878,32 +1046,6 @@ export function buildScenario(scenario: ScenarioId, ctx: SeedContext, uid: strin
       b.session(day(-1));
       break;
     }
-    case 'heavy-activity': {
-      // Three months: Juz 29–30 known, Juz 28 memorized two pages at a time,
-      // sessions most days, timed readings and daily-log notes.
-      b.memorize(juzPages(29, 30), b.at(day(-120), 20));
-      const juz28 = juzPages(28);
-      for (let i = 0; i < juz28.length; i += 2) b.memorize(juz28.slice(i, i + 2), b.at(day(-84 + i * 3), 19));
-      b.usePlan({ mode: 'pages', perDay: 5, anchorDay: day(-90) });
-      Object.assign(b.user, { smartTrackingEnabled: true, hasSeenSmartTrackingPreview: true });
-      for (let k = -90; k <= -1; k++) {
-        if (b.chance(0.15)) continue;
-        const pages = b.pagesFor(day(k), true);
-        b.session(day(k), { revise: b.chance(0.1) ? 2 : 'all', ratings: b.chance(0.3) ? [[pages[0], b.int(2, 5)]] : [] }, pages);
-        if (k % 4 === 0) b.reading(b.at(day(k), 7, 10), b.int(10, 25), b.memorizedPages(day(k)).slice(0, 3));
-        if (k % 3 === 0) {
-          const kind = (['memorization', 'revision', 'note'] as const)[(-k / 3) % 3];
-          const text =
-            kind === 'note'
-              ? 'A long day, but the revision held.'
-              : kind === 'revision'
-                ? `${pages.length} pages revised`
-                : 'New lines of Juz 28';
-          b.note(b.at(day(k), 22), kind, text, kind === 'note' ? null : b.int(10, 40));
-        }
-      }
-      break;
-    }
     case 'offline-queue': {
       // Juz 30, three a day, two days done; the phone then queues today's session,
       // a note and a timed reading, and holds them (lib/testScenarios).
@@ -950,6 +1092,370 @@ export function buildScenario(scenario: ScenarioId, ctx: SeedContext, uid: strin
   return b.build();
 }
 
+// ============================================================================
+// THE THREE STORIES SETTINGS OFFERS
+// ============================================================================
+
+/** Is `day` a Friday (the calendar day)? */
+function isFriday(day: string): boolean {
+  return new Date(`${day}T12:00:00Z`).getUTCDay() === 5;
+}
+
+const REVISION_NOTES = [
+  'Strong today, only one hesitation.',
+  'Slow start, then it flowed.',
+  'Revised after Fajr before work.',
+  'Tired, but finished the juz.',
+  'Mixed up two similar ayat again.',
+  'Kept stumbling on the same page; read it twice.',
+  'Smooth. Recited most of it from memory.',
+  'Split it: half after Fajr, half after Isha.',
+  'Listened to the reciter first, then revised.',
+  'Good day. The new pages are settling.',
+];
+const DAY_NOTES = [
+  'Travelling tomorrow; will revise on the train.',
+  'Family visiting, a short day.',
+  'Taught my son An-Naba tonight.',
+  'Need to slow down on the long ayat.',
+  'Halaqa tonight: recited to the teacher.',
+  'Felt the difference after a week of no gaps.',
+];
+
+/**
+ * Takes with Mark mistakes over `days` (offsets from today), on `passages` (each a run of pages), as Recite keeps
+ * them: one to a few a day; each over a page or two (now and then stopping part way), at Words & harakat or Strict,
+ * the page shown or hidden; a few marks of every kind, and the well-known slips (SLIPS) wrong as `slipWrong` says.
+ */
+function reciteTakes(
+  b: Builder,
+  opts: {
+    days: number[];
+    passages: { pages: number[]; weight: number }[];
+    perDay: [number, number];
+    strict: number;
+    hidden: number;
+    /** How likely each of SLIPS is said wrong in a take that reaches it, `k` days from today. */
+    slipWrong: (slip: number, k: number) => number;
+    /** Marks of their own a take finds, by how many: [none, one, two, three]. */
+    marks: [number, number, number, number];
+    /** Words that keep slipping (a haraka): how likely each is said wrong when reached. */
+    sticky?: { w: number; wrong: number }[];
+    /** A passage taken at most once from that day on (a word left one right take short of clearing). */
+    onceFrom?: { pages: number[]; k: number };
+  },
+): void {
+  const total = opts.passages.reduce((n, p) => n + p.weight, 0);
+  let onceTaken = false;
+  for (const k of opts.days) {
+    const day = addDays(b.today, k);
+    const n = b.int(opts.perDay[0], opts.perDay[1]);
+    // Morning or night; today's before now.
+    let at = k === 0 ? b.earlierToday(20 + n * 8) : b.chance(0.55) ? b.at(day, 6, b.int(10, 50)) : b.at(day, 21, b.int(0, 50));
+    // Today's end before now (a load just after midnight has room for fewer).
+    const until = k === 0 ? b.quarterHour : Infinity;
+    for (let i = 0; i < n; i++) {
+      let roll = b.int(1, total);
+      let passage = opts.passages[0];
+      for (const p of opts.passages) {
+        roll -= p.weight;
+        if (roll <= 0) {
+          passage = p;
+          break;
+        }
+      }
+      if (opts.onceFrom && passage.pages === opts.onceFrom.pages && k >= opts.onceFrom.k) {
+        if (onceTaken) continue;
+        onceTaken = true;
+      }
+      const memorized = new Set(b.memorizedPages(day));
+      const pages = passage.pages.filter((p) => memorized.has(p));
+      if (pages.length === 0) continue;
+      const first = b.int(0, pages.length - 1);
+      const two = first + 1 < pages.length && b.chance(0.3);
+      const from = pageWords(pages[first])[0];
+      let to = pageWords(pages[two ? first + 1 : first])[1];
+      if (b.chance(0.15)) to = from + Math.floor((to - from) * (0.4 + b.rand01() * 0.4));
+      const level: SeedTake['level'] = b.chance(opts.strict) ? 'strict' : 'words';
+      const marks = new Map<number, StoredMark>();
+      const add = (m: StoredMark | null) => {
+        if (m && m.w >= from && m.w <= to && !marks.has(m.w)) marks.set(m.w, m);
+      };
+      SLIPS.forEach((slip, s) => {
+        if (slip.w >= from && slip.w <= to && b.chance(opts.slipWrong(s, k))) add(slipMark(b.id(8), slip));
+      });
+      for (const st of opts.sticky ?? []) if (st.w >= from && st.w <= to && b.chance(st.wrong)) add(harakatMark(b.id(8), st.w, () => b.rand01()));
+      const roll2 = b.rand01();
+      const own = roll2 < opts.marks[0] ? 0 : roll2 < opts.marks[0] + opts.marks[1] ? 1 : roll2 < opts.marks[0] + opts.marks[1] + opts.marks[2] ? 2 : 3 + b.int(0, 1);
+      for (let j = 0; j < own; j++) {
+        const w = b.int(from, to);
+        const kind = b.rand01();
+        if (kind < 0.25) add(skippedMark(b.id(8), w));
+        else if (kind < 0.62) add(harakatMark(b.id(8), w, () => b.rand01(), b.chance(0.25) ? 'likely' : 'clear'));
+        else if (kind < 0.8) add(letterMark(b.id(8), w, () => b.rand01()));
+        else add(wrongWordMark(b.id(8), w, b.int(from, to)));
+      }
+      if (level === 'strict') for (let j = b.int(1, 3); j > 0; j--) add(tajweedMark(b.id(8), b.int(from, to), () => b.rand01()));
+      const secs = Math.round((to - from + 1) * (0.5 + b.rand01() * 0.2));
+      if (at + secs * 1000 > until) break;
+      b.take({ createdAt: at, level, hidden: b.chance(opts.hidden), from, to, secs, marks: [...marks.values()] });
+      at += (secs + b.int(40, 120)) * 1000;
+    }
+  }
+}
+
+/**
+ * Heavy: seven months of a hafiz-sized memorizer (Majd, Nov 17 2026: "a super heavy user with a lot of activity and
+ * months of data"). Juz 1 and Juz 11–30 memorized long ago but Al-Kahf's first pages; these months, Al-Baqarah from
+ * page 22 about a page a week (done by five weeks ago), Al-Kahf a page every ten days, and now Al-Kahf 301 and
+ * Al-Imran's first ayahs in part. A juz a day with Smart Tracking: misses now and then, a sixteen-day gap three to
+ * four months ago, days left part way, Juz 17 rated weak, a page revised ahead the day before yesterday, and today's
+ * juz begun. Sittings (Al-Kahf every Friday, and before memorizing), the daily log on many days, recordings, about a
+ * hundred and twenty Recite takes over nine weeks with marks of every kind and the slips into similar ayat, a word cleared by
+ * hand, and three Revo conversations with what it remembers.
+ */
+function buildHeavy(b: Builder): void {
+  const day = (k: number) => addDays(b.today, k);
+  const HISTORY = 210;
+  const inGap = (k: number) => k >= -118 && k <= -103;
+
+  b.memorize([...range(1, 21), ...range(202, 292), ...range(302, 604)], b.at(day(-400), 20));
+  // The pages memorized these months, by day (the sitting before, and the note after).
+  const memorizing = new Map<string, { page: number; at: number }>();
+  const learn = (page: number, at: number, minutes: number) => {
+    b.memorize([page], at, minutes);
+    memorizing.set(b.dayOf(at), { page, at });
+  };
+  range(22, 49).forEach((p, i) => {
+    let k = -205 + Math.round(i * 6.2);
+    if (inGap(k)) k = -102;
+    learn(p, b.at(day(k), 5, 40), b.int(25, 50));
+  });
+  range(293, 300).forEach((p, i) => learn(p, b.at(day(-92 + i * 10), 21, 15), b.int(30, 45)));
+  b.memorizeAyahs(301, ayahKeysStartingOn(301).slice(0, 3), b.at(day(-6), 21, 10), 35);
+  b.memorizeAyahs(50, ayahKeysStartingOn(50).slice(0, 5), b.at(day(-3), 5, 45), 30);
+
+  b.usePlan({ mode: 'juz', perDay: 1, anchorDay: day(-HISTORY) });
+  Object.assign(b.user, { smartTrackingEnabled: true, hasSeenSmartTrackingPreview: true });
+
+  const rate = (p: number): number => (p >= 322 && p <= 341 ? (b.chance(0.65) ? 2 : 3) : p >= 22 && p <= 50 ? b.int(2, 4) : b.int(3, 5));
+
+  for (let k = -HISTORY; k <= -1; k++) {
+    const d = day(k);
+    // Sittings: Al-Kahf on Fridays (in the morning: inside the Islamic Friday, KAHF-2), and the page about to be memorized.
+    if (isFriday(d)) {
+      const s = b.reading(b.at(d, 10, b.int(0, 30)), b.int(22, 38), range(293, 304));
+      if (k >= -60 && b.chance(0.6)) b.recording(s.startedAt + 2 * 60_000, range(293, 296), 'reading');
+    }
+    const fresh = memorizing.get(d);
+    if (fresh) {
+      b.reading(fresh.at - 35 * 60_000, b.int(18, 32), [fresh.page]);
+      b.note(fresh.at + 40 * 60_000, 'memorization', fresh.page >= 293 ? 'Al-Kahf: a new page, tested twice.' : 'New page of Al-Baqarah. Repeated it ten times.', b.int(25, 50));
+    } else if (b.chance(0.1)) {
+      const p = b.int(202, 600);
+      b.reading(b.at(d, 7, b.int(0, 40)), b.int(10, 25), range(p, p + b.int(2, 4)));
+    }
+    if (inGap(k)) {
+      if (k === -117) b.note(b.at(d, 22), 'note', 'Travelling for two weeks. Will try to keep up.');
+      continue;
+    }
+    // A missed day now and then; the last one twenty-five days ago, so the streak is 24 days.
+    if (k === -25 || (k < -25 && b.chance(0.07))) continue;
+    const pages = b.pagesFor(d, true);
+    if (pages.length === 0) continue;
+    const weak = pages.filter((p) => p >= 322 && p <= 341);
+    const rated = [...new Set([pages[b.int(0, pages.length - 1)], pages[b.int(0, pages.length - 1)], ...weak.slice(0, 2)])];
+    const half = k < -24 && b.chance(0.08);
+    const ahead = k === -2 ? { [day(-1)]: b.pagesFor(day(-1), true).slice(0, 3) } : undefined;
+    const s = b.session(d, {
+      revise: half ? Math.ceil(pages.length * 0.6) : 'all',
+      at: b.chance(0.6) ? b.at(d, 5, b.int(10, 50)) : b.at(d, 20, b.int(0, 50)),
+      minutes: b.int(28, 50),
+      ratings: rated.map((p) => [p, rate(p)] as [number, number]),
+      ...(ahead ? { ahead } : {}),
+    }, pages);
+    if (k >= -90 && b.chance(0.3)) b.recording(s.createdAt + 5 * 60_000, pages.slice(0, 3));
+    if (b.chance(0.28)) b.note(s.updatedAt + 60_000, 'revision', REVISION_NOTES[b.int(0, REVISION_NOTES.length - 1)], s.durationMinutes);
+    else if (b.chance(0.06)) b.note(b.at(d, 22, 15), 'note', DAY_NOTES[b.int(0, DAY_NOTES.length - 1)]);
+  }
+  // Today: the juz begun after Fajr.
+  const todays = b.pagesFor(b.today);
+  b.session(b.today, { revise: Math.min(8, todays.length - 1), at: b.earlierToday(60), minutes: 14 }, todays);
+
+  // Recite, from nine weeks ago.
+  const sticky = [441, 532, 563, 583, 295]
+    .map((page) => {
+      const [first, last] = pageWords(page);
+      for (let w = first + 17; w <= last; w++) if (harakatMark('x', w, () => 0)) return { w, wrong: 0.55 };
+      return null;
+    })
+    .filter((x): x is { w: number; wrong: number } => x != null);
+  const days: number[] = [];
+  for (let k = -63; k <= 0; k++) if (k === 0 || b.chance(0.8)) days.push(k);
+  const abasa = [585];
+  reciteTakes(b, {
+    days,
+    passages: [
+      { pages: [2, 3], weight: 2 },
+      { pages: [5, 6], weight: 3 },
+      { pages: [8, 9], weight: 4 },
+      { pages: [42], weight: 2 },
+      { pages: [293, 294], weight: 2 },
+      { pages: [295, 296], weight: 2 },
+      { pages: [302], weight: 4 },
+      { pages: [440, 441, 442], weight: 2 },
+      { pages: [531, 532, 533], weight: 3 },
+      { pages: [534, 535], weight: 2 },
+      { pages: [562, 563, 564], weight: 3 },
+      { pages: [582, 583], weight: 2 },
+      { pages: abasa, weight: 3 },
+      { pages: [587], weight: 1 },
+    ],
+    perDay: [1, 4],
+    strict: 0.2,
+    hidden: 0.3,
+    // 2:58 keeps going on as Al-A'raf 161; 2:35 was fixed a month ago; Abasa 3 right once since last week; Al-Kahf 75
+    // keeps skipping into 72.
+    slipWrong: (s, k) => [0.75, k < -30 ? 0.85 : 0, k < -8 ? 0.8 : 0, 0.65][s] ?? 0,
+    marks: [0.38, 0.32, 0.2, 0.1],
+    sticky,
+    onceFrom: { pages: abasa, k: -7 },
+  });
+  const cleared = b.takes.find((t) => t.marks.some((m) => m.kind === 'harakat' && m.sure === 'clear'));
+  const slipped = cleared?.marks.find((m) => m.kind === 'harakat' && m.sure === 'clear');
+  if (slipped) b.clear(slipped.w, 'slip', b.at(day(-20), 21, 50));
+
+  // Revo.
+  const weakest = b.revoChat('chat', 'Your weakest juz', b.at(day(-20), 21, 30), [
+    ['user', 'Which juz am I weakest in?'],
+    [
+      'revo',
+      'Juz 17, Al-Anbiya and Al-Hajj: most of its pages are rated Weak, more than any other juz. Give it ten extra minutes on its day this week.',
+      ['What about Al-Baqarah?', 'Plan it for tomorrow'],
+    ],
+    ['user', 'What about Al-Baqarah?'],
+    [
+      'revo',
+      'The pages you memorized this autumn are still settling, Moderate on average. Keep them in each juz day, and recite Al-Baqarah, ayah 58 a few times: you keep going on as Al-A‘raf 161.',
+    ],
+  ]);
+  b.revoRemember(weakest, 'Finds Juz 17 the hardest to hold');
+  b.revoRemember(weakest, 'Memorizing Al-Baqarah, about a page a week');
+  const recite = b.revoChat('chat', 'Recitation this week', b.at(day(-5), 7, 50), [
+    ['user', 'How did my recitation go this week?'],
+    [
+      'revo',
+      'Steady: most takes were at or above 99%. Al-Kahf, ayah 75 is the one that keeps slipping, where you go on as ayah 72. Recite the mistakes again from its page once a day.',
+      ['Which words are still marked?'],
+    ],
+  ]);
+  b.revoRemember(recite, 'Practises Al-Kahf for Fridays');
+  const review = b.revoChat('review', 'Day in review', b.at(day(-1), 19, 40), [
+    ['revo', 'Yesterday’s juz is done, and the streak holds. Tomorrow starts where today ends; Juz 17 comes round in a few days.'],
+  ]);
+  b.revoRemember(review, 'Revises a juz a day, most often after Fajr');
+}
+
+/**
+ * Steady: a mid-level user six weeks in. Juz 26–30 memorized (and the end of Al-Jathiyah in part), ten pages a day
+ * without Smart Tracking: two missed days in a row a month ago, a single one a fortnight ago, a day left part way, then
+ * twelve days done, and yesterday missed. So the streak shows its grace ring (SESS-6) and Home offers yesterday's
+ * pages (CARRY-1). A few sittings, notes, recordings and Recite takes.
+ */
+function buildSteady(b: Builder): void {
+  const day = (k: number) => addDays(b.today, k);
+  b.memorize(range(502, 604), b.at(day(-120), 20));
+  b.memorizeAyahs(501, ayahKeysStartingOn(501).slice(-4), b.at(day(-60), 21), 25);
+  b.usePlan({ mode: 'pages', perDay: 10, anchorDay: day(-42) });
+  const missed = new Set([-31, -30, -22, -14]);
+  for (let k = -42; k <= -2; k++) {
+    const d = day(k);
+    if (new Date(`${d}T12:00:00Z`).getUTCDay() % 3 === 0) b.reading(b.at(d, 7, b.int(0, 30)), b.int(10, 20), b.pagesFor(d).slice(0, 3));
+    if (missed.has(k)) continue;
+    const s = b.session(d, { revise: k === -25 ? 6 : 'all', minutes: b.int(14, 24) });
+    if (k === -9 || k === -5 || k === -2) b.recording(s.createdAt + 3 * 60_000, s.assignedPages.slice(0, 2));
+    if (b.chance(0.22)) b.note(s.updatedAt + 60_000, 'revision', REVISION_NOTES[b.int(0, REVISION_NOTES.length - 1)], s.durationMinutes);
+  }
+  b.note(b.at(day(-22), 21, 30), 'note', DAY_NOTES[0]);
+  b.note(b.at(day(-1), 22, 40), 'note', 'Long day at work, no revision. Catch up tomorrow.');
+  const days: number[] = [];
+  for (let k = -14; k <= -2; k++) if (!missed.has(k) && b.chance(0.55)) days.push(k);
+  reciteTakes(b, {
+    days,
+    passages: [
+      { pages: [562, 563, 564], weight: 3 },
+      { pages: [582, 583], weight: 2 },
+      { pages: [585], weight: 2 },
+    ],
+    perDay: [1, 2],
+    strict: 0,
+    hidden: 0.2,
+    slipWrong: (s) => (s === 2 ? 0.6 : 0),
+    marks: [0.45, 0.35, 0.15, 0.05],
+  });
+}
+
+/**
+ * Starting: a newer memorizer two weeks in. Juz 30 marked at sign-up, four pages a day; Al-Mulk ayah by ayah (its
+ * first page done, the next begun two days ago); one missed day and one left part way, the last four done, nothing
+ * yet today. Notes on the memorizing, two recordings, sittings, and the first four Recite takes.
+ */
+function buildStarting(b: Builder): void {
+  const day = (k: number) => addDays(b.today, k);
+  b.memorize(juzPages(30), b.at(day(-16), 19, 30));
+  b.usePlan({ mode: 'pages', perDay: 4, anchorDay: day(-14) });
+  b.memorizeAyahs(562, ayahKeysStartingOn(562).slice(0, 5), b.at(day(-12), 6, 10), 30);
+  b.memorize([562], b.at(day(-9), 6, 20), 35);
+  b.memorizeAyahs(563, ayahKeysStartingOn(563).slice(0, 4), b.at(day(-2), 6, 15), 30);
+  for (const k of [-12, -9, -2]) b.reading(b.at(day(k), 5, 45), b.int(20, 30), k === -2 ? [563] : [562]);
+  b.reading(b.at(day(-6), 7, 10), 12, range(582, 584));
+  b.note(b.at(day(-12), 6, 50), 'memorization', 'Started Al-Mulk: the first five ayat.', 30);
+  b.note(b.at(day(-9), 7, 0), 'memorization', 'Finished the first page of Al-Mulk.', 35);
+  b.note(b.at(day(-2), 6, 55), 'memorization', 'Al-Mulk, the next ayat. Slow but steady.', 30);
+  for (let k = -14; k <= -1; k++) {
+    if (k === -5) continue;
+    // Each day's plan from the pages memorized (or begun) by then: Al-Mulk joins it as it is learned.
+    const s = b.session(day(k), { revise: k === -8 ? 2 : 'all', minutes: b.int(6, 12) }, b.pagesFor(day(k), true));
+    if (k === -6 || k === -1) b.recording(s.createdAt + 2 * 60_000, s.assignedPages.slice(0, 2));
+    if (k === -13) b.note(s.updatedAt + 60_000, 'revision', 'Juz 30 is going well. An-Naba feels solid.', s.durationMinutes);
+  }
+  // The first takes: a rough one, the same page again, then two better.
+  const naba = pageWords(582);
+  const mulk = pageWords(562);
+  const word = (from: number, n: number) => from + n;
+  b.take({
+    createdAt: b.at(day(-3), 21, 5),
+    level: 'words',
+    hidden: false,
+    from: naba[0],
+    to: naba[1],
+    secs: 88,
+    marks: [skippedMark(b.id(8), word(naba[0], 31)), harakatMark(b.id(8), word(naba[0], 18), () => 0.3), wrongWordMark(b.id(8), word(naba[0], 52), word(naba[0], 61))].filter(
+      (m): m is StoredMark => m != null,
+    ),
+  });
+  b.take({
+    createdAt: b.at(day(-2), 21, 10),
+    level: 'words',
+    hidden: false,
+    from: naba[0],
+    to: naba[1],
+    secs: 80,
+    marks: [harakatMark(b.id(8), word(naba[0], 18), () => 0.3)].filter((m): m is StoredMark => m != null),
+  });
+  b.take({ createdAt: b.at(day(-1), 6, 40), level: 'words', hidden: true, from: mulk[0], to: mulk[1], secs: 95, marks: [] });
+  const nabaTwo = pageWords(583);
+  b.take({
+    createdAt: b.at(day(-1), 21, 20),
+    level: 'words',
+    hidden: false,
+    from: nabaTwo[0],
+    to: nabaTwo[1],
+    secs: 90,
+    marks: [harakatMark(b.id(8), word(nabaTwo[0], 40), () => 0.6, 'likely')].filter((m): m is StoredMark => m != null),
+  });
+}
+
 /**
  * A built scenario as documents (paths under users/<uid>/), in the shapes the
  * app writes: Timestamps (`stamp`) where the app stores Timestamps, numbers
@@ -974,6 +1480,7 @@ export function scenarioDocuments(
         weaknessRating: p.weaknessRating,
         totalRevisionCount: p.totalRevisionCount,
         skipCount: p.skipCount,
+        ...(p.verses ? { verses: p.verses } : {}),
       },
     });
   }
@@ -1004,6 +1511,24 @@ export function scenarioDocuments(
     const { id, ...data } = rec;
     out.push({ path: `recordings/${id}`, data: { ...data, updatedAt: now } });
   }
+  for (const t of plan.takes) out.push({ path: `reciteTakes/${t.id}`, data: takeDocument(t, now) });
+  for (const c of plan.clears) out.push({ path: `reciteTakes/${c.id}`, data: clearDocument(c, now) });
+  return out;
+}
+
+/**
+ * Revo's documents of a built scenario (paths under users/<uid>/), as its functions write them
+ * (functions/src/revo/admin.ts). Apart from scenarioDocuments: only the functions write these, never the app
+ * (firestore.rules), so the rules tests leave them out.
+ */
+export function revoDocuments(plan: SeedPlan, uid: string): { path: string; data: Record<string, unknown> }[] {
+  const out: { path: string; data: Record<string, unknown> }[] = [];
+  for (const chat of plan.revoChats) {
+    const { id, messages, ...fields } = chat;
+    out.push({ path: `revoChats/${id}`, data: { ...fields, uid, turns: messages.filter((m) => m.role === 'user').length } });
+    for (const m of messages) out.push({ path: `revoChats/${id}/messages/${m.id}`, data: { ...m, uid } });
+  }
+  for (const { id, ...item } of plan.revoMemory) out.push({ path: `revoMemory/${id}`, data: { ...item, uid } });
   return out;
 }
 

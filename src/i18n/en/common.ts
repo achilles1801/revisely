@@ -55,4 +55,17 @@ export const common = {
   loading: 'Loading…',
   /** "Try again." as a sentence after an error. */
   tryAgainSentence: 'Try again.',
+  /** A link that opened nowhere (lib/openWebPage): its address follows, with Copy. */
+  pageDidNotOpen: 'Couldn’t open the page',
+  pageDidNotOpenBody: 'Copy its address to open it in a browser.\n\n{{address}}',
+  /** An email address no email app took (Settings → Contact support). */
+  emailDidNotOpen: 'Couldn’t open an email app',
+  emailDidNotOpenBody: 'Copy our address to write to us from any email app.\n\n{{address}}',
+  /** A size, kept on one line: "247 MB". */
+  megabytesTight: '{{n}}\u00a0MB',
+  gigabytes: '{{n}} GB',
+  /** The greeting at the top of Home. */
+  salam: 'Assalamu Alaikum',
+  /** A request that ran out of time. */
+  tookTooLong: 'This took too long.',
 } as const;

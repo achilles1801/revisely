@@ -9,6 +9,7 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { logger } from './logger';
+import { t } from '../i18n';
 
 export type ActivityTab = 'overview' | 'insights';
 
@@ -34,15 +35,42 @@ export const REQUIRED_SECTIONS: { [T in ActivityTab]: readonly SectionId<T>[] } 
 
 /** The names the editor shows: each section's own title where it has one. */
 export const SECTION_LABELS: { [T in ActivityTab]: Record<SectionId<T>, string> } = {
-  overview: { totals: 'Month totals', calendar: 'Calendar', key: 'Key', day: 'Day summary' },
+  overview: {
+    get totals() {
+      return t('lib.activity.sections.totals');
+    },
+    get calendar() {
+      return t('lib.activity.sections.calendar');
+    },
+    get key() {
+      return t('lib.activity.sections.key');
+    },
+    get day() {
+      return t('lib.activity.sections.day');
+    },
+  },
   insights: {
-    coverage: 'Coverage',
-    consistency: 'Consistency',
-    gaps: 'Gaps',
-    weak: 'Weak spots',
-    recitation: 'Recitation',
-    memorization: 'Memorization',
-    pace: 'Pace',
+    get coverage() {
+      return t('lib.activity.sections.coverage');
+    },
+    get consistency() {
+      return t('lib.activity.sections.consistency');
+    },
+    get gaps() {
+      return t('lib.activity.sections.gaps');
+    },
+    get weak() {
+      return t('lib.activity.sections.weak');
+    },
+    get recitation() {
+      return t('lib.activity.sections.recitation');
+    },
+    get memorization() {
+      return t('lib.activity.sections.memorization');
+    },
+    get pace() {
+      return t('lib.activity.sections.pace');
+    },
   },
 };
 
@@ -65,8 +93,8 @@ export const DEFAULT_SECTIONS: SectionsLayout = {
 
 export const activitySectionsKey = (uid: string) => `@revisely_activity_sections:v1:${uid}`;
 
-/** Testers only for now: everyone else keeps the layout as it was. */
-export const activitySectionsEnabled = (user: { previewTester?: boolean } | null | undefined) => user?.previewTester === true;
+/** Every signed-in account, from the mistake detection release (1.0.5; Majd, Nov 17 2026: Activity sections are in). */
+export const activitySectionsEnabled = (user: { previewTester?: boolean } | null | undefined) => user != null;
 
 /**
  * A tab's layout from whatever was stored: known sections only, each once, in the stored order; a section the

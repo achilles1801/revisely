@@ -4,7 +4,7 @@
 import { formatMinutesLong } from './activityFormat';
 import { queueChange } from './offline/queue';
 import { describePassage } from './passages';
-import { weekdayName } from '../i18n';
+import { t, weekdayName } from '../i18n';
 import { RecordingUndo, undoRecording } from './recordings';
 
 /** What a sitting saved, as the timer tells the screen: the pages it held and its session (null: too short to keep). */
@@ -47,7 +47,7 @@ export const sittingsEnabled = (user: { previewTester?: boolean } | null | undef
 
 /** The day as the note names it: "today", or its weekday ("Tuesday") for an earlier revision day. */
 export function sittingDayWord(day: string, today: string): string {
-  if (day === today) return 'today';
+  if (day === today) return t('lib.sitting.today');
   const [y, m, d] = day.split('-').map(Number);
   return weekdayName(new Date(y, m - 1, d));
 }
@@ -56,7 +56,10 @@ export function sittingDayWord(day: string, today: string): string {
 export function sittingSavedText(input: { day: string; today: string; pages: readonly number[]; seconds: number }): string {
   const minutes = Math.max(1, Math.round(input.seconds / 60));
   const what = input.pages.length > 0 ? describePassage(input.pages) : '';
-  return `Saved to ${sittingDayWord(input.day, input.today)}: ${[what, formatMinutesLong(minutes)].filter(Boolean).join(', ')}`;
+  return t('lib.sitting.savedTo', {
+    day: sittingDayWord(input.day, input.today),
+    what: [what, formatMinutesLong(minutes)].filter(Boolean).join(t('lib.passages.listSeparator')),
+  });
 }
 
 /**
@@ -68,8 +71,8 @@ export function sittingToReviseText(pages: readonly number[], left: readonly num
   const share =
     pages.length >= left.length
       ? pages.length === 1
-        ? 'the page left'
-        : `the ${pages.length} pages left`
-      : `${pages.length} of the ${left.length} pages left`;
-  return `${what} is ${share} of ${day}’s revision.`;
+        ? t('lib.sitting.pageLeft')
+        : t('lib.sitting.pagesLeft', { count: pages.length })
+      : t('lib.sitting.someLeft', { some: pages.length, count: left.length });
+  return day === 'today' ? t('lib.sitting.shareToday', { what, share }) : t('lib.sitting.shareYesterday', { what, share });
 }

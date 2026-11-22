@@ -7,7 +7,9 @@
 
 import { errorResponse, handleTcq, TcqEnv } from './tcq';
 import { gate, GateEnv } from './gate';
-import { withAccountNav } from './nav';
+import { injectAccountNav, withPageChange } from './nav';
+import { showReciteSection } from './recite';
+import { dressesPath, dressForRamadan, ramadanDates, ramadanOver, ramadanPhase } from './ramadan';
 
 // The Durable Object class behind TCQ_BUDGET (wrangler.jsonc).
 export { TcqBudget } from './budget';
@@ -21,6 +23,19 @@ interface Env extends TcqEnv, GateEnv {
    * 404, so they reach revisely.app only when Majd sets it there (wrangler.jsonc sends their paths here).
    */
   ACCOUNT_PAGES?: string;
+  /**
+   * "1" where the home shows its Recite section, mistake detection (dev.revisely.app until the release; recite.ts).
+   * revisely.app serves its home without the worker, so setting it there would do nothing: see recite.ts.
+   */
+  RECITE_SECTION?: string;
+  /**
+   * "1" where the site is dressed for Ramadan: lanterns, lights, the greeting (dev.revisely.app only; ramadan.ts).
+   * revisely.app serves its own pages without the worker, so setting it there would dress only the account pages.
+   */
+  RAMADAN_THEME?: string;
+  /** The first day of Ramadan and of Eid al-Fitr (YYYY-MM-DD): the theme's countdown and phases (ramadan.ts). */
+  RAMADAN_START?: string;
+  RAMADAN_EID?: string;
   /**
    * The Firebase Hosting site of the project the pages sign in to (revisely-dev.web.app on dev). Its
    * /__/firebase/init.json is the web config, served here at the same path, so no key is kept in the repository.
@@ -86,14 +101,24 @@ async function answer(request: Request, env: Env, ctx: ExecutionContext): Promis
       return errorResponse(500, 'UPSTREAM_ERROR', 'Something went wrong; try again');
     }
   }
-  if (env.ACCOUNT_PAGES !== '1') return env.ASSETS.fetch(request);
-  // dev.revisely.app: the site's own pages link the account, Premium and Open Door pages (nav.ts). A page asks the
-  // assets without its validators, so a copy cached before the navigation was added (a 304) never stands in for it.
+  const nav = env.ACCOUNT_PAGES === '1';
+  const recite = env.RECITE_SECTION === '1';
+  const dates = ramadanDates(env);
+  const now = Date.now();
+  const ramadan = env.RAMADAN_THEME === '1' && dressesPath(pathname) && !ramadanOver(now, dates);
+  if (!nav && !recite && !ramadan) return env.ASSETS.fetch(request);
+  // dev.revisely.app: the site's own pages link the account, Premium and Open Door pages (nav.ts), the home shows its
+  // Recite section (recite.ts), and every page is dressed for Ramadan (ramadan.ts). A page asks the assets without its validators, so a copy cached before either
+  // was added (a 304) never stands in for it.
   let ask = request;
   if ((request.headers.get('Accept') ?? '').includes('text/html')) {
     ask = new Request(request);
     ask.headers.delete('If-None-Match');
     ask.headers.delete('If-Modified-Since');
   }
-  return withAccountNav(await env.ASSETS.fetch(ask));
+  return withPageChange(await env.ASSETS.fetch(ask), (html) => {
+    let page = nav ? injectAccountNav(html) : html;
+    if (recite) page = showReciteSection(page);
+    return ramadan ? dressForRamadan(page, { phase: ramadanPhase(now, dates), dates, now }) : page;
+  });
 }

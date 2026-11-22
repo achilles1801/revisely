@@ -1,105 +1,86 @@
 # Revisely
 
-A Quran revision tracker that schedules daily review by pages, juz, or a custom plan, with optional Smart Tracking insights that surface weak pages.
+A Qur'an revision app for people who have memorized it. Revisely plans each day's revision by pages, juz or a
+custom schedule. It tracks what was revised, keeps a streak, and shows which parts are getting weak. It's on the App
+Store, and Android is in Play testing.
 
-Built with Expo SDK 54, React Native, and Firebase. Quran.com sign-in syncs streak and activity from Quran Foundation.
+## What's here
 
-## Stack
+| Path | What it is |
+| --- | --- |
+| `src/`, `App.tsx` | The app: Expo SDK 54, React Native 0.81 (new architecture), React 19, TypeScript (strict) |
+| `functions/` | Cloud Functions for Firebase (Revo, account deletion, config, admin tasks): their own `package.json` |
+| `worker/`, `wrangler*.jsonc` | The Cloudflare Worker that serves revisely.app (`docs/`) and its `/api` |
+| `docs/` | The website, revisely.app |
+| `admin/` | The Revisely Console (Firebase Hosting) |
+| `firestore.rules`, `storage.rules` | Security rules, tested in `tests/firestore-rules/` |
+| `tests/scenarios/` | Scenario and property tests against the Firebase emulators |
+| `.maestro/` | End-to-end flows on the iOS Simulator and the Android emulator |
+| `targets/widget/`, `modules/` | The iOS widgets (SwiftUI) and the app's own native modules |
+| `scripts/` | Release, store, CI and maintenance scripts, and the lint tools (`scripts/lint`) |
 
-- **App**: Expo (new architecture), React Native 0.81, React 19, TypeScript
-- **Backend**: Firebase Auth, Firestore, App Check
-- **Functions**: Cloud Functions v2 (account deletion; legacy memorization parser is deployed but no longer wired to the client)
-- **Tests**: Jest + RNTL, `@firebase/rules-unit-testing`, `firebase-functions-test`, Maestro
+The recitation checker and the mistake-detection lab live in a private repository.
 
 ## Setup
 
-```bash
-npm install --legacy-peer-deps
-npm --prefix functions install
-npm --prefix tests/firestore-rules install
-cp .env.example .env   # then fill in Firebase + Google client IDs
-```
-
-Place `GoogleService-Info.plist` at the project root for iOS builds.
-
-> Expo Go is not supported. The app uses native Firebase modules and the new architecture, so you need a dev client.
-
-## Run
+You need Node 20 and a development build: Expo Go can't run the app (native Firebase and the new architecture).
 
 ```bash
-npx expo start                  # JS server (use with a dev client build)
-npx expo run:ios                # build + install dev client (iOS)
-npx expo run:android            # build + install dev client (Android)
+npm ci --legacy-peer-deps
+cp .env.example .env            # then fill in the Firebase and Google values
+npx expo run:ios                # builds and installs the development build
+npx expo start --dev-client     # afterwards, the JavaScript server alone
 ```
 
-## Verify a change
+iOS builds also need `GoogleService-Info.plist` at the repository root.
 
-```bash
-npx tsc --noEmit                # type check
-npm test                        # unit + component tests
-npx expo export --platform ios  # bundle check
-```
+## Checks
 
-## Tests
+| What | Command |
+| --- | --- |
+| Types (app and worker) | `npx tsc --noEmit && npx tsc --noEmit -p worker` |
+| Lint | `npm ci --prefix scripts/lint && npx --prefix scripts/lint eslint -c scripts/lint/eslint.config.mjs .` |
+| Unit and component tests | `npm test` |
+| Cloud Functions | `npm run test:functions` |
+| Firestore rules (Java 21) | `npm run test:rules` |
+| Scenarios (Java 21) | `npm ci --prefix tests/scenarios && npm test --prefix tests/scenarios` |
+| End to end | `.maestro/README.md` |
 
-| Layer | Command | Notes |
-|---|---|---|
-| Unit + component | `npm test` | — |
-| Cloud Functions | `npm run test:functions` | — |
-| Firestore rules | `npm run test:rules` | needs Java for the emulator |
-| Everything above | `npm run test:all` | — |
-| E2E (Maestro) | `npm run test:e2e:ios` | needs Maestro + simulator + dev client |
-
-CI runs all of the above except Maestro on every PR and on every push to `develop` and `main`, via [.github/workflows/ci.yml](.github/workflows/ci.yml).
+CI (`.github/workflows/ci.yml`) runs all of these on every pull request. The one check required to merge is
+`Required`. `TESTING.md` explains the layers, what each proves, and how to add a test. `BEHAVIOUR.md` lists every
+rule the app keeps for its users; the scenario tests check them by id.
 
 ## Branches and releases
 
-| Branch | What happens on push |
-|---|---|
-| `develop` | CI, then [Preview](.github/workflows/preview.yml): the JS goes to the `preview` channel, which TestFlight installs follow (a new TestFlight build first if native code changed). Day-to-day work lands here. |
-| `main` | CI, then [Promote to production](.github/workflows/promote.yml): the update already tried in TestFlight (published from `develop` with the same app files as main) is republished to `production`, after approval. |
+- **`develop`** is where work lands, through pull requests. Each push publishes the JavaScript to the `preview`
+  channel that testers' TestFlight and Play builds follow. It builds a new binary first when native code changed.
+- **`main`** is production. A release is a pull request from `develop` into `main`. `Promote to production` then
+  republishes the update testers already ran, after the owner approves the run. Nothing else publishes to
+  production.
+- **Updates and binaries:** an update reaches only binaries built from the same native code (the runtime version
+  is a fingerprint, `fingerprint.config.js`). Store releases are made by hand.
 
-To release, try the change in TestFlight, open a PR from `develop` to `main`, merge it once CI is green, and approve the `Promote to production` run.
+**Revisely Dev** is a second app (`com.revisionbuddy.app.dev`, `APP_VARIANT=dev`) that installs beside the store
+app. It runs on its own Firebase project (`revisely-dev`), so testing never touches production data. It gets each
+develop commit on its own `dev` channel, and its site and API are at dev.revisely.app. See "Dev stack" in
+`CLAUDE.md`.
 
-**Revisely Dev** is a second app (`com.revisionbuddy.app.dev`, `APP_VARIANT=dev`) that installs beside the
-store app. It runs on its own Firebase project, so testing never touches production data, and gets each
-develop commit on its own `dev` channel after `preview`. Its site and API are at dev.revisely.app (without
-The Clear Quran: its portal gives one key per product, and revisely.app has it). How it
-fits together, and what stays off until it is set up: "Dev stack" in [CLAUDE.md](CLAUDE.md).
+## Deploying the backend
 
-The runtime version is a fingerprint of the native side, so an update only ever reaches a binary
-built from the same native code. A new library with native code, a plugin, a permission or the icon
-changes the fingerprint; the next push to `main` then builds and submits a new binary, and the update
-reaches phones once that build is installed from TestFlight. What the fingerprint counts is in
-[fingerprint.config.js](fingerprint.config.js).
-
-To build by hand, run [EAS Build](.github/workflows/build.yml) from the Actions tab. Both workflows
-need an `EXPO_TOKEN` repository secret, and read config from the `production` environment on EAS.
-
-Local development:
-
-```bash
-npx expo run:ios                # simulator with hot reload
-```
-
-## Deploy backend (Firebase)
+Rules and Cloud Functions deploy by hand. Without `--project`, these commands deploy **production** (the default in
+`.firebaserc`):
 
 ```bash
 firebase deploy --only firestore:rules
-firebase deploy --only functions
-firebase deploy --only firestore:rules,functions   # both at once
+firebase deploy --only functions:<name>
 ```
 
-These deploy production (`.firebaserc`'s default). The dev project deploys itself from develop
-([Dev backend](.github/workflows/dev-backend.yml)); by hand it is `--project revisely-dev`.
+The dev project deploys itself from develop (`.github/workflows/dev-backend.yml`). By hand, it's
+`--project revisely-dev`. Rules go live before any app code that needs them.
 
-## Layout
+`CLAUDE.md` is the full operations handbook: releases, the fingerprint, config and secrets, and each feature's
+traps. `CONTRIBUTING.md` says how to make a change.
 
-```
-src/
-  components/   context/   hooks/   lib/
-  navigation/   screens/   theme/   types/
-functions/                # Cloud Functions (Anthropic-powered parser)
-tests/firestore-rules/    # security-rules tests
-.maestro/                 # E2E flows
-```
+## Licence
+
+Copyright © 2026 Revisely LLC. All rights reserved. See `LICENSE.md`.

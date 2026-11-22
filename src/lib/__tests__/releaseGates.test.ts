@@ -13,7 +13,6 @@ import { replayOffered, walkthroughDue } from '../whatsNew/due';
 import { insightsTab, mainTabRoutes, swipeableTabCount } from '../../navigation/tabPages';
 import { needOpen } from '../../components/whatsNew/needs';
 import { revoAvailable } from '../revo/availability';
-import { reciteModeEnabled } from '../recite/availability';
 import { showsResetMyData } from '../testerReset';
 import { showsTestScenarios } from '../testScenarios';
 import { quranSearchEnabled, voiceSearchEnabled } from '../search/availability';
@@ -106,11 +105,9 @@ describe('still for testers', () => {
     expect(revoAvailable(TESTER, 'testers')).toBe(true);
   });
 
-  it.each(APP_STORE)('[RESET-2] [RESET-3] hidden recite mode, Reset my data and Load test scenario, for %o', (user) => {
-    expect(reciteModeEnabled(user)).toBe(false);
+  it.each(APP_STORE)('[RESET-2] [RESET-3] Reset my data and Load test scenario, for %o', (user) => {
     expect(showsResetMyData(user)).toBe(false);
     expect(showsTestScenarios(user)).toBe(false);
-    expect(reciteModeEnabled(TESTER)).toBe(true);
     expect(showsResetMyData(TESTER)).toBe(true);
     expect(showsTestScenarios(TESTER)).toBe(true);
   });
@@ -123,7 +120,7 @@ describe('still for testers', () => {
   });
 });
 
-describe('the mistake detection release (1.0.5): one switch, off until the release PR', () => {
+describe('the mistake detection release (1.0.5): everyone’s, through one switch', () => {
   // Outside Revisely Dev, as the store app is.
   const { reciteLiveForAccount } = require('../reciteLive/availability') as typeof import('../reciteLive/availability');
   const { gapsInsightsEnabled } = require('../insightsGaps') as typeof import('../insightsGaps');
@@ -155,13 +152,51 @@ describe('the mistake detection release (1.0.5): one switch, off until the relea
 
   it.each(APP_STORE)('on: every card of its What’s new is open, for %o (none drops out at the release)', (user) => {
     setMistakeDetectionReleasedForTests(true);
-    const { NEXT_RELEASE } = require('../help/whatsNew') as typeof import('../help/whatsNew');
-    expect(NEXT_RELEASE).not.toBeNull();
-    expect(needsOf(NEXT_RELEASE!).filter((n) => !needOpen(n, user, 'everyone'))).toEqual([]);
+    const { CURRENT_RELEASE: current, NEXT_RELEASE } = require('../help/whatsNew') as typeof import('../help/whatsNew');
+    expect(current.id).toBe('1.0.5');
+    expect(current.live).toBe(true);
+    expect(NEXT_RELEASE).toBeNull();
+    expect(needsOf(current).filter((n) => !needOpen(n, user, 'everyone'))).toEqual([]);
   });
 
-  it('develop ships it off: store users get it only with the release PR’s Promote', () => {
-    expect(MISTAKE_DETECTION_RELEASED).toBe(false);
+  it('the release PR ships it on: store users get it with this release’s Promote', () => {
+    expect(MISTAKE_DETECTION_RELEASED).toBe(true);
+  });
+
+  it.each(APP_STORE)('[ACT-29] Activity’s sections (show, hide, drag) are every account’s, for %o', (user) => {
+    const { activitySectionsEnabled } = require('../activitySections') as typeof import('../activitySections');
+    expect(activitySectionsEnabled(user)).toBe(true);
+    expect(activitySectionsEnabled(null)).toBe(false);
   });
 });
 
+
+describe('reminders while away (REMIND-2): everyone’s through one switch of its own', () => {
+  // The days after tomorrow get one reminder each (lib/reminders/plan LATER_DAYS). It can reach App Store users on
+  // its own, before or with any release: REMINDERS_WHILE_AWAY_RELEASED = true is the whole change (plus Revo's guide).
+  const variant = require('../variant') as typeof import('../variant');
+  const { remindersWhileAwayEnabled, REMINDERS_WHILE_AWAY_RELEASED, setRemindersWhileAwayReleasedForTests } =
+    require('../release/remindersWhileAway') as typeof import('../release/remindersWhileAway');
+  afterEach(() => {
+    setRemindersWhileAwayReleasedForTests(undefined);
+    jest.restoreAllMocks();
+  });
+
+  it('[REMIND-2] off: Revisely Dev has them, the store app doesn’t', () => {
+    setRemindersWhileAwayReleasedForTests(false);
+    jest.spyOn(variant, 'isDevVariant').mockReturnValue(false);
+    expect(remindersWhileAwayEnabled()).toBe(false);
+    jest.spyOn(variant, 'isDevVariant').mockReturnValue(true);
+    expect(remindersWhileAwayEnabled()).toBe(true);
+  });
+
+  it('[REMIND-2] on: the store app has them too', () => {
+    setRemindersWhileAwayReleasedForTests(true);
+    jest.spyOn(variant, 'isDevVariant').mockReturnValue(false);
+    expect(remindersWhileAwayEnabled()).toBe(true);
+  });
+
+  it('ships off until Majd opens it: Revisely Dev’s for now (Nov 21 2026)', () => {
+    expect(REMINDERS_WHILE_AWAY_RELEASED).toBe(false);
+  });
+});

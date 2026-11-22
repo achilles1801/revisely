@@ -9,7 +9,7 @@ import React, {
 } from 'react';
 import { Alert, AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Haptics from 'expo-haptics';
+import { hapticOf } from '../design/haptics';
 import * as Notifications from 'expo-notifications';
 import { useApp } from './AppContext';
 import { getCurrentRevisionDay } from '../lib/algorithm';
@@ -131,7 +131,7 @@ export function ReadingTimerProvider({ children }: { children: ReactNode }) {
   const complete = useCallback(async () => {
     const running = timerRef.current;
     if (!running || finishingRef.current) return;
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    hapticOf('success').catch(() => {});
     if (!(await finish())) return;
     alertSessionSaved(running.date, running.targetSeconds ?? 0, t('timer.sessionComplete'));
   }, [finish]);

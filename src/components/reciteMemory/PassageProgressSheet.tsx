@@ -11,14 +11,17 @@ import { formatAccuracy, mistakesLabel, scoreLevel } from '../../lib/reciteLive/
 import type { Mark } from '../../lib/reciteLive/contract';
 import type { WordMemory } from '../../lib/reciteMemory/memory';
 import { openInRange } from '../../lib/reciteMemory/memory';
-import { progressLine } from '../../lib/reciteMemory/progress';
+import { comparableTakes, progressLine } from '../../lib/reciteMemory/progress';
 import type { TakeRecord } from '../../lib/reciteMemory/record';
 import { takeWhen } from '../../lib/reciteMemory/describe';
 import { passageOf } from '../reciteLive/TakeSummarySheet';
+import { spokenText } from '../../lib/passages';
 import { markFill } from '../reciteLive/markColours';
 import { PAST_OPACITY } from './RememberedLayers';
 import { AccuracyChart } from './AccuracyChart';
 import { WordChip } from '../reciteLive/WordChip';
+import { t } from '../../i18n';
+import { forwardIcon } from '../../i18n/direction';
 
 /** A word's remembered highlight on the sheet: the page's past shade (PAST_OPACITY) as one solid colour, WordChip's fill. */
 function pastFill(palette: PaletteV2, mark: Pick<Mark, 'kind'>, isDark: boolean): string {
@@ -29,7 +32,7 @@ function pastFill(palette: PaletteV2, mark: Pick<Mark, 'kind'>, isDark: boolean)
 export function takeRange(words: QuranWords, take: TakeRecord, sura: number): string {
   const a = words.ref(take.from);
   const b = words.ref(take.to);
-  if (a.sura === sura && b.sura === sura) return a.ayah === b.ayah ? `Ayah ${a.ayah}` : `Ayahs ${a.ayah}–${b.ayah}`;
+  if (a.sura === sura && b.sura === sura) return a.ayah === b.ayah ? t('reciteMemory.passage.ayahN', { n: a.ayah }) : t('reciteMemory.passage.ayahs', { from: a.ayah, to: b.ayah });
   return passageOf(words, take.from, take.to);
 }
 
@@ -46,6 +49,7 @@ export function PassageProgressSheet({
   takes,
   memories,
   now,
+  sameStretch = false,
   onOpenTake,
   onClose,
 }: {
@@ -57,6 +61,11 @@ export function PassageProgressSheet({
   takes: TakeRecord[];
   memories: Map<string, WordMemory>;
   now: number;
+  /**
+   * Compare like with like (RMEM-7, Revisely Dev): the score, the line and the chart count only takes of the same stretch
+   * (sharing at least half of each one's words); "Your takes here" still lists every take, each with its ayat.
+   */
+  sameStretch?: boolean;
   /** A take's row: show it on the page (Activity's "Show on the page"); absent, the rows don't open. */
   onOpenTake?: (take: TakeRecord) => void;
   onClose: () => void;
@@ -65,13 +74,16 @@ export function PassageProgressSheet({
   const { width } = useWindowDimensions();
   if (!words || takes.length === 0) return <Sheet visible={false} onClose={onClose} />;
   const sura = words.ref(from).sura;
-  const latest = takes[takes.length - 1];
+  // What the score, the line and the chart compare. A sheet opened for a take's own stretch always holds that take.
+  const same = sameStretch ? comparableTakes(takes, from, to) : takes;
+  const charted = same.length > 0 ? same : takes;
+  const latest = charted[charted.length - 1];
   const level = scoreLevel(latest.accuracy);
   const scoreColor = level === 'good' ? palette.good : level === 'warn' ? palette.warn : palette.onRedSubtle;
   const open = openInRange(memories, from, to + 1);
-  const line = progressLine(takes, now);
+  const line = progressLine(charted, now);
   return (
-    <Sheet visible={visible} onClose={onClose} title="Your progress" scroll right={{ label: 'Done', onPress: onClose, strong: true }} testID="progress-sheet">
+    <Sheet visible={visible} onClose={onClose} title={t('reciteMemory.passage.title')} scroll right={{ label: t('common.done'), onPress: onClose, strong: true }} testID="progress-sheet">
       <View style={styles.head}>
         <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={1.4} testID="progress-passage">
           {passageOf(words, from, to)}
@@ -81,17 +93,22 @@ export function PassageProgressSheet({
             {formatAccuracy(latest.accuracy)}
           </Text>
           <Text style={[typeV2.meta, styles.scoreNote, { color: palette.secondary }]} maxFontSizeMultiplier={1.3} testID="progress-line">
-            {line ?? 'Your first take here'}
+            {line ?? t('reciteMemory.passage.first')}
           </Text>
         </View>
       </View>
       <View style={styles.chart}>
-        <AccuracyChart points={takes.map((t) => ({ at: t.createdAt, accuracy: t.accuracy }))} width={width - layoutV2.gutter * 2} now={now} />
+        <AccuracyChart points={charted.map((take) => ({ at: take.createdAt, accuracy: take.accuracy }))} width={width - layoutV2.gutter * 2} now={now} />
+        {charted.length < takes.length ? (
+          <Text style={[typeV2.meta, styles.sameAyat, { color: palette.secondary }]} maxFontSizeMultiplier={1.4} testID="progress-same-ayat">
+            {t('reciteMemory.passage.sameAyatOnly')}
+          </Text>
+        ) : null}
       </View>
       {open.length > 0 ? (
         <View style={styles.section}>
           <Text style={[typeV2.name, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
-            Still to fix here
+            {t('reciteMemory.passage.toFix')}
           </Text>
           <View style={styles.chips}>
             {open.map((m) =>
@@ -110,12 +127,12 @@ export function PassageProgressSheet({
         </View>
       ) : null}
       <Text style={[typeV2.name, styles.listTitle, { color: palette.text, borderTopColor: palette.separator }]} maxFontSizeMultiplier={1.4}>
-        Your takes here
+        {t('reciteMemory.passage.takes')}
       </Text>
-      {[...takes].reverse().map((t, i) => {
-        const c = scoreLevel(t.accuracy);
+      {[...takes].reverse().map((take, i) => {
+        const c = scoreLevel(take.accuracy);
         const color = c === 'good' ? palette.good : c === 'warn' ? palette.warn : palette.onRedSubtle;
-        const when = takeWhen(t.createdAt, now, true);
+        const when = takeWhen(take.createdAt, now, true);
         const row = (
           <>
             <View style={styles.rowText}>
@@ -123,31 +140,31 @@ export function PassageProgressSheet({
                 <Text style={[typeV2.name, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
                   {when}
                 </Text>
-                {t.hidden ? <Ionicons name="eye-off-outline" size={15} color={palette.secondary} accessibilityLabel="Page hidden" /> : null}
+                {take.hidden ? <Ionicons name="eye-off-outline" size={15} color={palette.secondary} accessibilityLabel={t('reciteMemory.passage.pageHidden')} /> : null}
               </View>
               <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
-                {`${takeRange(words, t, sura)} · ${mistakesLabel(t.mistakes)}`}
+                {`${takeRange(words, take, sura)} · ${mistakesLabel(take.mistakes)}`}
               </Text>
             </View>
             <Text style={[typeV2.button, typeV2.numeral, { color }]} maxFontSizeMultiplier={1.3}>
-              {formatAccuracy(t.accuracy)}
+              {formatAccuracy(take.accuracy)}
             </Text>
-            {onOpenTake ? <Ionicons name="chevron-forward" size={15} color={palette.secondary} /> : null}
+            {onOpenTake ? <Ionicons name={forwardIcon()} size={15} color={palette.secondary} /> : null}
           </>
         );
         return onOpenTake ? (
           <Tap
-            key={t.id}
-            onPress={() => onOpenTake(t)}
+            key={take.id}
+            onPress={() => onOpenTake(take)}
             style={[styles.row, i > 0 && { borderTopColor: palette.separator, borderTopWidth: layoutV2.hairline }]}
             accessibilityRole="button"
-            accessibilityLabel={`${when}, ${formatAccuracy(t.accuracy)}, ${mistakesLabel(t.mistakes)}. Show it on the page`}
+            accessibilityLabel={t('reciteMemory.passage.takeLabel', { when, ayat: spokenText(takeRange(words, take, sura)), score: formatAccuracy(take.accuracy), mistakes: mistakesLabel(take.mistakes) })}
             testID="progress-take"
           >
             {row}
           </Tap>
         ) : (
-          <View key={t.id} style={[styles.row, i > 0 && { borderTopColor: palette.separator, borderTopWidth: layoutV2.hairline }]} testID="progress-take">
+          <View key={take.id} style={[styles.row, i > 0 && { borderTopColor: palette.separator, borderTopWidth: layoutV2.hairline }]} testID="progress-take">
             {row}
           </View>
         );
@@ -163,6 +180,7 @@ const styles = StyleSheet.create({
   score: { fontSize: 38, lineHeight: 44, fontWeight: '300', letterSpacing: -1 },
   scoreNote: { paddingBottom: 7, flexShrink: 1 },
   chart: { paddingHorizontal: layoutV2.gutter, paddingTop: 6 },
+  sameAyat: { paddingTop: 4, paddingBottom: 6 },
   section: { paddingHorizontal: layoutV2.gutter, paddingTop: 8, paddingBottom: 12 },
   chips: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 6, marginTop: 6 },
   listTitle: { paddingHorizontal: layoutV2.gutter, paddingTop: 12, paddingBottom: 4, borderTopWidth: layoutV2.hairline },

@@ -19,7 +19,7 @@ export default {
     slug: "revision-buddy",
     owner: "achilles1802",
     scheme: SCHEME,
-    version: "1.0.3",
+    version: "1.0.5",
     // A hash of the native side (see fingerprint.config.js). An update reaches only
     // binaries with the same one, so JS that needs new native code never lands on a
     // build that lacks it.
@@ -162,6 +162,9 @@ export default {
       "expo-font",
       // Android dialogs', cursor's and selection handles' colour (ink, not Material's teal).
       "./plugins/withAndroidTheme",
+      // Android Auto Backup leaves out the offline mushaf, the Arabic text and the
+      // translations (they download again; with them the app passes the 25 MB quota).
+      "./plugins/withAndroidBackupRules",
       "expo-web-browser",
       // The launch screen: the R, 200 pt wide, on black (in light and dark mode
       // alike). imageWidth needs this plugin: the top-level `splash` key shows the
@@ -176,14 +179,15 @@ export default {
           backgroundColor: "#000000",
         },
       ],
-      // Verse recitation (and, later, recording yourself reciting). The pod
-      // ships recording APIs, so Apple's upload check requires a microphone
-      // purpose string even before the app records.
+      // Verse recitation, and the microphone: recordings, Recite's following along and
+      // marking mistakes (checked on Revisely's server, nothing kept), and searching the
+      // Quran by voice (on-device Whisper). Apple's upload check requires the purpose
+      // string, since the pod ships recording APIs. 1.0.5's wording waits for Majd's OK.
       [
         "expo-audio",
         {
           microphonePermission:
-            "Revisely uses the microphone to record your recitation, and to follow along word by word as you recite from memory. Following along happens on this iPhone; that audio isn't recorded or sent.",
+            "Revisely uses the microphone to record your recitation, follow along and mark your mistakes as you recite, and search the Quran by voice. Following along and marking mistakes send your recitation's audio to Revisely's server; voice search stays on this iPhone.",
           recordAudioAndroid: false,
         },
       ],

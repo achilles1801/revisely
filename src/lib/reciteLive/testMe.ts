@@ -14,6 +14,7 @@ import type { QuranWords } from '../recite/quranWords';
 import type { Mark } from './contract';
 import type { TakeSpan } from './span';
 import { furthestWord, LiveState, mistakeCount } from './state';
+import { t } from '../../i18n';
 
 /** Places in one test. */
 export const TEST_PLACES = 5;
@@ -138,6 +139,6 @@ export function testPlaceName(place: TestPlace): string {
 /** "3 of 5 continued cleanly". */
 export function testHeadline(results: readonly TestResult[]): string {
   const clean = results.filter((r) => r.outcome === 'clean').length;
-  if (results.length > 1 && clean === results.length) return `All ${clean} continued cleanly`;
-  return `${clean} of ${results.length} continued cleanly`;
+  if (results.length > 1 && clean === results.length) return t('reciteLive.allClean', { count: clean });
+  return t('reciteLive.someClean', { clean, total: results.length });
 }

@@ -12,8 +12,8 @@ import * as firestoreService from '../../services/firestoreService';
 import { typeV2 } from '../../theme/v2';
 import type { JournalNote } from '../../types';
 import { BlockMark, type BlockKind } from './BlockMark';
-import { TagChip } from './AddSheetParts';
-import { formatTime } from '../../i18n';
+import { TagChip, dayWords } from './AddSheetParts';
+import { formatTime, t } from '../../i18n';
 
 type TagOption = { tag: string; label: string; kind: BlockKind };
 
@@ -21,9 +21,9 @@ type TagOption = { tag: string; label: string; kind: BlockKind };
 async function tagOptionsFor(day: string): Promise<TagOption[]> {
   const items = await firestoreService.getActivityItemsForDay(day);
   return [
-    ...(items.revisions.some((r) => r.countsFor === day) ? [{ tag: tagFor('revision', day), label: 'Revised', kind: 'revised' as const }] : []),
-    ...items.memorized.map((m) => ({ tag: tagFor('memorization', m.id), label: 'Memorized', kind: 'memorized' as const })),
-    ...items.reads.map((r) => ({ tag: tagFor('read', r.id), label: 'Read', kind: 'read' as const })),
+    ...(items.revisions.some((r) => r.countsFor === day) ? [{ tag: tagFor('revision', day), label: t('activity.day.revised'), kind: 'revised' as const }] : []),
+    ...items.memorized.map((m) => ({ tag: tagFor('memorization', m.id), label: t('activity.day.memorized'), kind: 'memorized' as const })),
+    ...items.reads.map((r) => ({ tag: tagFor('read', r.id), label: t('activity.day.read'), kind: 'read' as const })),
   ];
 }
 
@@ -86,17 +86,17 @@ export function AddNoteSheet({
     }
   };
 
-  const stamp = `${capitalized(dayName)} · ${formatTime(now)}`;
+  const stamp = `${capitalized(dayWords(dayName))} · ${formatTime(now)}`;
 
   return (
     <Sheet
       visible={visible}
       onClose={onClose}
-      title="Note"
+      title={t('activity.add.note')}
       titleMark={<BlockMark kind="notes" size={24} />}
       headerRule="full"
-      left={{ label: 'Cancel', onPress: onClose }}
-      right={{ label: saving ? 'Saving…' : 'Add', onPress: handleAdd, strong: true, accent: true, disabled: !canAdd, testID: 'add-note-add' }}
+      left={{ label: t('common.cancel'), onPress: onClose }}
+      right={{ label: saving ? t('common.saving') : t('activity.add.add'), onPress: handleAdd, strong: true, accent: true, disabled: !canAdd, testID: 'add-note-add' }}
       keyboard
       testID="add-note-sheet"
     >
@@ -108,20 +108,20 @@ export function AddNoteSheet({
           testID="add-note-text"
           value={text}
           onChangeText={setText}
-          placeholder="Write a note"
+          placeholder={t('activity.add.writeNote')}
           placeholderTextColor={palette.secondary}
           selectionColor={palette.primary}
           multiline
           autoFocus
           keyboardAppearance={isDark ? 'dark' : 'light'}
-          accessibilityLabel="Note"
+          accessibilityLabel={t('activity.add.note')}
           style={[styles.input, { color: palette.text }]}
         />
 
         {options.length > 0 && (
           <View style={styles.tagRow}>
             <Text style={[typeV2.meta, styles.tagLabel, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
-              Show under
+              {t('activity.add.showUnder')}
             </Text>
             {options.map((o) => (
               <TagChip

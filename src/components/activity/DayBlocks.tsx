@@ -15,11 +15,15 @@ import { getFajrTimeFor } from '../../lib/fajrBoundary';
 import { PageStrip, StrengthCounts, StripSummary, WindowFooter } from './DayParts';
 import { DayBlock, ItemLine, PageChip } from './DayBlockFrame';
 import { BlockMark, RevisedMark } from './BlockMark';
-import { creditLine, formatMinutesLong, windowFooter } from '../../lib/activityFormat';
+import { creditLine, dayTitle, formatMinutesLong, windowFooter } from '../../lib/activityFormat';
 import { describePassage } from '../../lib/passages';
 import { RecordingsList } from '../recordings/RecordingsList';
-import { RecitedMark, TakeDayItem, takeLine, useQuranWordsWhen, type TakeMenuAction } from '../reciteMemory/TakeRows';
+import { RecitedMark, TakeDayRow, dayTakeLine, useQuranWordsWhen, type TakeMenuAction } from '../reciteMemory/TakeRows';
+import { ActionSheet } from '../v2/ActionSheet';
 import { passageOf } from '../reciteLive/TakeSummarySheet';
+import { RecitedSheet } from '../reciteMemory/RecitedSheet';
+import { deleteTake } from '../../lib/reciteMemory/apart';
+import { useTakeRecordings } from '../../lib/reciteMemory/takeAudio';
 import { takeAttachment } from '../../lib/revo/recitation';
 import { openRevo } from '../../lib/revo/open';
 import { useRevoPresent } from '../../lib/revo/presence';
@@ -28,6 +32,7 @@ import { clearedBy } from '../../lib/reciteMemory/memory';
 import type { TakeRecord } from '../../lib/reciteMemory/record';
 import { reciteLiveForAccount } from '../../lib/reciteLive/availability';
 import { listRecordings, type RecordingMeta } from '../../lib/recordings';
+import { sortTakeAudio } from '../../lib/reciteMemory/apart';
 import { describeSurahRuns, describeSurahs, pageRuns } from '../../lib/pageRanges';
 import { logger } from '../../lib/logger';
 import { parseTag } from '../../lib/noteTags';
@@ -62,12 +67,15 @@ import { smartTrackingOn } from '../../lib/smartTracking';
 import { juzOfPages } from '../../lib/juzSheet';
 import { PillButton } from '../v2/PillButton';
 import type { UserPage } from '../../types';
-import { formatDate, formatTime } from '../../i18n';
+import { formatDate, formatTime, t } from '../../i18n';
 
 const EMPTY_DAY: DayItems = { revisions: [], memorized: [], reads: [], doneAhead: [] };
 
 /** The day's blocks, by the names Overview's preview rows use for them. */
-export type DayBlockKind = 'revised' | 'memorized' | 'read' | 'notes';
+export type DayBlockKind = 'revised' | 'memorized' | 'read' | 'notes' | 'recited';
+
+/** Takes a day lists in its Recited block; past this, the newest TAKES_SHOWN − 1 and "All N takes" (the Recited sheet). */
+export const TAKES_SHOWN = 5;
 
 /** Whether the Activity blocks show (every account since the November 2026 release): lib/activityBlocks. */
 export { activityBlocksEnabled } from '../../lib/activityBlocks';
@@ -100,6 +108,8 @@ interface Props {
   onOpenRecording: (id: string) => void;
   /** A recitation take on its page with its marks (Recite's memory, Revisely Dev). */
   onShowTake?: (take: TakeRecord, page: number) => void;
+  /** All activity's Recitations (the Recited sheet's All recitations). */
+  onSeeAllTakes?: () => void;
   /** Deletes a timed session (the screen confirms first). */
   onDeleteReading: (session: ReadingSession) => void;
   /** Memorized today, on an automatic plan: put the pages first tomorrow (Insights' Plan it). */
@@ -135,7 +145,7 @@ export const timeRange = (start: number | null | undefined, minutes: number | nu
 };
 
 /** A timed sitting by what it held: "Al-Mulk, ayahs 1–26" (REC-2); "Timed in Read" with no pages. */
-const sittingName = (pages: number[]) => (pages.length > 0 ? describePassage(pages) : 'Timed in Read');
+const sittingName = (pages: number[]) => (pages.length > 0 ? describePassage(pages) : t('activity.day.timedInRead'));
 
 /** "1 page", "18 pages". */
 const pagesWord = (n: number) => `${n} ${n === 1 ? 'page' : 'pages'}`;
@@ -150,8 +160,8 @@ const subline = (parts: (string | null | undefined)[]) => {
 /** Destructive actions confirm first, and name what goes (Activity spec section 3). */
 function confirmDelete(title: string, message: string, onConfirm: () => void) {
   Alert.alert(title, message, [
-    { text: 'Cancel', style: 'cancel' },
-    { text: 'Delete', style: 'destructive', onPress: onConfirm },
+    { text: t('common.cancel'), style: 'cancel' },
+    { text: t('common.delete'), style: 'destructive', onPress: onConfirm },
   ]);
 }
 
@@ -173,6 +183,7 @@ export function DayBlocks({
   onFocusBlockLayout,
   onOpenRecording,
   onShowTake,
+  onSeeAllTakes,
   onDeleteReading,
   onReviseTomorrow,
   onEditSchedule,
@@ -272,7 +283,8 @@ export function DayBlocks({
         const shown = withPending(EMPTY_DAY);
         if (shown !== EMPTY_DAY) setItems(shown);
       });
-    listRecordings()
+    sortTakeAudio()
+      .then(() => listRecordings())
       .then((all) => setRecs(all.filter((r) => r.day === day)))
       .catch((err) => logger.warn('Could not list the day’s recordings', err));
   }, [day]);
@@ -282,35 +294,58 @@ export function DayBlocks({
     () => memoryRecords.filter((r): r is TakeRecord => r.kind === 'take' && !r.deleted && r.day === day).sort((a, b) => a.createdAt - b.createdAt),
     [memoryRecords, day],
   );
+  const newestTakes = useMemo(() => [...dayTakes].reverse(), [dayTakes]);
   const takeRecordings = useMemo(() => new Set(dayTakes.map((t) => t.recordingId).filter((id): id is string => id != null)), [dayTakes]);
   const notTake = useCallback((r: RecordingMeta) => !takeRecordings.has(r.id), [takeRecordings]);
   const takeWords = useQuranWordsWhen(dayTakes.length > 0);
+  // The day's takes in their own block (RMEM-5, RMEM-6), each a row of its own; a day with more than TAKES_SHOWN has
+  // the rest in the Recited sheet. A day opened at its takes (the take summary's "In today's Recited") scrolls to them.
+  const [recitedOpen, setRecitedOpen] = useState(false);
+  // A take held in the block: its menu.
+  const [heldTake, setHeldTake] = useState<TakeRecord | null>(null);
+  const takeAudio = useTakeRecordings(dayTakes.length > 0);
   // A take's menu (RINS-3): Show on the page, and Ask Revo about this take while Revo is on (the take goes with
   // the question, as Revo's + attaches it).
   const revoOn = useRevoPresent();
+  const showTake = (take: TakeRecord) => {
+    if (!takeWords) return;
+    setRecitedOpen(false);
+    onShowTake?.(take, takeWords.pageOf(take.from));
+  };
   const takeActions = (take: TakeRecord): TakeMenuAction[] => {
     if (!takeWords) return [];
-    const out: TakeMenuAction[] = [{ key: 'show', label: 'Show on the page', onPress: () => onShowTake?.(take, takeWords.pageOf(take.from)) }];
+    const out: TakeMenuAction[] = [{ key: 'show', label: t('activity.day.showOnPage'), onPress: () => showTake(take) }];
     if (revoOn) {
       out.push({
         key: 'ask-revo',
-        label: 'Ask Revo about this take',
+        label: t('activity.day.askRevoTake'),
         onPress: () => {
+          setRecitedOpen(false);
           const attach = takeAttachment(memoryRecords, take, takeWords, today);
           openRevo(attach ? { attach } : {});
         },
       });
     }
+    // A take is no recording (RMEM-6): it is deleted here, with its marks and its audio.
+    if (user?.id) {
+      const uid = user.id;
+      out.push({
+        key: 'delete',
+        label: t('activity.day.deleteTake'),
+        onPress: () =>
+          Alert.alert(t('activity.day.deleteTakeTitle'), t('activity.day.deleteTakeBody'), [
+            { text: t('common.cancel'), style: 'cancel' },
+            {
+              text: t('common.delete'),
+              style: 'destructive',
+              onPress: () => {
+                deleteTake(uid, take).catch((err) => logger.warn('Could not delete the take', err));
+              },
+            },
+          ]),
+      });
+    }
     return out;
-  };
-  const takeMenu = (take: TakeRecord, cleared: number) => {
-    const actions = takeActions(take);
-    if (!takeWords || actions.length === 0) return;
-    setMenu({
-      title: passageOf(takeWords, take.from, take.to),
-      text: takeLine(take, cleared),
-      actions: actions.map((a) => ({ ...a, icon: a.key === 'ask-revo' ? 'sparkles-outline' : 'book-outline' })),
-    });
   };
   const revRecs = recs.filter((r) => r.kind === 'revision');
   const readRecs = recs.filter((r) => r.kind === 'reading' && notTake(r));
@@ -346,7 +381,7 @@ export function DayBlocks({
   // the entry; with several entries each pair names its own.
   const oneMemorized = memorized.items.length === 1;
   const memorizedMenu = headerMenu(
-    'Memorized',
+    t('activity.day.memorized'),
     memorized.items.flatMap((i) => {
       const name = oneMemorized ? '' : ` ${describePassage(i.pages, { form: 'short' })}`;
       return [
@@ -360,9 +395,9 @@ export function DayBlocks({
           destructive: true,
           onPress: () =>
             confirmDelete(
-              'Delete this memorization?',
+              t('activity.day.deleteMemorizationTitle'),
               // Its own ayahs (ACT-7): an entry for part of a page names that part.
-              `${describeAyahs(ayahsOfItem(i), { form: 'compact' })} goes back to not memorized.`,
+              t('activity.day.backToNotMemorized', { ayahs: describeAyahs(ayahsOfItem(i), { form: 'compact' }) }),
               () => onDeleteMemorized({ id: i.id, day, pages: i.pages, ...(i.verses ? { verses: i.verses } : {}) }),
             ),
         },
@@ -371,14 +406,14 @@ export function DayBlocks({
     oneMemorized ? describePassage(memorized.items[0].pages) : undefined,
   );
   const readMenu = headerMenu(
-    'Read',
+    t('activity.day.read'),
     readItems.items.flatMap((i) => {
       const session = readings.find((r) => r.id === i.id);
       if (!session) return [];
-      const label = timeRange(i.occurredAt, i.minutes) || (i.pages.length > 0 ? describePassage(i.pages, { form: 'short' }) : 'session');
+      const label = timeRange(i.occurredAt, i.minutes) || (i.pages.length > 0 ? describePassage(i.pages, { form: 'short' }) : t('activity.day.session'));
       return [
-        { key: `edit-${i.id}`, label: `Edit ${label}`, icon: 'create-outline' as const, onPress: () => onEditReading(session) },
-        { key: `delete-${i.id}`, label: `Delete ${label}`, icon: 'trash-outline' as const, destructive: true, onPress: () => onDeleteReading(session) },
+        { key: `edit-${i.id}`, label: t('activity.day.editThing', { label }), icon: 'create-outline' as const, onPress: () => onEditReading(session) },
+        { key: `delete-${i.id}`, label: t('activity.day.deleteThing', { label }), icon: 'trash-outline' as const, destructive: true, onPress: () => onDeleteReading(session) },
       ];
     }),
   );
@@ -406,18 +441,18 @@ export function DayBlocks({
   // entry added by hand had no way out before (Nov 2026).
   const sessionRevised = revisedLog ? new Set(revisedLog.pagesRevised).size : 0;
   const handAdded = (items?.revisions ?? []).filter((r) => r.day === day && r.countsFor === day && isManualRevisionId(r.id) && r.pages.length > 0);
-  const revisedMenu = headerMenu('Revised', [
+  const revisedMenu = headerMenu(t('activity.day.revised'), [
     ...(revisedLog
       ? [
           {
             key: 'delete',
-            label: 'Delete this session',
+            label: t('activity.day.deleteSession'),
             icon: 'trash-outline' as const,
             destructive: true,
             onPress: () =>
               confirmDelete(
-                'Delete this session?',
-                `Its ${sessionRevised} revised ${sessionRevised === 1 ? 'page' : 'pages'} leave the day’s Revised block.`,
+                t('activity.day.deleteSessionTitle'),
+                t('activity.day.deleteSessionBody', { count: sessionRevised }),
                 () => onDeleteRevised(revisedLog),
               ),
           },
@@ -425,11 +460,11 @@ export function DayBlocks({
       : []),
     ...handAdded.map((a) => ({
       key: `delete-${a.id}`,
-      label: `Delete ${describePassage(a.pages, { form: 'short' })}, added by hand`,
+      label: t('activity.day.deleteHandAdded', { passage: describePassage(a.pages, { form: 'short' }) }),
       icon: 'trash-outline' as const,
       destructive: true,
       onPress: () =>
-        confirmDelete('Delete these pages?', `${describePassage(a.pages)} leaves the day’s Revised block.`, () => {
+        confirmDelete(t('activity.day.deletePagesTitle'), t('activity.day.deletePagesBody', { passage: describePassage(a.pages) }), () => {
           queueChange({ kind: 'revision.delete', day, id: a.id })
             // The pages' last revised day and count go back without it (ACT-16).
             .then(() => refreshPageStates?.())
@@ -441,7 +476,7 @@ export function DayBlocks({
   // A tagged note (ACT-11): "Note · 9:40 PM", then its text.
   const noteItem = (n: JournalNote) => (
     <ItemLine key={n.id} icon="document-text-outline">
-      <Text style={[typeV2.meta, { color: palette.secondary }]}>{`Note · ${timeOf(n.at)}`}</Text>
+      <Text style={[typeV2.meta, { color: palette.secondary }]}>{t('activity.day.noteAt', { time: timeOf(n.at) })}</Text>
       <Text style={[typeV2.body, { color: palette.text }]}>{n.text.trim()}</Text>
     </ItemLine>
   );
@@ -483,7 +518,7 @@ export function DayBlocks({
     ? (() => {
         const mine = new Set(memorizedAyahsOnPage(lastPartly));
         const rest = ayahsOnPage(lastPartly.pageNumber).filter((k) => !mine.has(k));
-        return rest.length > 0 ? `${describeAyahs(rest, { form: 'compact' })} finishes the page` : null;
+        return rest.length > 0 ? t('activity.day.finishesPage', { ayahs: describeAyahs(rest, { form: 'compact' }) }) : null;
       })()
     : null;
   // A sitting whose pages were memorized that day stands under Memorized, not Read.
@@ -503,7 +538,7 @@ export function DayBlocks({
       const planned = new Set(user.customPlan.days.flat());
       const outside = mine.filter((p) => !planned.has(p));
       if (outside.length === 0 || !onAddToPlan) return null;
-      return { title: 'Not in your custom plan yet', links: [{ label: 'Add to your plan', arrow: true, onPress: () => onAddToPlan(outside), id: 'activity-add-to-plan' }] };
+      return { title: t('activity.day.notInCustomPlan'), links: [{ label: t('activity.day.addToPlan'), arrow: true, onPress: () => onAddToPlan(outside), id: 'activity-add-to-plan' }] };
     }
     const [y, m, d] = today.split('-').map(Number);
     const days = scheduledDaysFrom(user, revisablePages(pages), new Date(y, m - 1, d + 1), 60);
@@ -512,21 +547,21 @@ export function DayBlocks({
       at < 0
         ? null
         : at === 0
-          ? 'tomorrow'
-          : formatDate(new Date(y, m - 1, d + 1 + at), { weekday: 'long', day: 'numeric', month: 'long' }, 'en-GB');
+          ? t('activity.day.inRevisionTomorrow')
+          : t('activity.day.inRevisionFrom', { when: formatDate(new Date(y, m - 1, d + 1 + at), { weekday: 'long', day: 'numeric', month: 'long' }, 'en-GB') });
     // Already first tomorrow (its link was tapped, or Insights put them there): it says so, and the link
     // goes, so it can't be tapped twice (ACT-24).
     const first = allFirstTomorrow(mine, firstTomorrowPages(user, shiftDay(today, 1)));
     const links = [
-      ...(onReviseTomorrow && at !== 0 && !first ? [{ label: 'Revise them tomorrow', arrow: false, onPress: () => onReviseTomorrow(mine), id: 'activity-revise-tomorrow' }] : []),
-      ...(onEditSchedule ? [{ label: 'Edit schedule', arrow: true, onPress: onEditSchedule, id: 'activity-edit-schedule' }] : []),
+      ...(onReviseTomorrow && at !== 0 && !first ? [{ label: t('activity.day.reviseTomorrow'), arrow: false, onPress: () => onReviseTomorrow(mine), id: 'activity-revise-tomorrow' }] : []),
+      ...(onEditSchedule ? [{ label: t('activity.day.editSchedule'), arrow: true, onPress: onEditSchedule, id: 'activity-edit-schedule' }] : []),
     ];
-    return { title: first ? 'First in tomorrow’s revision' : when ? `In your revision from ${when}` : 'In your revision', links };
+    return { title: first ? t('activity.day.firstTomorrow') : (when ?? t('activity.day.inRevision')), links };
   })();
   const sittingRow = (i: { id: string; pages: number[]; minutes: number | null; occurredAt?: number | null }) => {
     const session = readings.find((r) => r.id === i.id);
     return (
-      <Tap onPress={() => session && onEditReading(session)} accessibilityRole="button" accessibilityLabel={`${sittingName(i.pages)}. Edit pages`}>
+      <Tap onPress={() => session && onEditReading(session)} accessibilityRole="button" accessibilityLabel={t('activity.day.sittingEdit', { name: sittingName(i.pages) })}>
         <ItemLine icon="stopwatch-outline" right={timeRange(i.occurredAt, i.minutes)}>
           {/* What the sitting held, by surah and ayah (REC-2), or "Timed in Read" when no pages are known. */}
           <Text style={[typeV2.body, { color: palette.text }]}>{sittingName(i.pages)}</Text>
@@ -600,10 +635,10 @@ export function DayBlocks({
           {open.length > 0 ? (
             <View style={styles.offer} testID={`activity-sitting-offer-${i.id}`}>
               <Text style={[typeV2.meta, { color: palette.secondary }]}>
-                {`${describePassage(open)} ${open.some((p) => pageByNumber.get(p)?.status === 'in_progress') ? 'isn’t all memorized yet.' : 'isn’t memorized yet.'}`}
+                {t(open.some((p) => pageByNumber.get(p)?.status === 'in_progress') ? 'activity.day.notAllMemorized' : 'activity.day.notMemorized', { passage: describePassage(open) })}
               </Text>
               <PillButton
-                title="Add to memorized"
+                title={t('activity.day.addToMemorized')}
                 variant="outline"
                 size="sm"
                 icon="leaf-outline"
@@ -621,7 +656,7 @@ export function DayBlocks({
                 {sittingToReviseText(toRevise.pages, toRevise.left, reviseWord)}
               </Text>
               <PillButton
-                title="Add to revised"
+                title={t('activity.day.addToRevised')}
                 variant="outline"
                 size="sm"
                 icon={REVISED_ICON}
@@ -642,7 +677,7 @@ export function DayBlocks({
   ];
   const notesItems: React.ReactNode[] = notesBlock.map((n) => (
     // Editing happens in the log: a note here only opens it (no swipe, no menu).
-    <Tap key={n.id} onPress={onOpenLog} accessibilityRole="button" accessibilityLabel="Daily log. Open the log">
+    <Tap key={n.id} onPress={onOpenLog} accessibilityRole="button" accessibilityLabel={t('activity.day.openLog')}>
       <Text style={[typeV2.meta, { color: palette.secondary }]}>{timeOf(n.at)}</Text>
       <Text style={[typeV2.body, { color: palette.text }]} numberOfLines={4}>
         {n.text.trim()}
@@ -673,7 +708,7 @@ export function DayBlocks({
   );
   const revisedSubline =
     left > 0
-      ? subline([revised.juzLabel, revised.minutes != null ? formatMinutesLong(revised.minutes) : null, `${left} not revised`])
+      ? subline([revised.juzLabel, revised.minutes != null ? formatMinutesLong(revised.minutes) : null, t('activity.day.notRevisedCount', { n: left })])
       : subline([revised.juzLabel, assignedSurahs, revised.minutes != null ? formatMinutesLong(revised.minutes) : null]);
 
   return (
@@ -686,8 +721,8 @@ export function DayBlocks({
               done={revised.assigned.length > 0 && assignedDone >= revised.assigned.length}
             />
           }
-          title="Revised"
-          figure={revised.assigned.length > 0 ? `${assignedDone} of ${revised.assigned.length}` : undefined}
+          title={t('activity.day.revised')}
+          figure={revised.assigned.length > 0 ? t('common.nOfTotal', { n: assignedDone, total: revised.assigned.length }) : undefined}
           subline={revisedSubline}
           summary={
             revised.assigned.length > 0 ? (
@@ -712,7 +747,7 @@ export function DayBlocks({
                 }
               : undefined
           }
-          pressHint={dayJuz != null ? `Opens Juz ${dayJuz}` : undefined}
+          pressHint={dayJuz != null ? t('activity.day.opensJuz', { juz: dayJuz }) : undefined}
           onLayout={layoutFor('revised')}
           testID="activity-block-revised"
         />
@@ -720,7 +755,7 @@ export function DayBlocks({
       {hasMemorized && (
         <DayBlock
           mark={<BlockMark kind="memorized" />}
-          title="Memorized"
+          title={t('activity.day.memorized')}
           // In ayahs when part of a page was memorized (MEM-1), else in pages.
           figure={
             memorized.items.length === 0
@@ -746,7 +781,9 @@ export function DayBlocks({
                   />
                 ))}
                 <Text style={[typeV2.meta, styles.chipsNote, { color: palette.secondary }]}>
-                  {partlyHere.length > 0 ? `${percentOf(memorizedPageShare(pages))} of the Quran in all` : `${memorizedSet.size} pages memorized in all`}
+                  {partlyHere.length > 0
+                    ? t('activity.day.quranShareInAll', { share: percentOf(memorizedPageShare(pages)) })
+                    : t('activity.day.pagesMemorizedInAll', { count: memorizedSet.size })}
                 </Text>
                 {finishesIt ? (
                   <Text style={[typeV2.meta, styles.finishes, { color: palette.secondary }]} testID="activity-finishes-page">
@@ -765,7 +802,7 @@ export function DayBlocks({
       {(readHere.length > 0 || (readRecs.length > 0 && nested.length === 0)) && (
         <DayBlock
           mark={<BlockMark kind="read" />}
-          title="Read"
+          title={t('activity.day.read')}
           figure={readHere.length > 0 ? pagesWord(readHere.reduce((n, i) => n + i.pages.length, 0)) : undefined}
           subline={subline([surahsOf(readHere.flatMap((i) => i.pages)), readHere.reduce((n, i) => n + (i.minutes ?? 0), 0) > 0 ? formatMinutesLong(readHere.reduce((n, i) => n + (i.minutes ?? 0), 0)) : null])}
           items={readItemNodes}
@@ -775,33 +812,87 @@ export function DayBlocks({
         />
       )}
       {dayTakes.length > 0 && (
+        // The day's takes, each a row (RMEM-5): apart from its recordings (RMEM-6), but there to see.
         <DayBlock
           mark={<RecitedMark />}
-          title="Recited"
-          figure={dayTakes.length === 1 ? '1 take' : `${dayTakes.length} takes`}
+          title={t('activity.day.recited')}
+          figure={t('activity.day.takes', { count: dayTakes.length })}
           subline={subline([
             takeWords ? surahsOf(dayTakes.map((t) => takeWords.pageOf(t.from))) : null,
             formatMinutesLong(Math.max(1, Math.round(dayTakes.reduce((n, t) => n + t.secs, 0) / 60))),
           ])}
-          items={dayTakes.map((t) => (
-            <TakeDayItem
-              key={t.id}
-              take={t}
-              words={takeWords}
-              cleared={clearedBy(memoryRecords, t).length}
-              onShow={(take) => takeWords && onShowTake?.(take, takeWords.pageOf(take.from))}
-              onOpenRecording={onOpenRecording}
-              onHold={() => takeMenu(t, clearedBy(memoryRecords, t).length)}
-              actions={takeActions(t)}
-            />
-          ))}
+          items={[
+            // Newest first, as the take's summary leaves it: the one just recited is at the top.
+            ...(dayTakes.length > TAKES_SHOWN ? newestTakes.slice(0, TAKES_SHOWN - 1) : newestTakes).map((t) => (
+              <TakeDayRow
+                key={t.id}
+                take={t}
+                words={takeWords}
+                cleared={clearedBy(memoryRecords, t).length}
+                playable={t.recordingId != null && takeAudio.has(t.recordingId)}
+                onShow={showTake}
+                onPlay={onOpenRecording}
+                onHold={() => setHeldTake(t)}
+                actions={takeActions(t)}
+              />
+            )),
+            ...(dayTakes.length > TAKES_SHOWN
+              ? [
+                  <Tap key="all-takes" onPress={() => setRecitedOpen(true)} accessibilityRole="button" hitSlop={6} testID="activity-takes-all">
+                    <Text style={[typeV2.body, { color: palette.link }]} maxFontSizeMultiplier={1.4}>
+                      {t('activity.day.allTakes', { count: dayTakes.length })}
+                    </Text>
+                  </Tap>,
+                ]
+              : []),
+          ]}
+          onLayout={layoutFor('recited')}
           testID="activity-block-recited"
         />
       )}
+      {dayTakes.length > 0 ? (
+        <ActionSheet
+          visible={heldTake != null}
+          onClose={() => setHeldTake(null)}
+          title={heldTake && takeWords ? passageOf(takeWords, heldTake.from, heldTake.to) : t('activity.day.recited')}
+          message={heldTake ? dayTakeLine(heldTake, clearedBy(memoryRecords, heldTake).length) : undefined}
+          actions={(heldTake ? takeActions(heldTake) : []).map((a) => ({
+            ...a,
+            icon: a.key === 'ask-revo' ? 'sparkles-outline' : a.key === 'delete' ? 'trash-outline' : 'book-outline',
+            destructive: a.key === 'delete',
+          }))}
+          testID="activity-take-menu"
+        />
+      ) : null}
+      {dayTakes.length > 0 ? (
+        <RecitedSheet
+          visible={recitedOpen}
+          dayLabel={dayTitle(day, today).title}
+          takes={dayTakes}
+          words={takeWords}
+          clearedOf={(t) => clearedBy(memoryRecords, t).length}
+          playable={takeAudio}
+          onShow={showTake}
+          onPlay={(id) => {
+            setRecitedOpen(false);
+            onOpenRecording(id);
+          }}
+          actionsFor={takeActions}
+          onSeeAll={
+            onSeeAllTakes
+              ? () => {
+                  setRecitedOpen(false);
+                  onSeeAllTakes();
+                }
+              : undefined
+          }
+          onClose={() => setRecitedOpen(false)}
+        />
+      ) : null}
       {notesBlock.length > 0 && (
         <DayBlock
           mark={<BlockMark kind="notes" />}
-          title="Notes"
+          title={t('activity.day.notes')}
           figure={String(notesBlock.length)}
           items={notesItems}
           onLayout={layoutFor('notes')}
@@ -821,7 +912,7 @@ export function DayBlocks({
           const itemPagesBefore = memorizedPages;
           const itemAyahsBefore = new Set(memorized.items.flatMap((i) => ayahsOfItem(i)));
           onUndoOffer?.({
-            text: `${describeAyahs(added.ayahs)} marked memorized`,
+            text: t('activity.day.markedMemorized', { ayahs: describeAyahs(added.ayahs) }),
             undo: () => {
               // Each page back as it was, and the ayahs it brought out of this day's item alone (MEM-3,
               // ACT-7: another day's item keeps the ayahs it holds).

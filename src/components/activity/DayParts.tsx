@@ -11,6 +11,7 @@ import { typeV2 } from '../../theme/v2';
 import { Tap } from '../v2/Tap';
 import { describePassage, pageRunEnds, spokenText } from '../../lib/passages';
 import type { StripCell, Strength } from '../../lib/activityDayParts';
+import { t } from '../../i18n';
 
 /** The Revised mark: a ring filled to the share revised; a check when done. */
 export function ProgressRing({ fraction, done, size = 40 }: { fraction: number; done: boolean; size?: number }) {
@@ -20,7 +21,7 @@ export function ProgressRing({ fraction, done, size = 40 }: { fraction: number; 
   const c = 2 * Math.PI * r;
   const f = Math.max(0, Math.min(1, fraction));
   return (
-    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }} accessibilityLabel={`${Math.round(f * 100)} percent revised`}>
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }} accessibilityLabel={t('activity.marks.percentRevised', { n: Math.round(f * 100) })}>
       <Svg width={size} height={size}>
         <Circle cx={size / 2} cy={size / 2} r={r} stroke={palette.track} strokeWidth={stroke} fill="none" />
         <Circle
@@ -40,7 +41,8 @@ export function ProgressRing({ fraction, done, size = 40 }: { fraction: number; 
   );
 }
 
-const CELL_STATE: Record<StripCell['state'], string> = { revised: 'revised', skipped: 'skipped', 'not-reached': 'not reached' };
+const cellState = (state: StripCell['state']): string =>
+  state === 'revised' ? t('activity.marks.revised') : state === 'skipped' ? t('activity.marks.skipped') : t('activity.marks.notReached');
 
 /**
  * One cell per assigned page (gap audit §4): revised primary, skipped hollow, not reached dimmed, a red
@@ -63,8 +65,8 @@ export function PageStrip({ cells, onOpenPage }: { cells: StripCell[]; onOpenPag
               onPress={onOpenPage ? () => onOpenPage(c.page) : undefined}
               disabled={!onOpenPage}
               accessibilityRole="button"
-              accessibilityLabel={`${spokenText(describePassage([c.page]))}, ${CELL_STATE[c.state]}${c.weak ? ', weak' : ''}`}
-              accessibilityHint={onOpenPage ? 'Opens in the reader' : undefined}
+              accessibilityLabel={t(c.weak ? 'activity.marks.stripCellWeak' : 'activity.marks.stripCell', { passage: spokenText(describePassage([c.page])), state: cellState(c.state) })}
+              accessibilityHint={onOpenPage ? t('activity.juz.opensInReader') : undefined}
               hitSlop={{ top: 8, bottom: 8 }}
               style={styles.stripCol}
               testID={`strip-page-${c.page}`}

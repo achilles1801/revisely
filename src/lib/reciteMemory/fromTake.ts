@@ -59,6 +59,8 @@ export function recordFromTake(state: LiveState, words: QuranWords, ctx: TakeCon
     marks: marks.slice(0, MAX_MARKS),
     passed: passed.slice(0, MAX_PASSED),
     recordingId: ctx.recordingId,
+    // No final answer came (lib/reciteLive/state `settleUnfinished`): what the take found before it.
+    ...(state.final.unfinished ? { unfinished: true } : {}),
   };
 }
 

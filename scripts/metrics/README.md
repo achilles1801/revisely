@@ -70,12 +70,13 @@ GitHub "Metrics" workflow, hourly ── Sentry + App Store totals ──► met
   came back), thumbs, actions taken, attachments, spend against the month's cap and today's allowance,
   and every account (questions, days, reviews, tokens, cost, days at the 20-question limit, failures,
   thumbs, last used). Tap one for its conversations and memory.
-- **Retention** (Nov 2026; `functions/src/metrics/retention.ts`, read by `sources.ts` `readActivity`): accounts
+- **Retention** (Nov 2026; `functions/src/metrics/retention.ts`, read by `sources.ts` `readActivity`; returned by
+  `adminMetrics` and `consoleMetrics`, shown in the staff console's Overview): accounts
   active yesterday, this week and in 30 days, a weekly chart since Oct 1, and day 1, 7 and 30 retention by
   sign-up week (exact day, and "day 7 or later"). Active = a revision session with pages or minutes, an
   Activity item (revisions, memorizations, reads), a recited take or a daily log, on the account's own
   day. An account starts on its first local session day when that is within a day of its UTC sign-up.
-  Testers, the App Review and screenshot accounts and the owner are left out. Only dates and page or
+  Testers, the App Review and screenshot accounts and staff are left out. Only dates and page or
   minute counts are read; only counts leave the function. The same numbers from a laptop, read-only:
   `cd functions && npm run build && GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-admin.json node scripts/retention.js`
   (`--json`; it leaves out accounts with the `admin` claim). No platform: accounts don't record theirs

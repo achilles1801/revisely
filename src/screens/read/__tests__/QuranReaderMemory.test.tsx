@@ -10,6 +10,12 @@ import type { LiveEvent } from '../../../lib/reciteLive/contract';
 import { STOP_TRACE_KEY } from '../../../lib/reciteLive/stopTrace';
 import { versesOnPage } from '../../../lib/ayahBounds';
 import { paletteV2 } from '../../../theme/v2';
+import { harakatClip } from '../../../../jest/arabicLines';
+import { setMistakeDetectionReleasedForTests } from '../../../lib/release/mistakeDetection';
+import { Sheet } from '../../../components/v2/Sheet';
+
+// The release's switch is the kill switch: these tests run with it as each says, and back to as it ships.
+afterEach(() => setMistakeDetectionReleasedForTests(undefined));
 
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
 jest.mock('expo-linear-gradient', () => ({ LinearGradient: ({ children }: { children?: React.ReactNode }) => children ?? null }));
@@ -205,6 +211,12 @@ const UTIYAT = A23 + 4;
 
 const flush = () => act(async () => {});
 const event = (e: LiveEvent) => act(async () => mockLive.onEvent?.(e));
+
+/** After Stop the bar shows the take's result; nothing opens by itself (Nov 22 2026). A tap on it opens the summary. */
+async function openResult() {
+  fireEvent.press(screen.getByTestId('recite-result'));
+  await flush();
+}
 /** An element's style, flattened. */
 const flatStyle = (el: { props: { style?: unknown } }): Record<string, unknown> => {
   const flat = (st: unknown): Record<string, unknown> => (Array.isArray(st) ? Object.assign({}, ...st.map(flat)) : ((st as Record<string, unknown>) ?? {}));
@@ -262,6 +274,12 @@ async function startTake(mode: 'recite' | 'check', lock: number | null = A23) {
 
 // Recite's memory: the account's records come from the test (lib/reciteMemory/store's own test covers the store).
 const mockMemory: { records: unknown[]; remembered: unknown[] } = { records: [], remembered: [] };
+/**
+ * What was remembered of one kind or id. An earlier test's reader that a cleanup unmounted mid-take keeps its take
+ * (unfinished, RECITE-12), and that write can land during a later test: never read `remembered` by position.
+ */
+const rememberedWhere = (match: (r: { id?: string; kind?: string }) => boolean) =>
+  (mockMemory.remembered as { id?: string; kind?: string }[]).find(match);
 jest.mock('../../../lib/reciteMemory/store', () => ({
   useMemoryRecords: () => mockMemory.records,
   remember: jest.fn(async (_uid: string, r: unknown) => {
@@ -334,11 +352,11 @@ describe("Recite's memory on the page", () => {
     // The card is modal for VoiceOver, so the page behind it counts as hidden.
     expect(screen.getByTestId('past-highlight-word-picked', { includeHiddenElements: true })).toBeTruthy();
     expect(screen.getAllByTestId('past-try-wrong')).toHaveLength(1);
-    // What was said, on the mark's highlight (WordChip: no fixed lineHeight, so its harakat aren't cut off).
+    // What was said, on the mark's highlight (WordChip: a line that holds every haraka, so none is cut off).
     const heard = screen.getByTestId('past-try-heard');
     expect(flatStyle(heard).backgroundColor).toBe(flatStyle(screen.getByTestId('past-card-swatch-word')).backgroundColor);
-    expect(flatStyle(screen.getByText('وَأُوهِيَتْ')).lineHeight).toBeUndefined();
-    expect(screen.getByText('Say it right on 2 different days to clear it.')).toBeTruthy();
+    expect(harakatClip(screen.getByText('وَأُوهِيَتْ').props.style)).toBeNull();
+    expect(screen.getByText('2 more right takes, on 2 different days, clear it.')).toBeTruthy();
     // ▶ plays your voice there, cut from that take's recording on the phone.
     fireEvent.press(screen.getByTestId('past-try-play'));
     await flush();
@@ -350,12 +368,12 @@ describe("Recite's memory on the page", () => {
     await tapWord(UTIYAT);
     fireEvent.press(screen.getByTestId('past-card-clear'));
     await flush();
-    expect(mockMemory.remembered[0]).toMatchObject({ kind: 'clear', w: UTIYAT, group: 'word' });
+    expect(rememberedWhere((r) => r.kind === 'clear')).toMatchObject({ kind: 'clear', w: UTIYAT, group: 'word' });
     expect(screen.queryByTestId('past-card')).toBeNull();
     expect(screen.getByText('Cleared from the page')).toBeTruthy();
     fireEvent.press(screen.getByText('Undo'));
     await flush();
-    expect(mockMemory.remembered[1]).toMatchObject({ kind: 'clear', w: UTIYAT, deleted: true });
+    expect(rememberedWhere((r) => r.kind === 'clear' && (r as { deleted?: boolean }).deleted === true)).toMatchObject({ kind: 'clear', w: UTIYAT });
   });
 
   it('during a take the remembered marks step aside: the page shows only that take’s marks', async () => {
@@ -379,7 +397,8 @@ describe("Recite's memory on the page", () => {
     expect(screen.queryByTestId('past-highlight-word')).toBeNull();
   });
 
-  it('outside Revisely Dev nothing is drawn', async () => {
+  it('with the release switched off: outside Revisely Dev nothing is drawn', async () => {
+    setMistakeDetectionReleasedForTests(false);
     mockState.dev = false;
     await open();
     expect(screen.queryByTestId('past-highlight-word')).toBeNull();
@@ -405,6 +424,7 @@ describe("Recite's memory in the take's summary", () => {
     fireEvent.press(screen.getByTestId('recite-stop'));
     await flush();
     await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: UTIYAT + 25, secs: 12, marks: [], score: { reached: 30, mistakes: 0, tajweed: 0, accuracy: 1 }, start: A23 } });
+    await openResult();
     expect(screen.getByTestId('take-summary')).toBeTruthy();
     // One right take so far: nothing cleared yet (it needs a second day).
     expect(screen.queryByTestId('take-summary-cleared')).toBeNull();
@@ -418,6 +438,60 @@ describe("Recite's memory in the take's summary", () => {
     expect(screen.queryByTestId('progress-sheet')).toBeNull();
   });
 
+  it('[RMEM-7] the summary lists this passage’s earlier take, in words for VoiceOver; a tap shows it on the page', async () => {
+    await startTake('check');
+    await event({ type: 'at', w: UTIYAT + 25 });
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await flush();
+    await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: UTIYAT + 25, secs: 12, marks: [], score: { reached: 30, mistakes: 0, tajweed: 0, accuracy: 1 }, start: A23 } });
+    await openResult();
+    expect(screen.getByText('This passage: your last take')).toBeTruthy();
+    const rows = screen.getAllByTestId('take-summary-history-row');
+    expect(rows).toHaveLength(1);
+    expect(rows[0].props.accessibilityLabel).toMatch(/^Yesterday: 99\.0%, (.+, )?1 mistake\. Show it on the page$/);
+    fireEvent.press(rows[0]);
+    await flush();
+    expect(screen.getByTestId('shown-take-bar')).toBeTruthy();
+    // The summary is closed at once. Its sheet's own going (the closing animation, then the modal) is v2/Sheet's to test:
+    // waiting for it here took 1.5 s on a laptop and past Jest's 5 s on a loaded CI runner (#885, Nov 22 2026), as it did
+    // in QuranReaderRecite.test (Nov 17–18).
+    const summary = screen.UNSAFE_getAllByType(Sheet).find((s) => s.props.testID === 'take-summary');
+    expect(summary?.props.visible).toBe(false);
+  });
+
+  it('[RMEM-7] the trend compares like with like: a whole-page take earlier never counts for a take of a few ayat (the store app keeps it)', async () => {
+    const page = pastTake({ id: 'page', createdAt: NOW - 3 * 86_400_000, day: '2026-11-12', to: words.pageRange(379)[1] - 1, accuracy: 0.95, mistakes: 7 });
+    const finish = async () => {
+      await startTake('check');
+      await event({ type: 'at', w: UTIYAT + 25 });
+      fireEvent.press(screen.getByTestId('recite-stop'));
+      await flush();
+      await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: UTIYAT + 25, secs: 12, marks: [], score: { reached: 30, mistakes: 0, tajweed: 0, accuracy: 1 }, start: A23 } });
+      // Revisely Dev: the summary opens from the bar's result (nothing opens by itself); the store app opens it as before.
+      if (mockState.dev) await openResult();
+    };
+    mockMemory.records = [page, pastTake()];
+    await finish();
+    expect(screen.getByTestId('take-summary-progress').props.accessibilityLabel).toMatch(/^Your progress here\. Up from 99\.0% yesterday · 2 takes$/);
+    // Its history lists only the take of the same ayat too.
+    expect(screen.getAllByTestId('take-summary-history-row')).toHaveLength(1);
+    screen.unmount();
+    mockState.dev = false;
+    await finish();
+    expect(screen.getByTestId('take-summary-progress').props.accessibilityLabel).toMatch(/^Your progress here\. Up from 95\.0% on .* · 3 takes$/);
+  });
+
+  it('[RMEM-7] the store app has no passage history yet (Revisely Dev’s until the next release); the trend is there', async () => {
+    mockState.dev = false;
+    await startTake('check');
+    await event({ type: 'at', w: UTIYAT + 25 });
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await flush();
+    await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: UTIYAT + 25, secs: 12, marks: [], score: { reached: 30, mistakes: 0, tajweed: 0, accuracy: 1 }, start: A23 } });
+    expect(screen.getByTestId('take-summary-progress')).toBeTruthy();
+    expect(screen.queryByTestId('take-summary-history')).toBeNull();
+  });
+
   it('a second right day clears the word: the summary says so', async () => {
     mockMemory.records = [pastTake({ createdAt: NOW - 2 * 86_400_000, day: '2026-11-13' }), pastTake({ id: 'right1', createdAt: NOW - 86_400_000, day: '2026-11-14', marks: [], mistakes: 0, accuracy: 1 })];
     await startTake('check');
@@ -425,6 +499,7 @@ describe("Recite's memory in the take's summary", () => {
     fireEvent.press(screen.getByTestId('recite-stop'));
     await flush();
     await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: UTIYAT + 25, secs: 12, marks: [], score: { reached: 30, mistakes: 0, tajweed: 0, accuracy: 1 }, start: A23 } });
+    await openResult();
     expect(screen.getByText('1 cleared from the page')).toBeTruthy();
   });
 });
@@ -447,7 +522,7 @@ describe('Show on the page', () => {
     await tapWord(UTIYAT);
     fireEvent.press(screen.getByTestId('mark-card-dismiss'));
     await flush();
-    expect(mockMemory.remembered[0]).toMatchObject({ id: 'past1', marks: [], mistakes: 0, accuracy: 1 });
+    expect(rememberedWhere((r) => r.id === 'past1')).toMatchObject({ id: 'past1', marks: [], mistakes: 0, accuracy: 1 });
     expect(jest.requireMock('../../../lib/reciteCheck/service').sendLabel).not.toHaveBeenCalled();
     // (The store here doesn't change, so the card stays open over the bar: modal for VoiceOver.)
     fireEvent.press(screen.getByTestId('shown-take-done', { includeHiddenElements: true }));

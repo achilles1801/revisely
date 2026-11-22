@@ -470,10 +470,10 @@ appId: com.revisionbuddy.app
     notVisible:
       id: insights-uncovered
     timeout: 10000
-# Gaps (ACT-28, mocks insights-gaps): the days since the last revision, the strip and its two tiles.
+# Gaps (ACT-28, mocks insights-gaps): the days since the last revision, the line under it and the gaps listed.
 - scrollUntilVisible:
     element:
-      id: insights-gaps-tiles
+      id: insights-gaps-list
     direction: DOWN
     centerElement: true
     timeout: 15000
@@ -481,7 +481,8 @@ appId: com.revisionbuddy.app
     file: shot.yaml
     env:
       NAME: 09-insights-gaps-${THEME}
-# When did I last revise…? (ACT-30): Last revised by surah, longest waiting first, its first surah opened.
+# When did I last revise…? (ACT-30): Last revised in the unit that suits the account (Juz, with 305 pages), recent
+# first, its first row opened: its pages drawn as part of it.
 - scrollUntilVisible:
     element:
       id: insights-gaps-last-revised
@@ -492,10 +493,10 @@ appId: com.revisionbuddy.app
     id: insights-gaps-last-revised
 - extendedWaitUntil:
     visible:
-      id: last-revised-views
+      id: last-revised-controls
     timeout: 10000
 - tapOn:
-    id: "last-revised-row-surah-.*"
+    id: "last-revised-row-.*"
     index: 0
 - waitForAnimationToEnd
 - runFlow:
@@ -504,6 +505,39 @@ appId: com.revisionbuddy.app
       NAME: 09-last-revised-${THEME}
 - tapOn:
     id: back
+- extendedWaitUntil:
+    visible:
+      id: activity-insights
+    timeout: 10000
+# The range's one gap (9 – 10 October, 2 days without revising) on Overview's calendar (ACT-28).
+- scrollUntilVisible:
+    element:
+      id: insights-gap-2026-10-09
+    direction: UP
+    centerElement: true
+    timeout: 15000
+- tapOn:
+    id: insights-gap-2026-10-09
+- extendedWaitUntil:
+    visible:
+      id: calendar-gap-cue
+    timeout: 10000
+# Overview starts at its top (it shares Insights' scroll): the tabs and October's title show with the band.
+- extendedWaitUntil:
+    visible:
+      id: calendar-month-title
+    timeout: 10000
+- extendedWaitUntil:
+    visible:
+      id: pill-insights
+    timeout: 10000
+- waitForAnimationToEnd
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-gaps-calendar-${THEME}
+- tapOn:
+    id: pill-insights
 - extendedWaitUntil:
     visible:
       id: activity-insights

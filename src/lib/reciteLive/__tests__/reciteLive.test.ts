@@ -1,5 +1,5 @@
 import { quranWords } from '../../recite/__fixtures__/quranWords';
-import { GROUP_RANK, isUnclear, LiveEvent, markGroup, parseEvent, parseMark, severityOf, Mark } from '../contract';
+import { countsAsMistake, GROUP_RANK, isUnclear, LiveEvent, markGroup, parseEvent, parseMark, severityOf, Mark } from '../contract';
 import {
   applyEvent,
   dismissMark,
@@ -96,7 +96,7 @@ describe('the contract', () => {
   });
 
   it('reads Recite’s final answer: words only, no marks list or score (live.py’s follow result)', () => {
-    // As the service sends it at the end of a Recite take (scripts/recite-check/live.py, `self.follow`).
+    // As the service sends it at the end of a Recite take (revisely-internal's checker/live.py, `self.follow`).
     const recite = {
       type: 'done',
       result: {
@@ -127,18 +127,24 @@ describe('the contract', () => {
 });
 
 describe('the live state', () => {
-  it('ends with the final answer’s marks, on every fixture', () => {
+  it('[RECITE-14] ends with the final answer’s marks and every mark shown live on a word it didn’t judge, on every fixture', () => {
     for (const name of FIXTURES) {
       const events = eventsOf(name);
-      const done = events.find((e): e is Extract<LiveEvent, { type: 'done' }> => e.type === 'done')!;
+      const at = events.findIndex((e) => e.type === 'done');
+      const done = events[at] as Extract<LiveEvent, { type: 'done' }>;
+      const live = run(events.slice(0, at));
       const s = run(events);
       expect(s.status).toBe('done');
-      expect(marksInOrder(s).map((m) => m.id).sort()).toEqual(done.result.marks.map((m) => m.id).sort());
+      const judged = new Set(done.result.marks.map((m) => m.w));
+      const keptLive = Object.values(live.marks).filter((m) => !judged.has(m.w) && !done.result.marks.some((f) => f.id === m.id));
+      expect(marksInOrder(s).map((m) => m.id).sort()).toEqual([...done.result.marks, ...keptLive].map((m) => m.id).sort());
       // In mushaf order.
       const ws = marksInOrder(s).map((m) => m.w);
       expect(ws).toEqual([...ws].sort((a, b) => a - b));
-      // These checkers counted "not clear" marks in `mistakes` (no `unclear`); the app takes them out.
-      expect(mistakeCount(s)).toBe(done.result.score!.mistakes - done.result.marks.filter(isUnclear).length);
+      // These checkers counted "not clear" marks in `mistakes` (no `unclear`); the app takes them out. A mark kept from
+      // the take counts as it did.
+      const keptCounted = keptLive.filter((m) => countsAsMistake(m) && !isUnclear(m)).length;
+      expect(mistakeCount(s)).toBe(done.result.score!.mistakes + keptCounted - done.result.marks.filter(isUnclear).length - keptLive.filter(isUnclear).length);
     }
   });
 

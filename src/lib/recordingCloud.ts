@@ -95,7 +95,7 @@ export class CloudError extends Error {
 /** A transfer stopped on purpose (cancelled, or the caller said stop). */
 export class TransferStopped extends Error {
   constructor() {
-    super('Transfer stopped');
+    super('Transfer stopped'); // i18n-ignore (an error's message, for the log)
     this.name = 'TransferStopped';
   }
 }
@@ -274,7 +274,7 @@ export async function uploadSegment(
     const last = offset + length >= sizeBytes;
     const headers = {
       ...(await authHeaders()),
-      'X-Goog-Upload-Command': last ? 'upload, finalize' : 'upload',
+      'X-Goog-Upload-Command': last ? 'upload, finalize' : 'upload', // i18n-ignore (the protocol's words)
       'X-Goog-Upload-Offset': String(offset),
     };
     check(); // a cancel while the tokens were fetched

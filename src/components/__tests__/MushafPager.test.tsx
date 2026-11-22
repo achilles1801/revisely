@@ -1,5 +1,5 @@
 import React, { createRef } from 'react';
-import { Dimensions, FlatList, StyleSheet, Text } from 'react-native';
+import { Dimensions, FlatList, I18nManager, StyleSheet, Text } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { MushafPager, MushafPagerHandle } from '../MushafPager';
 import { ayahRects } from '../../lib/ayahBounds';
@@ -423,6 +423,19 @@ describe('<MushafPager /> a verse’s highlight', () => {
     expect(screen.getAllByTestId('ayah-highlight')).toHaveLength(ayahRects(17, 2, 106).length);
   });
 
+  it('is the page’s one grey highlight, solid, never the accent', () => {
+    // Majd, Nov 21 2026: the accent's tint (Crimson's especially) could be read as a mistake's red.
+    const { paletteLight } = jest.requireActual('../../theme/v2');
+    render(<MushafPager pages={[17]} highlightedAyah={{ page: 17, sura: 2, ayah: 106 }} />);
+    act(() => screen.UNSAFE_getByType(FlatList).props.onLayout({ nativeEvent: { layout: { x: 0, y: 0, width: 402, height: 626 } } }));
+    drawPages();
+    for (const box of screen.getAllByTestId('ayah-highlight')) {
+      const style = StyleSheet.flatten(box.props.style);
+      expect(style.backgroundColor).toBe(paletteLight.highlight);
+      expect(style.opacity).toBeUndefined();
+    }
+  });
+
   it('a page whose image fails shows no highlight', () => {
     render(<MushafPager pages={[17]} highlightedAyah={{ page: 17, sura: 2, ayah: 106 }} />);
     act(() => screen.UNSAFE_getByType(FlatList).props.onLayout({ nativeEvent: { layout: { x: 0, y: 0, width: 402, height: 626 } } }));
@@ -767,5 +780,45 @@ describe('<MushafPager /> left to right in any language (LANG-1)', () => {
     const list = screen.UNSAFE_getByType(FlatList);
     expect(list.props.inverted).toBe(true);
     expect(StyleSheet.flatten(list.props.style).direction).toBe('ltr');
+  });
+});
+
+describe('<MushafPager /> right to left: Arabic (LANG-2)', () => {
+  const manager = I18nManager as { isRTL: boolean };
+  beforeEach(() => {
+    manager.isRTL = true;
+  });
+  afterEach(() => {
+    manager.isRTL = false;
+  });
+
+  it('[LANG-2] lets the list follow the direction (React Native measures its offsets from the right), and never mirrors a page', () => {
+    setup(3);
+    const list = screen.UNSAFE_getByType(FlatList);
+    // Pinned left to right, the list placed its pages where React Native didn't look: a black page (Nov 21 2026).
+    expect(list.props.inverted).toBe(false);
+    expect(StyleSheet.flatten(list.props.style).direction).toBeUndefined();
+    // Each page is left to right inside, so its verse boxes, covers and Recite's layers stay on their words.
+    const pagesShown = screen.getAllByTestId('mushaf-page');
+    expect(pagesShown.length).toBeGreaterThan(0);
+    for (const page of pagesShown) expect(StyleSheet.flatten(page.props.style).direction).toBe('ltr');
+  });
+
+  it('[LANG-2] a swipe credits the page under the finger, counted from the right end', () => {
+    const { onAdvance, report } = setup(1);
+    const list = screen.UNSAFE_getByType(FlatList);
+    report(3);
+    // The native list's offset is from the content's left edge: page index 3 of 20 is 16 pages from it.
+    act(() =>
+      list.props.onScrollBeginDrag({
+        nativeEvent: {
+          contentOffset: { x: (PAGES.length - 1 - 3) * PAGE_WIDTH, y: 0 },
+          contentSize: { width: PAGES.length * PAGE_WIDTH, height: 800 },
+          layoutMeasurement: { width: PAGE_WIDTH, height: 800 },
+        },
+      }),
+    );
+    report(4);
+    expect(onAdvance).toHaveBeenCalledWith(PAGES[3], PAGES[4]);
   });
 });

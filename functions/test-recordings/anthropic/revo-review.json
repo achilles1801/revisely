@@ -1,25 +1,25 @@
 {
-  "recordedAt": null,
-  "how": "functions/scripts/record-anthropic.js on 2026-11-10T02:34:07.945Z; request moved by hand to the system prompt of guide.ts with the search screen's cards, Share, Copy and Open in the reader (Nov 16 2026) (the reply is that recording, not re-recorded: record again with the coach key)",
+  "recordedAt": "2026-11-22T08:40:01.406Z",
+  "how": "functions/scripts/record-anthropic.js",
   "request": {
     "model": "claude-sonnet-5-5",
     "max_tokens": 800,
     "thinking": {
       "type": "between_tools"
     },
-    "systemSha256": "ca84559c4a88461e7e82f09c655bdd336332ffa2aa3eaedaef99ac70605f782d",
+    "systemSha256": "e858677d9768a15b2362559fdca7a5f029099686e4a0ff02bec87f721a2c4119",
     "outputSchemaSha256": "ca725b35345fa9d4316a6e08e45b7f3a3c7c7833def4ea0b669b4c4d39dfba1e"
   },
   "status": 200,
   "body": {
     "model": "claude-sonnet-5-5",
-    "id": "msg_011CgtTzGwrENRjm6PVeWAnP",
+    "id": "msg_011ChHfbXx6PSujWL7NMJzNP",
     "type": "message",
     "role": "assistant",
     "content": [
       {
         "type": "text",
-        "text": "{\"text\":\"You revised 4 of today's 10 pages, from An-Naba on, and kept your 2-day streak going. For tomorrow, how about putting Al-Mutaffifin 35 to Al-Inshiqaq first, since it's your weakest page?\",\"chart\":null,\"textAfter\":null,\"action\":{\"kind\":\"reviseFirst\",\"title\":\"Revise Al-Mutaffifin 35 to Al-Inshiqaq first\",\"detail\":\"Your weakest page, put at the front of tomorrow's session\",\"pages\":[589]},\"remember\":[],\"title\":\"Day in review\",\"chips\":[\"How is my week going?\",\"Which pages are weak?\"]}"
+        "text": "{\"text\":\"You gave today 22 minutes and got 4 of the 10 pages done, and your two-day streak is still alive. For tomorrow, start with the weak page in Al-Mutaffifin 35 to Al-Inshiqaq.\",\"chart\":null,\"textAfter\":null,\"action\":{\"kind\":\"reviseFirst\",\"title\":\"Revise Al-Mutaffifin 35 to Al-Inshiqaq first\",\"detail\":\"Your weakest page, put at the front of tomorrow's session\",\"pages\":[589]},\"remember\":[],\"title\":\"Day in review\",\"chips\":[\"How can I finish today?\",\"Which pages are weak?\",\"How was my week?\"]}"
       }
     ],
     "container": null,
@@ -29,12 +29,12 @@
     "usage": {
       "input_tokens": 555,
       "cache_creation_input_tokens": 0,
-      "cache_read_input_tokens": 17637,
+      "cache_read_input_tokens": 19775,
       "cache_creation": {
         "ephemeral_5m_input_tokens": 0,
         "ephemeral_1h_input_tokens": 0
       },
-      "output_tokens": 217,
+      "output_tokens": 218,
       "output_tokens_details": {
         "thinking_tokens": 0
       },

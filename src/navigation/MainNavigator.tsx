@@ -10,11 +10,13 @@ import PlanEditScreen from '../screens/main/PlanEditScreen';
 import PlanDayEditScreen from '../screens/main/PlanDayEditScreen';
 import PrayerCalculationScreen from '../screens/prayer/PrayerCalculationScreen';
 import PrayerNotificationsScreen from '../screens/prayer/PrayerNotificationsScreen';
+import AthanVoiceScreen from '../screens/prayer/AthanVoiceScreen';
 import ActiveRevisionScreen from '../screens/revision/ActiveRevisionScreen';
 import ReadIndexScreen from '../screens/read/ReadIndexScreen';
 import QuranReaderScreen from '../screens/read/QuranReaderScreen';
 import QuranSearchScreen from '../screens/read/QuranSearchScreen';
 import { RevoHost } from '../components/revo/RevoHost';
+import { ReportProblemHost } from '../components/report/ReportProblemHost';
 import ListenBackScreen from '../screens/activity/ListenBackScreen';
 import JournalEntryScreen from '../screens/journal/JournalEntryScreen';
 import ActivityScreen from '../screens/activity/ActivityScreen';
@@ -26,6 +28,9 @@ import { activityBlocksEnabled } from '../components/activity/DayBlocks';
 import type { ActivityKind } from '../lib/activityItems';
 import { ReadingTimerProvider } from '../context/ReadingTimerContext';
 import { useAppUsageTracking } from '../lib/appUsage';
+import { useWarmCheckerOnFront } from '../components/reciteLive/useKeepCheckerWarm';
+import { reciteLiveForAccount } from '../lib/reciteLive/availability';
+import { reciteCheckOff } from '../lib/reciteLive/off';
 import { TabBar, useTabBarHeight } from './TabBar';
 import type { PagerTabBarProps } from './PagerTabs';
 import { MiniPlayer, MINI_PLAYER_GAP } from '../components/player/MiniPlayer';
@@ -68,7 +73,7 @@ export type HomeStackParamList = {
   // date is a revision day, YYYY-MM-DD.
   /** focusRecordingId: scroll to that recording and highlight it. focusBlock: scroll to that block
    *  (a row of Overview's picked day, ACT-18). */
-  ActivityDay: { date: string; focusRecordingId?: string; focusBlock?: 'revised' | 'memorized' | 'read' | 'notes' };
+  ActivityDay: { date: string; focusRecordingId?: string; focusBlock?: 'revised' | 'memorized' | 'read' | 'notes' | 'recited' };
   // The reader over Activity (a page of a day's strip, a weak spot): back returns to where it was
   // opened (ACT-20), unlike the Read tab's reader.
   // `highlight`: ayahs highlighted until the page is turned (Insights' Recitation rows, RINS-2), as the Read tab's.
@@ -78,17 +83,19 @@ export type HomeStackParamList = {
   // into it; default the start).
   ListenBack: { recordingId: string; fromMs?: number };
   // Everything done, searchable (new design's "See all"); kind preselects a filter.
-  ActivityAll: { kind?: ActivityKind } | undefined;
+  ActivityAll: { kind?: ActivityKind | 'recitation' } | undefined;
   // Every revised page by strength (the Insights tab's Browse), from Activity's Weak spots.
   PagesByStrength: undefined;
   // When each surah, juz, hizb or page was last revised (ACT-30), from Insights' Gaps.
-  LastRevised: undefined;
+  LastRevised: { sort?: 'recent' | 'waiting' | 'mushaf' } | undefined;
   // Daily-log editor. date is YYYY-MM-DD; omitted means "today" (fajr-aware
   // revision day).
   JournalEntry: { date?: string; kind?: JournalKind } | undefined;
   // Settings → Prayer (testers).
   PrayerCalculation: undefined;
   PrayerNotifications: undefined;
+  /** The athan voice for every prayer, or (prayer) for one. Revisely Dev, iPhone. */
+  AthanVoice: { prayer?: 'fajr' | 'dhuhr' | 'asr' | 'maghrib' | 'isha' } | undefined;
 };
 
 export type ReadStackParamList = {
@@ -151,6 +158,7 @@ function HomeStackNavigator() {
       <HomeStack.Screen name="PlanDayEdit" component={PlanDayEditScreen} />
       <HomeStack.Screen name="PrayerCalculation" component={PrayerCalculationScreen} />
       <HomeStack.Screen name="PrayerNotifications" component={PrayerNotificationsScreen} />
+      <HomeStack.Screen name="AthanVoice" component={AthanVoiceScreen} />
       <HomeStack.Screen name="Activity" component={ActivityScreen} />
       <HomeStack.Screen name="ActivityDay" component={ActivityDayScreen} />
       <HomeStack.Screen name="ListenBack" component={ListenBackScreen} />
@@ -196,6 +204,8 @@ function MiniPlayerAboveTabs({ navigation }: { navigation: PagerTabBarProps['nav
 
 export function MainNavigator() {
   const { user } = useApp();
+  // The recitation checker, woken as the app comes to the front, so a take begun soon after doesn't meet a cold start.
+  useWarmCheckerOnFront(!reciteCheckOff() && reciteLiveForAccount(user));
   const smartTrackingEnabled = user?.smartTrackingEnabled ?? false;
   const hasSeenPreview = user?.hasSeenSmartTrackingPreview ?? false;
   // Accounts on the new Activity have Insights there: the tab bar is Home and Read (ACT-12).
@@ -254,6 +264,8 @@ export function MainNavigator() {
       />
       {/* Revo (previewTester accounts): its button over the main screens, and its sheet. */}
       <RevoHost />
+      {/* Settings → Report a problem: its form, and the bar that captures a screen for it. */}
+      <ReportProblemHost />
     </ReadingTimerProvider>
   );
 }

@@ -5,13 +5,17 @@ import {
   meanScore,
   mistakeKindOf,
   passageRecitation,
+  perPage,
   recitationInsights,
   similarSlips,
   slippingPassages,
+  takeMistakes,
   WINDOW_DAYS,
   weekScores,
 } from '../insights';
 import { wordMemories } from '../../reciteMemory/memory';
+import { quranWords } from '../../recite/__fixtures__/quranWords';
+import { pagesReached, PER_PAGE_FROM } from '../../reciteLive/score';
 
 // Words of Al-Kahf 22–23 and Al-Baqarah 48 (the app's word numbers are only identities here).
 const KAHF22 = 21000;
@@ -143,11 +147,11 @@ describe('Recite insights: passages that keep slipping', () => {
   it('a passage was last recited by the latest take over its words, one that heard them only as Not clear too', () => {
     const records: MemoryRecord[] = [
       take(-5, [mark(KAHF23, [18, 23], 'harakat')]),
-      // Heard only as Not clear: not a try at the slip, but the passage was recited.
+      // Heard only as Not clear: not said clearly, so a wrong try (RMEM-2, Majd's Nov 20 (a)).
       take(-1, [mark(KAHF23, [18, 23], 'harakat', { sure: 'likely' })]),
     ];
     const [p] = recitationInsights(records, TODAY).slipping;
-    expect(p).toMatchObject({ sura: 18, from: 23, wrong: 1, tries: 1, lastDay: day(-1) });
+    expect(p).toMatchObject({ sura: 18, from: 23, wrong: 2, tries: 2, lastDay: day(-1) });
   });
 
   it('keeps passages in different surahs apart, even when their ayah numbers touch', () => {
@@ -217,5 +221,57 @@ describe('Recite insights: a passage', () => {
     expect(baqarah.similar).toHaveLength(1);
     const elsewhere = passageRecitation(records, 30000, 31000, TODAY);
     expect(elsewhere).toEqual({ takes: 0, last: null, stillMarked: [], similar: [] });
+  });
+});
+
+describe('Recite insights: mistakes a page in long takes (RECITE-24)', () => {
+  // Real pages here: a take's pages come from the word data, as the take's summary counts them.
+  const words = quranWords();
+  const start = (p: number) => words.pageRange(p)[0];
+  const end = (p: number) => words.pageRange(p)[1] - 1;
+  const at = (w: number, kind: Mark['kind'], extra: Partial<Mark> = {}): Mark => {
+    const r = words.ref(w);
+    return mark(w, [r.sura, r.ayah], kind, extra);
+  };
+  const long = (offset: number, first: number, last: number, marks: Mark[], over: Partial<TakeRecord> = {}) =>
+    take(offset, marks, { from: start(first) + 3, to: end(last) - 3, ...over });
+
+  it('pools the takes of 2 pages or more: their mistakes over their pages, each take from its first word’s page to its last’s', () => {
+    const w = start(300) + 10;
+    const takes = [
+      // Pages 300–301: 3 mistakes.
+      long(-1, 300, 301, [at(w, 'word'), at(w + 1, 'skipped'), at(w + 2, 'harakat')]),
+      // Pages 300–302: 1 mistake.
+      long(-2, 300, 302, [at(w, 'added')]),
+      // One page: never counted, whatever its mistakes.
+      long(-3, 300, 300, [at(w, 'word'), at(w + 1, 'word')]),
+    ];
+    expect(pagesReached(words, takes[0].from, takes[0].to)).toBe(2);
+    expect(perPage(takes, words)).toEqual({ takes: 2, pages: 5, mistakes: 4 });
+    expect(PER_PAGE_FROM).toBe(2);
+  });
+
+  it('counts mistakes as the summary does (never Not clear or a tajweed note), and never a take kept without its final answer', () => {
+    const w = start(400) + 5;
+    const takes = [
+      long(-1, 400, 401, [at(w, 'word'), at(w + 1, 'harakat', { sure: 'likely' }), at(w + 2, 'tajweed', { rule: 'ghunnah' })], { level: 'strict' }),
+      long(-2, 400, 403, [at(w, 'word'), at(w + 1, 'word')], { unfinished: true }),
+    ];
+    expect(takeMistakes(takes[0])).toBe(1);
+    expect(perPage(takes, words)).toEqual({ takes: 1, pages: 2, mistakes: 1 });
+    expect(perPage([takes[1]], words)).toBeNull();
+    expect(perPage([], words)).toBeNull();
+  });
+
+  it('is the window’s, for takes kept before this too (their first and last word were always kept), and waits for the word data', () => {
+    const w = start(500) + 5;
+    const records: MemoryRecord[] = [
+      long(-3, 500, 501, [at(w, 'word')]),
+      long(-WINDOW_DAYS - 2, 500, 503, [at(w, 'word'), at(w + 1, 'word')]),
+      long(-1, 500, 501, [], { deleted: true }),
+    ];
+    expect(recitationInsights(records, TODAY).perPage).toBeNull();
+    expect(recitationInsights(records, TODAY, WINDOW_DAYS, words).perPage).toEqual({ takes: 1, pages: 2, mistakes: 1 });
+    expect(recitationInsights(records, TODAY, 90, words).perPage).toEqual({ takes: 2, pages: 6, mistakes: 3 });
   });
 });

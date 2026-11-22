@@ -8,7 +8,7 @@ import {
 import { ScreenSafeAreaView } from '../../components/SafeAreaView';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
+import type { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
 import { Stepper } from '../../components/Stepper';
 import { MemorizationBrowser } from '../../components/MemorizationBrowser';
 import { PillButton } from '../../components/v2/PillButton';

@@ -5,7 +5,9 @@ import { act, render, screen } from '@testing-library/react-native';
 
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
 import { readRepo } from '../../../../jest/behaviourRules';
-import { PICTURE_WORDS, demoTakeOf, pictureFor } from '../pictures';
+import { demoTakeOf, pictureFor, pictureWords } from '../pictures';
+import { en } from '../../../i18n/en';
+import { t } from '../../../i18n';
 import { ThemeProvider } from '../../../context/ThemeContext';
 import { DesignProvider } from '../../../design/DesignContext';
 import { setQuranWordsForTests } from '../../../lib/recite/quranWords';
@@ -15,18 +17,30 @@ beforeAll(() => setQuranWordsForTests(wordsData()));
 afterAll(() => setQuranWordsForTests(null));
 
 const source = (p: string) => readRepo(p).replace(/’/g, "'");
-const plain = (s: string) => s.replace(/’/g, "'");
 
 describe('the pictures', () => {
   it("the + sheet's title and rows are AddToDaySheet's", () => {
+    // The sheet's words are t('activity.…') (src/i18n): the picture draws the same English, for today.
     const sheet = source('src/components/activity/AddToDaySheet.tsx');
-    expect(sheet).toContain('Add to ${dayName}');
-    expect(PICTURE_WORDS.addTitle).toBe('Add to today');
-    for (const [title, sub] of PICTURE_WORDS.rows) {
-      expect(sheet).toContain(`'${plain(title)}'`);
-      // "Today's pages, …" is `${whose} pages, …` there.
-      expect(sheet).toContain(plain(sub).replace("Today's ", ''));
+    for (const key of [
+      'activity.addMenu.title',
+      'activity.elsewhere.title',
+      'activity.addMenu.revisedSubtitle',
+      'activity.day.memorized',
+      'activity.addMenu.memorizedSubtitle',
+      'activity.add.note',
+      'activity.addMenu.noteSubtitle',
+    ]) {
+      expect(sheet).toContain(`t('${key}'`);
     }
+    const words = pictureWords();
+    expect(t('activity.addMenu.title', { day: 'today' })).toBe(words.addTitle);
+    expect(words.addTitle).toBe('Add to today');
+    expect(words.rows).toEqual([
+      [t('activity.elsewhere.title'), t('activity.addMenu.revisedSubtitle', { Day: 'Today' })],
+      [t('activity.day.memorized'), t('activity.addMenu.memorizedSubtitle', { day: 'today' })],
+      [t('activity.add.note'), t('activity.addMenu.noteSubtitle')],
+    ]);
   });
 
   it("the demo take is Al-Mulk 1–2 from the word data, as src/data/whatsNewTake.json holds it", () => {
@@ -43,7 +57,9 @@ describe('the pictures', () => {
   });
 
   it("the drill's button is the take summary's", () => {
-    expect(source('src/components/reciteLive/TakeSummarySheet.tsx')).toContain(`title="${PICTURE_WORDS.drill}"`);
+    // The summary's button is t('reciteLive.summary.drill') (src/i18n): the picture draws the same English.
+    expect(source('src/components/reciteLive/TakeSummarySheet.tsx')).toContain("title={t('reciteLive.summary.drill')}");
+    expect(en.reciteLive.summary.drill).toBe(pictureWords().drill);
   });
 
   it('each draws, hidden from VoiceOver and never touched', async () => {
@@ -65,5 +81,20 @@ describe('the pictures', () => {
   it('name surahs and juz, never page numbers (NAME-1)', () => {
     const file = source('src/components/whatsNew/pictures.tsx');
     expect(file).not.toMatch(/'[^']*\bp\.\s*\d[^']*'|pp\.\s*\d/);
+  });
+});
+
+describe('the pictures in Arabic', () => {
+  it('draw the screens’ Arabic words', async () => {
+    const { i18n } = jest.requireActual('../../../i18n') as typeof import('../../../i18n');
+    await i18n.changeLanguage('ar');
+    try {
+      const words = pictureWords();
+      expect(words.addTitle).toBe('إضافة إلى اليوم');
+      expect(words.drill).toBe('إعادة تسميع الأخطاء');
+      expect(words.rows.map(([title]) => title)).toEqual(['راجعت في مكان آخر', 'المحفوظ', 'ملاحظة']);
+    } finally {
+      await i18n.changeLanguage('en');
+    }
   });
 });

@@ -9,6 +9,8 @@ import { useTheme } from '../../context/ThemeContext';
 import { typeV2 } from '../../theme/v2';
 import { Tap } from '../v2/Tap';
 import { ChromeText } from './ChromeText';
+import { t } from '../../i18n';
+import { forwardIcon } from '../../i18n/direction';
 
 export function AddToPlanLink({ onPress, testID, maxScale }: { onPress: () => void; testID: string; maxScale?: number }) {
   const { palette } = useTheme();
@@ -16,15 +18,15 @@ export function AddToPlanLink({ onPress, testID, maxScale }: { onPress: () => vo
     <Tap
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityHint="Opens tomorrow’s day of your plan with these pages added"
+      accessibilityHint={t('activity.addToPlan.hint')}
       hitSlop={8}
       style={styles.link}
       testID={testID}
     >
       <ChromeText style={[typeV2.meta, { color: palette.link }]} maxFontSizeMultiplier={maxScale}>
-        Add to plan
+        {t('activity.addToPlan.label')}
       </ChromeText>
-      <Ionicons name="chevron-forward" size={14} color={palette.link} />
+      <Ionicons name={forwardIcon()} size={14} color={palette.link} />
     </Tap>
   );
 }

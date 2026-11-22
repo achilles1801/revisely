@@ -16,7 +16,8 @@ import { asides, revoChips, revoGreeting, revoHello, todayDone, type Aside, type
 import type { RevoPlace } from './place';
 import type { RevoContext, RevoDayFacts, RevoPassageFacts } from './types';
 import { passageLong, passageShort } from './words';
-import { formatDate, weekdayName } from '../../i18n';
+import { currentLanguage, formatDate, weekdayName } from '../../i18n';
+import * as arabic from './openers.ar';
 
 const NBSP = ' ';
 const juzName = (juz: number) => `Juz${NBSP}${juz}`;
@@ -143,13 +144,13 @@ export function placeFacts(place: RevoPlace | null | undefined, prepared: Prepar
 }
 
 /** One sentence and the suggestion that goes with it. */
-interface Line {
+export interface Line {
   text: string;
   chip?: string | null;
 }
 
 /** What a place's line is made of: its lead, the sentence after it, and what takes that sentence's turn when opened again. */
-interface Built {
+export interface Built {
   lead: string;
   second: Line | null;
   /** The second sentence's turns (REVO-35), from the second open on. */
@@ -382,20 +383,22 @@ export function revoOpener(
 ): Opener {
   if (facts == null) return { text: revoGreeting(name, ctx, open, extras), chips: revoChips(ctx, open, extras) };
   const strength = extras.strength !== false;
+  // In Arabic, the same facts in Arabic sentences (openers.ar.ts).
+  const L = currentLanguage() === 'ar' ? arabic : { dayLine, overviewLine, insightLines, weakLine, juzLine };
   if (facts.kind === 'insights') {
-    const lines = insightLines(facts, ctx);
+    const lines = L.insightLines(facts, ctx);
     if (lines.length === 0) return { text: revoGreeting(name, ctx, open, extras), chips: revoChips(ctx, open, extras) };
     const pick = lines[open % lines.length];
     return { text: [revoHello(name), ...pick.lines.map((l) => l.text)].join(' '), chips: uniq(pick.chips) };
   }
   const built =
     facts.kind === 'day'
-      ? dayLine(facts, ctx)
+      ? L.dayLine(facts, ctx)
       : facts.kind === 'overview'
-        ? overviewLine(facts, ctx)
+        ? L.overviewLine(facts, ctx)
         : facts.kind === 'weak'
-          ? weakLine(facts)
-          : juzLine(facts, strength);
+          ? L.weakLine(facts)
+          : L.juzLine(facts, strength);
   const turns = [...built.turns, ...placeTurns(ctx, extras)];
   // Opened again with nothing changed: the second sentence takes its turn, so two opens in a row differ.
   const second = open > 0 && turns.length > 0 ? turns[(open - 1) % turns.length] : built.second;

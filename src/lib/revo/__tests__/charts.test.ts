@@ -533,3 +533,23 @@ describe('words and touch', () => {
     expect(stepIndex(null, 1, 0)).toBeNull();
   });
 });
+
+describe('the charts’ readouts in Arabic', () => {
+  const { i18n } = jest.requireActual('../../../i18n') as typeof import('../../../i18n');
+  beforeAll(() => i18n.changeLanguage('ar'));
+  afterAll(() => i18n.changeLanguage('en'));
+
+  it('dates list with «و» before each after the first, digits in Arabic', () => {
+    const { daysList } = jest.requireActual('../charts') as typeof import('../charts');
+    const text = daysList(['2026-09-26', '2026-10-10', '2026-10-17', '2026-10-24']);
+    expect(text).toMatch(/^٢٦ \S+ و١٠ و١٧ و٢٤ \S+$/);
+  });
+
+  it('how long ago, the table’s headings and the hints read in Arabic', () => {
+    const { agoWords, TABLE_HEADS, timelineHint } = jest.requireActual('../charts') as typeof import('../charts');
+    expect(agoWords('2026-11-03', '2026-11-07')).toBe('قبل ٤ أيام');
+    expect(agoWords('2026-11-06', '2026-11-07')).toBe('أمس');
+    expect(TABLE_HEADS.lastRevised).toBe('آخر مراجعة');
+    expect(timelineHint([], 30)).toBe('لم يُراجَع خلال ٣٠ يومًا');
+  });
+});

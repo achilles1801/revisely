@@ -15,6 +15,8 @@ import { attemptWhat, clearLine, takeWhen, wrongCount } from '../../lib/reciteMe
 import { markFill } from '../reciteLive/markColours';
 import { Phrase, Row, SmallPill } from '../reciteLive/MarkParts';
 import { WordChip } from '../reciteLive/WordChip';
+import { t } from '../../i18n';
+import { chevron } from '../../i18n/direction';
 
 const CARD_MARGIN = 12;
 /** The latest tries the card lists (newest first). */
@@ -32,7 +34,7 @@ function TryRow({ attempt, now, fill, onPlay }: { attempt: Attempt; now: number;
           {when}
         </Text>
         {attempt.take.hidden ? (
-          <Ionicons name="eye-off-outline" size={14} color={palette.secondary} accessibilityLabel="Page hidden" />
+          <Ionicons name="eye-off-outline" size={14} color={palette.secondary} accessibilityLabel={t('reciteMemory.passage.pageHidden')} />
         ) : null}
       </View>
       <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={1.3}>
@@ -45,7 +47,7 @@ function TryRow({ attempt, now, fill, onPlay }: { attempt: Attempt; now: number;
           hitSlop={6}
           style={[styles.play, { borderColor: palette.outline }]}
           accessibilityRole="button"
-          accessibilityLabel={`Your recitation, ${when}`}
+          accessibilityLabel={t('reciteMemory.card.yours', { when })}
           testID="past-try-play"
         >
           <Ionicons name="play" size={12} color={palette.text} style={styles.playIcon} />
@@ -154,25 +156,25 @@ export function WordHistoryCard({
               {`${markPlace({ ...mark, sure: 'clear' })} · ${wrongCount(memory)}`}
             </Text>
           </View>
-          {memory.open ? <SmallPill label="Clear now" onPress={() => onClear(memory)} testID="past-card-clear" /> : null}
+          {memory.open ? <SmallPill label={t('reciteMemory.card.clearNow')} onPress={() => onClear(memory)} testID="past-card-clear" /> : null}
         </View>
         {mark.kind === 'tajweed' ? (
           <Text style={[typeV2.body, styles.tajweed, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
             {[tajweedLines(mark).main, tajweedLines(mark).sub].filter(Boolean).join(' · ')}
           </Text>
         ) : (
-          <Row label="Expected" first>
+          <Row label={t('reciteLive.card.expected')} first>
             <Phrase parts={expectedPhrase(words, mark)} fill={fill} />
           </Row>
         )}
         <View style={styles.triesHead}>
           <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={1.3}>
-            Your takes
+            {t('reciteMemory.card.takes')}
           </Text>
           {onSeeAll ? (
-            <Tap onPress={() => onSeeAll(memory)} hitSlop={8} accessibilityRole="button" accessibilityLabel="See all your takes here" testID="past-card-see-all">
+            <Tap onPress={() => onSeeAll(memory)} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('reciteMemory.card.seeAllLabel')} testID="past-card-see-all">
               <Text style={[typeV2.meta, styles.seeAll, { color: palette.text }]} maxFontSizeMultiplier={1.3}>
-                See all ›
+                {`${t('reciteMemory.card.seeAll')} ${chevron()}`}
               </Text>
             </Tap>
           ) : null}
@@ -191,8 +193,8 @@ export function WordHistoryCard({
           </Text>
         </View>
         <View style={styles.actions}>
-          <SmallPill icon="volume-high-outline" label="Hear it" onPress={() => onHear(memory)} testID="past-card-hear" />
-          {hasSimilar ? <SmallPill icon="git-compare-outline" label="Similar phrases" onPress={() => onSimilar(memory)} testID="past-card-similar" /> : null}
+          <SmallPill icon="volume-high-outline" label={t('reciteLive.card.hear')} onPress={() => onHear(memory)} testID="past-card-hear" />
+          {hasSimilar ? <SmallPill icon="git-compare-outline" label={t('reciteLive.card.similar')} onPress={() => onSimilar(memory)} testID="past-card-similar" /> : null}
         </View>
       </View>
     </View>

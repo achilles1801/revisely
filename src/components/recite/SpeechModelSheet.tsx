@@ -19,7 +19,7 @@ export function SpeechModelSheet({
   visible,
   onClose,
   onReady,
-  title = t('recite.panel.followWordByWord'),
+  title = t('recite.speechModel.title'),
   intro = t('recite.speechModel.intro'),
 }: {
   visible: boolean;

@@ -5,14 +5,18 @@
 // or 'device' (the phone's own, for clock times: 12 or 24 hours as the phone is set). The orders
 // the designs chose by hand ("Wednesday 28 October", no comma) stay hand-built in English.
 // Another language uses Intl with its own locale and order for all of them.
+import { localDigits, localNumber, localNumeral } from './digits';
 import { currentLanguage } from './instance';
 
 export type EnglishLocale = 'en-US' | 'en-GB' | 'device';
 
-/** Each language's Intl locale. Arabic's digits (Western or Arabic-Indic) are still Majd's call. */
-const LOCALES: Record<string, string> = { en: 'en-US' };
+/** Each language's Intl locale. Arabic's digits come from digits.ts (Majd's choice 1). */
+const LOCALES: Record<string, string> = { en: 'en-US', ar: 'ar' };
 
 const isEnglish = () => currentLanguage() === 'en';
+
+/** Intl's text in the language's digits: unchanged in English. */
+const digits = (text: string): string => (isEnglish() ? text : localDigits(text, currentLanguage()));
 
 /**
  * The locale for a toLocale…String or Intl call: in English the one this call has always used
@@ -30,8 +34,30 @@ export function numberLocale(): string {
 
 /** A date with Intl's options: "Sat, Oct 24", "October 2026". */
 export function formatDate(date: Date, options: Intl.DateTimeFormatOptions, english: EnglishLocale = 'en-US'): string {
-  return date.toLocaleDateString(dateLocale(english), options);
+  return digits(date.toLocaleDateString(dateLocale(english), options));
 }
+
+/**
+ * A calendar day ('YYYY-MM-DD') with Intl's date options: "Tuesday", "November 17". It names the day as written in
+ * any time zone, so each language and set of options makes its formatter once: toLocaleDateString makes a new one on
+ * every call, and Activity's search words asked three times an item (Nov 17 2026).
+ */
+export function formatDay(day: string, options: Intl.DateTimeFormatOptions, english: EnglishLocale = 'en-US'): string {
+  const [y, m, d] = day.split('-').map(Number);
+  const locale = dateLocale(english);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  // The phone's own locale can change while the app runs: only named locales are kept.
+  if (locale === undefined) return digits(date.toLocaleDateString(locale, { ...options, timeZone: 'UTC' }));
+  const key = `${locale}|${JSON.stringify(options)}`;
+  let format = dayFormats.get(key);
+  if (!format) {
+    format = new Intl.DateTimeFormat(locale, { ...options, timeZone: 'UTC' });
+    dayFormats.set(key, format);
+  }
+  return digits(format.format(date));
+}
+
+const dayFormats = new Map<string, Intl.DateTimeFormat>();
 
 /** A clock time, "5:07 AM", in the phone's 12- or 24-hour style. */
 export function formatTime(
@@ -39,12 +65,17 @@ export function formatTime(
   options: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit' },
   english: EnglishLocale = 'device',
 ): string {
-  return date.toLocaleTimeString(dateLocale(english), options);
+  return digits(date.toLocaleTimeString(dateLocale(english), options));
 }
 
-/** A number, "1,234". */
+/** A number, "1,234" (in Arabic "١٢٣٤": digits.ts). */
 export function formatNumber(n: number, options?: Intl.NumberFormatOptions): string {
-  return n.toLocaleString(numberLocale(), options);
+  return isEnglish() ? n.toLocaleString(numberLocale(), options) : localNumber(n, currentLanguage(), options);
+}
+
+/** A number written by the code ("0.4" from toFixed) in the language's digits; unchanged in English. */
+export function formatNumeral(text: string): string {
+  return isEnglish() ? text : localNumeral(text, currentLanguage());
 }
 
 /** "Wednesday", "Wed", "W". */

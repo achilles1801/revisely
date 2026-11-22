@@ -160,6 +160,18 @@ const SAMPLES = [
     ],
   },
   {
+    q: 'What’s this ring next to the ? on Home for?',
+    aboutToday: true,
+    ctx: missedYesterday,
+    note: 'Majd’s question, Nov 16 2026 (the streak’s grace ring, SESS-6)',
+    facts: [
+      F('it fills as yesterday’s missed pages are revised', /yesterday’s (?:\w+ ){0,3}pages|missed pages|pages (?:you )?missed/i, true),
+      F('full: the streak comes back', /streak (?:comes|is) back|brings? (?:back )?(?:your|the) streak|streak back|restore/i, true),
+      F('before today ends', /before today ends|until today ends|by the end of today|today’s revision day ends|before (?:fajr|midnight)|by (?:fajr|midnight)/i),
+      F('how: Add to today', /add to today/i),
+    ],
+  },
+  {
     q: 'I missed two days. Is my streak gone? Can I get it back?',
     aboutToday: true,
     ctx: missedTwo,
@@ -277,6 +289,17 @@ const SAMPLES = [
     screen: 'jumpTo',
   },
   {
+    // KAHF-1, KAHF-2 (Majd, Nov 21 2026): the card follows the Islamic Friday.
+    q: 'Why is the Al-Kahf card on Home on Thursday night?',
+    ctx: steady,
+    facts: [
+      F('the Islamic Friday starts at Thursday’s maghrib', /maghrib/i, true),
+      F('it goes at Friday’s maghrib', /friday[’']s maghrib|maghrib on friday|until maghrib/i, true),
+      F('reading it now counts for Friday', /counts|for (?:that|this) friday|friday[’']s/i),
+      UNSURE,
+    ],
+  },
+  {
     q: 'How do I change how many pages I revise each day?',
     ctx: steady,
     facts: [F('Edit schedule', /edit schedule/i, true), F('Daily amount → Pages per day', /daily amount|pages per day/i, true)],
@@ -385,38 +408,39 @@ const SAMPLES = [
     ctx: steady,
     facts: [F('Copy under the ayah found', /copy/i, true), F('works offline', /offline/i)],
   },
-  // Revisely Dev (the Dev guide, Nov 16 2026): Recite, its marks, the hidden page and the takes kept.
+  // Recite, its marks, the hidden page and the takes kept: every account's from 1.0.5 (the main guide). Strict stays
+  // Revisely Dev's (the Dev guide), so its question is asked as Revisely Dev asks it.
   {
     q: 'How do I get the app to check my recitation for mistakes?',
-    ctx: devSteady,
-    dev: true,
+    ctx: steady,
     facts: [F('in the reader, the mic', /reader|mic/i, true), F('hold it: Recite, with Mark mistakes on', /mark mistakes/i, true)],
     screen: 'reader',
   },
   {
     q: 'Can I recite from memory with the words covered?',
-    ctx: devSteady,
-    dev: true,
+    ctx: steady,
     facts: [F('yes: the eye, Hide the page', /hide the page|eye/i, true), F('words appear as recited, or Show the next word', /appear|next word|whole ayah/i, true)],
     screen: 'reader',
   },
   {
     q: 'What does an amber highlight on a word mean?',
-    ctx: devSteady,
-    dev: true,
+    ctx: steady,
     facts: [F('a haraka or letter slip', /haraka|harakat|letter/i, true), F('or Not clear, which never counts', /not clear/i, true)],
   },
   {
     q: 'It marked a word I said correctly. What can I do?',
-    ctx: devSteady,
-    dev: true,
+    ctx: steady,
     facts: [F('tap the word', /tap/i), F('Not a mistake', /not a mistake/i, true)],
   },
   {
     q: 'Does Revisely remember the words I got wrong last time?',
-    ctx: devSteady,
-    dev: true,
+    ctx: steady,
     facts: [F('yes, kept on the account', /yes|kept|remember/i, true), F('until said right in 2 takes on 2 different days', /2 (?:right )?takes|two (?:right )?takes|2 different|two different/i, true)],
+  },
+  {
+    q: 'Is marking mistakes free?',
+    ctx: steady,
+    facts: [F('part of Premium, free during early access', /free|early access/i, true), F('kept for life', /for life|keep/i, true), NOT('never calls it a trial', /\btrial\b/i)],
   },
   {
     q: 'How do I make it check my tajweed too?',
@@ -426,36 +450,25 @@ const SAMPLES = [
     screen: 'settings',
   },
   {
-    q: 'It marks fewer of my mistakes than it used to. Did something change?',
-    ctx: devSteady,
-    dev: true,
-    facts: [F('yes: a newer model for Words & harakat and Recite', /newer|new model|updated/i, true), F('fewer marks on right recitation; word slips caught as before', /word|skipped|changed|added/i, true), F('Strict unchanged', /strict/i)],
-  },
-  {
     q: 'Can the app test me on random places in what I’ve memorized?',
-    ctx: devSteady,
-    dev: true,
+    ctx: steady,
     facts: [F('yes: hold the mic → Test me', /test me/i, true), F('five places, everything memorized or one juz', /five|5|juz|everything you/i, true)],
     screen: 'reader',
   },
   {
     q: 'Why are some words grey on the page after I uncovered them?',
-    ctx: devSteady,
-    dev: true,
+    ctx: steady,
     facts: [F('they were peeked (uncovered with ‹ or ‹‹)', /peek/i, true), F('never counted in the score', /score|count/i, true)],
   },
   {
-    q: 'I searched by voice and the reader started listening to me. Why?',
-    ctx: devSteady,
-    dev: true,
-    facts: [F('one place found: it opens there and starts a take', /one (?:place|result)|just one|only one/i, true), F('carry on, or start the ayah again', /carry on|go on|start (?:the|that) ayah/i, true)],
+    q: 'I searched by voice and it opened the reader. Why?',
+    ctx: steady,
+    facts: [F('one place found: it opens there, highlighted', /one (?:place|result)|just one|only one/i, true), F('nothing listening; Back returns to the search', /back|search/i, true)],
   },
   {
     q: 'Can I use Recite during my revision session?',
-    ctx: devSteady,
-    dev: true,
-    note: 'not possible: the reader only',
-    facts: [F('no: only in the reader', /no\b|not|only in the reader|reader only/i), F('closest: the reader', /reader/i, true), UNSURE],
+    ctx: steady,
+    facts: [F('yes: the mic in the session', /yes|mic|session/i, true), F('a take never marks a page revised', /revised|swip|✓/i, true)],
   },
 ];
 

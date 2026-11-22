@@ -8,6 +8,8 @@ import { markBox, markHighlight } from '../../lib/reciteLive/geometry';
 import type { WordMemory } from '../../lib/reciteMemory/memory';
 import type { PaletteV2 } from '../../theme/v2';
 import { markFill, markFirm } from '../reciteLive/markColours';
+import { Wash } from '../reciteLive/Wash';
+import { t } from '../../i18n';
 
 /**
  * How strong a remembered mistake is drawn: the take's own highlight colour, lighter, so it reads as "from before"
@@ -26,7 +28,7 @@ type Colours = Pick<PaletteV2, 'markWord' | 'markWordFirm' | 'markSlip' | 'markS
 export const markOf = (m: WordMemory): Mark | null => m.lastMark;
 
 /**
- * Behind the page's ink, outside a take: each word still to fix, in its group's highlight, lighter (Majd, Nov 15 2026:
+ * Behind the page's ink, outside a take: each word still to fix, in its group's wash, lighter (Majd, Nov 15 2026:
  * remembered mistakes stay on the mushaf until said right). The word a card is open for is its firm shade.
  */
 export function RememberedUnderlay({
@@ -55,17 +57,13 @@ export function RememberedUnderlay({
         if (!mark || words.pageOf(m.w) !== page) return null;
         const picked = selected === m.w;
         return (
-          <View
+          <Wash
             key={m.w}
             testID={picked ? `past-highlight-${m.group}-picked` : `past-highlight-${m.group}`}
-            style={[
-              styles.abs,
-              styles.box,
-              rectStyle(markHighlight(words, mark), scale),
-              picked
-                ? { backgroundColor: markFirm(colours, mark) }
-                : { backgroundColor: markFill(colours, mark), opacity: isDark ? PAST_OPACITY.dark : PAST_OPACITY.light },
-            ]}
+            box={markHighlight(words, mark)}
+            scale={scale}
+            colour={picked ? markFirm(colours, mark) : markFill(colours, mark)}
+            opacity={picked ? undefined : isDark ? PAST_OPACITY.dark : PAST_OPACITY.light}
           />
         );
       })}
@@ -90,8 +88,8 @@ export function RememberedTargets({ page, scale, words, memories }: { page: numb
             pointerEvents="none"
             accessible
             accessibilityRole="button"
-            accessibilityLabel={`Past mistake: ${markTitle(mark)}, ${mark.kind === 'added' ? 'after ' : ''}${words.uthmani(m.w)}`}
-            accessibilityHint="Shows your takes of this word"
+            accessibilityLabel={t(mark.kind === 'added' ? 'reciteMemory.pastLabelAfter' : 'reciteMemory.pastLabel', { title: markTitle(mark), word: words.uthmani(m.w) })}
+            accessibilityHint={t('reciteMemory.pastHint')}
             testID={`past-mark-${m.group}`}
             style={[styles.abs, rectStyle(markBox(words, mark), scale)]}
           />
@@ -103,5 +101,4 @@ export function RememberedTargets({ page, scale, words, memories }: { page: numb
 
 const styles = StyleSheet.create({
   abs: { position: 'absolute' },
-  box: { borderRadius: 7 },
 });

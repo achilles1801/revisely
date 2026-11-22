@@ -11,18 +11,22 @@ import { arabicLabelLines } from '../../../lib/platformUi';
 import { t } from '../../../i18n';
 
 /**
- * Friday on Home: a post suggesting Surah Al-Kahf. Read opens it; "Mark as
- * read" asks how long it took (a sheet) and logs a reading session; ⋯ hides it
- * for today. Once read, its mark is done.
+ * The Islamic Friday on Home (Thursday's maghrib to Friday's, KAHF-1): a post
+ * suggesting Surah Al-Kahf. Read opens it; "Mark as read" asks how long it took
+ * (a sheet) and logs a reading session; ⋯ hides it until Friday's maghrib. Once
+ * read, its mark is done.
  */
 export function KahfPost({
   state,
+  eve = false,
   saving = false,
   onRead,
   onMarkRead,
   onDismiss,
 }: {
   state: 'prompt' | 'done';
+  /** Thursday evening, after maghrib: Friday has begun but the revision day is still Thursday's. */
+  eve?: boolean;
   saving?: boolean;
   onRead: () => void;
   onMarkRead: (minutes: number) => void;
@@ -67,7 +71,7 @@ export function KahfPost({
           )
         }
       >
-        <RowText>{done ? t('home.kahf.readToday') : t('home.kahf.itsFriday')}</RowText>
+        <RowText>{done ? t('home.kahf.doneFriday') : eve ? t('home.kahf.fridayBegan') : t('home.kahf.itsFriday')}</RowText>
         <RowText secondary>{done ? t('home.kahf.saved', { range }) : t('home.kahf.whole', { range })}</RowText>
       </ThreadRow>
 

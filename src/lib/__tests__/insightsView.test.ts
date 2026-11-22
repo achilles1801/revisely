@@ -19,6 +19,8 @@ import {
   untouchedJuz,
   weakSpotRows,
   weekCircles,
+  timedDays,
+  HOURS_FROM_DAYS,
 } from '../insightsView';
 
 const TODAY = '2026-11-03';
@@ -122,6 +124,13 @@ describe('Consistency', () => {
     const c = weekCircles(new Set([ago(0), ago(6)]), TODAY);
     expect(c.map((x) => x.letter).join('')).toBe('WTFSSMT');
     expect(c.map((x) => x.done)).toEqual([true, false, false, false, false, false, true]);
+    expect(c.every((x) => !x.before)).toBe(true);
+  });
+
+  it('[ACT-31] days before the account’s first day are before it, never missed', () => {
+    const c = weekCircles(new Set([ago(0)]), TODAY, ago(1));
+    expect(c.map((x) => x.before)).toEqual([true, true, true, true, true, false, false]);
+    expect(c.map((x) => x.done)).toEqual([false, false, false, false, false, false, true]);
   });
 
   it('reports on the month just ended for the first six days of a month', () => {
@@ -133,8 +142,25 @@ describe('Consistency', () => {
 
   it('counts a month’s active days out of its days so far', () => {
     const active = new Set(['2026-10-01', '2026-10-31', '2026-11-02']);
-    expect(monthCount(active, '2026-10', TODAY)).toEqual({ done: 2, of: 31 });
-    expect(monthCount(active, '2026-11', TODAY)).toEqual({ done: 1, of: 3 });
+    expect(monthCount(active, '2026-10', TODAY)).toEqual({ done: 2, of: 31, from: null });
+    expect(monthCount(active, '2026-11', TODAY)).toEqual({ done: 1, of: 3, from: null });
+  });
+
+  it('[ACT-31] counts a month the account began in from its first day, and none it began after', () => {
+    const active = new Set(['2026-10-20', '2026-10-31', '2026-11-02']);
+    expect(monthCount(active, '2026-10', TODAY, '2026-10-20')).toEqual({ done: 2, of: 12, from: '2026-10-20' });
+    expect(monthCount(active, '2026-10', TODAY, '2026-10-01')).toEqual({ done: 2, of: 31, from: null });
+    expect(monthCount(active, '2026-10', TODAY, '2026-11-01')).toBeNull();
+    expect(monthCount(active, '2026-11', TODAY, TODAY)).toEqual({ done: 0, of: 1, from: TODAY });
+  });
+
+  it('[ACT-31] counts the days of the range with something timed', () => {
+    const at = new Date(2026, 10, 2, 5, 40).getTime();
+    const timed = (day: string, minutes: number | null = 20) => ({ day, occurredAt: at, minutes });
+    expect(timedDays([timed(ago(0)), timed(ago(0)), timed(ago(1))], TODAY, 30)).toBe(2);
+    expect(timedDays([timed(ago(0)), timed(ago(1), null), timed(ago(2), 0), timed(ago(40))], TODAY, 30)).toBe(1);
+    expect(timedDays([{ day: ago(0), occurredAt: null, minutes: 20 }], TODAY, 30)).toBe(0);
+    expect(HOURS_FROM_DAYS).toBe(3);
   });
 
   it('spreads minutes over the hours they ran, in local time', () => {

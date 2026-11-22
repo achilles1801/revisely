@@ -23,20 +23,29 @@ import { PAST_OPACITY } from '../reciteMemory/RememberedLayers';
 import { useQuranWordsWhen } from '../reciteMemory/TakeRows';
 import { PillButton } from '../v2/PillButton';
 import { arabicV2 } from '../../theme/v2';
+import { strictOffered } from '../../lib/reciteCheck/settings';
 import type { QuranWords } from '../../lib/recite/quranWords';
 import type { Mark, MarkKind } from '../../lib/reciteLive/contract';
 import DEMO_TAKE from '../../data/whatsNewTake.json';
+import { forwardIcon } from '../../i18n/direction';
+import { t } from '../../i18n';
 
-/** The words the pictures show, as the screens they're drawn from show them (pictures.test.ts). */
-export const PICTURE_WORDS = {
-  drill: 'Recite the mistakes again',
-  addTitle: 'Add to today',
-  rows: [
-    ['Revised elsewhere', 'Today’s pages, revised away from a session'],
-    ['Memorized', 'New pages you learned today'],
-    ['Note', 'A thought, or a mistake to watch'],
-  ],
-} as const;
+/**
+ * The words the pictures show: the screens' own (AddToDaySheet's for today, the take summary's button), in the app's
+ * language (pictures.test.ts).
+ */
+export function pictureWords() {
+  const today = t('activity.add.today');
+  return {
+    drill: t('reciteLive.summary.drill'),
+    addTitle: t('activity.addMenu.title', { day: today }),
+    rows: [
+      [t('activity.elsewhere.title'), t('activity.addMenu.revisedSubtitle', { Day: `${today.charAt(0).toUpperCase()}${today.slice(1)}` })],
+      [t('activity.day.memorized'), t('activity.addMenu.memorizedSubtitle', { day: today })],
+      [t('activity.add.note'), t('activity.addMenu.noteSubtitle')],
+    ] as const,
+  };
+}
 
 const FADE = 56;
 const nop = () => undefined;
@@ -137,12 +146,12 @@ function ElsewherePicture() {
       <View style={[styles.sheet, { backgroundColor: palette.sheet }]}>
         <View style={[styles.handle, { backgroundColor: palette.handle }]} />
         <Text style={[typeV2.sheetTitle, styles.center, { color: palette.text }]} maxFontSizeMultiplier={1}>
-          {PICTURE_WORDS.addTitle}
+          {pictureWords().addTitle}
         </Text>
-        {PICTURE_WORDS.rows.map(([title, sub], i) => (
+        {pictureWords().rows.map(([title, sub], i, rows) => (
           <View
             key={title}
-            style={[styles.addRow, i < PICTURE_WORDS.rows.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.separator }]}
+            style={[styles.addRow, i < rows.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.separator }]}
           >
             {marks[i]}
             <View style={styles.flex}>
@@ -153,7 +162,7 @@ function ElsewherePicture() {
                 {sub}
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color={palette.secondary} />
+            <Ionicons name={forwardIcon()} size={18} color={palette.secondary} />
           </View>
         ))}
       </View>
@@ -264,6 +273,8 @@ export function demoTakeOf(words: QuranWords): DemoTake {
 }
 
 export const TAKE = DEMO_TAKE as DemoTake;
+/** The marks the cards show: no tajweed note where Strict isn't offered (Majd, Nov 17 2026: Strict waits). */
+export const demoMarks = (): Mark[] => (strictOffered() ? TAKE.marks : TAKE.marks.filter((m) => m.kind !== 'tajweed'));
 export const textOf = (w: number) => TAKE.lines.flat().find((x) => x.w === w)?.text ?? '';
 
 /**
@@ -274,13 +285,13 @@ export function TakeLines({
   live,
   past,
   cursor = TAKE.cursor,
-  marks = TAKE.marks,
+  marks = demoMarks(),
 }: {
   live: boolean;
   past: boolean;
   /** The word being said (the take's own by default; the moment moves it; null: none yet). */
   cursor?: number | null;
-  /** The marks shown (the take's three by default; the moment lands them one by one). */
+  /** The marks shown (the take's, `demoMarks()`, by default; the moment lands them one by one). */
   marks?: Mark[];
 }) {
   const { palette, isDark } = useTheme();
@@ -291,7 +302,7 @@ export function TakeLines({
   const fill = (w: number) => {
     const m = markOf.get(w);
     if (m) return past ? { backgroundColor: markFill(palette, m), opacity: isDark ? PAST_OPACITY.dark : PAST_OPACITY.light } : { backgroundColor: markFill(palette, m) };
-    return live && w === cursor ? { backgroundColor: palette.followWord } : null;
+    return live && w === cursor ? { backgroundColor: palette.highlight } : null;
   };
   const scale = room > 0 && wide > room ? room / wide : 1;
   return (
@@ -303,7 +314,7 @@ export function TakeLines({
         {lines.map((line) => {
           const here = live && cursor != null && line.some((x) => x.w === cursor);
           return (
-            <View key={line[0].w} style={[styles.takeLine, here && { backgroundColor: palette.followBand }]}>
+            <View key={line[0].w} style={[styles.takeLine, here && { backgroundColor: palette.highlightSoft }]}>
               {line.map(({ w, text }) => (
                 <View key={w} style={[styles.takeWord, fill(w)]}>
                   <Text style={[arabicV2(19), { color: palette.text }]} maxFontSizeMultiplier={1}>
@@ -333,8 +344,8 @@ function MarksPicture() {
       <View style={[styles.markCard, { backgroundColor: palette.sheet, borderColor: palette.outline }]}>
         <MarkBlock mark={mark} words={words} onDismiss={noop} first />
         <View style={styles.markActions}>
-          <SmallPill icon="volume-high-outline" label="Hear it" onPress={noop} />
-          <SmallPill icon="person-outline" label="Your recitation" onPress={noop} />
+          <SmallPill icon="volume-high-outline" label={t('reciteLive.card.hear')} onPress={noop} />
+          <SmallPill icon="person-outline" label={t('reciteLive.card.yours')} onPress={noop} />
         </View>
       </View>
     </View>
@@ -347,7 +358,7 @@ function AgainPicture() {
     <View style={styles.reciteScreen}>
       <TakeLines live={false} past />
       <View style={styles.againButton}>
-        <PillButton title={PICTURE_WORDS.drill} size="lg" onPress={noop} />
+        <PillButton title={pictureWords().drill} size="lg" onPress={noop} />
       </View>
     </View>
   );

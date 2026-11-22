@@ -44,6 +44,12 @@ export const settings = {
     loading: 'Loading…',
     load: 'Load {{title}}',
     pick: 'Pick a scenario',
+    heavy: 'Heavy user',
+    heavyDetail: 'Seven months: 21 juz memorized and more in part, a juz a day, gaps, the daily log, recordings, over a hundred Recite takes, Revo.',
+    steady: 'Missed yesterday',
+    steadyDetail: 'Six weeks of ten pages a day: a twelve-day run, then yesterday missed. The streak’s grace ring and the catch-up.',
+    starting: 'Getting started',
+    startingDetail: 'Two weeks in: Juz 30, Al-Mulk ayah by ayah, four pages a day, the first Recite takes.',
   },
   /** components/FajrBoundaryCard: the day starting at fajr. */
   fajr: {
@@ -144,6 +150,7 @@ export const settings = {
   prayer: {
     times: 'Prayer times',
     notifications: 'Prayer notifications',
+    athanVoice: 'Athan voice',
     /** How many prayers notify: "3 on". */
     nOn: '{{count}} on',
     calculation: 'Calculation',
@@ -153,12 +160,8 @@ export const settings = {
     smartTracking: 'Smart Tracking',
     smartTrackingOff: 'Turn on to rate pages from the session menu and see personalized insights.',
     speechModel: 'Speech model',
-    speechFollows: 'Searches by voice and follows your recitation, on this iPhone',
     speechSearches: 'Searches the Quran by voice, on this iPhone',
     notDownloaded: 'Not downloaded',
-    searchByVoice: 'Search by voice',
-    searchByVoiceIntro: 'Recite a few words and Revisely finds the ayah.',
-    deleteSpeechFollows: '{{size}} on this iPhone. It downloads again the next time you search by voice or follow word by word.',
     deleteSpeech: '{{size}} on this iPhone. It downloads again the next time you search by voice.',
     deleteSpeechModel: 'Delete speech model',
   },
@@ -188,6 +191,8 @@ export const settings = {
     cellularLabel: 'Download the mushaf over mobile data',
   },
   recite: {
+    premium: 'Premium',
+    premiumSub: 'Marking mistakes and Test me are part of it',
     footer: 'Marking mistakes is AI and can make mistakes. Recordings are checked by software; nobody listens.',
     level: 'Mistakes to mark',
     strict: 'Strict',
@@ -203,22 +208,45 @@ export const settings = {
     saveSub: 'On this phone only, with your recordings in Activity',
     showPast: 'Show past mistakes',
     showPastSub: 'Lightly, until each is said right on 2 different days',
+    mistakeSound: 'Sound on a mistake',
+    mistakeSoundSub: 'A short tone and a tap as a mistake is marked',
   },
   notifications: {
     enable: 'Enable notifications',
+    /** Under the switch while the phone refuses Revisely's notifications (REMIND-5). */
+    refused: 'Off in your phone’s Settings, so no reminders can come',
+    refusedTitle: 'Notifications are off for Revisely',
+    refusedBody: 'Allow them in your phone’s Settings, then turn reminders on here.',
   },
   appearance: {
     theme: 'Theme',
     system: 'System',
     light: 'Light',
     dark: 'Dark',
+    /** Decorations over the usual design (Revisely Dev until its release switch). */
+    ramadan: 'Ramadan theme',
+  },
+  /** Settings → Appearance → Language (Revisely Dev until Arabic ships). Each language's own name is LANGUAGE_NAMES. */
+  language: {
+    row: 'Language',
+    /** The choice that follows the phone. */
+    system: 'Phone’s language',
+    systemSub: 'Now {{language}}',
+    restartTitle: 'Restart Revisely?',
+    restartBody: 'It closes and opens again in {{language}}.',
+    restart: 'Restart',
   },
   support: {
+    /** The subject of an email to support. */
+    emailSubject: 'Revisely support',
     helpButtons: 'Help buttons',
     helpButtonsSub: 'A ? on screens that need explaining',
     helpButtonsLabel: 'Help buttons on screens',
     share: 'Share Revisely',
-    shareMessage: "I've been using Revisely to stay on top of my Quran memorization — give it a try: https://revisely.app",
+    /** The store's review page (SESS-8; Revisely Dev). */
+    rate: 'Rate Revisely',
+    /** The words shared; the link follows them (once: SET-2). */
+    shareMessage: 'I use Revisely to keep the Quran I’ve memorized. It plans a little revision for every day.',
     feedback: 'Send feedback',
     feedbackMessage: 'Found a bug or have an idea? Tell us anything. We read every note.',
     feedbackPlaceholder: "What's on your mind?",
@@ -231,6 +259,23 @@ export const settings = {
     report: 'Report a problem',
     contact: 'Contact support',
   },
+  /** Settings → Report a problem: the form (SET-3, SET-4). */
+  report: {
+    title: 'Report a problem',
+    message: 'Tell us what went wrong. It goes to us with the app’s version, never your name or email.',
+    placeholder: 'What were you doing, and what went wrong?',
+    send: 'Send',
+    thanks: 'Thank you',
+    thanksBody: 'Your report was sent.',
+    shotAdd: 'Add a screenshot',
+    shotHint: 'Go to the screen with the problem, then capture it.',
+    shotFailed: 'Couldn’t take a screenshot. Try again.',
+    shotAdded: 'Screenshot added',
+    shotRemove: 'Remove',
+    shotRemoveLabel: 'Remove the screenshot',
+    capture: 'Capture this screen',
+    captureCancel: 'Back to the report without a screenshot',
+  },
   about: {
     whatsNew: 'What’s new',
     reciteNotice: 'Recitation check notice',
@@ -241,11 +286,28 @@ export const settings = {
     version: 'Revisely · v{{version}}',
   },
   testing: {
+    /** Revisely Dev's list of the revision reminders this phone will show (components/settings/ScheduledRemindersRow). */
+    reminders: 'Scheduled reminders',
+    remindersSub: 'What this phone will show, and when',
+    remindersNone: 'None scheduled: reminders are off, or this phone doesn’t allow notifications.',
+    /** "Sat, Nov 22 · 8:00 AM". */
+    remindersWhen: '{{day}} · {{time}}',
+    /** After the time, for the one reminder of a day after tomorrow (REMIND-2). */
+    remindersAway: ' · while away',
+    remindersPreview: 'Show the next one in 5 seconds',
     resetSub: 'Start again as a new account',
     whatsNewAtLaunch: 'Show What’s new at launch',
     whatsNewAtLaunchSub: 'As App Store users will see it after the update',
     keep: 'Keep my recitations as test data',
     keepSub: 'Recitation checks, for Revisely’s tests. Software checks them; nobody listens.',
+    /** Revisely Dev's row naming the checker's models (components/settings/CheckerModelRow). */
+    model: 'Mistake detection model',
+    modelLine: 'Recite {{recite}} · Words & harakat {{harakat}} · Strict {{strict}}',
+    /** The checker's commit, a quiet detail under the models. */
+    modelServer: 'Checker {{server}}',
+    modelReading: 'Asking the checker…',
+    modelFailed: 'Couldn’t reach the checker. Tap to try again.',
+    modelHint: 'Asks the checker again',
     premium: 'Premium',
     premiumSub: 'Free in Revisely Dev. Turn it off to see Mark mistakes locked',
     premiumOnFailed: 'Couldn’t turn on Premium',

@@ -1,0 +1,14 @@
+{
+  "_note": "Indonesian: approved by Majd, Nov 21 2026 (~/Documents/revisely-store-listings/2026-11-21-store-listings.md). Written with: node scripts/asc.js listing --locale id.",
+  "name": "Revisely: Murojaah Al-Quran",
+  "subtitle": "Setor hafalan, lihat kesalahan",
+  "keywords": "tahfidz,tahfiz,hafiz,hafidz,hafal,murajaah,setoran,ziyadah,juz,surat,mushaf,alquran,ngaji,tilawah",
+  "description": "Revisely membantu Anda menjaga hafalan Al-Qur'an.\nBacalah dari hafalan, dan halaman mushaf mengikuti bacaan Anda. Aktifkan Mark mistakes, maka setiap kesalahan ditandai saat Anda membaca, lalu dijelaskan.\nRevo, asisten murojaah Anda, mengenal jadwal dan bacaan Anda, dan bisa menjawab pertanyaan Anda.\nWidget menampilkan murojaah hari ini di Layar Utama dan Layar Terkunci.\nSusun jadwal murojaah, catat yang sudah Anda murojaah, dan pantau perkembangannya.\nAplikasi ini masih berbahasa Inggris. Terjemahan Al-Qur'an bahasa Indonesia, termasuk terjemahan Kemenag, ada di dalamnya dan bisa dibaca offline. Gratis. Mark mistakes termasuk Premium, yang gratis untuk semua pengguna selama akses awal dan tetap Anda miliki seumur hidup.",
+  "whatsNew": {
+    "minor": "Perbaikan dan peningkatan kecil.",
+    "feature": "Setor hafalan dan lihat kesalahan Anda saat itu juga: tekan lama tombol mikrofon di layar mushaf dan aktifkan Mark mistakes."
+  },
+  "supportUrl": "https://revisely.app/support/",
+  "marketingUrl": "https://revisely.app",
+  "privacyPolicyUrl": "https://revisely.app/privacy/"
+}

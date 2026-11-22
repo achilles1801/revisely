@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../../context/ThemeContext';
 import { Tap } from '../v2/Tap';
+import { t } from '../../i18n';
 
 /** What a tap on the mic starts: Record, Recite, or Recite marking mistakes ("check", Premium). */
 export type ReciteMicMode = 'record' | 'recite' | 'check';
@@ -11,9 +12,15 @@ export type ReciteMicMode = 'record' | 'recite' | 'check';
 const SIZE = 40;
 
 export const MIC_LABEL: Record<ReciteMicMode, string> = {
-  record: 'Record',
-  recite: 'Recite',
-  check: 'Recite and mark mistakes',
+  get record() {
+    return t('reciteLive.mic.record');
+  },
+  get recite() {
+    return t('reciteLive.mic.recite');
+  },
+  get check() {
+    return t('reciteLive.mic.check');
+  },
 };
 
 /** Marking mistakes' mark (Premium): a tick on its own gradient (palette.premium), with a lock without Premium. */
@@ -64,8 +71,8 @@ export function ReciteMic({
       hitSlop={6}
       accessibilityRole="button"
       accessibilityLabel={MIC_LABEL[mode]}
-      accessibilityHint="Hold to choose Record or Recite"
-      accessibilityActions={[{ name: 'longpress', label: 'Choose Record or Recite' }]}
+      accessibilityHint={t('reciteLive.mic.hint')}
+      accessibilityActions={[{ name: 'longpress', label: t('reciteLive.mic.choose') }]}
       onAccessibilityAction={(e) => {
         if (e.nativeEvent.actionName === 'longpress') onLongPress();
       }}

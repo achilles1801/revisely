@@ -10,6 +10,7 @@ import { spokenText } from '../../lib/passages';
 import { testHeadline, testPlaceName, type TestResult } from '../../lib/reciteLive/testMe';
 import { findingsLine } from './TakeSummarySheet';
 import { peekedLine } from '../../lib/reciteLive/peeked';
+import { t } from '../../i18n';
 
 /** Chrome text stops growing here (CLAUDE.md, UI traps). */
 const CHROME_MAX = 1.4;
@@ -18,15 +19,15 @@ const CHROME_MAX = 1.4;
 export function outcomeText(r: TestResult): string {
   switch (r.outcome) {
     case 'clean':
-      return 'Clean';
+      return t('reciteLive.test.clean');
     case 'mistakes':
-      return [findingsLine(r.marks) || 'Mistakes', r.peeked ? peekedLine(r.peeked) : ''].filter(Boolean).join(', ');
+      return [findingsLine(r.marks) || t('reciteLive.test.mistakes'), r.peeked ? peekedLine(r.peeked) : ''].filter(Boolean).join(', ');
     case 'helped':
       return peekedLine(r.peeked);
     case 'unfinished':
-      return 'Stopped before the end';
+      return t('reciteLive.test.unfinished');
     case 'missed':
-      return 'Not continued';
+      return t('reciteLive.test.missed');
   }
 }
 
@@ -70,15 +71,15 @@ export function TestMeScopeSheet({
     </Tap>
   );
   return (
-    <Sheet visible={visible} onClose={onClose} title="Test me" scroll testID="test-me-sheet">
+    <Sheet visible={visible} onClose={onClose} title={t('reciteLive.test.title')} scroll testID="test-me-sheet">
       {row(
         'all',
-        'Everything you’ve memorized',
-        juz.length > 1 ? `${juz.length} juz` : null,
+        t('reciteLive.test.everything'),
+        juz.length > 1 ? t('common.juzCount', { count: juz.length }) : null,
         () => onStart(null),
         true,
       )}
-      {juz.length > 1 ? juz.map((j) => row(`juz-${j.juz}`, `Juz ${j.juz}`, null, () => onStart(j.juz))) : null}
+      {juz.length > 1 ? juz.map((j) => row(`juz-${j.juz}`, t('common.juzN', { n: j.juz }), null, () => onStart(j.juz))) : null}
     </Sheet>
   );
 }
@@ -103,12 +104,12 @@ export function TestSummarySheet({
   const { palette } = useTheme();
   const actions = (
     <View style={styles.buttons}>
-      <PillButton title="Test me again" size="lg" onPress={onAgain} testID="test-summary-again" />
-      <PillButton title="Done" size="lg" variant="outline" onPress={onDone} testID="test-summary-done" />
+      <PillButton title={t('reciteLive.test.again')} size="lg" onPress={onAgain} testID="test-summary-again" />
+      <PillButton title={t('common.done')} size="lg" variant="outline" onPress={onDone} testID="test-summary-done" />
     </View>
   );
   return (
-    <Sheet visible={visible} onClose={onDone} title="Test me" scroll pinned={actions} testID="test-summary">
+    <Sheet visible={visible} onClose={onDone} title={t('reciteLive.test.title')} scroll pinned={actions} testID="test-summary">
       <View style={styles.head}>
         <Text style={[typeV2.title, { color: palette.text }]} maxFontSizeMultiplier={CHROME_MAX} accessibilityRole="header" testID="test-summary-headline">
           {testHeadline(results)}
@@ -123,7 +124,7 @@ export function TestSummarySheet({
             onPress={() => onPlace(r)}
             style={[styles.row, { borderTopWidth: layoutV2.hairline, borderTopColor: palette.separator }]}
             accessibilityRole="button"
-            accessibilityLabel={`${spokenText(place)}: ${how}. Show it on the page`}
+            accessibilityLabel={t('reciteLive.test.placeLabel', { place: spokenText(place), how })}
             testID={`test-summary-place-${r.outcome}`}
           >
             <View style={styles.rowText}>

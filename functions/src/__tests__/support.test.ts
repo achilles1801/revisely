@@ -343,10 +343,31 @@ describe('Premium in the Dev app', () => {
     expect(m.ents.get('alice')?.premium?.source).toBe('support');
   });
 
+  it("turning it off lifts early access's grant too, so a tester can see the lock; on gives only the dev grant", async () => {
+    const m = memoryStore(USERS);
+    m.ents.set('alice', { grants: { early: grant('early', null) }, premium: grant('early', null) });
+    expect(await handleDevPremium({ auth: { uid: 'alice' } }, m.store, true, false)).toEqual({ premium: false });
+    expect(m.ents.get('alice')?.grants?.early).toBeUndefined();
+    expect(await handleDevPremium({ auth: { uid: 'alice' } }, m.store, true, true)).toEqual({ premium: true });
+    expect(Object.keys(m.ents.get('alice')?.grants ?? {})).toEqual(['dev']);
+  });
+
   it('refuses outside Revisely Dev and without a sign-in', async () => {
     const m = memoryStore(USERS);
     expect((await refusal(handleDevPremium({ auth: { uid: 'alice' } }, m.store, false, true))).code).toBe('permission-denied');
     expect((await refusal(handleDevPremium({}, m.store, true, true))).code).toBe('unauthenticated');
     expect(m.ents.size).toBe(0);
+  });
+});
+
+describe('where the program runs', () => {
+  const { SUPPORT_PAGES, SUPPORT_ORIGINS } = require('../support/logic') as typeof import('../support/logic');
+  it('revisely-dev and production have their program page; any other project has none (supportLink refuses)', () => {
+    expect(SUPPORT_PAGES['revisely-dev']).toBe('https://dev.revisely.app/apply/');
+    expect(SUPPORT_PAGES['revision-buddy-3a398']).toBe('https://revisely.app/apply/');
+    expect(SUPPORT_PAGES['demo-revisely']).toBeUndefined();
+  });
+  it('only the two sites may call it from a browser', () => {
+    expect([...SUPPORT_ORIGINS].sort()).toEqual(['https://dev.revisely.app', 'https://revisely.app']);
   });
 });

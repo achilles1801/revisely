@@ -19,14 +19,14 @@ const page = (pageNumber: number, lastRevisedDate: string | null): UserPage =>
 
 describe('revoGaps', () => {
   it('the section’s figures over 30 days, the full revision, and each surah’s days since revised', () => {
-    // Revised every day to the 6th, then the 12th and 13th: a 6-day gap; nothing since (2 days).
+    // Revised every day to the 6th, then the 12th and 13th: a 5-day gap (the 7th to the 11th); nothing since (2 days).
     const days = ['2026-01-01', '2026-01-02', '2026-01-03', '2026-01-04', '2026-01-05', '2026-01-06', '2026-01-12', '2026-01-13'];
     const history = days.map((day) => ({ day, pages: [1] }));
     // Pages 1–3 (Al-Fatihah, Al-Baqarah) revised on the 13th; 4–20 (Al-Baqarah) on the 6th.
     const pages = Array.from({ length: 20 }, (_, i) => page(i + 1, i < 3 ? '2026-01-13T00:00:00.000Z' : '2026-01-06T00:00:00.000Z'));
     const g = revoGaps({ user, pages, history, today: TODAY, firstDay: '2026-01-01' })!;
     expect(g.lastRevisedDaysAgo).toBe(2);
-    expect(g.longestGap).toEqual({ days: 6, endedDaysAgo: 3 });
+    expect(g.longestGap).toEqual({ days: 5, endedDaysAgo: 3 });
     expect(g.usualStepDays).toBe(1);
     expect(g.longGaps).toBe(1);
     expect(g.fullRevision).toMatchObject({ cycleDays: 4 });

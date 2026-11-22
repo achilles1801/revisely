@@ -38,6 +38,10 @@ export interface StartFrame {
    * for takes from the reader's mic only. A server before 7 ignores it.
    */
   startIn?: 'quran';
+  /** Protocol 9: send `guess` events before `locked` (older checkers ignore it). */
+  guess?: boolean;
+  /** Send the audio as IMA-ADPCM blocks if the checker's `ready` agrees (contract "ADPCM uplink"); raw PCM otherwise. */
+  audio?: 'adpcm';
 }
 
 export type ClientFrame =
@@ -49,7 +53,24 @@ export type ClientFrame =
   | { type: 'undismiss'; id: string }
   /** A word or an ayah shown by hand in the hidden view (information for the checker). */
   | { type: 'hint'; w: number; what: 'word' | 'ayah' }
-  | { type: 'end' };
+  | { type: 'end'; counts?: TakeCounts };
+
+/**
+ * What a take did on the phone, counts only, with its `end` (Recite due diligence, row 2; Revisely Dev until Majd's word
+ * for production): no audio, words or ids. The checker keeps them on its take line. A checker without them ignores the field.
+ */
+export interface TakeCounts {
+  /** Marks shown during the take (still shown, or taken off). */
+  shown: number;
+  /** "Not a mistake" taps. */
+  notMistake: number;
+  /** Undo or Put back. */
+  putBack: number;
+  /** Words or ayahs shown by hand on a hidden page (‹, ‹‹). */
+  peeks: number;
+  /** The connection resumed. */
+  resumes: number;
+}
 
 export interface LiveConnection {
   /** 16 kHz mono PCM, as the microphone gives it. */
@@ -57,6 +78,11 @@ export interface LiveConnection {
   send(frame: Exclude<ClientFrame, StartFrame>): void;
   /** Hang up (nothing more comes). */
   close(): void;
+  /**
+   * Paused (the microphone off, the take open): `true` keeps the checker from letting the take go while nothing is
+   * sent, `false` when the audio comes again. Optional: a recorded take has nothing to keep open.
+   */
+  hold?(on: boolean): void;
   /** The connection's state in a word or two, for the Stop trace (lib/reciteLive/stopTrace): "live", "retry 2", … */
   status?(): string;
   /** The take's audio from `from` to `to` seconds (16 kHz mono), as held on the phone; null outside what was heard. */

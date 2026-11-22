@@ -88,9 +88,7 @@ appId: com.revisionbuddy.app
 # A recording beside it. While recording, the screen never settles (a live timer and waveform):
 # don't wait for it after these taps. If the microphone's alert comes up (its grant didn't take: CI),
 # Allow, as a user would, and record if that didn't start it.
-- tapOn:
-    id: record-start
-    waitToSettleTimeoutMs: 500
+- runFlow: ../subflows/record-start.yaml
 - extendedWaitUntil:
     visible:
       id: record-stop
@@ -108,7 +106,7 @@ appId: com.revisionbuddy.app
           timeout: 3000
           optional: true
       - tapOn:
-          id: record-start
+          id: "record-start|recite-mic"
           optional: true
           waitToSettleTimeoutMs: 500
 - extendedWaitUntil:

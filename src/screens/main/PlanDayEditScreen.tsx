@@ -10,7 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { BottomSheetModal } from '@gorhom/bottom-sheet';
-import { HomeStackParamList } from '../../navigation/MainNavigator';
+import type { HomeStackParamList } from '../../navigation/MainNavigator';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import { spacing } from '../../theme/spacing';
@@ -46,6 +46,7 @@ import { useRevisionDay } from '../../hooks/useRevisionDay';
 import { arabicLabelLines } from '../../lib/platformUi';
 import { revisablePages } from '../../lib/memorizedAyahs';
 import { t } from '../../i18n';
+import { backIcon } from '../../i18n/direction';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'PlanDayEdit'>;
 type RouteProps = RouteProp<HomeStackParamList, 'PlanDayEdit'>;
@@ -256,7 +257,7 @@ export default function PlanDayEditScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
       <TopBar
         left={
-          <IconButton icon="chevron-back" onPress={commit} label={t('plan.day.back')} size={26} testID="back" />
+          <IconButton icon={backIcon()} onPress={commit} label={t('plan.day.back')} size={26} testID="back" />
         }
         title={title}
         separator

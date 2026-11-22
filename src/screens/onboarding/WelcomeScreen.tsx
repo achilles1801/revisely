@@ -10,7 +10,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
+import type { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
 import { HeroGlow } from '../../components/v2/HeroGlow';
 import { PillButton } from '../../components/v2/PillButton';
 import { useTheme } from '../../context/ThemeContext';

@@ -1,6 +1,8 @@
 // Activity's Insights and calendar marks, from items (Activity spec section 5, C3).
 // Pure: the screens pass in items and get the figures. Days are YYYY-MM-DD revision days.
 
+import { dayNumber, daysBetween } from './dayKeys';
+
 export interface Revised { day: string; pages: number[]; assigned?: number[]; minutes: number | null; countsFor: string; }
 export interface Memorized { day: string; pages: number[]; }
 export interface Read { day: string; pages: number[]; minutes: number | null; }
@@ -8,8 +10,6 @@ export interface Read { day: string; pages: number[]; minutes: number | null; }
 /** Pace shows only when at least this many items carry minutes (suggested; open point). */
 export const PACE_MIN_ITEMS = 10;
 
-const dayNumber = (day: string) => Math.round(Date.parse(`${day}T00:00:00Z`) / 86_400_000);
-const daysBetween = (from: string, to: string) => dayNumber(to) - dayNumber(from);
 
 /** The last day each page was revised (own or credited items, by the day it counts for). */
 /**

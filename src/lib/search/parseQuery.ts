@@ -4,17 +4,13 @@
 
 import { getAllSurahs, getSurahDisplay } from '../quranData';
 import { editDistance, normalizeWord } from '../recite/arabic';
+import { westernDigits } from '../../i18n/digits';
 
 export type SearchTarget =
   | { kind: 'verse'; sura: number; ayah: number }
   | { kind: 'surah'; sura: number }
   | { kind: 'page'; page: number }
   | { kind: 'juz'; juz: number };
-
-/** Arabic-Indic and Persian digits as 0-9. */
-function westernDigits(text: string): string {
-  return text.replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660)).replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0));
-}
 
 const ayahCount = (sura: number) => getSurahDisplay(sura)?.ayahCount ?? 0;
 

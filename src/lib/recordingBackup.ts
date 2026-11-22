@@ -264,7 +264,7 @@ export async function runBackup(
     onProgress?.({ ...status });
     const finished = () =>
       refused > 0 || failedDeletes > 0
-        ? done('error', [refused > 0 && `${refused} could not be backed up`, failedDeletes > 0 && `${failedDeletes} backup deletions failed`].filter(Boolean).join('; '))
+        ? done('error', [refused > 0 && `${refused} could not be backed up`, failedDeletes > 0 && `${failedDeletes} backup deletions failed`].filter(Boolean).join('; ')) // i18n-ignore (the status's detail, for the log)
         : done('idle');
     let refused = 0;
     if (pending.length === 0) return finished();
@@ -321,7 +321,7 @@ export async function runBackup(
             // changes. The next listing unmarks this part if its record never
             // got written.
             logger.error('Recording backup: the backup refused a record', err);
-            return done('idle', 'The backup refused a record');
+            return done('idle', 'The backup refused a record'); // i18n-ignore (for the log)
           }
         }
         if (!rec) {
@@ -355,7 +355,7 @@ export async function runBackup(
 /** Nothing of the recording is left in the backup (its record pointed at nothing). */
 export class RecordingGone extends Error {
   constructor() {
-    super('This recording is no longer in your backup.');
+    super('This recording is no longer in your backup.'); // i18n-ignore (an error's message, for the log)
     this.name = 'RecordingGone';
   }
 }

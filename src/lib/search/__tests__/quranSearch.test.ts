@@ -122,6 +122,29 @@ describe('searchText', () => {
     expect(searchText(words, 'لم يلد ولم يولد').hits[0]).toMatchObject({ sura: 112, ayah: 3, from, to });
   });
 
+  // From the property test's seed -256462220 (Nov 21 2026): 24:61 runs بيوت إخوانكم أو بيوت
+  // أخواتكم أو بيوت …, and with إخوانكم heard as إخوالكم the two halves read as one phrase said
+  // again a letter differently. That phrase once is the ayah's later بيوت أخوالكم أو, word for
+  // word, which was all that was found.
+  it('finds a run of a repetitive ayah with a word misheard, though it reads as a phrase said again', () => {
+    const [from] = words.verseRange(24, 61);
+    const misheard = 'بيوت إخوالكم أو بيوت أخواتكم أو';
+    for (const text of [misheard, `${misheard} ${misheard}`]) {
+      const r = searchText(words, text);
+      // The run as said, one word off, and the phrase once, word for word, are both listed.
+      expect(r.hits.map((h) => [h.sura, h.ayah, h.from - from, h.to - from])).toEqual([
+        [24, 61, 38, 41],
+        [24, 61, 26, 32],
+      ]);
+      expect(r.hits[1].score).toBeGreaterThan(0.9);
+      expect(r.hits[1].score).toBeLessThan(1);
+      expect([...matchedWords(words, r.hits[1], r.words)].map((i) => i - from)).toEqual([26, 27, 28, 29, 30, 31]);
+    }
+    // Said right, the run alone; a phrase said again that the text doesn't run on with, once.
+    expect(searchText(words, 'بيوت إخوانكم أو بيوت أخواتكم أو').hits.map((h) => [h.from - from, h.to - from])).toEqual([[26, 32]]);
+    expect(found('بيوت أخوالكم أو بيوت أخوالكم أو')).toEqual(['24:61']);
+  });
+
   it('finds nothing in words that are not in the Quran', () => {
     expect(found('كيف حالك اليوم يا صديقي')).toEqual([]);
     expect(found('ترجمة نانسي قنقر')).toEqual([]);
@@ -175,6 +198,12 @@ describe('withoutRepeats', () => {
   it('keeps neighbouring words a letter apart: one word counts as said twice only when it is the same', () => {
     expect(withoutRepeats(ws('إنما أنا لكم')).map((w) => w.key)).toEqual(['انما', 'انا', 'لكم']);
     expect(withoutRepeats(ws('الرحمن الرحمن الرحيم')).map((w) => w.key)).toEqual(['الرحمن', 'الرحيم']);
+  });
+  it('folds a phrase said again a letter differently, or with near off only word for word', () => {
+    const run = 'بيوت إخوالكم أو بيوت أخواتكم أو';
+    expect(withoutRepeats(ws(run)).map((w) => w.key)).toEqual(['بيوت', 'اخوالكم', 'او']);
+    expect(withoutRepeats(ws(run), false).map((w) => w.key)).toEqual(['بيوت', 'اخوالكم', 'او', 'بيوت', 'اخواتكم', 'او']);
+    expect(withoutRepeats(ws(`${run} ${run}`), false).map((w) => w.key)).toEqual(['بيوت', 'اخوالكم', 'او', 'بيوت', 'اخواتكم', 'او']);
   });
 });
 

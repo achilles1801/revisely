@@ -10,7 +10,7 @@ import { WheelPicker } from '../v2/WheelPicker';
 import { layoutV2, typeV2 } from '../../theme/v2';
 import { getAllSurahs, getJuzForPage, getPagesForJuz, getSurahDisplay, getSurahForPage } from '../../lib/quranData';
 import { isJuzMode, jumpablePages, type JumpTarget, todayStartPage } from '../../lib/jump';
-import { describePageRange, describePassage, NBSP, spokenText } from '../../lib/passages';
+import { describePageRange, describePassage, spokenText } from '../../lib/passages';
 import type { User, UserPage } from '../../types';
 import { t } from '../../i18n';
 

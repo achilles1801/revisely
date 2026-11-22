@@ -1,4 +1,4 @@
-import { socketFeed, SocketLike } from '../socket';
+import { KEEPALIVE_MS, READY_WAIT_MS, socketFeed, SocketLike } from '../socket';
 import { pairAnswered, pairClosed, pairOpen, PAIR_CLOSED_MS } from '../pairService';
 import type { LiveEvent } from '../contract';
 import type { StartFrame } from '../feed';
@@ -32,9 +32,15 @@ const flush = async () => {
   for (let i = 0; i < 5; i++) await Promise.resolve();
 };
 
+/** The test's clock (the socket's `now`), moved by `later`. */
+let clockNow = 1_000_000;
+const later = (ms: number) => (clockNow += ms);
+
 function setup(tokens: (string | null)[] = ['tok1', 'tok2', 'tok3', 'tok4'], start: StartFrame = START) {
   const sockets: FakeSocket[] = [];
   const queue: { fn: () => void; ms: number }[] = [];
+  // The first-ready wait is kept apart, so the other timers' order stays as each test expects.
+  const waits: { fn: () => void; ms: number }[] = [];
   const events: LiveEvent[] = [];
   let closed = 0;
   let n = 0;
@@ -42,6 +48,7 @@ function setup(tokens: (string | null)[] = ['tok1', 'tok2', 'tok3', 'tok4'], sta
     url: 'wss://example.test/live',
     token: async () => tokens[n++] ?? null,
     app: '1.0.4 (40) dev test',
+    now: () => clockNow,
     open: () => {
       const s = new FakeSocket();
       sockets.push(s);
@@ -50,18 +57,20 @@ function setup(tokens: (string | null)[] = ['tok1', 'tok2', 'tok3', 'tok4'], sta
     timers: {
       set: (fn, ms) => {
         const t = { fn, ms };
-        queue.push(t);
+        (ms === READY_WAIT_MS ? waits : queue).push(t);
         return t;
       },
       clear: (h) => {
-        const i = queue.indexOf(h as { fn: () => void; ms: number });
-        if (i >= 0) queue.splice(i, 1);
+        for (const list of [queue, waits]) {
+          const i = list.indexOf(h as { fn: () => void; ms: number });
+          if (i >= 0) list.splice(i, 1);
+        }
       },
     },
   });
   const conn = connect(start, { onEvent: (e) => events.push(e), onClose: () => closed++ });
   const runTimer = () => queue.shift()!.fn();
-  return { conn, sockets, events, queue, runTimer, closed: () => closed };
+  return { conn, sockets, events, queue, waits, runTimer, closed: () => closed };
 }
 
 describe('the live socket', () => {
@@ -194,6 +203,8 @@ describe('the live socket', () => {
     const s2 = t.sockets[1];
     s2.onopen!();
     s2.answer({ type: 'ready', v: 2, take: 'take1', from: 0 });
+    // Paced, a second a tick (RECITE-10).
+    while (t.queue.length) t.runTimer();
     const out = s2.out().slice(1);
     expect(out.map((x) => (Array.isArray(x) ? x.length : x))).toEqual([16_000, 16_000, 8_000, { type: 'end' }]);
     expect((out as number[][]).slice(0, 3).flat()).toEqual(Array.from(long));
@@ -334,7 +345,8 @@ describe('two services: the light levels on recite-check-pair (recite-contract.m
       timers: {
         set: (fn, ms) => {
           const t = { fn, ms };
-          timers.push(t);
+          // The first-ready wait (READY_WAIT_MS) isn't what these tests look at.
+          if (ms !== READY_WAIT_MS) timers.push(t);
           return t;
         },
         clear: (h) => {
@@ -439,5 +451,268 @@ describe('two services: the light levels on recite-check-pair (recite-contract.m
     connect(RECITE, { onEvent: () => undefined, onClose: () => undefined });
     await flush();
     expect(opened).toEqual([MAIN]);
+  });
+});
+
+describe('long takes (Nov 20 2026): a quiet connection, and a resume’s held audio', () => {
+  it('[RECITE-10] once the checker beats, 8 s without a word from it is a drop: the socket goes and the take resumes', async () => {
+    const t = setup();
+    await flush();
+    const s1 = t.sockets[0];
+    s1.onopen!();
+    s1.answer({ type: 'ready', v: 2, take: 'take1', from: 0, protocol: 8 });
+    s1.answer({ type: 'beat', t: 0.5, rx: 0.5 });
+    expect(t.events.map((e) => e.type)).toEqual(['ready', 'beat']);
+    expect(t.events[1]).toEqual({ type: 'beat', t: 0.5, rx: 0.5 });
+    t.conn.sendAudio(pcm(1, 2, 3));
+    // Beats keep it alive.
+    later(2000);
+    t.runTimer();
+    s1.answer({ type: 'beat', t: 2.5, rx: 2.5 });
+    later(2000);
+    t.runTimer();
+    expect(s1.closed).toBe(false);
+    // Then nothing: audio still goes in, nothing comes back (Majd's take of Nov 19, for 76 s).
+    for (let i = 0; i < 3; i++) {
+      later(2000);
+      t.runTimer();
+    }
+    // 8 s since its last beat: still watched.
+    expect(s1.closed).toBe(false);
+    later(2000);
+    t.runTimer();
+    expect(s1.closed).toBe(true);
+    // A drop like any other: a retry, then a resume with the held audio.
+    expect(t.queue.map((q) => q.ms)).toEqual([500]);
+    t.runTimer();
+    await flush();
+    const s2 = t.sockets[1];
+    s2.onopen!();
+    expect((s2.out()[0] as { resume?: string }).resume).toBe('take1');
+    s2.answer({ type: 'ready', v: 2, take: 'take1', from: 0 });
+    expect(s2.out().slice(1)).toEqual([[1, 2, 3]]);
+    expect(t.closed()).toBe(0);
+  });
+
+  it('[RECITE-10] a checker that never beats is never watched (older checkers keep today’s behaviour)', async () => {
+    const t = setup();
+    await flush();
+    const s1 = t.sockets[0];
+    s1.onopen!();
+    s1.answer({ type: 'ready', v: 2, take: 'take1', from: 0 });
+    later(60_000);
+    expect(t.queue).toEqual([]);
+    expect(s1.closed).toBe(false);
+  });
+
+  it('[RECITE-10] the watchdog stops with the take: no timer is left after the final answer', async () => {
+    const t = setup();
+    await flush();
+    const s1 = t.sockets[0];
+    s1.onopen!();
+    s1.answer({ type: 'ready', v: 2, take: 'take1', from: 0 });
+    s1.answer({ type: 'beat', t: 0 });
+    expect(t.queue.length).toBe(1);
+    s1.answer({ type: 'done', result: { v: 2, take: 'take1', from: 1, to: 2, secs: 1, marks: [], score: { reached: 1, mistakes: 0, tajweed: 0, accuracy: 1 } } });
+    expect(t.queue).toEqual([]);
+    expect(t.closed()).toBe(1);
+  });
+
+  it('[RECITE-10] a resume sends the held audio a slice at a time (1 s every 125 ms), in order, then goes live', async () => {
+    const t = setup();
+    await flush();
+    const s1 = t.sockets[0];
+    s1.onopen!();
+    s1.answer({ type: 'ready', v: 2, take: 'take1', from: 0 });
+    // 4 s of audio, a dismissal at 2 s.
+    const second = (k: number) => new Int16Array(16_000).fill(k);
+    for (let k = 0; k < 4; k++) {
+      if (k === 2) t.conn.send({ type: 'dismiss', id: 'm1' });
+      t.conn.sendAudio(second(k));
+    }
+    s1.onclose!();
+    t.runTimer();
+    await flush();
+    const s2 = t.sockets[1];
+    s2.onopen!();
+    s2.answer({ type: 'ready', v: 2, take: 'take1', from: 0 });
+    const shape = () => s2.out().slice(1).map((x) => (Array.isArray(x) ? `a${x[0]}` : (x as { type: string }).type));
+    // The first second at once; the rest a second a tick.
+    expect(shape()).toEqual(['a0']);
+    expect(t.queue.map((q) => q.ms)).toEqual([125]);
+    // Audio that comes meanwhile joins the end, and isn't sent ahead of the held audio.
+    t.conn.sendAudio(second(4));
+    expect(shape()).toEqual(['a0']);
+    t.runTimer();
+    expect(shape()).toEqual(['a0', 'a1']);
+    t.runTimer();
+    expect(shape()).toEqual(['a0', 'a1', 'dismiss', 'a2']);
+    t.runTimer();
+    t.runTimer();
+    expect(shape()).toEqual(['a0', 'a1', 'dismiss', 'a2', 'a3', 'a4']);
+    expect(t.queue).toEqual([]);
+    // Live again.
+    t.conn.sendAudio(pcm(7));
+    expect(s2.out().slice(-1)).toEqual([[7]]);
+  });
+
+  it('[RECITE-10] with beats, the held audio goes no further than 5 s ahead of what the checker has received', async () => {
+    const t = setup();
+    await flush();
+    const s1 = t.sockets[0];
+    s1.onopen!();
+    s1.answer({ type: 'ready', v: 2, take: 'take1', from: 0, beat: 2 });
+    for (let k = 0; k < 12; k++) t.conn.sendAudio(new Int16Array(16_000).fill(k));
+    s1.onclose!();
+    t.runTimer();
+    await flush();
+    const s2 = t.sockets[1];
+    s2.onopen!();
+    // The checker holds the first 2 s: what it has, it has received.
+    s2.answer({ type: 'ready', v: 2, take: 'take1', from: 32_000, beat: 2 });
+    const seconds = () => s2.out().slice(1).filter(Array.isArray).map((x) => (x as number[])[0]);
+    const runPacing = () => {
+      for (let i = 0; i < 20; i++) {
+        const k = t.queue.findIndex((q) => q.ms === 125);
+        if (k < 0) return;
+        t.queue.splice(k, 1)[0].fn();
+      }
+    };
+    runPacing();
+    // Up to 5 s ahead of the 2 s received: seconds 2–6.
+    expect(seconds()).toEqual([2, 3, 4, 5, 6]);
+    // The checker says it has received up to 5 s: up to 10.
+    s2.answer({ type: 'beat', t: 4, rx: 5 });
+    runPacing();
+    expect(seconds()).toEqual([2, 3, 4, 5, 6, 7, 8, 9]);
+    s2.answer({ type: 'beat', t: 9, rx: 9 });
+    runPacing();
+    expect(seconds()).toEqual([2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+  });
+});
+
+describe('a paused take (Nov 21 2026: the checker let a paused take go after 30 s, and its summary came up by itself)', () => {
+  const live = async () => {
+    const t = setup();
+    await flush();
+    const s = t.sockets[0];
+    s.onopen!();
+    s.answer({ type: 'ready', v: 2, take: 'take1', from: 0 });
+    t.conn.sendAudio(pcm(1, 2, 3));
+    return { ...t, s };
+  };
+  const keepalives = (s: FakeSocket) => s.out().filter((f) => (f as { type?: string }).type === 'keepalive').length;
+
+  it('[RECITE-16] held: a frame at once and every 10 s, which the checker ignores but counts; let go, none', async () => {
+    const t = await live();
+    t.conn.hold!(true);
+    expect(keepalives(t.s)).toBe(1);
+    expect(t.queue.map((q) => q.ms)).toEqual([KEEPALIVE_MS]);
+    t.runTimer();
+    t.runTimer();
+    expect(keepalives(t.s)).toBe(3);
+    t.conn.hold!(false);
+    expect(t.queue).toEqual([]);
+    t.conn.sendAudio(pcm(4));
+    expect(t.s.out().slice(-1)).toEqual([[4]]);
+    expect(t.closed()).toBe(0);
+  });
+
+  it('[RECITE-16] keepalives are never replayed on a resume, and the final answer stops them', async () => {
+    const t = await live();
+    t.conn.hold!(true);
+    t.s.onclose!({ code: 1006 });
+    // The retry's timer, and the keepalive's (which sends nothing while there's no live socket).
+    const retry = t.queue.find((q) => q.ms === 500)!;
+    t.queue.splice(t.queue.indexOf(retry), 1);
+    retry.fn();
+    await flush();
+    const s2 = t.sockets[1];
+    s2.onopen!();
+    s2.answer({ type: 'ready', v: 2, take: 'take1', from: 3 });
+    expect(keepalives(s2)).toBe(0);
+    s2.answer({ type: 'done', result: { score: { accuracy: 1 }, marks: [] } });
+    expect(t.queue).toEqual([]);
+  });
+
+  it('[RECITE-16] the checker’s idle error before its final answer is a drop to resume from, never the take’s end', async () => {
+    const t = await live();
+    t.s.answer({ type: 'error', reason: 'idle' });
+    expect(t.events.some((e) => e.type === 'error')).toBe(false);
+    expect(t.s.closed).toBe(true);
+    expect(t.queue.map((q) => q.ms)).toContain(500);
+    expect(t.closed()).toBe(0);
+  });
+});
+
+describe('the audio 4:1 (contract "ADPCM uplink", Nov 22 2026)', () => {
+  const { decodeBlock } = jest.requireActual('../adpcm');
+  const ADPCM_START: StartFrame = { ...START, audio: 'adpcm' };
+  const setupAdpcm = async () => {
+    const t = setup(['tok1', 'tok2', 'tok3', 'tok4'], ADPCM_START);
+    await flush();
+    t.sockets[0].onopen!();
+    return t;
+  };
+  const isBlock = (d: string | ArrayBuffer, n: number) => typeof d !== 'string' && d.byteLength === 6 + Math.ceil((n - 1) / 2);
+
+  it('[RECITE-5] raw until ready says "adpcm"; then each frame is a block that decodes to the same number of samples', async () => {
+    const t = await setupAdpcm();
+    const s = t.sockets[0];
+    expect(s.out()[0]).toMatchObject({ audio: 'adpcm' });
+    t.conn.sendAudio(new Int16Array(1600).fill(100)); // held before ready
+    s.answer({ type: 'ready', v: 2, take: 'k', from: 0, audio: 'adpcm' });
+    const held = s.sent[1];
+    expect(isBlock(held, 1600)).toBe(true);
+    expect(decodeBlock(held as ArrayBuffer).length).toBe(1600);
+    t.conn.sendAudio(new Int16Array(1600).fill(-50));
+    expect(isBlock(s.sent[s.sent.length - 1], 1600)).toBe(true);
+  });
+
+  it('a checker that doesn’t answer "adpcm" gets raw audio, and so does a resume onto one', async () => {
+    const t = await setupAdpcm();
+    const s1 = t.sockets[0];
+    s1.answer({ type: 'ready', v: 2, take: 'k', from: 0, audio: 'adpcm' });
+    t.conn.sendAudio(new Int16Array(1600));
+    s1.onclose!({ code: 1006 });
+    t.runTimer();
+    await flush();
+    const s2 = t.sockets[1];
+    s2.onopen!();
+    s2.answer({ type: 'ready', v: 2, take: 'k', from: 0 });
+    // The held audio goes again, raw (3,200 bytes for 1,600 samples).
+    const frames = s2.sent.slice(1).filter((d) => typeof d !== 'string');
+    expect(frames.length).toBeGreaterThan(0);
+    for (const f of frames) expect((f as ArrayBuffer).byteLength % 2).toBe(0);
+    expect(frames.reduce((n, f) => n + (f as ArrayBuffer).byteLength, 0)).toBe(3200);
+  });
+
+  it('a start frame that didn’t ask gets raw audio even if the checker says "adpcm"', async () => {
+    const t = setup();
+    await flush();
+    const s = t.sockets[0];
+    s.onopen!();
+    s.answer({ type: 'ready', v: 2, take: 'k', from: 0, audio: 'adpcm' });
+    t.conn.sendAudio(new Int16Array(1600));
+    expect((s.sent[s.sent.length - 1] as ArrayBuffer).byteLength).toBe(3200);
+  });
+});
+
+describe('a checker at capacity (Nov 22 2026: Cloud Run holds a new take about 35 s, then refuses it)', () => {
+  it('[RECITE-5] no ready within 20 s of the start: the take ends as busy, said in the bar, not minutes of Starting…', async () => {
+    const t = setup();
+    await flush();
+    t.sockets[0].onopen!();
+    expect(t.waits).toHaveLength(1);
+    t.waits[0].fn();
+    expect(t.events).toContainEqual({ type: 'error', reason: 'busy' });
+  });
+
+  it('a ready in time clears it, and a later resume isn’t held to it', async () => {
+    const t = setup();
+    await flush();
+    t.sockets[0].onopen!();
+    t.sockets[0].answer({ type: 'ready', v: 2, take: 'k', from: 0 });
+    expect(t.waits).toHaveLength(0);
   });
 });

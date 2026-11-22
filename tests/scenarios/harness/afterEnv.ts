@@ -2,6 +2,7 @@ import { cleanup } from '@testing-library/react-native';
 import { closeAllPhones } from './phone';
 import { restoreClock } from './clock';
 import { setOnline } from './netinfo';
+import { resetNotifications } from './notifications';
 
 afterEach(async () => {
   await closeAllPhones();
@@ -12,5 +13,6 @@ afterEach(async () => {
   require('react-native/Libraries/Modal/Modal').resetModalsForTests();
   require('../../../src/components/v2/modalTurn').resetModalTurnsForTests();
   setOnline(true);
+  resetNotifications();
   restoreClock();
 });

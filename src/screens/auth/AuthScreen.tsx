@@ -214,7 +214,7 @@ export default function AuthScreen() {
         setResetSent(true);
         haptics.success();
       }
-    } catch (err) {
+    } catch {
       // AuthContext shows the error; everything typed stays.
     } finally {
       setSubmitting(false);

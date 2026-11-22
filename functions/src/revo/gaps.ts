@@ -17,12 +17,15 @@ function every(step: number): string {
 /** The context's lines about gaps: the figures, then each memorized surah's last revision, longest first. */
 export function gapsText(g: RevoGaps): string {
   const lines: string[] = [];
+  // A gap is 2 days or more in a row without revising (the section's own count: Monday, then Thursday, is 2 days).
+  const count = g.longGaps > 0 ? `${g.longGaps} ${g.longGaps === 1 ? 'gap' : 'gaps'}` : 'no gaps';
   const longest = g.longestGap
-    ? `the longest ${days(g.longestGap.days)}${g.longestGap.endedDaysAgo === null ? ', still going' : `, ended ${ago(g.longestGap.endedDaysAgo)}`}`
-    : 'no gaps';
+    ? `, the longest ${days(g.longestGap.days)} without revising${g.longestGap.endedDaysAgo === null ? ' (still going)' : ` (ended ${ago(g.longestGap.endedDaysAgo)})`}`
+    : '';
   const usual = g.usualStepDays === null ? '' : `; usually ${every(g.usualStepDays)}`;
-  const long = g.longGaps > 0 ? `; ${g.longGaps} ${g.longGaps === 1 ? 'gap' : 'gaps'} of 3 days or more` : '';
-  lines.push(`Gaps, the last 30 days (Activity → Insights → “Gaps”): last revised ${ago(g.lastRevisedDaysAgo)}; ${longest}${usual}${long}.`);
+  lines.push(
+    `Gaps (2 days or more in a row without revising), the last 30 days (Activity → Insights → “Gaps”): last revised ${ago(g.lastRevisedDaysAgo)}; ${count}${longest}${usual}.`,
+  );
   const f = g.fullRevision;
   if (f) {
     lines.push(

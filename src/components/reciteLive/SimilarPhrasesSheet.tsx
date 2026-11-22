@@ -2,14 +2,13 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
-import { arabicV2, layoutV2, markV2, typeV2 } from '../../theme/v2';
+import { arabicFullV2, layoutV2, markV2, typeV2 } from '../../theme/v2';
 import { Sheet } from '../v2/Sheet';
 import { Tap } from '../v2/Tap';
 import { surahName } from '../../lib/passages';
 import type { QuranWords } from '../../lib/recite/quranWords';
 import type { SimilarPlace } from '../../lib/reciteLive/similar';
-
-const NBSP = ' ';
+import { t } from '../../i18n';
 
 /**
  * Similar phrases (mutashabihat) for a marked word: the ayahs that read almost the same, worked out on the phone
@@ -42,7 +41,11 @@ export function SimilarPhrasesSheet({
         onPress={() => onOpen({ sura, ayah, page })}
         style={[styles.row, { borderBottomColor: palette.separator }]}
         accessibilityRole="button"
-        accessibilityLabel={`${surahName(sura)}, ayah ${ayah}${note ? `, ${note}` : ''}`}
+        accessibilityLabel={
+          note
+            ? t('reciteLive.similar.placeNote', { surah: surahName(sura), ayah, note })
+            : t('reciteLive.similar.place', { surah: surahName(sura), ayah })
+        }
         testID={`similar-${sura}-${ayah}`}
       >
         <View style={[styles.mark, { backgroundColor: palette.fill }]}>
@@ -53,7 +56,7 @@ export function SimilarPhrasesSheet({
         <View style={styles.body}>
           <View style={styles.titleRow}>
             <Text style={[typeV2.name, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
-              {`${surahName(sura)}, ayah${NBSP}${ayah}`}
+              {t('reciteLive.similar.placeTitle', { surah: surahName(sura), ayah })}
             </Text>
             {note ? (
               <Text style={[typeV2.meta, styles.note, { color: palette.secondary }]} maxFontSizeMultiplier={1.3}>
@@ -63,7 +66,7 @@ export function SimilarPhrasesSheet({
             <View style={styles.spacer} />
             <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
           </View>
-          <Text style={[arabicV2(21), styles.ar]}>
+          <Text style={[arabicFullV2(21), styles.ar]}>
             {Array.from({ length: to - from }, (_, i) => from + i).map((x, i) => (
               <Text key={x} style={{ color: x === w ? palette.followInk : same.has(x) ? palette.text : palette.secondary }}>
                 {i > 0 ? ' ' : ''}
@@ -80,12 +83,12 @@ export function SimilarPhrasesSheet({
     const ref = words.ref(here);
     const [vFrom, vTo] = words.verseRange(ref.sura, ref.ayah);
     const same = new Set(places[0].same.map((s) => here + (s - places[0].w)));
-    mine = row(ref.sura, ref.ayah, here, Math.max(vFrom, here - 2), Math.min(vTo, here + 4), same, 'this ayah');
+    mine = row(ref.sura, ref.ayah, here, Math.max(vFrom, here - 2), Math.min(vTo, here + 4), same, t('reciteLive.similar.thisAyah'));
   }
   return (
-    <Sheet visible={visible} onClose={onClose} title="Similar phrases" scroll testID="similar-sheet">
+    <Sheet visible={visible} onClose={onClose} title={t('reciteLive.similar.title')} scroll testID="similar-sheet">
       <Text style={[typeV2.meta, styles.intro, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
-        Ayahs that read almost the same
+        {t('reciteLive.similar.intro')}
       </Text>
       {places.map((p) => row(p.sura, p.ayah, p.w, p.from, p.to, new Set(p.same)))}
       {mine}
