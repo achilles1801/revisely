@@ -3,6 +3,7 @@
 import { common } from './common';
 import { home } from './home';
 import { insights } from './insights';
+import { plan } from './plan';
 import { read } from './read';
 import { reader } from './reader';
 import { recite } from './recite';
@@ -16,6 +17,7 @@ export const ar: ArStrings = {
   common,
   home,
   insights,
+  plan,
   read,
   reader,
   recite,
