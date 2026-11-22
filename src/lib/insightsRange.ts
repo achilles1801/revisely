@@ -4,10 +4,8 @@
 // Coverage in cycles, a weeks grid from the start).
 
 import { formatDate, t, weekdayName } from '../i18n';
+import { dayNumber, daysBetween, shiftDay } from './dayKeys';
 
-const dayNumber = (day: string) => Math.round(Date.parse(`${day}T00:00:00Z`) / 86_400_000);
-const daysBetween = (from: string, to: string) => dayNumber(to) - dayNumber(from);
-const shiftDay = (day: string, n: number) => new Date((dayNumber(day) + n) * 86_400_000).toISOString().slice(0, 10);
 
 export type InsightsRange = 7 | 30 | 90 | 'all';
 export const INSIGHTS_RANGES: InsightsRange[] = [7, 30, 90, 'all'];

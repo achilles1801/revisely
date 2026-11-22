@@ -19,10 +19,8 @@ import { t } from '../i18n';
 import { getPagesForDay, juzModeCycle } from './algorithm';
 import { durationWords, gapDate } from './insightsGaps';
 import type { User, UserPage } from '../types';
+import { dayFromNumber, dayNumber } from './dayKeys';
 
-const DAY_MS = 86_400_000;
-const dayNumber = (day: string) => Math.round(Date.parse(`${day.slice(0, 10)}T00:00:00Z`) / DAY_MS);
-const dayOf = (n: number) => new Date(n * DAY_MS).toISOString().slice(0, 10);
 /** A revision day as the scheduler takes it: that day's local midnight. */
 const localDate = (day: string) => {
   const [y, m, d] = day.split('-').map(Number);
@@ -92,7 +90,7 @@ export function pushBack(input: PushBackInput): PushBack | null {
   const horizon = 3 * cycle + 2;
   const slots = new Map<number, number[]>();
   for (let d = 0; d <= horizon; d++) {
-    for (const page of getPagesForDay(user, localDate(dayOf(t + d)), memorized)) {
+    for (const page of getPagesForDay(user, localDate(dayFromNumber(t + d)), memorized)) {
       const at = slots.get(page) ?? [];
       if (at.length < 3 && at[at.length - 1] !== d) at.push(d);
       slots.set(page, at);
@@ -117,9 +115,9 @@ export function pushBack(input: PushBackInput): PushBack | null {
   const next = late.length ? Math.max(...late.map((l) => l.next)) : null;
   return {
     cycleDays: Math.round(median(spacings)),
-    late: late.map((l) => ({ page: l.page, due: dayOf(t + l.due), next: dayOf(t + l.next) })),
-    due: due == null ? null : dayOf(t + due),
-    next: next == null ? null : dayOf(t + next),
+    late: late.map((l) => ({ page: l.page, due: dayFromNumber(t + l.due), next: dayFromNumber(t + l.next) })),
+    due: due == null ? null : dayFromNumber(t + due),
+    next: next == null ? null : dayFromNumber(t + next),
     days: due == null || next == null ? 0 : next - due,
     missed: late.length > 0 && late.every((l) => l.due < 0),
   };
