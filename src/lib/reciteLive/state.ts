@@ -61,6 +61,8 @@ export interface LiveState {
    * on `w`. `from`: the cursor when it came, so going back clears it. Never a mark, never counted.
    */
   off: { w: number; from: number | null } | null;
+  /** The checker's guess at where the reciter is, while it looks (protocol 9, `guess`); never a start or a cursor time. */
+  guess?: number | null;
 }
 
 /** A mark taken off with "Not a mistake": the mark, and what it had counted in the score (taken off with it). */
@@ -122,7 +124,7 @@ export function checkerLooks(state: LiveState): boolean {
  * take's start. The cursor goes until it's found; what was decided stays.
  */
 export function seekOnPage(state: LiveState, w: number): LiveState {
-  return { ...state, seeking: true, seekFrom: w, cursor: null, off: null };
+  return { ...state, seeking: true, seekFrom: w, cursor: null, off: null, guess: null };
 }
 
 /**
@@ -203,6 +205,10 @@ export function applyEvent(state: LiveState, e: LiveEvent): LiveState {
       // A checker that doesn't look for the start begins at the page's first ayah, as before: no waiting.
       return ready.seeking && protocol < LOOKS_FOR_START ? startedUnlocked(ready) : ready;
     }
+    case 'guess':
+      // Shown as the cursor until the checker is sure (draft 11); ignored once it is, or from a checker before protocol 9.
+      if (!state.seeking || state.cursor != null || (state.protocol ?? 0) < GUESS_PROTOCOL) return state;
+      return state.guess === e.w ? state : { ...state, guess: e.w };
     case 'locked': {
       // Found where the reciter is: the cursor shows there (and the page turns to it). The first lock is the start.
       const start = state.start ?? e.w;
@@ -211,6 +217,7 @@ export function applyEvent(state: LiveState, e: LiveEvent): LiveState {
         start,
         seeking: false,
         off: null,
+        guess: null,
         cursor: e.w,
         marks: Object.fromEntries(Object.entries(state.marks).filter(([, m]) => !beforeStart(m, start))),
       };
@@ -457,6 +464,17 @@ export function shownUpTo(state: LiveState, held: number | null): number | null 
   const upTo = revealedUpTo(state);
   if (held == null || held !== state.cursor || state.status !== 'listening') return upTo;
   return Math.max(upTo ?? -1, held);
+}
+
+/** The first protocol whose checker sends `guess` before `locked` (contract draft 11). */
+export const GUESS_PROTOCOL = 9;
+
+/**
+ * Where the page shown draws the cursor before the checker is sure (draft 11; Majd's A2 lock request): its guess, while it
+ * still looks and has no cursor. A hidden page shows nothing for it (it would give a word away).
+ */
+export function guessCursor(state: LiveState): number | null {
+  return state.status === 'listening' && state.seeking && state.cursor == null ? state.guess ?? null : null;
 }
 
 /** The furthest word reached (the cursor or what's decided). */

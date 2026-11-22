@@ -134,6 +134,11 @@ export type LiveEvent =
    */
   | { type: 'locked'; w: number; s: number; a: number; t?: number; where?: 'page' | 'quran' }
   | { type: 'at'; w: number; t?: number }
+  /**
+   * Protocol 9 (contract draft 11): before `locked`, the checker's best guess at where the reciter is on the page shown,
+   * at most once a hop and only when it changes. Shown as the cursor, never a start, mark or `said`; none after `locked`.
+   */
+  | { type: 'guess'; w: number; t?: number }
   /** Something other than word `w` (the next to say) is being said in its slot: the hidden view's red cover (draft 7). */
   | { type: 'off'; w: number; t?: number }
   | { type: 'said'; upTo: number }
@@ -308,6 +313,8 @@ export function parseEvent(raw: unknown): LiveEvent | null {
         : null;
     case 'at':
       return isWord(x.w) ? { type: 'at', w: x.w, ...(isNum(x.t) ? { t: x.t } : {}) } : null;
+    case 'guess':
+      return isWord(x.w) ? { type: 'guess', w: x.w, ...(isNum(x.t) ? { t: x.t } : {}) } : null;
     case 'off':
       return isWord(x.w) ? { type: 'off', w: x.w, ...(isNum(x.t) ? { t: x.t } : {}) } : null;
     case 'said':

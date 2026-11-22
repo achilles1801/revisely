@@ -926,6 +926,48 @@ describe('no word shows before it is said (Majd, Nov 21 2026)', () => {
   });
 });
 
+describe('the guess before the lock (contract draft 11, protocol 9; Majd: the cursor within 2 s of the first word)', () => {
+  const begin = async (protocol: number) => {
+    setReciteCheckSettings('u1', { noticeSeen: true, mode: 'recite', markMistakes: true });
+    await open();
+    fireEvent.press(screen.getByTestId('recite-mic'));
+    await flush();
+    await flush();
+    await event({ type: 'ready', take: 't1', protocol });
+  };
+
+  it('[RECITE-1] the start frame asks for guesses; a guess shows as the cursor on the page shown, Listening… stays, and the lock takes over', async () => {
+    await begin(9);
+    expect(mockLive.start).toMatchObject({ guess: true });
+    expect(screen.queryByTestId('live-word-box')).toBeNull();
+    await event({ type: 'guess', w: A23 + 2 } as LiveEvent);
+    expect(screen.getByTestId('live-word-box')).toBeTruthy();
+    expect(screen.getByTestId('live-line-band')).toBeTruthy();
+    expect(screen.getByTestId('recite-status').props.children).toBe('Listening…');
+    // Sure now, somewhere else: the cursor jumps there; a guess after the lock is ignored.
+    await event({ type: 'locked', w: A23 + 5, s: 27, a: 23 });
+    await event({ type: 'guess', w: A23 + 1 } as LiveEvent);
+    expect(screen.getByTestId('live-word-box')).toBeTruthy();
+    expect(screen.queryByTestId('recite-status')).toBeNull();
+  });
+
+  it('[RECITE-1] a hidden page shows nothing for a guess; shown again, the page draws it', async () => {
+    await begin(9);
+    fireEvent.press(screen.getByTestId('recite-eye'));
+    await event({ type: 'guess', w: A23 + 2 } as LiveEvent);
+    expect(screen.queryByTestId('live-word-box')).toBeNull();
+    expect(screen.queryByTestId('live-cover-current')).toBeNull();
+    fireEvent.press(screen.getByTestId('recite-eye'));
+    expect(screen.getByTestId('live-word-box')).toBeTruthy();
+  });
+
+  it('a checker before protocol 9: its guesses are ignored', async () => {
+    await begin(8);
+    await event({ type: 'guess', w: A23 + 2 } as LiveEvent);
+    expect(screen.queryByTestId('live-word-box')).toBeNull();
+  });
+});
+
 describe('Check: a mark’s card, the summary, and Check’s page', () => {
   const tapWord = (w: number) => {
     const { wordBox } = require('../../../lib/reciteLive/geometry');
