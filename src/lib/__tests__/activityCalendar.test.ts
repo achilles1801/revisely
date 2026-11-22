@@ -1,8 +1,8 @@
-import { bandInRow, CALENDAR_SCREEN_LABEL, parseSpan, periodForGap, periodForSpan, shiftWeek, showsToday, weekDays, weekTitle } from '../activityCalendar';
+import { bandInRow, calendarScreenLabel, parseSpan, periodForGap, periodForSpan, shiftWeek, showsToday, weekDays, weekTitle } from '../activityCalendar';
 
 describe('the History/Overview calendar (week and month)', () => {
   it('the screen label is one constant, Overview for now', () => {
-    expect(CALENDAR_SCREEN_LABEL).toBe('Overview');
+    expect(calendarScreenLabel()).toBe('Overview');
   });
 
   it('the last choice is kept; nothing or junk is the month', () => {

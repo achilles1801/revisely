@@ -5,6 +5,8 @@
 import { versesOnPage } from './ayahBounds';
 import { getJuzForPage, getJuzRange, getSurahDisplay } from './quranData';
 import { globalVerseNumber, nextVerse, pageOfVerse, previousVerse, VerseKey } from './verses';
+import { t } from '../i18n';
+import { formatNumber } from '../i18n';
 
 /** Playback speeds, fastest first (the speed menu's order). */
 export const SPEEDS = [2, 1.75, 1.5, 1.25, 1.1, 1, 0.9, 0.75, 0.5, 0.25] as const;
@@ -18,10 +20,18 @@ export const PAUSES = [0, 0.5, 1, 1.5, 2] as const;
 export type PlayUpTo = 'page' | 'surah' | 'juz' | 'custom';
 export const PLAY_UP_TO: PlayUpTo[] = ['page', 'surah', 'juz', 'custom'];
 export const PLAY_UP_TO_LABELS: Record<PlayUpTo, string> = {
-  page: 'Page',
-  surah: 'Surah',
-  juz: 'Juz’',
-  custom: 'Custom',
+  get page() {
+    return t('verse.playUpTo.page');
+  },
+  get surah() {
+    return t('verse.playUpTo.surah');
+  },
+  get juz() {
+    return t('verse.playUpTo.juz');
+  },
+  get custom() {
+    return t('verse.playUpTo.custom');
+  },
 };
 
 export interface PlaybackOptions {
@@ -53,9 +63,9 @@ export function storableOptions(o: PlaybackOptions): Record<string, unknown> {
   return { ...o, repeat: o.repeat === Infinity ? 0 : o.repeat };
 }
 
-export const speedLabel = (s: number) => `${s}×`;
-export const repeatLabel = (r: number) => (r === Infinity ? 'Loop' : `${r}×`);
-export const pauseLabel = (p: number) => (p === 0 ? 'Off' : `${p}×`);
+export const speedLabel = (s: number) => `${formatNumber(s)}×`;
+export const repeatLabel = (r: number) => (r === Infinity ? t('verse.loop') : `${formatNumber(r)}×`);
+export const pauseLabel = (p: number) => (p === 0 ? t('verse.off') : `${formatNumber(p)}×`);
 
 /** After a verse ends: play it again, or go on. `round` counts from 1. */
 export function afterVerse(round: number, repeat: number): 'again' | 'next' {

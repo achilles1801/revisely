@@ -44,6 +44,7 @@ const EXTRACTED: string[] = [
   'components/verse',
   'context',
   'hooks',
+  'lib/*',
   'lib/prayer',
   'lib/recite',
   'lib/reciteCheck',
@@ -71,6 +72,7 @@ const EXTRACTED: string[] = [
  * counts in the progress report.
  */
 const WAITING: Record<string, string> = {
+  'lib/releaseInfo.ts': 'App info’s lines (testers only); open PR #780 changes this file, so it goes once that merges.',
   'lib/revo/openers.ts':
     'Revo’s first lines are built from English sentence parts (a day’s “on”/bare forms, “both pages”, “you” added or not): Arabic needs a module of its own with the same signature, as lib/help will.',
   'lib/revo/charts.ts':

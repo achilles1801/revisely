@@ -61,4 +61,11 @@ export const common = {
   /** An email address no email app took (Settings → Contact support). */
   emailDidNotOpen: 'Couldn’t open an email app',
   emailDidNotOpenBody: 'Copy our address to write to us from any email app.\n\n{{address}}',
+  /** A size, kept on one line: "247 MB". */
+  megabytesTight: '{{n}}\u00a0MB',
+  gigabytes: '{{n}} GB',
+  /** The greeting at the top of Home. */
+  salam: 'Assalamu Alaikum',
+  /** A request that ran out of time. */
+  tookTooLong: 'This took too long.',
 } as const;

@@ -1,4 +1,4 @@
-import { formatDate as formatLocaleDate } from '../i18n';
+import { formatDate as formatLocaleDate, t } from '../i18n';
 
 /**
  * Format date to YYYY-MM-DD in the user's local timezone.
@@ -54,8 +54,8 @@ export function generateId(): string {
  */
 export function getGreeting(): string {
   const hour = new Date().getHours();
-  if (hour < 12) return 'Assalamu Alaikum';
-  if (hour < 18) return 'Assalamu Alaikum';
-  return 'Assalamu Alaikum';
+  if (hour < 12) return t('common.salam');
+  if (hour < 18) return t('common.salam');
+  return t('common.salam');
 }
 

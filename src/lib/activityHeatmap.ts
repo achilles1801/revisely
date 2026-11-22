@@ -1,6 +1,6 @@
 import { ActivityDay, isActivityDayEmpty, summarizeActivityDay } from './activity';
 import { shiftDay } from './journal';
-import { formatDate, monthName } from '../i18n';
+import { formatDate, monthName, t } from '../i18n';
 
 // Activity's calendar (new design): a month (or a week) of revision days, each
 // in jade by how much it held.
@@ -104,10 +104,10 @@ const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? o
 
 /** "34 min", "1h 5m". */
 export function formatMinutesShort(minutes: number): string {
-  if (minutes < 60) return `${minutes} min`;
+  if (minutes < 60) return t('lib.activity.minutes', { n: minutes });
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
-  return m === 0 ? `${h}h` : `${h}h ${m}m`;
+  return m === 0 ? t('lib.activity.hoursShort', { h }) : t('lib.activity.hoursMinutesShort', { h, m });
 }
 
 /** What a day held, as short parts: "12 pages revised", "18 read", "34 min", "1 recording". */
@@ -116,13 +116,13 @@ export function dayFacts(day: ActivityDay | undefined): string[] {
   const s = summarizeActivityDay(day);
   const read = new Set(day.readings.flatMap((r) => r.pages)).size;
   const parts: string[] = [];
-  if (s.revisedPages > 0) parts.push(`${plural(s.revisedPages, 'page')} revised`);
-  if (s.aheadPages > 0) parts.push(`${s.aheadPages} ahead`);
-  if (read > 0) parts.push(s.revisedPages > 0 ? `${read} read` : `${plural(read, 'page')} read`);
+  if (s.revisedPages > 0) parts.push(t('lib.activity.pagesRevised', { count: s.revisedPages }));
+  if (s.aheadPages > 0) parts.push(t('lib.activity.ahead', { count: s.aheadPages }));
+  if (read > 0) parts.push(s.revisedPages > 0 ? t('lib.activity.read', { count: read }) : t('lib.activity.pagesRead', { count: read }));
   if (s.totalMinutes > 0) parts.push(formatMinutesShort(s.totalMinutes));
-  if ((day.recordings ?? 0) > 0) parts.push(plural(day.recordings ?? 0, 'recording'));
+  if ((day.recordings ?? 0) > 0) parts.push(t('lib.activity.recordings', { count: day.recordings ?? 0 }));
   // Only the daily log, with nothing countable in it.
-  if (parts.length === 0 && day.journal) parts.push('Daily log');
+  if (parts.length === 0 && day.journal) parts.push(t('lib.activity.dailyLog'));
   return parts;
 }
 
@@ -142,5 +142,5 @@ export function heatDayLabel(date: string, today: string): string {
 export function heatCellLabel(date: string, day: ActivityDay | undefined): string {
   const name = formatDate(localDay(date), { weekday: 'long', month: 'long', day: 'numeric' });
   const facts = dayFacts(day);
-  return `${name}: ${facts.length > 0 ? facts.join(', ') : 'no activity'}`;
+  return t('lib.activity.dayLabel', { name, facts: facts.length > 0 ? facts.join(t('lib.passages.listSeparator')) : t('lib.activity.noActivity') });
 }

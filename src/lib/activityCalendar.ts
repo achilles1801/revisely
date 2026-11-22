@@ -3,10 +3,10 @@
 
 import { shiftDay } from './journal';
 import { weekOf, weekStart } from './activityHeatmap';
-import { formatDate } from '../i18n';
+import { formatDate, t } from '../i18n';
 
 /** The name of the calendar screen (Majd chose "Overview"). */
-export const CALENDAR_SCREEN_LABEL = 'Overview';
+export const calendarScreenLabel = () => t('lib.activity.overview');
 
 export type CalendarSpan = 'week' | 'month';
 export const CALENDAR_SPAN_KEY = 'activity.calendarSpan';

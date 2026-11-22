@@ -7,6 +7,7 @@ import {
   journalTotalMinutes,
   shiftDay,
 } from './journal';
+import { t } from '../i18n';
 
 /**
  * One revision day in the Activity timeline: everything logged on it, from
@@ -227,10 +228,18 @@ export function filterActivityDays(
 export type ActivitySort = 'newest' | 'oldest' | 'recentlyLogged' | 'mostTime';
 
 export const ACTIVITY_SORT_LABELS: Record<ActivitySort, string> = {
-  newest: 'Newest first',
-  oldest: 'Oldest first',
-  recentlyLogged: 'Recently logged',
-  mostTime: 'Most time spent',
+  get newest() {
+    return t('lib.sorts.newest');
+  },
+  get oldest() {
+    return t('lib.sorts.oldest');
+  },
+  get recentlyLogged() {
+    return t('lib.sorts.recentlyLogged');
+  },
+  get mostTime() {
+    return t('lib.sorts.mostTime');
+  },
 };
 
 export function sortActivityDays(days: ActivityDay[], sort: ActivitySort): ActivityDay[] {

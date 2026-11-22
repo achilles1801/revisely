@@ -16,6 +16,7 @@ import { useSyncExternalStore } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { logger } from './logger';
 import madani1441 from '../data/mushaf1441.json';
+import { t } from '../i18n';
 
 export type MushafEditionId = 'madani1405' | 'madani1441';
 
@@ -33,25 +34,32 @@ export interface MushafEdition {
   reciteData: boolean;
 }
 
-const KING_FAHD_COMPLEX = 'King Fahd Glorious Qur’an Printing Complex, Madinah';
 
 export const MUSHAF_EDITIONS: Record<MushafEditionId, MushafEdition> = {
   madani1405: {
     id: 'madani1405',
-    name: 'Madani 1405',
+    get name() {
+      return t('mushaf.editions.madani1405');
+    },
     folder: '',
     aspect: 2600 / 4206,
     // The Complex's 1405 print, drawn with its fonts by quran.com-images.
-    credit: KING_FAHD_COMPLEX,
+    get credit() {
+      return t('mushaf.editions.kingFahd');
+    },
     reciteData: true,
   },
   madani1441: {
     id: 'madani1441',
-    name: 'Madani 1441',
+    get name() {
+      return t('mushaf.editions.madani1441');
+    },
     folder: '1441',
     // The window inside the frame that the build script draws (254.4 × 410.4 pt).
     aspect: madani1441.page.width / madani1441.page.height,
-    credit: KING_FAHD_COMPLEX,
+    get credit() {
+      return t('mushaf.editions.kingFahd');
+    },
     reciteData: false,
   },
 };
@@ -69,8 +77,8 @@ export function mushafCredits(order: MushafEditionId[] = MUSHAF_EDITION_ORDER): 
     const e = MUSHAF_EDITIONS[id];
     names.set(e.credit, [...(names.get(e.credit) ?? []), e.name]);
   }
-  if (names.size === 1) return [...names.keys()].map((credit) => `Pages: ${credit}`);
-  return [...names].map(([credit, who]) => `${who.join(', ')}: ${credit}`);
+  if (names.size === 1) return [...names.keys()].map((credit) => t('mushaf.editions.creditPages', { credit }));
+  return [...names].map(([credit, who]) => t('mushaf.editions.creditNames', { names: who.join(', '), credit }));
 }
 
 export const DEFAULT_MUSHAF_EDITION: MushafEditionId = 'madani1405';

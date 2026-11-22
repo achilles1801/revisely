@@ -100,4 +100,49 @@ export const verse = {
     ayah: 'Ayah',
     ayahN: 'Ayah {{n}}',
   },
+  /** Errors from The Clear Quran (lib/clearQuran). */
+  tcq: {
+    rateLimited: 'Too many requests right now. Try again in a minute.',
+    dailyLimit: 'The Clear Quran has reached its limit for today. Try again tomorrow.',
+    signIn: 'Sign in again, then try again.',
+    notFound: "This verse isn't available.",
+    unavailable: 'The Clear Quran is unavailable right now. Try again shortly.',
+    network: 'Check your connection and try again.',
+  },
+  /** The Arabic's source, as Tanzil's terms ask (its link is tanzil.net). */
+  arabicCredit: 'Arabic text: Tanzil Project',
+  /** A shared verse's reference: "Āli-'Imrān, Ayah 5". */
+  reference: '{{name}}, Ayah {{ayah}}',
+  /** The translation picker's sections and download lines (lib/translationPicker). */
+  sections: {
+    favorites: 'Favorites',
+    downloaded: 'Downloaded',
+    selected: 'Selected',
+  },
+  downloads: {
+    withMushaf: 'On this phone, with the offline mushaf',
+    downloadsWithMushaf: 'Downloads with the offline mushaf',
+    downloading: 'Downloading… {{percent}}%',
+    onPhone: 'On this phone · {{size}}',
+    failed: 'Couldn’t download all of it · {{suras}} of {{total}} suras on this phone',
+    partial: '{{suras}} of {{total}} suras on this phone · {{size}}',
+  },
+  /** How a reciter recites (lib/recitation). */
+  styles: {
+    murattal: 'Murattal',
+    murattalSub: 'Measured, at a steady pace',
+    mujawwad: 'Mujawwad',
+    mujawwadSub: 'Melodic, slower, with longer pauses',
+    muallim: "Mu'allim",
+    muallimSub: 'Teaching: each verse with a pause to repeat',
+  },
+  /** Audio Options' Play up to, Repeat and Pause. */
+  playUpTo: {
+    page: 'Page',
+    surah: 'Surah',
+    juz: 'Juz’',
+    custom: 'Custom',
+  },
+  loop: 'Loop',
+  off: 'Off',
 } as const;
