@@ -120,12 +120,15 @@ appId: com.revisionbuddy.app
     env:
       NAME: ls01-hidden-start
 
-# Minute 7.5 of the recitation (90 s): following.
+# Each check waits for the take's clock to reach its minute: the emulator's timers run a little slow, so 5x is about
+# 4.7x by the clock (the first run at 5x read 43:07 at 546 s).
+
+# Minute 7: following.
 - extendedWaitUntil:
     visible:
-      id: never-there
-    timeout: 90000
-    optional: true
+      id: recite-time
+      text: "([7-9]|1[0-4]):[0-9][0-9]"
+    timeout: 150000
 - assertVisible:
     id: recite-words
 - runFlow:
@@ -133,17 +136,14 @@ appId: com.revisionbuddy.app
     env:
       NAME: ls02-minute-7
 
-# Minute 16 (192 s): past the first take's end at a pause near 14 minutes, the next take following, the clock past 15:00.
+# Minute 16: past the first take's end at a pause near 14 minutes, the next take following, no summary or result.
 - extendedWaitUntil:
     visible:
-      id: never-there
-    timeout: 102000
-    optional: true
+      id: recite-time
+      text: "1[6-9]:[0-9][0-9]"
+    timeout: 200000
 - assertVisible:
     id: recite-words
-- assertVisible:
-    id: recite-time
-    text: "1[5-9]:[0-9][0-9]"
 - assertNotVisible:
     id: take-summary
 - assertNotVisible:
@@ -153,33 +153,27 @@ appId: com.revisionbuddy.app
     env:
       NAME: ls03-minute-16
 
-# Minute 31 (372 s): past the second take's end.
+# Minute 31: past the second take's end.
 - extendedWaitUntil:
     visible:
-      id: never-there
-    timeout: 180000
-    optional: true
+      id: recite-time
+      text: "3[1-9]:[0-9][0-9]"
+    timeout: 250000
 - assertVisible:
     id: recite-words
-- assertVisible:
-    id: recite-time
-    text: "3[0-9]:[0-9][0-9]"
 - runFlow:
     file: ../subflows/shot.yaml
     env:
       NAME: ls04-minute-31
 
-# Minute 45.5 (546 s): still following, then Stop. The result in the bar (a tap opens the summary), or the summary itself.
+# Minute 45: still following, then Stop. The result in the bar (a tap opens the summary), or the summary itself.
 - extendedWaitUntil:
     visible:
-      id: never-there
-    timeout: 174000
-    optional: true
+      id: recite-time
+      text: "4[5-9]:[0-9][0-9]"
+    timeout: 250000
 - assertVisible:
     id: recite-words
-- assertVisible:
-    id: recite-time
-    text: "4[5-9]:[0-9][0-9]"
 - runFlow:
     file: ../subflows/shot.yaml
     env:
