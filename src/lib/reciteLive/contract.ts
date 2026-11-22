@@ -124,6 +124,8 @@ export type LiveEvent =
       session?: string;
       from?: number;
       protocol?: number;
+      /** "voice": `said` also comes as the reciter's voice stops (recite-check-00115 and later; absent on rollbacks). */
+      said?: 'voice';
       /** The checker beats every this many seconds (contract draft 9): its silence then means a dead socket. */
       beat?: number;
     }
@@ -292,6 +294,7 @@ export function parseEvent(raw: unknown): LiveEvent | null {
         ...(typeof x.session === 'string' ? { session: x.session } : {}),
         ...(isNum(x.from) ? { from: x.from } : {}),
         ...(isNum(x.protocol) ? { protocol: x.protocol } : {}),
+        ...(x.said === 'voice' ? { said: 'voice' as const } : {}),
         ...(isNum(x.beat) && x.beat > 0 ? { beat: x.beat } : {}),
       };
     case 'locked':

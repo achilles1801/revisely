@@ -426,24 +426,35 @@ describe('Recite: following along', () => {
 describe('a checker whose said follows the voice, and a slow connection (Nov 22 2026)', () => {
   const barSays = () => screen.getByTestId('recite-middle').props.accessibilityLabel as string;
 
-  it('[RECITE-6] from protocol 9 the word being said waits only as a late backstop (1.5–4 s), for babble', async () => {
+  const beginReady = async (ready: Record<string, unknown>) => {
     setReciteCheckSettings('u1', { noticeSeen: true, mode: 'recite', markMistakes: true });
     await open();
     fireEvent.press(screen.getByTestId('recite-mic'));
     await flush();
     await flush();
-    await event({ type: 'ready', take: 't1', protocol: 9 });
+    await event({ type: 'ready', take: 't1', ...ready } as never);
     await event({ type: 'locked', w: A23, s: 27, a: 23 });
     fireEvent.press(screen.getByTestId('recite-eye'));
     await event({ type: 'at', w: A23 + 1 });
+  };
+  const wait = (ms: number) =>
+    act(async () => {
+      await new Promise((r) => setTimeout(r, ms));
+    });
+
+  it('[RECITE-6] a checker whose said follows the voice (ready.said "voice"): the word being said waits only as a late backstop (1.5–4 s)', async () => {
+    await beginReady({ protocol: 9, said: 'voice' });
     const w = words.uthmani(A23 + 1);
-    await act(async () => {
-      await new Promise((r) => setTimeout(r, revealDelay(wordLetters(w), null) + 100));
-    });
+    await wait(revealDelay(wordLetters(w), null) + 100);
     expect(barSays()).not.toContain(w);
-    await act(async () => {
-      await new Promise((r) => setTimeout(r, revealDelay(wordLetters(w), null, true) - revealDelay(wordLetters(w), null)));
-    });
+    await wait(revealDelay(wordLetters(w), null, true) - revealDelay(wordLetters(w), null));
+    expect(barSays()).toContain(w);
+  });
+
+  it('[RECITE-6] protocol 9 without it (a rollback) keeps the ordinary wait', async () => {
+    await beginReady({ protocol: 9 });
+    const w = words.uthmani(A23 + 1);
+    await wait(revealDelay(wordLetters(w), null) + 100);
     expect(barSays()).toContain(w);
   });
 
