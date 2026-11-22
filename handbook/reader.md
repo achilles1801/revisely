@@ -154,6 +154,27 @@ already in memory is shown in the first frame (`peekVerseText`), with no spinner
   wheel is one adjustable element for VoiceOver): tap by point. Maestro takes whole-number
   percentages only; `"26.5%"` throws an exception that a grep for `FAILED` misses.
 
+**The athan** (Revisely Dev, iPhone; Majd, Nov 22 2026: "genuine adthan notifications like the athan actually
+playing … the most popular widely known ones"; BEHAVIOUR.md ATHAN-1 to ATHAN-3): a prayer's notification sound can be
+the athan.
+- **History:** built on Oct 28–29 2026 (#124, #125, #133) and removed a day later (2216ecf6, Majd: "All the athans
+  suck"; its voices were chosen for clear licences). Nov 22's version is that code restored, without a bundled voice,
+  for the well-known recordings. Majd accepted the licensing risk; a voice can be withdrawn from the catalogue.
+- **iPhone's limit:** a notification sound is at most 30 seconds (a longer file plays the default tone). So a
+  notification plays a voice's first 29.5 s (`notif/<id>.caf`), and the whole athan only plays in the app.
+- **How:** `lib/athan` reads a catalogue (`catalog.json` beside the audio, at `ATHAN_BASE_URL`: the dev project's public
+  Storage folder `athan/`) and downloads a chosen voice's clip into the app's `Library/Sounds`, where iOS looks a
+  notification's sound up by name. JavaScript only: no native build. `athanEnabled()` is the gate (Revisely Dev and iOS).
+- **Never quiet:** no voice chosen, a clip not downloaded yet, removed or withdrawn, or the gate off: the standard tone
+  (`lib/prayer/sync` `iosSound`). A reminder before a prayer is never the athan.
+- **Choosing:** Settings → Prayer → Athan voice (every prayer), or a prayer's Sound → Athan → Voice (that prayer; the
+  picker's `prayer` param). Fajr takes the voice's Fajr athan (`lib/prayer/athanChoice`).
+- **Android** takes a notification's sound from its channel, and expo-notifications gives a channel only sounds built
+  into the app (the plugin's `sounds` in app.config.js, which moves both fingerprints). That, and a channel per voice
+  (a channel's sound is fixed once made), wait for a native build (the 1.0.6 list).
+- **The audio pipeline** is outside the repository: `~/Documents/revisely-athan` (`build_athan.py` cuts, fades and
+  levels the 29.5 s clip and the full copy; `RESULTS.md`).
+
 **Qibla** (Oct 28 2026; mocks and notes in `~/Documents/revisely-qibla-mocks/`): a compass icon in
 Home's top bar (left of Activity and Settings; `TopBar`'s `sideWidth` 120 keeps the salam centred)
 opens `qibla/QiblaSheet`, a `v2/Sheet` (drag to close, Done).
