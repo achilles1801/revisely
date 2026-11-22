@@ -421,6 +421,33 @@ export function revealedUpTo(state: LiveState): number | null {
  * while it is being said (p95 0.13 s before its end), so this shows it about as it ends, not as it begins.
  */
 export const REVEAL_AFTER_MS = 700;
+/** The longest the word under the cursor waits (ms), whatever its length. */
+export const REVEAL_MAX_MS = 2500;
+
+/**
+ * A word's length for its timing: its letters, a madd sign (ٓ, or آ) counting two more (a held vowel is about three letters
+ * long). The checker's bench (Nov 22 2026): a held madd outlasts a flat 0.7 s, so a flat wait would show a word mid-madd.
+ */
+export function wordLetters(text: string): number {
+  let n = 0;
+  for (const ch of text) {
+    const c = ch.codePointAt(0)!;
+    if (c === 0x0622) n += 3; // آ: an alif with its madd
+    else if ((c >= 0x0621 && c <= 0x064a) || c === 0x0671) n += 1;
+    else if (c === 0x0653) n += 2;
+  }
+  return Math.max(1, n);
+}
+
+/**
+ * How long the word under the cursor waits before a hidden page shows it (ms): its length at the reciter's own pace
+ * (`msPerLetter`, the median of this take's word-to-word times per letter), with a little to spare, between
+ * REVEAL_AFTER_MS and REVEAL_MAX_MS. Before the take has a pace, about 0.7 s for five letters.
+ */
+export function revealDelay(letters: number, msPerLetter: number | null): number {
+  const perLetter = msPerLetter != null && msPerLetter > 0 ? msPerLetter : REVEAL_AFTER_MS / 5;
+  return Math.round(Math.min(REVEAL_MAX_MS, Math.max(REVEAL_AFTER_MS, 1.15 * perLetter * letters)));
+}
 
 /**
  * What a hidden page shows (RECITE-6): `revealedUpTo`, and the word under the cursor once it has been there

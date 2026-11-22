@@ -481,7 +481,8 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   may show again on the next word until it is reached.)
 - **RECITE-6.** With the page hidden, the words show as they are recited, from where the take started: a word shows
   once it has been said in full (the checker has decided it), the next word has begun, or it has been the word being
-  said for 0.7 s, never a word ahead, and the bar names no more than the page shows (Majd, Nov 21 2026: "we shouldn't
+  said about as long as it takes to say (its letters at the reciter's pace, a held madd longer; 0.7–2.5 s), never a
+  word ahead, and the bar names no more than the page shows (Majd, Nov 21 2026: "we shouldn't
   be showing the full word until the user maybe either starts the next word or we get a full match"; Nov 22: "it should
   be under one second max that it shows up"). The word being said keeps its cover, lightly marked, and the newest word
   shown has the grey box, so the reciter always sees where they are. ‹ shows the next hidden word and ‹‹ the rest of its ayah: a word shown by hand is peeked, never counts in the score, and its

@@ -40,7 +40,8 @@ import {
   removedMarks,
   startNotFound,
   shownUpTo,
-  REVEAL_AFTER_MS,
+  revealDelay,
+  wordLetters,
 } from '../../lib/reciteLive/state';
 import { stopTrace } from '../../lib/reciteLive/stopTrace';
 import {
@@ -311,17 +312,33 @@ export function useReciteLayer({
   const memorized = useMemo(() => (liveOn ? memorizedAyahs(pages ?? []) : []), [liveOn, pages]);
   const testableJuz = useMemo(() => (liveOn && qw ? testJuz(memorized, qw) : []), [liveOn, qw, memorized]);
   const testPlace = test ? test.places[test.at] : null;
-  // The word under the cursor, once it has been there REVEAL_AFTER_MS while the take listens: a hidden page shows it then
-  // (Majd, Nov 22 2026: "under one second max").
+  // The word under the cursor, once it has been there about as long as it takes to say (revealDelay: its letters at the
+  // reciter's pace, 0.7–2.5 s) while the take listens: a hidden page shows it then (Majd, Nov 22 2026: "under one second
+  // max"), and a held madd isn't shown before its end.
   const [heldCursor, setHeldCursor] = useState<number | null>(null);
   const cursorNow = live.state.cursor;
   const listeningNow = live.state.status === 'listening' && !live.paused;
+  // The reciter's pace: each step of the cursor to the next word, per letter of the word left (the last 20).
+  const pace = useRef<{ w: number | null; at: number; perLetter: number[] }>({ w: null, at: 0, perLetter: [] });
+  const paceTake = live.state.take;
+  useEffect(() => {
+    pace.current = { w: null, at: 0, perLetter: [] };
+  }, [paceTake]);
   useEffect(() => {
     setHeldCursor(null);
-    if (cursorNow == null || !listeningNow) return;
-    const id = setTimeout(() => setHeldCursor(cursorNow), REVEAL_AFTER_MS);
+    if (cursorNow == null || !listeningNow || !qw) return;
+    const now = Date.now();
+    const p = pace.current;
+    if (p.w != null && cursorNow === p.w + 1) {
+      p.perLetter = [...p.perLetter, (now - p.at) / wordLetters(qw.uthmani(p.w))].slice(-20);
+    }
+    p.w = cursorNow;
+    p.at = now;
+    const sorted = [...p.perLetter].sort((a, b) => a - b);
+    const median = sorted.length >= 3 ? sorted[Math.floor(sorted.length / 2)] : null;
+    const id = setTimeout(() => setHeldCursor(cursorNow), revealDelay(wordLetters(qw.uthmani(cursorNow)), median));
     return () => clearTimeout(id);
-  }, [cursorNow, listeningNow]);
+  }, [cursorNow, listeningNow, qw]);
   const liveInfo = useMemo(
     () => ({
       // What the hidden page shows (RECITE-6): what's decided or left behind, and the word being said once it has been
