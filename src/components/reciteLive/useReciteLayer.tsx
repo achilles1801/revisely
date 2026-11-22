@@ -746,7 +746,7 @@ export function useReciteLayer({
               page={page}
               scale={scale}
               words={qw}
-              // A hidden page: the grey box on the newest word shown, behind its ink (the cursor's word is covered).
+              // A hidden page: the grey wash on the newest word shown, behind its ink (the cursor’s word is covered); a shown page washes no word (followCues).
               cursor={
                 live.state.status !== 'listening'
                   ? null

@@ -8,7 +8,9 @@ import type { Mark, MarkGroup } from '../../lib/reciteLive/contract';
 import { markGroup, strongestByWord } from '../../lib/reciteLive/contract';
 import { markTitle } from '../../lib/reciteLive/describe';
 import { currentLineBand, cursorBox, markBox, markHighlight, offBox, wordBox } from '../../lib/reciteLive/geometry';
+import { followCues } from '../../lib/reciteLive/wash';
 import { t } from '../../i18n';
+import { Wash } from './Wash';
 
 const NO_REVEALED: ReadonlySet<string> = new Set();
 
@@ -20,12 +22,14 @@ function rectStyle(r: Rect, scale: number) {
 export type MarkColours = Record<MarkGroup, { fill: string; firm: string }>;
 
 /**
- * Behind the page's ink, in its frame: the line being recited (a quiet grey band; none on a hidden page) and the word
- * being recited, or the newest shown on a hidden page (a firmer grey box), as Tarteel's grey line and box are; and the
- * marks (Check) as highlights behind their words, three colours at most: red for words, amber for slips and "Not clear",
- * violet for tajweed (Majd, Nov 15 2026: "only things we should show are highlites for mistakes 3 colors max"). An extra
- * word is highlighted on the word before it. A word with several marks shows its strongest. The mark a card is open
- * for is a firmer shade of its own colour. No red ink, dotted lines or + discs on the page any more.
+ * Behind the page's ink, in its frame: what follows the reciter (lib/reciteLive/wash's followCues: with the page shown,
+ * only a quiet grey band on the line being recited and no word washed, Majd, Nov 21 2026: "They dont even use shades
+ * when ur reciting with the page shown … which is actually really nice"; with it hidden, no band and a grey wash on the
+ * newest word shown), and the marks (Check) behind their words, three colours at most: red for words, amber for slips
+ * and "Not clear", violet for tajweed (Majd, Nov 15 2026: "only things we should show are highlites for mistakes 3
+ * colors max"). Every highlight is a soft pastel wash (Wash), never a box. An extra word is highlighted on the word
+ * before it. A word with several marks shows its strongest. The mark a card is open for is a firmer shade of its own
+ * colour. No red ink, dotted lines or + discs on the page.
  */
 export function LiveUnderlay({
   page,
@@ -40,15 +44,17 @@ export function LiveUnderlay({
   page: number;
   scale: number;
   words: QuranWords;
+  /** The word to follow: the cursor's on a shown page, the newest word shown on a hidden page. */
   cursor: number | null;
   marks: Mark[];
   selected: Mark | null;
-  /** The hidden view: no line band. */
+  /** The hidden view: no line band, and the word followed is washed. */
   hidden: boolean;
   colors: { band: string; word: string; marks: MarkColours };
 }) {
-  const here = cursor != null && words.pageOf(cursor) === page;
-  const line = here && !hidden ? currentLineBand(words, page, cursor) : null;
+  const cues = followCues(hidden, hidden ? null : cursor, hidden ? cursor : null);
+  const line = cues.band != null ? currentLineBand(words, page, cues.band) : null;
+  const washed = cues.word != null && words.pageOf(cues.word) === page ? cues.word : null;
   // One highlight per word: its strongest mark (a word mistake over a slip over a tajweed note).
   const byWord = strongestByWord(marks.filter((m) => words.pageOf(m.w) === page));
   const picked = selected && words.pageOf(selected.w) === page ? selected : null;
@@ -57,22 +63,17 @@ export function LiveUnderlay({
       {line ? (
         <View testID="live-line-band" style={[styles.abs, styles.band, rectStyle(line, scale), { backgroundColor: colors.band }]} />
       ) : null}
-      {here ? (
-        <View testID="live-word-box" style={[styles.abs, styles.box, rectStyle(cursorBox(words, cursor), scale), { backgroundColor: colors.word }]} />
-      ) : null}
+      {washed != null ? <Wash testID="live-word-box" box={cursorBox(words, washed)} scale={scale} colour={colors.word} /> : null}
       {[...byWord.values()].map((m) => {
         const group = markGroup(picked && picked.w === m.w ? picked : m);
         const firm = picked != null && picked.w === m.w;
         return (
-          <View
+          <Wash
             key={m.w}
             testID={firm ? `live-highlight-${group}-picked` : `live-highlight-${group}`}
-            style={[
-              styles.abs,
-              styles.box,
-              rectStyle(markHighlight(words, m), scale),
-              { backgroundColor: firm ? colors.marks[group].firm : colors.marks[group].fill },
-            ]}
+            box={markHighlight(words, m)}
+            scale={scale}
+            colour={firm ? colors.marks[group].firm : colors.marks[group].fill}
           />
         );
       })}
@@ -82,7 +83,8 @@ export function LiveUnderlay({
 
 /**
  * Over the page's ink: on a hidden page, the covers (words show as recited, or shown by hand), with no band on any line
- * (Majd, Nov 15 2026). The newest word's grey box and the marks' highlights are behind the ink (LiveUnderlay).
+ * (Majd, Nov 15 2026). The newest word's grey wash and the marks' washes are behind the ink (LiveUnderlay); what marks a
+ * cover (a mistake on a hidden word, the word being said, `off`) is a wash too, over the cover.
  * `off`: the next word, while something else is being said in its slot (the checker's `off`): its cover turns red, the
  * word-mistake highlight over it, its text still hidden. Not a mark: it goes when the word is said, the reciter goes
  * back, or a mark comes (lib/reciteLive/state). During a take, the words peeked (shown by hand) under a veil of the
@@ -129,20 +131,19 @@ export function LiveOverlay({
       {hidden && coverMarks
         ? coverMarks.marks.map(({ mark, fill, opacity }) =>
             coverMarks.words.pageOf(mark.w) === page && !hidden.follow.shown(mark.w) ? (
-              <View
+              <Wash
                 key={`cover-${mark.w}`}
                 testID={opacity == null ? `cover-highlight-${markGroup(mark)}` : `cover-past-${markGroup(mark)}`}
-                style={[styles.abs, styles.box, rectStyle(markHighlight(coverMarks.words, mark), scale), { backgroundColor: fill }, opacity == null ? null : { opacity }]}
+                box={markHighlight(coverMarks.words, mark)}
+                scale={scale}
+                colour={fill}
+                opacity={opacity}
               />
             ) : null,
           )
         : null}
-      {current ? (
-        <View testID="live-cover-current" style={[styles.abs, styles.box, rectStyle(offBox(current.words, current.w), scale), { backgroundColor: current.colour }]} />
-      ) : null}
-      {off ? (
-        <View testID="live-off" style={[styles.abs, styles.box, rectStyle(offBox(off.words, off.w), scale), { backgroundColor: off.colour }]} />
-      ) : null}
+      {current ? <Wash testID="live-cover-current" box={offBox(current.words, current.w)} scale={scale} colour={current.colour} /> : null}
+      {off ? <Wash testID="live-off" box={offBox(off.words, off.w)} scale={scale} colour={off.colour} /> : null}
       {peeked
         ? veiled.map((w) => (
             <View
@@ -187,5 +188,4 @@ export function LiveMarkTargets({ page, scale, words, marks }: { page: number; s
 const styles = StyleSheet.create({
   abs: { position: 'absolute' },
   band: { borderRadius: 8 },
-  box: { borderRadius: 7 },
 });

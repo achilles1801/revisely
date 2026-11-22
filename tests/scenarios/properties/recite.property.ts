@@ -63,6 +63,8 @@ import type { TakeRecord } from '../../../src/lib/reciteMemory/record';
 import { ayahKey, ayahsBetween, ayahCount, suraOf, ayahOf, type AyahKey } from '../../../src/lib/ayahKeys';
 import { getJuzForPage } from '../../../src/lib/quranData';
 import { runs } from './fixtures';
+import { cursorBox, markHighlight, wordBox } from '../../../src/lib/reciteLive/geometry';
+import { followCues, washOf, washReach } from '../../../src/lib/reciteLive/wash';
 
 const words = quranWords();
 const KINDS: MarkKind[] = ['word', 'skipped', 'added', 'harakat', 'letter', 'tajweed'];
@@ -1233,6 +1235,41 @@ describe('[RECITE-18] Your recitation plays the phrase the mistake is in', () =>
           for (let i = p0; i < p1; i++) expect(endsPhrase(i)).toBe(false);
         }
       }),
+describe('[RECITE-19] highlights are soft washes wider than their word; with the page shown no word is washed', () => {
+  // Every word of the 1405 print that has a box (pages 1 to 604).
+  const wordArb = fc.integer({ min: 0, max: words.count - 1 });
+
+  it('a wash reaches past its word on every side, whatever the word, so a box a little off never shows an edge', () => {
+    fc.assert(
+      fc.property(wordArb, fc.constantFrom('word', 'harakat', 'added'), fc.boolean(), (w, kind, asCursor) => {
+        const word = wordBox(words, w);
+        const box = asCursor ? cursorBox(words, w) : markHighlight(words, { id: 'm', w, ayah: [1, 1], kind } as Mark);
+        const wash = washOf(box);
+        const reach = washReach(wash);
+        const h = word.y1 - word.y0;
+        // Its core stays inside the line, a pill at least as wide as it is tall.
+        expect(wash.core.y0).toBeGreaterThanOrEqual(box.y0);
+        expect(wash.core.y1).toBeLessThanOrEqual(box.y1);
+        expect(wash.core.x1 - wash.core.x0).toBeGreaterThanOrEqual(wash.core.y1 - wash.core.y0 - 1e-9);
+        // Its soft edge goes past the word: well past each end, a little above and below.
+        expect(reach.x0).toBeLessThanOrEqual(word.x0 - 0.2 * h);
+        expect(reach.x1).toBeGreaterThanOrEqual(word.x1 + 0.2 * h);
+        expect(reach.y0).toBeLessThan(word.y0);
+        expect(reach.y1).toBeGreaterThan(word.y1);
+      }),
+      { numRuns: runs(300) },
+    );
+  });
+
+  it('the page shown: only the line’s band follows the reciter; hidden: no band, the newest word shown is washed', () => {
+    const at = fc.option(wordArb, { nil: null });
+    fc.assert(
+      fc.property(fc.boolean(), at, at, (hidden, cursor, newest) => {
+        const cues = followCues(hidden, cursor, newest);
+        if (hidden) expect(cues).toEqual({ band: null, word: newest });
+        else expect(cues).toEqual({ band: cursor, word: null });
+      }),
+      { numRuns: runs(100) },
     );
   });
 });
