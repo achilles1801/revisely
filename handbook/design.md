@@ -147,6 +147,19 @@ classic default), and a fresh install starts in light.
 - Fonts: SF Pro for Latin, Amiri for all Arabic. In a line that mixes them, put the Latin first
   and the Arabic last in a first-strong isolate (`⁨…⁩`): a line that starts with Arabic
   is laid out right to left (Insights' juz rows did).
+- **Amiri's lines never clip** (Majd, Nov 22 2026, on a mistake's card: "u cant even see if theres a dumma or fatha on
+  the top"; #879, #883). A Text draws only inside its own box, and Amiri's marks reach past the line the font declares.
+  - `arabicFullV2(size)` (a 2.51× line) for anything with harakat: Qur'an words, phrases, ayat, the bismillah, the
+    voweled surah names. Every word of the Qur'an reaches 1.481× the size above the baseline and 0.950× below.
+  - `arabicV2(size)` (1.83×) for unvoweled names (a surah's name, the salam, a prayer's name): up to 1.001× above and
+    0.651× below. Its old 1.6× line cut a hamza's top on iOS and a meem's tail on Android.
+  - `arabicForV2(text, size)` where one place shows both (the plan picker's surah and juz names, the wheels, search).
+  - Never Amiri by hand, nor a `lineHeight` over a helper's. A highlight behind a word (a nested Text's background)
+    fills the line, so it covers the marks. A box that clips (`overflow: 'hidden'`, a fixed height) must hold the line,
+    as the Recite bar's capsule caps its words' text size.
+  - The numbers come from `swift scripts/measure-amiri-ink.swift` (CoreText over the word data and the names). Run it
+    again if the font or the text changes. `src/design/__tests__/arabicLines.test.tsx` holds the lines to them and
+    scans the app; `jest/arabicLines`'s `clippedArabic(root)` checks every Amiri line a test renders.
 - **Surahs and juz first, page numbers almost never** (the owner, Nov 7 2026). People memorize by
   surah and juz: "Your revision starts at page 288" means little, "Al-Baqarah" a lot. So the app
   names any part of the Qur'an by its surahs and juz ("Al-Baqarah, ayahs 142–176", "Adh-Dhariyat 7
