@@ -15,6 +15,8 @@ const INK_EDGE = 1;
 const COVER_EDGE = 4;
 /** A rule shorter than this (bounds units) is the gap at a line's end beside its last word shown, not a hidden word. */
 const MIN_RULE = 12;
+/** How far a cover over or under a marker reaches into the line's cover beside it, so no seam shows between them. */
+const SEAM = 0.5;
 
 export interface InkWash {
   box: Rect;
@@ -29,19 +31,22 @@ export interface HiddenInkPlan {
    * parts (where words are still hidden), and the band a word's ink takes.
    */
   lines: { line: number; covers: Rect[]; rules: Span[]; ruleY: number; top: number; bottom: number }[];
-  /** What the covers leave open: the verse markers, whole, and each run of words shown, in bounds space. */
-  open: { box: Rect; kind: 'marker' | 'shown' }[];
+  /** What the covers leave open: the verse markers, whole, in their own rows, and each run of words shown, in bounds space. */
+  open: { line: number; box: Rect; kind: 'marker' | 'shown' }[];
 }
 
 /**
  * A hidden page (Majd, Nov 22 2026, of Tarteel's: "let's do it and test it"): covers in the page's colour over the words
- * still hidden, with a faint rule on each, leaving the verse markers whole and every run of words shown (recited, peeked
- * or in a verse shown) open, so they show in the page's own ink from the page's image underneath: ready at once, nothing
- * drawn again (Majd, Nov 22: "it should just appear ready from the start like it was before"). Pure, in bounds space.
+ * still hidden, with a faint rule on each, leaving the verse markers whole (in their own rows) and every run of words shown
+ * (recited, peeked or in a verse shown) open, so they show in the page's own ink from the page's image underneath: ready
+ * at once, nothing drawn again (Majd, Nov 22: "it should just appear ready from the start like it was before"). Pure, in
+ * bounds space.
  */
 export function hiddenInkPlan(words: QuranWords, page: number, shown: (w: number) => boolean): HiddenInkPlan {
   const [from, to] = words.pageRange(page);
   const runs = new Map<number, Span[]>();
+  // Each line's words, for the words beside each marker.
+  const onLine = new Map<number, { x0: number; x1: number; shown: boolean }[]>();
   let run: { line: number; x0: number; x1: number } | null = null;
   const close = () => {
     if (!run) return;
@@ -51,12 +56,16 @@ export function hiddenInkPlan(words: QuranWords, page: number, shown: (w: number
     run = null;
   };
   for (let w = from; w < to; w++) {
-    if (!shown(w)) {
+    const line = words.lineOf(w);
+    const r = words.rect(w);
+    const isShown = shown(w);
+    const list = onLine.get(line) ?? [];
+    list.push({ x0: r.x0, x1: r.x1, shown: isShown });
+    onLine.set(line, list);
+    if (!isShown) {
       close();
       continue;
     }
-    const line = words.lineOf(w);
-    const r = words.rect(w);
     if (run && run.line === line) {
       run.x0 = Math.min(run.x0, r.x0);
       run.x1 = Math.max(run.x1, r.x1);
@@ -71,14 +80,42 @@ export function hiddenInkPlan(words: QuranWords, page: number, shown: (w: number
   for (const l of pageLines(page)) {
     const shownSpans = runs.get(l.line) ?? [];
     const band = (a: number, b: number): Rect => ({ x0: a - INK_EDGE, x1: b + INK_EDGE, y0: l.coverTop, y1: l.coverBottom });
-    for (const [a, b] of l.markers) open.push({ box: band(a, b), kind: 'marker' });
-    for (const [a, b] of shownSpans) open.push({ box: band(a, b), kind: 'shown' });
-    const holes: Span[] = [...l.markers, ...shownSpans].map(([a, b]) => [a - INK_EDGE, b + INK_EDGE]);
+    l.markers.forEach(([a, b], k) => open.push({ line: l.line, box: { ...band(a, b), y0: l.markerRows[k][0], y1: l.markerRows[k][1] }, kind: 'marker' }));
+    for (const [a, b] of shownSpans) open.push({ line: l.line, box: band(a, b), kind: 'shown' });
+    const shownHoles: Span[] = shownSpans.map(([a, b]) => [a - INK_EDGE, b + INK_EDGE]);
+    const holes: Span[] = [...l.markers.map(([a, b]): Span => [a - INK_EDGE, b + INK_EDGE]), ...shownHoles];
+    const covers = subtractSpans(l.x0 - COVER_EDGE, l.x1 + COVER_EDGE, holes)
+      .filter(([a, b]) => b - a > 0.5)
+      .map(([a, b]): Rect => ({ x0: a, x1: b, y0: l.coverTop, y1: l.coverBottom }));
+    // Over and under each marker, in its columns: covered, so a sajdah's overline or a hidden word's dot there doesn't show
+    // (Nov 22 2026, page 379's ۲٤). Each half goes with its side's word, since a word's stroke over a marker (a kaf's
+    // top) reaches no further than the middle (scripts/check-page-markers.py checks it): the right half is covered while
+    // the word before the marker (the page reads right to left) is hidden, the left half while the word after is.
+    const lineWords = onLine.get(l.line) ?? [];
+    l.markers.forEach(([a, b], k) => {
+      const [top, bottom] = l.markerRows[k];
+      if (top <= l.coverTop && bottom >= l.coverBottom) return;
+      const mid = (a + b) / 2;
+      let before: { x0: number; shown: boolean } | null = null;
+      let after: { x1: number; shown: boolean } | null = null;
+      for (const w of lineWords) {
+        if (w.x0 >= mid && (!before || w.x0 < before.x0)) before = w;
+        if (w.x1 <= mid && (!after || w.x1 > after.x1)) after = w;
+      }
+      const leftOpen = after?.shown ?? false;
+      const rightOpen = before?.shown ?? false;
+      if (leftOpen && rightOpen) return;
+      const x0 = leftOpen ? mid : a - INK_EDGE - SEAM;
+      const x1 = rightOpen ? mid : b + INK_EDGE + SEAM;
+      for (const [p, q] of subtractSpans(x0, x1, shownHoles)) {
+        if (q - p <= 0.5) continue;
+        if (top > l.coverTop) covers.push({ x0: p, x1: q, y0: l.coverTop, y1: top });
+        if (bottom < l.coverBottom) covers.push({ x0: p, x1: q, y0: bottom, y1: l.coverBottom });
+      }
+    });
     lines.push({
       line: l.line,
-      covers: subtractSpans(l.x0 - COVER_EDGE, l.x1 + COVER_EDGE, holes)
-        .filter(([a, b]) => b - a > 0.5)
-        .map(([a, b]) => ({ x0: a, x1: b, y0: l.coverTop, y1: l.coverBottom })),
+      covers,
       rules: subtractSpans(l.x0, l.x1, [...l.markers, ...shownSpans]).filter(([a, b]) => b - a > MIN_RULE),
       ruleY: l.y0 + RULE_AT * (l.y1 - l.y0),
       top: l.coverTop,

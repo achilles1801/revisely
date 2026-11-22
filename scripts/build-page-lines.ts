@@ -20,6 +20,8 @@
 // refit them from the images and check every page:
 //
 //   python3 scripts/check-page-markers.py /tmp/mushaf --write && python3 scripts/check-page-markers.py /tmp/mushaf
+//
+// --write also writes each marker's rows (src/data/markerRows.json, in the order this file lists the markers).
 import * as fs from 'fs';
 const BR = process.env.HOME + '/revisely-mistakes';
 const DEV = process.env.HOME + '/revisely';

@@ -1370,8 +1370,8 @@ describe('[RECITE-20] a hidden page is drawn empty: faint rules where words are 
         expect(plan.lines.map((l) => l.line)).toEqual(lines.map((l) => l.line));
         const lineOf = (line: number) => lines.find((x) => x.line === line)!;
         const coversOn = (line: number) => plan.lines.find((x) => x.line === line)!.covers;
-        const openOn = (line: number, kind: 'marker' | 'shown') =>
-          plan.open.filter((p) => p.kind === kind && p.box.y0 === lineOf(line).coverTop).map((p) => p.box);
+        const openOn = (line: number, kind: 'marker' | 'shown') => plan.open.filter((p) => p.kind === kind && p.line === line).map((p) => p.box);
+        const coveredAt = (line: number, x: number, y: number) => coversOn(line).some((c) => c.x0 <= x && x <= c.x1 && c.y0 <= y && y <= c.y1);
         const [from, to] = words.pageRange(page);
         for (let w = from; w < to; w++) {
           const r = words.rect(w);
@@ -1394,11 +1394,25 @@ describe('[RECITE-20] a hidden page is drawn empty: faint rules where words are 
           }
         }
         for (const l of lines) {
-          // Every marker whole: open, and no cover reaches into it.
-          for (const [a, b] of l.markers) {
-            expect(openOn(l.line, 'marker').some((m) => m.x0 <= a && m.x1 >= b)).toBe(true);
-            for (const c of coversOn(l.line)) expect(Math.min(c.x1, b) - Math.max(c.x0, a)).toBeLessThanOrEqual(0);
-          }
+          l.markers.forEach(([a, b], k) => {
+            const [top, bottom] = l.markerRows[k];
+            // Every marker whole: open in its rows, and no cover reaches into it.
+            expect(openOn(l.line, 'marker').some((m) => m.x0 <= a && m.x1 >= b && m.y0 <= top && m.y1 >= bottom)).toBe(true);
+            for (const c of coversOn(l.line)) expect(Math.min(c.x1, b) - Math.max(c.x0, a) <= 0 || Math.min(c.y1, bottom) - Math.max(c.y0, top) <= 0).toBe(true);
+            // Over and under it, each half with its side's word (page 379's ۲٤ showed a sajdah's overline): the right half
+            // covered while the word before it (right to left) is hidden, the left half while the word after is.
+            const mid = (a + b) / 2;
+            const onLine = [...Array(to - from).keys()].map((i) => from + i).filter((w) => words.lineOf(w) === l.line);
+            const before = onLine.filter((w) => words.rect(w).x0 >= mid).sort((p, q) => words.rect(p).x0 - words.rect(q).x0)[0];
+            const after = onLine.filter((w) => words.rect(w).x1 <= mid).sort((p, q) => words.rect(q).x1 - words.rect(p).x1)[0];
+            const inShown = (x: number) => openOn(l.line, 'shown').some((o) => o.x0 <= x && x <= o.x1);
+            for (const [x, word] of [[(mid + b) / 2, before], [(a + mid) / 2, after]] as const) {
+              if (inShown(x)) continue;
+              const hidden = word == null || !shown(word);
+              if (top > l.coverTop + 1) expect({ marker: [page, l.line, k], x, over: coveredAt(l.line, x, (l.coverTop + top) / 2) }).toEqual({ marker: [page, l.line, k], x, over: hidden });
+              if (bottom < l.coverBottom - 1) expect({ marker: [page, l.line, k], x, under: coveredAt(l.line, x, (bottom + l.coverBottom) / 2) }).toEqual({ marker: [page, l.line, k], x, under: hidden });
+            }
+          });
           // The rule never runs under a word shown or a marker.
           const rules = plan.lines.find((x) => x.line === l.line)!.rules;
           for (const box of openOn(l.line, 'shown')) for (const [a, b] of rules) expect(Math.min(b, box.x1 - 1) - Math.max(a, box.x0 + 1)).toBeLessThanOrEqual(0);

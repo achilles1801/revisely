@@ -297,6 +297,14 @@ until its part is set up.
     (some pages and lines draw it smaller, page 3 wider; a sajdah sign stays with its marker) and checks that no marker
     ink is under a cover and no word's ink shows beside a marker, on the originals and Android's w1080 and w1440. Run it
     after any change to the page lines or the images; `hiddenPage.test` pins measured markers (page 2's among them).
+  - **A marker is open in its own rows only** (Nov 22 2026: the end of a sajdah's overline showed above page 379's ۲٤
+    on a hidden page, flow 18). `src/data/markerRows.json` holds each marker's rows (its ink with up to 1.5 units of
+    room), written by the same script's `--write`. Over and under a marker, in its columns, `HiddenInkLayer` covers by
+    halves: the right half while the word before the marker is hidden (the page reads right to left), the left half
+    while the word after is, so a shown word's stroke over a marker (a kaf's top) still shows.
+    - The script fails if a word's ink over or under a marker passes the marker's middle. None does: 53 markers have
+      ink there, 12 of them another line's tip (a descender from above), covered with this line's words.
+    - Ink beside the ring in its own rows (326 markers, up to 16.5 units) shows in any opening, as before.
   - **Every word's box is its ink too** (Majd, Nov 21 2026: the word just recited was "partially cut off").
     - `quranWords.dat`'s x0 and x1 (the hidden view, the cursor's box, the mistakes' highlights) came from glyph data
       2–12 units off the images; the next word's cover cut 84% of words, and on 450:14 one box held its neighbour's.
