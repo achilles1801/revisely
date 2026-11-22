@@ -198,6 +198,10 @@ describe('the help on Home', () => {
     });
     await app.until(() => app.screen.getByTestId('settings-help-buttons').props.value === true, 'the switch to turn on');
     const { navigation } = app.mods.require<{ navigation: { current: { goBack: () => void } } }>('./navRef');
+    // Back from Help and support, then from Settings' first level (SET-1).
+    await app.act(async () => {
+      navigation.current.goBack();
+    });
     await app.act(async () => {
       navigation.current.goBack();
     });
