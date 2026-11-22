@@ -59,9 +59,12 @@ export function recitationText(r: RevoRecitation): string {
   if (r.takes === 0) lines.push(`- No takes in the last ${r.days} days.`);
   else {
     const before = r.earlierScore === null ? '' : ` (the ${r.days} days before: ${percent(r.earlierScore)})`;
-    lines.push(
-      `- ${count(r.takes, 'take')} on ${count(r.daysRecited, 'day')}, ${r.minutes} min, ${count(r.words, 'word')} recited. Score by the page: ${percent(r.score ?? 1)}${before}.`,
-    );
+    // Takes kept without the checker's final answer never count in a score (RECITE-11): with only those, there is none.
+    const score =
+      r.score === null
+        ? 'No score: none of these takes got the checker’s final answer (the connection ended first), so none was scored'
+        : `Score by the page: ${percent(r.score)}${before}`;
+    lines.push(`- ${count(r.takes, 'take')} on ${count(r.daysRecited, 'day')}, ${r.minutes} min, ${count(r.words, 'word')} recited. ${score}.`);
     const mistakes = r.mistakes === 0 ? 'none' : `${r.mistakes}: ${kindsText(r)}`;
     const tajweed = r.tajweed === null ? '' : ` Tajweed notes (Strict takes): ${r.tajweed}.`;
     lines.push(`- Mistakes: ${mistakes}. Not clear (never counted): ${r.unclear}.${tajweed}`);

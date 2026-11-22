@@ -134,7 +134,10 @@ export interface RevoRecitation {
   unclear: number;
   /** Tajweed notes; null when no take in the window was at the Strict level. */
   tajweed: number | null;
-  /** The score by the page (0–1), each take weighted by the words it recited; null with no takes in the window. */
+  /**
+   * The score by the page (0–1), each take weighted by the words it recited; null with no takes in the window, or when
+   * every one ended without the checker's final answer (RECITE-11: those never count in a score).
+   */
   score: number | null;
   /** The same for the `days` before. */
   earlierScore: number | null;

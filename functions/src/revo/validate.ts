@@ -385,7 +385,9 @@ export function validateRecitation(v: unknown, path: string): RevoRecitation {
   const mistakes = int(r.mistakes, 0, MAX_COUNT, `${path}.mistakes`);
   if (REVO_MISTAKE_KINDS.reduce((n, kind) => n + kinds[kind], 0) !== mistakes) fail(`${path}.mistakes`);
   const scored = maybe(r.score, (x) => score(x, `${path}.score`));
-  if ((scored === null) !== (takes === 0)) fail(`${path}.score`);
+  // No takes, no score. Takes and no score: every one ended without the checker's final answer (RECITE-11), and those
+  // never count in a score, so the summary still goes, without one.
+  if (takes === 0 && scored !== null) fail(`${path}.score`);
   const stillMarked = int(r.stillMarked, 0, MAX_COUNT, `${path}.stillMarked`);
   const slipping = list(r.slipping, REVO_RECITATION_LIST, `${path}.slipping`, (x, p) => {
     const o = obj(x, p);
