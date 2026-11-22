@@ -10,5 +10,6 @@ interface ClipboardModule extends TurboModule {
 }
 
 export function copyText(text: string): void {
-  TurboModuleRegistry.getEnforcing<ClipboardModule>('Clipboard') // i18n-ignore (the native module's name).setString(text);
+  // i18n-ignore (the native module's name)
+  TurboModuleRegistry.getEnforcing<ClipboardModule>('Clipboard').setString(text);
 }
