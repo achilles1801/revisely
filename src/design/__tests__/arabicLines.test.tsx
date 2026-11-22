@@ -34,7 +34,9 @@ import { CAPSULE_HEIGHT } from '../../components/reader/PlayerCapsule';
 import type { Mark } from '../../lib/reciteLive/contract';
 
 const mockPalette = require('../../theme/v2').paletteV2(false, 'indigo');
-jest.mock('../../context/ThemeContext', () => ({ useTheme: () => ({ palette: mockPalette, theme: mockPalette, isDark: false }) }));
+jest.mock('../../context/ThemeContext', () => ({
+  useTheme: () => ({ palette: mockPalette, theme: mockPalette, isDark: false }),
+}));
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
 jest.mock('react-native-reanimated', () => require('react-native-reanimated/mock'));
 
@@ -47,8 +49,13 @@ const METRICS = { frame: { x: 0, y: 0, width: 375, height: 667 }, insets: { top:
 function fontLine(file: string) {
   const b = fs.readFileSync(file);
   const tables: Record<string, number> = {};
-  for (let i = 0; i < b.readUInt16BE(4); i++) tables[b.toString('latin1', 12 + i * 16, 16 + i * 16)] = b.readUInt32BE(20 + i * 16);
-  return { upm: b.readUInt16BE(tables.head + 18), ascent: b.readInt16BE(tables.hhea + 4), descent: b.readInt16BE(tables.hhea + 6) };
+  for (let i = 0; i < b.readUInt16BE(4); i++)
+    tables[b.toString('latin1', 12 + i * 16, 16 + i * 16)] = b.readUInt32BE(20 + i * 16);
+  return {
+    upm: b.readUInt16BE(tables.head + 18),
+    ascent: b.readInt16BE(tables.hhea + 4),
+    descent: b.readInt16BE(tables.hhea + 6),
+  };
 }
 
 const SIZES = [12, 14, 16, 18, 19, 20, 21, 24, 28, 32, 40];
@@ -80,7 +87,9 @@ describe('Amiri’s line', () => {
     for (const size of SIZES) {
       for (const scale of SCALES) {
         const s = arabicV2(size);
-        expect(harakatClip({ ...s, fontSize: size * scale, lineHeight: (s.lineHeight as number) * scale }, AMIRI_NAME_INK)).toBeNull();
+        expect(
+          harakatClip({ ...s, fontSize: size * scale, lineHeight: (s.lineHeight as number) * scale }, AMIRI_NAME_INK),
+        ).toBeNull();
       }
     }
     // Stacked marks need more (arabicFullV2), and so does the font's own line, with no lineHeight.
@@ -143,9 +152,11 @@ describe('the app’s Arabic', () => {
     // Arabic-Indic digits, shrunk to fit its disc) is the one exception: digits stay inside the font's own line.
     const found = SOURCES.filter((f) => f !== 'src/components/v2/Mark.tsx').flatMap((f) => {
       const text = fs.readFileSync(path.join(ROOT, f), 'utf8');
-      return [...text.matchAll(/arabic(?:Full|For)?V2\([^)]*\)[^\]\n]*lineHeight|\.\.\.arabic(?:Full|For)?V2\([^)]*\),\s*lineHeight/g)].map(
-        (m) => `${f}: ${m[0]}`,
-      );
+      return [
+        ...text.matchAll(
+          /arabic(?:Full|For)?V2\([^)]*\)[^\]\n]*lineHeight|\.\.\.arabic(?:Full|For)?V2\([^)]*\),\s*lineHeight/g,
+        ),
+      ].map((m) => `${f}: ${m[0]}`);
     });
     expect(found).toEqual([]);
   });
@@ -178,9 +189,33 @@ describe('Recite’s Arabic', () => {
   });
 
   it('the mark card: Expected and Recited, a slip, a tajweed note’s word', () => {
-    const wrong: Mark = { id: 'm1', w: A23 + 3, ayah: [27, 23], kind: 'word', sure: 'clear', heard: 'وَأُوهِيَتْ', heardExact: false };
-    const slip: Mark = { id: 'm2', w: A23 + 3, ayah: [27, 23], kind: 'harakat', sure: 'clear', heard: 'وَأُوتِيَتُ', heardExact: true };
-    const tajweed = { id: 'm3', w: A23 + 3, ayah: [27, 23], kind: 'tajweed', sure: 'clear', rule: 'madd_lazim', got: 2 } as Mark;
+    const wrong: Mark = {
+      id: 'm1',
+      w: A23 + 3,
+      ayah: [27, 23],
+      kind: 'word',
+      sure: 'clear',
+      heard: 'وَأُوهِيَتْ',
+      heardExact: false,
+    };
+    const slip: Mark = {
+      id: 'm2',
+      w: A23 + 3,
+      ayah: [27, 23],
+      kind: 'harakat',
+      sure: 'clear',
+      heard: 'وَأُوتِيَتُ',
+      heardExact: true,
+    };
+    const tajweed = {
+      id: 'm3',
+      w: A23 + 3,
+      ayah: [27, 23],
+      kind: 'tajweed',
+      sure: 'clear',
+      rule: 'madd_lazim',
+      got: 2,
+    } as Mark;
     render(
       <>
         <MarkBlock mark={wrong} words={words} onDismiss={jest.fn()} first />
@@ -196,7 +231,13 @@ describe('Recite’s Arabic', () => {
   it('a phrase and a word chip (the past card, Still to fix, Your progress, Insights)', () => {
     render(
       <>
-        <Phrase parts={[{ role: 'context', text: 'إِنِّى' }, { role: 'expected', text: 'وَجَدتُّ' }]} fill={mockPalette.markWord} />
+        <Phrase
+          parts={[
+            { role: 'context', text: 'إِنِّى' },
+            { role: 'expected', text: 'وَجَدتُّ' },
+          ]}
+          fill={mockPalette.markWord}
+        />
         <WordChip text="ظَمَأٌۭ" fill={mockPalette.markWord} />
         <WordChip text="عَظِيمٌۭ" fill={mockPalette.markWord} size={22} maxScale={1.5} />
       </>,
@@ -219,7 +260,16 @@ describe('Recite’s Arabic', () => {
           visible
           words={words}
           here={w}
-          places={[{ sura: 27, ayah: 16, w: words.verseFirstWord(27, 16) + 5, from: words.verseFirstWord(27, 16) + 2, to: words.verseFirstWord(27, 16) + 8, same: [] }]}
+          places={[
+            {
+              sura: 27,
+              ayah: 16,
+              w: words.verseFirstWord(27, 16) + 5,
+              from: words.verseFirstWord(27, 16) + 2,
+              to: words.verseFirstWord(27, 16) + 8,
+              same: [],
+            },
+          ]}
           onOpen={jest.fn()}
           onClose={jest.fn()}
         />
@@ -241,7 +291,17 @@ describe('Recite’s Arabic', () => {
             from={A23}
             to={A23 + 20}
             seconds={102}
-            marks={[{ id: 'm1', w: A23 + 3, ayah: [27, 23], kind: 'word', sure: 'clear', heard: 'وَأُوهِيَتْ', heardExact: false }]}
+            marks={[
+              {
+                id: 'm1',
+                w: A23 + 3,
+                ayah: [27, 23],
+                kind: 'word',
+                sure: 'clear',
+                heard: 'وَأُوهِيَتْ',
+                heardExact: false,
+              },
+            ]}
             score={{ text: '96%', level: 'good' }}
             checkOwned
             memory={{ cleared: ['فَتَحَسَّسُوا۟', 'بِبِضَـٰعَةٍۢ'], trend: [0.95, 0.99], line: null }}
