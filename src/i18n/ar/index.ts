@@ -4,10 +4,12 @@ import { common } from './common';
 import { home } from './home';
 import { insights } from './insights';
 import { plan } from './plan';
+import { prayer } from './prayer';
 import { read } from './read';
 import { reader } from './reader';
 import { recite } from './recite';
 import { reciteLive } from './reciteLive';
+import { reminders } from './reminders';
 import { revision } from './revision';
 import { settings } from './settings';
 import { verse } from './verse';
@@ -18,10 +20,12 @@ export const ar: ArStrings = {
   home,
   insights,
   plan,
+  prayer,
   read,
   reader,
   recite,
   reciteLive,
+  reminders,
   revision,
   settings,
   verse,
