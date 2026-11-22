@@ -78,8 +78,6 @@ const WAITING: Record<string, string> = {
   'lib/revo/openers.ts':
     'Revo’s first lines, built from English sentence parts (a day’s “on”/bare forms, “both pages”, “you” added or not): per-language sentence builders, as lib/help; the Arabic ones are openers.ar.ts.',
   'lib/revo/openers.ar.ts': 'openers.ts’s sentence builders in Arabic (Arabic number-and-noun agreement): per-language content, as lib/help.',
-  'lib/revo/charts.ts':
-    'Its readouts lean on lib/recency’s words (timesWord, recencyWords) and English grammar: it goes with lib’s own files.',
 };
 
 describe('UI text comes from src/i18n', () => {
