@@ -17,17 +17,23 @@ struct TodayEntry: TimelineEntry {
   let date: Date
   let state: TodayState
   let colors: ColorPair?
+  var words: Words = .english
 
   /// The widget gallery's example: pages 582–586 as the app names them (surahs and juz,
-  /// never page numbers; lib/passages via snapshot.ts), no-break hyphens included.
-  static let sample = TodayEntry(
-    date: Date(),
-    state: .ready(WidgetDay(
-      day: "", startsAt: 0, endsAt: 0, title: "An\u{2011}Naba to At\u{2011}Takwir", place: "Juz 30",
-      short: "An\u{2011}Naba to At\u{2011}Takwir", total: 5, done: 0, completed: false, streak: 7
-    ), next: nil),
-    colors: nil
-  )
+  /// never page numbers; lib/passages via snapshot.ts), no-break hyphens included, in the
+  /// app's language.
+  static var sample: TodayEntry {
+    let words = Words.current
+    return TodayEntry(
+      date: Date(),
+      state: .ready(WidgetDay(
+        day: "", startsAt: 0, endsAt: 0, title: words.sampleTitle, place: words.samplePlace,
+        short: words.sampleTitle, total: 5, done: 0, completed: false, streak: 7, words: words.sampleDay
+      ), next: nil),
+      colors: nil,
+      words: words
+    )
+  }
 
   /// Today's session, or Home once it's done (or there's nothing to start).
   var url: URL {
@@ -40,15 +46,19 @@ enum TodayTimeline {
   /// An entry for each day the app wrote ahead, starting at its boundary (fajr or
   /// midnight), then a "stale" one when they run out.
   static func entries(_ snapshot: Snapshot?, now: Date) -> [TodayEntry] {
+    let words = snapshot?.words ?? .english
     guard let snapshot, snapshot.state == "ready" else {
-      return [TodayEntry(date: now, state: .setUp, colors: snapshot?.colors)]
+      return [TodayEntry(date: now, state: .setUp, colors: snapshot?.colors, words: words)]
     }
     let live = snapshot.days.filter { $0.end > now }
-    guard let last = live.last else { return [TodayEntry(date: now, state: .stale, colors: snapshot.colors)] }
+    guard let last = live.last else { return [TodayEntry(date: now, state: .stale, colors: snapshot.colors, words: words)] }
     var out = live.enumerated().map { i, day in
-      TodayEntry(date: max(day.start, now), state: .ready(day, next: i + 1 < live.count ? live[i + 1] : nil), colors: snapshot.colors)
+      TodayEntry(
+        date: max(day.start, now), state: .ready(day, next: i + 1 < live.count ? live[i + 1] : nil),
+        colors: snapshot.colors, words: words
+      )
     }
-    out.append(TodayEntry(date: last.end, state: .stale, colors: snapshot.colors))
+    out.append(TodayEntry(date: last.end, state: .stale, colors: snapshot.colors, words: words))
     return out
   }
 
@@ -81,8 +91,8 @@ struct TodayWidget: Widget {
     StaticConfiguration(kind: "ReviselyToday", provider: TodayProvider()) { entry in
       TodayView(entry: entry)
     }
-    .configurationDisplayName("Today")
-    .description("Today's revision, whether it's done, and your streak.")
+    .configurationDisplayName(Words.current.galleryToday)
+    .description(Words.current.galleryTodayDescription)
     .supportedFamilies([.systemSmall, .systemMedium, .accessoryRectangular, .accessoryCircular, .accessoryInline])
   }
 }
@@ -105,6 +115,7 @@ struct TodayView: View {
     }
     .widgetURL(entry.url)
     .widgetGroundIfHome(family, palette.bg)
+    .inLanguage(entry.words)
   }
 }
 
@@ -119,8 +130,8 @@ extension View {
   }
 }
 
-private func setUpText(_ state: TodayState) -> String {
-  state == .stale ? "Open Revisely to see today's revision." : "Open Revisely to set up your plan."
+private func setUpText(_ state: TodayState, _ words: Words) -> String {
+  state == .stale ? words.openToSeeToday : words.openToSetUp
 }
 
 // MARK: Home Screen
@@ -128,21 +139,22 @@ private func setUpText(_ state: TodayState) -> String {
 struct TodaySmall: View {
   let entry: TodayEntry
   let palette: Palette
+  @Environment(\.words) private var words
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
       HStack(spacing: 8) {
         MarkView(done: day?.completed ?? false, size: 28, palette: palette)
         VStack(alignment: .leading, spacing: 0) {
-          Text("Today").font(.system(size: 15, weight: .semibold)).tone(palette.text)
-          if let streak = day.flatMap({ Copy.streak($0.streak) }) {
+          Text(words.today).font(.system(size: 15, weight: .semibold)).tone(palette.text)
+          if let streak = day?.w.streak {
             Text(streak).font(.system(size: 12)).tone(palette.secondary, .secondary).lineLimit(1)
           }
         }
       }
       Spacer(minLength: 6)
       if let day {
-        Text(day.completed ? "Done for today" : day.title)
+        Text(day.completed ? words.doneForToday : day.title)
           .font(.system(size: 16, weight: .semibold))
           .tone(day.completed ? palette.accentText : palette.text)
           .lineLimit(2)
@@ -157,7 +169,7 @@ struct TodaySmall: View {
           .lineLimit(1)
           .minimumScaleFactor(0.8)
       } else {
-        Text(setUpText(entry.state)).font(.system(size: 13)).tone(palette.secondary, .secondary).lineLimit(3)
+        Text(setUpText(entry.state, words)).font(.system(size: 13)).tone(palette.secondary, .secondary).lineLimit(3)
         Spacer(minLength: 0)
       }
     }
@@ -167,35 +179,36 @@ struct TodaySmall: View {
   private var day: WidgetDay? { if case .ready(let d, _) = entry.state { return d } else { return nil } }
 
   private func status(_ day: WidgetDay) -> String {
-    if day.completed { return "\(Copy.pages(day.total)) revised" }
-    if day.done > 0 { return "\(day.left) left · \(day.done) done" }
-    return "\(Copy.pages(day.left)) left"
+    if day.completed { return day.w.revised }
+    if day.done > 0 { return day.w.leftAndDone }
+    return day.w.left
   }
 }
 
 struct TodayMedium: View {
   let entry: TodayEntry
   let palette: Palette
+  @Environment(\.words) private var words
 
   var body: some View {
     HStack(alignment: .top, spacing: 12) {
       MarkView(done: day?.completed ?? false, size: 40, palette: palette)
       VStack(alignment: .leading, spacing: 2) {
         HStack(spacing: 4) {
-          Text("Today").font(.system(size: 15, weight: .semibold)).tone(palette.text)
-          if let streak = day.flatMap({ Copy.streak($0.streak) }) {
+          Text(words.today).font(.system(size: 15, weight: .semibold)).tone(palette.text)
+          if let streak = day?.w.streak {
             Text("· \(streak)").font(.system(size: 13)).tone(palette.secondary, .secondary)
           }
         }
         .lineLimit(1)
         if let day {
-          Text(day.completed ? "Done for today" : day.title)
+          Text(day.completed ? words.doneForToday : day.title)
             .font(.system(size: 17, weight: .semibold))
             .tone(day.completed ? palette.accentText : palette.text)
             .lineLimit(1)
             .minimumScaleFactor(0.8)
             .padding(.top, 2)
-          Text(day.completed ? "\(Copy.pages(day.total)) revised · \(day.place)" : day.place)
+          Text(day.completed ? "\(day.w.revised) · \(day.place)" : day.place)
             .font(.system(size: 13))
             .tone(palette.secondary, .secondary)
             .lineLimit(2)
@@ -204,11 +217,11 @@ struct TodayMedium: View {
           HStack {
             Text(status(day)).font(.system(size: 13, weight: .semibold)).tone(palette.text).lineLimit(1)
             Spacer(minLength: 8)
-            if !day.completed && day.total > 0 { Pill(text: day.done > 0 ? "Continue" : "Start", palette: palette) }
+            if !day.completed && day.total > 0 { Pill(text: day.done > 0 ? words.continueLabel : words.startLabel, palette: palette) }
           }
           .padding(.top, 6)
         } else {
-          Text(setUpText(entry.state)).font(.system(size: 13)).tone(palette.secondary, .secondary).padding(.top, 2)
+          Text(setUpText(entry.state, words)).font(.system(size: 13)).tone(palette.secondary, .secondary).padding(.top, 2)
           Spacer(minLength: 0)
         }
       }
@@ -221,9 +234,9 @@ struct TodayMedium: View {
   private var next: WidgetDay? { if case .ready(_, let n) = entry.state { return n } else { return nil } }
 
   private func status(_ day: WidgetDay) -> String {
-    if day.completed { return next.map { "Tomorrow · \($0.title)" } ?? "Revised" }
-    if day.done > 0 { return "\(day.done) of \(day.total) done" }
-    return "\(Copy.pages(day.left)) left"
+    if day.completed { return next.map { $0.w.asTomorrow } ?? words.revised }
+    if day.done > 0 { return day.w.doneOf }
+    return day.w.left
   }
 }
 
@@ -251,6 +264,7 @@ struct Pill: View {
 
 struct TodayRectangular: View {
   let entry: TodayEntry
+  @Environment(\.words) private var words
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
@@ -258,28 +272,29 @@ struct TodayRectangular: View {
         HStack(spacing: 4) {
           Image(systemName: day.completed ? "checkmark.circle.fill" : "book.closed")
             .widgetAccentable()
-          Text(day.completed ? "Revised" : "Today").font(.headline).widgetAccentable()
+          Text(day.completed ? words.revised : words.today).font(.headline).widgetAccentable()
         }
         Text(day.short).font(.body).lineLimit(1)
         Text(detail(day)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
       } else {
-        Text("Revisely").font(.headline).widgetAccentable()
-        Text(setUpText(entry.state)).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+        Text(verbatim: "Revisely").font(.headline).widgetAccentable()
+        Text(setUpText(entry.state, words)).font(.caption).foregroundStyle(.secondary).lineLimit(2)
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
   }
 
   private func detail(_ day: WidgetDay) -> String {
-    let streak = Copy.streak(day.streak)
-    if day.completed { return streak ?? Copy.pages(day.total) }
+    let streak = day.w.streak
+    if day.completed { return streak ?? day.w.pages }
     // Short, so the streak fits on the line: "20 left · 54-day streak".
-    return ["\(day.left) left", streak].compactMap { $0 }.joined(separator: " · ")
+    return [day.w.leftCount, streak].compactMap { $0 }.joined(separator: " · ")
   }
 }
 
 struct TodayCircular: View {
   let entry: TodayEntry
+  @Environment(\.words) private var words
 
   var body: some View {
     ZStack {
@@ -288,12 +303,12 @@ struct TodayCircular: View {
         if day.completed {
           VStack(spacing: 0) {
             Image(systemName: "checkmark").font(.system(size: 20, weight: .bold)).widgetAccentable()
-            if day.streak > 0 { Text("\(day.streak)d").font(.system(size: 11, weight: .medium)) }
+            if let streak = day.w.streakShort { Text(streak).font(.system(size: 11, weight: .medium)) }
           }
         } else {
           VStack(spacing: -2) {
-            Text("\(day.left)").font(.system(size: 22, weight: .semibold, design: .rounded)).widgetAccentable()
-            Text("left").font(.system(size: 10, weight: .medium))
+            Text(day.w.leftNumber).font(.system(size: 22, weight: .semibold, design: .rounded)).widgetAccentable()
+            Text(words.left).font(.system(size: 10, weight: .medium))
           }
         }
       } else {
@@ -306,23 +321,24 @@ struct TodayCircular: View {
 
   private var label: String {
     guard case .ready(let day, _) = entry.state else { return "Revisely" }
-    return day.completed ? "Today's revision is done" : "\(Copy.pages(day.left)) left today"
+    return day.completed ? words.todayDone : day.w.leftToday
   }
 }
 
 struct TodayInline: View {
   let entry: TodayEntry
+  @Environment(\.words) private var words
 
   var body: some View {
     if case .ready(let day, _) = entry.state {
       if day.completed {
-        Label(Copy.streak(day.streak).map { "Revised · \($0)" } ?? "Revised today", systemImage: "checkmark.circle")
+        Label(day.w.streak.map { "\(words.revised) · \($0)" } ?? words.revisedToday, systemImage: "checkmark.circle")
       } else {
         // Short: it shares the line with the date.
-        Label("\(day.left) left · \(day.short)", systemImage: "book.closed")
+        Label("\(day.w.leftCount) · \(day.short)", systemImage: "book.closed")
       }
     } else {
-      Label("Open Revisely", systemImage: "book.closed")
+      Label(words.openRevisely, systemImage: "book.closed")
     }
   }
 }

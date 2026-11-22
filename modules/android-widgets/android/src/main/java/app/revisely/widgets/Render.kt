@@ -18,7 +18,6 @@ import android.widget.RemoteViews
 import org.json.JSONArray
 import java.text.SimpleDateFormat
 import java.util.Date
-import java.util.Locale
 import java.util.TimeZone
 
 internal enum class Kind { TODAY, VERSE, QIBLA, PRAYER }
@@ -42,12 +41,17 @@ internal class Render(private val context: Context, private val snapshot: Snapsh
   private val zone: TimeZone = TimeZone.getDefault()
   private val pkg = context.packageName
   private val fontScale = context.resources.configuration.fontScale
+  /** The app's language: the widget's words and its direction (Words.kt). */
+  private val words = snapshot?.words ?: Words.ENGLISH
 
   fun views(kind: Kind, size: SizeF): RemoteViews = when (kind) {
     Kind.TODAY -> today(size)
     Kind.VERSE -> verse(size)
     Kind.QIBLA -> qibla(size)
     Kind.PRAYER -> prayer(size)
+  }.also { v ->
+    // The way the app's language reads, not the launcher's (BEHAVIOUR.md LANG-1).
+    v.setInt(android.R.id.background, "setLayoutDirection", if (words.rtl) View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR)
   }
 
   // ---------------------------------------------------------------- Today
@@ -67,7 +71,8 @@ internal class Render(private val context: Context, private val snapshot: Snapsh
 
     when (shape) {
       Shape.SMALL, Shape.MEDIUM -> {
-        val streak = day?.let { Copy.streak(it.streak) }
+        v.setTextViewText(R.id.aw_heading, words.today)
+        val streak = day?.w?.streak
         v.setTextViewText(R.id.aw_streak, if (shape == Shape.MEDIUM) "· ${streak.orEmpty()}" else streak.orEmpty())
         v.visible(R.id.aw_streak, streak != null)
         val ready = day != null
@@ -75,7 +80,7 @@ internal class Render(private val context: Context, private val snapshot: Snapsh
         v.visible(R.id.aw_setup, !ready)
         if (shape == Shape.SMALL) v.visible(R.id.aw_status, ready) else v.visible(R.id.aw_foot, ready)
         if (day != null) {
-          val title = if (day.completed) "Done for today" else day.title
+          val title = if (day.completed) words.doneForToday else day.title
           v.setTextViewText(R.id.aw_title, title)
           if (shape == Shape.SMALL) fit(v, R.id.aw_title, title, 16f, size.width - 32f, 2)
           else fit(v, R.id.aw_title, title, 17f, size.width - 32f - 52f, 1)
@@ -85,28 +90,28 @@ internal class Render(private val context: Context, private val snapshot: Snapsh
             v.setTextViewText(R.id.aw_status, Copy.smallStatus(day))
           } else {
             v.setTextViewText(R.id.aw_place, Copy.mediumPlace(day))
-            v.setTextViewText(R.id.aw_status, Copy.mediumStatus(day, next))
-            pill(v, Copy.action(day))
+            v.setTextViewText(R.id.aw_status, Copy.mediumStatus(day, next, words))
+            pill(v, Copy.action(day, words))
           }
         } else {
-          v.setTextViewText(R.id.aw_setup, Copy.setUp(state))
+          v.setTextViewText(R.id.aw_setup, Copy.setUp(state, words))
         }
       }
       Shape.WIDE, Shape.TINY -> {
         if (day != null) {
-          val title = if (shape == Shape.WIDE) (if (day.completed) "Done for today" else day.title) else Copy.tinyTitle(day)
+          val title = if (shape == Shape.WIDE) (if (day.completed) words.doneForToday else day.title) else Copy.tinyTitle(day, words)
           v.setTextViewText(R.id.aw_title, title)
-          val room = if (shape == Shape.WIDE) size.width - 28f - 48f - (if (Copy.action(day) != null) 84f else 0f) else size.width - 28f - 42f
+          val room = if (shape == Shape.WIDE) size.width - 28f - 48f - (if (Copy.action(day, words) != null) 84f else 0f) else size.width - 28f - 42f
           fit(v, R.id.aw_title, title, 15f, room, 1)
           ink.textColor(v, R.id.aw_title, if (day.completed) ink.accentText else ink.text)
           v.setTextViewText(R.id.aw_line, if (shape == Shape.WIDE) Copy.wideLine(day) else Copy.tinyLine(day))
           v.setInt(R.id.aw_line, "setMaxLines", 1)
-          if (shape == Shape.WIDE) pill(v, Copy.action(day))
+          if (shape == Shape.WIDE) pill(v, Copy.action(day, words))
         } else {
-          v.setTextViewText(R.id.aw_title, context.getString(R.string.aw_today))
+          v.setTextViewText(R.id.aw_title, words.today)
           v.setTextViewTextSize(R.id.aw_title, TypedValue.COMPLEX_UNIT_SP, 15f)
           ink.textColor(v, R.id.aw_title, ink.text)
-          v.setTextViewText(R.id.aw_line, Copy.setUp(state))
+          v.setTextViewText(R.id.aw_line, Copy.setUp(state, words))
           v.setInt(R.id.aw_line, "setMaxLines", 2)
           if (shape == Shape.WIDE) pill(v, null)
         }
@@ -165,6 +170,8 @@ internal class Render(private val context: Context, private val snapshot: Snapsh
     val medium = size.width >= WIDE
     val v = RemoteViews(pkg, if (medium) R.layout.aw_verse_medium else R.layout.aw_verse_small)
     val verse = Verses.of(context, now, zone)
+    v.setTextViewText(R.id.aw_heading, words.verseOfTheDay)
+    v.setTextViewText(R.id.aw_open, words.openRevisely)
     v.visible(R.id.aw_arabic, verse != null)
     v.visible(R.id.aw_reference, verse != null)
     v.visible(R.id.aw_open, verse == null)
@@ -179,7 +186,7 @@ internal class Render(private val context: Context, private val snapshot: Snapsh
     v.setImageViewBitmap(R.id.aw_arabic, bitmap)
     ink.tint(v, R.id.aw_arabic, ink.text)
     v.setContentDescription(R.id.aw_arabic, verse.arabic)
-    v.setTextViewText(R.id.aw_reference, verse.reference)
+    v.setTextViewText(R.id.aw_reference, verse.reference(words))
     v.setOnClickPendingIntent(android.R.id.background, link("revisely://read?page=${verse.page}"))
     return v
   }
@@ -190,7 +197,7 @@ internal class Render(private val context: Context, private val snapshot: Snapsh
     val tiny = minOf(size.width, size.height) < TALL
     val v = RemoteViews(pkg, if (tiny) R.layout.aw_qibla_tiny else R.layout.aw_qibla_small)
     val q = snapshot?.qibla
-    val dial = Masks.dial(context, if (tiny) 60f else 72f, q?.bearing, if (tiny) 8f else 10f, if (tiny) 13f else 0f)
+    val dial = Masks.dial(context, if (tiny) 60f else 72f, q?.bearing, if (tiny) 8f else 10f, if (tiny) 13f else 0f, words.north)
     v.setImageViewBitmap(R.id.aw_dial_ring, dial.ring)
     v.setImageViewBitmap(R.id.aw_dial_body, dial.body)
     v.setImageViewBitmap(R.id.aw_dial_accent, dial.accent)
@@ -202,22 +209,22 @@ internal class Render(private val context: Context, private val snapshot: Snapsh
     if (tiny) {
       v.visible(R.id.aw_qibla_short, q != null)
       v.visible(R.id.aw_no_location, q == null)
-      if (q != null) v.setTextViewText(R.id.aw_qibla_short, "${q.bearing}°")
+      if (q != null) v.setTextViewText(R.id.aw_qibla_short, q.degreesText)
     } else {
       v.visible(R.id.aw_qibla_text, q != null)
       v.visible(R.id.aw_open, q == null)
       if (q != null) {
-        v.setTextViewText(R.id.aw_qibla_label, "Qibla ${q.label}")
+        v.setTextViewText(R.id.aw_qibla_label, q.lineText)
         v.visible(R.id.aw_qibla_place, q.place != null)
         v.setTextViewText(R.id.aw_qibla_place, q.place.orEmpty())
-        v.setTextViewText(R.id.aw_qibla_distance, "${q.distance} to Makkah")
+        v.setTextViewText(R.id.aw_qibla_distance, q.toMakkahText)
       } else {
-        v.setTextViewText(R.id.aw_open, Copy.QIBLA_OPEN)
+        v.setTextViewText(R.id.aw_open, words.qiblaOpen)
       }
     }
     v.setContentDescription(
       android.R.id.background,
-      q?.let { "Qibla ${it.label}, ${it.distance} to Makkah" } ?: "Qibla: open Revisely to set your location",
+      q?.spokenText ?: words.qiblaOpenLabel,
     )
     v.setOnClickPendingIntent(android.R.id.background, link("revisely://qibla"))
     return v
@@ -237,6 +244,7 @@ internal class Render(private val context: Context, private val snapshot: Snapsh
 
     when (shape) {
       Shape.SMALL, Shape.MEDIUM -> {
+        v.setTextViewText(R.id.aw_heading, words.prayer)
         val place = moment?.place
         v.visible(R.id.aw_place, place != null)
         v.setTextViewText(R.id.aw_place, place.orEmpty())
@@ -247,28 +255,29 @@ internal class Render(private val context: Context, private val snapshot: Snapsh
           nextPrayer(v, moment)
           if (shape == Shape.MEDIUM) rows(v, moment)
         } else {
-          v.setTextViewText(R.id.aw_open, Copy.PRAYER_OPEN)
+          v.setTextViewText(R.id.aw_open, words.openToSeePrayer)
         }
       }
       Shape.WIDE -> {
         val cells = moment?.today?.filter { it.name != PrayerName.SUNRISE }.orEmpty()
         for (i in 0 until 5) cell(v, i, cells.getOrNull(i), moment)
         v.visible(R.id.aw_open, moment == null)
-        if (moment == null) v.setTextViewText(R.id.aw_open, Copy.PRAYER_OPEN)
+        if (moment == null) v.setTextViewText(R.id.aw_open, words.openToSeePrayer)
       }
       Shape.TINY -> {
+        v.setTextViewText(R.id.aw_title, words.prayerTimes)
         v.visible(R.id.aw_ready, moment != null)
         v.visible(R.id.aw_title, moment == null)
         v.visible(R.id.aw_open, moment == null)
         v.visible(R.id.aw_countdown_preview, false)
         if (moment != null) {
-          v.setTextViewText(R.id.aw_next_name, moment.next.label)
+          v.setTextViewText(R.id.aw_next_name, words.name(moment.next))
           ink.textColor(v, R.id.aw_next_name, ink.accentText)
           v.setTextViewText(R.id.aw_next_time, time(moment.nextAt))
           countdown(v, moment.nextAt)
         } else {
           v.visible(R.id.aw_countdown, false)
-          v.setTextViewText(R.id.aw_open, Copy.PRAYER_OPEN)
+          v.setTextViewText(R.id.aw_open, words.openToSeePrayer)
         }
       }
     }
@@ -278,7 +287,7 @@ internal class Render(private val context: Context, private val snapshot: Snapsh
 
   /** The next prayer: its name in the accent, the time large, the countdown under a hairline. */
   private fun nextPrayer(v: RemoteViews, moment: PrayerMoment) {
-    v.setTextViewText(R.id.aw_next_name, moment.next.label)
+    v.setTextViewText(R.id.aw_next_name, words.name(moment.next))
     ink.textColor(v, R.id.aw_next_name, ink.accentText)
     v.setTextViewText(R.id.aw_next_time, time(moment.nextAt))
     v.visible(R.id.aw_countdown_preview, false)
@@ -297,7 +306,7 @@ internal class Render(private val context: Context, private val snapshot: Snapsh
       val past = at != null && at <= now && name != moment.current
       val quiet = !isNext && (past || name == PrayerName.SUNRISE)
       val tone = if (isNext) ink.accentText else if (quiet) ink.secondary else ink.text
-      v.setTextViewText(names[i], weighted(name.label, isNext))
+      v.setTextViewText(names[i], weighted(words.name(name), isNext))
       v.setTextViewText(times[i], weighted(at?.let(::time) ?: "—", isNext))
       ink.textColor(v, names[i], tone)
       ink.textColor(v, times[i], tone)
@@ -318,7 +327,7 @@ internal class Render(private val context: Context, private val snapshot: Snapsh
     val past = at != null && at <= now && slot.name != moment.current
     v.setViewVisibility(bg, if (isNext) View.VISIBLE else View.INVISIBLE)
     if (isNext) ink.tint(v, bg, ink.accentSubtle)
-    v.setTextViewText(name, weighted(slot.name.label, isNext))
+    v.setTextViewText(name, weighted(words.name(slot.name), isNext))
     v.setTextViewText(time, at?.let(::shortTime) ?: "—")
     ink.textColor(v, name, if (isNext) ink.subtleText else ink.secondary)
     ink.textColor(v, time, if (isNext) ink.subtleText else if (past) ink.secondary else ink.text)
@@ -328,16 +337,20 @@ internal class Render(private val context: Context, private val snapshot: Snapsh
   private fun countdown(v: RemoteViews, at: Long) {
     val base = SystemClock.elapsedRealtime() + (at - System.currentTimeMillis())
     v.visible(R.id.aw_countdown, true)
-    v.setChronometer(R.id.aw_countdown, base, context.getString(R.string.aw_countdown_format), true)
+    v.setChronometer(R.id.aw_countdown, base, words.countdownFormat, true)
     v.setChronometerCountDown(R.id.aw_countdown, true)
   }
 
-  /** "2:21 PM", or "14:21" on a 24-hour phone. */
-  private fun time(at: Long): String = DateFormat.getTimeFormat(context).format(Date(at))
+  /** "2:21 PM", or "14:21" on a 24-hour phone; in the app's language when it isn't English ("٢:٢١ م"). */
+  private fun time(at: Long): String {
+    if (words.isEnglish) return DateFormat.getTimeFormat(context).format(Date(at))
+    val pattern = DateFormat.getBestDateTimePattern(words.locale, if (DateFormat.is24HourFormat(context)) "Hm" else "hma")
+    return SimpleDateFormat(pattern, words.locale).apply { timeZone = zone }.format(Date(at))
+  }
 
   /** The time without AM/PM ("2:21", or "14:21"), for the 4×1 row. */
   private fun shortTime(at: Long): String {
-    val locale = Locale.getDefault()
+    val locale = words.locale
     val skeleton = if (DateFormat.is24HourFormat(context)) "Hm" else "hm"
     var quoted = false
     val pattern = DateFormat.getBestDateTimePattern(locale, skeleton).filter { c ->
@@ -370,8 +383,12 @@ internal class Render(private val context: Context, private val snapshot: Snapsh
 }
 
 /** One of the verses in verses.json (the iOS widget's list, scripts/widget-verses.ts). */
-internal data class Verse(val sura: Int, val ayah: Int, val surah: String, val page: Int, val arabic: String) {
-  val reference get() = "$surah $sura:$ayah"
+internal data class Verse(val sura: Int, val ayah: Int, val surah: String, val surahAr: String?, val page: Int, val arabic: String) {
+  /** "Ash-Sharh 94:5", or «الشرح ٩٤:٥» for the app in Arabic. */
+  fun reference(words: Words): String {
+    val name = if (words.language == "ar") surahAr ?: surah else surah
+    return "$name ${words.number(sura)}:${words.number(ayah)}"
+  }
 }
 
 internal object Verses {
@@ -391,7 +408,10 @@ internal object Verses {
     val a = JSONArray(json)
     (0 until a.length()).map { i ->
       val o = a.getJSONObject(i)
-      Verse(o.getInt("sura"), o.getInt("ayah"), o.getString("surah"), o.getInt("page"), o.getString("arabic"))
+      Verse(
+        o.getInt("sura"), o.getInt("ayah"), o.getString("surah"), o.optString("surahAr").takeIf { it.isNotEmpty() },
+        o.getInt("page"), o.getString("arabic"),
+      )
     }
   } catch (e: Exception) {
     emptyList()

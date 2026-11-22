@@ -10,10 +10,16 @@ struct Verse: Codable, Hashable {
   let sura: Int
   let ayah: Int
   let surah: String
+  /// The surah's Arabic name, for the app in Arabic (verses.json from scripts/widget-verses.ts).
+  var surahAr: String? = nil
   let page: Int
   let arabic: String
 
-  var reference: String { "\(surah) \(sura):\(ayah)" }
+  /// "Ash-Sharh 94:5", or «الشرح ٩٤:٥» for the app in Arabic.
+  func reference(_ words: Words) -> String {
+    let name = words.language == "ar" ? (surahAr ?? surah) : surah
+    return "\(name) \(words.number(sura)):\(words.number(ayah))"
+  }
   var url: URL { URL(string: "revisely://read?page=\(page)")! }
 }
 
@@ -48,12 +54,16 @@ struct VerseEntry: TimelineEntry {
   let date: Date
   let verse: Verse?
   let colors: ColorPair?
+  var words: Words = .english
 
-  static let sample = VerseEntry(
-    date: Date(),
-    verse: Verse(sura: 94, ayah: 5, surah: "Ash-Sharh", page: 596, arabic: "فَإِنَّ مَعَ ٱلْعُسْرِ يُسْرًا"),
-    colors: nil
-  )
+  static var sample: VerseEntry {
+    VerseEntry(
+      date: Date(),
+      verse: Verse(sura: 94, ayah: 5, surah: "Ash-Sharh", surahAr: "الشرح", page: 596, arabic: "فَإِنَّ مَعَ ٱلْعُسْرِ يُسْرًا"),
+      colors: nil,
+      words: Words.current
+    )
+  }
 }
 
 struct VerseProvider: TimelineProvider {
@@ -61,7 +71,8 @@ struct VerseProvider: TimelineProvider {
 
   func getSnapshot(in context: Context, completion: @escaping (VerseEntry) -> Void) {
     if context.isPreview { return completion(.sample) }
-    completion(VerseEntry(date: Date(), verse: VerseBook.verse(for: Date()), colors: SnapshotStore.load()?.colors))
+    let snapshot = SnapshotStore.load()
+    completion(VerseEntry(date: Date(), verse: VerseBook.verse(for: Date()), colors: snapshot?.colors, words: snapshot?.words ?? .english))
   }
 
   /// Today and the next six days, each from local midnight.
@@ -69,10 +80,13 @@ struct VerseProvider: TimelineProvider {
     let calendar = Calendar.current
     let now = Date()
     let today = calendar.startOfDay(for: now)
-    let colors = SnapshotStore.load()?.colors
+    let snapshot = SnapshotStore.load()
     let entries = (0..<7).compactMap { offset -> VerseEntry? in
       guard let day = calendar.date(byAdding: .day, value: offset, to: today) else { return nil }
-      return VerseEntry(date: offset == 0 ? now : day, verse: VerseBook.verse(for: day), colors: colors)
+      return VerseEntry(
+        date: offset == 0 ? now : day, verse: VerseBook.verse(for: day), colors: snapshot?.colors,
+        words: snapshot?.words ?? .english
+      )
     }
     completion(Timeline(entries: entries, policy: .atEnd))
   }
@@ -83,8 +97,8 @@ struct VerseWidget: Widget {
     StaticConfiguration(kind: "ReviselyVerse", provider: VerseProvider()) { entry in
       VerseView(entry: entry)
     }
-    .configurationDisplayName("Verse of the day")
-    .description("A short verse each day, in Arabic.")
+    .configurationDisplayName(Words.current.galleryVerse)
+    .description(Words.current.galleryVerseDescription)
     .supportedFamilies([.systemSmall, .systemMedium])
   }
 }
@@ -100,7 +114,7 @@ struct VerseView: View {
     VStack(spacing: 0) {
       HStack(spacing: 6) {
         RMark(height: medium ? 16 : 14)
-        Text("Verse of the day")
+        Text(entry.words.verseOfTheDay)
           .font(.system(size: medium ? 13 : 12, weight: .semibold))
           .tone(palette.secondary, .secondary)
           .lineLimit(1)
@@ -118,17 +132,18 @@ struct VerseView: View {
           .environment(\.layoutDirection, .rightToLeft)
           .frame(maxWidth: .infinity)
         Spacer(minLength: 4)
-        Text(verse.reference)
+        Text(verse.reference(entry.words))
           .font(.system(size: medium ? 13 : 12))
           .tone(palette.secondary, .secondary)
           .lineLimit(1)
           .frame(maxWidth: .infinity, alignment: medium ? .trailing : .center)
       } else {
-        Text("Open Revisely").font(.system(size: 13)).tone(palette.secondary, .secondary)
+        Text(entry.words.openRevisely).font(.system(size: 13)).tone(palette.secondary, .secondary)
         Spacer(minLength: 0)
       }
     }
     .widgetURL(entry.verse?.url ?? URL(string: "revisely://home")!)
     .widgetGround(palette.bg)
+    .inLanguage(entry.words)
   }
 }

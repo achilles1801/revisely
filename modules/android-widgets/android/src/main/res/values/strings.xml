@@ -13,7 +13,6 @@
   <string name="aw_prayer">Prayer</string>
   <string name="aw_verse_of_the_day">Verse of the day</string>
   <string name="aw_open_revisely">Open Revisely</string>
-  <string name="aw_countdown_format">in %s</string>
 
   <!-- The widget picker's previews: pages 582–586 as the app names them (no-break hyphens), an afternoon in New York. -->
   <string name="aw_sample_title">An‑Naba to At‑Takwir</string>

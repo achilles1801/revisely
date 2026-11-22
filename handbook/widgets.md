@@ -50,6 +50,13 @@ Moved from CLAUDE.md word for word on Nov 22 2026. CLAUDE.md keeps the rules eve
   ~19.0.8, SDK 54's version; it had drifted to ^55.
 - **Links:** `revisely` is listed in `ios.infoPlist.CFBundleURLTypes`. Setting that key makes Expo
   ignore `scheme`, so before Oct 28 2026 revisely:// wasn't registered at all.
+- **Language** (1.0.6): the widgets show the app's language, not the phone's (Settings → Appearance → Language can
+  differ from it). The app writes their words into the snapshot (`lib/widgets/words.ts`, strings in
+  `src/i18n/<lang>/widgets.ts`): shared words, each day's pieces ("5 pages left", "7-day streak"), the Qibla's lines,
+  with the app's plurals and digits. `Words.swift` and Android's `Words.kt` read them, and keep the same English built
+  in for a snapshot from before; each widget sets its direction from `rtl` (the Qibla dial stays north-up, left to
+  right) and, in Arabic, its locale for times. A verse's reference takes `surahAr` from `verses.json`. Android's
+  picker (names, descriptions, previews) is resources, so it follows the phone (`values-ar/strings.xml`).
 - **Look:** the new design's grounds, ink and hairlines, the accent's colours from the snapshot.
   Tinted and clear Home Screens use the system's hierarchy and `widgetAccentable` (an outlined
   pill, a cut-out check): a filled accent shape would hide its own label.

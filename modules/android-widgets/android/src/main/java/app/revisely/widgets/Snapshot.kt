@@ -21,8 +21,13 @@ data class WidgetDay(
   val done: Int,
   val completed: Boolean,
   val streak: Int,
+  /** The day's pieces in the app's language (Words.kt); null in snapshots written before them. */
+  val words: DayWords? = null,
 ) {
   val left: Int get() = if (completed) 0 else maxOf(total - done, 0)
+
+  /** The day's pieces: the app's, else the widgets' own English. */
+  val w: DayWords get() = words ?: DayWords.english(this)
 }
 
 /** The accent's colours for one appearance, as ARGB ints. */
@@ -56,7 +61,23 @@ data class ColorPair(val light: AccentColors, val dark: AccentColors) {
 }
 
 /** The Qibla from the phone's last known position: the bearing and distance only. */
-data class QiblaInfo(val bearing: Int, val label: String, val distance: String, val place: String?)
+data class QiblaInfo(
+  val bearing: Int,
+  val label: String,
+  val distance: String,
+  val place: String?,
+  /** Its lines in the app's language ("Qibla 58° NE", "10,306 km to Makkah", both together, "58°"); null in snapshots
+   *  written before them. */
+  val line: String? = null,
+  val toMakkah: String? = null,
+  val spoken: String? = null,
+  val degrees: String? = null,
+) {
+  val lineText: String get() = line ?: "Qibla $label"
+  val toMakkahText: String get() = toMakkah ?: "$distance to Makkah"
+  val spokenText: String get() = spoken ?: "Qibla $label, $distance to Makkah"
+  val degreesText: String get() = degrees ?: "$bearing°"
+}
 
 enum class PrayerName(val key: String, val label: String) {
   FAJR("fajr", "Fajr"),
@@ -86,6 +107,8 @@ data class Snapshot(
   val days: List<WidgetDay>,
   val qibla: QiblaInfo?,
   val prayer: PrayerInfo?,
+  /** The widgets' words in the app's language (English in snapshots written before them). */
+  val words: Words = Words.ENGLISH,
 ) {
   companion object {
     /** The snapshot, or null when it's missing, unreadable or another version. */
@@ -100,6 +123,7 @@ data class Snapshot(
           days = o.optJSONArray("days").objects().map(::day),
           qibla = o.optJSONObject("qibla")?.let(::qibla),
           prayer = o.optJSONObject("prayer")?.let(::prayer),
+          words = Words.parse(o.optJSONObject("words")),
         )
       } catch (e: Exception) {
         null
@@ -117,6 +141,7 @@ data class Snapshot(
       done = o.optInt("done"),
       completed = o.optBoolean("completed"),
       streak = o.optInt("streak"),
+      words = DayWords.parse(o.optJSONObject("words")),
     )
 
     private fun colorPair(o: JSONObject?): ColorPair {
@@ -147,6 +172,10 @@ data class Snapshot(
       label = o.optString("label"),
       distance = o.optString("distance"),
       place = o.optNullableString("place"),
+      line = o.optNullableString("line"),
+      toMakkah = o.optNullableString("toMakkah"),
+      spoken = o.optNullableString("spoken"),
+      degrees = o.optNullableString("degrees"),
     )
 
     private fun prayer(o: JSONObject) = PrayerInfo(

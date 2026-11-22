@@ -137,50 +137,48 @@ object Timeline {
   private tailrec fun gcd(a: Int, b: Int): Int = if (b == 0) a else gcd(b, a % b)
 }
 
-/** The widgets' words, as the iOS widgets say them (targets/widget). */
+/**
+ * The widgets' lines, made of the app's words (Words.kt) as the iOS widgets make theirs (targets/widget). Without
+ * words given, the widgets' own English.
+ */
 object Copy {
   fun pages(n: Int) = if (n == 1) "1 page" else "$n pages"
-  fun streak(n: Int): String? = if (n > 0) "$n-day streak" else null
 
-  const val SET_UP = "Open Revisely to set up your plan."
-  const val STALE = "Open Revisely to see today's revision."
-  const val PRAYER_OPEN = "Open Revisely to see prayer times."
-  const val QIBLA_OPEN = "Open Revisely to set your location."
-
-  fun setUp(state: TodayState) = if (state is TodayState.Stale) STALE else SET_UP
+  fun setUp(state: TodayState, words: Words = Words.ENGLISH) =
+    if (state is TodayState.Stale) words.openToSeeToday else words.openToSetUp
 
   /** 2×2: what's left, or what was revised. */
   fun smallStatus(d: WidgetDay) = when {
-    d.completed -> "${pages(d.total)} revised"
-    d.done > 0 -> "${d.left} left · ${d.done} done"
-    else -> "${pages(d.left)} left"
+    d.completed -> d.w.revised
+    d.done > 0 -> d.w.leftAndDone
+    else -> d.w.left
   }
 
   /** 4×2: progress, or tomorrow once today is done. */
-  fun mediumStatus(d: WidgetDay, next: WidgetDay?) = when {
-    d.completed -> next?.let { "Tomorrow · ${it.title}" } ?: "Revised"
-    d.done > 0 -> "${d.done} of ${d.total} done"
-    else -> "${pages(d.left)} left"
+  fun mediumStatus(d: WidgetDay, next: WidgetDay?, words: Words = Words.ENGLISH) = when {
+    d.completed -> next?.w?.asTomorrow ?: words.revised
+    d.done > 0 -> d.w.doneOf
+    else -> d.w.left
   }
 
-  fun mediumPlace(d: WidgetDay) = if (d.completed) "${pages(d.total)} revised · ${d.place}" else d.place
+  fun mediumPlace(d: WidgetDay) = if (d.completed) "${d.w.revised} · ${d.place}" else d.place
 
   /** 4×1: the title, and one line under it. */
   fun wideLine(d: WidgetDay) = when {
-    d.completed -> listOfNotNull("${pages(d.total)} revised", streak(d.streak)).joinToString(" · ")
-    d.done > 0 -> listOf("${d.done} of ${d.total} done", d.place).filter { it.isNotEmpty() }.joinToString(" · ")
-    else -> listOf("${pages(d.left)} left", d.place).filter { it.isNotEmpty() }.joinToString(" · ")
+    d.completed -> listOfNotNull(d.w.revised, d.w.streak).joinToString(" · ")
+    d.done > 0 -> listOf(d.w.doneOf, d.place).filter { it.isNotEmpty() }.joinToString(" · ")
+    else -> listOf(d.w.left, d.place).filter { it.isNotEmpty() }.joinToString(" · ")
   }
 
   /** 2×1: what's left over where it starts, or done over the streak. */
-  fun tinyTitle(d: WidgetDay) = if (d.completed) "Done for today" else "${pages(d.left)} left"
-  fun tinyLine(d: WidgetDay) = if (d.completed) streak(d.streak) ?: "${pages(d.total)} revised" else d.short
+  fun tinyTitle(d: WidgetDay, words: Words = Words.ENGLISH) = if (d.completed) words.doneForToday else d.w.left
+  fun tinyLine(d: WidgetDay) = if (d.completed) d.w.streak ?: d.w.revised else d.short
 
   /** Start or Continue, while there's something to revise. */
-  fun action(d: WidgetDay): String? = when {
+  fun action(d: WidgetDay, words: Words = Words.ENGLISH): String? = when {
     d.completed || d.total <= 0 -> null
-    d.done > 0 -> "Continue"
-    else -> "Start"
+    d.done > 0 -> words.continueLabel
+    else -> words.startLabel
   }
 
   /** Today's session, or Home once it's done (or there's nothing to start). */

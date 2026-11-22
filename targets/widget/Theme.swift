@@ -150,7 +150,4 @@ struct MarkView: View {
   }
 }
 
-enum Copy {
-  static func pages(_ n: Int) -> String { n == 1 ? "1 page" : "\(n) pages" }
-  static func streak(_ n: Int) -> String? { n > 0 ? "\(n)-day streak" : nil }
-}
+

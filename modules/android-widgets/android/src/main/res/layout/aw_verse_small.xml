@@ -22,6 +22,7 @@
       android:scaleType="fitCenter"
       android:src="@drawable/aw_r_mark" />
     <TextView
+      android:id="@+id/aw_heading"
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
       android:layout_marginStart="6dp"

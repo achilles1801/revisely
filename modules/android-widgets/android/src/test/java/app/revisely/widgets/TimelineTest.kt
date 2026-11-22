@@ -174,5 +174,53 @@ class TimelineTest {
     assertEquals(ColorPair.INDIGO, bare.colors)
     assertNull(bare.qibla)
     assertNull(bare.prayer)
+    // Before the app wrote its words: the widgets' own English.
+    assertEquals(Words.ENGLISH, bare.words)
+  }
+
+  @Test fun `shows the app's language from its words, Arabic right to left`() {
+    val json = """
+      {"v":1,"state":"ready","accent":"indigo",
+       "words":{"language":"ar","rtl":true,"today":"اليوم","doneForToday":"أنهيت مراجعة اليوم","revised":"تمت المراجعة",
+                "continueLabel":"متابعة","startLabel":"بدء","openToSetUp":"افتح ريفايزلي لتُعِدّ خطتك.","countdown":"بعد {time}",
+                "north":"ش","prayerNames":{"asr":"العصر"},"digits":"٠١٢٣٤٥٦٧٨٩"},
+       "days":[{"day":"2026-11-09","startsAt":1,"endsAt":2,"title":"من المجادلة إلى التحريم","where":"الجزء ٢٨","short":"المجادلة",
+                "total":20,"done":6,"completed":false,"streak":12,
+                "words":{"pages":"٢٠ صفحة","left":"بقيت ١٤ صفحة","leftToday":"بقيت ١٤ صفحة اليوم","revised":"تمت مراجعة ٢٠ صفحة",
+                         "leftCount":"بقي ١٤","leftNumber":"١٤","leftAndDone":"بقي ١٤ · أُنجز ٦","doneOf":"أُنجز ٦ من ٢٠",
+                         "streak":"أيام متتالية: ١٢","streakShort":"١٢ يومًا","asTomorrow":"غدًا · من المجادلة إلى التحريم"}}],
+       "qibla":{"bearing":58,"label":"٥٨° شمال شرق","distance":"١٠٬٣٠٧ كم","place":null,"line":"القبلة ٥٨° شمال شرق",
+                "toMakkah":"١٠٬٣٠٧ كم إلى مكة","spoken":"القبلة ٥٨° شمال شرق، ١٠٬٣٠٧ كم إلى مكة","degrees":"٥٨°"}}
+    """.trimIndent()
+    val s = Snapshot.parse(json)!!
+    val w = s.words
+    assertEquals("ar", w.language)
+    assertTrue(w.rtl)
+    val d = s.days[0]
+    assertEquals("بقي ١٤ · أُنجز ٦", Copy.smallStatus(d))
+    assertEquals("أُنجز ٦ من ٢٠", Copy.mediumStatus(d, null, w))
+    assertEquals("أُنجز ٦ من ٢٠ · الجزء ٢٨", Copy.wideLine(d))
+    assertEquals("متابعة", Copy.action(d, w))
+    assertEquals("افتح ريفايزلي لتُعِدّ خطتك.", Copy.setUp(TodayState.SetUp, w))
+    assertEquals("بعد %s", w.countdownFormat)
+    assertEquals("العصر", w.name(PrayerName.ASR))
+    // A name the app didn't write keeps its English.
+    assertEquals("Fajr", w.name(PrayerName.FAJR))
+    assertEquals("٩٤", w.number(94))
+    assertEquals("القبلة ٥٨° شمال شرق", s.qibla?.lineText)
+    assertEquals("٥٨°", s.qibla?.degreesText)
+    // A word the app didn't write keeps its English.
+    assertEquals("Open Revisely", w.openRevisely)
+  }
+
+  @Test fun `an English day reads exactly as before`() {
+    val d = WidgetDay("2026-11-09", 1, 2, "Al‑Mujadila to At‑Tahrim", "Juz 28", "Al‑Mujadila", 20, 0, false, 12)
+    assertEquals(
+      DayWords("20 pages", "20 pages left", "20 pages left today", "20 pages revised", "20 left", "20", "20 left · 0 done",
+        "0 of 20 done", "12-day streak", "12d", "Tomorrow · Al‑Mujadila to At‑Tahrim"),
+      d.w,
+    )
+    assertEquals("in %s", Words.ENGLISH.countdownFormat)
+    assertEquals("94", Words.ENGLISH.number(94))
   }
 }

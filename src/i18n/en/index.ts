@@ -39,6 +39,7 @@ import { updates } from './updates';
 import { v2 } from './v2';
 import { verse } from './verse';
 import { whatsNew } from './whatsNew';
+import { widgets } from './widgets';
 
 export const en = {
   activity,
@@ -80,6 +81,7 @@ export const en = {
   v2,
   verse,
   whatsNew,
+  widgets,
 } as const;
 
 export type Strings = typeof en;

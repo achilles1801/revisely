@@ -43,7 +43,17 @@ describe('Qibla bearing and distance', () => {
 describe('widgetQibla', () => {
   it('the bearing, its label and the distance; never the position', () => {
     const q = widgetQibla(NEW_YORK)!;
-    expect(q).toEqual({ bearing: 58, label: '58° NE', distance: expect.stringMatching(/^10,\d{3} km$/), place: null });
+    expect(q).toEqual({
+      bearing: 58,
+      label: '58° NE',
+      distance: expect.stringMatching(/^10,\d{3} km$/),
+      place: null,
+      // The widget's lines, as it wrote them itself before (targets/widget/QiblaWidget.swift).
+      line: 'Qibla 58° NE',
+      toMakkah: `${q.distance} to Makkah`,
+      spoken: `Qibla 58° NE, ${q.distance} to Makkah`,
+      degrees: '58°',
+    });
     expect(JSON.stringify(q)).not.toMatch(/40\.7|74\.0/);
   });
 

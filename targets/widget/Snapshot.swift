@@ -16,11 +16,16 @@ struct WidgetDay: Codable, Hashable {
   let done: Int
   let completed: Bool
   let streak: Int
+  /// The day's pieces in the app's language (Words.swift); missing in snapshots written before them.
+  var words: DayWords? = nil
 
   enum CodingKeys: String, CodingKey {
-    case day, startsAt, endsAt, title, short, total, done, completed, streak
+    case day, startsAt, endsAt, title, short, total, done, completed, streak, words
     case place = "where"
   }
+
+  /// The day's pieces: the app's, else the widgets' own English.
+  var w: DayWords { words ?? .english(self) }
 
   var start: Date { Date(timeIntervalSince1970: startsAt / 1000) }
   var end: Date { Date(timeIntervalSince1970: endsAt / 1000) }
@@ -56,6 +61,17 @@ struct QiblaInfo: Codable, Hashable {
   /// "10,306 km".
   let distance: String
   let place: String?
+  /// Its lines in the app's language ("Qibla 58° NE", "10,306 km to Makkah", both together, "58°"); missing in
+  /// snapshots written before them.
+  var line: String? = nil
+  var toMakkah: String? = nil
+  var spoken: String? = nil
+  var degrees: String? = nil
+
+  var lineText: String { line ?? "Qibla \(label)" }
+  var toMakkahText: String { toMakkah ?? "\(distance) to Makkah" }
+  var spokenText: String { spoken ?? "Qibla \(label), \(distance) to Makkah" }
+  var degreesText: String { degrees ?? "\(bearing)°" }
 }
 
 /// A day's prayer times as epoch milliseconds (absolute instants); nil when there
@@ -80,6 +96,8 @@ struct PrayerInfo: Codable, Hashable {
 
 struct Snapshot: Codable {
   let v: Int
+  /// The widgets' words in the app's language; missing in snapshots written before them (Words.english then).
+  let words: Words?
   /// "ready", "signedOut" or "noPlan".
   let state: String
   let accent: String
