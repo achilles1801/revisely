@@ -5,7 +5,7 @@ import { getJuzForPage, getPagesForJuz } from './quranData';
 import { describePassage } from './passages';
 import { formatDayLong } from './activityFormat';
 import { lastRevisedWords } from './recency';
-import { weekdayName } from '../i18n';
+import { t, weekdayName } from '../i18n';
 
 // A day, or a timestamp whose first ten characters are its day (a page's record).
 const dayNumber = (day: string) => Math.round(Date.parse(`${day.slice(0, 10)}T00:00:00Z`) / 86_400_000);
@@ -71,8 +71,8 @@ export function uncoveredRows(input: {
       rows.push({
         kind: 'juz',
         juz,
-        label: `Juz ${juz}`,
-        detail: `${describePassage(open, { form: 'short', wholeJuz: false })} · ${lastRevisedWords(age(open))}`,
+        label: t('lib.insights.juz', { n: juz }),
+        detail: t('lib.insights.detail', { what: describePassage(open, { form: 'short', wholeJuz: false }), last: lastRevisedWords(age(open)) }),
         pages: open,
       });
       continue;
@@ -85,7 +85,11 @@ export function uncoveredRows(input: {
         kind: 'passage',
         juz,
         label: describePassage(run, { form: 'short' }),
-        detail: fresh ? `Memorized ${on === today ? 'today' : formatDayLong(on!)}, not revised yet` : lastRevisedWords(ago),
+        detail: fresh
+          ? on === today
+            ? t('lib.insights.memorizedToday')
+            : t('lib.insights.memorizedOn', { day: formatDayLong(on!) })
+          : lastRevisedWords(ago),
         pages: run,
       });
     }
@@ -113,7 +117,7 @@ export function monthOfMemorizing(items: { day: string; pages: number[] }[], mon
     items: mine.map((i) => ({
       day: i.day,
       label: describePassage(i.pages, { form: 'short' }),
-      when: `${formatDayLong(i.day)} · ${i.pages.length} ${i.pages.length === 1 ? 'page' : 'pages'}`,
+      when: t('lib.insights.dayPages', { day: formatDayLong(i.day), count: i.pages.length }),
       pages: i.pages.length,
     })),
   };
@@ -124,10 +128,10 @@ export function monthOfMemorizing(items: { day: string; pages: number[] }[], mon
 /** Minutes as "54 min", "5 h 54 min", "2 h". */
 export function minutesWords(minutes: number): string {
   const m = Math.round(minutes);
-  if (m < 60) return `${m} min`;
+  if (m < 60) return t('lib.insights.minutes', { n: m });
   const h = Math.floor(m / 60);
   const rest = m % 60;
-  return rest > 0 ? `${h} h ${rest} min` : `${h} h`;
+  return rest > 0 ? t('lib.insights.hoursMinutes', { h, m: rest }) : t('lib.insights.hours', { h });
 }
 
 const hourWord = (h: number) => {
@@ -168,20 +172,20 @@ export function hourDetail(
   const a = hourWord(hour);
   const b = hourWord((hour + 1) % 24);
   const range = a.p === b.p ? `${a.n}–${b.n} ${b.p}` : `${a.n} ${a.p}–${b.n} ${b.p}`;
-  if (sessions === 0) return { title: range, detail: `Nothing timed ${inWords}` };
+  if (sessions === 0) return { title: range, detail: t('lib.insights.nothingTimed', { span: inWords }) };
   const last = days.sort().pop()!;
   const ago = daysBetween(last, today);
   const when =
     ago === 0
-      ? 'today'
+      ? t('lib.insights.today')
       : ago === 1
-        ? 'yesterday'
+        ? t('lib.insights.yesterday')
         : ago < 7
-          ? `on ${weekdayName(new Date(`${last}T00:00:00Z`), 'long', 'UTC')}`
-          : `on ${formatDayLong(last)}`;
+          ? t('lib.insights.onDay', { day: weekdayName(new Date(`${last}T00:00:00Z`), 'long', 'UTC') })
+          : t('lib.insights.onDay', { day: formatDayLong(last) });
   return {
-    title: `${range} · ${minutesWords(minutes)}`,
-    detail: `${sessions} ${sessions === 1 ? 'session' : 'sessions'} ${inWords}, the last ${when}`,
+    title: t('lib.insights.hourTitle', { range, time: minutesWords(minutes) }),
+    detail: t('lib.insights.sessions', { count: sessions, span: inWords, when }),
   };
 }
 
@@ -213,8 +217,8 @@ export function timedRevisions(
   const timed = inWindow.filter((r) => r.minutes != null && r.minutes > 0).sort((a, b) => b.day.localeCompare(a.day));
   const dayWord = (day: string) => {
     const ago = daysBetween(day, today);
-    if (ago === 0) return 'Today';
-    if (ago === 1) return 'Yesterday';
+    if (ago === 0) return t('lib.insights.todayTitle');
+    if (ago === 1) return t('lib.insights.yesterdayTitle');
     if (ago < 7) return weekdayName(new Date(`${day}T00:00:00Z`), 'long', 'UTC');
     return formatDayLong(day);
   };
@@ -222,7 +226,7 @@ export function timedRevisions(
     list: timed.map((r) => ({
       day: r.day,
       label: describePassage(r.pages, { form: 'short' }),
-      detail: `${dayWord(r.day)} · ${r.pages.length} ${r.pages.length === 1 ? 'page' : 'pages'} in ${minutesWords(r.minutes!)}`,
+      detail: t('lib.insights.timedDetail', { day: dayWord(r.day), count: r.pages.length, time: minutesWords(r.minutes!) }),
       perPage: r.minutes! / r.pages.length,
     })),
     untimed: inWindow.length - timed.length,

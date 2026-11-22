@@ -8,7 +8,7 @@ import { describePassage, pagesNote } from './passages';
 import { PACE_MIN_ITEMS } from './activityInsights';
 import { memorizedByMonth, type MemorizationItemLike } from './memorizedAyahs';
 import { coverageRecency, type CoverageRecency } from './recency';
-import { formatDate } from '../i18n';
+import { formatDate, t } from '../i18n';
 
 const dayNumber = (day: string) => Math.round(Date.parse(`${day}T00:00:00Z`) / 86_400_000);
 const daysBetween = (from: string, to: string) => dayNumber(to) - dayNumber(from);
@@ -217,7 +217,9 @@ export function busiestHours(hours: number[]): string | null {
   }
   runs.sort((a, b) => b.total - a.total || a.from - b.from);
   const [first, second] = runs;
-  return second ? `Mostly ${hourRange(first.from, first.to)}, then ${hourRange(second.from, second.to)}` : `Mostly ${hourRange(first.from, first.to)}`;
+  return second
+    ? t('lib.insights.mostlyThen', { hours: hourRange(first.from, first.to), next: hourRange(second.from, second.to) })
+    : t('lib.insights.mostly', { hours: hourRange(first.from, first.to) });
 }
 
 // ── Weak spots ───────────────────────────────────────────────────────────
@@ -254,7 +256,7 @@ export function weakSpotRows(input: {
   limit?: number;
 }): WeakSpotRow[] {
   const window = input.window ?? 30;
-  const span = input.inWords ?? `in ${window} days`;
+  const span = input.inWords ?? t('lib.insights.inDays', { count: window });
   const skips = new Map<number, number>();
   for (const r of input.revisions) {
     if (!within(r.day, input.today, window)) continue;
@@ -272,9 +274,9 @@ export function weakSpotRows(input: {
     const ratedWeak = Math.max(...run.map((p) => input.ratedWeak.get(p) ?? 0));
     const skipped = Math.max(...run.map((p) => skips.get(p) ?? 0));
     const parts = [
-      weakNow ? 'Weak now' : null,
-      weakNow && ratedWeak >= 2 ? `rated weak ${ratedWeak} times ${span}` : null,
-      skipped >= 2 ? `${weakNow ? 'skipped' : 'Skipped'} ${skipped} times ${span}` : null,
+      weakNow ? t('lib.insights.weakNow') : null,
+      weakNow && ratedWeak >= 2 ? t('lib.insights.ratedWeak', { count: ratedWeak, span }) : null,
+      skipped >= 2 ? t(weakNow ? 'lib.insights.skippedLower' : 'lib.insights.skipped', { count: skipped, span }) : null,
     ].filter(Boolean);
     rows.push({
       surah: surahOf(run[0]),
@@ -326,17 +328,17 @@ export function monthLabel(month: string, first: boolean): string {
 /** How much of the Quran `pages` is, in words when it is near a simple share ("half the Quran"). */
 export function quranShare(pages: number): string | null {
   if (pages <= 0) return null;
-  if (pages >= 604) return 'all of the Quran';
+  if (pages >= 604) return t('lib.insights.allQuran');
   const f = pages / 604;
   const words: [number, string][] = [
-    [1 / 4, 'a quarter of the Quran'],
-    [1 / 3, 'a third of the Quran'],
-    [1 / 2, 'half the Quran'],
-    [2 / 3, 'two thirds of the Quran'],
-    [3 / 4, 'three quarters of the Quran'],
+    [1 / 4, t('lib.insights.quarter')],
+    [1 / 3, t('lib.insights.third')],
+    [1 / 2, t('lib.insights.half')],
+    [2 / 3, t('lib.insights.twoThirds')],
+    [3 / 4, t('lib.insights.threeQuarters')],
   ];
   for (const [v, w] of words) if (Math.abs(f - v) <= 0.02) return w;
-  return `${Math.max(1, Math.round(f * 100))}% of the Quran`;
+  return t('lib.insights.percentQuran', { percent: Math.max(1, Math.round(f * 100)) });
 }
 
 // ── Pace ─────────────────────────────────────────────────────────────────
@@ -397,6 +399,6 @@ export function formatPace(minutesPerPage: number): string {
  * first tomorrow"), several are "these weak spots".
  */
 export function reviseFirstLabel(rows: { pages: number[] }[]): string {
-  if (rows.length === 1) return `Revise ${describePassage(rows[0].pages, { form: 'short', sentence: true })} first tomorrow`;
-  return 'Revise these weak spots first tomorrow';
+  if (rows.length === 1) return t('lib.insights.reviseFirst', { what: describePassage(rows[0].pages, { form: 'short', sentence: true }) });
+  return t('lib.insights.reviseTheseFirst');
 }
