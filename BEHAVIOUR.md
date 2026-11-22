@@ -120,7 +120,7 @@ How the tests are made: `tests/scenarios/README.md`.
   quiet line, "Enjoying Revisely? Rate it ›", with a ✕ ("Don't ask again"). The line opens the App Store's Write a
   Review page (Revisely's Google Play listing on Android). A phone asks at most 3 times ever, 120 days apart (a line
   shown counts as asked, tapped or not), never for an account under 7 days old, and stops for good once the line is
-  tapped or dismissed, or Settings → Support → Rate Revisely is used (that row opens the same page at any time). The same
+  tapped or dismissed, or Settings → Help and support → Rate Revisely is used (that row opens the same page at any time). The same
   for everyone: no stars asked for, no reward, nothing that sends unhappy users anywhere else. The stores' own in-app
   prompt needs a native module and waits for the next native release (lib/rateAsk).
 
@@ -215,7 +215,7 @@ permission when "Daily reminders" is on, and a no saves reminders off.
   never asks again once answered. With reminders off, nothing asks. (Changed Nov 2026: the app asked on
   every launch, so a fresh install asked on its first screen, before sign-in; a no there turned reminders
   off at onboarding. Home asked again even with reminders off, and a yes there didn't turn them on.)
-- **REMIND-5.** (Revisely Dev) In Settings, "Enable notifications" shows on only while reminders can come.
+- **REMIND-5.** (Revisely Dev) In Settings → Reminders, "Revision reminders" shows on only while reminders can come.
   While the phone refuses Revisely's notifications, it shows off and says so ("Off in your phone's
   Settings"), and turning it on offers Open Settings instead of a switch that does nothing. Allowed there
   and back in the app, it shows on again if reminders were on. Turned on with the phone not asked yet, it
@@ -240,7 +240,7 @@ current basic sounds". October 2026's version was removed for the voices it offe
 
 ## Al-Kahf on Friday
 
-- **KAHF-1.** The Al-Kahf card (Settings → Home screen → "Friday Al-Kahf reminder", on by default) is on Home
+- **KAHF-1.** The Al-Kahf card (Settings → Reminders → "Friday Al-Kahf reminder", on by default) is on Home
   for the Islamic Friday: from Thursday's maghrib to Friday's maghrib, where the user is. Maghrib is the Prayer
   sheet's, for the place its times are worked out for (the phone's last position, else the saved Fajr location).
   With neither, the city the phone's time zone is named after stands in when the bundled city list has it
@@ -291,7 +291,7 @@ current basic sounds". October 2026's version was removed for the voices it offe
   catch-up) and Getting started (two weeks, Al-Mulk ayah by ayah, the first takes). The older, narrow
   scenarios stay loadable for the automated tests; their Offline queue holds its changes on the phone until
   "Send held changes" (or the next start of the app), then sends them in order.
-- **ACCOUNT-1.** Delete account (Settings, confirmed twice) removes the account from the server with everything of it
+- **ACCOUNT-1.** Delete account (Settings → Account, confirmed twice) removes the account from the server with everything of it
   (pages, sessions, notes, Revo's and the coach's data, backed-up recordings) and signs the phone out. Offline, or when
   the server refuses (App Check), nothing is deleted and the user stays signed in.
 - **ACCOUNT-3.** Delete account always ends, in "Account deleted" (signed out) or an error with Try again: never an
@@ -320,6 +320,29 @@ current basic sounds". October 2026's version was removed for the voices it offe
   signed out. Sign in again to carry on." until the next sign-in, and Sentry hears of it once, with no account
   details. A sign-out or an account deletion from the app says nothing.
 
+## Settings
+
+- **SET-1.** Settings opens on a short first level (Majd, Nov 22 2026, the Settings audit's option B: "i feel like
+  option B is way better and cleaner let's do that"): your account at the top (name, email, and Premium when the account
+  has it), then a row per page with what it is set to (Revision "Smart Tracking on", Reminders "On · 3 prayers", Prayer
+  its method and city, Mushaf and Recite the mushaf, Revo AI, Downloads and storage how much is on the phone,
+  Appearance "Light · Indigo"), then Help and support, About and, for testers, Testing, and the version. Each row opens
+  its own page with that group's rows and nothing else:
+  - Account: Display name, Premium, Time in app, Sign out and Delete account;
+  - Revision: Smart Tracking, Keep daily amount, Start day at fajr (always here, with prayer times or without),
+    Memorized pages and Activity;
+  - Reminders: Revision reminders (the revision reminders' switch, REMIND-1), Prayer notifications and the Friday
+    Al-Kahf reminder;
+  - Prayer (with prayer times): Prayer times, Calculation, Qibla and Next prayer on Home;
+  - Mushaf and Recite: the mushaf and, with Recite, its settings;
+  - Downloads and storage: Offline mushaf, Download over mobile data, Recordings, Back up recordings, Back up over
+    mobile data and the speech model;
+  - Appearance, Help and support, About and Testing: as their names say.
+
+  Back from a page returns to the first level. A Settings section opened from elsewhere (Revo's card, Insights' "Turn on
+  Smart Tracking") opens the page that holds it. No setting was removed or changed by the move; the rows look as they
+  did (flat rows, the theme's colours).
+
 ## Tabs
 
 - **TAB-1.** A sideways swipe never presses what is under the finger: a touch that has moved more than
@@ -341,11 +364,11 @@ current basic sounds". October 2026's version was removed for the voices it offe
 
 ## Sharing Revisely and reporting a problem
 
-- **SET-2.** Settings → Support → Share Revisely opens the phone's share sheet with one short sentence about
+- **SET-2.** Settings → Help and support → Share Revisely opens the phone's share sheet with one short sentence about
   Revisely and the link revisely.app, each once: on an iPhone the link goes apart from the words (Messages and
   WhatsApp draw the site's preview under them); on Android it ends the text. The sentence claims only what
   every account has. (Nov 22 2026: the link was in the words and shared again beside them.)
-- **SET-3.** Settings → Support → Report a problem opens the app's own form, in the app's design, light or
+- **SET-3.** Settings → Help and support → Report a problem opens the app's own form, in the app's design, light or
   dark: "Report a problem" between Cancel and Send, one line saying what goes with it, and the field. Send
   needs words; it sends them to us with the app's version, never a name or an email, closes the form and says
   "Your report was sent." Cancel, or closing the sheet, sends nothing and keeps nothing. Offline, the report
@@ -601,7 +624,7 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
 - **RECITE-15.** (Revisely Dev) Each new mistake that counts (a word wrong, skipped or added, a wrong haraka or letter)
   plays a short sound and a tap as it is marked during a take: never for Not clear or a tajweed note, never twice for
   one mark (a resume sends marks again), and at most one every 0.7 s. It plays in silent mode, at the volume the
-  buttons set, and Settings → Recite → Sound on a mistake turns it off. (Majd, Nov 20 2026: "there should be some like
+  buttons set, and Settings → Mushaf and Recite → Sound on a mistake turns it off. (Majd, Nov 20 2026: "there should be some like
   error sound ... so I know I just made a mistake".)
 - **RECITE-16.** (Revisely Dev) Pause keeps the take open however long the pause lasts: nothing ends it or opens its
   summary until Stop, ✕ or leaving the app, and Resume carries on the same take. A checker that let a paused take go
@@ -704,7 +727,7 @@ Recite with Mark mistakes remembers each take (Majd, Nov 15 2026; Tarteel's bigg
 - **RMEM-3.** Outside a take, a word with a remembered mistake stays marked on the page, in its highlight
   colour made lighter (red for a word, amber for harakat and letters, violet for tajweed). A word shows one
   mark, its most severe. Marks don't show during a take, where only that take's marks do. They also don't
-  show on a hidden page, or with Settings → Recite → Show past mistakes off. (In Revisely Dev a hidden page keeps
+  show on a hidden page, or with Settings → Mushaf and Recite → Show past mistakes off. (In Revisely Dev a hidden page keeps
   them on its covers, during a take too: RECITE-13.) Tapping one opens its history,
   which shows:
   - the kind in words, with its place and how often it went wrong;
@@ -770,7 +793,7 @@ Every account, from the Read tab: "Search the Quran" under its title (`lib/searc
 `screens/read/QuranSearchScreen`; Majd, Nov 8 2026 for testers, Nov 9 for everyone). A result opens
 the reader at its ayah, highlighted until the page is turned. Searching by voice, a mic beside it, is
 for every account on an iPhone that can listen (1.0.3 on; Majd, Nov 9 2026); Android types only. Its
-first use downloads the speech model, once and on the user's tap (Settings → Revision → Speech model
+first use downloads the speech model, once and on the user's tap (Settings → Downloads and storage → Speech model
 shows and deletes it). Listening uses that model on the phone: nothing said is recorded or sent. The
 microphone's purpose string (in the binary) names searching only from 1.0.4.
 
@@ -1389,14 +1412,14 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   REVO-25), "Hide help buttons", and Done. The
   words name surahs and juz, never page numbers. (Majd, Nov 8 2026: "helper buttons are good".)
 - **HELP-2.** "Hide help buttons" removes every ? at once, for this account on this phone, and they stay
-  hidden across launches. The screen they were hidden from says "Help buttons hidden. Settings → Support
-  brings them back." with Undo. Settings → Support → Help buttons turns them back on, or off again.
+  hidden across launches. The screen they were hidden from says "Help buttons hidden. Settings → Help and
+  support brings them back." with Undo. Settings → Help and support → Help buttons turns them back on, or off again.
 - **HELP-3.** Help follows Smart Tracking: with it off, no topic mentions ratings or strength. A session's
   Rating topic and the new plan's "weakest first" show only with it on. Recite's topics show only where Recite is
   offered.
 - **HELP-4.** The ? buttons are on by default: an account that has help sees them on every phone where
   its user hasn't hidden them, new or existing, with nothing stored. Only the user takes them away, with
-  "Hide help buttons" or Settings → Support → Help buttons (HELP-2); a setting that can't be read leaves
+  "Hide help buttons" or Settings → Help and support → Help buttons (HELP-2); a setting that can't be read leaves
   them on. Help is every account's since the November 2026 release (testers' before). (Majd, Nov 8
   2026: "the helper icons should be on by default for ex a new user account unless a user turns them
   off manually".)
@@ -1476,7 +1499,7 @@ of this deal. those users can have premium for life".
   an account set up then gets it from the server as soon as it is set up, and older accounts get it from the owner's
   script. Early access itself has no end date yet. Marking mistakes' intro says Premium is free for everyone during
   early access, which has no end date yet, will be paid after it, and is kept for life, and its Get Premium gives it at
-  once; "Can't afford it? Apply for support" is hidden. Settings' Premium row says the same (a take's
+  once; "Can't afford it? Apply for support" is hidden. Settings' Account page's Premium row says the same (a take's
   summary doesn't: Majd, Nov 21 2026). A grant once given is never changed or taken away, after early access too; once early access ends, new
   accounts don't get it and the intro's Get Premium no longer gives it. The words say early access and for life, never
   trial, a price or a date.

@@ -1,7 +1,7 @@
 # The help buttons, for an account that isn't a tester (help is every account's since the November
 # 2026 release, HELP_FOR_EVERYONE): Home's ? on the Today post opens "How Home works"; the sheet
 # closes; "Hide help buttons" takes the ? away with a toast and Undo; hidden it stays hidden after a
-# relaunch, until Settings → Support → Help buttons brings it back. Screenshots of the button, the
+# relaunch, until Settings → Help and support → Help buttons brings it back. Screenshots of the button, the
 # sheet and the toast (h1–h3).
 # Rules (BEHAVIOUR.md): HELP-1, HELP-2
 appId: com.revisionbuddy.app
@@ -101,12 +101,13 @@ appId: com.revisionbuddy.app
 - assertNotVisible:
     id: help-button-home
 
-# Settings → Support → Help buttons: off; turned on, the ? is back on Home.
+# Settings → Help and support → Help buttons: off; turned on, the ? is back on Home.
 - tapOn:
     id: open-settings
 - runFlow:
     file: ../subflows/settings-row.yaml
     env:
+      PAGE: help
       ROW: settings-help-buttons
 - tapOn:
     id: settings-help-buttons

@@ -121,6 +121,7 @@ it('[REVO-39] Settings → Revo AI → What Revo can do plays it any time: Turn 
   const { app, uid } = await tester(phone);
 
   await tap(app, 'open-settings');
+  await tap(app, 'settings-page-revo');
   expect(await stored(app, SEEN(uid))).toBeNull();
   await tap(app, 'settings-revo-moment');
   await app.until(() => app.screen.queryByTestId('settings-revo-moment-screen') != null, 'the moment from Settings');

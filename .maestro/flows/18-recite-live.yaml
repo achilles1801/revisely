@@ -453,6 +453,7 @@ appId: com.revisionbuddy.app
 - runFlow:
     file: ../subflows/settings-row.yaml
     env:
+      PAGE: testing
       ROW: settings-premium
 - tapOn:
     id: settings-premium

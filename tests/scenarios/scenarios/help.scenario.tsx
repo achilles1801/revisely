@@ -1,5 +1,5 @@
 // The help buttons (BEHAVIOUR.md HELP-1, HELP-2): a ? on Home's Today post opens "How Home works"; hiding
-// the buttons takes them away for good on this phone, with Undo, until Settings → Support brings them back.
+// the buttons takes them away for good on this phone, with Undo, until Settings → Help and support brings them back.
 // Every account's since the November 2026 release: these run as App Store accounts (previewTester unset),
 // except where a tester's Revo is what Ask Revo needs (Revo follows its own switch, config/app.revo).
 
@@ -164,7 +164,7 @@ describe('the help on Home', () => {
     await app2.close();
   });
 
-  it('[HELP-2] Hide help buttons takes every ? away, with Undo; hidden they stay hidden at the next launch, until Settings → Support → Help buttons', async () => {
+  it('[HELP-2] Hide help buttons takes every ? away, with Undo; hidden they stay hidden at the next launch, until Settings → Help and support → Help buttons', async () => {
     const phone = await account(false);
     let { app } = await openHome(phone, false);
     await app.until(() => helpButton(app) != null, 'the ? on the Today post');
@@ -173,7 +173,7 @@ describe('the help on Home', () => {
     await press(app, 'help-button-home');
     await press(app, 'help-hide');
     await app.until(() => helpButton(app) == null, 'the ? to go');
-    expect(flatText(app.screen.getByTestId('undo-toast-bar'))).toContain('Help buttons hidden. Settings → Support brings them back.');
+    expect(flatText(app.screen.getByTestId('undo-toast-bar'))).toContain('Help buttons hidden. Settings → Help and support brings them back.');
     await press(app, 'undo-toast-action');
     await app.until(() => helpButton(app) != null, 'Undo to bring the ? back');
 
@@ -186,8 +186,10 @@ describe('the help on Home', () => {
     await app.idle(300);
     expect(helpButton(app)).toBeNull();
 
-    // Settings → Support → Help buttons: off, and turned on it brings them back.
+    // Settings → Help and support → Help buttons: off, and turned on it brings them back.
     await press(app, 'open-settings');
+    await app.until(() => app.screen.queryByTestId('settings-page-help') != null, 'Settings');
+    await press(app, 'settings-page-help');
     await app.until(() => app.screen.queryByTestId('settings-help-buttons') != null, 'the Help buttons switch');
     const { fireEvent } = app.mods.rtl;
     expect(app.screen.getByTestId('settings-help-buttons').props.value).toBe(false);

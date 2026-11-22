@@ -5,5 +5,5 @@ export const help: NonNullable<ArStrings['help']> = {
   button: 'المساعدة: {{title}}',
   askRevo: 'اسأل ⁨Revo⁩',
   hide: 'إخفاء أزرار المساعدة',
-  hidden: 'أُخفيت أزرار المساعدة. تعيدها الإعدادات ← الدعم.',
+  hidden: 'أُخفيت أزرار المساعدة. تعيدها الإعدادات ← المساعدة والدعم.',
 };

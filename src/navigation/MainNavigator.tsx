@@ -42,6 +42,7 @@ import { SmartTrackingPreviewScreen } from '../screens/preview/SmartTrackingPrev
 import { useApp } from '../context/AppContext';
 import type { JournalKind } from '../types';
 import type { RevoSettingsSection } from '../lib/revo/types';
+import type { SettingsPage } from '../lib/settingsPages';
 
 export type MainTabParamList = {
   // Non-screen code (the timer) opens a day of Activity on the Home stack.
@@ -58,7 +59,8 @@ export type HomeStackParamList = {
   // round: that day repeats today's pages (the cycle has come round, AHEAD-3): it opens alone, a new round.
   ActiveRevision: { aheadDay?: string; round?: boolean } | undefined;
   // section: scroll to that section (Revo's openScreen, REVO-31).
-  Settings: { section?: RevoSettingsSection } | undefined;
+  /** `page`: one of Settings' pages (SET-1); `section`: a Settings section (Revo's openScreen), opened as its page. */
+  Settings: { section?: RevoSettingsSection; page?: SettingsPage } | undefined;
   // edit: open with the pages ready to edit (Home's Memorized line). focusPages: open at those pages
   // (Activity's Memorized → Edit): their surah open and scrolled to, the pages ringed.
   Memorization: { edit?: boolean; focusPages?: number[] } | undefined;

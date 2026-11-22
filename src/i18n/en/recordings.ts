@@ -55,7 +55,7 @@ export const recordings = {
   /** components/RecordingBackupController: the one-time notice before the first upload. */
   backupNotice: {
     title: 'Your recordings are backed up',
-    body: 'Recordings are now saved to your Revisely account as well as this phone, so you keep them if you lose or change your phone. Only you can access them. Uploads use {{network}}. You can turn this off in Settings → Activity → Back up recordings.',
+    body: 'Recordings are now saved to your Revisely account as well as this phone, so you keep them if you lose or change your phone. Only you can access them. Uploads use {{network}}. You can turn this off in Settings → Downloads and storage → Back up recordings.',
     cellular: 'Wi-Fi or mobile data',
     wifi: 'Wi-Fi only',
     turnOff: 'Turn off',
