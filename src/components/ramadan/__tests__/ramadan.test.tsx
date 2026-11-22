@@ -20,7 +20,16 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DesignProvider } from '../../../design/DesignContext';
 import { ThemeProvider } from '../../../context/ThemeContext';
 import { TabBar } from '../../../navigation/TabBar';
-import { __resetRamadanThemeForTests, loadRamadanTheme, RAMADAN_THEME_KEY, ramadanThemeOn, setRamadanTheme } from '../../../lib/ramadanTheme';
+import {
+  __resetRamadanThemeForTests,
+  __setRamadanReleasedForTests,
+  loadRamadanTheme,
+  RAMADAN_THEME_KEY,
+  RAMADAN_THEME_RELEASED,
+  ramadanThemeOffered,
+  ramadanThemeOn,
+  setRamadanTheme,
+} from '../../../lib/ramadanTheme';
 import { ACCENTS, paletteV2, ramadanV2 } from '../../../theme/v2';
 import { MOTES, moteOpacity } from '../RamadanSky';
 import { bulbBrightness, scallops } from '../StringLights';
@@ -128,6 +137,23 @@ describe('[THEME-1] the switch', () => {
     __resetRamadanThemeForTests();
     await loadRamadanTheme();
     expect(ramadanThemeOn()).toBe(true);
+  });
+
+  it('is Revisely Dev’s until the release flips RAMADAN_THEME_RELEASED (the release PR changes this line)', () => {
+    expect(RAMADAN_THEME_RELEASED).toBe(false);
+  });
+
+  it('once released, every app offers it, on unless this phone turned it off', async () => {
+    mockVariant.dev = false;
+    __setRamadanReleasedForTests(true);
+    expect(ramadanThemeOffered()).toBe(true);
+    await loadRamadanTheme();
+    expect(ramadanThemeOn()).toBe(true);
+    await setRamadanTheme(false);
+    __resetRamadanThemeForTests();
+    __setRamadanReleasedForTests(true);
+    await loadRamadanTheme();
+    expect(ramadanThemeOn()).toBe(false);
   });
 
   it('puts string lights on the tab bar in Revisely Dev only, with the switch on', async () => {

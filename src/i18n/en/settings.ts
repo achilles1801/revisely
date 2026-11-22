@@ -216,9 +216,8 @@ export const settings = {
     system: 'System',
     light: 'Light',
     dark: 'Dark',
-    /** Revisely Dev only: decorations over the usual design. */
+    /** Decorations over the usual design (Revisely Dev until its release switch). */
     ramadan: 'Ramadan theme',
-    ramadanSub: 'Lanterns, string lights and falling stars',
   },
   /** Settings → Appearance → Language (Revisely Dev until Arabic ships). Each language's own name is LANGUAGE_NAMES. */
   language: {

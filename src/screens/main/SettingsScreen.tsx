@@ -107,7 +107,7 @@ import {
 } from '../../i18n/choice';
 import { LANGUAGE_NAMES } from '../../i18n/language';
 import { isDevVariant } from '../../lib/variant';
-import { setRamadanTheme, useRamadanThemeSaved } from '../../lib/ramadanTheme';
+import { ramadanThemeOffered, setRamadanTheme, useRamadanThemeSaved } from '../../lib/ramadanTheme';
 import { CheckerModelRow } from '../../components/settings/CheckerModelRow';
 import { ScheduledRemindersRow } from '../../components/settings/ScheduledRemindersRow';
 import { useNotificationPermission } from '../../hooks/useNotificationPermission';
@@ -1151,12 +1151,12 @@ export default function SettingsScreen() {
               testID="settings-language"
             />
           ) : null}
-          {/* Revisely Dev only (THEME-1): decorations, kept on this phone. */}
-          {isDevVariant() ? (
+          {/* Revisely Dev's until the release switch (THEME-1): decorations, kept on this phone. Just the
+              name, no subtitle (Majd, Nov 21 2026). */}
+          {ramadanThemeOffered() ? (
             <Row
               icon="moon-outline"
               label={t('settings.appearance.ramadan')}
-              subtitle={t('settings.appearance.ramadanSub')}
               rightSlot={
                 <SettingSwitch
                   value={ramadanTheme}
