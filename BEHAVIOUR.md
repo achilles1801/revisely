@@ -470,7 +470,9 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   when those words were said just before (Majd, Nov 20 2026: they count), and never takes in a word that wasn't said.
   Only while what was said reads the same in two places on the page (a refrain)
   does it wait, for the words that part them. A take whose start is never found (no recitation in it) ends with
-  nothing: no summary, no score, and nothing kept. A microphone that is refused or can't start says so ("Microphone
+  nothing: no summary, no score, and nothing kept. The checker is woken when the app comes to the front (at most every
+  10 minutes) and when the reader opens, so a take begun soon after doesn't wait for it to start. A microphone that is
+  refused or can't start says so ("Microphone
   access is off" with Open Settings, or "Couldn't start the microphone"), never nothing (Majd's Android store build,
   Nov 22 2026: a tap did nothing).
 - **RECITE-2.** With Mark mistakes, a take marks a word said wrong, skipped or added, and a slip in a word's harakat

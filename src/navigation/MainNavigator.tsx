@@ -26,6 +26,9 @@ import { activityBlocksEnabled } from '../components/activity/DayBlocks';
 import type { ActivityKind } from '../lib/activityItems';
 import { ReadingTimerProvider } from '../context/ReadingTimerContext';
 import { useAppUsageTracking } from '../lib/appUsage';
+import { useWarmCheckerOnFront } from '../components/reciteLive/useKeepCheckerWarm';
+import { reciteLiveForAccount } from '../lib/reciteLive/availability';
+import { reciteCheckOff } from '../lib/reciteLive/off';
 import { TabBar, useTabBarHeight } from './TabBar';
 import type { PagerTabBarProps } from './PagerTabs';
 import { MiniPlayer, MINI_PLAYER_GAP } from '../components/player/MiniPlayer';
@@ -196,6 +199,8 @@ function MiniPlayerAboveTabs({ navigation }: { navigation: PagerTabBarProps['nav
 
 export function MainNavigator() {
   const { user } = useApp();
+  // The recitation checker, woken as the app comes to the front, so a take begun soon after doesn't meet a cold start.
+  useWarmCheckerOnFront(!reciteCheckOff() && reciteLiveForAccount(user));
   const smartTrackingEnabled = user?.smartTrackingEnabled ?? false;
   const hasSeenPreview = user?.hasSeenSmartTrackingPreview ?? false;
   // Accounts on the new Activity have Insights there: the tab bar is Home and Read (ACT-12).
