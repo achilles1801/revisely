@@ -78,6 +78,7 @@ import ScheduleScreen from '../ScheduleScreen';
 import { DesignProvider } from '../../../design/DesignContext';
 import { ThemeProvider } from '../../../context/ThemeContext';
 import { PillButton } from '../../../components/v2/PillButton';
+import { arabicLines, clippedArabic } from '../../../../jest/arabicLines';
 import { DEFAULT_ACCENT, paletteV2 } from '../../../theme/v2';
 import type { UserPage } from '../../../types';
 
@@ -140,6 +141,9 @@ describe('<WelcomeScreen /> in the new design', () => {
     expect(screen.getByTestId('hero-glow').props.pointerEvents).toBe('none');
     expect(screen.getByText(/Your Quran,/)).toBeTruthy();
     expect(styleOf('welcome-accent').color).toBe(light.accentText);
+    // The bismillah's every haraka, the shadda and its fatha over the lam too (arabicFullV2).
+    expect(arabicLines(screen.UNSAFE_root as never)).toHaveLength(1);
+    expect(clippedArabic(screen.UNSAFE_root as never)).toEqual([]);
     expectPrimary('welcome-begin', 'Begin');
 
     fireEvent.press(screen.getByTestId('welcome-begin'));

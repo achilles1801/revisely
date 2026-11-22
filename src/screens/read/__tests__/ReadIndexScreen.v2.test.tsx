@@ -34,6 +34,7 @@ import ReadIndexScreen from '../ReadIndexScreen';
 import { DesignProvider } from '../../../design/DesignContext';
 import { ThemeProvider } from '../../../context/ThemeContext';
 import { DEFAULT_ACCENT, paletteV2 } from '../../../theme/v2';
+import { clippedArabic } from '../../../../jest/arabicLines';
 
 const palette = paletteV2(false, DEFAULT_ACCENT);
 const flat = (style: unknown) => Object.assign({}, ...[style].flat(5).filter(Boolean));
@@ -76,6 +77,8 @@ describe('the Read index in the new design', () => {
     expect(within(baqarah).getByText('Madani · 286 verses · page 2')).toBeTruthy();
     const arabic = within(baqarah).getByText('الْبَقَرَة');
     expect(flat(arabic.props.style)).toMatchObject({ fontFamily: 'Amiri-Regular', color: palette.text });
+    // The voweled names whole: a line that holds every haraka (arabicFullV2).
+    expect(clippedArabic(screen.UNSAFE_root as never)).toEqual([]);
     // No card behind the rows.
     expect(flat(baqarah.props.style)).toMatchObject({ borderBottomWidth: 0.5, borderBottomColor: palette.separator });
     expect(flat(baqarah.props.style).borderRadius).toBeUndefined();

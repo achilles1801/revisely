@@ -1,8 +1,8 @@
-// Voweled Arabic never clips (Majd, Nov 22 2026, on a mistake's card: "the two lines have the expected vs recited have
-// their arabic cut off so for example u cant even see if theres a dumma or fatha on the top"). A Text draws only inside
-// its own box, on iOS and Android, so its line must hold Amiri's ink: up to 1.481× the font size above the baseline and
-// 0.950× below, measured over every word of the Qur'an (scripts/measure-amiri-ink.swift). arabicV2's 1.6× line left
-// 0.97× above on iOS: a fatha reaches 1.04×.
+// Arabic never clips (Majd, Nov 22 2026, on a mistake's card: "the two lines have the expected vs recited have their
+// arabic cut off so for example u cant even see if theres a dumma or fatha on the top"). A Text draws only inside its own
+// box, on iOS and Android, so its line must hold Amiri's ink (scripts/measure-amiri-ink.swift): with harakat up to 1.481×
+// the font size above the baseline and 0.950× below (every word of the Qur'an), without them 1.001× and 0.651× (the
+// surah names). arabicV2's old 1.6× line left 0.97× above on iOS (a fatha reaches 1.04×) and 0.56× below on Android.
 import fs from 'fs';
 import path from 'path';
 import React from 'react';
@@ -12,11 +12,16 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import {
   AMIRI_INK,
   AMIRI_LINE,
+  AMIRI_NAME_INK,
   ARABIC_FULL_LINE,
+  ARABIC_NAME_LINE,
   amiriRoom,
+  arabicForV2,
   arabicFullV2,
   arabicV2,
+  hasHarakat,
 } from '../../theme/v2';
+import { getAllSurahs } from '../../lib/quranData';
 import { arabicLines, clippedArabic, harakatClip } from '../../../jest/arabicLines';
 import { MarkBlock } from '../../components/reciteLive/MarkCard';
 import { Phrase } from '../../components/reciteLive/MarkParts';
@@ -70,13 +75,79 @@ describe('Amiri’s line', () => {
     }
   });
 
-  it('arabicV2 does not: why the card cut its fatha and damma off', () => {
-    // A fatha over a short letter reaches 1.036× the size above the baseline; arabicV2 leaves 0.966× on iOS.
-    const s = arabicV2(21);
-    expect(amiriRoom(21, s.lineHeight as number).above).toBeLessThan(1.036 * 21);
-    expect(harakatClip(s)).not.toBeNull();
-    // Nor does the font's own line: stacked marks over a lam reach past its ascent.
+  it('arabicV2 holds every unvoweled letter and hamza, at every size and text scale; not harakat', () => {
+    expect(ARABIC_NAME_LINE).toBeCloseTo(1.832, 3);
+    for (const size of SIZES) {
+      for (const scale of SCALES) {
+        const s = arabicV2(size);
+        expect(harakatClip({ ...s, fontSize: size * scale, lineHeight: (s.lineHeight as number) * scale }, AMIRI_NAME_INK)).toBeNull();
+      }
+    }
+    // Stacked marks need more (arabicFullV2), and so does the font's own line, with no lineHeight.
+    expect(harakatClip(arabicV2(21))).not.toBeNull();
     expect(harakatClip({ fontFamily: 'Amiri-Regular', fontSize: 18 })).not.toBeNull();
+  });
+
+  it('its old 1.6× line cut both: why the card lost its fatha and damma', () => {
+    const old = { fontFamily: 'Amiri-Regular', fontSize: 21, lineHeight: Math.round(21 * 1.6) };
+    // A fatha over a short letter reaches 1.036× the size above the baseline; it left 0.966× on iOS.
+    expect(amiriRoom(21, old.lineHeight).above).toBeLessThan(1.036 * 21);
+    expect(harakatClip(old, AMIRI_NAME_INK)).not.toBeNull();
+  });
+
+  it('arabicForV2 takes the full line for text with harakat, the name line for text without', () => {
+    expect(arabicForV2('سَيَقُولُ', 18)).toEqual(arabicFullV2(18));
+    expect(arabicForV2('البقرة', 18)).toEqual(arabicV2(18));
+    expect(arabicForV2(undefined, 18)).toEqual(arabicV2(18));
+    // The surah names come both ways: unvoweled for labels, voweled for the reader's and the pickers'.
+    for (const s of getAllSurahs()) expect(hasHarakat(s.nameArabic)).toBe(false);
+  });
+});
+
+describe('the app’s Arabic', () => {
+  /** Every source file of the app outside the theme and its tests. */
+  const walk = (dir: string): string[] =>
+    fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true }).flatMap((e) => {
+      const rel = `${dir}/${e.name}`;
+      if (e.isDirectory()) return e.name === '__tests__' || e.name === '__fixtures__' ? [] : walk(rel);
+      return /\.tsx?$/.test(e.name) ? [rel] : [];
+    });
+  const SOURCES = walk('src').filter((f) => !f.startsWith('src/theme/'));
+  /**
+   * Amiri set by hand, each with the reason it doesn't clip: a surah's unvoweled name on the font's own line, which
+   * misses its lowest tail by 0.017× the size (0.2 pt), with no room to spare in its header.
+   */
+  const BY_HAND: Record<string, string> = {
+    'src/screens/read/QuranReaderScreen.tsx': 'the header’s surah name on the font’s own line',
+    'src/screens/revision/ActiveRevisionScreen.tsx': 'the crumb’s surah name on the font’s own line',
+  };
+  const lines = (f: string) =>
+    fs
+      .readFileSync(path.join(ROOT, f), 'utf8')
+      .split('\n')
+      .map((line, i) => ({ f, i: i + 1, line }))
+      .filter(({ line }) => !/^\s*(\/\/|\*)/.test(line));
+
+  it('takes Amiri only from the theme’s helpers (arabicV2, arabicFullV2, arabicForV2), never by hand', () => {
+    expect(SOURCES.length).toBeGreaterThan(300);
+    const found = SOURCES.filter((f) => !BY_HAND[f]).flatMap((f) =>
+      lines(f)
+        .filter(({ line }) => /fontsV2\.arabic|fonts\.arabic|['"]Amiri/.test(line))
+        .map(({ i, line }) => `${f}:${i}: ${line.trim()}`),
+    );
+    expect(found).toEqual([]);
+  });
+
+  it('never sets a shorter line over one of them', () => {
+    // A lineHeight after the helper's own (in the same style array or object) undoes it. The avatar's label (v2/Mark,
+    // Arabic-Indic digits, shrunk to fit its disc) is the one exception: digits stay inside the font's own line.
+    const found = SOURCES.filter((f) => f !== 'src/components/v2/Mark.tsx').flatMap((f) => {
+      const text = fs.readFileSync(path.join(ROOT, f), 'utf8');
+      return [...text.matchAll(/arabic(?:Full|For)?V2\([^)]*\)[^\]\n]*lineHeight|\.\.\.arabic(?:Full|For)?V2\([^)]*\),\s*lineHeight/g)].map(
+        (m) => `${f}: ${m[0]}`,
+      );
+    });
+    expect(found).toEqual([]);
   });
 });
 

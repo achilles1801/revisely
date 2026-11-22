@@ -19,7 +19,7 @@ import { Backdrop } from '../Backdrop';
 import { useTheme } from '../../context/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { shadows } from '../../theme/shadows';
-import { arabicV2, layoutV2, PaletteV2, radiusV2, typeV2 } from '../../theme/v2';
+import { arabicFullV2, layoutV2, PaletteV2, radiusV2, typeV2 } from '../../theme/v2';
 import { Tap } from '../v2/Tap';
 import { PillButton } from '../v2/PillButton';
 import { getSurahDisplay } from '../../lib/quranData';
@@ -743,7 +743,7 @@ const makeStylesV2 = (p: PaletteV2) =>
     titleBox: { flex: 1, minWidth: 0 },
     titleLine: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
     surahName: { ...typeV2.meta, color: p.secondary, flexShrink: 1 },
-    surahArabic: { ...arabicV2(15), lineHeight: undefined, color: p.secondary },
+    surahArabic: { ...arabicFullV2(15), color: p.secondary },
     ayahLabel: { ...typeV2.sheetTitle, color: p.text },
     pill: { flexDirection: 'row', alignItems: 'center' },
     pillBtn: { minWidth: 32, minHeight: 36, alignItems: 'center', justifyContent: 'center' },
@@ -781,10 +781,9 @@ const makeStylesV2 = (p: PaletteV2) =>
       backgroundColor: p.fill,
       marginBottom: layoutV2.gutter,
     },
-    // Amiri's stacked marks need this line height on the longest verses.
+    // Every haraka whole, stacked marks too (arabicFullV2: a 54 pt line cut the first line's top and the last's bottom).
     arabic: {
-      ...arabicV2(28),
-      lineHeight: 54,
+      ...arabicFullV2(28),
       color: p.text,
       textAlign: 'right',
       writingDirection: 'rtl',

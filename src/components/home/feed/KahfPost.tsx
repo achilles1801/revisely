@@ -45,7 +45,7 @@ export function KahfPost({
         mark={<Mark label="١٨" arabic done={done} />}
         name="Al-Kahf"
         nameAfter={
-          <Text style={[arabicV2(16), { color: palette.secondary, marginLeft: 6, lineHeight: 20 }]} accessibilityLanguage="ar" numberOfLines={arabicLabelLines}>
+          <Text style={[arabicV2(16), { color: palette.secondary, marginLeft: 6 }]} accessibilityLanguage="ar" numberOfLines={arabicLabelLines}>
             الكهف
           </Text>
         }

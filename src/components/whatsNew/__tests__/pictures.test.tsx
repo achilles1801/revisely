@@ -5,6 +5,7 @@ import { act, render, screen } from '@testing-library/react-native';
 
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
 import { readRepo } from '../../../../jest/behaviourRules';
+import { clippedArabic } from '../../../../jest/arabicLines';
 import { demoTakeOf, pictureFor, pictureWords } from '../pictures';
 import { en } from '../../../i18n/en';
 import { t } from '../../../i18n';
@@ -74,6 +75,8 @@ describe('the pictures', () => {
       expect(window.props.pointerEvents).toBe('none');
       expect(window.props.accessibilityElementsHidden).toBe(true);
       expect(window.props.importantForAccessibility).toBe('no-hide-descendants');
+      // Its Arabic whole: the take's words with every haraka (arabicFullV2).
+      expect(clippedArabic(screen.UNSAFE_root as never)).toEqual([]);
       screen.unmount();
     }
   });

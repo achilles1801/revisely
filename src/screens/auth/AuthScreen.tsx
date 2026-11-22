@@ -15,7 +15,7 @@ import { GoogleGIcon } from '../../components/GoogleGIcon';
 import { Mark } from '../../components/v2/Mark';
 import { PillButton } from '../../components/v2/PillButton';
 import { Tap } from '../../components/v2/Tap';
-import { arabicV2, layoutV2, radiusV2, typeV2 } from '../../theme/v2';
+import { arabicFullV2, layoutV2, radiusV2, typeV2 } from '../../theme/v2';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useHaptics } from '../../design/haptics';
@@ -250,7 +250,7 @@ export default function AuthScreen() {
         >
           <View style={v2.header}>
             <Text
-              style={[arabicV2(28), v2.centered, { color: palette.text }]}
+              style={[arabicFullV2(28), v2.centered, { color: palette.text }]}
               accessibilityLanguage="ar"
               maxFontSizeMultiplier={1.6}
             >

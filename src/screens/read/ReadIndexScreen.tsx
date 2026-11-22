@@ -10,7 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { useApp } from '../../context/AppContext';
 import { quranSearchEnabled, voiceSearchEnabled } from '../../lib/search/availability';
-import { arabicV2, layoutV2, typeV2 } from '../../theme/v2';
+import { arabicFullV2, layoutV2, typeV2 } from '../../theme/v2';
 import { Mark } from '../../components/v2/Mark';
 import { Tap } from '../../components/v2/Tap';
 import {
@@ -257,7 +257,7 @@ function RecentRowV2({ entry, onPress }: { entry: ReadingHistoryEntry; onPress: 
         <Text style={[typeV2.meta, { color: palette.secondary }]}>{meta}</Text>
       </View>
       {display?.nameArabicVoweled ? (
-        <Text style={[arabicV2(20), v2.arabic, { color: palette.text }]} accessibilityLanguage="ar" numberOfLines={arabicLabelLines}>
+        <Text style={[arabicFullV2(20), v2.arabic, { color: palette.text }]} accessibilityLanguage="ar" numberOfLines={arabicLabelLines}>
           {display.nameArabicVoweled}
         </Text>
       ) : null}
@@ -287,7 +287,7 @@ function SurahRowV2({ row, onPress }: { row: SurahRow; onPress: () => void }) {
         </Text>
         <Text style={[typeV2.meta, { color: palette.secondary }]}>{meta}</Text>
       </View>
-      <Text style={[arabicV2(20), v2.arabic, { color: palette.text }]} accessibilityLanguage="ar" numberOfLines={arabicLabelLines}>
+      <Text style={[arabicFullV2(20), v2.arabic, { color: palette.text }]} accessibilityLanguage="ar" numberOfLines={arabicLabelLines}>
         {row.nameArabicVoweled}
       </Text>
     </Tap>
