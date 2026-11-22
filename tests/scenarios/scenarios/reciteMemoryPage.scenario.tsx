@@ -75,7 +75,7 @@ it('[RMEM-3] [RMEM-4] a word missed before stays marked on the page; its card sh
   expect(plain(app.screen.getByTestId('past-card-place').props.children)).toBe('Yusuf, ayah 88 · wrong in 1 of 2 takes');
   expect(app.screen.getAllByTestId('past-try-right')).toHaveLength(1);
   expect(app.screen.getAllByTestId('past-try-wrong')).toHaveLength(1);
-  expect(app.screen.getByText('Right today. Right again on another day clears it.')).toBeTruthy();
+  expect(app.screen.getByText('Right today. 1 more right take, on another day, clears it.')).toBeTruthy();
   // No recording of these takes on this phone: nothing to play.
   expect(app.screen.queryByTestId('past-try-play')).toBeNull();
 
