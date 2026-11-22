@@ -166,7 +166,7 @@ export default function LastRevisedScreen() {
           thread
           last={item.last}
           onPress={() => openPage(p.page)}
-          accessibilityLabel={`${spokenText(name)}, page ${p.page}. ${recencyText(p)}. ${t('insights.lastRevised.openPage')}`}
+          accessibilityLabel={t('activity.lastRevised.pageRow', { name: spokenText(name), page: p.page, when: recencyText(p), open: t('insights.lastRevised.openPage') })}
           testID={`last-revised-page-${row.view}-${row.number}-${p.page}`}
         />
       );
@@ -181,7 +181,7 @@ export default function LastRevisedScreen() {
           page={row.number}
           when={when}
           onPress={() => openPage(row.number)}
-          accessibilityLabel={`${spokenText(name)}, page ${row.number}. ${when}. ${t('insights.lastRevised.openPage')}`}
+          accessibilityLabel={t('activity.lastRevised.pageRow', { name: spokenText(name), page: row.number, when, open: t('insights.lastRevised.openPage') })}
           testID={`last-revised-row-page-${row.number}`}
         />
       );

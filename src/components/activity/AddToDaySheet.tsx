@@ -17,6 +17,8 @@ import { RevisedElsewhereSheet } from './RevisedElsewhereSheet';
 import { AddMemorizedSheet } from './AddMemorizedSheet';
 import { AddNoteSheet } from './AddNoteSheet';
 import { revisedOnDay, useDayItems } from './useDayItems';
+import { t } from '../../i18n';
+import { dayWords } from './AddSheetParts';
 
 type Row = 'revised' | 'memorized' | 'note';
 
@@ -55,16 +57,17 @@ export function AddToDaySheet({
     setTimeout(() => setOpen(next), 350);
   };
 
-  const whose = dayName === 'today' ? 'Today’s' : `${dayName.charAt(0).toUpperCase()}${dayName.slice(1)}’s`;
+  const dayText = dayWords(dayName);
+  const DayText = `${dayText.charAt(0).toUpperCase()}${dayText.slice(1)}`;
   const rows: { key: Row; mark: React.ReactNode; label: string; subtitle: string }[] = [
-    { key: 'revised', mark: <RevisedMark fraction={assigned > 0 ? doneCount / assigned : 0} done={assigned > 0 && doneCount >= assigned} />, label: 'Revised elsewhere', subtitle: `${whose} pages, revised away from a session` },
-    { key: 'memorized', mark: <BlockMark kind="memorized" />, label: 'Memorized', subtitle: dayName === 'today' ? 'New pages you learned today' : `New pages you learned ${dayName}` },
-    { key: 'note', mark: <BlockMark kind="notes" />, label: 'Note', subtitle: 'A thought, or a mistake to watch' },
+    { key: 'revised', mark: <RevisedMark fraction={assigned > 0 ? doneCount / assigned : 0} done={assigned > 0 && doneCount >= assigned} />, label: t('activity.elsewhere.title'), subtitle: t('activity.addMenu.revisedSubtitle', { Day: DayText }) },
+    { key: 'memorized', mark: <BlockMark kind="memorized" />, label: t('activity.day.memorized'), subtitle: t('activity.addMenu.memorizedSubtitle', { day: dayText }) },
+    { key: 'note', mark: <BlockMark kind="notes" />, label: t('activity.add.note'), subtitle: t('activity.addMenu.noteSubtitle') },
   ];
 
   return (
     <>
-      <Sheet visible={visible} onClose={onClose} title={`Add to ${dayName}`} headerRule="none" testID="activity-add-menu">
+      <Sheet visible={visible} onClose={onClose} title={t('activity.addMenu.title', { day: dayText })} headerRule="none" testID="activity-add-menu">
         <View style={styles.body}>
           {rows.map((r, i) => (
             <Tap

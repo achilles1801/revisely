@@ -27,30 +27,55 @@ import { layoutV2, typeV2 } from '../../theme/v2';
 import { Sheet } from '../v2/Sheet';
 import { Tap } from '../v2/Tap';
 import { PillButton } from '../v2/PillButton';
+import { t } from '../../i18n';
 
 /** Chrome text stops growing here, as headers and menu rows do. */
 const MAX_SCALE = 1.4;
 
-const STATE_WORDS: Record<JuzCellState, string> = {
-  'not-memorized': 'not memorized',
-  learning: 'being learned',
-  weak: 'weak',
-  moderate: 'moderate',
-  strong: 'strong',
-  week: 'revised this week',
-  month: 'revised this month',
-  new: 'not revised yet',
-  older: 'not revised in 30 days',
-};
-const COUNT_WORDS: Record<string, string> = {
-  weak: 'weak',
-  moderate: 'moderate',
-  strong: 'strong',
-  week: 'this week',
-  month: 'this month',
-  new: 'not revised yet',
-  older: 'over 30 days',
-};
+/** A page's state in words, for VoiceOver. */
+function stateWords(state: JuzCellState): string {
+  switch (state) {
+    case 'not-memorized':
+      return t('activity.juz.state.notMemorized');
+    case 'learning':
+      return t('activity.juz.state.learning');
+    case 'weak':
+      return t('activity.juz.state.weak');
+    case 'moderate':
+      return t('activity.juz.state.moderate');
+    case 'strong':
+      return t('activity.juz.state.strong');
+    case 'week':
+      return t('activity.juz.state.week');
+    case 'month':
+      return t('activity.juz.state.month');
+    case 'new':
+      return t('activity.juz.state.new');
+    case 'older':
+      return t('activity.juz.state.older');
+  }
+}
+/** Beside each colour under the grid. */
+function countWords(state: string): string | undefined {
+  switch (state) {
+    case 'weak':
+      return t('activity.juz.count.weak');
+    case 'moderate':
+      return t('activity.juz.count.moderate');
+    case 'strong':
+      return t('activity.juz.count.strong');
+    case 'week':
+      return t('activity.juz.count.week');
+    case 'month':
+      return t('activity.juz.count.month');
+    case 'new':
+      return t('activity.juz.count.new');
+    case 'older':
+      return t('activity.juz.count.older');
+    default:
+      return undefined;
+  }
+}
 
 type Revised = { day?: string; countsFor: string; pages: number[] }[];
 
@@ -174,7 +199,7 @@ export function JuzSheet({
       title={model?.title}
       message={model?.subtitle}
       messageMaxScale={MAX_SCALE}
-      right={ask ? { label: 'Ask', onPress: ask } : undefined}
+      right={ask ? { label: t('activity.insights.ask'), onPress: ask } : undefined}
       scroll
       onHidden={runPending}
       testID="juz-sheet"
@@ -195,10 +220,10 @@ export function JuzSheet({
             </ChromeText>
             {model.stale && onPlanIt && allFirstTomorrow(model.memorizedPages, firstTomorrow ?? new Set()) ? (
               <View style={styles.doneRow}>
-                <View style={styles.planIt} accessible accessibilityLabel="Goes first tomorrow" testID="juz-sheet-plan-it-done">
+                <View style={styles.planIt} accessible accessibilityLabel={t('activity.insights.goesFirstTomorrow')} testID="juz-sheet-plan-it-done">
                   <Ionicons name="checkmark" size={16} color={palette.secondary} />
                   <ChromeText style={[typeV2.name, { color: palette.secondary }]} maxFontSizeMultiplier={MAX_SCALE}>
-                    First tomorrow
+                    {t('activity.insights.firstTomorrow')}
                   </ChromeText>
                 </View>
                 {onAddToPlan ? (
@@ -224,7 +249,7 @@ export function JuzSheet({
                 testID="juz-sheet-plan-it"
               >
                 <ChromeText style={[typeV2.name, { color: palette.link }]} maxFontSizeMultiplier={MAX_SCALE}>
-                  Plan it for tomorrow first
+                  {t('activity.juz.planFirst')}
                 </ChromeText>
                 <Ionicons name="chevron-forward" size={16} color={palette.link} />
               </Tap>
@@ -238,8 +263,8 @@ export function JuzSheet({
                 key={c.page}
                 onPress={() => closeThen(() => onOpenPage(c.page))}
                 accessibilityRole="button"
-                accessibilityLabel={`${spokenText(describePassage([c.page]))}, ${STATE_WORDS[c.state]}`}
-                accessibilityHint="Opens in the reader"
+                accessibilityLabel={t('activity.juz.pageRow', { passage: spokenText(describePassage([c.page])), state: stateWords(c.state) })}
+                accessibilityHint={t('activity.juz.opensInReader')}
                 hitSlop={{ top: 6, bottom: 6 }}
                 style={[styles.cell, look(c.state)]}
                 testID={`juz-cell-${c.page}`}
@@ -268,7 +293,7 @@ export function JuzSheet({
                     {c.n}
                   </ChromeText>
                   <ChromeText style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={MAX_SCALE}>
-                    {COUNT_WORDS[c.state]}
+                    {countWords(c.state)}
                   </ChromeText>
                 </View>
               ))}
@@ -276,7 +301,7 @@ export function JuzSheet({
                 <View style={styles.count}>
                   <PartMark color={palette.done} />
                   <ChromeText style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={MAX_SCALE}>
-                    Part of a page
+                    {t('activity.juz.partOfPage')}
                   </ChromeText>
                 </View>
               ) : null}
@@ -287,7 +312,7 @@ export function JuzSheet({
             <View style={styles.learning} testID="juz-sheet-learning">
               <PartMark color={palette.done} />
               <ChromeText style={[typeV2.meta, styles.learningText, { color: palette.secondary }]} maxFontSizeMultiplier={MAX_SCALE}>
-                <ChromeText style={{ color: palette.text, fontWeight: '600' }}>Being learned</ChromeText>
+                <ChromeText style={{ color: palette.text, fontWeight: '600' }}>{t('activity.juz.beingLearned')}</ChromeText>
                 {`   ${model.learningText}`}
               </ChromeText>
             </View>
@@ -301,7 +326,7 @@ export function JuzSheet({
               onPress={() => closeThen(() => onOpenPage(s.firstPage))}
               accessibilityRole="button"
               accessibilityLabel={`${spokenText(s.name)}, ${spokenText(s.text)}`}
-              accessibilityHint="Opens in the reader"
+              accessibilityHint={t('activity.juz.opensInReader')}
               style={[styles.row, i < model.surahs.length - 1 && { borderBottomWidth: layoutV2.hairline, borderBottomColor: palette.separator }]}
               testID={`juz-surah-${s.sura}`}
             >
@@ -327,7 +352,7 @@ export function JuzSheet({
             {model.continueAt ? (
               // Being learned: on from the first ayah not memorized yet (MEM-7).
               <PillButton
-                title={`Continue at ${model.continueAt.label}`}
+                title={t('activity.juz.continueAt', { label: model.continueAt.label })}
                 size="sm"
                 onPress={() => {
                   const at = model.continueAt!.page;
@@ -338,7 +363,7 @@ export function JuzSheet({
               />
             ) : (
               <PillButton
-                title="Open in the reader"
+                title={t('activity.juz.openInReader')}
                 variant="outline"
                 size="sm"
                 onPress={() => {

@@ -1,5 +1,6 @@
 // Every English string, one file per folder of the app (src/i18n/README.md). The keys are what
 // t() takes: t('updates.ready.title'). Another language is a copy of this folder with the same keys.
+import { activity } from './activity';
 import { auth } from './auth';
 import { coach } from './coach';
 import { common } from './common';
@@ -40,6 +41,7 @@ import { verse } from './verse';
 import { whatsNew } from './whatsNew';
 
 export const en = {
+  activity,
   auth,
   coach,
   common,

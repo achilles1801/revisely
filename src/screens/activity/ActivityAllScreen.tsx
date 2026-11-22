@@ -34,15 +34,16 @@ import { useTakeRecordings } from '../../lib/reciteMemory/takeAudio';
 import { TakeListRow, useQuranWordsWhen } from '../../components/reciteMemory/TakeRows';
 import { passageOf } from '../../components/reciteLive/TakeSummarySheet';
 import { plainText } from '../../lib/passages';
+import { t } from '../../i18n';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'ActivityAll'>;
 /** `recitation`: Recite's takes (Revisely Dev), listed from its memory rather than the activity items. */
 type Kind = ActivityKind | 'all' | 'recitation';
 type TakesFilter = 'all' | 'mistakes' | 'hidden';
-const TAKES_FILTERS: { value: TakesFilter; label: string }[] = [
-  { value: 'all', label: 'All takes' },
-  { value: 'mistakes', label: 'With mistakes' },
-  { value: 'hidden', label: 'Page hidden' },
+const takesFilters = (): { value: TakesFilter; label: string }[] => [
+  { value: 'all', label: t('activity.all.allTakes') },
+  { value: 'mistakes', label: t('activity.all.withMistakes') },
+  { value: 'hidden', label: t('activity.all.pageHidden') },
 ];
 
 /** The ISO day `n` days from `day`. */
@@ -126,18 +127,18 @@ export default function ActivityAllScreen() {
         <TextInput
           value={query}
           onChangeText={setQuery}
-          placeholder="Search pages, surahs, dates"
+          placeholder={t('activity.all.searchPlaceholder')}
           placeholderTextColor={palette.secondary}
           style={[typeV2.body, styles.input, { color: palette.text }]}
           autoCorrect={false}
           autoCapitalize="none"
           returnKeyType="search"
           clearButtonMode="never"
-          accessibilityLabel="Search activity"
+          accessibilityLabel={t('activity.all.searchLabel')}
           testID="activity-search"
         />
         {query !== '' ? (
-          <Tap onPress={() => setQuery('')} hitSlop={10} accessibilityRole="button" accessibilityLabel="Clear search">
+          <Tap onPress={() => setQuery('')} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('activity.all.clearSearch')}>
             <Ionicons name="close-circle" size={18} color={palette.secondary} />
           </Tap>
         ) : null}
@@ -149,17 +150,21 @@ export default function ActivityAllScreen() {
           size="sm"
           variant={range !== 'all' ? 'solid' : 'outline'}
           onPress={() => setRangeOpen(true)}
-          accessibilityLabel={`Dates: ${journalFilterLabel(range)}`}
+          accessibilityLabel={t('activity.all.datesLabel', { range: journalFilterLabel(range) })}
           testID="filter-range"
         />
         {(['all', ...ACTIVITY_KINDS.flatMap((x) => (x === 'revision' && memoryOn ? [x, 'recitation'] : [x]))] as Kind[]).map((k) => (
           <PillButton
             key={k}
-            title={k === 'all' ? 'All' : k === 'recitation' ? 'Recitations' : ACTIVITY_KIND_LABELS[k]}
+            title={k === 'all' ? t('activity.all.kindAll') : k === 'recitation' ? t('activity.all.recitations') : ACTIVITY_KIND_LABELS[k]}
             size="sm"
             variant={kind === k ? 'solid' : 'outline'}
             onPress={() => setKind(k)}
-            accessibilityLabel={`Show ${k === 'all' ? 'everything' : k === 'recitation' ? 'Recitations' : ACTIVITY_KIND_LABELS[k]}`}
+            accessibilityLabel={
+              k === 'all'
+                ? t('activity.all.showEverything')
+                : t('activity.all.showKind', { kind: k === 'recitation' ? t('activity.all.recitations') : ACTIVITY_KIND_LABELS[k] })
+            }
             testID={`filter-${k}`}
           />
         ))}
@@ -167,20 +172,23 @@ export default function ActivityAllScreen() {
       {reciting ? (
         <>
           <View style={styles.pills}>
-            {TAKES_FILTERS.map((f) => (
+            {takesFilters().map((f) => (
               <PillButton
                 key={f.value}
                 title={f.label}
                 size="sm"
                 variant={takesFilter === f.value ? 'solid' : 'outline'}
                 onPress={() => setTakesFilter(f.value)}
-                accessibilityLabel={`Show ${f.label.toLowerCase()}`}
+                accessibilityLabel={t('activity.all.showKind', { kind: f.label.toLowerCase() })}
                 testID={`filter-takes-${f.value}`}
               />
             ))}
           </View>
           <Text style={[typeV2.meta, styles.takesCount, { color: palette.secondary }]} testID="activity-all-takes-count">
-            {`${takesShown.length} ${takesShown.length === 1 ? 'take' : 'takes'} · ${takesShown.reduce((n, t) => n + t.mistakes, 0)} mistakes`}
+            {t('activity.all.takesCount', {
+              takes: t('activity.day.takes', { count: takesShown.length }),
+              mistakes: t('activity.all.mistakes', { count: takesShown.reduce((n, take) => n + take.mistakes, 0) }),
+            })}
           </Text>
         </>
       ) : null}
@@ -189,7 +197,7 @@ export default function ActivityAllScreen() {
 
   return (
     <TopSafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
-      <TopBar title="All activity" onBack={() => navigation.goBack()} separator />
+      <TopBar title={t('activity.all.title')} onBack={() => navigation.goBack()} separator />
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator color={palette.secondary} />
@@ -213,7 +221,7 @@ export default function ActivityAllScreen() {
             ListHeaderComponent={header}
             ListEmptyComponent={
               <Text style={[typeV2.body, styles.empty, { color: palette.secondary }]} testID="all-empty">
-                {filtered ? 'Nothing matches.' : 'No takes yet.'}
+                {filtered ? t('activity.all.nothingMatches') : t('activity.all.noTakes')}
               </Text>
             }
             keyboardDismissMode="on-drag"
@@ -230,7 +238,7 @@ export default function ActivityAllScreen() {
           ListHeaderComponent={header}
           ListEmptyComponent={
             <Text style={[typeV2.body, styles.empty, { color: palette.secondary }]} testID="all-empty">
-              {filtered ? 'Nothing matches.' : 'No sessions yet. Start your first revision from Home.'}
+              {filtered ? t('activity.all.nothingMatches') : t('activity.all.noSessions')}
             </Text>
           }
           keyboardDismissMode="on-drag"
@@ -243,11 +251,11 @@ export default function ActivityAllScreen() {
       )}
       <OptionSheet<JournalFilter>
         visible={rangeOpen}
-        title="Dates"
+        title={t('activity.all.dates')}
         sections={[
           { options: (['all', 'last7', 'last30'] as JournalFilter[]).map((f) => ({ value: f, label: journalFilterLabel(f) })) },
           ...(months.length > 0
-            ? [{ title: 'By month', options: months.map((m) => ({ value: m, label: journalFilterLabel(m) })) }]
+            ? [{ title: t('activity.all.byMonth'), options: months.map((m) => ({ value: m, label: journalFilterLabel(m) })) }]
             : []),
         ]}
         value={range}

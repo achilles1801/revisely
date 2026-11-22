@@ -21,6 +21,7 @@ import { shiftDay } from '../../lib/journal';
 import { typeV2 } from '../../theme/v2';
 import { PillTabs } from '../v2/PillTabs';
 import { Tap } from '../v2/Tap';
+import { t } from '../../i18n';
 
 export type CalendarRange = 'month' | 'week';
 
@@ -89,7 +90,7 @@ export function ActivityCalendar({
   return (
     <View testID="activity-calendar">
       <View style={styles.header}>
-        <StepButton icon="chevron-back" label={`Previous ${unit}`} disabled={!canBack} onPress={() => step(-1)} />
+        <StepButton icon="chevron-back" label={unit === 'week' ? t('activity.calendar.previousWeek') : t('activity.calendar.previousMonth')} disabled={!canBack} onPress={() => step(-1)} />
         <Text
           style={[typeV2.barTitle, styles.title, { color: palette.text }]}
           accessibilityRole="header"
@@ -99,13 +100,13 @@ export function ActivityCalendar({
         >
           {isMonth ? monthTitle(month) : weekTitle(weekStart(anchor), today)}
         </Text>
-        <StepButton icon="chevron-forward" label={`Next ${unit}`} disabled={!canForward} onPress={() => step(1)} />
+        <StepButton icon="chevron-forward" label={unit === 'week' ? t('activity.calendar.nextWeek') : t('activity.calendar.nextMonth')} disabled={!canForward} onPress={() => step(1)} />
         <View style={styles.spacer} />
         <View style={styles.tabs}>
           <PillTabs<CalendarRange>
             options={[
-              { value: 'month', label: 'Month' },
-              { value: 'week', label: 'Week' },
+              { value: 'month', label: t('activity.calendar.month') },
+              { value: 'week', label: t('activity.calendar.week') },
             ]}
             value={range}
             onChange={changeRange}
@@ -165,11 +166,11 @@ export function ActivityCalendar({
       )}
 
       <View style={styles.legend} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-        <Text style={[typeV2.meta, { color: palette.secondary }]}>Less</Text>
+        <Text style={[typeV2.meta, { color: palette.secondary }]}>{t('activity.heat.less')}</Text>
         {palette.heat.map((c) => (
           <View key={c} style={[styles.legendCell, { backgroundColor: c }]} />
         ))}
-        <Text style={[typeV2.meta, { color: palette.secondary }]}>More</Text>
+        <Text style={[typeV2.meta, { color: palette.secondary }]}>{t('activity.heat.more')}</Text>
       </View>
 
       {isMonth ? <DayLine date={selected} today={today} day={byDate.get(selected)} onOpen={onOpenDay} /> : null}
@@ -272,8 +273,8 @@ function WeekRow({
   const level = heatLevel(day);
   const facts = dayFacts(day);
   const future = date > today;
-  const name = date === today ? 'Today' : heatDayLabel(date, today);
-  const detail = future ? '' : facts.length > 0 ? facts.join(' · ') : date === today ? 'Nothing yet' : 'No activity';
+  const name = date === today ? t('common.today') : heatDayLabel(date, today);
+  const detail = future ? '' : facts.length > 0 ? facts.join(' · ') : date === today ? t('activity.heat.nothingYet') : t('activity.heat.noActivity');
   const body = (
     <>
       <View style={[styles.swatch, { backgroundColor: future ? palette.fill : palette.heat[level] }]}>
@@ -297,7 +298,7 @@ function WeekRow({
       <View
         style={[styles.weekRow, future && { opacity: 0.6 }]}
         accessible
-        accessibilityLabel={`${name}: ${detail || 'later'}`}
+        accessibilityLabel={`${name}: ${detail || t('activity.heat.later')}`}
         testID={`week-${date}`}
       >
         {body}
@@ -309,7 +310,7 @@ function WeekRow({
       onPress={() => onOpen(date)}
       style={styles.weekRow}
       accessibilityRole="button"
-      accessibilityLabel={`${name}: ${facts.join(', ')}. Open the day`}
+      accessibilityLabel={t('activity.heat.dayLabel', { name, facts: facts.join(', ') })}
       testID={`week-${date}`}
     >
       {body}
@@ -334,7 +335,7 @@ function DayLine({
 }) {
   const { palette } = useTheme();
   const facts = dayFacts(day);
-  const label = date === today ? 'Today' : heatDayLabel(date, today);
+  const label = date === today ? t('common.today') : heatDayLabel(date, today);
   const fade = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -345,7 +346,7 @@ function DayLine({
   const text = (
     <Text style={[typeV2.body, styles.lineText, { color: palette.secondary }]} numberOfLines={2}>
       <Text style={[typeV2.name, { color: palette.text }]}>{label}</Text>
-      {` · ${facts.length > 0 ? facts.join(' · ') : date === today ? 'Nothing yet' : 'No activity'}`}
+      {` · ${facts.length > 0 ? facts.join(' · ') : date === today ? t('activity.heat.nothingYet') : t('activity.heat.noActivity')}`}
     </Text>
   );
   const translateY = fade.interpolate({ inputRange: [0, 1], outputRange: [4, 0] });
@@ -357,7 +358,7 @@ function DayLine({
           onPress={() => onOpen(date)}
           style={styles.line}
           accessibilityRole="button"
-          accessibilityLabel={`${label}: ${facts.join(', ')}. Open the day`}
+          accessibilityLabel={t('activity.heat.dayLabel', { name: label, facts: facts.join(', ') })}
           testID="heat-day-line"
         >
           {text}

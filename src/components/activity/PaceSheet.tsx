@@ -15,6 +15,7 @@ import { formatDayLong } from '../../lib/activityFormat';
 import { typeV2 } from '../../theme/v2';
 import { Sheet } from '../v2/Sheet';
 import { Tap } from '../v2/Tap';
+import { t } from '../../i18n';
 
 const CHART_HEIGHT = 120;
 const dayNumber = (day: string) => Math.round(Date.parse(`${day}T00:00:00Z`) / 86_400_000);
@@ -59,15 +60,19 @@ export function PaceSheet({
   const first = dayNumber(today) - (range - 1);
   const x = (day: string) => (width <= 8 ? 0 : 4 + ((dayNumber(day) - first) / Math.max(1, range - 1)) * (width - 8));
   const change =
-    before == null ? null : Math.abs(perPage - before) < 0.05 ? 'The same' : `${perPage < before ? 'Down' : 'Up'} from ${formatPace(before)}`;
+    before == null
+      ? null
+      : Math.abs(perPage - before) < 0.05
+        ? t('activity.pace.same')
+        : t(perPage < before ? 'activity.pace.downFrom' : 'activity.pace.upFrom', { pace: formatPace(before) });
   const startDay = new Date((first) * 86_400_000).toISOString().slice(0, 10);
 
   return (
     <Sheet
       visible={visible}
       onClose={onClose}
-      title="Pace"
-      message="Minutes a page, revising"
+      title={t('activity.insights.pace')}
+      message={t('activity.pace.message')}
       messageMaxScale={CHROME_MAX_SCALE}
       scroll
       onHidden={() => {
@@ -81,7 +86,7 @@ export function PaceSheet({
         <ChromeText style={[styles.big, { color: palette.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
           {formatPace(perPage)}
         </ChromeText>
-        <ChromeText style={[typeV2.body, styles.flex, { color: palette.secondary }]}>{`min a page ${inWords}`}</ChromeText>
+        <ChromeText style={[typeV2.body, styles.flex, { color: palette.secondary }]}>{t('activity.pace.minAPageSpan', { span: inWords })}</ChromeText>
         {change ? <ChromeText style={[typeV2.name, { color: before != null && perPage < before ? palette.good : palette.text }]}>{change}</ChromeText> : null}
       </View>
       {before != null && beforeWords ? (
@@ -100,11 +105,11 @@ export function PaceSheet({
       </View>
       <View style={styles.ends}>
         <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{formatDayLong(startDay).split(' ').slice(1).join(' ')}</ChromeText>
-        <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>Today</ChromeText>
+        <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{t('common.today')}</ChromeText>
       </View>
 
       <ChromeText style={[typeV2.name, styles.listHead, { color: palette.secondary }]} accessibilityRole="header">
-        {`${list.length} timed ${list.length === 1 ? 'revision' : 'revisions'}`}
+        {t('activity.pace.timedRevisions', { count: list.length })}
       </ChromeText>
       {list.map((r, i) => (
         <Tap
@@ -115,8 +120,8 @@ export function PaceSheet({
           }}
           disabled={!onOpenDay}
           accessibilityRole="button"
-          accessibilityLabel={`${spokenText(r.label)}, ${r.detail}, ${formatPace(r.perPage)} minutes a page`}
-          accessibilityHint="Opens the day"
+          accessibilityLabel={t('activity.pace.row', { label: spokenText(r.label), detail: r.detail, pace: formatPace(r.perPage) })}
+          accessibilityHint={t('activity.insights.opensDay')}
           style={[styles.row, { borderTopColor: palette.separator }]}
           testID={`pace-row-${r.day}-${i}`}
         >
@@ -136,7 +141,7 @@ export function PaceSheet({
       ))}
       {untimed > 0 ? (
         <ChromeText style={[typeV2.meta, styles.untimed, { color: palette.secondary }]} testID="pace-untimed">
-          {`${untimed} ${untimed === 1 ? 'revision' : 'revisions'} ${inWords} had no time, so ${untimed === 1 ? 'it isn’t' : 'they aren’t'} counted.`}
+          {t('activity.pace.untimed', { count: untimed, span: inWords })}
         </ChromeText>
       ) : null}
     </Sheet>
