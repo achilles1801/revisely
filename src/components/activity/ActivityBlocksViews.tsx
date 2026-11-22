@@ -5,7 +5,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PanResponder } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { CALENDAR_SCREEN_LABEL, CALENDAR_SPAN_KEY, parseSpan, periodForGap, periodForSpan, shiftWeek, showsToday, weekDays, type CalendarGap, type CalendarSpan } from '../../lib/activityCalendar';
+import { calendarScreenLabel, CALENDAR_SPAN_KEY, parseSpan, periodForGap, periodForSpan, shiftWeek, showsToday, weekDays, type CalendarGap, type CalendarSpan } from '../../lib/activityCalendar';
 import { weekStart as weekStartOf } from '../../lib/activityHeatmap';
 import { StyleSheet, View as RNView } from 'react-native';
 import { useApp } from '../../context/AppContext';
@@ -300,7 +300,7 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
       <RNView style={styles.switch}>
         <PillTabs
           options={[
-            { value: 'calendar', label: CALENDAR_SCREEN_LABEL },
+            { value: 'calendar', label: calendarScreenLabel() },
             { value: 'insights', label: 'Insights' },
           ]}
           value={view}
