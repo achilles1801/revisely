@@ -18,11 +18,8 @@ const iconsOf = (text: string) => [...text.matchAll(/\[\[([a-z]+)\]\]/g)].map((m
 const strings = (o: unknown): string[] =>
   typeof o === 'string' ? [o] : o && typeof o === 'object' ? Object.values(o).flatMap(strings) : [];
 
-/**
- * Labels whose Arabic UI text arrives with Activity's Arabic (its English strings are extracted by #843): the
- * Recited sheet's "Show on the page" and Activity's sections editor. Its translation PR empties this.
- */
-const LABELS_PENDING = new Set(['عرض في الصفحة', 'تعديل الأقسام', 'عرض الكل بالترتيب المعتاد']);
+/** Labels whose Arabic UI text hasn't arrived yet (none: Activity's Arabic brought the last three). */
+const LABELS_PENDING = new Set<string>([]);
 
 describe('the help in Arabic', () => {
   it('has entries only for topics and sheets the help has', () => {
