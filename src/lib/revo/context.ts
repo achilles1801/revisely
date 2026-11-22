@@ -13,6 +13,7 @@ import { daySignals, revoPatterns, sessionStarts } from './patterns';
 import type { RevoContext, RevoGaps, RevoRecitation, RevoTotals } from './types';
 import { contextWords, memorizedWords } from './words';
 import { isDevVariant } from '../variant';
+import { currentLanguage } from '../../i18n';
 import { isRevisable, memorizedAyahs, memorizedPageShare, partlyMemorizedAyahs, revisablePages } from '../memorizedAyahs';
 
 const MAX_PAGES = 20;
@@ -166,6 +167,8 @@ export function buildRevoContext(input: {
     // Revisely Dev: the server adds the Dev guide, what only Revisely Dev has (functions/src/revo/guide.ts). The
     // store app never sends it, so its questions are asked exactly as before.
     ...(dev ? { app: 'dev' as const } : {}),
+    // Revo answers in the app's language (Majd's choice 3): the server asks for Arabic. Only Revisely Dev offers it.
+    ...(currentLanguage() === 'ar' ? { language: 'ar' as const } : {}),
     // Gaps, for an account that has them (the mistake detection release opened them to everyone; ACT-28), once the
     // server takes them from any app (config/app.revoRecite); from Revisely Dev always.
     ...(input.gaps && (dev || input.recite) ? { gaps: input.gaps } : {}),

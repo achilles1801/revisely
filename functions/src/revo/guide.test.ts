@@ -8,7 +8,7 @@ import { existsSync, readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { DEV_GUIDE, DEV_GUIDE_SECTIONS, DEV_GUIDE_SYSTEM, GUIDE_INTERNAL, GUIDE_INTERNAL_KINDS, GUIDE_SECTIONS, REVO_GUIDE } from './guide';
 import { barePageNumbers, replyWords } from './pageWords';
-import { REVO_SYSTEM_PROMPT, buildAskRequest, buildReviewRequest } from './prompt';
+import { ARABIC_SYSTEM, REVO_SYSTEM_PROMPT, buildAskRequest, buildReviewRequest } from './prompt';
 import { RECITATION_SYSTEM } from './recitation';
 import { parseReply } from './reply';
 import { REVO_SCREENS, REVO_SETTINGS_SECTIONS, RevoContext, RevoRecitation } from './types';
@@ -191,6 +191,24 @@ describe('the Dev guide goes only with questions from Revisely Dev', () => {
     expect(validateContext(plain).app).toBeUndefined();
     expect(() => validateContext({ ...plain, app: 'store' })).toThrow();
     expect(() => validateContext({ ...plain, app: true })).toThrow();
+  });
+
+  it('the app in Arabic asks for the answer in Arabic: its own block last, the rest unchanged; a day in review too', () => {
+    const ar = ask(context({ app: 'dev', language: 'ar' }));
+    expect(ar.system.map((s) => s.text)).toEqual([REVO_SYSTEM_PROMPT, DEV_GUIDE_SYSTEM, ARABIC_SYSTEM]);
+    expect(ar.system[2].cache_control).toEqual({ type: 'ephemeral' });
+    expect(ask(context({ app: 'dev', language: 'ar', recitation })).system.map((s) => s.text)).toEqual([REVO_SYSTEM_PROMPT, DEV_GUIDE_SYSTEM, RECITATION_SYSTEM, ARABIC_SYSTEM]);
+    expect(buildReviewRequest({ day: DAY, context: context({ app: 'dev', language: 'ar' }), memory: [] }).system.map((s) => s.text)).toEqual([REVO_SYSTEM_PROMPT, ARABIC_SYSTEM]);
+    // In English nothing changes.
+    expect(ask(context({ app: 'dev' })).system.map((s) => s.text)).not.toContain(ARABIC_SYSTEM);
+  });
+
+  it('the server takes language "ar" and nothing else there', () => {
+    const plain = JSON.parse(JSON.stringify(context())) as Record<string, unknown>;
+    expect(validateContext({ ...plain, language: 'ar' }).language).toBe('ar');
+    expect(validateContext(plain).language).toBeUndefined();
+    expect(() => validateContext({ ...plain, language: 'en' })).toThrow();
+    expect(() => validateContext({ ...plain, language: 'fr' })).toThrow();
   });
 
   it('Gaps’ figures come from any app that has them, and reach the model as their lines (ACT-28, ACT-30)', () => {
