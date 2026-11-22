@@ -31,6 +31,10 @@ import {
   furthestWord,
   revealedUpTo,
   shownUpTo,
+  revealDelay,
+  wordLetters,
+  REVEAL_AFTER_MS,
+  REVEAL_MAX_MS,
   LIVE_IDLE,
   type LiveState,
 } from '../../../src/lib/reciteLive/state';
@@ -634,6 +638,21 @@ describe('[RECITE-6] the word being said shows once it has been under the cursor
         },
       ),
     );
+  });
+});
+
+describe('[RECITE-6] the wait follows the word’s length at the reciter’s pace', () => {
+  it('between 0.7 s and 2.5 s, never shorter for a longer word, and a madd counts as more letters', () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 1, max: 20 }), fc.integer({ min: 0, max: 5 }), fc.option(fc.double({ min: 1, max: 600, noNaN: true }), { nil: null }), (letters, more, pace) => {
+        const d = revealDelay(letters, pace);
+        expect(d).toBeGreaterThanOrEqual(REVEAL_AFTER_MS);
+        expect(d).toBeLessThanOrEqual(REVEAL_MAX_MS);
+        expect(revealDelay(letters + more, pace)).toBeGreaterThanOrEqual(d);
+      }),
+    );
+    expect(wordLetters('قَالَ')).toBe(3);
+    expect(wordLetters('جَآءَ')).toBe(5);
   });
 });
 
