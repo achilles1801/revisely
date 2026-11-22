@@ -16,6 +16,9 @@ export const activity = {
     coverageDetailSurah: "Which surahs you've revised lately",
     coverageDetailPage: "Which pages you've revised lately",
     coverageDetailJuz: "Which juz you've revised lately",
+    /** The word after Memorization's big number: "305 | pages · Half the Quran". */
+    pagesWord_one: 'page',
+    pagesWord_other: 'pages',
     /** "120 memorized pages", inside the coverage figure. */
     memorizedPages_one: '{{count}} memorized page',
     memorizedPages_other: '{{count}} memorized pages',

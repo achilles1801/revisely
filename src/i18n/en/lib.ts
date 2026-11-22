@@ -162,6 +162,11 @@ export const lib = {
     mostMissed: 'Most missed days were {{day}}s ({{count}} of {{missed}})',
     mostly: 'Mostly {{hours}}',
     mostlyThen: 'Mostly {{hours}}, then {{next}}',
+    /** An hour range: "5–7 AM", "11 AM–1 PM" (busiestHours). */
+    hoursSame: '{{from}}–{{to}} {{period}}',
+    hoursAcross: '{{from}} {{fromPeriod}}–{{to}} {{toPeriod}}',
+    am: 'AM',
+    pm: 'PM',
     inDays: 'in {{count}} days',
     weakNow: 'Weak now',
     ratedWeak: 'rated weak {{count}} times {{span}}',
@@ -330,5 +335,12 @@ export const lib = {
       memorization: 'Memorization',
       pace: 'Pace',
     },
+  },
+  /** lib/readingTimer formatDuration: a time spent, short ("45s", "18m", "1h 5m"). */
+  duration: {
+    seconds: '{{n}}s',
+    minutes: '{{n}}m',
+    hours: '{{h}}h',
+    hoursMinutes: '{{h}}h {{m}}m',
   },
 } as const;

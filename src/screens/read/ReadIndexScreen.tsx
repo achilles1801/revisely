@@ -29,7 +29,7 @@ import { useTabBarFootprint } from '../../navigation/TabBar';
 import type { ReadStackParamList } from '../../navigation/MainNavigator';
 import { arabicLabelLines } from '../../lib/platformUi';
 import { ayahsInSurah, spokenText } from '../../lib/passages';
-import { formatDate, t } from '../../i18n';
+import { formatDate, t, formatNumber } from '../../i18n';
 
 type NavigationProp = NativeStackNavigationProp<ReadStackParamList, 'ReadIndex'>;
 
@@ -276,11 +276,11 @@ function SurahRowV2({ row, onPress }: { row: SurahRow; onPress: () => void }) {
     <Tap
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${row.number}. ${row.nameDisplay}, ${meta}`}
+      accessibilityLabel={`${formatNumber(row.number)}. ${row.nameDisplay}, ${meta}`}
       style={[v2.row, { borderBottomColor: palette.separator }]}
       testID={`surah-${row.number}`}
     >
-      <Mark size="reply" label={String(row.number)} />
+      <Mark size="reply" label={formatNumber(row.number)} />
       <View style={v2.main}>
         <Text style={[typeV2.name, { color: palette.text }]} numberOfLines={1}>
           {row.nameDisplay}

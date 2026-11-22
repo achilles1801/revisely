@@ -65,7 +65,7 @@ import { maybeAskForRating, openRatingPage, rateAskEnabled, stopRatingAsks } fro
 import { streakDetailFromLogs } from '../../lib/streak';
 import { pagesToUnrevise, removeRevisedPages, removeRoundPages } from '../../lib/revisionSession';
 import { dismissPresentedRevisionReminders } from '../../lib/reminders/sync';
-import { t } from '../../i18n';
+import { t, formatNumber } from '../../i18n';
 import { backIcon } from '../../i18n/direction';
 
 const NO_PAGES: number[] = [];
@@ -852,7 +852,7 @@ export default function ActiveRevisionScreen() {
               maxFontSizeMultiplier={1.3}
               testID="session-quiet-count"
             >
-              {t('common.juzN', { n: currentJuz })} · {viewDone}/{totalPages}
+              {t('common.juzN', { n: currentJuz })} · {formatNumber(viewDone)}/{formatNumber(totalPages)}
             </Text>
             {fromInsights ? (
               <Text
@@ -892,7 +892,7 @@ export default function ActiveRevisionScreen() {
                   ? t('revision.session.revisingAhead', { day: aheadDayLabel(sessionDay ?? viewDay, viewDay) })
                   : t('revision.session.revising', { scope: scopeLabel })}{' '}
                 <Text style={{ color: palette.textSecondary, fontWeight: '400' }}>
-                  · {viewDone}/{totalPages}
+                  · {formatNumber(viewDone)}/{formatNumber(totalPages)}
                 </Text>
               </Text>
               <Text

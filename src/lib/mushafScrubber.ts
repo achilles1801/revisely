@@ -1,4 +1,5 @@
 import { getJuzForPage, getSurahsForPage } from './quranData';
+import { surahNameIn } from './passages';
 
 export const MUSHAF_PAGE_COUNT = 604;
 
@@ -47,7 +48,7 @@ export function scrubberPreview(page: number): {
   return {
     page: p,
     surahs: getSurahsForPage(p)
-      .map((s) => s.name)
+      .map((s) => surahNameIn(s.number))
       .join(' / '),
     juz: getJuzForPage(p),
   };

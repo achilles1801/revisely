@@ -5,7 +5,7 @@
 // Notes option any more, Nov 7 2026). A recording goes as its length and pages, never the audio.
 
 import { getAllSurahs, getJuzRange, getSurah } from '../quranData';
-import { plainText } from '../passages';
+import { plainText, surahNameIn } from '../passages';
 import type { RecordingMeta } from '../recordings';
 import { dayFacts, type DayExtras, passageFacts, type Prepared } from './facts';
 import { juzOf, passageShort } from './words';
@@ -38,7 +38,7 @@ export function juzPages(juz: number): number[] {
 }
 
 export function surahAttachment(surah: number, prepared: Prepared): RevoAttachment {
-  const name = plainText(getSurah(surah)?.name ?? t('common.surahN', { n: surah }));
+  const name = plainText(getSurah(surah) ? surahNameIn(surah) : t('common.surahN', { n: surah }));
   const pages = surahPages(surah);
   // Named by the surah itself ("Yusuf · Juz 12–13"): its first page may end the surah before.
   return { kind: 'surah', label: name, surah, facts: passageFacts(pages, prepared, `${name} · ${plainText(juzOf(pages))}`) };
@@ -84,7 +84,7 @@ export function findPassages(text: string): Found[] {
   return getAllSurahs()
     .filter((s) => plain(s.name).includes(want) || s.nameArabic.includes(q))
     .slice(0, 8)
-    .map((s) => ({ kind: 'surah', surah: s.number, label: plainText(s.name) }));
+    .map((s) => ({ kind: 'surah', surah: s.number, label: plainText(surahNameIn(s.number)) }));
 }
 
 /** The attachment for what a search found. */

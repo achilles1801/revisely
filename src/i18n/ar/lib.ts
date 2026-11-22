@@ -188,6 +188,10 @@ export const lib: NonNullable<ArStrings['lib']> = {
     mostMissed: 'معظم الأيام التي فاتتك كانت أيام {{day}} ({{count}} من {{missed}})',
     mostly: 'غالبًا {{hours}}',
     mostlyThen: 'غالبًا {{hours}}، ثم {{next}}',
+    hoursSame: '{{from}}–{{to}} {{period}}',
+    hoursAcross: '{{from}} {{fromPeriod}}–{{to}} {{toPeriod}}',
+    am: 'ص',
+    pm: 'م',
     inDays: 'خلال {{count}} يومًا',
     weakNow: 'ضعيفة الآن',
     ratedWeak: 'قُيّمت ضعيفة {{count}} مرات {{span}}',
@@ -405,5 +409,11 @@ export const lib: NonNullable<ArStrings['lib']> = {
       memorization: 'الحفظ',
       pace: 'الوتيرة',
     },
+  },
+  duration: {
+    seconds: '{{n}} ث',
+    minutes: '{{n}} د',
+    hours: '{{h}} س',
+    hoursMinutes: '{{h}} س {{m}} د',
   },
 };

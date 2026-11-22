@@ -14,17 +14,17 @@ import { PillButton } from '../../v2/PillButton';
 import { ThreadRow } from '../../v2/ThreadRow';
 import { ProgressBar } from '../../ProgressBar';
 import { Tap } from '../../v2/Tap';
-import { t } from '../../../i18n';
+import { formatPercentage, t } from '../../../i18n';
 import { forwardIcon } from '../../../i18n/direction';
 
 export type { TodayStatus } from '../../../lib/todayLines';
 
-/** "17.9%": of the 604 pages, to one decimal ("0%", "100%" at the ends). */
+/** "17.9%": of the 604 pages, to one decimal ("0%", "100%" at the ends); «١٧٫٩٪» in Arabic. */
 export function formatPercent(fraction: number): string {
   const percent = Math.round(fraction * 1000) / 10;
-  if (percent <= 0) return '0%';
-  if (percent >= 100) return '100%';
-  return `${percent.toFixed(1)}%`;
+  if (percent <= 0) return formatPercentage(0);
+  if (percent >= 100) return formatPercentage(100);
+  return formatPercentage(percent, 1);
 }
 
 /** How much is memorized: "17.9% of the Quran memorized", and each juz's share (the dots). */
