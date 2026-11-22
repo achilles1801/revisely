@@ -1,6 +1,7 @@
-// The Ramadan theme (BEHAVIOUR.md THEME-1, Revisely Dev): Settings → Appearance → Ramadan theme, off until turned on and
-// kept on the phone, dresses Home (falling light, lanterns, a crescent) and never a session's page. The store app has no
-// switch and shows nothing, whatever the phone has stored.
+// The Ramadan theme (BEHAVIOUR.md THEME-1, Revisely Dev): on until Settings → Appearance → Ramadan theme turns it off
+// (Majd, Nov 22 2026: "yes ramadan theme as default for dev too"), the choice kept on the phone, it dresses Home (falling
+// light, lanterns, a crescent) and never a session's page. The store app has no switch and shows nothing, whatever the
+// phone has stored.
 
 import type { ReactElement } from 'react';
 import { setNow, setZone, ZONES } from '../harness/clock';
@@ -78,25 +79,12 @@ async function navigate(app: OpenApp, how: (nav: { navigate: (name: string) => v
 }
 
 describe('the Ramadan theme', () => {
-  it('[THEME-1] in Revisely Dev it is off until Settings → Appearance turns it on; then Home has its falling light, lanterns and crescent, kept on the phone, and a session’s page none of it', async () => {
+  it('[THEME-1] in Revisely Dev it is on until Settings → Appearance turns it off: Home has its falling light, lanterns and crescent, a session’s page none of it, and Off is kept on the phone', async () => {
     const phone = await account();
     let { app, home } = await openHome(phone, true);
-    // Off by default: nothing drawn, nothing stored.
-    await app.idle(300);
-    expect(shown(app)).toEqual([]);
-    expect(phone.storage.has('@revisely_ramadan_theme:v1')).toBe(false);
-
-    // Settings → Appearance → Ramadan theme.
-    await navigate(app, (n) => n.navigate('Settings'));
-    await app.until(() => app.screen.queryByTestId('settings-ramadan-theme') != null, 'the Ramadan theme switch');
-    expect(app.screen.getByTestId('settings-ramadan-theme').props.value).toBe(false);
-    const { fireEvent } = app.mods.rtl;
-    await app.act(async () => {
-      fireEvent(app.screen.getByTestId('settings-ramadan-theme'), 'valueChange', true);
-    });
-    await app.until(() => app.screen.getByTestId('settings-ramadan-theme').props.value === true, 'the switch to turn on');
-    await navigate(app, (n) => n.goBack());
+    // On by default: drawn with nothing stored (no choice made on this phone).
     await app.until(() => shown(app).length === DECORATIONS.length, 'Home’s decorations');
+    expect(phone.storage.has('@revisely_ramadan_theme:v1')).toBe(false);
     // Decorations only: none of it is a control or read by VoiceOver.
     for (const id of DECORATIONS) {
       const el = app.screen.getByTestId(id, HIDDEN);
@@ -114,9 +102,25 @@ describe('the Ramadan theme', () => {
     expect(ramadanIds().sort()).toEqual([...DECORATIONS].sort());
     await app.close();
 
-    // Kept on the phone: the next launch has it.
+    // Settings → Appearance → Ramadan theme, shown on: turned off, Home has none of it.
     ({ app, home } = await openHome(phone, true));
-    await app.until(() => shown(app).length === DECORATIONS.length, 'the decorations after a relaunch');
+    await navigate(app, (n) => n.navigate('Settings'));
+    await app.until(() => app.screen.queryByTestId('settings-ramadan-theme') != null, 'the Ramadan theme switch');
+    expect(app.screen.getByTestId('settings-ramadan-theme').props.value).toBe(true);
+    const { fireEvent } = app.mods.rtl;
+    await app.act(async () => {
+      fireEvent(app.screen.getByTestId('settings-ramadan-theme'), 'valueChange', false);
+    });
+    await app.until(() => app.screen.getByTestId('settings-ramadan-theme').props.value === false, 'the switch to turn off');
+    await navigate(app, (n) => n.goBack());
+    await app.until(() => shown(app).length === 0, 'Home without the decorations');
+    await app.close();
+    expect(phone.storage.get('@revisely_ramadan_theme:v1')).toBe('0');
+
+    // Kept on the phone: the next launch stays off.
+    ({ app, home } = await openHome(phone, true));
+    await app.idle(300);
+    expect(shown(app)).toEqual([]);
     await app.close();
   });
 

@@ -1327,12 +1327,14 @@ shows up once and they must go through it and complete it … just the main stuf
 
 ## The Ramadan theme (Revisely Dev)
 
-- **THEME-1.** Settings → Appearance → Ramadan theme (off until turned on, kept on that phone, not the account) dresses
+- **THEME-1.** Settings → Appearance → Ramadan theme (on until turned off, kept on that phone, not the account) dresses
   the app for Ramadan and changes nothing it does (Majd, Nov 21 2026): on Home, light falling softly over the glow,
   lanterns hanging in the top bar's empty side (gone while the timer chip shows there) and a crescent by the greeting;
   string lights along the tab bar. None of it is drawn over the mushaf page, a revision session's page or a Recite take,
   none of it takes a touch or is read by VoiceOver, and with Reduce Motion it stays still. The store app has no switch
-  and never shows it (`lib/ramadanTheme`, `components/ramadan`).
+  and never shows it (`lib/ramadanTheme`, `components/ramadan`). The Settings row is just its name and the switch. It is
+  on by default (Majd, Nov 22 2026: "yes ramadan theme as default for dev too"), and at the next release
+  (`RAMADAN_THEME_RELEASED`, Majd, Nov 21 2026) every app has it, the same way.
 
 ## Premium early access
 

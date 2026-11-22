@@ -421,7 +421,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['THEME-1'],
     routes: ['Settings', 'Dashboard'],
     text: lines(
-      '- Settings → Appearance → “Ramadan theme” dresses the app for Ramadan: light falling softly over the top of Home, lanterns hanging at the top of Home (not while the timer shows there), a crescent by the greeting and string lights along the tab bar. It changes nothing the app does. It’s off until they turn it on, and it stays on that phone only.',
+      '- Settings → Appearance → “Ramadan theme” dresses the app for Ramadan: light falling softly over the top of Home, lanterns hanging at the top of Home (not while the timer shows there), a crescent by the greeting and string lights along the tab bar. It changes nothing the app does. It’s on until they turn it off there, and that choice stays on that phone only.',
       '- It never shows over the Qur’an’s pages, a revision session’s pages or a Recite take. With Reduce Motion on, it stays still.',
     ),
   },
