@@ -8,7 +8,9 @@ import { prayer } from './prayer';
 import { read } from './read';
 import { reader } from './reader';
 import { recite } from './recite';
+import { reciteInsights } from './reciteInsights';
 import { reciteLive } from './reciteLive';
+import { reciteMemory } from './reciteMemory';
 import { recordings } from './recordings';
 import { reminders } from './reminders';
 import { revision } from './revision';
@@ -26,7 +28,9 @@ export const ar: ArStrings = {
   read,
   reader,
   recite,
+  reciteInsights,
   reciteLive,
+  reciteMemory,
   recordings,
   reminders,
   revision,
