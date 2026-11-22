@@ -999,15 +999,16 @@ describe('the guess before the lock (contract draft 11, protocol 9; Majd: the cu
   it('[RECITE-1] the start frame asks for guesses; a guess shows as the cursor on the page shown, Listening… stays, and the lock takes over', async () => {
     await begin(9);
     expect(mockLive.start).toMatchObject({ guess: true });
-    expect(screen.queryByTestId('live-word-box')).toBeNull();
+    expect(screen.queryByTestId('live-line-band')).toBeNull();
     await event({ type: 'guess', w: A23 + 2 } as LiveEvent);
-    expect(screen.getByTestId('live-word-box')).toBeTruthy();
+    // The cursor on a shown page is the band on its line, no word washed (RECITE-19).
     expect(screen.getByTestId('live-line-band')).toBeTruthy();
+    expect(screen.queryByTestId('live-word-box')).toBeNull();
     expect(screen.getByTestId('recite-status').props.children).toBe('Listening…');
     // Sure now, somewhere else: the cursor jumps there; a guess after the lock is ignored.
     await event({ type: 'locked', w: A23 + 5, s: 27, a: 23 });
     await event({ type: 'guess', w: A23 + 1 } as LiveEvent);
-    expect(screen.getByTestId('live-word-box')).toBeTruthy();
+    expect(screen.getByTestId('live-line-band')).toBeTruthy();
     expect(screen.queryByTestId('recite-status')).toBeNull();
   });
 
@@ -1016,14 +1017,16 @@ describe('the guess before the lock (contract draft 11, protocol 9; Majd: the cu
     fireEvent.press(screen.getByTestId('recite-eye'));
     await event({ type: 'guess', w: A23 + 2 } as LiveEvent);
     expect(screen.queryByTestId('live-word-box')).toBeNull();
+    expect(screen.queryByTestId('live-line-band')).toBeNull();
     expect(screen.queryByTestId('live-cover-current')).toBeNull();
     fireEvent.press(screen.getByTestId('recite-eye'));
-    expect(screen.getByTestId('live-word-box')).toBeTruthy();
+    expect(screen.getByTestId('live-line-band')).toBeTruthy();
   });
 
   it('a checker before protocol 9: its guesses are ignored', async () => {
     await begin(8);
     await event({ type: 'guess', w: A23 + 2 } as LiveEvent);
+    expect(screen.queryByTestId('live-line-band')).toBeNull();
     expect(screen.queryByTestId('live-word-box')).toBeNull();
   });
 });
