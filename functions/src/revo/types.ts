@@ -149,7 +149,15 @@ export interface RevoRecitation {
   similar: { from: RevoRecitedAyah; into: RevoRecitedAyah; ending: boolean; times: number; also: number; daysAgo: number }[];
   /** The latest take, any time. */
   last: { daysAgo: number; passage: RevoRecitedPassage; score: number; mistakes: number; unclear: number; hidden: boolean; strict: boolean } | null;
+  /**
+   * The window's finished takes of REVO_PER_PAGE_FROM pages or more, their pages and mistakes (RECITE-24: the mistakes a
+   * page Insights shows). Only when there are some: a summary without long takes is as before.
+   */
+  perPage?: { takes: number; pages: number; mistakes: number };
 }
+
+/** A take this many pages or longer says its mistakes a page (the app's PER_PAGE_FROM, lib/reciteLive/score). */
+export const REVO_PER_PAGE_FROM = 2;
 
 /** A mark's kind, finer detail and tajweed rule, as the checker names them (recite-contract.md). */
 export const REVO_MARK_KINDS = ['word', 'skipped', 'added', 'harakat', 'letter', 'tajweed'] as const;

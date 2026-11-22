@@ -601,7 +601,11 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   smart switching: "do the same".)
 
 - **RECITE-24.** (Revisely Dev) A take's summary: a take of 2 pages or more says its mistakes per page beside the count
-  ("3 mistakes · 1.5 a page"; never in the bar), where a % alone hides how many there were. Each wrong word, haraka or
+  ("3 mistakes · 1.5 a page"; never in the bar), where a % alone hides how many there were. Insights' Recitation
+  section says it for its range, in one quiet line under the score: the mistakes a page across the range's finished takes
+  of 2 pages or more, pooled ("Takes of 2 pages or more: 1.2 mistakes a page"; "no mistakes"; "under 0.1" rather than
+  none), each take's pages counted as its summary counts them, from its first word's page to its last's, so takes kept
+  before this count too. Revo is told the same. Each wrong word, haraka or
   letter slip with what was heard shows two lines, Expected and what was recited, each the phrase around it (two words
   either side, in its ayah), as its card does. (Majd, Nov 22 2026, Tarteel picks 4 and 5: "ur recommended is fine, we
   should aim to keep it clean", "recommended is fine".)

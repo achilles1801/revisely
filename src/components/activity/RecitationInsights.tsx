@@ -23,6 +23,7 @@ import {
   clearedLine,
   kindsLine,
   passageName,
+  perPageLine,
   scoreLine,
   similarNote,
   similarTitle,
@@ -68,7 +69,7 @@ export function RecitationInsights({ records, words, today, window, inWords, sma
   // First on Insights (ACT-29): no hairline above it.
   const first = useFirstSection();
   const [allSlipping, setAllSlipping] = useState(false);
-  const ins = useMemo(() => recitationInsights(records, today, window), [records, today, window]);
+  const ins = useMemo(() => recitationInsights(records, today, window, words), [records, today, window, words]);
   const strong = useMemo(
     () => (smartTracking ? ins.slipping.filter((p) => (rating(pageOfVerse({ sura: p.sura, ayah: p.from })) ?? 0) >= STRONG) : []),
     [smartTracking, ins.slipping, rating],
@@ -77,6 +78,9 @@ export function RecitationInsights({ records, words, today, window, inWords, sma
   // The weeks are drawn once two had takes; their line then says how the score moved, and the figure gives the takes.
   const weeksDrawn = ins.weeks.filter((w) => w.score !== null).length >= 2;
   const quiet = [clearedLine(ins.cleared.length), ins.takes > 0 ? kindsLine(ins) : null].filter(Boolean) as string[];
+  // The long takes' mistakes a page, beside the % and in words (RECITE-24; Majd, Nov 22 2026: "we should aim to keep it
+  // clean"): one quiet line, only once the range has a take of 2 pages or more and the word data has loaded.
+  const perPage = perPageLine(ins.perPage);
   return (
     <View style={[styles.section, !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.separator }]} testID="insights-recitation">
       <View style={styles.head}>
@@ -108,6 +112,11 @@ export function RecitationInsights({ records, words, today, window, inWords, sma
         ) : null}
         <ChromeText style={[typeV2.body, styles.flex, { color: palette.secondary }]}>{scoreLine(ins, inWords, !weeksDrawn)}</ChromeText>
       </View>
+      {perPage ? (
+        <ChromeText style={[typeV2.meta, styles.perPage, { color: palette.secondary }]} testID="insights-recitation-per-page">
+          {perPage}
+        </ChromeText>
+      ) : null}
       {weeksDrawn ? <WeekBars weeks={ins.weeks} /> : null}
 
       {ins.slipping.length > 0 ? (
@@ -321,6 +330,7 @@ const styles = StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   title: { fontSize: 17, lineHeight: 22, fontWeight: '600', letterSpacing: -0.3 },
   figure: { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginTop: 12, flexWrap: 'wrap', rowGap: 4 },
+  perPage: { marginTop: 4 },
   big: { fontSize: 28, lineHeight: 32, fontWeight: '700', letterSpacing: -0.6, fontVariant: ['tabular-nums'] },
   ask: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 32, borderRadius: 16, borderWidth: 1, paddingHorizontal: 12 },
   weeks: { marginTop: 14 },

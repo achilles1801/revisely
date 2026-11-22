@@ -8,9 +8,10 @@ import type { Mark, MarkKind } from '../../../src/lib/reciteLive/contract';
 import { isUnclear } from '../../../src/lib/reciteLive/contract';
 import { wordMemories } from '../../../src/lib/reciteMemory/memory';
 import type { ClearRecord, MemoryRecord, TakeRecord } from '../../../src/lib/reciteMemory/record';
-import { liveTakes, recitationInsights } from '../../../src/lib/reciteInsights/insights';
+import { liveTakes, recitationInsights, takeMistakes } from '../../../src/lib/reciteInsights/insights';
+import { pagesReached, perPageLabel, PER_PAGE_FROM } from '../../../src/lib/reciteLive/score';
 import { recitationForRevo, takeAttachment } from '../../../src/lib/revo/recitation';
-import { kindsLine, passageName, scoreLine, similarNote, similarTitle, slipNote } from '../../../src/lib/reciteInsights/describe';
+import { kindsLine, passageName, perPageLine, perPageTenths, scoreLine, similarNote, similarTitle, slipNote } from '../../../src/lib/reciteInsights/describe';
 import { plainText } from '../../../src/lib/passages';
 import { recitationText } from '../../../functions/src/revo/recitation';
 import { attachedText } from '../../../functions/src/revo/attachText';
@@ -268,5 +269,109 @@ describe('Insights’ Recitation section in words [RINS-2]', () => {
       }),
       { numRuns: 120 },
     );
+  });
+});
+
+describe('Mistakes a page in long takes: Insights and Revo [RECITE-24]', () => {
+  // Takes anywhere in the Qur'an, from a few words to about ten pages, some kept without their final answer.
+  const longArb = fc
+    .record({
+      start: fc.integer({ min: 0, max: words.count - 1600 }),
+      span: fc.integer({ min: 0, max: 1500 }),
+      offset: fc.integer({ min: -40, max: 0 }),
+      strict: fc.boolean(),
+      unfinished: fc.boolean(),
+      accuracy: fc.double({ min: 0.9, max: 1, noNaN: true }),
+    })
+    .chain((t) => fc.array(markArb(t.start, t.start + t.span), { maxLength: 10 }).map((marks) => ({ ...t, marks })));
+
+  const recordsOf = (gen: { start: number; span: number; offset: number; strict: boolean; unfinished: boolean; accuracy: number; marks: Mark[] }[]) =>
+    records(
+      gen.map((g) => ({ from: g.start, to: g.start + g.span, offset: g.offset, strict: g.strict, hidden: false, deleted: false, accuracy: g.accuracy, secs: 60, marks: g.marks })),
+      [],
+    ).map((r, i) => (r.kind === 'take' && gen[i].unfinished ? { ...r, unfinished: true } : r));
+
+  it('pools the window’s finished takes of 2 pages or more, each from its first word’s page to its last’s, between the takes’ own rates', () => {
+    fc.assert(
+      fc.property(fc.array(longArb, { minLength: 1, maxLength: 8 }), (gen) => {
+        const recs = recordsOf(gen);
+        const ins = recitationInsights(recs, TODAY, 30, words);
+        const long = liveTakes(recs).filter(
+          (t) => t.day >= ins.from && t.day <= TODAY && !t.unfinished && words.pageOf(t.to) - words.pageOf(t.from) + 1 >= PER_PAGE_FROM,
+        );
+        if (long.length === 0) {
+          expect(ins.perPage).toBeNull();
+          expect(perPageLine(ins.perPage)).toBeNull();
+          return;
+        }
+        const pagesOf = (t: TakeRecord) => pagesReached(words, t.from, t.to);
+        const mistakesOf = (t: TakeRecord) => t.marks.filter((m) => m.kind !== 'tajweed' && !isUnclear(m)).length;
+        expect(ins.perPage).toEqual({ takes: long.length, pages: long.reduce((n, t) => n + pagesOf(t), 0), mistakes: long.reduce((n, t) => n + mistakesOf(t), 0) });
+        const p = ins.perPage!;
+        const rates = long.map((t) => mistakesOf(t) / pagesOf(t));
+        const pooled = p.mistakes / p.pages;
+        expect(pooled).toBeGreaterThanOrEqual(Math.min(...rates) - 1e-9);
+        expect(pooled).toBeLessThanOrEqual(Math.max(...rates) + 1e-9);
+        // Its line: none, under a tenth, or the figure to a tenth; never a page number.
+        const line = perPageLine(p)!;
+        if (p.mistakes === 0) expect(line).toBe('Takes of 2 pages or more: no mistakes');
+        else if (perPageTenths(p) === 0) expect(line).toBe('Takes of 2 pages or more: under 0.1 mistakes a page');
+        else expect(line).toMatch(new RegExp(`: ${perPageTenths(p)} mistakes? a page$`));
+        expect(line).not.toMatch(/\bp(?:ages?|p?\.)\s?\d/);
+      }),
+      { numRuns: 150 },
+    );
+  });
+
+  it('a single long take reads in Insights as its summary does', () => {
+    fc.assert(
+      fc.property(longArb, (g) => {
+        const recs = recordsOf([{ ...g, offset: 0, unfinished: false }]);
+        const t = liveTakes(recs)[0];
+        const pages = pagesReached(words, t.from, t.to);
+        const p = recitationInsights(recs, TODAY, 30, words).perPage;
+        const summary = perPageLabel(takeMistakes(t), pages);
+        if (pages < PER_PAGE_FROM) {
+          expect(p).toBeNull();
+          expect(summary).toBeNull();
+          return;
+        }
+        expect(p).toEqual({ takes: 1, pages, mistakes: takeMistakes(t) });
+        expect(summary).toBe(`${perPageTenths(p!)} a page`);
+      }),
+      { numRuns: 150 },
+    );
+  });
+
+  it('Revo’s server takes the figure as the phone sends it and reads it out, and refuses one that doesn’t add up', () => {
+    let sent = 0;
+    fc.assert(
+      // Finished takes: a window of only unfinished ones sends no score, which the server refuses today (reported apart).
+      fc.property(fc.array(longArb.map((g) => ({ ...g, unfinished: false })), { minLength: 1, maxLength: 6 }), (gen) => {
+        const recs = recordsOf(gen);
+        const r = recitationForRevo(recs, TODAY, words);
+        if (!r) return;
+        const c = validateContext({ ...baseContext, recitation: r });
+        expect(c.recitation).toEqual(r);
+        const text = recitationText(c.recitation!);
+        if (!r.perPage) {
+          expect(text).not.toContain('pages or more');
+          return;
+        }
+        sent += 1;
+        expect(r.perPage).toEqual(recitationInsights(recs, TODAY, 28, words).perPage);
+        expect(text).toContain(`In their takes of 2 pages or more (`);
+        const bad = [
+          { ...r.perPage, pages: r.perPage.takes * PER_PAGE_FROM - 1 },
+          { ...r.perPage, mistakes: r.mistakes + 1 },
+          { ...r.perPage, takes: r.takes + 1, pages: (r.takes + 1) * PER_PAGE_FROM },
+          { ...r.perPage, takes: 0 },
+          { ...r.perPage, extra: 1 },
+        ];
+        for (const perPage of bad) expect(() => validateContext({ ...baseContext, recitation: { ...r, perPage } })).toThrow();
+      }),
+      { numRuns: 80 },
+    );
+    expect(sent).toBeGreaterThan(0);
   });
 });

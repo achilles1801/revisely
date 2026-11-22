@@ -16,6 +16,11 @@ export const reciteInsights = {
   daysAgo_other: '{{count}} days ago',
   onDay: 'on {{day}}',
   noTakes: 'No takes {{when}}',
+  /** Under the figure, the range's long takes (RECITE-24); {{n}} is to a tenth ("1.2"), {{count}} picks the form. */
+  perPage_one: 'Takes of 2 pages or more: {{n}} mistake a page',
+  perPage_other: 'Takes of 2 pages or more: {{n}} mistakes a page',
+  perPageNone: 'Takes of 2 pages or more: no mistakes',
+  perPageUnder: 'Takes of 2 pages or more: under {{n}} mistakes a page',
   sameAsBefore: '{{takes}} · the same as before',
   upFrom: '{{takes}} · up from {{then}}',
   downFrom: '{{takes}} · down from {{then}}',
