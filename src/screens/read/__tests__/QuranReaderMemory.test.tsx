@@ -350,7 +350,7 @@ describe("Recite's memory on the page", () => {
     const heard = screen.getByTestId('past-try-heard');
     expect(flatStyle(heard).backgroundColor).toBe(flatStyle(screen.getByTestId('past-card-swatch-word')).backgroundColor);
     expect(harakatClip(screen.getByText('وَأُوهِيَتْ').props.style)).toBeNull();
-    expect(screen.getByText('Say it right on 2 different days to clear it.')).toBeTruthy();
+    expect(screen.getByText('2 more right takes, on 2 different days, clear it.')).toBeTruthy();
     // ▶ plays your voice there, cut from that take's recording on the phone.
     fireEvent.press(screen.getByTestId('past-try-play'));
     await flush();

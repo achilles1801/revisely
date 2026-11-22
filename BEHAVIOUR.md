@@ -637,7 +637,9 @@ Recite with Mark mistakes remembers each take (Majd, Nov 15 2026; Tarteel's bigg
   checked: Words & harakat never clears a tajweed note. A Not clear mark is remembered like a slip, amber,
   until the word is said clearly: a take that heard its harakat only as Not clear hasn't said it clearly, so it
   counts as wrong. It still never counts in a score. (Majd, Nov 20 2026, on Not clear staying after a take: "yes
-  (a) is fine".) Clear now clears a word at once.
+  (a) is fine".) Clear now clears a word at once. The word's card says plainly what clears it: how many more right
+  takes, and on another day ("Right today. 1 more right take, on another day, clears it."), with Strict on for a
+  tajweed note. (Majd, Nov 22 2026: "yeah that's fine".)
 - **RMEM-3.** Outside a take, a word with a remembered mistake stays marked on the page, in its highlight
   colour made lighter (red for a word, amber for harakat and letters, violet for tajweed). A word shows one
   mark, its most severe. Marks don't show during a take, where only that take's marks do. They also don't
