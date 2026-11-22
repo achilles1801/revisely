@@ -1,0 +1,308 @@
+# Revisely in Arabic, right to left (the app in Arabic: LANG-2; Revisely Dev offers it, the store app from the native
+# release that declares it). Screenshots of the key screens, so the layout can be checked without a phone. It looks;
+# it tests no rule. Its screens have no baselines until Majd has seen them (.maestro/README.md, "Screenshots"), so it
+# only reports. Taps are by id, since the words are Arabic.
+# The account is Activity's (seed-activity.js: a previewTester, 305 pages, Smart Tracking on, the mocks' recordings),
+# signed up in English, then switched (subflows/language.yaml, src/lib/e2e/language.ts).
+# Screenshots: ar-<screen>.
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    file: ../subflows/new-account.yaml
+    env:
+      CLOCK: 2026-11-03T20:00
+      BOUNDARY: midnight
+- runFlow: ../subflows/seed-activity.yaml
+- runFlow:
+    file: ../subflows/relaunch-recordings.yaml
+    env:
+      SET: activity
+- runFlow: ../subflows/backup-notice.yaml
+# Revo's functions once each first: a function's first call in the emulator is slow on a CI macOS runner (09-revo).
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: warm
+- runFlow:
+    file: ../subflows/language.yaml
+    env:
+      LANG: ar
+
+# Home, and its help.
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: ar-home
+- tapOn:
+    id: help-button-home
+- extendedWaitUntil:
+    visible:
+      id: help-sheet-home
+    timeout: 10000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: ar-help-home
+- runFlow: ../subflows/close-sheet.yaml
+- extendedWaitUntil:
+    notVisible:
+      id: help-sheet-home
+    timeout: 10000
+
+# Activity: the month, today, Insights.
+- tapOn:
+    id: open-activity
+- extendedWaitUntil:
+    visible:
+      id: activity-blocks-views
+    timeout: 20000
+- tapOn:
+    id: calendar-day-2026-11-03
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: ar-activity-month
+# Near its top, as activity-screens.yaml: lower, the row can sit under the tab bar on a small phone.
+- tapOn:
+    id: preview-row-revised
+    point: 50%,10%
+- extendedWaitUntil:
+    visible:
+      id: activity-day-v2
+    timeout: 15000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: ar-activity-day
+- tapOn:
+    id: back
+- extendedWaitUntil:
+    visible:
+      id: activity-blocks-views
+    timeout: 15000
+- tapOn:
+    id: pill-insights
+- extendedWaitUntil:
+    visible:
+      id: activity-insights
+    timeout: 15000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: ar-insights
+- repeat:
+    times: 2
+    commands:
+      - scroll
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: ar-insights-2
+- repeat:
+    times: 3
+    commands:
+      - scroll
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: ar-insights-3
+- tapOn:
+    id: back
+- extendedWaitUntil:
+    visible:
+      id: today-post
+    timeout: 15000
+
+# Today's session: its quiet page, then its controls.
+- runFlow:
+    file: ../subflows/open-session.yaml
+    env:
+      QUIET: ".*"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: ar-session-quiet
+- runFlow: ../subflows/show-controls.yaml
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: ar-session-controls
+- tapOn:
+    id: session-back
+- extendedWaitUntil:
+    visible:
+      id: today-post
+    timeout: 15000
+
+# Read: the index, and a surah in the reader (E2E builds load no page images: "page-missing").
+- tapOn:
+    id: tab-Read
+- extendedWaitUntil:
+    visible:
+      id: read-index-v2
+    timeout: 15000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: ar-read
+- tapOn:
+    id: surah-2
+- extendedWaitUntil:
+    visible:
+      id: "page-(image|missing)"
+    timeout: 20000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: ar-reader
+- retry:
+    maxRetries: 2
+    commands:
+      - runFlow:
+          when:
+            notVisible:
+              id: reader-back
+          commands:
+            - tapOn:
+                point: 50%, 30%
+      - extendedWaitUntil:
+          visible:
+            id: reader-back
+          timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: ar-reader-controls
+- tapOn:
+    id: reader-back
+- extendedWaitUntil:
+    visible:
+      id: read-index-v2
+    timeout: 15000
+- tapOn:
+    id: tab-Home
+- extendedWaitUntil:
+    visible:
+      id: today-post
+    timeout: 15000
+
+# Settings, top to bottom.
+- tapOn:
+    id: open-settings
+- extendedWaitUntil:
+    visible:
+      id: back
+    timeout: 10000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: ar-settings
+- repeat:
+    times: 3
+    commands:
+      - scroll
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: ar-settings-2
+- repeat:
+    times: 3
+    commands:
+      - scroll
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: ar-settings-3
+
+# What's new, replayed from Settings → About (a tester's): each card. Settings again from its top: settings-row.yaml
+# looks down, and the screenshots above left it at its foot, past the row (the first Android run, 45004643758).
+- tapOn:
+    id: back
+- extendedWaitUntil:
+    visible:
+      id: today-post
+    timeout: 15000
+- tapOn:
+    id: open-settings
+- runFlow:
+    file: ../subflows/settings-row.yaml
+    env:
+      ROW: settings-whats-new
+- tapOn:
+    id: settings-whats-new
+- extendedWaitUntil:
+    visible:
+      id: whats-new-replay
+    timeout: 10000
+- runFlow: ../subflows/recite-moment-skip.yaml
+- extendedWaitUntil:
+    visible:
+      id: whats-new-title
+    timeout: 20000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: ar-whats-new-1
+- tapOn:
+    id: whats-new-next
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: ar-whats-new-2
+- tapOn:
+    id: whats-new-next
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: ar-whats-new-3
+- tapOn:
+    id: whats-new-next
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: ar-whats-new-4
+- tapOn:
+    id: whats-new-next
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: ar-whats-new-5
+- tapOn:
+    id: whats-new-close
+- extendedWaitUntil:
+    notVisible:
+      id: whats-new-replay
+    timeout: 10000
+- tapOn:
+    id: back
+- extendedWaitUntil:
+    visible:
+      id: today-post
+    timeout: 15000
+
+# Revo: its opt-in, then its first line (lib/revo/openers.ar.ts) once revoSetOptions has answered.
+- runFlow:
+    file: ../subflows/tap-to-open.yaml
+    env:
+      ID: revo-button
+      OPENS: "whats-new-moment-skip|whats-new-revo-moment|revo-optin"
+- runFlow: ../subflows/revo-moment-skip.yaml
+- extendedWaitUntil:
+    visible:
+      id: revo-optin
+    timeout: 40000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: ar-revo-optin
+- tapOn:
+    id: revo-turn-on
+- extendedWaitUntil:
+    visible:
+      id: revo-greeting
+    timeout: 30000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: ar-revo
+- runFlow: ../subflows/revo-close.yaml

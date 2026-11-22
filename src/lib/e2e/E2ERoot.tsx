@@ -19,6 +19,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { paletteV2 } from '../../theme/v2';
 import { onOutboxChange, outboxText } from './outboxStatus';
 import { e2eTakeStatsLine, onE2ETakeStats } from './reciteLive';
+import { languageStatus } from './language';
 
 function zoneName(): string {
   try {
@@ -34,11 +35,12 @@ let netInfoUp = true;
 /**
  * "e2e 2026-11-03 00:30 America/Chicago", then " offline" while the E2E network
  * switch is off, and " · net down" while NetInfo sees no connection (which side
- * is stuck, when a flow waits for the app to come back online). Changes once a
+ * is stuck, when a flow waits for the app to come back online), and " ar rtl" in
+ * Arabic laid out right to left (./language; nothing in English). Changes once a
  * minute at most otherwise.
  */
 export function statusText(): string {
-  return `e2e ${clockLabel()} ${zoneName()}${isOffline() ? ' offline' : ''}${netInfoUp ? '' : ' · net down'}`;
+  return `e2e ${clockLabel()} ${zoneName()}${isOffline() ? ' offline' : ''}${netInfoUp ? '' : ' · net down'}${languageStatus()}`;
 }
 
 function Status() {

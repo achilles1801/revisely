@@ -880,7 +880,7 @@ export default function ActiveRevisionScreen() {
         }
         header={
           <View style={styles.header}>
-            <RoundButton icon={backIcon()} label={t('common.back')} onPress={handleSaveAndBack} palette={palette} />
+            <RoundButton icon={backIcon()} label={t('common.back')} onPress={handleSaveAndBack} palette={palette} testID="session-back" />
             <View style={styles.titleCol}>
               <Text
                 style={[styles.title, typeV2.name, { color: palette.textPrimary }]}

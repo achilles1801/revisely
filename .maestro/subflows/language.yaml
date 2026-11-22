@@ -1,0 +1,42 @@
+# The app in LANG, kept until the install is cleared (E2E builds are English otherwise: src/lib/e2e/language.ts),
+# then a cold start, since React Native lays out right to left only from a launch. Waits until the status line says
+# the language and, for Arabic, "rtl" (E2ERoot: "e2e 2026-11-03 20:00 America/Chicago ar rtl").
+# iOS takes the language at launch (as the clock, launch.yaml); Android takes the link.
+#   env LANG: ar
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - stopApp
+      - launchApp:
+          stopApp: true
+          permissions:
+            all: allow
+            # Not location unless the flow has set a position (location.yaml). iOS names it always | never.
+            location: "${maestro.platform == 'ios' ? (output.location == 'allow' ? 'always' : 'never') : (output.location == 'allow' ? 'allow' : 'deny')}"
+          arguments:
+            e2eLanguage: ${LANG}
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - openLink:
+          link: revisely://e2e/language?lang=${LANG}
+- extendedWaitUntil:
+    visible:
+      id: e2e-status
+      text: ".* ${LANG}( .*)?"
+    timeout: 30000
+# The direction from this launch on.
+- runFlow: relaunch.yaml
+- extendedWaitUntil:
+    visible:
+      id: e2e-status
+      text: ".* ${LANG} rtl.*"
+    timeout: 15000
+- extendedWaitUntil:
+    visible:
+      id: today-post
+    timeout: 20000
