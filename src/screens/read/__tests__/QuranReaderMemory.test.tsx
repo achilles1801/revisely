@@ -462,6 +462,8 @@ describe("Recite's memory in the take's summary", () => {
       fireEvent.press(screen.getByTestId('recite-stop'));
       await flush();
       await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: UTIYAT + 25, secs: 12, marks: [], score: { reached: 30, mistakes: 0, tajweed: 0, accuracy: 1 }, start: A23 } });
+      // Revisely Dev: the summary opens from the bar's result (nothing opens by itself); the store app opens it as before.
+      if (mockState.dev) await openResult();
     };
     mockMemory.records = [page, pastTake()];
     await finish();
