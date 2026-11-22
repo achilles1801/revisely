@@ -110,7 +110,7 @@ describe('Arabic on screen', () => {
   });
 
   it('a string not translated yet shows in English', () => {
-    expect(arT('updates.ready.title')).toBe('A new update is ready');
+    expect(arT('preview.close')).toBe('Close preview');
   });
 
   it('English is exactly as before: Western digits, no grouping added', () => {
