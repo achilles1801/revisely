@@ -324,16 +324,21 @@ until its part is set up.
     - Takes saved before were plain recordings: `sortTakeAudio` (`lib/reciteMemory/apart`) marks those a take record
       names, once a launch, index only. Recite alone's old audio stays a recording.
   - **Calm, exact tracking** (Majd's Dev take, Nov 15 2026; Tarteel's mic take as the reference): a quiet grey band on
-    the line being recited (the ayah's part of it, `currentLineBand`) and a grey box on the word (the page's one
-    highlight, `highlightSoft` and `highlight` in theme/v2, below in "The design"). It is not a blue band
+    the line being recited (the ayah's part of it, `currentLineBand`), and no word marked while the page is shown (Majd,
+    Nov 21 2026: "They dont even use shades when ur reciting with the page shown"; RECITE-19, `followCues` in
+    lib/reciteLive/wash). The page's one highlight is `highlightSoft` and `highlight` in theme/v2 (below in "The
+    design"). It is not a blue band
     over the whole ayah, which covered lines not yet said and read as running ahead (the checker's `at` was 1.0 s
     behind, never ahead). Blue (`followInk`) is only for the word being said in the bar. None of Recite's colours follow
     the accent (design.test). Nothing shows before the checker has found where the reciter is (`locked`): no band or
     box, in either view. The hidden view has no band at all (Majd, Nov 15 2026: "there shouldn't be an always there
-    highlight at the top when the verses are hidden"): the words recited show in place, the newest in the grey box.
+    highlight at the top when the verses are hidden"): the words recited show in place, the newest in a soft grey wash.
   - **Mistakes are highlights** (Majd, Nov 15 2026: "i don't like the red + circles, only things we should show are
     highlites for mistakes 3 colors max"; board `~/Documents/revisely-recite-mocks/marks-highlights/`): a highlight
-    behind the word, the page's ink unchanged, in three colours (`markGroup`, theme/v2 `markWord`…): red for a wrong,
+    behind the word, the page's ink unchanged, drawn as a soft pastel wash, never a box (Majd, Nov 21 2026, after
+    Tarteel's "blurb or splash": RECITE-19; `components/reciteLive/Wash`, `lib/reciteLive/wash`: a pill-shaped core
+    whose edge fades out all round in its own colour, a `boxShadow`, reaching a little past the word so a box a few
+    units off never shows an edge; pastel colours, checked in design.test), in three colours (`markGroup`, theme/v2 `markWord`…): red for a wrong,
     skipped or extra word (an extra word on the word before it: "Extra word"), amber for a haraka or letter slip and
     "Not clear", violet for a tajweed note (Strict). A word with several shows its strongest; the mark a card is open
     for is a firmer shade of its own (`…Firm`), no outline. No red ink, dotted lines or + discs. The bar, the card and

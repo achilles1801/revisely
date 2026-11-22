@@ -293,6 +293,26 @@ describe('v2 palette (white and black grounds, no accent tint)', () => {
     expect(apart(word, tajweed)).toBeGreaterThanOrEqual(60);
     expect(apart(slip, tajweed)).toBeGreaterThanOrEqual(60);
     expect(contrast(word, slip)).toBeGreaterThanOrEqual(1.25);
+    // Pastel (Majd, Nov 21 2026: "I also like their color shades its like more pastel which is what we should aim for"):
+    // soft, never strong (CIE L*a*b* chroma at most 36), light on a light page and muted on a dark one.
+    const labOf = (hex: string) => {
+      const [r, g, b] = [1, 3, 5].map((i) => {
+        const v = parseInt(hex.slice(i, i + 2), 16) / 255;
+        return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+      });
+      const xyz = [
+        (0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047,
+        0.2126 * r + 0.7152 * g + 0.0722 * b,
+        (0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883,
+      ].map((t) => (t > 216 / 24389 ? Math.cbrt(t) : ((24389 / 27) * t + 16) / 116));
+      return [116 * xyz[1] - 16, 500 * (xyz[0] - xyz[1]), 200 * (xyz[1] - xyz[2])];
+    };
+    for (const fill of [word, slip, tajweed]) {
+      const [l, a, b] = labOf(fill);
+      expect(Math.hypot(a, b)).toBeLessThanOrEqual(36);
+      if (isDark) expect(l).toBeLessThanOrEqual(45);
+      else expect(l).toBeGreaterThanOrEqual(78);
+    }
     // The follow blue as text (the word being said in the bar) on every ground.
     for (const ground of [p.bg, p.fill, p.sheet, p.bubble]) expect(contrast(p.followInk, ground)).toBeGreaterThanOrEqual(4.5);
     // The box stands out from the band (non-text, a little).

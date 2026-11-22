@@ -165,9 +165,11 @@ export interface PaletteV2 extends AccentTokens {
    * Recite's mistakes as highlights behind the word, three colours at most (Majd, Nov 15 2026: "only things we should
    * show are highlites for mistakes 3 colors max and each color can consists of diff types of mistake"): `markWord` a
    * wrong, skipped or extra word (on the word before it), `markSlip` a haraka or letter slip and "Not clear",
-   * `markTajweed` a tajweed note (Strict). Each `…Firm` is the mark a card is open for. On the page, in the bar, the
-   * card's and the summary's swatches. The ink reads at 4.5:1 on each; the three tell apart by hue and by lightness
-   * (colour blindness); the card and the summary always name the kind in words. None follows the accent.
+   * `markTajweed` a tajweed note (Strict). Each `…Firm` is the mark a card is open for. On the page (as soft washes,
+   * components/reciteLive/Wash), in the bar, the card's and the summary's swatches. Pastel (Majd, Nov 21 2026: "I also
+   * like their color shades its like more pastel which is what we should aim for as well"): light and soft on a light
+   * page, muted on a dark one. The ink reads at 4.5:1 on each; the three tell apart by hue and by lightness (colour
+   * blindness); the card and the summary always name the kind in words. None follows the accent.
    */
   markWord: string;
   markWordFirm: string;
@@ -213,12 +215,12 @@ const BASE_LIGHT: Base = {
   highlight: '#DEDEE3',
   highlightSoft: '#F2F2F4',
   followInk: '#1D4ED8',
-  markWord: '#F49A9A',
-  markWordFirm: '#EC7A7A',
-  markSlip: '#FBD38D',
-  markSlipFirm: '#F5B94D',
-  markTajweed: '#C9B6F2',
-  markTajweedFirm: '#A98EEB',
+  markWord: '#F6B9BC',
+  markWordFirm: '#EF9CA1',
+  markSlip: '#FADDA0',
+  markSlipFirm: '#F4C878',
+  markTajweed: '#D6C8F5',
+  markTajweedFirm: '#BFA9EF',
   premium: ['#7C3AED', '#DB2777'],
   onPremium: '#FFFFFF',
 };
@@ -251,12 +253,12 @@ const BASE_DARK: Base = {
   highlight: '#26262B',
   highlightSoft: '#121214',
   followInk: '#7DB3F5',
-  markWord: '#7A2424',
-  markWordFirm: '#A33434',
-  markSlip: '#6E4C0C',
-  markSlipFirm: '#94660E',
-  markTajweed: '#4B3A86',
-  markTajweedFirm: '#6450B5',
+  markWord: '#7A3D48',
+  markWordFirm: '#94505E',
+  markSlip: '#7A5D2C',
+  markSlipFirm: '#937035',
+  markTajweed: '#55487F',
+  markTajweedFirm: '#6B5C9E',
   premium: ['#A78BFA', '#F472B6'],
   onPremium: '#000000',
 };
