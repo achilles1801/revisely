@@ -41,4 +41,6 @@ How changes are made here. `CLAUDE.md` has the full detail behind each point.
 - Tests sit beside the code in `__tests__/`.
 - Scenario tests drive the real screens against the Firebase emulators. Start the emulators only through
   `scripts/emulators.sh`.
+- A PR that changes only docs, the website, store files, E2E flows, the console or the worker skips the scenario
+  shards in CI. `.github/scripts/scenarios-needed.js` has the exact list. Any other file runs them.
 - A flaky test is fixed at its cause, never retried or skipped (`TESTING.md`, "Flakes").
