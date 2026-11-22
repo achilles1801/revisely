@@ -53,7 +53,7 @@ export function installE2E(): void {
   const link = Linking.getInitialURL()
     .then(handle)
     .catch(() => undefined);
-  // The language a flow asked for (21-arabic), before the first screen: English otherwise.
+  // The language a flow asked for (22-arabic), before the first screen: English otherwise.
   ready = Promise.all([link, pinFreshTheme(), applyE2ELanguage()]).then(() => undefined);
   // eslint-disable-next-line no-console
   console.log('[e2e] installed: revisely-e2e-build');

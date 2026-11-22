@@ -312,7 +312,7 @@ The app's `Date` runs at an offset from the device's own clock (`src/lib/e2e/clo
 | `revisely://e2e/network?offline=1` (`0`) | the E2E network off: the emulators unreachable (iOS) |
 | `revisely://e2e/update-ready` | as if an update had just downloaded: "A new update is ready" opens by itself, as on a tester's phone (`src/lib/e2e/updates.ts`; flow 17) |
 | `revisely://e2e/recordings?set=activity` | the Activity mocks' recordings, written into the signed-in account's folder (`src/lib/e2e/demoRecordings.ts`; iOS takes `e2eRecordings` at launch instead: `subflows/relaunch-recordings.yaml`) |
-| `revisely://e2e/language?lang=ar` | the app in Arabic, kept until the install is cleared, right to left from the next launch (`src/lib/e2e/language.ts`; iOS takes `e2eLanguage` at launch instead; `subflows/language.yaml` does both and the relaunch; flow 21 only: every other flow is English) |
+| `revisely://e2e/language?lang=ar` | the app in Arabic, kept until the install is cleared, right to left from the next launch (`src/lib/e2e/language.ts`; iOS takes `e2eLanguage` at launch instead; `subflows/language.yaml` does both and the relaunch; flow 22 only: every other flow is English) |
 | `revisely://e2e/voice-search?heard=<words, URL-encoded>` (`?off=1`) | voice search on with no microphone or speech model: a search by voice shows Listening… for 4.5 s, then searches with these words (`src/lib/e2e/voiceSearch.ts`; flow 18) |
 
 - Time runs on from there, as on a phone; timers and animations use real time.

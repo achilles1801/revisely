@@ -1,4 +1,4 @@
-// The E2E build in Arabic (src/lib/e2e/language.ts): flow 21 asks for it once (a launch argument on iOS, a link on
+// The E2E build in Arabic (src/lib/e2e/language.ts): flow 22 asks for it once (a launch argument on iOS, a link on
 // Android), and the app shows it from then on, laid out right to left from the next launch. Every other flow, asking
 // for nothing, stays in English.
 

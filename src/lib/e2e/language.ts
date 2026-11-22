@@ -1,5 +1,5 @@
 // E2E builds only (install.ts): the app in another language, for the flow that looks at Revisely in Arabic
-// (.maestro/flows/21-arabic.yaml). E2E builds are English otherwise (src/i18n/language.ts, pinnedToEnglish), since
+// (.maestro/flows/22-arabic.yaml). E2E builds are English otherwise (src/i18n/language.ts, pinnedToEnglish), since
 // every other flow matches English text.
 //
 // A flow asks for it once; the app keeps it on this phone until the install is cleared:
