@@ -57,13 +57,37 @@ describe('applyEntry: Activity items beside a session (dual write)', () => {
   });
 
   it('replaces the items of an edited session', async () => {
-    await applyEntry(UID, { id: 'e2', at: 1, op: { kind: 'session.edit', id: DAY, addRevised: [550], removeRevised: [], pagesSkipped: [], durationMinutes: null, weaknessUpdates: [] } });
+    await applyEntry(UID, {
+      id: 'e2',
+      at: 1,
+      op: {
+        kind: 'session.edit',
+        id: DAY,
+        addRevised: [550],
+        removeRevised: [],
+        pagesSkipped: [],
+        durationMinutes: null,
+        weaknessUpdates: [],
+      },
+    });
     expect(mocked.replaceRevisionItems).toHaveBeenCalledWith(DAY, [expect.objectContaining({ id: DAY })], UID);
   });
 
   it('a session that is gone leaves no items for its day', async () => {
     mocked.mergeSessionOnServer.mockResolvedValue(null);
-    await applyEntry(UID, { id: 'e2', at: 1, op: { kind: 'session.edit', id: DAY, addRevised: [], removeRevised: [], pagesSkipped: [], durationMinutes: null, weaknessUpdates: [] } });
+    await applyEntry(UID, {
+      id: 'e2',
+      at: 1,
+      op: {
+        kind: 'session.edit',
+        id: DAY,
+        addRevised: [],
+        removeRevised: [],
+        pagesSkipped: [],
+        durationMinutes: null,
+        weaknessUpdates: [],
+      },
+    });
     expect(mocked.replaceRevisionItems).toHaveBeenCalledWith(DAY, [], UID);
   });
 

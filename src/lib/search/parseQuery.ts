@@ -51,7 +51,11 @@ function keys(): SurahKeys[] {
         latin.add(latinKey(n));
         latin.add(withoutArticle(n));
       }
-      return { sura: s.number, latin: [...latin].filter(Boolean), arabic: s.nameArabic.split(/\s+/).map(normalizeWord).join('') };
+      return {
+        sura: s.number,
+        latin: [...latin].filter(Boolean),
+        arabic: s.nameArabic.split(/\s+/).map(normalizeWord).join(''),
+      };
     });
   }
   return surahKeys;

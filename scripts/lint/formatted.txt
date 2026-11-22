@@ -5,3 +5,9 @@ src/hooks
 src/lib/widgets
 src/types
 worker
+src/context
+src/lib/offline
+src/lib/search
+src/services
+src/lib/coach
+src/lib/reminders
