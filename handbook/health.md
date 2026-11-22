@@ -35,7 +35,7 @@ Moved from CLAUDE.md word for word on Nov 22 2026. CLAUDE.md keeps the rules eve
     issue mentioning the owner. Nothing rolls back by itself.
   - Issues carry the error, in-app frames, release and update; never user ids, locations or
     breadcrumbs. Problem reports (users' own words) are never copied out of Sentry.
-  - **Report a problem** (Settings → Support; SET-3, SET-4) is the app's own form (`components/report/ReportProblemHost`,
+  - **Report a problem** (Settings → Help and support; SET-3, SET-4) is the app's own form (`components/report/ReportProblemHost`,
     mounted in `MainNavigator`; state in `lib/report/state`), not Sentry's widget, which ignored the theme and showed
     Sentry's logo (Majd, Nov 22 2026). It sends through `Sentry.captureFeedback` (`sendProblemReport` in `lib/sentry`),
     so reports land in Sentry's User Feedback as before. Its screenshot is the SDK's native capture

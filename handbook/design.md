@@ -110,7 +110,7 @@ classic default), and a fresh install starts in light.
     show: Overview or Insights), and a day's before +. It opens a `v2/Sheet` of at
     most four topics, about two sentences each, then "Ask Revo ›" (only while Revo is on for the
     account, `useRevoPresent`, so it follows Revo's release switch) and "Hide help buttons". Hiding
-    is one switch for every screen, kept on the phone per account; Settings → Support → Help buttons
+    is one switch for every screen, kept on the phone per account; Settings → Help and support → Help buttons
     turns it back on. BEHAVIOUR.md HELP-1 to HELP-3. No first-run guides,
     tooltips, coach marks, or ⓘ beside single controls.
     - **All help text is in `src/lib/help/topics.ts`.** Each topic lists the BEHAVIOUR.md rules it
@@ -192,3 +192,14 @@ classic default), and a fresh install starts in light.
   (`systemAppearanceAvailable()`; `resolveThemeMode` in `context/ThemeContext`).
 - `expo-blur` and `expo-glass-effect` were removed from `package.json` (and the tests' mocks) with
   the background-audio build (Oct 28 2026).
+
+## Settings (SET-1)
+
+Settings is a short first level with a page per group (Majd's option B from the Settings audit, Nov 22 2026; the audit
+and its mocks are in Drive › Revisely › Product and design › Settings audit). `SettingsScreen` draws the first level, or
+the page its route's `page` names (`lib/settingsPages`), pushed again so the back gesture returns to the first level.
+- A new setting goes in its group's page (`page === '…'` in `SettingsScreen`). It shows on the first level only through
+  that page's value: a few words for its state, never a paragraph.
+- Revo's Settings section ids (`REVO_SETTINGS_SECTIONS`) stay as they are on the phone and the server. `pageOfSection` maps
+  each to the page that holds its rows.
+- A path written for users ("Settings → Reminders → …") names the page: in BEHAVIOUR.md, Revo's guide, help and strings.

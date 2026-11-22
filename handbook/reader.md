@@ -206,7 +206,7 @@ asks about rights to them, that is the answer; the Qur'an text itself is public 
 print's pages (below) are drawn from the King Fahd Complex's own vector files, which its rights page
 (dm.qurancomplex.gov.sa/rights/) lets anyone use free, in apps too.
 
-**Mushaf editions** (Settings → Mushaf, `lib/mushafEdition`, `components/mushaf/MushafPickerSheet`;
+**Mushaf editions** (Settings → Mushaf and Recite → Mushaf, `lib/mushafEdition`, `components/mushaf/MushafPickerSheet`;
 Nov 3 2026): the 1405 pages (the default) or the King Fahd Complex's **Madani 1441** print. The
 choice is kept per phone (`@revisely_mushaf_edition:v1`), not on the account.
 - **Page numbers are shared.** 568 pages hold the same verses in both; the other 36 come in runs
