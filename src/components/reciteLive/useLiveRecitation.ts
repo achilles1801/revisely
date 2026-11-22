@@ -304,6 +304,8 @@ export function useLiveRecitation({
   // The take's `ready`s (a second one is a resume), the furthest audio time the cursor has shown, and while a re-check
   // replays the take, the time it must pass before its cursor shows again.
   const readies = useRef(0);
+  // The take's counts for the checker's take line (Recite due diligence, row 2): Not a mistake, Put back, peeks.
+  const counts = useRef({ notMistake: 0, putBack: 0, peeks: 0 });
   const shownT = useRef(0);
   const replayUntil = useRef<number | null>(null);
   /** Each event the take receives: its type to the Stop trace, then the live state. */
@@ -396,7 +398,19 @@ export function useLiveRecitation({
       });
       stopHearing();
       void stopMic();
-      conn.current?.send({ type: 'end' });
+      const st = traceRef.current.state;
+      conn.current?.send(
+        isDevVariant()
+          ? {
+              type: 'end',
+              counts: {
+                shown: Object.keys(st.marks).length + Object.keys(st.removed).length,
+                ...counts.current,
+                resumes: Math.max(0, readies.current - 1),
+              },
+            }
+          : { type: 'end' },
+      );
       applyQueued();
       setState((s) => liveStopping(s));
       // The summary within a few seconds, whatever the checker does: what the take found, if its answer is late.
@@ -455,6 +469,7 @@ export function useLiveRecitation({
       clearBudget();
       reportedLong.current = false;
       readies.current = 0;
+      counts.current = { notMistake: 0, putBack: 0, peeks: 0 };
       shownT.current = 0;
       replayUntil.current = null;
       cue.reset();
@@ -712,6 +727,7 @@ export function useLiveRecitation({
   const dismiss = useCallback(
     (id: string) => {
       label('dismiss', id);
+      counts.current.notMistake++;
       applyQueued();
       setState((s) => dismissMark(s, id));
     },
@@ -723,6 +739,7 @@ export function useLiveRecitation({
     (id: string) => {
       if (!traceRef.current.state.removed[id]) return;
       label('undismiss', id);
+      counts.current.putBack++;
       applyQueued();
       setState((s) => restoreMark(s, id));
     },
@@ -734,6 +751,7 @@ export function useLiveRecitation({
 
   /** A word or an ayah shown by hand (hidden view), told to the checker as information. */
   const hint = useCallback((w: number, what: 'word' | 'ayah') => {
+    counts.current.peeks++;
     if (SEND_HINTS) conn.current?.send({ type: 'hint', w, what });
   }, []);
 

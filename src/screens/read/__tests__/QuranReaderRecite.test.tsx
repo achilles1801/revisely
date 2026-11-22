@@ -414,7 +414,7 @@ describe('Recite: following along', () => {
     await startTake('recite');
     fireEvent.press(screen.getByTestId('recite-stop'));
     await flush();
-    expect(mockLive.sent).toContainEqual({ type: 'end' });
+    expect(mockLive.sent).toContainEqual(expect.objectContaining({ type: 'end' }));
     expect(screen.getByLabelText('Checking')).toBeTruthy();
     await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [], score: null } });
     fireEvent.press(screen.getByTestId('recite-close'));
@@ -987,6 +987,20 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
       expect(sendLabel()).not.toHaveBeenCalled();
     });
 
+    it('[RECITE-4] Stop sends the take’s counts with its end (Recite due diligence row 2): numbers only, no words or ids', async () => {
+      await startTake('check');
+      await event({ type: 'mark', mark: wrongMark as never });
+      await tapWord(UTIYAT);
+      fireEvent.press(screen.getByTestId('mark-card-dismiss'));
+      fireEvent.press(screen.getByTestId('undo-toast-action'));
+      fireEvent.press(screen.getByTestId('recite-eye'));
+      fireEvent.press(screen.getByTestId('recite-next-word'));
+      fireEvent.press(screen.getByTestId('recite-stop'));
+      await flush();
+      const end = (mockLive.sent as { type: string; counts?: unknown }[]).find((f) => f.type === 'end');
+      expect(end?.counts).toEqual({ shown: 1, notMistake: 1, putBack: 1, peeks: 1, resumes: 0 });
+    });
+
     it('after the final answer: the label goes over HTTP (the connection has gone), Undo too', async () => {
       await startTake('check');
       fireEvent.press(screen.getByTestId('recite-stop'));
@@ -1087,7 +1101,7 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
       await act(async () => fireEvent.press(screen.getByTestId('mark-card-hear')));
       expect(recitation).not.toHaveBeenCalled();
       expect(playerUris()).toEqual([expect.stringMatching(/\/027023\.mp3$/)]);
-      expect(mockLive.sent).not.toContainEqual({ type: 'end' });
+      expect(mockLive.sent).not.toContainEqual(expect.objectContaining({ type: 'end' }));
       await closeCard();
       expect(screen.getByTestId('recite-status').props.children).toBe('Paused');
       expect(screen.getByTestId('recite-resume')).toBeTruthy();
@@ -1143,7 +1157,7 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
       const { writeClip } = jest.requireMock('../../../lib/reciteLive/clipFile');
       expect((writeClip as jest.Mock).mock.calls[0][0]).toHaveLength(Math.round(1.4 * 16000));
       expect(playerUris().at(-1)).toBe('file:///cache/recite-your-recitation.wav');
-      expect(mockLive.sent).not.toContainEqual({ type: 'end' });
+      expect(mockLive.sent).not.toContainEqual(expect.objectContaining({ type: 'end' }));
       await closeCard();
       expect(screen.getByTestId('recite-resume')).toBeTruthy();
     });
@@ -1204,12 +1218,12 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
       const mic = (await jest.requireMock('../../../lib/recite/micSource').startMicStream.mock.results[0].value) as { stop: jest.Mock };
       await act(async () => fireEvent.press(screen.getByTestId('recite-pause')));
       expect(mic.stop).toHaveBeenCalled();
-      expect(mockLive.sent).not.toContainEqual({ type: 'end' });
+      expect(mockLive.sent).not.toContainEqual(expect.objectContaining({ type: 'end' }));
       expect(screen.getByTestId('recite-status').props.children).toBe('Paused');
       expect(screen.queryByTestId('recite-recording')).toBeNull();
       fireEvent.press(screen.getByTestId('recite-stop'));
       await flush();
-      expect(mockLive.sent).toContainEqual({ type: 'end' });
+      expect(mockLive.sent).toContainEqual(expect.objectContaining({ type: 'end' }));
       expect(mockTake.finished).toBe(1);
     });
 
@@ -1217,7 +1231,7 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
       await startTake('recite');
       await act(async () => fireEvent.press(screen.getByTestId('recite-pause')));
       await toBackground();
-      expect(mockLive.sent).toContainEqual({ type: 'end' });
+      expect(mockLive.sent).toContainEqual(expect.objectContaining({ type: 'end' }));
     });
   });
 
@@ -1370,7 +1384,7 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
     // The paid side is Premium, with no feature name and no price (Majd, Nov 14 2026).
     expect(screen.getByText('Mark my mistakes')).toBeTruthy();
     expect(screen.getByText('Get Premium')).toBeTruthy();
-    expect(screen.getByText('Part of Premium. Following along stays free. It’s AI and can make mistakes.')).toBeTruthy();
+    expect(screen.getByText('For recitation in Hafs ʿan ʿĀṣim. Part of Premium; following along stays free. It’s AI and can make mistakes.')).toBeTruthy();
     expect(screen.queryByText(/[$€£]|\d+(\.\d+)? ?(USD|a month|\/mo)/)).toBeNull();
     expect(screen.getByText('Can’t afford it? Apply for support')).toBeTruthy();
     expect(mockLive.start).toBeUndefined();
@@ -1541,10 +1555,10 @@ describe('Recite the mistakes again (Majd, Nov 15 2026: one take from the first 
     const last = words.verseFirstWord(27, 25) - 1;
     await event({ type: 'at', w: last - 1 });
     await event({ type: 'said', upTo: last - 2 } as LiveEvent);
-    expect(mockLive.sent).not.toContainEqual({ type: 'end' });
+    expect(mockLive.sent).not.toContainEqual(expect.objectContaining({ type: 'end' }));
     await event({ type: 'said', upTo: last } as LiveEvent);
     await flush();
-    expect(mockLive.sent).toContainEqual({ type: 'end' });
+    expect(mockLive.sent).toContainEqual(expect.objectContaining({ type: 'end' }));
     await event({ type: 'done', result: { v: 2, take: 't2', from: A23, to: last + 1, start: words.verseFirstWord(27, 23), secs: 9, marks: [], score: null } } as LiveEvent);
     await flush();
     expect(screen.getByTestId('take-summary-before').props.children).toBe('Before: 1 wrong word');
@@ -1817,7 +1831,7 @@ describe('Test me (Majd, Nov 15 2026: random within what’s memorized, with an 
     mockLive.sent = [];
     await event({ type: 'said', upTo: last } as LiveEvent);
     await flush();
-    expect(mockLive.sent).toContainEqual({ type: 'end' });
+    expect(mockLive.sent).toContainEqual(expect.objectContaining({ type: 'end' }));
     await event({ type: 'done', result: { v: 2, take: 't1', from: first, to: last + 1, start: first, secs: 12, marks: [], score: null } } as LiveEvent);
     await flush();
     expect(screen.queryByTestId('take-summary')).toBeNull();
@@ -1956,7 +1970,7 @@ describe('an immersive page during a take (Majd, Nov 15 2026: a tap hides the he
     await startTake('recite');
     await tapPage();
     await toBackground();
-    expect(mockLive.sent).toContainEqual({ type: 'end' });
+    expect(mockLive.sent).toContainEqual(expect.objectContaining({ type: 'end' }));
     expect(screen.getByTestId('recite-bar')).toBeTruthy();
   });
 
@@ -2409,7 +2423,7 @@ describe('Majd’s Nov 21 asks: Pause keeps the take, the score opens what it ha
     expect(screen.getByTestId('take-summary-finding-word')).toBeTruthy();
     expect(screen.queryByTestId('take-summary-again')).toBeNull();
     expect(screen.queryByTestId('take-summary-more')).toBeNull();
-    expect(mockLive.sent).not.toContainEqual({ type: 'end' });
+    expect(mockLive.sent).not.toContainEqual(expect.objectContaining({ type: 'end' }));
     fireEvent.press(screen.getByTestId('take-summary-done'));
     await flush();
     // Asked to close (whether iOS has finished its animation and turn is the sheet's business, SHEET-1).

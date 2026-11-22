@@ -486,7 +486,8 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   never counts in the score, whether or not the checker left it out of its own count.
 - **RECITE-4.** "Not a mistake" takes a mark off at once, with what it counted in the score; Undo, or the summary's
   Put back, brings it back as it was, its count too. A mark taken off stays off whatever the checker sends again,
-  during the take or in its final answer.
+  during the take or in its final answer. In Revisely Dev, Stop tells the checker the take's counts with its end (marks
+  shown, Not a mistake, Put back, words peeked, resumes): numbers only, never words, audio or ids.
 - **RECITE-5.** A take whose connection drops and comes back shows the same take: its start, the words recited, its
   marks and its score. Anything the checker sends again changes none of them. (The hidden view's red cover, a hint,
   may show again on the next word until it is reached.)

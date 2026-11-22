@@ -49,7 +49,24 @@ export type ClientFrame =
   | { type: 'undismiss'; id: string }
   /** A word or an ayah shown by hand in the hidden view (information for the checker). */
   | { type: 'hint'; w: number; what: 'word' | 'ayah' }
-  | { type: 'end' };
+  | { type: 'end'; counts?: TakeCounts };
+
+/**
+ * What a take did on the phone, counts only, with its `end` (Recite due diligence, row 2; Revisely Dev until Majd's word
+ * for production): no audio, words or ids. The checker keeps them on its take line. A checker without them ignores the field.
+ */
+export interface TakeCounts {
+  /** Marks shown during the take (still shown, or taken off). */
+  shown: number;
+  /** "Not a mistake" taps. */
+  notMistake: number;
+  /** Undo or Put back. */
+  putBack: number;
+  /** Words or ayahs shown by hand on a hidden page (‹, ‹‹). */
+  peeks: number;
+  /** The connection resumed. */
+  resumes: number;
+}
 
 export interface LiveConnection {
   /** 16 kHz mono PCM, as the microphone gives it. */
