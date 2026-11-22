@@ -7,7 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import * as Haptics from 'expo-haptics';
+import { hapticOf } from '../design/haptics';
 import { ReadPalette } from '../theme/readPalette';
 import { typography } from '../theme/typography';
 import { spacing } from '../theme/spacing';
@@ -95,7 +95,7 @@ export function MushafScrubber({
     setDragPage(next);
     // A tick at each juz boundary gives the drag some texture.
     const juz = getJuzForPage(next);
-    if (juzRef.current !== 0 && juz !== juzRef.current) Haptics.selectionAsync();
+    if (juzRef.current !== 0 && juz !== juzRef.current) hapticOf('selection').catch(() => undefined);
     juzRef.current = juz;
   }
 
