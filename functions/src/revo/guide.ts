@@ -266,16 +266,16 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'Settings, section by section',
-    covers: ['REVO-39', 'REMIND-1', 'REMIND-3', 'REMIND-4'],
+    covers: ['REVO-39', 'REMIND-1', 'REMIND-3', 'REMIND-4', 'SET-1', 'SET-2', 'SET-3'],
     routes: ['Settings'],
     text: lines(
       '- Account: display name. Activity: “Activity”, “Recordings”, “Back up recordings”, “Time in app”, “Memorized pages”. Home screen: “Next prayer”, “Friday Al-Kahf reminder”. Prayer: as above.',
       '- Revision: “Smart Tracking” (rate pages, Insights), “Keep daily amount”, and on an iPhone “Speech model” (searching by voice).',
       '- Revo AI: Revo on or off, “What Revo can do” (Revo’s short introduction, which also plays before Revo is first turned on; Skip ends it), “Memory”, “Delete conversations”.',
       '- Mushaf: “Mushaf”, “Offline mushaf”, “Download over mobile data”. Notifications: “Enable notifications” (revision reminders: 8:00 AM, after Asr, and an hour before the day ends, while today isn’t done; there is no setting for their times). Appearance: “Theme” (Light or Dark) and “Accent” (Indigo, Crimson or Jade).',
-      '- Support: “Share Revisely”, “Send feedback”, “Report a problem”, “Contact support”, “Help buttons”. About: “What’s new”, “Privacy Policy”, “Terms of Service”, the version.',
+      '- Support: “Share Revisely”, “Send feedback”, “Report a problem” (with “Add a screenshot”), “Contact support”, “Help buttons”. About: “What’s new”, “Privacy Policy”, “Terms of Service”, the version.',
       '- Testing (testers only): “Reset my data”, “Load test scenario”. Then “Sign out” and “Delete account”.',
-      '- Widgets: Today, Verse of the day, Qibla and Prayer times, added like any widget: on an iPhone (Home Screen and Lock Screen) and, from version 1.0.4, on Android’s home screen.',
+      '- Widgets: Today, Verse of the day, Qibla and Prayer times, added like any widget: on an iPhone (Home Screen, Lock Screen) and, from 1.0.4, on Android.',
     ),
   },
   {
