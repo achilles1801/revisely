@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import type { Rect } from '../../lib/ayahBounds';
 import type { QuranWords } from '../../lib/recite/quranWords';
 import type { WordFollow } from '../../lib/recite/hiddenPage';
-import type { Mark, MarkGroup } from '../../lib/reciteLive/contract';
+import type { Mark } from '../../lib/reciteLive/contract';
 import { markGroup, strongestByWord } from '../../lib/reciteLive/contract';
 import { markTitle } from '../../lib/reciteLive/describe';
 import { ayahBand, markBox, markHighlight, offBox, wordBox } from '../../lib/reciteLive/geometry';
@@ -11,6 +11,8 @@ import { followCues } from '../../lib/reciteLive/wash';
 import { t } from '../../i18n';
 import { HiddenInkLayer, shownOnHiddenPage, type InkWash } from './HiddenInkLayer';
 import { Wash } from './Wash';
+import { markFill, markFirm } from './markColours';
+import type { PaletteV2 } from '../../theme/v2';
 
 const NO_REVEALED: ReadonlySet<string> = new Set();
 
@@ -18,8 +20,8 @@ function rectStyle(r: Rect, scale: number) {
   return { left: r.x0 * scale, top: r.y0 * scale, width: (r.x1 - r.x0) * scale, height: (r.y1 - r.y0) * scale };
 }
 
-/** Each group's highlight, and its firmer shade for the mark a card is open for (theme/v2: markWord, markWordFirm…). */
-export type MarkColours = Record<MarkGroup, { fill: string; firm: string }>;
+/** The marks' colours (theme/v2: markWord, markWordFirm…), read through markFill and markFirm, which say which a mark takes. */
+export type MarkColours = Pick<PaletteV2, 'markWord' | 'markWordFirm' | 'markSlip' | 'markSlipFirm' | 'markTajweed' | 'markTajweedFirm'>;
 
 /**
  * Behind the page's ink, in its frame: what follows the reciter (lib/reciteLive/wash's followCues: with the page shown,
@@ -75,7 +77,7 @@ export function LiveUnderlay({
             testID={firm ? `live-highlight-${group}-picked` : `live-highlight-${group}`}
             box={markHighlight(words, m)}
             scale={scale}
-            colour={firm ? colors.marks[group].firm : colors.marks[group].fill}
+            colour={firm ? markFirm(colors.marks, m) : markFill(colors.marks, m)}
           />
         );
       })}

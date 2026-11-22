@@ -740,15 +740,6 @@ export function useReciteLayer({
   );
   // The hidden view: covers and guide lines only, no band on any line (lib/reciteLive's LiveOverlay).
   const coverColors = useMemo(() => ({ cover: palette.pageBg, guide: palette.textSecondary }), [palette]);
-  // Recite's three highlight colours (theme/v2: markWord…), each with its firmer shade for the mark a card is open for.
-  const markColours = useMemo(
-    () => ({
-      word: { fill: v2.markWord, firm: v2.markWordFirm },
-      slip: { fill: v2.markSlip, firm: v2.markSlipFirm },
-      tajweed: { fill: v2.markTajweed, firm: v2.markTajweedFirm },
-    }),
-    [v2],
-  );
   const pageUnderlay = useMemo(
     () =>
       showing && qw
@@ -761,7 +752,7 @@ export function useReciteLayer({
               marks={shownOnPage(page)}
               selected={shownCardMarks[0] ?? null}
               hidden={false}
-              colors={{ band: v2.highlight, marks: markColours }}
+              colors={{ band: v2.highlight, marks: v2 }}
             />
           )
         : showPast && qw && !pastOnCovers
@@ -789,11 +780,11 @@ export function useReciteLayer({
               marks={hidden ? [] : pageMarks(page)}
               selected={cardMarks[0] ?? null}
               hidden={hidden}
-              colors={{ band: v2.highlight, marks: markColours }}
+              colors={{ band: v2.highlight, marks: v2 }}
             />
           )
         : undefined,
-    [liveOn, qw, live.active, live.state, v2, cardMarks, pageMarks, hidden, markColours, showPast, pastOnPage, pastAt, isDark, showing, shownOnPage, shownCardMarks, liveInfo, pastOnCovers],
+    [liveOn, qw, live.active, live.state, v2, cardMarks, pageMarks, hidden, showPast, pastOnPage, pastAt, isDark, showing, shownOnPage, shownCardMarks, liveInfo, pastOnCovers],
   );
   // The next word's cover turns red while something else is being said in its slot (the checker's `off`, draft 7).
   const offWord = live.state.off?.w ?? null;
@@ -823,11 +814,11 @@ export function useReciteLayer({
             ? { mark, fill: markFirm(v2, mark), opacity: 1, picked: true }
             : { mark, fill: markFill(v2, mark), opacity: isDark ? PAST_OPACITY.dark : PAST_OPACITY.light }
           : mark.w === pickedLive
-            ? { mark, fill: markColours[markGroup(mark)].firm, picked: true }
-            : { mark, fill: markColours[markGroup(mark)].fill },
+            ? { mark, fill: markFirm(v2, mark), picked: true }
+            : { mark, fill: markFill(v2, mark) },
       );
     },
-    [qw, hidden, coversKeepMarks, live.active, live.state, checkTake, markColours, pastOnCovers, memories, v2, isDark, cardMarks, pastAt],
+    [qw, hidden, coversKeepMarks, live.active, live.state, checkTake, pastOnCovers, memories, v2, isDark, cardMarks, pastAt],
   );
   // A tap on the page: the shown take's marks; else this take's marks, then the past mistakes on show (on the page, or
   // on a hidden page's covers: Majd, Nov 21 2026, "the shaded mistakes when the page is hidden aren't clickable"). The
