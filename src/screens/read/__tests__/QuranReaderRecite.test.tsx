@@ -473,6 +473,37 @@ describe('a checker whose said follows the voice, and a slow connection (Nov 22 
     await event({ type: 'beat', t: 5, rx: 5.5 } as LiveEvent);
     expect(screen.queryByText('Slow connection: checking is behind')).toBeNull();
   });
+
+  it('[RECITE-5] a resume onto another instance: its catch-up never says "Slow connection", the words stay; a slow connection after it still does', async () => {
+    const slowText = 'Slow connection: checking is behind';
+    await startTake('check');
+    await act(async () => mockMic!.onAudio(new Int16Array(16000 * 12)));
+    await event({ type: 'at', w: A23 + 3, t: 10 });
+    await event({ type: 'beat', t: 10, rx: 11 } as LiveEvent);
+    expect(screen.getByTestId('recite-words')).toBeTruthy();
+    // The connection went quiet and the take resumed on another instance: it checks the take again from its start, its
+    // held audio going out a slice at a time, far behind what was recorded (E2E flow 20's minute 5).
+    await event({ type: 'ready', take: 't1', protocol: 6, from: 0 });
+    for (const [t, rx] of [
+      [1, 2],
+      [3, 4],
+      [3.5, 5],
+      [6, 8],
+    ]) {
+      await act(async () => mockMic!.onAudio(new Int16Array(16000)));
+      await event({ type: 'beat', t, rx } as LiveEvent);
+      expect(screen.queryByText(slowText)).toBeNull();
+      expect(screen.getByTestId('recite-words')).toBeTruthy();
+    }
+    // Caught up: measured afresh, and a connection that then falls behind says so again.
+    await event({ type: 'beat', t: 10.5, rx: 13 } as LiveEvent);
+    expect(screen.queryByText(slowText)).toBeNull();
+    await act(async () => mockMic!.onAudio(new Int16Array(16000 * 4)));
+    await event({ type: 'beat', t: 12, rx: 13.5 } as LiveEvent);
+    await act(async () => mockMic!.onAudio(new Int16Array(16000 * 2)));
+    await event({ type: 'beat', t: 12.5, rx: 14 } as LiveEvent);
+    expect(screen.getByText(slowText)).toBeTruthy();
+  });
 });
 
 describe('a take’s audio stays with the take, never a recording (RMEM-6)', () => {

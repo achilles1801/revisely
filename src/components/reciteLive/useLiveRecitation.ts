@@ -322,6 +322,11 @@ export function useLiveRecitation({
       readies.current++;
       // A resume onto a checker that holds less than the page shows: it checks the take again from there.
       if (readies.current > 1 && (e.from ?? 0) / SAMPLE_RATE < shownT.current - 1) replayUntil.current = shownT.current;
+      // A resume measures the connection afresh: the held audio going out again is no slow connection (RECITE-5).
+      if (readies.current > 1) {
+        behindBefore.current = null;
+        setSlow(false);
+      }
     }
     let replayed = false;
     if (replayUntil.current != null) {
@@ -343,8 +348,9 @@ export function useLiveRecitation({
       if (e.rx != null) {
         const behind = samples.current / SAMPLE_RATE - e.rx;
         const before = behindBefore.current;
-        behindBefore.current = behind;
-        setSlow((was) => slowAfterBeat(was, behind, before));
+        // While a re-check catches up it is behind by design: measured again from the first beat after it.
+        behindBefore.current = replayed ? null : behind;
+        setSlow((was) => slowAfterBeat(was, behind, before, replayed));
       }
       return;
     }

@@ -479,8 +479,14 @@ export const SLOW_CLEAR_S = 2;
  * Whether the bar says the connection is slow, after a `beat` (Nov 22 2026, the checker's bad-network test: below about
  * 256 kbit/s the take's audio falls further behind every second). `behind`: seconds recorded minus the checker's `rx`;
  * `before`: the last beat's. On once 3 s behind and still falling behind; off again below 2 s.
+ *
+ * `catchingUp`: a resume's re-check, where the checker has the take again from its start and is behind by the whole take
+ * while the held audio goes out. That isn't a slow connection, so it's never on then; the phone starts measuring again
+ * once it has caught up (`before` null). Before, a resume onto another instance said "Slow connection" in the words'
+ * place for the whole catch-up (E2E flow 20, Nov 22 2026).
  */
-export function slowAfterBeat(was: boolean, behind: number, before: number | null): boolean {
+export function slowAfterBeat(was: boolean, behind: number, before: number | null, catchingUp = false): boolean {
+  if (catchingUp) return false;
   if (was) return behind >= SLOW_CLEAR_S;
   return behind >= SLOW_AT_S && before != null && behind > before;
 }
