@@ -2,6 +2,7 @@ import { JournalEntry, JournalKind, JournalNote, User } from '../types';
 import { getSurahsForPage } from './quranData';
 import { getRevisionDayForUser, revisionDayOf } from './fajrBoundary';
 import { formatDate, formatTime, t, weekdayName } from '../i18n';
+import { westernDigits } from '../i18n/digits';
 
 // Limits mirrored in firestore.rules — keep them in sync.
 export const JOURNAL_TEXT_MAX = 200;
@@ -167,7 +168,7 @@ export function formatMinutes(minutes: number): string {
  * "not recorded" (null), and values are capped at a full day.
  */
 export function parseMinutesInput(text: string): number | null {
-  const digits = text.replace(/[^0-9]/g, '');
+  const digits = westernDigits(text).replace(/[^0-9]/g, '');
   if (digits === '') return null;
   return Math.min(parseInt(digits, 10), JOURNAL_MINUTES_MAX);
 }

@@ -20,6 +20,7 @@ import { PillTabs } from '../v2/PillTabs';
 import { Tap } from '../v2/Tap';
 import { t } from '../../i18n';
 import type { SittingEnded } from '../../lib/sitting';
+import { westernDigits } from '../../i18n/digits';
 
 type Kind = 'stopwatch' | 'timer';
 type Direction = 'countUp' | 'countDown';
@@ -274,7 +275,7 @@ export function TimerControls(props: TimerControlsProps) {
           <View style={v2.entry}>
             <TextInput
               value={draft}
-              onChangeText={(text) => setDraft(text.replace(/[^0-9]/g, '').slice(0, 3))}
+              onChangeText={(text) => setDraft(westernDigits(text).replace(/[^0-9]/g, '').slice(0, 3))}
               onBlur={endEdit}
               onSubmitEditing={() => commitEdit()}
               keyboardType="number-pad"

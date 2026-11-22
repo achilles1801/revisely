@@ -11,6 +11,7 @@ import { Tap } from '../v2/Tap';
 import { typeV2 } from '../../theme/v2';
 import { BLOCK_ICON, REVISED_ICON, type BlockKind } from './BlockMark';
 import { formatNumber, t } from '../../i18n';
+import { westernDigits } from '../../i18n/digits';
 
 const MAX_SCALE = 1.4;
 
@@ -98,7 +99,7 @@ export function MinutesField({ value, onChange, testID }: { value: string; onCha
       <TextInput
         testID={testID}
         value={value}
-        onChangeText={(v) => onChange(v.replace(/[^0-9]/g, ''))}
+        onChangeText={(v) => onChange(westernDigits(v).replace(/[^0-9]/g, ''))}
         placeholder={formatNumber(0)}
         placeholderTextColor={palette.secondary}
         keyboardType="number-pad"
