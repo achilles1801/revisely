@@ -1,5 +1,5 @@
 /**
- * Settings → Report a problem (SET-2): what the form holds while it is open, kept outside the screens so
+ * Settings → Report a problem (SET-3): what the form holds while it is open, kept outside the screens so
  * the form can step aside for a screenshot of any screen and come back with the words still there.
  *
  * - `form`: the sheet is up.

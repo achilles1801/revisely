@@ -28,7 +28,7 @@ export function identifyUser(uid: string | null) {
 }
 
 /**
- * Settings → Report a problem (SET-2): sends the user's words to Sentry's User Feedback, as Sentry's own
+ * Settings → Report a problem (SET-3): sends the user's words to Sentry's User Feedback, as Sentry's own
  * form did until Nov 2026 (the app now draws the form itself, components/report). The report carries this
  * launch's release and tags (lib/releaseInfo), the recent breadcrumbs, and the screenshot if the user took
  * one; the native SDK keeps it until it can be sent when offline. No name or email is asked for.

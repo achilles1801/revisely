@@ -1,4 +1,4 @@
-// Settings → Share Revisely and Report a problem (BEHAVIOUR.md SET-1 to SET-3). The report form is the app's own
+// Settings → Share Revisely and Report a problem (BEHAVIOUR.md SET-2 to SET-4). The report form is the app's own
 // (components/report), mounted once over the main screens; only Sentry, the outside service the report goes to, is
 // stood in, at its SDK's edge.
 import React from 'react';
@@ -43,8 +43,8 @@ const flush = async (ms: number) => {
   });
 };
 
-describe('Sharing Revisely (SET-1)', () => {
-  it('[SET-1] the words and the link are each shared once, on an iPhone and on Android', () => {
+describe('Sharing Revisely (SET-2)', () => {
+  it('[SET-2] the words and the link are each shared once, on an iPhone and on Android', () => {
     const words = en.settings.support.shareMessage;
     expect(words).not.toContain('revisely.app');
     expect(shareRevisely(words, 'ios')).toEqual({ message: words, url: REVISELY_LINK });
@@ -55,7 +55,7 @@ describe('Sharing Revisely (SET-1)', () => {
   });
 });
 
-describe('Report a problem (SET-2, SET-3)', () => {
+describe('Report a problem (SET-3, SET-4)', () => {
   let alert: jest.SpyInstance;
   beforeEach(() => {
     jest.useFakeTimers();
@@ -68,7 +68,7 @@ describe('Report a problem (SET-2, SET-3)', () => {
     jest.useRealTimers();
   });
 
-  it('[SET-2] Send needs words, sends them with no name or email, closes the form and says so', async () => {
+  it('[SET-3] Send needs words, sends them with no name or email, closes the form and says so', async () => {
     const screen = host();
     expect(screen.queryByTestId('report-sheet-input')).toBeNull();
     act(() => openReportProblem());
@@ -92,7 +92,7 @@ describe('Report a problem (SET-2, SET-3)', () => {
     expect(getReportState().text).toBe('');
   });
 
-  it('[SET-2] Cancel sends nothing and keeps nothing', () => {
+  it('[SET-3] Cancel sends nothing and keeps nothing', () => {
     const screen = host();
     act(() => openReportProblem());
     fireEvent.changeText(screen.getByTestId('report-sheet-input'), 'Half a thought');
@@ -102,7 +102,7 @@ describe('Report a problem (SET-2, SET-3)', () => {
     expect(screen.getByTestId('report-sheet-input').props.value).toBe('');
   });
 
-  it('[SET-3] a screenshot: the form steps aside, the bar captures the screen, and the report carries it', async () => {
+  it('[SET-4] a screenshot: the form steps aside, the bar captures the screen, and the report carries it', async () => {
     const data = new Uint8Array([1, 2, 3]);
     mockScreen.shots = [{ filename: 'screenshot.png', contentType: 'image/png', data }];
     const screen = host();
@@ -125,7 +125,7 @@ describe('Report a problem (SET-2, SET-3)', () => {
     expect(mockSent[0].hint.attachments).toEqual([{ filename: 'screenshot.png', contentType: 'image/png', data }]);
   });
 
-  it('[SET-3] ✕ and Remove leave the report without a picture; a failed capture says so and can still be sent', async () => {
+  it('[SET-4] ✕ and Remove leave the report without a picture; a failed capture says so and can still be sent', async () => {
     mockScreen.shots = [{ filename: 'screenshot.png', contentType: 'image/png', data: new Uint8Array([9]) }];
     const screen = host();
     act(() => openReportProblem());

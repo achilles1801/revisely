@@ -244,7 +244,7 @@ export const settings = {
     share: 'Share Revisely',
     /** The store's review page (SESS-8; Revisely Dev). */
     rate: 'Rate Revisely',
-    /** The words shared; the link follows them (once: SET-1). */
+    /** The words shared; the link follows them (once: SET-2). */
     shareMessage: 'I use Revisely to keep the Quran I’ve memorized. It plans a little revision for every day.',
     feedback: 'Send feedback',
     feedbackMessage: 'Found a bug or have an idea? Tell us anything. We read every note.',
@@ -258,7 +258,7 @@ export const settings = {
     report: 'Report a problem',
     contact: 'Contact support',
   },
-  /** Settings → Report a problem: the form (SET-2, SET-3). */
+  /** Settings → Report a problem: the form (SET-3, SET-4). */
   report: {
     title: 'Report a problem',
     message: 'Tell us what went wrong. It goes to us with the app’s version, never your name or email.',

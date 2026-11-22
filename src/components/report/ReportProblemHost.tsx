@@ -23,7 +23,7 @@ export const CAPTURE_DELAY_MS = 150;
 export const REPORT_MAX_LENGTH = 2000;
 
 /**
- * Settings → Report a problem (SET-2, SET-3; Majd, Nov 22 2026: "fix the terrible ui for the report a
+ * Settings → Report a problem (SET-3, SET-4; Majd, Nov 22 2026: "fix the terrible ui for the report a
  * problem"): the app's own form, in its own design, in place of Sentry's white one with its logo. Mounted once
  * over the main screens, so "Add a screenshot" can put the form away, let the user go to the screen with the
  * problem, and bring the form back with the picture. The report still goes to Sentry (lib/sentry).

@@ -266,7 +266,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'Settings, section by section',
-    covers: ['REVO-39', 'REMIND-1', 'REMIND-3', 'REMIND-4', 'SET-1', 'SET-2', 'SET-3'],
+    covers: ['REVO-39', 'REMIND-1', 'REMIND-3', 'REMIND-4', 'SET-2', 'SET-3', 'SET-4'],
     routes: ['Settings'],
     text: lines(
       '- Account: display name. Activity: “Activity”, “Recordings”, “Back up recordings”, “Time in app”, “Memorized pages”. Home screen: “Next prayer”, “Friday Al-Kahf reminder”. Prayer: as above.',
