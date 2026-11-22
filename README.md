@@ -60,6 +60,24 @@ rule the app keeps for its users; the scenario tests check them by id.
 - **Updates and binaries:** an update reaches only binaries built from the same native code (the runtime version
   is a fingerprint, `fingerprint.config.js`). Store releases are made by hand.
 
+**Revisely Dev** is a second app (`com.revisionbuddy.app.dev`, `APP_VARIANT=dev`) that installs beside the store
+app. It runs on its own Firebase project (`revisely-dev`), so testing never touches production data. It gets each
+develop commit on its own `dev` channel, and its site and API are at dev.revisely.app. See "Dev stack" in
+`CLAUDE.md`.
+
+## Deploying the backend
+
+Rules and Cloud Functions deploy by hand. Without `--project`, these commands deploy **production** (the default in
+`.firebaserc`):
+
+```bash
+firebase deploy --only firestore:rules
+firebase deploy --only functions:<name>
+```
+
+The dev project deploys itself from develop (`.github/workflows/dev-backend.yml`). By hand, it's
+`--project revisely-dev`. Rules go live before any app code that needs them.
+
 `CLAUDE.md` is the full operations handbook: releases, the fingerprint, config and secrets, and each feature's
 traps. `CONTRIBUTING.md` says how to make a change.
 
