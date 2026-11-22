@@ -67,7 +67,8 @@ import { smartTrackingOn } from '../../lib/smartTracking';
 import { juzOfPages } from '../../lib/juzSheet';
 import { PillButton } from '../v2/PillButton';
 import type { UserPage } from '../../types';
-import { formatDate, formatTime, t } from '../../i18n';
+import { formatDate, formatTime, t, formatNumber } from '../../i18n';
+import { chevron } from '../../i18n/direction';
 
 const EMPTY_DAY: DayItems = { revisions: [], memorized: [], reads: [], doneAhead: [] };
 
@@ -147,8 +148,8 @@ export const timeRange = (start: number | null | undefined, minutes: number | nu
 /** A timed sitting by what it held: "Al-Mulk, ayahs 1–26" (REC-2); "Timed in Read" with no pages. */
 const sittingName = (pages: number[]) => (pages.length > 0 ? describePassage(pages) : t('activity.day.timedInRead'));
 
-/** "1 page", "18 pages". */
-const pagesWord = (n: number) => `${n} ${n === 1 ? 'page' : 'pages'}`;
+/** "1 page", "18 pages", in the app's language. */
+const pagesWord = (n: number) => t('common.pages', { count: n });
 /** The surahs the pages fall in ("Al-Mulk 1–12"), or nothing. */
 const surahsOf = (pages: number[]) => (pages.length > 0 ? describeSurahRuns(pageRuns(pages)) : null);
 /** The sub-line of a block: its parts joined with " · ". */
@@ -591,7 +592,7 @@ export function DayBlocks({
             <View style={styles.links}>
               {planLine.links.map((l) => (
                 <Tap key={l.id} onPress={l.onPress} accessibilityRole="button" testID={l.id}>
-                  <Text style={[typeV2.meta, styles.link, { color: palette.link }]}>{`${l.label}${l.arrow ? ' ›' : ''}`}</Text>
+                  <Text style={[typeV2.meta, styles.link, { color: palette.link }]}>{`${l.label}${l.arrow ? ` ${chevron()}` : ''}`}</Text>
                 </Tap>
               ))}
             </View>
@@ -893,7 +894,7 @@ export function DayBlocks({
         <DayBlock
           mark={<BlockMark kind="notes" />}
           title={t('activity.day.notes')}
-          figure={String(notesBlock.length)}
+          figure={formatNumber(notesBlock.length)}
           items={notesItems}
           onLayout={layoutFor('notes')}
           testID="activity-block-notes"

@@ -21,7 +21,7 @@ import { shiftDay } from '../../lib/journal';
 import { typeV2 } from '../../theme/v2';
 import { PillTabs } from '../v2/PillTabs';
 import { Tap } from '../v2/Tap';
-import { t } from '../../i18n';
+import { t, weekdayLetters, formatNumber } from '../../i18n';
 import { forwardIcon, backIcon } from '../../i18n/direction';
 
 export type CalendarRange = 'month' | 'week';
@@ -29,7 +29,6 @@ export type CalendarRange = 'month' | 'week';
 const RANGE_KEY = '@revisely_activity_range';
 const GAP = 6;
 const MAX_CELL_H = 44;
-const WEEKDAY_LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
 /**
  * Activity's calendar (new design). A month by default: a cell per day in
@@ -118,7 +117,7 @@ export function ActivityCalendar({
       {isMonth ? (
         <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} testID="calendar-month">
           <View style={styles.row} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-            {WEEKDAY_LETTERS.map((d, i) => (
+            {weekdayLetters().map((d, i) => (
               <Text key={i} style={[typeV2.meta, styles.weekday, { width: cellW || undefined, color: palette.secondary }]}>
                 {d}
               </Text>
@@ -251,7 +250,7 @@ const DayCell = memo(function DayCell({
           ]}
           maxFontSizeMultiplier={1.2}
         >
-          {Number(date.slice(8))}
+          {formatNumber(Number(date.slice(8)))}
         </Text>
       </View>
     </Tap>
@@ -280,7 +279,7 @@ function WeekRow({
     <>
       <View style={[styles.swatch, { backgroundColor: future ? palette.fill : palette.heat[level] }]}>
         <Text style={[typeV2.meta, { color: future ? palette.secondary : palette.heatInk[level], fontWeight: '600' }]}>
-          {Number(date.slice(8))}
+          {formatNumber(Number(date.slice(8)))}
         </Text>
       </View>
       <View style={styles.weekText}>

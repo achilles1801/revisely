@@ -8,7 +8,7 @@ import {
   getJuzName,
   getSurahsForPage,
 } from './quranData';
-import { describePassage, placeOfPage } from './passages';
+import { describePassage, placeOfPage, surahNameIn } from './passages';
 import { pageRuns } from './pageRanges';
 import { formatNumber, t } from '../i18n';
 
@@ -99,7 +99,7 @@ export function pageCountLabel(n: number): string {
   return t('lib.plan.pages', { count: n });
 }
 
-/** Surah names on these pages in order, deduped: "Al-Baqarah, Al-Imran +2". */
+/** Surah names on these pages in order, deduped, in the app's language: "Al-Baqarah, Al-Imran +2". */
 export function surahNamesLabel(pages: number[], max = 2): string {
   const names: string[] = [];
   const seen = new Set<number>();
@@ -107,12 +107,13 @@ export function surahNamesLabel(pages: number[], max = 2): string {
     for (const s of getSurahsForPage(p)) {
       if (!seen.has(s.number)) {
         seen.add(s.number);
-        names.push(s.name);
+        names.push(surahNameIn(s.number));
       }
     }
   }
-  if (names.length <= max) return names.join(', ');
-  return `${names.slice(0, max).join(', ')} +${names.length - max}`;
+  const separator = t('lib.passages.listSeparator');
+  if (names.length <= max) return names.join(separator);
+  return `${names.slice(0, max).join(separator)} +${formatNumber(names.length - max)}`;
 }
 
 export interface DaySummary {

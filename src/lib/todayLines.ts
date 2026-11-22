@@ -21,9 +21,8 @@
 import { getJuzForPage, getSurahsForPage } from './quranData';
 import type { PageRun } from './pageRanges';
 import type { Leftovers } from './carryOver';
-import { describePagesToRevise, NBHY, NBSP, pagesNote, placeOfPageToRevise, spokenText, type PartialPages } from './passages';
+import { describePagesToRevise, NBHY, NBSP, pagesNote, placeOfPageToRevise, spokenText, surahNameIn, type PartialPages } from './passages';
 import { suraOf } from './ayahKeys';
-import { getSurah } from './quranData';
 import { t } from '../i18n';
 
 export type { PartialPages };
@@ -77,17 +76,17 @@ export const spoken = (s: string) => {
 };
 
 const pages = (n: number) => t('lib.today.pages', { count: n });
-/** A surah's name, held together ("Al‑Mujadila" never breaks after "Al-"). */
-const held = (name: string | undefined) => (name ?? '').split('-').join(NBHY);
+/** A surah's name in the app's language, held together ("Al‑Mujadila" never breaks after "Al-"). */
+const named = (sura: number | undefined) => (sura ? surahNameIn(sura).split('-').join(NBHY) : '');
 const firstSurah = (p: number, partial: PartialPages = NONE) => {
   const mine = partial.get(p);
-  return held(mine ? getSurah(suraOf(mine[0]))?.name : getSurahsForPage(p)[0]?.name);
+  return named(mine ? suraOf(mine[0]) : getSurahsForPage(p)[0]?.number);
 };
 const lastSurah = (p: number, partial: PartialPages = NONE) => {
   const mine = partial.get(p);
-  if (mine) return held(getSurah(suraOf(mine[mine.length - 1]))?.name);
+  if (mine) return named(suraOf(mine[mine.length - 1]));
   const all = getSurahsForPage(p);
-  return held(all[all.length - 1]?.name);
+  return named(all[all.length - 1]?.number);
 };
 /** Where reading a page begins: its first ayah, or a partly memorized page's first memorized one. */
 const placeOf = (p: number, partial: PartialPages) => placeOfPageToRevise(p, partial);

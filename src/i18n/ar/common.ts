@@ -30,6 +30,7 @@ export const common: NonNullable<ArStrings['common']> = {
   today: 'اليوم',
   yesterday: 'أمس',
   tomorrow: 'غدًا',
+  weekdayLetters: 'ح ن ث ر خ ج س',
   edit: 'تعديل',
   search: 'بحث',
   apply: 'تطبيق',

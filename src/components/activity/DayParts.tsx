@@ -11,7 +11,7 @@ import { typeV2 } from '../../theme/v2';
 import { Tap } from '../v2/Tap';
 import { describePassage, pageRunEnds, spokenText } from '../../lib/passages';
 import type { StripCell, Strength } from '../../lib/activityDayParts';
-import { t } from '../../i18n';
+import { formatNumber, t } from '../../i18n';
 
 /** The Revised mark: a ring filled to the share revised; a check when done. */
 export function ProgressRing({ fraction, done, size = 40 }: { fraction: number; done: boolean; size?: number }) {
@@ -113,9 +113,9 @@ export function StripSummary({ text }: { text: string }) {
 export function StrengthCounts({ counts }: { counts: Record<Strength, number> }) {
   const { palette } = useTheme();
   const items: { key: Strength; color: string; label: string }[] = [
-    { key: 'weak', color: palette.red, label: 'weak' },
-    { key: 'moderate', color: palette.secondary, label: 'moderate' },
-    { key: 'strong', color: palette.good, label: 'strong' },
+    { key: 'weak', color: palette.red, label: t('activity.juz.count.weak') },
+    { key: 'moderate', color: palette.secondary, label: t('activity.juz.count.moderate') },
+    { key: 'strong', color: palette.good, label: t('activity.juz.count.strong') },
   ];
   const shown = items.filter((i) => counts[i.key] > 0);
   if (shown.length === 0) return null;
@@ -124,7 +124,7 @@ export function StrengthCounts({ counts }: { counts: Record<Strength, number> })
       {shown.map((i) => (
         <View key={i.key} style={styles.count}>
           <View style={[styles.countDot, { backgroundColor: i.color }]} />
-          <Text style={[typeV2.meta, styles.tabular, { color: palette.text, fontWeight: '600' }]}>{counts[i.key]}</Text>
+          <Text style={[typeV2.meta, styles.tabular, { color: palette.text, fontWeight: '600' }]}>{formatNumber(counts[i.key])}</Text>
           <Text style={[typeV2.meta, { color: palette.secondary }]}>{i.label}</Text>
         </View>
       ))}

@@ -3,6 +3,7 @@
 // than "Juz 27 + 1 more".
 
 import { getJuzForPage, getJuzRange, getSurahsForPage } from './quranData';
+import { surahNameIn } from './passages';
 import { formatNumber, t } from '../i18n';
 
 export interface PageRun {
@@ -44,8 +45,10 @@ export function describePageRuns(runs: PageRun[], show = 3): string {
 export function describeSurahs(run: PageRun): string {
   const startSurahs = getSurahsForPage(run.first);
   const endSurahs = getSurahsForPage(run.last);
-  const first = startSurahs[0]?.name ?? '';
-  const last = endSurahs[endSurahs.length - 1]?.name ?? first;
+  // In the app's language («الملك» in Arabic).
+  const first = startSurahs[0] ? surahNameIn(startSurahs[0].number) : '';
+  const lastSurah = endSurahs[endSurahs.length - 1];
+  const last = lastSurah ? surahNameIn(lastSurah.number) : first;
   return first === last ? first : t('lib.passages.fromTo', { from: first, to: last });
 }
 

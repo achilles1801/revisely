@@ -27,6 +27,8 @@ export const common = {
   today: 'Today',
   yesterday: 'Yesterday',
   tomorrow: 'Tomorrow',
+  /** The week's day letters, Sunday first, as the calendars head their columns (format.ts weekdayLetters). */
+  weekdayLetters: 'S M T W T F S',
   edit: 'Edit',
   search: 'Search',
   apply: 'Apply',

@@ -1,5 +1,6 @@
 import { JournalEntry, JournalKind, JournalNote, User } from '../types';
 import { getSurahsForPage } from './quranData';
+import { surahNameIn } from './passages';
 import { getRevisionDayForUser, revisionDayOf } from './fajrBoundary';
 import { formatDate, formatTime, t, weekdayName } from '../i18n';
 import { westernDigits } from '../i18n/digits';
@@ -291,7 +292,8 @@ export function summarizeRevisedPages(pages: number[]): string {
   const surahs: string[] = [];
   for (const pn of unique) {
     for (const s of getSurahsForPage(pn)) {
-      if (!surahs.includes(s.name)) surahs.push(s.name);
+      const name = surahNameIn(s.number);
+      if (!surahs.includes(name)) surahs.push(name);
     }
   }
 

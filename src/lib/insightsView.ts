@@ -4,11 +4,11 @@
 // Days are YYYY-MM-DD revision days; definitions follow ACT-4 (lib/activityInsights).
 
 import { getPagesForJuz, getSurahsForPage } from './quranData';
-import { describePassage, pagesNote } from './passages';
+import { describePassage, pagesNote, surahNameIn } from './passages';
 import { PACE_MIN_ITEMS } from './activityInsights';
 import { memorizedByMonth, type MemorizationItemLike } from './memorizedAyahs';
 import { coverageRecency, type CoverageRecency } from './recency';
-import { formatDate, t } from '../i18n';
+import { formatDate, t, weekdayLetters, formatNumeral } from '../i18n';
 
 const dayNumber = (day: string) => Math.round(Date.parse(`${day}T00:00:00Z`) / 86_400_000);
 const daysBetween = (from: string, to: string) => dayNumber(to) - dayNumber(from);
@@ -109,7 +109,6 @@ export function coverageCount(memorized: Set<number>, last: Map<number, string>,
 
 // ── Consistency ──────────────────────────────────────────────────────────
 
-const LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
 /**
  * The last seven days, oldest first, each with its weekday letter, whether it was active, and whether it came before
@@ -120,7 +119,7 @@ export function weekCircles(active: Set<string>, today: string, firstDay?: strin
   const first = firstDay ? firstDay.slice(0, 10) : null;
   for (let k = 6; k >= 0; k--) {
     const day = shiftDay(today, -k);
-    out.push({ day, letter: LETTERS[new Date(`${day}T00:00:00Z`).getUTCDay()], done: active.has(day), before: first != null && day < first });
+    out.push({ day, letter: weekdayLetters()[new Date(`${day}T00:00:00Z`).getUTCDay()], done: active.has(day), before: first != null && day < first });
   }
   return out;
 }
@@ -191,12 +190,14 @@ export function timedDays(items: { day: string; occurredAt?: number | null; minu
   return days.size;
 }
 
-const hourParts = (h: number) => ({ n: h % 12 === 0 ? 12 : h % 12, p: h % 24 < 12 ? 'AM' : 'PM' });
-/** Hours [from, to) as "5–7 AM", "11 AM–1 PM". */
+const hourParts = (h: number) => ({ n: h % 12 === 0 ? 12 : h % 12, p: h % 24 < 12 ? t('lib.insights.am') : t('lib.insights.pm') });
+/** Hours [from, to) as "5–7 AM", "11 AM–1 PM"; in Arabic «٥–٧ ص». */
 export function hourRange(from: number, to: number): string {
   const a = hourParts(from);
   const b = hourParts(to);
-  return a.p === b.p ? `${a.n}–${b.n} ${b.p}` : `${a.n} ${a.p}–${b.n} ${b.p}`;
+  return a.p === b.p
+    ? t('lib.insights.hoursSame', { from: a.n, to: b.n, period: b.p })
+    : t('lib.insights.hoursAcross', { from: a.n, fromPeriod: a.p, to: b.n, toPeriod: b.p });
 }
 
 /**
@@ -265,7 +266,10 @@ export function weakSpotRows(input: {
   const flagged = [...input.memorized]
     .filter((p) => (input.rating(p) ?? 5) <= 2 || (skips.get(p) ?? 0) >= 2)
     .sort((a, b) => a - b);
-  const surahOf = (p: number) => getSurahsForPage(p)[0]?.name ?? '';
+  const surahOf = (p: number) => {
+    const s = getSurahsForPage(p)[0];
+    return s ? surahNameIn(s.number) : '';
+  };
   const rows: WeakSpotRow[] = [];
   let run: number[] = [];
   const flush = () => {
@@ -391,7 +395,8 @@ export function paceView(input: {
 
 /** "1.8", "6", "12": a pace to one decimal under 10 (no ".0"), whole from there. */
 export function formatPace(minutesPerPage: number): string {
-  return minutesPerPage < 10 ? minutesPerPage.toFixed(1).replace(/\.0$/, '') : String(Math.round(minutesPerPage));
+  // In the language's digits («١٫٨» in Arabic).
+  return formatNumeral(minutesPerPage < 10 ? minutesPerPage.toFixed(1).replace(/\.0$/, '') : String(Math.round(minutesPerPage)));
 }
 
 /**

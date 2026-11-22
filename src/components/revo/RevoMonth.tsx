@@ -13,10 +13,9 @@ import type { RevoDayFacts } from '../../lib/revo/types';
 import { typeV2 } from '../../theme/v2';
 import { BlockMark, RevisedMark } from '../activity/BlockMark';
 import { Tap } from '../v2/Tap';
-import { t, dayMonth } from '../../i18n';
+import { t, dayMonth, weekdayLetters, formatNumber } from '../../i18n';
 import { forwardIcon, backIcon } from '../../i18n/direction';
 
-const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const DISC = 34;
 
 /** How much of the day's plan was done, as Activity's ring shows it: none for a day nothing was revised on. */
@@ -105,7 +104,7 @@ export function RevoMonth({
         </View>
       </View>
       <View style={styles.row}>
-        {WEEKDAYS.map((w, i) => (
+        {weekdayLetters().map((w, i) => (
           <Text key={i} style={[styles.letter, { color: palette.secondary }]}>
             {w}
           </Text>
@@ -218,7 +217,7 @@ function DayCell({ day, today, facts, picked, chosen, onPress }: { day: string; 
           </Svg>
         ) : null}
         {done ? <View style={[StyleSheet.absoluteFill, { borderRadius: DISC / 2, backgroundColor: palette.primary }]} /> : null}
-        <Text style={[styles.number, { color: numberColor, fontWeight: done || ring != null ? '600' : '400', opacity: future ? 0.5 : 1 }]}>{Number(day.slice(8))}</Text>
+        <Text style={[styles.number, { color: numberColor, fontWeight: done || ring != null ? '600' : '400', opacity: future ? 0.5 : 1 }]}>{formatNumber(Number(day.slice(8)))}</Text>
         {chosen ? (
           <View style={[styles.badge, { backgroundColor: palette.primary, borderColor: palette.sheet }]} testID={`revo-add-day-added-${day}`}>
             <Ionicons name="checkmark" size={11} color={palette.onPrimary} />

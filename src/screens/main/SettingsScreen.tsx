@@ -98,7 +98,7 @@ import { premiumErrorText, setDevPremium, usePremium } from '../../lib/premium';
 import { earlyAccessLine, useEarlyAccess } from '../../lib/earlyAccess';
 import { checkLevel, setReciteCheckSettings, strictOffered, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
 import { ReciteCheckNotice } from '../../components/reciteCheck/ReciteCheckNotice';
-import { currentLanguage, t } from '../../i18n';
+import { currentLanguage, t, formatNumber } from '../../i18n';
 import {
   chooseLanguage,
   languageChoice,
@@ -707,7 +707,7 @@ export default function SettingsScreen() {
             label={t('settings.activity.recordings')}
             value={
               recordings && recordings.count > 0
-                ? `${recordings.count} · ${formatBytes(recordings.bytes)}`
+                ? `${formatNumber(recordings.count)} · ${formatBytes(recordings.bytes)}`
                 : t('settings.activity.none')
             }
             onPress={
