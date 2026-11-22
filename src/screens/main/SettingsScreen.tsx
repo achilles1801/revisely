@@ -53,7 +53,7 @@ import { useApp } from '../../context/AppContext';
 import { showsUpdateTools } from '../../lib/updates/testerTools';
 import { useAuth } from '../../context/AuthContext';
 import { systemAppearanceAvailable, useTheme } from '../../context/ThemeContext';
-import { HomeStackParamList } from '../../navigation/MainNavigator';
+import type { HomeStackParamList } from '../../navigation/MainNavigator';
 import type { RevoSettingsSection } from '../../lib/revo/types';
 import * as firestoreService from '../../services/firestoreService';
 import { getTotalAppUsageSeconds } from '../../lib/appUsage';

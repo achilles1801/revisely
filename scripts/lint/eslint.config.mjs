@@ -43,6 +43,9 @@ export default defineConfig([
       'react/no-unescaped-entities': 'off',
       // Names help in React DevTools, so they're reported, but an anonymous memo() is not a bug.
       'react/display-name': 'warn',
+      // No import cycles (types imported with `import type` don't count). There were two, navigators and
+      // screens importing each other's types as values, until Nov 22 2026.
+      'import/no-cycle': ['error', { ignoreExternal: true }],
     },
   },
   {

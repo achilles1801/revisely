@@ -13,7 +13,7 @@ import { TopSafeAreaView } from '../../components/SafeAreaView';
 import { ScrollView } from 'react-native-gesture-handler';
 import { useFocusEffect, useNavigation, useScrollToTop } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { HomeStackParamList } from '../../navigation/MainNavigator';
+import type { HomeStackParamList } from '../../navigation/MainNavigator';
 import { PillButton } from '../../components/v2/PillButton';
 import { EditSessionModal } from '../../components/EditSessionModal';
 import { greetingName } from '../../lib/displayName';
