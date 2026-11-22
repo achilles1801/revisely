@@ -21,6 +21,7 @@
 import { dayMonth, t } from '../i18n';
 import { isDevVariant } from './variant';
 import { mistakeDetectionReleased } from './release/mistakeDetection';
+import { dayFromNumber, dayNumber } from './dayKeys';
 
 /**
  * Who sees Gaps and Last revised: Revisely Dev (Majd, Nov 16 2026: build straight into Revisely Dev). Only Revisely
@@ -33,9 +34,6 @@ export function gapsInsightsEnabled(user: { previewTester?: boolean } | null | u
   return user != null && (mistakeDetectionReleased() || isDevVariant() || process.env.EXPO_PUBLIC_E2E === '1');
 }
 
-const DAY_MS = 86_400_000;
-const dayNumber = (day: string) => Math.round(Date.parse(`${day.slice(0, 10)}T00:00:00Z`) / DAY_MS);
-const dayOf = (n: number) => new Date(n * DAY_MS).toISOString().slice(0, 10);
 
 /** A gap is this many days in a row without revising, or more. */
 export const MIN_GAP_DAYS = 2;
@@ -147,17 +145,17 @@ export function gapsView(input: GapsInput): GapsView | null {
     // Days before the first revision read, in an account older than what was read: a gap of unknown start.
     const d0 = dayNumber(days[0]);
     const lower = d0 - known;
-    if (lower >= MIN_GAP_DAYS) gaps.push({ from: null, to: days[0], first: dayOf(known), last: dayOf(d0 - 1), days: lower, atLeast: true, open: false });
+    if (lower >= MIN_GAP_DAYS) gaps.push({ from: null, to: days[0], first: dayFromNumber(known), last: dayFromNumber(d0 - 1), days: lower, atLeast: true, open: false });
   }
   const steps: { to: number; step: number }[] = [];
   for (let i = 1; i < days.length; i++) {
     const a = dayNumber(days[i - 1]);
     const b = dayNumber(days[i]);
     steps.push({ to: b, step: b - a });
-    if (b - a - 1 >= MIN_GAP_DAYS) gaps.push({ from: days[i - 1], to: days[i], first: dayOf(a + 1), last: dayOf(b - 1), days: b - a - 1, atLeast: false, open: false });
+    if (b - a - 1 >= MIN_GAP_DAYS) gaps.push({ from: days[i - 1], to: days[i], first: dayFromNumber(a + 1), last: dayFromNumber(b - 1), days: b - a - 1, atLeast: false, open: false });
   }
   if (sinceLast >= RED_FROM_DAYS) {
-    gaps.push({ from: lastDay, to: null, first: dayOf(dayNumber(lastDay) + 1), last: today, days: sinceLast, atLeast: false, open: true });
+    gaps.push({ from: lastDay, to: null, first: dayFromNumber(dayNumber(lastDay) + 1), last: today, days: sinceLast, atLeast: false, open: true });
   }
 
   const counted = gaps.filter((g) => dayNumber(g.last) >= rangeStart);
@@ -172,7 +170,7 @@ export function gapsView(input: GapsInput): GapsView | null {
   const closedToday = sinceLast === 0 && lastStep && lastStep.to === t && lastStep.step - 1 >= MIN_GAP_DAYS ? lastStep.step - 1 : null;
   const revisedDays = days.filter((d) => dayNumber(d) >= rangeStart).length;
 
-  return { lastDay, sinceLast, closedToday, longest, usual, gaps: counted, revisedDays, rangeStart: dayOf(rangeStart) };
+  return { lastDay, sinceLast, closedToday, longest, usual, gaps: counted, revisedDays, rangeStart: dayFromNumber(rangeStart) };
 }
 
 /** The gaps as the section lists them: the one still open first, then the latest first. */

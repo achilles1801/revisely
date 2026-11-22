@@ -6,10 +6,9 @@ import { describePassage } from './passages';
 import { formatDayLong } from './activityFormat';
 import { lastRevisedWords } from './recency';
 import { t, weekdayName } from '../i18n';
+import { dayNumber, daysBetween } from './dayKeys';
 
 // A day, or a timestamp whose first ten characters are its day (a page's record).
-const dayNumber = (day: string) => Math.round(Date.parse(`${day.slice(0, 10)}T00:00:00Z`) / 86_400_000);
-const daysBetween = (from: string, to: string) => dayNumber(to) - dayNumber(from);
 
 export interface UncoveredRow {
   /** A whole memorized juz not revised in the range, or a run of pages inside a juz. */

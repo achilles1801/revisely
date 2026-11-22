@@ -26,6 +26,10 @@ import type { TodaySnapshot } from '../todaySnapshot';
 import type { RevoDayFacts, RevoPassageFacts, RevoPlanTally, RevoTimes } from './types';
 import { isRevisable } from '../memorizedAyahs';
 import { t } from '../../i18n';
+import { daysBetween } from '../dayKeys';
+
+// revo/openers imports daysBetween from here.
+export { daysBetween };
 
 /** Everything the facts are read from: what Home's snapshot (and so Revo's context) was built from. */
 export interface FactSources {
@@ -55,10 +59,6 @@ export const NOTE_CHARS = 1000;
 /** A day's notes together, at most (the server's limit too). */
 export const DAY_NOTE_CHARS = 3000;
 
-const DAY_MS = 86_400_000;
-const dayNumber = (day: string) => Math.round(Date.parse(`${day}T00:00:00Z`) / DAY_MS);
-/** Whole days from `from` to `to` (YYYY-MM-DD). */
-export const daysBetween = (from: string, to: string) => dayNumber(to) - dayNumber(from);
 
 /** Words for the model: surah and juz first, with ordinary spaces and hyphens. */
 const words = (pages: Iterable<number>, juz = true) => plainText(describePassage(pages, { juz }));

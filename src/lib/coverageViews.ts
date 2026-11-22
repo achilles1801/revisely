@@ -7,6 +7,7 @@ import { getAllSurahs, getPagesForJuz } from './quranData';
 import { surahName } from './passages';
 import { coverageRecency, type CoverageRecency } from './recency';
 import { t } from '../i18n';
+import { dayNumber } from './dayKeys';
 
 export type CoverageView = 'juz' | 'surah' | 'page';
 export const COVERAGE_VIEWS: readonly CoverageView[] = ['juz', 'surah', 'page'];
@@ -88,7 +89,6 @@ export interface JuzCoverage {
   surahs: SurahCoverage[];
 }
 
-const dayNumber = (day: string) => Math.round(Date.parse(`${day.slice(0, 10)}T00:00:00Z`) / 86_400_000);
 
 /** Each juz with a memorized page, with its memorized surahs. */
 export function surahCoverage(input: CoverageInput): JuzCoverage[] {
