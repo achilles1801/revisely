@@ -9,9 +9,11 @@ import { read } from './read';
 import { reader } from './reader';
 import { recite } from './recite';
 import { reciteLive } from './reciteLive';
+import { recordings } from './recordings';
 import { reminders } from './reminders';
 import { revision } from './revision';
 import { settings } from './settings';
+import { timer } from './timer';
 import { verse } from './verse';
 import type { ArStrings } from './types';
 
@@ -25,8 +27,10 @@ export const ar: ArStrings = {
   reader,
   recite,
   reciteLive,
+  recordings,
   reminders,
   revision,
   settings,
+  timer,
   verse,
 };
