@@ -2300,6 +2300,16 @@ code into `src/i18n/en/<folder>.ts`, folder by folder, with the English unchange
     own, the pan never started and the row under the finger got a tap.
   - The gesture is made once and reads what changes from shared values; in Jest, Reanimated's mock
     makes a new shared value every render, so `PagerTabs.test` keeps them across renders.
+  - **Nothing renders in React while the pager moves** (Majd, Nov 22 2026: the swipe was laggy on
+    Android, smooth on iOS). Reanimated 4 skips its own frame updates from a React commit until Android
+    has mounted it (`shouldReanimatedSkipCommit`), so a render mid-swipe froze the pager. A swipe now
+    changes the tab once its spring has settled (`go` in the spring's callback). A tap on the tab still
+    shown during the settle turns the pager back (`settleTabPress`). The landing page comes from the
+    release's own translation, since a busy Android frame hands the last moves over with the release.
+    While the pager moves, each page is drawn into a hardware texture on Android
+    (`renderToHardwareTextureAndroid` through animated props, `moving`). Otherwise both tabs' content is
+    drawn again every frame. `PagerTabs.settle.test` pins all of it, with springs the test finishes.
+    Keep screens' focus work from rendering when nothing changed (Home's history: `sameHistory`).
   - The swipe accent: a 5pt dot under the current tab's icon stretches into a short pill between
     two tabs (front end ahead, back end behind; `wormFrame`) and gathers again as the tab lands,
     1:1 with `position` on the UI thread. A swipe that lands on another tab ticks (selection
