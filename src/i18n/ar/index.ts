@@ -8,6 +8,7 @@ import { home } from './home';
 import { insights } from './insights';
 import { insightsTab } from './insightsTab';
 import { journal } from './journal';
+import { languages } from './languages';
 import { lib } from './lib';
 import { memorization } from './memorization';
 import { mushaf } from './mushaf';
@@ -16,6 +17,7 @@ import { onboarding } from './onboarding';
 import { plan } from './plan';
 import { player } from './player';
 import { prayer } from './prayer';
+import { preview } from './preview';
 import { premium } from './premium';
 import { qibla } from './qibla';
 import { read } from './read';
@@ -29,6 +31,7 @@ import { reciters } from './reciters';
 import { recordings } from './recordings';
 import { reminders } from './reminders';
 import { revision } from './revision';
+import { revo } from './revo';
 import { settings } from './settings';
 import { timer } from './timer';
 import { updates } from './updates';
@@ -46,6 +49,7 @@ export const ar: ArStrings = {
   insights,
   insightsTab,
   journal,
+  languages,
   lib,
   memorization,
   mushaf,
@@ -55,6 +59,7 @@ export const ar: ArStrings = {
   player,
   prayer,
   premium,
+  preview,
   qibla,
   read,
   reader,
@@ -67,6 +72,7 @@ export const ar: ArStrings = {
   recordings,
   reminders,
   revision,
+  revo,
   settings,
   timer,
   updates,
