@@ -12,7 +12,7 @@
 //   session does; the volume buttons set how loud.
 
 import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
-import * as Haptics from 'expo-haptics';
+import { hapticOf } from '../../design/haptics';
 import { countsAsMistake, isUnclear, type Mark } from './contract';
 import { logger } from '../logger';
 
@@ -78,5 +78,5 @@ export function playCueSound(): void {
 
 /** The cue's tap. */
 export function playCueTap(): void {
-  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => undefined);
+  hapticOf('warning').catch(() => undefined);
 }
