@@ -697,6 +697,13 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   letter slip with what was heard shows two lines, Expected and what was recited, each the phrase around it (two words
   either side, in its ayah), as its card does. (Majd, Nov 22 2026, Tarteel picks 4 and 5: "ur recommended is fine, we
   should aim to keep it clean", "recommended is fine".)
+- **RECITE-25.** Nothing a take shows under the page covers it, on any phone and at any text size, the page shown or
+  hidden (Majd, Nov 22 2026, of the shown take's card: "it's blocking the view of the bottom verses which is
+  unacceptable"). The take's bar and a shown take's card ("Your take · …", RMEM-5) are the screen's footer, in the
+  player's place and of its height, in the room the page leaves under it; the card's text is one line each. Not a
+  mistake's Undo (RECITE-4) is in the take's bar, in the words' place, for 5 s (15 with VoiceOver or TalkBack), the bar's
+  buttons staying; Stop ends it, and the summary's Removed list has Put back. Before, both were notes over the page's
+  last lines. A mark's card, opened from its word, is the one thing over the page, on purpose.
 ## Recite insights
 
 What a user's takes with Mark mistakes show over time, and Revo knowing it (Majd, Nov 16 2026).
@@ -803,8 +810,8 @@ Recite with Mark mistakes remembers each take (Majd, Nov 15 2026; Tarteel's bigg
   ayat" when it lists takes the chart leaves out.
 - **RMEM-8.** (Revisely Dev) A finished take's summary opens again from its card (Majd, Nov 22 2026: "make that take card
   clickable and have it open that days summary popup sheet"). A take shown on its page (RMEM-5: from a day's Recited, the
-  progress page's takes, or a row of "This passage", RMEM-7) has its card at the bottom, "Your take · Yesterday, 9:41 PM",
-  with ▶ and Done as before; a tap anywhere else on the card opens that take's summary. All activity's Recitations show a
+  progress page's takes, or a row of "This passage", RMEM-7) has its card in the player's place under the page (RECITE-25),
+  "Your take · Yesterday, 9:41 PM", with ▶ and Done as before; a tap anywhere else on the card opens that take's summary. All activity's Recitations show a
   take on its page the same way (before, a tap there opened its day). The summary is built from the take's record, as it
   was when the take ended:
   - when it was, first, and "page hidden" when it was; its score by the page and its mistakes (per page from 2 pages), or

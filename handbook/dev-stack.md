@@ -238,7 +238,7 @@ until its part is set up.
       Extra word just before it (`off` in `lib/reciteLive/state`).
     - What the lab measured: right 86% of the times it fires, and never on hesitations or pauses.
     - VoiceOver hears nothing: the mic is on throughout a take.
-  - **"Not a mistake" can be undone** (Majd, Nov 15 2026; Tarteel's Removed list): for 5 s an Undo toast above the bar,
+  - **"Not a mistake" can be undone** (Majd, Nov 15 2026; Tarteel's Removed list): for 5 s an Undo in the take's bar, in the words' place (RECITE-25: never a note over the page),
     and after the take the summary's "1 marked not a mistake" (closed until tapped) lists each with Put back
     (`restoreMark`: the mark and what it counted come back). The checker is told both ways, so the lab never keeps a
     wrong label: on the connection while live (`dismiss`, `undismiss`), and after the final answer over HTTP (`POST

@@ -36,6 +36,8 @@ export const reciteLive = {
     /** After Stop, a follow-along take's result in the bar (a tap opens the summary). */
     resultDone: 'Done',
     resultLabel: '{{result}}. Show your recitation',
+    /** Not a mistake's Undo, in the bar's words' place (RECITE-25). */
+    undoLabel: '{{text}}. Undo',
     /** Said once to screen reader users when a take ends (the microphone already off). */
     resultSpoken: 'Take done. {{result}}',
     slow: 'Slow connection: checking is behind',

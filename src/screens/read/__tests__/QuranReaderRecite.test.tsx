@@ -1,7 +1,7 @@
 // The reader's one mic (Revisely Dev): Record, Recite, Check; the recite bar; marks and the hidden view.
 import React from 'react';
 import { AccessibilityInfo, Alert, Modal, StatusBar } from 'react-native';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import QuranReaderScreen from '../QuranReaderScreen';
 import { Sheet } from '../../../components/v2/Sheet';
@@ -1267,8 +1267,13 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
       fireEvent.press(screen.getByTestId('mark-card-dismiss'));
       expect(screen.queryByTestId('live-mark-word')).toBeNull();
       expect(screen.getByText('Marked not a mistake')).toBeTruthy();
-      fireEvent.press(screen.getByTestId('undo-toast-action'));
+      // [RECITE-25] In the take's bar, in the words' place, Stop still there: never a note over the page's last lines.
+      expect(screen.queryByTestId('undo-toast')).toBeNull();
+      expect(within(screen.getByTestId('recite-bar')).getByTestId('recite-undo')).toBeTruthy();
+      expect(within(screen.getByTestId('recite-bar')).getByTestId('recite-stop')).toBeTruthy();
+      fireEvent.press(screen.getByTestId('recite-undo'));
       expect(screen.getByTestId('live-mark-word')).toBeTruthy();
+      expect(screen.queryByTestId('recite-undo')).toBeNull();
       expect(mockLive.sent).toEqual(expect.arrayContaining([{ type: 'dismiss', id: 'a' }, { type: 'undismiss', id: 'a' }]));
       const types = (mockLive.sent as { type: string }[]).map((f) => f.type);
       expect(types.indexOf('dismiss')).toBeLessThan(types.indexOf('undismiss'));
@@ -1280,7 +1285,7 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
       await event({ type: 'mark', mark: wrongMark as never });
       await tapWord(UTIYAT);
       fireEvent.press(screen.getByTestId('mark-card-dismiss'));
-      fireEvent.press(screen.getByTestId('undo-toast-action'));
+      fireEvent.press(screen.getByTestId('recite-undo'));
       fireEvent.press(screen.getByTestId('recite-eye'));
       fireEvent.press(screen.getByTestId('recite-next-word'));
       fireEvent.press(screen.getByTestId('recite-stop'));
@@ -1303,7 +1308,7 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
       fireEvent.press(screen.getByTestId('mark-card-dismiss'));
       expect(sendLabel()).toHaveBeenCalledWith('dismiss', 't1', 'a', expect.any(Number));
       expect(mockLive.sent).not.toContainEqual({ type: 'dismiss', id: 'a' });
-      fireEvent.press(screen.getByTestId('undo-toast-action'));
+      fireEvent.press(screen.getByTestId('recite-undo'));
       expect(sendLabel()).toHaveBeenLastCalledWith('undismiss', 't1', 'a', expect.any(Number));
     });
 

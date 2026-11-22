@@ -31,6 +31,7 @@ export const reciteLive: NonNullable<ArStrings['reciteLive']> = {
     wrongLetter: 'خطأ في الحروف',
     tajweed: 'ملاحظة تجويد',
     paused: 'متوقف مؤقتًا',
+    undoLabel: '{{text}}. تراجع',
     slow: 'الاتصال بطيء: الفحص متأخر عن تلاوتك',
     scoreLabel: 'النتيجة {{score}}. عرض أخطائك',
     resume: 'استئناف',

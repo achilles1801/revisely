@@ -311,8 +311,15 @@ export function useReciteLayer({
   // With VoiceOver or TalkBack: the Undo stays longer, and what happened is said (never while the microphone is on).
   const screenReader = useScreenReaderOn();
   useEffect(() => {
-    if (live.state.status === 'connecting' || live.state.status === 'idle') setUndoFor(null);
+    // Stop ends it too: the bar's middle is the take's result's then, and the summary's Removed list has Put back.
+    if (live.state.status === 'connecting' || live.state.status === 'idle' || live.state.status === 'checking') setUndoFor(null);
   }, [live.state.status]);
+  // The Undo is in the take's bar, for 5 s (15 with VoiceOver or TalkBack), as the note it replaced (RECITE-25).
+  useEffect(() => {
+    if (!undoFor) return undefined;
+    const timer = setTimeout(() => setUndoFor(null), undoMs(screenReader));
+    return () => clearTimeout(timer);
+  }, [undoFor, screenReader]);
   const [summaryFor, setSummaryFor] = useState<string | null>(null);
   const [introOpen, setIntroOpen] = useState(false);
   // Keep the checker awake while the reader is open and in front (Cloud Run stops an idle one after about 15 minutes, and
@@ -1019,7 +1026,9 @@ export function useReciteLayer({
     if (!takeListening || cardAt) setTakeImmersive(false);
   }, [takeListening, cardAt]);
   const immersive = takeImmersive && takeListening && !screenReader && !cardAt;
-  const chromeShown = modeMenu || (live.active ? !immersive : chromeVisible);
+  // A past take shown on its page keeps the controls up: its card is the footer (RECITE-25), there while it shows, as the
+  // take's bar is during a take.
+  const chromeShown = modeMenu || showing || (live.active ? !immersive : chromeVisible);
   const onTapReader = useCallback(() => {
     if (takeListening && !screenReader) {
       dismissHint();
@@ -1082,9 +1091,20 @@ export function useReciteLayer({
         ? `${live.state.cursor}|${live.state.guess ?? ''}|${live.state.saidUpTo}|${heldCursor ?? ''}|${Object.keys(live.state.marks).length}|${hidden}|${revealed.size}|${offWord}|${veiled.length}|${showPast || pastOnCovers ? memoryRecords.length : -1}|${pastAt?.w ?? ''}|${showing ? `${shownTake?.id}:${shownTake?.marks.length}` : ''}|${shownCardAt?.w ?? ''}`
         : undefined,
     },
-    /** The take's bar, in the footer's place while a take is open. */
+    /**
+     * The take's bar, in the footer's place while a take is open; while a past take shows on its page, its card there
+     * (RECITE-25: the room under the page holds both, so neither covers a line).
+     */
     bar:
-      live.active && qw ? (
+      showing && shownTake ? (
+        <ShownTakeBar
+          take={shownTake}
+          now={Date.now()}
+          onDone={endShowing}
+          onOpen={pastSummaryOn ? () => setPastOpen(true) : undefined}
+          surface={{ background: palette.control, border: palette.divider }}
+        />
+      ) : live.active && qw ? (
         <ReciteBar
           hidden={hidden}
           onToggleHidden={toggleHidden}
@@ -1106,6 +1126,19 @@ export function useReciteLayer({
           result={
             quietEnd && barPhase === 'done' && takeId && !test
               ? { text: takeResultText(live.state, qw, live.startWord, checkTake), onPress: () => setSummaryShown(takeId) }
+              : null
+          }
+          // Not a mistake's Undo, in the words' place: never a note over the page (RECITE-25).
+          undo={
+            undoFor
+              ? {
+                  text: t('reciteLive.layer.marked'),
+                  onUndo: () => {
+                    const id = undoFor;
+                    setUndoFor(null);
+                    if (id) live.restore(id);
+                  },
+                }
               : null
           }
           onScore={() => {
@@ -1156,19 +1189,6 @@ export function useReciteLayer({
     /** The cards, sheets and notes, rendered last. */
     sheets: liveOn ? (
       <>
-        <UndoToast
-          visible={undoFor != null}
-          message={t('reciteLive.layer.marked')}
-          duration={undoMs(screenReader)}
-          onUndo={() => {
-            const id = undoFor;
-            setUndoFor(null);
-            if (id) live.restore(id);
-          }}
-          onDismiss={() => setUndoFor(null)}
-          // Above the recite bar.
-          bottomInset={insets.bottom + spacing.sm + CAPSULE_HEIGHT + spacing.sm}
-        />
         <ReciteModeMenu
           visible={modeMenu}
           mode={reciteSettings.mode}
@@ -1268,15 +1288,6 @@ export function useReciteLayer({
               if (t) setProgressFor({ from: t.from, to: t.to, back: null });
             }}
             onClose={() => setPastAt(null)}
-          />
-        ) : null}
-        {showing && shownTake ? (
-          <ShownTakeBar
-            take={shownTake}
-            now={Date.now()}
-            bottom={insets.bottom + spacing.sm + CAPSULE_HEIGHT + spacing.sm}
-            onDone={endShowing}
-            onOpen={pastSummaryOn ? () => setPastOpen(true) : undefined}
           />
         ) : null}
         {qw && showing ? (

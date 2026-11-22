@@ -38,7 +38,7 @@ async function tap(app: OpenApp, testID: string): Promise<void> {
   await app.idle(50);
 }
 
-it('[RMEM-8] a take shown on its page: its card opens its summary from the record, with its history, its peeks and Put back; All activity shows the take the same way', async () => {
+it('[RMEM-8] [RECITE-25] a take shown on its page: its card, under the page in the player’s place, opens its summary from the record, with its history, its peeks and Put back; All activity shows the take the same way', async () => {
   setZone(ZONES.chicago);
   setNow('2026-11-13 20:12');
   const phone = new Phone('phone');
@@ -65,6 +65,10 @@ it('[RMEM-8] a take shown on its page: its card opens its summary from the recor
   await app.until(() => nav(app).current.getCurrentRoute()?.name === 'QuranReader', 'the reader');
   expect(nav(app).current.getCurrentRoute()?.params).toMatchObject({ pageNumber: 246, showTake: 'take2' });
   await app.until(() => app.screen.queryByTestId('shown-take-bar') != null, 'the take on its page');
+  // The card is the reader's footer, in the room the page leaves under it: never over the page's last lines.
+  const { within } = app.mods.rtl;
+  expect(within(app.screen.getByTestId('reader-footer')).getByTestId('shown-take-bar')).toBeTruthy();
+  expect(app.screen.queryByTestId('mushaf-scrubber')).toBeNull();
 
   // Its card opens the summary, as it said when the take ended.
   await tap(app, 'shown-take-open');
