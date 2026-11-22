@@ -141,10 +141,13 @@ jest.mock('../../../lib/recite/micSource', () => ({
     return { stop: jest.fn(async () => undefined) };
   }),
 }));
+// The word data: the fixture, loaded as the screens load it. Read at once (getQuranWords) only where a test says it has
+// loaded (Your recitation's phrase, RECITE-18).
+const mockWordsLoaded = { on: false };
 jest.mock('../../../lib/recite/quranWords', () => {
   const actual = jest.requireActual('../../../lib/recite/quranWords');
   const fixture = () => require('../../../lib/recite/__fixtures__/quranWords').quranWords();
-  return { ...actual, loadQuranWords: async () => fixture(), getQuranWords: () => null };
+  return { ...actual, loadQuranWords: async () => fixture(), getQuranWords: () => (mockWordsLoaded.on ? fixture() : null) };
 });
 
 // The checker: the test sends its events.
@@ -288,6 +291,7 @@ beforeEach(async () => {
   mockLive.sent = [];
   mockLive.audio = 0;
   mockLive.clips = [];
+  mockWordsLoaded.on = false;
   mockLive.start = undefined;
   mockPager.scrolled = [];
   mockRoute.params = { pageNumber: 379 };
@@ -1165,6 +1169,24 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
       await tapWord(UTIYAT);
       await act(async () => fireEvent.press(screen.getByTestId('mark-card-yours')));
       expect(mockLive.clips).toEqual([[expect.closeTo(4.8, 5), expect.closeTo(7.2, 5)]]);
+    });
+
+    it('[RECITE-18] plays the phrase the mistake is in: a short ayah whole, from its first word to the next ayah’s', async () => {
+      mockWordsLoaded.on = true;
+      await startTake('check');
+      await act(async () => mockMic!.onAudio(new Int16Array(16000 * 14)));
+      // 27:23 (11 words) and 27:24's first word, a word every 0.7 s from 2 s.
+      const [a0, a1] = words.verseRange(27, 23);
+      const at = (w: number) => 2 + (w - a0) * 0.7;
+      for (let w = a0; w <= a1; w++) await event({ type: 'at', w, t: at(w) } as LiveEvent);
+      await event({
+        type: 'mark',
+        mark: { id: 'a', w: UTIYAT, ayah: [27, 23], kind: 'word', sure: 'clear', heard: 'وَأُوهِيَتْ', heardExact: false, t: [at(UTIYAT) - 0.3, at(UTIYAT) + 0.2] },
+      });
+      await tapWord(UTIYAT);
+      await act(async () => fireEvent.press(screen.getByTestId('mark-card-yours')));
+      // From 0.75 s before the cursor reached its first word (it does about 0.45 s after the word starts) to 27:24's.
+      expect(mockLive.clips).toEqual([[expect.closeTo(at(a0) - 0.75, 5), expect.closeTo(at(a1) + 0.05, 5)]]);
     });
 
     it('no button when the moment isn’t known', async () => {

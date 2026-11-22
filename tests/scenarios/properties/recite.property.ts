@@ -38,6 +38,7 @@ import {
   LIVE_IDLE,
   type LiveState,
 } from '../../../src/lib/reciteLive/state';
+import { AT_LAG, clipRange, endsPhrase, LEAD, MAX_SECONDS, phraseOf, SHORT_WORDS, TAIL } from '../../../src/lib/reciteLive/phrase';
 import { socketFeed, CATCHUP_SLICE_SAMPLES, CATCHUP_TICK_MS, KEEPALIVE_MS, WATCHDOG_MS, type SocketLike } from '../../../src/lib/reciteLive/socket';
 import { scoreTapOpens } from '../../../src/lib/reciteLive/view';
 import type { StartFrame } from '../../../src/lib/reciteLive/feed';
@@ -1080,6 +1081,79 @@ describe('[RECITE-17] the score opens something whenever it shows', () => {
         if (status === 'listening' || status === 'checking') expect(opens).toBe('so-far');
         else if (status === 'done') expect(opens).toBe('summary');
         else expect(opens).toBeNull();
+      }),
+    );
+  });
+});
+
+describe('[RECITE-18] Your recitation plays the phrase the mistake is in', () => {
+  // A take over one ayah and the next: the cursor reaches each word `step` seconds after the one before (some never:
+  // skipped), from `from` seconds.
+  const takeOverAyah = fc
+    .record({
+      w: fc.integer({ min: words.verseFirstWord(2, 1), max: words.count - 2 }),
+      from: fc.double({ min: 2, max: 60, noNaN: true }),
+      step: fc.double({ min: 0.25, max: 3, noNaN: true }),
+      skipped: fc.uniqueArray(fc.nat(40), { maxLength: 4 }),
+      kind: fc.constantFrom(...KINDS),
+      tail: fc.double({ min: 0, max: 20, noNaN: true }),
+    })
+    .map((t) => {
+      const r = words.ref(t.w);
+      const [a0, a1] = words.verseRange(r.sura, r.ayah);
+      const end = Math.min(words.count, a1 + 40);
+      const times = new Map<number, number>();
+      for (let i = a0; i < end; i++) {
+        if (i !== t.w && t.skipped.includes(i - a0)) continue;
+        if (t.kind === 'skipped' && i === t.w) continue;
+        times.set(i, t.from + (i - a0) * t.step);
+      }
+      const takeEnd = t.from + (end - a0) * t.step + t.tail;
+      return { ...t, a0, a1, times, takeEnd, mark: { id: 'm', w: t.w, ayah: [r.sura, r.ayah], kind: t.kind, sure: 'clear' } as Mark };
+    });
+
+  it(`never more than ${MAX_SECONDS} s, inside the take, around the mistake, and never past its ayah`, () => {
+    fc.assert(
+      fc.property(takeOverAyah, (t) => {
+        const timeOf = (w: number) => t.times.get(w) ?? null;
+        const clip = clipRange(words, t.mark, timeOf, t.takeEnd);
+        expect(clip).not.toBeNull();
+        const [c0, c1] = clip!;
+        expect(c0).toBeGreaterThanOrEqual(0);
+        expect(c1).toBeLessThanOrEqual(t.takeEnd + 1e-9);
+        expect(c1 - c0).toBeLessThanOrEqual(MAX_SECONDS + 1e-9);
+        // The mistake's moment: when the cursor reached the word (or, skipped, the word before and after it).
+        const before = [...t.times.keys()].filter((w) => w <= t.w).pop();
+        const after = [...t.times.keys()].find((w) => w > t.w);
+        if (before != null) expect(c0).toBeLessThanOrEqual(t.times.get(before)! - AT_LAG + 1e-9);
+        if (after != null && t.kind !== 'added') expect(c1).toBeGreaterThanOrEqual(Math.min(t.takeEnd, t.times.get(after)! - AT_LAG) - 1e-9);
+        // Not before the ayah's first word the cursor reached (when it reached one), nor much past the next ayah's.
+        const first = [...t.times.keys()].find((w) => w >= t.a0 && w < t.a1);
+        if (first != null) expect(c0).toBeGreaterThanOrEqual(t.times.get(first)! - AT_LAG - LEAD - 1e-9);
+        const nextAyah = [...t.times.keys()].find((w) => w >= t.a1);
+        if (nextAyah != null) expect(c1).toBeLessThanOrEqual(t.times.get(nextAyah)! - AT_LAG + TAIL + 1e-9);
+      }),
+    );
+  });
+
+  it('a short ayah plays whole; a long one, the phrase between pause marks', () => {
+    fc.assert(
+      fc.property(takeOverAyah, (t) => {
+        const timeOf = (w: number) => t.times.get(w) ?? null;
+        const [c0] = clipRange(words, t.mark, timeOf, t.takeEnd)!;
+        const firstHeard = (from: number, to: number) => [...t.times.keys()].find((w) => w >= from && w <= to);
+        const ayahFirst = firstHeard(t.a0, t.a1 - 1);
+        if (ayahFirst == null) return; // a skipped ayah: across it (the property above)
+        const short = t.a1 - t.a0 <= SHORT_WORDS;
+        const ayahSeconds = (t.times.get(firstHeard(t.a1, t.a1 + 40)!) ?? t.takeEnd) - t.times.get(ayahFirst)!;
+        if (short && ayahSeconds + LEAD + TAIL <= MAX_SECONDS) expect(c0).toBeCloseTo(Math.max(0, t.times.get(ayahFirst)! - AT_LAG - LEAD));
+        else {
+          // Never before the phrase's first word the cursor reached.
+          const [p0, p1] = phraseOf(words, t.w);
+          const pFirst = firstHeard(p0, p1);
+          if (pFirst != null) expect(c0).toBeGreaterThanOrEqual(Math.min(t.times.get(pFirst)!, t.times.get(ayahFirst)!) - AT_LAG - LEAD - 1e-9);
+          for (let i = p0; i < p1; i++) expect(endsPhrase(i)).toBe(false);
+        }
       }),
     );
   });
