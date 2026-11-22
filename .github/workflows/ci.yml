@@ -349,6 +349,14 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npx --prefix scripts/lint eslint -c scripts/lint/eslint.config.mjs --quiet .
 
+      # Prettier on the folders formatted so far (scripts/lint/formatted.txt): the rest is formatted a
+      # folder at a time, never all at once. A failure prints the files; `npx --prefix scripts/lint prettier
+      # --config scripts/lint/prettier.config.mjs --write <file>` fixes them.
+      - name: Format (formatted folders)
+        id: format
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npx --prefix scripts/lint prettier --config scripts/lint/prettier.config.mjs --check $(grep -v '^#' scripts/lint/formatted.txt)
+
       - name: Unit + component tests (app)
         id: unit
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}

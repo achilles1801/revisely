@@ -99,7 +99,11 @@ export function expectedEnglish(dates: RamadanDates): string {
   const start = utcDay(dates.start);
   if (Number.isNaN(start)) return '';
   const day = new Date(start).toLocaleDateString('en-US', {
-    timeZone: 'UTC', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+    timeZone: 'UTC',
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
   });
   return `Expected around ${day} (the first fast), depending on the moon sighting.`;
 }
@@ -181,7 +185,8 @@ const banner = (daysLeft: string) => `<div class="rm-banner">
   </div>`;
 
 /** A string of lights: the wire and five layers of bulbs that twinkle out of step (ramadan.css draws them). */
-const LIGHTS = (where: string) => `<div class="rm-lights ${where}" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>`;
+const LIGHTS = (where: string) =>
+  `<div class="rm-lights ${where}" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>`;
 
 /** What hangs into the side margins on wide screens, from just under the header. */
 const HANGERS = `<div class="rm-hangers" aria-hidden="true">
@@ -250,17 +255,22 @@ export function dressForRamadan(html: string, opts: DressOptions = {}): string {
     (dates.start ? ` data-rm-start="${dates.start}"` : '') +
     (dates.eid ? ` data-rm-eid="${dates.eid}"` : '');
   let added = false;
-  let out = html.replace(/<body(\s+class="([^"]*)")?([^>]*)>/, (tag, _attr, classes: string | undefined, rest: string) => {
-    const list = (classes ?? '').split(/\s+/).filter(Boolean);
-    if (list.includes(RAMADAN_ON)) return tag;
-    added = true;
-    return `<body class="${[...list, RAMADAN_ON].join(' ')}"${attrs}${rest}>\n  ${SPRITE}\n  <div class="rm-sky" aria-hidden="true"></div>`;
-  });
+  let out = html.replace(
+    /<body(\s+class="([^"]*)")?([^>]*)>/,
+    (tag, _attr, classes: string | undefined, rest: string) => {
+      const list = (classes ?? '').split(/\s+/).filter(Boolean);
+      if (list.includes(RAMADAN_ON)) return tag;
+      added = true;
+      return `<body class="${[...list, RAMADAN_ON].join(' ')}"${attrs}${rest}>\n  ${SPRITE}\n  <div class="rm-sky" aria-hidden="true"></div>`;
+    },
+  );
   if (!added) return html;
   out = out.replace('</head>', `  ${STYLESHEET}\n</head>`);
   const daysLeft = daysLeftEnglish(opts.now ?? Date.now(), dates);
-  out = out.replace(/(\n?[ \t]*)<header class="site-header">([\s\S]*?)<\/header>/, (_m, indent: string, inner: string) =>
-    `${indent}${banner(daysLeft)}${indent}<header class="site-header">${inner}  ${LIGHTS('rm-head')}\n  </header>${indent}${HANGERS}`,
+  out = out.replace(
+    /(\n?[ \t]*)<header class="site-header">([\s\S]*?)<\/header>/,
+    (_m, indent: string, inner: string) =>
+      `${indent}${banner(daysLeft)}${indent}<header class="site-header">${inner}  ${LIGHTS('rm-head')}\n  </header>${indent}${HANGERS}`,
   );
   out = out.replace(
     /<footer class="site-footer">/,

@@ -87,7 +87,10 @@ async function signingKey(kid: string, now: number, fetchImpl: typeof fetch): Pr
 
 function base64UrlBytes(part: string): Uint8Array<ArrayBuffer> {
   if (!/^[A-Za-z0-9_-]*$/.test(part)) throw new AuthError('Malformed token');
-  const b64 = part.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(part.length / 4) * 4, '=');
+  const b64 = part
+    .replace(/-/g, '+')
+    .replace(/_/g, '/')
+    .padEnd(Math.ceil(part.length / 4) * 4, '=');
   let bin: string;
   try {
     bin = atob(b64);
@@ -141,7 +144,12 @@ export async function verifyIdTokenClaims(
   const key = await signingKey(header.kid, now, fetchImpl);
   let valid = false;
   try {
-    valid = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, signature, new TextEncoder().encode(`${parts[0]}.${parts[1]}`));
+    valid = await crypto.subtle.verify(
+      'RSASSA-PKCS1-v1_5',
+      key,
+      signature,
+      new TextEncoder().encode(`${parts[0]}.${parts[1]}`),
+    );
   } catch {
     valid = false;
   }

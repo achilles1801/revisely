@@ -27,6 +27,9 @@ How changes are made here. `CLAUDE.md` has the full detail behind each point.
 ## Code
 - **TypeScript is strict.** Avoid `any`. Use `import type` for types.
 - **Lint** (`scripts/lint`): errors fail CI. Don't add warnings, and fix the ones in code you touch.
+- **Format:** Prettier (`scripts/lint/prettier.config.mjs`). In a folder listed in `scripts/lint/formatted.txt`, run
+  it on the files you change; CI checks those folders. Other folders are formatted one PR at a time
+  (`scripts/lint/README.md`).
 - **Colours** come only from `src/theme`. A raw hex elsewhere fails `noRawColours.test.ts`.
 - **Text people see** goes through `t()` and `src/i18n/en`. Lay out with start and end, never left and right (the app
   also runs right to left).
