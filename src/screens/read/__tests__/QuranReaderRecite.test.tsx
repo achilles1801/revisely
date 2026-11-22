@@ -423,6 +423,43 @@ describe('Recite: following along', () => {
   });
 });
 
+describe('a checker whose said follows the voice, and a slow connection (Nov 22 2026)', () => {
+  const barSays = () => screen.getByTestId('recite-middle').props.accessibilityLabel as string;
+
+  it('[RECITE-6] from protocol 9 the word being said waits only as a late backstop (1.5–4 s), for babble', async () => {
+    setReciteCheckSettings('u1', { noticeSeen: true, mode: 'recite', markMistakes: true });
+    await open();
+    fireEvent.press(screen.getByTestId('recite-mic'));
+    await flush();
+    await flush();
+    await event({ type: 'ready', take: 't1', protocol: 9 });
+    await event({ type: 'locked', w: A23, s: 27, a: 23 });
+    fireEvent.press(screen.getByTestId('recite-eye'));
+    await event({ type: 'at', w: A23 + 1 });
+    const w = words.uthmani(A23 + 1);
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, revealDelay(wordLetters(w), null) + 100));
+    });
+    expect(barSays()).not.toContain(w);
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, revealDelay(wordLetters(w), null, true) - revealDelay(wordLetters(w), null)));
+    });
+    expect(barSays()).toContain(w);
+  });
+
+  it('[RECITE-5] the bar says "Slow connection" once the checker is 3 s behind and falling behind, and stops once it catches up', async () => {
+    await startTake('check');
+    await act(async () => mockMic!.onAudio(new Int16Array(16000 * 5)));
+    await event({ type: 'beat', t: 1, rx: 1 } as LiveEvent);
+    expect(screen.queryByText('Slow connection: checking is behind')).toBeNull();
+    await act(async () => mockMic!.onAudio(new Int16Array(16000)));
+    await event({ type: 'beat', t: 1.5, rx: 1.5 } as LiveEvent);
+    expect(screen.getByText('Slow connection: checking is behind')).toBeTruthy();
+    await event({ type: 'beat', t: 5, rx: 5.5 } as LiveEvent);
+    expect(screen.queryByText('Slow connection: checking is behind')).toBeNull();
+  });
+});
+
 describe('a take’s audio stays with the take, never a recording (RMEM-6)', () => {
   it('with Mark mistakes: the red dot while it records; Stop keeps it with the take, and no note says Recording saved', async () => {
     await startTake('check');

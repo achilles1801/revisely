@@ -490,10 +490,13 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   shown, Not a mistake, Put back, words peeked, resumes): numbers only, never words, audio or ids.
 - **RECITE-5.** A take whose connection drops and comes back shows the same take: its start, the words recited, its
   marks and its score. Anything the checker sends again changes none of them. (The hidden view's red cover, a hint,
-  may show again on the next word until it is reached.)
+  may show again on the next word until it is reached.) When a slow connection leaves the checker 3 s or more behind
+  what was recorded and still falling behind, the bar's line says "Slow connection: checking is behind" in place of the
+  words until it is under 2 s behind again: quietly, never a pop-up, a sound or speech.
 - **RECITE-6.** With the page hidden, the words show as they are recited, from where the take started: a word shows
   once it has been said in full (the checker has decided it), the next word has begun, or it has been the word being
-  said about as long as it takes to say (its letters at the reciter's pace, a held madd longer; 0.7–2.5 s), never a
+  said about as long as it takes to say (its letters at the reciter's pace, a held madd longer; 0.7–2.5 s; with a
+  checker whose `said` follows the voice, only as a late backstop for a noisy room, 2.5 times as long, 1.5–4 s), never a
   word ahead, and the bar names no more than the page shows (Majd, Nov 21 2026: "we shouldn't
   be showing the full word until the user maybe either starts the next word or we get a full match"; Nov 22: "it should
   be under one second max that it shows up"). The word being said keeps its cover, lightly marked, and the newest word

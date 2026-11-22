@@ -32,6 +32,7 @@ export const reciteLive = {
     slip: 'slip',
     tajweed: 'tajweed note',
     paused: 'Paused',
+    slow: 'Slow connection: checking is behind',
     scoreLabel: 'Score {{score}}. Show your mistakes',
     resume: 'Resume',
     pause: 'Pause',

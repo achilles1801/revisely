@@ -42,6 +42,7 @@ import {
   shownUpTo,
   revealDelay,
   wordLetters,
+  VOICE_SAID_PROTOCOL,
 } from '../../lib/reciteLive/state';
 import { stopTrace } from '../../lib/reciteLive/stopTrace';
 import {
@@ -337,9 +338,12 @@ export function useReciteLayer({
     p.at = now;
     const sorted = [...p.perLetter].sort((a, b) => a - b);
     const median = sorted.length >= 3 ? sorted[Math.floor(sorted.length / 2)] : null;
-    const id = setTimeout(() => setHeldCursor(cursorNow), revealDelay(wordLetters(qw.uthmani(cursorNow)), median));
+    // From a checker whose `said` follows the voice, only a late backstop (babble).
+    const backstop = (live.state.protocol ?? 0) >= VOICE_SAID_PROTOCOL;
+    const id = setTimeout(() => setHeldCursor(cursorNow), revealDelay(wordLetters(qw.uthmani(cursorNow)), median, backstop));
     return () => clearTimeout(id);
-  }, [cursorNow, listeningNow, qw]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cursorNow, listeningNow, qw, live.state.protocol]);
   const liveInfo = useMemo(
     () => ({
       // What the hidden page shows (RECITE-6): what's decided or left behind, and the word being said once it has been
@@ -955,6 +959,7 @@ export function useReciteLayer({
           status={barStatus}
           phase={barPhase}
           paused={live.paused}
+          slow={live.slow}
           onPause={() => void live.pause()}
           onResume={() => void live.resume()}
           onStop={live.stop}
