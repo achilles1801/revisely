@@ -44,8 +44,11 @@ export const reciteMemory = {
     first: 'Your first take here',
     toFix: 'Still to fix here',
     takes: 'Your takes here',
+    /** Under the chart when some takes here ran over other ayat too (RMEM-7, Revisely Dev). */
+    sameAyatOnly: 'The score and chart count only your takes of these ayat',
     pageHidden: 'Page hidden',
-    takeLabel: '{{when}}, {{score}}, {{mistakes}}. Show it on the page',
+    /** "Today, 8:12 PM, Ayahs 87 to 90, 99.1%, 1 mistake. Show it on the page". */
+    takeLabel: '{{when}}, {{ayat}}, {{score}}, {{mistakes}}. Show it on the page',
   },
   recited: {
     title: 'Recited',

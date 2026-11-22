@@ -445,6 +445,26 @@ describe("Recite's memory in the take's summary", () => {
     await waitFor(() => expect(screen.queryByTestId('take-summary')).toBeNull(), { timeout: 3000 });
   });
 
+  it('[RMEM-7] the trend compares like with like: a whole-page take earlier never counts for a take of a few ayat (the store app keeps it)', async () => {
+    const page = pastTake({ id: 'page', createdAt: NOW - 3 * 86_400_000, day: '2026-11-12', to: words.pageRange(379)[1] - 1, accuracy: 0.95, mistakes: 7 });
+    const finish = async () => {
+      await startTake('check');
+      await event({ type: 'at', w: UTIYAT + 25 });
+      fireEvent.press(screen.getByTestId('recite-stop'));
+      await flush();
+      await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: UTIYAT + 25, secs: 12, marks: [], score: { reached: 30, mistakes: 0, tajweed: 0, accuracy: 1 }, start: A23 } });
+    };
+    mockMemory.records = [page, pastTake()];
+    await finish();
+    expect(screen.getByTestId('take-summary-progress').props.accessibilityLabel).toMatch(/^Your progress here\. Up from 99\.0% yesterday · 2 takes$/);
+    // Its history lists only the take of the same ayat too.
+    expect(screen.getAllByTestId('take-summary-history-row')).toHaveLength(1);
+    screen.unmount();
+    mockState.dev = false;
+    await finish();
+    expect(screen.getByTestId('take-summary-progress').props.accessibilityLabel).toMatch(/^Your progress here\. Up from 95\.0% on .* · 3 takes$/);
+  });
+
   it('[RMEM-7] the store app has no passage history yet (Revisely Dev’s until the next release); the trend is there', async () => {
     mockState.dev = false;
     await startTake('check');

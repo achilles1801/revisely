@@ -2,6 +2,7 @@
 
 import type { MemoryRecord, TakeRecord } from './record';
 import { takeDaysAgo, takeWhen } from './describe';
+import { samePassage } from './history';
 import { formatAccuracy } from '../reciteLive/score';
 import { t } from '../../i18n';
 
@@ -17,6 +18,15 @@ export function passageTakes(records: readonly MemoryRecord[], from: number, to:
     .filter((r): r is TakeRecord => r.kind === 'take' && !r.deleted && !r.unfinished)
     .filter((t) => Math.min(to, t.to) - Math.max(from, t.from) + 1 >= length / 2)
     .sort((a, b) => a.createdAt - b.createdAt);
+}
+
+/**
+ * The takes a passage's score, line and chart compare (RMEM-7, Revisely Dev): those of the same stretch, sharing at least
+ * half of each one's words. A longer take's score holds its mistakes in ayat this passage doesn't have, so comparing with
+ * it would credit (or blame) the passage for ayat it never recited. "Your takes here" still lists every take of it.
+ */
+export function comparableTakes(takes: readonly TakeRecord[], from: number, to: number): TakeRecord[] {
+  return takes.filter((take) => samePassage(take, { from, to }));
 }
 
 /** "Up from 95.1% on Mon 2 Nov · 6 takes", "Down from 98.3% yesterday · 2 takes", "The same as …"; null with fewer than two. */

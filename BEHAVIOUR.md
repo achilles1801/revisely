@@ -675,6 +675,12 @@ Recite with Mark mistakes remembers each take (Majd, Nov 15 2026; Tarteel's bigg
   in words ("Yesterday: 98.1%, 2 mistakes. Show it on the page"). With no earlier take, during a take (the score's "so
   far") and after Recite alone, there is no such section. "Your progress here" (RMEM-4) follows it.
 
+  Its progress compares like with like (the orchestrator, Nov 22 2026: "'Up from 99.3%' must not credit a take for
+  ayat it never recited"): the summary's trend line, and the progress page's score, line and chart, count only takes
+  of the same stretch, by the same rule. "Your takes here" still lists every take covering half of the passage, each
+  with its ayat on screen and for VoiceOver, and the page says "The score and chart count only your takes of these
+  ayat" when it lists takes the chart leaves out.
+
 ## Searching the Qur'an
 
 Every account, from the Read tab: "Search the Quran" under its title (`lib/search`,

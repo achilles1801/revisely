@@ -11,10 +11,11 @@ import { formatAccuracy, mistakesLabel, scoreLevel } from '../../lib/reciteLive/
 import type { Mark } from '../../lib/reciteLive/contract';
 import type { WordMemory } from '../../lib/reciteMemory/memory';
 import { openInRange } from '../../lib/reciteMemory/memory';
-import { progressLine } from '../../lib/reciteMemory/progress';
+import { comparableTakes, progressLine } from '../../lib/reciteMemory/progress';
 import type { TakeRecord } from '../../lib/reciteMemory/record';
 import { takeWhen } from '../../lib/reciteMemory/describe';
 import { passageOf } from '../reciteLive/TakeSummarySheet';
+import { spokenText } from '../../lib/passages';
 import { markFill } from '../reciteLive/markColours';
 import { PAST_OPACITY } from './RememberedLayers';
 import { AccuracyChart } from './AccuracyChart';
@@ -48,6 +49,7 @@ export function PassageProgressSheet({
   takes,
   memories,
   now,
+  sameStretch = false,
   onOpenTake,
   onClose,
 }: {
@@ -59,6 +61,11 @@ export function PassageProgressSheet({
   takes: TakeRecord[];
   memories: Map<string, WordMemory>;
   now: number;
+  /**
+   * Compare like with like (RMEM-7, Revisely Dev): the score, the line and the chart count only takes of the same stretch
+   * (sharing at least half of each one's words); "Your takes here" still lists every take, each with its ayat.
+   */
+  sameStretch?: boolean;
   /** A take's row: show it on the page (Activity's "Show on the page"); absent, the rows don't open. */
   onOpenTake?: (take: TakeRecord) => void;
   onClose: () => void;
@@ -67,11 +74,14 @@ export function PassageProgressSheet({
   const { width } = useWindowDimensions();
   if (!words || takes.length === 0) return <Sheet visible={false} onClose={onClose} />;
   const sura = words.ref(from).sura;
-  const latest = takes[takes.length - 1];
+  // What the score, the line and the chart compare. A sheet opened for a take's own stretch always holds that take.
+  const same = sameStretch ? comparableTakes(takes, from, to) : takes;
+  const charted = same.length > 0 ? same : takes;
+  const latest = charted[charted.length - 1];
   const level = scoreLevel(latest.accuracy);
   const scoreColor = level === 'good' ? palette.good : level === 'warn' ? palette.warn : palette.onRedSubtle;
   const open = openInRange(memories, from, to + 1);
-  const line = progressLine(takes, now);
+  const line = progressLine(charted, now);
   return (
     <Sheet visible={visible} onClose={onClose} title={t('reciteMemory.passage.title')} scroll right={{ label: t('common.done'), onPress: onClose, strong: true }} testID="progress-sheet">
       <View style={styles.head}>
@@ -88,7 +98,12 @@ export function PassageProgressSheet({
         </View>
       </View>
       <View style={styles.chart}>
-        <AccuracyChart points={takes.map((take) => ({ at: take.createdAt, accuracy: take.accuracy }))} width={width - layoutV2.gutter * 2} now={now} />
+        <AccuracyChart points={charted.map((take) => ({ at: take.createdAt, accuracy: take.accuracy }))} width={width - layoutV2.gutter * 2} now={now} />
+        {charted.length < takes.length ? (
+          <Text style={[typeV2.meta, styles.sameAyat, { color: palette.secondary }]} maxFontSizeMultiplier={1.4} testID="progress-same-ayat">
+            {t('reciteMemory.passage.sameAyatOnly')}
+          </Text>
+        ) : null}
       </View>
       {open.length > 0 ? (
         <View style={styles.section}>
@@ -143,7 +158,7 @@ export function PassageProgressSheet({
             onPress={() => onOpenTake(take)}
             style={[styles.row, i > 0 && { borderTopColor: palette.separator, borderTopWidth: layoutV2.hairline }]}
             accessibilityRole="button"
-            accessibilityLabel={t('reciteMemory.passage.takeLabel', { when, score: formatAccuracy(take.accuracy), mistakes: mistakesLabel(take.mistakes) })}
+            accessibilityLabel={t('reciteMemory.passage.takeLabel', { when, ayat: spokenText(takeRange(words, take, sura)), score: formatAccuracy(take.accuracy), mistakes: mistakesLabel(take.mistakes) })}
             testID="progress-take"
           >
             {row}
@@ -165,6 +180,7 @@ const styles = StyleSheet.create({
   score: { fontSize: 38, lineHeight: 44, fontWeight: '300', letterSpacing: -1 },
   scoreNote: { paddingBottom: 7, flexShrink: 1 },
   chart: { paddingHorizontal: layoutV2.gutter, paddingTop: 6 },
+  sameAyat: { paddingTop: 4, paddingBottom: 6 },
   section: { paddingHorizontal: layoutV2.gutter, paddingTop: 8, paddingBottom: 12 },
   chips: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 6, marginTop: 6 },
   listTitle: { paddingHorizontal: layoutV2.gutter, paddingTop: 12, paddingBottom: 4, borderTopWidth: layoutV2.hairline },
