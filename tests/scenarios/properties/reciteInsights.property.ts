@@ -228,6 +228,39 @@ describe('Recite insights over generated takes [RINS-1]', () => {
     for (const k of Object.keys(seen) as (keyof typeof seen)[]) expect(seen[k]).toBeGreaterThan(0);
   });
 
+  it('a window whose takes all ended without the checker’s final answer has no score: the server still takes it, and says none was scored [RINS-1] [RECITE-11]', () => {
+    const [a, b] = PASSAGES[0];
+    const recs = records([{ from: a, to: b, offset: -1, strict: false, hidden: false, deleted: false, accuracy: 0.97, secs: 60, marks: [] }], []).map((r) =>
+      r.kind === 'take' ? { ...r, unfinished: true } : r,
+    );
+    const r = recitationForRevo(recs, TODAY, words)!;
+    expect(r.takes).toBe(1);
+    expect(r.score).toBeNull();
+    // Refused before: a score had to come with every window that had takes.
+    const c = validateContext({ ...baseContext, recitation: r });
+    expect(c.recitation).toEqual(r);
+    const text = recitationText(c.recitation!);
+    expect(text).toContain('No score: none of these takes got the checker’s final answer');
+    expect(text).not.toMatch(/Score by the page: \d/);
+    // A window with no takes still never carries a score.
+    expect(() => validateContext({ ...baseContext, recitation: { ...r, takes: 0, daysRecited: 0, score: 0.98 } })).toThrow();
+  });
+
+  it('the server takes the summary whichever takes ended without a final answer, and names a score only when one was checked [RINS-1] [RECITE-11]', () => {
+    fc.assert(
+      fc.property(accountArb, fc.array(fc.boolean(), { minLength: 14, maxLength: 14 }), ({ takes, clears }, unfinished) => {
+        const recs = records(takes, clears).map((r, i) => (r.kind === 'take' && unfinished[i % 14] ? { ...r, unfinished: true } : r));
+        const r = recitationForRevo(recs, TODAY, words);
+        if (!r) return;
+        const c = validateContext({ ...baseContext, recitation: r });
+        expect(c.recitation).toEqual(r);
+        const text = recitationText(c.recitation!);
+        if (r.takes > 0) expect(text.includes('Score by the page:')).toBe(r.score !== null);
+      }),
+      { numRuns: 120 },
+    );
+  });
+
   it('tells Revo nothing of recitation without takes, or before the word data has loaded [RINS-1]', () => {
     expect(recitationForRevo([], TODAY, words)).toBeNull();
     const [a, b] = PASSAGES[0];
