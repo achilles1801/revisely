@@ -78,6 +78,12 @@ classic default), and a fresh install starts in light.
     surah names, so the › never stands alone and "Al-" never ends a line. Each line is two lines at most (`maxFontSizeMultiplier` 1.6, then it shrinks to
     fit); the name and streak and the sheet's header stop at 1.4, and so does the greeting, which
     also keeps 12pt from the icons (about 1.05 on an iPhone SE).
+  - **Edit schedule is one simple screen** (Majd chose option B of the Edit schedule audit, Nov 22 2026: "i feel like
+    option B is way better and cleaner let's do that"; SCHED-8; mocks `~/Documents/revisely-schedule-mocks/`). It leads
+    with "Every page, every N days" and how much a day; the settings (Revise by, the amount, Order, Today starts at)
+    build the days; a day is changed in one sheet; Saved plans and Reset to automatic are under More; one Save. A
+    settings-only plan in mushaf order stays automatic (MEM-6). `REBUILD_OVER_HAND_EDITS` (lib/scheduleEditor) is the
+    switch for what an amount change does to days changed by hand, until Majd decides.
   - Activity is a calendar (`activity/ActivityCalendar`): **a month by default**, ‹ › to step,
     and **Week as the finest view** (seven rows, each day's facts), kept per device. Day shades
     are `lib/activityHeatmap` levels in `palette.heat` (≥ 2:1 on the ground) with
