@@ -24,7 +24,7 @@ afterEach(() => {
   dims = null;
 });
 
-function show({ fontScale = 1, to = A23 + 20, marks = [wrong(A23 + 3, [27, 23])], check = true, premiumNote = null as string | null } = {}) {
+function show({ fontScale = 1, to = A23 + 20, marks = [wrong(A23 + 3, [27, 23])], check = true } = {}) {
   dims = jest.spyOn(Dimensions, 'get').mockReturnValue({ width: 375, height: 667, scale: 2, fontScale });
   render(
     <SafeAreaProvider initialMetrics={METRICS}>
@@ -37,8 +37,6 @@ function show({ fontScale = 1, to = A23 + 20, marks = [wrong(A23 + 3, [27, 23])]
       seconds={102}
       marks={marks}
       score={check ? { text: '96%', level: 'good' } : null}
-      kept={false}
-      premiumNote={premiumNote}
       checkOwned
       onFinding={() => undefined}
       onCheck={() => undefined}
@@ -106,15 +104,10 @@ describe('the take summary with screen readers and the largest text', () => {
     expect(opts).toEqual({ queue: true });
   });
 
-  it('[PREM-1] one quiet line about Premium in early access, under the buttons, only when given', () => {
-    show({ premiumNote: 'Premium is free for everyone during early access, and yours for life.' });
-    expect(screen.getByTestId('take-summary-premium')).toBeTruthy();
-    expect(screen.getByText('Premium is free for everyone during early access, and yours for life.')).toBeTruthy();
-  });
-
-  it('no Premium line without one', () => {
+  it('[PREM-1] no line about Premium or test data after a take (Majd, Nov 21 2026: nothing in the face)', () => {
     show();
     expect(screen.queryByTestId('take-summary-premium')).toBeNull();
+    expect(screen.queryByText(/early access|test data|nobody listens/i)).toBeNull();
   });
 
   it('following along (no Check): the passage and the time, no score', async () => {
@@ -189,7 +182,6 @@ describe('where a slip went (`into`, Majd said yes Nov 15 2026)', () => {
           seconds={60}
           marks={props.marks ?? marks}
           score={{ text: '90%', level: 'good' }}
-          kept={false}
           checkOwned
           onFinding={() => undefined}
           onInto={props.onInto}

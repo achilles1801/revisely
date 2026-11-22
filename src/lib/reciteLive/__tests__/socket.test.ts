@@ -1,4 +1,4 @@
-import { socketFeed, SocketLike } from '../socket';
+import { KEEPALIVE_MS, socketFeed, SocketLike } from '../socket';
 import { pairAnswered, pairClosed, pairOpen, PAIR_CLOSED_MS } from '../pairService';
 import type { LiveEvent } from '../contract';
 import type { StartFrame } from '../feed';
@@ -583,5 +583,59 @@ describe('long takes (Nov 20 2026): a quiet connection, and a resume’s held au
     s2.answer({ type: 'beat', t: 9, rx: 9 });
     runPacing();
     expect(seconds()).toEqual([2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+  });
+});
+
+describe('a paused take (Nov 21 2026: the checker let a paused take go after 30 s, and its summary came up by itself)', () => {
+  const live = async () => {
+    const t = setup();
+    await flush();
+    const s = t.sockets[0];
+    s.onopen!();
+    s.answer({ type: 'ready', v: 2, take: 'take1', from: 0 });
+    t.conn.sendAudio(pcm(1, 2, 3));
+    return { ...t, s };
+  };
+  const keepalives = (s: FakeSocket) => s.out().filter((f) => (f as { type?: string }).type === 'keepalive').length;
+
+  it('[RECITE-16] held: a frame at once and every 10 s, which the checker ignores but counts; let go, none', async () => {
+    const t = await live();
+    t.conn.hold!(true);
+    expect(keepalives(t.s)).toBe(1);
+    expect(t.queue.map((q) => q.ms)).toEqual([KEEPALIVE_MS]);
+    t.runTimer();
+    t.runTimer();
+    expect(keepalives(t.s)).toBe(3);
+    t.conn.hold!(false);
+    expect(t.queue).toEqual([]);
+    t.conn.sendAudio(pcm(4));
+    expect(t.s.out().slice(-1)).toEqual([[4]]);
+    expect(t.closed()).toBe(0);
+  });
+
+  it('[RECITE-16] keepalives are never replayed on a resume, and the final answer stops them', async () => {
+    const t = await live();
+    t.conn.hold!(true);
+    t.s.onclose!({ code: 1006 });
+    // The retry's timer, and the keepalive's (which sends nothing while there's no live socket).
+    const retry = t.queue.find((q) => q.ms === 500)!;
+    t.queue.splice(t.queue.indexOf(retry), 1);
+    retry.fn();
+    await flush();
+    const s2 = t.sockets[1];
+    s2.onopen!();
+    s2.answer({ type: 'ready', v: 2, take: 'take1', from: 3 });
+    expect(keepalives(s2)).toBe(0);
+    s2.answer({ type: 'done', result: { score: { accuracy: 1 }, marks: [] } });
+    expect(t.queue).toEqual([]);
+  });
+
+  it('[RECITE-16] the checker’s idle error before its final answer is a drop to resume from, never the take’s end', async () => {
+    const t = await live();
+    t.s.answer({ type: 'error', reason: 'idle' });
+    expect(t.events.some((e) => e.type === 'error')).toBe(false);
+    expect(t.s.closed).toBe(true);
+    expect(t.queue.map((q) => q.ms)).toContain(500);
+    expect(t.closed()).toBe(0);
   });
 });

@@ -31,6 +31,7 @@ export const reciteLive = {
     slip: 'slip',
     tajweed: 'tajweed note',
     paused: 'Paused',
+    scoreLabel: 'Score {{score}}. Show your mistakes',
     resume: 'Resume',
     pause: 'Pause',
     checking: 'Checking',
@@ -126,7 +127,6 @@ export const reciteLive = {
     seeLabel: 'See your mistakes, part of Premium',
     see: 'See your mistakes',
     seeSub: 'Mark mistakes shows each one as you recite',
-    kept: 'Kept as test data. Software checks it; nobody listens.',
   },
   test: {
     clean: 'Clean',

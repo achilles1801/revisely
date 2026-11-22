@@ -48,6 +48,14 @@ export const CATCHUP_TICK_MS = 125;
 export const CATCHUP_LEAD_SAMPLES = 5 * SAMPLE_RATE_HZ;
 /** Once the checker has beaten: this long without a word from it, and the connection counts as dropped (ms). */
 export const WATCHDOG_MS = 8000;
+/**
+ * While a take is paused (the microphone off, the take open), a frame this often (ms). The checker lets a take go after
+ * 30 s without a frame from the phone (`IDLE`, error `idle`): Majd paused a take in a session and its summary came up
+ * by itself (Nov 21 2026). Any text frame counts, and it ignores a type it doesn't know.
+ */
+export const KEEPALIVE_MS = 10_000;
+const KEEPALIVE_FRAME = JSON.stringify({ type: 'keepalive' });
+
 /** How often the watchdog looks (ms). */
 const WATCH_EVERY_MS = 2000;
 /** Tries to reconnect before giving up, and the waits between them. */
@@ -135,6 +143,15 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
     let watch: unknown = null;
     /** A resume's held audio still going out (the next slice's timer). */
     let catching: unknown = null;
+    /** Paused: the keepalive's next frame. */
+    let holding = false;
+    let keep: unknown = null;
+    const keepAlive = () => {
+      keep = null;
+      if (!holding || finished) return;
+      if (live && socket) socket.send(KEEPALIVE_FRAME);
+      keep = timers.set(keepAlive, KEEPALIVE_MS);
+    };
     const stopWatch = () => {
       if (watch != null) timers.clear(watch);
       watch = null;
@@ -161,6 +178,8 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
       if (finished) return;
       finished = true;
       stopWatch();
+      if (keep != null) timers.clear(keep);
+      keep = null;
       if (retry != null) timers.clear(retry);
       if (namesWait != null) timers.clear(namesWait);
       if (e) handlers.onEvent(e);
@@ -344,6 +363,12 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
           }
           return;
         }
+        // The checker let the take go for want of frames (a pause past its IDLE, or a phone that sent nothing): a drop
+        // to resume from, never the take's end (Nov 21 2026).
+        if (e.type === 'error' && e.reason === 'idle' && !answered) {
+          stale(s);
+          return;
+        }
         if (e.type === 'done' || e.type === 'error' || (e.type === 'into' && answered)) {
           finish(e);
           return;
@@ -403,6 +428,12 @@ export function socketFeed(deps: SocketDeps): LiveConnect {
       },
       send: control,
       close: () => finish(),
+      hold: (on) => {
+        holding = on;
+        if (keep != null) timers.clear(keep);
+        keep = null;
+        if (on) keepAlive();
+      },
       status: () =>
         // i18n-ignore (a status for the log and Sentry)
         (finished ? 'finished' : retry != null ? `retry ${tries}` : socket ? (live ? 'live' : 'opening') : 'none') +

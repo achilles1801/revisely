@@ -30,7 +30,7 @@ import { openWebPage } from '../../lib/openWebPage';
 import { reciteLiveEnabled } from '../../lib/reciteLive/availability';
 import { isDevVariant } from '../../lib/variant';
 import { premiumErrorText, setDevPremium, supportLinkUrl, usePremium } from '../../lib/premium';
-import { claimEarlyAccess, earlyAccessShortLine, useEarlyAccess } from '../../lib/earlyAccess';
+import { claimEarlyAccess, useEarlyAccess } from '../../lib/earlyAccess';
 import { checkLevel, setReciteCheckSettings, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
 import { loadQuranWords, getQuranWords, QuranWords } from '../../lib/recite/quranWords';
 import {
@@ -53,6 +53,7 @@ import {
   revealNextWord,
   Revealed,
   scorePill,
+  scoreTapOpens,
   wordShown,
 } from '../../lib/reciteLive/view';
 import { NOTHING_PEEKED, Peeked, peekedByAyah, peekedLine } from '../../lib/reciteLive/peeked';
@@ -578,19 +579,24 @@ export function useReciteLayer({
     if (live.active && showTakeId) endShowing();
   }, [live.active, showTakeId, endShowing]);
   const showPast = liveOn && !!qw && reciteSettings.showPast && !hidden && !live.active && !showing;
+  // The hidden view keeps mistakes on the covers (Majd, Nov 20 2026; RECITE-13): a take's marks in their colour, and the
+  // words Recite's memory still holds, lighter (with Show past mistakes on), during a take and outside one.
+  // Revisely Dev's until the next release (its Dev guide says so).
+  const coversKeepMarks = isDevVariant();
+  const pastOnCovers = coversKeepMarks && liveOn && !!qw && hidden && reciteSettings.showPast && !showing;
   const pastOnPage = useCallback(
     (page: number): WordMemory[] => (showPast && qw ? openInRange(memories, ...qw.pageRange(page)) : []),
     [showPast, qw, memories],
   );
   const [pastAt, setPastAt] = useState<{ w: number; anchor: Box } | null>(null);
   useEffect(() => {
-    if (!showPast) setPastAt(null);
-  }, [showPast]);
+    if (!showPast && !pastOnCovers) setPastAt(null);
+  }, [showPast, pastOnCovers]);
   // What its card plays stops when the card closes.
   useEffect(() => {
     if (!pastAt) stopHearing();
   }, [pastAt]);
-  const takeRecordings = useTakeRecordings(showPast || showing);
+  const takeRecordings = useTakeRecordings(showPast || pastOnCovers || showing);
   const pastMemory = useMemo(() => (pastAt ? memoryOfWord(memories, pastAt.w) : null), [pastAt, memories]);
   const pastHasSimilar = useMemo(() => (qw && pastAt ? similarPhrases(qw, pastAt.w).length > 0 : false), [qw, pastAt]);
   // Clear now can be undone for a few seconds (the clear is a record of its own; Undo forgets it).
@@ -624,45 +630,24 @@ export function useReciteLayer({
     const all = takeRecord ? [...memoryRecords.filter((r) => r.id !== takeRecord.id), takeRecord] : memoryRecords;
     return passageTakes(all, progressFor.from, progressFor.to);
   }, [progressFor, memoryRecords, takeRecord]);
-  const onTapPoint = useMemo(
-    () =>
-      showing && qw
-        ? (page: number, x: number, y: number, toWindow: (r: { x0: number; y0: number; x1: number; y1: number }) => Box) => {
-            const m = markAt(qw, shownOnPage(page), x, y);
-            if (!m) return false;
-            setShownCardAt({ w: m.w, anchor: toWindow(wordBox(qw, m.w)) });
-            return true;
-          }
-        : liveOn && qw && checkTake
-        ? (page: number, x: number, y: number, toWindow: (r: { x0: number; y0: number; x1: number; y1: number }) => Box) => {
-            const m = markAt(qw, marksOnPage(live.state, qw, page), x, y);
-            if (!m) return false;
-            setCardAt({ w: m.w, anchor: toWindow(wordBox(qw, m.w)) });
-            return true;
-          }
-        : showPast && qw
-          ? (page: number, x: number, y: number, toWindow: (r: { x0: number; y0: number; x1: number; y1: number }) => Box) => {
-              const past = pastOnPage(page);
-              const m = markAt(qw, past.map((p) => p.lastMark).filter((x): x is Mark => x != null), x, y);
-              if (!m) return false;
-              setPastAt({ w: m.w, anchor: toWindow(wordBox(qw, m.w)) });
-              return true;
-            }
-          : undefined,
-    [liveOn, qw, checkTake, live.state, showPast, pastOnPage, showing, shownOnPage],
-  );
   const similar = useMemo(() => (qw && similarFor != null ? similarPhrases(qw, similarFor) : []), [qw, similarFor]);
   const cardHasSimilar = useMemo(() => (qw && cardAt ? similarPhrases(qw, cardAt.w).length > 0 : false), [qw, cardAt]);
   // The summary, once a take has its final answer.
   const takeId = live.state.take;
   const [summaryShown, setSummaryShown] = useState<string | null>(null);
+  // The score tapped during the take: what it has found so far (Majd, Nov 21 2026), the take going on.
+  const [soFar, setSoFar] = useState(false);
   // A new take may get the id of the one before (E2E's recorded takes all do): its summary must still show.
   useEffect(() => {
-    if (live.state.status === 'connecting') setSummaryFor(null);
+    if (live.state.status === 'connecting') {
+      setSummaryFor(null);
+      setSoFar(false);
+    }
   }, [live.state.status]);
   useEffect(() => {
     if (live.state.status !== 'done' || !takeId || summaryFor === takeId) return;
     setSummaryFor(takeId);
+    setSoFar(false);
     // A test's place: how it went is kept, and the bar says so with Next (or the test's summary after its last place).
     const run = testRef.current;
     if (run) {
@@ -771,11 +756,6 @@ export function useReciteLayer({
     const marked = new Set(Object.values(live.state.marks).map((m) => m.w));
     return [...peeked].filter((w) => !marked.has(w));
   }, [live.active, peeked, live.state.marks]);
-  // The hidden view keeps mistakes on the covers (Majd, Nov 20 2026; RECITE-13): a take's marks in their colour, and the
-  // words Recite's memory still holds, lighter (with Show past mistakes on), during a take and outside one.
-  // Revisely Dev's until the next release (its Dev guide says so).
-  const coversKeepMarks = isDevVariant();
-  const pastOnCovers = coversKeepMarks && liveOn && !!qw && hidden && reciteSettings.showPast && !showing;
   const coverMarksOn = useCallback(
     (page: number): { mark: Mark; fill: string; opacity?: number }[] => {
       if (!qw || !hidden || !coversKeepMarks) return [];
@@ -795,6 +775,42 @@ export function useReciteLayer({
     },
     [qw, hidden, coversKeepMarks, revealed, liveInfo, live.active, live.state, checkTake, markColours, pastOnCovers, memories, v2, isDark],
   );
+  // A tap on the page: the shown take's marks; else this take's marks, then the past mistakes on show (on the page, or
+  // on a hidden page's covers: Majd, Nov 21 2026, "the shaded mistakes when the page is hidden aren't clickable"). The
+  // take's marks never stand in the way of the past ones when none is under the finger.
+  const pastTaps = showPast || pastOnCovers;
+  const onTapPoint = useMemo(() => {
+    if (!qw) return undefined;
+    type ToWindow = (r: { x0: number; y0: number; x1: number; y1: number }) => Box;
+    if (showing) {
+      return (page: number, x: number, y: number, toWindow: ToWindow) => {
+        const m = markAt(qw, shownOnPage(page), x, y);
+        if (!m) return false;
+        setShownCardAt({ w: m.w, anchor: toWindow(wordBox(qw, m.w)) });
+        return true;
+      };
+    }
+    const liveTaps = liveOn && checkTake;
+    if (!liveTaps && !pastTaps) return undefined;
+    return (page: number, x: number, y: number, toWindow: ToWindow) => {
+      if (liveTaps) {
+        const m = markAt(qw, marksOnPage(live.state, qw, page), x, y);
+        if (m) {
+          setCardAt({ w: m.w, anchor: toWindow(wordBox(qw, m.w)) });
+          return true;
+        }
+      }
+      if (!pastTaps) return false;
+      // Hidden: exactly the past marks its covers draw (a word already shown has none).
+      const past = pastOnCovers
+        ? coverMarksOn(page).flatMap((c) => (c.opacity != null ? [c.mark] : []))
+        : pastOnPage(page).map((p) => p.lastMark).filter((x): x is Mark => x != null);
+      const m = markAt(qw, past, x, y);
+      if (!m) return false;
+      setPastAt({ w: m.w, anchor: toWindow(wordBox(qw, m.w)) });
+      return true;
+    };
+  }, [liveOn, qw, checkTake, live.state, pastTaps, pastOnCovers, coverMarksOn, pastOnPage, showing, shownOnPage]);
   const pageOverlay = useMemo(
     () =>
       liveOn && qw && (hidden || veiled.length > 0)
@@ -929,6 +945,11 @@ export function useReciteLayer({
           onPause={() => void live.pause()}
           onResume={() => void live.resume()}
           onStop={live.stop}
+          onScore={() => {
+            const opens = scoreTapOpens(live.state.status);
+            if (opens === 'summary' && takeId) setSummaryShown(takeId);
+            else if (opens === 'so-far') setSoFar(true);
+          }}
           onClose={() => {
             if (test) {
               endTest(test.results);
@@ -1162,7 +1183,11 @@ export function useReciteLayer({
           onClose={() => setSimilarFor(null)}
         />
         <TakeSummarySheet
-          visible={summaryShown != null && live.state.status === 'done'}
+          visible={
+            (summaryShown != null && live.state.status === 'done') ||
+            (soFar && scoreTapOpens(live.state.status) === 'so-far')
+          }
+          during={live.state.status !== 'done'}
           check={checkTake}
           words={qw}
           from={live.startWord}
@@ -1173,9 +1198,7 @@ export function useReciteLayer({
           seconds={live.seconds}
           marks={Object.values(live.state.marks).sort((a, b) => a.w - b.w)}
           score={checkTake && qw ? scorePill(live.state, qw, live.startWord) : null}
-          kept={live.testData}
           removed={removedMarks(live.state)}
-          premiumNote={checkTake ? earlyAccessShortLine(premium, earlyAccessOn) : null}
           unfinished={isUnfinished(live.state)}
           onPutBack={(id) => {
             if (undoFor === id) setUndoFor(null);
@@ -1187,6 +1210,7 @@ export function useReciteLayer({
           checkOwned={owned}
           onFinding={(m) => {
             setSummaryShown(null);
+            setSoFar(false);
             if (!qw) return;
             goTo(qw.pageOf(m.w));
             setCardAt({ w: m.w, anchor: { x: width / 2, y: insets.top + 120, width: 1, height: 1 } });
@@ -1194,6 +1218,7 @@ export function useReciteLayer({
           onInto={(into) => {
             // That ayah, highlighted as a search result is, until the page is turned (once its page is the one shown).
             setSummaryShown(null);
+            setSoFar(false);
             setCardAt(null);
             const target = toAyahRef({ sura: into.ayah[0], ayah: into.ayah[1] });
             // Over this screen, so Back returns to the page left (READ-2); highlighted in place where nothing can open.
@@ -1236,7 +1261,10 @@ export function useReciteLayer({
             setSummaryShown(null);
             if (qw) goTo(qw.pageOf(w));
           }}
-          onDone={() => setSummaryShown(null)}
+          onDone={() => {
+            setSummaryShown(null);
+            setSoFar(false);
+          }}
           // The summary is on screen: the take's Stop trace ends (lib/reciteLive/stopTrace).
           onShown={() => stopTrace.end()}
           // RMEM-6: a take is no recording, so its summary is where it can be deleted, and where to find it after.

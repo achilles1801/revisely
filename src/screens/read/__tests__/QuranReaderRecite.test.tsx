@@ -173,6 +173,7 @@ jest.mock('../../../lib/reciteLive/socket', () => ({
     return {
       sendAudio: (pcm: Int16Array) => (mockLive.audio += pcm.length),
       send: (f: unknown) => mockLive.sent.push(f),
+      hold: (on: boolean) => mockLive.sent.push({ hold: on }),
       close: jest.fn(),
       // The take's audio held on the phone (lib/reciteLive/socket's own test cuts it): the seconds asked for, as samples.
       audioClip: (from: number, to: number) => {
@@ -1232,8 +1233,8 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
     await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [mark], score: null } });
     expect(screen.getByTestId('take-summary')).toBeTruthy();
     expect(screen.getByTestId('take-summary-finding-word')).toBeTruthy();
-    // Keep as test data is on by default: the take went to be kept, and the summary says so.
-    expect(screen.getByText('Kept as test data. Software checks it; nobody listens.')).toBeTruthy();
+    // No line about test data or Premium under it (Majd, Nov 21 2026; RECITE-17).
+    expect(screen.queryByText('Kept as test data. Software checks it; nobody listens.')).toBeNull();
     fireEvent.press(screen.getByTestId('take-summary-done'));
     expect(screen.getByTestId('recite-close')).toBeTruthy();
   });
@@ -2346,5 +2347,100 @@ describe('Majd’s Nov 20 asks: the mistake sound, and mistakes on a hidden page
     // Show past mistakes off: none.
     await act(async () => setReciteCheckSettings('u1', { showPast: false }));
     expect(screen.queryByTestId('cover-past-word')).toBeNull();
+  });
+});
+
+describe('Majd’s Nov 21 asks: Pause keeps the take, the score opens what it has found, a hidden page’s mistakes open (Revisely Dev)', () => {
+  const { remember, resetMemoryForTests } = jest.requireActual('../../../lib/reciteMemory/store');
+  const wrong = (w: number, id = `${w}:word:sound`) => ({ id, w, ayah: [27, 23], kind: 'word', heard: 'كذا', sure: 'clear' });
+  const tapWord = (w: number) => {
+    const { wordBox } = require('../../../lib/reciteLive/geometry');
+    const b = wordBox(words, w);
+    return act(async () => {
+      mockPager.onTapPoint?.(379, (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, (r: { x0: number; y0: number; x1: number; y1: number }) => ({
+        x: r.x0,
+        y: r.y0 + 100,
+        width: r.x1 - r.x0,
+        height: r.y1 - r.y0,
+      }));
+    });
+  };
+
+  it('[RECITE-16] Pause asks the connection to hold the take open, Resume lets it go; no summary meanwhile', async () => {
+    await startTake('check');
+    await act(async () => fireEvent.press(screen.getByTestId('recite-pause')));
+    expect(mockLive.sent).toContainEqual({ hold: true });
+    expect(screen.queryByTestId('take-summary')).toBeNull();
+    await act(async () => fireEvent.press(screen.getByTestId('recite-resume')));
+    expect(mockLive.sent).toContainEqual({ hold: false });
+    expect(screen.queryByTestId('take-summary')).toBeNull();
+  });
+
+  it('[RECITE-17] the score during a take opens what it has found so far, Done only, and the take goes on; after it, the summary again', async () => {
+    const summaryVisible = () => screen.UNSAFE_getAllByType(Sheet).find((x) => x.props.testID === 'take-summary')?.props.visible;
+    await startTake('check');
+    await event({ type: 'said', upTo: A23 + 8 });
+    await event({ type: 'mark', mark: wrong(A23 + 6) as never });
+    fireEvent.press(screen.getByTestId('recite-score-tap'));
+    await flush();
+    expect(screen.getByTestId('take-summary')).toBeTruthy();
+    expect(screen.getByTestId('take-summary-finding-word')).toBeTruthy();
+    expect(screen.queryByTestId('take-summary-again')).toBeNull();
+    expect(screen.queryByTestId('take-summary-more')).toBeNull();
+    expect(mockLive.sent).not.toContainEqual({ type: 'end' });
+    fireEvent.press(screen.getByTestId('take-summary-done'));
+    await flush();
+    // Asked to close (whether iOS has finished its animation and turn is the sheet's business, SHEET-1).
+    expect(summaryVisible()).toBe(false);
+    expect(screen.getByTestId('recite-stop')).toBeTruthy();
+    // Stopped and answered: the summary; closed, the score opens it again.
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await flush();
+    await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [wrong(A23 + 6) as never], score: null } });
+    expect(screen.getByTestId('take-summary-again')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('take-summary-done'));
+    await flush();
+    // Asked to close (whether iOS has finished its animation and turn is the sheet's business, SHEET-1).
+    expect(summaryVisible()).toBe(false);
+    fireEvent.press(screen.getByTestId('recite-score-tap'));
+    await flush();
+    expect(screen.getByTestId('take-summary-again')).toBeTruthy();
+  });
+
+  it('[RECITE-13] a past mistake on a hidden page’s cover opens its card', async () => {
+    // Earlier tests’ takes are written again 800 ms after their recording: let them land, then start empty.
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 2000));
+    });
+    resetMemoryForTests();
+    await AsyncStorage.clear();
+    const [from, to] = words.pageRange(379);
+    await remember('u1', {
+      id: 'mem-1',
+      kind: 'take',
+      take: 'old',
+      createdAt: Date.UTC(2026, 10, 14, 18),
+      rev: Date.UTC(2026, 10, 14, 18),
+      day: '2026-11-14',
+      level: 'words',
+      hidden: false,
+      from,
+      to: to - 1,
+      secs: 60,
+      mistakes: 1,
+      tajweed: 0,
+      unclear: 0,
+      accuracy: 0.9,
+      marks: [wrong(A23 + 12, 'old:word')],
+      passed: [],
+      recordingId: null,
+    });
+    setReciteCheckSettings('u1', { noticeSeen: true, mode: 'recite', markMistakes: true });
+    await open();
+    await flush();
+    fireEvent.press(screen.getByTestId('reader-eye'));
+    await settle(() => expect(screen.getByTestId('cover-past-word')).toBeTruthy());
+    await tapWord(A23 + 12);
+    expect(screen.getByTestId('past-card-layer')).toBeTruthy();
   });
 });

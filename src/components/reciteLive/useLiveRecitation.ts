@@ -633,6 +633,8 @@ export function useLiveRecitation({
     source.current = null;
     setPaused(true);
     setMic('paused');
+    // However long the pause, the take stays open on the checker (it lets a take go after 30 s without a frame).
+    conn.current.hold?.(true);
     await src.stop().catch(() => undefined);
     await setAudioMode(false).catch(() => undefined);
   }, []);
@@ -651,6 +653,7 @@ export function useLiveRecitation({
         return;
       }
       source.current = src;
+      conn.current.hold?.(false);
       pausedRef.current = false;
       setPaused(false);
       setMic('on');

@@ -78,8 +78,8 @@ export function findingsLine(marks: Mark[]): string {
 
 /**
  * The end of a take. Check: the score (by the page), the passage and time, each finding (a tap shows it on the page),
- * Recite again, Done, and whether it was kept as test data. Recite (following along): the passage and time, and for
- * an account without Check, one quiet way to it.
+ * Recite again and Done. Recite (following along): the passage and time, and for an account without Check, one quiet
+ * way to it. No line about test data or Premium (Majd, Nov 21 2026: nothing in the face after a take).
  */
 /** A take kept without the checker's final answer: what its summary says (RECITE-11). */
 export function unfinishedLine(): string {
@@ -95,7 +95,6 @@ export function TakeSummarySheet({
   seconds,
   marks,
   score,
-  kept,
   removed = [],
   onPutBack,
   checkOwned,
@@ -106,7 +105,6 @@ export function TakeSummarySheet({
   onDrill,
   before = null,
   memory = null,
-  premiumNote = null,
   onProgress,
   peeked = [],
   onPeeked,
@@ -115,14 +113,18 @@ export function TakeSummarySheet({
   onDelete,
   onRecited,
   unfinished = false,
+  during = false,
 }: {
   /**
    * No final answer came (late, or the connection was lost; lib/reciteLive/state `settleUnfinished`): the summary is what
    * the take found before its end, and says so in one line.
    */
   unfinished?: boolean;
-  /** One quiet line about Premium in early access (lib/earlyAccess, PREM-1), or null. */
-  premiumNote?: string | null;
+  /**
+   * Opened from the score during the take (Majd, Nov 21 2026: "the percentage score should be clickable throughout"):
+   * what it has found so far, with Done only. The take goes on; nothing is spoken (the microphone is on).
+   */
+  during?: boolean;
   visible: boolean;
   check: boolean;
   words: QuranWords | null;
@@ -131,7 +133,6 @@ export function TakeSummarySheet({
   seconds: number;
   marks: Mark[];
   score: { text: string; level: ScoreLevel } | null;
-  kept: boolean;
   /** Marks taken off with "Not a mistake" during or after the take: listed under Removed, each with Put back. */
   removed?: Mark[];
   onPutBack?: (id: string) => void;
@@ -196,13 +197,18 @@ export function TakeSummarySheet({
     .filter(Boolean)
     .join('. ');
   const shown = () => {
+    if (during) return;
     if (Platform.OS === 'ios') AccessibilityInfo.announceForAccessibilityWithOptions(spokenSummary, { queue: true });
     else AccessibilityInfo.announceForAccessibility(spokenSummary);
     onShown?.();
   };
   // Pinned under the findings, always on screen (at the largest text on an SE, or with many findings, they sat at the
   // end of a long scroll).
-  const actions = (
+  const actions = during ? (
+    <View style={styles.buttons}>
+      <PillButton title={t('common.done')} size="lg" variant="outline" onPress={onDone} testID="take-summary-done" />
+    </View>
+  ) : (
     <View style={styles.buttons}>
       {drillable ? <PillButton title={t('reciteLive.summary.drill')} size="lg" onPress={onDrill} testID="take-summary-drill" /> : null}
       <PillButton
@@ -227,11 +233,6 @@ export function TakeSummarySheet({
           </Text>
         </Tap>
       ) : null}
-      {premiumNote ? (
-        <Text style={[typeV2.meta, styles.premiumNote, { color: palette.secondary }]} maxFontSizeMultiplier={1.4} testID="take-summary-premium">
-          {premiumNote}
-        </Text>
-      ) : null}
     </View>
   );
   return (
@@ -240,7 +241,7 @@ export function TakeSummarySheet({
       onClose={onDone}
       onShow={shown}
       title={t('reciteLive.summary.title')}
-      right={onDelete ? { label: t('common.more'), icon: 'ellipsis-horizontal', onPress: () => setMenuOpen(true), testID: 'take-summary-more' } : undefined}
+      right={onDelete && !during ? { label: t('common.more'), icon: 'ellipsis-horizontal', onPress: () => setMenuOpen(true), testID: 'take-summary-more' } : undefined}
       scroll
       pinned={actions}
       testID="take-summary"
@@ -447,7 +448,7 @@ export function TakeSummarySheet({
           </Text>
         </View>
       ) : null}
-      {check && memory?.line && onProgress ? (
+      {check && !during && memory?.line && onProgress ? (
         <Tap
           onPress={onProgress}
           style={[styles.row, { borderTopColor: palette.separator }]}
@@ -467,7 +468,7 @@ export function TakeSummarySheet({
           <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
         </Tap>
       ) : null}
-      {!check && !checkOwned ? (
+      {!check && !checkOwned && !during ? (
         <Tap
           onPress={onCheck}
           style={[styles.row, styles.firstRow, { borderTopColor: palette.separator }]}
@@ -487,17 +488,11 @@ export function TakeSummarySheet({
           <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
         </Tap>
       ) : null}
-      {kept ? (
-        <Text style={[typeV2.meta, styles.kept, { color: palette.secondary }]} maxFontSizeMultiplier={CHROME_MAX}>
-          {t('reciteLive.summary.kept')}
-        </Text>
-      ) : null}
     </Sheet>
   );
 }
 
 const styles = StyleSheet.create({
-  premiumNote: { textAlign: 'center', marginTop: 2 },
   head: { paddingHorizontal: layoutV2.gutter, paddingTop: 16, paddingBottom: 12, gap: 2 },
   scoreRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 10, marginBottom: 4 },
   score: { fontSize: 44, lineHeight: 50, fontWeight: '300', letterSpacing: -1 },
@@ -526,5 +521,4 @@ const styles = StyleSheet.create({
   cleared: { writingDirection: 'rtl', textAlign: 'right', maxWidth: '45%' },
   buttons: { paddingHorizontal: layoutV2.gutter, paddingTop: 16, gap: 10 },
   recited: { alignSelf: 'center', paddingVertical: 4 },
-  kept: { textAlign: 'center', paddingHorizontal: layoutV2.gutter, paddingTop: 10, paddingBottom: 6 },
 });

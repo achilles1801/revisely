@@ -524,7 +524,8 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   on the page, lighter (with Show past mistakes on), during a take and outside one. A word that shows has its highlight
   behind its ink, as on a shown page. (Majd, Nov 20 2026: "if I hide the page, that highlight should still be there.
   Obviously, the word won't be shown, but the highlight should still be there so I know where I typically make
-  mistakes".)
+  mistakes".) A tap on a highlighted cover opens that mark's card, as a tap on a marked word does on a shown page (Majd,
+  Nov 21 2026: "the shaded mistakes when the page is hidden aren't clickable which they should be").
 - **RECITE-14.** A mark shown during a take stays after Stop, on the page and in the summary, unless it was called Not
   a mistake: one the checker's final answer leaves out stays as it was shown and counts as it did, unless the final
   answer judged that word itself (its mark there replaces it). (Majd, Nov 20 2026: "As soon as a mistake is made, the
@@ -534,6 +535,14 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   one mark (a resume sends marks again), and at most one every 0.7 s. It plays in silent mode, at the volume the
   buttons set, and Settings → Recite → Sound on a mistake turns it off. (Majd, Nov 20 2026: "there should be some like
   error sound ... so I know I just made a mistake".)
+- **RECITE-16.** (Revisely Dev) Pause keeps the take open however long the pause lasts: nothing ends it or opens its
+  summary until Stop, ✕ or leaving the app, and Resume carries on the same take. A checker that let a paused take go
+  anyway is reconnected to, never taken as the take's end. (Majd, Nov 21 2026: a session's take, paused with nothing
+  wrong, opened its summary by itself.)
+- **RECITE-17.** (Revisely Dev) The bar's score can be tapped throughout a take: while it runs, or Stop waits, it opens
+  what the take has found so far, with Done only, and the take goes on; once it's done, it opens the take's summary
+  again. A take's summary carries no line about test data or Premium. (Majd, Nov 21 2026: "the percentage score
+  should be clickable throughout the whole process".)
 
 ## Recite insights
 
@@ -1324,8 +1333,8 @@ of this deal. those users can have premium for life".
   an account set up then gets it from the server as soon as it is set up, and older accounts get it from the owner's
   script. Early access itself has no end date yet. Marking mistakes' intro says Premium is free for everyone during
   early access, which has no end date yet, will be paid after it, and is kept for life, and its Get Premium gives it at
-  once; "Can't afford it? Apply for support" is hidden. Settings' Premium row and a Mark mistakes take's summary say the
-  same. A grant once given is never changed or taken away, after early access too; once early access ends, new
+  once; "Can't afford it? Apply for support" is hidden. Settings' Premium row says the same (a take's
+  summary doesn't: Majd, Nov 21 2026). A grant once given is never changed or taken away, after early access too; once early access ends, new
   accounts don't get it and the intro's Get Premium no longer gives it. The words say early access and for life, never
   trial, a price or a date.
 

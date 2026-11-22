@@ -134,6 +134,7 @@ export function ReciteBar({
   onClose,
   next,
   surface,
+  onScore,
 }: {
   hidden: boolean;
   onToggleHidden: () => void;
@@ -160,6 +161,8 @@ export function ReciteBar({
   /** Once a take is done, a way on (Test me's next place), beside ✕. */
   next?: { label: string; onPress: () => void };
   surface: { background: string; border: string };
+  /** The score was tapped: what the take has found so far, or its summary once it's done (Majd, Nov 21 2026). */
+  onScore?: () => void;
 }) {
   const { palette } = useTheme();
   const ticking = useTakeSeconds(takeClock);
@@ -175,7 +178,19 @@ export function ReciteBar({
       testID="recite-bar"
     >
       <EyeGroup hidden={hidden} onToggle={onToggleHidden} onNextWord={onNextWord} onWholeAyah={onWholeAyah} />
-      {score ? <ScorePill text={score.text} level={score.level} /> : null}
+      {score && onScore ? (
+        <Tap
+          onPress={onScore}
+          hitSlop={6}
+          accessibilityRole="button"
+          accessibilityLabel={t('reciteLive.bar.scoreLabel', { score: score.text })}
+          testID="recite-score-tap"
+        >
+          <ScorePill text={score.text} level={score.level} />
+        </Tap>
+      ) : score ? (
+        <ScorePill text={score.text} level={score.level} />
+      ) : null}
       {/* Not a live region: its clock changes every second, and TalkBack would speak each one over the recitation, where
           the microphone hears it. VoiceOver reads it when focused; the summary is spoken once when it shows. */}
       <View style={styles.middle} accessible accessibilityLabel={`${clock(secs)}${recording && phase === 'live' && !paused ? ', recording' : ''}. ${paused ? shownStatus : spoken || status}`} testID="recite-middle">

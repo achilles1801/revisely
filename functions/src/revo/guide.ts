@@ -405,10 +405,11 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     // Majd's Nov 20 2026 asks, in Revisely Dev until the next release (Not clear's line too: the store app has it, and
     // the release's re-record brings it to the main guide).
     title: 'Mistakes on a hidden page, Not clear, and the mistake sound',
-    covers: ['RECITE-13', 'RECITE-15'],
+    covers: ['RECITE-13', 'RECITE-15', 'RECITE-16', 'RECITE-17'],
     routes: ['QuranReader', 'ActiveRevision', 'Settings'],
     text: lines(
-      '- With the page hidden (the eye), a word with a mistake keeps its highlight on its cover, the word still hidden: the take’s marks in their colour during the take and after, and past mistakes lighter (with “Show past mistakes” on), during a take too, so they know where they tend to slip before they get there.',
+      '- With the page hidden (the eye), a word with a mistake keeps its highlight on its cover, the word still hidden: the take’s marks in their colour during the take and after, and past mistakes lighter (with “Show past mistakes” on), during a take too, so they know where they tend to slip before they get there. A tap on a highlighted cover opens that word’s card, as on a shown page (it shows the word).',
+      '- Pause on the bar keeps the take open however long the pause; its summary only comes after Stop. During a take the score on the bar opens what it has found so far (Done goes back to the take); after it, the score opens the take’s summary again.',
       '- “Not clear” words stay amber on the page after the take too (and on a hidden page’s covers), remembered like a slip until the word is said clearly in 2 takes on 2 days; a take that heard it only as Not clear again counts as not clear. They still never count in a score.',
       '- Each new mistake plays a short sound and a tap as it is marked (not for Not clear or tajweed notes, at most one every 0.7 s). It plays in silent mode at the media volume; Settings → Recite → “Sound on a mistake” turns it off. While the microphone records, the iPhone plays it from the earpiece, so it is quiet without headphones.',
       '- On a hidden page a word shows once it has been said in full, the next word has begun, or it has been the word being said about as long as it takes to say (a long madd waits for its end), never a word ahead; the word being said keeps its cover, lightly marked, and the newest word shown has a grey box. The bar shows no more than the page.',
