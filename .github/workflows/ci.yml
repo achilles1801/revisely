@@ -60,6 +60,7 @@ jobs:
       draft: ${{ steps.live.outputs.draft }}
       repeat: ${{ steps.plan.outputs.repeat }}
       scenario_repeat: ${{ steps.plan.outputs.scenario_repeat }}
+      scenarios: ${{ steps.plan.outputs.scenarios }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -119,6 +120,10 @@ jobs:
           out=$(printf '%s\n' "$files" | E2E_JOBS_BEFORE="$before" node .github/scripts/affected-flows.js)
           echo "Shared test code: $out"
           { echo "flows=$(jq -c .flows <<<"$out")"; echo "ios_flows=$(jq -c .ios <<<"$out")"; echo "scenarios=$(jq -r .scenarios <<<"$out")"; } >> "$GITHUB_OUTPUT"
+          # Whether the scenario run can tell this PR anything: false only when every file it changes is one
+          # the suite never reads (.github/scripts/scenarios-needed.js, conservative). Anything else runs it.
+          needed=$(printf '%s\n' "$files" | node .github/scripts/scenarios-needed.js) || needed=true
+          echo "scenarios_needed=$needed" >> "$GITHUB_OUTPUT"
       # PRs into develop built on one another's branches without GitHub's stacks: the Recite PRs of
       # Nov 15 2026 (#621 → #625 → #628 → #629 → #630 → #659, #632 → #633 → #635) each ran every
       # flow it touched on iOS for commits the PR above held too, and sessions cancelled the
@@ -187,6 +192,7 @@ jobs:
           INFRA_IOS_FLOWS: ${{ steps.infra.outputs.ios_flows }}
           UPPER: ${{ steps.layers.outputs.upper }}
           INFRA_SCENARIOS: ${{ steps.infra.outputs.scenarios }}
+          INFRA_SCENARIOS_NEEDED: ${{ steps.infra.outputs.scenarios_needed }}
         run: |
           ios=none; android=none; only=""; only_ios=""; repeat=1; scenario_repeat=1
           case "$EVENT" in
@@ -238,8 +244,15 @@ jobs:
             *) what="$EVENT: no E2E" ;;
           esac
           e2e=true; [ "$ios$android" = nonenone ] && e2e=false
+          # A PR that changes nothing the scenario suite reads skips it (only an explicit `false` skips; a
+          # push, a merge group and a run by hand always run it). No run means no scenarios-passed-<tree>
+          # artifact, so this never counts as a pass for Preview's publishing gate.
+          scenarios=true
+          if [ "$EVENT" = pull_request ] && [ "$INFRA_SCENARIOS_NEEDED" = false ]; then
+            scenarios=false; what="$what; it changes nothing the scenarios read: no scenario run"
+          fi
           echo "$what (iOS: $ios, Android: $android)"
-          { echo "ios=$ios"; echo "android=$android"; echo "e2e=$e2e"; echo "only=$only"; echo "only_ios=$only_ios"; echo "repeat=$repeat"; echo "scenario_repeat=$scenario_repeat"; } >> "$GITHUB_OUTPUT"
+          { echo "ios=$ios"; echo "android=$android"; echo "e2e=$e2e"; echo "only=$only"; echo "only_ios=$only_ios"; echo "repeat=$repeat"; echo "scenario_repeat=$scenario_repeat"; echo "scenarios=$scenarios"; } >> "$GITHUB_OUTPUT"
 
   # -----------------------------------------------------------------------
   # The runs of the PRs whose commits this PR holds (`layers` in `plan`): this run tests them, so
@@ -373,6 +386,8 @@ jobs:
   scenarios:
     name: Scenarios
     needs: plan
+    # Skipped only when `plan` says so: a PR that changes nothing the suite reads.
+    if: ${{ needs.plan.outputs.scenarios != 'false' }}
     uses: ./.github/workflows/scenarios.yml
     with:
       repeat: ${{ fromJSON(needs.plan.outputs.scenario_repeat || '1') }}
@@ -425,11 +440,15 @@ jobs:
       - env:
           NEEDS: ${{ toJSON(needs) }}
           E2E_PLANNED: ${{ needs.plan.outputs.e2e }}
+          SCENARIOS_PLANNED: ${{ needs.plan.outputs.scenarios }}
         run: |
           echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
-          bad=$(echo "$NEEDS" | jq -r --arg e2e "$E2E_PLANNED" '
+          # Skipped passes only for a job the plan left out: E2E when e2e is false, Scenarios when scenarios is
+          # exactly false. Skipped for any other reason (a job before it failed) is not a pass.
+          bad=$(echo "$NEEDS" | jq -r --arg e2e "$E2E_PLANNED" --arg scen "$SCENARIOS_PLANNED" '
             to_entries[] | select(.value.result != "success")
-            | select(.key != "e2e" or $e2e == "true" or .value.result != "skipped") | .key')
+            | select(.key != "e2e" or $e2e == "true" or .value.result != "skipped")
+            | select(.key != "scenarios" or $scen != "false" or .value.result != "skipped") | .key')
           if [ -n "$bad" ]; then echo "::error::Not passed: $(echo $bad)"; exit 1; fi
           echo "Every job this change needs passed."
 
