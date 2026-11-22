@@ -6,6 +6,7 @@ import { read } from './read';
 import { reader } from './reader';
 import { revision } from './revision';
 import { settings } from './settings';
+import { verse } from './verse';
 import type { ArStrings } from './types';
 
 export const ar: ArStrings = {
@@ -15,4 +16,5 @@ export const ar: ArStrings = {
   reader,
   revision,
   settings,
+  verse,
 };
