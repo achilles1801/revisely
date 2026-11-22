@@ -61,6 +61,21 @@ async function timedReading(app: OpenApp, id: string, date: string, at: Date): P
   await app.untilSynced();
 }
 
+/**
+ * Auth's launch check of the saved sign-in (accounts:lookup) answered `ms` late, until restored: Home opens on the
+ * account's copy first (AUTH_GRACE_MS), before Auth has a user, as on a slow phone or network. CI's runners did this
+ * now and then on their own (#822).
+ */
+function slowAuthCheck(ms: number): () => void {
+  const routed = global.fetch;
+  global.fetch = (async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : (input as Request).url;
+    if (/\/v1\/accounts:lookup/.test(url)) await new Promise((r) => setTimeout(r, ms));
+    return routed(input, init);
+  }) as typeof fetch;
+  return () => (global.fetch = routed);
+}
+
 async function press(app: OpenApp, el: unknown): Promise<void> {
   const { fireEvent } = app.mods.rtl;
   await app.act(async () => {
@@ -104,10 +119,16 @@ describe('Al-Kahf on the Islamic Friday', () => {
     expect(marked.map((r) => [r.date, r.pages])).toEqual([[THU, KAHF]]);
     await app.close();
 
-    // Friday morning, after Fajr: still done, counted for this Friday.
+    // Friday morning, after Fajr: still done, counted for this Friday. Home opens before Auth has checked the saved
+    // sign-in; the readings are read once it has (they were read without a user, failed, and showed "Read").
     setNow(`${FRI} 09:00`);
-    ({ app, home: h } = await home(phone));
-    await app.until(() => h.kahf() != null, 'the Al-Kahf card on Friday morning');
+    const restore = slowAuthCheck(4000);
+    try {
+      ({ app, home: h } = await home(phone));
+      await app.until(() => h.kahf() != null, 'the Al-Kahf card on Friday morning');
+    } finally {
+      restore();
+    }
     expect(h.kahf()).toContain('Done for this Friday.');
     expect(app.screen.queryByTestId('kahf-mark')).toBeNull();
 

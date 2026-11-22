@@ -287,9 +287,12 @@ export default function DashboardScreen() {
   const [sessionsLoadedFor, setSessionsLoadedFor] = useState<string | null>(null);
   const [kahfSaving, setKahfSaving] = useState(false);
   const kahfSavingRef = useRef(false);
+  // Read once Auth has a user: on a slow start Home opens on the account's copy before Auth has checked the saved
+  // sign-in, and a read then fails ("User not authenticated") and showed the card unread (KAHF-2).
+  const authUid = firebaseUser?.uid ?? null;
   useFocusEffect(
     useCallback(() => {
-      if (!kahfFriday || !kahfEnabled) return;
+      if (!kahfFriday || !kahfEnabled || !authUid) return;
       let live = true;
       firestoreService
         .getReadingSessions(20)
@@ -303,7 +306,7 @@ export default function DashboardScreen() {
       return () => {
         live = false;
       };
-    }, [kahfFriday, kahfEnabled]),
+    }, [kahfFriday, kahfEnabled, authUid]),
   );
   const kahfDone = useMemo(
     () => (kahf ? kahfReadOn(kahf, readingSessions, logs) : false),
