@@ -432,7 +432,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     routes: ['QuranReader', 'ActiveRevision'],
     text: lines(
       '- A recitation can go on as long as they like, in the reader or a whole revision session (30–45 minutes for 20 pages): the server checks 15 minutes at a time, and Revisely joins those pieces by itself, at a pause after an ayah near the 15 minutes. Nothing stops or changes on screen: the bar keeps listening, the time keeps running, and every mistake marked stays.',
-      '- Stop ends it as usual, and the summary covers the whole recitation: one score, one recording, and one take in “Recited” and “Your progress”. “Your recitation” on a mistake from earlier in a long recitation plays while it lasts; after Stop, only for mistakes in its last 15-minute part.',
+      '- Stop ends it as usual, and the summary covers the whole recitation: one score, one recording, and one take in “Recited” and “Your progress”. “Your recitation” plays for any mistake in it, during and after Stop, from the recitation’s recording; with “Save recordings when you recite” off (Settings, Recite) nothing keeps the earlier parts’ audio, so only mistakes in its last 15-minute part play.',
     ),
   },
   {

@@ -28,6 +28,7 @@ import { createTakeStats } from '../../lib/reciteLive/takeStats';
 import { createMistakeCue, playCueSound, playCueTap } from '../../lib/reciteLive/mistakeCue';
 import { reportLongTake, reportUnfinishedTake } from '../../lib/reciteLive/takeReport';
 import { SavedTake, startTakeRecording, TakeRecording } from '../../lib/reciteLive/takeRecording';
+import { takeFile, type TakeFile } from '../../lib/reciteMemory/takeAudio';
 import {
   applyEvent,
   checkerLooks,
@@ -272,6 +273,7 @@ export function useLiveRecitation({
       setPriorTick((n) => n + 1);
     }
     linkStart.current = 0;
+    savedAudio.current = null;
     for (const c of conns) c.close();
   }, []);
   const state = useMemo(
@@ -326,6 +328,10 @@ export function useLiveRecitation({
   const [owner] = useState(() => `recite-live-${Math.random().toString(36).slice(2)}`);
   const recordingRef = useRef<TakeRecording | null>(null);
   const [recording, setRecording] = useState(false);
+  // After Stop, a long recitation's recording as saved (its file joined the day's recordings): Your recitation on an
+  // earlier take's mark reads it there, as a past take's does (RECITE-22). `savedTick` shows the screen it came.
+  const savedAudio = useRef<TakeFile | null>(null);
+  const [, setSavedTick] = useState(0);
   // The take went with Keep as test data on: the checker stores it (its `done` no longer says so; a `kept` event
   // follows, after the phone has hung up).
   const [testData, setTestData] = useState(false);
@@ -531,11 +537,21 @@ export function useLiveRecitation({
     recordingRef.current = null;
     setRecording(false);
     if (!rec) return;
+    const forTake = takeNo.current;
+    const chained = linkStart.current > 0;
     rec
       .finish()
       .then((saved) => {
         stopTrace.step(saved ? 'recording-saved' : 'recording-none');
-        if (saved) onSavedRef.current?.(saved);
+        if (!saved) return;
+        onSavedRef.current?.(saved);
+        // The earlier takes' audio is in that file alone now (their connections let theirs go).
+        if (!chained) return;
+        void takeFile(saved.recordingId).then((file) => {
+          if (!file || takeNo.current !== forTake || linkStart.current === 0) return;
+          savedAudio.current = file;
+          setSavedTick((n) => n + 1);
+        });
       })
       .catch((err) => {
         stopTrace.step('recording-failed');
@@ -962,15 +978,17 @@ export function useLiveRecitation({
   }, []);
   /**
    * Where a moment of the take (in the chain's seconds) is held: the current link's connection (a take that never rolled
-   * over holds all of it there), or, for an earlier link of a long recitation, the take's recording, read back from its
-   * file while it is recorded (earlier links keep no audio in memory). Null: nowhere.
+   * over holds all of it there), or, for an earlier link of a long recitation, the take's recording: read back from its
+   * file while it is recorded, and after Stop from the file as saved (earlier links keep no audio in memory). Null:
+   * nowhere (the recording wasn't kept: Save recordings off, or not yet saved).
    */
-  const clipSource = useCallback((range: [number, number]): 'link' | 'recording' | null => {
+  const clipSource = useCallback((range: [number, number]): 'link' | 'recording' | 'saved' | null => {
     const linkHas = !!lastConn.current?.audioClip;
     const off = linkStart.current / SAMPLE_RATE;
     if (off === 0) return linkHas ? 'link' : null;
     if (range[0] >= off - 0.05 && linkHas) return 'link';
     if (recordingRef.current?.clip) return 'recording';
+    if (savedAudio.current?.there()) return 'saved';
     return linkHas && range[1] > off ? 'link' : null;
   }, []);
   /** Whether Your recitation has something to play for `m` (cheap: nothing is cut). */
@@ -990,7 +1008,9 @@ export function useLiveRecitation({
       const pcm =
         from === 'link'
           ? (lastConn.current?.audioClip?.(Math.max(0, range[0] - off), range[1] - off) ?? null)
-          : (recordingRef.current?.clip?.(Math.max(0, range[0]), range[1]) ?? null);
+          : from === 'recording'
+            ? (recordingRef.current?.clip?.(Math.max(0, range[0]), range[1]) ?? null)
+            : (savedAudio.current?.read(Math.max(0, range[0]), range[1]) ?? null);
       return pcm && pcm.length > 0 ? pcm : null;
     },
     [clipSeconds, clipSource],

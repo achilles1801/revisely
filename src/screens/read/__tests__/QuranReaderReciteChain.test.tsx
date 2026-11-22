@@ -174,6 +174,18 @@ jest.mock('../../../lib/reciteLive/takeRecording', () => ({
     };
   },
 }));
+// The recording once saved (Stop moved its file into the day's recordings), read back by the chain's seconds.
+const mockSaved = { opened: [] as string[], reads: [] as [number, number][] };
+jest.mock('../../../lib/reciteMemory/takeAudio', () => ({
+  ...jest.requireActual('../../../lib/reciteMemory/takeAudio'),
+  takeFile: async (id: string) => {
+    mockSaved.opened.push(id);
+    return {
+      there: () => true,
+      read: (from: number, to: number) => (mockSaved.reads.push([from, to]), new Int16Array(Math.round((to - from) * 16000))),
+    };
+  },
+}));
 // Recite's memory: what the reader keeps of the recitation.
 const mockMemory: { remembered: { kind?: string; links?: unknown; marks?: Mark[]; take?: string | null; from?: number; to?: number }[] } = { remembered: [] };
 jest.mock('../../../lib/reciteMemory/store', () => ({
@@ -231,6 +243,8 @@ beforeEach(async () => {
   mockTake.added = 0;
   mockTake.finished = 0;
   mockTake.clips = [];
+  mockSaved.opened = [];
+  mockSaved.reads = [];
   mockMemory.remembered = [];
   setStopBudgetForTests(300);
   resetReciteCheckSettingsForTests();
@@ -240,8 +254,8 @@ beforeEach(async () => {
 afterEach(() => setStopBudgetForTests());
 
 /** A take with Mark mistakes from An-Naml 23, its first mistake on page 379 already shown. */
-async function startLong() {
-  setReciteCheckSettings('u1', { noticeSeen: true, mode: 'recite', markMistakes: true });
+async function startLong({ saveRecording = true }: { saveRecording?: boolean } = {}) {
+  setReciteCheckSettings('u1', { noticeSeen: true, mode: 'recite', markMistakes: true, saveRecording });
   render(<QuranReaderScreen />);
   await flush();
   await flush();
@@ -393,6 +407,56 @@ describe('[RECITE-22] a recitation past the checker’s 15 minutes is one take o
     expect(sendLabel).toHaveBeenCalledWith('dismiss', 'take-a', wrong(A23 + 6).id, expect.any(Number));
     expect(b.sent.some((f) => f.type === 'dismiss')).toBe(false);
     expect(screen.queryByTestId('live-mark-word')).toBeNull();
+  });
+
+  it('after Stop, Your recitation on an earlier take’s mark plays from the recitation’s saved recording, in the chain’s seconds', async () => {
+    const a = await startLong();
+    await recite(850);
+    await say(a, { type: 'at', w: A24 - 1 });
+    await say(a, { type: 'said', upTo: A24 - 1 });
+    await recite(1);
+    expect(mockConns).toHaveLength(2);
+    const b = mockConns[1];
+    await say(b, { type: 'ready', take: 'take-b', protocol: 9, said: 'voice' });
+    await say(b, { type: 'locked', w: A24, s: 27, a: 24 });
+    await recite(60);
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await flush();
+    await say(a, doneOf('take-a', A23, [wrong(A23 + 4)], 'end', 851));
+    await say(b, doneOf('take-b', A24, [], 'end', 60));
+    await flush();
+    // One recording for the whole recitation, saved at Stop: the first take's audio is in it alone.
+    expect(mockTake.finished).toBe(1);
+    expect(mockSaved.opened).toEqual(['rec-1']);
+    await tapWord(A23 + 4);
+    await act(async () => fireEvent.press(screen.getByTestId('mark-card-yours')));
+    expect(mockTake.clips).toHaveLength(0);
+    expect(mockSaved.reads).toHaveLength(1);
+    expect(mockSaved.reads[0][1]).toBeLessThan(851);
+  });
+
+  it('with Save recordings off nothing keeps an earlier take’s audio: its mark has no Your recitation, during or after', async () => {
+    const a = await startLong({ saveRecording: false });
+    expect(mockTake.started).toBe(0);
+    await recite(850);
+    await say(a, { type: 'at', w: A24 - 1 });
+    await say(a, { type: 'said', upTo: A24 - 1 });
+    await recite(1);
+    expect(mockConns).toHaveLength(2);
+    await tapWord(A23 + 4);
+    expect(screen.getByTestId('mark-card-dismiss')).toBeTruthy();
+    expect(screen.queryByTestId('mark-card-yours')).toBeNull();
+    fireEvent(screen.getByTestId('mark-card-backdrop'), 'responderGrant');
+    await flush();
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await flush();
+    await say(a, doneOf('take-a', A23, [wrong(A23 + 4)], 'end', 851));
+    await say(mockConns[1], doneOf('take-b', A24, [], 'end', 1));
+    await flush();
+    expect(mockSaved.opened).toEqual([]);
+    await tapWord(A23 + 4);
+    expect(screen.getByTestId('mark-card-dismiss')).toBeTruthy();
+    expect(screen.queryByTestId('mark-card-yours')).toBeNull();
   });
 
   it('Stop before the roll-over ends the take: no next take, even if the checker’s cap comes with the answer', async () => {

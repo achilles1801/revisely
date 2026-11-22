@@ -24,29 +24,63 @@ async function takeFiles(): Promise<Map<string, string>> {
   return out;
 }
 
-/** The samples of `recordingId` around second `t` (null when the recording isn't on the phone or can't be read). */
-export async function clipOfTake(recordingId: string, t: number): Promise<Int16Array | null> {
+/** A take's recording on this phone, read by the take's seconds (a long recitation's: its whole chain, RECITE-22). */
+export interface TakeFile {
+  /** Still on the phone (deleting the take, or its recording in Activity, removes it). */
+  there(): boolean;
+  /** The samples from second `from` to `to`, within the file (null when it isn't there or can't be read). */
+  read(from: number, to: number): Int16Array | null;
+}
+
+/** The recording `recordingId` as a take file (null when it isn't on the phone). Reading it never throws. */
+export async function takeFile(recordingId: string): Promise<TakeFile | null> {
   try {
     const uri = (await takeFiles()).get(recordingId);
-    if (!uri) return null;
-    const file = new File(uri);
-    if (!file.exists) return null;
-    const total = Math.floor(((file.size ?? 0) - HEADER) / 2);
-    const from = Math.max(0, Math.floor((t - BEFORE) * SAMPLE_RATE));
-    const to = Math.min(total, Math.ceil((t + AFTER) * SAMPLE_RATE));
-    if (to <= from) return null;
-    const handle = file.open();
-    try {
-      handle.offset = HEADER + from * 2;
-      const bytes = handle.readBytes((to - from) * 2);
-      return new Int16Array(bytes.buffer, bytes.byteOffset, Math.floor(bytes.byteLength / 2)).slice();
-    } finally {
-      handle.close();
-    }
+    return uri ? wavFile(uri) : null;
   } catch (err) {
-    logger.warn('Recite memory: could not read the take’s recording', err);
+    logger.warn('Recite memory: could not find the take’s recording', err);
     return null;
   }
+}
+
+function wavFile(uri: string): TakeFile {
+  const there = () => {
+    try {
+      return new File(uri).exists;
+    } catch {
+      return false;
+    }
+  };
+  return {
+    there,
+    read(fromS, toS) {
+      try {
+        const file = new File(uri);
+        if (!file.exists) return null;
+        const total = Math.floor(((file.size ?? 0) - HEADER) / 2);
+        const from = Math.max(0, Math.floor(fromS * SAMPLE_RATE));
+        const to = Math.min(total, Math.ceil(toS * SAMPLE_RATE));
+        if (to <= from) return null;
+        const handle = file.open();
+        try {
+          handle.offset = HEADER + from * 2;
+          const bytes = handle.readBytes((to - from) * 2);
+          return new Int16Array(bytes.buffer, bytes.byteOffset, Math.floor(bytes.byteLength / 2)).slice();
+        } finally {
+          handle.close();
+        }
+      } catch (err) {
+        logger.warn('Recite memory: could not read the take’s recording', err);
+        return null;
+      }
+    },
+  };
+}
+
+/** The samples of `recordingId` around second `t` (null when the recording isn't on the phone or can't be read). */
+export async function clipOfTake(recordingId: string, t: number): Promise<Int16Array | null> {
+  const file = await takeFile(recordingId);
+  return file ? file.read(t - BEFORE, t + AFTER) : null;
 }
 
 /** The ids of the take recordings on this phone, kept current (a recording deleted in Activity drops out). */
