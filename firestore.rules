@@ -578,7 +578,7 @@ service cloud.firestore {
     function isValidReciteTake(d) {
       return d.keys().hasOnly(['v', 'kind', 'take', 'createdAt', 'rev', 'day', 'level', 'hidden', 'from', 'to',
                                'secs', 'mistakes', 'tajweed', 'unclear', 'accuracy', 'marks', 'passed',
-                               'recordingId', 'deleted', 'updatedAt', 'unfinished']) &&
+                               'recordingId', 'deleted', 'updatedAt', 'unfinished', 'links']) &&
              d.keys().hasAll(['take', 'level', 'hidden', 'from', 'to', 'secs', 'mistakes', 'tajweed', 'unclear',
                               'accuracy', 'marks', 'passed', 'recordingId']) &&
              (d.take == null || (d.take is string && d.take.size() <= 100)) &&
@@ -594,7 +594,9 @@ service cloud.firestore {
              d.passed is list && d.passed.size() <= 400 &&
              (d.recordingId == null || (d.recordingId is string && d.recordingId.size() <= 100)) &&
              // A take kept without its final answer (long takes, Nov 20 2026): written only as true.
-             d.get('unfinished', true) == true;
+             d.get('unfinished', true) == true &&
+             // A recitation longer than the checker's cap: its takes, each one's id and first word (RECITE-22).
+             (!('links' in d) || (d.links is list && d.links.size() >= 2 && d.links.size() <= 20));
     }
 
     function isValidReciteClear(d) {

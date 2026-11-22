@@ -18,6 +18,8 @@ export interface LiveTakeView {
   words: QuranWords | null;
   seconds: number;
   wordTime: (w: number) => number | null;
+  /** A recitation longer than the checker's cap: its takes (RECITE-22). */
+  links?: Array<{ take: string | null; from: number }> | null;
 }
 
 /** Today in the phone's zone, when there's no revision day to file a take under. */
@@ -126,6 +128,7 @@ export function useRememberTake({
       recordingId: t.recordingId,
       timeOf: view.wordTime,
       openWords: (from, to) => openWordsBetween(records, from, to),
+      links: view.links,
     });
   }, [enabled, live, day, level, records]);
 

@@ -276,6 +276,21 @@ until its part is set up.
     for), and a heartbeat keeps the longest JavaScript stall. The summary on screen, a failure, ✕ or leaving the reader
     removes it. One left at the next launch goes to Sentry once (environment `dev`, "Recite: a take's Stop never
     reached the summary", tag `recite_stop_last`). It holds no audio or words, only event types.
+  - **A recitation past 15 minutes is a chain of takes** (RECITE-22, Nov 22 2026; the release owner's plan): the checker
+    ends a take at 900 s of its audio (`done.why: "too_long"`), and a 20-page session runs 30–45 minutes.
+    - `lib/reciteLive/chain` (pure): from 14:00 of a take, at a pause (`said` ≥ the cursor) after an ayah's or a phrase's
+      last word, the take ends and the next starts, looking from the ayah the reciter continues in to the end of its page
+      (`nextTakeFrom`: from the page's top, the checker's replay locked 2:61 on 2:58); any pause from 14:45, at once
+      from 14:55; a `too_long` done chains too, the next take getting what was sent past 900 s first. At 13:30 `warmUpReciteCheck()`
+      wakes a second recite-check instance (one take an instance) so the next take doesn't wait for a cold one.
+    - `useLiveRecitation` keeps the current take in `curRef` and the takes rolled over in `priorRef`; the screens see
+      `chainView` of both, which is the take itself when it never rolls over. The microphone never stops, every sample
+      goes to one take, and an earlier take's audio goes with its connection once its answer is in.
+    - One record in Recite's memory, with `links` (each take's checker id and first word; `takeOfWord` for labels).
+      Your recitation on an earlier take's mark reads the take's recording file back (`TakeRecording.clip`) while it
+      lasts.
+    - E2E: `revisely://e2e/recite-live?on=1&long=45&speed=5` (flow 21, 45 minutes in 9): the stand-in enforces the cap,
+      starts each take where the last ended, and beats every 2 s of audio (5 times as often by the clock).
   - **A take starts anywhere on the page** (Majd, Nov 14 2026; protocol 6). The start frame sends `startBy` (the page's
     last ayah), and the checker says where the reciter started (`locked`; recite-contract.md in the shared notes).
     - Until then the bar says Listening…, with no cursor and no score. **It must always find where he is** (Majd, Nov 20

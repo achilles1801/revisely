@@ -9,6 +9,11 @@
 //                                     watchdog must notice and resume, and the take is sent and replayed again), and
 //                                     the microphone's frames 10 a second, decoded as the native module's are. The take's
 //                                     numbers go to the E2E log ("[e2e] take stats").
+//   revisely://e2e/recite-live?on=1&long=45&speed=5
+//                                     a long session (RECITE-22): 45 minutes of recitation, its audio 5 times as fast as
+//                                     a phone's (45 minutes in 9; the checker beats 5 times as often), through takes the phone chains: the stand-in checker
+//                                     ends a take at 15 minutes of its audio as the real one does (`done.why: too_long`),
+//                                     and a new take carries on from where the last one ended, finding the place first.
 //
 // A take plays a recorded event log instead of listening. Marking mistakes: An-Naml 23–24 on page 379 (the 1405
 // print), from the page's top, with وَأُوتِيَتْ said as وَأُوهِيَتْ (a wrong word) and شَىْءٍ's tanween said as a shadda
@@ -24,6 +29,8 @@ let on = false;
 /** A long take's minutes (0: the recorded short takes), and the second of audio its checker goes quiet at (or none). */
 let longMinutes = 0;
 let quietAt: number | null = null;
+/** A long take's audio this many times as fast as a phone's microphone (1: as a phone). */
+let longSpeed = 1;
 /** The stand-in checker has gone quiet once already (it does so only once a take). */
 let wentQuiet = false;
 
@@ -32,9 +39,11 @@ export function handleReciteLiveLink(url: string): boolean {
   if (!m) return false;
   on = m[1] === '1';
   const long = /[?&]long=(\d+)/.exec(url);
-  longMinutes = on && long ? Math.min(15, Number(long[1])) : 0;
+  longMinutes = on && long ? Math.min(60, Number(long[1])) : 0;
   const quiet = /[?&]quiet=(\d+)/.exec(url);
   quietAt = longMinutes && quiet ? Number(quiet[1]) : null;
+  const speed = /[?&]speed=(\d+)/.exec(url);
+  longSpeed = longMinutes && speed ? Math.max(1, Math.min(10, Number(speed[1]))) : 1;
   // eslint-disable-next-line no-console
   console.log(`[e2e] recite-live ${on ? 'on' : 'off'}`);
   if (on) void putPage379();
@@ -192,7 +201,14 @@ export function e2eLongTakeMinutes(): number {
   return longMinutes;
 }
 
+/** How many of the microphone's frames go out at each tick (10 a second): `speed`. */
+export function e2eLongSpeed(): number {
+  return longSpeed;
+}
+
 const SAMPLE_RATE = 16_000;
+/** The checker's cap on a take's audio (s): live.py's MAX_SECONDS. */
+const CAP_SECONDS = 15 * 60;
 
 /** A tenth of a second of a 220 Hz tone, as the native module sends it (base64 of little-endian samples). */
 let toneFrame: string | null = null;
@@ -211,39 +227,50 @@ export function e2eToneFrameBase64(): string {
   return out;
 }
 
-/** The long take's events by seconds of audio: Majd's pace (a word every 1.1 s), a mark every 37 words, each ayah. */
-function longEvents(minutes: number): { t: number; e: Record<string, unknown> }[] {
+/** One moment of the long recitation: at `t` seconds of it, the cursor reaches a word, a word is decided, or a mark. */
+type LongEvent = { t: number; w: number; kind: 'at' | 'said' | 'mark' };
+
+/**
+ * The long recitation by seconds of audio: Majd's pace (a word every 1.1 s), a breath after each ayah (the checker decides
+ * its last word as the voice stops, `said`, before the next begins), a word said wrong every 37 words.
+ */
+function longEvents(minutes: number): LongEvent[] {
   const { getQuranWords } = require('../recite/quranWords') as typeof import('../recite/quranWords');
   const words = getQuranWords();
   if (!words) return [];
   // From An-Naml 23 on page 379 (the page E2E builds have an image of), on through the pages after it.
   const start = words.verseFirstWord(27, 23);
-  const out: { t: number; e: Record<string, unknown> }[] = [{ t: 1.5, e: { type: 'locked', w: start, s: 27, a: 23 } }];
-  let mistakes = 0;
-  const marks: Record<string, unknown>[] = [];
-  for (let i = 1, t = 2.6; t < minutes * 60; i++, t += 1.1) {
-    const w = start + i;
+  const out: LongEvent[] = [];
+  let t = 1.5;
+  for (let w = start; t < minutes * 60; w++) {
+    out.push({ t, w, kind: 'at' });
+    if (w > start) out.push({ t: t + 0.05, w: w - 1, kind: 'said' });
+    if (w % 37 === 0) out.push({ t: t + 0.1, w: w - 1, kind: 'mark' });
     const r = words.ref(w);
-    out.push({ t, e: { type: 'at', w, t } });
-    out.push({ t: t + 0.05, e: { type: 'said', upTo: w - 2 } });
-    if (w % 37 === 0) {
-      const said = words.ref(w - 2);
-      const mark = { id: `${w - 2}:word:sound`, w: w - 2, ayah: [said.sura, said.ayah], kind: 'word', detail: 'sound', heard: 'كذا', heardExact: false, sure: 'clear' };
-      marks.push(mark);
-      mistakes++;
-      out.push({ t: t + 0.1, e: { type: 'mark', mark } });
-    }
-    out.push({ t: t + 0.15, e: { type: 'score', reached: i, mistakes, tajweed: 0, accuracy: 1 - mistakes / i } });
-    if (words.verseFirstWord(r.sura, r.ayah) === w && r.ayah > 1) out.push({ t: t + 0.2, e: { type: 'ayah', s: r.sura, a: r.ayah - 1 } });
+    const ayahEnd = words.verseRange(r.sura, r.ayah)[1] - 1 === w;
+    if (ayahEnd) {
+      // The breath: the ayah's last word decided as the voice stops, then a second of quiet.
+      out.push({ t: t + 0.8, w, kind: 'said' });
+      t += 2.1;
+    } else t += 1.1;
   }
   return out;
 }
+
+/** The take the stand-in checker is on: where in the recitation its audio began (s), for a resume to carry on from. */
+let takeBase = 0;
+/** Where the takes that have ended left the recitation (s): a new take (not a resume) begins there. */
+let chainAt = 0;
 
 /**
  * The stand-in checker on the other end of the real socket: it answers `ready`, sends each event once it has received
  * the take's audio up to that event's time (as the checker hears and decides), beats every 2 s, and answers `end` with
  * the final answer. A resume (another instance, `from: 0`) sends everything again from the start once the audio comes
  * back. Once a take, at `quietAt` seconds of audio, it goes quiet without closing: only the phone's watchdog notices.
+ *
+ * Takes chain (RECITE-22): a take that isn't a resume begins where the last one ended, finds the place first (`locked`, a
+ * second after the first word it hears), and judges and counts only its own words. At 15 minutes of a take's audio it
+ * ends the take itself, as the real checker does (`done.why: "too_long"`).
  */
 class LongTakeChecker implements SocketLike {
   binaryType?: string;
@@ -253,19 +280,84 @@ class LongTakeChecker implements SocketLike {
   onerror: ((e?: unknown) => void) | null = null;
   private got = 0;
   private next = 0;
+  private base = 0;
+  private started = false;
+  private ended = false;
   private quiet = false;
   private closed = false;
   private beat: ReturnType<typeof setInterval> | null = null;
-  constructor(private readonly events: { t: number; e: Record<string, unknown> }[]) {
+  /** The take's start once found, its words judged, its marks. */
+  private lock: number | null = null;
+  private reached = 0;
+  private marks: Record<string, unknown>[] = [];
+  private furthest: number | null = null;
+  constructor(private readonly events: LongEvent[]) {
     setTimeout(() => this.onopen?.(), 80);
   }
   private emit(e: Record<string, unknown>) {
     if (!this.closed && !this.quiet) this.onmessage?.({ data: JSON.stringify(e) });
   }
+  /** The recitation's events up to `secs` of it, as this take's (times from its own start). */
+  private hear(secs: number) {
+    const words = (require('../recite/quranWords') as typeof import('../recite/quranWords')).getQuranWords();
+    while (this.next < this.events.length && this.events[this.next].t <= secs) {
+      const ev = this.events[this.next];
+      if (this.lock == null) {
+        // Looking for the place: found a second after the first word this take hears.
+        if (ev.kind !== 'at') {
+          this.next++;
+          continue;
+        }
+        if (secs < ev.t + 1) return;
+        this.lock = ev.w;
+        const r = words?.ref(ev.w);
+        this.emit({ type: 'locked', w: ev.w, s: r?.sura, a: r?.ayah, t: ev.t - this.base });
+      }
+      this.next++;
+      const t = ev.t - this.base;
+      if (ev.kind === 'at') {
+        if (ev.w < this.lock) continue;
+        this.emit({ type: 'at', w: ev.w, t });
+        this.reached++;
+        this.furthest = ev.w;
+        this.emit({ type: 'score', reached: this.reached, mistakes: this.marks.length, tajweed: 0, accuracy: 1 - this.marks.length / this.reached });
+      } else if (ev.kind === 'said') {
+        if (ev.w >= this.lock) this.emit({ type: 'said', upTo: ev.w, t });
+      } else if (ev.w >= this.lock) {
+        const r = words?.ref(ev.w);
+        const mark = { id: `${ev.w}:word:sound`, w: ev.w, ayah: [r?.sura, r?.ayah], kind: 'word', detail: 'sound', heard: 'كذا', heardExact: false, sure: 'clear' };
+        this.marks.push(mark);
+        this.emit({ type: 'mark', mark, t });
+      }
+    }
+  }
+  /** The final answer: what this take heard, and why it ended. */
+  private finish(why: 'end' | 'too_long') {
+    if (this.ended) return;
+    this.ended = true;
+    chainAt = this.base + this.got / SAMPLE_RATE;
+    const from = this.lock ?? 0;
+    this.emit({
+      type: 'done',
+      result: {
+        v: 2,
+        take: `e2e-long-${Math.round(this.base)}`,
+        from,
+        to: (this.furthest ?? from) + 1,
+        start: this.lock,
+        secs: Math.round(this.got / SAMPLE_RATE),
+        marks: this.marks,
+        score: this.reached ? { reached: this.reached, mistakes: this.marks.length, tajweed: 0, accuracy: 1 - this.marks.length / this.reached } : null,
+        why,
+      },
+    });
+    this.emit({ type: 'into', names: [] });
+  }
   send(data: string | ArrayBuffer): void {
     if (this.closed) return;
     if (typeof data !== 'string') {
-      this.got += data.byteLength / 2;
+      if (!this.started || this.ended) return;
+      this.got = Math.min(this.got + data.byteLength / 2, CAP_SECONDS * SAMPLE_RATE);
       const secs = this.got / SAMPLE_RATE;
       if (quietAt != null && !wentQuiet && secs >= quietAt) {
         wentQuiet = true;
@@ -273,33 +365,38 @@ class LongTakeChecker implements SocketLike {
         // eslint-disable-next-line no-console
         console.log(`[e2e] recite-live checker quiet at ${Math.round(secs)} s`);
       }
-      while (this.next < this.events.length && this.events[this.next].t <= secs) this.emit(this.events[this.next++].e);
+      this.hear(this.base + secs);
+      // The checker's cap: the take ends there, whatever the phone sends.
+      if (secs >= CAP_SECONDS) {
+        // eslint-disable-next-line no-console
+        console.log('[e2e] recite-live checker cap reached');
+        this.finish('too_long');
+      }
       return;
     }
     const frame = JSON.parse(data) as { type: string; resume?: string };
     if (frame.type === 'start') {
+      // A new take begins where the last one ended; a resume is the same take again from its start.
+      if (!frame.resume) takeBase = chainAt;
+      this.base = takeBase;
+      this.next = this.events.findIndex((e) => e.t > this.base);
+      if (this.next < 0) this.next = this.events.length;
+      this.started = true;
       setTimeout(() => {
-        this.emit({ type: 'ready', v: 2, take: 'e2e-long', engine: 'e2e', protocol: 8, from: 0, beat: 2 });
-        this.beat = setInterval(() => this.emit({ type: 'beat', t: this.got / SAMPLE_RATE, rx: this.got / SAMPLE_RATE }), 2000);
+        this.emit({ type: 'ready', v: 2, take: `e2e-long-${Math.round(this.base)}`, engine: 'e2e', protocol: 8, from: 0, beat: 2, said: 'voice' });
+        // Every 2 s of the take's audio: at `speed` that's more often by the clock, so the phone's paced catch-up (at most
+        // 5 s past the checker's last `rx`) still drains held audio faster than it comes. At 2 s by the clock a new take's
+        // held audio fell further behind at 6x, and the bar said Slow connection (flow 21's first run, Nov 22 2026).
+        this.beat = setInterval(() => this.emit({ type: 'beat', t: this.got / SAMPLE_RATE, rx: this.got / SAMPLE_RATE }), 2000 / longSpeed);
       }, 300);
       if (frame.resume) {
         // eslint-disable-next-line no-console
         console.log('[e2e] recite-live resumed');
       }
     } else if (frame.type === 'end') {
-      setTimeout(() => {
-        // What it heard: the events up to the audio received.
-        const heard = this.events.slice(0, this.next);
-        const marks = heard.filter((x) => x.e.type === 'mark').map((x) => x.e.mark);
-        const last = [...heard].reverse().find((x) => x.e.type === 'at')?.e.w as number | undefined;
-        const first = this.events[0]?.e.w as number;
-        const score = [...heard].reverse().find((x) => x.e.type === 'score')?.e;
-        this.emit({
-          type: 'done',
-          result: { v: 2, take: 'e2e-long', from: first, to: (last ?? first) + 1, start: first, secs: Math.round(this.got / SAMPLE_RATE), marks, score: score ? { ...score, type: undefined } : null },
-        });
-        this.emit({ type: 'into', names: [] });
-      }, 800);
+      // The next take may start before this one's answer goes: it begins where this one's audio ended.
+      chainAt = this.base + this.got / SAMPLE_RATE;
+      setTimeout(() => this.finish('end'), 800);
     }
   }
   close(): void {
@@ -312,6 +409,8 @@ class LongTakeChecker implements SocketLike {
 /** The long take's connection: the real socket, the stand-in checker at its other end. */
 export function e2eLongConnect(): LiveConnect {
   wentQuiet = false;
+  takeBase = 0;
+  chainAt = 0;
   const events = longEvents(longMinutes);
   return socketFeed({
     url: 'wss://e2e.invalid/live',
@@ -346,11 +445,11 @@ export function e2eTakeEnded(s: {
   heapStart: number | null;
   heapMax: number | null;
   events: number;
-}): void {
+}, links = 1): void {
   if (!longMinutes) return;
   const heap = s.heapStart != null && s.heapMax != null ? ` heap ${s.heapStart}→${s.heapMax}MB` : '';
   statsLine =
-    `take ${s.secs}s ev ${s.events} stall max ${Math.round(s.stallMax)}ms ×${s.stalls} ` +
+    `take ${s.secs}s links ${links} ev ${s.events} stall max ${Math.round(s.stallMax)}ms ×${s.stalls} ` +
     `apply ${s.applyAvg}/${s.applyMax}ms lag ${s.lagMax ?? '–'}s quiet ${Math.round(s.quietMax / 1000)}s${heap}`;
   for (const l of [...statsListeners]) l();
 }

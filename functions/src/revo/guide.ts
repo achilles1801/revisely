@@ -426,6 +426,16 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     ),
   },
   {
+    // Long recitations (Nov 22 2026), in Revisely Dev until the mistake detection release brings them to the main guide.
+    title: 'Reciting for longer than 15 minutes',
+    covers: ['RECITE-22'],
+    routes: ['QuranReader', 'ActiveRevision'],
+    text: lines(
+      '- A recitation can go on as long as they like, in the reader or a whole revision session (30–45 minutes for 20 pages): the server checks 15 minutes at a time, and Revisely joins those pieces by itself, at a pause after an ayah near the 15 minutes. Nothing stops or changes on screen: the bar keeps listening, the time keeps running, and every mistake marked stays.',
+      '- Stop ends it as usual, and the summary covers the whole recitation: one score, one recording, and one take in “Recited” and “Your progress”. “Your recitation” on a mistake from earlier in a long recitation plays while it lasts; after Stop, only for mistakes in its last 15-minute part.',
+    ),
+  },
+  {
     // Majd's Nov 20 2026 asks, in Revisely Dev until the next release (Not clear's line too: the store app has it, and
     // the release's re-record brings it to the main guide).
     title: 'Mistakes on a hidden page, Not clear, the mistake sound, Your recitation, and how highlights look',
