@@ -23,9 +23,7 @@ import { markUiReady, startOtaUpdates } from './src/lib/updates/ota';
 import { stopTrace } from './src/lib/reciteLive/stopTrace';
 import { startStoreChecks } from './src/lib/updates/storeUpdates';
 import { UpdateRequiredGate } from './src/components/updates/UpdateRequired';
-import { currentLanguage } from './src/i18n';
-import { languagePickerOffered, loadLanguageChoice } from './src/i18n/choice';
-import { syncLayoutDirection } from './src/i18n/direction';
+import { loadLanguageChoice } from './src/i18n/choice';
 
 // Every launch is one Sentry session, labelled with the exact JavaScript it ran
 // (src/lib/releaseInfo.ts): release com.revisionbuddy.app@1.0.2+19.u<update>,
@@ -90,13 +88,12 @@ Sentry.setTags(releaseTags(release));
 // New store versions are offered, or required below the minimum (storeUpdates.ts).
 startOtaUpdates();
 startStoreChecks();
-// The layout reads the way the app's language does, not the phone's: Android mirrored the English
-// app on a phone set to Arabic (BEHAVIOUR.md LANG-1). Applies from the next launch. Where a language
-// can be chosen (Revisely Dev), loadLanguageChoice does it below, once the choice is read.
-if (!languagePickerOffered()) syncLayoutDirection(currentLanguage());
 // Revisely Dev: a live take whose Stop never reached its summary last run (a freeze, or the app closed then) goes to
 // Sentry once (src/lib/reciteLive/stopTrace.ts).
 void stopTrace.reportLeftover();
+
+/** How long the splash waits for a restart into the right direction (LANG-1) before showing the app as it is. */
+const RESTART_FALLBACK_MS = 3000;
 
 function App() {
   // Amiri (classical Naskh) for all Arabic UI text. If loading fails we still
@@ -114,13 +111,21 @@ function App() {
     void ensureAndroidChannels();
   }, []);
 
-  // Revisely Dev: the language chosen in Settings, applied before the first screen (src/i18n/choice.ts). The store
-  // app has nothing to read.
-  const [languageReady, setLanguageReady] = useState(() => !languagePickerOffered());
+  // The language (the one chosen in Settings, where there is a choice) and the layout's direction, before the first
+  // screen (src/i18n/choice.ts). The layout reads the way the app's language does, not the phone's (BEHAVIOUR.md
+  // LANG-1): a launch that started the other way (Android mirrors any app on a phone set to Arabic) restarts once, and
+  // the splash stays up for it. If that restart never comes, the app shows after RESTART_FALLBACK_MS as it is.
+  const [languageReady, setLanguageReady] = useState(false);
   useEffect(() => {
-    if (languageReady) return;
-    void loadLanguageChoice().finally(() => setLanguageReady(true));
-  }, [languageReady]);
+    let fallback: ReturnType<typeof setTimeout> | undefined;
+    void loadLanguageChoice()
+      .then(({ restarting }) => {
+        if (restarting) fallback = setTimeout(() => setLanguageReady(true), RESTART_FALLBACK_MS);
+        else setLanguageReady(true);
+      })
+      .catch(() => setLanguageReady(true));
+    return () => clearTimeout(fallback);
+  }, []);
 
   // Something to show: the splash can go once the launch check is done.
   const fontsSettled = (fontsLoaded || !!fontError) && languageReady;

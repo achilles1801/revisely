@@ -3,12 +3,12 @@
 //
 // The language is applied before the first screen (App.tsx waits for loadLanguageChoice, inside the splash), and a
 // change restarts the app: React Native lays out right to left only from a launch, and a restart also redraws every
-// screen in the new language.
+// screen in the new language. A launch that started the wrong way round restarts once, in the splash (LANG-1).
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Updates from 'expo-updates';
 import { DevSettings } from 'react-native';
 import { isDevVariant } from '../lib/variant';
-import { syncLayoutDirection } from './direction';
+import { isRTLLanguage, restartForDirection, syncLayoutDirection } from './direction';
 import { i18n } from './instance';
 import { deviceLanguages, isLanguage, LANGUAGES, pinnedToEnglish, resolveLanguage, SHIPPED, type Language } from './language';
 
@@ -49,21 +49,60 @@ function parseChoice(raw: string | null): LanguageChoice {
   return raw === 'system' || isLanguage(raw) ? raw : 'system';
 }
 
+/** The direction the last launch-time restart was for (restartForDirection). Cleared once a launch is the right way. */
+const DIRECTION_RESTART_KEY = '@revisely_direction_restart:v1';
+
 /**
- * Reads the choice and applies it, before the first screen. The store app reads nothing. Returns the language
- * shown.
+ * Sets the direction for the language shown and, when this launch is laid out the other way, restarts once (LANG-1).
+ * True when it is restarting: the caller keeps the splash up.
  */
-export async function loadLanguageChoice(): Promise<Language> {
-  if (!languagePickerOffered()) return i18n.language as Language;
+async function settleDirection(language: Language): Promise<boolean> {
+  const wrongWay = syncLayoutDirection(language);
+  const pinned = pinnedToEnglish();
+  if (pinned) return false;
+  const wanted = isRTLLanguage(language) ? 'rtl' : 'ltr';
+  let restartedFor: string | null = null;
   try {
-    choice = parseChoice(await AsyncStorage.getItem(KEY));
+    restartedFor = await AsyncStorage.getItem(DIRECTION_RESTART_KEY);
   } catch {
-    choice = 'system';
+    // Unread: no restart, since one that didn't take couldn't be told apart from a first.
+    return false;
   }
-  const language = resolveChoice(choice);
-  if (i18n.language !== language) await i18n.changeLanguage(language);
-  syncLayoutDirection(language);
-  return language;
+  if (!restartForDirection(wrongWay, wanted, restartedFor, pinned)) {
+    if (!wrongWay && restartedFor != null) {
+      try {
+        await AsyncStorage.removeItem(DIRECTION_RESTART_KEY);
+      } catch {
+        // Left: the next launch the wrong way carries on as it is.
+      }
+    }
+    return false;
+  }
+  try {
+    await AsyncStorage.setItem(DIRECTION_RESTART_KEY, wanted);
+    await restartForLanguage();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Reads the choice (where there is one to make) and applies the language and its direction, before the first screen.
+ * A launch laid out the wrong way restarts once (LANG-1): `restarting` is then true and the splash stays.
+ */
+export async function loadLanguageChoice(): Promise<{ language: Language; restarting: boolean }> {
+  if (languagePickerOffered()) {
+    try {
+      choice = parseChoice(await AsyncStorage.getItem(KEY));
+    } catch {
+      choice = 'system';
+    }
+    const chosen = resolveChoice(choice);
+    if (i18n.language !== chosen) await i18n.changeLanguage(chosen);
+  }
+  const language = i18n.language as Language;
+  return { language, restarting: await settleDirection(language) };
 }
 
 /**
