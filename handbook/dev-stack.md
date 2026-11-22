@@ -267,8 +267,9 @@ until its part is set up.
   - **A recitation past 15 minutes is a chain of takes** (RECITE-22, Nov 22 2026; the release owner's plan): the checker
     ends a take at 900 s of its audio (`done.why: "too_long"`), and a 20-page session runs 30–45 minutes.
     - `lib/reciteLive/chain` (pure): from 14:00 of a take, at a pause (`said` ≥ the cursor) after an ayah's or a phrase's
-      last word, the take ends and the next starts on the page on screen; any pause from 14:45, at once from 14:55; a
-      `too_long` done chains too, the next take getting what was sent past 900 s first. At 13:30 `warmUpReciteCheck()`
+      last word, the take ends and the next starts, looking from the ayah the reciter continues in to the end of its page
+      (`nextTakeFrom`: from the page's top, the checker's replay locked 2:61 on 2:58); any pause from 14:45, at once
+      from 14:55; a `too_long` done chains too, the next take getting what was sent past 900 s first. At 13:30 `warmUpReciteCheck()`
       wakes a second recite-check instance (one take an instance) so the next take doesn't wait for a cold one.
     - `useLiveRecitation` keeps the current take in `curRef` and the takes rolled over in `priorRef`; the screens see
       `chainView` of both, which is the take itself when it never rolls over. The microphone never stops, every sample

@@ -17,7 +17,7 @@ import { checkLevel, type ReciteCheckSettings } from '../../lib/reciteCheck/sett
 import { sendLabel, warmUpReciteCheck } from '../../lib/reciteCheck/service';
 import type { LiveEvent, Mark } from '../../lib/reciteLive/contract';
 import type { ClientFrame, LiveConnect, LiveConnection, StartFrame } from '../../lib/reciteLive/feed';
-import { CAP_S, chainTakes, chainView, judgedUpTo, LINK_ANSWER_MS, nextLinkStart, ROLL_FROM_S, rolloverDue, settleLink, WARM_NEXT_S, type ChainLink } from '../../lib/reciteLive/chain';
+import { CAP_S, chainTakes, chainView, judgedUpTo, LINK_ANSWER_MS, nextLinkStart, nextTakeFrom, ROLL_FROM_S, rolloverDue, settleLink, WARM_NEXT_S, type ChainLink } from '../../lib/reciteLive/chain';
 import { socketFeed } from '../../lib/reciteLive/socket';
 import { stopHearing } from '../../lib/reciteLive/hearAudio';
 import { clipRange } from '../../lib/reciteLive/phrase';
@@ -153,8 +153,11 @@ export function startFrameFor(
   settings: ReciteCheckSettings,
   anywhere: boolean = START_ANYWHERE,
   span: TakeSpan | null = null,
+  /** A long recitation's next take: looked for from this ayah, not the page's first (lib/reciteLive/chain `nextTakeFrom`). */
+  startAt: [number, number] | null = null,
 ): StartFrame {
-  const first = versesOnPage(page)[0] ?? { sura: 1, ayah: 1 };
+  const top = versesOnPage(page)[0] ?? { sura: 1, ayah: 1 };
+  const first = startAt && !span ? { sura: startAt[0], ayah: startAt[1] } : top;
   const startBy = span ? span.startBy : anywhere ? lastAyahOf(page) : undefined;
   return {
     type: 'start',
@@ -649,6 +652,7 @@ export function useLiveRecitation({
       const secs = linkSecs();
       const no = linkNo.current;
       let done = curRef.current;
+      const cutState = done;
       // Cut mid-word (the cap, or at once near it): this take judged only up to what it had decided (lib/reciteLive/chain).
       const upTo = judgedUpTo(done);
       if (capDone) done = applyEvent(done, capDone);
@@ -680,7 +684,9 @@ export function useLiveRecitation({
       behindBefore.current = null;
       setSlow(false);
       counts.current = { notMistake: 0, putBack: 0, peeks: 0 };
-      const frame = startFrameFor(pageRef.current, take, settingsRef.current, START_ANYWHERE, null);
+      // From the ayah the reciter is continuing in, to the end of its page (and anywhere in the Qur'an).
+      const from = nextTakeFrom(qw, cutState);
+      const frame = startFrameFor(from?.page ?? pageRef.current, take, settingsRef.current, START_ANYWHERE, null, from?.from ?? null);
       update(() => connectingFor(frame, qw));
       const b = openLink(frame);
       // A second at a time, as the microphone's frames come (an encoded block holds at most 65,535 samples).

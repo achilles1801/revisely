@@ -345,6 +345,11 @@ describe('[RECITE-22] a recitation past the checker’s 15 minutes is one take o
     expect(mockConns).toHaveLength(2);
     expect(a.sent.filter((f) => f.type === 'end')).toHaveLength(1);
     const b = mockConns[1];
+    // It looks from the ayah the reciter goes on with (An-Naml 24), not the page's top: a look-alike opening earlier on the
+    // page can't be taken for it (the checker session's replay: 2:61 locked on 2:58).
+    const { versesOnPage } = require('../../../lib/ayahBounds');
+    const last = versesOnPage(379).at(-1);
+    expect(b.start).toMatchObject({ s: 27, a: 24, startBy: [last.sura, last.ayah], startIn: 'quran', guess: true });
     await recite(30);
     expect(a.audio).toBe(847 * SR);
     expect(b.audio).toBe(30 * SR);

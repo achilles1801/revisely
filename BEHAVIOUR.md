@@ -646,8 +646,9 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
 - **RECITE-22.** (Revisely Dev) A recitation goes on past the checker's 15 minutes a take, as long as the reciter does
   (a 20-page session runs 30–45 minutes), and shows as one take. From 14 minutes into a take, at a pause after an
   ayah's or a phrase's last word (later at any pause, and five seconds before the cap at once), the take ends and the
-  next starts by itself on the page on screen, which the checker finds as at any start; a take the checker's cap ends
-  is followed the same way. The microphone never stops: every moment of the recitation goes to exactly one take, none
+  next starts by itself, looking for the reciter from the ayah they are continuing in to the end of its page (and then
+  anywhere in the Qur'an), so a look-alike opening earlier on the page is never taken for it; a take the checker's cap
+  ends is followed the same way. The microphone never stops: every moment of the recitation goes to exactly one take, none
   twice and none missed. A take cut mid-word (at the cap, or near it) counts and marks nothing past the last word it had
   decided: the word in flight is judged by neither take, never wrongly marked. Nothing on screen changes: the bar listens on, the clock runs on, every mark stays, and the
   cursor and a hidden page's words stay where the reciter was until the next take has found the place. Stop, ✕,

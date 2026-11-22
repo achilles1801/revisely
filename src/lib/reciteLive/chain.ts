@@ -4,8 +4,8 @@
 // long recitation is a chain of takes (the release owner's plan, Nov 22 2026, recite-cap-and-tiers-plan.md):
 //
 // - Rolling over: from ROLL_FROM_S of a take's audio, at a pause after an ayah's or a phrase's last word (everything up
-//   to it decided, nothing after it begun), the phone ends the take and starts the next one at once, on the page on
-//   screen, where the checker finds the place as at any start. From ROLL_LOOSE_S any pause will do, and at ROLL_NOW_S it
+//   to it decided, nothing after it begun), the phone ends the take and starts the next one at once, looking for the
+//   reciter from the ayah they are continuing in to the end of its page (`nextTakeFrom`). From ROLL_LOOSE_S any pause will do, and at ROLL_NOW_S it
 //   rolls over wherever the reciter is. The checker's own cap (`done.why: "too_long"`) chains too.
 // - The microphone never stops: every sample goes to exactly one take, in order. Nothing is said twice to the checker
 //   and nothing is missed.
@@ -73,6 +73,21 @@ export function rolloverDue(state: LiveState, words: QuranWords, linkSeconds: nu
   if (state.cursor != null && state.cursor > said) return false;
   if (linkSeconds >= ROLL_LOOSE_S) return true;
   return endsAyah(words, said) || endsPhrase(said);
+}
+
+/**
+ * Where the next take looks for the reciter: from the ayah of the word after the last one decided (the next ayah when the
+ * take ended at an ayah's end, the same one mid-ayah) to the end of that word's page, and then anywhere in the Qur'an.
+ * Not the page's top: a look-alike opening earlier on the page could be taken for it (the checker session's replay, Nov 22
+ * 2026: 2:61 «وإذ قلتم» locked on 2:58 «وإذ قلنا», on the same page, and that take never found its way back). Null when
+ * the take decided nothing (it starts on the page on screen, as any take does).
+ */
+export function nextTakeFrom(words: QuranWords, state: LiveState): { page: number; from: [number, number] } | null {
+  const last = state.saidUpTo ?? state.cursor;
+  if (last == null) return null;
+  const next = Math.min(last + 1, words.count - 1);
+  const r = words.ref(next);
+  return { page: words.pageOf(next), from: [r.sura, r.ayah] };
 }
 
 /**

@@ -9,6 +9,7 @@ import {
   endsAyah,
   judgedUpTo,
   linkHolding,
+  nextTakeFrom,
   ROLL_FROM_S,
   ROLL_LOOSE_S,
   ROLL_NOW_S,
@@ -162,6 +163,20 @@ describe('what the screens see of a chain', () => {
     expect(Object.keys(view.marks)).toEqual([mark(A24 + 2).id]);
     expect(view.removed[mark(A23 + 4).id]).toBeTruthy();
     expect(mistakeCount(view)).toBe(1);
+  });
+});
+
+describe('where the next take looks for the reciter', () => {
+  it('from the ayah they continue in: the next ayah after an ayah’s end, the same one mid-ayah; on that word’s page', () => {
+    expect(nextTakeFrom(words, take(A23, [{ type: 'at', w: A24 - 1 }, { type: 'said', upTo: A24 - 1 }]))).toEqual({ page: words.pageOf(A24), from: [27, 24] });
+    expect(nextTakeFrom(words, take(A23, [{ type: 'at', w: A23 + 5 }, { type: 'said', upTo: A23 + 5 }]))).toEqual({ page: 379, from: [27, 23] });
+    // The page's last word decided: the next take looks on the next page.
+    const pageEnd = words.pageRange(379)[1] - 1;
+    const next = nextTakeFrom(words, take(A23, [{ type: 'at', w: pageEnd }, { type: 'said', upTo: pageEnd }]));
+    expect(next?.page).toBe(380);
+    expect(next?.from).toEqual([words.ref(pageEnd + 1).sura, words.ref(pageEnd + 1).ayah]);
+    // Nothing decided yet: the page on screen, as any take.
+    expect(nextTakeFrom(words, liveConnecting({ anywhereFrom: A23 }))).toBeNull();
   });
 });
 
