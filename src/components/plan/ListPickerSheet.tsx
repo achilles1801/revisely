@@ -13,7 +13,7 @@ import { Tap } from '../v2/Tap';
 import { useTheme } from '../../context/ThemeContext';
 import { useHaptics } from '../../design/haptics';
 import { spacing } from '../../theme/spacing';
-import { arabicV2, layoutV2, radiusV2, typeV2 } from '../../theme/v2';
+import { arabicForV2, layoutV2, radiusV2, typeV2 } from '../../theme/v2';
 import { t } from '../../i18n';
 
 /**
@@ -151,7 +151,7 @@ export const ListPickerSheet = forwardRef<BottomSheetModal, ListPickerSheetProps
             ) : null}
           </View>
           {item.trailing ? (
-            <Text style={[arabicV2(18), v2.trailing, { color: palette.secondary }]} numberOfLines={1}>
+            <Text style={[arabicForV2(item.trailing, 18), v2.trailing, { color: palette.secondary }]} numberOfLines={1}>
               {item.trailing}
             </Text>
           ) : null}

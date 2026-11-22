@@ -557,19 +557,17 @@ export const typeV2 = t({
 });
 
 /**
- * Arabic text in Amiri: a little larger than the Latin beside it. Its 1.6× line is shorter than the font's own, so
- * iOS cuts the top of the line: harakat above the letters clip (a fatha needs 1.04× above the baseline; this line
- * leaves 0.97×). Fine for a surah's name; Qur'an words and anything voweled use arabicFullV2.
- */
-export function arabicV2(size: number): TextStyle {
-  return { fontFamily: fontsV2.arabic, fontSize: size, lineHeight: Math.round(size * 1.6) };
-}
-
-/**
  * Amiri's own line, as fractions of the font size: the ascender and descender of its hhea table (unitsPerEm 1000),
  * which both platforms build a line from. arabicLines.test reads them from assets/fonts/Amiri-Regular.ttf.
  */
 export const AMIRI_LINE = { ascent: 1.124, descent: 0.634 } as const;
+
+/**
+ * How far unvoweled Amiri reaches, as fractions of the font size: the highest and lowest of the 114 surah names
+ * (scripts/measure-amiri-ink.swift, Nov 22 2026: the hamza of الأنبياء reaches 1.001 above, the meem's tail of القلم
+ * 0.651 below). The salam, the prayer names and الكهف stay inside it.
+ */
+export const AMIRI_NAME_INK = { above: 1.001, below: 0.651 } as const;
 
 /**
  * How far voweled Amiri's ink reaches from the baseline, as fractions of the font size: the highest and the lowest of
@@ -584,13 +582,29 @@ const INK_MARGIN = 0.02;
 
 /**
  * A line taller than the font's own gets half the extra above the ascent and half below the descent, on iOS
- * (RCTApplyBaselineOffset) and Android (CustomLineHeightSpan) alike, React Native 0.81. So the line that holds the ink
- * adds twice the larger overshoot to the font's own line: 2.51× the font size.
+ * (RCTApplyBaselineOffset) and Android (CustomLineHeightSpan) alike, React Native 0.81. So the line that holds some ink
+ * adds twice its larger overshoot to the font's own line (none when it fits, but never a shorter line than the font's).
  */
-export const ARABIC_FULL_LINE =
-  AMIRI_LINE.ascent +
-  AMIRI_LINE.descent +
-  2 * (Math.max(AMIRI_INK.above - AMIRI_LINE.ascent, AMIRI_INK.below - AMIRI_LINE.descent) + INK_MARGIN);
+function lineFor(ink: { above: number; below: number }): number {
+  const over = Math.max(ink.above - AMIRI_LINE.ascent, ink.below - AMIRI_LINE.descent, 0);
+  return AMIRI_LINE.ascent + AMIRI_LINE.descent + 2 * (over + INK_MARGIN);
+}
+
+/** The line voweled Amiri needs: 2.51× the font size. */
+export const ARABIC_FULL_LINE = lineFor(AMIRI_INK);
+
+/** The line unvoweled Amiri needs: 1.83× the font size. */
+export const ARABIC_NAME_LINE = lineFor(AMIRI_NAME_INK);
+
+/**
+ * Unvoweled Arabic in Amiri (a surah's name, the salam, a prayer's name): a little larger than the Latin beside it,
+ * on a line that holds every letter and hamza (ARABIC_NAME_LINE). Until Nov 22 2026 it was 1.6×, shorter than the
+ * font's own line: iOS cut the line's top (a hamza over an alif) and Android its bottom (a meem's tail). Anything with
+ * harakat uses arabicFullV2.
+ */
+export function arabicV2(size: number): TextStyle {
+  return { fontFamily: fontsV2.arabic, fontSize: size, lineHeight: Math.ceil(size * ARABIC_NAME_LINE) };
+}
 
 /**
  * Voweled Arabic in Amiri that never clips (Majd, Nov 22 2026: on a mistake's card "u cant even see if theres a dumma
@@ -600,6 +614,20 @@ export const ARABIC_FULL_LINE =
  */
 export function arabicFullV2(size: number): TextStyle {
   return { fontFamily: fontsV2.arabic, fontSize: size, lineHeight: Math.ceil(size * ARABIC_FULL_LINE) };
+}
+
+/** Harakat, tanween, the dagger alif and the Qur'an's small signs. */
+const HARAKAT = /[ً-ٰٟۖ-ۭ]/;
+
+/** Whether Arabic text carries harakat (so it needs arabicFullV2's line). */
+export const hasHarakat = (text: string): boolean => HARAKAT.test(text);
+
+/**
+ * The line a given Arabic text needs, where one place shows both kinds (a picker's surah name and a juz's voweled
+ * opening words, a typed search and a heard one): arabicFullV2 when it carries harakat, arabicV2 when it doesn't.
+ */
+export function arabicForV2(text: string | null | undefined, size: number): TextStyle {
+  return text && hasHarakat(text) ? arabicFullV2(size) : arabicV2(size);
 }
 
 /**

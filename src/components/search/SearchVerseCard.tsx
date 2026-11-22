@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
-import { arabicV2, layoutV2, typeV2 } from '../../theme/v2';
+import { arabicFullV2, layoutV2, typeV2 } from '../../theme/v2';
 import { Tap } from '../v2/Tap';
 import { PillButton } from '../v2/PillButton';
 import { describeAyahs, plainText, spokenText, surahName } from '../../lib/passages';
@@ -123,7 +123,7 @@ export function SearchVerseCard({
         </Text>
         <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={CHROME_MAX}>{t('common.pageShort', { n: page })}</Text>
       </Tap>
-      <Text style={[arabicV2(26), styles.arabic]} accessibilityLanguage="ar" maxFontSizeMultiplier={2} testID="search-verse-arabic">
+      <Text style={[arabicFullV2(26), styles.arabic]} accessibilityLanguage="ar" maxFontSizeMultiplier={2} testID="search-verse-arabic">
         {ayahs.map((key, n) => {
           const [from, to] = words.verseRange(suraOf(key), ayahOf(key));
           return (

@@ -14,7 +14,7 @@ import type { OnboardingStackParamList } from '../../navigation/OnboardingNaviga
 import { HeroGlow } from '../../components/v2/HeroGlow';
 import { PillButton } from '../../components/v2/PillButton';
 import { useTheme } from '../../context/ThemeContext';
-import { arabicV2, layoutV2, typeV2 } from '../../theme/v2';
+import { arabicFullV2, layoutV2, typeV2 } from '../../theme/v2';
 import { t } from '../../i18n';
 
 type NavigationProp = NativeStackNavigationProp<OnboardingStackParamList, 'Welcome'>;
@@ -61,7 +61,7 @@ export default function WelcomeScreen() {
       <ScrollView contentContainerStyle={v2.scroll} showsVerticalScrollIndicator={false}>
         <Animated.View style={[v2.top, bismillahAnim]}>
           <Text
-            style={[arabicV2(24), v2.center, { color: palette.text }]}
+            style={[arabicFullV2(24), v2.center, { color: palette.text }]}
             accessibilityLanguage="ar"
             maxFontSizeMultiplier={1.6}
           >

@@ -69,6 +69,7 @@ jest.mock('../../../lib/translation', () => {
 import { DesignProvider } from '../../../design/DesignContext';
 import { ThemeProvider } from '../../../context/ThemeContext';
 import { DEFAULT_ACCENT, paletteV2 } from '../../../theme/v2';
+import { arabicLines, clippedArabic } from '../../../../jest/arabicLines';
 import { touchHandlingAncestor } from '../../../../jest/scrollable';
 import { VerseSheet } from '../VerseSheet';
 import { VerseMenu } from '../VerseMenu';
@@ -144,6 +145,9 @@ describe('VerseSheet in the new design', () => {
     const tanzil = screen.getByText('tanzil.net');
     expect(tanzil.props.accessibilityRole).toBe('link');
     expect(StyleSheet.flatten(tanzil.props.style).color).toBe(palette.link);
+    // The verse's every haraka, stacked marks too (arabicFullV2), and the surah's name whole (arabicV2).
+    expect(arabicLines(screen.UNSAFE_root as never).map((l) => l.text)).toEqual(expect.arrayContaining([mockArabic]));
+    expect(clippedArabic(screen.UNSAFE_root as never)).toEqual([]);
   });
 
   it('The Clear Quran: its text exactly as given, the credit and its link pinned under the verse', async () => {
