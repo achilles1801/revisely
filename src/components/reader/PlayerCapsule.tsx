@@ -66,6 +66,8 @@ interface PlayerCapsuleProps {
  */
 export function PlayerCapsule({ player, page, record, timer, trailing, compact, surface, recording }: PlayerCapsuleProps) {
   const { theme } = useTheme();
+  // Every hook goes before the early return below, so a recording that starts or stops keeps the hooks in order.
+  const chip = useRef<View>(null);
   const frame = { backgroundColor: surface.background, borderColor: surface.border, borderWidth: StyleSheet.hairlineWidth };
   if (recording && record) {
     return (
@@ -86,7 +88,6 @@ export function PlayerCapsule({ player, page, record, timer, trailing, compact, 
   const active = state.status !== 'idle' && state.verse != null;
   const playing = state.status === 'playing';
   const failed = state.status === 'error';
-  const chip = useRef<View>(null);
 
   const iconBtn = (
     icon: keyof typeof Ionicons.glyphMap,

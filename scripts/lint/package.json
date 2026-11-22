@@ -1,0 +1,10 @@
+{
+  "name": "revisely-lint",
+  "private": true,
+  "description": "ESLint for the app. Its own package, so the app's package.json (whose scripts are in the store fingerprint) never changes for it.",
+  "devDependencies": {
+    "eslint": "9.39.5",
+    "eslint-config-expo": "10.0.0",
+    "typescript": "5.9.3"
+  }
+}

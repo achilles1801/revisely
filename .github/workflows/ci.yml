@@ -297,6 +297,7 @@ jobs:
             tests/scenarios/package-lock.json
             functions/package-lock.json
             tests/firestore-rules/package-lock.json
+            scripts/lint/package-lock.json
 
       # npm 10, which Node 20 comes with, can give two of its cache's temporary files the same
       # name, and `npm ci` then fails with EEXIST (npm/cli#7308; a scenario shard in #422's CI).
@@ -310,7 +311,7 @@ jobs:
         id: secrets
         run: bash scripts/check-secrets.sh --self-test && bash scripts/check-secrets.sh
 
-      - name: Install (app, scenarios, functions, rules)
+      - name: Install (app, scenarios, functions, rules, lint)
         id: install
         if: ${{ !cancelled() }}
         run: |
@@ -318,6 +319,7 @@ jobs:
           npm ci --prefix tests/scenarios
           npm ci --prefix functions
           npm ci --prefix tests/firestore-rules
+          npm ci --prefix scripts/lint
 
       # The app (tests/scenarios with it; fast-check is its own dependency), and
       # the Cloudflare worker (worker/, wrangler*.jsonc). functions/ and
@@ -326,6 +328,13 @@ jobs:
         id: typecheck
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npx tsc --noEmit && npx tsc --noEmit -p worker
+
+      # ESLint on the app (scripts/lint/README.md: its own package, so the app's package.json, part of
+      # the store fingerprint, never changes for it). Errors fail; warnings are left to come down over time.
+      - name: Lint (app)
+        id: lint
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npx --prefix scripts/lint eslint -c scripts/lint/eslint.config.mjs --quiet .
 
       - name: Unit + component tests (app)
         id: unit
