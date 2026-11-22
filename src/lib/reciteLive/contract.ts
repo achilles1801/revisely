@@ -112,7 +112,10 @@ export type LiveFailure =
   /** Production's checker (recite-server-prod-plan.md): its kill switch (`PAUSED`), and App Check refused once it's on. */
   | 'paused'
   | 'app_check'
-  /** The phone's own, as `offline`: every instance was busy (Cloud Run's 429/503, or the socket never opened). */
+  /**
+   * The phone's own, as `offline`: every instance was busy (Cloud Run's 429/503, or the socket never opened), or no
+   * `ready` within READY_WAIT_MS of the take's start (at capacity Cloud Run holds a new take about 35 s, then refuses it).
+   */
   | 'busy'
   | 'offline';
 
