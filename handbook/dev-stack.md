@@ -276,8 +276,8 @@ until its part is set up.
     - One record in Recite's memory, with `links` (each take's checker id and first word; `takeOfWord` for labels).
       Your recitation on an earlier take's mark reads the take's recording file back (`TakeRecording.clip`) while it
       lasts.
-    - E2E: `revisely://e2e/recite-live?on=1&long=45&speed=5` (flow 21, 45 minutes in 9; it beats 5 times as often): the stand-in enforces the cap and starts each
-      take where the last ended.
+    - E2E: `revisely://e2e/recite-live?on=1&long=45&speed=5` (flow 21, 45 minutes in 9): the stand-in enforces the cap,
+      starts each take where the last ended, and beats every 2 s of audio (5 times as often by the clock).
   - **A take starts anywhere on the page** (Majd, Nov 14 2026; protocol 6). The start frame sends `startBy` (the page's
     last ayah), and the checker says where the reciter started (`locked`; recite-contract.md in the shared notes).
     - Until then the bar says Listening…, with no cursor and no score. **It must always find where he is** (Majd, Nov 20
