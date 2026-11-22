@@ -8,6 +8,7 @@ import { formatAccuracy, mistakesLabel } from '../../../src/lib/reciteLive/score
 import { historyRows, HISTORY_MAX, passageHistory, samePassage } from '../../../src/lib/reciteMemory/history';
 import { comparableTakes, passageTakes } from '../../../src/lib/reciteMemory/progress';
 import { CLEAR_AFTER, memoryOfWord, openInRange, wordMemories } from '../../../src/lib/reciteMemory/memory';
+import { clearLine } from '../../../src/lib/reciteMemory/describe';
 import type { ClearRecord, MemoryRecord, TakeRecord } from '../../../src/lib/reciteMemory/record';
 import { runs } from './fixtures';
 
@@ -133,6 +134,13 @@ describe("Recite's memory", () => {
           }
           expect({ group, open: got?.open, rightDays: got?.rightDays }).toEqual({ group, open: m.open, rightDays: m.days });
           expect(got?.needed).toBe(m.open ? CLEAR_AFTER - m.days : 0);
+          // The card says what clears it: as many more right takes as are needed, on other days (Strict for tajweed).
+          const line = clearLine(got!, null);
+          if (m.open) {
+            expect(line).toContain(`${CLEAR_AFTER - m.days} more right take`);
+            expect(line).toMatch(/on another day|on \d+ different days/);
+            expect(line.includes('with Strict on')).toBe(group === 'tajweed');
+          } else expect(line).toMatch(/^Cleared/);
         }
         // The page shows a word at most once, with its most severe open group.
         const shown = openInRange(memories, W, W + 1);

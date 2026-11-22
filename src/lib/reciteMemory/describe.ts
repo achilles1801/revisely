@@ -66,8 +66,12 @@ export function attemptWhat(a: Attempt): { right: boolean; text: string; heard: 
 /** The clear rule as it stands for this word (CLEAR_AFTER right takes on as many days). */
 export function clearLine(memory: WordMemory, today: string | null): string {
   if (!memory.open) return memory.clearedByHand ? t('reciteMemory.clearedByYou') : t('reciteMemory.clearedTwoDays');
-  if (memory.needed >= CLEAR_AFTER) return t('reciteMemory.sayRightOn', { count: CLEAR_AFTER });
+  // What clears it, plainly (Majd, Nov 22 2026, "yeah that's fine"): how many more right takes, and on other days. A
+  // tajweed note clears only with takes that check tajweed (Strict).
+  const strict = memory.group === 'tajweed';
+  if (memory.needed >= CLEAR_AFTER) return t(strict ? 'reciteMemory.moreTakesStrict' : 'reciteMemory.moreTakes', { count: memory.needed });
   const last = memory.attempts[memory.attempts.length - 1];
   const rightToday = last?.right && last.take.day === today;
+  if (strict) return rightToday ? t('reciteMemory.rightTodayStrict') : t('reciteMemory.rightOnceStrict');
   return rightToday ? t('reciteMemory.rightToday') : t('reciteMemory.rightOnce');
 }
