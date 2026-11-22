@@ -269,7 +269,7 @@ describe('v2 palette (white and black grounds, no accent tint)', () => {
     // Following: the page's ink on the line band and the word box (the page's one highlight, below).
     const page = getReadPalette(isDark);
     const inks = [p.text, page.textPrimary, page.pageTint ?? '#000000'];
-    for (const ground of [p.highlightSoft, p.highlight]) for (const ink of inks) expect(contrast(ink, ground)).toBeGreaterThanOrEqual(4.5);
+    for (const ground of [p.highlightSoft, p.highlight, p.highlightFirm]) for (const ink of inks) expect(contrast(ink, ground)).toBeGreaterThanOrEqual(4.5);
     // Mistakes are highlights behind the word, three colours (Majd, Nov 15 2026): the page's ink and the bar's text read
     // at 4.5:1 on each, and on each firmer shade (a mark whose card is open), which stands out from its own.
     const groups = [
@@ -316,12 +316,13 @@ describe('v2 palette (white and black grounds, no accent tint)', () => {
     // The following green (Majd, Nov 22 2026): as text (the word being said in the bar) on every ground, and as ink on the
     // page (the newest word shown on a hidden page, drawn in it over its own ink).
     for (const ground of [p.bg, p.fill, p.sheet, p.bubble, page.pageBg]) expect(contrast(p.followInk, ground)).toBeGreaterThanOrEqual(4.5);
-    // The box stands out from the band (non-text, a little).
+    // The box stands out from the band (non-text, a little): the word being recited on a shown page, inside the ayah's band.
     expect(contrast(p.highlight, p.highlightSoft)).toBeGreaterThan(1.15);
+    expect(contrast(p.highlightFirm, p.highlight)).toBeGreaterThan(1.2);
     // None of it follows the accent (Majd, Nov 14 2026): a mistake is red, a slip amber and the following green with every
     // accent, so Crimson's follow never looks like a mistake.
     const jade = paletteV2(isDark, 'jade');
-    const fixed = ['red', 'warn', 'highlight', 'highlightSoft', 'followInk', 'markWord', 'markWordFirm', 'markSlip', 'markSlipFirm', 'markTajweed', 'markTajweedFirm'] as const;
+    const fixed = ['red', 'warn', 'highlight', 'highlightSoft', 'highlightFirm', 'followInk', 'markWord', 'markWordFirm', 'markSlip', 'markSlipFirm', 'markTajweed', 'markTajweedFirm'] as const;
     for (const k of fixed) expect(p[k]).toBe(jade[k]);
     // The following green tells apart from red and amber by hue, and from the tajweed violet: from the status colours and
     // from each mistake's wash, so the word followed never reads as a mistake.
@@ -367,7 +368,7 @@ describe('v2 palette (white and black grounds, no accent tint)', () => {
       const ink = rgb(over);
       return '#' + [r, g, b].map((c, i) => Math.round(c * a + ink[i] * (1 - a)).toString(16).padStart(2, '0')).join('');
     };
-    const greys = [p.highlight, p.highlightSoft];
+    const greys = [p.highlight, p.highlightSoft, p.highlightFirm];
     for (const grey of greys) {
       // Neutral: no hue to mistake for a mark or an accent.
       expect(Math.hypot(lab(grey)[1], lab(grey)[2])).toBeLessThan(4);
@@ -375,7 +376,9 @@ describe('v2 palette (white and black grounds, no accent tint)', () => {
       // grey ink, or the Ramadan theme's colours.
       const others = [
         p.markWord, p.markWordFirm, p.markSlip, p.markSlipFirm, p.markTajweed, p.markTajweedFirm,
-        veiled(page.peekVeil, page.pageTint ?? '#000000'),
+        // A peeked word's grey ink: the box on the word being recited is a fill behind the page's own ink, never ink, so
+        // it can't be taken for one (and no grey can be both firmer than the band and 20 apart from it in light).
+        ...(grey === p.highlightFirm ? [] : [veiled(page.peekVeil, page.pageTint ?? '#000000')]),
         ...(() => {
           const r = ramadanV2(isDark, accent);
           return [r.gold, r.glass, r.flame, r.mote, ...r.bulbs];
@@ -391,7 +394,7 @@ describe('v2 palette (white and black grounds, no accent tint)', () => {
     expect(contrast(p.highlightSoft, page.pageBg)).toBeGreaterThan(1.1);
     // The same with every accent, so Crimson's highlight is never a red.
     const jade = paletteV2(isDark, 'jade');
-    expect([p.highlight, p.highlightSoft]).toEqual([jade.highlight, jade.highlightSoft]);
+    expect([p.highlight, p.highlightSoft, p.highlightFirm]).toEqual([jade.highlight, jade.highlightSoft, jade.highlightFirm]);
   });
 
   it('Jade is the design as agreed: ink buttons, grey links; a jade glow in light only', () => {

@@ -6,7 +6,7 @@ import type { WordFollow } from '../../lib/recite/hiddenPage';
 import type { Mark } from '../../lib/reciteLive/contract';
 import { markGroup, strongestByWord } from '../../lib/reciteLive/contract';
 import { markTitle } from '../../lib/reciteLive/describe';
-import { ayahBand, markBox, markHighlight, offBox, wordBox } from '../../lib/reciteLive/geometry';
+import { ayahBand, cursorBox, markBox, markHighlight, offBox, wordBox } from '../../lib/reciteLive/geometry';
 import { followCues } from '../../lib/reciteLive/wash';
 import { t } from '../../i18n';
 import { HiddenInkLayer, shownOnHiddenPage, type InkWash } from './HiddenInkLayer';
@@ -53,7 +53,7 @@ export function LiveUnderlay({
   selected: Mark | null;
   /** The hidden view: no line band. */
   hidden: boolean;
-  colors: { band: string; marks: MarkColours };
+  colors: { band: string; box: string; marks: MarkColours };
 }) {
   const cues = followCues(hidden, cursor, null);
   // The whole ayah being recited, every line of it on this page (Majd, Nov 22 2026: "we should follow how tarteel does
@@ -68,6 +68,9 @@ export function LiveUnderlay({
       {bands.map((r, i) => (
         <View key={`band-${i}`} testID="live-ayah-band" style={[styles.abs, styles.band, rectStyle(r, scale), { backgroundColor: colors.band }]} />
       ))}
+      {cues.box != null && words.pageOf(cues.box) === page ? (
+        <View testID="live-word-box" style={[styles.abs, styles.box, rectStyle(cursorBox(words, cues.box), scale), { backgroundColor: colors.box }]} />
+      ) : null}
       {[...byWord.values()].map((m) => {
         const group = markGroup(picked && picked.w === m.w ? picked : m);
         const firm = picked != null && picked.w === m.w;
@@ -207,4 +210,5 @@ export function LiveMarkTargets({ page, scale, words, marks }: { page: number; s
 const styles = StyleSheet.create({
   abs: { position: 'absolute' },
   band: { borderRadius: 3 },
+  box: { borderRadius: 5 },
 });

@@ -32,15 +32,16 @@ describe('washOf: a highlight as a soft wash, never a box (Majd, Nov 21 2026)', 
 });
 
 describe('followCues: what follows the reciter (Majd, Nov 21 and 22 2026)', () => {
-  it('the page shown: the band on the cursor’s line, no word inked', () => {
-    expect(followCues(false, 12, 11)).toEqual({ band: 12, ink: null });
+  it('the page shown: the band behind the cursor’s ayah and the box on the cursor’s word, no word inked', () => {
+    expect(followCues(false, 12, 11)).toEqual({ band: 12, box: 12, ink: null });
+    expect(followCues(false, null, 11)).toEqual({ band: null, box: null, ink: null });
   });
-  it('the page hidden: no band, the newest word shown in the following ink', () => {
-    expect(followCues(true, 12, 11)).toEqual({ band: null, ink: 11 });
-    expect(followCues(true, 12, null)).toEqual({ band: null, ink: null });
+  it('the page hidden: no band or box, the newest word shown in the following ink', () => {
+    expect(followCues(true, 12, 11)).toEqual({ band: null, box: null, ink: 11 });
+    expect(followCues(true, 12, null)).toEqual({ band: null, box: null, ink: null });
   });
   it('a newest word with a mark keeps its wash and no following ink', () => {
-    expect(followCues(true, 12, 11, (w) => w === 11)).toEqual({ band: null, ink: null });
-    expect(followCues(true, 12, 11, (w) => w === 10)).toEqual({ band: null, ink: 11 });
+    expect(followCues(true, 12, 11, (w) => w === 11)).toEqual({ band: null, box: null, ink: null });
+    expect(followCues(true, 12, 11, (w) => w === 10)).toEqual({ band: null, box: null, ink: 11 });
   });
 });

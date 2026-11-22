@@ -185,9 +185,11 @@ until its part is set up.
       names, once a launch, index only. Recite alone's old audio stays a recording.
   - **Calm, exact tracking** (Majd's Dev take, Nov 15 2026; Tarteel's mic take as the reference): a flat grey band
     behind the whole ayah being recited, every line of it (`ayahBand`, the page's one highlight `highlight` in theme/v2,
-    below in "The design"; Majd, Nov 22 2026: "we should follow how tarteel does it here"), and no word marked while the
-    page is shown (Majd, Nov 21 2026: "They dont even use shades when ur reciting with the page shown"; RECITE-19,
-    `followCues` in lib/reciteLive/wash). Before that, Nov 15, a blue band over the whole ayah read as running ahead (the
+    below in "The design"; Majd, Nov 22 2026: "we should follow how tarteel does it here"), and on it a firmer grey
+    rectangle on the word being recited (`highlightFirm`, the cursor's `cursorBox`, never ahead of the checker's place;
+    Majd, Nov 22 2026, of Tarteel's: "a boxed rectangle kinda that moves side to side"; RECITE-19, `followCues` in
+    lib/reciteLive/wash). A mark's wash shows over it. (Nov 21 2026 had dropped the word on a shown page, read from the
+    Tarteel analysis, which missed Tarteel's box.) Before that, Nov 15, a blue band over the whole ayah read as running ahead (the
     checker's `at` was 1.0 s behind, never ahead), and the band was the line's only until Nov 22. Green (`followInk`) is
     Recite's one following colour: the word being said in the bar, and the newest word shown on a hidden page (below).
     None of Recite's colours follow the accent (design.test). Nothing shows before the checker has found where the

@@ -404,9 +404,15 @@ describe('Recite: following along', () => {
     await event({ type: 'mark', mark: { id: 'a', w: UTIYAT, ayah: [27, 23], kind: 'word', sure: 'likely', heard: 'وَأُوهِيَتْ', heardExact: false } });
     await event({ type: 'at', w: UTIYAT + 1 });
     expect(screen.getByTestId('recite-words')).toBeTruthy();
-    // Where the reciter is: a flat grey band behind the whole ayah, every line of it, and no word washed (Majd, Nov 21 and
-    // 22 2026: "They dont even use shades when ur reciting with the page shown", "we should follow how tarteel does it here").
-    expect(screen.queryByTestId('live-word-box')).toBeNull();
+    // Where the reciter is: a flat grey band behind the whole ayah, every line of it (Majd, Nov 22 2026: "we should follow
+    // how tarteel does it here"), and a firmer grey rectangle on the word being recited, word by word (Majd, Nov 22 2026:
+    // "follow along is clearly shading each word … a boxed rectangle kinda that moves side to side").
+    const { cursorBox } = require('../../../lib/reciteLive/geometry');
+    const box = flatStyle(screen.getByTestId('live-word-box'));
+    const cb = cursorBox(words, UTIYAT + 1);
+    expect(box.backgroundColor).toBe(paletteV2(false, 'indigo').highlightFirm);
+    expect(box.left as number).toBeCloseTo(cb.x0 * 0.38);
+    expect(box.width as number).toBeCloseTo((cb.x1 - cb.x0) * 0.38);
     const { ayahBand } = require('../../../lib/reciteLive/geometry');
     const expected = ayahBand(379, 27, 23);
     const bands = screen.getAllByTestId('live-ayah-band').map(flatStyle);
@@ -870,9 +876,9 @@ describe('a take starts anywhere on the page (Majd, Nov 14 2026)', () => {
     const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
     await startTake('check', null);
     await event({ type: 'locked', w: A25, s: 27, a: 25 });
-    // The page shown: the band on the line found, no word washed.
+    // The page shown: the band behind the ayah found and the box on its word.
     expect(screen.queryAllByTestId('live-ayah-band').length).toBeGreaterThan(0);
-    expect(screen.queryByTestId('live-word-box')).toBeNull();
+    expect(screen.getByTestId('live-word-box')).toBeTruthy();
     expect(screen.getByTestId('recite-words')).toBeTruthy();
     expect(screen.getByTestId('recite-score')).toBeTruthy();
     expect(announce).toHaveBeenCalledWith('Started at An-Naml, ayah 25');
@@ -1118,9 +1124,9 @@ describe('the guess before the lock (contract draft 11, protocol 9; Majd: the cu
     expect(mockLive.start).toMatchObject({ guess: true });
     expect(screen.queryAllByTestId('live-ayah-band')).toHaveLength(0);
     await event({ type: 'guess', w: A23 + 2 } as LiveEvent);
-    // The cursor on a shown page is the band on its line, no word washed (RECITE-19).
+    // The cursor on a shown page: the band behind its ayah and the box on its word (RECITE-19).
     expect(screen.queryAllByTestId('live-ayah-band').length).toBeGreaterThan(0);
-    expect(screen.queryByTestId('live-word-box')).toBeNull();
+    expect(screen.getByTestId('live-word-box')).toBeTruthy();
     expect(screen.getByTestId('recite-status').props.children).toBe('Listening…');
     // Sure now, somewhere else: the cursor jumps there; a guess after the lock is ignored.
     await event({ type: 'locked', w: A23 + 5, s: 27, a: 23 });

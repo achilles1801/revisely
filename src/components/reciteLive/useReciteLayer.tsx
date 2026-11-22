@@ -777,7 +777,7 @@ export function useReciteLayer({
               marks={shownOnPage(page)}
               selected={shownCardMarks[0] ?? null}
               hidden={false}
-              colors={{ band: v2.highlight, marks: v2 }}
+              colors={{ band: v2.highlight, box: v2.highlightFirm, marks: v2 }}
             />
           )
         : showPast && qw && !pastOnCovers
@@ -805,7 +805,7 @@ export function useReciteLayer({
               marks={hidden ? [] : pageMarks(page)}
               selected={cardMarks[0] ?? null}
               hidden={hidden}
-              colors={{ band: v2.highlight, marks: v2 }}
+              colors={{ band: v2.highlight, box: v2.highlightFirm, marks: v2 }}
             />
           )
         : undefined,
