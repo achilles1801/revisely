@@ -12,6 +12,7 @@ import { versesOnPage } from '../../../lib/ayahBounds';
 import { paletteV2 } from '../../../theme/v2';
 import { harakatClip } from '../../../../jest/arabicLines';
 import { setMistakeDetectionReleasedForTests } from '../../../lib/release/mistakeDetection';
+import { Sheet } from '../../../components/v2/Sheet';
 
 // The release's switch is the kill switch: these tests run with it as each says, and back to as it ships.
 afterEach(() => setMistakeDetectionReleasedForTests(undefined));
@@ -441,9 +442,13 @@ describe("Recite's memory in the take's summary", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].props.accessibilityLabel).toMatch(/^Yesterday: 99\.0%, (.+, )?1 mistake\. Show it on the page$/);
     fireEvent.press(rows[0]);
-    await waitFor(() => expect(screen.getByTestId('shown-take-bar')).toBeTruthy(), { timeout: 3000 });
-    // The summary closes (its sheet animates away).
-    await waitFor(() => expect(screen.queryByTestId('take-summary')).toBeNull(), { timeout: 3000 });
+    await flush();
+    expect(screen.getByTestId('shown-take-bar')).toBeTruthy();
+    // The summary is closed at once. Its sheet's own going (the closing animation, then the modal) is v2/Sheet's to test:
+    // waiting for it here took 1.5 s on a laptop and past Jest's 5 s on a loaded CI runner (#885, Nov 22 2026), as it did
+    // in QuranReaderRecite.test (Nov 17–18).
+    const summary = screen.UNSAFE_getAllByType(Sheet).find((s) => s.props.testID === 'take-summary');
+    expect(summary?.props.visible).toBe(false);
   });
 
   it('[RMEM-7] the trend compares like with like: a whole-page take earlier never counts for a take of a few ayat (the store app keeps it)', async () => {
