@@ -2,7 +2,6 @@
 // keep slipping with their words on their highlights, the similar ayahs, the quiet line, Smart Tracking on and off,
 // Weak spots naming words Recite still marks, and each row opening the reader at its ayahs.
 import React from 'react';
-import { StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -13,6 +12,7 @@ import type { Mark } from '../../../lib/reciteLive/contract';
 import type { MemoryRecord, TakeRecord } from '../../../lib/reciteMemory/record';
 import { openRevo } from '../../../lib/revo/open';
 import { plainText } from '../../../lib/passages';
+import { harakatClip } from '../../../../jest/arabicLines';
 
 const mockPalette = paletteV2(false, 'indigo');
 jest.mock('../../../context/ThemeContext', () => ({ useTheme: () => ({ palette: mockPalette, theme: mockPalette, isDark: false }) }));
@@ -144,8 +144,8 @@ describe('Insights: Recitation (RINS-2)', () => {
     const chips = within(row).getAllByText(/[\u0600-\u06FF]/, { includeHiddenElements: true });
     // The Not clear letter too, remembered like a slip (RMEM-2).
     expect(chips.map((c) => c.props.children)).toEqual([words.uthmani(w22), words.uthmani(w23), words.uthmani(w23 + 1)]);
-    // No fixed line height (it cut the harakat off): the font's own ascent and descent.
-    for (const c of chips) expect(StyleSheet.flatten(c.props.style).lineHeight).toBeUndefined();
+    // Each word whole: a line that holds every haraka (arabicFullV2; a shorter one cut them off).
+    for (const c of chips) expect(harakatClip(c.props.style)).toBeNull();
   });
 
   it('[RINS-2] nothing shows for an account that doesn’t recite', async () => {

@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
-import { arabicV2, layoutV2, typeV2 } from '../../theme/v2';
+import { arabicFullV2, layoutV2, typeV2 } from '../../theme/v2';
 import { t } from '../../i18n';
 
 /**
@@ -25,7 +25,7 @@ export function ReciteCheckNotice() {
   return (
     <View style={styles.wrap} testID="recite-check-notice">
       <Text style={[typeV2.body, { color: palette.text }]}>{NOTICE_EN}</Text>
-      <Text style={[arabicV2(19), styles.ar, { color: palette.text }]}>{NOTICE_AR}</Text>
+      <Text style={[arabicFullV2(19), styles.ar, { color: palette.text }]}>{NOTICE_AR}</Text>
       <Text style={[typeV2.meta, { color: palette.secondary }]}>
         {t('recite.checkPrivacy')}
       </Text>
