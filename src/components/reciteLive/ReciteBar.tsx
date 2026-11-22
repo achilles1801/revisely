@@ -128,6 +128,7 @@ export function ReciteBar({
   status,
   phase,
   paused = false,
+  slow = false,
   onPause,
   onResume,
   onStop,
@@ -153,6 +154,8 @@ export function ReciteBar({
   phase: 'live' | 'checking' | 'done';
   /** The take is paused (the microphone off, the take open). */
   paused?: boolean;
+  /** The checker has fallen behind a slow connection: a quiet line in the words' place (Nov 22 2026). */
+  slow?: boolean;
   /** Pause and resume the take (shown while it's live). */
   onPause?: () => void;
   onResume?: () => void;
@@ -170,8 +173,9 @@ export function ReciteBar({
   // Each word as VoiceOver and TalkBack read it, its mark said in words: in the bar a mistake is a colour behind the
   // word, and colour must never be the only signal.
   const spoken = words.map(spokenBarWord).join(' ');
-  const shownWords = paused ? [] : words;
-  const shownStatus = paused ? t('reciteLive.bar.paused') : status;
+  const slowNow = slow && !paused && phase === 'live';
+  const shownWords = paused || slowNow ? [] : words;
+  const shownStatus = paused ? t('reciteLive.bar.paused') : slowNow ? t('reciteLive.bar.slow') : status;
   return (
     <View
       style={[styles.capsule, { backgroundColor: surface.background, borderColor: surface.border }]}

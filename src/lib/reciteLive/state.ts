@@ -56,6 +56,8 @@ export interface LiveState {
   seekFrom: number | null;
   /** The checker's protocol (`ready`); null until it's ready. Below 6 it doesn't look: the take starts at s:a. */
   protocol: number | null;
+  /** The checker sends `said` as the reciter's voice stops (`ready.said: "voice"`). */
+  voiceSaid?: boolean;
   /**
    * Something else is being said where word `w` goes (the checker's `off`, contract draft 7): the hidden view's red cover
    * on `w`. `from`: the cursor when it came, so going back clears it. Never a mark, never counted.
@@ -201,6 +203,7 @@ export function applyEvent(state: LiveState, e: LiveEvent): LiveState {
         take: e.take ?? state.take,
         failure: null,
         protocol,
+        voiceSaid: e.said === 'voice',
       };
       // A checker that doesn't look for the start begins at the page's first ayah, as before: no waiting.
       return ready.seeking && protocol < LOOKS_FOR_START ? startedUnlocked(ready) : ready;
@@ -451,9 +454,35 @@ export function wordLetters(text: string): number {
  * (`msPerLetter`, the median of this take's word-to-word times per letter), with a little to spare, between
  * REVEAL_AFTER_MS and REVEAL_MAX_MS. Before the take has a pace, about 0.7 s for five letters.
  */
-export function revealDelay(letters: number, msPerLetter: number | null): number {
+export function revealDelay(letters: number, msPerLetter: number | null, backstop = false): number {
   const perLetter = msPerLetter != null && msPerLetter > 0 ? msPerLetter : REVEAL_AFTER_MS / 5;
+  if (backstop) return Math.round(Math.min(BACKSTOP_MAX_MS, Math.max(BACKSTOP_MIN_MS, 2.5 * perLetter * letters)));
   return Math.round(Math.min(REVEAL_MAX_MS, Math.max(REVEAL_AFTER_MS, 1.15 * perLetter * letters)));
+}
+
+/**
+ * A checker that sends `said` as the reciter's voice stops says so in `ready` (`said: "voice"`; recite-check-00115 and
+ * later, Nov 22 2026: 0.4–0.7 s after a word's end before a pause). The protocol alone can't tell: the checker's rollback
+ * revisions report protocol 9 without it. With it the wait above is only a late backstop (`backstop`): voicing never fires
+ * in babble, so a word before a pause in a noisy room would otherwise wait for the next word. 2.5 times the word's length
+ * at the reciter's pace, between 1.5 s and 4 s, late enough that waqf lengthening isn't shown early (the checker's bench:
+ * 127 early before a pause at ×2.5, against 578 at ×1.15).
+ */
+export const BACKSTOP_MIN_MS = 1500;
+export const BACKSTOP_MAX_MS = 4000;
+
+/** The checker this far behind what was recorded (s), and growing, shows "Slow connection"; it clears below SLOW_CLEAR_S. */
+export const SLOW_AT_S = 3;
+export const SLOW_CLEAR_S = 2;
+
+/**
+ * Whether the bar says the connection is slow, after a `beat` (Nov 22 2026, the checker's bad-network test: below about
+ * 256 kbit/s the take's audio falls further behind every second). `behind`: seconds recorded minus the checker's `rx`;
+ * `before`: the last beat's. On once 3 s behind and still falling behind; off again below 2 s.
+ */
+export function slowAfterBeat(was: boolean, behind: number, before: number | null): boolean {
+  if (was) return behind >= SLOW_CLEAR_S;
+  return behind >= SLOW_AT_S && before != null && behind > before;
 }
 
 /**

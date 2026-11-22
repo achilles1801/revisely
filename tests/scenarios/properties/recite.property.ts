@@ -36,6 +36,11 @@ import {
   wordLetters,
   REVEAL_AFTER_MS,
   REVEAL_MAX_MS,
+  BACKSTOP_MIN_MS,
+  BACKSTOP_MAX_MS,
+  slowAfterBeat,
+  SLOW_AT_S,
+  SLOW_CLEAR_S,
   LIVE_IDLE,
   type LiveState,
 } from '../../../src/lib/reciteLive/state';
@@ -677,6 +682,41 @@ describe('[RECITE-6] the word being said shows once it has been under the cursor
           if (status === 'listening' && cursor != null && (said == null || said <= cursor)) expect(shown ?? -1).toBeLessThanOrEqual(cursor);
         },
       ),
+    );
+  });
+});
+
+describe('[RECITE-6] with a checker whose said follows the voice, the wait is only a late backstop', () => {
+  it('between 1.5 s and 4 s, and never sooner than the ordinary wait', () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 1, max: 20 }), fc.option(fc.double({ min: 1, max: 600, noNaN: true }), { nil: null }), (letters, pace) => {
+        const late = revealDelay(letters, pace, true);
+        expect(late).toBeGreaterThanOrEqual(BACKSTOP_MIN_MS);
+        expect(late).toBeLessThanOrEqual(BACKSTOP_MAX_MS);
+        expect(late).toBeGreaterThanOrEqual(revealDelay(letters, pace));
+      }),
+    );
+  });
+});
+
+describe('[RECITE-5] a slow connection’s note: on at 3 s behind and growing, off below 2 s', () => {
+  it('never on while catching up, never flickers between 2 and 3 s', () => {
+    fc.assert(
+      fc.property(fc.array(fc.double({ min: 0, max: 30, noNaN: true }), { minLength: 1, maxLength: 30 }), (behinds) => {
+        let on = false;
+        let before: number | null = null;
+        for (const b of behinds) {
+          const next = slowAfterBeat(on, b, before);
+          if (!on && next) {
+            expect(b).toBeGreaterThanOrEqual(SLOW_AT_S);
+            expect(before != null && b > before).toBe(true);
+          }
+          if (on && !next) expect(b).toBeLessThan(SLOW_CLEAR_S);
+          if (on && b >= SLOW_CLEAR_S) expect(next).toBe(true);
+          on = next;
+          before = b;
+        }
+      }),
     );
   });
 });

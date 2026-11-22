@@ -39,6 +39,7 @@ import {
   LiveState,
   liveStopping,
   seekOnPage,
+  slowAfterBeat,
 } from '../../lib/reciteLive/state';
 import { isDevVariant } from '../../lib/variant';
 import { useReduceMotion } from '../../design/motion';
@@ -259,6 +260,9 @@ export function useLiveRecitation({
   // Paused (Majd, Nov 15 2026: listening mid-take ended it, with no way back): the microphone is off and the take goes
   // on, on the same connection, from where it was. `reopen` starts this take's microphone (or E2E's tone) again.
   const [paused, setPaused] = useState(false);
+  // The connection too slow for the take's audio: the checker this far behind what was recorded (slowAfterBeat).
+  const [slow, setSlow] = useState(false);
+  const behindBefore = useRef<number | null>(null);
   const pausedRef = useRef(false);
   const reopen = useRef<(() => Promise<AudioSource>) | null>(null);
   // "Your recitation": the take's connection, kept until the take is closed (its audio stays on the phone for resuming),
@@ -332,8 +336,16 @@ export function useLiveRecitation({
       // Revisely Dev's until the next release.
       cue.mark(e.mark, soundRef.current && traceRef.current.mode === 'check' && isDevVariant());
     }
-    // The checker's heartbeat is for the connection and the numbers only (lib/reciteLive/socket).
-    if (e.type === 'beat') return;
+    // The checker's heartbeat is for the connection and the numbers, and a slow connection's note (lib/reciteLive/socket).
+    if (e.type === 'beat') {
+      if (e.rx != null) {
+        const behind = samples.current / SAMPLE_RATE - e.rx;
+        const before = behindBefore.current;
+        behindBefore.current = behind;
+        setSlow((was) => slowAfterBeat(was, behind, before));
+      }
+      return;
+    }
     stopTrace.event(e.type);
     // Found elsewhere in the Qur'an (protocol 7): a breadcrumb for any report that follows (numbers only; the checker
     // keeps where every kept take locked).
@@ -478,6 +490,8 @@ export function useLiveRecitation({
       setMic('starting');
       clock.set(0);
       samples.current = 0;
+      behindBefore.current = null;
+      setSlow(false);
       endWord.current = null;
       /** The page the take starts on: the span's first ayah's (turned to), or the one on screen. */
       const startPage = (qw: QuranWords) => {
@@ -893,6 +907,8 @@ export function useLiveRecitation({
     active: state.status !== 'idle',
     /** The take is paused: the microphone off, the take open (Resume carries on). */
     paused,
+    /** The checker has fallen behind a slow connection (the bar says so, quietly). */
+    slow,
     start,
     stop,
     pause,
