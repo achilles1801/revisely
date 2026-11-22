@@ -70,7 +70,7 @@ internal object Masks {
    * the centre (QiblaDial on iOS). `hole` keeps the centre clear for a label. Without a bearing,
    * only the ring has anything on it.
    */
-  fun dial(context: Context, sizeDp: Float, bearing: Int?, labelDp: Float, holeDp: Float): Dial {
+  fun dial(context: Context, sizeDp: Float, bearing: Int?, labelDp: Float, holeDp: Float, north: String = "N"): Dial {
     val d = context.resources.displayMetrics.density
     val px = max((sizeDp * d).roundToInt(), 1)
     fun layer() = Bitmap.createBitmap(px, px, config)
@@ -111,7 +111,7 @@ internal object Masks {
         textAlign = Paint.Align.CENTER
         color = Color.WHITE
       }
-      drawText("N", r, labelDp * d * 1.32f, label)
+      drawText(north, r, labelDp * d * 1.32f, label)
     }
 
     if (bearing != null) {

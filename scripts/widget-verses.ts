@@ -1,6 +1,7 @@
-// Builds targets/widget/verses.json, the verse-of-the-day list for the widget:
-// short, complete verses, their Arabic (Uthmani, as the app's verse sheet shows
-// it, from api.alquran.cloud), surah name and mushaf page.
+// Builds targets/widget/verses.json, the verse-of-the-day list for the widget, and its
+// copy for the Android widgets (modules/android-widgets, the same bytes): short, complete
+// verses, their Arabic (Uthmani, as the app's verse sheet shows it, from api.alquran.cloud),
+// the surah's name (and its Arabic name, for the app in Arabic) and mushaf page.
 //
 //   npx sucrase-node scripts/widget-verses.ts
 //
@@ -23,7 +24,7 @@ const PICKS: [number, number][] = [
 const MAX_CHARS = 140; // longer won't fit a small widget in Amiri
 
 async function main() {
-  const out: { sura: number; ayah: number; surah: string; page: number; arabic: string }[] = [];
+  const out: { sura: number; ayah: number; surah: string; surahAr: string; page: number; arabic: string }[] = [];
   const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
   for (const [sura, ayah] of PICKS) {
     // Gently: the API rate-limits bursts (429).
@@ -53,13 +54,17 @@ async function main() {
       console.log(`skip ${sura}:${ayah} (${text.length} chars)`);
       continue;
     }
-    const surah = getSurah(sura)?.name;
-    if (!surah) throw new Error(`no surah ${sura}`);
-    out.push({ sura, ayah, surah, page: pageOfVerse({ sura, ayah }), arabic: text });
+    const info = getSurah(sura);
+    if (!info) throw new Error(`no surah ${sura}`);
+    out.push({ sura, ayah, surah: info.name, surahAr: info.nameArabic, page: pageOfVerse({ sura, ayah }), arabic: text });
   }
-  const file = path.join(__dirname, '..', 'targets', 'widget', 'verses.json');
-  fs.writeFileSync(file, JSON.stringify(out, null, 1) + '\n');
-  console.log(`${out.length} verses → ${path.relative(process.cwd(), file)}`);
+  for (const file of [
+    path.join(__dirname, '..', 'targets', 'widget', 'verses.json'),
+    path.join(__dirname, '..', 'modules', 'android-widgets', 'android', 'src', 'main', 'assets', 'widgets', 'verses.json'),
+  ]) {
+    fs.writeFileSync(file, JSON.stringify(out, null, 1) + '\n');
+    console.log(`${out.length} verses → ${path.relative(process.cwd(), file)}`);
+  }
 }
 
 main().catch((e) => {

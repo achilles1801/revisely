@@ -20,6 +20,7 @@ import type { QuranPage, RevisionLog, User, UserPage } from '../../types';
 import { widgetQibla, type City, type Coords, type WidgetQibla } from './qibla';
 import { partlyMemorizedAyahs, revisablePages } from '../memorizedAyahs';
 import { t } from '../../i18n';
+import { widgetDayWords, widgetWords, type WidgetDayWords, type WidgetWords } from './words';
 
 /** Shared by the app and the extension (app.config.js, targets/widget). */
 export { widgetAppGroup } from '../variant';
@@ -47,6 +48,8 @@ export interface WidgetDay {
   completed: boolean;
   /** Days in a row with a session, through this day or, before it's revised, the day before. */
   streak: number;
+  /** The day's lines' pieces in the app's language (./words): "5 pages left", "7-day streak". */
+  words: WidgetDayWords;
 }
 
 export interface WidgetColors {
@@ -65,6 +68,8 @@ export interface WidgetColors {
 
 export interface WidgetSnapshot {
   v: 1;
+  /** The widgets' words in the app's language, and whether they read right to left (./words). */
+  words: WidgetWords;
   /** signedOut / noPlan: the widget asks to open Revisely. */
   state: 'ready' | 'signedOut' | 'noPlan';
   accent: AccentName;
@@ -178,6 +183,7 @@ export { aliveStreak };
 export function buildWidgetSnapshot(input: WidgetInputs): WidgetSnapshot {
   const base = {
     v: 1 as const,
+    words: widgetWords(),
     accent: input.accent,
     colors: colorsFor(input.accent),
     qibla: widgetQibla(input.qiblaFrom ?? null, input.cities),
@@ -215,6 +221,12 @@ export function buildWidgetSnapshot(input: WidgetInputs): WidgetSnapshot {
     const doneHere = needDoneCount(own, credited, caughtUp);
     const completed = needDone(own, credited, caughtUp);
 
+    const counts = {
+      total,
+      done: completed ? total : doneHere,
+      completed,
+      streak: input.history ? streakReadingFromItems({ user, pages: input.pages, items: input.history, today: day }).streak : aliveStreak(done, day),
+    };
     days.push({
       day,
       startsAt: startsAt.getTime(),
@@ -222,10 +234,8 @@ export function buildWidgetSnapshot(input: WidgetInputs): WidgetSnapshot {
       title,
       where: juzLabel(assignment.juzBreakdown),
       short: shortLabel(assignment.pages, title, partial),
-      total,
-      done: completed ? total : doneHere,
-      completed,
-      streak: input.history ? streakReadingFromItems({ user, pages: input.pages, items: input.history, today: day }).streak : aliveStreak(done, day),
+      ...counts,
+      words: widgetDayWords({ title, ...counts }),
     });
     // Never stall: a boundary that isn't later (an odd clock) moves on a day.
     startsAt = endsAt.getTime() > startsAt.getTime() ? endsAt : new Date(startsAt.getTime() + 86_400_000);

@@ -11,12 +11,18 @@ struct QiblaEntry: TimelineEntry {
   let date: Date
   let qibla: QiblaInfo?
   let colors: ColorPair?
+  var words: Words = .english
 
-  static let sample = QiblaEntry(
-    date: Date(),
-    qibla: QiblaInfo(bearing: 58, label: "58° NE", distance: "10,306 km", place: nil),
-    colors: nil
-  )
+  /// From New York, in the app's language (the app writes it as it does the real one).
+  static var sample: QiblaEntry {
+    let words = Words.current
+    return QiblaEntry(
+      date: Date(),
+      qibla: words.sampleQibla ?? QiblaInfo(bearing: 58, label: "58° NE", distance: "10,306 km", place: nil),
+      colors: nil,
+      words: words
+    )
+  }
 }
 
 struct QiblaProvider: TimelineProvider {
@@ -25,14 +31,14 @@ struct QiblaProvider: TimelineProvider {
   func getSnapshot(in context: Context, completion: @escaping (QiblaEntry) -> Void) {
     if context.isPreview { return completion(.sample) }
     let snapshot = SnapshotStore.load()
-    completion(QiblaEntry(date: Date(), qibla: snapshot?.qibla, colors: snapshot?.colors))
+    completion(QiblaEntry(date: Date(), qibla: snapshot?.qibla, colors: snapshot?.colors, words: snapshot?.words ?? .english))
   }
 
   /// One entry: it changes only when the app writes a new position, and the app
   /// reloads the widgets when it does.
   func getTimeline(in context: Context, completion: @escaping (Timeline<QiblaEntry>) -> Void) {
     let snapshot = SnapshotStore.load()
-    let entry = QiblaEntry(date: Date(), qibla: snapshot?.qibla, colors: snapshot?.colors)
+    let entry = QiblaEntry(date: Date(), qibla: snapshot?.qibla, colors: snapshot?.colors, words: snapshot?.words ?? .english)
     completion(Timeline(entries: [entry], policy: .never))
   }
 }
@@ -42,8 +48,8 @@ struct QiblaWidget: Widget {
     StaticConfiguration(kind: "ReviselyQibla", provider: QiblaProvider()) { entry in
       QiblaView(entry: entry)
     }
-    .configurationDisplayName("Qibla")
-    .description("The Qibla's direction from true north, from where you last opened Revisely.")
+    .configurationDisplayName(Words.current.galleryQibla)
+    .description(Words.current.galleryQiblaDescription)
     .supportedFamilies([.systemSmall, .accessoryCircular])
   }
 }
@@ -64,12 +70,14 @@ struct QiblaView: View {
     }
     .widgetURL(URL(string: "revisely://qibla")!)
     .widgetGroundIfHome(family, palette.bg)
+    .inLanguage(entry.words)
   }
 }
 
 struct QiblaSmall: View {
   let qibla: QiblaInfo?
   let palette: Palette
+  @Environment(\.words) private var words
 
   var body: some View {
     VStack(spacing: 6) {
@@ -77,17 +85,17 @@ struct QiblaSmall: View {
         .frame(width: 76, height: 76)
       if let qibla {
         VStack(spacing: 1) {
-          Text("Qibla \(qibla.label)")
+          Text(qibla.lineText)
             .font(.system(size: 15, weight: .semibold))
             .tone(palette.text)
-          Text([qibla.place, "\(qibla.distance) to Makkah"].compactMap { $0 }.joined(separator: " · "))
+          Text([qibla.place, qibla.toMakkahText].compactMap { $0 }.joined(separator: " · "))
             .font(.system(size: 12))
             .tone(palette.secondary, .secondary)
             .minimumScaleFactor(0.8)
         }
         .lineLimit(1)
       } else {
-        Text("Open Revisely to set your location.")
+        Text(words.qiblaOpen)
           .font(.system(size: 12))
           .tone(palette.secondary, .secondary)
           .multilineTextAlignment(.center)
@@ -96,12 +104,13 @@ struct QiblaSmall: View {
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .accessibilityElement(children: .ignore)
-    .accessibilityLabel(qibla.map { "Qibla \($0.label), \($0.distance) to Makkah" } ?? "Qibla: open Revisely to set your location")
+    .accessibilityLabel(qibla?.spokenText ?? words.qiblaOpenLabel)
   }
 }
 
 struct QiblaCircular: View {
   let qibla: QiblaInfo?
+  @Environment(\.words) private var words
 
   var body: some View {
     ZStack {
@@ -109,13 +118,13 @@ struct QiblaCircular: View {
       QiblaDial(bearing: qibla?.bearing, palette: nil, labelSize: 8)
         .padding(3)
       if let qibla {
-        Text("\(qibla.bearing)°").font(.system(size: 12, weight: .semibold, design: .rounded))
+        Text(qibla.degreesText).font(.system(size: 12, weight: .semibold, design: .rounded))
       } else {
         Image(systemName: "location.slash").font(.system(size: 14, weight: .medium))
       }
     }
     .accessibilityElement(children: .ignore)
-    .accessibilityLabel(qibla.map { "Qibla \($0.label)" } ?? "Qibla: open Revisely to set your location")
+    .accessibilityLabel(qibla?.lineText ?? words.qiblaOpenLabel)
   }
 }
 
@@ -127,6 +136,7 @@ struct QiblaDial: View {
   let palette: Palette?
   let labelSize: CGFloat
   @Environment(\.widgetRenderingMode) private var mode
+  @Environment(\.words) private var words
 
   private var fullColor: Bool { mode == .fullColor && palette != nil }
 
@@ -148,7 +158,7 @@ struct QiblaDial: View {
           }
           .stroke(line, lineWidth: 1)
         }
-        Text("N")
+        Text(words.north)
           .font(.system(size: labelSize, weight: .semibold))
           .foregroundStyle(fullColor ? AnyShapeStyle(palette!.secondary) : AnyShapeStyle(.secondary))
           .position(point(c, r - labelSize * 0.95, 0))
@@ -173,6 +183,8 @@ struct QiblaDial: View {
         }
       }
     }
+    // A compass, not a row: east stays on the right in every language.
+    .environment(\.layoutDirection, .leftToRight)
   }
 
   /// The point `radius` from the centre at `degrees` clockwise from north (up).

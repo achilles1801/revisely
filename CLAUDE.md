@@ -425,9 +425,10 @@ code into `src/i18n/en/<folder>.ts`, folder by folder, with the English unchange
   forms; `__tests__/arabic.test.ts`). Words: `src/i18n/ar-glossary.md`; take a new term from Tarteel's Arabic or
   Quran.com's `locales/ar` before asking Majd (his Nov 18 rule). Numbers come out in Arabic-Indic digits
   (`src/i18n/digits.ts`).
-- **The picker is Revisely Dev only** (Settings → Appearance → Language, `src/i18n/choice.ts`). It restarts the app
-  into the language and its direction. The store app offers English alone (`SHIPPED`) until Arabic ships with the
-  native release that declares it; that release's changes move the fingerprints, so they wait for the release owner.
+- **The picker** (Settings → Appearance → Language, `src/i18n/choice.ts`, LANG-3) restarts the app into the language
+  and its direction. The store app offers `SHIPPED` (English and Arabic from 1.0.6, the binary that declares Arabic:
+  `CFBundleLocalizations` and `locales/ar.json` in app.config.js, `plugins/withAndroidLocales.js`). A new language
+  moves the fingerprints with it, so it waits for the release owner.
 - **New layouts use start and end**, never left and right (`marginStart`, `paddingEnd`, `start: 0`). No
   `textAlign: 'left'` on text that should follow the language. Arrows and chevrons come from `chevron()` or a flipped
   icon.

@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import { setWidgetStoreForTests, writeWidgetSnapshot } from '../widgets/storage';
 import { WIDGET_SNAPSHOT_KEY, type WidgetSnapshot } from '../widgets/snapshot';
 import { parseWidgetLink } from '../widgets/links';
+import { widgetWords } from '../widgets/words';
 
 // The Android widgets module (modules/android-widgets): null unless a test puts one in.
 const mockAndroidWidgets: { current: { set: jest.Mock; reload: jest.Mock } | null } = { current: null };
@@ -14,6 +15,7 @@ jest.mock('../../../modules/android-widgets', () => ({
 
 const snapshot = (state: WidgetSnapshot['state'] = 'ready'): WidgetSnapshot => ({
   v: 1,
+  words: widgetWords(),
   state,
   accent: 'indigo',
   colors: {

@@ -148,18 +148,19 @@ describe('Arabic on screen', () => {
   });
 });
 
-describe('the language choice (Revisely Dev)', () => {
+describe('the language choice (LANG-3)', () => {
   beforeEach(async () => {
     resetLanguageChoiceForTests();
     await AsyncStorage.clear();
   });
 
-  it('only Revisely Dev offers Arabic; tests and E2E builds never show the picker', () => {
+  it('the store app and Revisely Dev both offer Arabic; tests and E2E builds never show the picker', () => {
     expect(offeredLanguages(true)).toEqual(['en', 'ar']);
-    expect(offeredLanguages(false)).toEqual(['en']);
+    expect(offeredLanguages(false)).toEqual(['en', 'ar']);
     expect(languagePickerOffered(true, false)).toBe(true);
-    expect(languagePickerOffered(false, false)).toBe(false);
+    expect(languagePickerOffered(false, false)).toBe(true);
     expect(languagePickerOffered(true, true)).toBe(false);
+    expect(languagePickerOffered(false, true)).toBe(false);
   });
 
   it("a language chosen is that language; the phone's otherwise; English when it isn't offered", () => {
@@ -167,7 +168,7 @@ describe('the language choice (Revisely Dev)', () => {
     expect(resolveChoice('system', ['ar-SA', 'en-US'], ['en', 'ar'], false)).toBe('ar');
     expect(resolveChoice('system', ['fr-FR'], ['en', 'ar'], false)).toBe('en');
     expect(resolveChoice('en', ['ar-SA'], ['en', 'ar'], false)).toBe('en');
-    // The store app: Arabic isn't offered, chosen or not.
+    // A build that doesn't offer Arabic (the store app before 1.0.6): English, chosen or not.
     expect(resolveChoice('ar', ['ar-SA'], ['en'], false)).toBe('en');
     expect(resolveChoice('ar', ['ar-SA'], ['en', 'ar'], true)).toBe('en');
   });

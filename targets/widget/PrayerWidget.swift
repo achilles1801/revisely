@@ -11,7 +11,8 @@ import WidgetKit
 enum PrayerName: String, CaseIterable, Hashable {
   case fajr, sunrise, dhuhr, asr, maghrib, isha
 
-  /// As the app says them (TIME_LABELS in src/lib/prayer/times.ts).
+  /// As the app says them in English (TIME_LABELS in src/lib/prayer/times.ts); the widgets show Words.name, the app's
+  /// language.
   var label: String {
     switch self {
     case .fajr: return "Fajr"
@@ -78,6 +79,7 @@ struct PrayerEntry: TimelineEntry {
   /// Nil: no prayer times (no place, or not on yet), or past the last day written.
   let moment: PrayerMoment?
   let colors: ColorPair?
+  var words: Words = .english
 
   /// The widget gallery: an afternoon in London.
   static var sample: PrayerEntry {
@@ -100,7 +102,8 @@ struct PrayerEntry: TimelineEntry {
         current: .dhuhr,
         place: "London"
       ),
-      colors: nil
+      colors: nil,
+      words: Words.current
     )
   }
 }
@@ -142,7 +145,8 @@ enum PrayerTimeline {
   /// widget's day), then a quiet one once the days written run out.
   static func entries(_ snapshot: Snapshot?, now: Date, calendar: Calendar = .current) -> [PrayerEntry] {
     let colors = snapshot?.colors
-    guard let info = snapshot?.prayer else { return [PrayerEntry(date: now, moment: nil, colors: colors)] }
+    let words = snapshot?.words ?? .english
+    guard let info = snapshot?.prayer else { return [PrayerEntry(date: now, moment: nil, colors: colors, words: words)] }
     let prayers = prayers(info)
     var instants = Set<Date>()
     for day in info.days {
@@ -154,7 +158,7 @@ enum PrayerTimeline {
     var out: [PrayerEntry] = []
     for date in [now] + instants.sorted() {
       let moment = moment(info, prayers: prayers, at: date, calendar: calendar)
-      out.append(PrayerEntry(date: date, moment: moment, colors: colors))
+      out.append(PrayerEntry(date: date, moment: moment, colors: colors, words: words))
       if moment == nil { break }
     }
     return out
@@ -182,8 +186,8 @@ struct PrayerWidget: Widget {
     StaticConfiguration(kind: "ReviselyPrayer", provider: PrayerProvider()) { entry in
       PrayerView(entry: entry)
     }
-    .configurationDisplayName("Prayer times")
-    .description("The next prayer and today's times.")
+    .configurationDisplayName(Words.current.galleryPrayer)
+    .description(Words.current.galleryPrayerDescription)
     .supportedFamilies([.systemSmall, .systemMedium, .accessoryRectangular, .accessoryCircular, .accessoryInline])
   }
 }
@@ -206,28 +210,29 @@ struct PrayerView: View {
     }
     .widgetURL(URL(string: "revisely://prayer")!)
     .widgetGroundIfHome(family, palette.bg)
+    .inLanguage(entry.words)
   }
 }
-
-private let openText = "Open Revisely to see prayer times."
 
 /// "in 1 hr, 12 min" ("in 12 min, 5 sec" in the last hour), kept current by the
 /// system. iOS 18's `.reference` format rounds to one unit ("in 1 hour" at 1:59),
 /// and `.offset` spells the units out, too long for the small widget.
 struct Countdown: View {
   let to: Date
+  @Environment(\.words) private var words
 
   var body: some View {
-    Text("in \(Text(to, style: .relative))")
+    words.countdown(to: to)
   }
 }
 
 /// The time without AM/PM ("3:42", or "15:42" on a 24-hour phone), for the circle.
 /// A DateFormatter on the phone's own locale follows its 12/24-hour setting (the
-/// view's locale, used by a format style, rendered "06:48" on a 12-hour phone).
-private func shortTime(_ date: Date) -> Text {
+/// view's locale, used by a format style, rendered "06:48" on a 12-hour phone). The
+/// app in another language: that language's ("٣:٤٢" in Arabic).
+private func shortTime(_ date: Date, _ words: Words) -> Text {
   let f = DateFormatter()
-  f.locale = .autoupdatingCurrent
+  f.locale = words.isEnglish ? .autoupdatingCurrent : Locale(identifier: words.language)
   f.timeZone = .autoupdatingCurrent
   f.setLocalizedDateFormatFromTemplate("jmm")
   // Drop the day period ("a", or "b"/"B" as in Urdu's "شام"), outside quoted text.
@@ -265,12 +270,13 @@ struct PrayerMark: View {
 struct PrayerHeader: View {
   let place: String?
   let palette: Palette
+  @Environment(\.words) private var words
 
   var body: some View {
     HStack(spacing: 8) {
       PrayerMark(size: 28, palette: palette)
       VStack(alignment: .leading, spacing: 0) {
-        Text("Prayer").font(.system(size: 15, weight: .semibold)).tone(palette.text)
+        Text(words.prayer).font(.system(size: 15, weight: .semibold)).tone(palette.text)
         if let place {
           Text(place).font(.system(size: 12)).tone(palette.secondary, .secondary).minimumScaleFactor(0.8)
         }
@@ -284,10 +290,11 @@ struct PrayerHeader: View {
 struct NextPrayer: View {
   let next: PrayerTime
   let palette: Palette
+  @Environment(\.words) private var words
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
-      Text(next.name.label)
+      Text(words.name(next.name))
         .font(.system(size: 16, weight: .semibold))
         .tone(palette.accentText)
         .widgetAccentable()
@@ -314,6 +321,7 @@ struct NextPrayer: View {
 struct PrayerSmall: View {
   let moment: PrayerMoment?
   let palette: Palette
+  @Environment(\.words) private var words
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
@@ -322,7 +330,7 @@ struct PrayerSmall: View {
       if let moment {
         NextPrayer(next: moment.next, palette: palette)
       } else {
-        Text(openText).font(.system(size: 13)).tone(palette.secondary, .secondary).lineLimit(3)
+        Text(words.openToSeePrayer).font(.system(size: 13)).tone(palette.secondary, .secondary).lineLimit(3)
         Spacer(minLength: 0)
       }
     }
@@ -333,6 +341,7 @@ struct PrayerSmall: View {
 struct PrayerMedium: View {
   let entry: PrayerEntry
   let palette: Palette
+  @Environment(\.words) private var words
 
   var body: some View {
     if let moment = entry.moment {
@@ -350,8 +359,8 @@ struct PrayerMedium: View {
       HStack(alignment: .top, spacing: 12) {
         PrayerMark(size: 40, palette: palette)
         VStack(alignment: .leading, spacing: 2) {
-          Text("Prayer times").font(.system(size: 15, weight: .semibold)).tone(palette.text)
-          Text(openText).font(.system(size: 13)).tone(palette.secondary, .secondary).padding(.top, 2)
+          Text(words.prayerTimes).font(.system(size: 15, weight: .semibold)).tone(palette.text)
+          Text(words.openToSeePrayer).font(.system(size: 13)).tone(palette.secondary, .secondary).padding(.top, 2)
           Spacer(minLength: 0)
         }
       }
@@ -366,6 +375,7 @@ struct PrayerDayList: View {
   let moment: PrayerMoment
   let now: Date
   let palette: Palette
+  @Environment(\.words) private var words
 
   var body: some View {
     VStack(spacing: 0) {
@@ -382,7 +392,7 @@ struct PrayerDayList: View {
     let quiet = !isNext && (past || slot.name == .sunrise)
     let weight: Font.Weight = isNext ? .semibold : .regular
     HStack(spacing: 6) {
-      Text(slot.name.label).font(.system(size: 13, weight: weight)).lineLimit(1)
+      Text(words.name(slot.name)).font(.system(size: 13, weight: weight)).lineLimit(1)
       Spacer(minLength: 0)
       Group {
         if let date = slot.date { Text(date, style: .time) } else { Text("—") }
@@ -402,13 +412,14 @@ struct PrayerDayList: View {
 
 struct PrayerRectangular: View {
   let moment: PrayerMoment?
+  @Environment(\.words) private var words
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
       if let moment {
         HStack(spacing: 4) {
           Image(systemName: "clock")
-          Text("\(moment.next.name.label) \(Text(moment.next.date, style: .time))")
+          Text(verbatim: "\(words.name(moment.next.name)) ") + Text(moment.next.date, style: .time)
         }
         .font(.headline)
         .widgetAccentable()
@@ -419,8 +430,8 @@ struct PrayerRectangular: View {
           Text(place).font(.caption).foregroundStyle(.secondary).lineLimit(1)
         }
       } else {
-        Text("Prayer times").font(.headline).widgetAccentable()
-        Text(openText).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+        Text(words.prayerTimes).font(.headline).widgetAccentable()
+        Text(words.openToSeePrayer).font(.caption).foregroundStyle(.secondary).lineLimit(2)
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -431,17 +442,18 @@ struct PrayerRectangular: View {
 /// system), around the next prayer's name and time.
 struct PrayerCircular: View {
   let moment: PrayerMoment?
+  @Environment(\.words) private var words
 
   var body: some View {
     if let moment {
       ProgressView(timerInterval: moment.previous...moment.next.date, countsDown: false) {
-        Text(moment.next.name.label)
+        Text(words.name(moment.next.name))
       } currentValueLabel: {
         VStack(spacing: -1) {
-          Text(moment.next.name.label)
+          Text(words.name(moment.next.name))
             .font(.system(size: 11, weight: .semibold))
             .widgetAccentable()
-          shortTime(moment.next.date)
+          shortTime(moment.next.date, words)
             .font(.system(size: 15, weight: .semibold, design: .rounded))
             .monospacedDigit()
         }
@@ -450,30 +462,31 @@ struct PrayerCircular: View {
       }
       .progressViewStyle(.circular)
       .accessibilityElement(children: .ignore)
-      .accessibilityLabel(Text("Next prayer: \(moment.next.name.label) at \(Text(moment.next.date, style: .time))"))
+      .accessibilityLabel(words.nextPrayer(words.name(moment.next.name), at: moment.next.date))
     } else {
       ZStack {
         AccessoryWidgetBackground()
         Image(systemName: "clock").font(.system(size: 20, weight: .medium))
       }
-      .accessibilityLabel("Prayer times: open Revisely")
+      .accessibilityLabel(words.prayerTimesOpen)
     }
   }
 }
 
 struct PrayerInline: View {
   let moment: PrayerMoment?
+  @Environment(\.words) private var words
 
   var body: some View {
     if let moment {
       // Short: it shares the line with the date.
       Label {
-        Text("\(moment.next.name.label) \(Text(moment.next.date, style: .time))")
+        Text(verbatim: "\(words.name(moment.next.name)) ") + Text(moment.next.date, style: .time)
       } icon: {
         Image(systemName: "clock")
       }
     } else {
-      Label("Open Revisely", systemImage: "clock")
+      Label(words.openRevisely, systemImage: "clock")
     }
   }
 }

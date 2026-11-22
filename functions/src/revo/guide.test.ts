@@ -129,8 +129,10 @@ describe('Revo’s guide names what the app has', () => {
     // Activity, memorizing by the ayah), and from 30,000 on Nov 18 2026 for mistake detection reaching the store app
     // (1.0.5): its lines came over from the Dev guide condensed, about 5,000 characters from 14,000, and the Dev block
     // shrank by as much. On Sonnet 5.5 the 5,000 are about $0.00014 a question cached and $0.0035 on a cache miss. It
-    // rides on every question in the cached system prompt. Trim before raising it again.
-    expect(REVO_GUIDE.length).toBeLessThan(35_000);
+    // rides on every question in the cached system prompt. Raised to 35,250 for 1.0.6's Language setting (the app in
+    // Arabic reaching the store app; its Dev line came over folded into Appearance, and the widgets' line was cut). Trim
+    // before raising it again.
+    expect(REVO_GUIDE.length).toBeLessThan(35_250);
     expect(REVO_GUIDE).not.toMatch(/\b[A-Z]+-\d+\b/);
   });
 

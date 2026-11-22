@@ -39,6 +39,7 @@ import { updates } from './updates';
 import { v2 } from './v2';
 import { verse } from './verse';
 import { whatsNew } from './whatsNew';
+import { widgets } from './widgets';
 import type { ArStrings } from './types';
 
 export const ar: ArStrings = {
@@ -81,4 +82,5 @@ export const ar: ArStrings = {
   v2,
   verse,
   whatsNew,
+  widgets,
 };

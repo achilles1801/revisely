@@ -70,7 +70,8 @@ describe('Android widgets', () => {
 
   it('say what the iOS widgets say when there’s nothing to show', () => {
     const k = kotlin();
-    const swift = ['TodayWidget', 'PrayerWidget', 'QiblaWidget'].map((f) => read(`targets/widget/${f}.swift`)).join('\n');
+    // Their own English (Words.swift, Words.kt), for a snapshot from before the app wrote its words (lib/widgets/words).
+    const swift = ['TodayWidget', 'PrayerWidget', 'QiblaWidget', 'Words', 'Snapshot'].map((f) => read(`targets/widget/${f}.swift`)).join('\n');
     for (const text of [
       'Open Revisely to set up your plan.',
       "Open Revisely to see today's revision.",
@@ -80,6 +81,7 @@ describe('Android widgets', () => {
       'Tomorrow · ',
       '-day streak',
       ' to Makkah',
+      'in {time}',
     ]) {
       expect(`${text}: ${k.includes(text)}`).toBe(`${text}: true`);
       expect(`${text}: ${swift.includes(text)}`).toBe(`${text}: true`);

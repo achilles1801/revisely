@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Arabic for values/strings.xml: the widget picker's names, descriptions and previews, which Android shows in the
+     phone's language. The widgets themselves show the app's language, from the snapshot (Words.kt). Words and forms:
+     src/i18n/ar-glossary.md; the same text as src/i18n/ar/widgets.ts. -->
+<resources>
+  <string name="aw_today_name">اليوم</string>
+  <string name="aw_today_description">مراجعة اليوم، وهل أنهيتها، وأيامك المتتالية.</string>
+  <string name="aw_verse_name">آية اليوم</string>
+  <string name="aw_verse_description">آية قصيرة كل يوم، بالعربية.</string>
+  <string name="aw_qibla_name">القبلة</string>
+  <string name="aw_qibla_description">اتجاه القبلة من الشمال الحقيقي، من آخر مكان فتحت فيه ريفايزلي.</string>
+  <string name="aw_prayer_name">مواقيت الصلاة</string>
+  <string name="aw_prayer_description">الصلاة القادمة ومواقيت اليوم.</string>
+
+  <string name="aw_today">اليوم</string>
+  <string name="aw_prayer">الصلاة</string>
+  <string name="aw_verse_of_the_day">آية اليوم</string>
+  <string name="aw_open_revisely">افتح ريفايزلي</string>
+
+  <string name="aw_sample_title">من النبأ إلى التكوير</string>
+  <string name="aw_sample_place">الجزء ٣٠</string>
+  <string name="aw_sample_streak">أيام متتالية: ٧</string>
+  <string name="aw_sample_streak_dot">· أيام متتالية: ٧</string>
+  <string name="aw_sample_left">بقيت ٥ صفحات</string>
+  <string name="aw_sample_wide_line">بقيت ٥ صفحات · الجزء ٣٠</string>
+  <string name="aw_sample_start">بدء</string>
+  <string name="aw_sample_city">نيويورك</string>
+  <string name="aw_sample_prayer">العصر</string>
+  <string name="aw_sample_time">٢:٢١ م</string>
+  <string name="aw_sample_countdown">بعد ١:١٢:٠٥</string>
+  <string name="aw_sample_qibla">القبلة ٥٨° شمال شرق</string>
+  <string name="aw_sample_qibla_short">٥٨°</string>
+  <string name="aw_sample_qibla_city">نيويورك</string>
+  <string name="aw_sample_distance">١٠٬٣٠٧ كم إلى مكة</string>
+  <string name="aw_sample_reference">الشرح ٩٤:٥</string>
+  <string name="aw_sample_fajr">الفجر</string>
+  <string name="aw_sample_sunrise">الشروق</string>
+  <string name="aw_sample_dhuhr">الظهر</string>
+  <string name="aw_sample_maghrib">المغرب</string>
+  <string name="aw_sample_isha">العشاء</string>
+  <string name="aw_sample_fajr_time">٥:١٨ ص</string>
+  <string name="aw_sample_sunrise_time">٦:٣٦ ص</string>
+  <string name="aw_sample_dhuhr_time">١١:٤١ ص</string>
+  <string name="aw_sample_maghrib_time">٤:٤٣ م</string>
+  <string name="aw_sample_isha_time">٦:٠١ م</string>
+  <string name="aw_sample_fajr_short">٥:١٨</string>
+  <string name="aw_sample_dhuhr_short">١١:٤١</string>
+  <string name="aw_sample_asr_short">٢:٢١</string>
+  <string name="aw_sample_maghrib_short">٤:٤٣</string>
+  <string name="aw_sample_isha_short">٦:٠١</string>
+</resources>

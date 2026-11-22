@@ -266,16 +266,16 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'Settings, section by section',
-    covers: ['REVO-39', 'REMIND-1', 'REMIND-3', 'REMIND-4', 'SET-2', 'SET-3', 'SET-4'],
+    covers: ['REVO-39', 'REMIND-1', 'REMIND-3', 'REMIND-4', 'SET-2', 'SET-3', 'SET-4', 'LANG-2', 'LANG-3'],
     routes: ['Settings'],
     text: lines(
       '- Account: display name. Activity: “Activity”, “Recordings”, “Back up recordings”, “Time in app”, “Memorized pages”. Home screen: “Next prayer”, “Friday Al-Kahf reminder”. Prayer: as above.',
       '- Revision: “Smart Tracking” (rate pages, Insights), “Keep daily amount”, and on an iPhone “Speech model” (searching by voice).',
       '- Revo AI: Revo on or off, “What Revo can do” (Revo’s short introduction, which also plays before Revo is first turned on; Skip ends it), “Memory”, “Delete conversations”.',
-      '- Mushaf: “Mushaf”, “Offline mushaf”, “Download over mobile data”. Notifications: “Enable notifications” (revision reminders: 8:00 AM, after Asr, and an hour before the day ends, while today isn’t done; there is no setting for their times). Appearance: “Theme” (Light or Dark) and “Accent” (Indigo, Crimson or Jade).',
+      '- Mushaf: “Mushaf”, “Offline mushaf”, “Download over mobile data”. Notifications: “Enable notifications” (revision reminders: 8:00 AM, after Asr, and an hour before the day ends, while today isn’t done; there is no setting for their times). Appearance: “Theme” (Light or Dark), “Accent” (Indigo, Crimson or Jade), “Language” (English, العربية or the phone’s; Arabic reads right to left, the mushaf still turns as in print, Revo answers in Arabic; changing it restarts the app).',
       '- Support: “Share Revisely”, “Send feedback”, “Report a problem” (with “Add a screenshot”), “Contact support”, “Help buttons”. About: “What’s new”, “Privacy Policy”, “Terms of Service”, the version.',
       '- Testing (testers only): “Reset my data”, “Load test scenario”. Then “Sign out” and “Delete account”.',
-      '- Widgets: Today, Verse of the day, Qibla and Prayer times, added like any widget: on an iPhone (Home Screen, Lock Screen) and, from 1.0.4, on Android.',
+      '- Widgets: Today, Verse of the day, Qibla and Prayer times, added like any widget (iPhone Home and Lock Screen; Android).',
     ),
   },
   {
@@ -390,13 +390,12 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     // Mistake detection reached the store app with 1.0.5 (its lines are in GUIDE_SECTIONS). Strict stays Revisely Dev's
     // until it has a release of its own (Majd, Nov 17 2026).
     title: 'Only in Revisely Dev',
-    covers: ['SESS-8', 'LANG-2'],
+    covers: ['SESS-8'],
     routes: ['Settings'],
     text: lines(
       '- Settings → Recite → “Mistakes to mark”: “Words & harakat”, or “Strict”, which also marks tajweed in violet (madd lengths, set by “Madd munfasil”, “Madd muttasil” and “Madd ʿarid”; qalqalah, ghunnah, ikhfa, idgham, iqlab). The store app marks words and harakat only.',
       '- Settings → Testing → “Keep my recitations as test data” keeps takes for Revisely’s tests; nobody listens. Settings → Testing → “Premium” turns Premium off to see Mark mistakes locked.',
       '- Settings → Testing → “Mistake detection model” says which model the checker runs for Recite, Words & harakat and Strict (for example v7), read from the checker when Settings opens; a tap asks again.',
-      '- Settings → Appearance → “Language”: “Phone’s language”, English or العربية (Arabic, right to left). Revisely restarts to change it (“Restart”, or “Not now” for the next launch). In Arabic, Revo answers in Arabic too. The Arabic is still being written: what isn’t translated yet shows in English. The store app is English only for now. In Arabic the mushaf still turns like a printed one: page 1 on the right, the next page from the left.',
       '- Rating Revisely: Settings → Support → “Rate Revisely” opens the App Store’s Write a Review page (Revisely’s Google Play page on Android). After finishing a day’s revision with a streak of 7 days or more, the end card may also show “Enjoying Revisely? Rate it”: at most 3 times ever, four months apart, never in an account’s first week, and never again once it is tapped or dismissed with its ✕ (or Rate Revisely is used). Rating is always optional and nothing is given for it.',
     ),
   },
