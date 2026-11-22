@@ -72,8 +72,8 @@ How the tests are made: `tests/scenarios/README.md`.
   ("Every page comes round every 11 days"), never "Automatic" or "Custom plan" (Majd chose the audit's option A, a
   tidy-up, Nov 22 2026: "for edit schedule let's do option A (tidy up) for now"); a named plan shows its name above.
   "Daily amount" is the first row under it. A saved plan loaded and saved keeps its name (on every phone), and so does
-  an edit of it. "Save this schedule as a copy…" (Saved plans) on a custom plan names it too (at once when it has no
-  unsaved edits, with the next Save when it has). A plan made with "Start a new plan" has no name. On the automatic
+  an edit of it. "Save current plan…" (in Saved plans) on a custom plan names it too (at once when it has no
+  unsaved edits, with the next Save when it has). A plan made with "Create new plan" has no name. On the automatic
   schedule, saving a copy only keeps a copy. A saved plan is a copy: editing the plan in use doesn't change it, and
   deleting it doesn't rename the plan in use. With a custom plan, "Daily amount" says the plan's days stay as they are.
 

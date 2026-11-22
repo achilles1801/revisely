@@ -12,7 +12,7 @@ import { t } from '../../i18n';
 
 /**
  * Edit schedule → More → Saved plans (SCHED-7, SCHED-8; the audit's mock B4): each saved plan with Load (it shows
- * in the editor first; nothing changes until Save) and a bin, then "Save this schedule as a copy…".
+ * in the editor first; nothing changes until Save) and a bin, then "Save current plan…".
  */
 export const SavedPlansSheet = forwardRef<
   BottomSheetModal,

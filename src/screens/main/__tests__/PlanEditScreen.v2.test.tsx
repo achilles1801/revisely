@@ -212,13 +212,13 @@ describe('the schedule in the new design', () => {
     expect(mockNavigation.goBack).toHaveBeenCalled();
   });
 
-  it('[SCHED-7] tidied (option A): Daily amount first, the days unfolded, Start a new plan and Saved plans as two rows', async () => {
+  it('[SCHED-7] tidied (option A): Daily amount first, the days unfolded, Create new plan and Saved plans as two rows', async () => {
     await mount(<PlanEditScreen />);
     expect(flat(screen.getByText('Your days').props.style)).toMatchObject({ fontWeight: '600', color: palette.text });
-    for (const label of ['Daily amount', 'Show all 10 days', 'Add a rest day', 'Start a new plan', 'Saved plans', 'Tap a day to change what’s on it.']) {
+    for (const label of ['Daily amount', 'Show all 10 days', 'Add rest day', 'Create new plan', 'Saved plans', 'Tap a day to change what’s on it.']) {
       expect(screen.getByText(label)).toBeTruthy();
     }
-    for (const gone of ['Cycle', 'More', 'Create new plan', 'Save current plan…', 'Use automatic schedule']) {
+    for (const gone of ['Cycle', 'More', 'Save current plan…', 'Use automatic schedule']) {
       expect(screen.queryByText(gone)).toBeNull();
     }
     // Daily amount comes before the days.
@@ -233,7 +233,7 @@ describe('the schedule in the new design', () => {
     expect(screen.queryByText('Create New Plan')).toBeNull();
     // "Show all" is a link; actions read in ink.
     expect(flat(screen.getByText('Show all 10 days').props.style).color).toBe(palette.link);
-    expect(flat(screen.getByText('Start a new plan').props.style).color).toBe(palette.text);
+    expect(flat(screen.getByText('Create new plan').props.style).color).toBe(palette.text);
     // How much a day, and how often each page comes round; never "Automatic".
     expect(within(screen.getByTestId('plan-hero')).getByText('3 pages a day')).toBeTruthy();
     expect(within(screen.getByTestId('plan-hero')).getByText('Every page comes round every 10 days')).toBeTruthy();
@@ -324,7 +324,7 @@ describe('the schedule in the new design', () => {
     expect(within(sheet).getByText('Ajzaʼ per day')).toBeTruthy();
   });
 
-  it('Saved plans opens a sheet: each plan with Load and a bin, and Save this schedule as a copy…', async () => {
+  it('Saved plans opens a sheet: each plan with Load and a bin, and Save current plan…', async () => {
     const { Alert } = require('react-native');
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
     await mount(<PlanEditScreen />);
@@ -333,7 +333,7 @@ describe('the schedule in the new design', () => {
     const sheet = screen.getByTestId('saved-plans-sheet');
     expect(within(sheet).getByText('Ramadan rotation')).toBeTruthy();
     expect(within(sheet).getByText('2-day cycle')).toBeTruthy();
-    expect(within(sheet).getByText('Save this schedule as a copy…')).toBeTruthy();
+    expect(within(sheet).getByText('Save current plan…')).toBeTruthy();
     fireEvent.press(screen.getByTestId('saved-plan-delete-p1'));
     expect(alert.mock.calls.at(-1)![0]).toBe('Delete "Ramadan rotation"?');
     fireEvent.press(screen.getByTestId('saved-plan-load-p1'));
@@ -590,10 +590,10 @@ describe('the plan’s name in the header (SCHED-7)', () => {
     expect(within(hero()).queryByText('Custom plan')).toBeNull();
     // Daily amount says the plan's days stay as they are.
     fireEvent.press(screen.getByTestId('plan-quota'));
-    expect(screen.getByText('Your plan’s days stay as they are. To use this amount, choose “Start a new plan”.')).toBeTruthy();
+    expect(screen.getByText('Your plan’s days stay as they are. To use this amount, choose “Create new plan”.')).toBeTruthy();
   });
 
-  it('[SCHED-7] “Start a new plan” makes a plan with no name, saved without one', async () => {
+  it('[SCHED-7] “Create new plan” makes a plan with no name, saved without one', async () => {
     mockApp.user = { ...baseUser, savedPlans: [saved], customPlan: live('Weekdays') };
     await mount(<PlanEditScreen />);
     fireEvent.press(screen.getByTestId('plan-create'));

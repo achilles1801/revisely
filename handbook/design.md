@@ -80,7 +80,7 @@ classic default), and a fresh install starts in light.
     also keeps 12pt from the icons (about 1.05 on an iPhone SE).
   - **Edit schedule, tidied** (Majd chose option A of the Edit schedule audit, Nov 22 2026: "for edit schedule let's
     do option A (tidy up) for now"; mocks `~/Documents/revisely-schedule-mocks/`, A1): the header says how much a day and
-    how often each page comes round (never "Automatic"); Daily amount is the first row; the days don't fold; "Start a
+    how often each page comes round (never "Automatic"); Daily amount is the first row; the days don't fold; "Create
     new plan" and "Saved plans" (a sheet) are two rows; an edit on the automatic schedule says before Save that it
     becomes a custom plan (MEM-6). Other directions are being explored as mocks only.
   - Activity is a calendar (`activity/ActivityCalendar`): **a month by default**, ‹ › to step,
