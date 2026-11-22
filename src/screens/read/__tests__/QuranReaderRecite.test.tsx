@@ -2444,3 +2444,29 @@ describe('Majd’s Nov 21 asks: Pause keeps the take, the score opens what it ha
     expect(screen.getByTestId('past-card-layer')).toBeTruthy();
   });
 });
+
+describe('a refused or failed microphone says so (Majd’s Android store build, Nov 22 2026: a tap did nothing)', () => {
+  it('[RECITE-1] refused: "Microphone access is off" with Open Settings; failing to start: a short message', async () => {
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    const audio = jest.requireMock('expo-audio');
+    audio.getRecordingPermissionsAsync.mockResolvedValue({ granted: false, canAskAgain: false });
+    setReciteCheckSettings('u1', { noticeSeen: true, mode: 'recite', markMistakes: true });
+    await open();
+    fireEvent.press(screen.getByTestId('recite-mic'));
+    await flush();
+    await flush();
+    expect(alert).toHaveBeenCalledWith('Microphone access is off', expect.stringContaining('Settings'), expect.any(Array));
+    const buttons = alert.mock.calls[0][2] as { text: string }[];
+    expect(buttons.map((b) => b.text)).toEqual(['Cancel', 'Open Settings']);
+    // Allowed, but the microphone can't start.
+    alert.mockClear();
+    audio.getRecordingPermissionsAsync.mockResolvedValue({ granted: true, canAskAgain: false });
+    const mic = jest.requireMock('../../../lib/recite/micSource');
+    mic.startMicStream.mockRejectedValueOnce(new Error('busy'));
+    fireEvent.press(screen.getByTestId('recite-mic'));
+    await flush();
+    await flush();
+    expect(alert).toHaveBeenCalledWith('Couldn’t start the microphone. Try again.');
+    alert.mockRestore();
+  });
+});
