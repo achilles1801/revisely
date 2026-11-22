@@ -1,4 +1,4 @@
-# Lint
+# Lint and format
 
 ESLint for the app: `src/`, `App.tsx` and `index.ts`. CI runs it in Fast checks: an error fails the check, and a
 warning doesn't.
@@ -9,6 +9,24 @@ npx --prefix scripts/lint eslint -c scripts/lint/eslint.config.mjs .            
 npx --prefix scripts/lint eslint -c scripts/lint/eslint.config.mjs --quiet .    # errors only, as CI
 npx --prefix scripts/lint eslint -c scripts/lint/eslint.config.mjs src/lib/streak.ts   # one file
 ```
+
+## Format (Prettier)
+`prettier.config.mjs` is the style the code was already written in (single quotes, semicolons, trailing commas), with
+lines up to 120 characters. CI checks only the folders in `formatted.txt`.
+
+```bash
+npx --prefix scripts/lint prettier --config scripts/lint/prettier.config.mjs --check $(grep -v '^#' scripts/lint/formatted.txt)
+npx --prefix scripts/lint prettier --config scripts/lint/prettier.config.mjs --write src/lib/streak.ts   # one file
+```
+
+To add a folder:
+1. Check that no open PR touches it.
+2. Format it with `--write`.
+3. Add it to `formatted.txt`.
+4. Open a PR with nothing else in it.
+
+Never format the whole repository in one PR: every open branch would conflict. After that, run `--write` on any file
+you change in that folder.
 
 ## Why it lives here
 - **The fingerprint:** the app's `package.json` is part of the store fingerprint. Its whole `scripts` block is

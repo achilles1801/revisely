@@ -52,7 +52,9 @@ function notFound(): Response {
 
 /** The project's web config, from its Hosting site (an hour at the edge). */
 async function firebaseConfig(host: string): Promise<Response> {
-  const res = await fetch(`https://${host}/__/firebase/init.json`, { cf: { cacheTtl: 3600, cacheEverything: true } } as RequestInit);
+  const res = await fetch(`https://${host}/__/firebase/init.json`, {
+    cf: { cacheTtl: 3600, cacheEverything: true },
+  } as RequestInit);
   if (!res.ok) return new Response('{}', { status: 502, headers: { 'Content-Type': 'application/json' } });
   return new Response(await res.text(), {
     headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=3600' },

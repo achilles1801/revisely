@@ -40,6 +40,7 @@ iOS builds also need `GoogleService-Info.plist` at the repository root.
 | --- | --- |
 | Types (app and worker) | `npx tsc --noEmit && npx tsc --noEmit -p worker` |
 | Lint | `npm ci --prefix scripts/lint && npx --prefix scripts/lint eslint -c scripts/lint/eslint.config.mjs .` |
+| Format (folders done so far) | `npx --prefix scripts/lint prettier --config scripts/lint/prettier.config.mjs --check $(grep -v '^#' scripts/lint/formatted.txt)` |
 | Unit and component tests | `npm test` |
 | Cloud Functions | `npm run test:functions` |
 | Firestore rules (Java 21) | `npm run test:rules` |

@@ -1,0 +1,7 @@
+# Folders Prettier keeps formatted (prettier.config.mjs); CI's Format step checks exactly these.
+# Add a folder once it's formatted, in a PR of its own, when no open PR touches it.
+src/dev
+src/hooks
+src/lib/widgets
+src/types
+worker

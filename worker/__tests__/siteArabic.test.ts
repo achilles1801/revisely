@@ -90,7 +90,7 @@ describe('the website in Arabic', () => {
     expect(misses).toEqual([]);
   });
 
-  it('every key the home and Support use has Arabic, and strings-site.js holds nothing they don\'t use', () => {
+  it("every key the home and Support use has Arabic, and strings-site.js holds nothing they don't use", () => {
     const ar = strings(true).ar;
     const used = siteKeys();
     expect([...used].filter((k) => ar[k] == null)).toEqual([]);
@@ -106,7 +106,8 @@ describe('the website in Arabic', () => {
   });
 
   it('the pages load the subset fonts, Regular and Bold, and both are there', () => {
-    const fontsOf = (file: string) => [...read(file).matchAll(/url\("\/assets\/fonts\/([^"]+)"\)/g)].map((m) => m[1]).sort();
+    const fontsOf = (file: string) =>
+      [...read(file).matchAll(/url\("\/assets\/fonts\/([^"]+)"\)/g)].map((m) => m[1]).sort();
     expect(fontsOf('docs/assets/site-rtl.css')).toEqual(['Amiri-Bold.woff2', 'Amiri-Regular.woff2']);
     const css = read('docs/assets/account.css');
     const urls = [...css.matchAll(/url\("\/assets\/fonts\/([^"]+)"\)/g)].map((m) => m[1]);

@@ -29,7 +29,11 @@ function load(now: number, lang: 'en' | 'ar' = 'en') {
   for (const s of Array.from(document.querySelectorAll('script'))) s.remove();
   document.documentElement.lang = lang;
   document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
-  try { localStorage.setItem('rv.lang', lang); } catch { /* no storage */ }
+  try {
+    localStorage.setItem('rv.lang', lang);
+  } catch {
+    /* no storage */
+  }
   const w = window as unknown as { RV_STRINGS?: unknown; RV?: unknown; eval: (src: string) => void };
   delete w.RV_STRINGS;
   delete w.RV;
@@ -56,7 +60,9 @@ describe("the Ramadan theme's countdown and phases", () => {
     expect(text('[data-rm-days]')).toBe('Ramadan in 78 days');
     expect(text('[data-rm-clock]')).toBe('12:00:00');
     expect(units()).toEqual(['78', '12', '00', '00']);
-    expect(text('[data-rm-expected]')).toBe('Expected around Monday, February 8, 2027 (the first fast), depending on the moon sighting.');
+    expect(text('[data-rm-expected]')).toBe(
+      'Expected around Monday, February 8, 2027 (the first fast), depending on the moon sighting.',
+    );
     expect(text('.rm-count-title [data-rm-when="before"]')).toBe('Ramadan is almost here.');
     expect($('.rm-cta')?.getAttribute('href')).toBe('/get/?c=ramadan');
 
@@ -66,7 +72,7 @@ describe("the Ramadan theme's countdown and phases", () => {
     expect(units()).toEqual(['78', '11', '59', '59']);
   });
 
-  it('counts to 00:00 of the first day on the visitor\'s clock, and the last day reads as one day, then hours', () => {
+  it("counts to 00:00 of the first day on the visitor's clock, and the last day reads as one day, then hours", () => {
     load(local(2027, 2, 6, 6, 30, 0));
     expect(text('[data-rm-days]')).toBe('Ramadan in 1 day');
     expect(text('[data-rm-clock]')).toBe('17:30:00');
@@ -128,7 +134,15 @@ describe("the Ramadan theme's countdown and phases", () => {
     rerender();
     expect(document.body.classList.contains('ramadan')).toBe(false);
     expect(phase()).toBeNull();
-    for (const sel of ['.rm-banner', '.rm-lights', '.rm-hangers', '.rm-sky', '.rm-count', '.rm-sprite', '.rm-foot-greet']) {
+    for (const sel of [
+      '.rm-banner',
+      '.rm-lights',
+      '.rm-hangers',
+      '.rm-sky',
+      '.rm-count',
+      '.rm-sprite',
+      '.rm-foot-greet',
+    ]) {
       expect([sel, $(sel)]).toEqual([sel, null]);
     }
     // The page's own content is still there.
@@ -138,7 +152,11 @@ describe("the Ramadan theme's countdown and phases", () => {
 
   it('exposes the same rules the worker uses, for the dates on this clock', () => {
     load(local(2026, 11, 21));
-    const R = (window as unknown as { RV_RAMADAN: { phase: (n: number, s: number, e: number) => string; localDay: (s: string) => number } }).RV_RAMADAN;
+    const R = (
+      window as unknown as {
+        RV_RAMADAN: { phase: (n: number, s: number, e: number) => string; localDay: (s: string) => number };
+      }
+    ).RV_RAMADAN;
     const s = R.localDay('2027-02-08');
     const e = R.localDay('2027-03-09');
     expect(R.phase(s - 1, s, e)).toBe('before');

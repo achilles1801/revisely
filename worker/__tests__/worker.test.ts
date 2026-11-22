@@ -85,15 +85,19 @@ const ENV: TcqEnv = {
 };
 
 // The text as The Clear Quran shows it: brackets and a footnote marker, kept as is.
-const TEXT = 'Allah! There is no god ˹worthy of worship˺ except Him,<footnote id="57" number="1"></footnote> the Ever-Living';
+const TEXT =
+  'Allah! There is no god ˹worthy of worship˺ except Him,<footnote id="57" number="1"></footnote> the Ever-Living';
 
 const textOf = (key: string) => (key === '2:255' ? TEXT : `The text of ${key}`);
 
 function upstreamOk(key = '2:255', text: unknown = TEXT) {
-  return new Response(JSON.stringify({ success: true, data: { verse_key: key, text_english: text, text_uthmani: 'x' } }), {
-    status: 200,
-    headers: { 'Content-Type': 'application/json' },
-  });
+  return new Response(
+    JSON.stringify({ success: true, data: { verse_key: key, text_english: text, text_uthmani: 'x' } }),
+    {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    },
+  );
 }
 
 /** The range query's answer: verses from..to of one surah, as the API documents it. */
@@ -153,7 +157,15 @@ const ctx = () => {
 
 async function call(
   path: string,
-  { auth, channel, env = ENV, api = theClearQuran, cache = memoryCache(), method = 'GET', now = NOW }: {
+  {
+    auth,
+    channel,
+    env = ENV,
+    api = theClearQuran,
+    cache = memoryCache(),
+    method = 'GET',
+    now = NOW,
+  }: {
     auth?: string | null;
     channel?: string;
     env?: TcqEnv;
@@ -250,8 +262,15 @@ describe('blocks of verses', () => {
 
   it('a short surah is one block; the last block of a surah is short', async () => {
     const short = await call('/api/tcq/windows/112:3', { channel: 'production' });
-    expect(short.upstream[0].url).toBe('https://api.theclearquran.org/verses?surah=112&from_verse=1&to_verse=4&limit=4');
-    expect(short.body.verses.map((v: { verse_key: string }) => v.verse_key)).toEqual(['112:1', '112:2', '112:3', '112:4']);
+    expect(short.upstream[0].url).toBe(
+      'https://api.theclearquran.org/verses?surah=112&from_verse=1&to_verse=4&limit=4',
+    );
+    expect(short.body.verses.map((v: { verse_key: string }) => v.verse_key)).toEqual([
+      '112:1',
+      '112:2',
+      '112:3',
+      '112:4',
+    ]);
     const end = await call('/api/tcq/windows/2:286', { channel: 'production' });
     expect(end.body).toMatchObject({ from: 271, to: 286 });
     expect(end.body.verses).toHaveLength(16);
@@ -259,7 +278,10 @@ describe('blocks of verses', () => {
 
   it('accepts an answer only if it holds exactly the block, each verse with text', () => {
     const win = { sura: 2, from: 1, to: 3 };
-    const data = (keys: string[], text = 'x') => ({ success: true, data: keys.map((k) => ({ verse_key: k, text_english: text })) });
+    const data = (keys: string[], text = 'x') => ({
+      success: true,
+      data: keys.map((k) => ({ verse_key: k, text_english: text })),
+    });
     expect(parseWindow(data(['2:1', '2:2', '2:3']), win)).toHaveLength(3);
     expect(parseWindow(data(['2:3', '2:1', '2:2']), win)!.map((v) => v.verse_key)).toEqual(['2:1', '2:2', '2:3']);
     expect(parseWindow(data(['2:1', '2:2']), win)).toBeNull(); // a verse missing (the API's default limit is 20)
@@ -285,7 +307,12 @@ describe('blocks of verses', () => {
     ]);
     // The app's block request gets a block of one.
     const block = await call('/api/tcq/windows/2:256', { env, api: refusing, channel: 'production' });
-    expect(block.body).toEqual({ surah: 2, from: 256, to: 256, verses: [{ verse_key: '2:256', text: 'The text of 2:256' }] });
+    expect(block.body).toEqual({
+      surah: 2,
+      from: 256,
+      to: 256,
+      verses: [{ verse_key: '2:256', text: 'The text of 2:256' }],
+    });
     expect(block.upstream.map((c) => c.url)).toEqual(['https://api.theclearquran.org/verses/2:256']);
     // Each request to The Clear Quran counted, the refused one too.
     expect(store.get('all:live')).toBe(3);
@@ -311,7 +338,13 @@ describe('blocks of verses', () => {
     const cache = memoryCache();
     const miss = await call('/api/tcq/windows/2:255', { api, cache, env: { ...ENV, TCQ_BUDGET: ns } });
     const names = (h: string | null) => (h ?? '').split(', ').map((p) => p.split(';')[0]);
-    expect(names(miss.res.headers.get('Server-Timing'))).toEqual(['auth', 'cache', 'budget', 'tcq-window', 'tcq-server']);
+    expect(names(miss.res.headers.get('Server-Timing'))).toEqual([
+      'auth',
+      'cache',
+      'budget',
+      'tcq-window',
+      'tcq-server',
+    ]);
     expect(miss.res.headers.get('Server-Timing')).toContain('tcq-server;dur=412');
     const hit = await call('/api/tcq/windows/2:255', { api, cache, env: { ...ENV, TCQ_BUDGET: ns } });
     expect(names(hit.res.headers.get('Server-Timing'))).toEqual(['auth', 'cache']);
@@ -344,7 +377,9 @@ describe('sign-in', () => {
   });
 
   it('accepts a valid ID token', async () => {
-    await expect(verifyIdToken(await token(), PROJECT, NOW, fakeFetch(() => upstreamOk()).fn)).resolves.toBe('user-123');
+    await expect(verifyIdToken(await token(), PROJECT, NOW, fakeFetch(() => upstreamOk()).fn)).resolves.toBe(
+      'user-123',
+    );
   });
 
   it('a per-user limit answers 429 before calling The Clear Quran', async () => {
@@ -445,9 +480,9 @@ describe('edge cache', () => {
     const first = await call('/api/tcq/verses/2:255', { cache, channel: 'production' });
     expect(first.res.headers.get('X-Cache')).toBe('MISS');
     expect([...cache.store.keys()]).toEqual(['https://revisely.app/__cache/tcq/v1/live/windows/2:241-270']);
-    expect(cache.store.get('https://revisely.app/__cache/tcq/v1/live/windows/2:241-270')!.headers.get('Cache-Control')).toBe(
-      'public, max-age=3600',
-    );
+    expect(
+      cache.store.get('https://revisely.app/__cache/tcq/v1/live/windows/2:241-270')!.headers.get('Cache-Control'),
+    ).toBe('public, max-age=3600');
 
     const second = await call('/api/tcq/verses/2:255', { cache, channel: 'production' });
     expect(second.upstream).toHaveLength(0);
@@ -509,7 +544,13 @@ describe('long-lived edge cache (stale-while-revalidate)', () => {
     const cache = memoryCache();
     await call('/api/tcq/windows/2:255', { env, cache, channel: 'production' });
     const down = () => new Response('oops', { status: 500 });
-    const stale = await call('/api/tcq/windows/2:255', { env, cache, api: down, channel: 'production', now: NOW + 150 });
+    const stale = await call('/api/tcq/windows/2:255', {
+      env,
+      cache,
+      api: down,
+      channel: 'production',
+      now: NOW + 150,
+    });
     expect(stale.res.status).toBe(200);
     expect(stale.res.headers.get('X-Cache')).toBe('STALE');
     expect((await stored(cache)).fetchedAt).toBe(NOW);
@@ -532,14 +573,22 @@ describe('long-lived edge cache (stale-while-revalidate)', () => {
     const shorter = { ...ENV, TCQ_EDGE_CACHE_SECONDS: '10', TCQ_EDGE_STALE_SECONDS: '0' };
     const res = await call('/api/tcq/windows/2:255', { env: shorter, cache, channel: 'production', now: NOW + 50 });
     expect(res.res.headers.get('X-Cache')).toBe('MISS');
-    const off = await call('/api/tcq/windows/2:255', { env: { ...ENV, TCQ_EDGE_CACHE_SECONDS: '0' }, cache, channel: 'production' });
+    const off = await call('/api/tcq/windows/2:255', {
+      env: { ...ENV, TCQ_EDGE_CACHE_SECONDS: '0' },
+      cache,
+      channel: 'production',
+    });
     expect(off.res.headers.get('X-Cache')).toBe('MISS');
   });
 
   it('a new TCQ_CACHE_VERSION drops every cached copy', async () => {
     const cache = memoryCache();
     await call('/api/tcq/windows/2:255', { env, cache, channel: 'production' });
-    const bumped = await call('/api/tcq/windows/2:255', { env: { ...env, TCQ_CACHE_VERSION: '2' }, cache, channel: 'production' });
+    const bumped = await call('/api/tcq/windows/2:255', {
+      env: { ...env, TCQ_CACHE_VERSION: '2' },
+      cache,
+      channel: 'production',
+    });
     expect(bumped.res.headers.get('X-Cache')).toBe('MISS');
     expect([...cache.store.keys()]).toContain('https://revisely.app/__cache/tcq/v2/live/windows/2:241-270');
     expect(cacheVersion({ ...ENV, TCQ_CACHE_VERSION: ' 7 ' })).toBe('7');
@@ -551,14 +600,23 @@ describe('long-lived edge cache (stale-while-revalidate)', () => {
     const cache = memoryCache();
     const old = { verses: (await call('/api/tcq/windows/2:255', { channel: 'production' })).body.verses };
     cache.store.set(KEY, new Response(JSON.stringify(old)));
-    const res = await call('/api/tcq/windows/2:255', { env: { ...env, TCQ_EDGE_STALE_SECONDS: '0' }, cache, channel: 'production' });
+    const res = await call('/api/tcq/windows/2:255', {
+      env: { ...env, TCQ_EDGE_STALE_SECONDS: '0' },
+      cache,
+      channel: 'production',
+    });
     expect(res.res.headers.get('X-Cache')).toBe('MISS');
   });
 });
 
 describe('the device cache policy', () => {
   it('tells the app how long it may keep the text, and the cache version; no sign-in needed', async () => {
-    const env = { ...ENV, TCQ_DEVICE_CACHE_SECONDS: '2592000', TCQ_DEVICE_STALE_SECONDS: '604800', TCQ_CACHE_VERSION: '3' };
+    const env = {
+      ...ENV,
+      TCQ_DEVICE_CACHE_SECONDS: '2592000',
+      TCQ_DEVICE_STALE_SECONDS: '604800',
+      TCQ_CACHE_VERSION: '3',
+    };
     const { res, body, upstream } = await call('/api/tcq/policy', { env, auth: null });
     expect(res.status).toBe(200);
     expect(res.headers.get('Cache-Control')).toBe('no-store');
@@ -625,7 +683,11 @@ describe('the account, Premium and Open Door pages', () => {
       const res = await worker.fetch(new Request(`https://revisely.app${path}`), { ...ENV, ASSETS: assets }, c);
       expect(res.status).toBe(404);
     }
-    const other = await worker.fetch(new Request('https://revisely.app/applications-and-more/'), { ...ENV, ASSETS: assets }, c);
+    const other = await worker.fetch(
+      new Request('https://revisely.app/applications-and-more/'),
+      { ...ENV, ASSETS: assets },
+      c,
+    );
     expect(await other.text()).toBe('/applications-and-more/');
   });
 
@@ -642,7 +704,11 @@ describe('the account, Premium and Open Door pages', () => {
     const res = await worker.fetch(new Request('https://dev.revisely.app/__/firebase/init.json'), dev, ctx());
     expect(await res.json()).toEqual({ projectId: 'revisely-dev' });
     expect(fetchMock.mock.calls[0][0]).toBe('https://revisely-dev.web.app/__/firebase/init.json');
-    const none = await worker.fetch(new Request('https://revisely.app/__/firebase/init.json'), { ...ENV, ASSETS: assets }, ctx());
+    const none = await worker.fetch(
+      new Request('https://revisely.app/__/firebase/init.json'),
+      { ...ENV, ASSETS: assets },
+      ctx(),
+    );
     expect(none.status).toBe(404);
   });
 });
@@ -652,17 +718,36 @@ describe("the site's navigation on dev: the account, Premium and Open Door pages
   const fs = jest.requireActual('fs') as typeof import('fs');
   const path = jest.requireActual('path') as typeof import('path');
   const page = (p: string) => fs.readFileSync(path.join(__dirname, '../../docs', p), 'utf8');
-  const html = (body: string) => ({ fetch: jest.fn(async () => new Response(body, { headers: { 'Content-Type': 'text/html; charset=utf-8', ETag: '"x"' } })) });
+  const html = (body: string) => ({
+    fetch: jest.fn(
+      async () => new Response(body, { headers: { 'Content-Type': 'text/html; charset=utf-8', ETag: '"x"' } }),
+    ),
+  });
 
   // Since Nov 18 2026 the site's own pages carry the navigation and Arabic in their HTML (written once by nav.ts), so
   // revisely.app serves them straight from the assets, and the pages they link answer there (ACCOUNT_PAGES "1").
   it('revisely.app: the pages carry their links and Arabic themselves, and the pages they link answer there', async () => {
     const ts = jest.requireActual('typescript') as typeof import('typescript');
-    const prod = ts.parseConfigFileTextToJson('wrangler.jsonc', fs.readFileSync(path.join(__dirname, '../../wrangler.jsonc'), 'utf8')).config;
+    const prod = ts.parseConfigFileTextToJson(
+      'wrangler.jsonc',
+      fs.readFileSync(path.join(__dirname, '../../wrangler.jsonc'), 'utf8'),
+    ).config;
     expect(prod.vars.ACCOUNT_PAGES).toBe('1');
-    for (const p of ['index.html', 'support/index.html', 'privacy/index.html', 'terms/index.html', 'donate/index.html']) {
+    for (const p of [
+      'index.html',
+      'support/index.html',
+      'privacy/index.html',
+      'terms/index.html',
+      'donate/index.html',
+    ]) {
       const own = page(p);
-      for (const s of ['data-acct-nav', 'href="/premium/"', 'href="/apply/"', 'data-lang-switch', '/assets/strings-site.js']) {
+      for (const s of [
+        'data-acct-nav',
+        'href="/premium/"',
+        'href="/apply/"',
+        'data-lang-switch',
+        '/assets/strings-site.js',
+      ]) {
         expect([p, own.includes(s)]).toEqual([p, true]);
       }
       // The worker leaves them as they are, with the account pages on or off.
@@ -674,7 +759,11 @@ describe("the site's navigation on dev: the account, Premium and Open Door pages
   });
 
   it('dev: the home gets Premium, Open Door and the account in its header, menu and footer', async () => {
-    const res = await worker.fetch(new Request('https://dev.revisely.app/'), { ...ENV, ASSETS: html(page('index.html')), NOINDEX: '1', ACCOUNT_PAGES: '1' }, ctx());
+    const res = await worker.fetch(
+      new Request('https://dev.revisely.app/'),
+      { ...ENV, ASSETS: html(page('index.html')), NOINDEX: '1', ACCOUNT_PAGES: '1' },
+      ctx(),
+    );
     const body = await res.text();
     const header = body.slice(body.indexOf('<nav class="site-nav"'), body.indexOf('data-menu-panel'));
     expect(header).toContain('href="/premium/"');
@@ -691,7 +780,11 @@ describe("the site's navigation on dev: the account, Premium and Open Door pages
 
   it('dev: the home and Support get Arabic: the switch, the language before the first paint, its words and styles', async () => {
     for (const p of ['index.html', 'support/index.html']) {
-      const res = await worker.fetch(new Request('https://dev.revisely.app/'), { ...ENV, ASSETS: html(page(p)), NOINDEX: '1', ACCOUNT_PAGES: '1' }, ctx());
+      const res = await worker.fetch(
+        new Request('https://dev.revisely.app/'),
+        { ...ENV, ASSETS: html(page(p)), NOINDEX: '1', ACCOUNT_PAGES: '1' },
+        ctx(),
+      );
       const body = await res.text();
       const head = body.slice(0, body.indexOf('</head>'));
       expect(head).toContain("d.dir = l === 'ar' ? 'rtl' : 'ltr'");
@@ -700,22 +793,32 @@ describe("the site's navigation on dev: the account, Premium and Open Door pages
       expect(header).toContain('data-lang-switch');
       expect(header.indexOf('data-lang-switch')).toBeLessThan(header.indexOf('data-account-btn'));
       // strings-site.js after strings.js and before site-i18n.js, which reads both.
-      const order = ['/assets/strings.js', '/assets/strings-site.js', '/assets/site-i18n.js'].map((s) => body.indexOf(s));
+      const order = ['/assets/strings.js', '/assets/strings-site.js', '/assets/site-i18n.js'].map((s) =>
+        body.indexOf(s),
+      );
       expect(order.every((i) => i > 0)).toBe(true);
       expect(order).toEqual([...order].sort((a, b) => a - b));
     }
   });
 
-  it("dev: the pages with no Arabic yet (privacy, terms, donate) get the switch, and their Download pill its key", async () => {
+  it('dev: the pages with no Arabic yet (privacy, terms, donate) get the switch, and their Download pill its key', async () => {
     for (const p of ['privacy/index.html', 'terms/index.html', 'donate/index.html']) {
-      const res = await worker.fetch(new Request('https://dev.revisely.app/'), { ...ENV, ASSETS: html(page(p)), NOINDEX: '1', ACCOUNT_PAGES: '1' }, ctx());
+      const res = await worker.fetch(
+        new Request('https://dev.revisely.app/'),
+        { ...ENV, ASSETS: html(page(p)), NOINDEX: '1', ACCOUNT_PAGES: '1' },
+        ctx(),
+      );
       const body = await res.text();
       const header = body.slice(body.indexOf('<nav class="site-nav"'), body.indexOf('data-menu-panel'));
       expect([p, header]).toEqual([p, expect.stringContaining('data-t="nav.download">Download</a>')]);
       expect(body).toContain('/assets/site-i18n.js');
     }
     // The home already carries the key: it isn't added twice.
-    const res = await worker.fetch(new Request('https://dev.revisely.app/'), { ...ENV, ASSETS: html(page('index.html')), NOINDEX: '1', ACCOUNT_PAGES: '1' }, ctx());
+    const res = await worker.fetch(
+      new Request('https://dev.revisely.app/'),
+      { ...ENV, ASSETS: html(page('index.html')), NOINDEX: '1', ACCOUNT_PAGES: '1' },
+      ctx(),
+    );
     expect((await res.text()).match(/data-t="nav.download"/g)).toHaveLength(1);
   });
 
@@ -725,7 +828,9 @@ describe("the site's navigation on dev: the account, Premium and Open Door pages
 
   it('dev: a page is always fetched whole, so a copy cached before the navigation never answers (no 304)', async () => {
     const assets = html(page('index.html'));
-    const req = new Request('https://dev.revisely.app/', { headers: { Accept: 'text/html', 'If-None-Match': '"x"', 'If-Modified-Since': 'Sat, 14 Nov 2026 00:00:00 GMT' } });
+    const req = new Request('https://dev.revisely.app/', {
+      headers: { Accept: 'text/html', 'If-None-Match': '"x"', 'If-Modified-Since': 'Sat, 14 Nov 2026 00:00:00 GMT' },
+    });
     await worker.fetch(req, { ...ENV, ASSETS: assets, ACCOUNT_PAGES: '1' }, ctx());
     const asked = assets.fetch.mock.calls[0][0] as unknown as Request;
     expect(asked.headers.get('If-None-Match')).toBeNull();
@@ -735,10 +840,18 @@ describe("the site's navigation on dev: the account, Premium and Open Door pages
   it('dev: the account, Premium and Open Door pages keep their own navigation; other files pass through', async () => {
     const apply = page('apply/index.html');
     const env = { ...ENV, ACCOUNT_PAGES: '1' };
-    const res = await worker.fetch(new Request('https://dev.revisely.app/apply/'), { ...env, ASSETS: html(apply) }, ctx());
+    const res = await worker.fetch(
+      new Request('https://dev.revisely.app/apply/'),
+      { ...env, ASSETS: html(apply) },
+      ctx(),
+    );
     expect(await res.text()).toBe(apply);
     const css = { fetch: jest.fn(async () => new Response('a{}', { headers: { 'Content-Type': 'text/css' } })) };
-    const res2 = await worker.fetch(new Request('https://dev.revisely.app/assets/site.css'), { ...env, ASSETS: css }, ctx());
+    const res2 = await worker.fetch(
+      new Request('https://dev.revisely.app/assets/site.css'),
+      { ...env, ASSETS: css },
+      ctx(),
+    );
     expect(await res2.text()).toBe('a{}');
   });
 });
@@ -799,7 +912,9 @@ describe("Google's keys", () => {
     let up = true;
     const f = (async () =>
       up
-        ? new Response(JSON.stringify({ keys: [{ ...jwk, kid: 'key-1' }] }), { headers: { 'Cache-Control': 'max-age=100' } })
+        ? new Response(JSON.stringify({ keys: [{ ...jwk, kid: 'key-1' }] }), {
+            headers: { 'Cache-Control': 'max-age=100' },
+          })
         : new Response('down', { status: 503 })) as unknown as typeof fetch;
     await verifyIdToken(await token(), PROJECT, NOW, f);
     up = false;
@@ -881,7 +996,14 @@ describe('daily budgets', () => {
   });
 
   it('if the budget can’t be reached, the request goes through (logged)', async () => {
-    const broken = { idFromName: () => ({}), get: () => ({ fetch: async () => { throw new Error('DO down'); } }) };
+    const broken = {
+      idFromName: () => ({}),
+      get: () => ({
+        fetch: async () => {
+          throw new Error('DO down');
+        },
+      }),
+    };
     const { res } = await call('/api/tcq/verses/2:255', { env: { ...ENV, TCQ_BUDGET: broken as never } });
     expect(res.status).toBe(200);
   });
@@ -889,7 +1011,9 @@ describe('daily budgets', () => {
 
 describe('robustness', () => {
   it('a rate limiter that fails lets the request through', async () => {
-    const limit = jest.fn(async () => { throw new Error('limiter down'); });
+    const limit = jest.fn(async () => {
+      throw new Error('limiter down');
+    });
     const { res } = await call('/api/tcq/verses/2:255', { env: { ...ENV, TCQ_USER_LIMIT: { limit } } });
     expect(res.status).toBe(200);
   });
