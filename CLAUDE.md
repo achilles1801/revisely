@@ -692,12 +692,19 @@ Non-testers follow `production`, so nobody sees this on a phone before Promote; 
   hand.
 - `develop` requires one check to merge: **`Required`** (ci.yml's last job, since Nov 6 2026). It
   runs after a failure too and fails unless every job the change needs passed: `Fast checks` (one
-  job since Nov 7 2026, a step each: secret scan, typecheck, unit + component tests, Cloud Functions
-  tests, Firestore rules tests; every step runs even after one fails), Scenarios (four shards split
-  by each file's time; `Scenarios / Scenario tests` passes only if all four did) and E2E when `plan`
-  asks for it.
-  A job skipped because another failed is not a pass; E2E is the one job that may be skipped, when
-  the plan leaves it out. Branches needn't be up to date with develop (`strict` off: the Preview
+  job since Nov 7 2026, a step each: secret scan, typecheck, lint (`scripts/lint`, errors fail), unit +
+  component tests, Cloud Functions tests, Firestore rules tests; every step runs even after one fails),
+  Scenarios (four shards split by each file's time; `Scenarios / Scenario tests` passes only if all four
+  did) and E2E when `plan` asks for it.
+  A job skipped because another failed is not a pass. Two jobs may be skipped when the plan leaves them
+  out:
+  - E2E.
+  - Scenarios, for a PR that changes nothing the suite reads (Nov 22 2026; `.github/scripts/scenarios-needed.js`).
+    It's conservative: only the website, store, `.maestro/`, the console, the worker, some of `scripts/` and
+    plain `.md` files (not BEHAVIOUR.md, nor docs under `src/`, `tests/` or `functions/`); any other path runs
+    the suite. All of these are in Preview's `paths-ignore`, and a skipped run uploads no
+    `scenarios-passed-<tree>`, so publishing still needs a run that passed. Pushes, merge groups and runs by hand
+    always run it. Branches needn't be up to date with develop (`strict` off: the Preview
   workflow's scenario gate still stops a broken develop from publishing). Admins can still bypass
   (`enforce_admins` off). `main` has no branch protection. "Bug fixes add a scenario" (`spec.yml`)
   runs on every PR on its own, so a label or a title edit re-runs it alone.
