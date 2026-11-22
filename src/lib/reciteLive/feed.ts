@@ -80,7 +80,8 @@ export interface LiveConnection {
   close(): void;
   /**
    * Paused (the microphone off, the take open): `true` keeps the checker from letting the take go while nothing is
-   * sent, `false` when the audio comes again. Optional: a recorded take has nothing to keep open.
+   * sent, `false` when the audio comes again. A long pause may let the connection go and connect again on `false` (or
+   * the end), the take kept (contract draft 12). Optional: a recorded take has nothing to keep open.
    */
   hold?(on: boolean): void;
   /** The connection's state in a word or two, for the Stop trace (lib/reciteLive/stopTrace): "live", "retry 2", … */

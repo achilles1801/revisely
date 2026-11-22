@@ -1,4 +1,4 @@
-import { KEEPALIVE_MS, READY_WAIT_MS, socketFeed, SocketLike } from '../socket';
+import { KEEPALIVE_MS, PARK_AFTER_MS, READY_WAIT_MS, socketFeed, SocketLike } from '../socket';
 import { pairAnswered, pairClosed, pairOpen, PAIR_CLOSED_MS } from '../pairService';
 import type { LiveEvent } from '../contract';
 import type { StartFrame } from '../feed';
@@ -607,9 +607,15 @@ describe('a paused take (Nov 21 2026: the checker let a paused take go after 30 
     const t = await live();
     t.conn.hold!(true);
     expect(keepalives(t.s)).toBe(1);
-    expect(t.queue.map((q) => q.ms)).toEqual([KEEPALIVE_MS]);
-    t.runTimer();
-    t.runTimer();
+    // The keepalive's timer, and the park's (draft 12), which does nothing on a checker that didn't say `pause`.
+    expect(t.queue.map((q) => q.ms)).toEqual([KEEPALIVE_MS, PARK_AFTER_MS]);
+    const tick = () => {
+      const k = t.queue.find((q) => q.ms === KEEPALIVE_MS)!;
+      t.queue.splice(t.queue.indexOf(k), 1);
+      k.fn();
+    };
+    tick();
+    tick();
     expect(keepalives(t.s)).toBe(3);
     t.conn.hold!(false);
     expect(t.queue).toEqual([]);
@@ -642,6 +648,118 @@ describe('a paused take (Nov 21 2026: the checker let a paused take go after 30 
     expect(t.s.closed).toBe(true);
     expect(t.queue.map((q) => q.ms)).toContain(500);
     expect(t.closed()).toBe(0);
+  });
+});
+
+describe('a long pause parks the take (contract draft 12, Nov 22 2026: a paused take held a checker instance for its whole pause)', () => {
+  const live = async (pause = true) => {
+    const t = setup();
+    await flush();
+    const s = t.sockets[0];
+    s.onopen!();
+    s.answer({ type: 'ready', v: 2, take: 'take1', from: 0, ...(pause ? { pause: true } : {}) });
+    t.conn.sendAudio(pcm(1, 2, 3));
+    return { ...t, s };
+  };
+  const types = (s: FakeSocket) => s.out().map((f) => (f as { type?: string }).type ?? 'audio');
+  const fire = (t: { queue: { fn: () => void; ms: number }[] }, ms: number) => {
+    const timer = t.queue.find((q) => q.ms === ms)!;
+    t.queue.splice(t.queue.indexOf(timer), 1);
+    timer.fn();
+  };
+
+  it('[RECITE-16] past a minute, `pause` and the socket let go, the take kept; Resume connects again and carries on', async () => {
+    const t = await live();
+    t.conn.hold!(true);
+    fire(t, PARK_AFTER_MS);
+    expect(types(t.s).slice(-1)).toEqual(['pause']);
+    expect(t.s.closed).toBe(true);
+    expect(t.conn.status!()).toBe('parked');
+    // Nothing tries to connect while parked, and the take hasn't ended.
+    expect(t.queue.map((q) => q.ms)).toEqual([KEEPALIVE_MS]);
+    expect(t.sockets).toHaveLength(1);
+    expect(t.closed()).toBe(0);
+    fire(t, KEEPALIVE_MS);
+    expect(types(t.s).filter((x) => x === 'keepalive')).toHaveLength(1);
+
+    t.conn.hold!(false);
+    await flush();
+    const s2 = t.sockets[1];
+    s2.onopen!();
+    expect(s2.out()[0]).toMatchObject({ type: 'start', resume: 'take1', token: 'tok2' });
+    // The checker held it: nothing sent again, and the audio carries on.
+    s2.answer({ type: 'ready', v: 2, take: 'take1', from: 3, pause: true });
+    t.conn.sendAudio(pcm(4));
+    expect(s2.out().slice(1)).toEqual([[4]]);
+    expect(t.events.filter((e) => e.type === 'ready')).toHaveLength(2);
+  });
+
+  it('[RECITE-16] on another instance (the hold gone), Resume sends the take again from its first sample', async () => {
+    const t = await live();
+    t.conn.hold!(true);
+    fire(t, PARK_AFTER_MS);
+    t.conn.hold!(false);
+    await flush();
+    const s2 = t.sockets[1];
+    s2.onopen!();
+    s2.answer({ type: 'ready', v: 2, take: 'take1', from: 0, pause: true });
+    expect(s2.out().slice(1)).toEqual([[1, 2, 3]]);
+  });
+
+  it('[RECITE-16] a pause under a minute keeps its socket: no `pause`, no new connection', async () => {
+    const t = await live();
+    t.conn.hold!(true);
+    fire(t, KEEPALIVE_MS);
+    t.conn.hold!(false);
+    expect(t.queue).toEqual([]);
+    expect(types(t.s)).not.toContain('pause');
+    expect(t.s.closed).toBe(false);
+    t.conn.sendAudio(pcm(4));
+    expect(t.s.out().slice(-1)).toEqual([[4]]);
+    expect(t.sockets).toHaveLength(1);
+  });
+
+  it('[RECITE-16] a checker that didn’t say `pause` keeps the socket open however long the pause lasts', async () => {
+    const t = await live(false);
+    t.conn.hold!(true);
+    fire(t, PARK_AFTER_MS);
+    expect(types(t.s)).not.toContain('pause');
+    expect(t.s.closed).toBe(false);
+    expect(t.conn.status!()).toBe('live');
+    // A drop while paused on such a checker connects again at once, as before.
+    t.s.onclose!({ code: 1006 });
+    expect(t.queue.map((q) => q.ms)).toContain(500);
+  });
+
+  it('[RECITE-16] Stop while parked: connects again, and the end goes out after the held audio; no second park', async () => {
+    const t = await live();
+    t.conn.hold!(true);
+    fire(t, PARK_AFTER_MS);
+    t.conn.send({ type: 'end' });
+    await flush();
+    const s2 = t.sockets[1];
+    s2.onopen!();
+    s2.answer({ type: 'ready', v: 2, take: 'take1', from: 3, pause: true });
+    expect(types(s2).slice(1)).toEqual(['end']);
+    expect(t.queue.map((q) => q.ms)).not.toContain(PARK_AFTER_MS);
+    s2.answer({ type: 'done', result: { v: 2, take: 'take1', from: 1, to: 2, secs: 1, marks: [], score: { reached: 1, mistakes: 0, tajweed: 0, accuracy: 1 } } });
+    expect(t.events.some((e) => e.type === 'done')).toBe(true);
+    expect(t.closed()).toBe(1);
+  });
+
+  it('[RECITE-16] a drop while paused (or the checker’s idle backstop) waits for Resume instead of holding an instance', async () => {
+    const t = await live();
+    t.conn.hold!(true);
+    t.s.answer({ type: 'error', reason: 'idle' });
+    expect(t.s.closed).toBe(true);
+    expect(t.queue.map((q) => q.ms)).not.toContain(500);
+    expect(t.conn.status!()).toBe('parked');
+    expect(t.events.some((e) => e.type === 'error')).toBe(false);
+    t.conn.hold!(false);
+    await flush();
+    expect(t.sockets).toHaveLength(2);
+    t.sockets[1].onopen!();
+    expect(t.sockets[1].out()[0]).toMatchObject({ type: 'start', resume: 'take1' });
   });
 });
 
