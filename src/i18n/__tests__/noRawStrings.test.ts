@@ -17,6 +17,7 @@ const SRC = path.resolve(__dirname, '../..');
  */
 const EXTRACTED: string[] = [
   'components/*',
+  'components/activity',
   'components/coach',
   'components/help',
   'components/home',
@@ -56,6 +57,7 @@ const EXTRACTED: string[] = [
   'lib/updates',
   'lib/widgets',
   'navigation',
+  'screens/activity',
   'screens/auth',
   'screens/journal',
   'screens/main',

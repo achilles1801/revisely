@@ -40,6 +40,7 @@ import { useQuranWordsWhen } from '../reciteMemory/TakeRows';
 import { activitySectionsEnabled, useActivitySections, type InsightsSection } from '../../lib/activitySections';
 import { IconButton } from '../v2/TopBar';
 import { SectionsSheet } from './SectionsSheet';
+import { t } from '../../i18n';
 
 const shiftDays = (day: string, n: number) => {
   const d = new Date(`${day}T00:00:00Z`);
@@ -301,7 +302,7 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
         <PillTabs
           options={[
             { value: 'calendar', label: calendarScreenLabel() },
-            { value: 'insights', label: 'Insights' },
+            { value: 'insights', label: t('activity.blocks.insights') },
           ]}
           value={view}
           onChange={(v) => {
@@ -318,27 +319,27 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
             <ChoiceChip
               label={rangeLabel(range)}
               onPress={() => setRangeMenu(true)}
-              accessibilityLabel={`Insights for ${rangeLabel(range)}`}
-              accessibilityHint="Choose how far back Insights look"
+              accessibilityLabel={t('activity.blocks.insightsFor', { range: rangeLabel(range) })}
+              accessibilityHint={t('activity.blocks.chooseRange')}
               size="md"
               testID="insights-range"
             />
           ) : null}
           {/* Edit sections (ACT-29): what the tab on show shows, and in what order. */}
           {editable ? (
-            <IconButton icon="options-outline" label="Edit sections" onPress={() => setEditing(view)} size={22} testID="activity-edit-sections" />
+            <IconButton icon="options-outline" label={t('activity.insights.editSections')} onPress={() => setEditing(view)} size={22} testID="activity-edit-sections" />
           ) : null}
         </RNView>
       </RNView>
       <ActionSheet
         visible={rangeMenu}
         onClose={() => setRangeMenu(false)}
-        title="Insights for"
+        title={t('activity.blocks.insightsForTitle')}
         actions={INSIGHTS_RANGES.map((r) => ({
           key: `range-${r}`,
           label: rangeLabel(r),
           // All time names where it starts (the NOTE: "Since 9 September").
-          subtitle: r === 'all' && firstDay ? `Since ${dayAndMonth(firstDay)}` : undefined,
+          subtitle: r === 'all' && firstDay ? t('activity.blocks.since', { day: dayAndMonth(firstDay) }) : undefined,
           selected: r === range,
           onPress: () => setRange(r),
         }))}
@@ -417,7 +418,7 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
             has={(id: InsightsSection) =>
               id === 'recitation' ? recitation != null && onOpenAyahs != null : id === 'gaps' ? gapsOn : true
             }
-            notes={smartTrackingOn(user) ? {} : { weak: 'Smart Tracking is off' }}
+            notes={smartTrackingOn(user) ? {} : { weak: t('activity.blocks.smartTrackingOff') }}
           />
         </>
       ) : null}

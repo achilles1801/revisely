@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { layoutV2, typeV2 } from '../../theme/v2';
 import { Tap } from '../v2/Tap';
+import { t } from '../../i18n';
 
 /** What a row's wheels get: the value, the first and last it may be, and a test id. */
 export interface RangeWheelProps {
@@ -47,8 +48,8 @@ export function RangeFields({
     <Tap
       onPress={() => setOpen((o) => (o === which ? null : which))}
       accessibilityRole="button"
-      accessibilityLabel={`${title}, ${label(value)}`}
-      accessibilityHint="Shows a picker"
+      accessibilityLabel={t('activity.range.withValue', { title, value: label(value) })}
+      accessibilityHint={t('activity.range.showsPicker')}
       style={styles.row}
       testID={testID}
     >
@@ -61,7 +62,7 @@ export function RangeFields({
   );
   return (
     <View>
-      {row('from', 'From', from, testIDs.from)}
+      {row('from', t('activity.range.from'), from, testIDs.from)}
       {open === 'from' ? (
         <Wheels
           value={from}
@@ -75,7 +76,7 @@ export function RangeFields({
         />
       ) : null}
       <View style={[styles.rule, { backgroundColor: palette.separator }]} />
-      {row('to', 'To', to, testIDs.to)}
+      {row('to', t('activity.range.to'), to, testIDs.to)}
       {open === 'to' ? <Wheels value={to} lo={from} hi={hi} onChange={onTo} testID={`${testIDs.to}-picker`} /> : null}
     </View>
   );

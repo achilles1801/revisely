@@ -25,7 +25,7 @@ import { typeV2 } from '../../theme/v2';
 import { RecitedMark } from '../reciteMemory/TakeRows';
 import { BlockMark, RevisedMark } from './BlockMark';
 import type { Memorized, Read, Revised } from '../../lib/activityInsights';
-import { formatDate } from '../../i18n';
+import { formatDate, t } from '../../i18n';
 import { DEFAULT_SECTIONS, sectionsToShow, type OverviewSection, type TabLayout } from '../../lib/activitySections';
 
 /** Chrome text (the pills, the title, the totals, the grid, the preview) stops growing here, as headers and menu rows do. */
@@ -156,24 +156,24 @@ export function CalendarMonth({
   const previewRows: { key: string; kind: PreviewBlock; label: string; value: string; mics?: number }[] = [];
   if (preview.revised) {
     const minutes = preview.revised.minutes != null && preview.revised.minutes > 0 ? ` · ${formatMinutesLong(preview.revised.minutes)}` : '';
-    previewRows.push({ key: 'revised', kind: 'revised', label: 'Revised', value: `${preview.revised.done} of ${preview.revised.assigned}${minutes}`, mics: recs?.revision });
+    previewRows.push({ key: 'revised', kind: 'revised', label: t('activity.day.revised'), value: `${t('common.nOfTotal', { n: preview.revised.done, total: preview.revised.assigned })}${minutes}`, mics: recs?.revision });
   }
   // What was memorized and read, by surah (Majd, Nov 7 2026: surahs and juz first, pages almost never).
   const pagesOf = (items: { day: string; pages: number[] }[]) => items.filter((i) => i.day === shownDay).flatMap((i) => i.pages);
   if (preview.memorizedPages > 0) {
-    previewRows.push({ key: 'memorized', kind: 'memorized', label: 'Memorized', value: describePassage(pagesOf(data.memorized), { form: 'short' }) });
+    previewRows.push({ key: 'memorized', kind: 'memorized', label: t('activity.day.memorized'), value: describePassage(pagesOf(data.memorized), { form: 'short' }) });
   }
   if (preview.readPages > 0) {
     const minutes = preview.readMinutes != null && preview.readMinutes > 0 ? ` · ${formatMinutesLong(preview.readMinutes)}` : '';
-    previewRows.push({ key: 'read', kind: 'read', label: 'Read', value: `${describePassage(pagesOf(data.read), { form: 'short' })}${minutes}`, mics: recs?.reading });
+    previewRows.push({ key: 'read', kind: 'read', label: t('activity.day.read'), value: `${describePassage(pagesOf(data.read), { form: 'short' })}${minutes}`, mics: recs?.reading });
   }
   // The day's takes, where the day is looked at (Majd, Nov 20 2026): its passages and how many (RMEM-5).
   const takes = recited?.get(shownDay);
   if (takes && takes.takes > 0) {
-    const count = takes.takes === 1 ? '1 take' : `${takes.takes} takes`;
-    previewRows.push({ key: 'recited', kind: 'recited', label: 'Recited', value: takes.pages.length > 0 ? `${describePassage(takes.pages, { form: 'short' })} · ${count}` : count });
+    const count = t('activity.day.takes', { count: takes.takes });
+    previewRows.push({ key: 'recited', kind: 'recited', label: t('activity.day.recited'), value: takes.pages.length > 0 ? `${describePassage(takes.pages, { form: 'short' })} · ${count}` : count });
   }
-  if (preview.notes) previewRows.push({ key: 'notes', kind: 'notes', label: 'Notes', value: '1' });
+  if (preview.notes) previewRows.push({ key: 'notes', kind: 'notes', label: t('activity.day.notes'), value: t('activity.calendar.oneNote') });
 
   // The sections under the header, in the user's order, those hidden left out (ACT-29): the header (the month or
   // week, Week | Month, Today and the arrows) stays on top, since everything below follows it.
@@ -182,10 +182,10 @@ export function CalendarMonth({
     span === 'month' ? (
       <View style={styles.totals} testID="calendar-totals">
         {[
-          { icon: 'repeat' as const, label: 'Revised', value: `${revisedDays} ${revisedDays === 1 ? 'day' : 'days'}` },
-          { icon: 'leaf-outline' as const, label: 'Memorized', value: `+${memorizedPages} pages` },
-          { icon: 'book-outline' as const, label: 'Read', value: readMinutes > 0 ? formatMinutesLong(readMinutes) : '0 min' },
-          { icon: 'document-text-outline' as const, label: 'Notes', value: String(noteDays) },
+          { icon: 'repeat' as const, label: t('activity.day.revised'), value: t('common.days', { count: revisedDays }) },
+          { icon: 'leaf-outline' as const, label: t('activity.day.memorized'), value: t('activity.calendar.plusPages', { count: memorizedPages }) },
+          { icon: 'book-outline' as const, label: t('activity.day.read'), value: readMinutes > 0 ? formatMinutesLong(readMinutes) : t('activity.calendar.zeroMin') },
+          { icon: 'document-text-outline' as const, label: t('activity.day.notes'), value: String(noteDays) },
         ].map((t) => (
           <Total key={t.label} {...t} twoByTwo={fontScale >= TOTALS_TWO_BY_TWO} />
         ))}
@@ -226,19 +226,19 @@ export function CalendarMonth({
     );
   const key = (
     <View style={styles.legend} testID="calendar-legend">
-      <LegendItem label="Revised">
+      <LegendItem label={t('activity.day.revised')}>
         <Svg width={12} height={12}>
           <Circle cx={6} cy={6} r={4.5} stroke={palette.track} strokeWidth={2} fill="none" />
           <Circle cx={6} cy={6} r={4.5} stroke={palette.primary} strokeWidth={2} fill="none" strokeDasharray={`${2 * Math.PI * 4.5 * 0.7} ${2 * Math.PI * 4.5}`} transform="rotate(-90 6 6)" />
         </Svg>
       </LegendItem>
-      <LegendItem label="Memorized">
+      <LegendItem label={t('activity.day.memorized')}>
         <View style={[styles.legendDot, { backgroundColor: palette.primary }]} />
       </LegendItem>
-      <LegendItem label="Read">
+      <LegendItem label={t('activity.day.read')}>
         <View style={[styles.legendDot, { backgroundColor: palette.text }]} />
       </LegendItem>
-      <LegendItem label="Note">
+      <LegendItem label={t('activity.calendar.note')}>
         <View style={[styles.legendDot, styles.noteRing, { borderColor: palette.secondary }]} />
       </LegendItem>
     </View>
@@ -253,7 +253,7 @@ export function CalendarMonth({
       <Tap
         onPress={() => onOpen(shownDay)}
         accessibilityRole="button"
-        accessibilityLabel="Open the day"
+        accessibilityLabel={t('activity.calendar.openTheDay')}
         accessibilityValue={{ text: formatDayLong(shownDay) }}
         style={styles.previewHead}
         testID="preview-open"
@@ -263,7 +263,7 @@ export function CalendarMonth({
         </Text>
         <View style={styles.openRow}>
           <Text style={[typeV2.name, { color: palette.link }]} maxFontSizeMultiplier={MAX_SCALE}>
-            Open
+            {t('activity.calendar.open')}
           </Text>
           <Ionicons name="chevron-forward" size={16} color={palette.link} />
         </View>
@@ -273,8 +273,12 @@ export function CalendarMonth({
           key={r.key}
           onPress={() => onOpen(shownDay, r.kind)}
           accessibilityRole="button"
-          accessibilityLabel={`${r.label}, ${r.value}${r.mics ? `, ${r.mics} ${r.mics === 1 ? 'recording' : 'recordings'}` : ''}`}
-          accessibilityHint={`Opens the day at ${r.label}`}
+          accessibilityLabel={
+            r.mics
+              ? t('activity.calendar.previewRowRecordings', { label: r.label, value: r.value, count: r.mics })
+              : t('activity.calendar.previewRow', { label: r.label, value: r.value })
+          }
+          accessibilityHint={t('activity.calendar.opensDayAt', { label: r.label })}
           style={styles.previewRow}
           testID={`preview-row-${r.key}`}
         >
@@ -333,10 +337,10 @@ export function CalendarMonth({
             {span === 'week' ? weekTitle(week) : monthTitle(month)}
           </Text>
           <ChoiceChip
-            label={span === 'week' ? 'Week' : 'Month'}
+            label={span === 'week' ? t('activity.calendar.week') : t('activity.calendar.month')}
             onPress={() => setSpanMenu(true)}
-            accessibilityLabel={`${span === 'week' ? 'Week' : 'Month'} view`}
-            accessibilityHint="Choose week or month"
+            accessibilityLabel={span === 'week' ? t('activity.calendar.weekView') : t('activity.calendar.monthView')}
+            accessibilityHint={t('activity.calendar.chooseSpan')}
             testID="calendar-span"
           />
         </View>
@@ -345,21 +349,21 @@ export function CalendarMonth({
             <Tap
               onPress={onToday}
               accessibilityRole="button"
-              accessibilityLabel="Today"
-              accessibilityHint={`Shows this ${unit}`}
+              accessibilityLabel={t('common.today')}
+              accessibilityHint={unit === 'week' ? t('activity.calendar.showsThisWeek') : t('activity.calendar.showsThisMonth')}
               hitSlop={8}
               testID="calendar-today"
             >
               <Text style={[typeV2.name, { color: palette.link }]} numberOfLines={1} maxFontSizeMultiplier={MAX_SCALE}>
-                Today
+                {t('common.today')}
               </Text>
             </Tap>
           ) : null}
           <View style={styles.chevrons}>
-            <Tap onPress={() => onStep(-1)} accessibilityRole="button" accessibilityLabel={`Previous ${unit}`} hitSlop={8}>
+            <Tap onPress={() => onStep(-1)} accessibilityRole="button" accessibilityLabel={unit === 'week' ? t('activity.calendar.previousWeek') : t('activity.calendar.previousMonth')} hitSlop={8}>
               <Ionicons name="chevron-back" size={22} color={palette.text} />
             </Tap>
-            <Tap onPress={() => onStep(1)} accessibilityRole="button" accessibilityLabel={`Next ${unit}`} hitSlop={8}>
+            <Tap onPress={() => onStep(1)} accessibilityRole="button" accessibilityLabel={unit === 'week' ? t('activity.calendar.nextWeek') : t('activity.calendar.nextMonth')} hitSlop={8}>
               <Ionicons name="chevron-forward" size={22} color={palette.text} />
             </Tap>
           </View>
@@ -368,10 +372,10 @@ export function CalendarMonth({
       <ActionSheet
         visible={spanMenu}
         onClose={() => setSpanMenu(false)}
-        title="Show the calendar by"
+        title={t('activity.calendar.showBy')}
         actions={[
-          { key: 'week', label: 'Week', subtitle: 'Seven days, each with what it held', selected: span === 'week', onPress: () => onSpan('week') },
-          { key: 'month', label: 'Month', subtitle: "The month's days and its totals", selected: span === 'month', onPress: () => onSpan('month') },
+          { key: 'week', label: t('activity.calendar.week'), subtitle: t('activity.calendar.weekSubtitle'), selected: span === 'week', onPress: () => onSpan('week') },
+          { key: 'month', label: t('activity.calendar.month'), subtitle: t('activity.calendar.monthSubtitle'), selected: span === 'month', onPress: () => onSpan('month') },
         ]}
         testID="calendar-span-menu"
       />
@@ -507,7 +511,15 @@ function DayCell({
     <Tap
       onPress={() => onPick(day)}
       accessibilityRole="button"
-      accessibilityLabel={`${day}${m.ring != null ? `, revised ${Math.round(m.ring * 100)} percent` : ''}${m.memorized ? ', memorized' : ''}${m.read ? ', read' : ''}${m.note ? ', note' : ''}`}
+      accessibilityLabel={[
+        String(day),
+        m.ring != null ? t('activity.calendar.cellRevised', { n: Math.round(m.ring * 100) }) : null,
+        m.memorized ? t('activity.calendar.cellMemorized') : null,
+        m.read ? t('activity.calendar.cellRead') : null,
+        m.note ? t('activity.calendar.cellNote') : null,
+      ]
+        .filter(Boolean)
+        .join(', ')}
       style={[styles.cell, isPicked && { backgroundColor: palette.bubble, borderRadius: 12 }]}
       testID={`calendar-day-${day}`}
     >
@@ -526,10 +538,10 @@ function WeekSummary({ day, data, onOpen }: { day: string; data: CalendarData; o
   const { palette } = useTheme();
   const p = dayPreview(day, data);
   const parts = [
-    p.revised ? `Revised ${p.revised.done} of ${p.revised.assigned}` : null,
-    p.memorizedPages > 0 ? `Memorized ${p.memorizedPages}` : null,
-    p.readPages > 0 ? `Read ${p.readPages} ${p.readPages === 1 ? 'page' : 'pages'}` : null,
-    p.notes ? 'Note' : null,
+    p.revised ? t('activity.calendar.summaryRevised', { done: p.revised.done, assigned: p.revised.assigned }) : null,
+    p.memorizedPages > 0 ? t('activity.calendar.summaryMemorized', { n: p.memorizedPages }) : null,
+    p.readPages > 0 ? t('activity.calendar.summaryRead', { count: p.readPages }) : null,
+    p.notes ? t('activity.calendar.note') : null,
   ].filter(Boolean);
   return (
     <Tap onPress={() => onOpen(day)} accessibilityRole="button" style={styles.summary}>
@@ -537,7 +549,7 @@ function WeekSummary({ day, data, onOpen }: { day: string; data: CalendarData; o
         {formatDate(new Date(`${day}T00:00:00`), { weekday: 'short', day: 'numeric' })}
       </Text>
       <Text style={[typeV2.body, { color: palette.secondary, flex: 1 }]} numberOfLines={1} maxFontSizeMultiplier={MAX_SCALE}>
-        {parts.length > 0 ? parts.join(' · ') : 'Nothing logged'}
+        {parts.length > 0 ? parts.join(' · ') : t('activity.calendar.nothingLogged')}
       </Text>
     </Tap>
   );

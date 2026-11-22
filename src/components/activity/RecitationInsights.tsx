@@ -36,6 +36,8 @@ import {
 import { markFill } from '../reciteLive/markColours';
 import { WordChip } from '../reciteLive/WordChip';
 import { useFirstSection } from './sectionPlace';
+import { t } from '../../i18n';
+import { chevron } from '../../i18n/direction';
 
 /** Rows shown before "See all". */
 const FIRST_ROWS = 3;
@@ -80,20 +82,20 @@ export function RecitationInsights({ records, words, today, window, inWords, sma
       <View style={styles.head}>
         <View style={styles.flex}>
           <ChromeText style={[styles.title, { color: palette.text }]} accessibilityRole="header">
-            Recitation
+            {t('activity.recitation.title')}
           </ChromeText>
-          <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{`Your takes with Mark mistakes ${inWords}`}</ChromeText>
+          <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{t('activity.recitation.detail', { span: inWords })}</ChromeText>
         </View>
         {revo ? (
           <Tap
             onPress={() => openRevo({ attach: insightAttachment('recitation') })}
             accessibilityRole="button"
-            accessibilityLabel="Ask Revo about your recitation"
+            accessibilityLabel={t('activity.recitation.askRevo')}
             style={[styles.ask, { borderColor: palette.outline }]}
             testID="insights-recitation-ask"
           >
             <Ionicons name="sparkles-outline" size={16} color={palette.accentText} />
-            <ChromeText style={[typeV2.name, { color: palette.text }]}>Ask</ChromeText>
+            <ChromeText style={[typeV2.name, { color: palette.text }]}>{t('activity.insights.ask')}</ChromeText>
           </Tap>
         ) : null}
       </View>
@@ -112,12 +114,12 @@ export function RecitationInsights({ records, words, today, window, inWords, sma
         <>
           <View style={styles.subHead}>
             <ChromeText style={[typeV2.name, styles.flex, { color: palette.text }]} accessibilityRole="header">
-              Keeps slipping
+              {t('activity.recitation.keepsSlipping')}
             </ChromeText>
             {ins.slipping.length > FIRST_ROWS ? (
               <Tap onPress={() => setAllSlipping((v) => !v)} accessibilityRole="button" hitSlop={8} testID="insights-recitation-see-all">
                 <ChromeText style={[typeV2.meta, styles.strong, { color: palette.text }]}>
-                  {allSlipping ? 'Show fewer' : `See all ${ins.slipping.length} ›`}
+                  {allSlipping ? t('activity.recitation.showFewer') : `${t('activity.recitation.seeAll', { count: ins.slipping.length })} ${chevron()}`}
                 </ChromeText>
               </Tap>
             ) : null}
@@ -140,7 +142,7 @@ export function RecitationInsights({ records, words, today, window, inWords, sma
         <>
           <View style={styles.subHead}>
             <ChromeText style={[typeV2.name, styles.flex, { color: palette.text }]} accessibilityRole="header">
-              Similar ayahs
+              {t('activity.recitation.similarAyahs')}
             </ChromeText>
           </View>
           {ins.similar.slice(0, FIRST_ROWS).map((s, i) => (
@@ -160,7 +162,7 @@ export function RecitationInsights({ records, words, today, window, inWords, sma
         <>
           <View style={styles.subHead}>
             <ChromeText style={[typeV2.name, styles.flex, { color: palette.text }]} accessibilityRole="header">
-              Rated strong, but slips
+              {t('activity.recitation.strongButSlips')}
             </ChromeText>
           </View>
           {strong.slice(0, FIRST_ROWS).map((p, i) => (
@@ -209,7 +211,7 @@ function PassageRow({
     <Tap
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${spokenText(title)}. ${spokenText(note)}. Open it`}
+      accessibilityLabel={t('activity.insights.weakRow', { label: spokenText(title), reason: spokenText(note) })}
       style={[styles.row, !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.separator }]}
       testID={testID}
     >

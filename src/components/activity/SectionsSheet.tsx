@@ -26,14 +26,14 @@ import { Tap } from '../v2/Tap';
 import { ReorderableRows } from '../v2/ReorderableRows';
 import type { ScrollLink } from '../plan/ReorderableDayList';
 import { ChromeText } from './ChromeText';
+import { t } from '../../i18n';
 
 /** Chrome: it stops growing at 1.4×, as the sheet's own header does. */
 const MAX_SCALE = 1.4;
 
-export const SHEET_TITLES: Record<ActivityTab, string> = {
-  overview: 'Overview sections',
-  insights: 'Insights sections',
-};
+export function sheetTitle(tab: ActivityTab): string {
+  return tab === 'overview' ? t('activity.sections.overviewTitle') : t('activity.sections.insightsTitle');
+}
 
 export function SectionsSheet<T extends ActivityTab>({
   tab,
@@ -73,10 +73,10 @@ export function SectionsSheet<T extends ActivityTab>({
     <Sheet
       visible={visible}
       onClose={onClose}
-      title={SHEET_TITLES[tab]}
-      message="Hold a section and drag it to move it."
+      title={sheetTitle(tab)}
+      message={t('activity.sections.message')}
       messageMaxScale={MAX_SCALE}
-      right={{ label: 'Done', strong: true, onPress: onClose, testID: 'sections-done' }}
+      right={{ label: t('common.done'), strong: true, onPress: onClose, testID: 'sections-done' }}
       contentStyle={styles.content}
       testID={`sections-sheet-${tab}`}
     >
@@ -102,10 +102,10 @@ export function SectionsSheet<T extends ActivityTab>({
           accessibility={(id) => {
             const label = labels[id];
             const note = notes[id];
-            if (required.includes(id)) return { label: `${label}, always shown` };
+            if (required.includes(id)) return { label: t('activity.sections.alwaysShownLabel', { label }) };
             const shown = !layout.hidden.includes(id);
             return {
-              label: note ? `${label}, ${note}` : label,
+              label: note ? t('activity.sections.withNote', { label, note }) : label,
               role: 'switch',
               state: { checked: shown },
               actions: [{ name: 'activate' }],
@@ -132,7 +132,7 @@ export function SectionsSheet<T extends ActivityTab>({
                 </View>
                 {required.includes(id) ? (
                   <ChromeText style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={MAX_SCALE}>
-                    Always shown
+                    {t('activity.sections.alwaysShown')}
                   </ChromeText>
                 ) : (
                   // Only its picture: a tap anywhere on the row flips it (one target, and VoiceOver's row is the switch).
@@ -153,7 +153,7 @@ export function SectionsSheet<T extends ActivityTab>({
             testID="sections-reset"
           >
             <ChromeText style={[typeV2.name, { color: palette.link }]} maxFontSizeMultiplier={MAX_SCALE}>
-              Show all, in the usual order
+              {t('activity.sections.showAll')}
             </ChromeText>
           </Tap>
         ) : null}

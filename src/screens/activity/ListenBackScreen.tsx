@@ -22,11 +22,11 @@ import { logger } from '../../lib/logger';
 import { getReadPalette } from '../../theme/readPalette';
 import { spacing } from '../../theme/spacing';
 import { typeV2 } from '../../theme/v2';
-import { dateLocale } from '../../i18n';
+import { dateLocale, t } from '../../i18n';
 
 const FOOTER_HEIGHT = CAPSULE_HEIGHT + spacing.sm;
 
-const KIND_LABEL = { revision: 'Revision', reading: 'Reading' } as const;
+const kindLabel = (kind: 'revision' | 'reading') => (kind === 'revision' ? t('activity.listen.revision') : t('activity.listen.reading'));
 
 /**
  * Listen back: a recording played over the pages it was recorded on. The page
@@ -145,7 +145,7 @@ export default function ListenBackScreen() {
 
   const header = (
     <View style={styles.header}>
-      <RoundButton icon="chevron-back" label="Back" onPress={() => navigation.goBack()} palette={palette} />
+      <RoundButton icon="chevron-back" label={t('common.back')} onPress={() => navigation.goBack()} palette={palette} />
       <View style={styles.titleCol}>
         <Text
           style={[typeV2.name, styles.center, { color: palette.textPrimary }]}
@@ -153,7 +153,7 @@ export default function ListenBackScreen() {
           maxFontSizeMultiplier={1.3}
           accessibilityRole="header"
         >
-          Listen back
+          {t('activity.listen.title')}
         </Text>
         {rec ? (
           <Text
@@ -162,7 +162,7 @@ export default function ListenBackScreen() {
             maxFontSizeMultiplier={1.3}
             testID="listen-back-page"
           >
-            {KIND_LABEL[rec.kind]} · {when}
+            {kindLabel(rec.kind)} · {when}
             {page != null ? ` · p. ${page}` : ''}
           </Text>
         ) : null}
@@ -181,7 +181,7 @@ export default function ListenBackScreen() {
           onPress={() => void togglePause(rec)}
           style={[styles.play, { backgroundColor: v2.text }]}
           accessibilityRole="button"
-          accessibilityLabel={downloading ? 'Downloading recording' : playing ? 'Pause recording' : 'Play recording'}
+          accessibilityLabel={downloading ? t('activity.listen.downloading') : playing ? t('activity.listen.pause') : t('activity.listen.play')}
           testID="listen-back-play"
         >
           {downloading ? (
@@ -202,7 +202,7 @@ export default function ListenBackScreen() {
             onSeek={(f) => void play(rec, Math.round(f * rec.durationMs))}
             height={26}
             ticks={ticks}
-            valueText={`${formatRecordingTime(at)} of ${formatRecordingTime(rec.durationMs)}`}
+            valueText={t('common.nOfTotal', { n: formatRecordingTime(at), total: formatRecordingTime(rec.durationMs) })}
             testID="listen-back-waveform"
           />
         </View>
@@ -220,7 +220,7 @@ export default function ListenBackScreen() {
             hitSlop={6}
             style={[styles.speed, { backgroundColor: v2.bg, borderColor: v2.outline }]}
             accessibilityRole="button"
-            accessibilityLabel={`Speed ${speedLabel(playback.speed)}. Change speed`}
+            accessibilityLabel={t('activity.listen.speed', { speed: speedLabel(playback.speed) })}
             testID="listen-back-speed"
           >
             <Text style={[styles.speedText, { color: v2.text }]} maxFontSizeMultiplier={1.2}>
@@ -260,7 +260,7 @@ export default function ListenBackScreen() {
               maxFontSizeMultiplier={1.4}
               testID="listen-back-missing"
             >
-              This recording isn’t on this phone any more.
+              {t('activity.listen.notOnPhone')}
             </Text>
           </View>
         ) : null}

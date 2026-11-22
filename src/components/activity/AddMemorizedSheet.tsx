@@ -24,7 +24,8 @@ import { getRevisionDayForUser } from '../../lib/fajrBoundary';
 import { typeV2 } from '../../theme/v2';
 import type { UserPage } from '../../types';
 import { BlockMark } from './BlockMark';
-import { FormLabel, InfoLine, DismissArea, MinutesField, Segmented, Suggestion } from './AddSheetParts';
+import { FormLabel, InfoLine, DismissArea, MinutesField, Segmented, Suggestion, dayWords } from './AddSheetParts';
+import { t } from '../../i18n';
 
 type What = 'ayahs' | 'pages' | 'surah';
 
@@ -50,8 +51,9 @@ export interface AyahsAdded {
 /** "this morning" (before noon), "this afternoon", "this evening"; "that morning" on another day. */
 export function partOfDay(at: number, today: boolean): string {
   const h = new Date(at).getHours();
-  const part = h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening';
-  return `${today ? 'this' : 'that'} ${part}`;
+  if (h < 12) return today ? t('activity.add.thisMorning') : t('activity.add.thatMorning');
+  if (h < 17) return today ? t('activity.add.thisAfternoon') : t('activity.add.thatAfternoon');
+  return today ? t('activity.add.thisEvening') : t('activity.add.thatEvening');
 }
 
 export function AddMemorizedSheet({
@@ -139,7 +141,7 @@ export function AddMemorizedSheet({
   const readAt = readings.find((r) => r.pages.some((p) => suggestion.includes(p)))?.startedAt;
   const suggestionText = [
     describePassage(suggestion, { form: 'compact' }),
-    readAt != null && Number.isFinite(readAt) ? `read ${partOfDay(readAt, dayName === 'today')}` : `read ${dayName}`,
+    t('activity.add.readOn', { when: readAt != null && Number.isFinite(readAt) ? partOfDay(readAt, dayName === 'today') : dayWords(dayName) }),
   ].join(' · ');
 
   const pageRange = useMemo(() => Array.from({ length: Math.max(0, toPage - fromPage + 1) }, (_, i) => fromPage + i), [fromPage, toPage]);
@@ -233,11 +235,11 @@ export function AddMemorizedSheet({
     <Sheet
       visible={visible}
       onClose={onClose}
-      title="Memorized"
+      title={t('activity.day.memorized')}
       titleMark={<BlockMark kind="memorized" size={24} />}
       headerRule="full"
-      left={{ label: 'Cancel', onPress: onClose }}
-      right={{ label: saving ? 'Saving…' : 'Add', onPress: handleAdd, strong: true, accent: true, disabled: !canAdd, testID: 'add-memorized-add' }}
+      left={{ label: t('common.cancel'), onPress: onClose }}
+      right={{ label: saving ? t('common.saving') : t('activity.add.add'), onPress: handleAdd, strong: true, accent: true, disabled: !canAdd, testID: 'add-memorized-add' }}
       keyboard
       testID="add-memorized-sheet"
     >
@@ -247,11 +249,11 @@ export function AddMemorizedSheet({
         {suggestion.length > 0 && !sitting && (
           <View style={styles.top}>
             <Suggestion
-              label="From your reading"
+              label={t('activity.add.fromYourReading')}
               text={suggestionText}
-              action={usedReading ? 'Undo' : 'Use'}
+              action={usedReading ? t('common.undo') : t('activity.add.use')}
               onAction={useReading}
-              accessibilityLabel={usedReading ? 'Undo the reading pages' : 'Use the reading pages'}
+              accessibilityLabel={usedReading ? t('activity.add.undoReading') : t('activity.add.useReading')}
               testID="add-memorized-from-reading"
             />
           </View>
@@ -260,9 +262,9 @@ export function AddMemorizedSheet({
         <FormLabel text="WHAT" />
         <Segmented<What>
           options={[
-            { value: 'ayahs', label: 'Ayahs' },
-            { value: 'pages', label: 'Whole pages' },
-            { value: 'surah', label: 'Surah' },
+            { value: 'ayahs', label: t('activity.add.ayahs') },
+            { value: 'pages', label: t('activity.add.wholePages') },
+            { value: 'surah', label: t('common.surah') },
           ]}
           value={what}
           onChange={(w) => {
@@ -320,7 +322,7 @@ export function AddMemorizedSheet({
 
         {what === 'ayahs' && shareAfter > shareNow ? (
           <Text style={[typeV2.meta, styles.under, { color: palette.secondary }]} testID="add-memorized-share">
-            {`Memorized on ${dayName === 'today' ? 'today' : dayName}: ${percent(shareNow)} → ${percent(shareAfter)} of the Quran`}
+            {t('activity.add.shareOn', { day: dayWords(dayName), now: percent(shareNow), after: percent(shareAfter) })}
           </Text>
         ) : null}
 
@@ -328,8 +330,8 @@ export function AddMemorizedSheet({
           text={
             // A custom plan doesn't add new pages by itself (pruneCustomPlanForMemorized).
             user?.customPlan
-              ? 'Adding marks them memorized. Your custom plan doesn’t add them by itself. For anything else, add a note.'
-              : 'Adding marks them memorized, so they join your revision. For anything else, add a note.'
+              ? t('activity.add.footCustomPlan')
+              : t('activity.add.foot')
           }
         />
       </View>

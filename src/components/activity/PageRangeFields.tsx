@@ -9,6 +9,7 @@ import { firstAyahOfPage, suraOf } from '../../lib/ayahKeys';
 import { surahName } from '../../lib/passages';
 import { WheelItem, WheelPicker } from '../v2/WheelPicker';
 import { RangeFields, type RangeWheelProps } from './RangeFields';
+import { t } from '../../i18n';
 
 /** The surah a page starts in, as the app names it everywhere ("Al-Mujadila", held together). */
 const surahOfPage = (page: number) => surahName(suraOf(firstAyahOfPage(page)));
@@ -17,7 +18,7 @@ const surahOfPage = (page: number) => surahName(suraOf(firstAyahOfPage(page)));
 export const pageWheelLabel = (page: number) => `${page} · ${surahOfPage(page)}`;
 
 /** What From and To say: "Page 542 · Al-Mujadila". */
-export const pageLabel = (page: number) => `Page ${pageWheelLabel(page)}`;
+export const pageLabel = (page: number) => t('common.pageN', { n: pageWheelLabel(page) });
 
 function PageWheel({ value, lo, hi, onChange, testID }: RangeWheelProps) {
   const pages = useMemo<WheelItem[]>(
@@ -26,7 +27,7 @@ function PageWheel({ value, lo, hi, onChange, testID }: RangeWheelProps) {
   );
   return (
     <View style={styles.wheels} testID={testID}>
-      <WheelPicker items={pages} index={value - lo} onChange={(i) => onChange(lo + i)} label="Page" testID={`${testID}-page`} />
+      <WheelPicker items={pages} index={value - lo} onChange={(i) => onChange(lo + i)} label={t('common.page')} testID={`${testID}-page`} />
     </View>
   );
 }
