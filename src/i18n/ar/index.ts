@@ -2,6 +2,7 @@
 // English. Words, voice, plurals and typography: src/i18n/ar-glossary.md.
 import { common } from './common';
 import { home } from './home';
+import { insights } from './insights';
 import { read } from './read';
 import { reader } from './reader';
 import { recite } from './recite';
@@ -14,6 +15,7 @@ import type { ArStrings } from './types';
 export const ar: ArStrings = {
   common,
   home,
+  insights,
   read,
   reader,
   recite,
