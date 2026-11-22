@@ -27,6 +27,7 @@ import { JournalFilter, journalFilterLabel } from '../../lib/journal';
 import type { HomeStackParamList } from '../../navigation/MainNavigator';
 import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
 import { reciteLiveForAccount } from '../../lib/reciteLive/availability';
+import { isDevVariant } from '../../lib/variant';
 import { useMemoryRecords } from '../../lib/reciteMemory/store';
 import type { TakeRecord } from '../../lib/reciteMemory/record';
 import { takeWhen } from '../../lib/reciteMemory/describe';
@@ -215,7 +216,13 @@ export default function ActivityAllScreen() {
                 first={index === 0}
                 playable={item.recordingId != null && takeRecordings.has(item.recordingId)}
                 onPlay={() => item.recordingId && navigation.navigate('ListenBack', { recordingId: item.recordingId })}
-                onPress={() => navigation.navigate('ActivityDay', { date: item.day })}
+                onPress={() =>
+                  // Revisely Dev: on its page with its marks, as a day's take opens, so its card opens its summary (RMEM-8);
+                  // the summary links back to its day.
+                  isDevVariant() && takeWords
+                    ? navigation.navigate('QuranReader', { pageNumber: takeWords.pageOf(item.from), showTake: item.id })
+                    : navigation.navigate('ActivityDay', { date: item.day })
+                }
               />
             )}
             ListHeaderComponent={header}

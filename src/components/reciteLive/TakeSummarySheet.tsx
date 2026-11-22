@@ -121,6 +121,8 @@ export function TakeSummarySheet({
   onShown,
   onDelete,
   onRecited,
+  when = null,
+  recitedToday = true,
   unfinished = false,
   during = false,
 }: {
@@ -150,7 +152,8 @@ export function TakeSummarySheet({
   /** Where a slip went (`into`): that ayah in the reader. Without it, no such lines. */
   onInto?: (into: MarkInto) => void;
   onCheck: () => void;
-  onAgain: () => void;
+  /** Recite again (the same mode, at once). Absent for a past take's summary (RMEM-8): no such button. */
+  onAgain?: () => void;
   /** Recite the mistakes again (Check, with something to drill): one take from the first mistake to the last. */
   onDrill?: () => void;
   /** This take recited the mistakes of the one before: what that one found there ("1 wrong word, 1 not clear"). */
@@ -180,6 +183,13 @@ export function TakeSummarySheet({
   onDelete?: () => void;
   /** "In today's Recited ›": the take's day in Activity, its Recited open (where a kept take lives, RMEM-6). */
   onRecited?: () => void;
+  /**
+   * A finished take's summary opened again from its card (RMEM-8, Revisely Dev): when it was ("Yesterday, 9:41 PM · page
+   * hidden"), first in the head. Absent right after a take.
+   */
+  when?: string | null;
+  /** The take's day is today: its link says "In today's Recited", else "Its day in Activity". */
+  recitedToday?: boolean;
 }) {
   const { palette } = useTheme();
   const stacked = useWindowDimensions().fontScale >= STACK_FINDINGS_AT;
@@ -209,6 +219,7 @@ export function TakeSummarySheet({
   // the microphone is on, where it would be recorded with the recitation.
   const spokenSummary = [
     t('reciteLive.summary.title'),
+    when ? spokenText(when) : '',
     passage ? spokenText(passage) : '',
     spokenClock(seconds),
     check && score ? `${score.text}, ${mistakesLabel(mistakes)}` : '', // i18n-ignore (two texts joined as a list)
@@ -232,25 +243,28 @@ export function TakeSummarySheet({
   ) : (
     <View style={styles.buttons}>
       {drillable ? <PillButton title={t('reciteLive.summary.drill')} size="lg" onPress={onDrill} testID="take-summary-drill" /> : null}
-      <PillButton
-        title={t('reciteLive.summary.again')}
-        size="lg"
-        variant={drillable ? 'outline' : undefined}
-        onPress={onAgain}
-        testID="take-summary-again"
-      />
-      <PillButton title={t('common.done')} size="lg" variant="outline" onPress={onDone} testID="take-summary-done" />
+      {onAgain ? (
+        <PillButton
+          title={t('reciteLive.summary.again')}
+          size="lg"
+          variant={drillable ? 'outline' : undefined}
+          onPress={onAgain}
+          testID="take-summary-again"
+        />
+      ) : null}
+      {/* Done is the main button when nothing else is (a past take with nothing to recite again). */}
+      <PillButton title={t('common.done')} size="lg" variant={drillable || onAgain ? 'outline' : undefined} onPress={onDone} testID="take-summary-done" />
       {onRecited ? (
         <Tap
           onPress={onRecited}
           hitSlop={8}
           style={styles.recited}
           accessibilityRole="link"
-          accessibilityLabel={t('reciteLive.summary.recitedLabel')}
+          accessibilityLabel={t(recitedToday ? 'reciteLive.summary.recitedLabel' : 'reciteLive.summary.recitedDayLabel')}
           testID="take-summary-recited"
         >
           <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
-            {`${t('reciteLive.summary.recited')} ${chevron()}`}
+            {`${t(recitedToday ? 'reciteLive.summary.recited' : 'reciteLive.summary.recitedDay')} ${chevron()}`}
           </Text>
         </Tap>
       ) : null}
@@ -277,6 +291,11 @@ export function TakeSummarySheet({
         />
       ) : null}
       <View style={styles.head}>
+        {when ? (
+          <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={CHROME_MAX} testID="take-summary-when">
+            {when}
+          </Text>
+        ) : null}
         {check && score ? (
           <View style={styles.scoreRow} accessible accessibilityLabel={t('reciteLive.summary.score', { score: score.text, mistakes: mistakesNote })}>
             <Text style={[styles.score, typeV2.numeral, { color: scoreColor }]} maxFontSizeMultiplier={1.3} testID="take-summary-score">

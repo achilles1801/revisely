@@ -60,6 +60,16 @@ export interface TakeRecord {
    * checker take and the first word it recited, in order. Absent for a single take (`take` is its id).
    */
   links?: Array<{ take: string | null; from: number }>;
+  /**
+   * The words shown by hand during the take (‹, ‹‹ on the hidden page), so its summary still lists them when opened again
+   * later (RMEM-8, Revisely Dev). Absent for none, and for takes kept before Nov 22 2026.
+   */
+  peeked?: number[];
+  /**
+   * The marks called Not a mistake, apart from `marks` (nothing else reads them: never remembered on the page, never in
+   * Insights or Revo), so the summary opened again later lists them with Put back (RMEM-8). Absent for none.
+   */
+  removed?: Mark[];
 }
 
 /** "Clear now" on a word: its remembered mistake of `group` goes, as if said right enough times. */
@@ -80,6 +90,8 @@ export type MemoryRecord = TakeRecord | ClearRecord;
 export const MAX_MARKS = 400;
 export const MAX_PASSED = 400;
 export const MAX_LINKS = 20;
+export const MAX_PEEKED = 300;
+export const MAX_REMOVED = 100;
 
 /** The checker take that judged word `w` of a take's record: its link's in a chain (the last to start at or before it). */
 export function takeOfWord(r: TakeRecord, w: number): string | null {
@@ -234,6 +246,9 @@ export function toStored(r: MemoryRecord): Record<string, unknown> {
     ...(r.unfinished ? { unfinished: true } : {}),
     // Only for a chain of takes (RECITE-22).
     ...(r.links && r.links.length > 1 ? { links: r.links.slice(0, MAX_LINKS).map((l) => ({ take: l.take, from: l.from })) } : {}),
+    // Only when there are some (RMEM-8), so a take without them is written as before.
+    ...(r.peeked?.length ? { peeked: r.peeked.slice(0, MAX_PEEKED) } : {}),
+    ...(r.removed?.length ? { removed: r.removed.slice(0, MAX_REMOVED).map(storedMark) } : {}),
   };
 }
 
@@ -284,7 +299,23 @@ export function fromStored(id: string, raw: unknown): MemoryRecord | null {
     ...deleted,
     ...(d.unfinished === true ? { unfinished: true } : {}),
     ...linksFromStored(d.links),
+    ...peekedFromStored(d.peeked),
+    ...removedFromStored(d.removed),
   };
+}
+
+/** The words peeked, from the document (RMEM-8): whole numbers only, in order. */
+function peekedFromStored(raw: unknown): { peeked?: number[] } {
+  if (!Array.isArray(raw)) return {};
+  const peeked = raw.filter((w): w is number => num(w) != null && Number.isInteger(w)).sort((a, b) => a - b);
+  return peeked.length ? { peeked } : {};
+}
+
+/** The marks called Not a mistake, from the document (RMEM-8). */
+function removedFromStored(raw: unknown): { removed?: Mark[] } {
+  if (!Array.isArray(raw)) return {};
+  const removed = raw.map(markFromStored).filter((m): m is Mark => m != null);
+  return removed.length ? { removed } : {};
 }
 
 /** A chain's links from its document (dropped when damaged: the record stays, its labels go by `take`). */

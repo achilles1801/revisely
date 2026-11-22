@@ -118,6 +118,9 @@ export const reciteLive = {
     again: 'Recite again',
     recitedLabel: 'In today’s Recited, in Activity',
     recited: 'In today’s Recited',
+    /** A past take's summary (RMEM-8): its own day in Activity, when that isn't today. */
+    recitedDayLabel: 'The day of this take, in Activity',
+    recitedDay: 'Its day in Activity',
     score: 'Score {{score}}, {{mistakes}}',
     before: 'Before: {{before}}',
     intoLabel: '{{line}}. Show it in the reader',

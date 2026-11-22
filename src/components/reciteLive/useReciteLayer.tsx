@@ -92,7 +92,7 @@ import type { Mark } from '../../lib/reciteLive/contract';
 import type { Box } from '../verse/menuPlacement';
 import { playClip, playReference, stopHearing } from '../../lib/reciteLive/hearAudio';
 import { useKeepCheckerWarm } from './useKeepCheckerWarm';
-import { countsAsMistake, isUnclear, type LiveFailure, markGroup, needsPremium } from '../../lib/reciteLive/contract';
+import { type LiveFailure, markGroup, needsPremium } from '../../lib/reciteLive/contract';
 import { logger } from '../../lib/logger';
 import { useRememberTake } from '../reciteMemory/useRememberTake';
 import { remember, useMemoryRecords } from '../../lib/reciteMemory/store';
@@ -107,7 +107,9 @@ import { markFill, markFirm } from './markColours';
 import { WordHistoryCard } from '../reciteMemory/WordHistoryCard';
 import { ShownTakeBar } from '../reciteMemory/ShownTakeBar';
 import type { TakeRecord } from '../../lib/reciteMemory/record';
-import { mistakesLabel, pageAccuracy } from '../../lib/reciteLive/score';
+import { pastMemory as pastTakeMemory, pastScore, pastWhen, withMarkBack, withoutMark } from '../../lib/reciteMemory/pastTake';
+import { deleteTake } from '../../lib/reciteMemory/apart';
+import { mistakesLabel } from '../../lib/reciteLive/score';
 import { sendLabel } from '../../lib/reciteCheck/service';
 import { t } from '../../i18n';
 import type { Strings } from '../../i18n/en';
@@ -277,6 +279,9 @@ export function useReciteLayer({
   const qw = live.words ?? words;
   const [hidden, setHidden] = useState(false);
   const [revealed, setRevealed] = useState<Revealed>(NOTHING_SHOWN);
+  // Words shown by hand during the take (‹, ‹‹): kept in quiet grey on the page, listed in the summary, drilled, and kept
+  // with the take's record for its summary later (RMEM-8).
+  const [peeked, setPeeked] = useState<Peeked>(NOTHING_PEEKED);
   const remembering = useRememberTake({
     uid: user?.id,
     enabled: liveOn,
@@ -285,11 +290,10 @@ export function useReciteLayer({
     day,
     level: checkLevel(reciteSettings),
     records: memoryRecords,
+    peeked,
   });
   noteTakeRecording.current = remembering.noteRecording;
   const takeRecord = remembering.current;
-  // Words shown by hand during the take (‹, ‹‹): kept in quiet grey on the page, listed in the summary, drilled.
-  const [peeked, setPeeked] = useState<Peeked>(NOTHING_PEEKED);
   const [modeMenu, setModeMenu] = useState(false);
   // The AI notice comes before the first take: the take it was asked for starts once it's agreed.
   const [noticeFor, setNoticeFor] = useState<{ mode: LiveMode; span: TakeSpan | null; reveal: Revealed } | null>(null);
@@ -597,33 +601,43 @@ export function useReciteLayer({
   useEffect(() => {
     if (shownCardAt && shownCardMarks.length === 0) setShownCardAt(null);
   }, [shownCardAt, shownCardMarks.length]);
+  // The shown take's summary, opened from its card (RMEM-8, Revisely Dev; Majd, Nov 22 2026: "make that take card
+  // clickable and have it open that days summary popup sheet"). Revisely Dev's until the next release (its Dev guide says
+  // so).
+  const pastSummaryOn = isDevVariant();
+  const [pastOpen, setPastOpen] = useState(false);
   const endShowing = useCallback(() => {
     setShowTakeId(null);
     setShownCardAt(null);
+    setPastOpen(false);
     onShowTakeEndRef.current?.();
   }, []);
-  // Not a mistake on a past take's mark: the take is kept again without it (and its score with it), and the checker
-  // hears it as a label.
+  // Not a mistake on a past take's mark: the take is kept again without it (and its score with it), the mark listed apart
+  // for its summary's Put back (RMEM-8), and the checker hears it as a label.
   const dismissShown = useCallback(
     (id: string) => {
       if (!shownTake || !user?.id || !qw) return;
+      const next = withoutMark(shownTake, id, qw, Date.now());
       const m = shownTake.marks.find((x) => x.id === id);
-      if (!m) return;
-      const unclear = isUnclear(m);
-      const mistakes = shownTake.mistakes - (countsAsMistake(m) && !unclear ? 1 : 0);
-      const next: TakeRecord = {
-        ...shownTake,
-        marks: shownTake.marks.filter((x) => x.id !== id),
-        mistakes: Math.max(0, mistakes),
-        tajweed: Math.max(0, shownTake.tajweed - (m.kind === 'tajweed' ? 1 : 0)),
-        unclear: Math.max(0, shownTake.unclear - (unclear ? 1 : 0)),
-        accuracy: pageAccuracy(qw, Math.max(0, mistakes), shownTake.from, shownTake.to),
-        rev: Date.now(),
-      };
+      if (!next || !m) return;
       remember(user.id, next).catch((err) => logger.warn('Recite memory: Not a mistake was not kept', err));
       // The take that judged it (a long recitation's own link, RECITE-22).
       const judgedBy = takeOfWord(shownTake, m.w);
       if (judgedBy) void sendLabel('dismiss', judgedBy, id, Date.now());
+    },
+    [shownTake, user?.id, qw],
+  );
+  // Put back from the shown take's summary: the mark is the take's again, and the checker hears that too.
+  const putBackShown = useCallback(
+    (id: string) => {
+      if (!shownTake || !user?.id || !qw) return;
+      const m = shownTake.removed?.find((x) => x.id === id);
+      const next = withMarkBack(shownTake, id, qw, Date.now());
+      if (!next || !m) return;
+      remember(user.id, next).catch((err) => logger.warn('Recite memory: Put back was not kept', err));
+      const judgedBy = takeOfWord(shownTake, m.w);
+      if (judgedBy) void sendLabel('undismiss', judgedBy, id, Date.now());
+      say(t('reciteLive.layer.putBack', { title: markTitle(m) }));
     },
     [shownTake, user?.id, qw],
   );
@@ -688,7 +702,7 @@ export function useReciteLayer({
     [historyOn, takeRecord, memoryRecords, qw],
   );
   // A passage's progress: from the summary (Done goes back to it) or a word's card.
-  const [progressFor, setProgressFor] = useState<{ from: number; to: number; back: 'summary' | null } | null>(null);
+  const [progressFor, setProgressFor] = useState<{ from: number; to: number; back: 'summary' | 'past' | null } | null>(null);
   const progressTakes = useMemo(() => {
     if (!progressFor) return [];
     const all = takeRecord ? [...memoryRecords.filter((r) => r.id !== takeRecord.id), takeRecord] : memoryRecords;
@@ -706,6 +720,7 @@ export function useReciteLayer({
   const openPastTake = (t: TakeRecord) => {
     setProgressFor(null);
     setSummaryShown(null);
+    setPastOpen(false);
     setSoFar(false);
     setPastAt(null);
     if (live.active) live.clear();
@@ -713,6 +728,39 @@ export function useReciteLayer({
     const page = qw.pageOf(t.from);
     if (showPage(page) !== false) setShowTakeId(t.id);
     else openElsewhere?.({ page, showTake: t.id });
+  };
+  // The shown take's summary, from its record (RMEM-8): as the summary said when the take ended, its trend up to it.
+  const pastNow = Date.now();
+  const past = useMemo(() => {
+    if (!pastSummaryOn || !pastOpen || !shownTake || !qw) return null;
+    return {
+      take: shownTake,
+      when: pastWhen(shownTake, pastNow),
+      score: pastScore(shownTake),
+      memory: pastTakeMemory(memoryRecords, shownTake, qw, pastNow, historyOn),
+      history: historyOn ? historyRows(qw, shownTake, passageHistory(memoryRecords, shownTake), pastNow) : [],
+      peeked: shownTake.peeked?.length ? peekedByAyah(qw, new Set(shownTake.peeked)) : [],
+    };
+    // pastNow moves every render; the rest says when to work it out again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pastSummaryOn, pastOpen, shownTake, qw, memoryRecords, historyOn]);
+  // Recite the mistakes again from a past take's summary: one take over the stretch from the ayah before its first
+  // mistake to its last (and the ayat of the words it peeked), as right after the take.
+  const drillPast = (take: TakeRecord) => {
+    if (!qw) return;
+    const peekedAyahs = take.peeked?.length ? peekedByAyah(qw, new Set(take.peeked)).map((p) => p.ayah) : [];
+    const range = drillRange(take.marks, peekedAyahs);
+    if (!range) return;
+    endShowing();
+    setCardAt(null);
+    setRevealed(NOTHING_SHOWN);
+    setPeeked(NOTHING_PEEKED);
+    setDrillBefore([findingsLine(drillMarks(take.marks)), take.peeked?.length ? peekedLine(take.peeked.length) : ''].filter(Boolean).join(', '));
+    if (!reciteSettings.noticeSeen) {
+      setNoticeFor({ mode: 'check', span: range, reveal: NOTHING_SHOWN });
+      return;
+    }
+    void live.start('check', range);
   };
   // A new take may get the id of the one before (E2E's recorded takes all do): its summary must still show.
   useEffect(() => {
@@ -1223,7 +1271,13 @@ export function useReciteLayer({
           />
         ) : null}
         {showing && shownTake ? (
-          <ShownTakeBar take={shownTake} now={Date.now()} bottom={insets.bottom + spacing.sm + CAPSULE_HEIGHT + spacing.sm} onDone={endShowing} />
+          <ShownTakeBar
+            take={shownTake}
+            now={Date.now()}
+            bottom={insets.bottom + spacing.sm + CAPSULE_HEIGHT + spacing.sm}
+            onDone={endShowing}
+            onOpen={pastSummaryOn ? () => setPastOpen(true) : undefined}
+          />
         ) : null}
         {qw && showing ? (
           <MarkCard
@@ -1261,6 +1315,7 @@ export function useReciteLayer({
             const back = progressFor?.back;
             setProgressFor(null);
             if (back === 'summary' && live.state.status === 'done' && takeId) setSummaryShown(takeId);
+            if (back === 'past' && showing) setPastOpen(true);
           }}
         />
         <UndoToast
@@ -1395,6 +1450,71 @@ export function useReciteLayer({
                 }
               : undefined
           }
+        />
+        {/* A finished take's summary again, from its card on the page (RMEM-8): built from its record. */}
+        <TakeSummarySheet
+          visible={showing && past != null}
+          check
+          words={qw}
+          from={past?.take.from ?? null}
+          to={past?.take.to ?? null}
+          seconds={past?.take.secs ?? 0}
+          marks={past?.take.marks ?? []}
+          score={past?.score ?? null}
+          removed={past?.take.removed ?? []}
+          onPutBack={putBackShown}
+          checkOwned
+          when={past?.when ?? null}
+          unfinished={past?.take.unfinished === true}
+          onFinding={(m) => {
+            setPastOpen(false);
+            if (!qw) return;
+            goTo(qw.pageOf(m.w));
+            setShownCardAt({ w: m.w, anchor: { x: width / 2, y: insets.top + 120, width: 1, height: 1 } });
+          }}
+          onInto={(into) => {
+            setPastOpen(false);
+            const target = toAyahRef({ sura: into.ayah[0], ayah: into.ayah[1] });
+            if (openElsewhere) openElsewhere({ page: target.page, highlight: { sura: target.sura, ayah: target.ayah } });
+            else if (showPage(target.page) !== false) onInto(target);
+          }}
+          onCheck={() => undefined}
+          // With Premium, as right after the take; without it, no such button.
+          onDrill={owned && past ? () => drillPast(past.take) : undefined}
+          memory={past?.memory ?? null}
+          onProgress={() => {
+            if (!past) return;
+            setPastOpen(false);
+            setProgressFor({ from: past.take.from, to: past.take.to, back: 'past' });
+          }}
+          history={past?.history ?? []}
+          onPastTake={openPastTake}
+          peeked={past?.peeked ?? []}
+          onPeeked={(w) => {
+            setPastOpen(false);
+            if (qw) goTo(qw.pageOf(w));
+          }}
+          onDone={() => setPastOpen(false)}
+          onDelete={
+            past && user?.id
+              ? () => {
+                  const uid = user.id;
+                  const gone = past.take;
+                  endShowing();
+                  deleteTake(uid, gone).catch((err) => logger.warn('Could not delete the take', err));
+                  say(t('reciteLive.layer.deleted'));
+                }
+              : undefined
+          }
+          onRecited={
+            past
+              ? () => {
+                  setPastOpen(false);
+                  navigateToActivityDay(past.take.day, undefined, 'recited');
+                }
+              : undefined
+          }
+          recitedToday={past?.take.day === day}
         />
         <CheckIntroPage
           visible={introOpen}

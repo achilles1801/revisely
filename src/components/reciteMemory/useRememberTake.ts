@@ -44,6 +44,7 @@ export function useRememberTake({
   day,
   level,
   records,
+  peeked = null,
 }: {
   uid: string | null | undefined;
   enabled: boolean;
@@ -54,6 +55,8 @@ export function useRememberTake({
   level: TakeLevel;
   /** The account's records (for the words that had a remembered mistake). */
   records: readonly MemoryRecord[];
+  /** The words shown by hand during this take (RMEM-8: kept, so its summary lists them when opened again). */
+  peeked?: ReadonlySet<number> | null;
 }): { noteRecording: (saved: { recordingId: string }) => void; forget: () => void; current: TakeRecord | null } {
   const status = live.state.status;
   // This take: its record's id and start, whether the page was hidden, its recording, what was written last.
@@ -129,8 +132,9 @@ export function useRememberTake({
       timeOf: view.wordTime,
       openWords: (from, to) => openWordsBetween(records, from, to),
       links: view.links,
+      peeked,
     });
-  }, [enabled, live, day, level, records]);
+  }, [enabled, live, day, level, records, peeked]);
 
   const schedule = useCallback(() => {
     const t = take.current;
