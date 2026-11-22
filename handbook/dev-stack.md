@@ -122,9 +122,21 @@ until its part is set up.
 - **Recitation check** (Majd, Nov 11 2026: "push the best version we have so far on dev"): the lab's mistake
   detection in the Dev app only (`lib/reciteCheck`: `isDevVariant()`, `previewTester`, a binary with the
   microphone stream). The reader's one mic: Recite follows the reciter on the page, and with Mark mistakes (Premium) it
-  marks the words skipped, said wrong or added, harakat and letter slips and, with Strict, tajweed notes (madd lengths
+  marks the words skipped, said wrong or added, wrong harakat and letters and, with Strict, tajweed notes (madd lengths
   per Settings → Recite, qalqalah, ghunnah, ikhfa, idgham, iqlab). The verse menu's old "Check my recitation" row
   (record, then check) is gone (Nov 15 2026; nothing showed it any more).
+  - **Two tiers** (Majd, Nov 22 2026: "saying a wrong haraka or letter IS a word mistake. the only two "tiers" is word
+    (including haraqah and letters) mistakes and then second tier is tajweed level mistake which we can market as
+    "beta". but the former should be perfected by release date"; RECITE-2). `markTier` in `lib/reciteLive/contract`:
+    `mistake` (a wrong, skipped or extra word, a wrong haraka, a wrong letter: named "Wrong haraka", "Wrong letter",
+    counted, never a "slip"), `tajweed` (Strict, "(Beta)" after its name in the card, the summary's line, Insights and
+    Settings' "Strict (Beta)"; never counted) and `unclear` (Not clear, never counted, not a tier). Settings' levels are
+    "Mistakes" and "Strict (Beta)"; there is no words-only level. `markGroup` stays what a mark is about: Recite memory
+    keys words by it.
+    - **Colours aren't decided** (Majd's decision says nothing about them): they stay by `markGroup`. The one switch is
+      `COLOURS_FOLLOW_TIERS` in `components/reciteLive/markColours` (`colourGroup`, `markFill`, `markFirm`, the bar's
+      `toneFill`): on, every mistake is red, amber only Not clear. Every page wash must read `markFill`/`markFirm` for it
+      to reach them (LiveUnderlay and the hidden page's marks index colours by group until the shading PR moves them).
   - **In revision sessions too** (Majd, Nov 17 2026: "add the mistake detection and mic functionality same as mushaf to
     the revision sessions themselves and get rid of that old hidden view thing on the top"; RECITE-9). Everything Recite
     puts on a page lives in `components/reciteLive/useReciteLayer`, used by the reader and `ActiveRevisionScreen` alike:
@@ -213,7 +225,7 @@ until its part is set up.
     Tarteel's "blurb or splash": RECITE-19; `components/reciteLive/Wash`, `lib/reciteLive/wash`: a pill-shaped core
     whose edge fades out all round in its own colour, a `boxShadow`, reaching a little past the word so a box a few
     units off never shows an edge; pastel colours, checked in design.test), in three colours (`markGroup`, theme/v2 `markWord`…): red for a wrong,
-    skipped or extra word (an extra word on the word before it: "Extra word"), amber for a haraka or letter slip and
+    skipped or extra word (an extra word on the word before it: "Extra word"), amber for a wrong haraka or letter and
     "Not clear", violet for a tajweed note (Strict). A word with several shows its strongest; the mark a card is open
     for is a firmer shade of its own (`…Firm`), no outline. No red ink, dotted lines or + discs. The bar, the card and
     the summary use the same highlights, and a small flat swatch beside the kind's name (never a round mark): the kind

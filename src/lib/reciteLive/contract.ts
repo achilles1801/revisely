@@ -5,7 +5,7 @@
 
 import type { TajweedRule } from '../reciteCheck/result';
 
-/** What a mark is about. Mistakes: word, skipped, added; slips: harakat, letter, tajweed (`severityOf`). Colours: `markGroup`. */
+/** What a mark is about. Its tier (mistake, Not clear, tajweed): `markTier`. Its colour and memory group: `markGroup`. */
 export type MarkKind = 'word' | 'skipped' | 'added' | 'harakat' | 'letter' | 'tajweed';
 
 /** Finer than the kind, for the card's wording. */
@@ -372,7 +372,7 @@ export function parseEvent(raw: unknown): LiveEvent | null {
   }
 }
 
-/** Red for words; amber for harakat, letters and tajweed. */
+/** What a mark is about, for its colour group: a whole word (wrong, skipped, extra), or a part of one (a haraka, a letter, tajweed). */
 export type Severity = 'mistake' | 'slip';
 
 export function severityOf(mark: Pick<Mark, 'kind'>): Severity {
@@ -380,23 +380,43 @@ export function severityOf(mark: Pick<Mark, 'kind'>): Severity {
 }
 
 /**
- * A mark's colour on the page, in the bar, the card and the summary: three groups at most (Majd, Nov 15 2026). Words
- * (wrong, skipped, extra) red, slips (a haraka, a letter, "Not clear") amber, tajweed notes violet. The card and the
- * summary always name the kind in words.
+ * The two tiers (Majd, Nov 22 2026: "saying a wrong haraka or letter IS a word mistake. the only two "tiers" is word
+ * (including haraqah and letters) mistakes and then second tier is tajweed level mistake which we can market as
+ * "beta""). `mistake`: a wrong, skipped or extra word, a wrong haraka or a wrong letter, counted in the score and named
+ * a mistake. `tajweed`: a tajweed note (Strict), never counted, labelled Beta wherever it shows. `unclear` isn't a tier:
+ * a haraka or letter not heard clearly enough to judge, shown and never counted (RECITE-3). RECITE-2.
+ */
+export type MarkTier = 'mistake' | 'unclear' | 'tajweed';
+export function markTier(mark: Pick<Mark, 'kind' | 'sure'>): MarkTier {
+  if (mark.kind === 'tajweed') return 'tajweed';
+  return isUnclear(mark) ? 'unclear' : 'mistake';
+}
+
+/**
+ * A mark's colour group on the page, in the bar, the card and the summary: three colours at most (Majd, Nov 15 2026).
+ * Words (wrong, skipped, extra) red, a haraka or a letter (and "Not clear") amber, tajweed notes violet. Recite's memory
+ * keys a word's mistakes by it (lib/reciteMemory), so it stays what a mark is about whatever the colours follow
+ * (`colourGroup` in components/reciteLive/markColours). The card and the summary always name the kind in words.
  */
 export type MarkGroup = 'word' | 'slip' | 'tajweed';
 export function markGroup(mark: Pick<Mark, 'kind'>): MarkGroup {
   return mark.kind === 'tajweed' ? 'tajweed' : severityOf(mark) === 'mistake' ? 'word' : 'slip';
 }
-/** Which of a word's marks shows when it has several: a word mistake over a slip over a tajweed note. */
+/** Which of a word's marks shows when it has several: a word mistake over a haraka or letter over a tajweed note. */
 export const GROUP_RANK: Record<MarkGroup, number> = { tajweed: 0, slip: 1, word: 2 };
 
-/** One highlight per word: its strongest mark, a word mistake over a slip over a tajweed note (RECITE-2). */
+/** How strong a mark is beside another on its word: its group, then a mistake over a Not clear in the same group. */
+const strength = (m: Mark) => GROUP_RANK[markGroup(m)] * 2 + (isUnclear(m) ? 0 : 1);
+
+/**
+ * One highlight per word: its strongest mark, a word mistake over a haraka or letter over a tajweed note, and a mistake
+ * over a Not clear (RECITE-2).
+ */
 export function strongestByWord(marks: readonly Mark[]): Map<number, Mark> {
   const byWord = new Map<number, Mark>();
   for (const m of marks) {
     const had = byWord.get(m.w);
-    if (!had || GROUP_RANK[markGroup(m)] > GROUP_RANK[markGroup(had)]) byWord.set(m.w, m);
+    if (!had || strength(m) > strength(had)) byWord.set(m.w, m);
   }
   return byWord;
 }

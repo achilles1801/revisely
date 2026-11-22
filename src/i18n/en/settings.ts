@@ -195,10 +195,11 @@ export const settings = {
     premiumSub: 'Marking mistakes and Test me are part of it',
     footer: 'Marking mistakes is AI and can make mistakes. Recordings are checked by software; nobody listens.',
     level: 'Mistakes to mark',
-    strict: 'Strict',
-    strictSub: 'The same, and tajweed: madd lengths, qalqalah, ghunnah, ikhfa, idgham, iqlab',
-    words: 'Words & harakat',
-    wordsSub: 'Wrong, skipped and added words, and letter and haraka slips',
+    /** Tajweed is labelled Beta wherever it shows (Majd, Nov 22 2026). */
+    strict: 'Strict (Beta)',
+    strictSub: 'Your mistakes, and tajweed: madd lengths, qalqalah, ghunnah, ikhfa, idgham, iqlab',
+    words: 'Mistakes',
+    wordsSub: 'Wrong, skipped and extra words, and wrong harakat and letters',
     munfasil: 'Madd munfasil',
     muttasil: 'Madd muttasil',
     aared: 'Madd ʿarid',
@@ -302,7 +303,7 @@ export const settings = {
     keepSub: 'Recitation checks, for Revisely’s tests. Software checks them; nobody listens.',
     /** Revisely Dev's row naming the checker's models (components/settings/CheckerModelRow). */
     model: 'Mistake detection model',
-    modelLine: 'Recite {{recite}} · Words & harakat {{harakat}} · Strict {{strict}}',
+    modelLine: 'Recite {{recite}} · Mistakes {{harakat}} · Strict {{strict}}',
     /** The checker's commit, a quiet detail under the models. */
     modelServer: 'Checker {{server}}',
     modelReading: 'Asking the checker…',

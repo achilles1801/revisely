@@ -11,8 +11,8 @@ const passage = (over: Partial<SlippingPassage> = {}): SlippingPassage => ({
   from: 22,
   to: 23,
   words: [
-    { w: 1, group: 'word', kind: 'word', ayah: [18, 22] },
-    { w: 2, group: 'slip', kind: 'harakat', ayah: [18, 23] },
+    { w: 1, group: 'word', kind: 'word', sure: 'clear', ayah: [18, 22] },
+    { w: 2, group: 'slip', kind: 'harakat', sure: 'clear', ayah: [18, 23] },
   ],
   wordMistakes: 1,
   wrong: 3,
@@ -76,7 +76,7 @@ describe('Recite insights in words', () => {
     expect(kindsLine({ ...base, mistakes: 2, unclear: 1, kinds: { ...NO_KINDS, letter: 2 } })).toBe(
       'Harakat and letters: 2 letters. 1 wasn’t clear enough to check (not counted).',
     );
-    expect(kindsLine({ mistakes: 0, unclear: 0, tajweed: 2, strictTakes: 1, kinds: NO_KINDS })).toBe('No mistakes. 2 tajweed notes.');
+    expect(kindsLine({ mistakes: 0, unclear: 0, tajweed: 2, strictTakes: 1, kinds: NO_KINDS })).toBe('No mistakes. 2 tajweed notes (Beta).');
     // Tajweed notes only from Strict takes.
     expect(kindsLine({ mistakes: 0, unclear: 0, tajweed: 2, strictTakes: 0, kinds: NO_KINDS })).toBe('No mistakes.');
   });

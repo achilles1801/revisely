@@ -432,7 +432,7 @@ appId: com.revisionbuddy.app
     timeout: 30000
 - assertVisible:
     id: take-summary-before
-    text: "Before: 1 wrong word, 1 harakat slip"
+    text: "Before: 1 wrong word, 1 wrong haraka"
 - runFlow:
     file: ../subflows/shot.yaml
     env:

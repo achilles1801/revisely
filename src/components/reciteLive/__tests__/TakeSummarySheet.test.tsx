@@ -5,7 +5,7 @@ import React from 'react';
 import { AccessibilityInfo, Dimensions, Modal, Text } from 'react-native';
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { TakeSummarySheet, findingPlace, STACK_FINDINGS_AT } from '../TakeSummarySheet';
+import { TakeSummarySheet, findingPlace, findingsLine, STACK_FINDINGS_AT } from '../TakeSummarySheet';
 import { plainText } from '../../../lib/passages';
 import type { Mark } from '../../../lib/reciteLive/contract';
 
@@ -58,6 +58,24 @@ const grows = (max: number) =>
     .filter((t) => flat(t.props.children).replace(/[-]/g, '').trim() !== '')
     .filter((t) => !(typeof t.props.maxFontSizeMultiplier === 'number' && t.props.maxFontSizeMultiplier <= max))
     .map((t) => flat(t.props.children));
+
+describe('the findings line: two tiers (Majd, Nov 22 2026) [RECITE-2, RECITE-3]', () => {
+  const m = (id: string, over: Partial<Mark>): Mark => ({ id, w: 1, ayah: [27, 23], kind: 'word', sure: 'clear', ...over });
+  it('names a wrong haraka and a wrong letter apart, as mistakes, then what never counts', () => {
+    expect(
+      findingsLine([
+        m('a', { kind: 'letter' }),
+        m('b', { kind: 'harakat' }),
+        m('c', { kind: 'harakat' }),
+        m('d', { kind: 'tajweed', rule: 'ghunnah' }),
+        m('e', { kind: 'harakat', sure: 'likely' }),
+        m('f', { kind: 'word' }),
+      ]),
+    ).toBe('1 wrong word, 2 wrong harakat, 1 wrong letter, 1 not clear, 1 tajweed note (Beta)');
+    // Before, a wrong letter read "1 harakat slip".
+    expect(findingsLine([m('a', { kind: 'letter' })])).toBe('1 wrong letter');
+  });
+});
 
 describe('the take summary with screen readers and the largest text', () => {
   it('at normal sizes a finding’s Arabic word sits beside its title', () => {
@@ -177,7 +195,7 @@ describe('the take summary with screen readers and the largest text', () => {
     expect(swatch.borderRadius).toBeLessThan((swatch.width as number) / 2);
     // The kind is spelled out beside it.
     expect(screen.getByText('Extra word · ayah 23')).toBeTruthy();
-    expect(screen.getByText('1 wrong word, 1 extra, 1 harakat slip, 1 tajweed note')).toBeTruthy();
+    expect(screen.getByText('1 wrong word, 1 extra, 1 wrong haraka, 1 tajweed note (Beta)')).toBeTruthy();
     // The word in ink on its colour, as on the page (the wrong word's, said, on its colour in its phrase: RECITE-24).
     expect(screen.getAllByTestId('take-summary-finding-highlight').map((e) => style(e).backgroundColor)).toEqual([p.markSlip, p.markTajweed, p.markWord]);
     expect(style(screen.getAllByTestId('take-summary-finding-arabic')[0]).color).toBe(p.text);

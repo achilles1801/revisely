@@ -11,7 +11,10 @@ export function unclearNote(): string {
   return t('reciteLive.describe.unclearNote');
 }
 
-/** "Wrong word", "Harakat slip", "Madd munfasil". */
+/**
+ * "Wrong word", "Wrong haraka", "Madd munfasil (Beta)". A wrong haraka or letter is a mistake like a wrong word (Majd,
+ * Nov 22 2026), and a tajweed note is labelled Beta wherever it shows (RECITE-2).
+ */
 export function markTitle(mark: Mark): string {
   if (isUnclear(mark)) return t('reciteLive.describe.notClear');
   switch (mark.kind) {
@@ -23,11 +26,11 @@ export function markTitle(mark: Mark): string {
       // "Extra": the page highlights the word before it (an extra word has no text there).
       return mark.detail === 'trail' ? t('reciteLive.describe.extraAfterEnd') : t('reciteLive.describe.extraWord');
     case 'harakat':
-      return mark.detail === 'shadda' ? t('reciteLive.describe.shaddaSlip') : t('reciteLive.describe.harakatSlip');
+      return mark.detail === 'shadda' ? t('reciteLive.describe.wrongShadda') : t('reciteLive.describe.wrongHaraka');
     case 'letter':
-      return t('reciteLive.describe.letterSlip');
+      return t('reciteLive.describe.wrongLetter');
     case 'tajweed':
-      return mark.rule ? tajweedName(mark.rule) : t('reciteLive.describe.tajweed');
+      return t('reciteLive.describe.beta', { title: mark.rule ? tajweedName(mark.rule) : t('reciteLive.describe.tajweed') });
   }
 }
 

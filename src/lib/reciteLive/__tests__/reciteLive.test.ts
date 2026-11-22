@@ -1,5 +1,7 @@
 import { quranWords } from '../../recite/__fixtures__/quranWords';
-import { countsAsMistake, GROUP_RANK, isUnclear, LiveEvent, markGroup, parseEvent, parseMark, severityOf, Mark } from '../contract';
+import { countsAsMistake, GROUP_RANK, isUnclear, LiveEvent, markGroup, markTier, parseEvent, parseMark, severityOf, strongestByWord, Mark } from '../contract';
+import { colourGroup, markFill, markFirm, toneFill, COLOURS_FOLLOW_TIERS } from '../../../components/reciteLive/markColours';
+import { paletteV2 } from '../../../theme/v2';
 import {
   applyEvent,
   dismissMark,
@@ -112,7 +114,50 @@ describe('the contract', () => {
     expect(parseEvent({ type: 'done', result: { ...recite.result, follow: undefined } })).toBeNull();
   });
 
-  it('mistakes are words; slips are harakat, letters and tajweed', () => {
+  // Majd, Nov 22 2026: "saying a wrong haraka or letter IS a word mistake. the only two "tiers" is word (including
+  // haraqah and letters) mistakes and then second tier is tajweed level mistake which we can market as "beta"" (RECITE-2).
+  it('two tiers: a wrong word, haraka or letter is a mistake, tajweed its own tier; Not clear is neither [RECITE-2, RECITE-3]', () => {
+    const kinds = ['word', 'skipped', 'added', 'harakat', 'letter', 'tajweed'] as const;
+    expect(kinds.map((kind) => markTier(mark({ kind })))).toEqual(['mistake', 'mistake', 'mistake', 'mistake', 'mistake', 'tajweed']);
+    expect(markTier(mark({ kind: 'harakat', sure: 'likely' }))).toBe('unclear');
+    expect(markTier(mark({ kind: 'letter', sure: 'likely' }))).toBe('unclear');
+    // A likely word mistake is still a mistake (only a haraka or letter can be Not clear), and so is a likely tajweed note a note.
+    expect(markTier(mark({ kind: 'word', sure: 'likely' }))).toBe('mistake');
+    expect(markTier(mark({ kind: 'tajweed', sure: 'likely' }))).toBe('tajweed');
+    // Every mistake counts, nothing else does.
+    for (const kind of kinds) for (const sure of ['clear', 'likely'] as const) {
+      const m = mark({ kind, sure });
+      expect(countsAsMistake(m) && !isUnclear(m)).toBe(markTier(m) === 'mistake');
+    }
+  });
+
+  it('a word shows its strongest mark: a mistake over a Not clear of the same kind [RECITE-2]', () => {
+    const unclear = mark({ id: 'u', kind: 'harakat', sure: 'likely' });
+    const wrong = mark({ id: 'w', kind: 'letter', sure: 'clear' });
+    expect(strongestByWord([unclear, wrong]).get(UTIYAT)?.id).toBe('w');
+    expect(strongestByWord([wrong, unclear]).get(UTIYAT)?.id).toBe('w');
+    // A wrong word still beats a wrong haraka, and a wrong haraka a tajweed note.
+    expect(strongestByWord([wrong, mark({ id: 'x', kind: 'word' })]).get(UTIYAT)?.id).toBe('x');
+    expect(strongestByWord([mark({ id: 't', kind: 'tajweed' }), unclear]).get(UTIYAT)?.id).toBe('u');
+  });
+
+  it('colours stay by what a mark is about until Majd decides; the switch moves them to the tiers in one place', () => {
+    const p = paletteV2(false, 'indigo');
+    const harakat = mark({ kind: 'harakat' });
+    const unclear = mark({ kind: 'letter', sure: 'likely' });
+    const tajweed = mark({ kind: 'tajweed' });
+    // As now (Nov 22 2026): a wrong haraka amber like Not clear.
+    expect(COLOURS_FOLLOW_TIERS).toBe(false);
+    expect([markFill(p, mark({ kind: 'word' })), markFill(p, harakat), markFill(p, unclear), markFill(p, tajweed)]).toEqual([p.markWord, p.markSlip, p.markSlip, p.markTajweed]);
+    expect(toneFill(p, 'slip')).toBe(p.markSlip);
+    // Switched: every mistake red, amber only for Not clear, violet for tajweed; the memory group never moves.
+    expect([colourGroup(harakat, true), colourGroup(unclear, true), colourGroup(tajweed, true)]).toEqual(['word', 'slip', 'tajweed']);
+    expect([markFill(p, harakat, true), markFirm(p, harakat, true), markFill(p, unclear, true)]).toEqual([p.markWord, p.markWordFirm, p.markSlip]);
+    expect(toneFill(p, 'slip', true)).toBe(p.markWord);
+    expect(markGroup(harakat)).toBe('slip');
+  });
+
+  it('a mark is about a whole word or a part of one (its colour and memory group)', () => {
     expect(['word', 'skipped', 'added'].map((kind) => severityOf({ kind } as Mark))).toEqual(['mistake', 'mistake', 'mistake']);
     expect(['harakat', 'letter', 'tajweed'].map((kind) => severityOf({ kind } as Mark))).toEqual(['slip', 'slip', 'slip']);
   });
@@ -557,10 +602,11 @@ describe('the card’s words', () => {
     expect(markTitle(mark({ kind: 'skipped' }))).toBe('Skipped word');
     expect(markTitle(mark({ kind: 'added' }))).toBe('Extra word');
     expect(markTitle(mark({ kind: 'added', detail: 'trail' }))).toBe('Extra word after the end');
-    expect(markTitle(mark({ kind: 'harakat' }))).toBe('Harakat slip');
-    expect(markTitle(mark({ kind: 'harakat', detail: 'shadda' }))).toBe('Shadda slip');
-    expect(markTitle(mark({ kind: 'letter' }))).toBe('Letter slip');
-    expect(markTitle(mark({ kind: 'tajweed', rule: 'madd_munfasil' }))).toBe('Madd munfasil');
+    // A wrong haraka or letter is a mistake like a wrong word, and tajweed is Beta (Majd, Nov 22 2026; RECITE-2).
+    expect(markTitle(mark({ kind: 'harakat' }))).toBe('Wrong haraka');
+    expect(markTitle(mark({ kind: 'harakat', detail: 'shadda' }))).toBe('Wrong shadda');
+    expect(markTitle(mark({ kind: 'letter' }))).toBe('Wrong letter');
+    expect(markTitle(mark({ kind: 'tajweed', rule: 'madd_munfasil' }))).toBe('Madd munfasil (Beta)');
   });
 
   it('a haraka or letter past the normal bar only is “Not clear”: say it more clearly, not counted (Majd, Nov 15 2026)', () => {
@@ -572,7 +618,7 @@ describe('the card’s words', () => {
     expect(plainText(markPlace(unclear))).toBe('An-Naml, ayah 23');
     expect(markTitle(mark({ kind: 'letter', sure: 'likely' }))).toBe('Not clear');
     // Clear harakat and letters, and every word mark, keep their names.
-    expect(markTitle(mark({ kind: 'harakat', sure: 'clear' }))).toBe('Harakat slip');
+    expect(markTitle(mark({ kind: 'harakat', sure: 'clear' }))).toBe('Wrong haraka');
     expect(isUnclear(mark({ kind: 'word', sure: 'likely' }))).toBe(false);
     expect(isUnclear(mark({ kind: 'skipped', sure: 'likely' }))).toBe(false);
     expect(isUnclear(mark({ kind: 'tajweed', rule: 'ghunnah', sure: 'likely' }))).toBe(false);
