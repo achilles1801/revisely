@@ -4,6 +4,8 @@ import { auth } from './auth';
 import { common } from './common';
 import { home } from './home';
 import { insights } from './insights';
+import { journal } from './journal';
+import { memorization } from './memorization';
 import { mushaf } from './mushaf';
 import { onboarding } from './onboarding';
 import { plan } from './plan';
@@ -11,6 +13,7 @@ import { prayer } from './prayer';
 import { read } from './read';
 import { reader } from './reader';
 import { recite } from './recite';
+import { reciteCheck } from './reciteCheck';
 import { reciteInsights } from './reciteInsights';
 import { reciteLive } from './reciteLive';
 import { reciteMemory } from './reciteMemory';
@@ -27,6 +30,8 @@ export const ar: ArStrings = {
   common,
   home,
   insights,
+  journal,
+  memorization,
   mushaf,
   onboarding,
   plan,
@@ -34,6 +39,7 @@ export const ar: ArStrings = {
   read,
   reader,
   recite,
+  reciteCheck,
   reciteInsights,
   reciteLive,
   reciteMemory,
