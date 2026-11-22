@@ -105,7 +105,8 @@ ROUNDS = 5
 # before, and taken out like a marker.
 WAQF_FILE = ROOT / "src" / "data" / "quranWaqf.json"
 STAR_AT = (236, 5, 485, 545)
-STAR_SCORE = 0.85
+# A sign scores 0.82 to 1.00 against the template; nothing else on its line above 0.52.
+STAR_SCORE = 0.75
 # The 15 sajdah ayahs' pages: each has an overline over its word.
 SAJDAH_PAGES = [176, 251, 272, 293, 309, 334, 341, 365, 379, 416, 454, 480, 528, 589, 597]
 
@@ -199,7 +200,7 @@ def find_star(ink, tpl, r0, r1, c0, c1):
     """The quarter sign's best place in ink[r0:r1, c0:c1]: (score, top, left, template at its size)."""
     win = ink[r0:r1, c0:c1].astype(np.float32)
     best = (-1.0, 0, 0, tpl)
-    for k in [1.0] + [round(x, 2) for x in np.arange(0.8, 1.21, 0.05) if abs(x - 1) > 1e-9]:
+    for k in [1.0] + [round(x, 2) for x in np.arange(0.7, 1.21, 0.05) if abs(x - 1) > 1e-9]:
         tk = tpl if k == 1.0 else np.asarray(Image.fromarray(tpl.astype(np.uint8) * 255).resize(
             (max(1, round(tpl.shape[1] * k)), max(1, round(tpl.shape[0] * k))), Image.BILINEAR)) > 127
         if win.shape[0] < tk.shape[0] or win.shape[1] < tk.shape[1]:
