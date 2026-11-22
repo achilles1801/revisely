@@ -11,3 +11,5 @@ src/lib/search
 src/services
 src/lib/coach
 src/lib/reminders
+src/design
+src/theme

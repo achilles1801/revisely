@@ -53,7 +53,7 @@ describe('colours come from the theme', () => {
       "// '#fff' in a comment",
       "{ uri: 'https://revisely.app/#top' }",
       "testID: 'item-1'",
-      "const label = `Page ${n}`;",
+      'const label = `Page ${n}`;',
       "backgroundColor: 'transparent',",
     ]) {
       expect(coloursIn(line)).toBe(false);

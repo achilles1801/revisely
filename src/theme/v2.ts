@@ -322,7 +322,14 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
       ring: ['#0E6B5A', '#0E6B5A'],
       heat: ['#EBEDF0', '#79C2AA', '#3FA084', '#1A7D66', '#0B5A4A'],
       heatInk: ['#1A1A1A', '#1A1A1A', '#1A1A1A', '#FFFFFF', '#FFFFFF'],
-      revo: { r: ['#3FA084', '#79C2AA'], disc: '#0B3A30', ring: '#4DBA9F', glow: '#3FA084', shadow: '#06231D', sheetGlow: { color: '#3FA084', opacity: 0.12 } },
+      revo: {
+        r: ['#3FA084', '#79C2AA'],
+        disc: '#0B3A30',
+        ring: '#4DBA9F',
+        glow: '#3FA084',
+        shadow: '#06231D',
+        sheetGlow: { color: '#3FA084', opacity: 0.12 },
+      },
     },
     dark: {
       primary: '#FFFFFF',
@@ -340,7 +347,14 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
       ring: ['#4DBA9F', '#4DBA9F'],
       heat: ['#1C1C1E', '#0F4A3B', '#18735C', '#2A9C7F', '#5CD1B2'],
       heatInk: ['#FFFFFF', '#FFFFFF', '#FFFFFF', '#000000', '#000000'],
-      revo: { r: ['#3FA084', '#79C2AA'], disc: '#0B3A30', ring: '#4DBA9F', glow: '#3FA084', shadow: '#06231D', sheetGlow: null },
+      revo: {
+        r: ['#3FA084', '#79C2AA'],
+        disc: '#0B3A30',
+        ring: '#4DBA9F',
+        glow: '#3FA084',
+        shadow: '#06231D',
+        sheetGlow: null,
+      },
     },
   },
   // RedotPay, from colours sampled off its screens: #DC1433 for the action,
@@ -364,7 +378,14 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
       ring: ['#3E0812', '#DC1433'],
       heat: ['#EBEDF0', '#F29AA7', '#E9637A', '#DC1433', '#7A0B1D'],
       heatInk: ['#1A1A1A', '#1A1A1A', '#1A1A1A', '#FFFFFF', '#FFFFFF'],
-      revo: { r: ['#DC1433', '#F5455E'], disc: '#3E0812', ring: '#F03C56', glow: '#DC1433', shadow: '#2A0509', sheetGlow: { color: '#DC1433', opacity: 0.08 } },
+      revo: {
+        r: ['#DC1433', '#F5455E'],
+        disc: '#3E0812',
+        ring: '#F03C56',
+        glow: '#DC1433',
+        shadow: '#2A0509',
+        sheetGlow: { color: '#DC1433', opacity: 0.08 },
+      },
     },
     dark: {
       primary: '#DC1433',
@@ -388,7 +409,14 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
       ring: ['#DC1433', '#F03C56'],
       heat: ['#2E0E15', '#8A0E26', '#B3112C', '#DC1433', '#F5455E'],
       heatInk: ['#FFFFFF', '#FFFFFF', '#FFFFFF', '#FFFFFF', '#000000'],
-      revo: { r: ['#DC1433', '#F5455E'], disc: '#3E0812', ring: '#F03C56', glow: '#DC1433', shadow: '#2A0509', sheetGlow: { color: '#DC1433', opacity: 0.22 } },
+      revo: {
+        r: ['#DC1433', '#F5455E'],
+        disc: '#3E0812',
+        ring: '#F03C56',
+        glow: '#DC1433',
+        shadow: '#2A0509',
+        sheetGlow: { color: '#DC1433', opacity: 0.22 },
+      },
     },
   },
   // The real-estate app, from sampled colours: #624BD5 for the action (white
@@ -411,7 +439,14 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
       ring: ['#2E0EC6', '#9789DA'],
       heat: ['#EBEDF0', '#9789DA', '#624BD5', '#2E0EC6', '#1F1170'],
       heatInk: ['#1A1A1A', '#1A1A1A', '#FFFFFF', '#FFFFFF', '#FFFFFF'],
-      revo: { r: ['#624BD5', '#9789DA'], disc: '#2B2352', ring: '#9789DA', glow: '#624BD5', shadow: '#14103C', sheetGlow: { color: '#624BD5', opacity: 0.1 } },
+      revo: {
+        r: ['#624BD5', '#9789DA'],
+        disc: '#2B2352',
+        ring: '#9789DA',
+        glow: '#624BD5',
+        shadow: '#14103C',
+        sheetGlow: { color: '#624BD5', opacity: 0.1 },
+      },
     },
     dark: {
       primary: '#624BD5',
@@ -435,7 +470,14 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
       ring: ['#624BD5', '#9789DA'],
       heat: ['#1C1C1E', '#3F2AA2', '#624BD5', '#7E6CD8', '#9789DA'],
       heatInk: ['#FFFFFF', '#FFFFFF', '#FFFFFF', '#000000', '#000000'],
-      revo: { r: ['#624BD5', '#9789DA'], disc: '#2B2352', ring: '#9789DA', glow: '#624BD5', shadow: '#14103C', sheetGlow: { color: '#624BD5', opacity: 0.22 } },
+      revo: {
+        r: ['#624BD5', '#9789DA'],
+        disc: '#2B2352',
+        ring: '#9789DA',
+        glow: '#624BD5',
+        shadow: '#14103C',
+        sheetGlow: { color: '#624BD5', opacity: 0.22 },
+      },
     },
   },
 };
@@ -714,8 +756,28 @@ export interface RamadanTokens {
 }
 
 const RAMADAN_BASE = {
-  light: { gold: '#B07D1E', glass: '#F7C561', glassOpacity: 0.4, flame: '#FFE7A8', mote: '#C99532', moteOpacity: 0.7, wire: '#CBBFA6', amber: '#E3A72F', third: '#D9774A' },
-  dark: { gold: '#E8B65A', glass: '#FFCF73', glassOpacity: 0.55, flame: '#FFF1CC', mote: '#FFE2A0', moteOpacity: 0.9, wire: '#5A4F3C', amber: '#FFC857', third: '#FFE9B8' },
+  light: {
+    gold: '#B07D1E',
+    glass: '#F7C561',
+    glassOpacity: 0.4,
+    flame: '#FFE7A8',
+    mote: '#C99532',
+    moteOpacity: 0.7,
+    wire: '#CBBFA6',
+    amber: '#E3A72F',
+    third: '#D9774A',
+  },
+  dark: {
+    gold: '#E8B65A',
+    glass: '#FFCF73',
+    glassOpacity: 0.55,
+    flame: '#FFF1CC',
+    mote: '#FFE2A0',
+    moteOpacity: 0.9,
+    wire: '#5A4F3C',
+    amber: '#FFC857',
+    third: '#FFE9B8',
+  },
 } as const;
 
 export function ramadanV2(isDark: boolean, accent: AccentName = DEFAULT_ACCENT): RamadanTokens {
