@@ -1278,13 +1278,11 @@ describe('[RECITE-19] highlights are soft washes wider than their word; with the
     );
   });
 
-  it('the page shown: only the line’s band follows the reciter; hidden: no band, the newest word shown is washed', () => {
+  it('the page shown: only the line’s band follows the reciter, no word is washed or inked', () => {
     const at = fc.option(wordArb, { nil: null });
     fc.assert(
-      fc.property(fc.boolean(), at, at, (hidden, cursor, newest) => {
-        const cues = followCues(hidden, cursor, newest);
-        if (hidden) expect(cues).toEqual({ band: null, word: newest });
-        else expect(cues).toEqual({ band: cursor, word: null });
+      fc.property(at, at, (cursor, newest) => {
+        expect(followCues(false, cursor, newest)).toEqual({ band: cursor, ink: null });
       }),
       { numRuns: runs(100) },
     );
@@ -1306,6 +1304,21 @@ describe('[RECITE-5] the audio 4:1: any block decodes to its own length, its fir
         expect(end).toBeGreaterThanOrEqual(0);
         expect(end).toBeLessThanOrEqual(88);
       }),
+    );
+  });
+});
+
+describe('[RECITE-20] on a hidden page the newest word shown is in the following ink, unless it carries a mark', () => {
+  const wordArb = fc.integer({ min: 0, max: words.count - 1 });
+  it('no band; the newest word shown is inked, never another, and never one with a mark', () => {
+    fc.assert(
+      fc.property(fc.option(wordArb, { nil: null }), fc.option(wordArb, { nil: null }), fc.uniqueArray(wordArb, { maxLength: 6 }), (cursor, newest, marked) => {
+        const cues = followCues(true, cursor, newest, (w) => marked.includes(w));
+        expect(cues.band).toBeNull();
+        if (newest == null || marked.includes(newest)) expect(cues.ink).toBeNull();
+        else expect(cues.ink).toBe(newest);
+      }),
+      { numRuns: runs(200) },
     );
   });
 });

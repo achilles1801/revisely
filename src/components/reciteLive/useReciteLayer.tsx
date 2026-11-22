@@ -63,6 +63,8 @@ import { ReciteMic, ReciteMicMode } from './ReciteMic';
 import { ReciteMenuMode, ReciteModeMenu } from './ReciteModeMenu';
 import { BarButton, ReciteBar } from './ReciteBar';
 import { LiveMarkTargets, LiveOverlay, LiveUnderlay } from './LivePageLayers';
+import type { PageImage } from '../MushafPager';
+import { followCues } from '../../lib/reciteLive/wash';
 import { ReciteNoticeSheet } from './ReciteNoticeSheet';
 import { MarkCard } from './MarkCard';
 import { SimilarPhrasesSheet } from './SimilarPhrasesSheet';
@@ -746,7 +748,7 @@ export function useReciteLayer({
               marks={shownOnPage(page)}
               selected={shownCardMarks[0] ?? null}
               hidden={false}
-              colors={{ band: v2.highlightSoft, word: v2.highlight, marks: markColours }}
+              colors={{ band: v2.highlightSoft, marks: markColours }}
             />
           )
         : showPast && qw
@@ -767,20 +769,13 @@ export function useReciteLayer({
               page={page}
               scale={scale}
               words={qw}
-              // A hidden page: the grey wash on the newest word shown, behind its ink (the cursor’s word is covered); a shown page washes no word (followCues).
-              cursor={
-                live.state.status !== 'listening'
-                  ? null
-                  : hidden
-                    ? liveInfo.saidUpTo != null && liveInfo.startWord != null && liveInfo.saidUpTo >= liveInfo.startWord
-                      ? liveInfo.saidUpTo
-                      : null
-                    : live.state.cursor ?? guessCursor(live.state)
-              }
+              // The band on the cursor's line, on a shown page only (followCues); a hidden page's newest word is inked over
+              // the ink (LiveOverlay's follow).
+              cursor={live.state.status !== 'listening' ? null : live.state.cursor ?? guessCursor(live.state)}
               marks={pageMarks(page)}
               selected={cardMarks[0] ?? null}
               hidden={hidden}
-              colors={{ band: v2.highlightSoft, word: v2.highlight, marks: markColours }}
+              colors={{ band: v2.highlightSoft, marks: markColours }}
             />
           )
         : undefined,
@@ -849,13 +844,23 @@ export function useReciteLayer({
       return true;
     };
   }, [liveOn, qw, checkTake, live.state, pastTaps, pastOnCovers, coverMarksOn, pastOnPage, showing, shownOnPage]);
+  // On a hidden page, the newest word shown, in the following ink (followCues: none for a word with a mark, whose wash
+  // says more; Majd, Nov 22 2026: "i dont see the words being a different color as its recited with page hidden").
+  const followWord = useMemo(() => {
+    if (!hidden || !qw || live.state.status !== 'listening') return null;
+    const newest =
+      liveInfo.saidUpTo != null && liveInfo.startWord != null && liveInfo.saidUpTo >= liveInfo.startWord ? liveInfo.saidUpTo : null;
+    return followCues(true, null, newest, (w) => pageMarks(qw.pageOf(w)).some((m) => m.w === w)).ink;
+  }, [hidden, qw, live.state.status, liveInfo, pageMarks]);
   const pageOverlay = useMemo(
     () =>
       liveOn && qw && (hidden || veiled.length > 0)
-        ? (page: number, scale: number) => (
+        ? (page: number, scale: number, image: PageImage | null) => (
             <LiveOverlay
               page={page}
               scale={scale}
+              image={image}
+              follow={followWord != null ? { w: followWord, words: qw, colour: v2.followInk } : null}
               hidden={
                 hidden
                   ? {
@@ -872,7 +877,7 @@ export function useReciteLayer({
             />
           )
         : undefined,
-    [liveOn, qw, hidden, revealed, liveInfo, coverColors, offWord, v2, veiled, palette, coverMarksOn, live.state.status, live.state.cursor],
+    [liveOn, qw, hidden, revealed, liveInfo, coverColors, offWord, v2, veiled, palette, coverMarksOn, live.state.status, live.state.cursor, followWord],
   );
   // The marks as elements of their own (VoiceOver, the tests). Given whenever the live UI is on, so the pager's pages
   // keep one shape through takes.

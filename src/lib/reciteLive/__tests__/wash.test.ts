@@ -31,12 +31,16 @@ describe('washOf: a highlight as a soft wash, never a box (Majd, Nov 21 2026)', 
   });
 });
 
-describe('followCues: what follows the reciter (Majd, Nov 21 2026: no shades with the page shown)', () => {
-  it('the page shown: the band on the cursor’s line, no word washed', () => {
-    expect(followCues(false, 12, 11)).toEqual({ band: 12, word: null });
+describe('followCues: what follows the reciter (Majd, Nov 21 and 22 2026)', () => {
+  it('the page shown: the band on the cursor’s line, no word inked', () => {
+    expect(followCues(false, 12, 11)).toEqual({ band: 12, ink: null });
   });
-  it('the page hidden: no band, the newest word shown washed', () => {
-    expect(followCues(true, 12, 11)).toEqual({ band: null, word: 11 });
-    expect(followCues(true, 12, null)).toEqual({ band: null, word: null });
+  it('the page hidden: no band, the newest word shown in the following ink', () => {
+    expect(followCues(true, 12, 11)).toEqual({ band: null, ink: 11 });
+    expect(followCues(true, 12, null)).toEqual({ band: null, ink: null });
+  });
+  it('a newest word with a mark keeps its wash and no following ink', () => {
+    expect(followCues(true, 12, 11, (w) => w === 11)).toEqual({ band: null, ink: null });
+    expect(followCues(true, 12, 11, (w) => w === 10)).toEqual({ band: null, ink: 11 });
   });
 });

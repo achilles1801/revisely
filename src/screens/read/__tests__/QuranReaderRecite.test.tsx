@@ -698,14 +698,38 @@ describe('mistakes are highlights (Majd, Nov 15 2026: “only things we should s
     expect((wash.left as number) + (wash.width as number) + shadow.spreadDistance + shadow.blurRadius).toBeGreaterThan(b.x1 * 0.38);
   });
 
-  it('the hidden view: the newest word in the grey box, no line band, no blue on the page', async () => {
-    await startTake('recite', null);
+  it('[RECITE-20] the hidden view: the newest word shown in the following ink over its own, the ones before in the page’s ink; no band or wash', async () => {
+    await startTake('check', null);
     fireEvent.press(screen.getByTestId('recite-eye'));
     await event({ type: 'locked', w: A23, s: 27, a: 23 });
+    await event({ type: 'said', upTo: A23 + 2 });
     await event({ type: 'at', w: A23 + 3 });
-    expect(bg('live-word-box')).toBe(p.highlight);
+    const { wordBox } = require('../../../lib/reciteLive/geometry');
+    // Majd, Nov 22 2026: "i dont see the words being a different color as its recited with page hidden". The page's own
+    // image, tinted, seen through the newest word's box only (the word before it isn't inked).
+    const ink = flatStyle(screen.getByTestId('live-follow-ink'));
+    const box = wordBox(words, A23 + 2);
+    expect(ink.left).toBeCloseTo((box.x0 - 1) * 0.38);
+    expect(ink.width).toBeCloseTo((box.x1 - box.x0 + 2) * 0.38);
+    expect(ink.overflow).toBe('hidden');
+    const image = screen.getByTestId('live-follow-ink-image');
+    expect(image.props.source).toEqual({ uri: 'file:///379.png' });
+    expect(flatStyle(image)).toMatchObject({ tintColor: p.followInk, width: 389, height: 629, left: -(box.x0 - 1) * 0.38 });
+    expect(screen.queryAllByTestId('live-follow-ink')).toHaveLength(1);
+    expect(screen.queryByTestId('live-word-box')).toBeNull();
     expect(screen.queryByTestId('live-line-band')).toBeNull();
     expect(screen.queryAllByTestId('hidden-band')).toHaveLength(0);
+    // A word with a mark keeps its wash, in the page's ink: the mark says more than where the reciter is.
+    await event({ type: 'mark', mark: { id: 'm', w: A23 + 2, ayah: [27, 23], kind: 'word', sure: 'clear', heard: 'x', heardExact: false } });
+    expect(screen.queryByTestId('live-follow-ink')).toBeNull();
+    expect(bg('live-highlight-word')).toBe(p.markWord);
+    // The next word said: it takes the ink.
+    await event({ type: 'said', upTo: A23 + 3 });
+    expect(flatStyle(screen.getByTestId('live-follow-ink')).left).toBeCloseTo((wordBox(words, A23 + 3).x0 - 1) * 0.38);
+    // The page shown: no ink, only the band.
+    fireEvent.press(screen.getByTestId('recite-eye'));
+    expect(screen.queryByTestId('live-follow-ink')).toBeNull();
+    expect(screen.getByTestId('live-line-band')).toBeTruthy();
   });
 
   it('something else said in the next word’s slot (`off`): its cover turns red, its text still hidden, until it’s said', async () => {
@@ -965,9 +989,10 @@ describe('no word shows before it is said (Majd, Nov 21 2026)', () => {
     // What the bar says (its words as VoiceOver reads them); the page's covers follow the same word (liveInfo).
     const barSays = () => screen.getByTestId('recite-middle').props.accessibilityLabel as string;
     expect(barSays()).not.toContain(words.uthmani(A23 + 2));
-    // Where they are, still covered: the word being said has its cover lightly marked, and the newest shown word its box.
+    // Where they are, still covered: the word being said has its cover lightly marked, and the newest shown word is in the
+    // following ink.
     expect(screen.getByTestId('live-cover-current')).toBeTruthy();
-    expect(screen.getByTestId('live-word-box')).toBeTruthy();
+    expect(screen.getByTestId('live-follow-ink')).toBeTruthy();
     // The next word begins: the third shows.
     await event({ type: 'at', w: A23 + 3 });
     expect(barSays()).toContain(words.uthmani(A23 + 2));

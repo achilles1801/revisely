@@ -313,19 +313,23 @@ describe('v2 palette (white and black grounds, no accent tint)', () => {
       if (isDark) expect(l).toBeLessThanOrEqual(45);
       else expect(l).toBeGreaterThanOrEqual(78);
     }
-    // The follow blue as text (the word being said in the bar) on every ground.
-    for (const ground of [p.bg, p.fill, p.sheet, p.bubble]) expect(contrast(p.followInk, ground)).toBeGreaterThanOrEqual(4.5);
+    // The following green (Majd, Nov 22 2026): as text (the word being said in the bar) on every ground, and as ink on the
+    // page (the newest word shown on a hidden page, drawn in it over its own ink).
+    for (const ground of [p.bg, p.fill, p.sheet, p.bubble, page.pageBg]) expect(contrast(p.followInk, ground)).toBeGreaterThanOrEqual(4.5);
     // The box stands out from the band (non-text, a little).
     expect(contrast(p.highlight, p.highlightSoft)).toBeGreaterThan(1.15);
-    // None of it follows the accent (Majd, Nov 14 2026): a mistake is red, a slip amber and the follow blue with every
+    // None of it follows the accent (Majd, Nov 14 2026): a mistake is red, a slip amber and the following green with every
     // accent, so Crimson's follow never looks like a mistake.
     const jade = paletteV2(isDark, 'jade');
     const fixed = ['red', 'warn', 'highlight', 'highlightSoft', 'followInk', 'markWord', 'markWordFirm', 'markSlip', 'markSlipFirm', 'markTajweed', 'markTajweedFirm'] as const;
     for (const k of fixed) expect(p[k]).toBe(jade[k]);
-    // Blue (the bar's word being said) tells apart from red and amber by hue, and from the tajweed violet.
-    expect(Math.abs(hue(p.followInk) - hue(p.red))).toBeGreaterThanOrEqual(90);
-    expect(Math.abs(hue(p.followInk) - hue(p.warn))).toBeGreaterThanOrEqual(90);
-    expect(apart(p.followInk, p.markTajweed)).toBeGreaterThanOrEqual(20);
+    // The following green tells apart from red and amber by hue, and from the tajweed violet: from the status colours and
+    // from each mistake's wash, so the word followed never reads as a mistake.
+    expect(apart(p.followInk, p.red)).toBeGreaterThanOrEqual(90);
+    expect(apart(p.followInk, p.warn)).toBeGreaterThanOrEqual(90);
+    expect(apart(p.followInk, p.markWord)).toBeGreaterThanOrEqual(90);
+    expect(apart(p.followInk, p.markSlip)).toBeGreaterThanOrEqual(90);
+    expect(apart(p.followInk, p.markTajweed)).toBeGreaterThanOrEqual(60);
     // Check, drawn special: each end as text on the sheet, and the glyph on each end.
     for (const end of p.premium) {
       expect(contrast(end, p.sheet)).toBeGreaterThanOrEqual(4.5);

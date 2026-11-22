@@ -504,7 +504,7 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   word ahead, and the bar names no more than the page shows (Majd, Nov 21 2026: "we shouldn't
   be showing the full word until the user maybe either starts the next word or we get a full match"; Nov 22: "it should
   be under one second max that it shows up"). The word being said keeps its cover, lightly marked, and the newest word
-  shown has a soft grey wash, so the reciter always sees where they are. ‹ shows the next hidden word and ‹‹ the rest of its ayah: a word shown by hand is peeked, never counts in the score, and its
+  shown is in the following ink (RECITE-20), so the reciter always sees where they are. ‹ shows the next hidden word and ‹‹ the rest of its ayah: a word shown by hand is peeked, never counts in the score, and its
   ayah joins Recite the mistakes again. While something else is said where the next word goes, that word's cover
   turns red. It goes once the word is reached or said, the reciter goes back, or a mark lands on it (or an extra word
   just before it); it is never a mark and never counts.
@@ -574,11 +574,16 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
 - **RECITE-19.** (Revisely Dev) Recite's highlights on a page are soft pastel washes behind the word, never boxes: each a
   rounded core with an edge that fades out all round, reaching a little past its word on every side, with no outline
   and the ink as it is. That holds for the mistakes (red for words, amber for harakat, letters and Not clear, violet for
-  tajweed; the mark a card is open for a firmer shade), Recite's memory's past mistakes (lighter), the newest word shown
-  on a hidden page (grey), and what marks a hidden page's covers. With the page shown, nothing marks the word being
-  said: only a quiet band on its line. (Majd, Nov 21 2026: Tarteel's shading "is way more elegant than ours and also
+  tajweed; the mark a card is open for a firmer shade), Recite's memory's past mistakes (lighter), and what marks a hidden
+  page's covers. With the page shown, nothing marks the word being said: only a quiet band on its line. (Majd, Nov 21 2026: Tarteel's shading "is way more elegant than ours and also
   seems like a blurb or splash … They dont even use shades when ur reciting with the page shown ie not hidden, which is
   actually really nice. I also like their color shades its like more pastel which is what we should aim for".)
+- **RECITE-20.** (Revisely Dev) With the page hidden, the newest word shown during a take is in its own ink in the
+  following colour (green, the same as the word being said in the bar), and the words shown before it are in the page's
+  own ink; it moves on with each word shown, never to a word still covered. A word with a mark keeps its wash and the
+  page's ink instead: the mark says more than where the reciter is. With the page shown nothing is inked (RECITE-19).
+  (Majd, Nov 22 2026, of Tarteel's hidden page: "i dont see the words being a different color as its recited with page
+  hidden, why are we not taking that up?")
 
 ## Recite insights
 

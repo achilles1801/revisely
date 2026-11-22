@@ -7,9 +7,10 @@ import type { WordFollow } from '../../lib/recite/hiddenPage';
 import type { Mark, MarkGroup } from '../../lib/reciteLive/contract';
 import { markGroup, strongestByWord } from '../../lib/reciteLive/contract';
 import { markTitle } from '../../lib/reciteLive/describe';
-import { currentLineBand, cursorBox, markBox, markHighlight, offBox, wordBox } from '../../lib/reciteLive/geometry';
+import { currentLineBand, grow, markBox, markHighlight, offBox, wordBox } from '../../lib/reciteLive/geometry';
 import { followCues } from '../../lib/reciteLive/wash';
 import { t } from '../../i18n';
+import { FollowInk } from './FollowInk';
 import { Wash } from './Wash';
 
 const NO_REVEALED: ReadonlySet<string> = new Set();
@@ -24,8 +25,8 @@ export type MarkColours = Record<MarkGroup, { fill: string; firm: string }>;
 /**
  * Behind the page's ink, in its frame: what follows the reciter (lib/reciteLive/wash's followCues: with the page shown,
  * only a quiet grey band on the line being recited and no word washed, Majd, Nov 21 2026: "They dont even use shades
- * when ur reciting with the page shown … which is actually really nice"; with it hidden, no band and a grey wash on the
- * newest word shown), and the marks (Check) behind their words, three colours at most: red for words, amber for slips
+ * when ur reciting with the page shown … which is actually really nice"; with it hidden, no band: the newest word shown
+ * is in the following ink, over the ink, LiveOverlay), and the marks (Check) behind their words, three colours at most: red for words, amber for slips
  * and "Not clear", violet for tajweed (Majd, Nov 15 2026: "only things we should show are highlites for mistakes 3
  * colors max"). Every highlight is a soft pastel wash (Wash), never a box. An extra word is highlighted on the word
  * before it. A word with several marks shows its strongest. The mark a card is open for is a firmer shade of its own
@@ -44,17 +45,16 @@ export function LiveUnderlay({
   page: number;
   scale: number;
   words: QuranWords;
-  /** The word to follow: the cursor's on a shown page, the newest word shown on a hidden page. */
+  /** The cursor's word: the band on its line, on a shown page. */
   cursor: number | null;
   marks: Mark[];
   selected: Mark | null;
-  /** The hidden view: no line band, and the word followed is washed. */
+  /** The hidden view: no line band. */
   hidden: boolean;
-  colors: { band: string; word: string; marks: MarkColours };
+  colors: { band: string; marks: MarkColours };
 }) {
-  const cues = followCues(hidden, hidden ? null : cursor, hidden ? cursor : null);
+  const cues = followCues(hidden, cursor, null);
   const line = cues.band != null ? currentLineBand(words, page, cues.band) : null;
-  const washed = cues.word != null && words.pageOf(cues.word) === page ? cues.word : null;
   // One highlight per word: its strongest mark (a word mistake over a slip over a tajweed note).
   const byWord = strongestByWord(marks.filter((m) => words.pageOf(m.w) === page));
   const picked = selected && words.pageOf(selected.w) === page ? selected : null;
@@ -63,7 +63,6 @@ export function LiveUnderlay({
       {line ? (
         <View testID="live-line-band" style={[styles.abs, styles.band, rectStyle(line, scale), { backgroundColor: colors.band }]} />
       ) : null}
-      {washed != null ? <Wash testID="live-word-box" box={cursorBox(words, washed)} scale={scale} colour={colors.word} /> : null}
       {[...byWord.values()].map((m) => {
         const group = markGroup(picked && picked.w === m.w ? picked : m);
         const firm = picked != null && picked.w === m.w;
@@ -97,6 +96,8 @@ export function LiveOverlay({
   hidden,
   peeked = null,
   coverMarks = null,
+  follow = null,
+  image = null,
 }: {
   page: number;
   scale: number;
@@ -115,6 +116,13 @@ export function LiveOverlay({
    * over the cover so the word stays hidden. A word that shows has its highlight behind its ink (LiveUnderlay).
    */
   coverMarks?: { words: QuranWords; marks: readonly { mark: Mark; fill: string; opacity?: number }[] } | null;
+  /**
+   * On a hidden page, the newest word shown, drawn again in the following ink over its own (FollowInk; followCues
+   * decides which word, none for a word with a mark). Drawn first, so a cover over a neighbour stays on top.
+   */
+  follow?: { w: number; words: QuranWords; colour: string } | null;
+  /** The page's image as the pager draws it, for drawing a word again. */
+  image?: { uri: string; width: number; height: number } | null;
 }) {
   const veiled = peeked ? peeked.peeked.filter((w) => peeked.words.pageOf(w) === page) : [];
   if (!hidden && veiled.length === 0) return null;
@@ -123,8 +131,13 @@ export function LiveOverlay({
     hidden?.current && hidden.current.words.pageOf(hidden.current.w) === page && !hidden.follow.shown(hidden.current.w) && off?.w !== hidden.current.w
       ? hidden.current
       : null;
+  const inked =
+    hidden && follow && image && follow.words.pageOf(follow.w) === page && hidden.follow.shown(follow.w) ? follow : null;
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill} testID={`live-overlay-${page}`}>
+      {inked && image ? (
+        <FollowInk testID="live-follow-ink" box={grow(wordBox(inked.words, inked.w), 1, 0)} scale={scale} image={image} colour={inked.colour} />
+      ) : null}
       {hidden ? (
         <HiddenPageOverlay page={page} scale={scale} revealed={NO_REVEALED} follow={hidden.follow} colors={{ cover: hidden.cover, guide: hidden.guide }} />
       ) : null}
