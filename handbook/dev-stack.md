@@ -183,16 +183,25 @@ until its part is set up.
       "In today's Recited ›" opens the day at its takes. A day's Recited is one row that opens `RecitedSheet`.
     - Takes saved before were plain recordings: `sortTakeAudio` (`lib/reciteMemory/apart`) marks those a take record
       names, once a launch, index only. Recite alone's old audio stays a recording.
-  - **Calm, exact tracking** (Majd's Dev take, Nov 15 2026; Tarteel's mic take as the reference): a quiet grey band on
-    the line being recited (the ayah's part of it, `currentLineBand`), and no word marked while the page is shown (Majd,
-    Nov 21 2026: "They dont even use shades when ur reciting with the page shown"; RECITE-19, `followCues` in
-    lib/reciteLive/wash). The page's one highlight is `highlightSoft` and `highlight` in theme/v2 (below in "The
-    design"). It is not a blue band
-    over the whole ayah, which covered lines not yet said and read as running ahead (the checker's `at` was 1.0 s
-    behind, never ahead). Blue (`followInk`) is only for the word being said in the bar. None of Recite's colours follow
-    the accent (design.test). Nothing shows before the checker has found where the reciter is (`locked`): no band or
-    box, in either view. The hidden view has no band at all (Majd, Nov 15 2026: "there shouldn't be an always there
-    highlight at the top when the verses are hidden"): the words recited show in place, the newest in a soft grey wash.
+  - **Calm, exact tracking** (Majd's Dev take, Nov 15 2026; Tarteel's mic take as the reference): a flat grey band
+    behind the whole ayah being recited, every line of it (`ayahBand`, the page's one highlight `highlight` in theme/v2,
+    below in "The design"; Majd, Nov 22 2026: "we should follow how tarteel does it here"), and no word marked while the
+    page is shown (Majd, Nov 21 2026: "They dont even use shades when ur reciting with the page shown"; RECITE-19,
+    `followCues` in lib/reciteLive/wash). Before that, Nov 15, a blue band over the whole ayah read as running ahead (the
+    checker's `at` was 1.0 s behind, never ahead), and the band was the line's only until Nov 22. Green (`followInk`) is
+    Recite's one following colour: the word being said in the bar, and the newest word shown on a hidden page (below).
+    None of Recite's colours follow the accent (design.test). Nothing shows before the checker has found where the
+    reciter is (`locked`): no band, in either view. The hidden view has no band at all (Majd, Nov 15 2026: "there
+    shouldn't be an always there highlight at the top when the verses are hidden").
+  - **The hidden page is drawn empty** (RECITE-20, `components/reciteLive/HiddenInkLayer`; Majd, Nov 22 2026, of
+    Tarteel's: "i dont see the words being a different color as its recited with page hidden", "let's do it and test
+    it"): each line covered, a faint rule where its words are still hidden, the washes over the covers, then the markers
+    and every run of words shown drawn again from the page's image through their boxes (given by MushafPager's
+    `pageOverlay`), the newest tinted green. A word with a mark keeps its wash and the page's ink instead.
+    - During a take nothing is drawn on a word still hidden: not the word being said, not its marks or past mistakes
+      (Majd's Dev take, Nov 22 2026: they gave words away). With no take running, a hidden word's marks show on its place.
+    - Switched to hidden mid-take it keeps everything behind the reciter (the page before the start too) and hides only
+      what is ahead; after a take, everything (RECITE-21, `lib/reciteLive/hideSwitch`; Majd, Nov 22 2026: "do the same").
   - **Mistakes are highlights** (Majd, Nov 15 2026: "i don't like the red + circles, only things we should show are
     highlites for mistakes 3 colors max"; board `~/Documents/revisely-recite-mocks/marks-highlights/`): a highlight
     behind the word, the page's ink unchanged, drawn as a soft pastel wash, never a box (Majd, Nov 21 2026, after
@@ -203,7 +212,8 @@ until its part is set up.
     "Not clear", violet for a tajweed note (Strict). A word with several shows its strongest; the mark a card is open
     for is a firmer shade of its own (`…Firm`), no outline. No red ink, dotted lines or + discs. The bar, the card and
     the summary use the same highlights, and a small flat swatch beside the kind's name (never a round mark): the kind
-    is always in words.
+    is always in words. "The page's ink unchanged" is about mistakes (Majd's Nov 15 board); the hidden page's newest word
+    in the following ink (RECITE-20) is the one place the ink takes a colour, and it never carries a mark.
   - **The next word's cover turns red while something else is said** (contract draft 7's `off`; Majd's yes, Nov 15 2026):
     - What shows: in the hidden view only, red over the word's cover (the word-mistake highlight), its text still
       hidden. It's never a mark and never counted.

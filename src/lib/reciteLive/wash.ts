@@ -51,10 +51,19 @@ export function washReach(wash: Wash): Rect {
 }
 
 /**
- * What follows the reciter on a page during a take (Majd, Nov 21 2026: no shades with the page shown): with the page
- * shown, only the quiet band on the line being recited (`band`, the cursor's word) and no word is washed; with it
- * hidden, no band, and the newest word shown (`newest`) has the grey wash, so the reciter sees where they are.
+ * What follows the reciter on a page during a take: with the page shown, only the flat band behind the ayah being recited
+ * (`band`, the cursor's word, whose ayah it is; Majd, Nov 21 and 22 2026: no shades with the page shown, the band as
+ * Tarteel's); with it hidden, no band, and the newest
+ * word shown (`newest`) in its own ink in the following colour (`ink`; Majd, Nov 22 2026, of Tarteel's hidden page: "i
+ * dont see the words being a different color as its recited"), unless it carries a mark (`marked`): its wash says more.
+ * The words recited before it are in the page's own ink. No word is washed to follow the reciter.
  */
-export function followCues(hidden: boolean, cursor: number | null, newest: number | null): { band: number | null; word: number | null } {
-  return hidden ? { band: null, word: newest } : { band: cursor, word: null };
+export function followCues(
+  hidden: boolean,
+  cursor: number | null,
+  newest: number | null,
+  marked: (w: number) => boolean = () => false,
+): { band: number | null; ink: number | null } {
+  if (!hidden) return { band: cursor, ink: null };
+  return { band: null, ink: newest != null && !marked(newest) ? newest : null };
 }

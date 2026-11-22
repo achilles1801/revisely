@@ -63,6 +63,9 @@ import { ReciteMic, ReciteMicMode } from './ReciteMic';
 import { ReciteMenuMode, ReciteModeMenu } from './ReciteModeMenu';
 import { BarButton, ReciteBar } from './ReciteBar';
 import { LiveMarkTargets, LiveOverlay, LiveUnderlay } from './LivePageLayers';
+import type { PageImage } from '../MushafPager';
+import { followCues } from '../../lib/reciteLive/wash';
+import { hiddenTakeInfo, revealedOnHide } from '../../lib/reciteLive/hideSwitch';
 import { ReciteNoticeSheet } from './ReciteNoticeSheet';
 import { MarkCard } from './MarkCard';
 import { SimilarPhrasesSheet } from './SimilarPhrasesSheet';
@@ -95,7 +98,7 @@ import { PassageProgressSheet } from '../reciteMemory/PassageProgressSheet';
 import { memoryId, type ClearRecord } from '../../lib/reciteMemory/record';
 import { clipOfTake, useTakeRecordings } from '../../lib/reciteMemory/takeAudio';
 import { markOf, PAST_OPACITY, RememberedTargets, RememberedUnderlay } from '../reciteMemory/RememberedLayers';
-import { markFill } from './markColours';
+import { markFill, markFirm } from './markColours';
 import { WordHistoryCard } from '../reciteMemory/WordHistoryCard';
 import { ShownTakeBar } from '../reciteMemory/ShownTakeBar';
 import type { TakeRecord } from '../../lib/reciteMemory/record';
@@ -356,6 +359,14 @@ export function useReciteLayer({
     }),
     [live.state, live.startWord, testPlace, heldCursor],
   );
+  // Switched to hidden after a take, the page hides everything, the take's recited words too (RECITE-21; Majd, Nov 22
+  // 2026, of Tarteel's: "do the same"); a new take starts from that again. While it runs, its recited words show.
+  const [hiddenAfterTake, setHiddenAfterTake] = useState(false);
+  const takeRunning = live.active && (live.state.status === 'listening' || live.state.status === 'connecting');
+  useEffect(() => {
+    if (live.state.status === 'connecting') setHiddenAfterTake(false);
+  }, [live.state.status]);
+  const hiddenInfo = useMemo(() => hiddenTakeInfo(liveInfo, hiddenAfterTake && !takeRunning), [liveInfo, hiddenAfterTake, takeRunning]);
 
   // Recite the mistakes again: what the take before found in the stretch, for its summary ("Before: …").
   const [drillBefore, setDrillBefore] = useState<string | null>(null);
@@ -478,38 +489,42 @@ export function useReciteLayer({
     (on: boolean) => setReciteCheckSettings(user?.id, { markMistakes: on, mode: 'recite' }),
     [user?.id],
   );
+  // Switched to hidden during a take, everything behind the reciter stays and only what is ahead hides; after a take,
+  // everything hides (RECITE-21).
   const toggleHidden = useCallback(() => {
-    setRevealed(NOTHING_SHOWN);
-    setHidden((h) => !h);
-  }, []);
+    const hide = !hidden;
+    setRevealed(hide && qw ? revealedOnHide(qw, currentPage, { running: takeRunning, startWord: liveInfo.startWord }) : NOTHING_SHOWN);
+    setHiddenAfterTake(hide && !takeRunning);
+    setHidden(hide);
+  }, [hidden, qw, currentPage, takeRunning, liveInfo.startWord]);
   // Each tells the checker which word was shown (the ayah's first word not shown before, for ‹‹).
   /** During a take, the words that `next` shows that weren't showing: peeks. */
   const notePeeks = useCallback(
     (next: Revealed) => {
       if (!live.active) return;
-      const newly = [...next].filter((w) => !wordShown(w, revealed, liveInfo));
+      const newly = [...next].filter((w) => !wordShown(w, revealed, hiddenInfo));
       if (newly.length) setPeeked((p) => new Set([...p, ...newly]));
     },
-    [live.active, revealed, liveInfo],
+    [live.active, revealed, hiddenInfo],
   );
   const showNextWord = useCallback(() => {
     if (!qw) return;
-    const next = revealNextWord(qw, currentPage, revealed, liveInfo);
+    const next = revealNextWord(qw, currentPage, revealed, hiddenInfo);
     const added = [...next].find((w) => !revealed.has(w));
     if (added == null) return;
     live.hint(added, 'word');
     notePeeks(next);
     setRevealed(next);
-  }, [qw, currentPage, revealed, liveInfo, live, notePeeks]);
+  }, [qw, currentPage, revealed, hiddenInfo, live, notePeeks]);
   const showWholeAyah = useCallback(() => {
     if (!qw) return;
-    const next = revealAyah(qw, currentPage, revealed, liveInfo);
+    const next = revealAyah(qw, currentPage, revealed, hiddenInfo);
     const added = [...next].find((w) => !revealed.has(w));
     if (added == null) return;
     live.hint(added, 'ayah');
     notePeeks(next);
     setRevealed(next);
-  }, [qw, currentPage, revealed, liveInfo, live, notePeeks]);
+  }, [qw, currentPage, revealed, hiddenInfo, live, notePeeks]);
 
   const checkTake = live.mode === 'check';
   const cardMarks = useMemo<Mark[]>(
@@ -727,15 +742,6 @@ export function useReciteLayer({
   );
   // The hidden view: covers and guide lines only, no band on any line (lib/reciteLive's LiveOverlay).
   const coverColors = useMemo(() => ({ cover: palette.pageBg, guide: palette.textSecondary }), [palette]);
-  // Recite's three highlight colours (theme/v2: markWord…), each with its firmer shade for the mark a card is open for.
-  const markColours = useMemo(
-    () => ({
-      word: { fill: v2.markWord, firm: v2.markWordFirm },
-      slip: { fill: v2.markSlip, firm: v2.markSlipFirm },
-      tajweed: { fill: v2.markTajweed, firm: v2.markTajweedFirm },
-    }),
-    [v2],
-  );
   const pageUnderlay = useMemo(
     () =>
       showing && qw
@@ -748,10 +754,10 @@ export function useReciteLayer({
               marks={shownOnPage(page)}
               selected={shownCardMarks[0] ?? null}
               hidden={false}
-              colors={{ band: v2.highlightSoft, word: v2.highlight, marks: markColours }}
+              colors={{ band: v2.highlight, marks: v2 }}
             />
           )
-        : showPast && qw
+        : showPast && qw && !pastOnCovers
         ? (page: number, scale: number) => (
             <RememberedUnderlay
               page={page}
@@ -769,24 +775,18 @@ export function useReciteLayer({
               page={page}
               scale={scale}
               words={qw}
-              // A hidden page: the grey wash on the newest word shown, behind its ink (the cursor’s word is covered); a shown page washes no word (followCues).
-              cursor={
-                live.state.status !== 'listening'
-                  ? null
-                  : hidden
-                    ? liveInfo.saidUpTo != null && liveInfo.startWord != null && liveInfo.saidUpTo >= liveInfo.startWord
-                      ? liveInfo.saidUpTo
-                      : null
-                    : live.state.cursor ?? guessCursor(live.state)
-              }
-              marks={pageMarks(page)}
+              // The band behind the cursor's ayah, on a shown page only (followCues); a hidden page's newest word is inked over
+              // the ink (LiveOverlay's follow).
+              cursor={live.state.status !== 'listening' ? null : live.state.cursor ?? guessCursor(live.state)}
+              // A hidden page draws its marks over its covers (LiveOverlay).
+              marks={hidden ? [] : pageMarks(page)}
               selected={cardMarks[0] ?? null}
               hidden={hidden}
-              colors={{ band: v2.highlightSoft, word: v2.highlight, marks: markColours }}
+              colors={{ band: v2.highlight, marks: v2 }}
             />
           )
         : undefined,
-    [liveOn, qw, live.active, live.state, v2, cardMarks, pageMarks, hidden, markColours, showPast, pastOnPage, pastAt, isDark, showing, shownOnPage, shownCardMarks, liveInfo],
+    [liveOn, qw, live.active, live.state, v2, cardMarks, pageMarks, hidden, showPast, pastOnPage, pastAt, isDark, showing, shownOnPage, shownCardMarks, liveInfo, pastOnCovers],
   );
   // The next word's cover turns red while something else is being said in its slot (the checker's `off`, draft 7).
   const offWord = live.state.off?.w ?? null;
@@ -796,10 +796,11 @@ export function useReciteLayer({
     const marked = new Set(Object.values(live.state.marks).map((m) => m.w));
     return [...peeked].filter((w) => !marked.has(w));
   }, [live.active, peeked, live.state.marks]);
+  // A hidden page draws every mark on the page over its covers (LiveOverlay), shown words' too: the page under them is
+  // covered. `picked`: the one a card is open for, in its firm shade.
   const coverMarksOn = useCallback(
-    (page: number): { mark: Mark; fill: string; opacity?: number }[] => {
+    (page: number): { mark: Mark; fill: string; opacity?: number; picked?: boolean }[] => {
       if (!qw || !hidden || !coversKeepMarks) return [];
-      const follow = hiddenFollow(qw, revealed, liveInfo);
       const liveMarks = live.active && checkTake ? marksOnPage(live.state, qw, page) : [];
       const past = pastOnCovers
         ? openInRange(memories, ...qw.pageRange(page)).flatMap((p) => {
@@ -807,13 +808,19 @@ export function useReciteLayer({
             return m ? [m] : [];
           })
         : [];
-      return coverHighlights(qw, page, follow.shown, liveMarks, past).map(({ mark, past: before }) =>
+      const pickedLive = cardMarks[0]?.w ?? null;
+      const pickedPast = pastAt?.w ?? null;
+      return coverHighlights(qw, page, () => false, liveMarks, past).map(({ mark, past: before }) =>
         before
-          ? { mark, fill: markFill(v2, mark), opacity: isDark ? PAST_OPACITY.dark : PAST_OPACITY.light }
-          : { mark, fill: markColours[markGroup(mark)].fill },
+          ? mark.w === pickedPast
+            ? { mark, fill: markFirm(v2, mark), opacity: 1, picked: true }
+            : { mark, fill: markFill(v2, mark), opacity: isDark ? PAST_OPACITY.dark : PAST_OPACITY.light }
+          : mark.w === pickedLive
+            ? { mark, fill: markFirm(v2, mark), picked: true }
+            : { mark, fill: markFill(v2, mark) },
       );
     },
-    [qw, hidden, coversKeepMarks, revealed, liveInfo, live.active, live.state, checkTake, markColours, pastOnCovers, memories, v2, isDark],
+    [qw, hidden, coversKeepMarks, live.active, live.state, checkTake, pastOnCovers, memories, v2, isDark, cardMarks, pastAt],
   );
   // A tap on the page: the shown take's marks; else this take's marks, then the past mistakes on show (on the page, or
   // on a hidden page's covers: Majd, Nov 21 2026, "the shaded mistakes when the page is hidden aren't clickable"). The
@@ -851,21 +858,32 @@ export function useReciteLayer({
       return true;
     };
   }, [liveOn, qw, checkTake, live.state, pastTaps, pastOnCovers, coverMarksOn, pastOnPage, showing, shownOnPage]);
+  // On a hidden page, the newest word shown, in the following ink (followCues: none for a word with a mark, whose wash
+  // says more; Majd, Nov 22 2026: "i dont see the words being a different color as its recited with page hidden").
+  const followWord = useMemo(() => {
+    if (!hidden || !qw || live.state.status !== 'listening') return null;
+    const newest =
+      liveInfo.saidUpTo != null && liveInfo.startWord != null && liveInfo.saidUpTo >= liveInfo.startWord ? liveInfo.saidUpTo : null;
+    return followCues(true, null, newest, (w) => pageMarks(qw.pageOf(w)).some((m) => m.w === w)).ink;
+  }, [hidden, qw, live.state.status, liveInfo, pageMarks]);
   const pageOverlay = useMemo(
     () =>
       liveOn && qw && (hidden || veiled.length > 0)
-        ? (page: number, scale: number) => (
+        ? (page: number, scale: number, image: PageImage | null) => (
             <LiveOverlay
               page={page}
               scale={scale}
+              image={image}
+              follow={followWord != null ? { w: followWord, words: qw, colour: v2.followInk } : null}
               hidden={
                 hidden
                   ? {
-                      follow: hiddenFollow(qw, revealed, liveInfo),
+                      follow: hiddenFollow(qw, revealed, hiddenInfo),
+                      ink: { colour: palette.pageTint, opacity: palette.pageTint != null ? 0.92 : undefined },
                       ...coverColors,
                       off: offWord != null ? { w: offWord, words: qw, colour: v2.markWord } : null,
-                      current:
-                        live.state.status === 'listening' && live.state.cursor != null ? { w: live.state.cursor, words: qw, colour: v2.highlight } : null,
+                      // Nothing on a word still hidden during a take (Majd's Dev take, Nov 22 2026).
+                      duringTake: takeRunning,
                     }
                   : null
               }
@@ -874,7 +892,7 @@ export function useReciteLayer({
             />
           )
         : undefined,
-    [liveOn, qw, hidden, revealed, liveInfo, coverColors, offWord, v2, veiled, palette, coverMarksOn, live.state.status, live.state.cursor],
+    [liveOn, qw, hidden, revealed, hiddenInfo, coverColors, offWord, v2, veiled, palette, coverMarksOn, takeRunning, followWord],
   );
   // The marks as elements of their own (VoiceOver, the tests). Given whenever the live UI is on, so the pager's pages
   // keep one shape through takes.

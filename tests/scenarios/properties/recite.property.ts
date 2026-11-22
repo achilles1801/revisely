@@ -63,8 +63,11 @@ import type { TakeRecord } from '../../../src/lib/reciteMemory/record';
 import { ayahKey, ayahsBetween, ayahCount, suraOf, ayahOf, type AyahKey } from '../../../src/lib/ayahKeys';
 import { getJuzForPage } from '../../../src/lib/quranData';
 import { runs } from './fixtures';
-import { cursorBox, markHighlight, wordBox } from '../../../src/lib/reciteLive/geometry';
+import { ayahBand, cursorBox, markHighlight, wordBox } from '../../../src/lib/reciteLive/geometry';
 import { followCues, washOf, washReach } from '../../../src/lib/reciteLive/wash';
+import { followBox, hiddenInkPlan } from '../../../src/components/reciteLive/HiddenInkLayer';
+import { hiddenTakeInfo, revealedOnHide } from '../../../src/lib/reciteLive/hideSwitch';
+import { pageLines } from '../../../src/lib/recite/pageLines';
 
 const words = quranWords();
 const KINDS: MarkKind[] = ['word', 'skipped', 'added', 'harakat', 'letter', 'tajweed'];
@@ -1278,13 +1281,11 @@ describe('[RECITE-19] highlights are soft washes wider than their word; with the
     );
   });
 
-  it('the page shown: only the line’s band follows the reciter; hidden: no band, the newest word shown is washed', () => {
+  it('the page shown: only the ayah’s band follows the reciter, no word is washed or inked', () => {
     const at = fc.option(wordArb, { nil: null });
     fc.assert(
-      fc.property(fc.boolean(), at, at, (hidden, cursor, newest) => {
-        const cues = followCues(hidden, cursor, newest);
-        if (hidden) expect(cues).toEqual({ band: null, word: newest });
-        else expect(cues).toEqual({ band: cursor, word: null });
+      fc.property(at, at, (cursor, newest) => {
+        expect(followCues(false, cursor, newest)).toEqual({ band: cursor, ink: null });
       }),
       { numRuns: runs(100) },
     );
@@ -1306,6 +1307,131 @@ describe('[RECITE-5] the audio 4:1: any block decodes to its own length, its fir
         expect(end).toBeGreaterThanOrEqual(0);
         expect(end).toBeLessThanOrEqual(88);
       }),
+    );
+  });
+});
+
+describe('[RECITE-20] on a hidden page the newest word shown is in the following ink, unless it carries a mark', () => {
+  const wordArb = fc.integer({ min: 0, max: words.count - 1 });
+  it('no band; the newest word shown is inked, never another, and never one with a mark', () => {
+    fc.assert(
+      fc.property(fc.option(wordArb, { nil: null }), fc.option(wordArb, { nil: null }), fc.uniqueArray(wordArb, { maxLength: 6 }), (cursor, newest, marked) => {
+        const cues = followCues(true, cursor, newest, (w) => marked.includes(w));
+        expect(cues.band).toBeNull();
+        if (newest == null || marked.includes(newest)) expect(cues.ink).toBeNull();
+        else expect(cues.ink).toBe(newest);
+      }),
+      { numRuns: runs(200) },
+    );
+  });
+});
+
+describe('[RECITE-20] a hidden page is drawn empty: faint rules where words are hidden, the markers and the words shown in their own ink', () => {
+  // A page, and what it shows: a run of words from where a take started (the words recited), and maybe a few more shown
+  // by hand further on (peeks, a verse shown whole).
+  const caseArb = fc.integer({ min: 3, max: 604 }).chain((page) => {
+    const [from, to] = words.pageRange(page);
+    return fc.record({
+      page: fc.constant(page),
+      start: fc.integer({ min: from, max: to - 1 }),
+      length: fc.integer({ min: 0, max: to - from }),
+      extra: fc.uniqueArray(fc.integer({ min: from, max: to - 1 }), { maxLength: 4 }),
+    });
+  });
+
+  it('every line is covered; each word shown is inside a run drawn in ink on its line, each hidden word outside them; every marker is drawn whole', () => {
+    fc.assert(
+      fc.property(caseArb, ({ page, start, length, extra }) => {
+        const shown = (w: number) => (w >= start && w < start + length) || extra.includes(w);
+        const plan = hiddenInkPlan(words, page, shown);
+        const lines = pageLines(page);
+        expect(plan.lines.map((l) => l.line)).toEqual(lines.map((l) => l.line));
+        const runsOn = (line: number) => {
+          const l = lines.find((x) => x.line === line)!;
+          return plan.ink.filter((p) => p.kind === 'shown' && p.box.y0 === l.coverTop).map((p) => p.box);
+        };
+        const [from, to] = words.pageRange(page);
+        for (let w = from; w < to; w++) {
+          const r = words.rect(w);
+          const runs = runsOn(words.lineOf(w));
+          if (shown(w)) expect(runs.some((b) => b.x0 <= r.x0 && b.x1 >= r.x1)).toBe(true);
+          else {
+            // A run spans only consecutive words shown, so a hidden word's middle is never in one, unless the word data
+            // puts it inside a shown word's own box (a few boxes overlap their neighbours; the fitted boxes fix those).
+            const mid = (r.x0 + r.x1) / 2;
+            const insideShownWord = (() => {
+              for (let v = from; v < to; v++) {
+                if (!shown(v) || words.lineOf(v) !== words.lineOf(w)) continue;
+                const o = words.rect(v);
+                if (o.x0 < mid && mid < o.x1) return true;
+              }
+              return false;
+            })();
+            if (!insideShownWord) expect(runs.filter((b) => b.x0 + 1 < mid && mid < b.x1 - 1)).toEqual([]);
+          }
+        }
+        for (const l of lines) {
+          for (const [a, b] of l.markers) expect(plan.ink.some((p) => p.kind === 'marker' && p.box.x0 <= a && p.box.x1 >= b && p.box.y0 === l.coverTop)).toBe(true);
+          // The rule never runs under a word shown or a marker.
+          const rules = plan.lines.find((x) => x.line === l.line)!.rules;
+          for (const box of runsOn(l.line)) for (const [a, b] of rules) expect(Math.min(b, box.x1 - 1) - Math.max(a, box.x0 + 1)).toBeLessThanOrEqual(0);
+        }
+        // The newest word's ink: its own x, its line's band.
+        if (length > 0) {
+          const w = start + length - 1 < to ? start + length - 1 : to - 1;
+          const box = followBox(words, plan, w);
+          const l = lines.find((x) => x.line === words.lineOf(w))!;
+          expect([box.y0, box.y1]).toEqual([l.coverTop, l.coverBottom]);
+          expect(box.x0).toBeLessThan(words.rect(w).x0);
+          expect(box.x1).toBeGreaterThan(words.rect(w).x1);
+        }
+      }),
+      { numRuns: runs(150) },
+    );
+  });
+});
+
+describe('[RECITE-19] on a shown page the band is the whole ayah being recited', () => {
+  it('the band behind the cursor’s ayah takes every line of it on the page, the cursor’s own line among them', () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 0, max: words.count - 1 }), (w) => {
+        const page = words.pageOf(w);
+        const ref = words.ref(w);
+        const bands = ayahBand(page, ref.sura, ref.ayah);
+        const box = wordBox(words, w);
+        const mid = (box.y0 + box.y1) / 2;
+        expect(bands.length).toBeGreaterThan(0);
+        expect(bands.some((b) => b.y0 <= mid && mid <= b.y1)).toBe(true);
+        // One rect a line, top to bottom, none overlapping the next.
+        for (let i = 1; i < bands.length; i++) expect(bands[i].y0).toBeGreaterThanOrEqual(bands[i - 1].y0);
+      }),
+      { numRuns: runs(200) },
+    );
+  });
+});
+
+describe('[RECITE-21] switched to hidden: mid-take everything behind the reciter stays, after a take nothing', () => {
+  it('during a take, the page’s words before the start stay (and those recited show anyway); none at or after the start', () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 1, max: 604 }), fc.integer({ min: 0, max: words.count - 1 }), (page, start) => {
+        const kept = revealedOnHide(words, page, { running: true, startWord: start });
+        const [from, to] = words.pageRange(page);
+        for (let w = from; w < to; w++) expect(kept.has(w)).toBe(w < start);
+        // With what the take recited (from its start up to where it is), every word behind the reciter shows.
+        const info = { saidUpTo: Math.min(to - 1, start + 3), startWord: start, cursor: null };
+        for (let w = from; w < to && w <= info.saidUpTo; w++) expect(wordShown(w, kept, info)).toBe(true);
+      }),
+      { numRuns: runs(150) },
+    );
+  });
+  it('after a take (or before one), nothing stays, and the take’s recited words no longer show', () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 1, max: 604 }), fc.integer({ min: 0, max: words.count - 1 }), (page, start) => {
+        expect(revealedOnHide(words, page, { running: false, startWord: start }).size).toBe(0);
+        const info = hiddenTakeInfo({ saidUpTo: start + 5, startWord: start, cursor: start + 6 }, true);
+        expect(wordShown(start + 1, new Set(), info)).toBe(false);
+      }),
+      { numRuns: runs(80) },
     );
   });
 });

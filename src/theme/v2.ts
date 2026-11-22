@@ -151,12 +151,15 @@ export interface PaletteV2 extends AccentTokens {
   /**
    * The one highlight on a mushaf page, a neutral grey for every accent (Majd, Nov 21 2026: "we should have one global
    * highlite color that doesnt conflict with other colors, maybe gray?"): `highlight` for an ayah (held, playing, a
-   * search result, a similar ayah, "You continued with…", a passage opened from Insights) and Recite's box on the word
-   * being said (or the newest one shown on a hidden page); `highlightSoft`, its lighter shade, for Recite's band on the
-   * line being recited (none on a hidden page). Grey like Tarteel's (Majd, Nov 15 2026: the blue ayah band read as
+   * search result, a similar ayah, "You continued with…", a passage opened from Insights) and the cover of the word being
+   * said on a hidden page; `highlightSoft`, its lighter shade, for Recite's band on the line being recited (none on a
+   * hidden page). Grey like Tarteel's (Majd, Nov 15 2026: the blue ayah band read as
    * running ahead). It never follows the accent, so it never reads as a mistake (Nov 14: Crimson's follow looked like
    * one), and it stays apart from the mistake highlights (`mark…`) and the peek veil. The page's ink reads at 4.5:1 on
-   * both. `followInk`, the word being said in the bar, is the one place Recite uses blue, as text at 4.5:1 on the ground.
+   * both. `followInk` is Recite's one following colour, a green of our own (Majd, Nov 22 2026, of Tarteel's hidden page:
+   * "i dont see the words being a different color as its recited with page hidden, why are we not taking that up?"):
+   * the newest word shown on a hidden page, in its own ink (components/reciteLive/FollowInk), and the word being said in
+   * the bar. Text at 4.5:1 on every ground and on the page; apart from the mistakes' red, amber and violet by hue.
    */
   highlight: string;
   highlightSoft: string;
@@ -214,7 +217,7 @@ const BASE_LIGHT: Base = {
   goodSubtle: '#E6F2EF',
   highlight: '#DEDEE3',
   highlightSoft: '#F2F2F4',
-  followInk: '#1D4ED8',
+  followInk: '#1A7A44',
   markWord: '#F6B9BC',
   markWordFirm: '#EF9CA1',
   markSlip: '#FADDA0',
@@ -252,7 +255,7 @@ const BASE_DARK: Base = {
   goodSubtle: '#0D2721',
   highlight: '#26262B',
   highlightSoft: '#121214',
-  followInk: '#7DB3F5',
+  followInk: '#86E0B0',
   markWord: '#7A3D48',
   markWordFirm: '#94505E',
   markSlip: '#7A5D2C',
