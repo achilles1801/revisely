@@ -704,6 +704,12 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   mistake's Undo (RECITE-4) is in the take's bar, in the words' place, for 5 s (15 with VoiceOver or TalkBack), the bar's
   buttons staying; Stop ends it, and the summary's Removed list has Put back. Before, both were notes over the page's
   last lines. A mark's card, opened from its word, is the one thing over the page, on purpose.
+- **RECITE-26.** (Revisely Dev) "Keep my recitations as test data" (on by default: each take and its result are kept on
+  revisely-dev for the lab, and nobody listens to them) is on Settings → Mushaf and Recite, for every account that
+  recites, tester or not. Off, takes are no longer kept. Revisely Dev is shared by link with people who aren't testers
+  (Majd, Nov 22 2026: "i just need to have the link to send to my friends"), and the Testing page shows only to
+  testers, so before this they had no way to turn it off. The store app never shows it: production's checker keeps
+  nothing.
 ## Recite insights
 
 What a user's takes with Mark mistakes show over time, and Revo knowing it (Majd, Nov 16 2026).

@@ -955,6 +955,23 @@ export default function SettingsScreen() {
                     }
                   />
                 ) : null}
+                {/* Revisely Dev's checker only: production's keeps nothing (recite-server-prod-plan.md). Here, not on the
+                    Testing page, so every Dev account that recites can turn it off (RECITE-26), testers or not. */}
+                {isDevVariant() ? (
+                  <Row
+                    icon="flask-outline"
+                    label={t('settings.recite.keep')}
+                    subtitle={t('settings.recite.keepSub')}
+                    rightSlot={
+                      <SettingSwitch
+                        value={reciteCheckSettings.keep}
+                        onValueChange={(keep) => setReciteCheckSettings(user?.id, { keep })}
+                        accessibilityLabel={t('settings.recite.keep')}
+                        testID="settings-recite-check-keep"
+                      />
+                    }
+                  />
+                ) : null}
               </>
             ) : null}
           </Section>
@@ -1327,22 +1344,6 @@ export default function SettingsScreen() {
                     />
                   }
                 />
-                {/* Revisely Dev's checker only: production's keeps nothing (recite-server-prod-plan.md). */}
-                {reciteCheck && isDevVariant() ? (
-                  <Row
-                    icon="mic-outline"
-                    label={t('settings.testing.keep')}
-                    subtitle={t('settings.testing.keepSub')}
-                    rightSlot={
-                      <SettingSwitch
-                        value={reciteCheckSettings.keep}
-                        onValueChange={(keep) => setReciteCheckSettings(user?.id, { keep })}
-                        accessibilityLabel={t('settings.testing.keep')}
-                        testID="settings-recite-check-keep"
-                      />
-                    }
-                  />
-                ) : null}
                 {/* Revisely Dev only: the reminders this phone will show, the days after tomorrow's too (REMIND-2). */}
                 {isDevVariant() ? <ScheduledRemindersRow /> : null}
                 {/* Revisely Dev only: which model its checker runs for each level (Majd, Nov 18 2026). */}

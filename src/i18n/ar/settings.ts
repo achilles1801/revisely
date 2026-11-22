@@ -230,6 +230,8 @@ export const settings: NonNullable<ArStrings['settings']> = {
     showPastSub: 'بلون خفيف، حتى تقرأ كل واحد منها صحيحًا في يومين مختلفين',
     mistakeSound: 'صوت عند الخطأ',
     mistakeSoundSub: 'نغمة قصيرة واهتزاز خفيف عند تحديد الخطأ',
+    keep: 'الاحتفاظ بتلاواتي كبيانات اختبار',
+    keepSub: 'فحوص التلاوة، لاختبارات ريفايزلي. تُفحَص آليًا، ولا يستمع إليها أحد.',
   },
   notifications: {
     enable: 'تذكيرات المراجعة',
@@ -306,8 +308,6 @@ export const settings: NonNullable<ArStrings['settings']> = {
     resetSub: 'البدء من جديد كحساب جديد',
     whatsNewAtLaunch: 'إظهار «الجديد في ريفايزلي» عند الفتح',
     whatsNewAtLaunchSub: 'كما سيراه مستخدمو ⁨App Store⁩ بعد التحديث',
-    keep: 'الاحتفاظ بتلاواتي كبيانات اختبار',
-    keepSub: 'فحوص التلاوة، لاختبارات ريفايزلي. تُفحَص آليًا، ولا يستمع إليها أحد.',
     model: 'نموذج تحديد الأخطاء',
     modelLine: 'متابعة التلاوة ⁨{{recite}}⁩ · الأخطاء ⁨{{harakat}}⁩ · الوضع الصارم ⁨{{strict}}⁩',
     modelServer: 'الفاحص ⁨{{server}}⁩',
