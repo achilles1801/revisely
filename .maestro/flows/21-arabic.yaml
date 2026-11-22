@@ -214,7 +214,16 @@ appId: com.revisionbuddy.app
     env:
       NAME: ar-settings-3
 
-# What's new, replayed from Settings → About (a tester's): each card.
+# What's new, replayed from Settings → About (a tester's): each card. Settings again from its top: settings-row.yaml
+# looks down, and the screenshots above left it at its foot, past the row (the first Android run, 45004643758).
+- tapOn:
+    id: back
+- extendedWaitUntil:
+    visible:
+      id: today-post
+    timeout: 15000
+- tapOn:
+    id: open-settings
 - runFlow:
     file: ../subflows/settings-row.yaml
     env:
