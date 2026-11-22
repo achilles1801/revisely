@@ -9,8 +9,9 @@ module.exports = {
     '/functions/',
     '/tests/firestore-rules/',
     '/.maestro/',
-    // Agent worktrees (.claude/worktrees) hold whole copies of the repo.
-    '/.claude/',
+    // Agent worktrees (.claude/worktrees) hold whole copies of the repo. Anchored to <rootDir> so the main
+    // checkout skips them while a worktree, whose own path contains /.claude/, still finds its tests.
+    '<rootDir>/.claude/',
   ],
   transformIgnorePatterns: [
     'node_modules/(?!((jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@react-native-firebase/.*|@sentry/react-native|native-base|react-native-svg|firebase|@firebase/.*))',
