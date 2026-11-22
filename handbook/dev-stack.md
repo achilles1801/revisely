@@ -123,7 +123,7 @@ until its part is set up.
   detection in the Dev app only (`lib/reciteCheck`: `isDevVariant()`, `previewTester`, a binary with the
   microphone stream). The reader's one mic: Recite follows the reciter on the page, and with Mark mistakes (Premium) it
   marks the words skipped, said wrong or added, wrong harakat and letters and, with Strict, tajweed notes (madd lengths
-  per Settings → Recite, qalqalah, ghunnah, ikhfa, idgham, iqlab). The verse menu's old "Check my recitation" row
+  per Settings → Mushaf and Recite, qalqalah, ghunnah, ikhfa, idgham, iqlab). The verse menu's old "Check my recitation" row
   (record, then check) is gone (Nov 15 2026; nothing showed it any more).
   - **Two tiers** (Majd, Nov 22 2026: "saying a wrong haraka or letter IS a word mistake. the only two "tiers" is word
     (including haraqah and letters) mistakes and then second tier is tajweed level mistake which we can market as

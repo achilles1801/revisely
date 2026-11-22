@@ -113,7 +113,7 @@ Every page is downloaded to the phone, so the reader and revision sessions work 
 - **A page that fails to show** (`evictCachedPage`) is deleted only if its size isn't the table's
   (a decoding failure from memory can hit a whole file: "Couldn't load page N", Try again); the
   download hears it (`onPageRemoved`) and fetches it again.
-- **Settings → Mushaf:** "Offline mushaf" (status and %, a menu with Download now and Remove from
+- **Settings → Downloads and storage:** "Offline mushaf" (status and %, a menu with Download now and Remove from
   this phone) and "Download over mobile data". "Downloaded" means every page, the Arabic and every
   sura of Saheeh International; the text downloads first. Remove deletes all three and turns the
   download off (kept on this phone, `@revisely_mushaf_offline:v1`) until Download now; pages and
