@@ -151,6 +151,7 @@ export function ReciteBar({
   surface,
   onScore,
   result = null,
+  undo = null,
 }: {
   hidden: boolean;
   onToggleHidden: () => void;
@@ -186,6 +187,11 @@ export function ReciteBar({
    * summary. Nothing opens by itself after Stop (Majd, Nov 22 2026: "nothing pops up in my face at any time").
    */
   result?: { text: string; onPress: () => void } | null;
+  /**
+   * A mark just called Not a mistake: "Marked not a mistake" and Undo in the words' place for a few seconds, the bar's
+   * buttons staying (RECITE-25). It used to be a note above the bar, over the page's last lines.
+   */
+  undo?: { text: string; onUndo: () => void } | null;
 }) {
   const { palette } = useTheme();
   const ticking = useTakeSeconds(takeClock);
@@ -217,8 +223,27 @@ export function ReciteBar({
       ) : null}
       {/* Not a live region: its clock changes every second, and TalkBack would speak each one over the recitation, where
           the microphone hears it. VoiceOver reads it when focused; the summary is spoken once when it shows. */}
-      <View style={styles.middle} accessible={!(phase === 'done' && result)} accessibilityLabel={`${clock(secs)}${recording && phase === 'live' && !paused ? ', recording' : ''}. ${paused ? shownStatus : spoken || status}`} testID="recite-middle">
-        <View style={styles.time}>
+      <View style={styles.middle} accessible={!(phase === 'done' && result) && !undo} accessibilityLabel={`${clock(secs)}${recording && phase === 'live' && !paused ? ', recording' : ''}. ${paused ? shownStatus : spoken || status}`} testID="recite-middle">
+        {undo ? (
+          <View style={styles.undo} accessibilityLiveRegion="polite" testID="recite-undo-note">
+            <Text style={[typeV2.meta, styles.undoText, { color: palette.text }]} numberOfLines={1} maxFontSizeMultiplier={1.2}>
+              {undo.text}
+            </Text>
+            <Tap
+              onPress={undo.onUndo}
+              hitSlop={8}
+              style={[styles.pill, { backgroundColor: palette.fill }]}
+              accessibilityRole="button"
+              accessibilityLabel={t('reciteLive.bar.undoLabel', { text: undo.text })}
+              testID="recite-undo"
+            >
+              <Text style={[styles.pillText, { color: palette.text }]} maxFontSizeMultiplier={1.2}>
+                {t('common.undo')}
+              </Text>
+            </Tap>
+          </View>
+        ) : null}
+        <View style={[styles.time, undo && styles.away]}>
           {recording && phase === 'live' && !paused ? (
             <View style={[styles.dot, { backgroundColor: palette.red }]} testID="recite-recording" />
           ) : null}
@@ -226,7 +251,7 @@ export function ReciteBar({
             {clock(secs)}
           </Text>
         </View>
-        {phase === 'done' && result ? (
+        {undo ? null : phase === 'done' && result ? (
           <Tap
             onPress={result.onPress}
             hitSlop={8}
@@ -323,6 +348,10 @@ const styles = StyleSheet.create({
   pill: { height: 30, paddingHorizontal: 11, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   pillText: { fontSize: 14, fontWeight: '600' },
   middle: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  undo: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  undoText: { flexShrink: 1 },
+  // The time steps aside while Undo has the words' place (it keeps its clock running).
+  away: { display: 'none' },
   time: { flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 0 },
   dot: { width: 7, height: 7, borderRadius: 3.5 },
   timeText: { fontSize: 14, fontWeight: '600' },

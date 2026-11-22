@@ -1,8 +1,8 @@
 // Recite's memory on the reader (Revisely Dev): words missed in past takes stay marked outside takes. The mocks are
 // QuranReaderRecite.test's (the page draws what the screen puts behind and beside it; the test sends the checker's events).
 import React from 'react';
-import { AccessibilityInfo, Alert, Modal } from 'react-native';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { AccessibilityInfo, Alert, Modal, StyleSheet } from 'react-native';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import QuranReaderScreen from '../QuranReaderScreen';
 import { resetReciteCheckSettingsForTests, setReciteCheckSettings } from '../../../lib/reciteCheck/settings';
@@ -529,6 +529,26 @@ describe('Show on the page', () => {
     await flush();
     expect(screen.queryByTestId('shown-take-bar')).toBeNull();
     expect(screen.getByTestId('past-highlight-word')).toBeTruthy();
+  });
+
+  it('[RECITE-25] its card is the footer, in the room the page leaves under it, never over the page’s last lines', async () => {
+    await open();
+    // Majd, Nov 22 2026: the card sat over the bottom verses, "which is unacceptable". The page is laid out above the
+    // footer's room (ReaderFrame), so a card inside that room, no taller than it, covers nothing at any size.
+    const footer = screen.getByTestId('reader-footer');
+    expect(within(footer).getByTestId('shown-take-bar')).toBeTruthy();
+    // The controls stay up while the take shows (the reader opens with them away), so the card is always there.
+    expect(footer.props.accessibilityElementsHidden).toBe(false);
+    const room = StyleSheet.flatten(footer.props.style).height as number;
+    const card = StyleSheet.flatten(screen.getByTestId('shown-take-bar').props.style);
+    expect(card.position).toBeUndefined();
+    expect(card.height).toBeLessThanOrEqual(room);
+    // In the player's place: the capsule and the track come back with Done.
+    expect(screen.queryByTestId('mushaf-scrubber')).toBeNull();
+    fireEvent.press(screen.getByTestId('shown-take-done'));
+    await flush();
+    expect(within(screen.getByTestId('reader-footer')).queryByTestId('shown-take-bar')).toBeNull();
+    expect(screen.getByTestId('mushaf-scrubber')).toBeTruthy();
   });
 
   it('▶ plays the take’s recording from its start, ❚❚ pauses it; Done stops it', async () => {
