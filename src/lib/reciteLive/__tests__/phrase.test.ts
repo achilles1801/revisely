@@ -118,6 +118,22 @@ describe('Your recitation: what it plays (RECITE-10)', () => {
     expect(clipRange(words, mark(w), timeOf, 400)).toEqual([t - MAX_SECONDS / 2, t + MAX_SECONDS / 2]);
   });
 
+  it('a slow take with words skipped after the mistake: the whole 15 s, holding the mistake and the next word reached', () => {
+    // The property's counterexample (seed -1351223486, Preview run 44990232450): 7:194's 3rd word said wrong, its 4th
+    // and 5th skipped, a word every 2.65 s. Its phrase (to the ۖ after the 8th) is too long even as 4 words before and 3
+    // after, so the clip is 15 s, from the phrase's start; before, it ended 7.5 s after the mistake, before the next
+    // word reached.
+    const a0 = words.verseFirstWord(7, 194);
+    const step = 2.6500000003333337;
+    const ws = range(a0, words.verseRange(7, 195)[1]).filter((w) => w !== word(7, 194, 4) && w !== word(7, 194, 5));
+    const m = new Map(ws.map((w) => [w, 2 + (w - a0) * step]));
+    const timeOf = (w: number) => m.get(w) ?? null;
+    const [c0, c1] = clipRange(words, mark(word(7, 194, 3)), timeOf, 145.1)!;
+    expect(c0).toBeCloseTo(startAt(2), 6);
+    expect(c1 - c0).toBeCloseTo(MAX_SECONDS, 6);
+    expect(c1).toBeGreaterThan(timeOf(word(7, 194, 6))! - AT_LAG);
+  });
+
   it('a take that ended in the phrase: up to the take’s end', () => {
     const ws = range(words.verseFirstWord(2, 255), word(2, 255, 11));
     const timeOf = timed(ws, 0, 1);

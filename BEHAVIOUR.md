@@ -564,7 +564,8 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   second alone: from the word after the last pause mark before it (or its ayah's start) to the next word that carries
   one, its own included (or its ayah's end). Every pause mark ends a phrase but ۙ (don't stop), and a phrase never
   leaves its ayah. A short ayah (12 words or fewer, or 8 seconds or less in the take) plays whole. It is never longer
-  than 15 seconds: a longer phrase is the mistake with 4 words before and 3 after. A skipped word plays from the word
+  than 15 seconds: a longer phrase is the mistake with 4 words before and 3 after, and if that is still longer (a slow
+  take), the 15 seconds of it around the mistake. A skipped word plays from the word
   before it, so the jump is heard; an extra word, the phrase of the word it came after, up to the word after it.
   (Majd, Nov 21 2026: "the playback should be 'smart' it should know based on where and what the mistake is, what
   exactly and how much of the recording they need to playback in order to benefit".)

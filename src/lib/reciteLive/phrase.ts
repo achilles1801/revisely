@@ -122,22 +122,24 @@ export function clipRange(
       range = span(Math.max(first, m.w - WORDS_BEFORE), Math.min(last, m.w + WORDS_AFTER), timeOf, takeEnd);
     }
   }
-  // Still too long (words the cursor never reached in between), or the mistake isn't in it (the reciter started the
-  // ayah again: the times are when the cursor first reached each word): around the mark's own second.
-  if (!range || range[1] - range[0] > MAX_SECONDS || (m.t && (m.t[0] < range[0] || m.t[1] > range[1]))) {
-    if (own) return own;
-    if (range && range[1] - range[0] > MAX_SECONDS) {
-      const at = momentOf(m.w, timeOf) ?? range[0];
-      return [Math.max(range[0], at - MAX_SECONDS / 2), Math.min(range[1], at + MAX_SECONDS / 2)];
-    }
-  }
-  if (!range) return across(m.w, timeOf, takeEnd);
+  if (!range) return own ?? across(m.w, timeOf, takeEnd);
+  // The mistake isn't in it (the reciter started the ayah again: the times are when the cursor first reached each word):
+  // around the mark's own second.
+  if (own && m.t && (m.t[0] < range[0] || m.t[1] > range[1])) return own;
   // A skipped word the clip would start after (the first of its phrase or ayah): from the last word reached before it,
   // so the jump over it is heard.
   if (timeOf(m.w) == null) {
     const [prev] = heardAround(m.w, timeOf);
-    const from = prev != null ? Math.max(0, prev - AT_LAG - LEAD) : null;
-    if (from != null && from < range[0]) range = [from, Math.min(range[1], from + MAX_SECONDS)];
+    if (prev != null) range = [Math.min(range[0], Math.max(0, prev - AT_LAG - LEAD)), range[1]];
+  }
+  // Still longer than MAX_SECONDS (a slow take, or words the cursor never reached in between): the mark's own second
+  // when it has one, else MAX_SECONDS of the range around the mistake's moment (shifted to stay inside it, so it is
+  // always the whole MAX_SECONDS and always holds the mistake).
+  if (range[1] - range[0] > MAX_SECONDS) {
+    if (own) return own;
+    const at = momentOf(m.w, timeOf) ?? range[0];
+    const start = Math.min(Math.max(range[0], at - MAX_SECONDS / 2), range[1] - MAX_SECONDS);
+    return [start, start + MAX_SECONDS];
   }
   return range;
 }

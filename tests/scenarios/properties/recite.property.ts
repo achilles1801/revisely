@@ -1199,19 +1199,32 @@ describe('[RECITE-18] Your recitation plays the phrase the mistake is in', () =>
         const clip = clipRange(words, t.mark, timeOf, t.takeEnd);
         expect(clip).not.toBeNull();
         const [c0, c1] = clip!;
+        // Times are sums of a step that isn't a whole number of seconds: compare to a microsecond.
+        const eps = 1e-6;
         expect(c0).toBeGreaterThanOrEqual(0);
-        expect(c1).toBeLessThanOrEqual(t.takeEnd + 1e-9);
-        expect(c1 - c0).toBeLessThanOrEqual(MAX_SECONDS + 1e-9);
-        // The mistake's moment: when the cursor reached the word (or, skipped, the word before and after it).
+        expect(c1).toBeLessThanOrEqual(t.takeEnd + eps);
+        expect(c1 - c0).toBeLessThanOrEqual(MAX_SECONDS + eps);
+        // The mistake's moment: when the cursor reached the word (or, skipped, the words reached before and after it).
         const before = [...t.times.keys()].filter((w) => w <= t.w).pop();
         const after = [...t.times.keys()].find((w) => w > t.w);
-        if (before != null) expect(c0).toBeLessThanOrEqual(t.times.get(before)! - AT_LAG + 1e-9);
-        if (after != null && t.kind !== 'added') expect(c1).toBeGreaterThanOrEqual(Math.min(t.takeEnd, t.times.get(after)! - AT_LAG) - 1e-9);
-        // Not before the ayah's first word the cursor reached (when it reached one), nor much past the next ayah's.
+        const moment = t.times.get(t.w) ?? (before != null && after != null ? (t.times.get(before)! + t.times.get(after)!) / 2 : null);
+        if (c1 - c0 < MAX_SECONDS - eps) {
+          // The phrase (or the ayah) whole: from the word reached before the mistake to the one reached after it.
+          if (before != null) expect(c0).toBeLessThanOrEqual(t.times.get(before)! - AT_LAG + eps);
+          if (after != null && t.kind !== 'added') expect(c1).toBeGreaterThanOrEqual(Math.min(t.takeEnd, t.times.get(after)! - AT_LAG) - eps);
+        } else if (moment != null) {
+          // Cut to 15 s (a slow take): it still holds the mistake, with up to half of it after, or to the word reached
+          // after it if that comes sooner.
+          expect(c0).toBeLessThanOrEqual(moment - AT_LAG + eps);
+          const reach = Math.min(t.takeEnd, moment + MAX_SECONDS / 2, after != null ? t.times.get(after)! - AT_LAG : Infinity);
+          if (t.kind !== 'added') expect(c1).toBeGreaterThanOrEqual(reach - eps);
+        }
+        // Not before the ayah's first word the cursor reached (when it reached one, and the mistake isn't a skipped
+        // first word, which plays from the word before it), nor much past the next ayah's.
         const first = [...t.times.keys()].find((w) => w >= t.a0 && w < t.a1);
-        if (first != null) expect(c0).toBeGreaterThanOrEqual(t.times.get(first)! - AT_LAG - LEAD - 1e-9);
+        if (first != null && t.times.has(t.w)) expect(c0).toBeGreaterThanOrEqual(t.times.get(first)! - AT_LAG - LEAD - eps);
         const nextAyah = [...t.times.keys()].find((w) => w >= t.a1);
-        if (nextAyah != null) expect(c1).toBeLessThanOrEqual(t.times.get(nextAyah)! - AT_LAG + TAIL + 1e-9);
+        if (nextAyah != null) expect(c1).toBeLessThanOrEqual(t.times.get(nextAyah)! - AT_LAG + TAIL + eps);
       }),
     );
   });
