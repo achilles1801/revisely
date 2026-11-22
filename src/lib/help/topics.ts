@@ -302,7 +302,7 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         id: 'reciteTake.hidden',
         icon: 'eye-off-outline',
         title: 'From memory',
-        text: '[[eye]] hides the words, and they appear as you say them. [[back]] shows the next word, and ‹‹ the rest of its ayah.',
+        text: '[[eye]] hides the words, and each appears once you’ve said it. [[back]] shows the next word, and ‹‹ the rest of its ayah.',
         covers: ['RECITE-6'],
         when: 'liveRecite',
       },

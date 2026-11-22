@@ -17,9 +17,17 @@ export interface BarWord {
   tone: 'current' | 'said' | 'wrong' | 'slip' | 'tajweed';
 }
 
-/** The words heard, for the bar: the last two up to the cursor (newest last). Check shows a wrong word as heard. */
-export function barWords(state: LiveState, words: QuranWords, opts: { check: boolean; startWord: number | null }): BarWord[] {
+/**
+ * The words heard, for the bar: the last two up to the cursor (newest last). Check shows a wrong word as heard. `upTo`
+ * (a hidden page): no further than the page shows, so the bar never gives away the word being said (RECITE-6).
+ */
+export function barWords(
+  state: LiveState,
+  words: QuranWords,
+  opts: { check: boolean; startWord: number | null; upTo?: number | null },
+): BarWord[] {
   if (state.cursor == null) return [];
+  const top = opts.upTo !== undefined ? Math.min(state.cursor, opts.upTo ?? -1) : state.cursor;
   const wrong = new Map<number, Mark>();
   const skipped = new Set<number>();
   const slipped = new Set<number>();
@@ -34,7 +42,7 @@ export function barWords(state: LiveState, words: QuranWords, opts: { check: boo
     }
   }
   const out: BarWord[] = [];
-  for (let w = state.cursor; w >= 0 && out.length < 2; w--) {
+  for (let w = top; w >= 0 && out.length < 2; w--) {
     if (opts.startWord != null && w < opts.startWord) break;
     if (skipped.has(w)) continue;
     const m = wrong.get(w);

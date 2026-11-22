@@ -479,8 +479,10 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
 - **RECITE-5.** A take whose connection drops and comes back shows the same take: its start, the words recited, its
   marks and its score. Anything the checker sends again changes none of them. (The hidden view's red cover, a hint,
   may show again on the next word until it is reached.)
-- **RECITE-6.** With the page hidden, the words show as they are recited, from where the take started. ‹ shows the
-  next hidden word and ‹‹ the rest of its ayah: a word shown by hand is peeked, never counts in the score, and its
+- **RECITE-6.** With the page hidden, the words show as they are recited, from where the take started: a word shows
+  once it has been said in full (the checker has decided it) or the next word has begun, never while it is being said,
+  and the bar names no more than the page shows (Majd, Nov 21 2026: "we shouldn't be showing the full word until the
+  user maybe either starts the next word or we get a full match"). ‹ shows the next hidden word and ‹‹ the rest of its ayah: a word shown by hand is peeked, never counts in the score, and its
   ayah joins Recite the mistakes again. While something else is said where the next word goes, that word's cover
   turns red. It goes once the word is reached or said, the reciter goes back, or a mark lands on it (or an extra word
   just before it); it is never a mark and never counts.

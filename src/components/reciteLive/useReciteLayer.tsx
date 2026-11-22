@@ -33,7 +33,7 @@ import { premiumErrorText, setDevPremium, supportLinkUrl, usePremium } from '../
 import { claimEarlyAccess, earlyAccessShortLine, useEarlyAccess } from '../../lib/earlyAccess';
 import { checkLevel, setReciteCheckSettings, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
 import { loadQuranWords, getQuranWords, QuranWords } from '../../lib/recite/quranWords';
-import { furthestWord, isUnfinished, marksOnPage, removedMarks, startNotFound } from '../../lib/reciteLive/state';
+import { furthestWord, isUnfinished, marksOnPage, removedMarks, startNotFound, revealedUpTo } from '../../lib/reciteLive/state';
 import { stopTrace } from '../../lib/reciteLive/stopTrace';
 import {
   barWords,
@@ -305,7 +305,8 @@ export function useReciteLayer({
   const testPlace = test ? test.places[test.at] : null;
   const liveInfo = useMemo(
     () => ({
-      saidUpTo: furthestWord(live.state),
+      // What the hidden page shows: never the word being said (RECITE-6).
+      saidUpTo: revealedUpTo(live.state),
       // Before the checker has found the start of a test's place: from the place (‹ shows its third word, not the page's first).
       startWord: live.startWord ?? testPlace?.cue[0] ?? null,
       cursor: live.state.cursor,
@@ -873,7 +874,7 @@ export function useReciteLayer({
           clock={live.clock}
           recording={live.recording && live.mic === 'on'}
           // A test's place, once done, says how it went in the words' place.
-          words={placeResult ? [] : barWords(live.state, qw, { check: checkTake, startWord: live.startWord })}
+          words={placeResult ? [] : barWords(live.state, qw, { check: checkTake, startWord: live.startWord, upTo: hidden ? revealedUpTo(live.state) : undefined })}
           status={barStatus}
           phase={barPhase}
           paused={live.paused}

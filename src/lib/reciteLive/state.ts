@@ -403,6 +403,18 @@ export function mistakeCount(state: LiveState): number {
   return marks.filter((m) => countsAsMistake(m) && !isUnclear(m)).length;
 }
 
+/**
+ * The furthest word a hidden page may show (RECITE-6; Majd, Nov 21 2026: "we shouldn't be showing the full word until the
+ * user maybe either starts the next word or we get a full match"). While the take runs: what the checker has decided
+ * (`said`, its full match), or the word before the cursor once the next word has begun, never the word being said.
+ * Once it has stopped: the furthest word reached.
+ */
+export function revealedUpTo(state: LiveState): number | null {
+  if (state.status !== 'listening' && state.status !== 'connecting') return furthestWord(state);
+  const xs = [state.saidUpTo, state.cursor != null ? state.cursor - 1 : null].filter((x): x is number => x != null);
+  return xs.length ? Math.max(...xs) : null;
+}
+
 /** The furthest word reached (the cursor or what's decided). */
 export function furthestWord(state: LiveState): number | null {
   const xs = [state.cursor, state.saidUpTo].filter((x): x is number => x != null);
