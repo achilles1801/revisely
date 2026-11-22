@@ -1,8 +1,11 @@
 // Recite's memory (lib/reciteMemory/memory): when a word's remembered mistake clears, against a model of the rule
-// written out step by step.
+// written out step by step; and a take's passage history (lib/reciteMemory/history, RMEM-7), against its own model.
 
 import fc from 'fast-check';
 import type { Mark } from '../../../src/lib/reciteLive/contract';
+import { isUnclear } from '../../../src/lib/reciteLive/contract';
+import { formatAccuracy, mistakesLabel } from '../../../src/lib/reciteLive/score';
+import { historyRows, HISTORY_MAX, passageHistory } from '../../../src/lib/reciteMemory/history';
 import { CLEAR_AFTER, memoryOfWord, openInRange, wordMemories } from '../../../src/lib/reciteMemory/memory';
 import type { ClearRecord, MemoryRecord, TakeRecord } from '../../../src/lib/reciteMemory/record';
 import { runs } from './fixtures';
@@ -159,3 +162,95 @@ describe("Recite's memory", () => {
     );
   });
 });
+
+// ------------------------------------------------------------------ RMEM-7: a take's passage history
+
+const words = require('../../../src/lib/recite/__fixtures__/quranWords').quranWords();
+/** Yusuf 87's first word: the passages here sit around it. */
+const P0 = words.verseRange(12, 87)[0];
+const NOW = Date.UTC(2026, 10, 22, 20);
+
+type Past = { start: number; length: number; minutesAgo: number; deleted: boolean; unfinished: boolean; kinds: Mark['kind'][]; unclear: boolean[] };
+const kindArb = fc.constantFrom<Mark['kind']>('word', 'skipped', 'added', 'harakat', 'letter', 'tajweed');
+const pastArb: fc.Arbitrary<Past> = fc.record({
+  start: fc.integer({ min: -150, max: 150 }),
+  length: fc.integer({ min: 1, max: 260 }),
+  // From two months before the take to an hour after it.
+  minutesAgo: fc.integer({ min: -60, max: 60 * 24 * 60 }),
+  deleted: fc.integer({ min: 0, max: 9 }).map((n) => n < 2),
+  unfinished: fc.integer({ min: 0, max: 9 }).map((n) => n < 2),
+  kinds: fc.array(kindArb, { maxLength: 6 }),
+  unclear: fc.array(fc.boolean(), { minLength: 6, maxLength: 6 }),
+});
+
+/** A take as Recite's memory keeps it: its mistakes counted as the summary counts them (tajweed and Not clear apart). */
+function pastTake(p: Past, i: number): TakeRecord {
+  const from = P0 + p.start;
+  const createdAt = NOW - p.minutesAgo * 60_000;
+  const marks: Mark[] = p.kinds.map((kind, k) => ({
+    id: `${i}:${k}`,
+    w: from + Math.min(k, p.length - 1),
+    ayah: [12, 87],
+    kind,
+    sure: (kind === 'harakat' || kind === 'letter') && p.unclear[k] ? 'likely' : 'clear',
+  }));
+  const summaryCount = marks.filter((m) => m.kind !== 'tajweed' && !isUnclear(m)).length;
+  return {
+    id: `p${i}`,
+    kind: 'take',
+    take: null,
+    createdAt,
+    rev: createdAt,
+    day: new Date(createdAt).toISOString().slice(0, 10),
+    level: 'strict',
+    hidden: false,
+    from,
+    to: from + p.length - 1,
+    secs: 60,
+    mistakes: summaryCount,
+    tajweed: marks.filter((m) => m.kind === 'tajweed').length,
+    unclear: marks.filter(isUnclear).length,
+    accuracy: Math.max(0, 1 - summaryCount / p.length),
+    marks,
+    passed: [],
+    recordingId: null,
+    ...(p.deleted ? { deleted: true } : {}),
+    ...(p.unfinished ? { unfinished: true } : {}),
+  };
+}
+
+describe("A take's passage history", () => {
+  it('[RMEM-7] the summary lists the takes of the same stretch before this one (sharing at least half of each), newest first, five at most; never a forgotten or unfinished one', () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 0, max: 100 }), fc.integer({ min: 3, max: 140 }), fc.array(pastArb, { maxLength: 14 }), (start, length, pasts) => {
+        const current = { id: 'now', createdAt: NOW, from: P0 + start, to: P0 + start + length - 1 };
+        const takes = pasts.map(pastTake);
+        // This take is in the account's records too, once kept: never its own history.
+        const self = { ...pastTake({ start, length, minutesAgo: 0, deleted: false, unfinished: false, kinds: [], unclear: [] }, 0), id: 'now' };
+        const records = [...takes, self];
+        // The rule, written out.
+        const len = (r: { from: number; to: number }) => r.to - r.from + 1;
+        const shared = (r: { from: number; to: number }) => Math.min(r.to, current.to) - Math.max(r.from, current.from) + 1;
+        const expected = takes
+          .filter((r) => !r.deleted && !r.unfinished && r.createdAt < NOW)
+          .filter((r) => shared(r) > 0 && shared(r) * 2 >= len(r) && shared(r) * 2 >= len(current))
+          .sort((a, b) => b.createdAt - a.createdAt)
+          .slice(0, HISTORY_MAX)
+          .map((r) => r.id);
+        const got = passageHistory(records, current);
+        expect(got.map((r) => r.id)).toEqual(expected);
+        // Each row: its day in words (never a date), its score, and its mistakes as the summary counts them.
+        for (const row of historyRows(words, current, got, NOW)) {
+          expect(row.when).toMatch(/^(Earlier today|Yesterday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|\d+ (days?|weeks?|months?) ago)$/);
+          expect(row.score).toBe(formatAccuracy(row.take.accuracy));
+          const counted = row.take.marks.filter((m) => m.kind !== 'tajweed' && !isUnclear(m)).length;
+          expect(row.detail.split(' · ')).toContain(mistakesLabel(counted));
+          expect(row.label).toContain(row.when);
+          expect(row.label).toContain(mistakesLabel(counted));
+        }
+      }),
+      { numRuns: runs(300) },
+    );
+  });
+});
+

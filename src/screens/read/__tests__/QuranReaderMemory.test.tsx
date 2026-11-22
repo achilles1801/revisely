@@ -429,6 +429,33 @@ describe("Recite's memory in the take's summary", () => {
     expect(screen.queryByTestId('progress-sheet')).toBeNull();
   });
 
+  it('[RMEM-7] the summary lists this passage’s earlier take, in words for VoiceOver; a tap shows it on the page', async () => {
+    await startTake('check');
+    await event({ type: 'at', w: UTIYAT + 25 });
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await flush();
+    await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: UTIYAT + 25, secs: 12, marks: [], score: { reached: 30, mistakes: 0, tajweed: 0, accuracy: 1 }, start: A23 } });
+    expect(screen.getByText('This passage: your last take')).toBeTruthy();
+    const rows = screen.getAllByTestId('take-summary-history-row');
+    expect(rows).toHaveLength(1);
+    expect(rows[0].props.accessibilityLabel).toMatch(/^Yesterday: 99\.0%, (.+, )?1 mistake\. Show it on the page$/);
+    fireEvent.press(rows[0]);
+    await waitFor(() => expect(screen.getByTestId('shown-take-bar')).toBeTruthy(), { timeout: 3000 });
+    // The summary closes (its sheet animates away).
+    await waitFor(() => expect(screen.queryByTestId('take-summary')).toBeNull(), { timeout: 3000 });
+  });
+
+  it('[RMEM-7] the store app has no passage history yet (Revisely Dev’s until the next release); the trend is there', async () => {
+    mockState.dev = false;
+    await startTake('check');
+    await event({ type: 'at', w: UTIYAT + 25 });
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await flush();
+    await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: UTIYAT + 25, secs: 12, marks: [], score: { reached: 30, mistakes: 0, tajweed: 0, accuracy: 1 }, start: A23 } });
+    expect(screen.getByTestId('take-summary-progress')).toBeTruthy();
+    expect(screen.queryByTestId('take-summary-history')).toBeNull();
+  });
+
   it('a second right day clears the word: the summary says so', async () => {
     mockMemory.records = [pastTake({ createdAt: NOW - 2 * 86_400_000, day: '2026-11-13' }), pastTake({ id: 'right1', createdAt: NOW - 86_400_000, day: '2026-11-14', marks: [], mistakes: 0, accuracy: 1 })];
     await startTake('check');

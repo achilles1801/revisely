@@ -661,6 +661,19 @@ Recite with Mark mistakes remembers each take (Majd, Nov 15 2026; Tarteel's bigg
   Settings' recordings or what Revo is told of a day's recordings, and Settings' Delete all recordings
   leaves it. A take saved before as a plain recording becomes a take's audio again once its take is on the
   phone; Recite alone's old audio has no take, so it stays a recording.
+- **RMEM-7.** (Revisely Dev) A take's summary lists the user's earlier takes of the same stretch, newest first, five at
+  most: "This passage: your last 3 takes" (Majd, Nov 22 2026, after the Tarteel analysis: "we can queue up another
+  session to implement this, no reason to wait until later"). An earlier take counts when the two share at least half
+  of each one's words, so a whole-page take isn't the history of two of its ayat, nor the other way round; a take
+  deleted, or kept without its final answer (RECITE-11), never does. Each row says:
+  - when, as a day and never a date: Earlier today, Yesterday, a weekday within the week, then "9 days ago", "3 weeks
+    ago", "2 months ago";
+  - its score by the page, and its mistakes as the summary counts them (tajweed notes and Not clear never count);
+  - its ayat, only when they aren't this take's, and "page hidden" when it was.
+
+  A tap shows that take on its page with its marks until Done, as Show on the page does (RMEM-5). VoiceOver reads a row
+  in words ("Yesterday: 98.1%, 2 mistakes. Show it on the page"). With no earlier take, during a take (the score's "so
+  far") and after Recite alone, there is no such section. "Your progress here" (RMEM-4) follows it.
 
 ## Searching the Qur'an
 
