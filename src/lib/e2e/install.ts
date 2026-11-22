@@ -5,6 +5,7 @@
 
 import { AppState, Linking } from 'react-native';
 import { handleClockLink, installClock } from './clock';
+import { applyE2ELanguage, handleLanguageLink } from './language';
 import { handleRecordingsLink, installDemoRecordings } from './demoRecordings';
 import { handleVerseLink, installDemoTranslations } from './demoTranslations';
 import { flushE2ELog, installLog } from './log';
@@ -25,6 +26,7 @@ function handle(url: string | null | undefined): void {
   if (handleUpdateLink(url)) return;
   if (handleReciteLiveLink(url)) return;
   if (handleVoiceSearchLink(url)) return;
+  if (handleLanguageLink(url)) return;
   handleNetworkLink(url);
 }
 
@@ -51,12 +53,13 @@ export function installE2E(): void {
   const link = Linking.getInitialURL()
     .then(handle)
     .catch(() => undefined);
-  ready = Promise.all([link, pinFreshTheme()]).then(() => undefined);
+  // The language a flow asked for (21-arabic), before the first screen: English otherwise.
+  ready = Promise.all([link, pinFreshTheme(), applyE2ELanguage()]).then(() => undefined);
   // eslint-disable-next-line no-console
   console.log('[e2e] installed: revisely-e2e-build');
 }
 
-/** Resolves once a launch link, if any, has been applied (and the fresh install's theme chosen). */
+/** Resolves once a launch link, if any, has been applied (and the fresh install's theme and the language chosen). */
 export function e2eReady(): Promise<void> {
   return ready;
 }

@@ -24,7 +24,8 @@
     "17-jump-after-ahead": 7.5,
     "18-recite-live": 9,
     "19-recite-session": 9,
-    "20-long-take": 15
+    "20-long-take": 15,
+    "21-arabic": 12
   },
   "android": {
     "01-onboarding": 3,
@@ -50,6 +51,7 @@
     "17-jump-after-ahead": 4,
     "18-recite-live": 6,
     "19-recite-session": 6,
-    "20-long-take": 13
+    "20-long-take": 13,
+    "21-arabic": 8
   }
 }

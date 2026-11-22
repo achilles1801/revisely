@@ -19,7 +19,8 @@ t('updates.store.body', { version, store });      // "Revisely 1.0.4 is on the A
 - `t()` is a plain function, for components and `lib/` alike. Call it where the text is used, never in
   a module-level constant: the language is set at launch, and a constant would keep the first one.
 - Tests, scenarios and E2E builds always run in English (`pinnedToEnglish` in `language.ts`), so text
-  queries and Maestro matchers keep working.
+  queries and Maestro matchers keep working. One E2E flow, `21-arabic`, asks for Arabic
+  (`src/lib/e2e/language.ts`) and takes screenshots of the key screens right to left, tapping by id.
 
 ## Writing a string
 
