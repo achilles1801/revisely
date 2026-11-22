@@ -11,7 +11,7 @@ import { SafeAreaView } from '../../components/SafeAreaView';
 import { RouteProp, useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { HomeStackParamList } from '../../navigation/MainNavigator';
+import type { HomeStackParamList } from '../../navigation/MainNavigator';
 import { PillButton } from '../../components/v2/PillButton';
 import { MushafPager, MushafPagerHandle } from '../../components/MushafPager';
 import { useHaptics } from '../../design/haptics';

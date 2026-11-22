@@ -18,7 +18,8 @@ npx --prefix scripts/lint eslint -c scripts/lint/eslint.config.mjs src/lib/strea
   and publish a preview update. `scripts/` is outside it.
 
 ## What it checks
-Expo's own config for SDK 54 (`eslint-config-expo` 10), with three changes:
+Expo's own config for SDK 54 (`eslint-config-expo` 10), with four changes:
+- `import/no-cycle` is an error: no import cycles (`import type` doesn't count). It adds about 45 s to a full run.
 - `react/no-unescaped-entities` is off: a React Native `<Text>` shows `'` and `"` as they are.
 - `react/display-name` is a warning: names help in React DevTools, but an anonymous `memo()` isn't a bug.
 - In tests, `require` in `jest.mock`, imports after mocks, anonymous mock components and `children` as a prop are

@@ -4,7 +4,7 @@ import { ScreenSafeAreaView } from '../../components/SafeAreaView';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { OnboardingStackParamList, JourneyStage } from '../../navigation/OnboardingNavigator';
+import type { OnboardingStackParamList, JourneyStage } from '../../navigation/OnboardingNavigator';
 import { Stepper } from '../../components/Stepper';
 import { Mark } from '../../components/v2/Mark';
 import { PillButton } from '../../components/v2/PillButton';
