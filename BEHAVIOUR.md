@@ -552,6 +552,14 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   what the take has found so far, with Done only, and the take goes on; once it's done, it opens the take's summary
   again. A take's summary carries no line about test data or Premium. (Majd, Nov 21 2026: "the percentage score
   should be clickable throughout the whole process".)
+- **RECITE-18.** (Revisely Dev) "Your recitation" on a mark's card plays the phrase the mistake is in, not the mark's
+  second alone: from the word after the last pause mark before it (or its ayah's start) to the next word that carries
+  one, its own included (or its ayah's end). Every pause mark ends a phrase but ۙ (don't stop), and a phrase never
+  leaves its ayah. A short ayah (12 words or fewer, or 8 seconds or less in the take) plays whole. It is never longer
+  than 15 seconds: a longer phrase is the mistake with 4 words before and 3 after. A skipped word plays from the word
+  before it, so the jump is heard; an extra word, the phrase of the word it came after, up to the word after it.
+  (Majd, Nov 21 2026: "the playback should be 'smart' it should know based on where and what the mistake is, what
+  exactly and how much of the recording they need to playback in order to benefit".)
 
 ## Recite insights
 

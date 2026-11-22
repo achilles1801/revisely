@@ -355,11 +355,16 @@ until its part is set up.
     after Stop never reached the checker: the connection drops every frame once it has the final answer. With VoiceOver
     or TalkBack the Undo stays 15 s, and Not a mistake and Put back are said (`components/reciteLive/a11y`; never while
     the microphone is on). The bar's words are read with their marks ("…, wrong word"): colour is never the only signal.
-  - **Your recitation** on the mark card: the reciter's own voice at the mark, from the take's audio that the connection
-    holds on the phone for resuming (`audioClip`), from the mark's `t` (0.6 s before to 0.4 s after). A mark without
-    one (a skipped word) uses when the cursor first reached that word or the one before, ±1.2 s. It works until the take
-    is closed, and has no button when the moment isn't known (E2E's recorded take has no audio). The clip is a WAV in the
-    caches folder (`lib/reciteLive/clipFile`), on this phone only.
+  - **Your recitation** on the mark card: the reciter's own voice, from the take's audio that the connection holds on
+    the phone for resuming (`audioClip`). It plays the phrase the mistake is in (Majd, Nov 21 2026: "smart" playback;
+    RECITE-18, `lib/reciteLive/phrase`): between the pause marks either side of it (any but ۙ), within its ayah, or the
+    whole ayah when it's short (12 words or fewer, or 8 s or less), at most 15 s (else 4 words before and 3 after). Its
+    times are when the cursor first reached each word. A skipped word plays from the word before it; a mark the cursor
+    reached nothing near falls back to its `t` (0.6 s before to 0.4 s after). The pause marks are
+    `src/data/quranWaqf.json` (`scripts/build-quran-waqf.py`, from Tanzil's Uthmani text, by the app's word numbers).
+    It works until the take is closed, and has no button when the moment isn't known (E2E's recorded take has no audio).
+    The clip is a WAV in the caches folder (`lib/reciteLive/clipFile`), on this phone only. A past take's ▶ (Recite's
+    memory, `clipOfTake`) still plays a moment around one time: its record keeps no time for every word.
   - **Recite the mistakes again** (Majd, Nov 15 2026; `lib/reciteLive/drill`): a Check summary with a mark other than
     tajweed offers one take over the stretch from the ayah before the first mistake (same surah) to the last mistake's
     ayah (`s2`/`a2`, no `startBy`). It stops by itself once `said` reaches the stretch's last word (reciting on would

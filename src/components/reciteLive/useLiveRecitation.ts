@@ -19,6 +19,7 @@ import type { LiveEvent, Mark } from '../../lib/reciteLive/contract';
 import type { LiveConnect, LiveConnection, StartFrame } from '../../lib/reciteLive/feed';
 import { socketFeed } from '../../lib/reciteLive/socket';
 import { stopHearing } from '../../lib/reciteLive/hearAudio';
+import { clipRange } from '../../lib/reciteLive/phrase';
 import { spanEndWord, TakeSpan } from '../../lib/reciteLive/span';
 import { stopTrace } from '../../lib/reciteLive/stopTrace';
 import { createTakeClock } from '../../lib/reciteLive/takeClock';
@@ -664,29 +665,32 @@ export function useLiveRecitation({
   }, [owner]);
 
   /**
-   * The reciter's own voice at a mark ("Your recitation"): the mark's time in the take (a little before and after), or
-   * for a mark without one (a skipped word), around when the cursor reached that word or the one before. Null when the
-   * take's audio isn't held (E2E's recorded take) or the moment isn't known.
+   * The reciter's own voice at a mark ("Your recitation", RECITE-10): the phrase the mistake is in, whole for a short
+   * ayah (lib/reciteLive/phrase), from when the cursor reached each word. Before the word data has loaded, or for a
+   * phrase the cursor never reached, the mark's own second (a little before and after), or around when the cursor
+   * reached that word or the one before. Null when the take's audio isn't held (E2E's recorded take) or the moment
+   * isn't known.
    */
-  /** Whether Your recitation has something to play for `m` (cheap: nothing is cut). */
-  const hasClip = useCallback(
-    (m: Mark): boolean =>
-      !!lastConn.current?.audioClip && (m.t != null || wordTimes.current.has(m.w) || wordTimes.current.has(m.w - 1)),
-    [],
-  );
-  const clipFor = useCallback((m: Mark): Int16Array | null => {
-    const c = lastConn.current;
-    if (!c?.audioClip) return null;
-    let range: [number, number] | null = null;
-    if (m.t) range = [m.t[0] - 0.6, m.t[1] + 0.4];
-    else {
-      const at = wordTimes.current.get(m.w) ?? wordTimes.current.get(m.w - 1);
-      if (at != null) range = [at - 1.2, at + 1.2];
-    }
-    if (!range) return null;
-    const pcm = c.audioClip(Math.max(0, range[0]), range[1]);
-    return pcm && pcm.length > 0 ? pcm : null;
+  const clipSeconds = useCallback((m: Mark): [number, number] | null => {
+    const words = getQuranWords();
+    const timeOf = (w: number) => wordTimes.current.get(w) ?? null;
+    if (words) return clipRange(words, m, timeOf, samples.current / SAMPLE_RATE);
+    if (m.t) return [m.t[0] - 0.6, m.t[1] + 0.4];
+    const at = timeOf(m.w) ?? timeOf(m.w - 1);
+    return at != null ? [at - 1.2, at + 1.2] : null;
   }, []);
+  /** Whether Your recitation has something to play for `m` (cheap: nothing is cut). */
+  const hasClip = useCallback((m: Mark): boolean => !!lastConn.current?.audioClip && clipSeconds(m) != null, [clipSeconds]);
+  const clipFor = useCallback(
+    (m: Mark): Int16Array | null => {
+      const c = lastConn.current;
+      const range = c?.audioClip ? clipSeconds(m) : null;
+      if (!c?.audioClip || !range) return null;
+      const pcm = c.audioClip(Math.max(0, range[0]), range[1]);
+      return pcm && pcm.length > 0 ? pcm : null;
+    },
+    [clipSeconds],
+  );
 
   /**
    * A label for the checker ("Not a mistake", or taking it back): on the take's connection while it's live; after its
