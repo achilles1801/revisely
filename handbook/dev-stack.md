@@ -288,7 +288,8 @@ until its part is set up.
       goes to one take, and an earlier take's audio goes with its connection once its answer is in.
     - One record in Recite's memory, with `links` (each take's checker id and first word; `takeOfWord` for labels).
       Your recitation on an earlier take's mark reads the take's recording file back (`TakeRecording.clip`) while it
-      lasts.
+      lasts, and after Stop the file as saved in the day's recordings (`takeFile`, lib/reciteMemory/takeAudio, as a
+      past take's word does). With Save recordings off no file holds the earlier takes' audio.
     - E2E: `revisely://e2e/recite-live?on=1&long=45&speed=5` (flow 21, 45 minutes in 9): the stand-in enforces the cap,
       starts each take where the last ended, and beats every 2 s of audio (5 times as often by the clock).
   - **A take starts anywhere on the page** (Majd, Nov 14 2026; protocol 6). The start frame sends `startBy` (the page's

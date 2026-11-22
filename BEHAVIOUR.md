@@ -661,8 +661,9 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   leaving the app or a drill's or a test's end never start a next take. The summary covers the whole recitation once
   every take has its answer (a take whose answer doesn't come stands unfinished, RECITE-11), with one score, one
   recording and one record in Recite's memory, whose Not a mistake labels go to the take that judged the word. "Your
-  recitation" on an earlier take's mark plays from the recording while the recitation lasts. (The release owner's plan,
-  Nov 22 2026: Recite in a revision session stopped at 15 minutes.)
+  recitation" on an earlier take's mark plays from the recitation's recording, while it lasts and after Stop (read from
+  the file as saved); with Save recordings off nothing keeps an earlier take's audio, and its marks have none. (The
+  release owner's plan, Nov 22 2026: Recite in a revision session stopped at 15 minutes.)
 
 - **RECITE-24.** (Revisely Dev) A take's summary: a take of 2 pages or more says its mistakes per page beside the count
   ("3 mistakes · 1.5 a page"; never in the bar), where a % alone hides how many there were. Insights' Recitation
