@@ -24,17 +24,20 @@ export interface InkWash {
 }
 
 export interface HiddenInkPlan {
-  /** Each line: its cover, its faint rule's parts (where words are still hidden), and the band its ink is drawn in. */
-  lines: { line: number; cover: Rect; rules: Span[]; ruleY: number; top: number; bottom: number }[];
-  /** What is drawn in the page's ink: the verse markers, whole, and each run of words shown, in bounds space. */
-  ink: { box: Rect; kind: 'marker' | 'shown' }[];
+  /**
+   * Each line: its covers (over the words still hidden, leaving the markers and the words shown open), its faint rule's
+   * parts (where words are still hidden), and the band a word's ink takes.
+   */
+  lines: { line: number; covers: Rect[]; rules: Span[]; ruleY: number; top: number; bottom: number }[];
+  /** What the covers leave open: the verse markers, whole, and each run of words shown, in bounds space. */
+  open: { box: Rect; kind: 'marker' | 'shown' }[];
 }
 
 /**
- * A hidden page drawn as an empty page (Majd, Nov 22 2026, of Tarteel's: "yeah kinda similar to the ink color change i
- * mentioned earlier, let's do it and test it"): each line covered in the page's colour, a faint rule where its words are
- * still hidden, and over it, in the page's own ink, the verse markers whole and every run of words shown (recited,
- * peeked or in a verse shown), each drawn again from the page's image through its words' boxes. Pure, in bounds space.
+ * A hidden page (Majd, Nov 22 2026, of Tarteel's: "let's do it and test it"): covers in the page's colour over the words
+ * still hidden, with a faint rule on each, leaving the verse markers whole and every run of words shown (recited, peeked
+ * or in a verse shown) open, so they show in the page's own ink from the page's image underneath: ready at once, nothing
+ * drawn again (Majd, Nov 22: "it should just appear ready from the start like it was before"). Pure, in bounds space.
  */
 export function hiddenInkPlan(words: QuranWords, page: number, shown: (w: number) => boolean): HiddenInkPlan {
   const [from, to] = words.pageRange(page);
@@ -64,22 +67,25 @@ export function hiddenInkPlan(words: QuranWords, page: number, shown: (w: number
   }
   close();
   const lines: HiddenInkPlan['lines'] = [];
-  const ink: HiddenInkPlan['ink'] = [];
+  const open: HiddenInkPlan['open'] = [];
   for (const l of pageLines(page)) {
     const shownSpans = runs.get(l.line) ?? [];
     const band = (a: number, b: number): Rect => ({ x0: a - INK_EDGE, x1: b + INK_EDGE, y0: l.coverTop, y1: l.coverBottom });
-    for (const [a, b] of l.markers) ink.push({ box: band(a, b), kind: 'marker' });
-    for (const [a, b] of shownSpans) ink.push({ box: band(a, b), kind: 'shown' });
+    for (const [a, b] of l.markers) open.push({ box: band(a, b), kind: 'marker' });
+    for (const [a, b] of shownSpans) open.push({ box: band(a, b), kind: 'shown' });
+    const holes: Span[] = [...l.markers, ...shownSpans].map(([a, b]) => [a - INK_EDGE, b + INK_EDGE]);
     lines.push({
       line: l.line,
-      cover: { x0: l.x0 - COVER_EDGE, x1: l.x1 + COVER_EDGE, y0: l.coverTop, y1: l.coverBottom },
+      covers: subtractSpans(l.x0 - COVER_EDGE, l.x1 + COVER_EDGE, holes)
+        .filter(([a, b]) => b - a > 0.5)
+        .map(([a, b]) => ({ x0: a, x1: b, y0: l.coverTop, y1: l.coverBottom })),
       rules: subtractSpans(l.x0, l.x1, [...l.markers, ...shownSpans]).filter(([a, b]) => b - a > MIN_RULE),
       ruleY: l.y0 + RULE_AT * (l.y1 - l.y0),
       top: l.coverTop,
       bottom: l.coverBottom,
     });
   }
-  return { lines, ink };
+  return { lines, open };
 }
 
 /** The newest word's box for its following ink: its own x, its line's band (as the runs of words shown). */
@@ -115,10 +121,10 @@ function PageInk({ box, scale, image, tint, testID }: { box: Rect; scale: number
 }
 
 /**
- * The hidden page (hiddenInkPlan), drawn: the covers and rules, then the washes (mistakes, past mistakes, the covered
- * word being said, `off`: over the covers, so a shown word's wash is whole and a hidden word's marks its place), then
- * the ink: markers and the words shown in the page's ink (`ink`: the page image's own tint), and the newest word shown
- * in the following colour (`follow`), its own ink drawn again over it. Without the page's image yet, only the covers.
+ * The hidden page (hiddenInkPlan), drawn over the page's image: the covers and their rules, the washes that mark a word
+ * still hidden (no take running: RECITE-13; `off`), and the newest word shown in the following colour (`follow`), its own
+ * ink drawn again over it (the one copy of the page's image: Majd, Nov 22 2026, "i dont see the words being a different
+ * color as its recited"). A shown word's wash is behind the page's ink (the underlay).
  */
 export function HiddenInkLayer({
   page,
@@ -126,7 +132,6 @@ export function HiddenInkLayer({
   words,
   shown,
   image,
-  ink,
   colors,
   washes,
   follow,
@@ -136,9 +141,8 @@ export function HiddenInkLayer({
   words: QuranWords;
   shown: (w: number) => boolean;
   image: { uri: string; width: number; height: number } | null;
-  /** How the pager tints the page image (dark pages: white at 0.92), so words drawn again match the rest. */
-  ink: { colour: string | null; opacity?: number };
   colors: { cover: string; guide: string };
+  /** Over the covers: only for words still hidden. */
   washes: readonly InkWash[];
   follow: { w: number; colour: string } | null;
 }) {
@@ -146,13 +150,15 @@ export function HiddenInkLayer({
   const inked = follow && words.pageOf(follow.w) === page && shown(follow.w) ? follow : null;
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill} testID={`hidden-page-${page}`}>
-      {plan.lines.map((l) => (
-        <View
-          key={`cover-${l.line}`}
-          testID="hidden-cover"
-          style={[styles.abs, { backgroundColor: colors.cover, left: l.cover.x0 * scale, top: l.cover.y0 * scale, width: (l.cover.x1 - l.cover.x0) * scale, height: (l.cover.y1 - l.cover.y0) * scale }]}
-        />
-      ))}
+      {plan.lines.flatMap((l) =>
+        l.covers.map((c, i) => (
+          <View
+            key={`cover-${l.line}-${i}`}
+            testID="hidden-cover"
+            style={[styles.abs, { backgroundColor: colors.cover, left: c.x0 * scale, top: c.y0 * scale, width: (c.x1 - c.x0) * scale, height: (c.y1 - c.y0) * scale }]}
+          />
+        )),
+      )}
       {plan.lines.flatMap((l) =>
         l.rules.map(([a, b], i) => (
           <View
@@ -165,19 +171,8 @@ export function HiddenInkLayer({
       {washes.map((w) => (
         <Wash key={w.testID + w.box.x0} testID={w.testID} box={w.box} scale={scale} colour={w.colour} opacity={w.opacity} />
       ))}
-      {image
-        ? plan.ink.map((p, i) => (
-            <PageInk key={`ink-${i}`} testID={p.kind === 'marker' ? 'hidden-marker' : 'hidden-shown'} box={p.box} scale={scale} image={image} tint={ink} />
-          ))
-        : null}
       {image && inked ? (
-        <PageInk
-          testID="live-follow-ink"
-          box={followBox(words, plan, inked.w)}
-          scale={scale}
-          image={image}
-          tint={{ colour: inked.colour }}
-        />
+        <PageInk testID="live-follow-ink" box={followBox(words, plan, inked.w)} scale={scale} image={image} tint={{ colour: inked.colour }} />
       ) : null}
     </View>
   );
