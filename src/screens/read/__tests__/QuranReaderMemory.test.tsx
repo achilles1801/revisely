@@ -443,6 +443,7 @@ describe("Recite's memory in the take's summary", () => {
     fireEvent.press(screen.getByTestId('recite-stop'));
     await flush();
     await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: UTIYAT + 25, secs: 12, marks: [], score: { reached: 30, mistakes: 0, tajweed: 0, accuracy: 1 }, start: A23 } });
+    await openResult();
     expect(screen.getByText('This passage: your last take')).toBeTruthy();
     const rows = screen.getAllByTestId('take-summary-history-row');
     expect(rows).toHaveLength(1);
