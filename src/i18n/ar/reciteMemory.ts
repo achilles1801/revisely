@@ -82,6 +82,7 @@ export const reciteMemory: NonNullable<ArStrings['reciteMemory']> = {
     label: 'تسميعك، {{when}}',
     title: 'تسميعك · {{when}}',
     hidden: 'سمّعته والصفحة مخفية',
+    openLabel: 'تسميعك، {{when}}: {{line}}. افتح ملخّصه',
   },
   rows: {
     cleared_zero: 'لم يُزَل شيء',

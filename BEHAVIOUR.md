@@ -801,6 +801,27 @@ Recite with Mark mistakes remembers each take (Majd, Nov 15 2026; Tarteel's bigg
   of the same stretch, by the same rule. "Your takes here" still lists every take covering half of the passage, each
   with its ayat on screen and for VoiceOver, and the page says "The score and chart count only your takes of these
   ayat" when it lists takes the chart leaves out.
+- **RMEM-8.** (Revisely Dev) A finished take's summary opens again from its card (Majd, Nov 22 2026: "make that take card
+  clickable and have it open that days summary popup sheet"). A take shown on its page (RMEM-5: from a day's Recited, the
+  progress page's takes, or a row of "This passage", RMEM-7) has its card at the bottom, "Your take · Yesterday, 9:41 PM",
+  with ▶ and Done as before; a tap anywhere else on the card opens that take's summary. All activity's Recitations show a
+  take on its page the same way (before, a tap there opened its day). The summary is built from the take's record, as it
+  was when the take ended:
+  - when it was, first, and "page hidden" when it was; its score by the page and its mistakes (per page from 2 pages), or
+    no score for a take never checked (RECITE-12), and the unfinished line when it has no final answer (RECITE-11);
+  - its mistakes, similar ayahs gone on with, Not clear and tajweed notes, as right after the take: a mistake's row shows
+    it on its page with its card open, a similar ayah opens in the reader;
+  - the words it peeked, a row per ayah, and the marks called Not a mistake, with Put back (the mark is the take's again
+    on every phone, its score with it, and the checker hears it). Not a mistake on the shown take's card lists the mark
+    there too;
+  - the words it cleared (RMEM-4), "This passage" (RMEM-7), and "Your progress here", whose line is the passage's trend up
+    to and including this take (a later take isn't this take's progress); the progress page's Done comes back to it.
+
+  Its buttons: Recite the mistakes again with Premium (one take over its mistakes and peeked ayat, as right after it),
+  and Done, back to the take on its page; no Recite again. Under them "Its day in Activity" (or "In today's Recited")
+  opens its day at its takes, and ⋯ has Delete this take. A take kept before Nov 22 2026 has no peeked words or marks
+  called Not a mistake to show: the record didn't keep them then. A take of Recite the mistakes again shows no
+  "Before:" line later, and no take of Recite alone is kept (RMEM-1), so none has a summary to open.
 
 ## Searching the Qur'an
 

@@ -139,6 +139,8 @@ export const reciteLive: NonNullable<ArStrings['reciteLive']> = {
     again: 'إعادة التسميع',
     recitedLabel: 'في «ما سمّعته» اليوم، في النشاط',
     recited: 'في «ما سمّعته» اليوم',
+    recitedDayLabel: 'يوم هذا التسميع، في النشاط',
+    recitedDay: 'يومه في النشاط',
     score: 'النتيجة {{score}}، {{mistakes}}',
     before: 'سابقًا: {{before}}',
     intoLabel: '{{line}}. عرضها في المصحف',

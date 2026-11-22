@@ -84,11 +84,20 @@ describe('a take’s record', () => {
     expect(r.accuracy).toBeCloseTo(1 - 2 / 124, 5);
   });
 
-  it('leaves out a mark called Not a mistake', () => {
+  it('leaves out a mark called Not a mistake, and [RMEM-8] lists it apart so its summary can put it back later', () => {
     const state = dismissMark(doneState([lookalike, slip]), lookalike.id);
     const r = recordFromTake(state, words, ctx()) as TakeRecord;
     expect(r.marks.map((m) => m.id)).toEqual([slip.id]);
     expect(r.mistakes).toBe(1);
+    expect(r.removed).toEqual([lookalike]);
+  });
+
+  it('[RMEM-8] keeps the words peeked, in order; none, and nothing removed, leave the fields out', () => {
+    const r = recordFromTake(doneState([lookalike]), words, ctx({ peeked: new Set([31421, 31420]) })) as TakeRecord;
+    expect(r.peeked).toEqual([31420, 31421]);
+    const plain = recordFromTake(doneState([lookalike]), words, ctx({ peeked: new Set() })) as TakeRecord;
+    expect('peeked' in plain).toBe(false);
+    expect('removed' in plain).toBe(false);
   });
 
   it('is nothing before the final answer, or when the checker never found where the reciter started', () => {
@@ -137,6 +146,23 @@ describe('a record on the account', () => {
     const u = { ...r, unfinished: true };
     expect(toStored(u).unfinished).toBe(true);
     expect((fromStored(u.id, JSON.parse(JSON.stringify(toStored(u)))) as TakeRecord).unfinished).toBe(true);
+  });
+
+  it('[RMEM-8] the words peeked and the marks called Not a mistake read back; a take without them is written as before', () => {
+    const r = recordFromTake(dismissMark(doneState([lookalike, slip]), lookalike.id), words, ctx({ peeked: new Set([31420]) })) as TakeRecord;
+    const stored = toStored(r);
+    expect(stored.peeked).toEqual([31420]);
+    expect(JSON.stringify(stored.removed)).not.toMatch(/"t":\[/);
+    const back = fromStored(r.id, JSON.parse(JSON.stringify(stored))) as TakeRecord;
+    expect(back.peeked).toEqual([31420]);
+    expect(back.removed).toEqual([lookalike]);
+    expect(back.marks).toEqual([slip]);
+    const plain = toStored({ ...r, peeked: undefined, removed: undefined });
+    expect('peeked' in plain || 'removed' in plain).toBe(false);
+    // Damaged lists drop what isn't a word or a mark, never the take.
+    const damaged = fromStored(r.id, { ...JSON.parse(JSON.stringify(stored)), peeked: ['x', 31420.5, 31422], removed: [{ id: 'm' }] }) as TakeRecord;
+    expect(damaged.peeked).toEqual([31422]);
+    expect('removed' in damaged).toBe(false);
   });
 
   it('a word cleared by hand, and a forgotten take, read back', () => {

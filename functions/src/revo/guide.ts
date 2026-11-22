@@ -425,6 +425,17 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     ),
   },
   {
+    // RMEM-8 (Nov 22 2026; Majd: "make that take card clickable and have it open that days summary popup sheet"):
+    // Revisely Dev's until the next release brings it to the main guide (with its re-record).
+    title: 'A take’s summary, opened again',
+    covers: ['RMEM-8'],
+    routes: ['QuranReader', 'ActivityDay', 'ActivityAll'],
+    text: lines(
+      '- A take shown on its page (from a day’s “Recited”, “Recitations”, “This passage” or “Your takes here”) has its card at the bottom, “Your take · …”, with ▶ and Done. A tap on the card opens that take’s summary again as it ended: when, score, each mistake (a tap shows its card), similar ayahs, words peeked, marks called Not a mistake with Put back, words cleared, “This passage” and “Your progress here”; “Recite the mistakes again”, “Its day in Activity” and ⋯ “Delete this take”. No Recite again.',
+      '- Takes before Nov 22 2026 don’t show their peeked words or marks called Not a mistake (not kept then).',
+    ),
+  },
+  {
     // Long recitations (Nov 22 2026), in Revisely Dev until the mistake detection release brings them to the main guide.
     title: 'Reciting for longer than 15 minutes',
     covers: ['RECITE-22'],

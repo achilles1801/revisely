@@ -2,9 +2,9 @@
 
 import type { QuranWords } from '../recite/quranWords';
 import { pageAccuracy } from '../reciteLive/score';
-import { furthestWord, LiveState, marksInOrder, mistakeCount } from '../reciteLive/state';
+import { furthestWord, LiveState, marksInOrder, mistakeCount, removedMarks } from '../reciteLive/state';
 import { countsAsMistake, isUnclear } from '../reciteLive/contract';
-import { MAX_LINKS, MAX_MARKS, MAX_PASSED, TakeLevel, TakeRecord } from './record';
+import { MAX_LINKS, MAX_MARKS, MAX_PASSED, MAX_PEEKED, MAX_REMOVED, TakeLevel, TakeRecord } from './record';
 
 export interface TakeContext {
   id: string;
@@ -21,6 +21,8 @@ export interface TakeContext {
   openWords: (from: number, to: number) => number[];
   /** A recitation longer than the checker's cap: its takes, each one's id and first word (RECITE-22). */
   links?: Array<{ take: string | null; from: number }> | null;
+  /** The words shown by hand during the take (RMEM-8): kept for its summary later. */
+  peeked?: ReadonlySet<number> | null;
 }
 
 /**
@@ -64,7 +66,21 @@ export function recordFromTake(state: LiveState, words: QuranWords, ctx: TakeCon
     // No final answer came (lib/reciteLive/state `settleUnfinished`): what the take found before it.
     ...(state.final.unfinished ? { unfinished: true } : {}),
     ...(ctx.links && ctx.links.length > 1 ? { links: ctx.links.slice(0, MAX_LINKS) } : {}),
+    // What its summary showed, for when it is opened again (RMEM-8): the words peeked, and the marks called Not a
+    // mistake, so they can still be put back.
+    ...peekedOf(ctx.peeked),
+    ...removedOf(state),
   };
+}
+
+function peekedOf(peeked: ReadonlySet<number> | null | undefined): { peeked?: number[] } {
+  if (!peeked || peeked.size === 0) return {};
+  return { peeked: [...peeked].sort((a, b) => a - b).slice(0, MAX_PEEKED) };
+}
+
+function removedOf(state: LiveState): { removed?: TakeRecord['removed'] } {
+  const removed = removedMarks(state);
+  return removed.length ? { removed: removed.slice(0, MAX_REMOVED) } : {};
 }
 
 /** Whether two versions of a take's record say the same (its version stamp aside): nothing to write again. */

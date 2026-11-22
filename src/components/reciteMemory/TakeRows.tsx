@@ -8,6 +8,7 @@ import { getQuranWords, loadQuranWords, type QuranWords } from '../../lib/recite
 import { formatAccuracy, mistakesLabel, scoreLevel } from '../../lib/reciteLive/score';
 import type { TakeRecord } from '../../lib/reciteMemory/record';
 import { takeClock, takeWhen } from '../../lib/reciteMemory/describe';
+import { wasChecked } from '../../lib/reciteMemory/pastTake';
 import { logger } from '../../lib/logger';
 import { passageOf } from '../reciteLive/TakeSummarySheet';
 import { similarSlips } from '../../lib/reciteInsights/insights';
@@ -72,7 +73,7 @@ const clockTime = takeClock;
  * shows no score.
  */
 export function takeChecked(take: TakeRecord): boolean {
-  return !(take.unfinished && take.take == null && take.marks.length === 0);
+  return wasChecked(take);
 }
 
 /** A take's score where its rows show one; a dash for a take that was never checked. */
