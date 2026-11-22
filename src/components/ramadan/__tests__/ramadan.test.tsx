@@ -129,7 +129,14 @@ describe('[THEME-1] the switch', () => {
     await AsyncStorage.clear();
   });
 
-  it('is off until turned on, and is kept on this phone', async () => {
+  it('is on in Revisely Dev until this phone turns it off, and the choice is kept on this phone', async () => {
+    // Majd, Nov 22 2026: "yes ramadan theme as default for dev too". Nothing stored is no choice: on.
+    expect(ramadanThemeOn()).toBe(true);
+    await loadRamadanTheme();
+    expect(ramadanThemeOn()).toBe(true);
+    await setRamadanTheme(false);
+    expect(await AsyncStorage.getItem(RAMADAN_THEME_KEY)).toBe('0');
+    __resetRamadanThemeForTests();
     await loadRamadanTheme();
     expect(ramadanThemeOn()).toBe(false);
     await setRamadanTheme(true);
@@ -137,6 +144,14 @@ describe('[THEME-1] the switch', () => {
     __resetRamadanThemeForTests();
     await loadRamadanTheme();
     expect(ramadanThemeOn()).toBe(true);
+  });
+
+  it('the store app never shows it before the release, whatever is stored', async () => {
+    mockVariant.dev = false;
+    expect(ramadanThemeOffered()).toBe(false);
+    await AsyncStorage.setItem(RAMADAN_THEME_KEY, '1');
+    await loadRamadanTheme();
+    expect(ramadanThemeOn()).toBe(false);
   });
 
   it('is Revisely Dev’s until the release flips RAMADAN_THEME_RELEASED (the release PR changes this line)', () => {
@@ -157,6 +172,9 @@ describe('[THEME-1] the switch', () => {
   });
 
   it('puts string lights on the tab bar in Revisely Dev only, with the switch on', async () => {
+    await act(async () => {
+      await setRamadanTheme(false);
+    });
     await tabBar();
     expect(screen.queryByTestId('ramadan-lights', HIDDEN)).toBeNull();
     screen.unmount();
