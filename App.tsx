@@ -60,25 +60,8 @@ Sentry.init({
   // declared in the App Store privacy label. Kept off until it's declared.
   replaysSessionSampleRate: 0,
   replaysOnErrorSampleRate: 0,
-  integrations: [
-    // Settings → Report a problem (src/lib/sentry.ts reportProblem). A report
-    // carries the release and tags below, the recent breadcrumbs, and a
-    // screenshot if the user takes one; the native SDK keeps it until it can
-    // be sent when offline.
-    Sentry.feedbackIntegration({
-      formTitle: 'Report a problem',
-      messageLabel: 'What happened?',
-      messagePlaceholder: 'What were you doing, and what went wrong?',
-      submitButtonLabel: 'Send report',
-      showName: false,
-      showEmail: false,
-      isNameRequired: false,
-      isEmailRequired: false,
-      enableScreenshot: false,
-      enableTakeScreenshot: true,
-      successMessageText: 'Thank you. Your report was sent.',
-    }),
-  ],
+  // Settings → Report a problem is the app's own form (components/report); it sends through
+  // Sentry.captureFeedback (lib/sentry sendProblemReport), which needs no integration here.
 
   // uncomment the line below to enable Spotlight (https://spotlightjs.com)
   // spotlight: __DEV__,

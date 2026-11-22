@@ -245,7 +245,8 @@ export const settings = {
     share: 'Share Revisely',
     /** The store's review page (SESS-8; Revisely Dev). */
     rate: 'Rate Revisely',
-    shareMessage: "I've been using Revisely to stay on top of my Quran memorization — give it a try: https://revisely.app",
+    /** The words shared; the link follows them (once: SET-2). */
+    shareMessage: 'I use Revisely to keep the Quran I’ve memorized. It plans a little revision for every day.',
     feedback: 'Send feedback',
     feedbackMessage: 'Found a bug or have an idea? Tell us anything. We read every note.',
     feedbackPlaceholder: "What's on your mind?",
@@ -257,6 +258,23 @@ export const settings = {
     feedbackFailedBody: 'Please try again later.',
     report: 'Report a problem',
     contact: 'Contact support',
+  },
+  /** Settings → Report a problem: the form (SET-3, SET-4). */
+  report: {
+    title: 'Report a problem',
+    message: 'Tell us what went wrong. It goes to us with the app’s version, never your name or email.',
+    placeholder: 'What were you doing, and what went wrong?',
+    send: 'Send',
+    thanks: 'Thank you',
+    thanksBody: 'Your report was sent.',
+    shotAdd: 'Add a screenshot',
+    shotHint: 'Go to the screen with the problem, then capture it.',
+    shotFailed: 'Couldn’t take a screenshot. Try again.',
+    shotAdded: 'Screenshot added',
+    shotRemove: 'Remove',
+    shotRemoveLabel: 'Remove the screenshot',
+    capture: 'Capture this screen',
+    captureCancel: 'Back to the report without a screenshot',
   },
   about: {
     whatsNew: 'What’s new',

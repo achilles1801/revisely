@@ -16,6 +16,7 @@ import ReadIndexScreen from '../screens/read/ReadIndexScreen';
 import QuranReaderScreen from '../screens/read/QuranReaderScreen';
 import QuranSearchScreen from '../screens/read/QuranSearchScreen';
 import { RevoHost } from '../components/revo/RevoHost';
+import { ReportProblemHost } from '../components/report/ReportProblemHost';
 import ListenBackScreen from '../screens/activity/ListenBackScreen';
 import JournalEntryScreen from '../screens/journal/JournalEntryScreen';
 import ActivityScreen from '../screens/activity/ActivityScreen';
@@ -263,6 +264,8 @@ export function MainNavigator() {
       />
       {/* Revo (previewTester accounts): its button over the main screens, and its sheet. */}
       <RevoHost />
+      {/* Settings → Report a problem: its form, and the bar that captures a screen for it. */}
+      <ReportProblemHost />
     </ReadingTimerProvider>
   );
 }

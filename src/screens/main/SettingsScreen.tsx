@@ -25,7 +25,8 @@ import { Mark } from '../../components/v2/Mark';
 import { PillButton } from '../../components/v2/PillButton';
 import { Tap } from '../../components/v2/Tap';
 import { Sheet } from '../../components/v2/Sheet';
-import { reportProblem } from '../../lib/sentry';
+import { openReportProblem } from '../../lib/report/state';
+import { shareRevisely } from '../../lib/shareApp';
 import { RouteProp, useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -506,10 +507,7 @@ export default function SettingsScreen() {
 
   const handleShareApp = async () => {
     try {
-      await Share.share({
-        message: t('settings.support.shareMessage'),
-        url: 'https://revisely.app',
-      });
+      await Share.share(shareRevisely(t('settings.support.shareMessage'), Platform.OS));
     } catch {
       // User dismissed the sheet or platform refused — nothing to do.
     }
@@ -1226,7 +1224,7 @@ export default function SettingsScreen() {
           <Row
             icon="bug-outline"
             label={t('settings.support.report')}
-            onPress={reportProblem}
+            onPress={openReportProblem}
           />
           <Row
             icon="mail-outline"

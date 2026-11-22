@@ -337,6 +337,24 @@ current basic sounds". October 2026's version was removed for the voices it offe
   timer, nor while another sheet is open (it waits until that one has gone, then the delay again).
   Later puts it off until the next cold start.
 
+## Sharing Revisely and reporting a problem
+
+- **SET-2.** Settings → Support → Share Revisely opens the phone's share sheet with one short sentence about
+  Revisely and the link revisely.app, each once: on an iPhone the link goes apart from the words (Messages and
+  WhatsApp draw the site's preview under them); on Android it ends the text. The sentence claims only what
+  every account has. (Nov 22 2026: the link was in the words and shared again beside them.)
+- **SET-3.** Settings → Support → Report a problem opens the app's own form, in the app's design, light or
+  dark: "Report a problem" between Cancel and Send, one line saying what goes with it, and the field. Send
+  needs words; it sends them to us with the app's version, never a name or an email, closes the form and says
+  "Your report was sent." Cancel, or closing the sheet, sends nothing and keeps nothing. Offline, the report
+  waits on the phone and goes when it can. (Majd, Nov 22 2026: Sentry's white form with its logo was
+  "terrible ui".)
+- **SET-4.** "Add a screenshot" puts the form away and shows a small bar, "Capture this screen" and ✕, over
+  whatever screen is in front, so the user can go to the screen with the problem first. Capture takes the
+  picture without the bar in it and brings the form back with the words still there and "Screenshot added ·
+  Remove"; ✕ brings it back without one. A capture that fails says so in the form, and the report can still
+  be sent. The picture goes only with a report that is sent.
+
 ## Links
 
 - **LINK-1.** A link to a web page opens in the app's own browser: the privacy policy and the terms
