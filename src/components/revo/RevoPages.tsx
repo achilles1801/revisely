@@ -16,6 +16,9 @@ import { openWebPage } from '../../lib/openWebPage';
 export const REVO_PRIVACY_URL = 'https://revisely.app/privacy/#revo';
 
 /** Conversations by day, with search; ✎ starts a new one. Days in review sit among them. */
+/** A chat's title in History: a Day in review in the app's language (the server stores it in English), else as kept. */
+const chatTitle = (c: RevoChat) => (c.kind === 'review' ? t('revo.parts.review') : c.title);
+
 export function RevoHistory({
   uid,
   onBack,
@@ -68,13 +71,13 @@ export function RevoHistory({
                 onPress={() => onOpen(c.id)}
                 style={[styles.row, i > 0 && { borderTopColor: palette.separator, borderTopWidth: StyleSheet.hairlineWidth }]}
                 accessibilityRole="button"
-                accessibilityLabel={`${c.title}, ${historyLine(c)}`}
+                accessibilityLabel={`${chatTitle(c)}, ${historyLine(c)}`}
                 testID={`revo-chat-${c.id}`}
               >
                 <Ionicons name={c.kind === 'review' ? 'moon-outline' : 'chatbubble-ellipses-outline'} size={24} color={palette.secondary} />
                 <View style={styles.rowText}>
                   <Text style={[styles.rowTitle, { color: palette.text }]} numberOfLines={2}>
-                    {c.title}
+                    {chatTitle(c)}
                   </Text>
                   <Text style={[styles.rowLine, { color: palette.secondary }]}>{historyLine(c)}</Text>
                 </View>

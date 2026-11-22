@@ -185,8 +185,10 @@ export function validateContext(v: unknown): RevoContext {
   // `app` ('dev') comes only from Revisely Dev, from Nov 16 2026: its requests carry the Dev guide (guide.ts).
   // `gaps` comes from Revisely Dev from Nov 16 2026, and from every app with the mistake detection release (Insights'
   // Gaps, ACT-28). `recitation` likewise, for an account that recites.
-  keys(c, ['totals', 'today', 'weakPages', 'week', 'streak', 'patterns', 'passages', 'pageNames', 'recitation', 'app', 'gaps', 'localTime'], 'context', ['totals', 'today', 'weakPages', 'week']);
+  // `language` ('ar') comes from apps in Arabic (Revisely Dev's picker), from Nov 22 2026: the answer is asked for in it.
+  keys(c, ['totals', 'today', 'weakPages', 'week', 'streak', 'patterns', 'passages', 'pageNames', 'recitation', 'app', 'gaps', 'language', 'localTime'], 'context', ['totals', 'today', 'weakPages', 'week']);
   if (c.app !== undefined && c.app !== 'dev') fail('context.app');
+  if (c.language !== undefined && c.language !== 'ar') fail('context.language');
 
   const t = obj(c.totals, 'context.totals');
   keys(t, REVO_TOTALS, 'context.totals');
@@ -284,6 +286,7 @@ export function validateContext(v: unknown): RevoContext {
     ...(pageNames ? { pageNames } : {}),
     ...(recitation ? { recitation } : {}),
     ...(c.app === 'dev' ? { app: 'dev' as const } : {}),
+    ...(c.language === 'ar' ? { language: 'ar' as const } : {}),
     ...(c.gaps !== undefined ? { gaps: validateGaps(c.gaps, 'context.gaps') } : {}),
     localTime: lt,
   };

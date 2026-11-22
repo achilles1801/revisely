@@ -55,6 +55,18 @@ describe('Revo’s context says which app asks', () => {
     expect(build().app).toBe('dev');
   });
 
+  it('the app in Arabic asks for the answer in Arabic (language "ar"); in English nothing is sent', async () => {
+    const { i18n } = jest.requireActual('../../../i18n') as typeof import('../../../i18n');
+    mockDev = true;
+    expect('language' in build()).toBe(false);
+    await i18n.changeLanguage('ar');
+    try {
+      expect(build().language).toBe('ar');
+    } finally {
+      await i18n.changeLanguage('en');
+    }
+  });
+
   // ACT-28, ACT-30, RINS-1: Gaps and the recitation are every account's from the mistake detection release, but a server
   // from before it refuses them from any app but Revisely Dev, and with them the whole question. So the store app sends
   // them only once config/app.revoRecite says the server takes them (set on release day, after deploying revoAsk).

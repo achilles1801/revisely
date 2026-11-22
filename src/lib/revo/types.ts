@@ -82,6 +82,11 @@ export interface RevoContext {
   /** 'dev' from Revisely Dev (lib/variant): the server then adds the Dev guide to the question. Never from the store app. */
   app?: 'dev';
   /**
+   * 'ar' when the app is in Arabic (Revisely Dev's language picker, src/i18n/choice): the server asks for the answer in
+   * Arabic. Never sent in English, so those requests are as before.
+   */
+  language?: 'ar';
+  /**
    * Insights' Gaps and Last revised (ACT-28 and ACT-30): the figures the section and the screen show, from lib/revo/gaps,
    * for an account that has them. A server from before the mistake detection release refuses them without `app: 'dev'`,
    * so it is deployed with the release (before its Promote).

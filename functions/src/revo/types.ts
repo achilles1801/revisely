@@ -68,6 +68,11 @@ export interface RevoContext {
    * (guide.ts DEV_GUIDE_SECTIONS) as a system block of its own. The store app never sends it.
    */
   app?: 'dev';
+  /**
+   * 'ar' when the app is in Arabic (Revisely Dev's language picker, from Nov 22 2026): the answer is asked for in Arabic
+   * (prompt.ts ARABIC_SYSTEM, a system block of its own). English requests never carry it.
+   */
+  language?: 'ar';
   localTime: string | null;
 }
 
