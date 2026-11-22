@@ -7,6 +7,7 @@ jest.mock('react-native-safe-area-context', () => require('react-native-safe-are
 import { readRepo } from '../../../../jest/behaviourRules';
 import { PICTURE_WORDS, demoTakeOf, pictureFor } from '../pictures';
 import { en } from '../../../i18n/en';
+import { t } from '../../../i18n';
 import { ThemeProvider } from '../../../context/ThemeContext';
 import { DesignProvider } from '../../../design/DesignContext';
 import { setQuranWordsForTests } from '../../../lib/recite/quranWords';
@@ -16,18 +17,28 @@ beforeAll(() => setQuranWordsForTests(wordsData()));
 afterAll(() => setQuranWordsForTests(null));
 
 const source = (p: string) => readRepo(p).replace(/’/g, "'");
-const plain = (s: string) => s.replace(/’/g, "'");
 
 describe('the pictures', () => {
   it("the + sheet's title and rows are AddToDaySheet's", () => {
+    // The sheet's words are t('activity.…') (src/i18n): the picture draws the same English, for today.
     const sheet = source('src/components/activity/AddToDaySheet.tsx');
-    expect(sheet).toContain('Add to ${dayName}');
-    expect(PICTURE_WORDS.addTitle).toBe('Add to today');
-    for (const [title, sub] of PICTURE_WORDS.rows) {
-      expect(sheet).toContain(`'${plain(title)}'`);
-      // "Today's pages, …" is `${whose} pages, …` there.
-      expect(sheet).toContain(plain(sub).replace("Today's ", ''));
+    for (const key of [
+      'activity.addMenu.title',
+      'activity.elsewhere.title',
+      'activity.addMenu.revisedSubtitle',
+      'activity.day.memorized',
+      'activity.addMenu.memorizedSubtitle',
+      'activity.add.note',
+      'activity.addMenu.noteSubtitle',
+    ]) {
+      expect(sheet).toContain(`t('${key}'`);
     }
+    expect(t('activity.addMenu.title', { day: 'today' })).toBe(PICTURE_WORDS.addTitle);
+    expect(PICTURE_WORDS.rows).toEqual([
+      [t('activity.elsewhere.title'), t('activity.addMenu.revisedSubtitle', { Day: 'Today' })],
+      [t('activity.day.memorized'), t('activity.addMenu.memorizedSubtitle', { day: 'today' })],
+      [t('activity.add.note'), t('activity.addMenu.noteSubtitle')],
+    ]);
   });
 
   it("the demo take is Al-Mulk 1–2 from the word data, as src/data/whatsNewTake.json holds it", () => {
