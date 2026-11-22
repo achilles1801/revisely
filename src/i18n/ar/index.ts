@@ -8,6 +8,7 @@ import { home } from './home';
 import { insights } from './insights';
 import { insightsTab } from './insightsTab';
 import { journal } from './journal';
+import { lib } from './lib';
 import { memorization } from './memorization';
 import { mushaf } from './mushaf';
 import { offline } from './offline';
@@ -45,6 +46,7 @@ export const ar: ArStrings = {
   insights,
   insightsTab,
   journal,
+  lib,
   memorization,
   mushaf,
   offline,
