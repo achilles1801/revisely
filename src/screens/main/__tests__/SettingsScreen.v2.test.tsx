@@ -421,6 +421,39 @@ describe("Settings: the checker's model (Revisely Dev's testers)", () => {
   });
 });
 
+describe('[RECITE-26] Keep my recitations as test data: Revisely Dev, every account that recites', () => {
+  afterEach(() => {
+    mockDev = false;
+    delete mockUser.previewTester;
+  });
+
+  it('Revisely Dev, not a tester: on Mushaf and Recite (on until turned off), and no Testing page', async () => {
+    mockDev = true;
+    await renderV2('mushaf');
+    expect(screen.getByText('Keep my recitations as test data')).toBeTruthy();
+    expect(screen.getByTestId('settings-recite-check-keep').props.value).toBe(true);
+    await renderV2();
+    expect(screen.queryByTestId('settings-page-testing')).toBeNull();
+  });
+
+  it('Revisely Dev, a tester: the same row on Mushaf and Recite, none on Testing', async () => {
+    mockDev = true;
+    mockUser.previewTester = true;
+    await renderV2('mushaf');
+    expect(screen.getByTestId('settings-recite-check-keep')).toBeTruthy();
+    await renderV2('testing');
+    expect(screen.queryByTestId('settings-recite-check-keep')).toBeNull();
+  });
+
+  it('the store app, tester or not: never (production’s checker keeps nothing)', async () => {
+    await renderV2('mushaf');
+    expect(screen.queryByTestId('settings-recite-check-keep')).toBeNull();
+    mockUser.previewTester = true;
+    await renderV2('testing');
+    expect(screen.queryByTestId('settings-recite-check-keep')).toBeNull();
+  });
+});
+
 describe('Settings: Load test scenario (testers)', () => {
   afterEach(() => {
     delete mockUser.previewTester;
