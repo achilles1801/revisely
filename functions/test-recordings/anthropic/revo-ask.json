@@ -1,6 +1,6 @@
 {
-  "recordedAt": null,
-  "how": "functions/scripts/record-anthropic.js on 2026-11-22T08:39:58.649Z; request moved by hand to the system prompt of #895 rebased on #899: Settings paths (option B) in the guide (the reply is that recording, not re-recorded: record again with the coach key)",
+  "recordedAt": "2026-11-22T14:26:12.880Z",
+  "how": "functions/scripts/record-anthropic.js",
   "request": {
     "model": "claude-sonnet-5-5",
     "max_tokens": 800,
@@ -13,13 +13,13 @@
   "status": 200,
   "body": {
     "model": "claude-sonnet-5-5",
-    "id": "msg_011ChHfbKzFUyGKdbja9ycXp",
+    "id": "msg_011ChJ7zfh6YJp9tAX2sJFnU",
     "type": "message",
     "role": "assistant",
     "content": [
       {
         "type": "text",
-        "text": "{\"text\":\"You finished the whole plan on four of the last six days, and your 2-day streak is alive. Saturday was missed and Thursday fell one page short. Today has 6 pages left, so finishing them keeps the run going.\",\"chart\":{\"kind\":\"dailyPages\",\"title\":\"Your last 7 days\",\"days\":7},\"textAfter\":null,\"action\":{\"kind\":\"startRevision\",\"title\":\"Continue today's revision\",\"detail\":\"6 pages left, starting at Al-Infitar\"},\"remember\":[],\"title\":\"How my week went\",\"chips\":[\"Which days do I miss?\",\"What are my weak pages?\",\"Am I on pace?\"]}"
+        "text": "{\"text\":\"Your week was steady: you finished the whole plan on four of the last six days, and missed only Saturday. Yesterday was complete, and today you've already done 4 of 10 pages.\",\"chart\":{\"kind\":\"dailyPages\",\"title\":\"Pages revised, last 7 days\",\"days\":7},\"textAfter\":\"Six pages are left today, starting at Al-Infitar. Shall we continue?\",\"action\":{\"kind\":\"startRevision\",\"title\":\"Continue today's revision\",\"detail\":\"Six pages left, from Al-Infitar to Al-Ghashiyah\"},\"remember\":[],\"title\":\"How my week went\",\"chips\":[\"Which days do I miss?\",\"Which pages are weak?\"]}"
       }
     ],
     "container": null,
@@ -28,13 +28,13 @@
     "stop_details": null,
     "usage": {
       "input_tokens": 551,
-      "cache_creation_input_tokens": 19775,
+      "cache_creation_input_tokens": 19815,
       "cache_read_input_tokens": 0,
       "cache_creation": {
-        "ephemeral_5m_input_tokens": 19775,
+        "ephemeral_5m_input_tokens": 19815,
         "ephemeral_1h_input_tokens": 0
       },
-      "output_tokens": 207,
+      "output_tokens": 226,
       "output_tokens_details": {
         "thinking_tokens": 0
       },
