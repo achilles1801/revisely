@@ -7,7 +7,8 @@ export const reciteLive = {
     body: 'Revisely highlights a wrong, missed or extra word in red, and a haraka or letter slip in amber. Tap one to see what you said.',
     get: 'Get Premium',
     support: 'Can’t afford it? Apply for support',
-    note: 'Part of Premium. Following along stays free. It’s AI and can make mistakes.',
+    // The riwaya it checks (Recite due diligence, row 6): Hafs ʿan ʿĀṣim, the only one the model knows.
+    note: 'For recitation in Hafs ʿan ʿĀṣim. Part of Premium; following along stays free. It’s AI and can make mistakes.',
   },
   /** A mark on the page, for VoiceOver: "Wrong word, وَأُوهِيَتْ". An extra word is on the word before it. */
   markLabel: '{{title}}, {{word}}',
