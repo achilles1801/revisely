@@ -67,12 +67,18 @@ export function setLiveBatchForTests(ms: number): void {
 /**
  * After Stop, the checker's final answer has this long (ms); then the summary shows what the take found, marked
  * unfinished, and a final answer that comes later replaces it (long takes, Nov 20 2026: Majd's Stop spun until he left).
+ * 8 s since Nov 22 2026: the checker's new final pass takes 4.0–5.3 s on a take with many mistakes (2.3 s before), so
+ * 5 s settled those takes unfinished a moment before their answer; the bar's progress line shows the wait (RECITE-25).
  */
-export const STOP_BUDGET_MS = 5000;
+export const STOP_BUDGET_MS = 8000;
 let stopBudgetMs = STOP_BUDGET_MS;
 /** Tests shorten the wait (and put it back with no argument). */
 export function setStopBudgetForTests(ms: number = STOP_BUDGET_MS): void {
   stopBudgetMs = ms;
+}
+/** Stop's budget now (ms): the bar's progress line ends with it (RECITE-25). */
+export function stopBudget(): number {
+  return stopBudgetMs;
 }
 
 /**

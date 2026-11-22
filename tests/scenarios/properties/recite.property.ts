@@ -71,6 +71,7 @@ import { followBox, hiddenInkPlan } from '../../../src/components/reciteLive/Hid
 import { hiddenTakeInfo, keepRecited, revealedOnHide } from '../../../src/lib/reciteLive/hideSwitch';
 import { pageLines } from '../../../src/lib/recite/pageLines';
 import { CAP_S, chainView, endsAyah, nextLinkStart, ROLL_FROM_S, ROLL_NOW_S, rolloverDue } from '../../../src/lib/reciteLive/chain';
+import { checkingSegments, EXPECTED_AT, expectedCheckMs, HOLD_AT, progressAt, SHOW_AFTER_MS } from '../../../src/lib/reciteLive/checkingProgress';
 
 const words = quranWords();
 const KINDS: MarkKind[] = ['word', 'skipped', 'added', 'harakat', 'letter', 'tajweed'];
@@ -1638,6 +1639,58 @@ describe('[RECITE-21] when a take stops, the words it recited stay shown with th
         },
       ),
       { numRuns: runs(120) },
+    );
+  });
+});
+
+describe('[RECITE-25] after Stop, the progress line: never back, never full before the answer, gone for a short wait', () => {
+  const waitArb = fc.record({ expected: fc.integer({ min: 0, max: 30_000 }), budget: fc.integer({ min: 0, max: 20_000 }) });
+
+  it('moves forward only, starts empty, and never reaches the end before the answer', () => {
+    fc.assert(
+      fc.property(waitArb, fc.array(fc.integer({ min: 0, max: 40_000 }), { minLength: 2, maxLength: 20 }), ({ expected, budget }, times) => {
+        const way = checkingSegments(expected, budget);
+        expect(progressAt(way, 0)).toBe(0);
+        const sorted = [...times].sort((a, b) => a - b);
+        let last = 0;
+        for (const ms of sorted) {
+          const p = progressAt(way, ms);
+          expect(p).toBeGreaterThanOrEqual(last);
+          expect(p).toBeLessThanOrEqual(HOLD_AT);
+          expect(p).toBeLessThan(1);
+          last = p;
+        }
+      }),
+      { numRuns: runs(200) },
+    );
+  });
+
+  it('is most of the way when the answer is expected, and still moving until the result shows anyway', () => {
+    fc.assert(
+      fc.property(waitArb, ({ expected, budget }) => {
+        const way = checkingSegments(expected, budget);
+        const total = way.reduce((n, s) => n + s.ms, 0);
+        // The way ends at the budget (or its least), never before it, so the line moves the whole wait.
+        expect(total).toBeGreaterThanOrEqual(budget);
+        expect(progressAt(way, total)).toBeCloseTo(HOLD_AT, 6);
+        // The answer expected inside the budget: the line is at EXPECTED_AT then.
+        if (expected >= SHOW_AFTER_MS && expected <= budget - 500) expect(progressAt(way, expected)).toBeCloseTo(EXPECTED_AT, 6);
+        // Short of the end just before the budget: a line that sat full would say it was done.
+        expect(progressAt(way, total - 100)).toBeLessThan(HOLD_AT);
+      }),
+      { numRuns: runs(200) },
+    );
+  });
+
+  it('expects a longer take, or one with more marks, to take no less long; and always within the wait', () => {
+    fc.assert(
+      fc.property(fc.nat(900), fc.nat(900), fc.nat(60), fc.nat(60), (a, b, m, n) => {
+        const [s1, s2] = a <= b ? [a, b] : [b, a];
+        const [m1, m2] = m <= n ? [m, n] : [n, m];
+        expect(expectedCheckMs(s2, m2)).toBeGreaterThanOrEqual(expectedCheckMs(s1, m1));
+        expect(expectedCheckMs(s1, m1)).toBeGreaterThan(0);
+      }),
+      { numRuns: runs(200) },
     );
   });
 });

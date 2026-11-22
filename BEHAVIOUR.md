@@ -697,6 +697,12 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   letter slip with what was heard shows two lines, Expected and what was recited, each the phrase around it (two words
   either side, in its ayah), as its card does. (Majd, Nov 22 2026, Tarteel picks 4 and 5: "ur recommended is fine, we
   should aim to keep it clean", "recommended is fine".)
+- **RECITE-25.** (Revisely Dev) While Stop waits for the checker's final answer, a thin line along the bar's lower edge
+  shows it coming: it fills from the start edge, most of the way by when the answer is expected (from the take's length
+  and what it found), then slowly until Stop's few seconds are up (RECITE-11). It never goes back and never reaches the
+  end before the answer; once the answer is in, it fills and fades. A wait under a second shows no line, and VoiceOver
+  or TalkBack say "Checking" once, only when the line shows. (Majd, Nov 22 2026: "if it genuinely takes 4-5 seconds for
+  the summary to be rdy then shouldn't we show that with maybe a bar or something".)
 ## Recite insights
 
 What a user's takes with Mark mistakes show over time, and Revo knowing it (Majd, Nov 16 2026).

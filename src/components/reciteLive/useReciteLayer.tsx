@@ -60,7 +60,8 @@ import {
   wordShown,
 } from '../../lib/reciteLive/view';
 import { NOTHING_PEEKED, Peeked, peekedByAyah, peekedLine } from '../../lib/reciteLive/peeked';
-import { LiveMode, useLiveRecitation } from './useLiveRecitation';
+import { LiveMode, stopBudget, useLiveRecitation } from './useLiveRecitation';
+import { expectedCheckMs } from '../../lib/reciteLive/checkingProgress';
 import { ReciteMic, ReciteMicMode } from './ReciteMic';
 import { ReciteMenuMode, ReciteModeMenu } from './ReciteModeMenu';
 import { BarButton, ReciteBar } from './ReciteBar';
@@ -1055,6 +1056,9 @@ export function useReciteLayer({
           onPause={() => void live.pause()}
           onResume={() => void live.resume()}
           onStop={live.stop}
+          // Read as Stop is tapped: the take's length and what it has found say how long its answer should take. Given
+          // throughout, so the line can fill and fade once the answer is in.
+          checkingWait={{ expectedMs: expectedCheckMs(live.clock.get(), Object.keys(live.state.marks).length), budgetMs: stopBudget() }}
           result={
             quietEnd && barPhase === 'done' && takeId && !test
               ? { text: takeResultText(live.state, qw, live.startWord, checkTake), onPress: () => setSummaryShown(takeId) }

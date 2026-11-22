@@ -404,10 +404,11 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     // Long takes (Nov 20 2026), in Revisely Dev until the mistake detection release brings them to the main guide (with
     // its re-record).
     title: 'Takes that end without their final check',
-    covers: ['RECITE-11', 'RECITE-12'],
+    covers: ['RECITE-11', 'RECITE-12', 'RECITE-25'],
     routes: ['QuranReader', 'ActiveRevision', 'ActivityDay', 'ActivityAll'],
     text: lines(
       '- Stop always ends within a few seconds: nothing opens by itself; the bar shows the take’s result (the score and mistakes, or “Done”), and a tap on it opens the summary. If the server’s check of the end hasn’t come by then, or the connection was lost after the take had found where they were, the summary shows what the take found and says the end of the take wasn’t checked; the take is kept, unfinished, with its marks and its recording. If the check comes after all, the summary and the take update.',
+      '- While that check of the end comes, a thin line along the bottom of the bar fills, most of the way by when it should be ready; once it is in, the line fills and goes. A wait under a second shows no line.',
       '- Leaving the reader or the session during a take, or while Stop waits, keeps the take too (unfinished); a take that never found where they were keeps nothing.',
       '- In “Recited” and “Recitations” an unfinished take’s line says "unfinished"; one whose audio is all there is (from before takes were kept this way) says "not checked" and shows no score. Unfinished takes never count in the score or in “Your progress”.',
     ),

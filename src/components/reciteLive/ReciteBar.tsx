@@ -11,6 +11,7 @@ import { CAPSULE_HEIGHT } from '../reader/PlayerCapsule';
 import { t } from '../../i18n';
 import { chevron } from '../../i18n/direction';
 import { toneFill } from './markColours';
+import { CheckingLine } from './CheckingLine';
 
 /** The capsule's height inside its hairline border (at most half a point each side, on any screen). */
 export const BAR_ROOM = CAPSULE_HEIGHT - 1;
@@ -151,6 +152,7 @@ export function ReciteBar({
   surface,
   onScore,
   result = null,
+  checkingWait,
 }: {
   hidden: boolean;
   onToggleHidden: () => void;
@@ -186,6 +188,11 @@ export function ReciteBar({
    * summary. Nothing opens by itself after Stop (Majd, Nov 22 2026: "nothing pops up in my face at any time").
    */
   result?: { text: string; onPress: () => void } | null;
+  /**
+   * After Stop, when the final answer is expected and when the result shows anyway (ms from Stop): a progress line along
+   * the bar's lower edge while it comes (RECITE-25; Majd, Nov 22 2026: "shouldn't we show that with maybe a bar").
+   */
+  checkingWait?: { expectedMs: number; budgetMs: number };
 }) {
   const { palette } = useTheme();
   const ticking = useTakeSeconds(takeClock);
@@ -300,6 +307,9 @@ export function ReciteBar({
           )}
         </Tap>
       )}
+      {checkingWait ? (
+        <CheckingLine checking={phase === 'checking'} expectedMs={checkingWait.expectedMs} budgetMs={checkingWait.budgetMs} />
+      ) : null}
     </View>
   );
 }
