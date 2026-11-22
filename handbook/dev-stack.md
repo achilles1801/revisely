@@ -282,6 +282,19 @@ until its part is set up.
     (some pages and lines draw it smaller, page 3 wider; a sajdah sign stays with its marker) and checks that no marker
     ink is under a cover and no word's ink shows beside a marker, on the originals and Android's w1080 and w1440. Run it
     after any change to the page lines or the images; `hiddenPage.test` pins measured markers (page 2's among them).
+  - **Every word's box is its ink too** (Majd, Nov 21 2026: the word just recited was "partially cut off").
+    - `quranWords.dat`'s x0 and x1 (the hidden view, the cursor's box, the mistakes' highlights) came from glyph data
+      2–12 units off the images; the next word's cover cut 84% of words, and on 450:14 one box held its neighbour's.
+    - `scripts/check-word-boxes.py` (`--write`) fits each box to its word's ink, with half the gap to the next ink (at
+      most 1.5 units), to a tenth, and widens a line's ends in `pageLines.json` to its words. It starts from the glyph
+      boxes in git (`GLYPH_REF`), splits touching words at the junction (a waw's tail, a kaf's stroke: 480 places), and
+      leaves the 199 quarter signs (۞, found by shape before the ayahs `quranWaqf.json` lists) and the sajdah overlines
+      to no word. It checks the originals and Android's w1080 and w1440 (ownership from the originals, `--like`): no
+      word cut beside a hidden one, no hidden word's ink in an opening. Run it after the page lines, the images or the
+      word data change.
+    - Word by word, a hidden word takes no extra edge (`WORD_EDGE` in `hiddenPage.ts`).
+    - The limit: about 12% of words share columns with the next without touching (a kaf's top stroke over the previous
+      word); the edge leaves that stroke's tip (up to about 20 units) over the word recited rather than cut it.
   - **A voice search with one result opens the reader at the ayah, nothing listening** (SEARCH-4; Majd, Nov 17 2026:
     "it takes me to the mushaf with the verse highlighted without it still recording then clicking back shows me that
     one search result"). It replaced Nov 15's "opens the reader reciting".

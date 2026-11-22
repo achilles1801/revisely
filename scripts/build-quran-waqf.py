@@ -9,8 +9,9 @@ word carries which mark: nothing of the text itself.
   python3 scripts/build-quran-waqf.py           # fetches the text from api.alquran.cloud
   python3 scripts/build-quran-waqf.py FILE      # or reads a copy of that answer
 
-The file: {"v": 1, "source": ..., "kinds": "ۖۗۚۛۘۙۜ", "stops": [word, kind, word, kind, ...]}, the kind being the
-mark's index in `kinds`:
+The file: {"v": 1, "source": ..., "kinds": "ۖۗۚۛۘۙۜ", "stops": [word, kind, word, kind, ...], "quarters": [word, ...]},
+the kind being the mark's index in `kinds`, and `quarters` the first word of each ayah a quarter's sign (۞, rub'
+al-hizb) comes before (scripts/check-word-boxes.py finds each sign on the page there). The kinds:
   ۖ  better to continue (al-wasl awla)       ۗ  better to stop (al-waqf awla)
   ۚ  either (jaiz)                           ۛ  stop at one of the two, not both (mu'anaqah)
   ۘ  must stop (lazim)                       ۙ  don't stop (mamnu')
@@ -54,7 +55,7 @@ def main():
         answer = json.loads(urllib.request.urlopen(req, timeout=60).read())
     surahs = answer["data"]["surahs"]
     data = json.loads(WORDS_FILE.read_text())
-    stops, bad, v, w = [], [], 0, 0
+    stops, quarters, bad, v, w = [], [], [], 0, 0
     for s in surahs:
         for a in s["ayahs"]:
             where = f"{s['number']}:{a['numberInSurah']}"
@@ -62,6 +63,9 @@ def main():
             # alquran.cloud puts the basmala before each surah's first ayah (not Al-Fatihah's, which it is, nor At-Tawbah).
             if s["number"] not in (1, 9) and a["numberInSurah"] == 1 and letters(toks[0]) == "بسم":
                 toks = toks[4:]
+            # A quarter's sign (۞, rub' al-hizb) before the ayah's first word.
+            if any("\u06de" in tok for tok in toks[:1]):
+                quarters.append(w)
             app = data["uthmani"][v].split(" ")
             words = [j for j, tok in enumerate(toks) if not is_mark(tok)]
             # Tanzil's words for each of the app's: one each when the counts agree (the app writes some with a no-break
@@ -105,9 +109,11 @@ def main():
         "source": "Tanzil Quran Text (Uthmani), tanzil.net, via api.alquran.cloud: which word each pause mark follows",
         "kinds": KINDS,
         "stops": stops,
+        "quarters": quarters,
     }, ensure_ascii=False, separators=(",", ":")) + "\n")
     counts = {k: stops[1::2].count(i) for i, k in enumerate(KINDS)}
-    print(f"{len(stops) // 2} pause marks on {w} words:", ", ".join(f"{k} {n}" for k, n in counts.items()), f"-> {OUT.name}")
+    print(f"{len(stops) // 2} pause marks on {w} words:", ", ".join(f"{k} {n}" for k, n in counts.items()),
+          f"and {len(quarters)} quarters (۞) -> {OUT.name}")
 
 
 if __name__ == "__main__":
