@@ -693,9 +693,9 @@ describe('mistakes are highlights (Majd, Nov 15 2026: “only things we should s
     const wash = flatStyle(screen.getByTestId('live-highlight-slip', { includeHiddenElements: true }));
     expect(wash.borderRadius).toBeCloseTo((wash.height as number) / 2);
     expect(wash.boxShadow).toEqual([expect.objectContaining({ offsetX: 0, offsetY: 0, color: p.markSlip })]);
-    const shadow = (wash.boxShadow as { blurRadius: number }[])[0];
-    expect((wash.left as number) - shadow.blurRadius).toBeLessThan(b.x0 * 0.38);
-    expect((wash.left as number) + (wash.width as number) + shadow.blurRadius).toBeGreaterThan(b.x1 * 0.38);
+    const shadow = (wash.boxShadow as { blurRadius: number; spreadDistance: number }[])[0];
+    expect((wash.left as number) - shadow.spreadDistance - shadow.blurRadius).toBeLessThan(b.x0 * 0.38);
+    expect((wash.left as number) + (wash.width as number) + shadow.spreadDistance + shadow.blurRadius).toBeGreaterThan(b.x1 * 0.38);
   });
 
   it('the hidden view: the newest word in the grey box, no line band, no blue on the page', async () => {

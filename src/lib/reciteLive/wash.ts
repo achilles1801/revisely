@@ -7,25 +7,31 @@
 
 import type { Rect } from '../ayahBounds';
 
-/** A wash: a pill-shaped core at full strength, and a soft edge (`soft`, a blur radius) fading to nothing around it. */
+/**
+ * A wash: a pill-shaped core at full strength, and a soft edge fading to nothing around it: the core's colour spread
+ * out by `spread`, then blurred over `soft` (a blur radius). The spread keeps the edge at about full strength where the
+ * core ends, so the wash fades smoothly from its middle instead of showing the core as a pill with a glow around it.
+ */
 export interface Wash {
   core: Rect;
-  /** How far the soft edge reaches past the core, fading out (bounds units). */
+  /** How far the colour is spread past the core before it is blurred (bounds units). */
+  spread: number;
+  /** The blur radius of the edge, past the spread (bounds units). */
   soft: number;
 }
 
 /** Of the box's height: the core sits this far in from its top and bottom… */
-const INSET_Y = 0.2;
+const INSET_Y = 0.26;
 /** …and this far in from each end. */
 const INSET_X = 0.08;
-/** The soft edge, as a share of the box's height. */
-const SOFT = 0.32;
+/** The soft edge's blur, as a share of the box's height; the spread is half of it. */
+const SOFT = 0.26;
 
 /**
  * The wash for a highlight's box (a word's box grown a little: markHighlight, cursorBox, offBox). The core is the box's
  * middle, at least as wide as it is tall (a short word is a round blob); the soft edge reaches past the box on every
- * side (by about a tenth of its height above and below, a quarter at the ends), so the wash is wider than its word and
- * forgives a box that is a little off.
+ * side (by about an eighth of its height above and below, nearly a third at the ends), so the wash is wider than its
+ * word and forgives a box that is a little off.
  */
 export function washOf(box: Rect): Wash {
   const h = box.y1 - box.y0;
@@ -34,13 +40,14 @@ export function washOf(box: Rect): Wash {
   const coreH = y1 - y0;
   const mid = (box.x0 + box.x1) / 2;
   const half = Math.max(coreH / 2, (box.x1 - box.x0) / 2 - INSET_X * h);
-  return { core: { x0: mid - half, x1: mid + half, y0, y1 }, soft: SOFT * h };
+  return { core: { x0: mid - half, x1: mid + half, y0, y1 }, spread: (SOFT / 2) * h, soft: SOFT * h };
 }
 
 /** How far a wash shows, its soft edge included. */
 export function washReach(wash: Wash): Rect {
-  const { core, soft } = wash;
-  return { x0: core.x0 - soft, x1: core.x1 + soft, y0: core.y0 - soft, y1: core.y1 + soft };
+  const { core, spread, soft } = wash;
+  const d = spread + soft;
+  return { x0: core.x0 - d, x1: core.x1 + d, y0: core.y0 - d, y1: core.y1 + d };
 }
 
 /**
