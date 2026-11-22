@@ -12,6 +12,8 @@
 // {{Label}} is text the app shows (drawn in ink); [[icon]] a button's own glyph; [[revo]] Revo's disc.
 
 import { helpPlainText, helpTextParts, type HelpIcon, type HelpTextPart } from './topics';
+import { currentLanguage } from '../../i18n';
+import { WHATS_NEW_AR } from './whatsNew.ar';
 
 /**
  * A feature a card describes that may still be for testers only. A card (or a row of the last card)
@@ -275,7 +277,19 @@ export function cardsFor(release: WhatsNewRelease, open: (need: WhatsNewNeed) =>
       if (rows.length > 0) out.push({ ...card, rows });
     } else out.push(card);
   }
-  return out;
+  return currentLanguage() === 'ar' ? out.map((card) => inArabic(release.id, card)) : out;
+}
+
+/** A card and its rows in Arabic, where whatsNew.ar.ts has them (else as here). */
+function inArabic(release: string, card: WhatsNewCard): WhatsNewCard {
+  const key = `${release}/${card.id}`;
+  const ar = WHATS_NEW_AR[key];
+  const rows = card.rows?.map((row) => {
+    const r = WHATS_NEW_AR[`${key}/${row.id}`];
+    return r?.text != null ? { ...row, title: r.title, text: r.text } : row;
+  });
+  const words = ar ? { title: ar.title, ...(card.text != null && ar.text != null ? { text: ar.text } : {}) } : {};
+  return { ...card, ...words, ...(rows ? { rows } : {}) };
 }
 
 /** Every need a release's cards and rows name. */
@@ -298,5 +312,5 @@ export function whatsNewParts(text: string): WhatsNewPart[] {
 
 /** A card's words as read aloud (VoiceOver), never a glyph's private character. */
 export function whatsNewPlainText(text: string): string {
-  return helpPlainText(text.replace(/\[\[revo\]\]/g, 'Revo’s R'));
+  return helpPlainText(text.replace(/\[\[revo\]\]/g, currentLanguage() === 'ar' ? 'شعار \u2068Revo\u2069' : 'Revo’s R'));
 }
