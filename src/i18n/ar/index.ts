@@ -4,6 +4,8 @@ import { common } from './common';
 import { home } from './home';
 import { read } from './read';
 import { reader } from './reader';
+import { recite } from './recite';
+import { reciteLive } from './reciteLive';
 import { revision } from './revision';
 import { settings } from './settings';
 import { verse } from './verse';
@@ -14,6 +16,8 @@ export const ar: ArStrings = {
   home,
   read,
   reader,
+  recite,
+  reciteLive,
   revision,
   settings,
   verse,
