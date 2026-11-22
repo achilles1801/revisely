@@ -2,19 +2,21 @@
 
 import type { QuranWords } from '../recite/quranWords';
 import type { WordFollow } from '../recite/hiddenPage';
-import { isUnclear, severityOf, strongestByWord, type Mark } from './contract';
+import { isUnclear, strongestByWord, type Mark } from './contract';
 import { furthestWord, LiveState, LiveStatus, mistakeCount } from './state';
 import { formatAccuracy, pageAccuracy, ScoreLevel, scoreLevel } from './score';
 
 /**
- * A word in the bar: the one being said (blue), one already said, one said wrong (as heard, on red), one with a slip (a
- * haraka or a letter, on amber) or a tajweed note (on violet): the page's highlights (Majd, Nov 15 2026). The colours
- * never follow the accent.
+ * A word in the bar: the one being said (blue), one already said, one said wrong (as heard, on red), one with a wrong
+ * haraka or letter (tone `slip`, on amber; `part` says which) or a tajweed note (on violet): the page's highlights (Majd,
+ * Nov 15 2026; components/reciteLive/markColours' `toneFill`). The colours never follow the accent.
  */
 export interface BarWord {
   w: number;
   text: string;
   tone: 'current' | 'said' | 'wrong' | 'slip' | 'tajweed';
+  /** A `slip` word's mistake: a wrong haraka or a wrong letter (a letter when it has both), for a screen reader. */
+  part?: 'harakat' | 'letter';
 }
 
 /**
@@ -30,15 +32,15 @@ export function barWords(
   const top = opts.upTo !== undefined ? Math.min(state.cursor, opts.upTo ?? -1) : state.cursor;
   const wrong = new Map<number, Mark>();
   const skipped = new Set<number>();
-  const slipped = new Set<number>();
+  const slipped = new Map<number, 'harakat' | 'letter'>();
   const tajweed = new Set<number>();
   if (opts.check) {
     for (const m of Object.values(state.marks)) {
       if (m.kind === 'word' && m.heard) wrong.set(m.w, m);
       if (m.kind === 'skipped') skipped.add(m.w);
       if (m.kind === 'tajweed') tajweed.add(m.w);
-      // A "not clear" haraka or letter isn't shown as a slip in the bar: it wasn't heard as wrong.
-      else if (severityOf(m) === 'slip' && !isUnclear(m)) slipped.add(m.w);
+      // A "not clear" haraka or letter isn't shown as a mistake in the bar: it wasn't heard as wrong.
+      else if ((m.kind === 'harakat' || m.kind === 'letter') && !isUnclear(m)) slipped.set(m.w, slipped.get(m.w) === 'letter' ? 'letter' : m.kind);
     }
   }
   const out: BarWord[] = [];
@@ -46,10 +48,13 @@ export function barWords(
     if (opts.startWord != null && w < opts.startWord) break;
     if (skipped.has(w)) continue;
     const m = wrong.get(w);
+    const part = slipped.get(w);
     out.unshift(
       m
         ? { w, text: m.heard ?? words.uthmani(w), tone: 'wrong' }
-        : { w, text: words.uthmani(w), tone: slipped.has(w) ? 'slip' : tajweed.has(w) ? 'tajweed' : w === state.cursor ? 'current' : 'said' },
+        : part
+          ? { w, text: words.uthmani(w), tone: 'slip', part }
+          : { w, text: words.uthmani(w), tone: tajweed.has(w) ? 'tajweed' : w === state.cursor ? 'current' : 'said' },
     );
   }
   return out;

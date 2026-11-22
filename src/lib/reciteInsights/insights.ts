@@ -136,6 +136,8 @@ export interface MarkedWord {
   w: number;
   group: MarkGroup;
   kind: MarkKind;
+  /** Its latest wrong try's: "likely" for a Not clear haraka or letter (its colour, once colours follow the tiers). */
+  sure: Mark['sure'];
   ayah: [number, number];
 }
 
@@ -249,7 +251,7 @@ function markedWords(memories: Map<string, WordMemory>): { words: MarkedWord[]; 
     byWord.set(m.w, [...(byWord.get(m.w) ?? []), m]);
   }
   const words = [...best.values()]
-    .map((m) => ({ w: m.w, group: m.group, kind: (m.lastMark as Mark).kind, ayah: (m.lastMark as Mark).ayah }))
+    .map((m) => ({ w: m.w, group: m.group, kind: (m.lastMark as Mark).kind, sure: (m.lastMark as Mark).sure, ayah: (m.lastMark as Mark).ayah }))
     .sort((a, b) => a.w - b.w);
   return { words, byWord };
 }

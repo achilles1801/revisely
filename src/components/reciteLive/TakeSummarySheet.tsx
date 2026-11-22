@@ -59,22 +59,27 @@ export function passageOf(words: QuranWords, from: number, to: number): string {
 /** "1 marked not a mistake": the Removed list's line. */
 export const removedLine = (n: number) => t('reciteLive.summary.removed', { count: n });
 
-/** "1 wrong word, 1 harakat slip, 1 tajweed note, 2 not clear". */
+/**
+ * "1 wrong word, 1 wrong haraka, 1 wrong letter, 2 not clear, 1 tajweed note (Beta)": the mistakes by kind (a wrong haraka
+ * or letter is a mistake, Majd, Nov 22 2026), then what never counts.
+ */
 export function findingsLine(marks: Mark[]): string {
   const n = (kinds: Mark['kind'][]) => marks.filter((m) => kinds.includes(m.kind) && !isUnclear(m)).length;
   const parts: string[] = [];
   const wrong = n(['word']);
   const skipped = n(['skipped']);
   const added = n(['added']);
-  const slips = n(['harakat', 'letter']);
+  const harakat = n(['harakat']);
+  const letters = n(['letter']);
   const tajweed = n(['tajweed']);
   const unclear = marks.filter(isUnclear).length;
   if (wrong) parts.push(t('reciteLive.summary.wrong', { count: wrong }));
   if (skipped) parts.push(t('reciteLive.summary.skipped', { count: skipped }));
   if (added) parts.push(t('reciteLive.summary.extra', { count: added }));
-  if (slips) parts.push(t('reciteLive.summary.slips', { count: slips }));
-  if (tajweed) parts.push(t('reciteLive.summary.tajweed', { count: tajweed }));
+  if (harakat) parts.push(t('reciteLive.summary.harakat', { count: harakat }));
+  if (letters) parts.push(t('reciteLive.summary.letters', { count: letters }));
   if (unclear) parts.push(t('reciteLive.summary.unclear', { count: unclear }));
+  if (tajweed) parts.push(t('reciteLive.summary.tajweed', { count: tajweed }));
   return parts.join(', ');
 }
 

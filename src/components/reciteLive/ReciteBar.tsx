@@ -10,6 +10,7 @@ import type { ScoreLevel } from '../../lib/reciteLive/score';
 import { CAPSULE_HEIGHT } from '../reader/PlayerCapsule';
 import { t } from '../../i18n';
 import { chevron } from '../../i18n/direction';
+import { toneFill } from './markColours';
 
 /** The capsule's height inside its hairline border (at most half a point each side, on any screen). */
 export const BAR_ROOM = CAPSULE_HEIGHT - 1;
@@ -113,13 +114,15 @@ export function ScorePill({ text, level }: { text: string; level: ScoreLevel }) 
  * score (Check), then the time with the last words heard to its right, then Stop. After Stop: a spinner until the
  * checker's final answer; then ✕ closes.
  */
-/** A word in the bar as a screen reader reads it: "وَأُوهِيَتْ, wrong word". */
-export function spokenBarWord(w: { text: string; tone: string }): string {
+/** A word in the bar as a screen reader reads it: "وَأُوهِيَتْ, wrong word", "…, wrong haraka". */
+export function spokenBarWord(w: { text: string; tone: string; part?: 'harakat' | 'letter' }): string {
   const mark =
     w.tone === 'wrong'
       ? t('reciteLive.bar.wrong')
       : w.tone === 'slip'
-        ? t('reciteLive.bar.slip')
+        ? w.part === 'letter'
+          ? t('reciteLive.bar.wrongLetter')
+          : t('reciteLive.bar.wrongHaraka')
         : w.tone === 'tajweed'
           ? t('reciteLive.bar.tajweed')
           : '';
@@ -243,8 +246,7 @@ export function ReciteBar({
                 // A mistake is a highlight behind the word, as on the page; blue is only the word being said.
                 style={{
                   color: w.tone === 'current' ? palette.followInk : palette.text,
-                  backgroundColor:
-                    w.tone === 'wrong' ? palette.markWord : w.tone === 'slip' ? palette.markSlip : w.tone === 'tajweed' ? palette.markTajweed : undefined,
+                  backgroundColor: toneFill(palette, w.tone),
                 }}
                 testID={`recite-word-${w.tone}`}
               >

@@ -59,8 +59,8 @@ export const reciteInsights = {
   kinds: '{{lead}}: {{list}}.',
   unclear_one: '{{count}} wasn’t clear enough to check (not counted).',
   unclear_other: '{{count}} weren’t clear enough to check (not counted).',
-  tajweedNotes_one: '{{n}} tajweed note.',
-  tajweedNotes_other: '{{n}} tajweed notes.',
+  tajweedNotes_one: '{{n}} tajweed note (Beta).',
+  tajweedNotes_other: '{{n}} tajweed notes (Beta).',
   ratedStrong: 'Rated strong · wrong in {{takes}}',
   /** The weeks for a screen reader: "Score by week: 2 Nov 96.9%, 9 Nov no takes, this week 98.9%". */
   noTakesWeek: 'no takes',

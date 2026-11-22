@@ -513,15 +513,20 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   refused or can't start says so ("Microphone
   access is off" with Open Settings, or "Couldn't start the microphone"), never nothing (Majd's Android store build,
   Nov 22 2026: a tap did nothing).
-- **RECITE-2.** With Mark mistakes, a take marks a word said wrong, skipped or added, and a slip in a word's harakat
-  or letters; with Strict, tajweed notes too. The score is the share of the words reached said right, and a tajweed
-  note never counts against it. A word with several marks shows its strongest: a word mistake, then a slip, then a
-  tajweed note. The marks are highlights in three colours: red for words, amber for harakat and letters (and Not
-  clear), violet for tajweed. Strict has a switch of its own and stays Revisely Dev's until it is on, even once the
-  rest of Recite is everyone's: elsewhere a take checks words and harakat whatever level the phone kept, Settings
-  offers no choice of level, and What's new shows no tajweed note.
-- **RECITE-3.** A haraka or letter the checker couldn't hear clearly enough to judge is "Not clear", never wrong: it
-  never counts in the score, whether or not the checker left it out of its own count.
+- **RECITE-2.** With Mark mistakes, a take marks two tiers (Majd, Nov 22 2026: "saying a wrong haraka or letter IS a
+  word mistake"). Mistakes: a word said wrong, skipped or added, a wrong haraka and a wrong letter, each named for what
+  it is ("Wrong word", "Wrong haraka", "Wrong letter") and counted as a mistake, on its card, in the bar, in the
+  summary's line ("1 wrong haraka, 1 wrong letter") and in the score, never called a slip. With Strict, tajweed notes,
+  labelled Beta wherever they show (Strict in Settings, a note's title, the summary's line, Insights) and never
+  counted. There is no level that marks words without harakat and letters: Settings' levels are Mistakes and Strict
+  (Beta). The score is the share of the words reached said right. A word with several marks shows its strongest: a
+  word mistake, then a wrong haraka or letter, then a tajweed note, and a mistake over a Not clear. The marks are
+  highlights in three colours: red for words, amber for harakat and letters (and Not clear), violet for tajweed.
+  Strict has a switch of its own and stays Revisely Dev's until it is on, even once the rest of Recite is everyone's:
+  elsewhere a take checks mistakes whatever level the phone kept, Settings offers no choice of level, and What's new
+  shows no tajweed note.
+- **RECITE-3.** A haraka or letter the checker couldn't hear clearly enough to judge is "Not clear", never wrong: it is
+  neither a mistake nor a tier, and never counts in the score, whether or not the checker left it out of its own count.
 - **RECITE-4.** "Not a mistake" takes a mark off at once, with what it counted in the score; Undo, or the summary's
   Put back, brings it back as it was, its count too. A mark taken off stays off whatever the checker sends again,
   during the take or in its final answer. In Revisely Dev, Stop tells the checker the take's counts with its end (marks
@@ -593,7 +598,7 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   a mistake: one the checker's final answer leaves out stays as it was shown and counts as it did, unless the final
   answer judged that word itself (its mark there replaces it). (Majd, Nov 20 2026: "As soon as a mistake is made, the
   color should be highlighted immediately and should stay that way".)
-- **RECITE-15.** (Revisely Dev) Each new mistake that counts (a word wrong, skipped or added, a haraka or letter slip)
+- **RECITE-15.** (Revisely Dev) Each new mistake that counts (a word wrong, skipped or added, a wrong haraka or letter)
   plays a short sound and a tap as it is marked during a take: never for Not clear or a tajweed note, never twice for
   one mark (a resume sends marks again), and at most one every 0.7 s. It plays in silent mode, at the volume the
   buttons set, and Settings → Recite → Sound on a mistake turns it off. (Majd, Nov 20 2026: "there should be some like
@@ -690,7 +695,7 @@ Recite with Mark mistakes remembers each take (Majd, Nov 15 2026; Tarteel's bigg
   (a failure before then included) leave nothing; one that failed after it is kept unfinished (RECITE-11). Forgetting a take removes it from every phone.
 - **RMEM-2.** A remembered mistake on a word clears after 2 right takes of that word in a row, on 2
   different revision days. Getting it wrong again starts the count over. A take counts only for what it
-  checked: Words & harakat never clears a tajweed note. A Not clear mark is remembered like a slip, amber,
+  checked: a take without Strict never clears a tajweed note. A Not clear mark is remembered like a wrong haraka, amber,
   until the word is said clearly: a take that heard its harakat only as Not clear hasn't said it clearly, so it
   counts as wrong. It still never counts in a score. (Majd, Nov 20 2026, on Not clear staying after a take: "yes
   (a) is fine".) Clear now clears a word at once. The word's card says plainly what clears it: how many more right

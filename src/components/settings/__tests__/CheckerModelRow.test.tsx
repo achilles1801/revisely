@@ -24,14 +24,14 @@ describe("Revisely Dev's Settings → Testing: the checker's model", () => {
   it('names each level’s model in the app’s words, and the checker’s commit quietly', async () => {
     await show(async () => V7);
     expect(screen.getByText('Mistake detection model')).toBeTruthy();
-    expect(screen.getByText('Recite v7 · Words & harakat v7 · Strict v5')).toBeTruthy();
+    expect(screen.getByText('Recite v7 · Mistakes v7 · Strict v5')).toBeTruthy();
     expect(screen.getByText('Checker a5b8def6')).toBeTruthy();
-    expect(screen.getByLabelText('Mistake detection model, Recite v7 · Words & harakat v7 · Strict v5, Checker a5b8def6')).toBeTruthy();
+    expect(screen.getByLabelText('Mistake detection model, Recite v7 · Mistakes v7 · Strict v5, Checker a5b8def6')).toBeTruthy();
   });
 
   it('production’s models read the same way', async () => {
     await show(async () => ({ recite: 'v6', harakat: 'v6', strict: 'released+v5' }));
-    expect(screen.getByText('Recite v6 · Words & harakat v6 · Strict v5')).toBeTruthy();
+    expect(screen.getByText('Recite v6 · Mistakes v6 · Strict v5')).toBeTruthy();
     expect(screen.queryByText(/^Checker /)).toBeNull();
   });
 
@@ -55,7 +55,7 @@ describe("Revisely Dev's Settings → Testing: the checker's model", () => {
     fireEvent.press(screen.getByTestId('settings-checker-model'));
     await act(async () => {});
     expect(read).toHaveBeenCalledTimes(2);
-    expect(screen.getByText('Recite v7 · Words & harakat v7 · Strict v5')).toBeTruthy();
+    expect(screen.getByText('Recite v7 · Mistakes v7 · Strict v5')).toBeTruthy();
   });
 
   it('asks once when Settings opens, and not again while an answer is on its way', async () => {
@@ -70,6 +70,6 @@ describe("Revisely Dev's Settings → Testing: the checker's model", () => {
     fireEvent.press(screen.getByTestId('settings-checker-model'));
     expect(read).toHaveBeenCalledTimes(1);
     await act(async () => answer(V7));
-    expect(screen.getByText('Recite v7 · Words & harakat v7 · Strict v5')).toBeTruthy();
+    expect(screen.getByText('Recite v7 · Mistakes v7 · Strict v5')).toBeTruthy();
   });
 });
