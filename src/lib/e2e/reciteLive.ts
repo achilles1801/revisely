@@ -11,7 +11,7 @@
 //                                     numbers go to the E2E log ("[e2e] take stats").
 //   revisely://e2e/recite-live?on=1&long=45&speed=5
 //                                     a long session (RECITE-22): 45 minutes of recitation, its audio 5 times as fast as
-//                                     a phone's (45 minutes in 9), through takes the phone chains: the stand-in checker
+//                                     a phone's (45 minutes in 9; the checker beats 5 times as often), through takes the phone chains: the stand-in checker
 //                                     ends a take at 15 minutes of its audio as the real one does (`done.why: too_long`),
 //                                     and a new take carries on from where the last one ended, finding the place first.
 //
@@ -384,7 +384,10 @@ class LongTakeChecker implements SocketLike {
       this.started = true;
       setTimeout(() => {
         this.emit({ type: 'ready', v: 2, take: `e2e-long-${Math.round(this.base)}`, engine: 'e2e', protocol: 8, from: 0, beat: 2, said: 'voice' });
-        this.beat = setInterval(() => this.emit({ type: 'beat', t: this.got / SAMPLE_RATE, rx: this.got / SAMPLE_RATE }), 2000);
+        // Every 2 s of the take's audio: at `speed` that's more often by the clock, so the phone's paced catch-up (at most
+        // 5 s past the checker's last `rx`) still drains held audio faster than it comes. At 2 s by the clock a new take's
+        // held audio fell further behind at 6x, and the bar said Slow connection (flow 21's first run, Nov 22 2026).
+        this.beat = setInterval(() => this.emit({ type: 'beat', t: this.got / SAMPLE_RATE, rx: this.got / SAMPLE_RATE }), 2000 / longSpeed);
       }, 300);
       if (frame.resume) {
         // eslint-disable-next-line no-console

@@ -4,7 +4,7 @@
 # pause after an ayah past 14 minutes it ends the take and starts the next on the page on screen, and the screen shows
 # one recitation (no summary, no flash, the clock running on, the words and marks kept). The stand-in checker
 # (lib/e2e/reciteLive, `long=45`) enforces the cap as the real one does and starts each new take where the last ended. The
-# take's audio goes 6 times as fast as a phone's (45 minutes in 7.5), through the real socket (lib/reciteLive/socket).
+# take's audio goes 5 times as fast as a phone's (45 minutes in 9), through the real socket (lib/reciteLive/socket).
 # Stop ends the recitation: one result, one summary, and the take's numbers (stalls, event to screen, lag, heap, links)
 # on the E2E status line.
 appId: com.revisionbuddy.app
@@ -27,7 +27,7 @@ appId: com.revisionbuddy.app
 
 # The Dev UI, then the reader at An-Naml 23.
 - openLink:
-    link: revisely://e2e/recite-live?on=1&long=45&speed=6
+    link: revisely://e2e/recite-live?on=1&long=45&speed=5
     optional: true
 - runFlow: ../subflows/open-link-prompt.yaml
 - openLink:
@@ -120,11 +120,11 @@ appId: com.revisionbuddy.app
     env:
       NAME: ls01-hidden-start
 
-# Minute 7.5 of the recitation (75 s): following.
+# Minute 7.5 of the recitation (90 s): following.
 - extendedWaitUntil:
     visible:
       id: never-there
-    timeout: 75000
+    timeout: 90000
     optional: true
 - assertVisible:
     id: recite-words
@@ -133,11 +133,11 @@ appId: com.revisionbuddy.app
     env:
       NAME: ls02-minute-7
 
-# Minute 16 (160 s): past the first take's end at a pause near 14 minutes, the next take following, the clock past 15:00.
+# Minute 16 (192 s): past the first take's end at a pause near 14 minutes, the next take following, the clock past 15:00.
 - extendedWaitUntil:
     visible:
       id: never-there
-    timeout: 85000
+    timeout: 102000
     optional: true
 - assertVisible:
     id: recite-words
@@ -153,11 +153,11 @@ appId: com.revisionbuddy.app
     env:
       NAME: ls03-minute-16
 
-# Minute 31 (310 s): past the second take's end.
+# Minute 31 (372 s): past the second take's end.
 - extendedWaitUntil:
     visible:
       id: never-there
-    timeout: 150000
+    timeout: 180000
     optional: true
 - assertVisible:
     id: recite-words
@@ -169,11 +169,11 @@ appId: com.revisionbuddy.app
     env:
       NAME: ls04-minute-31
 
-# Minute 45.5 (455 s): still following, then Stop. The result in the bar (a tap opens the summary), or the summary itself.
+# Minute 45.5 (546 s): still following, then Stop. The result in the bar (a tap opens the summary), or the summary itself.
 - extendedWaitUntil:
     visible:
       id: never-there
-    timeout: 145000
+    timeout: 174000
     optional: true
 - assertVisible:
     id: recite-words

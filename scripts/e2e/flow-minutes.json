@@ -25,7 +25,7 @@
     "18-recite-live": 9,
     "19-recite-session": 9,
     "20-long-take": 15,
-    "21-long-session": 15
+    "21-long-session": 16
   },
   "android": {
     "01-onboarding": 3,
@@ -52,6 +52,6 @@
     "18-recite-live": 6,
     "19-recite-session": 6,
     "20-long-take": 13,
-    "21-long-session": 12
+    "21-long-session": 13.5
   }
 }
