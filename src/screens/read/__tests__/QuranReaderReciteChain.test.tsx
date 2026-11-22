@@ -265,7 +265,11 @@ describe('[RECITE-22] a recitation past the checker’s 15 minutes is one take o
     await recite(890);
     // Mid-word at 14:50: not yet.
     expect(mockConns).toHaveLength(1);
-    await say(a, doneOf('take-a', A23, [wrong(A23 + 4)], 'too_long'));
+    // The checker's cap cuts the word being said (the cursor's, past what's decided): its mark there is judged by neither
+    // take, so it goes from the page (the checker session's cuts: a part-word was once marked as a slip).
+    await say(a, { type: 'mark', mark: wrong(A23 + 8) });
+    expect(screen.getAllByTestId('live-mark-word')).toHaveLength(2);
+    await say(a, doneOf('take-a', A23, [wrong(A23 + 4), wrong(A23 + 8)], 'too_long'));
     expect(mockConns).toHaveLength(2);
     const b = mockConns[1];
     // The next take starts on the page on screen, looking for the reciter there and in the whole Qur'an.

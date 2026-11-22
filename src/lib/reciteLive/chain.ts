@@ -35,10 +35,22 @@ export const ROLL_NOW_S = 14 * 60 + 55;
 /** A take rolled over waits this long for its final answer (ms); then what it found stands, unfinished. */
 export const LINK_ANSWER_MS = 20_000;
 
-/** A take of the chain: its live state and the seconds of the chain's audio before its first sample. */
+/**
+ * A take of the chain: its live state and the seconds of the chain's audio before its first sample. `upTo`: a take cut
+ * where the reciter was mid-word (at the cap, or at once near it) judged words only up to what it had decided by then;
+ * the word in flight is judged by neither take (the checker session's measurement, Nov 22 2026: a word cut 0.3 s in
+ * was once marked as a false haraka slip).
+ */
 export interface ChainLink {
   state: LiveState;
   offset: number;
+  upTo?: number;
+}
+
+/** Where a take is cut, if it isn't at a pause: the last word it had decided (null when it's at a pause, or decided nothing). */
+export function judgedUpTo(state: LiveState): number | null {
+  const atPause = state.cursor != null && state.saidUpTo != null && state.cursor <= state.saidUpTo;
+  return atPause ? null : state.saidUpTo;
 }
 
 /** Whether word `w` is its ayah's last. */
@@ -88,6 +100,35 @@ export function settleLink(state: LiveState, secs: number): LiveState {
 /** A mark with its times in the chain's seconds (the take's recording, which runs across the chain). */
 function shifted(m: Mark, offset: number): Mark {
   return offset && m.t ? { ...m, t: [m.t[0] + offset, m.t[1] + offset] } : m;
+}
+
+/** A link as the chain counts it: past its `upTo`, no marks (the word in flight) and none of its words reached. */
+function judged(l: ChainLink): LiveState {
+  const upTo = l.upTo;
+  if (upTo == null) return l.state;
+  const s = l.state;
+  const keep = (m: Mark) => m.w <= upTo;
+  const past = Object.values(s.marks).filter((m) => !keep(m));
+  const beyond = Math.max(0, (furthestWord(s) ?? upTo) - upTo);
+  if (!past.length && !beyond) return s;
+  const marks = Object.fromEntries(Object.entries(s.marks).filter(([, m]) => keep(m)));
+  const removed = Object.fromEntries(Object.entries(s.removed).filter(([, r]) => keep(r.mark)));
+  let score = s.score;
+  if (score) {
+    const dropped = past.filter((m) => countsAsMistake(m) && (score!.unclear == null || !isUnclear(m))).length;
+    const unclear = past.filter(isUnclear).length;
+    const reached = Math.max(0, score.reached - beyond);
+    const mistakes = Math.max(0, score.mistakes - dropped);
+    score = {
+      ...score,
+      reached,
+      mistakes,
+      tajweed: Math.max(0, score.tajweed - past.filter((m) => m.kind === 'tajweed').length),
+      ...(score.unclear != null ? { unclear: Math.max(0, score.unclear - unclear) } : {}),
+      accuracy: reached > 0 ? Math.max(0, 1 - mistakes / reached) : 1,
+    };
+  }
+  return { ...s, marks, removed, score };
 }
 
 /** A link's counts: mistakes without Not clear, from its score when it has one, else from its marks. */
@@ -143,7 +184,7 @@ function chainScore(states: readonly LiveState[]): LiveScore | null {
  */
 export function chainView(prior: readonly ChainLink[], cur: ChainLink): LiveState {
   if (prior.length === 0) return cur.state;
-  const links = [...prior, cur];
+  const links = [...prior.map((l) => ({ ...l, state: judged(l) })), cur];
   const states = links.map((l) => l.state);
   const first = prior[0].state;
   const last = prior[prior.length - 1].state;

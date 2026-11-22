@@ -7,6 +7,7 @@ import {
   chainTakes,
   chainView,
   endsAyah,
+  judgedUpTo,
   linkHolding,
   ROLL_FROM_S,
   ROLL_LOOSE_S,
@@ -161,6 +162,30 @@ describe('what the screens see of a chain', () => {
     expect(Object.keys(view.marks)).toEqual([mark(A24 + 2).id]);
     expect(view.removed[mark(A23 + 4).id]).toBeTruthy();
     expect(mistakeCount(view)).toBe(1);
+  });
+});
+
+describe('a take cut mid-word (at the cap, or at once near it)', () => {
+  it('judged only what it had decided by then: no mark, and no count, on the word in flight', () => {
+    // The cursor on A24 + 1 (being said), A24 decided: cut there.
+    const cut = take(A23, [
+      { type: 'at', w: A24 + 1 },
+      { type: 'said', upTo: A24 },
+      { type: 'mark', mark: mark(A23 + 4) },
+      { type: 'score', score: { reached: 13, mistakes: 1, tajweed: 0, unclear: 0, accuracy: 12 / 13 } },
+    ], 'a');
+    expect(judgedUpTo(cut)).toBe(A24);
+    // At a pause there's nothing in flight.
+    expect(judgedUpTo(take(A23, [{ type: 'at', w: A24 }, { type: 'said', upTo: A24 }]))).toBeNull();
+    // Its final answer marks the part-word (a false haraka slip, as the checker's cuts sometimes do) and counts it.
+    const answered = applyEvent(liveStopping(cut), {
+      type: 'done',
+      result: { v: 2, take: 'a', from: A23, to: A26, secs: 900, marks: [mark(A23 + 4), mark(A24 + 1, 'harakat')], score: { reached: 13, mistakes: 2, tajweed: 0, unclear: 0, accuracy: 11 / 13 }, start: A23, why: 'too_long' },
+    });
+    const b = take(A24 + 2, [{ type: 'at', w: A24 + 4 }, { type: 'score', score: { reached: 3, mistakes: 0, tajweed: 0, unclear: 0, accuracy: 1 } }], 'b');
+    const view = chainView([{ state: answered, offset: 0, upTo: judgedUpTo(cut)! }], { state: b, offset: 900 });
+    expect(Object.keys(view.marks)).toEqual([mark(A23 + 4).id]);
+    expect(view.score).toMatchObject({ reached: 12 + 3, mistakes: 1 });
   });
 });
 

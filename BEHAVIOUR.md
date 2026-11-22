@@ -648,7 +648,8 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   ayah's or a phrase's last word (later at any pause, and five seconds before the cap at once), the take ends and the
   next starts by itself on the page on screen, which the checker finds as at any start; a take the checker's cap ends
   is followed the same way. The microphone never stops: every moment of the recitation goes to exactly one take, none
-  twice and none missed. Nothing on screen changes: the bar listens on, the clock runs on, every mark stays, and the
+  twice and none missed. A take cut mid-word (at the cap, or near it) counts and marks nothing past the last word it had
+  decided: the word in flight is judged by neither take, never wrongly marked. Nothing on screen changes: the bar listens on, the clock runs on, every mark stays, and the
   cursor and a hidden page's words stay where the reciter was until the next take has found the place. Stop, ✕,
   leaving the app or a drill's or a test's end never start a next take. The summary covers the whole recitation once
   every take has its answer (a take whose answer doesn't come stands unfinished, RECITE-11), with one score, one

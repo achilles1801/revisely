@@ -17,7 +17,7 @@ import { checkLevel, type ReciteCheckSettings } from '../../lib/reciteCheck/sett
 import { sendLabel, warmUpReciteCheck } from '../../lib/reciteCheck/service';
 import type { LiveEvent, Mark } from '../../lib/reciteLive/contract';
 import type { ClientFrame, LiveConnect, LiveConnection, StartFrame } from '../../lib/reciteLive/feed';
-import { CAP_S, chainTakes, chainView, LINK_ANSWER_MS, nextLinkStart, ROLL_FROM_S, rolloverDue, settleLink, WARM_NEXT_S, type ChainLink } from '../../lib/reciteLive/chain';
+import { CAP_S, chainTakes, chainView, judgedUpTo, LINK_ANSWER_MS, nextLinkStart, ROLL_FROM_S, rolloverDue, settleLink, WARM_NEXT_S, type ChainLink } from '../../lib/reciteLive/chain';
 import { socketFeed } from '../../lib/reciteLive/socket';
 import { stopHearing } from '../../lib/reciteLive/hearAudio';
 import { clipRange } from '../../lib/reciteLive/phrase';
@@ -649,13 +649,15 @@ export function useLiveRecitation({
       const secs = linkSecs();
       const no = linkNo.current;
       let done = curRef.current;
+      // Cut mid-word (the cap, or at once near it): this take judged only up to what it had decided (lib/reciteLive/chain).
+      const upTo = judgedUpTo(done);
       if (capDone) done = applyEvent(done, capDone);
       else {
         a.send(endFrame());
         done = liveStopping(done);
       }
       const ran = capDone ? Math.min(secs, CAP_S) : secs;
-      priorRef.current = [...priorRef.current, { no, state: done, offset: linkOffset(), secs: ran }];
+      priorRef.current = [...priorRef.current, { no, state: done, offset: linkOffset(), secs: ran, ...(upTo != null ? { upTo } : {}) }];
       linkConns.current.set(no, a);
       if (done.status !== 'done') {
         linkTimers.current.set(
