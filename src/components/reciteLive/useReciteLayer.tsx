@@ -825,7 +825,7 @@ export function useReciteLayer({
                       ...coverColors,
                       off: offWord != null ? { w: offWord, words: qw, colour: v2.markWord } : null,
                       current:
-                        live.state.status === 'listening' && live.state.cursor != null ? { w: live.state.cursor, words: qw, colour: v2.followWord } : null,
+                        live.state.status === 'listening' && live.state.cursor != null ? { w: live.state.cursor, words: qw, colour: v2.highlight } : null,
                     }
                   : null
               }
