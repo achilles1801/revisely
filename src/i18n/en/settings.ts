@@ -70,22 +70,38 @@ export const settings = {
   /** screens/main/SettingsScreen. */
   title: 'Settings',
   /** Section titles. Revo opens Settings at one by its title (REVO-31). */
+  /** Settings' pages (SET-1): each is a row on the first level and its page's title. */
   sections: {
     account: 'Account',
-    activity: 'Activity',
-    homeScreen: 'Home screen',
-    prayer: 'Prayer',
-    dayBoundary: 'Day boundary',
     revision: 'Revision',
-    revo: 'Revo AI',
+    reminders: 'Reminders',
+    prayer: 'Prayer',
+    /** The page of the mushaf and, with Recite, its settings. */
+    mushafRecite: 'Mushaf and Recite',
     mushaf: 'Mushaf',
-    recite: 'Recite',
-    notifications: 'Notifications',
+    revo: 'Revo AI',
+    storage: 'Downloads and storage',
     appearance: 'Appearance',
-    support: 'Support',
+    help: 'Help and support',
     about: 'About',
     testing: 'Testing',
     dev: 'Dev',
+  },
+  /** Settings' first level (SET-1): what each page is set to, beside its name. */
+  root: {
+    smartOn: 'Smart Tracking on',
+    smartOff: 'Smart Tracking off',
+    /** Revision reminders on, and prayers that notify: "On · 3 prayers". */
+    onAndPrayers_one: 'On · {{count}} prayer',
+    onAndPrayers_other: 'On · {{count}} prayers',
+    /** Revision reminders off, some prayers notify: "3 prayers". */
+    prayers_one: '{{count}} prayer',
+    prayers_other: '{{count}} prayers',
+    /** Under your name. */
+    premium: 'Premium',
+    premiumEarly: 'Premium · free in early access',
+    /** The account row, for VoiceOver: "Majd, majd@example.com, Premium. Your account". */
+    accountLabel: '{{who}}. Your account',
   },
   /** A row's value: "On", "Off". */
   on: 'On',
@@ -143,9 +159,10 @@ export const settings = {
     memorizedPages: 'Memorized pages',
   },
   homeScreen: {
-    nextPrayer: 'Next prayer',
-    nextPrayerSub: 'A line under the header',
+    /** Prayer's switch for the line under Home's header. */
+    nextPrayer: 'Next prayer on Home',
     fridayKahf: 'Friday Al-Kahf reminder',
+    fridayKahfSub: 'A card on Home on Fridays',
   },
   prayer: {
     times: 'Prayer times',
@@ -213,7 +230,8 @@ export const settings = {
     mistakeSoundSub: 'A short tone and a tap as a mistake is marked',
   },
   notifications: {
-    enable: 'Enable notifications',
+    /** Reminders' switch for the revision reminders (REMIND-1). */
+    enable: 'Revision reminders',
     /** Under the switch while the phone refuses Revisely's notifications (REMIND-5). */
     refused: 'Off in your phone’s Settings, so no reminders can come',
     refusedTitle: 'Notifications are off for Revisely',

@@ -310,7 +310,7 @@ export function useLiveRecitation({
   }, []);
   /** This take's long-take numbers have gone (once a take, whatever its answer). */
   const reportedLong = useRef(false);
-  // A sound and a tap as a mistake is marked (Settings → Recite → Sound on a mistake; lib/reciteLive/mistakeCue).
+  // A sound and a tap as a mistake is marked (Settings → Mushaf and Recite → Sound on a mistake; lib/reciteLive/mistakeCue).
   const [cue] = useState(() => createMistakeCue({ now: () => Date.now(), sound: playCueSound, tap: playCueTap }));
   const soundRef = useRef(settings.mistakeSound);
   soundRef.current = settings.mistakeSound;

@@ -425,7 +425,7 @@ export function useReciteLayer({
   );
   // Recite your N mistakes here (the held mic, with Premium): the page's words still to fix in Recite's memory, as one
   // take over the stretch that holds them, stopping by itself at its end. Worked out only while the menu is open.
-  // Not with Settings → Recite → "Show past mistakes" off: the page doesn't show them then (RMEM-3).
+  // Not with Settings → Mushaf and Recite → "Show past mistakes" off: the page doesn't show them then (RMEM-3).
   const pageDrill = useMemo(
     () =>
       modeMenu && liveOn && owned && qw && reciteSettings.showPast && memoryRecords.length > 0

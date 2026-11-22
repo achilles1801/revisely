@@ -453,6 +453,7 @@ appId: com.revisionbuddy.app
 - runFlow:
     file: ../subflows/settings-row.yaml
     env:
+      PAGE: testing
       ROW: settings-premium
 - tapOn:
     id: settings-premium
@@ -462,8 +463,18 @@ appId: com.revisionbuddy.app
       checked: false
       enabled: true
     timeout: 30000
-- tapOn:
-    id: back
+# Back to Settings' first level, then Home (SET-1): Settings left open stays on Home's stack, and the tab-Home tap after
+# the takes below would show it instead of Home's open-activity.
+- runFlow:
+    file: ../subflows/tap-to-open.yaml
+    env:
+      ID: back
+      OPENS: settings-page-testing
+- runFlow:
+    file: ../subflows/tap-to-open.yaml
+    env:
+      ID: back
+      OPENS: today-post
 - openLink:
     link: revisely://read?page=379
     optional: true

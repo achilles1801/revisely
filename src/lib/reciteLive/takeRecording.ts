@@ -1,4 +1,4 @@
-// A take's audio, kept with the take (Revisely Dev; Settings → Recite → Save recordings when you recite, on by
+// A take's audio, kept with the take (Revisely Dev; Settings → Mushaf and Recite → Save recordings when you recite, on by
 // default; takes with Mark mistakes only). The microphone's samples go to a WAV file in the caches folder as they come,
 // about once a second, so a long take never sits in memory; when the take ends the file joins lib/recordings' store for
 // that day, with the pages it turned through and its waveform, marked `take`: it is the take's audio, never listed as a

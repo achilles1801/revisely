@@ -4,7 +4,7 @@
 // made no difference to who came back. With this on, each day after tomorrow gets one reminder, for a week
 // from the last open (lib/reminders/plan LATER_DAYS).
 //
-// The same switch opens Settings' "Enable notifications" telling the truth (REMIND-5): off while the phone refuses
+// The same switch opens Settings' "Revision reminders" (Reminders) telling the truth (REMIND-5): off while the phone refuses
 // Revisely's notifications, saying so, and offering the phone's Settings when turned on.
 //
 // One switch, so it can reach App Store users on its own, before or with any release: off, it is Revisely

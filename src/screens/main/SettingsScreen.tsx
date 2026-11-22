@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useRef, useCallback, useState, useEffect } from 'react';
+import React, { useRef, useCallback, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -18,7 +18,7 @@ import { TopSafeAreaView } from '../../components/SafeAreaView';
 import Constants from 'expo-constants';
 import { AppInfo } from '../../components/settings/AppInfo';
 import { useDesign } from '../../design/DesignContext';
-import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
+import { ACCENT_LABELS, layoutV2, radiusV2, typeV2 } from '../../theme/v2';
 import { AccentSetting } from '../../components/settings/AccentPicker';
 import { TopBar } from '../../components/v2/TopBar';
 import { Mark } from '../../components/v2/Mark';
@@ -57,7 +57,7 @@ import { showsUpdateTools } from '../../lib/updates/testerTools';
 import { useAuth } from '../../context/AuthContext';
 import { systemAppearanceAvailable, useTheme } from '../../context/ThemeContext';
 import type { HomeStackParamList } from '../../navigation/MainNavigator';
-import type { RevoSettingsSection } from '../../lib/revo/types';
+import { pageOfSection, remindersSummary, type SettingsPage } from '../../lib/settingsPages';
 import * as firestoreService from '../../services/firestoreService';
 import { getTotalAppUsageSeconds } from '../../lib/appUsage';
 import { formatDuration } from '../../lib/readingTimer';
@@ -127,35 +127,12 @@ type IconName = keyof typeof Ionicons.glyphMap;
 // Reusable bits — kept inline since they're tightly coupled to settings rows.
 // ---------------------------------------------------------------------------
 
-/** Each section's place in the list, by title, so Revo can open Settings at one (REVO-31). */
-const SectionLayout = createContext<((title: string, y: number) => void) | null>(null);
-
-type SectionId = 'activity' | 'homeScreen' | 'prayer' | 'dayBoundary' | 'revision' | 'revo' | 'mushaf' | 'notifications' | 'appearance' | 'testing';
-
-/** The sections Revo's openScreen names, found by their titles (`settings.sections`). */
-const REVO_SECTION_TITLES: Record<RevoSettingsSection, readonly SectionId[]> = {
-  activity: ['activity'],
-  homeScreen: ['homeScreen'],
-  // Without prayer times the day boundary has its own section.
-  prayer: ['prayer', 'dayBoundary'],
-  revision: ['revision'],
-  revo: ['revo'],
-  mushaf: ['mushaf'],
-  notifications: ['notifications'],
-  appearance: ['appearance'],
-  testing: ['testing'],
-};
-
 function Section({ title, footer, children }: { title?: string; footer?: string; children: React.ReactNode }) {
   const { palette } = useTheme();
-  const onLayout = useContext(SectionLayout);
   // A flat list: a bold sentence-case header, rows on the ground, a hairline
   // closing the group.
   return (
-    <View
-      style={[v2.section, { borderBottomColor: palette.separator }]}
-      onLayout={title && onLayout ? (e) => onLayout(title, e.nativeEvent.layout.y) : undefined}
-    >
+    <View style={[v2.section, { borderBottomColor: palette.separator }]}>
       {title ? (
         <Text style={[typeV2.name, v2.sectionTitle, { color: palette.text }]} accessibilityRole="header">
           {title}
@@ -280,31 +257,6 @@ function AthanVoiceRow({ onPress }: { onPress: () => void }) {
 export default function SettingsScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProp<HomeStackParamList, 'Settings'>>();
-  // Opened at a section (Revo's openScreen): scrolled to it once it has laid out.
-  const scrollRef = useRef<ScrollView>(null);
-  const sectionY = useRef(new Map<string, number>());
-  const wantedSection = route.params?.section;
-  const scrolledTo = useRef<string | null>(null);
-  const scrollToWanted = useCallback(() => {
-    if (!wantedSection || scrolledTo.current === wantedSection) return;
-    const y = REVO_SECTION_TITLES[wantedSection]
-      ?.map((id) => sectionY.current.get(t(`settings.sections.${id}`)))
-      .find((v) => v != null);
-    if (y == null) return;
-    scrolledTo.current = wantedSection;
-    scrollRef.current?.scrollTo({ y: Math.max(0, y - spacing.sm), animated: true });
-  }, [wantedSection]);
-  useEffect(() => {
-    scrolledTo.current = null;
-    scrollToWanted();
-  }, [scrollToWanted]);
-  const onSectionLayout = useCallback(
-    (title: string, y: number) => {
-      sectionY.current.set(title, y);
-      scrollToWanted();
-    },
-    [scrollToWanted],
-  );
   const { user, saveUser, resetOnboarding, pendingChanges = 0 } = useApp();
   const help = useHelpButtons();
   const { firebaseUser, signOutUser, deleteAccount } = useAuth();
@@ -652,200 +604,223 @@ export default function SettingsScreen() {
     );
   };
 
+  // ---------------------------------------------------------------------------
+  // Pages (SET-1): the first level, or the page `page` names (pushed again with it, so Back returns to the first level).
+  // A Settings section (Revo's openScreen, Insights' Turn on Smart Tracking) opens the page that holds its rows.
+  // ---------------------------------------------------------------------------
+  const page: SettingsPage | null =
+    route.params?.page ?? (route.params?.section ? pageOfSection(route.params.section, prayerEnabled) : null);
+  const openPage = (next: SettingsPage) => navigation.push('Settings', { page: next });
+  const pageTitle = (p: SettingsPage) =>
+    p === 'mushaf' ? (reciteCheck ? t('settings.sections.mushafRecite') : t('settings.sections.mushaf')) : t(`settings.sections.${p}`);
+  // What each page is set to, beside its name on the first level.
+  const remindersOn = localUser.notificationsEnabled && !notificationsRefused;
+  const prayerCity = prayerTimes.place ? nearestCity(prayerTimes.place, bundledCities())?.name : undefined;
+  const prayerValue = [methodLabel(prayerTimes.settings.method, true), prayerCity].filter(Boolean).join(' · '); // i18n-ignore (a list's separator)
+  // On this phone: the offline mushaf, the recordings and the speech model.
+  const storedBytes =
+    (mushaf.bytes ?? 0) + (recordings?.bytes ?? 0) + (speechModelShown && speechModel.status === 'ready' ? speechModel.bytes : 0);
+  const storageValue = storedBytes > 0 ? formatBytes(storedBytes) : undefined;
+  const themeLabel =
+    themeMode === 'system' ? t('settings.appearance.system') : themeMode === 'dark' ? t('settings.appearance.dark') : t('settings.appearance.light');
+  const appearanceValue = `${themeLabel} · ${ACCENT_LABELS[design.accent]}`; // i18n-ignore (a list's separator)
+  // Your account at the top of the first level (it opens the Account page) and of the Account page.
+  const premiumLine = reciteCheck && premium.has ? (earlyAccessOn ? t('settings.root.premiumEarly') : t('settings.root.premium')) : null;
+  const accountWho = [localUser.name?.trim(), firebaseUser?.email, premiumLine].filter(Boolean).join(', '); // i18n-ignore (a list for VoiceOver)
+  const accountHeader = (opens: boolean) => (
+    <View style={[v2.profileRow, { borderBottomColor: palette.separator }]} testID={opens ? undefined : 'settings-account-header'}>
+      <Mark label={avatarInitial(localUser.name, firebaseUser?.email)} />
+      <View style={{ flex: 1, minWidth: 0, marginLeft: layoutV2.markGap }}>
+        {/* Long names wrap to a second line before shrinking or cutting. */}
+        {localUser.name?.trim() ? (
+          <Text style={[typeV2.name, { color: theme.textPrimary }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.8}>
+            {localUser.name.trim()}
+          </Text>
+        ) : null}
+        <Text style={[typeV2.meta, { color: theme.textSecondary }]} numberOfLines={1} ellipsizeMode="middle">
+          {firebaseUser?.email}
+        </Text>
+        {premiumLine ? (
+          <Text style={[typeV2.meta, { color: palette.accentText }]} testID="settings-account-premium">
+            {premiumLine}
+          </Text>
+        ) : null}
+      </View>
+      {opens ? <Ionicons name={forwardIcon()} size={16} color={palette.secondary} /> : null}
+    </View>
+  );
+
   return (
     <TopSafeAreaView style={styles.container}>
-      <TopBar title={t('settings.title')} onBack={() => navigation.goBack()} separator />
+      <TopBar title={page ? pageTitle(page) : t('settings.title')} onBack={() => navigation.goBack()} separator />
 
-      <SectionLayout.Provider value={onSectionLayout}>
-      <ScrollView ref={scrollRef} contentInsetAdjustmentBehavior="never" contentContainerStyle={[v2.content, { paddingBottom: tabFootprint + spacing.lg }]} testID="settings-scroll">
-        {firebaseUser && (
-          <Section title={t('settings.sections.account')}>
-            <View style={v2.profileRow}>
-              <Mark label={avatarInitial(localUser.name, firebaseUser.email)} />
-              <View style={{ flex: 1, minWidth: 0, marginLeft: layoutV2.markGap }}>
-                {/* Long names wrap to a second line before shrinking or cutting. */}
-                {localUser.name?.trim() ? (
-                  <Text
-                    style={[typeV2.name, { color: theme.textPrimary }]}
-                    numberOfLines={2}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.8}
-                  >
-                    {localUser.name.trim()}
+      <ScrollView contentInsetAdjustmentBehavior="never" contentContainerStyle={[v2.content, { paddingBottom: tabFootprint + spacing.lg }]} testID={page ? `settings-${page}-scroll` : 'settings-scroll'}>
+        {page == null ? (
+          <>
+            {firebaseUser ? (
+              <Tap
+                onPress={() => openPage('account')}
+                accessibilityRole="button"
+                accessibilityLabel={t('settings.root.accountLabel', { who: accountWho })}
+                testID="settings-account"
+              >
+                {accountHeader(true)}
+              </Tap>
+            ) : null}
+            <Section>
+              <Row icon="analytics-outline" label={t('settings.sections.revision')} value={localUser.smartTrackingEnabled ? t('settings.root.smartOn') : t('settings.root.smartOff')} onPress={() => openPage('revision')} testID="settings-page-revision" />
+              <Row icon="alarm-outline" label={t('settings.sections.reminders')} value={remindersSummary(remindersOn, prayerEnabled ? prayerOn : 0)} onPress={() => openPage('reminders')} testID="settings-page-reminders" />
+              {prayerEnabled ? (
+                <Row icon="time-outline" label={t('settings.sections.prayer')} value={prayerValue} onPress={() => openPage('prayer')} testID="settings-page-prayer" />
+              ) : null}
+              <Row icon="book-outline" label={pageTitle('mushaf')} value={mushafEdition(edition).name} onPress={() => openPage('mushaf')} testID="settings-page-mushaf" />
+              {revoShown ? (
+                <Row icon="sparkles-outline" label={t('settings.sections.revo')} value={!revoOpen ? t('settings.revo.paused') : revoSettings?.optIn ? t('settings.on') : t('settings.off')} onPress={() => openPage('revo')} testID="settings-page-revo" />
+              ) : null}
+              <Row icon="cloud-download-outline" label={t('settings.sections.storage')} value={storageValue} onPress={() => openPage('storage')} testID="settings-page-storage" />
+              <Row icon="color-palette-outline" label={t('settings.sections.appearance')} value={appearanceValue} onPress={() => openPage('appearance')} testID="settings-page-appearance" />
+            </Section>
+            <Section>
+              <Row icon={HELP_ICON} label={t('settings.sections.help')} onPress={() => openPage('help')} testID="settings-page-help" />
+              <Row icon="information-circle-outline" label={t('settings.sections.about')} onPress={() => openPage('about')} testID="settings-page-about" />
+              {firebaseUser && showsResetMyData(user) ? (
+                <Row icon="flask-outline" label={t('settings.sections.testing')} onPress={() => openPage('testing')} testID="settings-page-testing" />
+              ) : null}
+            </Section>
+            <Text style={[typeV2.meta, v2.version, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
+              {t('settings.about.version', { version: Constants.expoConfig?.version ?? '1.0.0' })}
+            </Text>
+            {__DEV__ && (
+              <Section title={t('settings.sections.dev')}>
+                <Row
+                  icon="refresh-outline"
+                  label={t('settings.dev.replay')}
+                  onPress={handleReplayOnboarding}
+                />
+              </Section>
+            )}
+          </>
+        ) : null}
+        {page === 'account' && firebaseUser ? (
+          <>
+            {accountHeader(false)}
+            <Section>
+              <Row
+                icon="person-outline"
+                label={t('settings.account.displayName')}
+                value={localUser.name ?? t('settings.account.notSet')}
+                onPress={() => {
+                  setTempName(localUser.name ?? '');
+                  setShowNameModal(true);
+                }}
+              />
+              {reciteCheck && premium.has ? (
+                <Row
+                  icon="sparkles-outline"
+                  label={t('settings.recite.premium')}
+                  subtitle={earlyAccessLine(premium, earlyAccessOn) ?? t('settings.recite.premiumSub')}
+                  testID="settings-premium-row"
+                />
+              ) : null}
+              <Row
+                icon="hourglass-outline"
+                label={t('settings.activity.timeInApp')}
+                value={appSeconds != null ? formatDuration(appSeconds) : '—'}
+              />
+            </Section>
+            <Section>
+              <Row
+                icon="log-out-outline"
+                label={t('common.signOut')}
+                onPress={handleSignOut}
+                testID="settings-sign-out"
+              />
+              <Row
+                icon="trash-outline"
+                label={t('settings.account.deleteAccount')}
+                destructive
+                onPress={handleDeleteAccount}
+                testID="settings-delete-account"
+              />
+            </Section>
+          </>
+        ) : null}
+        {page === 'revision' ? (
+          <Section>
+            <View style={v2.iconRow} testID="smart-tracking-row">
+              <SettingIcon name="analytics-outline" />
+              <View style={v2.iconRowText}>
+                <Text style={[typeV2.body, { color: palette.text }]}>{t('settings.revision.smartTracking')}</Text>
+                {!localUser.smartTrackingEnabled && (
+                  <Text style={[typeV2.meta, { color: palette.secondary }]}>
+                    {t('settings.revision.smartTrackingOff')}
                   </Text>
-                ) : null}
-                <Text
-                  style={[typeV2.meta, { color: theme.textSecondary }]}
-                  numberOfLines={1}
-                  ellipsizeMode="middle"
-                >
-                  {firebaseUser.email}
-                </Text>
+                )}
               </View>
+              <SettingSwitch
+                value={localUser.smartTrackingEnabled}
+                onValueChange={(v) => updateUser({ smartTrackingEnabled: v })}
+                accessibilityLabel={t('settings.revision.smartTracking')}
+                testID="smart-tracking-switch"
+              />
             </View>
+            <CarryOverSetting
+              mode={localUser.carryOverMode}
+              onChange={(carryOverMode) => updateUser({ carryOverMode })}
+            />
+            {/* When the revision day starts. With prayer times its method is Prayer's Calculation, so the switch alone. */}
+            <FajrBoundaryCard compact={prayerEnabled} />
             <Row
-              icon="person-outline"
-              label={t('settings.account.displayName')}
-              value={localUser.name ?? t('settings.account.notSet')}
-              onPress={() => {
-                setTempName(localUser.name ?? '');
-                setShowNameModal(true);
-              }}
+              icon="book-outline"
+              label={t('settings.activity.memorizedPages')}
+              onPress={() => navigation.navigate('Memorization')}
+            />
+            <Row
+              icon="pulse-outline"
+              label={t('settings.activity.activity')}
+              value={readingSeconds != null ? t('settings.activity.timed', { duration: formatDuration(readingSeconds) }) : undefined}
+              onPress={() => navigation.navigate('Activity')}
             />
           </Section>
-        )}
-
-        <Section title={t('settings.sections.activity')}>
-          <Row
-            icon="pulse-outline"
-            label={t('settings.activity.activity')}
-            value={readingSeconds != null ? t('settings.activity.timed', { duration: formatDuration(readingSeconds) }) : undefined}
-            onPress={() => navigation.navigate('Activity')}
-          />
-          <Row
-            icon="mic-outline"
-            label={t('settings.activity.recordings')}
-            value={
-              recordings && recordings.count > 0
-                ? `${formatNumber(recordings.count)} · ${formatBytes(recordings.bytes)}`
-                : t('settings.activity.none')
-            }
-            onPress={
-              recordings && recordings.count > 0
-                ? () =>
-                    Alert.alert(
-                      t('settings.activity.recordings'),
-                      [
-                        t('settings.activity.recordingsBody', {
-                          count: recordings.count,
-                          size: formatBytes(recordings.bytes),
-                        }),
-                        recordings.backedUp === recordings.count
-                          ? t('settings.activity.allBackedUp', { count: recordings.count })
-                          : recordings.backedUp > 0
-                            ? t('settings.activity.someBackedUp', { n: recordings.backedUp })
-                            : t('settings.activity.phoneOnly'),
-                        recordings.cloudOnly > 0
-                          ? t('settings.activity.cloudOnly', { count: recordings.cloudOnly })
-                          : '',
-                        t('settings.activity.listedInActivity'),
-                      ]
-                        .filter(Boolean)
-                        .join(' '),
-                      [
-                        { text: t('settings.activity.openActivity'), onPress: () => navigation.navigate('Activity') },
-                        {
-                          text: t('settings.activity.deleteAll'),
-                          style: 'destructive',
-                          onPress: () =>
-                            Alert.alert(
-                              t('settings.activity.deleteAllTitle'),
-                              t('settings.activity.deleteAllBody'),
-                              [
-                              { text: t('common.cancel'), style: 'cancel' },
-                              {
-                                text: t('settings.activity.deleteAll'),
-                                style: 'destructive',
-                                onPress: async () => {
-                                  // The whole folder, including any file not in the index,
-                                  // and the backup (listed first, for recordings not seen here).
-                                  const uid = firebaseUser?.uid;
-                                  if (uid && (await deleteAllEverywhere(uid))) {
-                                    loadRecordings();
-                                    return;
-                                  }
-                                  Alert.alert(
-                                    t('settings.activity.backupUnreachable'),
-                                    t('settings.activity.backupUnreachableBody'),
-                                    [
-                                      { text: t('common.cancel'), style: 'cancel' },
-                                      {
-                                        text: t('settings.activity.deleteOnPhone'),
-                                        style: 'destructive',
-                                        onPress: async () => {
-                                          await deleteAllRecordings(uid, { keepTakes: true });
-                                          loadRecordings();
-                                        },
-                                      },
-                                    ],
-                                  );
-                                },
-                              },
-                              ],
-                            ),
-                        },
-                        { text: t('common.cancel'), style: 'cancel' },
-                      ],
-                    )
-                : undefined
-            }
-          />
-          <Row
-            icon="cloud-upload-outline"
-            label={t('settings.activity.backUp')}
-            value={localUser.recordingBackup !== false ? backupLabel(backupStatus) : undefined}
-            rightSlot={
-              <SettingSwitch
-                value={localUser.recordingBackup !== false}
-                onValueChange={handleBackupToggle}
-                accessibilityLabel={t('settings.activity.backUpLabel')}
-              />
-            }
-          />
-          {localUser.recordingBackup !== false && (
+        ) : null}
+        {page === 'reminders' ? (
+          <Section>
             <Row
-              icon="cellular-outline"
-              label={t('settings.activity.backUpCellular')}
+              icon="alarm-outline"
+              label={t('settings.notifications.enable')}
+              subtitle={notificationsRefused && localUser.notificationsEnabled ? t('settings.notifications.refused') : undefined}
               rightSlot={
                 <SettingSwitch
-                  value={localUser.recordingBackupCellular === true}
-                  onValueChange={(v) =>
-                    updateUser({ recordingBackupCellular: v }).catch((err) =>
-                      logger.warn('Could not change mobile data backup', err),
-                    )
-                  }
-                  accessibilityLabel={t('settings.activity.backUpCellularLabel')}
+                  value={localUser.notificationsEnabled && !notificationsRefused}
+                  onValueChange={handleNotificationToggle}
+                  accessibilityLabel={t('settings.notifications.enable')}
+                  testID="settings-notifications"
                 />
               }
             />
-          )}
-          <Row
-            icon="hourglass-outline"
-            label={t('settings.activity.timeInApp')}
-            value={appSeconds != null ? formatDuration(appSeconds) : '—'}
-          />
-          <Row
-            icon="book-outline"
-            label={t('settings.activity.memorizedPages')}
-            onPress={() => navigation.navigate('Memorization')}
-          />
-        </Section>
-
-        <Section title={t('settings.sections.homeScreen')}>
-          {prayerEnabled ? (
+            {prayerEnabled ? (
+              <Row
+                icon="notifications-outline"
+                label={t('settings.prayer.notifications')}
+                value={prayerOn > 0 ? t('settings.prayer.nOn', { count: prayerOn }) : t('settings.off')}
+                onPress={() => navigation.navigate('PrayerNotifications')}
+              />
+            ) : null}
             <Row
-              icon="time-outline"
-              label={t('settings.homeScreen.nextPrayer')}
-              subtitle={t('settings.homeScreen.nextPrayerSub')}
+              icon="book-outline"
+              label={t('settings.homeScreen.fridayKahf')}
+              subtitle={t('settings.homeScreen.fridayKahfSub')}
               rightSlot={
-                <SettingSwitch value={prayerPrefs.homeLine} onValueChange={(v) => setPrayerPrefs({ homeLine: v })} />
+                <SettingSwitch
+                  value={homePrefs.fridayKahfReminder}
+                  onValueChange={(v) => setHomePrefs({ fridayKahfReminder: v })}
+                />
               }
             />
-          ) : null}
-          <Row
-            icon="book-outline"
-            label={t('settings.homeScreen.fridayKahf')}
-            rightSlot={
-              <SettingSwitch
-                value={homePrefs.fridayKahfReminder}
-                onValueChange={(v) => setHomePrefs({ fridayKahfReminder: v })}
-              />
-            }
-          />
-        </Section>
-
-        {prayerEnabled ? (
-          <Section title={t('settings.sections.prayer')}>
+          </Section>
+        ) : null}
+        {page === 'prayer' && prayerEnabled ? (
+          <Section>
             <Row
               icon="time-outline"
               label={t('settings.prayer.times')}
@@ -856,12 +831,6 @@ export default function SettingsScreen() {
               }
               onPress={() => setPrayerSheet('times')}
             />
-            <Row
-              icon="notifications-outline"
-              label={t('settings.prayer.notifications')}
-              value={prayerOn > 0 ? t('settings.prayer.nOn', { count: prayerOn }) : t('settings.off')}
-              onPress={() => navigation.navigate('PrayerNotifications')}
-            />
             {athanEnabled() ? <AthanVoiceRow onPress={() => navigation.navigate('AthanVoice')} /> : null}
             <Row
               icon="options-outline"
@@ -870,518 +839,557 @@ export default function SettingsScreen() {
               onPress={() => navigation.navigate('PrayerCalculation')}
             />
             <Row icon="compass-outline" label={t('settings.prayer.qibla')} value={qiblaValue} onPress={() => setPrayerSheet('qibla')} />
-            <FajrBoundaryCard compact />
-          </Section>
-        ) : (
-          <Section title={t('settings.sections.dayBoundary')}>
-            <FajrBoundaryCard />
-          </Section>
-        )}
-
-        <Section title={t('settings.sections.revision')}>
-          {/* Like Keep daily amount below: the line under the label says what it does. */}
-          <View style={v2.iconRow} testID="smart-tracking-row">
-            <SettingIcon name="analytics-outline" />
-            <View style={v2.iconRowText}>
-              <Text style={[typeV2.body, { color: palette.text }]}>{t('settings.revision.smartTracking')}</Text>
-              {!localUser.smartTrackingEnabled && (
-                <Text style={[typeV2.meta, { color: palette.secondary }]}>
-                  {t('settings.revision.smartTrackingOff')}
-                </Text>
-              )}
-            </View>
-            <SettingSwitch
-              value={localUser.smartTrackingEnabled}
-              onValueChange={(v) => updateUser({ smartTrackingEnabled: v })}
-              accessibilityLabel={t('settings.revision.smartTracking')}
-              testID="smart-tracking-switch"
-            />
-          </View>
-          <CarryOverSetting
-            mode={localUser.carryOverMode}
-            onChange={(carryOverMode) => updateUser({ carryOverMode })}
-          />
-          {speechModelShown ? (
             <Row
-              icon="mic-outline"
-              label={t('settings.revision.speechModel')}
-              subtitle={t('settings.revision.speechSearches')}
-              value={
-                speechModel.status === 'ready'
-                  ? formatModelSize(speechModel.bytes)
-                  : speechModel.status === 'downloading'
-                    ? `${Math.round(speechModel.progress * 100)}%`
-                    : t('settings.revision.notDownloaded')
+              icon="home-outline"
+              label={t('settings.homeScreen.nextPrayer')}
+              rightSlot={
+                <SettingSwitch value={prayerPrefs.homeLine} onValueChange={(v) => setPrayerPrefs({ homeLine: v })} />
               }
-              onPress={() => (speechModel.status === 'ready' ? setDeleteSpeechOpen(true) : setSpeechSheet(true))}
             />
-          ) : null}
-
-        </Section>
-
-        {revoShown && (
-          <Section title={t('settings.sections.revo')} footer={t('settings.revo.footer')}>
-            <View style={v2.iconRow} testID="revo-settings-row">
-              <SettingIcon name="sparkles-outline" />
-              <View style={v2.iconRowText}>
-                <Text style={[typeV2.body, { color: palette.text }]}>{t('settings.revo.revo')}</Text>
-                <Text style={[typeV2.meta, { color: palette.secondary }]}>
-                  {!revoOpen ? t('settings.revo.paused') : revoSettings?.optIn ? t('settings.revo.on') : t('settings.revo.off')}
-                </Text>
-              </View>
-              <SettingSwitch
-                value={revoSettings?.optIn === true}
-                onValueChange={(v) => (v ? openRevo({ view: 'optin' }) : confirmRevoOff())}
-                accessibilityLabel={t('settings.revo.revo')}
-                testID="revo-settings-switch"
+          </Section>
+        ) : null}
+        {page === 'mushaf' ? (
+          <Section footer={reciteCheck ? t('settings.recite.footer') : undefined}>
+            <View testID="mushaf-edition-row">
+              <Row
+                icon="book-outline"
+                label={t('settings.mushafRows.mushaf')}
+                value={mushafEdition(edition).name}
+                onPress={() => setMushafPicker(true)}
               />
             </View>
-            {revoOpen ? (
-              <Row icon="play-circle-outline" label={t('settings.revo.whatRevoCanDo')} onPress={() => setRevoMoment(true)} testID="settings-revo-moment" />
-            ) : null}
-            {revoSettings?.optIn ? (
+            {reciteCheck ? (
               <>
-                {revoOpen ? (
-                  <Row icon="bulb-outline" label={t('settings.revo.memory')} value={revoSettings.memoryOn ? t('settings.on') : t('settings.off')} onPress={() => openRevo({ view: 'memory' })} />
+                {/* Mistakes to mark: a choice only where Strict is offered (Revisely Dev, until its own switch is on). */}
+                {strictOffered() ? (
+                  <Row
+                    icon="checkmark-done-outline"
+                    label={t('settings.recite.level')}
+                    value={checkLevel(reciteCheckSettings) === 'strict' ? t('settings.recite.strict') : t('settings.recite.words')}
+                    onPress={() => setCheckLevelSheet(true)}
+                    testID="settings-check-level"
+                  />
                 ) : null}
-                <Row icon="trash-outline" label={t('settings.revo.deleteConversations')} destructive onPress={confirmRevoHistoryDelete} />
+                {checkLevel(reciteCheckSettings) === 'strict' ? (
+                  <>
+                    <Row
+                      label={t('settings.recite.munfasil')}
+                      rightSlot={
+                        <PillTabs
+                          compact
+                          hug
+                          tone="ink"
+                          options={[2, 4, 5].map((n) => ({ value: String(n), label: String(n) }))}
+                          value={String(reciteCheckSettings.munfasil)}
+                          onChange={(v) => setReciteCheckSettings(user?.id, { munfasil: Number(v) as 2 | 4 | 5 })}
+                        />
+                      }
+                    />
+                    <Row
+                      label={t('settings.recite.muttasil')}
+                      rightSlot={
+                        <PillTabs
+                          compact
+                          hug
+                          tone="ink"
+                          options={[4, 5, 6].map((n) => ({ value: String(n), label: String(n) }))}
+                          value={String(reciteCheckSettings.muttasil)}
+                          onChange={(v) => setReciteCheckSettings(user?.id, { muttasil: Number(v) as 4 | 5 | 6 })}
+                        />
+                      }
+                    />
+                    <Row
+                      label={t('settings.recite.aared')}
+                      subtitle={t('settings.recite.atStop')}
+                      rightSlot={
+                        <PillTabs
+                          compact
+                          hug
+                          tone="ink"
+                          options={[{ value: '0', label: t('settings.recite.any') }, ...[2, 4, 6].map((n) => ({ value: String(n), label: String(n) }))]}
+                          value={String(reciteCheckSettings.aared)}
+                          onChange={(v) => setReciteCheckSettings(user?.id, { aared: Number(v) as 0 | 2 | 4 | 6 })}
+                        />
+                      }
+                    />
+                  </>
+                ) : null}
+                <Row
+                  icon="mic-outline"
+                  label={t('settings.recite.save')}
+                  subtitle={t('settings.recite.saveSub')}
+                  rightSlot={
+                    <SettingSwitch
+                      value={reciteCheckSettings.saveRecording}
+                      onValueChange={(saveRecording) => setReciteCheckSettings(user?.id, { saveRecording })}
+                      accessibilityLabel={t('settings.recite.save')}
+                      testID="settings-recite-save"
+                    />
+                  }
+                />
+                <Row
+                  icon="bookmark-outline"
+                  label={t('settings.recite.showPast')}
+                  subtitle={t('settings.recite.showPastSub')}
+                  rightSlot={
+                    <SettingSwitch
+                      value={reciteCheckSettings.showPast}
+                      onValueChange={(showPast) => setReciteCheckSettings(user?.id, { showPast })}
+                      accessibilityLabel={t('settings.recite.showPast')}
+                      testID="settings-recite-past"
+                    />
+                  }
+                />
+                {isDevVariant() ? (
+                  <Row
+                    icon="volume-medium-outline"
+                    label={t('settings.recite.mistakeSound')}
+                    subtitle={t('settings.recite.mistakeSoundSub')}
+                    rightSlot={
+                      <SettingSwitch
+                        value={reciteCheckSettings.mistakeSound}
+                        onValueChange={(mistakeSound) => setReciteCheckSettings(user?.id, { mistakeSound })}
+                        accessibilityLabel={t('settings.recite.mistakeSound')}
+                        testID="settings-recite-sound"
+                      />
+                    }
+                  />
+                ) : null}
               </>
             ) : null}
-            <Modal visible={revoMoment} animationType="fade" presentationStyle="fullScreen" onRequestClose={() => setRevoMoment(false)} statusBarTranslucent>
-              <View style={{ flex: 1, backgroundColor: palette.bg }} testID="settings-revo-moment-screen">
-                <RevoMoment
-                  mode="settings"
-                  title={t('settings.revo.meet')}
-                  text={t('settings.revo.meetText')}
-                  firstName={greetingName(user?.name, auth.currentUser?.displayName ?? null).split(' ')[0]}
-                  smartTracking={smartTrackingOn(user)}
-                  closable
-                  onNext={() => setRevoMoment(false)}
-                  onClose={() => setRevoMoment(false)}
-                  onEnded={() => {
-                    if (user?.id) markRevoMomentSeen(user.id);
-                  }}
-                />
-              </View>
-            </Modal>
           </Section>
-        )}
-
-        <Section title={t('settings.sections.mushaf')}>
-          <View testID="mushaf-edition-row">
-            <Row
-              icon="book-outline"
-              label={t('settings.mushafRows.mushaf')}
-              value={mushafEdition(edition).name}
-              onPress={() => setMushafPicker(true)}
-            />
-          </View>
-          <View testID="mushaf-offline-row">
-            <Row
-              icon="cloud-download-outline"
-              label={t('settings.mushafRows.offline')}
-              subtitle={mushafText.subtitle}
-              value={fontScale > 1.35 ? undefined : mushafText.value || undefined}
-              onPress={() => setMushafMenu(true)}
-            />
-          </View>
-          <Row
-            icon="cellular-outline"
-            label={t('settings.mushafRows.cellular')}
-            rightSlot={
-              <SettingSwitch
-                value={mushaf.prefs.cellular}
-                onValueChange={(v) => void setMushafCellular(v)}
-                accessibilityLabel={t('settings.mushafRows.cellularLabel')}
-              />
-            }
-          />
-        </Section>
-
-        {reciteCheck ? (
-          <Section title={t('settings.sections.recite')} footer={t('settings.recite.footer')}>
-            {premium.has ? (
+        ) : null}
+        {page === 'revo' ? (
+          <>
+            {revoShown && (
+              <Section footer={t('settings.revo.footer')}>
+                <View style={v2.iconRow} testID="revo-settings-row">
+                  <SettingIcon name="sparkles-outline" />
+                  <View style={v2.iconRowText}>
+                    <Text style={[typeV2.body, { color: palette.text }]}>{t('settings.revo.revo')}</Text>
+                    <Text style={[typeV2.meta, { color: palette.secondary }]}>
+                      {!revoOpen ? t('settings.revo.paused') : revoSettings?.optIn ? t('settings.revo.on') : t('settings.revo.off')}
+                    </Text>
+                  </View>
+                  <SettingSwitch
+                    value={revoSettings?.optIn === true}
+                    onValueChange={(v) => (v ? openRevo({ view: 'optin' }) : confirmRevoOff())}
+                    accessibilityLabel={t('settings.revo.revo')}
+                    testID="revo-settings-switch"
+                  />
+                </View>
+                {revoOpen ? (
+                  <Row icon="play-circle-outline" label={t('settings.revo.whatRevoCanDo')} onPress={() => setRevoMoment(true)} testID="settings-revo-moment" />
+                ) : null}
+                {revoSettings?.optIn ? (
+                  <>
+                    {revoOpen ? (
+                      <Row icon="bulb-outline" label={t('settings.revo.memory')} value={revoSettings.memoryOn ? t('settings.on') : t('settings.off')} onPress={() => openRevo({ view: 'memory' })} />
+                    ) : null}
+                    <Row icon="trash-outline" label={t('settings.revo.deleteConversations')} destructive onPress={confirmRevoHistoryDelete} />
+                  </>
+                ) : null}
+                <Modal visible={revoMoment} animationType="fade" presentationStyle="fullScreen" onRequestClose={() => setRevoMoment(false)} statusBarTranslucent>
+                  <View style={{ flex: 1, backgroundColor: palette.bg }} testID="settings-revo-moment-screen">
+                    <RevoMoment
+                      mode="settings"
+                      title={t('settings.revo.meet')}
+                      text={t('settings.revo.meetText')}
+                      firstName={greetingName(user?.name, auth.currentUser?.displayName ?? null).split(' ')[0]}
+                      smartTracking={smartTrackingOn(user)}
+                      closable
+                      onNext={() => setRevoMoment(false)}
+                      onClose={() => setRevoMoment(false)}
+                      onEnded={() => {
+                        if (user?.id) markRevoMomentSeen(user.id);
+                      }}
+                    />
+                  </View>
+                </Modal>
+              </Section>
+            )}
+          </>
+        ) : null}
+        {page === 'storage' ? (
+          <Section>
+            <View testID="mushaf-offline-row">
               <Row
-                icon="sparkles-outline"
-                label={t('settings.recite.premium')}
-                subtitle={earlyAccessLine(premium, earlyAccessOn) ?? t('settings.recite.premiumSub')}
-                testID="settings-premium-row"
+                icon="cloud-download-outline"
+                label={t('settings.mushafRows.offline')}
+                subtitle={mushafText.subtitle}
+                value={fontScale > 1.35 ? undefined : mushafText.value || undefined}
+                onPress={() => setMushafMenu(true)}
               />
-            ) : null}
-            {/* Mistakes to mark: a choice only where Strict is offered (Revisely Dev, until its own switch is on). */}
-            {strictOffered() ? (
-              <Row
-                icon="checkmark-done-outline"
-                label={t('settings.recite.level')}
-                value={checkLevel(reciteCheckSettings) === 'strict' ? t('settings.recite.strict') : t('settings.recite.words')}
-                onPress={() => setCheckLevelSheet(true)}
-                testID="settings-check-level"
-              />
-            ) : null}
-            {checkLevel(reciteCheckSettings) === 'strict' ? (
-              <>
-                <Row
-                  label={t('settings.recite.munfasil')}
-                  rightSlot={
-                    <PillTabs
-                      compact
-                      hug
-                      tone="ink"
-                      options={[2, 4, 5].map((n) => ({ value: String(n), label: String(n) }))}
-                      value={String(reciteCheckSettings.munfasil)}
-                      onChange={(v) => setReciteCheckSettings(user?.id, { munfasil: Number(v) as 2 | 4 | 5 })}
-                    />
-                  }
+            </View>
+            <Row
+              icon="cellular-outline"
+              label={t('settings.mushafRows.cellular')}
+              rightSlot={
+                <SettingSwitch
+                  value={mushaf.prefs.cellular}
+                  onValueChange={(v) => void setMushafCellular(v)}
+                  accessibilityLabel={t('settings.mushafRows.cellularLabel')}
                 />
-                <Row
-                  label={t('settings.recite.muttasil')}
-                  rightSlot={
-                    <PillTabs
-                      compact
-                      hug
-                      tone="ink"
-                      options={[4, 5, 6].map((n) => ({ value: String(n), label: String(n) }))}
-                      value={String(reciteCheckSettings.muttasil)}
-                      onChange={(v) => setReciteCheckSettings(user?.id, { muttasil: Number(v) as 4 | 5 | 6 })}
-                    />
-                  }
-                />
-                <Row
-                  label={t('settings.recite.aared')}
-                  subtitle={t('settings.recite.atStop')}
-                  rightSlot={
-                    <PillTabs
-                      compact
-                      hug
-                      tone="ink"
-                      options={[{ value: '0', label: t('settings.recite.any') }, ...[2, 4, 6].map((n) => ({ value: String(n), label: String(n) }))]}
-                      value={String(reciteCheckSettings.aared)}
-                      onChange={(v) => setReciteCheckSettings(user?.id, { aared: Number(v) as 0 | 2 | 4 | 6 })}
-                    />
-                  }
-                />
-              </>
-            ) : null}
+              }
+            />
             <Row
               icon="mic-outline"
-              label={t('settings.recite.save')}
-              subtitle={t('settings.recite.saveSub')}
-              rightSlot={
-                <SettingSwitch
-                  value={reciteCheckSettings.saveRecording}
-                  onValueChange={(saveRecording) => setReciteCheckSettings(user?.id, { saveRecording })}
-                  accessibilityLabel={t('settings.recite.save')}
-                  testID="settings-recite-save"
-                />
+              label={t('settings.activity.recordings')}
+              value={
+                recordings && recordings.count > 0
+                  ? `${formatNumber(recordings.count)} · ${formatBytes(recordings.bytes)}`
+                  : t('settings.activity.none')
+              }
+              onPress={
+                recordings && recordings.count > 0
+                  ? () =>
+                      Alert.alert(
+                        t('settings.activity.recordings'),
+                        [
+                          t('settings.activity.recordingsBody', {
+                            count: recordings.count,
+                            size: formatBytes(recordings.bytes),
+                          }),
+                          recordings.backedUp === recordings.count
+                            ? t('settings.activity.allBackedUp', { count: recordings.count })
+                            : recordings.backedUp > 0
+                              ? t('settings.activity.someBackedUp', { n: recordings.backedUp })
+                              : t('settings.activity.phoneOnly'),
+                          recordings.cloudOnly > 0
+                            ? t('settings.activity.cloudOnly', { count: recordings.cloudOnly })
+                            : '',
+                          t('settings.activity.listedInActivity'),
+                        ]
+                          .filter(Boolean)
+                          .join(' '),
+                        [
+                          { text: t('settings.activity.openActivity'), onPress: () => navigation.navigate('Activity') },
+                          {
+                            text: t('settings.activity.deleteAll'),
+                            style: 'destructive',
+                            onPress: () =>
+                              Alert.alert(
+                                t('settings.activity.deleteAllTitle'),
+                                t('settings.activity.deleteAllBody'),
+                                [
+                                { text: t('common.cancel'), style: 'cancel' },
+                                {
+                                  text: t('settings.activity.deleteAll'),
+                                  style: 'destructive',
+                                  onPress: async () => {
+                                    // The whole folder, including any file not in the index,
+                                    // and the backup (listed first, for recordings not seen here).
+                                    const uid = firebaseUser?.uid;
+                                    if (uid && (await deleteAllEverywhere(uid))) {
+                                      loadRecordings();
+                                      return;
+                                    }
+                                    Alert.alert(
+                                      t('settings.activity.backupUnreachable'),
+                                      t('settings.activity.backupUnreachableBody'),
+                                      [
+                                        { text: t('common.cancel'), style: 'cancel' },
+                                        {
+                                          text: t('settings.activity.deleteOnPhone'),
+                                          style: 'destructive',
+                                          onPress: async () => {
+                                            await deleteAllRecordings(uid, { keepTakes: true });
+                                            loadRecordings();
+                                          },
+                                        },
+                                      ],
+                                    );
+                                  },
+                                },
+                                ],
+                              ),
+                          },
+                          { text: t('common.cancel'), style: 'cancel' },
+                        ],
+                      )
+                  : undefined
               }
             />
             <Row
-              icon="bookmark-outline"
-              label={t('settings.recite.showPast')}
-              subtitle={t('settings.recite.showPastSub')}
+              icon="cloud-upload-outline"
+              label={t('settings.activity.backUp')}
+              value={localUser.recordingBackup !== false ? backupLabel(backupStatus) : undefined}
               rightSlot={
                 <SettingSwitch
-                  value={reciteCheckSettings.showPast}
-                  onValueChange={(showPast) => setReciteCheckSettings(user?.id, { showPast })}
-                  accessibilityLabel={t('settings.recite.showPast')}
-                  testID="settings-recite-past"
+                  value={localUser.recordingBackup !== false}
+                  onValueChange={handleBackupToggle}
+                  accessibilityLabel={t('settings.activity.backUpLabel')}
                 />
               }
             />
-            {isDevVariant() ? (
+            {localUser.recordingBackup !== false && (
               <Row
-                icon="volume-medium-outline"
-                label={t('settings.recite.mistakeSound')}
-                subtitle={t('settings.recite.mistakeSoundSub')}
+                icon="cellular-outline"
+                label={t('settings.activity.backUpCellular')}
                 rightSlot={
                   <SettingSwitch
-                    value={reciteCheckSettings.mistakeSound}
-                    onValueChange={(mistakeSound) => setReciteCheckSettings(user?.id, { mistakeSound })}
-                    accessibilityLabel={t('settings.recite.mistakeSound')}
-                    testID="settings-recite-sound"
+                    value={localUser.recordingBackupCellular === true}
+                    onValueChange={(v) =>
+                      updateUser({ recordingBackupCellular: v }).catch((err) =>
+                        logger.warn('Could not change mobile data backup', err),
+                      )
+                    }
+                    accessibilityLabel={t('settings.activity.backUpCellularLabel')}
+                  />
+                }
+              />
+            )}
+            {speechModelShown ? (
+              <Row
+                icon="search-outline"
+                label={t('settings.revision.speechModel')}
+                subtitle={t('settings.revision.speechSearches')}
+                value={
+                  speechModel.status === 'ready'
+                    ? formatModelSize(speechModel.bytes)
+                    : speechModel.status === 'downloading'
+                      ? `${Math.round(speechModel.progress * 100)}%`
+                      : t('settings.revision.notDownloaded')
+                }
+                onPress={() => (speechModel.status === 'ready' ? setDeleteSpeechOpen(true) : setSpeechSheet(true))}
+              />
+            ) : null}
+          </Section>
+        ) : null}
+        {page === 'appearance' ? (
+          <Section>
+            <View style={v2.iconRow}>
+              <SettingIcon name="color-palette-outline" />
+              <View style={styles.rowText}>
+                <Text style={[typeV2.body, { color: theme.textPrimary }]}>{t('settings.appearance.theme')}</Text>
+              </View>
+              <ThemeSegmentedControl
+                value={themeMode}
+                onChange={setThemeMode}
+                options={
+                  systemAppearanceAvailable()
+                    ? [
+                        { value: 'system', label: t('settings.appearance.system') },
+                        { value: 'light', label: t('settings.appearance.light') },
+                        { value: 'dark', label: t('settings.appearance.dark') },
+                      ]
+                    : [
+                        { value: 'light', label: t('settings.appearance.light') },
+                        { value: 'dark', label: t('settings.appearance.dark') },
+                      ]
+                }
+              />
+            </View>
+            {/* Like Theme: the label on the left, the choices on the right.
+                Kept with the account (DesignGate brings it to other devices). */}
+            <View style={v2.iconRow} testID="accent-row">
+              <SettingIcon name="color-filter-outline" />
+              <AccentSetting
+                value={design.accent}
+                onChange={(accent) => {
+                  design.setAccent(accent);
+                  updateUser({ accent });
+                }}
+              />
+            </View>
+            {languagePickerOffered() ? (
+              <Row
+                icon="language-outline"
+                label={t('settings.language.row')}
+                value={chosenLanguage === 'system' ? t('settings.language.system') : LANGUAGE_NAMES[chosenLanguage]}
+                onPress={() => setLanguageSheet(true)}
+                testID="settings-language"
+              />
+            ) : null}
+            {/* Revisely Dev's until the release switch (THEME-1): decorations, kept on this phone. Just the
+                name, no subtitle (Majd, Nov 21 2026). */}
+            {ramadanThemeOffered() ? (
+              <Row
+                icon="moon-outline"
+                label={t('settings.appearance.ramadan')}
+                rightSlot={
+                  <SettingSwitch
+                    value={ramadanTheme}
+                    onValueChange={(on) => void setRamadanTheme(on)}
+                    accessibilityLabel={t('settings.appearance.ramadan')}
+                    testID="settings-ramadan-theme"
                   />
                 }
               />
             ) : null}
           </Section>
         ) : null}
-
-        <Section title={t('settings.sections.notifications')}>
-          <Row
-            icon="notifications-outline"
-            label={t('settings.notifications.enable')}
-            subtitle={notificationsRefused && localUser.notificationsEnabled ? t('settings.notifications.refused') : undefined}
-            rightSlot={
-              <SettingSwitch
-                value={localUser.notificationsEnabled && !notificationsRefused}
-                onValueChange={handleNotificationToggle}
-                accessibilityLabel={t('settings.notifications.enable')}
-                testID="settings-notifications"
+        {page === 'help' ? (
+          <Section>
+            {help.available ? (
+              <Row
+                icon={HELP_ICON}
+                label={t('settings.support.helpButtons')}
+                subtitle={t('settings.support.helpButtonsSub')}
+                rightSlot={
+                  <SettingSwitch
+                    value={help.shown}
+                    onValueChange={help.setShown}
+                    accessibilityLabel={t('settings.support.helpButtonsLabel')}
+                    testID="settings-help-buttons"
+                  />
+                }
               />
-            }
-          />
-        </Section>
-
-        <Section title={t('settings.sections.appearance')}>
-          <View style={v2.iconRow}>
-            <SettingIcon name="color-palette-outline" />
-            <View style={styles.rowText}>
-              <Text style={[typeV2.body, { color: theme.textPrimary }]}>{t('settings.appearance.theme')}</Text>
-            </View>
-            <ThemeSegmentedControl
-              value={themeMode}
-              onChange={setThemeMode}
-              options={
-                systemAppearanceAvailable()
-                  ? [
-                      { value: 'system', label: t('settings.appearance.system') },
-                      { value: 'light', label: t('settings.appearance.light') },
-                      { value: 'dark', label: t('settings.appearance.dark') },
-                    ]
-                  : [
-                      { value: 'light', label: t('settings.appearance.light') },
-                      { value: 'dark', label: t('settings.appearance.dark') },
-                    ]
-              }
+            ) : null}
+            <Row
+              icon={shareIcon}
+              label={t('settings.support.share')}
+              onPress={handleShareApp}
             />
-          </View>
-          {/* Like Theme: the label on the left, the choices on the right.
-              Kept with the account (DesignGate brings it to other devices). */}
-          <View style={v2.iconRow} testID="accent-row">
-            <SettingIcon name="color-filter-outline" />
-            <AccentSetting
-              value={design.accent}
-              onChange={(accent) => {
-                design.setAccent(accent);
-                updateUser({ accent });
+            {rateAskEnabled() ? (
+              <Row
+                icon="star-outline"
+                label={t('settings.support.rate')}
+                onPress={() => void openRatingPage()}
+                testID="settings-rate"
+              />
+            ) : null}
+            <Row
+              icon="chatbubble-ellipses-outline"
+              label={t('settings.support.feedback')}
+              onPress={() => {
+                setFeedbackText('');
+                setShowFeedbackModal(true);
               }}
             />
-          </View>
-          {languagePickerOffered() ? (
             <Row
-              icon="language-outline"
-              label={t('settings.language.row')}
-              value={chosenLanguage === 'system' ? t('settings.language.system') : LANGUAGE_NAMES[chosenLanguage]}
-              onPress={() => setLanguageSheet(true)}
-              testID="settings-language"
+              icon="bug-outline"
+              label={t('settings.support.report')}
+              onPress={openReportProblem}
             />
-          ) : null}
-          {/* Revisely Dev's until the release switch (THEME-1): decorations, kept on this phone. Just the
-              name, no subtitle (Majd, Nov 21 2026). */}
-          {ramadanThemeOffered() ? (
             <Row
-              icon="moon-outline"
-              label={t('settings.appearance.ramadan')}
-              rightSlot={
-                <SettingSwitch
-                  value={ramadanTheme}
-                  onValueChange={(on) => void setRamadanTheme(on)}
-                  accessibilityLabel={t('settings.appearance.ramadan')}
-                  testID="settings-ramadan-theme"
-                />
-              }
+              icon="mail-outline"
+              label={t('settings.support.contact')}
+              onPress={() => void openEmail(supportMailto(), SUPPORT_EMAIL)}
             />
-          ) : null}
-        </Section>
-
-        <Section title={t('settings.sections.support')}>
-          {help.available ? (
-            <Row
-              icon={HELP_ICON}
-              label={t('settings.support.helpButtons')}
-              subtitle={t('settings.support.helpButtonsSub')}
-              rightSlot={
-                <SettingSwitch
-                  value={help.shown}
-                  onValueChange={help.setShown}
-                  accessibilityLabel={t('settings.support.helpButtonsLabel')}
-                  testID="settings-help-buttons"
-                />
-              }
-            />
-          ) : null}
-          <Row
-            icon={shareIcon}
-            label={t('settings.support.share')}
-            onPress={handleShareApp}
-          />
-          {rateAskEnabled() ? (
-            <Row
-              icon="star-outline"
-              label={t('settings.support.rate')}
-              onPress={() => void openRatingPage()}
-              testID="settings-rate"
-            />
-          ) : null}
-          <Row
-            icon="chatbubble-ellipses-outline"
-            label={t('settings.support.feedback')}
-            onPress={() => {
-              setFeedbackText('');
-              setShowFeedbackModal(true);
-            }}
-          />
-          <Row
-            icon="bug-outline"
-            label={t('settings.support.report')}
-            onPress={openReportProblem}
-          />
-          <Row
-            icon="mail-outline"
-            label={t('settings.support.contact')}
-            onPress={() => void openEmail(supportMailto(), SUPPORT_EMAIL)}
-          />
-        </Section>
-
-        <Section title={t('settings.sections.about')}>
-          {replayOffered(user) ? (
-            <Row
-              icon="sparkles-outline"
-              label={t('settings.about.whatsNew')}
-              onPress={() => setWhatsNewOpen(true)}
-              testID="settings-whats-new"
-            />
-          ) : null}
-          {reciteCheck ? (
-            <Row
-              icon="information-circle-outline"
-              label={t('settings.about.reciteNotice')}
-              onPress={() => setReciteNotice(true)}
-              testID="settings-recite-check-notice"
-            />
-          ) : null}
-          <Row
-            icon="document-text-outline"
-            label={t('settings.about.privacy')}
-            onPress={() => void openWebPage('https://revisely.app/privacy/')}
-          />
-          <Row
-            icon="document-outline"
-            label={t('settings.about.terms')}
-            onPress={() => void openWebPage('https://revisely.app/terms/')}
-          />
-          <AppInfo tools={showsUpdateTools(user)} />
-        </Section>
-
-        {firebaseUser && showsResetMyData(user) && (
-          <Section title={t('settings.sections.testing')}>
-            <View testID="reset-data-row">
-              <Row
-                icon="refresh-outline"
-                label={t('settings.reset.title')}
-                subtitle={t('settings.testing.resetSub')}
-                destructive
-                onPress={() => setResetSheet(true)}
-                testID="settings-reset-data"
-              />
-            </View>
-            <Row
-              icon="sparkles-outline"
-              label={t('settings.testing.whatsNewAtLaunch')}
-              subtitle={t('settings.testing.whatsNewAtLaunchSub')}
-              rightSlot={
-                <SettingSwitch
-                  value={whatsNewSaved?.forced === true}
-                  onValueChange={(on) => firebaseUser && setForcedAtLaunch(firebaseUser.uid, on)}
-                  accessibilityLabel={t('settings.testing.whatsNewAtLaunch')}
-                  testID="settings-whats-new-launch"
-                />
-              }
-            />
-            {/* Revisely Dev's checker only: production's keeps nothing (recite-server-prod-plan.md). */}
-            {reciteCheck && isDevVariant() ? (
-              <Row
-                icon="mic-outline"
-                label={t('settings.testing.keep')}
-                subtitle={t('settings.testing.keepSub')}
-                rightSlot={
-                  <SettingSwitch
-                    value={reciteCheckSettings.keep}
-                    onValueChange={(keep) => setReciteCheckSettings(user?.id, { keep })}
-                    accessibilityLabel={t('settings.testing.keep')}
-                    testID="settings-recite-check-keep"
-                  />
-                }
-              />
-            ) : null}
-            {/* Revisely Dev only: the reminders this phone will show, the days after tomorrow's too (REMIND-2). */}
-            {isDevVariant() ? <ScheduledRemindersRow /> : null}
-            {/* Revisely Dev only: which model its checker runs for each level (Majd, Nov 18 2026). */}
-            {reciteCheck && isDevVariant() ? <CheckerModelRow /> : null}
-            {reciteCheck ? (
+          </Section>
+        ) : null}
+        {page === 'about' ? (
+          <Section>
+            {replayOffered(user) ? (
               <Row
                 icon="sparkles-outline"
-                label={t('settings.testing.premium')}
-                subtitle={t('settings.testing.premiumSub')}
-                rightSlot={
-                  <SettingSwitch
-                    value={premium.has}
-                    disabled={premiumBusy || !premium.known}
-                    onValueChange={switchPremium}
-                    accessibilityLabel={t('settings.testing.premium')}
-                    testID="settings-premium"
-                  />
-                }
+                label={t('settings.about.whatsNew')}
+                onPress={() => setWhatsNewOpen(true)}
+                testID="settings-whats-new"
               />
             ) : null}
-            {showsTestScenarios(user) && (
-              <View testID="test-scenario-row">
+            {reciteCheck ? (
+              <Row
+                icon="information-circle-outline"
+                label={t('settings.about.reciteNotice')}
+                onPress={() => setReciteNotice(true)}
+                testID="settings-recite-check-notice"
+              />
+            ) : null}
+            <Row
+              icon="document-text-outline"
+              label={t('settings.about.privacy')}
+              onPress={() => void openWebPage('https://revisely.app/privacy/')}
+            />
+            <Row
+              icon="document-outline"
+              label={t('settings.about.terms')}
+              onPress={() => void openWebPage('https://revisely.app/terms/')}
+            />
+            <AppInfo tools={showsUpdateTools(user)} />
+          </Section>
+        ) : null}
+        {page === 'testing' ? (
+          <>
+            {firebaseUser && showsResetMyData(user) && (
+              <Section>
+                <View testID="reset-data-row">
+                  <Row
+                    icon="refresh-outline"
+                    label={t('settings.reset.title')}
+                    subtitle={t('settings.testing.resetSub')}
+                    destructive
+                    onPress={() => setResetSheet(true)}
+                    testID="settings-reset-data"
+                  />
+                </View>
                 <Row
-                  icon="flask-outline"
-                  label={t('settings.scenario.title')}
-                  subtitle={t('settings.testing.scenarioSub')}
-                  destructive
-                  onPress={() => setScenarioSheet(true)}
-                  testID="settings-test-scenario"
+                  icon="sparkles-outline"
+                  label={t('settings.testing.whatsNewAtLaunch')}
+                  subtitle={t('settings.testing.whatsNewAtLaunchSub')}
+                  rightSlot={
+                    <SettingSwitch
+                      value={whatsNewSaved?.forced === true}
+                      onValueChange={(on) => firebaseUser && setForcedAtLaunch(firebaseUser.uid, on)}
+                      accessibilityLabel={t('settings.testing.whatsNewAtLaunch')}
+                      testID="settings-whats-new-launch"
+                    />
+                  }
                 />
-              </View>
+                {/* Revisely Dev's checker only: production's keeps nothing (recite-server-prod-plan.md). */}
+                {reciteCheck && isDevVariant() ? (
+                  <Row
+                    icon="mic-outline"
+                    label={t('settings.testing.keep')}
+                    subtitle={t('settings.testing.keepSub')}
+                    rightSlot={
+                      <SettingSwitch
+                        value={reciteCheckSettings.keep}
+                        onValueChange={(keep) => setReciteCheckSettings(user?.id, { keep })}
+                        accessibilityLabel={t('settings.testing.keep')}
+                        testID="settings-recite-check-keep"
+                      />
+                    }
+                  />
+                ) : null}
+                {/* Revisely Dev only: the reminders this phone will show, the days after tomorrow's too (REMIND-2). */}
+                {isDevVariant() ? <ScheduledRemindersRow /> : null}
+                {/* Revisely Dev only: which model its checker runs for each level (Majd, Nov 18 2026). */}
+                {reciteCheck && isDevVariant() ? <CheckerModelRow /> : null}
+                {reciteCheck ? (
+                  <Row
+                    icon="sparkles-outline"
+                    label={t('settings.testing.premium')}
+                    subtitle={t('settings.testing.premiumSub')}
+                    rightSlot={
+                      <SettingSwitch
+                        value={premium.has}
+                        disabled={premiumBusy || !premium.known}
+                        onValueChange={switchPremium}
+                        accessibilityLabel={t('settings.testing.premium')}
+                        testID="settings-premium"
+                      />
+                    }
+                  />
+                ) : null}
+                {showsTestScenarios(user) && (
+                  <View testID="test-scenario-row">
+                    <Row
+                      icon="flask-outline"
+                      label={t('settings.scenario.title')}
+                      subtitle={t('settings.testing.scenarioSub')}
+                      destructive
+                      onPress={() => setScenarioSheet(true)}
+                      testID="settings-test-scenario"
+                    />
+                  </View>
+                )}
+                {syncHeld && (
+                  <View testID="held-changes-row">
+                    <Row
+                      icon="cloud-upload-outline"
+                      label={t('settings.testing.sendHeld')}
+                      subtitle={t('settings.testing.sendHeldSub')}
+                      onPress={() => firebaseUser && releaseSync(firebaseUser.uid)}
+                    />
+                  </View>
+                )}
+              </Section>
             )}
-            {syncHeld && (
-              <View testID="held-changes-row">
-                <Row
-                  icon="cloud-upload-outline"
-                  label={t('settings.testing.sendHeld')}
-                  subtitle={t('settings.testing.sendHeldSub')}
-                  onPress={() => firebaseUser && releaseSync(firebaseUser.uid)}
-                />
-              </View>
-            )}
-          </Section>
-        )}
-
-        {firebaseUser && (
-          <Section>
-            <Row
-              icon="log-out-outline"
-              label={t('common.signOut')}
-              onPress={handleSignOut}
-              testID="settings-sign-out"
-            />
-            <Row
-              icon="trash-outline"
-              label={t('settings.account.deleteAccount')}
-              destructive
-              onPress={handleDeleteAccount}
-              testID="settings-delete-account"
-            />
-          </Section>
-        )}
-
-        <Text style={[typeV2.meta, v2.version, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
-          {t('settings.about.version', { version: Constants.expoConfig?.version ?? '1.0.0' })}
-        </Text>
-
-        {__DEV__ && (
-          <Section title={t('settings.sections.dev')}>
-            <Row
-              icon="refresh-outline"
-              label={t('settings.dev.replay')}
-              onPress={handleReplayOnboarding}
-            />
-          </Section>
-        )}
+          </>
+        ) : null}
       </ScrollView>
-      </SectionLayout.Provider>
       <SpeechModelSheet
         visible={speechSheet}
         onClose={() => setSpeechSheet(false)}
@@ -1617,11 +1625,13 @@ const v2 = StyleSheet.create({
   rowLabel: { flex: 1 },
   // A row without an icon lines up with the labels of those with one.
   indent: { marginLeft: 40 },
+  // Your account: the first row of the first level, and the head of the Account page.
   profileRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: layoutV2.gutter,
-    paddingVertical: layoutV2.rowPad,
+    paddingVertical: 16,
+    borderBottomWidth: layoutV2.hairline,
   },
   pills: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' },
   // A row built around SettingIcon, which brings 8pt after its glyph: 8 more

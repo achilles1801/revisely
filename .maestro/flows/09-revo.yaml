@@ -626,6 +626,7 @@ appId: com.revisionbuddy.app
 - runFlow:
     file: ../subflows/settings-row.yaml
     env:
+      PAGE: revo
       ROW: settings-revo-moment
 - tapOn:
     id: settings-revo-moment

@@ -24,7 +24,7 @@ export const mushaf = {
     label: 'Page position',
     hint: 'Drag to jump to another page',
   },
-  /** Settings → Mushaf → Offline mushaf (lib/mushafOfflineUi). */
+  /** Settings → Downloads and storage → Offline mushaf (lib/mushafOfflineUi). */
   offline: {
     textAndTranslation: 'the text and translation',
     pagesOf: '{{pages}} of {{total}} pages',

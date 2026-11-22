@@ -1,4 +1,4 @@
-// Settings → Share Revisely and Report a problem (BEHAVIOUR.md SET-2 to SET-4). The report form is the app's own
+// Settings → Help and support → Share Revisely and Report a problem (BEHAVIOUR.md SET-2 to SET-4). The report form is the app's own
 // (components/report), mounted once over the main screens; only Sentry, the outside service the report goes to, is
 // stood in, at its SDK's edge.
 import React from 'react';

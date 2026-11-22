@@ -8,7 +8,7 @@
 // - The microphone is on while it plays, so the sound must never be heard as recitation: it is short and quiet, and
 //   played without taking the audio (claimAudio would stop the take). While iOS records it plays from the earpiece;
 //   with headphones, in them.
-// - Settings → Recite → "Sound on a mistake" turns it off (sound and tap). It plays in silent mode, as the take's audio
+// - Settings → Mushaf and Recite → "Sound on a mistake" turns it off (sound and tap). It plays in silent mode, as the take's audio
 //   session does; the volume buttons set how loud.
 
 import { createAudioPlayer, type AudioPlayer } from 'expo-audio';

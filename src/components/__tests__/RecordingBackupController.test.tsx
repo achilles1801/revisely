@@ -110,7 +110,7 @@ describe('<RecordingBackupController />', () => {
     await flush();
     act(() => mockStatusListener?.({ phase: 'needs-notice', pending: 1 }));
     expect(alert.mock.calls[0][1]).toContain('Wi-Fi or mobile data');
-    expect(alert.mock.calls[0][1]).toContain('Settings → Activity → Back up recordings');
+    expect(alert.mock.calls[0][1]).toContain('Settings → Downloads and storage → Back up recordings');
     alert.mockRestore();
   });
 

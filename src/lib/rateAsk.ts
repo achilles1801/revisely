@@ -5,7 +5,7 @@
 // After a good moment, the session's end card shows one quiet line, "Enjoying Revisely? Rate it ›": a swipe that
 // finishes a day's revision with a streak of at least 7 days. It opens the store's own review page. It asks at most 3
 // times ever on a phone, 120 days apart, never in an account's first week, and stops for good once the line is tapped
-// or dismissed (✕), or Settings → Support → Rate Revisely is used. The same for everyone: no stars asked for, no
+// or dismissed (✕), or Settings → Help and support → Rate Revisely is used. The same for everyone: no stars asked for, no
 // reward, nothing that sends unhappy users somewhere else (both stores forbid those).
 //
 // The stores' in-app prompt (SKStoreReviewController, Play In-App Review) needs a native module (expo-store-review),
