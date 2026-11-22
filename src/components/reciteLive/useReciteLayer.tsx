@@ -708,7 +708,7 @@ export function useReciteLayer({
               marks={shownOnPage(page)}
               selected={shownCardMarks[0] ?? null}
               hidden={false}
-              colors={{ band: v2.followBand, word: v2.followWord, marks: markColours }}
+              colors={{ band: v2.highlightSoft, word: v2.highlight, marks: markColours }}
             />
           )
         : showPast && qw
@@ -742,7 +742,7 @@ export function useReciteLayer({
               marks={pageMarks(page)}
               selected={cardMarks[0] ?? null}
               hidden={hidden}
-              colors={{ band: v2.followBand, word: v2.followWord, marks: markColours }}
+              colors={{ band: v2.highlightSoft, word: v2.highlight, marks: markColours }}
             />
           )
         : undefined,
@@ -825,7 +825,7 @@ export function useReciteLayer({
                       ...coverColors,
                       off: offWord != null ? { w: offWord, words: qw, colour: v2.markWord } : null,
                       current:
-                        live.state.status === 'listening' && live.state.cursor != null ? { w: live.state.cursor, words: qw, colour: v2.followWord } : null,
+                        live.state.status === 'listening' && live.state.cursor != null ? { w: live.state.cursor, words: qw, colour: v2.highlight } : null,
                     }
                   : null
               }

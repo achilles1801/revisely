@@ -294,7 +294,7 @@ export function TakeLines({
   const fill = (w: number) => {
     const m = markOf.get(w);
     if (m) return past ? { backgroundColor: markFill(palette, m), opacity: isDark ? PAST_OPACITY.dark : PAST_OPACITY.light } : { backgroundColor: markFill(palette, m) };
-    return live && w === cursor ? { backgroundColor: palette.followWord } : null;
+    return live && w === cursor ? { backgroundColor: palette.highlight } : null;
   };
   const scale = room > 0 && wide > room ? room / wide : 1;
   return (
@@ -306,7 +306,7 @@ export function TakeLines({
         {lines.map((line) => {
           const here = live && cursor != null && line.some((x) => x.w === cursor);
           return (
-            <View key={line[0].w} style={[styles.takeLine, here && { backgroundColor: palette.followBand }]}>
+            <View key={line[0].w} style={[styles.takeLine, here && { backgroundColor: palette.highlightSoft }]}>
               {line.map(({ w, text }) => (
                 <View key={w} style={[styles.takeWord, fill(w)]}>
                   <Text style={[arabicV2(19), { color: palette.text }]} maxFontSizeMultiplier={1}>
