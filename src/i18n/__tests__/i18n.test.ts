@@ -31,8 +31,9 @@ describe('the language', () => {
     expect(resolveLanguage(['fr-FR', 'ar_EG'], ['en', 'ar'], false)).toBe('ar');
     expect(resolveLanguage(['fr-FR', 'de'], ['en', 'ar'], false)).toBe('en');
     expect(resolveLanguage([], ['en', 'ar'], false)).toBe('en');
-    // Only English ships to the store app today.
-    expect(resolveLanguage(['ar-SA'], undefined, false)).toBe('en');
+    // The store app has Arabic too (SHIPPED, from 1.0.6): a phone in Arabic opens in it.
+    expect(resolveLanguage(['ar-SA'], undefined, false)).toBe('ar');
+    expect(resolveLanguage(['fr-FR'], undefined, false)).toBe('en');
   });
 });
 

@@ -1,5 +1,6 @@
-// The language the person chose (Settings → Appearance → Language), kept on this phone. Revisely Dev only until
-// Arabic ships: the store app offers English alone, never reads the choice, and shows exactly what it always has.
+// The language the person chose (Settings → Appearance → Language), kept on this phone: English, Arabic, or the
+// phone's. Offered wherever the build has more than one language (SHIPPED in the store app, every one in Revisely
+// Dev); tests and E2E builds never offer it.
 //
 // The language is applied before the first screen (App.tsx waits for loadLanguageChoice, inside the splash), and a
 // change restarts the app: React Native lays out right to left only from a launch, and a restart also redraws every

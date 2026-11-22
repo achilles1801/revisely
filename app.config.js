@@ -54,6 +54,9 @@ export default {
       },
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
+        // The languages the app has (src/i18n/language.ts, SHIPPED): iOS then offers Arabic in Settings → Revisely →
+        // Language, and an Arabic phone gets the permission prompts in Arabic (locales below).
+        CFBundleLocalizations: ["en", "ar"],
         // Recitation goes on with the app in the background or the phone
         // locked, with Now Playing on the lock screen (lib/recitation).
         UIBackgroundModes: ["audio"],
@@ -85,6 +88,11 @@ export default {
     notification: {
       icon: "./assets/notification-icon.png",
       color: "#624BD5"
+    },
+    // The permission prompts in Arabic (iOS: ar.lproj/InfoPlist.strings). Required, so the text is part of the config
+    // and the fingerprint: a path alone would leave a wording change out of it, and no new build would carry it.
+    locales: {
+      ar: require("./locales/ar.json")
     },
     android: {
       package: BUNDLE_ID,
@@ -165,6 +173,8 @@ export default {
       // Android Auto Backup leaves out the offline mushaf, the Arabic text and the
       // translations (they download again; with them the app passes the 25 MB quota).
       "./plugins/withAndroidBackupRules",
+      // The languages declared to Android 13+ (Settings → Apps → Revisely → Language).
+      "./plugins/withAndroidLocales",
       "expo-web-browser",
       // The launch screen: the R, 200 pt wide, on black (in light and dark mode
       // alike). imageWidth needs this plugin: the top-level `splash` key shows the

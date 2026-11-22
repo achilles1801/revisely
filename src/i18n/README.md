@@ -84,15 +84,18 @@ The words and rules (one term per concept, plurals, digits, typography) are in `
 - **Digits** (`digits.ts`): Arabic-Indic, written by the app rather than Intl (Hermes' platforms disagree). A number
   passed to `t()` and everything from `format.ts` comes out in them; English is untouched. `ARABIC_INDIC` is
   Majd's choice 1, still open.
-- **The picker** (`choice.ts`): Settings → Appearance → Language, Revisely Dev only (`offeredLanguages`). It's kept on
-  the phone (`@revisely_language:v1`) and applied before the first screen (App.tsx waits for `loadLanguageChoice`).
-  A change restarts the app, since React Native lays out right to left only from a launch. The store app offers
-  `SHIPPED` (English) alone and reads nothing.
+- **The picker** (`choice.ts`): Settings → Appearance → Language (`offeredLanguages`: `SHIPPED` in the store app,
+  every language in Revisely Dev). It's kept on the phone (`@revisely_language:v1`) and applied before the first
+  screen (App.tsx waits for `loadLanguageChoice`). A change restarts the app, since React Native lays out right to
+  left only from a launch. (BEHAVIOUR.md LANG-3.)
 - **Right to left** needs no native change: `I18nManager.forceRTL` is a flag React Native reads at launch on iOS
   whatever languages the app declares, and Android's manifest already allows it. A launch that started the other way
   (the first on a phone whose language reads the other way) restarts once in the splash (`loadLanguageChoice`,
-  `restartForDirection`; LANG-1), and not again if that restart didn't take. The native release adds the
-  system's side: Arabic in iOS Settings → Revisely → Language (`CFBundleLocalizations`), Arabic permission prompts,
-  Android 13's per-app language, and the widgets' Swift labels. All of them move the store fingerprints.
-- **"Phone's language"** follows the phone only once that release declares Arabic. Until then iOS gives the app
+  `restartForDirection`; LANG-1), and not again if that restart didn't take.
+- **The system's side** ships with 1.0.6's binary, and every piece moves the store fingerprints: Arabic in iOS
+  Settings → Revisely → Language (`CFBundleLocalizations` in app.config.js), the permission prompts in Arabic
+  (`locales/ar.json`, required into the config so its text counts in the fingerprint), Android 13's per-app
+  language (`plugins/withAndroidLocales.js`, whose list must equal `SHIPPED`), and the widgets' words (the app writes
+  them into the widgets' snapshot: handbook/widgets.md, "Language").
+- **"Phone's language"** follows the phone once the binary declares Arabic. On an older binary iOS gives the app
   English, so pick العربية.

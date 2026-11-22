@@ -1,14 +1,17 @@
-// Which language the app shows. English is the source and the fallback. Arabic has strings (src/i18n/ar) but is
-// offered only in Revisely Dev until every screen has it and the native release that declares it is out
-// (src/i18n/README.md, "Arabic"): the store app offers SHIPPED alone.
+// Which language the app shows. English is the source and the fallback. Arabic (src/i18n/ar) ships with the native
+// release that declares it (1.0.6: app.config.js's CFBundleLocalizations and locales, plugins/withAndroidLocales), so
+// the store app offers both, as Revisely Dev does (src/i18n/README.md, "Arabic").
 
 /** The languages the app has strings for. */
 export const LANGUAGES = ['en', 'ar'] as const;
 export type Language = (typeof LANGUAGES)[number];
 export const FALLBACK: Language = 'en';
 
-/** The languages the store app offers. Arabic joins once it ships whole. */
-export const SHIPPED: readonly Language[] = ['en'];
+/**
+ * The languages the store app offers: the ones its binary declares (app.config.js, plugins/withAndroidLocales, which
+ * plugins/__tests__/withAndroidLocales.test.js keeps the same as this).
+ */
+export const SHIPPED: readonly Language[] = ['en', 'ar'];
 
 /** Each language's name in itself, as the picker shows it. */
 export const LANGUAGE_NAMES: Record<Language, string> = { en: 'English', ar: 'العربية' };

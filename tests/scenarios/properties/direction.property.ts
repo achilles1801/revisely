@@ -1,7 +1,9 @@
 // The layout direction follows the app's language, not the phone's (src/i18n/direction.ts).
 
 import fc from 'fast-check';
+import { languagePickerOffered, offeredLanguages, resolveChoice } from '../../../src/i18n/choice';
 import { fromLeftEdge, isRTLLanguage, restartForDirection, syncLayoutDirection } from '../../../src/i18n/direction';
+import { SHIPPED } from '../../../src/i18n/language';
 import { pageIndexAt, pagerLayout } from '../../../src/lib/mushafDirection';
 import { runs } from './fixtures';
 
@@ -88,5 +90,34 @@ describe('the layout direction', () => {
     expect(fromLeftEdge(42, false)).toEqual({ left: 42 });
     // React Native swaps left and right in RTL: `right` is the screen's left edge there.
     expect(fromLeftEdge(42, true)).toEqual({ right: 42 });
+  });
+});
+
+describe('the language', () => {
+  const choices = fc.constantFrom('system' as const, 'en' as const, 'ar' as const);
+  const phones = fc.array(phoneLanguages, { maxLength: 3 });
+
+  it('[LANG-3] the store app comes in English and Arabic: the phone\'s language when it has it, else English; a choice wins', () => {
+    expect(offeredLanguages(false)).toEqual(['en', 'ar']);
+    expect(SHIPPED).toEqual(['en', 'ar']);
+    expect(languagePickerOffered(false, false)).toBe(true);
+    fc.assert(
+      fc.property(choices, phones, (choice, phone) => {
+        const shown = resolveChoice(choice, phone, offeredLanguages(false), false);
+        const firstKnown = phone.map((tag) => tag.slice(0, 2)).find((base) => base === 'en' || base === 'ar');
+        expect(shown).toBe(choice === 'system' ? (firstKnown ?? 'en') : choice);
+      }),
+      { numRuns: runs(60) },
+    );
+  });
+
+  it('[LANG-3] tests and E2E builds are English, whatever was chosen, and never offer the choice', () => {
+    fc.assert(
+      fc.property(choices, phones, fc.boolean(), (choice, phone, dev) => {
+        expect(resolveChoice(choice, phone, offeredLanguages(dev), true)).toBe('en');
+        expect(languagePickerOffered(dev, true)).toBe(false);
+      }),
+      { numRuns: runs(30) },
+    );
   });
 });

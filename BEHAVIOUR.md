@@ -1436,11 +1436,15 @@ shows up once and they must go through it and complete it … just the main stuf
   E2E builds. (Until Nov 2026 an Android phone set to an RTL language mirrored the English app: rows,
   the tab swipe, the verse highlights and the mushaf's page order, and until Nov 22 2026 its first
   launch still did; `src/i18n/direction.ts`.)
-- **LANG-2.** (Revisely Dev) In Arabic (right to left), the mushaf still reads like a printed one: page 1 on the
+- **LANG-2.** In Arabic (right to left), the mushaf still reads like a printed one: page 1 on the
   right, the next page coming from the left (a swipe from left to right turns forward), the same as in English. A
   page is never mirrored: its image, verse highlights, a hidden page's covers and Recite's marks stay on their words,
   and a swipe credits the page it left (SESS-1). A held verse's menu opens beside the verse. (Until Nov 21 2026 the
   pager was pinned left to right while React Native's list measured from the right, and the page came out black.)
+- **LANG-3.** The app comes in English and Arabic. It shows the phone's language when it has it (a phone set to
+  Arabic in any region opens in Arabic), else English. Settings → Appearance → Language picks English, Arabic or the
+  phone's, kept on the phone, and restarts the app into it. Tests and E2E builds are always English and never show
+  the choice. (Until 1.0.6 the store app offered English alone, and only Revisely Dev had Arabic.)
 
 ## The Ramadan theme (Revisely Dev)
 
