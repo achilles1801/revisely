@@ -75,6 +75,15 @@ jobs:
           fi
           xcodebuild -version
 
+      # Revisely Dev's private engine (modules-dev/recite-engine/core/fetch.js). The only step that holds the token, and
+      # before `npm ci`, so no third-party install script ever runs beside it; the script has no dependencies. With no
+      # secret it leaves the stub. core/__tests__/tokenScope.test.js holds all of this.
+      - name: Fetch the on-device engine
+        if: ${{ inputs.variant == 'dev' }}
+        env:
+          RECITE_CORE_TOKEN: ${{ secrets.RECITE_CORE_TOKEN }}
+        run: node modules-dev/recite-engine/core/fetch.js ios "$RUNNER_TEMP/recite-core"
+
       - run: npm ci --legacy-peer-deps
 
       - uses: expo/expo-github-action@v8
@@ -109,9 +118,8 @@ jobs:
           SENTRY_DISABLE_AUTO_UPLOAD: ${{ secrets.SENTRY_AUTH_TOKEN == '' && 'true' || 'false' }}
           # A failed upload costs readable stack traces, not the release.
           SENTRY_ALLOW_FAILURE: 'true'
-          # Read-only access to the engine's private release, for Revisely Dev's build alone (the store app doesn't link
-          # the module). Never in E2E or claude-fix; core/__tests__/tokenScope.test.js holds that.
-          RECITE_CORE_TOKEN: ${{ inputs.variant == 'dev' && secrets.RECITE_CORE_TOKEN || '' }}
+          # What the fetch step brought (the token itself is not in this step, where install scripts run).
+          RECITE_CORE_PREFETCHED: ${{ inputs.variant == 'dev' && format('{0}/recite-core', runner.temp) || '' }}
         run: eas build --local --profile "$PROFILE" --platform ios --non-interactive --output "$RUNNER_TEMP/revisely.ipa"
 
       # The Xcode build phase uploads dSYMs too, but its output is hidden and a

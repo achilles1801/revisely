@@ -17,19 +17,36 @@ describe('RECITE_CORE_TOKEN', () => {
   });
 
   it.each([
-    ['ios-build.yml', '--platform ios'],
-    ['android-build.yml', '--platform android'],
-  ])('%s gives it to Revisely Dev\'s build step alone', (file, platform) => {
+    ['ios-build.yml', 'ios'],
+    ['android-build.yml', 'android'],
+  ])('%s gives it to one step: Dev only, running our script alone, before any install', (file, platform) => {
     const text = read(file);
     const uses = text.split('\n').filter((l) => l.includes('secrets.RECITE_CORE_TOKEN'));
-    expect(uses).toEqual([
-      "          RECITE_CORE_TOKEN: ${{ inputs.variant == 'dev' && secrets.RECITE_CORE_TOKEN || '' }}",
-    ]);
-    // In the env of the `eas build --local` step: the next command after it is the build.
-    const after = text.slice(text.indexOf(uses[0]) + uses[0].length).split('\n').find((l) => l.trim());
-    expect(after).toContain(`run: eas build --local --profile "$PROFILE" ${platform}`);
-    // Never job-wide or workflow-wide, and optional, so a build without it makes the stub.
+    expect(uses).toEqual(['          RECITE_CORE_TOKEN: ${{ secrets.RECITE_CORE_TOKEN }}']);
+    const at = text.indexOf(uses[0]);
+    const step = text.slice(text.lastIndexOf('- name:', at), text.indexOf('\n\n', at));
+    expect(step).toBe(
+      [
+        '- name: Fetch the on-device engine',
+        "        if: ${{ inputs.variant == 'dev' }}",
+        '        env:',
+        '          RECITE_CORE_TOKEN: ${{ secrets.RECITE_CORE_TOKEN }}',
+        `        run: node modules-dev/recite-engine/core/fetch.js ${platform} "$RUNNER_TEMP/recite-core"`,
+      ].join('\n'),
+    );
+    // Before anything third-party is installed.
+    expect(at).toBeLessThan(text.indexOf('run: npm ci'));
+    // The build step gets the folder, not the token.
+    const build = text.slice(text.lastIndexOf('- name: eas build --local', text.indexOf('run: eas build --local')), text.indexOf('run: eas build --local'));
+    expect(build).toContain("RECITE_CORE_PREFETCHED: ${{ inputs.variant == 'dev' && format('{0}/recite-core', runner.temp) || '' }}");
+    expect(build).not.toContain('RECITE_CORE_TOKEN');
     expect(text).toMatch(/RECITE_CORE_TOKEN:\n\s+required: false/);
+  });
+
+  it("the fetch needs nothing installed: only Node's own modules", () => {
+    const src = fs.readFileSync(path.join(ROOT, 'modules-dev/recite-engine/core/fetch.js'), 'utf8');
+    const required = [...src.matchAll(/require\('([^']+)'\)/g)].map((m) => m[1]).sort();
+    expect(required).toEqual(['child_process', 'crypto', 'fs', 'os', 'path']);
   });
 
   it('the workflows that call those builds run them only from pushes or by hand', () => {
@@ -51,7 +68,8 @@ describe('RECITE_CORE_TOKEN', () => {
     expect(fs.readFileSync(path.join(ROOT, 'modules-dev/recite-engine/android/.gitignore'), 'utf8')).toContain('build/');
     expect(fs.readFileSync(path.join(ROOT, 'fingerprint.config.js'), 'utf8')).toContain("'modules-dev/recite-engine/ios/core-bin/**/*'");
     const lock = JSON.parse(fs.readFileSync(path.join(ROOT, 'modules-dev/recite-engine/core/recite-core.lock'), 'utf8'));
-    expect(lock.repo).toMatch(/^achilles1801\//);
+    // A repository of compiled zips alone: the token must not be able to read the engine's source.
+    expect(lock.repo).toBe('achilles1801/revisely-engine-releases');
     expect(Object.keys(lock).sort()).toEqual(['abi', 'asset', 'repo', 'sha256', 'tag', 'version']);
   });
 

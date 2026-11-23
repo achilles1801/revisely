@@ -5,11 +5,18 @@
 //
 //   node core/fetch.js ios|android OUT
 //
-// With a token it downloads the version in recite-core.lock from the private repository's release, checks the zip's
-// sha256 and the header, and puts the platform's library in OUT. Without one, OUT gets the stub, which says "not
-// available", and the app uses the server path: CI, E2E, forks and claude-fix never hold the token.
+// With a token it downloads the version in recite-core.lock from the private releases repository (compiled zips and
+// nothing else), checks the zip's sha256 and the header, and puts the platform's library in OUT. Without one, OUT gets
+// the stub, which says "not available", and the app uses the server path: CI, E2E, forks and claude-fix never hold it.
 // The token: RECITE_CORE_TOKEN, or on a laptop (not CI) the `gh` sign-in. A token that is there but fails, or a zip that
 // doesn't match the lock, fails the build: a release must never quietly ship the stub.
+//
+// On the runners the token never sits beside the build's third-party install scripts. A step of its own, before
+// `npm ci`, runs this with the token into a folder outside the project; `eas build` then runs with
+// RECITE_CORE_PREFETCHED naming that folder and no token, and the podspec's and Gradle's run of this script copies it.
+//
+// The token goes to the GitHub API alone: the asset's address is built here rather than taken from a response, and the
+// storage host it redirects to is called without it.
 //
 // stdout is one JSON line: {"mode":"engine","version":…} or {"mode":"stub","why":…}. The token is never printed.
 'use strict';
@@ -51,25 +58,36 @@ class Refused extends Error {
   }
 }
 
+/** A request to the API: the only one that carries the token. It follows no redirect by itself. */
 async function github(url, token, accept) {
+  if (!url.startsWith(`${apiBase()}/`)) throw new Error('refusing to send the token anywhere but the GitHub API');
   return fetch(url, {
     redirect: 'manual',
     headers: { Authorization: `Bearer ${token}`, Accept: accept, 'User-Agent': UA, 'X-GitHub-Api-Version': '2022-11-28' },
   });
 }
 
+/** A redirect's target must be HTTPS (or the tests' local server), and is called without the token. */
+function storageUrl(to, from) {
+  const url = new URL(to, from);
+  if (url.protocol !== 'https:' && url.hostname !== '127.0.0.1') throw new Error('the asset redirected to an insecure address');
+  return url.href;
+}
+
 /** The release asset's bytes. The token goes to the API only, never to the storage host it redirects to. */
 async function download(lock, token) {
-  const api = apiBase();
-  const rel = await github(`${api}/repos/${lock.repo}/releases/tags/${encodeURIComponent(lock.tag)}`, token, 'application/vnd.github+json');
+  if (!/^[\w.-]+\/[\w.-]+$/.test(lock.repo || '')) throw new Error('the lock names no repository');
+  const repo = `${apiBase()}/repos/${lock.repo}/releases`;
+  const rel = await github(`${repo}/tags/${encodeURIComponent(lock.tag)}`, token, 'application/vnd.github+json');
   if (!rel.ok) throw new Refused(rel.status, `release ${lock.tag}`);
   const asset = ((await rel.json()).assets || []).find((a) => a.name === lock.asset);
-  if (!asset) throw new Error(`release ${lock.tag} has no asset ${lock.asset}`);
-  let res = await github(asset.url, token, 'application/octet-stream');
+  if (!asset || !Number.isInteger(asset.id)) throw new Error(`release ${lock.tag} has no asset ${lock.asset}`);
+  const assetUrl = `${repo}/assets/${asset.id}`;
+  let res = await github(assetUrl, token, 'application/octet-stream');
   if (res.status >= 300 && res.status < 400) {
     const to = res.headers.get('location');
     if (!to) throw new Error('the asset redirected nowhere');
-    res = await fetch(to, { headers: { 'User-Agent': UA } });
+    res = await fetch(storageUrl(to, assetUrl), { headers: { 'User-Agent': UA } });
   }
   if (!res.ok) throw new Refused(res.status, `asset ${lock.asset}`);
   return Buffer.from(await res.arrayBuffer());
@@ -149,6 +167,19 @@ async function main() {
     return { mode: 'stub', why };
   };
   if (!lock.version) return stub('no version in the lock yet');
+  // A runner's build: an earlier step fetched it, and this step holds no token.
+  const prefetched = process.env.RECITE_CORE_PREFETCHED;
+  if (prefetched) {
+    const from = path.resolve(prefetched);
+    if (!alreadyHere(lock, platform, from)) return stub('this build fetched no engine');
+    if (from !== out) {
+      fs.rmSync(out, { recursive: true, force: true });
+      copyDir(from, out);
+    }
+    placeCommon(out);
+    console.error(`recite-core: ${lock.version} (from this build's fetch step)`);
+    return { mode: 'engine', version: lock.version };
+  }
   const found = findToken();
   if (!found) return stub('no RECITE_CORE_TOKEN');
   if (alreadyHere(lock, platform, out)) {

@@ -94,7 +94,8 @@ beforeEach(async () => {
       res.setHeader('Content-Type', 'application/json');
       return res.end(
         JSON.stringify({
-          assets: [{ name: 'recite-core-0.1.0.zip', url: `http://127.0.0.1:${portOf(api)}/repos/owner/private/releases/assets/7` }],
+          // The address in the response points elsewhere on purpose: fetch.js builds its own, so the token can't follow it.
+          assets: [{ id: 7, name: 'recite-core-0.1.0.zip', url: `http://127.0.0.1:${portOf(storage)}/not-the-api` }],
         }),
       );
     }
@@ -143,6 +144,9 @@ describe('core/fetch.js', () => {
     expect(seen.map((s) => s.host)).toEqual(['api', 'api', 'storage']);
     expect(seen[0].url).toBe('/repos/owner/private/releases/tags/recite-core-v0.1.0');
     expect(seen[0].auth).toBe(`Bearer ${TOKEN}`);
+    expect(seen[1].url).toBe('/repos/owner/private/releases/assets/7');
+    expect(seen[1].auth).toBe(`Bearer ${TOKEN}`);
+    expect(seen[2].url).toContain('/signed');
     expect(seen[2].auth).toBeUndefined();
     expect(r.stdout + r.stderr).not.toContain(TOKEN);
   });
@@ -217,6 +221,50 @@ describe('core/fetch.js', () => {
     const r = await run('ios', path.join(dir, 'out'), { RECITE_CORE_TOKEN: TOKEN });
     expect(r.code).toBe(1);
     expect(r.stderr).toContain('404');
+  });
+
+  it("a runner's build step holds no token: it copies what the fetch step brought", async () => {
+    const pre = path.join(dir, 'prefetched');
+    const fetched = await run('android', pre, { RECITE_CORE_TOKEN: TOKEN });
+    expect(fetched.json.mode).toBe('engine');
+    seen.length = 0;
+    const out = path.join(dir, 'in-the-build');
+    const r = await run('android', out, { RECITE_CORE_PREFETCHED: pre });
+    expect(r.code).toBe(0);
+    expect(r.json).toEqual({ mode: 'engine', version: '0.1.0' });
+    expect(seen).toEqual([]);
+    expect(fs.readFileSync(path.join(out, 'lib', 'x86_64', 'librecite_core.a'), 'utf8')).toBe('lib-x86_64');
+  });
+
+  it('a build whose fetch step had no token, or fetched another version or platform, gets the stub', async () => {
+    const none = path.join(dir, 'none');
+    await run('ios', none); // the fetch step, with an empty secret
+    let r = await run('ios', path.join(dir, 'a'), { RECITE_CORE_PREFETCHED: none });
+    expect(r.json).toEqual({ mode: 'stub', why: 'this build fetched no engine' });
+
+    const android = path.join(dir, 'android');
+    await run('android', android, { RECITE_CORE_TOKEN: TOKEN });
+    r = await run('ios', path.join(dir, 'b'), { RECITE_CORE_PREFETCHED: android });
+    expect(r.json.mode).toBe('stub');
+
+    const old = path.join(dir, 'old');
+    await run('ios', old, { RECITE_CORE_TOKEN: TOKEN });
+    writeLock({ sha256: 'a'.repeat(64) });
+    r = await run('ios', path.join(dir, 'c'), { RECITE_CORE_PREFETCHED: old });
+    expect(r.json.mode).toBe('stub');
+    expect(fs.existsSync(path.join(dir, 'c', 'ReciteCore.xcframework'))).toBe(false);
+  });
+
+  it('refuses a redirect to a plain-http storage host', async () => {
+    const src = fs.readFileSync(FETCH, 'utf8');
+    expect(src).toContain("url.protocol !== 'https:' && url.hostname !== '127.0.0.1'");
+  });
+
+  it('a lock that names no valid repository sends nothing', async () => {
+    writeLock({ repo: 'https://evil.example/x/y' });
+    const r = await run('ios', path.join(dir, 'out'), { RECITE_CORE_TOKEN: TOKEN });
+    expect(r.code).toBe(1);
+    expect(seen).toEqual([]);
   });
 
   it('never sends the token anywhere but GitHub or a local test server', () => {
