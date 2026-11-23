@@ -237,11 +237,15 @@ export const settings = {
     level: 'Mistakes to mark',
     /** Tajweed is labelled Beta wherever it shows (Majd, Nov 22 2026). */
     strict: 'Strict (Beta)',
-    strictSub: 'Your mistakes, and tajweed: madd lengths, qalqalah, ghunnah, ikhfa, idgham, iqlab',
+    strictSub: 'Your mistakes, and tajweed notes: ghunnah, ikhfa, qalqalah, idgham, iqlab and some madd',
     words: 'Mistakes',
     wordsSub: 'Wrong, skipped and extra words, and wrong harakat and letters',
     munfasil: 'Madd munfasil',
+    /** Under Madd munfasil at 2 counts (RECITE-2). */
+    munfasilTwo: 'This length isn’t checked yet',
     muttasil: 'Madd muttasil',
+    /** Under Madd muttasil (RECITE-2). */
+    muttasilSub: 'Not checked yet',
     aared: 'Madd ʿarid',
     atStop: 'At a stop',
     any: 'Any',

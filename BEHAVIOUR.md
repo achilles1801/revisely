@@ -573,7 +573,10 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   summary's line ("1 wrong haraka, 1 wrong letter") and in the score, never called a slip. With Strict, tajweed notes,
   labelled Beta wherever they show (Strict in Settings, a note's title, the summary's line, Insights) and never
   counted. There is no level that marks words without harakat and letters: Settings' levels are Mistakes and Strict
-  (Beta). The score is the share of the words reached said right. A word with several marks shows its strongest: a
+  (Beta). Strict marks ghunnah, ikhfa, qalqalah, idgham (with and without ghunnah), iqlab, a natural madd dropped, madd
+  munfasil at 4 or 5 counts, a lazim madd held short, and madd ʿarid once a length is set. It doesn't check madd
+  muttasil, munfasil at 2 counts or ikhfa of meem yet (Nov 23 2026, each rule measured), and Settings says so on those
+  madd rows. The score is the share of the words reached said right. A word with several marks shows its strongest: a
   word mistake, then a wrong haraka or letter, then a tajweed note, and a mistake over a Not clear. The marks are
   highlights in three colours: red for words, amber for harakat and letters (and Not clear), violet for tajweed.
   Strict has a switch of its own and stays Revisely Dev's until it is on, even once the rest of Recite is everyone's:

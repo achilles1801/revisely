@@ -40,6 +40,12 @@ export interface ReciteCheckSettings {
   mistakeSound: boolean;
 }
 
+/**
+ * Whether Strict checks this madd at this length (RECITE-2; the per-rule measurements, Nov 23 2026): munfasil at 4 or
+ * 5 counts, and muttasil not yet. Settings says so on the rows it doesn't check.
+ */
+export const maddChecked = (rule: 'munfasil' | 'muttasil', counts: number): boolean => rule === 'munfasil' && counts !== 2;
+
 export const RECITE_CHECK_DEFAULTS: ReciteCheckSettings = {
   munfasil: 4,
   muttasil: 4,
