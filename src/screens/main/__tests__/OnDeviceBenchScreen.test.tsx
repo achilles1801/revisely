@@ -193,18 +193,18 @@ describe('[ONDEV-1] Settings → Testing → On-device model', () => {
     expect(screen.getByText('Memory 300 MB with both models (180 MB for them)')).toBeTruthy();
   });
 
-  it('a run the app left the foreground during says not to use its numbers', async () => {
+  it('a run the app left the foreground during says so and names its longest clean stretch', async () => {
     const benchRun = jest.requireMock('../../../lib/onDevice/benchRun') as { runPlan: jest.Mock };
     benchRun.runPlan.mockImplementationOnce(async (_e: unknown, _m: unknown, plan: PlanSpec) => ({
       ...mockRun(plan, 40),
-      interrupted: { times: 1, awayMs: 42000, stallMs: 0 },
+      interrupted: { times: 1, awayMs: 42000, suspensions: 1, stallMs: 42000, cleanWindows: 18, longestCleanWindows: 12, longestCleanMs: 372000 },
     }));
     await show();
     for (const p of mockManifest.plans.ios.slice(1)) fireEvent.press(screen.getByLabelText(require('../OnDeviceBenchScreen').planLabel(p)));
     await act(async () => {
       fireEvent.press(screen.getByTestId('bench-run'));
     });
-    expect(screen.getByTestId('bench-interrupted').props.children).toBe('Interrupted: the app left the foreground once, for 42 s. Don’t use these numbers.');
+    expect(screen.getByTestId('bench-interrupted').props.children).toBe('Interrupted: the app left the foreground once, for 42 s. The times below leave that out; longest clean stretch 6.2 min.');
   });
 
   it('a failed download says why and sends nothing', async () => {

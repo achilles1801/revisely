@@ -390,14 +390,17 @@ export const settings = {
     longDrift: 'Slowed down: the last minute {{percent}}% off the first',
     longBattery: 'Battery down {{drop}} points ({{perHour}} an hour)',
     longCharging: 'On a charger: nothing to say about the battery',
+    longBatteryAway: 'Battery: no rate, the app was away for part of the run',
+    /** The drop is under two of the phone's battery steps (iOS reports 5-point steps). */
+    longBatteryCoarse: 'Battery down {{drop}} points: too coarse for a rate',
     longLate_one: '{{count}} window started late',
     longLate_other: '{{count}} windows started late',
     /** "Minute 3 · 41.2 ms · p95 52.0 · 97.5% · nominal". */
     longMinute: 'Minute {{minute}} · {{p50}} ms · p95 {{p95}} · {{battery}} · {{heat}}',
     /** A run the app left the foreground during: its numbers can't be trusted. */
-    interrupted_one: 'Interrupted: the app left the foreground once, for {{seconds}} s. Don’t use these numbers.',
-    interrupted_other: 'Interrupted: the app left the foreground {{count}} times, for {{seconds}} s. Don’t use these numbers.',
-    stalled: 'Interrupted: the run stalled for {{seconds}} s. Don’t use these numbers.',
+    interrupted_one: 'Interrupted: the app left the foreground once, for {{seconds}} s. The times below leave that out; longest clean stretch {{clean}} min.',
+    interrupted_other: 'Interrupted: the app left the foreground {{count}} times, for {{seconds}} s. The times below leave that out; longest clean stretch {{clean}} min.',
+    stalled: 'Interrupted: the phone held the run up for {{seconds}} s. The times below leave that out; longest clean stretch {{clean}} min.',
     /** "v7-live-fp32 · CPU · 2 threads: 34 of 60". */
     running: '{{plan}}: {{done}} of {{total}}',
     results: 'Results',

@@ -259,9 +259,9 @@ const HOT = new Set(HEAT.slice(HEAT.indexOf('serious')));
 /**
  * Research's pass line for a long run (on-device-research.md §3): never a serious thermal state, the model's time
  * steady (the last full minute's median within 20% of the first's), and the battery's drop over the run, per hour.
- * A run on a charger can't say anything about the battery.
+ * No rate on a charger, for a run the app left, or from a drop smaller than two of the phone's battery steps.
  */
-export function longVerdict(minutes: readonly MinuteStats[], samples: readonly LongSample[]) {
+export function longVerdict(minutes: readonly MinuteStats[], samples: readonly LongSample[], interrupted = false) {
   const full = minutes.filter((m) => m.windows >= 10);
   const first = full[0];
   const last = full[full.length - 1];
@@ -270,6 +270,15 @@ export function longVerdict(minutes: readonly MinuteStats[], samples: readonly L
   const charging = samples.some((s) => s.charging);
   const span = known.length >= 2 ? known[known.length - 1].t - known[0].t : 0;
   const drop = known.length >= 2 ? known[0].battery - known[known.length - 1].battery : NaN;
+  // iOS reports the battery in 5-point steps: one step down is anywhere from a sliver to nearly two steps' worth.
+  const step = known.length > 0 && known.every((s) => s.battery % 5 === 0) ? 5 : 1;
+  const batteryNote: 'ok' | 'charging' | 'away' | 'coarse' = charging
+    ? 'charging'
+    : interrupted
+      ? 'away'
+      : !(drop >= 2 * step) || span < 60000
+        ? 'coarse'
+        : 'ok';
   return {
     hot: samples.some((s) => HOT.has(s.thermal)),
     hottest: samples.reduce<string | null>((h, s) => (h === null || HEAT.indexOf(s.thermal) > HEAT.indexOf(h) ? s.thermal : h), null),
@@ -277,30 +286,104 @@ export function longVerdict(minutes: readonly MinuteStats[], samples: readonly L
     steady: Math.abs(drift) <= 0.2,
     charging,
     batteryDrop: drop,
-    batteryPerHour: !charging && span >= 60000 ? (drop * 3600000) / span : NaN,
+    batteryNote,
+    batteryPerHour: batteryNote === 'ok' ? (drop * 3600000) / span : NaN,
   };
 }
 
-/** How a run was disturbed: the app out of the foreground, or a stall in its windows (its process held up). */
+/** A run's windows without the ones the phone suspended (or that a suspension touched). */
+export interface CleanWindows {
+  start: number[];
+  run: number[];
+  feature: number[];
+  /** How many suspensions, and the time they took. */
+  suspensions: number;
+  suspendedMs: number;
+  /** The longest run of clean windows in a row. */
+  longestWindows: number;
+  longestMs: number;
+}
+
+/**
+ * Leaves out what a suspended process did to the timing: a window that took at least 3 s and five times the usual, and
+ * both windows either side of a gap that long. A slow phone's even windows are never suspensions.
+ */
+export function cleanWindows(startMs: readonly number[], runMs: readonly number[], featureMs: readonly number[]): CleanWindows {
+  const n = runMs.length;
+  const gaps = startMs.slice(1).map((t, i) => t - startMs[i]);
+  const usualGap = gaps.length ? median(gaps) : 0;
+  const usualRun = n ? median(runMs) : 0;
+  const longGap = Math.max(3000, 5 * usualGap);
+  const longRun = Math.max(3000, 5 * usualRun);
+  const out = new Set<number>();
+  let suspensions = 0;
+  let suspendedMs = 0;
+  for (let i = 0; i < n; i++) {
+    const slow = runMs[i] >= longRun;
+    const gapAfter = i < gaps.length ? gaps[i] : 0;
+    if (slow) out.add(i);
+    if (gapAfter >= longGap) {
+      out.add(i);
+      out.add(i + 1);
+      suspensions++;
+      suspendedMs += gapAfter - usualGap;
+    } else if (slow) {
+      suspensions++;
+      suspendedMs += runMs[i] - usualRun;
+    }
+  }
+  const keep = (i: number) => !out.has(i);
+  const idx = Array.from({ length: n }, (_, i) => i).filter(keep);
+  let longestWindows = 0;
+  let longestMs = 0;
+  for (let i = 0; i < n; ) {
+    if (!keep(i)) {
+      i++;
+      continue;
+    }
+    let j = i;
+    while (j + 1 < n && keep(j + 1)) j++;
+    if (j - i + 1 > longestWindows) {
+      longestWindows = j - i + 1;
+      longestMs = startMs[j] + runMs[j] - startMs[i];
+    }
+    i = j + 1;
+  }
+  return {
+    start: idx.map((i) => startMs[i]),
+    run: idx.map((i) => runMs[i]),
+    feature: idx.map((i) => featureMs[i]),
+    suspensions,
+    suspendedMs,
+    longestWindows,
+    longestMs,
+  };
+}
+
+/** How a run was disturbed: the app out of the foreground, or the phone suspending it. */
 export interface Interruption {
-  /** Times the app left the foreground during the run. */
+  /** Times the app left the foreground during the run (seen by the app). */
   times: number;
   awayMs: number;
-  /** The longest gap between two windows' starts, when it is far past the run's usual gap; else 0. */
+  /** Suspensions seen in the windows' own timing, and the time they took. */
+  suspensions: number;
   stallMs: number;
+  /** What's left to trust: the clean windows, and the longest stretch of them. */
+  cleanWindows: number;
+  longestCleanWindows: number;
+  longestCleanMs: number;
 }
 
 /**
  * Whether a run's numbers were disturbed (null: clean). `changes` are the app's state changes during the run, from
- * `startState` at `startT` to `endT`; anything but "active" is away. A stall catches what the state events can miss: a
- * gap between two windows of at least 3 s and at least five times the median gap.
+ * `startState` at `startT` to `endT`; anything but "active" is away. `clean` catches what the state events can miss.
  */
 export function interruption(
   startState: string,
   changes: readonly { t: number; state: string }[],
   startT: number,
   endT: number,
-  startMs: readonly number[],
+  clean: CleanWindows,
 ): Interruption | null {
   let away = startState !== 'active';
   let times = away ? 1 : 0;
@@ -314,9 +397,14 @@ export function interruption(
     from = c.t;
   }
   if (away) awayMs += Math.max(0, endT - from);
-  const gaps = startMs.slice(1).map((t, i) => t - startMs[i]);
-  const longest = gaps.length ? Math.max(...gaps) : 0;
-  const usual = gaps.length ? median(gaps) : 0;
-  const stallMs = longest >= 3000 && longest >= 5 * usual ? longest : 0;
-  return times > 0 || stallMs > 0 ? { times, awayMs, stallMs } : null;
+  if (times === 0 && clean.suspensions === 0) return null;
+  return {
+    times,
+    awayMs,
+    suspensions: clean.suspensions,
+    stallMs: clean.suspendedMs,
+    cleanWindows: clean.run.length,
+    longestCleanWindows: clean.longestWindows,
+    longestCleanMs: clean.longestMs,
+  };
 }

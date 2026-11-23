@@ -327,13 +327,17 @@ function RunCard({ run, manifest }: { run: BenchRun; manifest: BenchManifest }) 
     );
   }
   if (run.long && result.ok) {
-    const v = longVerdict(run.long.minutes, result.samples ?? []);
+    const v = longVerdict(run.long.minutes, result.samples ?? [], !!hit);
     lines.push(
       v.hot ? t('settings.bench.longHot', { heat: v.hottest ?? '' }) : t('settings.bench.longCool', { heat: v.hottest ?? '' }),
       v.steady ? t('settings.bench.longSteady', { percent: fixed(100 * v.drift, 0) }) : t('settings.bench.longDrift', { percent: fixed(100 * v.drift, 0) }),
-      v.charging
+      v.batteryNote === 'charging'
         ? t('settings.bench.longCharging')
-        : t('settings.bench.longBattery', { drop: fixed(v.batteryDrop, 1), perHour: fixed(v.batteryPerHour, 1) }),
+        : v.batteryNote === 'away'
+          ? t('settings.bench.longBatteryAway')
+          : v.batteryNote === 'coarse'
+            ? t('settings.bench.longBatteryCoarse', { drop: fixed(v.batteryDrop, 0) })
+            : t('settings.bench.longBattery', { drop: fixed(v.batteryDrop, 1), perHour: fixed(v.batteryPerHour, 1) }),
       t('settings.bench.longLate', { count: result.late }),
     );
     for (const m of run.long.minutes) {
@@ -367,8 +371,8 @@ function RunCard({ run, manifest }: { run: BenchRun; manifest: BenchManifest }) 
       {hit ? (
         <Text style={[typeV2.meta, styles.interrupted, { color: palette.text }]} testID="bench-interrupted">
           {hit.times > 0
-            ? t('settings.bench.interrupted', { count: hit.times, seconds: Math.round(hit.awayMs / 1000) })
-            : t('settings.bench.stalled', { seconds: Math.round(hit.stallMs / 1000) })}
+            ? t('settings.bench.interrupted', { count: hit.times, seconds: Math.round(hit.awayMs / 1000), clean: fixed(hit.longestCleanMs / 60000, 1) })
+            : t('settings.bench.stalled', { seconds: Math.round(hit.stallMs / 1000), clean: fixed(hit.longestCleanMs / 60000, 1) })}
         </Text>
       ) : null}
       <Text style={[typeV2.body, styles.cardTitle, { color: palette.text }]}>

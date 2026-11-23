@@ -1,5 +1,5 @@
 import manifestJson from './bench.manifest.json';
-import { checkVerdict, filesFor, GATE_P95_MS, interruption, longVerdict, parseManifest, perMinute, planKey, quantile, summarize } from '../bench';
+import { checkVerdict, cleanWindows, filesFor, GATE_P95_MS, interruption, longVerdict, parseManifest, perMinute, planKey, quantile, summarize } from '../bench';
 
 // The manifest on the dev backend (models/recite/bench.json), as uploaded with the bench.
 const raw = manifestJson as unknown as Record<string, unknown>;
@@ -148,33 +148,63 @@ describe('a long run (research’s 20-minute protocol)', () => {
 });
 
 describe('a run that was disturbed', () => {
-  const steady = Array.from({ length: 100 }, (_, i) => i * 500);
+  const n = 100;
+  const steady = Array.from({ length: n }, (_, i) => i * 500);
+  const runs = (count = n, ms = 70) => Array.from({ length: count }, () => ms);
+  const clean = (start = steady, run = runs(start.length)) => cleanWindows(start, run, run.map(() => 18));
 
   it('is clean when the app stayed in the foreground and the windows kept coming', () => {
-    expect(interruption('active', [], 0, 50000, steady)).toBeNull();
-    // Control Center and back still counts: the app wasn't active.
-    expect(interruption('active', [{ t: 1000, state: 'inactive' }, { t: 1400, state: 'active' }], 0, 50000, steady)).toEqual({
-      times: 1,
-      awayMs: 400,
-      stallMs: 0,
-    });
+    expect(clean().run).toHaveLength(n);
+    expect(clean().suspensions).toBe(0);
+    expect(interruption('active', [], 0, 50000, clean())).toBeNull();
   });
 
   it('counts each time the app left, and the time away, to the end of the run if it never came back', () => {
+    // Control Center and back still counts: the app wasn't active.
+    expect(interruption('active', [{ t: 1000, state: 'inactive' }, { t: 1400, state: 'active' }], 0, 50000, clean())).toMatchObject({ times: 1, awayMs: 400 });
     const changes = [
       { t: 1000, state: 'inactive' },
       { t: 1100, state: 'background' },
       { t: 5000, state: 'active' },
       { t: 9000, state: 'background' },
     ];
-    expect(interruption('active', changes, 0, 10000, steady)).toEqual({ times: 2, awayMs: 5000, stallMs: 0 });
-    expect(interruption('background', [{ t: 2000, state: 'active' }], 0, 10000, steady)).toEqual({ times: 1, awayMs: 2000, stallMs: 0 });
+    expect(interruption('active', changes, 0, 10000, clean())).toMatchObject({ times: 2, awayMs: 5000 });
+    expect(interruption('background', [{ t: 2000, state: 'active' }], 0, 10000, clean())).toMatchObject({ times: 1, awayMs: 2000 });
   });
 
-  it('catches a stall the state events missed, and not a slow phone’s even windows', () => {
-    const stalled = [...steady.slice(0, 50), ...steady.slice(50).map((t) => t + 42000)];
-    expect(interruption('active', [], 0, 92000, stalled)).toEqual({ times: 0, awayMs: 0, stallMs: 42500 });
+  it('leaves a suspension out of the numbers: the windows either side of the gap, and a window that lasted through it', () => {
+    // As on Majd's iPhone (Nov 23): a gap, a window that ran through a suspension, and a last window of 314 s.
+    const start = steady.map((t, i) => t + (i >= 30 ? 45000 : 0) + (i >= 60 ? 53000 : 0));
+    const run = runs();
+    run[59] = 53100;
+    run[99] = 314000;
+    const c = clean(start, run);
+    expect(c.suspensions).toBe(3);
+    expect(c.suspendedMs).toBeCloseTo(45000 + 53000 + (314000 - 70));
+    expect(c.run.every((ms) => ms === 70)).toBe(true);
+    expect(c.run).toHaveLength(n - 5);
+    expect(c.longestWindows).toBe(38);
+    expect(interruption('active', [], 0, 500000, c)).toMatchObject({ times: 0, suspensions: 3, cleanWindows: n - 5, longestCleanWindows: 38 });
+  });
+
+  it('never takes a slow phone’s even windows for suspensions', () => {
     const slow = Array.from({ length: 50 }, (_, i) => i * 3500);
-    expect(interruption('active', [], 0, 175000, slow)).toBeNull();
+    const c = cleanWindows(slow, runs(50, 3400), runs(50, 30));
+    expect(c.suspensions).toBe(0);
+    expect(c.run).toHaveLength(50);
+    expect(c.longestWindows).toBe(50);
+  });
+
+  it('gives a battery rate only when it means something', () => {
+    const minutes = perMinute(steady, runs());
+    const sample = (m: number, battery: number, charging = false) => ({ t: m * 60000, battery, charging, thermal: 'nominal' });
+    // Android, a point at a time.
+    expect(longVerdict(minutes, [sample(0, 80), sample(20, 74)])).toMatchObject({ batteryNote: 'ok', batteryPerHour: 18 });
+    // iOS's 5-point steps: one step down says too little; two do.
+    expect(longVerdict(minutes, [sample(0, 35), sample(20, 30)]).batteryNote).toBe('coarse');
+    expect(longVerdict(minutes, [sample(0, 35), sample(20, 30)]).batteryPerHour).toBeNaN();
+    expect(longVerdict(minutes, [sample(0, 35), sample(20, 25)])).toMatchObject({ batteryNote: 'ok', batteryPerHour: 30 });
+    expect(longVerdict(minutes, [sample(0, 80), sample(20, 70)], true).batteryNote).toBe('away');
+    expect(longVerdict(minutes, [sample(0, 80, true), sample(20, 80, true)]).batteryNote).toBe('charging');
   });
 });

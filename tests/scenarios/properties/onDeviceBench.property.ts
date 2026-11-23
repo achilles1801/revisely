@@ -4,7 +4,7 @@
 
 import fc from 'fast-check';
 import manifestJson from '../../../src/lib/onDevice/__tests__/bench.manifest.json';
-import { filesFor, GATE_P95_MS, interruption, longVerdict, parseManifest, perMinute, summarize } from '../../../src/lib/onDevice/bench';
+import { cleanWindows, filesFor, GATE_P95_MS, interruption, longVerdict, parseManifest, perMinute, summarize } from '../../../src/lib/onDevice/bench';
 import { runs } from './fixtures';
 
 const MANIFEST = parseManifest(manifestJson)!;
@@ -61,7 +61,8 @@ describe('the on-device bench', () => {
         const changes = steps.map(([dt, s]) => ({ t: (t += dt), state: s }));
         const end = t + 1000;
         const windows = Array.from({ length: 40 }, (_, i) => i * 500);
-        const r = interruption(start, changes, 0, end, windows);
+        const times = windows.map(() => 70);
+        const r = interruption(start, changes, 0, end, cleanWindows(windows, times, times));
         const everAway = start !== 'active' || changes.some((c) => c.state !== 'active');
         expect(r !== null).toBe(everAway);
         if (r) {
@@ -71,6 +72,31 @@ describe('the on-device bench', () => {
           expect(r.stallMs).toBe(0);
         }
       }),
+      { numRuns: runs(300) },
+    );
+  });
+
+  it('[ONDEV-1] a suspension never reaches the numbers: every kept window is an ordinary one', () => {
+    fc.assert(
+      fc.property(
+        fc.array(fc.record({ at: fc.integer({ min: 0, max: 199 }), ms: fc.integer({ min: 4000, max: 400000 }) }), { maxLength: 6 }),
+        fc.boolean(),
+        (hits, inRun) => {
+          const run = Array.from({ length: 200 }, () => 70);
+          const extra = Array.from({ length: 200 }, () => 0);
+          for (const h of hits) {
+            if (inRun) run[h.at] = h.ms;
+            if (h.at < 199) extra[h.at + 1] += h.ms;
+          }
+          let t = 0;
+          const start = run.map((_, i) => (t += 500 + extra[i]));
+          const c = cleanWindows(start, run, run.map(() => 18));
+          expect(c.run.every((ms) => ms === 70)).toBe(true);
+          for (let i = 1; i < c.start.length; i++) if (c.start[i] - c.start[i - 1] === 500) expect(c.run[i]).toBe(70);
+          expect(c.longestWindows).toBeLessThanOrEqual(c.run.length);
+          if (hits.some((h) => h.at < 199 || inRun)) expect(c.suspensions).toBeGreaterThan(0);
+        },
+      ),
       { numRuns: runs(300) },
     );
   });

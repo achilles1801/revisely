@@ -16,6 +16,7 @@ import { currentRelease } from '../releaseInfo';
 import { authHeaders, bucketName, objectUrl } from '../recordingCloud';
 import { isDevVariant } from '../variant';
 import {
+  cleanWindows,
   filesFor,
   interruption,
   longVerdict,
@@ -213,14 +214,16 @@ export async function runPlan(
       },
     });
     const hopSamples = cadenceMs > 0 ? (cadenceMs / 1000) * 16000 : manifest.hopSamples;
-    const summary = result.ok ? summarize(result.runMs, result.featureMs, hopSamples) : null;
-    const disturbed = interruption(startState, changes, startT, Date.now(), result.startMs ?? []);
+    // The summary and the minutes leave out what a suspended process did to the timing.
+    const clean = cleanWindows(result.startMs ?? [], result.runMs, result.featureMs);
+    const summary = result.ok ? summarize(clean.run, clean.feature, hopSamples) : null;
+    const disturbed = interruption(startState, changes, startT, Date.now(), clean);
     return {
       plan,
       result,
       summary,
       ...('durationSec' in length
-        ? { long: { durationSec: length.durationSec, cadenceMs, minutes: perMinute(result.startMs ?? [], result.runMs) } }
+        ? { long: { durationSec: length.durationSec, cadenceMs, minutes: perMinute(clean.start, clean.run) } }
         : {}),
       ...(disturbed ? { interrupted: disturbed } : {}),
     };
@@ -289,7 +292,7 @@ export function benchRecord(device: DeviceInfo, windows: number, runs: readonly 
             minutes: long.minutes.map((m) => ({ ...m, p50: round(m.p50), p95: round(m.p95), max: round(m.max) })),
             samples: (result.samples ?? []).map((x) => ({ ...x, t: Math.round(x.t), memoryMb: round(x.memoryMb, 1) })),
             verdict: (() => {
-              const v = longVerdict(long.minutes, result.samples ?? []);
+              const v = longVerdict(long.minutes, result.samples ?? [], !!interrupted);
               return { ...v, drift: round(v.drift, 3), batteryDrop: round(v.batteryDrop, 1), batteryPerHour: round(v.batteryPerHour, 1) };
             })(),
           }
