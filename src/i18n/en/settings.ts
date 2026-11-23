@@ -247,6 +247,9 @@ export const settings = {
     dark: 'Dark',
     /** Decorations over the usual design (Revisely Dev until its release switch). */
     ramadan: 'Ramadan theme',
+    /** Activity as a tab between Home and Read (Revisely Dev's switch to compare, TAB-2). */
+    activityTab: 'Activity tab',
+    activityTabSub: 'Between Home and Read, instead of the button at the top of Home',
   },
   /** Settings → Appearance → Language (Revisely Dev until Arabic ships). Each language's own name is LANGUAGE_NAMES. */
   language: {

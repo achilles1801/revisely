@@ -4,6 +4,8 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PanResponder } from 'react-native';
+import { Gesture } from 'react-native-gesture-handler';
+import { usePagerGesture } from '../../navigation/PagerTabs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { calendarScreenLabel, CALENDAR_SPAN_KEY, parseSpan, periodForGap, periodForSpan, shiftWeek, showsToday, weekDays, type CalendarGap, type CalendarSpan } from '../../lib/activityCalendar';
 import { weekStart as weekStartOf } from '../../lib/activityHeatmap';
@@ -79,9 +81,12 @@ interface Props {
   onShowTop?: () => void;
   /** Filled with what reads the items again, for the screen's pull to refresh (ACT-27). */
   refreshRef?: React.MutableRefObject<(() => Promise<unknown>) | null>;
+  /** Activity is a tab of the tab pager (Revisely Dev, TAB-2): a sideways swipe moves between tabs, but on the
+   *  calendar's days it steps the month or week, as everywhere on the calendar otherwise. */
+  inTabPager?: boolean;
 }
 
-export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorrow, onPlanIt, onAddToPlan, onOpenPage, onOpenAyahs, onSeeAllPages, onOpenLastRevised, onTurnOnSmartTracking, firstTomorrow, onViewChange, onShowTop, refreshRef }: Props) {
+export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorrow, onPlanIt, onAddToPlan, onOpenPage, onOpenAyahs, onSeeAllPages, onOpenLastRevised, onTurnOnSmartTracking, firstTomorrow, onViewChange, onShowTop, refreshRef, inTabPager = false }: Props) {
   const { pages, logs, user } = useApp();
   const revo = useRevoAvailable(user);
   const recitation = useRecitation(user);
@@ -220,6 +225,23 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
       }),
     [],
   );
+  // As a tab (TAB-2) the tab pager takes sideways swipes anywhere on the screen, and would take the calendar's too: its
+  // pan starts before the responder above. So there the swipe is on the days alone, and the pager waits for it to fail
+  // (a vertical scroll, a tap) before it can start (`blocksExternalGesture`). The same 50 pt step either way.
+  const pager = usePagerGesture();
+  const gridSwipe = useMemo(() => {
+    if (!inTabPager) return undefined;
+    const pan = Gesture.Pan()
+      .runOnJS(true)
+      .activeOffsetX([-10, 10])
+      .failOffsetY([-10, 10])
+      .onEnd((e) => {
+        if (e.translationX < -50) stepRef.current(1);
+        else if (e.translationX > 50) stepRef.current(-1);
+      })
+      .withTestId('calendar-grid-swipe');
+    return pager ? pan.blocksExternalGesture(pager) : pan;
+  }, [inTabPager, pager]);
 
   // Insights' twelve months of memorization (the calendar's window is 90 days).
   const [yearOfMemorizing, setYearOfMemorizing] = useState<{ day: string; pages: number[] }[]>([]);
@@ -346,8 +368,9 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
         testID="insights-range-menu"
       />
       {view === 'calendar' ? (
-        <RNView {...swipe.panHandlers} testID="activity-calendar">
+        <RNView {...(gridSwipe ? {} : swipe.panHandlers)} testID="activity-calendar">
           <CalendarMonth
+            gridSwipe={gridSwipe}
             month={month}
             week={week}
             span={span}

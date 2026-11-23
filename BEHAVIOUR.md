@@ -353,6 +353,15 @@ current basic sounds". October 2026's version was removed for the voices it offe
   12 pt sideways opens nothing, whether or not it changed the tab. A press that comes without a touch
   (VoiceOver, TalkBack) always counts. (Nov 22 2026: on Android, a swipe from Read toward Home that the
   tab pager didn't take opened the surah under the finger, 4 swipes in about 100 on the emulator.)
+- **TAB-2.** (Revisely Dev) Settings → Appearance → Activity tab (off until turned on, kept on that phone, not the
+  account) makes Activity a tab of its own between Home and Read, to compare with the button at the top of Home (Majd,
+  Nov 23 2026: "a test toggle in settings for me to see what it's like normal(rn) vs with it"). On: the tab bar is
+  Home, Activity, Read (the pulse icon), a swipe moves between them in that order, and Home's top bar has no Activity
+  button. Activity, with Insights inside it as before, starts its tab with no back arrow; what it opens (a day, See
+  all, the reader, the daily log) is pushed in its tab and Back comes back to it, and a press on the tab while it shows
+  goes back to Activity and its top. On the calendar's days a sideways swipe still steps the month or week; anywhere
+  else on Activity it moves between tabs. Settings' and Revo's ways to Activity open the tab. Off: the app as before. The
+  store app has no switch and never shows the tab (`lib/activityTab`).
 
 ## Sheets and updates
 

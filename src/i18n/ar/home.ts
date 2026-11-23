@@ -67,6 +67,7 @@ export const home: NonNullable<ArStrings['home']> = {
     undoFailed: 'تعذّر التراجع',
     qibla: 'تحديد القبلة',
     activity: 'فتح النشاط',
+    activityTab: 'النشاط',
     settings: 'فتح الإعدادات',
     recent: 'الجلسات الأخيرة',
     noSessions: 'لا توجد جلسات بعد. ابدأ أول مراجعة لك من الأعلى.',

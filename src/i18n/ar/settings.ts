@@ -245,6 +245,8 @@ export const settings: NonNullable<ArStrings['settings']> = {
     light: 'فاتح',
     dark: 'داكن',
     ramadan: 'سمة رمضان',
+    activityTab: 'تبويب النشاط',
+    activityTabSub: 'بين الشاشة الرئيسية والمصحف، بدلًا من الزر أعلى الشاشة الرئيسية',
   },
   language: {
     row: 'اللغة',

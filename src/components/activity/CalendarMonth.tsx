@@ -10,6 +10,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, Easing, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
+import { GestureDetector, type GestureType } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { Tap } from '../v2/Tap';
@@ -83,6 +84,7 @@ export function CalendarMonth({
   recited,
   sections = DEFAULT_SECTIONS.overview,
   gap = null,
+  gridSwipe,
 }: {
   /** 'YYYY-MM' (the month shown, and the grid's days). */
   month: string;
@@ -107,6 +109,9 @@ export function CalendarMonth({
   sections?: TabLayout<'overview'>;
   /** A gap from Insights, marked on its days (ACT-28); it fades when it goes. */
   gap?: CalendarGap | null;
+  /** The swipe between months or weeks, on the days alone (Activity as a tab, TAB-2). Without it the caller takes the
+   *  swipe over the whole calendar. */
+  gridSwipe?: GestureType;
 }) {
   const { palette } = useTheme();
   const { fontScale } = useWindowDimensions();
@@ -191,7 +196,7 @@ export function CalendarMonth({
         ))}
       </View>
     ) : null;
-  const calendar =
+  const dayGrid =
     span === 'week' ? (
       <View style={styles.grid} testID="calendar-week" onLayout={(e) => setRowWidth(e.nativeEvent.layout.width - 2 * GRID_PAD)}>
         {cue}
@@ -224,6 +229,7 @@ export function CalendarMonth({
         ))}
       </View>
     );
+  const calendar = gridSwipe ? <GestureDetector gesture={gridSwipe}>{dayGrid}</GestureDetector> : dayGrid;
   const key = (
     <View style={styles.legend} testID="calendar-legend">
       <LegendItem label={t('activity.day.revised')}>

@@ -29,6 +29,7 @@ jest.mock('@react-navigation/native', () => {
     useNavigation: () => mockNavigation,
     useRoute: () => mockRoute,
     useFocusEffect: (cb: () => void) => useEffect(cb, [cb]),
+    useScrollToTop: () => undefined,
   };
 });
 

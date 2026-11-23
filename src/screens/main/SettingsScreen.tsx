@@ -111,6 +111,7 @@ import {
 import { LANGUAGE_NAMES } from '../../i18n/language';
 import { isDevVariant } from '../../lib/variant';
 import { ramadanThemeOffered, setRamadanTheme, useRamadanThemeSaved } from '../../lib/ramadanTheme';
+import { activityTabOffered, activityTabOn, setActivityTab, useActivityTabSaved } from '../../lib/activityTab';
 import { CheckerModelRow } from '../../components/settings/CheckerModelRow';
 import { ScheduledRemindersRow } from '../../components/settings/ScheduledRemindersRow';
 import { useNotificationPermission } from '../../hooks/useNotificationPermission';
@@ -263,6 +264,12 @@ export default function SettingsScreen() {
   const { theme, palette, themeMode, setThemeMode } = useTheme();
   const design = useDesign();
   const ramadanTheme = useRamadanThemeSaved();
+  const activityTab = useActivityTabSaved();
+  // Activity: its own tab while it is one (Revisely Dev's switch, TAB-2), else pushed here as before.
+  const openActivity = () => {
+    if (activityTabOn()) navigation.getParent()?.navigate('ActivityTab', { screen: 'Activity' });
+    else navigation.navigate('Activity');
+  };
   const tabFootprint = useTabBarFootprint();
   const [localUser, setLocalUser] = useState(user);
 
@@ -779,7 +786,7 @@ export default function SettingsScreen() {
               icon="pulse-outline"
               label={t('settings.activity.activity')}
               value={readingSeconds != null ? t('settings.activity.timed', { duration: formatDuration(readingSeconds) }) : undefined}
-              onPress={() => navigation.navigate('Activity')}
+              onPress={openActivity}
             />
           </Section>
         ) : null}
@@ -1080,7 +1087,7 @@ export default function SettingsScreen() {
                           .filter(Boolean)
                           .join(' '),
                         [
-                          { text: t('settings.activity.openActivity'), onPress: () => navigation.navigate('Activity') },
+                          { text: t('settings.activity.openActivity'), onPress: openActivity },
                           {
                             text: t('settings.activity.deleteAll'),
                             style: 'destructive',
@@ -1230,6 +1237,23 @@ export default function SettingsScreen() {
                     onValueChange={(on) => void setRamadanTheme(on)}
                     accessibilityLabel={t('settings.appearance.ramadan')}
                     testID="settings-ramadan-theme"
+                  />
+                }
+              />
+            ) : null}
+            {/* Revisely Dev only (TAB-2): Activity as a tab between Home and Read, to compare with the button at the
+                top of Home (Majd, Nov 23 2026). Kept on this phone, off until turned on. */}
+            {activityTabOffered() ? (
+              <Row
+                icon="pulse-outline"
+                label={t('settings.appearance.activityTab')}
+                subtitle={t('settings.appearance.activityTabSub')}
+                rightSlot={
+                  <SettingSwitch
+                    value={activityTab}
+                    onValueChange={(on) => void setActivityTab(on)}
+                    accessibilityLabel={t('settings.appearance.activityTab')}
+                    testID="settings-activity-tab"
                   />
                 }
               />
