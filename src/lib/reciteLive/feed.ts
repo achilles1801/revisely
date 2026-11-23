@@ -88,6 +88,8 @@ export interface LiveConnection {
   status?(): string;
   /** The take's audio from `from` to `to` seconds (16 kHz mono), as held on the phone; null outside what was heard. */
   audioClip?(from: number, to: number): Int16Array | null;
+  /** Where the take ran (lib/reciteLive/where); absent: the server. */
+  ranOn?(): 'phone' | 'server';
 }
 
 export interface LiveHandlers {
