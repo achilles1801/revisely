@@ -509,7 +509,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['ONDEV-2', 'ONDEV-3'],
     routes: ['Settings'],
     text: lines(
-      '- Settings → Downloads and storage → “Recite on the phone” is the download that will let Recite check on the phone instead of Revisely’s server (about 66 MB). For now it only downloads: Recite itself still checks on the server.',
+      '- Settings → Downloads and storage → “Recite on the phone” is the download that will let Recite check on the phone instead of Revisely’s server (about 50 MB). For now it only downloads: Recite itself still checks on the server.',
       '- It starts by itself when they open the reader, on Wi-Fi unless “Download over mobile data” is on; the row’s menu has Download now and Remove from this phone. Removing it keeps it off until Download now.',
       '- It’s kept encrypted on the phone and out of backups. An account the team hasn’t given access sees “Not available for this account yet”.',
     ),

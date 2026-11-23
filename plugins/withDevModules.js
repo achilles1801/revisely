@@ -49,7 +49,7 @@ function devSettingsGradle(text) {
   );
 }
 
-/** Android's backup rules (written by withAndroidBackupRules) with Recite's pack left out too: 66 MB would pass the 25 MB quota. */
+/** Android's backup rules (written by withAndroidBackupRules) with Recite's pack left out too: it would pass the 25 MB quota. */
 function devBackupRules(xml) {
   if (xml.includes('path="recite-pack/"')) return xml;
   const at = xml.lastIndexOf('<exclude ');
