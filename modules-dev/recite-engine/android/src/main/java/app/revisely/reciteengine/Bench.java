@@ -39,6 +39,12 @@ public final class Bench {
     public Map<String, String> options = new HashMap<>();
     public String melFilters, hann, audio;
     public int windows = 60, warmup = 2, windowSamples = 64000, hopSamples = 8000;
+    /** Open the model from bytes in memory (as the real path will, after decrypting it), not from its file. */
+    public boolean fromMemory;
+    /** A long run (research's 20-minute protocol): windows until this many seconds have passed, not `windows`. */
+    public int durationSec;
+    /** Start a window every this many ms, as a live take does (0: back to back); a window due while one runs is late. */
+    public int cadenceMs;
     public String checkPcm, checkMel, checkOut;
     public int checkS0, checkEnd;
   }
@@ -49,6 +55,9 @@ public final class Bench {
     public double loadMs, firstRunMs, reloadMs;
     public final List<Double> featureMs = new ArrayList<>();
     public final List<Double> runMs = new ArrayList<>();
+    /** When each timed window started, in ms from the first one. */
+    public final List<Double> startMs = new ArrayList<>();
+    public int late;
     public final List<String> inputs = new ArrayList<>();
     public long[] outShape = new long[0];
     public double memoryBeforeMb, memoryLoadedMb, memoryAfterMb;
@@ -64,6 +73,11 @@ public final class Bench {
 
   public interface Progress {
     void update(int done, int total);
+  }
+
+  /** Called at the first timed window and then once a minute, between windows: the platform reads battery and heat. */
+  public interface Sampler {
+    void sample(double elapsedMs);
   }
 
   static double nowMs() {
@@ -117,7 +131,7 @@ public final class Bench {
     }
   }
 
-  private static Model open(OrtEnvironment env, Plan plan) throws OrtException {
+  private static Model open(OrtEnvironment env, Plan plan) throws OrtException, IOException {
     try (OrtSession.SessionOptions so = new OrtSession.SessionOptions()) {
       if (plan.threads > 0) so.setIntraOpNumThreads(plan.threads);
       so.setInterOpNumThreads(1);
@@ -145,7 +159,8 @@ public final class Bench {
         default:
           throw new IllegalArgumentException("unknown provider " + plan.provider);
       }
-      return new Model(env.createSession(plan.model, so));
+      // From memory: the bytes are dropped once the session holds its own copy of the weights.
+      return new Model(plan.fromMemory ? env.createSession(readAll(plan.model), so) : env.createSession(plan.model, so));
     }
   }
 
@@ -236,6 +251,10 @@ public final class Bench {
   }
 
   public static Result run(Plan plan, Memory memory, Progress progress) {
+    return run(plan, memory, progress, null);
+  }
+
+  public static Result run(Plan plan, Memory memory, Progress progress, Sampler sampler) {
     Result r = new Result();
     OrtEnvironment env = OrtEnvironment.getEnvironment();
     try {
@@ -254,8 +273,30 @@ public final class Bench {
         if (plan.checkPcm != null && !plan.checkPcm.isEmpty()) check(env, plan, m, logMel, r);
         int available = (audio.length - plan.windowSamples) / plan.hopSamples + 1;
         long[][] shape = new long[1][];
-        int total = plan.warmup + plan.windows;
-        for (int i = 0; i < total; i++) {
+        boolean timed = plan.durationSec > 0;
+        double begin = 0, due = 0, nextSample = 0;
+        for (int i = 0; ; i++) {
+          boolean warm = i < plan.warmup;
+          if (!warm) {
+            int done = i - plan.warmup;
+            if (done == 0) begin = due = nowMs();
+            double elapsed = nowMs() - begin;
+            if (timed ? elapsed >= plan.durationSec * 1000.0 : done >= plan.windows) break;
+            if (sampler != null && elapsed >= nextSample) {
+              sampler.sample(elapsed);
+              nextSample += 60000.0;
+            }
+            if (plan.cadenceMs > 0) {
+              if (done > 0) due += plan.cadenceMs;
+              double now = nowMs();
+              if (now < due) {
+                Thread.sleep((long) (due - now), (int) (((due - now) % 1) * 1e6));
+              } else if (done > 0 && now > due + 1.0) {
+                r.late++;
+                due = now;
+              }
+            }
+          }
           int start = (i % available) * plan.hopSamples;
           t0 = nowMs();
           float[] mel = logMel.compute(audio, start, plan.windowSamples);
@@ -263,12 +304,17 @@ public final class Bench {
           run(env, m, mel, shape);
           double t2 = nowMs();
           if (i == 0) r.firstRunMs = t2 - t1;
-          if (i >= plan.warmup) {
+          if (!warm) {
+            r.startMs.add(t0 - begin);
             r.featureMs.add(t1 - t0);
             r.runMs.add(t2 - t1);
-            if (progress != null) progress.update(i - plan.warmup + 1, plan.windows);
+            if (progress != null) {
+              if (timed) progress.update((int) ((t2 - begin) / 1000.0), plan.durationSec);
+              else progress.update(i - plan.warmup + 1, plan.windows);
+            }
           }
         }
+        if (sampler != null) sampler.sample(nowMs() - begin);
         r.outShape = shape[0];
         r.memoryAfterMb = memory.mb();
       }

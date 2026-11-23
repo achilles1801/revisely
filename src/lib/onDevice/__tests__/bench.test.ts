@@ -1,5 +1,5 @@
 import manifestJson from './bench.manifest.json';
-import { checkVerdict, filesFor, GATE_P95_MS, parseManifest, planKey, quantile, summarize } from '../bench';
+import { checkVerdict, filesFor, GATE_P95_MS, longVerdict, parseManifest, perMinute, planKey, quantile, summarize } from '../bench';
 
 // The manifest on the dev backend (models/recite/bench.json), as uploaded with the bench.
 const raw = manifestJson as unknown as Record<string, unknown>;
@@ -35,9 +35,10 @@ describe('the on-device bench’s manifest', () => {
     expect(bad((c) => (c.models[0].file = 'missing'))).toBeNull();
     expect(bad((c) => (c.plans.ios[0].model = 'v9'))).toBeNull();
     expect(bad((c) => (c.plans.android[0].provider = 'gpu'))).toBeNull();
-    expect(bad((c) => (c.plans.ios[7].options = { ModelFormat: 1 }))).toBeNull();
+    expect(bad((c) => (c.plans.ios[8].options = { ModelFormat: 1 }))).toBeNull();
     expect(bad((c) => (c.check.end = c.check.s0))).toBeNull();
     expect(bad((c) => delete c.tolerance)).toBeNull();
+    expect(bad((c) => (c.plans.ios[0].fromMemory = 'yes'))).toBeNull();
   });
 
   it('downloads only what the chosen runs need, each file once', () => {
@@ -51,6 +52,7 @@ describe('the on-device bench’s manifest', () => {
 
   it('names a run by everything that changes it', () => {
     expect(planKey({ model: 'v7-live-fp32', provider: 'cpu', threads: 2 })).toBe('v7-live-fp32|cpu|2');
+    expect(planKey({ model: 'v7-live-fp32', provider: 'cpu', threads: 2, fromMemory: true })).toBe('v7-live-fp32|cpu|2|memory');
     expect(planKey({ model: 'v7-live-fp16', provider: 'coreml', threads: 0, options: { b: '2', a: '1' } })).toBe('v7-live-fp16|coreml|0|a=1,b=2');
   });
 });
@@ -87,5 +89,51 @@ describe('a run’s summary', () => {
     expect(checkVerdict({ ...exact, outMaxDiff: 0.063, ownMaxDiff: 0.084 }, tol).model).toBe('sameSounds');
     expect(checkVerdict({ ...exact, ownTopSame: 0.98 }, tol).model).toBe('differs');
     expect(checkVerdict({ ...exact, melMaxDiff: 0.01 }, tol).features).toBe(false);
+  });
+});
+
+describe('a long run (research’s 20-minute protocol)', () => {
+  const minuteOf = (n: number, ms: (i: number) => number) => ({
+    startMs: Array.from({ length: n * 120 }, (_, i) => i * 500),
+    runMs: Array.from({ length: n * 120 }, (_, i) => ms(i)),
+  });
+
+  it('groups the windows by the minute they started in', () => {
+    const { startMs, runMs } = minuteOf(3, (i) => (i < 120 ? 40 : i < 240 ? 44 : 50));
+    expect(perMinute(startMs, runMs)).toEqual([
+      { minute: 0, windows: 120, p50: 40, p95: 40, max: 40 },
+      { minute: 1, windows: 120, p50: 44, p95: 44, max: 44 },
+      { minute: 2, windows: 120, p50: 50, p95: 50, max: 50 },
+    ]);
+  });
+
+  it('passes when never hot, steady within 20%, and says the battery’s drop an hour', () => {
+    const { startMs, runMs } = minuteOf(20, (i) => 40 + i / 400);
+    const samples = Array.from({ length: 21 }, (_, m) => ({ t: m * 60000, battery: 100 - m * 0.3, charging: false, thermal: 'nominal' }));
+    const v = longVerdict(perMinute(startMs, runMs), samples);
+    expect(v.hot).toBe(false);
+    expect(v.hottest).toBe('nominal');
+    expect(v.steady).toBe(true);
+    expect(v.batteryDrop).toBeCloseTo(6);
+    expect(v.batteryPerHour).toBeCloseTo(18);
+  });
+
+  it('fails on a serious thermal state or a slowdown past 20%, and says nothing of a battery on a charger', () => {
+    const { startMs, runMs } = minuteOf(10, (i) => (i < 600 ? 40 : 60));
+    const hot = [
+      { t: 0, battery: 80, charging: true, thermal: 'fair' },
+      { t: 300000, battery: 82, charging: true, thermal: 'serious' },
+      { t: 600000, battery: 84, charging: true, thermal: 'fair' },
+    ];
+    const v = longVerdict(perMinute(startMs, runMs), hot);
+    expect(v.hot).toBe(true);
+    expect(v.hottest).toBe('serious');
+    expect(v.steady).toBe(false);
+    expect(v.drift).toBeCloseTo(0.5);
+    expect(v.charging).toBe(true);
+    expect(v.batteryPerHour).toBeNaN();
+    // Android's names count too.
+    expect(longVerdict([], [{ t: 0, battery: 50, charging: false, thermal: 'severe' }]).hot).toBe(true);
+    expect(longVerdict([], [{ t: 0, battery: 50, charging: false, thermal: 'moderate' }]).hot).toBe(false);
   });
 });

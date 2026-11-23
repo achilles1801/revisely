@@ -427,6 +427,9 @@ owner's `on-device-release.md`).
   the clip (EveryAyah, Husary, page 7, 90 s) and M's vectors live on the dev bucket under `models/recite/`
   (`bench.json` is the manifest: files with sizes and SHA-256, runs per platform, M's pass marks). Changing the runs or
   adding a model is an upload, not a build: put the file there with the dev admin key and add it to `bench.json`.
+  The first run in a platform's list is the long run's (5 or 20 minutes at the live cadence, battery and heat each
+  minute: research's protocol); a run with `fromMemory` opens its model from bytes, as the real path will after
+  decrypting it (the bench's files themselves are plain: Dev only, signed in; the real path's pack is encrypted).
   Storage rules let signed-in accounts read `models/recite/`; only the admin SDK writes it. Each finished bench sends
   one record to Firestore `onDeviceBench` (create only: the phone, the build, each run's numbers; no uid, no audio);
   read them with the dev admin key.

@@ -71,6 +71,13 @@ struct Plan {
   std::string audio;
   int windows = 60;
   int warmup = 2;
+  /** Open the model from bytes in memory (as the real path will, after decrypting it), not from its file. */
+  bool fromMemory = false;
+  /** A long run (research's 20-minute protocol): windows until this many seconds have passed, not `windows`. */
+  int durationSec = 0;
+  /** Start a window every this many ms, as a live take does (0: back to back). A window that ends after the next
+   *  one was due is late, and the next starts at once. */
+  int cadenceMs = 0;
   int windowSamples = 64000;
   int hopSamples = 8000;
   /** Parity on M's vectors (empty: skipped): the take, its window, the features and the model's output there. */
@@ -84,6 +91,10 @@ struct Result {
   /** The first open, the first run, and a second open after the timed windows (Core ML: from its cache). */
   double loadMs = 0, firstRunMs = 0, reloadMs = 0;
   std::vector<double> featureMs, runMs;
+  /** When each timed window started, in ms from the first one. */
+  std::vector<double> startMs;
+  /** Windows that started late (cadence only). */
+  int late = 0;
   std::vector<std::string> inputs;
   std::vector<int64_t> outShape;
   double memoryBeforeMb = 0, memoryLoadedMb = 0, memoryAfterMb = 0;
@@ -94,7 +105,12 @@ struct Result {
   double melMaxDiff = 0, outMaxDiff = 0, outTopSame = 0, ownMaxDiff = 0, ownTopSame = 0;
 };
 
-/** Loads the model with the plan's provider and times it. progress(done, total) after each timed window. */
-Result runPlan(const Plan& plan, const std::function<double()>& memoryMb, const std::function<void(int, int)>& progress);
+/**
+ * Loads the model with the plan's provider and times it. progress(done, total) after each timed window (a long run:
+ * seconds done of its duration). sample(ms) at the first timed window and then once a minute, between windows, for
+ * the platform to read the battery and the thermal state.
+ */
+Result runPlan(const Plan& plan, const std::function<double()>& memoryMb, const std::function<void(int, int)>& progress,
+               const std::function<void(double)>& sample = nullptr);
 
 }  // namespace rec

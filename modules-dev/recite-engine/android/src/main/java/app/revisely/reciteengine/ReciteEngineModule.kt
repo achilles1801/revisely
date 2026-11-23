@@ -1,6 +1,7 @@
 package app.revisely.reciteengine
 
 import android.app.ActivityManager
+import android.os.BatteryManager
 import android.content.Context
 import android.os.Build
 import android.os.Debug
@@ -75,6 +76,9 @@ class ReciteEngineModule : Module() {
         audio = plainPath(options["audio"] as? String ?: "")
         windows = (options["windows"] as? Number)?.toInt() ?: 60
         warmup = (options["warmup"] as? Number)?.toInt() ?: 2
+        fromMemory = options["fromMemory"] as? Boolean ?: false
+        durationSec = (options["durationSec"] as? Number)?.toInt() ?: 0
+        cadenceMs = (options["cadenceMs"] as? Number)?.toInt() ?: 0
         (options["check"] as? Map<*, *>)?.let { c ->
           checkPcm = plainPath(c["pcm"] as? String ?: "")
           checkMel = plainPath(c["mel"] as? String ?: "")
@@ -85,9 +89,14 @@ class ReciteEngineModule : Module() {
       }
       thread(name = "recite-bench") {
         val thermalBefore = thermal()
-        val r = Bench.run(plan, { memoryMb() }) { done, total ->
-          sendEvent("onBenchProgress", mapOf("done" to done, "total" to total))
-        }
+        // Battery and heat once a minute (research's 20-minute protocol).
+        val samples = mutableListOf<Map<String, Any>>()
+        val r = Bench.run(
+          plan,
+          { memoryMb() },
+          { done, total -> sendEvent("onBenchProgress", mapOf("done" to done, "total" to total)) },
+          { elapsed -> samples.add(sample(elapsed)) },
+        )
         promise.resolve(
           mapOf(
             "ok" to r.ok,
@@ -97,6 +106,9 @@ class ReciteEngineModule : Module() {
             "reloadMs" to r.reloadMs,
             "featureMs" to r.featureMs,
             "runMs" to r.runMs,
+            "startMs" to r.startMs,
+            "late" to r.late,
+            "samples" to samples,
             "inputs" to r.inputs,
             "outShape" to r.outShape.map { it.toDouble() },
             "memoryBeforeMb" to r.memoryBeforeMb,
@@ -121,6 +133,21 @@ class ReciteEngineModule : Module() {
         )
       }
     }
+  }
+
+  /** The battery (percent, charging, the current drawn in mA where the phone reports it), heat and memory now. */
+  private fun sample(elapsedMs: Double): Map<String, Any> {
+    val bm = context?.getSystemService(Context.BATTERY_SERVICE) as? BatteryManager
+    val percent = bm?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: -1
+    val currentUa = bm?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW) ?: Int.MIN_VALUE
+    return mapOf(
+      "t" to elapsedMs,
+      "battery" to percent.toDouble(),
+      "charging" to (if (Build.VERSION.SDK_INT >= 23) bm?.isCharging ?: false else false),
+      "currentMa" to (if (currentUa == Int.MIN_VALUE || currentUa == 0) -1.0 else currentUa / 1000.0),
+      "thermal" to thermal(),
+      "memoryMb" to memoryMb(),
+    )
   }
 
   /** The process's proportional set size in MB (its share of the memory it touches). */

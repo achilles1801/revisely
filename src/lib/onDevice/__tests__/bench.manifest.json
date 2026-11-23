@@ -1,6 +1,6 @@
 {
  "version": 1,
- "about": "Revisely Dev's on-device bench (Settings -> Testing -> On-device model, ONDEV-1). Files are workstream M's (~/revisely-mistake-lab/runs/mobile, SPEC.md) and a public EveryAyah clip (Husary, page 7, 90 s, 16 kHz int16). Paths are under models/recite/.",
+ "about": "Revisely Dev's on-device bench (Settings -> Testing -> On-device model, ONDEV-1). Files are workstream M's (~/revisely-mistake-lab/runs/mobile, SPEC.md) and a public EveryAyah clip (Husary, page 7, 90 s, 16 kHz int16). Paths are under models/recite/. The first run is the long run\u2019s.",
  "files": {
   "fp32": {
    "path": "v7/v7-live-fp32.onnx",
@@ -109,12 +109,12 @@
    {
     "model": "v7-live-fp32",
     "provider": "cpu",
-    "threads": 1
+    "threads": 2
    },
    {
     "model": "v7-live-fp32",
     "provider": "cpu",
-    "threads": 2
+    "threads": 1
    },
    {
     "model": "v7-live-fp16",
@@ -140,6 +140,12 @@
     "model": "v7m-live-r16",
     "provider": "cpu",
     "threads": 2
+   },
+   {
+    "model": "v7-live-fp32",
+    "provider": "cpu",
+    "threads": 2,
+    "fromMemory": true
    },
    {
     "model": "v7-live-fp32",
@@ -166,12 +172,12 @@
    {
     "model": "v7-live-fp32",
     "provider": "cpu",
-    "threads": 1
+    "threads": 2
    },
    {
     "model": "v7-live-fp32",
     "provider": "cpu",
-    "threads": 2
+    "threads": 1
    },
    {
     "model": "v7-live-fp16",
@@ -197,6 +203,12 @@
     "model": "v7m-live-r16",
     "provider": "cpu",
     "threads": 2
+   },
+   {
+    "model": "v7-live-fp32",
+    "provider": "cpu",
+    "threads": 2,
+    "fromMemory": true
    },
    {
     "model": "v7-live-fp32.ort",

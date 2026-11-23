@@ -21,6 +21,12 @@ export interface BenchPlan {
   audio: string;
   windows: number;
   warmup: number;
+  /** Open the model from bytes in memory (as the real path will, after decrypting it), not from its file. */
+  fromMemory?: boolean;
+  /** A long run: windows for this many seconds instead of `windows`. */
+  durationSec?: number;
+  /** Start a window every this many ms, as a live take does (0: back to back). */
+  cadenceMs?: number;
   /** M's vectors: the take, the window [s0, end), its features and the model's output there. */
   check?: { pcm: string; mel: string; out: string; s0: number; end: number } | null;
 }
@@ -46,6 +52,12 @@ export interface BenchResult {
   reloadMs: number;
   featureMs: number[];
   runMs: number[];
+  /** When each timed window started, ms from the first. */
+  startMs: number[];
+  /** Windows that started after they were due (cadence only). */
+  late: number;
+  /** Battery, heat and memory at the first window and once a minute after. */
+  samples: BenchSample[];
   inputs: string[];
   outShape: number[];
   memoryBeforeMb: number;
@@ -55,6 +67,19 @@ export interface BenchResult {
   checkError: string | null;
   thermalBefore: string;
   thermalAfter: string;
+}
+
+export interface BenchSample {
+  /** ms from the first timed window. */
+  t: number;
+  /** Percent (iOS to 0.1, Android whole); -1 when unknown. */
+  battery: number;
+  charging: boolean;
+  thermal: string;
+  memoryMb: number;
+  lowPower?: boolean;
+  /** Android: the current drawn, where the phone reports it; -1 when not. */
+  currentMa?: number;
 }
 
 export interface DeviceInfo {

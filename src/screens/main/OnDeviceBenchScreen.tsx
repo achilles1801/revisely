@@ -11,7 +11,7 @@ import { PillTabs } from '../../components/v2/PillTabs';
 import { GroupedSection } from '../../components/plan/Grouped';
 import { layoutV2, typeV2 } from '../../theme/v2';
 import { useKeepScreenOn } from '../../hooks/useKeepScreenOn';
-import { checkVerdict, planKey, type BenchManifest, type PlanSpec, type Provider } from '../../lib/onDevice/bench';
+import { checkVerdict, longVerdict, planKey, type BenchManifest, type PlanSpec, type Provider } from '../../lib/onDevice/bench';
 import {
   benchEngine,
   benchRecord,
@@ -25,8 +25,12 @@ import {
 import { logger } from '../../lib/logger';
 import { t } from '../../i18n';
 
-const WINDOW_CHOICES = ['20', '60', '170'] as const;
+// The lead asks for at least 200 calls a run for p95 (the clip has 173 windows; the bench goes round it again).
+const WINDOW_CHOICES = ['60', '200', '600'] as const;
 type WindowChoice = (typeof WINDOW_CHOICES)[number];
+// A long run (research's 20-minute protocol): one run at the live cadence, battery and heat each minute.
+const MINUTE_CHOICES = ['5', '20'] as const;
+type MinuteChoice = (typeof MINUTE_CHOICES)[number];
 
 const PROVIDER_LABEL: Record<Provider, () => string> = {
   cpu: () => t('settings.bench.providerCpu'),
@@ -36,17 +40,18 @@ const PROVIDER_LABEL: Record<Provider, () => string> = {
 };
 
 export function planLabel(p: PlanSpec): string {
-  return t('settings.bench.plan', {
+  const label = t('settings.bench.plan', {
     model: p.model,
     provider: PROVIDER_LABEL[p.provider](),
     threads: p.threads > 0 ? t('settings.bench.threads', { count: p.threads }) : t('settings.bench.threadsDefault'),
   });
+  return p.fromMemory ? t('settings.bench.fromMemory', { plan: label }) : label;
 }
 
 type Status =
   | { kind: 'idle' }
   | { kind: 'downloading'; file: number; files: number; percent: number }
-  | { kind: 'running'; plan: string; done: number; total: number }
+  | { kind: 'running'; plan: string; done: number; total: number; long: boolean }
   | { kind: 'sending' }
   | { kind: 'sent' }
   | { kind: 'sendFailed'; error: string }
@@ -69,7 +74,8 @@ export default function OnDeviceBenchScreen() {
   const [manifest, setManifest] = useState<BenchManifest | null>(null);
   const [readError, setReadError] = useState<string | null>(null);
   const [off, setOff] = useState<Set<string>>(new Set());
-  const [windows, setWindows] = useState<WindowChoice>('60');
+  const [windows, setWindows] = useState<WindowChoice>('200');
+  const [minutes, setMinutes] = useState<MinuteChoice>('20');
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
   const [runs, setRuns] = useState<BenchRun[]>([]);
   const [record, setRecord] = useState<ReturnType<typeof benchRecord> | null>(null);
@@ -99,24 +105,28 @@ export default function OnDeviceBenchScreen() {
   const plans = manifest ? platformPlans(manifest) : [];
   const chosen = plans.filter((p) => !off.has(planKey(p)));
 
-  const start = async () => {
+  /** The chosen runs, N windows each; or (long) the first chosen one for so many minutes at the live cadence. */
+  const start = async (long: boolean) => {
     if (!engine || !manifest || !device || chosen.length === 0) return;
     const n = Number(windows);
+    const toRun = long ? chosen.slice(0, 1) : chosen;
+    const seconds = Number(minutes) * 60;
+    const length = long ? { durationSec: seconds } : { windows: n };
     setRuns([]);
     setRecord(null);
     const done: BenchRun[] = [];
     try {
       setStatus({ kind: 'downloading', file: 0, files: 0, percent: 0 });
-      const files = await ensureFiles(engine, manifest, chosen, (p) => {
+      const files = await ensureFiles(engine, manifest, toRun, (p) => {
         if (live.current) {
           setStatus({ kind: 'downloading', file: p.file, files: p.files, percent: p.totalBytes ? Math.floor((100 * p.bytes) / p.totalBytes) : 0 });
         }
       });
-      for (const plan of chosen) {
+      for (const plan of toRun) {
         const label = planLabel(plan);
-        if (live.current) setStatus({ kind: 'running', plan: label, done: 0, total: n });
-        const run = await runPlan(engine, manifest, plan, files, n, (d, total) => {
-          if (live.current) setStatus({ kind: 'running', plan: label, done: d, total });
+        if (live.current) setStatus({ kind: 'running', plan: label, done: 0, total: long ? seconds : n, long });
+        const run = await runPlan(engine, manifest, plan, files, length, (d, total) => {
+          if (live.current) setStatus({ kind: 'running', plan: label, done: d, total, long });
         });
         done.push(run);
         if (live.current) setRuns([...done]);
@@ -126,7 +136,7 @@ export default function OnDeviceBenchScreen() {
       if (live.current) setStatus({ kind: 'failed', error: message(err) });
       if (done.length === 0) return;
     }
-    const rec = benchRecord(engine.deviceInfo(), n, done);
+    const rec = benchRecord(engine.deviceInfo(), long ? Math.max(1, done[0]?.result.runMs.length ?? 1) : n, done);
     if (live.current) {
       setRecord(rec);
       setStatus((s) => (s.kind === 'failed' ? s : { kind: 'sending' }));
@@ -148,7 +158,9 @@ export default function OnDeviceBenchScreen() {
     status.kind === 'downloading'
       ? t('settings.bench.downloading', { file: status.file, files: status.files, percent: status.percent })
       : status.kind === 'running'
-        ? t('settings.bench.running', { plan: status.plan, done: status.done, total: status.total })
+        ? status.long
+          ? t('settings.bench.runningLong', { plan: status.plan, done: Math.floor(status.done / 60), total: Math.round(status.total / 60) })
+          : t('settings.bench.running', { plan: status.plan, done: status.done, total: status.total })
         : status.kind === 'sending'
           ? t('settings.bench.sending')
           : status.kind === 'sent'
@@ -227,7 +239,7 @@ export default function OnDeviceBenchScreen() {
                   <PillButton
                     title={t('settings.bench.run')}
                     size="lg"
-                    onPress={start}
+                    onPress={() => start(false)}
                     busy={busy}
                     disabled={chosen.length === 0}
                     testID="bench-run"
@@ -238,10 +250,30 @@ export default function OnDeviceBenchScreen() {
                     </Text>
                   ) : null}
                 </View>
+                <GroupedSection header={t('settings.bench.long')} footer={t('settings.bench.longFooter')}>
+                  <View style={styles.tabs}>
+                    <PillTabs
+                      options={MINUTE_CHOICES.map((m) => ({ value: m, label: t('settings.bench.minutes', { count: Number(m) }) }))}
+                      value={minutes}
+                      onChange={setMinutes}
+                      disabled={busy}
+                      testID="bench-minutes"
+                    />
+                  </View>
+                </GroupedSection>
+                <View style={styles.actions}>
+                  <PillButton
+                    title={t('settings.bench.longRun', { plan: chosen[0] ? planLabel(chosen[0]) : '' })}
+                    variant="outline"
+                    onPress={() => start(true)}
+                    disabled={busy || chosen.length === 0}
+                    testID="bench-long-run"
+                  />
+                </View>
                 {runs.length > 0 ? (
                   <GroupedSection header={t('settings.bench.results')}>
                     {runs.map((r) => (
-                      <RunCard key={planKey(r.plan)} run={r} manifest={manifest} />
+                      <RunCard key={`${planKey(r.plan)}${r.long ? '|long' : ''}`} run={r} manifest={manifest} />
                     ))}
                   </GroupedSection>
                 ) : null}
@@ -275,6 +307,29 @@ function RunCard({ run, manifest }: { run: BenchRun; manifest: BenchManifest }) 
       t('settings.bench.heat', { first: fixed(summary.firstP50, 1), last: fixed(summary.lastP50, 1), heat: `${result.thermalBefore} → ${result.thermalAfter}` }),
     );
   }
+  if (run.long && result.ok) {
+    const v = longVerdict(run.long.minutes, result.samples ?? []);
+    lines.push(
+      v.hot ? t('settings.bench.longHot', { heat: v.hottest ?? '' }) : t('settings.bench.longCool', { heat: v.hottest ?? '' }),
+      v.steady ? t('settings.bench.longSteady', { percent: fixed(100 * v.drift, 0) }) : t('settings.bench.longDrift', { percent: fixed(100 * v.drift, 0) }),
+      v.charging
+        ? t('settings.bench.longCharging')
+        : t('settings.bench.longBattery', { drop: fixed(v.batteryDrop, 1), perHour: fixed(v.batteryPerHour, 1) }),
+      t('settings.bench.longLate', { count: result.late }),
+    );
+    for (const m of run.long.minutes) {
+      const sample = (result.samples ?? []).find((x) => Math.floor(x.t / 60000) === m.minute);
+      lines.push(
+        t('settings.bench.longMinute', {
+          minute: m.minute + 1,
+          p50: fixed(m.p50, 1),
+          p95: fixed(m.p95, 1),
+          battery: sample && sample.battery >= 0 ? `${fixed(sample.battery, 1)}%` : '–',
+          heat: sample?.thermal ?? '–',
+        }),
+      );
+    }
+  }
   if (result.check) {
     const v = checkVerdict(result.check, manifest.tolerance);
     if (!v.features) lines.push(t('settings.bench.checkFeatures', { diff: result.check.melMaxDiff.toExponential(1) }));
@@ -289,8 +344,10 @@ function RunCard({ run, manifest }: { run: BenchRun; manifest: BenchManifest }) 
     lines.push(t('settings.bench.checkFailed', { error: result.checkError }));
   }
   return (
-    <View style={styles.card} testID={`bench-result-${run.plan.model}-${run.plan.provider}-${run.plan.threads}`}>
-      <Text style={[typeV2.body, styles.cardTitle, { color: palette.text }]}>{planLabel(run.plan)}</Text>
+    <View style={styles.card} testID={`bench-result-${run.plan.model}-${run.plan.provider}-${run.plan.threads}${run.long ? '-long' : ''}`}>
+      <Text style={[typeV2.body, styles.cardTitle, { color: palette.text }]}>
+        {run.long ? t('settings.bench.longTitle', { plan: planLabel(run.plan), minutes: Math.round(run.long.durationSec / 60) }) : planLabel(run.plan)}
+      </Text>
       {lines.map((line, i) => (
         <Text key={i} style={[typeV2.meta, typeV2.numeral, { color: palette.secondary }]}>
           {line}

@@ -4,7 +4,7 @@
 
 import fc from 'fast-check';
 import manifestJson from '../../../src/lib/onDevice/__tests__/bench.manifest.json';
-import { filesFor, GATE_P95_MS, parseManifest, summarize } from '../../../src/lib/onDevice/bench';
+import { filesFor, GATE_P95_MS, longVerdict, parseManifest, perMinute, summarize } from '../../../src/lib/onDevice/bench';
 import { runs } from './fixtures';
 
 const MANIFEST = parseManifest(manifestJson)!;
@@ -26,6 +26,30 @@ describe('the on-device bench', () => {
         expect(s.realTime).toBeCloseTo((s.runP50 + feature) / ((hop / 16000) * 1000), 9);
       }),
       { numRuns: runs(300) },
+    );
+  });
+
+  it('[ONDEV-1] a long run: every window counted in the minute it started, hot only at serious or worse, steady within 20%', () => {
+    const heat = fc.constantFrom('nominal', 'fair', 'serious', 'critical', 'none', 'light', 'moderate', 'severe');
+    fc.assert(
+      fc.property(
+        fc.array(fc.tuple(fc.integer({ min: 0, max: 1_200_000 }), fc.double({ min: 1, max: 900, noNaN: true })), { minLength: 1, maxLength: 300 }),
+        fc.array(fc.record({ t: fc.integer({ min: 0, max: 1_200_000 }), battery: fc.double({ min: 0, max: 100, noNaN: true }), charging: fc.boolean(), thermal: heat }), {
+          maxLength: 25,
+        }),
+        (windows, samples) => {
+          windows.sort((a, b) => a[0] - b[0]);
+          const minutes = perMinute(windows.map((w) => w[0]), windows.map((w) => w[1]));
+          expect(minutes.reduce((n, m) => n + m.windows, 0)).toBe(windows.length);
+          expect(new Set(minutes.map((m) => m.minute)).size).toBe(minutes.length);
+          for (const m of minutes) expect(m.p50).toBeLessThanOrEqual(m.max);
+          const v = longVerdict(minutes, samples);
+          expect(v.hot).toBe(samples.some((s) => ['serious', 'critical', 'severe'].includes(s.thermal)));
+          expect(v.steady).toBe(Math.abs(v.drift) <= 0.2);
+          if (samples.some((s) => s.charging)) expect(v.batteryPerHour).toBeNaN();
+        },
+      ),
+      { numRuns: runs(200) },
     );
   });
 

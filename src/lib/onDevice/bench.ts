@@ -28,6 +28,8 @@ export interface PlanSpec {
   provider: Provider;
   threads: number;
   options?: Record<string, string>;
+  /** Open the model from bytes in memory (the real path decrypts it there), not from its file. */
+  fromMemory?: boolean;
 }
 
 export interface BenchManifest {
@@ -89,7 +91,14 @@ export function parseManifest(raw: unknown): BenchManifest | null {
         if (!isRecord(p.options) || Object.values(p.options).some((v) => typeof v !== 'string')) return null;
         options = p.options as Record<string, string>;
       }
-      out.push({ model: p.model, provider: p.provider as Provider, threads: Math.floor(p.threads), ...(options ? { options } : {}) });
+      if (p.fromMemory !== undefined && typeof p.fromMemory !== 'boolean') return null;
+      out.push({
+        model: p.model,
+        provider: p.provider as Provider,
+        threads: Math.floor(p.threads),
+        ...(options ? { options } : {}),
+        ...(p.fromMemory ? { fromMemory: true } : {}),
+      });
     }
     return out;
   };
@@ -129,7 +138,7 @@ export function filesFor(manifest: BenchManifest, plans: readonly PlanSpec[]): s
 /** "v7-live-fp32 · Core ML · 2 threads" style key parts, for the screen and the record. */
 export function planKey(p: PlanSpec): string {
   const opts = p.options ? Object.entries(p.options).map(([k, v]) => `${k}=${v}`).sort().join(',') : '';
-  return `${p.model}|${p.provider}|${p.threads}${opts ? `|${opts}` : ''}`;
+  return `${p.model}|${p.provider}|${p.threads}${opts ? `|${opts}` : ''}${p.fromMemory ? '|memory' : ''}`;
 }
 
 /** The value at fraction q of the sorted list (nearest rank). */
@@ -203,4 +212,65 @@ export function checkVerdict(
   const sameSounds = c.outTopSame === 1 && c.ownTopSame === 1;
   const exact = sameSounds && c.outMaxDiff <= tol.out && c.ownMaxDiff <= tol.own;
   return { features: c.melMaxDiff <= tol.mel, model: exact ? 'exact' : sameSounds ? 'sameSounds' : 'differs' };
+}
+
+/** A long run's windows, a minute at a time. */
+export interface MinuteStats {
+  minute: number;
+  windows: number;
+  p50: number;
+  p95: number;
+  max: number;
+}
+
+export function perMinute(startMs: readonly number[], runMs: readonly number[]): MinuteStats[] {
+  const groups = new Map<number, number[]>();
+  startMs.forEach((t, i) => {
+    const m = Math.floor(t / 60000);
+    const list = groups.get(m) ?? [];
+    list.push(runMs[i]);
+    groups.set(m, list);
+  });
+  return [...groups.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([minute, list]) => {
+      const sorted = [...list].sort((a, b) => a - b);
+      return { minute, windows: list.length, p50: quantile(sorted, 0.5), p95: quantile(sorted, 0.95), max: sorted[sorted.length - 1] };
+    });
+}
+
+export interface LongSample {
+  t: number;
+  battery: number;
+  charging: boolean;
+  thermal: string;
+}
+
+// iOS's and Android's thermal states, coolest first.
+const HEAT = ['nominal', 'none', 'fair', 'light', 'moderate', 'serious', 'severe', 'critical', 'emergency', 'shutdown'];
+const HOT = new Set(HEAT.slice(HEAT.indexOf('serious')));
+
+/**
+ * Research's pass line for a long run (on-device-research.md §3): never a serious thermal state, the model's time
+ * steady (the last full minute's median within 20% of the first's), and the battery's drop over the run, per hour.
+ * A run on a charger can't say anything about the battery.
+ */
+export function longVerdict(minutes: readonly MinuteStats[], samples: readonly LongSample[]) {
+  const full = minutes.filter((m) => m.windows >= 10);
+  const first = full[0];
+  const last = full[full.length - 1];
+  const drift = first && last && first !== last ? last.p50 / first.p50 - 1 : 0;
+  const known = samples.filter((s) => s.battery >= 0);
+  const charging = samples.some((s) => s.charging);
+  const span = known.length >= 2 ? known[known.length - 1].t - known[0].t : 0;
+  const drop = known.length >= 2 ? known[0].battery - known[known.length - 1].battery : NaN;
+  return {
+    hot: samples.some((s) => HOT.has(s.thermal)),
+    hottest: samples.reduce<string | null>((h, s) => (h === null || HEAT.indexOf(s.thermal) > HEAT.indexOf(h) ? s.thermal : h), null),
+    drift,
+    steady: Math.abs(drift) <= 0.2,
+    charging,
+    batteryDrop: drop,
+    batteryPerHour: !charging && span >= 60000 ? (drop * 3600000) / span : NaN,
+  };
 }

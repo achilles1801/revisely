@@ -13,6 +13,7 @@
 #include <fstream>
 #include <memory>
 #include <stdexcept>
+#include <thread>
 #include <unordered_map>
 
 namespace rec {
@@ -240,7 +241,15 @@ Model open(const Plan& plan) {
     throw std::runtime_error("unknown provider " + plan.provider);
   }
   Model m;
-  m.session = std::make_unique<Ort::Session>(env(), plan.model.c_str(), so);
+  if (plan.fromMemory) {
+    // The bytes are dropped once the session holds its own copy of the weights (an .onnx file is parsed and copied).
+    std::vector<char> bytes;
+    std::string error;
+    if (!readBytes(plan.model, bytes, error)) throw std::runtime_error(error);
+    m.session = std::make_unique<Ort::Session>(env(), bytes.data(), bytes.size(), so);
+  } else {
+    m.session = std::make_unique<Ort::Session>(env(), plan.model.c_str(), so);
+  }
   Ort::AllocatorWithDefaultOptions alloc;
   for (size_t i = 0; i < m.session->GetInputCount(); i++) {
     m.inputNames.emplace_back(m.session->GetInputNameAllocated(i, alloc).get());
@@ -332,7 +341,8 @@ void check(const Plan& plan, Model& m, LogMel& logMel, Result& r) {
 
 }  // namespace
 
-Result runPlan(const Plan& plan, const std::function<double()>& memoryMb, const std::function<void(int, int)>& progress) {
+Result runPlan(const Plan& plan, const std::function<double()>& memoryMb, const std::function<void(int, int)>& progress,
+               const std::function<void(double)>& sample) {
   Result r;
   try {
     std::vector<float> hann, filters, audio;
@@ -358,8 +368,30 @@ Result runPlan(const Plan& plan, const std::function<double()>& memoryMb, const 
 
     const int available = (static_cast<int>(audio.size()) - plan.windowSamples) / plan.hopSamples + 1;
     std::vector<float> mel, out;
-    const int total = plan.warmup + plan.windows;
-    for (int i = 0; i < total; i++) {
+    const bool timed = plan.durationSec > 0;
+    double begin = 0, due = 0, nextSample = 0;
+    for (int i = 0;; i++) {
+      const bool warm = i < plan.warmup;
+      if (!warm) {
+        const int done = i - plan.warmup;
+        if (done == 0) begin = due = nowMs();
+        const double elapsed = nowMs() - begin;
+        if (timed ? elapsed >= plan.durationSec * 1000.0 : done >= plan.windows) break;
+        if (sample && elapsed >= nextSample) {
+          sample(elapsed);
+          nextSample += 60000.0;
+        }
+        if (plan.cadenceMs > 0) {
+          if (done > 0) due += plan.cadenceMs;
+          const double now = nowMs();
+          if (now < due) {
+            std::this_thread::sleep_for(std::chrono::duration<double, std::milli>(due - now));
+          } else if (done > 0 && now > due + 1.0) {
+            r.late++;
+            due = now;
+          }
+        }
+      }
       const size_t start = static_cast<size_t>(i % available) * plan.hopSamples;
       t0 = nowMs();
       const int frames = logMel.compute(audio.data() + start, plan.windowSamples, mel);
@@ -367,12 +399,17 @@ Result runPlan(const Plan& plan, const std::function<double()>& memoryMb, const 
       run(m, mel, frames, out, r.outShape);
       const double t2 = nowMs();
       if (i == 0) r.firstRunMs = t2 - t1;
-      if (i >= plan.warmup) {
+      if (!warm) {
+        r.startMs.push_back(t0 - begin);
         r.featureMs.push_back(t1 - t0);
         r.runMs.push_back(t2 - t1);
-        if (progress) progress(i - plan.warmup + 1, plan.windows);
+        if (progress) {
+          if (timed) progress(static_cast<int>((t2 - begin) / 1000.0), plan.durationSec);
+          else progress(i - plan.warmup + 1, plan.windows);
+        }
       }
     }
+    if (sample) sample(nowMs() - begin);
     r.memoryAfterMb = memoryMb();
     // Opened again: Core ML's second open reads the compiled model from its cache.
     m.session.reset();

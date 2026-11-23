@@ -14,7 +14,17 @@ import { logger } from '../logger';
 import { currentRelease } from '../releaseInfo';
 import { authHeaders, bucketName, objectUrl } from '../recordingCloud';
 import { isDevVariant } from '../variant';
-import { filesFor, parseManifest, summarize, type BenchManifest, type PlanSpec, type RunSummary } from './bench';
+import {
+  filesFor,
+  longVerdict,
+  parseManifest,
+  perMinute,
+  summarize,
+  type BenchManifest,
+  type MinuteStats,
+  type PlanSpec,
+  type RunSummary,
+} from './bench';
 
 export const MANIFEST_PATH = 'models/recite/bench.json';
 const ROOT = 'models/recite';
@@ -133,15 +143,20 @@ export interface BenchRun {
   plan: PlanSpec;
   result: BenchResult;
   summary: RunSummary | null;
+  /** A long run (research's 20-minute protocol): its length, and its windows a minute at a time. */
+  long?: { durationSec: number; minutes: MinuteStats[] };
 }
 
-/** Runs one plan; progress(done, total) per timed window. */
+/** How long to run: N windows back to back, or a long run of so many seconds at the live cadence. */
+export type RunLength = { windows: number } | { durationSec: number };
+
+/** Runs one plan; progress(done, total) per timed window (a long run: seconds of its duration). */
 export async function runPlan(
   engine: Engine,
   manifest: BenchManifest,
   plan: PlanSpec,
   files: Record<string, string>,
-  windows: number,
+  length: RunLength,
   onProgress: (done: number, total: number) => void,
 ): Promise<BenchRun> {
   const model = manifest.models.find((m) => m.id === plan.model);
@@ -157,8 +172,11 @@ export async function runPlan(
       melFilters: files[manifest.melFilters],
       hann: files[manifest.hann],
       audio: files[manifest.audio],
-      windows,
+      windows: 'windows' in length ? length.windows : 0,
       warmup: 2,
+      fromMemory: plan.fromMemory === true,
+      // A long run hops as a live take does: a window every half second (the manifest's hop), not back to back.
+      ...('durationSec' in length ? { durationSec: length.durationSec, cadenceMs: (manifest.hopSamples / 16000) * 1000 } : {}),
       check: {
         pcm: files[manifest.check.pcm],
         mel: files[manifest.check.mel],
@@ -167,7 +185,9 @@ export async function runPlan(
         end: manifest.check.end,
       },
     });
-    return { plan, result, summary: result.ok ? summarize(result.runMs, result.featureMs, manifest.hopSamples) : null };
+    const summary = result.ok ? summarize(result.runMs, result.featureMs, manifest.hopSamples) : null;
+    if (!('durationSec' in length)) return { plan, result, summary };
+    return { plan, result, summary, long: { durationSec: length.durationSec, minutes: perMinute(result.startMs ?? [], result.runMs) } };
   } finally {
     sub.remove();
   }
@@ -194,11 +214,13 @@ export function benchRecord(device: DeviceInfo, windows: number, runs: readonly 
       update: release.updateId ?? '',
     },
     windows,
-    runs: runs.map(({ plan, result, summary }) => ({
+    runs: runs.map(({ plan, result, summary, long }) => ({
+      mode: long ? 'long' : 'windows',
       model: plan.model,
       provider: plan.provider,
       threads: plan.threads,
       options: plan.options ?? {},
+      fromMemory: plan.fromMemory === true,
       ok: result.ok,
       error: result.error ?? '',
       loadMs: round(result.loadMs),
@@ -213,6 +235,19 @@ export function benchRecord(device: DeviceInfo, windows: number, runs: readonly 
       check: result.check,
       checkError: result.checkError ?? '',
       thermal: `${result.thermalBefore}→${result.thermalAfter}`,
+      ...(long
+        ? {
+            durationSec: long.durationSec,
+            late: result.late,
+            startMs: ms(result.startMs ?? []),
+            minutes: long.minutes.map((m) => ({ ...m, p50: round(m.p50), p95: round(m.p95), max: round(m.max) })),
+            samples: (result.samples ?? []).map((x) => ({ ...x, t: Math.round(x.t), memoryMb: round(x.memoryMb, 1) })),
+            verdict: (() => {
+              const v = longVerdict(long.minutes, result.samples ?? []);
+              return { ...v, drift: round(v.drift, 3), batteryDrop: round(v.batteryDrop, 1), batteryPerHour: round(v.batteryPerHour, 1) };
+            })(),
+          }
+        : {}),
     })),
   };
 }

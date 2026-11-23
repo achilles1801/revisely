@@ -1,5 +1,6 @@
 // See RECBench.h.
 #import "RECBench.h"
+#import <UIKit/UIKit.h>
 #import <mach/mach.h>
 
 #include "RECBenchCore.hpp"
@@ -50,6 +51,9 @@ static NSArray<NSNumber *> *numbers(const std::vector<double> &v) {
   plan.audio = str(options, @"audio");
   plan.windows = num(options, @"windows", 60);
   plan.warmup = num(options, @"warmup", 2);
+  plan.fromMemory = [options[@"fromMemory"] isKindOfClass:[NSNumber class]] && [(NSNumber *)options[@"fromMemory"] boolValue];
+  plan.durationSec = num(options, @"durationSec", 0);
+  plan.cadenceMs = num(options, @"cadenceMs", 0);
   NSDictionary *check = options[@"check"];
   if ([check isKindOfClass:[NSDictionary class]]) {
     plan.checkPcm = str(check, @"pcm");
@@ -59,11 +63,35 @@ static NSArray<NSNumber *> *numbers(const std::vector<double> &v) {
     plan.checkEnd = num(check, @"end", 0);
   }
 
+  // Battery and heat once a minute (research's 20-minute protocol). UIDevice is read on the main thread.
+  NSMutableArray *samples = [NSMutableArray array];
+  auto sample = [samples](double elapsedMs) {
+    __block float battery = -1;
+    __block NSInteger state = 0;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+      UIDevice *device = [UIDevice currentDevice];
+      device.batteryMonitoringEnabled = YES;
+      battery = device.batteryLevel;
+      state = device.batteryState;
+    });
+    NSProcessInfo *info = [NSProcessInfo processInfo];
+    NSString *thermal = @[ @"nominal", @"fair", @"serious", @"critical" ][MIN((NSUInteger)info.thermalState, 3u)];
+    [samples addObject:@{
+      @"t" : @(elapsedMs),
+      @"battery" : @(battery < 0 ? -1 : round(battery * 1000) / 10),
+      @"charging" : @(state == UIDeviceBatteryStateCharging || state == UIDeviceBatteryStateFull),
+      @"thermal" : thermal,
+      @"lowPower" : @(info.isLowPowerModeEnabled),
+      @"memoryMb" : @([RECBench footprintMb]),
+    }];
+  };
+
   rec::Result r = rec::runPlan(
       plan, [] { return [RECBench footprintMb]; },
       [progress](int done, int total) {
         if (progress) progress(done, total);
-      });
+      },
+      sample);
 
   NSMutableArray *inputs = [NSMutableArray array];
   for (const auto &name : r.inputs) [inputs addObject:[NSString stringWithUTF8String:name.c_str()]];
@@ -88,6 +116,9 @@ static NSArray<NSNumber *> *numbers(const std::vector<double> &v) {
     @"reloadMs" : @(r.reloadMs),
     @"featureMs" : numbers(r.featureMs),
     @"runMs" : numbers(r.runMs),
+    @"startMs" : numbers(r.startMs),
+    @"late" : @(r.late),
+    @"samples" : samples,
     @"inputs" : inputs,
     @"outShape" : shape,
     @"memoryBeforeMb" : @(r.memoryBeforeMb),

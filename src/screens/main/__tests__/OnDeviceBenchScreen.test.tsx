@@ -1,7 +1,7 @@
 import React from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import manifestJson from '../../../lib/onDevice/__tests__/bench.manifest.json';
-import { parseManifest, summarize, type PlanSpec } from '../../../lib/onDevice/bench';
+import { parseManifest, perMinute, summarize, type PlanSpec } from '../../../lib/onDevice/bench';
 import type { BenchRun } from '../../../lib/onDevice/benchRun';
 
 // Revisely Dev's Settings → Testing → On-device model (ONDEV-1). The native module, Storage and Firestore are stood
@@ -33,13 +33,23 @@ const mockBench = {
   fail: null as string | null,
 };
 
-function mockRun(plan: PlanSpec, ms: number): BenchRun {
-  const runMs = Array.from({ length: 20 }, () => ms);
-  const featureMs = Array.from({ length: 20 }, () => 6);
+function mockRun(plan: PlanSpec, ms: number, durationSec?: number): BenchRun {
+  const count = durationSec ? durationSec * 2 : 20;
+  // A long run slows by a tenth over its minutes and the battery falls a point every 4 minutes.
+  const runMs = Array.from({ length: count }, (_, i) => (durationSec ? ms * (1 + (0.1 * i) / count) : ms));
+  const featureMs = Array.from({ length: count }, () => 6);
+  const startMs = Array.from({ length: count }, (_, i) => i * 500);
+  const samples = durationSec
+    ? Array.from({ length: durationSec / 60 + 1 }, (_, m) => ({ t: m * 60000, battery: 100 - m / 4, charging: false, thermal: m > 10 ? 'fair' : 'nominal', memoryMb: 220 }))
+    : [];
   return {
     plan,
     summary: summarize(runMs, featureMs, 8000),
+    ...(durationSec ? { long: { durationSec, minutes: perMinute(startMs, runMs) } } : {}),
     result: {
+      startMs,
+      late: durationSec ? 3 : 0,
+      samples,
       ok: true,
       error: null,
       loadMs: 1200,
@@ -70,7 +80,9 @@ jest.mock('../../../lib/onDevice/benchRun', () => {
       if (mockBench.fail) throw new Error(mockBench.fail);
       return {};
     }),
-    runPlan: jest.fn(async (_e: unknown, _m: unknown, plan: PlanSpec) => mockRun(plan, plan.provider === 'coreml' ? 4 : 180)),
+    runPlan: jest.fn(async (_e: unknown, _m: unknown, plan: PlanSpec, _f: unknown, length: { windows?: number; durationSec?: number }) =>
+      mockRun(plan, plan.provider === 'coreml' ? 4 : 180, length.durationSec),
+    ),
     benchRecord: (device: object, windows: number, runs: BenchRun[]) => ({ device, windows, runs: runs.map((r) => r.plan.model) }),
     sendBenchRecord: jest.fn(async (rec: unknown) => {
       mockBench.sent.push(rec);
@@ -114,7 +126,7 @@ describe('[ONDEV-1] Settings → Testing → On-device model', () => {
     runPlan.mockClear();
     // Leave out every run but the two fp32 ones on the CPU at one thread and on Core ML.
     for (const p of mockManifest.plans.ios) {
-      const keep = p.model === 'v7-live-fp32' && (p.provider === 'coreml' || p.threads === 1);
+      const keep = p.model === 'v7-live-fp32' && (p.provider === 'coreml' || p.threads === 1) && !p.fromMemory;
       if (!keep) fireEvent.press(screen.getByLabelText(require('../OnDeviceBenchScreen').planLabel(p)));
     }
     await act(async () => {
@@ -129,8 +141,35 @@ describe('[ONDEV-1] Settings → Testing → On-device model', () => {
     expect(screen.getAllByText('Matches the checker’s output')).toHaveLength(2);
     expect(screen.getAllByText('Memory 215 MB with the model (95 MB for it)')).toHaveLength(2);
     expect(screen.getByTestId('bench-status').props.children).toBe('Sent to the dev backend');
-    expect(mockBench.sent).toEqual([{ device: mockDevice, windows: 60, runs: ['v7-live-fp32', 'v7-live-fp32'] }]);
+    expect(runPlan.mock.calls.map((c) => c[4])).toEqual([{ windows: 200 }, { windows: 200 }]);
+    expect(mockBench.sent).toEqual([{ device: mockDevice, windows: 200, runs: ['v7-live-fp32', 'v7-live-fp32'] }]);
     expect(screen.getByTestId('bench-share')).toBeTruthy();
+  });
+
+  it('a long run takes the first chosen run for 20 minutes and reports heat, steadiness and battery minute by minute', async () => {
+    await show();
+    const runPlan = jest.requireMock('../../../lib/onDevice/benchRun').runPlan as jest.Mock;
+    runPlan.mockClear();
+    expect(screen.getByText('Long run: v7-live-fp32 · CPU · 2 threads')).toBeTruthy();
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('bench-long-run'));
+    });
+    expect(runPlan).toHaveBeenCalledTimes(1);
+    expect(runPlan.mock.calls[0][2]).toEqual(mockManifest.plans.ios[0]);
+    expect(runPlan.mock.calls[0][4]).toEqual({ durationSec: 1200 });
+    expect(screen.getByText('v7-live-fp32 · CPU · 2 threads · 20 minutes')).toBeTruthy();
+    expect(screen.getByText('Never hot (hottest: fair)')).toBeTruthy();
+    expect(screen.getByText(/^Steady: the last minute (9|10)% off the first$/)).toBeTruthy();
+    expect(screen.getByText('Battery down 5.0 points (15.0 an hour)')).toBeTruthy();
+    expect(screen.getByText('3 windows started late')).toBeTruthy();
+    expect(screen.getByText(/^Minute 1 · 18\d\.\d ms · p95 18\d\.\d · 100\.0% · nominal$/)).toBeTruthy();
+    expect(screen.getAllByText(/^Minute \d+ · /)).toHaveLength(20);
+    expect(mockBench.sent).toHaveLength(1);
+  });
+
+  it('a run opened from memory says so', async () => {
+    const { planLabel } = require('../OnDeviceBenchScreen');
+    expect(planLabel({ model: 'v7-live-fp32', provider: 'cpu', threads: 2, fromMemory: true })).toBe('v7-live-fp32 · CPU · 2 threads · from memory');
   });
 
   it('a failed download says why and sends nothing', async () => {

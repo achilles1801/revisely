@@ -359,12 +359,33 @@ export const settings = {
     threads_one: '{{count}} thread',
     threads_other: '{{count}} threads',
     threadsDefault: 'default threads',
+    /** A run whose model is opened from bytes in memory, as the real path will after decrypting it. */
+    fromMemory: '{{plan}} · from memory',
     providerCpu: 'CPU',
     providerCoreml: 'Core ML',
     providerXnnpack: 'XNNPACK',
     providerNnapi: 'NNAPI',
     run: 'Run',
     downloading: 'Downloading {{file}} of {{files}} · {{percent}}%',
+    long: 'Long run',
+    longFooter: 'The first chosen run, a window every half second as a live take does, with the battery and the phone’s heat noted each minute. Unplug the phone, keep its brightness as it is, and leave it on this screen.',
+    minutes_one: '{{count}} minute',
+    minutes_other: '{{count}} minutes',
+    /** "Long run: v7-live-fp32 · CPU · 2 threads". */
+    longRun: 'Long run: {{plan}}',
+    /** "v7-live-fp32 · CPU · 2 threads: minute 3 of 20". */
+    runningLong: '{{plan}}: minute {{done}} of {{total}}',
+    longTitle: '{{plan}} · {{minutes}} minutes',
+    longCool: 'Never hot (hottest: {{heat}})',
+    longHot: 'Got hot: {{heat}}',
+    longSteady: 'Steady: the last minute {{percent}}% off the first',
+    longDrift: 'Slowed down: the last minute {{percent}}% off the first',
+    longBattery: 'Battery down {{drop}} points ({{perHour}} an hour)',
+    longCharging: 'On a charger: nothing to say about the battery',
+    longLate_one: '{{count}} window started late',
+    longLate_other: '{{count}} windows started late',
+    /** "Minute 3 · 41.2 ms · p95 52.0 · 97.5% · nominal". */
+    longMinute: 'Minute {{minute}} · {{p50}} ms · p95 {{p95}} · {{battery}} · {{heat}}',
     /** "v7-live-fp32 · CPU · 2 threads: 34 of 60". */
     running: '{{plan}}: {{done}} of {{total}}',
     results: 'Results',
