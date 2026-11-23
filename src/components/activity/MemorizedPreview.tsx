@@ -43,7 +43,7 @@ export function ChooseOnPage({
       testID="add-memorized-choose"
     >
       <View style={[styles.entryPage, { borderColor: palette.separator }]}>
-        <MemorizedPageArt page={page} size={size} memorized={memorized} chosen={NOTHING} thumb />
+        <MemorizedPageArt key={page} page={page} size={size} memorized={memorized} chosen={NOTHING} thumb />
       </View>
       <View style={styles.flex}>
         <Text style={[typeV2.name, { color: palette.text }]} maxFontSizeMultiplier={MAX_SCALE}>
@@ -63,6 +63,7 @@ export function MemorizedPreview({
   ayahs,
   memorized,
   name,
+  byPages = false,
   onOpen,
   onChange,
 }: {
@@ -70,6 +71,8 @@ export function MemorizedPreview({
   ayahs: AyahKey[];
   memorized: ReadonlySet<AyahKey>;
   name: string;
+  /** A surah or juz: how much is said in pages. */
+  byPages?: boolean;
   /** A tap on a page: the picker, on that page. */
   onOpen: (page: number) => void;
   onChange: () => void;
@@ -77,12 +80,12 @@ export function MemorizedPreview({
   const { palette } = useTheme();
   const size = useMemo(() => fitPage(THUMB, 1000), []);
   const chosen = useMemo(() => new Set(ayahs), [ayahs]);
-  const partway = stopsPartway(ayahs);
+  const partway = !byPages && stopsPartway(ayahs);
   const wholePages = useMemo(() => ayahs.length > 0 && ayahs.length === ayahsOfPages(pages).length, [ayahs, pages]);
   const words = useQuranWordsWhen(partway);
   const stopped = partway ? firstWordsOf(words, ayahs[ayahs.length - 1]) : null;
   const near = ayahs[0];
-  const sub = wholePages ? t('activity.pick.pagesCount', { count: pages.length }) : partway ? t('activity.pick.upTo', { count: ayahs.length }) : t('activity.pick.ayahsCount', { count: ayahs.length });
+  const sub = ayahs.length === 0 ? t('activity.pick.allMemorized') : byPages || wholePages ? t('activity.pick.pagesCount', { count: pages.length }) : partway ? t('activity.pick.upTo', { count: ayahs.length }) : t('activity.pick.ayahsCount', { count: ayahs.length });
 
   return (
     <View testID="add-memorized-preview">

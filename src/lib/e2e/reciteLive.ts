@@ -55,7 +55,7 @@ export function handleReciteLiveLink(url: string): boolean {
  * public image) is put where the offline mushaf keeps it, for this device's set. It comes from the bundle itself as
  * base64 (fixtures/page379.ts says why), written with the legacy API.
  */
-async function putPage379(): Promise<void> {
+export async function putPage379(asPages: number[] = [379]): Promise<void> {
   try {
     const { Directory, File, Paths } = require('expo-file-system') as typeof import('expo-file-system');
     const legacy = require('expo-file-system/legacy') as typeof import('expo-file-system/legacy');
@@ -63,9 +63,11 @@ async function putPage379(): Promise<void> {
     const { PAGE_379_PNG_BASE64 } = require('./fixtures/page379') as typeof import('./fixtures/page379');
     const dir = new Directory(Paths.document, 'mushaf', pageImageSet());
     if (!dir.exists) dir.create({ intermediates: true, idempotent: true });
-    const target = new File(dir, '379.png');
-    if (!target.exists) {
-      await legacy.writeAsStringAsync(target.uri, PAGE_379_PNG_BASE64, { encoding: legacy.EncodingType.Base64 });
+    for (const page of asPages) {
+      const target = new File(dir, `${page}.png`);
+      if (!target.exists) {
+        await legacy.writeAsStringAsync(target.uri, PAGE_379_PNG_BASE64, { encoding: legacy.EncodingType.Base64 });
+      }
     }
     // eslint-disable-next-line no-console
     console.log('[e2e] recite-live page 379 on the phone');

@@ -299,6 +299,8 @@ export const activity = {
     go: 'Go',
     notDownloaded: 'This page isn’t downloaded yet. Tap the ayah you reached.',
     memorizedRow: 'Memorized',
+    leftOffTag: 'You left off here',
+    allMemorized: 'Already memorized',
     startHere: 'Start here',
   },
   add: {

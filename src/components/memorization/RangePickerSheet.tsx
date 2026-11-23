@@ -6,6 +6,7 @@ import { StyleSheet, View } from 'react-native';
 import { Sheet } from '../v2/Sheet';
 import { PillTabs } from '../v2/PillTabs';
 import { WheelPicker, type WheelItem } from '../v2/WheelPicker';
+import { ayahCount, ayahKey, firstAyahOfPage, lastAyahOfPage, type AyahKey } from '../../lib/ayahKeys';
 import { getPagesForJuz, getPagesForSurah, getSurahDisplay } from '../../lib/quranData';
 import { layoutV2 } from '../../theme/v2';
 import { t } from '../../i18n';
@@ -19,21 +20,31 @@ export function rangeOf(kind: Kind, index: number): { from: number; to: number }
   return { from: sorted[0], to: sorted[sorted.length - 1] };
 }
 
+/** Exactly the picked surah's or juz's ayahs: a surah can share its first and last pages with its neighbours. */
+export function ayahsOf(kind: Kind, index: number): { from: AyahKey; to: AyahKey } {
+  if (kind === 'surah') return { from: ayahKey(index + 1, 1), to: ayahKey(index + 1, ayahCount(index + 1)) };
+  const { from, to } = rangeOf(kind, index);
+  return { from: firstAyahOfPage(from), to: lastAyahOfPage(to) };
+}
+
 export function RangePickerSheet({
   visible,
   onClose,
   onUse,
   initialKind = 'surah',
   useLabel,
+  onHidden,
 }: {
   visible: boolean;
   onClose: () => void;
-  /** The picked range, and its name ("Al-Mulk", "Juz 29"). */
-  onUse: (range: { from: number; to: number; name: string }) => void;
+  /** The picked range's pages, its name ("Al-Mulk", "Juz 29") and exactly its ayahs. */
+  onUse: (range: { from: number; to: number; name: string; ayahs: { from: AyahKey; to: AyahKey } }) => void;
   /** Which wheel it opens on (Activity's Revised sheet: Surah or Juz, as its What says). */
   initialKind?: Kind;
   /** The button's words, when it isn't choosing pages (the Memorized picker's "Go"). */
   useLabel?: string;
+  /** Once it has fully gone. */
+  onHidden?: () => void;
 }) {
   const [kind, setKind] = useState<Kind>(initialKind);
   useEffect(() => {
@@ -58,11 +69,12 @@ export function RangePickerSheet({
     <Sheet
       visible={visible}
       onClose={onClose}
+      onHidden={onHidden}
       title={kind === 'surah' ? t('common.surah') : t('common.juz')}
       footer={{
         label: useLabel ?? t('memorization.useThesePages'),
         onPress: () => {
-          onUse({ ...rangeOf(kind, index), name: items[index]?.label ?? '' });
+          onUse({ ...rangeOf(kind, index), name: items[index]?.label ?? '', ayahs: ayahsOf(kind, index) });
           onClose();
         },
         testID: 'range-use',

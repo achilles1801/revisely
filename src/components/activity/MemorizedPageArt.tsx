@@ -3,19 +3,21 @@
 // shares nothing with it but the page files: no audio, no recording, no verse menu.
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { Image, Platform, StyleSheet, View } from 'react-native';
+import { Image, Platform, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { ayahRects, versesOnPage, type Rect } from '../../lib/ayahBounds';
 import { ayahKey, type AyahKey } from '../../lib/ayahKeys';
 import { getMushafEdition } from '../../lib/mushafEdition';
+import { nativeRequestUrl } from '../../lib/devNetwork';
 import { knownOffline } from '../../lib/networkState';
 import { cachePage, getCachedPageUri } from '../../lib/pageCache';
 import type { PageSize } from '../../lib/pageFit';
 import { getQuranPageImageUrl, pageImageProps } from '../../lib/quranImages';
 import { getReadPalette } from '../../theme/readPalette';
+import { t } from '../../i18n';
 
-/** How much of the ink shows through on an ayah already memorized. */
-const FADED = 0.62;
+/** The line in the margin, beside the page's text. */
+const MARGIN_LINE = 2;
 
 /** A small copy decodes at its own size on Android too (the reader's pages are drawn as decoded). */
 const thumbImageProps = () => (Platform.OS === 'android' ? ({ resizeMethod: 'resize' } as const) : {});
@@ -26,6 +28,7 @@ export function MemorizedPageArt({
   memorized,
   chosen,
   thumb = false,
+  leftOff = null,
   onMissing,
 }: {
   page: number;
@@ -34,6 +37,8 @@ export function MemorizedPageArt({
   chosen: ReadonlySet<AyahKey>;
   /** A preview's small copy. */
   thumb?: boolean;
+  /** Where they left off, marked on the page until something is chosen. */
+  leftOff?: AyahKey | null;
   /** The page can't be shown (not on the phone and no connection): the picker offers its list. */
   onMissing?: () => void;
 }) {
@@ -51,23 +56,40 @@ export function MemorizedPageArt({
         if (!live) return;
         if (local) setUri(local);
         else if (knownOffline()) onMissing?.();
-        else setUri(getQuranPageImageUrl(page, undefined, edition));
+        else setUri(nativeRequestUrl(getQuranPageImageUrl(page, undefined, edition)));
       });
     return () => {
       live = false;
     };
   }, [page, edition, uri, onMissing]);
 
-  const { chosenRects, fadedRects } = useMemo(() => {
+  const { chosenRects, fadedRects, lines, marginX, leftOffRect } = useMemo(() => {
     const on: Rect[] = [];
     const faded: Rect[] = [];
+    // One line in the margin per line of text; a line shared by a memorized ayah and a chosen one is chosen.
+    const bands = new Map<number, { y0: number; y1: number; chosen: boolean }>();
+    let right = 0;
+    let tag: Rect | null = null;
+    const band = (r: Rect, isChosen: boolean) => {
+      const y = Math.round(r.y0);
+      const had = bands.get(y);
+      bands.set(y, { y0: r.y0, y1: r.y1, chosen: isChosen || had?.chosen === true });
+    };
     for (const v of versesOnPage(page, edition)) {
       const key = ayahKey(v.sura, v.ayah);
-      if (chosen.has(key)) on.push(...ayahRects(page, v.sura, v.ayah));
-      else if (memorized.has(key)) faded.push(...ayahRects(page, v.sura, v.ayah));
+      const rects = ayahRects(page, v.sura, v.ayah);
+      for (const r of rects) right = Math.max(right, r.x1);
+      if (key === leftOff) tag = rects[0] ?? null;
+      if (chosen.has(key)) {
+        on.push(...rects);
+        rects.forEach((r) => band(r, true));
+      } else if (memorized.has(key)) {
+        faded.push(...rects);
+        rects.forEach((r) => band(r, false));
+      }
     }
-    return { chosenRects: on, fadedRects: faded };
-  }, [page, edition, chosen, memorized]);
+    return { chosenRects: on, fadedRects: faded, lines: [...bands.values()], marginX: right, leftOffRect: tag as Rect | null };
+  }, [page, edition, chosen, memorized, leftOff]);
 
   const box = (r: Rect) => ({
     left: r.x0 * size.scale,
@@ -92,8 +114,43 @@ export function MemorizedPageArt({
         />
       ) : null}
       {fadedRects.map((r, i) => (
-        <View key={i} testID="picker-faded" style={[styles.rect, box(r), { backgroundColor: read.pageBg, opacity: FADED }]} />
+        <View key={i} testID="picker-faded" style={[styles.rect, box(r), { backgroundColor: read.peekVeil }]} />
       ))}
+      {thumb
+        ? null
+        : lines.map((l) => (
+            <View
+              key={l.y0}
+              testID={l.chosen ? 'picker-line-chosen' : 'picker-line-faded'}
+              style={[
+                styles.rect,
+                {
+                  left: Math.min(size.width - MARGIN_LINE, marginX * size.scale + 3),
+                  top: l.y0 * size.scale + 1,
+                  width: MARGIN_LINE,
+                  height: (l.y1 - l.y0) * size.scale - 2,
+                  backgroundColor: l.chosen ? palette.accentText : palette.separator,
+                },
+              ]}
+            />
+          ))}
+      {!thumb && leftOffRect && chosen.size === 0 ? (
+        <View
+          testID="picker-left-off"
+          style={[
+            styles.tag,
+            {
+              right: Math.max(0, size.width - leftOffRect.x1 * size.scale),
+              top: Math.max(0, leftOffRect.y0 * size.scale - 11),
+              backgroundColor: palette.accentText,
+            },
+          ]}
+        >
+          <Text style={[styles.tagText, { color: palette.sheet }]} maxFontSizeMultiplier={1.1}>
+            {t('activity.pick.leftOffTag')}
+          </Text>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -102,4 +159,6 @@ const styles = StyleSheet.create({
   // Boxes are measured from the image's left edge, in either language.
   page: { direction: 'ltr', overflow: 'hidden' },
   rect: { position: 'absolute' },
+  tag: { position: 'absolute', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 9 },
+  tagText: { fontSize: 10, lineHeight: 13, fontWeight: '600' },
 });

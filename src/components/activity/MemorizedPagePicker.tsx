@@ -5,7 +5,7 @@
 // A page that isn't on the phone, and VoiceOver, get the same choice as a list of first words.
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { AccessibilityInfo, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View, type GestureResponderEvent } from 'react-native';
+import { AccessibilityInfo, I18nManager, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View, type GestureResponderEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Sheet } from '../v2/Sheet';
@@ -14,11 +14,11 @@ import { RangePickerSheet } from '../memorization/RangePickerSheet';
 import { useQuranWordsWhen } from '../reciteMemory/TakeRows';
 import { useTheme } from '../../context/ThemeContext';
 import { ayahAt } from '../../lib/ayahBounds';
-import { ayahKey, ayahOf, ayahsOnPage, suraOf, type AyahKey } from '../../lib/ayahKeys';
+import { ayahKey, ayahOf, ayahsOnPage, firstAyahOfPage, pageOfAyah, suraOf, type AyahKey } from '../../lib/ayahKeys';
 import {
   chosenAyahs,
   clearPage,
-  leftOffPage,
+  firstOpenIn,
   pageOfSurah,
   pageWord,
   reachAyah,
@@ -139,20 +139,27 @@ export function MemorizedPagePicker({
   pick,
   openPage,
   memorized,
-  lo,
-  hi,
+  leftOff,
+  held,
+  only: startOnly,
+  onHidden,
 }: {
   visible: boolean;
   onClose: () => void;
-  onDone: (pick: AyahPick | null) => void;
+  /** The choice, and the pages it keeps to (`only`, while it is still the day's reading as offered). */
+  onDone: (pick: AyahPick | null, only: number[] | null) => void;
   /** What is chosen so far. */
   pick: AyahPick | null;
   /** The page it opens on. */
   openPage: number;
   memorized: ReadonlySet<AyahKey>;
-  /** The pages it can reach (a sitting's, or all of them). */
-  lo: number;
-  hi: number;
+  /** Where they left off: the page's mark, and where a first tap fills from. */
+  leftOff: AyahKey | null;
+  /** From a sitting: the only pages it can reach (MEM-5). */
+  held: number[] | null;
+  /** The pages a choice keeps to as it opens: the sitting's, or the day's reading until it is changed. */
+  only: number[] | null;
+  onHidden?: () => void;
 }) {
   const { palette } = useTheme();
   const insets = useSafeAreaInsets();
@@ -162,6 +169,7 @@ export function MemorizedPagePicker({
   const [area, setArea] = useState({ width: 0, height: 0 });
   const [missingPage, setMissingPage] = useState<number | null>(null);
   const [jumping, setJumping] = useState(false);
+  const [only, setOnly] = useState<number[] | null>(startOnly);
   const screenReader = useScreenReader();
   const words = useQuranWordsWhen(visible);
 
@@ -170,22 +178,30 @@ export function MemorizedPagePicker({
     setDraft(pick);
     setPage(openPage);
     setMissingPage(null);
+    setOnly(startOnly);
     // Only when it opens: a Done or a Cancel decides what comes back.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
-  const chosen = useMemo(() => new Set(chosenAyahs(draft, memorized)), [draft, memorized]);
+  const chosen = useMemo(() => new Set(chosenAyahs(draft, memorized, only)), [draft, memorized, only]);
   const here = useMemo(() => ayahsOnPage(page), [page]);
   const open = here.filter((k) => !memorized.has(k));
   const chosenHere = here.filter((k) => chosen.has(k));
   const lastHere = chosenHere[chosenHere.length - 1];
-  const toEnd = chosenHere.length > 0 && lastHere === here[here.length - 1];
+  const toEnd = chosenHere.length > 0 && lastHere === open[open.length - 1];
   const showList = screenReader || missingPage === page;
   const size = fitPage(area.width, area.height);
   const onMissing = useCallback(() => setMissingPage(page), [page]);
 
-  const tapAyah = (key: AyahKey) => setDraft((d) => reachAyah(d, key, page, memorized));
-  const holdAyah = (key: AyahKey) => setDraft((d) => startAtAyah(d, key, memorized));
+  // A change is the user's own choice: it no longer keeps to the day's reading (a sitting's pages always hold).
+  const edit = (change: (d: AyahPick | null) => AyahPick | null) => {
+    setDraft(change);
+    if (!held) setOnly(null);
+  };
+  const tapAyah = (key: AyahKey) => edit((d) => reachAyah(d, key, page, memorized, leftOff));
+  const holdAyah = (key: AyahKey) => edit((d) => startAtAyah(d, key, memorized));
+  const pageAfter = held ? (held.find((p) => p > page) ?? null) : page < 604 ? page + 1 : null;
+  const pageBefore = held ? ([...held].reverse().find((p) => p < page) ?? null) : page > 1 ? page - 1 : null;
   const atPoint = (e: GestureResponderEvent): AyahKey | null => {
     if (size.scale <= 0) return null;
     const hit = ayahAt(page, e.nativeEvent.locationX / size.scale, e.nativeEvent.locationY / size.scale);
@@ -202,12 +218,12 @@ export function MemorizedPagePicker({
         ? open.length < here.length
           ? t('activity.pick.fadedHint')
           : t('activity.pick.holdHint')
-        : toEnd && page < hi
-          ? t('activity.pick.goOn', { page: pageWord(page + 1) })
+        : toEnd && pageAfter != null
+          ? t('activity.pick.goOn', { page: pageWord(pageAfter) })
           : t('activity.pick.moveHint');
 
-  const arrow = (to: number, icon: 'chevron-back' | 'chevron-forward', testID: string) =>
-    to < lo || to > hi ? (
+  const arrow = (to: number | null, icon: 'chevron-back' | 'chevron-forward', testID: string) =>
+    to == null ? (
       <View style={styles.arrowGap} />
     ) : (
       <Tap
@@ -225,20 +241,21 @@ export function MemorizedPagePicker({
       </Tap>
     );
 
-  const canJump = lo === 1 && hi === 604;
+  const canJump = !held;
 
   return (
     <Sheet
       visible={visible}
       onClose={onClose}
+      onHidden={onHidden}
       title={surahOfPage(page)}
       message={t('activity.pick.message')}
       messageMaxScale={1.2}
-      left={{ label: t('common.cancel'), onPress: onClose }}
+      left={{ label: t('common.cancel'), onPress: onClose, testID: 'memorized-picker-cancel' }}
       right={{
         label: t('common.done'),
         onPress: () => {
-          onDone(draft);
+          onDone(draft, only);
           onClose();
         },
         strong: true,
@@ -272,14 +289,14 @@ export function MemorizedPagePicker({
               style={{ direction: 'ltr', width: size.width, height: size.height }}
               testID="memorized-picker-page"
             >
-              <MemorizedPageArt key={page} page={page} size={size} memorized={memorized} chosen={chosen} onMissing={onMissing} />
+              <MemorizedPageArt key={page} page={page} size={size} memorized={memorized} chosen={chosen} leftOff={leftOff} onMissing={onMissing} />
             </Pressable>
           ) : null}
         </View>
 
         {/* A mushaf's order in either language: the next page is on the left. */}
         <View style={styles.nav}>
-          {arrow(page + 1, 'chevron-back', 'memorized-picker-next')}
+          {arrow(pageAfter, 'chevron-back', 'memorized-picker-next')}
           <Tap
             onPress={() => setJumping(true)}
             disabled={!canJump}
@@ -293,7 +310,7 @@ export function MemorizedPagePicker({
             </Text>
             {canJump ? <Ionicons name="chevron-down" size={13} color={palette.secondary} /> : null}
           </Tap>
-          {arrow(page - 1, 'chevron-forward', 'memorized-picker-prev')}
+          {arrow(pageBefore, 'chevron-forward', 'memorized-picker-prev')}
         </View>
 
         <View style={[styles.bar, { backgroundColor: palette.bubble }]}>
@@ -316,7 +333,7 @@ export function MemorizedPagePicker({
           </View>
           {chosenHere.length < open.length ? (
             <Tap
-              onPress={() => setDraft((d) => wholePage(d, page, memorized))}
+              onPress={() => edit((d) => wholePage(d, page, memorized))}
               accessibilityRole="button"
               accessibilityLabel={t('activity.pick.wholePage')}
               style={[styles.pill, { backgroundColor: palette.raised }]}
@@ -329,7 +346,7 @@ export function MemorizedPagePicker({
           ) : null}
           {chosenHere.length > 0 ? (
             <Tap
-              onPress={() => setDraft((d) => clearPage(d, page))}
+              onPress={() => edit((d) => clearPage(d, page))}
               accessibilityRole="button"
               accessibilityLabel={t('activity.pick.clear')}
               style={[styles.pill, { backgroundColor: palette.raised }]}
@@ -347,7 +364,7 @@ export function MemorizedPagePicker({
         visible={jumping}
         onClose={() => setJumping(false)}
         useLabel={t('activity.pick.go')}
-        onUse={(r) => setPage(leftOffPage(memorized, r.from, r.to))}
+        onUse={(r) => setPage(pageOfAyah(firstOpenIn(Array.from({ length: r.to - r.from + 1 }, (_, i) => r.from + i), memorized) ?? firstAyahOfPage(r.from)))}
       />
     </Sheet>
   );
@@ -361,7 +378,7 @@ const styles = StyleSheet.create({
   arrow: { flexDirection: 'row', alignItems: 'center', gap: 3, minHeight: 36, paddingHorizontal: 10, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth, maxWidth: '36%' },
   arrowGap: { width: 36 },
   arrowText: { fontWeight: '600', flexShrink: 1 },
-  where: { flexDirection: 'row', alignItems: 'center', gap: 3, minHeight: 36, flexShrink: 1 },
+  where: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3, minHeight: 36 },
   bar: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, padding: 12, borderRadius: 14 },
   line: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 6 },
   words: { writingDirection: 'rtl', flexShrink: 1 },
@@ -370,5 +387,6 @@ const styles = StyleSheet.create({
   note: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, paddingVertical: 8 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 46, borderBottomWidth: StyleSheet.hairlineWidth },
   rowNote: { flexShrink: 0 },
-  rowWords: { flex: 1, textAlign: 'right', writingDirection: 'rtl' },
+  // Arabic sits at the right in either language (React Native swaps left and right in RTL).
+  rowWords: { flex: 1, textAlign: I18nManager.isRTL ? 'left' : 'right', writingDirection: 'rtl' },
 });

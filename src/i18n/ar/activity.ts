@@ -383,6 +383,8 @@ export const activity: NonNullable<ArStrings['activity']> = {
     go: 'اذهب',
     notDownloaded: 'لم تُنزَّل هذه الصفحة بعد. اضغط على الآية التي وصلت إليها.',
     memorizedRow: 'محفوظة',
+    leftOffTag: 'توقفت هنا',
+    allMemorized: 'محفوظ من قبل',
     startHere: 'ابدأ من هنا',
   },
   add: {

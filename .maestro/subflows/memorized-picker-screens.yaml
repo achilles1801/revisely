@@ -1,0 +1,170 @@
+# The Memorized picker's screens (MEM-8), one pass in the theme on show, from Home back to Home. Named as the mocks
+# are (~/Documents/revisely-today-mocks/memorized-picker/png): S, 1a–1c, D1–D3, F.
+#   env THEME: light or dark
+appId: com.revisionbuddy.app
+---
+- runFlow: open-day.yaml
+- tapOn:
+    id: day-add
+- extendedWaitUntil:
+    visible:
+      id: activity-add-menu
+    timeout: 10000
+- tapOn:
+    id: sheet-action-memorized
+- extendedWaitUntil:
+    visible:
+      id: add-memorized-choose
+    timeout: 10000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 22-S-sheet-${THEME}
+
+# 1a: where they left off, what is memorized faded.
+- tapOn:
+    id: add-memorized-choose
+- extendedWaitUntil:
+    visible:
+      id: memorized-picker-page
+    timeout: 15000
+- extendedWaitUntil:
+    visible: ".*3rd page of 9.*"
+    timeout: 5000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 22-1a-open-${THEME}
+
+# 1b: a tap on the ayah reached, ten lines down.
+- tapOn:
+    id: memorized-picker-page
+    point: 35%,63%
+- extendedWaitUntil:
+    visible:
+      id: memorized-picker-clear
+    timeout: 5000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 22-1b-chosen-${THEME}
+
+# D2: part of a page, after Done.
+- tapOn:
+    id: memorized-picker-done
+- extendedWaitUntil:
+    visible:
+      id: add-memorized-preview-379
+    timeout: 10000
+- extendedWaitUntil:
+    notVisible:
+      id: memorized-picker-page
+    timeout: 5000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 22-D2-part-${THEME}
+
+# 1c: to the end of the page.
+- tapOn:
+    id: add-memorized-change
+- extendedWaitUntil:
+    visible:
+      id: memorized-picker-whole
+    timeout: 10000
+- waitForAnimationToEnd
+- tapOn:
+    id: memorized-picker-whole
+- extendedWaitUntil:
+    notVisible:
+      id: memorized-picker-whole
+    timeout: 5000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 22-1c-next-page-${THEME}
+
+# D1: one page.
+- tapOn:
+    id: memorized-picker-done
+- extendedWaitUntil:
+    notVisible:
+      id: memorized-picker-page
+    timeout: 10000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 22-D1-one-page-${THEME}
+
+# D3: on through two more pages (a tap on the preview reopens it on that page).
+- tapOn:
+    id: add-memorized-preview-379
+- extendedWaitUntil:
+    visible:
+      id: memorized-picker-next
+    timeout: 10000
+- waitForAnimationToEnd
+- tapOn:
+    id: memorized-picker-next
+- extendedWaitUntil:
+    visible: ".*4th page of 9.*"
+    timeout: 5000
+- tapOn:
+    id: memorized-picker-whole
+- tapOn:
+    id: memorized-picker-next
+- extendedWaitUntil:
+    visible: ".*5th page of 9.*"
+    timeout: 5000
+- tapOn:
+    id: memorized-picker-whole
+- tapOn:
+    id: memorized-picker-done
+- extendedWaitUntil:
+    visible:
+      id: add-memorized-preview-381
+    timeout: 10000
+- extendedWaitUntil:
+    notVisible:
+      id: memorized-picker-next
+    timeout: 5000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 22-D3-pages-${THEME}
+
+# F: a page that isn't on the phone is the same choice as a list. Cancel keeps D3.
+- tapOn:
+    id: add-memorized-change
+- extendedWaitUntil:
+    visible:
+      id: memorized-picker-next
+    timeout: 10000
+- waitForAnimationToEnd
+- tapOn:
+    id: memorized-picker-next
+- extendedWaitUntil:
+    visible:
+      id: memorized-picker-list
+    timeout: 20000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 22-F-list-${THEME}
+- tapOn:
+    id: memorized-picker-cancel
+- extendedWaitUntil:
+    visible:
+      id: add-memorized-preview-381
+    timeout: 10000
+- extendedWaitUntil:
+    notVisible:
+      id: memorized-picker-list
+    timeout: 5000
+- waitForAnimationToEnd
+- runFlow: close-sheet.yaml
+- extendedWaitUntil:
+    notVisible:
+      id: add-memorized-sheet
+    timeout: 10000
+- runFlow: back-home.yaml

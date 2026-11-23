@@ -19,6 +19,7 @@ const base = Array.from({ length: 604 }, (_, i) => ({
   dateMemorized: null,
 }));
 // The first three ayahs of the page are memorized: it is where they left off.
+// (They are the latest entry, ahead of pages memorized with no date.)
 const mockPages = addAyahs(base as never, here.slice(0, 3), '2026-11-01T12:00:00.000Z').pages;
 const mockUpdatePages = jest.fn(async (..._args: unknown[]) => undefined);
 let mockCached: string | null = 'file:///page.png';
@@ -51,8 +52,13 @@ jest.mock('../../../src/components/v2/Sheet', () => {
   const React = require('react');
   const { Pressable, Text, View } = require('react-native');
   return {
-    Sheet: ({ visible, children, left, right, testID }: { visible: boolean; children: React.ReactNode; left?: MockAction; right?: MockAction; testID?: string }) =>
-      visible
+    Sheet: ({ visible, children, left, right, testID, onHidden }: { visible: boolean; children: React.ReactNode; left?: MockAction; right?: MockAction; testID?: string; onHidden?: () => void }) => {
+      const was = React.useRef(visible);
+      React.useEffect(() => {
+        if (was.current && !visible) onHidden?.();
+        was.current = visible;
+      }, [visible, onHidden]);
+      return visible
         ? React.createElement(
             View,
             null,
@@ -60,7 +66,8 @@ jest.mock('../../../src/components/v2/Sheet', () => {
             children,
             right ? React.createElement(Pressable, { testID: right.testID, disabled: right.disabled, onPress: right.onPress }, React.createElement(Text, null, right.label)) : null,
           )
-        : null,
+        : null;
+    },
   };
 });
 

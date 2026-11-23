@@ -1477,10 +1477,10 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
 - **MEM-8.** (Revisely Dev) The Memorized sheet chooses on the real mushaf page (Majd, Nov 23 2026: "tap where you stopped
   but once the user is done adding their stuff and they go back then i think it should still show the page "preview"
   of what they selected"). Its tabs are On the page, Surah and Juz.
-  - The picker opens on the page where they left off (or on the page they tapped), with what is memorized faded. A tap on
-    an ayah fills from the first ayah to go on that page to there; another tap moves the end, one before the start brings
-    the start back, a hold starts there. Whole page and Clear act on that page. What is already memorized is never added
-    again.
+  - The picker opens where they left off: the first ayah to go after their latest Memorized entry, going round to the
+    Quran's start, or on the page they tapped. What is memorized is faded. A tap on an ayah is the ayah they reached: it
+    fills from where they left off, or the page's first ayah to go, to there, and another tap moves the end. A hold starts
+    there. Whole page and Clear act on that page. What is already memorized is never added again.
   - It is apart from the reader ("they're independent of each other"): its own sheet with Cancel, Done and page arrows, no
     swipe, mic, recording, timer, audio or verse menu, and it never opens the reader or moves the reader's place. Cancel
     keeps what was chosen before.
@@ -1489,6 +1489,7 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
     numbers in this flow: a stop is named by the ayah's first words.
   - A page not on the phone with no connection, and VoiceOver, get the same choice as a list of each ayah's first words.
   - From a sitting it stays inside the pages the sitting held, chosen from the first ayah to go to their end (MEM-5).
+  - Surah and Juz add exactly that surah's or juz's ayahs: a neighbour sharing its page is not added.
 
 ## Help
 

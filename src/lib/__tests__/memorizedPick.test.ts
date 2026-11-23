@@ -1,9 +1,10 @@
-import { ayahKey, ayahsOnPage, firstAyahOfPage, lastAyahOfPage } from '../ayahKeys';
+import { ayahKey, ayahsBetween, ayahsOnPage, firstAyahOfPage, lastAyahOfPage } from '../ayahKeys';
 import { plainText } from '../passages';
 import {
   chosenAyahs,
   clearPage,
-  leftOffPage,
+  firstOpenIn,
+  leftOffAyah,
   pageOfSurah,
   pageWord,
   pagesOfAyahs,
@@ -34,11 +35,16 @@ describe('the Memorized picker’s choice (MEM-8)', () => {
     expect(chosenAyahs(pick, memorized)).toEqual([on[0], on[2], on[3]]);
   });
 
-  it('[MEM-8] a hold starts there; a tap before the start brings it back, keeping the end', () => {
+  it('[MEM-8] a hold starts there; a tap is always where it ends, also before the start', () => {
     const held = startAtAyah(null, on[4], none);
     expect(held).toEqual({ from: on[4], to: on[4] });
     expect(reachAyah(held, on[6], P, none)).toEqual({ from: on[4], to: on[6] });
-    expect(reachAyah({ from: on[4], to: on[6] }, on[2], P, none)).toEqual({ from: on[2], to: on[6] });
+    expect(reachAyah({ from: on[4], to: on[6] }, on[2], P, none)).toEqual({ from: on[0], to: on[2] });
+  });
+
+  it('[MEM-8] a first tap fills from where they left off when that is on the page', () => {
+    expect(reachAyah(null, on[6], P, none, on[3])).toEqual({ from: on[3], to: on[6] });
+    expect(reachAyah(null, on[2], P, none, on[3])).toEqual({ from: on[0], to: on[2] });
   });
 
   it('[MEM-8] Whole page takes in the page; Clear takes only that page out', () => {
@@ -49,9 +55,26 @@ describe('the Memorized picker’s choice (MEM-8)', () => {
     expect(clearPage({ from: on[0], to: on[2] }, P)).toBeNull();
   });
 
-  it('[MEM-8] opens on the first page with something to go', () => {
-    const memorized = new Set([...ayahsOnPage(1), ...ayahsOnPage(2)]);
-    expect(leftOffPage(memorized, 1, 604)).toBe(3);
+  it('[MEM-8] opens after the latest Memorized entry, not at the first gap in the Quran', () => {
+    const entries = [
+      { pageNumber: 1, status: 'memorized' as const, dateMemorized: '2026-01-01T12:00:00.000Z' },
+      { pageNumber: P, status: 'in_progress' as const, verses: on.slice(0, 3), dateMemorized: '2026-11-01T12:00:00.000Z' },
+    ];
+    const memorized = new Set([...ayahsOnPage(1), ...on.slice(0, 3)]);
+    expect(leftOffAyah(entries, memorized)).toBe(on[3]);
+  });
+
+  it('[MEM-8] with no dated entry, or nothing after the latest, it is the first ayah to go', () => {
+    const memorized = new Set(ayahsOnPage(1));
+    expect(leftOffAyah([{ pageNumber: 1, status: 'memorized', dateMemorized: null }], memorized)).toBe(firstAyahOfPage(2));
+    const last = new Set(ayahsOnPage(604));
+    expect(leftOffAyah([{ pageNumber: 604, status: 'memorized', dateMemorized: '2026-11-01T12:00:00.000Z' }], last)).toBe(1001);
+  });
+
+  it('[MEM-8] keeps to a sitting’s pages, across a gap', () => {
+    const run = { from: firstAyahOfPage(P), to: lastAyahOfPage(P + 2) };
+    expect(pagesOfAyahs(chosenAyahs(run, none, [P, P + 2]))).toEqual([P, P + 2]);
+    expect(firstOpenIn([P, P + 2], new Set(ayahsOnPage(P)))).toBe(firstAyahOfPage(P + 2));
   });
 
   it('[MEM-8] names by surah and page, never by ayah number', () => {
@@ -63,6 +86,9 @@ describe('the Memorized picker’s choice (MEM-8)', () => {
     expect(plainText(pickName(chosenAyahs({ from: firstAyahOfPage(377), to: lastAyahOfPage(378) }, none)))).toBe('An-Naml, first 2 pages');
     expect(plainText(pickName([ayahKey(67, 1), ayahKey(68, 1)]))).toBe('Al-Mulk to Al-Qalam');
     expect(pageWord(385)).toBe('last page');
+    // Partway down a surah's last page is not the whole surah.
+    expect(plainText(pickName(ayahsBetween(ayahKey(67, 1), ayahKey(67, 29))))).toBe('Al-Mulk, first 3 pages');
+    expect(plainText(pickName(ayahsBetween(ayahKey(67, 1), ayahKey(67, 30))))).toBe('Al-Mulk');
   });
 
   it('[MEM-8] says when the run stops partway down its last page', () => {

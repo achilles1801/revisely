@@ -18,8 +18,7 @@ import { memorizeSuggestion } from '../../lib/activityAdd';
 import { describeAyahs, describePassage } from '../../lib/passages';
 import { AyahKey, ayahsBetween, ayahsOfPages, LAST_AYAH, pageOfAyah } from '../../lib/ayahKeys';
 import { addAyahs, memorizedAyahs, memorizedPageShare } from '../../lib/memorizedAyahs';
-import { chosenAyahs, leftOffPage, pagesOfAyahs, pickName, type AyahPick } from '../../lib/memorizedPick';
-import { isDevVariant } from '../../lib/variant';
+import { chosenAyahs, firstOpenIn, leftOffAyah, memorizedPickerOn, pagesOfAyahs, pickName, type AyahPick } from '../../lib/memorizedPick';
 import { AyahRangeFields } from './AyahRangeFields';
 import { MemorizedPagePicker } from './MemorizedPagePicker';
 import { ChooseOnPage, MemorizedPreview } from './MemorizedPreview';
@@ -83,14 +82,20 @@ export function AddMemorizedSheet({
   const { user, pages, updatePages } = useApp();
   const { palette } = useTheme();
   const [minutes, setMinutes] = useState('');
-  const onThePage = isDevVariant();
+  const onThePage = memorizedPickerOn();
   const firstTab: What = onThePage ? 'page' : 'ayahs';
   const [what, setWhat] = useState<What>(firstTab);
   // The picker's choice (MEM-8), where it opens, and the surah or juz last used with its name.
   const [pick, setPick] = useState<AyahPick | null>(null);
   const [pickerPage, setPickerPage] = useState<number | null>(null);
+  const [rangePick, setRangePick] = useState<AyahPick | null>(null);
   const [rangeName, setRangeName] = useState('');
   const rangeUsed = useRef<What | null>(null);
+  // What was chosen before "Use" on the day's reading, for its Undo.
+  const beforeReading = useRef<AyahPick | null>(null);
+  // A sheet in this one, still going: the next waits for it (iOS refuses a modal while another is leaving, SHEET-1).
+  const nestedGoing = useRef(false);
+  const nestedNext = useRef<(() => void) | null>(null);
   const [rangeKind, setRangeKind] = useState<'surah' | 'juz'>('surah');
   // The ayahs: inside the sitting's pages, or the whole Qur'an.
   const range = useMemo(() => {
@@ -142,7 +147,10 @@ export function AddMemorizedSheet({
     setWhat(firstTab);
     setPick(sitting ? { from: open, to: range.hi } : null);
     setPickerPage(null);
+    setRangePick(null);
     rangeUsed.current = null;
+    nestedGoing.current = false;
+    nestedNext.current = null;
     setFromAyah(open);
     setToAyah(sitting ? range.hi : open);
     openPages();
@@ -165,11 +173,15 @@ export function AddMemorizedSheet({
   const pageNumbers = usedReading ?? pageRange;
   const minutesValue = minutes.trim() === '' ? null : Number(minutes);
   const minutesOk = minutesValue === null || (Number.isInteger(minutesValue) && minutesValue >= 0);
-  const byAyah = what === 'ayahs' || what === 'page';
-  const ayahs = useMemo(
-    () => (what === 'page' ? chosenAyahs(pick, memorizedNow) : ayahsBetween(fromAyah, toAyah)),
-    [what, pick, memorizedNow, fromAyah, toAyah],
-  );
+  // A sitting's own pages, in order: the picker keeps inside them, also when they have a gap (MEM-5).
+  const held = useMemo(() => (sitting && sitting.pages.length > 0 ? [...new Set(sitting.pages)].sort((a, b) => a - b) : null), [sitting]);
+  const onRange = onThePage && (what === 'surah' || what === 'juz');
+  const byAyah = what === 'ayahs' || what === 'page' || onRange;
+  const ayahs = useMemo(() => {
+    if (what === 'page') return chosenAyahs(pick, memorizedNow, held ?? usedReading);
+    if (onRange) return chosenAyahs(rangePick, memorizedNow, held);
+    return ayahsBetween(fromAyah, toAyah);
+  }, [what, onRange, pick, rangePick, memorizedNow, held, usedReading, fromAyah, toAyah]);
   const canAdd = (byAyah ? ayahs.length > 0 : pageNumbers.length > 0) && minutesOk && !saving && !!user;
   // How much is memorized now, and after adding (MEM-2): "50.3% → 50.6% of the Quran".
   const shareNow = useMemo(() => memorizedPageShare(pages ?? []), [pages]);
@@ -181,7 +193,7 @@ export function AddMemorizedSheet({
   const useReading = () => {
     if (usedReading) {
       openPages();
-      setPick(null);
+      setPick(beforeReading.current);
       setUsedReading(null);
       return;
     }
@@ -189,6 +201,7 @@ export function AddMemorizedSheet({
     // As ayahs: from the first not memorized on those pages to the end of the last (MEM-1).
     const read = ayahsOfPages(suggestion);
     setWhat(firstTab);
+    beforeReading.current = pick;
     setPick({ from: read.find((k) => !memorizedNow.has(k)) ?? read[0], to: read[read.length - 1] });
     setFromAyah(read.find((k) => !memorizedNow.has(k)) ?? read[0]);
     setToAyah(read[read.length - 1]);
@@ -258,15 +271,39 @@ export function AddMemorizedSheet({
   // traps): there only the minutes are in the area that puts the keyboard away.
   const Body = onThePage ? React.Fragment : DismissArea;
   const Foot = onThePage ? DismissArea : React.Fragment;
-  const previewAyahs = what === 'page' ? ayahs : ayahsOfPages(pageNumbers);
-  const previewPages = what === 'page' ? pagesOfAyahs(ayahs) : pageNumbers;
+  // A surah's or juz's pages are all shown; what is already memorized on them is faded and not added.
+  const previewPages = useMemo(
+    () => (onRange ? pagesOfAyahs(chosenAyahs(rangePick, new Set(), held)) : pagesOfAyahs(ayahs)),
+    [onRange, rangePick, held, ayahs],
+  );
+  const leftOff = useMemo(
+    () => (held ? firstOpenIn(held, memorizedNow) : leftOffAyah(pages ?? [], memorizedNow)),
+    [held, pages, memorizedNow],
+  );
+  const leftOffPage = leftOff != null ? pageOfAyah(leftOff) : pageBounds.lo;
+  // One sheet at a time in this one: the next waits until the last has gone.
+  const openNested = (open: () => void) => {
+    if (nestedGoing.current) {
+      nestedNext.current = open;
+      return;
+    }
+    nestedGoing.current = true;
+    open();
+  };
+  const nestedGone = () => {
+    nestedGoing.current = false;
+    const next = nestedNext.current;
+    nestedNext.current = null;
+    if (next) openNested(next);
+  };
   const openPicker = (page?: number) => {
     Keyboard.dismiss();
-    setPickerPage(page ?? (pick ? pageOfAyah(pick.to) : leftOffPage(memorizedNow, pageBounds.lo, pageBounds.hi)));
+    const at = page ?? (pick ? pageOfAyah(pick.to) : leftOffPage);
+    openNested(() => setPickerPage(at));
   };
   const openRange = (kind: 'surah' | 'juz') => {
     setRangeKind(kind);
-    setPickerOpen(true);
+    openNested(() => setPickerOpen(true));
   };
 
   return (
@@ -279,6 +316,7 @@ export function AddMemorizedSheet({
       left={{ label: t('common.cancel'), onPress: onClose }}
       right={{ label: saving ? t('common.saving') : t('activity.add.add'), onPress: handleAdd, strong: true, accent: true, disabled: !canAdd, testID: 'add-memorized-add' }}
       keyboard
+      scroll={onThePage}
       testID="add-memorized-sheet"
     >
       <Body>
@@ -324,14 +362,15 @@ export function AddMemorizedSheet({
             {previewPages.length > 0 && (what === 'page' || rangeUsed.current === what) ? (
               <MemorizedPreview
                 pages={previewPages}
-                ayahs={previewAyahs}
+                ayahs={ayahs}
                 memorized={memorizedNow}
-                name={what === 'page' || sitting ? pickName(previewAyahs) : rangeName}
+                name={onRange && !(sitting && ayahs.length > 0) ? rangeName : pickName(ayahs)}
+                byPages={onRange}
                 onOpen={(page) => (what === 'page' ? openPicker(page) : openRange(what === 'juz' ? 'juz' : 'surah'))}
                 onChange={() => (what === 'page' ? openPicker() : openRange(what === 'juz' ? 'juz' : 'surah'))}
               />
             ) : (
-              <ChooseOnPage page={leftOffPage(memorizedNow, pageBounds.lo, pageBounds.hi)} memorized={memorizedNow} onOpen={() => openPicker()} />
+              <ChooseOnPage page={leftOffPage} memorized={memorizedNow} onOpen={() => openPicker()} />
             )}
           </View>
         ) : what === 'ayahs' ? (
@@ -403,6 +442,7 @@ export function AddMemorizedSheet({
       <RangePickerSheet
         visible={pickerOpen}
         initialKind={rangeKind}
+        onHidden={nestedGone}
         onClose={() => {
           setPickerOpen(false);
           // Revisely Dev: closed without choosing, back to the page. The store app goes on to Whole pages.
@@ -415,23 +455,26 @@ export function AddMemorizedSheet({
           setFromPage(clamp(r.from));
           setToPage(Math.max(clamp(r.from), clamp(r.to)));
           setRangeName(r.name);
+          setRangePick(r.ayahs);
           rangeUsed.current = rangeKind;
           setUsedReading(null);
         }}
       />
       {onThePage ? (
         <MemorizedPagePicker
-          visible={pickerPage != null}
+          visible={visible && pickerPage != null}
           onClose={() => setPickerPage(null)}
-          onDone={(p) => {
+          onHidden={nestedGone}
+          onDone={(p, only) => {
             setPick(p);
-            setUsedReading(null);
+            setUsedReading(held ? null : only);
           }}
           pick={pick}
-          openPage={pickerPage ?? pageBounds.lo}
+          openPage={pickerPage ?? leftOffPage}
           memorized={memorizedNow}
-          lo={pageBounds.lo}
-          hi={pageBounds.hi}
+          leftOff={leftOff}
+          held={held}
+          only={held ?? usedReading}
         />
       ) : null}
     </Sheet>

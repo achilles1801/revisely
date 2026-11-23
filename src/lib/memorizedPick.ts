@@ -5,6 +5,9 @@
 
 import {
   AyahKey,
+  ayahCount,
+  ayahOf,
+  ayahSharesOnPage,
   ayahsBetween,
   ayahsOnPage,
   firstAyahOfPage,
@@ -14,8 +17,10 @@ import {
   previousAyah,
   suraOf,
 } from './ayahKeys';
+import { memorizedAyahsOnPage, type PageMemorization } from './memorizedAyahs';
 import { getSurah } from './quranData';
 import { surahName } from './passages';
+import { isDevVariant } from './variant';
 import { formatNumber, t } from '../i18n';
 
 export interface AyahPick {
@@ -23,26 +28,72 @@ export interface AyahPick {
   to: AyahKey;
 }
 
+/** The picker is Revisely Dev's until it ships; an E2E build turns it on with a link (lib/e2e/memorizedPicker). */
+export function memorizedPickerOn(): boolean {
+  if (isDevVariant()) return true;
+  return process.env.EXPO_PUBLIC_E2E === '1'
+    ? (require('./e2e/memorizedPicker') as typeof import('./e2e/memorizedPicker')).e2eMemorizedPickerOn()
+    : false;
+}
+
+const FIRST_AYAH: AyahKey = 1001;
+
 /** The first ayah on a page not memorized yet, or null when all of it is. */
 export function firstOpenOnPage(page: number, memorized: ReadonlySet<AyahKey>): AyahKey | null {
   return ayahsOnPage(page).find((k) => !memorized.has(k)) ?? null;
 }
 
-/** Where the picker opens: the first page from `lo` to `hi` with an ayah to go, else `lo`. */
-export function leftOffPage(memorized: ReadonlySet<AyahKey>, lo: number, hi: number): number {
-  for (let p = lo; p <= hi; p++) if (firstOpenOnPage(p, memorized) != null) return p;
-  return lo;
+/** The first ayah to go on these pages, in order. */
+export function firstOpenIn(pages: readonly number[], memorized: ReadonlySet<AyahKey>): AyahKey | null {
+  for (const p of pages) {
+    const open = firstOpenOnPage(p, memorized);
+    if (open != null) return open;
+  }
+  return null;
 }
 
 /**
- * A tap on an ayah. With nothing chosen, it fills from the page's first open ayah to there. After
- * that it moves the end, or, before the run, brings the run's start back to it. An ayah already
- * memorized changes nothing.
+ * Where they left off: the first ayah to go after their latest Memorized entry (of pages marked the same moment, the
+ * last), going round to the Quran's start. With no dated entry, the first ayah to go. Null when all of it is memorized.
  */
-export function reachAyah(pick: AyahPick | null, key: AyahKey, page: number, memorized: ReadonlySet<AyahKey>): AyahPick | null {
+export function leftOffAyah(
+  entries: readonly (PageMemorization & { dateMemorized?: string | null })[],
+  memorized: ReadonlySet<AyahKey>,
+): AyahKey | null {
+  let latest: (typeof entries)[number] | null = null;
+  let at = -Infinity;
+  for (const e of entries) {
+    const when = e.dateMemorized ? Date.parse(e.dateMemorized) : NaN;
+    if (Number.isNaN(when) || memorizedAyahsOnPage(e).length === 0) continue;
+    if (when > at || (when === at && latest != null && e.pageNumber > latest.pageNumber)) {
+      latest = e;
+      at = when;
+    }
+  }
+  if (latest) {
+    const done = memorizedAyahsOnPage(latest);
+    for (let k = nextAyah(done[done.length - 1]); k != null; k = nextAyah(k)) if (!memorized.has(k)) return k;
+  }
+  for (let k: AyahKey | null = FIRST_AYAH; k != null; k = nextAyah(k)) if (!memorized.has(k)) return k;
+  return null;
+}
+
+/**
+ * A tap on an ayah: it is always the ayah they reached, so it sets the end. With nothing chosen, or before what is
+ * chosen, the run starts at the page's first ayah to go (or `leftOff`, where they left off, when it is on the way).
+ * An ayah already memorized changes nothing.
+ */
+export function reachAyah(
+  pick: AyahPick | null,
+  key: AyahKey,
+  page: number,
+  memorized: ReadonlySet<AyahKey>,
+  leftOff?: AyahKey | null,
+): AyahPick | null {
   if (memorized.has(key)) return pick;
-  if (pick) return key >= pick.from ? { from: pick.from, to: key } : { from: key, to: pick.to };
-  const start = firstOpenOnPage(page, memorized) ?? key;
+  if (pick && key >= pick.from) return { from: pick.from, to: key };
+  const onPage = leftOff != null && leftOff <= key && ayahsOnPage(page).includes(leftOff);
+  const start = onPage ? leftOff : (firstOpenOnPage(page, memorized) ?? key);
   return { from: Math.min(start, key), to: key };
 }
 
@@ -72,8 +123,12 @@ export function clearPage(pick: AyahPick | null, page: number): AyahPick | null 
 }
 
 /** The ayahs a pick adds: the run, without what is already memorized. */
-export function chosenAyahs(pick: AyahPick | null, memorized: ReadonlySet<AyahKey>): AyahKey[] {
-  return pick ? ayahsBetween(pick.from, pick.to).filter((k) => !memorized.has(k)) : [];
+export function chosenAyahs(pick: AyahPick | null, memorized: ReadonlySet<AyahKey>, only?: readonly number[] | null): AyahKey[] {
+  if (!pick) return [];
+  const open = ayahsBetween(pick.from, pick.to).filter((k) => !memorized.has(k));
+  if (!only) return open;
+  const held = new Set(only);
+  return open.filter((k) => held.has(pageOfAyah(k)));
 }
 
 /** The pages those ayahs are on, in order. */
@@ -96,10 +151,14 @@ function placeIn(sura: number, page: number): { n: number; count: number } {
   return s ? { n: page - s.startPage + 1, count: s.endPage - s.startPage + 1 } : { n: 1, count: 1 };
 }
 
-/** The surah a page is named by, given the ayah that brings it up (a page can hold two surahs). */
+/** The surah a page is named by: the chosen ayah's if one is given, else the surah that fills more of the page. */
 function suraOnPage(page: number, near?: AyahKey): number {
   if (near != null && pageOfAyah(near) === page) return suraOf(near);
-  return suraOf(firstAyahOfPage(page));
+  const shares = new Map<number, number>();
+  for (const [key, share] of ayahSharesOnPage(page)) shares.set(suraOf(key), (shares.get(suraOf(key)) ?? 0) + share);
+  let best = suraOf(firstAyahOfPage(page));
+  for (const [sura, share] of shares) if (share > (shares.get(best) ?? 0)) best = sura;
+  return best;
 }
 
 /** "3rd page", "last page"; under a preview and between the picker's arrows. */
@@ -139,7 +198,7 @@ export function pickName(ayahs: readonly AyahKey[]): string {
   const end = placeIn(a, p1);
   const surah = surahName(a);
   const pages = p1 - p0 + 1;
-  if (start.n === 1 && end.n === end.count) return surah;
+  if (ayahOf(first) === 1 && ayahOf(last) === ayahCount(a)) return surah;
   if (start.n === 1) return t('activity.pick.firstPages', { surah, count: pages, n: formatNumber(pages) });
   if (end.n === end.count) return t('activity.pick.lastPages', { surah, count: pages, n: formatNumber(pages) });
   return t('activity.pick.run', { surah, from: nth(start.n), to: nth(end.n) });

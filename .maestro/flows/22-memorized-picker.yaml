@@ -1,0 +1,76 @@
+# The Memorized picker (Revisely Dev; `e2e/memorized-picker` turns it on here): choosing on the real page, apart from
+# the reader, then the chosen pages in the sheet. Every screen in light and dark, each beside its mock, then an Add.
+# E2E builds hold one page image (379, also put at 380 and 381); page 382 is the page not on the phone.
+# Rules (BEHAVIOUR.md): MEM-8
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    file: ../subflows/new-account.yaml
+    env:
+      CLOCK: 2026-11-03T20:00
+      BOUNDARY: midnight
+- runFlow: ../subflows/app-sent.yaml
+- runScript:
+    file: ../scripts/seed-memorized-picker.js
+- runFlow: ../subflows/relaunch.yaml
+- openLink:
+    link: revisely://e2e/memorized-picker?on=1
+    optional: true
+- runFlow: ../subflows/open-link-prompt.yaml
+- extendedWaitUntil:
+    visible:
+      id: today-post
+    timeout: 20000
+- runFlow:
+    file: ../subflows/memorized-picker-screens.yaml
+    env:
+      THEME: light
+- runFlow:
+    file: ../subflows/theme.yaml
+    env:
+      THEME: Dark
+- runFlow:
+    file: ../subflows/memorized-picker-screens.yaml
+    env:
+      THEME: dark
+
+# Add: the rest of page 379, and the day says so.
+- runFlow: ../subflows/open-day.yaml
+- tapOn:
+    id: day-add
+- extendedWaitUntil:
+    visible:
+      id: activity-add-menu
+    timeout: 10000
+- tapOn:
+    id: sheet-action-memorized
+- extendedWaitUntil:
+    visible:
+      id: add-memorized-choose
+    timeout: 10000
+- waitForAnimationToEnd
+- tapOn:
+    id: add-memorized-choose
+- extendedWaitUntil:
+    visible:
+      id: memorized-picker-whole
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn:
+    id: memorized-picker-whole
+- tapOn:
+    id: memorized-picker-done
+- extendedWaitUntil:
+    visible:
+      id: add-memorized-preview-379
+    timeout: 10000
+- waitForAnimationToEnd
+- tapOn:
+    id: add-memorized-add
+- extendedWaitUntil:
+    notVisible:
+      id: add-memorized-sheet
+    timeout: 10000
+- extendedWaitUntil:
+    visible: "Memorized.*"
+    timeout: 10000
