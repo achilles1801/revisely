@@ -28,11 +28,11 @@ describe('everyone’s from the November 2026 release', () => {
     expect(activityBlocksEnabled(user)).toBe(true);
   });
 
-  it.each(APP_STORE)('[ACT-12] Insights in Activity: the tab bar is Home and Read, for %o', (user) => {
+  it.each(APP_STORE)('[ACT-12] [TAB-2] Insights in Activity: the tab bar is Home, Activity and Read, for %o', (user) => {
     const inActivity = activityBlocksEnabled(user);
-    expect(mainTabRoutes(inActivity)).toEqual(['Home', 'Read']);
+    expect(mainTabRoutes(inActivity)).toEqual(['Home', 'ActivityTab', 'Read']);
     expect(insightsTab(true, true, inActivity).shown).toBe(false);
-    expect(swipeableTabCount(true, inActivity)).toBe(2);
+    expect(swipeableTabCount(true, inActivity)).toBe(3);
   });
 
   it.each(APP_STORE)('[REC-1] [REC-2] [MEM-6] the reader’s sittings and the plan’s “Not in your plan”, for %o', (user) => {

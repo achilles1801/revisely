@@ -256,7 +256,11 @@ describe('the help in Activity', () => {
     const phone = await account(false, false);
     const { app } = await openHome(phone, false);
     await app.until(() => helpButton(app) != null, 'the ? on the Today post');
-    await press(app, 'open-activity');
+    // Activity is a tab (TAB-2); here, the stack's Activity.
+    const { navigation } = app.mods.require<{ navigation: { current: { navigate: (name: string) => void } } }>('./navRef');
+    await app.act(async () => {
+      navigation.current.navigate('Activity');
+    });
     await app.until(() => app.screen.queryByTestId('help-button-activity') != null, 'Activity’s ?');
     await press(app, 'help-button-activity');
     await app.until(() => app.screen.queryByTestId('help-sheet-activity') != null, 'How Activity works');

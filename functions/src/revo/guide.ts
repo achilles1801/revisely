@@ -39,11 +39,11 @@ const lines = (...l: string[]) => l.join('\n');
 export const GUIDE_SECTIONS: readonly GuideSection[] = [
   {
     title: 'Finding your way',
-    covers: ['NAME-1', 'REVO-25'],
+    covers: ['NAME-1', 'REVO-25', 'TAB-2', 'HOME-1'],
     routes: ['Dashboard', 'ReadIndex', 'Activity', 'Settings'],
     text: lines(
-      '- The tab bar has Home and Read (swipe sideways between them). Insights is in Activity.',
-      '- Home’s top bar, on the right: a compass (the Prayer sheet: prayer times and the Qibla), a pulse icon (Activity) and a gear (Settings). A running timer shows on the left.',
+      '- The tab bar: Home, Activity, Read (swipe between them). Insights is in Activity; tapping Activity again goes back to its start.',
+      '- Home’s top bar: a gear (Settings) on the right, a running timer on the left. No compass: the next-prayer line opens the Prayer sheet.',
       '- Home’s Today post: where today starts (e.g. "Starts at Al-Mujadila ›", or "Starts at Al-Hadid, ayah 4 ›" mid-surah) and how much it is. Tapping that line (its ›) opens a menu with “Jump to…” and “Edit schedule”. Under it, one button: “Start revision”, “Continue revision” or “Review session”. Then "… of the Quran memorized ›" with a dot per juz; its › opens the memorized pages. Then “Recent sessions” (the last three) and “See all”.',
       '- Read tab: “Search the Quran” under its title, “Recent pages”, then every surah, grouped by juz. Tap one to open the reader.',
       '- The app names parts of the Qur’an by surah and juz ("Al-Baqarah 84–101", "Juz 28"). Page numbers show only as a detail (the header of today’s › menu), in the reader and the session, and where pages are chosen by number (the Page tab of “Jump to…”).',
@@ -169,7 +169,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['DAY-9', 'ACT-1', 'ACT-2', 'ACT-3', 'ACT-5', 'ACT-6', 'ACT-7', 'ACT-11', 'ACT-14', 'ACT-17', 'ACT-18', 'ACT-20', 'LOG-1', 'LOG-2', 'LOG-3', 'LOG-4'],
     routes: ['Activity', 'ActivityDay', 'ActivityAll', 'JournalEntry', 'ListenBack', 'QuranReader'],
     text: lines(
-      '- Activity (Home’s pulse icon, or Settings → Revision → “Activity”): everything done, day by day, on the revision day it was done: sessions, pages revised ahead (listed on the day they were revised), timed readings and sittings, recordings, memorized ayahs and notes.',
+      '- Activity (its tab, or Settings → Revision → “Activity”): everything done, day by day, on the revision day it was done: sessions, pages revised ahead (listed on the day they were revised), timed readings and sittings, recordings, memorized ayahs and notes.',
       '- Two tabs at the top, “Overview” and “Insights”. Overview is a calendar: the chip beside its title (“Month” or “Week”, with ⌄) switches between the two (kept on the phone). ‹ › step back and on; “Today” appears when another month or week is showing and brings today back. Each day has a ring for how much of its pages was revised, and dots for memorized, read and a note.',
       '- Tap a day: a preview under the calendar shows its date with “Open” and a row each for Revised, Memorized, Read and Notes. Tapping anywhere on the preview opens that day, at the block tapped.',
       '- A day: its Revised, Memorized, Read and Notes blocks and its recordings. The Revised block has a strip of the day’s pages (revised, skipped or not reached), its ends named by surah; tap a page to open it in the reader, and back returns to the day. Under the strip: the pages’ strength with Smart Tracking, or else what the strip shows (e.g. "18 revised · 2 skipped"). Tapping the Revised block’s header opens the juz most of its pages were in, in the juz sheet (see Insights).',
@@ -259,7 +259,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
     routes: ['Settings', 'PrayerCalculation', 'PrayerNotifications'],
     text: lines(
       '- Settings → Mushaf and Recite → “Mushaf”: Madani 1405 (the default) or Madani 1441. Page numbers stay the same for plans.',
-      '- Home’s compass opens the Prayer sheet: Times (today’s prayers, the next with a countdown) and Qibla (a compass to the Kaaba; it needs location, which stays on the phone).',
+      '- The next-prayer line under Home’s header opens the Prayer sheet: Times (today’s prayers, the next with a countdown) and Qibla (a compass to the Kaaba; it needs location, which stays on the phone).',
       '- Settings → Prayer: “Prayer times”, “Calculation” (method and madhab), “Qibla” and “Next prayer on Home” (a line under Home’s header).',
       '- Settings → Reminders → “Friday Al-Kahf reminder”: a card on Home from Thursday’s maghrib to Friday’s (the Prayer sheet’s maghrib). Read on Thursday evening, it counts for that Friday; “Not today” hides it until Friday’s maghrib.',
     ),
@@ -392,9 +392,9 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['REMIND-2', 'REMIND-5'],
     routes: ['Settings'],
     text: lines(
-      '- The revision reminders: today’s and tomorrow’s as usual, then one each morning for the rest of the week after the app was last open (naming where that day’s revision starts, worded differently each day), then none until it is opened again. Opening the app plans them again from that day. There is no setting for how many.',
+      '- The revision reminders: today’s and tomorrow’s, then one each morning for the rest of the week after the app was last open (naming where that day’s revision starts), then none until it is opened again. There is no setting for how many.',
       '- Settings → Testing → “Scheduled reminders” lists the reminders this phone will show and when; “Show the next one in 5 seconds” shows the next as a real notification.',
-      '- Settings → Reminders → “Revision reminders” is off while the phone refuses Revisely’s notifications, and says so; turning it on then offers “Open Settings” (allow notifications for Revisely there, then turn reminders on). Without notifications allowed, no reminder can come.',
+      '- Settings → Reminders → “Revision reminders” is off while the phone refuses Revisely’s notifications, and says so; turning it on then offers “Open Settings”.',
     ),
   },
   {
@@ -487,19 +487,8 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['THEME-1'],
     routes: ['Settings', 'Dashboard'],
     text: lines(
-      '- Settings → Appearance → “Ramadan theme” dresses the app for Ramadan: light falling softly over the top of Home, lanterns hanging at the top of Home (not while the timer shows there), a crescent by the greeting and string lights along the tab bar. It changes nothing the app does. It’s on until they turn it off there, and that choice stays on that phone only.',
-      '- It never shows over the Qur’an’s pages, a revision session’s pages or a Recite take. With Reduce Motion on, it stays still.',
-    ),
-  },
-  {
-    // Majd, Nov 23 2026: Activity as a tab of its own, to compare with the button at the top of Home; Revisely Dev only.
-    title: 'Activity as a tab',
-    covers: ['TAB-2'],
-    routes: ['Settings', 'Activity', 'Dashboard'],
-    text: lines(
-      '- Settings → Appearance → “Activity tab” makes Activity a tab of its own, between Home and Read, so they can compare it with opening Activity from the top of Home. It’s off until they turn it on, and that choice stays on that phone only.',
-      '- With it on, the tab bar is Home, Activity (the pulse icon), Read, in that order for swiping too, and Home’s top bar has only the compass and the gear. Activity works as before (Overview and Insights, a day, See all), each opened inside its tab; tapping the Activity tab again goes back to its start. A sideways swipe on the calendar’s days still changes the month or week.',
-      '- With it off, Activity opens from the pulse icon at the top of Home, as described in the main guide.',
+      '- Settings → Appearance → “Ramadan theme” adds falling light, lanterns and a crescent at the top of Home and string lights along the tab bar. It changes nothing the app does. On until turned off there, on that phone only.',
+      '- Never over the Qur’an’s pages, a session’s pages or a Recite take.',
     ),
   },
   {
@@ -626,7 +615,7 @@ export const GUIDE_PROMPT = [
   '- The guide below says how the app behaves, where each screen and setting is, how to do common tasks, and what it can’t do. A question about how something works, where it is, how to do it or whether the app can do it is answered from the guide only.',
   '- Such an answer is the answer in one sentence, then the path written once (“Home → today’s › → Jump to…”), at most two short steps: about 35 words in all. Don’t describe the steps and then list them again. It is still the one JSON object every reply is, with the steps in "text".',
   '- In such an answer say nothing about today’s pages, what is left today, weak pages or the streak unless the question is about them, and don’t suggest starting today’s revision. Its action is an openScreen to the screen the answer names, whenever that screen is in the openScreen list; otherwise no action.',
-  '- Which screen: “Edit schedule”, “Create new plan” or “Daily amount” → planEditor; “Jump to…” → jumpTo; Settings → a section → settings with that section; the reader, its player bar or “Audio Options” → reader; the compass: prayer times → prayerTimes, the Qibla → qibla; the memorized pages → memorized; the daily log → dailyLog; Activity → activity; Activity’s Insights → insights. Never write that you added a shortcut or will open something: the card shows it.',
+  '- Which screen: “Edit schedule”, “Create new plan” or “Daily amount” → planEditor; “Jump to…” → jumpTo; Settings → a section → settings with that section; the reader, its player bar or “Audio Options” → reader; the Prayer sheet: prayer times → prayerTimes, the Qibla → qibla; the memorized pages → memorized; the daily log → dailyLog; Activity → activity; Activity’s Insights → insights. Never write that you added a shortcut or will open something: the card shows it.',
   '- When the streak, missed days or missed pages come up, say how to catch up: tap “Add to today” on Home. A streak broken by two missed days can’t come back, but those days’ pages can still be added that way (the last three days): always say so.',
   '- Never invent a feature, a button, a setting or a path. When the guide says the app can’t do something (it is under “Not possible (yet)”, or the guide says no or not yet), say so plainly (“Not yet.” or “There’s no …”), then give the closest way the guide names. When that way changes more than they asked for (the whole plan, for one juz), say so in a few words. Say “I’m not sure that’s possible in Revisely” only for something the guide doesn’t mention at all, then offer the closest thing it has.',
   '- What the guide marks as for testers is in their app only when the question says "Tester: yes". For anyone else, never offer it as if it were there: say it isn’t in their app yet, then give the closest way that is.',

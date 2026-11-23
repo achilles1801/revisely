@@ -73,7 +73,7 @@ appId: com.revisionbuddy.app
 # phone for a new tester and puts Home back meanwhile (lib/whatsNew/due). Both attempts of #217's iOS
 # run 42619006611; Home's ? stopped meaning "tester" once help came to everyone.
 - tapOn:
-    id: open-activity
+    id: tab-ActivityTab
 - extendedWaitUntil:
     visible:
       id: activity-blocks-views
