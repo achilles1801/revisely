@@ -1584,6 +1584,18 @@ shows up once and they must go through it and complete it … just the main stuf
   chip, cores and memory, the build, each run's numbers; never the account or any audio) and can be shared. The store
   app has none of it: the native module is linked into Revisely Dev's builds only.
 
+- **ONDEV-2.** Recite's pack (the model and its tables, sealed) reaches a phone only through the server's `recitePack`:
+  signed in, App Check from the Revisely Dev app, the pack's access claim, at most 6 calls and 3 device keys an account a
+  day. Its key comes wrapped to a key only that phone's Keychain or Keystore holds, so the app's JavaScript never sees
+  it; the parts come only from Cloud Storage. A part counts once its size, its checksum, every sealed chunk and every
+  file inside have checked out; anything else is deleted and fetched again. Production has no pack and refuses.
+- **ONDEV-3.** In Revisely Dev, Settings → Downloads and storage → "Recite on the phone" shows the pack's status and size,
+  with Download now and Remove from this phone. It starts when a signed-in account opens the reader, in the foreground,
+  under the offline mushaf's rules: Wi-Fi unless "Download over mobile data" is on or one Download now allowed it. It
+  stays sealed on disk and out of iCloud and Android backups. A new pack comes beside the old one, which stays in use
+  until the new one's core part is whole. Remove deletes it all and keeps it off until Download now. An account the
+  team hasn't given access is told it isn't available yet.
+
 ## Premium early access
 
 Majd, Nov 16 2026: "give everyone premium access right now … it'll be paid for in the future but anyone who has

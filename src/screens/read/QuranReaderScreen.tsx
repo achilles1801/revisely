@@ -42,6 +42,7 @@ import type { ReadStackParamList } from '../../navigation/MainNavigator';
 import { useReciteLayer } from '../../components/reciteLive/useReciteLayer';
 import { t } from '../../i18n';
 import { backIcon } from '../../i18n/direction';
+import { readerOpened } from '../../lib/onDevice/packTrigger';
 
 type NavigationProp = NativeStackNavigationProp<ReadStackParamList, 'QuranReader'>;
 type RouteProps = RouteProp<ReadStackParamList, 'QuranReader'>;
@@ -137,6 +138,9 @@ export default function QuranReaderScreen() {
   // Reading or revising without touching the screen: don't let it lock.
   const isScreenFocused = useIsFocused();
   useKeepScreenOn(isScreenFocused);
+  useEffect(() => {
+    if (isScreenFocused) readerOpened(); // Recite's pack starts downloading (Revisely Dev only, ONDEV-3)
+  }, [isScreenFocused]);
 
   const verseActions = useVerseActions({
     pages: ALL_PAGES,

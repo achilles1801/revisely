@@ -503,6 +503,17 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
       '- The results go to the Revisely team (the phone’s model and the timings, never their account or any audio) and “Share results” sends them anywhere. A build without it says to update Revisely Dev; an account the team hasn’t given bench access is told so.',
     ),
   },
+  {
+    // Nov 23 2026: the model and tables on the phone, ahead of Recite running there (Majd: "get the model on phone").
+    title: 'Recite on the phone (Settings → Downloads and storage)',
+    covers: ['ONDEV-2', 'ONDEV-3'],
+    routes: ['Settings'],
+    text: lines(
+      '- Settings → Downloads and storage → “Recite on the phone” is the download that will let Recite check on the phone instead of Revisely’s server (about 66 MB). For now it only downloads: Recite itself still checks on the server.',
+      '- It starts by itself when they open the reader, on Wi-Fi unless “Download over mobile data” is on; the row’s menu has Download now and Remove from this phone. Removing it keeps it off until Download now.',
+      '- It’s kept encrypted on the phone and out of backups. An account the team hasn’t given access sees “Not available for this account yet”.',
+    ),
+  },
 ];
 
 /**

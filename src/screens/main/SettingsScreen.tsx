@@ -73,6 +73,7 @@ import { openEmail, openWebPage } from '../../lib/openWebPage';
 import { PillTabs } from '../../components/v2/PillTabs';
 import { setMushafCellular } from '../../lib/mushafOffline';
 import { describeMushaf, mushafMenuActions, useMushafOffline } from '../../lib/mushafOfflineUi';
+import { RecitePackRow } from '../../components/settings/RecitePackRow';
 import { mushafEdition, useMushafEdition } from '../../lib/mushafEdition';
 import { MushafPickerSheet } from '../../components/mushaf/MushafPickerSheet';
 import { shareIcon } from '../../lib/platformUi';
@@ -1049,6 +1050,7 @@ export default function SettingsScreen() {
                 onPress={() => setMushafMenu(true)}
               />
             </View>
+            {isDevVariant() ? <RecitePackRow Row={Row} /> : null}
             <Row
               icon="cellular-outline"
               label={t('settings.mushafRows.cellular')}
