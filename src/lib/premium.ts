@@ -15,6 +15,7 @@ import { auth, db } from './firebase';
 import { logger } from './logger';
 import { callFunction } from '../services/firestoreService';
 import { t } from '../i18n';
+import { setReciteWherePin } from './reciteLive/whereSettings';
 
 export type PremiumSource = 'support' | 'dev' | 'purchase' | 'gift' | 'family' | 'early';
 
@@ -79,13 +80,15 @@ function start(uid: string) {
   if (state.uid === uid && stop) return;
   stop?.();
   set({ uid, grant: null, early: false, known: false });
+  setReciteWherePin(null);
   // The copy kept on the phone, until the server answers (no locked flash on a cold start, and offline).
   AsyncStorage.getItem(KEY(uid))
     .then((raw) => {
       if (state.uid !== uid || state.known || raw == null) return;
       // { grant, early }; a copy from before early access is the grant alone.
-      const kept = JSON.parse(raw) as { grant?: unknown; early?: unknown; source?: unknown } | null;
+      const kept = JSON.parse(raw) as { grant?: unknown; early?: unknown; source?: unknown; where?: unknown } | null;
       const old = !!kept && 'source' in kept;
+      setReciteWherePin(kept?.where);
       set({ uid, grant: parseGrant(old ? kept : kept?.grant), early: !old && kept?.early === true, known: true });
     })
     .catch(() => undefined);
@@ -95,11 +98,16 @@ function start(uid: string) {
       if (state.uid !== uid) return;
       // An empty first answer from Firestore's memory isn't the server's.
       if (snap.metadata.fromCache && !snap.exists()) return;
-      const data = snap.exists() ? (snap.data() as { premium?: unknown; grants?: { early?: unknown } }) : null;
+      const data = snap.exists()
+        ? (snap.data() as { premium?: unknown; grants?: { early?: unknown }; reciteWhere?: unknown })
+        : null;
       const grant = data ? parseGrant(data.premium) : null;
       const early = !!data && parseGrant(data.grants?.early) != null;
+      // Where this account's takes run, if the team pinned it (lib/reciteLive/where); no client can write it.
+      const where = data?.reciteWhere ?? null;
+      setReciteWherePin(where);
       set({ uid, grant, early, known: true });
-      AsyncStorage.setItem(KEY(uid), JSON.stringify({ grant, early })).catch(() => undefined);
+      AsyncStorage.setItem(KEY(uid), JSON.stringify({ grant, early, where })).catch(() => undefined);
     },
     (err) => logger.warn('Premium: the grant could not be read', err),
   );
@@ -127,6 +135,7 @@ export function usePremium(
       if (users === 0) {
         stop?.();
         stop = null;
+        setReciteWherePin(null);
         set(NONE);
       }
     };

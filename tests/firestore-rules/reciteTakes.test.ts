@@ -86,6 +86,13 @@ describe("Recite's memory: users/<uid>/reciteTakes", () => {
     await assertFails(setDoc(doc(alice, path(ALICE, 't4')), take({ unfinished: 'yes' })));
   });
 
+  it('a take checked on the phone says so (ranOn: phone), and only that (ONDEV-4)', async () => {
+    const alice = env.authenticatedContext(ALICE).firestore();
+    await assertSucceeds(setDoc(doc(alice, path(ALICE, 'p1')), take({ ranOn: 'phone' })));
+    await assertFails(setDoc(doc(alice, path(ALICE, 'p2')), take({ ranOn: 'server' })));
+    await assertFails(setDoc(doc(alice, path(ALICE, 'p2')), take({ ranOn: true })));
+  });
+
   it('a recitation longer than the checker’s cap keeps its takes (links: 2 to 20), and nothing else in their place', async () => {
     const alice = env.authenticatedContext(ALICE).firestore();
     const links = [

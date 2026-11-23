@@ -115,14 +115,39 @@ export interface PackVerifyResult {
   error?: string;
 }
 
+/** A take's frames from the engine's thread, in order. code: 0, or the RC_ERR_* of the call that failed. */
+export interface EngineFramesEvent {
+  take: number;
+  frames: string[];
+  code: number;
+}
+
 export type ReciteEngineEvents = {
   onBenchProgress: (event: { done: number; total: number }) => void;
+  onEngineFrames: (event: EngineFramesEvent) => void;
 };
 
 declare class ReciteEngineModule extends NativeModule<ReciteEngineEvents> {
   deviceInfo(): DeviceInfo;
   /** Which engine this build linked, as JSON (lib/onDevice/coreInfo reads it). Builds before the pull-in don't have it. */
   coreInfo?(): string;
+  // The engine (recite_core.h) on one background thread; a take's frames come back as onEngineFrames. Builds before it
+  // don't have these (lib/onDevice/engine).
+  /** Opens the engine from named files, read into memory; an engine already open is released first. */
+  engineOpenFiles?(
+    items: { name: string; path: string }[],
+    options: string,
+  ): Promise<{ ok: boolean; code: number; error?: string; info?: string }>;
+  /** rc_info's JSON while the engine is open. */
+  engineInfo?(): string | null;
+  /** Starts a take from the contract's start frame: its number, or why not. */
+  engineStart?(frame: string): Promise<{ take?: number; code?: number; error?: string }>;
+  /** 16 kHz mono samples; copied before this returns. */
+  engineFeed?(take: number, pcm: Int16Array): void;
+  engineControl?(take: number, frame: string): void;
+  engineFinish?(take: number): void;
+  engineClose?(take: number): void;
+  engineRelease?(): Promise<void>;
   sha256(path: string): Promise<string>;
   bench(plan: BenchPlan): Promise<BenchResult>;
   packPublicKey(): Promise<PackPublicKey>;

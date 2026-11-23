@@ -60,6 +60,8 @@ export interface TakeRecord {
    * checker take and the first word it recited, in order. Absent for a single take (`take` is its id).
    */
   links?: Array<{ take: string | null; from: number }>;
+  /** Checked on the phone's engine (lib/reciteLive/where). Absent: on the server. */
+  ranOn?: 'phone';
   /**
    * The words shown by hand during the take (‹, ‹‹ on the hidden page), so its summary still lists them when opened again
    * later (RMEM-8, Revisely Dev). Absent for none, and for takes kept before Nov 22 2026.
@@ -244,6 +246,7 @@ export function toStored(r: MemoryRecord): Record<string, unknown> {
     deleted: r.deleted === true,
     // Only when true: a finished take's document is as it was (the rules allow the field, firestore.rules).
     ...(r.unfinished ? { unfinished: true } : {}),
+    ...(r.ranOn === 'phone' ? { ranOn: 'phone' } : {}),
     // Only for a chain of takes (RECITE-22).
     ...(r.links && r.links.length > 1 ? { links: r.links.slice(0, MAX_LINKS).map((l) => ({ take: l.take, from: l.from })) } : {}),
     // Only when there are some (RMEM-8), so a take without them is written as before.
@@ -298,6 +301,7 @@ export function fromStored(id: string, raw: unknown): MemoryRecord | null {
     recordingId: str(d.recordingId),
     ...deleted,
     ...(d.unfinished === true ? { unfinished: true } : {}),
+    ...(d.ranOn === 'phone' ? { ranOn: 'phone' as const } : {}),
     ...linksFromStored(d.links),
     ...peekedFromStored(d.peeked),
     ...removedFromStored(d.removed),

@@ -140,6 +140,16 @@ describe('a record on the account', () => {
     expect((fromStored(r.id, toStored({ ...r, marks: [lookalike] })) as TakeRecord).marks[0].into).toBeUndefined();
   });
 
+  it('says a take ran on the phone; a take on the server has no such field (ONDEV-4)', () => {
+    const r = recordFromTake(doneState([lookalike]), words, ctx()) as TakeRecord;
+    expect('ranOn' in r).toBe(false);
+    expect('ranOn' in toStored(r)).toBe(false);
+    const p = recordFromTake(doneState([lookalike]), words, { ...ctx(), ranOn: 'phone' }) as TakeRecord;
+    expect(toStored(p).ranOn).toBe('phone');
+    expect((fromStored(p.id, JSON.parse(JSON.stringify(toStored(p)))) as TakeRecord).ranOn).toBe('phone');
+    expect('ranOn' in (fromStored(r.id, { ...toStored(r), ranOn: 'mars' }) as TakeRecord)).toBe(false);
+  });
+
   it('[RECITE-11] an unfinished take reads back unfinished; a finished one’s document has no such field', () => {
     const r = recordFromTake(doneState([lookalike]), words, ctx()) as TakeRecord;
     expect('unfinished' in toStored(r)).toBe(false);

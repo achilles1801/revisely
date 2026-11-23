@@ -515,6 +515,17 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
       '- It’s kept encrypted on the phone and out of backups. An account the team hasn’t given access sees “Not available for this account yet”.',
     ),
   },
+  {
+    // Nov 23 2026: one pipeline in two places (on-device-plan.md §12).
+    title: 'Where Recite runs (Settings → Testing)',
+    covers: ['ONDEV-4'],
+    routes: ['Settings'],
+    text: lines(
+      '- Settings → Testing → “Recite runs on” chooses where this phone’s takes are checked: Automatic (what the Revisely team has set, the server for now), This phone, or The server. A tap moves to the next one.',
+      '- The line under it says where the next take will run and, if it is the server, why: for example no engine on this phone yet. The on-device engine is still being built, so most phones say that.',
+      '- A take the phone’s engine can’t run goes to the server by itself, with nothing lost and nothing to do. Everything on the screen works the same in both places.',
+    ),
+  },
 ];
 
 /**

@@ -43,6 +43,7 @@ import {
   seekOnPage,
   slowAfterBeat,
 } from '../../lib/reciteLive/state';
+import { deviceConnect } from '../../lib/onDevice/engine';
 import { isDevVariant } from '../../lib/variant';
 import { useReduceMotion } from '../../design/motion';
 import { t } from '../../i18n';
@@ -134,10 +135,12 @@ let realConnect: LiveConnect | null = null;
 const defaultConnect: LiveConnect = (start, handlers) => {
   if (!realConnect) {
     const r = currentRelease();
-    realConnect = socketFeed({
+    const server = socketFeed({
       token: async () => (await getAuth().currentUser?.getIdToken()) ?? null,
       app: `${r.version ?? '?'} (${r.build ?? '?'}) ${r.channel ?? 'dev'} ${r.updateShort ?? 'embedded'}`,
     });
+    // Revisely Dev: on the phone's engine when it can (lib/reciteLive/where). The store app has no engine.
+    realConnect = isDevVariant() ? deviceConnect(server) : server;
   }
   return realConnect(start, handlers);
 };
@@ -506,13 +509,20 @@ export function useLiveRecitation({
   const closeCurrent = useRef<() => void>(() => undefined);
   /** How takes connect: the checker's socket, or E2E's stand-ins (kept for the links that follow). */
   const connectRef = useRef<LiveConnect>(connect);
+  /** The take ran on the phone's engine (null until a connection has said `ready`). */
+  const onPhone = useRef<boolean | null>(null);
   /** A link's connection, its events to the link it was opened for. */
   const openLink = useCallback(
     (frame: StartFrame): LiveConnection => {
       const no = linkNo.current;
       const holder: { c: LiveConnection | null } = { c: null };
       const c = connectRef.current(frame, {
-        onEvent: (e) => (no === linkNo.current ? onEvent(e) : onLinkEvent(no, e)),
+        onEvent: (e) => {
+          // By `ready` a take is where it will stay; a recitation of several takes ran on the phone only if all did.
+          if (e.type === 'ready') onPhone.current = onPhone.current !== false && holder.c?.ranOn?.() === 'phone';
+          if (no === linkNo.current) onEvent(e);
+          else onLinkEvent(no, e);
+        },
         onClose: () => {
           if (no !== linkNo.current) {
             onLinkClose(no);
@@ -875,6 +885,7 @@ export function useLiveRecitation({
         stats.start();
         connectRef.current = connect;
         closeCurrent.current = () => void stopMic();
+        onPhone.current = null;
         const c = openLink(frame);
         recordingRef.current = keepsAudio(take, settings.saveRecording, recordingDay)
           ? startTakeRecording({ day: recordingDay as string, page })
@@ -1237,6 +1248,10 @@ export function useLiveRecitation({
     /** The take's time in seconds, as of now (read it when needed; `clock` re-renders what shows it). */
     get seconds() {
       return clock.get();
+    },
+    /** 'phone' when the take ran on the phone's engine, for its record; null on the server. */
+    get ranOn(): 'phone' | null {
+      return onPhone.current ? 'phone' : null;
     },
     clock,
     words,

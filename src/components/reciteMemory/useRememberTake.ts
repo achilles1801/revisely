@@ -20,6 +20,8 @@ export interface LiveTakeView {
   wordTime: (w: number) => number | null;
   /** A recitation longer than the checker's cap: its takes (RECITE-22). */
   links?: Array<{ take: string | null; from: number }> | null;
+  /** 'phone' when the take ran on the phone's engine (ONDEV-4). */
+  ranOn?: 'phone' | null;
 }
 
 /** Today in the phone's zone, when there's no revision day to file a take under. */
@@ -133,6 +135,7 @@ export function useRememberTake({
       openWords: (from, to) => openWordsBetween(records, from, to),
       links: view.links,
       peeked,
+      ranOn: view.ranOn,
     });
   }, [enabled, live, day, level, records, peeked]);
 

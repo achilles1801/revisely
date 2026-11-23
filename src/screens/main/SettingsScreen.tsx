@@ -116,6 +116,7 @@ import { isDevVariant } from '../../lib/variant';
 import { ramadanThemeOffered, setRamadanTheme, useRamadanThemeSaved } from '../../lib/ramadanTheme';
 import { activityTabOffered, activityTabOn, setActivityTab, useActivityTabSaved } from '../../lib/activityTab';
 import { CheckerModelRow } from '../../components/settings/CheckerModelRow';
+import { ReciteWhereRow } from '../../components/settings/ReciteWhereRow';
 import { ScheduledRemindersRow } from '../../components/settings/ScheduledRemindersRow';
 import { useNotificationPermission } from '../../hooks/useNotificationPermission';
 import { ensureNotificationsPermission } from '../../lib/notifications';
@@ -1381,6 +1382,8 @@ export default function SettingsScreen() {
                 {isDevVariant() ? <ScheduledRemindersRow /> : null}
                 {/* Revisely Dev only: which model its checker runs for each level (Majd, Nov 18 2026). */}
                 {reciteCheck && isDevVariant() ? <CheckerModelRow /> : null}
+                {/* Revisely Dev only: where this phone's takes run, the phone or the server (ONDEV-4). */}
+                {reciteCheck && isDevVariant() ? <ReciteWhereRow /> : null}
                 {/* Revisely Dev only: Recite's model timed on this phone (ONDEV-1). */}
                 {isDevVariant() ? (
                   <Row
