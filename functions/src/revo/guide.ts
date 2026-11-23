@@ -365,12 +365,13 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
   {
     // The athan (Majd, Nov 22 2026): Revisely Dev on iPhone until a version has its sounds built in for Android.
     title: 'The athan as a prayer’s notification sound (iPhone)',
-    covers: ['ATHAN-1', 'ATHAN-2', 'ATHAN-3'],
+    covers: ['ATHAN-1', 'ATHAN-2', 'ATHAN-3', 'ATHAN-4'],
     routes: ['Settings', 'PrayerNotifications', 'AthanVoice'],
     text: lines(
       '- On iPhone, a prayer’s notification can play the athan: Settings → Prayer → “Prayer notifications” → a prayer that is on → “Sound” → “Athan”, then “Voice” to choose it for that prayer. Settings → Prayer → “Athan voice” chooses one voice for every prayer set to the athan. Fajr uses the voice’s own Fajr athan when it has one.',
       '- An iPhone notification can play only the first 30 seconds of an athan. A reminder before the prayer keeps the standard tone. Silent mode and Focus still apply.',
       '- A voice downloads when chosen (the play button listens to it first); until it has, that prayer plays the standard tone. Android doesn’t have the athan yet.',
+      '- To hear the whole athan, tap the prayer’s notification within 15 minutes of it: the app opens and plays that voice’s whole athan from the start, with “Stop”. It needs a connection, and it stops if the app is left.',
     ),
   },
   {
