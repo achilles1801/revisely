@@ -252,10 +252,10 @@ describe('[ONDEV-1] Settings → Testing → On-device model', () => {
     await show();
     expect(screen.queryByTestId('bench-self-check')).toBeNull();
     screen.unmount();
-    const none = { ran: false, ok: null, maxDiff: null, topDiff: null, frames: null, notFinite: null, tol: null };
+    const none = { ran: false, ok: null, maxDiff: null, topDiff: null, frames: null, notFinite: null, tol: null, prepacking: null };
     mockBench.selfCheck = {
-      check: { ran: true, ok: true, pack: 'k', packContent: null, packId: 'v7m-1', ort: '1.31.1', prepacking: false, openCode: null, openError: null, v5: none,
-        v7: { ran: true, ok: true, maxDiff: 0.000042, topDiff: 0, frames: 240, notFinite: 0, tol: 0.001 } },
+      check: { ran: true, ok: true, pack: 'k', packContent: null, packId: 'v7m-1', ort: '1.31.1', openCode: null, openError: null, v5: none,
+        v7: { ran: true, ok: true, maxDiff: 0.000042, topDiff: 0, frames: 240, notFinite: 0, tol: 0.001, prepacking: false } },
       sendError: null,
     };
     await show();

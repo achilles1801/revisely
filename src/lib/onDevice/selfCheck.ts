@@ -17,6 +17,8 @@ export interface ModelCheck {
   notFinite: number | null;
   /** The bar in that model's check file. */
   tol: number | null;
+  /** The setting the engine loaded this model with (ONNX Runtime can't report it back); null when it isn't open. */
+  prepacking: boolean | null;
 }
 
 export interface SelfCheck {
@@ -29,8 +31,6 @@ export interface SelfCheck {
   /** The pack this engine was opened from. */
   packId: string | null;
   ort: string | null;
-  /** The setting the engine passes: ONNX Runtime can't report it back from a session. */
-  prepacking: boolean | null;
   v7: ModelCheck;
   v5: ModelCheck;
   /** rc_open's code and error when it returned no engine. */
@@ -44,11 +44,12 @@ const str = (v: unknown): string | null => (typeof v === 'string' && v.length > 
 const record = (v: unknown): Record<string, unknown> =>
   v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
 
-const NOT_RUN: ModelCheck = { ran: false, ok: null, maxDiff: null, topDiff: null, frames: null, notFinite: null, tol: null };
+const NOT_RUN: ModelCheck = { ran: false, ok: null, maxDiff: null, topDiff: null, frames: null, notFinite: null, tol: null, prepacking: null };
 
 function modelCheck(raw: unknown): ModelCheck {
   const m = record(raw);
-  if (m.ran !== true) return NOT_RUN;
+  const prepacking = bool(m.prepacking);
+  if (m.ran !== true) return { ...NOT_RUN, prepacking }; // a model can be open with no check file
   return {
     ran: true,
     ok: bool(m.ok),
@@ -57,6 +58,7 @@ function modelCheck(raw: unknown): ModelCheck {
     frames: num(m.frames),
     notFinite: num(m.not_finite),
     tol: num(m.tol),
+    prepacking,
   };
 }
 
@@ -72,7 +74,6 @@ export function selfCheckFromInfo(info: unknown, packId: string | null): SelfChe
     packContent: str(i.pack_content),
     packId,
     ort: str(c.ort),
-    prepacking: bool(c.prepacking),
     v7: modelCheck(models.v7),
     v5: modelCheck(models.v5),
     openCode: null,
@@ -89,7 +90,6 @@ export function selfCheckFromFailedOpen(code: number, error: string | null, pack
     packContent: null,
     packId,
     ort: null,
-    prepacking: null,
     v7: NOT_RUN,
     v5: NOT_RUN,
     openCode: code,

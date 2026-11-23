@@ -9,10 +9,9 @@ const INFO = {
     ok: true,
     max_diff: 0.000042,
     ort: '1.31.1',
-    prepacking: false,
     models: {
-      v7: { ran: true, ok: true, max_diff: 0.000042, top_diff: 0, frames: 240, not_finite: 0, tol: 0.001 },
-      v5: { ran: false },
+      v7: { ran: true, ok: true, max_diff: 0.000042, top_diff: 0, frames: 240, not_finite: 0, tol: 0.001, prepacking: false },
+      v5: { ran: false, prepacking: true },
     },
   },
 };
@@ -20,9 +19,10 @@ const INFO = {
 describe('[ONDEV-1] the engine self-check a device reports', () => {
   it('reads rc_info: both models, the pack, ONNX Runtime and prepacking', () => {
     const c = selfCheckFromInfo(INFO, 'abc');
-    expect(c).toMatchObject({ ran: true, ok: true, pack: '9dd74eec9a576643', packId: 'abc', ort: '1.31.1', prepacking: false, openCode: null });
-    expect(c.v7).toEqual({ ran: true, ok: true, maxDiff: 0.000042, topDiff: 0, frames: 240, notFinite: 0, tol: 0.001 });
-    expect(c.v5).toEqual({ ran: false, ok: null, maxDiff: null, topDiff: null, frames: null, notFinite: null, tol: null });
+    expect(c).toMatchObject({ ran: true, ok: true, pack: '9dd74eec9a576643', packId: 'abc', ort: '1.31.1', openCode: null });
+    expect(c.v7).toEqual({ ran: true, ok: true, maxDiff: 0.000042, topDiff: 0, frames: 240, notFinite: 0, tol: 0.001, prepacking: false });
+    expect(c.v5).toEqual({ ran: false, ok: null, maxDiff: null, topDiff: null, frames: null, notFinite: null, tol: null, prepacking: true }); // open, no check file
+    expect(selfCheckFromInfo({ self_check: { ran: true, models: { v5: { ran: false } } } }, null).v5.prepacking).toBeNull(); // not open
   });
 
   it('never reads a missing or malformed check as a pass', () => {

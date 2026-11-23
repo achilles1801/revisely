@@ -127,7 +127,7 @@ describe('warmEngine', () => {
 describe('[ONDEV-1] engineSelfCheck', () => {
   const INFO = JSON.stringify({
     pack: 'table-key',
-    self_check: { ran: true, ok: true, ort: '1.31.1', prepacking: false, models: { v7: { ran: true, ok: true, max_diff: 0.00004, top_diff: 0, frames: 240 }, v5: { ran: false } } },
+    self_check: { ran: true, ok: true, ort: '1.31.1', models: { v7: { ran: true, ok: true, max_diff: 0.00004, top_diff: 0, frames: 240, prepacking: false }, v5: { ran: false } } },
   });
   const opensWithInfo = () =>
     mockModule.enginePackOpen.mockImplementation(async () => {
