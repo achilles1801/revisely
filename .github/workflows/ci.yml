@@ -334,6 +334,14 @@ jobs:
           npm ci --prefix tests/firestore-rules
           npm ci --prefix scripts/lint
 
+      # The store app's fingerprints (CLAUDE.md "Runtime version is a fingerprint"): a change that
+      # moves one makes Preview build and submit a new store binary on the merge. A PR meant to move
+      # them commits scripts/store-fingerprints.json (`node scripts/check-store-fingerprints.js --write`).
+      - name: Store fingerprints
+        id: storefp
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: node scripts/check-store-fingerprints.js
+
       # The app (tests/scenarios with it; fast-check is its own dependency), and
       # the Cloudflare worker (worker/, wrangler*.jsonc). functions/ and
       # tests/firestore-rules/ have their own and are checked below.

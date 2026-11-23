@@ -52,6 +52,18 @@ until its part is set up.
   - Nothing on the dev side stops preview: its fingerprint step can fail without failing the job, and
     preview's update never waits for it. Promote reads only the preview branch.
   - Each native change now builds twice (store and Dev).
+  - **Native code in Revisely Dev only** (Nov 23 2026, for 1.0.5's on-device Recite; measured with local fingerprints
+    before and after: the store app's unchanged, Revisely Dev's moving with the code):
+    - an npm library with native code: the root `react-native.config.js` leaves it out unless
+      `APP_VARIANT === 'dev'`, as it leaves whisper.rn out of Android; its config plugin, if any, behind `DEV`;
+    - our own module: outside `modules/` (everything there is linked into the store app), for example
+      `modules-dev/<name>/`, added to autolinking's search paths by a Dev-only plugin (Podfile
+      `use_expo_modules!(searchPaths: [...])`, settings.gradle `expoAutolinking.searchPaths`), and counted by
+      `fingerprint.config.js`'s `extraSources` only under APP_VARIANT=dev;
+    - files a build fetches or generates go in `fingerprint.config.js`'s `ignorePaths`: EAS fingerprints again inside the
+      build, and a hash that differs there stops it;
+    - the JavaScript loads the module lazily (`requireOptionalNativeModule`) behind `isDevVariant()`.
+    The release owner's native PR then moves it into the store app, and the store fingerprints once.
   - Secrets: `GOOGLE_SERVICE_INFO_PLIST_DEV` and `GOOGLE_SERVICES_JSON_DEV` (base64, as the store app's),
     from `firebase apps:sdkconfig` of the dev project's iOS and Android apps.
 - **The dev backend:** Firebase project `revisely-dev` (number 433792838929; Blaze, a $10 budget alert;
