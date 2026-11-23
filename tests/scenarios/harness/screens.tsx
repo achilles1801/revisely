@@ -138,6 +138,29 @@ export function onboardingFlow(mods: Booted): ReactElement {
   return React.createElement(NavigationContainer, { ref: nav.navigation }, React.createElement(OnboardingNavigator));
 }
 
+/** Pass to Phone.open: Settings with Preview onboarding open over it (ONBOARD-5). */
+export function onboardingPreviewStack(mods: Booted): ReactElement {
+  const { React, require: req } = mods;
+  const { NavigationContainer } = req<any>('@react-navigation/native');
+  const { createNativeStackNavigator } = req<any>('@react-navigation/native-stack');
+  const { View } = req<any>('react-native');
+  const Preview = req<any>('src/screens/onboarding/OnboardingPreviewScreen').default;
+  const nav = req<{ navigation: { current: unknown } }>('./navRef');
+  const Stack = createNativeStackNavigator();
+  const h = React.createElement;
+  const Settings = () => h(View, { testID: 'settings-stub' });
+  return h(
+    NavigationContainer,
+    { ref: nav.navigation, initialState: { index: 1, routes: [{ name: 'Settings' }, { name: 'OnboardingPreview' }] } },
+    h(
+      Stack.Navigator,
+      { screenOptions: { headerShown: false, animation: 'none' } },
+      h(Stack.Screen, { name: 'Settings', component: Settings }),
+      h(Stack.Screen, { name: 'OnboardingPreview', component: Preview }),
+    ),
+  );
+}
+
 /** Onboarding's questions, read and driven through their own elements. */
 export class Onboarding {
   constructor(private readonly app: OpenApp) {}

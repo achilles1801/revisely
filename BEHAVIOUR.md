@@ -62,6 +62,10 @@ How the tests are made: `tests/scenarios/README.md`.
   starts chosen, so Juz 1 starts partly chosen, which looks different and is read out as mixed; a tap makes a partly
   chosen juz whole. "Choose by surah instead" opens the list on the same selection. The line at the foot counts what is
   chosen ("1 juz and 1 page chosen"), never with ayah numbers.
+- **ONBOARD-5.** (Revisely Dev) Settings → Testing → "Preview onboarding" walks the real onboarding screens, from the
+  welcome, on a blank account of its own, and saves nothing: no pages, plan, reminder, location, `onboardingComplete` or
+  `whatsNewSeen`, and no system prompt for location or notifications. ✕, or the last answer, returns to Settings with the
+  account as it was.
 
 ## The schedule
 

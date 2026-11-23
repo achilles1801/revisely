@@ -20,8 +20,8 @@ import {
 import { JUZ_NUMBERS, chosenCounts, juzState, memorizedWithPending, toggleJuz } from '../../lib/onboardingChoices';
 import { useTheme } from '../../context/ThemeContext';
 import { layoutV2, typeV2 } from '../../theme/v2';
-import { useApp } from '../../context/AppContext';
 import { t } from '../../i18n';
+import { useOnboardingAccess } from './onboardingAccess';
 
 type NavigationProp = NativeStackNavigationProp<OnboardingStackParamList, 'JuzSelection'>;
 type RouteProps = RouteProp<OnboardingStackParamList, 'JuzSelection'>;
@@ -31,7 +31,7 @@ export default function JuzSelectionScreen() {
   const route = useRoute<RouteProps>();
   const { palette } = useTheme();
   const { journeyStage } = route.params;
-  const { user, pages, updatePages, saveUser } = useApp();
+  const { user, pages, updatePages, saveUser } = useOnboardingAccess();
   const [bySurah, setBySurah] = useState(false);
   const { height } = useWindowDimensions();
 
