@@ -9,7 +9,7 @@ This file holds the rules every session needs. Reference for each area lives in 
 word on Nov 22 2026 (Majd: "Yes, split it"; it was 208 KB, read in full by every session). Working on one of these?
 Read its file first:
 
-- Any screen or UI text (Majd's design rules, accents, surah-first wording): `handbook/design.md`
+- Any screen or UI text (Majd's design rules, accents, page-first naming): `handbook/design.md`
 - Revisely Dev, the dev backend, dev.revisely.app: `handbook/dev-stack.md`
 - OTA updates, store versions, forced updates, What's new, the November 2026 release gates: `handbook/updates.md`
 - Sentry, the health report, Claude fix, the Claude key: `handbook/health.md`
