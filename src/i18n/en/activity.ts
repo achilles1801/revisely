@@ -289,7 +289,7 @@ export const activity = {
     tapHint: 'Tap the ayah you reached',
     fadedHint: 'Faded is already memorized',
     holdHint: 'Hold an ayah to start there',
-    moveHint: 'Tap another to move it · hold to start there',
+    moveHint: 'Tap another to move it',
     goOn: 'Go on to the {{page}}',
     pageDone: 'This page is already memorized',
     wholePage: 'Whole page',

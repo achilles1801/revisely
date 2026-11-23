@@ -373,7 +373,7 @@ export const activity: NonNullable<ArStrings['activity']> = {
     tapHint: 'اضغط على الآية التي وصلت إليها',
     fadedHint: 'الباهت محفوظ من قبل',
     holdHint: 'اضغط مطولًا على آية للبدء منها',
-    moveHint: 'اضغط على آية أخرى لنقله · مطولًا للبدء منها',
+    moveHint: 'اضغط على آية أخرى لنقله',
     goOn: 'تابع إلى {{page}}',
     pageDone: 'هذه الصفحة محفوظة من قبل',
     wholePage: 'الصفحة كاملة',

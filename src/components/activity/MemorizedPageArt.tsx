@@ -18,6 +18,8 @@ import { t } from '../../i18n';
 
 /** The line in the margin, beside the page's text. */
 const MARGIN_LINE = 2;
+/** How much of the sheet's colour lies over an ayah already memorized. */
+const FADED = 0.6;
 
 /** A small copy decodes at its own size on Android too (the reader's pages are drawn as decoded). */
 const thumbImageProps = () => (Platform.OS === 'android' ? ({ resizeMethod: 'resize' } as const) : {});
@@ -44,6 +46,8 @@ export function MemorizedPageArt({
 }) {
   const { palette, isDark } = useTheme();
   const read = getReadPalette(isDark);
+  // The big page sits on the sheet itself (in dark, a black page was a box on it); a preview is a small page of its own.
+  const paper = thumb ? read.pageBg : palette.sheet;
   const edition = getMushafEdition();
   const [uri, setUri] = useState<string | null>(() => getCachedPageUri(page, edition));
 
@@ -99,7 +103,7 @@ export function MemorizedPageArt({
   });
 
   return (
-    <View style={[styles.page, { width: size.width, height: size.height, backgroundColor: read.pageBg }]} pointerEvents="none">
+    <View style={[styles.page, { width: size.width, height: size.height, backgroundColor: paper }]} pointerEvents="none">
       {chosenRects.map((r, i) => (
         <View key={i} testID="picker-chosen" style={[styles.rect, box(r), { backgroundColor: palette.highlight }]} />
       ))}
@@ -114,7 +118,7 @@ export function MemorizedPageArt({
         />
       ) : null}
       {fadedRects.map((r, i) => (
-        <View key={i} testID="picker-faded" style={[styles.rect, box(r), { backgroundColor: read.peekVeil }]} />
+        <View key={i} testID="picker-faded" style={[styles.rect, box(r), { backgroundColor: paper, opacity: FADED }]} />
       ))}
       {thumb
         ? null

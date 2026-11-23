@@ -82,7 +82,7 @@ function AyahList({
 }) {
   const { palette } = useTheme();
   return (
-    <ScrollView style={styles.flex} testID="memorized-picker-list">
+    <ScrollView style={styles.list} testID="memorized-picker-list">
       {note ? (
         <View style={styles.note}>
           <Ionicons name="cloud-download-outline" size={16} color={palette.secondary} />
@@ -313,24 +313,22 @@ export function MemorizedPagePicker({
           {arrow(pageBefore, 'chevron-forward', 'memorized-picker-prev')}
         </View>
 
+        {/* Two lines in every state, so the page never changes size under the finger. */}
         <View style={[styles.bar, { backgroundColor: palette.bubble }]}>
-          <View style={styles.flex}>
-            <View style={styles.line}>
-              <Text style={[typeV2.name, { color: palette.text }]} maxFontSizeMultiplier={MAX_SCALE} testID="memorized-picker-headline">
-                {headline}
-              </Text>
-              {stoppedWords ? (
-                <Text style={[arabicFullV2(16), styles.words, { color: palette.text }]} numberOfLines={1} maxFontSizeMultiplier={MAX_SCALE}>
-                  {`«${stoppedWords}»`}
-                </Text>
-              ) : null}
-            </View>
-            {sub ? (
-              <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={MAX_SCALE}>
-                {sub}
+          <View style={styles.line}>
+            <Text style={[typeV2.name, styles.headline, { color: palette.text }]} numberOfLines={2} maxFontSizeMultiplier={MAX_SCALE} testID="memorized-picker-headline">
+              {headline}
+            </Text>
+            {stoppedWords ? (
+              <Text style={[arabicFullV2(15), styles.words, { color: palette.text }]} numberOfLines={1} maxFontSizeMultiplier={MAX_SCALE}>
+                {`«${stoppedWords}»`}
               </Text>
             ) : null}
           </View>
+          <View style={styles.barFoot}>
+          <Text style={[typeV2.meta, styles.flex, { color: palette.secondary }]} numberOfLines={2} maxFontSizeMultiplier={MAX_SCALE}>
+            {sub ?? ''}
+          </Text>
           {chosenHere.length < open.length ? (
             <Tap
               onPress={() => edit((d) => wholePage(d, page, memorized))}
@@ -357,6 +355,7 @@ export function MemorizedPagePicker({
               </Text>
             </Tap>
           ) : null}
+          </View>
         </View>
       </View>
 
@@ -372,6 +371,7 @@ export function MemorizedPagePicker({
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
+  list: { flex: 1, alignSelf: 'stretch' },
   body: { paddingTop: 6 },
   area: { flex: 1, alignItems: 'center', justifyContent: 'center', alignSelf: 'stretch' },
   nav: { direction: 'ltr', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 8 },
@@ -379,8 +379,11 @@ const styles = StyleSheet.create({
   arrowGap: { width: 36 },
   arrowText: { fontWeight: '600', flexShrink: 1 },
   where: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3, minHeight: 36 },
-  bar: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, padding: 12, borderRadius: 14 },
-  line: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 6 },
+  bar: { marginTop: 8, paddingHorizontal: 12, paddingTop: 2, paddingBottom: 8, borderRadius: 14 },
+  // As tall as a line of Arabic at 15, with or without the words.
+  line: { flexDirection: 'row', alignItems: 'center', columnGap: 6, minHeight: 38 },
+  headline: { flexShrink: 1 },
+  barFoot: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 36 },
   words: { writingDirection: 'rtl', flexShrink: 1 },
   pill: { minHeight: 36, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 18 },
   pillText: { fontWeight: '600' },
