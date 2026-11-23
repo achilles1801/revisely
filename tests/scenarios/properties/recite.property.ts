@@ -44,7 +44,7 @@ import {
   LIVE_IDLE,
   type LiveState,
 } from '../../../src/lib/reciteLive/state';
-import { AT_LAG, clipRange, endsPhrase, LEAD, MAX_SECONDS, phraseOf, SHORT_WORDS, TAIL } from '../../../src/lib/reciteLive/phrase';
+import { AT_LAG, clipRange, endsPhrase, LEAD, MAX_SECONDS, phraseOf, SHORT_WORDS, TAIL, WORDS_AFTER, WORDS_BEFORE } from '../../../src/lib/reciteLive/phrase';
 import { pagesReached, perPageLabel, PER_PAGE_FROM } from '../../../src/lib/reciteLive/score';
 import { expectedPhrase, recitedPhrase } from '../../../src/lib/reciteLive/describe';
 import { socketFeed, CATCHUP_SLICE_SAMPLES, CATCHUP_TICK_MS, KEEPALIVE_MS, WATCHDOG_MS, type SocketLike } from '../../../src/lib/reciteLive/socket';
@@ -1194,6 +1194,19 @@ describe('[RECITE-17] the score opens something whenever it shows', () => {
 describe('[RECITE-18] Your recitation plays the phrase the mistake is in', () => {
   // A take over one ayah and the next: the cursor reaches each word `step` seconds after the one before (some never:
   // skipped), from `from` seconds.
+  const overAyah = (t: { w: number; from: number; step: number; skipped: number[]; kind: (typeof KINDS)[number]; tail: number }) => {
+    const r = words.ref(t.w);
+    const [a0, a1] = words.verseRange(r.sura, r.ayah);
+    const end = Math.min(words.count, a1 + 40);
+    const times = new Map<number, number>();
+    for (let i = a0; i < end; i++) {
+      if (i !== t.w && t.skipped.includes(i - a0)) continue;
+      if (t.kind === 'skipped' && i === t.w) continue;
+      times.set(i, t.from + (i - a0) * t.step);
+    }
+    const takeEnd = t.from + (end - a0) * t.step + t.tail;
+    return { ...t, a0, a1, times, takeEnd, mark: { id: 'm', w: t.w, ayah: [r.sura, r.ayah], kind: t.kind, sure: 'clear' } as Mark };
+  };
   const takeOverAyah = fc
     .record({
       w: fc.integer({ min: words.verseFirstWord(2, 1), max: words.count - 2 }),
@@ -1203,19 +1216,9 @@ describe('[RECITE-18] Your recitation plays the phrase the mistake is in', () =>
       kind: fc.constantFrom(...KINDS),
       tail: fc.double({ min: 0, max: 20, noNaN: true }),
     })
-    .map((t) => {
-      const r = words.ref(t.w);
-      const [a0, a1] = words.verseRange(r.sura, r.ayah);
-      const end = Math.min(words.count, a1 + 40);
-      const times = new Map<number, number>();
-      for (let i = a0; i < end; i++) {
-        if (i !== t.w && t.skipped.includes(i - a0)) continue;
-        if (t.kind === 'skipped' && i === t.w) continue;
-        times.set(i, t.from + (i - a0) * t.step);
-      }
-      const takeEnd = t.from + (end - a0) * t.step + t.tail;
-      return { ...t, a0, a1, times, takeEnd, mark: { id: 'm', w: t.w, ayah: [r.sura, r.ayah], kind: t.kind, sure: 'clear' } as Mark };
-    });
+    .map(overAyah);
+  /** phrase.ts's AROUND: a phrase's words never reached play from this long before the next word that was. */
+  const ACROSS_SECONDS = 2;
 
   it(`never more than ${MAX_SECONDS} s, inside the take, around the mistake, and never past its ayah`, () => {
     fc.assert(
@@ -1266,14 +1269,37 @@ describe('[RECITE-18] Your recitation plays the phrase the mistake is in', () =>
         const ayahSeconds = (t.times.get(firstHeard(t.a1, t.a1 + 40)!) ?? t.takeEnd) - t.times.get(ayahFirst)!;
         if (short && ayahSeconds + LEAD + TAIL <= MAX_SECONDS) expect(c0).toBeCloseTo(Math.max(0, t.times.get(ayahFirst)! - AT_LAG - LEAD));
         else {
-          // Never before the phrase's first word the cursor reached.
+          // Never before the phrase's first word the cursor reached; or, in a phrase too long to play whole with none of
+          // the words around the mistake reached, the moment before the next word that was, so the skip is heard.
           const [p0, p1] = phraseOf(words, t.w);
           const pFirst = firstHeard(p0, p1);
-          if (pFirst != null) expect(c0).toBeGreaterThanOrEqual(Math.min(t.times.get(pFirst)!, t.times.get(ayahFirst)!) - AT_LAG - LEAD - 1e-9);
+          const nearby = firstHeard(Math.max(p0, t.w - WORDS_BEFORE), Math.min(p1, t.w + WORDS_AFTER));
+          const room = nearby == null ? ACROSS_SECONDS : 0;
+          if (pFirst != null) expect(c0).toBeGreaterThanOrEqual(Math.min(t.times.get(pFirst)!, t.times.get(ayahFirst)!) - AT_LAG - LEAD - room - 1e-9);
           for (let i = p0; i < p1; i++) expect(endsPhrase(i)).toBe(false);
         }
       }),
     );
+  });
+});
+
+describe('[RECITE-18] a long phrase whose first words were skipped', () => {
+  // Develop's Scenarios failed on this (seed 89377117, Nov 23 2026): the test's bound, not the clip. The reciter came in at
+  // the fifth word of an ayah whose first phrase runs past 15 s, so none of the words around the mistake were reached.
+  it('plays from 2 s before the first word reached, to just past it, so the skip is heard', () => {
+    const w = 28697;
+    const from = 2;
+    const step = 1.0923076923076924;
+    const [a0, a1] = words.verseRange(words.ref(w).sura, words.ref(w).ayah);
+    expect(a0).toBe(w);
+    const [p0, p1] = phraseOf(words, w);
+    expect(p1 - p0).toBeGreaterThan(WORDS_AFTER);
+    const times = new Map<number, number>();
+    for (let i = a0 + 4; i < a1 + 40; i++) times.set(i, from + (i - a0) * step);
+    const first = times.get(a0 + 4)!;
+    const clip = clipRange(words, { id: 'm', w, ayah: [words.ref(w).sura, words.ref(w).ayah], kind: 'skipped', sure: 'clear' } as Mark, (x) => times.get(x) ?? null, from + (a1 + 40 - a0) * step)!;
+    expect(clip[0]).toBeCloseTo(first - AT_LAG - LEAD - 2);
+    expect(clip[1]).toBeCloseTo(first - AT_LAG + TAIL);
   });
 });
 
