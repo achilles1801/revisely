@@ -39,7 +39,7 @@ appId: com.revisionbuddy.app
     timeout: 10000
 - assertVisible:
     id: session-page
-    text: "At.Tariq and Al.A'la · .*"
+    text: "At.Tariq · .*"
 # AHEAD-5: three of Wednesday's pages, swiped (591–593).
 - runFlow:
     file: ../subflows/swipe-pages.yaml
@@ -152,4 +152,4 @@ appId: com.revisionbuddy.app
     timeout: 10000
 - assertVisible:
     id: session-page
-    text: "Al.'Asr, Al.Humazah and Al.Fil · .*"
+    text: "Al.'Asr to Al.Fil · .*"

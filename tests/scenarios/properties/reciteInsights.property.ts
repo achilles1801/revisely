@@ -267,7 +267,7 @@ describe('Recite insights over generated takes [RINS-1]', () => {
     const [a, b] = PASSAGES[0];
     const recs = records([{ from: a, to: b, offset: 0, strict: false, hidden: false, deleted: false, accuracy: 0.98, secs: 60, marks: [] }], []);
     expect(recitationForRevo(recs, TODAY, null)).toBeNull();
-    expect(recitationForRevo(recs, TODAY, words)?.last?.passage.name).toBe('Al-Kahf, ayahs 17–26');
+    expect(recitationForRevo(recs, TODAY, words)?.last?.passage.name).toBe('Al-Kahf, 3rd to 4th page');
   });
 });
 

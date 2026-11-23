@@ -1590,8 +1590,8 @@ shows up once and they must go through it and complete it … just the main stuf
   first "1st page", its last "last page"; a surah of a page or less, its name alone). A run is "Maryam, 3rd to 5th page",
   "Maryam, first 3 pages", "Maryam, last 3 pages", and at a juz's edge "Juz 2, first 5 pages". Across surahs it is the
   names, "Maryam to Ta-Ha"; only the › sheet's header gives the page at each end. Part of a page reads "Maryam, 3rd page ·
-  start" (or middle, or end). A page holding two surahs counts for both, and alone is named by the one that fills more of
-  it. A place to start is the surah or juz the page opens, else its page: "Starts at Al-Mujadila", "Tomorrow starts at
+  start" (or middle, or end). A page holding two surahs counts for both, and alone is named by the one it opens with, else
+  the one that fills more of it. A place to start is the surah or juz the page opens, else its page: "Starts at Al-Mujadila", "Tomorrow starts at
   Juz 2", "Continue at Al-Hashr, 3rd page". Amounts are fine ("20 pages"). The mushaf's page numbers stay a quiet detail
   (the › sheet's "… · pp. 542–561"), inside the reader and the session, and where the user chooses by page (Jump to's Page
   tab, From and To). Ayah numbers stay only where a verse is cited or played: a held verse, search results, Audio Options

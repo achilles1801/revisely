@@ -72,7 +72,7 @@ appId: com.revisionbuddy.app
 - runFlow: ../subflows/show-controls.yaml
 - assertVisible:
     id: session-page
-    text: "An.Nazi'at · Juz 30 · .*"
+    text: "An.Nazi'at, last.page · Juz 30 · .*"
 - tapOn:
     id: session-pages
 - extendedWaitUntil:

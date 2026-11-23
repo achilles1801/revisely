@@ -19,7 +19,7 @@
 //                        under it, apart from the name so screens style it
 //
 // A page holding two surahs counts for both: it is the first's last page and the second's 1st. Alone it is named by the
-// surah that fills more of it.
+// surah it opens with, else the one that fills more of it.
 //
 // Ayah numbers stay only where a verse is being cited or played (`form: 'ayahs'` / 'ayahsCompact': a held verse, search
 // results, Audio Options, "Play from").
@@ -310,7 +310,7 @@ function insideSurah(run: AyahRun, sura: number, form: PassageForm, wholeJuz: bo
 
 /**
  * One page by itself. A page with two or more whole short surahs is named by them ("Ad-Duha to Ash-Sharh"); a page
- * holding two surahs by the one that fills more of it, as "Maryam, last page" or "Ta-Ha, 1st page".
+ * holding two surahs by the one it opens with ("At-Tariq"), else the one that fills more of it ("Ta-Ha, 1st page").
  */
 function pageName(page: number, edition: MushafEditionId, asPlace = false): string {
   const fills = new Map<number, number>();
@@ -325,7 +325,10 @@ function pageName(page: number, edition: MushafEditionId, asPlace = false): stri
     return t('lib.passages.fromTo', { from: surahName(whole[0]), to: surahName(whole[whole.length - 1]) });
   }
   if (suras.length === 1 && whole.length === 1) return surahName(whole[0]);
-  const most = suras.reduce((best, s) => ((fills.get(s) ?? 0) > (fills.get(best) ?? 0) ? s : best));
+  // A page that opens a surah goes by it, as "Starts at" does, so Home and the session name the page alike.
+  const first = firstAyahOfPage(page, edition);
+  const most =
+    ayahOf(first) === 1 ? suraOf(first) : suras.reduce((best, s) => ((fills.get(s) ?? 0) > (fills.get(best) ?? 0) ? s : best));
   return inside(surahName(most), pageWords(most, page, edition));
 }
 
