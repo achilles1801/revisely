@@ -368,9 +368,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['MEM-8'],
     routes: ['Activity'],
     text: lines(
-      '- In Revisely Dev, Activity → + → “Memorized” has the tabs “On the page”, “Surah” and “Juz” (in place of Ayahs and Whole pages). “Choose on the page” opens the mushaf page where they left off, with what is memorized faded.',
-      '- Tap the ayah you reached: it fills from the first ayah to go on that page. Another tap moves it, holding an ayah starts there, and “Whole page” and “Clear” act on the page. The arrows go to the next page; the line between them goes to a surah or juz. “Done” returns to the sheet, which shows the chosen pages with “Change”.',
-      '- It is separate from the reader: no recording, audio or timer there, and it doesn’t move the reader’s place. With VoiceOver, or a page not downloaded while offline, it is a list of each ayah’s first words.',
+      '- Activity → + → “Memorized” has “On the page”, “Surah” and “Juz”. “Choose on the page” opens the mushaf where they left off: tap the ayah reached and it fills from the first ayah to go; “Whole page” and “Clear” act on the page, and “Done” returns. It doesn’t move the reader’s place. With VoiceOver or a page not downloaded, it’s a list of first words.',
     ),
   },
   {
@@ -411,7 +409,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
       '- Settings → About → “Licences” shows, in full, the licence of the model Revisely’s recitation checking is built on (the Quran Muaalem License); it opens without a connection.',
       '- Settings → Testing → “Mistake detection model” says which model the checker runs for Recite, Mistakes and Strict (for example v7), read from the checker when Settings opens; a tap asks again.',
       '- Settings → Appearance → “Language”: “Phone’s language”, English or العربية (Arabic, right to left). Revisely restarts to change it (“Restart”, or “Not now” for the next launch). In Arabic, Revo answers in Arabic too. The Arabic is still being written: what isn’t translated yet shows in English. The store app is English only for now. In Arabic the mushaf still turns like a printed one: page 1 on the right, the next page from the left.',
-      '- Rating Revisely: Settings → Help and support → “Rate Revisely” opens the App Store’s Write a Review page (Revisely’s Google Play page on Android). After finishing a day’s revision with a streak of 7 days or more, the end card may also show “Enjoying Revisely? Rate it”: at most 3 times ever, four months apart, never in an account’s first week, and never again once it is tapped or dismissed with its ✕ (or Rate Revisely is used). Rating is always optional and nothing is given for it.',
+      '- Rating Revisely: Settings → Help and support → “Rate Revisely” opens the store’s review page. After a day’s revision with a streak of 7 days or more, the end card may show “Enjoying Revisely? Rate it”: at most 3 times ever, four months apart, never in an account’s first week, never again once tapped or dismissed. Rating is optional and nothing is given for it.',
     ),
   },
   {
@@ -433,9 +431,9 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['RMEM-7'],
     routes: ['QuranReader', 'ActiveRevision'],
     text: lines(
-      '- After a take with Mark mistakes, its summary lists their earlier takes of the same stretch, newest first, up to 5, as "This passage: your last 3 takes": a take counts when it shares at least half of its ayat with this one and this one at least half of its own (a whole-page take isn’t the history of two of its ayat). Each row says the day (“Earlier today”, “Yesterday”, a weekday, then "9 days ago", "3 weeks ago"), its score by the page and its mistakes (tajweed notes and Not clear never count), its ayat when they differ from this take’s, and whether the page was hidden. Unfinished and deleted takes aren’t listed. With no earlier take there is no such section.',
+      '- After a take with Mark mistakes, its summary lists up to 5 earlier takes of the same stretch, newest first, as "This passage: your last 3 takes" (a take counts when each shares at least half its ayat with the other). Each row says the day, its score by the page and its mistakes (tajweed notes and Not clear never count), its ayat when they differ, and whether the page was hidden. Unfinished and deleted takes aren’t listed.',
       '- A tap on a row shows that take on its page with its marks until Done, as Show on the page does. “Your progress here” under it still opens every take of the passage with the chart.',
-      '- “Your progress here” and “Your progress” compare like with like: the trend line, the score and the chart count only takes of the same stretch (by the same rule), so a longer take’s mistakes in other ayat never count for or against it. “Your takes here” still lists every take that covers half of the passage, each with its ayat; “The score and chart count only your takes of these ayat” says when some are left out of the chart.',
+      '- “Your progress here” and “Your progress” count only takes of the same stretch (by the same rule) in the trend, score and chart. “Your takes here” still lists every take covering half of the passage, each with its ayat.',
     ),
   },
   {
@@ -455,7 +453,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['RECITE-22'],
     routes: ['QuranReader', 'ActiveRevision'],
     text: lines(
-      '- A recitation can go on as long as they like, in the reader or a whole revision session (30–45 minutes for 20 pages): the server checks 15 minutes at a time, and Revisely joins those pieces by itself, at a pause after an ayah near the 15 minutes. Nothing stops or changes on screen: the bar keeps listening, the time keeps running, and every mistake marked stays.',
+      '- A recitation can go on as long as they like, in the reader or a whole session: the server checks 15 minutes at a time and Revisely joins the pieces by itself. Nothing stops or changes on screen, and every mistake marked stays.',
       '- Stop ends it as usual, and the summary covers the whole recitation: one score, one recording, and one take in “Recited” and “Your progress”. “Your recitation” plays for any mistake in it, during and after Stop, from the recitation’s recording; with “Save recordings when you recite” off (Settings, Recite) nothing keeps the earlier parts’ audio, so only mistakes in its last 15-minute part play.',
     ),
   },
@@ -476,10 +474,10 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
       '- Activity → “Insights” → “Recitation” says the same for its range, under the score: the mistakes a page across their takes of 2 pages or more ("Takes of 2 pages or more: 1.2 mistakes a page"). You are told it for the last 4 weeks; takes of a page or less aren’t in it.',
       '- “Your recitation” on a mark’s card plays the phrase the mistake is in, from the pause mark before it to the next (any but ۙ), or the whole ayah when it’s short (12 words or fewer, or 8 seconds or less); never more than 15 seconds. A skipped word plays from the word before it, so the jump is heard.',
       '- When a take starts, the cursor shows where they seem to be within a second or two of their first word (the page shown only), and settles once the app is sure where they started; "Listening…" stays until then.',
-      '- On a hidden page a word shows once it has been said in full, the next word has begun, or it has been the word being said about as long as it takes to say (a long madd waits for its end), never a word ahead; nothing is drawn on the word being said, still hidden, and the newest word shown is in green ink, the following colour (as the word being said in the bar); the words before it are in the page’s own ink, and a word with a mark keeps its highlight instead. The bar shows no more than the page.',
+      '- On a hidden page a word shows once it has been said in full or the next word has begun (a long madd waits for its end), never a word ahead. Nothing is drawn on the word being said; the newest word shown is in green ink, and a word with a mark keeps its highlight. The bar shows no more than the page.',
       '- A hidden page looks empty: a faint line where each line’s words are still hidden, the ayah markers whole, and each word appears in place, whole, once it is shown.',
       '- Hiding the page during a take keeps everything they have already passed on show (the page before where they started, and what they recited) and hides only what comes next. When a take stops, what they recited stays shown (with anything shown by hand) until they hide the page again. Hiding it after a take hides everything; the take’s mistakes still show where they are and can be tapped.',
-      '- Highlights on the page are soft pastel washes behind the word (rounded, fading out at the edges, a little wider than the word), not boxes: the mistakes’ red, amber and violet, and past mistakes lighter. With the page shown, a flat grey band lies behind the whole ayah being recited, across every line of it, and a firmer grey rectangle on the word being recited moves word by word with them, never ahead',
+      '- Highlights on the page are soft pastel washes behind the word, not boxes: the mistakes’ red, amber and violet, past mistakes lighter. With the page shown, a flat grey band lies behind the ayah being recited and a firmer grey rectangle follows the word being recited, never ahead',
     ),
   },
   {
