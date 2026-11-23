@@ -44,6 +44,9 @@ public class ReciteEngineModule: Module {
     /// Which engine this build linked: recite-core or its stub (core/fetch.js), as JSON.
     Function("coreInfo") { () -> String in RECCore.infoJSON() }
 
+    /// The highest the app's memory has been since it started, in MB (what iOS counts against it).
+    Function("memoryPeakMb") { () -> Double in RECBench.peakFootprintMb() }
+
     // The engine (recite_core.h) on its own thread: RECEngine. A take's frames come back as onEngineFrames.
 
     /// Opens the engine from named files ({name, path}), read into memory. Resolves {ok, code, error, info}.

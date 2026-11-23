@@ -131,6 +131,8 @@ declare class ReciteEngineModule extends NativeModule<ReciteEngineEvents> {
   deviceInfo(): DeviceInfo;
   /** Which engine this build linked, as JSON (lib/onDevice/coreInfo reads it). Builds before the pull-in don't have it. */
   coreInfo?(): string;
+  /** The app's highest memory since it started, in MB (iOS: its footprint; Android: resident, VmHWM). 0: not known. */
+  memoryPeakMb?(): number;
   // The engine (recite_core.h) on one background thread; a take's frames come back as onEngineFrames. Builds before it
   // don't have these (lib/onDevice/engine).
   /** Opens the engine from named files, read into memory; an engine already open is released first. */

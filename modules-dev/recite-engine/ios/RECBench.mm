@@ -2,6 +2,7 @@
 #import "RECBench.h"
 #import <UIKit/UIKit.h>
 #import <mach/mach.h>
+#include <cstddef>
 
 #include "RECBenchCore.hpp"
 
@@ -28,6 +29,15 @@ static NSArray<NSNumber *> *numbers(const std::vector<double> &v) {
   mach_msg_type_number_t count = TASK_VM_INFO_COUNT;
   if (task_info(mach_task_self(), TASK_VM_INFO, (task_info_t)&info, &count) != KERN_SUCCESS) return 0;
   return info.phys_footprint / 1048576.0;
+}
+
++ (double)peakFootprintMb {
+  task_vm_info_data_t info;
+  mach_msg_type_number_t count = TASK_VM_INFO_COUNT;
+  if (task_info(mach_task_self(), TASK_VM_INFO, (task_info_t)&info, &count) != KERN_SUCCESS) return 0;
+  const size_t needed = offsetof(task_vm_info_data_t, ledger_phys_footprint_peak) + sizeof info.ledger_phys_footprint_peak;
+  if (count * sizeof(natural_t) < needed) return 0;
+  return info.ledger_phys_footprint_peak / 1048576.0;
 }
 
 + (NSDictionary<NSString *, id> *)run:(NSDictionary<NSString *, id> *)options
