@@ -180,9 +180,10 @@ one slow PR instead of a broken develop.
 
 ## When develop is red
 
-E2E failing on a push to develop, or in the nightly run, opens (or updates) one issue labelled
-**`develop-red`** (`scripts/e2e/develop-red.js`): per platform, the failing flows, the run and each
-flow's first failing step, and the **suspects**: the PRs merged since that platform's last green run,
+E2E failing on a push to develop, or in the nightly run, or the scenario suite failing on what landed
+(Revisely Dev gets a merged PR before that suite runs, so this is said at once), opens (or updates) one
+issue labelled **`develop-red`** (`scripts/e2e/develop-red.js`): per platform, the failing flows, the run
+and each flow's first failing step, and the **suspects**: the PRs merged since that platform's last green run,
 the ones that changed a file a failing flow uses in bold. The first run green on every platform that
 was red closes it. Fix it like any failure; don't wait for it to pass on its own.
 

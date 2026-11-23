@@ -124,6 +124,14 @@ main is strictly for production"):
      - The publishing half checks the tree's scenario artifact and that the commit is on the branch
        itself, so a run by hand can't skip the gate.
      - `dry_run` (by hand) tries both halves without building or publishing.
+     - With no native build the publishing half is one job on one machine (Nov 23 2026).
+     - **Revisely Dev doesn't wait for this** (Majd, Nov 23 2026: "yeah let's do it"): a merged PR whose own
+       `Required` passed goes to the `dev` channel at the merge (`dev-at-merge.yml`, its own workflow, so
+       it can't stop preview). The tests after the merge still run, and `preview` and production still
+       wait for them. Two PRs that clash can briefly put a broken update on Dev; a failure after the merge
+       opens the `develop-red` issue. A push with no such PR, or a native change, reaches Dev through
+       Preview after the tests. Dev's updates carry `[commit <sha>]`, so an older commit never replaces a
+       newer one (`.github/scripts/publish-update.sh`).
      - Before, every push waited for each older push's scenario run: 19–24 minutes from a merge to
        its update in a burst of merges.
   2. A tester's TestFlight install follows `preview`. The binary's channel is `production`; once the

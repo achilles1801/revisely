@@ -46,12 +46,13 @@ name: Preview
 # through both halves without building or publishing anything.
 #
 # Revisely Dev (CLAUDE.md "Dev stack"), when the repository variable DEV_APP is 'true': the second
-# app, on the dev Firebase project, gets the same commit after preview's update, on its own `dev`
-# channel. Its runtimes are its own (APP_VARIANT=dev, the EAS development environment), so its
-# binaries are built here too when they're missing (tags ios-dev-fp/<hash>, android-dev-fp/<hash>;
-# Android only once DEV_ANDROID_SUBMIT is on, after its first bundle went to Play Console by hand).
-# Nothing on the dev side can stop or change preview's update: preview's jobs never wait for it, and
-# Promote reads only the preview branch.
+# app, on the dev Firebase project, on its own `dev` channel. A merged PR whose own CI passed reaches
+# it at the merge (dev-at-merge.yml, Majd, Nov 23 2026); this workflow publishes to dev only what that
+# didn't (a push with no PR, a native change). Its runtimes are its own (APP_VARIANT=dev, the EAS
+# development environment), so its binaries are built here when they're missing (tags
+# ios-dev-fp/<hash>, android-dev-fp/<hash>; Android only once DEV_ANDROID_SUBMIT is on, after its first
+# bundle went to Play Console by hand). Nothing on the dev side can stop or change preview's update:
+# preview's jobs never wait for it, and Promote reads only the preview branch.
 run-name: ${{ inputs.publish && format('Preview · publish {0}', inputs.publish) || '' }}
 on:
   push:
@@ -150,6 +151,9 @@ jobs:
     timeout-minutes: 5
     permissions:
       actions: write
+      contents: read
+      issues: write # the develop-red issue, below
+      pull-requests: read
     steps:
       - env:
           GH_TOKEN: ${{ github.token }}
@@ -166,16 +170,64 @@ jobs:
             -f publish="$SHA" -f message="$SUBJECT" -f dry_run="$DRY_RUN"
           echo "::notice title=Preview::Tested. Publishing $SHA is queued (Preview · publish $SHA)."
 
+      # The suite passed on what landed: clears its line in the develop-red issue, if it was red. After
+      # the hand-over, and a failure here changes nothing.
+      - uses: actions/checkout@v4
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/develop' }}
+        continue-on-error: true
+        with:
+          sparse-checkout: |
+            scripts
+            .github
+            .maestro
+      - name: Scenarios in the develop-red issue
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/develop' }}
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          MENTION: '@${{ github.repository_owner }}'
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SHA: ${{ github.sha }}
+          SCENARIOS: 'true:true:success'
+        run: node scripts/e2e/develop-red.js
+
+  # The suite failed on what landed. Revisely Dev may already have it (dev-at-merge.yml), so this says
+  # so at once: the develop-red issue, with the PRs merged since the suite last passed.
+  scenarios-red:
+    name: Scenarios (develop-red issue)
+    needs: [gate, scenarios]
+    if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/develop' && needs.scenarios.result == 'failure' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            scripts
+            .github
+            .maestro
+      - env:
+          GITHUB_TOKEN: ${{ github.token }}
+          MENTION: '@${{ github.repository_owner }}'
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SHA: ${{ github.sha }}
+          SCENARIOS: 'true:true:failure'
+        run: node scripts/e2e/develop-red.js
+
   # The publishing half (a run with `publish`), on one machine when no native build is needed: is that
   # commit tested and on this branch, its fingerprints, preview's update, then Revisely Dev's. Until
   # Nov 23 2026 these were four jobs, each waiting for a machine and installing the app again (16.8
   # minutes for one publish on Nov 22, 9.9 of them waiting). Builds use the branch as it is now
   # (ios-build.yml and android-build.yml check out this run's commit), so they run only if what goes
   # into the app there is what was tested; otherwise a newer push changed the app, and its own run builds.
-  # When a build is needed, its update waits for it: the jobs `update` and `dev-update` below.
-  # Dev comes after preview's update in this job, so nothing on the Dev side can stop it.
+  # When a build is needed, its update waits for it: the jobs `update` and `dev-update` below. Dev's
+  # part comes after preview's update, so nothing on the Dev side can stop it.
   publish:
-    name: Tested? Fingerprint and publish
+    name: Tested? Fingerprint and publish to preview
     if: ${{ inputs.publish }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -194,7 +246,7 @@ jobs:
       build_dev_android: ${{ steps.plan-dev.outputs.build_dev_android }}
       update_after_build: ${{ steps.plan.outputs.update_after_build }}
       preview_done: ${{ steps.preview.outcome == 'success' }}
-      dev_here: ${{ steps.plan-dev.outputs.dev_here }}
+      dev_needed: ${{ steps.plan-dev.outputs.dev_needed }}
     steps:
       - name: Require an Expo token
         env:
@@ -349,12 +401,11 @@ jobs:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
         run: sh "$RUNNER_TEMP/publish-update.sh" preview production
 
-      # Revisely Dev (DEV_APP): its runtimes, from its own config, after preview's update. It starts
-      # from what a new machine would have: no bundle, no bundler cache. A failure here leaves the
-      # dev side out of this run and never fails preview's.
-      - name: Clear preview's bundle for Revisely Dev
+      # Revisely Dev (DEV_APP): its runtimes, from its own config, after preview's update. A failure
+      # here leaves the dev side out of this run and never fails preview's.
+      - name: Clear preview's bundle
         if: ${{ !cancelled() && vars.DEV_APP == 'true' && steps.plan.outcome == 'success' }}
-        run: rm -rf dist .expo "${TMPDIR:-/tmp}"/metro-* "${TMPDIR:-/tmp}"/haste-map-*
+        run: rm -rf dist .expo
 
       - name: Look for Revisely Dev builds
         id: dev
@@ -382,50 +433,50 @@ jobs:
             fi
           done
 
-      # Dev's update goes out here when preview's did and no build comes first; otherwise the job
-      # `dev-update`, after the builds.
-      - name: Revisely Dev's builds, or publish now
+      # Whether Dev still needs this commit from here. It usually has it (dev-at-merge.yml): then this
+      # run needs no second machine, and never waits for Dev's turn while holding eas-preview.
+      - name: Revisely Dev's builds, and does it need this update
         id: plan-dev
         if: ${{ !cancelled() && vars.DEV_APP == 'true' && steps.plan.outcome == 'success' }}
+        continue-on-error: true
         env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TESTED: ${{ steps.check.outputs.sha }}
           DRY_RUN: ${{ inputs.dry_run == true }}
           CAN_BUILD: ${{ steps.check.outputs.can_build }}
           DEV_IOS: ${{ steps.dev.outputs.ios_needs_build }}
           DEV_ANDROID: ${{ steps.dev.outputs.android_needs_build }}
           ANDROID_RELEASES: ${{ vars.ANDROID_RELEASES }}
           DEV_ANDROID_SUBMIT: ${{ vars.DEV_ANDROID_SUBMIT }}
+          AFTER_BUILD: ${{ steps.plan.outputs.update_after_build }}
           PREVIEW: ${{ steps.preview.outcome }}
+          PLATFORM: ${{ vars.ANDROID_RELEASES == 'true' && 'all' || 'ios' }}
+          DEV_IOS_RUNTIME: ${{ steps.dev.outputs.ios_hash }}
+          DEV_ANDROID_RUNTIME: ${{ steps.dev.outputs.android_hash }}
         run: |
           build_dev_ios=false; build_dev_android=false
           if [ "$CAN_BUILD" = true ] && [ "$DRY_RUN" != true ]; then
             [ "$DEV_IOS" = true ] && build_dev_ios=true
             [ "$ANDROID_RELEASES" = true ] && [ "$DEV_ANDROID_SUBMIT" = true ] && [ "$DEV_ANDROID" = true ] && build_dev_android=true
           fi
-          dev_here=false
-          if [ "$PREVIEW" = success ] && [ "$build_dev_ios" = false ] && [ "$build_dev_android" = false ]; then dev_here=true; fi
-          echo "Revisely Dev: iOS build $build_dev_ios, Android build $build_dev_android, its update here: $dev_here"
-          { echo "build_dev_ios=$build_dev_ios"; echo "build_dev_android=$build_dev_android"; echo "dev_here=$dev_here"; } >> "$GITHUB_OUTPUT"
-
-      - name: Write Revisely Dev's Firebase plist
-        if: ${{ steps.plan-dev.outputs.dev_here == 'true' }}
-        env:
-          PLIST: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST_DEV }}
-        run: |
-          if [ -z "$PLIST" ]; then
-            echo "::error::Add the GOOGLE_SERVICE_INFO_PLIST_DEV repository secret (base64 of the dev project's plist), or turn DEV_APP off."
-            exit 1
+          { echo "build_dev_ios=$build_dev_ios"; echo "build_dev_android=$build_dev_android"; } >> "$GITHUB_OUTPUT"
+          dev_needed=true
+          if [ "$AFTER_BUILD" != true ] && [ "$PREVIEW" != success ]; then
+            dev_needed=false # preview's update failed: Dev doesn't go first
+          elif [ "$AFTER_BUILD" != true ] && [ "$build_dev_ios" = false ] && [ "$build_dev_android" = false ]; then
+            going=$(gh api "repos/$REPO/actions/workflows/dev-at-merge.yml/runs?head_sha=$TESTED&per_page=10" \
+              --jq '[.workflow_runs[] | select(.status != "completed")] | length' 2>/dev/null || echo 0)
+            if [ "$going" -gt 0 ]; then
+              dev_needed=false
+              echo "Revisely Dev at merge is publishing this commit."
+            elif sh "$RUNNER_TEMP/publish-update.sh" dev development check | grep -qx 'needed=false'; then
+              dev_needed=false
+              echo "The dev channel already has this commit or a newer one."
+            fi
           fi
-          echo "$PLIST" | base64 -d > GoogleService-Info.plist
-
-      - name: eas update (dev)
-        if: ${{ steps.plan-dev.outputs.dev_here == 'true' }}
-        env:
-          APP_VARIANT: dev
-          MESSAGE: ${{ inputs.message }}
-          PLATFORM: ${{ vars.ANDROID_RELEASES == 'true' && 'all' || 'ios' }}
-          DRY_RUN: ${{ inputs.dry_run == true }}
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-        run: sh "$RUNNER_TEMP/publish-update.sh" dev development clear
+          echo "Revisely Dev: iOS build $build_dev_ios, Android build $build_dev_android, update still needed: $dev_needed"
+          echo "dev_needed=$dev_needed" >> "$GITHUB_OUTPUT"
 
   build:
     name: Build
@@ -527,15 +578,19 @@ jobs:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
         run: sh "$RUNNER_TEMP/publish-update.sh" preview production
 
-  # Revisely Dev's update when a build came first (its own, or the store app's, whose update goes
-  # first): the same commit, after preview's, on the `dev` channel, with the dev project's config
-  # (EAS development environment) and APP_VARIANT=dev, so it runs only on Revisely Dev's runtime.
-  # Published even when its build failed, as preview's is.
+  # Revisely Dev's update, when it doesn't have this commit yet: no PR with a passed check, or a build
+  # came first (its own, or the store app's, whose update goes first). The same commit, after
+  # preview's, on the `dev` channel, with the dev project's config (EAS development environment) and
+  # APP_VARIANT=dev, so it runs only on Revisely Dev's runtime. Published even when its build failed,
+  # as preview's is. It takes eas-dev's turn, then publish-update.sh checks again.
   dev-update:
-    name: Publish Revisely Dev update (after the build)
+    name: Publish Revisely Dev update
     needs: [publish, update, dev-build, dev-android-build]
-    if: ${{ !cancelled() && vars.DEV_APP == 'true' && needs.publish.outputs.dev_here != 'true' && (needs.update.result == 'success' || needs.publish.outputs.preview_done == 'true') }}
+    if: ${{ !cancelled() && vars.DEV_APP == 'true' && needs.publish.outputs.dev_needed == 'true' && (needs.update.result == 'success' || needs.publish.outputs.preview_done == 'true') }}
     runs-on: ubuntu-latest
+    concurrency:
+      group: ${{ inputs.dry_run && 'eas-dev-dry-run' || 'eas-dev' }}
+      cancel-in-progress: false
     env:
       APP_VARIANT: dev
     steps:
@@ -576,5 +631,7 @@ jobs:
           MESSAGE: ${{ inputs.message }}
           PLATFORM: ${{ vars.ANDROID_RELEASES == 'true' && 'all' || 'ios' }}
           DRY_RUN: ${{ inputs.dry_run == true }}
+          DEV_IOS_RUNTIME: ${{ needs.publish.outputs.dev_ios_hash }}
+          DEV_ANDROID_RUNTIME: ${{ needs.publish.outputs.dev_android_hash }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
         run: sh "$RUNNER_TEMP/publish-update.sh" dev development
