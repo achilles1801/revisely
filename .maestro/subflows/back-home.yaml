@@ -1,5 +1,5 @@
-# Back (the top bar's) until Home shows.
-# After each Back it waits for Home (up to 5 s) before tapping again. The loop's own
+# Back (the top bar's) until Home shows; from a tab's own screen with no Back (Activity, TAB-2), the Home tab.
+# After each step it waits for Home (up to 5 s) before the next. The loop's own
 # check is immediate, so a Home still sliding in read as "not Home" and the next Back
 # found no button (09-insights-history, run 42783211424: Home showed a moment later).
 # A screen under this one has a Back of its own, and the wait just runs out there.
@@ -9,10 +9,22 @@ appId: com.revisionbuddy.app
     while:
       notVisible:
         id: today-post
-    times: 4
+    times: 5
     commands:
-      - tapOn:
-          id: back
+      - runFlow:
+          when:
+            visible:
+              id: back
+          commands:
+            - tapOn:
+                id: back
+      - runFlow:
+          when:
+            notVisible:
+              id: back
+          commands:
+            - tapOn:
+                id: tab-Home
       - extendedWaitUntil:
           visible:
             id: today-post

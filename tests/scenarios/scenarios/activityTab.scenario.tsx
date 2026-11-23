@@ -1,21 +1,18 @@
-// Activity as a tab (BEHAVIOUR.md TAB-2, Revisely Dev): Settings → Appearance → Activity tab, off until turned on and
-// kept on the phone, makes Activity a tab between Home and Read (Majd, Nov 23 2026: "a test toggle in settings for me to
-// see what it's like normal(rn) vs with it"). The app's real tabs (MainNavigator) and screens; the store app never has
-// it, whatever the phone has stored.
+// Activity's tab and Home's top bar (BEHAVIOUR.md TAB-2, HOME-1; Majd, Nov 23 2026: "i like the new style with the
+// activity being its own tab, let's make that official" … "i say we remove the qibla button/icon completely"). The app's
+// real tabs (MainNavigator) and screens, in the store app: every account has them.
 
 import type { ReactElement } from 'react';
 import { setNow, setZone, ZONES } from '../harness/clock';
 import { newAccount, pagesRange } from '../harness/account';
 import { Phone, type Booted, type OpenApp, revoMomentSeen } from '../harness/phone';
 
-const KEY = '@revisely_activity_tab:v1';
 const TABS = /^tab-(Home|ActivityTab|Read|Insights)$/;
 
-/** The app's tabs as MainNavigator mounts them, in the store app or Revisely Dev. */
-function mainTabs(dev: boolean) {
+/** The app's tabs as MainNavigator mounts them. */
+function mainTabs() {
   return (mods: Booted): ReactElement => {
     const { React, require: req } = mods;
-    if (dev) req<{ default: { expoConfig: { extra: Record<string, unknown> } } }>('expo-constants').default.expoConfig.extra.variant = 'dev';
     const { NavigationContainer } = req<any>('@react-navigation/native');
     const { MainNavigator } = req<any>('src/navigation/MainNavigator');
     const nav = req<{ navigation: { current: unknown } }>('./navRef');
@@ -40,8 +37,8 @@ async function account(): Promise<Phone> {
   return phone;
 }
 
-async function open(phone: Phone, dev: boolean): Promise<OpenApp> {
-  const app = await phone.open(mainTabs(dev));
+async function open(phone: Phone): Promise<OpenApp> {
+  const app = await phone.open(mainTabs());
   await app.until(() => app.screen.queryByTestId('tab-bar-v2') != null && app.screen.queryByTestId('open-settings') != null, 'Home and the tab bar');
   return app;
 }
@@ -63,68 +60,36 @@ async function press(app: OpenApp, testID: string | RegExp): Promise<void> {
   await app.idle(50);
 }
 
-async function openAppearance(app: OpenApp): Promise<void> {
-  await app.act(async () => {
-    navOf(app).navigate('Home', { screen: 'Settings', params: { page: 'appearance' } });
-  });
-  await app.until(() => app.screen.queryByTestId('accent-row') != null, 'Settings → Appearance');
-}
-
-async function flip(app: OpenApp, on: boolean): Promise<void> {
-  const { fireEvent } = app.mods.rtl;
-  await app.act(async () => {
-    fireEvent(app.screen.getByTestId('settings-activity-tab'), 'valueChange', on);
-  });
-  await app.until(() => app.screen.getByTestId('settings-activity-tab').props.value === on, `the switch ${on ? 'on' : 'off'}`);
-}
-
-describe('Activity as a tab (Revisely Dev)', () => {
-  it('[TAB-2] off until Settings → Appearance turns it on: then the tabs are Home, Activity, Read, Home loses its Activity button, and the choice is kept on the phone', async () => {
+describe('Activity’s tab and Home’s top bar', () => {
+  it('[TAB-2] [HOME-1] the tabs are Home, Activity and Read for every account, and Home’s top bar has only Settings', async () => {
     const phone = await account();
-    let app = await open(phone, true);
-    // Off: the app as it was.
-    expect(tabs(app)).toEqual(['tab-Home', 'tab-Read']);
-    expect(app.screen.queryByTestId('open-activity')).not.toBeNull();
-
-    await openAppearance(app);
-    expect(app.screen.getByTestId('settings-activity-tab').props.value).toBe(false);
-    await flip(app, true);
-    await app.until(() => tabs(app).length === 3, 'the Activity tab');
+    const app = await open(phone);
+    await app.until(() => tabs(app).length === 3, 'the tabs');
     expect(tabs(app)).toEqual(['tab-Home', 'tab-ActivityTab', 'tab-Read']);
     expect(app.screen.getByTestId('tab-ActivityTab').props.accessibilityLabel).toBe('Activity');
-    await app.act(async () => {
-      navOf(app).goBack();
-    });
-    await app.until(() => where(app).screen === 'Dashboard', 'Home');
+    // No Activity button and no compass: Activity is a tab, and the Qibla is on the Prayer sheet.
     expect(app.screen.queryByTestId('open-activity')).toBeNull();
+    expect(app.screen.queryByTestId('open-qibla')).toBeNull();
     expect(app.screen.queryByTestId('open-settings')).not.toBeNull();
+    expect(where(app)).toEqual({ tab: 'Home', screen: 'Dashboard' });
     await app.close();
-    expect(phone.storage.get(KEY)).toBe('1');
-
-    // Kept on the phone: the next launch has the tab.
-    app = await open(phone, true);
-    await app.until(() => tabs(app).length === 3, 'the Activity tab after a relaunch');
-    expect(tabs(app)).toEqual(['tab-Home', 'tab-ActivityTab', 'tab-Read']);
-    expect(app.screen.queryByTestId('open-activity')).toBeNull();
-
-    // Turned off: as before again.
-    await openAppearance(app);
-    await flip(app, false);
-    await app.until(() => tabs(app).length === 2, 'the tab gone');
-    expect(tabs(app)).toEqual(['tab-Home', 'tab-Read']);
-    await app.act(async () => {
-      navOf(app).goBack();
-    });
-    await app.until(() => app.screen.queryByTestId('open-activity') != null, 'Home’s Activity button back');
-    await app.close();
-    expect(phone.storage.get(KEY)).toBe('0');
   });
 
-  it('[TAB-2] the Activity tab starts at Activity with no back arrow; what it opens is pushed in its tab, a press on the tab goes back to Activity, and on the calendar’s days a swipe still steps the month', async () => {
+  it('[HOME-1] the Qibla widget’s link still opens the Prayer sheet on the Qibla', async () => {
     const phone = await account();
-    phone.storage.set(KEY, '1');
-    const app = await open(phone, true);
-    await app.until(() => tabs(app).length === 3, 'the Activity tab');
+    const app = await open(phone);
+    const { requestPrayerSheet } = app.mods.require<typeof import('../../../src/lib/widgets/links')>('src/lib/widgets/links');
+    await app.act(async () => {
+      requestPrayerSheet('qibla');
+    });
+    await app.until(() => app.screen.queryByTestId('prayer-sheet') != null && app.screen.queryByTestId('qibla-body') != null, 'the Prayer sheet on the Qibla');
+    await app.close();
+  });
+
+  it('[TAB-2] Activity’s tab starts at Activity with no back arrow; what it opens is pushed in its tab, a press on the tab goes back to Activity, and on the calendar’s days a swipe still steps the month', async () => {
+    const phone = await account();
+    const app = await open(phone);
+    await app.until(() => tabs(app).length === 3, 'the tabs');
 
     await press(app, 'tab-ActivityTab');
     await app.until(() => where(app).tab === 'ActivityTab' && app.screen.queryByTestId('activity-v2') != null, 'Activity in its tab');
@@ -133,8 +98,8 @@ describe('Activity as a tab (Revisely Dev)', () => {
     // Where its tab starts: no back arrow.
     expect(app.screen.queryByTestId('back')).toBeNull();
 
-    // On the calendar's days a sideways swipe steps the month (the tab pager waits for it); the rest of the calendar
-    // leaves sideways swipes to the pager, so it holds no responder of its own.
+    // On the calendar's days a sideways swipe steps the month (the tab pager waits for it); the rest of the screen
+    // leaves sideways swipes to the pager.
     await app.until(() => app.screen.queryByTestId('calendar-month-title') != null, 'the calendar');
     expect(app.screen.getByTestId('activity-calendar').props.onMoveShouldSetResponder).toBeUndefined();
     const title = () => app.screen.getByTestId('calendar-month-title').props.children as string;
@@ -154,7 +119,7 @@ describe('Activity as a tab (Revisely Dev)', () => {
     await app.until(() => title() !== before, 'the previous month');
     expect(title()).toBe('October 2026');
 
-    // See all, pushed in the Activity tab; Back comes back to Activity there.
+    // See all, pushed in Activity's tab; Back comes back to Activity there.
     const { fireEvent } = app.mods.rtl;
     await app.act(async () => {
       fireEvent.press(app.screen.getByLabelText('Search'));
@@ -186,29 +151,8 @@ describe('Activity as a tab (Revisely Dev)', () => {
     await app.act(async () => {
       fireEvent.press(app.screen.getByText('Activity'));
     });
-    await app.until(() => where(app).tab === 'ActivityTab', 'the Activity tab from Settings');
+    await app.until(() => where(app).tab === 'ActivityTab', 'Activity’s tab from Settings');
     expect(where(app).screen).toBe('Activity');
-    await app.close();
-  });
-
-  it('[TAB-2] the store app has no switch and no tab, even with it stored on; Activity opens from Home with its back arrow, as before', async () => {
-    const phone = await account();
-    phone.storage.set(KEY, '1');
-    const app = await open(phone, false);
-    await app.idle(300);
-    expect(tabs(app)).toEqual(['tab-Home', 'tab-Read']);
-    await press(app, 'open-activity');
-    await app.until(() => where(app).screen === 'Activity' && app.screen.queryByTestId('activity-v2') != null, 'Activity over Home');
-    expect(where(app).tab).toBe('Home');
-    expect(app.screen.queryByTestId('back')).not.toBeNull();
-    await app.until(() => app.screen.queryByTestId('activity-calendar') != null, 'the calendar');
-    // Its swipe between months is over the whole calendar, as it always was.
-    expect(app.screen.getByTestId('activity-calendar').props.onMoveShouldSetResponder).toBeDefined();
-    await app.act(async () => {
-      navOf(app).goBack();
-    });
-    await openAppearance(app);
-    expect(app.screen.queryByTestId('settings-activity-tab')).toBeNull();
     await app.close();
   });
 });

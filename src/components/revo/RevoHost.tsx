@@ -485,7 +485,7 @@ function RevoHostInner({ available, onOpenChange }: { available: boolean; onOpen
               onAction={doAction}
               onOpenDay={(date) => {
                 close();
-                // On the Home stack, or on Activity's own tab while it is one (Revisely Dev, TAB-2).
+                // In Activity's tab (TAB-2).
                 navigateToActivityDay(date);
               }}
               onOff={() => {

@@ -110,8 +110,8 @@ export function CalendarMonth({
   sections?: TabLayout<'overview'>;
   /** A gap from Insights, marked on its days (ACT-28); it fades when it goes. */
   gap?: CalendarGap | null;
-  /** The swipe between months or weeks, on the days alone (Activity as a tab, TAB-2). Without it the caller takes the
-   *  swipe over the whole calendar. */
+  /** The swipe between months or weeks, on the days alone (Activity is a tab, TAB-2: the tab pager has the rest).
+   *  Without it, only the arrows step. */
   gridSwipe?: GestureType;
 }) {
   const { palette } = useTheme();

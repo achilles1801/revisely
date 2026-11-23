@@ -464,7 +464,7 @@ appId: com.revisionbuddy.app
       enabled: true
     timeout: 30000
 # Back to Settings' first level, then Home (SET-1): Settings left open stays on Home's stack, and the tab-Home tap after
-# the takes below would show it instead of Home's open-activity.
+# the takes below would show it instead of Home.
 - runFlow:
     file: ../subflows/tap-to-open.yaml
     env:
@@ -591,7 +591,7 @@ appId: com.revisionbuddy.app
 - tapOn:
     id: tab-Home
 - tapOn:
-    id: open-activity
+    id: tab-ActivityTab
 - extendedWaitUntil:
     visible:
       id: activity-blocks-views

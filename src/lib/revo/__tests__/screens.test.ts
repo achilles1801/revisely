@@ -30,6 +30,9 @@ describe('Revo’s openScreen (REVO-31)', () => {
     expect(screenTarget(action('settings', { section: 'mushaf' }))).toEqual({ name: 'Home', params: { screen: 'Settings', params: { section: 'mushaf' }, initial: false } });
     expect(screenTarget(action('planEditor')).params).toEqual({ screen: 'PlanEdit', initial: false });
     expect(screenTarget(action('memorized')).params).toEqual({ screen: 'Memorization', params: { edit: true }, initial: false });
+    // Activity and Insights are Activity's tab (TAB-2).
+    expect(screenTarget(action('activity'))).toEqual({ name: 'ActivityTab', params: { screen: 'Activity' } });
+    expect(screenTarget(action('insights'))).toEqual({ name: 'ActivityTab', params: { screen: 'Activity' } });
   });
 
   it('Jump to opens Home, then its sheet; a request before Home listens waits for it', () => {

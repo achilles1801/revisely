@@ -517,9 +517,8 @@ function HomeSketch({ p, firstName, topInset, tabBar }: { p: P; firstName: strin
           السلام عليكم
         </Text>
         <View style={styles.sketchIcons}>
-          {(['compass-outline', 'pulse-outline', 'settings-outline'] as const).map((n) => (
-            <Ionicons key={n} name={n} size={24} color={palette.text} />
-          ))}
+          {/* Home's top bar: the gear alone (HOME-1). */}
+          <Ionicons name="settings-outline" size={24} color={palette.text} />
         </View>
       </View>
       <View style={[styles.sketchPost, { top: topInset + 64 }]}>
@@ -551,6 +550,10 @@ function HomeSketch({ p, firstName, topInset, tabBar }: { p: P; firstName: strin
         <View style={styles.sketchTab}>
           <Ionicons name="home" size={26} color={palette.text} />
           <View style={[styles.tabDot, { backgroundColor: palette.accentText }]} />
+        </View>
+        {/* Home, Activity, Read (TAB-2). */}
+        <View style={styles.sketchTab}>
+          <Ionicons name="pulse-outline" size={26} color={palette.secondary} />
         </View>
         <View style={styles.sketchTab}>
           <Ionicons name="book-outline" size={26} color={palette.secondary} />
