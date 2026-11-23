@@ -10,7 +10,7 @@ import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
 
-/** The Android pack reader against the vectors (vectors.js), on a desktop JDK. Built by run.sh. */
+/** The Android pack reader against the vectors (functions/scripts/recite-pack-vectors.js), on a desktop JDK. Built by run.sh. */
 public class Check {
   static byte[] hex(String s) {
     byte[] out = new byte[s.length() / 2];

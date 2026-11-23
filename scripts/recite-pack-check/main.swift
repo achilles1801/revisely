@@ -1,4 +1,4 @@
-// The iOS pack reader against the vectors (vectors.js). Built by run.sh with RecitePackReader.swift and RecitePackKey.swift.
+// The iOS pack reader against the vectors (functions/scripts/recite-pack-vectors.js). Built by run.sh with RecitePackReader.swift and RecitePackKey.swift.
 import CryptoKit
 import Foundation
 import Security

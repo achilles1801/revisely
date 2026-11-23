@@ -7,7 +7,7 @@ ROOT=$HERE/../..
 OUT=${1:-$(mktemp -d)}
 [ $# -gt 0 ] && shift
 [ -f "$ROOT/functions/lib/recitePack/format.js" ] || (cd "$ROOT/functions" && npx tsc)
-node "$HERE/vectors.js" "$OUT/vectors" "$@"
+node "$ROOT/functions/scripts/recite-pack-vectors.js" "$OUT/vectors" "$@"
 M=$ROOT/modules-dev/recite-engine
 mkdir -p "$OUT/swift" "$OUT/java"
 cp "$HERE/main.swift" "$OUT/swift/main.swift"

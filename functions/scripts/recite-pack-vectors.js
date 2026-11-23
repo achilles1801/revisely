@@ -2,13 +2,14 @@
 /**
  * Test vectors for the phone's pack readers (modules-dev/recite-engine: RecitePackReader.swift and .java), sealed by the
  * server's own format code, so the three stay one format. Writes OUT/*.rcpk and OUT/vectors.txt (one case a line, tab
- * separated, because the Java check has no JSON). Needs `npm run build` in functions/. Run through run.sh.
- *   node vectors.js OUT [REAL_DIR...]   each REAL_DIR: name=path,... of a real part (`core:` or `strict:` first)
+ * separated, because the Java check has no JSON). Needs `npm run build` in functions/. Run through
+ * scripts/recite-pack-check/run.sh.
+ *   node recite-pack-vectors.js OUT [REAL_DIR...]   each REAL_DIR: name=path,... of a real part (`core:` or `strict:` first)
  */
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
-const F = require('../../functions/lib/recitePack/format');
+const F = require('../lib/recitePack/format');
 
 const out = process.argv[2];
 fs.mkdirSync(out, { recursive: true });
