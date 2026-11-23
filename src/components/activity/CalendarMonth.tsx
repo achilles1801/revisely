@@ -21,9 +21,9 @@ import { ActionSheet } from '../v2/ActionSheet';
 import { ChoiceChip } from './ChoiceChip';
 import { dayMarks, dayPreview } from '../../lib/activityInsights';
 import { journalDesignEnabled } from '../../lib/release/journalDesign';
-import { DayEntry } from './DayEntry';
+import { DayEntry, type DayEntryLine } from './DayEntry';
 import { formatDayLong, formatMinutesLong } from '../../lib/activityFormat';
-import { describePassage } from '../../lib/passages';
+import { describePassage, fewPlaces } from '../../lib/passages';
 import { describeSurahRuns, pageRuns } from '../../lib/pageRanges';
 import { typeV2 } from '../../theme/v2';
 import { RecitedMark } from '../reciteMemory/TakeRows';
@@ -192,6 +192,28 @@ export function CalendarMonth({
     const count = t('activity.day.takes', { count: takes.takes });
     previewRows.push({ key: 'recited', kind: 'recited', label: t('activity.day.recited'), value: takes.pages.length > 0 ? `${describePassage(takes.pages, { form: 'short' })} · ${count}` : count });
   }
+  // The same day as one entry's lines (ACT-34): a few words and how much, never a list of places.
+  const entryLines: DayEntryLine[] = [];
+  const minutesText = (n: number | null | undefined) => (n != null && n > 0 ? formatMinutesLong(n) : undefined);
+  if (preview.revised) {
+    const planned = preview.revised.assigned > 0;
+    const count = planned ? undefined : t('common.pages', { count: preview.revised.pages.length });
+    entryLines.push({
+      key: 'revised',
+      label: t('activity.day.revised'),
+      value: planned ? t('common.nOfTotal', { n: preview.revised.done, total: preview.revised.assigned }) : fewPlaces(preview.revised.pages),
+      tail: [count, minutesText(preview.revised.minutes)].filter(Boolean).join(' · ') || undefined,
+      mics: recs?.revision,
+    });
+  }
+  if (preview.memorizedPages > 0) entryLines.push({ key: 'memorized', label: t('activity.day.memorized'), value: fewPlaces(pagesOf(data.memorized)) });
+  if (preview.readPages > 0) {
+    entryLines.push({ key: 'read', label: t('activity.day.read'), value: fewPlaces(pagesOf(data.read)), tail: minutesText(preview.readMinutes), mics: recs?.reading });
+  }
+  if (takes && takes.takes > 0) {
+    const count = t('activity.day.takes', { count: takes.takes });
+    entryLines.push({ key: 'recited', label: t('activity.day.recited'), value: takes.pages.length > 0 ? fewPlaces(takes.pages) : count, tail: takes.pages.length > 0 ? count : undefined });
+  }
   if (preview.notes) previewRows.push({ key: 'notes', kind: 'notes', label: t('activity.day.notes'), value: t('activity.calendar.oneNote') });
 
   // The sections under the header, in the user's order, those hidden left out (ACT-29): the header (the month or
@@ -271,7 +293,7 @@ export function CalendarMonth({
   const dayPart = journalDesignEnabled() ? (
     <DayEntry
       date={formatDayLong(shownDay)}
-      lines={previewRows.filter((r) => r.kind !== 'notes')}
+      lines={entryLines}
       note={noteOf?.(shownDay) ?? null}
       onOpen={() => onOpen(shownDay)}
       onAddNote={() => (onAddNote ?? onOpen)(shownDay)}

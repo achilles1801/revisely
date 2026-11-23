@@ -702,6 +702,25 @@ export function partOfSurah(sura: number, pages: Iterable<number>, edition: Mush
   return upperFirst(parts.join(t('lib.passages.listSeparator')));
 }
 
+/** A row's name for any pages stays this short, however scattered they are (ACT-34). */
+const FEW_PLACES_CHARS = 30;
+
+/**
+ * Any pages in a few words, for a row with one line: the passage when it is short, else its surahs, two at most and then how many
+ * more ("Al-Baqarah and Al-Anbiya", "Al-Baqarah and 3 more"). Never a list of places (Majd, Nov 23 2026: "this huge text of recited
+ * is unacceptable nothing should end up like that").
+ */
+export function fewPlaces(pages: Iterable<number>, edition: MushafEditionId = getMushafEdition()): string {
+  const list = [...pages];
+  if (list.length === 0) return '';
+  const whole = describePassage(list, { form: 'short', edition });
+  if (passageRunCount(list) <= 1 && plainText(whole).length <= FEW_PLACES_CHARS) return whole;
+  const suras = surahsOfPages(list, edition);
+  if (suras.length === 1) return surahName(suras[0]);
+  if (suras.length === 2) return t('lib.passages.twoPlaces', { a: surahName(suras[0]), b: surahName(suras[1]) });
+  return t('lib.passages.placesMore', { name: surahName(suras[0]), count: suras.length - 1 });
+}
+
 /**
  * The page numbers, as a quiet detail after the words where they help:
  * "p. 542", "pp. 542–561", "pp. 595–604, 1–10" (at most three runs, then "…").

@@ -1,4 +1,5 @@
 import { getPagesForHizb, getPagesForJuz } from '../quranData';
+import { fewPlaces, plainText } from '../passages';
 import {
   chosenHalf,
   chosenInJuz,
@@ -81,5 +82,16 @@ describe('Revised elsewhere’s picker (ACT-33)', () => {
     const canLog = new Set(getPagesForJuz(1));
     expect(searchPlaces('naml', canLog)).toEqual([]);
     expect(searchPlaces('baqarah', canLog).map((r) => r.key)).toEqual(['surah-2', 'juz-1']);
+  });
+});
+
+describe('a row’s few words for any pages (ACT-34)', () => {
+  it('stays short however scattered the pages are', () => {
+    expect(plainText(fewPlaces([2, 4, 322]))).toBe('Al-Baqarah and Al-Anbiya');
+    expect(plainText(fewPlaces([2, 4, 322, 500, 604]))).toMatch(/^Al-Baqarah and \d+ more$/);
+    for (const pages of [[1], [2, 3], [2, 4], [100, 200, 300, 400, 500], Array.from({ length: 604 }, (_, i) => i + 1)]) {
+      expect(plainText(fewPlaces(pages)).length).toBeLessThanOrEqual(30);
+    }
+    expect(fewPlaces([])).toBe('');
   });
 });

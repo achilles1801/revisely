@@ -26,7 +26,8 @@
     "19-recite-session": 9,
     "20-long-take": 15,
     "21-long-session": 16,
-    "22-memorized-picker": 12
+    "22-memorized-picker": 12,
+    "23-journal-design": 14
   },
   "android": {
     "01-onboarding": 3,
@@ -54,6 +55,7 @@
     "19-recite-session": 6,
     "20-long-take": 13,
     "21-long-session": 13.5,
-    "22-memorized-picker": 10
+    "22-memorized-picker": 10,
+    "23-journal-design": 12
   }
 }

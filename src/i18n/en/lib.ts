@@ -17,6 +17,10 @@ export const lib = {
     endOfJuz: 'the end of Juz {{n}}',
     listAnd: '{{list}} and {{last}}',
     listSeparator: ', ',
+    /** A row's name for scattered pages (fewPlaces). */
+    twoPlaces: '{{a}} and {{b}}',
+    placesMore_one: '{{name}} and {{count}} more',
+    placesMore_other: '{{name}} and {{count}} more',
     thenSeparator: ', then ',
     more_one: '{{count}} more',
     more_other: '{{count}} more',

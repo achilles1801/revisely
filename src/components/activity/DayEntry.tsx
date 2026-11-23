@@ -17,7 +17,10 @@ const MAX_SCALE = 1.4;
 export interface DayEntryLine {
   key: string;
   label: string;
+  /** What happened, in a few words: one line, cut rather than shrunk (Majd, Nov 23 2026). */
   value: string;
+  /** How much, always shown after it: "31 min", "4 takes". */
+  tail?: string;
   /** Recordings beside this line. */
   mics?: number;
 }
@@ -38,7 +41,7 @@ export function DayEntry({
   onAddNote: () => void;
 }) {
   const { palette } = useTheme();
-  const spoken = [date, ...lines.map((l) => `${l.label}, ${l.value}`), ...(note ? [`${t('activity.calendar.note')}, ${note}`] : [])].join('. ');
+  const spoken = [date, ...lines.map((l) => `${l.label}, ${l.value}${l.tail ? `, ${l.tail}` : ''}`), ...(note ? [`${t('activity.calendar.note')}, ${note}`] : [])].join('. ');
   const label = [typeV2.body, styles.label, { color: palette.secondary }];
   const value = [typeV2.body, styles.value, { color: palette.text }];
   return (
@@ -55,9 +58,16 @@ export function DayEntry({
             <Text style={label} numberOfLines={1} maxFontSizeMultiplier={MAX_SCALE}>
               {l.label}
             </Text>
-            <Text style={value} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={MAX_SCALE} testID={`preview-value-${l.key}`}>
-              {l.value}
-            </Text>
+            <View style={styles.valueRow}>
+              <Text style={[typeV2.body, styles.shrink, { color: palette.text }]} numberOfLines={1} maxFontSizeMultiplier={MAX_SCALE} testID={`preview-value-${l.key}`}>
+                {l.value}
+              </Text>
+              {l.tail ? (
+                <Text style={[typeV2.body, { color: palette.text }]} numberOfLines={1} maxFontSizeMultiplier={MAX_SCALE} testID={`preview-tail-${l.key}`}>
+                  {` · ${l.tail}`}
+                </Text>
+              ) : null}
+            </View>
             {l.mics ? (
               <View style={styles.mics} testID={`preview-mics-${l.key}`}>
                 <Ionicons name="mic-outline" size={13} color={palette.secondary} />
@@ -104,6 +114,8 @@ const styles = StyleSheet.create({
   line: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 4 },
   label: { width: 92 },
   value: { flex: 1, minWidth: 0 },
+  valueRow: { flex: 1, minWidth: 0, flexDirection: 'row' },
+  shrink: { flexShrink: 1 },
   mics: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingTop: 2 },
   nothing: { paddingVertical: 4 },
   addNote: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', minHeight: 36, paddingHorizontal: 16 },

@@ -65,6 +65,17 @@ describe('a day’s entry under the calendar', () => {
     expect(onOpen).not.toHaveBeenCalled();
   });
 
+  it('[ACT-34] a line never grows into long small text, however many takes or places', () => {
+    const scattered: Revised = { day: DAY, countsFor: DAY, pages: [2, 4, 322, 400, 500, 604], minutes: 12 } as Revised;
+    show({ items: [scattered] });
+    const value = screen.getByTestId('preview-value-revised');
+    expect(value.props.numberOfLines).toBe(1);
+    expect(value.props.adjustsFontSizeToFit).toBeUndefined();
+    expect(String(value.props.children).length).toBeLessThanOrEqual(30);
+    expect(value.props.children).toMatch(/and \d+ more$/);
+    expect(String(screen.getByTestId('preview-tail-revised').props.children)).toContain('6 pages');
+  });
+
   it('[ACT-34] a day with nothing says so, and can still take a note', () => {
     show();
     expect(screen.getByTestId('preview-nothing')).toBeTruthy();
