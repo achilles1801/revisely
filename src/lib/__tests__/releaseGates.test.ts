@@ -200,3 +200,33 @@ describe('reminders while away (REMIND-2): everyone’s through one switch of it
     expect(REMINDERS_WHILE_AWAY_RELEASED).toBe(false);
   });
 });
+
+describe('Settings → About → Licences (SET-5): everyone’s with on-device Recite, through one switch', () => {
+  // The recitation model's licence in full. The store app needs it once the model runs on phones (a copy of the
+  // model is then a distribution); until then the model runs on our server and nothing is distributed.
+  const variant = require('../variant') as typeof import('../variant');
+  const { showsModelLicense, MODEL_LICENSE_RELEASED, setModelLicenseReleasedForTests } =
+    require('../release/modelLicense') as typeof import('../release/modelLicense');
+  afterEach(() => {
+    setModelLicenseReleasedForTests(undefined);
+    jest.restoreAllMocks();
+  });
+
+  it('[SET-5] off: Revisely Dev shows it, the store app doesn’t', () => {
+    setModelLicenseReleasedForTests(false);
+    jest.spyOn(variant, 'isDevVariant').mockReturnValue(false);
+    expect(showsModelLicense()).toBe(false);
+    jest.spyOn(variant, 'isDevVariant').mockReturnValue(true);
+    expect(showsModelLicense()).toBe(true);
+  });
+
+  it('[SET-5] on: the store app shows it too', () => {
+    setModelLicenseReleasedForTests(true);
+    jest.spyOn(variant, 'isDevVariant').mockReturnValue(false);
+    expect(showsModelLicense()).toBe(true);
+  });
+
+  it('ships off until on-device Recite is released (Nov 23 2026)', () => {
+    expect(MODEL_LICENSE_RELEASED).toBe(false);
+  });
+});

@@ -77,6 +77,8 @@ import { mushafEdition, useMushafEdition } from '../../lib/mushafEdition';
 import { MushafPickerSheet } from '../../components/mushaf/MushafPickerSheet';
 import { shareIcon } from '../../lib/platformUi';
 import { ResetDataSheet } from '../../components/settings/ResetDataSheet';
+import { LicencesSheet } from '../../components/settings/LicencesSheet';
+import { showsModelLicense } from '../../lib/release/modelLicense';
 import { TestScenarioSheet, useSyncHeld } from '../../components/settings/TestScenarioSheet';
 import { showsResetMyData } from '../../lib/testerReset';
 import { replayOffered } from '../../lib/whatsNew/due';
@@ -288,6 +290,8 @@ export default function SettingsScreen() {
   const reciteCheck = reciteLiveForAccount(user);
   const reciteCheckSettings = useReciteCheckSettings(reciteCheck ? user?.id : null);
   const [checkLevelSheet, setCheckLevelSheet] = useState(false);
+  // About → Licences (SET-5): the recitation model's licence in full, once the model runs on the phone.
+  const [licences, setLicences] = useState(false);
   // Revisely Dev: Settings → Appearance → Language (src/i18n/choice.ts).
   const [languageSheet, setLanguageSheet] = useState(false);
   const [chosenLanguage, setChosenLanguage] = useState<LanguageChoice>(languageChoice);
@@ -1338,6 +1342,9 @@ export default function SettingsScreen() {
               label={t('settings.about.terms')}
               onPress={() => void openWebPage('https://revisely.app/terms/')}
             />
+            {showsModelLicense() ? (
+              <Row icon="ribbon-outline" label={t('settings.about.licences')} onPress={() => setLicences(true)} testID="settings-licences" />
+            ) : null}
             <AppInfo tools={showsUpdateTools(user)} />
           </Section>
         ) : null}
@@ -1483,6 +1490,7 @@ export default function SettingsScreen() {
         testID="settings-notifications-refused"
       />
       {showsResetMyData(user) ? <ResetDataSheet visible={resetSheet} onClose={() => setResetSheet(false)} /> : null}
+      {showsModelLicense() ? <LicencesSheet visible={licences} onClose={() => setLicences(false)} /> : null}
       {reciteCheck ? (
         <Sheet visible={reciteNotice} onClose={() => setReciteNotice(false)} title={t('settings.about.reciteNoticeTitle')} testID="settings-recite-notice-sheet">
           <ReciteCheckNotice />

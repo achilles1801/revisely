@@ -298,6 +298,7 @@ export const settings: NonNullable<ArStrings['settings']> = {
     reciteNoticeTitle: 'فحص التلاوة',
     privacy: 'سياسة الخصوصية',
     terms: 'شروط الخدمة',
+    licences: 'التراخيص',
     version: 'ريفايزلي · ⁨v{{version}}⁩',
   },
   testing: {
