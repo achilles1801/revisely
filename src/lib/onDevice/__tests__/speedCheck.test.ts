@@ -197,7 +197,7 @@ describe('[ONDEV-4] a take that fell behind', () => {
 });
 
 describe('[ONDEV-4] speedKeeper', () => {
-  const INFO = { pack: 'p1', version: 'e1', hop: 0.5, self_check: { ok: true } };
+  const INFO = { pack: 'p1', version: 'e1', hop: 0.5, self_check: { models: { v7: { ran: true, ok: true } } } };
   const BAD = { hops: 100, late_hops: 50, max_lag_s: 3 };
 
   function setup(over: Partial<KeeperDeps> = {}, ms = 70, stored: string | null = null) {
@@ -311,7 +311,7 @@ describe('[ONDEV-4] speedKeeper', () => {
   });
 
   it('skips the recorded stand-in, and an engine that failed its self-check', async () => {
-    for (const info of [{ ...INFO, version: 'recite-core replay' }, { ...INFO, self_check: { ok: false } }]) {
+    for (const info of [{ ...INFO, version: 'recite-core replay' }, { ...INFO, self_check: { models: { v7: { ran: true, ok: false } } } }, { ...INFO, self_check: { models: { v7: { ran: false } } } }]) {
       const t = setup();
       t.state.info = info;
       t.k.schedule();

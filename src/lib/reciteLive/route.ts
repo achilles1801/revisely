@@ -24,6 +24,8 @@ export interface RouteDeps {
   onRouted?: (answer: WhereAnswer) => void;
   /** The teacher's second opinion, for an engine that asks for it (`can.clips`). */
   clips?: (hooks: Pick<ClipDeps, 'cut' | 'verdict'>) => ClipSender;
+  /** This phone can send clips at the take's start: signed in and online (the engine's `clips` key promises that). */
+  canClip?: () => boolean;
   /** A take that ran on the phone has ended. */
   onPhoneEnd?: (end: PhoneTakeEnd) => void;
   /** Any take, wherever it runs, has opened or closed (nothing is measured beside one). */
@@ -52,7 +54,7 @@ export function routedFeed(deps: RouteDeps): LiveConnect {
       onHostFrame: deps.onHostFrame,
       onPhoneEnd: deps.onPhoneEnd,
       // Recite only follows: it has no marks for the teacher to hear.
-      clips: deps.info()?.can?.clips && !start.follow ? deps.clips : undefined,
+      clips: deps.info()?.can?.clips && !start.follow && deps.canClip?.() === true ? deps.clips : undefined,
       onFallback: (detail) => {
         why = detail;
         deps.onRouted?.(refused(detail));

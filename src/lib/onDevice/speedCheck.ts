@@ -164,7 +164,7 @@ const MAX_TRIES = 3;
 
 export interface KeeperDeps {
   /** The open engine's rc_info. */
-  info(): { pack?: string; version?: string; hop?: number; self_check?: { ok?: boolean } } | null;
+  info(): { pack?: string; version?: string; hop?: number; self_check?: { models?: { v7?: { ran?: boolean; ok?: boolean } } } } | null;
   device(): { model?: string; thermal?: string; lowPower?: boolean } | null;
   threads: number;
   probe(): Promise<number | null>;
@@ -205,7 +205,7 @@ export function speedKeeper(d: KeeperDeps) {
   const check = async () => {
     const info = d.info();
     const key = keyNow();
-    if (running || takes > 0 || !info || !key || info.self_check?.ok !== true || /replay/.test(info.version ?? '')) return;
+    if (running || takes > 0 || !info || !key || info.self_check?.models?.v7?.ran !== true || info.self_check.models.v7.ok !== true || /replay/.test(info.version ?? '')) return;
     const mine = record?.key === key ? record : null;
     const want = mine ? effectiveHop(mine) : null;
     if (mine && want && info.hop !== want && reopenedFor !== `${key}:${want}`) {

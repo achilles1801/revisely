@@ -13,7 +13,7 @@ const READY_ENGINE: EngineInfo = {
   version: 'recite-core 0.2.0',
   levels: ['recite', 'harakat', 'strict'],
   can: { letters: true, tajweed: true, names: true, startBy: true, startIn: true, controls: true },
-  self_check: { ok: true },
+  self_check: { ran: true, ok: true, models: { v7: { ran: true, ok: true }, v5: { ran: true, ok: true } } },
 };
 const pin = fc.constantFrom<RunsOn | null>('phone', 'server', null);
 const config = fc.constantFrom<WhereSetting | null>('phone', 'server', 'auto', null);
@@ -25,7 +25,8 @@ describe('where a take runs', () => {
   it('[ONDEV-4] never on the phone without an engine that passed its self-check and can run the take', () => {
     const engine = fc.constantFrom<EngineInfo | null>(
       null,
-      { ...READY_ENGINE, self_check: { ok: false } },
+      { ...READY_ENGINE, self_check: { ran: true, ok: false, models: { v7: { ran: true, ok: false } } } },
+      { ...READY_ENGINE, self_check: { ran: false, ok: true, models: { v7: { ran: false } } } },
       { ...READY_ENGINE, self_check: undefined },
       { ...READY_ENGINE, levels: ['recite'] },
       { ...READY_ENGINE, can: { ...READY_ENGINE.can, startBy: false } },

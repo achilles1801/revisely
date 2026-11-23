@@ -7,6 +7,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { File, Paths } from 'expo-file-system';
+import { getAuth } from 'firebase/auth';
 import { AppState } from 'react-native';
 import type { LiveConnect, StartFrame } from '../reciteLive/feed';
 import type { EngineBridge } from '../reciteLive/localFeed';
@@ -225,6 +226,7 @@ export function deviceConnect(server: LiveConnect): LiveConnect {
       warmEngine();
       speed.schedule();
     },
+    canClip: () => !knownOffline() && !!getAuth().currentUser,
     clips: (hooks) =>
       clipSender({
         ...hooks,
