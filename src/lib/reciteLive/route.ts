@@ -2,6 +2,7 @@
 
 import type { LiveConnect } from './feed';
 import { EngineBridge, localFeed } from './localFeed';
+import type { PhoneTakeEnd } from './phoneTake';
 import { chooseWhere, EngineInfo, RunsOn, WhereAnswer, WhereSetting } from './where';
 
 /** The server's take line says why the take came to it (`ranWhy`; a checker that doesn't read it ignores it). */
@@ -13,19 +14,25 @@ export interface RouteDeps {
   engine: () => EngineBridge | null;
   info: () => EngineInfo | null;
   fastEnough: () => boolean | null;
+  demoted?: () => boolean;
   settings: () => { config: WhereSetting | null; pin: RunsOn | null; testing: RunsOn | null };
   /** Open the engine in the background, for the takes after this one. */
   warm: () => void;
   onHostFrame?: (frame: Record<string, unknown>) => void;
   /** Where a take went and why; again, as `refused`, when the engine turns it down at its start. */
   onRouted?: (answer: WhereAnswer) => void;
+  /** A take that ran on the phone has ended. */
+  onPhoneEnd?: (end: PhoneTakeEnd) => void;
+  /** Any take, wherever it runs, has opened or closed (nothing is measured beside one). */
+  onTakeOpen?: () => void;
+  onTakeClose?: () => void;
 }
 
 export function routedFeed(deps: RouteDeps): LiveConnect {
-  return (start, handlers) => {
+  const routed: LiveConnect = (start, handlers) => {
     const s = deps.settings();
     if ((s.testing ?? s.pin ?? s.config ?? 'server') !== 'server') deps.warm();
-    const answer = chooseWhere({ ...s, engine: deps.info(), fastEnough: deps.fastEnough(), start });
+    const answer = chooseWhere({ ...s, engine: deps.info(), fastEnough: deps.fastEnough(), demoted: deps.demoted?.(), start });
     const engine = answer.on === 'phone' ? deps.engine() : null;
     if (!engine) {
       const served: WhereAnswer = answer.on === 'phone' ? { on: 'server', why: 'no-pack' } : answer;
@@ -40,10 +47,33 @@ export function routedFeed(deps: RouteDeps): LiveConnect {
       asked: answer,
       fallback: (s, h) => toServer(deps.server, refused(why))(s, h),
       onHostFrame: deps.onHostFrame,
+      onPhoneEnd: deps.onPhoneEnd,
       onFallback: (detail) => {
         why = detail;
         deps.onRouted?.(refused(detail));
       },
     })(start, handlers);
+  };
+  return (start, handlers) => {
+    let open = true;
+    const closed = () => {
+      if (open) deps.onTakeClose?.();
+      open = false;
+    };
+    deps.onTakeOpen?.();
+    const conn = routed(start, {
+      ...handlers,
+      onClose: () => {
+        closed();
+        handlers.onClose();
+      },
+    });
+    const close = conn.close;
+    return Object.assign(conn, {
+      close: () => {
+        closed();
+        close.call(conn);
+      },
+    });
   };
 }

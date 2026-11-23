@@ -29,6 +29,7 @@ export function nextTakeLine(a: WhereAnswer): string {
     case 'no-speed':
       return t('settings.testing.whereNextSpeed');
     case 'slow':
+    case 'demoted':
       return t('settings.testing.whereNextSlow');
     default:
       return t('settings.testing.whereNextLacks');

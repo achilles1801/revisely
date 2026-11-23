@@ -34,7 +34,7 @@ typedef void (^RECEngineFrames)(NSInteger take, NSArray<NSString *> *frames, NSI
           options:(NSString *)options
              done:(void (^)(NSDictionary<NSString *, id> *result))done;
 /// Starts a take from the contract's start frame. done: {take} or {code, error}.
-- (void)startTake:(NSString *)frame done:(void (^)(NSDictionary<NSString *, id> *result))done;
+- (void)startTake:(NSString *)frame hop:(double)hop done:(void (^)(NSDictionary<NSString *, id> *result))done;
 /// 16 kHz mono 16-bit little-endian samples.
 - (void)feedTake:(NSInteger)take pcm:(NSData *)pcm;
 - (void)controlTake:(NSInteger)take frame:(NSString *)frame;

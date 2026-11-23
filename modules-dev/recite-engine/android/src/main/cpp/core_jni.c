@@ -256,3 +256,29 @@ JNIEXPORT jbyteArray JNICALL FN(drain)(JNIEnv* env, jobject self, jlong session,
   free(out.data);
   return packed;
 }
+
+/* recite_host.h's meter, held by EngineHost in a double[]. */
+JNIEXPORT jdoubleArray JNICALL FN(meterStart)(JNIEnv* env, jobject self, jdouble hop, jint thermal) {
+  (void)self;
+  rh_meter m;
+  rh_meter_start(&m, hop, thermal);
+  jdoubleArray out = (*env)->NewDoubleArray(env, RH_METER_DOUBLES);
+  if (out) (*env)->SetDoubleArrayRegion(env, out, 0, RH_METER_DOUBLES, (const jdouble*)&m);
+  return out;
+}
+
+JNIEXPORT void JNICALL FN(meterFed)(JNIEnv* env, jobject self, jdoubleArray meter, jint samples, jdouble ms, jlong waiting) {
+  (void)self;
+  rh_meter m;
+  (*env)->GetDoubleArrayRegion(env, meter, 0, RH_METER_DOUBLES, (jdouble*)&m);
+  rh_meter_fed(&m, (size_t)samples, ms, (long long)waiting);
+  (*env)->SetDoubleArrayRegion(env, meter, 0, RH_METER_DOUBLES, (const jdouble*)&m);
+}
+
+JNIEXPORT jstring JNICALL FN(meterFrame)(JNIEnv* env, jobject self, jdoubleArray meter, jint thermal) {
+  (void)self;
+  rh_meter m;
+  char text[256];
+  (*env)->GetDoubleArrayRegion(env, meter, 0, RH_METER_DOUBLES, (jdouble*)&m);
+  return rh_meter_frame(&m, thermal, text, sizeof text) > 0 ? (*env)->NewStringUTF(env, text) : NULL;
+}

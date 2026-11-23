@@ -87,6 +87,8 @@ export interface WhereInput {
   engine: EngineInfo | null;
   /** The phone passed its own speed check; null: not known yet. Only `auto` asks. */
   fastEnough: boolean | null;
+  /** It measured fast enough, and takes that fell behind have moved it to the server until its next clean check. */
+  demoted?: boolean;
   start: StartFrame;
 }
 
@@ -95,9 +97,20 @@ export interface WhereInput {
  * chose (`forced`: this phone's Testing row; `pin`: the account; `config`: config/app, or nothing set), or what kept it
  * off the phone. A closed list: firestore.rules holds the same one.
  */
-export type WhereWhy = 'forced' | 'pin' | 'config' | 'no-pack' | 'self-check' | 'lacks' | 'slow' | 'no-speed' | 'refused' | 'replay';
+export type WhereWhy =
+  | 'forced'
+  | 'pin'
+  | 'config'
+  | 'no-pack'
+  | 'self-check'
+  | 'lacks'
+  | 'slow'
+  | 'no-speed'
+  | 'demoted'
+  | 'refused'
+  | 'replay';
 export const WHERE_WHYS: ReadonlySet<WhereWhy> = new Set<WhereWhy>([
-  'forced', 'pin', 'config', 'no-pack', 'self-check', 'lacks', 'slow', 'no-speed', 'refused', 'replay',
+  'forced', 'pin', 'config', 'no-pack', 'self-check', 'lacks', 'slow', 'no-speed', 'demoted', 'refused', 'replay',
 ]);
 
 export interface WhereAnswer {
@@ -117,7 +130,9 @@ export function chooseWhere(i: WhereInput): WhereAnswer {
   if (i.engine.self_check?.ok !== true) return { on: 'server', why: 'self-check' };
   const lacks = engineLacks(i.start, i.engine);
   if (lacks) return { on: 'server', why: 'lacks', detail: lacks };
-  if (wanted === 'auto' && i.fastEnough !== true) return { on: 'server', why: i.fastEnough === false ? 'slow' : 'no-speed' };
+  if (wanted === 'auto' && i.fastEnough !== true) {
+    return { on: 'server', why: i.demoted ? 'demoted' : i.fastEnough === false ? 'slow' : 'no-speed' };
+  }
   return { on: 'phone', why: chose };
 }
 

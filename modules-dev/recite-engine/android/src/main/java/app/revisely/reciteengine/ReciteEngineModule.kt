@@ -27,7 +27,7 @@ class ReciteEngineModule : Module() {
   private val engine by lazy {
     EngineHost { take, frames, code ->
       sendEvent("onEngineFrames", mapOf("take" to take, "frames" to frames, "code" to code))
-    }
+    }.also { it.thermal = ::thermalNumber }
   }
 
   override fun definition() = ModuleDefinition {
@@ -49,6 +49,7 @@ class ReciteEngineModule : Module() {
         "coreMaxMHz" to coreMaxMHz(),
         "memoryMb" to memory.totalMem / 1048576.0,
         "thermal" to thermal(),
+        "lowPower" to ((context?.getSystemService(Context.POWER_SERVICE) as? PowerManager)?.isPowerSaveMode == true),
       )
     }
 
@@ -94,8 +95,8 @@ class ReciteEngineModule : Module() {
     Function("engineInfo") { engine.info }
 
     // Starts a take from the contract's start frame. Resolves {take} or {code, error}.
-    AsyncFunction("engineStart") { frame: String, promise: Promise ->
-      engine.start(frame) { promise.resolve(it) }
+    AsyncFunction("engineStart") { frame: String, hop: Double, promise: Promise ->
+      engine.start(frame, hop) { promise.resolve(it) }
     }
 
     // The bytes are copied here: the array is JavaScript's, and the engine's thread reads them later.
@@ -273,6 +274,13 @@ class ReciteEngineModule : Module() {
 
   /** The process's proportional set size in MB (its share of the memory it touches). */
   private fun memoryMb(): Double = Debug.getPss() / 1024.0
+
+  /** The thermal status as a number for a take's health line; -1 before Android 10. */
+  private fun thermalNumber(): Int {
+    if (Build.VERSION.SDK_INT < 29) return -1
+    val pm = context?.getSystemService(Context.POWER_SERVICE) as? PowerManager ?: return -1
+    return pm.currentThermalStatus
+  }
 
   private fun thermal(): String {
     if (Build.VERSION.SDK_INT < 29) return "unknown"

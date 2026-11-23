@@ -5,12 +5,16 @@
 // What opens it: Recite's pack once it is whole on this phone (packRun), decrypted natively and read in place; else, for
 // a build that carries the replay stand-in, a recorded take's frames at Documents/recite-replay/frames.jsonl.
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { File, Paths } from 'expo-file-system';
+import { AppState } from 'react-native';
 import type { LiveConnect, StartFrame } from '../reciteLive/feed';
 import type { EngineBridge } from '../reciteLive/localFeed';
 import { routedFeed } from '../reciteLive/route';
 import { chooseWhere, EngineInfo, parseEngineInfo, WhereAnswer } from '../reciteLive/where';
 import { reciteWhere } from '../reciteLive/whereSettings';
+import { speedKeeper } from './speedCheck';
+import { reportPhoneTake } from './takeReport';
 import { logger } from '../logger';
 import { isDevVariant } from '../variant';
 import { coreLine } from './coreInfo';
@@ -33,7 +37,7 @@ export function engineBridge(): EngineBridge | null {
   if (!m?.engineStart || !m.engineFeed || !m.engineControl || !m.engineFinish || !m.engineClose) return null;
   const { engineStart, engineFeed, engineControl, engineFinish, engineClose } = m;
   return {
-    start: (frame) => engineStart.call(m, frame),
+    start: (frame) => engineStart.call(m, frame, openEngineInfo()?.hop ?? 0.5),
     feed: (take, pcm) => engineFeed.call(m, take, pcm),
     control: (take, frame) => engineControl.call(m, take, frame),
     finish: (take) => engineFinish.call(m, take),
@@ -65,7 +69,7 @@ async function openFromPack(m: Native): Promise<boolean> {
   await run.preparePack();
   const pack = run.packForEngine();
   if (!pack || pack.packId === refusedPack) return false;
-  const r = await m.enginePackOpen(pack.dir, pack.packId, pack.parts, '{}');
+  const r = await m.enginePackOpen(pack.dir, pack.packId, pack.parts, engineOptions());
   if (r.ok) return true;
   logger.warn(`Recite engine: the pack didn't open (${r.code}): ${r.error ?? ''}`);
   if (r.code === RC_ERR_DATA) await run.dropBadPack(pack.packId);
@@ -83,7 +87,7 @@ async function openFromReplay(m: Native): Promise<void> {
   } catch {
     return;
   }
-  const r = await m.engineOpenFiles([{ name: 'frames.jsonl', path: replay.uri }], '{}');
+  const r = await m.engineOpenFiles([{ name: 'frames.jsonl', path: replay.uri }], engineOptions());
   if (!r.ok) logger.warn(`Recite engine: didn't open (${r.code}): ${r.error ?? ''}`);
 }
 
@@ -108,11 +112,48 @@ export function __resetEngineForTests(): void {
   refusedPack = null;
 }
 
-/**
- * Whether this phone passed its speed check. Nothing measures it at load yet, so `auto` keeps takes on the server;
- * Settings → Testing and an account's pin can still choose the phone.
- */
-const fastEnough = (): boolean | null => null;
+/** The engine's threads (the bench: 1 misses the live pace on a Galaxy A15). Part of the speed result's key. */
+const ENGINE_THREADS = 2;
+const SPEED_KEY = '@revisely_recite_speed';
+
+/** The phone's speed check (lib/onDevice/speedCheck). A build without `engineProbe` never measures, so `auto` stays on the server. */
+const speed = speedKeeper({
+  info: openEngineInfo,
+  device: () => {
+    try {
+      return native()?.deviceInfo() ?? null;
+    } catch {
+      return null;
+    }
+  },
+  threads: ENGINE_THREADS,
+  probe: async () => {
+    const m = native() as (Native & { engineProbe?: () => Promise<number | null> }) | null;
+    return m?.engineProbe ? m.engineProbe() : null;
+  },
+  active: () => AppState.currentState === 'active',
+  read: () => AsyncStorage.getItem(SPEED_KEY),
+  write: (json) => AsyncStorage.setItem(SPEED_KEY, json),
+  reopen: () => {
+    const m = native();
+    if (!m?.engineRelease) return;
+    m.engineRelease()
+      .then(() => warmEngine())
+      .catch((err: unknown) => logger.warn('Recite engine: reopening failed', err));
+  },
+  now: () => Date.now(),
+  sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+  later: (fn, ms) => setTimeout(fn, ms),
+  cancel: (h) => clearTimeout(h as ReturnType<typeof setTimeout>),
+  log: (message) => logger.log(message),
+});
+if (isDevVariant()) void speed.load();
+
+/** What the engine opens with: the threads, and this phone's hop once it has been measured. */
+export function engineOptions(): string {
+  const hop = speed.hop();
+  return JSON.stringify({ threads: ENGINE_THREADS, ...(hop ? { hop } : {}) });
+}
 
 /** The take every phone can be asked about: Mark mistakes, anywhere on a page (Settings' line). */
 const TYPICAL: StartFrame = {
@@ -122,7 +163,7 @@ const TYPICAL: StartFrame = {
 
 /** Where a typical take would run now, and why (Settings → Testing). */
 export function whereNow(): WhereAnswer {
-  return chooseWhere({ ...reciteWhere(), engine: openEngineInfo(), fastEnough: fastEnough(), start: TYPICAL });
+  return chooseWhere({ ...reciteWhere(), engine: openEngineInfo(), fastEnough: speed.fastEnough(), demoted: speed.demoted(), start: TYPICAL });
 }
 
 /** Revisely Dev's takes: each to the phone or the server. */
@@ -131,9 +172,21 @@ export function deviceConnect(server: LiveConnect): LiveConnect {
     server,
     engine: engineBridge,
     info: openEngineInfo,
-    fastEnough,
+    fastEnough: speed.fastEnough,
+    demoted: speed.demoted,
     settings: reciteWhere,
-    warm: warmEngine,
+    warm: () => {
+      warmEngine();
+      speed.schedule();
+    },
+    onTakeOpen: speed.takeOpened,
+    onTakeClose: speed.takeClosed,
+    onPhoneEnd: (end) => {
+      const info = openEngineInfo();
+      const steps = speed.steps();
+      void reportPhoneTake(end, info, { ...(info?.hop ? { hop: info.hop } : {}), ...(steps ? { demoted: steps } : {}) });
+      speed.noteTake(end.meter);
+    },
     onRouted: (answer) => logger.log(`Recite: on the ${answer.on} (${answer.why}${answer.detail ? `: ${answer.detail}` : ''})`),
   });
 }

@@ -38,4 +38,9 @@ internal object ReciteCoreNative {
 
   /** Every frame waiting, each a little-endian u32 length and its UTF-8 bytes; null when none. code[0]: rh_drain's result. */
   external fun drain(session: Long, code: IntArray): ByteArray?
+
+  // recite_host.h's meter, held in a DoubleArray: how a take kept up.
+  external fun meterStart(hop: Double, thermal: Int): DoubleArray?
+  external fun meterFed(meter: DoubleArray, samples: Int, ms: Double, waiting: Long)
+  external fun meterFrame(meter: DoubleArray, thermal: Int): String?
 }

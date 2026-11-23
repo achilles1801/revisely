@@ -376,7 +376,7 @@ export const settings = {
     wherePhone: 'This phone',
     whereServer: 'The server',
     whereHint: 'Changes where this phone’s takes are checked',
-    whereNextPhone: 'Next take: on this phone. It won’t be kept as test data yet',
+    whereNextPhone: 'Next take: on this phone',
     whereNextReplay: 'Next take: a recorded take, played on this phone',
     whereNextServer: 'Next take: on the server',
     whereNextNoEngine: 'Next take: on the server. No engine on this phone yet',

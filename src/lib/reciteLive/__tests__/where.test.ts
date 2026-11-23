@@ -59,6 +59,8 @@ describe('chooseWhere', () => {
     expect(chooseWhere(input({ config: 'auto', fastEnough: null }))).toEqual({ on: 'server', why: 'no-speed' });
     expect(chooseWhere(input({ config: 'auto', fastEnough: false }))).toEqual({ on: 'server', why: 'slow' });
     expect(chooseWhere(input({ config: 'phone', fastEnough: false })).on).toBe('phone');
+    expect(chooseWhere(input({ config: 'auto', fastEnough: false, demoted: true }))).toEqual({ on: 'server', why: 'demoted' });
+    expect(chooseWhere(input({ testing: 'phone', fastEnough: false, demoted: true })).on).toBe('phone');
   });
 
   it('the replay stand-in runs only on this phone Testing choice', () => {

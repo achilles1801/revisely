@@ -519,7 +519,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     routes: ['Settings'],
     text: lines(
       '- “Recite runs on”: Automatic (the team’s setting, the server for now), This phone or The server. The line under it says where the next take runs and why.',
-      '- A take the phone’s engine can’t run goes to the server by itself, with nothing lost. A take on the phone isn’t kept as test data yet.',
+      '- A take the engine can’t run goes to the server by itself. Automatic needs a short speed check while idle; a take that falls behind slows the next ones.',
     ),
   },
 ];

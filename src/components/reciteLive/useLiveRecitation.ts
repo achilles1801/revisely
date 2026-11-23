@@ -29,6 +29,7 @@ import { createMistakeCue, playCueSound, playCueTap } from '../../lib/reciteLive
 import { reportLongTake, reportUnfinishedTake } from '../../lib/reciteLive/takeReport';
 import { SavedTake, startTakeRecording, TakeRecording } from '../../lib/reciteLive/takeRecording';
 import { joinWhere, type WhereAnswer } from '../../lib/reciteLive/where';
+import { labelPhoneTake } from '../../lib/onDevice/takeReport';
 import { takeFile, type TakeFile } from '../../lib/reciteMemory/takeAudio';
 import {
   applyEvent,
@@ -1054,8 +1055,11 @@ export function useLiveRecitation({
       const link = linkOf(id);
       const s = link ? link.state : curRef.current;
       if (s.status === 'done') {
-        // A take on the phone isn't stored on the checker (ONDEV-4), so it has nothing to label.
-        if (s.take && testDataRef.current && ranWhere.current?.on !== 'phone') void sendLabel(what, s.take, id, Date.now());
+        // A take on the phone is kept under the name the server gave it (ONDEV-4, lib/onDevice/takeReport).
+        if (s.take && testDataRef.current) {
+          if (ranWhere.current?.on === 'phone') void labelPhoneTake(what, s.take, id, Date.now());
+          else void sendLabel(what, s.take, id, Date.now());
+        }
         return;
       }
       (link ? linkConns.current.get(link.no) : conn.current)?.send({ type: what, id });

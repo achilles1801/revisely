@@ -1640,8 +1640,13 @@ shows up once and they must go through it and complete it … just the main stuf
   then gets the take whole, its audio and controls in order, and the reciter sees nothing of it. Once the engine has
   said `ready`, a failure ends the take as an error. The engine's `clip` and `health` frames never reach the take's
   state. Every take's record says where it ran and why (`ranOn`, `ranWhy`: who chose, or what kept it off the phone), and a take
-  on the server tells its take line why. A take on the phone isn't kept as test data yet, and Settings → Testing says so.
-  Revisely Dev only.
+  on the server tells its take line why. A take on the phone sends one health line after it ends, numbers only, and
+  with Keep my recitations as test data on, its audio and result once its final answer has come; a failure there is
+  never shown and never retried. `auto` uses the phone only after its speed check: one model call at a live take's pace,
+  warmed up, on an idle, cool phone with no power saving, kept per pack, engine, device and threads. Under about 150 ms
+  at p95 it runs the 0.5 s hop, up to about 400 ms the 1 s hop, over that the server. A take that falls behind (over 5%
+  of its hops late, or over 2 s of lag) is never changed itself: the next take runs one step slower, until a clean check
+  on a later launch. Revisely Dev only.
 
 - **ONDEV-2.** Recite's pack (the model and its tables, sealed) reaches a phone only through the server's `recitePack`:
   signed in, App Check from the Revisely Dev app, the pack's access claim, at most 6 calls and 3 device keys an account a

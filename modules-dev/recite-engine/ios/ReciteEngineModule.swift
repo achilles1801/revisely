@@ -78,8 +78,8 @@ public class ReciteEngineModule: Module {
     Function("engineInfo") { () -> String? in RECEngine.shared.info }
 
     /// Starts a take from the contract's start frame. Resolves {take} or {code, error}.
-    AsyncFunction("engineStart") { (frame: String, promise: Promise) in
-      RECEngine.shared.startTake(frame) { promise.resolve($0) }
+    AsyncFunction("engineStart") { (frame: String, hop: Double, promise: Promise) in
+      RECEngine.shared.startTake(frame, hop: hop) { promise.resolve($0) }
     }
 
     /// The bytes are copied here: the array is JavaScript's, and the engine's thread reads them later.

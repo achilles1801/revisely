@@ -147,8 +147,8 @@ declare class ReciteEngineModule extends NativeModule<ReciteEngineEvents> {
   ): Promise<{ ok: boolean; code: number; error?: string; info?: string }>;
   /** rc_info's JSON while the engine is open. */
   engineInfo?(): string | null;
-  /** Starts a take from the contract's start frame: its number, or why not. */
-  engineStart?(frame: string): Promise<{ take?: number; code?: number; error?: string }>;
+  /** Starts a take from the contract's start frame: its number, or why not. `hop`: the engine's, for the take's meter. */
+  engineStart?(frame: string, hop: number): Promise<{ take?: number; code?: number; error?: string }>;
   /** 16 kHz mono samples; copied before this returns. */
   engineFeed?(take: number, pcm: Int16Array): void;
   engineControl?(take: number, frame: string): void;

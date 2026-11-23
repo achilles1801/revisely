@@ -1,6 +1,7 @@
 import type { LiveEvent } from '../contract';
 import type { LiveConnection, StartFrame } from '../feed';
 import { EngineBridge, EngineFrames, localFeed } from '../localFeed';
+import type { PhoneTakeEnd } from '../phoneTake';
 import { NAMES_WAIT_MS } from '../socket';
 
 const START: StartFrame = { type: 'start', s: 18, a: 1, s2: 18, a2: 8, mon: 4, mot: 4, aar: 0, letters: true, keep: false, namesAfter: true };
@@ -70,6 +71,7 @@ function setup(answer?: { take?: number; code?: number; error?: string }, start:
   let closed = 0;
   const host: Record<string, unknown>[] = [];
   const why: string[] = [];
+  const ends: PhoneTakeEnd[] = [];
   const waits: { fn: () => void; ms: number; off?: boolean }[] = [];
   const connect = localFeed({
     engine: fake.engine,
@@ -77,6 +79,7 @@ function setup(answer?: { take?: number; code?: number; error?: string }, start:
     fallback: srv.connect,
     onHostFrame: (f) => host.push(f),
     onFallback: (w) => why.push(w),
+    onPhoneEnd: (e) => ends.push(e),
     timers: {
       set: (fn, ms) => {
         const h = { fn, ms };
@@ -89,7 +92,7 @@ function setup(answer?: { take?: number; code?: number; error?: string }, start:
     },
   });
   const conn = connect(start, { onEvent: (e) => events.push(e), onClose: () => (closed += 1) });
-  return { ...fake, srv, conn, events, closedCount: () => closed, host, why, waits };
+  return { ...fake, srv, conn, events, closedCount: () => closed, host, why, waits, ends };
 }
 
 describe('localFeed: a take on the phone', () => {
@@ -219,6 +222,90 @@ describe('localFeed: a take on the phone', () => {
     await t.answerStart();
     expect(t.conn.ranWhere!()).toEqual({ on: 'phone', why: 'forced' });
     expect(t.conn.status!()).toBe('local');
+  });
+});
+
+describe('[ONDEV-4] localFeed: what a finished take leaves for the server', () => {
+  const HEALTH = JSON.stringify({ type: 'health', hop: 0.5, marks: 2 });
+
+  it('a take without names ends on `done` and still gets the `health` right after it', async () => {
+    const t = setup(undefined, { ...START, namesAfter: false });
+    await t.answerStart();
+    t.conn.sendAudio(pcm(1, 2));
+    t.emit([READY, DONE, HEALTH]);
+    expect(t.closedCount()).toBe(1);
+    expect(t.ends).toHaveLength(1);
+    expect(t.ends[0]).toMatchObject({ how: 'done', take: 'local-1', samples: 2, health: { hop: 0.5 }, asked: { why: 'forced' } });
+    expect(t.ends[0].result).toEqual(JSON.parse(DONE).result);
+    expect(t.host).toEqual([JSON.parse(HEALTH)]);
+  });
+
+  it('a take with names waits for them, whichever order `health` comes in', async () => {
+    const t = setup();
+    await t.answerStart();
+    t.emit([READY, DONE, HEALTH]);
+    expect(t.ends).toHaveLength(0);
+    t.emit([INTO]);
+    expect(t.ends).toHaveLength(1);
+    expect(t.ends[0]).toMatchObject({ how: 'done', health: { marks: 2 } });
+  });
+
+  it('names that never come still end the take once', async () => {
+    const t = setup();
+    await t.answerStart();
+    t.emit([READY, DONE]);
+    t.waits[t.waits.length - 1].fn();
+    t.conn.close();
+    expect(t.ends).toHaveLength(1);
+    expect(t.ends[0].how).toBe('done');
+  });
+
+  it('holds the frames, labels and hints only for a kept take', async () => {
+    const kept = setup(undefined, { ...START, keep: true });
+    await kept.answerStart();
+    kept.emit([READY, AT]);
+    kept.conn.sendAudio(new Int16Array(16_000));
+    kept.conn.send({ type: 'dismiss', id: 'm1' });
+    kept.conn.send({ type: 'dismiss', id: 'm2' });
+    kept.conn.send({ type: 'undismiss', id: 'm1' });
+    kept.conn.send({ type: 'hint', w: 40, what: 'word' });
+    kept.emit([DONE, INTO]);
+    expect(kept.ends[0].events.map((e) => e.type)).toEqual(['ready', 'at', 'done', 'into']);
+    expect(kept.ends[0].dismissed).toEqual(['m2']);
+    expect(kept.ends[0].hints).toEqual([[1, { w: 40, what: 'word' }]]);
+
+    const plain = setup();
+    await plain.answerStart();
+    plain.emit([READY, DONE, INTO]);
+    expect(plain.ends[0].events).toEqual([]);
+  });
+
+  it('says so when the reciter left, or the engine failed', async () => {
+    const left = setup();
+    await left.answerStart();
+    left.emit([READY]);
+    left.conn.close();
+    left.conn.close();
+    expect(left.ends.map((e) => e.how)).toEqual(['left']);
+
+    const failed = setup();
+    await failed.answerStart();
+    failed.emit([READY]);
+    failed.emit([], -3);
+    expect(failed.ends.map((e) => e.how)).toEqual(['error']);
+  });
+
+  it('a take that never started here, or went to the server, leaves nothing', async () => {
+    const refused = setup({ code: -3 });
+    await refused.answerStart();
+    expect(refused.srv.connect).toHaveBeenCalledTimes(1);
+    refused.conn.close();
+    expect(refused.ends).toEqual([]);
+
+    const gone = setup();
+    gone.conn.close();
+    await gone.answerStart();
+    expect(gone.ends).toEqual([]);
   });
 });
 

@@ -12,6 +12,7 @@
 import { LiveEvent, parseEvent } from './contract';
 import type { ClientFrame, LiveConnect, LiveConnection, LiveHandlers, StartFrame } from './feed';
 import { NAMES_WAIT_MS } from './socket';
+import type { PhoneTakeEnd } from './phoneTake';
 import type { WhereAnswer } from './where';
 
 const SAMPLE_RATE_HZ = 16_000;
@@ -43,6 +44,8 @@ export interface LocalDeps {
   onHostFrame?: (frame: Record<string, unknown>) => void;
   /** The engine refused this take, and why. */
   onFallback?: (why: string) => void;
+  /** Once, when a take that ran here has ended (lib/onDevice/takeReport). */
+  onPhoneEnd?: (end: PhoneTakeEnd) => void;
   timers?: { set: (fn: () => void, ms: number) => unknown; clear: (h: unknown) => void };
 }
 
@@ -83,10 +86,52 @@ export function localFeed(deps: LocalDeps): LiveConnect {
     let answered = false;
     let namesWait: unknown = null;
     let unsubscribe: (() => void) | null = null;
+    // What the server would have noted of this take (lib/reciteLive/phoneTake).
+    let how: PhoneTakeEnd['how'] = 'left';
+    let named: string | null = null;
+    let health: Record<string, unknown> | null = null;
+    let meter: Record<string, unknown> | null = null;
+    let result: Record<string, unknown> | null = null;
+    const events: Record<string, unknown>[] = [];
+    const dismissed = new Set<string>();
+    const hints: PhoneTakeEnd['hints'] = [];
+    let told = false;
+
+    /** `health` comes after `done`, in the same batch: a take that has just finished still takes it. */
+    const hostFrame = (x: Record<string, unknown> | null): boolean => {
+      if (x?.type === 'meter') {
+        meter = x;
+        return true;
+      }
+      if (x?.type !== 'clip' && x?.type !== 'health') return false;
+      if (x.type === 'health') health = x;
+      deps.onHostFrame?.(x);
+      return true;
+    };
+
+    const tell = () => {
+      if (told || !finished || server || !ready) return;
+      told = true;
+      deps.onPhoneEnd?.({
+        start,
+        asked: deps.asked,
+        how,
+        take: named,
+        health,
+        meter,
+        audio,
+        samples,
+        result,
+        events,
+        dismissed: [...dismissed],
+        hints,
+      });
+    };
 
     const finish = (e?: LiveEvent) => {
       if (finished) return;
       finished = true;
+      if (e?.type === 'error' && how !== 'done') how = 'error';
       if (namesWait != null) timers.clear(namesWait);
       namesWait = null;
       unsubscribe?.();
@@ -130,10 +175,7 @@ export function localFeed(deps: LocalDeps): LiveConnect {
     const onFrame = (raw: string) => {
       if (finished || server) return;
       const x = parsed(raw);
-      if (x?.type === 'clip' || x?.type === 'health') {
-        deps.onHostFrame?.(x);
-        return;
-      }
+      if (hostFrame(x)) return;
       const e = parseEvent(raw);
       if (!e) {
         // A final answer this app can't read still ends the take.
@@ -144,8 +186,14 @@ export function localFeed(deps: LocalDeps): LiveConnect {
         toServer(`error:${e.reason}`);
         return;
       }
+      if (start.keep && x) events.push(x);
+      if (e.type === 'done') {
+        how = 'done';
+        result = x?.result && typeof x.result === 'object' ? (x.result as Record<string, unknown>) : null;
+      }
       if (e.type === 'ready') {
         ready = true;
+        named = e.take;
         held.length = 0; // the engine has them, and from here the server never will
         handlers.onEvent(e);
         return;
@@ -157,6 +205,7 @@ export function localFeed(deps: LocalDeps): LiveConnect {
           namesWait = timers.set(() => {
             namesWait = null;
             finish();
+            tell();
           }, NAMES_WAIT_MS);
         }
         return;
@@ -170,13 +219,15 @@ export function localFeed(deps: LocalDeps): LiveConnect {
 
     const onFrames = (batch: EngineFrames) => {
       for (const raw of batch.frames) {
-        if (finished || server) return;
-        onFrame(raw);
+        if (server) return;
+        if (finished) hostFrame(parsed(raw));
+        else onFrame(raw);
       }
       if (batch.code < 0 && !finished && !server) {
         if (ready) finish({ type: 'error', reason: 'server' });
         else toServer(`code:${batch.code}`);
       }
+      tell();
     };
 
     unsubscribe = engine.onFrames((batch) => {
@@ -233,13 +284,19 @@ export function localFeed(deps: LocalDeps): LiveConnect {
           return;
         }
         if (frame.type === 'end') ended = true;
+        if (frame.type === 'dismiss') dismissed.add(frame.id);
+        if (frame.type === 'undismiss') dismissed.delete(frame.id);
+        if (frame.type === 'hint') hints.push([Math.round(samples / 160) / 100, { w: frame.w, what: frame.what }]);
         // Until `ready` the server may still get this take, so it needs them too.
         if (!ready) held.push({ at: samples, frame });
         if (take != null) apply(take, frame);
       },
       close: () => {
         if (server) server.close();
-        else finish();
+        else {
+          finish();
+          tell();
+        }
       },
       // Nothing to keep open: a pause is only audio that doesn't come.
       hold: (on) => {
