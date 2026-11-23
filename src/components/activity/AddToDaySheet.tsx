@@ -30,6 +30,7 @@ export function AddToDaySheet({
   dayName,
   logs,
   noteOnly = false,
+  noteCount = 0,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -39,6 +40,8 @@ export function AddToDaySheet({
   logs: RevisionLog[];
   /** A day before yesterday: only a note can be added, and the + opens it at once (ACT-17). */
   noteOnly?: boolean;
+  /** How many entries the day holds (a full day takes no more notes). */
+  noteCount?: number;
 }) {
   const { palette } = useTheme();
   const [open, setOpen] = useState<Row | null>(null);
@@ -50,7 +53,7 @@ export function AddToDaySheet({
   const doneSet = new Set([...(log?.pagesRevised ?? []), ...revisedOnDay(items, day)]);
   const doneCount = new Set(assignedPages.filter((p) => doneSet.has(p))).size;
 
-  if (noteOnly) return <AddNoteSheet visible={visible} onClose={onClose} day={day} dayName={dayName} />;
+  if (noteOnly) return <AddNoteSheet visible={visible} onClose={onClose} day={day} dayName={dayName} noteCount={noteCount} />;
 
   // The sheets open once this one has gone (one modal at a time).
   const then = (next: Row) => {
@@ -91,7 +94,7 @@ export function AddToDaySheet({
       </Sheet>
       <RevisedElsewhereSheet visible={open === 'revised'} onClose={() => setOpen(null)} day={day} dayName={dayName} logs={logs} />
       <AddMemorizedSheet visible={open === 'memorized'} onClose={() => setOpen(null)} day={day} dayName={dayName} />
-      <AddNoteSheet visible={open === 'note'} onClose={() => setOpen(null)} day={day} dayName={dayName} />
+      <AddNoteSheet visible={open === 'note'} onClose={() => setOpen(null)} day={day} dayName={dayName} noteCount={noteCount} />
     </>
   );
 }

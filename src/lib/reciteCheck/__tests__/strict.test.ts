@@ -71,3 +71,15 @@ describe('[RECITE-2] Strict, on (its own release)', () => {
     expect(demoMarks()).toEqual(TAKE.marks);
   });
 });
+
+describe('[RECITE-2] the madd lengths Strict checks (Nov 23 2026)', () => {
+  const { maddChecked } = require('../settings') as typeof import('../settings');
+
+  it('checks munfasil at 4 and 5 counts, not at 2', () => {
+    expect([2, 4, 5].map((n) => maddChecked('munfasil', n))).toEqual([false, true, true]);
+  });
+
+  it('doesn’t check muttasil at any length yet', () => {
+    expect([4, 5, 6].map((n) => maddChecked('muttasil', n))).toEqual([false, false, false]);
+  });
+});

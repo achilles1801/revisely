@@ -39,15 +39,15 @@ const lines = (...l: string[]) => l.join('\n');
 export const GUIDE_SECTIONS: readonly GuideSection[] = [
   {
     title: 'Finding your way',
-    covers: ['NAME-1', 'REVO-25'],
+    covers: ['NAME-1', 'REVO-25', 'REVO-41', 'TAB-2', 'HOME-1'],
     routes: ['Dashboard', 'ReadIndex', 'Activity', 'Settings'],
     text: lines(
-      '- The tab bar has Home and Read (swipe sideways between them). Insights is in Activity.',
-      '- Home’s top bar, on the right: a compass (the Prayer sheet: prayer times and the Qibla), a pulse icon (Activity) and a gear (Settings). A running timer shows on the left.',
+      '- The tab bar: Home, Activity, Read (swipe between them). Insights is in Activity; tapping Activity again goes back to its start.',
+      '- Home’s top bar: a gear (Settings) on the right, a running timer on the left. No compass: the next-prayer line opens the Prayer sheet.',
       '- Home’s Today post: where today starts (e.g. "Starts at Al-Mujadila ›", or "Starts at Al-Hadid, ayah 4 ›" mid-surah) and how much it is. Tapping that line (its ›) opens a menu with “Jump to…” and “Edit schedule”. Under it, one button: “Start revision”, “Continue revision” or “Review session”. Then "… of the Quran memorized ›" with a dot per juz; its › opens the memorized pages. Then “Recent sessions” (the last three) and “See all”.',
       '- Read tab: “Search the Quran” under its title, “Recent pages”, then every surah, grouped by juz. Tap one to open the reader.',
       '- The app names parts of the Qur’an by surah and juz ("Al-Baqarah 84–101", "Juz 28"). Page numbers show only as a detail (the header of today’s › menu), in the reader and the session, and where pages are chosen by number (the Page tab of “Jump to…”).',
-      '- Revo: the round button at the bottom right of Home and of Activity (Overview, Insights, a day, See all, Pages by strength). There is no Revo on the Read tab (its list or the reader) or in a revision session.',
+      '- Revo: the round button in a bottom corner of Home and Activity (Overview, Insights, a day, See all, Pages by strength); drag it to the other corner and it stays. None on the Read tab or in a revision session.',
     ),
   },
   {
@@ -85,8 +85,8 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
     routes: ['ActiveRevision', 'ActivityAll'],
     text: lines(
       '- Home → “Start revision” (or “Continue revision”). The session shows today’s pages in the plan’s order, as mushaf pages.',
-      '- Swiping on from a page marks it revised; the last page is marked by swiping onto the end card. The check button at the top marks or unmarks the page on screen.',
-      '- ⋯ at the top: “Jump or mark in bulk” (by juz or all pages, “Mark all done”), and with Smart Tracking “Rate page strength” (“Very weak” to “Very strong”).',
+      '- Swiping on from a page marks it revised; the last page is marked by swiping onto the end card. Bars at the top show which are done.',
+      '- “Pages” (top right) lists the day’s pages: a row goes there, its circle marks or unmarks it; “Mark all revised”; with Smart Tracking “Rate page strength” (“Very weak” to “Very strong”).',
       '- The bottom bar: the recitation player, the mic (record) and the timer.',
       '- Back saves what was marked; nothing marked, nothing is saved.',
       '- The end card: “Revision complete” (or how many of the pages were revised), “Keep going” (revise ahead) and “Listen back” after a recording.',
@@ -141,7 +141,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'Memorized pages',
-    covers: ['ACT-10', 'ONBOARD-1'],
+    covers: ['ACT-10', 'ONBOARD-1', 'ONBOARD-3', 'ONBOARD-4'],
     routes: ['Memorization'],
     text: lines(
       '- Only pages marked memorized are scheduled. Home → "… of the Quran memorized ›" opens them ready to mark (from Settings → Revision → “Memorized pages”, tap the pencil first) → tap pages to mark or unmark them (by “Surahs”, “Juz” or “Hizb”) → Save. It asks “When did you memorize these?”: Today logs them in Activity for today; Before logs nothing.',
@@ -165,17 +165,17 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
     ),
   },
   {
-    title: 'Activity and the daily log',
+    title: 'Activity and a day’s notes',
     covers: ['DAY-9', 'ACT-1', 'ACT-2', 'ACT-3', 'ACT-5', 'ACT-6', 'ACT-7', 'ACT-11', 'ACT-14', 'ACT-17', 'ACT-18', 'ACT-20', 'LOG-1', 'LOG-2', 'LOG-3', 'LOG-4'],
-    routes: ['Activity', 'ActivityDay', 'ActivityAll', 'JournalEntry', 'ListenBack', 'QuranReader'],
+    routes: ['Activity', 'ActivityDay', 'ActivityAll', 'ListenBack', 'QuranReader'],
     text: lines(
-      '- Activity (Home’s pulse icon, or Settings → Revision → “Activity”): everything done, day by day, on the revision day it was done: sessions, pages revised ahead (listed on the day they were revised), timed readings and sittings, recordings, memorized ayahs and notes.',
+      '- Activity (its tab, or Settings → Revision → “Activity”): everything done, day by day, on the revision day it was done: sessions, pages revised ahead (listed on the day they were revised), timed readings and sittings, recordings, memorized ayahs and notes.',
       '- Two tabs at the top, “Overview” and “Insights”. Overview is a calendar: the chip beside its title (“Month” or “Week”, with ⌄) switches between the two (kept on the phone). ‹ › step back and on; “Today” appears when another month or week is showing and brings today back. Each day has a ring for how much of its pages was revised, and dots for memorized, read and a note.',
       '- Tap a day: a preview under the calendar shows its date with “Open” and a row each for Revised, Memorized, Read and Notes. Tapping anywhere on the preview opens that day, at the block tapped.',
       '- A day: its Revised, Memorized, Read and Notes blocks and its recordings. The Revised block has a strip of the day’s pages (revised, skipped or not reached), its ends named by surah; tap a page to open it in the reader, and back returns to the day. Under the strip: the pages’ strength with Smart Tracking, or else what the strip shows (e.g. "18 revised · 2 skipped"). Tapping the Revised block’s header opens the juz most of its pages were in, in the juz sheet (see Insights).',
       '- The + adds, for today and yesterday: “Revised elsewhere” (that day’s pages not revised yet, all ticked; untick the ones not done; they count on Home and for the streak), “Memorized” and “Note”. An older day’s + adds a note only. Reading is logged by the reader itself.',
       '- Hold a block’s header for Edit or Delete (it asks first; deleting a Memorized entry takes those ayahs off the memorized).',
-      '- The daily log (a day’s notes): open the day → “Write”, or Activity → + → “Note”. Each note stays on its own; edit or copy one from its menu; swipe one away to delete it (Undo for five seconds). A note can be shown under the day’s Revised, Memorized or Read item. A note written between midnight and Fajr belongs to the revision day.',
+      '- A day’s notes: open the day → + → “Note”. Each stays on its own; hold one for Edit, Copy or Delete (Undo for five seconds). A note can be shown under the day’s Revised, Memorized or Read item. A note written between midnight and Fajr belongs to the revision day.',
       '- “See all”: everything, searchable, with filters.',
     ),
   },
@@ -190,7 +190,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
       '- “Consistency”: days with a revision or a read in the range, and the minutes by hour (press and slide along the hour bars to read each hour). A day’s circle opens that day; the figure opens Overview at its month. At 3 months: a weeks grid and, if there is one, the missed days’ pattern ("Every missed day was a Saturday").',
       '- “Memorization”: pages memorized each month; tap a month’s bar for that month’s memorizations, each opening its day. “Pace”: minutes per page, shown from ten timed items, against the same length before; tap its "From 24 timed revisions ›" line for each one.',
       '- On a new account, days before it are neither done nor missed ("1 of 1 day since 19 November"); the minutes by hour show from 3 days with something timed, Memorization’s bars once a month has a page memorized.',
-      '- Strength comes from ratings: 1–2 weak, 3 moderate, 4–5 strong (an unrated revised page counts as strong). Rating needs “Smart Tracking” (Settings → Revision), then ⋯ → “Rate page strength” in a session.',
+      '- Strength comes from ratings: 1–2 weak, 3 moderate, 4–5 strong (an unrated revised page counts as strong). Rating needs “Smart Tracking” (Settings → Revision), then “Pages” → “Rate page strength” in a session.',
       '- Smart Tracking on: “Weak spots” (pages weak now or skipped twice, with “Revise … first tomorrow” and “Ask”), strength in the juz sheet and on a day, and at the foot of Weak spots “See all pages by strength”: every revised page, weakest first, by “Pages”, “Surahs” or “Juz”, filtered by juz or strength.',
       '- Smart Tracking off: nothing in Activity shows strength (no weak, moderate or strong counts, no weak marks, no Weak spots); when a part was last revised and how often show instead. In Weak spots’ place, “Turn on Smart Tracking to see your weak spots” turns it on (Settings → Revision).',
     ),
@@ -225,7 +225,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['HELP-1', 'HELP-2', 'HELP-3', 'HELP-4', 'NEW-1', 'NEW-2', 'NEW-3'],
     routes: ['Settings'],
     text: lines(
-      '- Screens that need explaining have a ?: Home (the Today post’s header), Edit schedule (before Save), the reader (its header), a session (the last row of ⋯, “How a session works”), Activity (its top bar, for the tab on show) and a day (before +). It opens up to four short topics, then “Ask Revo” (not in the reader’s or a session’s help), “Hide help buttons” and Done.',
+      '- Screens that need explaining have a ?: Home (the Today post’s header), Edit schedule (before Save), the reader (its header), a session (the last row of “Pages”, “Help”), Activity (its top bar, for the tab on show) and a day (before +). It opens up to four short topics, then “Ask Revo” (not in the reader’s or a session’s help), “Hide help buttons” and Done.',
       '- The ? buttons are on unless hidden: “Hide help buttons” hides every one at once on this phone, and Settings → Help and support → “Help buttons” brings them back. With Smart Tracking off, help says nothing about ratings or strength.',
       '- After an update with something new, a short walkthrough opens once before Home: Next on each card, Done on the last; it can’t be skipped, and another phone won’t show it again. Settings → About → “What’s new” shows it again any time.',
     ),
@@ -247,7 +247,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
     routes: ['Settings'],
     text: lines(
       '- Everything works offline from the copy on the phone: changes are saved on the phone and sent in order once back online, and Home shows “Offline”. Pages not downloaded or opened before need the internet, so download the offline mushaf (below) to read and revise anywhere. Another phone signed in to the account sees changes once sent. The same day revised on two phones offline keeps every page.',
-      '- The first setup on a phone needs the internet, and so do Revo, recitation, The Clear Quran (unless read before) and a day of the daily log not opened before.',
+      '- The first setup on a phone needs the internet, and so do Revo, recitation, The Clear Quran (unless read before) and a day’s notes not opened before.',
       '- Offline mushaf: Settings → Downloads and storage → “Offline mushaf” → “Download now”: every page, the Arabic text and Saheeh International (up to about 250 MB). Wi-Fi only unless “Download over mobile data”; it downloads while the app is open and carries on where it stopped. “Remove from this phone” deletes it.',
       '- “Delete account” (Settings → your name, confirmed twice) deletes the account and everything in it; it needs the internet.',
       '- Updates come by themselves: “A new update is ready” → “Update now” or “Later”.',
@@ -259,7 +259,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
     routes: ['Settings', 'PrayerCalculation', 'PrayerNotifications'],
     text: lines(
       '- Settings → Mushaf and Recite → “Mushaf”: Madani 1405 (the default) or Madani 1441. Page numbers stay the same for plans.',
-      '- Home’s compass opens the Prayer sheet: Times (today’s prayers, the next with a countdown) and Qibla (a compass to the Kaaba; it needs location, which stays on the phone).',
+      '- The next-prayer line under Home’s header opens the Prayer sheet: Times (today’s prayers, the next with a countdown) and Qibla (a compass to the Kaaba; it needs location, which stays on the phone).',
       '- Settings → Prayer: “Prayer times”, “Calculation” (method and madhab), “Qibla” and “Next prayer on Home” (a line under Home’s header).',
       '- Settings → Reminders → “Friday Al-Kahf reminder”: a card on Home from Thursday’s maghrib to Friday’s (the Prayer sheet’s maghrib). Read on Thursday evening, it counts for that Friday; “Not today” hides it until Friday’s maghrib.',
     ),
@@ -290,7 +290,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
       '- After Stop, “Your recitation”: the score by the page, each mark (a tap shows it), a row when they went on with a similar ayah ("You continued with Luqman 31:6, a similar ayah"), “Recite the mistakes again” (one take over just that stretch, then "Before: …"), “Recite again” and “Done”.',
       '- The eye (“Hide the page”) covers the words; they appear as recited. ‹ (“Show the next word”) and ‹‹ (“Show the whole ayah”) peek: peeked words stay grey and never count. Saying something other than the next word turns its cover red: a hint, never a mark.',
       '- “Test me”: five random places in what they’ve memorized (“Everything you’ve memorized” or one juz), each hidden but for an ayah’s first two words; then "4 of 5 continued cleanly" and “Test me again”. With nothing memorized: “Mark what you’ve memorized first”. In the reader only.',
-      '- In a session a take never marks a page revised (only swiping off it or ✓ does). A voice search that finds one place opens the reader at the ayah, highlighted, nothing listening; Back returns to the search.',
+      '- In a session a take never marks a page revised (only swiping off it or “Pages” does). A voice search that finds one place opens the reader at the ayah, highlighted, nothing listening; Back returns to the search.',
       '- Not yet: Recite with the Madani 1441 print or offline, tajweed marks, a teacher hearing the takes.',
     ),
   },
@@ -363,6 +363,15 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
  */
 export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
   {
+    // The Memorized picker (Majd, Nov 23 2026): Revisely Dev until it ships.
+    title: 'Choosing what you memorized on the page',
+    covers: ['MEM-8'],
+    routes: ['Activity'],
+    text: lines(
+      '- Activity → + → “Memorized” has “On the page”, “Surah” and “Juz”. “Choose on the page” opens the mushaf where they left off: tap the ayah reached and it fills from the first ayah to go; “Whole page” and “Clear” act on the page, and “Done” returns. It doesn’t move the reader’s place. With VoiceOver or a page not downloaded, it’s a list of first words.',
+    ),
+  },
+  {
     // The athan (Majd, Nov 22 2026): Revisely Dev on iPhone until a version has its sounds built in for Android.
     title: 'The athan as a prayer’s notification sound (iPhone)',
     covers: ['ATHAN-1', 'ATHAN-2', 'ATHAN-3', 'ATHAN-4'],
@@ -381,25 +390,26 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['REMIND-2', 'REMIND-5'],
     routes: ['Settings'],
     text: lines(
-      '- The revision reminders: today’s and tomorrow’s as usual, then one each morning for the rest of the week after the app was last open (naming where that day’s revision starts, worded differently each day), then none until it is opened again. Opening the app plans them again from that day. There is no setting for how many.',
+      '- The revision reminders: today’s and tomorrow’s, then one each morning for the rest of the week after the app was last open (naming where that day’s revision starts), then none until it is opened again. There is no setting for how many.',
       '- Settings → Testing → “Scheduled reminders” lists the reminders this phone will show and when; “Show the next one in 5 seconds” shows the next as a real notification.',
-      '- Settings → Reminders → “Revision reminders” is off while the phone refuses Revisely’s notifications, and says so; turning it on then offers “Open Settings” (allow notifications for Revisely there, then turn reminders on). Without notifications allowed, no reminder can come.',
+      '- Settings → Reminders → “Revision reminders” is off while the phone refuses Revisely’s notifications, and says so; turning it on then offers “Open Settings”.',
     ),
   },
   {
     // Mistake detection reached the store app with 1.0.5 (its lines are in GUIDE_SECTIONS). Strict stays Revisely Dev's
     // until it has a release of its own (Majd, Nov 17 2026).
     title: 'Only in Revisely Dev',
-    covers: ['SESS-8', 'LANG-2', 'RECITE-26', 'SET-5'],
+    covers: ['SESS-8', 'LANG-2', 'RECITE-26', 'SET-5', 'ONBOARD-5'],
     routes: ['Settings'],
     text: lines(
-      '- Settings → Mushaf and Recite → “Mistakes to mark”: “Mistakes”, or “Strict (Beta)”, which also marks tajweed in violet (madd lengths, set by “Madd munfasil”, “Madd muttasil” and “Madd ʿarid”; qalqalah, ghunnah, ikhfa, idgham, iqlab). The store app marks mistakes only.',
+      '- Settings → Testing → “Preview onboarding”: the first setup’s screens on a blank account. It saves nothing.',
+      '- Settings → Mushaf and Recite → “Mistakes to mark”: “Mistakes”, or “Strict (Beta)”, which also marks tajweed in violet: ghunnah, ikhfa, qalqalah, idgham (with and without ghunnah), iqlab, a natural madd dropped, “Madd munfasil” at 4 or 5 counts, a lazim madd held short, and “Madd ʿarid” once it’s set to a length. It doesn’t check “Madd muttasil”, munfasil at 2 counts or ikhfa of meem yet, so never say it checks every tajweed rule. It’s Beta: it can miss a slip or note a correct word, and notes never count in the score. The store app marks mistakes only.',
       '- Two tiers of marks (Majd, Nov 22 2026). Mistakes: a wrong, skipped or extra word, a wrong haraka and a wrong letter, each named for what it is on its card (“Wrong word”, “Wrong haraka”, “Wrong letter”, “Wrong shadda”), in the summary’s line (for example "1 wrong haraka, 1 wrong letter") and counted in the score; a wrong haraka or letter is a mistake like a wrong word, never a “slip”. Tajweed notes (Strict) are Beta: “(Beta)” after a note’s name, in the summary’s line and in Insights, and never counted. “Not clear” is neither: never a mistake, never counted. The colours are as before: red for words, amber for harakat and letters and Not clear, violet for tajweed.',
       '- Settings → Mushaf and Recite → “Keep my recitations as test data” (on unless turned off) keeps each take and its result for Revisely’s tests; software checks them, nobody listens. Any account that recites has it, tester or not. Settings → Testing → “Premium” turns Premium off to see Mark mistakes locked.',
       '- Settings → About → “Licences” shows, in full, the licence of the model Revisely’s recitation checking is built on (the Quran Muaalem License); it opens without a connection.',
       '- Settings → Testing → “Mistake detection model” says which model the checker runs for Recite, Mistakes and Strict (for example v7), read from the checker when Settings opens; a tap asks again.',
       '- Settings → Appearance → “Language”: “Phone’s language”, English or العربية (Arabic, right to left). Revisely restarts to change it (“Restart”, or “Not now” for the next launch). In Arabic, Revo answers in Arabic too. The Arabic is still being written: what isn’t translated yet shows in English. The store app is English only for now. In Arabic the mushaf still turns like a printed one: page 1 on the right, the next page from the left.',
-      '- Rating Revisely: Settings → Help and support → “Rate Revisely” opens the App Store’s Write a Review page (Revisely’s Google Play page on Android). After finishing a day’s revision with a streak of 7 days or more, the end card may also show “Enjoying Revisely? Rate it”: at most 3 times ever, four months apart, never in an account’s first week, and never again once it is tapped or dismissed with its ✕ (or Rate Revisely is used). Rating is always optional and nothing is given for it.',
+      '- Rating Revisely: Settings → Help and support → “Rate Revisely” opens the store’s review page. After a day’s revision with a streak of 7 days or more, the end card may show “Enjoying Revisely? Rate it”: at most 3 times ever, four months apart, never in an account’s first week, never again once tapped or dismissed. Rating is optional and nothing is given for it.',
     ),
   },
   {
@@ -421,9 +431,9 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['RMEM-7'],
     routes: ['QuranReader', 'ActiveRevision'],
     text: lines(
-      '- After a take with Mark mistakes, its summary lists their earlier takes of the same stretch, newest first, up to 5, as "This passage: your last 3 takes": a take counts when it shares at least half of its ayat with this one and this one at least half of its own (a whole-page take isn’t the history of two of its ayat). Each row says the day (“Earlier today”, “Yesterday”, a weekday, then "9 days ago", "3 weeks ago"), its score by the page and its mistakes (tajweed notes and Not clear never count), its ayat when they differ from this take’s, and whether the page was hidden. Unfinished and deleted takes aren’t listed. With no earlier take there is no such section.',
+      '- After a take with Mark mistakes, its summary lists up to 5 earlier takes of the same stretch, newest first, as "This passage: your last 3 takes" (a take counts when each shares at least half its ayat with the other). Each row says the day, its score by the page and its mistakes (tajweed notes and Not clear never count), its ayat when they differ, and whether the page was hidden. Unfinished and deleted takes aren’t listed.',
       '- A tap on a row shows that take on its page with its marks until Done, as Show on the page does. “Your progress here” under it still opens every take of the passage with the chart.',
-      '- “Your progress here” and “Your progress” compare like with like: the trend line, the score and the chart count only takes of the same stretch (by the same rule), so a longer take’s mistakes in other ayat never count for or against it. “Your takes here” still lists every take that covers half of the passage, each with its ayat; “The score and chart count only your takes of these ayat” says when some are left out of the chart.',
+      '- “Your progress here” and “Your progress” count only takes of the same stretch (by the same rule) in the trend, score and chart. “Your takes here” still lists every take covering half of the passage, each with its ayat.',
     ),
   },
   {
@@ -443,7 +453,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['RECITE-22'],
     routes: ['QuranReader', 'ActiveRevision'],
     text: lines(
-      '- A recitation can go on as long as they like, in the reader or a whole revision session (30–45 minutes for 20 pages): the server checks 15 minutes at a time, and Revisely joins those pieces by itself, at a pause after an ayah near the 15 minutes. Nothing stops or changes on screen: the bar keeps listening, the time keeps running, and every mistake marked stays.',
+      '- A recitation can go on as long as they like, in the reader or a whole session: the server checks 15 minutes at a time and Revisely joins the pieces by itself. Nothing stops or changes on screen, and every mistake marked stays.',
       '- Stop ends it as usual, and the summary covers the whole recitation: one score, one recording, and one take in “Recited” and “Your progress”. “Your recitation” plays for any mistake in it, during and after Stop, from the recitation’s recording; with “Save recordings when you recite” off (Settings, Recite) nothing keeps the earlier parts’ audio, so only mistakes in its last 15-minute part play.',
     ),
   },
@@ -464,10 +474,10 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
       '- Activity → “Insights” → “Recitation” says the same for its range, under the score: the mistakes a page across their takes of 2 pages or more ("Takes of 2 pages or more: 1.2 mistakes a page"). You are told it for the last 4 weeks; takes of a page or less aren’t in it.',
       '- “Your recitation” on a mark’s card plays the phrase the mistake is in, from the pause mark before it to the next (any but ۙ), or the whole ayah when it’s short (12 words or fewer, or 8 seconds or less); never more than 15 seconds. A skipped word plays from the word before it, so the jump is heard.',
       '- When a take starts, the cursor shows where they seem to be within a second or two of their first word (the page shown only), and settles once the app is sure where they started; "Listening…" stays until then.',
-      '- On a hidden page a word shows once it has been said in full, the next word has begun, or it has been the word being said about as long as it takes to say (a long madd waits for its end), never a word ahead; nothing is drawn on the word being said, still hidden, and the newest word shown is in green ink, the following colour (as the word being said in the bar); the words before it are in the page’s own ink, and a word with a mark keeps its highlight instead. The bar shows no more than the page.',
+      '- On a hidden page a word shows once it has been said in full or the next word has begun (a long madd waits for its end), never a word ahead. Nothing is drawn on the word being said; the newest word shown is in green ink, and a word with a mark keeps its highlight. The bar shows no more than the page.',
       '- A hidden page looks empty: a faint line where each line’s words are still hidden, the ayah markers whole, and each word appears in place, whole, once it is shown.',
       '- Hiding the page during a take keeps everything they have already passed on show (the page before where they started, and what they recited) and hides only what comes next. When a take stops, what they recited stays shown (with anything shown by hand) until they hide the page again. Hiding it after a take hides everything; the take’s mistakes still show where they are and can be tapped.',
-      '- Highlights on the page are soft pastel washes behind the word (rounded, fading out at the edges, a little wider than the word), not boxes: the mistakes’ red, amber and violet, and past mistakes lighter. With the page shown, a flat grey band lies behind the whole ayah being recited, across every line of it, and a firmer grey rectangle on the word being recited moves word by word with them, never ahead',
+      '- Highlights on the page are soft pastel washes behind the word, not boxes: the mistakes’ red, amber and violet, past mistakes lighter. With the page shown, a flat grey band lies behind the ayah being recited and a firmer grey rectangle follows the word being recited, never ahead',
     ),
   },
   {
@@ -476,19 +486,8 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['THEME-1'],
     routes: ['Settings', 'Dashboard'],
     text: lines(
-      '- Settings → Appearance → “Ramadan theme” dresses the app for Ramadan: light falling softly over the top of Home, lanterns hanging at the top of Home (not while the timer shows there), a crescent by the greeting and string lights along the tab bar. It changes nothing the app does. It’s on until they turn it off there, and that choice stays on that phone only.',
-      '- It never shows over the Qur’an’s pages, a revision session’s pages or a Recite take. With Reduce Motion on, it stays still.',
-    ),
-  },
-  {
-    // Majd, Nov 23 2026: Activity as a tab of its own, to compare with the button at the top of Home; Revisely Dev only.
-    title: 'Activity as a tab',
-    covers: ['TAB-2'],
-    routes: ['Settings', 'Activity', 'Dashboard'],
-    text: lines(
-      '- Settings → Appearance → “Activity tab” makes Activity a tab of its own, between Home and Read, so they can compare it with opening Activity from the top of Home. It’s off until they turn it on, and that choice stays on that phone only.',
-      '- With it on, the tab bar is Home, Activity (the pulse icon), Read, in that order for swiping too, and Home’s top bar has only the compass and the gear. Activity works as before (Overview and Insights, a day, See all), each opened inside its tab; tapping the Activity tab again goes back to its start. A sideways swipe on the calendar’s days still changes the month or week.',
-      '- With it off, Activity opens from the pulse icon at the top of Home, as described in the main guide.',
+      '- Settings → Appearance → “Ramadan theme” adds falling light, lanterns and a crescent at the top of Home and string lights along the tab bar. It changes nothing the app does. On until turned off there, on that phone only.',
+      '- Never over the Qur’an’s pages, a session’s pages or a Recite take.',
     ),
   },
   {
@@ -497,10 +496,28 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['ONDEV-1'],
     routes: ['Settings', 'OnDeviceBench'],
     text: lines(
-      '- Settings → Testing → “On-device model” times Recite’s model on this phone, for the Revisely team: the first step to checking recitation on the phone instead of Revisely’s server. Recite itself still checks on the server.',
-      '- It lists runs (a model, the CPU or Core ML / NNAPI / XNNPACK, a thread count), downloads what they need once (a few hundred MB on Wi‑Fi the first time), checks each model against the checker’s own output, then times it and shows the time per 4-second window (under 150 ms at p95 is the mark), memory and heat.',
-      '- “Long run” (5 or 20 minutes) runs the first chosen run as a live take would, a window every half second, and notes the battery and the phone’s heat each minute. Unplugged, at the usual brightness, on that screen.',
-      '- The results go to the Revisely team (the phone’s model and the timings, never their account or any audio) and “Share results” sends them anywhere. A build without it says to update Revisely Dev; an account the team hasn’t given bench access is told so.',
+      '- Settings → Testing → “On-device model” is the Revisely team’s bench: it times Recite’s model on this phone (per 4-second window; the mark is under 150 ms at p95), with memory and heat, and “Long run” adds battery.',
+      '- “Stub” under the phone’s name means this build has no on-device engine. Results go to the team without their account or audio.',
+    ),
+  },
+  {
+    // Nov 23 2026: the model and tables on the phone, ahead of Recite running there (Majd: "get the model on phone").
+    title: 'Recite on the phone (Settings → Downloads and storage)',
+    covers: ['ONDEV-2', 'ONDEV-3'],
+    routes: ['Settings'],
+    text: lines(
+      '- Settings → Downloads and storage → “Recite on the phone” downloads what lets Recite check on the phone (about 50 MB), encrypted and out of backups. For now Recite still checks on the server.',
+      '- It starts when they open the reader, on Wi-Fi unless “Download over mobile data” is on. Its menu has Download now and Remove. Some accounts don’t have it yet.',
+    ),
+  },
+  {
+    // Nov 23 2026: one pipeline in two places (on-device-plan.md §12).
+    title: 'Where Recite runs (Settings → Testing)',
+    covers: ['ONDEV-4'],
+    routes: ['Settings'],
+    text: lines(
+      '- “Recite runs on”: Automatic (the team’s setting, the server for now), This phone or The server. The line under it says where the next take runs and why.',
+      '- A take the phone’s engine can’t run goes to the server by itself, with nothing lost. A take on the phone isn’t kept as test data yet.',
     ),
   },
 ];
@@ -529,6 +546,7 @@ export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
   'LANG-1': 'layout: the layout follows the app’s language, not the phone’s; nothing for Revo to explain',
   'SHEET-1': 'layout: one sheet at a time, so the screen under them always takes taps again; nothing for Revo to explain',
   'TAB-1': 'layout: a sideways swipe never presses the row under the finger; nothing for Revo to explain',
+  'ACT-32': 'layout: how the calendar’s preview words a day’s Revised figure; nothing for Revo to explain',
   'RECITE-25': 'layout: nothing a take shows covers the page; its bar, a shown take’s card and its Undo sit under it; nothing for Revo to explain',
   'LINK-1': 'layout: where a link opens (the app’s own browser, else the phone’s, else its address to copy); the links themselves are in the guide',
   'SYNC-4': 'timing: a new account loads with no relaunch; nothing to do',
@@ -580,7 +598,7 @@ export const SCREEN_HINTS: Readonly<Record<RevoScreen, string>> = {
   memorized: 'the memorized pages, ready to mark',
   activity: 'Activity',
   insights: 'Activity, where Insights is the tab at the top',
-  dailyLog: 'today’s daily log',
+  dailyLog: 'today in Activity',
   settings: 'Settings; add "section", the page it opens: revision (Revision), notifications (Reminders), prayer (Prayer), mushaf (Mushaf and Recite), revo (Revo AI), activity (Downloads and storage), appearance (Appearance) or testing (Testing)',
   prayerTimes: 'the Prayer sheet on Times',
   qibla: 'the Prayer sheet on Qibla',
@@ -596,7 +614,7 @@ export const GUIDE_PROMPT = [
   '- The guide below says how the app behaves, where each screen and setting is, how to do common tasks, and what it can’t do. A question about how something works, where it is, how to do it or whether the app can do it is answered from the guide only.',
   '- Such an answer is the answer in one sentence, then the path written once (“Home → today’s › → Jump to…”), at most two short steps: about 35 words in all. Don’t describe the steps and then list them again. It is still the one JSON object every reply is, with the steps in "text".',
   '- In such an answer say nothing about today’s pages, what is left today, weak pages or the streak unless the question is about them, and don’t suggest starting today’s revision. Its action is an openScreen to the screen the answer names, whenever that screen is in the openScreen list; otherwise no action.',
-  '- Which screen: “Edit schedule”, “Create new plan” or “Daily amount” → planEditor; “Jump to…” → jumpTo; Settings → a section → settings with that section; the reader, its player bar or “Audio Options” → reader; the compass: prayer times → prayerTimes, the Qibla → qibla; the memorized pages → memorized; the daily log → dailyLog; Activity → activity; Activity’s Insights → insights. Never write that you added a shortcut or will open something: the card shows it.',
+  '- Which screen: “Edit schedule”, “Create new plan” or “Daily amount” → planEditor; “Jump to…” → jumpTo; Settings → a section → settings with that section; the reader, its player bar or “Audio Options” → reader; the Prayer sheet: prayer times → prayerTimes, the Qibla → qibla; the memorized pages → memorized; today’s day or adding a note → dailyLog; Activity → activity; Activity’s Insights → insights. Never write that you added a shortcut or will open something: the card shows it.',
   '- When the streak, missed days or missed pages come up, say how to catch up: tap “Add to today” on Home. A streak broken by two missed days can’t come back, but those days’ pages can still be added that way (the last three days): always say so.',
   '- Never invent a feature, a button, a setting or a path. When the guide says the app can’t do something (it is under “Not possible (yet)”, or the guide says no or not yet), say so plainly (“Not yet.” or “There’s no …”), then give the closest way the guide names. When that way changes more than they asked for (the whole plan, for one juz), say so in a few words. Say “I’m not sure that’s possible in Revisely” only for something the guide doesn’t mention at all, then offer the closest thing it has.',
   '- What the guide marks as for testers is in their app only when the question says "Tester: yes". For anyone else, never offer it as if it were there: say it isn’t in their app yet, then give the closest way that is.',

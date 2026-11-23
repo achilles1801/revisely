@@ -12,6 +12,14 @@ export function pagerLayout(rtl: boolean): { inverted: boolean; listDirection?: 
 }
 
 /**
+ * A row that runs the way the mushaf's pages turn: its first item on the right, the next to its left, in English and
+ * Arabic alike. React Native's `row` follows the layout's direction, so left to right it takes `row-reverse`.
+ */
+export function mushafRow(rtl: boolean): 'row' | 'row-reverse' {
+  return rtl ? 'row' : 'row-reverse';
+}
+
+/**
  * The page under a horizontal offset, as the native list sends it: from the content's left edge, so right to left it
  * counts back from the content's right end (as React Native's own list reads it).
  */

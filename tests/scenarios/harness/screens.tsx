@@ -71,7 +71,6 @@ function homeStackWith(mods: Booted, real: Record<string, unknown>, appRef = fal
   const { createNativeStackNavigator } = req<any>('@react-navigation/native-stack');
   const Dashboard = req<any>('src/screens/main/DashboardScreen').default;
   const Session = req<any>('src/screens/revision/ActiveRevisionScreen').default;
-  const Journal = req<any>('src/screens/journal/JournalEntryScreen').default;
   const Manager = req<any>('src/screens/main/MemorizationScreen').default;
   const ActivityDayScreen = req<any>('src/screens/activity/ActivityDayScreen').default;
   const nav = req<{ navigation: { current: unknown } }>('./navRef');
@@ -96,7 +95,6 @@ function homeStackWith(mods: Booted, real: Record<string, unknown>, appRef = fal
       { screenOptions: { headerShown: false, animation: 'none' } },
       h(Stack.Screen, { name: 'Dashboard', component: Dashboard }),
       h(Stack.Screen, { name: 'ActiveRevision', component: Session }),
-      h(Stack.Screen, { name: 'JournalEntry', component: Journal }),
       h(Stack.Screen, { name: 'Memorization', component: Manager }),
       h(Stack.Screen, { name: 'ActivityDay', component: ActivityDayScreen }),
       ...['Settings', 'PlanEdit', 'PlanDayEdit', 'Activity', 'ActivityAll', 'Insights', 'QuranReader', 'LastRevised'].map(
@@ -107,7 +105,7 @@ function homeStackWith(mods: Booted, real: Record<string, unknown>, appRef = fal
   );
 }
 
-/** Pass to Phone.open: the app opens on onboarding's "Select memorized portions" (in progress). */
+/** Pass to Phone.open: the app opens on onboarding's "Which juz?" (Part of it). */
 export function onboardingStack(mods: Booted): ReactElement {
   const { React, require: req } = mods;
   const { NavigationContainer } = req<any>('@react-navigation/native');
@@ -116,7 +114,7 @@ export function onboardingStack(mods: Booted): ReactElement {
   const nav = req<{ navigation: { current: unknown } }>('./navRef');
   const Stack = createNativeStackNavigator();
   const h = React.createElement;
-  const Schedule = () => null;
+  const DailyAmount = () => null;
   return h(
     NavigationContainer,
     { ref: nav.navigation },
@@ -124,19 +122,51 @@ export function onboardingStack(mods: Booted): ReactElement {
       Stack.Navigator,
       { screenOptions: { headerShown: false, animation: 'none' } },
       h(Stack.Screen, { name: 'JuzSelection', component: JuzSelection, initialParams: { journeyStage: 'in_progress' } }),
-      h(Stack.Screen, { name: 'Schedule', component: Schedule }),
+      h(Stack.Screen, { name: 'DailyAmount', component: DailyAmount }),
     ),
   );
 }
 
-/** Onboarding's "Select memorized portions", read and driven through its own elements. */
+/** Pass to Phone.open: the whole of onboarding, from the welcome. */
+export function onboardingFlow(mods: Booted): ReactElement {
+  const { React, require: req } = mods;
+  const { NavigationContainer } = req<any>('@react-navigation/native');
+  const { OnboardingNavigator } = req<any>('src/navigation/OnboardingNavigator');
+  const nav = req<{ navigation: { current: unknown } }>('./navRef');
+  return React.createElement(NavigationContainer, { ref: nav.navigation }, React.createElement(OnboardingNavigator));
+}
+
+/** Pass to Phone.open: Settings with Preview onboarding open over it (ONBOARD-5). */
+export function onboardingPreviewStack(mods: Booted): ReactElement {
+  const { React, require: req } = mods;
+  const { NavigationContainer } = req<any>('@react-navigation/native');
+  const { createNativeStackNavigator } = req<any>('@react-navigation/native-stack');
+  const { View } = req<any>('react-native');
+  const Preview = req<any>('src/screens/onboarding/OnboardingPreviewScreen').default;
+  const nav = req<{ navigation: { current: unknown } }>('./navRef');
+  const Stack = createNativeStackNavigator();
+  const h = React.createElement;
+  const Settings = () => h(View, { testID: 'settings-stub' });
+  return h(
+    NavigationContainer,
+    { ref: nav.navigation, initialState: { index: 1, routes: [{ name: 'Settings' }, { name: 'OnboardingPreview' }] } },
+    h(
+      Stack.Navigator,
+      { screenOptions: { headerShown: false, animation: 'none' } },
+      h(Stack.Screen, { name: 'Settings', component: Settings }),
+      h(Stack.Screen, { name: 'OnboardingPreview', component: Preview }),
+    ),
+  );
+}
+
+/** Onboarding's questions, read and driven through their own elements. */
 export class Onboarding {
   constructor(private readonly app: OpenApp) {}
 
-  /** The count at the foot: "24 of 604 pages memorized". */
+  /** What's chosen, at the foot: "Al-Fatihah and Juz 30 chosen" (without its no-break characters). */
   summary(): string {
     const el = this.app.screen.queryByTestId('juz-selection-summary');
-    return el ? flatText(el) : '';
+    return el ? flatText(el).replace(/\u2011/g, '-').replace(/\u00a0/g, ' ') : '';
   }
 
   continueEnabled(): boolean {
@@ -144,17 +174,22 @@ export class Onboarding {
     return !!el && el.props.accessibilityState?.disabled !== true;
   }
 
-  /**
-   * Marks a juz as its row's check does (MemorizationBrowser.applyBulk: every
-   * page of the juz by number, loaded or not). Its row isn't drawn here, the
-   * list being virtualized, so the browser's change goes in directly.
-   */
-  async markJuz(pages: number[]): Promise<void> {
-    const { MemorizationBrowser } = this.app.mods.require<any>('src/components/MemorizationBrowser');
-    const browser = this.app.screen.UNSAFE_getByType(MemorizationBrowser);
-    const next = new Map(browser.props.pendingChanges as Map<number, string>);
-    for (const p of pages) next.set(p, 'memorized');
-    await this.app.act(async () => browser.props.onChange(next));
+  /** A tap on a juz in the grid. */
+  async tapJuz(juz: number): Promise<void> {
+    await this.press(`juz-cell-${juz}`);
+  }
+
+  /** A tap on anything in the flow, by its testID. */
+  async press(testID: string): Promise<void> {
+    const { fireEvent } = this.app.mods.rtl;
+    await this.app.act(async () => {
+      fireEvent.press(this.app.screen.getByTestId(testID));
+    });
+  }
+
+  /** Until a question's screen is up. */
+  async reach(testID: string): Promise<void> {
+    await this.app.until(() => this.app.screen.queryByTestId(testID) != null, `onboarding's ${testID}`);
   }
 
   async continue(): Promise<void> {
@@ -378,13 +413,41 @@ export class Session {
     await this.app.idle(30);
   }
 
-  /** The check: marks the page on screen as revised (or unmarks it). */
+  /** The Pages sheet's circle for the page on screen, as a user reaches it: Pages, the circle, a tap outside. */
+  private async toggleHere(): Promise<void> {
+    const { fireEvent } = this.app.mods.rtl;
+    await this.openPages();
+    await this.app.act(async () => {
+      fireEvent.press(this.app.screen.getByTestId('session-pages-toggle-here'));
+    });
+    await this.closePages();
+  }
+
+  /** Opens the Pages sheet (SESS-1). */
+  async openPages(): Promise<void> {
+    await this.press('Pages');
+    await this.app.until(() => this.app.screen.queryByTestId('session-pages-toggle-here') != null, 'the Pages sheet');
+  }
+
+  /** Closes it with a tap on its backdrop. */
+  async closePages(): Promise<void> {
+    const { fireEvent } = this.app.mods.rtl;
+    await this.app.act(async () => {
+      fireEvent.press(this.app.screen.getByTestId('backdrop'));
+    });
+    await this.app.until(() => this.app.screen.queryByTestId('session-pages-toggle-here') == null, 'the Pages sheet to close');
+    await this.app.idle(30);
+  }
+
+  /** Marks the page on screen as revised, in the Pages sheet. */
   async check(): Promise<void> {
-    await this.press('Mark current page as revised');
+    if (await this.isChecked()) throw new Error('the page on screen is already marked');
+    await this.toggleHere();
   }
 
   async uncheck(): Promise<void> {
-    await this.press('Unmark current page');
+    if (!(await this.isChecked())) throw new Error('the page on screen is not marked');
+    await this.toggleHere();
   }
 
   /** A swipe to the next page (the pager's own callbacks, in its order); past the last page, the end card. */
@@ -494,12 +557,9 @@ export class Session {
     return el ? flatText(el) : '';
   }
 
-  /** Whether the page on screen is checked (its check reads "Unmark current page"). */
+  /** Whether the page on screen is marked: "Revised" beside its number, shown or waiting behind the controls. */
   async isChecked(): Promise<boolean> {
-    if (!this.app.screen.queryByLabelText('Unmark current page') && !this.app.screen.queryByLabelText('Mark current page as revised')) {
-      await this.tapPage();
-    }
-    return this.app.screen.queryByLabelText('Unmark current page') != null;
+    return this.app.screen.queryByTestId('session-page-revised', { includeHiddenElements: true }) != null;
   }
 
   /** Back to Home (the session saves as it goes). */
@@ -509,36 +569,41 @@ export class Session {
   }
 }
 
-/** The daily log of a day (JournalEntryScreen), as a user writes in it. */
+/** A day's notes in Activity, as a user writes them: the day's + adds one, a hold on one edits, copies or deletes it (ACT-6). */
 export class DailyLog {
   constructor(private readonly app: OpenApp) {}
 
-  /** Opens the log of `date` ('YYYY-MM-DD'; today's revision day when left out), as Activity's day does. */
+  /** Opens the day `date` ('YYYY-MM-DD'; today's revision day when left out). */
   async open(date?: string): Promise<void> {
     const nav = this.app.mods.require<{ navigation: { current: any } }>('./navRef').navigation;
+    const { getRevisionDayForUser } = this.app.mods.require<typeof import('../../../src/lib/fajrBoundary')>('src/lib/fajrBoundary');
+    const day = date ?? getRevisionDayForUser(this.app.app.user);
     await this.app.act(async () => {
-      nav.current.navigate('JournalEntry', date ? { date } : undefined);
+      nav.current.navigate('ActivityDay', { date: day });
     });
-    await this.app.until(() => this.app.screen.queryByTestId('journal-composer') != null, 'the daily log to open');
-    // Confirmations (Delete this entry?) are answered yes.
+    await this.app.until(() => this.app.screen.queryByTestId('activity-day-v2') != null, 'the day to open');
+    // Confirmations are answered yes.
     const { Alert } = this.app.mods.require<typeof import('react-native')>('react-native');
     (Alert as { alert: unknown }).alert = (_t: string, _m?: string, buttons?: { style?: string; onPress?: () => void }[]) =>
       buttons?.find((b) => b.style === 'destructive')?.onPress?.();
   }
 
-  /** The day's entries, oldest first: kind and text. */
+  /** The day's entries: kind and text. */
   entries(): { kind: string; text: string }[] {
     return this.rows().map(({ kind, text }) => ({ kind, text }));
   }
 
-  /** The day's entries, oldest first, with the time each shows ("12:40 am", or "12:40 am Wed"). */
+  /** The day's entries, with the time each shows ("12:40 am", or "12:40 am Wed"). */
   rows(): { kind: string; text: string; time: string }[] {
-    const rows = this.app.screen.queryAllByTestId(/^journal-note-(?!menu)[^-]+$/);
-    return rows.map((r) => {
+    return this.noteRows().map((r) => {
       const label: string = r.props.accessibilityLabel ?? '';
       const parts = label.split(', ');
       return { kind: parts[0], text: parts.slice(1, -1).join(', '), time: parts[parts.length - 1] };
     });
+  }
+
+  private noteRows() {
+    return this.app.screen.queryAllByTestId(/^day-note-/);
   }
 
   private async press(el: unknown): Promise<void> {
@@ -549,51 +614,73 @@ export class DailyLog {
     await this.app.idle(50);
   }
 
-  /** Writes a note of `kind` ('Note', 'Revision', 'Memorization') and taps Add. */
-  async add(text: string, kind = 'Note'): Promise<void> {
-    const { fireEvent, within } = this.app.mods.rtl;
-    await this.press(within(this.app.screen.getByTestId('journal-kind')).getByText(kind));
+  /** The day's +, Note, the text, Add: returns once the sheet has been sent, before the note need show. */
+  async write(text: string): Promise<void> {
+    const { fireEvent } = this.app.mods.rtl;
+    await this.press(this.app.screen.getByTestId('day-add'));
+    // Today and yesterday have a menu first; an older day's + opens the note at once (ACT-17).
+    await this.app.until(
+      () => this.app.screen.queryByTestId('add-note-text') != null || this.app.screen.queryByTestId('sheet-action-note') != null,
+      'the + to open',
+    );
+    const row = this.app.screen.queryByTestId('sheet-action-note');
+    if (row) await this.press(row);
+    await this.app.until(() => this.app.screen.queryByTestId('add-note-text') != null, 'the Note sheet');
     await this.app.act(async () => {
-      fireEvent.changeText(this.app.screen.getByTestId('journal-text-input'), text);
+      fireEvent.changeText(this.app.screen.getByTestId('add-note-text'), text);
     });
-    await this.press(this.app.screen.getByTestId('journal-send'));
-    await this.app.until(() => this.entries().some((e) => e.text === text), `"${text}" to show in the log`);
+    await this.press(this.app.screen.getByTestId('add-note-add'));
   }
 
-  private row(text: string) {
-    const row = this.app.screen
-      .queryAllByTestId(/^journal-note-(?!menu)[^-]+$/)
-      .find((r) => (r.props.accessibilityLabel ?? '').includes(`, ${text}, `));
+  /** Adds a note from the day's +. */
+  async add(text: string): Promise<void> {
+    await this.write(text);
+    await this.app.until(() => this.app.screen.queryByTestId('add-note-text') == null, 'the Note sheet to close');
+    await this.app.until(() => this.entries().some((e) => e.text === text), `"${text}" to show on the day`);
+    // The sheet has gone before the next one can open (one modal at a time).
+    await this.app.idle(400);
+  }
+
+  row(text: string) {
+    const row = this.noteRows().find((r) => (r.props.accessibilityLabel ?? '').includes(`, ${text}, `));
     if (!row) throw new Error(`no entry "${text}" in ${JSON.stringify(this.entries())}`);
     return row;
+  }
+
+  /** Holds an entry: its menu (Edit, Copy, Delete). */
+  async menu(text: string) {
+    const { fireEvent } = this.app.mods.rtl;
+    const row = this.row(text);
+    await this.app.act(async () => {
+      fireEvent(row, 'longPress');
+    });
+    await this.app.until(() => this.app.screen.queryByTestId('activity-row-menu') != null, 'the note’s menu');
+    return this.app.screen.getByTestId('activity-row-menu');
   }
 
   /** Hold on an entry, Edit, change its text, Save. */
   async edit(text: string, next: string): Promise<void> {
     const { fireEvent, within } = this.app.mods.rtl;
-    const row = this.row(text);
+    const menu = await this.menu(text);
+    await this.press(within(menu).getByText('Edit'));
+    // A menu's action runs as it closes, and the sheet waits for it to go.
+    await this.app.until(() => this.app.screen.queryByTestId('add-note-text') != null, 'the Note sheet, filled in');
     await this.app.act(async () => {
-      fireEvent(row, 'accessibilityAction', { nativeEvent: { actionName: 'options' } });
+      fireEvent.changeText(this.app.screen.getByTestId('add-note-text'), next);
     });
-    await this.app.idle(50);
-    await this.press(within(this.app.screen.getByTestId('journal-note-menu')).getByText('Edit'));
-    // A menu's action runs once the sheet has gone (v2/ActionSheet).
-    await this.app.until(() => this.app.screen.queryByLabelText('Save entry') != null, 'the note to be in the composer');
-    await this.app.act(async () => {
-      fireEvent.changeText(this.app.screen.getByTestId('journal-text-input'), next);
-    });
-    await this.press(this.app.screen.getByLabelText('Save entry'));
-    await this.app.until(() => this.entries().some((e) => e.text === next), `"${next}" to show in the log`);
+    await this.press(this.app.screen.getByTestId('add-note-add'));
+    await this.app.until(() => this.app.screen.queryByTestId('add-note-text') == null, 'the Note sheet to close');
+    await this.app.until(() => this.entries().some((e) => e.text === next), `"${next}" to show on the day`);
+    await this.app.idle(400);
   }
 
-  /** Swipe an entry away (Delete, confirmed). */
+  /** Hold on an entry, Delete: it goes at once, with Undo. */
   async delete(text: string): Promise<void> {
-    const { fireEvent } = this.app.mods.rtl;
-    const row = this.row(text);
-    await this.app.act(async () => {
-      fireEvent(row, 'accessibilityAction', { nativeEvent: { actionName: 'delete' } });
-    });
+    const { within } = this.app.mods.rtl;
+    const menu = await this.menu(text);
+    await this.press(within(menu).getByText('Delete'));
     await this.app.until(() => !this.entries().some((e) => e.text === text), `"${text}" to go`);
+    await this.app.until(() => this.app.screen.queryByTestId('activity-row-menu') == null, 'the menu to close');
   }
 
   async back(): Promise<void> {

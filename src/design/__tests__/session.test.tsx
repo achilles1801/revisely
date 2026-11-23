@@ -20,7 +20,7 @@ jest.mock('react-native-safe-area-context', () => require('react-native-safe-are
 import { DesignProvider } from '../DesignContext';
 import { ThemeProvider } from '../../context/ThemeContext';
 import { RoundButton } from '../../components/reader/RoundButton';
-import { BulkActionsModal } from '../../components/BulkActionsModal';
+import { PagesSheet } from '../../components/revision/PagesSheet';
 import { CarryOverSetting } from '../../components/CarryOverSetting';
 import { getReadPalette } from '../../theme/readPalette';
 import { getQuranData } from '../../lib/quranData';
@@ -76,31 +76,57 @@ describe('the session and reader in the new design', () => {
     expect(screen.getByTestId('icon-checkmark').props.children).toBe(paletteLight.onDone);
   });
 
-  it('“Manage pages”: a row per juz, its mark jade once all its pages are done', async () => {
-    const onMarkJuzComplete = jest.fn();
-    render(
+  it('[SESS-1] the Pages sheet: page numbers alone, You are here in the accent, a row goes, a circle marks', async () => {
+    const onJump = jest.fn();
+    const onToggle = jest.fn();
+    const onMarkAll = jest.fn();
+    const { rerender } = render(
       v2(
-        <BulkActionsModal
+        <PagesSheet
           visible
           onClose={jest.fn()}
-          pages={[
-            { pageNumber: 582, isCompleted: true, weaknessRating: 4 },
-            { pageNumber: 583, isCompleted: true, weaknessRating: 4 },
-          ]}
-          quranData={getQuranData()}
-          onMarkAllComplete={jest.fn()}
-          onMarkAllIncomplete={jest.fn()}
-          onMarkJuzComplete={onMarkJuzComplete}
-          onTogglePage={jest.fn()}
+          pages={[582, 583, 584]}
+          done={new Set([582])}
+          current={583}
+          onJump={onJump}
+          onToggle={onToggle}
+          onMarkAll={onMarkAll}
+          onUnmarkAll={jest.fn()}
         />,
       ),
     );
     await act(async () => {});
-    expect(screen.getByText('2 of 2 complete')).toBeTruthy();
-    expect(screen.getByText('Unmark all')).toBeTruthy();
-    expect(screen.getAllByTestId('mark-done', { includeHiddenElements: true })).toHaveLength(1);
-    fireEvent.press(screen.getByText('Juz 30'));
-    expect(onMarkJuzComplete).toHaveBeenCalledWith(30);
+    expect(screen.getByText('1 of 3 revised')).toBeTruthy();
+    expect(screen.getByText('Page 582')).toBeTruthy();
+    // No ayah numbers: every row is its page number.
+    expect(screen.queryByText(/An-Nazi|Al-Mutaffifin|\d+–\d+/)).toBeNull();
+    const accent = paletteV2(false, DEFAULT_ACCENT);
+    expect(flat(screen.getByTestId('session-pages-here').props.style).backgroundColor).toBe(accent.accentSubtle);
+    expect(flat(screen.getByText('You are here').parent!.parent!.props.style).backgroundColor).toBe(accent.accentText);
+    fireEvent.press(screen.getByLabelText('Go to page 584'));
+    expect(onJump).toHaveBeenCalledWith(584);
+    expect(onToggle).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByLabelText('Mark page 584 as revised'));
+    expect(onToggle).toHaveBeenCalledWith(584);
+    fireEvent.press(screen.getByLabelText('Mark all revised'));
+    expect(onMarkAll).toHaveBeenCalledTimes(1);
+    rerender(
+      v2(
+        <PagesSheet
+          visible
+          onClose={jest.fn()}
+          pages={[582, 583, 584]}
+          done={new Set([582, 583, 584])}
+          current={583}
+          onJump={onJump}
+          onToggle={onToggle}
+          onMarkAll={onMarkAll}
+          onUnmarkAll={jest.fn()}
+        />,
+      ),
+    );
+    await act(async () => {});
+    expect(screen.getByLabelText('Unmark all')).toBeTruthy();
   });
 
   it('no help buttons: Keep daily amount says what it does under its label', async () => {

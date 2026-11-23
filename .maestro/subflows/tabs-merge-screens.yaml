@@ -1,4 +1,4 @@
-# Insights moved into Activity (ACT-12): a tester's tab bar is Home and Read, and Weak spots' "See all
+# Insights moved into Activity (ACT-12): the tab bar is Home, Activity and Read (TAB-2), and Weak spots' "See all
 # pages by strength" opens every revised page by strength (the old tab's Browse). With Smart Tracking
 # off, one line in Weak spots' place opens Settings at its switch. Screenshots named
 # tabs-merge-<screen>-${THEME}. Run by 09-activity-light.yaml and 09-activity-dark.yaml after
@@ -60,15 +60,17 @@ appId: com.revisionbuddy.app
     visible:
       id: activity-insights
     timeout: 10000
+# Home, from its tab (Activity is a tab with no Back, TAB-2): the tab bar is Home, Activity and Read; no Insights tab.
 - tapOn:
-    id: back
-# Home: the tab bar is Home and Read; no Insights tab.
+    id: tab-Home
 - extendedWaitUntil:
     visible:
-      id: tab-Read
+      id: today-post
     timeout: 10000
 - assertVisible:
-    id: tab-Home
+    id: tab-Read
+- assertVisible:
+    id: tab-ActivityTab
 - assertNotVisible:
     id: tab-Insights
 - runFlow:
@@ -92,11 +94,15 @@ appId: com.revisionbuddy.app
       id: today-post
     timeout: 10000
 - tapOn:
-    id: open-activity
+    id: tab-ActivityTab
 - extendedWaitUntil:
     visible:
       id: activity-blocks-views
     timeout: 15000
+# Activity is a tab and keeps where it was (TAB-2): a press on its tab, now that it shows, takes it back to its top.
+- tapOn:
+    id: tab-ActivityTab
+- waitForAnimationToEnd
 - tapOn:
     id: pill-insights
 - scrollUntilVisible:

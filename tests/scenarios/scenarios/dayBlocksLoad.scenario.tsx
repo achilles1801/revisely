@@ -34,7 +34,7 @@ describe('DayBlocks loads its items once', () => {
         notes={[]}
         onEditReading={jest.fn()}
         onDeleteReading={jest.fn()}
-        onOpenLog={jest.fn()}
+        onEditNote={jest.fn()} onDeleteNote={jest.fn()} onDeleteAllNotes={jest.fn()}
         revisedLog={null}
         onDeleteRevised={jest.fn()}
         onDeleteMemorized={jest.fn()}

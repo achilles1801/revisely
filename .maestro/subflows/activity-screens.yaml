@@ -11,7 +11,7 @@
 appId: com.revisionbuddy.app
 ---
 - tapOn:
-    id: open-activity
+    id: tab-ActivityTab
 - extendedWaitUntil:
     visible:
       id: activity-blocks-views

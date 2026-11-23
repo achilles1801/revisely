@@ -3,7 +3,6 @@
 
 import { getJuzRange, getSurah } from '../quranData';
 import { requestPrayerSheet } from '../widgets/links';
-import { activityTabOn } from '../activityTab';
 import { REVO_SCREENS, REVO_SETTINGS_SECTIONS, type RevoAction, type RevoScreen } from './types';
 import { t } from '../../i18n';
 
@@ -26,7 +25,7 @@ export function knownAction(a: RevoAction | null | undefined): a is RevoAction {
 
 /** What opening a screen does: a navigation, and a sheet over Home afterwards. */
 export interface ScreenTarget {
-  /** navigation.navigate(name, params); ActivityTab is Activity's own tab (Revisely Dev, TAB-2). */
+  /** navigation.navigate(name, params); ActivityTab is Activity's tab (TAB-2). */
   name: 'Home' | 'ActivityTab' | 'Read';
   params: { screen: string; params?: object; initial?: false };
   /** Opened over Home once it shows. */
@@ -41,7 +40,7 @@ function readerPage(a: OpenScreen): number | null {
 }
 
 // i18n-ignore-start (route names)
-export function screenTarget(a: OpenScreen, activityTab = activityTabOn()): ScreenTarget {
+export function screenTarget(a: OpenScreen, today: string): ScreenTarget {
   // `initial: false` keeps Home beneath, so Back comes home.
   const home = (screen: string, params?: object): ScreenTarget => ({ name: 'Home', params: { screen, ...(params ? { params } : {}), initial: false } });
   switch (a.screen) {
@@ -57,11 +56,11 @@ export function screenTarget(a: OpenScreen, activityTab = activityTabOn()): Scre
       return home('Memorization', { edit: true });
     case 'activity':
     case 'insights':
-      // Activity's own tab while it is one (Revisely Dev's switch, TAB-2), else on top of Home.
-      return activityTab ? { name: 'ActivityTab', params: { screen: 'Activity' } } : home('Activity');
+      // Activity's tab (TAB-2).
+      return { name: 'ActivityTab', params: { screen: 'Activity' } };
     case 'dailyLog':
-      // No date: today's revision day.
-      return home('JournalEntry', {});
+      // Today's day in Activity, where notes are written and edited (ACT-6).
+      return { name: 'ActivityTab', params: { screen: 'ActivityDay', params: { date: today }, initial: false } };
     case 'settings':
       return home('Settings', a.section ? { section: a.section } : undefined);
     case 'reader': {
@@ -73,8 +72,8 @@ export function screenTarget(a: OpenScreen, activityTab = activityTabOn()): Scre
 // i18n-ignore-end
 
 /** Opens the screen: navigates, then opens its sheet over Home. */
-export function openScreen(navigate: (name: string, params: object) => void, a: OpenScreen): void {
-  const target = screenTarget(a);
+export function openScreen(navigate: (name: string, params: object) => void, a: OpenScreen, today: string): void {
+  const target = screenTarget(a, today);
   navigate(target.name, target.params);
   if (target.sheet === 'jumpTo') requestJumpSheet();
   else if (target.sheet === 'prayerTimes') requestPrayerSheet('times');

@@ -9,6 +9,7 @@ import android.os.PowerManager
 import expo.modules.kotlin.Promise
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
+import expo.modules.kotlin.typedarray.Int16Array
 import java.io.File
 import java.io.FileInputStream
 import java.security.MessageDigest
@@ -22,10 +23,16 @@ class ReciteEngineModule : Module() {
   private val context: Context?
     get() = appContext.reactContext
 
+  private val engine by lazy {
+    EngineHost { take, frames, code ->
+      sendEvent("onEngineFrames", mapOf("take" to take, "frames" to frames, "code" to code))
+    }
+  }
+
   override fun definition() = ModuleDefinition {
     Name("ReciteEngine")
 
-    Events("onBenchProgress")
+    Events("onBenchProgress", "onEngineFrames")
 
     // What the bench reports the phone as: maker, model, chip, cores (and each one's top speed), memory and heat.
     Function("deviceInfo") {
@@ -42,6 +49,52 @@ class ReciteEngineModule : Module() {
         "memoryMb" to memory.totalMem / 1048576.0,
         "thermal" to thermal(),
       )
+    }
+
+    // Which engine this build linked: recite-core or its stub (core/fetch.js), as JSON.
+    Function("coreInfo") { ReciteCoreNative.infoJson() }
+
+    // The engine (recite_core.h) on its own thread: EngineHost. A take's frames come back as onEngineFrames.
+
+    // Opens the engine from named files ({name, path}), read into memory. Resolves {ok, code, error, info}.
+    AsyncFunction("engineOpenFiles") { items: List<Map<String, String>>, options: String, promise: Promise ->
+      val plain = items.map { item -> item["path"]?.let { item + ("path" to plainPath(it)) } ?: item }
+      engine.open(plain, options) { promise.resolve(it) }
+    }
+
+    // rc_info's JSON while the engine is open.
+    Function("engineInfo") { engine.info }
+
+    // Starts a take from the contract's start frame. Resolves {take} or {code, error}.
+    AsyncFunction("engineStart") { frame: String, promise: Promise ->
+      engine.start(frame) { promise.resolve(it) }
+    }
+
+    // The bytes are copied here: the array is JavaScript's, and the engine's thread reads them later.
+    Function("engineFeed") { take: Int, pcm: Int16Array ->
+      val bytes = ByteArray(pcm.byteLength)
+      pcm.read(bytes, 0, bytes.size)
+      engine.feed(take, bytes)
+      Unit
+    }
+
+    Function("engineControl") { take: Int, frame: String ->
+      engine.control(take, frame)
+      Unit
+    }
+
+    Function("engineFinish") { take: Int ->
+      engine.finish(take)
+      Unit
+    }
+
+    Function("engineClose") { take: Int ->
+      engine.close(take)
+      Unit
+    }
+
+    AsyncFunction("engineRelease") { promise: Promise ->
+      engine.release { promise.resolve(null) }
     }
 
     // A file's SHA-256 (hex), read in 1 MB pieces.
@@ -134,6 +187,43 @@ class ReciteEngineModule : Module() {
             "thermalAfter" to thermal(),
           ),
         )
+      }
+    }
+
+    // ---- The pack (BEHAVIOUR.md ONDEV-2, ONDEV-3). JS only ever holds the wrapped key; the key itself stays in here.
+
+    // This phone's public key, made on first use: the private half never leaves the Keystore.
+    AsyncFunction("packPublicKey") { promise: Promise ->
+      thread(name = "recite-pack") {
+        try {
+          promise.resolve(mapOf("publicKey" to RecitePackKey.publicKeyBase64(), "keyFormat" to "spki"))
+        } catch (e: Exception) {
+          promise.reject("ERR_PACK_KEY", e.message ?: "no device key", e)
+        }
+      }
+    }
+
+    // Keeps the pack's wrapped key beside its parts.
+    AsyncFunction("packSaveKey") { dir: String, wrappedKey: String, promise: Promise ->
+      thread(name = "recite-pack") {
+        try {
+          RecitePackStore.saveKey(plainPath(dir), wrappedKey)
+          promise.resolve(null)
+        } catch (e: Exception) {
+          promise.reject("ERR_PACK_KEY", e.message ?: "can't keep the key", e)
+        }
+      }
+    }
+
+    // Decrypts a downloaded part and checks everything in it, keeping none of it.
+    AsyncFunction("packVerify") { dir: String, packId: String, part: String, promise: Promise ->
+      thread(name = "recite-pack") {
+        try {
+          RecitePackStore.verify(plainPath(dir), packId, part)
+          promise.resolve(mapOf("ok" to true))
+        } catch (e: Exception) {
+          promise.resolve(mapOf("ok" to false, "error" to (e.message ?: e.toString())))
+        }
       }
     }
   }

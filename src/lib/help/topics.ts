@@ -93,6 +93,7 @@ export interface HelpEntry {
 export const HELP_INLINE_ICONS: Readonly<Record<string, HelpIcon>> = {
   check: 'checkmark',
   more: 'ellipsis-horizontal',
+  pages: 'list-outline',
   eye: 'eye-off-outline',
   play: 'play',
   options: 'options-outline',
@@ -157,7 +158,7 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         title: 'Marking pages',
         text:
           'Swipe on and the page you leave is marked revised; swipe onto the end card for the last. ' +
-          '[[check]] marks or unmarks this page.',
+          '[[pages]] goes to any page, and marks or unmarks it.',
         covers: ['SESS-1'],
       },
       {
@@ -173,18 +174,18 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         id: 'session.rating',
         icon: 'fitness-outline',
         title: 'Rating',
-        text: '[[more]] → {{Rate page strength}}. Pages you rate weak show in Insights, and a new plan can put them first.',
+        text: '[[pages]] → {{Rate page strength}}. Pages you rate weak show in Insights, and a new plan can put them first.',
         covers: ['ACT-8', 'ACT-12'],
         when: 'smartTracking',
       },
       {
-        // The reader's mic in a session (Revisely Dev, Majd, Nov 17 2026). While a take is open, ⋯'s help is How Recite works.
+        // The reader's mic in a session (Revisely Dev, Majd, Nov 17 2026). While a take is open, the Pages sheet's Help is How Recite works.
         id: 'session.recite',
         icon: 'mic-outline',
         title: 'Reciting',
         text:
           '[[mic]] records you; hold it and choose {{Recite}}, and the page follows you. ' +
-          'A take never marks a page revised: swipe on or [[check]] as always.',
+          'A take never marks a page revised: swipe on or mark it in [[pages]].',
         covers: ['RECITE-9'],
         when: 'liveRecite',
       },
@@ -592,7 +593,7 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         icon: 'hand-left-outline',
         title: 'Changing an entry',
         text:
-          "Hold a block's title, or a recording, for its menu. Deleting a Memorized entry takes what it added " +
+          "Hold a block's title, a note or a recording for its menu. Deleting a Memorized entry takes what it added " +
           'off your memorized.',
         covers: ['ACT-6', 'ACT-7'],
       },
@@ -625,7 +626,7 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         id: 'day.notes',
         icon: 'document-text-outline',
         title: 'Notes',
-        text: 'A note sits under the block it’s about, or in Notes. Tap one in Notes to open the daily log, where notes are edited and deleted.',
+        text: 'A note sits under the block it’s about, or in Notes. Hold one to edit, copy or delete it.',
         covers: ['ACT-11', 'ACT-6', 'LOG-2'],
       },
     ],
@@ -697,6 +698,7 @@ export function helpPlainText(text: string): string {
 const SPOKEN_EN: Readonly<Record<string, string>> = {
   check: '✓',
   more: '⋯',
+  pages: 'Pages',
   eye: 'the eye',
   play: '▶',
   options: 'Audio Options',
@@ -712,6 +714,7 @@ const SPOKEN_EN: Readonly<Record<string, string>> = {
 const SPOKEN_AR: Readonly<Record<string, string>> = {
   check: '✓',
   more: '⋯',
+  pages: 'الصفحات',
   eye: 'زر العين',
   play: 'زر التشغيل',
   options: 'خيارات الصوت',

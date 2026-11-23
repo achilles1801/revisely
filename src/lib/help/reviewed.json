@@ -19,7 +19,7 @@
     "MEM-2": "fa6bccea850e23b7"
   },
   "session.marking": {
-    "SESS-1": "09cd1f564f7eac99"
+    "SESS-1": "6dbfd33bc4a89de6"
   },
   "session.stopping": {
     "SESS-3": "4227fa695c15768c",
@@ -27,10 +27,10 @@
   },
   "session.rating": {
     "ACT-8": "17530ba6416770ba",
-    "ACT-12": "4afb073e2a87d454"
+    "ACT-12": "7646aee12139e593"
   },
   "session.recite": {
-    "RECITE-9": "76319d1742c337f9"
+    "RECITE-9": "311ec4a7b2d1b790"
   },
   "reader.hold": {},
   "reader.turning": {},
@@ -49,7 +49,7 @@
     "RECITE-1": "c93d694c7ccaddb2"
   },
   "recite.marks": {
-    "RECITE-2": "2207cdfc1662d2da",
+    "RECITE-2": "9342c0e66aaa0f22",
     "RECITE-3": "b634371d6a67ec19"
   },
   "recite.card": {
@@ -122,7 +122,7 @@
     "ACT-1": "27b4c2094c950cdf"
   },
   "activity.adding": {
-    "ACT-5": "492efd0797908129",
+    "ACT-5": "b31b0455db3c890c",
     "ACT-17": "62b54494328e1e9d"
   },
   "activity.sections": {
@@ -139,7 +139,7 @@
     "ACT-23": "bc761a4eb1d943b5"
   },
   "insights.weak": {
-    "ACT-12": "4afb073e2a87d454",
+    "ACT-12": "7646aee12139e593",
     "ACT-8": "17530ba6416770ba",
     "ACT-20": "e576925144fbc092",
     "ACT-24": "84ed5272370beade"
@@ -161,7 +161,7 @@
     "ACT-29": "08ceb1f773563bb5"
   },
   "day.change": {
-    "ACT-6": "68186ff52bb557fb",
+    "ACT-6": "4ac85a1d24abe2f8",
     "ACT-7": "a1a7e5301dc5560c"
   },
   "day.pages": {
@@ -173,12 +173,12 @@
     "ACT-19": "26b92511a47d4f09"
   },
   "day.adding": {
-    "ACT-5": "492efd0797908129",
+    "ACT-5": "b31b0455db3c890c",
     "ACT-17": "62b54494328e1e9d"
   },
   "day.notes": {
     "ACT-11": "d94a53dd57138182",
-    "ACT-6": "68186ff52bb557fb",
+    "ACT-6": "4ac85a1d24abe2f8",
     "LOG-2": "da9323046be62b09"
   }
 }

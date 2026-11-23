@@ -13,6 +13,7 @@ import {
   plainText,
   spokenText,
   surahName,
+  surahNamesOfPage,
 } from '../passages';
 import { boundsFile, versesOnPage } from '../ayahBounds';
 import { getJuzRange, getPagesForJuz, getSurah, getSurahDisplay } from '../quranData';
@@ -377,5 +378,15 @@ describe('pageRunEnds: a strip’s two labels (Activity’s day, ACT-20)', () =>
   });
   it('nothing for a page out of range', () => {
     expect(pageRunEnds(0, 700)).toEqual(['', '']);
+  });
+});
+
+describe('a page by its surahs alone (SESS-1)', () => {
+  const names = (page: number) => plainText(surahNamesOfPage(page, 'madani1405'));
+  it('names the surah, with no ayah numbers', () => {
+    expect(names(379)).toBe('An-Naml');
+  });
+  it('names every surah a page holds', () => {
+    expect(names(604)).toBe('Al-Ikhlas, Al-Falaq and An-Nas');
   });
 });

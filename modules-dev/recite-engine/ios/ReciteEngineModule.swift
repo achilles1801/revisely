@@ -9,7 +9,17 @@ public class ReciteEngineModule: Module {
   public func definition() -> ModuleDefinition {
     Name("ReciteEngine")
 
-    Events("onBenchProgress")
+    Events("onBenchProgress", "onEngineFrames")
+
+    OnCreate {
+      RECEngine.shared.onFrames = { [weak self] take, frames, code in
+        self?.sendEvent("onEngineFrames", ["take": take, "frames": frames, "code": code])
+      }
+    }
+
+    OnDestroy {
+      RECEngine.shared.onFrames = nil
+    }
 
     /// What the bench reports the phone as: its model identifier (e.g. iPhone16,2), cores, memory and heat.
     Function("deviceInfo") { () -> [String: Any] in
@@ -29,6 +39,44 @@ public class ReciteEngineModule: Module {
         "thermal": ReciteEngineModule.thermal(),
         "lowPower": info.isLowPowerModeEnabled,
       ]
+    }
+
+    /// Which engine this build linked: recite-core or its stub (core/fetch.js), as JSON.
+    Function("coreInfo") { () -> String in RECCore.infoJSON() }
+
+    // The engine (recite_core.h) on its own thread: RECEngine. A take's frames come back as onEngineFrames.
+
+    /// Opens the engine from named files ({name, path}), read into memory. Resolves {ok, code, error, info}.
+    AsyncFunction("engineOpenFiles") { (items: [[String: String]], options: String, promise: Promise) in
+      let plain = items.map { item -> [String: String] in
+        var out = item
+        if let path = item["path"] { out["path"] = ReciteEngineModule.plainPath(path) }
+        return out
+      }
+      RECEngine.shared.openFiles(plain, options: options) { promise.resolve($0) }
+    }
+
+    /// rc_info's JSON while the engine is open.
+    Function("engineInfo") { () -> String? in RECEngine.shared.info }
+
+    /// Starts a take from the contract's start frame. Resolves {take} or {code, error}.
+    AsyncFunction("engineStart") { (frame: String, promise: Promise) in
+      RECEngine.shared.startTake(frame) { promise.resolve($0) }
+    }
+
+    /// The bytes are copied here: the array is JavaScript's, and the engine's thread reads them later.
+    Function("engineFeed") { (take: Int, pcm: Int16Array) in
+      RECEngine.shared.feedTake(take, pcm: Data(bytes: pcm.rawPointer, count: pcm.byteLength))
+    }
+
+    Function("engineControl") { (take: Int, frame: String) in RECEngine.shared.controlTake(take, frame: frame) }
+
+    Function("engineFinish") { (take: Int) in RECEngine.shared.finishTake(take) }
+
+    Function("engineClose") { (take: Int) in RECEngine.shared.closeTake(take) }
+
+    AsyncFunction("engineRelease") { (promise: Promise) in
+      RECEngine.shared.releaseEngine { promise.resolve(nil) }
     }
 
     /// A file's SHA-256 (hex), read in 1 MB pieces.
@@ -69,6 +117,43 @@ public class ReciteEngineModule: Module {
         result["thermalBefore"] = thermalBefore
         result["thermalAfter"] = ReciteEngineModule.thermal()
         promise.resolve(result)
+      }
+    }
+
+    // ---- The pack (BEHAVIOUR.md ONDEV-2, ONDEV-3). JS only ever holds the wrapped key; the key itself stays in here.
+
+    /// This phone's public key, made on first use: the private half never leaves the Keychain.
+    AsyncFunction("packPublicKey") { (promise: Promise) in
+      DispatchQueue.global(qos: .utility).async {
+        do {
+          promise.resolve(["publicKey": try RecitePackKey.publicKeyBase64(), "keyFormat": "pkcs1"])
+        } catch {
+          promise.reject("ERR_PACK_KEY", "\(error)")
+        }
+      }
+    }
+
+    /// Keeps the pack's wrapped key beside its parts.
+    AsyncFunction("packSaveKey") { (dir: String, wrappedKey: String, promise: Promise) in
+      DispatchQueue.global(qos: .utility).async {
+        do {
+          try RecitePackStore.saveKey(dir: ReciteEngineModule.plainPath(dir), wrappedBase64: wrappedKey)
+          promise.resolve(nil)
+        } catch {
+          promise.reject("ERR_PACK_KEY", "\(error)")
+        }
+      }
+    }
+
+    /// Decrypts a downloaded part and checks everything in it, keeping none of it.
+    AsyncFunction("packVerify") { (dir: String, packId: String, part: String, promise: Promise) in
+      DispatchQueue.global(qos: .utility).async {
+        do {
+          try RecitePackStore.verify(dir: ReciteEngineModule.plainPath(dir), packId: packId, part: part)
+          promise.resolve(["ok": true])
+        } catch {
+          promise.resolve(["ok": false, "error": "\(error)"])
+        }
       }
     }
   }

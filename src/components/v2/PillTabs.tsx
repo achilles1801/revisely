@@ -13,7 +13,7 @@ import { Text } from 'react-native';
  *
  * `tone="ink"` (Activity's tabs): the chosen pill is the text colour with a background label, and the
  * others are outlined. `hug`: each pill is as wide as its label, left-aligned (no flex). `compact`: 28
- * tall (a section's own control, e.g. Insights' 7 days | 30 days).
+ * tall (a section's own control, e.g. Insights' 7 days | 30 days). `stretch`: ink pills share the row equally.
  */
 export function PillTabs<T extends string>({
   options,
@@ -24,6 +24,7 @@ export function PillTabs<T extends string>({
   tone = 'primary',
   hug = false,
   compact = false,
+  stretch = false,
 }: {
   options: { value: T; label: string; icon?: keyof typeof Ionicons.glyphMap; count?: number }[];
   value: T;
@@ -34,6 +35,7 @@ export function PillTabs<T extends string>({
   tone?: 'primary' | 'ink';
   hug?: boolean;
   compact?: boolean;
+  stretch?: boolean;
 }) {
   const haptics = useHaptics();
   const { palette } = useTheme();
@@ -57,6 +59,7 @@ export function PillTabs<T extends string>({
               style={[
                 styles.ink,
                 compact && styles.compact,
+                stretch && styles.pill,
                 selected ? { backgroundColor: palette.text } : { borderWidth: 1, borderColor: palette.outline },
               ]}
               testID={`pill-${o.value}`}

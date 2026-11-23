@@ -207,6 +207,29 @@ export const settings = {
     cellular: 'Download over mobile data',
     cellularLabel: 'Download the mushaf over mobile data',
   },
+  /** Revisely Dev's row for Recite's pack: the model and tables on this phone (lib/onDevice/packUi, ONDEV-3). */
+  recitePack: {
+    title: 'Recite on the phone',
+    ready: 'Downloaded',
+    readySub: 'On this phone · {{size}}',
+    downloading: 'Downloading · {{size}}',
+    download: 'Download',
+    waitingWifi: 'Waiting for Wi-Fi',
+    offline: "Continues when you're online",
+    noSpace: 'Not enough free space · {{size}}',
+    error: "It didn't download · tries again soon",
+    removed: 'Not on this phone',
+    unavailable: 'Not available for this account yet',
+    idle: 'For checking your recitation on this phone',
+    downloadNow: 'Download now',
+    remove: 'Remove from this phone',
+    removeTitle: 'Remove Recite from this phone?',
+    removeBody: 'This frees {{size}}. Recite keeps working through the server.',
+    removeButton: 'Remove',
+    dataTitle: 'Download over mobile data?',
+    dataBody: 'About {{size}} left to download.',
+    dataBodyLarge: 'This is a large download.',
+  },
   recite: {
     premium: 'Premium',
     premiumSub: 'Marking mistakes and Test me are part of it',
@@ -214,11 +237,15 @@ export const settings = {
     level: 'Mistakes to mark',
     /** Tajweed is labelled Beta wherever it shows (Majd, Nov 22 2026). */
     strict: 'Strict (Beta)',
-    strictSub: 'Your mistakes, and tajweed: madd lengths, qalqalah, ghunnah, ikhfa, idgham, iqlab',
+    strictSub: 'Your mistakes, and tajweed notes: ghunnah, ikhfa, qalqalah, idgham, iqlab and some madd',
     words: 'Mistakes',
     wordsSub: 'Wrong, skipped and extra words, and wrong harakat and letters',
     munfasil: 'Madd munfasil',
+    /** Under Madd munfasil at 2 counts (RECITE-2). */
+    munfasilTwo: 'This length isn’t checked yet',
     muttasil: 'Madd muttasil',
+    /** Under Madd muttasil (RECITE-2). */
+    muttasilSub: 'Not checked yet',
     aared: 'Madd ʿarid',
     atStop: 'At a stop',
     any: 'Any',
@@ -247,9 +274,6 @@ export const settings = {
     dark: 'Dark',
     /** Decorations over the usual design (Revisely Dev until its release switch). */
     ramadan: 'Ramadan theme',
-    /** Activity as a tab between Home and Read (Revisely Dev's switch to compare, TAB-2). */
-    activityTab: 'Activity tab',
-    activityTabSub: 'Between Home and Read, instead of the button at the top of Home',
   },
   /** Settings → Appearance → Language (Revisely Dev until Arabic ships). Each language's own name is LANGUAGE_NAMES. */
   language: {
@@ -325,6 +349,9 @@ export const settings = {
     resetSub: 'Start again as a new account',
     whatsNewAtLaunch: 'Show What’s new at launch',
     whatsNewAtLaunchSub: 'As App Store users will see it after the update',
+    /** Revisely Dev: the onboarding screens on a blank account (ONBOARD-5). */
+    previewOnboarding: 'Preview onboarding',
+    previewOnboardingSub: 'The real screens. Nothing is saved',
     /** Revisely Dev's row naming the checker's models (components/settings/CheckerModelRow). */
     model: 'Mistake detection model',
     modelLine: 'Recite {{recite}} · Mistakes {{harakat}} · Strict {{strict}}',
@@ -343,6 +370,20 @@ export const settings = {
     /** Revisely Dev's row opening the on-device bench (screens/main/OnDeviceBenchScreen, ONDEV-1). */
     bench: 'On-device model',
     benchSub: 'Time Recite’s model on this phone',
+    /** Revisely Dev's row choosing where this phone's takes run (components/settings/ReciteWhereRow, ONDEV-4). */
+    where: 'Recite runs on',
+    whereAuto: 'Automatic',
+    wherePhone: 'This phone',
+    whereServer: 'The server',
+    whereHint: 'Changes where this phone’s takes are checked',
+    whereNextPhone: 'Next take: on this phone. It won’t be kept as test data yet',
+    whereNextReplay: 'Next take: a recorded take, played on this phone',
+    whereNextServer: 'Next take: on the server',
+    whereNextNoEngine: 'Next take: on the server. No engine on this phone yet',
+    whereNextCheck: 'Next take: on the server. The engine failed its check',
+    whereNextSpeed: 'Next take: on the server. This phone’s speed isn’t checked yet',
+    whereNextSlow: 'Next take: on the server. This phone is too slow for it',
+    whereNextLacks: 'Next take: on the server. The engine can’t do this yet',
   },
   /** Revisely Dev's on-device bench: Recite's model timed on this phone (ONDEV-1). */
   bench: {
@@ -350,6 +391,10 @@ export const settings = {
     missing: 'This Revisely Dev build doesn’t have the on-device model yet. Update it from TestFlight or Google Play.',
     /** "iPhone16,2 · 6 cores · 8 GB". */
     device: '{{model}} · {{cores}} cores · {{memory}} GB',
+    /** Which Recite engine this build carries (the private library, or the stub that leaves takes to the server). */
+    engine: 'Engine: {{version}}',
+    engineStub: 'Engine: stub (server path)',
+    engineFailed: 'Engine: {{version}}, self-test failed ({{why}})',
     reading: 'Reading the list of runs…',
     readFailed: 'Couldn’t read the list of runs: {{error}}',
     /** The account lacks the team's bench access (storage.rules, the onDeviceBench claim). */
@@ -374,24 +419,40 @@ export const settings = {
     run: 'Run',
     downloading: 'Downloading {{file}} of {{files}} · {{percent}}%',
     long: 'Long run',
-    longFooter: 'The first chosen run, a window every half second as a live take does, with the battery and the phone’s heat noted each minute. Unplug the phone, keep its brightness as it is, and leave it on this screen.',
+    longFooter: 'The first chosen run at a live take’s pace, with the battery and the phone’s heat noted each minute.',
+    longLength: 'Length',
+    longPace: 'How often the model runs',
+    /** Shown above the button: leaving the app suspends the run and spoils its battery and heat numbers. */
+    longStay: 'Unplug the phone and stay on this screen until it finishes. Leaving the app, even for a moment, spoils the run.',
+    /** Under the button: which run it takes. */
+    longPlan: 'Runs {{plan}}',
+    /** "Every 0.5 s": how often a long run starts a window. */
+    hopChoice: 'Every {{seconds}} s',
     minutes_one: '{{count}} minute',
     minutes_other: '{{count}} minutes',
     /** "Long run: v7-live-fp32 · CPU · 2 threads". */
-    longRun: 'Long run: {{plan}}',
+    /** "Start: 20 min, every 0.5 s". */
+    longRun: 'Start: {{minutes}} min, every {{hop}} s',
     /** "v7-live-fp32 · CPU · 2 threads: minute 3 of 20". */
     runningLong: '{{plan}}: minute {{done}} of {{total}}',
-    longTitle: '{{plan}} · {{minutes}} minutes',
+    longTitle: '{{plan}} · {{minutes}} minutes · every {{hop}} s',
     longCool: 'Never hot (hottest: {{heat}})',
     longHot: 'Got hot: {{heat}}',
     longSteady: 'Steady: the last minute {{percent}}% off the first',
     longDrift: 'Slowed down: the last minute {{percent}}% off the first',
     longBattery: 'Battery down {{drop}} points ({{perHour}} an hour)',
     longCharging: 'On a charger: nothing to say about the battery',
+    longBatteryAway: 'Battery: no rate, the app was away for part of the run',
+    /** The drop is under two of the phone's battery steps (iOS reports 5-point steps). */
+    longBatteryCoarse: 'Battery down {{drop}} points: too coarse for a rate',
     longLate_one: '{{count}} window started late',
     longLate_other: '{{count}} windows started late',
     /** "Minute 3 · 41.2 ms · p95 52.0 · 97.5% · nominal". */
     longMinute: 'Minute {{minute}} · {{p50}} ms · p95 {{p95}} · {{battery}} · {{heat}}',
+    /** A run the app left the foreground during: its numbers can't be trusted. */
+    interrupted_one: 'Interrupted: the app left the foreground once, for {{seconds}} s. The times below leave that out; longest clean stretch {{clean}} min.',
+    interrupted_other: 'Interrupted: the app left the foreground {{count}} times, for {{seconds}} s. The times below leave that out; longest clean stretch {{clean}} min.',
+    stalled: 'Interrupted: the phone held the run up for {{seconds}} s. The times below leave that out; longest clean stretch {{clean}} min.',
     /** "v7-live-fp32 · CPU · 2 threads: 34 of 60". */
     running: '{{plan}}: {{done}} of {{total}}',
     results: 'Results',

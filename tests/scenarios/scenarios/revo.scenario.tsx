@@ -46,7 +46,7 @@ function revoStack(mods: Booted): ReactElement {
         { screenOptions: { headerShown: false, animation: 'none' } },
         h(Stack.Screen, { name: 'Dashboard', component: Dashboard }),
         h(Stack.Screen, { name: 'ActiveRevision', component: Session }),
-        ...['Settings', 'PlanEdit', 'PlanDayEdit', 'Activity', 'ActivityAll', 'ActivityDay', 'JournalEntry', 'Memorization', 'Insights'].map((name) =>
+        ...['Settings', 'PlanEdit', 'PlanDayEdit', 'Activity', 'ActivityAll', 'ActivityDay', 'Memorization', 'Insights'].map((name) =>
           h(Stack.Screen, { key: name, name, component: Elsewhere }),
         ),
       ),

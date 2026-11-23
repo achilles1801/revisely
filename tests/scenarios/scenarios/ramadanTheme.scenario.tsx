@@ -40,7 +40,7 @@ function homeStack(dev: boolean) {
           h(Stack.Screen, { name: 'Dashboard', component: Dashboard }),
           h(Stack.Screen, { name: 'Settings', component: Settings }),
           h(Stack.Screen, { name: 'ActiveRevision', component: Session }),
-          ...['Activity', 'ActivityDay', 'PlanEdit', 'PlanDayEdit', 'Memorization', 'ActivityAll', 'Insights', 'QuranReader', 'JournalEntry', 'PagesByStrength', 'ListenBack'].map(
+          ...['Activity', 'ActivityDay', 'PlanEdit', 'PlanDayEdit', 'Memorization', 'ActivityAll', 'Insights', 'QuranReader', 'PagesByStrength', 'ListenBack'].map(
             (name) => h(Stack.Screen, { key: name, name, component: Elsewhere }),
           ),
         ),

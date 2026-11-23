@@ -31,6 +31,10 @@ export const revo: NonNullable<ArStrings['revo']> = {
   button: {
     newReview: '⁨Revo⁩، ملخّص يوم جديد',
     hint: 'اسأل عن مراجعتك',
+    moveLeft: 'نقل إلى اليسار',
+    moveRight: 'نقل إلى اليمين',
+    movedLeft: 'نُقل إلى اليسار',
+    movedRight: 'نُقل إلى اليمين',
   },
   card: {
     reviseFirst: 'إضافة إلى خطتي',
@@ -175,7 +179,7 @@ export const revo: NonNullable<ArStrings['revo']> = {
     memorized: 'فتح الصفحات المحفوظة',
     activity: 'فتح النشاط',
     insights: 'فتح النشاط',
-    dailyLog: 'فتح السجل اليومي',
+    dailyLog: 'فتح اليوم في النشاط',
     settings: 'فتح الإعدادات',
     prayerTimes: 'عرض مواقيت الصلاة',
     qibla: 'تحديد القبلة',

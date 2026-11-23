@@ -14,6 +14,7 @@ import { MINI_PLAYER_GAP, MINI_PLAYER_HEIGHT } from '../player/MiniPlayer';
 import { useMiniPlayer } from '../../lib/nowPlaying';
 import { refreshRevoRelease } from '../../lib/revo/release';
 import { REVO_BUTTON_ROUTES, useRevoAvailable } from '../../lib/revo/availability';
+import { useRevoButtonSide } from '../../lib/revo/buttonSide';
 import { revoBackend } from '../../lib/revo/backend';
 import { dayHadActivity } from '../../lib/revo/context';
 import { greetingState, nextPlaceOpens, readPlaceOpens, type GreetingOpens, type PlaceOpens } from '../../lib/revo/greeting';
@@ -103,6 +104,8 @@ export function RevoHost() {
 
 function RevoHostInner({ available, onOpenChange }: { available: boolean; onOpenChange: (open: boolean) => void }) {
   const uid = auth.currentUser?.uid ?? '';
+  // The corner its button sits in, kept per account on this phone (REVO-41).
+  const { side: buttonSide, setSide: setButtonSide } = useRevoButtonSide(uid);
   const { user } = useApp();
   useEffect(() => {
     setRevoPresent(true);
@@ -398,7 +401,7 @@ function RevoHostInner({ available, onOpenChange }: { available: boolean; onOpen
     } else if (action.kind === 'startRevision') {
       navigationRef.navigate('Home', { screen: 'ActiveRevision', params: undefined, initial: false });
     } else if (action.kind === 'openScreen') {
-      openScreen((name, params) => (navigationRef.navigate as (n: string, p: object) => void)(name, params), action);
+      openScreen((name, params) => (navigationRef.navigate as (n: string, p: object) => void)(name, params), action, day);
     }
   };
 
@@ -412,7 +415,9 @@ function RevoHostInner({ available, onOpenChange }: { available: boolean; onOpen
 
   return (
     <>
-      {buttonShown ? <RevoButton bottom={bottom} dot={reviewWaiting} onPress={() => show()} /> : null}
+      {buttonShown && buttonSide ? (
+        <RevoButton bottom={bottom} dot={reviewWaiting} onPress={() => show()} side={buttonSide} onSide={setButtonSide} />
+      ) : null}
       <Modal
         visible={intro}
         animationType="fade"
@@ -485,7 +490,7 @@ function RevoHostInner({ available, onOpenChange }: { available: boolean; onOpen
               onAction={doAction}
               onOpenDay={(date) => {
                 close();
-                // On the Home stack, or on Activity's own tab while it is one (Revisely Dev, TAB-2).
+                // In Activity's tab (TAB-2).
                 navigateToActivityDay(date);
               }}
               onOff={() => {

@@ -140,6 +140,21 @@ describe('a record on the account', () => {
     expect((fromStored(r.id, toStored({ ...r, marks: [lookalike] })) as TakeRecord).marks[0].into).toBeUndefined();
   });
 
+  it('says where a take ran and why; a take nothing routed has neither field (ONDEV-4)', () => {
+    const r = recordFromTake(doneState([lookalike]), words, ctx()) as TakeRecord;
+    expect('ranOn' in r).toBe(false);
+    expect('ranOn' in toStored(r)).toBe(false);
+    const p = recordFromTake(doneState([lookalike]), words, { ...ctx(), ranWhere: { on: 'phone', why: 'forced' } }) as TakeRecord;
+    expect(toStored(p).ranOn).toBe('phone');
+    expect(toStored(p).ranWhy).toBe('forced');
+    const back = fromStored(p.id, JSON.parse(JSON.stringify(toStored(p)))) as TakeRecord;
+    expect([back.ranOn, back.ranWhy]).toEqual(['phone', 'forced']);
+    const s = recordFromTake(doneState([lookalike]), words, { ...ctx(), ranWhere: { on: 'server', why: 'no-pack', detail: 'x' } }) as TakeRecord;
+    expect([toStored(s).ranOn, toStored(s).ranWhy]).toEqual(['server', 'no-pack']);
+    const odd = fromStored(r.id, { ...toStored(r), ranOn: 'mars', ranWhy: 'because' }) as TakeRecord;
+    expect('ranOn' in odd || 'ranWhy' in odd).toBe(false);
+  });
+
   it('[RECITE-11] an unfinished take reads back unfinished; a finished one’s document has no such field', () => {
     const r = recordFromTake(doneState([lookalike]), words, ctx()) as TakeRecord;
     expect('unfinished' in toStored(r)).toBe(false);

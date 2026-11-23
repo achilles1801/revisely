@@ -55,6 +55,10 @@
  *                                PAUSED on its Cloud Run services, which refuses new
  *                                takes within a minute; this one reaches phones as
  *                                whatsNewOff does. Unset: on.
+ *   recite.where                 Where takes run (src/lib/reciteLive/where.ts): phone,
+ *                                server or auto (the phone when it has the engine and
+ *                                passed its speed check). Unset: the server. A take the
+ *                                engine can't run goes to the server whatever this says.
  *
  * Run from the functions/ directory:
  *   GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-admin.json \
@@ -73,6 +77,7 @@
  *   ... node scripts/set-app-config.js --whats-new on            # let it show again
  *   ... node scripts/set-app-config.js --recite-check off        # hide Recite and Mark mistakes on phones
  *   ... node scripts/set-app-config.js --recite-check on         # offer them again
+ *   ... node scripts/set-app-config.js --recite-where auto       # phone, server, auto, or unset
  *   ... node scripts/set-app-config.js --early-access on         # every new account gets Premium (PREM-1)
  *   ... node scripts/set-app-config.js --early-access off        # paid Premium: new accounts stop; grants stay
  *
@@ -138,6 +143,13 @@ function parseArgs(argv) {
       if (!WHATS_NEW.includes(v)) throw new Error(`--recite-check needs on or off (got ${v ?? 'nothing'})`);
       opts.reciteCheck = v;
     }
+    else if (a === '--recite-where') {
+      const v = argv[++i];
+      if (!['phone', 'server', 'auto', 'unset'].includes(v)) {
+        throw new Error(`--recite-where needs phone, server, auto or unset (got ${v ?? 'nothing'})`);
+      }
+      opts.reciteWhere = v;
+    }
     else if (a === '--force') opts.force = true;
     else if (a === '--clear-min') opts.clearMin = true;
     else if (flags[a]) {
@@ -163,7 +175,7 @@ async function main() {
   } catch (err) {
     console.error(err.message);
     console.error(
-      'Usage: node scripts/set-app-config.js --show | [--min-ios V] [--min-android V] [--latest-android V [--latest-android-code N]] [--clear-min] [--revo testers|everyone|off] [--revo-patterns on|off] [--revo-recite on|off] [--whats-new on|off] [--recite-check on|off] [--early-access on|off] [--force]',
+      'Usage: node scripts/set-app-config.js --show | [--min-ios V] [--min-android V] [--latest-android V [--latest-android-code N]] [--clear-min] [--revo testers|everyone|off] [--revo-patterns on|off] [--revo-recite on|off] [--whats-new on|off] [--recite-check on|off] [--recite-where phone|server|auto|unset] [--early-access on|off] [--force]',
     );
     process.exit(1);
   }
@@ -192,6 +204,7 @@ async function main() {
           revoRecite: data.revoRecite === true ? 'on' : 'off',
           whatsNew: data.whatsNewOff === true ? 'off' : 'on',
           reciteCheck: data.reciteCheckOff === true ? 'off' : 'on',
+          reciteWhere: data.recite?.where ?? 'server (unset)',
           earlyAccess: data.earlyAccess === true ? 'on' : 'off',
         },
         null,
@@ -238,6 +251,7 @@ async function main() {
   if (opts.revoRecite) update.revoRecite = opts.revoRecite === 'on' ? true : FieldValue.delete();
   if (opts.whatsNew) update.whatsNewOff = opts.whatsNew === 'off' ? true : FieldValue.delete();
   if (opts.reciteCheck) update.reciteCheckOff = opts.reciteCheck === 'off' ? true : FieldValue.delete();
+  if (opts.reciteWhere) update['recite.where'] = opts.reciteWhere === 'unset' ? FieldValue.delete() : opts.reciteWhere;
   if (opts.earlyAccess) update.earlyAccess = opts.earlyAccess === 'on';
   if (opts.clearMin && (opts.minIos || opts.minAndroid)) {
     console.error('--clear-min with a minimum: pick one.');

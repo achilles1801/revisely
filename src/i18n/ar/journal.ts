@@ -1,21 +1,7 @@
-// Arabic for src/i18n/en/journal.ts. Words and forms: src/i18n/ar-glossary.md (the daily log is «السجل اليومي»).
+// Arabic for src/i18n/en/journal.ts. Words and forms: src/i18n/ar-glossary.md.
 import type { ArStrings } from './types';
 
 export const journal: NonNullable<ArStrings['journal']> = {
-  kinds: { memorization: 'الحفظ', revision: 'المراجعة', note: 'ملاحظة' },
-  placeholder: {
-    memorization: 'مثل: سورة الملك، أو الصفحات ٥٦٢–٥٦٤',
-    revision: 'مثل: سورتا مريم وطه، أو الصفحات ٣٠٥–٣٢١',
-    note: 'كيف كانت؟ أخطاء تنتبه لها، وآيات تكرّرها…',
-  },
-  discard: {
-    title: 'تجاهل التغييرات؟',
-    body: 'لم تحفظ هذه الملاحظة.',
-    keepEditing: 'متابعة التعديل',
-    discard: 'تجاهل',
-  },
-  tags: { revised: 'المراجعة', memorized: 'الحفظ', read: 'القراءة', untagged: 'دون وسم', label: 'الوسم: {{tag}}' },
-  checkPages: { title: 'تحقّق من الصفحات', body: 'اكتب الصفحة الأولى والأخيرة بأرقام من ١ إلى ٦٠٤.' },
   full: {
     title: 'هذا اليوم ممتلئ',
     body_zero: 'لا يتسع اليوم لمدخلات.',
@@ -27,28 +13,5 @@ export const journal: NonNullable<ArStrings['journal']> = {
   },
   saveFailed: 'تعذّر الحفظ',
   deleteFailed: 'تعذّر الحذف',
-  deleteDay: { title: 'حذف {{day}}؟', body: 'يزيل ذلك كل مدخلات هذا اليوم.' },
-  total: 'المجموع {{minutes}}',
-  offline: { title: 'تعذّر تحميل سجل هذا اليوم', body: 'اتصل بالإنترنت لتراه وتضيف إليه.' },
-  options: 'الخيارات',
-  newEntry: 'مُدخل جديد',
-  keyboardDoneHint: 'يخفي لوحة المفاتيح',
-  editing: { memorization: 'تعديل الحفظ', revision: 'تعديل المراجعة', note: 'تعديل الملاحظة' },
-  fillFromSession: 'الملء من جلستك',
-  fromSession: 'من جلستك: {{text}}',
-  fillRead: 'الملء بالصفحات التي قرأتها اليوم',
-  readNotMemorized: 'قرأتها اليوم ولم تحفظها: {{what}}',
-  surahOrJuz: 'سورة أو جزء',
-  fromPage: 'من الصفحة',
-  toPage: 'إلى الصفحة',
-  noteLabel: 'ملاحظة',
-  whatMemorized: 'ما حفظته',
-  whatRevised: 'ما راجعته',
-  minutes: 'الدقائق',
-  add: 'إضافة',
-  saveEntry: 'حفظ المُدخل',
-  addEntry: 'إضافة مُدخل',
-  deleteLog: 'حذف سجل هذا اليوم',
   noteDeleted: 'حُذفت الملاحظة',
-  min: 'د',
 };

@@ -46,14 +46,26 @@ How the tests are made: `tests/scenarios/README.md`.
 
 ## Onboarding
 
-- **ONBOARD-1.** In "Select memorized portions", a page the user marks counts at once, loaded or not: a
-  new account's 604 pages reach the phone once the server holds them (sign-up writes them in two
-  batches, 1–450 and 451–604), and a juz can be marked before its pages land. Continue never saves a selection without a marked page: while a marked page
-  hasn't loaded, it waits ("Loading your pages…"), and once the pages are there it saves them all.
+- **ONBOARD-1.** In "Which juz?", a juz the user taps counts at once, loaded or not: a new account's 604 pages
+  reach the phone once the server holds them (sign-up writes them in two batches, 1–450 and 451–604), and a juz can be
+  chosen before its pages land. Continue never saves a selection without a chosen page: while a chosen page hasn't
+  loaded, it waits ("Loading your pages…"), and once the pages are there it saves them all. "All of it" waits the same way.
 - **ONBOARD-2.** An account the server holds with some of its pages but not all 604 (a sign-up stopped
   between its two batches: the app closed, the second commit failed) gets the missing ones created, as
   new pages, once the app has the server's list and isn't writing them itself. A page it already has is
   never replaced.
+- **ONBOARD-3.** After the welcome, setup is one question a screen: how much is memorized, which juz, how much a day,
+  when the day starts, a daily reminder. A single choice moves on with one tap, with no Continue. "All of it" saves every
+  page and surah and skips "Which juz?". "At Fajr" asks for the location there; refused or unavailable, it says so and
+  the day starts at midnight. "Remind me" or "Not now" ends setup: the plan is saved and onboarding is complete.
+- **ONBOARD-4.** "Which juz?" is a grid of the 30 juz: a tap chooses a whole juz and a second clears it. Al-Fatihah
+  starts chosen, so Juz 1 starts partly chosen, which looks different and is read out as mixed; a tap makes a partly
+  chosen juz whole. "Choose by surah instead" opens the list on the same selection. The line at the foot counts what is
+  chosen ("1 juz and 1 page chosen"), never with ayah numbers.
+- **ONBOARD-5.** (Revisely Dev) Settings → Testing → "Preview onboarding" walks the real onboarding screens, from the
+  welcome, on a blank account of its own, and saves nothing: no pages, plan, reminder, location, `onboardingComplete` or
+  `whatsNewSeen`, and no system prompt for location or notifications. ✕, or the last answer, returns to Settings with the
+  account as it was.
 
 ## The schedule
 
@@ -79,8 +91,15 @@ How the tests are made: `tests/scenarios/README.md`.
 
 ## A revision session
 
-- **SESS-1.** Swiping off a page marks it revised, the last page by swiping onto the end card. The
-  check marks or unmarks the page on screen.
+- **SESS-1.** Swiping off a page marks it revised, the last page by swiping onto the end card. A strip above the page,
+  always on show, has a bar for each of the day's pages, filled once revised, the page on screen's taller. The bars run right to left,
+  the first page's on the right, the way the pages turn, in English and Arabic alike. Beside the
+  page's number, "Revised" says the page on screen is done. One Pages button opens one Pages sheet: the day's pages by
+  page number, no ayah numbers, the page on screen highlighted in the accent ("You are here"). A tap on a row goes to
+  that page and marks nothing; its circle marks or unmarks it; the top line marks them all (or unmarks them, once all
+  are). The sheet also holds Rate page strength and Help. The session's title and the line under it name surahs, never
+  ayah numbers. (Majd, Nov 23 2026: "remove the ayah count from the title -- too many numbers and most users don't care
+  about ayah numbers".)
 - **SESS-2.** A day is done when all its pages are credited to it. Home then says Done, and the streak
   counts the day. The streak counts back from
   today if today is done, else from yesterday, so it stays alive until today's revision day ends. Home, the
@@ -145,7 +164,7 @@ How the tests are made: `tests/scenarios/README.md`.
   revised (DAY-9, AHEAD-6): the day's own pages stay done there, each later day it counted for is
   named ("Ahead for Monday 9 November: …"), and Coverage counts them. Home's line goes on the same
   way, "Next cycle starts at Al-Fatihah ›" for a day that begins the plan again, and a day a week or
-  more away is named with its date ("Mon 16 Nov"). Mark in bulk works on the day on screen. (Majd, Nov
+  more away is named with its date ("Mon 16 Nov"). Mark all revised works on the day on screen. (Majd, Nov
   9 2026: "it should restart the cycle if they finish it before their cycle ends so for example if my
   cycle is one week and i procrastinated all my revision for today and kept revising ahead until that
   one week is done, my next revise ahead would just be restarting the cycle." It used to stop at the
@@ -264,15 +283,15 @@ current basic sounds". October 2026's version was removed for the voices it offe
   Thursday.
 - **KAHF-3.** "Not today" hides the card until that Friday's maghrib, from Thursday evening too.
 
-## The daily log
+## A day's notes
 
 - **LOG-1.** Every note added to a day's log stays, each as its own entry with its text; adding one
   never replaces another.
 - **LOG-2.** Editing a note changes only that note; deleting one removes only it. Both reach every
   phone.
 - **LOG-3.** A note written between midnight and Fajr (boundary on) belongs to the revision day.
-- **LOG-4.** The log writes what is added at once: a note or a revised portion shows as soon as it is sent, stays
-  while the server catches up, and the first note of a day shows without leaving the log.
+- **LOG-4.** A day's notes are written at once: a note shows on the day as soon as it is added, stays while the
+  server catches up, and the first note of a day shows without leaving it.
 
 ## Offline, devices and accounts
 
@@ -365,15 +384,19 @@ current basic sounds". October 2026's version was removed for the voices it offe
   12 pt sideways opens nothing, whether or not it changed the tab. A press that comes without a touch
   (VoiceOver, TalkBack) always counts. (Nov 22 2026: on Android, a swipe from Read toward Home that the
   tab pager didn't take opened the surah under the finger, 4 swipes in about 100 on the emulator.)
-- **TAB-2.** (Revisely Dev) Settings → Appearance → Activity tab (off until turned on, kept on that phone, not the
-  account) makes Activity a tab of its own between Home and Read, to compare with the button at the top of Home (Majd,
-  Nov 23 2026: "a test toggle in settings for me to see what it's like normal(rn) vs with it"). On: the tab bar is
-  Home, Activity, Read (the pulse icon), a swipe moves between them in that order, and Home's top bar has no Activity
-  button. Activity, with Insights inside it as before, starts its tab with no back arrow; what it opens (a day, See
-  all, the reader, the daily log) is pushed in its tab and Back comes back to it, and a press on the tab while it shows
-  goes back to Activity and its top. On the calendar's days a sideways swipe still steps the month or week; anywhere
-  else on Activity it moves between tabs. Settings' and Revo's ways to Activity open the tab. Off: the app as before. The
-  store app has no switch and never shows the tab (`lib/activityTab`).
+- **TAB-2.** Activity is a tab of its own between Home and Read, for every account (Majd, Nov 23 2026: "i like the new
+  style with the activity being its own tab, let's make that official"; he tried it in Revisely Dev first). The tab bar
+  is Home, Activity (the pulse icon), Read, and a swipe moves between them in that order. Activity, with Insights inside
+  it, starts its tab with no back arrow; what it opens (a day, See all, the reader) is pushed in its tab
+  and Back comes back to it, and a press on the tab while it shows goes back to Activity and its top. On the calendar's
+  days a sideways swipe steps the month or week; anywhere else on Activity it moves between tabs. Settings' "Activity",
+  Revo's Activity and Insights buttons and a day's links from elsewhere (the timer, Recite, Revo's Day in review) open it
+  in its tab.
+- **HOME-1.** Home's top bar is the timer chip while a timer runs (on the left) and Settings (on the right), nothing else
+  (Majd, Nov 23 2026: "i say we remove the qibla button/icon completely. that way opening the prayer sheet stays and the
+  qibla is next to it on the sheet if users wanna use it and it also makes the home page way cleaner"). The Prayer sheet
+  (Times | Qibla) opens from the next-prayer line on Home; the Qibla also opens from Settings → Prayer → Qibla and from
+  the Qibla widget, on the sheet's Qibla.
 
 ## Sheets and updates
 
@@ -567,7 +590,10 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   summary's line ("1 wrong haraka, 1 wrong letter") and in the score, never called a slip. With Strict, tajweed notes,
   labelled Beta wherever they show (Strict in Settings, a note's title, the summary's line, Insights) and never
   counted. There is no level that marks words without harakat and letters: Settings' levels are Mistakes and Strict
-  (Beta). The score is the share of the words reached said right. A word with several marks shows its strongest: a
+  (Beta). Strict marks ghunnah, ikhfa, qalqalah, idgham (with and without ghunnah), iqlab, a natural madd dropped, madd
+  munfasil at 4 or 5 counts, a lazim madd held short, and madd ʿarid once a length is set. It doesn't check madd
+  muttasil, munfasil at 2 counts or ikhfa of meem yet (Nov 23 2026, each rule measured), and Settings says so on those
+  madd rows. The score is the share of the words reached said right. A word with several marks shows its strongest: a
   word mistake, then a wrong haraka or letter, then a tajweed note, and a mistake over a Not clear. The marks are
   highlights in three colours: red for words, amber for harakat and letters (and Not clear), violet for tajweed.
   Strict has a switch of its own and stays Revisely Dev's until it is on, even once the rest of Recite is everyone's:
@@ -613,7 +639,7 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   continued.
 - **RECITE-9.** A revision session has the reader's mic, with the same takes, marks, hidden view, cards and summary;
   Test me stays in the reader. A take there stays in Recite: it never marks a page revised, since its own page turns
-  credit nothing, so only a swipe off a page or ✓ marks one (SESS-1). Its page turns stay on the session's pages, and
+  credit nothing, so only a swipe off a page or the Pages sheet marks one (SESS-1). Its page turns stay on the session's pages, and
   a place outside them (a similar ayah, a past take) opens in the reader over the session; Back comes back to it.
   (Majd, Nov 17 2026: "add the mistake detection and mic functionality same as mushaf to the revision sessions".)
 - **RECITE-10.** A long take keeps up: what the checker sends is shown as it comes, and a burst of it never holds the
@@ -936,7 +962,7 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   `createdAt` falls on its `date`); with no sessions, the saved location's zone, then UTC. (Changed Nov 5
   2026: memorized items used to have no Fajr shift; Majd chose one day rule for all of Activity.)
 - **ACT-2.** A day's Revised block is built from its revision items: one per day, with the pages revised
-  ahead for later days listed apart. A revision note in the daily log is not a second entry; it shows
+  ahead for later days listed apart. An older revision entry from the daily log is not a second entry; it shows
   under the Revised block. Every account's since the November 2026 release (testers' before).
 
 - **ACT-3.** The calendar's day shows the share of the day's assigned pages revised (a ring), and a dot for a
@@ -962,10 +988,15 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   for that day, dated that day; its minutes join the day's item once (an add sent again adds none). "From
   your reading" offers the pages read that day that are not memorized yet. Note opens its own sheet: its
   text, and an optional "Show under" choice of the day's Revised, Memorized or Read item (the note's tag).
-  Add is a new note with its own id and time; an empty note cannot be added.
-- **ACT-6.** In the daily log, a note swiped away goes at once, with Undo; the delete is saved after the undo
-  window (five seconds), and leaving the screen saves any delete still waiting. In the Activity day, the rows under
-  a block (notes, timed reads) have no hold and no swipe: they are edited and deleted in the daily log. A block
+  Add is a new note with its own id and time; an empty note cannot be added, and a day holds at most 50 entries. The +
+  is the only way to add to a day (Majd, Nov 23 2026: "why does this page still exist? i thought we replaced it with
+  "+" add to today button"; the old Today log page is gone).
+- **ACT-6.** On a day in Activity, a tap or a hold on a note opens its menu: Edit, Copy (when it has text) and Delete
+  (Majd, Nov 23 2026). Edit opens the same Note sheet the day's + uses, filled in: its text and "Show under", at its
+  own time. An older Revised or Memorized entry from the old log opens there too, with its minutes. Delete takes the
+  note off at once, with Undo; the delete is saved after the undo window (five seconds), and leaving the day saves any
+  delete still waiting. With two or more notes, a hold on the Notes header offers Delete all notes (confirmed first).
+  Timed reads have no hold or swipe of their own. A block
   header (Revised, Memorized, Read) holds a menu: Edit for a timed read, Delete for each item (confirmed first).
   A Memorized entry's menu is exactly Edit and Delete (each named when the day has several entries); Edit opens
   the memorized pages ready to edit, at that entry: its surah open and scrolled to, its pages ringed. A
@@ -973,7 +1004,7 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   VoiceOver offers the same actions as custom actions on the header (a recording's Delete, on its play button).
   The menu is the iOS-style long-press menu: a preview of the held item (its label and text) with its actions
   beneath it, over the dimmed screen. An action runs once the menu has closed; touching the backdrop runs nothing.
-  The daily log's note menu is the same menu (Edit, and Copy when the note has text).
+  A note's menu is the same menu.
 
 - **ACT-7.** Deleting a Revised session or a Memorized entry asks first, and names what goes. A Memorized
   entry takes off exactly the ayahs it added (MEM-3), and its item is removed: a page it memorized goes back
@@ -1000,7 +1031,7 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   Memorized or timed Read item. A tagged note whose item is gone, and an untagged note, stay in the Notes block.
   While the day's items load, a tagged note shows nowhere (it never flickers into Notes).
 - **ACT-12.** Insights live in Activity (Calendar | Insights), for every account since the November 2026 release
-  (testers' before): the tab bar is Home and Read, with or without Smart Tracking, and there is no Insights tab
+  (testers' before): the tab bar is Home, Activity and Read (TAB-2), with or without Smart Tracking, and there is no Insights tab
   to reach. Without Smart Tracking no page is rated, so Activity's Insights has no Weak spots (no Ask,
   no "See all"): one line stands in its place, "Turn on Smart Tracking to see your weak spots ›" (a link, not a
   guide), which opens Settings at Revision, where its switch is; once it is on, Weak spots shows. With it, Weak
@@ -1036,6 +1067,10 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   that day: its date and Open at the top, each of its rows (Revised, Memorized, Read, Notes) scrolled to
   that block. (Majd, Nov 8 2026: Week and Month as a second row of pills was "a whole tab just to show
   weeks instead of month"; Open alone was easy to miss.)
+- **ACT-32.** A day's Revised figure in the calendar counts only that day's plan: "3 of 5" is how many of its 5 planned
+  pages were revised, and pages revised beyond the plan never take it past 5 or fill the day's ring. A day with no plan
+  (pages logged by hand with no session) never says "2 of 0": it names what was revised and how much ("Al-Baqarah · 2
+  pages", and "Revised 2 pages" in the week view). (Majd, Nov 23 2026: "not sure what 2 of 0 even means".)
 - **ACT-19.** Without Smart Tracking no page is rated, so Activity shows no strength: no weak, moderate or
   strong counts, no weak marks on a day's pages, no Weak spots (ACT-12) and no rating colours. Recency
   stands in where it reads well: when a part was last revised and how often. With Smart Tracking on,
@@ -1291,8 +1326,8 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   showing its end keeps it in view as the list gets shorter or longer (an answer's chart and plan card included),
   unless the user has scrolled up to read.
 
-- **REVO-25.** Revo's button is a 44pt disc (the smallest touch target, with room around it to tap), bottom-right, 14
-  above the tab bar and the mini player. It shows on Home, Activity (Overview and Insights), a day in Activity, See
+- **REVO-25.** Revo's button is a 44pt disc (the smallest touch target, with room around it to tap), in a bottom corner
+  (REVO-41), 14 above the tab bar and the mini player. It shows on Home, Activity (Overview and Insights), a day in Activity, See
   all and Pages by strength, and nowhere else. There is no Revo on the Read tab (its list or the reader) or in a
   revision session, and their help sheets offer no "Ask Revo" (Majd, Nov 8 2026: "no revo in the revision
   sessions. there should also be no revo in the mushaf tab at all"); none in an editor or Settings either. The
@@ -1332,7 +1367,7 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   as before.
 
 - **REVO-31.** An answer can offer to open a screen (`openScreen`): Jump to…, the schedule editor, the memorized
-  pages, Activity (Insights are a tab at its top), the daily log, Settings at one of its sections, the prayer
+  pages, Activity (Insights are a tab at its top), today's day in Activity (`dailyLog`), Settings at one of its sections, the prayer
   times, the Qibla, or the reader at a surah or a juz. The server drops any other screen, section, surah or juz (the
   answer kept, as with a page Revo wasn't given). An answer that suggests nothing but names one of those screens the way
   the app does ("Edit schedule", "Settings → Appearance", "Jump to…") gets that screen's card from the server, the
@@ -1424,6 +1459,13 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   them. The app sends the patterns and the day facts only once config/app's `revoPatterns` is on (set after the
   functions that take them are deployed: older ones refuse fields they don't know); off, it sends what it sent
   before, and turning it off stops them with no deploy.
+- **REVO-41.** Revo's button can be dragged sideways between the bottom right and the bottom left (Majd, Nov 23 2026:
+  "let's make the revo icon bottom right be movable so a user can drag it to the other side so either just bottom right
+  or bottom left and that position is saved in memory meaning the app remembers it"). It follows the finger and settles
+  in the nearer corner (a flick counts where it was heading); a tap still opens Revo, and the end of a drag doesn't. The
+  corner is kept on that phone, per account, across launches. Until it's moved it sits at the end of the line: right, or
+  left in Arabic. VoiceOver and TalkBack have an action for it ("Move to the left", "Move to the right"), and say where
+  it went. Lists leave the same room at their end on either side.
 
 ## Memorizing
 
@@ -1474,11 +1516,28 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   own after that. Its button is Continue at the first ayah not memorized ("Continue at Al-Mulk 21").
   A page marked in progress with no ayahs saved has nothing memorized, and reads as not memorized.
 
+- **MEM-8.** (Revisely Dev) The Memorized sheet chooses on the real mushaf page (Majd, Nov 23 2026: "tap where you stopped
+  but once the user is done adding their stuff and they go back then i think it should still show the page "preview"
+  of what they selected"). Its tabs are On the page, Surah and Juz.
+  - The picker opens where they left off: the first ayah to go after their latest Memorized entry, going round to the
+    Quran's start, or on the page they tapped. What is memorized is faded. A tap on an ayah is the ayah they reached: it
+    fills from where they left off, or the page's first ayah to go, to there, and another tap moves the end. A hold starts
+    there. Whole page and Clear act on that page. What is already memorized is never added again.
+  - It is apart from the reader ("they're independent of each other"): its own sheet with Cancel, Done and page arrows, no
+    swipe, mic, recording, timer, audio or verse menu, and it never opens the reader or moves the reader's place. Cancel
+    keeps what was chosen before.
+  - After Done the sheet shows a row of the real pages, the chosen part in the page's grey highlight, then the choice's
+    name ("An-Naml, 3rd to 5th page"), how much, and Change. A tap on a page or Change opens the picker there. No ayah
+    numbers in this flow: a stop is named by the ayah's first words.
+  - A page not on the phone with no connection, and VoiceOver, get the same choice as a list of each ayah's first words.
+  - From a sitting it stays inside the pages the sitting held, chosen from the first ayah to go to their end (MEM-5).
+  - Surah and Juz add exactly that surah's or juz's ayahs: a neighbour sharing its page is not added.
+
 ## Help
 
 - **HELP-1.** Screens that need explaining have a ?. Home's sits at the right of the Today
   post's header; the schedule editor's before Save; the reader's is a round button at the right of its
-  header; a session's is the last row of its ⋯ menu, "How a session works" (its header is full);
+  header; a session's is the last row of its Pages sheet, "Help";
   Activity's is in its top bar before search, and explains the tab on show (Overview or Insights); a
   day's is before +. It opens
   that screen's help ("How Home works"): at most four short topics, then "Ask Revo ›" when the account has
@@ -1566,7 +1625,9 @@ shows up once and they must go through it and complete it … just the main stuf
 ## Recite on the phone (Revisely Dev)
 
 - **ONDEV-1.** Settings → Testing → On-device model times Recite's model on this phone, the first step to checking
-  recitation on the phone instead of the server (Majd, Nov 23 2026). It lists this platform's runs from the dev
+  recitation on the phone instead of the server (Majd, Nov 23 2026). Under the phone's name it says which Recite engine
+  this build carries: its version, "stub (server path)" for a build without the private engine, or that its self-test
+  failed. It lists this platform's runs from the dev
   backend (each a model file, a processor (CPU, Core ML, XNNPACK or NNAPI) and a thread count; all chosen, any left
   out), downloads what the chosen runs need once (only for accounts the team has given bench access: Revisely Dev is open
   to anyone with its link; the models are the watermarked ones; each file checked by size and SHA-256, kept on the
@@ -1577,12 +1638,35 @@ shows up once and they must go through it and complete it … just the main stuf
   both take, load and second-load times, memory, and the first and last windows' times with the phone's heat. A run
   can open its model from bytes in memory instead of its file, as the real path will after decrypting it, and hold the
   engine's second (any-length) graph beside it, for the memory with both. A long run
-  (5 or 20 minutes, research's protocol) takes the first chosen run at the live cadence, a window every half second,
+  (5 or 20 minutes, research's protocol) takes the first chosen run at a live pace, a window every 0.5 or 1 second (chosen on the screen, and named on its Start button; the screen says to unplug and that leaving the app spoils the run),
   and notes the battery, the thermal state and the window times each minute: it says whether the phone got hot
   (serious or worse), whether the last minute was within 20% of the first, and the battery's drop an hour (nothing on
-  a charger). A run that fails says why and the others go on. The results go to the dev backend (the phone's model,
+  a charger). A run the app left the foreground during, or that the phone suspended, says so on its result and in its record: its times leave out the suspended windows, it names the longest clean stretch, and it gives no battery rate. A battery drop under two of the phone's steps (iOS reports five points at a time) gives no rate either. A run that fails says why and the others go on. The results go to the dev backend (the phone's model,
   chip, cores and memory, the build, each run's numbers; never the account or any audio) and can be shared. The store
   app has none of it: the native module is linked into Revisely Dev's builds only.
+- **ONDEV-4.** A take runs on the phone's engine or on the checker's server, one pipeline in two places with the same
+  frames, chosen per take: this phone's choice (Settings → Testing → Recite runs on: Automatic, This phone, The server),
+  else the account's pin (`entitlements/{uid}.reciteWhere`, which no client can write), else `config/app.recite.where`
+  (phone, server or auto), else the server. `auto` also needs the phone to have passed its speed check. Whatever asks
+  for the phone, a take goes to the server when this build has no engine, no pack is open, the engine failed its
+  self-check or can't run that take's level or features, and when the engine refuses the take at its start: the server
+  then gets the take whole, its audio and controls in order, and the reciter sees nothing of it. Once the engine has
+  said `ready`, a failure ends the take as an error. The engine's `clip` and `health` frames never reach the take's
+  state. Every take's record says where it ran and why (`ranOn`, `ranWhy`: who chose, or what kept it off the phone), and a take
+  on the server tells its take line why. A take on the phone isn't kept as test data yet, and Settings → Testing says so.
+  Revisely Dev only.
+
+- **ONDEV-2.** Recite's pack (the model and its tables, sealed) reaches a phone only through the server's `recitePack`:
+  signed in, App Check from the Revisely Dev app, the pack's access claim, at most 6 calls and 3 device keys an account a
+  day. Its key comes wrapped to a key only that phone's Keychain or Keystore holds, so the app's JavaScript never sees
+  it; the parts come only from Cloud Storage. A part counts once its size, its checksum, every sealed chunk and every
+  file inside have checked out; anything else is deleted and fetched again. Production has no pack and refuses.
+- **ONDEV-3.** In Revisely Dev, Settings → Downloads and storage → "Recite on the phone" shows the pack's status and size,
+  with Download now and Remove from this phone. It starts when a signed-in account opens the reader, in the foreground,
+  under the offline mushaf's rules: Wi-Fi unless "Download over mobile data" is on or one Download now allowed it. It
+  stays sealed on disk and out of iCloud and Android backups. A new pack comes beside the old one, which stays in use
+  until the new one's core part is whole. Remove deletes it all and keeps it off until Download now. An account the
+  team hasn't given access is told it isn't available yet.
 
 ## Premium early access
 

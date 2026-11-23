@@ -49,7 +49,6 @@ import { RunningTimerChip } from '../../components/timer/RunningTimerChip';
 import { HeroGlow } from '../../components/v2/HeroGlow';
 import { RamadanHome, WithCrescent } from '../../components/ramadan';
 import { useRamadanTheme } from '../../lib/ramadanTheme';
-import { useActivityTab } from '../../lib/activityTab';
 import { QiblaSheet } from '../../components/qibla/QiblaSheet';
 import { PrayerSheet, PrayerTab } from '../../components/prayer/PrayerSheet';
 import { NextPrayerLine } from '../../components/prayer/NextPrayerLine';
@@ -101,8 +100,6 @@ export default function DashboardScreen() {
   const styles = useMemo(() => makeStyles(theme), [theme]);
   // Revisely Dev's Ramadan theme (THEME-1): decorations only.
   const ramadan = useRamadanTheme();
-  // Revisely Dev's Activity tab (TAB-2): Activity has a tab of its own, so its button here goes.
-  const activityTab = useActivityTab();
 
   const { user, pages, logs, addLog, updateLog, deleteLog, loadData, error, saveUser, pendingChanges } = useApp();
   const { firebaseUser } = useAuth();
@@ -550,10 +547,8 @@ export default function DashboardScreen() {
         center={ramadan ? <WithCrescent>{salam}</WithCrescent> : salam}
         right={
           <>
-            <IconButton icon="compass-outline" label={t('home.screen.qibla')} onPress={() => openPrayer('qibla')} testID="open-qibla" />
-            {activityTab ? null : (
-              <IconButton icon="pulse-outline" label={t('home.screen.activity')} onPress={() => navigation.navigate('Activity')} testID="open-activity" />
-            )}
+            {/* Settings alone (Majd, Nov 23 2026): Activity is a tab (TAB-2), and the prayer line opens the Prayer sheet,
+                Qibla beside the times (HOME-1). */}
             <IconButton icon="settings-outline" label={t('home.screen.settings')} onPress={() => navigation.navigate('Settings')} testID="open-settings" />
           </>
         }

@@ -73,6 +73,7 @@ import { openEmail, openWebPage } from '../../lib/openWebPage';
 import { PillTabs } from '../../components/v2/PillTabs';
 import { setMushafCellular } from '../../lib/mushafOffline';
 import { describeMushaf, mushafMenuActions, useMushafOffline } from '../../lib/mushafOfflineUi';
+import { RecitePackRow } from '../../components/settings/RecitePackRow';
 import { mushafEdition, useMushafEdition } from '../../lib/mushafEdition';
 import { MushafPickerSheet } from '../../components/mushaf/MushafPickerSheet';
 import { shareIcon } from '../../lib/platformUi';
@@ -98,7 +99,7 @@ import { releaseSync } from '../../lib/offline/sync';
 import { reciteLiveForAccount } from '../../lib/reciteLive/availability';
 import { premiumErrorText, setDevPremium, usePremium } from '../../lib/premium';
 import { earlyAccessLine, useEarlyAccess } from '../../lib/earlyAccess';
-import { checkLevel, setReciteCheckSettings, strictOffered, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
+import { checkLevel, maddChecked, setReciteCheckSettings, strictOffered, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
 import { ReciteCheckNotice } from '../../components/reciteCheck/ReciteCheckNotice';
 import { currentLanguage, t, formatNumber } from '../../i18n';
 import {
@@ -113,8 +114,8 @@ import {
 import { LANGUAGE_NAMES } from '../../i18n/language';
 import { isDevVariant } from '../../lib/variant';
 import { ramadanThemeOffered, setRamadanTheme, useRamadanThemeSaved } from '../../lib/ramadanTheme';
-import { activityTabOffered, activityTabOn, setActivityTab, useActivityTabSaved } from '../../lib/activityTab';
 import { CheckerModelRow } from '../../components/settings/CheckerModelRow';
+import { ReciteWhereRow } from '../../components/settings/ReciteWhereRow';
 import { ScheduledRemindersRow } from '../../components/settings/ScheduledRemindersRow';
 import { useNotificationPermission } from '../../hooks/useNotificationPermission';
 import { ensureNotificationsPermission } from '../../lib/notifications';
@@ -266,12 +267,8 @@ export default function SettingsScreen() {
   const { theme, palette, themeMode, setThemeMode } = useTheme();
   const design = useDesign();
   const ramadanTheme = useRamadanThemeSaved();
-  const activityTab = useActivityTabSaved();
-  // Activity: its own tab while it is one (Revisely Dev's switch, TAB-2), else pushed here as before.
-  const openActivity = () => {
-    if (activityTabOn()) navigation.getParent()?.navigate('ActivityTab', { screen: 'Activity' });
-    else navigation.navigate('Activity');
-  };
+  // Activity is a tab (TAB-2): its rows here go to it.
+  const openActivity = () => navigation.getParent()?.navigate('ActivityTab', { screen: 'Activity' });
   const tabFootprint = useTabBarFootprint();
   const [localUser, setLocalUser] = useState(user);
 
@@ -885,6 +882,7 @@ export default function SettingsScreen() {
                   <>
                     <Row
                       label={t('settings.recite.munfasil')}
+                      subtitle={maddChecked('munfasil', reciteCheckSettings.munfasil) ? undefined : t('settings.recite.munfasilTwo')}
                       rightSlot={
                         <PillTabs
                           compact
@@ -898,6 +896,7 @@ export default function SettingsScreen() {
                     />
                     <Row
                       label={t('settings.recite.muttasil')}
+                      subtitle={maddChecked('muttasil', reciteCheckSettings.muttasil) ? undefined : t('settings.recite.muttasilSub')}
                       rightSlot={
                         <PillTabs
                           compact
@@ -1049,6 +1048,7 @@ export default function SettingsScreen() {
                 onPress={() => setMushafMenu(true)}
               />
             </View>
+            {isDevVariant() ? <RecitePackRow Row={Row} /> : null}
             <Row
               icon="cellular-outline"
               label={t('settings.mushafRows.cellular')}
@@ -1245,23 +1245,6 @@ export default function SettingsScreen() {
                 }
               />
             ) : null}
-            {/* Revisely Dev only (TAB-2): Activity as a tab between Home and Read, to compare with the button at the
-                top of Home (Majd, Nov 23 2026). Kept on this phone, off until turned on. */}
-            {activityTabOffered() ? (
-              <Row
-                icon="pulse-outline"
-                label={t('settings.appearance.activityTab')}
-                subtitle={t('settings.appearance.activityTabSub')}
-                rightSlot={
-                  <SettingSwitch
-                    value={activityTab}
-                    onValueChange={(on) => void setActivityTab(on)}
-                    accessibilityLabel={t('settings.appearance.activityTab')}
-                    testID="settings-activity-tab"
-                  />
-                }
-              />
-            ) : null}
           </Section>
         ) : null}
         {page === 'help' ? (
@@ -1379,6 +1362,18 @@ export default function SettingsScreen() {
                 {isDevVariant() ? <ScheduledRemindersRow /> : null}
                 {/* Revisely Dev only: which model its checker runs for each level (Majd, Nov 18 2026). */}
                 {reciteCheck && isDevVariant() ? <CheckerModelRow /> : null}
+                {/* Revisely Dev only: where this phone's takes run, the phone or the server (ONDEV-4). */}
+                {reciteCheck && isDevVariant() ? <ReciteWhereRow /> : null}
+                {/* Revisely Dev only: the onboarding screens, saving nothing (ONBOARD-5). */}
+                {isDevVariant() ? (
+                  <Row
+                    icon="albums-outline"
+                    label={t('settings.testing.previewOnboarding')}
+                    subtitle={t('settings.testing.previewOnboardingSub')}
+                    onPress={() => navigation.navigate('OnboardingPreview')}
+                    testID="settings-preview-onboarding"
+                  />
+                ) : null}
                 {/* Revisely Dev only: Recite's model timed on this phone (ONDEV-1). */}
                 {isDevVariant() ? (
                   <Row

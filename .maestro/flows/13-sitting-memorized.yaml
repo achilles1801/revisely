@@ -154,7 +154,7 @@ appId: com.revisionbuddy.app
 - tapOn:
     id: tab-Home
 - tapOn:
-    id: open-activity
+    id: tab-ActivityTab
 - extendedWaitUntil:
     visible:
       id: activity-blocks-views
@@ -219,9 +219,10 @@ appId: com.revisionbuddy.app
           direction: DOWN
           duration: 400
       - waitForAnimationToEnd
+# A long flick can land on ayah 1, which reads "Al-Mulk 1 · 1 ayah" (iOS, run 45137501362, both attempts).
 - assertVisible:
     id: add-memorized-ayahs
-    text: "Al.Mulk.1.([1-9]|1[01]) · ([1-9]|1[01]) ayahs?"
+    text: "Al.Mulk.1(.([2-9]|1[01]))? · ([1-9]|1[01]) ayahs?"
 - assertVisible:
     id: add-memorized-share
 - runFlow:

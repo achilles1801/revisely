@@ -38,6 +38,8 @@ describe('on-device bench: onDeviceBench and models/recite/', () => {
     await assertFails(updateDoc(sent, { windows: 20 }));
     await assertFails(deleteDoc(sent));
     await assertFails(addDoc(collection(env.unauthenticatedContext().firestore(), 'onDeviceBench'), record()));
+    // A 20-minute long run at a 0.5 s hop is 2,400 windows.
+    await assertSucceeds(addDoc(collection(db, 'onDeviceBench'), record({ windows: 2400 })));
   });
 
   it('only the bench’s fields, in their shapes', async () => {
@@ -46,6 +48,7 @@ describe('on-device bench: onDeviceBench and models/recite/', () => {
     await assertFails(addDoc(collection(db, 'onDeviceBench'), record({ platform: 'web' })));
     await assertFails(addDoc(collection(db, 'onDeviceBench'), record({ createdAt: new Date(0) })));
     await assertFails(addDoc(collection(db, 'onDeviceBench'), record({ windows: 0 })));
+    await assertFails(addDoc(collection(db, 'onDeviceBench'), record({ windows: 20001 })));
     await assertFails(addDoc(collection(db, 'onDeviceBench'), record({ runs: [] })));
     await assertFails(addDoc(collection(db, 'onDeviceBench'), record({ runs: 'many' })));
     await assertFails(addDoc(collection(db, 'onDeviceBench'), record({ device: 'iPhone' })));

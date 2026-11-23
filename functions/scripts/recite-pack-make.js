@@ -7,24 +7,59 @@
  * Dev only. A pack id is one key and one set of files, for good: a new model, table or engine data version is a new id.
  * The key and the plain files are never printed, logged or written anywhere.
  *
- * From the functions/ directory, after `npm run build`:
+ * The usual way, one command from the functions/ directory, after `npm run build`:
+ *   GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-dev-admin.json node scripts/recite-pack-make.js --lab [--dry]
+ * It takes the lab's standard files (runs/mobile/models, golden/pack-v3, golden/pack-strict), refuses a table that isn't
+ * its manifest's or a model that isn't in the private checker/marks.json, and works the id out from the files' hashes:
+ * a changed file is a new version, and the same files are "already current". Phones move to it at their next daily check.
+ *
+ * Or file by file:
  *   GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-dev-admin.json node scripts/recite-pack-make.js \
  *     --id v7m-1 \
- *     --core v7-live=/path/model.ort,words.rcwt=/path/words.rcwt,ayahs.bin=/path/ayahs.bin,config.json=/path/config.json \
- *     --strict v5=/path/v5.ort \
+ *     --core v7.graph.onnx=/models/v7m-any.graph.onnx,v7.weights.f16=/models/v7m-any.weights.f16,\
+ *            v7.weights.json=/models/v7m-any.weights.json,v7.check=/pack/v7.check,words.rcwt=/pack/words.rcwt,\
+ *            ayahs.bin=/pack/ayahs.bin,\
+ *            norms.bin=/pack/norms.bin,stops.bin=/pack/stops.bin,lexicon.bin=/pack/lexicon.bin,\
+ *            letters.bin=/pack/letters.bin,mel.bin=/pack/mel.bin,config.json=/pack/config.json,\
+ *            manifest.json=/pack/manifest.json \
+ *     --strict v5.onnx=/models/v5m-server-int8.onnx,strict.bin=/pack-strict/strict.bin \
  *     --apps 1:433792838929:ios:…,1:433792838929:android:… \
  *     --claim onDeviceBench
  *
+ * Either way every table must be the one manifest.json names, and manifest.json travels in the core part: the engine
+ * reports its version and content in rc_info.
+ *
+ * Only marked models leave the Mac: v7m-* and v5m-server-int8.onnx (their hashes are in the private checker/marks.json).
+ *
+ *   --lab       the standard files, as above (--marks FILE: another marks.json, instead of the private repo's)
  *   --dry       seal and check only: no credentials, nothing uploaded or written
  *   --no-claim  any signed-in account of the listed apps (the default claim is onDeviceBench)
  */
 const crypto = require('crypto');
+const { execFileSync } = require('child_process');
 const fs = require('fs');
-const { PACK_ID, RCPK_FORMAT, KEY_BYTES, open, packContainer, seal, unpackContainer } = require('../lib/recitePack/format');
+const os = require('os');
+const path = require('path');
+const { PACK_ID, RCPK_FORMAT, KEY_BYTES, contentPackId, open, packContainer, seal, unpackContainer } = require('../lib/recitePack/format');
 
 /** The names recite-core's rc_open takes (recite_core.h). */
-const BLOB_NAMES = new Set(['v7-live', 'v7-any', 'words.rcwt', 'ayahs.bin', 'config.json', 'v5']);
-const CORE_NEEDS = ['v7-live', 'words.rcwt', 'ayahs.bin', 'config.json'];
+const CORE_NEEDS = ['v7.graph.onnx', 'v7.weights.f16', 'v7.weights.json', 'v7.check', 'words.rcwt', 'ayahs.bin', 'norms.bin',
+  'stops.bin', 'lexicon.bin', 'letters.bin', 'mel.bin', 'config.json', 'manifest.json'];
+const STRICT_NEEDS = ['v5.onnx', 'strict.bin'];
+const BLOB_NAMES = new Set([...CORE_NEEDS, ...STRICT_NEEDS]);
+/** The lab's tables. A pack folder is never remade in place: a new one sits beside the others under its own name. */
+const TABLES_FOLDER = 'golden/pack-v3';
+
+/** Revisely Dev's iOS and Android apps (handbook/dev-stack.md): the App Check ids a --lab pack is for. */
+const DEV_APPS = ['1:433792838929:ios:854e01f457f27d29bbf0b0', '1:433792838929:android:5c8c71d0893a4fe3bbf0b0'];
+/** Where the private repo keeps checker/marks.json, newest branch first. */
+const MARK_REFS = ['origin/recite-core/main', 'origin/checker/teacher-speed', 'origin/main'];
+const MODEL_FILES = {
+  'v7.graph.onnx': 'v7m-any.graph.onnx',
+  'v7.weights.f16': 'v7m-any.weights.f16',
+  'v7.weights.json': 'v7m-any.weights.json',
+  'v5.onnx': 'v5m-server-int8.onnx',
+};
 
 function fail(message) {
   console.error(`ERROR: ${message}`);
@@ -36,8 +71,9 @@ function args(argv) {
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--dry') out.dry = true;
+    else if (a === '--lab') out.lab = true;
     else if (a === '--no-claim') out.claim = null;
-    else if (['--id', '--core', '--strict', '--apps', '--claim'].includes(a)) {
+    else if (['--id', '--core', '--strict', '--apps', '--claim', '--marks'].includes(a)) {
       if (argv[i + 1] === undefined) fail(`${a} needs a value`);
       out[a.slice(2)] = argv[++i];
     } else fail(`unknown argument ${a}`);
@@ -60,9 +96,93 @@ function blobList(spec) {
 
 const sha256 = (b) => crypto.createHash('sha256').update(b).digest('hex');
 
+function readManifest(file) {
+  let manifest;
+  try {
+    manifest = JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch {
+    fail(`${file} isn't a readable manifest`);
+  }
+  if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) fail(`${file} isn't a manifest`);
+  return manifest;
+}
+
+/** A table must be the file the manifest names. Models have their marks, strict.bin isn't listed, and the manifest can't vouch for itself. */
+function checkTable(manifest, from, name, data) {
+  if (MODEL_FILES[name] || name === 'strict.bin' || name === 'manifest.json') return;
+  const row = manifest[name];
+  if (!row || row.sha256 !== sha256(data) || row.bytes !== data.length) fail(`${name} isn't the file ${from} names`);
+}
+
+/** Every file with an ownership mark, as "name sha256" (checker/marks.json: [{ files: { name: sha256 } }]). */
+function markedFiles(file) {
+  const texts = [];
+  if (file) texts.push(fs.readFileSync(file, 'utf8'));
+  else {
+    const repo = path.join(os.homedir(), 'revisely-internal');
+    try {
+      execFileSync('git', ['-C', repo, 'fetch', '-q', 'origin'], { stdio: 'ignore' });
+    } catch {
+      // offline: the refs as they are
+    }
+    for (const ref of MARK_REFS) {
+      try {
+        texts.push(execFileSync('git', ['-C', repo, 'show', `${ref}:checker/marks.json`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }));
+      } catch {
+        // this branch doesn't have it
+      }
+    }
+  }
+  if (texts.length === 0) fail('no checker/marks.json to check the models against (--marks FILE)');
+  const out = new Set();
+  for (const text of texts) {
+    for (const entry of JSON.parse(text)) {
+      for (const [name, hash] of Object.entries(entry.files ?? {})) out.add(`${name} ${hash}`);
+    }
+  }
+  return out;
+}
+
+/** The lab's standard files, each checked: tables against their manifest, models against the marks. */
+function labParts(marksFile) {
+  const lab = process.env.RECITE_LAB || path.join(os.homedir(), 'revisely-mistake-lab');
+  const models = path.join(lab, 'runs/mobile/models');
+  const tables = path.join(lab, TABLES_FOLDER);
+  if (!fs.existsSync(path.join(tables, 'manifest.json'))) fail(`no ${TABLES_FOLDER}/manifest.json`);
+  const where = (name) => {
+    if (MODEL_FILES[name]) return path.join(models, MODEL_FILES[name]);
+    return name === 'strict.bin' ? path.join(lab, 'golden/pack-strict/strict.bin') : path.join(tables, name);
+  };
+  const manifest = readManifest(path.join(tables, 'manifest.json'));
+  const marked = markedFiles(marksFile);
+  const hashes = [];
+  const part = (name, needs) =>
+    needs.map((blob) => {
+      const file = where(blob);
+      if (!fs.existsSync(file)) fail(`no file for ${blob}`);
+      const data = fs.readFileSync(file);
+      const hash = sha256(data);
+      if (MODEL_FILES[blob]) {
+        if (!marked.has(`${MODEL_FILES[blob]} ${hash}`)) fail(`${MODEL_FILES[blob]} isn't a marked model (checker/marks.json): it stays on the Mac`);
+      } else {
+        checkTable(manifest, `${TABLES_FOLDER}/manifest.json`, blob, data);
+      }
+      hashes.push({ part: name, name: blob, sha256: hash });
+      return { name: blob, path: file };
+    });
+  return { core: part('core', CORE_NEEDS), strict: part('strict', STRICT_NEEDS), hashes };
+}
+
 /** One part sealed, and opened again with the key before anything leaves this machine. */
 function makePart(packId, part, list, key) {
   const blobs = list.map(({ name, path }) => ({ name, data: fs.readFileSync(path) }));
+  const weights = blobs.find((b) => b.name === 'v7.weights.f16');
+  if (weights) {
+    // the engine widens them in place: the phone's buffer for them is the fp32 size (recite_core.h)
+    const layout = JSON.parse(blobs.find((b) => b.name === 'v7.weights.json').data.toString('utf8'));
+    if (!Number.isSafeInteger(layout.fp32_bytes) || layout.fp32_bytes < weights.data.length) fail('v7.weights.json: fp32_bytes');
+    weights.room = layout.fp32_bytes;
+  }
   const sealed = seal(packContainer(blobs), key, { packId, part });
   const back = unpackContainer(open(sealed, key, { packId, part }));
   if (back.length !== blobs.length || back.some((b, i) => b.name !== blobs[i].name || !b.data.equals(blobs[i].data))) {
@@ -75,12 +195,24 @@ function makePart(packId, part, list, key) {
 
 async function main() {
   const o = args(process.argv.slice(2));
+  const lab = o.lab ? labParts(o.marks) : null;
+  if (lab) {
+    o.id = contentPackId(lab.hashes);
+    o.apps = o.apps ?? DEV_APPS.join(',');
+    console.log(`pack id: ${o.id}`);
+  }
   if (!o.id || !PACK_ID.test(o.id)) fail('--id: lower-case letters, digits, dots and dashes');
-  if (!o.core) fail('--core is required');
-  const core = blobList(o.core);
+  if (!lab && !o.core) fail('--core is required');
+  const core = lab ? lab.core : blobList(o.core);
   const missing = CORE_NEEDS.filter((n) => !core.some((b) => b.name === n));
   if (missing.length) fail(`--core is missing ${missing.join(', ')}`);
-  const strict = o.strict ? blobList(o.strict) : null;
+  const strict = lab ? lab.strict : o.strict ? blobList(o.strict) : null;
+  const strictMissing = strict ? STRICT_NEEDS.filter((n) => !strict.some((b) => b.name === n)) : [];
+  if (strictMissing.length) fail(`--strict is missing ${strictMissing.join(', ')}`);
+  if (!lab) {
+    const manifest = readManifest(core.find((b) => b.name === 'manifest.json').path);
+    for (const b of [...core, ...(strict ?? [])]) checkTable(manifest, 'the given manifest.json', b.name, fs.readFileSync(b.path));
+  }
   const apps = (o.apps ?? '').split(',').filter(Boolean);
   if (!o.dry && apps.length === 0) fail('--apps: the App Check app ids that may fetch it');
 
@@ -94,7 +226,13 @@ async function main() {
     admin = require('firebase-admin');
     admin.initializeApp({ storageBucket: 'revisely-dev.firebasestorage.app' });
     db = admin.firestore();
-    if ((await db.doc(`recitePackKeys/${o.id}`).get()).exists) fail(`pack ${o.id} already exists: a new pack needs a new id`);
+    if ((await db.doc(`recitePackKeys/${o.id}`).get()).exists) {
+      if (lab && (await db.doc('recitePacks/current').get()).data()?.packId === o.id) {
+        console.log(`${o.id} is already the current pack: nothing to do.`);
+        return;
+      }
+      fail(`pack ${o.id} already exists: a version is never overwritten`);
+    }
   }
 
   const key = crypto.randomBytes(KEY_BYTES);

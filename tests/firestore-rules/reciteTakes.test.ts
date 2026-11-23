@@ -86,6 +86,18 @@ describe("Recite's memory: users/<uid>/reciteTakes", () => {
     await assertFails(setDoc(doc(alice, path(ALICE, 't4')), take({ unfinished: 'yes' })));
   });
 
+  it('a take says where it ran and why, from the closed lists (ONDEV-4)', async () => {
+    const alice = env.authenticatedContext(ALICE).firestore();
+    await assertSucceeds(setDoc(doc(alice, path(ALICE, 'p1')), take({ ranOn: 'phone' })));
+    await assertSucceeds(setDoc(doc(alice, path(ALICE, 'p2')), take({ ranOn: 'server', ranWhy: 'no-pack' })));
+    for (const why of ['forced', 'pin', 'config', 'self-check', 'lacks', 'slow', 'no-speed', 'refused', 'replay']) {
+      await assertSucceeds(setDoc(doc(alice, path(ALICE, `w-${why}`)), take({ ranOn: 'server', ranWhy: why })));
+    }
+    await assertFails(setDoc(doc(alice, path(ALICE, 'p3')), take({ ranOn: 'mars' })));
+    await assertFails(setDoc(doc(alice, path(ALICE, 'p3')), take({ ranOn: true })));
+    await assertFails(setDoc(doc(alice, path(ALICE, 'p3')), take({ ranOn: 'server', ranWhy: 'because' })));
+  });
+
   it('a recitation longer than the checker’s cap keeps its takes (links: 2 to 20), and nothing else in their place', async () => {
     const alice = env.authenticatedContext(ALICE).firestore();
     const links = [

@@ -1,132 +1,86 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
-import { ScreenSafeAreaView } from '../../components/SafeAreaView';
-import { Ionicons } from '@expo/vector-icons';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { OnboardingStackParamList, JourneyStage } from '../../navigation/OnboardingNavigator';
-import { Stepper } from '../../components/Stepper';
-import { Mark } from '../../components/v2/Mark';
-import { PillButton } from '../../components/v2/PillButton';
-import { Tap } from '../../components/v2/Tap';
-import { TopBar } from '../../components/v2/TopBar';
-import { useTheme } from '../../context/ThemeContext';
+import type { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
+import { ChoiceList, ChoiceRow } from '../../components/onboarding/ChoiceRow';
+import { QuestionScreen } from '../../components/onboarding/QuestionScreen';
 import { useHaptics } from '../../design/haptics';
-import { layoutV2, typeV2 } from '../../theme/v2';
+import {
+  applyPendingChanges,
+  applyPendingSurahChanges,
+  buildInitialPendingForJourney,
+  buildInitialPendingSurahsForJourney,
+} from '../../lib/memorizationChanges';
+import { logger } from '../../lib/logger';
+import { TOTAL_QURAN_PAGES } from '../../types/firestore';
 import { t } from '../../i18n';
+import { useOnboardingAccess } from './onboardingAccess';
 
 type NavigationProp = NativeStackNavigationProp<OnboardingStackParamList, 'JourneySelect'>;
 
-const OPTIONS: Array<{ value: JourneyStage; title: string; description: string; icon: keyof typeof Ionicons.glyphMap }> = [
-  {
-    value: 'in_progress',
-    get title() {
-      return t('onboarding.journey.inProgress');
-    },
-    get description() {
-      return t('onboarding.journey.inProgressDetail');
-    },
-    icon: 'flame-outline',
-  },
-  {
-    value: 'complete',
-    get title() {
-      return t('onboarding.journey.complete');
-    },
-    get description() {
-      return t('onboarding.journey.completeDetail');
-    },
-    icon: 'star-outline',
-  },
-];
-
+/**
+ * How much is memorized: one tap answers it (ONBOARD-3). "Part of it" goes on to the juz. "All of it" has nothing to
+ * pick, so it saves every page and surah here, as Continue on the juz screen would have. It waits for the account's
+ * pages first: a new account's arrive in two batches, and a page not loaded can't be saved (ONBOARD-1).
+ */
 export default function JourneySelectScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const { palette } = useTheme();
   const haptics = useHaptics();
-  const [selectedStage, setSelectedStage] = useState<JourneyStage>('in_progress');
+  const { user, pages, updatePages, saveUser } = useOnboardingAccess();
+  const [savingAll, setSavingAll] = useState(false);
+  const inFlight = useRef(false);
 
-  // No pre-seeding here. JuzSelection initializes its local pendingChanges
-  // buffer from the journeyStage param and only flushes to global state on
-  // Continue. This screen's tap is just a navigation.
-  const handleContinue = () => {
-    navigation.navigate('JuzSelection', { journeyStage: selectedStage });
-  };
+  useEffect(() => {
+    if (!savingAll || inFlight.current || pages.length < TOTAL_QURAN_PAGES) return;
+    inFlight.current = true;
+    (async () => {
+      try {
+        const { updatedPages, changedPageNumbers } = applyPendingChanges(pages, buildInitialPendingForJourney(pages, 'complete'));
+        if (changedPageNumbers.length > 0) await updatePages(updatedPages, changedPageNumbers);
+        if (user) {
+          const base = user.memorizedSurahs ?? [];
+          const surahs = buildInitialPendingSurahsForJourney(base, 'complete');
+          if (surahs.size > 0) await saveUser({ ...user, memorizedSurahs: applyPendingSurahChanges(base, surahs) });
+        }
+        navigation.navigate('DailyAmount', { journeyStage: 'complete' });
+      } catch (err) {
+        logger.error('Onboarding: saving the whole Quran failed', err);
+      } finally {
+        inFlight.current = false;
+        setSavingAll(false);
+      }
+    })();
+  }, [savingAll, pages, user, updatePages, saveUser, navigation]);
 
-  const totalSteps = 3;
-
-  // The two answers are rows on hairlines, each with its mark; the chosen
-  // one carries a check. The one action sits at the foot.
   return (
-    <ScreenSafeAreaView style={[styles.container, { backgroundColor: palette.bg }]} testID="journey-select">
-      <TopBar onBack={() => navigation.goBack()} center={<Stepper total={totalSteps} current={1} />} />
-      <ScrollView contentContainerStyle={v2.scroll}>
-        <Text
-          style={[typeV2.title, v2.headline, { color: palette.text }]}
-          accessibilityRole="header"
-          maxFontSizeMultiplier={1.6}
-        >
-          {t('onboarding.journey.title')}
-        </Text>
-        <View
-          style={[v2.list, { borderTopColor: palette.separator }]}
-          accessibilityRole="radiogroup"
-        >
-          {OPTIONS.map((option) => {
-            const isSelected = selectedStage === option.value;
-            return (
-              <Tap
-                key={option.value}
-                onPress={() => {
-                  if (isSelected) return;
-                  haptics.selection();
-                  setSelectedStage(option.value);
-                }}
-                accessibilityRole="radio"
-                accessibilityLabel={`${option.title}. ${option.description}`}
-                accessibilityState={{ checked: isSelected, selected: isSelected }}
-                style={[v2.row, { borderBottomColor: palette.separator }]}
-                testID={`journey-${option.value}`}
-              >
-                <Mark icon={option.icon} />
-                <View style={v2.rowText}>
-                  <Text style={[typeV2.name, { color: palette.text }]}>{option.title}</Text>
-                  <Text style={[typeV2.body, { color: palette.secondary }]}>{option.description}</Text>
-                </View>
-                <Ionicons
-                  name={isSelected ? 'checkmark-circle' : 'ellipse-outline'}
-                  size={24}
-                  color={isSelected ? palette.accentText : palette.secondary}
-                  testID={isSelected ? `journey-${option.value}-checked` : undefined}
-                />
-              </Tap>
-            );
-          })}
-        </View>
-      </ScrollView>
-      <View style={v2.footer}>
-        <PillButton title={t('onboarding.continue')} size="lg" onPress={handleContinue} testID="journey-continue" />
-      </View>
-    </ScreenSafeAreaView>
+    <QuestionScreen step={1} title={t('onboarding.journey.title')} onBack={() => navigation.goBack()} testID="journey-select">
+      <ChoiceList>
+        <ChoiceRow
+          icon="flame-outline"
+          title={t('onboarding.journey.part')}
+          detail={t('onboarding.journey.partDetail')}
+          onPress={() => {
+            // Still waiting for the pages: this answer replaces that one. A save under way finishes first.
+            if (inFlight.current) return;
+            setSavingAll(false);
+            haptics.selection();
+            navigation.navigate('JuzSelection', { journeyStage: 'in_progress' });
+          }}
+          testID="journey-part"
+        />
+        <ChoiceRow
+          icon="star-outline"
+          title={t('onboarding.journey.all')}
+          detail={savingAll ? t('onboarding.juz.loading') : t('onboarding.journey.allDetail')}
+          busy={savingAll}
+          onPress={() => {
+            if (savingAll) return;
+            haptics.selection();
+            setSavingAll(true);
+          }}
+          testID="journey-all"
+        />
+      </ChoiceList>
+    </QuestionScreen>
   );
 }
-
-const v2 = StyleSheet.create({
-  scroll: { paddingTop: 8, paddingBottom: 24 },
-  headline: { paddingHorizontal: layoutV2.gutter, marginBottom: 20 },
-  list: { borderTopWidth: layoutV2.hairline },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: layoutV2.markGap,
-    paddingHorizontal: layoutV2.gutter,
-    paddingVertical: layoutV2.rowPad,
-    borderBottomWidth: layoutV2.hairline,
-  },
-  rowText: { flex: 1, minWidth: 0 },
-  footer: { paddingHorizontal: layoutV2.gutter, paddingTop: 8, paddingBottom: 16 },
-});
-
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-});
