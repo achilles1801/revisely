@@ -276,7 +276,7 @@ appId: com.revisionbuddy.app
       - extendedWaitUntil:
           visible: "Delete this memorization\\?"
           timeout: 10000
-      - assertVisible: "Al.Mulk.1(.([2-9]|1[01]))? goes back to not memorized\\."
+      - assertVisible: "Back to not memorized: Al.Mulk.*"
       - tapOn: "Delete"
 - extendedWaitUntil:
     notVisible:

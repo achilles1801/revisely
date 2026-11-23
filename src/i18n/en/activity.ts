@@ -125,8 +125,8 @@ export const activity = {
     recited: 'Recited',
     notes: 'Notes',
     deleteMemorizationTitle: 'Delete this memorization?',
-    /** "Al-Mulk 1–12 goes back to not memorized." */
-    backToNotMemorized: '{{ayahs}} goes back to not memorized.',
+    /** "Back to not memorized: Al-Mulk, 1st page · start." */
+    backToNotMemorized: 'Back to not memorized: {{ayahs}}.',
     /** A reading session with no time or pages, in "Edit session". */
     session: 'session',
     editThing: 'Edit {{label}}',

@@ -160,7 +160,7 @@ export const activity: NonNullable<ArStrings['activity']> = {
     recited: 'ما سمّعته',
     notes: 'الملاحظات',
     deleteMemorizationTitle: 'حذف هذا الحفظ؟',
-    backToNotMemorized: 'تعود {{ayahs}} غير محفوظة.',
+    backToNotMemorized: 'تعود إلى غير المحفوظ: {{ayahs}}.',
     session: 'جلسة',
     editThing: 'تعديل {{label}}',
     deleteThing: 'حذف {{label}}',
