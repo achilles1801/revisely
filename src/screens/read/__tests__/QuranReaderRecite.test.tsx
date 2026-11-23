@@ -272,7 +272,18 @@ const toBackground = () =>
       if (type === 'change') listener('background');
     }
   });
-const event = (e: LiveEvent) => act(async () => mockLive.onEvent?.(e));
+// A real take's cursor has reached what it recited by its final answer (less than an ayah isn't a take: RECITE-27).
+const event = (e: LiveEvent) =>
+  act(async () => {
+    if (e.type === 'ready') heardInTake = false;
+    if (e.type === 'at' || e.type === 'said') heardInTake = true;
+    // Not for a take whose start was never found, or one that says itself how far it got.
+    if (e.type === 'done' && !heardInTake && e.result.start !== null && e.result.to > e.result.from) {
+      mockLive.onEvent?.({ type: 'at', w: e.result.to - 1 });
+    }
+    mockLive.onEvent?.(e);
+  });
+let heardInTake = false;
 
 /** After Stop the bar shows the take's result; nothing opens by itself (Nov 22 2026). A tap on it opens the summary. */
 async function openResult() {
@@ -919,6 +930,7 @@ describe('a take starts anywhere on the page (Majd, Nov 14 2026)', () => {
     await event({ type: 'ready', take: 't1', protocol: 5 });
     expect(screen.getByTestId('recite-score')).toBeTruthy();
     await event({ type: 'at', w: A23 + 2 });
+    await event({ type: 'at', w: A23 + 9 }); // a take needs at least a line's worth of a long ayah (RECITE-27)
     fireEvent.press(screen.getByTestId('recite-stop'));
     await done();
     await settle(() => expect(screen.getByTestId('recite-result')).toBeTruthy());
@@ -2486,12 +2498,24 @@ describe('long takes (Nov 20 2026): Stop always ends in a summary, and the take 
   /** A take that reached An-Naml 23's seventh word, with one wrong word. */
   async function reciteSome() {
     await startTake('check');
-    await event({ type: 'at', w: A23 + 7 });
+    await event({ type: 'at', w: A23 + 8 }); // nine words: enough of a long ayah to count (RECITE-27)
     await event({ type: 'said', upTo: A23 + 6 });
     await event({ type: 'mark', mark: wrong as never });
     await event({ type: 'score', reached: 7, mistakes: 1, tajweed: 0, accuracy: 6 / 7 } as never);
   }
   const messages = () => captured.mock.calls.map((c) => c[0]);
+
+  it('[RECITE-27] the mic pressed and nothing said is not a take: no summary, nothing kept, a word on why', async () => {
+    await startTake('check');
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await flush();
+    await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23, secs: 2, marks: [], score: null } } as never);
+    await settle(() => expect(screen.getByText('Recite at least one ayah for it to count.')).toBeTruthy());
+    expect(screen.queryByTestId('recite-result')).toBeNull();
+    expect(screen.queryByTestId('take-summary-score')).toBeNull();
+    await flush();
+    expect(taken()).toBeUndefined();
+  });
 
   it('[RECITE-11] no final answer within the budget: the summary shows what the take found, says its end wasn’t checked, and the take is kept unfinished', async () => {
     setStopBudgetForTests(40);
@@ -2651,6 +2675,7 @@ describe('Majd’s Nov 20 asks: the mistake sound, and mistakes on a hidden page
     await event({ type: 'said', upTo: A23 + 7 });
     expect(screen.getByTestId('live-highlight-word')).toBeTruthy();
     // After the take, hidden again: the page hides everything, the mark still on its word's place.
+    await event({ type: 'at', w: A23 + 8 });
     fireEvent.press(screen.getByTestId('recite-stop'));
     await flush();
     await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 8, secs: 9, marks: [wrong(A23 + 6)], score: null } as never });

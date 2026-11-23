@@ -178,6 +178,7 @@ export const reciteLive = {
     micFailed: 'Couldn’t start the microphone. Try again.',
     /** Said to screen reader users only, after Stop, when a take's start was never found. */
     startNotFound: 'Couldn’t follow that take. Try starting at the top of the page.',
+    tooShort: 'Recite at least one ayah for it to count.',
     premiumFailed: 'Couldn’t turn on Premium',
     devPremiumTitle: 'Premium in Revisely Dev',
     devPremiumBody: 'Free while testing: nothing is charged. Turn it off in Settings → Testing.',

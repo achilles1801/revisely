@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { logger } from '../../lib/logger';
 import type { QuranWords } from '../../lib/recite/quranWords';
 import { settleUnfinished, startNotFound, type LiveState } from '../../lib/reciteLive/state';
+import { isATake } from '../../lib/reciteLive/takeEnough';
 import type { WhereAnswer } from '../../lib/reciteLive/where';
 import { recordFromTake, sameTake } from '../../lib/reciteMemory/fromTake';
 import { openWordsBetween } from '../../lib/reciteMemory/memory';
@@ -123,6 +124,7 @@ export function useRememberTake({
     if (!enabled || !t || !words || view.mode !== 'check' || startNotFound(view.state)) return null;
     // A take the screen let go before its answer: what it had found, unfinished.
     const state = t.left ? settleUnfinished(view.state, view.seconds) : view.state;
+    if (!isATake(state, words, view.links)) return null; // RECITE-27
     return recordFromTake(state, words, {
       id: t.id,
       createdAt: t.createdAt,
@@ -155,8 +157,11 @@ export function useRememberTake({
   // The final answer, and every change to its marks after it.
   const marks = live.state.marks;
   useEffect(() => {
-    if (status === 'done') schedule();
-    else if (status === 'idle') {
+    if (status === 'done') {
+      // Less than an ayah isn't a take (RECITE-27): no record, and its audio goes, now or as it arrives.
+      if (live.words && !isATake(live.state, live.words, live.links)) forget();
+      else schedule();
+    } else if (status === 'idle') {
       flush();
       setCurrent(null);
     }
@@ -178,6 +183,10 @@ export function useRememberTake({
       t.left = true;
       const r = build();
       const forUid = uidRef.current;
+      if (!r && view.words && !startNotFound(view.state) && !isATake(settleUnfinished(view.state, view.seconds), view.words, view.links)) {
+        forget();
+        return;
+      }
       if (!r || !forUid) return;
       t.written = r;
       sent.current.add(r.id);

@@ -18,6 +18,8 @@ export interface PhoneTakeEnd {
   meter: Record<string, unknown> | null;
   audio: readonly Int16Array[];
   samples: number;
+  /** The furthest word the take's `at` and `said` frames reached. */
+  reached: number | null;
   /** `done`'s result. */
   result: Record<string, unknown> | null;
   /** The take's frames in order (held only for a kept take). */

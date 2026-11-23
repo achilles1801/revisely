@@ -22,6 +22,7 @@ import { getReadPalette } from '../../theme/readPalette';
 import { spacing } from '../../theme/spacing';
 import { CAPSULE_HEIGHT } from '../reader/PlayerCapsule';
 import { UndoToast } from '../revision/UndoToast';
+import { isATake } from '../../lib/reciteLive/takeEnough';
 import { toAyahRef } from '../../lib/verses';
 import { ayahKey, ayahsBetween } from '../../lib/ayahKeys';
 import type { AyahRef } from '../../lib/ayahBounds';
@@ -277,6 +278,7 @@ export function useReciteLayer({
       .catch((err) => logger.warn('The word data did not load (the reader’s live check)', err));
   }, [liveOn, words]);
   const qw = live.words ?? words;
+  const [tooShort, setTooShort] = useState(false);
   const [hidden, setHidden] = useState(false);
   const [revealed, setRevealed] = useState<Revealed>(NOTHING_SHOWN);
   // Words shown by hand during the take (‹, ‹‹): kept in quiet grey on the page, listed in the summary, drilled, and kept
@@ -784,7 +786,10 @@ export function useReciteLayer({
     const run = testRef.current;
     if (run) {
       stopTrace.end();
-      const results = [...run.results.slice(0, run.at), testResult(run.places[run.at], live.state, peeked.size)];
+      // Less than an ayah (RECITE-27): this place wasn't recited, and nothing of it is kept.
+      const place = run.places[run.at];
+      const result = qw && !isATake(live.state, qw, live.links) ? { place, outcome: 'missed' as const, marks: [], peeked: peeked.size } : testResult(place, live.state, peeked.size);
+      const results = [...run.results.slice(0, run.at), result];
       if (run.at + 1 >= run.places.length) endTest(results);
       else setTest({ ...run, results });
       return;
@@ -796,6 +801,14 @@ export function useReciteLayer({
       live.clear();
       // Said to screen reader users only (everyone else: nothing).
       if (screenReader) say(t('reciteLive.layer.startNotFound'));
+      return;
+    }
+    // Less than an ayah isn't a take (RECITE-27): no summary, just a word on why.
+    if (qw && !isATake(live.state, qw, live.links)) {
+      stopTrace.end();
+      live.clear();
+      setTooShort(true);
+      if (screenReader) say(t('reciteLive.layer.tooShort'));
       return;
     }
     // Nothing opens by itself (Majd, Nov 22 2026: "nothing pops up in my face at any time"; Tarteel leaves the page as it
@@ -1328,6 +1341,12 @@ export function useReciteLayer({
             if (back === 'summary' && live.state.status === 'done' && takeId) setSummaryShown(takeId);
             if (back === 'past' && showing) setPastOpen(true);
           }}
+        />
+        <UndoToast
+          visible={tooShort}
+          message={t('reciteLive.layer.tooShort')}
+          onDismiss={() => setTooShort(false)}
+          bottomInset={insets.bottom - spacing.sm}
         />
         <UndoToast
           visible={clearedUndo != null}

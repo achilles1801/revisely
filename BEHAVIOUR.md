@@ -761,6 +761,12 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   (Majd, Nov 22 2026: "i just need to have the link to send to my friends"), and the Testing page shows only to
   testers, so before this they had no way to turn it off. The store app never shows it: production's checker keeps
   nothing.
+- **RECITE-27.** (Revisely Dev) A take needs at least one ayah recited, in every mode, on the server and on the phone.
+  Less than that (the mic pressed for two seconds, nothing said) isn't a take: no summary, a short line saying to recite
+  at least one ayah, nothing in Activity, Insights or Revo, no remembered marks and no saved audio. In Test me that place
+  counts as not recited. An ayah too long to finish counts from about a line of the mushaf (9 words). A take that came
+  in partway through an ayah needs the next one whole, or those 9 words. (Majd, Nov 23 2026: "atleast one verse has to
+  be recited".)
 ## Recite insights
 
 What a user's takes with Mark mistakes show over time, and Revo knowing it (Majd, Nov 16 2026).
