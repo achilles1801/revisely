@@ -498,6 +498,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     text: lines(
       '- Settings → Testing → “On-device model” is the Revisely team’s bench: it times Recite’s model on this phone (per 4-second window; the mark is under 150 ms at p95), with memory and heat, and “Long run” adds battery.',
       '- “Stub” under the phone’s name means this build has no on-device engine. Results go to the team without their account or audio.',
+      '- With Recite’s pack on the phone, the screen also shows a “Self-check” line: whether the models compute the expected numbers on this phone. It is sent to the team once per pack and app update.',
     ),
   },
   {
@@ -506,7 +507,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['ONDEV-2', 'ONDEV-3'],
     routes: ['Settings'],
     text: lines(
-      '- Settings → Downloads and storage → “Recite on the phone” downloads what lets Recite check on the phone (about 50 MB), encrypted and out of backups. For now Recite still checks on the server.',
+      '- Settings → Downloads and storage → “Recite on the phone” downloads what lets Recite check on the phone (about 50 MB), encrypted and out of backups. A build with the engine uses it for takes Settings → Testing sends to this phone.',
       '- It starts when they open the reader, on Wi-Fi unless “Download over mobile data” is on. Its menu has Download now and Remove. Some accounts don’t have it yet.',
     ),
   },
@@ -517,7 +518,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     routes: ['Settings'],
     text: lines(
       '- “Recite runs on”: Automatic (the team’s setting, the server for now), This phone or The server. The line under it says where the next take runs and why.',
-      '- A take the phone’s engine can’t run goes to the server by itself, with nothing lost. A take on the phone isn’t kept as test data yet.',
+      '- A take the engine can’t run goes to the server by itself. Automatic needs a short speed check while idle; a take that falls behind slows the next ones.',
     ),
   },
 ];

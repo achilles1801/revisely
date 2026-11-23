@@ -44,6 +44,9 @@ public class ReciteEngineModule: Module {
     /// Which engine this build linked: recite-core or its stub (core/fetch.js), as JSON.
     Function("coreInfo") { () -> String in RECCore.infoJSON() }
 
+    /// The highest the app's memory has been since it started, in MB (what iOS counts against it).
+    Function("memoryPeakMb") { () -> Double in RECBench.peakFootprintMb() }
+
     // The engine (recite_core.h) on its own thread: RECEngine. A take's frames come back as onEngineFrames.
 
     /// Opens the engine from named files ({name, path}), read into memory. Resolves {ok, code, error, info}.
@@ -56,12 +59,30 @@ public class ReciteEngineModule: Module {
       RECEngine.shared.openFiles(plain, options: options) { promise.resolve($0) }
     }
 
+    /// Opens the engine from Recite's pack: decrypted and checked here (the key stays in native memory), then read in
+    /// place by the engine, which holds the blobs until rc_release; they are wiped and freed then. Resolves {ok, code,
+    /// error, info}; code -20 means its files failed the reader's checks here, before `rc_open` (a damaged file, a lost key).
+    AsyncFunction("enginePackOpen") { (dir: String, packId: String, parts: [String], options: String, promise: Promise) in
+      let path = ReciteEngineModule.plainPath(dir)
+      DispatchQueue.global(qos: .userInitiated).async {
+        do {
+          let blobs = try RecitePackStore.open(dir: path, packId: packId, parts: parts)
+          let items = blobs.map { RECEngineBlob(name: $0.name, bytes: $0.data, size: UInt($0.room)) }
+          // Swift's name for openBlobs:owner:options:done:
+          RECEngine.shared.open(items, owner: blobs, options: options) { promise.resolve($0) }
+        } catch {
+          let text = "\(error)"
+          promise.resolve(["ok": false, "code": text.hasPrefix("no memory") ? -3 : -20, "error": text])
+        }
+      }
+    }
+
     /// rc_info's JSON while the engine is open.
     Function("engineInfo") { () -> String? in RECEngine.shared.info }
 
     /// Starts a take from the contract's start frame. Resolves {take} or {code, error}.
-    AsyncFunction("engineStart") { (frame: String, promise: Promise) in
-      RECEngine.shared.startTake(frame) { promise.resolve($0) }
+    AsyncFunction("engineStart") { (frame: String, hop: Double, promise: Promise) in
+      RECEngine.shared.startTake(frame, hop: hop) { promise.resolve($0) }
     }
 
     /// The bytes are copied here: the array is JavaScript's, and the engine's thread reads them later.
@@ -74,6 +95,20 @@ public class ReciteEngineModule: Module {
     Function("engineFinish") { (take: Int) in RECEngine.shared.finishTake(take) }
 
     Function("engineClose") { (take: Int) in RECEngine.shared.closeTake(take) }
+
+    /// Samples [s0, s1) of an open take as base64, for the teacher's clips; null if they aren't there.
+    AsyncFunction("engineClip") { (take: Int, s0: Double, s1: Double, promise: Promise) in
+      guard let from = Int64(exactly: s0), let to = Int64(exactly: s1) else {
+        promise.resolve(nil)
+        return
+      }
+      RECEngine.shared.clipTake(take, from: from, to: to) { promise.resolve($0) }
+    }
+
+    /// One model call on the pack's check input, timed: its ms, or null when it can't run.
+    AsyncFunction("engineProbe") { (promise: Promise) in
+      RECEngine.shared.probe { ms in promise.resolve(ms >= 0 ? ms : nil) }
+    }
 
     AsyncFunction("engineRelease") { (promise: Promise) in
       RECEngine.shared.releaseEngine { promise.resolve(nil) }

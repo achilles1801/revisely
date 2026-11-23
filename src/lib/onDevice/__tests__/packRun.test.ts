@@ -5,7 +5,7 @@ import { setNetworkState, __resetNetworkStateForTests } from '../../networkState
 import {
   __resetPackForTests,
   downloadPackNow,
-  dropBadPack,
+  dropBadPack, refetchDamagedPack,
   getPackStatus,
   packForEngine,
   preparePack,
@@ -316,6 +316,65 @@ describe('Recite’s pack on the phone', () => {
     await run(); // a new pack is fetched
     expect(packForEngine()?.packId).toBe('v7m-2');
     later.mockRestore();
+  });
+
+  it('a pack one engine refused is fetched again once the app has another engine', async () => {
+    const carrying = (version: string) =>
+      Object.assign({}, engine, { coreInfo: () => JSON.stringify({ version, abi: 1, headerAbi: 1, stub: false, selfTest: 'skipped' }) });
+    mockEngine = carrying('recite-core 0.2.0');
+    await run();
+    await dropBadPack('v7m-1');
+    mockCall.mockClear();
+    await run(); // the same engine: not asked
+    expect(mockCall).not.toHaveBeenCalled();
+    expect(packForEngine()).toBeNull();
+
+    mockEngine = carrying('recite-core 0.3.0');
+    await run();
+    expect(mockCall).toHaveBeenCalledTimes(1);
+    expect(packForEngine()?.packId).toBe('v7m-1');
+  });
+
+  it.each([
+    ['with no engine named (a build from before this rule)', {}],
+    ['under the replay stand-in', { badPackEngine: 'recite-core 0.1.0 (replay)' }],
+  ])('a block recorded %s doesn’t stop the real engine getting a clean download', async (_name, block) => {
+    await AsyncStorage.setItem('@revisely_recite_pack:v1', JSON.stringify({ auto: true, have: null, checkedAt: Date.now(), badPack: 'v7m-1', ...block }));
+    mockEngine = Object.assign({}, engine, {
+      coreInfo: () => JSON.stringify({ version: 'recite-core 0.2.0', abi: 1, headerAbi: 1, stub: false, selfTest: 'skipped' }),
+    });
+    await run();
+    expect(mockCall).toHaveBeenCalledTimes(1); // at once, not at the next daily check
+    expect(mockDownload).toHaveBeenCalled();
+    expect(packForEngine()?.packId).toBe('v7m-1');
+  });
+
+  it('a pack damaged on the phone is deleted and fetched again, twice at most for a version', async () => {
+    await run();
+    for (let i = 0; i < 2; i++) {
+      mockDownload.mockClear();
+      await refetchDamagedPack('v7m-1');
+      await settle();
+      expect(mockDownload).toHaveBeenCalled();
+      expect(packForEngine()?.packId).toBe('v7m-1');
+    }
+    mockDownload.mockClear();
+    await refetchDamagedPack('v7m-1');
+    await settle();
+    expect(mockDownload).not.toHaveBeenCalled();
+    expect(packForEngine()).toBeNull();
+    expect(getPackStatus().phase).toBe('unavailable');
+  });
+
+  it('fetching a damaged pack again keeps to the mobile-data setting', async () => {
+    await run();
+    setNetworkState(cellular);
+    mockDownload.mockClear();
+    await refetchDamagedPack('v7m-1');
+    await settle();
+    expect(mockDownload).not.toHaveBeenCalled();
+    expect(packForEngine()).toBeNull();
+    expect(getPackStatus().phase).toBe('waiting-for-wifi');
   });
 
   it('Download now tries a refused pack again', async () => {

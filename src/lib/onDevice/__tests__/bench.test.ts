@@ -47,6 +47,15 @@ describe('the on-device bench’s manifest', () => {
     expect(bad((c) => delete c.tolerance)).toBeNull();
     expect(bad((c) => (c.plans.ios[0].fromMemory = 'yes'))).toBeNull();
     expect(bad((c) => (c.plans.ios[0].alsoModel = 'v9-any'))).toBeNull();
+    expect(bad((c) => (c.testLab = { plans: [], windows: 200, longSec: 0 }))).toBeNull();
+    expect(bad((c) => (c.testLab = { plans: [{ model: 'v7m-live-r16', provider: 'cpu', threads: 2 }], windows: 0, longSec: 0 }))).toBeNull();
+  });
+
+  it('reads Test Lab’s section when there is one (the OBB’s own bench.json)', () => {
+    const copy = JSON.parse(JSON.stringify(raw));
+    copy.testLab = { plans: [{ model: 'v7m-live-r16', provider: 'cpu', threads: 2 }], windows: 200, longSec: 300.5 };
+    expect(parseManifest(copy)!.testLab).toEqual({ plans: [{ model: 'v7m-live-r16', provider: 'cpu', threads: 2 }], windows: 200, longSec: 300 });
+    expect(parseManifest(raw)!.testLab).toBeUndefined();
   });
 
   it('downloads only what the chosen runs need, each file once', () => {

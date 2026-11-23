@@ -42,7 +42,7 @@ describe('ReciteWhereRow', () => {
   });
 
   it.each([
-    [{ on: 'phone', why: 'forced' }, 'Next take: on this phone. It won’t be kept as test data yet'],
+    [{ on: 'phone', why: 'forced' }, 'Next take: on this phone'],
     [{ on: 'phone', why: 'replay' }, 'Next take: a recorded take, played on this phone'],
     [{ on: 'server', why: 'config' }, 'Next take: on the server'],
     [{ on: 'server', why: 'no-pack' }, 'Next take: on the server. No engine on this phone yet'],

@@ -599,7 +599,7 @@ service cloud.firestore {
              // Where it was checked and why (ONDEV-4, Revisely Dev): the app's closed list (lib/reciteLive/where).
              d.get('ranOn', 'phone') in ['phone', 'server'] &&
              d.get('ranWhy', 'config') in ['forced', 'pin', 'config', 'no-pack', 'self-check', 'lacks', 'slow', 'no-speed',
-                                           'refused', 'replay'] &&
+                                           'demoted', 'refused', 'replay'] &&
              // A recitation longer than the checker's cap: its takes, each one's id and first word (RECITE-22).
              (!('links' in d) || (d.links is list && d.links.size() >= 2 && d.links.size() <= 20)) &&
              // The words shown by hand during the take, for its summary later (RMEM-8): their numbers.

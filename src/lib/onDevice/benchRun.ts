@@ -4,6 +4,7 @@
 // bench, sent to Firestore's onDeviceBench (create only: device and timings, no account, no audio).
 
 import { AppState, Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Directory, File, Paths } from 'expo-file-system';
 import { createDownloadResumable } from 'expo-file-system/legacy';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
@@ -13,6 +14,7 @@ import type { BenchResult, DeviceInfo } from '../../../modules-dev/recite-engine
 import { db } from '../firebase';
 import { logger } from '../logger';
 import { currentRelease } from '../releaseInfo';
+import { benchStarted } from './benchBusy';
 import { authHeaders, bucketName, objectUrl } from '../recordingCloud';
 import { isDevVariant } from '../variant';
 import {
@@ -29,6 +31,7 @@ import {
   type PlanSpec,
   type RunSummary,
 } from './bench';
+import { selfCheckRun, type SelfCheck } from './selfCheck';
 
 export const MANIFEST_PATH = 'models/recite/bench.json';
 const ROOT = 'models/recite';
@@ -189,6 +192,7 @@ export async function runPlan(
   const startT = Date.now();
   const changes: { t: number; state: string }[] = [];
   const stateSub = AppState.addEventListener('change', (state) => changes.push({ t: Date.now(), state }));
+  const benchEnded = benchStarted();
   try {
     const result = await engine.bench({
       model: files[model.file],
@@ -228,6 +232,7 @@ export async function runPlan(
       ...(disturbed ? { interrupted: disturbed } : {}),
     };
   } finally {
+    benchEnded();
     stateSub.remove();
     sub.remove();
   }
@@ -303,7 +308,38 @@ export function benchRecord(device: DeviceInfo, windows: number, runs: readonly 
 
 export type BenchRecord = ReturnType<typeof benchRecord>;
 
-export async function sendBenchRecord(record: BenchRecord): Promise<string> {
+/** A record of the engine's self-check alone: a run entry of its own, so firestore.rules needs no new field. */
+export function selfCheckRecord(device: DeviceInfo, check: SelfCheck) {
+  return { ...benchRecord(device, 1, []), runs: [selfCheckRun(check)] };
+}
+
+export async function sendBenchRecord(record: BenchRecord | ReturnType<typeof selfCheckRecord>): Promise<string> {
   const ref = await addDoc(collection(db, 'onDeviceBench'), { ...record, createdAt: serverTimestamp() });
   return ref.id;
+}
+
+const SELF_CHECK_SENT = '@revisely_bench_self_check_sent';
+
+export interface SelfCheckResult {
+  check: SelfCheck;
+  sendError: string | null;
+}
+
+/** This phone's self-check, sent once per pack, app update and outcome; null with no pack here. */
+export async function recordSelfCheck(device: DeviceInfo): Promise<SelfCheckResult | null> {
+  const { engineSelfCheck } = require('./engine') as typeof import('./engine');
+  const check = await engineSelfCheck();
+  if (!check) return null;
+  const release = currentRelease();
+  const key = [check.packId, release.build ?? '', release.updateId ?? '', String(check.ok)].join('|');
+  try {
+    if ((await AsyncStorage.getItem(SELF_CHECK_SENT)) !== key) {
+      await sendBenchRecord(selfCheckRecord(device, check));
+      await AsyncStorage.setItem(SELF_CHECK_SENT, key);
+    }
+    return { check, sendError: null };
+  } catch (err) {
+    logger.warn('Self-check record not sent', err);
+    return { check, sendError: err instanceof Error ? err.message : String(err) };
+  }
 }

@@ -1638,7 +1638,10 @@ shows up once and they must go through it and complete it … just the main stuf
 - **ONDEV-1.** Settings → Testing → On-device model times Recite's model on this phone, the first step to checking
   recitation on the phone instead of the server (Majd, Nov 23 2026). Under the phone's name it says which Recite engine
   this build carries: its version, "stub (server path)" for a build without the private engine, or that its self-test
-  failed. It lists this platform's runs from the dev
+  failed. With Recite's pack on the phone it opens the engine once, shows the load-time self-check (for each of v7 and v5,
+  the largest difference and the frames with another top sound), closes the engine before any run so the runs' memory
+  doesn't carry it, and sends the result once per pack and app update, a failed check or a refused open included, with
+  the pack's id, the chip, ONNX Runtime's version and whether each model loaded with prepacking. It lists this platform's runs from the dev
   backend (each a model file, a processor (CPU, Core ML, XNNPACK or NNAPI) and a thread count; all chosen, any left
   out), downloads what the chosen runs need once (only for accounts the team has given bench access: Revisely Dev is open
   to anyone with its link; the models are the watermarked ones; each file checked by size and SHA-256, kept on the
@@ -1653,8 +1656,11 @@ shows up once and they must go through it and complete it … just the main stuf
   and notes the battery, the thermal state and the window times each minute: it says whether the phone got hot
   (serious or worse), whether the last minute was within 20% of the first, and the battery's drop an hour (nothing on
   a charger). A run the app left the foreground during, or that the phone suspended, says so on its result and in its record: its times leave out the suspended windows, it names the longest clean stretch, and it gives no battery rate. A battery drop under two of the phone's steps (iOS reports five points at a time) gives no rate either. A run that fails says why and the others go on. The results go to the dev backend (the phone's model,
-  chip, cores and memory, the build, each run's numbers; never the account or any audio) and can be shared. The store
-  app has none of it: the native module is linked into Revisely Dev's builds only.
+  chip, cores and memory, the build, each run's numbers; never the account or any audio) and can be shared. On Firebase
+  Test Lab's Android phones, launched by its game loop, the same runs go with nobody signed in: from the files pushed
+  with the test (each checked by SHA-256), the record written to the test's results after every run, and the app
+  closing at the end. No other launch does it. The store app has none of it: the native module is linked into
+  Revisely Dev's builds only.
 - **ONDEV-4.** A take runs on the phone's engine or on the checker's server, one pipeline in two places with the same
   frames, chosen per take: this phone's choice (Settings → Testing → Recite runs on: Automatic, This phone, The server),
   else the account's pin (`entitlements/{uid}.reciteWhere`, which no client can write), else `config/app.recite.where`
@@ -1664,8 +1670,16 @@ shows up once and they must go through it and complete it … just the main stuf
   then gets the take whole, its audio and controls in order, and the reciter sees nothing of it. Once the engine has
   said `ready`, a failure ends the take as an error. The engine's `clip` and `health` frames never reach the take's
   state. Every take's record says where it ran and why (`ranOn`, `ranWhy`: who chose, or what kept it off the phone), and a take
-  on the server tells its take line why. A take on the phone isn't kept as test data yet, and Settings → Testing says so.
-  Revisely Dev only.
+  on the server tells its take line why. A take on the phone sends one health line after it ends, numbers only, and
+  with Keep my recitations as test data on, its audio and result once its final answer has come; a failure there is
+  never shown and never retried. `auto` uses the phone only after its speed check: one model call at a live take's pace,
+  warmed up, on an idle, cool phone with no power saving, kept per pack, engine, device and threads. Under about 150 ms
+  at p95 it runs the 0.5 s hop, up to about 400 ms the 1 s hop, over that the server. A take that falls behind (over 5%
+  of its hops late, or over 2 s of lag) is never changed itself: the next take runs one step slower, until a clean check
+  on a later launch. An engine that asks for it gets the teacher's second opinion as marks appear: its clips go to the
+  server a few at a time, and each verdict goes back to the engine. A clip not answered, for any reason, leaves the
+  phone's mark standing, and offline nothing is sent. At Stop no new clip goes: the take waits at most 1 s for the
+  verdicts already on their way, then ends. Revisely Dev only.
 
 - **ONDEV-2.** Recite's pack (the model and its tables, sealed) reaches a phone only through the server's `recitePack`:
   signed in, App Check from the Revisely Dev app, the pack's access claim, at most 6 calls and 3 device keys an account a
@@ -1677,7 +1691,13 @@ shows up once and they must go through it and complete it … just the main stuf
   under the offline mushaf's rules: Wi-Fi unless "Download over mobile data" is on or one Download now allowed it. It
   stays sealed on disk and out of iCloud and Android backups. A new pack comes beside the old one, which stays in use
   until the new one's core part is whole. Remove deletes it all and keeps it off until Download now. An account the
-  team hasn't given access is told it isn't available yet.
+  team hasn't given access is told it isn't available yet. Once the core part is whole, a build with the real engine
+  opens it for takes that may run on the phone (ONDEV-4): decrypted only in native memory, wiped when the engine closes;
+  a build with the stub or the replay stand-in never decrypts it, so neither can call a pack bad. A pack the real engine
+  refuses as bad data is deleted and that version isn't fetched again until a new version, an app update with another
+  engine, or Download now, and takes stay on the server. A pack whose files fail their check on the phone as it opens
+  (a damaged file, a lost key) isn't the engine's refusal: it is deleted and fetched again on the usual network rules,
+  at most twice for a version, and takes stay on the server meanwhile.
 
 ## Premium early access
 

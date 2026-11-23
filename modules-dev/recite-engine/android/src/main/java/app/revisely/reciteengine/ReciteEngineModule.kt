@@ -10,8 +10,12 @@ import expo.modules.kotlin.Promise
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import expo.modules.kotlin.typedarray.Int16Array
+import android.net.Uri
 import java.io.File
 import java.io.FileInputStream
+import java.io.FileOutputStream
+import java.nio.ByteBuffer
+import java.util.zip.ZipFile
 import java.security.MessageDigest
 import kotlin.concurrent.thread
 
@@ -26,7 +30,7 @@ class ReciteEngineModule : Module() {
   private val engine by lazy {
     EngineHost { take, frames, code ->
       sendEvent("onEngineFrames", mapOf("take" to take, "frames" to frames, "code" to code))
-    }
+    }.also { it.thermal = ::thermalNumber }
   }
 
   override fun definition() = ModuleDefinition {
@@ -48,11 +52,15 @@ class ReciteEngineModule : Module() {
         "coreMaxMHz" to coreMaxMHz(),
         "memoryMb" to memory.totalMem / 1048576.0,
         "thermal" to thermal(),
+        "lowPower" to ((context?.getSystemService(Context.POWER_SERVICE) as? PowerManager)?.isPowerSaveMode == true),
       )
     }
 
     // Which engine this build linked: recite-core or its stub (core/fetch.js), as JSON.
     Function("coreInfo") { ReciteCoreNative.infoJson() }
+
+    // The highest the app's resident memory has been since it started, in MB (VmHWM); 0 where it can't be read.
+    Function("memoryPeakMb") { peakMemoryMb() }
 
     // The engine (recite_core.h) on its own thread: EngineHost. A take's frames come back as onEngineFrames.
 
@@ -62,12 +70,77 @@ class ReciteEngineModule : Module() {
       engine.open(plain, options) { promise.resolve(it) }
     }
 
+    // Opens the engine from Recite's pack: decrypted and checked here (the key stays in native memory), then read in
+    // place by the engine, which holds the blobs until rc_release; they are wiped and freed then. Resolves {ok, code,
+    // error, info}; code -20 means its files failed the reader's checks here, before rc_open (a damaged file, a lost key).
+    AsyncFunction("enginePackOpen") { dir: String, packId: String, parts: List<String>, options: String, promise: Promise ->
+      thread(name = "recite-pack") {
+        if (!ReciteCoreNative.available) {
+          promise.resolve(mapOf("ok" to false, "code" to -3, "error" to "the native library didn't load"))
+          return@thread
+        }
+        val memory = ArrayList<ByteBuffer>()
+        val blobs = try {
+          RecitePackStore.open(plainPath(dir), packId, parts) { _, room ->
+            ReciteCoreNative.allocBlob(room)?.also { memory.add(it) }
+          }
+        } catch (e: Exception) {
+          memory.forEach { ReciteCoreNative.freeBlob(it) }
+          val text = e.message ?: "the pack didn't open"
+          promise.resolve(mapOf("ok" to false, "code" to if (text.startsWith("no memory")) -3 else -20, "error" to text))
+          return@thread
+        }
+        engine.openBlobs(blobs.map { it.name }, blobs.map { it.data }, options, {
+          blobs.forEach { it.wipe() }
+          memory.forEach { ReciteCoreNative.freeBlob(it) }
+        }) { promise.resolve(it) }
+      }
+    }
+
+    // Test Lab's self-check: the engine from plain, watermarked blobs in the OBB (no account there, so no pack key). Each
+    // goes in a direct buffer of its `room`, as a pack's do, since the engine widens the weights in place.
+    AsyncFunction("engineOpenRooms") { items: List<Map<String, Any>>, options: String, promise: Promise ->
+      thread(name = "recite-rooms") {
+        if (!ReciteCoreNative.available) {
+          promise.resolve(mapOf("ok" to false, "code" to -3, "error" to "the native library didn't load"))
+          return@thread
+        }
+        val names = ArrayList<String>(items.size)
+        val memory = ArrayList<ByteBuffer>(items.size)
+        try {
+          for (item in items) {
+            val name = item["name"] as String
+            val file = File(plainPath(item["path"] as String))
+            val size = file.length()
+            val room = (item["room"] as Number).toLong()
+            if (room < size || room > Int.MAX_VALUE) throw IllegalArgumentException("$name: room")
+            val buffer = ReciteCoreNative.allocBlob(room.toInt()) ?: throw IllegalStateException("no memory for $name")
+            memory.add(buffer)
+            names.add(name)
+            buffer.limit(size.toInt())
+            FileInputStream(file).channel.use { channel ->
+              while (buffer.hasRemaining()) {
+                if (channel.read(buffer) < 0) throw IllegalStateException("$name: cut short")
+              }
+            }
+            buffer.clear()
+          }
+        } catch (e: Exception) {
+          memory.forEach { ReciteCoreNative.freeBlob(it) }
+          val text = e.message ?: "the files didn't open"
+          promise.resolve(mapOf("ok" to false, "code" to if (text.startsWith("no memory")) -3 else -2, "error" to text))
+          return@thread
+        }
+        engine.openBlobs(names, memory, options, { memory.forEach { ReciteCoreNative.freeBlob(it) } }) { promise.resolve(it) }
+      }
+    }
+
     // rc_info's JSON while the engine is open.
     Function("engineInfo") { engine.info }
 
     // Starts a take from the contract's start frame. Resolves {take} or {code, error}.
-    AsyncFunction("engineStart") { frame: String, promise: Promise ->
-      engine.start(frame) { promise.resolve(it) }
+    AsyncFunction("engineStart") { frame: String, hop: Double, promise: Promise ->
+      engine.start(frame, hop) { promise.resolve(it) }
     }
 
     // The bytes are copied here: the array is JavaScript's, and the engine's thread reads them later.
@@ -93,8 +166,79 @@ class ReciteEngineModule : Module() {
       Unit
     }
 
+    // Samples [s0, s1) of an open take as base64, for the teacher's clips; null if they aren't there.
+    AsyncFunction("engineClip") { take: Int, s0: Double, s1: Double, promise: Promise ->
+      engine.clip(take, s0.toLong(), s1.toLong()) { promise.resolve(it) }
+    }
+
+    // One model call on the pack's check input, timed: its ms, or null when it can't run.
+    AsyncFunction("engineProbe") { promise: Promise ->
+      engine.probe { promise.resolve(it) }
+    }
+
     AsyncFunction("engineRelease") { promise: Promise ->
       engine.release { promise.resolve(null) }
+    }
+
+    // Firebase Test Lab's game loop (no sign-in on its phones): the launch intent's action, scenario and results file.
+    Function("testLoop") {
+      val intent = appContext.currentActivity?.intent ?: return@Function null
+      if (intent.action != "com.google.intent.action.TEST_LOOP") return@Function null
+      mapOf("scenario" to intent.getIntExtra("scenario", 0), "results" to intent.data?.toString())
+    }
+
+    // The bench's files, pushed by Test Lab as the app's OBB (a zip), unpacked once into the cache; resolves to the folder.
+    AsyncFunction("unpackObb") { promise: Promise ->
+      thread(name = "recite-obb") {
+        try {
+          val ctx = context ?: throw IllegalStateException("no context")
+          val obb = ctx.obbDir?.listFiles()?.firstOrNull { it.name.endsWith(".obb") }
+            ?: throw IllegalStateException("no OBB in ${ctx.obbDir}")
+          val out = File(ctx.cacheDir, "recite-bench-obb")
+          val mark = File(out, ".from")
+          val stamp = "${obb.name}:${obb.length()}:${obb.lastModified()}"
+          if (!(mark.exists() && mark.readText() == stamp)) {
+            out.deleteRecursively()
+            out.mkdirs()
+            ZipFile(obb).use { zip ->
+              for (entry in zip.entries()) {
+                val target = File(out, entry.name)
+                if (!target.canonicalPath.startsWith(out.canonicalPath + File.separator)) continue
+                if (entry.isDirectory) {
+                  target.mkdirs()
+                  continue
+                }
+                target.parentFile?.mkdirs()
+                zip.getInputStream(entry).use { input -> FileOutputStream(target).use { input.copyTo(it, 1 shl 20) } }
+              }
+            }
+            mark.writeText(stamp)
+          }
+          promise.resolve(out.absolutePath)
+        } catch (e: Exception) {
+          promise.reject("ERR_OBB", e.message ?: "unpack failed", e)
+        }
+      }
+    }
+
+    // Writes (replaces) the game loop's results file, given by Test Lab as a content URI.
+    AsyncFunction("writeTestLoopResult") { uri: String, text: String, promise: Promise ->
+      thread(name = "recite-loop-result") {
+        try {
+          val resolver = context?.contentResolver ?: throw IllegalStateException("no context")
+          resolver.openFileDescriptor(Uri.parse(uri), "wt")?.use { fd ->
+            FileOutputStream(fd.fileDescriptor).use { it.write(text.toByteArray(Charsets.UTF_8)) }
+          } ?: throw IllegalStateException("can't open $uri")
+          promise.resolve(null)
+        } catch (e: Exception) {
+          promise.reject("ERR_LOOP_RESULT", e.message ?: "write failed", e)
+        }
+      }
+    }
+
+    // Ends the game loop: Test Lab takes the app closing as the test finishing.
+    Function("finishTestLoop") {
+      appContext.currentActivity?.let { activity -> activity.runOnUiThread { activity.finishAndRemoveTask() } }
     }
 
     // A file's SHA-256 (hex), read in 1 MB pieces.
@@ -245,6 +389,20 @@ class ReciteEngineModule : Module() {
 
   /** The process's proportional set size in MB (its share of the memory it touches). */
   private fun memoryMb(): Double = Debug.getPss() / 1024.0
+
+  private fun peakMemoryMb(): Double = try {
+    File("/proc/self/status").useLines { lines -> lines.firstOrNull { it.startsWith("VmHWM:") } }
+      ?.trim()?.split(Regex("\\s+"))?.getOrNull(1)?.toDoubleOrNull()?.div(1024.0) ?: 0.0
+  } catch (e: Exception) {
+    0.0
+  }
+
+  /** The thermal status as a number for a take's health line; -1 before Android 10. */
+  private fun thermalNumber(): Int {
+    if (Build.VERSION.SDK_INT < 29) return -1
+    val pm = context?.getSystemService(Context.POWER_SERVICE) as? PowerManager ?: return -1
+    return pm.currentThermalStatus
+  }
 
   private fun thermal(): String {
     if (Build.VERSION.SDK_INT < 29) return "unknown"

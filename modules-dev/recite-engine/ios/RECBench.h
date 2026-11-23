@@ -13,6 +13,9 @@ NS_ASSUME_NONNULL_BEGIN
 /** The app's memory footprint in MB (what iOS counts against it). */
 + (double)footprintMb;
 
+/** The highest that footprint has been since the app started, in MB; 0 where iOS doesn't report it. */
++ (double)peakFootprintMb;
+
 @end
 
 NS_ASSUME_NONNULL_END

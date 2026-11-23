@@ -1,9 +1,11 @@
 package app.revisely.reciteengine
 
+import android.util.Base64
 import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * recite_core.h on one background thread: every call on the engine and its takes runs there, in the order made, so
@@ -14,7 +16,15 @@ internal class EngineHost(private val emit: (take: Int, frames: List<String>, co
   private val queue = Executors.newSingleThreadExecutor { r -> Thread(r, "recite-engine") }
   private var engine = 0L
   private val takes = HashMap<Int, Long>()
+  private val meters = HashMap<Int, DoubleArray>()
+
+  /** Samples handed over and not yet finished: the JS thread adds, this queue takes off. */
+  private val waiting = AtomicLong()
   private var next = 1
+
+  /** PowerManager's thermal status as a number; negative where the phone gives none. */
+  @Volatile
+  var thermal: () -> Int = { -1 }
 
   /** Frees the memory of blobs the engine read without copying; run once rc_release has returned. */
   private var releaseBlobs: (() -> Unit)? = null
@@ -91,7 +101,7 @@ internal class EngineHost(private val emit: (take: Int, frames: List<String>, co
   }
 
   /** Starts a take from the contract's start frame. */
-  fun start(frame: String, done: (Map<String, Any?>) -> Unit) = queue.execute {
+  fun start(frame: String, hop: Double, done: (Map<String, Any?>) -> Unit) = queue.execute {
     if (engine == 0L) {
       done(mapOf("code" to RC_ERR_STATE, "error" to "the engine isn't open"))
       return@execute
@@ -105,15 +115,29 @@ internal class EngineHost(private val emit: (take: Int, frames: List<String>, co
     }
     val take = next++
     takes[take] = session
+    ReciteCoreNative.meterStart(hop, thermal())?.let { meters[take] = it }
     // Before its first frame: JavaScript has the take's number by the time `ready` reaches it.
     done(mapOf("take" to take))
     drain(take, session, 0)
   }
 
   /** 16 kHz mono 16-bit little-endian samples. */
-  fun feed(take: Int, pcm: ByteArray) = queue.execute {
-    val session = takes[take] ?: return@execute
-    drain(take, session, ReciteCoreNative.feed(session, pcm, pcm.size / 2))
+  fun feed(take: Int, pcm: ByteArray) {
+    val samples = pcm.size / 2
+    waiting.addAndGet(samples.toLong())
+    queue.execute {
+      val session = takes[take]
+      if (session == null) {
+        waiting.addAndGet(-samples.toLong())
+        return@execute
+      }
+      val t0 = System.nanoTime()
+      val r = ReciteCoreNative.feed(session, pcm, samples)
+      val ms = (System.nanoTime() - t0) / 1e6
+      val behind = waiting.getAndAdd(-samples.toLong())
+      meters[take]?.let { ReciteCoreNative.meterFed(it, samples, ms, behind) }
+      drain(take, session, r)
+    }
   }
 
   fun control(take: Int, frame: String) = queue.execute {
@@ -123,12 +147,32 @@ internal class EngineHost(private val emit: (take: Int, frames: List<String>, co
 
   fun finish(take: Int) = queue.execute {
     val session = takes[take] ?: return@execute
-    drain(take, session, ReciteCoreNative.finish(session))
+    val r = ReciteCoreNative.finish(session)
+    drain(take, session, r, meters[take]?.let { ReciteCoreNative.meterFrame(it, thermal()) })
   }
 
   fun close(take: Int) = queue.execute {
     val session = takes.remove(take) ?: return@execute
+    meters.remove(take)
     ReciteCoreNative.close(session)
+  }
+
+  /** Samples [s0, s1) of an open take as base64 of 16-bit little-endian PCM; null if the take is gone or they aren't there. */
+  fun clip(take: Int, s0: Long, s1: Long, done: (String?) -> Unit) = queue.execute {
+    val bytes = takes[take]?.let { ReciteCoreNative.clip(it, s0, s1) }
+    done(bytes?.let { Base64.encodeToString(it, Base64.NO_WRAP) })
+  }
+
+  /** One model call on the pack's check input, timed: its ms, or null with no engine, a take open or no check input. */
+  fun probe(done: (Double?) -> Unit) = queue.execute {
+    // Never beside a take: rc_probe mustn't run during an rc_feed, and its time would say nothing.
+    if (engine == 0L || takes.isNotEmpty()) {
+      done(null)
+      return@execute
+    }
+    val t0 = System.nanoTime()
+    val r = ReciteCoreNative.probe(engine)
+    done(if (r == 0) (System.nanoTime() - t0) / 1e6 else null)
   }
 
   /** Closes every take and the engine. */
@@ -140,6 +184,7 @@ internal class EngineHost(private val emit: (take: Int, frames: List<String>, co
   private fun closeAll() {
     for (session in takes.values) ReciteCoreNative.close(session)
     takes.clear()
+    meters.clear()
     if (engine != 0L) ReciteCoreNative.release(engine)
     engine = 0L
     releaseBlobs?.invoke() // only now: the engine read from them until rc_release
@@ -148,9 +193,9 @@ internal class EngineHost(private val emit: (take: Int, frames: List<String>, co
   }
 
   /** On the queue: everything the take has waiting, then the failed call's code if there was one. */
-  private fun drain(take: Int, session: Long, code: Int) {
+  private fun drain(take: Int, session: Long, code: Int, last: String? = null) {
     val drained = IntArray(1)
-    val frames = split(ReciteCoreNative.drain(session, drained))
+    val frames = split(ReciteCoreNative.drain(session, drained)) + listOfNotNull(last)
     val failed = if (code < 0) code else if (drained[0] < 0) drained[0] else 0
     if (frames.isNotEmpty() || failed != 0) emit(take, frames, failed)
   }

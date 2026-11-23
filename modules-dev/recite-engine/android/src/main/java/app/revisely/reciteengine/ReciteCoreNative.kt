@@ -26,11 +26,15 @@ internal object ReciteCoreNative {
   external fun openBlobs(names: Array<String>, buffers: Array<ByteBuffer>, options: String, code: IntArray, failure: Array<String?>): Long
   external fun release(engine: Long)
   external fun engineInfo(engine: Long): String
+  external fun probe(engine: Long): Int
   external fun start(engine: Long, frame: String, code: IntArray, failure: Array<String?>): Long
   external fun close(session: Long)
   external fun feed(session: Long, pcm: ByteArray, samples: Int): Int
   external fun control(session: Long, frame: String): Int
   external fun finish(session: Long): Int
+
+  /** rc_clip: samples [s0, s1) as little-endian bytes; null unless all of them are there (20 s at most). */
+  external fun clip(session: Long, s0: Long, s1: Long): ByteArray?
 
   /** A direct buffer outside the Java heap, 64-byte aligned, for a pack blob; null without the memory. Free it with freeBlob. */
   external fun allocBlob(size: Int): ByteBuffer?
@@ -38,4 +42,9 @@ internal object ReciteCoreNative {
 
   /** Every frame waiting, each a little-endian u32 length and its UTF-8 bytes; null when none. code[0]: rh_drain's result. */
   external fun drain(session: Long, code: IntArray): ByteArray?
+
+  // recite_host.h's meter, held in a DoubleArray: how a take kept up.
+  external fun meterStart(hop: Double, thermal: Int): DoubleArray?
+  external fun meterFed(meter: DoubleArray, samples: Int, ms: Double, waiting: Long)
+  external fun meterFrame(meter: DoubleArray, thermal: Int): String?
 }

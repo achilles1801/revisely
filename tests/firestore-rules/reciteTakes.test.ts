@@ -90,7 +90,7 @@ describe("Recite's memory: users/<uid>/reciteTakes", () => {
     const alice = env.authenticatedContext(ALICE).firestore();
     await assertSucceeds(setDoc(doc(alice, path(ALICE, 'p1')), take({ ranOn: 'phone' })));
     await assertSucceeds(setDoc(doc(alice, path(ALICE, 'p2')), take({ ranOn: 'server', ranWhy: 'no-pack' })));
-    for (const why of ['forced', 'pin', 'config', 'self-check', 'lacks', 'slow', 'no-speed', 'refused', 'replay']) {
+    for (const why of ['forced', 'pin', 'config', 'self-check', 'lacks', 'slow', 'no-speed', 'demoted', 'refused', 'replay']) {
       await assertSucceeds(setDoc(doc(alice, path(ALICE, `w-${why}`)), take({ ranOn: 'server', ranWhy: why })));
     }
     await assertFails(setDoc(doc(alice, path(ALICE, 'p3')), take({ ranOn: 'mars' })));

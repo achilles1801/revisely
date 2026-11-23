@@ -157,6 +157,12 @@ JNIEXPORT jstring JNICALL FN(engineInfo)(JNIEnv* env, jobject self, jlong engine
   return (*env)->NewStringUTF(env, rc_info((const rc_engine*)(intptr_t)engine));
 }
 
+JNIEXPORT jint JNICALL FN(probe)(JNIEnv* env, jobject self, jlong engine) {
+  (void)env;
+  (void)self;
+  return rc_probe((rc_engine*)(intptr_t)engine);
+}
+
 JNIEXPORT jlong JNICALL FN(start)(JNIEnv* env, jobject self, jlong engine, jstring frame, jintArray code,
                                   jobjectArray failure) {
   (void)self;
@@ -255,4 +261,46 @@ JNIEXPORT jbyteArray JNICALL FN(drain)(JNIEnv* env, jobject self, jlong session,
   }
   free(out.data);
   return packed;
+}
+
+/* recite_host.h's meter, held by EngineHost in a double[]. */
+JNIEXPORT jdoubleArray JNICALL FN(meterStart)(JNIEnv* env, jobject self, jdouble hop, jint thermal) {
+  (void)self;
+  rh_meter m;
+  rh_meter_start(&m, hop, thermal);
+  jdoubleArray out = (*env)->NewDoubleArray(env, RH_METER_DOUBLES);
+  if (out) (*env)->SetDoubleArrayRegion(env, out, 0, RH_METER_DOUBLES, (const jdouble*)&m);
+  return out;
+}
+
+JNIEXPORT void JNICALL FN(meterFed)(JNIEnv* env, jobject self, jdoubleArray meter, jint samples, jdouble ms, jlong waiting) {
+  (void)self;
+  rh_meter m;
+  (*env)->GetDoubleArrayRegion(env, meter, 0, RH_METER_DOUBLES, (jdouble*)&m);
+  rh_meter_fed(&m, (size_t)samples, ms, (long long)waiting);
+  (*env)->SetDoubleArrayRegion(env, meter, 0, RH_METER_DOUBLES, (const jdouble*)&m);
+}
+
+JNIEXPORT jstring JNICALL FN(meterFrame)(JNIEnv* env, jobject self, jdoubleArray meter, jint thermal) {
+  (void)self;
+  rh_meter m;
+  char text[256];
+  (*env)->GetDoubleArrayRegion(env, meter, 0, RH_METER_DOUBLES, (jdouble*)&m);
+  return rh_meter_frame(&m, thermal, text, sizeof text) > 0 ? (*env)->NewStringUTF(env, text) : NULL;
+}
+
+/* rc_clip for the teacher's clips: all the samples asked for, or NULL. `/second` takes 20 s at most. */
+JNIEXPORT jbyteArray JNICALL FN(clip)(JNIEnv* env, jobject self, jlong session, jlong s0, jlong s1) {
+  (void)self;
+  const jlong samples = s1 - s0;
+  if (s0 < 0 || samples <= 0 || samples > 320000) return NULL;
+  int16_t* pcm = (int16_t*)malloc((size_t)samples * sizeof *pcm);
+  if (!pcm) return NULL;
+  jbyteArray out = NULL;
+  if (rc_clip((const rc_session*)(intptr_t)session, s0, s1, pcm, (size_t)samples) == (size_t)samples) {
+    out = (*env)->NewByteArray(env, (jsize)(samples * 2));
+    if (out) (*env)->SetByteArrayRegion(env, out, 0, (jsize)(samples * 2), (const jbyte*)pcm);
+  }
+  free(pcm);
+  return out;
 }

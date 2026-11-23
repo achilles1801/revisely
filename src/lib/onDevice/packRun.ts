@@ -23,6 +23,7 @@ import { logger } from '../logger';
 import { getMushafStatus, prepareMushafOffline, SPACE_MARGIN } from '../mushafOffline';
 import { networkState, onNetworkState } from '../networkState';
 import { benchEngine } from './benchRun';
+import { coreLine } from './coreInfo';
 import {
   mayDownloadPack,
   parsePackAnswer,
@@ -39,6 +40,8 @@ const FOLDER = 'recite-pack';
 /** How often a phone holding the pack asks whether there is a newer one (the callable allows 6 calls a day). */
 export const CHECK_EVERY_MS = 24 * 60 * 60 * 1000;
 export const RETRY_MS = [60_000, 5 * 60_000, 15 * 60_000];
+/** A pack damaged on this phone is fetched again at most this many times per version: a failing disk mustn't loop. */
+export const MAX_DAMAGED_REFETCHES = 2;
 /** The callable's answers that mean "not for this account or not yet": no retries today. */
 const NOT_NOW = new Set(['PERMISSION_DENIED', 'FAILED_PRECONDITION', 'UNAUTHENTICATED', 'RESOURCE_EXHAUSTED']);
 
@@ -68,8 +71,12 @@ interface Saved {
   auto: boolean;
   have: PackOnPhone | null;
   checkedAt: number;
-  /** A pack the engine refused as bad data: it isn't fetched again, until a new id or "Download now". */
+  /** A pack the engine refused as bad data: it isn't fetched again, until a new id, a new engine or "Download now". */
   badPack?: string | null;
+  /** The engine that refused it: another one (an app update) may be able to read it. */
+  badPackEngine?: string | null;
+  /** How many times this version has been fetched again after its files were damaged on this phone. */
+  damaged?: { packId: string; count: number } | null;
 }
 
 let saved: Saved = { auto: true, have: null, checkedAt: 0 };
@@ -316,12 +323,18 @@ function roomFor(bytes: number): boolean {
   }
 }
 
+const engineVersion = (): string | null => coreLine(benchEngine())?.version ?? null;
+
 async function runOnce(): Promise<void> {
   if (!benchEngine()) {
     publish({ phase: 'unavailable' });
     return;
   }
   await preparePack();
+  if (saved.badPack && (saved.badPackEngine ?? null) !== engineVersion()) {
+    saved = { ...saved, badPack: null, badPackEngine: null, checkedAt: 0 };
+    await persist();
+  }
   const gen = generation;
   if (!saved.auto || !active || !auth.currentUser) return;
   if (holdsCore(saved.have) && !once && Date.now() - saved.checkedAt < CHECK_EVERY_MS) {
@@ -414,14 +427,14 @@ export async function downloadPackNow({ overMobileData = false } = {}): Promise<
   once = once || overMobileData;
   attempt = 0;
   clearRetry();
-  saved = { ...saved, auto: true, checkedAt: 0, badPack: null };
+  saved = { ...saved, auto: true, checkedAt: 0, badPack: null, badPackEngine: null, damaged: null };
   await persist();
   requestPackDownload();
 }
 
 /**
- * The engine refused this pack as bad data (RC_ERR_DATA from rc_open): it goes, takes stay on the server, and this id
- * isn't fetched again, or a phone would download a pack its engine can't read every day.
+ * The engine refused this pack as bad data (RC_ERR_DATA from rc_open): it goes, takes stay on the server, and this
+ * engine doesn't fetch this id again, or a phone would download a pack it can't read every day.
  */
 export async function dropBadPack(packId: string): Promise<void> {
   await preparePack();
@@ -429,15 +442,42 @@ export async function dropBadPack(packId: string): Promise<void> {
   generation += 1;
   clearRetry();
   stopDownload();
-  saved = { ...saved, have: null, checkedAt: Date.now(), badPack: packId };
+  saved = { ...saved, have: null, checkedAt: Date.now(), badPack: packId, badPackEngine: engineVersion() };
   await persist();
+  deletePackFolder(packId);
+  publish({ phase: 'unavailable', packId: null, bytes: 0, totalBytes: 0 });
+}
+
+function deletePackFolder(packId: string): void {
   try {
     const dir = new Directory(root(), packId);
     if (dir.exists) dir.delete();
   } catch (err) {
     logger.warn('Could not delete a bad pack', err);
   }
-  publish({ phase: 'unavailable', packId: null, bytes: 0, totalBytes: 0 });
+}
+
+/**
+ * The pack's files failed the reader's checks as it opened: they were whole when they came, so this phone's copy was
+ * damaged (or its key lost). It goes and is fetched again on the usual network rules, until the limit; then it counts as
+ * a pack this engine can't use.
+ */
+export async function refetchDamagedPack(packId: string): Promise<void> {
+  await preparePack();
+  if (saved.have?.packId !== packId) return;
+  const count = saved.damaged?.packId === packId ? saved.damaged.count : 0;
+  if (count >= MAX_DAMAGED_REFETCHES) {
+    await dropBadPack(packId);
+    return;
+  }
+  generation += 1;
+  clearRetry();
+  stopDownload();
+  saved = { ...saved, have: null, checkedAt: 0, damaged: { packId, count: count + 1 } };
+  await persist();
+  deletePackFolder(packId);
+  publish({ phase: 'idle', packId: null, bytes: 0, totalBytes: 0 });
+  requestPackDownload();
 }
 
 /** "Remove from this phone": everything of it, and the download stays off until "Download now". */

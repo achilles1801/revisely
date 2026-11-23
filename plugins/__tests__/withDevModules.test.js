@@ -1,6 +1,6 @@
 // plugins/withDevModules: Revisely Dev's builds link modules-dev/ (Recite on the phone) through autolinking's search
 // path and take ONNX Runtime's pod from the module's own podspec. The store app never loads the plugin.
-const { devBackupRules, devPodfile, devSettingsGradle } = require('../withDevModules');
+const { devBackupRules, devPodfile, devSettingsGradle, withTestLoopFilter } = require('../withDevModules');
 const { dataExtractionRulesXml, fullBackupContentXml } = require('../withAndroidBackupRules');
 
 // The lines that matter in Expo SDK 54's bare template (expo-template-bare-minimum 54.0.54).
@@ -55,6 +55,35 @@ describe('withDevModules', () => {
     expect(set).toBeLessThan(out.indexOf('expoAutolinking.useExpoModules()'));
     expect(out.match(/expoAutolinking\.useExpoModules\(\)/g)).toHaveLength(1);
     expect(devSettingsGradle(out)).toBe(out);
+  });
+
+  it('adds Test Lab’s game-loop intent filter to the main activity, once, beside the launcher’s', () => {
+    const manifest = () => ({
+      manifest: {
+        application: [
+          {
+            $: { 'android:name': '.MainApplication' },
+            activity: [
+              {
+                $: { 'android:name': '.MainActivity' },
+                'intent-filter': [
+                  { action: [{ $: { 'android:name': 'android.intent.action.MAIN' } }], category: [{ $: { 'android:name': 'android.intent.category.LAUNCHER' } }] },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    });
+    const out = withTestLoopFilter(manifest());
+    const filters = out.manifest.application[0].activity[0]['intent-filter'];
+    expect(filters).toHaveLength(2);
+    expect(filters[1]).toEqual({
+      action: [{ $: { 'android:name': 'com.google.intent.action.TEST_LOOP' } }],
+      category: [{ $: { 'android:name': 'android.intent.category.DEFAULT' } }],
+      data: [{ $: { 'android:mimeType': 'application/javascript' } }],
+    });
+    expect(withTestLoopFilter(out).manifest.application[0].activity[0]['intent-filter']).toHaveLength(2);
   });
 
   it('fails the build when the templates change shape, never links half', () => {

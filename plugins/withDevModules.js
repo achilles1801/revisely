@@ -5,12 +5,34 @@
 // modules-dev/ isn't on autolinking's default path, so this plugin adds it in the copy Dev's build works on:
 // - iOS: `use_expo_modules!(searchPaths: [...])` in the Podfile, plus ONNX Runtime's pod from its podspec in the
 //   module (ios/ReviselyOnnxRuntime.podspec.json: Microsoft's NuGet package, pinned by SHA-256);
-// - Android: `expoAutolinking.searchPaths` in settings.gradle.
+// - Android: `expoAutolinking.searchPaths` in settings.gradle, and Firebase Test Lab's game-loop intent filter on the
+//   main activity, so Test Lab's phones can run the on-device bench without signing in (src/lib/onDevice/testLoop).
+//   Nothing sends that intent outside Test Lab.
 // fingerprint.config.js counts modules-dev/ toward Revisely Dev's fingerprints (only), so a change there builds Dev.
 // The release-native change links the module into the store app and retires this plugin (the release owner's call).
 const fs = require('fs');
 const path = require('path');
-const { withDangerousMod, withFinalizedMod, withSettingsGradle } = require('expo/config-plugins');
+const { AndroidConfig, withAndroidManifest, withDangerousMod, withFinalizedMod, withSettingsGradle } = require('expo/config-plugins');
+
+const TEST_LOOP = 'com.google.intent.action.TEST_LOOP';
+
+/** The manifest with Test Lab's game-loop intent filter on the main activity (its own filter, as Test Lab asks). */
+function withTestLoopFilter(manifest) {
+  const activity = AndroidConfig.Manifest.getMainActivityOrThrow(manifest);
+  const filters = activity['intent-filter'] ?? [];
+  const has = filters.some((f) => (f.action ?? []).some((a) => a.$['android:name'] === TEST_LOOP));
+  if (!has) {
+    activity['intent-filter'] = [
+      ...filters,
+      {
+        action: [{ $: { 'android:name': TEST_LOOP } }],
+        category: [{ $: { 'android:name': 'android.intent.category.DEFAULT' } }],
+        data: [{ $: { 'android:mimeType': 'application/javascript' } }],
+      },
+    ];
+  }
+  return manifest;
+}
 
 const MARK = 'Revisely Dev: modules-dev (plugins/withDevModules)';
 
@@ -90,10 +112,15 @@ function withDevModules(config) {
       return cfg;
     },
   ]);
-  return withSettingsGradle(config, (cfg) => {
+  config = withSettingsGradle(config, (cfg) => {
     assertDev(cfg.android && cfg.android.package);
     if (cfg.modResults.language !== 'groovy') throw new Error('withDevModules: settings.gradle is not Groovy.');
     cfg.modResults.contents = devSettingsGradle(cfg.modResults.contents);
+    return cfg;
+  });
+  return withAndroidManifest(config, (cfg) => {
+    assertDev(cfg.android && cfg.android.package);
+    cfg.modResults = withTestLoopFilter(cfg.modResults);
     return cfg;
   });
 }
@@ -102,3 +129,4 @@ module.exports = withDevModules;
 module.exports.devPodfile = devPodfile;
 module.exports.devSettingsGradle = devSettingsGradle;
 module.exports.devBackupRules = devBackupRules;
+module.exports.withTestLoopFilter = withTestLoopFilter;

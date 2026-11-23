@@ -26,7 +26,24 @@ export interface EngineInfo {
     controls?: boolean;
     clips?: boolean;
   };
-  self_check?: { ok?: boolean; max_diff?: number };
+  self_check?: { ran?: boolean; ok?: boolean; max_diff?: number; models?: { v7?: ModelCheck; v5?: ModelCheck } };
+}
+
+/** One model's load-time check in rc_info. */
+export interface ModelCheck {
+  ran?: boolean;
+  ok?: boolean;
+}
+
+const passed = (m: ModelCheck | undefined): boolean => m?.ran === true && m.ok === true;
+
+/**
+ * The models this take needs ran their load-time check and passed. The overall `ok` says only that every model that ran
+ * passed, so it holds when none did; and one failed model mustn't keep takes that don't use it off the phone.
+ */
+export function selfCheckPasses(start: StartFrame, info: EngineInfo): boolean {
+  const models = info.self_check?.models;
+  return passed(models?.v7) && (levelOf(start) !== 'strict' || passed(models?.v5));
 }
 
 export function parseEngineInfo(json: string | null | undefined): EngineInfo | null {
@@ -87,6 +104,8 @@ export interface WhereInput {
   engine: EngineInfo | null;
   /** The phone passed its own speed check; null: not known yet. Only `auto` asks. */
   fastEnough: boolean | null;
+  /** It measured fast enough, and takes that fell behind have moved it to the server until its next clean check. */
+  demoted?: boolean;
   start: StartFrame;
 }
 
@@ -95,9 +114,20 @@ export interface WhereInput {
  * chose (`forced`: this phone's Testing row; `pin`: the account; `config`: config/app, or nothing set), or what kept it
  * off the phone. A closed list: firestore.rules holds the same one.
  */
-export type WhereWhy = 'forced' | 'pin' | 'config' | 'no-pack' | 'self-check' | 'lacks' | 'slow' | 'no-speed' | 'refused' | 'replay';
+export type WhereWhy =
+  | 'forced'
+  | 'pin'
+  | 'config'
+  | 'no-pack'
+  | 'self-check'
+  | 'lacks'
+  | 'slow'
+  | 'no-speed'
+  | 'demoted'
+  | 'refused'
+  | 'replay';
 export const WHERE_WHYS: ReadonlySet<WhereWhy> = new Set<WhereWhy>([
-  'forced', 'pin', 'config', 'no-pack', 'self-check', 'lacks', 'slow', 'no-speed', 'refused', 'replay',
+  'forced', 'pin', 'config', 'no-pack', 'self-check', 'lacks', 'slow', 'no-speed', 'demoted', 'refused', 'replay',
 ]);
 
 export interface WhereAnswer {
@@ -114,10 +144,12 @@ export function chooseWhere(i: WhereInput): WhereAnswer {
   if (wanted === 'server') return { on: 'server', why: chose };
   if (!i.engine) return { on: 'server', why: 'no-pack' };
   if (isReplayEngine(i.engine)) return i.testing === 'phone' ? { on: 'phone', why: 'replay' } : { on: 'server', why: 'replay' };
-  if (i.engine.self_check?.ok !== true) return { on: 'server', why: 'self-check' };
+  if (!selfCheckPasses(i.start, i.engine)) return { on: 'server', why: 'self-check' };
   const lacks = engineLacks(i.start, i.engine);
   if (lacks) return { on: 'server', why: 'lacks', detail: lacks };
-  if (wanted === 'auto' && i.fastEnough !== true) return { on: 'server', why: i.fastEnough === false ? 'slow' : 'no-speed' };
+  if (wanted === 'auto' && i.fastEnough !== true) {
+    return { on: 'server', why: i.demoted ? 'demoted' : i.fastEnough === false ? 'slow' : 'no-speed' };
+  }
   return { on: 'phone', why: chose };
 }
 

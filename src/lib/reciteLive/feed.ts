@@ -43,6 +43,8 @@ export interface StartFrame {
   guess?: boolean;
   /** Send the audio as IMA-ADPCM blocks if the checker's `ready` agrees (contract "ADPCM uplink"); raw PCM otherwise. */
   audio?: 'adpcm';
+  /** The engine's own key (recite_core.h): emit `clip` frames for the teacher. Never sent to the server. */
+  clips?: boolean;
   /** Why this take came to the server and not the phone (ONDEV-4), for its take line. A checker without it ignores it. */
   ranWhy?: WhereWhy;
 }

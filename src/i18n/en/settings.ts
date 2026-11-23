@@ -376,7 +376,7 @@ export const settings = {
     wherePhone: 'This phone',
     whereServer: 'The server',
     whereHint: 'Changes where this phone’s takes are checked',
-    whereNextPhone: 'Next take: on this phone. It won’t be kept as test data yet',
+    whereNextPhone: 'Next take: on this phone',
     whereNextReplay: 'Next take: a recorded take, played on this phone',
     whereNextServer: 'Next take: on the server',
     whereNextNoEngine: 'Next take: on the server. No engine on this phone yet',
@@ -395,6 +395,16 @@ export const settings = {
     engine: 'Engine: {{version}}',
     engineStub: 'Engine: stub (server path)',
     engineFailed: 'Engine: {{version}}, self-test failed ({{why}})',
+    /** The engine's load-time check of the pack's models on this phone. */
+    selfCheckRunning: 'Checking the models on this phone…',
+    selfCheckPassed: 'Self-check passed',
+    selfCheckFailed: 'Self-check failed',
+    selfCheckUnknown: 'Self-check: no result',
+    selfCheckNoOpen: 'The engine didn’t open ({{code}}): {{error}}',
+    /** "v7: largest difference 0.000042, 0 of 240 frames with another top sound". */
+    selfCheckModel: '{{model}}: largest difference {{diff}}, {{top}} of {{frames}} frames with another top sound',
+    selfCheckNoModel: '{{model}}: no check in this pack',
+    selfCheckNotSent: 'Not sent: {{error}}',
     reading: 'Reading the list of runs…',
     readFailed: 'Couldn’t read the list of runs: {{error}}',
     /** The account lacks the team's bench access (storage.rules, the onDeviceBench claim). */

@@ -468,6 +468,9 @@ owner's `on-device-release.md`).
     it: GitHub → Settings → Developer settings → Fine-grained tokens → Regenerate; update the secret; set the repository
     variable `RECITE_CORE_EXPIRES` (YYYY-MM-DD) to the new date, which the daily health report reminds about from 30 days
     before.
+- **The engine's self-check per device** (ONDEV-1): the bench records it as a `runs` entry `{mode: 'selfCheck', …}` in
+  `onDeviceBench`, once per pack and app update (`recordSelfCheck`). Test Lab: `testLab.selfCheck` in the OBB's `bench.json`
+  (`packId`, `blobs: [{name, file, room}]`) opens plain watermarked blobs, and the results file gets a `selfCheck` key.
 - **The on-device bench** (Settings → Testing → On-device model, BEHAVIOUR.md ONDEV-1): its list of runs, the models,
   the clip (EveryAyah, Husary, page 7, 90 s) and M's vectors live on the dev bucket under `models/recite/`
   (`bench.json` is the manifest: files with sizes and SHA-256, runs per platform, M's pass marks). Changing the runs or
@@ -494,7 +497,15 @@ owner's `on-device-release.md`).
     `v5.onnx`, the marked `v5m-server-int8.onnx`, and `strict.bin`). Only marked models leave the Mac (hashes in the private
     repo's `checker/marks.json`). The names are `rc_blob`'s (`recite_core.h`). Tables are deflated; the weights stay stored.
   - **Phone:** `RecitePackReader` (Swift, Java) checks every chunk and blob; `RecitePackKey` holds the device key;
-    `src/lib/onDevice/packRun.ts` is the download. The transport opens it with `RecitePackStore.open`. `v7.weights.f16` gets
+    `src/lib/onDevice/packRun.ts` is the download. `warmEngine()` (`lib/onDevice/engine.ts`) opens it through the module's `enginePackOpen`, on the engine's thread; RC_ERR_DATA drops the pack (`dropBadPack`). `v7.weights.f16` gets
     a 64-byte aligned buffer of its `room` (fp32 size), and `rc_blob.size` is `room`.
   - **Check the readers** against the server's format, on a Mac with no simulator: `scripts/recite-pack-check/run.sh`.
   - Android keeps it out of backups through `plugins/withDevModules` (Dev only), so the store fingerprints don't move.
+- **Firebase Test Lab** (Majd, Nov 23: "yes let's use google test lab") times mid-range Android phones with no account:
+  Revisely Dev's Android build has Test Lab's game-loop intent filter (`plugins/withDevModules`), and
+  `src/lib/onDevice/testLoop` runs the bench from an OBB (a zip of the bench's files plus a `bench.json` with a
+  `testLab` section: runs, windows, a long run) and writes the record to the game loop's results file. Run it with
+  `gcloud firebase test android run --project revisely-dev --type game-loop --app <Dev .aab> --obb-files
+  main.<versionCode>.com.revisionbuddy.app.dev.obb --device model=a15,version=34 --timeout 20m`; the results are
+  `results_scenario_0.json` in the run's results bucket. Blaze gives 30 physical-device minutes a day free, then $5
+  an hour per phone (by the minute): keep runs short and say the price before going over.

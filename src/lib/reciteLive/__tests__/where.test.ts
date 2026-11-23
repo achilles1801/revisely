@@ -11,7 +11,7 @@ const ENGINE: EngineInfo = {
   version: 'recite-core 0.2.0',
   levels: ['recite', 'harakat', 'strict'],
   can: { letters: true, tajweed: true, names: true, startBy: true, startIn: true, controls: true, clips: true },
-  self_check: { ok: true, max_diff: 0 },
+  self_check: { ...({ ran: true, ok: true, models: { v7: { ran: true, ok: true }, v5: { ran: true, ok: true } } }), max_diff: 0 },
 };
 const input = (over: Partial<WhereInput> = {}): WhereInput => ({
   testing: null, pin: null, config: null, engine: ENGINE, fastEnough: true, start: MARK, ...over,
@@ -45,7 +45,8 @@ describe('chooseWhere', () => {
 
   it.each([
     ['no engine (a stub build, no pack)', { engine: null }, 'no-pack', undefined],
-    ['a failed self-check', { engine: { ...ENGINE, self_check: { ok: false } } }, 'self-check', undefined],
+    ['a failed self-check', { engine: { ...ENGINE, self_check: { ran: true, ok: false, models: { v7: { ran: true, ok: false } } } } }, 'self-check', undefined],
+    ['a check that never ran, though it says ok', { engine: { ...ENGINE, self_check: { ran: false, ok: true, models: { v7: { ran: false } } } } }, 'self-check', undefined],
     ['no self-check at all', { engine: { ...ENGINE, self_check: undefined } }, 'self-check', undefined],
     ['a level it does not run', { engine: { ...ENGINE, levels: ['recite'] } }, 'lacks', 'level:harakat'],
     ['a feature it lacks', { engine: { ...ENGINE, can: { ...ENGINE.can, names: false } } }, 'lacks', 'names'],
@@ -55,10 +56,23 @@ describe('chooseWhere', () => {
     }
   });
 
+  it('one failed model keeps only the takes that need it off the phone', () => {
+    const v5Failed: EngineInfo = {
+      ...ENGINE,
+      levels: ['recite', 'harakat', 'strict'],
+      can: { ...ENGINE.can, tajweed: true },
+      self_check: { ran: true, ok: false, models: { v7: { ran: true, ok: true }, v5: { ran: true, ok: false } } },
+    };
+    expect(chooseWhere(input({ testing: 'phone', engine: v5Failed })).on).toBe('phone');
+    expect(chooseWhere(input({ testing: 'phone', engine: v5Failed, start: { ...MARK, tajweed: true } }))).toEqual({ on: 'server', why: 'self-check' });
+  });
+
   it('only `auto` asks whether the phone is fast enough', () => {
     expect(chooseWhere(input({ config: 'auto', fastEnough: null }))).toEqual({ on: 'server', why: 'no-speed' });
     expect(chooseWhere(input({ config: 'auto', fastEnough: false }))).toEqual({ on: 'server', why: 'slow' });
     expect(chooseWhere(input({ config: 'phone', fastEnough: false })).on).toBe('phone');
+    expect(chooseWhere(input({ config: 'auto', fastEnough: false, demoted: true }))).toEqual({ on: 'server', why: 'demoted' });
+    expect(chooseWhere(input({ testing: 'phone', fastEnough: false, demoted: true })).on).toBe('phone');
   });
 
   it('the replay stand-in runs only on this phone Testing choice', () => {

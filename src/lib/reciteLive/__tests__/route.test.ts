@@ -8,7 +8,7 @@ const ENGINE: EngineInfo = {
   version: 'recite-core 0.2.0',
   levels: ['recite', 'harakat', 'strict'],
   can: { letters: true, tajweed: true, names: true, startBy: true, startIn: true, controls: true },
-  self_check: { ok: true },
+  self_check: { ran: true, ok: true, models: { v7: { ran: true, ok: true }, v5: { ran: true, ok: true } } },
 };
 const handlers = { onEvent: () => undefined, onClose: () => undefined };
 const flush = async () => {
@@ -78,6 +78,29 @@ describe('routedFeed', () => {
     t.connect(START, handlers);
     expect(t.server).toHaveBeenCalledTimes(1);
     expect(t.routed).toEqual([['server', 'no-pack', undefined]]);
+  });
+
+  describe('the teacher’s clips', () => {
+    const CLIPPING = { ...ENGINE, can: { ...ENGINE.can, clips: true } };
+    const sender = () => ({ add: jest.fn(), drop: jest.fn(), stop: jest.fn(async () => undefined), close: jest.fn() });
+    const onPhone = { settings: () => ({ config: 'phone' as const, pin: null, testing: null }) };
+    const asked = async (over: Parameters<typeof setup>[0], start = START) => {
+      const t = setup({ ...onPhone, clips: sender, ...over });
+      t.connect(start, handlers);
+      await flush();
+      return JSON.parse((t.start.mock.calls[0] as unknown as [string])[0]).clips;
+    };
+
+    it('asks the engine for them when it can hear them and this phone can send them', async () => {
+      expect(await asked({ info: () => CLIPPING, canClip: () => true })).toBe(true);
+    });
+
+    it('never asks offline or signed out, or an engine without them, or for a take that only follows', async () => {
+      expect(await asked({ info: () => CLIPPING, canClip: () => false })).toBeUndefined();
+      expect(await asked({ info: () => CLIPPING })).toBeUndefined();
+      expect(await asked({ info: () => ENGINE, canClip: () => true })).toBeUndefined();
+      expect(await asked({ info: () => CLIPPING, canClip: () => true }, { ...START, follow: true })).toBeUndefined();
+    });
   });
 
   it('a take the engine refuses goes to the server, and says why', async () => {

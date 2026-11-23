@@ -1,5 +1,7 @@
 #import "RECEngine.h"
 
+#include <atomic>
+#include <chrono>
 #include <unordered_map>
 #include <vector>
 
@@ -31,6 +33,8 @@ static void collect(void *ctx, const char *frame, size_t len) {
   rc_engine *_engine;
   id _blobOwner;  // what holds the memory of blobs the engine didn't copy
   std::unordered_map<NSInteger, rc_session *> _takes;
+  std::unordered_map<NSInteger, rh_meter> _meters;
+  std::atomic<long long> _waiting;  // samples handed over and not yet finished (the JS thread adds, the queue takes off)
   NSInteger _next;
 }
 
@@ -54,8 +58,14 @@ static void collect(void *ctx, const char *frame, size_t len) {
 
 /// On the queue: everything the take has waiting, then the failed call's code if there was one.
 - (void)drain:(NSInteger)take session:(rc_session *)session code:(int)code {
+  [self drain:take session:session code:code then:nil];
+}
+
+/// `last`: a frame of the host's own, after the engine's.
+- (void)drain:(NSInteger)take session:(rc_session *)session code:(int)code then:(nullable NSString *)last {
   NSMutableArray<NSString *> *frames = [NSMutableArray array];
   const int drained = rh_drain(session, collect, (__bridge void *)frames);
+  if (last) [frames addObject:last];
   const int failed = code < 0 ? code : (drained < 0 ? drained : 0);
   RECEngineFrames emit = self.onFrames;
   if (emit && (frames.count > 0 || failed != 0)) emit(take, frames, failed);
@@ -65,6 +75,7 @@ static void collect(void *ctx, const char *frame, size_t len) {
 - (void)closeAll {
   for (auto &entry : _takes) rc_close(entry.second);
   _takes.clear();
+  _meters.clear();
   if (_engine) rc_release(_engine);
   _engine = nullptr;
   _blobOwner = nil;  // only now: the engine read from it until rc_release
@@ -126,7 +137,7 @@ static void collect(void *ctx, const char *frame, size_t len) {
   });
 }
 
-- (void)startTake:(NSString *)frame done:(void (^)(NSDictionary<NSString *, id> *))done {
+- (void)startTake:(NSString *)frame hop:(double)hop done:(void (^)(NSDictionary<NSString *, id> *))done {
   dispatch_async(_queue, ^{
     if (!self->_engine) {
       done(@{@"code": @(RC_ERR_STATE), @"error": @"the engine isn't open"});
@@ -141,6 +152,7 @@ static void collect(void *ctx, const char *frame, size_t len) {
     }
     const NSInteger take = self->_next++;
     self->_takes[take] = session;
+    rh_meter_start(&self->_meters[take], hop, static_cast<int>(NSProcessInfo.processInfo.thermalState));
     // Before its first frame: JavaScript has the take's number by the time `ready` reaches it.
     done(@{@"take": @(take)});
     [self drain:take session:session code:0];
@@ -154,10 +166,20 @@ static void collect(void *ctx, const char *frame, size_t len) {
 }
 
 - (void)feedTake:(NSInteger)take pcm:(NSData *)pcm {
+  const size_t samples = pcm.length / sizeof(int16_t);
+  _waiting.fetch_add(static_cast<long long>(samples));
   dispatch_async(_queue, ^{
     rc_session *session = [self sessionOf:take];
-    if (!session) return;
-    const int r = rc_feed(session, static_cast<const int16_t *>(pcm.bytes), pcm.length / sizeof(int16_t));
+    if (!session) {
+      self->_waiting.fetch_sub(static_cast<long long>(samples));
+      return;
+    }
+    const auto t0 = std::chrono::steady_clock::now();
+    const int r = rc_feed(session, static_cast<const int16_t *>(pcm.bytes), samples);
+    const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+    const long long behind = self->_waiting.fetch_sub(static_cast<long long>(samples));
+    auto meter = self->_meters.find(take);
+    if (meter != self->_meters.end()) rh_meter_fed(&meter->second, samples, ms, behind);
     [self drain:take session:session code:r];
   });
 }
@@ -176,7 +198,14 @@ static void collect(void *ctx, const char *frame, size_t len) {
     rc_session *session = [self sessionOf:take];
     if (!session) return;
     const int r = rc_finish(session);
-    [self drain:take session:session code:r];
+    NSString *meterFrame = nil;
+    auto meter = self->_meters.find(take);
+    if (meter != self->_meters.end()) {
+      char text[256];
+      const int thermal = static_cast<int>(NSProcessInfo.processInfo.thermalState);
+      if (rh_meter_frame(&meter->second, thermal, text, sizeof text) > 0) meterFrame = [NSString stringWithUTF8String:text];
+    }
+    [self drain:take session:session code:r then:meterFrame];
   });
 }
 
@@ -186,6 +215,36 @@ static void collect(void *ctx, const char *frame, size_t len) {
     if (!session) return;
     rc_close(session);
     self->_takes.erase(take);
+    self->_meters.erase(take);
+  });
+}
+
+- (void)clipTake:(NSInteger)take from:(int64_t)s0 to:(int64_t)s1 done:(void (^)(NSString *_Nullable))done {
+  dispatch_async(_queue, ^{
+    rc_session *session = [self sessionOf:take];
+    const int64_t samples = s1 - s0;
+    // `/second` takes 20 s at most.
+    if (!session || s0 < 0 || samples <= 0 || samples > 320000) {
+      done(nil);
+      return;
+    }
+    NSMutableData *pcm = [NSMutableData dataWithLength:static_cast<NSUInteger>(samples) * sizeof(int16_t)];
+    const size_t got = rc_clip(session, s0, s1, static_cast<int16_t *>(pcm.mutableBytes), static_cast<size_t>(samples));
+    done(got == static_cast<size_t>(samples) ? [pcm base64EncodedStringWithOptions:0] : nil);
+  });
+}
+
+- (void)probe:(void (^)(double))done {
+  dispatch_async(_queue, ^{
+    // Never beside a take: rc_probe mustn't run during an rc_feed, and its time would say nothing.
+    if (!self->_engine || !self->_takes.empty()) {
+      done(-1);
+      return;
+    }
+    const auto t0 = std::chrono::steady_clock::now();
+    const int r = rc_probe(self->_engine);
+    const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+    done(r == RC_OK ? ms : -1);
   });
 }
 
