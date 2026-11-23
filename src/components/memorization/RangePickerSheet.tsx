@@ -24,12 +24,16 @@ export function RangePickerSheet({
   onClose,
   onUse,
   initialKind = 'surah',
+  useLabel,
 }: {
   visible: boolean;
   onClose: () => void;
-  onUse: (range: { from: number; to: number }) => void;
+  /** The picked range, and its name ("Al-Mulk", "Juz 29"). */
+  onUse: (range: { from: number; to: number; name: string }) => void;
   /** Which wheel it opens on (Activity's Revised sheet: Surah or Juz, as its What says). */
   initialKind?: Kind;
+  /** The button's words, when it isn't choosing pages (the Memorized picker's "Go"). */
+  useLabel?: string;
 }) {
   const [kind, setKind] = useState<Kind>(initialKind);
   useEffect(() => {
@@ -56,9 +60,9 @@ export function RangePickerSheet({
       onClose={onClose}
       title={kind === 'surah' ? t('common.surah') : t('common.juz')}
       footer={{
-        label: t('memorization.useThesePages'),
+        label: useLabel ?? t('memorization.useThesePages'),
         onPress: () => {
-          onUse(rangeOf(kind, index));
+          onUse({ ...rangeOf(kind, index), name: items[index]?.label ?? '' });
           onClose();
         },
         testID: 'range-use',

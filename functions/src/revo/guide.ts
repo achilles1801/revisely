@@ -363,6 +363,17 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
  */
 export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
   {
+    // The Memorized picker (Majd, Nov 23 2026): Revisely Dev until it ships.
+    title: 'Choosing what you memorized on the page',
+    covers: ['MEM-8'],
+    routes: ['Activity'],
+    text: lines(
+      '- In Revisely Dev, Activity → + → “Memorized” has the tabs “On the page”, “Surah” and “Juz” (in place of Ayahs and Whole pages). “Choose on the page” opens the mushaf page where they left off, with what is memorized faded.',
+      '- Tap the ayah you reached: it fills from the first ayah to go on that page. Another tap moves it, holding an ayah starts there, and “Whole page” and “Clear” act on the page. The arrows go to the next page; the line between them goes to a surah or juz. “Done” returns to the sheet, which shows the chosen pages with “Change”.',
+      '- It is separate from the reader: no recording, audio or timer there, and it doesn’t move the reader’s place. With VoiceOver, or a page not downloaded while offline, it is a list of each ayah’s first words.',
+    ),
+  },
+  {
     // The athan (Majd, Nov 22 2026): Revisely Dev on iPhone until a version has its sounds built in for Android.
     title: 'The athan as a prayer’s notification sound (iPhone)',
     covers: ['ATHAN-1', 'ATHAN-2', 'ATHAN-3', 'ATHAN-4'],
