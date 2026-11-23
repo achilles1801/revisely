@@ -15,9 +15,21 @@ static void collect(void *ctx, const char *frame, size_t len) {
 @property(atomic, copy, nullable) NSString *info;
 @end
 
+@implementation RECEngineBlob
+- (instancetype)initWithName:(NSString *)name bytes:(const void *)bytes size:(NSUInteger)size {
+  if ((self = [super init])) {
+    _name = [name copy];
+    _bytes = bytes;
+    _size = size;
+  }
+  return self;
+}
+@end
+
 @implementation RECEngine {
   dispatch_queue_t _queue;
   rc_engine *_engine;
+  id _blobOwner;  // what holds the memory of blobs the engine didn't copy
   std::unordered_map<NSInteger, rc_session *> _takes;
   NSInteger _next;
 }
@@ -55,7 +67,25 @@ static void collect(void *ctx, const char *frame, size_t len) {
   _takes.clear();
   if (_engine) rc_release(_engine);
   _engine = nullptr;
+  _blobOwner = nil;  // only now: the engine read from it until rc_release
   self.info = nil;
+}
+
+/// On the queue: rc_open over these blobs, and the answer.
+- (BOOL)openNow:(const std::vector<rc_blob> &)blobs
+        options:(NSString *)options
+           done:(void (^)(NSDictionary<NSString *, id> *))done {
+  int code = RC_OK;
+  char err[256] = "";
+  _engine = rc_open(blobs.data(), blobs.size(), options.UTF8String, &code, err, sizeof err);
+  if (!_engine) {
+    done(@{@"ok": @NO, @"code": @(code), @"error": [NSString stringWithUTF8String:err] ?: @""});
+    return NO;
+  }
+  NSString *info = [NSString stringWithUTF8String:rc_info(_engine)] ?: @"{}";
+  self.info = info;
+  done(@{@"ok": @YES, @"code": @0, @"info": info});
+  return YES;
 }
 
 - (void)openFiles:(NSArray<NSDictionary<NSString *, NSString *> *> *)items
@@ -78,16 +108,21 @@ static void collect(void *ctx, const char *frame, size_t len) {
     for (NSUInteger i = 0; i < held.count; i++) {
       blobs.push_back({names[i].UTF8String, held[i].bytes, held[i].length, 1});
     }
-    int code = RC_OK;
-    char err[256] = "";
-    self->_engine = rc_open(blobs.data(), blobs.size(), options.UTF8String, &code, err, sizeof err);
-    if (!self->_engine) {
-      done(@{@"ok": @NO, @"code": @(code), @"error": [NSString stringWithUTF8String:err] ?: @""});
-      return;
-    }
-    NSString *info = [NSString stringWithUTF8String:rc_info(self->_engine)] ?: @"{}";
-    self.info = info;
-    done(@{@"ok": @YES, @"code": @0, @"info": info});
+    [self openNow:blobs options:options done:done];
+  });
+}
+
+- (void)openBlobs:(NSArray<RECEngineBlob *> *)blobs
+            owner:(id)owner
+          options:(NSString *)options
+             done:(void (^)(NSDictionary<NSString *, id> *))done {
+  dispatch_async(_queue, ^{
+    [self closeAll];
+    std::vector<rc_blob> items;
+    for (RECEngineBlob *blob in blobs) items.push_back({blob.name.UTF8String, blob.bytes, blob.size, 0});
+    // Held before the answer: a take may start as soon as `done` has run.
+    self->_blobOwner = owner;
+    if (![self openNow:items options:options done:done]) self->_blobOwner = nil;
   });
 }
 

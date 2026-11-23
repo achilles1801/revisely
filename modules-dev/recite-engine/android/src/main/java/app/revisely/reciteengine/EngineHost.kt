@@ -16,6 +16,9 @@ internal class EngineHost(private val emit: (take: Int, frames: List<String>, co
   private val takes = HashMap<Int, Long>()
   private var next = 1
 
+  /** Frees the memory of blobs the engine read without copying; run once rc_release has returned. */
+  private var releaseBlobs: (() -> Unit)? = null
+
   /** rc_info's JSON while the engine is open. */
   @Volatile
   var info: String? = null
@@ -51,6 +54,37 @@ internal class EngineHost(private val emit: (take: Int, frames: List<String>, co
       done(mapOf("ok" to false, "code" to code[0], "error" to (failure[0] ?: "")))
       return@execute
     }
+    val text = ReciteCoreNative.engineInfo(engine)
+    info = text
+    done(mapOf("ok" to true, "code" to 0, "info" to text))
+  }
+
+  /**
+   * Opens the engine from direct buffers (ReciteCoreNative.allocBlob), which it reads without copying. [released] frees
+   * them: it runs after rc_release, or at once if the open fails.
+   */
+  fun openBlobs(
+    names: List<String>,
+    buffers: List<ByteBuffer>,
+    options: String,
+    released: () -> Unit,
+    done: (Map<String, Any?>) -> Unit,
+  ) = queue.execute {
+    closeAll()
+    if (!ReciteCoreNative.available) {
+      released()
+      done(mapOf("ok" to false, "code" to RC_ERR_MODEL, "error" to "the native library didn't load"))
+      return@execute
+    }
+    val failure = arrayOfNulls<String>(1)
+    val code = IntArray(1)
+    engine = ReciteCoreNative.openBlobs(names.toTypedArray(), buffers.toTypedArray(), options, code, failure)
+    if (engine == 0L) {
+      released()
+      done(mapOf("ok" to false, "code" to code[0], "error" to (failure[0] ?: "")))
+      return@execute
+    }
+    releaseBlobs = released
     val text = ReciteCoreNative.engineInfo(engine)
     info = text
     done(mapOf("ok" to true, "code" to 0, "info" to text))
@@ -108,6 +142,8 @@ internal class EngineHost(private val emit: (take: Int, frames: List<String>, co
     takes.clear()
     if (engine != 0L) ReciteCoreNative.release(engine)
     engine = 0L
+    releaseBlobs?.invoke() // only now: the engine read from them until rc_release
+    releaseBlobs = null
     info = null
   }
 

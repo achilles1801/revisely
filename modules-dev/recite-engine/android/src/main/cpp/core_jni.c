@@ -80,6 +80,72 @@ JNIEXPORT jlong JNICALL FN(open)(JNIEnv* env, jobject self, jobjectArray names, 
   return (jlong)(intptr_t)engine;
 }
 
+/* rc_open over direct buffers, which the engine reads without copying: they outlive it (EngineHost). */
+JNIEXPORT jlong JNICALL FN(openBlobs)(JNIEnv* env, jobject self, jobjectArray names, jobjectArray buffers, jstring options,
+                                      jintArray code, jobjectArray failure) {
+  (void)self;
+  const jsize n = (*env)->GetArrayLength(env, names);
+  rc_blob* items = (rc_blob*)calloc(n ? (size_t)n : 1, sizeof *items);
+  jstring* name_refs = (jstring*)calloc(n ? (size_t)n : 1, sizeof *name_refs);
+  if (!items || !name_refs || (*env)->EnsureLocalCapacity(env, n + 4) != 0) {
+    free(items);
+    free(name_refs);
+    (*env)->ExceptionClear(env);
+    report(env, code, failure, RC_ERR_DATA, "out of memory");
+    return 0;
+  }
+  int rc = RC_ERR_DATA;
+  char err[256] = "a blob isn't a direct buffer";
+  int ok = 1;
+  jsize held = 0;
+  for (; held < n && ok; held++) {
+    name_refs[held] = (jstring)(*env)->GetObjectArrayElement(env, names, held);
+    items[held].name = (*env)->GetStringUTFChars(env, name_refs[held], NULL);
+    jobject buffer = (*env)->GetObjectArrayElement(env, buffers, held);
+    items[held].data = (*env)->GetDirectBufferAddress(env, buffer);
+    const jlong size = (*env)->GetDirectBufferCapacity(env, buffer);
+    (*env)->DeleteLocalRef(env, buffer);
+    items[held].size = size > 0 ? (size_t)size : 0;
+    items[held].copy = 0;
+    ok = items[held].name && items[held].data && size >= 0;
+  }
+  rc_engine* engine = NULL;
+  if (ok) {
+    const char* opts = (*env)->GetStringUTFChars(env, options, NULL);
+    if (opts) {
+      err[0] = 0;
+      engine = rc_open(items, (size_t)n, opts, &rc, err, sizeof err);
+      (*env)->ReleaseStringUTFChars(env, options, opts);
+    }
+  }
+  for (jsize i = 0; i < held; i++) {
+    if (items[i].name) (*env)->ReleaseStringUTFChars(env, name_refs[i], items[i].name);
+    (*env)->DeleteLocalRef(env, name_refs[i]);
+  }
+  free(items);
+  free(name_refs);
+  (*env)->ExceptionClear(env);
+  if (!engine) {
+    report(env, code, failure, rc, err);
+    return 0;
+  }
+  return (jlong)(intptr_t)engine;
+}
+
+JNIEXPORT jobject JNICALL FN(allocBlob)(JNIEnv* env, jobject self, jint size) {
+  (void)self;
+  void* memory = NULL;
+  if (size < 0 || posix_memalign(&memory, 64, size > 0 ? (size_t)size : 1) != 0) return NULL;
+  jobject buffer = (*env)->NewDirectByteBuffer(env, memory, size);
+  if (!buffer) free(memory);
+  return buffer;
+}
+
+JNIEXPORT void JNICALL FN(freeBlob)(JNIEnv* env, jobject self, jobject buffer) {
+  (void)self;
+  free((*env)->GetDirectBufferAddress(env, buffer));
+}
+
 JNIEXPORT void JNICALL FN(release)(JNIEnv* env, jobject self, jlong engine) {
   (void)env;
   (void)self;
