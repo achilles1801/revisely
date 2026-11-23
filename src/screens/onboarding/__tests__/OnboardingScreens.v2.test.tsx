@@ -50,6 +50,14 @@ jest.mock('../../../components/MemorizationBrowser', () => {
             onChange(next);
           }}
         />
+        <Pressable
+          testID="mark-page-5"
+          onPress={() => {
+            const next = new Map(pendingChanges);
+            next.set(5, 'memorized');
+            onChange(next);
+          }}
+        />
       </>
     ),
   };
@@ -254,7 +262,7 @@ describe('<JuzSelectionScreen />', () => {
     expect(screen.getByTestId('juz-cell-1').props.accessibilityState).toMatchObject({ checked: 'mixed' });
     expect(styleOf('juz-cell-1')).toMatchObject({ backgroundColor: light.accentSubtle, borderColor: light.accentText });
     expect(screen.getByTestId('juz-cell-2').props.accessibilityState).toMatchObject({ checked: false });
-    expect(summary()).toBe('Al-Fatihah chosen');
+    expect(summary()).toBe('1 page chosen');
     expectPrimary('juz-continue', 'Continue');
   });
 
@@ -263,7 +271,7 @@ describe('<JuzSelectionScreen />', () => {
     fireEvent.press(screen.getByTestId('juz-cell-30'));
     expect(screen.getByTestId('juz-cell-30').props.accessibilityState).toMatchObject({ checked: true });
     expect(styleOf('juz-cell-30').backgroundColor).toBe(light.primary);
-    expect(summary()).toBe('Al-Fatihah and Juz 30 chosen');
+    expect(summary()).toBe('1 juz and 1 page chosen');
 
     fireEvent.press(screen.getByTestId('juz-cell-2'));
     fireEvent.press(screen.getByTestId('juz-cell-2'));
@@ -344,6 +352,20 @@ describe('<JuzSelectionScreen />', () => {
     });
     const [, changed] = (mockApp.updatePages as jest.Mock).mock.calls[0] as [UserPage[], number[]];
     expect([...changed].sort((a, b) => a - b)).toEqual([1, ...Array.from({ length: 20 }, (_, i) => 22 + i)]);
+  });
+
+  it('[ONBOARD-4] the line counts what is chosen: a single page mid-surah never shows ayah numbers', async () => {
+    mockApp.pages = allPages().map((p) => (p.pageNumber === 5 ? page(5, 'memorized') : p));
+    await show(v2(<JuzSelectionScreen />));
+    // Part of it clears what was saved and starts from page 1; the list marks a page in Al-Baqarah again.
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('juz-by-surah'));
+    });
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('mark-page-5'));
+    });
+    expect(summary()).toBe('2 pages chosen');
+    expect(summary()).not.toMatch(/\d+[–-]\d+/);
   });
 
   it('a cell stays a 44pt target on the narrowest phone, and six fit inside the gutters', () => {

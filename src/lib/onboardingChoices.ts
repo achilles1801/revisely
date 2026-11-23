@@ -26,6 +26,20 @@ export function juzState(juz: number, memorized: ReadonlySet<number>): JuzState 
   return held === pages.length ? 'all' : 'part';
 }
 
+/** What's chosen as counts: juz held whole, and the pages outside them. Never ayah numbers (Majd, Nov 23 2026). */
+export function chosenCounts(memorized: readonly number[]): { juz: number; pages: number } {
+  const set = new Set(memorized);
+  let juz = 0;
+  let inWholeJuz = 0;
+  for (const n of JUZ_NUMBERS) {
+    if (juzState(n, set) === 'all') {
+      juz++;
+      inWholeJuz += getPagesForJuz(n).length;
+    }
+  }
+  return { juz, pages: set.size - inWholeJuz };
+}
+
 /**
  * A tap on a juz in the grid: a juz not wholly chosen becomes whole, a whole one is cleared. The pages change as the
  * list's juz check changes them (a page back at its saved status leaves the buffer). A surah that loses a page this way

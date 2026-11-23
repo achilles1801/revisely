@@ -60,8 +60,8 @@ How the tests are made: `tests/scenarios/README.md`.
   the day starts at midnight. "Remind me" or "Not now" ends setup: the plan is saved and onboarding is complete.
 - **ONBOARD-4.** "Which juz?" is a grid of the 30 juz: a tap chooses a whole juz and a second clears it. Al-Fatihah
   starts chosen, so Juz 1 starts partly chosen, which looks different and is read out as mixed; a tap makes a partly
-  chosen juz whole. "Choose by surah instead" opens the list on the same selection. The line at the foot names what is
-  chosen by surah and juz ("Al-Fatihah and Juz 30 chosen").
+  chosen juz whole. "Choose by surah instead" opens the list on the same selection. The line at the foot counts what is
+  chosen ("1 juz and 1 page chosen"), never with ayah numbers.
 
 ## The schedule
 

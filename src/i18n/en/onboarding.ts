@@ -19,8 +19,14 @@ export const onboarding = {
   juz: {
     title: 'Which juz?',
     subtitle: 'Tap the ones you know.',
-    /** What's chosen, by surah and juz: "Al-Fatihah and Juz 30 chosen". */
-    chosen: '{{passage}} chosen',
+    /** What's chosen, as counts: "5 juz chosen", "1 juz and 1 page chosen". */
+    chosenJuz_one: '{{count}} juz chosen',
+    chosenJuz_other: '{{count}} juz chosen',
+    chosenPages_one: '{{count}} page chosen',
+    chosenPages_other: '{{count}} pages chosen',
+    chosenBoth: '{{juz}} and {{pages}} chosen',
+    pagesCount_one: '{{count}} page',
+    pagesCount_other: '{{count}} pages',
     none: 'Nothing chosen yet',
     bySurah: 'Choose by surah instead',
     bySurahTitle: 'Choose by surah',

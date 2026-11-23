@@ -46,9 +46,9 @@ appId: com.revisionbuddy.app
 - extendedWaitUntil:
     visible:
       id: juz-selection-summary
-      text: "Al.Fatihah chosen"
+      text: "1 page chosen"
     timeout: 30000
-# Tapped only while the line still says Al-Fatihah alone, and again only if a tap was lost: a tap
+# Tapped only while the line still counts Al-Fatihah's page alone, and again only if a tap was lost: a tap
 # toggles the juz, so a second one would clear it.
 - retry:
     maxRetries: 2
@@ -57,7 +57,7 @@ appId: com.revisionbuddy.app
           when:
             visible:
               id: juz-selection-summary
-              text: "Al.Fatihah chosen"
+              text: "1 page chosen"
           commands:
             - tapOn:
                 id: juz-cell-30
@@ -65,7 +65,7 @@ appId: com.revisionbuddy.app
       - extendedWaitUntil:
           visible:
             id: juz-selection-summary
-            text: "Al.Fatihah and Juz.30 chosen"
+            text: "1 juz and 1 page chosen"
           timeout: 5000
 - runFlow:
     when:

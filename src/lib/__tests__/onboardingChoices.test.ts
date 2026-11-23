@@ -1,4 +1,4 @@
-import { daysPerRound, firstDayPages, juzState, memorizedWithPending, toggleJuz } from '../onboardingChoices';
+import { chosenCounts, daysPerRound, firstDayPages, juzState, memorizedWithPending, toggleJuz } from '../onboardingChoices';
 import { getPagesForJuz } from '../quranData';
 import type { PageStatus } from '../memorizationChanges';
 import type { UserPage } from '../../types';
@@ -42,6 +42,15 @@ describe('toggleJuz', () => {
     // Al-Fatihah was only in the buffer; Al-Baqarah was saved, so it is cleared explicitly.
     expect(cleared.pendingSurahs.has(1)).toBe(false);
     expect(cleared.pendingSurahs.get(2)).toBe('not_memorized');
+  });
+});
+
+describe('chosenCounts', () => {
+  it('counts whole juz, and the pages outside them', () => {
+    expect(chosenCounts([1])).toEqual({ juz: 0, pages: 1 });
+    expect(chosenCounts(getPagesForJuz(30))).toEqual({ juz: 1, pages: 0 });
+    expect(chosenCounts([1, ...getPagesForJuz(30)])).toEqual({ juz: 1, pages: 1 });
+    expect(chosenCounts([])).toEqual({ juz: 0, pages: 0 });
   });
 });
 

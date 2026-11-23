@@ -38,15 +38,15 @@ it('[ONBOARD-1] a juz marked before its pages have arrived counts at once, and i
 
     // Juz 30 (582–604) is marked while its pages are still on their way.
     await screen.tapJuz(30);
-    // Its cell shows it, and so does the line: Al-Fatihah (Part of it starts there) and the juz.
-    expect(screen.summary()).toBe('Al-Fatihah and Juz 30 chosen');
+    // Its cell shows it, and so does the line: Al-Fatihah's page (Part of it starts there) and the juz.
+    expect(screen.summary()).toBe('1 juz and 1 page chosen');
     // Saving now would leave Juz 30 out, so Continue waits for its pages.
     expect(screen.continueEnabled()).toBe(false);
 
     // The second batch lands.
     addPages(email, 451, 604);
     await app.until(() => app.app.pages.length === 604, 'the second batch of pages');
-    expect(screen.summary()).toBe('Al-Fatihah and Juz 30 chosen');
+    expect(screen.summary()).toBe('1 juz and 1 page chosen');
     expect(screen.continueEnabled()).toBe(true);
 
     await screen.continue();
@@ -94,7 +94,7 @@ it('[ONBOARD-3] one question a screen, from the welcome to Home’s data: Part o
   // One tap answers it: no Continue on this screen.
   await flow.press('journey-part');
   await flow.reach('juz-selection');
-  await app.until(() => flow.summary() === 'Al-Fatihah chosen', 'Al-Fatihah to start chosen');
+  await app.until(() => flow.summary() === '1 page chosen', 'Al-Fatihah to start chosen');
   await flow.tapJuz(30);
   await flow.press('juz-continue');
   await flow.reach('daily-amount');
@@ -150,12 +150,12 @@ it('[ONBOARD-4] a juz tapped twice is cleared, and only what is chosen is saved'
   await app.act(() => app.auth.signIn(email, 'scenario-password'));
   await app.until(() => app.app.pages.length === 604, 'the pages');
   const screen = new Onboarding(app);
-  await app.until(() => screen.summary() === 'Al-Fatihah chosen', 'Al-Fatihah to start chosen');
+  await app.until(() => screen.summary() === '1 page chosen', 'Al-Fatihah to start chosen');
 
   await screen.tapJuz(2);
   await screen.tapJuz(2);
   await screen.tapJuz(30);
-  expect(screen.summary()).toBe('Al-Fatihah and Juz 30 chosen');
+  expect(screen.summary()).toBe('1 juz and 1 page chosen');
   await screen.continue();
   await app.untilSynced();
   expect(memorizedOnServer(email)).toEqual([1, ...pagesRange(582, 604)]);

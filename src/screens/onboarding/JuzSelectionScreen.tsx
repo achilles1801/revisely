@@ -17,8 +17,7 @@ import {
   buildInitialPendingSurahsForJourney,
   markedPagesNotLoaded,
 } from '../../lib/memorizationChanges';
-import { JUZ_NUMBERS, juzState, memorizedWithPending, toggleJuz } from '../../lib/onboardingChoices';
-import { describePassage } from '../../lib/passages';
+import { JUZ_NUMBERS, chosenCounts, juzState, memorizedWithPending, toggleJuz } from '../../lib/onboardingChoices';
 import { useTheme } from '../../context/ThemeContext';
 import { layoutV2, typeV2 } from '../../theme/v2';
 import { useApp } from '../../context/AppContext';
@@ -118,9 +117,19 @@ export default function JuzSelectionScreen() {
     }
   };
 
-  // Named by surah and juz (NAME-1): "Al-Fatihah and Juz 30".
+  // Counts only: "1 juz and 1 page chosen". A name here could carry ayah numbers.
+  const counts = chosenCounts(chosen);
   const summary =
-    chosen.length > 0 ? t('onboarding.juz.chosen', { passage: describePassage(chosen, { form: 'short' }) }) : t('onboarding.juz.none');
+    counts.juz > 0 && counts.pages > 0
+      ? t('onboarding.juz.chosenBoth', {
+          juz: t('common.juzCount', { count: counts.juz }),
+          pages: t('onboarding.juz.pagesCount', { count: counts.pages }),
+        })
+      : counts.juz > 0
+        ? t('onboarding.juz.chosenJuz', { count: counts.juz })
+        : counts.pages > 0
+          ? t('onboarding.juz.chosenPages', { count: counts.pages })
+          : t('onboarding.juz.none');
 
   return (
     <QuestionScreen
