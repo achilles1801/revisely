@@ -282,3 +282,19 @@ JNIEXPORT jstring JNICALL FN(meterFrame)(JNIEnv* env, jobject self, jdoubleArray
   (*env)->GetDoubleArrayRegion(env, meter, 0, RH_METER_DOUBLES, (jdouble*)&m);
   return rh_meter_frame(&m, thermal, text, sizeof text) > 0 ? (*env)->NewStringUTF(env, text) : NULL;
 }
+
+/* rc_clip for the teacher's clips: all the samples asked for, or NULL. `/second` takes 20 s at most. */
+JNIEXPORT jbyteArray JNICALL FN(clip)(JNIEnv* env, jobject self, jlong session, jlong s0, jlong s1) {
+  (void)self;
+  const jlong samples = s1 - s0;
+  if (s0 < 0 || samples <= 0 || samples > 320000) return NULL;
+  int16_t* pcm = (int16_t*)malloc((size_t)samples * sizeof *pcm);
+  if (!pcm) return NULL;
+  jbyteArray out = NULL;
+  if (rc_clip((const rc_session*)(intptr_t)session, s0, s1, pcm, (size_t)samples) == (size_t)samples) {
+    out = (*env)->NewByteArray(env, (jsize)(samples * 2));
+    if (out) (*env)->SetByteArrayRegion(env, out, 0, (jsize)(samples * 2), (const jbyte*)pcm);
+  }
+  free(pcm);
+  return out;
+}

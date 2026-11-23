@@ -122,6 +122,11 @@ class ReciteEngineModule : Module() {
       Unit
     }
 
+    // Samples [s0, s1) of an open take as base64, for the teacher's clips; null if they aren't there.
+    AsyncFunction("engineClip") { take: Int, s0: Double, s1: Double, promise: Promise ->
+      engine.clip(take, s0.toLong(), s1.toLong()) { promise.resolve(it) }
+    }
+
     AsyncFunction("engineRelease") { promise: Promise ->
       engine.release { promise.resolve(null) }
     }

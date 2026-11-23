@@ -32,6 +32,9 @@ internal object ReciteCoreNative {
   external fun control(session: Long, frame: String): Int
   external fun finish(session: Long): Int
 
+  /** rc_clip: samples [s0, s1) as little-endian bytes; null unless all of them are there (20 s at most). */
+  external fun clip(session: Long, s0: Long, s1: Long): ByteArray?
+
   /** A direct buffer outside the Java heap, 64-byte aligned, for a pack blob; null without the memory. Free it with freeBlob. */
   external fun allocBlob(size: Int): ByteBuffer?
   external fun freeBlob(buffer: ByteBuffer)

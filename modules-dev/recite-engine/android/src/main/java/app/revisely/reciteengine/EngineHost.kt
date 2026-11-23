@@ -1,5 +1,6 @@
 package app.revisely.reciteengine
 
+import android.util.Base64
 import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -154,6 +155,12 @@ internal class EngineHost(private val emit: (take: Int, frames: List<String>, co
     val session = takes.remove(take) ?: return@execute
     meters.remove(take)
     ReciteCoreNative.close(session)
+  }
+
+  /** Samples [s0, s1) of an open take as base64 of 16-bit little-endian PCM; null if the take is gone or they aren't there. */
+  fun clip(take: Int, s0: Long, s1: Long, done: (String?) -> Unit) = queue.execute {
+    val bytes = takes[take]?.let { ReciteCoreNative.clip(it, s0, s1) }
+    done(bytes?.let { Base64.encodeToString(it, Base64.NO_WRAP) })
   }
 
   /** Closes every take and the engine. */

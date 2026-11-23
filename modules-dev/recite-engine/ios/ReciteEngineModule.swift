@@ -93,6 +93,15 @@ public class ReciteEngineModule: Module {
 
     Function("engineClose") { (take: Int) in RECEngine.shared.closeTake(take) }
 
+    /// Samples [s0, s1) of an open take as base64, for the teacher's clips; null if they aren't there.
+    AsyncFunction("engineClip") { (take: Int, s0: Double, s1: Double, promise: Promise) in
+      guard let from = Int64(exactly: s0), let to = Int64(exactly: s1) else {
+        promise.resolve(nil)
+        return
+      }
+      RECEngine.shared.clipTake(take, from: from, to: to) { promise.resolve($0) }
+    }
+
     AsyncFunction("engineRelease") { (promise: Promise) in
       RECEngine.shared.releaseEngine { promise.resolve(nil) }
     }

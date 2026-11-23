@@ -154,6 +154,8 @@ declare class ReciteEngineModule extends NativeModule<ReciteEngineEvents> {
   engineControl?(take: number, frame: string): void;
   engineFinish?(take: number): void;
   engineClose?(take: number): void;
+  /** Samples [s0, s1) of an open take as base64 of 16-bit PCM, for the teacher's clips; null if they aren't there. */
+  engineClip?(take: number, s0: number, s1: number): Promise<string | null>;
   engineRelease?(): Promise<void>;
   sha256(path: string): Promise<string>;
   bench(plan: BenchPlan): Promise<BenchResult>;

@@ -219,6 +219,21 @@ static void collect(void *ctx, const char *frame, size_t len) {
   });
 }
 
+- (void)clipTake:(NSInteger)take from:(int64_t)s0 to:(int64_t)s1 done:(void (^)(NSString *_Nullable))done {
+  dispatch_async(_queue, ^{
+    rc_session *session = [self sessionOf:take];
+    const int64_t samples = s1 - s0;
+    // `/second` takes 20 s at most.
+    if (!session || s0 < 0 || samples <= 0 || samples > 320000) {
+      done(nil);
+      return;
+    }
+    NSMutableData *pcm = [NSMutableData dataWithLength:static_cast<NSUInteger>(samples) * sizeof(int16_t)];
+    const size_t got = rc_clip(session, s0, s1, static_cast<int16_t *>(pcm.mutableBytes), static_cast<size_t>(samples));
+    done(got == static_cast<size_t>(samples) ? [pcm base64EncodedStringWithOptions:0] : nil);
+  });
+}
+
 - (void)releaseEngine:(void (^)(void))done {
   dispatch_async(_queue, ^{
     [self closeAll];

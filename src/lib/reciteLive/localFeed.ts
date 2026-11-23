@@ -9,6 +9,7 @@
 // The engine also emits frames for the host alone, `clip` (a word for the teacher) and `health`: they go to `onHostFrame`
 // and never reach the take's state.
 
+import type { ClipSender, Verdict } from './clipSender';
 import { LiveEvent, parseEvent } from './contract';
 import type { ClientFrame, LiveConnect, LiveConnection, LiveHandlers, StartFrame } from './feed';
 import { NAMES_WAIT_MS } from './socket';
@@ -31,6 +32,8 @@ export interface EngineBridge {
   control(take: number, frame: string): void;
   finish(take: number): void;
   close(take: number): void;
+  /** Samples [s0, s1) of the take as base64, for the teacher's clips. */
+  clip?(take: number, s0: number, s1: number): Promise<string | null>;
   onFrames(listener: (e: EngineFrames) => void): () => void;
 }
 
@@ -44,6 +47,8 @@ export interface LocalDeps {
   onHostFrame?: (frame: Record<string, unknown>) => void;
   /** The engine refused this take, and why. */
   onFallback?: (why: string) => void;
+  /** The teacher's second opinion on this take's marks (lib/reciteLive/clipSender); absent: its marks stand as they are. */
+  clips?: (hooks: { cut: (s0: number, s1: number) => Promise<string | null>; verdict: (id: string, v: Verdict) => void }) => ClipSender;
   /** Once, when a take that ran here has ended (lib/onDevice/takeReport). */
   onPhoneEnd?: (end: PhoneTakeEnd) => void;
   timers?: { set: (fn: () => void, ms: number) => unknown; clear: (h: unknown) => void };
@@ -96,6 +101,13 @@ export function localFeed(deps: LocalDeps): LiveConnect {
     const dismissed = new Set<string>();
     const hints: PhoneTakeEnd['hints'] = [];
     let told = false;
+    const sender =
+      deps.clips?.({
+        cut: (s0, s1) => (take != null && engine.clip ? engine.clip(take, s0, s1) : Promise.resolve(null)),
+        verdict: (id, verdict) => {
+          if (take != null && !finished) engine.control(take, JSON.stringify({ type: 'verdict', id, verdict }));
+        },
+      }) ?? null;
 
     /** `health` comes after `done`, in the same batch: a take that has just finished still takes it. */
     const hostFrame = (x: Record<string, unknown> | null): boolean => {
@@ -105,6 +117,7 @@ export function localFeed(deps: LocalDeps): LiveConnect {
       }
       if (x?.type !== 'clip' && x?.type !== 'health') return false;
       if (x.type === 'health') health = x;
+      if (x.type === 'clip') sender?.add(x);
       deps.onHostFrame?.(x);
       return true;
     };
@@ -132,6 +145,7 @@ export function localFeed(deps: LocalDeps): LiveConnect {
       if (finished) return;
       finished = true;
       if (e?.type === 'error' && how !== 'done') how = 'error';
+      sender?.close();
       if (namesWait != null) timers.clear(namesWait);
       namesWait = null;
       unsubscribe?.();
@@ -146,6 +160,7 @@ export function localFeed(deps: LocalDeps): LiveConnect {
       if (finished || server) return;
       unsubscribe?.();
       unsubscribe = null;
+      sender?.close();
       if (take != null) engine.close(take);
       take = null;
       deps.onFallback?.(why);
@@ -168,8 +183,13 @@ export function localFeed(deps: LocalDeps): LiveConnect {
     };
 
     const apply = (id: number, frame: Control) => {
-      if (frame.type === 'end') engine.finish(id);
-      else engine.control(id, JSON.stringify(frame));
+      if (frame.type !== 'end') engine.control(id, JSON.stringify(frame));
+      else if (!sender) engine.finish(id);
+      // Stop waits a moment for the verdicts still out (at most 0.5 s), which the engine uses as it decides the take.
+      else
+        void sender.stop().then(() => {
+          if (!finished && !server && take === id) engine.finish(id);
+        });
     };
 
     const onFrame = (raw: string) => {
@@ -187,6 +207,7 @@ export function localFeed(deps: LocalDeps): LiveConnect {
         return;
       }
       if (start.keep && x) events.push(x);
+      if (e.type === 'unmark') sender?.drop(e.id);
       if (e.type === 'done') {
         how = 'done';
         result = x?.result && typeof x.result === 'object' ? (x.result as Record<string, unknown>) : null;
@@ -236,7 +257,7 @@ export function localFeed(deps: LocalDeps): LiveConnect {
     });
 
     engine
-      .start(JSON.stringify(start))
+      .start(JSON.stringify(sender ? { ...start, clips: true } : start))
       .catch((err: unknown) => ({ error: String(err), code: -1, take: undefined }))
       .then((r) => {
         if (r.take == null) {

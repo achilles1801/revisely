@@ -11,6 +11,7 @@ import { logger } from '../logger';
 import { currentRelease } from '../releaseInfo';
 import { RECITE_CHECK_URL, sendLabel } from '../reciteCheck/service';
 import { wavHeader } from '../reciteCheck/wav';
+import type { SecondClip } from '../reciteLive/clipSender';
 import { keepBody, lineFrom, type PhoneTakeEnd } from '../reciteLive/phoneTake';
 import type { EngineInfo } from '../reciteLive/where';
 
@@ -88,6 +89,27 @@ const defaults: ReportDeps = {
   },
   label: sendLabel,
 };
+
+/** One call to `/second` (recite-contract.md draft 14). A signed-out phone gets what the server would say. */
+export async function postSecond(clips: SecondClip[], timeoutMs: number): Promise<{ status: number; results?: unknown }> {
+  const headers = await defaults.headers();
+  if (!headers) return { status: 401 };
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${RECITE_CHECK_URL}/second`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clips }),
+      signal: abort.signal,
+    });
+    if (!res.ok) return { status: res.status };
+    const body = (await res.json()) as { results?: unknown };
+    return { status: res.status, results: body.results };
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 async function sendLine(end: PhoneTakeEnd, info: EngineInfo | null, extra: Record<string, number>, d: ReportDeps): Promise<void> {
   const line = lineFrom(end, info, extra);

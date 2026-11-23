@@ -1,6 +1,6 @@
 import type { LiveEvent } from '../contract';
 import type { LiveConnection, StartFrame } from '../feed';
-import { EngineBridge, EngineFrames, localFeed } from '../localFeed';
+import { EngineBridge, EngineFrames, LocalDeps, localFeed } from '../localFeed';
 import type { PhoneTakeEnd } from '../phoneTake';
 import { NAMES_WAIT_MS } from '../socket';
 
@@ -19,11 +19,13 @@ const flush = async () => {
 
 function fakeEngine(answer: { take?: number; code?: number; error?: string } = { take: 7 }) {
   const calls: unknown[][] = [];
+  const startFrames: Record<string, unknown>[] = [];
   let listener: ((e: EngineFrames) => void) | null = null;
   let resolveStart: ((v: { take?: number; code?: number; error?: string }) => void) | null = null;
   const engine: EngineBridge = {
     start: (frame) => {
       calls.push(['start', JSON.parse(frame).type]);
+      startFrames.push(JSON.parse(frame));
       return new Promise((r) => {
         resolveStart = r;
       });
@@ -43,6 +45,7 @@ function fakeEngine(answer: { take?: number; code?: number; error?: string } = {
   return {
     engine,
     calls,
+    startFrames,
     answerStart: async (a = answer) => {
       resolveStart?.(a);
       await flush();
@@ -306,6 +309,101 @@ describe('[ONDEV-4] localFeed: what a finished take leaves for the server', () =
     gone.conn.close();
     await gone.answerStart();
     expect(gone.ends).toEqual([]);
+  });
+});
+
+describe('[ONDEV-4] localFeed: the teacher’s clips', () => {
+  const CLIP = JSON.stringify({ type: 'clip', id: '12:word:sound', kind: 'word', a: 11, b: 14, w: 12, s0: 0, s1: 8000 });
+
+  function withClips(start: StartFrame = START) {
+    const fake = fakeEngine();
+    const srv = fakeServer();
+    const sent: Record<string, unknown>[] = [];
+    let finishStop: () => void = () => undefined;
+    const closed = { n: 0 };
+    let hooks!: Parameters<NonNullable<LocalDeps['clips']>>[0];
+    const connect = localFeed({
+      engine: fake.engine,
+      asked: { on: 'phone', why: 'forced' },
+      fallback: srv.connect,
+      clips: (h) => {
+        hooks = h;
+        return {
+          add: (f) => sent.push(f),
+          drop: (id) => sent.push({ dropped: id }),
+          stop: () => new Promise<void>((r) => (finishStop = r)),
+          close: () => (closed.n += 1),
+        };
+      },
+    });
+    const events: LiveEvent[] = [];
+    const conn = connect(start, { onEvent: (e) => events.push(e), onClose: () => undefined });
+    return { ...fake, srv, conn, sent, closed, events, hooks: () => hooks, release: () => finishStop() };
+  }
+
+  it('asks the engine for clips, and never tells the server', async () => {
+    const t = withClips();
+    await t.answerStart({ code: -3 });
+    const toEngine = t.calls.find((c) => c[0] === 'start');
+    expect(toEngine).toBeDefined();
+    expect(t.startFrames[0]).toMatchObject({ clips: true });
+    expect((t.srv.connect.mock.calls[0] as unknown[])[0]).not.toHaveProperty('clips');
+    expect(t.closed.n).toBe(1);
+  });
+
+  it('a `clip` goes to the sender and never reaches the take', async () => {
+    const t = withClips();
+    await t.answerStart();
+    t.emit([READY, CLIP]);
+    expect(t.sent).toEqual([JSON.parse(CLIP)]);
+    expect(t.events.map((e) => e.type)).toEqual(['ready']);
+  });
+
+  it('a mark the take took back cancels its clip', async () => {
+    const t = withClips();
+    await t.answerStart();
+    t.emit([READY, JSON.stringify({ type: 'unmark', id: '12:word:sound', why: 'retracted' })]);
+    expect(t.sent).toEqual([{ dropped: '12:word:sound' }]);
+  });
+
+  it('a verdict goes to the engine as a control', async () => {
+    const t = withClips();
+    await t.answerStart();
+    t.emit([READY]);
+    t.hooks().verdict('12:word:sound', 'veto');
+    expect(t.calls).toContainEqual(['control', 7, { type: 'verdict', id: '12:word:sound', verdict: 'veto' }]);
+  });
+
+  it('Stop waits for the sender before the engine finishes', async () => {
+    const t = withClips();
+    await t.answerStart();
+    t.emit([READY]);
+    t.conn.send({ type: 'end' });
+    await flush();
+    expect(t.calls.filter((c) => c[0] === 'finish')).toEqual([]);
+    t.release();
+    await flush();
+    expect(t.calls.filter((c) => c[0] === 'finish')).toEqual([['finish', 7]]);
+  });
+
+  it('a take closed while Stop waits never finishes the engine', async () => {
+    const t = withClips();
+    await t.answerStart();
+    t.emit([READY]);
+    t.conn.send({ type: 'end' });
+    t.conn.close();
+    t.release();
+    await flush();
+    expect(t.calls.filter((c) => c[0] === 'finish')).toEqual([]);
+    expect(t.closed.n).toBe(1);
+  });
+
+  it('cuts its clips from the engine, and only while the take is open', async () => {
+    const t = withClips();
+    expect(await t.hooks().cut(0, 8000)).toBeNull();
+    await t.answerStart();
+    t.engine.clip = async (take, s0, s1) => `${take}:${s0}:${s1}`;
+    expect(await t.hooks().cut(0, 8000)).toBe('7:0:8000');
   });
 });
 

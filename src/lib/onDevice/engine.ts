@@ -10,12 +10,14 @@ import { File, Paths } from 'expo-file-system';
 import { AppState } from 'react-native';
 import type { LiveConnect, StartFrame } from '../reciteLive/feed';
 import type { EngineBridge } from '../reciteLive/localFeed';
+import { clipSender } from '../reciteLive/clipSender';
 import { routedFeed } from '../reciteLive/route';
 import { chooseWhere, EngineInfo, parseEngineInfo, WhereAnswer } from '../reciteLive/where';
 import { reciteWhere } from '../reciteLive/whereSettings';
 import { speedKeeper } from './speedCheck';
-import { reportPhoneTake } from './takeReport';
+import { postSecond, reportPhoneTake } from './takeReport';
 import { logger } from '../logger';
+import { knownOffline } from '../networkState';
 import { isDevVariant } from '../variant';
 import { coreLine } from './coreInfo';
 
@@ -35,13 +37,14 @@ function native(): Native | null {
 export function engineBridge(): EngineBridge | null {
   const m = native();
   if (!m?.engineStart || !m.engineFeed || !m.engineControl || !m.engineFinish || !m.engineClose) return null;
-  const { engineStart, engineFeed, engineControl, engineFinish, engineClose } = m;
+  const { engineStart, engineFeed, engineControl, engineFinish, engineClose, engineClip } = m;
   return {
     start: (frame) => engineStart.call(m, frame, openEngineInfo()?.hop ?? 0.5),
     feed: (take, pcm) => engineFeed.call(m, take, pcm),
     control: (take, frame) => engineControl.call(m, take, frame),
     finish: (take) => engineFinish.call(m, take),
     close: (take) => engineClose.call(m, take),
+    ...(engineClip ? { clip: (take: number, s0: number, s1: number) => engineClip.call(m, take, s0, s1) } : {}),
     onFrames: (listener) => {
       const sub = m.addListener('onEngineFrames', listener);
       return () => sub.remove();
@@ -188,6 +191,14 @@ export function deviceConnect(server: LiveConnect): LiveConnect {
       warmEngine();
       speed.schedule();
     },
+    clips: (hooks) =>
+      clipSender({
+        ...hooks,
+        post: postSecond,
+        online: () => !knownOffline(),
+        later: (fn, ms) => setTimeout(fn, ms),
+        cancel: (h) => clearTimeout(h as ReturnType<typeof setTimeout>),
+      }),
     onTakeOpen: speed.takeOpened,
     onTakeClose: speed.takeClosed,
     onPhoneEnd: (end) => {

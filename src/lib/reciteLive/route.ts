@@ -1,5 +1,6 @@
 // Each take to where it runs (lib/reciteLive/where): the phone's engine, or the checker's server.
 
+import type { ClipDeps, ClipSender } from './clipSender';
 import type { LiveConnect } from './feed';
 import { EngineBridge, localFeed } from './localFeed';
 import type { PhoneTakeEnd } from './phoneTake';
@@ -21,6 +22,8 @@ export interface RouteDeps {
   onHostFrame?: (frame: Record<string, unknown>) => void;
   /** Where a take went and why; again, as `refused`, when the engine turns it down at its start. */
   onRouted?: (answer: WhereAnswer) => void;
+  /** The teacher's second opinion, for an engine that asks for it (`can.clips`). */
+  clips?: (hooks: Pick<ClipDeps, 'cut' | 'verdict'>) => ClipSender;
   /** A take that ran on the phone has ended. */
   onPhoneEnd?: (end: PhoneTakeEnd) => void;
   /** Any take, wherever it runs, has opened or closed (nothing is measured beside one). */
@@ -48,6 +51,8 @@ export function routedFeed(deps: RouteDeps): LiveConnect {
       fallback: (s, h) => toServer(deps.server, refused(why))(s, h),
       onHostFrame: deps.onHostFrame,
       onPhoneEnd: deps.onPhoneEnd,
+      // Recite only follows: it has no marks for the teacher to hear.
+      clips: deps.info()?.can?.clips && !start.follow ? deps.clips : undefined,
       onFallback: (detail) => {
         why = detail;
         deps.onRouted?.(refused(detail));
