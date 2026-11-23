@@ -225,6 +225,7 @@ export const settings = {
     unavailableVerify: 'Couldn’t verify this app. Try again',
     unavailableNone: 'Nothing to download yet',
     unavailableBad: 'This version didn’t open. Download it again',
+    unavailablePaused: 'Paused after a few tries today',
     idle: 'For checking your recitation on this phone',
     downloadNow: 'Download now',
     remove: 'Remove from this phone',

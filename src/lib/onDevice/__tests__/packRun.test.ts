@@ -3,6 +3,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setNetworkState, __resetNetworkStateForTests } from '../../networkState';
 import {
+  AUTO_CALLS_A_DAY,
   __resetPackForTests,
   downloadPackNow,
   dropBadPack, refetchDamagedPack,
@@ -420,6 +421,47 @@ describe('Recite’s pack on the phone', () => {
     expect(packForEngine()?.packId).toBe('v7m-1');
     expect(getPackStatus().why).toBeUndefined();
     clock.mockRestore();
+  });
+
+  it('coming back mid-download uses the links it has, and doesn’t spend another call', async () => {
+    mockDownload.mockResolvedValue({ status: 500 });
+    await run();
+    expect(getPackStatus().phase).toBe('error');
+    await run();
+    await run();
+    expect(mockCall).toHaveBeenCalledTimes(1);
+    expect(mockDownload.mock.calls.length).toBeGreaterThan(1);
+  });
+
+  it('links the server refuses are asked for again', async () => {
+    mockDownload.mockResolvedValueOnce({ status: 403 });
+    await run();
+    expect(getPackStatus().phase).toBe('error');
+    await run();
+    expect(mockCall).toHaveBeenCalledTimes(2);
+    expect(packForEngine()?.packId).toBe('v7m-1');
+  });
+
+  it('without a pack it takes three answers a day by itself, and Download now can still ask', async () => {
+    mockDownload.mockResolvedValue({ status: 500 });
+    mockCall.mockImplementation(async () => ({ result: { ...answer().result, expiresAt: Date.now() } })); // links that don't last
+    for (let i = 0; i < 6; i++) await run();
+    expect(mockCall).toHaveBeenCalledTimes(AUTO_CALLS_A_DAY);
+    const s = getPackStatus();
+    expect(s).toMatchObject({ phase: 'unavailable', why: 'paused' });
+    expect(describePack(s).subtitle).toBe('Paused after a few tries today');
+    expect(packMenuActions(s).some((a) => a.key === 'download')).toBe(true);
+
+    await downloadPackNow();
+    await settle();
+    expect(mockCall).toHaveBeenCalledTimes(AUTO_CALLS_A_DAY + 1);
+  });
+
+  it('a refusal the callable doesn’t count doesn’t use up the phone’s own tries', async () => {
+    mockCall.mockRejectedValue(Object.assign(new Error('This account can’t download the pack yet.'), { code: 'PERMISSION_DENIED' }));
+    for (let i = 0; i < 5; i++) await run();
+    expect(mockCall).toHaveBeenCalledTimes(5);
+    expect(getPackStatus().why).toBe('account');
   });
 
   it('Download now tries a refused pack again', async () => {

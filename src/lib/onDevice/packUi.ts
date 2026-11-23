@@ -34,13 +34,16 @@ function unavailableLine(why: PackRefusal | null | undefined): string {
       return t('settings.recitePack.unavailableNone');
     case 'bad':
       return t('settings.recitePack.unavailableBad');
+    case 'paused':
+      return t('settings.recitePack.unavailablePaused');
     default:
       return t('settings.recitePack.unavailable');
   }
 }
 
-/** Trying again can help: the app couldn't be verified just now, or a copy the engine refused can be fetched afresh. */
-const worthRetrying = (s: PackStatus): boolean => s.phase !== 'unavailable' || s.why === 'verify' || s.why === 'bad';
+/** Trying again can help: the app couldn't be verified just now, a copy the engine refused can be fetched afresh, or the phone stopped trying by itself. */
+const worthRetrying = (s: PackStatus): boolean =>
+  s.phase !== 'unavailable' || s.why === 'verify' || s.why === 'bad' || s.why === 'paused';
 
 /** The row's value (right) and the line under its label. */
 export function describePack(s: PackStatus): { value: string; subtitle: string } {
