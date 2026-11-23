@@ -435,6 +435,34 @@ owner's `on-device-release.md`).
     library; the `onnxruntime` jar on Maven Central) before a runner build. Their features follow workstream M's spec
     (`~/revisely-mistake-lab/runs/mobile/SPEC.md`) and match its vectors (Nov 23, Mac: features within 1.3e-6, the
     model's output identical, every top sound the same).
+- **The private engine (`recite-core`)** (Majd, Nov 23 2026: "Keep the checker code in your private repo and pull it
+  into the app at build time—do not commit it directly to a public repository"). Only compiled libraries and the C
+  header cross; the source stays in `revisely-internal` (`recite-core/`).
+  - **A release:** a tag `recite-core-v<x.y.z>` on `recite-core/main` runs that repository's
+    `recite-core-release.yml`: the gate, the iOS xcframework (arm64, simulator arm64 + x86_64), Android static libraries
+    (arm64-v8a, armeabi-v7a, x86_64), each one prelinked object where only `rc_*` is global, zipped onto a private
+    release. iOS spends that repository's small free macOS allowance, so tag versions the app needs, not every merge.
+    The gate refuses anything but the replay stand-in until the golden takes' parity check is wired in.
+  - **Moving the app to it:** `node modules-dev/recite-engine/core/bump.js <x.y.z>` (the laptop's `gh`) checks the zip
+    against the sha256 its CI published, copies it to `achilles1801/revisely-engine-releases`, a private repository of
+    compiled zips and nothing else, reads the copy back, and writes `core/recite-core.lock` (repository, version, asset,
+    sha256, ABI) and `core/include/recite_core.h`. The lock is the engine's only trace in git and what Dev's fingerprint
+    hashes, so a new version is one Dev native build.
+  - **The fetch:** `core/fetch.js` downloads the locked zip and fails the build if the sha256, version, ABI or header
+    doesn't match. **With no token it leaves a stub**, which says "not available", and the app uses the server path:
+    CI, E2E, forks and claude-fix. A token that is there but refused fails the build, so a release can't quietly ship
+    the stub. The files land in `ios/core-bin/` or `android/build/recite-core/` (gitignored and out of the fingerprint:
+    Dev's hash is the same with them there or not). On a laptop it uses the `gh` sign-in. Settings → Testing →
+    On-device model shows which engine the build carries.
+  - **The token:** the repository secret `RECITE_CORE_TOKEN`, a fine-grained token with read-only Contents on
+    `revisely-engine-releases` alone, so a leak can't reach the source in `revisely-internal`. One step holds it: "Fetch
+    the on-device engine" in `ios-build.yml` and `android-build.yml`, for Dev, before `npm ci`, running only `fetch.js`
+    (no dependencies). `eas build` then gets the folder (`RECITE_CORE_PREFETCHED`) and no token, so no install script
+    runs beside it. It is sent to the GitHub API alone, never to the storage host a download redirects to.
+    `core/__tests__/tokenScope.test.js` fails on anything else, and claude-fix refuses patches to the fetch. To rotate
+    it: GitHub → Settings → Developer settings → Fine-grained tokens → Regenerate; update the secret; set the repository
+    variable `RECITE_CORE_EXPIRES` (YYYY-MM-DD) to the new date, which the daily health report reminds about from 30 days
+    before.
 - **The on-device bench** (Settings → Testing → On-device model, BEHAVIOUR.md ONDEV-1): its list of runs, the models,
   the clip (EveryAyah, Husary, page 7, 90 s) and M's vectors live on the dev bucket under `models/recite/`
   (`bench.json` is the manifest: files with sizes and SHA-256, runs per platform, M's pass marks). Changing the runs or

@@ -67,6 +67,9 @@ module.exports = {
     // Terminal colouring the config loader pulls in only when it has a .env.local to announce.
     '**/node_modules/chalk/**/*',
     '**/node_modules/ansi-styles/**/*',
+    // Revisely Dev's engine: what core/fetch.js downloads at build time. Only its lock file counts, so a build with
+    // the token and one without hash the same. (Android's lands in the module's build/, ignored by default.)
+    'modules-dev/recite-engine/ios/core-bin/**/*',
   ],
   ...(process.env.APP_VARIANT === 'dev' ? { fileHookTransform: devWidgetAsCommitted } : {}),
 };

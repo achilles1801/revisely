@@ -22,6 +22,7 @@ import {
   sendBenchRecord,
   type BenchRun,
 } from '../../lib/onDevice/benchRun';
+import { coreLine } from '../../lib/onDevice/coreInfo';
 import { logger } from '../../lib/logger';
 import { t } from '../../i18n';
 
@@ -76,6 +77,7 @@ export default function OnDeviceBenchScreen() {
   const { palette } = useTheme();
   const engine = useMemo(() => benchEngine(), []);
   const device = useMemo(() => engine?.deviceInfo() ?? null, [engine]);
+  const engineLine = useMemo(() => coreLine(engine), [engine]);
   const [manifest, setManifest] = useState<BenchManifest | null>(null);
   const [readError, setReadError] = useState<string | null>(null);
   const [off, setOff] = useState<Set<string>>(new Set());
@@ -201,6 +203,15 @@ export default function OnDeviceBenchScreen() {
             {device ? (
               <Text style={[typeV2.meta, styles.note, { color: palette.secondary }]} testID="bench-device">
                 {t('settings.bench.device', { model: device.soc ? `${device.model} (${device.soc})` : device.model, cores: device.cores, memory: fixed(device.memoryMb / 1024, 1) })}
+              </Text>
+            ) : null}
+            {engineLine ? (
+              <Text style={[typeV2.meta, styles.note, { color: palette.secondary }]} testID="bench-engine">
+                {engineLine.stub
+                  ? t('settings.bench.engineStub')
+                  : engineLine.failed
+                    ? t('settings.bench.engineFailed', { version: engineLine.version, why: engineLine.failed })
+                    : t('settings.bench.engine', { version: engineLine.version })}
               </Text>
             ) : null}
             {readError ? (
