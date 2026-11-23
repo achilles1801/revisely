@@ -52,7 +52,7 @@ public class ReciteEngineModule: Module {
     /// Runs one bench plan on its own thread; progress goes out as onBenchProgress.
     AsyncFunction("bench") { (options: [String: Any], promise: Promise) in
       var plan = options
-      for key in ["model", "melFilters", "hann", "audio", "cacheDir"] {
+      for key in ["model", "alsoModel", "melFilters", "hann", "audio", "cacheDir"] {
         if let value = plan[key] as? String { plan[key] = ReciteEngineModule.plainPath(value) }
       }
       if var check = plan["check"] as? [String: Any] {

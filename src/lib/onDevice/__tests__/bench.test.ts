@@ -8,7 +8,9 @@ describe('the on-device bench’s manifest', () => {
   it('reads the uploaded one: M’s models, the clip, the check window, runs per platform', () => {
     const m = parseManifest(raw);
     expect(m).not.toBeNull();
-    expect(m!.models.map((x) => x.id)).toEqual(['v7-live-fp32', 'v7-live-fp16', 'v7-live-int8', 'v7-live-fp32.ort', 'v7m-live-r16']);
+    expect(m!.models.map((x) => x.id)).toEqual(['v7-live-fp32', 'v7-live-fp16', 'v7-live-int8', 'v7-live-fp32.ort', 'v7m-live-r16', 'v7-any-fp32']);
+    // The lead: memory with both of the engine's graphs, opened from memory as the real path will.
+    expect(m!.plans.ios.find((p) => p.fromMemory)).toEqual({ model: 'v7-live-fp32', provider: 'cpu', threads: 2, fromMemory: true, alsoModel: 'v7-any-fp32' });
     expect(m!.check).toEqual({ pcm: 'take', mel: 'mel16', s0: 64000, end: 128000 });
     expect(m!.plans.ios.some((p) => p.provider === 'coreml' && p.options?.ModelFormat === 'MLProgram')).toBe(true);
     expect(m!.plans.android.every((p) => p.provider !== 'coreml')).toBe(true);
@@ -39,6 +41,7 @@ describe('the on-device bench’s manifest', () => {
     expect(bad((c) => (c.check.end = c.check.s0))).toBeNull();
     expect(bad((c) => delete c.tolerance)).toBeNull();
     expect(bad((c) => (c.plans.ios[0].fromMemory = 'yes'))).toBeNull();
+    expect(bad((c) => (c.plans.ios[0].alsoModel = 'v9-any'))).toBeNull();
   });
 
   it('downloads only what the chosen runs need, each file once', () => {
@@ -48,6 +51,7 @@ describe('the on-device bench’s manifest', () => {
     const ios = filesFor(m, m.plans.ios);
     expect(new Set(ios).size).toBe(ios.length);
     expect(ios).not.toContain('fp32ort');
+    expect(filesFor(m, [{ model: 'v7-live-fp32', provider: 'cpu', threads: 2, alsoModel: 'v7-any-fp32' }])).toContain('any');
   });
 
   it('names a run by everything that changes it', () => {

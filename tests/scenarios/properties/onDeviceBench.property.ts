@@ -86,7 +86,8 @@ describe('the on-device bench', () => {
           expect(keys).toEqual(expect.arrayContaining([model.file, model.checkOut]));
         }
         // A model's file only when a chosen run uses it.
-        const used = new Set(chosen.map((p) => MANIFEST.models.find((m) => m.id === p.model)!.file));
+        const fileOf = (id: string) => MANIFEST.models.find((m) => m.id === id)!.file;
+        const used = new Set(chosen.flatMap((p) => [fileOf(p.model), ...(p.alsoModel ? [fileOf(p.alsoModel)] : [])]));
         for (const m of MANIFEST.models) expect(keys.includes(m.file)).toBe(used.has(m.file));
       }),
       { numRuns: runs(200) },

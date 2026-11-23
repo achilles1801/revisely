@@ -41,6 +41,8 @@ public final class Bench {
     public int windows = 60, warmup = 2, windowSamples = 64000, hopSamples = 8000;
     /** Open the model from bytes in memory (as the real path will, after decrypting it), not from its file. */
     public boolean fromMemory;
+    /** A second model opened the same way and held while the first is timed (the engine's any-length graph). */
+    public String alsoModel;
     /** A long run (research's 20-minute protocol): windows until this many seconds have passed, not `windows`. */
     public int durationSec;
     /** Start a window every this many ms, as a live take does (0: back to back); a window due while one runs is late. */
@@ -61,6 +63,8 @@ public final class Bench {
     public final List<String> inputs = new ArrayList<>();
     public long[] outShape = new long[0];
     public double memoryBeforeMb, memoryLoadedMb, memoryAfterMb;
+    /** With alsoModel: its open time and the memory with both loaded. */
+    public double alsoLoadMs, memoryBothMb;
     public boolean checked;
     public String checkError;
     public int checkFrames;
@@ -270,6 +274,19 @@ public final class Bench {
         r.loadMs = nowMs() - t0;
         r.inputs.addAll(m.names);
         r.memoryLoadedMb = memory.mb();
+        Model also = null;
+        if (plan.alsoModel != null && !plan.alsoModel.isEmpty()) {
+          Plan second = new Plan();
+          second.model = plan.alsoModel;
+          second.provider = plan.provider;
+          second.threads = plan.threads;
+          second.options = plan.options;
+          second.fromMemory = plan.fromMemory;
+          t0 = nowMs();
+          also = open(env, second);
+          r.alsoLoadMs = nowMs() - t0;
+          r.memoryBothMb = memory.mb();
+        }
         if (plan.checkPcm != null && !plan.checkPcm.isEmpty()) check(env, plan, m, logMel, r);
         int available = (audio.length - plan.windowSamples) / plan.hopSamples + 1;
         long[][] shape = new long[1][];
@@ -317,6 +334,7 @@ public final class Bench {
         if (sampler != null) sampler.sample(nowMs() - begin);
         r.outShape = shape[0];
         r.memoryAfterMb = memory.mb();
+        if (also != null) also.close();
       }
       // Opened again, as iOS does for Core ML's cache (on Android: the file is warm in the page cache).
       t0 = nowMs();

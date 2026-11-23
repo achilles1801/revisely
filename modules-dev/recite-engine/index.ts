@@ -23,6 +23,8 @@ export interface BenchPlan {
   warmup: number;
   /** Open the model from bytes in memory (as the real path will, after decrypting it), not from its file. */
   fromMemory?: boolean;
+  /** A second model, opened the same way and held while the first is timed (the engine keeps both graphs). */
+  alsoModel?: string;
   /** A long run: windows for this many seconds instead of `windows`. */
   durationSec?: number;
   /** Start a window every this many ms, as a live take does (0: back to back). */
@@ -63,6 +65,9 @@ export interface BenchResult {
   memoryBeforeMb: number;
   memoryLoadedMb: number;
   memoryAfterMb: number;
+  /** With alsoModel: its open time and the memory with both loaded (0 without). */
+  alsoLoadMs?: number;
+  memoryBothMb?: number;
   check: BenchCheck | null;
   checkError: string | null;
   thermalBefore: string;

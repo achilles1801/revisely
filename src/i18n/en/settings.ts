@@ -361,6 +361,8 @@ export const settings = {
     threadsDefault: 'default threads',
     /** A run whose model is opened from bytes in memory, as the real path will after decrypting it. */
     fromMemory: '{{plan}} · from memory',
+    /** A run that also holds the engine's second graph: "… · with v7-any-fp32". */
+    alsoModel: '{{plan}} · with {{model}}',
     providerCpu: 'CPU',
     providerCoreml: 'Core ML',
     providerXnnpack: 'XNNPACK',
@@ -395,6 +397,7 @@ export const settings = {
     features: 'Features {{ms}} ms · real time ×{{factor}}',
     load: 'Load {{load}} s · again {{again}} s · first run {{first}} ms',
     memory: 'Memory {{loaded}} MB with the model ({{added}} MB for it)',
+    memoryBoth: 'Memory {{both}} MB with both models ({{added}} MB for them)',
     heat: 'First windows {{first}} ms, last {{last}} ms · heat {{heat}}',
     checkExact: 'Matches the checker’s output',
     checkSame: 'Same sounds as the checker; values differ by up to {{diff}}',

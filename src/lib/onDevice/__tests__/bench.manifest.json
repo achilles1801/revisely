@@ -66,6 +66,11 @@
    "path": "vectors/hann400.f32",
    "bytes": 1600,
    "sha256": "2b66ad855bb20e73e657a4df6d8f4a4c840a18431c35cf323f29143f04796c7e"
+  },
+  "any": {
+   "path": "v7/v7-any-fp32.onnx",
+   "bytes": 82519804,
+   "sha256": "ee8e2cc8a3425f8f05d996aa48cc9e455273a257e41542c30f7c490b483ec9d7"
   }
  },
  "models": [
@@ -92,6 +97,11 @@
   {
    "id": "v7m-live-r16",
    "file": "r16",
+   "checkOut": "out16"
+  },
+  {
+   "id": "v7-any-fp32",
+   "file": "any",
    "checkOut": "out16"
   }
  ],
@@ -145,7 +155,8 @@
     "model": "v7-live-fp32",
     "provider": "cpu",
     "threads": 2,
-    "fromMemory": true
+    "fromMemory": true,
+    "alsoModel": "v7-any-fp32"
    },
    {
     "model": "v7-live-fp32",
@@ -208,7 +219,8 @@
     "model": "v7-live-fp32",
     "provider": "cpu",
     "threads": 2,
-    "fromMemory": true
+    "fromMemory": true,
+    "alsoModel": "v7-any-fp32"
    },
    {
     "model": "v7-live-fp32.ort",

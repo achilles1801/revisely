@@ -161,6 +161,7 @@ export async function runPlan(
 ): Promise<BenchRun> {
   const model = manifest.models.find((m) => m.id === plan.model);
   if (!model) throw new Error(`No model ${plan.model}`); // i18n-ignore (an error for logs)
+  const also = plan.alsoModel ? manifest.models.find((m) => m.id === plan.alsoModel) : undefined;
   const sub = engine.addListener('onBenchProgress', (e) => onProgress(e.done, e.total));
   try {
     const result = await engine.bench({
@@ -175,6 +176,7 @@ export async function runPlan(
       windows: 'windows' in length ? length.windows : 0,
       warmup: 2,
       fromMemory: plan.fromMemory === true,
+      ...(also ? { alsoModel: files[also.file] } : {}),
       // A long run hops as a live take does: a window every half second (the manifest's hop), not back to back.
       ...('durationSec' in length ? { durationSec: length.durationSec, cadenceMs: (manifest.hopSamples / 16000) * 1000 } : {}),
       check: {
@@ -221,6 +223,7 @@ export function benchRecord(device: DeviceInfo, windows: number, runs: readonly 
       threads: plan.threads,
       options: plan.options ?? {},
       fromMemory: plan.fromMemory === true,
+      alsoModel: plan.alsoModel ?? '',
       ok: result.ok,
       error: result.error ?? '',
       loadMs: round(result.loadMs),
@@ -231,7 +234,13 @@ export function benchRecord(device: DeviceInfo, windows: number, runs: readonly 
         : null,
       runMs: ms(result.runMs),
       featureMs: ms(result.featureMs),
-      memoryMb: { before: round(result.memoryBeforeMb, 1), loaded: round(result.memoryLoadedMb, 1), after: round(result.memoryAfterMb, 1) },
+      memoryMb: {
+        before: round(result.memoryBeforeMb, 1),
+        loaded: round(result.memoryLoadedMb, 1),
+        both: round(result.memoryBothMb ?? 0, 1),
+        after: round(result.memoryAfterMb, 1),
+      },
+      alsoLoadMs: round(result.alsoLoadMs ?? 0),
       check: result.check,
       checkError: result.checkError ?? '',
       thermal: `${result.thermalBefore}→${result.thermalAfter}`,

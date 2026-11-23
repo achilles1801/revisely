@@ -79,6 +79,7 @@ class ReciteEngineModule : Module() {
         fromMemory = options["fromMemory"] as? Boolean ?: false
         durationSec = (options["durationSec"] as? Number)?.toInt() ?: 0
         cadenceMs = (options["cadenceMs"] as? Number)?.toInt() ?: 0
+        alsoModel = (options["alsoModel"] as? String)?.let { plainPath(it) }
         (options["check"] as? Map<*, *>)?.let { c ->
           checkPcm = plainPath(c["pcm"] as? String ?: "")
           checkMel = plainPath(c["mel"] as? String ?: "")
@@ -114,6 +115,8 @@ class ReciteEngineModule : Module() {
             "memoryBeforeMb" to r.memoryBeforeMb,
             "memoryLoadedMb" to r.memoryLoadedMb,
             "memoryAfterMb" to r.memoryAfterMb,
+            "alsoLoadMs" to r.alsoLoadMs,
+            "memoryBothMb" to r.memoryBothMb,
             "check" to if (r.checked) {
               mapOf(
                 "frames" to r.checkFrames,

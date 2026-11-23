@@ -30,6 +30,8 @@ export interface PlanSpec {
   options?: Record<string, string>;
   /** Open the model from bytes in memory (the real path decrypts it there), not from its file. */
   fromMemory?: boolean;
+  /** Also hold this model (an id) while timing: the engine keeps the any-length graph beside the 4 s one. */
+  alsoModel?: string;
 }
 
 export interface BenchManifest {
@@ -92,12 +94,14 @@ export function parseManifest(raw: unknown): BenchManifest | null {
         options = p.options as Record<string, string>;
       }
       if (p.fromMemory !== undefined && typeof p.fromMemory !== 'boolean') return null;
+      if (p.alsoModel !== undefined && (typeof p.alsoModel !== 'string' || !ids.has(p.alsoModel))) return null;
       out.push({
         model: p.model,
         provider: p.provider as Provider,
         threads: Math.floor(p.threads),
         ...(options ? { options } : {}),
         ...(p.fromMemory ? { fromMemory: true } : {}),
+        ...(typeof p.alsoModel === 'string' ? { alsoModel: p.alsoModel } : {}),
       });
     }
     return out;
@@ -131,6 +135,8 @@ export function filesFor(manifest: BenchManifest, plans: readonly PlanSpec[]): s
       keys.add(model.file);
       keys.add(model.checkOut);
     }
+    const also = p.alsoModel ? manifest.models.find((m) => m.id === p.alsoModel) : undefined;
+    if (also) keys.add(also.file);
   }
   return [...keys];
 }
@@ -138,7 +144,7 @@ export function filesFor(manifest: BenchManifest, plans: readonly PlanSpec[]): s
 /** "v7-live-fp32 · Core ML · 2 threads" style key parts, for the screen and the record. */
 export function planKey(p: PlanSpec): string {
   const opts = p.options ? Object.entries(p.options).map(([k, v]) => `${k}=${v}`).sort().join(',') : '';
-  return `${p.model}|${p.provider}|${p.threads}${opts ? `|${opts}` : ''}${p.fromMemory ? '|memory' : ''}`;
+  return `${p.model}|${p.provider}|${p.threads}${opts ? `|${opts}` : ''}${p.fromMemory ? '|memory' : ''}${p.alsoModel ? `|+${p.alsoModel}` : ''}`;
 }
 
 /** The value at fraction q of the sorted list (nearest rank). */

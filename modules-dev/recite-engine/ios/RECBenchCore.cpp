@@ -363,6 +363,15 @@ Result runPlan(const Plan& plan, const std::function<double()>& memoryMb, const 
     r.loadMs = nowMs() - t0;
     r.inputs = m.inputNames;
     r.memoryLoadedMb = memoryMb();
+    Model also;
+    if (!plan.alsoModel.empty()) {
+      Plan second = plan;
+      second.model = plan.alsoModel;
+      t0 = nowMs();
+      also = open(second);
+      r.alsoLoadMs = nowMs() - t0;
+      r.memoryBothMb = memoryMb();
+    }
 
     if (!plan.checkPcm.empty()) check(plan, m, logMel, r);
 
@@ -413,6 +422,7 @@ Result runPlan(const Plan& plan, const std::function<double()>& memoryMb, const 
     r.memoryAfterMb = memoryMb();
     // Opened again: Core ML's second open reads the compiled model from its cache.
     m.session.reset();
+    also.session.reset();
     t0 = nowMs();
     Model again = open(plan);
     r.reloadMs = nowMs() - t0;

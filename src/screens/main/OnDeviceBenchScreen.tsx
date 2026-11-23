@@ -45,7 +45,8 @@ export function planLabel(p: PlanSpec): string {
     provider: PROVIDER_LABEL[p.provider](),
     threads: p.threads > 0 ? t('settings.bench.threads', { count: p.threads }) : t('settings.bench.threadsDefault'),
   });
-  return p.fromMemory ? t('settings.bench.fromMemory', { plan: label }) : label;
+  const memory = p.fromMemory ? t('settings.bench.fromMemory', { plan: label }) : label;
+  return p.alsoModel ? t('settings.bench.alsoModel', { plan: memory, model: p.alsoModel }) : memory;
 }
 
 type Status =
@@ -304,6 +305,9 @@ function RunCard({ run, manifest }: { run: BenchRun; manifest: BenchManifest }) 
       t('settings.bench.features', { ms: fixed(summary.featureP50, 1), factor: fixed(summary.realTime, 2) }),
       t('settings.bench.load', { load: fixed(result.loadMs / 1000, 1), again: fixed(result.reloadMs / 1000, 1), first: fixed(result.firstRunMs) }),
       t('settings.bench.memory', { loaded: fixed(result.memoryLoadedMb), added: fixed(result.memoryLoadedMb - result.memoryBeforeMb) }),
+      ...(run.plan.alsoModel && result.memoryBothMb
+        ? [t('settings.bench.memoryBoth', { both: fixed(result.memoryBothMb), added: fixed(result.memoryBothMb - result.memoryBeforeMb) })]
+        : []),
       t('settings.bench.heat', { first: fixed(summary.firstP50, 1), last: fixed(summary.lastP50, 1), heat: `${result.thermalBefore} → ${result.thermalAfter}` }),
     );
   }

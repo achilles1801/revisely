@@ -73,6 +73,9 @@ struct Plan {
   int warmup = 2;
   /** Open the model from bytes in memory (as the real path will, after decrypting it), not from its file. */
   bool fromMemory = false;
+  /** A second model opened the same way and held while the first is timed: the engine keeps the any-length graph
+   *  (a take's first hops and its last) beside the 4 s one, so the memory that matters is with both. */
+  std::string alsoModel;
   /** A long run (research's 20-minute protocol): windows until this many seconds have passed, not `windows`. */
   int durationSec = 0;
   /** Start a window every this many ms, as a live take does (0: back to back). A window that ends after the next
@@ -98,6 +101,8 @@ struct Result {
   std::vector<std::string> inputs;
   std::vector<int64_t> outShape;
   double memoryBeforeMb = 0, memoryLoadedMb = 0, memoryAfterMb = 0;
+  /** With alsoModel: its open time and the memory with both loaded. */
+  double alsoLoadMs = 0, memoryBothMb = 0;
   bool checked = false;
   std::string checkError;
   int checkFrames = 0;

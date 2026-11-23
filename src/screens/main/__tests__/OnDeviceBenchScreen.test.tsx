@@ -62,6 +62,8 @@ function mockRun(plan: PlanSpec, ms: number, durationSec?: number): BenchRun {
       memoryBeforeMb: 120,
       memoryLoadedMb: 215,
       memoryAfterMb: 220,
+      alsoLoadMs: plan.alsoModel ? 900 : 0,
+      memoryBothMb: plan.alsoModel ? 300 : 0,
       check: { frames: 240, melMaxDiff: 1.3e-6, outMaxDiff: 0, outTopSame: 1, ownMaxDiff: 3.8e-5, ownTopSame: 1 },
       checkError: null,
       thermalBefore: 'nominal',
@@ -167,9 +169,16 @@ describe('[ONDEV-1] Settings → Testing → On-device model', () => {
     expect(mockBench.sent).toHaveLength(1);
   });
 
-  it('a run opened from memory says so', async () => {
+  it('a run opened from memory, holding the any-length graph too, says so and gives the memory with both', async () => {
     const { planLabel } = require('../OnDeviceBenchScreen');
-    expect(planLabel({ model: 'v7-live-fp32', provider: 'cpu', threads: 2, fromMemory: true })).toBe('v7-live-fp32 · CPU · 2 threads · from memory');
+    const plan = mockManifest.plans.ios.find((p) => p.fromMemory)!;
+    expect(planLabel(plan)).toBe('v7-live-fp32 · CPU · 2 threads · from memory · with v7-any-fp32');
+    await show();
+    for (const p of mockManifest.plans.ios) if (p !== plan) fireEvent.press(screen.getByLabelText(planLabel(p)));
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('bench-run'));
+    });
+    expect(screen.getByText('Memory 300 MB with both models (180 MB for them)')).toBeTruthy();
   });
 
   it('a failed download says why and sends nothing', async () => {

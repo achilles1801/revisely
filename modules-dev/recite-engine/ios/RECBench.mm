@@ -54,6 +54,7 @@ static NSArray<NSNumber *> *numbers(const std::vector<double> &v) {
   plan.fromMemory = [options[@"fromMemory"] isKindOfClass:[NSNumber class]] && [(NSNumber *)options[@"fromMemory"] boolValue];
   plan.durationSec = num(options, @"durationSec", 0);
   plan.cadenceMs = num(options, @"cadenceMs", 0);
+  plan.alsoModel = str(options, @"alsoModel");
   NSDictionary *check = options[@"check"];
   if ([check isKindOfClass:[NSDictionary class]]) {
     plan.checkPcm = str(check, @"pcm");
@@ -124,6 +125,8 @@ static NSArray<NSNumber *> *numbers(const std::vector<double> &v) {
     @"memoryBeforeMb" : @(r.memoryBeforeMb),
     @"memoryLoadedMb" : @(r.memoryLoadedMb),
     @"memoryAfterMb" : @(r.memoryAfterMb),
+    @"alsoLoadMs" : @(r.alsoLoadMs),
+    @"memoryBothMb" : @(r.memoryBothMb),
     @"check" : checkResult,
     @"checkError" : r.checkError.empty() ? [NSNull null] : [NSString stringWithUTF8String:r.checkError.c_str()],
   };

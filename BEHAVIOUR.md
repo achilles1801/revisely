@@ -1567,7 +1567,8 @@ shows up once and they must go through it and complete it … just the main stuf
   200 (the default) or 600 windows (4 seconds of recitation each) of a public recitation clip, and shows the model's
   time per window (median, p90, p95, worst; under or over 150 ms at p95), the features', the share of a half second
   both take, load and second-load times, memory, and the first and last windows' times with the phone's heat. A run
-  can open its model from bytes in memory instead of its file, as the real path will after decrypting it. A long run
+  can open its model from bytes in memory instead of its file, as the real path will after decrypting it, and hold the
+  engine's second (any-length) graph beside it, for the memory with both. A long run
   (5 or 20 minutes, research's protocol) takes the first chosen run at the live cadence, a window every half second,
   and notes the battery, the thermal state and the window times each minute: it says whether the phone got hot
   (serious or worse), whether the last minute was within 20% of the first, and the battery's drop an hour (nothing on
