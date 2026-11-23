@@ -1,0 +1,238 @@
+{
+ "version": 1,
+ "about": "Revisely Dev's on-device bench (Settings -> Testing -> On-device model, ONDEV-1). Files are workstream M's (~/revisely-mistake-lab/runs/mobile, SPEC.md) and a public EveryAyah clip (Husary, page 7, 90 s, 16 kHz int16). Paths are under models/recite/.",
+ "files": {
+  "fp32": {
+   "path": "v7/v7-live-fp32.onnx",
+   "bytes": 79915849,
+   "sha256": "453e0420ef78b41dd3e9fcecd316e78af48a202686b49c3b195df36489c7f4df"
+  },
+  "fp16": {
+   "path": "v7/v7-live-fp16.onnx",
+   "bytes": 39998066,
+   "sha256": "4581bb180f3c7942bda58b22025465028c4dba8062242f60bfa8c94d6d0b9f6e"
+  },
+  "int8": {
+   "path": "v7/v7-live-int8.onnx",
+   "bytes": 20557971,
+   "sha256": "dfc76ce2fbcf038eeca74ebb66871438d0f4de2310b56384745c23fd5492ca47"
+  },
+  "fp32ort": {
+   "path": "v7/v7-live-fp32.ort",
+   "bytes": 80016368,
+   "sha256": "28e8ec0bf07915f207278904c75438c725e827b73bcfd38226ec8e59fed4e263"
+  },
+  "r16": {
+   "path": "v7/v7m-live-r16.onnx",
+   "bytes": 79915849,
+   "sha256": "5b4daf7d373abc0f84ee880f8d2cdf56a1d488fb8b2c1233affc05ec766971dc"
+  },
+  "clip": {
+   "path": "bench/husary-p7-90s.pcm16",
+   "bytes": 2880000,
+   "sha256": "91b8680d7ef01446e41ac0e25dabea8daa8734914a4a0ff4f04f0768e0454d01"
+  },
+  "take": {
+   "path": "vectors/take.pcm16",
+   "bytes": 394246,
+   "sha256": "9b0e17d26a7a8cb33f19c649001e96bfdebfa8485b12d1a10a316e6decb7a114"
+  },
+  "mel16": {
+   "path": "vectors/hop16.mel.f32",
+   "bytes": 153600,
+   "sha256": "8e2dcd2b05ae610724214859f1ffeccc5ab17f281af0ba80f233de71d22b5e3e"
+  },
+  "out16": {
+   "path": "vectors/hop16.logprobs.f32",
+   "bytes": 41280,
+   "sha256": "e54e931b05957c0410573f3eca55f7a5fb11894c3a696bf1da9c2265aadde612"
+  },
+  "out16fp16": {
+   "path": "vectors/hop16.logprobs.fp16.f32",
+   "bytes": 41280,
+   "sha256": "55d157de5b705ca67d545e6f81aa60452af6e8c7f02f59683c2cd4fda4b2c6b2"
+  },
+  "out16int8": {
+   "path": "vectors/hop16.logprobs.int8.f32",
+   "bytes": 41280,
+   "sha256": "b2f647f679e51c5f7532be1d0befb5f0509d8df3de2279a070129ca917eb3613"
+  },
+  "melFilters": {
+   "path": "vectors/mel_filters.f32",
+   "bytes": 64320,
+   "sha256": "88df35e6c6d720d89b2d59b410cf386081a6ad04ccc6daaa732ca9b481575137"
+  },
+  "hann": {
+   "path": "vectors/hann400.f32",
+   "bytes": 1600,
+   "sha256": "2b66ad855bb20e73e657a4df6d8f4a4c840a18431c35cf323f29143f04796c7e"
+  }
+ },
+ "models": [
+  {
+   "id": "v7-live-fp32",
+   "file": "fp32",
+   "checkOut": "out16"
+  },
+  {
+   "id": "v7-live-fp16",
+   "file": "fp16",
+   "checkOut": "out16fp16"
+  },
+  {
+   "id": "v7-live-int8",
+   "file": "int8",
+   "checkOut": "out16int8"
+  },
+  {
+   "id": "v7-live-fp32.ort",
+   "file": "fp32ort",
+   "checkOut": "out16"
+  },
+  {
+   "id": "v7m-live-r16",
+   "file": "r16",
+   "checkOut": "out16"
+  }
+ ],
+ "audio": "clip",
+ "melFilters": "melFilters",
+ "hann": "hann",
+ "check": {
+  "pcm": "take",
+  "mel": "mel16",
+  "s0": 64000,
+  "end": 128000
+ },
+ "plans": {
+  "ios": [
+   {
+    "model": "v7-live-fp32",
+    "provider": "cpu",
+    "threads": 1
+   },
+   {
+    "model": "v7-live-fp32",
+    "provider": "cpu",
+    "threads": 2
+   },
+   {
+    "model": "v7-live-fp16",
+    "provider": "cpu",
+    "threads": 1
+   },
+   {
+    "model": "v7-live-fp16",
+    "provider": "cpu",
+    "threads": 2
+   },
+   {
+    "model": "v7-live-int8",
+    "provider": "cpu",
+    "threads": 1
+   },
+   {
+    "model": "v7-live-int8",
+    "provider": "cpu",
+    "threads": 2
+   },
+   {
+    "model": "v7m-live-r16",
+    "provider": "cpu",
+    "threads": 2
+   },
+   {
+    "model": "v7-live-fp32",
+    "provider": "coreml",
+    "threads": 0,
+    "options": {
+     "ModelFormat": "MLProgram",
+     "MLComputeUnits": "ALL",
+     "RequireStaticInputShapes": "1"
+    }
+   },
+   {
+    "model": "v7-live-fp16",
+    "provider": "coreml",
+    "threads": 0,
+    "options": {
+     "ModelFormat": "MLProgram",
+     "MLComputeUnits": "ALL",
+     "RequireStaticInputShapes": "1"
+    }
+   }
+  ],
+  "android": [
+   {
+    "model": "v7-live-fp32",
+    "provider": "cpu",
+    "threads": 1
+   },
+   {
+    "model": "v7-live-fp32",
+    "provider": "cpu",
+    "threads": 2
+   },
+   {
+    "model": "v7-live-fp16",
+    "provider": "cpu",
+    "threads": 1
+   },
+   {
+    "model": "v7-live-fp16",
+    "provider": "cpu",
+    "threads": 2
+   },
+   {
+    "model": "v7-live-int8",
+    "provider": "cpu",
+    "threads": 1
+   },
+   {
+    "model": "v7-live-int8",
+    "provider": "cpu",
+    "threads": 2
+   },
+   {
+    "model": "v7m-live-r16",
+    "provider": "cpu",
+    "threads": 2
+   },
+   {
+    "model": "v7-live-fp32.ort",
+    "provider": "cpu",
+    "threads": 2
+   },
+   {
+    "model": "v7-live-fp32",
+    "provider": "cpu",
+    "threads": 4
+   },
+   {
+    "model": "v7-live-int8",
+    "provider": "cpu",
+    "threads": 4
+   },
+   {
+    "model": "v7-live-fp32",
+    "provider": "nnapi",
+    "threads": 0
+   },
+   {
+    "model": "v7-live-fp32",
+    "provider": "xnnpack",
+    "threads": 1,
+    "options": {
+     "intra_op_num_threads": "2"
+    }
+   }
+  ]
+ },
+ "windowSamples": 64000,
+ "hopSamples": 8000,
+ "tolerance": {
+  "mel": 0.0002,
+  "out": 0.001,
+  "own": 0.02
+ }
+}

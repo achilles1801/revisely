@@ -776,6 +776,25 @@ service cloud.firestore {
     }
 
     // ========================================================================
+    // ON-DEVICE BENCH (Revisely Dev, BEHAVIOUR.md ONDEV-1)
+    // ========================================================================
+    // Settings → Testing → On-device model sends one record per finished bench: the phone (model, chip, cores,
+    // memory), the build, and each run's timings and check. No uid, no account data, no audio. Create only;
+    // the team reads it with the admin SDK.
+    match /onDeviceBench/{benchId} {
+      allow create: if isAuthenticated() &&
+                       incomingData().keys().hasOnly(['createdAt', 'platform', 'device', 'app', 'windows', 'runs']) &&
+                       incomingData().keys().hasAll(['createdAt', 'platform', 'device', 'app', 'windows', 'runs']) &&
+                       incomingData().createdAt == request.time &&
+                       incomingData().platform in ['ios', 'android'] &&
+                       incomingData().device is map && incomingData().device.size() <= 20 &&
+                       incomingData().app is map && incomingData().app.size() <= 10 &&
+                       incomingData().windows is int && incomingData().windows > 0 && incomingData().windows <= 1000 &&
+                       incomingData().runs is list && incomingData().runs.size() >= 1 && incomingData().runs.size() <= 40;
+      allow read, update, delete: if false;
+    }
+
+    // ========================================================================
     // APP CONFIG
     // ========================================================================
     // config/app: the oldest supported version on each platform and the

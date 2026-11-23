@@ -11,6 +11,7 @@ import PlanDayEditScreen from '../screens/main/PlanDayEditScreen';
 import PrayerCalculationScreen from '../screens/prayer/PrayerCalculationScreen';
 import PrayerNotificationsScreen from '../screens/prayer/PrayerNotificationsScreen';
 import AthanVoiceScreen from '../screens/prayer/AthanVoiceScreen';
+import OnDeviceBenchScreen from '../screens/main/OnDeviceBenchScreen';
 import ActiveRevisionScreen from '../screens/revision/ActiveRevisionScreen';
 import ReadIndexScreen from '../screens/read/ReadIndexScreen';
 import QuranReaderScreen from '../screens/read/QuranReaderScreen';
@@ -101,6 +102,8 @@ export type HomeStackParamList = {
   PrayerNotifications: undefined;
   /** The athan voice for every prayer, or (prayer) for one. Revisely Dev, iPhone. */
   AthanVoice: { prayer?: 'fajr' | 'dhuhr' | 'asr' | 'maghrib' | 'isha' } | undefined;
+  /** Settings → Testing → On-device model: Recite's model timed on this phone (Revisely Dev, ONDEV-1). */
+  OnDeviceBench: undefined;
 };
 
 export type ReadStackParamList = {
@@ -169,6 +172,7 @@ function HomeStackNavigator({ initialRouteName = 'Dashboard' }: { initialRouteNa
       <HomeStack.Screen name="PrayerCalculation" component={PrayerCalculationScreen} />
       <HomeStack.Screen name="PrayerNotifications" component={PrayerNotificationsScreen} />
       <HomeStack.Screen name="AthanVoice" component={AthanVoiceScreen} />
+      <HomeStack.Screen name="OnDeviceBench" component={OnDeviceBenchScreen} />
       <HomeStack.Screen name="Activity" component={ActivityScreen} />
       <HomeStack.Screen name="ActivityDay" component={ActivityDayScreen} />
       <HomeStack.Screen name="ListenBack" component={ListenBackScreen} />

@@ -396,3 +396,37 @@ until its part is set up.
     in their ayahs (offered for peeks alone too; its summary's "Before:" counts them). Peeks never count in the score
     (the checker counts them as `helped`). In Test me a place said to its end with a peek is "1 word peeked", not
     clean. The words Test me shows to start a place aren't peeks.
+
+## Native code for Revisely Dev only: `modules-dev/` (Recite on the phone, Nov 23 2026)
+
+Majd, Nov 23 2026: "our main priority right now is to get the model on phone to avoid all unnecessary costs". The
+work's notes and owners are in the shared notes (`on-device-recite.md`, the lead's `on-device-plan.md`, the release
+owner's `on-device-release.md`).
+- **Where the code goes.** Native modules for Revisely Dev alone live in `modules-dev/`, never `modules/`: everything
+  in `modules/` is linked into the store app and moves its fingerprints, which makes Preview build and submit store
+  binaries by itself. `plugins/withDevModules` (loaded only with APP_VARIANT=dev) adds the folder to autolinking's
+  search path in Dev's Podfile (`use_expo_modules!(searchPaths: …)`) and settings.gradle
+  (`expoAutolinking.searchPaths`), and `fingerprint.config.js` counts `modules-dev/` toward Dev's fingerprints only.
+  JavaScript loads the module lazily (`requireOptionalNativeModule`, behind `isDevVariant()`): null in the store app,
+  older Dev builds and tests. Before merging a native change, compute both store fingerprints the CI way: they must not
+  move (Nov 23: iOS `d3acdfa5…`, Android `dd5fd2ad…`). The release-native PR (the release owner's) links the module
+  into the store app and moves them once.
+- **`modules-dev/recite-engine`** (the native module `ReciteEngine`): ONNX Runtime 1.31.1, the checker's version.
+  - iOS: `ReviselyOnnxRuntime.podspec.json` takes the xcframework from Microsoft's signed NuGet package
+    (`Microsoft.ML.OnnxRuntime` on nuget.org, pinned by SHA-256). ONNX Runtime's own pod (`onnxruntime-c`) downloads
+    from download.onnxruntime.ai, which served a certificate for another name on Nov 23 2026, and its CocoaPods
+    releases stop at 1.30.0; its GitHub repositories answer 404 since about Nov 17. The iOS build has the CPU, Core ML
+    and XNNPACK providers.
+  - Android: `com.microsoft.onnxruntime:onnxruntime-android:1.31.1` from Maven Central (CPU, XNNPACK, NNAPI).
+  - The bench's core is plain C++ (`ios/RECBenchCore.cpp`) and plain Java (`android/…/Bench.java`, `LogMel.java`),
+    so both run on a Mac against ONNX Runtime's desktop builds of the same version (the NuGet package's osx-arm64
+    library; the `onnxruntime` jar on Maven Central) before a runner build. Their features follow workstream M's spec
+    (`~/revisely-mistake-lab/runs/mobile/SPEC.md`) and match its vectors (Nov 23, Mac: features within 1.3e-6, the
+    model's output identical, every top sound the same).
+- **The on-device bench** (Settings → Testing → On-device model, BEHAVIOUR.md ONDEV-1): its list of runs, the models,
+  the clip (EveryAyah, Husary, page 7, 90 s) and M's vectors live on the dev bucket under `models/recite/`
+  (`bench.json` is the manifest: files with sizes and SHA-256, runs per platform, M's pass marks). Changing the runs or
+  adding a model is an upload, not a build: put the file there with the dev admin key and add it to `bench.json`.
+  Storage rules let signed-in accounts read `models/recite/`; only the admin SDK writes it. Each finished bench sends
+  one record to Firestore `onDeviceBench` (create only: the phone, the build, each run's numbers; no uid, no audio);
+  read them with the dev admin key.

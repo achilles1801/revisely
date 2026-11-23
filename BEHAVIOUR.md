@@ -1556,6 +1556,21 @@ shows up once and they must go through it and complete it … just the main stuf
   on by default (Majd, Nov 22 2026: "yes ramadan theme as default for dev too"), and at the next release
   (`RAMADAN_THEME_RELEASED`, Majd, Nov 21 2026) every app has it, the same way.
 
+## Recite on the phone (Revisely Dev)
+
+- **ONDEV-1.** Settings → Testing → On-device model times Recite's model on this phone, the first step to checking
+  recitation on the phone instead of the server (Majd, Nov 23 2026). It lists this platform's runs from the dev
+  backend (each a model file, a processor (CPU, Core ML, XNNPACK or NNAPI) and a thread count; all chosen, any left
+  out), downloads what the chosen runs need once (signed in; each file checked by size and SHA-256, kept on the phone
+  out of backups) and runs them one after another with the screen kept on. Each run first checks the model on the
+  checker's own output (the features within 0.0002, the model's output and its top sound per frame), then times 20, 60
+  or 170 windows (4 seconds of recitation each, one every half second as the live checker hops) of a public recitation
+  clip, and shows the model's time per window (median, p90, p95, worst; under or over 150 ms at p95), the features',
+  the share of a half second both take, load and second-load times, memory, and the first and last windows' times with
+  the phone's heat. A run that fails says why and the others go on. The results go to the dev backend (the phone's
+  model, chip, cores and memory, the build, each run's numbers; never the account or any audio) and can be shared.
+  The store app has none of it: the native module is linked into Revisely Dev's builds only.
+
 ## Premium early access
 
 Majd, Nov 16 2026: "give everyone premium access right now … it'll be paid for in the future but anyone who has

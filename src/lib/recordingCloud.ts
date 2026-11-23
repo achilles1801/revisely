@@ -74,7 +74,8 @@ export function uploadUrl(bucket: string, path: string): string {
   return `${STORAGE_HOST}/${bucket}/o?name=${encodeURIComponent(path)}`;
 }
 
-async function authHeaders(): Promise<Record<string, string>> {
+/** The user's Firebase ID token and, when there is one, an App Check token (also the on-device bench's downloads). */
+export async function authHeaders(): Promise<Record<string, string>> {
   const user = getAuth().currentUser;
   if (!user) throw new Error('Not signed in.');
   const headers: Record<string, string> = { Authorization: `Firebase ${await user.getIdToken()}` };
