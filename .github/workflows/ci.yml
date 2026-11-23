@@ -204,10 +204,10 @@ jobs:
             gh api "repos/$REPO/actions/artifacts?name=scenarios-passed-$TREE&per_page=30" \
               --jq '[.artifacts[] | select(.expired | not) | select(.workflow_run.head_repository_id == .workflow_run.repository_id)] | first | .workflow_run.id // empty' 2>/dev/null || true
           }
-          # The testing half of Preview on this commit, not yet finished (a publishing run's title says so).
+          # The testing half of Preview on this commit, not yet finished (its other halves' titles say so).
           running() {
             gh api "repos/$REPO/actions/workflows/preview.yml/runs?head_sha=$SHA&per_page=20" \
-              --jq '[.workflow_runs[] | select(.status != "completed") | select(.display_title | startswith("Preview · publish") | not)] | first | .id // empty' 2>/dev/null || true
+              --jq '[.workflow_runs[] | select(.status != "completed") | select(.display_title | startswith("Preview · ") | not)] | first | .id // empty' 2>/dev/null || true
           }
           RUN=$(passed)
           if [ -n "$RUN" ]; then

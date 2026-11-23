@@ -124,7 +124,9 @@ main is strictly for production"):
      - The publishing half checks the tree's scenario artifact and that the commit is on the branch
        itself, so a run by hand can't skip the gate.
      - `dry_run` (by hand) tries both halves without building or publishing.
-     - With no native build the publishing half is one job on one machine (Nov 23 2026).
+     - With no native build the publishing half is one job on one machine (Nov 23 2026). Revisely Dev's native
+       builds run in their own lane (`Preview · Dev <sha>`, group `eas-dev-builds`, one run at a time), so they
+       can't hold up preview.
      - **Revisely Dev doesn't wait for this** (Majd, Nov 23 2026: "yeah let's do it"): a merged PR whose own
        `Required` passed goes to the `dev` channel at the merge (`dev-at-merge.yml`, its own workflow, so
        it can't stop preview). The tests after the merge still run, and `preview` and production still
