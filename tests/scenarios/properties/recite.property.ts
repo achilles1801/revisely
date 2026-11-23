@@ -44,6 +44,7 @@ import {
   LIVE_IDLE,
   type LiveState,
 } from '../../../src/lib/reciteLive/state';
+import { isATake, LONG_AYAH_WORDS, recitedEnough } from '../../../src/lib/reciteLive/takeEnough';
 import { AT_LAG, clipRange, endsPhrase, LEAD, MAX_SECONDS, phraseOf, SHORT_WORDS, TAIL, WORDS_AFTER, WORDS_BEFORE } from '../../../src/lib/reciteLive/phrase';
 import { pagesReached, perPageLabel, PER_PAGE_FROM } from '../../../src/lib/reciteLive/score';
 import { expectedPhrase, recitedPhrase } from '../../../src/lib/reciteLive/describe';
@@ -1300,6 +1301,60 @@ describe('[RECITE-18] a long phrase whose first words were skipped', () => {
     const clip = clipRange(words, { id: 'm', w, ayah: [words.ref(w).sura, words.ref(w).ayah], kind: 'skipped', sure: 'clear' } as Mark, (x) => times.get(x) ?? null, from + (a1 + 40 - a0) * step)!;
     expect(clip[0]).toBeCloseTo(first - AT_LAG - LEAD - 2);
     expect(clip[1]).toBeCloseTo(first - AT_LAG + TAIL);
+  });
+});
+
+describe('[RECITE-27] a take needs at least one ayah recited', () => {
+  const taken = (start: number | null, cursor: number | null, marks: Mark[] = []) =>
+    ({ start, cursor, saidUpTo: null, marks: {}, final: { v: 2, take: 't', from: start ?? 0, to: (start ?? 0) + 1, secs: 2, marks, score: null } }) as unknown as LiveState;
+  const mark = (w: number, kind: Mark['kind']) => ({ id: `m${w}`, w, ayah: [words.ref(w).sura, words.ref(w).ayah], kind, sure: 'clear' }) as Mark;
+
+  it('the mic pressed and nothing said is not a take, even with its words marked as skipped', () => {
+    const [a0, a1] = words.verseRange(112, 1);
+    expect(isATake(taken(a0, null), words)).toBe(false);
+    expect(isATake(taken(a0, null, [mark(a0, 'skipped'), mark(a1 - 1, 'skipped')]), words)).toBe(false);
+  });
+
+  it('a whole short ayah is a take, and part of one is not', () => {
+    const [a0, a1] = words.verseRange(112, 1);
+    expect(a1 - a0).toBeLessThan(LONG_AYAH_WORDS);
+    expect(isATake(taken(a0, a1 - 1), words)).toBe(true);
+    expect(isATake(taken(a0, a0), words)).toBe(false);
+  });
+
+  it('coming in partway through an ayah needs the next one whole', () => {
+    const [a0, a1] = words.verseRange(112, 2 - 1);
+    const [, b1] = words.verseRange(112, 2);
+    expect(isATake(taken(a0 + 1, a1 - 1), words)).toBe(false);
+    expect(isATake(taken(a0 + 1, b1 - 1), words)).toBe(true);
+  });
+
+  it('a very long ayah counts from about a mushaf line of its words', () => {
+    const [a0] = words.verseRange(2, 282);
+    expect(isATake(taken(a0, a0 + LONG_AYAH_WORDS - 2), words)).toBe(false);
+    expect(isATake(taken(a0, a0 + LONG_AYAH_WORDS - 1), words)).toBe(true);
+    expect(isATake(taken(a0 + 20, a0 + 20 + LONG_AYAH_WORDS - 1), words)).toBe(true);
+  });
+
+  it('a recitation of several takes always counts', () => {
+    const [a0] = words.verseRange(2, 282);
+    expect(isATake(taken(a0, a0), words, [{}, {}])).toBe(true);
+  });
+
+  it('whatever the take: a long enough stretch counts, and a short one holding no whole ayah never does', () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 0, max: words.count - 40 }), fc.integer({ min: 0, max: 30 }), (first, more) => {
+        const last = first + more;
+        const got = recitedEnough(words, first, last);
+        if (more + 1 >= LONG_AYAH_WORDS) expect(got).toBe(true);
+        else if (!got) {
+          for (let w = first; w <= last; w++) {
+            const [a0, a1] = words.verseRange(words.ref(w).sura, words.ref(w).ayah);
+            expect(a0 >= first && a1 - 1 <= last).toBe(false);
+          }
+        }
+      }),
+    );
   });
 });
 

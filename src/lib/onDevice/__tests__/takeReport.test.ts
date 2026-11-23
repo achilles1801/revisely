@@ -20,6 +20,7 @@ const end = (over: Partial<PhoneTakeEnd> = {}): PhoneTakeEnd => ({
   meter: null,
   audio: [new Int16Array(16000)],
   samples: 16000,
+  reached: 40,
   result: { v: 2, score: 91 },
   events: [{ type: 'ready' }],
   dismissed: ['m1'],

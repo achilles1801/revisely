@@ -9,7 +9,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { File, Paths } from 'expo-file-system';
 import { getAuth } from 'firebase/auth';
 import { AppState } from 'react-native';
+import { loadQuranWords } from '../recite/quranWords';
+import type { FinalResult } from '../reciteLive/contract';
 import type { LiveConnect, StartFrame } from '../reciteLive/feed';
+import { reachedWord, recitedEnough } from '../reciteLive/takeEnough';
 import type { EngineBridge } from '../reciteLive/localFeed';
 import { clipSender } from '../reciteLive/clipSender';
 import { routedFeed } from '../reciteLive/route';
@@ -287,7 +290,16 @@ export function deviceConnect(server: LiveConnect): LiveConnect {
     onPhoneEnd: (end) => {
       const info = openEngineInfo();
       const steps = speed.steps();
-      void reportPhoneTake(end, info, { ...(info?.hop ? { hop: info.hop } : {}), ...(steps ? { demoted: steps } : {}) });
+      void loadQuranWords()
+        .then((words) => {
+          // Less than an ayah isn't a take (RECITE-27): no line, nothing kept.
+          const result = end.result as Partial<FinalResult> | null;
+          const first = result?.start ?? result?.from ?? null;
+          const last = reachedWord(end.reached, result?.marks ?? []);
+          if (end.how === 'done' && (first == null || last == null || !recitedEnough(words, first, last))) return undefined;
+          return reportPhoneTake(end, info, { ...(info?.hop ? { hop: info.hop } : {}), ...(steps ? { demoted: steps } : {}) });
+        })
+        .catch((err: unknown) => logger.warn('Recite: the take’s report failed', err));
       speed.noteTake(end.meter);
     },
     onRouted: (answer) => logger.log(`Recite: on the ${answer.on} (${answer.why}${answer.detail ? `: ${answer.detail}` : ''})`),

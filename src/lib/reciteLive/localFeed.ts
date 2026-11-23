@@ -101,6 +101,7 @@ export function localFeed(deps: LocalDeps): LiveConnect {
     const dismissed = new Set<string>();
     const hints: PhoneTakeEnd['hints'] = [];
     let told = false;
+    let reached: number | null = null;
     const sender =
       deps.clips?.({
         cut: (s0, s1) => (take != null && engine.clip ? engine.clip(take, s0, s1) : Promise.resolve(null)),
@@ -134,6 +135,7 @@ export function localFeed(deps: LocalDeps): LiveConnect {
         meter,
         audio,
         samples,
+        reached,
         result,
         events,
         dismissed: [...dismissed],
@@ -207,6 +209,8 @@ export function localFeed(deps: LocalDeps): LiveConnect {
         return;
       }
       if (start.keep && x) events.push(x);
+      if (e.type === 'at') reached = Math.max(reached ?? e.w, e.w);
+      if (e.type === 'said') reached = Math.max(reached ?? e.upTo, e.upTo);
       if (e.type === 'unmark') sender?.drop(e.id);
       if (e.type === 'done') {
         how = 'done';

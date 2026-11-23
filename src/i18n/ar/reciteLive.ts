@@ -201,6 +201,7 @@ export const reciteLive: NonNullable<ArStrings['reciteLive']> = {
     micOffBody: 'اسمح لريفايزلي باستخدام الميكروفون من الإعدادات لتبدأ التلاوة.',
     micFailed: 'تعذّر تشغيل الميكروفون. حاول مرة أخرى.',
     startNotFound: 'تعذّرت متابعة هذا التسميع. جرّب البدء من أعلى الصفحة.',
+    tooShort: 'سمِّع آية واحدة على الأقل ليُحتسب التسميع.',
     premiumFailed: 'تعذّر تفعيل بريميوم',
     devPremiumTitle: 'بريميوم في ⁨Revisely Dev⁩',
     devPremiumBody: 'مجاني أثناء الاختبار: لا يُحتسَب أي مبلغ. أوقفه من الإعدادات ← الاختبار.',
