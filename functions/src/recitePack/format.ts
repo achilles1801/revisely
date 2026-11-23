@@ -44,6 +44,15 @@ export type PackPart = (typeof PACK_PARTS)[number];
 /** A pack's id: a new one for every new model, table or engine data version, and so a new key. */
 export const PACK_ID = /^[a-z0-9][a-z0-9.-]{0,39}$/;
 
+/**
+ * A pack's id from what it holds: any file's hash changing makes a new id, so a version is never reused or overwritten,
+ * and the same files always have the same id.
+ */
+export function contentPackId(files: { part: string; name: string; sha256: string }[], prefix = 'v7m'): string {
+  const lines = files.map((f) => `${f.part}/${f.name} ${f.sha256}`).sort();
+  return `${prefix}-${createHash('sha256').update(lines.join('\n')).digest('hex').slice(0, 12)}`;
+}
+
 export interface PackBlob {
   name: string;
   data: Buffer;

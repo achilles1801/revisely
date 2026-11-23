@@ -1,7 +1,9 @@
 import { constants, generateKeyPairSync, privateDecrypt, randomBytes } from 'crypto';
 import {
+  contentPackId,
   DEFAULT_CHUNK,
   open,
+  PACK_ID,
   packContainer,
   PackFormatError,
   readHeader,
@@ -153,6 +155,22 @@ describe('the .rcpk format', () => {
     expect(() => packContainer([{ name: 'a', data: Buffer.alloc(1) }, { name: 'a', data: Buffer.alloc(1) }])).toThrow();
     expect(() => packContainer([{ name: '', data: Buffer.alloc(1) }])).toThrow();
     expect(() => seal(Buffer.alloc(1), KEY, { packId: 'Bad Id', part: 'core' })).toThrow('pack id');
+  });
+
+  it('a pack’s id follows its files: any hash, name or part changing makes a new one, their order doesn’t', () => {
+    const files = [
+      { part: 'core', name: 'config.json', sha256: 'a'.repeat(64) },
+      { part: 'core', name: 'words.rcwt', sha256: 'b'.repeat(64) },
+      { part: 'strict', name: 'v5.onnx', sha256: 'c'.repeat(64) },
+    ];
+    const id = contentPackId(files);
+    expect(id).toMatch(/^v7m-[0-9a-f]{12}$/);
+    expect(PACK_ID.test(id)).toBe(true);
+    expect(contentPackId([...files].reverse())).toBe(id);
+    expect(contentPackId([{ ...files[0], sha256: 'd'.repeat(64) }, files[1], files[2]])).not.toBe(id);
+    expect(contentPackId([{ ...files[0], name: 'other' }, files[1], files[2]])).not.toBe(id);
+    expect(contentPackId([{ ...files[2], part: 'core' }, files[0], files[1]])).not.toBe(id);
+    expect(contentPackId(files.slice(0, 2))).not.toBe(id);
   });
 
   it('a megabyte chunk by default', () => {

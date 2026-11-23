@@ -482,8 +482,12 @@ owner's `on-device-release.md`).
   read them with the dev admin key.
 - **Recite's pack on the phone** (Settings → Downloads and storage, BEHAVIOUR.md ONDEV-2, ONDEV-3; design in the shared
   notes, `on-device-a3-pack.md`):
-  - **Server:** `functions/src/recitePack/` (the gated callable, the `.rcpk` format). `functions/scripts/recite-pack-make.js`
-    seals and uploads a pack to the dev backend; a pack id is one key and one set of files, for good.
+  - **Server:** `functions/src/recitePack/` (the gated callable, the `.rcpk` format).
+  - **A new pack** (after any file in `golden/pack-v1` or `pack-strict`, or a model, changes): from `functions/`, after
+    `npm ci && npm run build`, `GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-dev-admin.json node
+    scripts/recite-pack-make.js --lab` (`--dry` first). It refuses a table that isn't its manifest's and a model without its
+    ownership mark, and the id comes from the files' hashes, so a changed file is a new version and nothing is ever
+    overwritten. Phones move to it at their next daily check; the app only fetches the version the callable names.
   - **Parts:** `core` (48.7 MB: `v7.graph.onnx`, `v7.weights.f16`, `v7.weights.json`, `v7.check`, the engine's load-time self-check, and the tables) and `strict` (17 MB:
     `v5.onnx`, the marked `v5m-server-int8.onnx`, and `strict.bin`). Only marked models leave the Mac (hashes in the private
     repo's `checker/marks.json`). The names are `rc_blob`'s (`recite_core.h`). Tables are deflated; the weights stay stored.
