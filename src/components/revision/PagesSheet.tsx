@@ -119,7 +119,7 @@ export function PagesSheet({
           </Text>
         </Tap>
       </View>
-      <ScrollView ref={list} style={styles.list} bounces={false}>
+      <ScrollView ref={list} style={styles.list} contentContainerStyle={styles.listContent} bounces={false}>
         {pages.map((page) => {
           const here = page === current;
           const checked = done.has(page);
@@ -180,10 +180,21 @@ const styles = StyleSheet.create({
   summary: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingVertical: 8 },
   summaryText: { flexShrink: 1 },
   markAll: { fontWeight: '600' },
-  list: { flexShrink: 1 },
+  // Wider than the rows by the highlight's overhang, or the list clips it at the gutter.
+  list: { flexShrink: 1, marginHorizontal: -8 },
+  listContent: { paddingHorizontal: 8 },
   row: { minHeight: ROW_HEIGHT, flexDirection: 'row', alignItems: 'center', gap: 12 },
   rowHere: { marginHorizontal: -8, paddingHorizontal: 8, borderRadius: radiusV2.media },
-  rowMain: { flex: 1, minHeight: ROW_HEIGHT, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
+  // alignContent: a row that wraps (the pill under the number at large text) centres its lines, as alignItems can't.
+  rowMain: {
+    flex: 1,
+    minHeight: ROW_HEIGHT,
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignContent: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
   herePill: { paddingHorizontal: 10, paddingVertical: 2, borderRadius: 999 },
   hereText: { fontWeight: '600' },
   circle: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
