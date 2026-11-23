@@ -54,7 +54,7 @@ describe('a sitting added as revised from the Day (REC-3)', () => {
     const shown = (id: string) => app.screen.queryByTestId(id) != null;
     await app.until(() => shown('activity-add-revised-sitting-due'), 'Add to revised on the sitting over today’s pages');
     const line = app.screen.getByTestId('activity-sitting-to-revise-sitting-due').props.children as string;
-    expect(plain(line)).toMatch(/^Al-Baqarah, ayahs \d+–\d+ is 2 of the 5 pages left of today’s revision\.$/);
+    expect(plain(line)).toMatch(/^Al-Baqarah, .+ is 2 of the 5 pages left of today’s revision\.$/);
     // Not due today: reading, no offer. Not memorized: Add to memorized, not Add to revised.
     expect(shown('activity-sitting-offer-sitting-other')).toBe(false);
     expect(shown('activity-add-memorized-sitting-new')).toBe(true);

@@ -113,7 +113,7 @@ describe('Coverage views (ACT-26)', () => {
     const cell = screen.getByTestId('coverage-page-586');
     expect(cell.props.accessibilityLabel).toBe('At-Takwir, page 586, revised this week');
     expect(screen.getByTestId('coverage-page-604').props.accessibilityLabel).toBe('Al-Ikhlas to An-Nas, page 604, not revised yet');
-    expect(screen.getByTestId('coverage-page-62').props.accessibilityLabel).toBe("Ali 'Imran 92 to 100, page 62, over 30 days");
+    expect(screen.getByTestId('coverage-page-62').props.accessibilityLabel).toBe("Juz 4, first page, page 62, over 30 days");
     await press('coverage-page-586');
     expect(onOpenPage).toHaveBeenCalledWith(586);
     // A row's juz opens its sheet.

@@ -555,7 +555,7 @@ export function DayBlocks({
     ? (() => {
         const mine = new Set(memorizedAyahsOnPage(lastPartly));
         const rest = ayahsOnPage(lastPartly.pageNumber).filter((k) => !mine.has(k));
-        return rest.length > 0 ? t('activity.day.finishesPage', { ayahs: describeAyahs(rest, { form: 'compact' }) }) : null;
+        return rest.length > 0 ? t('activity.day.finishesPage', { ayahs: describeAyahs(rest, { form: 'ayahsCompact' }) }) : null;
       })()
     : null;
   // A sitting whose pages were memorized that day stands under Memorized, not Read.

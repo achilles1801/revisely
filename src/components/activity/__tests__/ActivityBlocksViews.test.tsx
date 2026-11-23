@@ -238,7 +238,7 @@ describe('the Activity calendar (gap audit §3)', () => {
     });
     try {
       render(<ActivityBlocksViews {...props} />);
-      expect(await screen.findByText('Start of Al-Mulk', { normalizer: plainText })).toBeTruthy();
+      expect(await screen.findByText('Al-Mulk, 1st page', { normalizer: plainText })).toBeTruthy();
       expect(screen.getByText('Al-Mulk to Al-Qalam · 22 min', { normalizer: plainText })).toBeTruthy();
     } finally {
       service.getActivityItemsBetween.mockResolvedValue({ revisions: [], memorized: [], reads: [] });
@@ -278,10 +278,10 @@ describe('Insights (gap audit §5)', () => {
     ];
     render(<ActivityBlocksViews {...props} />);
     fireEvent.press(await screen.findByText('Insights'));
-    // By surah and ayahs, the pages a quiet detail after (Majd, Nov 7 2026).
-    expect(await screen.findByText('Al-Hashr, ayahs 4–16  pp. 546–547', { normalizer: plainText })).toBeTruthy();
+    // By surah and its pages, the mushaf's numbers a quiet detail after.
+    expect(await screen.findByText('Al-Hashr, 2nd to 3rd page  pp. 546–547', { normalizer: plainText })).toBeTruthy();
     expect(screen.getByText('Weak now')).toBeTruthy();
-    fireEvent.press(screen.getByText('Revise Al-Hashr 4–16 first tomorrow', { normalizer: plainText }));
+    fireEvent.press(screen.getByText('Revise Al-Hashr, 2nd to 3rd page first tomorrow', { normalizer: plainText }));
     expect(props.onReviseTomorrow).toHaveBeenCalledWith([546, 547]);
     fireEvent.press(screen.getByTestId('weak-spot-546'));
     expect(props.onOpenPage).toHaveBeenCalledWith(546);

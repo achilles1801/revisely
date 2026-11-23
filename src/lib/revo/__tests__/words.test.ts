@@ -8,7 +8,7 @@ const SERVER = /^[\p{L}\p{M}0-9 '’ʿʾ.,·–—\-‑ ]+$/u;
 describe('Revo’s words for parts of the Qur’an (REVO-20, REVO-27)', () => {
   it('[REVO-20] labels by surah and juz, never page numbers', () => {
     expect(plainText(passageShort([548, 549]))).toBe('Al-Hashr to Al-Mumtahanah');
-    expect(plainText(passageShort([548]))).toBe('End of Al-Hashr');
+    expect(plainText(passageShort([548]))).toBe('Al-Hashr, last page');
     expect(plainText(passageShort(range(542, 561)))).toBe('Juz 28');
     expect(juzOf([1, 2, 22])).toBe('Juz 1–2');
     expect(juzOf([548])).toBe('Juz 28');
@@ -19,12 +19,12 @@ describe('Revo’s words for parts of the Qur’an (REVO-20, REVO-27)', () => {
     expect(w.passages).toEqual({
       today: 'Juz 28',
       startsAt: 'Al-Mujadila',
-      next: 'Al-Hashr 17 to At-Tahrim · Juz 28',
-      nextAt: 'Al-Hashr, ayah 17',
-      weakNext: 'Al-Hashr 17 to Al-Mumtahanah 5 · Juz 28',
-      weak: 'Al-Baqarah 77–83 and Al-Hashr 17 to Al-Mumtahanah 5',
+      next: 'Al-Hashr to At-Tahrim · Juz 28',
+      nextAt: 'Al-Hashr, last page',
+      weakNext: 'Al-Hashr to Al-Mumtahanah · Juz 28',
+      weak: 'Al-Baqarah, 11th page and Al-Hashr to Al-Mumtahanah',
     });
-    expect(w.pageNames['548']).toBe('Al-Hashr, ayahs 17–24 · Juz 28');
+    expect(w.pageNames['548']).toBe('Al-Hashr, last page · Juz 28');
     expect(Object.keys(w.pageNames).map(Number).sort((a, b) => a - b)).toEqual([12, ...range(548, 561)]);
   });
 
@@ -63,9 +63,9 @@ describe('Revo’s words for a partly memorized page (MEM-4)', () => {
 });
 
 describe('what was memorized today, for Revo (MEM-1)', () => {
-  it('[REVO-27] by surah and ayah, as plain text the server takes; nothing for none', () => {
+  it('[REVO-27] by surah and page, as plain text the server takes; nothing for none', () => {
     const ayahs = Array.from({ length: 20 }, (_, i) => 67001 + i);
-    expect(memorizedWords(ayahs)).toBe('Al-Mulk, ayahs 1–20');
+    expect(memorizedWords(ayahs)).toBe('Al-Mulk, first 2 pages');
     expect(memorizedWords(ayahs)).toMatch(SERVER);
     expect(memorizedWords([])).toBeNull();
   });

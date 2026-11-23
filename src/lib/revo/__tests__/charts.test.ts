@@ -260,7 +260,7 @@ describe('juz map', () => {
 
   it('a picked juz: when it was last revised, and its surahs', () => {
     expect(juzReadout({ juz: 4, state: 'stale', learning: false, daysSince: 41, counts: NO_COUNTS })).toEqual({ title: 'Juz 4 · last revised 41 days ago', line: expect.anything() });
-    expect(plainText(juzReadout({ juz: 4, state: 'stale', learning: false, daysSince: 41, counts: NO_COUNTS }).line)).toBe("Ali 'Imran 92 to the end of Juz 4");
+    expect(plainText(juzReadout({ juz: 4, state: 'stale', learning: false, daysSince: 41, counts: NO_COUNTS }).line)).toBe("Ali 'Imran to An-Nisa");
     expect(juzReadout({ juz: 28, state: 'week', learning: false, daysSince: 0, counts: NO_COUNTS }).title).toBe('Juz 28 · revised today');
     expect(juzReadout({ juz: 27, state: 'week', learning: false, daysSince: 1, counts: NO_COUNTS }).title).toBe('Juz 27 · last revised yesterday');
     expect(juzReadout({ juz: 5, state: 'stale', learning: false, daysSince: null, counts: NO_COUNTS }).title).toBe('Juz 5 · not all revised yet');
@@ -493,17 +493,17 @@ describe('memorized by month', () => {
 
   it('a picked month: how many pages, named by their ayahs', () => {
     expect(monthReadout({ month: '2026-10', pages: 9 }, items).title).toBe('October · 9 pages');
-    expect(plainText(monthReadout({ month: '2026-10', pages: 9 }, items).line)).toBe("Al-Ma'idah 32–82");
+    expect(plainText(monthReadout({ month: '2026-10', pages: 9 }, items).line)).toBe("Juz 6, last 9 pages");
     expect(monthReadout({ month: '2026-07', pages: 0 }, items).line).toBe('Nothing memorized in July');
   });
 
   it('its days, oldest first, one row a day, each named by its ayahs', () => {
     const days = monthDays(items, '2026-10');
     expect(days.map((d) => [d.day, plainText(d.name), d.pages])).toEqual([
-      ['2026-10-06', "Al-Ma'idah 32–41", 2],
-      ['2026-10-13', "Al-Ma'idah 42–50", 2],
-      ['2026-10-20', "Al-Ma'idah 51–64", 2],
-      ['2026-10-27', "Al-Ma'idah 65–82", 3],
+      ['2026-10-06', "Al-Ma'idah, 8th to 9th page", 2],
+      ['2026-10-13', "Al-Ma'idah, 10th to 11th page", 2],
+      ['2026-10-20', "Al-Ma'idah, 12th to 13th page", 2],
+      ['2026-10-27', "Juz 6, last 3 pages", 3],
     ]);
     expect(monthDays(items, '2026-07')).toEqual([]);
   });

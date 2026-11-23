@@ -66,7 +66,7 @@ describe('Insights in Activity', () => {
     expect(getByText('Weak spots')).toBeTruthy();
     // Named by surah and ayahs (Majd, Nov 7 2026).
     expect(getByTestId('weak-spot-546')).toBeTruthy();
-    expect(getByText(/^Al-Hashr, ayahs /, { normalizer: plainText })).toBeTruthy();
+    expect(getByText(/^Al-Hashr, /, { normalizer: plainText })).toBeTruthy();
     expect(getByTestId('insights-ask-revo')).toBeTruthy();
     expect(queryByTestId('insights-smart-tracking')).toBeNull();
     fireEvent.press(getByText('See all pages by strength'));

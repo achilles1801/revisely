@@ -511,7 +511,7 @@ describe('ActiveRevisionScreen — swiping off the last page', () => {
     expect(screen.getByText('Revision complete')).toBeTruthy();
     expect(screen.getByText('10 pages revised today')).toBeTruthy();
     // What was revised, by surah (never page numbers).
-    expect(screen.getByTestId('session-end-what')).toHaveTextContent(/^Al.Anbiya.102 to Al.Hajj.72$/);
+    expect(screen.getByTestId('session-end-what')).toHaveTextContent(/^Al.Anbiya to Al.Hajj$/);
     expect(screen.getByTestId('confetti', { includeHiddenElements: true })).toBeTruthy();
     expect(Haptics.notificationAsync).toHaveBeenCalledTimes(1);
     expect(Haptics.selectionAsync).not.toHaveBeenCalled();
@@ -536,7 +536,7 @@ describe('ActiveRevisionScreen — swiping off the last page', () => {
     render(<ActiveRevisionScreen />);
     await finish();
     // The page by what it holds, never its number (surahs and juz first, CLAUDE.md).
-    expect(screen.getByText('Al\u2011Hajj\u00A065–72 marked as revised')).toBeTruthy();
+    expect(screen.getByText('Al\u2011Hajj, 9th\u00A0page marked as revised')).toBeTruthy();
     expect(screen.getByText('6 of 10 revised')).toBeTruthy();
     expect(screen.getByText('Swipe back for the pages left.')).toBeTruthy();
     expect(screen.queryByText('End session')).toBeNull();
@@ -588,7 +588,7 @@ describe('ActiveRevisionScreen — swiping off the last page', () => {
     setup([331, 332, 333, 334, 335, 336, 337, 338, 339]);
     render(<ActiveRevisionScreen />);
     await finish();
-    expect(screen.getByText(/^Al.Hajj · Juz 17 · Hizb \d+$/)).toBeTruthy();
+    expect(screen.getByText(/^Al.Hajj, 9th.page · Juz 17 · Hizb \d+$/)).toBeTruthy();
     expect(screen.queryByText('Submit')).toBeNull();
     await act(async () => {
       fireEvent.press(screen.getByLabelText('Back'));

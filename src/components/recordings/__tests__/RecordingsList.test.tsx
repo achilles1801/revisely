@@ -140,7 +140,7 @@ describe("<RecordingsList /> playback", () => {
 
   it("a page chip plays from that moment, seeking once the file has loaded", async () => {
     await renderList();
-    fireEvent.press(screen.getByLabelText(`Play from ${spokenText(placeOfPage(6, { form: "long" }))}`));
+    fireEvent.press(screen.getByLabelText(`Play from ${spokenText(placeOfPage(6, { form: 'ayahs' }))}`));
     const p = mockPlayers[0];
     expect(p.replace).toHaveBeenLastCalledWith({ uri: "file:///doc/r1-1.m4a" });
     expect(p.seekTo).not.toHaveBeenCalled(); // not before it has loaded

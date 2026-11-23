@@ -71,7 +71,7 @@ describe('Activity names a juz-plan session of whole juz by the juz', () => {
 
   it('never a page number: part of a surah by its ayahs, a reading and a recording by their surahs', () => {
     const part = revisionItem(log({ assignedPages: [22, 23, 24, 25, 26], pagesRevised: [22, 23, 24, 25, 26] }));
-    expect(plainText(part.detail)).toBe('Al-Baqarah 142–176 · 41 min');
+    expect(plainText(part.detail)).toBe('Al-Baqarah, 21st to 25th page · 41 min');
     const start = revisionItem(log({ assignedPages: [2, 3, 4], pagesRevised: [2, 3, 4], durationMinutes: 0 }));
     expect(plainText(start.detail)).toBe('Start of Al-Baqarah');
     const items = buildActivityItems(

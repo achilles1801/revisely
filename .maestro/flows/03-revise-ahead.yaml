@@ -57,7 +57,7 @@ appId: com.revisionbuddy.app
     timeout: 10000
 - assertVisible:
     id: today-ahead
-    text: "Tomorrow starts at Al.Fajr, ayah.24"
+    text: "Tomorrow starts at Al.Balad"
 - runFlow:
     file: ../subflows/shot.yaml
     env:
@@ -112,7 +112,7 @@ appId: com.revisionbuddy.app
 - extendedWaitUntil:
     visible:
       id: today-title
-      text: "Continue at Al.Fajr, ayah.24[^0-9]*"
+      text: "Continue at Al.Balad[^0-9]*"
     timeout: 20000
 - assertVisible:
     id: today-summary

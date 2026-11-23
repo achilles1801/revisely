@@ -144,11 +144,16 @@ export function summarizeDay(pages: number[]): DaySummary {
   };
 }
 
-/** "Al-Baqarah, ayah 142" / "Juz 2 · p. 22" for a start-point row: where the page begins, the page a quiet detail. */
+/**
+ * "Al-Hadid, 2nd page" / "Juz 27 · p. 538" for a start-point row: where the page begins, the page a quiet detail. A page
+ * that opens a juz is named by it, so its detail is the page alone.
+ */
 export function describeStartPage(page: number | null): { title: string; subtitle: string } {
   if (page == null) return { title: t('lib.plan.beginning'), subtitle: '' };
+  const juz = getJuzForPage(page);
+  const title = placeOfPage(page);
   return {
-    title: placeOfPage(page),
-    subtitle: t('lib.plan.startDetail', { juz: getJuzForPage(page), page }),
+    title,
+    subtitle: title === t('lib.passages.juz', { n: juz }) ? t('lib.plan.pagesShort', { list: page }) : t('lib.plan.startDetail', { juz, page }),
   };
 }

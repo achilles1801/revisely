@@ -240,7 +240,7 @@ describe('a juz being learned (MEM-7, mock j1)', () => {
     expect(cell.state).toBe('learning');
     expect(cell.share).toBeGreaterThan(0.4);
     expect(cell.share).toBeLessThan(0.75);
-    expect(plainText(m.learningText ?? '')).toBe('Al-Mulk 1–20 so far');
+    expect(plainText(m.learningText ?? '')).toBe('Al-Mulk, first 2 pages so far');
     expect(m.continueAt && { page: m.continueAt.page, label: plainText(m.continueAt.label) }).toEqual({ page: 563, label: 'Al-Mulk 21' });
     const mulk = m.surahs.find((s) => s.sura === 67)!;
     expect(mulk.state).toBe('learning');
@@ -259,7 +259,7 @@ describe('a juz being learned (MEM-7, mock j1)', () => {
       smartTracking: false,
     });
     expect(m.headline).toBe('Last revised 2 days ago');
-    expect(plainText(m.learningText ?? '')).toBe('Al-Mulk 1–20 so far');
+    expect(plainText(m.learningText ?? '')).toBe('Al-Mulk, first 2 pages so far');
   });
 
   it('has nothing being learned when no page is in part', () => {

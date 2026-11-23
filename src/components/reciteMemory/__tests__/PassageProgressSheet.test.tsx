@@ -54,7 +54,7 @@ describe("a passage's progress sheet", () => {
     render(
       <PassageProgressSheet visible words={words} from={A87} to={A90} takes={takes} memories={wordMemories(takes)} now={at(15) + 3600_000} onOpenTake={onOpen} onClose={jest.fn()} />,
     );
-    expect(plainText(screen.getByTestId('progress-passage').props.children)).toBe('Yusuf, ayahs 87–90');
+    expect(plainText(screen.getByTestId('progress-passage').props.children)).toBe('Yusuf, 12th page · start');
     expect(screen.getByTestId('progress-latest').props.children).toBe('99.1%');
     expect(screen.getByTestId('progress-line').props.children).toBe('Up from 95.1% on Mon 2 Nov · 3 takes');
     expect(screen.getByTestId('progress-chart')).toBeTruthy();

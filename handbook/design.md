@@ -165,27 +165,24 @@ classic default), and a fresh install starts in light.
   - The numbers come from `swift scripts/measure-amiri-ink.swift` (CoreText over the word data and the names). Run it
     again if the font or the text changes. `src/design/__tests__/arabicLines.test.tsx` holds the lines to them and
     scans the app; `jest/arabicLines`'s `clippedArabic(root)` checks every Amiri line a test renders.
-- **Surahs and juz first, page numbers almost never** (the owner, Nov 7 2026). People memorize by
-  surah and juz: "Your revision starts at page 288" means little, "Al-Baqarah" a lot. So the app
-  names any part of the Qur'an by its surahs and juz ("Al-Baqarah, ayahs 142–176", "Adh-Dhariyat 7
-  to Al-Hadid", "Juz 28"), never as "Pages 522–541", and every such name comes from `lib/passages`:
-  - `describePassage(pages, { form, juz, order, wholeJuz })`: long (rows, sentences) or short (chips,
-    chart labels: "Start of Al-Baqarah"); `juz: true` adds " · Juz 28" when it helps; `order:
-    'given'` keeps a session's order (the reverse plan, the cycle's end then its start).
-  - `form: 'compact'` drops the word "ayahs" ("Al-Mulk 1–12", sub-lines); `describePageRange`,
-    `describeSession` (SESS-5: whole juz only on the juz plan), `placeOfPage` ("Starts at
-    Al-Baqarah, ayah 142"), `ayahsInSurah` ("Ayahs 142–252", for a row already named by its surah),
-    `pagesNote` ("p. 542") and `plainText` / `spokenText` (notifications and tests / VoiceOver).
-    The text holds names together with no-break hyphens and spaces: in tests compare `plainText`.
-  - Where it shows (NAME-1 in BEHAVIOUR.md): Home's Today post, catch-up line, recent sessions and
-    See all (`lib/activityItems`), the session's header, toast, end card and Keep going, the daily
-    log, the plan editor and schedule, the memorization manager's juz and hizb rows, Jump to, the
-    Read tab's recent pages, the widget snapshot (`lib/widgets/snapshot`). Reminders already named
-    surahs (`lib/reminders/copy`).
-  - Page numbers stay only as a quiet detail after the words where they help ("Al-Mujadila ·
-    p. 542"), inside the reader (the printed page is the reference there) and where the user
-    chooses by page (Jump to's Page tab, the plan's start-point Page tab, page grids, From and To).
-    Amounts are fine ("20 pages"). Approved mocks that lead with page numbers are overridden by this.
+- **Surahs, their pages and first words** (the owner, Nov 7 and Nov 23 2026; NAME-1). People revise by surah, juz and
+  the page in front of them, not by ayah numbers: "almost no one references the quran by ayah numbers when it comes to
+  revising or memorizing ... it should just be the page". Every name comes from `lib/passages`:
+  - `describePassage(pages, { form, juz, order, wholeJuz, exact })`: "Juz 28", "Al-Mulk", "Maryam, 5th page", "Maryam,
+    3rd to 5th page", "Maryam, first 3 pages", "Juz 2, first 5 pages", "Maryam to Ta-Ha". `form: 'short'` (chips, chart
+    labels) says "Start of Al-Baqarah" for pages from a surah's edge; `juz: true` adds " · Juz 28" when it helps;
+    `order: 'given'` keeps a session's order; `exact` names the page at each end of a run across surahs.
+  - `describeAyahs` names any ayahs the same way, with part of a page as "Maryam, 3rd page · start" (middle, end).
+    `describePageRange`, `describeSession` (SESS-5: whole juz only on the juz plan), `placeOfPage` ("Starts at Al-Hadid,
+    2nd page"), `partOfSurah` ("5th page", for a row already named by its surah), `pagesNote` ("p. 542"),
+    `firstWordsOfPage` (a page's first words, from `src/data/pageFirstWords.json`) and `plainText` / `spokenText`
+    (notifications and tests / VoiceOver). The text holds names together with no-break hyphens and spaces: in tests
+    compare `plainText`.
+  - Ayah numbers only where a verse is cited or played: `form: 'ayahs'` ("Yunus, ayah 16") or `'ayahsCompact'` ("Yunus
+    16"), for a held verse, search results, Audio Options and "Play from". Nowhere else.
+  - The mushaf's page numbers stay a quiet detail after the words ("Al-Mujadila · p. 542"), inside the reader and the
+    session, and where the user chooses by page (Jump to's Page tab, the plan's start-point Page tab, page grids, From
+    and To). Amounts are fine ("20 pages").
 - `theme.onAccent` is the text colour on an `accent` fill. Use it instead of `'#fff'`.
 - Following the system appearance needs `userInterfaceStyle: "automatic"` in app.config (now "light"):
   a native change for a versioned release. Until then Settings offers Light and Dark only

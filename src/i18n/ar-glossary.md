@@ -119,6 +119,9 @@ The English is the app's label (as in `src/i18n/en`), or the concept where there
 | the Qur'an / Quran | القرآن (القرآن الكريم in titles) | قرآن without the article in running text | [QC] |
 | surah / surahs | سورة / سور | سورات | [QC] |
 | ayah / ayahs | آية / آيات | | [QC] |
+| a page of a surah ("Maryam, 5th page") | مريم، الصفحة ٥ | No ordinal words; digits through `formatNumber` | [QC] |
+| first / last pages of a surah | أول ٣ صفحات · آخر صفحة | | Plain usage |
+| part of a page (start, middle, end) | أول الصفحة · وسط الصفحة · آخر الصفحة | Majd's three words, Nov 23 2026 | Plain usage |
 | juz / juz' | جزء / أجزاء | | [QC] |
 | hizb, quarter | حزب / أحزاب، ربع / أرباع | | Mushaf divisions |
 | page / pages | صفحة / صفحات | | |

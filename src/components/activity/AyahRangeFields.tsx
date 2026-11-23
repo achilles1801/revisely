@@ -19,7 +19,7 @@ function bounds(lo: AyahKey, hi: AyahKey, sura: number): { first: number; last: 
 }
 
 /** "Al-Mulk, ayah 20". */
-export const ayahLabel = (key: AyahKey) => (ayahOf(key) === 1 ? t('activity.ayahFields.ayahOne', { place: placeOfAyah(key) }) : placeOfAyah(key));
+export const ayahLabel = (key: AyahKey) => (ayahOf(key) === 1 ? t('activity.ayahFields.ayahOne', { place: placeOfAyah(key, { form: 'ayahs' }) }) : placeOfAyah(key, { form: 'ayahs' }));
 
 function AyahWheels({ value, lo, hi, onChange, testID }: RangeWheelProps) {
   const firstSura = suraOf(lo);

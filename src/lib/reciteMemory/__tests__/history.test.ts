@@ -111,6 +111,6 @@ describe("a take's passage history", () => {
     const b2end = words.verseRange(13, 2)[1] - 1;
     const [y110] = words.verseRange(12, 110);
     const [row] = historyRows(words, { from: b1, to: b2end }, [take('x', 21, y110, b2end)], NOW);
-    expect(row.detail).toMatch(/^Yusuf.*110.*Ar.Ra.d/);
+    expect(row.detail).toMatch(/^Yusuf.*Ar.Ra.d/);
   });
 });

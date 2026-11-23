@@ -882,7 +882,7 @@ describe('a take starts anywhere on the page (Majd, Nov 14 2026)', () => {
     expect(screen.getByTestId('live-word-box')).toBeTruthy();
     expect(screen.getByTestId('recite-words')).toBeTruthy();
     expect(screen.getByTestId('recite-score')).toBeTruthy();
-    expect(announce).toHaveBeenCalledWith('Started at An-Naml, ayah 25');
+    expect(announce).toHaveBeenCalledWith('Started at An-Naml, 3rd page · middle');
     expect(mockPager.scrolled).toEqual([]);
   });
 
@@ -906,7 +906,7 @@ describe('a take starts anywhere on the page (Majd, Nov 14 2026)', () => {
     await settle(() => expect(screen.getByTestId('recite-result')).toBeTruthy());
     await openResult();
     const passage = String(screen.getByTestId('take-summary-passage').props.children);
-    expect(passage).toMatch(/^An.Naml,\sayahs\s25.26\s·\s/);
+    expect(passage).toMatch(/^An.Naml,\s3rd\spage\s·\smiddle\s·\s/);
     expect(screen.queryByTestId('take-summary-finding-skipped')).toBeNull();
   });
 
@@ -923,7 +923,7 @@ describe('a take starts anywhere on the page (Majd, Nov 14 2026)', () => {
     await done();
     await settle(() => expect(screen.getByTestId('recite-result')).toBeTruthy());
     await openResult();
-    expect(String(screen.getByTestId('take-summary-passage').props.children)).toMatch(/^An.Naml,\sayah\s23\s·\s/);
+    expect(String(screen.getByTestId('take-summary-passage').props.children)).toMatch(/^An.Naml,\s3rd\spage\s·\sstart\s·\s/);
   });
 
   it('never found: it fails silently (Majd, Nov 14 2026): Stop just ends the take, with no summary or message', async () => {
@@ -1600,7 +1600,7 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
     await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: end, secs: 12, marks: [], score: null } });
     await openResult();
     const passage = String(screen.getByTestId('take-summary-passage').props.children);
-    expect(passage).toMatch(/^An.Naml,\sayahs\s23.24\s·\s/);
+    expect(passage).toMatch(/^An.Naml,\s3rd\spage\s·\sstart\s·\s/);
     expect(passage).not.toMatch(/Qasas/);
   });
 
@@ -1803,7 +1803,7 @@ describe('screen readers during a take', () => {
     await startTake('check');
     const announce = AccessibilityInfo.announceForAccessibility as jest.Mock;
     const said = announce.mock.calls.map((c) => String(c[0]));
-    expect(said).toEqual([expect.stringMatching(/^Started at An.Naml, ayah 23$/)]);
+    expect(said).toEqual([expect.stringMatching(/^Started at An.Naml, 3rd.page$/)]);
     expect(screen.getByTestId('recite-middle').props.accessibilityLiveRegion).toBeUndefined();
     for (let i = 0; i < 3; i++) {
       await act(async () => mockMic!.onAudio(new Int16Array(16000)));
@@ -1964,7 +1964,7 @@ describe('Recite your mistakes here (the held mic: the page’s remembered mista
     const row = screen.getByTestId('recite-mode-drill');
     expect(row).toHaveTextContent(/Recite your 2 mistakes here/);
     // VoiceOver hears the stretch as words ("23 to 26").
-    expect(row.props.accessibilityLabel).toBe('Recite your 2 mistakes here, An-Naml, ayahs 23 to 26');
+    expect(row.props.accessibilityLabel).toBe('Recite your 2 mistakes here, An-Naml, 3rd page · start');
     fireEvent.press(row);
     await flush();
     await flush();
@@ -2175,7 +2175,7 @@ describe('Test me (Majd, Nov 15 2026: random within what’s memorized, with an 
     expect(screen.getByTestId('test-summary')).toBeTruthy();
     expect(screen.getByTestId('test-summary-headline')).toHaveTextContent('4 of 5 continued cleanly');
     expect(screen.getAllByTestId('test-summary-place-clean')).toHaveLength(4);
-    expect(screen.getByTestId('test-summary-place-mistakes')).toHaveTextContent(/ayahs 4.6.*1 wrong word$/);
+    expect(screen.getByTestId('test-summary-place-mistakes')).toHaveTextContent(/1st.page · middle.*1 wrong word$/);
     // The take is gone, and the page as it was (not hidden).
     expect(screen.queryByTestId('recite-bar')).toBeNull();
     fireEvent.press(screen.getByTestId('test-summary-again'));

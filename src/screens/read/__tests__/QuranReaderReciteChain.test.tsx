@@ -317,7 +317,7 @@ describe('[RECITE-22] a recitation past the checker’s 15 minutes is one take o
     await say(b, doneOf('take-b', A23 + 9, [wrong(A24 + 1)], 'end', 20));
     await openSummary();
     expect(screen.getByTestId('take-summary')).toBeTruthy();
-    expect(String(screen.getByTestId('take-summary-passage').props.children)).toMatch(/^An.Naml,\sayahs\s23.24\s·\s/);
+    expect(String(screen.getByTestId('take-summary-passage').props.children)).toMatch(/^An.Naml,\s3rd\spage\s·\sstart\s·\s/);
     // One recording for the recitation, and Recite's memory keeps one take, with each link's checker take.
     expect(mockTake.started).toBe(1);
     expect(mockTake.added).toBe(910 * SR);

@@ -511,7 +511,7 @@ it('[REVO-34] [REVO-35] [REVO-9] [REVO-20] every open starts on a greeting writt
     expect(app.screen.queryByTestId('revo-button-dot')).toBeNull();
     await openRevo();
     const second = await fresh('after the review');
-    expect(second).toMatch(/^Assalamu alaikum(, [^.]+)?\. Tomorrow starts at Al-Baqarah, ayah \d+, 5 pages\.$/);
+    expect(second).toMatch(/^Assalamu alaikum(, [^.]+)?\. Tomorrow starts at Al-Baqarah, \d+(st|nd|rd|th) page, 5 pages\.$/);
     expect(app.screen.getByTestId('revo-chip-How do I revise ahead?')).toBeTruthy();
     expect(app.screen.queryByTestId('revo-review')).toBeNull();
     await closeRevo();

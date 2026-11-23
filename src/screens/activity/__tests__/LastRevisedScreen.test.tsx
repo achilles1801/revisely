@@ -95,7 +95,7 @@ describe('Last revised', () => {
     // Recent first inside too.
     expect(ids(/^last-revised-page-surah-2-/)).toEqual(['last-revised-page-surah-2-4', 'last-revised-page-surah-2-2', 'last-revised-page-surah-2-3']);
     const child = screen.getByTestId('last-revised-page-surah-2-4');
-    expect(within(child).getByText(/^Ayahs/)).toBeTruthy();
+    expect(within(child).getByText(/^3rd.page/)).toBeTruthy();
     expect(within(child).queryByText(/Al-Baqarah/)).toBeNull();
     expect(within(child).getByText('6 days ago')).toBeTruthy();
     expect(label('last-revised-page-surah-2-4')).toMatch(/, page 4\. 9 Nov · 6 days ago\. Opens it in the reader$/);

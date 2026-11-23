@@ -22,9 +22,21 @@ export const lib = {
     more_other: '{{count}} more',
     withJuz: '{{text}} · {{juz}}',
     wholeSurah: 'Whole surah',
-    /** A surah's row: "Ayah 286", "Ayahs 1–5, 20–30". */
-    ayahOne: 'Ayah {{list}}',
-    ayahsMany: 'Ayahs {{list}}',
+    /** "Maryam, 5th page", "Juz 2, first 5 pages": a surah or juz and which of its pages. */
+    inSurah: '{{surah}}, {{part}}',
+    /** "5th page". {{nth}} is an ordinal in English; Arabic says "الصفحة ٥". */
+    nthPage: '{{nth}} page',
+    lastPage: 'last page',
+    nthToNth: '{{from}} to {{to}} page',
+    firstPages_one: 'first page',
+    firstPages_other: 'first {{count}} pages',
+    lastPages_one: 'last page',
+    lastPages_other: 'last {{count}} pages',
+    /** Part of a page: "Maryam, 3rd page · start". */
+    atPart: '{{place}} · {{part}}',
+    partStart: 'start',
+    partMiddle: 'middle',
+    partEnd: 'end',
   },
   /** lib/pageRanges: "Page 5", "Pages 1–3, 7 and 20–22". */
   pageRanges: {
@@ -53,7 +65,6 @@ export const lib = {
     nextCycle: 'Next cycle',
     /** Jump to's start: "Juz 18", "Juz 18 · Al-Kahf, ayah 75". */
     jumpJuz: 'Juz {{n}}',
-    jumpJuzAt: 'Juz {{n}} · {{place}}',
   },
   /** lib/recency. */
   recency: {

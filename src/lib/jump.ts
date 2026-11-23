@@ -200,16 +200,12 @@ export function undoJump(current: User, before: User): User {
 }
 
 /**
- * Where today now starts, for the toast, surahs and juz first, never the page
- * (lib/passages): "Juz 12" at its start, else "Juz 12 · Hud, ayah 29"; the surah
- * chosen when today starts at its first page ("Al-Kahf", though that page opens
- * with the end of Al-Isra), else where the page begins ("Al-Kahf, ayah 75").
+ * Where today now starts, for the toast (lib/passages): "Juz 12" at its start; the surah chosen when today starts at its
+ * first page ("Al-Kahf", though that page opens with the end of Al-Isra); else the page it starts on ("Hud, 5th page").
  */
 export function describeStart(target: JumpTarget, startPage: number): string {
   if (target.kind === 'juz') {
-    return startPage === getPagesForJuz(target.juz)[0]
-      ? t('lib.plan.jumpJuz', { n: target.juz })
-      : t('lib.plan.jumpJuzAt', { n: target.juz, place: placeOfPage(startPage) });
+    if (startPage === getPagesForJuz(target.juz)[0]) return t('lib.plan.jumpJuz', { n: target.juz });
   }
   if (target.kind === 'surah' && startPage === getPagesForSurah(target.surah)[0]) return surahName(target.surah);
   return placeOfPage(startPage);

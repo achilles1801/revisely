@@ -68,7 +68,7 @@ function opened(place: RevoPlace, { open = 0, strength = true, context = ctx }: 
   return { text: plainText(o.text), chips: o.chips.map(plainText) };
 }
 
-const TODAY_NEXT = 'Today, An-Nazi\'at 16 to \'Abasa is next.';
+const TODAY_NEXT = 'Today, An-Nazi\'at to \'Abasa is next.';
 /** Words no line may hold: a name left out, a page number alone. */
 const BROKEN = /\s{2}|\bundefined\b|\bNaN\b|\bnull\b|\bpages? \d|\bp\. ?\d/;
 const STRENGTH = /\b(weak|strong|strength|rated|rating)\b/i;
@@ -77,22 +77,22 @@ describe('Revo opened from a day in Activity (REVO-38)', () => {
   it('[REVO-38] a past day done on the day: its pages by surah, its minutes, its notes; then today’s next part', () => {
     const notes = { journal: [{ date: '2026-11-01', entries: [{ id: 'a', kind: 'note', text: 'Slow but steady' }, { id: 'b', kind: 'note', text: 'Revised after Fajr' }] }] };
     const { text, chips } = opened({ kind: 'day', day: '2026-11-01', extras: notes as never });
-    expect(text).toBe(`Assalamu alaikum, Majd. On Sunday you revised both pages, An-Naba to An-Nazi'at 15, in 20 minutes, and wrote 2 notes. ${TODAY_NEXT}`);
+    expect(text).toBe(`Assalamu alaikum, Majd. On Sunday you revised both pages, An-Naba to An-Nazi'at, in 20 minutes, and wrote 2 notes. ${TODAY_NEXT}`);
     expect(chips).toEqual(['How did Sunday go?', 'How was my week?', 'Which days do I miss?']);
   });
 
   it('[REVO-38] a day whose pages were caught up later, or revised ahead, says so', () => {
     expect(opened({ kind: 'day', day: '2026-11-02' }).text).toBe(
-      `Assalamu alaikum, Majd. On Monday, both pages, An-Nazi'at 16 to 'Abasa, were revised, 1 caught up later. ${TODAY_NEXT}`,
+      `Assalamu alaikum, Majd. On Monday, both pages, An-Nazi'at to 'Abasa, were revised, 1 caught up later. ${TODAY_NEXT}`,
     );
     expect(opened({ kind: 'day', day: '2026-11-06' }).text).toBe(
-      `Assalamu alaikum, Majd. Yesterday, both pages, An-Naba to An-Nazi'at 15, were revised, 1 revised ahead. ${TODAY_NEXT}`,
+      `Assalamu alaikum, Majd. Yesterday, both pages, An-Naba to An-Nazi'at, were revised, 1 revised ahead. ${TODAY_NEXT}`,
     );
   });
 
   it('[REVO-38] a missed day: its pages weren’t revised; catching up is offered only while it can be (three days)', () => {
     const missed = opened({ kind: 'day', day: '2026-11-03' });
-    expect(missed.text).toBe(`Assalamu alaikum, Majd. Tuesday’s 2 pages, At-Takwir to Al-Mutaffifin 6, weren’t revised. ${TODAY_NEXT}`);
+    expect(missed.text).toBe(`Assalamu alaikum, Majd. Tuesday’s 2 pages, At-Takwir to Al-Mutaffifin, weren’t revised. ${TODAY_NEXT}`);
     expect(missed.chips).toEqual(['Which days do I miss?', 'How is my pace?', 'How was my week?']);
     // Two days ago, on a 28-page plan: catching up is still a question.
     const facts: RevoDayFacts = {
@@ -108,7 +108,7 @@ describe('Revo opened from a day in Activity (REVO-38)', () => {
     };
     const recent: PlaceFacts = { kind: 'day', day: '2026-11-05', today: TODAY, facts, plan: Array.from({ length: 28 }, (_, i) => 2 + i), revised: [] };
     const o = revoOpener(null, ctx, recent);
-    expect(plainText(o.text)).toBe(`Assalamu alaikum. Thursday’s 28 pages, Al-Baqarah, ayahs 1–190, weren’t revised. ${TODAY_NEXT}`);
+    expect(plainText(o.text)).toBe(`Assalamu alaikum. Thursday’s 28 pages, Al-Baqarah, first 28 pages, weren’t revised. ${TODAY_NEXT}`);
     expect(o.chips.map(plainText)[0]).toBe('Can I still catch up Thursday?');
   });
 
@@ -141,8 +141,8 @@ describe('Revo opened from Activity’s Overview and Insights (REVO-38)', () => 
 
   it('[REVO-38] Insights with Smart Tracking: the weak part left longest and when it was revised; opened again, coverage, then pace', () => {
     const first = opened({ kind: 'insights' });
-    expect(first.text).toBe("Assalamu alaikum, Majd. An-Naba 31 to An-Nazi'at 15 is rated weak and was last revised yesterday. Want a short plan for it?");
-    expect(first.chips).toEqual(["Plan An-Naba to An-Nazi'at", 'Which parts are weakest?', 'How is my pace?']);
+    expect(first.text).toBe("Assalamu alaikum, Majd. An-Naba, last page is rated weak and was last revised yesterday. Want a short plan for it?");
+    expect(first.chips).toEqual(["Plan An-Naba, last page", 'Which parts are weakest?', 'How is my pace?']);
     expect(opened({ kind: 'insights' }, { open: 1 }).text).toBe('Assalamu alaikum, Majd. In the last 30 days you’ve revised 80% of what you’ve memorized.');
     expect(opened({ kind: 'insights' }, { open: 2 }).text).toBe('Assalamu alaikum, Majd. Over the last 30 days you’ve revised less than a page a day, against a plan of 2.');
     expect(opened({ kind: 'insights' }, { open: 3 }).text).toBe(first.text);
@@ -167,7 +167,7 @@ describe('Revo opened from Activity’s Overview and Insights (REVO-38)', () => 
     expect(opened({ kind: 'weakSpots' }).text).toBe('Assalamu alaikum, Majd. You have 1 weak page, in An-Naba. Ask about it, or I can plan it.');
     expect(opened({ kind: 'strength' }).text).toBe('Assalamu alaikum, Majd. 1 page is rated weak, in An-Naba.');
     const many: PlaceFacts = { kind: 'weak', from: 'strength', count: 6, mostIn: 'Al-Hashr', longest: [547, 548] };
-    expect(plainText(revoOpener('Majd', ctx, many).text)).toBe('Assalamu alaikum, Majd. 6 pages are rated weak, most in Al-Hashr. The one left longest is Al-Hashr, ayahs 10–24.');
+    expect(plainText(revoOpener('Majd', ctx, many).text)).toBe('Assalamu alaikum, Majd. 6 pages are rated weak, most in Al-Hashr. The one left longest is Al-Hashr, last 2 pages.');
   });
 });
 

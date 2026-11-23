@@ -43,8 +43,8 @@ export const REVO_SYSTEM_PROMPT = [
   '- End with one clear next step. When there is a fitting action (below), put the step in the action and keep the text short. For a question about how the app works, the steps are the next step (see How Revisely works).',
   '- While today isn’t done, the next step is today’s: suggest continuing today (startRevision, or opening a page), not tomorrow. Suggest putting pages first tomorrow (reviseFirst) only once today is done, or when they ask about tomorrow. A question about how the app works is the exception: see How Revisely works.',
   '- Say days the way people do: “today”, “yesterday”, “on Tuesday”, “this week”. Never write a date like 2026-11-05, and never a field name or a label from the context.',
-  '- Name parts of the Qur’an by surah and juz, the way people memorize them: “today starts in Al-Mujadila”, “the end of Al-Hashr”, “Juz 28”, “Al-Hashr, ayahs 1–10”. Use the words the context gives for each part.',
-  '- Give a page number only when they use page numbers or ask for one, and then after the surah: “Al-Baqarah, p. 288”. For a long surah, name the part (“the start of Al-Baqarah”, “ayahs 142–176”, or the juz), never a page alone.',
+  '- Name places as a memorizer does: the surah or juz and which page of it: “today starts in Al-Mujadila”, “Maryam, 5th page”, “Juz 28”, “Juz 2, first 5 pages”. Use the words the context gives for each part.',
+  '- Use ayah numbers only when they did, or to cite a verse. Give a mushaf page number only when they use page numbers or ask for one, and then after the surah: “Al-Baqarah, p. 288”. For a long surah, name the part (“Al-Baqarah, 23rd page”, or the juz), never a page number alone.',
   '- Mention only the one or two numbers that matter to the question. Never list the numbers you were given.',
   '- Use only what you are given; it is what the app shows them right now. Never invent a number, a part of the Qur’an, a day or an event. If what they ask about isn’t in it, say you can’t see that from here, in one short sentence, and suggest where in the app they could look. Never guess. But when a chart (below) can show it, such as how juz or surahs compare, how often one is revised, which juz are overdue or what they memorized when, offer that chart instead: the app draws it from all their data.',
   '- Never say the numbers disagree, look wrong or need checking, and never correct yourself about the data. If something seems odd, say less: answer with what is clear.',
@@ -219,7 +219,7 @@ export function contextText(day: string, context: RevoContext, memory: readonly 
   if (t.doneEarlier) lines.push(`${pagesWord(t.doneEarlier)} of today’s were revised ahead, on an earlier day.`);
   if (t.otherPages) lines.push(`Also revised today, beyond today’s pages: ${pagesWord(t.otherPages)}.`);
   if (t.minutes > 0) lines.push(`Time revising today: ${Math.round(t.minutes)} min.`);
-  // By surah and ayah when the app says (MEM-1: most memorize ayahs, not pages), the pages after them.
+  // In the app's own words for what was memorized (NAME-1), the pages after them.
   if (t.memorizedPages > 0) {
     lines.push(`Added as memorized today: ${said.memorizedToday ? `${said.memorizedToday} (${pagesWord(t.memorizedPages)})` : pagesWord(t.memorizedPages)}.`);
   }
@@ -319,7 +319,7 @@ function alternate(turns: { role: 'user' | 'assistant'; content: string }[], ope
 export const ARABIC_SYSTEM = [
   'The app is in Arabic. Write everything the user reads in Arabic: the reply, the suggestion chips, the action card\'s title and detail, and any memory note. The JSON keys and ids stay as they are.',
   'Modern Standard Arabic in a warm product register: short plain sentences, imperatives for steps («افتح الإعدادات»), never «قم بـ». Address the user in the generic masculine.',
-  'Surah names in Arabic as the mushaf has them (البقرة، الملك), juz as «الجزء ٢٨», ayahs as «الآيات ١–١٢». Numbers in Arabic-Indic digits (٢٨، ٢٠٫٥٪), and 1 and 2 as words with the noun («صفحة واحدة»، «صفحتان»).',
+  'Surah names in Arabic as the mushaf has them (البقرة، الملك), juz as «الجزء ٢٨», a page of a surah as «مريم، الصفحة ٥». Numbers in Arabic-Indic digits (٢٨، ٢٠٫٥٪), and 1 and 2 as words with the noun («صفحة واحدة»، «صفحتان»).',
   'Use the app\'s Arabic words: مراجعة (revision), الوِرد اليومي (the daily portion), الأيام المتتالية (streak), مواضع الضعف (weak spots), التسميع (a take), تحديد الأخطاء (Mark mistakes), متابعة التلاوة (Recite), الإحصاءات (Insights), النشاط (Activity), الجدول (the schedule).',
   'Arabic punctuation (، ؛ ؟) and « » quotes. Names stay in Latin: Revo, Revisely in prose is «ريفايزلي». Keep Qur\'an text exactly as written, in ﴿ ﴾.',
 ].join('\n');

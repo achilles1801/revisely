@@ -198,7 +198,7 @@ describe('Weak spots', () => {
     });
     // By surah and ayahs, the pages a quiet detail (Majd, Nov 7 2026).
     expect(rows.map((r) => [r.surah, plainText(r.label), plainText(r.pagesNote), r.reason])).toEqual([
-      ['Al-Hashr', 'Al-Hashr, ayahs 4–16', 'pp. 546–547', 'Weak now · rated weak 3 times in 30 days'],
+      ['Al-Hashr', 'Al-Hashr, 2nd to 3rd page', 'pp. 546–547', 'Weak now · rated weak 3 times in 30 days'],
       ['At-Taghabun', 'At-Taghabun', 'pp. 556–557', 'Skipped 3 times in 30 days'],
     ]);
   });
@@ -211,7 +211,7 @@ describe('Weak spots', () => {
       revisions: [1, 5, 9].map((n) => ({ day: ago(n), skipped: [556, 557] })),
       today: TODAY,
     });
-    expect(rows.map((r) => plainText(r.label))).toEqual(['Al-Hashr, ayahs 4–16', 'At-Taghabun', 'Al-Baqarah, ayahs 246–252']);
+    expect(rows.map((r) => plainText(r.label))).toEqual(['Al-Hashr, 2nd to 3rd page', 'At-Taghabun', 'Juz 2, last 2 pages']);
     expect(plainText(reviseFirstLabel(rows))).toBe('Revise these weak spots first tomorrow');
     expect(plainText(reviseFirstLabel(rows.slice(1, 2)))).toBe('Revise At-Taghabun first tomorrow');
   });
@@ -219,8 +219,8 @@ describe('Weak spots', () => {
   it('splits a run where a surah begins (548 is Al-Hashr’s last page)', () => {
     const rows = weakSpotRows({ memorized: new Set([548, 549]), rating: () => 2, ratedWeak: new Map(), revisions: [], today: TODAY });
     expect(rows.map((r) => [r.surah, plainText(r.label)])).toEqual([
-      ['Al-Hashr', 'Al-Hashr, ayahs 17–24'],
-      ['Al-Mumtahanah', 'Al-Mumtahanah, ayahs 1–5'],
+      ['Al-Hashr', 'Al-Hashr, last page'],
+      ['Al-Mumtahanah', 'Al-Mumtahanah, 1st page'],
     ]);
   });
 

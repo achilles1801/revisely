@@ -32,8 +32,8 @@ describe('Recite insights in words', () => {
   });
 
   it('names passages by surah and ayahs, never pages', () => {
-    expect(plainText(passageName(18, 22, 23))).toBe('Al-Kahf, ayahs 22–23');
-    expect(plainText(passageName(2, 48, 48))).toBe('Al-Baqarah, ayah 48');
+    expect(plainText(passageName(18, 22, 23))).toBe('Al-Kahf, 4th page · middle');
+    expect(plainText(passageName(2, 48, 48))).toBe('Al-Baqarah, 6th page · end');
   });
 
   it('the figure’s line says how the score moved, or that there were no takes', () => {

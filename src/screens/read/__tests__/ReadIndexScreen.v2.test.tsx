@@ -94,7 +94,7 @@ describe('the Read index in the new design', () => {
     await renderIndex();
     expect(screen.getByText('Recent pages')).toBeTruthy();
     const row = screen.getByTestId('recent-50');
-    expect(within(row).getByText(/^Ayahs.1–9 · p\. 50 · /)).toBeTruthy();
+    expect(within(row).getByText(/^1st.page · p\. 50 · /)).toBeTruthy();
     fireEvent.press(row);
     expect(mockNavigation.navigate).toHaveBeenCalledWith('QuranReader', { pageNumber: 50, source: 'index' });
   });
