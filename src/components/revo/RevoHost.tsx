@@ -401,7 +401,7 @@ function RevoHostInner({ available, onOpenChange }: { available: boolean; onOpen
     } else if (action.kind === 'startRevision') {
       navigationRef.navigate('Home', { screen: 'ActiveRevision', params: undefined, initial: false });
     } else if (action.kind === 'openScreen') {
-      openScreen((name, params) => (navigationRef.navigate as (n: string, p: object) => void)(name, params), action);
+      openScreen((name, params) => (navigationRef.navigate as (n: string, p: object) => void)(name, params), action, day);
     }
   };
 

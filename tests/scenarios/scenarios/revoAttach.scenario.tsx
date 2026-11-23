@@ -53,7 +53,7 @@ function stack(mods: Booted): ReactElement {
         { screenOptions: { headerShown: false, animation: 'none' } },
         h(Stack.Screen, { name: 'Dashboard', component: Dashboard }),
         h(Stack.Screen, { name: 'Insights', component: Insights }),
-        ...['ActiveRevision', 'Settings', 'PlanEdit', 'PlanDayEdit', 'Activity', 'ActivityAll', 'ActivityDay', 'JournalEntry', 'Memorization'].map((name) =>
+        ...['ActiveRevision', 'Settings', 'PlanEdit', 'PlanDayEdit', 'Activity', 'ActivityAll', 'ActivityDay', 'Memorization'].map((name) =>
           h(Stack.Screen, { key: name, name, component: Elsewhere }),
         ),
       ),

@@ -44,7 +44,7 @@ function homeAndSettings(mods: Booted): ReactElement {
         { screenOptions: { headerShown: false, animation: 'none' } },
         h(Stack.Screen, { name: 'Dashboard', component: Dashboard }),
         h(Stack.Screen, { name: 'Settings', component: Settings }),
-        ...['ActiveRevision', 'PlanEdit', 'PlanDayEdit', 'Memorization', 'Activity', 'ActivityDay', 'ActivityAll', 'Insights', 'QuranReader', 'JournalEntry', 'PagesByStrength', 'ListenBack'].map(
+        ...['ActiveRevision', 'PlanEdit', 'PlanDayEdit', 'Memorization', 'Activity', 'ActivityDay', 'ActivityAll', 'Insights', 'QuranReader', 'PagesByStrength', 'ListenBack'].map(
           (name) => h(Stack.Screen, { key: name, name, component: Elsewhere }),
         ),
       ),

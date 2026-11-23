@@ -158,7 +158,7 @@ function revoAppStack(mods: Booted): ReactElement {
   const { createNativeStackNavigator } = req<any>('@react-navigation/native-stack');
   const Dashboard = req<any>('src/screens/main/DashboardScreen').default;
   const Session = req<any>('src/screens/revision/ActiveRevisionScreen').default;
-  const Journal = req<any>('src/screens/journal/JournalEntryScreen').default;
+  const ActivityDay = req<any>('src/screens/activity/ActivityDayScreen').default;
   const Manager = req<any>('src/screens/main/MemorizationScreen').default;
   const { ReadingTimerProvider } = req<any>('src/context/ReadingTimerContext');
   const { RevoHost } = req<any>('src/components/revo/RevoHost');
@@ -182,9 +182,9 @@ function revoAppStack(mods: Booted): ReactElement {
         { screenOptions: { headerShown: false, animation: 'none' } },
         h(Stack.Screen, { name: 'Dashboard', component: Dashboard }),
         h(Stack.Screen, { name: 'ActiveRevision', component: Session }),
-        h(Stack.Screen, { name: 'JournalEntry', component: Journal }),
+        h(Stack.Screen, { name: 'ActivityDay', component: ActivityDay }),
         h(Stack.Screen, { name: 'Memorization', component: Manager }),
-        ...['Settings', 'PlanEdit', 'PlanDayEdit', 'Activity', 'ActivityAll', 'ActivityDay', 'Insights'].map((name) =>
+        ...['Settings', 'PlanEdit', 'PlanDayEdit', 'Activity', 'ActivityAll', 'Insights', 'QuranReader'].map((name) =>
           h(Stack.Screen, { key: name, name, component: Elsewhere }),
         ),
       ),
@@ -311,7 +311,7 @@ it('[REVO-26] Revo is asked with the state the phone shows now: after Jump to, a
     ctx = await askRevo(app, asks, 'How much do I know?');
     expect([ctx.totals.memorizedPages, ctx.today.memorizedPages]).toEqual([604, 23]);
 
-    // A note in the daily log: notes reach Revo only as an attachment the user picks (REVO-2).
+    // A note on the day: notes reach Revo only as an attachment the user picks (REVO-2).
     const log = new DailyLog(app);
     await log.open();
     await log.add('Revised with my teacher after Fajr');

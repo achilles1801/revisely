@@ -194,7 +194,7 @@ export const revo = {
     activity: 'Open Activity',
     // Testers' Insights are a tab at the top of Activity.
     insights: 'Open Activity',
-    dailyLog: 'Open the daily log',
+    dailyLog: 'Open today in Activity',
     settings: 'Open Settings',
     prayerTimes: 'Show prayer times',
     qibla: 'Find the Qibla',

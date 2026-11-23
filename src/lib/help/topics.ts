@@ -593,7 +593,7 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         icon: 'hand-left-outline',
         title: 'Changing an entry',
         text:
-          "Hold a block's title, or a recording, for its menu. Deleting a Memorized entry takes what it added " +
+          "Hold a block's title, a note or a recording for its menu. Deleting a Memorized entry takes what it added " +
           'off your memorized.',
         covers: ['ACT-6', 'ACT-7'],
       },
@@ -626,7 +626,7 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         id: 'day.notes',
         icon: 'document-text-outline',
         title: 'Notes',
-        text: 'A note sits under the block it’s about, or in Notes. Tap one in Notes to open the daily log, where notes are edited and deleted.',
+        text: 'A note sits under the block it’s about, or in Notes. Hold one to edit, copy or delete it.',
         covers: ['ACT-11', 'ACT-6', 'LOG-2'],
       },
     ],

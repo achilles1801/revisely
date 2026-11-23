@@ -179,7 +179,7 @@ export const revo: NonNullable<ArStrings['revo']> = {
     memorized: 'فتح الصفحات المحفوظة',
     activity: 'فتح النشاط',
     insights: 'فتح النشاط',
-    dailyLog: 'فتح السجل اليومي',
+    dailyLog: 'فتح اليوم في النشاط',
     settings: 'فتح الإعدادات',
     prayerTimes: 'عرض مواقيت الصلاة',
     qibla: 'تحديد القبلة',

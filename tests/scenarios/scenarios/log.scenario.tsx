@@ -102,14 +102,11 @@ for (let rep = 0; rep < 3; rep++) it(`[LOG-1] two notes sent back to back, the s
   await new Home(opened).ready();
   const log = new DailyLog(opened);
   await log.open();
-  const { fireEvent, within } = opened.mods.rtl;
+  // Sent, and on to the next as soon as its sheet has gone: the note need not have shown yet.
   const send = async (text: string) => {
-    fireEvent.press(within(opened.screen.getByTestId('journal-kind')).getByText('Note'));
-    await opened.act(async () => {
-      fireEvent.changeText(opened.screen.getByTestId('journal-text-input'), text);
-    });
-    fireEvent.press(opened.screen.getByTestId('journal-send'));
-    await opened.act(async () => {});
+    await log.write(text);
+    await opened.until(() => opened.screen.queryByTestId('add-note-text') == null, 'the Note sheet to close');
+    await opened.idle(400);
   };
   await send('first');
   await send('second');
