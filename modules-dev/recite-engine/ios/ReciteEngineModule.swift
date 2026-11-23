@@ -58,7 +58,7 @@ public class ReciteEngineModule: Module {
 
     /// Opens the engine from Recite's pack: decrypted and checked here (the key stays in native memory), then read in
     /// place by the engine, which holds the blobs until rc_release; they are wiped and freed then. Resolves {ok, code,
-    /// error, info}; code -2 (RC_ERR_DATA) means the pack itself is bad.
+    /// error, info}; code -20 means its files failed the reader's checks here, before `rc_open` (a damaged file, a lost key).
     AsyncFunction("enginePackOpen") { (dir: String, packId: String, parts: [String], options: String, promise: Promise) in
       let path = ReciteEngineModule.plainPath(dir)
       DispatchQueue.global(qos: .userInitiated).async {
@@ -69,7 +69,7 @@ public class ReciteEngineModule: Module {
           RECEngine.shared.open(items, owner: blobs, options: options) { promise.resolve($0) }
         } catch {
           let text = "\(error)"
-          promise.resolve(["ok": false, "code": text.hasPrefix("no memory") ? -3 : -2, "error": text])
+          promise.resolve(["ok": false, "code": text.hasPrefix("no memory") ? -3 : -20, "error": text])
         }
       }
     }

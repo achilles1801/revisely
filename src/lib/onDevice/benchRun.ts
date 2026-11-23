@@ -322,13 +322,13 @@ export interface SelfCheckResult {
   sendError: string | null;
 }
 
-/** This phone's self-check, sent once per pack and app update (a pass and a failure alike); null with no pack here. */
+/** This phone's self-check, sent once per pack, app update and outcome; null with no pack here. */
 export async function recordSelfCheck(device: DeviceInfo): Promise<SelfCheckResult | null> {
   const { engineSelfCheck } = require('./engine') as typeof import('./engine');
   const check = await engineSelfCheck();
   if (!check) return null;
   const release = currentRelease();
-  const key = [check.packId, release.build ?? '', release.updateId ?? ''].join('|');
+  const key = [check.packId, release.build ?? '', release.updateId ?? '', String(check.ok)].join('|');
   try {
     if ((await AsyncStorage.getItem(SELF_CHECK_SENT)) !== key) {
       await sendBenchRecord(selfCheckRecord(device, check));

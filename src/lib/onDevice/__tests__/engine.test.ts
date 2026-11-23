@@ -33,10 +33,12 @@ jest.mock('../../reciteLive/whereSettings', () => ({ reciteWhere: () => ({}) }))
 const PACK = { dir: 'file:///docs/recite-pack/v7m-1', packId: 'v7m-1', parts: ['core', 'strict'] };
 let mockPack: typeof PACK | null = PACK;
 const mockDrop = jest.fn(async (_id: string) => undefined);
+const mockRefetch = jest.fn(async (_id: string) => undefined);
 jest.mock('../packRun', () => ({
   preparePack: async () => undefined,
   packForEngine: () => mockPack,
   dropBadPack: (id: string) => mockDrop(id),
+  refetchDamagedPack: (id: string) => mockRefetch(id),
 }));
 
 const settle = async () => {
@@ -86,6 +88,14 @@ describe('warmEngine', () => {
     warmEngine();
     await settle();
     expect(mockDrop).toHaveBeenCalledWith('v7m-1');
+  });
+
+  it('files damaged on the phone are fetched again, and the pack isn’t called bad', async () => {
+    mockModule.enginePackOpen.mockResolvedValue({ ok: false, code: -20, error: 'chunk 3 failed its check' });
+    warmEngine();
+    await settle();
+    expect(mockRefetch).toHaveBeenCalledWith('v7m-1');
+    expect(mockDrop).not.toHaveBeenCalled();
   });
 
   it('any other failure keeps the pack, and it isn’t decrypted again this run', async () => {
@@ -143,6 +153,11 @@ describe('[ONDEV-1] engineSelfCheck', () => {
     mockModule.enginePackOpen.mockResolvedValue({ ok: false, code: -3, error: 'v7 check: largest difference 5.9' });
     expect(await engineSelfCheck()).toMatchObject({ ok: false, packId: 'v7m-1', openCode: -3, openError: 'v7 check: largest difference 5.9' });
     expect(mockModule.engineRelease).not.toHaveBeenCalled();
+  });
+
+  it('has no self-check to report from files damaged on the phone', async () => {
+    mockModule.enginePackOpen.mockResolvedValue({ ok: false, code: -20, error: 'chunk 3 failed its check' });
+    expect(await engineSelfCheck()).toBeNull();
   });
 
   it('has nothing to report with no pack on the phone', async () => {

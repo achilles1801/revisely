@@ -69,7 +69,7 @@ class ReciteEngineModule : Module() {
 
     // Opens the engine from Recite's pack: decrypted and checked here (the key stays in native memory), then read in
     // place by the engine, which holds the blobs until rc_release; they are wiped and freed then. Resolves {ok, code,
-    // error, info}; code -2 (RC_ERR_DATA) means the pack itself is bad.
+    // error, info}; code -20 means its files failed the reader's checks here, before rc_open (a damaged file, a lost key).
     AsyncFunction("enginePackOpen") { dir: String, packId: String, parts: List<String>, options: String, promise: Promise ->
       thread(name = "recite-pack") {
         if (!ReciteCoreNative.available) {
@@ -84,7 +84,7 @@ class ReciteEngineModule : Module() {
         } catch (e: Exception) {
           memory.forEach { ReciteCoreNative.freeBlob(it) }
           val text = e.message ?: "the pack didn't open"
-          promise.resolve(mapOf("ok" to false, "code" to if (text.startsWith("no memory")) -3 else -2, "error" to text))
+          promise.resolve(mapOf("ok" to false, "code" to if (text.startsWith("no memory")) -3 else -20, "error" to text))
           return@thread
         }
         engine.openBlobs(blobs.map { it.name }, blobs.map { it.data }, options, {

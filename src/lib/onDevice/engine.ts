@@ -65,6 +65,8 @@ let lastPackOpen: { packId: string; opened: { ok: boolean; code: number; error?:
 /** A pack that didn't open this run for another reason than its data (memory, a model): not decrypted again until the next. */
 let refusedPack: string | null = null;
 const RC_ERR_DATA = -2;
+/** enginePackOpen: the sealed files failed the reader's checks before rc_open (a damaged file, a lost key). */
+const PACK_DAMAGED = -20;
 
 /** Opens the engine from the pack when it is here. True once it is open. */
 async function openFromPack(m: Native): Promise<boolean> {
@@ -81,6 +83,7 @@ async function openFromPack(m: Native): Promise<boolean> {
   if (r.ok) return true;
   logger.warn(`Recite engine: the pack didn't open (${r.code}): ${r.error ?? ''}`);
   if (r.code === RC_ERR_DATA) await run.dropBadPack(pack.packId);
+  else if (r.code === PACK_DAMAGED) await run.refetchDamagedPack(pack.packId);
   else refusedPack = pack.packId;
   return false;
 }
@@ -132,7 +135,8 @@ export async function engineSelfCheck(): Promise<SelfCheck | null> {
   await openNow();
   const last = lastPackOpen;
   if (!wasOpen && openEngineInfo()) await m.engineRelease?.();
-  return last ? selfCheckFromOpen(last.opened, last.packId) : null;
+  // Damaged files say nothing about how the models run on this phone.
+  return last && last.opened.code !== PACK_DAMAGED ? selfCheckFromOpen(last.opened, last.packId) : null;
 }
 
 export function __resetEngineForTests(): void {

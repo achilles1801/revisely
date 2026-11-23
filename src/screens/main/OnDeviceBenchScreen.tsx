@@ -80,7 +80,7 @@ const modelCheckLine = (model: string, m: ModelCheck) =>
     : t('settings.bench.selfCheckNoModel', { model });
 
 function selfCheckText({ check, sendError }: SelfCheckResult): string {
-  const lines =
+  const lines: string[] =
     check.openCode !== null
       ? [t('settings.bench.selfCheckNoOpen', { code: check.openCode, error: check.openError ?? '' })]
       : [

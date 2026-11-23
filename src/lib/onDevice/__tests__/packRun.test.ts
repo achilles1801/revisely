@@ -5,7 +5,7 @@ import { setNetworkState, __resetNetworkStateForTests } from '../../networkState
 import {
   __resetPackForTests,
   downloadPackNow,
-  dropBadPack,
+  dropBadPack, refetchDamagedPack,
   getPackStatus,
   packForEngine,
   preparePack,
@@ -333,6 +333,34 @@ describe('Recite’s pack on the phone', () => {
     await run();
     expect(mockCall).toHaveBeenCalledTimes(1);
     expect(packForEngine()?.packId).toBe('v7m-1');
+  });
+
+  it('a pack damaged on the phone is deleted and fetched again, twice at most for a version', async () => {
+    await run();
+    for (let i = 0; i < 2; i++) {
+      mockDownload.mockClear();
+      await refetchDamagedPack('v7m-1');
+      await settle();
+      expect(mockDownload).toHaveBeenCalled();
+      expect(packForEngine()?.packId).toBe('v7m-1');
+    }
+    mockDownload.mockClear();
+    await refetchDamagedPack('v7m-1');
+    await settle();
+    expect(mockDownload).not.toHaveBeenCalled();
+    expect(packForEngine()).toBeNull();
+    expect(getPackStatus().phase).toBe('unavailable');
+  });
+
+  it('fetching a damaged pack again keeps to the mobile-data setting', async () => {
+    await run();
+    setNetworkState(cellular);
+    mockDownload.mockClear();
+    await refetchDamagedPack('v7m-1');
+    await settle();
+    expect(mockDownload).not.toHaveBeenCalled();
+    expect(packForEngine()).toBeNull();
+    expect(getPackStatus().phase).toBe('waiting-for-wifi');
   });
 
   it('Download now tries a refused pack again', async () => {
