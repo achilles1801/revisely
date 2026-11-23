@@ -89,7 +89,8 @@ const styles = StyleSheet.create({
   top: { alignItems: 'center' },
   middle: { flex: 1, justifyContent: 'center', paddingVertical: 32 },
   headline: { fontSize: 36, lineHeight: 42, fontWeight: '700', letterSpacing: -0.8 },
-  body: { marginTop: 12, maxWidth: 320, lineHeight: 24 },
+  // Narrow enough to break after the comma on every phone.
+  body: { marginTop: 12, maxWidth: 270, lineHeight: 24 },
   foot: { paddingHorizontal: layoutV2.gutter, paddingTop: 8, paddingBottom: 16, gap: 10 },
   note: { textAlign: 'center' },
 });

@@ -360,6 +360,9 @@ describe('<DailyAmountScreen />', () => {
     expect(screen.getByLabelText('Step 3 of 5')).toBeTruthy();
     expect(screen.getByTestId('amount-value').props.children).toBe('10');
     expect(screen.getByTestId('amount-unit').props.children).toBe('pages a day');
+    // Pages and Juz share the row.
+    expect(styleOf('pill-pages').flex).toBe(1);
+    expect(styleOf('pill-juz').flex).toBe(1);
     // Two pages memorized at 10 a day.
     expect(screen.getByTestId('amount-round').props.children).toBe('A full round every day');
 

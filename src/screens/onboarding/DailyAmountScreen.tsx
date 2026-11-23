@@ -55,6 +55,7 @@ export default function DailyAmountScreen() {
     >
       <PillTabs<ScheduleMode>
         tone="ink"
+        stretch
         options={[
           { value: 'pages', label: t('onboarding.amount.pages') },
           { value: 'juz', label: t('common.juz') },
