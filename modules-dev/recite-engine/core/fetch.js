@@ -80,6 +80,9 @@ async function download(lock, token) {
   const repo = `${apiBase()}/repos/${lock.repo}/releases`;
   const rel = await github(`${repo}/tags/${encodeURIComponent(lock.tag)}`, token, 'application/vnd.github+json');
   if (!rel.ok) throw new Refused(rel.status, `release ${lock.tag}`);
+  // GitHub says when a fine-grained token expires: the date for RECITE_CORE_EXPIRES (the health report's reminder).
+  const expires = rel.headers.get('github-authentication-token-expiration');
+  if (expires && /^[\d\- :+A-Z]{10,40}$/.test(expires)) console.error(`recite-core: the token expires ${expires}`);
   const asset = ((await rel.json()).assets || []).find((a) => a.name === lock.asset);
   if (!asset || !Number.isInteger(asset.id)) throw new Error(`release ${lock.tag} has no asset ${lock.asset}`);
   const assetUrl = `${repo}/assets/${asset.id}`;

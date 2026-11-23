@@ -79,10 +79,13 @@ jobs:
       # before `npm ci`, so no third-party install script ever runs beside it; the script has no dependencies. With no
       # secret it leaves the stub. core/__tests__/tokenScope.test.js holds all of this.
       - name: Fetch the on-device engine
+        id: engine
         if: ${{ inputs.variant == 'dev' }}
         env:
           RECITE_CORE_TOKEN: ${{ secrets.RECITE_CORE_TOKEN }}
-        run: node modules-dev/recite-engine/core/fetch.js ios "$RUNNER_TEMP/recite-core"
+        run: |
+          got=$(node modules-dev/recite-engine/core/fetch.js ios "$RUNNER_TEMP/recite-core")
+          echo "mode=$(node -p 'JSON.parse(process.argv[1]).mode' "$got")" >> "$GITHUB_OUTPUT"
 
       - run: npm ci --legacy-peer-deps
 
@@ -121,6 +124,11 @@ jobs:
           # What the fetch step brought (the token itself is not in this step, where install scripts run).
           RECITE_CORE_PREFETCHED: ${{ inputs.variant == 'dev' && format('{0}/recite-core', runner.temp) || '' }}
         run: eas build --local --profile "$PROFILE" --platform ios --non-interactive --output "$RUNNER_TEMP/revisely.ipa"
+
+      # A build that fetched the engine must carry it, or every take would quietly go to the server.
+      - name: Check the engine is in the build
+        if: ${{ steps.engine.outputs.mode == 'engine' }}
+        run: node modules-dev/recite-engine/core/check-build.js ios "$RUNNER_TEMP/revisely.ipa"
 
       # The Xcode build phase uploads dSYMs too, but its output is hidden and a
       # failure there is allowed. This makes the upload explicit and visible:

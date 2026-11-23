@@ -90,6 +90,7 @@ beforeEach(async () => {
       return res.end('{}');
     }
     if (req.url.includes('/releases/tags/')) {
+      res.setHeader('GitHub-Authentication-Token-Expiration', '2027-11-23 07:10:00 UTC');
       res.statusCode = answer;
       res.setHeader('Content-Type', 'application/json');
       return res.end(
@@ -137,6 +138,7 @@ describe('core/fetch.js', () => {
     const out = path.join(dir, 'out');
     const r = await run('ios', out, { RECITE_CORE_TOKEN: TOKEN });
     expect(r.stderr).toContain('fetched');
+    expect(r.stderr).toContain('the token expires 2027-11-23 07:10:00 UTC');
     expect(r.code).toBe(0);
     expect(r.json).toEqual({ mode: 'engine', version: '0.1.0' });
     expect(fs.readFileSync(path.join(out, 'ReciteCore.xcframework', 'ios-arm64', 'librecite_core.a'), 'utf8')).toBe('ios-lib');

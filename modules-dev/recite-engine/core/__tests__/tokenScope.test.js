@@ -28,10 +28,13 @@ describe('RECITE_CORE_TOKEN', () => {
     expect(step).toBe(
       [
         '- name: Fetch the on-device engine',
+        '        id: engine',
         "        if: ${{ inputs.variant == 'dev' }}",
         '        env:',
         '          RECITE_CORE_TOKEN: ${{ secrets.RECITE_CORE_TOKEN }}',
-        `        run: node modules-dev/recite-engine/core/fetch.js ${platform} "$RUNNER_TEMP/recite-core"`,
+        '        run: |',
+        `          got=$(node modules-dev/recite-engine/core/fetch.js ${platform} "$RUNNER_TEMP/recite-core")`,
+        '          echo "mode=$(node -p \'JSON.parse(process.argv[1]).mode\' "$got")" >> "$GITHUB_OUTPUT"',
       ].join('\n'),
     );
     // Before anything third-party is installed.
@@ -43,10 +46,24 @@ describe('RECITE_CORE_TOKEN', () => {
     expect(text).toMatch(/RECITE_CORE_TOKEN:\n\s+required: false/);
   });
 
+  it('a build with the engine is checked, and never attached to the public repository as an artifact', () => {
+    for (const [file, platform, output] of [['ios-build.yml', 'ios', 'revisely.ipa'], ['android-build.yml', 'android', 'revisely.aab']]) {
+      const text = read(file);
+      expect(text).toContain(`run: node modules-dev/recite-engine/core/check-build.js ${platform} "$RUNNER_TEMP/${output}"`);
+      // Every upload of the built app is off when the engine is in it.
+      for (const m of text.matchAll(/- uses: actions\/upload-artifact@[^\n]+\n([\s\S]*?)(?=\n\s*\n|\n\s*- )/g)) {
+        if (m[1].includes(output)) expect(m[1]).toContain("if: ${{ steps.engine.outputs.mode != 'engine' }}");
+      }
+    }
+    expect(read('android-build.yml')).toContain("if: ${{ steps.engine.outputs.mode != 'engine' }}");
+  });
+
   it("the fetch needs nothing installed: only Node's own modules", () => {
     const src = fs.readFileSync(path.join(ROOT, 'modules-dev/recite-engine/core/fetch.js'), 'utf8');
     const required = [...src.matchAll(/require\('([^']+)'\)/g)].map((m) => m[1]).sort();
     expect(required).toEqual(['child_process', 'crypto', 'fs', 'os', 'path']);
+    const check = fs.readFileSync(path.join(ROOT, 'modules-dev/recite-engine/core/check-build.js'), 'utf8');
+    expect([...check.matchAll(/require\('([^']+)'\)/g)].map((m) => m[1])).toEqual(['child_process']);
   });
 
   it('the workflows that call those builds run them only from pushes or by hand', () => {
