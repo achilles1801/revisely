@@ -335,6 +335,20 @@ describe('Recite’s pack on the phone', () => {
     expect(packForEngine()?.packId).toBe('v7m-1');
   });
 
+  it.each([
+    ['with no engine named (a build from before this rule)', {}],
+    ['under the replay stand-in', { badPackEngine: 'recite-core 0.1.0 (replay)' }],
+  ])('a block recorded %s doesn’t stop the real engine getting a clean download', async (_name, block) => {
+    await AsyncStorage.setItem('@revisely_recite_pack:v1', JSON.stringify({ auto: true, have: null, checkedAt: Date.now(), badPack: 'v7m-1', ...block }));
+    mockEngine = Object.assign({}, engine, {
+      coreInfo: () => JSON.stringify({ version: 'recite-core 0.2.0', abi: 1, headerAbi: 1, stub: false, selfTest: 'skipped' }),
+    });
+    await run();
+    expect(mockCall).toHaveBeenCalledTimes(1); // at once, not at the next daily check
+    expect(mockDownload).toHaveBeenCalled();
+    expect(packForEngine()?.packId).toBe('v7m-1');
+  });
+
   it('a pack damaged on the phone is deleted and fetched again, twice at most for a version', async () => {
     await run();
     for (let i = 0; i < 2; i++) {
