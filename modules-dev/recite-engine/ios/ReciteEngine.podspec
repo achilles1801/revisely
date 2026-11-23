@@ -39,7 +39,7 @@ Pod::Spec.new do |s|
     sources << 'core-bin/stub/*.c'
   end
   s.source_files = sources
-  # Swift sees RECBench.h and RECCore.h only; the C++ header stays out of the module's umbrella header.
-  s.public_header_files = ['RECBench.h', 'RECCore.h']
+  # Swift sees RECBench.h, RECCore.h and RECEngine.h only; the C++ header stays out of the module's umbrella header.
+  s.public_header_files = ['RECBench.h', 'RECCore.h', 'RECEngine.h']
   s.private_header_files = 'RECBenchCore.hpp'
 end
