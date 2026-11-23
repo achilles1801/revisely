@@ -162,6 +162,14 @@ declare class ReciteEngineModule extends NativeModule<ReciteEngineEvents> {
   packPublicKey(): Promise<PackPublicKey>;
   packSaveKey(dir: string, wrappedKey: string): Promise<void>;
   packVerify(dir: string, packId: string, part: string): Promise<PackVerifyResult>;
+  /** Android: Firebase Test Lab's game-loop launch (its scenario and results file's content URI), or null. */
+  testLoop?(): { scenario: number; results: string | null } | null;
+  /** Android: the OBB Test Lab pushed (a zip of the bench's files), unpacked; resolves to the folder. */
+  unpackObb?(): Promise<string>;
+  /** Android: replaces the game loop's results file. */
+  writeTestLoopResult?(uri: string, text: string): Promise<void>;
+  /** Android: closes the app, which ends the game loop. */
+  finishTestLoop?(): void;
 }
 
 export default requireOptionalNativeModule<ReciteEngineModule>('ReciteEngine');

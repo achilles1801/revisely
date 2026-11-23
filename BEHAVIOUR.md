@@ -1629,8 +1629,11 @@ shows up once and they must go through it and complete it … just the main stuf
   and notes the battery, the thermal state and the window times each minute: it says whether the phone got hot
   (serious or worse), whether the last minute was within 20% of the first, and the battery's drop an hour (nothing on
   a charger). A run the app left the foreground during, or that the phone suspended, says so on its result and in its record: its times leave out the suspended windows, it names the longest clean stretch, and it gives no battery rate. A battery drop under two of the phone's steps (iOS reports five points at a time) gives no rate either. A run that fails says why and the others go on. The results go to the dev backend (the phone's model,
-  chip, cores and memory, the build, each run's numbers; never the account or any audio) and can be shared. The store
-  app has none of it: the native module is linked into Revisely Dev's builds only.
+  chip, cores and memory, the build, each run's numbers; never the account or any audio) and can be shared. On Firebase
+  Test Lab's Android phones, launched by its game loop, the same runs go with nobody signed in: from the files pushed
+  with the test (each checked by SHA-256), the record written to the test's results after every run, and the app
+  closing at the end. No other launch does it. The store app has none of it: the native module is linked into
+  Revisely Dev's builds only.
 - **ONDEV-4.** A take runs on the phone's engine or on the checker's server, one pipeline in two places with the same
   frames, chosen per take: this phone's choice (Settings → Testing → Recite runs on: Automatic, This phone, The server),
   else the account's pin (`entitlements/{uid}.reciteWhere`, which no client can write), else `config/app.recite.where`

@@ -18,6 +18,7 @@ import { DesignGate } from './src/design/DesignGate';
 import { AndroidSystemTheme } from './src/components/AndroidSystemTheme';
 import { ensureAndroidChannels } from './src/lib/notifications';
 import { setupAppCheck } from './src/lib/appCheck';
+import { runTestLoopIfAsked } from './src/lib/onDevice/testLoop';
 import * as Sentry from '@sentry/react-native';
 import { currentRelease, releaseTags } from './src/lib/releaseInfo';
 import { markUiReady, startOtaUpdates } from './src/lib/updates/ota';
@@ -88,6 +89,8 @@ function App() {
   });
 
   useEffect(() => {
+    // Firebase Test Lab's game loop (Revisely Dev, Android): the on-device bench on its phones. Nothing on any other launch.
+    void runTestLoopIfAsked();
     setupAppCheck();
     // Android's channels only. Notification permission is asked where it means something (REMIND-4): onboarding's
     // Start with "Daily reminders" on, or Home for an account with reminders on. Until Nov 2026 it was asked here,

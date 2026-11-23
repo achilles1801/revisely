@@ -498,3 +498,11 @@ owner's `on-device-release.md`).
     a 64-byte aligned buffer of its `room` (fp32 size), and `rc_blob.size` is `room`.
   - **Check the readers** against the server's format, on a Mac with no simulator: `scripts/recite-pack-check/run.sh`.
   - Android keeps it out of backups through `plugins/withDevModules` (Dev only), so the store fingerprints don't move.
+- **Firebase Test Lab** (Majd, Nov 23: "yes let's use google test lab") times mid-range Android phones with no account:
+  Revisely Dev's Android build has Test Lab's game-loop intent filter (`plugins/withDevModules`), and
+  `src/lib/onDevice/testLoop` runs the bench from an OBB (a zip of the bench's files plus a `bench.json` with a
+  `testLab` section: runs, windows, a long run) and writes the record to the game loop's results file. Run it with
+  `gcloud firebase test android run --project revisely-dev --type game-loop --app <Dev .aab> --obb-files
+  main.<versionCode>.com.revisionbuddy.app.dev.obb --device model=a15,version=34 --timeout 20m`; the results are
+  `results_scenario_0.json` in the run's results bucket. Blaze gives 30 physical-device minutes a day free, then $5
+  an hour per phone (by the minute): keep runs short and say the price before going over.

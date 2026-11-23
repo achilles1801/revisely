@@ -10,9 +10,12 @@ import expo.modules.kotlin.Promise
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import expo.modules.kotlin.typedarray.Int16Array
+import android.net.Uri
 import java.io.File
 import java.io.FileInputStream
+import java.io.FileOutputStream
 import java.nio.ByteBuffer
+import java.util.zip.ZipFile
 import java.security.MessageDigest
 import kotlin.concurrent.thread
 
@@ -129,6 +132,67 @@ class ReciteEngineModule : Module() {
 
     AsyncFunction("engineRelease") { promise: Promise ->
       engine.release { promise.resolve(null) }
+    }
+
+    // Firebase Test Lab's game loop (no sign-in on its phones): the launch intent's action, scenario and results file.
+    Function("testLoop") {
+      val intent = appContext.currentActivity?.intent ?: return@Function null
+      if (intent.action != "com.google.intent.action.TEST_LOOP") return@Function null
+      mapOf("scenario" to intent.getIntExtra("scenario", 0), "results" to intent.data?.toString())
+    }
+
+    // The bench's files, pushed by Test Lab as the app's OBB (a zip), unpacked once into the cache; resolves to the folder.
+    AsyncFunction("unpackObb") { promise: Promise ->
+      thread(name = "recite-obb") {
+        try {
+          val ctx = context ?: throw IllegalStateException("no context")
+          val obb = ctx.obbDir?.listFiles()?.firstOrNull { it.name.endsWith(".obb") }
+            ?: throw IllegalStateException("no OBB in ${ctx.obbDir}")
+          val out = File(ctx.cacheDir, "recite-bench-obb")
+          val mark = File(out, ".from")
+          val stamp = "${obb.name}:${obb.length()}:${obb.lastModified()}"
+          if (!(mark.exists() && mark.readText() == stamp)) {
+            out.deleteRecursively()
+            out.mkdirs()
+            ZipFile(obb).use { zip ->
+              for (entry in zip.entries()) {
+                val target = File(out, entry.name)
+                if (!target.canonicalPath.startsWith(out.canonicalPath + File.separator)) continue
+                if (entry.isDirectory) {
+                  target.mkdirs()
+                  continue
+                }
+                target.parentFile?.mkdirs()
+                zip.getInputStream(entry).use { input -> FileOutputStream(target).use { input.copyTo(it, 1 shl 20) } }
+              }
+            }
+            mark.writeText(stamp)
+          }
+          promise.resolve(out.absolutePath)
+        } catch (e: Exception) {
+          promise.reject("ERR_OBB", e.message ?: "unpack failed", e)
+        }
+      }
+    }
+
+    // Writes (replaces) the game loop's results file, given by Test Lab as a content URI.
+    AsyncFunction("writeTestLoopResult") { uri: String, text: String, promise: Promise ->
+      thread(name = "recite-loop-result") {
+        try {
+          val resolver = context?.contentResolver ?: throw IllegalStateException("no context")
+          resolver.openFileDescriptor(Uri.parse(uri), "wt")?.use { fd ->
+            FileOutputStream(fd.fileDescriptor).use { it.write(text.toByteArray(Charsets.UTF_8)) }
+          } ?: throw IllegalStateException("can't open $uri")
+          promise.resolve(null)
+        } catch (e: Exception) {
+          promise.reject("ERR_LOOP_RESULT", e.message ?: "write failed", e)
+        }
+      }
+    }
+
+    // Ends the game loop: Test Lab takes the app closing as the test finishing.
+    Function("finishTestLoop") {
+      appContext.currentActivity?.let { activity -> activity.runOnUiThread { activity.finishAndRemoveTask() } }
     }
 
     // A file's SHA-256 (hex), read in 1 MB pieces.
