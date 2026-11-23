@@ -11,12 +11,15 @@
  *   GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-dev-admin.json node scripts/recite-pack-make.js \
  *     --id v7m-1 \
  *     --core v7.graph.onnx=/models/v7m-any.graph.onnx,v7.weights.f16=/models/v7m-any.weights.f16,\
- *            v7.weights.json=/models/v7m-any.weights.json,words.rcwt=/pack/words.rcwt,ayahs.bin=/pack/ayahs.bin,\
+ *            v7.weights.json=/models/v7m-any.weights.json,v7.check=/pack/v7.check,words.rcwt=/pack/words.rcwt,\
+ *            ayahs.bin=/pack/ayahs.bin,\
  *            norms.bin=/pack/norms.bin,stops.bin=/pack/stops.bin,lexicon.bin=/pack/lexicon.bin,\
  *            letters.bin=/pack/letters.bin,mel.bin=/pack/mel.bin,config.json=/pack/config.json \
- *     --strict v5.onnx=/models/v5.onnx,strict.bin=/pack-strict/strict.bin \
+ *     --strict v5.onnx=/models/v5-marked.onnx,strict.bin=/pack-strict/strict.bin \
  *     --apps 1:433792838929:ios:…,1:433792838929:android:… \
  *     --claim onDeviceBench
+ *
+ * Only marked models leave the Mac: leave --strict out until v5 has its ownership mark (the core part works alone).
  *
  *   --dry       seal and check only: no credentials, nothing uploaded or written
  *   --no-claim  any signed-in account of the listed apps (the default claim is onDeviceBench)
@@ -26,7 +29,7 @@ const fs = require('fs');
 const { PACK_ID, RCPK_FORMAT, KEY_BYTES, open, packContainer, seal, unpackContainer } = require('../lib/recitePack/format');
 
 /** The names recite-core's rc_open takes (recite_core.h). */
-const CORE_NEEDS = ['v7.graph.onnx', 'v7.weights.f16', 'v7.weights.json', 'words.rcwt', 'ayahs.bin', 'norms.bin',
+const CORE_NEEDS = ['v7.graph.onnx', 'v7.weights.f16', 'v7.weights.json', 'v7.check', 'words.rcwt', 'ayahs.bin', 'norms.bin',
   'stops.bin', 'lexicon.bin', 'letters.bin', 'mel.bin', 'config.json'];
 const STRICT_NEEDS = ['v5.onnx', 'strict.bin'];
 const BLOB_NAMES = new Set([...CORE_NEEDS, ...STRICT_NEEDS]);
