@@ -14,6 +14,7 @@ import type { BenchResult, DeviceInfo } from '../../../modules-dev/recite-engine
 import { db } from '../firebase';
 import { logger } from '../logger';
 import { currentRelease } from '../releaseInfo';
+import { benchStarted } from './benchBusy';
 import { authHeaders, bucketName, objectUrl } from '../recordingCloud';
 import { isDevVariant } from '../variant';
 import {
@@ -191,6 +192,7 @@ export async function runPlan(
   const startT = Date.now();
   const changes: { t: number; state: string }[] = [];
   const stateSub = AppState.addEventListener('change', (state) => changes.push({ t: Date.now(), state }));
+  const benchEnded = benchStarted();
   try {
     const result = await engine.bench({
       model: files[model.file],
@@ -230,6 +232,7 @@ export async function runPlan(
       ...(disturbed ? { interrupted: disturbed } : {}),
     };
   } finally {
+    benchEnded();
     stateSub.remove();
     sub.remove();
   }

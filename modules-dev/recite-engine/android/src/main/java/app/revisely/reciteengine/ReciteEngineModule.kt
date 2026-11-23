@@ -168,6 +168,11 @@ class ReciteEngineModule : Module() {
       engine.clip(take, s0.toLong(), s1.toLong()) { promise.resolve(it) }
     }
 
+    // One model call on the pack's check input, timed: its ms, or null when it can't run.
+    AsyncFunction("engineProbe") { promise: Promise ->
+      engine.probe { promise.resolve(it) }
+    }
+
     AsyncFunction("engineRelease") { promise: Promise ->
       engine.release { promise.resolve(null) }
     }

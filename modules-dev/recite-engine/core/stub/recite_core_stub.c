@@ -13,6 +13,7 @@ static void none(int* code, char* err, size_t cap) {
 int rc_abi(void) { return RC_ABI; }
 const char* rc_version(void) { return "stub"; }
 const char* rc_info(const rc_engine* e) { (void)e; return "{\"abi\":1,\"version\":\"stub\",\"levels\":[]}"; }
+int rc_probe(rc_engine* e) { (void)e; return RC_ERR_STATE; }
 
 rc_engine* rc_open(const rc_blob* blobs, size_t n, const char* options, int* code, char* err, size_t cap) {
   (void)blobs; (void)n; (void)options;

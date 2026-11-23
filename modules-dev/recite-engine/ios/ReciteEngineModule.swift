@@ -102,6 +102,11 @@ public class ReciteEngineModule: Module {
       RECEngine.shared.clipTake(take, from: from, to: to) { promise.resolve($0) }
     }
 
+    /// One model call on the pack's check input, timed: its ms, or null when it can't run.
+    AsyncFunction("engineProbe") { (promise: Promise) in
+      RECEngine.shared.probe { ms in promise.resolve(ms >= 0 ? ms : nil) }
+    }
+
     AsyncFunction("engineRelease") { (promise: Promise) in
       RECEngine.shared.releaseEngine { promise.resolve(nil) }
     }

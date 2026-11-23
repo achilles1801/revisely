@@ -234,6 +234,20 @@ static void collect(void *ctx, const char *frame, size_t len) {
   });
 }
 
+- (void)probe:(void (^)(double))done {
+  dispatch_async(_queue, ^{
+    // Never beside a take: rc_probe mustn't run during an rc_feed, and its time would say nothing.
+    if (!self->_engine || !self->_takes.empty()) {
+      done(-1);
+      return;
+    }
+    const auto t0 = std::chrono::steady_clock::now();
+    const int r = rc_probe(self->_engine);
+    const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+    done(r == RC_OK ? ms : -1);
+  });
+}
+
 - (void)releaseEngine:(void (^)(void))done {
   dispatch_async(_queue, ^{
     [self closeAll];

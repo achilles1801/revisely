@@ -14,6 +14,7 @@ import { clipSender } from '../reciteLive/clipSender';
 import { routedFeed } from '../reciteLive/route';
 import { chooseWhere, EngineInfo, parseEngineInfo, WhereAnswer } from '../reciteLive/where';
 import { reciteWhere } from '../reciteLive/whereSettings';
+import { benchRunning } from './benchBusy';
 import { speedKeeper } from './speedCheck';
 import { postSecond, reportPhoneTake } from './takeReport';
 import { logger } from '../logger';
@@ -164,10 +165,10 @@ const speed = speedKeeper({
   },
   threads: ENGINE_THREADS,
   probe: async () => {
-    const m = native() as (Native & { engineProbe?: () => Promise<number | null> }) | null;
+    const m = native();
     return m?.engineProbe ? m.engineProbe() : null;
   },
-  active: () => AppState.currentState === 'active',
+  active: () => AppState.currentState === 'active' && !benchRunning(),
   read: () => AsyncStorage.getItem(SPEED_KEY),
   write: (json) => AsyncStorage.setItem(SPEED_KEY, json),
   reopen: () => {

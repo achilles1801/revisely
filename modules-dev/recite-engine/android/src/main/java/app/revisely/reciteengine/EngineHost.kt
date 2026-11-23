@@ -163,6 +163,18 @@ internal class EngineHost(private val emit: (take: Int, frames: List<String>, co
     done(bytes?.let { Base64.encodeToString(it, Base64.NO_WRAP) })
   }
 
+  /** One model call on the pack's check input, timed: its ms, or null with no engine, a take open or no check input. */
+  fun probe(done: (Double?) -> Unit) = queue.execute {
+    // Never beside a take: rc_probe mustn't run during an rc_feed, and its time would say nothing.
+    if (engine == 0L || takes.isNotEmpty()) {
+      done(null)
+      return@execute
+    }
+    val t0 = System.nanoTime()
+    val r = ReciteCoreNative.probe(engine)
+    done(if (r == 0) (System.nanoTime() - t0) / 1e6 else null)
+  }
+
   /** Closes every take and the engine. */
   fun release(done: () -> Unit) = queue.execute {
     closeAll()

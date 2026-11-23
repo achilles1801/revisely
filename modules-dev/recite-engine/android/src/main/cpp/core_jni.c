@@ -157,6 +157,12 @@ JNIEXPORT jstring JNICALL FN(engineInfo)(JNIEnv* env, jobject self, jlong engine
   return (*env)->NewStringUTF(env, rc_info((const rc_engine*)(intptr_t)engine));
 }
 
+JNIEXPORT jint JNICALL FN(probe)(JNIEnv* env, jobject self, jlong engine) {
+  (void)env;
+  (void)self;
+  return rc_probe((rc_engine*)(intptr_t)engine);
+}
+
 JNIEXPORT jlong JNICALL FN(start)(JNIEnv* env, jobject self, jlong engine, jstring frame, jintArray code,
                                   jobjectArray failure) {
   (void)self;

@@ -26,6 +26,7 @@ internal object ReciteCoreNative {
   external fun openBlobs(names: Array<String>, buffers: Array<ByteBuffer>, options: String, code: IntArray, failure: Array<String?>): Long
   external fun release(engine: Long)
   external fun engineInfo(engine: Long): String
+  external fun probe(engine: Long): Int
   external fun start(engine: Long, frame: String, code: IntArray, failure: Array<String?>): Long
   external fun close(session: Long)
   external fun feed(session: Long, pcm: ByteArray, samples: Int): Int

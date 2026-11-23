@@ -42,6 +42,9 @@ typedef void (^RECEngineFrames)(NSInteger take, NSArray<NSString *> *frames, NSI
 - (void)closeTake:(NSInteger)take;
 /// Samples [s0, s1) of an open take, as base64 of 16-bit little-endian PCM; nil if the take is gone or they aren't there.
 - (void)clipTake:(NSInteger)take from:(int64_t)s0 to:(int64_t)s1 done:(void (^)(NSString *_Nullable base64))done;
+/// One model call on the pack's check input, timed on the engine's thread: its ms, or negative when it can't run (no
+/// engine, a take open, no check input).
+- (void)probe:(void (^)(double ms))done NS_SWIFT_NAME(probe(_:));
 /// Closes every take and the engine.
 /// Named for Swift: its importer would otherwise drop "Engine" and leave `release`, which ARC forbids.
 - (void)releaseEngine:(void (^)(void))done NS_SWIFT_NAME(releaseEngine(_:));

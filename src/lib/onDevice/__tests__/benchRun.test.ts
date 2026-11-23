@@ -28,6 +28,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 
 import { addDoc } from 'firebase/firestore';
 import { benchRecord, recordSelfCheck, runPlan } from '../benchRun';
+import { benchRunning } from '../benchBusy';
 import { selfCheckFromFailedOpen, selfCheckFromInfo } from '../selfCheck';
 
 const MANIFEST = parseManifest(manifestJson)!;
@@ -83,6 +84,16 @@ describe('[ONDEV-1] a run and the foreground', () => {
     const run = await runPlan(engineThat(() => undefined), MANIFEST, PLAN, FILES, { windows: 3 }, () => undefined);
     expect(run.interrupted).toBeUndefined();
     expect(remove).toHaveBeenCalledTimes(1);
+  });
+
+  it('counts as running for just as long as the model runs, so the speed check waits (ONDEV-4)', async () => {
+    let during = false;
+    await runPlan(engineThat(() => (during = benchRunning())), MANIFEST, PLAN, FILES, { windows: 3 }, () => undefined);
+    expect(during).toBe(true);
+    expect(benchRunning()).toBe(false);
+    const failing = { addListener: () => ({ remove: () => undefined }), bench: async () => Promise.reject(new Error('no')) };
+    await expect(runPlan(failing as never, MANIFEST, PLAN, FILES, { windows: 3 }, () => undefined)).rejects.toThrow('no');
+    expect(benchRunning()).toBe(false);
   });
 
   it('a long run goes at the chosen pace, and its share of real time is of that hop', async () => {
