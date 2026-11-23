@@ -92,7 +92,8 @@ How the tests are made: `tests/scenarios/README.md`.
 ## A revision session
 
 - **SESS-1.** Swiping off a page marks it revised, the last page by swiping onto the end card. A strip above the page,
-  always on show, has a bar for each of the day's pages, filled once revised, the page on screen's taller; beside the
+  always on show, has a bar for each of the day's pages, filled once revised, the page on screen's taller. The bars run right to left,
+  the first page's on the right, the way the pages turn, in English and Arabic alike. Beside the
   page's number, "Revised" says the page on screen is done. One Pages button opens one Pages sheet: the day's pages by
   page number, no ayah numbers, the page on screen highlighted in the accent ("You are here"). A tap on a row goes to
   that page and marks nothing; its circle marks or unmarks it; the top line marks them all (or unmarks them, once all
