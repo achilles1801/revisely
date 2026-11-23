@@ -20,7 +20,7 @@ import { useReduceMotion } from '../../design/motion';
 import { ActionSheet } from '../v2/ActionSheet';
 import { ChoiceChip } from './ChoiceChip';
 import { dayMarks, dayPreview } from '../../lib/activityInsights';
-import { journalDesignEnabled } from '../../lib/release/journalDesign';
+import { useJournalDesign } from '../../lib/release/journalDesign';
 import { DayEntry, type DayEntryLine } from './DayEntry';
 import { formatDayLong, formatMinutesLong } from '../../lib/activityFormat';
 import { describePassage, fewPlaces } from '../../lib/passages';
@@ -123,6 +123,7 @@ export function CalendarMonth({
   gridSwipe?: GestureType;
 }) {
   const { palette } = useTheme();
+  const journalDesign = useJournalDesign();
   const { fontScale } = useWindowDimensions();
   const [spanMenu, setSpanMenu] = useState(false);
   const band = useGapBand(gap);
@@ -290,7 +291,7 @@ export function CalendarMonth({
   // Open are one button, each row another, edge to edge with no gap between them. Chrome, so it
   // stops growing at 1.4×, and the date gives way: at the largest text it pushed Open off the
   // screen and the rows clipped into each other (Nov 2026).
-  const dayPart = journalDesignEnabled() ? (
+  const dayPart = journalDesign ? (
     <DayEntry
       date={formatDayLong(shownDay)}
       lines={entryLines}

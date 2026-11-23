@@ -5,6 +5,7 @@
 // line (JOURNAL_DESIGN_RELEASED = true), with the three rules' lines moving from Revo's Dev guide to the main guide (and the
 // re-record). releaseGates.test.ts holds both ways. An E2E build turns it on with a link (lib/e2e/journalDesign).
 
+import { useEffect, useReducer } from 'react';
 import { isDevVariant } from '../variant';
 
 export const JOURNAL_DESIGN_RELEASED = false;
@@ -24,4 +25,17 @@ export function journalDesignEnabled(): boolean {
   return process.env.EXPO_PUBLIC_E2E === '1'
     ? (require('../e2e/journalDesign') as typeof import('../e2e/journalDesign')).e2eJournalDesignOn()
     : false;
+}
+
+/** journalDesignEnabled for a screen already on show when an E2E build's link turns it on. */
+export function useJournalDesign(): boolean {
+  const [, refresh] = useReducer((n: number) => n + 1, 0);
+  useEffect(
+    () =>
+      process.env.EXPO_PUBLIC_E2E === '1'
+        ? (require('../e2e/journalDesign') as typeof import('../e2e/journalDesign')).onJournalDesignChange(refresh)
+        : undefined,
+    [],
+  );
+  return journalDesignEnabled();
 }
