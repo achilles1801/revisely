@@ -267,25 +267,44 @@ describe('[ONDEV-4] clipSender', () => {
       expect(t.verdicts).toEqual([['1:word:lookalike', 'veto']]);
     });
 
-    it('sends what is queued inside its budget', async () => {
+    it('drops what is queued, and waits only for the calls already out', async () => {
       const t = setup();
-      for (let n = 1; n <= CLIPS.parallel + 1; n++) t.s.add(word(n));
+      for (let n = 1; n <= CLIPS.parallel + 2; n++) t.s.add(word(n));
       await flush();
       const stop = t.s.stop();
       for (let i = 0; i < CLIPS.parallel; i++) t.calls[i].answer(results(t.calls[i].clips));
-      await flush();
-      expect(t.calls).toHaveLength(CLIPS.parallel + 1);
-      t.calls[CLIPS.parallel].answer(results(t.calls[CLIPS.parallel].clips));
       await stop;
-      expect(t.verdicts).toHaveLength(CLIPS.parallel + 1);
+      await flush();
+      expect(t.calls).toHaveLength(CLIPS.parallel);
+      expect(t.verdicts).toHaveLength(CLIPS.parallel);
     });
 
-    it('waits no longer than 0.5 s, and a late verdict is ignored', async () => {
+    it('a clip still being cut when Stop comes is not sent', async () => {
+      let cut: (v: string) => void = () => undefined;
+      const t = setup({ cut: () => new Promise((r) => (cut = r)) });
+      t.s.add(word(1));
+      await flush();
+      const stop = t.s.stop();
+      cut('QUJD');
+      await stop;
+      await flush();
+      expect(t.calls).toHaveLength(0);
+    });
+
+    it('takes no new clip after it', async () => {
+      const t = setup();
+      await t.s.stop();
+      t.s.add(word(1));
+      await flush();
+      expect(t.calls).toHaveLength(0);
+    });
+
+    it('waits no longer than 1 s, and a late verdict is ignored', async () => {
       const t = setup();
       t.s.add(word(1));
       await flush();
       const stop = t.s.stop();
-      expect(t.timers.find((h) => !h.off)?.ms).toBe(500);
+      expect(t.timers.find((h) => !h.off)?.ms).toBe(1000);
       t.ring();
       await stop;
       t.calls[0].answer(results(t.calls[0].clips, 'veto'));

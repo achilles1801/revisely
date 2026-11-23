@@ -185,7 +185,7 @@ export function localFeed(deps: LocalDeps): LiveConnect {
     const apply = (id: number, frame: Control) => {
       if (frame.type !== 'end') engine.control(id, JSON.stringify(frame));
       else if (!sender) engine.finish(id);
-      // Stop waits a moment for the verdicts still out (at most 0.5 s), which the engine uses as it decides the take.
+      // Stop waits a moment for the verdicts already on their way (at most 1 s), which the engine uses as it decides the take.
       else
         void sender.stop().then(() => {
           if (!finished && !server && take === id) engine.finish(id);

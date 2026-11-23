@@ -30,8 +30,8 @@ export const CLIPS = {
   coldStartMs: 20_000,
   /** Waiting to be sent, beyond which the oldest is dropped (a slow network mustn't hold a take's worth of audio). */
   queue: 16,
-  /** Stop waits this long for verdicts still out, and never longer. */
-  stopWaitMs: 500,
+  /** Stop waits this long for the verdicts already on their way, and never longer (contract, `/second`). */
+  stopWaitMs: 1000,
   /** The contract's limits on a clip. */
   minSamples: 3_200,
   maxSamples: 320_000,
@@ -81,7 +81,10 @@ export interface ClipSender {
   add(frame: Record<string, unknown>): void;
   /** The take took this mark back: its clip needn't go. */
   drop(id: string): void;
-  /** Stop was pressed: resolves when nothing is out, or after `stopWaitMs`. Verdicts after that are ignored. */
+  /**
+   * Stop was pressed: what hasn't been sent is dropped, and this resolves when the calls already out have answered, or
+   * after `stopWaitMs`. Verdicts after that are ignored.
+   */
   stop(): Promise<void>;
   /** The take is over. */
   close(): void;
@@ -96,6 +99,8 @@ export function clipSender(d: ClipDeps): ClipSender {
   const dropped = new Set<string>();
   /** Calls on their way. */
   let out = 0;
+  /** Stop came: no new clip goes. */
+  let stopped = false;
   /** No more verdicts are wanted. */
   let closed = false;
   /** `/second` refused in a way that won't change during this take. */
@@ -118,7 +123,7 @@ export function clipSender(d: ClipDeps): ClipSender {
       }),
     );
     const clips = cut.filter((c): c is SecondClip => c !== null);
-    if (clips.length === 0 || closed) return;
+    if (clips.length === 0 || closed || stopped) return;
     const samples = batch.filter((c) => clips.some((x) => x.id === c.id)).reduce((n, c) => n + c.s1 - c.s0, 0);
     const res = await d.post(clips, callTimeoutMs(samples));
     if (res.status !== 200) {
@@ -147,7 +152,7 @@ export function clipSender(d: ClipDeps): ClipSender {
   };
 
   const pump = () => {
-    while (out < CLIPS.parallel && !closed && !refused && queue.length > 0 && d.online()) {
+    while (out < CLIPS.parallel && !stopped && !closed && !refused && queue.length > 0 && d.online()) {
       out++;
       send(nextBatch())
         .catch(() => undefined) // not answered: those marks stand
@@ -161,7 +166,7 @@ export function clipSender(d: ClipDeps): ClipSender {
 
   return {
     add: (frame) => {
-      if (closed || refused) return;
+      if (stopped || closed || refused) return;
       const clip = parseClip(frame);
       if (!clip || seen.has(clip.id)) return;
       seen.add(clip.id);
@@ -185,8 +190,9 @@ export function clipSender(d: ClipDeps): ClipSender {
           closed = true;
           resolve();
         };
+        stopped = true;
+        queue.length = 0;
         const timer = d.later(finish, CLIPS.stopWaitMs);
-        pump();
         if (idle()) finish();
         else waiters.push(finish);
       }),

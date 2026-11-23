@@ -1648,7 +1648,8 @@ shows up once and they must go through it and complete it … just the main stuf
   of its hops late, or over 2 s of lag) is never changed itself: the next take runs one step slower, until a clean check
   on a later launch. An engine that asks for it gets the teacher's second opinion as marks appear: its clips go to the
   server a few at a time, and each verdict goes back to the engine. A clip not answered, for any reason, leaves the
-  phone's mark standing; offline nothing is sent, and Stop waits at most 0.5 s. Revisely Dev only.
+  phone's mark standing, and offline nothing is sent. At Stop no new clip goes: the take waits at most 1 s for the
+  verdicts already on their way, then ends. Revisely Dev only.
 
 - **ONDEV-2.** Recite's pack (the model and its tables, sealed) reaches a phone only through the server's `recitePack`:
   signed in, App Check from the Revisely Dev app, the pack's access claim, at most 6 calls and 3 device keys an account a
