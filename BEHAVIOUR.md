@@ -1036,6 +1036,10 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   that day: its date and Open at the top, each of its rows (Revised, Memorized, Read, Notes) scrolled to
   that block. (Majd, Nov 8 2026: Week and Month as a second row of pills was "a whole tab just to show
   weeks instead of month"; Open alone was easy to miss.)
+- **ACT-32.** A day's Revised figure in the calendar counts only that day's plan: "3 of 5" is how many of its 5 planned
+  pages were revised, and pages revised beyond the plan never take it past 5 or fill the day's ring. A day with no plan
+  (pages logged by hand with no session) never says "2 of 0": it names what was revised and how much ("Al-Baqarah · 2
+  pages", and "Revised 2 pages" in the week view). (Majd, Nov 23 2026: "not sure what 2 of 0 even means".)
 - **ACT-19.** Without Smart Tracking no page is rated, so Activity shows no strength: no weak, moderate or
   strong counts, no weak marks on a day's pages, no Weak spots (ACT-12) and no rating colours. Recency
   stands in where it reads well: when a part was last revised and how often. With Smart Tracking on,

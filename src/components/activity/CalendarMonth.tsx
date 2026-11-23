@@ -22,6 +22,7 @@ import { ChoiceChip } from './ChoiceChip';
 import { dayMarks, dayPreview } from '../../lib/activityInsights';
 import { formatDayLong, formatMinutesLong } from '../../lib/activityFormat';
 import { describePassage } from '../../lib/passages';
+import { describeSurahRuns, pageRuns } from '../../lib/pageRanges';
 import { typeV2 } from '../../theme/v2';
 import { RecitedMark } from '../reciteMemory/TakeRows';
 import { BlockMark, RevisedMark } from './BlockMark';
@@ -161,7 +162,12 @@ export function CalendarMonth({
   const previewRows: { key: string; kind: PreviewBlock; label: string; value: string; mics?: number }[] = [];
   if (preview.revised) {
     const minutes = preview.revised.minutes != null && preview.revised.minutes > 0 ? ` · ${formatMinutesLong(preview.revised.minutes)}` : '';
-    previewRows.push({ key: 'revised', kind: 'revised', label: t('activity.day.revised'), value: `${t('common.nOfTotal', { n: preview.revised.done, total: preview.revised.assigned })}${minutes}`, mics: recs?.revision });
+    // Against the day's plan; a day with no plan (pages logged by hand) says what was revised (ACT-32).
+    const figure =
+      preview.revised.assigned > 0
+        ? t('common.nOfTotal', { n: preview.revised.done, total: preview.revised.assigned })
+        : `${describeSurahRuns(pageRuns(preview.revised.pages))} · ${t('common.pages', { count: preview.revised.pages.length })}`;
+    previewRows.push({ key: 'revised', kind: 'revised', label: t('activity.day.revised'), value: `${figure}${minutes}`, mics: recs?.revision });
   }
   // What was memorized and read, by surah (Majd, Nov 7 2026: surahs and juz first, pages almost never).
   const pagesOf = (items: { day: string; pages: number[] }[]) => items.filter((i) => i.day === shownDay).flatMap((i) => i.pages);
@@ -544,7 +550,11 @@ function WeekSummary({ day, data, onOpen }: { day: string; data: CalendarData; o
   const { palette } = useTheme();
   const p = dayPreview(day, data);
   const parts = [
-    p.revised ? t('activity.calendar.summaryRevised', { done: p.revised.done, assigned: p.revised.assigned }) : null,
+    p.revised
+      ? p.revised.assigned > 0
+        ? t('activity.calendar.summaryRevised', { done: p.revised.done, assigned: p.revised.assigned })
+        : t('activity.calendar.summaryRevisedPages', { count: p.revised.pages.length })
+      : null,
     p.memorizedPages > 0 ? t('activity.calendar.summaryMemorized', { n: p.memorizedPages }) : null,
     p.readPages > 0 ? t('activity.calendar.summaryRead', { count: p.readPages }) : null,
     p.notes ? t('activity.calendar.note') : null,

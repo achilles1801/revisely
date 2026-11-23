@@ -82,7 +82,7 @@ describe('Activity Insights (C3)', () => {
       read: [{ day: '2026-11-09', pages: [5, 6], minutes: 18 }],
       noteDays: new Set(['2026-11-09']),
     });
-    expect(p).toEqual({ revised: { done: 2, assigned: 3, minutes: 34 }, memorizedPages: 1, readPages: 2, readMinutes: 18, notes: true });
+    expect(p).toEqual({ revised: { done: 2, assigned: 3, pages: [1, 2], minutes: 34 }, memorizedPages: 1, readPages: 2, readMinutes: 18, notes: true });
   });
 
   it('the consistency picture: one entry per day of the window, oldest first, true where there was an item', () => {
