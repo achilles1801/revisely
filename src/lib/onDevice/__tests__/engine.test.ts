@@ -56,7 +56,7 @@ describe('warmEngine', () => {
   it('opens the engine from the pack once it is whole on the phone', async () => {
     warmEngine();
     await settle();
-    expect(mockModule.enginePackOpen).toHaveBeenCalledWith(PACK.dir, 'v7m-1', ['core', 'strict'], '{}');
+    expect(mockModule.enginePackOpen).toHaveBeenCalledWith(PACK.dir, 'v7m-1', ['core', 'strict'], JSON.stringify({ threads: 2 }));
     expect(mockModule.engineOpenFiles).not.toHaveBeenCalled();
   });
 
