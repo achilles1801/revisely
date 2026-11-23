@@ -66,4 +66,8 @@ export const onboarding = {
     now: 'now',
     previewLabel: 'A sample reminder: {{text}}',
   },
+  /** Revisely Dev's Preview onboarding (ONBOARD-5). */
+  preview: {
+    close: 'Close preview',
+  },
 } as const;

@@ -6,16 +6,15 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
 import { QuestionScreen } from '../../components/onboarding/QuestionScreen';
 import { PillButton } from '../../components/v2/PillButton';
-import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useHaptics } from '../../design/haptics';
 import { DEFAULT_FAJR_METHOD } from '../../lib/fajrBoundary';
-import { ensureNotificationsPermission } from '../../lib/notifications';
 import { firstDayPages } from '../../lib/onboardingChoices';
 import { reminderCopy } from '../../lib/reminders/copy';
 import { radiusV2, typeV2 } from '../../theme/v2';
 import { t } from '../../i18n';
+import { useOnboardingAccess } from './onboardingAccess';
 
 type NavigationProp = NativeStackNavigationProp<OnboardingStackParamList, 'Reminder'>;
 type RouteProps = RouteProp<OnboardingStackParamList, 'Reminder'>;
@@ -29,7 +28,7 @@ export default function ReminderScreen() {
   const route = useRoute<RouteProps>();
   const { palette } = useTheme();
   const haptics = useHaptics();
-  const { pages, createDefaultUser, saveUser, completeOnboarding } = useApp();
+  const { pages, createDefaultUser, saveUser, completeOnboarding, askNotifications } = useOnboardingAccess();
   const { firebaseUser } = useAuth();
   const { scheduleMode, dailyCapacity, dailyJuzCount, fajrBoundaryEnabled, locationCoords } = route.params;
   const [starting, setStarting] = useState<'on' | 'off' | null>(null);
@@ -58,7 +57,7 @@ export default function ReminderScreen() {
     try {
       // Declined at the system's prompt: our own flag goes off too, so Settings says what is true and nothing is
       // scheduled against a refused permission.
-      const notificationsEnabled = wantsReminders ? await ensureNotificationsPermission() : false;
+      const notificationsEnabled = wantsReminders ? await askNotifications() : false;
       const user = createDefaultUser({
         name: firebaseUser?.displayName || undefined,
         dailyPageCapacity: dailyCapacity,

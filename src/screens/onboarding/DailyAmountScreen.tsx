@@ -7,11 +7,11 @@ import { AmountStepper } from '../../components/onboarding/AmountStepper';
 import { QuestionScreen } from '../../components/onboarding/QuestionScreen';
 import { PillButton } from '../../components/v2/PillButton';
 import { PillTabs } from '../../components/v2/PillTabs';
-import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import { daysPerRound } from '../../lib/onboardingChoices';
 import { typeV2 } from '../../theme/v2';
 import { t } from '../../i18n';
+import { useOnboardingAccess } from './onboardingAccess';
 
 type NavigationProp = NativeStackNavigationProp<OnboardingStackParamList, 'DailyAmount'>;
 type RouteProps = RouteProp<OnboardingStackParamList, 'DailyAmount'>;
@@ -24,7 +24,7 @@ export default function DailyAmountScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProps>();
   const { palette } = useTheme();
-  const { pages } = useApp();
+  const { pages } = useOnboardingAccess();
   const { journeyStage } = route.params;
 
   const [scheduleMode, setScheduleMode] = useState<ScheduleMode>('pages');

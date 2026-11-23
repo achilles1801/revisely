@@ -12,6 +12,7 @@ import PrayerCalculationScreen from '../screens/prayer/PrayerCalculationScreen';
 import PrayerNotificationsScreen from '../screens/prayer/PrayerNotificationsScreen';
 import AthanVoiceScreen from '../screens/prayer/AthanVoiceScreen';
 import OnDeviceBenchScreen from '../screens/main/OnDeviceBenchScreen';
+import OnboardingPreviewScreen from '../screens/onboarding/OnboardingPreviewScreen';
 import ActiveRevisionScreen from '../screens/revision/ActiveRevisionScreen';
 import ReadIndexScreen from '../screens/read/ReadIndexScreen';
 import QuranReaderScreen from '../screens/read/QuranReaderScreen';
@@ -103,6 +104,8 @@ export type HomeStackParamList = {
   AthanVoice: { prayer?: 'fajr' | 'dhuhr' | 'asr' | 'maghrib' | 'isha' } | undefined;
   /** Settings → Testing → On-device model: Recite's model timed on this phone (Revisely Dev, ONDEV-1). */
   OnDeviceBench: undefined;
+  /** Revisely Dev: the onboarding screens, saving nothing (ONBOARD-5). */
+  OnboardingPreview: undefined;
 };
 
 export type ReadStackParamList = {
@@ -145,6 +148,7 @@ const HIDE_TAB_BAR_ON = new Set([
   'QuranSearch',
   'JournalEntry',
   'ListenBack',
+  'OnboardingPreview', // i18n-ignore (route names)
 ]);
 
 const STACK_OPTIONS = {
@@ -166,6 +170,7 @@ function sharedScreens() {
       <HomeStack.Screen name="PrayerNotifications" component={PrayerNotificationsScreen} />
       <HomeStack.Screen name="AthanVoice" component={AthanVoiceScreen} />
       <HomeStack.Screen name="OnDeviceBench" component={OnDeviceBenchScreen} />
+      <HomeStack.Screen name="OnboardingPreview" component={OnboardingPreviewScreen} options={{ animation: 'slide_from_bottom' }} />
       <HomeStack.Screen name="ActivityDay" component={ActivityDayScreen} />
       <HomeStack.Screen name="ListenBack" component={ListenBackScreen} />
       <HomeStack.Screen name="ActivityAll" component={ActivityAllScreen} />

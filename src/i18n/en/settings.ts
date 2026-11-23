@@ -349,6 +349,9 @@ export const settings = {
     resetSub: 'Start again as a new account',
     whatsNewAtLaunch: 'Show What’s new at launch',
     whatsNewAtLaunchSub: 'As App Store users will see it after the update',
+    /** Revisely Dev: the onboarding screens on a blank account (ONBOARD-5). */
+    previewOnboarding: 'Preview onboarding',
+    previewOnboardingSub: 'The real screens. Nothing is saved',
     /** Revisely Dev's row naming the checker's models (components/settings/CheckerModelRow). */
     model: 'Mistake detection model',
     modelLine: 'Recite {{recite}} · Mistakes {{harakat}} · Strict {{strict}}',

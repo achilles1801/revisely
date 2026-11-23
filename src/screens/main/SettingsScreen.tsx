@@ -1364,6 +1364,16 @@ export default function SettingsScreen() {
                 {reciteCheck && isDevVariant() ? <CheckerModelRow /> : null}
                 {/* Revisely Dev only: where this phone's takes run, the phone or the server (ONDEV-4). */}
                 {reciteCheck && isDevVariant() ? <ReciteWhereRow /> : null}
+                {/* Revisely Dev only: the onboarding screens, saving nothing (ONBOARD-5). */}
+                {isDevVariant() ? (
+                  <Row
+                    icon="albums-outline"
+                    label={t('settings.testing.previewOnboarding')}
+                    subtitle={t('settings.testing.previewOnboardingSub')}
+                    onPress={() => navigation.navigate('OnboardingPreview')}
+                    testID="settings-preview-onboarding"
+                  />
+                ) : null}
                 {/* Revisely Dev only: Recite's model timed on this phone (ONDEV-1). */}
                 {isDevVariant() ? (
                   <Row

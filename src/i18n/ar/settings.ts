@@ -311,6 +311,8 @@ export const settings: NonNullable<ArStrings['settings']> = {
     resetSub: 'البدء من جديد كحساب جديد',
     whatsNewAtLaunch: 'إظهار «الجديد في ريفايزلي» عند الفتح',
     whatsNewAtLaunchSub: 'كما سيراه مستخدمو ⁨App Store⁩ بعد التحديث',
+    previewOnboarding: 'معاينة خطوات البدء',
+    previewOnboardingSub: 'الشاشات الحقيقية، ولا يُحفظ شيء',
     model: 'نموذج تحديد الأخطاء',
     modelLine: 'متابعة التلاوة ⁨{{recite}}⁩ · الأخطاء ⁨{{harakat}}⁩ · الوضع الصارم ⁨{{strict}}⁩',
     modelServer: 'الفاحص ⁨{{server}}⁩',

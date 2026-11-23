@@ -4,7 +4,6 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
 import { ChoiceList, ChoiceRow } from '../../components/onboarding/ChoiceRow';
 import { QuestionScreen } from '../../components/onboarding/QuestionScreen';
-import { useApp } from '../../context/AppContext';
 import { useHaptics } from '../../design/haptics';
 import {
   applyPendingChanges,
@@ -15,6 +14,7 @@ import {
 import { logger } from '../../lib/logger';
 import { TOTAL_QURAN_PAGES } from '../../types/firestore';
 import { t } from '../../i18n';
+import { useOnboardingAccess } from './onboardingAccess';
 
 type NavigationProp = NativeStackNavigationProp<OnboardingStackParamList, 'JourneySelect'>;
 
@@ -26,7 +26,7 @@ type NavigationProp = NativeStackNavigationProp<OnboardingStackParamList, 'Journ
 export default function JourneySelectScreen() {
   const navigation = useNavigation<NavigationProp>();
   const haptics = useHaptics();
-  const { user, pages, updatePages, saveUser } = useApp();
+  const { user, pages, updatePages, saveUser } = useOnboardingAccess();
   const [savingAll, setSavingAll] = useState(false);
   const inFlight = useRef(false);
 

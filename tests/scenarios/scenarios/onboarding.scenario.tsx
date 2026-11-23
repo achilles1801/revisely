@@ -12,7 +12,7 @@ import {
   memorizedOnServer,
   pageCountOnServer,
 } from '../harness/admin';
-import { Onboarding, onboardingFlow, onboardingStack } from '../harness/screens';
+import { Onboarding, onboardingFlow, onboardingPreviewStack, onboardingStack } from '../harness/screens';
 import { Phone } from '../harness/phone';
 
 const newEmail = () => `onboard-${Date.now()}-${Math.round(Math.random() * 1e6)}@example.com`;
@@ -159,5 +159,46 @@ it('[ONBOARD-4] a juz tapped twice is cleared, and only what is chosen is saved'
   await screen.continue();
   await app.untilSynced();
   expect(memorizedOnServer(email)).toEqual([1, ...pagesRange(582, 604)]);
+  await app.close();
+});
+
+it('[ONBOARD-5] Preview onboarding walks every question on a blank account and saves nothing', async () => {
+  setZone(ZONES.chicago);
+  setNow('2026-11-03 12:00');
+  const email = newEmail();
+  createAccountPartWay(email, 'scenario-password', 604);
+  markOnServer(email, 5);
+
+  const phone = new Phone('phone');
+  const app = await phone.open(onboardingPreviewStack);
+  await app.act(() => app.auth.signIn(email, 'scenario-password'));
+  await app.until(() => app.app.pages.length === 604, 'the pages');
+  await app.untilSynced();
+  const before = JSON.stringify(app.app.user);
+  const flow = new Onboarding(app);
+
+  await flow.press('welcome-begin');
+  await flow.reach('journey-select');
+  await flow.press('journey-part');
+  await flow.reach('juz-selection');
+  // Its own blank account: the page this one has memorized isn't there.
+  await app.until(() => flow.summary() === '1 page chosen', 'the blank account');
+  await flow.tapJuz(30);
+  await flow.press('juz-continue');
+  await flow.reach('daily-amount');
+  await flow.press('amount-more');
+  await flow.press('amount-continue');
+  await flow.reach('day-start');
+  await flow.press('day-fajr');
+  await flow.reach('reminder');
+  await flow.press('reminder-on');
+  await flow.reach('settings-stub');
+  await app.until(() => app.screen.queryByTestId('onboarding-preview') == null, 'the preview to close');
+
+  expect(app.app.pendingChanges).toBe(0);
+  await app.untilSynced();
+  expect(memorizedOnServer(email)).toEqual([5]);
+  expect(app.app.onboardingComplete).toBe(false);
+  expect(JSON.stringify(app.app.user)).toBe(before);
   await app.close();
 });

@@ -87,4 +87,7 @@ export const onboarding: NonNullable<ArStrings['onboarding']> = {
     now: 'الآن',
     previewLabel: 'مثال على التذكير: {{text}}',
   },
+  preview: {
+    close: 'إغلاق المعاينة',
+  },
 };
