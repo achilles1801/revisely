@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Sign in · Revisely Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/console.css">
+<style>
+html, body { margin: 0; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body class="auth-page">
+<main class="auth">
+  <div class="auth-brand">
+    <span class="mark" aria-hidden="true">R</span>
+    <span class="auth-name">Revisely Console</span>
+    <span class="env" id="env" hidden></span>
+  </div>
+
+  <section class="auth-card" id="loading" aria-live="polite">
+    <p class="auth-sub">Checking your sign-in…</p>
+  </section>
+
+  <section class="auth-card" id="signIn" hidden aria-labelledby="signInTitle">
+    <h1 id="signInTitle">Sign in</h1>
+    <p class="auth-sub">For Revisely staff. Use the account the owner gave access to.</p>
+    <button type="button" class="btn auth-google" id="googleBtn">
+      <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.3 0-9.7-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
+      Continue with Google
+    </button>
+    <div class="auth-or"><span>or with email</span></div>
+    <form id="emailForm" novalidate>
+      <label class="field"><span>Email</span><input type="email" id="email" autocomplete="username" required inputmode="email" autocapitalize="off" spellcheck="false"></label>
+      <label class="field"><span>Password</span><input type="password" id="password" autocomplete="current-password" required></label>
+      <button type="submit" class="btn primary auth-submit" id="emailBtn">Sign in</button>
+    </form>
+    <p class="auth-err" id="signInErr" role="alert" hidden></p>
+    <p class="auth-foot">There’s no sign-up. Access is given by the owner.</p>
+  </section>
+
+  <section class="auth-card" id="noAccess" hidden aria-labelledby="noAccessTitle">
+    <div class="auth-lock" aria-hidden="true">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="10.5" width="15" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg>
+    </div>
+    <h1 id="noAccessTitle">No access</h1>
+    <p class="auth-sub">You’re signed in as <b id="noAccessEmail"></b>, but this account doesn’t have a role in Revisely Console.</p>
+    <p class="auth-sub">If you work on Revisely, ask the owner to give you one, then sign in again.</p>
+    <div class="auth-actions">
+      <button type="button" class="btn primary" id="signOutBtn">Sign out</button>
+      <button type="button" class="btn" id="otherBtn">Use another account</button>
+    </div>
+  </section>
+
+  <section class="auth-card" id="broken" hidden>
+    <h1>Can’t open the console</h1>
+    <p class="auth-sub" id="brokenText"></p>
+    <div class="auth-actions"><button type="button" class="btn" id="retryBtn">Try again</button></div>
+  </section>
+
+  <p class="auth-legal" id="legal" hidden>This site is protected by reCAPTCHA and the Google <a href="https://policies.google.com/privacy" rel="noopener noreferrer">Privacy Policy</a> and <a href="https://policies.google.com/terms" rel="noopener noreferrer">Terms of Service</a> apply.</p>
+</main>
+<script type="module" src="/sign-in.js"></script>
+</body>
+</html>

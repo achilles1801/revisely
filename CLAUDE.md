@@ -13,7 +13,7 @@ Read its file first:
 - Revisely Dev, the dev backend, dev.revisely.app: `handbook/dev-stack.md`
 - OTA updates, store versions, forced updates, What's new, the November 2026 release gates: `handbook/updates.md`
 - Sentry, the health report, Claude fix, the Claude key: `handbook/health.md`
-- The stats digest and the metrics console: `handbook/stats-metrics.md`
+- The stats digest and Revisely Console (the staff console): `handbook/stats-metrics.md`
 - Offline (the account copy, the outbox), the offline mushaf, Saheeh International, QuranEnc: `handbook/offline.md`
 - TestFlight, App Store submission, the icon, screenshots, the public pages: `handbook/app-store.md`
 - The reader (verse positions, Copy and Share, The Clear Quran, recitation, the athan, Qibla, mushaf editions): `handbook/reader.md`

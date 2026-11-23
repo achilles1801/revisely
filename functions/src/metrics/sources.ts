@@ -3,7 +3,9 @@
  * Monitoring over REST with the function's own service account, through the metadata server).
  * Firestore reads name their fields (`select`), so no question or answer text is read for the numbers.
  */
+import type { Auth } from 'firebase-admin/auth';
 import type { Firestore } from 'firebase-admin/firestore';
+import { isRole } from '../console/roles';
 import { buckets, ChatRow, LedgerDay, MessageRow, Monitoring, RANGES, RangeKey, RevoLine, SettingsRow } from './aggregate';
 
 /** An access token for the function's own service account (Cloud Run's metadata server). */
@@ -281,4 +283,22 @@ export async function readActivity(db: Firestore): Promise<ActivityRow[]> {
   // Activity under an account whose user document is gone (deleted): no sign-up day, still activity.
   for (const [uid, s] of days) if (!seen.has(uid)) rows.push({ uid, signedUp: null, firstDay: null, onboarded: false, tester: false, service: false, days: [...s] });
   return rows;
+}
+
+/**
+ * Staff accounts in this project's Auth: the console's `role` claim or the old `admin` claim. Retention leaves
+ * them out (on a peer call nobody is "the reader", so the owner would otherwise count).
+ */
+export async function staffUids(auth: Auth): Promise<Set<string>> {
+  const out = new Set<string>();
+  let token: string | undefined;
+  do {
+    const page = await auth.listUsers(1000, token);
+    for (const u of page.users) {
+      const c = u.customClaims ?? {};
+      if (c.admin === true || isRole(c.role)) out.add(u.uid);
+    }
+    token = page.pageToken;
+  } while (token);
+  return out;
 }

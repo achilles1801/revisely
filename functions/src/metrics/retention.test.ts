@@ -80,6 +80,12 @@ describe('the console', () => {
     for (const id of ['uid-person-1', 'uid-person-2', 'uid-owner', 'uid-flagged', 'uid-listed-tester', 'uid-review']) expect(text).not.toContain(id);
   });
 
+  it('leaves out staff accounts too, read or not (a peer call has no reader)', () => {
+    const m = build({ now: Date.UTC(2026, 10, 21, 9), staffUids: new Set(['uid-staff']), activity: [row('uid-person-1'), row('uid-staff')] });
+    expect(m.retention?.left.owner).toBe(1);
+    expect(m.retention?.accounts).toBe(1);
+  });
+
   it('says nothing when the activity could not be read', () => {
     expect(build({ now: Date.UTC(2026, 10, 21) }).retention).toBeNull();
   });

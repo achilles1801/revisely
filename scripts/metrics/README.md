@@ -36,8 +36,10 @@ GitHub "Metrics" workflow, hourly ── Sentry + App Store totals ──► met
   Firebase config comes from Hosting itself (`/__/firebase/init.json`), so no key is in the repository,
   and the project's own domain is already allowed for Google sign-in. It keeps nothing in the browser but
   the range and channel picked.
-- **Who gets in:** only an account whose ID token carries `admin: true`, checked by the functions on
-  every call (`functions/src/metrics/admin.ts`). Set it with `functions/scripts/set-admin.js <uid>`.
+- **Who gets in:** only an account whose role allows it (`functions/src/console/roles.ts`: owner, admin and dev
+  see the metrics; owner and admin the conversations), checked by the functions on every call against the account's
+  claims read live. Give a role with `functions/scripts/set-role.js <email|uid> <role>` (CLAUDE.md, "Revisely
+  Console"); the old `admin: true` claim counts as owner.
   No Firestore or Storage rule reads the claim, so it opens the console and nothing else.
 - **adminMetrics** (callable) reads everything live and works out every number
   (`functions/src/metrics/aggregate.ts`), keeping the answer 2 minutes. Refresh asks for a new one. It
@@ -69,12 +71,12 @@ GitHub "Metrics" workflow, hourly ── Sentry + App Store totals ──► met
   and every account (questions, days, reviews, tokens, cost, days at the 20-question limit, failures,
   thumbs, last used). Tap one for its conversations and memory.
 - **Retention** (Nov 2026; `functions/src/metrics/retention.ts`, read by `sources.ts` `readActivity`; returned by
-  `adminMetrics` and `consoleMetrics`, shown in the staff console's Overview, PR #583's branch): accounts
+  `adminMetrics` and `consoleMetrics`, shown in the staff console's Overview): accounts
   active yesterday, this week and in 30 days, a weekly chart since Oct 1, and day 1, 7 and 30 retention by
   sign-up week (exact day, and "day 7 or later"). Active = a revision session with pages or minutes, an
   Activity item (revisions, memorizations, reads), a recited take or a daily log, on the account's own
   day. An account starts on its first local session day when that is within a day of its UTC sign-up.
-  Testers, the App Review and screenshot accounts and the owner are left out. Only dates and page or
+  Testers, the App Review and screenshot accounts and staff are left out. Only dates and page or
   minute counts are read; only counts leave the function. The same numbers from a laptop, read-only:
   `cd functions && npm run build && GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-admin.json node scripts/retention.js`
   (`--json`; it leaves out accounts with the `admin` claim). No platform: accounts don't record theirs
@@ -109,7 +111,7 @@ is free (public repository). Hosting serves a 60 KB page.
 ## Deploying (owner's word for each)
 
 1. Functions: `firebase deploy --only functions:adminMetrics,functions:adminRevo,functions:metricsTotals`
-2. Admin claim: `cd functions && GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-admin.json node scripts/set-admin.js <uid>`
+2. Role: `cd functions && npm run build && GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-admin.json node scripts/set-role.js <email|uid> owner`
 3. The page: `firebase deploy --only hosting` (from a checkout that has `admin/`).
 4. The workflow: `metrics.yml`, `scripts/metrics/totals.js` and `push.js` on `main`. Deploy step 1
    first, or the hourly run fails until `metricsTotals` exists.
@@ -129,4 +131,4 @@ The functions' service account needs to read Logging and Monitoring (`roles/logg
   Costs come from the log lines, priced in `functions/src/coach/pricing.ts`.
 - **The Clear Quran budget** isn't on the console: the worker keeps its counts in a Durable Object with
   no route to read them.
-- **To shut it:** `set-admin.js <uid> --off`, or delete the three functions. The page alone shows nothing.
+- **To shut it:** `set-role.js <email|uid> none`, or delete the functions. The page alone shows nothing.

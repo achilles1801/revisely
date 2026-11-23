@@ -96,6 +96,8 @@ export interface Input {
   totals?: Totals | null;
   /** Every account's active days (sources.readActivity); testers, the owner and service accounts are left out. */
   activity?: ActivityRow[] | null;
+  /** Staff accounts in this project's Auth (sources.staffUids): left out of retention like the owner. */
+  staffUids?: Set<string> | null;
   sources?: Record<string, string>;
 }
 
@@ -463,7 +465,7 @@ export function build(input: Input): Metrics {
 /** Counts only: the accounts left once testers, the owner and the service accounts are out. */
 function retentionOf(input: Input, now: number): Metrics['retention'] {
   if (!input.activity) return null;
-  const owners = input.ownerUids ?? new Set<string>();
+  const owners = new Set([...(input.ownerUids ?? []), ...(input.staffUids ?? [])]);
   const testers = input.testers ?? new Set<string>();
   const left = { testers: 0, owner: 0, service: 0 };
   const people = [];

@@ -11,8 +11,9 @@
  *   for that account for LINK_TTL_MS. Only its SHA-256 is stored (supportCodes/<hash>), so a copy of the database
  *   holds no working link. That page never signs in.
  * - From the web: signed in on the site, the same callable takes the caller's own account.
- * - `supportApplication` gives the account's state, or takes the application. Majd decides with
- *   functions/scripts/support-applications.js; a decision deletes the answers, so only the outcome stays.
+ * - `supportApplication` gives the account's state, or takes the application. Decisions are made in Revisely
+ *   Console (admin/, the callable adminConsole) or with functions/scripts/support-applications.js, both through
+ *   review.ts; a decision deletes the answers, so only the outcome stays.
  *
  * Applications are people's own words about their circumstances: nothing here logs an answer.
  */
@@ -134,7 +135,9 @@ export function accountLabel(user: { email?: string | null; providers?: string[]
 // ---------------------------------------------------------------------------------------------------------------
 // The application
 
-export type ApplicationStatus = 'pending' | 'approved' | 'declined';
+/** revoked: an approved account's support grant was taken back; like a decline, it may apply again after 30 days. */
+export type ApplicationStatus = 'pending' | 'approved' | 'declined' | 'revoked';
+export const APPLICATION_STATUSES: readonly ApplicationStatus[] = ['pending', 'approved', 'declined', 'revoked'];
 
 export const HEARD = ['store', 'friend', 'teacher', 'social', 'other'] as const;
 export const MEMORIZING = ['yes', 'revising', 'not_yet'] as const;
@@ -158,7 +161,7 @@ export interface Application {
   status: ApplicationStatus;
   createdAt: number;
   decidedAt: number | null;
-  /** Declined: when a new application is accepted. */
+  /** Declined or revoked: when a new application is accepted. */
   applyAgainFrom: number | null;
   /** Deleted once decided. */
   answers?: Answers;
@@ -250,7 +253,8 @@ export function stateOf(app: Application | null, ent: Entitlements | null, accou
   if (app?.status === 'pending') {
     return { state: 'pending', account, appliedAt: app.createdAt, replyBy: app.createdAt + REPLY_WITHIN_DAYS * DAY_MS };
   }
-  if (app?.status === 'declined' && app.applyAgainFrom != null && app.applyAgainFrom > now) {
+  // A revoked grant waits like a decline; the page says the same ("declined"), so its answer is unchanged.
+  if ((app?.status === 'declined' || app?.status === 'revoked') && app.applyAgainFrom != null && app.applyAgainFrom > now) {
     return { state: 'declined', account, applyAgainFrom: app.applyAgainFrom };
   }
   const answer: StatusAnswer = { state: 'none', account };
@@ -330,7 +334,7 @@ export function decideApply(
   return { answer: stateOf(app, current.ent, account, now), write: { app, limits: claim.next } };
 }
 
-/** Majd's decision. Approval grants Premium (no end date unless one is given); either way the answers go. */
+/** A decision on a pending application. Approval grants Premium (no end date unless one is given); either way the answers go. */
 export function decide(
   app: Application | null,
   ent: Entitlements | null,
@@ -349,4 +353,22 @@ export function decide(
     };
   }
   return { app: { ...rest, status: 'declined', decidedAt: now, applyAgainFrom: now + REAPPLY_AFTER_DAYS * DAY_MS } };
+}
+
+/**
+ * Taking the support grant back. Premium is worked out again from the other sources; the application becomes
+ * `revoked`, and like a decline the account may apply again after REAPPLY_AFTER_DAYS (Majd, Nov 14 2026). An account
+ * granted without an application (the script, before the console) gets a revoked record so the wait applies too.
+ */
+export function revoke(app: Application | null, ent: Entitlements | null, now: number): { app: Application; ent: ReturnType<typeof withGrant> } {
+  const support = ent?.grants?.support;
+  if (!support) throw new SupportError('failed-precondition', 'This account has no Premium through Open Door.');
+  const applyAgainFrom = now + REAPPLY_AFTER_DAYS * DAY_MS;
+  const base: Application = app
+    ? (({ answers: _answers, ...rest }) => rest)(app)
+    : { status: 'approved', createdAt: support.grantedAt, decidedAt: support.grantedAt, applyAgainFrom: null, count: 0, via: 'app' };
+  return {
+    app: { ...base, status: 'revoked', decidedAt: now, applyAgainFrom },
+    ent: withGrant(ent, 'support', null),
+  };
 }

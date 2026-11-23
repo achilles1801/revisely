@@ -9,7 +9,8 @@ import type { Firestore } from 'firebase-admin/firestore';
 import type { Input, Totals } from './aggregate';
 import { RANGES } from './aggregate';
 import type { RevoChatRow, RevoMemoryRow, RevoMessageRow, RevoReadStore, TotalsStore } from './admin';
-import { googleClient, metadataToken, readActivity, readFirestore, readMonitoring, readRevoLines } from './sources';
+import { getAuth } from 'firebase-admin/auth';
+import { googleClient, metadataToken, readActivity, readFirestore, readMonitoring, readRevoLines, staffUids } from './sources';
 
 const str = (v: unknown, fallback = '') => (typeof v === 'string' ? v : fallback);
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
@@ -114,6 +115,7 @@ export function collector(db: Firestore, project: string, opts: { emulator: bool
       attempt('Sentry and App Store', () => storedTotals(db)),
       attempt('Activity', () => readActivity(db)),
     ]);
+    const staff = activity ? await attempt('Staff accounts', () => staffUids(getAuth())) : null;
     if (totals?.errors) for (const [k, v] of Object.entries(totals.errors)) if (v) sources[k === 'sentry' ? 'Sentry' : 'App Store'] = String(v).slice(0, 160);
     if (!totals && sources['Sentry and App Store'] === 'ok') sources['Sentry and App Store'] = 'no totals yet (the Metrics workflow sends them hourly)';
     return {
@@ -128,6 +130,7 @@ export function collector(db: Firestore, project: string, opts: { emulator: bool
       monitoring,
       totals,
       activity,
+      staffUids: staff,
       sources,
     };
   };

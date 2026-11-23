@@ -20,6 +20,7 @@ rules_version = '2';
  * - config/app - Supported and latest app versions (read by every install)
  * - entitlements/{userId} - Revisely Premium (the owner reads; only the functions write)
  * - supportApplications/{userId} - The support program (the owner reads; only the functions write)
+ * - supportDecisions/{id}, consoleAudit/{id} - Revisely Console's audit log (closed: the console reads it through its callables)
  */
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -847,6 +848,18 @@ service cloud.firestore {
     }
 
     match /supportLimits/{userId} {
+      allow read, write: if false;
+    }
+
+    // Revisely Console's audit log: Open Door decisions (who, when, the reviewer's
+    // internal note; never an applicant's answers) and role changes. Closed to every
+    // client, staff included: the console reads it through its callables, which check
+    // the caller's role (functions/src/console/roles.ts). No role opens anything here.
+    match /supportDecisions/{decisionId} {
+      allow read, write: if false;
+    }
+
+    match /consoleAudit/{entryId} {
       allow read, write: if false;
     }
 

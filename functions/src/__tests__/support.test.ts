@@ -18,6 +18,7 @@ import {
   decide,
   decideApply,
   effectivePremium,
+  revoke,
   hasPremium,
   stateOf,
   withGrant,
@@ -182,6 +183,28 @@ describe('applying and deciding', () => {
     expect((await refusal(() => decide(null, null, { approve: true }, NOW))).code).toBe('failed-precondition');
     const pending: Application = { ...decided, status: 'pending', decidedAt: null };
     expect((await refusal(() => decide(pending, null, { approve: true, until: NOW }, NOW))).code).toBe('invalid-argument');
+  });
+
+  it('revoking takes the support grant back, keeps the others, and waits 30 days like a decline', () => {
+    const approved: Application = { status: 'approved', createdAt: NOW - 9 * DAY, decidedAt: NOW - 8 * DAY, applyAgainFrom: null, count: 2, via: 'web' };
+    const ent: Entitlements = { grants: { support: grant('support', null), dev: grant('dev', NOW + DAY) }, premium: grant('support', null) };
+    const out = revoke(approved, ent, NOW);
+    expect(out.app).toEqual({ ...approved, status: 'revoked', decidedAt: NOW, applyAgainFrom: NOW + REAPPLY_AFTER_DAYS * DAY });
+    expect(out.ent.grants.support).toBeUndefined();
+    expect(out.ent.premium?.source).toBe('dev');
+    // The page tells them they were declined until then, then they may apply again.
+    expect(stateOf(out.app, { grants: out.ent.grants, premium: out.ent.premium }, ACCOUNT, NOW).state).toBe('has');
+    expect(stateOf(out.app, null, ACCOUNT, NOW)).toMatchObject({ state: 'declined', applyAgainFrom: NOW + REAPPLY_AFTER_DAYS * DAY });
+    expect(stateOf(out.app, null, ACCOUNT, NOW + 31 * DAY).state).toBe('none');
+    expect(decideApply({ app: out.app, ent: null, limits: null }, OK, 'app', ACCOUNT, NOW + DAY).write).toBeUndefined();
+    expect(decideApply({ app: out.app, ent: null, limits: null }, OK, 'app', ACCOUNT, NOW + 31 * DAY).write?.app.count).toBe(3);
+  });
+
+  it('revoking a grant made without an application records one, so the wait applies too', async () => {
+    const out = revoke(null, { grants: { support: grant('support', null, NOW - 5 * DAY) } }, NOW);
+    expect(out.app).toEqual({ status: 'revoked', createdAt: NOW - 5 * DAY, decidedAt: NOW, applyAgainFrom: NOW + REAPPLY_AFTER_DAYS * DAY, count: 0, via: 'app' });
+    expect(out.ent.premium).toBeNull();
+    expect((await refusal(() => revoke(null, { grants: { dev: grant('dev', null) } }, NOW))).message).toBe('This account has no Premium through Open Door.');
   });
 });
 
