@@ -3,7 +3,7 @@
 // native module (modules-dev/recite-engine, linked into Revisely Dev's builds only); and the record of a finished
 // bench, sent to Firestore's onDeviceBench (create only: device and timings, no account, no audio).
 
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import { Directory, File, Paths } from 'expo-file-system';
 import { createDownloadResumable } from 'expo-file-system/legacy';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
@@ -17,11 +17,13 @@ import { authHeaders, bucketName, objectUrl } from '../recordingCloud';
 import { isDevVariant } from '../variant';
 import {
   filesFor,
+  interruption,
   longVerdict,
   parseManifest,
   perMinute,
   summarize,
   type BenchManifest,
+  type Interruption,
   type MinuteStats,
   type PlanSpec,
   type RunSummary,
@@ -157,6 +159,8 @@ export interface BenchRun {
   summary: RunSummary | null;
   /** A long run (research's 20-minute protocol): its length, and its windows a minute at a time. */
   long?: { durationSec: number; minutes: MinuteStats[] };
+  /** The app left the foreground, or the run stalled: its numbers aren't clean. */
+  interrupted?: Interruption;
 }
 
 /** How long to run: N windows back to back, or a long run of so many seconds at the live cadence. */
@@ -175,6 +179,10 @@ export async function runPlan(
   if (!model) throw new Error(`No model ${plan.model}`); // i18n-ignore (an error for logs)
   const also = plan.alsoModel ? manifest.models.find((m) => m.id === plan.alsoModel) : undefined;
   const sub = engine.addListener('onBenchProgress', (e) => onProgress(e.done, e.total));
+  const startState = String(AppState.currentState);
+  const startT = Date.now();
+  const changes: { t: number; state: string }[] = [];
+  const stateSub = AppState.addEventListener('change', (state) => changes.push({ t: Date.now(), state }));
   try {
     const result = await engine.bench({
       model: files[model.file],
@@ -200,9 +208,18 @@ export async function runPlan(
       },
     });
     const summary = result.ok ? summarize(result.runMs, result.featureMs, manifest.hopSamples) : null;
-    if (!('durationSec' in length)) return { plan, result, summary };
-    return { plan, result, summary, long: { durationSec: length.durationSec, minutes: perMinute(result.startMs ?? [], result.runMs) } };
+    const disturbed = interruption(startState, changes, startT, Date.now(), result.startMs ?? []);
+    return {
+      plan,
+      result,
+      summary,
+      ...('durationSec' in length
+        ? { long: { durationSec: length.durationSec, minutes: perMinute(result.startMs ?? [], result.runMs) } }
+        : {}),
+      ...(disturbed ? { interrupted: disturbed } : {}),
+    };
   } finally {
+    stateSub.remove();
     sub.remove();
   }
 }
@@ -228,8 +245,9 @@ export function benchRecord(device: DeviceInfo, windows: number, runs: readonly 
       update: release.updateId ?? '',
     },
     windows,
-    runs: runs.map(({ plan, result, summary, long }) => ({
+    runs: runs.map(({ plan, result, summary, long, interrupted }) => ({
       mode: long ? 'long' : 'windows',
+      interrupted: interrupted ?? null,
       model: plan.model,
       provider: plan.provider,
       threads: plan.threads,

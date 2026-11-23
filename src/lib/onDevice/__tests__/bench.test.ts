@@ -1,5 +1,5 @@
 import manifestJson from './bench.manifest.json';
-import { checkVerdict, filesFor, GATE_P95_MS, longVerdict, parseManifest, perMinute, planKey, quantile, summarize } from '../bench';
+import { checkVerdict, filesFor, GATE_P95_MS, interruption, longVerdict, parseManifest, perMinute, planKey, quantile, summarize } from '../bench';
 
 // The manifest on the dev backend (models/recite/bench.json), as uploaded with the bench.
 const raw = manifestJson as unknown as Record<string, unknown>;
@@ -144,5 +144,37 @@ describe('a long run (research’s 20-minute protocol)', () => {
     // Android's names count too.
     expect(longVerdict([], [{ t: 0, battery: 50, charging: false, thermal: 'severe' }]).hot).toBe(true);
     expect(longVerdict([], [{ t: 0, battery: 50, charging: false, thermal: 'moderate' }]).hot).toBe(false);
+  });
+});
+
+describe('a run that was disturbed', () => {
+  const steady = Array.from({ length: 100 }, (_, i) => i * 500);
+
+  it('is clean when the app stayed in the foreground and the windows kept coming', () => {
+    expect(interruption('active', [], 0, 50000, steady)).toBeNull();
+    // Control Center and back still counts: the app wasn't active.
+    expect(interruption('active', [{ t: 1000, state: 'inactive' }, { t: 1400, state: 'active' }], 0, 50000, steady)).toEqual({
+      times: 1,
+      awayMs: 400,
+      stallMs: 0,
+    });
+  });
+
+  it('counts each time the app left, and the time away, to the end of the run if it never came back', () => {
+    const changes = [
+      { t: 1000, state: 'inactive' },
+      { t: 1100, state: 'background' },
+      { t: 5000, state: 'active' },
+      { t: 9000, state: 'background' },
+    ];
+    expect(interruption('active', changes, 0, 10000, steady)).toEqual({ times: 2, awayMs: 5000, stallMs: 0 });
+    expect(interruption('background', [{ t: 2000, state: 'active' }], 0, 10000, steady)).toEqual({ times: 1, awayMs: 2000, stallMs: 0 });
+  });
+
+  it('catches a stall the state events missed, and not a slow phone’s even windows', () => {
+    const stalled = [...steady.slice(0, 50), ...steady.slice(50).map((t) => t + 42000)];
+    expect(interruption('active', [], 0, 92000, stalled)).toEqual({ times: 0, awayMs: 0, stallMs: 42500 });
+    const slow = Array.from({ length: 50 }, (_, i) => i * 3500);
+    expect(interruption('active', [], 0, 175000, slow)).toBeNull();
   });
 });

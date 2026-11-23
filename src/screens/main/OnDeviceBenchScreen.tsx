@@ -296,6 +296,7 @@ function RunCard({ run, manifest }: { run: BenchRun; manifest: BenchManifest }) 
   const { palette } = useTheme();
   const { result, summary } = run;
   const lines: string[] = [];
+  const hit = run.interrupted;
   if (!result.ok || !summary) {
     lines.push(t('settings.bench.failed', { error: result.error ?? '' }));
   } else {
@@ -349,6 +350,13 @@ function RunCard({ run, manifest }: { run: BenchRun; manifest: BenchManifest }) 
   }
   return (
     <View style={styles.card} testID={`bench-result-${run.plan.model}-${run.plan.provider}-${run.plan.threads}${run.long ? '-long' : ''}`}>
+      {hit ? (
+        <Text style={[typeV2.meta, styles.interrupted, { color: palette.text }]} testID="bench-interrupted">
+          {hit.times > 0
+            ? t('settings.bench.interrupted', { count: hit.times, seconds: Math.round(hit.awayMs / 1000) })
+            : t('settings.bench.stalled', { seconds: Math.round(hit.stallMs / 1000) })}
+        </Text>
+      ) : null}
       <Text style={[typeV2.body, styles.cardTitle, { color: palette.text }]}>
         {run.long ? t('settings.bench.longTitle', { plan: planLabel(run.plan), minutes: Math.round(run.long.durationSec / 60) }) : planLabel(run.plan)}
       </Text>
@@ -372,4 +380,5 @@ const styles = StyleSheet.create({
   status: { textAlign: 'center' },
   card: { paddingHorizontal: layoutV2.gutter, paddingVertical: 12, gap: 2 },
   cardTitle: { fontWeight: '600', marginBottom: 2 },
+  interrupted: { fontWeight: '600', marginBottom: 2 },
 });

@@ -4,7 +4,7 @@
 
 import fc from 'fast-check';
 import manifestJson from '../../../src/lib/onDevice/__tests__/bench.manifest.json';
-import { filesFor, GATE_P95_MS, longVerdict, parseManifest, perMinute, summarize } from '../../../src/lib/onDevice/bench';
+import { filesFor, GATE_P95_MS, interruption, longVerdict, parseManifest, perMinute, summarize } from '../../../src/lib/onDevice/bench';
 import { runs } from './fixtures';
 
 const MANIFEST = parseManifest(manifestJson)!;
@@ -50,6 +50,28 @@ describe('the on-device bench', () => {
         },
       ),
       { numRuns: runs(200) },
+    );
+  });
+
+  it('[ONDEV-1] a run is clean only if the app never left the foreground and its windows never stalled', () => {
+    const state = fc.constantFrom('active', 'inactive', 'background');
+    fc.assert(
+      fc.property(state, fc.array(fc.tuple(fc.integer({ min: 1, max: 5000 }), state), { maxLength: 12 }), (start, steps) => {
+        let t = 0;
+        const changes = steps.map(([dt, s]) => ({ t: (t += dt), state: s }));
+        const end = t + 1000;
+        const windows = Array.from({ length: 40 }, (_, i) => i * 500);
+        const r = interruption(start, changes, 0, end, windows);
+        const everAway = start !== 'active' || changes.some((c) => c.state !== 'active');
+        expect(r !== null).toBe(everAway);
+        if (r) {
+          expect(r.times).toBeGreaterThanOrEqual(1);
+          expect(r.awayMs).toBeGreaterThanOrEqual(0);
+          expect(r.awayMs).toBeLessThanOrEqual(end);
+          expect(r.stallMs).toBe(0);
+        }
+      }),
+      { numRuns: runs(300) },
     );
   });
 

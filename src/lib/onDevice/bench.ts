@@ -280,3 +280,43 @@ export function longVerdict(minutes: readonly MinuteStats[], samples: readonly L
     batteryPerHour: !charging && span >= 60000 ? (drop * 3600000) / span : NaN,
   };
 }
+
+/** How a run was disturbed: the app out of the foreground, or a stall in its windows (its process held up). */
+export interface Interruption {
+  /** Times the app left the foreground during the run. */
+  times: number;
+  awayMs: number;
+  /** The longest gap between two windows' starts, when it is far past the run's usual gap; else 0. */
+  stallMs: number;
+}
+
+/**
+ * Whether a run's numbers were disturbed (null: clean). `changes` are the app's state changes during the run, from
+ * `startState` at `startT` to `endT`; anything but "active" is away. A stall catches what the state events can miss: a
+ * gap between two windows of at least 3 s and at least five times the median gap.
+ */
+export function interruption(
+  startState: string,
+  changes: readonly { t: number; state: string }[],
+  startT: number,
+  endT: number,
+  startMs: readonly number[],
+): Interruption | null {
+  let away = startState !== 'active';
+  let times = away ? 1 : 0;
+  let awayMs = 0;
+  let from = startT;
+  for (const c of changes) {
+    const now = c.state !== 'active';
+    if (away) awayMs += Math.max(0, c.t - from);
+    if (now && !away) times++;
+    away = now;
+    from = c.t;
+  }
+  if (away) awayMs += Math.max(0, endT - from);
+  const gaps = startMs.slice(1).map((t, i) => t - startMs[i]);
+  const longest = gaps.length ? Math.max(...gaps) : 0;
+  const usual = gaps.length ? median(gaps) : 0;
+  const stallMs = longest >= 3000 && longest >= 5 * usual ? longest : 0;
+  return times > 0 || stallMs > 0 ? { times, awayMs, stallMs } : null;
+}
