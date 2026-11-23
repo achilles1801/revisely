@@ -579,7 +579,8 @@ service cloud.firestore {
     function isValidReciteTake(d) {
       return d.keys().hasOnly(['v', 'kind', 'take', 'createdAt', 'rev', 'day', 'level', 'hidden', 'from', 'to',
                                'secs', 'mistakes', 'tajweed', 'unclear', 'accuracy', 'marks', 'passed',
-                               'recordingId', 'deleted', 'updatedAt', 'unfinished', 'links', 'peeked', 'removed', 'ranOn', 'ranWhy']) &&
+                               'recordingId', 'deleted', 'updatedAt', 'unfinished', 'links', 'peeked', 'removed', 'ranOn', 'ranWhy',
+                               'spotTest']) &&
              d.keys().hasAll(['take', 'level', 'hidden', 'from', 'to', 'secs', 'mistakes', 'tajweed', 'unclear',
                               'accuracy', 'marks', 'passed', 'recordingId']) &&
              (d.take == null || (d.take is string && d.take.size() <= 100)) &&
@@ -605,7 +606,12 @@ service cloud.firestore {
              // The words shown by hand during the take, for its summary later (RMEM-8): their numbers.
              (!('peeked' in d) || (d.peeked is list && d.peeked.size() >= 1 && d.peeked.size() <= 300)) &&
              // The marks called Not a mistake, listed apart so the summary can put them back later (RMEM-8).
-             (!('removed' in d) || (d.removed is list && d.removed.size() >= 1 && d.removed.size() <= 100));
+             (!('removed' in d) || (d.removed is list && d.removed.size() >= 1 && d.removed.size() <= 100)) &&
+             // A spot test (RECITE-8): the length it was set to in pages, and whether it reached it.
+             (!('spotTest' in d) || (d.spotTest is map && d.spotTest.keys().hasOnly(['pages', 'finished']) &&
+                                     d.spotTest.keys().hasAll(['pages', 'finished']) &&
+                                     d.spotTest.pages is number && d.spotTest.pages > 0 && d.spotTest.pages <= 30 &&
+                                     d.spotTest.finished is bool));
     }
 
     function isValidReciteClear(d) {

@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isDevVariant } from '../variant';
 import { strictReleased } from '../release/mistakeDetection';
+import { DEFAULT_TEST_LENGTH, TEST_LENGTHS, type TestLength } from '../reciteLive/testLength';
 
 /**
  * The recitation check's settings, kept on this phone per account (Dev app, testers; not synced: a synced field
@@ -38,6 +39,8 @@ export interface ReciteCheckSettings {
   showPast: boolean;
   /** A short sound and a tap as a take marks a mistake (lib/reciteLive/mistakeCue; Majd, Nov 20 2026); off in Settings. */
   mistakeSound: boolean;
+  /** How far a spot test goes, in pages (RECITE-8): the last one chosen. */
+  testPages: TestLength;
 }
 
 /**
@@ -59,6 +62,7 @@ export const RECITE_CHECK_DEFAULTS: ReciteCheckSettings = {
   saveRecording: true,
   showPast: true,
   mistakeSound: true,
+  testPages: DEFAULT_TEST_LENGTH,
 };
 
 /** Whether Strict is offered: Revisely Dev's, until its own switch is on (lib/release/mistakeDetection). */
@@ -101,6 +105,7 @@ export function parseReciteCheckSettings(raw: string | null): ReciteCheckSetting
     saveRecording: typeof s.saveRecording === 'boolean' ? s.saveRecording : d.saveRecording,
     showPast: typeof s.showPast === 'boolean' ? s.showPast : d.showPast,
     mistakeSound: typeof s.mistakeSound === 'boolean' ? s.mistakeSound : d.mistakeSound,
+    testPages: pick(s.testPages, TEST_LENGTHS, d.testPages),
   };
 }
 

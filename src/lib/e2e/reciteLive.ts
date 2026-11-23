@@ -160,22 +160,25 @@ export function e2eToneSecond(second: number): Int16Array {
 }
 
 /**
- * A Test me place's take (a span with an end, its start looked for in its first ayah): the reciter carries on after the
- * two words shown, says every word to the place's end with no mistake, and the take stops by itself there.
+ * A spot test's take (a span with an end, its start looked for in its first two ayahs): the reciter carries on after the
+ * verse shown, says every word to the test's end with no mistake, and the take stops by itself there.
  */
 function placeTake(start: StartFrame): ReplayLog | null {
   const { getQuranWords } = require('../recite/quranWords') as typeof import('../recite/quranWords');
   const words = getQuranWords();
-  if (!words || start.s2 == null || start.a2 == null) return null;
-  const first = words.verseFirstWord(start.s, start.a) + 2;
+  if (!words || start.s2 == null || start.a2 == null || !start.startBy) return null;
+  const [nextS, nextA] = start.startBy;
+  const first = words.verseFirstWord(nextS, nextA);
   const last = words.verseRange(start.s2, start.a2)[1] - 1;
   const events: ReplayLog['events'] = [
     { t: 0.3, type: 'ready', v: 2, take: 'e2e-place', engine: 'e2e', protocol: 6 },
-    // A moment with only the two words shown, then the start found where the reciter carried on.
-    { t: 4, type: 'locked', w: first, s: start.s, a: start.a },
+    // A moment with only the verse shown, then the start found where the reciter carried on.
+    { t: 4, type: 'locked', w: first, s: nextS, a: nextA },
   ];
+  // A page in about 12 seconds, whatever its length.
+  const step = Math.min(0.4, 12 / Math.max(1, last - first + 1));
   let t = 4.1;
-  for (let w = first; w <= last; w++, t += 0.4) {
+  for (let w = first; w <= last; w++, t += step) {
     events.push({ t, type: 'at', w });
     if (w - 1 >= first) events.push({ t: t + 0.1, type: 'said', upTo: w - 1 });
   }
@@ -183,12 +186,12 @@ function placeTake(start: StartFrame): ReplayLog | null {
   events.push({
     t: 600,
     type: 'done',
-    result: { v: 2, take: 'e2e-place', from: first - 2, to: last + 1, start: first, secs: Math.round(t), marks: [], score: { reached: last - first + 1, mistakes: 0, tajweed: 0, accuracy: 1 } },
+    result: { v: 2, take: 'e2e-place', from: words.verseFirstWord(start.s, start.a), to: last + 1, start: first, secs: Math.round(t), marks: [], score: { reached: last - first + 1, mistakes: 0, tajweed: 0, accuracy: 1 } },
   });
   return { events };
 }
 
-/** The recorded take, played as a checker would send it (a Test me place gets one of its own). */
+/** The recorded take, played as a checker would send it (a spot test gets one of its own). */
 export function e2eLiveConnect(): LiveConnect {
   return (start, handlers) => {
     const place = start.startBy && start.s2 != null ? placeTake(start) : null;

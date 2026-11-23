@@ -32,7 +32,7 @@ function random(seed: number): () => number {
  * The pieces of one burst: thrown up and outwards in a fan, then falling.
  * Colours come from `colors` (theme tokens) in turn.
  */
-export function confettiPieces(count: number, colors: readonly string[], seed = 1): ConfettiPiece[] {
+export function confettiPieces(count: number, colors: readonly string[], seed = 1, reach = 1): ConfettiPiece[] {
   const r = random(seed);
   return Array.from({ length: count }, (_, id) => {
     // A fan of ±70° around straight up.
@@ -42,9 +42,9 @@ export function confettiPieces(count: number, colors: readonly string[], seed = 
     const size = 5 + r() * 4;
     return {
       id,
-      dx: Math.sin(angle) * speed * 1.2,
-      dy: -Math.cos(angle) * speed,
-      fall: 220 + r() * 120,
+      dx: Math.sin(angle) * speed * 1.2 * reach,
+      dy: -Math.cos(angle) * speed * reach,
+      fall: (220 + r() * 120) * reach,
       spin: (r() < 0.5 ? -1 : 1) * (180 + r() * 360),
       color: colors[id % colors.length],
       width: round ? size : size * 0.6,
@@ -66,16 +66,19 @@ export function Confetti({
   colors,
   count = 28,
   origin = { x: 0.5, y: 0.4 },
+  reach = 1,
 }: {
   trigger: number;
   colors: readonly string[];
   count?: number;
   /** Where the burst starts, as fractions of the box. */
   origin?: { x: number; y: number };
+  /** How far the pieces fly, as a share of a full burst (a small one stays near what it celebrates). */
+  reach?: number;
 }) {
   const reduceMotion = useReduceMotion();
   const progress = useSharedValue(0);
-  const pieces = useMemo(() => confettiPieces(count, colors, trigger), [count, colors, trigger]);
+  const pieces = useMemo(() => confettiPieces(count, colors, trigger, reach), [count, colors, trigger, reach]);
 
   useEffect(() => {
     if (trigger <= 0 || reduceMotion) return;

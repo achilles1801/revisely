@@ -322,30 +322,14 @@ appId: com.revisionbuddy.app
       NAME: rl08b-test-me-place
 - extendedWaitUntil:
     visible:
-      id: recite-next
+      id: recite-result
     timeout: 45000
 - runFlow:
     file: ../subflows/shot.yaml
     env:
-      NAME: rl08c-test-me-clean
-- tapOn:
-    id: recite-next
-- extendedWaitUntil:
-    visible:
-      id: recite-next
-    timeout: 45000
+      NAME: rl08c-test-me-finished
 - tapOn:
     id: recite-close
-- extendedWaitUntil:
-    visible:
-      id: test-summary
-    timeout: 5000
-- runFlow:
-    file: ../subflows/shot.yaml
-    env:
-      NAME: rl08d-test-me-summary
-- tapOn:
-    id: test-summary-done
 - extendedWaitUntil:
     visible:
       id: recite-mic

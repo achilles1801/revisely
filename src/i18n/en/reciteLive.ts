@@ -66,9 +66,9 @@ export const reciteLive = {
     markMistakesLocked: 'Mark mistakes, part of Premium, locked',
     testMe: 'Test me',
     testLocked: 'Test me, part of Premium, locked',
-    testReadyLabel: 'Test me, a random place in what you’ve memorized',
+    testReadyLabel: 'Test me, one verse at random to carry on from',
     testNotReadyLabel: 'Test me, mark what you’ve memorized first',
-    testReady: 'A random place in what you’ve memorized',
+    testReady: 'One verse at random, then carry on',
     testNotReady: 'Mark what you’ve memorized first',
   },
   notice: {
@@ -148,14 +148,18 @@ export const reciteLive = {
     seeSub: 'Mark mistakes shows each one as you recite',
   },
   test: {
-    clean: 'Clean',
-    mistakes: 'Mistakes',
-    unfinished: 'Stopped before the end',
-    missed: 'Not continued',
     title: 'Test me',
+    howFar: 'How far',
+    halfPage: '½ page',
     everything: 'Everything you’ve memorized',
     again: 'Test me again',
-    placeLabel: '{{place}}: {{how}}. Show it on the page',
+    /** Said when a reciter is told they can stop. Shown beside the Arabic word. */
+    hasbuk: 'Hasbuk',
+    hasbukWord: 'حسبك',
+    hasbukSpoken: 'Hasbuk. You reached the end of the test.',
+    finished: 'Finished',
+    stoppedEarly: 'Stopped early',
+    line: 'Test · {{length}} · {{how}}',
   },
   /** What the recite bar says when a take ends without its answer. */
   failure: {
@@ -188,7 +192,6 @@ export const reciteLive = {
     checking: 'Checking…',
     done: 'Done',
     listening: 'Listening…',
-    nextPlace: 'Next place, {{n}} of {{total}}',
     marked: 'Marked not a mistake',
     markedSpoken: 'Marked not a mistake. Undo is at the bottom of the screen.',
     cleared: 'Cleared from the page',
@@ -274,6 +277,4 @@ export const reciteLive = {
   perPage: '{{n}} a page',
   mistakesPerPage: '{{mistakes}} · {{perPage}}',
   /** Test me's headline. */
-  allClean: 'All {{count}} continued cleanly',
-  someClean: '{{clean}} of {{total}} continued cleanly',
 } as const;

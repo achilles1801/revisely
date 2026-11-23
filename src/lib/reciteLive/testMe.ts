@@ -1,144 +1,145 @@
-// "Test me" (Majd, Nov 15 2026: approved, "random within all memorized pages, with an optional juz pick"; Tarteel's
-// Test, checked word by word).
+// "Test me" is one spot test at a time (Majd, Nov 23 2026: "when people spot test they always recite one verse or give
+// them one verse and then the person starts from that one verse and continues ... there should only be one spot test at
+// a time"; before, Nov 15, five places in a row).
 //
-// Five places at random in what the account has memorized, or in one juz of it. At each, the page is hidden but for the
-// ayah's first two words, and the reciter carries on: a Mark mistakes take over that ayah and the two after it (those
-// memorized, in the same surah), which stops by itself at the end. Then a summary: how many were continued cleanly, and
-// what each one found. The start is given, so there's no search of the page: the checker looks only in the first ayah
-// (`startBy`), so beginning again at its first word or carrying on after the two shown both work.
+// One verse at random in what the account has memorized, or in one juz of it. The page is hidden but for that verse, and
+// the reciter carries on from it: a Mark mistakes take that stops by itself about the chosen length further on, at the
+// end of an ayah. The start is given, so there's no search of the page: the checker looks only in that verse and the one
+// after it (`startBy`), so reciting the verse first or carrying on straight after it both work.
 
-import { ayahKey, type AyahKey, ayahOf, ayahsBetween, nextAyah, suraOf } from '../ayahKeys';
-import { describeAyahs } from '../passages';
+import { type AyahKey, ayahOf, nextAyah, suraOf } from '../ayahKeys';
 import { getJuzForPage } from '../quranData';
 import type { QuranWords } from '../recite/quranWords';
-import type { Mark } from './contract';
 import type { TakeSpan } from './span';
-import { furthestWord, LiveState, mistakeCount } from './state';
+import { furthestWord, type LiveState } from './state';
+import { reachedEnd, reachedWord } from './takeEnough';
+import { DEFAULT_TEST_LENGTH, type TestLength } from './testLength';
 import { t } from '../../i18n';
 
-/** Places in one test. */
-export const TEST_PLACES = 5;
-/** Ayahs checked at each place: the one it starts in and the next two. */
-export const TEST_AYAHS = 3;
-/** Words shown at the start of each place. */
-export const CUE_WORDS = 2;
-/** A place starts only in an ayah with words to carry on after the cue. */
-const MIN_WORDS = CUE_WORDS + 2;
+/** Starts looked at for one with room for the whole length, before settling for the longest of them. */
+const MAX_DRAWS = 60;
 
-/** One place of a test: the take's span, and the words shown before it starts. */
-export interface TestPlace {
+/** One spot test: the take's span, the verse shown before it starts, where it ends and the length it was set to. */
+export interface SpotTest {
   span: TakeSpan;
-  /** The words shown on the hidden page (the first ayah's first two). */
+  /** The words shown on the hidden page: the whole starting verse. */
   cue: number[];
   /** Its last word: the take stops by itself once it's decided. */
   last: number;
+  pages: TestLength;
 }
 
 /** The juz an ayah is in (every juz of the 1405 print starts on a page of its own). */
 const juzOf = (words: QuranWords, key: AyahKey) => getJuzForPage(words.pageOf(words.verseFirstWord(suraOf(key), ayahOf(key))));
 
-/** The place starting at `key`: that ayah and the memorized ayahs after it in its surah, three at most. */
-function placeAt(words: QuranWords, key: AyahKey, memorized: ReadonlySet<AyahKey>): TestPlace {
-  let to = key;
-  for (let i = 1; i < TEST_AYAHS; i++) {
-    const n = nextAyah(to);
-    if (n == null || suraOf(n) !== suraOf(key) || !memorized.has(n)) break;
-    to = n;
-  }
-  const [first] = words.verseRange(suraOf(key), ayahOf(key));
-  const end = words.verseRange(suraOf(to), ayahOf(to))[1] - 1;
-  const cue = Array.from({ length: CUE_WORDS }, (_, i) => first + i);
-  const at: [number, number] = [suraOf(key), ayahOf(key)];
-  return { span: { from: at, startBy: at, to: [suraOf(to), ayahOf(to)] }, cue, last: end };
+/** A test can start at `key` when the next ayah of its surah is memorized too (and in `juz`, when given). */
+function canStart(words: QuranWords, key: AyahKey, held: ReadonlySet<AyahKey>, juz: number | null): boolean {
+  const n = nextAyah(key);
+  if (n == null || suraOf(n) !== suraOf(key) || !held.has(n)) return false;
+  return juz == null || (juzOf(words, key) === juz && juzOf(words, n) === juz);
 }
 
-/** The ayahs a test can start in: memorized ones (in `juz`, when given) long enough to carry on after the cue. */
+/** The word about `pages` pages on from `w`: just before the same place on the page that far ahead. */
+export function wordPagesOn(words: QuranWords, w: number, pages: number): number {
+  const page = words.pageOf(w);
+  const [p0, p1] = words.pageRange(page);
+  const at = page + (w - p0) / (p1 - p0) + pages;
+  const target = Math.floor(at);
+  if (target > words.pageOf(words.count - 1)) return words.count - 1;
+  const [q0, q1] = words.pageRange(target);
+  return Math.max(w, q0 + Math.round((at - target) * (q1 - q0)) - 1);
+}
+
+/** The test from `key`, and whether what's memorized holds its whole length. */
+function testAt(
+  words: QuranWords,
+  key: AyahKey,
+  pages: TestLength,
+  held: ReadonlySet<AyahKey>,
+  juz: number | null,
+): { test: SpotTest; fits: boolean } {
+  const [first, afterVerse] = words.verseRange(suraOf(key), ayahOf(key));
+  const target = wordPagesOn(words, first, pages);
+  const endOf = (k: AyahKey) => words.verseRange(suraOf(k), ayahOf(k))[1] - 1;
+  const next = nextAyah(key) as AyahKey; // canStart: there is one
+  let to = next;
+  while (endOf(to) < target) {
+    const n = nextAyah(to);
+    if (n == null || !held.has(n) || (juz != null && juzOf(words, n) !== juz)) break;
+    to = n;
+  }
+  const last = endOf(to);
+  return {
+    test: {
+      span: { from: [suraOf(key), ayahOf(key)], startBy: [suraOf(next), ayahOf(next)], to: [suraOf(to), ayahOf(to)] },
+      cue: Array.from({ length: afterVerse - first }, (_, i) => first + i),
+      last,
+      pages,
+    },
+    fits: last >= target,
+  };
+}
+
+/** The ayahs a test can start in: memorized ones (in `juz`, when given) with the next ayah of the surah to carry on to. */
 export function testStarts(memorized: readonly AyahKey[], words: QuranWords, juz: number | null = null): AyahKey[] {
-  return memorized.filter((k) => {
-    const [from, to] = words.verseRange(suraOf(k), ayahOf(k));
-    return to - from >= MIN_WORDS && (juz == null || juzOf(words, k) === juz);
-  });
+  const held = new Set(memorized);
+  return memorized.filter((k) => canStart(words, k, held, juz));
 }
 
 /** The juz a test can be given, each with how many ayahs it could start in, in order. */
 export function testJuz(memorized: readonly AyahKey[], words: QuranWords): { juz: number; starts: number }[] {
+  const held = new Set(memorized);
   const counts = new Map<number, number>();
   for (const k of testStarts(memorized, words)) {
     const j = juzOf(words, k);
-    counts.set(j, (counts.get(j) ?? 0) + 1);
+    if (canStart(words, k, held, j)) counts.set(j, (counts.get(j) ?? 0) + 1);
   }
   return [...counts.entries()].sort((a, b) => a[0] - b[0]).map(([juz, starts]) => ({ juz, starts }));
 }
 
 /**
- * Up to five places at random among the starts, none overlapping another (two places never share an ayah), in the
- * order they were drawn. Fewer when there's less memorized.
+ * One test at random among the starts: one with room for the whole length when there is one, otherwise the longest of
+ * those looked at (little memorized: it ends where what's memorized does). Null when it can't start anywhere.
  */
-export function testPlaces(
+export function pickTest(
   memorized: readonly AyahKey[],
   words: QuranWords,
-  opts: { juz?: number | null; places?: number; random?: () => number } = {},
-): TestPlace[] {
+  opts: { juz?: number | null; pages?: TestLength; random?: () => number } = {},
+): SpotTest | null {
   const random = opts.random ?? Math.random;
-  const want = opts.places ?? TEST_PLACES;
+  const pages = opts.pages ?? DEFAULT_TEST_LENGTH;
+  const juz = opts.juz ?? null;
   const held = new Set(memorized);
-  const pool = testStarts(memorized, words, opts.juz ?? null);
-  const used = new Set<AyahKey>();
-  const out: TestPlace[] = [];
-  while (out.length < want && pool.length > 0) {
+  const pool = testStarts(memorized, words, juz);
+  let best: SpotTest | null = null;
+  for (let draw = 0; draw < MAX_DRAWS && pool.length > 0; draw++) {
     const i = Math.min(pool.length - 1, Math.floor(random() * pool.length));
     const key = pool.splice(i, 1)[0];
-    if (used.has(key)) continue;
-    const place = placeAt(words, key, held);
-    const ayahs = ayahsBetween(key, ayahKey(place.span.to![0], place.span.to![1]));
-    if (ayahs.some((k) => used.has(k))) continue;
-    for (const k of ayahs) used.add(k);
-    out.push(place);
+    const { test, fits } = testAt(words, key, pages, held, juz);
+    if (fits) return test;
+    if (!best || test.last - test.cue[0] > best.last - best.cue[0]) best = test;
   }
-  return out;
+  return best;
 }
 
-/** How a place went. */
-export type TestOutcome =
-  /** Carried on to the end with no mistake. */
-  | 'clean'
-  /** Mistakes on the way (its marks say which). */
-  | 'mistakes'
-  /** To the end with no mistake, but with words peeked (not recalled). */
-  | 'helped'
-  /** Stopped before the end, with no mistake. */
-  | 'unfinished'
-  /** No start was ever found: nothing recited from there. */
-  | 'missed';
-
-export interface TestResult {
-  place: TestPlace;
-  outcome: TestOutcome;
-  /** The take's marks (tajweed notes and "not clear" included; they don't count against it). */
-  marks: Mark[];
-  /** Words peeked (shown by hand) at the place. */
-  peeked: number;
+/** Whether a finished take reached the test's end (its last word, or a moment before: the cursor runs behind the voice). */
+export function testFinished(words: QuranWords, test: Pick<SpotTest, 'last'>, state: LiveState): boolean {
+  const reached = reachedWord(furthestWord(state), state.final?.marks ?? Object.values(state.marks));
+  if (reached == null) return false;
+  const r = words.ref(test.last);
+  const [a0, a1] = words.verseRange(r.sura, r.ayah);
+  return reachedEnd(a0, a1, reached);
 }
 
-/** A finished take's outcome at its place, with the words peeked there. */
-export function testResult(place: TestPlace, state: LiveState, peeked = 0): TestResult {
-  const marks = Object.values(state.marks).sort((a, b) => a.w - b.w);
-  if (state.start == null) return { place, outcome: 'missed', marks: [], peeked };
-  const mistakes = mistakeCount(state);
-  if (mistakes > 0) return { place, outcome: 'mistakes', marks, peeked };
-  const reached = (furthestWord(state) ?? -1) >= place.last;
-  return { place, outcome: !reached ? 'unfinished' : peeked > 0 ? 'helped' : 'clean', marks, peeked };
+/** A test's length in words: "½ page", "1 page", "2 pages". */
+export function testLengthLabel(pages: number): string {
+  return pages === 0.5 ? t('reciteLive.test.halfPage') : t('common.pages', { count: pages });
 }
 
-/** Where a place is: "Al-Baqarah, ayahs 142–144". */
-export function testPlaceName(place: TestPlace): string {
-  const { from, to } = place.span;
-  return describeAyahs(ayahsBetween(ayahKey(from[0], from[1]), ayahKey(to![0], to![1])), { wholeJuz: false });
-}
-
-/** "3 of 5 continued cleanly". */
-export function testHeadline(results: readonly TestResult[]): string {
-  const clean = results.filter((r) => r.outcome === 'clean').length;
-  if (results.length > 1 && clean === results.length) return t('reciteLive.allClean', { count: clean });
-  return t('reciteLive.someClean', { clean, total: results.length });
+/** A test in a line: "Test · 1 page · Stopped early". */
+export function spotTestLine(pages: number, finished: boolean): string {
+  return t('reciteLive.test.line', {
+    length: testLengthLabel(pages),
+    how: finished ? t('reciteLive.test.finished') : t('reciteLive.test.stoppedEarly'),
+  });
 }

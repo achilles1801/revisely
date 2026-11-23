@@ -5,7 +5,7 @@ import { pageAccuracy } from '../reciteLive/score';
 import { furthestWord, LiveState, marksInOrder, mistakeCount, removedMarks } from '../reciteLive/state';
 import { countsAsMistake, isUnclear } from '../reciteLive/contract';
 import type { WhereAnswer } from '../reciteLive/where';
-import { MAX_LINKS, MAX_MARKS, MAX_PASSED, MAX_PEEKED, MAX_REMOVED, TakeLevel, TakeRecord } from './record';
+import { MAX_LINKS, MAX_MARKS, MAX_PASSED, MAX_PEEKED, MAX_REMOVED, TakeLevel, TakeRecord, type SpotTestRecord } from './record';
 
 export interface TakeContext {
   id: string;
@@ -26,6 +26,8 @@ export interface TakeContext {
   peeked?: ReadonlySet<number> | null;
   /** The take ran on the phone's engine. */
   ranWhere?: WhereAnswer | null;
+  /** The take was a spot test (RECITE-8): its length, and whether it reached it. */
+  spotTest?: SpotTestRecord | null;
 }
 
 /**
@@ -74,6 +76,7 @@ export function recordFromTake(state: LiveState, words: QuranWords, ctx: TakeCon
     // mistake, so they can still be put back.
     ...peekedOf(ctx.peeked),
     ...removedOf(state),
+    ...(ctx.spotTest ? { spotTest: ctx.spotTest } : {}),
   };
 }
 

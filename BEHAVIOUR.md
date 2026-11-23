@@ -631,12 +631,17 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   surah) to the last mistake's ayah. Tajweed notes are left out, and peeked ayahs are in. It stops by itself once
   that ayah's last word is decided. Holding the mic on a page that still has remembered mistakes offers the same
   stretch over them ("Recite your N mistakes here"), one each per word.
-- **RECITE-8.** Test me picks up to five places at random in what the account has memorized, or in one juz of it,
-  no two sharing an ayah. Each starts in an ayah long enough to go on after its first two words, which are all the
-  hidden page shows. Its take covers that ayah and up to two more memorized ayahs of the same surah, and stops at
-  their end. A place is clean when it reached the end with no mistake and nothing peeked; peeks make it "helped".
-  Tajweed notes and Not clear never count against it, and a place whose start was never found counts as not
-  continued.
+- **RECITE-8.** Test me is one spot test at a time, with no next place (Majd, Nov 23 2026: "when people spot test they
+  always recite one verse or give them one verse and then the person starts from that one verse and continues"; "there
+  should only be one spot test at a time"). It gives one verse at random in what the account has memorized, or in one juz
+  of it, never a surah's last. The hidden page shows that verse, and the reciter recites it or carries on straight after
+  it. How far is chosen in the same sheet: half a page, 1, 2 or 3 pages (1 at first, then the last one chosen, kept on the
+  phone). The take runs to the end of the ayah about that far on, across a surah's end, through memorized ayahs only (and
+  only in the juz picked), and stops by itself there; a start with room for the whole length is taken when there is one.
+  Reaching the end says Hasbuk (حسبك): a small note above the bar for about 2 seconds that takes no touches, with a little
+  confetti, or none with Reduce Motion. Stopped before the end, it is still kept, marked stopped early; under one ayah it
+  isn't a take (RECITE-27). The take's record says it was a test, its length and whether it finished (`spotTest`). Tajweed
+  notes and Not clear count as in any take. Its result in the bar opens the take's summary, with Test me again.
 - **RECITE-9.** A revision session has the reader's mic, with the same takes, marks, hidden view, cards and summary;
   Test me stays in the reader. A take there stays in Recite: it never marks a page revised, since its own page turns
   credit nothing, so only a swipe off a page or the Pages sheet marks one (SESS-1). Its page turns stay on the session's pages, and
