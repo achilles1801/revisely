@@ -16,14 +16,19 @@ on:
 permissions:
   contents: read
 
+# A newer push cancels the run before it, except on develop: there a started run finishes and the newest
+# push waits (GitHub keeps one waiting run per group, so a newer one takes its place). Until Nov 23 2026 each
+# merge cancelled the run in progress: 147 of the 259 hours of develop-push Android E2E in ten days ended
+# cancelled, and in a burst of merges no run finished.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/develop' }}
 
 # The one required check on develop is `Required` (the last job): it passes only
 # when every job this change needs passed. What runs where:
 #   - every PR, push and merge group: the fast checks (one job: secret scan,
-#     typecheck, unit, functions, rules) and the scenario suite in four shards;
+#     typecheck, unit, functions, rules) and the scenario suite in four shards
+#     (a push to develop or a run by hand reuses a pass on the same tree, `reuse`);
 #   - E2E (e2e.yml, called below), decided by `plan`:
 #       a draft PR: none, unless it has the `e2e` label (marking it ready runs everything);
 #       a lower layer of a GitHub stack: none (the top layer tests the whole stack);
@@ -36,7 +41,7 @@ concurrency:
 #       a change to test code (`infra`): the flows it touches (once, one retry); a change to
 #         the workflows, run.sh or config.yaml: every flow on Android, the smoke set on iOS;
 #       a push to develop (what just landed): every Android flow, and the iOS native
-#       build kept for PRs (no iOS flows);
+#       build kept for PRs (no iOS flows); a newer push waits for it;
 #     nightly and by hand: e2e.yml's own schedule and Run workflow.
 # "Bug fixes add a scenario" is its own workflow (spec.yml), so a label or title
 # edit re-runs it alone.
@@ -49,6 +54,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
+      actions: read # `reuse` reads the scenario artifacts and Preview's runs
     outputs:
       e2e: ${{ steps.plan.outputs.e2e }}
       ios: ${{ steps.plan.outputs.ios }}
@@ -61,6 +67,8 @@ jobs:
       repeat: ${{ steps.plan.outputs.repeat }}
       scenario_repeat: ${{ steps.plan.outputs.scenario_repeat }}
       scenarios: ${{ steps.plan.outputs.scenarios }}
+      preview_run: ${{ steps.reuse.outputs.preview_run }}
+      tree: ${{ steps.reuse.outputs.tree }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -176,6 +184,46 @@ jobs:
           [ -z "$upper" ] || echo "#$upper holds this PR's commits: it tests them, and this PR merges with it."
           [ "$lower" = '[]' ] || echo "This PR holds the commits of $(jq -r 'map("#\(.number)") | join(", ")' <<<"$lower"): their runs are cancelled."
           { echo "upper=$upper"; echo "lower=$lower"; } >> "$GITHUB_OUTPUT"
+      # A develop push starts CI and Preview together, and until Nov 23 2026 both ran the scenario suite
+      # on the same commit (146 hours of CI's in ten days). The same tree gives the same result, so:
+      # a pass on this tree already (scenarios-passed-<tree>, this repository's runs only) counts here;
+      # with Preview's run for this commit still going, `scenarios-wait` waits for its result; with no
+      # such run (a push Preview ignores), the suite runs here. A run by hand follows the same rule.
+      - id: reuse
+        if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/develop') }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          TREE=$(gh api "repos/$REPO/git/commits/$SHA" --jq .tree.sha 2>/dev/null || true)
+          [ -n "$TREE" ] || { echo "Couldn't read this commit's tree: the suite runs here."; exit 0; }
+          echo "tree=$TREE" >> "$GITHUB_OUTPUT"
+          passed() {
+            gh api "repos/$REPO/actions/artifacts?name=scenarios-passed-$TREE&per_page=30" \
+              --jq '[.artifacts[] | select(.expired | not) | select(.workflow_run.head_repository_id == .workflow_run.repository_id)] | first | .workflow_run.id // empty' 2>/dev/null || true
+          }
+          # The testing half of Preview on this commit, not yet finished (a publishing run's title says so).
+          running() {
+            gh api "repos/$REPO/actions/workflows/preview.yml/runs?head_sha=$SHA&per_page=20" \
+              --jq '[.workflow_runs[] | select(.status != "completed") | select(.display_title | startswith("Preview · publish") | not)] | first | .id // empty' 2>/dev/null || true
+          }
+          RUN=$(passed)
+          if [ -n "$RUN" ]; then
+            echo "tested=true" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Scenarios::This tree ($TREE) passed the scenario suite in run $RUN: not run again."
+            exit 0
+          fi
+          PREVIEW=$(running)
+          # Started by the same push, it can take a moment to be listed.
+          if [ -z "$PREVIEW" ] && [ "$EVENT" = push ]; then sleep 15; PREVIEW=$(running); fi
+          if [ -n "$PREVIEW" ]; then
+            echo "preview_run=$PREVIEW" >> "$GITHUB_OUTPUT"
+            echo "Preview's run $PREVIEW tests this commit: waiting for its result."
+          else
+            echo "No passing run on this tree and no Preview run going: the suite runs here."
+          fi
       # A stacked PR carries `stack` (position 1 is the bottom; the top has
       # position == size; base.ref is the branch the whole stack targets).
       - id: plan
@@ -193,6 +241,7 @@ jobs:
           UPPER: ${{ steps.layers.outputs.upper }}
           INFRA_SCENARIOS: ${{ steps.infra.outputs.scenarios }}
           INFRA_SCENARIOS_NEEDED: ${{ steps.infra.outputs.scenarios_needed }}
+          REUSED: ${{ steps.reuse.outputs.tested }}
         run: |
           ios=none; android=none; only=""; only_ios=""; repeat=1; scenario_repeat=1
           case "$EVENT" in
@@ -244,12 +293,14 @@ jobs:
             *) what="$EVENT: no E2E" ;;
           esac
           e2e=true; [ "$ios$android" = nonenone ] && e2e=false
-          # A PR that changes nothing the scenario suite reads skips it (only an explicit `false` skips; a
-          # push, a merge group and a run by hand always run it). No run means no scenarios-passed-<tree>
-          # artifact, so this never counts as a pass for Preview's publishing gate.
+          # A PR that changes nothing the scenario suite reads skips it (only an explicit `false` skips). No
+          # run means no scenarios-passed-<tree> artifact, so this never counts as a pass for Preview's
+          # publishing gate. A push to develop or a run by hand whose tree already passed reuses that (`reuse`).
           scenarios=true
           if [ "$EVENT" = pull_request ] && [ "$INFRA_SCENARIOS_NEEDED" = false ]; then
             scenarios=false; what="$what; it changes nothing the scenarios read: no scenario run"
+          elif [ "$REUSED" = true ]; then
+            scenarios=false; what="$what; this tree already passed the scenario suite"
           fi
           echo "$what (iOS: $ios, Android: $android)"
           { echo "ios=$ios"; echo "android=$android"; echo "e2e=$e2e"; echo "only=$only"; echo "only_ios=$only_ios"; echo "repeat=$repeat"; echo "scenario_repeat=$scenario_repeat"; echo "scenarios=$scenarios"; } >> "$GITHUB_OUTPUT"
@@ -407,11 +458,53 @@ jobs:
   # code and screens against the Firebase emulators, with a test clock and
   # time zone. preview.yml runs the same before it publishes.
   # -----------------------------------------------------------------------
+  # A develop push whose Preview run is testing the same commit: wait for that result instead of running
+  # the suite a second time. One machine, asking once a minute. Passed: not run here. Replaced by a newer
+  # push while it waited: that push's run tests a tree holding this one. Failed, or still not done after
+  # 35 minutes: the suite runs here, so this run's own check says what happened.
+  scenarios-wait:
+    name: Scenarios (Preview's run of this commit)
+    needs: plan
+    if: ${{ needs.plan.outputs.preview_run != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      actions: read
+    outputs:
+      tested: ${{ steps.wait.outputs.tested }}
+    steps:
+      - id: wait
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN: ${{ needs.plan.outputs.preview_run }}
+          TREE: ${{ needs.plan.outputs.tree }}
+        run: |
+          conclusion=""
+          for _ in $(seq 1 35); do
+            state=$(gh api "repos/$REPO/actions/runs/$RUN" --jq '.status + " " + (.conclusion // "")' 2>/dev/null || true)
+            case "$state" in completed*) conclusion=${state#completed }; break ;; esac
+            sleep 60
+          done
+          PASSED=$(gh api "repos/$REPO/actions/artifacts?name=scenarios-passed-$TREE&per_page=30" \
+            --jq '[.artifacts[] | select(.expired | not) | select(.workflow_run.head_repository_id == .workflow_run.repository_id)] | first | .workflow_run.id // empty' 2>/dev/null || true)
+          if [ -n "$PASSED" ]; then
+            echo "tested=true" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Scenarios::This tree ($TREE) passed the scenario suite in run $PASSED: not run again."
+          elif [ "$conclusion" = cancelled ]; then
+            echo "tested=true" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Scenarios::Preview's run $RUN was replaced by a newer push, whose run tests a tree holding this one."
+          else
+            echo "tested=false" >> "$GITHUB_OUTPUT"
+            echo "Preview's run $RUN ended '${conclusion:-not finished}' with no pass on this tree: the suite runs here."
+          fi
+
   scenarios:
     name: Scenarios
-    needs: plan
-    # Skipped only when `plan` says so: a PR that changes nothing the suite reads.
-    if: ${{ needs.plan.outputs.scenarios != 'false' }}
+    needs: [plan, scenarios-wait]
+    # Skipped when `plan` says so (a PR that changes nothing the suite reads, a tree that already passed)
+    # or when Preview's run of this commit gave the result.
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.scenarios != 'false' && needs.scenarios-wait.outputs.tested != 'true' }}
     uses: ./.github/workflows/scenarios.yml
     with:
       repeat: ${{ fromJSON(needs.plan.outputs.scenario_repeat || '1') }}
@@ -455,7 +548,7 @@ jobs:
     # A PR another PR's branch holds (`layers`) is "Required (under #N)": it merges with #N, or alone once
     # #N's run has passed (`pass-lower`). Whether it's a draft is GitHub's answer at the run (`live` in plan).
     name: "${{ needs.plan.outputs.draft == 'true' && 'Required (draft)' || (needs.plan.outputs.upper != '' && format('Required (under #{0})', needs.plan.outputs.upper)) || ((github.event.pull_request.stack.base.ref || github.base_ref) == 'main' && needs.plan.outputs.ios == 'full' && needs.plan.outputs.android == 'full' && 'Release gate' || 'Required') }}"
-    needs: [plan, fast, scenarios, e2e]
+    needs: [plan, fast, scenarios-wait, scenarios, e2e]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -465,12 +558,15 @@ jobs:
           NEEDS: ${{ toJSON(needs) }}
           E2E_PLANNED: ${{ needs.plan.outputs.e2e }}
           SCENARIOS_PLANNED: ${{ needs.plan.outputs.scenarios }}
+          PREVIEW_TESTED: ${{ needs.scenarios-wait.outputs.tested }}
         run: |
           echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
           # Skipped passes only for a job the plan left out: E2E when e2e is false, Scenarios when scenarios is
-          # exactly false. Skipped for any other reason (a job before it failed) is not a pass.
+          # exactly false or Preview's run gave the result. Skipped for any other reason (a job before it
+          # failed) is not a pass. `scenarios-wait` only decides whether the suite runs here: if it fails, it does.
+          [ "$PREVIEW_TESTED" = true ] && SCENARIOS_PLANNED=false
           bad=$(echo "$NEEDS" | jq -r --arg e2e "$E2E_PLANNED" --arg scen "$SCENARIOS_PLANNED" '
-            to_entries[] | select(.value.result != "success")
+            to_entries[] | select(.key != "scenarios-wait") | select(.value.result != "success")
             | select(.key != "e2e" or $e2e == "true" or .value.result != "skipped")
             | select(.key != "scenarios" or $scen != "false" or .value.result != "skipped") | .key')
           if [ -n "$bad" ]; then echo "::error::Not passed: $(echo $bad)"; exit 1; fi
