@@ -46,14 +46,22 @@ How the tests are made: `tests/scenarios/README.md`.
 
 ## Onboarding
 
-- **ONBOARD-1.** In "Select memorized portions", a page the user marks counts at once, loaded or not: a
-  new account's 604 pages reach the phone once the server holds them (sign-up writes them in two
-  batches, 1–450 and 451–604), and a juz can be marked before its pages land. Continue never saves a selection without a marked page: while a marked page
-  hasn't loaded, it waits ("Loading your pages…"), and once the pages are there it saves them all.
+- **ONBOARD-1.** In "Which juz?", a juz the user taps counts at once, loaded or not: a new account's 604 pages
+  reach the phone once the server holds them (sign-up writes them in two batches, 1–450 and 451–604), and a juz can be
+  chosen before its pages land. Continue never saves a selection without a chosen page: while a chosen page hasn't
+  loaded, it waits ("Loading your pages…"), and once the pages are there it saves them all. "All of it" waits the same way.
 - **ONBOARD-2.** An account the server holds with some of its pages but not all 604 (a sign-up stopped
   between its two batches: the app closed, the second commit failed) gets the missing ones created, as
   new pages, once the app has the server's list and isn't writing them itself. A page it already has is
   never replaced.
+- **ONBOARD-3.** After the welcome, setup is one question a screen: how much is memorized, which juz, how much a day,
+  when the day starts, a daily reminder. A single choice moves on with one tap, with no Continue. "All of it" saves every
+  page and surah and skips "Which juz?". "At Fajr" asks for the location there; refused or unavailable, it says so and
+  the day starts at midnight. "Remind me" or "Not now" ends setup: the plan is saved and onboarding is complete.
+- **ONBOARD-4.** "Which juz?" is a grid of the 30 juz: a tap chooses a whole juz and a second clears it. Al-Fatihah
+  starts chosen, so Juz 1 starts partly chosen, which looks different and is read out as mixed; a tap makes a partly
+  chosen juz whole. "Choose by surah instead" opens the list on the same selection. The line at the foot names what is
+  chosen by surah and juz ("Al-Fatihah and Juz 30 chosen").
 
 ## The schedule
 

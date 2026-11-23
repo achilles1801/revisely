@@ -107,7 +107,7 @@ function homeStackWith(mods: Booted, real: Record<string, unknown>, appRef = fal
   );
 }
 
-/** Pass to Phone.open: the app opens on onboarding's "Select memorized portions" (in progress). */
+/** Pass to Phone.open: the app opens on onboarding's "Which juz?" (Part of it). */
 export function onboardingStack(mods: Booted): ReactElement {
   const { React, require: req } = mods;
   const { NavigationContainer } = req<any>('@react-navigation/native');
@@ -116,7 +116,7 @@ export function onboardingStack(mods: Booted): ReactElement {
   const nav = req<{ navigation: { current: unknown } }>('./navRef');
   const Stack = createNativeStackNavigator();
   const h = React.createElement;
-  const Schedule = () => null;
+  const DailyAmount = () => null;
   return h(
     NavigationContainer,
     { ref: nav.navigation },
@@ -124,19 +124,28 @@ export function onboardingStack(mods: Booted): ReactElement {
       Stack.Navigator,
       { screenOptions: { headerShown: false, animation: 'none' } },
       h(Stack.Screen, { name: 'JuzSelection', component: JuzSelection, initialParams: { journeyStage: 'in_progress' } }),
-      h(Stack.Screen, { name: 'Schedule', component: Schedule }),
+      h(Stack.Screen, { name: 'DailyAmount', component: DailyAmount }),
     ),
   );
 }
 
-/** Onboarding's "Select memorized portions", read and driven through its own elements. */
+/** Pass to Phone.open: the whole of onboarding, from the welcome. */
+export function onboardingFlow(mods: Booted): ReactElement {
+  const { React, require: req } = mods;
+  const { NavigationContainer } = req<any>('@react-navigation/native');
+  const { OnboardingNavigator } = req<any>('src/navigation/OnboardingNavigator');
+  const nav = req<{ navigation: { current: unknown } }>('./navRef');
+  return React.createElement(NavigationContainer, { ref: nav.navigation }, React.createElement(OnboardingNavigator));
+}
+
+/** Onboarding's questions, read and driven through their own elements. */
 export class Onboarding {
   constructor(private readonly app: OpenApp) {}
 
-  /** The count at the foot: "24 of 604 pages memorized". */
+  /** What's chosen, at the foot: "Al-Fatihah and Juz 30 chosen" (without its no-break characters). */
   summary(): string {
     const el = this.app.screen.queryByTestId('juz-selection-summary');
-    return el ? flatText(el) : '';
+    return el ? flatText(el).replace(/\u2011/g, '-').replace(/\u00a0/g, ' ') : '';
   }
 
   continueEnabled(): boolean {
@@ -144,17 +153,22 @@ export class Onboarding {
     return !!el && el.props.accessibilityState?.disabled !== true;
   }
 
-  /**
-   * Marks a juz as its row's check does (MemorizationBrowser.applyBulk: every
-   * page of the juz by number, loaded or not). Its row isn't drawn here, the
-   * list being virtualized, so the browser's change goes in directly.
-   */
-  async markJuz(pages: number[]): Promise<void> {
-    const { MemorizationBrowser } = this.app.mods.require<any>('src/components/MemorizationBrowser');
-    const browser = this.app.screen.UNSAFE_getByType(MemorizationBrowser);
-    const next = new Map(browser.props.pendingChanges as Map<number, string>);
-    for (const p of pages) next.set(p, 'memorized');
-    await this.app.act(async () => browser.props.onChange(next));
+  /** A tap on a juz in the grid. */
+  async tapJuz(juz: number): Promise<void> {
+    await this.press(`juz-cell-${juz}`);
+  }
+
+  /** A tap on anything in the flow, by its testID. */
+  async press(testID: string): Promise<void> {
+    const { fireEvent } = this.app.mods.rtl;
+    await this.app.act(async () => {
+      fireEvent.press(this.app.screen.getByTestId(testID));
+    });
+  }
+
+  /** Until a question's screen is up. */
+  async reach(testID: string): Promise<void> {
+    await this.app.until(() => this.app.screen.queryByTestId(testID) != null, `onboarding's ${testID}`);
   }
 
   async continue(): Promise<void> {

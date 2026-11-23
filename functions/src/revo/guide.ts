@@ -141,7 +141,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'Memorized pages',
-    covers: ['ACT-10', 'ONBOARD-1'],
+    covers: ['ACT-10', 'ONBOARD-1', 'ONBOARD-3', 'ONBOARD-4'],
     routes: ['Memorization'],
     text: lines(
       '- Only pages marked memorized are scheduled. Home → "… of the Quran memorized ›" opens them ready to mark (from Settings → Revision → “Memorized pages”, tap the pencil first) → tap pages to mark or unmark them (by “Surahs”, “Juz” or “Hizb”) → Save. It asks “When did you memorize these?”: Today logs them in Activity for today; Before logs nothing.',
