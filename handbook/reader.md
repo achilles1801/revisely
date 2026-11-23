@@ -168,14 +168,19 @@ the athan.
 - **Never quiet:** no voice chosen, a clip not downloaded yet, removed or withdrawn, or the gate off: the standard tone
   (`lib/prayer/sync` `iosSound`). A reminder before a prayer is never the athan.
 - **Choosing:** Settings → Prayer → Athan voice (every prayer), or a prayer's Sound → Athan → Voice (that prayer; the
-  picker's `prayer` param). Fajr takes the voice's Fajr athan (`lib/prayer/athanChoice`).
+  picker's `prayer` param). Fajr takes the voice's Fajr athan (`lib/prayer/athanChoice`). A prayer's reminder and sound
+  is one sheet (`prayer/PrayerAlertSheet`), opened from Prayer notifications and from a prayer's row in the prayer
+  sheet's times.
+- **The picker** (Majd, Nov 23 2026): one list, every entry a choice; a row is the voice's name and its clip's size
+  (its progress while it downloads, the reason if that failed), nothing else. No "Report a rights issue": support's
+  email does that. He also took Hafiz Murad out: "the rest can stay as the final list".
 - **The whole athan on a tap** (ATHAN-4; Majd accepted "29.5 s clip on iPhone plus full athan on tap"): a prayer's
   notification that plays a voice's clip carries the voice in its data (`athan`, `lib/prayer/sync`). `prayer/AthanOnTap`
   (mounted in App.tsx beside PrayerSync) answers a tap within 15 minutes (`lib/athan/tapped`) by streaming the voice's
   `full/<id>.m4a` under a `v2/Sheet` with Stop. It stops on leaving the app (`background`, not `inactive`).
 - **The voices** (Nov 22 2026): 41 in dev Storage. Majd sent another app's list: "i want all these people as options.
-  get the most popular one from each". A Fajr athan with no regular partner of its style is listen-only in the picker
-  (`athanChoices`). Board, sources and the upload tool: `~/Documents/revisely-athan` (`tools/athan_release.py`,
+  get the most popular one from each". A Fajr athan with no regular partner of its style is an entry for Fajr alone
+  (`athanChoices`): chosen for every prayer it changes Fajr only, and another prayer's picker leaves it out. Board, sources and the upload tool: `~/Documents/revisely-athan` (`tools/athan_release.py`,
   `tools/athan_upload.js`, `release/held.json` for voices built but not offered).
 - **Android** takes a notification's sound from its channel, and expo-notifications gives a channel only sounds built
   into the app (the plugin's `sounds` in app.config.js, which moves both fingerprints). That, and a channel per voice

@@ -3,7 +3,7 @@
 // src/lib/athan/__tests__/store.test.ts and src/lib/prayer/__tests__/sync.test.ts.
 
 import fc from 'fast-check';
-import { athanChoices, athanVoiceFor, chosenAthanVoiceId, withAthanVoice } from '../../../src/lib/prayer/athanChoice';
+import { athanChoices, athanVoiceFor, chosenAthanVoiceId, chosenAthanVoiceIds, withAthanVoice } from '../../../src/lib/prayer/athanChoice';
 import type { AthanVoice } from '../../../src/lib/athan/catalog';
 import { DEFAULT_PRAYER_PREFS, PRAYERS, type PrayerAlert, type PrayerName } from '../../../src/lib/prayer/prefs';
 import { planPrayerNotifications } from '../../../src/lib/prayer/schedule';
@@ -32,8 +32,10 @@ const VOICES = [
   voice('madinah', 'madinah'),
   voice('aqsa', 'aqsa'),
   voice('egypt-fajr', 'egypt', { fajr: true, clip: null }),
+  voice('ayasofya-fajr', 'turkiye', { fajr: true }),
 ];
-const CHOICES = athanChoices(VOICES).choices;
+// The voices any prayer can take; the list also has a Fajr athan that stands alone.
+const CHOICES = athanChoices(VOICES, 'dhuhr');
 const prayerArb = fc.constantFrom<PrayerName>(...PRAYERS);
 const alertArb: fc.Arbitrary<PrayerAlert> = fc.record({
   on: fc.boolean(),
@@ -72,9 +74,24 @@ describe('choosing an athan voice', () => {
     );
   });
 
-  it('[ATHAN-2] a Fajr athan is never offered as a choice of its own, and one without a clip is never used', () => {
+  it('[ATHAN-2] one list: a Fajr athan that goes with a voice isn’t an entry, one that stands alone is (for Fajr only), one without a clip is never used', () => {
     expect(CHOICES.map((v) => v.id)).toEqual(['makkah', 'madinah', 'aqsa']);
+    expect(athanChoices(VOICES).map((v) => v.id)).toEqual(['makkah', 'madinah', 'aqsa', 'ayasofya-fajr']);
+    expect(athanChoices(VOICES, 'fajr').map((v) => v.id)).toEqual(['makkah', 'madinah', 'aqsa', 'ayasofya-fajr']);
     expect(athanVoiceFor('fajr', voice('egypt', 'egypt'), VOICES)).toBe('egypt');
+  });
+
+  it('[ATHAN-2] a Fajr athan chosen for every prayer is Fajr’s alone: no other prayer changes', () => {
+    const fajrOnly = VOICES[5];
+    fc.assert(
+      fc.property(alertsArb, (alerts) => {
+        const next = withAthanVoice(alerts, fajrOnly, VOICES);
+        expect(next.fajr).toEqual({ ...alerts.fajr, voice: 'ayasofya-fajr' });
+        for (const p of PRAYERS) if (p !== 'fajr') expect(next[p]).toEqual(alerts[p]);
+        expect(chosenAthanVoiceIds(next, VOICES).has('ayasofya-fajr')).toBe(true);
+      }),
+      { numRuns: runs(100) },
+    );
   });
 });
 

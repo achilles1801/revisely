@@ -660,6 +660,10 @@ export default function DashboardScreen() {
             setQiblaOpen(false);
             navigation.navigate('PrayerCalculation');
           }}
+          onOpenVoice={(prayer) => {
+            setQiblaOpen(false);
+            navigation.navigate('AthanVoice', { prayer });
+          }}
         />
       ) : (
         <QiblaSheet visible={qiblaOpen} onClose={() => setQiblaOpen(false)} />

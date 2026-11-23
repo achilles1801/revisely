@@ -232,8 +232,13 @@ current basic sounds". October 2026's version was removed for the voices it offe
   as an iPhone notification can play one (its first 30 seconds). A reminder before the prayer keeps the standard
   tone. Silent mode and Focus are the phone's, as for any notification.
 - **ATHAN-2.** A voice is chosen for every prayer at once (Settings → Prayer → Athan voice), which leaves which
-  prayers play the athan as they are, or for one prayer from its sound, which sets that prayer to the athan. Fajr
-  takes the voice's own Fajr athan when the voice has one.
+  prayers play the athan as they are, or for one prayer from its sound, which sets that prayer to the athan. A
+  prayer's sound is reached from Prayer notifications and from the prayer sheet's times (a prayer's row). Fajr
+  takes the voice's own Fajr athan when the voice has one. The voices are one list (Majd, Nov 23 2026: "there
+  should be just one consolidated list for all the athan options people can choose from"): every voice in it can
+  be chosen, and a row shows the voice's name and its size only. A Fajr athan with no voice of its own style is
+  in the list as Fajr's alone: chosen for every prayer it changes Fajr only, and a picker opened from another
+  prayer leaves it out.
 - **ATHAN-3.** A prayer's notification never goes quiet for the athan's sake. Until its voice has downloaded, after
   it is removed or withdrawn, with no voice chosen, and wherever the athan isn't offered (the store app, Android), a
   prayer set to the athan plays the standard tone.

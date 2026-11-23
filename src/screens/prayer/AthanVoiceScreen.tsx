@@ -13,7 +13,6 @@ import {
   cancelAthanDownload,
   deleteAthanVoice,
   downloadAthanVoice,
-  fajrVariant,
   formatAthanSize,
   useAthanCatalog,
   useAthanVoiceState,
@@ -23,24 +22,16 @@ import { setPrayerPrefs, usePrayerPrefs } from '../../lib/prayer/prefs';
 import { TIME_LABELS } from '../../lib/prayer/times';
 import type { HomeStackParamList } from '../../navigation/MainNavigator';
 import { t } from '../../i18n';
-import { athanChoices, athanVoiceFor, athanVoicesFor, chosenAthanVoiceId, withAthanVoice } from '../../lib/prayer/athanChoice';
+import { athanChoices, athanDownloadsFor, chosenAthanVoiceIds, withAthanVoice } from '../../lib/prayer/athanChoice';
 import { useAthanPreview } from '../../components/prayer/useAthanPreview';
-
-export const RIGHTS_EMAIL = 'support@revisely.app';
-
-/** mailto: for "Report a rights issue" about a voice. */
-export function rightsIssueUrl(voice: AthanVoice): string {
-  const subject = `Athan voice rights issue: ${voice.name} (${voice.id})`; // i18n-ignore (an email to support, in English)
-  const body = `Voice: ${voice.name} (${voice.id})\nCredit: ${voice.credit}\n\nWhat's the issue?\n`; // i18n-ignore (the same email)
-  return `mailto:${RIGHTS_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-}
 
 /**
  * Settings → Prayer → Athan voice (Revisely Dev, iPhone): the voice a prayer set to Athan plays at its
  * time. One tap chooses a voice for every prayer, or for the one prayer the picker was opened from
  * (which is then set to Athan), and downloads its clip; a prayer plays the standard tone until then.
- * Fajr takes the voice's Fajr athan when it has one. Each voice can be listened to; its credit is
- * shown, and its menu has the licence, where it's from and "Report a rights issue".
+ * Fajr takes the voice's Fajr athan when it has one; a Fajr athan listed by itself is Fajr's alone.
+ * One list (Majd, Nov 23 2026), each row the voice's name and its clip's size, with a play button to
+ * listen and a menu (where it's from, its download).
  */
 export default function AthanVoiceScreen() {
   const navigation = useNavigation();
@@ -50,16 +41,15 @@ export default function AthanVoiceScreen() {
   const { voices, loading, error } = useAthanCatalog();
   const preview = useAthanPreview();
   const [menu, setMenu] = useState<AthanVoice | null>(null);
-  const { choices, listenOnly } = athanChoices(voices);
   // Opened from one prayer's sound (Prayer notifications): the choice is that prayer's alone.
   const prayer = useRoute<RouteProp<HomeStackParamList, 'AthanVoice'>>().params?.prayer;
-  const chosen = chosenAthanVoiceId(prefs.alerts, voices, prayer);
+  const choices = athanChoices(voices, prayer);
+  const chosen = chosenAthanVoiceIds(prefs.alerts, voices, prayer);
 
   const choose = (voice: AthanVoice) => {
     setPrayerPrefs({ alerts: withAthanVoice(prefs.alerts, voice, voices, prayer) });
     // A prayer plays the standard tone until its voice has downloaded.
-    const ids = prayer ? [athanVoiceFor(prayer, voice, voices)] : Object.values(athanVoicesFor(voice, voices));
-    for (const id of new Set(ids)) downloadAthanVoice(id).catch(() => undefined);
+    for (const id of athanDownloadsFor(voice, voices, prayer)) downloadAthanVoice(id).catch(() => undefined);
   };
 
   return (
@@ -73,16 +63,12 @@ export default function AthanVoiceScreen() {
             {error ?? t('prayer.athan.loading')}
           </Text>
         ) : null}
-        <GroupedSection
-          header={t('prayer.athan.voices')}
-          footer={prayer ? t('prayer.athan.footerOne', { name: TIME_LABELS[prayer].en }) : t('prayer.athan.footerAll')}
-        >
+        <GroupedSection header={t('prayer.athan.voices')} footer={t('prayer.athan.footer')}>
           {choices.map((v) => (
             <VoiceRow
               key={v.id}
               voice={v}
-              fajr={prayer && prayer !== 'fajr' ? null : fajrVariant(v, voices)}
-              selected={v.id === chosen}
+              selected={chosen.has(v.id)}
               playing={preview.playing === v.id}
               onPress={() => choose(v)}
               onPreview={() => preview.toggle(v)}
@@ -90,103 +76,60 @@ export default function AthanVoiceScreen() {
             />
           ))}
         </GroupedSection>
-        {listenOnly.length > 0 ? (
-          <GroupedSection header={t('prayer.athan.listen')} footer={t('prayer.athan.listenFooter')}>
-            {listenOnly.map((v) => (
-              <VoiceRow
-                key={v.id}
-                voice={v}
-                fajr={null}
-                playing={preview.playing === v.id}
-                onPreview={() => preview.toggle(v)}
-                onMenu={() => setMenu(v)}
-              />
-            ))}
-          </GroupedSection>
-        ) : null}
       </ScrollView>
       <VoiceMenu voice={menu} onClose={() => setMenu(null)} />
     </View>
   );
 }
 
-function stateLine(voice: AthanVoice, state: ReturnType<typeof useAthanVoiceState>, choosable: boolean): string {
-  if (!choosable) return voice.fajr ? t('prayer.athan.fajrListenOnly') : t('prayer.athan.listenOnly');
-  switch (state.status) {
-    case 'ready':
-      return t('prayer.athan.downloaded');
-    case 'downloading':
-      return t('prayer.athan.downloading', { percent: Math.round(state.progress * 100) });
-    default: {
-      if (state.error) return state.error;
-      const size = formatAthanSize(voice.clip?.bytes ?? null);
-      return size ? t('prayer.athan.downloadsWhenChosenSize', { size }) : t('prayer.athan.downloadsWhenChosen');
-    }
-  }
+/** A row's second line: the clip's size ("338 KB"); its progress while it downloads; why a download failed. */
+function stateLine(voice: AthanVoice, state: ReturnType<typeof useAthanVoiceState>): string {
+  if (state.status === 'downloading') return t('prayer.athan.downloading', { percent: Math.round(state.progress * 100) });
+  if (state.status === 'missing' && state.error) return state.error;
+  return formatAthanSize(voice.clip?.bytes ?? null) ?? '';
 }
 
 function VoiceRow({
   voice,
-  fajr,
-  selected = false,
+  selected,
   playing,
   onPress,
   onPreview,
   onMenu,
 }: {
   voice: AthanVoice;
-  /** Its style's Fajr athan, used for Fajr. */
-  fajr: AthanVoice | null;
-  selected?: boolean;
+  selected: boolean;
   playing: boolean;
-  /** Choosing it (absent: listen only). */
-  onPress?: () => void;
+  onPress: () => void;
   onPreview: () => void;
   onMenu: () => void;
 }) {
   const { palette } = useTheme();
   const state = useAthanVoiceState(voice.id);
-  const choosable = onPress != null;
   const failed = state.status === 'missing' && !!state.error;
-  const meta = [stateLine(voice, state, choosable), fajr && fajr.id !== voice.id ? t('prayer.athan.withFajr') : null]
-    .filter(Boolean)
-    .join(' · ');
-  const body = (
-    <>
-      {choosable ? (
-        <View style={styles.check}>
-          {selected ? <Ionicons name="checkmark" size={22} color={palette.accentText} /> : null}
-        </View>
-      ) : null}
-      <View style={styles.text}>
-        <Text style={[typeV2.body, styles.name, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
-          {voice.name}
-        </Text>
-        <Text style={[typeV2.meta, { color: failed ? palette.red : palette.secondary }]} maxFontSizeMultiplier={1.4}>
-          {meta}
-        </Text>
-        <Text style={[typeV2.meta, { color: palette.secondary }]} numberOfLines={2} maxFontSizeMultiplier={1.4}>
-          {voice.credit}
-        </Text>
-      </View>
-    </>
-  );
+  const meta = stateLine(voice, state);
   return (
     <View style={styles.row} testID={`athan-voice-${voice.id}`}>
-      {choosable ? (
-        <Tap
-          onPress={onPress}
-          style={styles.choose}
-          accessibilityRole="radio"
-          accessibilityState={{ checked: selected }}
-          accessibilityLabel={`${voice.name}. ${meta}`}
-          testID={`athan-choose-${voice.id}`}
-        >
-          {body}
-        </Tap>
-      ) : (
-        <View style={styles.choose}>{body}</View>
-      )}
+      <Tap
+        onPress={onPress}
+        style={styles.choose}
+        accessibilityRole="radio"
+        accessibilityState={{ checked: selected }}
+        accessibilityLabel={meta ? `${voice.name}. ${meta}` : voice.name}
+        testID={`athan-choose-${voice.id}`}
+      >
+        <View style={styles.check}>{selected ? <Ionicons name="checkmark" size={22} color={palette.accentText} /> : null}</View>
+        <View style={styles.text}>
+          <Text style={[typeV2.body, styles.name, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
+            {voice.name}
+          </Text>
+          {meta ? (
+            <Text style={[typeV2.meta, { color: failed ? palette.red : palette.secondary }]} maxFontSizeMultiplier={1.4}>
+              {meta}
+            </Text>
+          ) : null}
+        </View>
+      </Tap>
       <Tap
         onPress={onPreview}
         hitSlop={6}
@@ -211,7 +154,7 @@ function VoiceRow({
   );
 }
 
-/** A voice's credit and links, its download, and the takedown path. */
+/** A voice's credit and links, and its download. */
 function VoiceMenu({ voice, onClose }: { voice: AthanVoice | null; onClose: () => void }) {
   const [shown, setShown] = useState<AthanVoice | null>(voice);
   if (voice && voice !== shown) setShown(voice);
@@ -239,12 +182,6 @@ function VoiceMenu({ voice, onClose }: { voice: AthanVoice | null; onClose: () =
       onPress: () => deleteAthanVoice(shown.id),
     });
   }
-  actions.push({
-    key: 'report',
-    label: t('prayer.athan.report'),
-    icon: 'flag-outline',
-    onPress: () => Linking.openURL(rightsIssueUrl(shown)),
-  });
   return (
     <ActionSheet
       visible={voice != null}
@@ -260,14 +197,14 @@ function VoiceMenu({ voice, onClose }: { voice: AthanVoice | null; onClose: () =
 const styles = StyleSheet.create({
   container: { flex: 1 },
   status: { paddingHorizontal: layoutV2.gutter, paddingTop: 12 },
-  row: { flexDirection: 'row', alignItems: 'center', paddingRight: layoutV2.gutter - 6 },
+  row: { flexDirection: 'row', alignItems: 'center', paddingEnd: layoutV2.gutter - 6 },
   choose: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 64,
-    paddingVertical: 10,
-    paddingLeft: layoutV2.gutter,
+    minHeight: 56,
+    paddingVertical: 8,
+    paddingStart: layoutV2.gutter,
   },
   check: { width: 30 },
   text: { flex: 1, minWidth: 0, gap: 2 },
