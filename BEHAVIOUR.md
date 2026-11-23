@@ -351,6 +351,13 @@ current basic sounds". October 2026's version was removed for the voices it offe
   Back from a page returns to the first level. A Settings section opened from elsewhere (Revo's card, Insights' "Turn on
   Smart Tracking") opens the page that holds it. No setting was removed or changed by the move; the rows look as they
   did (flat rows, the theme's colours).
+- **SET-5.** (Revisely Dev until on-device Recite ships) Settings → About → Licences opens the Quran Muaalem License in
+  full, word for word, with no network: Revisely's recitation model is derived from Quran Muaalem's, and a copy of the
+  model on the phone must carry the licence ("Every distribution of the Work or Derivative Works must reproduce this
+  License in full", section 2.4). One quiet row and the licence's own text, nothing else (Majd, Nov 23 2026: "super
+  subtle like a singular button that takes them to the page with the license"). The AI notice the licence asks for is
+  unchanged: before the first take and from About, in English and always in Arabic, the app's only interface
+  languages.
 
 ## Tabs
 

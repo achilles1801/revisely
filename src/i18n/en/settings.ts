@@ -307,6 +307,8 @@ export const settings = {
     reciteNoticeTitle: 'Recitation check',
     privacy: 'Privacy Policy',
     terms: 'Terms of Service',
+    /** The row and the page with the recitation model's licence in full (SET-5). */
+    licences: 'Licences',
     /** At the foot of Settings: "Revisely · v1.0.4". */
     version: 'Revisely · v{{version}}',
   },
