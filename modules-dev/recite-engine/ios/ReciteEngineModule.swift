@@ -71,6 +71,43 @@ public class ReciteEngineModule: Module {
         promise.resolve(result)
       }
     }
+
+    // ---- The pack (BEHAVIOUR.md ONDEV-2, ONDEV-3). JS only ever holds the wrapped key; the key itself stays in here.
+
+    /// This phone's public key, made on first use: the private half never leaves the Keychain.
+    AsyncFunction("packPublicKey") { (promise: Promise) in
+      DispatchQueue.global(qos: .utility).async {
+        do {
+          promise.resolve(["publicKey": try RecitePackKey.publicKeyBase64(), "keyFormat": "pkcs1"])
+        } catch {
+          promise.reject("ERR_PACK_KEY", "\(error)")
+        }
+      }
+    }
+
+    /// Keeps the pack's wrapped key beside its parts.
+    AsyncFunction("packSaveKey") { (dir: String, wrappedKey: String, promise: Promise) in
+      DispatchQueue.global(qos: .utility).async {
+        do {
+          try RecitePackStore.saveKey(dir: ReciteEngineModule.plainPath(dir), wrappedBase64: wrappedKey)
+          promise.resolve(nil)
+        } catch {
+          promise.reject("ERR_PACK_KEY", "\(error)")
+        }
+      }
+    }
+
+    /// Decrypts a downloaded part and checks everything in it, keeping none of it.
+    AsyncFunction("packVerify") { (dir: String, packId: String, part: String, promise: Promise) in
+      DispatchQueue.global(qos: .utility).async {
+        do {
+          try RecitePackStore.verify(dir: ReciteEngineModule.plainPath(dir), packId: packId, part: part)
+          promise.resolve(["ok": true])
+        } catch {
+          promise.resolve(["ok": false, "error": "\(error)"])
+        }
+      }
+    }
   }
 
   /// file:// URIs from expo-file-system to plain paths.
